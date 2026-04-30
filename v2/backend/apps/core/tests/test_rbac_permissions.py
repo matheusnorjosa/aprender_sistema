@@ -52,13 +52,13 @@ class TestRBACConstants(TestCase):
 
     def test_funcao_groups_contains_expected_funcoes(self):
         """FUNCAO_GROUPS deve conter todas as funções esperadas."""
-        expected_funcoes = ["Formador", "Coordenador", "Apoio de Coordenação", "Gerente"]
+        expected_funcoes = ["Formador", "Coordenador", "Apoio de Coordenação", "Gerente", "Assistente Administrativo"]
         for funcao in expected_funcoes:
             self.assertIn(funcao, FUNCAO_GROUPS, f"Função '{funcao}' não encontrada em FUNCAO_GROUPS")
 
     def test_funcao_groups_count(self):
-        """FUNCAO_GROUPS deve ter exatamente 4 funções."""
-        self.assertEqual(len(FUNCAO_GROUPS), 4)
+        """FUNCAO_GROUPS deve ter exatamente 5 funções (PR 3 hardening RBAC, 2026-04-29: +Assistente Administrativo)."""
+        self.assertEqual(len(FUNCAO_GROUPS), 5)
 
     def test_no_overlap_between_setor_and_funcao(self):
         """Não deve haver sobreposição entre SETOR_GROUPS e FUNCAO_GROUPS."""
@@ -129,8 +129,12 @@ class TestCanApproveSuperLogic(TestCase):
         self.assertIn("Gerente", response.data["funcoes"])
         self.assertIn("Superintendência", response.data["setores"])
 
-    def test_dat_can_approve_super(self):
-        """DAT pode aprovar SUPER (PA-02 Adaptada)."""
+    def test_dat_cannot_approve_super(self):
+        """PR 3 hardening RBAC (2026-04-29): DAT NÃO aprova mais.
+
+        Regra antiga (PA-02 Adaptada) incluía DAT; após PR 3 a regra é
+        composite Setor × Função (Gerente Sup OU Asst Admin Controle).
+        """
         user = self._create_user_with_groups(
             "gerente_dat",
             setores=["DAT"],
@@ -140,9 +144,7 @@ class TestCanApproveSuperLogic(TestCase):
         response = self.client.get("/api/me/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.data["can_approve_super"])
-        self.assertIn("Gerente", response.data["funcoes"])
-        self.assertIn("DAT", response.data["setores"])
+        self.assertFalse(response.data["can_approve_super"])
 
     def test_gerente_controle_cannot_approve_super(self):
         """Gerente de Controle NÃO pode aprovar SUPER."""
@@ -157,8 +159,8 @@ class TestCanApproveSuperLogic(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.data["can_approve_super"])
 
-    def test_formador_superintendencia_can_approve_super(self):
-        """Superintendência pode aprovar SUPER mesmo como Formador."""
+    def test_formador_superintendencia_cannot_approve_super(self):
+        """PR 3 hardening RBAC: Sup + Formador NÃO aprova (precisa Função Gerente)."""
         user = self._create_user_with_groups(
             "formador_super",
             setores=["Superintendência"],
@@ -168,12 +170,10 @@ class TestCanApproveSuperLogic(TestCase):
         response = self.client.get("/api/me/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.data["can_approve_super"])
-        self.assertIn("Superintendência", response.data["setores"])
-        self.assertIn("Formador", response.data["funcoes"])
+        self.assertFalse(response.data["can_approve_super"])
 
-    def test_coordenador_superintendencia_can_approve_super(self):
-        """Superintendência pode aprovar SUPER mesmo como Coordenador."""
+    def test_coordenador_superintendencia_cannot_approve_super(self):
+        """PR 3 hardening RBAC: Sup + Coordenador NÃO aprova."""
         user = self._create_user_with_groups(
             "coord_super",
             setores=["Superintendência"],
@@ -183,14 +183,27 @@ class TestCanApproveSuperLogic(TestCase):
         response = self.client.get("/api/me/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.data["can_approve_super"])
+        self.assertFalse(response.data["can_approve_super"])
 
-    def test_apoio_superintendencia_can_approve_super(self):
-        """Superintendência pode aprovar SUPER mesmo como Apoio."""
+    def test_apoio_superintendencia_cannot_approve_super(self):
+        """PR 3 hardening RBAC: Sup + Apoio de Coordenação NÃO aprova."""
         user = self._create_user_with_groups(
             "apoio_super",
             setores=["Superintendência"],
             funcoes=["Apoio de Coordenação"],
+        )
+        self.client.force_authenticate(user=user)
+        response = self.client.get("/api/me/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["can_approve_super"])
+
+    def test_asst_admin_controle_can_approve_super(self):
+        """PR 3 hardening RBAC: Controle + Assistente Administrativo aprova."""
+        user = self._create_user_with_groups(
+            "asst_admin_controle",
+            setores=["Controle"],
+            funcoes=["Assistente Administrativo"],
         )
         self.client.force_authenticate(user=user)
         response = self.client.get("/api/me/")

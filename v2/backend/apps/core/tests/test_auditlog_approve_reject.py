@@ -24,7 +24,8 @@ pytestmark = pytest.mark.django_db
 
 @pytest.fixture
 def super_user():
-    """Cria usuário com permissões de Superintendência (xdist-safe)."""
+    """Gerente da Superintendência (PR 3 hardening RBAC, 2026-04-29):
+    composite Setor `Superintendência` + Função `Gerente`."""
     import uuid
 
     uid = uuid.uuid4().hex[:8]
@@ -34,8 +35,9 @@ def super_user():
         password="testpass",
         cpf=f"999{uid.ljust(8, '0')}",
     )
-    group, _ = Group.objects.get_or_create(name="Superintendência")
-    user.groups.add(group)
+    grupo_setor, _ = Group.objects.get_or_create(name="Superintendência")
+    grupo_funcao, _ = Group.objects.get_or_create(name="Gerente")
+    user.groups.add(grupo_setor, grupo_funcao)
     return user
 
 

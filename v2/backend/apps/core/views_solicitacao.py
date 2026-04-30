@@ -35,7 +35,7 @@ from .api_schemas import (
 )
 from .models import AuditLog, Solicitacao
 from .permissions import HasPerm, IsOwnerOrPrivileged
-from .rbac.policies import CanUseGcal
+from .rbac.policies import CanAccessSolicitationApprovals, CanUseGcal
 from .serializers import SolicitacaoSerializer
 from .services.solicitacao_approval import (
     approve_solicitacao,
@@ -608,7 +608,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     @action(
         detail=True,
         methods=["patch"],
-        permission_classes=[HasPerm("approve_solicitation")],
+        permission_classes=[CanAccessSolicitationApprovals],
         url_path="approve",
     )
     def approve(self, request, pk=None):
@@ -646,7 +646,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     @action(
         detail=True,
         methods=["patch"],
-        permission_classes=[HasPerm("approve_solicitation")],
+        permission_classes=[CanAccessSolicitationApprovals],
         url_path="reject",
     )
     def reject(self, request, pk=None):
@@ -812,7 +812,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     @action(
         detail=False,
         methods=["post"],
-        permission_classes=[HasPerm("approve_solicitation")],
+        permission_classes=[CanAccessSolicitationApprovals],
         url_path="batch-approve",
     )
     def batch_approve(self, request):
@@ -848,7 +848,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     @action(
         detail=False,
         methods=["post"],
-        permission_classes=[HasPerm("approve_solicitation")],
+        permission_classes=[CanAccessSolicitationApprovals],
         url_path="batch-reject",
     )
     def batch_reject(self, request):

@@ -52,6 +52,8 @@ import {
   rejectSolicitacoesBatch,
 } from '../../api/solicitacoes';
 import { getMe } from '../../api/availability';
+import { getMyPolicies } from '../../api/me';
+import { computeAccess } from '../../hooks/useCanAccess';
 import { TIMING } from '../../constants/timing';
 import { usePolling } from '../../hooks/usePolling';
 import { syncChannel } from '../../services/syncChannel';
@@ -146,21 +148,26 @@ export default function ApprovalsPage(): JSX.Element {
     return () => { unsub1(); unsub2(); };
   }, [loadData]);
 
-  // PA-06: Carregar dados do usuário e verificar permissão
+  // PA-06 + PR 3 hardening RBAC (2026-04-29): preferir policy pública
+  // `access_solicitation_approvals` (Gerente Sup OU Asst Admin Controle).
+  // Mantém `can_approve_super` como fallback compat durante a transição.
   useEffect(() => {
-    const loadUser = async (): Promise<void> => {
+    const loadAccess = async (): Promise<void> => {
       try {
-        const userData = await getMe();
-
-        // Usar can_approve_super da API (Superintendência/DAT ou superuser)
-        // A API já calcula: is_superuser || Superintendência || DAT
-        setCanApprove(userData?.can_approve_super || false);
+        const [userData, policies] = await Promise.all([
+          getMe(),
+          getMyPolicies().catch(() => [] as string[]),
+        ]);
+        const access = computeAccess(policies, {
+          canApproveSuper: userData?.can_approve_super || false,
+        });
+        setCanApprove(access.canAccessApprovals);
       } catch (error) {
         logger.error('Erro ao carregar usuário:', error);
         setCanApprove(false);
       }
     };
-    loadUser();
+    loadAccess();
   }, []);
 
   // Issue #260: Memoizar handlers para evitar re-renderização desnecessária

@@ -76,7 +76,8 @@ def usuario_gerente_superintendencia(grupos):
 
 @pytest.fixture
 def usuario_superintendencia(grupos):
-    """User with Superintendência role."""
+    """Gerente da Superintendência (PR 3 hardening RBAC, 2026-04-29):
+    composite Setor `Superintendência` + Função `Gerente`."""
     uid = uuid4().hex[:8]
     user = Usuario.objects.create_user(
         username=f"super_{uid}",
@@ -84,7 +85,7 @@ def usuario_superintendencia(grupos):
         cpf=str(uuid4().int % 10**11).zfill(11),
         email=f"super_{uid}@test.com",
     )
-    user.groups.add(grupos["Superintendência"])
+    user.groups.add(grupos["Superintendência"], grupos["Gerente"])
     return user
 
 

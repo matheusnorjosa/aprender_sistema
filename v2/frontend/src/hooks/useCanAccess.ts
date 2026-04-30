@@ -44,8 +44,12 @@ export interface AccessState {
   // Migrar = trocar OR aqui.
 
   /**
-   * Pode acessar fila de aprovações (Superintendência + Gerente).
-   * Hoje: legacy.canApproveSuper (composite role). Futuro: `approve_solicitation` policy.
+   * Pode acessar fila de aprovações.
+   * Composite Setor × Função aprovado em PR 3 hardening RBAC (2026-04-29):
+   * Gerente da Superintendência OU Assistente Administrativo do Controle.
+   * Fonte de verdade: policy pública `access_solicitation_approvals`.
+   * `legacy.canApproveSuper` permanece como fallback compat durante a
+   * transição para clientes que ainda não consomem `/api/me/policies/`.
    */
   canAccessApprovals: boolean;
 
@@ -81,8 +85,7 @@ export function computeAccess(
   const can = (key: string): boolean => policySet.has(key);
 
   const canAccessApprovals =
-    can('approve_solicitation') ||           // Reservado Epic 4.6 — hoje sempre false
-    can('approve_solicitation_batch') ||     // idem
+    can('access_solicitation_approvals') ||   // PR 3 hardening RBAC (2026-04-29)
     legacy.canApproveSuper === true;
 
   const canAccessBlocks =

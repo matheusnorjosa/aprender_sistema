@@ -56,10 +56,17 @@ class TestUsuarioOptionsNoEmail(TestCase):
 
 
 class TestUsuarioLookupNoEmail(TestCase):
-    """SEC-ENUM-01: /api/lookup/usuarios/ must not return email field."""
+    """SEC-ENUM-01: /api/lookup/usuarios/ must not return email field.
+
+    PR 5 hardening RBAC (2026-04-30): endpoint deixou de ser
+    `IsAuthenticated`. User precisa ter cap legítima — usamos Coordenador
+    (cap `create_solicitation`) para validar SEC-ENUM-01.
+    """
 
     def setUp(self):
+        coord_group, _ = Group.objects.get_or_create(name="Coordenador")
         self.user = User.objects.create_user("lookup_test", "lookup@test.com", "pass1234", cpf=_next_cpf())
+        self.user.groups.add(coord_group)
         User.objects.create_user(
             "lookup_target", "target@secret.com", "pass1234", first_name="Maria", last_name="Silva", cpf=_next_cpf()
         )
@@ -116,13 +123,13 @@ class TestEmailSearchRestriction(TestCase):
 
         self.client = APIClient()
 
-    def test_formador_cannot_search_by_email(self):
-        """Formador searching by email should not find the user."""
+    def test_formador_cannot_lookup_at_all(self):
+        """PR 5 hardening RBAC: Formador NÃO acessa o endpoint
+        (regra anterior — busca por email retornar lista vazia — foi
+        substituída por capability gate; Formador recebe 403)."""
         self.client.force_authenticate(user=self.formador)
         response = self.client.get("/api/lookup/usuarios/?q=distinct.email")
-        data = response.json()
-        # Should not find user by email
-        assert len(data) == 0, f"Formador should not find users by email search: {data}"
+        assert response.status_code == 403, f"Formador deveria receber 403 após PR 5, recebeu {response.status_code}"
 
     def test_coordenador_can_search_by_email(self):
         """Coordenador searching by email should find the user."""
@@ -131,12 +138,12 @@ class TestEmailSearchRestriction(TestCase):
         data = response.json()
         assert len(data) > 0, "Coordenador should find users by email search"
 
-    def test_formador_can_search_by_name(self):
-        """Formador can still search by name."""
+    def test_formador_cannot_search_by_name_either(self):
+        """PR 5 hardening RBAC: Formador também perde a busca por nome
+        (gate é no endpoint inteiro, não só na coluna de email)."""
         self.client.force_authenticate(user=self.formador)
         response = self.client.get("/api/lookup/usuarios/?q=Ana")
-        data = response.json()
-        assert len(data) > 0, "Formador should find users by name search"
+        assert response.status_code == 403
 
 
 # ================================================================

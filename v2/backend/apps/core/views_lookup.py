@@ -22,6 +22,8 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.permissions import HasPerm
+from apps.core.rbac.helpers import user_has_any_perm
 from apps.core.services.normalize import norm_text
 
 from .models import Municipio, Projeto, TipoEvento, Usuario
@@ -183,14 +185,36 @@ class UsuarioLookup(APIView):
     GET /api/lookup/usuarios/?q=maria&role=formador
     Retorna: [{id, label, kind: "usuario"}]
 
-    SEC-ENUM-01: email removed from response to prevent user enumeration.
-    SEC-ENUM-02: email search restricted to Coordenador+ roles.
+    PR 5 hardening RBAC (2026-04-30):
+    - Capability gate: somente perfis com motivo legítimo (criar
+      solicitação OU administrar cadastros) listam usuários.
+    - Não usa hardcode de grupos.
+
+    SEC-ENUM-01: email permanece fora do payload (anti-enumeração).
+    SEC-ENUM-02: busca por email/username é cap-gated, mantendo a matriz
+    via `user_has_any_perm`.
+
+    Consumidores legítimos confirmados (auditoria 2026-04-30):
+    - `NewSolicitacaoWizard` (Coord/Apoio/Gerente cria) →
+      `create_solicitation`
+    - `EditSolicitacaoPage` (owner ou privileged edita) →
+      `create_solicitation`
+    - DAT admin (admin geral / suporte) → `manage_admin_registries`
+
+    Aprovações, Controle/Operação e dashboards executivos não consomem
+    este endpoint, portanto `approve_solicitation_batch` e
+    `operate_preagenda` ficam fora do gate.
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [HasPerm("create_solicitation") | HasPerm("manage_admin_registries")]
 
-    # Roles allowed to search by email (SEC-ENUM-02)
-    _EMAIL_SEARCH_ROLES = {"Coordenador", "Gerente", "Superintendência", "Apoio"}
+    # Capabilities habilitadas a buscar por email/username (SEC-ENUM-02).
+    # Idêntico ao gate de leitura: quem tem motivo legítimo para usar o
+    # picker no fluxo de solicitação ou para admin de cadastros.
+    _EMAIL_SEARCH_CAPS: tuple[str, ...] = (
+        "create_solicitation",
+        "manage_admin_registries",
+    )
 
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         q = request.GET.get("q", "").strip()
@@ -199,9 +223,8 @@ class UsuarioLookup(APIView):
         # Começar com queryset base
         qs = Usuario.objects.filter(is_active=True)
 
-        # SEC-ENUM-02: only Coordenador+ can search by email/username
-        user_groups = set(request.user.groups.values_list("name", flat=True))
-        can_search_email = bool(request.user.is_superuser or user_groups & self._EMAIL_SEARCH_ROLES)
+        # SEC-ENUM-02 (cap-based, sem hardcode de grupo).
+        can_search_email = bool(request.user.is_superuser or user_has_any_perm(request.user, *self._EMAIL_SEARCH_CAPS))
 
         # Aplicar filtro de busca
         if q:

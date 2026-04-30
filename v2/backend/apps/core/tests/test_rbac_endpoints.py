@@ -52,8 +52,16 @@ def grupo_formador():
 
 
 @pytest.fixture
-def user_superintendencia(grupo_superintendencia):
-    """Usuário do grupo Superintendência."""
+def grupo_gerente():
+    """Função Gerente (PR 3, 2026-04-29 — composite Gerente+Sup aprova)."""
+    grupo, _ = Group.objects.get_or_create(name="Gerente")
+    return grupo
+
+
+@pytest.fixture
+def user_superintendencia(grupo_superintendencia, grupo_gerente):
+    """PR 3 hardening RBAC: composite Gerente da Superintendência (Setor
+    Superintendência + Função Gerente). Sup puro sem Função não aprova mais."""
     uid = uuid4().hex[:8]
     user = Usuario.objects.create_user(
         username=f"super_rbac_{uid}",
@@ -61,22 +69,14 @@ def user_superintendencia(grupo_superintendencia):
         password="testpass123",
         cpf=str(uuid4().int % 10**11).zfill(11),
     )
-    user.groups.add(grupo_superintendencia)
+    user.groups.add(grupo_superintendencia, grupo_gerente)
     return user
 
 
 @pytest.fixture
-def grupo_super_extra():
-    """Issue #1222 (Epic 1): Group Superintendência (compat com tests legacy de DAT approve)."""
-    group, _ = Group.objects.get_or_create(name="Superintendência")
-    return group
-
-
-@pytest.fixture
-def user_dat(grupo_dat, grupo_super_extra):
-    """Issue #1222 (Epic 1): user mantém nome 'dat' por compat, mas
-    ganha grupo Superintendência (que tem `approve_solicitation` no
-    seed realinhado) para preservar testes legacy de PA-02 'DAT pode aprovar'."""
+def user_dat(grupo_dat):
+    """PR 3 hardening RBAC: DAT NÃO aprova mais (regra anterior PA-02 Adaptada
+    foi descontinuada). Mantém o nome `user_dat` para os testes invertidos."""
     uid = uuid4().hex[:8]
     user = Usuario.objects.create_user(
         username=f"dat_rbac_{uid}",
@@ -84,7 +84,7 @@ def user_dat(grupo_dat, grupo_super_extra):
         password="testpass123",
         cpf=str(uuid4().int % 10**11).zfill(11),
     )
-    user.groups.add(grupo_dat, grupo_super_extra)
+    user.groups.add(grupo_dat)
     return user
 
 
@@ -181,29 +181,24 @@ class TestRBACApprovalEndpoints:
 
         assert response.status_code == status.HTTP_403_FORBIDDEN, f"Esperado 403, recebido {response.status_code}"
 
-    def test_dat_can_approve(self, solicitacao_pendente, user_dat):
-        """DAT pode aprovar (PA-02 Adaptada).
+    def test_dat_cannot_approve(self, solicitacao_pendente, user_dat):
+        """PR 3 hardening RBAC (2026-04-29): DAT NÃO aprova mais.
 
-        PA-02 foi adaptada para incluir DAT além de Superintendência.
-        Ver HasPerm("approve_solicitation") permission class.
+        Regra antiga (PA-02 Adaptada) incluía DAT; após PR 3, apenas
+        Gerente da Superintendência ou Assistente Administrativo do
+        Controle podem aprovar.
         """
         client = APIClient()
         client.force_authenticate(user=user_dat)
 
         response = client.patch(f"/api/solicitacoes/{solicitacao_pendente.id}/approve/")
 
-        assert response.status_code in (
-            status.HTTP_200_OK,
-            status.HTTP_204_NO_CONTENT,
-        ), f"DAT deve poder aprovar, recebido {response.status_code}"
+        assert (
+            response.status_code == status.HTTP_403_FORBIDDEN
+        ), f"DAT deve receber 403 em approve, recebido {response.status_code}"
 
-        # Verificar que status mudou para aprovado
-        solicitacao_pendente.refresh_from_db()
-        assert solicitacao_pendente.status == "aprovado"
-
-    def test_dat_can_reject(self, user_dat, user_formador):
-        """DAT pode reprovar (PA-02 Adaptada)."""
-        # Criar nova solicitação para este teste
+    def test_dat_cannot_reject(self, user_dat, user_formador):
+        """PR 3 hardening RBAC (2026-04-29): DAT NÃO reprova mais."""
         municipio, _ = Municipio.objects.get_or_create(nome="Fortaleza RBAC", defaults={"uf": "CE", "ativo": True})
         projeto, _ = Projeto.objects.get_or_create(
             nome="Projeto RBAC SUPER",
@@ -227,20 +222,15 @@ class TestRBACApprovalEndpoints:
 
         response = client.patch(
             f"/api/solicitacoes/{solicitacao.id}/reject/",
-            {"justificativa": "Reprovado pelo DAT"},
+            {"justificativa": "tentativa"},
         )
 
-        assert response.status_code in (
-            status.HTTP_200_OK,
-            status.HTTP_204_NO_CONTENT,
-        ), f"DAT deve poder reprovar, recebido {response.status_code}"
+        assert (
+            response.status_code == status.HTTP_403_FORBIDDEN
+        ), f"DAT deve receber 403 em reject, recebido {response.status_code}"
 
-        # Verificar que status mudou para reprovado
-        solicitacao.refresh_from_db()
-        assert solicitacao.status == "reprovado"
-
-    def test_superintendencia_can_approve(self, solicitacao_pendente, user_superintendencia):
-        """Superintendência pode aprovar (PA-02)."""
+    def test_gerente_superintendencia_can_approve(self, solicitacao_pendente, user_superintendencia):
+        """PR 3 hardening RBAC: Gerente da Superintendência aprova."""
         client = APIClient()
         client.force_authenticate(user=user_superintendencia)
 
@@ -249,10 +239,10 @@ class TestRBACApprovalEndpoints:
         assert response.status_code in (
             status.HTTP_200_OK,
             status.HTTP_204_NO_CONTENT,
-        ), f"Superintendência deve poder aprovar, recebido {response.status_code}"
+        ), f"Gerente Superintendência deve poder aprovar, recebido {response.status_code}"
 
-    def test_superintendencia_can_reject(self, user_superintendencia, user_formador):
-        """Superintendência pode reprovar (PA-02)."""
+    def test_gerente_superintendencia_can_reject(self, user_superintendencia, user_formador):
+        """PR 3 hardening RBAC: Gerente da Superintendência reprova."""
         # Criar nova solicitação para este teste
         municipio, _ = Municipio.objects.get_or_create(nome="Fortaleza RBAC", defaults={"uf": "CE", "ativo": True})
         projeto, _ = Projeto.objects.get_or_create(

@@ -39,6 +39,7 @@ def grupos():
         "Superintendência": Group.objects.get_or_create(name="Superintendência")[0],
         "Controle": Group.objects.get_or_create(name="Controle")[0],
         "DAT": Group.objects.get_or_create(name="DAT")[0],
+        "Gerente": Group.objects.get_or_create(name="Gerente")[0],
     }
     return grupos
 
@@ -55,11 +56,12 @@ def usuario_coordenador(grupos):
 
 @pytest.fixture
 def usuario_superintendencia(grupos):
-    """Usuário com perfil Superintendência."""
+    """Gerente da Superintendência (PR 3 hardening RBAC, 2026-04-29):
+    composite Setor `Superintendência` + Função `Gerente`."""
     user = Usuario.objects.create_user(
         username="super1", password="senha123", cpf="22222222222", email="super@test.com"
     )
-    user.groups.add(grupos["Superintendência"])
+    user.groups.add(grupos["Superintendência"], grupos["Gerente"])
     return user
 
 

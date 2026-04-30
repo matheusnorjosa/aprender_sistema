@@ -47,15 +47,13 @@ describe('computeAccess.canAccessApprovals — semantic translation layer', () =
     expect(access.canAccessApprovals).toBe(true);
   });
 
-  test('future public policy approve_solicitation present → true (Epic 4.6 ready)', () => {
-    // Reservado para quando Epic 4.6 introduzir policy pública. Hoje a key
-    // não existe em PUBLIC_POLICY_KEYS, mas o hook está pronto.
-    const access = computeAccess(['approve_solicitation'], {});
+  test('public policy access_solicitation_approvals present → true (PR 3 hardening RBAC)', () => {
+    const access = computeAccess(['access_solicitation_approvals'], {});
     expect(access.canAccessApprovals).toBe(true);
   });
 
-  test('future public policy approve_solicitation_batch present → true', () => {
-    const access = computeAccess(['approve_solicitation_batch'], {});
+  test('public policy access_solicitation_approvals overrides legacy=false', () => {
+    const access = computeAccess(['access_solicitation_approvals'], { canApproveSuper: false });
     expect(access.canAccessApprovals).toBe(true);
   });
 

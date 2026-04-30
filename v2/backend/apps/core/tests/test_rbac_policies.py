@@ -124,9 +124,17 @@ class TestMatrixIntegrity:
         assert not orphans, f"Keys órfãs em ACCESS_POLICIES (sem classe Can*): {sorted(orphans)}"
 
     def test_no_matrix_entry_is_empty(self):
-        """frozenset() vazio nunca dá acesso → sintoma de bug."""
-        empty = [k for k, caps in ACCESS_POLICIES.items() if not caps]
-        assert not empty, f"Policies com capabilities vazias: {empty}"
+        """frozenset() vazio nunca dá acesso → sintoma de bug.
+
+        Exceção: keys em `COMPOSITE_POLICY_KEYS` carregam frozenset() vazio
+        como sentinela porque sua semântica é composite Setor × Função (não
+        cabe em OR de capabilities). A lógica vive em helpers dedicados
+        despachados por `user_has_policy`.
+        """
+        from apps.core.rbac.policies import COMPOSITE_POLICY_KEYS
+
+        empty = [k for k, caps in ACCESS_POLICIES.items() if not caps and k not in COMPOSITE_POLICY_KEYS]
+        assert not empty, f"Policies com capabilities vazias (não-composite): {empty}"
 
     def test_matrix_values_are_frozensets(self):
         """Defensivo: impede dict drift para set/list que quebrariam imutabilidade."""

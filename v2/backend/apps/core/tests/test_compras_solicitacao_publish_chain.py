@@ -75,7 +75,10 @@ def test_happy_path_import_compra_create_solicitacao_approve_and_publish():
     user_dat = _create_user_in_group(prefix="dat_chain", group_name="DAT")
     user_controle = _create_user_in_group(prefix="controle_chain", group_name="Controle")
     user_coordenador = _create_user_in_group(prefix="coord_chain", group_name="Coordenador")
+    # PR 3 hardening RBAC (2026-04-29): aprovar exige composite Setor Sup + Função Gerente.
     user_super = _create_user_in_group(prefix="super_chain", group_name="Superintendência")
+    grupo_gerente, _ = Group.objects.get_or_create(name="Gerente")
+    user_super.groups.add(grupo_gerente)
 
     municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
     projeto = Projeto.objects.create(nome="Novo Lendo", codigo="NL", fluxo="SUPER", ativo=True)

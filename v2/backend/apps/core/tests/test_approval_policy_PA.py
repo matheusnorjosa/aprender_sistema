@@ -44,8 +44,9 @@ def usuario_comum(faker):
 
 @pytest.fixture
 def usuario_superintendencia(faker):
-    """Usuário do grupo Superintendência."""
-    # Python uuid4() is truly random (faker.uuid4() is seeded and generates duplicates!)
+    """Gerente da Superintendência (PR 3 hardening RBAC, 2026-04-29):
+    composite Setor `Superintendência` + Função `Gerente`. A regra antiga
+    (Setor sozinho aprovava via PA-02) foi descontinuada."""
     uid = uuid4().hex  # 32 chars hex, 128-bit entropy
     user = Usuario.objects.create_user(
         username=f"super_{uid}",
@@ -53,8 +54,9 @@ def usuario_superintendencia(faker):
         password="testpass",
         cpf=str(uuid4().int % 10**11).zfill(11),  # 11-digit CPF from UUID int
     )
-    grupo, _ = Group.objects.get_or_create(name="Superintendência")
-    user.groups.add(grupo)
+    grupo_setor, _ = Group.objects.get_or_create(name="Superintendência")
+    grupo_funcao, _ = Group.objects.get_or_create(name="Gerente")
+    user.groups.add(grupo_setor, grupo_funcao)
     return user
 
 

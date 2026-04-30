@@ -75,11 +75,22 @@ class ProjetoGeralOptionSerializer(serializers.ModelSerializer):
 class ProjetoSerializer(serializers.ModelSerializer):
     """
     Full serializer for Projeto model (Admin CRUD).
+
+    PR 7 hardening RBAC (2026-04-30): `fluxo` é obrigatório explicitamente
+    no payload da API. Antes o field model tinha `default="NAO_SUPER"`,
+    o que silenciosamente assumia esse valor quando ausente — o serializer
+    agora exige escolha explícita (`SUPER` ou `NAO_SUPER`) na criação. O
+    default do model permanece para uso interno (fixtures de teste, ORM
+    direto), mas a API/Admin não dependem mais dele.
     """
 
     gerencia_nome = serializers.CharField(source="gerencia.nome_setor", read_only=True, allow_null=True)
     setor = serializers.SerializerMethodField()
     projeto_geral_nome = serializers.CharField(source="projeto_geral.nome", read_only=True, allow_null=True)
+
+    # PR 7 (2026-04-30): explícito + required=True (não consome default do
+    # model). DRF respeita choices e devolve 400 com mensagem padrão.
+    fluxo = serializers.ChoiceField(choices=Projeto.FLUXO_CHOICES, required=True)
 
     def get_setor(self, obj: Projeto) -> str:
         """Retorna nome do setor (derivado de gerencia)."""

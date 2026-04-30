@@ -132,7 +132,16 @@ test.describe(
         superApi2.patch(`/api/solicitacoes/${solicitacao.id}/approve/`, { data: {} }),
       ]);
 
-      const logsRes = await superApi1.get(`/api/audit-logs/?action=APPROVE&model_name=Solicitacao`);
+      // PR 6 hardening RBAC (2026-04-30): `access_audit_logs` reduzida a
+      // DAT/Controle. Usa contexto DAT para a leitura — atores
+      // aprovadores (super_geral / super_e2e) perderam a cap mas o
+      // AuditLog continua gravado normalmente pelo backend.
+      const datApi = await createApiContext({
+        baseURL: baseURL!,
+        username: ROLE_CREDENTIALS.dat_e2e.username,
+        password: ROLE_CREDENTIALS.dat_e2e.password,
+      });
+      const logsRes = await datApi.get(`/api/audit-logs/?action=APPROVE&model_name=Solicitacao`);
       expect(logsRes.ok()).toBeTruthy();
       const logsData = (await logsRes.json()) as
         | { results?: Array<{ details: Record<string, unknown> }> }

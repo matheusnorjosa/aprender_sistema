@@ -59,10 +59,16 @@ test.describe(
       const check = await superApi.get(`/api/solicitacoes/${solicitacao.id}/`);
       expect(((await check.json()) as { status: string }).status).toBe('reprovado');
 
-      // PA-05: AuditLog registra justificativa
-      const logsRes = await superApi.get(
-        `/api/audit-logs/?action=REJECT&model_name=Solicitacao`
-      );
+      // PA-05: AuditLog registra justificativa.
+      // PR 6 hardening RBAC (2026-04-30): `access_audit_logs` reduzida a
+      // DAT/Controle. Usa contexto DAT para ler o log (super_geral perdeu
+      // a cap mas ainda é o ator que reprova — o audit é gravado igual).
+      const datApi = await createApiContext({
+        baseURL: baseURL!,
+        username: ROLE_CREDENTIALS.dat_e2e.username,
+        password: ROLE_CREDENTIALS.dat_e2e.password,
+      });
+      const logsRes = await datApi.get(`/api/audit-logs/?action=REJECT&model_name=Solicitacao`);
       expect(logsRes.ok()).toBeTruthy();
       const logsData = (await logsRes.json()) as
         | { results?: Array<{ details: Record<string, unknown> }> }

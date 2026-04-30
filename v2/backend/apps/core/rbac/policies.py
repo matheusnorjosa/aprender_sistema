@@ -77,14 +77,15 @@ COMPOSITE_POLICY_KEYS: Final[frozenset[str]] = frozenset({"access_solicitation_a
 
 ACCESS_POLICIES: Final[dict[str, frozenset[str]]] = {
     # --- Solicitação / Audit ---
-    # AuditLog tem 4 motivos legítimos: auditar (Super/Gerente próprias e
-    # batch), operar (Controle), suportar (DAT). Confirmado Epic 1.6.
+    # PR 6 hardening RBAC (2026-04-30): policy reduzida a DAT (admin) +
+    # Controle (operação). Antes incluía `approve_solicitation` e
+    # `approve_solicitation_batch` (Sup, Gerente) — removidos para evitar
+    # liberação indevida a Gerente pedagógico e Sup pura. Auditoria por
+    # aprovador volta a ser escopo isolado se necessário em onda futura.
     "access_audit_logs": frozenset(
         {
             "manage_admin_registries",
             "operate_preagenda",
-            "approve_solicitation",
-            "approve_solicitation_batch",
         }
     ),
     # Transições GCal (publish/cancel/resync) — Controle (operação) +

@@ -44,7 +44,16 @@ Ver `RBAC_NAMING.md` para convenção de nomes (verbos canônicos, classe ↔ ke
 | Gerente | Supervisão, aprovação composta com Superintendência | Cross-sector (transversal) |
 | Coordenador | Cria solicitações, gerencia bloqueios próprios | Setor vinculado via `EquipeGerencia` |
 | Apoio de Coordenação | Mesma regra do Coordenador | Setor vinculado |
+| Assistente Administrativo | Função formal criada em PR 3 hardening RBAC (#1308). Combinada com Setor `Controle` libera aprovação de solicitações via `CanAccessSolicitationApprovals`. | Setor vinculado |
 | Formador | Declara próprio bloqueio (RD-02/03), participa de eventos | Próprios dados |
+
+### Composites Setor × Função (PR 3 hardening RBAC, 2026-04-29)
+
+| Composite | Setor | Função | Capacidade ganha |
+|-----------|-------|--------|------------------|
+| **Gerente da Superintendência** | `Superintendência` | `Gerente` | Aprovação de solicitações (individual + lote) |
+| **Assistente Administrativo do Controle** | `Controle` | `Assistente Administrativo` | Aprovação de solicitações (individual + lote) |
+| **Gerente pedagógico** | `Vidas` / `Fluir` / etc. (não-Sup) | `Gerente` | Cria/edita solicitação (`create_solicitation`); **não aprova** |
 
 ### Princípio "ator transversal"
 
@@ -68,12 +77,16 @@ Legenda:
 | **Dashboard GCal** (`/dashboards/gcal`) | 🔧 | ✅ (suportar) | ✅ (decidir) | ✅ (operar) | 🔒 | 🔒 | 🔒 |
 | **Mapa do Brasil** (`/mapa-brasil`) | 🔧 | ✅ (validar) | ✅ (decidir) | 🔒 | 🔒 | 🔒 | 🔒 |
 | **Grade Mensal** (`/api/availability/monthly/`) | 🔧 | ⚠️ scope | 🔒 | ✅ `view_all_availability` | ✅ `view_all_availability` | ⚠️ scope `EquipeGerencia` | 🔒 (não é grade — usa `/me/events`) |
-| **Aprovações** (`/solicitacoes/{id}/approve\|reject`) | 🔧 | 🔒 | ✅ Superintendência | 🔒 | ✅ batch (composite) | 🔒 | 🔒 |
+| **Aprovações** (`/solicitacoes/{id}/approve\|reject`, `/solicitacoes/batch-approve\|batch-reject`) | 🔧 | 🔒 | 🔒 (sem Função Gerente) | 🔒 (sem Função Asst Admin) | 🔒 (Gerente pedagógico) / ✅ composite Gerente da Sup / ✅ composite Asst Admin do Controle | 🔒 | 🔒 |
 | **Bloqueios** (`AvailabilityBlockViewSet`) | 🔧 | 🔒 | 🔒 | ⚠️ scope ampla | ⚠️ scope ampla | ⚠️ próprios + scope | ⚠️ apenas próprios (RD-02/03) |
 | **Deslocamentos** (`DeslocamentoViewSet`) | 🔧 | 🔒 | 🔒 | ✅ `view_all_availability` | ✅ `view_all_availability` | ⚠️ scope (Onda 1 — alinhar) | 🔒 |
 | **DAT Compras** (`DATCompraViewSet`) | 🔧 | ✅ `manage_purchases_and_materials` | ✅ dashboard | ✅ `manage_purchases_and_materials` | 🔒 | 🔒 | 🔒 |
 | **Reports** (`views_reports.py`) | 🔧 | ✅ `manage_admin_registries` | 🔒 | ✅ `operate_preagenda` | ✅ Super (auditar) | 🔒 | 🔒 |
-| **Admin Registries** (Municípios, Projetos, Produtos, etc.) | 🔧 | ✅ `manage_admin_registries` | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 |
+| **Admin Registries** (Municípios) | 🔧 | ✅ `manage_admin_registries` | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 |
+| **ProdutoViewSet — list/retrieve** (`GET /api/produtos/`) (PR 4 #1309) | 🔧 | ✅ `manage_admin_registries` | 🔒 | ✅ `run_daily_operations` / `manage_purchases_and_materials` | 🔒 | 🔒 (dropdowns: `/api/options/produtos/`) | 🔒 |
+| **Projeto — POST/PATCH** (`/api/projetos/`) (PR 7 #1312) | 🔧 | ✅ `manage_admin_registries` (com `fluxo` obrigatório) | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 |
+| **UsuarioLookup** (`GET /api/lookup/usuarios/`) (PR 5 #1310) | 🔧 | ✅ `manage_admin_registries` | 🔒 | 🔒 | ✅ `create_solicitation` | ✅ `create_solicitation` | 🔒 |
+| **AuditLogs** (`GET /api/audit-logs/`) (PR 6 #1311) | 🔧 | ✅ `manage_admin_registries` | 🔒 | ✅ `operate_preagenda` | 🔒 (PR 6: removidos `approve_solicitation*`) | 🔒 | 🔒 |
 | **Imports** (planilhas) | 🔧 | ✅ `import_spreadsheet` | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 |
 | **Ações Internas** (`CicloAcoes`, `AcaoInstancia`) | 🔧 | ✅ (Onda 1 — substituir `IsAdminUser`) | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 |
 | **Solicitações — Criar** (`POST /solicitacoes/`) | 🔧 | 🔒 (não é função de DAT) | 🔒 | 🔒 | ✅ `create_solicitation` | ✅ `create_solicitation` | 🔒 |
@@ -158,6 +171,12 @@ permission_classes = [IsAdminUser]                    # ❌ DRF built-in fora da
 | D7 | Dashboards = Diretoria + DAT + superuser only | 2026-04-26 | `project_rbac_invariants.md` — Controle não vê Dashboards (Onda 1 corrige `usePermissions` hardcoded) |
 | D8 | Formador, DAT e Diretoria **não acessam** Grade Mensal; Coord/Apoio só com `EquipeGerencia` ativa | 2026-04-28 (issue #1287) | Formador é caso especial RD-02/RD-03 (acessa só Meus Eventos + Bloqueios). DAT/Diretoria não têm motivo legítimo de consultar grade. Antes do fix, frontend `canDisponibilidade=!inControle` (lógica invertida) e backend `HasSectorAccess` retornava True sem `gerencia_id` — Formador via menu e abria página com 200. Reescrita como lista positiva no frontend + endurecimento no backend (sem `gerencia_id` exige vínculo de gerência) |
 | D9 | Grade Mensal — **DAT recebe** `view_all_availability` global; **Gerente perde** cap global e cai em scope via `EquipeGerencia` (igual Coord/Apoio) | 2026-04-28 (PR 2 RBAC hardening) | Refina D8: DAT é ator transversal admin (suporte/validação cross-setor) — motivo legítimo para grade global. Gerente pedagógico (ACerta, Vidas, Fluir, Brincando, Sou da Paz, Gestão Escolar) e Gerente da Superintendência devem ver apenas a própria gerência via `EquipeGerencia` — não devem receber visão global apenas por ter função "Gerente". Migration 0080 redistribui `view_all_availability` de `[Controle, Gerente]` para `[Controle, DAT]`. Diretoria mantém DENY (D8). Formador mantém DENY (D8). Distinção semântica entre subtipos de Gerente (pedagógico vs Sup vs DAT) fica em PR 8 (Matriz Viva escopo) |
+| D10 | Aprovação de solicitações = composite Setor × Função (Gerente da Sup OU Asst Admin do Controle) | 2026-04-29 (PR 3 #1308) | Consolidação da regra: PA-02 Adaptada (Sup OR DAT aprovavam) descontinuada. Após PR 3, `CanAccessSolicitationApprovals` exige composite Setor × Função. DAT/Sup pura/Gerente pedagógico não aprovam mais. Função formal `Assistente Administrativo` adicionada a `FUNCAO_GROUPS`. Policy nova `access_solicitation_approvals` em `PUBLIC_POLICY_KEYS`. |
+| D11 | ProdutoViewSet list/retrieve = capability gate (DAT/Controle) | 2026-04-30 (PR 4 #1309) | Endpoint estava em `IsAuthenticated` puro por bug em `get_permissions()` override. Composite `manage_admin_registries OR manage_purchases_and_materials OR run_daily_operations`. Dropdowns/selects de Coord/Apoio/Diretoria continuam via `/api/options/produtos/`. |
+| D12 | UsuarioLookup = capability gate, sem hardcode de grupos | 2026-04-30 (PR 5 #1310) | Endpoint era `IsAuthenticated` puro; SEC-ENUM-02 usava hardcode `_EMAIL_SEARCH_ROLES` (anti-pattern). Composition `create_solicitation OR manage_admin_registries`. SEC-ENUM-01 (email fora do payload) preservado. |
+| D13 | AuditLog policy reduzida a DAT (admin) + Controle (operação) | 2026-04-30 (PR 6 #1311) | Antes incluía `approve_solicitation` e `approve_solicitation_batch` (Sup, Gerente). Removidos: Gerente pedagógico, Sup pura e Gerente da Sup não acessam mais. Auditoria por aprovador volta como escopo isolado se necessário em onda futura. SEC-AUDIT-01 (PII redaction) preservado. |
+| D14 | Projeto.fluxo obrigatório explicitamente em criação | 2026-04-30 (PR 7 #1312) | Field tinha `default="NAO_SUPER"` que era aplicado silenciosamente quando ausente. Serializer + Admin form agora exigem `ChoiceField(required=True)` antes do DB. CheckConstraint preservado. Default no model preservado para fixtures internos. |
+| D15 | Matriz Viva expandida com atores composite e novos recursos | 2026-04-30 (PR 8 #TBD) | Atores `Gerente da Superintendência` e `Assistente Administrativo do Controle` adicionados ao `ACTOR_GROUPS`. Recursos `solicitacoes_batch_approve`, `produtos_list`, `usuario_lookup` adicionados a `RESOURCES`. Constante `ALLOW_PAYLOAD_INVALID = 400` adicionada para POSTs onde gate aprova mas payload é rejeitado por validação de serviço (não-RBAC). |
 
 ---
 

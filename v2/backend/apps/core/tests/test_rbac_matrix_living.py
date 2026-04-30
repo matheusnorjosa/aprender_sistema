@@ -25,8 +25,10 @@ from apps.core.rbac.matrix import (
     ACTOR_GROUPS,
     ACTORS,
     APOIO,
+    ASST_ADMIN_CONTROLE,
     COORDENADOR,
     GERENTE,
+    GERENTE_SUPER,
     RESOURCES,
     SUPERUSER,
     ResourceCase,
@@ -77,11 +79,15 @@ def _make_user_for_actor(actor: str) -> Usuario:
         group, _ = Group.objects.get_or_create(name=gname)
         user.groups.add(group)
 
-    # D8 + D9: Coord/Apoio/Gerente precisam de vínculo organizacional para passar HasSectorAccess.
-    if actor in (COORDENADOR, APOIO, GERENTE):
+    # D8 + D9 + PR 8: Coord/Apoio/Gerente* precisam de vínculo organizacional
+    # para passar HasSectorAccess na grade mensal.
+    if actor in (COORDENADOR, APOIO, GERENTE, GERENTE_SUPER):
+        # Setor da gerência segue o ator (Vidas para pedagógico, Sup para
+        # GERENTE_SUPER) — diferenciação importante para tests de scope.
+        nome_setor = "Superintendência" if actor == GERENTE_SUPER else "Vidas"
         gerencia, _ = Gerencia.objects.get_or_create(
             nome=f"GERENCIA MATRIX {_USER_COUNTER['i']:06d}",
-            defaults={"nome_setor": "Vidas"},
+            defaults={"nome_setor": nome_setor},
         )
         if actor == COORDENADOR:
             # Coordenador: papel direto, sem supervisor.
@@ -91,8 +97,8 @@ def _make_user_for_actor(actor: str) -> Usuario:
                 papel="COORDENADOR",
                 ativo=True,
             )
-        elif actor == GERENTE:
-            # Gerente: papel direto, sem supervisor (D9 — perdeu cap global).
+        elif actor in (GERENTE, GERENTE_SUPER):
+            # Gerente (pedagógico ou Sup): papel direto, sem supervisor.
             EquipeGerencia.objects.create(
                 gerencia=gerencia,
                 usuario=user,
@@ -160,7 +166,7 @@ def test_actor_can_or_cannot_access_resource(actor: str, resource: ResourceCase,
     if resource.method == "GET":
         res = client.get(resource.full_url())
     elif resource.method == "POST":
-        res = client.post(resource.full_url(), data={}, format="json")
+        res = client.post(resource.full_url(), data=resource.body or {}, format="json")
     else:
         raise ValueError(f"Method {resource.method} não suportado pela matriz viva")
 
@@ -216,9 +222,10 @@ def test_matrix_covers_all_actor_resource_combinations():
 
 
 def test_matrix_status_codes_are_valid():
-    """Toda célula deve ser ALLOW (200) ou DENY (403). Detecta typos tipo 200 vs 201."""
+    """Toda célula deve ser ALLOW (200), ALLOW_PAYLOAD_INVALID (400) ou DENY (403)."""
     for resource_name, actor_map in ACCESS_MATRIX.items():
         for actor, status in actor_map.items():
-            assert status in (200, 403), (
-                f"ACCESS_MATRIX['{resource_name}']['{actor}'] = {status} é inválido. " f"Use 200 (ALLOW) ou 403 (DENY)."
+            assert status in (200, 400, 403), (
+                f"ACCESS_MATRIX['{resource_name}']['{actor}'] = {status} é inválido. "
+                "Use 200 (ALLOW), 400 (ALLOW_PAYLOAD_INVALID) ou 403 (DENY)."
             )

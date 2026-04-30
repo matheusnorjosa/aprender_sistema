@@ -239,7 +239,17 @@ class ProdutoViewSet(viewsets.ModelViewSet):  # type: ignore[misc]
 
     queryset = Produto.objects.select_related("projeto").order_by("codigo")
     serializer_class = ProdutoSerializer
-    permission_classes = [IsAuthenticated]
+    # PR 4 hardening RBAC (2026-04-30, #1258): list/retrieve/CRUD são
+    # operações admin/operacionais — não devem ficar abertas a qualquer
+    # usuário autenticado. Composition cobre os 3 motivos legítimos:
+    #   - manage_admin_registries (DAT — admin de cadastros)
+    #   - manage_purchases_and_materials (DAT/Controle — gestão de materiais)
+    #   - run_daily_operations (Controle — operação diária)
+    # Dropdowns/selects de formulário continuam via /api/options/produtos/
+    # (IsAuthenticated) para Coordenador/Apoio/Diretoria.
+    permission_classes = [
+        HasPerm("manage_admin_registries") | HasPerm("manage_purchases_and_materials") | HasPerm("run_daily_operations")
+    ]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["ativo", "projeto"]
     search_fields = ["codigo", "nome"]
@@ -247,10 +257,19 @@ class ProdutoViewSet(viewsets.ModelViewSet):  # type: ignore[misc]
     ordering = ["codigo"]
 
     def get_permissions(self) -> list:  # type: ignore[type-arg]
-        """DAT pode criar/editar/deletar. Outros apenas leitura."""
+        """
+        PR 4 hardening RBAC (2026-04-30, #1258): list/retrieve/CRUD admin
+        compartilham o mesmo gate (capability operacional/admin). Dropdowns
+        públicos ficam em /api/options/produtos/.
+
+        Antes deste PR o override aceitava qualquer usuário autenticado em
+        list/retrieve, contornando `permission_classes` da classe.
+        """
         if self.action in ["create", "update", "partial_update", "destroy"]:
+            # Escrita exige a cap específica de gestão de materiais (DAT/Controle).
             return [IsAuthenticated(), HasPerm("manage_purchases_and_materials")()]
-        return [IsAuthenticated()]
+        # Leitura: composition das 3 caps via permission_classes da classe.
+        return [permission() for permission in self.permission_classes]
 
 
 class GerenciaViewSet(viewsets.ModelViewSet):  # type: ignore[misc]

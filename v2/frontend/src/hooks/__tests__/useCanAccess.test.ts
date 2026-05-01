@@ -36,29 +36,27 @@ describe('computeAccess.can()', () => {
   });
 });
 
-describe('computeAccess.canAccessApprovals — semantic translation layer', () => {
-  test('no policy + no legacy → false', () => {
-    const access = computeAccess([], {});
+describe('computeAccess.canAccessApprovals — policy-only (PR 10 hardening RBAC, 2026-04-30)', () => {
+  test('sem policy → false', () => {
+    const access = computeAccess([]);
     expect(access.canAccessApprovals).toBe(false);
   });
 
-  test('legacy canApproveSuper=true → true (current path)', () => {
-    const access = computeAccess([], { canApproveSuper: true });
+  test('policy access_solicitation_approvals presente → true', () => {
+    const access = computeAccess(['access_solicitation_approvals']);
     expect(access.canAccessApprovals).toBe(true);
   });
 
-  test('public policy access_solicitation_approvals present → true (PR 3 hardening RBAC)', () => {
-    const access = computeAccess(['access_solicitation_approvals'], {});
-    expect(access.canAccessApprovals).toBe(true);
+  test('policy unrelated → false', () => {
+    const access = computeAccess(['view_compras_dashboard']);
+    expect(access.canAccessApprovals).toBe(false);
   });
 
-  test('public policy access_solicitation_approvals overrides legacy=false', () => {
-    const access = computeAccess(['access_solicitation_approvals'], { canApproveSuper: false });
-    expect(access.canAccessApprovals).toBe(true);
-  });
-
-  test('legacy false + unrelated policy → false', () => {
-    const access = computeAccess(['view_compras_dashboard'], { canApproveSuper: false });
+  test('canAccessApprovals não depende de legacy can_approve_super', () => {
+    // Backend continua expondo `can_approve_super` no payload de /api/me/,
+    // mas o hook não consulta mais essa flag. Decisão é exclusivamente da
+    // policy pública — `LegacyAccessFlags` removeu o campo.
+    const access = computeAccess([], { canBloqueios: true, canCoordenador: true });
     expect(access.canAccessApprovals).toBe(false);
   });
 });

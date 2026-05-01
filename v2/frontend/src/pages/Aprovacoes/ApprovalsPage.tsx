@@ -51,7 +51,6 @@ import {
   approveSolicitacoesBatch,
   rejectSolicitacoesBatch,
 } from '../../api/solicitacoes';
-import { getMe } from '../../api/availability';
 import { getMyPolicies } from '../../api/me';
 import { computeAccess } from '../../hooks/useCanAccess';
 import { TIMING } from '../../constants/timing';
@@ -148,22 +147,19 @@ export default function ApprovalsPage(): JSX.Element {
     return () => { unsub1(); unsub2(); };
   }, [loadData]);
 
-  // PA-06 + PR 3 hardening RBAC (2026-04-29): preferir policy pública
-  // `access_solicitation_approvals` (Gerente Sup OU Asst Admin Controle).
-  // Mantém `can_approve_super` como fallback compat durante a transição.
+  // PA-06 + PR 3 hardening RBAC (#1308) + PR 10 hardening RBAC (2026-04-30):
+  // a fonte exclusiva de autorização passou a ser a policy pública
+  // `access_solicitation_approvals` (Gerente da Superintendência OU
+  // Assistente Administrativo do Controle). Legacy `can_approve_super`
+  // deixou de ser consultado pelo frontend.
   useEffect(() => {
     const loadAccess = async (): Promise<void> => {
       try {
-        const [userData, policies] = await Promise.all([
-          getMe(),
-          getMyPolicies().catch(() => [] as string[]),
-        ]);
-        const access = computeAccess(policies, {
-          canApproveSuper: userData?.can_approve_super || false,
-        });
+        const policies = await getMyPolicies().catch(() => [] as string[]);
+        const access = computeAccess(policies);
         setCanApprove(access.canAccessApprovals);
       } catch (error) {
-        logger.error('Erro ao carregar usuário:', error);
+        logger.error('Erro ao carregar policies:', error);
         setCanApprove(false);
       }
     };

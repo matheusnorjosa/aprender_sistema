@@ -19,8 +19,6 @@ import { useMemo } from 'react';
  * cada derived flag abaixo.
  */
 export interface LegacyAccessFlags {
-  /** Composite Gerente+Superintendência. Migrar quando Epic 4.6 criar policy `approve_*` pública. */
-  canApproveSuper?: boolean;
   /** `canControle || canCoordenador || isFormador`. Formador owns own bloqueio (RD-02/RD-03). */
   canBloqueios?: boolean;
   /** Hoje 100% legacy. Sem policy pública pra "criar solicitação" (apenas auth + role). */
@@ -47,9 +45,8 @@ export interface AccessState {
    * Pode acessar fila de aprovações.
    * Composite Setor × Função aprovado em PR 3 hardening RBAC (2026-04-29):
    * Gerente da Superintendência OU Assistente Administrativo do Controle.
-   * Fonte de verdade: policy pública `access_solicitation_approvals`.
-   * `legacy.canApproveSuper` permanece como fallback compat durante a
-   * transição para clientes que ainda não consomem `/api/me/policies/`.
+   * Fonte de verdade: policy pública `access_solicitation_approvals` (PR 10
+   * hardening RBAC, 2026-04-30 — fallback `can_approve_super` removido).
    */
   canAccessApprovals: boolean;
 
@@ -84,9 +81,10 @@ export function computeAccess(
   const policySet = new Set(policies);
   const can = (key: string): boolean => policySet.has(key);
 
-  const canAccessApprovals =
-    can('access_solicitation_approvals') ||   // PR 3 hardening RBAC (2026-04-29)
-    legacy.canApproveSuper === true;
+  // PR 10 hardening RBAC (2026-04-30): fonte exclusiva é a policy pública.
+  // Legacy `can_approve_super` foi removido — backend continua expondo o
+  // campo no payload de /api/me/, mas o frontend não decide por ele.
+  const canAccessApprovals = can('access_solicitation_approvals');
 
   const canAccessBlocks =
     can('view_all_availability') ||
@@ -123,7 +121,6 @@ export function useCanAccess(
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       policies,
-      legacy.canApproveSuper,
       legacy.canBloqueios,
       legacy.canCoordenador,
       legacy.canDashboardCompras,

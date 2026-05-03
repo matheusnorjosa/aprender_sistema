@@ -61,7 +61,6 @@ const ACTORS: ActorSnapshot[] = [
       'view_reports',
     ],
     legacy: {
-      canApproveSuper: true,
       canBloqueios: true,
       canCoordenador: true,
       canDashboardCompras: true,
@@ -90,7 +89,6 @@ const ACTORS: ActorSnapshot[] = [
     legacy: {
       // canDashboardCompras vem do usePermissions: inDAT → true
       canDashboardCompras: true,
-      canApproveSuper: false,
       canCoordenador: true, // canCoordenador inclui inDAT no usePermissions
     },
     expected: {
@@ -111,7 +109,6 @@ const ACTORS: ActorSnapshot[] = [
       'view_reports',
     ],
     legacy: {
-      canApproveSuper: false,
       canBloqueios: true, // canControle (true) || canCoordenador || isFormador
       canCoordenador: false,
       canDashboardCompras: false, // Controle não vê dashboard compras
@@ -127,7 +124,6 @@ const ACTORS: ActorSnapshot[] = [
     actor: 'Diretoria',
     policies: ['view_compras_dashboard', 'view_overview_dashboard', 'view_map_metrics'],
     legacy: {
-      canApproveSuper: false,
       canBloqueios: false,
       canCoordenador: false,
       canDashboardCompras: true, // inDiretoria
@@ -152,7 +148,9 @@ const ACTORS: ActorSnapshot[] = [
       'view_reports',
     ],
     legacy: {
-      canApproveSuper: true, // can_approve_super=true para Gerente da Super
+      // PR 10 hardening RBAC (2026-04-30): canApproveSuper saiu do contrato
+      // de useCanAccess. Decisão de Aprovações vem da policy
+      // `access_solicitation_approvals` listada acima.
       canBloqueios: true,
       canCoordenador: false,
       canDashboardCompras: false,
@@ -169,7 +167,6 @@ const ACTORS: ActorSnapshot[] = [
     // Coord/Apoio são SCOPED — sem view_all_availability após 0078
     policies: [],
     legacy: {
-      canApproveSuper: false,
       canBloqueios: true, // canCoordenador(=true) → canBloqueios true
       canCoordenador: true,
       canDashboardCompras: false,
@@ -186,7 +183,6 @@ const ACTORS: ActorSnapshot[] = [
     // Apoio segue regra de Coordenador — sem view_all_availability
     policies: [],
     legacy: {
-      canApproveSuper: false,
       canBloqueios: true,
       canCoordenador: true,
       canDashboardCompras: false,
@@ -203,7 +199,6 @@ const ACTORS: ActorSnapshot[] = [
     // Formador: nenhuma capability pública; só /me/events e bloqueio próprio (RD-02/03)
     policies: [],
     legacy: {
-      canApproveSuper: false,
       canBloqueios: true, // isFormador → canBloqueios true (RD-02/03 — declara próprio)
       canCoordenador: false,
       canDashboardCompras: false,

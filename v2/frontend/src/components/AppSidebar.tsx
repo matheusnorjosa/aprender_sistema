@@ -195,15 +195,17 @@ export function AppSidebar({
   const { openKeys, onOpenChange, closeAllSubmenus } = useMenuOpenKeys();
 
   const {
-    canApproveSuper, canCoordenador, canControle, canDAT, canAcoesInternas, isFormador,
+    canCoordenador, canControle, canDAT, canAcoesInternas, isFormador,
     canDashboardOverview, canDashboardEquipe, canDashboardGcal, canDashboardCompras,
     canMapaBrasil, canDashboardsMenu, canDisponibilidade,
   } = permissions;
 
   // Camada de tradução semântica (Epic 3, Issue #1228): derived flags do policy layer.
   // Itens de menu consomem `access.canAccessApprovals` etc. — origem (policy vs legacy) é detalhe.
+  // PR 10 hardening RBAC (2026-04-30): Aprovações depende exclusivamente da
+  // policy `access_solicitation_approvals`. Legacy `canApproveSuper` não é
+  // mais passado ao hook (campo segue na API, mas não decide acesso aqui).
   const access = useCanAccess(policies, {
-    canApproveSuper,
     canBloqueios: canControle || canCoordenador || isFormador,
     canDashboardCompras,
     canCoordenador,

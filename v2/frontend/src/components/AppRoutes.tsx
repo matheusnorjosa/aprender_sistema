@@ -86,16 +86,17 @@ interface AppRoutesProps {
 
 export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.Element {
   const {
-    canApproveSuper, canCoordenador, canControle, canDAT, canAcoesInternas,
+    canCoordenador, canControle, canDAT, canAcoesInternas,
     canDashboardOverview, canDashboardEquipe, canDashboardGcal, canDashboardCompras,
     canMapaBrasil, canDisponibilidade, isFormador,
   } = permissions;
 
   // Camada de tradução semântica (Epic 3): derived flags a partir de policies + legacy.
-  // Componentes consomem `access.canAccessApprovals` em vez de `canApproveSuper` direto.
-  // Quando Epic 4.6 introduzir policy `approve_*` pública, a fonte muda no hook sem ripple.
+  // Componentes consomem `access.canAccessApprovals` direto.
+  // PR 10 hardening RBAC (2026-04-30): aprovações dependem exclusivamente
+  // da policy `access_solicitation_approvals`; legacy `canApproveSuper`
+  // saiu do contrato deste hook.
   const access = useCanAccess(policies, {
-    canApproveSuper,
     canBloqueios: canControle || canCoordenador || isFormador,
     canCoordenador,
     canDashboardCompras,

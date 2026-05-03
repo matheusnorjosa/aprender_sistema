@@ -21,8 +21,10 @@ import {
   SafetyOutlined,
 } from '@ant-design/icons';
 import { getMe } from '../../api/availability';
+import { getMyPolicies } from '../../api/me';
 import { getHomeStats } from '../../api/stats';
 import { computePermissions } from '../../hooks/usePermissions';
+import { computeAccess } from '../../hooks/useCanAccess';
 import logger from '../../utils/logger';
 import type { CurrentUser } from '../../types';
 
@@ -91,6 +93,7 @@ function AccessCard({ icon, title, description, link, badge, disabled = false }:
 
 export default function HomePage(): JSX.Element {
   const [user, setUser] = useState<CurrentUser | null>(null);
+  const [policies, setPolicies] = useState<readonly string[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [stats, setStats] = useState<StatsType>({
     pendingApprovals: 0,
@@ -101,13 +104,18 @@ export default function HomePage(): JSX.Element {
   useEffect(() => {
     const loadUserAndStats = async (): Promise<void> => {
       try {
-        // Carregar dados do usuário e estatísticas em paralelo
-        const [userData, statsData] = await Promise.all([
+        // Carregar dados do usuário, policies e estatísticas em paralelo.
+        // PR 10 hardening RBAC (2026-04-30): policies viraram fonte oficial
+        // para gating de Aprovações no frontend (campo `can_approve_super`
+        // continua na API mas não é consumido aqui).
+        const [userData, userPolicies, statsData] = await Promise.all([
           getMe(),
+          getMyPolicies().catch(() => [] as string[]),
           getHomeStats() as Promise<HomeStatsResponse>,
         ]);
 
         setUser(userData);
+        setPolicies(userPolicies);
         setStats({
           pendingApprovals: statsData.pending_approvals ?? 0,
           myRequests: statsData.my_requests ?? 0,
@@ -135,7 +143,11 @@ export default function HomePage(): JSX.Element {
   // Epic 3.3 cleanup: usa computePermissions (SSOT) em vez de hardcodes inline.
   const perms = computePermissions(user);
   const isAdmin = perms.isAdmin;
-  const canApproveSuper = perms.canApproveSuper;
+  // PR 10 hardening RBAC (2026-04-30): Aprovações depende exclusivamente da
+  // policy `access_solicitation_approvals`. Legacy `can_approve_super` não
+  // é mais consultado pelo frontend.
+  const access = computeAccess(policies);
+  const canAccessApprovals = access.canAccessApprovals;
   const isManager = perms.isGerente && (perms.inGerencia || perms.isAdmin);
   const isCoordenador = perms.canCoordenador;
   const canDAT = perms.canDAT;
@@ -179,7 +191,7 @@ export default function HomePage(): JSX.Element {
       )}
 
       {/* Aprovações (Superintendência/DAT) */}
-      {canApproveSuper && (
+      {canAccessApprovals && (
         <>
           <Title level={4} className="mt-6 mb-4">
             Aprovações
@@ -275,7 +287,7 @@ export default function HomePage(): JSX.Element {
               />
             </Col>
           )}
-          {canApproveSuper && (
+          {canAccessApprovals && (
             <Col xs={24} sm={8}>
               <Statistic
                 title="Aprovações Pendentes"

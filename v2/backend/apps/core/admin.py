@@ -37,7 +37,7 @@ from .models import (
     Usuario,
 )
 
-# pyright: reportMissingTypeArgument=false, reportAttributeAccessIssue=false
+# pyright: reportMissingTypeArgument=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false
 
 
 class CPFFilter(admin.SimpleListFilter):

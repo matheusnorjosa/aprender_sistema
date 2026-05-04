@@ -310,7 +310,9 @@ class TestAuditLog:
             details__capability_codename=capability.codename,
         )
         assert logs.count() == 1
-        d = logs.first().details
+        log = logs.first()
+        assert log is not None
+        d = log.details
         assert d["added_groups"] == ["Diretoria"]
         assert d["removed_groups"] == ["DAT"]
         assert d["groups_after"] == ["Diretoria"]

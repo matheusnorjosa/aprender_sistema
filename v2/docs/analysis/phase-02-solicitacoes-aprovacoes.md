@@ -4,6 +4,14 @@ Date: 2026-02-04
 Scope: v2 only
 Status: Completed
 
+> 📜 **Análise histórica:** produzida antes do hardening RBAC. O diagnóstico
+> de "Permissões desalinhadas entre UI e API" foi resolvido nos PRs #1308 e
+> #1315: backend e frontend convergiram para a policy
+> `access_solicitation_approvals` (composite Setor × Função). DAT, Controle
+> puro e Gerente pedagógico não aprovam mais. `can_approve_super` permanece
+> em `/api/me/` apenas como contrato legado. Estado atual em
+> [`rbac_authorization_matrix.md`](../rbac_authorization_matrix.md) §3 e §6 (D10).
+
 ## Explored
 - v2/docs/IMPLEMENTACAO_PA.md
 - v2/docs/PROJETO_ORIGEM.md

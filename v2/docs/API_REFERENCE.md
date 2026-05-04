@@ -365,7 +365,20 @@ Endpoints para popular dropdowns e selects no frontend.
 
 ### Regra de Aprovação SUPER
 
+> **Atualização hardening RBAC (2026-04-29 — PR 3 #1308 e PR 10 #1315):**
+> a regra atual é `access_solicitation_approvals` (composite Setor × Função).
+> O campo `can_approve_super` permanece no payload de `/api/me/` por compat
+> externa, mas não é fonte de decisão no frontend.
+
 ```python
+# Atual — policy `access_solicitation_approvals` (Gerente Sup OU Asst Admin Controle)
+access_solicitation_approvals = is_superuser OR (
+    ("Gerente" IN funcoes AND "Superintendência" IN setores)
+    OR
+    ("Assistente Administrativo" IN funcoes AND "Controle" IN setores)
+)
+
+# [legacy] mantido em /api/me/ por compat externa; não usar para decisão nova
 can_approve_super = is_superuser OR (
     "Gerente" IN funcoes AND "Superintendência" IN setores
 )

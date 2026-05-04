@@ -1,10 +1,16 @@
 # Plano: Centralização de Importações no Módulo DAT
 
 **Data**: 2026-04-29
-**Status**: ✅ **decisões aprovadas** — pronto para iniciar PR-B
+**Status**: ✅ **Concluído** — PRs A1, B, C, D mergeados em 2026-04-29
 **Base**: [`v2/docs/analysis/imports_inventory.md`](../analysis/imports_inventory.md)
 **Branch atual**: `main` em `530fbe7`
 
+> ✅ **Plano executado.** Os PRs correspondentes foram mergeados e o estado
+> operacional atual reflete o que está descrito abaixo. Mantido como
+> referência histórica do programa de centralização.
+> Estado atual em [`rbac_authorization_matrix.md`](../rbac_authorization_matrix.md)
+> (Decisão D11 — DAT-Imports concluído).
+>
 > **Escopo**: este plano cobre **apenas import em massa/planilha** (upload de CSV/XLSX).
 > O fluxo manual de Controle/Assistente Administrativo lançando bloqueio/deslocamento em
 > nome de outro usuário é **issue separada** (programa hardening RBAC, PR 13).

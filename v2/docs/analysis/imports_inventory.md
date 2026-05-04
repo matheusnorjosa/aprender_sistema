@@ -5,6 +5,12 @@
 **HEAD**: `8e9e017b76a417e6baaef33ec882b39f6af50aab`
 **Escopo**: read-only — mapeamento estático do estado atual (frontend + backend).
 
+> 📜 **Inventário histórico:** capturado antes/durante o programa DAT-Imports
+> (PRs A1/B/C/D, mergeados 2026-04-29). Estado atual: importações em massa
+> centralizadas em `/dat/importacoes`; `/dat/importacao` redireciona para
+> `/dat/importacoes` (PR-C #1305). Apenas DAT/superuser importam em massa
+> via `import_spreadsheet` capability.
+>
 > Pós-PR #1298 (municípios IBGE) e PR #1299 (D9 transversal): `view_all_availability`
 > está em Controle + DAT (não mais Gerente). Mapping confirmado em
 > `apps/core/services/functional_permissions_seed.py` linhas 147–161.

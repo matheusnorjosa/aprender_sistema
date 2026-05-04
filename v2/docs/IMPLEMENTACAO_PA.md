@@ -8,11 +8,22 @@
 
 PR17 implementa conformidade total com a Política de Aprovação Manual (CP-02), garantindo que:
 1. Nenhuma solicitação é auto-aprovada (PA-01)
-2. Superintendência, DAT ou superuser podem aprovar/reprovar (PA-02 Adaptada)
+2. Apenas perfis autorizados podem aprovar/reprovar (PA-02 — composite Setor × Função após PR 3 #1308)
 3. Integrações externas só executam após aprovação (PA-03)
 4. Auditoria completa em AuditLog (PA-05)
 5. Botões ocultos para não-autorizados no frontend (PA-06)
 6. 5 testes obrigatórios implementados e passando (PA-07)
+
+> **Atualização hardening RBAC (2026-04-29 — PR 3 #1308):** PA-02 evoluiu da
+> regra original "Superintendência ou superuser" e da "PA-02 Adaptada" intermediária
+> ("Sup OR DAT") para uma policy composite Setor × Função:
+> `access_solicitation_approvals` exige **Gerente da Superintendência** (Setor
+> `Superintendência` + Função `Gerente`) **OU** **Assistente Administrativo do
+> Controle** (Setor `Controle` + Função `Assistente Administrativo`).
+> DAT, Controle puro e Gerente pedagógico **não aprovam** mais.
+> Frontend usa `access_solicitation_approvals` direto (PR 10 #1315);
+> `can_approve_super` permanece no payload de `/api/me/` apenas como
+> contrato legado — não é fonte de decisão.
 
 ## Mudanças Implementadas
 

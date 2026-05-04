@@ -3,6 +3,13 @@
 **Gerado em**: 2026-04-27
 **Branch**: main (`73cfaa0` — pós-stabilization)
 
+> 📜 **Inventário histórico:** este snapshot é anterior ao hardening RBAC dos
+> PRs #1308–#1319 (2026-04-29 a 2026-05-04). Ele cita `canApproveSuper` como
+> gate de Aprovações — após PR 10 (#1315) o frontend usa exclusivamente a
+> policy `access_solicitation_approvals` (PR 3 #1308 — composite Setor × Função).
+> Estado atual em [`rbac_authorization_matrix.md`](../rbac_authorization_matrix.md)
+> §3 (matriz autogen).
+
 ## 0. Estado pós-Stabilization
 
 Sistema pós-**RBAC Access Policy Realignment** (11 PRs, 2026-04-26) + **Stabilization** (6 PRs, 2026-04-27). As "lacunas críticas" C1-C3 e altos A1-A3 listadas em análise anterior **foram corrigidas** pelas Ondas 1-2 (PRs #1250, #1256).

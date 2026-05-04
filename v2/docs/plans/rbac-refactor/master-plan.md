@@ -1,10 +1,17 @@
 # RBAC Refactor — Master Plan
 
-**Status:** Planejado (execução pendente)
+**Status:** ✅ **Concluído em 2026-04-24** (programa de 6 epics / 12 PRs)
 **Owner:** @matheusnorjosa
 **Data de criação:** 2026-04-22
 **Escopo:** 6 epics, ~14 issues, ~14 PRs (500-700 linhas cada)
 **Timeline estimada:** ~3 semanas em execução linear com soak de 24h em staging entre cada PR
+
+> ✅ **Plano executado.** Os 6 epics foram mergeados; `HasPerm` parametrizado é
+> idioma canônico, lint guard `scripts/rbac_lint.py` ativo no CI, zero
+> setor-coupled naming. Mantido como referência histórica do refactor.
+> Estado atual em [`v2/docs/RBAC_NAMING.md`](../../RBAC_NAMING.md)
+> e [`v2/docs/rbac_authorization_matrix.md`](../../rbac_authorization_matrix.md).
+> Programa subsequente: hardening RBAC (PRs 3-16, 2026-04-29 a 2026-05-04).
 
 ---
 

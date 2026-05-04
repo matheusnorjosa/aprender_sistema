@@ -4,6 +4,11 @@ Date: 2026-02-04
 Scope: v2 only
 Status: Completed
 
+> 📜 **Análise histórica:** produzida antes do hardening RBAC dos PRs
+> #1308–#1319. `can_approve_super` deixou de ser fonte de decisão no
+> frontend (PR 10 #1315); a policy oficial é `access_solicitation_approvals`
+> (PR 3 #1308). Estado atual em [`rbac_authorization_matrix.md`](../rbac_authorization_matrix.md).
+
 ## Explored
 - v2/docs/RBAC_COMPLETO.md
 - v2/backend/apps/core/views_auth.py

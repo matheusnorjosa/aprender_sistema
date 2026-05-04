@@ -22,14 +22,24 @@ class AvailabilityBlockSerializer(serializers.ModelSerializer):
     Serializer for AvailabilityBlock model.
 
     Status é auto-aprovado no ViewSet.perform_create().
-    Usuario é preenchido automaticamente com request.user no ViewSet.
+    Usuario é preenchido automaticamente com request.user no ViewSet,
+    salvo se o requester delegar via `usuario_id` (PR 13 hardening RBAC,
+    2026-05-04). Validação de permissão de delegar fica no ViewSet
+    (`perform_create`), não aqui — anti-enumeração: requester não
+    autorizado recebe 403 ANTES de qualquer lookup do target.
     """
+
+    # PR 13: write-only opcional para delegação. IntegerField (não
+    # PrimaryKeyRelatedField) para evitar lookup de Usuario antes da
+    # validação de permissão — vazaria enumeração de IDs por 400 vs 403.
+    usuario_id = serializers.IntegerField(required=False, write_only=True)
 
     class Meta:
         model = AvailabilityBlock
         fields = [
             "id",
             "usuario",
+            "usuario_id",
             "inicio",
             "fim",
             "tipo",

@@ -45,7 +45,7 @@ from rest_framework.views import APIView
 # em `permission_classes`). Não usamos HasPerm aqui, mas precisamos que o
 # patch esteja ativo antes do primeiro uso de composition.
 from apps.core.rbac import permissions as _rbac_permissions  # noqa: F401
-from apps.core.rbac.helpers import user_has_any_perm
+from apps.core.rbac.helpers import user_has_any_perm, user_is_assistente_administrativo_controle
 
 # ============================================================================
 # SSOT: matriz declarativa Policy → capabilities elegíveis (OR semantics)
@@ -357,6 +357,10 @@ def _user_has_solicitation_approvals(user: AbstractBaseUser | AnonymousUser | No
     SSOT chamado tanto pela Policy class `CanAccessSolicitationApprovals`
     quanto por `user_has_policy("access_solicitation_approvals")`. Mudar
     a regra = mudar aqui e atualizar tests da matriz.
+
+    PR 13 (2026-05-04): a checagem do composite Asst Admin Controle migrou
+    para `helpers.user_is_assistente_administrativo_controle` (SSOT
+    compartilhado com o gate de delegação de bloqueios).
     """
     if not user or not getattr(user, "is_authenticated", False):
         return False
@@ -367,11 +371,34 @@ def _user_has_solicitation_approvals(user: AbstractBaseUser | AnonymousUser | No
         groups.filter(name="Gerente").exists()  # noqa: RBAC-composite-allowed
         and groups.filter(name="Superintendência").exists()  # noqa: RBAC-composite-allowed
     )
-    is_asst_admin_controle = (
-        groups.filter(name="Assistente Administrativo").exists()  # noqa: RBAC-composite-allowed
-        and groups.filter(name="Controle").exists()  # noqa: RBAC-composite-allowed
-    )
-    return bool(is_gerente_super or is_asst_admin_controle)
+    if is_gerente_super:
+        return True
+    return user_is_assistente_administrativo_controle(user)
+
+
+def user_can_delegate_availability_block(user: AbstractBaseUser | AnonymousUser | None) -> bool:
+    """
+    Composite check (PR 13 hardening RBAC, 2026-05-04): autoriza criar
+    bloqueio em nome de outro Formador.
+
+    Habilitado para:
+    - Superuser (bypass)
+    - Assistente Administrativo do Controle (composite Setor × Função)
+    - DAT (via capability `manage_admin_registries` — exclusiva de DAT
+      e superuser no seed atual)
+
+    Outros perfis (Coord, Apoio, Gerente Sup, Gerente pedagógico,
+    Diretoria, Controle puro, Formador) → False.
+
+    Não cria capability nova: composição de helpers SSOT existentes.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    if user_is_assistente_administrativo_controle(user):
+        return True
+    return user_has_any_perm(user, "manage_admin_registries")
 
 
 def user_has_policy(user: AbstractBaseUser | AnonymousUser | None, key: str) -> bool:
@@ -424,6 +451,7 @@ __all__ = [
     "ACCESS_POLICIES",
     "PUBLIC_POLICY_KEYS",
     "_PolicyPermission",
+    "user_can_delegate_availability_block",
     "user_has_policy",
     "resolve_public_policies",
     "CanAccessAuditLogs",

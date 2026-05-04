@@ -12,7 +12,7 @@ Filtros de data scope por nome de grupo (ex: "quem é formador?") vivem em
 Ver v2/docs/RBAC_NAMING.md §4 e master-plan §4.
 """
 
-# pyright: reportUnknownMemberType=false, reportAttributeAccessIssue=false
+# pyright: reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportUnknownArgumentType=false
 
 from __future__ import annotations
 
@@ -45,6 +45,30 @@ def user_has_any_perm(
         return False
     user_perms = get_user_functional_permissions(user)
     return any(code in user_perms for code in codenames)
+
+
+def user_is_assistente_administrativo_controle(
+    user: AbstractBaseUser | AnonymousUser | None,
+) -> bool:
+    """
+    True se o usuário é Assistente Administrativo do Controle (composite
+    Setor `Controle` + Função `Assistente Administrativo`).
+
+    SSOT extraído em PR 13 hardening RBAC (2026-05-04). Antes a checagem
+    vivia inline em `IsAssistenteAdministrativoControle` (permissions.py);
+    este helper é reutilizado pela classe DRF E pelo helper de delegação
+    de bloqueios (`_user_can_delegate_availability_block`).
+
+    - user None ou anônimo → False
+    - is_superuser → False (bypass é decidido por quem chama)
+    - caso geral → exige AMBOS os grupos
+    """
+    if not user or not user.is_authenticated:
+        return False
+    return bool(
+        user.groups.filter(name="Controle").exists()  # noqa: RBAC-composite-allowed
+        and user.groups.filter(name="Assistente Administrativo").exists()  # noqa: RBAC-composite-allowed
+    )
 
 
 def user_has_all_perms(

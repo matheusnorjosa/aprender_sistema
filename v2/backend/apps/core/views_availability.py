@@ -126,14 +126,67 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """
-        Cria bloqueio e auto-aprova.
+        Cria bloqueio para o owner ou para um Formador delegado.
 
         Bloqueios são informações factuais (formador sabe quando está indisponível)
-        e não requerem aprovação de terceiros. O status é definido como 'aprovado'
-        automaticamente para que o bloqueio seja considerado imediatamente nas
-        verificações de conflito (RD-02, RD-03).
+        e não requerem aprovação de terceiros. Status='aprovado' automático para
+        que o bloqueio entre nas verificações de conflito (RD-02, RD-03).
+
+        PR 13 hardening RBAC (2026-05-04):
+        - Sem `usuario_id` (ou == request.user.id): comportamento original.
+          `usuario = created_by = request.user`.
+        - Com `usuario_id != request.user.id`: requer permissão de delegar
+          (`user_can_delegate_availability_block`). Anti-enumeração: 403
+          é avaliado ANTES de qualquer lookup do target.
+          Após autorizar: valida que target é Formador ativo (400 caso
+          contrário), salva `usuario=target, created_by=request.user` e
+          registra AuditLog `DELEGATE_BLOCK_CREATE`.
         """
-        serializer.save(usuario=self.request.user, status="aprovado")
+        from rest_framework.exceptions import PermissionDenied, ValidationError
+
+        from apps.core.models import AuditLog, Usuario
+        from apps.core.rbac.policies import user_can_delegate_availability_block
+
+        request_user = self.request.user
+        target_id = serializer.validated_data.pop("usuario_id", None)
+
+        # Caso 1: sem usuario_id ou self-target → fluxo original.
+        if target_id is None or target_id == request_user.id:
+            serializer.save(usuario=request_user, created_by=request_user, status="aprovado")
+            return
+
+        # Caso 2: delegação. Anti-enumeração: 403 ANTES de qualquer lookup.
+        if not user_can_delegate_availability_block(request_user):
+            raise PermissionDenied("Você não tem permissão para criar bloqueio em nome de outro usuário.")
+
+        # Autorizado: agora podemos buscar target sem vazar enumeração.
+        try:
+            target = Usuario.objects.get(pk=target_id)
+        except Usuario.DoesNotExist:
+            raise ValidationError({"usuario_id": "Usuário alvo não encontrado."})
+
+        if not target.is_active:
+            raise ValidationError({"usuario_id": "Usuário alvo está inativo."})
+
+        if not target.groups.filter(name="Formador").exists():  # noqa: RBAC-composite-allowed
+            raise ValidationError({"usuario_id": "Usuário alvo não tem a Função Formador."})
+
+        block = serializer.save(usuario=target, created_by=request_user, status="aprovado")
+
+        # AuditLog (não inclui PII desnecessária — `motivo` ficou de fora).
+        AuditLog.objects.create(
+            usuario=request_user,
+            action="DELEGATE_BLOCK_CREATE",
+            model_name="AvailabilityBlock",
+            details={
+                "delegate_user_id": request_user.id,
+                "target_formador_id": target.id,
+                "block_id": block.id,
+                "inicio": block.inicio.isoformat(),
+                "fim": block.fim.isoformat(),
+                "origem": "delegated",
+            },
+        )
 
 
 class AvailabilityCheckView(APIView):

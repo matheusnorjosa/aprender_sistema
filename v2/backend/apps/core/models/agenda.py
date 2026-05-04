@@ -41,6 +41,18 @@ class AvailabilityBlock(models.Model):
     usuario = models.ForeignKey(  # type: ignore[misc]
         "core.Usuario", on_delete=models.PROTECT, related_name="availability_blocks"
     )
+    # PR 13 hardening RBAC (2026-05-04): separa `usuario` (target) de
+    # `created_by` (delegate). Quando `created_by != usuario`, indica
+    # bloqueio delegado por Asst Admin Controle / DAT / Superuser.
+    # Registros antigos: NULL (owner é o próprio `usuario`).
+    created_by = models.ForeignKey(  # type: ignore[misc]
+        "core.Usuario",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="availability_blocks_created",
+        help_text=("Usuario que criou o bloqueio. Quando != usuario, indica " "delegação (PR 13 hardening RBAC)."),
+    )
     inicio = models.DateTimeField(help_text="Inicio do bloqueio (UTC)")
     fim = models.DateTimeField(help_text="Fim do bloqueio (UTC)")
     tipo = models.CharField(max_length=1, choices=TIPO_CHOICES, default="T")

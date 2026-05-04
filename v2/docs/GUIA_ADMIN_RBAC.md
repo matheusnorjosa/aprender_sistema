@@ -130,7 +130,16 @@ GET /api/me/
   "funcoes": ["Gerente"],
   "can_approve_super": true
 }
+
+# Para autorização atual de Aprovações, prefira:
+GET /api/me/policies/
+# Resposta: lista de keys públicas; `access_solicitation_approvals` indica
+# que o usuário pode aprovar (PR 3 #1308 — composite Setor × Função).
 ```
+
+> **⚠️ Legado:** `can_approve_super` permanece em `/api/me/` por compat externa.
+> Não é fonte de decisão no frontend desde PR 10 (#1315). Use a policy
+> `access_solicitation_approvals` via `/api/me/policies/`.
 
 ---
 

@@ -4,6 +4,15 @@
 **Analista**: Claude Opus 4.5
 **Escopo**: Análise completa de arquitetura, código, conformidade e qualidade
 
+> 📜 **Análise histórica:** este documento foi produzido antes do hardening
+> RBAC dos PRs #1308–#1319 (2026-04-29 a 2026-05-04). Use como contexto
+> histórico, não como fonte operacional atual. Para o estado vigente,
+> consulte [`v2/docs/rbac_authorization_matrix.md`](../rbac_authorization_matrix.md)
+> (matriz canônica autogerada) e [`v2/docs/RBAC_COMPLETO.md`](../RBAC_COMPLETO.md).
+> Em particular, `can_approve_super` deixou de ser fonte de decisão no
+> frontend (PR 10 #1315) — hoje a policy `access_solicitation_approvals`
+> exige composite Setor × Função (Gerente da Sup OU Asst Admin Controle, PR 3 #1308).
+
 ---
 
 ## 🎯 SUMÁRIO EXECUTIVO

@@ -54,21 +54,35 @@
 
 ### Regra de Aprovação SUPER
 
+> **Atualização hardening RBAC (2026-04-29 — PR 3 #1308 e PR 10 #1315):**
+> a regra original `can_approve_super = is_superuser OR (Gerente + Superintendência)` foi
+> substituída pela policy composite `access_solicitation_approvals`. O campo
+> `can_approve_super` permanece em `/api/me/` apenas como **legacy compat**;
+> não é fonte de decisão no frontend nem nos gates dos endpoints de aprovação.
+
+Policy oficial:
+
 ```python
 # Pode aprovar solicitações SUPER se:
-can_approve_super = is_superuser OR (
-    "Gerente" IN funcoes AND "Superintendência" IN setores
+access_solicitation_approvals = is_superuser OR (
+    ("Gerente" IN funcoes AND "Superintendência" IN setores)  # Gerente da Sup
+    OR
+    ("Assistente Administrativo" IN funcoes AND "Controle" IN setores)  # Asst Admin Controle
 )
 ```
 
 **Exemplos**:
 | Usuário | Setor | Função | Pode aprovar SUPER? |
 |---------|-------|--------|---------------------|
-| Maria | Superintendência | Gerente | ✅ Sim |
-| João | Superintendência | Formador | ❌ Não |
-| Pedro | Vidas | Gerente | ❌ Não (setor diferente) |
+| Maria | Superintendência | Gerente | ✅ Sim (Gerente da Superintendência) |
+| Carla | Controle | Assistente Administrativo | ✅ Sim (composite Asst Admin Controle, PR 3 #1308) |
+| João | Superintendência | Formador | ❌ Não (sem Função Gerente) |
+| Pedro | Vidas | Gerente | ❌ Não (Gerente pedagógico, setor diferente) |
+| Ana | Controle | — | ❌ Não (Controle puro, sem Função Asst Admin) |
+| Bruno | DAT | — | ❌ Não (DAT não aprova após PR 3) |
 
-**Nota**: Um usuário pode pertencer a **múltiplos grupos** de ambos os tipos.
+**Nota**: Um usuário pode pertencer a **múltiplos grupos** de ambos os tipos. A policy
+exige composite (AND) entre Setor e Função — pertencer a um sem o outro nega.
 
 ---
 
@@ -124,7 +138,10 @@ const inControle = setores.includes('Controle');
 const inGerencia = setores.includes('Gerência');
 
 // Permissões compostas (Setor + Função)
-const canApproveSuper = user?.can_approve_super || false;  // Gerente + Superintendência
+// [legacy] canApproveSuper continua em usePermissions por contrato externo,
+// mas o frontend NÃO o consulta para gating de Aprovações (PR 10 #1315).
+// Fonte de verdade: policy `access_solicitation_approvals` via getMyPolicies().
+const canApproveSuper = user?.can_approve_super || false;  // legacy compat
 const canCoordenador = user?.is_superuser || isCoordenador || inDAT;
 const canControle = user?.is_superuser || inControle;
 const canDAT = user?.is_superuser || inDAT;
@@ -133,6 +150,7 @@ const isManager = isGerente && (inGerencia || isAdmin);
 ```
 
 **Endpoint `/api/me/` retorna**:
+
 ```json
 {
   "id": 1,
@@ -144,6 +162,11 @@ const isManager = isGerente && (inGerencia || isAdmin);
   "is_superuser": false
 }
 ```
+
+> **⚠️ Legado:** `can_approve_super` continua no payload por **compatibilidade de contrato**
+> com clientes externos, mas o frontend deixou de consultá-lo em PR 10 (#1315). A fonte oficial
+> de autorização para Aprovações é `GET /api/me/policies/` retornando
+> `access_solicitation_approvals`. Para novas integrações, prefira `policies` direto.
 
 ---
 

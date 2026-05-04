@@ -225,13 +225,19 @@ GERÊNCIA (estrutura organizacional)
 
 ### Regra de Aprovação SUPER
 
+> **Atualização hardening RBAC (2026-04-29 — PR 3 #1308):** a regra atual é
+> a policy composite `access_solicitation_approvals` (Gerente da Sup OU
+> Asst Admin Controle). O campo `can_approve_super` permanece no payload por
+> compat externa, mas não é fonte de decisão.
+
 ```python
+# [legacy] mantido em /api/me/ por compat externa; usar policy `access_solicitation_approvals`
 can_approve_super = is_superuser or (
     "Gerente" in funcoes and "Superintendência" in setores
 )
 ```
 
-**Nota**: Consulte [`docs/RBAC_COMPLETO.md`](./RBAC_COMPLETO.md) para documentação detalhada.
+**Nota**: Consulte [`docs/RBAC_COMPLETO.md`](./RBAC_COMPLETO.md) e [`docs/rbac_authorization_matrix.md`](./rbac_authorization_matrix.md) para documentação detalhada.
 
 ---
 

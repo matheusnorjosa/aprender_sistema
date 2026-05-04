@@ -12,7 +12,7 @@ Filtros de data scope por nome de grupo (ex: "quem é formador?") vivem em
 Ver v2/docs/RBAC_NAMING.md §4 e master-plan §4.
 """
 
-# pyright: reportUnknownMemberType=false, reportAttributeAccessIssue=false
+# pyright: reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportUnknownArgumentType=false
 
 from __future__ import annotations
 

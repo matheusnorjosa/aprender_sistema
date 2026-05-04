@@ -63,36 +63,53 @@ DAT e Controle entram em policies por **motivo legítimo de acesso** (decidir/op
 
 ## 3. Matriz canônica — atores × recursos
 
-Legenda:
-- ✅ — acesso liberado por capability/policy
-- 🔒 — bloqueado deliberadamente
-- ⚠️ — depende de scope (`HasSectorAccess`, queryset filter, ou self-ownership)
-- 🔧 — superuser bypass (sempre)
+A matriz abaixo é **autogerada** a partir de `apps/core/rbac/matrix.py` (PR 14
+hardening RBAC, 2026-05-04). Espelha exatamente os gates de autorização
+testados pelo PR 8 (`test_rbac_matrix_living.py`) e o snapshot literal do
+PR 9 (`test_rbac_matrix_contract.py`).
 
-| Recurso | Superuser | DAT | Diretoria | Controle | Gerente | Coordenador / Apoio | Formador |
-|---------|-----------|-----|-----------|----------|---------|---------------------|----------|
-| **Dashboard Geral** (`/dashboards`) | 🔧 | 🔒 | ✅ | 🔒 | 🔒 | 🔒 | 🔒 |
-| **Dashboard Compras** (`/dashboards/compras`) | 🔧 | ✅ (suportar) | ✅ (decidir) | 🔒 | 🔒 | 🔒 | 🔒 |
-| **Dashboard Equipe** (`/dashboards/equipe`) | 🔧 | ✅ (validar) | ✅ (decidir) | 🔒 | 🔒 | 🔒 | 🔒 |
-| **Dashboard GCal** (`/dashboards/gcal`) | 🔧 | ✅ (suportar) | ✅ (decidir) | ✅ (operar) | 🔒 | 🔒 | 🔒 |
-| **Mapa do Brasil** (`/mapa-brasil`) | 🔧 | ✅ (validar) | ✅ (decidir) | 🔒 | 🔒 | 🔒 | 🔒 |
-| **Grade Mensal** (`/api/availability/monthly/`) | 🔧 | ⚠️ scope | 🔒 | ✅ `view_all_availability` | ✅ `view_all_availability` | ⚠️ scope `EquipeGerencia` | 🔒 (não é grade — usa `/me/events`) |
-| **Aprovações** (`/solicitacoes/{id}/approve\|reject`, `/solicitacoes/batch-approve\|batch-reject`) | 🔧 | 🔒 | 🔒 (sem Função Gerente) | 🔒 (sem Função Asst Admin) | 🔒 (Gerente pedagógico) / ✅ composite Gerente da Sup / ✅ composite Asst Admin do Controle | 🔒 | 🔒 |
-| **Bloqueios** (`AvailabilityBlockViewSet`) | 🔧 | 🔒 | 🔒 | ⚠️ scope ampla | ⚠️ scope ampla | ⚠️ próprios + scope | ⚠️ apenas próprios (RD-02/03) |
-| **Deslocamentos** (`DeslocamentoViewSet`) | 🔧 | 🔒 | 🔒 | ✅ `view_all_availability` | ✅ `view_all_availability` | ⚠️ scope (Onda 1 — alinhar) | 🔒 |
-| **DAT Compras** (`DATCompraViewSet`) | 🔧 | ✅ `manage_purchases_and_materials` | ✅ dashboard | ✅ `manage_purchases_and_materials` | 🔒 | 🔒 | 🔒 |
-| **Reports** (`views_reports.py`) | 🔧 | ✅ `manage_admin_registries` | 🔒 | ✅ `operate_preagenda` | ✅ Super (auditar) | 🔒 | 🔒 |
-| **Admin Registries** (Municípios) | 🔧 | ✅ `manage_admin_registries` | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 |
-| **ProdutoViewSet — list/retrieve** (`GET /api/produtos/`) (PR 4 #1309) | 🔧 | ✅ `manage_admin_registries` | 🔒 | ✅ `run_daily_operations` / `manage_purchases_and_materials` | 🔒 | 🔒 (dropdowns: `/api/options/produtos/`) | 🔒 |
-| **Projeto — POST/PATCH** (`/api/projetos/`) (PR 7 #1312) | 🔧 | ✅ `manage_admin_registries` (com `fluxo` obrigatório) | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 |
-| **UsuarioLookup** (`GET /api/lookup/usuarios/`) (PR 5 #1310) | 🔧 | ✅ `manage_admin_registries` | 🔒 | 🔒 | ✅ `create_solicitation` | ✅ `create_solicitation` | 🔒 |
-| **AuditLogs** (`GET /api/audit-logs/`) (PR 6 #1311) | 🔧 | ✅ `manage_admin_registries` | 🔒 | ✅ `operate_preagenda` | 🔒 (PR 6: removidos `approve_solicitation*`) | 🔒 | 🔒 |
-| **Imports** (planilhas) | 🔧 | ✅ `import_spreadsheet` | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 |
-| **Ações Internas** (`CicloAcoes`, `AcaoInstancia`) | 🔧 | ✅ (Onda 1 — substituir `IsAdminUser`) | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 |
-| **Solicitações — Criar** (`POST /solicitacoes/`) | 🔧 | 🔒 (não é função de DAT) | 🔒 | 🔒 | ✅ `create_solicitation` | ✅ `create_solicitation` | 🔒 |
-| **Solicitações — Próprias** (`/solicitacoes/minhas`) | 🔧 | ⚠️ owner | ⚠️ owner | ⚠️ owner | ⚠️ owner | ⚠️ owner | ⚠️ via `/me/events` |
-| **/api/me/events/** (eventos onde participa) | 🔧 | ⚠️ self | ⚠️ self | ⚠️ self | ⚠️ self | ⚠️ self | ✅ caso primário |
-| **/api/me/policies/** | 🔧 todas | ✅ subset | ✅ subset | ✅ subset | ✅ subset | ✅ subset | ✅ vazio ou mínimo |
+Para atualizar:
+
+1. Editar `apps/core/rbac/matrix.py` (entry de `ACCESS_MATRIX`).
+2. Rodar `python manage.py rbac_matrix_doc --write` no container backend.
+3. Commitar as duas mudanças juntas.
+
+CI valida sync com `python manage.py rbac_matrix_doc --check` — drift
+silencioso entre Markdown e Python falha o pipeline.
+
+> Recursos não listados na matriz Python (Bloqueios, Reports, Imports,
+> Ações Internas, Solicitações Criar, Dashboard Geral isolado) ficam fora
+> deste contrato auto-sync. Suas regras vivem nos respectivos
+> `permission_classes` e em testes dedicados; expansão de
+> `ACCESS_MATRIX` para cobri-los é incremental.
+
+<!-- BEGIN AUTOGEN: ACCESS_MATRIX -->
+
+<!-- Bloco autogerado por `python manage.py rbac_matrix_doc --write`. Não editar manualmente — atualize `apps/core/rbac/matrix.py` -->
+
+Legenda dos status codes (matriz executável):
+
+- ✅ — `ALLOW` (HTTP 200) — gate aprova
+- 🔒 — `DENY` (HTTP 403) — gate nega
+- ⚠️ 400 — `ALLOW_PAYLOAD_INVALID` (HTTP 400) — gate aprova; serviço rejeita payload por motivo não-RBAC (ex: `ids: []` em batch-approve)
+
+| Recurso (método URL) | Superuser | DAT | Controle | Diretoria | Gerente | Gerente da Superintendência | Assistente Administrativo do Controle | Coordenador | Apoio de Coordenação | Formador |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **grade_mensal** (`GET /api/availability/monthly/`) | ✅ | ✅ | ✅ | 🔒 | ✅ | ✅ | ✅ | ✅ | ✅ | 🔒 |
+| **deslocamentos** (`GET /api/deslocamentos/`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **dashboard_compras** (`GET /api/dat/compras-materiais/dashboard/`) | ✅ | ✅ | 🔒 | ✅ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 |
+| **metrics_team_productivity** (`GET /api/metrics/team/productivity/`) | ✅ | ✅ | ✅ | ✅ | 🔒 | 🔒 | ✅ | 🔒 | 🔒 | 🔒 |
+| **ciclos_acoes** (`GET /api/ciclos-acoes/`) | ✅ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 |
+| **audit_logs** (`GET /api/audit-logs/`) | ✅ | ✅ | ✅ | 🔒 | 🔒 | 🔒 | ✅ | 🔒 | 🔒 | 🔒 |
+| **me_events** (`GET /api/me/events/`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **solicitacoes_list** (`GET /api/solicitacoes/`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **solicitacoes_batch_approve** (`POST /api/solicitacoes/batch-approve/`) | ⚠️ 400 | 🔒 | 🔒 | 🔒 | 🔒 | ⚠️ 400 | ⚠️ 400 | 🔒 | 🔒 | 🔒 |
+| **produtos_list** (`GET /api/produtos/`) | ✅ | ✅ | ✅ | 🔒 | 🔒 | 🔒 | ✅ | 🔒 | 🔒 | 🔒 |
+| **usuario_lookup** (`GET /api/lookup/usuarios/`) | ✅ | ✅ | 🔒 | 🔒 | ✅ | ✅ | 🔒 | ✅ | ✅ | 🔒 |
+
+*Para atualizar este bloco: edite `apps/core/rbac/matrix.py` e rode `python manage.py rbac_matrix_doc --write` no container backend.*
+
+<!-- END AUTOGEN: ACCESS_MATRIX -->
 
 ---
 

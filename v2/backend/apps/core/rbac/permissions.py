@@ -176,15 +176,17 @@ class IsAssistenteAdministrativoControle(permissions.BasePermission):  # type: i
     message = "Apenas Assistente Administrativo do Controle pode realizar esta ação."
 
     def has_permission(self, request: Request, view: APIView) -> bool:
+        # PR 13 hardening RBAC (2026-05-04): a checagem composite virou
+        # helper reutilizável em `apps.core.rbac.helpers` para que o gate
+        # de delegação de bloqueios consuma o mesmo SSOT.
+        from apps.core.rbac.helpers import user_is_assistente_administrativo_controle
+
         user = request.user
         if not user or not user.is_authenticated:
             return False
         if getattr(user, "is_superuser", False):
             return True
-        return bool(
-            user.groups.filter(name="Controle").exists()  # noqa: RBAC-composite-allowed
-            and user.groups.filter(name="Assistente Administrativo").exists()  # noqa: RBAC-composite-allowed
-        )
+        return user_is_assistente_administrativo_controle(user)
 
 
 class IsOwnerOrPrivileged(HasFunctionalPermission):  # type: ignore[misc]

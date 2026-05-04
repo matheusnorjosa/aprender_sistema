@@ -28,6 +28,7 @@ from .models import (
     Municipio,
     NotificacaoInterna,
     Participation,
+    PermissaoFuncional,
     Projeto,
     RegistroAncora,
     RegistroConclusaoAcao,
@@ -36,7 +37,7 @@ from .models import (
     Usuario,
 )
 
-# pyright: reportMissingTypeArgument=false
+# pyright: reportMissingTypeArgument=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false
 
 
 class CPFFilter(admin.SimpleListFilter):
@@ -343,7 +344,82 @@ class NotificacaoInternaAdmin(admin.ModelAdmin):
     list_select_related = ("destinatario", "acao_instancia")
 
 
+class PermissaoFuncionalAdmin(admin.ModelAdmin):
+    """
+    PR 16 hardening RBAC (2026-05-04): Admin UI superuser-only para
+    atribuição Group × Capability.
+
+    Decisão D17: pós-PR 16, a relação Group × Capability passa a ser
+    admin-driven. Migrations só criam/removem/renomeiam capability
+    codename — não devem mais usar `groups.set()` para sobrescrever
+    atribuições feitas via Admin (`v2/docs/RBAC_NAMING.md` §X +
+    `v2/docs/rbac_authorization_matrix.md` §6 D17).
+
+    Guardas estritos:
+    - `has_add_permission` / `has_delete_permission` desabilitados.
+      Capability codenames são SSOT em
+      `apps/core/services/functional_permissions_seed.py` (16 itens
+      validados em `_validate_seed`). Adicionar via Admin violaria essa
+      contagem; remover quebraria policies hardcoded.
+    - Todos os campos descritivos read-only — admin só edita `groups`.
+      Renomear `codename` quebra `ACCESS_POLICIES` (referencia literal).
+
+    Cache bust e AuditLog ficam em `m2m_changed` signal (ver
+    `apps/core/signals.py`) — disparam por SAVE direto via shell, ETL
+    interno ou Admin.
+    """
+
+    list_display = ("category", "codename", "label", "groups_count")
+    list_filter = ("category", "is_system")
+    search_fields = ("codename", "label")
+    ordering = ("category", "label")
+    readonly_fields = (
+        "codename",
+        "label",
+        "description",
+        "category",
+        "is_system",
+        "created_at",
+        "updated_at",
+    )
+    fields = (
+        "codename",
+        "label",
+        "description",
+        "category",
+        "is_system",
+        "groups",
+        "created_at",
+        "updated_at",
+    )
+    filter_horizontal = ("groups",)
+
+    @admin.display(description="Grupos atribuídos", ordering="codename")
+    def groups_count(self, obj: PermissaoFuncional) -> int:
+        return obj.groups.count()
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        # SSOT é o seed (16 itens). Add via Admin violaria `_validate_seed`.
+        return False
+
+    def has_delete_permission(self, request: HttpRequest, obj: PermissaoFuncional | None = None) -> bool:
+        # Remover capability quebraria policies hardcoded em ACCESS_POLICIES.
+        return False
+
+    def save_related(self, request: HttpRequest, form: Any, formsets: Any, change: bool) -> None:
+        """
+        Após persistir os m2m (`groups`), emite o AuditLog consolidado por
+        operação Admin. O signal `m2m_changed` em `signals.py` já cuidou
+        do cache bust e acumulou os deltas; aqui flushamos uma vez.
+        """
+        from apps.core.signals import flush_group_capability_audit
+
+        super().save_related(request, form, formsets, change)
+        flush_group_capability_audit(actor_user=request.user)
+
+
 # Registro funcional (evita problemas de importação circular com decoradores)
+admin_site.register(PermissaoFuncional, PermissaoFuncionalAdmin)
 admin_site.register(Usuario, UsuarioAdmin)
 admin_site.register(Municipio, MunicipioAdmin)
 admin_site.register(Projeto, ProjetoAdmin)

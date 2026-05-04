@@ -251,7 +251,92 @@ python scripts/rbac_lint.py apps/
 
 ---
 
-## 8. Referência rápida
+## 8. Admin-driven Group × Capability (PR 16, 2026-05-04 — Decisão D17)
+
+A partir do PR 16 (último do programa hardening RBAC), a **atribuição
+Group × Capability migra para o Django Admin** superuser-only. Capability
+codenames continuam SSOT no código.
+
+### Quem é SSOT no quê
+
+| Item | SSOT | Editável via Admin? |
+|------|------|---------------------|
+| Capability codename, label, description, category, is_system | `apps/core/services/functional_permissions_seed.py` | Não (read-only) |
+| Existência de capability (lista de 16) | `_validate_seed()` | Não (`has_add_permission=False`, `has_delete_permission=False`) |
+| Policy → capabilities elegíveis | `apps/core/rbac/policies.py:ACCESS_POLICIES` | Não (hardcoded) |
+| Matriz Viva (atores × recursos) | `apps/core/rbac/matrix.py:ACCESS_MATRIX` | Não (validada por `test_rbac_matrix_contract.py`) |
+| **Atribuição Group × Capability** | **Django Admin** (`PermissaoFuncionalAdmin`) | **Sim** |
+
+### Workflow de mudança
+
+1. Admin (superuser) abre `/admin/core/permissaofuncional/<id>/change/`.
+2. Edita o widget `groups` (filter_horizontal).
+3. Salva.
+4. Sistema dispara automaticamente:
+   - **Cache bust** funcional via signal `m2m_changed` (usuários dos grupos
+     afetados recebem nova capability sem restart).
+   - **AuditLog `GROUP_CAPABILITY_CHANGED`** consolidado:
+
+     ```json
+     {
+       "actor_user_id": <int>,
+       "capability_id": <int>,
+       "capability_codename": "view_compras_dashboard",
+       "added_groups": ["Diretoria"],
+       "removed_groups": ["Gerente"],
+       "groups_after": ["DAT", "Diretoria"]
+     }
+     ```
+
+### Migrations e seed pós-PR 16
+
+**Proibido em migration nova:**
+
+```python
+# ❌ NÃO FAZER após PR 16
+perm.groups.set([Group.objects.get(name="Diretoria")])
+perm.groups.clear()
+```
+
+Esses padrões existem em migrations 0077-0080 (one-shot, já rodaram em prod
+e não rodam de novo). Migrations futuras de redistribuição ferem D17 —
+**use Admin**.
+
+**Permitido em migration nova:**
+
+```python
+# ✅ Criar capability nova
+PermissaoFuncional.objects.update_or_create(
+    codename="new_capability",
+    defaults={"label": "...", "category": "...", ...},
+)
+# ✅ Renomear / reescrever metadata (sem tocar em groups)
+# ✅ Remover capability (após confirmar não está em ACCESS_POLICIES)
+```
+
+### Reset de defaults
+
+Se for necessário restaurar atribuições "originais" do seed
+(`seed_functional_permissions(assign_default_groups=True)`), isso fica
+como **comando explícito** (`manage.py seed_rbac` em dev/staging,
+nunca em deploy automático). Em prod o command nem é registrado
+(`INCLUDE_DEV_TOOLS=false`).
+
+### Guardas no Admin
+
+| Campo | Estado |
+|-------|--------|
+| `codename` | read-only (renomear quebraria policies hardcoded) |
+| `label`, `description`, `category`, `is_system` | read-only (SSOT no seed) |
+| `created_at`, `updated_at` | read-only (auto) |
+| `groups` | **editável** |
+| Botão "Adicionar" | bloqueado (`has_add_permission=False`) |
+| Botão "Excluir" | bloqueado (`has_delete_permission=False`) |
+| Acesso ao admin | **superuser apenas** (via `SuperuserOnlyAdminSite`) |
+
+---
+
+## 9. Referência rápida
 
 | Tipo                 | Forma canônica                            | Forma proibida                                    |
 | -------------------- | ----------------------------------------- | ------------------------------------------------- |

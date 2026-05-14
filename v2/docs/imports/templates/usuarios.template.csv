@@ -1,0 +1,2 @@
+cpf,nome,email,telefone,cargo,is_active,grupos
+00000000000,Maria de Souza Exemplo,maria.exemplo@example.com,85999999999,Formadora,true,"Superintendência,Formador"

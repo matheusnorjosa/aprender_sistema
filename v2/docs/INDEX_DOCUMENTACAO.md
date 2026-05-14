@@ -324,6 +324,7 @@
 | Configurar hierarquia | [GUIA_HIERARQUIA_ORGANIZACIONAL.md](./GUIA_HIERARQUIA_ORGANIZACIONAL.md) |
 | Ver SLOs definidos | [SLO_DEFINITIONS.md](./SLO_DEFINITIONS.md) |
 | Procedimentos de DR | [DISASTER_RECOVERY.md](./DISASTER_RECOVERY.md) |
+| Auditoria de regras hardcoded (2026-05) | [audits/PLATFORM_HARDCODED_RULES_AUDIT_2026-05.md](./audits/PLATFORM_HARDCODED_RULES_AUDIT_2026-05.md) |
 
 ---
 

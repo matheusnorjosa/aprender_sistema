@@ -41,20 +41,22 @@ describe('API Config', () => {
     })
 
     test('deve extrair csrftoken do cookie', () => {
-      document.cookie = 'csrftoken=abc123xyz'
+      // `; Secure` evita CodeQL js/clear-text-cookie; jsdom roda em HTTPS
+      // (ver vitest.config.ts) então o jar aceita.
+      document.cookie = 'csrftoken=abc123xyz; Secure'
       expect(getCsrfToken()).toBe('abc123xyz')
     })
 
     test('deve encontrar csrftoken entre múltiplos cookies', () => {
       // Em jsdom, cookies devem ser setados individualmente
-      document.cookie = 'sessionid=xyz123'
-      document.cookie = 'csrftoken=token456'
-      document.cookie = 'other=value'
+      document.cookie = 'sessionid=xyz123; Secure'
+      document.cookie = 'csrftoken=token456; Secure'
+      document.cookie = 'other=value; Secure'
       expect(getCsrfToken()).toBe('token456')
     })
 
     test('deve decodificar valor do cookie', () => {
-      document.cookie = 'csrftoken=hello%20world'
+      document.cookie = 'csrftoken=hello%20world; Secure'
       expect(getCsrfToken()).toBe('hello world')
     })
   })

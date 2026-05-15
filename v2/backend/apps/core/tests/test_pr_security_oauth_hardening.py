@@ -15,7 +15,7 @@ sanitizadas antes de propagar.
 
 from __future__ import annotations
 
-import logging
+from unittest.mock import patch
 
 import pytest
 
@@ -63,16 +63,21 @@ class TestSafeReturnTo:
         assert _safe_return_to(None, default="/home") == "/home"
         assert _safe_return_to("https://evil.com", default="/safe") == "/safe"
 
-    def test_rejection_logs_warning_without_full_url(self, caplog):
-        """Warning não deve expor URL maliciosa completa (apenas length)."""
+    def test_rejection_logs_warning_without_full_url(self):
+        """Warning não deve expor URL maliciosa completa (apenas length).
+
+        Usa ``unittest.mock.patch`` direto no logger porque ``caplog`` do pytest
+        depende de ``propagate=True``, que pode estar desabilitado pelo LOGGING
+        do Django.
+        """
         malicious = "https://evil.com/" + "A" * 200
-        with caplog.at_level(logging.WARNING, logger="apps.core.views_oauth"):
+        with patch("apps.core.views_oauth.logger.warning") as mock_warning:
             _safe_return_to(malicious)
-        # ``rec.getMessage()`` aplica os args (`%d` etc); ``rec.message`` pode estar vazio
-        # quando o handler do caplog não chamou ``getMessage`` ainda.
-        joined = " ".join(rec.getMessage() for rec in caplog.records)
-        assert "evil.com" not in joined
-        assert "len=" in joined
+        mock_warning.assert_called_once()
+        # ``call_args.args[0]`` é a format string; args restantes são valores.
+        fmt = mock_warning.call_args.args[0]
+        assert "evil.com" not in fmt
+        assert "len=" in fmt
 
 
 # ============================================================================

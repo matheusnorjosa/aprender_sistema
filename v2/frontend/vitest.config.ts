@@ -11,6 +11,13 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    // Run jsdom under HTTPS so tests that set `Secure` cookies (frontend hardening
+    // against CodeQL js/clear-text-cookie) are accepted by the cookie jar.
+    environmentOptions: {
+      jsdom: {
+        url: 'https://localhost/',
+      },
+    },
     setupFiles: './src/test/setup.js',
     include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
     exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],

@@ -38,9 +38,57 @@ from apps.core.services.oauth.token_manager import encrypt_token
 
 logger = logging.getLogger(__name__)
 
+# OAuth error codes whitelist (RFC 6749 §4.1.2.1 + OpenID Connect Core 1.0 §3.1.2.6)
+# Qualquer outro valor recebido em ?error= no callback é normalizado para "unknown"
+# antes de virar query string, evitando URL injection / log poisoning.
+SAFE_OAUTH_ERROR_CODES: frozenset[str] = frozenset(
+    {
+        "access_denied",
+        "invalid_request",
+        "unauthorized_client",
+        "unsupported_response_type",
+        "invalid_scope",
+        "server_error",
+        "temporarily_unavailable",
+        "interaction_required",
+        "login_required",
+        "consent_required",
+        "account_selection_required",
+    }
+)
+
+
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
+
+
+def _safe_return_to(value: str | None, default: str = "/pre-agenda") -> str:
+    """
+    Sanitiza ``return_to`` antes de propagar para Google OAuth.
+
+    Aceita:
+      - caminhos relativos seguros (``/path``) — não ``//evil.com``;
+      - URLs absolutas cujo origin esteja em ``CORS_ALLOWED_ORIGINS`` ou
+        ``OAUTH_ALLOWED_RETURN_ORIGINS`` (delegado a ``is_safe_url``).
+
+    Rejeita tudo o mais (incluindo ``javascript:``, ``data:``, hosts externos).
+    Em rejeição, faz fallback para ``default`` e loga warning (apenas tamanho/prefixo,
+    não a string completa).
+    """
+    if not value:
+        return default
+    if not is_safe_url(value):
+        logger.warning("OAuth return_to rejeitado (open redirect prevention): len=%d", len(value))
+        return default
+    return value
+
+
+def _safe_oauth_error_reason(value: str | None) -> str:
+    """Normaliza ?error= do callback Google para a allowlist RFC 6749."""
+    if not value:
+        return "unknown"
+    return value if value in SAFE_OAUTH_ERROR_CODES else "unknown"
 
 
 def _merge_query_params(url: str, **params) -> str:
@@ -184,7 +232,9 @@ def google_oauth_start(request: Request) -> Response:
 
         → Redirects to: https://accounts.google.com/o/oauth2/v2/auth?...
     """
-    return_to = request.GET.get("return_to", "/pre-agenda")
+    # Security: ``return_to`` é user-controlled — validar contra allowlist
+    # antes de injetar no fluxo OAuth (CodeQL py/url-redirection).
+    return_to = _safe_return_to(request.GET.get("return_to"))
 
     try:
         # Gerar URL de autorização
@@ -239,10 +289,16 @@ def google_oauth_callback(request: Request) -> Response:
         return Response({"error": "HTTPS obrigatório em produção"}, status=status.HTTP_403_FORBIDDEN)
 
     # Verificar erro do Google (ex: usuário negou permissão)
-    error = request.GET.get("error")
-    if error:
-        logger.warning(f"⚠️ OAuth callback erro: {error}")
-        redirect_url = _build_frontend_redirect_url(f"/pre-agenda?google=error&reason={error}")
+    # Security: ``error`` vem via query string user-modificável.
+    # Normalizar para allowlist antes de propagar à URL (CodeQL py/url-redirection).
+    # Não logar o valor para evitar log poisoning / vazamento (CodeQL
+    # py/clear-text-logging-sensitive-data) — a allowlist pode ser auditada
+    # via AuditLog se houver caso de uso.
+    if request.GET.get("error"):
+        safe_reason = _safe_oauth_error_reason(request.GET.get("error"))
+        logger.warning("⚠️ OAuth callback: Google retornou error param (sanitized)")
+        redirect_path = _merge_query_params("/pre-agenda", google="error", reason=safe_reason)
+        redirect_url = _build_frontend_redirect_url(redirect_path)
         return redirect(redirect_url)
 
     # Obter parâmetros
@@ -266,7 +322,10 @@ def google_oauth_callback(request: Request) -> Response:
     validation = validate_oauth_state(state, request.user.id)
 
     if not validation["valid"]:
-        logger.error(f"❌ OAuth callback: state validation failed ({validation['error']})")
+        # Security: ``validation['error']`` pode propagar fragmentos do state token
+        # ou do refresh token. Não logar o valor — quem precisar de detalhes
+        # usa AuditLog dedicado (CodeQL py/clear-text-logging-sensitive-data).
+        logger.error("❌ OAuth callback: state validation failed (details not logged)")
         redirect_url = _build_frontend_redirect_url("/pre-agenda?google=error&reason=invalid_state")
         return redirect(redirect_url)
 

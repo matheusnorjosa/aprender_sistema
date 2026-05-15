@@ -21,7 +21,6 @@ import pytest
 
 from apps.core.views_oauth import SAFE_OAUTH_ERROR_CODES, _safe_oauth_error_reason, _safe_return_to
 
-
 # ============================================================================
 # _safe_return_to (open redirect prevention — CodeQL py/url-redirection)
 # ============================================================================
@@ -69,7 +68,9 @@ class TestSafeReturnTo:
         malicious = "https://evil.com/" + "A" * 200
         with caplog.at_level(logging.WARNING, logger="apps.core.views_oauth"):
             _safe_return_to(malicious)
-        joined = " ".join(rec.message for rec in caplog.records)
+        # ``rec.getMessage()`` aplica os args (`%d` etc); ``rec.message`` pode estar vazio
+        # quando o handler do caplog não chamou ``getMessage`` ainda.
+        joined = " ".join(rec.getMessage() for rec in caplog.records)
         assert "evil.com" not in joined
         assert "len=" in joined
 

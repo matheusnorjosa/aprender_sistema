@@ -55,15 +55,42 @@ def validate_fernet_key(key):
 
 
 def validate_client_id(client_id):
-    """Valida formato do OAuth Client ID."""
-    # Formato esperado: xxx.apps.googleusercontent.com
-    return ".apps.googleusercontent.com" in client_id
+    """Valida formato do OAuth Client ID.
+
+    Formato esperado: ``<id>.apps.googleusercontent.com``.
+
+    Hardening (CodeQL py/incomplete-url-substring-sanitization):
+    substring check (``"x" in value``) é bypassável (ex: ``evil.com/.apps.googleusercontent.com``).
+    Usar ``endswith`` + checagem de prefixo + ausência de delimitadores de URL.
+    """
+    if not isinstance(client_id, str) or not client_id:
+        return False
+    # Não pode conter delimitadores de URL/whitespace
+    if any(ch in client_id for ch in ("/", " ", "\t", "\n", "?", "#", ":", "@")):
+        return False
+    suffix = ".apps.googleusercontent.com"
+    if not client_id.endswith(suffix):
+        return False
+    prefix = client_id[: -len(suffix)]
+    # Prefixo precisa existir (não pode ser apenas o sufixo) e não começar com '.'
+    return bool(prefix) and not prefix.startswith(".")
 
 
 def validate_redirect_uri(uri):
-    """Valida formato do Redirect URI."""
-    # Deve começar com http:// ou https://
-    return uri.startswith("http://") or uri.startswith("https://")
+    """Valida formato do Redirect URI.
+
+    Hardening: parse com ``urlparse`` e exigir scheme ``http``/``https`` E
+    netloc não-vazio (substring/startswith é bypassável por URLs malformadas).
+    """
+    if not isinstance(uri, str) or not uri:
+        return False
+    try:
+        from urllib.parse import urlparse
+
+        parsed = urlparse(uri)
+    except (ValueError, TypeError):
+        return False
+    return parsed.scheme in ("http", "https") and bool(parsed.netloc)
 
 
 def main():

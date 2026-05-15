@@ -96,10 +96,16 @@ class TestGCalMeetLinkByMode:
         assert "preview" in response.data
         preview = response.data["preview"]
 
-        # Preview de evento online deve incluir meet_link fake
+        # Preview de evento online deve incluir meet_link fake.
+        # Hardening (CodeQL py/incomplete-url-substring-sanitization):
+        # validar hostname com urlparse em vez de substring check —
+        # garante que URLs como "https://evil.com?next=meet.google.com" não passam.
+        from urllib.parse import urlparse
+
         assert "meet_link" in preview
         assert preview["meet_link"] is not None
-        assert "meet.google.com" in preview["meet_link"]
+        parsed_meet_link = urlparse(preview["meet_link"])
+        assert parsed_meet_link.hostname == "meet.google.com"
 
         # Refresh do DB
         sol.refresh_from_db()

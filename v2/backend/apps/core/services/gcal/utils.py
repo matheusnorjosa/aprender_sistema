@@ -145,6 +145,15 @@ def _payload_hash(payload: JsonDict) -> PayloadHash:
     """
     Calcula SHA1 hash determinístico do payload (PR14).
 
+    Used for deterministic idempotency key generation
+    (``Solicitacao.gcal_payload_hash`` — drift detection for GCal events),
+    not for cryptographic security. The ``usedforsecurity=False`` flag is set
+    per PEP 644 to silence general weak-crypto linters; CodeQL
+    ``py/weak-sensitive-data-hashing`` is also dismissed as false-positive in
+    this context (the input is a normalized event payload, not a credential).
+    Trocar para SHA-256 invalidaria todos os ``gcal_payload_hash`` históricos
+    e forçaria re-sync do GCal — manter SHA-1 preserva o contrato de drift.
+
     Exclui ``conferenceData`` do cálculo porque contém metadata
     da API Google (requestId) que não representa dados do evento.
     Fix #573: evita falsos positivos de drift em eventos online.

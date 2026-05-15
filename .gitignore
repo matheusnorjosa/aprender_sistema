@@ -279,6 +279,8 @@ google_service_account.json
 *.xlsx
 *.xls
 *.csv
+# Exception: import contract templates (fictitious, no real data)
+!v2/docs/imports/templates/*.csv
 extracted_*.json
 dumps/
 backups/*.sql

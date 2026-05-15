@@ -33,7 +33,16 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def sha1_str(s: str) -> str:
-    """Gera SHA1 hex digest de uma string."""
+    """Gera SHA1 hex digest de uma string.
+
+    Used for deterministic idempotency key generation (``Compra.external_hash``),
+    not for cryptographic security. The ``usedforsecurity=False`` flag is set
+    per PEP 644 to silence general weak-crypto linters; CodeQL
+    ``py/weak-sensitive-data-hashing`` is also dismissed as false-positive
+    in this context (the input is a composite natural key, not a credential).
+    Trocar para SHA-256 quebraria ``external_hash`` histórico em
+    ``core_compra`` — manter SHA-1 preserva idempotência.
+    """
     return hashlib.sha1(s.encode("utf-8"), usedforsecurity=False).hexdigest()
 
 

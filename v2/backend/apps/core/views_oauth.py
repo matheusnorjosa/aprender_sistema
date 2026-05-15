@@ -289,13 +289,14 @@ def google_oauth_callback(request: Request) -> Response:
         return Response({"error": "HTTPS obrigatório em produção"}, status=status.HTTP_403_FORBIDDEN)
 
     # Verificar erro do Google (ex: usuário negou permissão)
-    # Security: ``error`` vem do Google mas chega via query string user-modificável.
-    # Normalizar para allowlist antes de propagar à URL (CodeQL py/url-redirection)
-    # e ao log (CodeQL py/clear-text-logging-sensitive-data).
-    raw_error = request.GET.get("error")
-    if raw_error:
-        safe_reason = _safe_oauth_error_reason(raw_error)
-        logger.warning("⚠️ OAuth callback erro: reason=%s", safe_reason)
+    # Security: ``error`` vem via query string user-modificável.
+    # Normalizar para allowlist antes de propagar à URL (CodeQL py/url-redirection).
+    # Não logar o valor para evitar log poisoning / vazamento (CodeQL
+    # py/clear-text-logging-sensitive-data) — a allowlist pode ser auditada
+    # via AuditLog se houver caso de uso.
+    if request.GET.get("error"):
+        safe_reason = _safe_oauth_error_reason(request.GET.get("error"))
+        logger.warning("⚠️ OAuth callback: Google retornou error param (sanitized)")
         redirect_path = _merge_query_params("/pre-agenda", google="error", reason=safe_reason)
         redirect_url = _build_frontend_redirect_url(redirect_path)
         return redirect(redirect_url)
@@ -322,10 +323,9 @@ def google_oauth_callback(request: Request) -> Response:
 
     if not validation["valid"]:
         # Security: ``validation['error']`` pode propagar fragmentos do state token
-        # ou do refresh token; manter em DEBUG e nunca em INFO/WARNING
-        # (CodeQL py/clear-text-logging-sensitive-data).
-        logger.error("❌ OAuth callback: state validation failed")
-        logger.debug("OAuth state validation details (debug-only): %s", validation.get("error"))
+        # ou do refresh token. Não logar o valor — quem precisar de detalhes
+        # usa AuditLog dedicado (CodeQL py/clear-text-logging-sensitive-data).
+        logger.error("❌ OAuth callback: state validation failed (details not logged)")
         redirect_url = _build_frontend_redirect_url("/pre-agenda?google=error&reason=invalid_state")
         return redirect(redirect_url)
 

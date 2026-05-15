@@ -19,11 +19,7 @@ import logging
 
 import pytest
 
-from apps.core.views_oauth import (
-    SAFE_OAUTH_ERROR_CODES,
-    _safe_oauth_error_reason,
-    _safe_return_to,
-)
+from apps.core.views_oauth import SAFE_OAUTH_ERROR_CODES, _safe_oauth_error_reason, _safe_return_to
 
 
 # ============================================================================

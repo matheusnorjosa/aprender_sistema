@@ -42,6 +42,7 @@ Retorna:
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, time
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -52,6 +53,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+logger = logging.getLogger(__name__)
 
 from apps.core.services.resolvers import resolve_municipio, resolve_projeto, resolve_tipo_evento, resolve_user_by_email
 
@@ -151,8 +154,12 @@ class SolicitationValidateView(APIView):
                     canonical["inicio"] = inicio_aware.isoformat()
                     canonical["fim"] = fim_aware.isoformat()
 
-            except ValueError as e:
-                errors.append(f"Erro ao processar data/hora: {str(e)}")
+            except ValueError:
+                # Security: não expor ``str(e)`` na response — pode propagar
+                # detalhes do parsing/stack trace (CodeQL py/stack-trace-exposure).
+                # Detalhes completos ficam no log server-side.
+                logger.warning("Validate solicitacao: failed to parse data/hora", exc_info=True)
+                errors.append("Data ou horário em formato inválido (use YYYY-MM-DD para data e HH:MM para horários)")
 
         # 5. Validar e resolver participantes
         participants = data.get("participants", {})

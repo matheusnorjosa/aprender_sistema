@@ -6,7 +6,7 @@ Detalhe do exception vai apenas para o log server-side; usuário recebe
 mensagem genérica.
 """
 
-# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportCallIssue=false
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportCallIssue=false, reportMissingTypeArgument=false
 
 from __future__ import annotations
 

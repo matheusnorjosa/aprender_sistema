@@ -54,11 +54,11 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-logger = logging.getLogger(__name__)
-
 from apps.core.services.resolvers import resolve_municipio, resolve_projeto, resolve_tipo_evento, resolve_user_by_email
 
 from .models import Compra, Municipio, Projeto, TipoEvento
+
+logger = logging.getLogger(__name__)
 
 
 class SolicitationValidateView(APIView):

@@ -12,6 +12,12 @@ Verifica:
 - Client ID/Secret format
 """
 
+# Standalone CLI script (not part of Django app). Optional dependencies
+# (``dotenv``, ``cryptography``) are imported lazily inside functions and may
+# not be installed in the analysis environment — suppress related Pyright
+# noise to keep the IDE Problems panel clean.
+# pyright: reportMissingImports=false, reportMissingTypeArgument=false, reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportArgumentType=false, reportCallIssue=false, reportAttributeAccessIssue=false, reportReturnType=false
+
 import os
 import sys
 from pathlib import Path

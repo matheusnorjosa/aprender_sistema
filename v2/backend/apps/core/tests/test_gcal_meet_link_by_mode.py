@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
+from urllib.parse import urlparse
 
 from django.contrib.auth.models import Group
 from django.utils import timezone
@@ -100,8 +101,6 @@ class TestGCalMeetLinkByMode:
         # Hardening (CodeQL py/incomplete-url-substring-sanitization):
         # validar hostname com urlparse em vez de substring check —
         # garante que URLs como "https://evil.com?next=meet.google.com" não passam.
-        from urllib.parse import urlparse
-
         assert "meet_link" in preview
         assert preview["meet_link"] is not None
         parsed_meet_link = urlparse(preview["meet_link"])

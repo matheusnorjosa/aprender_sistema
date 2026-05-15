@@ -247,6 +247,18 @@ scripts/oauth/renew_auth_simple.py
 scripts/renew_google_calendar_auth.py
 acesso_planilhas.json
 
+# Google credential file patterns (Secret Scanning remediation 2026-05-15)
+# Cobre arquivos historicamente vazados em commits antigos.
+# Inclui hifen (google-calendar-key.json) que `google_*.json` nao captura.
+token.json
+google-calendar-key.json
+aprender-integracoes-*.json
+google*.json
+# Excecoes para templates seguros (sem segredo real)
+!*.example.json
+!*.sample.json
+!google*.json.example
+
 # Backup files
 *.bak
 *.backup

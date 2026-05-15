@@ -112,36 +112,70 @@ def _nfkd(value: str | None) -> str:
     return v.casefold()
 
 
+# Comprimento máximo aceito para texto Município/UF antes de short-circuit.
+# Guard defensivo (CodeQL py/polynomial-redos): mesmo o algoritmo sem regex
+# evita processar entradas absurdas vindas de planilhas / API.
+_MAX_CITY_UF_LEN = 200
+
+
 def _split_city_uf(raw: str | None) -> tuple[str, str | None]:
     """
-    Separa município e UF de formatos variados:
-    - "Cidade - UF"
-    - "Cidade (UF)"
-    - "Cidade/UF"
+    Separa município e UF de formatos variados.
+
+    Implementação sem regex backtracking (CodeQL py/polynomial-redos):
+    usa ``rpartition`` / ``rfind`` por separadores conhecidos, em ordem
+    de precedência. Cada operação é O(n).
+
+    Formatos aceitos:
+    - ``"Cidade - UF"``
+    - ``"Cidade (UF)"``
+    - ``"Cidade/UF"``
+    - ``"Cidade, UF"``
+    - ``"Cidade"`` (sem UF)
 
     Returns:
-        (nome_cidade, uf) ou (texto_original, None) se não separou
+        ``(nome_cidade, uf)`` ou ``(texto_original, None)`` se não separou.
     """
     if raw is None:
         return ("", None)
 
     txt = str(raw).strip()
-    # Normaliza separadores (diferentes tipos de hífen)
-    txt = txt.replace("–", "-").replace("—", "-").replace("/", "-")
-    txt = re.sub(r"\s+", " ", txt)  # Collapse espaços
+    # Defensive cap: entrada muito longa volta como-está sem tentar parse
+    # (CodeQL py/polynomial-redos — limitar tamanho como segunda camada).
+    if not txt or len(txt) > _MAX_CITY_UF_LEN:
+        return (txt[:_MAX_CITY_UF_LEN], None)
 
-    # Padrão 1: "Cidade - UF"
-    m = re.match(r"^(?P<nome>.+?)\s*-\s*(?P<uf>[A-Za-z]{2})$", txt)
-    if not m:
-        # Padrão 2: "Cidade (UF)"
-        m = re.match(r"^(?P<nome>.+?)\s*\((?P<uf>[A-Za-z]{2})\)\s*$", txt)
+    # Normaliza variantes de hífen para "-"; mantém os demais separadores
+    # explícitos para o algoritmo abaixo.
+    txt = txt.replace("–", "-").replace("—", "-")
+    # Collapse espaços sem regex (split() trata qualquer whitespace).
+    txt = " ".join(txt.split())
 
-    if m:
-        nome = m.group("nome").strip()
-        uf = m.group("uf").upper()
-        return (nome, uf)
+    # Padrão "Cidade (UF)" — UF em parênteses no final.
+    if txt.endswith(")") and "(" in txt:
+        before, sep, after = txt.rpartition("(")
+        if sep == "(":
+            candidate = after[:-1].strip()  # remove ")" final
+            if _is_uf(candidate):
+                return (before.strip(), candidate.upper())
+
+    # Padrões "Cidade <sep> UF" — separadores em ordem de precedência
+    # (mais específico primeiro para evitar match espúrio em nomes com
+    # vírgula/hífen internos).
+    for sep in (" - ", " – ", " — ", "/", ",", "-"):
+        idx = txt.rfind(sep)
+        if idx == -1:
+            continue
+        candidate = txt[idx + len(sep) :].strip()
+        if _is_uf(candidate):
+            return (txt[:idx].strip(), candidate.upper())
 
     return (txt, None)
+
+
+def _is_uf(value: str) -> bool:
+    """``True`` se ``value`` parece sigla de UF brasileira (2 letras ASCII)."""
+    return len(value) == 2 and value.isascii() and value.isalpha()
 
 
 def resolve_municipio(nome: str) -> Municipio | None:

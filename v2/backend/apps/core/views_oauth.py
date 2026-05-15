@@ -57,6 +57,27 @@ SAFE_OAUTH_ERROR_CODES: frozenset[str] = frozenset(
     }
 )
 
+# Hosts permitidos como destino do redirect em ``google_oauth_start`` — defesa
+# em profundidade contra ``build_authorization_url`` retornar URL inesperada
+# (CodeQL py/url-redirection #3). Sempre HTTPS, hostname exato.
+GOOGLE_OAUTH_AUTHORIZED_HOSTS: frozenset[str] = frozenset({"accounts.google.com"})
+
+
+def _is_google_oauth_authorize_url(url: str | None) -> bool:
+    """``True`` se ``url`` aponta para o consent screen do Google.
+
+    Aceita ``https://accounts.google.com/...``. Rejeita qualquer outro host
+    (inclusive subdomain spoofing ``accounts.google.com.evil.com``),
+    qualquer scheme não-HTTPS, e protocolo-relativo ``//evil.com``.
+    """
+    if not url or not isinstance(url, str):
+        return False
+    try:
+        parsed = urlparse(url)
+    except (ValueError, TypeError):
+        return False
+    return parsed.scheme == "https" and parsed.hostname in GOOGLE_OAUTH_AUTHORIZED_HOSTS
+
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -239,6 +260,17 @@ def google_oauth_start(request: Request) -> Response:
     try:
         # Gerar URL de autorização
         auth_url = build_authorization_url(request.user, return_to=return_to)
+
+        # Security: segunda barreira antes do redirect — confirma que o URL
+        # gerado aponta para o consent screen do Google (CodeQL
+        # py/url-redirection #3). Defesa em profundidade contra mudança
+        # acidental do serviço retornar URL inesperada.
+        if not _is_google_oauth_authorize_url(auth_url):
+            logger.error("OAuth start: build_authorization_url returned unexpected host")
+            return Response(
+                {"error": "Configuração OAuth inválida. Contate o administrador."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         logger.info(f"🔐 OAuth start: {request.user.username} → Google consent screen")
 

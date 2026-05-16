@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any
+import tempfile
+from pathlib import PurePath
+from typing import IO, Any
 
 from django.conf import settings
 from rest_framework import status
@@ -23,6 +25,12 @@ from rest_framework.response import Response
 logger = logging.getLogger(__name__)
 
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB
+
+# Allowlist of file extensions accepted by the import endpoints.
+# Aligned with ALLOWED_CONTENT_TYPES below (CSV / XLS / XLSX). Any extension
+# outside this set is normalized to ".tmp" by ``_safe_upload_suffix`` —
+# defense in depth against CodeQL py/path-injection on tempfile creation.
+ALLOWED_UPLOAD_EXTENSIONS: frozenset[str] = frozenset({".csv", ".xls", ".xlsx"})
 
 # First layer: HTTP Content-Type header validation
 ALLOWED_CONTENT_TYPES = {
@@ -166,3 +174,51 @@ def validate_upload(upload: Any) -> Response | None:
             )
 
     return None  # Valid
+
+
+def _safe_upload_suffix(uploaded_file: Any) -> str:
+    """
+    Derive a sanitized suffix from an uploaded file's name.
+
+    Returns the original extension only when it is part of
+    ``ALLOWED_UPLOAD_EXTENSIONS``. Defaults to ``.tmp`` for any name that
+    contains path separators, null bytes, missing extension, or extension
+    outside the allowlist. The original ``uploaded_file.name`` itself is
+    NEVER used as part of the final filesystem path.
+    """
+    original_name = str(getattr(uploaded_file, "name", "") or "")
+
+    if "\x00" in original_name:
+        return ".tmp"
+
+    if "/" in original_name or "\\" in original_name:
+        return ".tmp"
+
+    suffix = PurePath(original_name).suffix.lower()
+
+    if suffix in ALLOWED_UPLOAD_EXTENSIONS:
+        return suffix
+
+    return ".tmp"
+
+
+def safe_temp_upload_file(uploaded_file: Any) -> "IO[bytes]":
+    """
+    Create a ``NamedTemporaryFile`` in ``tempfile.gettempdir()`` with a
+    suffix derived strictly from the allowlist (see ``_safe_upload_suffix``).
+
+    The user-controlled ``uploaded_file.name`` is never embedded in the
+    returned path — only a server-chosen random name plus the sanitized
+    suffix. This closes CodeQL ``py/path-injection`` (CWE-022/023/036/073/099)
+    on the eleven import endpoints.
+
+    Caller is responsible for writing chunks, closing the file, and
+    ``os.unlink`` in a ``finally`` block as before.
+    """
+    suffix = _safe_upload_suffix(uploaded_file)
+    return tempfile.NamedTemporaryFile(
+        mode="wb",
+        suffix=suffix,
+        delete=False,
+        dir=tempfile.gettempdir(),
+    )

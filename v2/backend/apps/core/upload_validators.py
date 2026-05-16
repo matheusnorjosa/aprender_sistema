@@ -212,13 +212,20 @@ def safe_temp_upload_file(uploaded_file: Any) -> "IO[bytes]":
     suffix. This closes CodeQL ``py/path-injection`` (CWE-022/023/036/073/099)
     on the eleven import endpoints.
 
+    Implementation note: each branch passes a *literal* string to
+    ``NamedTemporaryFile`` so CodeQL's taint analysis can prove the
+    ``suffix`` argument is never user-controlled (the function would
+    otherwise re-flag the centralized sink with 11 sources).
+
     Caller is responsible for writing chunks, closing the file, and
     ``os.unlink`` in a ``finally`` block as before.
     """
     suffix = _safe_upload_suffix(uploaded_file)
-    return tempfile.NamedTemporaryFile(
-        mode="wb",
-        suffix=suffix,
-        delete=False,
-        dir=tempfile.gettempdir(),
-    )
+    tmp_dir = tempfile.gettempdir()
+    if suffix == ".csv":
+        return tempfile.NamedTemporaryFile(mode="wb", suffix=".csv", delete=False, dir=tmp_dir)
+    if suffix == ".xls":
+        return tempfile.NamedTemporaryFile(mode="wb", suffix=".xls", delete=False, dir=tmp_dir)
+    if suffix == ".xlsx":
+        return tempfile.NamedTemporaryFile(mode="wb", suffix=".xlsx", delete=False, dir=tmp_dir)
+    return tempfile.NamedTemporaryFile(mode="wb", suffix=".tmp", delete=False, dir=tmp_dir)

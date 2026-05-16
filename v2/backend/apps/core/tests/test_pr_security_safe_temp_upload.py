@@ -75,7 +75,7 @@ class TestSafeUploadSuffixPathTraversal:
             "../etc/passwd.xls",
             "folder/file.csv",
             "folder/sub/file.xlsx",
-            "/tmp/evil.csv",
+            "/var/data/evil.csv",
         ],
     )
     def test_forward_slash_vira_tmp(self, name):

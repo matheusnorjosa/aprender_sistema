@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import logging
 import os
-import tempfile
 from typing import Any
 
 from django.utils.datastructures import MultiValueDictKeyError
@@ -34,7 +33,7 @@ from apps.core.serializers.openapi_critical_contract import (
     ImportOperationResponseSerializer,
 )
 from apps.core.services.produtos_import import import_produtos_from_file
-from apps.core.upload_validators import validate_upload
+from apps.core.upload_validators import safe_temp_upload_file, validate_upload
 
 logger = logging.getLogger(__name__)
 
@@ -114,8 +113,9 @@ class ImportProdutosView(APIView):
         temp_file = None
         try:
             # Criar arquivo temporario com sufixo baseado no nome original
-            suffix = os.path.splitext(upload.name)[1] or ".csv"
-            temp_file = tempfile.NamedTemporaryFile(mode="wb", suffix=suffix, delete=False)
+            # Issue #1343: Path-injection mitigation — sufixo sanitizado via allowlist,
+            # nome original do upload nunca entra no path final (CodeQL py/path-injection).
+            temp_file = safe_temp_upload_file(upload)
 
             for chunk in upload.chunks():
                 temp_file.write(chunk)

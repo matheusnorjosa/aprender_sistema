@@ -21,6 +21,7 @@ from django.db import transaction
 
 import pandas as pd
 
+from apps.core.imports.normalization import normalize_active_flag, normalize_blank, normalize_uf
 from apps.core.models import Municipio
 from apps.core.services.options_cache import invalidate_municipios_options_cache
 
@@ -120,8 +121,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Nome do municipio
     for key in ["nome", "municipio", "município", "cidade"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["nome"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["nome"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["nome"] = ""
@@ -129,8 +129,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # UF
     for key in ["uf", "estado"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["uf"] = str(val).strip().upper() if val and str(val) != "nan" else ""
+            normalized["uf"] = normalize_uf(lower_map[key])
             break
     else:
         normalized["uf"] = ""
@@ -138,8 +137,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # IBGE code
     for key in ["ibge_code", "ibge", "codigo_ibge", "código_ibge"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["ibge_code"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["ibge_code"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["ibge_code"] = ""
@@ -147,9 +145,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Status ativo
     for key in ["ativo", "is_active", "active", "status"]:
         if key in lower_map:
-            val = lower_map[key]
-            val_str = str(val).strip().lower() if val and str(val) != "nan" else ""
-            normalized["is_active"] = val_str not in ("nao", "não", "false", "0", "inativo", "n")
+            normalized["is_active"] = normalize_active_flag(lower_map[key])
             break
     else:
         normalized["is_active"] = True

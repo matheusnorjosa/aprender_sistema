@@ -16,7 +16,6 @@ Colunas esperadas:
 
 from __future__ import annotations
 
-import hashlib
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -26,6 +25,8 @@ from django.db import transaction
 
 import pandas as pd
 
+from apps.core.imports.hashing import stable_import_hash
+from apps.core.imports.normalization import normalize_blank
 from apps.core.models import Deslocamento
 from apps.core.services.resolvers import resolve_user_by_email, resolve_user_by_name
 
@@ -127,8 +128,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Email (chaves claramente de email)
     for key in ["email", "e-mail", "mail"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["email"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["email"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["email"] = ""
@@ -136,8 +136,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Nome (chaves de nome)
     for key in ["name", "nome", "display_name", "usuario_nome"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["name"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["name"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["name"] = ""
@@ -145,7 +144,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Heuristica para "usuario"/"user": se tem "@" -> email, senao -> nome
     for key in ["usuario", "user", "usuário"]:
         if key in lower_map:
-            value = str(lower_map[key]).strip() if lower_map[key] and str(lower_map[key]) != "nan" else ""
+            value = normalize_blank(lower_map[key])
             if value:
                 if "@" in value:
                     if not normalized["email"]:
@@ -158,8 +157,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Origem
     for key in ["origem", "origin", "de", "from"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["origem"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["origem"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["origem"] = ""
@@ -167,8 +165,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Destino
     for key in ["destino", "destination", "dest", "para", "to"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["destino"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["destino"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["destino"] = ""
@@ -192,8 +189,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Observacao
     for key in ["observacao", "observacoes", "observação", "obs", "notes", "nota"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["observacao"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["observacao"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["observacao"] = ""
@@ -259,16 +255,19 @@ def _compute_external_hash(usuario_id: int, origem: str, destino: str, start: da
     Gera external_hash SHA1 a partir de campos-chave.
 
     Formato: SHA1(usuario_id|origem|destino|start|end)
+
+    Delegates to :func:`apps.core.imports.hashing.stable_import_hash` —
+    byte-equivalent: same field order, same pipe delimiter, same UTF-8
+    encoding, same SHA-1 digest. Historical ``Deslocamento.external_hash``
+    values remain valid.
     """
-    parts = [
+    return stable_import_hash(
         str(usuario_id),
         origem,
         destino,
         start.isoformat(),
         end.isoformat(),
-    ]
-    content = "|".join(parts)
-    return hashlib.sha1(content.encode("utf-8"), usedforsecurity=False).hexdigest()
+    )
 
 
 def _process_row(

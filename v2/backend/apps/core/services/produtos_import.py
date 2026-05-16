@@ -22,6 +22,7 @@ from django.db import transaction
 
 import pandas as pd
 
+from apps.core.imports.normalization import normalize_active_flag, normalize_blank
 from apps.core.models import Produto, Projeto
 from apps.core.services.resolvers import _nfkd
 
@@ -149,8 +150,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Codigo
     for key in ["codigo", "code", "cod", "sku", "codigo_produto"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["codigo"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["codigo"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["codigo"] = ""
@@ -158,8 +158,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Nome
     for key in ["nome", "name", "produto", "descricao_produto", "nome_produto"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["nome"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["nome"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["nome"] = ""
@@ -167,8 +166,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Descricao
     for key in ["descricao", "description", "obs", "observacao", "detalhes"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["descricao"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["descricao"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["descricao"] = ""
@@ -176,8 +174,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Projeto
     for key in ["projeto", "project", "projeto_nome", "projeto_codigo"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["projeto"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["projeto"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["projeto"] = ""
@@ -185,10 +182,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Status ativo
     for key in ["ativo", "is_active", "active", "status"]:
         if key in lower_map:
-            val = lower_map[key]
-            val_str = str(val).strip().lower() if val and str(val) != "nan" else ""
-            # Considera ativo por padrao, inativo apenas se explicitamente marcado
-            normalized["is_active"] = val_str not in ("nao", "não", "false", "0", "inativo", "n")
+            normalized["is_active"] = normalize_active_flag(lower_map[key])
             break
     else:
         normalized["is_active"] = True

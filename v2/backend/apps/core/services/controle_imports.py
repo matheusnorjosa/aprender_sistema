@@ -12,7 +12,6 @@ Importa Compras da aba "🟥 COMPRAS" da Planilha de Controle.
 from __future__ import annotations
 
 import csv
-import hashlib
 import json
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
@@ -23,6 +22,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
+from apps.core.imports.hashing import stable_import_hash
 from apps.core.models import Compra, Municipio, Produto, Projeto
 from apps.core.services.normalize import norm_text
 from apps.core.services.resolvers import resolve_municipio, resolve_projeto
@@ -33,17 +33,15 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def sha1_str(s: str) -> str:
-    """Gera SHA1 hex digest de uma string.
+    """Compat wrapper preserved for existing callers.
 
-    Used for deterministic idempotency key generation (``Compra.external_hash``),
-    not for cryptographic security. The ``usedforsecurity=False`` flag is set
-    per PEP 644 to silence general weak-crypto linters; CodeQL
-    ``py/weak-sensitive-data-hashing`` is also dismissed as false-positive
-    in this context (the input is a composite natural key, not a credential).
-    Trocar para SHA-256 quebraria ``external_hash`` histórico em
-    ``core_compra`` — manter SHA-1 preserva idempotência.
+    Delegates to :func:`apps.core.imports.hashing.stable_import_hash` —
+    byte-equivalent because ``"|".join([s]) == s``. See that helper's
+    docstring for the full rationale on SHA-1 + ``usedforsecurity=False``
+    and the prohibition on switching to SHA-256 (would break historical
+    ``Compra.external_hash``).
     """
-    return hashlib.sha1(s.encode("utf-8"), usedforsecurity=False).hexdigest()
+    return stable_import_hash(s)
 
 
 def parse_date_flexible(v: str | None) -> date | None:

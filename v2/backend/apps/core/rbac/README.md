@@ -79,6 +79,24 @@ class IsDAT(BasePermission):
 permission_classes = [HasPerm("manage_admin_registries")]
 ```
 
+### V003 — Mutar `PermissaoFuncional.groups` / `Group.permissions` em migration (D17, 2026-05-04)
+
+```python
+# ❌ Errado — em apps/core/migrations/0NNN_*.py com número > 82
+def forwards(apps, schema_editor):
+    perm = PermissaoFuncional.objects.get(codename="x")
+    groups = list(Group.objects.filter(name__in=["Controle"]))
+    perm.groups.set(groups)  # V003 dispara
+
+# ✅ Certo — mover atribuição para management command de seed
+# em apps/dev_tools/management/commands/seed_rbac.py
+```
+
+A atribuição de capabilities a grupos é responsabilidade do **admin UI** ou de
+**seeds manuais** (`apps/dev_tools/`), não de migrations versionadas. Migrations
+existentes antes da ratificação D17 (números ≤ `D17_LEGACY_MIGRATIONS_MAX = 82`
+no `scripts/rbac_lint.py`) são histórico aceitável.
+
 ## Exceções (whitelist)
 
 Usos legítimos de `groups.filter(name=...)` devem ter marker `# noqa: RBAC-*-allowed`:
@@ -86,6 +104,9 @@ Usos legítimos de `groups.filter(name=...)` devem ter marker `# noqa: RBAC-*-al
 - **`# noqa: RBAC-composite-allowed`** — classes compostas (funcperm + grupo)
 - **`# noqa: RBAC-block-allowed`** — bloqueio explícito de um grupo por design
 - **`# noqa: RBAC-data-scope-allowed`** — filtro de escopo de dados (não authz)
+- **`# noqa: RBAC-migration-allowed`** — V003: migration nova com mutação grupo×perm
+  legítima (ex: backfill imediato pós-rename de grupo). Documentar motivo em
+  comentário acima.
 
 ## Shims de backcompat
 

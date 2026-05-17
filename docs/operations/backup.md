@@ -2,11 +2,17 @@
 
 Estratégias de backup para o Aprender Sistema v2.
 
+> **SSOT**: parâmetros canônicos (RPO/RTO/retenção/frequência) e procedimentos
+> operacionais ficam em `v2/docs/BACKUP_OPERATIONS.md` (fora do escopo do
+> MkDocs deste site). Este doc é um overview público; para detalhes de operação,
+> sempre consulte o SSOT no repositório. Para procedimentos de recovery, ver
+> `v2/docs/DISASTER_RECOVERY.md` (Docker) ou `v2/docs/GUIDE_DR.md` (VM).
+
 ## Componentes para Backup
 
 | Componente | Frequência | Retenção |
 |------------|------------|----------|
-| PostgreSQL | Diário | 30 dias |
+| PostgreSQL | Diário (ver SSOT) | 7 dias (configurável) |
 | Redis | Não necessário | - |
 | Uploads | Diário | 90 dias |
 | Configurações | Por deploy | Indefinido |
@@ -35,21 +41,10 @@ gunzip -c backup_20250115.sql.gz | docker compose exec -T db psql -U aprender ap
 
 ### Backup Automatizado
 
-```yaml
-# docker-compose.yml
-services:
-  backup:
-    image: prodrigestivill/postgres-backup-local
-    environment:
-      POSTGRES_HOST: db
-      POSTGRES_DB: aprender_db
-      POSTGRES_USER: aprender
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      SCHEDULE: "@daily"
-      BACKUP_KEEP_DAYS: 30
-    volumes:
-      - ./backups:/backups
-```
+O AS v2 usa o script `v2/infra/scripts/backup_db.sh` orquestrado por Celery Beat
+(Docker, 2:00 AM) ou cron (VM, 3:00 AM). Para configuração completa de env vars,
+volume `backup_data`, S3 opcional e criptografia age opcional (SEC-017),
+consultar a seção `Configuration` no SSOT `v2/docs/BACKUP_OPERATIONS.md`.
 
 ## Uploads
 

@@ -1,29 +1,36 @@
 # Disaster Recovery Runbook
 
-**Data**: 2026-04-06
+**Data**: 2026-05-17 (alinhamento SSOT)
 **Status**: Ativo
 **Referência**: PLAN_maturity_gaps.md (Gap 9)
 **Ambiente**: Docker Compose (dev/staging). Para procedimentos em VM de produção, ver [GUIDE_DR.md](./GUIDE_DR.md).
+
+> **Parâmetros de backup (RPO/RTO/retenção/frequência)** são definidos no SSOT
+> [`BACKUP_OPERATIONS.md`](./BACKUP_OPERATIONS.md#parâmetros-canônicos-rpo--rto--retenção--frequência).
+> Este documento foca em **cenários de recovery** (procedimentos operacionais).
 
 ---
 
 ## 1. Visão Geral
 
-Este documento define os procedimentos de recuperação de desastres para o AS v2.
+Este documento define os procedimentos de recuperação de desastres para o AS v2
+em ambientes Docker Compose. Para a configuração do pipeline de backup (script,
+agendamento, criptografia opcional, S3), consulte o SSOT
+[`BACKUP_OPERATIONS.md`](./BACKUP_OPERATIONS.md).
 
-### 1.1 RTO/RPO
+### 1.1 RTO/RPO (resumo — fonte: SSOT)
 
-| Métrica | Valor | Descrição |
-|---------|-------|-----------|
-| **RPO** (Recovery Point Objective) | 5 minutos | Perda máxima de dados aceitável |
-| **RTO** (Recovery Time Objective) | 1 hora | Tempo máximo para restaurar serviço |
+| Métrica | Valor |
+|---------|-------|
+| **RPO** | 5 minutos (WAL archiving) |
+| **RTO** | 1 hora (restore + migrations + smoke) |
 
-### 1.2 Backups
+### 1.2 Backups (resumo — fonte: SSOT)
 
 | Tipo | Frequência | Retenção | Storage |
 |------|------------|----------|---------|
-| Full dump | Diário (3h) | 30 dias | S3/Local |
-| WAL archiving | Contínuo | 7 dias | S3/Local |
+| Full dump | Diário (2:00 AM Docker / 3:00 AM VM) | 7 dias (configurável `BACKUP_RETENTION_DAYS`) | volume `backup_data` + S3 opcional |
+| WAL archiving | Contínuo (`archive_timeout=300`) | 7 dias | `/var/lib/postgresql/wal_archive/` + S3 opcional |
 | Redis snapshot | Não persistido | - | Memory only |
 
 ---
@@ -154,78 +161,19 @@ docker compose logs -f web | grep gcal
 
 ## 3. Scripts de Backup/Restore
 
-### 3.1 Backup Script
+Scripts canônicos em `v2/infra/scripts/`:
 
-```bash
-#!/bin/bash
-# scripts/backup_db.sh
+- **`backup_db.sh`** — script unificado Docker+VM. Configurável via env vars
+  (`DB_HOST/DB_PORT/DB_USER/DB_NAME/PGPASSWORD`, `BACKUP_DIR`,
+  `BACKUP_RETENTION_DAYS`, `S3_BUCKET`, `BACKUP_AGE_RECIPIENT`). Nomenclatura
+  `backup_full_YYYYMMDD_HHMMSS.sql.gz[.age]`. Retenção via
+  `find -mtime +$BACKUP_RETENTION_DAYS -delete`. **Não duplicar lógica neste doc.**
+- **`restore_db.sh`** — interativo (exige confirmação). Em modo não-interativo,
+  invocar via `docker compose exec -T web /app/infra/scripts/restore_db.sh <file>`.
 
-set -e
-
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-BACKUP_DIR="${BACKUP_DIR:-/backups}"
-BACKUP_FILE="${BACKUP_DIR}/backup_full_${TIMESTAMP}.sql.gz"
-
-# Criar diretório se não existir
-mkdir -p "$BACKUP_DIR"
-
-# Dump com pg_dump
-docker compose exec -T db pg_dump -U aprender_user aprender_db | gzip > "$BACKUP_FILE"
-
-# Verificar tamanho mínimo (proteção contra backup vazio)
-SIZE=$(stat -f%z "$BACKUP_FILE" 2>/dev/null || stat -c%s "$BACKUP_FILE")
-if [ "$SIZE" -lt 1000 ]; then
-    echo "ERROR: Backup suspeitamente pequeno ($SIZE bytes)"
-    rm "$BACKUP_FILE"
-    exit 1
-fi
-
-echo "Backup criado: $BACKUP_FILE ($SIZE bytes)"
-
-# Limpar backups antigos (manter últimos 30)
-ls -t "$BACKUP_DIR"/backup_full_*.sql.gz | tail -n +31 | xargs -r rm
-
-# Upload para S3 (opcional)
-if [ -n "$S3_BUCKET" ]; then
-    aws s3 cp "$BACKUP_FILE" "s3://${S3_BUCKET}/backups/"
-fi
-```
-
-### 3.2 Restore Script
-
-```bash
-#!/bin/bash
-# scripts/restore_db.sh
-
-set -e
-
-BACKUP_FILE="${1:?Uso: restore_db.sh <arquivo.sql.gz>}"
-
-if [ ! -f "$BACKUP_FILE" ]; then
-    echo "ERROR: Arquivo não encontrado: $BACKUP_FILE"
-    exit 1
-fi
-
-echo "⚠️  ATENÇÃO: Isso irá SUBSTITUIR todo o banco de dados!"
-echo "Backup: $BACKUP_FILE"
-read -p "Continuar? (yes/no): " CONFIRM
-
-if [ "$CONFIRM" != "yes" ]; then
-    echo "Abortado."
-    exit 0
-fi
-
-# Parar aplicação
-echo "Parando aplicação..."
-docker compose stop web celery
-
-# Restaurar banco
-echo "Restaurando banco..."
-gunzip -c "$BACKUP_FILE" | docker compose exec -T db psql -U aprender_user -d aprender_db
-
-echo "Restauração completa!"
-echo "Reinicie a aplicação com: docker compose up -d"
-```
+Para detalhes completos (variáveis, S3 setup, criptografia age opcional —
+SEC-017), consultar [`BACKUP_OPERATIONS.md`](./BACKUP_OPERATIONS.md). Os exemplos
+operacionais nas seções 2.1-2.4 acima referenciam esses scripts.
 
 ---
 

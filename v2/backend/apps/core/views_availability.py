@@ -176,7 +176,7 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
         # AuditLog (não inclui PII desnecessária — `motivo` ficou de fora).
         AuditLog.objects.create(
             usuario=request_user,
-            action="DELEGATE_BLOCK_CREATE",
+            action=AuditLog.Action.DELEGATE_BLOCK_CREATE,
             model_name="AvailabilityBlock",
             details={
                 "delegate_user_id": request_user.id,

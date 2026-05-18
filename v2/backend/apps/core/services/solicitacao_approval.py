@@ -134,7 +134,7 @@ def approve_solicitacao(
         # Persist AuditLog
         AuditLog.objects.create(
             usuario=user,
-            action="APPROVE",
+            action=AuditLog.Action.APPROVE,
             model_name="Solicitacao",
             details={
                 "solicitacao_id": solicitacao.id,
@@ -205,7 +205,7 @@ def reject_solicitacao(
         # Persist AuditLog
         AuditLog.objects.create(
             usuario=user,
-            action="REJECT",
+            action=AuditLog.Action.REJECT,
             model_name="Solicitacao",
             details={
                 "solicitacao_id": solicitacao.id,
@@ -295,7 +295,7 @@ def batch_approve_solicitacoes(
             # PA-05: Individual AuditLog with batch=true
             AuditLog.objects.create(
                 usuario=user,
-                action="APPROVE",
+                action=AuditLog.Action.APPROVE,
                 model_name="Solicitacao",
                 details={
                     "solicitacao_id": sol.id,
@@ -383,7 +383,7 @@ def batch_reject_solicitacoes(
             # PA-05: Individual AuditLog with batch=true
             AuditLog.objects.create(
                 usuario=user,
-                action="REJECT",
+                action=AuditLog.Action.REJECT,
                 model_name="Solicitacao",
                 details={
                     "solicitacao_id": sol.id,

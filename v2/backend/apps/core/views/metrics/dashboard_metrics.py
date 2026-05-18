@@ -189,7 +189,7 @@ def quality_metrics(request: Request) -> Response:
     # (edited after creation)
     reworked_ids = (
         AuditLog.objects.filter(
-            action="UPDATE",
+            action=AuditLog.Action.UPDATE,
             model_name="Solicitacao",
             created_at__gte=cutoff,
         )

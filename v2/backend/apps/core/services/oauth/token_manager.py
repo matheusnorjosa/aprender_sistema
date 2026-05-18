@@ -186,7 +186,7 @@ def refresh_access_token_safe(credential: GoogleOAuthCredential) -> GoogleOAuthC
             # Auditoria (PA-05)
             AuditLog.objects.create(
                 usuario=cred.user,
-                action="GOOGLE_REFRESH_TOKEN",
+                action=AuditLog.Action.GOOGLE_REFRESH_TOKEN,
                 model_name="GoogleOAuthCredential",
                 details={
                     "google_email": cred.google_email,
@@ -210,7 +210,7 @@ def refresh_access_token_safe(credential: GoogleOAuthCredential) -> GoogleOAuthC
                     # Auditoria (PA-05)
                     AuditLog.objects.create(
                         usuario=cred.user,
-                        action="GOOGLE_DISCONNECT",
+                        action=AuditLog.Action.GOOGLE_DISCONNECT,
                         model_name="GoogleOAuthCredential",
                         details={
                             "google_email": cred.google_email,
@@ -267,7 +267,7 @@ def revoke_token(credential: GoogleOAuthCredential) -> bool:
         # Auditoria (PA-05)
         AuditLog.objects.create(
             usuario=user,
-            action="GOOGLE_DISCONNECT",
+            action=AuditLog.Action.GOOGLE_DISCONNECT,
             model_name="GoogleOAuthCredential",
             details={
                 "google_email": google_email,
@@ -354,7 +354,7 @@ def rotate_encryption_key(old_key: str, new_key: str) -> int:
     # Auditoria (PA-05)
     AuditLog.objects.create(
         usuario=None,
-        action="GCAL_ENCRYPTION_KEY_ROTATION",
+        action=AuditLog.Action.GCAL_ENCRYPTION_KEY_ROTATION,
         model_name="GoogleOAuthCredential",
         details={
             "credentials_updated": count,

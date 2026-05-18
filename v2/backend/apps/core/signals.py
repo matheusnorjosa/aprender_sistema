@@ -288,7 +288,7 @@ def flush_group_capability_audit(actor_user: Any) -> list[int]:
 
         log = AuditLog.objects.create(
             usuario_id=actor_id,
-            action="GROUP_CAPABILITY_CHANGED",
+            action=AuditLog.Action.GROUP_CAPABILITY_CHANGED,
             model_name="PermissaoFuncional",
             details={
                 "actor_user_id": actor_id,

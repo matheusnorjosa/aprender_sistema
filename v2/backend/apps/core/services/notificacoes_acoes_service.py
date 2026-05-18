@@ -331,7 +331,7 @@ class AcoesNotificacaoDailyService:
 
         AuditLog.objects.create(
             usuario=None,
-            action="ACOES_NOTIFICACOES_DAILY",
+            action=AuditLog.Action.ACOES_NOTIFICACOES_DAILY,
             model_name="AcaoInstancia",
             details=metrics,
         )

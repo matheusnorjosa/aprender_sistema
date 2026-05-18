@@ -386,7 +386,7 @@ def google_oauth_callback(request: Request) -> Response:
         # Auditoria (PA-05)
         AuditLog.objects.create(
             usuario=request.user,
-            action="GOOGLE_CONNECT",
+            action=AuditLog.Action.GOOGLE_CONNECT,
             model_name="GoogleOAuthCredential",
             details={
                 "google_email": tokens["email"],
@@ -687,7 +687,7 @@ def google_oauth_select_calendar(request: Request) -> Response:
         # Auditoria (PA-05)
         AuditLog.objects.create(
             usuario=request.user,
-            action="GOOGLE_SELECT_CALENDAR",
+            action=AuditLog.Action.GOOGLE_SELECT_CALENDAR,
             model_name="GoogleOAuthCredential",
             details={
                 "calendar_id": calendar_id,

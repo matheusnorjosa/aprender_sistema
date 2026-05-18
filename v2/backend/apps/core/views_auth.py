@@ -223,7 +223,7 @@ def login(request: Request) -> Response:
         # Log tentativa de login em conta bloqueada (detalhes só internamente)
         AuditLog.objects.create(
             usuario=None,
-            action="LOGIN_BLOCKED",
+            action=AuditLog.Action.LOGIN_BLOCKED,
             model_name="Usuario",
             details={
                 "username": username,
@@ -246,7 +246,7 @@ def login(request: Request) -> Response:
         # Log tentativa falha
         AuditLog.objects.create(
             usuario=None,
-            action="LOGIN_FAILED",
+            action=AuditLog.Action.LOGIN_FAILED,
             model_name="Usuario",
             details={
                 "username": username,
@@ -266,7 +266,7 @@ def login(request: Request) -> Response:
         threshold = getattr(settings, "ACCOUNT_LOCKOUT_THRESHOLD", 10)
         AuditLog.objects.create(
             usuario=None,
-            action="LOGIN_FAILED",
+            action=AuditLog.Action.LOGIN_FAILED,
             model_name="Usuario",
             details={
                 "username": username,
@@ -288,7 +288,7 @@ def login(request: Request) -> Response:
     # PA-05: Auditoria de login
     AuditLog.objects.create(
         usuario=user,
-        action="LOGIN",
+        action=AuditLog.Action.LOGIN,
         model_name="Usuario",
         details={
             "ip_address": _get_client_ip(request),
@@ -330,7 +330,7 @@ def logout(request: Request) -> Response:
     # PA-05: Auditoria de logout
     AuditLog.objects.create(
         usuario=request.user,
-        action="LOGOUT",
+        action=AuditLog.Action.LOGOUT,
         model_name="Usuario",
         details={
             "ip_address": _get_client_ip(request),

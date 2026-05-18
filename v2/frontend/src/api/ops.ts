@@ -121,8 +121,107 @@ async function postMultipart(url: string, file: File, dryRun: boolean = true): P
     throw new Error(error.detail || `HTTP ${response.status}: ${response.statusText}`);
   }
 
-  return response.json();
+  const raw: unknown = await response.json();
+  return normalizeImportResponse(raw);
 }
+
+/**
+ * Adapt backend `{stats, pendencias, dry_run, file}` shape to `ImportResult`.
+ *
+ * Backend service responses are not uniform across importers, so the raw JSON
+ * must be reshaped before the page-level adapters (`toValidationResult` /
+ * `toApplyResult`) can read it as `{created, updated, skipped, errors}`.
+ *
+ * Variants seen in production:
+ *   - bloqueios / usuarios / municipios / colecoes / produtos / equipe_gerencia /
+ *     acoes / deslocamentos / cadastros:
+ *       stats = { created, updated, unchanged, skipped: {cat1: N, cat2: N, ...} }
+ *       pendencias = { cat1: [{linha, erro, ...}], ... }
+ *   - compras (controle_imports):
+ *       stats = { created, updated, skipped: N, errors: N }
+ *       pendencias = { municipios: [...], projetos: [...], linhas_invalidas: [...] }
+ *   - eventos (eventos_import):
+ *       stats = { solicitacoes: {created, updated, unchanged}, participations: {...}, skipped: {...} }
+ *       pendencias = { ... }
+ *
+ * The adapter also accepts already-flat payloads (`{created, updated, errors}`)
+ * so future endpoints conforming to ImportResult directly keep working.
+ */
+function normalizeImportResponse(raw: unknown): ImportResult {
+  if (!raw || typeof raw !== 'object') {
+    return { created: 0, updated: 0, skipped: 0, errors: [], warnings: [] };
+  }
+  const r = raw as Record<string, unknown>;
+
+  const toNum = (v: unknown): number => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  // Pass-through if response already matches the ImportResult contract
+  if (Array.isArray(r.errors) && typeof r.created !== 'undefined') {
+    return {
+      created: toNum(r.created),
+      updated: toNum(r.updated),
+      skipped: toNum(r.skipped),
+      errors: r.errors as Array<{ row: number; message: string }>,
+      warnings: Array.isArray(r.warnings) ? (r.warnings as string[]) : [],
+    };
+  }
+
+  const stats = (r.stats ?? {}) as Record<string, unknown>;
+
+  // eventos returns stats.solicitacoes = {created, updated, unchanged}
+  const nested = stats.solicitacoes;
+  const baseStats =
+    nested && typeof nested === 'object'
+      ? (nested as Record<string, unknown>)
+      : stats;
+
+  // stats.skipped may be a number (compras) or an object keyed by skip reason
+  let skippedTotal = 0;
+  const sk = stats.skipped;
+  if (typeof sk === 'number') {
+    skippedTotal = sk;
+  } else if (sk && typeof sk === 'object') {
+    for (const v of Object.values(sk as Record<string, unknown>)) {
+      skippedTotal += toNum(v);
+    }
+  }
+  // `unchanged` rows are also "non-mutating" — surface them in the same bucket
+  // so the page label "registros não alterados" reflects everything that
+  // didn't create or update.
+  skippedTotal += toNum(baseStats.unchanged);
+
+  // Flatten pendencias dict-of-arrays into errors[]
+  const pendencias = (r.pendencias ?? {}) as Record<string, unknown>;
+  const errors: Array<{ row: number; message: string }> = [];
+  for (const [cat, items] of Object.entries(pendencias)) {
+    if (!Array.isArray(items)) continue;
+    for (const e of items) {
+      if (typeof e !== 'object' || e === null) continue;
+      const item = e as Record<string, unknown>;
+      const rowNum = toNum(item.linha ?? item.linha_num ?? item.row);
+      const detail = [item.erro, item.nome, item.message]
+        .filter((x): x is string => typeof x === 'string' && x.length > 0)
+        .join(' — ');
+      errors.push({
+        row: rowNum,
+        message: detail ? `[${cat}] ${detail}` : `[${cat}]`,
+      });
+    }
+  }
+
+  return {
+    created: toNum(baseStats.created),
+    updated: toNum(baseStats.updated),
+    skipped: skippedTotal,
+    errors,
+    warnings: [],
+  };
+}
+
+export const __testing = { normalizeImportResponse };
 
 /**
  * Importa COMPRAS de CSV/XLSX.

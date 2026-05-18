@@ -31,6 +31,7 @@ from apps.core.serializers.gcal_dashboard_contract import (
     PaginatedSolicitacaoResponseSerializer,
 )
 from apps.core.services.gcal import compute_payload_hash
+from apps.core.services.gcal.validation import _event_id_for
 from apps.core.views_gcal.helpers import DashboardEventsPagination, _filter_events_queryset
 
 
@@ -302,7 +303,7 @@ class GCalDriftView(APIView):
                         "projeto": s.projeto.nome if s.projeto else "",
                         "stored_hash": s.gcal_payload_hash,
                         "current_hash": current_hash,
-                        "external_event_id": s.external_event_id or f"asv2-{s.id}",
+                        "external_event_id": s.external_event_id or _event_id_for(s),
                     }
                 )
 

@@ -226,3 +226,111 @@ def test_v002_message_suggests_can_or_hasperm(tmp_path):
     assert (
         "can" in stderr_lower or "policy" in stderr_lower or "hasperm" in stderr_lower
     ), f"Mensagem V002 deveria sugerir Can* / Policy / HasPerm:\n{result.stderr}"
+
+
+# ============================================================================
+# V003 — D17 (2026-05-04): proibir mutação de PermissaoFuncional.groups /
+# Group.permissions em migrations de apps/core/ criadas após o cutoff.
+# ============================================================================
+
+
+def _write_fake_migration(tmp_path: pathlib.Path, number: int, body: str) -> pathlib.Path:
+    """Helper: cria arquivo em estrutura apps/core/migrations/ dentro de tmp_path."""
+    mig_dir = tmp_path / "apps" / "core" / "migrations"
+    mig_dir.mkdir(parents=True, exist_ok=True)
+    (mig_dir / "__init__.py").touch()
+    path = mig_dir / f"{number:04d}_fake.py"
+    path.write_text(body)
+    return path
+
+
+def test_v003_blocks_groups_set_in_new_migration(tmp_path):
+    """Migration nova (> D17 cutoff) com `perm.groups.set(...)` deve disparar V003."""
+    body = (
+        "from django.db import migrations\n"
+        "def forwards(apps, schema_editor):\n"
+        "    PermissaoFuncional = apps.get_model('core', 'PermissaoFuncional')\n"
+        "    Group = apps.get_model('auth', 'Group')\n"
+        "    perm = PermissaoFuncional.objects.get(codename='x')\n"
+        "    groups = list(Group.objects.filter(name__in=['Controle', 'DAT']))\n"
+        "    perm.groups.set(groups)\n"
+    )
+    _write_fake_migration(tmp_path, 99, body)
+    result = _run_lint(tmp_path / "apps" / "core" / "migrations")
+    assert result.returncode == 1, f"Esperava V003, mas: {result.stderr or result.stdout}"
+    assert "V003" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "mutation_line",
+    [
+        "    perm.groups.set(groups)\n",
+        "    perm.groups.add(group)\n",
+        "    perm.groups.clear()\n",
+        "    group.permissions.set(perms)\n",
+        "    group.permissions.add(perm)\n",
+        "    group.permissions.clear()\n",
+    ],
+)
+def test_v003_variants(tmp_path, mutation_line):
+    """V003 pega variantes: groups vs permissions × set/add/clear."""
+    body = "from django.db import migrations\n" "def forwards(apps, schema_editor):\n" + mutation_line
+    _write_fake_migration(tmp_path, 99, body)
+    result = _run_lint(tmp_path / "apps" / "core" / "migrations")
+    assert result.returncode == 1, f"Esperava V003 em '{mutation_line.strip()}', mas passou."
+    assert "V003" in result.stderr
+
+
+def test_v003_skips_legacy_migrations(tmp_path):
+    """Migration com número <= D17_LEGACY_MIGRATIONS_MAX (82) é histórico aceitável."""
+    body = "from django.db import migrations\n" "def forwards(apps, schema_editor):\n" "    perm.groups.set(groups)\n"
+    # Migration 0082 é o último número histórico aceito.
+    _write_fake_migration(tmp_path, 82, body)
+    result = _run_lint(tmp_path / "apps" / "core" / "migrations")
+    assert result.returncode == 0, f"Esperava migration legacy passar limpa, mas: {result.stderr}"
+
+
+def test_v003_accepts_noqa_marker(tmp_path):
+    """Migration nova com `# noqa: RBAC-migration-allowed` é aceita (exceção documentada)."""
+    body = (
+        "from django.db import migrations\n"
+        "def forwards(apps, schema_editor):\n"
+        "    perm.groups.set(groups)  # noqa: RBAC-migration-allowed\n"
+    )
+    _write_fake_migration(tmp_path, 99, body)
+    result = _run_lint(tmp_path / "apps" / "core" / "migrations")
+    assert result.returncode == 0, f"Esperava noqa marker aceitar, mas: {result.stderr}"
+
+
+def test_v003_does_not_fire_outside_migrations(tmp_path):
+    """V003 só vale em apps/core/migrations/; código aplicativo pode chamar set/add/clear."""
+    views_dir = tmp_path / "apps" / "core" / "views_fake"
+    views_dir.mkdir(parents=True)
+    (views_dir / "view.py").write_text("def handler(perm, groups):\n" "    perm.groups.set(groups)\n")
+    result = _run_lint(views_dir)
+    # Não dispara V003 (path não-migration); pode disparar outros lints, mas
+    # neste caso `perm.groups.set` não tem prefixo Is<> nem groups.filter(name=...),
+    # então deve passar limpo.
+    assert result.returncode == 0, f"V003 não deveria pegar paths não-migration: {result.stderr}"
+
+
+def test_v003_does_not_fire_in_dev_tools_seeds(tmp_path):
+    """apps/dev_tools/ é o lugar canônico para seeds que mutam grupos."""
+    seeds_dir = tmp_path / "apps" / "dev_tools" / "management" / "commands"
+    seeds_dir.mkdir(parents=True)
+    (seeds_dir / "seed_groups.py").write_text("def handle(perm, groups):\n" "    perm.groups.set(groups)\n")
+    result = _run_lint(seeds_dir)
+    assert result.returncode == 0, f"Esperava seeds passarem: {result.stderr}"
+
+
+def test_v003_baseline_current_core_migrations_pass(tmp_path):
+    """Baseline: todas as migrations existentes em apps/core/migrations/ passam.
+
+    Se este teste falhar, alguém commitou uma migration nova violadora ou criou
+    uma migration sem ajustar o cutoff D17_LEGACY_MIGRATIONS_MAX no rbac_lint.py.
+    """
+    target = BACKEND_ROOT / "apps" / "core" / "migrations"
+    result = _run_lint(target)
+    assert result.returncode == 0, (
+        f"Migrations atuais devem passar limpas (V003).\n" f"STDOUT: {result.stdout}\n" f"STDERR: {result.stderr}"
+    )

@@ -7,6 +7,9 @@ Histórico:
   e classes legacy `IsControleOrSuper` etc.
 - Epic 4.3 (2026-04-26): atualizou docs/mensagens para refletir Capability Policy
   Layer (`Can*` classes) como forma canônica nova alongside `HasPerm("codename")`.
+- D17 (2026-05-04): proíbe mutação de `PermissaoFuncional.groups` /
+  `Group.permissions` via migrations versionadas — atribuição é responsabilidade
+  do admin UI / seed manual. V003 enforça preventivamente em migrations novas.
 
 Sem este guard, em 6-12 meses alguém escreveria `user.groups.filter(name="DAT")`
 em uma view e a dívida voltaria.
@@ -48,13 +51,24 @@ em uma view e a dívida voltaria.
   Nota: classes `Can*` são automaticamente aceitas (não match no V002 — só
   prefixo `Is<Upper>` é banido). Não precisam whitelist.
 
-Whitelist de paths (não linta):
+- **V003** `<expr>.permissions.set|add|clear(...)` ou
+  `<expr>.groups.set|add|clear(...)` em migrations de `apps/core/` com número
+  acima do cutoff D17 (`D17_LEGACY_MIGRATIONS_MAX`). Migrations existentes antes
+  da ratificação D17 (2026-05-04) são histórico aceitável; novas migrations
+  devem deixar a atribuição de grupos para admin UI / management commands de
+  seed manuais (`apps/dev_tools/`). Para casos legítimos (ex: backfill após
+  rename de grupo), adicionar `# noqa: RBAC-migration-allowed` na linha.
+
+Whitelist de paths (não linta V001/V002):
 - `tests/`, `migrations/`, `fixtures/` (test data e data migrations podem
   referenciar nomes de grupos por design)
 - `apps/core/rbac/` (o próprio módulo RBAC, incluindo `policies.py` Epic 4.1)
 - `apps/core/constants.py`, `apps/core/permissions.py`, `apps/core/rbac_helpers.py`
   (shims e data-scope constants)
 - `scripts/rbac_lint.py`, `scripts/rbac_codemod.py` (o próprio lint e histórico)
+
+V003 inverte a whitelist: SÓ migrations de `apps/core/` são lintadas, e apenas
+aquelas com número > `D17_LEGACY_MIGRATIONS_MAX`.
 
 Exit code:
 - 0 se limpo
@@ -113,6 +127,17 @@ WHITELIST_EXACT_FILES: tuple[str, ...] = (
 
 # Kwargs de filter/exclude que indicam authz por nome de grupo.
 GROUP_NAME_KWARGS: frozenset[str] = frozenset({"name", "name__in", "name__exact", "name__iexact"})
+
+# D17 (2026-05-04): última migration de `apps/core/` aceita como histórico antes
+# da ratificação da regra. Migrations com número > este valor disparam V003 se
+# mutarem PermissaoFuncional.groups ou Group.permissions.
+D17_LEGACY_MIGRATIONS_MAX: int = 82
+
+# Métodos M2M que constituem mutação de atribuição grupo↔permissão.
+M2M_MUTATION_METHODS: frozenset[str] = frozenset({"set", "add", "clear"})
+
+# Atributos do lado da relação M2M que V003 protege.
+M2M_PROTECTED_ATTRS: frozenset[str] = frozenset({"groups", "permissions"})
 
 
 @dataclass(frozen=True)
@@ -192,6 +217,76 @@ class RBACLintVisitor(ast.NodeVisitor):
         return "# noqa: RBAC-" in line and "-allowed" in line
 
 
+class MigrationLintVisitor(ast.NodeVisitor):
+    """Varre o AST de uma migration procurando violações V003.
+
+    Pega chamadas tipo:
+        perm.groups.set(groups)        # PermissaoFuncional.groups (reverse M2M)
+        group.permissions.add(perm)    # Group.permissions (forward M2M)
+        obj.groups.clear()
+    """
+
+    def __init__(self, filepath: pathlib.Path, source_lines: list[str]) -> None:
+        self.filepath: pathlib.Path = filepath
+        self.source_lines: list[str] = source_lines
+        self.violations: list[Violation] = []
+
+    def visit_Call(self, node: ast.Call) -> None:
+        if self._is_m2m_mutation(node) and not self._has_noqa_marker(node.lineno):
+            self.violations.append(
+                Violation(
+                    filepath=str(self.filepath),
+                    lineno=node.lineno,
+                    code="V003",
+                    message=(
+                        "Mutação de PermissaoFuncional.groups / Group.permissions em "
+                        "migration nova viola D17 (2026-05-04). Atribuição de grupos "
+                        "deve ser feita via admin UI ou management command de seed "
+                        "manual (apps/dev_tools/), não em migration versionada. "
+                        "Se o uso for legítimo (ex: backfill pós-rename), adicione "
+                        "'# noqa: RBAC-migration-allowed' na linha."
+                    ),
+                )
+            )
+        self.generic_visit(node)
+
+    @staticmethod
+    def _is_m2m_mutation(node: ast.Call) -> bool:
+        """True se `node` é `<expr>.<groups|permissions>.<set|add|clear>(...)`."""
+        func = node.func
+        if not isinstance(func, ast.Attribute):
+            return False
+        if func.attr not in M2M_MUTATION_METHODS:
+            return False
+        inner = func.value
+        if not isinstance(inner, ast.Attribute):
+            return False
+        return inner.attr in M2M_PROTECTED_ATTRS
+
+    def _has_noqa_marker(self, lineno: int) -> bool:
+        """True se a linha tem '# noqa: RBAC-migration-allowed'."""
+        if lineno < 1 or lineno > len(self.source_lines):
+            return False
+        line = self.source_lines[lineno - 1]
+        return "# noqa: RBAC-migration-allowed" in line
+
+
+def _is_core_migration(path: pathlib.Path) -> bool:
+    """True se `path` é uma migration de `apps/core/migrations/`."""
+    posix = path.as_posix()
+    return "/apps/core/migrations/" in posix and path.suffix == ".py" and path.stem != "__init__"
+
+
+def _migration_number(path: pathlib.Path) -> int | None:
+    """Extrai o prefixo numérico de uma migration (`0083_xxx.py` → 83)."""
+    stem = path.stem
+    head = stem.split("_", 1)[0]
+    try:
+        return int(head)
+    except ValueError:
+        return None
+
+
 def _is_path_whitelisted(path: pathlib.Path, root: pathlib.Path) -> bool:
     """True se `path` está na whitelist (não deve ser lintado)."""
     path_str = str(path).replace("\\", "/")
@@ -210,6 +305,23 @@ def _is_path_whitelisted(path: pathlib.Path, root: pathlib.Path) -> bool:
 
 
 def check_file(path: pathlib.Path, root: pathlib.Path) -> list[Violation]:
+    # Migrations de apps/core/ rodam apenas V003 (com cutoff D17); ignoram V001/V002.
+    if _is_core_migration(path):
+        number = _migration_number(path)
+        if number is None or number <= D17_LEGACY_MIGRATIONS_MAX:
+            return []
+        try:
+            source = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            return []
+        try:
+            tree = ast.parse(source, filename=str(path))
+        except SyntaxError:
+            return []
+        migration_visitor = MigrationLintVisitor(path, source.splitlines())
+        migration_visitor.visit(tree)
+        return migration_visitor.violations
+
     if _is_path_whitelisted(path, root):
         return []
     try:

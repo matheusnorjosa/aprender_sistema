@@ -7,57 +7,75 @@ shared across the import services in `apps/core/services/*_import.py`.
 
 | Module                                | Purpose                                                                       |
 | ------------------------------------- | ----------------------------------------------------------------------------- |
-| `apps.core.imports.normalization`     | Pure string / flag normalization (`normalize_blank`, `normalize_active_flag`, `normalize_uf`, `normalize_cpf_digits`). |
-| `apps.core.imports.hashing`           | Deterministic SHA-1 idempotency-key generation (`stable_import_hash`). Not cryptographic. |
+| `apps.core.imports.normalization`     | String / flag normalization (`normalize_blank`, `normalize_active_flag`, `normalize_uf`, `normalize_cpf_digits`) plus legacy text helpers (`norm_text`, `normalize_sector`, `normalize_project_alias`, `split_municipios_super`, `parse_date_iso`, `parse_time_iso`, `normalize_email`, `normalize_date_field`, `normalize_time_field`). |
+| `apps.core.imports.hashing`           | Deterministic SHA-1 idempotency-key generation (`stable_import_hash`, `hash_event_v2`). Not cryptographic. |
 
 ## Where to put new helpers
 
 > **All new shared helpers used by import services go here, in
 > `apps.core.imports.*`** — never in `apps.core.services.normalize`.
 
-## Migration policy for `apps.core.services.normalize` (legacy)
+## `apps.core.services.normalize` is a compat wrapper
 
-The pre-existing `apps/core/services/normalize.py` contains import-related
-helpers (`norm_text`, `hash_event_v2`, `normalize_sector`,
-`normalize_project_alias`, `split_municipios_super`, etc.) that **belong
-conceptually in this package** but were not migrated in PR 3 for safety:
+As of PR for issue #1349, `apps/core/services/normalize.py` is a thin
+**re-export wrapper** over `apps.core.imports.*`. It exists only so the
+existing callers keep working without touching their import lines:
 
-* `services/normalize.py` has near-zero test coverage (only one smoke test
-  in `test_optional_etl.py`).
-* `hash_event_v2` is used to compute `external_hash` for the
-  Acompanhamento ETL — moving it without an equivalence test would risk
-  silent idempotency corruption on the next ETL run.
+* `apps.core.services.controle_imports`
+* `apps.core.services.controle_acoes_import`
+* `apps.core.services.dat_cadastros_import`
+* `apps.core.views_lookup`
 
-### Required steps before migrating the legacy module
+The wrapper preserves byte-for-byte behaviour — equivalence is pinned by
+[`apps/core/tests/test_services_normalize_equivalence.py`](../tests/test_services_normalize_equivalence.py)
+(75 snapshots, see PR #1350).
 
-1. Create `apps/core/tests/test_services_normalize_equivalence.py` covering
-   every public function of `services/normalize.py` with snapshot inputs
-   and expected outputs (especially `hash_event_v2`).
-2. Move the implementations to `apps.core.imports.normalization` and
-   `apps.core.imports.hashing`.
-3. Convert `apps/core/services/normalize.py` into a thin re-export module
-   for backward compatibility with the existing callers
-   (`controle_imports.py`, `controle_acoes_import.py`,
-   `dat_cadastros_import.py`, `views_lookup.py`).
-4. Open a dedicated PR — do NOT bundle this with feature work.
+### Future cleanup (optional, not blocking)
 
-Until that PR lands, `apps/core/services/normalize.py` is treated as
-**legacy preexisting code**, not as a provisional landing zone for new
-helpers.
+After a soak period, callers may migrate their imports to read directly
+from `apps.core.imports.*` and the wrapper can be removed. This is a
+mechanical change (sed/codemod) and should be a single PR.
 
-## Scope of PR 3
+## Legacy quirks (intentionally preserved)
 
-PR 3 (the introduction of this package) intentionally migrated only the
-lowest-risk callers:
+Some pre-existing behaviours of the legacy helpers are arguably "bugs"
+but are kept exactly as-is for compatibility (see `# NOTE:` comments in
+the test snapshots):
 
-* `produtos_import.py`
-* `colecoes_import.py`
-* `municipios_import.py`
-* `deslocamentos_import.py`
-* `controle_imports.py::sha1_str` (thin wrapper for compatibility)
+* `split_municipios_super("nan")` → `["nan"]` (does NOT filter the
+  literal string).
+* `parse_date_iso` rejects `/` and the BR `DD/MM/YYYY` format (use
+  `normalize_date_field` for BR).
+* `parse_time_iso("08")` rejects formats without `:`.
+* `normalize_email("inválido")` → `"inválido"` (no format validation,
+  only lowercase + strip).
+* `norm_text(None)` returns `""` (defensive, despite the `s: str`
+  signature).
 
-The remaining import services (`usuarios_import.py`, `eventos_import.py`,
-`bloqueios_import.py`, `equipe_gerencia_import.py`,
-`controle_acoes_import.py`, `dat_cadastros_import.py`) carry import-specific
-logic enmeshed in their `_normalize_row` functions and will be migrated
-incrementally in follow-up PRs.
+Any change to these behaviours must be a dedicated PR that breaks the
+snapshot tests intentionally.
+
+## SHA-1 idempotency policy
+
+Both `stable_import_hash` and `hash_event_v2` use `hashlib.sha1` with
+`usedforsecurity=False` (PEP 644). This is documented because:
+
+* The hashes are **idempotency keys**, not cryptographic security.
+* Migrating to SHA-256 would break historical `external_hash` values
+  stored in `Compra`, `Solicitacao`, `Deslocamento`, `AcaoControle`,
+  `AcaoDAT`, and `Acompanhamento`.
+* CodeQL's `py/weak-sensitive-data-hashing` flags these via dataflow
+  taint — alerts #20, #21, and #26 have been dismissed as
+  `false positive` with the same justification.
+* A formal ADR is tracked in issue #1347.
+
+## Scope of historical PRs
+
+| PR | What |
+|---|---|
+| #1344 | Created the package + modern helpers (`normalize_blank`, etc.) + `stable_import_hash`. Migrated 4 low-risk services. |
+| #1350 | Snapshot tests for the legacy `services/normalize.py` (75 cases). |
+| #1349 (this PR) | Moved the 10 legacy helpers into the canonical namespace + converted `services/normalize.py` into a compat wrapper. |
+
+Remaining work tracked in issue #1346 (migrate the other 6 import
+services to use the modern helpers).

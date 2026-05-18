@@ -183,7 +183,7 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
         # Create AuditLog
         AuditLog.objects.create(
             usuario=self.request.user,
-            action="CREATE_DESLOCAMENTO",
+            action=AuditLog.Action.CREATE_DESLOCAMENTO,
             model_name="Deslocamento",
             details={
                 "deslocamento_id": deslocamento.id,
@@ -236,7 +236,7 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
         if changed_fields:
             AuditLog.objects.create(
                 usuario=self.request.user,
-                action="UPDATE_DESLOCAMENTO",
+                action=AuditLog.Action.UPDATE_DESLOCAMENTO,
                 model_name="Deslocamento",
                 details={
                     "deslocamento_id": deslocamento.id,
@@ -260,7 +260,7 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
         # Create AuditLog before deletion
         AuditLog.objects.create(
             usuario=self.request.user,
-            action="DELETE_DESLOCAMENTO",
+            action=AuditLog.Action.DELETE_DESLOCAMENTO,
             model_name="Deslocamento",
             details={
                 "deslocamento_id": instance.id,

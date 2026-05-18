@@ -523,7 +523,7 @@ class GroupViewSet(viewsets.ModelViewSet):
 
             AuditLog.objects.create(
                 usuario=request.user if request.user.is_authenticated else None,
-                action="SYNC_GROUP_MEMBERS",
+                action=AuditLog.Action.SYNC_GROUP_MEMBERS,
                 model_name="Group",
                 details={
                     "group_id": group.id,

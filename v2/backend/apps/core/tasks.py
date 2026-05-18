@@ -165,7 +165,7 @@ def task_publish_solicitacao_to_gcal(
 
             AuditLog.objects.create(
                 usuario=operator,  # OAuth: registrar operador; service_account: None
-                action="PUBLISH_GCAL",
+                action=AuditLog.Action.PUBLISH_GCAL,
                 model_name="Solicitacao",
                 details=audit_details,
             )
@@ -204,7 +204,7 @@ def task_publish_solicitacao_to_gcal(
             if not dry_run:
                 AuditLog.objects.create(
                     usuario=None,  # Task assíncrona
-                    action="PUBLISH_GCAL_ERROR",
+                    action=AuditLog.Action.PUBLISH_GCAL_ERROR,
                     model_name="Solicitacao",
                     details={
                         "solicitacao_id": s.id,
@@ -283,7 +283,7 @@ def task_cancel_solicitacao_from_gcal(
         # Criar AuditLog
         AuditLog.objects.create(
             usuario=None,  # Task assíncrona, sem usuário direto
-            action="CANCEL_GCAL",
+            action=AuditLog.Action.CANCEL_GCAL,
             model_name="Solicitacao",
             details={
                 "solicitacao_id": s.id,
@@ -377,7 +377,7 @@ def preview_then_apply_gcal() -> dict[str, Any]:
         }
         AuditLog.objects.create(
             usuario=None,
-            action="CELERY_GCAL_SYNC",
+            action=AuditLog.Action.CELERY_GCAL_SYNC,
             model_name=None,
             details=result,
         )
@@ -396,7 +396,7 @@ def preview_then_apply_gcal() -> dict[str, Any]:
         }
         AuditLog.objects.create(
             usuario=None,
-            action="CELERY_GCAL_SYNC",
+            action=AuditLog.Action.CELERY_GCAL_SYNC,
             model_name=None,
             details=result,
         )
@@ -414,7 +414,7 @@ def preview_then_apply_gcal() -> dict[str, Any]:
         }
         AuditLog.objects.create(
             usuario=None,
-            action="CELERY_GCAL_SYNC",
+            action=AuditLog.Action.CELERY_GCAL_SYNC,
             model_name=None,
             details=result,
         )
@@ -443,7 +443,7 @@ def preview_then_apply_gcal() -> dict[str, Any]:
         }
         AuditLog.objects.create(
             usuario=None,
-            action="CELERY_GCAL_SYNC",
+            action=AuditLog.Action.CELERY_GCAL_SYNC,
             model_name=None,
             details=result,
         )
@@ -463,7 +463,7 @@ def preview_then_apply_gcal() -> dict[str, Any]:
         }
         AuditLog.objects.create(
             usuario=None,
-            action="CELERY_GCAL_SYNC",
+            action=AuditLog.Action.CELERY_GCAL_SYNC,
             model_name=None,
             details=result,
         )
@@ -484,7 +484,7 @@ def preview_then_apply_gcal() -> dict[str, Any]:
         }
         AuditLog.objects.create(
             usuario=None,
-            action="CELERY_GCAL_SYNC",
+            action=AuditLog.Action.CELERY_GCAL_SYNC,
             model_name=None,
             details=result,
         )
@@ -514,7 +514,7 @@ def preview_then_apply_gcal() -> dict[str, Any]:
         }
         AuditLog.objects.create(
             usuario=None,
-            action="CELERY_GCAL_SYNC",
+            action=AuditLog.Action.CELERY_GCAL_SYNC,
             model_name=None,
             details=result,
         )
@@ -530,7 +530,7 @@ def preview_then_apply_gcal() -> dict[str, Any]:
     }
     AuditLog.objects.create(
         usuario=None,
-        action="CELERY_GCAL_SYNC",
+        action=AuditLog.Action.CELERY_GCAL_SYNC,
         model_name=None,
         details=result,
     )
@@ -618,7 +618,7 @@ def task_run_import_job(self: Any, import_job_id: int) -> dict[str, Any]:
 
         AuditLog.objects.create(
             usuario=job.user,
-            action="IMPORT_JOB_COMPLETED",
+            action=AuditLog.Action.IMPORT_JOB_COMPLETED,
             model_name="ImportJob",
             details={
                 "import_job_id": job.id,
@@ -653,7 +653,7 @@ def task_run_import_job(self: Any, import_job_id: int) -> dict[str, Any]:
         try:
             AuditLog.objects.create(
                 usuario=job.user if job.user_id else None,
-                action="IMPORT_JOB_FAILED",
+                action=AuditLog.Action.IMPORT_JOB_FAILED,
                 model_name="ImportJob",
                 details={
                     "import_job_id": import_job_id,
@@ -725,7 +725,7 @@ def queue_gcal_sync_retry(
         if not dry_run:
             AuditLog.objects.create(
                 usuario=None,
-                action="GCAL_RETRY_SUCCESS",
+                action=AuditLog.Action.GCAL_RETRY_SUCCESS,
                 model_name="Solicitacao",
                 details={
                     "solicitacao_id": s.id,

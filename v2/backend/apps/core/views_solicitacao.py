@@ -476,7 +476,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             # AuditLog persistente
             AuditLog.objects.create(
                 usuario=self.request.user,
-                action="UPDATE",
+                action=AuditLog.Action.UPDATE,
                 model_name="Solicitacao",
                 details={
                     "solicitacao_id": instance.id,
@@ -582,7 +582,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         # Registrar exclusão no AuditLog ANTES de deletar
         AuditLog.objects.create(
             usuario=self.request.user,
-            action="DELETE",
+            action=AuditLog.Action.DELETE,
             model_name="Solicitacao",
             details={
                 "solicitacao_data": solicitacao_data,

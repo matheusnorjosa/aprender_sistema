@@ -151,14 +151,14 @@ def check_conflicts(
     )
 
     conflicts: list[Conflict] = []
-    events_qs = Solicitacao.objects.filter(status="aprovado").filter(
+    events_qs = Solicitacao.objects.filter(status=Solicitacao.Status.APROVADO).filter(
         Q(usuario=usuario) | Q(participations__usuario=usuario)
     )
 
     # ================================================================
     # RD-02, RD-03: BLOQUEIOS aprovados
     # ================================================================
-    blocks = AvailabilityBlock.objects.filter(usuario=usuario, status="aprovado").filter(
+    blocks = AvailabilityBlock.objects.filter(usuario=usuario, status=AvailabilityBlock.Status.APROVADO).filter(
         Q(inicio__lt=fim) & Q(fim__gt=inicio)  # Interseção
     )
 

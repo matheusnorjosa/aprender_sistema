@@ -29,11 +29,19 @@ class Solicitacao(models.Model):
     RD-06: Armazena UTC, compara em America/Fortaleza.
     """
 
-    STATUS_CHOICES = [
-        ("pendente", "Pendente"),
-        ("aprovado", "Aprovado"),
-        ("reprovado", "Reprovado"),
-    ]
+    class Status(models.TextChoices):
+        """Status do fluxo de aprovacao (PA-01..PA-07).
+
+        Use Solicitacao.Status.APROVADO em vez de literal "aprovado" em
+        codigo novo. Valores preservados (zero migration de dados).
+        Refs: audit 2026-05 finding B3.
+        """
+
+        PENDENTE = "pendente", "Pendente"
+        APROVADO = "aprovado", "Aprovado"
+        REPROVADO = "reprovado", "Reprovado"
+
+    STATUS_CHOICES = Status.choices
 
     class GCalStatus(models.TextChoices):
         """Status de sincronizacao com Google Calendar."""

@@ -28,6 +28,7 @@ from django.db import transaction
 
 import pandas as pd
 
+from apps.core.imports.normalization import normalize_active_flag, normalize_blank, normalize_cpf_digits
 from apps.core.models import Usuario
 
 
@@ -127,8 +128,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # CPF
     for key in ["cpf", "documento", "cpf_usuario", "cpf_formador"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["cpf"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["cpf"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["cpf"] = ""
@@ -136,8 +136,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Nome completo
     for key in ["nome", "nome_completo", "name", "full_name", "nome_formador"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["nome"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["nome"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["nome"] = ""
@@ -145,8 +144,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Email
     for key in ["email", "e-mail", "mail", "correio"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["email"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["email"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["email"] = ""
@@ -154,8 +152,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Telefone
     for key in ["telefone", "tel", "celular", "phone", "fone"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["telefone"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["telefone"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["telefone"] = ""
@@ -163,19 +160,15 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Cargo
     for key in ["cargo", "funcao", "função", "function", "role"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["cargo"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["cargo"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["cargo"] = ""
 
-    # Status ativo
+    # Status ativo — considera ativo por padrao, inativo apenas se explicitamente marcado
     for key in ["ativo", "is_active", "active", "status"]:
         if key in lower_map:
-            val = lower_map[key]
-            val_str = str(val).strip().lower() if val and str(val) != "nan" else ""
-            # Considera ativo por padrao, inativo apenas se explicitamente marcado
-            normalized["is_active"] = val_str not in ("nao", "não", "false", "0", "inativo", "n")
+            normalized["is_active"] = normalize_active_flag(lower_map[key])
             break
     else:
         normalized["is_active"] = True
@@ -183,8 +176,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Grupos (separados por virgula)
     for key in ["grupos", "groups", "perfis", "profiles", "grupo", "perfil"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["grupos"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["grupos"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["grupos"] = ""
@@ -193,8 +185,13 @@ def _normalize_row(row: Any) -> dict[str, Any]:
 
 
 def _clean_cpf(cpf: str) -> str:
-    """Remove formatacao do CPF (pontos, tracos, espacos)."""
-    return re.sub(r"[^\d]", "", cpf)
+    """Remove formatacao do CPF (pontos, tracos, espacos).
+
+    Compat wrapper preserved for callers within this module. Delegates to
+    :func:`apps.core.imports.normalization.normalize_cpf_digits` —
+    byte-equivalent for ASCII CPF inputs.
+    """
+    return normalize_cpf_digits(cpf)
 
 
 def _validate_cpf(cpf: str) -> bool:

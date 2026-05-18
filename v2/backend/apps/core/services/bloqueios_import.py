@@ -24,6 +24,7 @@ from django.db import transaction
 
 import pandas as pd
 
+from apps.core.imports.normalization import normalize_blank
 from apps.core.models import AvailabilityBlock
 from apps.core.services.resolvers import resolve_user_by_name
 
@@ -126,8 +127,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Usuario
     for key in ["usuário", "usuario", "user", "formador", "nome"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["usuario"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["usuario"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["usuario"] = ""
@@ -148,7 +148,10 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     else:
         normalized["fim"] = None
 
-    # Tipo
+    # Tipo — pattern legado mantido inline. ``normalize_blank`` não pode ser
+    # usado direto porque o default ``"Total"`` se ativa apenas quando ``val``
+    # é falsy/None/"nan", não quando ``val`` strip() resulta em "" — divergiria
+    # do comportamento atual em fixtures com whitespace puro.
     for key in ["tipo", "type"]:
         if key in lower_map:
             val = lower_map[key]
@@ -160,8 +163,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Motivo
     for key in ["motivo", "obs", "observacao", "observação"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["motivo"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["motivo"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["motivo"] = ""

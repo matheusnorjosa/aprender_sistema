@@ -262,8 +262,7 @@ def test_municipio_with_accent_resolves():
     report = import_acoes_controle(csv_file, dry_run=False)
 
     assert report["stats"]["created"] == 1, (
-        f"Esperado 1 created, recebido {report['stats']!r}. "
-        "Provável regressão do bug de lookup com acento."
+        f"Esperado 1 created, recebido {report['stats']!r}. " "Provável regressão do bug de lookup com acento."
     )
     assert report["stats"]["skipped"]["municipio"] == 0
     assert AcaoControle.objects.count() == 1
@@ -293,9 +292,7 @@ def test_municipio_cidade_uf_format_resolves():
 
     report = import_acoes_controle(csv_file, dry_run=False)
 
-    assert report["stats"]["created"] == 1, (
-        f"Esperado 1 created, recebido {report['stats']!r}"
-    )
+    assert report["stats"]["created"] == 1, f"Esperado 1 created, recebido {report['stats']!r}"
     assert AcaoControle.objects.count() == 1
 
 

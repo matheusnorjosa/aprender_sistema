@@ -111,9 +111,12 @@ Error Budget (horas/mês) = (100 - SLO%) × 720 / 100
 
 | Dado | RPO | RTO | Backup |
 |------|-----|-----|--------|
-| Banco de Dados | 5 min | 1 hora | WAL + Daily dump |
+| Banco de Dados | 5 min | 1 hora | WAL + Daily dump — ver SSOT [`BACKUP_OPERATIONS.md`](./BACKUP_OPERATIONS.md) |
 | Redis (cache) | N/A | 5 min | Não persistido |
 | Google Calendar | 0 | 24 horas | Resync automático |
+
+> Para detalhes de backup (frequência, retenção, criptografia opcional, S3,
+> health checks) consultar o SSOT [`BACKUP_OPERATIONS.md`](./BACKUP_OPERATIONS.md).
 
 ### 6.2 Consistência
 

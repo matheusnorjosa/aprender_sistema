@@ -234,6 +234,68 @@ def test_coordenador_optional():
     assert acao.coordenador is None  # Opcional, não bloqueia criação
 
 
+def test_municipio_with_accent_resolves():
+    """Regression: município com acento no DB casa com entrada acentuada do CSV.
+
+    Bug histórico: o importer fazia `Municipio.objects.filter(nome__iexact=norm_text(...))`,
+    ou seja, removia acentos do INPUT mas comparava com a coluna `nome` no DB
+    via `__iexact`, que é case-insensitive mas não strip acentos. Resultado:
+    "Iguatú" no DB e "Iguatú" no CSV viravam respectivamente "Iguatú" e "iguatu"
+    no lado do query, sem match.
+
+    Fix: usar `resolve_municipio` que tem fallback NFKD.
+    """
+    Municipio.objects.create(nome="Iguatú", uf="CE", ativo=True)
+    Projeto.objects.create(nome="ACerta", ativo=True)
+
+    csv_file = _create_csv_file(
+        rows=[
+            {
+                "Município": "Iguatú",
+                "Projeto": "ACerta",
+                "Data Entrega": "2026-01-15",
+            }
+        ],
+        fieldnames=["Município", "Projeto", "Data Entrega"],
+    )
+
+    report = import_acoes_controle(csv_file, dry_run=False)
+
+    assert report["stats"]["created"] == 1, (
+        f"Esperado 1 created, recebido {report['stats']!r}. " "Provável regressão do bug de lookup com acento."
+    )
+    assert report["stats"]["skipped"]["municipio"] == 0
+    assert AcaoControle.objects.count() == 1
+
+
+def test_municipio_cidade_uf_format_resolves():
+    """Município no formato 'CIDADE-UF' (texto único da fonte sheets.banco)
+    é desambiguado pelo resolver.
+
+    A planilha original digita o município como 'CURVELO-MG' em uma coluna
+    única (vs a coluna separada Município/UF do COMPRAS). O resolver deve
+    splitar e casar com Municipio(nome='Curvelo', uf='MG').
+    """
+    Municipio.objects.create(nome="Curvelo", uf="MG", ativo=True)
+    Projeto.objects.create(nome="ACerta", ativo=True)
+
+    csv_file = _create_csv_file(
+        rows=[
+            {
+                "Município": "CURVELO-MG",
+                "Projeto": "ACerta",
+                "Data Entrega": "2026-01-15",
+            }
+        ],
+        fieldnames=["Município", "Projeto", "Data Entrega"],
+    )
+
+    report = import_acoes_controle(csv_file, dry_run=False)
+
+    assert report["stats"]["created"] == 1, f"Esperado 1 created, recebido {report['stats']!r}"
+    assert AcaoControle.objects.count() == 1
+
+
 def test_update_existing_record():
     """Atualiza registro existente se dados mudarem."""
     municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)

@@ -17,7 +17,7 @@ from apps.core.models import Solicitacao
 from apps.core.types import JsonDict, PayloadHash
 
 from .utils import _payload_hash
-from .validation import _event_id_for
+from .validation import GCAL_EVENT_ID_PREFIX, _event_id_for, _request_id_for
 
 logger = logging.getLogger(__name__)
 
@@ -229,7 +229,7 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> JsonDict:
     if enable_meet:
         # requestId determinístico para idempotência (fix #573: era uuid4 aleatório)
         # Google usa requestId para deduplicar createRequest — mesmo ID = mesmo Meet link
-        request_id = f"meet-asv2-{s.id}"
+        request_id = _request_id_for(s)
         conference_data = {
             "createRequest": {
                 "requestId": request_id,
@@ -308,7 +308,7 @@ def build_preview_for_solicitacao(s: Solicitacao) -> JsonDict:
     # Gerar meet_link fake para preview (não persiste) apenas quando online
     meet_link_preview = None
     if enable_meet:
-        # Extrai número do event_id (formato: asv2-{id})
+        # Extrai número do event_id (formato: {GCAL_EVENT_ID_PREFIX}-{id})
         event_num = event_id.split("-")[-1] if "-" in event_id else event_id
         meet_link_preview = f"https://meet.google.com/fake-{event_num}"
 

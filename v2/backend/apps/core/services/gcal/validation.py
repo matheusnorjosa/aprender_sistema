@@ -13,6 +13,14 @@ import re
 from apps.core.models import Solicitacao
 from apps.core.types import EventId
 
+# Prefixos canonicos dos identificadores GCal.
+# Sao contrato com Google (eventId determinstico — ADR-008) e devem ser estaveis
+# entre client real e fake (audit 2026-05 finding B2). Mudanca aqui propaga para
+# todos os call sites e quebra idempotencia retroativa: nao alterar sem migration
+# explicita dos eventos ja publicados.
+GCAL_EVENT_ID_PREFIX: str = "asv2"
+GCAL_REQUEST_ID_PREFIX: str = "meet-asv2"
+
 
 def _validate_event_id(event_id: EventId) -> bool:
     """
@@ -52,7 +60,7 @@ def _event_id_for(s: Solicitacao) -> EventId:
     """
     Gera eventId determinístico para uma Solicitacao.
 
-    Format: asv2-{id}
+    Format: ``{GCAL_EVENT_ID_PREFIX}-{id}`` (ex: ``asv2-123``)
 
     Args:
         s: Solicitacao
@@ -63,9 +71,28 @@ def _event_id_for(s: Solicitacao) -> EventId:
     Raises:
         ValueError: Se ID gerado for inválido
     """
-    event_id = f"asv2-{s.id}"
+    event_id = f"{GCAL_EVENT_ID_PREFIX}-{s.id}"
 
     # Validar antes de retornar
     _validate_event_id(event_id)
 
     return event_id
+
+
+def _request_id_for(s: Solicitacao) -> str:
+    """
+    Gera requestId determinístico para criacao de Google Meet (ADR-008).
+
+    Google usa requestId para deduplicar createRequest — mesmo ID = mesmo Meet
+    link. Distinto de ``_event_id_for`` (event_id vs request_id sao IDs
+    separados, com prefixos diferentes para deixar a relacao explicita).
+
+    Format: ``{GCAL_REQUEST_ID_PREFIX}-{id}`` (ex: ``meet-asv2-123``)
+
+    Args:
+        s: Solicitacao
+
+    Returns:
+        str: Request ID determinístico (ex: meet-asv2-123)
+    """
+    return f"{GCAL_REQUEST_ID_PREFIX}-{s.id}"

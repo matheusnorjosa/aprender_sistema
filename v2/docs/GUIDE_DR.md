@@ -2,14 +2,19 @@
 
 **Ambiente**: VM de produção (systemd + PostgreSQL nativo). Para Docker Compose, ver [DISASTER_RECOVERY.md](./DISASTER_RECOVERY.md).
 
+> **Parâmetros canônicos** (RPO/RTO/retenção/frequência) vêm do SSOT
+> [`BACKUP_OPERATIONS.md`](./BACKUP_OPERATIONS.md#parâmetros-canônicos-rpo--rto--retenção--frequência).
+> Este documento foca em **PITR via WAL archiving** e procedimentos específicos
+> de VM (systemd, cron, restore PostgreSQL nativo).
+
 ## Visão Geral
 
 | Métrica | Valor |
 |---------|-------|
-| **RPO** (Recovery Point Objective) | 5 minutos |
+| **RPO** (Recovery Point Objective) | 5 minutos (WAL archiving) |
 | **RTO** (Recovery Time Objective) | 1 hora |
-| **Retenção** | 7 dias |
-| **Frequência** | Diário às 3h |
+| **Retenção** | 7 dias (configurável via `BACKUP_RETENTION_DAYS`) |
+| **Frequência** | Diário às 3h (cron VM); 2h em Docker — ver SSOT |
 
 ## Arquitetura de Backup
 

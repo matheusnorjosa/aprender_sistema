@@ -112,7 +112,7 @@ def preview_gcal(
     client_ip = _get_client_ip(request)
     AuditLog.objects.create(
         usuario=user,
-        action="PREVIEW_GCAL",
+        action=AuditLog.Action.PREVIEW_GCAL,
         model_name="Solicitacao",
         details={
             "solicitacao_id": solicitacao.id,
@@ -221,7 +221,7 @@ def publish_to_gcal(
     client_ip = _get_client_ip(request)
     AuditLog.objects.create(
         usuario=user,
-        action="PUBLISH_GCAL_REQUESTED",
+        action=AuditLog.Action.PUBLISH_GCAL_REQUESTED,
         model_name="Solicitacao",
         details={
             "solicitacao_id": solicitacao.id,
@@ -316,7 +316,7 @@ def resync_to_gcal(
     client_ip = _get_client_ip(request)
     AuditLog.objects.create(
         usuario=user,
-        action="RESYNC_GCAL_REQUESTED",
+        action=AuditLog.Action.RESYNC_GCAL_REQUESTED,
         model_name="Solicitacao",
         details={
             "solicitacao_id": solicitacao.id,
@@ -404,7 +404,7 @@ def cancel_from_gcal(
     client_ip = _get_client_ip(request)
     AuditLog.objects.create(
         usuario=user,
-        action="CANCEL_GCAL_REQUESTED",
+        action=AuditLog.Action.CANCEL_GCAL_REQUESTED,
         model_name="Solicitacao",
         details={
             "solicitacao_id": solicitacao.id,

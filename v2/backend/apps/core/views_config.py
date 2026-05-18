@@ -191,7 +191,7 @@ def config_view(request: Request) -> Response:
         # AuditLog (Issue #187 requirement)
         AuditLog.objects.create(
             usuario=request.user,
-            action="UPDATE_CONFIG",
+            action=AuditLog.Action.UPDATE_CONFIG,
             model_name="Config",
             details={
                 "changed_fields": list(vd.keys()),

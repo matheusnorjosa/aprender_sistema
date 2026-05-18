@@ -87,7 +87,7 @@ class CicloAcoesViewSet(viewsets.ModelViewSet):
 
             AuditLog.objects.create(
                 usuario=self.request.user,
-                action="CICLO_ACOES_CREATE",
+                action=AuditLog.Action.CICLO_ACOES_CREATE,
                 model_name="CicloAcoes",
                 details={
                     "ciclo_id": ciclo.id,
@@ -146,7 +146,7 @@ class AcaoInstanciaViewSet(viewsets.ReadOnlyModelViewSet):
 
             AuditLog.objects.create(
                 usuario=request.user,
-                action="ACAO_REGISTRAR_ANCORA",
+                action=AuditLog.Action.ACAO_REGISTRAR_ANCORA,
                 model_name="AcaoInstancia",
                 details={
                     "acao_instancia_id": action_instance.id,
@@ -177,7 +177,7 @@ class AcaoInstanciaViewSet(viewsets.ReadOnlyModelViewSet):
 
         AuditLog.objects.create(
             usuario=request.user,
-            action="ACAO_CONCLUIR",
+            action=AuditLog.Action.ACAO_CONCLUIR,
             model_name="AcaoInstancia",
             details={
                 "acao_instancia_id": action_instance.id,

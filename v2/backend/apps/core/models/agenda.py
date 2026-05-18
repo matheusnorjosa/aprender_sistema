@@ -32,11 +32,18 @@ class AvailabilityBlock(models.Model):
         ("P", "Parcial"),
     ]
 
-    STATUS_CHOICES = [
-        ("pendente", "Pendente"),
-        ("aprovado", "Aprovado"),
-        ("reprovado", "Reprovado"),
-    ]
+    class Status(models.TextChoices):
+        """Status do bloqueio (segue PA-01..PA-07).
+
+        Use AvailabilityBlock.Status.APROVADO em vez de literal "aprovado"
+        em codigo novo. Refs: audit 2026-05 finding B3.
+        """
+
+        PENDENTE = "pendente", "Pendente"
+        APROVADO = "aprovado", "Aprovado"
+        REPROVADO = "reprovado", "Reprovado"
+
+    STATUS_CHOICES = Status.choices
 
     usuario = models.ForeignKey(  # type: ignore[misc]
         "core.Usuario", on_delete=models.PROTECT, related_name="availability_blocks"

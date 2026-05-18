@@ -1,19 +1,45 @@
 # Backup Operations Guide — AS v2
 
-**Implemented in**: Issue #169, PR #186
 **Status**: ✅ Production-ready
-**Last Updated**: 2025-11-18
+**Refs**: Issue #169, PR #186, SEC-017 (criptografia opcional)
+**Last Updated**: 2026-05-17
+
+> **SSOT de operações de backup do AS v2.** Outros docs (`DISASTER_RECOVERY.md`,
+> `GUIDE_DR.md`, `SLO_DEFINITIONS.md`, `docs/operations/backup.md`) devem apontar
+> para este arquivo em vez de duplicar parâmetros.
+
+## Parâmetros canônicos (RPO / RTO / Retenção / Frequência)
+
+| Métrica | Valor | Nota |
+|---|---|---|
+| **RPO** (Recovery Point Objective) | **5 minutos** | WAL archiving contínuo (`archive_timeout=300`) |
+| **RTO** (Recovery Time Objective) | **1 hora** | Inclui restore + migrations + smoke; restore puro é tipicamente 10-30 min em base atual |
+| **Retenção padrão** | **7 dias** | Configurável via `BACKUP_RETENTION_DAYS`; S3 pode ter lifecycle policy mais longa |
+| **Frequência** | **1×/dia** | 2:00 AM em Docker (Celery beat) / 3:00 AM em VM (cron) — janela noturna |
+| **Verificação** | Semanal (domingos) | `verify_backup_health` (Docker) ou `verify_backup.sh` (VM) |
 
 ## Overview
 
 The AS v2 backup system provides automated, reliable PostgreSQL backups with:
 
-- **Daily full backups** at 2:00 AM (America/Fortaleza)
-- **Retention policies** (7 days default)
+- **Daily full backups** (parâmetros acima)
 - **S3/MinIO upload** support (optional)
+- **Optional age encryption at rest** (SEC-017, set `BACKUP_AGE_RECIPIENT`)
 - **Automated health checks** (weekly)
 - **Failure alerting** via Sentry
 - **Disaster recovery** with tested restore procedures
+
+## Contextos suportados (mesmo script `backup_db.sh`)
+
+| Contexto | Schedule | Storage | Doc complementar |
+|---|---|---|---|
+| **Docker Compose** (dev/staging/prod-like) | Celery Beat 2:00 AM (`tasks_backup.py`) | volume `backup_data` → `/backups` (+ S3 opcional) | `DISASTER_RECOVERY.md` (cenários de recovery) |
+| **VM de produção** (systemd + PostgreSQL nativo) | Cron 3:00 AM (`/etc/cron.d/aprender-backup`) | `/var/backups/aprender` (+ S3 opcional) | `GUIDE_DR.md` (PITR via WAL) |
+
+Em ambos os contextos, o script `v2/infra/scripts/backup_db.sh` é o **mesmo**;
+muda apenas a chamada (Celery vs cron) e os defaults das env vars
+(`DB_HOST=db` em Docker, `DB_HOST=localhost` em VM; `BACKUP_DIR=/backups` vs
+`/var/backups/aprender`).
 
 ## Architecture
 

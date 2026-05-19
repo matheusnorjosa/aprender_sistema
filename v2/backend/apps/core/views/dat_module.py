@@ -296,9 +296,7 @@ class DATAcaoViewSet(viewsets.ModelViewSet):
         }
 
         # Por projeto (top 10)
-        por_projeto = list(
-            stats_qs.values("projeto__nome").annotate(count=Count("id")).order_by("-count")[:10]
-        )
+        por_projeto = list(stats_qs.values("projeto__nome").annotate(count=Count("id")).order_by("-count")[:10])
 
         # Por coordenador (top 10)
         por_coordenador = list(

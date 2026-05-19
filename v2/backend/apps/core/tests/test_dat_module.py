@@ -632,7 +632,8 @@ class DATAcaoAPITests(DATModuleAPITestCase):
         # Critério de aceite obrigatório
         sum_carta = sum(por_etapa["carta"].values())
         self.assertEqual(
-            sum_carta, total,
+            sum_carta,
+            total,
             f"por_etapa.carta groups should sum to total ({total}); got {sum_carta} "
             f"— likely regression of ORDER BY → GROUP BY fragmentation. "
             f"Raw por_etapa.carta={por_etapa['carta']!r}",
@@ -644,7 +645,8 @@ class DATAcaoAPITests(DATModuleAPITestCase):
         for etapa in ("contato", "reuniao", "entrega"):
             sum_etapa = sum(por_etapa[etapa].values())
             self.assertEqual(
-                sum_etapa, total,
+                sum_etapa,
+                total,
                 f"por_etapa.{etapa} groups should sum to total ({total}); got {sum_etapa}",
             )
 

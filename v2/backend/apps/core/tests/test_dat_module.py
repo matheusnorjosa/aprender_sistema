@@ -690,6 +690,52 @@ class DATCompraAPITests(DATModuleAPITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("total", response.data)
 
+    def test_stats_aggregations_not_fragmented_by_listing_ordering(self):
+        """Regression: same bug as DATAcao stats (PR #1361).
+
+        DATCompra base queryset is ordered by ("-ano_uso", "municipio__nome").
+        Without `.order_by()` before `.values_list().annotate(Count())`, Django
+        injects those columns into GROUP BY and fragments the counts.
+        """
+        import uuid
+
+        self.client.force_authenticate(user=self.dat_user)
+
+        uid = uuid.uuid4().hex[:6]
+        # 6 compras, same status_uso, varied municipio + ano_uso → would
+        # fragment without the fix (GROUP BY status, ano_uso, municipio_nome).
+        for i in range(6):
+            mun = Municipio.objects.create(nome=f"ComprasCity_{uid}_{i}", uf="CE")
+            DATCompra.objects.create(
+                municipio=mun,
+                projeto=self.projeto,
+                descricao_produto=f"Item {i}",
+                quantidade=10,
+                ano_uso=2020 + i,  # varied
+                status_uso="disponivel",
+                created_by=self.dat_user,
+            )
+
+        url = reverse("core:dat-compra-material-stats")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        total = response.data["total"]
+        self.assertEqual(total, 6)
+
+        # por_status deve somar 6 (todos disponivel) — não fragmentado
+        sum_status = sum(response.data["por_status"].values())
+        self.assertEqual(
+            sum_status,
+            total,
+            f"por_status should sum to total ({total}); got {sum_status}. "
+            f"Regression of ORDER BY → GROUP BY fragmentation. por_status={response.data['por_status']!r}",
+        )
+
+        # por_ano top 5 deve ter contagens corretas
+        sum_ano = sum(p["count"] for p in response.data["por_ano"])
+        # 5 últimos anos: cada ano teve 1 compra → sum = 5 (de 6 total)
+        self.assertEqual(sum_ano, 5)
+
     def test_dashboard_action_allows_diretoria_user(self):
         """Diretoria deve acessar dashboard de compras (somente leitura)."""
         self.client.force_authenticate(user=self.diretoria_user)
@@ -802,6 +848,44 @@ class DATCadastroAPITests(DATModuleAPITestCase):
         response = self.client.post(url, {"etapa": "invalid_etapa", "status": "concluido"})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_stats_aggregations_not_fragmented_by_listing_ordering(self):
+        """Regression: same bug as DATAcao stats (PR #1361).
+
+        DATCadastro base queryset is ordered by ("plataforma", "municipio__nome").
+        Without `.order_by()` before `.values_list().annotate(Count())`, Django
+        injects those columns into GROUP BY → por_plataforma fragmented.
+        """
+        import uuid
+
+        self.client.force_authenticate(user=self.dat_user)
+
+        uid = uuid.uuid4().hex[:6]
+        # 6 cadastros plataforma=FORMAR, varied municipio → should yield
+        # por_plataforma == {"FORMAR": 6} (not 6 distinct buckets).
+        # DATCadastro has unique_together(municipio, projeto_geral, plataforma).
+        for i in range(6):
+            mun = Municipio.objects.create(nome=f"CadastroCity_{uid}_{i}", uf="CE")
+            DATCadastro.objects.create(
+                municipio=mun,
+                projeto_geral=self.projeto_geral,
+                plataforma="FORMAR",
+                created_by=self.dat_user,
+            )
+
+        url = reverse("core:dat-cadastro-stats")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        total = response.data["total"]
+        self.assertEqual(total, 6)
+
+        sum_plataforma = sum(response.data["por_plataforma"].values())
+        self.assertEqual(
+            sum_plataforma,
+            total,
+            f"por_plataforma should sum to total ({total}); got {sum_plataforma}. "
+            f"Regression of ORDER BY → GROUP BY. por_plataforma={response.data['por_plataforma']!r}",
+        )
+
 
 class DATFormacaoAPITests(DATModuleAPITestCase):
     """Tests for DATFormacao API endpoints."""
@@ -874,6 +958,51 @@ class DATFormacaoAPITests(DATModuleAPITestCase):
         self.assertIn("total", response.data)
         self.assertIn("participantes_previstos", response.data)
         self.assertEqual(response.data["participantes_previstos"], 50)
+
+    def test_stats_aggregations_not_fragmented_by_listing_ordering(self):
+        """Regression: same bug as DATAcao stats (PR #1361).
+
+        DATFormacao base queryset is ordered by ("-data_formacao", "horario_inicio").
+        Without `.order_by()` before `.values_list().annotate(Count())`, Django
+        injects those columns into GROUP BY → por_status fragmented.
+        """
+        import uuid
+
+        self.client.force_authenticate(user=self.dat_user)
+
+        uid = uuid.uuid4().hex[:6]
+        # 6 formações com status="agendada" mas datas/horários distintos →
+        # would fragment without the fix.
+        today = date.today()
+        for i in range(6):
+            DATFormacao.objects.create(
+                municipio=self.municipio,
+                projeto=self.projeto,
+                titulo=f"Formação {uid}_{i}",
+                data_formacao=today + timedelta(days=i),  # varied date
+                horario_inicio=time(8 + i, 0),  # varied hour
+                horario_fim=time(12, 0),
+                status="agendada",
+                modalidade="presencial",
+                created_by=self.dat_user,
+            )
+
+        url = reverse("core:dat-formacao-stats")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        total = response.data["total"]
+        self.assertEqual(total, 6)
+
+        sum_status = sum(response.data["por_status"].values())
+        self.assertEqual(
+            sum_status,
+            total,
+            f"por_status should sum to total ({total}); got {sum_status}. "
+            f"Regression of ORDER BY → GROUP BY. por_status={response.data['por_status']!r}",
+        )
+
+        sum_modalidade = sum(response.data["por_modalidade"].values())
+        self.assertEqual(sum_modalidade, total)
 
 
 # ============================================================

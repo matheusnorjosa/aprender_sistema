@@ -585,6 +585,76 @@ class DATAcaoAPITests(DATModuleAPITestCase):
         self.assertIn("total", response.data)
         self.assertIn("por_etapa", response.data)
 
+    def test_stats_por_etapa_aggregates_correctly_across_priorities_and_municipios(self):
+        """Regression: por_etapa.<status>.values() must sum to total.
+
+        The ViewSet's base queryset is ordered by `-prioridade, municipio__nome`.
+        When `.values_list("status_carta").annotate(c=Count("id"))` is called
+        on that ordered queryset, Django pulls the ORDER BY columns into the
+        GROUP BY clause, producing a fragmented count
+        (one bucket per (status, prioridade, municipio_nome) tuple) so the
+        stats endpoint reported sum << total.
+
+        With the fix, `stats_qs = qs.order_by()` strips the inherited ordering
+        before aggregation, restoring the correct GROUP BY status_carta only.
+        """
+        self.client.force_authenticate(user=self.dat_user)
+
+        # 6 acoes, same status_carta="concluido", varied prioridade + municipio
+        # → without the fix, GROUP BY (status_carta, prioridade, municipio__nome)
+        # would yield 6 distinct buckets of count=1 instead of {"concluido": 6}.
+        # DATAcao has unique_together(municipio, projeto), so we create one
+        # fresh municipio per row (different prioridade for each).
+        import uuid
+
+        uid = uuid.uuid4().hex[:6]
+        for prio in range(1, 7):
+            mun = Municipio.objects.create(nome=f"StatsCity_{uid}_{prio}", uf="CE")
+            DATAcao.objects.create(
+                municipio=mun,
+                projeto=self.projeto,
+                status_carta="concluido",
+                status_contato="pendente",
+                status_reuniao="pendente",
+                status_entrega="pendente",
+                prioridade=prio,
+                created_by=self.dat_user,
+            )
+
+        url = reverse("core:dat-acao-ciclo-stats")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        total = response.data["total"]
+        self.assertEqual(total, 6, "Sanity: 6 DATAcao created in this test")
+
+        por_etapa = response.data["por_etapa"]
+        # Critério de aceite obrigatório
+        sum_carta = sum(por_etapa["carta"].values())
+        self.assertEqual(
+            sum_carta,
+            total,
+            f"por_etapa.carta groups should sum to total ({total}); got {sum_carta} "
+            f"— likely regression of ORDER BY → GROUP BY fragmentation. "
+            f"Raw por_etapa.carta={por_etapa['carta']!r}",
+        )
+        # E os 6 devem estar em UMA bucket (concluido), não fragmentados
+        self.assertEqual(por_etapa["carta"].get("concluido"), 6)
+
+        # Mesma propriedade para as outras 3 etapas
+        for etapa in ("contato", "reuniao", "entrega"):
+            sum_etapa = sum(por_etapa[etapa].values())
+            self.assertEqual(
+                sum_etapa,
+                total,
+                f"por_etapa.{etapa} groups should sum to total ({total}); got {sum_etapa}",
+            )
+
+        # por_projeto / por_coordenador também devem usar mesmo queryset stats
+        # → soma de counts deve bater com total quando há 1 projeto único
+        sum_projeto = sum(p["count"] for p in response.data["por_projeto"])
+        self.assertEqual(sum_projeto, total)
+
 
 class DATCompraAPITests(DATModuleAPITestCase):
     """Tests for DATCompra API endpoints."""

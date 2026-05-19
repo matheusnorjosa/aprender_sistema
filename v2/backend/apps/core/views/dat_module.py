@@ -429,14 +429,20 @@ class DATCompraViewSet(viewsets.ModelViewSet):
         total = qs.count()
         valor_total = qs.aggregate(total=Sum(F("valor_unitario") * F("quantidade")))["total"] or 0
 
+        # Same fix as DATAcao stats (PR #1361): clear listing ordering before
+        # aggregation. Base queryset orders by ("-ano_uso", "municipio__nome"),
+        # which Django would otherwise inject into the GROUP BY clause and
+        # fragment the per-status/per-ano/per-projeto counts.
+        stats_qs = qs.order_by()
+
         # Por status de uso
-        por_status = dict(qs.values_list("status_uso").annotate(c=Count("id")))
+        por_status = dict(stats_qs.values_list("status_uso").annotate(c=Count("id")))
 
         # Por ano (últimos 5)
-        por_ano = list(qs.values("ano_uso").annotate(count=Count("id")).order_by("-ano_uso")[:5])
+        por_ano = list(stats_qs.values("ano_uso").annotate(count=Count("id")).order_by("-ano_uso")[:5])
 
         # Por projeto (top 10)
-        por_projeto = list(qs.values("projeto__nome").annotate(count=Count("id")).order_by("-count")[:10])
+        por_projeto = list(stats_qs.values("projeto__nome").annotate(count=Count("id")).order_by("-count")[:10])
 
         return Response(
             {
@@ -776,11 +782,16 @@ class DATCadastroViewSet(viewsets.ModelViewSet):
 
         total = qs.count()
 
+        # Same fix as DATAcao stats (PR #1361): clear listing ordering before
+        # aggregation. Base queryset orders by ("plataforma", "municipio__nome"),
+        # which Django would otherwise inject into the GROUP BY.
+        stats_qs = qs.order_by()
+
         # Por plataforma
-        por_plataforma = dict(qs.values_list("plataforma").annotate(c=Count("id")))
+        por_plataforma = dict(stats_qs.values_list("plataforma").annotate(c=Count("id")))
 
         # FORMAR completos
-        formar_completos = qs.filter(
+        formar_completos = stats_qs.filter(
             plataforma="FORMAR",
             status_criacao_curso="concluido",
             status_chaves="concluido",
@@ -789,7 +800,7 @@ class DATCadastroViewSet(viewsets.ModelViewSet):
         ).count()
 
         # AVALIAR completos
-        avaliar_completos = qs.filter(
+        avaliar_completos = stats_qs.filter(
             plataforma="AVALIAR",
             status_recebidos="concluido",
             status_validados="concluido",
@@ -797,7 +808,7 @@ class DATCadastroViewSet(viewsets.ModelViewSet):
         ).count()
 
         # Por projeto geral (top 10)
-        por_projeto = list(qs.values("projeto_geral__nome").annotate(count=Count("id")).order_by("-count")[:10])
+        por_projeto = list(stats_qs.values("projeto_geral__nome").annotate(count=Count("id")).order_by("-count")[:10])
 
         return Response(
             {
@@ -949,25 +960,31 @@ class DATFormacaoViewSet(viewsets.ModelViewSet):
 
         total = qs.count()
 
+        # Same fix as DATAcao stats (PR #1361): clear listing ordering before
+        # aggregation. Base queryset orders by ("-data_formacao", "horario_inicio"),
+        # which Django would otherwise inject into the GROUP BY.
+        stats_qs = qs.order_by()
+
         # Por status
-        por_status = dict(qs.values_list("status").annotate(c=Count("id")))
+        por_status = dict(stats_qs.values_list("status").annotate(c=Count("id")))
 
         # Por modalidade
-        por_modalidade = dict(qs.values_list("modalidade").annotate(c=Count("id")))
+        por_modalidade = dict(stats_qs.values_list("modalidade").annotate(c=Count("id")))
 
         # Por projeto (top 10)
-        por_projeto = list(qs.values("projeto__nome").annotate(count=Count("id")).order_by("-count")[:10])
+        por_projeto = list(stats_qs.values("projeto__nome").annotate(count=Count("id")).order_by("-count")[:10])
 
         # Por coordenador (top 10)
         por_coordenador = list(
-            qs.filter(coordenador__isnull=False)
+            stats_qs.filter(coordenador__isnull=False)
             .values("coordenador__nome")
             .annotate(count=Count("id"))
             .order_by("-count")[:10]
         )
 
-        # Participantes totais
-        participantes = qs.aggregate(
+        # Participantes totais (Sum em qs ordenada não sofre o bug; mantemos qs
+        # original mas usar stats_qs também é seguro)
+        participantes = stats_qs.aggregate(
             previstos=Sum("quantidade_prevista"),
             presentes=Sum("quantidade_presente"),
         )

@@ -279,20 +279,30 @@ class DATAcaoViewSet(viewsets.ModelViewSet):
 
         total = qs.count()
 
+        # `.order_by()` clears the listing ordering before aggregation.
+        # The base queryset is ordered by ("-prioridade", "municipio__nome").
+        # Django would add those columns to GROUP BY when combined with
+        # values/values_list + annotate, producing fragmented counts
+        # (e.g. status_carta grouped by (status, prioridade, municipio) so
+        # `sum(por_etapa.carta.values()) << total`).
+        stats_qs = qs.order_by()
+
         # Por status de cada etapa
         por_etapa = {
-            "carta": dict(qs.values_list("status_carta").annotate(c=Count("id"))),
-            "contato": dict(qs.values_list("status_contato").annotate(c=Count("id"))),
-            "reuniao": dict(qs.values_list("status_reuniao").annotate(c=Count("id"))),
-            "entrega": dict(qs.values_list("status_entrega").annotate(c=Count("id"))),
+            "carta": dict(stats_qs.values_list("status_carta").annotate(c=Count("id"))),
+            "contato": dict(stats_qs.values_list("status_contato").annotate(c=Count("id"))),
+            "reuniao": dict(stats_qs.values_list("status_reuniao").annotate(c=Count("id"))),
+            "entrega": dict(stats_qs.values_list("status_entrega").annotate(c=Count("id"))),
         }
 
         # Por projeto (top 10)
-        por_projeto = list(qs.values("projeto__nome").annotate(count=Count("id")).order_by("-count")[:10])
+        por_projeto = list(
+            stats_qs.values("projeto__nome").annotate(count=Count("id")).order_by("-count")[:10]
+        )
 
         # Por coordenador (top 10)
         por_coordenador = list(
-            qs.filter(coordenador__isnull=False)
+            stats_qs.filter(coordenador__isnull=False)
             .values("coordenador__nome")
             .annotate(count=Count("id"))
             .order_by("-count")[:10]

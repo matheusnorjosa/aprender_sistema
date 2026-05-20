@@ -79,7 +79,20 @@ jobs:
       - name: Run pip-audit (PyPI Advisory Database)
         run: |
           cd v2/backend
-          pip-audit -r requirements.txt --format json > pip-audit-report.json
+          # Ignored CVEs (TTL — revisar trimestralmente, próxima 2026-08-20):
+          #   PYSEC-2024-271 (CVE-2024-1681): flask-cors log injection via CRLF em debug log.
+          #     Transitiva de `locust` (dev-only, não-runtime). Sem fix em nenhuma versão
+          #     publicada (afetadas 0.* até 6.0.2 — última no PyPI).
+          #   PYSEC-2025-183 (CVE-2025-45768): PyJWT "weak encryption" alegado.
+          #     DISPUTADO oficialmente pelo maintainer (key length é responsabilidade da
+          #     aplicação, não da lib). Sem fix em nenhuma versão (afetadas até 2.12.1).
+          # Validado em osv.dev + NVD + PyPI: nenhum fix disponível upstream.
+          # Plano de saída: remover --ignore-vuln quando upstream publicar patch
+          # ou ao renovar TTL trimestralmente (re-checar advisories nessa data).
+          pip-audit -r requirements.txt --format json \
+            --ignore-vuln PYSEC-2024-271 \
+            --ignore-vuln PYSEC-2025-183 \
+            > pip-audit-report.json
 
       - name: Run Bandit (SAST)
         run: |

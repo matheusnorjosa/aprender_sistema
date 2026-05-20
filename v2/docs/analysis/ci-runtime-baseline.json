@@ -76,10 +76,10 @@
       "samples": 15
     },
     "frontend-ci::[required] build/lint do frontend": {
-      "max_seconds": 71.0,
-      "median_seconds": 60.0,
-      "min_seconds": 52.0,
-      "p95_seconds": 71.0,
+      "max_seconds": 107.0,
+      "median_seconds": 86.0,
+      "min_seconds": 67.0,
+      "p95_seconds": 95.0,
       "samples": 15
     },
     "frontend-ci::[required] checklist tests (meta, a11y, security)": {

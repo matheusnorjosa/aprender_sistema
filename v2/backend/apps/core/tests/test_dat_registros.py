@@ -529,9 +529,7 @@ class DATRegistroFilterRegiaoTests(APITestCase):
 
         suffix = str(uuid.uuid4())[:8]
         cls.dat_group, _ = Group.objects.get_or_create(name="DAT")
-        cls.user = User.objects.create_user(
-            username=f"regiao_test_{suffix}", password="t123", cpf=f"444{suffix[:8]}"
-        )
+        cls.user = User.objects.create_user(username=f"regiao_test_{suffix}", password="t123", cpf=f"444{suffix[:8]}")
         cls.user.groups.add(cls.dat_group)
         cls.pg = ProjetoGeral.objects.create(nome=f"PG Regiao Test {suffix}", usa_avaliar=False)
         cls.projeto = Projeto.objects.create(
@@ -594,7 +592,9 @@ class DATRegistroFilterRegiaoTests(APITestCase):
 
     def test_filter_regiao_unknown_returns_empty(self):
         self.assertEqual(self._filter("XYZ").count(), 0)
-        self.assertEqual(self._filter("").count(), DATRegistro.objects.count())  # empty = no filter applied by django-filter
+        self.assertEqual(
+            self._filter("").count(), DATRegistro.objects.count()
+        )  # empty = no filter applied by django-filter
 
     def test_filter_regiao_does_not_match_uf_outside_region(self):
         nordeste_ids = set(self._filter("Nordeste").values_list("id", flat=True))

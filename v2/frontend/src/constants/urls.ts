@@ -10,5 +10,5 @@ export const EXTERNAL_URLS: Record<string, string> = {
   FORMAR_PLATFORM: (import.meta.env.VITE_FORMAR_URL as string) || 'https://www.aprenderformar.com.br/plataforma/',
 
   // Avaliar Platform (Assessment)
-  AVALIAR_PLATFORM: (import.meta.env.VITE_AVALIAR_URL as string) || 'https://avaliar.aprenderformar.com.br/',
+  AVALIAR_PLATFORM: (import.meta.env.VITE_AVALIAR_URL as string) || 'https://aprenderavaliar.com.br/',
 };

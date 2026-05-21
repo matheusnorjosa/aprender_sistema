@@ -19,6 +19,7 @@ class DATCompraSerializer(serializers.ModelSerializer["DATCompra"]):
 
     # FK names
     municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
+    municipio_uf = serializers.CharField(source="municipio.uf", read_only=True)
     projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
     produto_nome = serializers.CharField(source="produto.nome", read_only=True, allow_null=True)
 
@@ -36,6 +37,7 @@ class DATCompraSerializer(serializers.ModelSerializer["DATCompra"]):
             # FKs
             "municipio",
             "municipio_nome",
+            "municipio_uf",
             "projeto",
             "projeto_nome",
             "produto",
@@ -69,6 +71,7 @@ class DATCompraListSerializer(serializers.ModelSerializer["DATCompra"]):
     """List serializer for DATCompra (table view)."""
 
     municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
+    municipio_uf = serializers.CharField(source="municipio.uf", read_only=True)
     projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
     produto_nome = serializers.CharField(source="produto.nome", read_only=True, allow_null=True)
     disponivel = serializers.IntegerField(read_only=True)
@@ -79,6 +82,7 @@ class DATCompraListSerializer(serializers.ModelSerializer["DATCompra"]):
         fields = [
             "id",
             "municipio_nome",
+            "municipio_uf",
             "projeto_nome",
             "produto_nome",
             "descricao_produto",
@@ -89,6 +93,7 @@ class DATCompraListSerializer(serializers.ModelSerializer["DATCompra"]):
             "valor_unitario",
             "valor_total",
             "ano_uso",
+            "data_compra",
             "status_uso",
             "ativo",
         ]

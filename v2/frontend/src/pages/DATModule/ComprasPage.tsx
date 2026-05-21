@@ -68,11 +68,13 @@ interface CompraRecord {
   produto_nome: string;
   codigo_produto: string | null;
   tipo_compra?: string | null;
-  uf: string;
+  uf?: string;
+  municipio_uf?: string;
   municipio: number;
   municipio_nome: string;
   quantidade: number;
   quantidade_utilizada: number | null;
+  data_compra?: string | null;
   [key: string]: any;
 }
 
@@ -323,10 +325,12 @@ export default function ComprasPage(): JSX.Element {
     },
     {
       title: 'UF',
-      dataIndex: 'uf',
       key: 'uf',
       width: 60,
-      render: (uf: string) => <Tag>{uf}</Tag>,
+      render: (_: unknown, record: CompraRecord) => {
+        const uf = record.municipio_uf || record.uf;
+        return uf ? <Tag>{uf}</Tag> : <span style={{ color: '#bfbfbf' }}>—</span>;
+      },
     },
     {
       title: 'Município',
@@ -334,6 +338,14 @@ export default function ComprasPage(): JSX.Element {
       key: 'municipio',
       width: 150,
       ellipsis: true,
+    },
+    {
+      title: 'Data Compra',
+      dataIndex: 'data_compra',
+      key: 'data_compra',
+      width: 110,
+      render: (data: string | null | undefined) =>
+        data ? dayjs(data).format('DD/MM/YYYY') : <span style={{ color: '#bfbfbf' }}>—</span>,
     },
     {
       title: 'Quantidade',

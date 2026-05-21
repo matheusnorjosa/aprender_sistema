@@ -159,6 +159,15 @@ export default function ProdutosPage(): JSX.Element {
     { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
     { title: 'Codigo', dataIndex: 'codigo', key: 'codigo', width: 120 },
     { title: 'Nome', dataIndex: 'nome', key: 'nome', width: 250 },
+    {
+      title: 'Descrição',
+      dataIndex: 'descricao',
+      key: 'descricao',
+      width: 280,
+      ellipsis: true,
+      render: (descricao: string | null | undefined) =>
+        descricao && descricao.trim() ? descricao : <span style={{ color: '#bfbfbf' }}>—</span>,
+    },
     { title: 'Projeto', dataIndex: 'projeto_nome', key: 'projeto_nome', width: 150 },
     {
       title: 'Ativo',
@@ -239,7 +248,7 @@ export default function ProdutosPage(): JSX.Element {
             pageSizeOptions: ['15', '30', '50', '100'],
             showTotal: (total) => `Total: ${total}`,
           }}
-          scroll={{ x: 900 }}
+          scroll={{ x: 1180 }}
         />
       </Card>
 

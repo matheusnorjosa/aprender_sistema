@@ -150,8 +150,10 @@ export default function CadastrosPage(): JSX.Element {
     buildParams: (f) => ({
       ...(f.search && { search: f.search }),
       ...(f.uf && { uf: f.uf }),
-      ...(f.municipio !== undefined && { municipio_id: f.municipio }),
-      ...(f.projeto_geral !== undefined && { projeto_geral_id: f.projeto_geral }),
+      // Backend filterset (DATCadastroFilter) usa `municipio` e `projeto_geral`
+      // (sem sufixo `_id`) — vide v2/backend/.../dat_module.py:698.
+      ...(f.municipio !== undefined && { municipio: f.municipio }),
+      ...(f.projeto_geral !== undefined && { projeto_geral: f.projeto_geral }),
       ...(f.status_etapa && { status_etapa: f.status_etapa }),
       plataforma: activeTab,
     }),

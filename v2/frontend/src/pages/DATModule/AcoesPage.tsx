@@ -137,12 +137,14 @@ const DEFAULT_FILTERS: AcoesFilters = {
   status_geral: undefined,
 };
 
+// Backend filterset (DATAcaoFilter) expõe `municipio`, `projeto`, `coordenador`
+// (sem sufixo `_id`). Manter chaves alinhadas aqui — vide v2/backend/.../dat_module.py:195.
 const buildAcoesParams = (f: AcoesFilters): TableFilterParams => ({
   ...(f.search && { search: f.search }),
   ...(f.uf && { uf: f.uf }),
-  ...(f.municipio !== undefined && { municipio_id: f.municipio }),
-  ...(f.projeto !== undefined && { projeto_id: f.projeto }),
-  ...(f.coordenador !== undefined && { coordenador_id: f.coordenador }),
+  ...(f.municipio !== undefined && { municipio: f.municipio }),
+  ...(f.projeto !== undefined && { projeto: f.projeto }),
+  ...(f.coordenador !== undefined && { coordenador: f.coordenador }),
   ...(f.status_geral && { status_geral: f.status_geral }),
 });
 
@@ -502,35 +504,38 @@ export default function AcoesPage(): JSX.Element {
           </Col>
           <Col xs={24} sm={12} md={6}>
             <Card>
-              <Statistic
-                title="Cartas Enviadas"
-                value={stats.cartas_enviadas || 0}
-                valueStyle={{ color: '#1890ff' }}
-                prefix={<MailOutlined />}
-                suffix={`/ ${stats.total || 0}`}
-              />
+              <Tooltip title="Aguardando reprocessamento dos dados (parser de etapas Carta/Contato/Reunião/Entrega)">
+                <Statistic
+                  title="Cartas Enviadas"
+                  value="—"
+                  valueStyle={{ color: '#bfbfbf' }}
+                  prefix={<MailOutlined />}
+                />
+              </Tooltip>
             </Card>
           </Col>
           <Col xs={24} sm={12} md={6}>
             <Card>
-              <Statistic
-                title="Reuniões Realizadas"
-                value={stats.reunioes_realizadas || 0}
-                valueStyle={{ color: '#722ed1' }}
-                prefix={<TeamOutlined />}
-                suffix={`/ ${stats.total || 0}`}
-              />
+              <Tooltip title="Aguardando reprocessamento dos dados (parser de etapas Carta/Contato/Reunião/Entrega)">
+                <Statistic
+                  title="Reuniões Realizadas"
+                  value="—"
+                  valueStyle={{ color: '#bfbfbf' }}
+                  prefix={<TeamOutlined />}
+                />
+              </Tooltip>
             </Card>
           </Col>
           <Col xs={24} sm={12} md={6}>
             <Card>
-              <Statistic
-                title="Entregas Concluídas"
-                value={stats.entregas_concluidas || 0}
-                valueStyle={{ color: '#52c41a' }}
-                prefix={<CheckCircleFilled />}
-                suffix={`/ ${stats.total || 0}`}
-              />
+              <Tooltip title="Aguardando reprocessamento dos dados (parser de etapas Carta/Contato/Reunião/Entrega)">
+                <Statistic
+                  title="Entregas Concluídas"
+                  value="—"
+                  valueStyle={{ color: '#bfbfbf' }}
+                  prefix={<CheckCircleFilled />}
+                />
+              </Tooltip>
             </Card>
           </Col>
         </Row>

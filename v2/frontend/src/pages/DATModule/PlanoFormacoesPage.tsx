@@ -612,32 +612,38 @@ export default function PlanoFormacoesPage(): JSX.Element {
           </Col>
           <Col xs={24} sm={12} md={6}>
             <Card>
-              <Statistic
-                title={`Formações ${new Date().getFullYear()}`}
-                value={stats.total_formacoes}
-                prefix={<CalendarOutlined />}
-              />
+              <Tooltip title="Aguardando reprocessamento dos dados (parser de Formações por ano)">
+                <Statistic
+                  title={`Formações ${new Date().getFullYear()}`}
+                  value="—"
+                  valueStyle={{ color: '#bfbfbf' }}
+                  prefix={<CalendarOutlined />}
+                />
+              </Tooltip>
             </Card>
           </Col>
           <Col xs={24} sm={12} md={6}>
             <Card>
-              <Statistic
-                title="Realizadas"
-                value={stats.total_realizadas}
-                suffix={`(${stats.taxa_realizacao}%)`}
-                valueStyle={{ color: '#52c41a' }}
-                prefix={<CheckCircleOutlined />}
-              />
+              <Tooltip title="Aguardando reprocessamento dos dados (cálculo de Formacao.realizada)">
+                <Statistic
+                  title="Realizadas"
+                  value="—"
+                  valueStyle={{ color: '#bfbfbf' }}
+                  prefix={<CheckCircleOutlined />}
+                />
+              </Tooltip>
             </Card>
           </Col>
           <Col xs={24} sm={12} md={6}>
             <Card>
-              <Statistic
-                title="CH Total"
-                value={stats.ch_total}
-                suffix="h"
-                prefix={<ClockCircleOutlined />}
-              />
+              <Tooltip title="Aguardando recálculo de CH total (PlanoFormacoes.recalcular_ch)">
+                <Statistic
+                  title="CH Total"
+                  value="—"
+                  valueStyle={{ color: '#bfbfbf' }}
+                  prefix={<ClockCircleOutlined />}
+                />
+              </Tooltip>
             </Card>
           </Col>
         </Row>

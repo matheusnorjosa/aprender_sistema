@@ -37,11 +37,25 @@ if TYPE_CHECKING:
     from rest_framework.request import Request
 
 
+# Canonical Brazilian region → UF tuple mapping. Must match frontend
+# constant at v2/frontend/src/pages/DATModule/DATRegistros/constants.tsx
+# (REGIAO_UFS) — divergence breaks the regiao filter on /dat/registros.
+REGIAO_UFS: dict[str, tuple[str, ...]] = {
+    "Norte": ("AC", "AP", "AM", "PA", "RO", "RR", "TO"),
+    "Nordeste": ("AL", "BA", "CE", "MA", "PB", "PE", "PI", "RN", "SE"),
+    "Centro-Oeste": ("DF", "GO", "MT", "MS"),
+    "Sudeste": ("ES", "MG", "RJ", "SP"),
+    "Sul": ("PR", "RS", "SC"),
+}
+_REGIAO_UFS_CI: dict[str, tuple[str, ...]] = {k.lower(): v for k, v in REGIAO_UFS.items()}
+
+
 class DATRegistroFilter(filters.FilterSet):
     """
     FilterSet for DATRegistro.
 
     Supports filtering by:
+    - regiao: Brazilian region (Norte, Nordeste, Centro-Oeste, Sudeste, Sul)
     - uf: Município UF (e.g., CE, BA)
     - municipio: Município ID
     - projeto_geral: ProjetoGeral ID
@@ -51,7 +65,15 @@ class DATRegistroFilter(filters.FilterSet):
     """
 
     uf = filters.CharFilter(field_name="municipio__uf", lookup_expr="iexact")
+    regiao = filters.CharFilter(method="filter_regiao")
     status_formar = filters.CharFilter(method="filter_status_formar")
+
+    def filter_regiao(self, queryset: QuerySet, name: str, value: str) -> QuerySet:
+        """Filter by Brazilian region → set of UFs (case-insensitive)."""
+        ufs = _REGIAO_UFS_CI.get(value.lower())
+        if not ufs:
+            return queryset.none()
+        return queryset.filter(municipio__uf__in=ufs)
 
     def filter_status_formar(self, queryset: QuerySet, name: str, value: str) -> QuerySet:
         """Filter by FORMAR completion status."""

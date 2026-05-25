@@ -110,6 +110,7 @@ interface UFOption {
 
 
 const buildRegistrosParams = (f: DATRegistrosFilters): TableFilterParams => ({
+  ...(f.regiao && { regiao: f.regiao }),
   ...(f.uf && { uf: f.uf }),
   ...(f.municipio !== undefined && { municipio: f.municipio }),
   ...(f.projeto_geral !== undefined && { projeto_geral: f.projeto_geral }),

@@ -518,3 +518,92 @@ class ProjetoGeralAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
         self.assertIn("Linked Project", response.data[0]["nome"])
+
+
+class DATRegistroFilterRegiaoTests(APITestCase):
+    """Tests for the regiao filter on DATRegistroFilter (PR B audit)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        import uuid
+
+        suffix = str(uuid.uuid4())[:8]
+        cls.dat_group, _ = Group.objects.get_or_create(name="DAT")
+        cls.user = User.objects.create_user(username=f"regiao_test_{suffix}", password="t123", cpf=f"444{suffix[:8]}")
+        cls.user.groups.add(cls.dat_group)
+        cls.pg = ProjetoGeral.objects.create(nome=f"PG Regiao Test {suffix}", usa_avaliar=False)
+        cls.projeto = Projeto.objects.create(
+            nome=f"Projeto Regiao Test {suffix}",
+            codigo=f"REG{suffix}",
+            fluxo="NAO_SUPER",
+            projeto_geral=cls.pg,
+        )
+
+        # One município per Brazilian region (UF picked from REGIAO_UFS).
+        cls.mun_nordeste = Municipio.objects.create(nome=f"MunNE_{suffix}", uf="CE")
+        cls.mun_sudeste = Municipio.objects.create(nome=f"MunSE_{suffix}", uf="SP")
+        cls.mun_sul = Municipio.objects.create(nome=f"MunS_{suffix}", uf="RS")
+        cls.mun_centro = Municipio.objects.create(nome=f"MunCO_{suffix}", uf="DF")
+        cls.mun_norte = Municipio.objects.create(nome=f"MunN_{suffix}", uf="PA")
+
+        for mun in (cls.mun_nordeste, cls.mun_sudeste, cls.mun_sul, cls.mun_centro, cls.mun_norte):
+            DATRegistro.objects.create(
+                municipio=mun,
+                projeto_geral=cls.pg,
+                projeto=cls.projeto,
+                aluno_qtde=10,
+                created_by=cls.user,
+            )
+
+    def _filter(self, regiao):
+        from apps.core.views.dat import DATRegistroFilter
+
+        fs = DATRegistroFilter({"regiao": regiao}, queryset=DATRegistro.objects.all())
+        return fs.qs
+
+    def test_filter_regiao_nordeste_keeps_only_nordeste_municipios(self):
+        qs = self._filter("Nordeste")
+        ufs = list(qs.values_list("municipio__uf", flat=True))
+        self.assertEqual(ufs, ["CE"])
+
+    def test_filter_regiao_sudeste_keeps_only_sudeste(self):
+        qs = self._filter("Sudeste")
+        self.assertEqual(list(qs.values_list("municipio__uf", flat=True)), ["SP"])
+
+    def test_filter_regiao_sul_keeps_only_sul(self):
+        qs = self._filter("Sul")
+        self.assertEqual(list(qs.values_list("municipio__uf", flat=True)), ["RS"])
+
+    def test_filter_regiao_centro_oeste_keeps_only_centro_oeste(self):
+        qs = self._filter("Centro-Oeste")
+        self.assertEqual(list(qs.values_list("municipio__uf", flat=True)), ["DF"])
+
+    def test_filter_regiao_norte_keeps_only_norte(self):
+        qs = self._filter("Norte")
+        self.assertEqual(list(qs.values_list("municipio__uf", flat=True)), ["PA"])
+
+    def test_filter_regiao_is_case_insensitive(self):
+        upper = self._filter("NORDESTE").count()
+        lower = self._filter("nordeste").count()
+        title = self._filter("Nordeste").count()
+        self.assertEqual(upper, lower)
+        self.assertEqual(lower, title)
+        self.assertEqual(title, 1)
+
+    def test_filter_regiao_unknown_returns_empty(self):
+        self.assertEqual(self._filter("XYZ").count(), 0)
+        self.assertEqual(
+            self._filter("").count(), DATRegistro.objects.count()
+        )  # empty = no filter applied by django-filter
+
+    def test_filter_regiao_does_not_match_uf_outside_region(self):
+        nordeste_ids = set(self._filter("Nordeste").values_list("id", flat=True))
+        sul_ids = set(self._filter("Sul").values_list("id", flat=True))
+        self.assertEqual(nordeste_ids.intersection(sul_ids), set())
+
+    def test_filter_regiao_via_http_list_endpoint(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get("/api/dat/registros/?regiao=Nordeste")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ufs = {r["municipio_uf"] for r in response.data["results"] if r.get("municipio_uf")}
+        self.assertTrue(ufs.issubset({"AL", "BA", "CE", "MA", "PB", "PE", "PI", "RN", "SE"}))

@@ -11,9 +11,10 @@ if (!Number.isFinite(minScore)) {
   process.exit(2);
 }
 
-// react-doctor is a devDependency (pinned in package.json).
-// No "-y" or "@latest" — avoids 30-65s registry download on every CI run.
-const doctorArgs = ["react-doctor", targetDir, "--score", "--yes"];
+// react-doctor pinned to a known baseline (score=80 on PR A, 2026-05-21).
+// Pin avoids drift from unpinned `npx react-doctor` fetching latest each run
+// (saw 0.0.42 → 0.2.6 drop scoring from 80 to 66 between 2026-05-21 and 2026-05-25).
+const doctorArgs = ["react-doctor@0.0.42", targetDir, "--score", "--yes"];
 const run =
   process.platform === "win32"
     ? spawnSync("cmd.exe", ["/d", "/s", "/c", "npx", ...doctorArgs], {

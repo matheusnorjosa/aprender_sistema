@@ -630,3 +630,9 @@ graphify-out/cost.json
 
 # RTK (Rust Token Killer) local filters
 .rtk/
+
+# Claude Code agent skills cache
+.agents/
+
+# Staging gate evidence (local artifacts)
+evidence/

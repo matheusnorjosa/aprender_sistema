@@ -89,10 +89,19 @@ class TestSeedGerentesCommand:
         assert "Created Django Group: Gerente" in output
 
     def test_seed_gerentes_does_not_use_legacy_gerencia_group(self, clean_gerencias, clean_gerentes):
-        """Regression C2-B1: command must NOT create non-canonical 'Gerência' group."""
+        """Regression C2-B1: gerentes vão para grupo canônico 'Gerente', não para o legado 'Gerência'.
+
+        Valida comportamento (a quais grupos os gerentes são atribuídos), não a
+        inexistência global do grupo 'Gerência' — que pode existir no DB por
+        migration/seed de RBAC independente deste command.
+        """
         call_command("seed_gerentes")
-        assert not Group.objects.filter(name="Gerência").exists()
-        assert Group.objects.filter(name="Gerente").exists()
+
+        gerentes = Usuario.objects.filter(cargo="Gerente")
+        assert gerentes.exists()
+        for usuario in gerentes:
+            assert usuario.groups.filter(name="Gerente").exists()
+            assert not usuario.groups.filter(name="Gerência").exists()
 
     def test_seed_gerentes_creates_missing_usuarios(self, clean_gerencias, clean_gerentes):
         """Test that command creates 4 missing usuarios."""

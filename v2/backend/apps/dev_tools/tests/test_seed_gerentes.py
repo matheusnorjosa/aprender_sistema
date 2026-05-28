@@ -23,7 +23,7 @@ from django.core.management import call_command
 
 import pytest
 
-from apps.core.models import Gerencia, Usuario
+from apps.core.models import EquipeGerencia, Gerencia, Usuario
 
 
 @pytest.fixture
@@ -44,24 +44,26 @@ def clean_gerencias(db):
 @pytest.fixture
 def clean_gerentes(db):
     """Remove gerentes from DB and Group."""
-    # Remove gerentes from Group
+    # Remove gerentes from canonical função group
     try:
-        gerencia_group = Group.objects.get(name="Gerência")
-        gerencia_group.user_set.clear()
+        gerente_group = Group.objects.get(name="Gerente")
+        gerente_group.user_set.clear()
     except Group.DoesNotExist:
         pass
 
-    # Delete gerentes (keep other usuarios)
+    # Delete EquipeGerencia GERENTE + gerentes (keep other usuarios)
+    EquipeGerencia.objects.filter(papel="GERENTE").delete()
     Usuario.objects.filter(cargo="Gerente").delete()
 
     yield
 
     # Cleanup
     try:
-        gerencia_group = Group.objects.get(name="Gerência")
-        gerencia_group.user_set.clear()
+        gerente_group = Group.objects.get(name="Gerente")
+        gerente_group.user_set.clear()
     except Group.DoesNotExist:
         pass
+    EquipeGerencia.objects.filter(papel="GERENTE").delete()
     Usuario.objects.filter(cargo="Gerente").delete()
 
 
@@ -70,11 +72,11 @@ class TestSeedGerentesCommand:
     """Tests for seed_gerentes management command."""
 
     def test_seed_gerentes_creates_group_if_not_exists(self, clean_gerencias, clean_gerentes):
-        """Test that command creates 'Gerência' group if it doesn't exist."""
+        """Test that command creates canonical função group 'Gerente' if it doesn't exist."""
         # Simula ausência do grupo sem deletar registro referenciado por FKs auxiliares.
-        existing = Group.objects.filter(name="Gerência").first()
+        existing = Group.objects.filter(name="Gerente").first()
         if existing is not None:
-            existing.name = "Gerência (temp)"
+            existing.name = "Gerente (temp)"
             existing.save(update_fields=["name"])
 
         # Run command
@@ -82,9 +84,24 @@ class TestSeedGerentesCommand:
         call_command("seed_gerentes", stdout=out)
 
         # Verify group was created
-        assert Group.objects.filter(name="Gerência").exists()
+        assert Group.objects.filter(name="Gerente").exists()
         output = out.getvalue()
-        assert "Created Django Group: Gerência" in output
+        assert "Created Django Group: Gerente" in output
+
+    def test_seed_gerentes_does_not_use_legacy_gerencia_group(self, clean_gerencias, clean_gerentes):
+        """Regression C2-B1: gerentes vão para grupo canônico 'Gerente', não para o legado 'Gerência'.
+
+        Valida comportamento (a quais grupos os gerentes são atribuídos), não a
+        inexistência global do grupo 'Gerência' — que pode existir no DB por
+        migration/seed de RBAC independente deste command.
+        """
+        call_command("seed_gerentes")
+
+        gerentes = Usuario.objects.filter(cargo="Gerente")
+        assert gerentes.exists()
+        for usuario in gerentes:
+            assert usuario.groups.filter(name="Gerente").exists()
+            assert not usuario.groups.filter(name="Gerência").exists()
 
     def test_seed_gerentes_creates_missing_usuarios(self, clean_gerencias, clean_gerentes):
         """Test that command creates 4 missing usuarios."""
@@ -114,17 +131,37 @@ class TestSeedGerentesCommand:
         assert set(actual_cpfs) == set(expected_cpfs)
 
     def test_seed_gerentes_adds_usuarios_to_group(self, clean_gerencias, clean_gerentes):
-        """Test that all 7 gerentes are added to 'Gerência' group."""
+        """Test that all 7 gerentes are added to canonical 'Gerente' group."""
         # Run command
         call_command("seed_gerentes")
 
         # Verify all gerentes are in group
-        gerencia_group = Group.objects.get(name="Gerência")
-        assert gerencia_group.user_set.count() == 7
+        gerente_group = Group.objects.get(name="Gerente")
+        assert gerente_group.user_set.count() == 7
 
         # Verify all usuarios with cargo="Gerente" are in group
         for usuario in Usuario.objects.filter(cargo="Gerente"):
-            assert gerencia_group in usuario.groups.all()
+            assert gerente_group in usuario.groups.all()
+
+    def test_seed_gerentes_creates_equipe_gerencia_gerente(self, clean_gerencias, clean_gerentes):
+        """C2-B1: command must create EquipeGerencia.papel=GERENTE for each resolved gerente."""
+        call_command("seed_gerentes")
+
+        # 7 gerentes, all with resolvable gerencia_setor → 7 EquipeGerencia GERENTE rows
+        equipe_gerente = EquipeGerencia.objects.filter(papel="GERENTE")
+        assert equipe_gerente.count() == 7
+
+        # Each gerente usuario has exactly one GERENTE row
+        for usuario in Usuario.objects.filter(cargo="Gerente"):
+            assert EquipeGerencia.objects.filter(usuario=usuario, papel="GERENTE").count() == 1
+
+    def test_seed_gerentes_equipe_gerencia_idempotent(self, clean_gerencias, clean_gerentes):
+        """C2-B1: running twice must not duplicate EquipeGerencia GERENTE rows."""
+        call_command("seed_gerentes")
+        first = EquipeGerencia.objects.filter(papel="GERENTE").count()
+        call_command("seed_gerentes")
+        second = EquipeGerencia.objects.filter(papel="GERENTE").count()
+        assert first == second == 7
 
     def test_seed_gerentes_links_gerencia_fk(self, clean_gerencias, clean_gerentes):
         """Test that gerentes are linked to Gerencia.gerente FK."""
@@ -164,7 +201,7 @@ class TestSeedGerentesCommand:
 
         # Verify counts
         first_gerentes_count = Usuario.objects.filter(cargo="Gerente").count()
-        first_group_count = Group.objects.get(name="Gerência").user_set.count()
+        first_group_count = Group.objects.get(name="Gerente").user_set.count()
         first_gerencia_links = Gerencia.objects.filter(gerente__isnull=False).count()
 
         assert first_gerentes_count == 7
@@ -177,7 +214,7 @@ class TestSeedGerentesCommand:
 
         # Verify counts haven't changed
         second_gerentes_count = Usuario.objects.filter(cargo="Gerente").count()
-        second_group_count = Group.objects.get(name="Gerência").user_set.count()
+        second_group_count = Group.objects.get(name="Gerente").user_set.count()
         second_gerencia_links = Gerencia.objects.filter(gerente__isnull=False).count()
 
         assert second_gerentes_count == first_gerentes_count
@@ -239,7 +276,7 @@ class TestSeedGerentesCommand:
         assert super_gerencia.gerente is not None
 
         # Verify all 4 SUPERINTENDENCIA managers are in Group
-        gerencia_group = Group.objects.get(name="Gerência")
+        gerente_group = Group.objects.get(name="Gerente")
         super_managers = Usuario.objects.filter(
             cargo="Gerente",
             email__in=[
@@ -252,7 +289,7 @@ class TestSeedGerentesCommand:
         assert super_managers.count() == 4
 
         for manager in super_managers:
-            assert gerencia_group in manager.groups.all()
+            assert gerente_group in manager.groups.all()
 
         # Verify output warns about multiple managers
         output = out.getvalue()

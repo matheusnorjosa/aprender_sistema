@@ -16,9 +16,11 @@ Colunas esperadas:
 - segmento (opcional): segmento educacional
 - local (opcional): local do evento
 
-Regras de negocio (PA):
-- Se projeto.fluxo == 'SUPER' e data >= hoje: status = 'pendente'
-- Se projeto.fluxo == 'NAO_SUPER' ou data < hoje: status = 'aprovado'
+Regras de negocio (PA-01/PA-04):
+- Status inicial decidido por resolve_initial_status (mesma regra da API):
+  - projeto.fluxo == 'SUPER'      -> 'pendente' (PA-01: SUPER NUNCA auto-aprova)
+  - projeto.fluxo == 'NAO_SUPER'  -> 'aprovado'
+  - A data do evento NAO influencia o status (passado/futuro irrelevante).
 - Criar Participation para coordenador (role='COORDENADOR')
 - Criar Participation para cada formador1-5 (role='FORMADOR')
 """
@@ -47,6 +49,7 @@ from apps.core.services.resolvers import (
     resolve_user_by_email,
     resolve_user_by_name,
 )
+from apps.core.services.solicitacao_create import resolve_initial_status
 
 TZ = ZoneInfo("America/Fortaleza")
 
@@ -96,9 +99,6 @@ def import_eventos_from_file(*, path: str, dry_run: bool = True) -> dict[str, An
         "outros": [],
     }
 
-    # Data de referencia para status
-    today = timezone.localdate()
-
     # Carregar arquivo
     rows = _load_file(path)
 
@@ -109,7 +109,7 @@ def import_eventos_from_file(*, path: str, dry_run: bool = True) -> dict[str, An
         for idx, row in enumerate(rows, start=1):
             try:
                 with transaction.atomic():  # savepoint
-                    _process_row(row, idx, stats, pendencias, today)
+                    _process_row(row, idx, stats, pendencias)
             except Exception as e:
                 stats["skipped"]["other"] += 1
                 pendencias["outros"].append(
@@ -373,22 +373,6 @@ def _compute_external_hash(
     return hashlib.sha1(content.encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
-def _determine_status(projeto: Any, data_evento: date, today: date) -> str:
-    """
-    Determina status da solicitacao conforme regras PA:
-    - data < hoje → aprovado
-    - projeto.fluxo == 'SUPER' → pendente
-    - projeto.fluxo == 'NAO_SUPER' → aprovado
-    """
-    if data_evento < today:
-        return "aprovado"
-
-    if projeto and projeto.fluxo == "SUPER":
-        return "pendente"
-
-    return "aprovado"
-
-
 def _resolve_user(identifier: str) -> Any:
     """Resolve usuario por email ou nome."""
     if not identifier:
@@ -409,7 +393,6 @@ def _process_row(
     linha_num: int,
     stats: dict[str, Any],
     pendencias: dict[str, list[dict[str, Any]]],
-    today: date,
 ) -> None:
     """Processa uma linha do arquivo."""
     # Resolver municipio
@@ -517,8 +500,9 @@ def _process_row(
     fim = datetime.combine(data_evento, hora_fim)
     fim = timezone.make_aware(fim, TZ)
 
-    # Determinar status (PA rules)
-    status = _determine_status(projeto, data_evento, today)
+    # Determinar status inicial (PA-01/PA-04) — mesma regra da API.
+    # SUPER -> pendente, NAO_SUPER -> aprovado. A data do evento NAO decide.
+    status = resolve_initial_status(projeto=projeto).status
 
     # Campos opcionais
     encontro = row.get("encontro", "").strip()

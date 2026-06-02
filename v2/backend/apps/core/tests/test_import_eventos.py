@@ -179,6 +179,20 @@ def sample_csv_nao_super(coordenador_user, municipio, projeto_nao_super, tipo_ev
 
 
 @pytest.fixture
+def sample_csv_super_passado(coordenador_user, municipio, projeto_super, tipo_evento):
+    """CSV com projeto SUPER e data PASSADA (PA-01: deve permanecer pendente)."""
+    d_passado = (date.today() - timedelta(days=30)).isoformat()
+    content = f"""municipio,projeto,tipo_evento,data,hora_inicio,hora_fim,coordenador
+{municipio.nome},{projeto_super.nome},{tipo_evento.nome},{d_passado},08:00,12:00,{coordenador_user.email}
+"""
+    temp = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8")
+    temp.write(content)
+    temp.close()
+    yield temp.name
+    Path(temp.name).unlink(missing_ok=True)
+
+
+@pytest.fixture
 def sample_csv_invalid_municipio():
     """CSV com municipio inexistente."""
     content = """municipio,projeto,tipo_evento,data,hora_inicio,hora_fim,coordenador
@@ -266,6 +280,23 @@ class TestEventosImportService:
         solicitacoes = Solicitacao.objects.all()
         for sol in solicitacoes:
             assert sol.status == "pendente"
+
+    def test_projeto_super_passado_status_pendente(
+        self, sample_csv_super_passado, coordenador_user, municipio, projeto_super, tipo_evento
+    ):
+        """PA-01: projeto SUPER com data PASSADA NUNCA auto-aprova — deve ficar pendente.
+
+        Regressao do bug latente: o importer decidia status por data (passado -> aprovado)
+        ANTES de checar o fluxo, auto-aprovando eventos SUPER historicos. A regra correta
+        (resolve_initial_status) ignora a data: SUPER sempre nasce pendente.
+        """
+        result = import_eventos_from_file(path=sample_csv_super_passado, dry_run=False)
+
+        assert result["stats"]["solicitacoes"]["created"] == 1
+
+        solicitacao = Solicitacao.objects.first()
+        assert solicitacao is not None
+        assert solicitacao.status == "pendente"
 
     def test_projeto_nao_super_status_aprovado(
         self, sample_csv_nao_super, coordenador_user, municipio, projeto_nao_super, tipo_evento

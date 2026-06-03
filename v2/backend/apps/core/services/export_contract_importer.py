@@ -28,7 +28,16 @@ from typing import Any
 
 from django.db import transaction
 
-from apps.core.models import DATArea, Municipio, ProjetoGeral
+from apps.core.models import (
+    DATArea,
+    DATCoordenador,
+    Gerencia,
+    Municipio,
+    Produto,
+    ProjetoGeral,
+    TipoEvento,
+    Usuario,
+)
 from apps.core.services.export_contract_projeto_resolver import build_projeto_index, resolve_projeto_export
 
 # Campos protegidos por entidade — NUNCA sobrescrever em update (decisão humana).
@@ -64,7 +73,16 @@ ENTITY_ORDER = [
     "acompanhamento",
     "prova",
 ]
-IMPLEMENTED = {"dat_area", "municipio", "projeto_geral"}
+IMPLEMENTED = {
+    "dat_area",
+    "municipio",
+    "projeto_geral",
+    "produto",
+    "usuario",
+    "tipo_evento",
+    "gerencia",
+    "dat_coordenador",
+}
 
 
 def _norm(s: str) -> str:
@@ -185,6 +203,74 @@ class ExportContractImporter:
                 st, _ = diff_and_classify(
                     idx.get(_norm(nome)), {"usa_avaliar": _to_bool(r.get("usa_avaliar"))}, protected
                 )
+                tally[st] += 1
+
+        elif name == "produto":
+            # NK = codigo (unique). Compara nome (não-protegido).
+            idx = {
+                (c or "").strip().upper(): {"nome": n or ""} for c, n in Produto.objects.values_list("codigo", "nome")
+            }
+            for r in rows:
+                codigo = (r.get("codigo") or "").strip()
+                if not codigo:
+                    tally["would_reject"] += 1
+                    continue
+                st, _ = diff_and_classify(idx.get(codigo.upper()), {"nome": r.get("nome") or ""}, protected)
+                tally[st] += 1
+
+        elif name == "usuario":
+            # NK = CPF (unique), fallback email. PII: só conta/resolve, nunca imprime valores.
+            cpfs = {
+                re.sub(r"\D", "", c)
+                for c in Usuario.objects.values_list("cpf", flat=True)
+                if re.sub(r"\D", "", c or "")
+            }
+            emails = {(e or "").lower() for e in Usuario.objects.values_list("email", flat=True) if e}
+            for r in rows:
+                cpf = re.sub(r"\D", "", r.get("cpf") or "")
+                email = (r.get("email") or "").lower().strip()
+                if not cpf and not email:
+                    tally["would_reject"] += 1
+                    continue
+                existe = (cpf in cpfs) or (email in emails)
+                # sem comparação de campo (evita PII); existência decide skip vs create.
+                st, _ = diff_and_classify({} if existe else None, {}, protected)
+                tally[st] += 1
+
+        elif name == "tipo_evento":
+            idx = {_norm(n): {"cor": (c or "")} for n, c in TipoEvento.objects.values_list("nome", "cor")}
+            for r in rows:
+                nome = (r.get("nome") or "").strip()
+                if not nome:
+                    tally["would_reject"] += 1
+                    continue
+                st, _ = diff_and_classify(idx.get(_norm(nome)), {"cor": r.get("cor") or ""}, protected)
+                tally[st] += 1
+
+        elif name == "gerencia":
+            # Export `nome` é o SETOR ("Vidas"); casa DB.nome_setor (não DB.nome="GERENCIA N").
+            # Create é complexo (falta o `nome` canônico) → classifica, mas apply de create não suportado.
+            idx = {_norm(s) for s in Gerencia.objects.values_list("nome_setor", flat=True)}
+            for r in rows:
+                nome = (r.get("nome") or "").strip()
+                if not nome or nome == "-":
+                    tally["would_reject"] += 1
+                    continue
+                st, _ = diff_and_classify({} if _norm(nome) in idx else None, {}, protected)
+                tally[st] += 1
+
+        elif name == "dat_coordenador":
+            # DATCoordenador não tem unique no model; matching por email (lower) ∪ norm(nome).
+            # PII: coordenador é pessoa → só conta/resolve, nunca imprime valores.
+            emails = {(e or "").lower() for e in DATCoordenador.objects.values_list("email", flat=True) if e}
+            nomes = {_norm(n) for n in DATCoordenador.objects.values_list("nome", flat=True) if n}
+            for r in rows:
+                val = (r.get("usuario") or "").strip()
+                if not val:
+                    tally["would_reject"] += 1
+                    continue
+                existe = ("@" in val and val.lower() in emails) or (_norm(val) in nomes)
+                st, _ = diff_and_classify({} if existe else None, {}, protected)
                 tally[st] += 1
 
         tally["export_rows"] = len(rows)

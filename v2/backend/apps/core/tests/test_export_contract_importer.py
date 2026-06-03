@@ -21,7 +21,17 @@ from typing import Any
 
 import pytest
 
-from apps.core.models import DATArea, Municipio, Projeto, ProjetoGeral
+from apps.core.models import (
+    DATArea,
+    DATCoordenador,
+    Gerencia,
+    Municipio,
+    Produto,
+    Projeto,
+    ProjetoGeral,
+    TipoEvento,
+    Usuario,
+)
 from apps.core.services.export_contract_importer import (
     ExportContractImporter,
     diff_and_classify,
@@ -150,3 +160,94 @@ def test_report_has_no_pii(tmp_path):
     blob = json.dumps(report).lower()
     for token in ("cpf", "telefone", "@"):
         assert token not in blob
+
+
+# ───────── entidades-mestre adicionais (PR feat/export-contract-master-importers) ─────────
+def test_classify_produto(tmp_path):
+    proj = Projeto.objects.create(nome="Proj Prod Teste", fluxo="NAO_SUPER")
+    Produto.objects.create(codigo="PT-1", nome="Produto Existente", projeto=proj)
+    Produto.objects.create(codigo="PT-2", nome="Produto Upd", projeto=proj)
+    # PT-1 nome igual -> skip; PT-2 nome diverge -> update; PT-NOVO -> create; vazio -> reject
+    csv = "codigo,nome\nPT-1,Produto Existente\nPT-2,Nome Mudou\nPT-NOVO,Novo\n,Sem Codigo\n"
+    r = ExportContractImporter(path=_write_export(tmp_path, {"produto": csv})).run()["por_entidade"]["produto"]
+    assert r["would_skip_same"] == 1
+    assert r["would_update"] == 1
+    assert r["would_create"] == 1
+    assert r["would_reject"] == 1
+
+
+def test_classify_usuario(tmp_path):
+    Usuario.objects.create_user(username="u_imp_exist", password="x", cpf="11122233344", email="u.exist@ex.com")
+    # existente por cpf -> skip; novo -> create; sem cpf/email -> reject
+    csv = "nome_completo,cpf,email\nFulano,11122233344,u.exist@ex.com\nBeltrano,55566677788,novo@ex.com\nSem Id,,\n"
+    r = ExportContractImporter(path=_write_export(tmp_path, {"usuario": csv})).run()["por_entidade"]["usuario"]
+    assert r["would_skip_same"] == 1
+    assert r["would_create"] == 1
+    assert r["would_reject"] == 1
+
+
+def test_usuario_no_pii_in_report(tmp_path):
+    csv = "nome_completo,cpf,email\nFulano Secreto,12398712399,fulano.secreto@ex.com\n"
+    report = ExportContractImporter(path=_write_export(tmp_path, {"usuario": csv})).run()
+    blob = json.dumps(report)
+    assert "12398712399" not in blob  # CPF não vaza
+    assert "fulano.secreto@ex.com" not in blob  # email não vaza
+    assert "Fulano Secreto" not in blob  # nome não vaza
+
+
+def test_classify_tipo_evento(tmp_path):
+    TipoEvento.objects.create(nome="Formacao TE", cor="#111111")
+    TipoEvento.objects.create(nome="Visita TE", cor="#222222")
+    # Formacao igual -> skip; Visita cor diverge -> update; Novo -> create
+    csv = "nome,cor\nFormacao TE,#111111\nVisita TE,#999999\nEvento Novo TE,#333333\n"
+    r = ExportContractImporter(path=_write_export(tmp_path, {"tipo_evento": csv})).run()["por_entidade"]["tipo_evento"]
+    assert r["would_skip_same"] == 1
+    assert r["would_update"] == 1
+    assert r["would_create"] == 1
+
+
+def test_classify_gerencia_matches_by_setor(tmp_path):
+    # Export `nome` é o setor → casa DB.nome_setor (não DB.nome canônico).
+    Gerencia.objects.create(nome="GERENCIA TESTE", nome_setor="Setor Existente")
+    csv = "nome,nome_setor\nSetor Existente,Setor Existente\nSetor Novo,Setor Novo\n-,-\n"
+    r = ExportContractImporter(path=_write_export(tmp_path, {"gerencia": csv})).run()["por_entidade"]["gerencia"]
+    assert r["would_skip_same"] == 1  # casou por nome_setor
+    assert r["would_create"] == 1  # setor novo (create exige nome canônico — caveat)
+    assert r["would_reject"] == 1  # linha "-"
+
+
+def test_classify_dat_coordenador(tmp_path):
+    creator = Usuario.objects.create_user(username="u_dc_creator", password="x", cpf="99900011122")
+    area = DATArea.objects.create(nome="Area Coord Teste")
+    DATCoordenador.objects.create(nome="Coord Existente", email="coord.exist@ex.com", area=area, created_by=creator)
+    # existente por email -> skip; novo -> create; vazio -> reject
+    csv = "usuario,area\ncoord.exist@ex.com,Area Coord Teste\nNovo Coord,Area Coord Teste\n,Area Coord Teste\n"
+    r = ExportContractImporter(path=_write_export(tmp_path, {"dat_coordenador": csv})).run()["por_entidade"][
+        "dat_coordenador"
+    ]
+    assert r["would_skip_same"] == 1
+    assert r["would_create"] == 1
+    assert r["would_reject"] == 1
+
+
+def test_dat_coordenador_no_pii(tmp_path):
+    csv = "usuario,area\ncoord.secreto@ex.com,Area X\n"
+    report = ExportContractImporter(path=_write_export(tmp_path, {"dat_coordenador": csv})).run()
+    assert "coord.secreto@ex.com" not in json.dumps(report)
+
+
+def test_demo_oito_entidades_implementadas(tmp_path):
+    files = {
+        "dat_area": "nome,descricao\nA,d\n",
+        "municipio": "nome,uf,ativo\nC,CE,True\n",
+        "projeto_geral": "nome,usa_avaliar\nPG,True\n",
+        "produto": "codigo,nome\nC1,N\n",
+        "usuario": "nome_completo,cpf,email\nF,11111111111,f@ex.com\n",
+        "tipo_evento": "nome,cor\nT,#000000\n",
+        "gerencia": "nome,nome_setor\nSetor,Setor\n",
+        "dat_coordenador": "usuario,area\ncoord@ex.com,Area\n",
+    }
+    r = ExportContractImporter(path=_write_export(tmp_path, files)).run()["por_entidade"]
+    for ent in files:
+        assert "status" not in r[ent], f"{ent} deveria estar implementada"
+        assert "export_rows" in r[ent]

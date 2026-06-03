@@ -17,6 +17,7 @@ NÃO importa dados reais.
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import pytest
 
@@ -33,7 +34,7 @@ def _write_export(tmp_path, files: dict[str, str]):
     """Cria um diretório de export mínimo com manifest + CSVs."""
     d = tmp_path / "export"
     d.mkdir()
-    manifest = {"generated_at": "2026-06-02", "snapshot_date": "2026-05-19", "entities": {}}
+    manifest: dict[str, Any] = {"generated_at": "2026-06-02", "snapshot_date": "2026-05-19", "entities": {}}
     for name, content in files.items():
         (d / f"{name}.csv").write_text(content, encoding="utf-8")
         rows = max(content.strip().count("\n"), 0)
@@ -114,10 +115,11 @@ def test_classify_municipio(tmp_path):
 
 
 def test_classify_projeto_geral(tmp_path):
-    ProjetoGeral.objects.create(nome="VIDA E LINGUAGEM", usa_avaliar=True)
-    ProjetoGeral.objects.create(nome="ACERTA MAT", usa_avaliar=True)
-    # VIDA E LINGUAGEM igual -> skip; ACERTA MAT usa_avaliar diverge -> would_update; NOVO PG -> create
-    csv = "nome,usa_avaliar\nVIDA E LINGUAGEM,True\nACERTA MAT,False\nNOVO PG,False\n"
+    # Nomes sintéticos (PG TESTE *) para não colidir com ProjetoGeral seedado por migração.
+    ProjetoGeral.objects.create(nome="PG TESTE SKIP", usa_avaliar=True)
+    ProjetoGeral.objects.create(nome="PG TESTE UPD", usa_avaliar=True)
+    # SKIP igual -> skip; UPD usa_avaliar diverge -> would_update; PG TESTE NOVO -> create
+    csv = "nome,usa_avaliar\nPG TESTE SKIP,True\nPG TESTE UPD,False\nPG TESTE NOVO,False\n"
     path = _write_export(tmp_path, {"projeto_geral": csv})
     r = ExportContractImporter(path=path).run()["por_entidade"]["projeto_geral"]
     assert r["would_skip_same"] == 1

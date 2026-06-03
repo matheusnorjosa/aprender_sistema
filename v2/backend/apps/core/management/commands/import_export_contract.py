@@ -76,10 +76,11 @@ class Command(BaseCommand):
             if v.get("status") == "not_implemented":
                 self.stdout.write(f"  [{ent}] NOT_IMPLEMENTED (rows={v['export_rows']})")
             else:
-                self.stdout.write(
-                    f"  [{ent}] rows={v['export_rows']} create={v['would_create']} "
-                    f"update={v['would_update']} skip={v['would_skip_same']} "
-                    f"protected_diff={v['protected_diff']} reject={v['would_reject']}"
+                linha = (
+                    f"  [{ent}] rows={v['export_rows']} create={v['would_create']}"
+                    + f" update={v['would_update']} skip={v['would_skip_same']}"
+                    + f" protected_diff={v['protected_diff']} reject={v['would_reject']}"
                 )
+                self.stdout.write(linha)
         if report["applied"]:
             self.stdout.write(self.style.SUCCESS(f"  applied(create-only)={report['applied']}"))

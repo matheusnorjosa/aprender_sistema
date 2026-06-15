@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
-import { appendFileSync } from "node:fs";
+import { appendFileSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { resolve as resolvePath, join as joinPath } from "node:path";
 
 const targetDir = process.argv[2] ?? ".";
 const minScore = Number.parseInt(process.env.REACT_DOCTOR_MIN_SCORE ?? "75", 10);
@@ -11,20 +12,28 @@ if (!Number.isFinite(minScore)) {
   process.exit(2);
 }
 
-// react-doctor pinned to a known baseline (score=80 on PR A, 2026-05-21).
-// Pin avoids drift from unpinned `npx react-doctor` fetching latest each run
-// (saw 0.0.42 → 0.2.6 drop scoring from 80 to 66 between 2026-05-21 and 2026-05-25).
-const doctorArgs = ["react-doctor@0.0.42", targetDir, "--score", "--yes"];
-const run =
-  process.platform === "win32"
-    ? spawnSync("cmd.exe", ["/d", "/s", "/c", "npx", ...doctorArgs], {
-        encoding: "utf8",
-        stdio: ["inherit", "pipe", "pipe"],
-      })
-    : spawnSync("npx", doctorArgs, {
-        encoding: "utf8",
-        stdio: ["inherit", "pipe", "pipe"],
-      });
+// react-doctor é pinado como devDependency EXATA (package.json) e travado em package-lock.json,
+// incluindo TODA a árvore transitiva. Rodamos o binário LOCAL (não `npx react-doctor@x`, que
+// re-resolve os transitivos a cada run e causou drift de score — 0.0.42 marcou 80 em 2026-05-21 e
+// 65 em 2026-06-05 com o MESMO código). Invocar via process.execPath + cli.js resolvido do
+// node_modules travado = determinístico e cross-platform (sem shell, sem .cmd, sem branch win32).
+// Resolve o cli.js a partir do bin do package.json travado (o campo `exports` do react-doctor
+// bloqueia subpath deep via require.resolve, então lemos o manifest direto). react-doctor é devDep
+// direta → fica no node_modules de topo de <targetDir>.
+//
+// `--offline` é OBRIGATÓRIO para o determinismo: sem ele, o react-doctor consulta um serviço de
+// telemetria remoto que ENTRA no cálculo do score (`--help`: "skip telemetry ... only used to
+// calculate score"). Online, o mesmo código pontua 64 (com rede, ex: CI) ou 86 (offline); o número
+// remoto driftou 80→65 ao longo de semanas sem mudança de código. `--offline` força a análise
+// estática 100% local (árvore travada no lockfile) → score reproduzível e independente de rede.
+const pkgDir = joinPath(resolvePath(targetDir), "node_modules", "react-doctor");
+const binField = JSON.parse(readFileSync(joinPath(pkgDir, "package.json"), "utf8")).bin;
+const binRel = typeof binField === "string" ? binField : binField["react-doctor"];
+const cliPath = joinPath(pkgDir, binRel);
+const run = spawnSync(process.execPath, [cliPath, targetDir, "--score", "--yes", "--offline"], {
+  encoding: "utf8",
+  stdio: ["inherit", "pipe", "pipe"],
+});
 
 const output = `${run.stdout ?? ""}${run.stderr ?? ""}`;
 process.stdout.write(output);

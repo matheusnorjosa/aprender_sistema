@@ -81,14 +81,24 @@ export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }: Colu
       key: 'criacao_curso',
       width: 110,
       align: 'center',
-      render: (_, record) => (
+      render: (_, record) => {
+        const handleToggle = () => {
+          const newStatus =
+            record.status_criacao_curso === 'concluido' ? 'pendente' : 'concluido';
+          onQuickStatusUpdate(record, 'criacao_curso', newStatus);
+        };
+        return (
         <Tooltip title="Clique para alterar status">
           <div
             className="cursor-pointer"
-            onClick={() => {
-              const newStatus =
-                record.status_criacao_curso === 'concluido' ? 'pendente' : 'concluido';
-              onQuickStatusUpdate(record, 'criacao_curso', newStatus);
+            role="button"
+            tabIndex={0}
+            onClick={handleToggle}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleToggle();
+              }
             }}
           >
             {renderStatusIcon(record.status_criacao_curso)}
@@ -99,21 +109,32 @@ export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }: Colu
             </div>
           </div>
         </Tooltip>
-      ),
+        );
+      },
     },
     {
       title: 'Chaves',
       key: 'chaves',
       width: 100,
       align: 'center',
-      render: (_, record) => (
+      render: (_, record) => {
+        const handleToggle = () => {
+          const newStatus =
+            record.status_chaves === 'concluido' ? 'pendente' : 'concluido';
+          onQuickStatusUpdate(record, 'chaves', newStatus);
+        };
+        return (
         <Tooltip title="Clique para alterar status">
           <div
             className="cursor-pointer"
-            onClick={() => {
-              const newStatus =
-                record.status_chaves === 'concluido' ? 'pendente' : 'concluido';
-              onQuickStatusUpdate(record, 'chaves', newStatus);
+            role="button"
+            tabIndex={0}
+            onClick={handleToggle}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleToggle();
+              }
             }}
           >
             {renderStatusIcon(record.status_chaves)}
@@ -122,21 +143,32 @@ export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }: Colu
             </div>
           </div>
         </Tooltip>
-      ),
+        );
+      },
     },
     {
       title: 'Instruções',
       key: 'instrucoes',
       width: 100,
       align: 'center',
-      render: (_, record) => (
+      render: (_, record) => {
+        const handleToggle = () => {
+          const newStatus =
+            record.status_instrucoes === 'concluido' ? 'pendente' : 'concluido';
+          onQuickStatusUpdate(record, 'instrucoes', newStatus);
+        };
+        return (
         <Tooltip title="Clique para alterar status">
           <div
             className="cursor-pointer"
-            onClick={() => {
-              const newStatus =
-                record.status_instrucoes === 'concluido' ? 'pendente' : 'concluido';
-              onQuickStatusUpdate(record, 'instrucoes', newStatus);
+            role="button"
+            tabIndex={0}
+            onClick={handleToggle}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleToggle();
+              }
             }}
           >
             {renderStatusIcon(record.status_instrucoes)}
@@ -145,21 +177,32 @@ export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }: Colu
             </div>
           </div>
         </Tooltip>
-      ),
+        );
+      },
     },
     {
       title: 'Envio',
       key: 'envio',
       width: 100,
       align: 'center',
-      render: (_, record) => (
+      render: (_, record) => {
+        const handleToggle = () => {
+          const newStatus =
+            record.status_envio === 'concluido' ? 'pendente' : 'concluido';
+          onQuickStatusUpdate(record, 'envio', newStatus);
+        };
+        return (
         <Tooltip title="Clique para alterar status">
           <div
             className="cursor-pointer"
-            onClick={() => {
-              const newStatus =
-                record.status_envio === 'concluido' ? 'pendente' : 'concluido';
-              onQuickStatusUpdate(record, 'envio', newStatus);
+            role="button"
+            tabIndex={0}
+            onClick={handleToggle}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleToggle();
+              }
             }}
           >
             {renderStatusIcon(record.status_envio)}
@@ -168,7 +211,8 @@ export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }: Colu
             </div>
           </div>
         </Tooltip>
-      ),
+        );
+      },
     },
     {
       title: 'Link',
@@ -253,15 +297,25 @@ export function getColumnsAvaliar({ onQuickStatusUpdate, onEdit, onDelete }: Col
       title: 'Recebidos',
       key: 'recebidos',
       width: 120,
-      render: (_, record) => (
+      render: (_, record) => {
+        const handleToggle = () => {
+          const newStatus =
+            record.status_recebidos === 'concluido' ? 'pendente' : 'concluido';
+          onQuickStatusUpdate(record, 'recebidos', newStatus);
+        };
+        return (
         <Space direction="vertical" size={0} align="center">
           <Tooltip title="Clique para alterar status">
             <div
               className="cursor-pointer"
-              onClick={() => {
-                const newStatus =
-                  record.status_recebidos === 'concluido' ? 'pendente' : 'concluido';
-                onQuickStatusUpdate(record, 'recebidos', newStatus);
+              role="button"
+              tabIndex={0}
+              onClick={handleToggle}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleToggle();
+                }
               }}
             >
               {renderStatusIcon(record.status_recebidos)}
@@ -269,21 +323,32 @@ export function getColumnsAvaliar({ onQuickStatusUpdate, onEdit, onDelete }: Col
           </Tooltip>
           <Text type="secondary">{record.quantidade_recebidos || 0}</Text>
         </Space>
-      ),
+        );
+      },
     },
     {
       title: 'Validados',
       key: 'validados',
       width: 120,
-      render: (_, record) => (
+      render: (_, record) => {
+        const handleToggle = () => {
+          const newStatus =
+            record.status_validados === 'concluido' ? 'pendente' : 'concluido';
+          onQuickStatusUpdate(record, 'validados', newStatus);
+        };
+        return (
         <Space direction="vertical" size={0} align="center">
           <Tooltip title="Clique para alterar status">
             <div
               className="cursor-pointer"
-              onClick={() => {
-                const newStatus =
-                  record.status_validados === 'concluido' ? 'pendente' : 'concluido';
-                onQuickStatusUpdate(record, 'validados', newStatus);
+              role="button"
+              tabIndex={0}
+              onClick={handleToggle}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleToggle();
+                }
               }}
             >
               {renderStatusIcon(record.status_validados)}
@@ -291,21 +356,32 @@ export function getColumnsAvaliar({ onQuickStatusUpdate, onEdit, onDelete }: Col
           </Tooltip>
           <Text type="secondary">{record.quantidade_validados || 0}</Text>
         </Space>
-      ),
+        );
+      },
     },
     {
       title: 'Importados',
       key: 'importados',
       width: 120,
-      render: (_, record) => (
+      render: (_, record) => {
+        const handleToggle = () => {
+          const newStatus =
+            record.status_importados === 'concluido' ? 'pendente' : 'concluido';
+          onQuickStatusUpdate(record, 'importados', newStatus);
+        };
+        return (
         <Space direction="vertical" size={0} align="center">
           <Tooltip title="Clique para alterar status">
             <div
               className="cursor-pointer"
-              onClick={() => {
-                const newStatus =
-                  record.status_importados === 'concluido' ? 'pendente' : 'concluido';
-                onQuickStatusUpdate(record, 'importados', newStatus);
+              role="button"
+              tabIndex={0}
+              onClick={handleToggle}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleToggle();
+                }
               }}
             >
               {renderStatusIcon(record.status_importados)}
@@ -313,7 +389,8 @@ export function getColumnsAvaliar({ onQuickStatusUpdate, onEdit, onDelete }: Col
           </Tooltip>
           <Text type="secondary">{record.quantidade_importados || 0}</Text>
         </Space>
-      ),
+        );
+      },
     },
     {
       title: 'Progresso',

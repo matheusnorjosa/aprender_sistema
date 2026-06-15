@@ -296,7 +296,7 @@ export default function FormacoesPage(): JSX.Element {
               <Badge
                 status={statusConfig?.color === 'green' ? 'success' : statusConfig?.color === 'red' ? 'error' : 'processing'}
                 text={
-                  <Text style={{ fontSize: 11 }} ellipsis>
+                  <Text style={{ fontSize: 12 }} ellipsis>
                     {item.projeto_nome}
                   </Text>
                 }
@@ -306,7 +306,7 @@ export default function FormacoesPage(): JSX.Element {
         })}
         {dayFormacoes.length > 3 && (
           <li>
-            <Text type="secondary" style={{ fontSize: 11 }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>
               +{dayFormacoes.length - 3} mais
             </Text>
           </li>
@@ -577,6 +577,7 @@ export default function FormacoesPage(): JSX.Element {
                           style={{ marginBottom: 8 }}
                           actions={[
                             <Button
+                              key="edit"
                               type="link"
                               size="small"
                               onClick={() => {

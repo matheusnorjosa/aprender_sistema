@@ -339,7 +339,7 @@ export default function ImportUploader({ label, onDryRun, onApply, description }
                   description={
                     <Collapse ghost size="small">
                       <Panel header="Ver detalhes" key="1">
-                        <pre style={{ fontSize: 11, margin: 0, overflow: 'auto' }}>
+                        <pre style={{ fontSize: 12, margin: 0, overflow: 'auto' }}>
                           {JSON.stringify(validationResult.pendencias, null, 2)}
                         </pre>
                       </Panel>

@@ -793,8 +793,8 @@ export default function GCalDashboardPage(): JSX.Element {
               <>
                 <Divider orientation="left">Participações</Divider>
                 <Space direction="vertical" style={{ width: '100%' }}>
-                  {eventDetail.participations.map((p, idx) => (
-                    <Card key={idx} size="small">
+                  {eventDetail.participations.map((p) => (
+                    <Card key={p.email} size="small">
                       <Space>
                         <UserOutlined />
                         <Text strong>{p.email}</Text>

@@ -43,8 +43,17 @@ export default function DetailsDrawer({ open, onClose, person, day, details }: D
     <>
       {/* Overlay */}
       <div
+        role="button"
+        tabIndex={0}
+        aria-label="Fechar detalhes"
         className="fixed inset-0 bg-black/30 z-40"
         onClick={onClose}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClose();
+          }
+        }}
       ></div>
 
       {/* Drawer */}

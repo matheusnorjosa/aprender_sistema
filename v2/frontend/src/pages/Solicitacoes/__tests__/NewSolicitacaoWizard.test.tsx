@@ -53,39 +53,41 @@ vi.mock('../../../components/CoordenadoresPicker', () => ({
   default: () => <div data-testid="coordenadores-picker">CoordenadoresPicker</div>,
 }));
 
-vi.mock('../../../components/ComboBox', () => ({
-  default: ({
-    placeholder = '',
-    lookupFunction,
-    onChange,
-    disabled = false,
-  }: {
-    placeholder?: string;
-    lookupFunction: (query: string) => Promise<unknown[]>;
-    onChange?: (item: unknown) => void;
-    disabled?: boolean;
-  }) => {
-    useEffect(() => {
-      void lookupFunction('');
-    }, [lookupFunction]);
+function MockComboBox({
+  placeholder = '',
+  lookupFunction,
+  onChange,
+  disabled = false,
+}: {
+  placeholder?: string;
+  lookupFunction: (query: string) => Promise<unknown[]>;
+  onChange?: (item: unknown) => void;
+  disabled?: boolean;
+}) {
+  useEffect(() => {
+    void lookupFunction('');
+  }, [lookupFunction]);
 
-    return (
-      <button
-        type="button"
-        data-testid={placeholder}
-        disabled={disabled}
-        onClick={() => {
-          if (placeholder.includes('projeto')) {
-            onChange?.({ id: 123, label: 'Projeto X', fluxo: 'SUPER' });
-            return;
-          }
-          onChange?.({ id: 456, label: 'Fortaleza - CE' });
-        }}
-      >
-        {placeholder}
-      </button>
-    );
-  },
+  return (
+    <button
+      type="button"
+      data-testid={placeholder}
+      disabled={disabled}
+      onClick={() => {
+        if (placeholder.includes('projeto')) {
+          onChange?.({ id: 123, label: 'Projeto X', fluxo: 'SUPER' });
+          return;
+        }
+        onChange?.({ id: 456, label: 'Fortaleza - CE' });
+      }}
+    >
+      {placeholder}
+    </button>
+  );
+}
+
+vi.mock('../../../components/ComboBox', () => ({
+  default: MockComboBox,
 }));
 
 import NewSolicitacaoWizard from '../NewSolicitacaoWizard';

@@ -139,7 +139,7 @@ export default function AdminDATHomePage(): JSX.Element {
               <Text
                 type={module.status === 'Disponível' ? 'success' : 'warning'}
                 strong
-                style={{ fontSize: '11px' }}
+                style={{ fontSize: '12px' }}
               >
                 {module.status}
               </Text>

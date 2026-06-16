@@ -151,10 +151,11 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
 
       {/* Filtro de gerência */}
       <div>
-        <label className="block text-xs font-medium text-gray-700 mb-1">
+        <label htmlFor="filtersbar-gerencia" className="block text-xs font-medium text-gray-700 mb-1">
           Gerência
         </label>
         <select
+          id="filtersbar-gerencia"
           value={gerenciaId || ''}
           onChange={(e: ChangeEvent<HTMLSelectElement>) => onChange({ gerenciaId: e.target.value ? Number(e.target.value) : null })}
           disabled={loading}
@@ -172,10 +173,11 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
 
       {/* Filtro de setor (texto) */}
       <div>
-        <label className="block text-xs font-medium text-gray-700 mb-1">
+        <label htmlFor="filtersbar-setor" className="block text-xs font-medium text-gray-700 mb-1">
           Setor
         </label>
         <input
+          id="filtersbar-setor"
           type="text"
           value={sector}
           onChange={(e: ChangeEvent<HTMLInputElement>) => onChange({ sector: e.target.value })}
@@ -186,10 +188,11 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
 
       {/* Filtro de busca */}
       <div>
-        <label className="block text-xs font-medium text-gray-700 mb-1">
+        <label htmlFor="filtersbar-buscar" className="block text-xs font-medium text-gray-700 mb-1">
           Buscar
         </label>
         <input
+          id="filtersbar-buscar"
           type="text"
           value={q}
           onChange={(e: ChangeEvent<HTMLInputElement>) => onChange({ q: e.target.value })}

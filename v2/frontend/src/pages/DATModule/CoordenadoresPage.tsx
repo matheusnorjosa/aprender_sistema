@@ -382,12 +382,12 @@ export default function CoordenadoresPage(): JSX.Element {
               <Divider style={{ margin: '8px 0' }} />
               <Row gutter={8}>
                 <Col span={12}>
-                  <Text type="secondary" style={{ fontSize: 11 }}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
                     <EnvironmentOutlined /> {coord.total_municipios || 0} municípios
                   </Text>
                 </Col>
                 <Col span={12}>
-                  <Text type="secondary" style={{ fontSize: 11 }}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
                     <ProjectOutlined /> {coord.total_projetos || 0} projetos
                   </Text>
                 </Col>
@@ -434,7 +434,7 @@ export default function CoordenadoresPage(): JSX.Element {
                     <div>
                       <Text strong>{coord.nome}</Text>
                       <div>
-                        <Text type="secondary" style={{ fontSize: 11 }}>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
                           {coord.total_municipios || 0} mun. | {coord.total_projetos || 0} proj.
                         </Text>
                       </div>

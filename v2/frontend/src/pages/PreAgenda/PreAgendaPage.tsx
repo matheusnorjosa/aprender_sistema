@@ -995,7 +995,7 @@ export default function PreAgendaPage(): JSX.Element {
                       <Space direction="vertical" style={{ width: '100%' }}>
                         <Descriptions size="small" column={1}>
                           <Descriptions.Item label="Payload Hash">
-                            <Text code copyable style={{ fontSize: '11px' }}>
+                            <Text code copyable style={{ fontSize: '12px' }}>
                               {previewData.preview.payload_hash}
                             </Text>
                           </Descriptions.Item>
@@ -1006,7 +1006,7 @@ export default function PreAgendaPage(): JSX.Element {
                           overflow: 'auto',
                           backgroundColor: '#f5f5f5',
                           padding: 12,
-                          fontSize: '11px',
+                          fontSize: '12px',
                           borderRadius: '4px'
                         }}>
                           {JSON.stringify(previewData, null, 2)}

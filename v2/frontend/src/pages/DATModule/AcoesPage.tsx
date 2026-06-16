@@ -339,7 +339,7 @@ export default function AcoesPage(): JSX.Element {
       render: (_: unknown, record: AcaoRecord) => (
         <Space direction="vertical" size={0} align="center">
           {renderStatusIcon(record.status_carta)}
-          <Text type="secondary" style={{ fontSize: 11 }}>
+          <Text type="secondary" style={{ fontSize: 12 }}>
             {record.data_carta ? dayjs(record.data_carta).format('DD/MM') : '-'}
           </Text>
         </Space>
@@ -360,7 +360,7 @@ export default function AcoesPage(): JSX.Element {
       render: (_: unknown, record: AcaoRecord) => (
         <Space direction="vertical" size={0} align="center">
           {renderStatusIcon(record.status_contato)}
-          <Text type="secondary" style={{ fontSize: 11 }}>
+          <Text type="secondary" style={{ fontSize: 12 }}>
             {record.data_contato ? dayjs(record.data_contato).format('DD/MM') : '-'}
           </Text>
         </Space>
@@ -381,7 +381,7 @@ export default function AcoesPage(): JSX.Element {
       render: (_: unknown, record: AcaoRecord) => (
         <Space direction="vertical" size={0} align="center">
           {renderStatusIcon(record.status_reuniao)}
-          <Text type="secondary" style={{ fontSize: 11 }}>
+          <Text type="secondary" style={{ fontSize: 12 }}>
             {record.data_reuniao ? dayjs(record.data_reuniao).format('DD/MM') : '-'}
           </Text>
         </Space>
@@ -402,7 +402,7 @@ export default function AcoesPage(): JSX.Element {
       render: (_: unknown, record: AcaoRecord) => (
         <Space direction="vertical" size={0} align="center">
           {renderStatusIcon(record.status_entrega)}
-          <Text type="secondary" style={{ fontSize: 11 }}>
+          <Text type="secondary" style={{ fontSize: 12 }}>
             {record.data_entrega ? dayjs(record.data_entrega).format('DD/MM') : '-'}
           </Text>
         </Space>

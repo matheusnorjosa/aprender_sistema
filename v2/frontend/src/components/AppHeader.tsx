@@ -150,9 +150,9 @@ export function AppHeader({
                           }
                           description={
                             <span style={{ fontSize: 12 }}>
-                              <Tag color="purple" style={{ fontSize: 11 }}>{item.fase_disparo}</Tag>
-                              {item.prioridade === 'CRITICA' ? <Tag color="red" style={{ fontSize: 11 }}>CRÍTICA</Tag>
-                                : item.prioridade === 'ALTA' ? <Tag color="orange" style={{ fontSize: 11 }}>ALTA</Tag>
+                              <Tag color="purple" style={{ fontSize: 12 }}>{item.fase_disparo}</Tag>
+                              {item.prioridade === 'CRITICA' ? <Tag color="red" style={{ fontSize: 12 }}>CRÍTICA</Tag>
+                                : item.prioridade === 'ALTA' ? <Tag color="orange" style={{ fontSize: 12 }}>ALTA</Tag>
                                 : null}
                             </span>
                           }

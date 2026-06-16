@@ -475,8 +475,8 @@ export default function MapaBrasilPage(): JSX.Element {
       key: 'projetos',
       render: (projetos: CoordenadorProjetoType[]) => (
         <Space wrap size={[4, 4]}>
-          {projetos.map((p, idx) => (
-            <Tag key={idx} color="purple" style={{ margin: 0 }}>
+          {projetos.map((p) => (
+            <Tag key={p.nome} color="purple" style={{ margin: 0 }}>
               {p.nome}: <strong>{p.eventos}</strong>
             </Tag>
           ))}
@@ -489,8 +489,8 @@ export default function MapaBrasilPage(): JSX.Element {
       key: 'municipios',
       render: (municipios: CoordenadorMunicipioType[]) => (
         <Space wrap size={[4, 4]}>
-          {municipios.map((m, idx) => (
-            <Tag key={idx} color="green" style={{ margin: 0 }}>
+          {municipios.map((m) => (
+            <Tag key={m.nome} color="green" style={{ margin: 0 }}>
               {m.nome}: <strong>{m.eventos}</strong>
             </Tag>
           ))}
@@ -955,8 +955,8 @@ export default function MapaBrasilPage(): JSX.Element {
                     Municípios com eventos ({estadosData[selectedState].municipiosTotal})
                   </Title>
                   <Space wrap>
-                    {estadosData[selectedState].municipios.map((municipio, idx) => (
-                      <Tag key={idx} color="green">{municipio}</Tag>
+                    {estadosData[selectedState].municipios.map((municipio) => (
+                      <Tag key={municipio} color="green">{municipio}</Tag>
                     ))}
                   </Space>
                 </div>

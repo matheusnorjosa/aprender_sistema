@@ -128,8 +128,10 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/.github/workflows"
     schedule:
+      # `day` aceita SOMENTE nome de dia da semana (monday..sunday); "first-wednesday"
+      # quebrava o parser do Dependabot e invalidava o arquivo INTEIRO (todos os blocos).
       interval: "monthly"
-      day: "first-wednesday"  
+      day: "wednesday"
       time: "11:00"
       timezone: "America/Fortaleza"
     

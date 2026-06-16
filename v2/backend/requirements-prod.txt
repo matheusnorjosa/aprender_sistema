@@ -5,7 +5,7 @@
 # This file is used by Dockerfile.prod for lean production images.
 
 # Core Framework
-Django==5.2.14
+Django==5.2.15
 djangorestframework==3.16.1
 djangorestframework-simplejwt==5.5.1
 
@@ -44,7 +44,7 @@ drf-spectacular==0.29.0
 drf-spectacular-sidecar==2026.3.1
 
 # External Integrations (Google Calendar / OAuth)
-cryptography==46.0.7
+cryptography==48.0.1
 google-api-python-client==2.144.0
 google-auth==2.35.0
 google-auth-httplib2==0.2.0

@@ -6,7 +6,7 @@
 # Celery
 celery==5.4.0
 # Django Core
-Django==5.2.14
+Django==5.2.15
 django-celery-beat==2.9.0
 django-celery-results==2.5.1
 django-cors-headers==4.6.0

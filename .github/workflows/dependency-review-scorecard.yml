@@ -65,7 +65,7 @@ jobs:
       # Fallback keeps a blocking dependency gate for changed dependency manifests.
       - name: Fallback Python dependency scan (private repos)
         if: github.event.repository.private == true && steps.deps-changes.outputs.python_changed == 'true'
-        uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518 # 0.34.1
+        uses: aquasecurity/trivy-action@476e4fdcdc675b65ce75e8c3440b48d7a494f0e5 # 0.34.1
         with:
           scan-type: fs
           scan-ref: v2/backend

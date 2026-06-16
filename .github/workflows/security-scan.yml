@@ -131,7 +131,7 @@ jobs:
           docker build -f v2/frontend/Dockerfile.prod -t aprender-frontend:scan v2/frontend
 
       - name: Run Trivy (backend JSON report)
-        uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518 # 0.34.1
+        uses: aquasecurity/trivy-action@476e4fdcdc675b65ce75e8c3440b48d7a494f0e5 # 0.34.1
         with:
           image-ref: 'aprender-backend:scan'
           format: 'json'
@@ -141,7 +141,7 @@ jobs:
           severity: 'CRITICAL,HIGH,MEDIUM'
 
       - name: Run Trivy (frontend JSON report)
-        uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518 # 0.34.1
+        uses: aquasecurity/trivy-action@476e4fdcdc675b65ce75e8c3440b48d7a494f0e5 # 0.34.1
         with:
           image-ref: 'aprender-frontend:scan'
           format: 'json'

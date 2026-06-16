@@ -29,10 +29,12 @@ from typing import Any
 from django.db import transaction
 
 from apps.core.models import (
+    DATAcao,
     DATArea,
     DATCoordenador,
     Gerencia,
     Municipio,
+    PlanoFormacoes,
     Produto,
     ProjetoGeral,
     TipoEvento,
@@ -82,6 +84,8 @@ IMPLEMENTED = {
     "tipo_evento",
     "gerencia",
     "dat_coordenador",
+    "dat_acao",
+    "plano_formacao",
 }
 
 
@@ -159,6 +163,10 @@ class ExportContractImporter:
             return {}
         with open(fp, encoding="utf-8") as f:
             return json.load(f)
+
+    def _municipio_index(self) -> dict[tuple[str, str], int]:
+        """Índice (norm(nome), uf.upper()) → municipio_id, para resolver FK por nome+uf."""
+        return {(_norm(n), (u or "").upper()): mid for mid, n, u in Municipio.objects.values_list("id", "nome", "uf")}
 
     # ── handlers da fatia implementada ──
     def _classify_master(self, name: str) -> dict[str, int]:
@@ -271,6 +279,21 @@ class ExportContractImporter:
                     continue
                 existe = ("@" in val and val.lower() in emails) or (_norm(val) in nomes)
                 st, _ = diff_and_classify({} if existe else None, {}, protected)
+                tally[st] += 1
+
+        elif name in ("dat_acao", "plano_formacao"):
+            # NK = (municipio_id, projeto_id). Município por (norm(nome), uf); Projeto via resolver (#1372).
+            # FK não-resolvido → would_reject. Existence-based (não compara campos operacionais, não lê coordenador).
+            model_cls = {"dat_acao": DATAcao, "plano_formacao": PlanoFormacoes}[name]
+            mun_idx = self._municipio_index()
+            existing = set(model_cls.objects.values_list("municipio_id", "projeto_id"))
+            for r in rows:
+                mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
+                proj_id = self.resolve_projeto(r.get("projeto") or "")
+                if mun_id is None or proj_id is None:
+                    tally["would_reject"] += 1
+                    continue
+                st, _ = diff_and_classify({} if (mun_id, proj_id) in existing else None, {}, protected)
                 tally[st] += 1
 
         tally["export_rows"] = len(rows)

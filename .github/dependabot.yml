@@ -113,14 +113,29 @@ updates:
           - "patch"
     
     open-pull-requests-limit: 5
-    
+
     commit-message:
       prefix: "docker"
-    
+
     labels:
       - "docker"
       - "infrastructure"
       - "automated"
+
+    # Base-image = patch/seguranca SOMENTE. Saltar versao de linguagem (python 3.12->3.14,
+    # node 20->26) e decisao DELIBERADA, nao automatica: quebra build/runtime e exige
+    # validacao. A seguranca de SO ja vem do `apt-get/apk upgrade` no build (cache-bust por
+    # GIT_SHA, ver memoria image-os-cve-deploy-gate). Dependabot trata 3.12->3.14 como
+    # semver-minor da tag e node 20->26 como semver-major; ignoramos ambos p/ python e node.
+    ignore:
+      - dependency-name: "python"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+      - dependency-name: "node"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
 
   # ================================
   # GITHUB ACTIONS
@@ -148,14 +163,22 @@ updates:
     
     commit-message:
       prefix: "ci"
-    
+
     labels:
       - "github-actions"
       - "ci-cd"
       - "automated"
 
+    # Actions: minor/patch automaticos; major (ex.: codecov 4->7, setup-chrome 1->2) e
+    # decisao deliberada (pode ter breaking change) e fica fora do auto-update. Updates
+    # de SEGURANCA do Dependabot ignoram este filtro e continuam vindo normalmente.
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+
 # ================================
-# SECURITY AND VULNERABILITY UPDATES  
+# SECURITY AND VULNERABILITY UPDATES
 # ================================
 # Note: Dependabot automatically creates PRs for security vulnerabilities
 # regardless of the schedule configuration above.

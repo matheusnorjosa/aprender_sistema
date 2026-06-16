@@ -1,4 +1,4 @@
-﻿name: Strict Security Headers
+name: Strict Security Headers
 
 on:
   workflow_dispatch:
@@ -29,7 +29,7 @@ jobs:
         working-directory: v2/frontend
 
     steps:
-    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
 
     - name: Resolve target URL
       id: target
@@ -66,7 +66,7 @@ jobs:
 
     - name: Setup Node.js 20.x
       if: steps.target.outputs.skip_run != '1'
-      uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v4
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v4
       with:
         node-version: '20.x'
         cache: 'npm'
@@ -90,7 +90,7 @@ jobs:
         STRICT_SECURITY_HEADERS: '1'
 
     - name: Upload strict security headers artifacts
-      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4
       if: always() && steps.target.outputs.skip_run != '1'
       with:
         name: strict-security-headers-results

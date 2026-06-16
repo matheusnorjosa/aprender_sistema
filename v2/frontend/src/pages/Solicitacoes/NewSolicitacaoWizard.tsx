@@ -646,8 +646,8 @@ export default function NewSolicitacaoWizard(): JSX.Element {
         {/* Navegacao do wizard */}
         <nav aria-label="Passos do wizard" className="mt-6 mb-8">
           <Steps current={currentStep}>
-            {steps.map((step, index) => (
-              <Step key={index} title={step.title} icon={step.icon} />
+            {steps.map((step) => (
+              <Step key={step.title} title={step.title} icon={step.icon} />
             ))}
           </Steps>
         </nav>

@@ -366,8 +366,16 @@ export default function PlanoFormacoesPage(): JSX.Element {
 
     return (
       <div
+        role="button"
+        tabIndex={0}
         style={{ textAlign: 'center', cursor: 'pointer', padding: 4 }}
         onClick={() => handleFormacaoClick(plano, formacao)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleFormacaoClick(plano, formacao);
+          }
+        }}
       >
         {hasData ? (
           <>
@@ -385,7 +393,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
             )}
           </>
         ) : (
-          <Text type="secondary" style={{ fontSize: 11 }}>-</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>-</Text>
         )}
       </div>
     );
@@ -441,7 +449,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
       render: (nome: string, record: PlanoFormacaoRecord) => (
         <div>
           <Text strong>{nome}</Text>
-          <div style={{ fontSize: 11, color: '#888' }}>{record.municipio_uf}</div>
+          <div style={{ fontSize: 12, color: '#888' }}>{record.municipio_uf}</div>
         </div>
       ),
     },

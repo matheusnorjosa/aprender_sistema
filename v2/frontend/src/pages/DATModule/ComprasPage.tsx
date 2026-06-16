@@ -315,7 +315,7 @@ export default function ComprasPage(): JSX.Element {
           <Text strong>{nome}</Text>
           {record.codigo_produto && (
             <div>
-              <Text type="secondary" style={{ fontSize: 11 }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>
                 Cód: {record.codigo_produto}
               </Text>
             </div>

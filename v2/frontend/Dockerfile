@@ -1,7 +1,7 @@
 # Frontend Dockerfile - Vite + React
 # Usado para desenvolvimento local via Docker
 
-FROM node:20-alpine
+FROM node:26-alpine
 
 WORKDIR /app
 

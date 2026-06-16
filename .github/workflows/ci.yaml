@@ -1,4 +1,4 @@
-﻿name: CI – Continuous Integration
+name: CI – Continuous Integration
 
 on:
   push:
@@ -30,7 +30,7 @@ jobs:
       changed_files_count: ${{ steps.detect.outputs.changed_files_count }}
       backend_changed_count: ${{ steps.detect.outputs.backend_changed_count }}
     steps:
-    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
       with:
         fetch-depth: 0
 
@@ -112,7 +112,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
 
       - name: Set up Python 3.12
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v5
@@ -191,7 +191,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
 
       - name: Set up Python 3.12
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v5
@@ -239,7 +239,7 @@ jobs:
           - 6379:6379
 
     steps:
-    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
 
     - uses: ./.github/actions/setup-python-deps
       with:
@@ -315,7 +315,7 @@ jobs:
 
     - name: Upload core coverage artifact
       if: always()
-      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4
       continue-on-error: true
       with:
         name: backend-coverage-core
@@ -360,7 +360,7 @@ jobs:
           - 6379:6379
 
     steps:
-    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
 
     - uses: ./.github/actions/setup-python-deps
       with:
@@ -427,7 +427,7 @@ jobs:
 
     - name: Upload ingest/devtools coverage artifact
       if: always()
-      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4
       continue-on-error: true
       with:
         name: backend-coverage-ingest-devtools
@@ -449,7 +449,7 @@ jobs:
       - backend-tests-ingest-devtools
     if: always() && needs.backend-impact.outputs.backend_changed == 'true'
     steps:
-    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
 
     - uses: ./.github/actions/setup-python-deps
       with:
@@ -524,7 +524,7 @@ jobs:
       - backend-impact
     if: needs.backend-impact.outputs.backend_changed == 'true'
     steps:
-    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
 
     - uses: ./.github/actions/setup-python-deps
       with:
@@ -579,7 +579,7 @@ jobs:
           - 6379:6379
 
     steps:
-    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
 
     - name: Build backend image (Dockerfile.prod)
       run: |

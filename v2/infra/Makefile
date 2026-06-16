@@ -409,6 +409,7 @@ staging-build: ## Build backend+frontend PROD images para staging gate
 	  -t $(BACKEND_IMAGE) ..
 	@echo "🔨 [STAGING] building frontend ($(FRONTEND_IMAGE))..."
 	docker build -f ../frontend/Dockerfile.prod \
+	  --build-arg GIT_SHA=$(GIT_SHA) \
 	  -t $(FRONTEND_IMAGE) ../frontend
 	@echo "✅ [STAGING] build concluído"
 

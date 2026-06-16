@@ -26,6 +26,12 @@ RUN npm run build
 # -----------------------------------------------------------------------------
 FROM nginx:alpine AS production
 
+# Cache-bust the apk upgrade layer per release. GIT_SHA changes every commit, so
+# `apk upgrade` re-runs against the CURRENT Alpine mirror instead of reusing a
+# stale cached layer (the gha build cache otherwise pins the upgrade to whatever
+# packages existed when the layer was first built).
+ARG GIT_SHA=unknown
+
 # Labels para Docker Hub
 LABEL org.opencontainers.image.title="Aprender Sistema Frontend"
 LABEL org.opencontainers.image.description="React frontend for Aprender Sistema"
@@ -33,7 +39,7 @@ LABEL org.opencontainers.image.vendor="norjosamatheus"
 LABEL org.opencontainers.image.source="https://github.com/matheusnorjosa/aprender-sistema"
 
 # Atualiza pacotes base para reduzir CVEs conhecidos da imagem runtime.
-RUN apk upgrade --no-cache
+RUN echo "os-security-upgrade for ${GIT_SHA}" && apk upgrade --no-cache
 
 # Remover configuracao default do nginx
 RUN rm /etc/nginx/conf.d/default.conf

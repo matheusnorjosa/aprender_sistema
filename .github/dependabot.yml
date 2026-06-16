@@ -89,11 +89,17 @@ updates:
   # ================================  
   # DOCKER DEPENDENCIES
   # ================================
+  # NOTE: os Dockerfiles ficam em /v2/infra e /v2/frontend, NÃO na raiz.
+  # Com `directory: "/"` (antigo) o Dependabot não encontrava Dockerfile nenhum
+  # e nunca abria PR de bump de imagem-base — as bases driftavam até um deploy
+  # falhar no gate de CVE de SO. `directories` (plural) cobre os dois caminhos.
   - package-ecosystem: "docker"
-    directory: "/"
+    directories:
+      - "/v2/infra"
+      - "/v2/frontend"
     schedule:
-      interval: "monthly"
-      day: "first-tuesday"
+      interval: "weekly"
+      day: "tuesday"
       time: "10:00"
       timezone: "America/Fortaleza"
     

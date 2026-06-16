@@ -22,10 +22,12 @@ from typing import Any
 import pytest
 
 from apps.core.models import (
+    DATAcao,
     DATArea,
     DATCoordenador,
     Gerencia,
     Municipio,
+    PlanoFormacoes,
     Produto,
     Projeto,
     ProjetoGeral,
@@ -236,7 +238,60 @@ def test_dat_coordenador_no_pii(tmp_path):
     assert "coord.secreto@ex.com" not in json.dumps(report)
 
 
-def test_demo_oito_entidades_implementadas(tmp_path):
+# ───────── entidades operacionais — espinhaço municipio+projeto (Slice 1, classify dry-run) ─────────
+def test_classify_dat_acao_skip_create_reject(tmp_path):
+    # NK = (municipio_id, projeto_id). Existência decide skip vs create; FK não-resolvido → reject.
+    creator = Usuario.objects.create_user(username="u_da_creator", password="x", cpf="33344455566")
+    mun_a = Municipio.objects.create(nome="Cidade Acao Um", uf="CE", ativo=True)
+    Municipio.objects.create(nome="Cidade Acao Dois", uf="CE", ativo=True)
+    proj = Projeto.objects.create(nome="Proj Acao Teste", fluxo="NAO_SUPER")
+    DATAcao.objects.create(municipio=mun_a, projeto=proj, created_by=creator)
+    # linha 1: (Um, Proj) existe → skip; linha 2: (Dois, Proj) resolve mas sem DATAcao → create;
+    # linha 3: municipio inexistente → reject (FK não-resolvido).
+    csv = (
+        "municipio,uf,projeto,coordenador\n"
+        "Cidade Acao Um,CE,Proj Acao Teste,Coord Um\n"
+        "Cidade Acao Dois,CE,Proj Acao Teste,Coord Dois\n"
+        "Cidade Fantasma XYZ,CE,Proj Acao Teste,Coord Tres\n"
+    )
+    r = ExportContractImporter(path=_write_export(tmp_path, {"dat_acao": csv})).run()["por_entidade"]["dat_acao"]
+    assert r["would_skip_same"] == 1
+    assert r["would_create"] == 1
+    assert r["would_reject"] == 1
+    assert r["would_update"] == 0
+
+
+def test_classify_plano_formacao_skip_create_reject(tmp_path):
+    creator = Usuario.objects.create_user(username="u_pf_creator", password="x", cpf="77788899900")
+    mun_a = Municipio.objects.create(nome="Cidade Plano Um", uf="CE", ativo=True)
+    Municipio.objects.create(nome="Cidade Plano Dois", uf="CE", ativo=True)
+    proj = Projeto.objects.create(nome="Proj Plano Teste", fluxo="NAO_SUPER")
+    PlanoFormacoes.objects.create(municipio=mun_a, projeto=proj, created_by=creator)
+    csv = (
+        "municipio,uf,projeto,coordenador\n"
+        "Cidade Plano Um,CE,Proj Plano Teste,Coord Um\n"
+        "Cidade Plano Dois,CE,Proj Plano Teste,Coord Dois\n"
+        "Cidade Fantasma ZZZ,CE,Proj Plano Teste,Coord Tres\n"
+    )
+    r = ExportContractImporter(path=_write_export(tmp_path, {"plano_formacao": csv})).run()["por_entidade"][
+        "plano_formacao"
+    ]
+    assert r["would_skip_same"] == 1
+    assert r["would_create"] == 1
+    assert r["would_reject"] == 1
+    assert r["would_update"] == 0
+
+
+def test_dat_acao_no_coordenador_pii(tmp_path):
+    # coordenador é pessoa (DATCoordenador) → nunca deve vazar no relatório.
+    Municipio.objects.create(nome="Cidade PII", uf="CE", ativo=True)
+    Projeto.objects.create(nome="Proj PII Teste", fluxo="NAO_SUPER")
+    csv = "municipio,uf,projeto,coordenador\nCidade PII,CE,Proj PII Teste,CoordSecretoXYZ\n"
+    report = ExportContractImporter(path=_write_export(tmp_path, {"dat_acao": csv})).run()
+    assert "CoordSecretoXYZ" not in json.dumps(report)
+
+
+def test_demo_dez_entidades_implementadas(tmp_path):
     files = {
         "dat_area": "nome,descricao\nA,d\n",
         "municipio": "nome,uf,ativo\nC,CE,True\n",
@@ -246,6 +301,8 @@ def test_demo_oito_entidades_implementadas(tmp_path):
         "tipo_evento": "nome,cor\nT,#000000\n",
         "gerencia": "nome,nome_setor\nSetor,Setor\n",
         "dat_coordenador": "usuario,area\ncoord@ex.com,Area\n",
+        "dat_acao": "municipio,uf,projeto\nC,CE,P\n",
+        "plano_formacao": "municipio,uf,projeto\nC,CE,P\n",
     }
     r = ExportContractImporter(path=_write_export(tmp_path, files)).run()["por_entidade"]
     for ent in files:

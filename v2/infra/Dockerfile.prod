@@ -37,10 +37,18 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PATH="/home/appuser/.local/bin:/opt/venv/bin:$PATH"
 
+# Cache-bust the OS security-upgrade layer per release. GIT_SHA changes every
+# commit, so `apt-get upgrade` re-runs against the CURRENT Debian mirror instead
+# of reusing a stale cached layer (the gha build cache otherwise pins the upgrade
+# to whatever packages existed when the layer was first built). Pairs with the
+# Dependabot docker base-image bumps to keep the runtime image free of fixed OS CVEs.
+ARG GIT_SHA=unknown
+
 # Runtime OS packages only (NO compilers, NO headers)
 # - postgresql-client: required for backup scripts (Issue #562 C-05)
 # - libmagic1: required by python-magic at runtime
-RUN apt-get update \
+RUN echo "os-security-upgrade for ${GIT_SHA}" \
+ && apt-get update \
  && apt-get upgrade -y \
  && apt-get install -y --no-install-recommends \
     curl tzdata ca-certificates libpq5 postgresql-client libmagic1 \

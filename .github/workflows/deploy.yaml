@@ -184,9 +184,11 @@ jobs:
           tags: aprender-frontend:scan-${{ github.run_id }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            GIT_SHA=${{ github.sha }}
 
       - name: Generate Trivy report (backend)
-        uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518 # 0.34.1
+        uses: aquasecurity/trivy-action@476e4fdcdc675b65ce75e8c3440b48d7a494f0e5 # 0.34.1
         with:
           image-ref: aprender-backend:scan-${{ github.run_id }}
           format: json
@@ -196,7 +198,7 @@ jobs:
           ignore-unfixed: true
 
       - name: Generate Trivy report (frontend)
-        uses: aquasecurity/trivy-action@e368e328979b113139d6f9068e03accaed98a518 # 0.34.1
+        uses: aquasecurity/trivy-action@476e4fdcdc675b65ce75e8c3440b48d7a494f0e5 # 0.34.1
         with:
           image-ref: aprender-frontend:scan-${{ github.run_id }}
           format: json
@@ -260,6 +262,8 @@ jobs:
             ${{ env.FRONTEND_IMAGE }}:${{ needs.prepare.outputs.release_version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            GIT_SHA=${{ github.sha }}
 
       - name: Create git tag if missing
         env:

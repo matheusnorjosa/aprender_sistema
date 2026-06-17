@@ -26,7 +26,7 @@ pytest-watch==4.2.0
 # Debugging & Profiling
 ipdb==0.13.13
 ipython==8.26.0
-django-debug-toolbar==5.1.0
+django-debug-toolbar==5.2.0
 django-extensions==4.1
 django-silk==5.5.0
 watchdog==4.0.2
@@ -40,8 +40,8 @@ import-linter==2.6
 
 # Type Checking (Python 3.12 + PEP 695)
 pyright==1.1.382
-django-types==0.23.0
-djangorestframework-types==0.8.0
+django-types==0.24.0
+djangorestframework-types==0.9.0
 types-requests==2.32.0.20240914
 types-redis==4.6.0.20240903
 celery-types==0.22.0

@@ -8,12 +8,12 @@ celery==5.4.0
 # Django Core
 Django==5.2.15
 django-celery-beat==2.9.0
-django-celery-results==2.5.1
-django-cors-headers==4.6.0
+django-celery-results==2.6.0
+django-cors-headers==4.9.0
 django-redis==5.4.0
 
 # Django Extensions
-djangorestframework==3.16.1
+djangorestframework==3.17.1
 
 # Production Server
 gunicorn==23.0.0

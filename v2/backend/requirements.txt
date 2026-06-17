@@ -46,7 +46,7 @@ djangorestframework==3.16.1
 djangorestframework-simplejwt==5.5.1
 drf-spectacular==0.29.0
 drf-spectacular-sidecar==2026.3.1
-factory-boy==3.3.1
+factory-boy==3.3.3
 faker==28.4.1
 flake8==7.1.1
 

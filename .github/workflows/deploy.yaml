@@ -573,13 +573,19 @@ jobs:
             curl_opts+=(--insecure)
           fi
 
+          # API key via curl --config (arquivo mode 600): mantém o token fora de
+          # argv (/proc/<pid>/cmdline). A requisição HTTP enviada é idêntica. #1394.
+          portainer_hdr_file="$(mktemp)"
+          chmod 600 "$portainer_hdr_file"
+          printf 'header = "X-API-KEY: %s"\n' "$portainer_access_token" > "$portainer_hdr_file"
+          trap 'rm -f "$portainer_hdr_file"' EXIT
+          curl_opts+=(--config "$portainer_hdr_file")
+
           # --- Read current stack state ---
           stack_json="$(curl "${curl_opts[@]}" \
-            -H "X-API-KEY: ${portainer_access_token}" \
             "${portainer_url}/api/stacks/${PORTAINER_STACK_ID}")"
 
           stack_file_json="$(curl "${curl_opts[@]}" \
-            -H "X-API-KEY: ${portainer_access_token}" \
             "${portainer_url}/api/stacks/${PORTAINER_STACK_ID}/file")"
 
           stack_file_content="$(printf '%s' "$stack_file_json" | jq -r '.StackFileContent')"
@@ -627,7 +633,6 @@ jobs:
               -o /tmp/portainer-stack-update-response.json \
               -w '%{http_code}' \
               -X PUT \
-              -H "X-API-KEY: ${portainer_access_token}" \
               -H "Content-Type: application/json" \
               "${portainer_url}/api/stacks/${PORTAINER_STACK_ID}?endpointId=${PORTAINER_ENDPOINT_ID}" \
               --data-raw "$payload" || true)"
@@ -848,9 +853,14 @@ jobs:
             if [ "${PORTAINER_SKIP_TLS_VERIFY:-}" = "true" ]; then
               portainer_curl_opts+=(--insecure)
             fi
+            # API key via curl --config (mode 600), fora do argv. #1394.
+            portainer_hdr_file="$(mktemp)"
+            chmod 600 "$portainer_hdr_file"
+            printf 'header = "X-API-KEY: %s"\n' "$PORTAINER_ACCESS_TOKEN" > "$portainer_hdr_file"
+            trap 'rm -f "$portainer_hdr_file"' EXIT
+            portainer_curl_opts+=(--config "$portainer_hdr_file")
 
             containers_json="$(curl "${portainer_curl_opts[@]}" \
-              -H "X-API-KEY: ${PORTAINER_ACCESS_TOKEN}" \
               "${PORTAINER_URL}/api/endpoints/${PORTAINER_ENDPOINT_ID}/docker/containers/json?all=true&filters=%7B%22label%22%3A%5B%22com.docker.compose.project%3Daprender_prod%22%5D%7D" 2>/dev/null || echo "[]")"
 
             web_state="$(printf '%s' "$containers_json" | jq -r '[.[] | select(.Names[] | contains("web"))] | .[0].State // "unknown"' 2>/dev/null || echo "unknown")"
@@ -944,14 +954,18 @@ jobs:
           if [ "${PORTAINER_SKIP_TLS_VERIFY:-false}" = "true" ]; then
             curl_opts+=(--insecure)
           fi
+          # API key via curl --config (arquivo mode 600), fora do argv. #1394.
+          portainer_hdr_file="$(mktemp)"
+          chmod 600 "$portainer_hdr_file"
+          printf 'header = "X-API-KEY: %s"\n' "$portainer_access_token" > "$portainer_hdr_file"
+          trap 'rm -f "$portainer_hdr_file"' EXIT
+          curl_opts+=(--config "$portainer_hdr_file")
 
           docker_api_base="${portainer_url}/api/endpoints/${PORTAINER_ENDPOINT_ID}/docker"
 
           containers_json="$(curl "${curl_opts[@]}" \
-            -H "X-API-KEY: ${portainer_access_token}" \
             "${docker_api_base}/containers/json?all=1" || true)"
           images_json="$(curl "${curl_opts[@]}" \
-            -H "X-API-KEY: ${portainer_access_token}" \
             "${docker_api_base}/images/json?all=1" || true)"
 
           if [ -z "$containers_json" ] || [ -z "$images_json" ]; then
@@ -1003,7 +1017,6 @@ jobs:
                 -o /tmp/portainer-image-delete-response.json \
                 -w '%{http_code}' \
                 -X DELETE \
-                -H "X-API-KEY: ${portainer_access_token}" \
                 "${docker_api_base}/images/${encoded_ref}?force=false&noprune=false" || true)"
 
               if [[ "$http_code" =~ ^[0-9]+$ ]] && [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then

@@ -60,7 +60,9 @@ jobs:
 
           if [ -n "${SAFETY_API_KEY:-}" ]; then
             set +e
-            safety --key "$SAFETY_API_KEY" scan --target . --output json > safety-report.json
+            # safety 3.x le SAFETY_API_KEY do ambiente (setado no env: do step) —
+            # dispensa --key na linha de comando, que expunha a chave em /proc/<pid>/cmdline.
+            safety scan --target . --output json > safety-report.json
             safety_exit=$?
             set -e
 

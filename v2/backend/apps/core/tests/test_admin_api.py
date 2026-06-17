@@ -479,7 +479,8 @@ class TestUsuarioAdminAPI:
 
         user = Usuario.objects.get(username="test_hash")
         assert user.password != "SecurePass456!"  # senha não em plaintext
-        assert user.password.startswith("pbkdf2_")  # formato Django hash
+        assert user.has_usable_password()  # armazenada como hash (independe do algoritmo)
+        assert user.check_password("SecurePass456!")  # hash válido e verificável
 
     def test_controle_cannot_create_usuario(self, api_client, usuario_controle):
         """Controle NÃO pode criar usuário"""

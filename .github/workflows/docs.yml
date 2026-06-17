@@ -33,6 +33,7 @@ concurrency:
 
 jobs:
   build:
+    name: "[info] documentation build"
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

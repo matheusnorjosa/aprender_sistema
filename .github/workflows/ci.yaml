@@ -2,9 +2,9 @@ name: CI – Continuous Integration
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, feat/dashboard-compras-etl ]
+    branches: [ main ]
 
 permissions:
   contents: read

@@ -9,7 +9,14 @@ updates:
   # PYTHON DEPENDENCIES
   # ================================
   - package-ecosystem: "pip"
-    directory: "/"
+    # NOTE: os requirements de backend vivem em /v2/backend (requirements*.txt), NAO na raiz.
+    # Com `directory: "/"` (antigo) o Dependabot so encontrava /requirements-docs.txt e NUNCA
+    # abria PR de dep de backend — gap que custou bumps manuais de Django 5.2.15, cryptography
+    # 48.0.1 e pyarrow. `directories` (plural) cobre os dois: backend + docs (raiz), sem
+    # regressao na cobertura dos docs. Ver memoria dependabot-pip-directory.
+    directories:
+      - "/v2/backend"
+      - "/"
     schedule:
       interval: "weekly"
       day: "tuesday"
@@ -141,7 +148,14 @@ updates:
   # GITHUB ACTIONS
   # ================================
   - package-ecosystem: "github-actions"
-    directory: "/.github/workflows"
+    # `/` cobre .github/workflows (comportamento padrao do ecossistema github-actions).
+    # Glob NAO e suportado p/ github-actions, entao as 2 composite actions em
+    # .github/actions/<nome>/action.yml entram como diretorios explicitos — senao os SHAs
+    # dessas actions internas envelhecem em silencio (ficam fora do auto-update).
+    directories:
+      - "/"
+      - "/.github/actions/setup-node-deps"
+      - "/.github/actions/setup-python-deps"
     schedule:
       # `day` aceita SOMENTE nome de dia da semana (monday..sunday); "first-wednesday"
       # quebrava o parser do Dependabot e invalidava o arquivo INTEIRO (todos os blocos).

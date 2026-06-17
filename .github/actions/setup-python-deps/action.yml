@@ -31,6 +31,9 @@ runs:
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: |
+        # Sem --no-cache-dir: o setup-python (cache: 'pip') restaura o cache de
+        # download e o pip o reutiliza no hit, evitando recompilar wheels pesados
+        # (pandas/pyarrow/cryptography) a cada job. O flag antigo anulava esse cache.
         for req in ${{ inputs.requirements }}; do
-          pip install --no-cache-dir -r "$req"
+          pip install -r "$req"
         done

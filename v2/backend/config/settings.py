@@ -34,6 +34,12 @@ DEBUG = os.getenv("DEBUG", "0") == "1"
 # Detect if running under pytest (for disabling debug toolbar during tests)
 TESTING = "pytest" in sys.modules or "PYTEST_CURRENT_TEST" in os.environ
 
+if TESTING:
+    # Hashing rápido apenas em teste. PBKDF2 (default de produção) custa
+    # centenas de ms por create_user/set_password — chamado em ~141 arquivos
+    # de teste. Gated pela flag TESTING; produção/staging mantêm PBKDF2.
+    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
 print("Aprender Sistema Inicializado")
 # ================================================================
 # SECRET KEY

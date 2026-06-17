@@ -6,16 +6,16 @@
 
 # Core Framework
 Django==5.2.15
-djangorestframework==3.16.1
+djangorestframework==3.17.1
 djangorestframework-simplejwt==5.5.1
 
 # Authentication & Authorization
-django-allauth==65.14.1
+django-allauth==65.18.0
 
 # Task Queue
 celery==5.5.3
 django-celery-beat==2.9.0
-django-celery-results==2.5.1
+django-celery-results==2.6.0
 
 # Cache & Sessions
 django-redis==5.4.0
@@ -23,15 +23,15 @@ redis==5.2.1
 
 # Database
 psycopg2-binary==2.9.12
-django-db-connection-pool==1.2.4
+django-db-connection-pool==1.2.6
 
 # CORS & Middleware
-django-cors-headers==4.4.0
+django-cors-headers==4.9.0
 django-filter==24.3
 whitenoise==6.7.0
 
 # Forms & Validation
-django-crispy-forms==2.3
+django-crispy-forms==2.6
 crispy-bootstrap5==2024.2
 
 # Storage & Files
@@ -71,6 +71,6 @@ django-environ==0.13.0
 pybreaker==1.2.0
 
 # Monitoring & Logging (production)
-django-prometheus==2.4.1
+django-prometheus==2.5.0
 python-json-logger==2.0.7
 sentry-sdk==2.13.0

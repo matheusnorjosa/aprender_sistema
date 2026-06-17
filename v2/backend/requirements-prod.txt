@@ -22,7 +22,7 @@ django-redis==5.4.0
 redis==5.2.1
 
 # Database
-psycopg2-binary==2.9.11
+psycopg2-binary==2.9.12
 django-db-connection-pool==1.2.4
 
 # CORS & Middleware

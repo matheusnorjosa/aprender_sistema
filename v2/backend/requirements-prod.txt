@@ -37,7 +37,7 @@ crispy-bootstrap5==2024.2
 # Storage & Files
 django-storages==1.14.6
 python-magic==0.4.27
-boto3==1.35.9
+boto3==1.43.31
 
 # API Documentation
 drf-spectacular==0.29.0

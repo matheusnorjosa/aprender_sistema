@@ -103,9 +103,9 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     permissions:
+      # publish_results:false + so upload-artifact (sem upload-sarif) -> os escopos
+      # security-events:write e id-token:write ficavam ociosos. Removidos. #1397.
       contents: read
-      security-events: write
-      id-token: write
       actions: read
     # Fork PRs can have restricted token permissions for Scorecard internals.
     if: github.event.pull_request.head.repo.full_name == github.repository

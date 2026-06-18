@@ -19,8 +19,9 @@ on:
       - "docs/operations/ci-check-policy.md"
 
 permissions:
+  # `issues: write` movido p/ o job canary-report (unico que comenta na issue);
+  # o job de matriz de testes herda so `contents: read`. #1397.
   contents: read
-  issues: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -167,6 +168,10 @@ jobs:
   canary-report:
     name: "[ops] backend xdist canary summary"
     runs-on: ubuntu-latest
+    permissions:
+      # Unico job que comenta na issue 677 — issues:write vive aqui. #1397.
+      contents: read
+      issues: write
     needs:
       - xdist-canary
     if: always()

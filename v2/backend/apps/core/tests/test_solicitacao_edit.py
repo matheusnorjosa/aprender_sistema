@@ -383,14 +383,11 @@ class TestSolicitacaoEditBusinessRules:
 class TestSolicitacaoEditAuditLog:
     """Testes de audit log para edições."""
 
-    @pytest.mark.skip(reason="AuditLog para edições em investigação - funcionalidade principal de edição funciona")
     def test_edit_creates_audit_log(self, api_client, usuario_owner, solicitacao_editavel):
-        """Edição cria registro no AuditLog com campos alterados.
+        """Edição via PATCH cria registro no AuditLog com campos alterados (PA-05).
 
-        Nota: O AuditLog é criado no perform_update() do ViewSet quando
-        há campos alterados. Este teste verifica que o mecanismo funciona.
-
-        TODO: Investigar por que perform_update não está gerando AuditLog em testes.
+        O AuditLog é criado no perform_update() do ViewSet quando
+        há campos alterados.
         """
         api_client.force_authenticate(user=usuario_owner)
 
@@ -429,6 +426,9 @@ class TestSolicitacaoEditAuditLog:
         assert log.usuario == usuario_owner
         assert log.details["solicitacao_id"] == solicitacao_editavel.id
         assert "local" in log.details["changed_fields"]
+        assert "observacoes" in log.details["changed_fields"]
+        assert log.details["changed_fields"]["local"]["old"] == "Local Original"
+        assert log.details["changed_fields"]["local"]["new"] == "Novo Local para Audit"
 
     def test_no_audit_log_when_no_changes(self, api_client, usuario_owner, solicitacao_editavel):
         """Não cria AuditLog quando não há mudanças."""

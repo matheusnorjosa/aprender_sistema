@@ -1,12 +1,25 @@
 name: Architecture Guardrails
 
 on:
+  # Guardrails de arquitetura (import-linter backend + dependency-cruiser frontend)
+  # so importam quando o codigo muda. Path filters evitam runs em PRs so-docs.
+  # NAO e required check (nem ruleset nem branch protection), entao skip nao trava merge.
   push:
     branches:
       - main
+    paths:
+      - 'v2/backend/**'
+      - 'v2/frontend/**'
+      - '.github/workflows/architecture-guardrails.yml'
+      - '.github/actions/setup-node-deps/**'
   pull_request:
     branches:
       - main
+    paths:
+      - 'v2/backend/**'
+      - 'v2/frontend/**'
+      - '.github/workflows/architecture-guardrails.yml'
+      - '.github/actions/setup-node-deps/**'
 
 permissions:
   contents: read

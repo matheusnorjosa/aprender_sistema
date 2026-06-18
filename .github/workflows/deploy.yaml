@@ -653,11 +653,29 @@ jobs:
               break
             fi
 
-            # Timeout (000) = firewall dropped the response, but Portainer likely received the request
+            # Timeout (000): o firewall pode ter dropado a RESPOSTA mas o Portainer
+            # recebeu o PUT — OU o PUT nao chegou (deploy fantasma). NAO assumir sucesso
+            # cego: confirmar via GET que o stack realmente recebeu a IMAGE_TAG nova.
+            # Fail-fast (#1396): se nao confirmar, faz retry; se esgotar, deploy_sent
+            # fica false -> exit 1 abaixo (em vez de depender so do timeout de 360s).
             if [ "$http_code" = "000" ]; then
-              echo "Portainer request timed out (attempt ${attempt}/${max_attempts}). Treating as fire-and-forget — post-deploy verification will confirm."
-              deploy_sent=true
-              break
+              echo "Portainer PUT timed out (attempt ${attempt}/${max_attempts}). Confirming stack IMAGE_TAG before assuming success..."
+              confirm_json="$(curl "${curl_opts[@]}" --max-time 30 \
+                "${portainer_url}/api/stacks/${PORTAINER_STACK_ID}" 2>/dev/null || true)"
+              live_tag="$(printf '%s' "$confirm_json" | jq -r '([.Env[]? | select(.name == "IMAGE_TAG") | .value] | first) // ""' 2>/dev/null || true)"
+              if [ "$live_tag" = "$RELEASE_VERSION" ]; then
+                echo "Confirmed: stack IMAGE_TAG=${RELEASE_VERSION} despite the timeout. Treating as sent."
+                deploy_sent=true
+                break
+              fi
+              echo "Not confirmed: stack IMAGE_TAG='${live_tag:-unknown}' != '${RELEASE_VERSION}' after timeout."
+              if [ "$attempt" -lt "$max_attempts" ]; then
+                echo "Retrying PUT in ${retry_sleep}s... (${attempt}/${max_attempts})"
+                sleep "$retry_sleep"
+                continue
+              fi
+              echo "Exhausted ${max_attempts} attempts after timeout without IMAGE_TAG confirmation." >&2
+              # deploy_sent permanece false -> exit 1 logo abaixo.
             fi
 
             # Server errors are retryable

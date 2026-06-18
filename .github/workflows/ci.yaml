@@ -291,6 +291,10 @@ jobs:
         mkdir -p "$GITHUB_WORKSPACE/v2/backend/data/csv-import"
 
     - name: Run core tests with coverage
+      env:
+        # Backend sys.monitoring do Python 3.12: coverage muito mais leve que o
+        # C-trace (~30-50% menos overhead), mantendo --cov e o gate de 85%. #1399.
+        COVERAGE_CORE: sysmon
       run: |
         cd v2/backend
         echo "🧪 Running backend core suite (serial)"
@@ -403,6 +407,9 @@ jobs:
         mkdir -p "$GITHUB_WORKSPACE/v2/backend/data/csv-import"
 
     - name: Run ingest/devtools tests with coverage
+      env:
+        # Backend sys.monitoring do Python 3.12 (ver step core). #1399.
+        COVERAGE_CORE: sysmon
       run: |
         cd v2/backend
         echo "🧪 Running backend ingest/devtools suite (serial)"

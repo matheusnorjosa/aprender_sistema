@@ -54,8 +54,8 @@ docker compose -f v2/infra/docker-compose.yml exec web pytest
 
 ## CI/CD
 
-O projeto usa GitHub Actions para CI:
+O projeto usa GitHub Actions para CI/CD:
 
 - **Lint**: Black, isort, flake8, Pyright
 - **Testes**: pytest com coverage (threshold 85%)
-- **Deploy**: GitHub Pages (documentação)
+- **Deploy**: Merge na `main` dispara o workflow `.github/workflows/deploy.yaml` ("Deploy (Portainer CE)"), que faz build + scan + push da imagem Docker com tag imutável `vYYYY.MM.DD-<sha>` e atualiza a stack na VM de produção via Portainer CE API (ver [ADR-010](project-decisions/ADR-010-deploy-portainer-direct-to-prod.md)). Não há ambiente de staging remoto; a validação pré-merge é o staging gate local (`make staging-full`).

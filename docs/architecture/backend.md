@@ -16,7 +16,7 @@ apps/core/
 ├── models/           # Modelos Django
 │   ├── usuario.py
 │   ├── solicitacao.py
-│   ├── availability.py
+│   ├── agenda.py     # AvailabilityBlock (disponibilidade)
 │   └── ...
 ├── serializers/      # DRF Serializers
 ├── views/            # DRF ViewSets
@@ -70,7 +70,7 @@ O sistema possui dois domínios distintos de compras e eles não devem ser confu
 
 - `core_compra`
   - leitura: Controle e Superintendência
-  - escrita: pipelines/importações de controle e rotinas ETL
+  - escrita: pipelines/importações de controle (`services/controle_imports.py`)
 - `core_dat_compra`
   - leitura/escrita: DAT e Superintendência (CRUD operacional DAT)
 
@@ -85,7 +85,7 @@ A lógica de negócio está isolada em services:
 
 - `availability_service.py`: Verificação de conflitos
 - `gcal_sync_service.py`: Sincronização com Google Calendar
-- `approval_service.py`: Fluxo de aprovação
+- `solicitacao_approval.py`: Fluxo de aprovação
 
 ## Type Hints
 

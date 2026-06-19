@@ -16,7 +16,7 @@ Fonte operacional oficial para evitar confusao de contexto no fluxo solo.
 | dev | Desenvolvimento local | `docker-compose.yml + docker-compose.override.yml` | `.env.dev` | `aprender_dev` | `8002` | `5173` | `5434` | `6380` |
 | staging | Homologacao local | `docker-compose.yml` | `.env.staging` | `aprender_staging` | `18002` | `15173` | `15434` | `16380` |
 | prod-like | Validacao local fiel ao compose de producao | `docker-compose.prod.yml` | `.env.prodlike.local` | `aprender_prod_like` | `28000` | `18081` | externo | interno |
-| producao | Runtime final (VM01) | `docker-compose.prod.yml` | `stack.env`/`.env.production` | `aprender_prod` | `8000` | `81` | VM02 | VM03 |
+| producao | Runtime final (VM01) | `docker-compose.prod.yml` | `stack.env`/`.env.production` | `aprender_prod` | `8000` | `81` | VM02 | interno (VM01) |
 
 ## 3) Comandos Oficiais
 
@@ -71,7 +71,7 @@ make build-prod-image
 6. `staging/producao` devem usar imagem publicada gerada com `Dockerfile.prod`.
 7. `staging` e `producao` exigem `IMAGE_TAG` explicita e imutavel (`vYYYY.MM.DD-<sha-or-id>`); `latest` nao e permitido em promocao/rollback de producao.
 8. Em `staging/producao`, `docker-compose.override.yml` nao e aplicado.
-9. Em producao Golden Cloud (3-VMs), `docker-compose.prod.yml` usa DB/Redis externos (VM02/VM03); a stack da VM01 sobe `web/worker/beat/frontend`.
+9. Em producao Golden Cloud, `docker-compose.prod.yml` usa DB externo (VM02); o Redis e container local da stack (servico `redis`), e a stack da VM01 sobe `web/worker/beat/frontend/redis`.
 10. O `docker-compose.yml` base e prod-like: binds de codigo do frontend (`src/public`) ficam apenas no `docker-compose.override.yml` (dev-only).
 
 ## 5) Staging Gate — Validacao Local Pre-Merge

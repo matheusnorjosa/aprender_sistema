@@ -60,7 +60,7 @@ v2/
 │   │   │   ├── views/     # ViewSets DRF
 │   │   │   ├── services/  # Lógica de negócio
 │   │   │   └── tests/     # Testes
-│   │   └── dat_ingest/    # ETL e importação
+│   │   └── dev_tools/     # Seeds (desabilitado em prod)
 │   ├── config/            # Configurações Django
 │   └── manage.py
 ├── frontend/

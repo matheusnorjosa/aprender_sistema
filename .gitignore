@@ -588,11 +588,10 @@ v2/frontend/validate-*.json
 v2/frontend/playwright-report/
 v2/frontend/test-results/
 
-# Observability stack (opcional - não utilizado atualmente)
+# Observability stack: configs de infra local opcionais (o doc v2/docs/OBSERVABILITY.md E versionado)
 v2/infra/docker-compose.observability.yml
 v2/infra/prometheus.yml
 v2/infra/grafana/
-v2/docs/OBSERVABILITY.md
 
 # Continuous Claude cache (local only)
 .claude/cache/

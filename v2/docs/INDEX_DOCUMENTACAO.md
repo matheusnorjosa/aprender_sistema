@@ -223,7 +223,6 @@
 **Arquivos**:
 - [LOGGING.md](./LOGGING.md) - Structured logging
 - [OBSERVABILITY.md](./OBSERVABILITY.md) - Métricas e monitoramento
-- [ENV_VARS_ETL.md](./ENV_VARS_ETL.md) - Variáveis de ambiente
 
 ---
 

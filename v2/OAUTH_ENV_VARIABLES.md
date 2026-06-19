@@ -188,5 +188,4 @@ docker compose restart web worker beat
 
 - [Google Calendar API - OAuth 2.0](https://developers.google.com/calendar/api/guides/auth)
 - [Fernet (Cryptography)](https://cryptography.io/en/latest/fernet/)
-- [fechar_plano_gcal.md](../docs/fechar_plano_gcal.md) - Plano completo OAuth
-- [GUIDE_GCAL.md](../docs/GUIDE_GCAL.md) - Guia de configuração GCal
+- [GUIDE_GCAL.md](docs/GUIDE_GCAL.md) - Guia de configuração GCal

@@ -171,6 +171,6 @@ DOCKER_HUB_TOKEN=your-docker-hub-token
 
 ## Related Documentation
 
-- [PLAN_infrastructure_scaling.md](../docs/PLAN_infrastructure_scaling.md)
+- [PLAN_infrastructure_scaling.md](../docs/_archive/plans/PLAN_infrastructure_scaling.md)
 - [DEPLOY_CHECKLIST.md](../docs/DEPLOY_CHECKLIST.md)
 - [GUIDE_DR.md](../docs/GUIDE_DR.md) - Disaster Recovery & Backup

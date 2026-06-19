@@ -1,0 +1,259 @@
+# Reusable workflow: backend test job (SSOT de infra de teste).
+#
+# Centraliza o setup duplicado dos jobs backend (#1401):
+#   - services postgres/redis  (bump de versao = 1 edicao, aqui)
+#   - 19 env vars de teste      (idem)
+#   - manage.py migrate         (idem)
+#   - prepare runtime dirs/symlinks
+#   - run pytest (parametrizado: paths, coverage, xdist, junit, log, metadata)
+#   - upload de artifact
+#
+# Consumido por:
+#   - ci.yaml: backend-tests-core, backend-tests-ingest-devtools
+#   - backend-xdist-canary.yml: xdist-canary (via strategy.matrix no caller)
+#
+# Fora de escopo (carve-out documentado): ci.yaml::docker-parity-backend usa env/topologia
+# de container (host.docker.internal, REQUIRE_DOCKER=1, migrate in-container) e nao consome
+# este reusable; ao bumpar postgres/redis aqui, sincronizar tambem o services de la.
+name: Backend Test (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      runner_timeout:
+        description: "Job timeout em minutos"
+        type: number
+        default: 35
+      pytest_paths:
+        description: "Paths/targets do pytest (separados por espaco)"
+        type: string
+        default: "apps"
+      pytest_extra_args:
+        description: "Args extras do pytest (xdist, junit, dispatch passthrough)"
+        type: string
+        default: ""
+      coverage_file:
+        description: "Se != '', exporta COVERAGE_FILE e adiciona --cov=apps --cov-report=term"
+        type: string
+        default: ""
+      validate_test_paths:
+        description: "Roda o guard de paths '/app' hardcoded (so o core precisa)"
+        type: boolean
+        default: false
+      summary_title:
+        description: "Titulo do bloco no GITHUB_STEP_SUMMARY"
+        type: string
+        default: "Backend tests"
+      capture_log_file:
+        description: "Se != '', redireciona o pytest para esse log + tail (canary)"
+        type: string
+        default: ""
+      fail_on_test_error:
+        description: "Se true, o job falha quando o pytest falha (gates core/ingest). O canary usa false (non-blocking): exit real fica no metadata/report."
+        type: boolean
+        default: true
+      emit_canary_metadata:
+        description: "Se true, escreve xdist-canary-metadata.json (canary)"
+        type: boolean
+        default: false
+      matrix_workers:
+        description: "Valor de matrix.workers (para o metadata do canary)"
+        type: string
+        default: ""
+      matrix_dist:
+        description: "Valor de matrix.dist (para o metadata do canary)"
+        type: string
+        default: ""
+      artifact_name:
+        description: "Nome do artifact de saida"
+        type: string
+        required: true
+      artifact_paths:
+        description: "Path(s) do artifact (newline-separated)"
+        type: string
+        required: true
+      artifact_if_no_files:
+        description: "if-no-files-found do upload (error|warn|ignore)"
+        type: string
+        default: "warn"
+      artifact_retention_days:
+        description: "Retencao do artifact em dias"
+        type: number
+        default: 7
+
+permissions:
+  contents: read
+
+jobs:
+  backend-test:
+    name: "[info] backend test"
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.runner_timeout }}
+
+    services:
+      # SSOT: bump de versao aqui cobre core/ingest/canary (#1401).
+      postgres:
+        image: postgres:15.13
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_aprender
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7.4
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
+
+      - uses: ./.github/actions/setup-python-deps
+        with:
+          requirements: 'requirements.txt requirements-dev.txt'
+
+      - name: Set up environment variables
+        run: |
+          echo "DJANGO_SETTINGS_MODULE=config.settings" >> "$GITHUB_ENV"
+          echo "ENVIRONMENT=testing" >> "$GITHUB_ENV"
+          echo "DEBUG=0" >> "$GITHUB_ENV"
+          echo "SECRET_KEY=test-secret-key-for-ci-only" >> "$GITHUB_ENV"
+          echo "DB_HOST=localhost" >> "$GITHUB_ENV"
+          echo "DB_PORT=5432" >> "$GITHUB_ENV"
+          echo "DB_NAME=test_aprender" >> "$GITHUB_ENV"
+          echo "DB_USER=postgres" >> "$GITHUB_ENV"
+          echo "DB_PASSWORD=postgres" >> "$GITHUB_ENV"
+          echo "REDIS_HOST=localhost" >> "$GITHUB_ENV"
+          echo "REDIS_PORT=6379" >> "$GITHUB_ENV"
+          echo "TZ=America/Fortaleza" >> "$GITHUB_ENV"
+          echo "REQUIRE_DOCKER=0" >> "$GITHUB_ENV"
+          echo "GCAL_CLIENT=fake" >> "$GITHUB_ENV"
+          echo "GCAL_SEND_UPDATES=none" >> "$GITHUB_ENV"
+          echo "FEATURE_AUTO_APPLY_ENABLED=false" >> "$GITHUB_ENV"
+          echo "ETL_OUTPUT_DIR=${{ github.workspace }}/v2/backend/out_etl" >> "$GITHUB_ENV"
+          echo "ETL_DATA_DIR=${{ github.workspace }}/v2/backend/data/csv-import" >> "$GITHUB_ENV"
+          echo "PYTHONDONTWRITEBYTECODE=1" >> "$GITHUB_ENV"
+
+      - name: Validate test paths (no /app hardcoded)
+        if: ${{ inputs.validate_test_paths }}
+        run: |
+          cd v2/backend
+          if grep -R --line-number '"/app' apps/core/tests apps/dev_tools/tests 2>/dev/null | grep -v "Binary file" | grep -v '"/api/'; then
+            echo "❌ Found '/app' hardcoded in tests. Use Path(settings.BASE_DIR) instead." >&2
+            exit 1
+          fi
+          echo "✅ No hardcoded '/app' paths found in tests"
+
+      - name: Run migrations
+        run: |
+          cd v2/backend
+          python manage.py migrate --noinput
+
+      - name: Prepare runtime dirs and symlinks
+        run: |
+          sudo mkdir -p /app
+          mkdir -p "$GITHUB_WORKSPACE/v2/backend/.agents/outbox"
+          sudo rm -rf /app/.agents || true
+          sudo ln -s "$GITHUB_WORKSPACE/v2/backend/.agents" /app/.agents
+          mkdir -p "$GITHUB_WORKSPACE/v2/backend/out_etl"
+          mkdir -p "$GITHUB_WORKSPACE/v2/backend/data/csv-import"
+
+      - name: Run tests
+        env:
+          # Backend sys.monitoring do Python 3.12: coverage muito mais leve que o C-trace
+          # (no-op quando nao ha --cov). #1399.
+          COVERAGE_CORE: sysmon
+          PYTEST_PATHS: ${{ inputs.pytest_paths }}
+          PYTEST_EXTRA_ARGS: ${{ inputs.pytest_extra_args }}
+          COVERAGE_FILE_INPUT: ${{ inputs.coverage_file }}
+          CAPTURE_LOG_FILE: ${{ inputs.capture_log_file }}
+          FAIL_ON_TEST_ERROR: ${{ inputs.fail_on_test_error }}
+          SUMMARY_TITLE: ${{ inputs.summary_title }}
+          EMIT_CANARY_METADATA: ${{ inputs.emit_canary_metadata }}
+          WORKERS: ${{ inputs.matrix_workers }}
+          DIST_MODE: ${{ inputs.matrix_dist }}
+        run: |
+          cd v2/backend
+          echo "🧪 ${SUMMARY_TITLE}"
+          START_TS=$(date +%s)
+
+          # Monta o argv do pytest a partir dos inputs (array evita eval / word-splitting inseguro).
+          read -ra _paths <<< "${PYTEST_PATHS}" || true
+          read -ra _extra <<< "${PYTEST_EXTRA_ARGS}" || true
+          pytest_cmd=(pytest -q --tb=short "${_paths[@]}" "${_extra[@]}")
+          if [ -n "${COVERAGE_FILE_INPUT}" ]; then
+            export COVERAGE_FILE="${COVERAGE_FILE_INPUT}"
+            pytest_cmd+=(--cov=apps --cov-report=term)
+          fi
+
+          set +e
+          if [ -n "${CAPTURE_LOG_FILE}" ]; then
+            "${pytest_cmd[@]}" > "${CAPTURE_LOG_FILE}" 2>&1
+            TEST_EXIT=$?
+          else
+            "${pytest_cmd[@]}"
+            TEST_EXIT=$?
+          fi
+          set -e
+
+          END_TS=$(date +%s)
+          DURATION_SEC=$((END_TS - START_TS))
+
+          if [ -n "${CAPTURE_LOG_FILE}" ]; then
+            tail -n 120 "${CAPTURE_LOG_FILE}" || true
+          fi
+          ls -la .coverage* 2>/dev/null || true
+
+          if [ "${EMIT_CANARY_METADATA}" = "true" ]; then
+          TEST_EXIT="${TEST_EXIT}" DURATION_SEC="${DURATION_SEC}" python - <<'PY'
+          import json
+          import os
+
+          payload = {
+              "workers": os.environ.get("WORKERS", ""),
+              "dist": os.environ.get("DIST_MODE", ""),
+              "exit_code": int(os.environ["TEST_EXIT"]),
+              "duration_seconds": int(os.environ["DURATION_SEC"]),
+              "repository": os.environ.get("GITHUB_REPOSITORY", ""),
+              "run_id": os.environ.get("GITHUB_RUN_ID", ""),
+              "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", ""),
+          }
+          with open("xdist-canary-metadata.json", "w", encoding="utf-8") as file:
+              json.dump(payload, file, indent=2, sort_keys=True)
+              file.write("\n")
+          PY
+          fi
+
+          {
+            echo "### ${SUMMARY_TITLE}"
+            echo "- Duration (seconds): ${DURATION_SEC}"
+            echo "- Exit code: ${TEST_EXIT}"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          # core/ingest sao gates reais (falham quando o pytest falha). O canary e
+          # non-blocking (fail_on_test_error=false): o exit real vive no metadata/report
+          # da issue #677 e o job segue verde, preservando o contrato original.
+          if [ "${FAIL_ON_TEST_ERROR}" = "true" ]; then
+            exit "${TEST_EXIT}"
+          fi
+
+      - name: Upload test artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4
+        continue-on-error: true
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ${{ inputs.artifact_paths }}
+          if-no-files-found: ${{ inputs.artifact_if_no_files }}
+          include-hidden-files: true
+          retention-days: ${{ inputs.artifact_retention_days }}

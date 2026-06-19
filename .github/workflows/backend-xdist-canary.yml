@@ -13,6 +13,7 @@ on:
     branches: [ main ]
     paths:
       - ".github/workflows/backend-xdist-canary.yml"
+      - ".github/workflows/_backend-test.yml"
       - "v2/scripts/xdist_canary_report.py"
       - "docs/operations/ci-backend-xdist-canary.md"
       - "docs/operations/ci-backend-xdist-stabilization-backlog.md"
@@ -30,140 +31,34 @@ concurrency:
 jobs:
   xdist-canary:
     name: "[info] backend xdist canary (w=${{ matrix.workers }},dist=${{ matrix.dist }})"
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
         workers: ["2", "auto"]
         dist: ["loadscope", "loadfile"]
-
-    services:
-      postgres:
-        image: postgres:15.13
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: test_aprender
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
-      redis:
-        image: redis:7.4
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
-
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
-
-      - uses: ./.github/actions/setup-python-deps
-        with:
-          requirements: 'requirements.txt requirements-dev.txt'
-
-      - name: Set up environment variables
-        run: |
-          echo "DJANGO_SETTINGS_MODULE=config.settings" >> "$GITHUB_ENV"
-          echo "ENVIRONMENT=testing" >> "$GITHUB_ENV"
-          echo "DEBUG=0" >> "$GITHUB_ENV"
-          echo "SECRET_KEY=test-secret-key-for-ci-only" >> "$GITHUB_ENV"
-          echo "DB_HOST=localhost" >> "$GITHUB_ENV"
-          echo "DB_PORT=5432" >> "$GITHUB_ENV"
-          echo "DB_NAME=test_aprender" >> "$GITHUB_ENV"
-          echo "DB_USER=postgres" >> "$GITHUB_ENV"
-          echo "DB_PASSWORD=postgres" >> "$GITHUB_ENV"
-          echo "REDIS_HOST=localhost" >> "$GITHUB_ENV"
-          echo "REDIS_PORT=6379" >> "$GITHUB_ENV"
-          echo "TZ=America/Fortaleza" >> "$GITHUB_ENV"
-          echo "REQUIRE_DOCKER=0" >> "$GITHUB_ENV"
-          echo "GCAL_CLIENT=fake" >> "$GITHUB_ENV"
-          echo "GCAL_SEND_UPDATES=none" >> "$GITHUB_ENV"
-          echo "FEATURE_AUTO_APPLY_ENABLED=false" >> "$GITHUB_ENV"
-          echo "ETL_OUTPUT_DIR=${{ github.workspace }}/v2/backend/out_etl" >> "$GITHUB_ENV"
-          echo "ETL_DATA_DIR=${{ github.workspace }}/v2/backend/data/csv-import" >> "$GITHUB_ENV"
-          echo "PYTHONDONTWRITEBYTECODE=1" >> "$GITHUB_ENV"
-
-      - name: Run migrations
-        run: |
-          cd v2/backend
-          python manage.py migrate --noinput
-
-      - name: Prepare runtime dirs and symlinks
-        run: |
-          sudo mkdir -p /app
-          mkdir -p "$GITHUB_WORKSPACE/v2/backend/.agents/outbox"
-          sudo rm -rf /app/.agents || true
-          sudo ln -s "$GITHUB_WORKSPACE/v2/backend/.agents" /app/.agents
-          mkdir -p "$GITHUB_WORKSPACE/v2/backend/out_etl"
-          mkdir -p "$GITHUB_WORKSPACE/v2/backend/data/csv-import"
-
-      - name: Run xdist canary suite (non-blocking)
-        env:
-          WORKERS: ${{ matrix.workers }}
-          DIST_MODE: ${{ matrix.dist }}
-          EXTRA_PYTEST_ARGS: ${{ github.event.inputs.extra_pytest_args || '' }}
-        run: |
-          cd v2/backend
-          echo "🧪 Running xdist canary (workers=${WORKERS}, dist=${DIST_MODE})"
-          START_TS=$(date +%s)
-
-          set +e
-          pytest -q --tb=short -n "${WORKERS}" --dist "${DIST_MODE}" --max-worker-restart=0 \
-            --junitxml=xdist-canary-junit.xml ${EXTRA_PYTEST_ARGS} apps > xdist-canary-pytest.log 2>&1
-          TEST_EXIT=$?
-          set -e
-
-          END_TS=$(date +%s)
-          DURATION_SEC=$((END_TS - START_TS))
-
-          TEST_EXIT="${TEST_EXIT}" DURATION_SEC="${DURATION_SEC}" python - <<'PY'
-          import json
-          import os
-
-          payload = {
-              "workers": os.environ["WORKERS"],
-              "dist": os.environ["DIST_MODE"],
-              "exit_code": int(os.environ["TEST_EXIT"]),
-              "duration_seconds": int(os.environ["DURATION_SEC"]),
-              "repository": os.environ.get("GITHUB_REPOSITORY", ""),
-              "run_id": os.environ.get("GITHUB_RUN_ID", ""),
-              "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", ""),
-          }
-          with open("xdist-canary-metadata.json", "w", encoding="utf-8") as file:
-              json.dump(payload, file, indent=2, sort_keys=True)
-              file.write("\n")
-          PY
-
-          tail -n 120 xdist-canary-pytest.log || true
-
-          {
-            echo "### xdist canary run"
-            echo "- workers: ${WORKERS}"
-            echo "- dist: ${DIST_MODE}"
-            echo "- duration (seconds): ${DURATION_SEC}"
-            echo "- exit code: ${TEST_EXIT}"
-            echo "- mode: non-blocking canary"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload xdist canary artifact
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4
-        with:
-          name: xdist-canary-${{ matrix.workers }}w-${{ matrix.dist }}
-          path: |
-            v2/backend/xdist-canary-pytest.log
-            v2/backend/xdist-canary-junit.xml
-            v2/backend/xdist-canary-metadata.json
-          if-no-files-found: warn
-          retention-days: 30
+    # Setup (services/env/migrate/dirs) centralizado no reusable; matrix fica aqui no
+    # caller e passa workers/dist via inputs. #1401.
+    uses: ./.github/workflows/_backend-test.yml
+    with:
+      runner_timeout: 40
+      pytest_paths: apps
+      pytest_extra_args: >-
+        -n ${{ matrix.workers }} --dist ${{ matrix.dist }} --max-worker-restart=0
+        --junitxml=xdist-canary-junit.xml ${{ github.event.inputs.extra_pytest_args || '' }}
+      summary_title: xdist canary run
+      capture_log_file: xdist-canary-pytest.log
+      # non-blocking: falhas xdist vivem no report/issue #677, job segue verde (#1401).
+      fail_on_test_error: false
+      emit_canary_metadata: true
+      matrix_workers: ${{ matrix.workers }}
+      matrix_dist: ${{ matrix.dist }}
+      artifact_name: xdist-canary-${{ matrix.workers }}w-${{ matrix.dist }}
+      artifact_paths: |
+        v2/backend/xdist-canary-pytest.log
+        v2/backend/xdist-canary-junit.xml
+        v2/backend/xdist-canary-metadata.json
+      artifact_if_no_files: warn
+      artifact_retention_days: 30
 
   canary-report:
     name: "[ops] backend xdist canary summary"

@@ -76,7 +76,7 @@ jobs:
 
         # Conservative impact patterns to prevent false green:
         # includes backend app, backend runtime infra, backend tests and this CI workflow itself.
-        BACKEND_IMPACT_REGEX='^(v2/backend/|v2/infra/|v2/tests/|v2/.dockerignore$|\.github/workflows/ci\.yaml$)'
+        BACKEND_IMPACT_REGEX='^(v2/backend/|v2/infra/|v2/tests/|v2/.dockerignore$|\.github/workflows/ci\.yaml$|\.github/workflows/_backend-test\.yml$)'
         BACKEND_MATCHED_FILES="$(printf '%s\n' "$CHANGED_FILES" | grep -E "$BACKEND_IMPACT_REGEX" || true)"
         BACKEND_MATCHED_COUNT="$(printf '%s\n' "$BACKEND_MATCHED_FILES" | sed '/^$/d' | wc -l | tr -d ' ')"
 
@@ -208,240 +208,39 @@ jobs:
   # ----------------------------------------------------------------
   backend-tests-core:
     name: "[info] backend tests core (runner)"
-    runs-on: ubuntu-latest
-    timeout-minutes: 35
     needs:
       - backend-impact
     if: needs.backend-impact.outputs.backend_changed == 'true'
-
-    services:
-      postgres:
-        image: postgres:15.13
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: test_aprender
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
-      redis:
-        image: redis:7.4
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
-
-    steps:
-    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
-
-    - uses: ./.github/actions/setup-python-deps
-      with:
-        requirements: 'requirements.txt requirements-dev.txt'
-
-    - name: Set up environment variables
-      run: |
-        echo "DJANGO_SETTINGS_MODULE=config.settings" >> $GITHUB_ENV
-        echo "ENVIRONMENT=testing" >> $GITHUB_ENV
-        echo "DEBUG=0" >> $GITHUB_ENV
-        echo "SECRET_KEY=test-secret-key-for-ci-only" >> $GITHUB_ENV
-        echo "DB_HOST=localhost" >> $GITHUB_ENV
-        echo "DB_PORT=5432" >> $GITHUB_ENV
-        echo "DB_NAME=test_aprender" >> $GITHUB_ENV
-        echo "DB_USER=postgres" >> $GITHUB_ENV
-        echo "DB_PASSWORD=postgres" >> $GITHUB_ENV
-        echo "REDIS_HOST=localhost" >> $GITHUB_ENV
-        echo "REDIS_PORT=6379" >> $GITHUB_ENV
-        echo "TZ=America/Fortaleza" >> $GITHUB_ENV
-        echo "REQUIRE_DOCKER=0" >> $GITHUB_ENV
-        echo "GCAL_CLIENT=fake" >> $GITHUB_ENV
-        echo "GCAL_SEND_UPDATES=none" >> $GITHUB_ENV
-        echo "FEATURE_AUTO_APPLY_ENABLED=false" >> $GITHUB_ENV
-        echo "ETL_OUTPUT_DIR=${{ github.workspace }}/v2/backend/out_etl" >> $GITHUB_ENV
-        echo "ETL_DATA_DIR=${{ github.workspace }}/v2/backend/data/csv-import" >> $GITHUB_ENV
-        echo "PYTHONDONTWRITEBYTECODE=1" >> $GITHUB_ENV
-
-    - name: Validate test paths (no /app hardcoded)
-      run: |
-        cd v2/backend
-        if grep -R --line-number '"/app' apps/core/tests apps/dev_tools/tests 2>/dev/null | grep -v "Binary file" | grep -v '"/api/'; then
-          echo "❌ Found '/app' hardcoded in tests. Use Path(settings.BASE_DIR) instead." >&2
-          exit 1
-        fi
-        echo "✅ No hardcoded '/app' paths found in tests"
-
-    - name: Run migrations
-      run: |
-        cd v2/backend
-        python manage.py migrate --noinput
-
-    - name: Prepare runtime dirs and symlinks
-      run: |
-        sudo mkdir -p /app
-        mkdir -p "$GITHUB_WORKSPACE/v2/backend/.agents/outbox"
-        sudo rm -rf /app/.agents || true
-        sudo ln -s "$GITHUB_WORKSPACE/v2/backend/.agents" /app/.agents
-        mkdir -p "$GITHUB_WORKSPACE/v2/backend/out_etl"
-        mkdir -p "$GITHUB_WORKSPACE/v2/backend/data/csv-import"
-
-    - name: Run core tests with coverage
-      env:
-        # Backend sys.monitoring do Python 3.12: coverage muito mais leve que o
-        # C-trace (~30-50% menos overhead), mantendo --cov e o gate de 85%. #1399.
-        COVERAGE_CORE: sysmon
-      run: |
-        cd v2/backend
-        echo "🧪 Running backend core suite (serial)"
-        START_TS=$(date +%s)
-
-        set +e
-        COVERAGE_FILE=".coverage.core" \
-        pytest -q --tb=short apps/core/tests --cov=apps --cov-report=term
-        TEST_EXIT=$?
-        set -e
-        ls -la .coverage* || true
-
-        END_TS=$(date +%s)
-        DURATION_SEC=$((END_TS - START_TS))
-        {
-          echo "### Backend Core Tests Runtime"
-          echo "- Duration (seconds): ${DURATION_SEC}"
-          echo "- Exit code: ${TEST_EXIT}"
-        } >> "${GITHUB_STEP_SUMMARY}"
-
-        exit ${TEST_EXIT}
-
-    - name: Upload core coverage artifact
-      if: always()
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4
-      continue-on-error: true
-      with:
-        name: backend-coverage-core
-        path: v2/backend/.coverage.core
-        if-no-files-found: error
-        include-hidden-files: true
-        retention-days: 7
+    # Setup (services/env/migrate/dirs) centralizado no reusable. #1401.
+    uses: ./.github/workflows/_backend-test.yml
+    with:
+      runner_timeout: 35
+      pytest_paths: apps/core/tests
+      coverage_file: .coverage.core
+      validate_test_paths: true
+      summary_title: Backend Core Tests Runtime
+      artifact_name: backend-coverage-core
+      artifact_paths: v2/backend/.coverage.core
+      artifact_if_no_files: error
 
   # ----------------------------------------------------------------
   # Job 2b: Backend tests - ingest/devtools suite (serial)
   # ----------------------------------------------------------------
   backend-tests-ingest-devtools:
     name: "[info] backend tests ingest/devtools (runner)"
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
     needs:
       - backend-impact
     if: needs.backend-impact.outputs.backend_changed == 'true'
-
-    services:
-      postgres:
-        image: postgres:15.13
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: test_aprender
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
-      redis:
-        image: redis:7.4
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
-
-    steps:
-    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
-
-    - uses: ./.github/actions/setup-python-deps
-      with:
-        requirements: 'requirements.txt requirements-dev.txt'
-
-    - name: Set up environment variables
-      run: |
-        echo "DJANGO_SETTINGS_MODULE=config.settings" >> $GITHUB_ENV
-        echo "ENVIRONMENT=testing" >> $GITHUB_ENV
-        echo "DEBUG=0" >> $GITHUB_ENV
-        echo "SECRET_KEY=test-secret-key-for-ci-only" >> $GITHUB_ENV
-        echo "DB_HOST=localhost" >> $GITHUB_ENV
-        echo "DB_PORT=5432" >> $GITHUB_ENV
-        echo "DB_NAME=test_aprender" >> $GITHUB_ENV
-        echo "DB_USER=postgres" >> $GITHUB_ENV
-        echo "DB_PASSWORD=postgres" >> $GITHUB_ENV
-        echo "REDIS_HOST=localhost" >> $GITHUB_ENV
-        echo "REDIS_PORT=6379" >> $GITHUB_ENV
-        echo "TZ=America/Fortaleza" >> $GITHUB_ENV
-        echo "REQUIRE_DOCKER=0" >> $GITHUB_ENV
-        echo "GCAL_CLIENT=fake" >> $GITHUB_ENV
-        echo "GCAL_SEND_UPDATES=none" >> $GITHUB_ENV
-        echo "FEATURE_AUTO_APPLY_ENABLED=false" >> $GITHUB_ENV
-        echo "ETL_OUTPUT_DIR=${{ github.workspace }}/v2/backend/out_etl" >> $GITHUB_ENV
-        echo "ETL_DATA_DIR=${{ github.workspace }}/v2/backend/data/csv-import" >> $GITHUB_ENV
-        echo "PYTHONDONTWRITEBYTECODE=1" >> $GITHUB_ENV
-
-    - name: Run migrations
-      run: |
-        cd v2/backend
-        python manage.py migrate --noinput
-
-    - name: Prepare runtime dirs and symlinks
-      run: |
-        sudo mkdir -p /app
-        mkdir -p "$GITHUB_WORKSPACE/v2/backend/.agents/outbox"
-        sudo rm -rf /app/.agents || true
-        sudo ln -s "$GITHUB_WORKSPACE/v2/backend/.agents" /app/.agents
-        mkdir -p "$GITHUB_WORKSPACE/v2/backend/out_etl"
-        mkdir -p "$GITHUB_WORKSPACE/v2/backend/data/csv-import"
-
-    - name: Run ingest/devtools tests with coverage
-      env:
-        # Backend sys.monitoring do Python 3.12 (ver step core). #1399.
-        COVERAGE_CORE: sysmon
-      run: |
-        cd v2/backend
-        echo "🧪 Running backend ingest/devtools suite (serial)"
-        START_TS=$(date +%s)
-
-        set +e
-        COVERAGE_FILE=".coverage.ingest_devtools" \
-        pytest -q --tb=short apps/dev_tools/tests --cov=apps --cov-report=term
-        TEST_EXIT=$?
-        set -e
-        ls -la .coverage* || true
-
-        END_TS=$(date +%s)
-        DURATION_SEC=$((END_TS - START_TS))
-        {
-          echo "### Backend Ingest/DevTools Tests Runtime"
-          echo "- Duration (seconds): ${DURATION_SEC}"
-          echo "- Exit code: ${TEST_EXIT}"
-        } >> "${GITHUB_STEP_SUMMARY}"
-
-        exit ${TEST_EXIT}
-
-    - name: Upload ingest/devtools coverage artifact
-      if: always()
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4
-      continue-on-error: true
-      with:
-        name: backend-coverage-ingest-devtools
-        path: v2/backend/.coverage.ingest_devtools
-        if-no-files-found: error
-        include-hidden-files: true
-        retention-days: 7
+    # Setup (services/env/migrate/dirs) centralizado no reusable. #1401.
+    uses: ./.github/workflows/_backend-test.yml
+    with:
+      runner_timeout: 30
+      pytest_paths: apps/dev_tools/tests
+      coverage_file: .coverage.ingest_devtools
+      summary_title: Backend Ingest/DevTools Tests Runtime
+      artifact_name: backend-coverage-ingest-devtools
+      artifact_paths: v2/backend/.coverage.ingest_devtools
+      artifact_if_no_files: error
 
   # ----------------------------------------------------------------
   # Job 2c: Backend coverage combine + required backend tests gate
@@ -561,6 +360,10 @@ jobs:
       - backend-impact
     if: needs.backend-impact.outputs.backend_changed == 'true'
 
+    # Carve-out do reusable _backend-test.yml (#1401): topologia de container
+    # (host.docker.internal, REQUIRE_DOCKER=1, migrate in-container, build buildx)
+    # diverge do setup de runner. Ao bumpar postgres/redis aqui, sincronizar com o
+    # services do reusable (SSOT das versoes).
     services:
       postgres:
         image: postgres:15.13

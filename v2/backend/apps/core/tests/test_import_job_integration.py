@@ -24,7 +24,6 @@ from rest_framework.test import APIClient
 import pytest
 
 from apps.core.models import AvailabilityBlock, ImportJob
-from apps.core.services.functional_permissions_seed import seed_functional_permissions
 
 User = get_user_model()
 
@@ -33,10 +32,8 @@ UPLOAD_URL = "/api/imports/bloqueios/"
 
 @pytest.fixture
 def controle_user(db):
-    # Testes com transaction=True truncam entre cases; re-semeia a ligacao
-    # PermissaoFuncional <-> Group que o conftest de sessao criou.
-    seed_functional_permissions(assign_default_groups=True)
-
+    # O seed RBAC (incl. pos-truncate de transaction=True) e garantido globalmente
+    # pela fixture autouse `ensure_rbac_seed` (conftest raiz, #1402).
     user = User.objects.create_user(
         username="ctrl_intg",
         email="ctrl_intg@test.com",

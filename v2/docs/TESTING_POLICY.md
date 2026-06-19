@@ -4,7 +4,7 @@ Este documento consolida práticas e contratos adotados nos testes para manter o
 
 ## Ambiente de CI
 
-- **Runtime**: Python 3.11, PostgreSQL 15, Redis 7, TZ `America/Fortaleza`
+- **Runtime**: Python 3.12, PostgreSQL 15, Redis 7, TZ `America/Fortaleza`
 - **Settings**: `DJANGO_SETTINGS_MODULE=config.settings`, `ENVIRONMENT=testing`, `REQUIRE_DOCKER=0`
 - **Integrações externas**:
   - `GCAL_CLIENT=fake`, `GCAL_SEND_UPDATES=none`

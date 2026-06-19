@@ -51,3 +51,16 @@ Ordem obrigatória para agentes autônomos:
 **Branches**: `<type>/<nome>`
 
 **PRs**: Require 1+ approval, CI verde
+
+## CP-07: Nunca Push Direto na main
+
+- **Push direto na `main` é proibido** — sempre via branch + Pull Request
+- Merge por **squash-merge** após CI verde
+- Enforced por hook local `PreToolUse` (`.claude/settings.json`) que bloqueia `git push origin main`
+- ⚠️ O hook vive em `.claude/` (gitignored) → enforcement local não é herdado por um clone novo; o backstop real é o **ruleset de branch protection** da `main` no GitHub (PR obrigatório)
+
+## CP-08: dev_tools Desabilitado em Produção
+
+- **`apps.dev_tools` (seeds/backfills/cleanup) NÃO deve rodar em produção** — definir `INCLUDE_DEV_TOOLS=false`
+- Mecanismo: `config/settings.py` inclui `apps.dev_tools` apenas se `INCLUDE_DEV_TOOLS != "false"`
+- ⚠️ **Default é `true`** (conveniência de dev) e **não há guard por `ENVIRONMENT`** → produção PRECISA setar `INCLUDE_DEV_TOOLS=false` explicitamente; se a variável não existir no `stack.env`, o app de dev é carregado (CP-08 violado)

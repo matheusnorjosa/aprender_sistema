@@ -8,7 +8,7 @@
 
 | Métrica | Valor |
 |---------|-------|
-| **Models** | 33 (28 core + 5 dat_ingest) |
+| **Models** | 28 (core) |
 | **API Endpoints** | 87+ |
 | **Testes** | 1.707 (130 arquivos) |
 | **Type Hints** | 100% (Pyright strict) |
@@ -51,7 +51,7 @@
 **Quando usar**: Entender grupos, permissões, páginas acessíveis.
 
 **Conteúdo**:
-- 9 setores + 4 funções
+- 13 setores + 5 funções
 - Permissões Django granulares
 - Páginas acessíveis por perfil
 - Regra de aprovação SUPER
@@ -258,12 +258,11 @@
 
 ## 📋 Referência de Arquitetura
 
-### Backend (33 Models)
+### Backend (28 Models)
 
 | App | Models | Arquivos |
 |-----|--------|----------|
 | **core** | 28 | Usuario, Solicitacao, AvailabilityBlock, Municipio, Projeto, Gerencia, TipoEvento, Produto, Participation, Compra, Deslocamento, AcaoControle, AcaoDAT, Config, AuditLog, GoogleOAuthCredential, DATRegistro, DATArea, DATCoordenador, DATAcao, DATCompra, DATCadastro, DATFormacao, PlanoFormacoes, Formacao, Acompanhamento, Prova, ProjetoGeral |
-| **dat_ingest** | 5 | ImportLog, StgUsuario, StgMunicipio, StgProjeto, StgTipoEvento |
 | **dev_tools** | 0 | - |
 
 ---
@@ -289,7 +288,6 @@
 | App | Commands | Exemplos |
 |-----|----------|----------|
 | **core** | 4 | preagenda_to_gcal, compliance_audit, lgpd_export |
-| **dat_ingest** | 21 | etl_all, etl_upsert_*, import_* |
 | **dev_tools** | 15 | seed_*, backfill_*, cleanup_* |
 
 ---
@@ -339,7 +337,6 @@ aprender_sistema/
 │   ├── backend/
 │   │   ├── apps/
 │   │   │   ├── core/          # App principal (28 models)
-│   │   │   ├── dat_ingest/    # ETL (5 models)
 │   │   │   └── dev_tools/     # Seeds (prod disabled)
 │   │   └── config/            # Django settings
 │   ├── frontend/

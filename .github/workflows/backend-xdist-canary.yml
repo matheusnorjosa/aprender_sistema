@@ -47,6 +47,8 @@ jobs:
         --junitxml=xdist-canary-junit.xml ${{ github.event.inputs.extra_pytest_args || '' }}
       summary_title: xdist canary run
       capture_log_file: xdist-canary-pytest.log
+      # non-blocking: falhas xdist vivem no report/issue #677, job segue verde (#1401).
+      fail_on_test_error: false
       emit_canary_metadata: true
       matrix_workers: ${{ matrix.workers }}
       matrix_dist: ${{ matrix.dist }}

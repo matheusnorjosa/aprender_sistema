@@ -48,6 +48,10 @@ on:
         description: "Se != '', redireciona o pytest para esse log + tail (canary)"
         type: string
         default: ""
+      fail_on_test_error:
+        description: "Se true, o job falha quando o pytest falha (gates core/ingest). O canary usa false (non-blocking): exit real fica no metadata/report."
+        type: boolean
+        default: true
       emit_canary_metadata:
         description: "Se true, escreve xdist-canary-metadata.json (canary)"
         type: boolean
@@ -173,6 +177,7 @@ jobs:
           PYTEST_EXTRA_ARGS: ${{ inputs.pytest_extra_args }}
           COVERAGE_FILE_INPUT: ${{ inputs.coverage_file }}
           CAPTURE_LOG_FILE: ${{ inputs.capture_log_file }}
+          FAIL_ON_TEST_ERROR: ${{ inputs.fail_on_test_error }}
           SUMMARY_TITLE: ${{ inputs.summary_title }}
           EMIT_CANARY_METADATA: ${{ inputs.emit_canary_metadata }}
           WORKERS: ${{ inputs.matrix_workers }}
@@ -235,7 +240,12 @@ jobs:
             echo "- Exit code: ${TEST_EXIT}"
           } >> "${GITHUB_STEP_SUMMARY}"
 
-          exit "${TEST_EXIT}"
+          # core/ingest sao gates reais (falham quando o pytest falha). O canary e
+          # non-blocking (fail_on_test_error=false): o exit real vive no metadata/report
+          # da issue #677 e o job segue verde, preservando o contrato original.
+          if [ "${FAIL_ON_TEST_ERROR}" = "true" ]; then
+            exit "${TEST_EXIT}"
+          fi
 
       - name: Upload test artifact
         if: always()

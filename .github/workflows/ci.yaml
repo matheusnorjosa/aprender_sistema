@@ -204,7 +204,7 @@ jobs:
           python scripts/rbac_lint.py apps/
 
   # ----------------------------------------------------------------
-  # Job 2a: Backend tests - core suite (serial)
+  # Job 2a: Backend tests - core suite (paralelo, xdist -n auto)
   # ----------------------------------------------------------------
   backend-tests-core:
     name: "[info] backend tests core (runner)"
@@ -216,6 +216,10 @@ jobs:
     with:
       runner_timeout: 35
       pytest_paths: apps/core/tests
+      # Paralelizacao xdist no gate (~15min->~5min). loadscope mantem testes da
+      # mesma classe/modulo no mesmo worker. Habilitado apos #1402 estabilizar a
+      # suite (re-seed RBAC pos-truncate; canary 0/4 em 2 runs consecutivos). #1403.
+      pytest_extra_args: -n auto --dist loadscope
       coverage_file: .coverage.core
       validate_test_paths: true
       summary_title: Backend Core Tests Runtime
@@ -224,7 +228,7 @@ jobs:
       artifact_if_no_files: error
 
   # ----------------------------------------------------------------
-  # Job 2b: Backend tests - ingest/devtools suite (serial)
+  # Job 2b: Backend tests - ingest/devtools suite (paralelo, xdist -n auto)
   # ----------------------------------------------------------------
   backend-tests-ingest-devtools:
     name: "[info] backend tests ingest/devtools (runner)"
@@ -236,6 +240,7 @@ jobs:
     with:
       runner_timeout: 30
       pytest_paths: apps/dev_tools/tests
+      pytest_extra_args: -n auto --dist loadscope  # paralelizacao xdist. #1403.
       coverage_file: .coverage.ingest_devtools
       summary_title: Backend Ingest/DevTools Tests Runtime
       artifact_name: backend-coverage-ingest-devtools

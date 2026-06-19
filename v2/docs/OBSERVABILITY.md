@@ -4,6 +4,7 @@ status: active
 last_verified: 2026-06-19
 sources_of_truth:
   - v2/backend/config/settings.py
+  - v2/backend/config/urls.py
   - v2/infra/docker-compose.yml
   - v2/infra/Makefile
 owner: infra
@@ -15,24 +16,35 @@ related:
 
 # Observabilidade (v2)
 
-Documento-índice da observabilidade do AS v2. Consolida os ponteiros para a stack real de métricas,
-logging e alertas. Para o guia narrativo publicado no MkDocs, ver [observability.md](../../docs/guides/observability.md).
+> **Dev × Produção (importante):** a stack de **coleta e painéis (Prometheus + Grafana) é local/opcional e NÃO
+> roda em produção.** Em prod, o app apenas **expõe `/metrics`** (instrumentação `django-prometheus`) para
+> scraping por um serviço externo do provedor, e envia erros ao **Sentry somente se `SENTRY_DSN` estiver
+> configurado**. Fonte autoritativa: comentário em `v2/infra/docker-compose.yml` — a stack foi movida para
+> `docker-compose.observability.yml` (Issue #234): *"Em produção, use o serviço de observabilidade do provedor.
+> O endpoint /metrics do Django permanece disponível para scraping."*
 
-> Nota: este arquivo foi criado em 2026-06-19 (Fase 0 do plano SDD) para resolver ponteiros que apontavam
-> para um `v2/docs/OBSERVABILITY.md` inexistente (README, INDEX_DOCUMENTACAO, LOGGING). Ver
-> [plano SDD](./plans/PLAN_sdd_migration_2026-06-19.md) e [auditoria](./reports/AUDITORIA_DOCUMENTAL_2026-06-19.md).
+Documento-índice criado em 2026-06-19 (Fase 0 do plano SDD) para resolver ponteiros que apontavam para um
+`v2/docs/OBSERVABILITY.md` inexistente (README, INDEX_DOCUMENTACAO, LOGGING). Ver
+[plano SDD](./plans/PLAN_sdd_migration_2026-06-19.md) e [auditoria](./reports/AUDITORIA_DOCUMENTAL_2026-06-19.md).
 
-## Stack real
+## O que existe em cada ambiente
 
-| Camada | Tecnologia | Onde está |
+| Componente | Dev/local | Produção |
 |---|---|---|
-| Erros/tracing | Sentry SDK | bloco `SENTRY` em `config/settings.py` (ativado por `SENTRY_DSN`) |
-| Métricas | `django-prometheus` (`/metrics`) | `INSTALLED_APPS`/`MIDDLEWARE` em `config/settings.py` |
-| Coleta/painéis | Prometheus + Grafana | `v2/infra/docker-compose.yml` (perfil de observabilidade) |
-| Subir local | `make up-obs` | `v2/infra/Makefile` |
+| Instrumentação `django-prometheus` (middleware) | ✅ | ✅ (sempre ativa; em `INSTALLED_APPS`/`MIDDLEWARE`) |
+| Endpoint `/metrics` | ✅ | ✅ **gated** — só staff / IP interno (`config/urls.py`, SEC-RECON-02) |
+| Prometheus + Grafana (coleta + painéis) | ✅ opcional via `make up-obs` | ❌ **não roda em prod** — design é scraping externo do `/metrics` pelo provedor |
+| Sentry (erros/tracing) | se `SENTRY_DSN` setado | se `SENTRY_DSN` setado (secret do Portainer — **status não verificado**) |
 
-> As versões exatas (django-prometheus, sentry-sdk, Prometheus, Grafana) são definidas em
-> `v2/backend/requirements.txt` e nas imagens do compose — consultá-las lá para evitar drift de versão.
+> Os arquivos da stack local (`docker-compose.observability.yml`, `prometheus.yml`, `grafana/`) são **locais e
+> não versionados** (gitignored). `docker-compose.prod.yml` não contém nenhum serviço de Prometheus/Grafana.
+
+## Stack local (opcional)
+
+```bash
+make up-obs     # docker-compose.yml + docker-compose.observability.yml (Prometheus + Grafana)
+make down-obs
+```
 
 ## Logging
 
@@ -41,12 +53,11 @@ logging e alertas. Para o guia narrativo publicado no MkDocs, ver [observability
 ### MP2 — Structured Logging
 
 O logging estruturado (JSON) e as práticas de log (níveis, contexto, dados sensíveis) estão documentados em
-[LOGGING.md](./LOGGING.md). Logs de produção são coletados pela stack do container; eventos de erro também
-chegam ao Sentry quando `SENTRY_DSN` está configurado.
+[LOGGING.md](./LOGGING.md). Em produção, os erros chegam ao Sentry apenas quando `SENTRY_DSN` está configurado.
 
 ## SLOs e alertas
 
-Os objetivos de nível de serviço (latência, disponibilidade, taxa de erro) e a política de alertas estão em
+Os objetivos de nível de serviço (latência, disponibilidade, taxa de erro) estão em
 [SLO_DEFINITIONS.md](./SLO_DEFINITIONS.md).
 
 ## Análise histórica

@@ -257,6 +257,28 @@ CACHES = {
     }
 }
 
+if TESTING:
+    # xdist: isola o cache Redis por worker usando um DB index distinto. Sem isso,
+    # todos os workers batem no mesmo DB 0 → o `cache.clear()`/FLUSHDB (ou a
+    # invalidação) de um worker apaga o keyspace dos outros mid-test, causando a
+    # flakiness paralelo-insegura sob `-n auto` (sessões em cache, contagens e
+    # caches de permissão vazando entre workers). #1402.
+    #
+    # Mantemos o backend django_redis real (NÃO LocMemCache): o código de
+    # invalidação usa `cache.keys("static_endpoint:*")` + `delete_many` — APIs
+    # específicas do django_redis que o LocMemCache não possui (o `hasattr` falha
+    # e a invalidação vira no-op, quebrando os testes de invalidação). As sessões
+    # (SESSION_ENGINE=cache, abaixo) também ficam isoladas por worker.
+    #
+    # Mapa: serial/master → DB 0 (status quo); gwN → DB (N % 16). No runner
+    # ubuntu-latest (`-n auto` = 4 cores) usa DBs 0–3; Redis tem 16 DBs (0–15).
+    _xdist_worker = os.environ.get("PYTEST_XDIST_WORKER", "")  # "gw0".."gwN" ou "" (serial)
+    _test_redis_db = int(_xdist_worker[2:]) % 16 if _xdist_worker[2:].isdigit() else 0
+    CACHES["default"]["LOCATION"] = (
+        f"redis://:{os.getenv('REDIS_PASSWORD', '')}@"
+        f"{os.getenv('REDIS_HOST', 'redis')}:{os.getenv('REDIS_PORT', '6379')}/{_test_redis_db}"
+    )
+
 # ================================================================
 # SESSION BACKEND (CP2 - Redis Sessions)
 # ================================================================

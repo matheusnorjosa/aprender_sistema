@@ -20,6 +20,9 @@ related:
 > **Verificado em 2026-06-19** contra a stack viva no Portainer (aba Editor + Environment variables) e contra o
 > repositório. **Drift funcional: zero** — o compose vivo é idêntico ao `v2/infra/docker-compose.prod.yml` (só
 > diferem 2-3 linhas de comentário). Esta spec descreve o que **de fato** roda em produção.
+>
+> **Pré-go-live:** em 2026-06-19 produção está **sem dados e sem usuários** — isso reduz a urgência dos gaps
+> abaixo (não são emergência), mas todos devem ser fechados **antes do go-live**.
 
 ## Qual arquivo vai para produção
 
@@ -69,6 +72,23 @@ só muda por edição **manual** no Editor (CP do hook: *"Compose changes requir
 - Com **Sentry off**, a falha não gera alerta → silenciosa. A única proteção de dados possível é o cron na **VM02**
   (#376, WAL archiving) — **fora desta stack**, não verificável pelo Portainer/repo (exige SSH na VM02).
 - Rastreado em **#1455** (mount `/backups`) e **#1457**/**#1456** (Redis guard / migrations).
+
+## Topologia do Redis: container na VM01 (decisão 2026-06-19)
+
+**Realidade:** o Redis roda como **container na VM01** (serviço `redis` no `docker-compose.prod.yml`, rede
+`backend-internal`), **não** numa VM03 dedicada. O app conecta via `REDIS_HOST` (default `redis` → o container);
+cache (`/0`), Celery broker (`/1`) e sessões (`SESSION_ENGINE=cache`) usam esse Redis.
+
+**Decisão: manter na VM01.** Latência localhost (<1ms — sessão bate no Redis a cada request autenticado), seguro
+(senha + `backend-internal` sem porta no host), cabe nos recursos (2g de 16g). O downside (restart da VM01 =
+re-login + perda de tasks Celery em voo) é irrelevante pré-go-live e aceitável no volume previsto.
+**Rejeitado:** Redis grátis externo (latência por-request + rate-limit de free tier para sessão/cache/broker).
+VM03 dedicada só se **HA** virar requisito.
+
+**Docs a reconciliar (Fase 2 — hoje afirmam VM03, divergindo do compose):** `v2/infra/ENVIRONMENTS.md:19/74`
+("Redis externo VM03"), `v2/infra/README.md:170` (tabela "VM03_Redis"), `.claude/CLAUDE.md` (tabela prod).
+Vestigiais (não montados pelo container, que usa `--requirepass` inline): `v2/infra/configs/vm03/redis.conf`,
+`v2/infra/redis/redis.conf`. **VM03 provavelmente está ociosa** (nota de inventário/custo).
 
 ## Variáveis de ambiente em produção (stack.env)
 

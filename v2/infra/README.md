@@ -167,7 +167,7 @@ DOCKER_HUB_TOKEN=your-docker-hub-token
 |----|------|-----|-------|
 | VM01_App | App + Workers (Docker) | <VM01_IP_PRIVADO> | 8000 (web), 81 (frontend), 80/443 (via NPM) |
 | VM02_Banco | PostgreSQL 15 (servico nativo) | <VM02_IP_PRIVADO> | 5432 |
-| VM03_Redis | Redis 7 (servico nativo) | <VM03_IP_PRIVADO> | 6379 |
+| VM01_App (Redis) | Redis 7 (container na stack da VM01, servico `redis`) | <VM01_IP_PRIVADO> | interno (rede `backend-internal`, sem porta no host) |
 
 ## Related Documentation
 

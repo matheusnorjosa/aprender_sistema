@@ -65,7 +65,8 @@ Interface de serviço (chamável internamente): `approve_solicitacao(solicitacao
 
 ## Fluxos principais
 
-**Aprovação individual (caminho feliz)**
+### Aprovação individual (caminho feliz)
+
 1. View resolve `get_object()` e extrai `reason`/`justificativa`.
 2. Service abre transação, faz `select_for_update().get(pk=...)` (relê sob lock).
 3. Valida `status == "pendente"`; senão levanta erro de status (400).
@@ -74,7 +75,8 @@ Interface de serviço (chamável internamente): `approve_solicitacao(solicitacao
 
 **Reprovação**: idêntico, com `status = "reprovado"`, `AuditLog` REJECT e mensagem "Solicitação reprovada.".
 
-**Lote (approve/reject)**
+### Lote (approve/reject)
+
 1. Valida `ids` não vazio e `len(ids) <= 100`.
 2. Em uma transação, carrega `filter(id__in=ids, status="pendente").select_for_update(skip_locked=True).order_by("id")`.
 3. `_build_batch_status_errors` calcula em **uma query** os IDs faltantes/não-pendentes e os anexa a `errors`.

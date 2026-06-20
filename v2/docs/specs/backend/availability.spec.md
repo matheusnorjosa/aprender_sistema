@@ -71,6 +71,7 @@ Idioma RBAC canônico: `permission_classes=[HasPerm("codename")]` (grupos direto
 ## Fluxos principais
 
 **Check de conflito (`check_conflicts`)**
+
 1. Valida intervalo (`fim > inicio`); inválido → `CheckResult(ok=False)` com `Conflict("X", "Intervalo inválido", ...)`.
 2. Carrega `TRAVEL_BUFFER_MINUTES` e `AVAILABILITY_DAILY_LIMIT_HOURS` (config → fallback settings).
 3. **RD-02/03**: bloqueios aprovados que intersectam → conflito T ou P por `tipo`.

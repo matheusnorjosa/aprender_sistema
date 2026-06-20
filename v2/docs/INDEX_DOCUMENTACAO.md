@@ -30,7 +30,7 @@
 
 ### 1. 📋 **CLAUDE.md** (Guia Principal)
 
-**Arquivo**: [.claude/CLAUDE.md](../../.claude/CLAUDE.md)
+**Arquivo**: `.claude/CLAUDE.md` (local, nao versionado)
 
 **Quando usar**: Ponto de entrada para qualquer trabalho no projeto.
 

@@ -6,7 +6,6 @@ sources_of_truth:
   - docs/business-rules/clausulas-petreas.md
   - v2/backend/config/settings.py
   - v2/backend/apps/dev_tools/apps.py
-  - .claude/settings.json
   - .github/workflows/ci.yaml
   - v2/scripts/ban_v1.sh
   - docs/architecture/project-decisions/ADR-001-docker-only-deployment.md
@@ -42,7 +41,7 @@ Esta spec é o **índice canônico** das CPs: lista cada cláusula com seu **enf
 | CP-04 | Workflow de sub-agents (convenção; **sem gate de CI**) | [`docs/business-rules/clausulas-petreas.md`](../../../../docs/business-rules/clausulas-petreas.md) §CP-04 |
 | CP-05 | v1 congelado (convenção/branch protection; **sem script dedicado**) | [`docs/business-rules/clausulas-petreas.md`](../../../../docs/business-rules/clausulas-petreas.md) §CP-05 |
 | CP-06 | Conventional commits (convenção; **sem commit-lint em CI**) | [ADR-004](../../../../docs/architecture/project-decisions/ADR-004-conventional-commits-branch-protection.md) |
-| CP-07 | Hook local `PreToolUse` + branch protection da `main` | [`.claude/settings.json`](../../../../.claude/settings.json) (bloco `PreToolUse`) |
+| CP-07 | Hook local `PreToolUse` + branch protection da `main` | `.claude/settings.json` (bloco `PreToolUse`, local) |
 | CP-08 | Gate de `INSTALLED_APPS` por `INCLUDE_DEV_TOOLS` | [`v2/backend/config/settings.py`](../../../backend/config/settings.py) (linhas ~110-141) |
 
 ## Contratos e invariantes

@@ -46,7 +46,7 @@
 
 ### 2. 🔐 **RBAC e Controle de Acesso**
 
-**Arquivo**: [RBAC_COMPLETO.md](./RBAC_COMPLETO.md)
+**Arquivo**: [RBAC_COMPLETO.md](./_archive/RBAC_COMPLETO.md)
 
 **Quando usar**: Entender grupos, permissões, páginas acessíveis.
 
@@ -60,7 +60,7 @@
 
 ### 3. 🏢 **Estrutura Organizacional**
 
-**Arquivo**: [MAPEAMENTO_COMPLETO_SETORES_GERENCIAS.md](./MAPEAMENTO_COMPLETO_SETORES_GERENCIAS.md)
+**Arquivo**: [MAPEAMENTO_COMPLETO_SETORES_GERENCIAS.md](./_archive/MAPEAMENTO_COMPLETO_SETORES_GERENCIAS.md)
 
 **Quando usar**: Entender hierarquia Gerências → Setores → Projetos.
 
@@ -162,7 +162,7 @@
 - [BACKLOG_QUALIDADE_SISTEMA_2026-03-06.md](./reports/BACKLOG_QUALIDADE_SISTEMA_2026-03-06.md)
 - [ESTIMATIVAS_PRAZOS_QUALIDADE_2026-03-06.md](./reports/ESTIMATIVAS_PRAZOS_QUALIDADE_2026-03-06.md)
 - [CLASSIFICACAO_PUBLICO_PRIVADO_2026-03-09.md](./reports/CLASSIFICACAO_PUBLICO_PRIVADO_2026-03-09.md)
-- [relatorio_deploy.md](./reports/relatorio_deploy.md)
+- [relatorio_deploy.md](./_archive/reports/relatorio_deploy.md)
 
 ---
 
@@ -249,7 +249,7 @@
 
 ### 🗺️ **Mapa do Brasil**
 
-**Arquivo**: [BACKLOG_MAPA_BRASIL.md](./BACKLOG_MAPA_BRASIL.md)
+**Arquivo**: [BACKLOG_MAPA_BRASIL.md](./_archive/BACKLOG_MAPA_BRASIL.md)
 
 - Funcionalidades planejadas
 - Integração com Leaflet
@@ -313,12 +313,12 @@
 | Se você quer... | Consulte... |
 |-----------------|-------------|
 | Entender o projeto | [PROJETO_ORIGEM.md](./PROJETO_ORIGEM.md) |
-| Saber permissões por grupo | [RBAC_COMPLETO.md](./RBAC_COMPLETO.md) |
+| Saber permissões por grupo | [RBAC_COMPLETO.md](./_archive/RBAC_COMPLETO.md) |
 | Configurar Google Calendar | [GUIDE_GCAL.md](./GUIDE_GCAL.md) |
 | Entender regras de disponibilidade | [GUIDE_AVAILABILITY.md](./GUIDE_AVAILABILITY.md) |
 | Ver fluxo de aprovação | [IMPLEMENTACAO_PA.md](./IMPLEMENTACAO_PA.md) |
 | Preparar deploy | [DEPLOY_CHECKLIST.md](./DEPLOY_CHECKLIST.md) |
-| Configurar hierarquia | [GUIA_HIERARQUIA_ORGANIZACIONAL.md](./GUIA_HIERARQUIA_ORGANIZACIONAL.md) |
+| Configurar hierarquia | [GUIA_HIERARQUIA_ORGANIZACIONAL.md](./_archive/GUIA_HIERARQUIA_ORGANIZACIONAL.md) |
 | Ver SLOs definidos | [SLO_DEFINITIONS.md](./SLO_DEFINITIONS.md) |
 | Procedimentos de DR | [DISASTER_RECOVERY.md](./DISASTER_RECOVERY.md) |
 | Auditoria de regras hardcoded (2026-05) | [audits/PLATFORM_HARDCODED_RULES_AUDIT_2026-05.md](./audits/PLATFORM_HARDCODED_RULES_AUDIT_2026-05.md) |

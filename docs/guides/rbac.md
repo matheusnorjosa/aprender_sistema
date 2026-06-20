@@ -1,72 +1,16 @@
-# RBAC e Permissões
+# RBAC — Controle de Acesso
 
-Sistema de permissões baseado em grupos de Setor e Função.
+> **Guia consolidado (SDD 2026-06-19).** O conteúdo legado deste guia (modelo antigo via `views_basic.py`)
+> foi arquivado em `v2/docs/_archive/legacy-guides/rbac.md`. A documentação **canônica e atual** de RBAC é:
 
-## Conceito
+- **Convenção de nomes + idioma `HasPerm`/composition**: [`RBAC_NAMING.md`](https://github.com/matheusnorjosa/aprender_sistema/blob/main/v2/docs/RBAC_NAMING.md)
+- **Matriz de autorização (atores × capabilities × policies)**: [`rbac_authorization_matrix.md`](https://github.com/matheusnorjosa/aprender_sistema/blob/main/v2/docs/rbac_authorization_matrix.md)
+- **Módulo de código**: [`apps/core/rbac/README.md`](https://github.com/matheusnorjosa/aprender_sistema/blob/main/v2/backend/apps/core/rbac/README.md)
+- **Guia do administrador (atribuir Setor/Função na UI)**: [`GUIA_ADMIN_RBAC.md`](https://github.com/matheusnorjosa/aprender_sistema/blob/main/v2/docs/GUIA_ADMIN_RBAC.md)
 
-O sistema RBAC usa duas dimensões:
+## Em uma linha
 
-- **SETOR**: Onde o usuário trabalha
-- **FUNÇÃO**: O que o usuário pode fazer
-
-## Grupos de Setor
-
-| Grupo | Descrição |
-|-------|-----------|
-| Superintendência | Setor estratégico (fluxo SUPER) |
-| Vidas | Gerência 2 - Projetos Vida |
-| Fluir | Gerência 3 - Projeto Fluir |
-| ACerta | Gerência 4 - Projetos ACerta |
-| Brincando | Gerência 5 - Brincando e Aprendendo |
-| Sou da Paz | Gerência 6 - Projeto Sou da Paz |
-| DAT | Departamento de Apoio Técnico |
-| Controle | Setor de Controle (operações) |
-| Gerência | Gerência genérica |
-
-## Grupos de Função
-
-| Grupo | Permissões |
-|-------|------------|
-| Formador | Visualiza grade, gerencia bloqueios pessoais |
-| Coordenador | Cria solicitações de eventos |
-| Apoio de Coordenação | Auxilia coordenação, visualiza solicitações |
-| Gerente | Aprova/reprova, acessa dashboards e relatórios |
-
-## Regra de Aprovação SUPER
-
-```python
-can_approve_super = is_superuser OR (
-    "Gerente" IN funcoes AND "Superintendência" IN setores
-)
-```
-
-## Exemplos
-
-| Usuário | Setor | Função | Pode Aprovar SUPER? |
-|---------|-------|--------|---------------------|
-| Maria | Superintendência | Gerente | ✅ Sim |
-| João | DAT | Gerente | ❌ Não |
-| Pedro | Superintendência | Formador | ❌ Não |
-
-## API /api/me/
-
-Retorna dados RBAC do usuário autenticado:
-
-```json
-{
-  "id": 1,
-  "username": "maria",
-  "groups": ["Superintendência", "Gerente"],
-  "setores": ["Superintendência"],
-  "funcoes": ["Gerente"],
-  "is_superuser": false,
-  "is_superintendencia": true,
-  "can_approve_super": true
-}
-```
-
-## Arquivos Principais
-
-- `apps/core/views_basic.py`: Definição de grupos e CurrentUserView
-- `apps/core/tests/test_rbac_permissions.py`: Testes unitários
-- `v2/frontend/src/pages/AdminDAT/UsuariosPage.jsx`: Interface de gestão
+- Autorização em views usa `permission_classes = [HasPerm("codename")]` — **não** checagem direta de grupos
+  (`user.groups.filter(name=...)` é banido pelo `scripts/rbac_lint.py`).
+- SSOT de setores/funções: `apps.core.constants` (**13 setores, 5 funções**, inclui "Assistente Administrativo").
+- SSOT de capabilities × grupos: `apps.core.rbac` + admin-driven (Group × Capability).

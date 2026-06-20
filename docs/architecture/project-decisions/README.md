@@ -24,6 +24,7 @@ Cada ADR documenta: contexto (problema), decisão (o que foi escolhido e por qu�
 | [ADR-014](ADR-014-stateless-horizontal-scaling.md) | Arquitetura Stateless para Scaling | Accepted | 2026-01-12 |
 | [ADR-015](ADR-015-testing-policy.md) | Política de Testes | Accepted | 2026-02-24 |
 | [ADR-016](ADR-016-asymmetric-crypto-strategy.md) | Estratégia de Criptografia Assimétrica | Accepted | 2026-04-13 |
+| [ADR-017](ADR-017-spec-driven-documentation.md) | Documentação Spec-Driven (SDD) | Accepted | 2026-06-19 |
 
 ## Como Adicionar um Novo ADR
 

@@ -72,6 +72,7 @@ Invariantes que NAO podem ser violados:
 Nao expoe endpoints HTTP. Interface = tasks Celery + scripts CLI + env vars.
 
 **Disparo manual (Docker):**
+
 ```bash
 # backup full
 docker compose exec web /app/infra/scripts/backup_db.sh full

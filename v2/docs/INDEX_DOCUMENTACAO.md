@@ -170,8 +170,8 @@
 
 **Arquivos**:
 - [analysis/README.md](./analysis/README.md) - Índice das análises técnicas
-- [ANALISE_COMPLETA_SISTEMA.md](./analysis/ANALISE_COMPLETA_SISTEMA.md)
-- [ANALISE_ESCALABILIDADE.md](./analysis/ANALISE_ESCALABILIDADE.md)
+- [ANALISE_COMPLETA_SISTEMA.md](./_archive/analysis/ANALISE_COMPLETA_SISTEMA.md)
+- [ANALISE_ESCALABILIDADE.md](./_archive/analysis/ANALISE_ESCALABILIDADE.md)
 
 ---
 
@@ -239,7 +239,7 @@
 
 ### 📊 **DAT Module**
 
-**Arquivo**: [SPEC_DAT_REGISTROS.md](./SPEC_DAT_REGISTROS.md)
+**Arquivo**: [SPEC_DAT_REGISTROS.md](./_archive/SPEC_DAT_REGISTROS.md) _(arquivado)_
 
 - Acompanhamento de turmas
 - Workflow FORMAR/AVALIAR

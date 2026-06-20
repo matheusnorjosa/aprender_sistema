@@ -460,7 +460,6 @@ def processar(dados: Any) -> Any:
 - [luizomf/typehints_python](https://github.com/luizomf/typehints_python) - 47 exemplos progressivos
 
 ### Interno
-- [`TYPE_HINTS_REFERENCE_FULL.md`](../../TYPE_HINTS_REFERENCE_FULL.md) - Referência completa (1500 linhas)
 - [`PYRIGHT_SETUP.md`](./PYRIGHT_SETUP.md) - Setup e troubleshooting
 - [`.claude/skills/django-patterns/SKILL.md`](../../.claude/skills/django-patterns/SKILL.md) - Padrões Django/DRF
 

@@ -10,15 +10,14 @@ Esta pasta concentra planos tecnicos ativos (nao arquivados).
 
 ## Demais planos tecnicos
 
-- `PLAN_ci_security_hardening_2026-02-23.md`
 - `PLAN_code_analysis_tools.md`
-- `PLAN_compras_flow_end_to_end.md`
-- `PLAN_import_pages.md`
-- `PLAN_import_usuarios_produtos.md`
 - `PLAN_mobile_responsiveness.md`
-- `PLAN_remove_etl_backend_2026-03-24.md`
-- `PLAN_remediation_phases_01_07.md`
-- `PLAN_system_stabilization_2026-02-23.md`
+
+> Planos concluídos movidos para `../_archive/plans/` na consolidação SDD 2026-06-19: `rbac-refactor/`,
+> `PLAN_remove_etl_backend`, `PLAN_remediation_phases_01_07`, `PLAN_system_stabilization`,
+> `PLAN_ci_security_hardening`, `PLAN_compras_flow_end_to_end`, `PLAN_import_pages`,
+> `PLAN_import_usuarios_produtos`, `PLAN_gerencias_produtos_admin`, `PLAN_dat_imports_centralization`,
+> `2026-03-09_simplificacao-pipeline-deploy`.
 
 ## Relacao com issues
 

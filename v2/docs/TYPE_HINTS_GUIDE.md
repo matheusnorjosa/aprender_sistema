@@ -461,7 +461,7 @@ def processar(dados: Any) -> Any:
 
 ### Interno
 - [`PYRIGHT_SETUP.md`](./PYRIGHT_SETUP.md) - Setup e troubleshooting
-- [`.claude/skills/django-patterns/SKILL.md`](../../.claude/skills/django-patterns/SKILL.md) - Padrões Django/DRF
+- `.claude/skills/django-patterns/SKILL.md` (skill local) - Padrões Django/DRF
 
 ---
 

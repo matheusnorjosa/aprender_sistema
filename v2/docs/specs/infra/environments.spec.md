@@ -9,8 +9,6 @@ sources_of_truth:
   - v2/infra/docker-compose.override.yml
   - v2/infra/docker-compose.staging-gate.yml
   - v2/infra/docker-compose.prod.yml
-  - v2/infra/.env.dev
-  - v2/infra/.env.staging
   - v2/infra/.env.prodlike.example
   - v2/infra/scripts/smoke_test_staging.sh
 owner: infra
@@ -45,8 +43,8 @@ dirigidos por [`v2/infra/Makefile`](../../../infra/Makefile). Vale a Cláusula P
 
 | Perfil | Makefile (target) | Compose | `.env` | Imagem |
 |---|---|---|---|---|
-| **dev** | [`v2/Makefile`](../../../Makefile) `up` / `down` / `logs` | [`docker-compose.yml`](../../../infra/docker-compose.yml) + [`docker-compose.override.yml`](../../../infra/docker-compose.override.yml) | [`.env.dev`](../../../infra/.env.dev) | build local ([`Dockerfile.dev`](../../../infra/Dockerfile.dev)), `IMAGE_TAG=latest` |
-| **staging** | [`v2/infra/Makefile`](../../../infra/Makefile) `up-staging` / `health-staging` / `down-staging` | `docker-compose.yml` **sozinho** | [`.env.staging`](../../../infra/.env.staging) | pull por tag publicada (`--no-build`), `IMAGE_TAG` **obrigatório** |
+| **dev** | [`v2/Makefile`](../../../Makefile) `up` / `down` / `logs` | [`docker-compose.yml`](../../../infra/docker-compose.yml) + [`docker-compose.override.yml`](../../../infra/docker-compose.override.yml) | `.env.dev` (local) | build local ([`Dockerfile.dev`](../../../infra/Dockerfile.dev)), `IMAGE_TAG=latest` |
+| **staging** | [`v2/infra/Makefile`](../../../infra/Makefile) `up-staging` / `health-staging` / `down-staging` | `docker-compose.yml` **sozinho** | `.env.staging` (local) | pull por tag publicada (`--no-build`), `IMAGE_TAG` **obrigatório** |
 | **staging-gate** | `v2/infra/Makefile` `staging-full` (precheck→build→up→test→down) | `docker-compose.yml` + [`docker-compose.staging-gate.yml`](../../../infra/docker-compose.staging-gate.yml) | `.env.staging` | build local PROD ([`Dockerfile.prod`](../../../infra/Dockerfile.prod)), tag `staging-local` |
 | **prod-like** | `v2/infra/Makefile` `up-prod-like` / `health-prod-like` | [`docker-compose.prod.yml`](../../../infra/docker-compose.prod.yml) **standalone** | `.env.prodlike.local` (cópia de [`.env.prodlike.example`](../../../infra/.env.prodlike.example)) | pull por tag (`--no-build`) |
 | **prod** | `v2/infra/Makefile` `up-prod` (→ ver [deploy.spec](./deploy.spec.md)) | `docker-compose.prod.yml` **standalone** | `stack.env` no Portainer (`APP_ENV_FILE`) | tag imutável promovida |

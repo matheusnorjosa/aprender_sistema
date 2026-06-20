@@ -338,7 +338,7 @@ repos:
 
 ### Interno
 - [`TYPE_HINTS_GUIDE.md`](./TYPE_HINTS_GUIDE.md) - Guia para desenvolvedores
-- [`.claude/skills/django-patterns/SKILL.md`](../../.claude/skills/django-patterns/SKILL.md) - Padrões Django
+- `.claude/skills/django-patterns/SKILL.md` (skill local) - Padrões Django
 
 ---
 

@@ -25,16 +25,10 @@ cp v2/backend/.env.example v2/backend/.env
 
 | Variável | Descrição |
 |----------|-----------|
-| `GCAL_CLIENT` | Cliente a usar: `fake` ou `google` |
+| `GCAL_CLIENT` | Cliente a usar: `fake` (in-memory, default) ou `google` (API real) |
+| `GCAL_AUTH_MODE` | Modo de auth quando `google`: `service_account` (default) ou `oauth` |
 | `GCAL_CALENDAR_ID` | ID do calendário Google |
-| `GOOGLE_SERVICE_ACCOUNT_FILE` | Caminho para credenciais |
-
-### ETL
-
-| Variável | Descrição |
-|----------|-----------|
-| `ETL_OUTPUT_DIR` | Diretório para relatórios ETL |
-| `ETL_DATA_DIR` | Diretório com arquivos CSV/Excel |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | Credenciais da service account (JSON) |
 
 ## Configuração do Docker
 

@@ -5,8 +5,43 @@
 **ViewSets**: 26
 
 > **Legenda de Status**: ![Stable](https://img.shields.io/badge/-stable-green) Estável | ![Beta](https://img.shields.io/badge/-beta-yellow) Beta | ![Deprecated](https://img.shields.io/badge/-deprecated-red) Deprecated | ![Internal](https://img.shields.io/badge/-internal-gray) Interno
->
-> Ver [API_BADGES.md](./API_BADGES.md) para detalhes.
+
+---
+
+## Status dos Endpoints (badges)
+
+| Badge | Significado | Uso |
+|-------|-------------|-----|
+| **Stable** (verde) | Endpoint estável, sem mudanças planejadas | Maioria dos endpoints |
+| **Beta** (amarelo) | Pode mudar sem aviso prévio | Features novas |
+| **Deprecated** (vermelho) | Será removido na próxima versão | Endpoints antigos |
+| **Internal** (cinza) | Uso interno, não documentado publicamente | Admin tools |
+
+### Critérios de classificação
+
+#### Stable
+
+- Endpoint em produção há mais de 30 dias
+- Contrato de API não mudou nas últimas 3 releases
+- Cobertura de testes > 80%
+
+#### Beta
+
+- Feature nova ou experimental
+- Pode ter breaking changes sem deprecation period
+- Feedback de usuários ainda sendo coletado
+
+#### Deprecated
+
+- Será removido em versão futura
+- Alternativa documentada disponível
+- Período de deprecation: mínimo 1 release
+
+#### Internal
+
+- Uso apenas por ferramentas internas
+- Não coberto por garantias de estabilidade
+- Pode mudar a qualquer momento
 
 ---
 

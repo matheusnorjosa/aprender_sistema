@@ -607,6 +607,54 @@ See: [PostgreSQL WAL Archiving](https://www.postgresql.org/docs/current/continuo
 - **Tasks**: `v2/backend/apps/core/tasks_backup.py`
 - **Schedule**: `v2/backend/config/celery.py` (beat_schedule)
 
+## Estratégia 3-2-1 (recomendada / alvo)
+
+> **Nota de realidade (2026-06):** a stack roda na **VM01** (containers) e o job de backup automatizado está
+> **silencioso/morto em produção** (issue #1455). A estratégia abaixo descreve o **alvo recomendado**, não um
+> pipeline 3-2-1 hoje ativo. Trate como aspiracional até o job ser ressuscitado e validado.
+
+- **3** cópias dos dados
+- **2** tipos de mídia diferentes
+- **1** cópia offsite
+
+| Camada | Destino | Status |
+|---|---|---|
+| Local | Volume Docker `backup_data` (`/backups`) — restore rápido | wiring existe (`docker-compose.yml`), execução em prod **inativa** (#1455) |
+| Cloud | S3/GCS (redundância geográfica) — `BACKUP_S3_BUCKET` opcional | opcional, não configurado por padrão |
+| Offsite | Backup semanal em storage separado | aspiracional |
+
+## Cobertura além do PostgreSQL
+
+O sistema de backup automatizado cobre **apenas o PostgreSQL** (`pg_dump`). As coberturas abaixo são **alvo
+recomendado**, não automatizadas hoje.
+
+### Uploads / media
+
+Não há tarefa Celery/cron que faça backup da pasta de uploads. Para cobrir media manualmente:
+
+```bash
+# Snapshot local dos arquivos de mídia
+tar -czvf uploads_$(date +%Y%m%d).tar.gz v2/backend/media/
+
+# Sync incremental para S3 (opcional)
+aws s3 sync v2/backend/media/ s3://aprender-backups/media/
+```
+
+Retenção alvo sugerida para uploads: ~90 dias (separada da retenção do DB, default 7 dias).
+
+### Configurações e secrets
+
+Os secrets reais de produção vivem no **Portainer** (env vars das Golden VMs), não no repo (os `.env.production`
+versionados são templates de dev). Para snapshot de configuração sem expor segredos:
+
+```bash
+# Cópia local do arquivo de config (revisar: nunca commitar com senhas reais)
+cp .env .env.backup.$(date +%Y%m%d)
+```
+
+Guardar segredos fora do repo em cofre dedicado (ex.: AWS Secrets Manager, HashiCorp Vault, Azure Key Vault).
+A fonte de verdade dos secrets de prod permanece o Portainer.
+
 ## Next Steps (Post-MP5)
 
 1. **Monthly restore drills** (verify backups are restorable)

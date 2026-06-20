@@ -148,8 +148,8 @@
 ### 🚀 **Deploy e Produção**
 
 **Arquivos**:
-- [DEPLOY_CHECKLIST.md](./DEPLOY_CHECKLIST.md) - Checklist completo
-- [GO_LIVE_CHECKLIST.md](./GO_LIVE_CHECKLIST.md) - Validações pré-go-live
+- [DEPLOY_CHECKLIST.md](./DEPLOY_CHECKLIST.md) - Checklist completo (inclui go-live local, §4.5)
+- [GO_LIVE_CHECKLIST.md](./_archive/GO_LIVE_CHECKLIST.md) - Validações pré-go-live (consolidado em DEPLOY_CHECKLIST.md §4.5; original arquivado)
 - [SCALING.md](./SCALING.md) - Escalabilidade
 
 ---

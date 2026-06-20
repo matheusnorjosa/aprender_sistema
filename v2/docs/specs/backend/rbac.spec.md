@@ -52,7 +52,7 @@ Doc canônico detalhado (não duplicado aqui): convenção de nomes em [`RBAC_NA
 
 ## Contratos e invariantes
 
-- **Idioma canônico**: `permission_classes = [IsAuthenticated, HasPerm("codename")]`. Composition por instância: `HasPerm("a") | HasPerm("b")` (OR), `& ` (AND), `~` (NOT). Para OR semântico recorrente (≥3 caps ou compartilhado entre views) usa-se uma Policy `Can*`.
+- **Idioma canônico**: `permission_classes = [IsAuthenticated, HasPerm("codename")]`. Composition por instância: `HasPerm("a") | HasPerm("b")` (OR), `&` (AND), `~` (NOT). Para OR semântico recorrente (≥3 caps ou compartilhado entre views) usa-se uma Policy `Can*`.
 - **Grupos diretos são banidos**: `user.groups.filter(name=...)` em `apps/core/views*` ou `apps/core/services/` é violação **V001** do lint. Usos legítimos (composite, block, data-scope) exigem marcador `# noqa: RBAC-<tipo>-allowed` na linha. Classes `class Is<Word>(...)` fora da whitelist (`IsGerenteSuperintendencia`, `IsOwnerOrPrivileged`) são violação **V002**. Mutação de `PermissaoFuncional.groups` / `Group.permissions` em migration de `apps/core/` acima do cutoff D17 (número > 82) é violação **V003**. CI job `[required] backend rbac-lint`.
 - **Codename é capacidade, não identidade**: formato `verb_noun[_qualifier]` snake_case inglês. Proibido nome de setor/função/grupo. Exceções bundle conscientes: `manage_admin_registries`, `manage_purchases_and_materials`.
 - **Superuser sempre bypassa**: toda classe e helper retorna `True` para `is_superuser` antes de qualquer checagem.

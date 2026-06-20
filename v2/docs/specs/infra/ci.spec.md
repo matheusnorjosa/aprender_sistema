@@ -67,6 +67,7 @@ A nomenclatura dos checks é o contrato de governança: `[required]` bloqueia me
 ## Fluxos principais
 
 **PR → merge (caminho feliz):**
+
 1. `backend-impact` decide se a suíte backend roda (PR sem impacto em backend pula os jobs pesados; push/dispatch sempre full).
 2. `lint` + `rbac-lint` (rápidos, paralelos).
 3. `backend-tests-core` e `backend-tests-ingest-devtools` rodam via reusable com `-n auto --dist loadscope`, cada um emitindo um artifact de cobertura.
@@ -79,6 +80,7 @@ A nomenclatura dos checks é o contrato de governança: `[required]` bloqueia me
 **Deploy (resumo — detalhe em `deploy.spec.md`):** build+scan(Trivy)+push das imagens → `validate_existing_tag` (promotion/rollback) → `deploy` chama Portainer CE API atualizando só o `IMAGE_TAG` → post-deploy verification (polling de versão + fallback via Portainer API quando o health externo está inacessível por rede).
 
 **Erros relevantes:**
+
 - Cobertura < 85% → `backend-tests` falha → `tests` vermelho.
 - xdist instável → fica **isolado** no canary (não bloqueia); recorrências viram issues de estabilização antes de promover ao gate.
 - Corpo de PR sem os 3 marcadores → `staging gate evidence` falha (exceto draft / sem runtime impact).

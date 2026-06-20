@@ -75,15 +75,18 @@ Corpo de `approve`/`reject` aceita `{"justificativa": "..."}` (opcional). Lote a
 ## Fluxos principais
 
 **Fluxo SUPER (aprovação manual):**
+
 1. Coordenador cria solicitação para projeto `fluxo == "SUPER"` → `perform_create` valida disponibilidade (`check_conflicts`) e grava `status="pendente"` (`resolve_initial_status`).
 2. Gerente da Superintendência (ou Assistente Administrativo do Controle) chama `approve`/`reject`.
 3. Service trava a linha (`select_for_update`), exige `status == "pendente"`, grava novo status e cria `AuditLog`.
 4. Aprovada → entra na Pré-Agenda; Controle/Super publica no GCal via `publish` (PA-03).
 
 **Fluxo NAO_SUPER (auto-aprovado):**
+
 1. Coordenador cria solicitação para projeto `fluxo == "NAO_SUPER"` → nasce `status="aprovado"` e vai direto à Pré-Agenda. Não passa pelos endpoints de aprovação.
 
 **Erros relevantes:**
+
 - Perfil não autorizado em `approve`/`reject` → **403** (mensagem cita "permissão"/"Superintendência").
 - `publish` em solicitação `pendente` → **400** e task Celery não enfileirada.
 - Reaprovar item já decidido → **400** (`already_approved`/`already_rejected`).

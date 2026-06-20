@@ -55,17 +55,20 @@ Esta spec é o **índice canônico do inventário de páginas**: domínio, rota 
 
 Inventário por domínio (rota → componente → guard). Detalhe da capability na [matriz RBAC](../../rbac_authorization_matrix.md).
 
-**Home**
+### Home
+
 | Rota | Página | Guard |
 |---|---|---|
 | `/`, `/home` | `Home/HomePage` | autenticado |
 
-**Auth**
+### Auth
+
 | Rota | Página | Guard |
 |---|---|---|
 | (sem rota — render condicional em `App.tsx`) | `Auth/LoginPage` | anônimo |
 
-**Solicitações** (agrupadas sob `/solicitacoes/*`)
+### Solicitações (agrupadas sob `/solicitacoes/*`)
+
 | Rota | Página | Guard |
 |---|---|---|
 | `/solicitacoes/minhas` | `Solicitacoes/MySolicitacoesPage` | `access.canCreateSolicitation` |
@@ -73,19 +76,22 @@ Inventário por domínio (rota → componente → guard). Detalhe da capability 
 | `/solicitacoes/:id/editar` | `Solicitacoes/EditSolicitacaoPage` | autenticado |
 | `/solicitacoes/meus-eventos` | `MeusEventos/MeusEventosPage` | autenticado |
 
-**Aprovações**
+### Aprovações
+
 | Rota | Página | Guard |
 |---|---|---|
 | `/solicitacoes/aprovacoes` | `Aprovacoes/ApprovalsPage` | policy `access_solicitation_approvals` |
 
-**Disponibilidade**
+### Disponibilidade
+
 | Rota | Página | Guard |
 |---|---|---|
 | `/solicitacoes/disponibilidade` | `Disponibilidade/MonthlyPage` | policy `view_all_availability` OU `canDisponibilidade` |
 | `/solicitacoes/bloqueios` | `Disponibilidade` (blocks) | `access.canAccessBlocks` (inclui Formador, escopo próprio) |
 | `/solicitacoes/deslocamentos` | `Deslocamentos/DeslocamentosPage` | `view_all_availability` OU `canControle`/`canCoordenador`/`canDAT` |
 
-**Controle**
+### Controle
+
 | Rota | Página | Guard |
 |---|---|---|
 | `/controle` | `Controle/ControlePage` | `canControle` |
@@ -97,7 +103,8 @@ Inventário por domínio (rota → componente → guard). Detalhe da capability 
 | `/controle/pre-agenda`, `/pre-agenda` | `PreAgenda/PreAgendaPage` | `canControle` |
 | `/acoes-notificacao`, `/acoes-notificacao/timeline`, `/notificacoes-internas` | `Controle/AcoesNotificacaoPage` / `AcoesTimelinePage` / `NotificacoesInternasPage` | `canAcoesInternas` |
 
-**DAT / AdminDAT**
+### DAT / AdminDAT
+
 | Rota | Página | Guard |
 |---|---|---|
 | `/dat/admin` (+ `/usuarios`, `/municipios`, `/projetos`, `/grupos`, `/setores`, `/funcoes`, `/gerencias`, `/produtos`, `/configuracoes`, `/colecoes`, `/equipe-gerencia`) | `AdminDAT/*` | `canDAT` |
@@ -107,7 +114,8 @@ Inventário por domínio (rota → componente → guard). Detalhe da capability 
 | `/dat/compras-materiais` | `DATModule/ComprasPage` | `canControle` OU `canDAT` |
 | `/dat/coordenadores` | `DATModule/CoordenadoresPage` | `canControle` |
 
-**Dashboards**
+### Dashboards
+
 | Rota | Página | Guard |
 |---|---|---|
 | `/dashboards` | `Dashboards/DashboardsPage` | `canDashboardOverview` (Diretoria/superuser) |

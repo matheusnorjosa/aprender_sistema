@@ -259,6 +259,8 @@ jobs:
       - backend-tests-core
       - backend-tests-ingest-devtools
     if: always() && needs.backend-impact.outputs.backend_changed == 'true'
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     steps:
     - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
 
@@ -315,13 +317,15 @@ jobs:
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4
+      # Sobe cobertura apenas quando o secret CODECOV_TOKEN existe; sem token o
+      # codecov-action v4 falha o upload (tokenless rejeitado) e polui o log.
+      if: ${{ env.CODECOV_TOKEN != '' }}
       with:
+        token: ${{ env.CODECOV_TOKEN }}
         file: ./v2/backend/coverage.xml
         flags: backend
         name: backend-coverage
         fail_ci_if_error: false
-      env:
-        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   # ----------------------------------------------------------------
   # Job 3: Backend typecheck with Pyright

@@ -11,7 +11,7 @@ related:
 
 Backend real = **apenas** `apps/core` (28 models) + `apps/dev_tools`. Voltar ao [índice SDD](../INDEX_SDD.md).
 
-## Specs planejadas (Fase 3-4)
+## Specs (escritas em 2026-06-19) — origem de cada uma
 
 | Spec | Estado da doc hoje | Fonte canônica / código |
 |---|---|---|
@@ -25,4 +25,4 @@ Backend real = **apenas** `apps/core` (28 models) + `apps/dev_tools`. Voltar ao 
 | `dat.spec.md` | migrar | `views/dat_module.py`, `SPEC_DAT_REGISTROS.md` |
 | `notificacoes.spec.md` | consolidar | `services/notificacoes_acoes_service.py`, `PLANO_NOTIFICACOES_TIMING.md` |
 
-> Status: esqueleto. Nenhuma spec escrita ainda (Fase 0).
+> Status: **specs escritas** (Fase 3-4, 2026-06-19) — links vivos no [índice SDD](../INDEX_SDD.md).

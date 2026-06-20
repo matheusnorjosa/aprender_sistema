@@ -11,7 +11,7 @@ related:
 
 Contratos imutáveis do negócio. Voltar ao [índice SDD](../INDEX_SDD.md).
 
-## Specs planejadas (Fase 3-4)
+## Specs (escritas em 2026-06-19) — origem de cada uma
 
 | Spec | Conteúdo | Fonte canônica atual |
 |---|---|---|
@@ -20,4 +20,4 @@ Contratos imutáveis do negócio. Voltar ao [índice SDD](../INDEX_SDD.md).
 | `politica-aprovacao.spec.md` | PA-01..PA-07 | `docs/business-rules/politica-aprovacao.md`, ADR-002 |
 | `requisitos-funcionais.spec.md` | RF-xx | `docs/business-rules/requisitos-funcionais.md` |
 
-> Status: esqueleto. Nenhuma spec escrita ainda (Fase 0).
+> Status: **specs escritas** (Fase 3-4, 2026-06-19) — links vivos no [índice SDD](../INDEX_SDD.md).

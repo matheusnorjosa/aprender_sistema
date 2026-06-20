@@ -63,7 +63,7 @@ Os objetivos de nível de serviço (latência, disponibilidade, taxa de erro) es
 ## Análise histórica
 
 Para o levantamento de gaps de observabilidade/infra (datado), ver
-[analysis/phase-07-infra-observability-backup-dr.md](./analysis/phase-07-infra-observability-backup-dr.md).
+[_archive/analysis/phase-07-infra-observability-backup-dr.md](./_archive/analysis/phase-07-infra-observability-backup-dr.md).
 
 ## Relacionados
 

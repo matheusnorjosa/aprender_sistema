@@ -222,7 +222,6 @@ Semana 1 (40h)          Semana 2 (40h)          Semana 3 (40h)          Semana 4
 
 - [`TYPE_HINTS_GUIDE.md`](../docs/TYPE_HINTS_GUIDE.md) - Guia do desenvolvedor
 - [`PYRIGHT_SETUP.md`](../docs/PYRIGHT_SETUP.md) - Setup e troubleshooting
-- [`TYPE_HINTS_REFERENCE_FULL.md`](../../TYPE_HINTS_REFERENCE_FULL.md) - Referência completa (1500 linhas)
 - [`.claude/CLAUDE.md`](../../.claude/CLAUDE.md) - Guia geral do projeto
 
 ---

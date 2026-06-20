@@ -1,7 +1,26 @@
 # Plano de Migração SDD (Spec-Driven Development) — 2026-06-19
 
-> Status: plano ativo (não-iniciado) · Base: [`../reports/AUDITORIA_DOCUMENTAL_2026-06-19.md`](../reports/AUDITORIA_DOCUMENTAL_2026-06-19.md)
-> Regra deste plano: **nenhum arquivo é movido nesta etapa**. Isto descreve a estrutura-alvo e as fases.
+> Status: **CONCLUÍDO (Fases 0-6 + cleanup), 2026-06-20** · Base: [`../reports/AUDITORIA_DOCUMENTAL_2026-06-19.md`](../reports/AUDITORIA_DOCUMENTAL_2026-06-19.md)
+> Backlog vivo: GitHub **#1477** (tracking). As seções 1-10 abaixo são o plano original (referência).
+
+## 0. Status de execução (atualizado 2026-06-20)
+
+Todas as fases concluídas. Mapeamento fase → PR:
+
+| Fase | PR(s) | Resultado |
+|---|---|---|
+| 0 — Fundação | #1464 | esqueleto `specs/` + `INDEX_SDD` + frontmatter + 8 links |
+| 1 — Contratos no git | #1472 | ADR-017 + decisão `CLAUDE.md`/`AGENTS.md` local-only; CP-07/08 em #1465 |
+| 2 — Reconciliar stale | #1465, #1471 | `dat_ingest`, deploy→Portainer, versões, Redis VM01, `etl.md` stub |
+| 3+4 — Specs + gaps | #1472 | **19 specs vivas** (domain/backend/frontend/infra) |
+| 5 — Histórico | #1467, #1468 | `analysis/` + planos + 18 stale → `_archive/` |
+| Onda 3 — Merges | #1469 | 17 merges → SSOTs + 7 stubs + archives |
+| 6 — Automação | #1473 | gate `docs-quality` (links vivos + frontmatter) |
+| Cleanup | #1475, #1476 | codecov guard + markdownlint; #1470 Makefile/RUNBOOK ETL |
+
+**Backlog restante** (baixa prio, rastreado em #1477): #1474 (`rbac_matrix_doc --check`); refs stale
+residuais em `.claude/`; promover `docs-quality` a `[required]`; ~40 links em `_archive/` (histórico
+imutável); remoção profunda das seções ETL do `RUNBOOK.md` (hoje com banner).
 
 ## 1. Objetivo
 

@@ -2,8 +2,6 @@ DC = COMPOSE_PROJECT_NAME=aprender_dev IMAGE_TAG=latest docker compose -f infra/
 WEB = $(DC) exec -T web
 
 .PHONY: up down build logs shell migrate collect seed seed-demo seed-rbac \
-        etl-acomp-dry etl-acomp-apply etl-desloc-dry etl-desloc-apply \
-        etl-acoes-dry etl-acoes-apply etl-dat-dry etl-dat-apply \
         import-compras-dry import-acoes-dry import-cadastros-dry \
         solic-pend-super solic-approve solic-reject \
         readyz healthz preview-json apply-json flags-fake flags-google preview-on preview-off \
@@ -40,71 +38,6 @@ seed-demo:
 
 seed-rbac:
 	$(WEB) python manage.py seed_rbac
-
-etl-acomp-dry:
-	$(WEB) python manage.py etl_upsert_acompanhamento \
-		--events-csv /app/data/csv-import/etl_eventos_normalizados.csv \
-		--participants-csv /app/data/csv-import/etl_participantes_normalizados.csv \
-		--dry-run
-
-etl-acomp-apply:
-	$(WEB) python manage.py etl_upsert_acompanhamento \
-		--events-csv /app/data/csv-import/etl_eventos_normalizados.csv \
-		--participants-csv /app/data/csv-import/etl_participantes_normalizados.csv
-
-etl-desloc-dry:
-	@echo "⚙️  Uso: make etl-desloc-dry FILE=/app/data/deslocamentos.csv"
-	@if [ -z "$(FILE)" ]; then \
-		echo "❌ Erro: Variável FILE não definida"; \
-		echo "   Exemplo: make etl-desloc-dry FILE=/app/data/deslocamentos.xlsx"; \
-		exit 1; \
-	fi
-	$(WEB) python manage.py etl_upsert_deslocamento --file "$(FILE)" --dry-run
-
-etl-desloc-apply:
-	@echo "⚙️  Uso: make etl-desloc-apply FILE=/app/data/deslocamentos.csv"
-	@if [ -z "$(FILE)" ]; then \
-		echo "❌ Erro: Variável FILE não definida"; \
-		echo "   Exemplo: make etl-desloc-apply FILE=/app/data/deslocamentos.xlsx"; \
-		exit 1; \
-	fi
-	$(WEB) python manage.py etl_upsert_deslocamento --file "$(FILE)"
-
-etl-acoes-dry:
-	@echo "⚙️  Uso: make etl-acoes-dry FILE=/app/data/acoes_controle.csv"
-	@if [ -z "$(FILE)" ]; then \
-		echo "❌ Erro: Variável FILE não definida"; \
-		echo "   Exemplo: make etl-acoes-dry FILE=/app/data/acoes_controle.xlsx"; \
-		exit 1; \
-	fi
-	$(WEB) python manage.py etl_import_acoes_controle "$(FILE)" --dry-run
-
-etl-acoes-apply:
-	@echo "⚙️  Uso: make etl-acoes-apply FILE=/app/data/acoes_controle.csv"
-	@if [ -z "$(FILE)" ]; then \
-		echo "❌ Erro: Variável FILE não definida"; \
-		echo "   Exemplo: make etl-acoes-apply FILE=/app/data/acoes_controle.xlsx"; \
-		exit 1; \
-	fi
-	$(WEB) python manage.py etl_import_acoes_controle "$(FILE)"
-
-etl-dat-dry:
-	@echo "⚙️  Uso: make etl-dat-dry FILE=/app/data/dat_cadastros.csv"
-	@if [ -z "$(FILE)" ]; then \
-		echo "❌ Erro: Variável FILE não definida"; \
-		echo "   Exemplo: make etl-dat-dry FILE=/app/data/dat_cadastros.xlsx"; \
-		exit 1; \
-	fi
-	$(WEB) python manage.py etl_import_dat_cadastros "$(FILE)" --dry-run
-
-etl-dat-apply:
-	@echo "⚙️  Uso: make etl-dat-apply FILE=/app/data/dat_cadastros.csv"
-	@if [ -z "$(FILE)" ]; then \
-		echo "❌ Erro: Variável FILE não definida"; \
-		echo "   Exemplo: make etl-dat-apply FILE=/app/data/dat_cadastros.xlsx"; \
-		exit 1; \
-	fi
-	$(WEB) python manage.py etl_import_dat_cadastros "$(FILE)"
 
 # ════════════════════════════════════════════════════════════════════════════
 # API HTTP Imports (via curl - requer autenticação)
@@ -274,16 +207,6 @@ help:
 	@echo "  make seed                  Seed RBAC data"
 	@echo "  make seed-demo             Seed demo users"
 	@echo "  make seed-rbac             Seed RBAC groups/permissions (idempotent)"
-	@echo ""
-	@echo "ETL (via management commands):"
-	@echo "  make etl-acomp-dry         Preview ETL acompanhamento (dry-run)"
-	@echo "  make etl-acomp-apply       Apply ETL acompanhamento"
-	@echo "  make etl-desloc-dry        Preview ETL deslocamentos (use FILE=/path/to/file.{csv|xlsx})"
-	@echo "  make etl-desloc-apply      Apply ETL deslocamentos (use FILE=/path/to/file.{csv|xlsx})"
-	@echo "  make etl-acoes-dry         Preview ETL ações controle (use FILE=/path/to/file.{csv|xlsx})"
-	@echo "  make etl-acoes-apply       Apply ETL ações controle (use FILE=/path/to/file.{csv|xlsx})"
-	@echo "  make etl-dat-dry           Preview ETL DAT cadastros (use FILE=/path/to/file.{csv|xlsx})"
-	@echo "  make etl-dat-apply         Apply ETL DAT cadastros (use FILE=/path/to/file.{csv|xlsx})"
 	@echo ""
 	@echo "Import via API HTTP (porta 8002, trailing slashes):"
 	@echo "  make import-compras-dry    POST /api/controle/import-compras/ (use FILE=...)"

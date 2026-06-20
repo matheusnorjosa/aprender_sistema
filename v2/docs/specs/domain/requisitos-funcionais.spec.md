@@ -80,6 +80,7 @@ Rotas registradas em [`urls.py`](../../../backend/apps/core/urls.py) (prefixo `/
 1. **Importação (RF01)**: operador roda `import_export_contract` em dry-run → revisa classificação → (com autorização) `--apply --allow-entity X` → writes create-only idempotentes; campos protegidos preservados.
 2. **Solicitação → publicação (RF02→RF05/RF06)**: coordenador cria solicitação → sistema checa conflitos (RF03) → `NAO_SUPER` auto-aprova; `SUPER` fica `pendente` → Superintendência/DAT aprova (RF04, grava AuditLog) → Controle/Super faz `preview-gcal` (não persiste) → `publish` enfileira Celery → evento criado no GCal; se `is_online=True`, `meet_link` extraído de `hangoutLink` e persistido (RF06).
 3. **Mapa mensal (RF08)**: front pede `availability/monthly/` por ano/mês/papel/setor → `build_monthly_grid` agrega eventos, bloqueios e deslocamentos em códigos por dia/pessoa → resposta cacheada; clique abre detalhe do dia.
+
 - **Erros relevantes**: aprovar item não-`pendente` → `ValidationAPIError` (`already_approved`/`already_rejected`/`invalid_status`); lote > 100 → `batch_limit_exceeded`; `--apply` sem allowlist → bloqueado, nada escrito; publish com `apply_blocked=True` → respeitado (não escreve no GCal).
 
 ## Decisões relacionadas (ADRs)

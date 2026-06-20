@@ -75,6 +75,7 @@ Interface publica dos hooks:
 ## Fluxos principais
 
 **Bootstrap de autorizacao (1x por mount, sem polling de RBAC):**
+
 1. `App.tsx` chama `getMe()` (= `/api/me/`); o payload passa por `assertCurrentUserPayload` (em `api/availability.ts`/`auth.ts`). Sucesso => `setUser`.
 2. So entao chama `getMyPolicies()` (= `/api/me/policies/`); sucesso => `setPolicies`. Erro nao-auth => log `warn` + degrada para `[]`.
 3. `usePermissions(user)` computa flags legacy; `AppRoutes` chama `useCanAccess(policies, { canBloqueios, canCoordenador, canDashboardCompras })` para derivar flags.
@@ -83,6 +84,7 @@ Interface publica dos hooks:
 **Atualizacao de RBAC**: nao ha polling das capabilities. Mudancas de permissao so refletem apos reload/relogin (logout faz `window.location.reload()`). Os pollings existentes em `App.tsx` (`useGCalAlertsPolling`, `useUnreadNotificationsPolling`) sao de dados operacionais, gated pelas flags de `usePermissions`, e nao re-buscam policies.
 
 **Guard Google (caminho feliz + erro):**
+
 1. Pagina (ex: PreAgenda) obtem `googleStatus` via `useGoogleIntegration` e instancia `useGoogleGuard({ googleStatus, returnTo })`.
 2. Antes da acao: `if (!requireGoogleConnection('publicar eventos')) return;` — se desconectado, abre `Modal.confirm` e (no `onOk`) redireciona para `/api/oauth/google/start/?return_to=...`.
 3. No `catch` da chamada: `if (handleGoogleError(error)) return;` — trata `403 google_not_connected` reabrindo o modal; demais erros seguem o fluxo normal de mensagem.

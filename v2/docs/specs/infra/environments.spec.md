@@ -121,6 +121,7 @@ Endpoints de health expostos por todos os perfis: `GET /api/readyz/` (db + redis
 PostgreSQL externo da VM02; Redis é local na stack. Backend em `:28000`, frontend em `:18081`.
 
 **Erros comuns:**
+
 - `IMAGE_TAG is required` ao subir staging/prod sem tag → exportar `IMAGE_TAG=vYYYY.MM.DD-<sha>`.
 - `staging-precheck falhou: !reset não suportado` → atualizar Docker Compose (v2.24.6+).
 - Colisão de porta → confirmar que não há outro perfil usando a mesma faixa (cada perfil tem portas próprias).

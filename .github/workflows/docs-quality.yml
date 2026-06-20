@@ -1,0 +1,54 @@
+name: Docs Quality
+
+# Gate de qualidade da documentação viva (modelo SDD / ADR-017):
+#  - links relativos quebrados em docs/ + v2/docs/ (exceto _archive)
+#  - frontmatter (status + last_verified) das specs em v2/docs/specs/
+# Complementa o `mkdocs build --strict` (docs.yml), que cobre só a árvore docs/.
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+      - 'v2/docs/**'
+      - 'scripts/check_doc_links.py'
+      - 'scripts/check_doc_frontmatter.py'
+      - '.github/workflows/docs-quality.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+      - 'v2/docs/**'
+      - 'scripts/check_doc_links.py'
+      - 'scripts/check_doc_frontmatter.py'
+      - '.github/workflows/docs-quality.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  docs-quality:
+    name: "[info] docs quality (links + frontmatter)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
+
+      - name: Setup Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v5
+        with:
+          python-version: '3.12'
+
+      - name: Links relativos quebrados (docs vivos)
+        run: python scripts/check_doc_links.py
+
+      - name: Frontmatter das specs SDD
+        run: python scripts/check_doc_frontmatter.py

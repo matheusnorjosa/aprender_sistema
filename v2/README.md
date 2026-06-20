@@ -121,7 +121,7 @@ docker compose exec web python manage.py import_usuarios --apply
 | [API_REFERENCE.md](docs/API_REFERENCE.md) | Referência da API e política canônica de rotas |
 | [PROJETO_ORIGEM.md](docs/PROJETO_ORIGEM.md) | Origem, modelos, regras |
 | [GUIDE_GCAL.md](docs/GUIDE_GCAL.md) | Integração Google Calendar |
-| [RBAC_COMPLETO.md](docs/RBAC_COMPLETO.md) | Sistema de permissões |
+| [RBAC_NAMING.md](docs/RBAC_NAMING.md) | Convenção RBAC e sistema de permissões |
 | [OBSERVABILITY.md](docs/OBSERVABILITY.md) | Prometheus/Grafana/Logs |
 | [TESTING_POLICY.md](docs/TESTING_POLICY.md) | Políticas de teste |
 

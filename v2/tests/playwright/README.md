@@ -265,7 +265,7 @@ Draft workflow preparado: `.github/workflows/e2e-tests.yml.draft`
 - [Playwright Docs](https://playwright.dev/docs/intro)
 - [Playwright TypeScript](https://playwright.dev/docs/test-typescript)
 - [Best Practices](https://playwright.dev/docs/best-practices)
-- [Plano DAT/GCal](../../docs/PLANO_DAT_GCAL_2025-10-29.md)
+- [Guia GCal](../../docs/GUIDE_GCAL.md)
 
 ---
 

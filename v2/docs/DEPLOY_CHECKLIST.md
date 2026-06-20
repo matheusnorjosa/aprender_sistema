@@ -62,6 +62,15 @@ Observação:
 - O workflow rejeita `latest` em produção. Use apenas tag imutável no formato `vYYYY.MM.DD-<sha-or-id>`.
 - O build/publish do pipeline usa somente a tag imutável da release (sem retag `latest`).
 
+### 4.5 Go-live local (v2)
+
+Sequência mínima de validação pré-go-live (rodar em `v2/`):
+
+- [ ] `make up` — sobe a stack dev
+- [ ] `make readyz` — checa `/api/readyz/` (db + redis)
+- [ ] `make healthz` — checa `/healthz/` (saúde da app)
+- [ ] `make ban-v1` — roda `scripts/ban_v1.sh`: remove à força containers, redes e volumes legados do projeto v1 (`com.docker.compose.project=aprendersistema`), garantindo que nenhum resíduo v1 sobreviva ao corte (CP-05).
+
 ## 5. Evidências obrigatórias
 
 - [ ] Artifact `deploy-evidence-<run_id>` disponível

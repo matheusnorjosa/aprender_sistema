@@ -50,6 +50,46 @@ Este guia documenta a configuração e uso da integração do **Aprender Sistema
 2. Seção "Integrar calendário"
 3. Copie o **ID do calendário** (ex: `primary` ou `abc123@group.calendar.google.com`)
 
+### Modo OAuth (alternativa ao Service Account)
+
+O sistema suporta dois modos de autenticação com o Google Calendar, selecionados por `GCAL_AUTH_MODE`:
+
+| Modo | Variável | Credenciais | Uso |
+|------|----------|-------------|-----|
+| **Service Account** (padrão) | `GCAL_AUTH_MODE=service_account` (ou omitir) | `GOOGLE_SERVICE_ACCOUNT_JSON` / `GOOGLE_SERVICE_ACCOUNT_FILE` | Autenticação servidor-a-servidor |
+| **OAuth** | `GCAL_AUTH_MODE=oauth` | Credenciais OAuth 2.0 por usuário (Controle/Superintendência) | Cada usuário conecta sua conta Google |
+
+> Em ambos os modos, `GCAL_CLIENT=google` é obrigatório para chamar a API real. A variável de modo é `GCAL_AUTH_MODE` (**não** `GCAL_CLIENT_MODE`).
+
+#### Variáveis de ambiente do modo OAuth
+
+```bash
+# Cliente real + modo OAuth
+GCAL_CLIENT=google
+GCAL_AUTH_MODE=oauth
+
+# Credenciais OAuth 2.0 (Google Cloud Console)
+GCAL_OAUTH_CLIENT_ID=<oauth-client-id>
+GCAL_OAUTH_CLIENT_SECRET=<oauth-client-secret>
+GCAL_OAUTH_REDIRECT_URI=https://seu-dominio.com/api/oauth/google/callback/
+
+# Chave Fernet para criptografar tokens OAuth (ver seção 8 — SEC-011)
+GCAL_ENCRYPTION_KEY=<fernet-key-base64>
+
+# Calendar primário do usuário
+GCAL_CALENDAR_ID=primary
+```
+
+> Esses vars OAuth são lidos via `os.getenv` em `apps/core/services/oauth/oauth_flow.py`, `services/oauth/token_manager.py` e `services/gcal_oauth_client.py` (não ficam em `settings.py`). Ausência de `GCAL_OAUTH_CLIENT_ID`/`GCAL_OAUTH_REDIRECT_URI` levanta `ValueError`.
+
+#### Comportamento do modo OAuth
+
+- **Pré-requisito**: usuário do grupo Controle ou Superintendência conecta a conta Google via `GET /api/oauth/google/start/` (callback em `/api/oauth/google/callback/`).
+- **Fluxo de publicação**: ao publicar/resync na Pré-agenda, o sistema verifica a conexão. Sem conexão retorna **403 Forbidden** (UI mostra card/modal "Conectar conta Google"); com conexão enfileira a task Celery com `operator_user_id` e retorna **202 Accepted**.
+- **Governança**: `apply_blocked` continua dependendo de `GCAL_CLIENT='google'`.
+
+Tokens OAuth são criptografados em repouso (ver seção 8 — SEC-011, `GCAL_ENCRYPTION_KEY`).
+
 ## 2. Variáveis de Ambiente
 
 Adicione as seguintes variáveis ao seu `.env` (local ou em `v2/infra/.env`):
@@ -97,6 +137,25 @@ GCAL_SEND_UPDATES=externalOnly
 GCAL_CALENDAR_ID=abc123@group.calendar.google.com
 GOOGLE_SERVICE_ACCOUNT_FILE=/app/secrets/aprender-prod-sa.json
 ```
+
+### Validação fail-fast (boot)
+
+Na inicialização do Django (`config/settings.py`), o valor de `GCAL_SEND_UPDATES` é validado contra a allowlist `{none, all, externalOnly}`. Valor inválido aborta o boot com `sys.exit(1)` e mensagem clara em stderr:
+
+```python
+# config/settings.py
+GCAL_SEND_UPDATES = os.getenv("GCAL_SEND_UPDATES", "none")
+_VALID_SEND_UPDATES = {"none", "all", "externalOnly"}
+if GCAL_SEND_UPDATES not in _VALID_SEND_UPDATES:
+    print(
+        f"ERRO: GCAL_SEND_UPDATES='{GCAL_SEND_UPDATES}' invalido. "
+        f"Valores permitidos: {', '.join(_VALID_SEND_UPDATES)}",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+```
+
+O `GoogleCalendarClient` (`apps/core/services/gcal_google_client.py`) lê `settings.GCAL_SEND_UPDATES` e o repassa como `sendUpdates` em três operações — `insert()` (criação), `update()` (PATCH) e `delete()`. O Preview usa o mesmo `sendUpdates` configurado (consistência com a publicação real). Testes em `apps/core/tests/test_gcal_send_updates.py`.
 
 ## 3. Configuração apply_blocked vs dry_run
 
@@ -645,7 +704,7 @@ logger.info(f"GCal response: {result}")
 - [Google Calendar API - Events.insert](https://developers.google.com/calendar/api/v3/reference/events/insert)
 - [Google Calendar API - Conference Data](https://developers.google.com/calendar/api/v3/reference/events#conferenceData)
 - [Service Account Authentication](https://developers.google.com/identity/protocols/oauth2/service-account)
-- [GCAL_SEND_UPDATES.md](../backend/GCAL_SEND_UPDATES.md)
+- Detalhes de `GCAL_SEND_UPDATES` (validação fail-fast + uso no client): seção 2 deste guia — conteúdo consolidado do antigo `v2/backend/GCAL_SEND_UPDATES.md` (arquivado em `_archive/`).
 
 ## 8. Criptografia de Tokens OAuth (SEC-011)
 

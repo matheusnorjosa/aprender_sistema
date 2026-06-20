@@ -47,6 +47,11 @@ só muda por edição **manual** no Editor (CP do hook: *"Compose changes requir
 > 2026-06-19 estavam idênticos (verificado), mas mudanças no repo não propagam sozinhas — re-verificar a cada
 > alteração estrutural de infra.
 
+**Depreciado (issue #814):** os workflows `.github/workflows/release.yaml` e
+`.github/workflows/dockerhub-rebuild.yml` foram **removidos** — o `deploy.yaml` é o único pipeline de deploy.
+As variáveis `STAGING_DEPLOY_COMMAND` e `PRODUCTION_DEPLOY_COMMAND` ficaram **obsoletas** e não são mais usadas
+pelo pipeline canônico (ver `DEPLOY_CHECKLIST.md` §7).
+
 ## Produção vs Local (estado verificado 2026-06-19)
 
 | Componente | Produção | Local/dev |

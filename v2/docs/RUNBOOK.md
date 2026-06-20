@@ -499,6 +499,8 @@ docker compose -p aprender_v2 exec web python manage.py shell
 
 ## 📦 ETL e Seeds
 
+> **⚠️ Depreciado (#1470, 2026-06).** Os comandos `etl_upsert_*` / `etl_import_*` desta seção foram **removidos** junto com `apps.dat_ingest` (#967/#971) — não há mais `*/management/commands/etl_*.py`. A importação atual usa o pipeline **export-contract** (`import_export_contract`) + endpoints DRF `POST /api/<recurso>/import/` (alvos `make import-compras-dry` / `import-acoes-dry` / `import-cadastros-dry`). Ver a spec viva [`imports.spec.md`](specs/backend/imports.spec.md) e `v2/docs/imports/`. O conteúdo abaixo é **histórico** e não roda mais.
+
 ### Seeds RBAC
 
 Cria grupos e permissões mínimas (idempotente):
@@ -840,6 +842,8 @@ python manage.py preagenda_to_gcal \
 ---
 
 ## 📊 ETL: Importação de Ações (Controle e DAT)
+
+> **⚠️ Depreciado (#1470, 2026-06).** Os comandos `etl_upsert_*` / `etl_import_*` desta seção foram **removidos** junto com `apps.dat_ingest` (#967/#971) — não há mais `*/management/commands/etl_*.py`. A importação atual usa o pipeline **export-contract** (`import_export_contract`) + endpoints DRF `POST /api/<recurso>/import/` (alvos `make import-compras-dry` / `import-acoes-dry` / `import-cadastros-dry`). Ver a spec viva [`imports.spec.md`](specs/backend/imports.spec.md) e `v2/docs/imports/`. O conteúdo abaixo é **histórico** e não roda mais.
 
 ### **Visão Geral**
 
@@ -1289,6 +1293,8 @@ u.groups.add(g)
 ---
 
 ## 📦 ETL: Acompanhamento com hash v2 e Quality Gates (PR21)
+
+> **⚠️ Depreciado (#1470, 2026-06).** Os comandos `etl_upsert_*` / `etl_import_*` desta seção foram **removidos** junto com `apps.dat_ingest` (#967/#971) — não há mais `*/management/commands/etl_*.py`. A importação atual usa o pipeline **export-contract** (`import_export_contract`) + endpoints DRF `POST /api/<recurso>/import/` (alvos `make import-compras-dry` / `import-acoes-dry` / `import-cadastros-dry`). Ver a spec viva [`imports.spec.md`](specs/backend/imports.spec.md) e `v2/docs/imports/`. O conteúdo abaixo é **histórico** e não roda mais.
 
 ### **Visão Geral**
 

@@ -6,24 +6,17 @@ name: Docs Quality
 # Complementa o `mkdocs build --strict` (docs.yml), que cobre só a árvore docs/.
 
 on:
+  # NOTE: SEM path filter de propósito. Este é um check [required] no ruleset da main,
+  # então PRECISA sempre reportar status — com path filter, um PR que não toca docs/**
+  # deixaria o check "Expected/pending" eterno e travaria o merge (trap clássico de
+  # required + path filter no GitHub). Os 2 scripts rodam em segundos e validam toda a
+  # árvore docs/ + v2/docs viva de qualquer forma (não são incrementais).
   pull_request:
     branches:
       - main
-    paths:
-      - 'docs/**'
-      - 'v2/docs/**'
-      - 'scripts/check_doc_links.py'
-      - 'scripts/check_doc_frontmatter.py'
-      - '.github/workflows/docs-quality.yml'
   push:
     branches:
       - main
-    paths:
-      - 'docs/**'
-      - 'v2/docs/**'
-      - 'scripts/check_doc_links.py'
-      - 'scripts/check_doc_frontmatter.py'
-      - '.github/workflows/docs-quality.yml'
   workflow_dispatch:
 
 permissions:
@@ -35,7 +28,7 @@ concurrency:
 
 jobs:
   docs-quality:
-    name: "[info] docs quality (links + frontmatter)"
+    name: "[required] docs quality (links + frontmatter)"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

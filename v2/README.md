@@ -49,8 +49,7 @@ docker compose up -d
 v2/
 ├── backend/              # Django + DRF
 │   ├── apps/
-│   │   ├── core/         # Domínio principal (28 models)
-│   │   └── dat_ingest/   # ETL (21 comandos)
+│   │   └── core/         # Domínio principal (28 models; imports em core/imports/)
 │   └── config/           # Settings, URLs, Celery
 │
 ├── frontend/             # React + Vite
@@ -89,17 +88,19 @@ cd frontend && npx playwright test
 
 ---
 
-## ETL
+## Importação de Dados
+
+O antigo pipeline ETL (`apps.dat_ingest`, ~21 comandos `import_*`) foi **removido** (#967/#971). A importação
+hoje usa o pipeline **export-contract** (`apps/core/imports/`), idempotente por `external_hash` SHA1 (ADR-012),
+**dry-run por padrão**:
 
 ```bash
-# Dry-run (simulação)
-docker compose exec web python manage.py import_usuarios --dry-run
-
-# Executar
-docker compose exec web python manage.py import_usuarios --apply
+# Único command de import real (dry-run por padrão)
+docker compose exec web python manage.py import_export_contract --dry-run
 ```
 
-**Comandos disponíveis**: 21 (import_usuarios, import_municipios, import_dat_acoes, etc.)
+Também há endpoints DRF (`POST /api/<recurso>/import/`). Contratos por entidade e ordem de importação em
+`v2/docs/imports/README.md`.
 
 ---
 

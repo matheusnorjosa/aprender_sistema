@@ -115,27 +115,17 @@ O sistema original funcionava integralmente sobre planilhas Google/Excel, que ac
 | `AuditLog` | Log de auditoria (todas operações críticas) |
 | `GoogleOAuthCredential` | Credenciais OAuth criptografadas |
 
-### 2.4 ETLs Disponíveis (21 comandos)
+### 2.4 Importação de Dados
 
-```bash
-# Importação de dados base
-import_municipios, import_projetos, import_tipos_evento, import_usuarios
+> **Atualizado (SDD 2026-06).** O antigo pipeline ETL (`apps.dat_ingest`, ~21 comandos `import_*` como
+> `import_municipios`/`import_usuarios`/`import_dat_*`) foi **removido** (#967/#971). Aquela lista não reflete
+> mais o sistema.
 
-# Acompanhamento e Agenda
-import_acompanhamento, import_disponibilidade, import_deslocamentos
+A importação hoje usa o pipeline **export-contract** (`apps/core/imports/`), idempotente por `external_hash`
+SHA1 (ADR-012), **dry-run por padrão**. Único management command real: `import_export_contract`. Também há
+endpoints DRF (`POST /api/<recurso>/import/`).
 
-# Módulo DAT
-import_dat_acoes, import_dat_registros, import_dat_cadastros
-import_dat_compras, import_dat_coordenadores, import_dat_formacoes
-
-# Controle
-import_acoes_controle, import_compras
-
-# Utilitários
-backfill_user_groups, fix_duplicate_users, validate_data
-```
-
-Todos suportam `--dry-run` e geram relatórios em `out_etl/*.json`.
+Contratos por entidade e ordem de importação: `v2/docs/imports/README.md`.
 
 ---
 

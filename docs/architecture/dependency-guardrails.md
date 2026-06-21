@@ -13,9 +13,10 @@ Este documento define os guardrails arquiteturais obrigatórios executados no CI
 Configuração: `v2/backend/.importlinter`
 
 Contratos ativos:
-- `apps.core` não pode depender de `apps.dat_ingest` nem `apps.dev_tools`;
-- `apps.dat_ingest` não pode depender de `apps.dev_tools`;
-- `config` não pode depender de `apps.dat_ingest` nem `apps.dev_tools`.
+- `apps.core` não pode depender de `apps.dev_tools`;
+- `config` não pode depender de `apps.dev_tools`.
+
+> `apps.dat_ingest` foi removido (#967/#971); os guardrails restantes cobrem `apps.core` ↔ `apps.dev_tools`.
 
 Execução local:
 
@@ -62,6 +63,6 @@ Artifacts gerados:
 ## Falha esperada (prova de efetividade)
 
 O check deve falhar quando:
-- um import proibido for adicionado no backend (ex.: `apps.core -> apps.dat_ingest`);
+- um import proibido for adicionado no backend (ex.: `apps.core -> apps.dev_tools`);
 - um ciclo de import for introduzido no frontend;
 - um módulo de runtime importar arquivo de teste.

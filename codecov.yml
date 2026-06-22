@@ -1,0 +1,31 @@
+# Codecov configuration — Aprender Sistema
+#
+# Coverage analytics aqui sao INFORMATIONAL ONLY. O gate de cobertura
+# autoritativo (>= 85%) e enforcado no CI pelo job `[required] backend tests`
+# (passo coverage combine em .github/workflows/ci.yaml). O Codecov NUNCA bloqueia
+# um PR neste repo — ele fornece feedback de patch/diff e tendencias, nada mais.
+#
+# Fluxo completo do CI: v2/docs/specs/infra/ci.spec.md
+
+coverage:
+  status:
+    project:
+      default:
+        target: 85%          # espelha o gate real do CI
+        informational: true  # nunca bloqueia o PR (o gate vive no CI)
+    patch:
+      default:
+        informational: true  # feedback de cobertura do diff, sem bloquear
+
+comment:
+  layout: "diff, flags, files"
+  require_changes: false     # comenta sempre que houver upload (visibilidade do patch)
+
+# Apenas o backend sobe cobertura (flag "backend" em ci.yaml). carryforward
+# evita que um PR sem impacto em backend (backend-tests pulado) apareca como
+# queda de cobertura — o Codecov reaproveita o ultimo upload conhecido.
+flags:
+  backend:
+    paths:
+      - v2/backend/
+    carryforward: true

@@ -17,14 +17,21 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AvailabilityBlock, Municipio, Solicitacao, TipoEvento, Usuario
+from apps.core.models import AvailabilityBlock
 from apps.core.services.availability_service import check_conflicts
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.fixture
 def usuario_test(db):
     """Cria um usuário de teste"""
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username="testuser",
         email="testuser@example.com",
         password="testpass123",
@@ -35,19 +42,19 @@ def usuario_test(db):
 @pytest.fixture
 def tipo_evento_test(db):
     """Cria um tipo de evento de teste"""
-    return TipoEvento.objects.create(nome="Formação Teste", descricao="Teste")
+    return TipoEventoFactory(nome="Formação Teste", descricao="Teste")
 
 
 @pytest.fixture
 def municipio_a(db):
     """Município A (Fortaleza)"""
-    return Municipio.objects.create(nome="Fortaleza", uf="CE")
+    return MunicipioFactory(nome="Fortaleza", uf="CE")
 
 
 @pytest.fixture
 def municipio_b(db):
     """Município B (Caucaia)"""
-    return Municipio.objects.create(nome="Caucaia", uf="CE")
+    return MunicipioFactory(nome="Caucaia", uf="CE")
 
 
 @pytest.mark.django_db
@@ -64,7 +71,7 @@ class TestAvailabilityServiceRules:
         now = timezone.now().replace(hour=10, minute=0, second=0, microsecond=0)
 
         # Criar evento aprovado existente
-        Solicitacao.objects.create(
+        SolicitacaoFactory(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_a,
@@ -92,7 +99,7 @@ class TestAvailabilityServiceRules:
         """
         now = timezone.now().replace(hour=10, minute=0, second=0, microsecond=0)
 
-        Solicitacao.objects.create(
+        SolicitacaoFactory(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_a,
@@ -119,7 +126,7 @@ class TestAvailabilityServiceRules:
         """
         now = timezone.now().replace(hour=10, minute=0, second=0, microsecond=0)
 
-        Solicitacao.objects.create(
+        SolicitacaoFactory(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_a,
@@ -213,7 +220,7 @@ class TestAvailabilityServiceRules:
         now = timezone.now().replace(hour=8, minute=0, second=0, microsecond=0)
 
         # Evento aprovado em Município A
-        Solicitacao.objects.create(
+        SolicitacaoFactory(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_a,
@@ -243,7 +250,7 @@ class TestAvailabilityServiceRules:
         """
         now = timezone.now().replace(hour=8, minute=0, second=0, microsecond=0)
 
-        Solicitacao.objects.create(
+        SolicitacaoFactory(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_a,
@@ -271,7 +278,7 @@ class TestAvailabilityServiceRules:
         now = timezone.now().replace(hour=8, minute=0, second=0, microsecond=0)
 
         # Criar evento de 7h já aprovado
-        Solicitacao.objects.create(
+        SolicitacaoFactory(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_a,
@@ -348,7 +355,7 @@ class TestAvailabilityServiceRules:
 
         # Criar evento aprovado às 23:30 Fortaleza
         # (persistido só pelo side effect — check_conflicts vai buscar no DB)
-        Solicitacao.objects.create(
+        SolicitacaoFactory(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_a,
@@ -398,10 +405,8 @@ class TestAvailabilityCheckEndpoint:
         Para chamar endpoint com sucesso (200), usuário deve ter permissão.
         Adiciona usuário ao grupo Controle para passar RBAC (403→200).
         """
-        from django.contrib.auth.models import Group
-
         # Dar permissão ao usuário (evitar 403)
-        grupo_controle, _ = Group.objects.get_or_create(name="Controle")
+        grupo_controle = GroupFactory(name="Controle")
         usuario_test.groups.add(grupo_controle)
 
         client = APIClient()
@@ -410,7 +415,7 @@ class TestAvailabilityCheckEndpoint:
         now = timezone.now().replace(hour=14, minute=0, second=0, microsecond=0)
 
         # Criar evento aprovado
-        Solicitacao.objects.create(
+        SolicitacaoFactory(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_a,
@@ -471,10 +476,8 @@ class TestAvailabilityCheckEndpoint:
         Para validar parâmetros (400), usuário deve ter permissão.
         Adiciona usuário ao grupo Controle para passar RBAC (403→400).
         """
-        from django.contrib.auth.models import Group
-
         # Dar permissão ao usuário (evitar 403 antes de validar parâmetros)
-        grupo_controle, _ = Group.objects.get_or_create(name="Controle")
+        grupo_controle = GroupFactory(name="Controle")
         usuario_test.groups.add(grupo_controle)
 
         client = APIClient()
@@ -500,10 +503,8 @@ class TestAvailabilityCheckEndpoint:
         Para validar parâmetros (400), usuário deve ter permissão.
         Adiciona usuário ao grupo Controle para passar RBAC (403→400).
         """
-        from django.contrib.auth.models import Group
-
         # Dar permissão ao usuário (evitar 403 antes de validar parâmetros)
-        grupo_controle, _ = Group.objects.get_or_create(name="Controle")
+        grupo_controle = GroupFactory(name="Controle")
         usuario_test.groups.add(grupo_controle)
 
         client = APIClient()
@@ -532,14 +533,12 @@ class TestAvailabilityCheckEndpoint:
         Coordenador/Apoio Coord têm `view_all_availability`. Superintendência
         deixou de ter (Diretoria assumiu dashboards executivos).
         """
-        from django.contrib.auth.models import Group
-
         # Tornar usuario_test privilegiado (grupo Controle tem view_all_availability)
-        grupo_controle, _ = Group.objects.get_or_create(name="Controle")
+        grupo_controle = GroupFactory(name="Controle")
         usuario_test.groups.add(grupo_controle)
 
         # Criar segundo usuário
-        usuario_2 = Usuario.objects.create_user(
+        usuario_2 = UsuarioFactory(
             username="user2",
             email="user2@example.com",
             password="pass",
@@ -552,7 +551,7 @@ class TestAvailabilityCheckEndpoint:
         now = timezone.now().replace(hour=14, minute=0, second=0, microsecond=0)
 
         # Criar conflito apenas para usuario_test
-        Solicitacao.objects.create(
+        SolicitacaoFactory(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_a,
@@ -589,7 +588,7 @@ class TestAvailabilityCheckEndpoint:
         Valida 403 RBAC quando usuário sem permissão tenta checar outro usuário.
         """
         # Criar segundo usuário (não privilegiado)
-        outro_usuario = Usuario.objects.create_user(
+        outro_usuario = UsuarioFactory(
             username="outro",
             email="outro@example.com",
             password="pass",
@@ -628,7 +627,7 @@ class TestAvailabilityServiceAdditional:
         Se qualquer formador tiver conflito, a solicitação não deve prosseguir.
         """
         # Criar segundo formador
-        formador_2 = Usuario.objects.create_user(
+        formador_2 = UsuarioFactory(
             username="formador2",
             email="formador2@example.com",
             password="pass",
@@ -638,7 +637,7 @@ class TestAvailabilityServiceAdditional:
         now = timezone.now().replace(hour=10, minute=0, second=0, microsecond=0)
 
         # Criar evento aprovado apenas para formador_2
-        Solicitacao.objects.create(
+        SolicitacaoFactory(
             usuario=formador_2,
             tipo_evento=tipo_evento_test,
             municipio=municipio_a,
@@ -675,7 +674,7 @@ class TestAvailabilityServiceAdditional:
         now = timezone.now().replace(hour=14, minute=0, second=0, microsecond=0)
 
         # Criar evento aprovado
-        Solicitacao.objects.create(
+        SolicitacaoFactory(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_a,

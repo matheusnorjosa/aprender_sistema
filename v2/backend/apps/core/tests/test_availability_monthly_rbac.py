@@ -23,7 +23,6 @@ view_all_availability é atribuído a Controle/Gerente/Coord/Apoio por design).
 
 from __future__ import annotations
 
-from django.contrib.auth.models import Group
 from django.core.cache import cache
 from django.core.management import call_command
 from rest_framework.test import APIClient
@@ -31,6 +30,7 @@ from rest_framework.test import APIClient
 import pytest
 
 from apps.core.models import EquipeGerencia, Gerencia, PermissaoFuncional, Usuario
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -50,14 +50,14 @@ def _make_user_with_groups_and_caps(username: str, group_names: list[str], capab
     ligada a pelo menos um desses grupos. Espelha o cenário de produção onde
     o seed 0077 atribuiu `view_all_availability` ao grupo Controle.
     """
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=username,
         email=f"{username}@example.com",
         password="testpass123",
         cpf=_next_cpf(),
     )
     for gname in group_names:
-        group, _ = Group.objects.get_or_create(name=gname)
+        group = GroupFactory(name=gname)
         user.groups.add(group)
         for code in capability_codenames:
             perm = PermissaoFuncional.objects.filter(codename=code).first()
@@ -385,12 +385,7 @@ class TestSanity:
         assert res.status_code in (401, 403)
 
     def test_superuser_returns_200(self):
-        super_user = Usuario.objects.create_superuser(
-            username="super_test_monthly",
-            email="super_test_monthly@example.com",
-            password="testpass123",
-            cpf="99900099997",
-        )
+        super_user = UsuarioFactory(superuser=True)
         client = APIClient()
         client.force_authenticate(user=super_user)
         res = client.get(URL + QS)

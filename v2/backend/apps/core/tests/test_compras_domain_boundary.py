@@ -8,12 +8,17 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from django.contrib.auth.models import Group
 from rest_framework.test import APIClient
 
 import pytest
 
 from apps.core.models import Compra, DATCompra, Municipio, Projeto, Usuario
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    UsuarioFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -25,28 +30,28 @@ def api_client() -> APIClient:
 
 @pytest.fixture
 def controle_user() -> Usuario:
-    user = Usuario.objects.create_user(username="controle_boundary", password="test123", cpf="20000000001")
-    group, _ = Group.objects.get_or_create(name="Controle")
+    user = UsuarioFactory(username="controle_boundary", password="test123", cpf="20000000001")
+    group = GroupFactory(name="Controle")
     user.groups.add(group)
     return user
 
 
 @pytest.fixture
 def dat_user() -> Usuario:
-    user = Usuario.objects.create_user(username="dat_boundary", password="test123", cpf="20000000002")
-    group, _ = Group.objects.get_or_create(name="DAT")
+    user = UsuarioFactory(username="dat_boundary", password="test123", cpf="20000000002")
+    group = GroupFactory(name="DAT")
     user.groups.add(group)
     return user
 
 
 @pytest.fixture
 def municipio() -> Municipio:
-    return Municipio.objects.create(nome="Fortaleza", uf="CE")
+    return MunicipioFactory(nome="Fortaleza", uf="CE")
 
 
 @pytest.fixture
 def projeto() -> Projeto:
-    return Projeto.objects.create(nome="Projeto Fronteira")
+    return ProjetoFactory(nome="Projeto Fronteira")
 
 
 @pytest.fixture

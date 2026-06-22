@@ -32,7 +32,7 @@ import factory
 from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 
 
-class GroupFactory(factory.django.DjangoModelFactory):
+class GroupFactory(factory.django.DjangoModelFactory[Group]):
     """Grupo RBAC. `django_get_or_create` evita duplicar grupos base do seed."""
 
     class Meta:
@@ -42,7 +42,7 @@ class GroupFactory(factory.django.DjangoModelFactory):
     name = "Coordenador"
 
 
-class UsuarioFactory(factory.django.DjangoModelFactory):
+class UsuarioFactory(factory.django.DjangoModelFactory[Usuario]):
     """Usuário de teste com CPF/username/email únicos e determinísticos."""
 
     class Meta:
@@ -82,7 +82,7 @@ class UsuarioFactory(factory.django.DjangoModelFactory):
             self.groups.add(group)
 
 
-class MunicipioFactory(factory.django.DjangoModelFactory):
+class MunicipioFactory(factory.django.DjangoModelFactory[Municipio]):
     """Município com nome único (constraint unique nome+uf)."""
 
     class Meta:
@@ -93,7 +93,7 @@ class MunicipioFactory(factory.django.DjangoModelFactory):
     ativo = True
 
 
-class ProjetoFactory(factory.django.DjangoModelFactory):
+class ProjetoFactory(factory.django.DjangoModelFactory[Projeto]):
     """Projeto NAO_SUPER por padrão; `ProjetoFactory(super=True)` → fluxo SUPER."""
 
     class Meta:
@@ -107,7 +107,7 @@ class ProjetoFactory(factory.django.DjangoModelFactory):
         super = factory.Trait(fluxo="SUPER")
 
 
-class TipoEventoFactory(factory.django.DjangoModelFactory):
+class TipoEventoFactory(factory.django.DjangoModelFactory[TipoEvento]):
     """Tipo de evento. `django_get_or_create` espelha o get_or_create(nome=...)."""
 
     class Meta:
@@ -117,7 +117,7 @@ class TipoEventoFactory(factory.django.DjangoModelFactory):
     nome = "Formação"
 
 
-class SolicitacaoFactory(factory.django.DjangoModelFactory):
+class SolicitacaoFactory(factory.django.DjangoModelFactory[Solicitacao]):
     """
     Solicitação pendente por padrão (PA-01: a auto-aprovação NAO_SUPER vive na
     camada serializer/view, não no model — criar via ORM mantém `pendente`).

@@ -13,22 +13,19 @@ Session keep-alive functionality:
 from __future__ import annotations
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.test import APIClient
 
 import pytest
 
-Usuario = get_user_model()
+from apps.core.tests.factories import UsuarioFactory
 
 
 @pytest.fixture
 def authenticated_client(db):
     """Client with authenticated user."""
     client = APIClient()
-    user = Usuario.objects.create_user(
-        username="testuser", password="testpass123", email="test@example.com", cpf="12345678901"
-    )
+    user = UsuarioFactory(username="testuser", password="testpass123", email="test@example.com", cpf="12345678901")
     client.force_authenticate(user=user)
     return client, user
 

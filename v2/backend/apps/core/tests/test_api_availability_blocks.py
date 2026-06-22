@@ -18,23 +18,22 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AvailabilityBlock, Usuario
+from apps.core.models import AvailabilityBlock
 from apps.core.tests.conftest import get_field_errors
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 
 @pytest.fixture
 def user_test(db):
     """Issue #1222 (Epic 1): user adicionado ao Controle (que tem
     `view_all_availability`) para criar/CRUD bloqueios via /api/availability-blocks/."""
-    from django.contrib.auth.models import Group
-
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="testuser",
         email="testuser@example.com",
         password="testpass123",
         cpf="12345678901",
     )
-    grupo_controle, _ = Group.objects.get_or_create(name="Controle")
+    grupo_controle = GroupFactory(name="Controle")
     user.groups.add(grupo_controle)
     return user
 
@@ -42,7 +41,7 @@ def user_test(db):
 @pytest.fixture
 def another_user(db):
     """Cria um segundo usuário de teste"""
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username="anotheruser",
         email="another@example.com",
         password="testpass456",

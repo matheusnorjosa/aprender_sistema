@@ -19,7 +19,13 @@ from datetime import timedelta
 from django.test import TestCase
 from django.utils import timezone
 
-from apps.core.models import AvailabilityBlock, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import AvailabilityBlock, Solicitacao
+from apps.core.tests.factories import (
+    MunicipioFactory,
+    ProjetoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 class TestAvailabilityBlockAutoApproval(TestCase):
@@ -27,7 +33,7 @@ class TestAvailabilityBlockAutoApproval(TestCase):
 
     def setUp(self) -> None:
         """Create test fixtures."""
-        self.formador = Usuario.objects.create_user(
+        self.formador = UsuarioFactory(
             username="formador_block_test",
             email="formador_block@test.com",
             password="testpass123",
@@ -93,9 +99,9 @@ class TestAvailabilityBlockAutoApproval(TestCase):
         - Solicitacao SUPER: Requer aprovação gerencial (PA-01 a PA-07)
         - AvailabilityBlock: Informação factual do formador, não precisa aprovação
         """
-        projeto_super = Projeto.objects.create(nome="Test SUPER Project", fluxo="SUPER")
-        municipio = Municipio.objects.create(nome="Test City Block", uf="CE")
-        tipo_evento = TipoEvento.objects.create(nome="Formação Block Test")
+        projeto_super = ProjetoFactory(nome="Test SUPER Project", fluxo="SUPER")
+        municipio = MunicipioFactory(nome="Test City Block", uf="CE")
+        tipo_evento = TipoEventoFactory(nome="Formação Block Test")
 
         inicio = timezone.now() + timedelta(days=4)
         fim = inicio + timedelta(hours=4)

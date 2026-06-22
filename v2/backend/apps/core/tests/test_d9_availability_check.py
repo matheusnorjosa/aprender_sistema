@@ -4,15 +4,14 @@
 
 from __future__ import annotations
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.core.cache import cache
 from django.core.management import call_command
 from rest_framework.test import APIClient
 
 import pytest
 
-User = get_user_model()
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
+
 pytestmark = pytest.mark.django_db
 
 
@@ -35,9 +34,9 @@ def _next_cpf():
 def _make_user_with_caps(username, group_names, cap_codenames):
     from apps.core.models import PermissaoFuncional
 
-    user = User.objects.create_user(username=username, email=f"{username}@t.com", password="x", cpf=_next_cpf())
+    user = UsuarioFactory(username=username, email=f"{username}@t.com", password="x", cpf=_next_cpf())
     for gn in group_names:
-        g, _ = Group.objects.get_or_create(name=gn)
+        g = GroupFactory(name=gn)
         user.groups.add(g)
         for code in cap_codenames:
             p = PermissaoFuncional.objects.filter(codename=code).first()
@@ -47,7 +46,7 @@ def _make_user_with_caps(username, group_names, cap_codenames):
 
 
 def _make_target():
-    return User.objects.create_user(
+    return UsuarioFactory(
         username=f"target_{_cpf_counter[0]}", email=f"t{_cpf_counter[0]}@t.com", password="x", cpf=_next_cpf()
     )
 

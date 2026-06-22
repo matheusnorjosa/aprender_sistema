@@ -12,12 +12,12 @@ Security tests added for Issue #561 (C-04):
 
 from __future__ import annotations
 
-from django.contrib.auth.models import Group
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import PermissaoFuncional, Usuario
+from apps.core.models import PermissaoFuncional
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 
 @pytest.fixture
@@ -29,13 +29,13 @@ def api_client():
 @pytest.fixture
 def usuario_dat(db):
     """Usuário com permissão DAT."""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="dat_user",
         email="dat@example.com",
         password="testpass123",
         cpf="11111111111",
     )
-    grupo_dat, _ = Group.objects.get_or_create(name="DAT")
+    grupo_dat = GroupFactory(name="DAT")
     user.groups.add(grupo_dat)
     return user
 
@@ -43,7 +43,7 @@ def usuario_dat(db):
 @pytest.fixture
 def usuario_formador(db):
     """Usuário formador sem grupos."""
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username="formador1",
         email="formador1@example.com",
         password="testpass123",
@@ -54,7 +54,7 @@ def usuario_formador(db):
 @pytest.fixture
 def usuario_comum(db):
     """Usuário sem permissão DAT."""
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username="comum",
         email="comum@example.com",
         password="testpass123",
@@ -69,8 +69,8 @@ class TestAssignGroups:
     def test_assign_groups_success(self, api_client, usuario_dat, usuario_formador):
         """Deve atribuir grupos com sucesso (200)."""
         # Criar grupos
-        grupo1, _ = Group.objects.get_or_create(name="Formador")
-        grupo2, _ = Group.objects.get_or_create(name="Coordenador")
+        grupo1 = GroupFactory(name="Formador")
+        grupo2 = GroupFactory(name="Coordenador")
 
         # Login como DAT
         api_client.force_authenticate(usuario_dat)
@@ -95,7 +95,7 @@ class TestAssignGroups:
 
     def test_assign_groups_nonexistent_group(self, api_client, usuario_dat, usuario_formador):
         """Deve retornar 400 quando grupo não existe."""
-        grupo1, _ = Group.objects.get_or_create(name="Formador")
+        grupo1 = GroupFactory(name="Formador")
 
         api_client.force_authenticate(usuario_dat)
 
@@ -114,7 +114,7 @@ class TestAssignGroups:
     def test_assign_groups_empty_list(self, api_client, usuario_dat, usuario_formador):
         """Deve remover todos os grupos quando lista vazia (200)."""
         # Adicionar grupo inicial
-        grupo1, _ = Group.objects.get_or_create(name="Formador")
+        grupo1 = GroupFactory(name="Formador")
         usuario_formador.groups.add(grupo1)
         assert usuario_formador.groups.count() == 1
 
@@ -135,7 +135,7 @@ class TestAssignGroups:
 
     def test_assign_groups_duplicates(self, api_client, usuario_dat, usuario_formador):
         """Deve ignorar IDs duplicados e atribuir apenas uma vez."""
-        grupo1, _ = Group.objects.get_or_create(name="Formador")
+        grupo1 = GroupFactory(name="Formador")
 
         api_client.force_authenticate(usuario_dat)
 
@@ -155,7 +155,7 @@ class TestAssignGroups:
 
     def test_assign_groups_permission_denied(self, api_client, usuario_comum, usuario_formador):
         """Deve retornar 403 quando usuário não tem permissão DAT."""
-        grupo1, _ = Group.objects.get_or_create(name="Formador")
+        grupo1 = GroupFactory(name="Formador")
 
         # Login como usuário comum (sem DAT)
         api_client.force_authenticate(usuario_comum)
@@ -199,9 +199,9 @@ class TestAssignGroups:
         (função canônica pós-realign).
         """
         # Configurar grupos iniciais
-        grupo1, _ = Group.objects.get_or_create(name="Formador")
-        grupo2, _ = Group.objects.get_or_create(name="Coordenador")
-        grupo3, _ = Group.objects.get_or_create(name="Gerente")
+        grupo1 = GroupFactory(name="Formador")
+        grupo2 = GroupFactory(name="Coordenador")
+        grupo3 = GroupFactory(name="Gerente")
 
         usuario_formador.groups.set([grupo1, grupo2])
         assert usuario_formador.groups.count() == 2
@@ -234,7 +234,7 @@ class TestAssignGroups:
         mesmo que tenham permissão DAT.
         """
         # Criar grupo válido da whitelist
-        grupo_formador, _ = Group.objects.get_or_create(name="Formador")
+        grupo_formador = GroupFactory(name="Formador")
 
         api_client.force_authenticate(usuario_dat)
 
@@ -255,7 +255,7 @@ class TestAssignGroups:
         Security: Apenas grupos em ALLOWED_USER_GROUPS podem ser atribuídos.
         """
         # Criar grupo que NÃO está na whitelist
-        grupo_invalido, _ = Group.objects.get_or_create(name="GrupoInvalido")
+        grupo_invalido = GroupFactory(name="GrupoInvalido")
 
         api_client.force_authenticate(usuario_dat)
 
@@ -276,8 +276,8 @@ class TestAssignGroups:
         Valida que grupos como 'Formador', 'Coordenador', 'DAT' funcionam.
         """
         # Criar grupos válidos da whitelist
-        grupo_formador, _ = Group.objects.get_or_create(name="Formador")
-        grupo_coordenador, _ = Group.objects.get_or_create(name="Coordenador")
+        grupo_formador = GroupFactory(name="Formador")
+        grupo_coordenador = GroupFactory(name="Coordenador")
 
         api_client.force_authenticate(usuario_dat)
 
@@ -303,8 +303,8 @@ class TestAssignGroups:
         toda a operação deve falhar.
         """
         # Criar um grupo válido e um inválido
-        grupo_formador, _ = Group.objects.get_or_create(name="Formador")
-        grupo_invalido, _ = Group.objects.get_or_create(name="GrupoHacker")
+        grupo_formador = GroupFactory(name="Formador")
+        grupo_invalido = GroupFactory(name="GrupoHacker")
 
         api_client.force_authenticate(usuario_dat)
 
@@ -328,7 +328,7 @@ class TestAssignGroups:
         #832 - Grupo fora do fallback estatico deve ser permitido se tiver permissao funcional vinculada.
         """
 
-        grupo_dinamico, _ = Group.objects.get_or_create(name="GrupoDinamicoRBAC")
+        grupo_dinamico = GroupFactory(name="GrupoDinamicoRBAC")
         permissao, _ = PermissaoFuncional.objects.get_or_create(
             codename="pode_operar_grupo_dinamico",
             defaults={

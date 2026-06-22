@@ -27,7 +27,6 @@ from __future__ import annotations
 from datetime import timedelta
 from unittest.mock import patch
 
-from django.contrib.auth.models import Group
 from django.test import override_settings
 from django.utils import timezone
 from rest_framework import status as http_status
@@ -35,8 +34,16 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import GoogleOAuthCredential, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import GoogleOAuthCredential, Solicitacao
 from apps.core.services.google_oauth import _encrypt_token
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 # ============================================================================
 # FIXTURES
@@ -52,8 +59,8 @@ def api_client():
 @pytest.fixture
 def usuario_controle(db):
     """Cria usuário do grupo Controle"""
-    controle_group, _ = Group.objects.get_or_create(name="Controle")
-    user = Usuario.objects.create_user(
+    controle_group = GroupFactory(name="Controle")
+    user = UsuarioFactory(
         username="controle_batch_test",
         email="controle@aprendereditora.com.br",
         password="testpass123",
@@ -66,8 +73,8 @@ def usuario_controle(db):
 @pytest.fixture
 def usuario_coordenador(db):
     """Cria usuário do grupo Coordenador (sem permissão para batch)"""
-    coord_group, _ = Group.objects.get_or_create(name="Coordenador")
-    user = Usuario.objects.create_user(
+    coord_group = GroupFactory(name="Coordenador")
+    user = UsuarioFactory(
         username="coord_batch_test",
         email="coord@example.com",
         password="testpass123",
@@ -80,15 +87,15 @@ def usuario_coordenador(db):
 @pytest.fixture
 def setup_solicitacoes(usuario_controle):
     """Cria 3 solicitações aprovadas para testes de batch"""
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="Projeto Batch Test", codigo="PBT", fluxo="SUPER", ativo=True)
-    tipo_evento = TipoEvento.objects.create(nome="Formação Batch Test")
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="Projeto Batch Test", codigo="PBT", fluxo="SUPER", ativo=True)
+    tipo_evento = TipoEventoFactory(nome="Formação Batch Test")
 
     now = timezone.now()
     solicitacoes = []
 
     for i in range(3):
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_controle,
             municipio=municipio,
             projeto=projeto,

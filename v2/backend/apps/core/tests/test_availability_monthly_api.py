@@ -21,7 +21,14 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AvailabilityBlock, Municipio, Participation, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import AvailabilityBlock, Participation
+from apps.core.tests.factories import (
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -42,14 +49,7 @@ def user_auth():
     `view_all_availability` OU `EquipeGerencia` ativa quando `gerencia_id`
     é omitido. Superuser bypassa, mantendo o foco do test.
     """
-    user = Usuario.objects.create_superuser(
-        username="api_user",
-        email="api@example.com",
-        password="test123",
-        cpf="99999999999",
-        first_name="API",
-        last_name="User",
-    )
+    user = UsuarioFactory(superuser=True)
     return user
 
 
@@ -74,7 +74,7 @@ def setup_data():
     tz = timezone.get_current_timezone()
 
     # Usuários
-    ana = Usuario.objects.create_user(
+    ana = UsuarioFactory(
         username="ana",
         email="ana@example.com",
         password="test123",
@@ -82,7 +82,7 @@ def setup_data():
         first_name="Ana",
         last_name="Silva",
     )
-    bruno = Usuario.objects.create_user(
+    bruno = UsuarioFactory(
         username="bruno",
         email="bruno@example.com",
         password="test123",
@@ -92,13 +92,13 @@ def setup_data():
     )
 
     # Dependências
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="Gestão Escolar", ativo=True)
-    tipo_evento = TipoEvento.objects.create(nome="Formação")
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="Gestão Escolar", ativo=True)
+    tipo_evento = TipoEventoFactory(nome="Formação")
 
     # Eventos aprovados
     # 2025-10-03 (Ana, 4h)
-    sol1 = Solicitacao.objects.create(
+    sol1 = SolicitacaoFactory(
         usuario=ana,
         municipio=municipio,
         projeto=projeto,
@@ -110,7 +110,7 @@ def setup_data():
     Participation.objects.get_or_create(solicitacao=sol1, usuario=ana, role="FORMADOR")
 
     # 2025-10-08 08:00-10:00 (Ana, 2h)
-    sol2 = Solicitacao.objects.create(
+    sol2 = SolicitacaoFactory(
         usuario=ana,
         municipio=municipio,
         projeto=projeto,
@@ -122,7 +122,7 @@ def setup_data():
     Participation.objects.get_or_create(solicitacao=sol2, usuario=ana, role="FORMADOR")
 
     # 2025-10-08 14:00-16:00 (Ana, 2h)
-    sol3 = Solicitacao.objects.create(
+    sol3 = SolicitacaoFactory(
         usuario=ana,
         municipio=municipio,
         projeto=projeto,
@@ -134,7 +134,7 @@ def setup_data():
     Participation.objects.get_or_create(solicitacao=sol3, usuario=ana, role="FORMADOR")
 
     # 2025-10-01 (Bruno, 4h)
-    sol4 = Solicitacao.objects.create(
+    sol4 = SolicitacaoFactory(
         usuario=bruno,
         municipio=municipio,
         projeto=projeto,
@@ -146,7 +146,7 @@ def setup_data():
     Participation.objects.get_or_create(solicitacao=sol4, usuario=bruno, role="FORMADOR")
 
     # 2025-10-20 08:00-12:00 (Ana, 4h) - para gerar X
-    sol5 = Solicitacao.objects.create(
+    sol5 = SolicitacaoFactory(
         usuario=ana,
         municipio=municipio,
         projeto=projeto,

@@ -14,12 +14,18 @@ import statistics
 import time
 from typing import TYPE_CHECKING
 
-from django.contrib.auth.models import Group
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Gerencia, Municipio, Projeto, TipoEvento, Usuario
+from apps.core.models import Gerencia
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -92,7 +98,7 @@ def measure_latency(
 @pytest.fixture
 def authenticated_client(db) -> APIClient:
     """Create an authenticated API client."""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="perf_test_user",
         email="perf@test.com",
         password="test123",
@@ -106,11 +112,11 @@ def authenticated_client(db) -> APIClient:
 @pytest.fixture
 def setup_minimal_data(db) -> None:
     """Create minimal data for performance tests."""
-    Municipio.objects.get_or_create(nome="Fortaleza", defaults={"uf": "CE", "ativo": True})
+    MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
     Gerencia.objects.get_or_create(nome="SUPERINTENDENCIA", defaults={"nome_setor": "Super"})
-    Projeto.objects.get_or_create(nome="Teste Perf", defaults={"ativo": True, "fluxo": "SUPER"})
-    TipoEvento.objects.get_or_create(nome="Formação")
-    Group.objects.get_or_create(name="Formador")
+    ProjetoFactory(nome="Teste Perf", ativo=True, fluxo="SUPER")
+    TipoEventoFactory(nome="Formação")
+    GroupFactory(name="Formador")
 
 
 class TestHealthzLatency:

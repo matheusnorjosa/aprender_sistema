@@ -19,23 +19,23 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from django.contrib.auth.models import Group
 from rest_framework import status
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AuditLog, Deslocamento, Usuario
+from apps.core.models import AuditLog, Deslocamento
 from apps.core.tests.conftest import get_field_errors
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 
 @pytest.fixture
 def grupos(db):
     """Create necessary groups."""
-    controle, _ = Group.objects.get_or_create(name="Controle")
-    dat, _ = Group.objects.get_or_create(name="DAT")
-    coordenador, _ = Group.objects.get_or_create(name="Coordenador")
-    formador, _ = Group.objects.get_or_create(name="Formador")
+    controle = GroupFactory(name="Controle")
+    dat = GroupFactory(name="DAT")
+    coordenador = GroupFactory(name="Coordenador")
+    formador = GroupFactory(name="Formador")
     return {
         "controle": controle,
         "dat": dat,
@@ -47,7 +47,7 @@ def grupos(db):
 @pytest.fixture
 def user_controle(db, grupos):
     """User with Controle permission."""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="controle1", email="controle1@example.com", password="testpass123", cpf="12345678901"
     )
     user.groups.add(grupos["controle"])
@@ -57,9 +57,7 @@ def user_controle(db, grupos):
 @pytest.fixture
 def user_dat(db, grupos):
     """User with DAT permission."""
-    user = Usuario.objects.create_user(
-        username="dat1", email="dat1@example.com", password="testpass123", cpf="98765432109"
-    )
+    user = UsuarioFactory(username="dat1", email="dat1@example.com", password="testpass123", cpf="98765432109")
     user.groups.add(grupos["dat"])
     return user
 
@@ -67,7 +65,7 @@ def user_dat(db, grupos):
 @pytest.fixture
 def user_formador(db, grupos):
     """User with Formador permission (no access to Deslocamentos)."""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="formador1",
         email="formador1@example.com",
         password="testpass123",

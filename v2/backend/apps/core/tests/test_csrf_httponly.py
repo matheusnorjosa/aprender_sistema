@@ -20,7 +20,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Usuario
+from apps.core.tests.factories import UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -57,7 +57,7 @@ def clear_throttle_cache():
 @pytest.fixture
 def usuario_teste():
     """Usuário válido para testes de autenticação."""
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username="csrf_test_user",
         email="csrf@test.com",
         password="testpass123",

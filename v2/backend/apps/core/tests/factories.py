@@ -61,6 +61,18 @@ class UsuarioFactory(factory.django.DjangoModelFactory):
         superuser = factory.Trait(is_staff=True, is_superuser=True)
 
     @factory.post_generation
+    def password(self, create: bool, extracted, **kwargs):  # noqa: ANN001
+        """
+        Senha hasheada via set_password (default "testpass123"). Torna a factory
+        drop-in para create_user/create_superuser inclusive em testes que
+        autenticam por senha: UsuarioFactory(password="x") loga com "x".
+        """
+        if not create:
+            return
+        self.set_password(extracted if extracted else "testpass123")
+        self.save()
+
+    @factory.post_generation
     def groups(self, create: bool, extracted, **kwargs):  # noqa: ANN001
         """UsuarioFactory(groups=["Coordenador", "DAT"]) anexa aos grupos."""
         if not create or not extracted:

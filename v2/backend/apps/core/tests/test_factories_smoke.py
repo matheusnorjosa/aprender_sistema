@@ -40,6 +40,15 @@ def test_usuario_factory_superuser_trait_and_groups():
     assert set(user.groups.values_list("name", flat=True)) == {"Coordenador", "DAT"}
 
 
+def test_usuario_factory_password_is_hashed_and_authenticates():
+    # default
+    assert UsuarioFactory().check_password("testpass123")
+    # override (drop-in para create_user(password=...) em testes de login)
+    u = UsuarioFactory(password="s3cr3t")
+    assert u.check_password("s3cr3t")
+    assert u.password != "s3cr3t"  # hasheada, não raw
+
+
 def test_municipio_factory_unique():
     m1 = MunicipioFactory()
     m2 = MunicipioFactory()

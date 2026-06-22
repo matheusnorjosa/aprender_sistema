@@ -1,9 +1,10 @@
 ---
 title: CI/CD (GitHub Actions)
 status: canonical
-last_verified: 2026-06-19
+last_verified: 2026-06-22
 sources_of_truth:
   - .github/workflows/ci.yaml
+  - codecov.yml
   - .github/workflows/deploy.yaml
   - .github/workflows/_backend-test.yml
   - .github/workflows/backend-xdist-canary.yml
@@ -71,7 +72,7 @@ A nomenclatura dos checks é o contrato de governança: `[required]` bloqueia me
 1. `backend-impact` decide se a suíte backend roda (PR sem impacto em backend pula os jobs pesados; push/dispatch sempre full).
 2. `lint` + `rbac-lint` (rápidos, paralelos).
 3. `backend-tests-core` e `backend-tests-ingest-devtools` rodam via reusable com `-n auto --dist loadscope`, cada um emitindo um artifact de cobertura.
-4. `backend-tests` baixa os dois artifacts, faz `coverage combine`, exige ≥85% e sobe para o Codecov.
+4. `backend-tests` baixa os dois artifacts, faz `coverage combine`, **exige ≥85% (gate bloqueante)** e sobe a cobertura para o Codecov (analytics **informational**, não bloqueia PR — config em `codecov.yml`; upload só quando o secret `CODECOV_TOKEN` existe).
 5. `backend-typecheck` (pyright em `apps/core config`) e `docker-parity-backend` (smoke em imagem `Dockerfile.prod`) rodam em paralelo.
 6. `tests` agrega: verde só se todos passaram (ou todos `skipped` quando sem impacto).
 7. `frontend-ci` (react doctor + build/lint + checklist) e `staging-gate-audit` (evidência no corpo) completam o gate.

@@ -216,10 +216,16 @@ jobs:
     with:
       runner_timeout: 35
       pytest_paths: apps/core/tests
+      # run_migrations=false + --no-migrations: pytest-django cria o schema dos
+      # models (sem replay das 24 RunPython), cortando o setup de DB. Os seeds RBAC
+      # vem das fixtures de sessao/funcao (ensure_base_groups + seed_functional_
+      # permissions), nao das migrations. A cadeia RunPython e exercitada a parte no
+      # job backend-migrate-integrity (deploy-safe). #1404.
+      run_migrations: false
       # Paralelizacao xdist no gate (~15min->~5min). loadscope mantem testes da
       # mesma classe/modulo no mesmo worker. Habilitado apos #1402 estabilizar a
       # suite (re-seed RBAC pos-truncate; canary 0/4 em 2 runs consecutivos). #1403.
-      pytest_extra_args: -n auto --dist loadscope
+      pytest_extra_args: -n auto --dist loadscope --no-migrations
       coverage_file: .coverage.core
       validate_test_paths: true
       summary_title: Backend Core Tests Runtime
@@ -240,7 +246,8 @@ jobs:
     with:
       runner_timeout: 30
       pytest_paths: apps/dev_tools/tests
-      pytest_extra_args: -n auto --dist loadscope  # paralelizacao xdist. #1403.
+      run_migrations: false  # --no-migrations: schema dos models, sem replay das RunPython. #1404.
+      pytest_extra_args: -n auto --dist loadscope --no-migrations  # xdist #1403 + --no-migrations #1404.
       coverage_file: .coverage.ingest_devtools
       summary_title: Backend Ingest/DevTools Tests Runtime
       artifact_name: backend-coverage-ingest-devtools

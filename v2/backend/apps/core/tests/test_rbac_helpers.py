@@ -19,12 +19,13 @@ Ver v2/docs/plans/rbac-refactor/epic-3-hardcoded.md e master-plan §4.
 
 from __future__ import annotations
 
-from django.contrib.auth.models import AnonymousUser, Group
+from django.contrib.auth.models import AnonymousUser
 
 import pytest
 
-from apps.core.models import PermissaoFuncional, Usuario
+from apps.core.models import PermissaoFuncional
 from apps.core.rbac_helpers import user_has_all_perms, user_has_any_perm
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -64,21 +65,21 @@ def perm_b():
 
 @pytest.fixture
 def group_with_a(perm_a):
-    group, _ = Group.objects.get_or_create(name="TestGroupA")
+    group = GroupFactory(name="TestGroupA")
     perm_a.groups.add(group)
     return group
 
 
 @pytest.fixture
 def group_with_b(perm_b):
-    group, _ = Group.objects.get_or_create(name="TestGroupB")
+    group = GroupFactory(name="TestGroupB")
     perm_b.groups.add(group)
     return group
 
 
 @pytest.fixture
 def user_with_a(group_with_a):
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="user_a",
         email="a@test.com",
         password="x",
@@ -90,7 +91,7 @@ def user_with_a(group_with_a):
 
 @pytest.fixture
 def user_with_a_and_b(group_with_a, group_with_b):
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="user_ab",
         email="ab@test.com",
         password="x",
@@ -102,7 +103,7 @@ def user_with_a_and_b(group_with_a, group_with_b):
 
 @pytest.fixture
 def user_empty():
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username="user_empty",
         email="empty@test.com",
         password="x",
@@ -112,12 +113,7 @@ def user_empty():
 
 @pytest.fixture
 def superuser():
-    return Usuario.objects.create_superuser(
-        username="su",
-        email="su@test.com",
-        password="x",
-        cpf="30000000004",
-    )
+    return UsuarioFactory(superuser=True)
 
 
 # ============================================================================

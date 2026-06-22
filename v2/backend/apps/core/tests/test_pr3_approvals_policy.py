@@ -26,13 +26,19 @@ from __future__ import annotations
 
 import itertools
 
-from django.contrib.auth.models import Group
 from django.urls import reverse
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import Solicitacao, Usuario
+from apps.core.tests.factories import (
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -42,24 +48,21 @@ _CPF_COUNTER = itertools.count(70000000000)
 
 def _user_in_groups(*group_names: str, label: str = "user") -> Usuario:
     cpf = str(next(_CPF_COUNTER)).zfill(11)
-    user = Usuario.objects.create_user(
+    return UsuarioFactory(
         username=f"{label}_{cpf}",
         email=f"{label}_{cpf}@example.com",
         password="testpass",
         cpf=cpf,
+        groups=list(group_names),
     )
-    for name in group_names:
-        group, _ = Group.objects.get_or_create(name=name)
-        user.groups.add(group)
-    return user
 
 
 @pytest.fixture
 def pendente_solicitacao() -> Solicitacao:
     """Cria uma Solicitação pendente que pode ser aprovada/reprovada."""
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="Projeto Aprov", codigo="APR", fluxo="SUPER", ativo=True)
-    tipo_evento = TipoEvento.objects.create(nome="Formação")
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="Projeto Aprov", codigo="APR", fluxo="SUPER", ativo=True)
+    tipo_evento = TipoEventoFactory(nome="Formação")
     requester = _user_in_groups("Coordenador", label="requester")
 
     from datetime import timedelta
@@ -69,7 +72,7 @@ def pendente_solicitacao() -> Solicitacao:
     inicio = timezone.now() + timedelta(days=2)
     fim = inicio + timedelta(hours=2)
 
-    return Solicitacao.objects.create(
+    return SolicitacaoFactory(
         projeto=projeto,
         municipio=municipio,
         tipo_evento=tipo_evento,
@@ -234,13 +237,7 @@ def test_forbidden_personas_get_403_on_batch_reject(persona, pendente_solicitaca
 
 
 def test_superuser_can_approve(pendente_solicitacao):
-    cpf = str(next(_CPF_COUNTER)).zfill(11)
-    user = Usuario.objects.create_superuser(
-        username=f"super_pr3_{cpf}",
-        email=f"super_pr3_{cpf}@example.com",
-        password="testpass",
-        cpf=cpf,
-    )
+    user = UsuarioFactory(superuser=True)
     client = APIClient()
     client.force_authenticate(user=user)
 

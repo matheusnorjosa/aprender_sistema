@@ -19,8 +19,6 @@ from __future__ import annotations
 from datetime import date, time, timedelta
 from decimal import Decimal
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
@@ -36,16 +34,16 @@ from apps.core.models import (
     DATCompra,
     DATCoordenador,
     DATFormacao,
-    Municipio,
-    Produto,
-    Projeto,
     ProjetoGeral,
-    Solicitacao,
-    TipoEvento,
 )
-
-User = get_user_model()
-
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 # ============================================================
 # Model Tests
@@ -79,9 +77,7 @@ class DATCoordenadorModelTests(TestCase):
         import uuid
 
         uid = uuid.uuid4().hex[:6]
-        cls.user = User.objects.create_user(
-            username=f"testuser_{uid}", password="test123", cpf=f"111{uid}11"  # 11 chars
-        )
+        cls.user = UsuarioFactory(username=f"testuser_{uid}", password="test123", cpf=f"111{uid}11")  # 11 chars
 
     def test_create_coordenador(self):
         """DATCoordenador should be created with correct fields."""
@@ -115,11 +111,9 @@ class DATAcaoModelTests(TestCase):
         import uuid
 
         uid = uuid.uuid4().hex[:5]
-        cls.user = User.objects.create_user(
-            username=f"testuser_acao_{uid}", password="test123", cpf=f"222{uid}222"  # 11 chars
-        )
-        cls.municipio = Municipio.objects.create(nome=f"Fortaleza_{uid}", uf="CE")
-        cls.projeto = Projeto.objects.create(nome=f"Projeto Teste_{uid}", codigo=f"PT{uid[:4]}", fluxo="NAO_SUPER")
+        cls.user = UsuarioFactory(username=f"testuser_acao_{uid}", password="test123", cpf=f"222{uid}222")  # 11 chars
+        cls.municipio = MunicipioFactory(nome=f"Fortaleza_{uid}", uf="CE")
+        cls.projeto = ProjetoFactory(nome=f"Projeto Teste_{uid}", codigo=f"PT{uid[:4]}", fluxo="NAO_SUPER")
         cls.coordenador = DATCoordenador.objects.create(nome="Coordenador Teste", area="DAT", created_by=cls.user)
 
     def test_create_acao(self):
@@ -190,13 +184,9 @@ class DATCompraModelTests(TestCase):
         import uuid
 
         uid = uuid.uuid4().hex[:5]
-        cls.user = User.objects.create_user(
-            username=f"testuser_compra_{uid}", password="test123", cpf=f"333{uid}333"  # 11 chars
-        )
-        cls.municipio = Municipio.objects.create(nome=f"Fortaleza_compra_{uid}", uf="CE")
-        cls.projeto = Projeto.objects.create(
-            nome=f"Projeto Teste_compra_{uid}", codigo=f"PC{uid[:4]}", fluxo="NAO_SUPER"
-        )
+        cls.user = UsuarioFactory(username=f"testuser_compra_{uid}", password="test123", cpf=f"333{uid}333")  # 11 chars
+        cls.municipio = MunicipioFactory(nome=f"Fortaleza_compra_{uid}", uf="CE")
+        cls.projeto = ProjetoFactory(nome=f"Projeto Teste_compra_{uid}", codigo=f"PC{uid[:4]}", fluxo="NAO_SUPER")
 
     def test_create_compra(self):
         """DATCompra should be created with correct fields."""
@@ -268,10 +258,10 @@ class DATCadastroModelTests(TestCase):
         import uuid
 
         uid = uuid.uuid4().hex[:5]
-        cls.user = User.objects.create_user(
+        cls.user = UsuarioFactory(
             username=f"testuser_cadastro_{uid}", password="test123", cpf=f"444{uid}444"  # 11 chars
         )
-        cls.municipio = Municipio.objects.create(nome=f"Fortaleza_cadastro_{uid}", uf="CE")
+        cls.municipio = MunicipioFactory(nome=f"Fortaleza_cadastro_{uid}", uf="CE")
         cls.projeto_geral = ProjetoGeral.objects.create(nome=f"PG Teste_cadastro_{uid}", usa_avaliar=True)
 
     def test_create_cadastro_formar(self):
@@ -343,13 +333,11 @@ class DATFormacaoModelTests(TestCase):
         import uuid
 
         uid = uuid.uuid4().hex[:5]
-        cls.user = User.objects.create_user(
+        cls.user = UsuarioFactory(
             username=f"testuser_formacao_{uid}", password="test123", cpf=f"555{uid}555"  # 11 chars
         )
-        cls.municipio = Municipio.objects.create(nome=f"Fortaleza_formacao_{uid}", uf="CE")
-        cls.projeto = Projeto.objects.create(
-            nome=f"Projeto Teste_formacao_{uid}", codigo=f"PF{uid[:4]}", fluxo="NAO_SUPER"
-        )
+        cls.municipio = MunicipioFactory(nome=f"Fortaleza_formacao_{uid}", uf="CE")
+        cls.projeto = ProjetoFactory(nome=f"Projeto Teste_formacao_{uid}", codigo=f"PF{uid[:4]}", fluxo="NAO_SUPER")
 
     def test_create_formacao(self):
         """DATFormacao should be created with correct fields."""
@@ -429,40 +417,38 @@ class DATModuleAPITestCase(APITestCase):
         import uuid
 
         # Create groups
-        cls.dat_group, _ = Group.objects.get_or_create(name="DAT")
-        cls.diretoria_group, _ = Group.objects.get_or_create(name="Diretoria")
-        cls.super_group, _ = Group.objects.get_or_create(name="Superintendência")
-        cls.gerente_group, _ = Group.objects.get_or_create(name="Gerente")
+        cls.dat_group = GroupFactory(name="DAT")
+        cls.diretoria_group = GroupFactory(name="Diretoria")
+        cls.super_group = GroupFactory(name="Superintendência")
+        cls.gerente_group = GroupFactory(name="Gerente")
 
         # Create users with unique CPFs (exactly 11 chars)
         uid = uuid.uuid4().hex[:5]
-        cls.dat_user = User.objects.create_user(
-            username=f"dat_user_{uid}", password="test123", cpf=f"666{uid}666"  # 11 chars
-        )
+        cls.dat_user = UsuarioFactory(username=f"dat_user_{uid}", password="test123", cpf=f"666{uid}666")  # 11 chars
         cls.dat_user.groups.add(cls.dat_group)
 
         uid2 = uuid.uuid4().hex[:5]
-        cls.super_user = User.objects.create_user(
+        cls.super_user = UsuarioFactory(
             username=f"super_user_{uid2}", password="test123", cpf=f"777{uid2}777"  # 11 chars
         )
         cls.super_user.groups.add(cls.super_group, cls.gerente_group)
 
         uid3 = uuid.uuid4().hex[:5]
-        cls.regular_user = User.objects.create_user(
+        cls.regular_user = UsuarioFactory(
             username=f"regular_user_{uid3}", password="test123", cpf=f"888{uid3}888"  # 11 chars
         )
 
         uid4 = uuid.uuid4().hex[:5]
-        cls.diretoria_user = User.objects.create_user(
+        cls.diretoria_user = UsuarioFactory(
             username=f"diretoria_user_{uid4}", password="test123", cpf=f"889{uid4}889"  # 11 chars
         )
         cls.diretoria_user.groups.add(cls.diretoria_group)
 
         # Create base data with unique names
         uid = uuid.uuid4().hex[:8]
-        cls.municipio = Municipio.objects.create(nome=f"Fortaleza_api_{uid}", uf="CE")
-        cls.municipio2 = Municipio.objects.create(nome=f"Caucaia_api_{uid}", uf="CE")
-        cls.projeto = Projeto.objects.create(nome=f"Projeto Teste_api_{uid}", codigo=f"PA{uid[:4]}", fluxo="NAO_SUPER")
+        cls.municipio = MunicipioFactory(nome=f"Fortaleza_api_{uid}", uf="CE")
+        cls.municipio2 = MunicipioFactory(nome=f"Caucaia_api_{uid}", uf="CE")
+        cls.projeto = ProjetoFactory(nome=f"Projeto Teste_api_{uid}", codigo=f"PA{uid[:4]}", fluxo="NAO_SUPER")
         cls.projeto_geral = ProjetoGeral.objects.create(nome=f"PG Teste_api_{uid}", usa_avaliar=True)
         cls.area, _ = DATArea.objects.get_or_create(nome="DAT", defaults={"cor": "blue", "ordem": 1})
         cls.coordenador = DATCoordenador.objects.create(
@@ -609,7 +595,7 @@ class DATAcaoAPITests(DATModuleAPITestCase):
 
         uid = uuid.uuid4().hex[:6]
         for prio in range(1, 7):
-            mun = Municipio.objects.create(nome=f"StatsCity_{uid}_{prio}", uf="CE")
+            mun = MunicipioFactory(nome=f"StatsCity_{uid}_{prio}", uf="CE")
             DATAcao.objects.create(
                 municipio=mun,
                 projeto=self.projeto,
@@ -705,7 +691,7 @@ class DATCompraAPITests(DATModuleAPITestCase):
         # 6 compras, same status_uso, varied municipio + ano_uso → would
         # fragment without the fix (GROUP BY status, ano_uso, municipio_nome).
         for i in range(6):
-            mun = Municipio.objects.create(nome=f"ComprasCity_{uid}_{i}", uf="CE")
+            mun = MunicipioFactory(nome=f"ComprasCity_{uid}_{i}", uf="CE")
             DATCompra.objects.create(
                 municipio=mun,
                 projeto=self.projeto,
@@ -755,7 +741,7 @@ class DATCompraAPITests(DATModuleAPITestCase):
         """Pendencias should list only core_compra pairs without pending/approved solicitacao."""
         self.client.force_authenticate(user=self.dat_user)
 
-        tipo_evento = TipoEvento.objects.create(nome="Seminário DAT")
+        tipo_evento = TipoEventoFactory(nome="Seminário DAT")
 
         Compra.objects.create(
             codigo="CORE-A",
@@ -778,7 +764,7 @@ class DATCompraAPITests(DATModuleAPITestCase):
 
         inicio = timezone.now() + timedelta(days=2)
         fim = inicio + timedelta(hours=2)
-        Solicitacao.objects.create(
+        SolicitacaoFactory(
             usuario=self.dat_user,
             municipio=self.municipio,
             projeto=self.projeto,
@@ -864,7 +850,7 @@ class DATCadastroAPITests(DATModuleAPITestCase):
         # por_plataforma == {"FORMAR": 6} (not 6 distinct buckets).
         # DATCadastro has unique_together(municipio, projeto_geral, plataforma).
         for i in range(6):
-            mun = Municipio.objects.create(nome=f"CadastroCity_{uid}_{i}", uf="CE")
+            mun = MunicipioFactory(nome=f"CadastroCity_{uid}_{i}", uf="CE")
             DATCadastro.objects.create(
                 municipio=mun,
                 projeto_geral=self.projeto_geral,

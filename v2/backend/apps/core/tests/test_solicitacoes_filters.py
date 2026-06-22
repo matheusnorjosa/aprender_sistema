@@ -11,14 +11,19 @@ Cobertura:
 
 from __future__ import annotations
 
-from django.contrib.auth.models import Group
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -26,18 +31,18 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture
 def setup_data():
     """Cria dados de teste para filtros."""
-    municipio_fortaleza = Municipio.objects.create(nome="Fortaleza", uf="CE")
-    municipio_caucaia = Municipio.objects.create(nome="Caucaia", uf="CE")
-    tipo_evento = TipoEvento.objects.create(nome="Formação")
+    municipio_fortaleza = MunicipioFactory(nome="Fortaleza", uf="CE")
+    municipio_caucaia = MunicipioFactory(nome="Caucaia", uf="CE")
+    tipo_evento = TipoEventoFactory(nome="Formação")
 
-    user_joao = Usuario.objects.create_user(
+    user_joao = UsuarioFactory(
         username="joao",
         email="joao@x.com",
         password="x",
         first_name="João",
         cpf="12345678901",
     )
-    user_maria = Usuario.objects.create_user(
+    user_maria = UsuarioFactory(
         username="maria",
         email="maria@x.com",
         password="x",
@@ -49,10 +54,11 @@ def setup_data():
     now = timezone.now()
 
     # Pendente, Fortaleza, João
-    s1 = Solicitacao.objects.create(
+    s1 = SolicitacaoFactory(
         usuario=user_joao,
         municipio=municipio_fortaleza,
         tipo_evento=tipo_evento,
+        projeto=None,
         inicio=now,
         fim=now + timezone.timedelta(hours=2),
         status="pendente",
@@ -60,10 +66,11 @@ def setup_data():
     )
 
     # Aprovado, Fortaleza, Maria
-    s2 = Solicitacao.objects.create(
+    s2 = SolicitacaoFactory(
         usuario=user_maria,
         municipio=municipio_fortaleza,
         tipo_evento=tipo_evento,
+        projeto=None,
         inicio=now + timezone.timedelta(days=1),
         fim=now + timezone.timedelta(days=1, hours=2),
         status="aprovado",
@@ -71,10 +78,11 @@ def setup_data():
     )
 
     # Pendente, Caucaia, João
-    s3 = Solicitacao.objects.create(
+    s3 = SolicitacaoFactory(
         usuario=user_joao,
         municipio=municipio_caucaia,
         tipo_evento=tipo_evento,
+        projeto=None,
         inicio=now + timezone.timedelta(days=2),
         fim=now + timezone.timedelta(days=2, hours=2),
         status="pendente",
@@ -82,10 +90,11 @@ def setup_data():
     )
 
     # Reprovado, Fortaleza, Maria
-    s4 = Solicitacao.objects.create(
+    s4 = SolicitacaoFactory(
         usuario=user_maria,
         municipio=municipio_fortaleza,
         tipo_evento=tipo_evento,
+        projeto=None,
         inicio=now + timezone.timedelta(days=3),
         fim=now + timezone.timedelta(days=3, hours=2),
         status="reprovado",
@@ -93,8 +102,8 @@ def setup_data():
     )
 
     # Criar grupo Superintendência
-    super_group, _ = Group.objects.get_or_create(name="Superintendência")
-    user_admin = Usuario.objects.create_user(username="admin", email="admin@x.com", password="x", cpf="11111111111")
+    super_group = GroupFactory(name="Superintendência")
+    user_admin = UsuarioFactory(username="admin", email="admin@x.com", password="x", cpf="11111111111")
     user_admin.groups.add(super_group)
 
     return {

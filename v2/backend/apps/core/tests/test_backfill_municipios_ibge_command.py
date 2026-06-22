@@ -12,13 +12,14 @@ from django.core.management import call_command
 
 import pytest
 
-from apps.core.models import Municipio, MunicipioReferencia
+from apps.core.models import MunicipioReferencia
+from apps.core.tests.factories import MunicipioFactory
 
 pytestmark = pytest.mark.django_db
 
 
 def test_backfill_municipios_ibge_dry_run_does_not_persist():
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ibge_code=None)
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ibge_code=None)
     MunicipioReferencia.objects.create(
         nome="Fortaleza",
         uf="CE",
@@ -38,7 +39,7 @@ def test_backfill_municipios_ibge_dry_run_does_not_persist():
 
 
 def test_backfill_municipios_ibge_apply_persists_unique_match():
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ibge_code=None)
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ibge_code=None)
     MunicipioReferencia.objects.create(
         nome="Fortaleza",
         uf="CE",
@@ -58,7 +59,7 @@ def test_backfill_municipios_ibge_apply_persists_unique_match():
 
 
 def test_backfill_municipios_ibge_apply_detects_ambiguous_normalized_names():
-    municipio = Municipio.objects.create(nome="Santo Antonio", uf="CE", ibge_code=None)
+    municipio = MunicipioFactory(nome="Santo Antonio", uf="CE", ibge_code=None)
     MunicipioReferencia.objects.create(
         nome="Santo Antônio",
         uf="CE",
@@ -85,8 +86,8 @@ def test_backfill_municipios_ibge_apply_detects_ambiguous_normalized_names():
 
 
 def test_backfill_municipios_ibge_apply_detects_conflict_with_existing_code():
-    Municipio.objects.create(nome="Aquiraz", uf="CE", ibge_code="2301000")
-    target = Municipio.objects.create(nome="Eusébio", uf="CE", ibge_code=None)
+    MunicipioFactory(nome="Aquiraz", uf="CE", ibge_code="2301000")
+    target = MunicipioFactory(nome="Eusébio", uf="CE", ibge_code=None)
     MunicipioReferencia.objects.create(
         nome="Eusébio",
         uf="CE",
@@ -106,7 +107,7 @@ def test_backfill_municipios_ibge_apply_detects_conflict_with_existing_code():
 
 
 def test_backfill_municipios_ibge_apply_matches_without_accents():
-    target = Municipio.objects.create(nome="Sao Paulo", uf="SP", ibge_code=None)
+    target = MunicipioFactory(nome="Sao Paulo", uf="SP", ibge_code=None)
     MunicipioReferencia.objects.create(
         nome="São Paulo",
         uf="SP",

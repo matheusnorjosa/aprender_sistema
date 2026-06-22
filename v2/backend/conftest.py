@@ -34,11 +34,19 @@ def ensure_rbac_seed(db):
 
     Guarda de 1 query: no-op quando o seed ja existe (caso comum -> sem overhead). So
     re-semeia (idempotente) quando o vinculo group x capability sumiu (pos-truncate).
+
+    `ensure_base_groups()` restaura tambem os 18 grupos base (setor + funcao) que o
+    truncate apaga. Necessario sob `pytest --no-migrations`, onde os grupos vem do
+    fixture de sessao (nao das migrations RunPython). #1404.
     """
     from apps.core.models import PermissaoFuncional
-    from apps.core.services.functional_permissions_seed import seed_functional_permissions
+    from apps.core.services.functional_permissions_seed import (
+        ensure_base_groups,
+        seed_functional_permissions,
+    )
 
     if not PermissaoFuncional.objects.filter(groups__isnull=False).exists():
+        ensure_base_groups()
         seed_functional_permissions(assign_default_groups=True)
         # O groups.set do seed dispara m2m_changed e popula o buffer de auditoria de
         # capability; essas mudancas sao infraestrutura de teste (nao operacoes

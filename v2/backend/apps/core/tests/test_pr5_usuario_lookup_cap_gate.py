@@ -33,12 +33,11 @@ from __future__ import annotations
 
 import itertools
 
-from django.contrib.auth.models import Group
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Usuario
+from apps.core.tests.factories import UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -46,37 +45,32 @@ pytestmark = pytest.mark.django_db
 _CPF_COUNTER = itertools.count(50000000000)
 
 
-def _user_in_groups(*group_names: str, label: str = "user") -> Usuario:
+def _user_in_groups(*group_names: str, label: str = "user"):
     cpf = str(next(_CPF_COUNTER)).zfill(11)
-    user = Usuario.objects.create_user(
+    return UsuarioFactory(
         username=f"{label}_{cpf}",
         email=f"{label}_{cpf}@example.com",
         password="testpass",
         cpf=cpf,
         first_name=label.capitalize(),
         last_name="User",
+        groups=list(group_names),
     )
-    for name in group_names:
-        group, _ = Group.objects.get_or_create(name=name)
-        user.groups.add(group)
-    return user
 
 
 @pytest.fixture
 def target_formador():
     """Usuário-alvo para a busca."""
     cpf = str(next(_CPF_COUNTER)).zfill(11)
-    user = Usuario.objects.create_user(
+    return UsuarioFactory(
         username=f"target_{cpf}",
         email=f"maria_alvo_{cpf}@example.com",
         password="testpass",
         cpf=cpf,
         first_name="Maria",
         last_name="Silva",
+        groups=["Formador"],
     )
-    formador, _ = Group.objects.get_or_create(name="Formador")
-    user.groups.add(formador)
-    return user
 
 
 # =============================================================================
@@ -106,13 +100,7 @@ def test_allowed_personas_can_lookup(persona, target_formador):
 
 
 def test_superuser_can_lookup(target_formador):
-    cpf = str(next(_CPF_COUNTER)).zfill(11)
-    user = Usuario.objects.create_superuser(
-        username=f"super_pr5_{cpf}",
-        email=f"super_pr5_{cpf}@example.com",
-        password="testpass",
-        cpf=cpf,
-    )
+    user = UsuarioFactory(superuser=True)
     client = APIClient()
     client.force_authenticate(user=user)
     response = client.get("/api/lookup/usuarios/?q=Maria")

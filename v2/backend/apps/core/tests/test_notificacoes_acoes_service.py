@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from datetime import date
 
-from django.contrib.auth.models import Group
-
 import pytest
 
 from apps.core.models import (
@@ -18,14 +16,18 @@ from apps.core.models import (
     AcaoTemplateExecutor,
     AuditLog,
     CicloAcoes,
-    Municipio,
     NotificacaoInterna,
-    Projeto,
     Usuario,
 )
 from apps.core.services.notificacoes_acoes_service import AcoesNotificacaoDailyService
 from apps.core.services.prazo_engine_service import PrazoEngineService
 from apps.core.tasks import processar_notificacoes_acoes_diarias
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.fixture
@@ -35,16 +37,12 @@ def user_factory(db):
     def _create(*, prefix: str, groups: list[str]) -> Usuario:
         counter["n"] += 1
         idx = counter["n"]
-        user = Usuario.objects.create_user(
+        return UsuarioFactory(
             username=f"{prefix}_{idx}",
             email=f"{prefix}_{idx}@example.com",
-            password="testpass123",
             cpf=f"{idx:011d}",
+            groups=groups,
         )
-        for group_name in groups:
-            group, _ = Group.objects.get_or_create(name=group_name)
-            user.groups.add(group)
-        return user
 
     return _create
 
@@ -52,8 +50,8 @@ def user_factory(db):
 @pytest.fixture
 def base_context(db, user_factory):
     creator = user_factory(prefix="creator", groups=["DAT"])
-    projeto = Projeto.objects.create(nome="Projeto Notificacoes")
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE")
+    projeto = ProjetoFactory(nome="Projeto Notificacoes")
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE")
     ciclo = CicloAcoes.objects.create(
         projeto=projeto,
         municipio=municipio,
@@ -73,7 +71,7 @@ def _create_action(*, ciclo: CicloAcoes, ordem: int, anchor: date, executor_grou
         ref_evento_externo=f"EVENT_{ordem}",
         dias_prazo_uteis=1,
     )
-    group, _ = Group.objects.get_or_create(name=executor_group)
+    group = GroupFactory(name=executor_group)
     AcaoTemplateExecutor.objects.create(acao_template=template, group=group, ativo=True)
 
     action = AcaoInstancia.objects.create(

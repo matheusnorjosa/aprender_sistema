@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from django.contrib.auth.models import Group
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework import status
@@ -19,7 +18,15 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Compra, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import Compra, Projeto, Solicitacao
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 class TestFluxoPorProjeto(TestCase):
@@ -32,13 +39,13 @@ class TestFluxoPorProjeto(TestCase):
         self.client = APIClient()
 
         # Criar grupos
-        self.grupo_coordenador, _ = Group.objects.get_or_create(name="Coordenador")
-        self.grupo_superintendencia, _ = Group.objects.get_or_create(name="Superintendência")
-        self.grupo_controle, _ = Group.objects.get_or_create(name="Controle")
-        self.grupo_dat, _ = Group.objects.get_or_create(name="DAT")
+        self.grupo_coordenador = GroupFactory(name="Coordenador")
+        self.grupo_superintendencia = GroupFactory(name="Superintendência")
+        self.grupo_controle = GroupFactory(name="Controle")
+        self.grupo_dat = GroupFactory(name="DAT")
 
         # Criar usuários
-        self.coordenador = Usuario.objects.create_user(
+        self.coordenador = UsuarioFactory(
             username="coordenador1",
             password="test123",
             email="coord@test.com",
@@ -46,7 +53,7 @@ class TestFluxoPorProjeto(TestCase):
         )
         self.coordenador.groups.add(self.grupo_coordenador)
 
-        self.superintendente = Usuario.objects.create_user(
+        self.superintendente = UsuarioFactory(
             username="super1",
             password="test123",
             email="super@test.com",
@@ -55,26 +62,26 @@ class TestFluxoPorProjeto(TestCase):
         self.superintendente.groups.add(self.grupo_superintendencia)
 
         # Criar dados de teste
-        self.municipio = Municipio.objects.create(
+        self.municipio = MunicipioFactory(
             nome="Fortaleza",
             uf="CE",
             ativo=True,
         )
 
-        self.tipo_evento = TipoEvento.objects.create(
+        self.tipo_evento = TipoEventoFactory(
             nome="Formação",
             descricao="Formação de professores",
         )
 
         # Criar projetos com diferentes fluxos
-        self.projeto_super = Projeto.objects.create(
+        self.projeto_super = ProjetoFactory(
             nome="ACerta",
             codigo="",  # Explicitly set empty string (default)
             fluxo="SUPER",
             ativo=True,
         )
 
-        self.projeto_outros = Projeto.objects.create(
+        self.projeto_outros = ProjetoFactory(
             nome="Workshop",
             codigo="",  # Explicitly set empty string (default)
             fluxo="NAO_SUPER",
@@ -212,7 +219,7 @@ class TestFluxoPorProjeto(TestCase):
         Testa que projetos sem fluxo definido usam o padrão (pendente).
         """
         # Criar projeto sem fluxo definido (simula migration antiga)
-        projeto_sem_fluxo = Projeto.objects.create(
+        projeto_sem_fluxo = ProjetoFactory(
             nome="Projeto Antigo",
             codigo="",  # Explicitly set empty string (default)
             ativo=True,
@@ -256,7 +263,7 @@ class TestFluxoPorProjeto(TestCase):
         Testa que o endpoint de pré-agenda filtra por fluxo do projeto.
         """
         # Criar solicitações aprovadas
-        sol_super = Solicitacao.objects.create(
+        sol_super = SolicitacaoFactory(
             usuario=self.coordenador,
             municipio=self.municipio,
             projeto=self.projeto_super,
@@ -267,7 +274,7 @@ class TestFluxoPorProjeto(TestCase):
             status="aprovado",
         )
 
-        sol_outros = Solicitacao.objects.create(
+        sol_outros = SolicitacaoFactory(
             usuario=self.coordenador,
             municipio=self.municipio,
             projeto=self.projeto_outros,
@@ -279,7 +286,7 @@ class TestFluxoPorProjeto(TestCase):
         )
 
         # Autenticar como Controle (pode ver pré-agenda)
-        usuario_controle = Usuario.objects.create_user(
+        usuario_controle = UsuarioFactory(
             username="controle1",
             password="test123",
             cpf="11111111111",
@@ -306,7 +313,7 @@ class TestFluxoPorProjeto(TestCase):
         Testa que o PreAgendaListSerializer retorna o fluxo correto.
         """
         # Criar solicitação
-        solicitacao = Solicitacao.objects.create(
+        solicitacao = SolicitacaoFactory(
             usuario=self.coordenador,
             municipio=self.municipio,
             projeto=self.projeto_super,
@@ -318,7 +325,7 @@ class TestFluxoPorProjeto(TestCase):
         )
 
         # Autenticar como Controle
-        usuario_controle = Usuario.objects.create_user(
+        usuario_controle = UsuarioFactory(
             username="controle2",
             password="test123",
             cpf="22222222222",
@@ -357,7 +364,7 @@ class TestFluxoPorProjeto(TestCase):
             pytest.skip(f"CSV não encontrado: {csv_path}")
 
         # Criar projeto para atualizar
-        projeto_teste = Projeto.objects.create(
+        projeto_teste = ProjetoFactory(
             nome="Lendo e Escrevendo",  # Nome no CSV como SUPER
             codigo="",  # Explicitly set empty string (default)
             fluxo="NAO_SUPER",  # Começar com NAO_SUPER

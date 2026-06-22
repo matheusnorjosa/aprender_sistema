@@ -32,6 +32,10 @@ on:
         description: "Args extras do pytest (xdist, junit, dispatch passthrough)"
         type: string
         default: ""
+      run_migrations:
+        description: "Se true, roda `manage.py migrate` antes do pytest. O gate core usa false + `--no-migrations` (schema dos models, setup ~rapido, #1404); o job migrate-integrity usa true (exercita a cadeia RunPython em DB limpo)."
+        type: boolean
+        default: true
       coverage_file:
         description: "Se != '', exporta COVERAGE_FILE e adiciona --cov=apps --cov-report=term"
         type: string
@@ -155,6 +159,7 @@ jobs:
           echo "✅ No hardcoded '/app' paths found in tests"
 
       - name: Run migrations
+        if: ${{ inputs.run_migrations }}
         run: |
           cd v2/backend
           python manage.py migrate --noinput

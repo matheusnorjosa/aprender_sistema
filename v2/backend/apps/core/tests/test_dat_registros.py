@@ -11,17 +11,19 @@ from __future__ import annotations
 import json
 from decimal import Decimal
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.core.models import DATRegistro, Municipio, Projeto, ProjetoGeral
-
-User = get_user_model()
+from apps.core.models import DATRegistro, ProjetoGeral
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    UsuarioFactory,
+)
 
 
 class ProjetoGeralModelTests(TestCase):
@@ -66,7 +68,7 @@ class DATRegistroModelTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         """Set up test data."""
-        cls.municipio = Municipio.objects.create(nome="Test City", uf="CE")
+        cls.municipio = MunicipioFactory(nome="Test City", uf="CE")
         cls.projeto_geral_professor = ProjetoGeral.objects.create(
             nome="PG Professor",
             usa_avaliar=True,
@@ -79,13 +81,13 @@ class DATRegistroModelTests(TestCase):
             tipo_calculo_codigos="por_aluno",
             divisor_aluno=20,
         )
-        cls.projeto = Projeto.objects.create(
+        cls.projeto = ProjetoFactory(
             nome="Test Projeto",
             codigo="TEST",
             fluxo="NAO_SUPER",
             projeto_geral=cls.projeto_geral_professor,
         )
-        cls.user = User.objects.create_user(username="testuser", password="test123")
+        cls.user = UsuarioFactory(username="testuser", password="test123")
 
     def test_nr_codigos_calculated_por_professor(self):
         """nr_codigos should be calculated using professor * multiplicador."""
@@ -102,7 +104,7 @@ class DATRegistroModelTests(TestCase):
 
     def test_nr_codigos_calculated_por_aluno(self):
         """nr_codigos should be calculated using alunos / divisor."""
-        projeto_aluno = Projeto.objects.create(
+        projeto_aluno = ProjetoFactory(
             nome="Test Projeto Aluno",
             codigo="TESTALUNO",
             fluxo="NAO_SUPER",
@@ -132,7 +134,7 @@ class DATRegistroModelTests(TestCase):
 
     def test_avaliar_fields_set_to_nao_aplicavel_when_not_used(self):
         """Avaliar status fields should be 'nao_aplicavel' when usa_avaliar=False."""
-        projeto_aluno = Projeto.objects.create(
+        projeto_aluno = ProjetoFactory(
             nome="Test Projeto Aluno 2",
             codigo="TESTALUNO2",
             fluxo="NAO_SUPER",
@@ -255,14 +257,14 @@ class DATRegistroAPITests(APITestCase):
 
         suffix = str(uuid.uuid4())[:8]
 
-        cls.municipio = Municipio.objects.create(nome=f"API Test City {suffix}", uf="BA")
+        cls.municipio = MunicipioFactory(nome=f"API Test City {suffix}", uf="BA")
         cls.projeto_geral = ProjetoGeral.objects.create(
             nome=f"API PG {suffix}",
             usa_avaliar=True,
             tipo_calculo_codigos="por_professor",
             multiplicador_professor=Decimal("1.1"),
         )
-        cls.projeto = Projeto.objects.create(
+        cls.projeto = ProjetoFactory(
             nome=f"API Test Projeto {suffix}",
             codigo=f"APITEST{suffix}",
             fluxo="NAO_SUPER",
@@ -270,22 +272,22 @@ class DATRegistroAPITests(APITestCase):
         )
 
         # Create groups
-        cls.dat_group, _ = Group.objects.get_or_create(name="DAT")
-        cls.super_group, _ = Group.objects.get_or_create(name="Superintendência")
+        cls.dat_group = GroupFactory(name="DAT")
+        cls.super_group = GroupFactory(name="Superintendência")
 
         # Create users with unique CPFs (11 chars max)
-        cls.regular_user = User.objects.create_user(
+        cls.regular_user = UsuarioFactory(
             username=f"regular_{suffix}",
             password="test123",
             cpf=f"111{suffix[:8]}",  # 11 chars: 111 + 8 chars
         )
-        cls.dat_user = User.objects.create_user(
+        cls.dat_user = UsuarioFactory(
             username=f"datuser_{suffix}",
             password="test123",
             cpf=f"222{suffix[:8]}",
         )
         cls.dat_user.groups.add(cls.dat_group)
-        cls.super_user = User.objects.create_user(
+        cls.super_user = UsuarioFactory(
             username=f"superuser_{suffix}",
             password="test123",
             cpf=f"333{suffix[:8]}",
@@ -426,13 +428,13 @@ class ProjetoGeralAPITests(APITestCase):
 
         suffix = str(uuid.uuid4())[:8]
 
-        cls.dat_group, _ = Group.objects.get_or_create(name="DAT")
-        cls.regular_user = User.objects.create_user(
+        cls.dat_group = GroupFactory(name="DAT")
+        cls.regular_user = UsuarioFactory(
             username=f"regular2_{suffix}",
             password="test123",
             cpf=f"444{suffix[:8]}",  # 11 chars
         )
-        cls.dat_user = User.objects.create_user(
+        cls.dat_user = UsuarioFactory(
             username=f"datuser2_{suffix}",
             password="test123",
             cpf=f"555{suffix[:8]}",
@@ -504,7 +506,7 @@ class ProjetoGeralAPITests(APITestCase):
         suffix = str(uuid.uuid4())[:8]
 
         pg = ProjetoGeral.objects.create(nome=f"PG with Projects {suffix}", usa_avaliar=True)
-        Projeto.objects.create(
+        ProjetoFactory(
             nome=f"Linked Project {suffix}",
             codigo=f"LINKED{suffix}",
             fluxo="NAO_SUPER",
@@ -528,11 +530,11 @@ class DATRegistroFilterRegiaoTests(APITestCase):
         import uuid
 
         suffix = str(uuid.uuid4())[:8]
-        cls.dat_group, _ = Group.objects.get_or_create(name="DAT")
-        cls.user = User.objects.create_user(username=f"regiao_test_{suffix}", password="t123", cpf=f"444{suffix[:8]}")
+        cls.dat_group = GroupFactory(name="DAT")
+        cls.user = UsuarioFactory(username=f"regiao_test_{suffix}", password="t123", cpf=f"444{suffix[:8]}")
         cls.user.groups.add(cls.dat_group)
         cls.pg = ProjetoGeral.objects.create(nome=f"PG Regiao Test {suffix}", usa_avaliar=False)
-        cls.projeto = Projeto.objects.create(
+        cls.projeto = ProjetoFactory(
             nome=f"Projeto Regiao Test {suffix}",
             codigo=f"REG{suffix}",
             fluxo="NAO_SUPER",
@@ -540,11 +542,11 @@ class DATRegistroFilterRegiaoTests(APITestCase):
         )
 
         # One município per Brazilian region (UF picked from REGIAO_UFS).
-        cls.mun_nordeste = Municipio.objects.create(nome=f"MunNE_{suffix}", uf="CE")
-        cls.mun_sudeste = Municipio.objects.create(nome=f"MunSE_{suffix}", uf="SP")
-        cls.mun_sul = Municipio.objects.create(nome=f"MunS_{suffix}", uf="RS")
-        cls.mun_centro = Municipio.objects.create(nome=f"MunCO_{suffix}", uf="DF")
-        cls.mun_norte = Municipio.objects.create(nome=f"MunN_{suffix}", uf="PA")
+        cls.mun_nordeste = MunicipioFactory(nome=f"MunNE_{suffix}", uf="CE")
+        cls.mun_sudeste = MunicipioFactory(nome=f"MunSE_{suffix}", uf="SP")
+        cls.mun_sul = MunicipioFactory(nome=f"MunS_{suffix}", uf="RS")
+        cls.mun_centro = MunicipioFactory(nome=f"MunCO_{suffix}", uf="DF")
+        cls.mun_norte = MunicipioFactory(nome=f"MunN_{suffix}", uf="PA")
 
         for mun in (cls.mun_nordeste, cls.mun_sudeste, cls.mun_sul, cls.mun_centro, cls.mun_norte):
             DATRegistro.objects.create(

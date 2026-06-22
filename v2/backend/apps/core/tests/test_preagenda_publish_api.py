@@ -24,11 +24,18 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AuditLog, Municipio, Participation, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import AuditLog, Participation
 from apps.core.services.gcal_sync_service import (
     apply_one_solicitacao,
     build_attendees_for_solicitacao,
     build_preview_for_solicitacao,
+)
+from apps.core.tests.factories import (
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
 )
 
 pytestmark = pytest.mark.django_db
@@ -43,37 +50,29 @@ def api_client():
 @pytest.fixture
 def user_super():
     """Usuário Superintendência."""
-    from django.contrib.auth.models import Group
-
-    user = Usuario.objects.create_user(
+    return UsuarioFactory(
         username="super_user",
         email="super@example.com",
         password="test123",
         cpf="11111111111",
         first_name="Super",
         last_name="User",
+        groups=["Superintendência"],
     )
-    group, _ = Group.objects.get_or_create(name="Superintendência")
-    user.groups.add(group)
-    return user
 
 
 @pytest.fixture
 def user_coord():
     """Usuário Coordenador (sem permissão para preview/publish)."""
-    from django.contrib.auth.models import Group
-
-    user = Usuario.objects.create_user(
+    return UsuarioFactory(
         username="coord_user",
         email="coord@example.com",
         password="test123",
         cpf="22222222222",
         first_name="Coord",
         last_name="User",
+        groups=["Coordenador"],
     )
-    group, _ = Group.objects.get_or_create(name="Coordenador")
-    user.groups.add(group)
-    return user
 
 
 @pytest.fixture
@@ -88,24 +87,24 @@ def setup_solicitacao():
     tz = timezone.get_current_timezone()
 
     # Dependências
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="Gestão Escolar", ativo=True)
-    tipo_evento = TipoEvento.objects.create(nome="Formação")
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="Gestão Escolar", ativo=True)
+    tipo_evento = TipoEventoFactory(nome="Formação")
 
     # Usuários
-    coord = Usuario.objects.create_user(
+    coord = UsuarioFactory(
         username="coord",
         email="coord@example.com",
         password="test123",
         cpf="33333333333",
     )
-    formador = Usuario.objects.create_user(
+    formador = UsuarioFactory(
         username="formador",
         email="formador@example.com",
         password="test123",
         cpf="44444444444",
     )
-    acompanha = Usuario.objects.create_user(
+    acompanha = UsuarioFactory(
         username="acompanha",
         email="acompanha@example.com",
         password="test123",
@@ -113,7 +112,7 @@ def setup_solicitacao():
     )
 
     # Solicitação aprovada
-    sol = Solicitacao.objects.create(
+    sol = SolicitacaoFactory(
         usuario=coord,
         municipio=municipio,
         projeto=projeto,

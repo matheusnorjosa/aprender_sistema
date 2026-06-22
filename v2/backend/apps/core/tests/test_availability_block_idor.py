@@ -14,13 +14,13 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AvailabilityBlock, EquipeGerencia, Gerencia, Usuario
+from apps.core.models import AvailabilityBlock, EquipeGerencia, Gerencia
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 
 @pytest.fixture
@@ -32,19 +32,19 @@ def api_client():
 @pytest.fixture
 def grupo_controle(db):
     """Grupo Controle."""
-    return Group.objects.get_or_create(name="Controle")[0]
+    return GroupFactory(name="Controle")
 
 
 @pytest.fixture
 def grupo_superintendencia(db):
     """Grupo Superintendência."""
-    return Group.objects.get_or_create(name="Superintendência")[0]
+    return GroupFactory(name="Superintendência")
 
 
 @pytest.fixture
 def usuario_comum(db):
     """Usuário comum sem privilégios especiais."""
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username="comum",
         email="comum@example.com",
         password="testpass123",
@@ -55,7 +55,7 @@ def usuario_comum(db):
 @pytest.fixture
 def outro_usuario(db):
     """Outro usuário comum."""
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username="outro",
         email="outro@example.com",
         password="testpass123",
@@ -80,7 +80,7 @@ def usuarios_mesma_gerencia(db, gerencia_vidas, usuario_comum, outro_usuario):
 @pytest.fixture
 def usuario_controle(db, grupo_controle):
     """Usuário com permissão Controle."""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="controle",
         email="controle@example.com",
         password="testpass123",
@@ -93,7 +93,7 @@ def usuario_controle(db, grupo_controle):
 @pytest.fixture
 def usuario_super(db, grupo_superintendencia):
     """Usuário com permissão Superintendência."""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="super",
         email="super@example.com",
         password="testpass123",
@@ -106,12 +106,7 @@ def usuario_super(db, grupo_superintendencia):
 @pytest.fixture
 def superuser(db):
     """Superuser."""
-    return Usuario.objects.create_superuser(
-        username="admin",
-        email="admin@example.com",
-        password="testpass123",
-        cpf="55555555555",
-    )
+    return UsuarioFactory(superuser=True)
 
 
 @pytest.fixture

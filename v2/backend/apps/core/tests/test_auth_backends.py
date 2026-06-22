@@ -21,7 +21,7 @@ from django.test import RequestFactory
 import pytest
 
 from apps.core.auth_backends import CPFOrUsernameBackend
-from apps.core.models import Usuario
+from apps.core.tests.factories import UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -43,7 +43,7 @@ def usuario_com_cpf():
     """Usuário com CPF para testes de autenticação."""
     uid = uuid4().hex
     cpf = "12345678901"  # CPF fixo para testes
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username=f"user_{uid}",
         email=f"user_{uid}@example.com",
         password="testpass123",
@@ -57,7 +57,7 @@ def usuario_cpf_com_zeros():
     """Usuário com CPF contendo leading zeros."""
     uid = uuid4().hex
     cpf = "00123456789"  # CPF com leading zeros
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username=f"user_zeros_{uid}",
         email=f"user_zeros_{uid}@example.com",
         password="testpass123",
@@ -71,7 +71,7 @@ def usuario_inativo():
     """Usuário inativo para testes de bloqueio."""
     uid = uuid4().hex
     cpf = str(uuid4().int % 10**11).zfill(11)
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username=f"inactive_{uid}",
         email=f"inactive_{uid}@example.com",
         password="testpass123",
@@ -310,7 +310,7 @@ def test_authenticate_alphanumeric_tries_username(backend, request_factory, usua
 
     # Criar usuário com username alfanumérico
     uid = uuid4().hex
-    user_alpha = Usuario.objects.create_user(
+    user_alpha = UsuarioFactory(
         username="user123",
         email=f"user123_{uid}@example.com",
         password="testpass123",

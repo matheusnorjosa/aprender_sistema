@@ -10,13 +10,12 @@ from __future__ import annotations
 
 from unittest import mock
 
-from django.contrib.auth.models import Group
 from django.test import TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.core.exceptions import APIError, ConflictError, NotFoundError, ServiceUnavailableError, ValidationAPIError
-from apps.core.models import Usuario
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 
 class TestCustomExceptionClasses(TestCase):
@@ -89,7 +88,7 @@ class TestExceptionHandlerFormat(APITestCase):
 
     def setUp(self):
         """Create authenticated user."""
-        self.usuario = Usuario.objects.create_user(
+        self.usuario = UsuarioFactory(
             username="testuser",
             password="testpass123",
             email="test@example.com",
@@ -123,13 +122,13 @@ class TestGCalHealthErrorHandling(APITestCase):
 
     def setUp(self):
         """Create authenticated user with GCal access role."""
-        self.usuario = Usuario.objects.create_user(
+        self.usuario = UsuarioFactory(
             username="testuser",
             password="testpass123",
             email="test@example.com",
             cpf="12345678901",
         )
-        group, _ = Group.objects.get_or_create(name="Controle")
+        group = GroupFactory(name="Controle")
         self.usuario.groups.add(group)
         self.client.force_authenticate(user=self.usuario)
 

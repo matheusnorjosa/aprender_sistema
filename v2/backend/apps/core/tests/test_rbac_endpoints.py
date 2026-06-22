@@ -18,14 +18,20 @@ from __future__ import annotations
 from datetime import timedelta
 from uuid import uuid4
 
-from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -33,28 +39,28 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture
 def grupo_superintendencia():
     """Grupo Superintendência."""
-    grupo, _ = Group.objects.get_or_create(name="Superintendência")
+    grupo = GroupFactory(name="Superintendência")
     return grupo
 
 
 @pytest.fixture
 def grupo_dat():
     """Grupo DAT."""
-    grupo, _ = Group.objects.get_or_create(name="DAT")
+    grupo = GroupFactory(name="DAT")
     return grupo
 
 
 @pytest.fixture
 def grupo_formador():
     """Grupo Formador."""
-    grupo, _ = Group.objects.get_or_create(name="Formador")
+    grupo = GroupFactory(name="Formador")
     return grupo
 
 
 @pytest.fixture
 def grupo_gerente():
     """Função Gerente (PR 3, 2026-04-29 — composite Gerente+Sup aprova)."""
-    grupo, _ = Group.objects.get_or_create(name="Gerente")
+    grupo = GroupFactory(name="Gerente")
     return grupo
 
 
@@ -63,7 +69,7 @@ def user_superintendencia(grupo_superintendencia, grupo_gerente):
     """PR 3 hardening RBAC: composite Gerente da Superintendência (Setor
     Superintendência + Função Gerente). Sup puro sem Função não aprova mais."""
     uid = uuid4().hex[:8]
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"super_rbac_{uid}",
         email=f"super_rbac_{uid}@test.com",
         password="testpass123",
@@ -78,7 +84,7 @@ def user_dat(grupo_dat):
     """PR 3 hardening RBAC: DAT NÃO aprova mais (regra anterior PA-02 Adaptada
     foi descontinuada). Mantém o nome `user_dat` para os testes invertidos."""
     uid = uuid4().hex[:8]
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"dat_rbac_{uid}",
         email=f"dat_rbac_{uid}@test.com",
         password="testpass123",
@@ -92,7 +98,7 @@ def user_dat(grupo_dat):
 def user_formador(grupo_formador):
     """Usuário do grupo Formador (sem permissão de aprovação)."""
     uid = uuid4().hex[:8]
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"formador_rbac_{uid}",
         email=f"formador_rbac_{uid}@test.com",
         password="testpass123",
@@ -105,15 +111,12 @@ def user_formador(grupo_formador):
 @pytest.fixture
 def solicitacao_pendente(user_formador):
     """Solicitação pendente para testes RBAC."""
-    municipio, _ = Municipio.objects.get_or_create(nome="Fortaleza RBAC", defaults={"uf": "CE", "ativo": True})
-    projeto, _ = Projeto.objects.get_or_create(
-        nome="Projeto RBAC SUPER",
-        defaults={"ativo": True, "fluxo": "SUPER"},
-    )
-    tipo_evento, _ = TipoEvento.objects.get_or_create(nome="Formação RBAC")
+    municipio = MunicipioFactory(nome="Fortaleza RBAC", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="Projeto RBAC SUPER", ativo=True, fluxo="SUPER")
+    tipo_evento = TipoEventoFactory(nome="Formação RBAC")
 
     now = timezone.now()
-    return Solicitacao.objects.create(
+    return SolicitacaoFactory(
         usuario=user_formador,
         municipio=municipio,
         projeto=projeto,
@@ -199,15 +202,12 @@ class TestRBACApprovalEndpoints:
 
     def test_dat_cannot_reject(self, user_dat, user_formador):
         """PR 3 hardening RBAC (2026-04-29): DAT NÃO reprova mais."""
-        municipio, _ = Municipio.objects.get_or_create(nome="Fortaleza RBAC", defaults={"uf": "CE", "ativo": True})
-        projeto, _ = Projeto.objects.get_or_create(
-            nome="Projeto RBAC SUPER",
-            defaults={"ativo": True, "fluxo": "SUPER"},
-        )
-        tipo_evento, _ = TipoEvento.objects.get_or_create(nome="Formação RBAC")
+        municipio = MunicipioFactory(nome="Fortaleza RBAC", uf="CE", ativo=True)
+        projeto = ProjetoFactory(nome="Projeto RBAC SUPER", ativo=True, fluxo="SUPER")
+        tipo_evento = TipoEventoFactory(nome="Formação RBAC")
 
         now = timezone.now()
-        solicitacao = Solicitacao.objects.create(
+        solicitacao = SolicitacaoFactory(
             usuario=user_formador,
             municipio=municipio,
             projeto=projeto,
@@ -244,15 +244,12 @@ class TestRBACApprovalEndpoints:
     def test_gerente_superintendencia_can_reject(self, user_superintendencia, user_formador):
         """PR 3 hardening RBAC: Gerente da Superintendência reprova."""
         # Criar nova solicitação para este teste
-        municipio, _ = Municipio.objects.get_or_create(nome="Fortaleza RBAC", defaults={"uf": "CE", "ativo": True})
-        projeto, _ = Projeto.objects.get_or_create(
-            nome="Projeto RBAC SUPER",
-            defaults={"ativo": True, "fluxo": "SUPER"},
-        )
-        tipo_evento, _ = TipoEvento.objects.get_or_create(nome="Formação RBAC")
+        municipio = MunicipioFactory(nome="Fortaleza RBAC", uf="CE", ativo=True)
+        projeto = ProjetoFactory(nome="Projeto RBAC SUPER", ativo=True, fluxo="SUPER")
+        tipo_evento = TipoEventoFactory(nome="Formação RBAC")
 
         now = timezone.now()
-        solicitacao = Solicitacao.objects.create(
+        solicitacao = SolicitacaoFactory(
             usuario=user_formador,
             municipio=municipio,
             projeto=projeto,

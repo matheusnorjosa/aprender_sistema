@@ -18,16 +18,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.urls import reverse
 from rest_framework.test import APIClient
 
 import pytest
 
 from apps.core.models import AuditLog, Config
-
-User = get_user_model()
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 
 @pytest.fixture
@@ -39,8 +36,8 @@ def client() -> APIClient:
 @pytest.fixture
 def dat_user(db: Any) -> Any:
     """Create a DAT user."""
-    user = User.objects.create_user(username="dat_user", email="dat@example.com", password="testpass123")
-    dat_group, _ = Group.objects.get_or_create(name="DAT")
+    user = UsuarioFactory(username="dat_user", email="dat@example.com", password="testpass123")
+    dat_group = GroupFactory(name="DAT")
     user.groups.add(dat_group)
     return user
 
@@ -48,8 +45,8 @@ def dat_user(db: Any) -> Any:
 @pytest.fixture
 def super_user(db: Any) -> Any:
     """Create a Superintendência user."""
-    user = User.objects.create_user(username="super_user", email="super@example.com", password="testpass123")
-    super_group, _ = Group.objects.get_or_create(name="Superintendência")
+    user = UsuarioFactory(username="super_user", email="super@example.com", password="testpass123")
+    super_group = GroupFactory(name="Superintendência")
     user.groups.add(super_group)
     return user
 
@@ -57,8 +54,8 @@ def super_user(db: Any) -> Any:
 @pytest.fixture
 def coordenador_user(db: Any) -> Any:
     """Create a Coordenador user (no DAT/Super access)."""
-    user = User.objects.create_user(username="coordenador", email="coord@example.com", password="testpass123")
-    coord_group, _ = Group.objects.get_or_create(name="Coordenador")
+    user = UsuarioFactory(username="coordenador", email="coord@example.com", password="testpass123")
+    coord_group = GroupFactory(name="Coordenador")
     user.groups.add(coord_group)
     return user
 

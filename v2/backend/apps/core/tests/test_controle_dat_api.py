@@ -19,16 +19,19 @@ from __future__ import annotations
 
 from datetime import date
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from rest_framework import status
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AcaoControle, AcaoDAT, Municipio, Projeto, TipoAcaoDAT
+from apps.core.models import AcaoControle, AcaoDAT, TipoAcaoDAT
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    UsuarioFactory,
+)
 
-User = get_user_model()
 pytestmark = pytest.mark.django_db
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -39,8 +42,8 @@ pytestmark = pytest.mark.django_db
 def test_controle_user_can_list():
     """Usuário do grupo Controle pode listar ações."""
     # Criar grupo e usuário
-    controle_group, _ = Group.objects.get_or_create(name="Controle")
-    user = User.objects.create_user(
+    controle_group = GroupFactory(name="Controle")
+    user = UsuarioFactory(
         username="controle1",
         email="controle@example.com",
         password="test123",
@@ -49,9 +52,9 @@ def test_controle_user_can_list():
     user.groups.add(controle_group)
 
     # Criar dados
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
-    coord = User.objects.create_user(
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="ACerta", ativo=True)
+    coord = UsuarioFactory(
         username="coord1",
         email="coord@example.com",
         password="test123",
@@ -79,7 +82,7 @@ def test_controle_user_can_list():
 
 def test_regular_user_cannot_list_controle_acoes():
     """Usuário sem permissão recebe 403."""
-    user = User.objects.create_user(
+    user = UsuarioFactory(
         username="regular",
         email="regular@example.com",
         password="test123",
@@ -87,8 +90,8 @@ def test_regular_user_cannot_list_controle_acoes():
     )
 
     # Criar dados
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="ACerta", ativo=True)
     AcaoControle.objects.create(
         municipio=municipio,
         projeto=projeto,
@@ -115,8 +118,8 @@ def test_unauthenticated_cannot_list_controle_acoes():
 
 def test_filter_by_date_range():
     """Filtro por data_inicio e data_fim funciona."""
-    controle_group, _ = Group.objects.get_or_create(name="Controle")
-    user = User.objects.create_user(
+    controle_group = GroupFactory(name="Controle")
+    user = UsuarioFactory(
         username="controle1",
         email="controle@example.com",
         password="test123",
@@ -124,8 +127,8 @@ def test_filter_by_date_range():
     )
     user.groups.add(controle_group)
 
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="ACerta", ativo=True)
 
     # Criar ação dentro do intervalo
     AcaoControle.objects.create(
@@ -155,8 +158,8 @@ def test_filter_by_date_range():
 
 def test_controle_serializer_uses_string_related_field():
     """Serializer retorna nomes legíveis (não IDs) para FKs."""
-    controle_group, _ = Group.objects.get_or_create(name="Controle")
-    user = User.objects.create_user(
+    controle_group = GroupFactory(name="Controle")
+    user = UsuarioFactory(
         username="controle1",
         email="controle@example.com",
         password="test123",
@@ -164,8 +167,8 @@ def test_controle_serializer_uses_string_related_field():
     )
     user.groups.add(controle_group)
 
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="ACerta", ativo=True)
     AcaoControle.objects.create(
         municipio=municipio,
         projeto=projeto,
@@ -192,8 +195,8 @@ def test_controle_serializer_uses_string_related_field():
 
 def test_dat_user_can_list():
     """Usuário do grupo DAT pode listar ações."""
-    dat_group, _ = Group.objects.get_or_create(name="DAT")
-    user = User.objects.create_user(
+    dat_group = GroupFactory(name="DAT")
+    user = UsuarioFactory(
         username="dat1",
         email="dat@example.com",
         password="test123",
@@ -201,8 +204,8 @@ def test_dat_user_can_list():
     )
     user.groups.add(dat_group)
 
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="ACerta", ativo=True)
     AcaoDAT.objects.create(
         municipio=municipio,
         projeto=projeto,
@@ -222,15 +225,15 @@ def test_dat_user_can_list():
 
 def test_regular_user_cannot_list_dat_acoes():
     """Usuário sem permissão recebe 403."""
-    user = User.objects.create_user(
+    user = UsuarioFactory(
         username="regular",
         email="regular@example.com",
         password="test123",
         cpf="33333333333",
     )
 
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="ACerta", ativo=True)
     AcaoDAT.objects.create(
         municipio=municipio,
         projeto=projeto,
@@ -246,8 +249,8 @@ def test_regular_user_cannot_list_dat_acoes():
 
 def test_filter_by_projeto():
     """Filtro por projeto funciona."""
-    dat_group, _ = Group.objects.get_or_create(name="DAT")
-    user = User.objects.create_user(
+    dat_group = GroupFactory(name="DAT")
+    user = UsuarioFactory(
         username="dat1",
         email="dat@example.com",
         password="test123",
@@ -255,9 +258,9 @@ def test_filter_by_projeto():
     )
     user.groups.add(dat_group)
 
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto1 = Projeto.objects.create(nome="ACerta", ativo=True)
-    projeto2 = Projeto.objects.create(nome="Outro Projeto", ativo=True)
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto1 = ProjetoFactory(nome="ACerta", ativo=True)
+    projeto2 = ProjetoFactory(nome="Outro Projeto", ativo=True)
 
     AcaoDAT.objects.create(
         municipio=municipio,
@@ -282,8 +285,8 @@ def test_filter_by_projeto():
 
 def test_filter_by_tipo_acao():
     """Filtro parcial por tipo_acao (icontains) funciona."""
-    dat_group, _ = Group.objects.get_or_create(name="DAT")
-    user = User.objects.create_user(
+    dat_group = GroupFactory(name="DAT")
+    user = UsuarioFactory(
         username="dat1",
         email="dat@example.com",
         password="test123",
@@ -291,8 +294,8 @@ def test_filter_by_tipo_acao():
     )
     user.groups.add(dat_group)
 
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="ACerta", ativo=True)
 
     AcaoDAT.objects.create(
         municipio=municipio,
@@ -322,8 +325,8 @@ def test_filter_by_tipo_acao():
 
 def test_dat_user_can_create():
     """Usuário do grupo DAT pode criar ações."""
-    dat_group, _ = Group.objects.get_or_create(name="DAT")
-    user = User.objects.create_user(
+    dat_group = GroupFactory(name="DAT")
+    user = UsuarioFactory(
         username="dat1",
         email="dat@example.com",
         password="test123",
@@ -331,9 +334,9 @@ def test_dat_user_can_create():
     )
     user.groups.add(dat_group)
 
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
-    coord = User.objects.create_user(
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="ACerta", ativo=True)
+    coord = UsuarioFactory(
         username="coord1",
         email="coord@example.com",
         password="test123",
@@ -363,15 +366,15 @@ def test_dat_user_can_create():
 
 def test_regular_user_cannot_create():
     """Usuário sem permissão recebe 403."""
-    user = User.objects.create_user(
+    user = UsuarioFactory(
         username="regular",
         email="regular@example.com",
         password="test123",
         cpf="33333333333",
     )
 
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="ACerta", ativo=True)
 
     payload = {
         "municipio": municipio.id,
@@ -388,8 +391,8 @@ def test_regular_user_cannot_create():
 
 def test_create_returns_read_serializer():
     """POST retorna serializer de leitura (StringRelatedField)."""
-    dat_group, _ = Group.objects.get_or_create(name="DAT")
-    user = User.objects.create_user(
+    dat_group = GroupFactory(name="DAT")
+    user = UsuarioFactory(
         username="dat1",
         email="dat@example.com",
         password="test123",
@@ -397,8 +400,8 @@ def test_create_returns_read_serializer():
     )
     user.groups.add(dat_group)
 
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="ACerta", ativo=True)
 
     payload = {
         "municipio": municipio.id,
@@ -419,8 +422,8 @@ def test_create_returns_read_serializer():
 
 def test_create_without_optional_fields():
     """Criação funciona sem campos opcionais (responsavel, observacao, data_registro)."""
-    dat_group, _ = Group.objects.get_or_create(name="DAT")
-    user = User.objects.create_user(
+    dat_group = GroupFactory(name="DAT")
+    user = UsuarioFactory(
         username="dat1",
         email="dat@example.com",
         password="test123",
@@ -428,8 +431,8 @@ def test_create_without_optional_fields():
     )
     user.groups.add(dat_group)
 
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="ACerta", ativo=True)
 
     payload = {
         "municipio": municipio.id,
@@ -448,8 +451,8 @@ def test_create_without_optional_fields():
 
 def test_tipo_acao_invalido_rejeitado_pelo_serializer():
     """POST com tipo_acao fora dos choices retorna erro claro de validação."""
-    dat_group, _ = Group.objects.get_or_create(name="DAT")
-    user = User.objects.create_user(
+    dat_group = GroupFactory(name="DAT")
+    user = UsuarioFactory(
         username="dat1",
         email="dat@example.com",
         password="test123",
@@ -457,8 +460,8 @@ def test_tipo_acao_invalido_rejeitado_pelo_serializer():
     )
     user.groups.add(dat_group)
 
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="ACerta", ativo=True)
 
     payload = {
         "municipio": municipio.id,
@@ -483,8 +486,8 @@ def test_tipo_acao_invalido_rejeitado_pelo_serializer():
 
 def test_create_missing_required_fields():
     """POST sem campos obrigatórios retorna 400."""
-    dat_group, _ = Group.objects.get_or_create(name="DAT")
-    user = User.objects.create_user(
+    dat_group = GroupFactory(name="DAT")
+    user = UsuarioFactory(
         username="dat1",
         email="dat@example.com",
         password="test123",
@@ -492,7 +495,7 @@ def test_create_missing_required_fields():
     )
     user.groups.add(dat_group)
 
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
 
     payload = {
         "municipio": municipio.id,

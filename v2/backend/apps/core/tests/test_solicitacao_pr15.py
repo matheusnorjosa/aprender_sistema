@@ -16,13 +16,20 @@ from __future__ import annotations
 
 from datetime import date
 
-from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Compra, Municipio, Participation, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import Compra, Participation
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.fixture
@@ -35,11 +42,11 @@ def api_client():
 def grupos():
     """Cria grupos Django."""
     grupos = {
-        "Coordenador": Group.objects.get_or_create(name="Coordenador")[0],
-        "Superintendência": Group.objects.get_or_create(name="Superintendência")[0],
-        "Controle": Group.objects.get_or_create(name="Controle")[0],
-        "DAT": Group.objects.get_or_create(name="DAT")[0],
-        "Gerente": Group.objects.get_or_create(name="Gerente")[0],
+        "Coordenador": GroupFactory(name="Coordenador"),
+        "Superintendência": GroupFactory(name="Superintendência"),
+        "Controle": GroupFactory(name="Controle"),
+        "DAT": GroupFactory(name="DAT"),
+        "Gerente": GroupFactory(name="Gerente"),
     }
     return grupos
 
@@ -47,9 +54,7 @@ def grupos():
 @pytest.fixture
 def usuario_coordenador(grupos):
     """Usuário com perfil Coordenador."""
-    user = Usuario.objects.create_user(
-        username="coord1", password="senha123", cpf="11111111111", email="coord@test.com"
-    )
+    user = UsuarioFactory(username="coord1", password="senha123", cpf="11111111111", email="coord@test.com")
     user.groups.add(grupos["Coordenador"])
     return user
 
@@ -58,9 +63,7 @@ def usuario_coordenador(grupos):
 def usuario_superintendencia(grupos):
     """Gerente da Superintendência (PR 3 hardening RBAC, 2026-04-29):
     composite Setor `Superintendência` + Função `Gerente`."""
-    user = Usuario.objects.create_user(
-        username="super1", password="senha123", cpf="22222222222", email="super@test.com"
-    )
+    user = UsuarioFactory(username="super1", password="senha123", cpf="22222222222", email="super@test.com")
     user.groups.add(grupos["Superintendência"], grupos["Gerente"])
     return user
 
@@ -68,9 +71,7 @@ def usuario_superintendencia(grupos):
 @pytest.fixture
 def usuario_controle(grupos):
     """Usuário com perfil Controle."""
-    user = Usuario.objects.create_user(
-        username="controle1", password="senha123", cpf="33333333333", email="controle@test.com"
-    )
+    user = UsuarioFactory(username="controle1", password="senha123", cpf="33333333333", email="controle@test.com")
     user.groups.add(grupos["Controle"])
     return user
 
@@ -78,25 +79,25 @@ def usuario_controle(grupos):
 @pytest.fixture
 def municipio():
     """Município de teste."""
-    return Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+    return MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
 
 
 @pytest.fixture
 def projeto_super():
     """Projeto com fluxo SUPER (requer aprovação)."""
-    return Projeto.objects.create(nome="ACerta", codigo="ACERTA", fluxo="SUPER", ativo=True)
+    return ProjetoFactory(nome="ACerta", codigo="ACERTA", fluxo="SUPER", ativo=True)
 
 
 @pytest.fixture
 def projeto_nao_super():
     """Projeto com fluxo NAO_SUPER (auto-aprovado)."""
-    return Projeto.objects.create(nome="Alfabetização Ceará", codigo="ALFCE", fluxo="NAO_SUPER", ativo=True)
+    return ProjetoFactory(nome="Alfabetização Ceará", codigo="ALFCE", fluxo="NAO_SUPER", ativo=True)
 
 
 @pytest.fixture
 def tipo_evento():
     """TipoEvento de teste."""
-    return TipoEvento.objects.create(nome="Formação")
+    return TipoEventoFactory(nome="Formação")
 
 
 @pytest.fixture
@@ -122,7 +123,7 @@ class TestFiltroMine:
     ):
         """mine=true retorna apenas solicitações do usuário, mesmo para super."""
         # Criar solicitação do coordenador
-        sol_coord = Solicitacao.objects.create(
+        sol_coord = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -133,7 +134,7 @@ class TestFiltroMine:
         )
 
         # Criar solicitação da superintendência
-        sol_super = Solicitacao.objects.create(
+        sol_super = SolicitacaoFactory(
             usuario=usuario_superintendencia,
             municipio=municipio,
             projeto=projeto_super,
@@ -167,7 +168,7 @@ class TestFiltroFlow:
         self, api_client, usuario_coordenador, municipio, projeto_super, projeto_nao_super, tipo_evento
     ):
         """flow=SUPER retorna apenas solicitações de projetos SUPER."""
-        sol_super = Solicitacao.objects.create(
+        sol_super = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -177,7 +178,7 @@ class TestFiltroFlow:
             status="pendente",
         )
 
-        sol_nao_super = Solicitacao.objects.create(
+        sol_nao_super = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_nao_super,
@@ -212,7 +213,7 @@ class TestFiltroStatusAlias:
         self, api_client, usuario_coordenador, municipio, projeto_super, tipo_evento
     ):
         """status=pending retorna solicitações pendentes."""
-        sol_pendente = Solicitacao.objects.create(
+        sol_pendente = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -234,7 +235,7 @@ class TestFiltroStatusAlias:
         self, api_client, usuario_coordenador, municipio, projeto_nao_super, tipo_evento
     ):
         """status=approved retorna solicitações aprovadas."""
-        sol_aprovado = Solicitacao.objects.create(
+        sol_aprovado = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_nao_super,
@@ -256,7 +257,7 @@ class TestFiltroStatusAlias:
         self, api_client, usuario_coordenador, usuario_superintendencia, municipio, projeto_super, tipo_evento
     ):
         """status=rejected retorna solicitações reprovadas."""
-        sol_reprovado = Solicitacao.objects.create(
+        sol_reprovado = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -432,7 +433,7 @@ class TestReasonAlias:
         self, api_client, usuario_coordenador, usuario_superintendencia, municipio, projeto_super, tipo_evento
     ):
         """approve aceita 'reason' como alias para 'justificativa'."""
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -455,7 +456,7 @@ class TestReasonAlias:
         self, api_client, usuario_coordenador, usuario_superintendencia, municipio, projeto_super, tipo_evento
     ):
         """reject aceita 'reason' como alias para 'justificativa'."""
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -481,7 +482,7 @@ class TestFluxoFallback:
 
     def test_fluxo_fallback_is_nao_super(self, api_client, usuario_coordenador, municipio, tipo_evento):
         """Solicitação sem projeto retorna fluxo=NAO_SUPER."""
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=None,  # Sem projeto

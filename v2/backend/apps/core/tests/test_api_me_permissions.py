@@ -11,13 +11,13 @@ Cobertura:
 
 from __future__ import annotations
 
-from django.contrib.auth.models import Group
 from django.urls import reverse
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import GroupClassificacao, PermissaoFuncional, Usuario
+from apps.core.models import GroupClassificacao, PermissaoFuncional
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -26,9 +26,9 @@ def test_me_includes_groups_and_flag():
     """
     /api/me/ deve retornar groups (lista) e is_superintendencia (bool).
     """
-    user = Usuario.objects.create_user(username="u1", email="u1@x.com", password="x", cpf="11111111111")
-    group1, _ = Group.objects.get_or_create(name="Coordenador")
-    group2, _ = Group.objects.get_or_create(name="Formador")
+    user = UsuarioFactory(username="u1", email="u1@x.com", password="x", cpf="11111111111")
+    group1 = GroupFactory(name="Coordenador")
+    group2 = GroupFactory(name="Formador")
     user.groups.add(group1, group2)
 
     client = APIClient()
@@ -55,8 +55,8 @@ def test_is_superintendencia_true_only_for_group():
     """
     is_superintendencia = True apenas se usuário pertence ao grupo "Superintendência" (case-sensitive).
     """
-    user = Usuario.objects.create_user(username="u2", email="u2@x.com", password="x", cpf="22222222222")
-    super_group, _ = Group.objects.get_or_create(name="Superintendência")
+    user = UsuarioFactory(username="u2", email="u2@x.com", password="x", cpf="22222222222")
+    super_group = GroupFactory(name="Superintendência")
     user.groups.add(super_group)
 
     client = APIClient()
@@ -76,8 +76,8 @@ def test_is_superintendencia_false_for_similar_name():
     """
     Grupo com nome parecido (ex: "superintendencia" minúsculo) não ativa flag.
     """
-    user = Usuario.objects.create_user(username="u3", email="u3@x.com", password="x", cpf="33333333333")
-    fake_group, _ = Group.objects.get_or_create(name="superintendencia")  # minúsculo
+    user = UsuarioFactory(username="u3", email="u3@x.com", password="x", cpf="33333333333")
+    fake_group = GroupFactory(name="superintendencia")  # minúsculo
     user.groups.add(fake_group)
 
     client = APIClient()
@@ -97,7 +97,7 @@ def test_me_no_groups_returns_empty_list():
     """
     Usuário sem grupos retorna groups=[] e is_superintendencia=False.
     """
-    user = Usuario.objects.create_user(username="u4", email="u4@x.com", password="x", cpf="44444444444")
+    user = UsuarioFactory(username="u4", email="u4@x.com", password="x", cpf="44444444444")
 
     client = APIClient()
     client.force_authenticate(user=user)
@@ -117,7 +117,7 @@ def test_superuser_always_has_access():
     """
     Superusers sempre têm is_superintendencia=True, mesmo sem grupo.
     """
-    user = Usuario.objects.create_superuser(username="admin", email="admin@x.com", password="x", cpf="55555555555")
+    user = UsuarioFactory(superuser=True)
 
     client = APIClient()
     client.force_authenticate(user=user)
@@ -136,8 +136,8 @@ def test_me_returns_effective_functional_permissions():
     """
     /api/me/ deve retornar permissions (codenames) vindos do mapeamento funcional.
     """
-    user = Usuario.objects.create_user(username="u5", email="u5@x.com", password="x", cpf="66666666666")
-    dat_group, _ = Group.objects.get_or_create(name="DAT")
+    user = UsuarioFactory(username="u5", email="u5@x.com", password="x", cpf="66666666666")
+    dat_group = GroupFactory(name="DAT")
     user.groups.add(dat_group)
 
     perm = PermissaoFuncional.objects.create(
@@ -165,8 +165,8 @@ def test_me_classifies_dynamic_funcao_group():
     """
     Grupo classificado dinamicamente como função deve aparecer em funcoes.
     """
-    user = Usuario.objects.create_user(username="u6", email="u6@x.com", password="x", cpf="77777777777")
-    dynamic_group, _ = Group.objects.get_or_create(name="Analista de Campo")
+    user = UsuarioFactory(username="u6", email="u6@x.com", password="x", cpf="77777777777")
+    dynamic_group = GroupFactory(name="Analista de Campo")
     GroupClassificacao.objects.update_or_create(
         group=dynamic_group,
         defaults={"tipo": GroupClassificacao.Tipo.FUNCAO},

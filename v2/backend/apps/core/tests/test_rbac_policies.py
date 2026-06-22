@@ -18,8 +18,7 @@ from __future__ import annotations
 import re
 from typing import Iterable
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import AnonymousUser, Group
+from django.contrib.auth.models import AnonymousUser
 from rest_framework import permissions as drf_permissions
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.test import APIRequestFactory
@@ -29,6 +28,7 @@ import pytest
 from apps.core.models import PermissaoFuncional
 from apps.core.rbac import policies as policies_module
 from apps.core.rbac.policies import ACCESS_POLICIES, _PolicyPermission
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -76,8 +76,7 @@ def _next_cpf() -> str:
 
 def _make_user(username: str, *codenames: str):
     """Cria User autenticado e atribui capabilities via PermissaoFuncional groups."""
-    User = get_user_model()
-    user = User.objects.create_user(
+    user = UsuarioFactory(
         username=username,
         email=f"{username}@example.com",
         password="testpass123",
@@ -85,7 +84,7 @@ def _make_user(username: str, *codenames: str):
     )
     if codenames:
         # Atribui capabilities via grupo dedicado (consistent com pattern atual)
-        group, _ = Group.objects.get_or_create(name=f"test-group-{username}")
+        group = GroupFactory(name=f"test-group-{username}")
         user.groups.add(group)
         for code in codenames:
             perm = PermissaoFuncional.objects.filter(codename=code).first()
@@ -239,13 +238,7 @@ class TestPolicySmoke:
     @pytest.mark.parametrize("policy_cls", _all_policy_classes(), ids=lambda c: c.__name__)
     def test_allows_superuser(self, policy_cls, seeded_db):
         """Superuser bypass (mesma semântica de HasPerm)."""
-        User = get_user_model()
-        super_user = User.objects.create_superuser(
-            username="super_test",
-            email="super_test@example.com",
-            password="testpass123",
-            cpf="99900000999",
-        )
+        super_user = UsuarioFactory(superuser=True)
         req = _request_for(super_user)
         assert policy_cls().has_permission(req, view=object()) is True
 

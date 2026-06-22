@@ -15,6 +15,7 @@ import pytest
 
 from apps.core.models import Municipio, MunicipioReferencia
 from apps.core.services.options_cache import MUNICIPIOS_OPTIONS_CACHE_KEY
+from apps.core.tests.factories import MunicipioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -85,7 +86,7 @@ def test_promote_municipios_referencia_apply_is_idempotent():
 
 
 def test_promote_municipios_referencia_apply_updates_existing_normalized_match():
-    municipio = Municipio.objects.create(nome="Sao Paulo", uf="SP", ibge_code=None, ativo=False)
+    municipio = MunicipioFactory(nome="Sao Paulo", uf="SP", ibge_code=None, ativo=False)
     MunicipioReferencia.objects.create(
         nome="Sao Paulo",
         uf="SP",
@@ -108,7 +109,7 @@ def test_promote_municipios_referencia_apply_updates_existing_normalized_match()
 
 
 def test_promote_municipios_referencia_prefers_existing_ibge_code_match():
-    Municipio.objects.create(nome="Fortaleza", uf="CE", ibge_code="2304400", ativo=False)
+    MunicipioFactory(nome="Fortaleza", uf="CE", ibge_code="2304400", ativo=False)
     MunicipioReferencia.objects.create(
         nome="Fortaleza",
         uf="CE",
@@ -130,7 +131,7 @@ def test_promote_municipios_referencia_prefers_existing_ibge_code_match():
 
 
 def test_promote_municipios_referencia_does_not_match_by_name_without_uf():
-    Municipio.objects.create(nome="Fortaleza", uf="CE", ibge_code=None, ativo=True)
+    MunicipioFactory(nome="Fortaleza", uf="CE", ibge_code=None, ativo=True)
     MunicipioReferencia.objects.create(
         nome="Fortaleza",
         uf="PI",
@@ -187,7 +188,7 @@ def test_promote_municipios_referencia_include_inactive_refs_creates_inactive_ro
 
 
 def test_promote_municipios_referencia_apply_detects_code_owned_by_other():
-    Municipio.objects.create(nome="Aquiraz", uf="CE", ibge_code="2301000", ativo=True)
+    MunicipioFactory(nome="Aquiraz", uf="CE", ibge_code="2301000", ativo=True)
     MunicipioReferencia.objects.create(
         nome="Eusebio",
         uf="CE",
@@ -206,8 +207,8 @@ def test_promote_municipios_referencia_apply_detects_code_owned_by_other():
 
 
 def test_promote_municipios_referencia_apply_detects_ambiguous_existing_candidates():
-    Municipio.objects.create(nome="Santo Antonio", uf="CE", ibge_code=None, ativo=True)
-    Municipio.objects.create(nome="Santo Antônio", uf="CE", ibge_code=None, ativo=True)
+    MunicipioFactory(nome="Santo Antonio", uf="CE", ibge_code=None, ativo=True)
+    MunicipioFactory(nome="Santo Antônio", uf="CE", ibge_code=None, ativo=True)
     MunicipioReferencia.objects.create(
         nome="Santo Antonio",
         uf="CE",
@@ -225,7 +226,7 @@ def test_promote_municipios_referencia_apply_detects_ambiguous_existing_candidat
 
 
 def test_promote_municipios_referencia_apply_detects_mismatched_existing_code():
-    Municipio.objects.create(nome="Fortaleza", uf="CE", ibge_code="2304401", ativo=True)
+    MunicipioFactory(nome="Fortaleza", uf="CE", ibge_code="2304401", ativo=True)
     MunicipioReferencia.objects.create(
         nome="Fortaleza",
         uf="CE",

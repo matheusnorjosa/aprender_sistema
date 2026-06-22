@@ -18,8 +18,6 @@ Padrão: TDD-first — testes escritos antes da implementação.
 
 from __future__ import annotations
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.core.management import call_command
 from django.urls import reverse
 from rest_framework.test import APIClient
@@ -28,6 +26,7 @@ import pytest
 
 from apps.core.models import PermissaoFuncional
 from apps.core.rbac.policies import ACCESS_POLICIES, PUBLIC_POLICY_KEYS, _PolicyPermission
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -50,15 +49,14 @@ def _next_cpf() -> str:
 
 def _make_user(username: str, *codenames: str):
     """Cria User autenticado e atribui capabilities via grupo dedicado."""
-    User = get_user_model()
-    user = User.objects.create_user(
+    user = UsuarioFactory(
         username=username,
         email=f"{username}@example.com",
         password="testpass123",
         cpf=_next_cpf(),
     )
     if codenames:
-        group, _ = Group.objects.get_or_create(name=f"test-group-{username}")
+        group = GroupFactory(name=f"test-group-{username}")
         user.groups.add(group)
         for code in codenames:
             perm = PermissaoFuncional.objects.filter(codename=code).first()
@@ -110,13 +108,7 @@ class TestBasicCases:
         assert body == []
 
     def test_superuser_returns_all_public_policy_keys_sorted(self, seeded_db):
-        User = get_user_model()
-        super_user = User.objects.create_superuser(
-            username="super_test",
-            email="super_test@example.com",
-            password="testpass123",
-            cpf="99900000999",
-        )
+        super_user = UsuarioFactory(superuser=True)
         client = APIClient()
         client.force_authenticate(user=super_user)
         res = client.get(reverse(ENDPOINT_URL_NAME))
@@ -171,13 +163,7 @@ class TestContract:
         assert isinstance(body, list), f"Response deve ser JSON list (flat), não object. Got: {type(body).__name__}"
 
     def test_response_is_alphabetically_sorted(self, seeded_db):
-        User = get_user_model()
-        super_user = User.objects.create_superuser(
-            username="sorted_test",
-            email="sorted_test@example.com",
-            password="testpass123",
-            cpf="99900001000",
-        )
+        super_user = UsuarioFactory(superuser=True)
         client = APIClient()
         client.force_authenticate(user=super_user)
         res = client.get(reverse(ENDPOINT_URL_NAME))
@@ -189,13 +175,7 @@ class TestContract:
         Anti-leakage guard: nenhum elemento da response pode ser uma key fora
         de PUBLIC_POLICY_KEYS. Garante que policy interna futura não vaze.
         """
-        User = get_user_model()
-        super_user = User.objects.create_superuser(
-            username="leak_test",
-            email="leak_test@example.com",
-            password="testpass123",
-            cpf="99900001001",
-        )
+        super_user = UsuarioFactory(superuser=True)
         client = APIClient()
         client.force_authenticate(user=super_user)
         res = client.get(reverse(ENDPOINT_URL_NAME))
@@ -215,13 +195,7 @@ class TestContract:
         view_compras_dashboard, view_overview_dashboard, view_map_metrics,
         view_all_availability) — essas são intencionais.
         """
-        User = get_user_model()
-        super_user = User.objects.create_superuser(
-            username="codename_leak_test",
-            email="codename_leak_test@example.com",
-            password="testpass123",
-            cpf="99900001002",
-        )
+        super_user = UsuarioFactory(superuser=True)
         client = APIClient()
         client.force_authenticate(user=super_user)
         res = client.get(reverse(ENDPOINT_URL_NAME))

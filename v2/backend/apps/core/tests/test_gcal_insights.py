@@ -16,14 +16,18 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento
-
-User = get_user_model()
+from apps.core.models import Solicitacao
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 class TestGCalInsights(TestCase):
@@ -51,11 +55,11 @@ class TestGCalInsights(TestCase):
         self.tz_local = ZoneInfo("America/Fortaleza")
 
         # Criar grupos
-        self.group_controle = Group.objects.get_or_create(name="Controle")[0]
-        self.group_coordenador = Group.objects.get_or_create(name="Coordenador")[0]
+        self.group_controle = GroupFactory(name="Controle")
+        self.group_coordenador = GroupFactory(name="Coordenador")
 
         # Criar usuários (com CPFs únicos para evitar unique constraint violation)
-        self.user_controle = User.objects.create_user(
+        self.user_controle = UsuarioFactory(
             username="controle_insights",
             email="controle_insights@example.com",
             password="password123",
@@ -63,7 +67,7 @@ class TestGCalInsights(TestCase):
         )
         self.user_controle.groups.add(self.group_controle)
 
-        self.user_coordenador = User.objects.create_user(
+        self.user_coordenador = UsuarioFactory(
             username="coordenador_insights",
             email="coordenador_insights@example.com",
             password="password123",
@@ -72,11 +76,11 @@ class TestGCalInsights(TestCase):
         self.user_coordenador.groups.add(self.group_coordenador)
 
         # Criar fixtures (municipios, projetos, tipo_evento)
-        self.municipio_fortaleza = Municipio.objects.create(nome="Fortaleza - CE")
-        self.municipio_caucaia = Municipio.objects.create(nome="Caucaia - CE")
-        self.projeto_super = Projeto.objects.create(nome="Projeto SUPER", fluxo="SUPER")
-        self.projeto_outros = Projeto.objects.create(nome="Projeto OUTROS", fluxo="NAO_SUPER")
-        self.tipo_evento = TipoEvento.objects.create(nome="Formação")
+        self.municipio_fortaleza = MunicipioFactory(nome="Fortaleza - CE")
+        self.municipio_caucaia = MunicipioFactory(nome="Caucaia - CE")
+        self.projeto_super = ProjetoFactory(nome="Projeto SUPER", fluxo="SUPER")
+        self.projeto_outros = ProjetoFactory(nome="Projeto OUTROS", fluxo="NAO_SUPER")
+        self.tipo_evento = TipoEventoFactory(nome="Formação")
 
     def test_success_rate_requires_authentication(self):
         """
@@ -110,7 +114,7 @@ class TestGCalInsights(TestCase):
 
         # Criar 4 PUBLISHED
         for i in range(4):
-            Solicitacao.objects.create(
+            SolicitacaoFactory(
                 status="aprovado",
                 inicio=ref_date.replace(hour=10 + i),
                 fim=ref_date.replace(hour=11 + i),
@@ -124,7 +128,7 @@ class TestGCalInsights(TestCase):
 
         # Criar 2 ERROR
         for i in range(2):
-            Solicitacao.objects.create(
+            SolicitacaoFactory(
                 status="aprovado",
                 inicio=ref_date.replace(hour=14 + i),
                 fim=ref_date.replace(hour=15 + i),
@@ -137,7 +141,7 @@ class TestGCalInsights(TestCase):
             )
 
         # Criar 1 PENDING
-        Solicitacao.objects.create(
+        SolicitacaoFactory(
             status="aprovado",
             inicio=ref_date.replace(hour=16),
             fim=ref_date.replace(hour=17),
@@ -150,7 +154,7 @@ class TestGCalInsights(TestCase):
         )
 
         # Criar 1 NONE
-        Solicitacao.objects.create(
+        SolicitacaoFactory(
             status="aprovado",
             inicio=ref_date.replace(hour=18),
             fim=ref_date.replace(hour=19),
@@ -194,7 +198,7 @@ class TestGCalInsights(TestCase):
 
         # Fortaleza: 3 PUBLISHED, 1 ERROR
         for i in range(3):
-            Solicitacao.objects.create(
+            SolicitacaoFactory(
                 status="aprovado",
                 inicio=ref_date.replace(hour=10 + i),
                 fim=ref_date.replace(hour=11 + i),
@@ -206,7 +210,7 @@ class TestGCalInsights(TestCase):
                 gcal_status=Solicitacao.GCalStatus.PUBLISHED,
             )
 
-        Solicitacao.objects.create(
+        SolicitacaoFactory(
             status="aprovado",
             inicio=ref_date.replace(hour=14),
             fim=ref_date.replace(hour=15),
@@ -219,7 +223,7 @@ class TestGCalInsights(TestCase):
         )
 
         # Caucaia: 1 PUBLISHED, 2 ERROR
-        Solicitacao.objects.create(
+        SolicitacaoFactory(
             status="aprovado",
             inicio=ref_date.replace(hour=10),
             fim=ref_date.replace(hour=11),
@@ -232,7 +236,7 @@ class TestGCalInsights(TestCase):
         )
 
         for i in range(2):
-            Solicitacao.objects.create(
+            SolicitacaoFactory(
                 status="aprovado",
                 inicio=ref_date.replace(hour=12 + i),
                 fim=ref_date.replace(hour=13 + i),
@@ -286,7 +290,7 @@ class TestGCalInsights(TestCase):
 
         # SUPER: 2 PUBLISHED
         for i in range(2):
-            Solicitacao.objects.create(
+            SolicitacaoFactory(
                 status="aprovado",
                 inicio=ref_date.replace(hour=10 + i),
                 fim=ref_date.replace(hour=11 + i),
@@ -299,7 +303,7 @@ class TestGCalInsights(TestCase):
             )
 
         # OUTROS: 1 ERROR
-        Solicitacao.objects.create(
+        SolicitacaoFactory(
             status="aprovado",
             inicio=ref_date.replace(hour=14),
             fim=ref_date.replace(hour=15),
@@ -365,8 +369,8 @@ class TestGCalInsights(TestCase):
 
         # Criar 25 municípios com 1 evento ERROR cada
         for i in range(25):
-            municipio = Municipio.objects.create(nome=f"Municipio {i}")
-            Solicitacao.objects.create(
+            municipio = MunicipioFactory(nome=f"Municipio {i}")
+            SolicitacaoFactory(
                 status="aprovado",
                 inicio=ref_date,
                 fim=ref_date + timedelta(hours=1),
@@ -411,7 +415,7 @@ class TestGCalInsights(TestCase):
         ref_date = datetime(2025, 2, 20, 10, 0, 0, tzinfo=self.tz_local)
 
         # Evento dentro do período (incluir)
-        Solicitacao.objects.create(
+        SolicitacaoFactory(
             status="aprovado",
             inicio=ref_date,
             fim=ref_date + timedelta(hours=2),
@@ -424,7 +428,7 @@ class TestGCalInsights(TestCase):
         )
 
         # Evento um dia antes (excluir)
-        Solicitacao.objects.create(
+        SolicitacaoFactory(
             status="aprovado",
             inicio=ref_date - timedelta(days=1),
             fim=ref_date - timedelta(days=1, hours=-1),
@@ -437,7 +441,7 @@ class TestGCalInsights(TestCase):
         )
 
         # Evento um dia depois (excluir)
-        Solicitacao.objects.create(
+        SolicitacaoFactory(
             status="aprovado",
             inicio=ref_date + timedelta(days=1),
             fim=ref_date + timedelta(days=1, hours=1),

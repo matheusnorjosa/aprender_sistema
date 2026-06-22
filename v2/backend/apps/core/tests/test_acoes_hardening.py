@@ -25,19 +25,23 @@ from apps.core.models.acoes_notificacao import (
     TipoAncoraChoices,
 )
 from apps.core.services.prazo_engine_service import PrazoEngineService
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.fixture()
 def group(db):  # type: ignore[no-untyped-def]
-    return Group.objects.create(name="Test Executors")
+    return GroupFactory(name="Test Executors")
 
 
 @pytest.fixture()
 def ciclo(db):  # type: ignore[no-untyped-def]
-    from apps.core.models import Municipio, Projeto
-
-    projeto = Projeto.objects.create(nome="Projeto Hardening Test")
-    municipio = Municipio.objects.create(nome="Municipio Test")
+    projeto = ProjetoFactory(nome="Projeto Hardening Test")
+    municipio = MunicipioFactory(nome="Municipio Test")
     return CicloAcoes.objects.create(
         projeto=projeto,
         municipio=municipio,
@@ -84,9 +88,7 @@ def template_c(template_b):  # type: ignore[no-untyped-def]
 
 @pytest.fixture()
 def usuario(db):  # type: ignore[no-untyped-def]
-    from apps.core.models import Usuario
-
-    return Usuario.objects.create_user(  # type: ignore[attr-defined]
+    return UsuarioFactory(
         username="hardening_test",
         password="test123",  # noqa: S106
         first_name="Test",
@@ -106,7 +108,7 @@ class TestExecutorGroupProtect:
         assert Group.objects.filter(pk=group.pk).exists()
 
     def test_delete_group_without_executor_succeeds(self, db) -> None:  # type: ignore[no-untyped-def]
-        g = Group.objects.create(name="Orphan Group")
+        g = GroupFactory(name="Orphan Group")
         g.delete()
         assert not Group.objects.filter(name="Orphan Group").exists()
 

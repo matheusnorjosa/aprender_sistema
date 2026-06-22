@@ -14,8 +14,6 @@ from __future__ import annotations
 
 from unittest import mock
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -31,8 +29,7 @@ from apps.core.services.gcal.circuit_breaker import (
     reset_circuit,
 )
 from apps.core.services.gcal.utils import _retry_with_circuit_breaker
-
-User = get_user_model()
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 
 @pytest.fixture(autouse=True)
@@ -160,14 +157,14 @@ class TestCircuitBreakerEndpoint:
 
     @pytest.fixture
     def staff_user(self, db):
-        user = User.objects.create_user(username="operator", email="operator@test.com", password="x")
-        group, _ = Group.objects.get_or_create(name="Controle")
+        user = UsuarioFactory(username="operator", email="operator@test.com", password="x")
+        group = GroupFactory(name="Controle")
         user.groups.add(group)
         return user
 
     @pytest.fixture
     def regular_user(self, db):
-        return User.objects.create_user(username="regular", email="regular@test.com", password="x")
+        return UsuarioFactory(username="regular", email="regular@test.com", password="x")
 
     def test_returns_closed_state_on_fresh_breaker(self, client, staff_user):
         client.force_authenticate(user=staff_user)

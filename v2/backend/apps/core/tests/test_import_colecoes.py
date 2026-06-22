@@ -14,24 +14,25 @@ Cobertura:
 import tempfile
 from pathlib import Path
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from rest_framework import status
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Colecao, Projeto
+from apps.core.models import Colecao
 from apps.core.services.colecoes_import import import_colecoes_from_file
+from apps.core.tests.factories import (
+    GroupFactory,
+    ProjetoFactory,
+    UsuarioFactory,
+)
 
 IMPORT_COLECOES_URL = "/api/colecoes/import/"
-
-User = get_user_model()
 
 
 @pytest.fixture
 def dat_user(db):
-    user = User.objects.create_user(
+    user = UsuarioFactory(
         username="dat_user",
         email="dat@test.com",
         password="testpass123",
@@ -39,14 +40,14 @@ def dat_user(db):
         first_name="DAT",
         last_name="User",
     )
-    group, _ = Group.objects.get_or_create(name="DAT")
+    group = GroupFactory(name="DAT")
     user.groups.add(group)
     return user
 
 
 @pytest.fixture
 def formador_user(db):
-    user = User.objects.create_user(
+    user = UsuarioFactory(
         username="formador_user",
         email="formador@test.com",
         password="testpass123",
@@ -54,21 +55,14 @@ def formador_user(db):
         first_name="Formador",
         last_name="User",
     )
-    group, _ = Group.objects.get_or_create(name="Formador")
+    group = GroupFactory(name="Formador")
     user.groups.add(group)
     return user
 
 
 @pytest.fixture
 def superuser(db):
-    return User.objects.create_superuser(
-        username="admin",
-        email="admin@test.com",
-        password="testpass123",
-        cpf="99999999999",
-        first_name="Admin",
-        last_name="User",
-    )
+    return UsuarioFactory(superuser=True)
 
 
 @pytest.fixture
@@ -78,7 +72,7 @@ def api_client():
 
 @pytest.fixture
 def projeto_teste(db):
-    return Projeto.objects.create(
+    return ProjetoFactory(
         nome="Projeto Teste",
         codigo="PROJ-TEST",
         fluxo="NAO_SUPER",

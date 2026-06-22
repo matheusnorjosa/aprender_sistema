@@ -11,15 +11,12 @@ Covers:
 
 from __future__ import annotations
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.test import TestCase
 from rest_framework.test import APIClient
 
 from apps.core.models import AuditLog
 from apps.core.serializers.auditoria import _mask_email, _mask_ip, _redact_details
-
-User = get_user_model()
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 _cpf_counter = 0
 
@@ -37,9 +34,14 @@ class TestUsuarioOptionsNoEmail(TestCase):
     """SEC-ENUM-01: /api/options/usuarios/ must not return email field."""
 
     def setUp(self):
-        self.user = User.objects.create_user("enum_test", "enum@test.com", "pass1234", cpf=_next_cpf())
-        User.objects.create_user(
-            "target_user", "target@secret.com", "pass1234", first_name="Target", last_name="User", cpf=_next_cpf()
+        self.user = UsuarioFactory(username="enum_test", email="enum@test.com", password="pass1234", cpf=_next_cpf())
+        UsuarioFactory(
+            username="target_user",
+            email="target@secret.com",
+            password="pass1234",
+            first_name="Target",
+            last_name="User",
+            cpf=_next_cpf(),
         )
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
@@ -64,11 +66,18 @@ class TestUsuarioLookupNoEmail(TestCase):
     """
 
     def setUp(self):
-        coord_group, _ = Group.objects.get_or_create(name="Coordenador")
-        self.user = User.objects.create_user("lookup_test", "lookup@test.com", "pass1234", cpf=_next_cpf())
+        coord_group = GroupFactory(name="Coordenador")
+        self.user = UsuarioFactory(
+            username="lookup_test", email="lookup@test.com", password="pass1234", cpf=_next_cpf()
+        )
         self.user.groups.add(coord_group)
-        User.objects.create_user(
-            "lookup_target", "target@secret.com", "pass1234", first_name="Maria", last_name="Silva", cpf=_next_cpf()
+        UsuarioFactory(
+            username="lookup_target",
+            email="target@secret.com",
+            password="pass1234",
+            first_name="Maria",
+            last_name="Silva",
+            cpf=_next_cpf(),
         )
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
@@ -100,22 +109,26 @@ class TestEmailSearchRestriction(TestCase):
 
     def setUp(self):
         # Create groups
-        self.formador_group, _ = Group.objects.get_or_create(name="Formador")
-        self.coord_group, _ = Group.objects.get_or_create(name="Coordenador")
+        self.formador_group = GroupFactory(name="Formador")
+        self.coord_group = GroupFactory(name="Coordenador")
 
         # Create formador user
-        self.formador = User.objects.create_user("formador1", "formador@test.com", "pass1234", cpf=_next_cpf())
+        self.formador = UsuarioFactory(
+            username="formador1", email="formador@test.com", password="pass1234", cpf=_next_cpf()
+        )
         self.formador.groups.add(self.formador_group)
 
         # Create coordenador user
-        self.coordenador = User.objects.create_user("coord1", "coord@test.com", "pass1234", cpf=_next_cpf())
+        self.coordenador = UsuarioFactory(
+            username="coord1", email="coord@test.com", password="pass1234", cpf=_next_cpf()
+        )
         self.coordenador.groups.add(self.coord_group)
 
         # Create target user with distinct email
-        User.objects.create_user(
-            "target_email",
-            "distinct.email@example.com",
-            "pass1234",
+        UsuarioFactory(
+            username="target_email",
+            email="distinct.email@example.com",
+            password="pass1234",
             first_name="Ana",
             last_name="Costa",
             cpf=_next_cpf(),
@@ -201,14 +214,18 @@ class TestAuditLogViewSetRedaction(TestCase):
 
     def setUp(self):
         # Create groups for HasPerm("operate_preagenda") permission
-        self.controle_group, _ = Group.objects.get_or_create(name="Controle")
+        self.controle_group = GroupFactory(name="Controle")
 
         # Create controle user (can read audit logs but not superuser)
-        self.controle_user = User.objects.create_user("controle_audit", "c@test.com", "pass1234", cpf=_next_cpf())
+        self.controle_user = UsuarioFactory(
+            username="controle_audit", email="c@test.com", password="pass1234", cpf=_next_cpf()
+        )
         self.controle_user.groups.add(self.controle_group)
 
         # Create superuser
-        self.superuser = User.objects.create_superuser("super_audit", "s@test.com", "pass1234", cpf=_next_cpf())
+        self.superuser = UsuarioFactory(
+            superuser=True, username="super_audit", email="s@test.com", password="pass1234", cpf=_next_cpf()
+        )
 
         # Create audit log with PII
         self.audit = AuditLog.objects.create(

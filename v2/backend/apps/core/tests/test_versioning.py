@@ -19,7 +19,7 @@ from rest_framework.response import Response
 from rest_framework.test import APIClient
 
 from apps.core.deprecation import deprecated_endpoint
-from apps.core.models import Usuario
+from apps.core.tests.factories import UsuarioFactory
 
 
 class TestAPIVersioning(TestCase):
@@ -30,7 +30,7 @@ class TestAPIVersioning(TestCase):
         self.client = APIClient()
 
         # Create a user for authenticated endpoints
-        self.user = Usuario.objects.create_user(
+        self.user = UsuarioFactory(
             username="test_versioning",
             email="test_versioning@test.com",
             password="testpass123",

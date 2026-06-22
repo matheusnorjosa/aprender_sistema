@@ -15,12 +15,18 @@ from __future__ import annotations
 
 from datetime import date
 
-from django.contrib.auth.models import Group
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Compra, Municipio, Projeto, TipoEvento, Usuario
+from apps.core.models import Compra
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.fixture
@@ -31,7 +37,7 @@ def api_client():
 @pytest.fixture
 def authenticated_user(db):
     """Criar usuário autenticado para testes"""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="testuser",
         email="test@example.com",
         password="testpass123",
@@ -39,7 +45,7 @@ def authenticated_user(db):
         first_name="Test",
         last_name="User",
     )
-    coord_group, _ = Group.objects.get_or_create(name="Coordenador")
+    coord_group = GroupFactory(name="Coordenador")
     user.groups.add(coord_group)
     return user
 
@@ -48,19 +54,19 @@ def authenticated_user(db):
 def sample_data(db):
     """Criar dados de exemplo para testes"""
     # Municípios
-    m1 = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    m2 = Municipio.objects.create(nome="Sobral", uf="CE", ativo=True)
+    m1 = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    m2 = MunicipioFactory(nome="Sobral", uf="CE", ativo=True)
 
     # Projetos
-    p1 = Projeto.objects.create(nome="ACerta", codigo="ACERTA", ativo=True, fluxo="SUPER")
-    p2 = Projeto.objects.create(nome="Brincando e Aprendendo", codigo="BRINCANDO", ativo=True, fluxo="NAO_SUPER")
+    p1 = ProjetoFactory(nome="ACerta", codigo="ACERTA", ativo=True, fluxo="SUPER")
+    p2 = ProjetoFactory(nome="Brincando e Aprendendo", codigo="BRINCANDO", ativo=True, fluxo="NAO_SUPER")
 
     # Tipos de Evento
-    t1 = TipoEvento.objects.create(nome="Formação")
-    t2 = TipoEvento.objects.create(nome="Acompanhamento")
+    t1 = TipoEventoFactory(nome="Formação")
+    t2 = TipoEventoFactory(nome="Acompanhamento")
 
     # Usuários
-    u1 = Usuario.objects.create_user(
+    u1 = UsuarioFactory(
         username="formador1",
         email="formador1@example.com",
         password="pass123",
@@ -68,7 +74,7 @@ def sample_data(db):
         first_name="João",
         last_name="Silva",
     )
-    formador_group, _ = Group.objects.get_or_create(name="Formador")
+    formador_group = GroupFactory(name="Formador")
     u1.groups.add(formador_group)
 
     return {

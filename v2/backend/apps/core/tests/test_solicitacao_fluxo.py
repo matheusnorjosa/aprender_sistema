@@ -17,13 +17,20 @@ from __future__ import annotations
 
 from datetime import date
 
-from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Compra, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import Compra, Projeto, Solicitacao
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.fixture
@@ -36,11 +43,11 @@ def api_client():
 def grupos():
     """Cria grupos Django."""
     grupos = {
-        "Coordenador": Group.objects.get_or_create(name="Coordenador")[0],
-        "Superintendência": Group.objects.get_or_create(name="Superintendência")[0],
-        "Controle": Group.objects.get_or_create(name="Controle")[0],
-        "DAT": Group.objects.get_or_create(name="DAT")[0],
-        "Gerente": Group.objects.get_or_create(name="Gerente")[0],
+        "Coordenador": GroupFactory(name="Coordenador"),
+        "Superintendência": GroupFactory(name="Superintendência"),
+        "Controle": GroupFactory(name="Controle"),
+        "DAT": GroupFactory(name="DAT"),
+        "Gerente": GroupFactory(name="Gerente"),
     }
     return grupos
 
@@ -48,9 +55,7 @@ def grupos():
 @pytest.fixture
 def usuario_coordenador(grupos):
     """Usuário com perfil Coordenador."""
-    user = Usuario.objects.create_user(
-        username="coord1", password="senha123", cpf="11111111111", email="coord@test.com"
-    )
+    user = UsuarioFactory(username="coord1", password="senha123", cpf="11111111111", email="coord@test.com")
     user.groups.add(grupos["Coordenador"])
     return user
 
@@ -59,9 +64,7 @@ def usuario_coordenador(grupos):
 def usuario_superintendencia(grupos):
     """Gerente da Superintendência (PR 3 hardening RBAC, 2026-04-29):
     composite Setor `Superintendência` + Função `Gerente`."""
-    user = Usuario.objects.create_user(
-        username="super1", password="senha123", cpf="22222222222", email="super@test.com"
-    )
+    user = UsuarioFactory(username="super1", password="senha123", cpf="22222222222", email="super@test.com")
     user.groups.add(grupos["Superintendência"], grupos["Gerente"])
     return user
 
@@ -69,25 +72,25 @@ def usuario_superintendencia(grupos):
 @pytest.fixture
 def municipio():
     """Município de teste."""
-    return Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+    return MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
 
 
 @pytest.fixture
 def projeto_super():
     """Projeto com fluxo SUPER (requer aprovação)."""
-    return Projeto.objects.create(nome="ACerta", codigo="ACERTA", fluxo="SUPER", ativo=True)
+    return ProjetoFactory(nome="ACerta", codigo="ACERTA", fluxo="SUPER", ativo=True)
 
 
 @pytest.fixture
 def projeto_outros():
     """Projeto com fluxo NAO_SUPER (auto-aprovado)."""
-    return Projeto.objects.create(nome="Alfabetização Ceará", codigo="ALFCE", fluxo="NAO_SUPER", ativo=True)
+    return ProjetoFactory(nome="Alfabetização Ceará", codigo="ALFCE", fluxo="NAO_SUPER", ativo=True)
 
 
 @pytest.fixture
 def tipo_evento():
     """Tipo de evento de teste."""
-    return TipoEvento.objects.create(nome="Formação Inicial")
+    return TipoEventoFactory(nome="Formação Inicial")
 
 
 @pytest.fixture
@@ -314,13 +317,13 @@ class TestPreAgendaFiltroPorFluxo:
         - Sem filtro retorna ambos
         """
         # Criar usuário Controle (tem acesso à pré-agenda)
-        usuario_controle = Usuario.objects.create_user(
+        usuario_controle = UsuarioFactory(
             username="controle1", password="senha123", cpf="33333333333", email="controle@test.com"
         )
         usuario_controle.groups.add(grupos["Controle"])
 
         # Criar 2 solicitações: 1 SUPER (pendente→aprovado) + 1 NAO_SUPER (auto-aprovado)
-        sol_super = Solicitacao.objects.create(
+        sol_super = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -331,7 +334,7 @@ class TestPreAgendaFiltroPorFluxo:
             status="aprovado",  # Manualmente aprovada para teste
         )
 
-        sol_outros = Solicitacao.objects.create(
+        sol_outros = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_outros,
@@ -379,13 +382,13 @@ class TestSerializerFluxo:
         - Valor = Projeto.fluxo (SUPER ou NAO_SUPER)
         """
         # Criar usuário Controle
-        usuario_controle = Usuario.objects.create_user(
+        usuario_controle = UsuarioFactory(
             username="controle1", password="senha123", cpf="33333333333", email="controle@test.com"
         )
         usuario_controle.groups.add(grupos["Controle"])
 
         # Criar solicitação SUPER aprovada
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -415,13 +418,13 @@ class TestSerializerFluxo:
         - Solicitação sem projeto → fluxo='NAO_SUPER' (fallback)
         """
         # Criar usuário Controle
-        usuario_controle = Usuario.objects.create_user(
+        usuario_controle = UsuarioFactory(
             username="controle2", password="senha123", cpf="44444444444", email="controle2@test.com"
         )
         usuario_controle.groups.add(grupos["Controle"])
 
         # Criar solicitação SEM projeto (cenário raro, mas testável)
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=None,  # Sem projeto

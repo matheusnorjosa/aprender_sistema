@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from datetime import date
 
-from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 
@@ -19,12 +18,16 @@ from apps.core.models import (
     AcaoTemplate,
     AcaoTemplateExecutor,
     CicloAcoes,
-    Municipio,
     NotificacaoInterna,
-    Projeto,
     RegistroAncora,
     RegistroConclusaoAcao,
     Usuario,
+)
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    UsuarioFactory,
 )
 
 
@@ -35,7 +38,7 @@ def usuario_factory(db):
     def _create(prefix: str = "user") -> Usuario:
         counter["n"] += 1
         n = counter["n"]
-        return Usuario.objects.create_user(
+        return UsuarioFactory(
             username=f"{prefix}{n}",
             email=f"{prefix}{n}@example.com",
             password="testpass123",
@@ -47,12 +50,12 @@ def usuario_factory(db):
 
 @pytest.fixture
 def projeto(db):
-    return Projeto.objects.create(nome="Projeto Teste Acoes")
+    return ProjetoFactory(nome="Projeto Teste Acoes")
 
 
 @pytest.fixture
 def municipio(db):
-    return Municipio.objects.create(nome="Municipio Teste Acoes", uf="CE")
+    return MunicipioFactory(nome="Municipio Teste Acoes", uf="CE")
 
 
 @pytest.fixture
@@ -111,7 +114,7 @@ def test_ciclo_acoes_unique_contexto(projeto, municipio, usuario_factory):
 
 @pytest.mark.django_db
 def test_acao_template_executor_unique_mapping(acao_template):
-    group, _ = Group.objects.get_or_create(name="Comercial")
+    group = GroupFactory(name="Comercial")
     AcaoTemplateExecutor.objects.create(acao_template=acao_template, group=group)
 
     with pytest.raises(IntegrityError):

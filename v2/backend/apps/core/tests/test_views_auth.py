@@ -18,7 +18,6 @@ from __future__ import annotations
 from unittest.mock import patch
 from uuid import uuid4
 
-from django.contrib.auth.models import Group
 from django.core.cache import cache
 from django.test import override_settings
 from rest_framework import status
@@ -26,7 +25,8 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AuditLog, Usuario
+from apps.core.models import AuditLog
+from apps.core.tests.factories import UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -44,7 +44,7 @@ def usuario_ativo():
     """Usuário ativo para testes de login."""
     uid = uuid4().hex
     cpf = str(uuid4().int % 10**11).zfill(11)
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username=f"user_{uid}",
         email=f"user_{uid}@example.com",
         password="testpass123",
@@ -58,7 +58,7 @@ def usuario_inativo():
     """Usuário inativo para testes de bloqueio."""
     uid = uuid4().hex
     cpf = str(uuid4().int % 10**11).zfill(11)
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username=f"inactive_{uid}",
         email=f"inactive_{uid}@example.com",
         password="testpass123",
@@ -72,16 +72,14 @@ def usuario_superintendencia():
     """Usuário do grupo Superintendência."""
     uid = uuid4().hex
     cpf = str(uuid4().int % 10**11).zfill(11)
-    user = Usuario.objects.create_user(
+    return UsuarioFactory(
         username=f"super_{uid}",
         email=f"super_{uid}@example.com",
         password="testpass123",
         cpf=cpf,
         is_active=True,
+        groups=["Superintendência"],
     )
-    grupo, _ = Group.objects.get_or_create(name="Superintendência")
-    user.groups.add(grupo)
-    return user
 
 
 @pytest.fixture

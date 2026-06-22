@@ -6,7 +6,6 @@ Testes da Fase 2 RBAC funcional (#828).
 
 from __future__ import annotations
 
-from django.contrib.auth.models import Group
 from django.core.cache import cache
 from rest_framework.test import APIRequestFactory
 
@@ -14,6 +13,7 @@ import pytest
 
 from apps.core.models import PermissaoFuncional, Usuario
 from apps.core.permissions import HasPerm, IsGerenteSuperintendencia
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -30,8 +30,8 @@ def _request_with_user(factory: APIRequestFactory, user: Usuario):
 
 
 def test_functional_permission_allows_access_via_group_mapping():
-    dat_group, _ = Group.objects.get_or_create(name="DAT")
-    user = Usuario.objects.create_user(
+    dat_group = GroupFactory(name="DAT")
+    user = UsuarioFactory(
         username="dat_funcperm",
         email="dat_funcperm@test.com",
         password="test123",
@@ -44,7 +44,7 @@ def test_functional_permission_allows_access_via_group_mapping():
 
 
 def test_functional_permission_denies_user_without_mapping():
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="sem_funcperm",
         email="sem_funcperm@test.com",
         password="test123",
@@ -57,8 +57,8 @@ def test_functional_permission_denies_user_without_mapping():
 
 def test_functional_permission_cache_hit_miss(django_assert_num_queries):
     cache.clear()
-    dat_group, _ = Group.objects.get_or_create(name="DAT")
-    user = Usuario.objects.create_user(
+    dat_group = GroupFactory(name="DAT")
+    user = UsuarioFactory(
         username="cache_funcperm",
         email="cache_funcperm@test.com",
         password="test123",
@@ -78,8 +78,8 @@ def test_functional_permission_cache_hit_miss(django_assert_num_queries):
 
 def test_cache_invalidated_when_user_groups_change():
     cache.clear()
-    dat_group, _ = Group.objects.get_or_create(name="DAT")
-    user = Usuario.objects.create_user(
+    dat_group = GroupFactory(name="DAT")
+    user = UsuarioFactory(
         username="invalidate_user_groups",
         email="invalidate_user_groups@test.com",
         password="test123",
@@ -97,8 +97,8 @@ def test_cache_invalidated_when_user_groups_change():
 
 def test_cache_invalidated_when_permission_m2m_changes():
     cache.clear()
-    dat_group, _ = Group.objects.get_or_create(name="DAT")
-    user = Usuario.objects.create_user(
+    dat_group = GroupFactory(name="DAT")
+    user = UsuarioFactory(
         username="invalidate_perm_m2m",
         email="invalidate_perm_m2m@test.com",
         password="test123",
@@ -128,8 +128,8 @@ def test_cache_invalidated_when_permission_m2m_changes():
 
 def test_cache_invalidated_when_permission_saved():
     cache.clear()
-    dat_group, _ = Group.objects.get_or_create(name="DAT")
-    user = Usuario.objects.create_user(
+    dat_group = GroupFactory(name="DAT")
+    user = UsuarioFactory(
         username="invalidate_perm_save",
         email="invalidate_perm_save@test.com",
         password="test123",
@@ -160,8 +160,8 @@ def test_cache_invalidated_when_permission_saved():
 
 def test_cache_invalidated_when_permission_deleted():
     cache.clear()
-    dat_group, _ = Group.objects.get_or_create(name="DAT")
-    user = Usuario.objects.create_user(
+    dat_group = GroupFactory(name="DAT")
+    user = UsuarioFactory(
         username="invalidate_perm_delete",
         email="invalidate_perm_delete@test.com",
         password="test123",
@@ -190,10 +190,10 @@ def test_cache_invalidated_when_permission_deleted():
 
 
 def test_is_gerente_superintendencia_requires_funcperm_and_gerente_group():
-    super_group, _ = Group.objects.get_or_create(name="Superintendência")
-    gerente_group, _ = Group.objects.get_or_create(name="Gerente")
+    super_group = GroupFactory(name="Superintendência")
+    gerente_group = GroupFactory(name="Gerente")
 
-    user_ok = Usuario.objects.create_user(
+    user_ok = UsuarioFactory(
         username="gerente_super_ok",
         email="gerente_super_ok@test.com",
         password="test123",
@@ -201,7 +201,7 @@ def test_is_gerente_superintendencia_requires_funcperm_and_gerente_group():
     )
     user_ok.groups.add(super_group, gerente_group)
 
-    user_without_gerente = Usuario.objects.create_user(
+    user_without_gerente = UsuarioFactory(
         username="gerente_super_no_gerente",
         email="gerente_super_no_gerente@test.com",
         password="test123",
@@ -209,7 +209,7 @@ def test_is_gerente_superintendencia_requires_funcperm_and_gerente_group():
     )
     user_without_gerente.groups.add(super_group)
 
-    user_without_super = Usuario.objects.create_user(
+    user_without_super = UsuarioFactory(
         username="gerente_super_no_super",
         email="gerente_super_no_super@test.com",
         password="test123",

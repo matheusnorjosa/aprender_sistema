@@ -13,14 +13,14 @@ Valida hardening do serializer de admin de usuários:
 
 from __future__ import annotations
 
-from django.contrib.auth.models import Group
 from django.test import TestCase
 from rest_framework.test import APIRequestFactory
 
 import pytest
 
-from apps.core.models import PermissaoFuncional, Usuario
+from apps.core.models import PermissaoFuncional
 from apps.core.serializers import UsuarioAdminSerializer
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 
 class AdminUserSecurityTests(TestCase):
@@ -29,16 +29,16 @@ class AdminUserSecurityTests(TestCase):
     def setUp(self):
         """Setup: criar grupos e usuários de teste"""
         # Criar grupos padrão (usando get_or_create para idempotência)
-        self.group_dat, _ = Group.objects.get_or_create(name="DAT")
-        self.group_controle, _ = Group.objects.get_or_create(name="Controle")
-        self.group_super, _ = Group.objects.get_or_create(name="Superintendência")
-        self.group_coord, _ = Group.objects.get_or_create(name="Coordenador")
-        self.group_formador, _ = Group.objects.get_or_create(name="Formador")
-        self.group_gerencia, _ = Group.objects.get_or_create(name="Gerência")
-        self.group_invalid, _ = Group.objects.get_or_create(name="GrupoInválido")  # Não na whitelist
+        self.group_dat = GroupFactory(name="DAT")
+        self.group_controle = GroupFactory(name="Controle")
+        self.group_super = GroupFactory(name="Superintendência")
+        self.group_coord = GroupFactory(name="Coordenador")
+        self.group_formador = GroupFactory(name="Formador")
+        self.group_gerencia = GroupFactory(name="Gerência")
+        self.group_invalid = GroupFactory(name="GrupoInválido")  # Não na whitelist
 
         # Usuário DAT (quem administra usuários)
-        self.user_dat = Usuario.objects.create_user(
+        self.user_dat = UsuarioFactory(
             username="dat_user",
             email="dat@example.com",
             password="T3stP@ssw0rd!Qwerty#2025XyZ",
@@ -47,7 +47,7 @@ class AdminUserSecurityTests(TestCase):
         self.user_dat.groups.add(self.group_dat)
 
         # Usuário comum para testar atribuição
-        self.user_comum = Usuario.objects.create_user(
+        self.user_comum = UsuarioFactory(
             username="comum_user",
             email="comum@example.com",
             password="T3stP@ssw0rd!Qwerty#2025XyZ",
@@ -321,7 +321,7 @@ class AdminUserSecurityTests(TestCase):
         #832 - Grupo fora do fallback estatico passa a ser valido quando vinculado a permissao funcional.
         """
 
-        dynamic_group, _ = Group.objects.get_or_create(name="GrupoDinamicSerializer")
+        dynamic_group = GroupFactory(name="GrupoDinamicSerializer")
         permissao, _ = PermissaoFuncional.objects.get_or_create(
             codename="pode_usar_grupo_dinamico_serializer",
             defaults={
@@ -354,12 +354,7 @@ class AdminUserSecurityTests(TestCase):
         """
         RBAC funcional - superuser pode promover outro usuário a superuser.
         """
-        super_admin = Usuario.objects.create_superuser(
-            username="super_admin",
-            email="super_admin@example.com",
-            password="T3stP@ssw0rd!Qwerty#2025XyZ",
-            cpf="44444444444",
-        )
+        super_admin = UsuarioFactory(superuser=True, cpf="44444444444")
         data = {"is_superuser": True}
 
         request = self.factory.patch(f"/api/usuarios/{self.user_comum.id}/", data)
@@ -380,12 +375,7 @@ class AdminUserSecurityTests(TestCase):
         """
         RBAC funcional - superuser não pode remover o próprio privilégio.
         """
-        super_admin = Usuario.objects.create_superuser(
-            username="self_demote_admin",
-            email="self_demote_admin@example.com",
-            password="T3stP@ssw0rd!Qwerty#2025XyZ",
-            cpf="55555555555",
-        )
+        super_admin = UsuarioFactory(superuser=True, cpf="55555555555")
         data = {"is_superuser": False}
 
         request = self.factory.patch(f"/api/usuarios/{super_admin.id}/", data)
@@ -406,18 +396,8 @@ class AdminUserSecurityTests(TestCase):
         """
         RBAC funcional - último superuser ativo não pode ser removido.
         """
-        last_super = Usuario.objects.create_superuser(
-            username="last_super_admin",
-            email="last_super_admin@example.com",
-            password="T3stP@ssw0rd!Qwerty#2025XyZ",
-            cpf="66666666666",
-        )
-        actor_super = Usuario.objects.create_superuser(
-            username="inactive_super_actor",
-            email="inactive_super_actor@example.com",
-            password="T3stP@ssw0rd!Qwerty#2025XyZ",
-            cpf="77777777777",
-        )
+        last_super = UsuarioFactory(superuser=True, cpf="66666666666")
+        actor_super = UsuarioFactory(superuser=True, cpf="77777777777")
         actor_super.is_active = False
         actor_super.save(update_fields=["is_active"])
 
@@ -440,18 +420,8 @@ class AdminUserSecurityTests(TestCase):
         """
         RBAC funcional - último superuser ativo não pode ser desativado.
         """
-        last_super = Usuario.objects.create_superuser(
-            username="last_super_active",
-            email="last_super_active@example.com",
-            password="T3stP@ssw0rd!Qwerty#2025XyZ",
-            cpf="88888888888",
-        )
-        actor_super = Usuario.objects.create_superuser(
-            username="inactive_super_actor_two",
-            email="inactive_super_actor_two@example.com",
-            password="T3stP@ssw0rd!Qwerty#2025XyZ",
-            cpf="99999999999",
-        )
+        last_super = UsuarioFactory(superuser=True, cpf="88888888888")
+        actor_super = UsuarioFactory(superuser=True, cpf="99999999999")
         actor_super.is_active = False
         actor_super.save(update_fields=["is_active"])
 

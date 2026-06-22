@@ -12,14 +12,20 @@ from django.utils import timezone
 
 import pytest
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import Solicitacao
 from apps.core.services.solicitacao_create import resolve_initial_status
+from apps.core.tests.factories import (
+    MunicipioFactory,
+    ProjetoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
 
 def test_resolve_initial_status_nao_super_returns_aprovado():
-    projeto = Projeto.objects.create(nome="Projeto NS", fluxo="NAO_SUPER", ativo=True)
+    projeto = ProjetoFactory(nome="Projeto NS", fluxo="NAO_SUPER", ativo=True)
 
     decision = resolve_initial_status(projeto=projeto)
 
@@ -29,7 +35,7 @@ def test_resolve_initial_status_nao_super_returns_aprovado():
 
 
 def test_resolve_initial_status_super_returns_pendente():
-    projeto = Projeto.objects.create(nome="Projeto SUPER", fluxo="SUPER", ativo=True)
+    projeto = ProjetoFactory(nome="Projeto SUPER", fluxo="SUPER", ativo=True)
 
     decision = resolve_initial_status(projeto=projeto)
 
@@ -39,15 +45,15 @@ def test_resolve_initial_status_super_returns_pendente():
 
 
 def test_model_create_without_status_no_longer_auto_approves_nao_super():
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="status_model_test",
         password="testpass123",
         cpf="12312312312",
         email="status_model_test@example.com",
     )
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="Projeto NS Model", fluxo="NAO_SUPER", ativo=True)
-    tipo_evento = TipoEvento.objects.create(nome="Formacao")
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="Projeto NS Model", fluxo="NAO_SUPER", ativo=True)
+    tipo_evento = TipoEventoFactory(nome="Formacao")
 
     solicitacao = Solicitacao.objects.create(
         usuario=user,

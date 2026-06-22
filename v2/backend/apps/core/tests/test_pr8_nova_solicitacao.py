@@ -15,14 +15,21 @@ from __future__ import annotations
 
 from datetime import date
 
-from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Compra, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import Compra
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -33,22 +40,22 @@ class TestSolicitacaoNewFields:
     def test_solicitacao_has_new_fields(self):
         """PR 8/N: Solicitacao deve ter todos os novos campos"""
         # Arrange
-        user = Usuario.objects.create_user(
+        user = UsuarioFactory(
             username="coord1",
             password="pass123",
             cpf="12345678901",
             first_name="João",
             last_name="Coordenador",
         )
-        municipio = Municipio.objects.create(nome="Fortaleza", uf="CE")
-        projeto = Projeto.objects.create(nome="Projeto Teste")
-        tipo_evento = TipoEvento.objects.create(nome="Formação")
+        municipio = MunicipioFactory(nome="Fortaleza", uf="CE")
+        projeto = ProjetoFactory(nome="Projeto Teste")
+        tipo_evento = TipoEventoFactory(nome="Formação")
 
         inicio = timezone.now()
         fim = inicio + timezone.timedelta(hours=2)
 
         # Act
-        solicitacao = Solicitacao.objects.create(
+        solicitacao = SolicitacaoFactory(
             usuario=user,
             municipio=municipio,
             projeto=projeto,
@@ -80,11 +87,11 @@ class TestOptionsAPI:
         """GET /api/options/municipios/ deve retornar apenas municípios ativos"""
         # Arrange
         client = APIClient()
-        user = Usuario.objects.create_user(username="user1", password="pass", cpf="11111111111")
+        user = UsuarioFactory(username="user1", password="pass", cpf="11111111111")
         client.force_authenticate(user=user)
 
-        Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-        Municipio.objects.create(nome="Inativo City", uf="XX", ativo=False)
+        MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+        MunicipioFactory(nome="Inativo City", uf="XX", ativo=False)
 
         # Act
         response = client.get("/api/options/municipios/")
@@ -109,12 +116,12 @@ class TestAvailabilityCheckMany:
         """POST /api/availability/check-many/ deve retornar ok=true quando todos disponíveis"""
         # Arrange
         client = APIClient()
-        user1 = Usuario.objects.create_user(username="user1", password="pass", cpf="11111111111")
-        user2 = Usuario.objects.create_user(username="user2", password="pass", cpf="22222222222")
-        coord = Usuario.objects.create_user(username="coord", password="pass", cpf="33333333333")
+        user1 = UsuarioFactory(username="user1", password="pass", cpf="11111111111")
+        user2 = UsuarioFactory(username="user2", password="pass", cpf="22222222222")
+        coord = UsuarioFactory(username="coord", password="pass", cpf="33333333333")
 
         # P2.2: check-many endpoint requires HasPerm("operate_preagenda") permission
-        controle_group, _ = Group.objects.get_or_create(name="Controle")
+        controle_group = GroupFactory(name="Controle")
         coord.groups.add(controle_group)
 
         client.force_authenticate(user=coord)
@@ -156,13 +163,13 @@ class TestSolicitacaoRBAC:
         """PR 8/N: Coordenador pode criar solicitação"""
         # Arrange
         client = APIClient()
-        coord = Usuario.objects.create_user(username="coord1", password="pass", cpf="11111111111")
-        group_coord, _ = Group.objects.get_or_create(name="Coordenador")
+        coord = UsuarioFactory(username="coord1", password="pass", cpf="11111111111")
+        group_coord = GroupFactory(name="Coordenador")
         coord.groups.add(group_coord)
 
-        tipo_evento = TipoEvento.objects.create(nome="Formação")
-        municipio = Municipio.objects.create(nome="Fortaleza", uf="CE")
-        projeto = Projeto.objects.create(nome="Projeto X", fluxo="SUPER")  # SUPER=pendente
+        tipo_evento = TipoEventoFactory(nome="Formação")
+        municipio = MunicipioFactory(nome="Fortaleza", uf="CE")
+        projeto = ProjetoFactory(nome="Projeto X", fluxo="SUPER")  # SUPER=pendente
         Compra.objects.create(
             codigo="COMP-COORD-001",
             projeto=projeto,
@@ -208,11 +215,11 @@ class TestSolicitacaoRBAC:
         """PR 8/N: Formador NÃO pode criar solicitação"""
         # Arrange
         client = APIClient()
-        formador = Usuario.objects.create_user(username="formador1", password="pass", cpf="11111111111")
-        group_formador, _ = Group.objects.get_or_create(name="Formador")
+        formador = UsuarioFactory(username="formador1", password="pass", cpf="11111111111")
+        group_formador = GroupFactory(name="Formador")
         formador.groups.add(group_formador)
 
-        tipo_evento = TipoEvento.objects.create(nome="Formação")
+        tipo_evento = TipoEventoFactory(nome="Formação")
         client.force_authenticate(user=formador)
 
         inicio = timezone.now() + timezone.timedelta(days=1)
@@ -239,8 +246,8 @@ class TestSolicitacaoRBAC:
         """PR 8/N: Superuser pode criar solicitação"""
         # Arrange
         client = APIClient()
-        superuser = Usuario.objects.create_superuser(username="admin", password="pass", cpf="11111111111")
-        tipo_evento = TipoEvento.objects.create(nome="Formação")
+        superuser = UsuarioFactory(superuser=True)
+        tipo_evento = TipoEventoFactory(nome="Formação")
         client.force_authenticate(user=superuser)
 
         inicio = timezone.now() + timezone.timedelta(days=1)
@@ -264,13 +271,13 @@ class TestSolicitacaoRBAC:
     def test_coordenador_sem_compra_para_projeto_recebe_400(self):
         """Coordenador não pode criar solicitação quando município+projeto não têm compra."""
         client = APIClient()
-        coord = Usuario.objects.create_user(username="coord2", password="pass", cpf="22222222222")
-        group_coord, _ = Group.objects.get_or_create(name="Coordenador")
+        coord = UsuarioFactory(username="coord2", password="pass", cpf="22222222222")
+        group_coord = GroupFactory(name="Coordenador")
         coord.groups.add(group_coord)
 
-        tipo_evento = TipoEvento.objects.create(nome="Acompanhamento")
-        municipio = Municipio.objects.create(nome="Sobral", uf="CE")
-        projeto = Projeto.objects.create(nome="Projeto Y", fluxo="SUPER")
+        tipo_evento = TipoEventoFactory(nome="Acompanhamento")
+        municipio = MunicipioFactory(nome="Sobral", uf="CE")
+        projeto = ProjetoFactory(nome="Projeto Y", fluxo="SUPER")
 
         client.force_authenticate(user=coord)
 

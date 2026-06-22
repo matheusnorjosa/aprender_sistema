@@ -17,16 +17,21 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Solicitacao, TipoEvento, Usuario
+from apps.core.models import Solicitacao
 from apps.core.tests.conftest import get_field_errors
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.fixture
 def user_test(db):
     """Cria um usuário de teste com grupo Coordenador (PA-06)"""
-    from django.contrib.auth.models import Group
-
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="testuser",
         email="testuser@example.com",
         password="testpass123",
@@ -34,7 +39,7 @@ def user_test(db):
     )
 
     # PA-06: Adicionar grupo Coordenador para poder criar solicitações
-    coord_group, _ = Group.objects.get_or_create(name="Coordenador")
+    coord_group = GroupFactory(name="Coordenador")
     user.groups.add(coord_group)
 
     return user
@@ -43,13 +48,13 @@ def user_test(db):
 @pytest.fixture
 def tipo_evento_test(db):
     """Cria um tipo de evento de teste"""
-    return TipoEvento.objects.create(nome="Palestra", descricao="Palestra online")
+    return TipoEventoFactory(nome="Palestra", descricao="Palestra online")
 
 
 @pytest.fixture
 def municipio_test(db):
     """Cria um município de teste"""
-    return Municipio.objects.create(nome="Fortaleza", uf="CE")
+    return MunicipioFactory(nome="Fortaleza", uf="CE")
 
 
 @pytest.mark.django_db
@@ -264,10 +269,11 @@ class TestAPICreateSolicitacaoPendente:
         inicio_existente = now + timedelta(days=1, hours=9)
         fim_existente = inicio_existente + timedelta(hours=2)
 
-        Solicitacao.objects.create(
+        SolicitacaoFactory(
             usuario=user_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_test,
+            projeto=None,  # preserva o create original (projeto não era informado)
             inicio=inicio_existente,
             fim=fim_existente,
             status="aprovado",

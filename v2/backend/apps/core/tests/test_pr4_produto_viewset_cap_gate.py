@@ -26,12 +26,12 @@ from __future__ import annotations
 
 import itertools
 
-from django.contrib.auth.models import Group
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Produto, Projeto, Usuario
+from apps.core.models import Produto
+from apps.core.tests.factories import ProjetoFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -39,23 +39,20 @@ pytestmark = pytest.mark.django_db
 _CPF_COUNTER = itertools.count(60000000000)
 
 
-def _user_in_groups(*group_names: str, label: str = "user") -> Usuario:
+def _user_in_groups(*group_names: str, label: str = "user"):
     cpf = str(next(_CPF_COUNTER)).zfill(11)
-    user = Usuario.objects.create_user(
+    return UsuarioFactory(
         username=f"{label}_{cpf}",
         email=f"{label}_{cpf}@example.com",
         password="testpass",
         cpf=cpf,
+        groups=list(group_names),
     )
-    for name in group_names:
-        group, _ = Group.objects.get_or_create(name=name)
-        user.groups.add(group)
-    return user
 
 
 @pytest.fixture
 def produto():
-    projeto = Projeto.objects.create(nome="Projeto Test", codigo="PT", ativo=True)
+    projeto = ProjetoFactory(nome="Projeto Test", codigo="PT", ativo=True)
     return Produto.objects.create(codigo="P001", nome="Produto Teste", projeto=projeto, ativo=True)
 
 
@@ -97,13 +94,7 @@ def test_allowed_personas_can_retrieve_produto(persona, produto):
 
 
 def test_superuser_can_list_produtos(produto):
-    cpf = str(next(_CPF_COUNTER)).zfill(11)
-    user = Usuario.objects.create_superuser(
-        username=f"super_pr4_{cpf}",
-        email=f"super_pr4_{cpf}@example.com",
-        password="testpass",
-        cpf=cpf,
-    )
+    user = UsuarioFactory(superuser=True)
     client = APIClient()
     client.force_authenticate(user=user)
 
@@ -164,7 +155,7 @@ def test_anonymous_blocked_on_list():
 
 def test_dat_can_create_produto():
     user = _user_in_groups("DAT", label="dat_writer")
-    projeto = Projeto.objects.create(nome="Proj W", codigo="PW", ativo=True)
+    projeto = ProjetoFactory(nome="Proj W", codigo="PW", ativo=True)
     client = APIClient()
     client.force_authenticate(user=user)
 
@@ -178,7 +169,7 @@ def test_dat_can_create_produto():
 
 def test_coordenador_cannot_create_produto():
     user = _user_in_groups("Coordenador", label="coord_writer")
-    projeto = Projeto.objects.create(nome="Proj W2", codigo="PW2", ativo=True)
+    projeto = ProjetoFactory(nome="Proj W2", codigo="PW2", ativo=True)
     client = APIClient()
     client.force_authenticate(user=user)
 

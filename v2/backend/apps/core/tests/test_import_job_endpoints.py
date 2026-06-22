@@ -27,8 +27,6 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -36,47 +34,42 @@ from rest_framework.test import APIClient
 import pytest
 
 from apps.core.models import ImportJob
+from apps.core.tests.factories import UsuarioFactory
 
 UPLOAD_URL = "/api/imports/bloqueios/"
 LIST_URL = "/api/imports/"
 
 
-User = get_user_model()
-
-
 @pytest.fixture
 def controle_user(db):
-    user = User.objects.create_user(
+    return UsuarioFactory(
         username="ctrl_imp",
         email="ctrl_imp@test.com",
         password="testpass123",
         cpf="11111111111",
         first_name="Ctrl",
         last_name="Imp",
+        groups=["Controle"],
     )
-    group, _ = Group.objects.get_or_create(name="Controle")
-    user.groups.add(group)
-    return user
 
 
 @pytest.fixture
 def formador_user(db):
-    user = User.objects.create_user(
+    return UsuarioFactory(
         username="frm_imp",
         email="frm_imp@test.com",
         password="testpass123",
         cpf="22222222222",
         first_name="Frm",
         last_name="Imp",
+        groups=["Formador"],
     )
-    group, _ = Group.objects.get_or_create(name="Formador")
-    user.groups.add(group)
-    return user
 
 
 @pytest.fixture
 def super_user(db):
-    return User.objects.create_superuser(
+    return UsuarioFactory(
+        superuser=True,
         username="super_imp",
         email="super_imp@test.com",
         password="testpass123",

@@ -16,26 +16,33 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework import status as http_status
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AuditLog, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import AuditLog, Solicitacao
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.fixture
 def usuario_controle():
     """Usuário do grupo Controle"""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="controle_test_detail",
         email="controle_detail@test.com",
         password="testpass",
         cpf="22222222222",
     )
-    grupo, _ = Group.objects.get_or_create(name="Controle")
+    grupo = GroupFactory(name="Controle")
     user.groups.add(grupo)
     return user
 
@@ -43,13 +50,13 @@ def usuario_controle():
 @pytest.fixture
 def usuario_formador():
     """Usuário sem permissão (grupo Formador)"""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="formador_test_detail",
         email="formador_detail@test.com",
         password="testpass",
         cpf="33333333333",
     )
-    grupo, _ = Group.objects.get_or_create(name="Formador")
+    grupo = GroupFactory(name="Formador")
     user.groups.add(grupo)
     return user
 
@@ -57,19 +64,19 @@ def usuario_formador():
 @pytest.fixture
 def municipio():
     """Município de teste"""
-    return Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+    return MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
 
 
 @pytest.fixture
 def projeto():
     """Projeto de teste"""
-    return Projeto.objects.create(nome="Projeto Detail Test", codigo="PDT", fluxo="SUPER", ativo=True)
+    return ProjetoFactory(nome="Projeto Detail Test", codigo="PDT", fluxo="SUPER", ativo=True)
 
 
 @pytest.fixture
 def tipo_evento():
     """Tipo de evento de teste"""
-    return TipoEvento.objects.create(nome="Formação Detail Test")
+    return TipoEventoFactory(nome="Formação Detail Test")
 
 
 @pytest.fixture
@@ -79,7 +86,7 @@ def solicitacao_aprovada(usuario_controle, municipio, projeto, tipo_evento):
     inicio = now + timedelta(days=5)
     fim = inicio + timedelta(hours=4)
 
-    return Solicitacao.objects.create(
+    return SolicitacaoFactory(
         usuario=usuario_controle,
         municipio=municipio,
         projeto=projeto,

@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from django.contrib.auth.models import Group
 from django.core.cache import cache
 from django.test import TestCase
 from django.utils import timezone
@@ -25,14 +24,17 @@ from apps.core.models import (
     AvailabilityBlock,
     EquipeGerencia,
     Gerencia,
-    Municipio,
     Participation,
-    Projeto,
-    Solicitacao,
-    TipoEvento,
-    Usuario,
 )
 from apps.core.permissions import HasSectorAccess
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 class MockView:
@@ -52,22 +54,17 @@ class TestHasSectorAccessPermission(TestCase):
         self.permission = HasSectorAccess()
 
         # Criar grupos
-        self.controle_group, _ = Group.objects.get_or_create(name="Controle")
-        self.formador_group, _ = Group.objects.get_or_create(name="Formador")
+        self.controle_group = GroupFactory(name="Controle")
+        self.formador_group = GroupFactory(name="Formador")
 
         # Criar gerências
         self.gerencia_vidas = Gerencia.objects.create(nome="GERENCIA 2", nome_setor="Vidas")
         self.gerencia_fluir = Gerencia.objects.create(nome="GERENCIA 3", nome_setor="Fluir")
 
         # Criar usuários
-        self.superuser = Usuario.objects.create_superuser(
-            username="admin",
-            email="admin@test.com",
-            password="admin123",
-            cpf="00000000000",
-        )
+        self.superuser = UsuarioFactory(superuser=True)
 
-        self.user_controle = Usuario.objects.create_user(
+        self.user_controle = UsuarioFactory(
             username="controle_user",
             email="controle@test.com",
             password="test123",
@@ -75,7 +72,7 @@ class TestHasSectorAccessPermission(TestCase):
         )
         self.user_controle.groups.add(self.controle_group)
 
-        self.user_vidas = Usuario.objects.create_user(
+        self.user_vidas = UsuarioFactory(
             username="vidas_user",
             email="vidas@test.com",
             password="test123",
@@ -87,7 +84,7 @@ class TestHasSectorAccessPermission(TestCase):
             papel="FORMADOR",
         )
 
-        self.user_fluir = Usuario.objects.create_user(
+        self.user_fluir = UsuarioFactory(
             username="fluir_user",
             email="fluir@test.com",
             password="test123",
@@ -99,7 +96,7 @@ class TestHasSectorAccessPermission(TestCase):
             papel="FORMADOR",
         )
 
-        self.user_sem_gerencia = Usuario.objects.create_user(
+        self.user_sem_gerencia = UsuarioFactory(
             username="sem_gerencia",
             email="sem@test.com",
             password="test123",
@@ -183,20 +180,15 @@ class TestMonthlyAvailabilityViewMultiSector(TestCase):
         self.client = APIClient()
 
         # Criar grupos
-        self.controle_group, _ = Group.objects.get_or_create(name="Controle")
+        self.controle_group = GroupFactory(name="Controle")
 
         # Criar gerências
         self.gerencia_vidas = Gerencia.objects.create(nome="GERENCIA 2", nome_setor="Vidas")
 
         # Criar usuários
-        self.superuser = Usuario.objects.create_superuser(
-            username="admin",
-            email="admin@test.com",
-            password="admin123",
-            cpf="00000000000",
-        )
+        self.superuser = UsuarioFactory(superuser=True)
 
-        self.user_vidas = Usuario.objects.create_user(
+        self.user_vidas = UsuarioFactory(
             username="vidas_user",
             email="vidas@test.com",
             password="test123",
@@ -208,7 +200,7 @@ class TestMonthlyAvailabilityViewMultiSector(TestCase):
             papel="FORMADOR",
         )
 
-        self.user_controle = Usuario.objects.create_user(
+        self.user_controle = UsuarioFactory(
             username="controle_user",
             email="controle@test.com",
             password="test123",
@@ -264,7 +256,7 @@ class TestMonthlyAvailabilityViewMultiSector(TestCase):
 
         # Segunda gerência e usuário de outro setor
         gerencia_fluir = Gerencia.objects.create(nome="GERENCIA 3", nome_setor="Fluir")
-        user_fluir = Usuario.objects.create_user(
+        user_fluir = UsuarioFactory(
             username="fluir_user",
             email="fluir@test.com",
             password="test123",
@@ -276,12 +268,12 @@ class TestMonthlyAvailabilityViewMultiSector(TestCase):
             papel="FORMADOR",
         )
 
-        municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-        projeto = Projeto.objects.create(nome="Projeto SUPER", fluxo="SUPER", ativo=True)
-        tipo_evento = TipoEvento.objects.create(nome="Formação")
+        municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+        projeto = ProjetoFactory(nome="Projeto SUPER", fluxo="SUPER", ativo=True)
+        tipo_evento = TipoEventoFactory(nome="Formação")
 
         # Evento da gerência do usuário autenticado
-        sol_vidas = Solicitacao.objects.create(
+        sol_vidas = SolicitacaoFactory(
             usuario=self.user_vidas,
             municipio=municipio,
             projeto=projeto,
@@ -293,7 +285,7 @@ class TestMonthlyAvailabilityViewMultiSector(TestCase):
         Participation.objects.create(solicitacao=sol_vidas, usuario=self.user_vidas, role="FORMADOR")
 
         # Evento de outra gerência (não deve aparecer)
-        sol_fluir = Solicitacao.objects.create(
+        sol_fluir = SolicitacaoFactory(
             usuario=user_fluir,
             municipio=municipio,
             projeto=projeto,
@@ -355,8 +347,8 @@ class TestAvailabilityBlockViewSetMultiSector(TestCase):
         self.client = APIClient()
 
         # Criar grupos (get_or_create para evitar duplicatas)
-        self.controle_group, _ = Group.objects.get_or_create(name="Controle")
-        self.superintendencia_group, _ = Group.objects.get_or_create(name="Superintendência")
+        self.controle_group = GroupFactory(name="Controle")
+        self.superintendencia_group = GroupFactory(name="Superintendência")
 
         # Criar gerências com nomes únicos para este teste
         self.gerencia_vidas, _ = Gerencia.objects.get_or_create(
@@ -371,14 +363,9 @@ class TestAvailabilityBlockViewSetMultiSector(TestCase):
 
         unique_suffix = uuid.uuid4().hex[:8]
 
-        self.superuser = Usuario.objects.create_superuser(
-            username=f"admin_block_{unique_suffix}",
-            email=f"admin_block_{unique_suffix}@test.com",
-            password="admin123",
-            cpf=f"99{unique_suffix[:9]}",
-        )
+        self.superuser = UsuarioFactory(superuser=True)
 
-        self.user_vidas = Usuario.objects.create_user(
+        self.user_vidas = UsuarioFactory(
             username=f"vidas_block_{unique_suffix}",
             email=f"vidas_block_{unique_suffix}@test.com",
             password="test123",
@@ -391,7 +378,7 @@ class TestAvailabilityBlockViewSetMultiSector(TestCase):
         )
 
         # Usuário par na mesma gerência (usado para validar IDOR em update/delete)
-        self.user_vidas_peer = Usuario.objects.create_user(
+        self.user_vidas_peer = UsuarioFactory(
             username=f"vidas_peer_{unique_suffix}",
             email=f"vidas_peer_{unique_suffix}@test.com",
             password="test123",
@@ -403,7 +390,7 @@ class TestAvailabilityBlockViewSetMultiSector(TestCase):
             papel="FORMADOR",
         )
 
-        self.user_fluir = Usuario.objects.create_user(
+        self.user_fluir = UsuarioFactory(
             username=f"fluir_block_{unique_suffix}",
             email=f"fluir_block_{unique_suffix}@test.com",
             password="test123",
@@ -415,7 +402,7 @@ class TestAvailabilityBlockViewSetMultiSector(TestCase):
             papel="FORMADOR",
         )
 
-        self.user_controle = Usuario.objects.create_user(
+        self.user_controle = UsuarioFactory(
             username=f"controle_block_{unique_suffix}",
             email=f"controle_block_{unique_suffix}@test.com",
             password="test123",

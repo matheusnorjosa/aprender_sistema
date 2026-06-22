@@ -15,30 +15,37 @@ from datetime import timedelta
 from types import SimpleNamespace
 from uuid import uuid4
 
-from django.contrib.auth.models import Group
 from django.db import close_old_connections
 from django.utils import timezone
 
 import pytest
 
 from apps.core.exceptions import ValidationAPIError
-from apps.core.models import AuditLog, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import AuditLog, Solicitacao, Usuario
 from apps.core.services.solicitacao_approval import approve_solicitacao, batch_approve_solicitacoes
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.fixture
 def grupos():
     return {
-        "Superintendência": Group.objects.get_or_create(name="Superintendência")[0],
-        "Gerente": Group.objects.get_or_create(name="Gerente")[0],
-        "Coordenador": Group.objects.get_or_create(name="Coordenador")[0],
+        "Superintendência": GroupFactory(name="Superintendência"),
+        "Gerente": GroupFactory(name="Gerente"),
+        "Coordenador": GroupFactory(name="Coordenador"),
     }
 
 
 @pytest.fixture
 def usuario_superintendencia(grupos):
     uid = uuid4().hex[:8]
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"super_conc_{uid}",
         password="senha123",
         cpf=str(uuid4().int % 10**11).zfill(11),
@@ -52,7 +59,7 @@ def usuario_superintendencia(grupos):
 @pytest.fixture
 def usuario_coordenador(grupos):
     uid = uuid4().hex[:8]
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"coord_conc_{uid}",
         password="senha123",
         cpf=str(uuid4().int % 10**11).zfill(11),
@@ -64,13 +71,13 @@ def usuario_coordenador(grupos):
 
 @pytest.fixture
 def municipio():
-    return Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+    return MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
 
 
 @pytest.fixture
 def projeto_super():
     uid = uuid4().hex[:8]
-    return Projeto.objects.create(
+    return ProjetoFactory(
         nome=f"Projeto Concorrencia {uid}",
         codigo=f"PC{uid[:5]}",
         fluxo="SUPER",
@@ -80,7 +87,7 @@ def projeto_super():
 
 @pytest.fixture
 def tipo_evento():
-    return TipoEvento.objects.get_or_create(nome="Formacao Concorrencia")[0]
+    return TipoEventoFactory(nome="Formacao Concorrencia")
 
 
 @pytest.mark.django_db(transaction=True)
@@ -98,7 +105,7 @@ def test_approve_solicitacao_allows_single_winner_under_concurrency(
     - exactly 1 approval wins
     - exactly 1 AuditLog APPROVE is created for the solicitacao
     """
-    solicitacao = Solicitacao.objects.create(
+    solicitacao = SolicitacaoFactory(
         usuario=usuario_coordenador,
         municipio=municipio,
         projeto=projeto_super,
@@ -160,7 +167,7 @@ def test_batch_approve_solicitacoes_blocks_double_approval_race(
     - second call returns the item as already processed
     - only one APPROVE AuditLog is persisted
     """
-    solicitacao = Solicitacao.objects.create(
+    solicitacao = SolicitacaoFactory(
         usuario=usuario_coordenador,
         municipio=municipio,
         projeto=projeto_super,

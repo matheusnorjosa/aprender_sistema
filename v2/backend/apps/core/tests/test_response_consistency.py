@@ -18,8 +18,14 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 from apps.core.responses import APIResponse
+from apps.core.tests.factories import (
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 class TestAPIResponseFactory(TestCase):
@@ -89,27 +95,23 @@ class TestReportsResponseConsistency(TestCase):
         self.client = APIClient()
 
         # Create superuser with permission
-        self.user = Usuario.objects.create_superuser(
-            username="admin_consistency",
-            email="admin_consistency@test.com",
-            password="testpass123",
-        )
+        self.user = UsuarioFactory(superuser=True)
         self.client.force_authenticate(user=self.user)
 
         # Create required objects
-        self.municipio = Municipio.objects.create(
+        self.municipio = MunicipioFactory(
             nome="Test City",
             uf="CE",
             latitude=Decimal("-3.7172"),
             longitude=Decimal("-38.5433"),
         )
-        self.tipo_evento = TipoEvento.objects.create(nome="Test Type")
-        self.projeto = Projeto.objects.create(nome="Test Project")
+        self.tipo_evento = TipoEventoFactory(nome="Test Type")
+        self.projeto = ProjetoFactory(nome="Test Project")
 
         # Create some solicitações
         now = timezone.now()
         for i in range(5):
-            Solicitacao.objects.create(
+            SolicitacaoFactory(
                 usuario=self.user,
                 status="aprovado",
                 municipio=self.municipio,

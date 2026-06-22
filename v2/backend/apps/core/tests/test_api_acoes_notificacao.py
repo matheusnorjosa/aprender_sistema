@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
-from django.contrib.auth.models import Group
 from rest_framework.test import APIClient
 
 import pytest
@@ -19,12 +18,11 @@ from apps.core.models import (
     AcaoTemplateExecutor,
     AuditLog,
     CicloAcoes,
-    Municipio,
     NotificacaoInterna,
-    Projeto,
     Usuario,
 )
 from apps.core.services.prazo_engine_service import PrazoEngineService
+from apps.core.tests.factories import GroupFactory, MunicipioFactory, ProjetoFactory, UsuarioFactory
 
 
 @pytest.fixture
@@ -45,7 +43,7 @@ def user_factory(db):
     ) -> Usuario:
         counter["n"] += 1
         idx = counter["n"]
-        user = Usuario.objects.create_user(
+        user = UsuarioFactory(
             username=f"{prefix}_{idx}",
             email=f"{prefix}_{idx}@example.com",
             password="testpass123",
@@ -54,7 +52,7 @@ def user_factory(db):
             is_staff=is_staff,
         )
         for group_name in groups or []:
-            group, _ = Group.objects.get_or_create(name=group_name)
+            group = GroupFactory(name=group_name)
             user.groups.add(group)
         return user
 
@@ -63,8 +61,8 @@ def user_factory(db):
 
 @pytest.fixture
 def base_entities(db):
-    projeto = Projeto.objects.create(nome="Projeto API Acoes")
-    municipio = Municipio.objects.create(nome="Municipio API Acoes", uf="CE")
+    projeto = ProjetoFactory(nome="Projeto API Acoes")
+    municipio = MunicipioFactory(nome="Municipio API Acoes", uf="CE")
     return {"projeto": projeto, "municipio": municipio}
 
 
@@ -86,7 +84,7 @@ def ciclo_com_acao(base_entities, user_factory):
         ref_evento_externo="EVENT_API",
         dias_prazo_uteis=1,
     )
-    comercial, _ = Group.objects.get_or_create(name="Comercial")
+    comercial = GroupFactory(name="Comercial")
     AcaoTemplateExecutor.objects.create(acao_template=template, group=comercial, ativo=True)
     action = AcaoInstancia.objects.create(
         ciclo=ciclo,
@@ -110,7 +108,7 @@ def test_ciclo_create_auto_instantiates_actions(api_client, user_factory, base_e
         ref_evento_externo="EVENT_CREATE",
         dias_prazo_uteis=2,
     )
-    comercial, _ = Group.objects.get_or_create(name="Comercial")
+    comercial = GroupFactory(name="Comercial")
     AcaoTemplateExecutor.objects.create(acao_template=template, group=comercial, ativo=True)
 
     # Não-superuser (qualquer grupo) é 403

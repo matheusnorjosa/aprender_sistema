@@ -18,14 +18,14 @@ from __future__ import annotations
 from datetime import timedelta
 from uuid import uuid4
 
-from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AvailabilityBlock, Municipio, Usuario
+from apps.core.models import AvailabilityBlock
+from apps.core.tests.factories import GroupFactory, MunicipioFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -33,14 +33,14 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture
 def grupo_controle():
     """Grupo Controle (permissão para check-many)."""
-    grupo, _ = Group.objects.get_or_create(name="Controle")
+    grupo = GroupFactory(name="Controle")
     return grupo
 
 
 @pytest.fixture
 def grupo_superintendencia():
     """Grupo Superintendência (permissão para check-many)."""
-    grupo, _ = Group.objects.get_or_create(name="Superintendência")
+    grupo = GroupFactory(name="Superintendência")
     return grupo
 
 
@@ -48,7 +48,7 @@ def grupo_superintendencia():
 def user_controle(grupo_controle):
     """Usuário do grupo Controle com permissão para check-many."""
     uid = uuid4().hex[:8]
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"controle_batch_{uid}",
         email=f"controle_batch_{uid}@test.com",
         password="testpass123",
@@ -62,7 +62,7 @@ def user_controle(grupo_controle):
 def user_formador():
     """Usuário formador comum (sem permissão para check-many de outros)."""
     uid = uuid4().hex[:8]
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username=f"formador_batch_{uid}",
         email=f"formador_batch_{uid}@test.com",
         password="testpass123",
@@ -74,7 +74,7 @@ def user_formador():
 def formador_1():
     """Primeiro formador para testes batch."""
     uid = uuid4().hex[:8]
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username=f"formador1_{uid}",
         email=f"formador1_{uid}@test.com",
         password="testpass123",
@@ -86,7 +86,7 @@ def formador_1():
 def formador_2():
     """Segundo formador para testes batch."""
     uid = uuid4().hex[:8]
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username=f"formador2_{uid}",
         email=f"formador2_{uid}@test.com",
         password="testpass123",
@@ -98,7 +98,7 @@ def formador_2():
 def municipio():
     """Município para testes."""
     uid = uuid4().hex[:8]
-    return Municipio.objects.create(nome=f"Cidade Batch {uid}", uf="CE")
+    return MunicipioFactory(nome=f"Cidade Batch {uid}", uf="CE")
 
 
 class TestAvailabilityCheckManyEndpoint:

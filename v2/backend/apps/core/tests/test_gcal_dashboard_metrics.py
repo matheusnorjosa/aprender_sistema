@@ -14,26 +14,33 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework import status as http_status
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import Solicitacao
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.fixture
 def usuario_controle():
     """Usuário do grupo Controle"""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="controle_sprint5",
         email="controle_sprint5@test.com",
         password="testpass",
         cpf="11111111111",
     )
-    grupo, _ = Group.objects.get_or_create(name="Controle")
+    grupo = GroupFactory(name="Controle")
     user.groups.add(grupo)
     return user
 
@@ -41,19 +48,19 @@ def usuario_controle():
 @pytest.fixture
 def municipio():
     """Município de teste"""
-    return Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+    return MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
 
 
 @pytest.fixture
 def projeto():
     """Projeto de teste"""
-    return Projeto.objects.create(nome="Projeto Sprint5", codigo="SP5", fluxo="SUPER", ativo=True)
+    return ProjetoFactory(nome="Projeto Sprint5", codigo="SP5", fluxo="SUPER", ativo=True)
 
 
 @pytest.fixture
 def tipo_evento():
     """Tipo de evento de teste"""
-    return TipoEvento.objects.create(nome="Formação Sprint5")
+    return TipoEventoFactory(nome="Formação Sprint5")
 
 
 def create_solicitacao(usuario, municipio, projeto, tipo_evento, gcal_status, data_offset_days, gcal_last_error=""):
@@ -62,7 +69,7 @@ def create_solicitacao(usuario, municipio, projeto, tipo_evento, gcal_status, da
     inicio = now + timedelta(days=data_offset_days)
     fim = inicio + timedelta(hours=3)
 
-    sol = Solicitacao.objects.create(
+    sol = SolicitacaoFactory(
         usuario=usuario,
         municipio=municipio,
         projeto=projeto,
@@ -203,13 +210,13 @@ class TestDashboardMetrics:
         Caso 5: Endpoint exige permissão Controle ou Superintendência
         """
         # Usuário sem grupo Controle/Super
-        user = Usuario.objects.create_user(
+        user = UsuarioFactory(
             username="coordenador_sprint5",
             email="coordenador@test.com",
             password="testpass",
             cpf="22222222222",
         )
-        grupo_coord, _ = Group.objects.get_or_create(name="Coordenador")
+        grupo_coord = GroupFactory(name="Coordenador")
         user.groups.add(grupo_coord)
 
         client = APIClient()
@@ -370,13 +377,13 @@ class TestDashboardEvents:
         Caso 7: Endpoint exige permissão Controle ou Superintendência
         """
         # Usuário sem grupo Controle/Super
-        user = Usuario.objects.create_user(
+        user = UsuarioFactory(
             username="formador_sprint5",
             email="formador@test.com",
             password="testpass",
             cpf="33333333333",
         )
-        grupo_formador, _ = Group.objects.get_or_create(name="Formador")
+        grupo_formador = GroupFactory(name="Formador")
         user.groups.add(grupo_formador)
 
         client = APIClient()

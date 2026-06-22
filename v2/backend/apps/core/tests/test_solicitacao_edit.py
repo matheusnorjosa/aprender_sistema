@@ -31,14 +31,21 @@ from __future__ import annotations
 from datetime import timedelta
 from uuid import uuid4
 
-from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AuditLog, Municipio, Participation, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import AuditLog, Participation, Solicitacao
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -51,21 +58,21 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture
 def grupo_superintendencia():
     """Grupo Superintendência para testes."""
-    group, _ = Group.objects.get_or_create(name="Superintendência")
+    group = GroupFactory(name="Superintendência")
     return group
 
 
 @pytest.fixture
 def grupo_dat():
     """Grupo DAT para testes."""
-    group, _ = Group.objects.get_or_create(name="DAT")
+    group = GroupFactory(name="DAT")
     return group
 
 
 @pytest.fixture
 def grupo_coordenador():
     """Grupo Coordenador para testes."""
-    group, _ = Group.objects.get_or_create(name="Coordenador")
+    group = GroupFactory(name="Coordenador")
     return group
 
 
@@ -73,7 +80,7 @@ def grupo_coordenador():
 def usuario_owner(grupo_coordenador):
     """Usuário dono da solicitação (Coordenador)."""
     cpf = str(uuid4().int % 10**11).zfill(11)
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"owner_{uuid4().hex[:8]}",
         email=f"owner_{uuid4().hex[:8]}@test.com",
         password="testpass123",
@@ -88,7 +95,7 @@ def usuario_owner(grupo_coordenador):
 def usuario_outro(grupo_coordenador):
     """Outro usuário comum (não é owner nem privilegiado)."""
     cpf = str(uuid4().int % 10**11).zfill(11)
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"outro_{uuid4().hex[:8]}",
         email=f"outro_{uuid4().hex[:8]}@test.com",
         password="testpass123",
@@ -102,7 +109,7 @@ def usuario_outro(grupo_coordenador):
 @pytest.fixture
 def grupo_gerente():
     """Issue #1222 (Epic 1): grupo Gerente tem edit_solicitation_as_owner_or_privileged."""
-    group, _ = Group.objects.get_or_create(name="Gerente")
+    group = GroupFactory(name="Gerente")
     return group
 
 
@@ -112,7 +119,7 @@ def usuario_superintendencia(grupo_superintendencia, grupo_gerente):
     edit/delete, fixture adiciona grupo Gerente que tem
     `edit_solicitation_as_owner_or_privileged` no seed realinhado."""
     cpf = str(uuid4().int % 10**11).zfill(11)
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"super_{uuid4().hex[:8]}",
         email=f"super_{uuid4().hex[:8]}@test.com",
         password="testpass123",
@@ -128,7 +135,7 @@ def usuario_dat(grupo_dat, grupo_gerente):
     """Issue #1222 (Epic 1): fixture adiciona grupo Gerente para preservar
     tests legacy de 'privileged' edit/delete."""
     cpf = str(uuid4().int % 10**11).zfill(11)
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"dat_{uuid4().hex[:8]}",
         email=f"dat_{uuid4().hex[:8]}@test.com",
         password="testpass123",
@@ -142,7 +149,7 @@ def usuario_dat(grupo_dat, grupo_gerente):
 @pytest.fixture
 def municipio():
     """Município para testes."""
-    return Municipio.objects.create(
+    return MunicipioFactory(
         nome=f"Município {uuid4().hex[:8]}",
         uf="CE",
     )
@@ -151,7 +158,7 @@ def municipio():
 @pytest.fixture
 def projeto():
     """Projeto para testes (SUPER para evitar auto-aprovação)."""
-    return Projeto.objects.create(
+    return ProjetoFactory(
         nome=f"Projeto {uuid4().hex[:8]}",
         fluxo="SUPER",
     )
@@ -160,7 +167,7 @@ def projeto():
 @pytest.fixture
 def projeto_nao_super():
     """Projeto NAO_SUPER para testes (auto-aprovação)."""
-    return Projeto.objects.create(
+    return ProjetoFactory(
         nome=f"Projeto NAO_SUPER {uuid4().hex[:8]}",
         fluxo="NAO_SUPER",
     )
@@ -169,7 +176,7 @@ def projeto_nao_super():
 @pytest.fixture
 def tipo_evento():
     """Tipo de evento para testes."""
-    return TipoEvento.objects.create(
+    return TipoEventoFactory(
         nome=f"Tipo {uuid4().hex[:8]}",
     )
 
@@ -177,7 +184,7 @@ def tipo_evento():
 @pytest.fixture
 def solicitacao_editavel(usuario_owner, municipio, projeto, tipo_evento):
     """Solicitação editável (pendente ou aprovada, não publicada)."""
-    return Solicitacao.objects.create(
+    return SolicitacaoFactory(
         usuario=usuario_owner,
         municipio=municipio,
         projeto=projeto,
@@ -194,7 +201,7 @@ def solicitacao_editavel(usuario_owner, municipio, projeto, tipo_evento):
 @pytest.fixture
 def solicitacao_publicada(usuario_owner, municipio, projeto, tipo_evento):
     """Solicitação já publicada no GCal (não editável)."""
-    return Solicitacao.objects.create(
+    return SolicitacaoFactory(
         usuario=usuario_owner,
         municipio=municipio,
         projeto=projeto,
@@ -211,7 +218,7 @@ def solicitacao_publicada(usuario_owner, municipio, projeto, tipo_evento):
 @pytest.fixture
 def solicitacao_reprovada(usuario_owner, municipio, projeto, tipo_evento):
     """Solicitação reprovada (não editável)."""
-    return Solicitacao.objects.create(
+    return SolicitacaoFactory(
         usuario=usuario_owner,
         municipio=municipio,
         projeto=projeto,
@@ -562,7 +569,7 @@ class TestSolicitacaoEditFields:
 @pytest.fixture
 def grupo_formador():
     """Grupo Formador para testes."""
-    group, _ = Group.objects.get_or_create(name="Formador")
+    group = GroupFactory(name="Formador")
     return group
 
 
@@ -570,7 +577,7 @@ def grupo_formador():
 def formador_1(grupo_formador):
     """Formador 1 para testes."""
     cpf = str(uuid4().int % 10**11).zfill(11)
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"formador1_{uuid4().hex[:8]}",
         email=f"formador1_{uuid4().hex[:8]}@test.com",
         password="testpass123",
@@ -587,7 +594,7 @@ def formador_1(grupo_formador):
 def formador_2(grupo_formador):
     """Formador 2 para testes."""
     cpf = str(uuid4().int % 10**11).zfill(11)
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"formador2_{uuid4().hex[:8]}",
         email=f"formador2_{uuid4().hex[:8]}@test.com",
         password="testpass123",
@@ -604,7 +611,7 @@ def formador_2(grupo_formador):
 def formador_3(grupo_formador):
     """Formador 3 para testes."""
     cpf = str(uuid4().int % 10**11).zfill(11)
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"formador3_{uuid4().hex[:8]}",
         email=f"formador3_{uuid4().hex[:8]}@test.com",
         password="testpass123",
@@ -620,7 +627,7 @@ def formador_3(grupo_formador):
 @pytest.fixture
 def solicitacao_com_formador(usuario_owner, municipio, projeto, tipo_evento, formador_1):
     """Solicitação com um formador já associado."""
-    sol = Solicitacao.objects.create(
+    sol = SolicitacaoFactory(
         usuario=usuario_owner,
         municipio=municipio,
         projeto=projeto,
@@ -914,7 +921,7 @@ class TestSolicitacaoDelete:
     ):
         """Pode excluir solicitação NAO_SUPER aprovada (se não publicada)."""
         # Criar solicitação NAO_SUPER já aprovada para validar regra de exclusão.
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_owner,
             municipio=municipio,
             projeto=projeto_nao_super,
@@ -939,7 +946,7 @@ class TestSolicitacaoDelete:
     ):
         """Pode excluir solicitação NAO_SUPER reprovada (se não publicada)."""
         # Criar e reprovar solicitação NAO_SUPER.
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_owner,
             municipio=municipio,
             projeto=projeto_nao_super,

@@ -35,6 +35,7 @@ mark_test_projects = migration_module.mark_test_projects
 unmark_test_projects = migration_module.unmark_test_projects
 
 
+@pytest.mark.migrations
 @pytest.mark.django_db
 class TestMarkTestProjectsMigration:
     """Tests for mark_test_projects data migration."""

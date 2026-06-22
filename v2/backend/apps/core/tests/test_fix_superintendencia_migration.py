@@ -36,6 +36,7 @@ fix_superintendencia_fluxo = migration_module.fix_superintendencia_fluxo
 reverse_superintendencia_fluxo = migration_module.reverse_superintendencia_fluxo
 
 
+@pytest.mark.migrations
 @pytest.mark.django_db
 class TestFixSuperintendenciaFluxoMigration:
     """Tests for fix_superintendencia_fluxo data migration."""

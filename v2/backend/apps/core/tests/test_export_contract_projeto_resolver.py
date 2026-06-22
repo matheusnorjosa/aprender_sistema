@@ -14,8 +14,8 @@ from __future__ import annotations
 
 import pytest
 
-from apps.core.models import Projeto
 from apps.core.services.export_contract_projeto_resolver import resolve_projeto_export
+from apps.core.tests.factories import ProjetoFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -37,7 +37,7 @@ def catalogo():
         "ACerta Português",
         "Avançando Juntos Português",
     ]
-    return {n: Projeto.objects.create(nome=n, fluxo="NAO_SUPER") for n in nomes}
+    return {n: ProjetoFactory(nome=n, fluxo="NAO_SUPER") for n in nomes}
 
 
 def _assert_matches(raw, expected_nome):
@@ -104,8 +104,8 @@ def test_avancando_juntos_portugues_nao_vira_lingua_portuguesa(catalogo):
 def test_ambiguidade_falha_explicita(db):
     # Dois projetos que colapsam para a mesma chave canônica (& <-> E).
     # Raw com hífen NÃO casa nenhum norm exato → cai na chave canônica, que casa os 2 → ambíguo.
-    Projeto.objects.create(nome="Vida & Matemática 6", fluxo="NAO_SUPER")
-    Projeto.objects.create(nome="Vida E Matemática 6", fluxo="NAO_SUPER")
+    ProjetoFactory(nome="Vida & Matemática 6", fluxo="NAO_SUPER")
+    ProjetoFactory(nome="Vida E Matemática 6", fluxo="NAO_SUPER")
     res = resolve_projeto_export("VIDA - E - MATEMATICA 6")
     assert res.status == "ambiguous", f"esperado ambiguous, veio {res.status}"
     assert res.projeto is None

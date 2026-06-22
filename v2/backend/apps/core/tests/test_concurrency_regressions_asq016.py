@@ -22,7 +22,6 @@ from datetime import timezone as dt_timezone
 from unittest import mock
 from uuid import uuid4
 
-from django.contrib.auth.models import Group
 from django.db import close_old_connections
 from django.utils import timezone
 
@@ -31,19 +30,23 @@ import pytest
 from apps.core.models import (
     AvailabilityBlock,
     GoogleOAuthCredential,
-    Municipio,
-    Projeto,
     Solicitacao,
-    TipoEvento,
-    Usuario,
 )
 from apps.core.services.bloqueios_import import import_bloqueios_from_file
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.fixture
 def usuario():
     uid = uuid4().hex[:8]
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username=f"asq016_{uid}",
         password="x",
         cpf=str(uuid4().int % 10**11).zfill(11),
@@ -171,17 +174,17 @@ class _RecordingCalendarClient:
 
 @pytest.fixture
 def solicitacao_aprovada(usuario):
-    muni = Municipio.objects.create(nome=f"Mun_{uuid4().hex[:6]}", uf="CE", ativo=True)
-    proj = Projeto.objects.create(
+    muni = MunicipioFactory(nome=f"Mun_{uuid4().hex[:6]}", uf="CE", ativo=True)
+    proj = ProjetoFactory(
         nome=f"Proj_{uuid4().hex[:6]}",
         codigo=f"P{uuid4().hex[:5]}",
         fluxo="SUPER",
         ativo=True,
     )
-    tipo = TipoEvento.objects.get_or_create(nome="Evt_ASQ016")[0]
-    group, _ = Group.objects.get_or_create(name="Coordenador")
+    tipo = TipoEventoFactory(nome="Evt_ASQ016")
+    group = GroupFactory(name="Coordenador")
     usuario.groups.add(group)
-    return Solicitacao.objects.create(
+    return SolicitacaoFactory(
         usuario=usuario,
         municipio=muni,
         projeto=proj,

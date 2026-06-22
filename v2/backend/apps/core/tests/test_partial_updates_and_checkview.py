@@ -18,7 +18,15 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AvailabilityBlock, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import AvailabilityBlock
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -26,31 +34,29 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture
 def municipio():
     """Fixture para criar município de teste."""
-    return Municipio.objects.create(nome="Fortaleza", uf="CE")
+    return MunicipioFactory(nome="Fortaleza", uf="CE")
 
 
 @pytest.fixture
 def tipo_evento():
     """Fixture para criar tipo de evento de teste."""
-    return TipoEvento.objects.create(nome="Formação")
+    return TipoEventoFactory(nome="Formação")
 
 
 @pytest.fixture
 def projeto():
     """Fixture para criar projeto de teste."""
-    return Projeto.objects.create(nome="Projeto Teste", descricao="Desc")
+    return ProjetoFactory(nome="Projeto Teste", descricao="Desc")
 
 
 def auth_client(user=None):
     """Issue #1222 (Epic 1): user adicionado ao grupo Controle (que tem
     `view_all_availability`) para CRUD de bloqueios e operate_preagenda
     para acessar /api/solicitacoes/."""
-    from django.contrib.auth.models import Group
-
     client = APIClient()
     if user is None:
-        user = Usuario.objects.create_user(username="u1", email="u1@x.com", password="x")
-        grupo_controle, _ = Group.objects.get_or_create(name="Controle")
+        user = UsuarioFactory(username="u1", email="u1@x.com", password="x")
+        grupo_controle = GroupFactory(name="Controle")
         user.groups.add(grupo_controle)
     client.force_authenticate(user=user)
     return client, user
@@ -65,7 +71,7 @@ def test_partial_update_solicitacao_only_observacoes_ok(municipio, tipo_evento):
     """
     c, u = auth_client()
     now = timezone.now()
-    s = Solicitacao.objects.create(
+    s = SolicitacaoFactory(
         usuario=u,
         municipio=municipio,
         tipo_evento=tipo_evento,
@@ -115,12 +121,10 @@ def test_availability_check_invalid_user_id_returns_400():
     Para validar parâmetros (400), usuário deve ter permissão.
     Adiciona usuário ao grupo Controle para passar RBAC (403→400).
     """
-    from django.contrib.auth.models import Group
-
     c, u = auth_client()
 
     # Dar permissão ao usuário (evitar 403 antes de validar parâmetros)
-    grupo_controle, _ = Group.objects.get_or_create(name="Controle")
+    grupo_controle = GroupFactory(name="Controle")
     u.groups.add(grupo_controle)
 
     now = timezone.now()
@@ -147,12 +151,10 @@ def test_availability_check_invalid_municipio_id_returns_400():
     Para validar parâmetros (400), usuário deve ter permissão.
     Adiciona usuário ao grupo Controle para passar RBAC (403→400).
     """
-    from django.contrib.auth.models import Group
-
     c, u = auth_client()
 
     # Dar permissão ao usuário (evitar 403 antes de validar parâmetros)
-    grupo_controle, _ = Group.objects.get_or_create(name="Controle")
+    grupo_controle = GroupFactory(name="Controle")
     u.groups.add(grupo_controle)
 
     now = timezone.now()
@@ -177,12 +179,10 @@ def test_availability_check_missing_dates_returns_400():
     Para validar parâmetros (400), usuário deve ter permissão.
     Adiciona usuário ao grupo Controle para passar RBAC (403→400).
     """
-    from django.contrib.auth.models import Group
-
     c, u = auth_client()
 
     # Dar permissão ao usuário (evitar 403 antes de validar parâmetros)
-    grupo_controle, _ = Group.objects.get_or_create(name="Controle")
+    grupo_controle = GroupFactory(name="Controle")
     u.groups.add(grupo_controle)
 
     url = reverse("core:availability-check")
@@ -207,12 +207,10 @@ def test_availability_check_fim_before_inicio_returns_400():
     Para validar parâmetros (400), usuário deve ter permissão.
     Adiciona usuário ao grupo Controle para passar RBAC (403→400).
     """
-    from django.contrib.auth.models import Group
-
     c, u = auth_client()
 
     # Dar permissão ao usuário (evitar 403 antes de validar parâmetros)
-    grupo_controle, _ = Group.objects.get_or_create(name="Controle")
+    grupo_controle = GroupFactory(name="Controle")
     u.groups.add(grupo_controle)
 
     now = timezone.now()

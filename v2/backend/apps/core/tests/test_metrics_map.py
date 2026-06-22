@@ -18,14 +18,21 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from django.contrib.auth.models import Group
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Compra, Municipio, Participation, Produto, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import Compra, Participation, Produto
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -38,19 +45,19 @@ pytestmark = pytest.mark.django_db
 def grupos():
     """Criar grupos necessários para os testes."""
     return {
-        "diretoria": Group.objects.get_or_create(name="Diretoria")[0],
-        "controle": Group.objects.get_or_create(name="Controle")[0],
-        "dat": Group.objects.get_or_create(name="DAT")[0],
-        "superintendencia": Group.objects.get_or_create(name="Superintendência")[0],
-        "coordenador": Group.objects.get_or_create(name="Coordenador")[0],
-        "formador": Group.objects.get_or_create(name="Formador")[0],
+        "diretoria": GroupFactory(name="Diretoria"),
+        "controle": GroupFactory(name="Controle"),
+        "dat": GroupFactory(name="DAT"),
+        "superintendencia": GroupFactory(name="Superintendência"),
+        "coordenador": GroupFactory(name="Coordenador"),
+        "formador": GroupFactory(name="Formador"),
     }
 
 
 @pytest.fixture
 def user_diretoria(grupos):
     """Issue #1222 (Epic 1): Diretoria tem `view_map_metrics` no seed realinhado."""
-    user = Usuario.objects.create_user(username="diretoria1", email="dir@x.com", password="x", cpf="99999999991")
+    user = UsuarioFactory(username="diretoria1", email="dir@x.com", password="x", cpf="99999999991")
     user.groups.add(grupos["diretoria"])
     return user
 
@@ -58,7 +65,7 @@ def user_diretoria(grupos):
 @pytest.fixture
 def user_controle(grupos):
     """Usuário do grupo Controle (sem view_map_metrics no seed realinhado)."""
-    user = Usuario.objects.create_user(username="controle1", email="controle@x.com", password="x", cpf="11111111111")
+    user = UsuarioFactory(username="controle1", email="controle@x.com", password="x", cpf="11111111111")
     user.groups.add(grupos["controle"])
     return user
 
@@ -66,7 +73,7 @@ def user_controle(grupos):
 @pytest.fixture
 def user_dat(grupos):
     """Usuário do grupo DAT."""
-    user = Usuario.objects.create_user(username="dat1", email="dat@x.com", password="x", cpf="22222222222")
+    user = UsuarioFactory(username="dat1", email="dat@x.com", password="x", cpf="22222222222")
     user.groups.add(grupos["dat"])
     return user
 
@@ -74,7 +81,7 @@ def user_dat(grupos):
 @pytest.fixture
 def user_coordenador(grupos):
     """Usuário do grupo Coordenador (sem permissão)."""
-    user = Usuario.objects.create_user(username="coord1", email="coord@x.com", password="x", cpf="33333333333")
+    user = UsuarioFactory(username="coord1", email="coord@x.com", password="x", cpf="33333333333")
     user.groups.add(grupos["coordenador"])
     return user
 
@@ -82,7 +89,7 @@ def user_coordenador(grupos):
 @pytest.fixture
 def user_formador(grupos):
     """Usuário do grupo Formador (sem permissão)."""
-    user = Usuario.objects.create_user(username="form1", email="form@x.com", password="x", cpf="44444444444")
+    user = UsuarioFactory(username="form1", email="form@x.com", password="x", cpf="44444444444")
     user.groups.add(grupos["formador"])
     return user
 
@@ -91,26 +98,20 @@ def user_formador(grupos):
 def dados_basicos(grupos):
     """Criar dados básicos para os testes."""
     # Formadores (usuários)
-    formador1 = Usuario.objects.create_user(username="ana.silva", email="ana@x.com", password="x", cpf="55555555555")
+    formador1 = UsuarioFactory(username="ana.silva", email="ana@x.com", password="x", cpf="55555555555")
     formador1.groups.add(grupos["formador"])
 
     # Municípios (3 UFs diferentes) com coordenadas para testes
-    mun_ce = Municipio.objects.create(
-        nome="Fortaleza", uf="CE", ibge_code="2304400", latitude=-3.717200, longitude=-38.543400
-    )
-    mun_sp = Municipio.objects.create(
-        nome="São Paulo", uf="SP", ibge_code="3550308", latitude=-23.550520, longitude=-46.633308
-    )
-    mun_ba = Municipio.objects.create(
-        nome="Salvador", uf="BA", ibge_code="2927408", latitude=-12.971400, longitude=-38.510800
-    )
+    mun_ce = MunicipioFactory(nome="Fortaleza", uf="CE", ibge_code="2304400", latitude=-3.717200, longitude=-38.543400)
+    mun_sp = MunicipioFactory(nome="São Paulo", uf="SP", ibge_code="3550308", latitude=-23.550520, longitude=-46.633308)
+    mun_ba = MunicipioFactory(nome="Salvador", uf="BA", ibge_code="2927408", latitude=-12.971400, longitude=-38.510800)
 
     # Projetos (fluxo='SUPER' para permitir testar diferentes status)
-    proj1 = Projeto.objects.create(nome="Vida & Matemática", codigo="P001", fluxo="SUPER")
-    proj2 = Projeto.objects.create(nome="TEMA", codigo="P002", fluxo="SUPER")
+    proj1 = ProjetoFactory(nome="Vida & Matemática", codigo="P001", fluxo="SUPER")
+    proj2 = ProjetoFactory(nome="TEMA", codigo="P002", fluxo="SUPER")
 
     # Tipos de evento
-    tipo1 = TipoEvento.objects.create(nome="Formação Inicial")
+    tipo1 = TipoEventoFactory(nome="Formação Inicial")
 
     return {
         "formador": formador1,
@@ -127,15 +128,13 @@ def solicitacoes_variedade(dados_basicos):
     formador = dados_basicos["formador"]
 
     # Criar um usuário coordenador para ser o criador
-    coordenador = Usuario.objects.create_user(
-        username="coord_test", email="coord_test@x.com", password="x", cpf="88888888888"
-    )
+    coordenador = UsuarioFactory(username="coord_test", email="coord_test@x.com", password="x", cpf="88888888888")
 
     solicitacoes = []
 
     # 3 aprovadas em CE, projeto Matemática
     for i in range(3):
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=coordenador,
             status="aprovado",
             inicio=now + timedelta(days=i),
@@ -149,7 +148,7 @@ def solicitacoes_variedade(dados_basicos):
 
     # 2 pendentes em SP, projeto TEMA
     for i in range(2):
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=coordenador,
             status="pendente",
             inicio=now + timedelta(days=10 + i),
@@ -162,7 +161,7 @@ def solicitacoes_variedade(dados_basicos):
         solicitacoes.append(sol)
 
     # 1 reprovada em BA, projeto Matemática
-    sol = Solicitacao.objects.create(
+    sol = SolicitacaoFactory(
         usuario=coordenador,
         status="reprovado",
         inicio=now + timedelta(days=20),
@@ -249,7 +248,7 @@ def test_map_metrics_formador_forbidden(user_formador):
 
 def test_map_metrics_superuser_allowed():
     """Superuser sempre tem acesso."""
-    user = Usuario.objects.create_superuser(username="admin", email="admin@x.com", password="x", cpf="99999999999")
+    user = UsuarioFactory(superuser=True)
     client = APIClient()
     client.force_authenticate(user=user)
 
@@ -378,17 +377,17 @@ def test_map_metrics_coordenadores_homonimos_nao_colidem_por_nome(user_diretoria
     client = APIClient()
     client.force_authenticate(user=user_diretoria)
 
-    projeto = Projeto.objects.create(nome="Projeto Homônimos", codigo="PH01", fluxo="SUPER")
-    tipo = TipoEvento.objects.create(nome="Tipo Homônimos")
+    projeto = ProjetoFactory(nome="Projeto Homônimos", codigo="PH01", fluxo="SUPER")
+    tipo = TipoEventoFactory(nome="Tipo Homônimos")
 
-    municipio_ce = Municipio.objects.create(
+    municipio_ce = MunicipioFactory(
         nome="Santa Maria",
         uf="CE",
         ibge_code="2300001",
         latitude=-3.12,
         longitude=-39.10,
     )
-    municipio_sp = Municipio.objects.create(
+    municipio_sp = MunicipioFactory(
         nome="Santa Maria",
         uf="SP",
         ibge_code="3500001",
@@ -396,21 +395,17 @@ def test_map_metrics_coordenadores_homonimos_nao_colidem_por_nome(user_diretoria
         longitude=-47.10,
     )
 
-    criador = Usuario.objects.create_user(
+    criador = UsuarioFactory(
         username="criador_homonimo",
         email="criador_homonimo@test.com",
         password="x",
         cpf="10101010101",
     )
-    coord_ce = Usuario.objects.create_user(
-        username="coord_ce", email="coord_ce@test.com", password="x", cpf="20202020202"
-    )
-    coord_sp = Usuario.objects.create_user(
-        username="coord_sp", email="coord_sp@test.com", password="x", cpf="30303030303"
-    )
+    coord_ce = UsuarioFactory(username="coord_ce", email="coord_ce@test.com", password="x", cpf="20202020202")
+    coord_sp = UsuarioFactory(username="coord_sp", email="coord_sp@test.com", password="x", cpf="30303030303")
 
     now = timezone.now()
-    sol_ce = Solicitacao.objects.create(
+    sol_ce = SolicitacaoFactory(
         usuario=criador,
         status="aprovado",
         inicio=now,
@@ -419,7 +414,7 @@ def test_map_metrics_coordenadores_homonimos_nao_colidem_por_nome(user_diretoria
         projeto=projeto,
         tipo_evento=tipo,
     )
-    sol_sp = Solicitacao.objects.create(
+    sol_sp = SolicitacaoFactory(
         usuario=criador,
         status="aprovado",
         inicio=now + timedelta(days=1),
@@ -448,9 +443,9 @@ def test_map_metrics_eventos_e_compras_separados_no_payload(user_diretoria):
     client = APIClient()
     client.force_authenticate(user=user_diretoria)
 
-    projeto = Projeto.objects.create(nome="Projeto Compras", codigo="PC01", fluxo="SUPER")
-    tipo = TipoEvento.objects.create(nome="Tipo Compras")
-    municipio = Municipio.objects.create(
+    projeto = ProjetoFactory(nome="Projeto Compras", codigo="PC01", fluxo="SUPER")
+    tipo = TipoEventoFactory(nome="Tipo Compras")
+    municipio = MunicipioFactory(
         nome="Maracanaú",
         uf="CE",
         ibge_code="2307650",
@@ -458,11 +453,11 @@ def test_map_metrics_eventos_e_compras_separados_no_payload(user_diretoria):
         longitude=-38.62,
     )
 
-    criador = Usuario.objects.create_user(
+    criador = UsuarioFactory(
         username="criador_compra", email="criador_compra@test.com", password="x", cpf="40404040404"
     )
     now = timezone.now()
-    Solicitacao.objects.create(
+    SolicitacaoFactory(
         usuario=criador,
         status="aprovado",
         inicio=now,

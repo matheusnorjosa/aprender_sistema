@@ -28,6 +28,7 @@ import pytest
 from apps.core.models import AuditLog, PermissaoFuncional, Usuario
 from apps.core.services.functional_permissions_seed import seed_functional_permissions
 from apps.core.services.rbac_permissions import get_user_functional_permissions
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -38,16 +39,14 @@ ADMIN_LIST_URL = "/admin/core/permissaofuncional/"
 
 def _make_user(*, is_superuser: bool = False, is_staff: bool = False, label: str = "u") -> Usuario:
     cpf = str(next(_CPF_COUNTER)).zfill(11)
-    user = Usuario.objects.create_user(
+    return UsuarioFactory(
         username=f"{label}_{cpf}",
         email=f"{label}_{cpf}@test.com",
         password="testpass",
         cpf=cpf,
+        is_superuser=is_superuser,
+        is_staff=is_staff or is_superuser,
     )
-    user.is_superuser = is_superuser
-    user.is_staff = is_staff or is_superuser
-    user.save()
-    return user
 
 
 @pytest.fixture
@@ -89,12 +88,12 @@ def capability() -> PermissaoFuncional:
 
 @pytest.fixture
 def group_diretoria(db) -> Group:
-    return Group.objects.get_or_create(name="Diretoria")[0]
+    return GroupFactory(name="Diretoria")
 
 
 @pytest.fixture
 def group_dat(db) -> Group:
-    return Group.objects.get_or_create(name="DAT")[0]
+    return GroupFactory(name="DAT")
 
 
 # ============================================================================

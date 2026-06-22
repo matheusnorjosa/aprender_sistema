@@ -8,13 +8,12 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from django.contrib.auth.models import Group
-
 import pytest
 
 from apps.core.constants import ALLOWED_USER_GROUPS
 from apps.core.models import PermissaoFuncional
 from apps.core.services.rbac_service import get_assignable_group_names, invalidate_assignable_groups_cache
+from apps.core.tests.factories import GroupFactory
 
 
 @pytest.mark.django_db
@@ -30,7 +29,7 @@ class TestRBACServiceWhitelist:
         assert ALLOWED_USER_GROUPS.issubset(names)
 
     def test_dynamic_group_with_functional_permission_is_included(self) -> None:
-        group, _ = Group.objects.get_or_create(name="GrupoDinamicoService")
+        group = GroupFactory(name="GrupoDinamicoService")
         permission, _ = PermissaoFuncional.objects.get_or_create(
             codename="pode_usar_grupo_dinamico_service",
             defaults={
@@ -47,7 +46,7 @@ class TestRBACServiceWhitelist:
         assert "GrupoDinamicoService" in names
 
     def test_cache_is_invalidated_on_permission_group_change(self) -> None:
-        group, _ = Group.objects.get_or_create(name="GrupoCacheInvalidation")
+        group = GroupFactory(name="GrupoCacheInvalidation")
         permission, _ = PermissaoFuncional.objects.get_or_create(
             codename="pode_invalidate_assignable_cache",
             defaults={

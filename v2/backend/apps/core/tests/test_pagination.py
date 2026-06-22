@@ -14,11 +14,16 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.test import TestCase
-from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.tests.factories import (
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 class TestGCalListPagination(TestCase):
@@ -29,29 +34,25 @@ class TestGCalListPagination(TestCase):
         self.client = APIClient()
 
         # Create superuser with permission
-        self.user = Usuario.objects.create_superuser(
-            username="admin_pagination",
-            email="admin_pagination@test.com",
-            password="testpass123",
-        )
+        self.user = UsuarioFactory(superuser=True)
         self.client.force_authenticate(user=self.user)
 
         # Create required objects
-        self.municipio = Municipio.objects.create(
+        self.municipio = MunicipioFactory(
             nome="Test City",
             uf="CE",
             latitude=Decimal("-3.7172"),
             longitude=Decimal("-38.5433"),
         )
-        self.tipo_evento = TipoEvento.objects.create(nome="Test Type")
-        self.projeto = Projeto.objects.create(nome="Test Project")
+        self.tipo_evento = TipoEventoFactory(nome="Test Type")
+        self.projeto = ProjetoFactory(nome="Test Project")
 
     def test_gcal_list_returns_paginated_response(self) -> None:
         """GCalListView should return paginated response with count, next, results."""
         # Create 10 approved solicitações
         now = timezone.now()
         for i in range(10):
-            Solicitacao.objects.create(
+            SolicitacaoFactory(
                 usuario=self.user,
                 status="aprovado",
                 municipio=self.municipio,
@@ -76,7 +77,7 @@ class TestGCalListPagination(TestCase):
         """GCalListView should respect page_size parameter."""
         now = timezone.now()
         for i in range(15):
-            Solicitacao.objects.create(
+            SolicitacaoFactory(
                 usuario=self.user,
                 status="aprovado",
                 municipio=self.municipio,
@@ -100,7 +101,7 @@ class TestGCalListPagination(TestCase):
         now = timezone.now()
         # Create just a few items
         for i in range(5):
-            Solicitacao.objects.create(
+            SolicitacaoFactory(
                 usuario=self.user,
                 status="aprovado",
                 municipio=self.municipio,
@@ -128,17 +129,13 @@ class TestMetricsMapLimit(TestCase):
         self.client = APIClient()
 
         # Create superuser with permission
-        self.user = Usuario.objects.create_superuser(
-            username="admin_metrics_limit",
-            email="admin_metrics_limit@test.com",
-            password="testpass123",
-        )
+        self.user = UsuarioFactory(superuser=True)
         self.client.force_authenticate(user=self.user)
 
         # Create municipios with coordinates
         self.municipios = []
         for i in range(20):
-            m = Municipio.objects.create(
+            m = MunicipioFactory(
                 nome=f"City {i}",
                 uf="CE",
                 latitude=Decimal("-3.7172") + Decimal(str(i * 0.1)),
@@ -146,13 +143,13 @@ class TestMetricsMapLimit(TestCase):
             )
             self.municipios.append(m)
 
-        self.tipo_evento = TipoEvento.objects.create(nome="Test Type")
-        self.projeto = Projeto.objects.create(nome="Test Project")
+        self.tipo_evento = TipoEventoFactory(nome="Test Type")
+        self.projeto = ProjetoFactory(nome="Test Project")
 
         # Create solicitações for different municipios
         now = timezone.now()
         for i, municipio in enumerate(self.municipios):
-            Solicitacao.objects.create(
+            SolicitacaoFactory(
                 usuario=self.user,
                 status="aprovado",
                 municipio=municipio,

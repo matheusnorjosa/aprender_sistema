@@ -16,26 +16,23 @@ import io
 import tempfile
 from pathlib import Path
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from rest_framework import status
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Produto, Projeto
+from apps.core.models import Produto
 from apps.core.services.produtos_import import import_produtos_from_file
+from apps.core.tests.factories import GroupFactory, ProjetoFactory, UsuarioFactory
 
 # URL direta (evita problemas de cache de rotas no container)
 IMPORT_PRODUTOS_URL = "/api/produtos/import/"
-
-User = get_user_model()
 
 
 @pytest.fixture
 def dat_import_user(db):
     """Usuario do grupo DAT (PR-A1 DAT-Imports: detentor de import_spreadsheet)."""
-    user = User.objects.create_user(
+    user = UsuarioFactory(
         username="dat_import_user",
         email="dat_imports@test.com",
         password="testpass123",
@@ -43,7 +40,7 @@ def dat_import_user(db):
         first_name="DAT",
         last_name="Imports",
     )
-    group, _ = Group.objects.get_or_create(name="DAT")
+    group = GroupFactory(name="DAT")
     user.groups.add(group)
     return user
 
@@ -51,7 +48,7 @@ def dat_import_user(db):
 @pytest.fixture
 def formador_user(db):
     """Usuario do grupo Formador (sem permissao de import)."""
-    user = User.objects.create_user(
+    user = UsuarioFactory(
         username="formador_user",
         email="formador@test.com",
         password="testpass123",
@@ -59,7 +56,7 @@ def formador_user(db):
         first_name="Formador",
         last_name="User",
     )
-    group, _ = Group.objects.get_or_create(name="Formador")
+    group = GroupFactory(name="Formador")
     user.groups.add(group)
     return user
 
@@ -67,14 +64,7 @@ def formador_user(db):
 @pytest.fixture
 def superuser(db):
     """Superusuario (sempre tem permissao)."""
-    return User.objects.create_superuser(
-        username="admin",
-        email="admin@test.com",
-        password="testpass123",
-        cpf="99999999999",
-        first_name="Admin",
-        last_name="User",
-    )
+    return UsuarioFactory(superuser=True)
 
 
 @pytest.fixture
@@ -86,7 +76,7 @@ def api_client():
 @pytest.fixture
 def projeto_teste(db):
     """Projeto de teste para vincular produtos."""
-    return Projeto.objects.create(
+    return ProjetoFactory(
         nome="Projeto Teste",
         codigo="PROJ-TEST",
         fluxo="NAO_SUPER",
@@ -97,7 +87,7 @@ def projeto_teste(db):
 @pytest.fixture
 def projeto_acerta(db):
     """Projeto ACerta para testes."""
-    return Projeto.objects.create(
+    return ProjetoFactory(
         nome="ACERTA MATEMATICA",
         codigo="ACERTA",
         fluxo="NAO_SUPER",

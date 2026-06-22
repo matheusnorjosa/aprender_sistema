@@ -27,12 +27,12 @@ from __future__ import annotations
 
 import itertools
 
-from django.contrib.auth.models import Group
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AuditLog, Usuario
+from apps.core.models import AuditLog
+from apps.core.tests.factories import UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -40,18 +40,15 @@ pytestmark = pytest.mark.django_db
 _CPF_COUNTER = itertools.count(40000000000)
 
 
-def _user_in_groups(*group_names: str, label: str = "user") -> Usuario:
+def _user_in_groups(*group_names: str, label: str = "user"):
     cpf = str(next(_CPF_COUNTER)).zfill(11)
-    user = Usuario.objects.create_user(
+    return UsuarioFactory(
         username=f"{label}_{cpf}",
         email=f"{label}_{cpf}@example.com",
         password="testpass",
         cpf=cpf,
+        groups=list(group_names),
     )
-    for name in group_names:
-        group, _ = Group.objects.get_or_create(name=name)
-        user.groups.add(group)
-    return user
 
 
 @pytest.fixture
@@ -94,13 +91,7 @@ def test_allowed_personas_can_list_audit_logs(persona, audit_log_record):
 
 
 def test_superuser_can_list_audit_logs(audit_log_record):
-    cpf = str(next(_CPF_COUNTER)).zfill(11)
-    user = Usuario.objects.create_superuser(
-        username=f"super_pr6_{cpf}",
-        email=f"super_pr6_{cpf}@example.com",
-        password="testpass",
-        cpf=cpf,
-    )
+    user = UsuarioFactory(superuser=True)
     client = APIClient()
     client.force_authenticate(user=user)
     response = client.get("/api/audit-logs/")
@@ -155,13 +146,7 @@ def test_redaction_works_for_allowed_personas(persona, audit_log_record):
     label, group_names = persona
 
     if label == "superuser_redaction":
-        cpf = str(next(_CPF_COUNTER)).zfill(11)
-        user = Usuario.objects.create_superuser(
-            username=f"super_red_{cpf}",
-            email=f"super_red_{cpf}@example.com",
-            password="testpass",
-            cpf=cpf,
-        )
+        user = UsuarioFactory(superuser=True)
         expected_full_payload = True
     else:
         user = _user_in_groups(*group_names, label=label)

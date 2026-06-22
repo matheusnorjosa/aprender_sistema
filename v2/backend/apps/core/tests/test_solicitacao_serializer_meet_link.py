@@ -14,25 +14,32 @@ from __future__ import annotations
 from datetime import timedelta
 from unittest.mock import patch
 
-from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import Solicitacao
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.fixture
 def usuario_controle():
     """Usuário do grupo Controle"""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="controle_test",
         email="controle@test.com",
         password="testpass",
         cpf="11111111111",
     )
-    grupo, _ = Group.objects.get_or_create(name="Controle")
+    grupo = GroupFactory(name="Controle")
     user.groups.add(grupo)
     return user
 
@@ -40,12 +47,12 @@ def usuario_controle():
 @pytest.fixture
 def solicitacao_com_meet_link(usuario_controle):
     """Solicitação aprovada com meet_link preenchido"""
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="Projeto Teste", ativo=True)
-    tipo_evento = TipoEvento.objects.create(nome="Formação")
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="Projeto Teste", ativo=True)
+    tipo_evento = TipoEventoFactory(nome="Formação")
 
     now = timezone.now()
-    sol = Solicitacao.objects.create(
+    sol = SolicitacaoFactory(
         usuario=usuario_controle,
         municipio=municipio,
         projeto=projeto,
@@ -99,12 +106,12 @@ class TestSolicitacaoSerializerMeetLink:
 
         Resultado esperado: Response contém meet_link=null
         """
-        municipio = Municipio.objects.create(nome="São Paulo", uf="SP", ativo=True)
-        projeto = Projeto.objects.create(nome="Projeto Teste", ativo=True)
-        tipo_evento = TipoEvento.objects.create(nome="Reunião")
+        municipio = MunicipioFactory(nome="São Paulo", uf="SP", ativo=True)
+        projeto = ProjetoFactory(nome="Projeto Teste", ativo=True)
+        tipo_evento = TipoEventoFactory(nome="Reunião")
 
         now = timezone.now()
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_controle,
             municipio=municipio,
             projeto=projeto,
@@ -157,9 +164,9 @@ class TestSolicitacaoSerializerMeetLink:
 
         Resultado esperado: meet_link continua null (não foi setado via POST)
         """
-        municipio = Municipio.objects.create(nome="Recife", uf="PE", ativo=True)
-        projeto = Projeto.objects.create(nome="Projeto Teste", ativo=True)
-        tipo_evento = TipoEvento.objects.create(nome="Workshop")
+        municipio = MunicipioFactory(nome="Recife", uf="PE", ativo=True)
+        projeto = ProjetoFactory(nome="Projeto Teste", ativo=True)
+        tipo_evento = TipoEventoFactory(nome="Workshop")
 
         client = APIClient()
         client.force_authenticate(user=usuario_controle)

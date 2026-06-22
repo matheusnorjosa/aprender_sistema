@@ -13,24 +13,20 @@ from __future__ import annotations
 
 import io
 
-from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import status
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Usuario
+from apps.core.tests.factories import UsuarioFactory
 
 
 @pytest.fixture
 def dat_user(db):
     """Usuário em grupo DAT (PR-A1 DAT-Imports: detentor de import_spreadsheet
     + manage_admin_registries via seed_functional_permissions)."""
-    user = Usuario.objects.create_user(username="dat1", password="test123", email="dat@example.com")
-    group, _ = Group.objects.get_or_create(name="DAT")
-    user.groups.add(group)
-    return user
+    return UsuarioFactory(username="dat1", password="test123", email="dat@example.com", groups=["DAT"])
 
 
 @pytest.fixture

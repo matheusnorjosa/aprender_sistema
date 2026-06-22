@@ -13,25 +13,31 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import Solicitacao
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.fixture
 def usuario_coordenador():
     """Usuário coordenador para criar solicitações"""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="coordenador_test",
         email="coordenador@test.com",
         password="testpass",
         cpf="33333333333",
     )
-    grupo, _ = Group.objects.get_or_create(name="Coordenador")
+    grupo = GroupFactory(name="Coordenador")
     user.groups.add(grupo)
     return user
 
@@ -39,9 +45,9 @@ def usuario_coordenador():
 @pytest.fixture
 def fixtures_basicas():
     """Fixtures básicas para criar solicitações"""
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="Projeto Teste", ativo=True)
-    tipo_evento = TipoEvento.objects.create(nome="Formação")
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="Projeto Teste", ativo=True)
+    tipo_evento = TipoEventoFactory(nome="Formação")
 
     return {
         "municipio": municipio,

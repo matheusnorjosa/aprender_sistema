@@ -14,36 +14,42 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
 
 def make_user_in_group(name="Controle"):
     """Cria usuário em um grupo específico."""
-    u = Usuario.objects.create_user(
+    u = UsuarioFactory(
         username=f"user{name.lower()}",
         email=f"{name.lower()}@test.com",
         password="x",
         cpf=f"9999999999{name[:1]}",
     )
-    g, _ = Group.objects.get_or_create(name=name)
+    g = GroupFactory(name=name)
     u.groups.add(g)
     return u
 
 
 def _make_approved_solicitacao(user):
     """Cria solicitação aprovada para testes."""
-    tipo = TipoEvento.objects.create(nome="Formação")
-    mun = Municipio.objects.create(nome="Acarape", uf="CE", ativo=True)
-    proj = Projeto.objects.create(nome="Gestão Escolar", ativo=True)
-    s = Solicitacao.objects.create(
+    tipo = TipoEventoFactory(nome="Formação")
+    mun = MunicipioFactory(nome="Acarape", uf="CE", ativo=True)
+    proj = ProjetoFactory(nome="Gestão Escolar", ativo=True)
+    s = SolicitacaoFactory(
         usuario=user,
         tipo_evento=tipo,
         municipio=mun,
@@ -62,7 +68,7 @@ def test_preview_publish_denied_unauthenticated():
     - Sem autenticação → 401 ou 403 para preview e publish
     - DRF pode retornar 403 se a permissão da classe for verificada primeiro
     """
-    u = Usuario.objects.create_user(
+    u = UsuarioFactory(
         username="plain",
         email="plain@test.com",
         password="x",
@@ -87,7 +93,7 @@ def test_preview_publish_denied_without_group():
 
     - Usuário autenticado sem grupo → 403 para preview e publish
     """
-    u = Usuario.objects.create_user(
+    u = UsuarioFactory(
         username="plain",
         email="plain@test.com",
         password="x",
@@ -157,12 +163,12 @@ def test_preview_publish_allowed_for_superuser():
     - Preview → 200
     - Publish → 202 (ou 409 se apply_blocked)
     """
-    u = Usuario.objects.create_user(
+    u = UsuarioFactory(
         username="superuser",
         email="super@test.com",
         password="x",
         cpf="77777777777",
-        is_superuser=True,
+        superuser=True,
     )
     s = _make_approved_solicitacao(u)
     client = APIClient()

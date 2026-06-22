@@ -29,6 +29,12 @@ from apps.core.models import (
     Projeto,
     Usuario,
 )
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.fixture
@@ -40,13 +46,13 @@ def api_client():
 @pytest.fixture
 def usuario_dat(db):
     """Usuário do grupo DAT"""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="dat_user",
         email="dat@example.com",
         password="senha123",
         cpf="12345678901",
     )
-    group_dat, _ = Group.objects.get_or_create(name="DAT")
+    group_dat = GroupFactory(name="DAT")
     user.groups.add(group_dat)
     return user
 
@@ -54,13 +60,13 @@ def usuario_dat(db):
 @pytest.fixture
 def usuario_controle(db):
     """Usuário do grupo Controle"""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="controle_user",
         email="controle@example.com",
         password="senha123",
         cpf="12345678902",
     )
-    group_controle, _ = Group.objects.get_or_create(name="Controle")
+    group_controle = GroupFactory(name="Controle")
     user.groups.add(group_controle)
     return user
 
@@ -68,13 +74,13 @@ def usuario_controle(db):
 @pytest.fixture
 def usuario_superintendencia(db):
     """Usuário do grupo Superintendência"""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="super_user",
         email="super@example.com",
         password="senha123",
         cpf="12345678903",
     )
-    group_super, _ = Group.objects.get_or_create(name="Superintendência")
+    group_super = GroupFactory(name="Superintendência")
     user.groups.add(group_super)
     return user
 
@@ -82,13 +88,13 @@ def usuario_superintendencia(db):
 @pytest.fixture
 def usuario_formador(db):
     """Usuário do grupo Formador (sem acesso admin)"""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="formador_user",
         email="formador@example.com",
         password="senha123",
         cpf="12345678904",
     )
-    group_formador, _ = Group.objects.get_or_create(name="Formador")
+    group_formador = GroupFactory(name="Formador")
     user.groups.add(group_formador)
     return user
 
@@ -96,13 +102,13 @@ def usuario_formador(db):
 @pytest.fixture
 def municipio_sample(db):
     """Município de exemplo"""
-    return Municipio.objects.create(nome="Fortaleza", uf="CE", ibge_code="2304400")
+    return MunicipioFactory(nome="Fortaleza", uf="CE", ibge_code="2304400")
 
 
 @pytest.fixture
 def projeto_sample(db):
     """Projeto de exemplo"""
-    return Projeto.objects.create(nome="Alfabetização", codigo="ALF-01")
+    return ProjetoFactory(nome="Alfabetização", codigo="ALF-01")
 
 
 @pytest.fixture
@@ -174,8 +180,8 @@ class TestMunicipioAPI:
 
     def test_filter_municipios_by_uf(self, api_client, usuario_dat, municipio_sample, db):
         """Filtrar municípios por UF"""
-        Municipio.objects.create(nome="Juazeiro do Norte", uf="CE")
-        Municipio.objects.create(nome="Recife", uf="PE")
+        MunicipioFactory(nome="Juazeiro do Norte", uf="CE")
+        MunicipioFactory(nome="Recife", uf="PE")
         api_client.force_authenticate(user=usuario_dat)
         response = api_client.get("/api/municipios/?uf=CE")
         assert response.status_code == status.HTTP_200_OK
@@ -197,7 +203,7 @@ class TestMunicipioAPI:
             fonte="sistemasaprender",
             ativo=True,
         )
-        Municipio.objects.create(nome="Fortaleza", uf="CE", ibge_code="2304400")
+        MunicipioFactory(nome="Fortaleza", uf="CE", ibge_code="2304400")
 
         api_client.force_authenticate(user=usuario_dat)
         response = api_client.get("/api/municipios/autocomplete/?q=Fort&uf=CE")
@@ -212,7 +218,7 @@ class TestMunicipioAPI:
 
     def test_autocomplete_municipios_fallbacks_to_existing_cadastro(self, api_client, usuario_dat):
         """Sem referência confiável, endpoint usa fallback de municípios já cadastrados."""
-        Municipio.objects.create(nome="Maranguape", uf="CE", ibge_code="2307705")
+        MunicipioFactory(nome="Maranguape", uf="CE", ibge_code="2307705")
 
         api_client.force_authenticate(user=usuario_dat)
         response = api_client.get("/api/municipios/autocomplete/?q=Maran&uf=CE")
@@ -292,7 +298,7 @@ class TestProjetoAPI:
 
     def test_filter_projetos_by_ativo(self, api_client, usuario_dat, projeto_sample):
         """Filtrar projetos por ativo"""
-        Projeto.objects.create(nome="Projeto Inativo", ativo=False)
+        ProjetoFactory(nome="Projeto Inativo", ativo=False)
         api_client.force_authenticate(user=usuario_dat)
         response = api_client.get("/api/projetos/?ativo=true")
         assert response.status_code == status.HTTP_200_OK
@@ -369,7 +375,7 @@ class TestCompraAPI:
 
     def test_filter_compras_by_projeto(self, api_client, usuario_dat, compra_sample, municipio_sample, db):
         """Filtrar compras por projeto"""
-        projeto2 = Projeto.objects.create(nome="Ciências")
+        projeto2 = ProjetoFactory(nome="Ciências")
         Compra.objects.create(
             codigo="COMP-004",
             projeto=projeto2,
@@ -444,7 +450,7 @@ class TestUsuarioAdminAPI:
 
     def test_dat_can_update_usuario_telefone_cargo_and_active(self, api_client, usuario_dat, db):
         """DAT pode atualizar telefone/cargo e status ativo de usuários comuns."""
-        target = Usuario.objects.create_user(
+        target = UsuarioFactory(
             username="usuario_perfil",
             email="perfil@example.com",
             password="SecurePass123!",
@@ -543,7 +549,7 @@ class TestUsuarioAdminAPI:
 
     def test_dat_cannot_patch_is_superuser(self, api_client, usuario_dat, db):
         """DAT não pode alterar is_superuser via endpoint de admin."""
-        target = Usuario.objects.create_user(
+        target = UsuarioFactory(
             username="target_common_user",
             email="target_common_user@example.com",
             password="SecurePass123!",
@@ -563,13 +569,8 @@ class TestUsuarioAdminAPI:
 
     def test_superuser_can_patch_is_superuser_for_other_user(self, api_client, db):
         """Superuser pode promover outro usuário para superuser via endpoint."""
-        super_admin = Usuario.objects.create_superuser(
-            username="api_super_admin",
-            email="api_super_admin@example.com",
-            password="SecurePass123!",
-            cpf="22312312312",
-        )
-        target = Usuario.objects.create_user(
+        super_admin = UsuarioFactory(superuser=True)
+        target = UsuarioFactory(
             username="api_target_common_user",
             email="api_target_common_user@example.com",
             password="SecurePass123!",
@@ -730,7 +731,7 @@ class TestRbacFunctionalAPI:
 
     def test_dat_can_patch_group_permissoes_funcionais(self, api_client, usuario_dat):
         """DAT pode vincular permissões funcionais a um grupo."""
-        group, _ = Group.objects.get_or_create(name="Equipe Operacional")
+        group = GroupFactory(name="Equipe Operacional")
         permissao_a = PermissaoFuncional.objects.create(
             codename="rbac.group_patch_a",
             label="Permissão Group Patch A",
@@ -759,7 +760,7 @@ class TestRbacFunctionalAPI:
 
     def test_rename_reserved_group_requires_confirmation(self, api_client, usuario_dat):
         """Renomeio de grupo reservado exige ?confirm_reserved=true."""
-        group, _ = Group.objects.get_or_create(name="Controle")
+        group = GroupFactory(name="Controle")
         api_client.force_authenticate(user=usuario_dat)
 
         response = api_client.patch(f"/api/grupos/{group.id}/", {"name": "Controle Novo"}, format="json")
@@ -769,7 +770,7 @@ class TestRbacFunctionalAPI:
 
     def test_delete_reserved_group_requires_confirmation(self, api_client, usuario_dat):
         """Exclusão de grupo reservado exige ?confirm_reserved=true."""
-        group, _ = Group.objects.get_or_create(name="Formador")
+        group = GroupFactory(name="Formador")
         api_client.force_authenticate(user=usuario_dat)
 
         response = api_client.delete(f"/api/grupos/{group.id}/")

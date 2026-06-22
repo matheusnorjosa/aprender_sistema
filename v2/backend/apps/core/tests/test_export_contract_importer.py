@@ -26,17 +26,20 @@ from apps.core.models import (
     DATArea,
     DATCoordenador,
     Gerencia,
-    Municipio,
     PlanoFormacoes,
     Produto,
     Projeto,
     ProjetoGeral,
-    TipoEvento,
-    Usuario,
 )
 from apps.core.services.export_contract_importer import (
     ExportContractImporter,
     diff_and_classify,
+)
+from apps.core.tests.factories import (
+    MunicipioFactory,
+    ProjetoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
 )
 
 pytestmark = pytest.mark.django_db
@@ -118,7 +121,7 @@ def test_classify_dat_area(tmp_path):
 
 
 def test_classify_municipio(tmp_path):
-    Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+    MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
     csv = "nome,uf,ativo\nFortaleza,CE,True\nNova Cidade,PE,True\n"
     path = _write_export(tmp_path, {"municipio": csv})
     r = ExportContractImporter(path=path).run()["por_entidade"]["municipio"]
@@ -141,7 +144,7 @@ def test_classify_projeto_geral(tmp_path):
 
 # ───────── uso do resolver de Projeto ─────────
 def test_uses_projeto_resolver():
-    Projeto.objects.create(nome="Vida & Matemática 6", fluxo="NAO_SUPER")
+    ProjetoFactory(nome="Vida & Matemática 6", fluxo="NAO_SUPER")
     imp = ExportContractImporter(path=".")
     pid = imp.resolve_projeto("VIDA E MATEMATICA 6")
     assert pid is not None
@@ -166,7 +169,7 @@ def test_report_has_no_pii(tmp_path):
 
 # ───────── entidades-mestre adicionais (PR feat/export-contract-master-importers) ─────────
 def test_classify_produto(tmp_path):
-    proj = Projeto.objects.create(nome="Proj Prod Teste", fluxo="NAO_SUPER")
+    proj = ProjetoFactory(nome="Proj Prod Teste", fluxo="NAO_SUPER")
     Produto.objects.create(codigo="PT-1", nome="Produto Existente", projeto=proj)
     Produto.objects.create(codigo="PT-2", nome="Produto Upd", projeto=proj)
     # PT-1 nome igual -> skip; PT-2 nome diverge -> update; PT-NOVO -> create; vazio -> reject
@@ -179,7 +182,7 @@ def test_classify_produto(tmp_path):
 
 
 def test_classify_usuario(tmp_path):
-    Usuario.objects.create_user(username="u_imp_exist", password="x", cpf="11122233344", email="u.exist@ex.com")
+    UsuarioFactory(username="u_imp_exist", password="x", cpf="11122233344", email="u.exist@ex.com")
     # existente por cpf -> skip; novo -> create; sem cpf/email -> reject
     csv = "nome_completo,cpf,email\nFulano,11122233344,u.exist@ex.com\nBeltrano,55566677788,novo@ex.com\nSem Id,,\n"
     r = ExportContractImporter(path=_write_export(tmp_path, {"usuario": csv})).run()["por_entidade"]["usuario"]
@@ -198,8 +201,8 @@ def test_usuario_no_pii_in_report(tmp_path):
 
 
 def test_classify_tipo_evento(tmp_path):
-    TipoEvento.objects.create(nome="Formacao TE", cor="#111111")
-    TipoEvento.objects.create(nome="Visita TE", cor="#222222")
+    TipoEventoFactory(nome="Formacao TE", cor="#111111")
+    TipoEventoFactory(nome="Visita TE", cor="#222222")
     # Formacao igual -> skip; Visita cor diverge -> update; Novo -> create
     csv = "nome,cor\nFormacao TE,#111111\nVisita TE,#999999\nEvento Novo TE,#333333\n"
     r = ExportContractImporter(path=_write_export(tmp_path, {"tipo_evento": csv})).run()["por_entidade"]["tipo_evento"]
@@ -219,7 +222,7 @@ def test_classify_gerencia_matches_by_setor(tmp_path):
 
 
 def test_classify_dat_coordenador(tmp_path):
-    creator = Usuario.objects.create_user(username="u_dc_creator", password="x", cpf="99900011122")
+    creator = UsuarioFactory(username="u_dc_creator", password="x", cpf="99900011122")
     area = DATArea.objects.create(nome="Area Coord Teste")
     DATCoordenador.objects.create(nome="Coord Existente", email="coord.exist@ex.com", area=area, created_by=creator)
     # existente por email -> skip; novo -> create; vazio -> reject
@@ -241,10 +244,10 @@ def test_dat_coordenador_no_pii(tmp_path):
 # ───────── entidades operacionais — espinhaço municipio+projeto (Slice 1, classify dry-run) ─────────
 def test_classify_dat_acao_skip_create_reject(tmp_path):
     # NK = (municipio_id, projeto_id). Existência decide skip vs create; FK não-resolvido → reject.
-    creator = Usuario.objects.create_user(username="u_da_creator", password="x", cpf="33344455566")
-    mun_a = Municipio.objects.create(nome="Cidade Acao Um", uf="CE", ativo=True)
-    Municipio.objects.create(nome="Cidade Acao Dois", uf="CE", ativo=True)
-    proj = Projeto.objects.create(nome="Proj Acao Teste", fluxo="NAO_SUPER")
+    creator = UsuarioFactory(username="u_da_creator", password="x", cpf="33344455566")
+    mun_a = MunicipioFactory(nome="Cidade Acao Um", uf="CE", ativo=True)
+    MunicipioFactory(nome="Cidade Acao Dois", uf="CE", ativo=True)
+    proj = ProjetoFactory(nome="Proj Acao Teste", fluxo="NAO_SUPER")
     DATAcao.objects.create(municipio=mun_a, projeto=proj, created_by=creator)
     # linha 1: (Um, Proj) existe → skip; linha 2: (Dois, Proj) resolve mas sem DATAcao → create;
     # linha 3: municipio inexistente → reject (FK não-resolvido).
@@ -262,10 +265,10 @@ def test_classify_dat_acao_skip_create_reject(tmp_path):
 
 
 def test_classify_plano_formacao_skip_create_reject(tmp_path):
-    creator = Usuario.objects.create_user(username="u_pf_creator", password="x", cpf="77788899900")
-    mun_a = Municipio.objects.create(nome="Cidade Plano Um", uf="CE", ativo=True)
-    Municipio.objects.create(nome="Cidade Plano Dois", uf="CE", ativo=True)
-    proj = Projeto.objects.create(nome="Proj Plano Teste", fluxo="NAO_SUPER")
+    creator = UsuarioFactory(username="u_pf_creator", password="x", cpf="77788899900")
+    mun_a = MunicipioFactory(nome="Cidade Plano Um", uf="CE", ativo=True)
+    MunicipioFactory(nome="Cidade Plano Dois", uf="CE", ativo=True)
+    proj = ProjetoFactory(nome="Proj Plano Teste", fluxo="NAO_SUPER")
     PlanoFormacoes.objects.create(municipio=mun_a, projeto=proj, created_by=creator)
     csv = (
         "municipio,uf,projeto,coordenador\n"
@@ -284,8 +287,8 @@ def test_classify_plano_formacao_skip_create_reject(tmp_path):
 
 def test_dat_acao_no_coordenador_pii(tmp_path):
     # coordenador é pessoa (DATCoordenador) → nunca deve vazar no relatório.
-    Municipio.objects.create(nome="Cidade PII", uf="CE", ativo=True)
-    Projeto.objects.create(nome="Proj PII Teste", fluxo="NAO_SUPER")
+    MunicipioFactory(nome="Cidade PII", uf="CE", ativo=True)
+    ProjetoFactory(nome="Proj PII Teste", fluxo="NAO_SUPER")
     csv = "municipio,uf,projeto,coordenador\nCidade PII,CE,Proj PII Teste,CoordSecretoXYZ\n"
     report = ExportContractImporter(path=_write_export(tmp_path, {"dat_acao": csv})).run()
     assert "CoordSecretoXYZ" not in json.dumps(report)

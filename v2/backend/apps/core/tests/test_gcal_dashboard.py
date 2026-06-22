@@ -18,14 +18,21 @@ from __future__ import annotations
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
-from django.contrib.auth.models import Group
 from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import Solicitacao, TipoEvento
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.fixture
@@ -37,13 +44,13 @@ def api_client():
 @pytest.fixture
 def usuario_controle(db):
     """Usuário do grupo Controle."""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="controle_user",
         password="testpass123",
         first_name="Controle",
         last_name="User",
     )
-    group, _ = Group.objects.get_or_create(name="Controle")
+    group = GroupFactory(name="Controle")
     user.groups.add(group)
     return user
 
@@ -51,13 +58,13 @@ def usuario_controle(db):
 @pytest.fixture
 def usuario_coordenador(db):
     """Usuário do grupo Coordenador (sem permissão)."""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="coord_user",
         password="testpass123",
         first_name="Coord",
         last_name="User",
     )
-    group, _ = Group.objects.get_or_create(name="Coordenador")
+    group = GroupFactory(name="Coordenador")
     user.groups.add(group)
     return user
 
@@ -65,16 +72,16 @@ def usuario_coordenador(db):
 @pytest.fixture
 def setup_solicitacoes(db, usuario_controle):
     """Cria solicitações aprovadas com diferentes gcal_status para testes."""
-    municipio_fortaleza = Municipio.objects.create(nome="Fortaleza", uf="CE")
-    municipio_caucaia = Municipio.objects.create(nome="Caucaia", uf="CE")
-    tipo_evento = TipoEvento.objects.create(nome="Formação")
-    projeto_super = Projeto.objects.create(nome="Gestão Escolar", fluxo="SUPER")
-    projeto_outros = Projeto.objects.create(nome="Alfabetização", fluxo="NAO_SUPER")
+    municipio_fortaleza = MunicipioFactory(nome="Fortaleza", uf="CE")
+    municipio_caucaia = MunicipioFactory(nome="Caucaia", uf="CE")
+    tipo_evento = TipoEventoFactory(nome="Formação")
+    projeto_super = ProjetoFactory(nome="Gestão Escolar", fluxo="SUPER")
+    projeto_outros = ProjetoFactory(nome="Alfabetização", fluxo="NAO_SUPER")
 
     now = timezone.now()
 
     # Solicitação 1: NONE (Fortaleza, Gestão Escolar, hoje)
-    sol1 = Solicitacao.objects.create(
+    sol1 = SolicitacaoFactory(
         usuario=usuario_controle,
         municipio=municipio_fortaleza,
         tipo_evento=tipo_evento,
@@ -86,7 +93,7 @@ def setup_solicitacoes(db, usuario_controle):
     )
 
     # Solicitação 2: PENDING (Fortaleza, Gestão Escolar, hoje + 1 dia)
-    sol2 = Solicitacao.objects.create(
+    sol2 = SolicitacaoFactory(
         usuario=usuario_controle,
         municipio=municipio_fortaleza,
         tipo_evento=tipo_evento,
@@ -98,7 +105,7 @@ def setup_solicitacoes(db, usuario_controle):
     )
 
     # Solicitação 3: PUBLISHED (Caucaia, Alfabetização, hoje + 2 dias)
-    sol3 = Solicitacao.objects.create(
+    sol3 = SolicitacaoFactory(
         usuario=usuario_controle,
         municipio=municipio_caucaia,
         tipo_evento=tipo_evento,
@@ -111,7 +118,7 @@ def setup_solicitacoes(db, usuario_controle):
     )
 
     # Solicitação 4: ERROR (Fortaleza, Gestão Escolar, hoje + 3 dias)
-    sol4 = Solicitacao.objects.create(
+    sol4 = SolicitacaoFactory(
         usuario=usuario_controle,
         municipio=municipio_fortaleza,
         tipo_evento=tipo_evento,
@@ -335,7 +342,7 @@ class TestGCalBulkReapply:
     def test_reapply_validates_approved_status(self, api_client, usuario_controle, setup_solicitacoes):
         """Apenas solicitações aprovadas podem ser republicadas."""
         # Criar solicitação pendente
-        sol_pendente = Solicitacao.objects.create(
+        sol_pendente = SolicitacaoFactory(
             usuario=usuario_controle,
             municipio=setup_solicitacoes["municipio_fortaleza"],
             tipo_evento=TipoEvento.objects.first(),

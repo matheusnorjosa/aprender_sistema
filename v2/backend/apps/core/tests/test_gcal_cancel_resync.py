@@ -15,15 +15,22 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AuditLog, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import AuditLog, Solicitacao
 from apps.core.services.gcal_sync_service import SyncOutcome, cancel_solicitacao, resync_solicitacao
 from apps.core.tasks import task_cancel_solicitacao_from_gcal
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 # ============================================================================
 # FIXTURES
@@ -39,21 +46,21 @@ def api_client():
 @pytest.fixture
 def grupo_super(db):
     """Grupo Superintendência."""
-    grupo, _ = Group.objects.get_or_create(name="Superintendência")
+    grupo = GroupFactory(name="Superintendência")
     return grupo
 
 
 @pytest.fixture
 def grupo_controle(db):
     """Grupo Controle."""
-    grupo, _ = Group.objects.get_or_create(name="Controle")
+    grupo = GroupFactory(name="Controle")
     return grupo
 
 
 @pytest.fixture
 def usuario_super(db, grupo_super):
     """Usuário com perfil Superintendência."""
-    usuario = Usuario.objects.create_user(
+    usuario = UsuarioFactory(
         username="superintendente", email="super@example.com", password="testpass123", cpf="11111111111"
     )
     usuario.groups.add(grupo_super)
@@ -63,7 +70,7 @@ def usuario_super(db, grupo_super):
 @pytest.fixture
 def usuario_controle(db, grupo_controle):
     """Usuário com perfil Controle."""
-    usuario = Usuario.objects.create_user(
+    usuario = UsuarioFactory(
         username="controle", email="controle@example.com", password="testpass123", cpf="22222222222"
     )
     usuario.groups.add(grupo_controle)
@@ -73,33 +80,31 @@ def usuario_controle(db, grupo_controle):
 @pytest.fixture
 def usuario_coordenador(db):
     """Usuário coordenador (sem permissões especiais)."""
-    return Usuario.objects.create_user(
-        username="coordenador", email="coord@example.com", password="testpass123", cpf="33333333333"
-    )
+    return UsuarioFactory(username="coordenador", email="coord@example.com", password="testpass123", cpf="33333333333")
 
 
 @pytest.fixture
 def municipio(db):
     """Município de teste."""
-    return Municipio.objects.create(nome="Fortaleza", uf="CE", ibge_code="2304400")
+    return MunicipioFactory(nome="Fortaleza", uf="CE", ibge_code="2304400")
 
 
 @pytest.fixture
 def tipo_evento(db):
     """Tipo de evento de teste."""
-    return TipoEvento.objects.create(nome="Formação", cor="#0000FF")
+    return TipoEventoFactory(nome="Formação", cor="#0000FF")
 
 
 @pytest.fixture
 def projeto(db):
     """Projeto de teste."""
-    return Projeto.objects.create(nome="Projeto Teste", fluxo="SUPER")
+    return ProjetoFactory(nome="Projeto Teste", fluxo="SUPER")
 
 
 @pytest.fixture
 def solicitacao_aprovada(db, usuario_coordenador, municipio, tipo_evento, projeto):
     """Solicitação aprovada (pronta para publicação)."""
-    return Solicitacao.objects.create(
+    return SolicitacaoFactory(
         usuario=usuario_coordenador,
         municipio=municipio,
         tipo_evento=tipo_evento,

@@ -16,13 +16,14 @@ from django.utils import timezone
 
 import pytest
 
-from apps.core.models import AvailabilityBlock, Municipio, Solicitacao, TipoEvento, Usuario
+from apps.core.models import AvailabilityBlock, Solicitacao
+from apps.core.tests.factories import MunicipioFactory, TipoEventoFactory, UsuarioFactory
 
 
 @pytest.fixture
 def usuario_test(db):
     """Cria um usuário de teste"""
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username="testuser",
         email="test@example.com",
         password="testpass123",
@@ -33,13 +34,13 @@ def usuario_test(db):
 @pytest.fixture
 def tipo_evento_test(db):
     """Cria um tipo de evento de teste"""
-    return TipoEvento.objects.create(nome="Formação", descricao="Formação presencial")
+    return TipoEventoFactory(nome="Formação", descricao="Formação presencial")
 
 
 @pytest.fixture
 def municipio_test(db):
     """Cria um município de teste"""
-    return Municipio.objects.create(nome="Fortaleza", uf="CE")
+    return MunicipioFactory(nome="Fortaleza", uf="CE")
 
 
 @pytest.mark.django_db

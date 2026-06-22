@@ -17,14 +17,21 @@ from datetime import timedelta
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from django.contrib.auth.models import Group
 from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AuditLog, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import AuditLog
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -34,7 +41,7 @@ def usuario_comum(faker):
     """Usuário comum sem permissões especiais."""
     # Python uuid4() is truly random (faker.uuid4() is seeded and generates duplicates!)
     uid = uuid4().hex  # 32 chars hex, 128-bit entropy
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username=f"comum_{uid}",
         email=f"comum_{uid}@example.com",
         password="testpass",
@@ -48,14 +55,14 @@ def usuario_superintendencia(faker):
     composite Setor `Superintendência` + Função `Gerente`. A regra antiga
     (Setor sozinho aprovava via PA-02) foi descontinuada."""
     uid = uuid4().hex  # 32 chars hex, 128-bit entropy
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"super_{uid}",
         email=f"super_{uid}@example.com",
         password="testpass",
         cpf=str(uuid4().int % 10**11).zfill(11),  # 11-digit CPF from UUID int
     )
-    grupo_setor, _ = Group.objects.get_or_create(name="Superintendência")
-    grupo_funcao, _ = Group.objects.get_or_create(name="Gerente")
+    grupo_setor = GroupFactory(name="Superintendência")
+    grupo_funcao = GroupFactory(name="Gerente")
     user.groups.add(grupo_setor, grupo_funcao)
     return user
 
@@ -63,12 +70,12 @@ def usuario_superintendencia(faker):
 @pytest.fixture
 def solicitacao_pendente(usuario_comum):
     """Solicitação pendente para testes (projeto SUPER)."""
-    municipio, _ = Municipio.objects.get_or_create(nome="Fortaleza", defaults={"uf": "CE", "ativo": True})
-    projeto, _ = Projeto.objects.get_or_create(nome="Projeto Teste SUPER", defaults={"ativo": True, "fluxo": "SUPER"})
-    tipo_evento, _ = TipoEvento.objects.get_or_create(nome="Formação")
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="Projeto Teste SUPER", ativo=True, fluxo="SUPER")
+    tipo_evento = TipoEventoFactory(nome="Formação")
 
     now = timezone.now()
-    return Solicitacao.objects.create(
+    return SolicitacaoFactory(
         usuario=usuario_comum,
         municipio=municipio,
         projeto=projeto,
@@ -256,25 +263,23 @@ def test_calendar_integration_is_called_after_approval(
 
     from django.utils import timezone
 
-    from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
-
     # Mock task.delay() para retornar objeto com id serializável (evita JSON error)
     mock_task_result = MagicMock()
     mock_task_result.id = "test-task-id-12345"
     mock_celery_task.return_value = mock_task_result
 
     # Criar Solicitacao já aprovada (evita caminho lento de aprovação)
-    mun, _ = Municipio.objects.get_or_create(nome="Fortaleza", defaults={"uf": "CE", "ativo": True})
-    proj, _ = Projeto.objects.get_or_create(nome="Projeto Teste SUPER", defaults={"ativo": True, "fluxo": "SUPER"})
-    tipo, _ = TipoEvento.objects.get_or_create(nome="Formação")
-    coord = Usuario.objects.create_user(
+    mun = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    proj = ProjetoFactory(nome="Projeto Teste SUPER", ativo=True, fluxo="SUPER")
+    tipo = TipoEventoFactory(nome="Formação")
+    coord = UsuarioFactory(
         username=f"coord_pa03_{uuid4().hex[:8]}",
         email=f"coord_pa03_{uuid4().hex[:8]}@x.com",
         password="x",
         cpf=str(uuid4().int % 10**11).zfill(11),
     )
 
-    sol = Solicitacao.objects.create(
+    sol = SolicitacaoFactory(
         usuario=coord,
         municipio=mun,
         projeto=proj,

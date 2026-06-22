@@ -21,7 +21,8 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, PermissaoFuncional, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import PermissaoFuncional, Usuario
+from apps.core.tests.factories import MunicipioFactory, ProjetoFactory, TipoEventoFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -40,13 +41,13 @@ def run_seed_rbac():
 def dados_basicos():
     """Criar dados básicos para os testes."""
     # Municípios
-    mun_ce = Municipio.objects.create(nome="Fortaleza", uf="CE", ibge_code="2304400")
+    mun_ce = MunicipioFactory(nome="Fortaleza", uf="CE", ibge_code="2304400")
 
     # Projetos
-    proj1 = Projeto.objects.create(nome="Alfabetização", codigo="P001")
+    proj1 = ProjetoFactory(nome="Alfabetização", codigo="P001")
 
     # Tipos de evento
-    tipo1 = TipoEvento.objects.create(nome="Formação Inicial")
+    tipo1 = TipoEventoFactory(nome="Formação Inicial")
 
     return {
         "municipio": mun_ce,
@@ -199,7 +200,7 @@ def test_endpoint_municipios_dat_allowed(run_seed_rbac):
     """Issue #1222 (Epic 1): DAT acessa /api/municipios/ via `manage_admin_registries`
     (cadastro admin DAT puro). `seed_rbac` cria grupo DAT mas não atribui
     funcperms por default; explicitamente atribui aqui pra simular estado realista."""
-    user = Usuario.objects.create_user(username="dat1", email="dat@x.com", password="x", cpf="11111111111")
+    user = UsuarioFactory(username="dat1", email="dat@x.com", password="x", cpf="11111111111")
     dat = Group.objects.get(name="DAT")
     PermissaoFuncional.objects.get(codename="manage_admin_registries").groups.add(dat)
     user.groups.add(dat)
@@ -215,7 +216,7 @@ def test_endpoint_municipios_dat_allowed(run_seed_rbac):
 
 def test_endpoint_municipios_coordenador_forbidden(run_seed_rbac):
     """Coordenador NÃO tem acesso a /api/municipios/ (endpoint protegido por HasPerm("manage_purchases_and_materials"))."""
-    user = Usuario.objects.create_user(username="coord1", email="coord@x.com", password="x", cpf="22222222222")
+    user = UsuarioFactory(username="coord1", email="coord@x.com", password="x", cpf="22222222222")
     coord = Group.objects.get(name="Coordenador")
     user.groups.add(coord)
 
@@ -247,7 +248,7 @@ def test_endpoint_import_compras_dat_allowed(run_seed_rbac):
     portanto os vínculos cap↔grupo precisam ser explicitamente reatribuídos no
     teste (mesmo padrão do test obsoleto `*_controle_allowed`).
     """
-    user = Usuario.objects.create_user(username="dat1", email="dat@x.com", password="x", cpf="66666666666")
+    user = UsuarioFactory(username="dat1", email="dat@x.com", password="x", cpf="66666666666")
     dat = Group.objects.get(name="DAT")
     PermissaoFuncional.objects.get(codename="import_spreadsheet").groups.add(dat)
     user.groups.add(dat)
@@ -269,7 +270,7 @@ def test_endpoint_import_compras_controle_forbidden(run_seed_rbac):
     `manage_purchases_and_materials`, o gate atual é `import_spreadsheet`
     (DAT-only) — Controle continua 403.
     """
-    user = Usuario.objects.create_user(username="controle1", email="controle@x.com", password="x", cpf="55555555555")
+    user = UsuarioFactory(username="controle1", email="controle@x.com", password="x", cpf="55555555555")
     controle = Group.objects.get(name="Controle")
     # Reatribuir caps que Controle teria por seed em produção (já que
     # seed_rbac.py usa assign_default_groups=False).
@@ -288,7 +289,7 @@ def test_endpoint_import_compras_controle_forbidden(run_seed_rbac):
 
 def test_endpoint_import_compras_coordenador_forbidden(run_seed_rbac):
     """Coordenador NÃO tem acesso ao endpoint de import compras."""
-    user = Usuario.objects.create_user(username="coord1", email="coord@x.com", password="x", cpf="77777777777")
+    user = UsuarioFactory(username="coord1", email="coord@x.com", password="x", cpf="77777777777")
     coord = Group.objects.get(name="Coordenador")
     user.groups.add(coord)
 
@@ -305,7 +306,7 @@ def test_endpoint_import_compras_coordenador_forbidden(run_seed_rbac):
 
 def test_superuser_bypasses_all_permissions(run_seed_rbac):
     """Superuser sempre tem acesso, independente de grupos."""
-    user = Usuario.objects.create_superuser(username="admin", email="admin@x.com", password="x", cpf="99999999999")
+    user = UsuarioFactory(superuser=True)
 
     client = APIClient()
     client.force_authenticate(user=user)

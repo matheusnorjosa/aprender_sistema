@@ -14,7 +14,10 @@ from django.conf import settings
 
 import pytest
 
-from apps.core.services.functional_permissions_seed import seed_functional_permissions
+from apps.core.services.functional_permissions_seed import (
+    ensure_base_groups,
+    seed_functional_permissions,
+)
 
 
 def get_field_errors(response) -> dict[str, Any]:
@@ -66,10 +69,17 @@ def force_service_account_mode():
 @pytest.fixture(autouse=True, scope="session")
 def seed_functional_permissions_fixture(django_db_setup, django_db_blocker):
     """
-    Garante baseline de permissoes funcionais em todos os testes de apps.core.
+    Garante baseline de RBAC (todos os grupos base + permissoes funcionais +
+    vinculos) em todos os testes de apps.core.
 
     Idempotente: usa get_or_create/update_or_create internamente.
+
+    `ensure_base_groups()` cria os 18 grupos base (setor + funcao). Sob
+    `pytest --no-migrations` nenhuma migration RunPython cria os grupos, e
+    `seed_functional_permissions` so cria os 7 com capability — este passo
+    cobre os demais (Formador, setores sem capability, etc.). #1404.
     """
 
     with django_db_blocker.unblock():
+        ensure_base_groups()
         seed_functional_permissions(assign_default_groups=True)

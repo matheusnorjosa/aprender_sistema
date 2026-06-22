@@ -15,12 +15,19 @@ from datetime import timedelta
 from unittest.mock import patch
 from uuid import uuid4
 
-from django.contrib.auth.models import Group
 from django.utils import timezone
 
 import pytest
 
-from apps.core.models import AuditLog, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import AuditLog, Solicitacao
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 pytestmark = [pytest.mark.django_db]
 
@@ -29,19 +36,19 @@ pytestmark = [pytest.mark.django_db]
 def task_solicitacao(db):
     """Create a published solicitacao for task tests."""
     uid = uuid4().hex[:8]
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"task_user_{uid}",
         email=f"task_{uid}@test.com",
         password="testpass",
         cpf=f"888{uid.ljust(8, '0')}",
     )
-    Group.objects.get_or_create(name="Controle")
-    municipio = Municipio.objects.create(nome=f"TaskCity_{uid}", uf="CE")
-    projeto = Projeto.objects.create(nome=f"TaskProj_{uid}", fluxo="SUPER")
-    tipo = TipoEvento.objects.create(nome=f"TaskType_{uid}")
+    GroupFactory(name="Controle")
+    municipio = MunicipioFactory(nome=f"TaskCity_{uid}", uf="CE")
+    projeto = ProjetoFactory(nome=f"TaskProj_{uid}", fluxo="SUPER")
+    tipo = TipoEventoFactory(nome=f"TaskType_{uid}")
 
     now = timezone.now()
-    sol = Solicitacao.objects.create(
+    sol = SolicitacaoFactory(
         usuario=user,
         municipio=municipio,
         projeto=projeto,

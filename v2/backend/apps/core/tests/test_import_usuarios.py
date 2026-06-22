@@ -17,13 +17,13 @@ import tempfile
 from pathlib import Path
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from rest_framework import status
 from rest_framework.test import APIClient
 
 import pytest
 
 from apps.core.services.usuarios_import import import_usuarios_from_file
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 # URL direta (evita problemas de cache de rotas no container)
 IMPORT_USUARIOS_URL = "/api/usuarios/import/"
@@ -34,7 +34,7 @@ User = get_user_model()
 @pytest.fixture
 def dat_user(db):
     """Usuario do grupo DAT (com permissao de import)."""
-    user = User.objects.create_user(
+    user = UsuarioFactory(
         username="dat_user",
         email="dat@test.com",
         password="testpass123",
@@ -42,7 +42,7 @@ def dat_user(db):
         first_name="DAT",
         last_name="User",
     )
-    group, _ = Group.objects.get_or_create(name="DAT")
+    group = GroupFactory(name="DAT")
     user.groups.add(group)
     return user
 
@@ -50,7 +50,7 @@ def dat_user(db):
 @pytest.fixture
 def formador_user(db):
     """Usuario do grupo Formador (sem permissao de import)."""
-    user = User.objects.create_user(
+    user = UsuarioFactory(
         username="formador_user",
         email="formador@test.com",
         password="testpass123",
@@ -58,7 +58,7 @@ def formador_user(db):
         first_name="Formador",
         last_name="User",
     )
-    group, _ = Group.objects.get_or_create(name="Formador")
+    group = GroupFactory(name="Formador")
     user.groups.add(group)
     return user
 
@@ -66,14 +66,7 @@ def formador_user(db):
 @pytest.fixture
 def superuser(db):
     """Superusuario (sempre tem permissao)."""
-    return User.objects.create_superuser(
-        username="admin",
-        email="admin@test.com",
-        password="testpass123",
-        cpf="99999999999",
-        first_name="Admin",
-        last_name="User",
-    )
+    return UsuarioFactory(superuser=True)
 
 
 @pytest.fixture
@@ -100,8 +93,8 @@ def sample_csv(db):
 def sample_csv_with_groups(db):
     """CSV com grupos especificados."""
     # Criar grupos primeiro
-    Group.objects.get_or_create(name="Formador")
-    Group.objects.get_or_create(name="Coordenador")
+    GroupFactory(name="Formador")
+    GroupFactory(name="Coordenador")
 
     content = """cpf,nome,email,grupos
 55555555555,Ana Costa Lima,ana.costa@test.com,Formador
@@ -160,7 +153,7 @@ def sample_csv_flexible_headers(db):
 def sample_csv_update_existing(db):
     """CSV para testar atualizacao de usuario existente."""
     # Criar usuario existente
-    User.objects.create_user(
+    UsuarioFactory(
         username="existing_user",
         email="old@test.com",
         password="testpass123",

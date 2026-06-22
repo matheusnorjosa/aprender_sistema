@@ -13,6 +13,7 @@ from rest_framework.test import APIClient
 import pytest
 
 from apps.core.models import AuditLog, Usuario
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 
 @pytest.fixture
@@ -22,33 +23,30 @@ def api_client() -> APIClient:
 
 @pytest.fixture
 def usuario_dat(db) -> Usuario:
-    user = Usuario.objects.create_user(
+    return UsuarioFactory(
         username="dat_sync",
         email="dat_sync@example.com",
         password="senha123",
         cpf="81234567890",
+        groups=["DAT"],
     )
-    dat_group, _ = Group.objects.get_or_create(name="DAT")
-    user.groups.add(dat_group)
-    return user
 
 
 @pytest.fixture
 def usuario_sem_dat(db) -> Usuario:
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="comum_sync",
         email="comum_sync@example.com",
         password="senha123",
         cpf="81234567891",
     )
-    Group.objects.get_or_create(name="Formador")
+    GroupFactory(name="Formador")
     return user
 
 
 @pytest.fixture
 def grupo_alvo(db) -> Group:
-    group, _ = Group.objects.get_or_create(name="Grupo Operacional X")
-    return group
+    return GroupFactory(name="Grupo Operacional X")
 
 
 @pytest.fixture
@@ -56,7 +54,7 @@ def usuarios_alvo(db) -> list[Usuario]:
     users = []
     for idx in range(3):
         users.append(
-            Usuario.objects.create_user(
+            UsuarioFactory(
                 username=f"user_sync_{idx}",
                 email=f"user_sync_{idx}@example.com",
                 password="senha123",

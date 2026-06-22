@@ -18,13 +18,20 @@ from __future__ import annotations
 from datetime import date, timedelta
 from uuid import uuid4
 
-from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AuditLog, Compra, Municipio, Participation, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import AuditLog, Compra, Participation
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.fixture
@@ -37,11 +44,11 @@ def api_client():
 def grupos():
     """Create Django groups."""
     return {
-        "Coordenador": Group.objects.get_or_create(name="Coordenador")[0],
-        "Superintendência": Group.objects.get_or_create(name="Superintendência")[0],
-        "Controle": Group.objects.get_or_create(name="Controle")[0],
-        "DAT": Group.objects.get_or_create(name="DAT")[0],
-        "Gerente": Group.objects.get_or_create(name="Gerente")[0],
+        "Coordenador": GroupFactory(name="Coordenador"),
+        "Superintendência": GroupFactory(name="Superintendência"),
+        "Controle": GroupFactory(name="Controle"),
+        "DAT": GroupFactory(name="DAT"),
+        "Gerente": GroupFactory(name="Gerente"),
     }
 
 
@@ -49,7 +56,7 @@ def grupos():
 def usuario_coordenador(grupos):
     """User with Coordenador role."""
     uid = uuid4().hex[:8]
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"coord_{uid}",
         password="senha123",
         cpf=str(uuid4().int % 10**11).zfill(11),
@@ -63,7 +70,7 @@ def usuario_coordenador(grupos):
 def usuario_gerente_superintendencia(grupos):
     """User with Superintendência role (also Gerente) for batch approve/reject tests."""
     uid = uuid4().hex[:8]
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"gerente_super_{uid}",
         password="senha123",
         cpf=str(uuid4().int % 10**11).zfill(11),
@@ -79,7 +86,7 @@ def usuario_superintendencia(grupos):
     """Gerente da Superintendência (PR 3 hardening RBAC, 2026-04-29):
     composite Setor `Superintendência` + Função `Gerente`."""
     uid = uuid4().hex[:8]
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"super_{uid}",
         password="senha123",
         cpf=str(uuid4().int % 10**11).zfill(11),
@@ -93,7 +100,7 @@ def usuario_superintendencia(grupos):
 def usuario_formador(grupos):
     """User to be used as formador."""
     uid = uuid4().hex[:8]
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username=f"formador_{uid}",
         password="senha123",
         cpf=str(uuid4().int % 10**11).zfill(11),
@@ -104,14 +111,14 @@ def usuario_formador(grupos):
 @pytest.fixture
 def municipio():
     """Test municipality."""
-    return Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+    return MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
 
 
 @pytest.fixture
 def projeto_super():
     """Project with SUPER flow (requires approval)."""
     uid = uuid4().hex[:8]
-    return Projeto.objects.create(
+    return ProjetoFactory(
         nome=f"Projeto SUPER {uid}",
         codigo=f"SUPER{uid[:4]}",
         fluxo="SUPER",
@@ -122,7 +129,7 @@ def projeto_super():
 @pytest.fixture
 def tipo_evento():
     """Test event type."""
-    return TipoEvento.objects.get_or_create(nome="Formação")[0]
+    return TipoEventoFactory(nome="Formação")
 
 
 @pytest.fixture
@@ -158,7 +165,7 @@ class TestGetClientIP:
         tipo_evento,
     ):
         """X-Forwarded-For header is correctly extracted (line 36)."""
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -192,7 +199,7 @@ class TestGetClientIP:
         tipo_evento,
     ):
         """X-Real-IP header is correctly extracted (line 39)."""
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -234,20 +241,20 @@ class TestSolicitacaoFilters:
         tipo_evento,
     ):
         """Sector filter works correctly (line 134)."""
-        projeto_acerta = Projeto.objects.create(
+        projeto_acerta = ProjetoFactory(
             nome="ACerta Teste",
             codigo="ACERTA",
             fluxo="SUPER",
             ativo=True,
         )
-        projeto_vidas = Projeto.objects.create(
+        projeto_vidas = ProjetoFactory(
             nome="Vidas Teste",
             codigo="VIDAS",
             fluxo="SUPER",
             ativo=True,
         )
 
-        sol_acerta = Solicitacao.objects.create(
+        sol_acerta = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_acerta,
@@ -256,7 +263,7 @@ class TestSolicitacaoFilters:
             fim=timezone.now() + timedelta(days=1, hours=2),
             status="pendente",
         )
-        sol_vidas = Solicitacao.objects.create(
+        sol_vidas = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_vidas,
@@ -286,7 +293,7 @@ class TestSolicitacaoFilters:
         """date_from filter works correctly (lines 137-142)."""
         today = timezone.now().date()
 
-        sol_past = Solicitacao.objects.create(
+        sol_past = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -295,7 +302,7 @@ class TestSolicitacaoFilters:
             fim=timezone.now() - timedelta(days=10) + timedelta(hours=2),
             status="pendente",
         )
-        sol_future = Solicitacao.objects.create(
+        sol_future = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -323,7 +330,7 @@ class TestSolicitacaoFilters:
         tipo_evento,
     ):
         """Invalid date_from format is ignored (lines 141-142)."""
-        Solicitacao.objects.create(
+        SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -351,7 +358,7 @@ class TestSolicitacaoFilters:
         """date_to filter works correctly (lines 145-150)."""
         today = timezone.now().date()
 
-        sol_past = Solicitacao.objects.create(
+        sol_past = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -360,7 +367,7 @@ class TestSolicitacaoFilters:
             fim=timezone.now() - timedelta(days=5) + timedelta(hours=2),
             status="pendente",
         )
-        sol_future = Solicitacao.objects.create(
+        sol_future = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -388,7 +395,7 @@ class TestSolicitacaoFilters:
         tipo_evento,
     ):
         """Invalid date_to format is ignored (lines 149-150)."""
-        Solicitacao.objects.create(
+        SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -414,7 +421,7 @@ class TestSolicitacaoFilters:
         tipo_evento,
     ):
         """q search filter works correctly (lines 153-154)."""
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -667,7 +674,7 @@ class TestApproveRejectEdgeCases:
         tipo_evento,
     ):
         """Approving already approved solicitation returns 400 (line 284)."""
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -693,7 +700,7 @@ class TestApproveRejectEdgeCases:
         tipo_evento,
     ):
         """Rejecting already rejected solicitation returns 400 (line 350)."""
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -722,7 +729,7 @@ class TestApproveRejectEdgeCases:
         tipo_evento,
     ):
         """Approving rejected solicitation returns 400 (status must be pendente)."""
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -748,7 +755,7 @@ class TestApproveRejectEdgeCases:
         tipo_evento,
     ):
         """Rejecting approved solicitation returns 400 (status must be pendente)."""
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -787,7 +794,7 @@ class TestBatchApprove:
         tipo_evento,
     ):
         """Batch approve multiple solicitations successfully."""
-        sol1 = Solicitacao.objects.create(
+        sol1 = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -796,7 +803,7 @@ class TestBatchApprove:
             fim=timezone.now() + timedelta(days=1, hours=2),
             status="pendente",
         )
-        sol2 = Solicitacao.objects.create(
+        sol2 = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -876,7 +883,7 @@ class TestBatchApprove:
         tipo_evento,
     ):
         """Batch approve handles already approved solicitations."""
-        sol_pendente = Solicitacao.objects.create(
+        sol_pendente = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -885,7 +892,7 @@ class TestBatchApprove:
             fim=timezone.now() + timedelta(days=1, hours=2),
             status="pendente",
         )
-        sol_aprovado = Solicitacao.objects.create(
+        sol_aprovado = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -920,7 +927,7 @@ class TestBatchApprove:
         tipo_evento,
     ):
         """Batch approve handles non-existent ids."""
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -965,7 +972,7 @@ class TestBatchReject:
         tipo_evento,
     ):
         """Batch reject multiple solicitations successfully."""
-        sol1 = Solicitacao.objects.create(
+        sol1 = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -974,7 +981,7 @@ class TestBatchReject:
             fim=timezone.now() + timedelta(days=1, hours=2),
             status="pendente",
         )
-        sol2 = Solicitacao.objects.create(
+        sol2 = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -1054,7 +1061,7 @@ class TestBatchReject:
         tipo_evento,
     ):
         """Batch reject handles already rejected solicitations."""
-        sol_pendente = Solicitacao.objects.create(
+        sol_pendente = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -1063,7 +1070,7 @@ class TestBatchReject:
             fim=timezone.now() + timedelta(days=1, hours=2),
             status="pendente",
         )
-        sol_reprovado = Solicitacao.objects.create(
+        sol_reprovado = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,
@@ -1098,7 +1105,7 @@ class TestBatchReject:
         tipo_evento,
     ):
         """Batch reject handles non-existent ids."""
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_super,

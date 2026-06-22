@@ -10,13 +10,18 @@ Valida:
 
 from __future__ import annotations
 
-from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.utils import timezone
 
 import pytest
 
-from apps.core.models import Municipio, Participation, Projeto, Solicitacao, TipoEvento
+from apps.core.models import Participation
+from apps.core.tests.factories import (
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -28,32 +33,29 @@ def factory_solicitacao():
     """
 
     def _factory(**kwargs):
-        User = get_user_model()
-        user = User.objects.create_user(
+        user = UsuarioFactory(
             username="solicita_user",
             email="solicita@example.com",
             password="testpass123",
             cpf="12345678901",
         )
 
-        municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+        municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
 
-        tipo_evento = TipoEvento.objects.create(nome="Formação", descricao="Formação continuada")
+        tipo_evento = TipoEventoFactory(nome="Formação", descricao="Formação continuada")
 
-        projeto = Projeto.objects.create(nome="Teste Projeto", ativo=True)
+        projeto = ProjetoFactory(nome="Teste Projeto", ativo=True)
 
         defaults = {
             "usuario": user,
             "municipio": municipio,
             "tipo_evento": tipo_evento,
             "projeto": projeto,
-            "inicio": timezone.now(),
-            "fim": timezone.now() + timezone.timedelta(hours=2),
             "status": "pendente",
         }
         defaults.update(kwargs)
 
-        return Solicitacao.objects.create(**defaults)
+        return SolicitacaoFactory(**defaults)
 
     return _factory
 
@@ -63,8 +65,7 @@ def test_participation_unique_constraint(factory_solicitacao):
     Testa que UniqueConstraint impede duplicação de papel por (solicitacao, usuario, role).
     """
     solicitacao = factory_solicitacao()
-    User = get_user_model()
-    user = User.objects.create_user(
+    user = UsuarioFactory(
         username="formador1",
         email="formador1@example.com",
         password="testpass123",
@@ -92,8 +93,7 @@ def test_participation_allows_different_roles_same_user(factory_solicitacao):
     Testa que o mesmo usuário pode ter múltiplos papéis DIFERENTES na mesma solicitação.
     """
     solicitacao = factory_solicitacao()
-    User = get_user_model()
-    user = User.objects.create_user(
+    user = UsuarioFactory(
         username="multi_role",
         email="multi@example.com",
         password="testpass123",
@@ -123,8 +123,7 @@ def test_participation_cascade_delete_on_solicitacao(factory_solicitacao):
     Testa que deletar Solicitacao deleta Participations em cascata.
     """
     solicitacao = factory_solicitacao()
-    User = get_user_model()
-    user = User.objects.create_user(
+    user = UsuarioFactory(
         username="cascade_test",
         email="cascade@example.com",
         password="testpass123",
@@ -150,8 +149,7 @@ def test_participation_protect_on_usuario_delete(factory_solicitacao):
     Testa que deletar Usuario com Participations deve ser PROTEGIDO (PROTECT).
     """
     solicitacao = factory_solicitacao()
-    User = get_user_model()
-    user = User.objects.create_user(
+    user = UsuarioFactory(
         username="protect_test",
         email="protect@example.com",
         password="testpass123",

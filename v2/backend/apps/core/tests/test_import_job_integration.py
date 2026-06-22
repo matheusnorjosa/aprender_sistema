@@ -16,16 +16,13 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from rest_framework import status
 from rest_framework.test import APIClient
 
 import pytest
 
 from apps.core.models import AvailabilityBlock, ImportJob
-
-User = get_user_model()
+from apps.core.tests.factories import UsuarioFactory
 
 UPLOAD_URL = "/api/imports/bloqueios/"
 
@@ -34,22 +31,20 @@ UPLOAD_URL = "/api/imports/bloqueios/"
 def controle_user(db):
     # O seed RBAC (incl. pos-truncate de transaction=True) e garantido globalmente
     # pela fixture autouse `ensure_rbac_seed` (conftest raiz, #1402).
-    user = User.objects.create_user(
+    return UsuarioFactory(
         username="ctrl_intg",
         email="ctrl_intg@test.com",
         password="testpass123",
         cpf="11111111111",
         first_name="Ctrl",
         last_name="Intg",
+        groups=["Controle"],
     )
-    group, _ = Group.objects.get_or_create(name="Controle")
-    user.groups.add(group)
-    return user
 
 
 @pytest.fixture
 def target_user(db):
-    return User.objects.create_user(
+    return UsuarioFactory(
         username="target_intg",
         email="target_intg@test.com",
         password="testpass123",

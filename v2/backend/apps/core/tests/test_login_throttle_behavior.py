@@ -38,7 +38,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Usuario
+from apps.core.tests.factories import UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -48,7 +48,7 @@ def usuario_valido():
     """Usuário válido para testes de throttling."""
     uid = uuid4().hex
     cpf = str(uuid4().int % 10**11).zfill(11)
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username=f"throttle_user_{uid}",
         email=f"throttle_{uid}@example.com",
         password="validpass123",

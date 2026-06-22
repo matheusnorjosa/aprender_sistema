@@ -6,17 +6,14 @@ Tests for municipio cache invalidation through the admin API.
 
 from __future__ import annotations
 
-from uuid import uuid4
-
-from django.contrib.auth.models import Group
 from django.core.cache import cache
 from rest_framework import status
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Usuario
 from apps.core.services.options_cache import MUNICIPIOS_OPTIONS_CACHE_KEY
+from apps.core.tests.factories import MunicipioFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -28,16 +25,7 @@ def api_client():
 
 @pytest.fixture
 def usuario_dat():
-    uid = uuid4().hex[:8]
-    user = Usuario.objects.create_user(
-        username=f"dat_{uid}",
-        email=f"dat_{uid}@example.com",
-        password="senha123",
-        cpf=str(uuid4().int % 10**11).zfill(11),
-    )
-    group_dat, _ = Group.objects.get_or_create(name="DAT")
-    user.groups.add(group_dat)
-    return user
+    return UsuarioFactory(groups=["DAT"])
 
 
 def test_dat_create_municipio_invalidates_options_cache(api_client, usuario_dat):
@@ -52,7 +40,7 @@ def test_dat_create_municipio_invalidates_options_cache(api_client, usuario_dat)
 
 
 def test_dat_update_municipio_invalidates_options_cache(api_client, usuario_dat):
-    municipio = Municipio.objects.create(nome="Caucaia", uf="CE", ibge_code="2303709", ativo=True)
+    municipio = MunicipioFactory(nome="Caucaia", uf="CE", ibge_code="2303709", ativo=True)
     cache.set(MUNICIPIOS_OPTIONS_CACHE_KEY, [{"id": municipio.id, "nome": "stale", "uf": "CE"}], timeout=300)
 
     api_client.force_authenticate(user=usuario_dat)
@@ -63,7 +51,7 @@ def test_dat_update_municipio_invalidates_options_cache(api_client, usuario_dat)
 
 
 def test_dat_delete_municipio_invalidates_options_cache(api_client, usuario_dat):
-    municipio = Municipio.objects.create(nome="Caucaia", uf="CE", ibge_code="2303709", ativo=True)
+    municipio = MunicipioFactory(nome="Caucaia", uf="CE", ibge_code="2303709", ativo=True)
     cache.set(MUNICIPIOS_OPTIONS_CACHE_KEY, [{"id": municipio.id, "nome": "stale", "uf": "CE"}], timeout=300)
 
     api_client.force_authenticate(user=usuario_dat)

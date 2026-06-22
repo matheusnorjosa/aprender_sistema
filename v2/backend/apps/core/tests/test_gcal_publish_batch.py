@@ -15,13 +15,19 @@ from __future__ import annotations
 import os
 from unittest.mock import MagicMock, patch
 
-from django.contrib.auth.models import Group
 from django.test import override_settings
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.fixture
@@ -33,13 +39,13 @@ def api_client():
 @pytest.fixture
 def grupo_controle(db):
     """Cria grupo Controle."""
-    return Group.objects.get_or_create(name="Controle")[0]
+    return GroupFactory(name="Controle")
 
 
 @pytest.fixture
 def usuario_controle(db, grupo_controle):
     """Cria usuário com grupo Controle."""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="controle_user", email="controle@test.com", password="testpass123", cpf="12345678901"  # CPF único
     )
     user.groups.add(grupo_controle)
@@ -49,7 +55,7 @@ def usuario_controle(db, grupo_controle):
 @pytest.fixture
 def usuario_comum(db):
     """Cria usuário sem permissões especiais."""
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username="comum_user", email="comum@test.com", password="testpass123", cpf="98765432109"  # CPF único diferente
     )
 
@@ -57,25 +63,25 @@ def usuario_comum(db):
 @pytest.fixture
 def projeto(db):
     """Cria projeto de teste."""
-    return Projeto.objects.create(nome="Projeto Teste", codigo="PROJ001", fluxo="SUPER")
+    return ProjetoFactory(nome="Projeto Teste", codigo="PROJ001", fluxo="SUPER")
 
 
 @pytest.fixture
 def municipio(db):
     """Cria município de teste."""
-    return Municipio.objects.create(nome="Fortaleza", uf="CE", ibge_code="2304400")
+    return MunicipioFactory(nome="Fortaleza", uf="CE", ibge_code="2304400")
 
 
 @pytest.fixture
 def tipo_evento(db):
     """Cria tipo de evento de teste."""
-    return TipoEvento.objects.create(nome="Formação")
+    return TipoEventoFactory(nome="Formação")
 
 
 @pytest.fixture
 def solicitacao_aprovada(db, usuario_controle, projeto, municipio, tipo_evento):
     """Cria solicitação aprovada."""
-    return Solicitacao.objects.create(
+    return SolicitacaoFactory(
         usuario=usuario_controle,
         projeto=projeto,
         municipio=municipio,
@@ -90,7 +96,7 @@ def solicitacao_aprovada(db, usuario_controle, projeto, municipio, tipo_evento):
 @pytest.fixture
 def solicitacao_pendente(db, usuario_controle, projeto, municipio, tipo_evento):
     """Cria solicitação pendente."""
-    return Solicitacao.objects.create(
+    return SolicitacaoFactory(
         usuario=usuario_controle,
         projeto=projeto,
         municipio=municipio,
@@ -114,7 +120,7 @@ class TestGCalPublishBatchEndpoint:
         Espera: 202 com queued=2, errors=[]
         """
         # Criar segunda solicitação aprovada
-        sol2 = Solicitacao.objects.create(
+        sol2 = SolicitacaoFactory(
             usuario=usuario_controle,
             projeto=solicitacao_aprovada.projeto,
             municipio=solicitacao_aprovada.municipio,

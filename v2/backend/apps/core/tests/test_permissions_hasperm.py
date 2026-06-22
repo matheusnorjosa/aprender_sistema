@@ -15,14 +15,15 @@ Ver v2/docs/plans/rbac-refactor/epic-2-hasperm.md e master-plan §3.3.
 
 from __future__ import annotations
 
-from django.contrib.auth.models import AnonymousUser, Group
+from django.contrib.auth.models import AnonymousUser
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
 
 import pytest
 
-from apps.core.models import PermissaoFuncional, Usuario
+from apps.core.models import PermissaoFuncional
 from apps.core.permissions import HasPerm
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -50,7 +51,7 @@ def seeded_permission():
 @pytest.fixture
 def group_with_permission(seeded_permission):
     """Cria um group Django associado à permission de teste."""
-    group, _ = Group.objects.get_or_create(name="TestCapabilityGroup")
+    group = GroupFactory(name="TestCapabilityGroup")
     seeded_permission.groups.add(group)
     return group
 
@@ -58,7 +59,7 @@ def group_with_permission(seeded_permission):
 @pytest.fixture
 def user_with_capability(group_with_permission):
     """Usuário cuja associação de group lhe dá a permissão funcional."""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="cap_user",
         email="cap@test.com",
         password="x",
@@ -71,7 +72,7 @@ def user_with_capability(group_with_permission):
 @pytest.fixture
 def user_without_capability():
     """Usuário autenticado mas sem a permissão de teste."""
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username="no_cap_user",
         email="nocap@test.com",
         password="x",
@@ -82,12 +83,7 @@ def user_without_capability():
 @pytest.fixture
 def superuser():
     """Superuser — sempre passa em HasPerm (bypass)."""
-    return Usuario.objects.create_superuser(
-        username="su",
-        email="su@test.com",
-        password="x",
-        cpf="10000000003",
-    )
+    return UsuarioFactory(superuser=True)
 
 
 @pytest.fixture

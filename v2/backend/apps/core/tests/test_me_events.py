@@ -15,14 +15,18 @@ Cobertura:
 
 from __future__ import annotations
 
-from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Participation, Projeto, Solicitacao, TipoEvento
+from apps.core.models import Municipio, Participation, Projeto, Solicitacao
+from apps.core.tests.factories import (
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -30,13 +34,12 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture
 def make_user():
     """Cria Usuario com cpf único."""
-    User = get_user_model()
     counter = {"i": 0}
 
     def _factory(username: str = "", **extra):
         counter["i"] += 1
         idx = counter["i"]
-        return User.objects.create_user(
+        return UsuarioFactory(
             username=username or f"user_{idx}",
             email=f"user_{idx}@example.com",
             password="testpass123",
@@ -61,9 +64,7 @@ def make_solicitacao(make_user):
                 nome="Fortaleza", uf="CE", defaults={"ativo": True}
             )
         if "tipo_evento" not in kwargs:
-            kwargs["tipo_evento"], _ = TipoEvento.objects.get_or_create(
-                nome="Formação E2E", defaults={"descricao": "Formação para tests"}
-            )
+            kwargs["tipo_evento"] = TipoEventoFactory(nome="Formação E2E", descricao="Formação para tests")
         if "projeto" not in kwargs:
             kwargs["projeto"], _ = Projeto.objects.get_or_create(nome="Projeto Teste", defaults={"ativo": True})
         if "inicio" not in kwargs:
@@ -72,7 +73,7 @@ def make_solicitacao(make_user):
             kwargs["fim"] = kwargs["inicio"] + timezone.timedelta(hours=2)
         if "status" not in kwargs:
             kwargs["status"] = "aprovado"
-        return Solicitacao.objects.create(**kwargs)
+        return SolicitacaoFactory(**kwargs)
 
     return _factory
 

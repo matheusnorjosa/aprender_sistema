@@ -16,13 +16,13 @@ import tempfile
 from datetime import date
 from pathlib import Path
 
-from django.contrib.auth.models import Group
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Compra, Municipio, Projeto, Usuario
+from apps.core.models import Compra, Municipio, Projeto
 from apps.core.services.controle_imports import import_compras_from_file
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -31,13 +31,13 @@ pytestmark = pytest.mark.django_db
 def user_dat():
     """Cria usuário no grupo DAT (PR-A1 DAT-Imports: detentor de
     `import_spreadsheet` via seed_functional_permissions)."""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="dat_imports",
         email="dat_imports@test.com",
         password="testpass",
         cpf="11111111111",
     )
-    group, _ = Group.objects.get_or_create(name="DAT")
+    group = GroupFactory(name="DAT")
     user.groups.add(group)
     return user
 
@@ -304,13 +304,13 @@ def test_import_compras_forbidden_for_formador():
     PR-A1 DAT-Imports (2026-04-29): endpoint é DAT-only via
     `HasPerm("import_spreadsheet")`. Formador → 403.
     """
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="formador",
         email="formador@test.com",
         password="testpass",
         cpf="22222222222",
     )
-    group, _ = Group.objects.get_or_create(name="Formador")
+    group = GroupFactory(name="Formador")
     user.groups.add(group)
 
     client = APIClient()
@@ -326,13 +326,13 @@ def test_import_compras_forbidden_for_controle_after_pr_a1():
     em massa. Compras continuam visíveis em /controle, mas o upload é
     feito em /dat/importacoes (D-1 do plano DAT-Imports).
     """
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="controle2",
         email="controle2@test.com",
         password="testpass",
         cpf="33333333333",
     )
-    group, _ = Group.objects.get_or_create(name="Controle")
+    group = GroupFactory(name="Controle")
     user.groups.add(group)
 
     client = APIClient()

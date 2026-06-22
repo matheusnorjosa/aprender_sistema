@@ -17,7 +17,6 @@ from __future__ import annotations
 from datetime import timedelta
 from unittest.mock import MagicMock, Mock, patch
 
-from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework import status as http_status
 from rest_framework.test import APIClient
@@ -25,19 +24,27 @@ from rest_framework.test import APIClient
 import pytest
 from googleapiclient.errors import HttpError
 
-from apps.core.models import AuditLog, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import AuditLog, Solicitacao
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.fixture
 def usuario_controle():
     """Usuário do grupo Controle"""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="controle_sprint4",
         email="controle_sprint4@test.com",
         password="testpass",
         cpf="88888888888",
     )
-    grupo, _ = Group.objects.get_or_create(name="Controle")
+    grupo = GroupFactory(name="Controle")
     user.groups.add(grupo)
     return user
 
@@ -45,12 +52,12 @@ def usuario_controle():
 @pytest.fixture
 def solicitacao_aprovada(usuario_controle):
     """Solicitação aprovada para testes"""
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="Projeto Sprint4", codigo="SP4", fluxo="SUPER", ativo=True)
-    tipo_evento = TipoEvento.objects.create(nome="Formação Sprint4")
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="Projeto Sprint4", codigo="SP4", fluxo="SUPER", ativo=True)
+    tipo_evento = TipoEventoFactory(nome="Formação Sprint4")
 
     now = timezone.now()
-    return Solicitacao.objects.create(
+    return SolicitacaoFactory(
         usuario=usuario_controle,
         municipio=municipio,
         projeto=projeto,

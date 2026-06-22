@@ -16,8 +16,6 @@ import io
 import tempfile
 from pathlib import Path
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -25,17 +23,16 @@ import pytest
 
 from apps.core.models import Deslocamento
 from apps.core.services.deslocamentos_import import import_deslocamentos_from_file
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 # URL direta (evita problemas de cache de rotas no container)
 IMPORT_DESLOCAMENTOS_URL = "/api/deslocamentos/import/"
-
-User = get_user_model()
 
 
 @pytest.fixture
 def dat_import_user(db):
     """Usuario do grupo DAT (PR-A1 DAT-Imports: detentor de import_spreadsheet)."""
-    user = User.objects.create_user(
+    user = UsuarioFactory(
         username="dat_import_user",
         email="dat_imports@test.com",
         password="testpass123",
@@ -43,7 +40,7 @@ def dat_import_user(db):
         first_name="DAT",
         last_name="Imports",
     )
-    group, _ = Group.objects.get_or_create(name="DAT")
+    group = GroupFactory(name="DAT")
     user.groups.add(group)
     return user
 
@@ -51,7 +48,7 @@ def dat_import_user(db):
 @pytest.fixture
 def formador_user(db):
     """Usuario do grupo Formador (sem permissao de import)."""
-    user = User.objects.create_user(
+    user = UsuarioFactory(
         username="formador_user",
         email="formador@test.com",
         password="testpass123",
@@ -59,7 +56,7 @@ def formador_user(db):
         first_name="Formador",
         last_name="User",
     )
-    group, _ = Group.objects.get_or_create(name="Formador")
+    group = GroupFactory(name="Formador")
     user.groups.add(group)
     return user
 
@@ -67,7 +64,7 @@ def formador_user(db):
 @pytest.fixture
 def target_user(db):
     """Usuario que tera deslocamentos registrados."""
-    return User.objects.create_user(
+    return UsuarioFactory(
         username="target_user",
         email="target@test.com",
         password="testpass123",

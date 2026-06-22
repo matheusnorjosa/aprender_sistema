@@ -16,23 +16,30 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework import status as http_status
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AuditLog, Municipio, Participation, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import AuditLog, Participation, Solicitacao
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.fixture
 def grupos(db):
     """Create necessary groups (Controle, Gerência, Formador, Coordenador)"""
-    controle, _ = Group.objects.get_or_create(name="Controle")
-    gerencia, _ = Group.objects.get_or_create(name="Gerência")
-    formador, _ = Group.objects.get_or_create(name="Formador")
-    coordenador, _ = Group.objects.get_or_create(name="Coordenador")
+    controle = GroupFactory(name="Controle")
+    gerencia = GroupFactory(name="Gerência")
+    formador = GroupFactory(name="Formador")
+    coordenador = GroupFactory(name="Coordenador")
     return {
         "controle": controle,
         "gerencia": gerencia,
@@ -44,7 +51,7 @@ def grupos(db):
 @pytest.fixture
 def controle_user(db, grupos):
     """User in Controle group"""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="controle1",
         email="controle1@test.com",
         password="testpass123",
@@ -59,7 +66,7 @@ def controle_user(db, grupos):
 @pytest.fixture
 def gerencia_user(db, grupos):
     """User in Gerência group"""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="gerencia1",
         email="gerencia1@test.com",
         password="testpass123",
@@ -74,7 +81,7 @@ def gerencia_user(db, grupos):
 @pytest.fixture
 def formador_user(db, grupos):
     """User in Formador group (unauthorized for metrics)"""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="formador1",
         email="formador1@test.com",
         password="testpass123",
@@ -89,7 +96,7 @@ def formador_user(db, grupos):
 @pytest.fixture
 def coordenador_user(db, grupos):
     """User in Coordenador group (unauthorized for metrics)"""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="coord1",
         email="coord1@test.com",
         password="testpass123",
@@ -102,25 +109,25 @@ def coordenador_user(db, grupos):
 @pytest.fixture
 def tipo_evento(db):
     """Sample event type"""
-    return TipoEvento.objects.create(nome="Formação", descricao="Formação presencial")
+    return TipoEventoFactory(nome="Formação", descricao="Formação presencial")
 
 
 @pytest.fixture
 def projeto(db):
     """Sample project"""
-    return Projeto.objects.create(nome="Projeto Teste", codigo="TESTE", fluxo="SUPER")
+    return ProjetoFactory(nome="Projeto Teste", codigo="TESTE", fluxo="SUPER")
 
 
 @pytest.fixture
 def municipio_a(db):
     """Municipality A"""
-    return Municipio.objects.create(nome="Fortaleza", uf="CE", ibge_code="2304400")
+    return MunicipioFactory(nome="Fortaleza", uf="CE", ibge_code="2304400")
 
 
 @pytest.fixture
 def municipio_b(db):
     """Municipality B"""
-    return Municipio.objects.create(nome="Caucaia", uf="CE", ibge_code="2303501")
+    return MunicipioFactory(nome="Caucaia", uf="CE", ibge_code="2303501")
 
 
 @pytest.mark.django_db
@@ -155,7 +162,7 @@ class TestProductivityMetrics:
 
         # 6 approved
         for i in range(6):
-            sol = Solicitacao.objects.create(
+            sol = SolicitacaoFactory(
                 usuario=controle_user,
                 tipo_evento=tipo_evento,
                 projeto=projeto,
@@ -182,7 +189,7 @@ class TestProductivityMetrics:
 
         # 3 rejected
         for i in range(3):
-            sol = Solicitacao.objects.create(
+            sol = SolicitacaoFactory(
                 usuario=controle_user,
                 tipo_evento=tipo_evento,
                 projeto=projeto,
@@ -196,7 +203,7 @@ class TestProductivityMetrics:
             solicitacoes.append(sol)
 
         # 1 pending
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=controle_user,
             tipo_evento=tipo_evento,
             projeto=projeto,
@@ -265,7 +272,7 @@ class TestProductivityMetrics:
         now = timezone.now()
 
         # Create event 2 days ago (should be included in days=7)
-        Solicitacao.objects.create(
+        SolicitacaoFactory(
             usuario=controle_user,
             tipo_evento=tipo_evento,
             projeto=projeto,
@@ -277,7 +284,7 @@ class TestProductivityMetrics:
         )
 
         # Create event 10 days ago (should NOT be included in days=7)
-        Solicitacao.objects.create(
+        SolicitacaoFactory(
             usuario=controle_user,
             tipo_evento=tipo_evento,
             projeto=projeto,
@@ -324,7 +331,7 @@ class TestFormadoresMetrics:
         client = APIClient()
 
         # Create Controle user for authentication
-        controle_user = Usuario.objects.create_user(
+        controle_user = UsuarioFactory(
             username="controle_test",
             email="controle@test.com",
             password="testpass123",
@@ -340,7 +347,7 @@ class TestFormadoresMetrics:
         # Create 15 formadores
         formadores = []
         for i in range(15):
-            formador = Usuario.objects.create_user(
+            formador = UsuarioFactory(
                 username=f"formador{i}",
                 email=f"formador{i}@test.com",
                 password="testpass123",
@@ -359,7 +366,7 @@ class TestFormadoresMetrics:
 
             for i in range(count):
                 # Create solicitacao (approved, in date range)
-                sol = Solicitacao.objects.create(
+                sol = SolicitacaoFactory(
                     usuario=controle_user,
                     tipo_evento=tipo_evento,
                     projeto=projeto,
@@ -420,7 +427,7 @@ class TestFormadoresMetrics:
         """Test that formadores ranking is limited to top 10"""
         client = APIClient()
 
-        controle_user = Usuario.objects.create_user(
+        controle_user = UsuarioFactory(
             username="controle_top10",
             email="controle_top10@test.com",
             password="testpass123",
@@ -435,7 +442,7 @@ class TestFormadoresMetrics:
 
         # Create 15 formadores with 1 event each
         for i in range(15):
-            formador = Usuario.objects.create_user(
+            formador = UsuarioFactory(
                 username=f"formador_top10_{i}",
                 email=f"formador_top10_{i}@test.com",
                 password="testpass123",
@@ -446,7 +453,7 @@ class TestFormadoresMetrics:
             formador.groups.add(grupos["formador"])
 
             # Create 1 event
-            sol = Solicitacao.objects.create(
+            sol = SolicitacaoFactory(
                 usuario=controle_user,
                 tipo_evento=tipo_evento,
                 projeto=projeto,
@@ -477,7 +484,7 @@ class TestFormadoresMetrics:
         """Test that guest participations (no usuario) are excluded"""
         client = APIClient()
 
-        controle_user = Usuario.objects.create_user(
+        controle_user = UsuarioFactory(
             username="controle_guest",
             email="controle_guest@test.com",
             password="testpass123",
@@ -491,7 +498,7 @@ class TestFormadoresMetrics:
         base_time = now - timedelta(days=5)
 
         # Create event with guest participation (should be excluded)
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=controle_user,
             tipo_evento=tipo_evento,
             projeto=projeto,
@@ -551,7 +558,7 @@ class TestQualityMetrics:
 
         # 7 approved (no conflicts)
         for i in range(7):
-            sol = Solicitacao.objects.create(
+            sol = SolicitacaoFactory(
                 usuario=controle_user,
                 tipo_evento=tipo_evento,
                 projeto=projeto,
@@ -574,7 +581,7 @@ class TestQualityMetrics:
             solicitacoes.append(sol)
 
         # 1 approved with conflict in observacoes
-        sol_conflict = Solicitacao.objects.create(
+        sol_conflict = SolicitacaoFactory(
             usuario=controle_user,
             tipo_evento=tipo_evento,
             projeto=projeto,
@@ -590,7 +597,7 @@ class TestQualityMetrics:
 
         # 2 rejected
         for i in range(2):
-            sol = Solicitacao.objects.create(
+            sol = SolicitacaoFactory(
                 usuario=controle_user,
                 tipo_evento=tipo_evento,
                 projeto=projeto,

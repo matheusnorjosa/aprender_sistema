@@ -51,8 +51,11 @@ class UsuarioFactory(factory.django.DjangoModelFactory[Usuario]):
 
     username = factory.Sequence(lambda n: f"user_{n}")
     email = factory.Sequence(lambda n: f"user_{n}@example.com")
-    first_name = "Test"
-    last_name = "User"
+    # first_name/last_name vazios por padrão = fiéis a create_user/create_superuser
+    # (que não preenchem nome). Importa p/ asserts em usuario_nome, que cai no
+    # username quando get_full_name() é vazio. Passe explicitamente se precisar.
+    first_name = ""
+    last_name = ""
     cpf = factory.Sequence(lambda n: str(n + 1).zfill(11))
     is_active = True
 

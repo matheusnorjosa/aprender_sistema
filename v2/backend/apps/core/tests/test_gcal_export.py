@@ -20,16 +20,20 @@ import io
 import json
 from datetime import date, datetime, timedelta
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
-
-User = get_user_model()
+from apps.core.models import Solicitacao
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 class TestGCalExport(TestCase):
@@ -44,37 +48,35 @@ class TestGCalExport(TestCase):
         self.now = timezone.make_aware(datetime(2025, 1, 15, 12, 0, 0))
 
         # Criar grupos
-        self.grupo_controle, _ = Group.objects.get_or_create(name="Controle")
-        self.grupo_super, _ = Group.objects.get_or_create(name="Superintendência")
-        self.grupo_coordenador, _ = Group.objects.get_or_create(name="Coordenador")
+        self.grupo_controle = GroupFactory(name="Controle")
+        self.grupo_super = GroupFactory(name="Superintendência")
+        self.grupo_coordenador = GroupFactory(name="Coordenador")
 
         # Criar usuários (Usuario é o User customizado com cpf obrigatório)
-        self.user_controle = User.objects.create_user(
+        self.user_controle = UsuarioFactory(
             username="controle_user",
             password="testpass123",
             cpf="11111111111",  # CPF único para evitar constraint violation
         )
         self.user_controle.groups.add(self.grupo_controle)
 
-        self.user_super = User.objects.create_user(
-            username="super_user", password="testpass123", cpf="22222222222"  # CPF único
-        )
+        self.user_super = UsuarioFactory(username="super_user", password="testpass123", cpf="22222222222")  # CPF único
         self.user_super.groups.add(self.grupo_super)
 
-        self.user_coordenador = User.objects.create_user(
+        self.user_coordenador = UsuarioFactory(
             username="coordenador_user", password="testpass123", cpf="33333333333"  # CPF único
         )
         self.user_coordenador.groups.add(self.grupo_coordenador)
 
         # Criar dados de teste
-        self.municipio = Municipio.objects.create(nome="Fortaleza", uf="CE")
+        self.municipio = MunicipioFactory(nome="Fortaleza", uf="CE")
 
-        self.projeto = Projeto.objects.create(nome="ACERTA", fluxo="SUPER")
+        self.projeto = ProjetoFactory(nome="ACERTA", fluxo="SUPER")
 
-        self.tipo_evento = TipoEvento.objects.create(nome="Fundamental I Online")
+        self.tipo_evento = TipoEventoFactory(nome="Fundamental I Online")
 
         # Criar solicitações aprovadas com gcal_status diferentes
-        self.sol_published = Solicitacao.objects.create(
+        self.sol_published = SolicitacaoFactory(
             status="aprovado",
             inicio=self.now + timedelta(days=1),
             fim=self.now + timedelta(days=1, hours=2),
@@ -88,7 +90,7 @@ class TestGCalExport(TestCase):
             meet_link="https://meet.google.com/abc-def-ghi",
         )
 
-        self.sol_error = Solicitacao.objects.create(
+        self.sol_error = SolicitacaoFactory(
             status="aprovado",
             inicio=self.now + timedelta(days=2),
             fim=self.now + timedelta(days=2, hours=2),
@@ -101,7 +103,7 @@ class TestGCalExport(TestCase):
             gcal_last_error="500 Internal Server Error",
         )
 
-        self.sol_none = Solicitacao.objects.create(
+        self.sol_none = SolicitacaoFactory(
             status="aprovado",
             inicio=self.now + timedelta(days=3),
             fim=self.now + timedelta(days=3, hours=2),
@@ -315,7 +317,7 @@ class TestGCalExport(TestCase):
         ref_date = datetime(2025, 2, 10, 0, 0, 0, tzinfo=tz_local)
 
         # Evento exatamente às 00:00 (início do dia)
-        sol_midnight = Solicitacao.objects.create(
+        sol_midnight = SolicitacaoFactory(
             status="aprovado",
             inicio=ref_date,  # 2025-02-10 00:00 BRT
             fim=ref_date + timedelta(hours=1),
@@ -328,7 +330,7 @@ class TestGCalExport(TestCase):
         )
 
         # Evento exatamente às 23:59:59 (fim do dia)
-        sol_eod = Solicitacao.objects.create(
+        sol_eod = SolicitacaoFactory(
             status="aprovado",
             inicio=ref_date.replace(hour=23, minute=59, second=59),  # 2025-02-10 23:59:59 BRT
             fim=ref_date.replace(hour=23, minute=59, second=59) + timedelta(hours=1),
@@ -341,7 +343,7 @@ class TestGCalExport(TestCase):
         )
 
         # Evento um dia antes (deve ser excluído quando start=2025-02-10)
-        sol_before = Solicitacao.objects.create(
+        sol_before = SolicitacaoFactory(
             status="aprovado",
             inicio=ref_date - timedelta(days=1),  # 2025-02-09
             fim=ref_date - timedelta(days=1) + timedelta(hours=2),
@@ -354,7 +356,7 @@ class TestGCalExport(TestCase):
         )
 
         # Evento um dia depois (deve ser excluído quando end=2025-02-10)
-        sol_after = Solicitacao.objects.create(
+        sol_after = SolicitacaoFactory(
             status="aprovado",
             inicio=ref_date + timedelta(days=1),  # 2025-02-11
             fim=ref_date + timedelta(days=1) + timedelta(hours=2),

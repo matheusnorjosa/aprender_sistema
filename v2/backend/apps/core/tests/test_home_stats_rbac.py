@@ -26,7 +26,6 @@ rbac_lint via `# noqa: RBAC-data-scope-allowed`.
 
 from __future__ import annotations
 
-from django.contrib.auth.models import Group
 from django.core.cache import cache
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -42,6 +41,13 @@ from apps.core.models import (
     Solicitacao,
     TipoEvento,
     Usuario,
+)
+from apps.core.tests.factories import (
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
 )
 
 pytestmark = pytest.mark.django_db
@@ -63,20 +69,14 @@ def _next_username(prefix: str) -> str:
 
 def _make_user(prefix: str, group_names: list[str], is_superuser: bool = False) -> Usuario:
     username = _next_username(prefix)
-    user = Usuario.objects.create_user(
+    return UsuarioFactory(
         username=username,
         email=f"{username}@example.com",
         password="testpass123",
         cpf=_next_cpf(),
+        superuser=is_superuser,
+        groups=group_names,
     )
-    if is_superuser:
-        user.is_superuser = True
-        user.is_staff = True
-        user.save(update_fields=["is_superuser", "is_staff"])
-    for gname in group_names:
-        group, _ = Group.objects.get_or_create(name=gname)
-        user.groups.add(group)
-    return user
 
 
 def _make_gerencia(nome: str, setor: str) -> Gerencia:
@@ -104,7 +104,7 @@ def _link_to_gerencia(
 
 
 def _make_projeto(nome: str, gerencia: Gerencia, fluxo: str = "NAO_SUPER") -> Projeto:
-    return Projeto.objects.create(nome=nome, codigo=nome[:20], fluxo=fluxo, ativo=True, gerencia=gerencia)
+    return ProjetoFactory(nome=nome, codigo=nome[:20], fluxo=fluxo, ativo=True, gerencia=gerencia)
 
 
 def _make_solicitacao(
@@ -117,7 +117,7 @@ def _make_solicitacao(
     days_ahead: int = 7,
 ) -> Solicitacao:
     inicio = timezone.now() + timezone.timedelta(days=days_ahead)
-    return Solicitacao.objects.create(
+    return SolicitacaoFactory(
         usuario=usuario,
         municipio=municipio,
         projeto=projeto,
@@ -139,8 +139,8 @@ def _clear_rbac_cache(db):
 @pytest.fixture
 def world():
     """Mundo compartilhado: 2 gerências, projetos, eventos aprovados em cada."""
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    tipo_evento = TipoEvento.objects.create(nome="Formação")
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    tipo_evento = TipoEventoFactory(nome="Formação")
 
     g1 = _make_gerencia("GERENCIA 2", "Vidas")
     g2 = _make_gerencia("GERENCIA 3", "Fluir")

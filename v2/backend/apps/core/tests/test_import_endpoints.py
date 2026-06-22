@@ -17,12 +17,11 @@ from __future__ import annotations
 import io
 from unittest.mock import patch
 
-from django.contrib.auth.models import Group
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Usuario
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -36,13 +35,13 @@ def _file(bytes_: bytes, name="sample.csv"):
 
 def _user_in_group(group_name: str):
     """Helper para criar usuário em grupo específico."""
-    u = Usuario.objects.create_user(
+    u = UsuarioFactory(
         username=f"u{group_name}",
         email=f"{group_name}@x.com",
         password="x",
         cpf="1" * 11,
     )
-    g, _ = Group.objects.get_or_create(name=group_name)
+    g = GroupFactory(name=group_name)
     u.groups.add(g)
     return u
 
@@ -117,7 +116,7 @@ def test_import_cadastros_requires_dat():
 
 def test_import_unauthorized_returns_403():
     """Usuário sem permissão recebe 403 Forbidden."""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="plain",
         email="plain@test.com",
         password="x",

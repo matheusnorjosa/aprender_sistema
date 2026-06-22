@@ -17,15 +17,22 @@ from datetime import datetime, timedelta
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
-from django.contrib.auth.models import Group
 from django.core.cache import cache
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AvailabilityBlock, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import AvailabilityBlock
 from apps.core.services.availability_service import check_conflicts
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.fixture
@@ -39,8 +46,8 @@ def clear_cache():
 @pytest.fixture
 def usuario_formador(db):
     """Cria um usuário formador para testes."""
-    grupo_formador = Group.objects.get_or_create(name="Formador")[0]
-    usuario = Usuario.objects.create_user(
+    grupo_formador = GroupFactory(name="Formador")
+    usuario = UsuarioFactory(
         username="formador_cache",
         email="formador_cache@test.com",
         first_name="Cache",
@@ -54,13 +61,13 @@ def usuario_formador(db):
 @pytest.fixture
 def municipio(db):
     """Cria um município para testes."""
-    return Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+    return MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
 
 
 @pytest.fixture
 def projeto_super(db):
     """Cria um projeto SUPER para testes."""
-    return Projeto.objects.create(
+    return ProjetoFactory(
         nome="Projeto Cache Test",
         codigo="CACHE",
         fluxo="SUPER",
@@ -71,7 +78,7 @@ def projeto_super(db):
 @pytest.fixture
 def tipo_evento(db):
     """Cria um tipo de evento para testes."""
-    return TipoEvento.objects.create(nome="Formação Inicial")
+    return TipoEventoFactory(nome="Formação Inicial")
 
 
 # ================================================================
@@ -130,7 +137,7 @@ def test_cache_invalidated_on_solicitacao_create(clear_cache, usuario_formador, 
     assert result1.ok is True
 
     # Criar solicitação aprovada (conflita)
-    Solicitacao.objects.create(
+    SolicitacaoFactory(
         usuario=usuario_formador,
         inicio=inicio,
         fim=fim,
@@ -162,7 +169,7 @@ def test_cache_invalidated_on_solicitacao_update(clear_cache, usuario_formador, 
     fim = inicio + timedelta(hours=2)
 
     # Criar solicitação pendente
-    sol = Solicitacao.objects.create(
+    sol = SolicitacaoFactory(
         usuario=usuario_formador,
         inicio=inicio,
         fim=fim,
@@ -201,7 +208,7 @@ def test_cache_invalidated_on_solicitacao_delete(clear_cache, usuario_formador, 
     fim = inicio + timedelta(hours=2)
 
     # Criar solicitação aprovada (conflita)
-    sol = Solicitacao.objects.create(
+    sol = SolicitacaoFactory(
         usuario=usuario_formador,
         inicio=inicio,
         fim=fim,
@@ -274,7 +281,7 @@ def test_municipios_options_cached(clear_cache):
     """
     client = APIClient()
     # Criar usuário autenticado
-    usuario = Usuario.objects.create_user(
+    usuario = UsuarioFactory(
         username="test_municipios",
         email="test@test.com",
         password="test123",
@@ -282,8 +289,8 @@ def test_municipios_options_cached(clear_cache):
     client.force_authenticate(user=usuario)
 
     # Criar municípios
-    Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    Municipio.objects.create(nome="Sobral", uf="CE", ativo=True)
+    MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    MunicipioFactory(nome="Sobral", uf="CE", ativo=True)
 
     # Primeira chamada: cache miss
     response1 = client.get("/api/options/municipios/")
@@ -307,7 +314,7 @@ def test_static_cache_invalidated_on_municipio_create(clear_cache):
     3. Verificar que cache foi invalidado e retorna 2 municípios
     """
     client = APIClient()
-    usuario = Usuario.objects.create_user(
+    usuario = UsuarioFactory(
         username="test_municipios2",
         email="test2@test.com",
         password="test123",
@@ -315,7 +322,7 @@ def test_static_cache_invalidated_on_municipio_create(clear_cache):
     client.force_authenticate(user=usuario)
 
     # Criar primeiro município
-    Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+    MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
 
     # Cachear resultado
     response1 = client.get("/api/options/municipios/")
@@ -323,7 +330,7 @@ def test_static_cache_invalidated_on_municipio_create(clear_cache):
     assert len(response1.data) == 1
 
     # Criar novo município
-    Municipio.objects.create(nome="Sobral", uf="CE", ativo=True)
+    MunicipioFactory(nome="Sobral", uf="CE", ativo=True)
 
     # Cache invalidado, agora retorna 2 municípios
     response2 = client.get("/api/options/municipios/")
@@ -341,7 +348,7 @@ def test_projetos_options_cached(clear_cache):
     2. Segunda chamada: cache hit (retorna mesmos dados)
     """
     client = APIClient()
-    usuario = Usuario.objects.create_user(
+    usuario = UsuarioFactory(
         username="test_projetos",
         email="test3@test.com",
         password="test123",
@@ -349,8 +356,8 @@ def test_projetos_options_cached(clear_cache):
     client.force_authenticate(user=usuario)
 
     # Criar projetos
-    Projeto.objects.create(nome="Projeto 1", codigo="P1", fluxo="SUPER", ativo=True)
-    Projeto.objects.create(nome="Projeto 2", codigo="P2", fluxo="NAO_SUPER", ativo=True)
+    ProjetoFactory(nome="Projeto 1", codigo="P1", fluxo="SUPER", ativo=True)
+    ProjetoFactory(nome="Projeto 2", codigo="P2", fluxo="NAO_SUPER", ativo=True)
 
     # Primeira chamada: cache miss
     response1 = client.get("/api/options/projetos/")
@@ -375,7 +382,7 @@ def test_static_cache_invalidated_on_projeto_update(clear_cache):
     3. Verificar que cache foi invalidado
     """
     client = APIClient()
-    usuario = Usuario.objects.create_user(
+    usuario = UsuarioFactory(
         username="test_projetos2",
         email="test4@test.com",
         password="test123",
@@ -383,7 +390,7 @@ def test_static_cache_invalidated_on_projeto_update(clear_cache):
     client.force_authenticate(user=usuario)
 
     # Criar projeto ativo
-    projeto = Projeto.objects.create(nome="Projeto Cache", codigo="PCACHE", fluxo="SUPER", ativo=True)
+    projeto = ProjetoFactory(nome="Projeto Cache", codigo="PCACHE", fluxo="SUPER", ativo=True)
 
     # Cachear resultado
     response1 = client.get("/api/options/projetos/")
@@ -410,7 +417,7 @@ def test_tipos_evento_options_cached(clear_cache):
     2. Segunda chamada: cache hit
     """
     client = APIClient()
-    usuario = Usuario.objects.create_user(
+    usuario = UsuarioFactory(
         username="test_tipos",
         email="test5@test.com",
         password="test123",
@@ -418,8 +425,8 @@ def test_tipos_evento_options_cached(clear_cache):
     client.force_authenticate(user=usuario)
 
     # Criar tipos de evento
-    TipoEvento.objects.create(nome="Formação Inicial")
-    TipoEvento.objects.create(nome="Acompanhamento")
+    TipoEventoFactory(nome="Formação Inicial")
+    TipoEventoFactory(nome="Acompanhamento")
 
     # Primeira chamada: cache miss
     response1 = client.get("/api/options/tipos-evento/")
@@ -443,7 +450,7 @@ def test_static_cache_invalidated_on_tipo_evento_delete(clear_cache):
     3. Verificar que cache foi invalidado
     """
     client = APIClient()
-    usuario = Usuario.objects.create_user(
+    usuario = UsuarioFactory(
         username="test_tipos2",
         email="test6@test.com",
         password="test123",
@@ -451,8 +458,8 @@ def test_static_cache_invalidated_on_tipo_evento_delete(clear_cache):
     client.force_authenticate(user=usuario)
 
     # Criar tipos de evento
-    tipo1 = TipoEvento.objects.create(nome="Formação Inicial")
-    tipo2 = TipoEvento.objects.create(nome="Acompanhamento")
+    tipo1 = TipoEventoFactory(nome="Formação Inicial")
+    tipo2 = TipoEventoFactory(nome="Acompanhamento")
 
     # Cachear resultado
     response1 = client.get("/api/options/tipos-evento/")

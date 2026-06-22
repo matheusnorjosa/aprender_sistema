@@ -7,8 +7,8 @@ são normalizados antes do lookup em Projeto.
 
 import pytest
 
-from apps.core.models import Projeto
 from apps.core.services.resolvers import normalize_projeto_name, resolve_projeto
+from apps.core.tests.factories import ProjetoFactory
 
 # ---------------------------------------------------------------------------
 # normalize_projeto_name — unit tests (sem DB)
@@ -74,9 +74,9 @@ class TestResolveProjetoWithYearPrefix:
 
     @pytest.fixture(autouse=True)
     def create_projetos(self, db: None) -> None:
-        Projeto.objects.create(nome="Novo Lendo", fluxo="NAO_SUPER", ativo=True)
-        Projeto.objects.create(nome="Fluir das Emoções N1", fluxo="SUPER", ativo=True)
-        Projeto.objects.create(nome="Sou da Paz", fluxo="NAO_SUPER", ativo=True)
+        ProjetoFactory(nome="Novo Lendo", fluxo="NAO_SUPER", ativo=True)
+        ProjetoFactory(nome="Fluir das Emoções N1", fluxo="SUPER", ativo=True)
+        ProjetoFactory(nome="Sou da Paz", fluxo="NAO_SUPER", ativo=True)
 
     def test_resolve_com_prefixo_2026(self):
         projeto = resolve_projeto("2026 Novo Lendo")

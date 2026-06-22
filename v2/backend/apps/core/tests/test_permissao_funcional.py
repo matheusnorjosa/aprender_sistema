@@ -6,7 +6,6 @@ Testes para modelo e seed de PermissaoFuncional (issue #827).
 
 from __future__ import annotations
 
-from django.contrib.auth.models import Group
 from django.core.management import call_command
 from django.db import IntegrityError
 
@@ -14,6 +13,7 @@ import pytest
 
 from apps.core.models import PermissaoFuncional
 from apps.core.services.functional_permissions_seed import FUNCTIONAL_PERMISSIONS_SEED, seed_functional_permissions
+from apps.core.tests.factories import GroupFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -51,8 +51,8 @@ def test_permissao_funcional_is_system_default_true():
 
 
 def test_permissao_funcional_groups_m2m():
-    g1, _ = Group.objects.get_or_create(name="Grupo Teste 1")
-    g2, _ = Group.objects.get_or_create(name="Grupo Teste 2")
+    g1 = GroupFactory(name="Grupo Teste 1")
+    g2 = GroupFactory(name="Grupo Teste 2")
     perm = PermissaoFuncional.objects.create(
         codename="permissao_m2m",
         label="Permissão M2M",

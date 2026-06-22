@@ -20,14 +20,16 @@ import pytest
 from apps.core.models import (
     AvailabilityBlock,
     Deslocamento,
-    Municipio,
     Participation,
-    Projeto,
-    Solicitacao,
-    TipoEvento,
-    Usuario,
 )
 from apps.core.services.monthly_grid_service import build_monthly_grid
+from apps.core.tests.factories import (
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.mark.django_db
@@ -42,26 +44,26 @@ class TestMonthlyWithDeslocamento:
         self.tz = timezone.get_current_timezone()
 
         # Criar usuários
-        self.user_formador = Usuario.objects.create_user(
+        self.user_formador = UsuarioFactory(
             username="formador1",
             email="formador1@example.com",
             password="password123",
         )
 
         # Criar municipio, projeto, tipo_evento
-        self.municipio = Municipio.objects.create(
+        self.municipio = MunicipioFactory(
             nome="Fortaleza",
             uf="CE",
             ativo=True,
         )
 
-        self.projeto = Projeto.objects.create(
+        self.projeto = ProjetoFactory(
             nome="Projeto Teste",
             ativo=True,
             fluxo="SUPER",  # Required for monthly_grid_service.py filter
         )
 
-        self.tipo_evento = TipoEvento.objects.create(
+        self.tipo_evento = TipoEventoFactory(
             nome="Formação",
             cor="#FF0000",
         )
@@ -88,7 +90,7 @@ class TestMonthlyWithDeslocamento:
         )
 
         # Criar participation em OUTUBRO para incluir usuário na grade
-        solicitacao = Solicitacao.objects.create(
+        solicitacao = SolicitacaoFactory(
             usuario=self.user_formador,
             municipio=self.municipio,
             projeto=self.projeto,
@@ -134,7 +136,7 @@ class TestMonthlyWithDeslocamento:
         - Dia 15: código "E"
         """
         # Criar evento aprovado dia 10
-        solicitacao_day10 = Solicitacao.objects.create(
+        solicitacao_day10 = SolicitacaoFactory(
             usuario=self.user_formador,
             municipio=self.municipio,
             projeto=self.projeto,
@@ -159,7 +161,7 @@ class TestMonthlyWithDeslocamento:
         )
 
         # Criar evento aprovado dia 15 (sem deslocamento)
-        solicitacao_day15 = Solicitacao.objects.create(
+        solicitacao_day15 = SolicitacaoFactory(
             usuario=self.user_formador,
             municipio=self.municipio,
             projeto=self.projeto,
@@ -208,7 +210,7 @@ class TestMonthlyWithDeslocamento:
         - Dia 15: código "X"
         """
         # Dia 10: evento + bloqueio + deslocamento
-        solicitacao_day10 = Solicitacao.objects.create(
+        solicitacao_day10 = SolicitacaoFactory(
             usuario=self.user_formador,
             municipio=self.municipio,
             projeto=self.projeto,
@@ -240,7 +242,7 @@ class TestMonthlyWithDeslocamento:
         )
 
         # Dia 15: evento + bloqueio (sem deslocamento)
-        solicitacao_day15 = Solicitacao.objects.create(
+        solicitacao_day15 = SolicitacaoFactory(
             usuario=self.user_formador,
             municipio=self.municipio,
             projeto=self.projeto,
@@ -289,7 +291,7 @@ class TestMonthlyWithDeslocamento:
         - Dia 7: vazio → ""
         """
         # Dia 1: X
-        s1 = Solicitacao.objects.create(
+        s1 = SolicitacaoFactory(
             usuario=self.user_formador,
             municipio=self.municipio,
             projeto=self.projeto,
@@ -315,7 +317,7 @@ class TestMonthlyWithDeslocamento:
         )
 
         # Dia 2: D1
-        s2 = Solicitacao.objects.create(
+        s2 = SolicitacaoFactory(
             usuario=self.user_formador,
             municipio=self.municipio,
             projeto=self.projeto,
@@ -334,7 +336,7 @@ class TestMonthlyWithDeslocamento:
         )
 
         # Dia 3: 2
-        s3a = Solicitacao.objects.create(
+        s3a = SolicitacaoFactory(
             usuario=self.user_formador,
             municipio=self.municipio,
             projeto=self.projeto,
@@ -344,7 +346,7 @@ class TestMonthlyWithDeslocamento:
             status="aprovado",
         )
         Participation.objects.create(solicitacao=s3a, usuario=self.user_formador, role="FORMADOR")
-        s3b = Solicitacao.objects.create(
+        s3b = SolicitacaoFactory(
             usuario=self.user_formador,
             municipio=self.municipio,
             projeto=self.projeto,
@@ -356,7 +358,7 @@ class TestMonthlyWithDeslocamento:
         Participation.objects.create(solicitacao=s3b, usuario=self.user_formador, role="FORMADOR")
 
         # Dia 4: E
-        s4 = Solicitacao.objects.create(
+        s4 = SolicitacaoFactory(
             usuario=self.user_formador,
             municipio=self.municipio,
             projeto=self.projeto,
@@ -420,7 +422,7 @@ class TestMonthlyWithDeslocamento:
         )
 
         # Criar participation em OUTUBRO para incluir usuário na grade
-        solicitacao = Solicitacao.objects.create(
+        solicitacao = SolicitacaoFactory(
             usuario=self.user_formador,
             municipio=self.municipio,
             projeto=self.projeto,
@@ -470,7 +472,7 @@ class TestMonthlyWithDeslocamento:
         )
 
         # Criar participation em OUTUBRO para incluir usuário na grade
-        solicitacao = Solicitacao.objects.create(
+        solicitacao = SolicitacaoFactory(
             usuario=self.user_formador,
             municipio=self.municipio,
             projeto=self.projeto,

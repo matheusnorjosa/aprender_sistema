@@ -13,13 +13,13 @@ Ver v2/docs/plans/rbac-refactor/epic-3-hardcoded.md §3.2.
 
 from __future__ import annotations
 
-from django.contrib.auth.models import Group
 from django.core.management import call_command
 
 import pytest
 
 from apps.core.models import Usuario
 from apps.core.rbac_helpers import user_has_any_perm
+from apps.core.tests.factories import UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -34,16 +34,13 @@ def rbac_seeded():
 
 
 def _user_with_groups(username: str, groups: list[str]) -> Usuario:
-    u = Usuario.objects.create_user(
+    return UsuarioFactory(
         username=username,
         email=f"{username}@test.com",
         password="x",
         cpf=username.rjust(11, "9")[-11:],
+        groups=groups,
     )
-    for gname in groups:
-        group, _ = Group.objects.get_or_create(name=gname)
-        u.groups.add(group)
-    return u
 
 
 # ============================================================================

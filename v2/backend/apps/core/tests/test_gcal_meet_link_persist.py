@@ -14,25 +14,31 @@ from __future__ import annotations
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
-from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.fixture
 def usuario_controle():
     """Usuário do grupo Controle"""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="controle_meet",
         email="controle_meet@test.com",
         password="testpass",
         cpf="22222222222",
     )
-    grupo, _ = Group.objects.get_or_create(name="Controle")
+    grupo = GroupFactory(name="Controle")
     user.groups.add(grupo)
     return user
 
@@ -40,12 +46,12 @@ def usuario_controle():
 @pytest.fixture
 def solicitacao_aprovada(usuario_controle):
     """Solicitação aprovada sem meet_link"""
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="Projeto Meet", ativo=True)
-    tipo_evento = TipoEvento.objects.create(nome="Formação")
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="Projeto Meet", ativo=True)
+    tipo_evento = TipoEventoFactory(nome="Formação")
 
     now = timezone.now()
-    sol = Solicitacao.objects.create(
+    sol = SolicitacaoFactory(
         usuario=usuario_controle,
         municipio=municipio,
         projeto=projeto,

@@ -16,14 +16,18 @@ import uuid
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento
-
-User = get_user_model()
+from apps.core.models import Solicitacao
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 class TestGCalAlerts(TestCase):
@@ -47,12 +51,12 @@ class TestGCalAlerts(TestCase):
         self.tz_local = ZoneInfo("America/Fortaleza")
 
         # Criar grupos
-        self.group_controle = Group.objects.get_or_create(name="Controle")[0]
-        self.group_coordenador = Group.objects.get_or_create(name="Coordenador")[0]
+        self.group_controle = GroupFactory(name="Controle")
+        self.group_coordenador = GroupFactory(name="Coordenador")
 
         # Criar usuários com IDs únicos (xdist-safe)
         uid = uuid.uuid4().hex[:8]
-        self.user_controle = User.objects.create_user(
+        self.user_controle = UsuarioFactory(
             username=f"controle_alerts_{uid}",
             email=f"controle_{uid}@example.com",
             password="password123",
@@ -60,7 +64,7 @@ class TestGCalAlerts(TestCase):
         )
         self.user_controle.groups.add(self.group_controle)
 
-        self.user_coordenador = User.objects.create_user(
+        self.user_coordenador = UsuarioFactory(
             username=f"coordenador_alerts_{uid}",
             email=f"coordenador_{uid}@example.com",
             password="password123",
@@ -69,9 +73,9 @@ class TestGCalAlerts(TestCase):
         self.user_coordenador.groups.add(self.group_coordenador)
 
         # Criar fixtures com nomes únicos (xdist-safe)
-        self.municipio = Municipio.objects.create(nome=f"Fortaleza_{uid}")
-        self.projeto = Projeto.objects.create(nome=f"Projeto Teste_{uid}", fluxo="SUPER")
-        self.tipo_evento = TipoEvento.objects.create(nome=f"Formação_{uid}")
+        self.municipio = MunicipioFactory(nome=f"Fortaleza_{uid}")
+        self.projeto = ProjetoFactory(nome=f"Projeto Teste_{uid}", fluxo="SUPER")
+        self.tipo_evento = TipoEventoFactory(nome=f"Formação_{uid}")
 
     def test_alerts_requires_authentication(self):
         """
@@ -103,7 +107,7 @@ class TestGCalAlerts(TestCase):
         ref_date = datetime(2025, 2, 15, 10, 0, 0, tzinfo=self.tz_local)
 
         # Criar 4 eventos aprovados no mesmo dia
-        sol_error_1 = Solicitacao.objects.create(
+        sol_error_1 = SolicitacaoFactory(
             status="aprovado",
             inicio=ref_date,
             fim=ref_date + timedelta(hours=2),
@@ -115,7 +119,7 @@ class TestGCalAlerts(TestCase):
             gcal_status=Solicitacao.GCalStatus.ERROR,
         )
 
-        sol_error_2 = Solicitacao.objects.create(
+        sol_error_2 = SolicitacaoFactory(
             status="aprovado",
             inicio=ref_date.replace(hour=14),
             fim=ref_date.replace(hour=16),
@@ -127,7 +131,7 @@ class TestGCalAlerts(TestCase):
             gcal_status=Solicitacao.GCalStatus.ERROR,
         )
 
-        sol_pending = Solicitacao.objects.create(
+        sol_pending = SolicitacaoFactory(
             status="aprovado",
             inicio=ref_date.replace(hour=18),
             fim=ref_date.replace(hour=20),
@@ -139,7 +143,7 @@ class TestGCalAlerts(TestCase):
             gcal_status=Solicitacao.GCalStatus.PENDING,
         )
 
-        sol_published = Solicitacao.objects.create(
+        sol_published = SolicitacaoFactory(
             status="aprovado",
             inicio=ref_date.replace(hour=22),
             fim=ref_date.replace(hour=23, minute=30),
@@ -184,7 +188,7 @@ class TestGCalAlerts(TestCase):
         ref_date = datetime(2025, 2, 20, 0, 0, 0, tzinfo=self.tz_local)
 
         # Evento exatamente às 00:00 (início do dia)
-        sol_midnight = Solicitacao.objects.create(
+        sol_midnight = SolicitacaoFactory(
             status="aprovado",
             inicio=ref_date,
             fim=ref_date + timedelta(hours=1),
@@ -197,7 +201,7 @@ class TestGCalAlerts(TestCase):
         )
 
         # Evento exatamente às 23:59:59 (fim do dia)
-        sol_eod = Solicitacao.objects.create(
+        sol_eod = SolicitacaoFactory(
             status="aprovado",
             inicio=ref_date.replace(hour=23, minute=59, second=59),
             fim=ref_date.replace(hour=23, minute=59, second=59) + timedelta(hours=1),
@@ -210,7 +214,7 @@ class TestGCalAlerts(TestCase):
         )
 
         # Evento um dia antes (excluir)
-        sol_before = Solicitacao.objects.create(
+        sol_before = SolicitacaoFactory(
             status="aprovado",
             inicio=ref_date - timedelta(days=1, hours=1),
             fim=ref_date - timedelta(days=1),
@@ -223,7 +227,7 @@ class TestGCalAlerts(TestCase):
         )
 
         # Evento um dia depois (excluir)
-        sol_after = Solicitacao.objects.create(
+        sol_after = SolicitacaoFactory(
             status="aprovado",
             inicio=ref_date + timedelta(days=1, hours=1),
             fim=ref_date + timedelta(days=1, hours=2),
@@ -261,7 +265,7 @@ class TestGCalAlerts(TestCase):
         # Criar 3 eventos em datas diferentes
         now = datetime.now(self.tz_local)
 
-        sol_1 = Solicitacao.objects.create(
+        sol_1 = SolicitacaoFactory(
             status="aprovado",
             inicio=now,
             fim=now + timedelta(hours=2),
@@ -273,7 +277,7 @@ class TestGCalAlerts(TestCase):
             gcal_status=Solicitacao.GCalStatus.ERROR,
         )
 
-        sol_2 = Solicitacao.objects.create(
+        sol_2 = SolicitacaoFactory(
             status="aprovado",
             inicio=now + timedelta(days=5),
             fim=now + timedelta(days=5, hours=2),
@@ -285,7 +289,7 @@ class TestGCalAlerts(TestCase):
             gcal_status=Solicitacao.GCalStatus.PUBLISHED,
         )
 
-        sol_3 = Solicitacao.objects.create(
+        sol_3 = SolicitacaoFactory(
             status="aprovado",
             inicio=now + timedelta(days=10),
             fim=now + timedelta(days=10, hours=2),

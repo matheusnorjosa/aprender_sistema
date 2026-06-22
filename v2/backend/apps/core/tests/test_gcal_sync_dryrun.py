@@ -14,15 +14,21 @@ from django.utils import timezone
 
 import pytest
 
-from apps.core.models import Municipio, Solicitacao, TipoEvento, Usuario
+from apps.core.models import Solicitacao
 from apps.core.services.gcal_fake_client import FakeCalendarClient
 from apps.core.services.gcal_sync_service import upsert_one
+from apps.core.tests.factories import (
+    MunicipioFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.fixture
 def usuario_test(db):
     """Cria um usuário de teste"""
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username="testuser",
         email="testuser@example.com",
         password="testpass123",
@@ -33,13 +39,13 @@ def usuario_test(db):
 @pytest.fixture
 def tipo_evento_test(db):
     """Cria um tipo de evento de teste"""
-    return TipoEvento.objects.create(nome="Formação Teste", descricao="Teste")
+    return TipoEventoFactory(nome="Formação Teste", descricao="Teste")
 
 
 @pytest.fixture
 def municipio_test(db):
     """Município de teste"""
-    return Municipio.objects.create(nome="Fortaleza", uf="CE")
+    return MunicipioFactory(nome="Fortaleza", uf="CE")
 
 
 @pytest.fixture
@@ -63,7 +69,7 @@ class TestGCalSyncIdempotency:
         now = timezone.now().replace(hour=10, minute=0, second=0, microsecond=0)
 
         # Criar solicitação aprovada
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_test,
@@ -121,7 +127,7 @@ class TestGCalSyncIdempotency:
         now = timezone.now().replace(hour=14, minute=0, second=0, microsecond=0)
 
         # Criar solicitação aprovada SEM external_event_id
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_test,
@@ -173,7 +179,7 @@ class TestGCalSyncIdempotency:
         now = timezone.now().replace(hour=9, minute=0, second=0, microsecond=0)
 
         # Criar e sincronizar evento inicial
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_test,
@@ -228,7 +234,7 @@ class TestGCalSyncIdempotency:
         now = timezone.now().replace(hour=11, minute=0, second=0, microsecond=0)
 
         # Criar solicitação aprovada e sincronizar
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_test,
@@ -285,7 +291,7 @@ class TestGCalSyncIdempotency:
         now = timezone.now().replace(hour=15, minute=0, second=0, microsecond=0)
 
         # Criar e sincronizar solicitação aprovada
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_test,
@@ -338,7 +344,7 @@ class TestGCalSyncDryRun:
         now = timezone.now().replace(hour=8, minute=0, second=0, microsecond=0)
 
         # Criar solicitação aprovada sem external_event_id
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_test,
@@ -378,7 +384,7 @@ class TestGCalSyncDryRun:
         now = timezone.now().replace(hour=10, minute=0, second=0, microsecond=0)
 
         # Criar solicitação aprovada
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_test,
@@ -422,7 +428,7 @@ class TestGCalSyncFilters:
         base = timezone.now().replace(hour=10, minute=0, second=0, microsecond=0)
 
         # Criar 3 solicitações em diferentes datas
-        sol_passado = Solicitacao.objects.create(
+        sol_passado = SolicitacaoFactory(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_test,
@@ -431,7 +437,7 @@ class TestGCalSyncFilters:
             status="aprovado",
         )
 
-        sol_presente = Solicitacao.objects.create(
+        sol_presente = SolicitacaoFactory(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_test,
@@ -440,7 +446,7 @@ class TestGCalSyncFilters:
             status="aprovado",
         )
 
-        sol_futuro = Solicitacao.objects.create(
+        sol_futuro = SolicitacaoFactory(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_test,
@@ -486,7 +492,7 @@ class TestGCalSyncFilters:
         now = timezone.now().replace(hour=14, minute=0, second=0, microsecond=0)
 
         # Criar 3 solicitações
-        sol1 = Solicitacao.objects.create(
+        sol1 = SolicitacaoFactory(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_test,
@@ -495,7 +501,7 @@ class TestGCalSyncFilters:
             status="aprovado",
         )
 
-        sol2 = Solicitacao.objects.create(
+        sol2 = SolicitacaoFactory(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_test,
@@ -504,7 +510,7 @@ class TestGCalSyncFilters:
             status="aprovado",
         )
 
-        sol3 = Solicitacao.objects.create(
+        sol3 = SolicitacaoFactory(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_test,
@@ -552,7 +558,7 @@ class TestGCalSyncEdgeCases:
         """
         now = timezone.now().replace(hour=13, minute=0, second=0, microsecond=0)
 
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_test,
@@ -582,7 +588,7 @@ class TestGCalSyncEdgeCases:
         """
         now = timezone.now().replace(hour=9, minute=30, second=0, microsecond=0)
 
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_test,
             tipo_evento=tipo_evento_test,
             municipio=municipio_test,

@@ -23,13 +23,19 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import DATArea, DATCoordenador, Municipio, Produto, Projeto, TipoEvento, Usuario
+from apps.core.models import DATArea, DATCoordenador, Produto, Usuario
+from apps.core.tests.factories import (
+    MunicipioFactory,
+    ProjetoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.fixture
 def projeto_base():
     """Base project for tests that require Projeto FK."""
-    return Projeto.objects.create(
+    return ProjetoFactory(
         nome="Projeto Base",
         codigo="BASE",
         ativo=True,
@@ -47,7 +53,7 @@ def api_client():
 def usuario_autenticado():
     """Authenticated user for API requests."""
     uid = uuid4().hex[:8]
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username=f"user_{uid}",
         password="senha123",
         cpf=str(uuid4().int % 10**11).zfill(11),
@@ -75,7 +81,7 @@ class TestUsuariosOptions:
     def test_returns_active_users(self, api_client, usuario_autenticado):
         """Returns list of active users."""
         # Create additional active users
-        user1 = Usuario.objects.create_user(
+        user1 = UsuarioFactory(
             username="formador1",
             password="senha123",
             cpf="11111111111",
@@ -84,7 +90,7 @@ class TestUsuariosOptions:
             last_name="Silva",
             is_active=True,
         )
-        user2 = Usuario.objects.create_user(
+        user2 = UsuarioFactory(
             username="formador2",
             password="senha123",
             cpf="22222222222",
@@ -94,7 +100,7 @@ class TestUsuariosOptions:
             is_active=True,
         )
         # Create inactive user (should not appear)
-        Usuario.objects.create_user(
+        UsuarioFactory(
             username="inativo",
             password="senha123",
             cpf="33333333333",
@@ -402,7 +408,7 @@ class TestMunicipiosOptionsCache:
 
     def test_cache_hit_returns_cached_data(self, api_client, usuario_autenticado):
         """Municipios endpoint returns cached data on cache hit."""
-        Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
+        MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
 
         api_client.force_authenticate(user=usuario_autenticado)
 
@@ -426,7 +432,7 @@ class TestProjetosOptionsCache:
 
     def test_cache_hit_returns_cached_data(self, api_client, usuario_autenticado):
         """Projetos endpoint returns cached data on cache hit."""
-        Projeto.objects.create(nome="Teste", codigo="TST", ativo=True, is_test=False)
+        ProjetoFactory(nome="Teste", codigo="TST", ativo=True, is_test=False)
 
         api_client.force_authenticate(user=usuario_autenticado)
 
@@ -445,8 +451,8 @@ class TestProjetosOptionsCache:
 
     def test_include_test_param_uses_different_cache(self, api_client, usuario_autenticado):
         """include_test=true uses separate cache key."""
-        Projeto.objects.create(nome="Normal", codigo="NRM", ativo=True, is_test=False)
-        Projeto.objects.create(nome="Test Project", codigo="TST2", ativo=True, is_test=True)
+        ProjetoFactory(nome="Normal", codigo="NRM", ativo=True, is_test=False)
+        ProjetoFactory(nome="Test Project", codigo="TST2", ativo=True, is_test=True)
 
         api_client.force_authenticate(user=usuario_autenticado)
 
@@ -478,7 +484,7 @@ class TestTiposEventoOptionsCache:
 
     def test_cache_hit_returns_cached_data(self, api_client, usuario_autenticado):
         """Tipos evento endpoint returns cached data on cache hit."""
-        TipoEvento.objects.create(nome="Formação")
+        TipoEventoFactory(nome="Formação")
 
         api_client.force_authenticate(user=usuario_autenticado)
 

@@ -12,13 +12,14 @@ from django.utils import timezone
 
 import pytest
 
-from apps.core.models import AcaoInstancia, AcaoTemplate, CicloAcoes, Municipio, Projeto, Usuario
+from apps.core.models import AcaoInstancia, AcaoTemplate, CicloAcoes
 from apps.core.services.prazo_engine_service import PrazoEngineService
+from apps.core.tests.factories import MunicipioFactory, ProjetoFactory, UsuarioFactory
 
 
 @pytest.fixture
 def usuario(db):
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username="prazo_user",
         email="prazo_user@example.com",
         password="testpass123",
@@ -28,8 +29,8 @@ def usuario(db):
 
 @pytest.fixture
 def ciclo(db, usuario):
-    projeto = Projeto.objects.create(nome="Projeto Prazo Engine")
-    municipio = Municipio.objects.create(nome="Municipio Prazo Engine", uf="CE")
+    projeto = ProjetoFactory(nome="Projeto Prazo Engine")
+    municipio = MunicipioFactory(nome="Municipio Prazo Engine", uf="CE")
     return CicloAcoes.objects.create(
         projeto=projeto,
         municipio=municipio,

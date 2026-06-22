@@ -17,25 +17,31 @@ from datetime import timedelta
 from unittest.mock import MagicMock, patch
 from urllib.parse import urlparse
 
-from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.fixture
 def usuario_controle():
     """Usuário do grupo Controle"""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="controle_mode",
         email="controle_mode@test.com",
         password="testpass",
         cpf="44444444444",
     )
-    grupo, _ = Group.objects.get_or_create(name="Controle")
+    grupo = GroupFactory(name="Controle")
     user.groups.add(grupo)
     return user
 
@@ -43,9 +49,9 @@ def usuario_controle():
 @pytest.fixture
 def fixtures_basicas():
     """Fixtures básicas para criar solicitações"""
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="Projeto Mode", ativo=True)
-    tipo_evento = TipoEvento.objects.create(nome="Formação")
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="Projeto Mode", ativo=True)
+    tipo_evento = TipoEventoFactory(nome="Formação")
 
     return {
         "municipio": municipio,
@@ -71,7 +77,7 @@ class TestGCalMeetLinkByMode:
         - DB permanece com meet_link=None
         """
         now = timezone.now()
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_controle,
             municipio=fixtures_basicas["municipio"],
             projeto=fixtures_basicas["projeto"],
@@ -125,7 +131,7 @@ class TestGCalMeetLinkByMode:
         - DB permanece com meet_link=None
         """
         now = timezone.now()
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_controle,
             municipio=fixtures_basicas["municipio"],
             projeto=fixtures_basicas["projeto"],
@@ -184,7 +190,7 @@ class TestGCalMeetLinkByMode:
         settings.GCAL_CALENDAR_ID = "test@calendar.google.com"
 
         now = timezone.now()
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_controle,
             municipio=fixtures_basicas["municipio"],
             projeto=fixtures_basicas["projeto"],
@@ -239,7 +245,7 @@ class TestGCalMeetLinkByMode:
         settings.GCAL_CLIENT = "fake"
 
         now = timezone.now()
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_controle,
             municipio=fixtures_basicas["municipio"],
             projeto=fixtures_basicas["projeto"],
@@ -288,7 +294,7 @@ class TestGCalMeetLinkByMode:
         settings.GCAL_CLIENT = "fake"
 
         now = timezone.now()
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_controle,
             municipio=fixtures_basicas["municipio"],
             projeto=fixtures_basicas["projeto"],
@@ -332,7 +338,7 @@ class TestGCalMeetLinkByMode:
         - preview.payload não contém conferenceData
         """
         now = timezone.now()
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_controle,
             municipio=fixtures_basicas["municipio"],
             projeto=fixtures_basicas["projeto"],
@@ -370,7 +376,7 @@ class TestGCalMeetLinkByMode:
         - preview.payload contém conferenceData
         """
         now = timezone.now()
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=usuario_controle,
             municipio=fixtures_basicas["municipio"],
             projeto=fixtures_basicas["projeto"],

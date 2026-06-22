@@ -11,13 +11,20 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AuditLog, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import AuditLog, Solicitacao
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -29,14 +36,14 @@ def super_user():
     import uuid
 
     uid = uuid.uuid4().hex[:8]
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"sup_audit_{uid}",
         email=f"sup_audit_{uid}@test.com",
         password="testpass",
         cpf=f"999{uid.ljust(8, '0')}",
     )
-    grupo_setor, _ = Group.objects.get_or_create(name="Superintendência")
-    grupo_funcao, _ = Group.objects.get_or_create(name="Gerente")
+    grupo_setor = GroupFactory(name="Superintendência")
+    grupo_funcao = GroupFactory(name="Gerente")
     user.groups.add(grupo_setor, grupo_funcao)
     return user
 
@@ -49,25 +56,26 @@ def solicitacao_pendente(super_user):
     IMPORTANTE: Usa fluxo='SUPER' para evitar auto-aprovação.
     Força status='pendente' via .update() para bypass de save() logic.
     """
-    municipio, _ = Municipio.objects.get_or_create(
+    municipio = MunicipioFactory(
         nome="Test City",
-        defaults={"uf": "TS", "ativo": True},
+        uf="TS",
+        ativo=True,
     )
 
     # Projeto com fluxo SUPER (não auto-aprova)
-    projeto = Projeto.objects.create(
+    projeto = ProjetoFactory(
         nome="Test Project SUPER",
         codigo="",
         ativo=True,
         fluxo="SUPER",
     )
 
-    tipo_evento, _ = TipoEvento.objects.get_or_create(
+    tipo_evento = TipoEventoFactory(
         nome="Test Event Type",
     )
 
     now = timezone.now()
-    sol = Solicitacao.objects.create(
+    sol = SolicitacaoFactory(
         usuario=super_user,
         municipio=municipio,
         projeto=projeto,

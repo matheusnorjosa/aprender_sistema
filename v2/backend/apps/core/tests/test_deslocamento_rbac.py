@@ -21,13 +21,13 @@ from __future__ import annotations
 
 from datetime import date
 
-from django.contrib.auth.models import Group
 from django.core.cache import cache
 from rest_framework.test import APIClient
 
 import pytest
 
 from apps.core.models import Deslocamento, EquipeGerencia, Gerencia, Usuario
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -41,11 +41,9 @@ def _next_cpf() -> str:
 
 
 def _make_user(username: str, group_names: list[str]) -> Usuario:
-    user = Usuario.objects.create_user(
-        username=username, email=f"{username}@example.com", password="testpass123", cpf=_next_cpf()
-    )
+    user = UsuarioFactory(username=username, email=f"{username}@example.com", password="testpass123", cpf=_next_cpf())
     for gname in group_names:
-        group, _ = Group.objects.get_or_create(name=gname)
+        group = GroupFactory(name=gname)
         user.groups.add(group)
     return user
 
@@ -225,8 +223,12 @@ class TestSanity:
     def test_superuser_sees_all(self, gerencia_vidas):
         user = _user_in_gerencia("u", ["Formador"], gerencia_vidas)
         _create_deslocamento(user)
-        super_user = Usuario.objects.create_superuser(
-            username="super_d", email="super_d@example.com", password="testpass123", cpf="99900099996"
+        super_user = UsuarioFactory(
+            superuser=True,
+            username="super_d",
+            email="super_d@example.com",
+            password="testpass123",
+            cpf="99900099996",
         )
         client = APIClient()
         client.force_authenticate(user=super_user)

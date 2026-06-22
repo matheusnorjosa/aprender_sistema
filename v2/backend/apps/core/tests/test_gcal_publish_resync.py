@@ -17,14 +17,21 @@ from __future__ import annotations
 from datetime import timedelta
 from unittest.mock import ANY, Mock, patch
 
-from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import Solicitacao
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 def mock_task_result(task_id="fake-task-id"):
@@ -37,13 +44,13 @@ def mock_task_result(task_id="fake-task-id"):
 @pytest.fixture
 def usuario_controle():
     """Usuário do grupo Controle"""
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username="controle_sprint3",
         email="controle_sprint3@test.com",
         password="testpass",
         cpf="99999999999",
     )
-    grupo, _ = Group.objects.get_or_create(name="Controle")
+    grupo = GroupFactory(name="Controle")
     user.groups.add(grupo)
     return user
 
@@ -51,12 +58,12 @@ def usuario_controle():
 @pytest.fixture
 def solicitacao_aprovada(usuario_controle):
     """Solicitação aprovada para testes de publicação"""
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="Projeto Sprint3", codigo="SP3", fluxo="SUPER", ativo=True)
-    tipo_evento = TipoEvento.objects.create(nome="Formação Sprint3")
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="Projeto Sprint3", codigo="SP3", fluxo="SUPER", ativo=True)
+    tipo_evento = TipoEventoFactory(nome="Formação Sprint3")
 
     now = timezone.now()
-    return Solicitacao.objects.create(
+    return SolicitacaoFactory(
         usuario=usuario_controle,
         municipio=municipio,
         projeto=projeto,
@@ -72,12 +79,12 @@ def solicitacao_aprovada(usuario_controle):
 @pytest.fixture
 def solicitacao_published(usuario_controle):
     """Solicitação já publicada para testes de resync"""
-    municipio = Municipio.objects.create(nome="Sobral", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="Projeto B", codigo="PRB", fluxo="NAO_SUPER", ativo=True)
-    tipo_evento = TipoEvento.objects.create(nome="Workshop Sprint3")
+    municipio = MunicipioFactory(nome="Sobral", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="Projeto B", codigo="PRB", fluxo="NAO_SUPER", ativo=True)
+    tipo_evento = TipoEventoFactory(nome="Workshop Sprint3")
 
     now = timezone.now()
-    return Solicitacao.objects.create(
+    return SolicitacaoFactory(
         usuario=usuario_controle,
         municipio=municipio,
         projeto=projeto,
@@ -218,12 +225,12 @@ class TestPublishEndpoint:
         """
         Validação: Apenas solicitações aprovadas podem ser publicadas
         """
-        municipio = Municipio.objects.create(nome="Juazeiro", uf="CE", ativo=True)
-        projeto = Projeto.objects.create(nome="Projeto Pendente", fluxo="SUPER", ativo=True)
-        tipo_evento = TipoEvento.objects.create(nome="Teste")
+        municipio = MunicipioFactory(nome="Juazeiro", uf="CE", ativo=True)
+        projeto = ProjetoFactory(nome="Projeto Pendente", fluxo="SUPER", ativo=True)
+        tipo_evento = TipoEventoFactory(nome="Teste")
 
         now = timezone.now()
-        sol_pendente = Solicitacao.objects.create(
+        sol_pendente = SolicitacaoFactory(
             usuario=usuario_controle,
             municipio=municipio,
             projeto=projeto,
@@ -287,12 +294,12 @@ class TestResyncEndpoint:
         """
         Validação: Apenas solicitações aprovadas podem ser resync
         """
-        municipio = Municipio.objects.create(nome="Crato", uf="CE", ativo=True)
-        projeto = Projeto.objects.create(nome="Projeto Reprovado", fluxo="SUPER", ativo=True)
-        tipo_evento = TipoEvento.objects.create(nome="Teste Resync")
+        municipio = MunicipioFactory(nome="Crato", uf="CE", ativo=True)
+        projeto = ProjetoFactory(nome="Projeto Reprovado", fluxo="SUPER", ativo=True)
+        tipo_evento = TipoEventoFactory(nome="Teste Resync")
 
         now = timezone.now()
-        sol_reprovada = Solicitacao.objects.create(
+        sol_reprovada = SolicitacaoFactory(
             usuario=usuario_controle,
             municipio=municipio,
             projeto=projeto,

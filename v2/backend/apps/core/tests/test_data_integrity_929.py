@@ -25,21 +25,23 @@ import pytest
 from apps.core.models import (
     AvailabilityBlock,
     Gerencia,
-    Municipio,
     Participation,
-    Projeto,
-    Solicitacao,
-    TipoEvento,
-    Usuario,
 )
 from apps.core.models.organizacao import EquipeGerencia
+from apps.core.tests.factories import (
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 # ── Fixtures ──────────────────────────────────────────────────────────
 
 
 @pytest.fixture
 def usuario(db):
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username="integrity_user",
         email="integrity@test.com",
         password="testpass123",
@@ -49,7 +51,7 @@ def usuario(db):
 
 @pytest.fixture
 def usuario2(db):
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username="integrity_user2",
         email="integrity2@test.com",
         password="testpass123",
@@ -59,17 +61,17 @@ def usuario2(db):
 
 @pytest.fixture
 def tipo_evento(db):
-    return TipoEvento.objects.create(nome="Teste Integridade")
+    return TipoEventoFactory(nome="Teste Integridade")
 
 
 @pytest.fixture
 def municipio(db):
-    return Municipio.objects.create(nome="Teste Mun", uf="CE")
+    return MunicipioFactory(nome="Teste Mun", uf="CE")
 
 
 @pytest.fixture
 def projeto(db):
-    return Projeto.objects.create(nome="Teste Projeto", fluxo="NAO_SUPER")
+    return ProjetoFactory(nome="Teste Projeto", fluxo="NAO_SUPER")
 
 
 @pytest.fixture
@@ -80,7 +82,7 @@ def gerencia(db):
 @pytest.fixture
 def solicitacao(usuario, tipo_evento, municipio, projeto):
     now = timezone.now()
-    return Solicitacao.objects.create(
+    return SolicitacaoFactory(
         usuario=usuario,
         tipo_evento=tipo_evento,
         municipio=municipio,
@@ -168,7 +170,8 @@ class TestQueryCountRegression:
 
     @pytest.fixture
     def superuser(self, db):
-        return Usuario.objects.create_superuser(
+        return UsuarioFactory(
+            superuser=True,
             username="superquery",
             email="superquery@test.com",
             password="testpass123",
@@ -187,7 +190,7 @@ class TestQueryCountRegression:
         now = timezone.now()
         solis = []
         for i in range(10):
-            sol = Solicitacao.objects.create(
+            sol = SolicitacaoFactory(
                 usuario=superuser,
                 tipo_evento=tipo_evento,
                 municipio=municipio,

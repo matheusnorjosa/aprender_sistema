@@ -11,15 +11,20 @@ from __future__ import annotations
 
 import uuid
 
-from django.contrib.auth import get_user_model
 from django.db import connection
 from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APIClient
 
-from apps.core.models import AvailabilityBlock, Municipio, Participation, Projeto, Solicitacao, TipoEvento
-
-Usuario = get_user_model()
+from apps.core.models import AvailabilityBlock, Participation
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 def unique_cpf() -> str:
@@ -33,7 +38,7 @@ class TestAvailabilityBlockQueryOptimization(TestCase):
 
     def setUp(self):
         self.client = APIClient()
-        self.user = Usuario.objects.create_user(
+        self.user = UsuarioFactory(
             username="testuser_avail",
             password="testpass123",
             is_superuser=True,
@@ -82,7 +87,7 @@ class TestAvailabilityCheckManyQueryOptimization(TestCase):
     def setUp(self):
         self.client = APIClient()
         # Create a user with the right permissions
-        self.user = Usuario.objects.create_user(
+        self.user = UsuarioFactory(
             username="testuser_check",
             password="testpass123",
             is_superuser=True,  # Superuser has all permissions
@@ -93,7 +98,7 @@ class TestAvailabilityCheckManyQueryOptimization(TestCase):
         # Create test users
         self.test_users = []
         for i in range(10):
-            u = Usuario.objects.create_user(
+            u = UsuarioFactory(
                 username=f"formador_check_{i}",
                 password="testpass123",
                 cpf=unique_cpf(),
@@ -146,35 +151,33 @@ class TestUpdateFormadoresQueryOptimization(TestCase):
         self.client = APIClient()
 
         # Create coordenador user
-        self.coord = Usuario.objects.create_user(
+        self.coord = UsuarioFactory(
             username="coord_update_test",
             password="testpass123",
             cpf=unique_cpf(),
         )
         # Add to Coordenador group
-        from django.contrib.auth.models import Group
-
-        coord_group, _ = Group.objects.get_or_create(name="Coordenador")
+        coord_group = GroupFactory(name="Coordenador")
         self.coord.groups.add(coord_group)
         self.client.force_authenticate(user=self.coord)
 
         # Create required related objects
-        self.municipio = Municipio.objects.create(
+        self.municipio = MunicipioFactory(
             nome=f"Fortaleza Update {uuid.uuid4().hex[:8]}",
             uf="CE",
         )
-        self.projeto = Projeto.objects.create(
+        self.projeto = ProjetoFactory(
             nome=f"Test Project Update {uuid.uuid4().hex[:8]}",
             fluxo="NAO_SUPER",
         )
-        self.tipo_evento = TipoEvento.objects.create(
+        self.tipo_evento = TipoEventoFactory(
             nome=f"Formação Update {uuid.uuid4().hex[:8]}",
         )
 
         # Create formadores
         self.formadores = []
         for i in range(10):
-            u = Usuario.objects.create_user(
+            u = UsuarioFactory(
                 username=f"formador_upd_{uuid.uuid4().hex[:8]}",
                 password="testpass123",
                 cpf=unique_cpf(),
@@ -182,7 +185,7 @@ class TestUpdateFormadoresQueryOptimization(TestCase):
             self.formadores.append(u)
 
         # Create solicitacao
-        self.solicitacao = Solicitacao.objects.create(
+        self.solicitacao = SolicitacaoFactory(
             usuario=self.coord,
             municipio=self.municipio,
             projeto=self.projeto,
@@ -242,7 +245,7 @@ class TestSolicitacaoListQueryOptimization(TestCase):
 
     def setUp(self):
         self.client = APIClient()
-        self.user = Usuario.objects.create_user(
+        self.user = UsuarioFactory(
             username=f"testuser_list_{uuid.uuid4().hex[:8]}",
             password="testpass123",
             is_superuser=True,
@@ -251,21 +254,21 @@ class TestSolicitacaoListQueryOptimization(TestCase):
         self.client.force_authenticate(user=self.user)
 
         # Create required related objects
-        self.municipio = Municipio.objects.create(
+        self.municipio = MunicipioFactory(
             nome=f"Fortaleza List {uuid.uuid4().hex[:8]}",
             uf="CE",
         )
-        self.projeto = Projeto.objects.create(
+        self.projeto = ProjetoFactory(
             nome=f"Test List {uuid.uuid4().hex[:8]}",
             fluxo="NAO_SUPER",
         )
-        self.tipo_evento = TipoEvento.objects.create(
+        self.tipo_evento = TipoEventoFactory(
             nome=f"Formação List {uuid.uuid4().hex[:8]}",
         )
 
         # Create 20 solicitações
         for i in range(20):
-            Solicitacao.objects.create(
+            SolicitacaoFactory(
                 usuario=self.user,
                 municipio=self.municipio,
                 projeto=self.projeto,

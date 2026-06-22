@@ -15,7 +15,6 @@ from datetime import timedelta
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.utils import timezone
@@ -23,20 +22,27 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AuditLog, Compra, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import AuditLog, Compra, Solicitacao, Usuario
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
 
 def _create_user_in_group(*, prefix: str, group_name: str) -> Usuario:
     uid = uuid4().hex[:8]
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"{prefix}_{uid}",
         email=f"{prefix}_{uid}@example.com",
         password="testpass",
         cpf=str(uuid4().int % 10**11).zfill(11),
     )
-    group, _ = Group.objects.get_or_create(name=group_name)
+    group = GroupFactory(name=group_name)
     user.groups.add(group)
     return user
 
@@ -77,12 +83,12 @@ def test_happy_path_import_compra_create_solicitacao_approve_and_publish():
     user_coordenador = _create_user_in_group(prefix="coord_chain", group_name="Coordenador")
     # PR 3 hardening RBAC (2026-04-29): aprovar exige composite Setor Sup + Função Gerente.
     user_super = _create_user_in_group(prefix="super_chain", group_name="Superintendência")
-    grupo_gerente, _ = Group.objects.get_or_create(name="Gerente")
+    grupo_gerente = GroupFactory(name="Gerente")
     user_super.groups.add(grupo_gerente)
 
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="Novo Lendo", codigo="NL", fluxo="SUPER", ativo=True)
-    tipo_evento = TipoEvento.objects.create(nome="Formacao")
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="Novo Lendo", codigo="NL", fluxo="SUPER", ativo=True)
+    tipo_evento = TipoEventoFactory(nome="Formacao")
 
     # 1) Import compras via endpoint real (DAT-only após PR-A1 DAT-Imports).
     client.force_authenticate(user=user_dat)
@@ -154,10 +160,10 @@ def test_invalid_path_blocks_solicitacao_when_pair_municipio_projeto_has_no_comp
     user_controle = _create_user_in_group(prefix="dat_invalid", group_name="DAT")
     user_coordenador = _create_user_in_group(prefix="coord_invalid", group_name="Coordenador")
 
-    municipio = Municipio.objects.create(nome="Sobral", uf="CE", ativo=True)
-    projeto_com_compra = Projeto.objects.create(nome="Novo Lendo", codigo="NL2", fluxo="SUPER", ativo=True)
-    projeto_sem_compra = Projeto.objects.create(nome="ACerta", codigo="AC", fluxo="SUPER", ativo=True)
-    tipo_evento = TipoEvento.objects.create(nome="Acompanhamento")
+    municipio = MunicipioFactory(nome="Sobral", uf="CE", ativo=True)
+    projeto_com_compra = ProjetoFactory(nome="Novo Lendo", codigo="NL2", fluxo="SUPER", ativo=True)
+    projeto_sem_compra = ProjetoFactory(nome="ACerta", codigo="AC", fluxo="SUPER", ativo=True)
+    tipo_evento = TipoEventoFactory(nome="Acompanhamento")
 
     # Import cria compra somente para "Novo Lendo".
     client.force_authenticate(user=user_controle)

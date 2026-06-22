@@ -23,7 +23,6 @@ from __future__ import annotations
 from datetime import timedelta
 from unittest.mock import patch
 
-from django.contrib.auth.models import Group
 from django.test import override_settings
 from django.utils import timezone
 from rest_framework import status as http_status
@@ -31,8 +30,16 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import GoogleOAuthCredential, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import GoogleOAuthCredential, Solicitacao
 from apps.core.services.google_oauth import _encrypt_token
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 # ============================================================================
 # FIXTURES
@@ -45,8 +52,8 @@ def usuario_controle(db):
     import uuid
 
     uid = uuid.uuid4().hex[:8]
-    controle_group, _ = Group.objects.get_or_create(name="Controle")
-    user = Usuario.objects.create_user(
+    controle_group = GroupFactory(name="Controle")
+    user = UsuarioFactory(
         username=f"controle_oauth_{uid}",
         email=f"controle_{uid}@aprendereditora.com.br",
         password="testpass123",
@@ -62,12 +69,12 @@ def solicitacao_aprovada(usuario_controle):
     import uuid
 
     uid = uuid.uuid4().hex[:8]
-    municipio = Municipio.objects.create(nome=f"Fortaleza_oauth_{uid}", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome=f"Projeto OAuth {uid}", codigo=f"PO{uid[:3]}", fluxo="SUPER", ativo=True)
-    tipo_evento = TipoEvento.objects.create(nome=f"Formação OAuth {uid}")
+    municipio = MunicipioFactory(nome=f"Fortaleza_oauth_{uid}", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome=f"Projeto OAuth {uid}", codigo=f"PO{uid[:3]}", fluxo="SUPER", ativo=True)
+    tipo_evento = TipoEventoFactory(nome=f"Formação OAuth {uid}")
 
     now = timezone.now()
-    return Solicitacao.objects.create(
+    return SolicitacaoFactory(
         usuario=usuario_controle,
         municipio=municipio,
         projeto=projeto,

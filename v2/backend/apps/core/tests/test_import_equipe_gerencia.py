@@ -14,8 +14,6 @@ Cobertura:
 import tempfile
 from pathlib import Path
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -23,45 +21,41 @@ import pytest
 
 from apps.core.models import EquipeGerencia, Gerencia
 from apps.core.services.equipe_gerencia_import import import_equipe_gerencia_from_file
+from apps.core.tests.factories import UsuarioFactory
 
 IMPORT_EQUIPE_URL = "/api/equipe-gerencia/import/"
-
-User = get_user_model()
 
 
 @pytest.fixture
 def dat_user(db):
-    user = User.objects.create_user(
+    return UsuarioFactory(
         username="dat_user",
         email="dat@test.com",
         password="testpass123",
         cpf="11111111111",
         first_name="DAT",
         last_name="User",
+        groups=["DAT"],
     )
-    group, _ = Group.objects.get_or_create(name="DAT")
-    user.groups.add(group)
-    return user
 
 
 @pytest.fixture
 def formador_user(db):
-    user = User.objects.create_user(
+    return UsuarioFactory(
         username="formador_user",
         email="formador@test.com",
         password="testpass123",
         cpf="22222222222",
         first_name="Formador",
         last_name="User",
+        groups=["Formador"],
     )
-    group, _ = Group.objects.get_or_create(name="Formador")
-    user.groups.add(group)
-    return user
 
 
 @pytest.fixture
 def superuser(db):
-    return User.objects.create_superuser(
+    return UsuarioFactory(
+        superuser=True,
         username="admin",
         email="admin@test.com",
         password="testpass123",
@@ -78,7 +72,7 @@ def api_client():
 
 @pytest.fixture
 def usuario_formador(db):
-    return User.objects.create_user(
+    return UsuarioFactory(
         username="formador1",
         email="formador1@test.com",
         password="testpass123",
@@ -90,7 +84,7 @@ def usuario_formador(db):
 
 @pytest.fixture
 def usuario_coordenador(db):
-    return User.objects.create_user(
+    return UsuarioFactory(
         username="coord1",
         email="coord1@test.com",
         password="testpass123",

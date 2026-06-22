@@ -10,7 +10,31 @@ from dataclasses import dataclass
 from django.contrib.auth.models import Group
 from django.db import transaction
 
+from apps.core.constants import FUNCAO_GROUPS, SETOR_GROUPS
 from apps.core.models import PermissaoFuncional
+
+# União canônica de todos os grupos RBAC base (setor + função). SSOT em
+# apps.core.constants. Mesma lista usada pelo command dev_tools `seed_rbac`.
+BASE_GROUP_NAMES: tuple[str, ...] = tuple(SETOR_GROUPS + [f for f in FUNCAO_GROUPS if f not in SETOR_GROUPS])
+
+
+def ensure_base_groups() -> int:
+    """
+    Garante a existência de TODOS os grupos RBAC base (setor + função).
+
+    Idempotente. Necessário em ambientes sem as migrations de seed RunPython
+    (ex.: `pytest --no-migrations`), onde nenhuma migration cria os grupos.
+    `seed_functional_permissions(assign_default_groups=True)` só cria os grupos
+    que têm capability atribuída (7 dos 18); este helper cobre os demais
+    (setores sem capability, Formador, Assistente Administrativo). Retorna a
+    quantidade de grupos criados nesta chamada.
+    """
+    created = 0
+    for name in BASE_GROUP_NAMES:
+        _, was_created = Group.objects.get_or_create(name=name)
+        if was_created:
+            created += 1
+    return created
 
 
 @dataclass(frozen=True)

@@ -22,7 +22,6 @@ from datetime import datetime, timedelta
 from datetime import timezone as dt_timezone
 from zoneinfo import ZoneInfo
 
-from django.contrib.auth.models import Group
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework import status as http_status
@@ -30,8 +29,15 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 from apps.core.services.gcal_sync_service import build_event_payload, build_preview_for_solicitacao
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 class GCalTemplateFase3Tests(TestCase):
@@ -40,11 +46,11 @@ class GCalTemplateFase3Tests(TestCase):
     def setUp(self):
         """Setup: criar dados de teste completos"""
         # Criar grupos (get_or_create para evitar IntegrityError)
-        self.group_coord, _ = Group.objects.get_or_create(name="Coordenador")
-        self.group_controle, _ = Group.objects.get_or_create(name="Controle")
+        self.group_coord = GroupFactory(name="Coordenador")
+        self.group_controle = GroupFactory(name="Controle")
 
         # Criar usuários (com CPF único para evitar IntegrityError)
-        self.coord = Usuario.objects.create_user(
+        self.coord = UsuarioFactory(
             username="coord_fase3",
             email="coord_fase3@example.com",
             password="senha123",
@@ -54,7 +60,7 @@ class GCalTemplateFase3Tests(TestCase):
         )
         self.coord.groups.add(self.group_coord)
 
-        self.formador = Usuario.objects.create_user(
+        self.formador = UsuarioFactory(
             username="formador_fase3",
             email="formador_fase3@example.com",
             password="senha123",
@@ -63,7 +69,7 @@ class GCalTemplateFase3Tests(TestCase):
             last_name="Santos",
         )
 
-        self.controle = Usuario.objects.create_user(
+        self.controle = UsuarioFactory(
             username="controle_fase3",
             email="controle_fase3@example.com",
             password="senha123",
@@ -72,13 +78,13 @@ class GCalTemplateFase3Tests(TestCase):
         self.controle.groups.add(self.group_controle)
 
         # Criar entidades de negócio
-        self.municipio = Municipio.objects.create(nome="Salvador", uf="BA")
-        self.projeto = Projeto.objects.create(
+        self.municipio = MunicipioFactory(nome="Salvador", uf="BA")
+        self.projeto = ProjetoFactory(
             nome="Projeto ACerta",
             codigo="ACERTA",
             fluxo="NAO_SUPER",
         )
-        self.tipo_evento = TipoEvento.objects.create(nome="Formação Presencial")
+        self.tipo_evento = TipoEventoFactory(nome="Formação Presencial")
 
         # Datas (America/Fortaleza)
         fortaleza_tz = ZoneInfo("America/Fortaleza")
@@ -93,7 +99,7 @@ class GCalTemplateFase3Tests(TestCase):
 
         Expected: "Salvador - BA Fundamental I Online [ACERTA]"
         """
-        solicitacao = Solicitacao.objects.create(
+        solicitacao = SolicitacaoFactory(
             usuario=self.coord,
             municipio=self.municipio,
             projeto=self.projeto,
@@ -117,7 +123,7 @@ class GCalTemplateFase3Tests(TestCase):
 
         Expected: "Salvador - BA Presencial [ACERTA]"
         """
-        solicitacao = Solicitacao.objects.create(
+        solicitacao = SolicitacaoFactory(
             usuario=self.coord,
             municipio=self.municipio,
             projeto=self.projeto,
@@ -141,13 +147,13 @@ class GCalTemplateFase3Tests(TestCase):
 
         Expected: "Salvador - BA Online [Projeto sem Código]"
         """
-        projeto_sem_codigo = Projeto.objects.create(
+        projeto_sem_codigo = ProjetoFactory(
             nome="Projeto sem Código",
             codigo="",  # Vazio
             fluxo="NAO_SUPER",
         )
 
-        solicitacao = Solicitacao.objects.create(
+        solicitacao = SolicitacaoFactory(
             usuario=self.coord,
             municipio=self.municipio,
             projeto=projeto_sem_codigo,
@@ -170,7 +176,7 @@ class GCalTemplateFase3Tests(TestCase):
 
         Expected: "... Presencial ..."
         """
-        solicitacao = Solicitacao.objects.create(
+        solicitacao = SolicitacaoFactory(
             usuario=self.coord,
             municipio=self.municipio,
             projeto=self.projeto,
@@ -201,7 +207,7 @@ class GCalTemplateFase3Tests(TestCase):
         - Equipe: "👥 Equipe: ..."
         - Observações: "📝 Observações: ..."
         """
-        solicitacao = Solicitacao.objects.create(
+        solicitacao = SolicitacaoFactory(
             usuario=self.coord,
             municipio=self.municipio,
             projeto=self.projeto,
@@ -238,7 +244,7 @@ class GCalTemplateFase3Tests(TestCase):
 
         Expected: Seções obrigatórias presentes, opcionais ausentes
         """
-        solicitacao = Solicitacao.objects.create(
+        solicitacao = SolicitacaoFactory(
             usuario=self.coord,
             municipio=self.municipio,
             projeto=self.projeto,
@@ -278,7 +284,7 @@ class GCalTemplateFase3Tests(TestCase):
         inicio_utc = timezone.make_aware(datetime(2025, 12, 15, 12, 0, 0), timezone=dt_timezone.utc)
         fim_utc = timezone.make_aware(datetime(2025, 12, 15, 15, 0, 0), timezone=dt_timezone.utc)
 
-        solicitacao = Solicitacao.objects.create(
+        solicitacao = SolicitacaoFactory(
             usuario=self.coord,
             municipio=self.municipio,
             projeto=self.projeto,
@@ -306,18 +312,18 @@ class GCalTemplateFase3Tests(TestCase):
         - Template formatado corretamente
         """
         # Criar município com nome longo (respeitando max_length=100)
-        municipio_longo = Municipio.objects.create(
+        municipio_longo = MunicipioFactory(
             nome="A" * 95,  # Nome com 95 caracteres (< 100)
             uf="BA",
         )
 
-        projeto_longo = Projeto.objects.create(
+        projeto_longo = ProjetoFactory(
             nome="B" * 200,  # Nome com 200 caracteres
             codigo="C" * 50,  # Código com 50 caracteres
             fluxo="NAO_SUPER",
         )
 
-        solicitacao = Solicitacao.objects.create(
+        solicitacao = SolicitacaoFactory(
             usuario=self.coord,
             municipio=municipio_longo,
             projeto=projeto_longo,
@@ -354,7 +360,7 @@ class GCalTemplateFase3Tests(TestCase):
         # Criar observações com texto muito longo
         observacoes_longas = "X" * 6000  # 6000 caracteres
 
-        solicitacao = Solicitacao.objects.create(
+        solicitacao = SolicitacaoFactory(
             usuario=self.coord,
             municipio=self.municipio,
             projeto=self.projeto,
@@ -380,7 +386,7 @@ class GCalTemplateFase3Tests(TestCase):
 
         Expected: JSON com payload contendo título e descrição formatados
         """
-        solicitacao = Solicitacao.objects.create(
+        solicitacao = SolicitacaoFactory(
             usuario=self.coord,
             municipio=self.municipio,
             projeto=self.projeto,
@@ -428,7 +434,7 @@ class GCalTemplateFase3Tests(TestCase):
         - gcal_payload_hash setado (SHA1)
         - Título e descrição formatados conforme Fase 3
         """
-        solicitacao = Solicitacao.objects.create(
+        solicitacao = SolicitacaoFactory(
             usuario=self.coord,
             municipio=self.municipio,
             projeto=self.projeto,
@@ -471,7 +477,7 @@ class GCalTemplateFase3Tests(TestCase):
 
         Expected: dict com event_id, payload, payload_hash, meet_link (se online)
         """
-        solicitacao = Solicitacao.objects.create(
+        solicitacao = SolicitacaoFactory(
             usuario=self.coord,
             municipio=self.municipio,
             projeto=self.projeto,
@@ -506,7 +512,7 @@ class GCalTemplateFase3Tests(TestCase):
 
         Expected: "Formador(es): João Santos, Pedro Oliveira"
         """
-        formador2 = Usuario.objects.create_user(
+        formador2 = UsuarioFactory(
             username="formador2_fase3",
             email="formador2_fase3@example.com",
             password="senha123",
@@ -515,7 +521,7 @@ class GCalTemplateFase3Tests(TestCase):
             last_name="Oliveira",
         )
 
-        solicitacao = Solicitacao.objects.create(
+        solicitacao = SolicitacaoFactory(
             usuario=self.coord,
             municipio=self.municipio,
             projeto=self.projeto,

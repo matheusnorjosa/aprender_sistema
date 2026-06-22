@@ -14,31 +14,29 @@ Tests:
 
 from __future__ import annotations
 
-from django.contrib.auth.models import Group
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Projeto, Usuario
+from apps.core.models import Projeto
+from apps.core.tests.factories import ProjetoFactory, UsuarioFactory
 
 
 @pytest.fixture
 def dat_user(db):
     """Create DAT user for CRUD permissions."""
-    user = Usuario.objects.create_user(
+    return UsuarioFactory(
         username="dat_user",
         email="dat@example.com",
         password="testpass123",
+        groups=["DAT"],
     )
-    dat_group, _ = Group.objects.get_or_create(name="DAT")
-    user.groups.add(dat_group)
-    return user
 
 
 @pytest.fixture
 def regular_user(db):
     """Create regular authenticated user for options endpoints."""
-    return Usuario.objects.create_user(
+    return UsuarioFactory(
         username="regular_user",
         email="user@example.com",
         password="testpass123",
@@ -49,15 +47,15 @@ def regular_user(db):
 def projetos_mixed(db):
     """Create mix of production and test projects."""
     # Production projects
-    prod1 = Projeto.objects.create(nome="CIRANDAR", fluxo="SUPER", ativo=True, is_test=False)
-    prod2 = Projeto.objects.create(nome="ACERTA MATEMÁTICA", fluxo="NAO_SUPER", ativo=True, is_test=False)
+    prod1 = ProjetoFactory(nome="CIRANDAR", fluxo="SUPER", ativo=True, is_test=False)
+    prod2 = ProjetoFactory(nome="ACERTA MATEMÁTICA", fluxo="NAO_SUPER", ativo=True, is_test=False)
 
     # Test projects
-    test1 = Projeto.objects.create(nome="SMOKE SUPER", fluxo="SUPER", ativo=True, is_test=True)
-    test2 = Projeto.objects.create(nome="TESTE E2E", fluxo="SUPER", ativo=True, is_test=True)
+    test1 = ProjetoFactory(nome="SMOKE SUPER", fluxo="SUPER", ativo=True, is_test=True)
+    test2 = ProjetoFactory(nome="TESTE E2E", fluxo="SUPER", ativo=True, is_test=True)
 
     # Inactive project (should be filtered by options endpoint anyway)
-    inactive = Projeto.objects.create(nome="INACTIVE", fluxo="SUPER", ativo=False, is_test=False)
+    inactive = ProjetoFactory(nome="INACTIVE", fluxo="SUPER", ativo=False, is_test=False)
 
     return {
         "production": [prod1, prod2],

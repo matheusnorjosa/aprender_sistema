@@ -17,20 +17,26 @@ from django.utils import timezone
 
 import pytest
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 from apps.core.services.gcal.payload import build_event_payload, compute_payload_hash
+from apps.core.tests.factories import (
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 
 @pytest.fixture
 def online_solicitacao(db):
     """Cria uma solicitação online aprovada para testes de hash."""
-    user = Usuario.objects.create_user(username="hash_test_user", password="test123")
-    municipio = Municipio.objects.create(nome="HashCity", uf="CE")
-    projeto = Projeto.objects.create(nome="HASH TEST", fluxo="NAO_SUPER")
-    tipo = TipoEvento.objects.create(nome="Formação Hash")
+    user = UsuarioFactory(username="hash_test_user", password="test123")
+    municipio = MunicipioFactory(nome="HashCity", uf="CE")
+    projeto = ProjetoFactory(nome="HASH TEST", fluxo="NAO_SUPER")
+    tipo = TipoEventoFactory(nome="Formação Hash")
 
     now = timezone.now()
-    sol = Solicitacao.objects.create(
+    sol = SolicitacaoFactory(
         usuario=user,
         municipio=municipio,
         projeto=projeto,
@@ -46,13 +52,13 @@ def online_solicitacao(db):
 @pytest.fixture
 def presencial_solicitacao(db):
     """Cria uma solicitação presencial aprovada para testes de hash."""
-    user = Usuario.objects.create_user(username="hash_test_pres", password="test123")
-    municipio = Municipio.objects.create(nome="PresCity", uf="SP")
-    projeto = Projeto.objects.create(nome="PRES TEST", fluxo="NAO_SUPER")
-    tipo = TipoEvento.objects.create(nome="Formação Pres")
+    user = UsuarioFactory(username="hash_test_pres", password="test123")
+    municipio = MunicipioFactory(nome="PresCity", uf="SP")
+    projeto = ProjetoFactory(nome="PRES TEST", fluxo="NAO_SUPER")
+    tipo = TipoEventoFactory(nome="Formação Pres")
 
     now = timezone.now()
-    sol = Solicitacao.objects.create(
+    sol = SolicitacaoFactory(
         usuario=user,
         municipio=municipio,
         projeto=projeto,

@@ -24,13 +24,13 @@ Doc §3 da matriz canônica:
 
 from __future__ import annotations
 
-from django.contrib.auth.models import Group
 from django.core.cache import cache
 from rest_framework.test import APIClient
 
 import pytest
 
 from apps.core.models import Usuario
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -44,11 +44,9 @@ def _next_cpf() -> str:
 
 
 def _make_user(username: str, group_names: list[str]) -> Usuario:
-    user = Usuario.objects.create_user(
-        username=username, email=f"{username}@example.com", password="testpass123", cpf=_next_cpf()
-    )
+    user = UsuarioFactory(username=username, email=f"{username}@example.com", password="testpass123", cpf=_next_cpf())
     for gname in group_names:
-        group, _ = Group.objects.get_or_create(name=gname)
+        group = GroupFactory(name=gname)
         user.groups.add(group)
     return user
 
@@ -118,9 +116,7 @@ class TestExistingAccessPreserved:
 
     @pytest.mark.parametrize("endpoint", ENDPOINTS)
     def test_superuser_bypass(self, endpoint):
-        super_user = Usuario.objects.create_superuser(
-            username="super_metrics", email="sm@example.com", password="testpass123", cpf="99900099995"
-        )
+        super_user = UsuarioFactory(superuser=True)
         client = APIClient()
         client.force_authenticate(user=super_user)
         res = client.get(endpoint)

@@ -16,7 +16,7 @@ from typing import Any
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from apps.core.models import Usuario
+from apps.core.tests.factories import UsuarioFactory
 
 
 class TestOpenAPISchema(TestCase):
@@ -27,11 +27,7 @@ class TestOpenAPISchema(TestCase):
         self.client = APIClient()
 
         # Create superuser for accessing schema
-        self.user = Usuario.objects.create_superuser(
-            username="admin_openapi",
-            email="admin_openapi@test.com",
-            password="testpass123",
-        )
+        self.user = UsuarioFactory(superuser=True)
         self.client.force_authenticate(user=self.user)
 
     def test_schema_endpoint_returns_200(self) -> None:
@@ -391,11 +387,7 @@ class TestSchemaErrors(TestCase):
         """Set up test fixtures."""
         self.client = APIClient()
 
-        self.user = Usuario.objects.create_superuser(
-            username="admin_schema_errors",
-            email="admin_schema_errors@test.com",
-            password="testpass123",
-        )
+        self.user = UsuarioFactory(superuser=True)
         self.client.force_authenticate(user=self.user)
 
     def test_schema_contains_error_responses(self) -> None:

@@ -20,14 +20,13 @@ from datetime import date
 from pathlib import Path
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
 
 import pytest
 
-from apps.core.models import AcaoControle, Municipio, Projeto
+from apps.core.models import AcaoControle
 from apps.core.services.controle_acoes_import import import_acoes_controle
+from apps.core.tests.factories import MunicipioFactory, ProjetoFactory, UsuarioFactory
 
-User = get_user_model()
 pytestmark = pytest.mark.django_db
 
 
@@ -45,7 +44,7 @@ def _create_csv_file(rows, fieldnames):
 def test_import_creates_acao_controle():
     """Importação cria AcaoControle com todas as datas parseadas."""
     # Criar dependências diretamente
-    coord = User.objects.create_user(
+    coord = UsuarioFactory(
         username="coord1",
         email="coord@example.com",
         password="test123",
@@ -53,8 +52,8 @@ def test_import_creates_acao_controle():
         first_name="Maria",
         last_name="Silva",
     )
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="ACerta", ativo=True)
 
     # Criar CSV temporário
     csv_file = _create_csv_file(
@@ -102,8 +101,8 @@ def test_import_creates_acao_controle():
 
 def test_idempotency_no_duplicates():
     """Rodar ETL 2x não duplica registros (external_hash)."""
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="ACerta", ativo=True)
 
     csv_file = _create_csv_file(
         rows=[
@@ -131,8 +130,8 @@ def test_idempotency_no_duplicates():
 
 def test_dry_run_does_not_commit():
     """Dry-run não persiste dados no banco."""
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="ACerta", ativo=True)
 
     csv_file = _create_csv_file(
         rows=[
@@ -156,7 +155,7 @@ def test_dry_run_does_not_commit():
 
 def test_skip_missing_municipio():
     """Registros com município inexistente são pulados."""
-    Projeto.objects.create(nome="ACerta", ativo=True)
+    ProjetoFactory(nome="ACerta", ativo=True)
 
     csv_file = _create_csv_file(
         rows=[
@@ -181,8 +180,8 @@ def test_skip_missing_municipio():
 
 def test_report_saved_to_out_etl():
     """Relatório é salvo em out_etl/import_acoes_controle_report.json."""
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="ACerta", ativo=True)
 
     csv_file = _create_csv_file(
         rows=[
@@ -212,8 +211,8 @@ def test_report_saved_to_out_etl():
 
 def test_coordenador_optional():
     """Coordenador é opcional - registro criado mesmo se não encontrado."""
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="ACerta", ativo=True)
 
     csv_file = _create_csv_file(
         rows=[
@@ -245,8 +244,8 @@ def test_municipio_with_accent_resolves():
 
     Fix: usar `resolve_municipio` que tem fallback NFKD.
     """
-    Municipio.objects.create(nome="Iguatú", uf="CE", ativo=True)
-    Projeto.objects.create(nome="ACerta", ativo=True)
+    MunicipioFactory(nome="Iguatú", uf="CE", ativo=True)
+    ProjetoFactory(nome="ACerta", ativo=True)
 
     csv_file = _create_csv_file(
         rows=[
@@ -276,8 +275,8 @@ def test_municipio_cidade_uf_format_resolves():
     única (vs a coluna separada Município/UF do COMPRAS). O resolver deve
     splitar e casar com Municipio(nome='Curvelo', uf='MG').
     """
-    Municipio.objects.create(nome="Curvelo", uf="MG", ativo=True)
-    Projeto.objects.create(nome="ACerta", ativo=True)
+    MunicipioFactory(nome="Curvelo", uf="MG", ativo=True)
+    ProjetoFactory(nome="ACerta", ativo=True)
 
     csv_file = _create_csv_file(
         rows=[
@@ -298,8 +297,8 @@ def test_municipio_cidade_uf_format_resolves():
 
 def test_update_existing_record():
     """Atualiza registro existente se dados mudarem."""
-    municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = Projeto.objects.create(nome="ACerta", ativo=True)
+    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    projeto = ProjetoFactory(nome="ACerta", ativo=True)
 
     # Criar inicial
     csv_file = _create_csv_file(

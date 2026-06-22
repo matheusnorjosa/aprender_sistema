@@ -21,7 +21,6 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-from django.contrib.auth.models import Group
 from django.core.cache import cache
 from django.urls import reverse
 from django.utils import timezone
@@ -29,7 +28,14 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -51,18 +57,18 @@ def clear_cache():
 def grupos():
     """Criar grupos necessários para os testes."""
     return {
-        "superintendencia": Group.objects.get_or_create(name="Superintendência")[0],
-        "controle": Group.objects.get_or_create(name="Controle")[0],
-        "dat": Group.objects.get_or_create(name="DAT")[0],
-        "coordenador": Group.objects.get_or_create(name="Coordenador")[0],
-        "formador": Group.objects.get_or_create(name="Formador")[0],
+        "superintendencia": GroupFactory(name="Superintendência"),
+        "controle": GroupFactory(name="Controle"),
+        "dat": GroupFactory(name="DAT"),
+        "coordenador": GroupFactory(name="Coordenador"),
+        "formador": GroupFactory(name="Formador"),
     }
 
 
 @pytest.fixture
 def user_super(grupos):
     """Usuário do grupo Superintendência."""
-    user = Usuario.objects.create_user(username="super1", email="super@x.com", password="x", cpf="11111111111")
+    user = UsuarioFactory(username="super1", email="super@x.com", password="x", cpf="11111111111")
     user.groups.add(grupos["superintendencia"])
     return user
 
@@ -70,7 +76,7 @@ def user_super(grupos):
 @pytest.fixture
 def user_controle(grupos):
     """Usuário do grupo Controle."""
-    user = Usuario.objects.create_user(username="controle1", email="controle@x.com", password="x", cpf="22222222222")
+    user = UsuarioFactory(username="controle1", email="controle@x.com", password="x", cpf="22222222222")
     user.groups.add(grupos["controle"])
     return user
 
@@ -78,7 +84,7 @@ def user_controle(grupos):
 @pytest.fixture
 def user_dat(grupos):
     """Usuário do grupo DAT."""
-    user = Usuario.objects.create_user(username="dat1", email="dat@x.com", password="x", cpf="33333333333")
+    user = UsuarioFactory(username="dat1", email="dat@x.com", password="x", cpf="33333333333")
     user.groups.add(grupos["dat"])
     return user
 
@@ -86,7 +92,7 @@ def user_dat(grupos):
 @pytest.fixture
 def user_coordenador(grupos):
     """Usuário do grupo Coordenador (sem permissão)."""
-    user = Usuario.objects.create_user(username="coord1", email="coord@x.com", password="x", cpf="44444444444")
+    user = UsuarioFactory(username="coord1", email="coord@x.com", password="x", cpf="44444444444")
     user.groups.add(grupos["coordenador"])
     return user
 
@@ -94,7 +100,7 @@ def user_coordenador(grupos):
 @pytest.fixture
 def user_formador(grupos):
     """Usuário do grupo Formador (sem permissão)."""
-    user = Usuario.objects.create_user(username="form1", email="form@x.com", password="x", cpf="55555555555")
+    user = UsuarioFactory(username="form1", email="form@x.com", password="x", cpf="55555555555")
     user.groups.add(grupos["formador"])
     return user
 
@@ -103,25 +109,25 @@ def user_formador(grupos):
 def dados_basicos(grupos):
     """Criar dados básicos para os testes."""
     # Formadores (usuários)
-    formador1 = Usuario.objects.create_user(username="ana.silva", email="ana@x.com", password="x", cpf="66666666666")
+    formador1 = UsuarioFactory(username="ana.silva", email="ana@x.com", password="x", cpf="66666666666")
     formador1.groups.add(grupos["formador"])
 
-    formador2 = Usuario.objects.create_user(username="joao.santos", email="joao@x.com", password="x", cpf="77777777777")
+    formador2 = UsuarioFactory(username="joao.santos", email="joao@x.com", password="x", cpf="77777777777")
     formador2.groups.add(grupos["formador"])
 
     # Municípios
-    mun_ce = Municipio.objects.create(nome="Fortaleza", uf="CE", ibge_code="2304400")
-    mun_pe = Municipio.objects.create(nome="Recife", uf="PE", ibge_code="2611606")
-    mun_ba = Municipio.objects.create(nome="Salvador", uf="BA", ibge_code="2927408")
+    mun_ce = MunicipioFactory(nome="Fortaleza", uf="CE", ibge_code="2304400")
+    mun_pe = MunicipioFactory(nome="Recife", uf="PE", ibge_code="2611606")
+    mun_ba = MunicipioFactory(nome="Salvador", uf="BA", ibge_code="2927408")
 
     # Projetos (fluxo='SUPER' para permitir testar diferentes status)
-    proj1 = Projeto.objects.create(nome="Alfabetização Ceará", codigo="P001", fluxo="SUPER")
-    proj2 = Projeto.objects.create(nome="Matemática", codigo="P002", fluxo="SUPER")
-    proj3 = Projeto.objects.create(nome="Ciências", codigo="P003", fluxo="SUPER")
+    proj1 = ProjetoFactory(nome="Alfabetização Ceará", codigo="P001", fluxo="SUPER")
+    proj2 = ProjetoFactory(nome="Matemática", codigo="P002", fluxo="SUPER")
+    proj3 = ProjetoFactory(nome="Ciências", codigo="P003", fluxo="SUPER")
 
     # Tipos de evento
-    tipo1 = TipoEvento.objects.create(nome="Formação Inicial")
-    tipo2 = TipoEvento.objects.create(nome="Formação Continuada")
+    tipo1 = TipoEventoFactory(nome="Formação Inicial")
+    tipo2 = TipoEventoFactory(nome="Formação Continuada")
 
     return {
         "formadores": [formador1, formador2],
@@ -137,15 +143,13 @@ def solicitacoes_variedade(dados_basicos):
     now = timezone.now()
     formador = dados_basicos["formadores"][0]
     # Criar um usuário coordenador para ser o criador das solicitações
-    coordenador = Usuario.objects.create_user(
-        username="coord_test", email="coord_test@x.com", password="x", cpf="88888888888"
-    )
+    coordenador = UsuarioFactory(username="coord_test", email="coord_test@x.com", password="x", cpf="88888888888")
 
     solicitacoes = []
 
     # 3 aprovadas em CE, projeto Alfabetização, últimas 2 semanas
     for i in range(3):
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=coordenador,
             status="aprovado",
             inicio=now - timedelta(days=7),
@@ -159,7 +163,7 @@ def solicitacoes_variedade(dados_basicos):
 
     # 2 pendentes em PE, projeto Matemática, últimas 4 semanas (dentro do range de 30 dias)
     for i in range(2):
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=coordenador,
             status="pendente",
             inicio=now - timedelta(days=20),
@@ -172,7 +176,7 @@ def solicitacoes_variedade(dados_basicos):
         solicitacoes.append(sol)
 
     # 1 reprovada em BA, projeto Ciências (dentro do range de 30 dias)
-    sol = Solicitacao.objects.create(
+    sol = SolicitacaoFactory(
         usuario=coordenador,
         status="reprovado",
         inicio=now - timedelta(days=25),  # Mudei de 35 para 25 dias
@@ -185,7 +189,7 @@ def solicitacoes_variedade(dados_basicos):
     solicitacoes.append(sol)
 
     # 1 aprovada antiga (fora do range de 30 dias)
-    sol = Solicitacao.objects.create(
+    sol = SolicitacaoFactory(
         usuario=coordenador,
         status="aprovado",
         inicio=now - timedelta(days=60),
@@ -272,7 +276,7 @@ def test_status_counts_formador_forbidden(user_formador, clear_cache):
 
 def test_superuser_always_has_access(clear_cache):
     """Superuser sempre tem acesso, mesmo sem grupo."""
-    user = Usuario.objects.create_superuser(username="admin", email="admin@x.com", password="x", cpf="99999999999")
+    user = UsuarioFactory(superuser=True)
     client = APIClient()
     client.force_authenticate(user=user)
 
@@ -590,9 +594,9 @@ def test_by_uf_ignores_null_municipio(user_super, dados_basicos, clear_cache):
     tipo = dados_basicos["tipos"][0]
 
     # Criar um usuário para a solicitação
-    coord = Usuario.objects.create_user(username="coord_mun", email="coord_mun@x.com", password="x", cpf="99888777666")
+    coord = UsuarioFactory(username="coord_mun", email="coord_mun@x.com", password="x", cpf="99888777666")
 
-    sol = Solicitacao.objects.create(
+    sol = SolicitacaoFactory(
         usuario=coord,
         status="aprovado",
         inicio=timezone.now(),

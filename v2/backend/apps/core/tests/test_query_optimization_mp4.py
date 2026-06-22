@@ -21,7 +21,15 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import Solicitacao, Usuario
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import User
@@ -30,8 +38,8 @@ if TYPE_CHECKING:
 @pytest.fixture
 def grupos(db: None) -> dict[str, Group]:
     """Cria grupos necessários."""
-    controle, _ = Group.objects.get_or_create(name="Controle")
-    superintendencia, _ = Group.objects.get_or_create(name="Superintendência")
+    controle = GroupFactory(name="Controle")
+    superintendencia = GroupFactory(name="Superintendência")
     return {"controle": controle, "superintendencia": superintendencia}
 
 
@@ -41,7 +49,7 @@ def usuario_controle(db: None, grupos: dict[str, Group]) -> Usuario:
     import uuid
 
     uid = uuid.uuid4().hex[:8]
-    usuario = Usuario.objects.create_user(
+    usuario = UsuarioFactory(
         username=f"controle_qopt_{uid}",
         email=f"controle_qopt_{uid}@test.com",
         password="senha123",
@@ -57,7 +65,7 @@ def usuario_super(db: None, grupos: dict[str, Group]) -> Usuario:
     import uuid
 
     uid = uuid.uuid4().hex[:8]
-    usuario = Usuario.objects.create_user(
+    usuario = UsuarioFactory(
         username=f"super_qopt_{uid}",
         email=f"super_qopt_{uid}@test.com",
         password="senha123",
@@ -71,15 +79,15 @@ def usuario_super(db: None, grupos: dict[str, Group]) -> Usuario:
 def solicitacoes_published(db: None, usuario_controle: User, usuario_super: User) -> list[Solicitacao]:
     """Cria 10 solicitações PUBLISHED para testar N+1."""
     # Criar dependências
-    municipio = Municipio.objects.create(nome="Salvador", uf="BA", ibge_code="2927408")
-    projeto = Projeto.objects.create(nome="ACERTA", codigo="ACERTA", fluxo="NAO_SUPER")
-    tipo_evento = TipoEvento.objects.create(nome="Formação")
+    municipio = MunicipioFactory(nome="Salvador", uf="BA", ibge_code="2927408")
+    projeto = ProjetoFactory(nome="ACERTA", codigo="ACERTA", fluxo="NAO_SUPER")
+    tipo_evento = TipoEventoFactory(nome="Formação")
 
     # Criar 10 solicitações
     solicitacoes = []
     now = timezone.now()
     for i in range(10):
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             inicio=now + timedelta(hours=i),
             fim=now + timedelta(hours=i + 2),
             municipio=municipio,

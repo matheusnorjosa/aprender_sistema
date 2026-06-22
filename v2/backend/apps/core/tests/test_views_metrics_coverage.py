@@ -19,14 +19,21 @@ from __future__ import annotations
 from datetime import timedelta
 from uuid import uuid4
 
-from django.contrib.auth.models import Group
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Participation, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import Participation
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -40,14 +47,14 @@ pytestmark = pytest.mark.django_db
 def grupos():
     """Create required groups for tests."""
     return {
-        "diretoria": Group.objects.get_or_create(name="Diretoria")[0],
-        "controle": Group.objects.get_or_create(name="Controle")[0],
-        "dat": Group.objects.get_or_create(name="DAT")[0],
-        "superintendencia": Group.objects.get_or_create(name="Superintendência")[0],
-        "coordenador": Group.objects.get_or_create(name="Coordenador")[0],
-        "formador": Group.objects.get_or_create(name="Formador")[0],
-        "gerente": Group.objects.get_or_create(name="Gerente")[0],
-        "gerencia": Group.objects.get_or_create(name="Gerência")[0],
+        "diretoria": GroupFactory(name="Diretoria"),
+        "controle": GroupFactory(name="Controle"),
+        "dat": GroupFactory(name="DAT"),
+        "superintendencia": GroupFactory(name="Superintendência"),
+        "coordenador": GroupFactory(name="Coordenador"),
+        "formador": GroupFactory(name="Formador"),
+        "gerente": GroupFactory(name="Gerente"),
+        "gerencia": GroupFactory(name="Gerência"),
     }
 
 
@@ -58,7 +65,7 @@ def user_controle(grupos):
     no seed realinhado. Este endpoint metrics/map é alimentado por dashboards
     da Diretoria — gating real de UI fica no menu condicional do frontend."""
     uid = uuid4().hex[:8]
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"controle_{uid}",
         email=f"controle_{uid}@test.com",
         password="test123",
@@ -74,7 +81,7 @@ def user_gerencia(grupos):
     adicionado a Diretoria (que tem `supervise_operations` no seed
     realinhado, perm exigida por /metrics/team/formadores/)."""
     uid = uuid4().hex[:8]
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"gerencia_{uid}",
         email=f"gerencia_{uid}@test.com",
         password="test123",
@@ -88,21 +95,21 @@ def user_gerencia(grupos):
 def municipios():
     """Create municipalities in different states."""
     return {
-        "fortaleza": Municipio.objects.create(
+        "fortaleza": MunicipioFactory(
             nome="Fortaleza",
             uf="CE",
             ibge_code=f"23{uuid4().hex[:5]}",
             latitude=-3.717200,
             longitude=-38.543400,
         ),
-        "caucaia": Municipio.objects.create(
+        "caucaia": MunicipioFactory(
             nome="Caucaia",
             uf="CE",
             ibge_code=f"23{uuid4().hex[:5]}",
             latitude=-3.736111,
             longitude=-38.653889,
         ),
-        "sao_paulo": Municipio.objects.create(
+        "sao_paulo": MunicipioFactory(
             nome="São Paulo",
             uf="SP",
             ibge_code=f"35{uuid4().hex[:5]}",
@@ -115,7 +122,7 @@ def municipios():
 @pytest.fixture
 def projeto():
     """Create a test project."""
-    return Projeto.objects.create(
+    return ProjetoFactory(
         nome=f"Projeto Test {uuid4().hex[:6]}",
         codigo=f"PT{uuid4().hex[:4].upper()}",
         fluxo="SUPER",
@@ -125,14 +132,14 @@ def projeto():
 @pytest.fixture
 def tipo_evento():
     """Create an event type."""
-    return TipoEvento.objects.create(nome=f"Tipo {uuid4().hex[:6]}")
+    return TipoEventoFactory(nome=f"Tipo {uuid4().hex[:6]}")
 
 
 @pytest.fixture
 def coordenador_user(grupos):
     """Create a coordinator user with first/last name."""
     uid = uuid4().hex[:8]
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"coord_{uid}",
         email=f"coord_{uid}@test.com",
         password="test123",
@@ -148,7 +155,7 @@ def coordenador_user(grupos):
 def formador_sem_nome(grupos):
     """Create a formador without first_name/last_name (for fallback test)."""
     uid = uuid4().hex[:8]
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"formador_anonimo_{uid}",
         email=f"formador_{uid}@test.com",
         password="test123",
@@ -164,7 +171,7 @@ def formador_sem_nome(grupos):
 def formador_com_nome(grupos):
     """Create a formador with first_name/last_name."""
     uid = uuid4().hex[:8]
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"formador_nomeado_{uid}",
         email=f"formador_nome_{uid}@test.com",
         password="test123",
@@ -184,7 +191,7 @@ def solicitacoes_ce(municipios, projeto, tipo_evento, coordenador_user, formador
 
     # Create user to be the creator
     uid = uuid4().hex[:8]
-    criador = Usuario.objects.create_user(
+    criador = UsuarioFactory(
         username=f"criador_{uid}",
         email=f"criador_{uid}@test.com",
         password="test123",
@@ -193,7 +200,7 @@ def solicitacoes_ce(municipios, projeto, tipo_evento, coordenador_user, formador
 
     # Create 3 solicitations in Fortaleza-CE
     for i in range(3):
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=criador,
             status="aprovado",
             inicio=now + timedelta(days=i),
@@ -221,7 +228,7 @@ def solicitacoes_ce(municipios, projeto, tipo_evento, coordenador_user, formador
         solicitacoes.append(sol)
 
     # Create 1 solicitation in Caucaia-CE
-    sol = Solicitacao.objects.create(
+    sol = SolicitacaoFactory(
         usuario=criador,
         status="aprovado",
         inicio=now + timedelta(days=10),
@@ -253,14 +260,14 @@ def solicitacao_sp(municipios, projeto, tipo_evento, grupos):
     now = timezone.now()
 
     uid = uuid4().hex[:8]
-    criador = Usuario.objects.create_user(
+    criador = UsuarioFactory(
         username=f"criador_sp_{uid}",
         email=f"criador_sp_{uid}@test.com",
         password="test123",
         cpf=f"7{uid[:10].ljust(10, '0')}",
     )
 
-    sol = Solicitacao.objects.create(
+    sol = SolicitacaoFactory(
         usuario=criador,
         status="aprovado",
         inicio=now + timedelta(days=20),
@@ -597,7 +604,7 @@ class TestMetricsMapCoordinators:
 
         # Create coordinator without name
         uid = uuid4().hex[:8]
-        coord_sem_nome = Usuario.objects.create_user(
+        coord_sem_nome = UsuarioFactory(
             username=f"coord_anonimo_{uid}",
             email=f"coord_anonimo_{uid}@test.com",
             password="test123",
@@ -608,14 +615,14 @@ class TestMetricsMapCoordinators:
         coord_sem_nome.groups.add(grupos["coordenador"])
 
         # Create solicitation with this coordinator
-        criador = Usuario.objects.create_user(
+        criador = UsuarioFactory(
             username=f"criador_x_{uid}",
             email=f"criador_x_{uid}@test.com",
             password="test123",
             cpf=f"9{uid[:10].ljust(10, '0')}",
         )
 
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=criador,
             status="aprovado",
             inicio=timezone.now(),
@@ -690,14 +697,14 @@ class TestFormadoresMetricsUsernameFallback:
 
         # Create solicitation with formador_sem_nome
         uid = uuid4().hex[:8]
-        criador = Usuario.objects.create_user(
+        criador = UsuarioFactory(
             username=f"criador_form_{uid}",
             email=f"criador_form_{uid}@test.com",
             password="test123",
             cpf=f"1{uid[:10].ljust(10, '1')}",
         )
 
-        sol = Solicitacao.objects.create(
+        sol = SolicitacaoFactory(
             usuario=criador,
             status="aprovado",
             inicio=timezone.now() - timedelta(days=5),

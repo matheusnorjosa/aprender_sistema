@@ -32,6 +32,7 @@ migration_module = importlib.import_module("apps.core.migrations.0036_consolidat
 consolidate_projetos = migration_module.consolidate_projetos
 
 
+@pytest.mark.migrations
 @pytest.mark.django_db(transaction=True)
 class TestProjectDedupMigration:
     """Testes para migration 0036_consolidate_duplicate_projetos."""

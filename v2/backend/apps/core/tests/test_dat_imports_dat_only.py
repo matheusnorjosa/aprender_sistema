@@ -31,12 +31,12 @@ from __future__ import annotations
 import io
 import itertools
 
-from django.contrib.auth.models import Group
 from rest_framework.test import APIClient
 
 import pytest
 
 from apps.core.models import Usuario
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -64,14 +64,14 @@ def _file(content: bytes = b"x", name: str = "f.csv") -> io.BytesIO:
 
 def _user_in_groups(*group_names: str, username: str = "u") -> Usuario:
     cpf = str(next(_CPF_COUNTER)).zfill(11)
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"{username}_{cpf}",
         email=f"{username}_{cpf}@x.com",
         password="x",
         cpf=cpf,
     )
     for name in group_names:
-        group, _ = Group.objects.get_or_create(name=name)
+        group = GroupFactory(name=name)
         user.groups.add(group)
     return user
 
@@ -153,7 +153,8 @@ def test_anonymous_request_is_rejected(endpoint: str):
 def test_superuser_bypasses_dat_only_gate(endpoint: str):
     """Superuser tem bypass via HasPerm; passa em todos os endpoints PR-A1."""
     cpf = str(next(_CPF_COUNTER)).zfill(11)
-    user = Usuario.objects.create_superuser(
+    user = UsuarioFactory(
+        superuser=True,
         username=f"su_pr_a1_{cpf}",
         email=f"su_{cpf}@x.com",
         password="x",

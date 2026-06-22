@@ -11,13 +11,19 @@ Valida:
 
 from __future__ import annotations
 
-from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Participation, Projeto, Solicitacao, TipoEvento
+from apps.core.models import Participation
+from apps.core.tests.factories import (
+    MunicipioFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -29,34 +35,21 @@ def factory_solicitacao():
     """
 
     def _factory(**kwargs):
-        User = get_user_model()
-
         # Usuario criador (se não fornecido)
         if "usuario" not in kwargs:
-            user = User.objects.create_user(
-                username=f"user_{timezone.now().timestamp()}",
-                email=f"user{timezone.now().timestamp()}@example.com",
-                password="testpass123",
-                cpf=f"{int(timezone.now().timestamp()) % 100000000000}",
-            )
-            kwargs["usuario"] = user
+            kwargs["usuario"] = UsuarioFactory()
 
         # Municipio
         if "municipio" not in kwargs:
-            municipio, _ = Municipio.objects.get_or_create(nome="Fortaleza", uf="CE", defaults={"ativo": True})
-            kwargs["municipio"] = municipio
+            kwargs["municipio"] = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
 
         # TipoEvento
         if "tipo_evento" not in kwargs:
-            tipo_evento, _ = TipoEvento.objects.get_or_create(
-                nome="Formação", defaults={"descricao": "Formação continuada"}
-            )
-            kwargs["tipo_evento"] = tipo_evento
+            kwargs["tipo_evento"] = TipoEventoFactory(nome="Formação", descricao="Formação continuada")
 
         # Projeto
         if "projeto" not in kwargs:
-            projeto, _ = Projeto.objects.get_or_create(nome="Teste Projeto", defaults={"ativo": True})
-            kwargs["projeto"] = projeto
+            kwargs["projeto"] = ProjetoFactory(nome="Teste Projeto", ativo=True)
 
         # Datas
         if "inicio" not in kwargs:
@@ -68,7 +61,7 @@ def factory_solicitacao():
         if "status" not in kwargs:
             kwargs["status"] = "pendente"
 
-        return Solicitacao.objects.create(**kwargs)
+        return SolicitacaoFactory(**kwargs)
 
     return _factory
 
@@ -78,9 +71,8 @@ def test_solicitacao_list_includes_participations(factory_solicitacao):
     Testa que listagem de Solicitacoes inclui campo 'participations' (read-only).
     """
     solicitacao = factory_solicitacao()
-    User = get_user_model()
 
-    u1 = User.objects.create_user(
+    u1 = UsuarioFactory(
         username="coordenador1",
         email="coord1@example.com",
         password="testpass123",
@@ -88,7 +80,7 @@ def test_solicitacao_list_includes_participations(factory_solicitacao):
         first_name="Coordenador",
         last_name="Um",
     )
-    u2 = User.objects.create_user(
+    u2 = UsuarioFactory(
         username="formador1",
         email="formador1@example.com",
         password="testpass123",
@@ -102,12 +94,7 @@ def test_solicitacao_list_includes_participations(factory_solicitacao):
 
     client = APIClient()
     # Autenticar como superuser para ver todas as solicitações
-    superuser = User.objects.create_superuser(
-        username="admin",
-        email="admin@example.com",
-        password="admin123",
-        cpf="00000000000",
-    )
+    superuser = UsuarioFactory(superuser=True)
     client.force_authenticate(user=superuser)
 
     resp = client.get("/api/solicitacoes/")
@@ -147,9 +134,8 @@ def test_solicitacao_detail_includes_participations(factory_solicitacao):
     Testa que detalhes de uma Solicitacao incluem campo 'participations'.
     """
     solicitacao = factory_solicitacao()
-    User = get_user_model()
 
-    u1 = User.objects.create_user(
+    u1 = UsuarioFactory(
         username="convidado1",
         email="convidado@example.com",
         password="testpass123",
@@ -167,12 +153,7 @@ def test_solicitacao_detail_includes_participations(factory_solicitacao):
     )
 
     client = APIClient()
-    superuser = User.objects.create_superuser(
-        username="admin2",
-        email="admin2@example.com",
-        password="admin123",
-        cpf="00000000001",
-    )
+    superuser = UsuarioFactory(superuser=True)
     client.force_authenticate(user=superuser)
 
     resp = client.get(f"/api/solicitacoes/{solicitacao.id}/")
@@ -195,15 +176,9 @@ def test_solicitacao_api_no_formadores_field(factory_solicitacao):
     Testa que campo 'formadores' NÃO aparece no payload (prefetch removido).
     """
     solicitacao = factory_solicitacao()
-    User = get_user_model()
 
     client = APIClient()
-    superuser = User.objects.create_superuser(
-        username="admin3",
-        email="admin3@example.com",
-        password="admin123",
-        cpf="00000000002",
-    )
+    superuser = UsuarioFactory(superuser=True)
     client.force_authenticate(user=superuser)
 
     resp = client.get(f"/api/solicitacoes/{solicitacao.id}/")

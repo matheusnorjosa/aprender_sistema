@@ -10,23 +10,22 @@ mensagem genérica.
 
 from __future__ import annotations
 
-from django.contrib.auth.models import Group
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Usuario
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 
 @pytest.fixture
 def authenticated_client(db) -> APIClient:
-    user = Usuario.objects.create_user(  # type: ignore[attr-defined]
+    user = UsuarioFactory(
         username="validate_user",
         email="validate.user@example.com",
         password="testpass123",
         cpf="12345678901",
     )
-    coord_group, _ = Group.objects.get_or_create(name="Coordenador")
+    coord_group = GroupFactory(name="Coordenador")
     user.groups.add(coord_group)
     client = APIClient()
     client.force_authenticate(user=user)

@@ -18,58 +18,56 @@ import tempfile
 from datetime import date, timedelta
 from pathlib import Path
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from rest_framework import status
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Municipio, Participation, Projeto, Solicitacao, TipoEvento
+from apps.core.models import Participation, Solicitacao
 from apps.core.services.eventos_import import import_eventos_from_file
+from apps.core.tests.factories import (
+    MunicipioFactory,
+    ProjetoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+)
 
 # URL direta (evita problemas de cache de rotas no container)
 IMPORT_EVENTOS_URL = "/api/solicitacoes/import/"
-
-User = get_user_model()
 
 
 @pytest.fixture
 def dat_import_user(db):
     """Usuario do grupo DAT (PR-A1 DAT-Imports: detentor de import_spreadsheet)."""
-    user = User.objects.create_user(
+    return UsuarioFactory(
         username="dat_import_user",
         email="dat_imports@test.com",
         password="testpass123",
         cpf="11111111111",
         first_name="DAT",
         last_name="Imports",
+        groups=["DAT"],
     )
-    group, _ = Group.objects.get_or_create(name="DAT")
-    user.groups.add(group)
-    return user
 
 
 @pytest.fixture
 def formador_user(db):
     """Usuario do grupo Formador (sem permissao de import)."""
-    user = User.objects.create_user(
+    return UsuarioFactory(
         username="formador_user",
         email="formador@test.com",
         password="testpass123",
         cpf="22222222222",
         first_name="Formador",
         last_name="User",
+        groups=["Formador"],
     )
-    group, _ = Group.objects.get_or_create(name="Formador")
-    user.groups.add(group)
-    return user
 
 
 @pytest.fixture
 def coordenador_user(db):
     """Usuario que sera coordenador dos eventos."""
-    return User.objects.create_user(
+    return UsuarioFactory(
         username="coord_user",
         email="coord@test.com",
         password="testpass123",
@@ -82,7 +80,7 @@ def coordenador_user(db):
 @pytest.fixture
 def formador1_user(db):
     """Usuario que sera formador 1."""
-    return User.objects.create_user(
+    return UsuarioFactory(
         username="formador1",
         email="formador1@test.com",
         password="testpass123",
@@ -95,7 +93,7 @@ def formador1_user(db):
 @pytest.fixture
 def municipio(db):
     """Municipio para os eventos."""
-    return Municipio.objects.create(
+    return MunicipioFactory(
         nome="Fortaleza",
         uf="CE",
     )
@@ -104,7 +102,7 @@ def municipio(db):
 @pytest.fixture
 def projeto_super(db):
     """Projeto com fluxo SUPER (requer aprovacao)."""
-    return Projeto.objects.create(
+    return ProjetoFactory(
         nome="Projeto Super",
         fluxo="SUPER",
     )
@@ -113,7 +111,7 @@ def projeto_super(db):
 @pytest.fixture
 def projeto_nao_super(db):
     """Projeto com fluxo NAO_SUPER (auto-aprovado)."""
-    return Projeto.objects.create(
+    return ProjetoFactory(
         nome="Projeto Nao Super",
         fluxo="NAO_SUPER",
     )
@@ -122,7 +120,7 @@ def projeto_nao_super(db):
 @pytest.fixture
 def tipo_evento(db):
     """Tipo de evento para os eventos."""
-    return TipoEvento.objects.create(
+    return TipoEventoFactory(
         nome="Formacao",
     )
 

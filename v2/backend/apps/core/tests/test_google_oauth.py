@@ -35,7 +35,6 @@ from datetime import timedelta
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
-from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework import status as http_status
 from rest_framework.test import APIClient, APIRequestFactory
@@ -43,7 +42,7 @@ from rest_framework.test import APIClient, APIRequestFactory
 import pytest
 from cryptography.fernet import Fernet
 
-from apps.core.models import AuditLog, GoogleOAuthCredential, Usuario
+from apps.core.models import AuditLog, GoogleOAuthCredential
 from apps.core.services.google_oauth import (
     _decrypt_token,
     _encrypt_token,
@@ -51,6 +50,7 @@ from apps.core.services.google_oauth import (
     refresh_access_token_safe,
     rotate_encryption_key,
 )
+from apps.core.tests.factories import UsuarioFactory
 
 # ============================================================================
 # FIXTURES
@@ -101,29 +101,25 @@ def patch_decrypt_for_memoryview(monkeypatch):
 @pytest.fixture
 def usuario_controle(db):
     """Cria usuário do grupo Controle"""
-    controle_group, _ = Group.objects.get_or_create(name="Controle")
-    user = Usuario.objects.create_user(
+    return UsuarioFactory(
         username="controle_test",
         email="controle@aprendereditora.com.br",
         password="testpass123",
         cpf="11111111111",
+        groups=["Controle"],
     )
-    user.groups.add(controle_group)
-    return user
 
 
 @pytest.fixture
 def usuario_formador(db):
     """Cria usuário do grupo Formador (sem permissão OAuth)"""
-    formador_group, _ = Group.objects.get_or_create(name="Formador")
-    user = Usuario.objects.create_user(
+    return UsuarioFactory(
         username="formador_test",
         email="formador@aprendereditora.com.br",
         password="testpass123",
         cpf="22222222222",
+        groups=["Formador"],
     )
-    user.groups.add(formador_group)
-    return user
 
 
 @pytest.fixture
@@ -457,14 +453,13 @@ class TestGoogleOAuthEndpoints:
         cache.clear()
 
         # Criar usuário único para este teste (evitar throttle compartilhado)
-        controle_group, _ = Group.objects.get_or_create(name="Controle")
-        unique_user = Usuario.objects.create_user(
+        unique_user = UsuarioFactory(
             username="throttle_test_user",
             email="throttle@aprendereditora.com.br",
             password="testpass123",
             cpf="99999999999",
+            groups=["Controle"],
         )
-        unique_user.groups.add(controle_group)
 
         client = APIClient()
         client.force_authenticate(user=unique_user)

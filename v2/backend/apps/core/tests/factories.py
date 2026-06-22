@@ -18,7 +18,7 @@ Convenções:
   já existentes (criados pelo seed de sessão).
 """
 
-# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownLambdaType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownLambdaType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false, reportPrivateImportUsage=false, reportIncompatibleVariableOverride=false
 
 from __future__ import annotations
 

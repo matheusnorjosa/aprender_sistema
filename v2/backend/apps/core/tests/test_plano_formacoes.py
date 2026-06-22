@@ -16,36 +16,30 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 
 import pytest
 
-from apps.core.models import Acompanhamento, Formacao, Municipio, PlanoFormacoes, Projeto, Prova
-
-User = get_user_model()
+from apps.core.models import Acompanhamento, Formacao, PlanoFormacoes, Prova
+from apps.core.tests.factories import MunicipioFactory, ProjetoFactory, UsuarioFactory
 
 
 @pytest.fixture
 def user(db):
     """Create a test user with DAT permissions."""
-    from django.contrib.auth.models import Group
-
-    user = User.objects.create_user(
+    # Add to DAT group for permissions
+    return UsuarioFactory(
         username="testuser",
         cpf="12345678901",
         password="testpass123",
+        groups=["DAT"],
     )
-    # Add to DAT group for permissions
-    dat_group, _ = Group.objects.get_or_create(name="DAT")
-    user.groups.add(dat_group)
-    return user
 
 
 @pytest.fixture
 def municipio(db):
     """Create a test municipio."""
-    return Municipio.objects.create(
+    return MunicipioFactory(
         nome="Municipio Teste",
         uf="CE",
     )
@@ -54,7 +48,7 @@ def municipio(db):
 @pytest.fixture
 def projeto(db):
     """Create a test projeto."""
-    return Projeto.objects.create(
+    return ProjetoFactory(
         nome="Projeto Teste",
         fluxo="NAO_SUPER",
     )
@@ -385,11 +379,11 @@ class TestPlanoFormacoesAPI:
         client.force_login(user)
 
         # Create another municipio to avoid unique constraint
-        mun2 = Municipio.objects.create(
+        mun2 = MunicipioFactory(
             nome="Municipio 2",
             uf="CE",
         )
-        proj2 = Projeto.objects.create(
+        proj2 = ProjetoFactory(
             nome="Projeto 2",
             fluxo="NAO_SUPER",
         )

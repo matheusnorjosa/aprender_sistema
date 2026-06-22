@@ -13,7 +13,6 @@ dedicados (`test_deslocamento_rbac.py`, `test_availability_monthly_rbac.py`).
 
 from __future__ import annotations
 
-from django.contrib.auth.models import Group
 from django.core.cache import cache
 from rest_framework.test import APIClient
 
@@ -35,6 +34,7 @@ from apps.core.rbac.matrix import (
     expand_matrix,
     format_failure_message,
 )
+from apps.core.tests.factories import UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -63,21 +63,16 @@ def _make_user_for_actor(actor: str) -> Usuario:
     GERENTE retorne 200 na Matriz Viva. DAT recebe cap global (sem fixture).
     """
     if actor == SUPERUSER:
-        return Usuario.objects.create_superuser(
-            username=f"matrix_super_{_USER_COUNTER['i']:06d}",
-            email=f"matrix_super_{_USER_COUNTER['i']:06d}@example.com",
-            password="testpass123",
+        return UsuarioFactory(
+            superuser=True,
             cpf=_next_cpf(),
         )
-    user = Usuario.objects.create_user(
+    user = UsuarioFactory(
         username=f"matrix_{actor.lower().replace(' ', '_')}_{_USER_COUNTER['i']:06d}",
         email=f"matrix_{actor.lower().replace(' ', '_')}_{_USER_COUNTER['i']:06d}@example.com",
-        password="testpass123",
         cpf=_next_cpf(),
+        groups=ACTOR_GROUPS[actor],
     )
-    for gname in ACTOR_GROUPS[actor]:
-        group, _ = Group.objects.get_or_create(name=gname)
-        user.groups.add(group)
 
     # D8 + D9 + PR 8: Coord/Apoio/Gerente* precisam de vínculo organizacional
     # para passar HasSectorAccess na grade mensal.
@@ -109,10 +104,9 @@ def _make_user_for_actor(actor: str) -> Usuario:
             # Apoio: check constraint `apoio_requires_supervisor` exige
             # `coordenador_supervisor` (FK Usuario) não-nulo. Criamos um Coord
             # auxiliar para servir de supervisor.
-            supervisor_user = Usuario.objects.create_user(
+            supervisor_user = UsuarioFactory(
                 username=f"matrix_supervisor_{_USER_COUNTER['i']:06d}",
                 email=f"matrix_supervisor_{_USER_COUNTER['i']:06d}@example.com",
-                password="testpass123",
                 cpf=_next_cpf(),
             )
             EquipeGerencia.objects.create(

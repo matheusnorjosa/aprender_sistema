@@ -20,12 +20,12 @@ from __future__ import annotations
 
 import itertools
 
-from django.contrib.auth.models import Group
 from rest_framework.test import APIClient
 
 import pytest
 
 from apps.core.models import EquipeGerencia, Gerencia, Usuario
+from apps.core.tests.factories import UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -35,16 +35,13 @@ _CPF_COUNTER = itertools.count(20000000000)
 
 def _user_in_groups(*group_names: str, label: str = "user") -> Usuario:
     cpf = str(next(_CPF_COUNTER)).zfill(11)
-    user = Usuario.objects.create_user(
+    return UsuarioFactory(
         username=f"{label}_{cpf}",
         email=f"{label}_{cpf}@example.com",
         password="testpass",
         cpf=cpf,
+        groups=list(group_names),
     )
-    for name in group_names:
-        group, _ = Group.objects.get_or_create(name=name)
-        user.groups.add(group)
-    return user
 
 
 def _attach_equipe(user: Usuario, gerencia: Gerencia, papel: str = "GERENTE") -> EquipeGerencia:

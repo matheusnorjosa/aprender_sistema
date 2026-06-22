@@ -24,13 +24,12 @@ from __future__ import annotations
 
 import itertools
 
-from django.contrib.auth.models import Group
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Projeto, Usuario
 from apps.core.serializers.organizacao import ProjetoSerializer
+from apps.core.tests.factories import ProjetoFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -38,18 +37,16 @@ pytestmark = pytest.mark.django_db
 _CPF_COUNTER = itertools.count(30000000000)
 
 
-def _dat_user() -> Usuario:
+def _dat_user():
     """DAT puro — tem cap `manage_admin_registries` para acessar ProjetoViewSet."""
     cpf = str(next(_CPF_COUNTER)).zfill(11)
-    user = Usuario.objects.create_user(
+    return UsuarioFactory(
         username=f"dat_pr7_{cpf}",
         email=f"dat_pr7_{cpf}@example.com",
         password="testpass",
         cpf=cpf,
+        groups=["DAT"],
     )
-    grupo, _ = Group.objects.get_or_create(name="DAT")
-    user.groups.add(grupo)
-    return user
 
 
 # =============================================================================
@@ -141,7 +138,7 @@ def test_api_patch_without_fluxo_keeps_current_value():
     client = APIClient()
     client.force_authenticate(user=user)
 
-    projeto = Projeto.objects.create(nome="P PATCH", fluxo="SUPER", ativo=True)
+    projeto = ProjetoFactory(nome="P PATCH", fluxo="SUPER", ativo=True)
 
     response = client.patch(
         f"/api/projetos/{projeto.id}/",
@@ -159,7 +156,7 @@ def test_api_patch_with_invalid_fluxo_returns_400():
     client = APIClient()
     client.force_authenticate(user=user)
 
-    projeto = Projeto.objects.create(nome="P PATCH inválido", fluxo="SUPER", ativo=True)
+    projeto = ProjetoFactory(nome="P PATCH inválido", fluxo="SUPER", ativo=True)
 
     response = client.patch(
         f"/api/projetos/{projeto.id}/",
@@ -210,7 +207,7 @@ def test_resolve_initial_status_super_returns_pendente():
     """Regression: PR 7 não muda regra de status inicial — SUPER → pendente."""
     from apps.core.services.solicitacao_create import resolve_initial_status
 
-    projeto = Projeto.objects.create(nome="P SUPER reg", fluxo="SUPER", ativo=True)
+    projeto = ProjetoFactory(nome="P SUPER reg", fluxo="SUPER", ativo=True)
     decision = resolve_initial_status(projeto=projeto)
     assert decision.status == "pendente", f"got={decision.status}"
 
@@ -219,6 +216,6 @@ def test_resolve_initial_status_nao_super_returns_aprovado():
     """Regression: NAO_SUPER → aprovado (auto-aprovação preservada)."""
     from apps.core.services.solicitacao_create import resolve_initial_status
 
-    projeto = Projeto.objects.create(nome="P NAO_SUPER reg", fluxo="NAO_SUPER", ativo=True)
+    projeto = ProjetoFactory(nome="P NAO_SUPER reg", fluxo="NAO_SUPER", ativo=True)
     decision = resolve_initial_status(projeto=projeto)
     assert decision.status == "aprovado", f"got={decision.status}"

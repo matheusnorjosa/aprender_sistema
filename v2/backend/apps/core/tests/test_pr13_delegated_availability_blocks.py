@@ -27,13 +27,13 @@ from __future__ import annotations
 import itertools
 from datetime import timedelta
 
-from django.contrib.auth.models import Group
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
 from apps.core.models import AuditLog, AvailabilityBlock, Usuario
+from apps.core.tests.factories import UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -43,18 +43,14 @@ _CPF_COUNTER = itertools.count(72000000000)
 
 def _user_in_groups(*group_names: str, label: str = "user", is_active: bool = True) -> Usuario:
     cpf = str(next(_CPF_COUNTER)).zfill(11)
-    user = Usuario.objects.create_user(
+    return UsuarioFactory(
         username=f"{label}_{cpf}",
         email=f"{label}_{cpf}@example.com",
         password="testpass",
         cpf=cpf,
+        is_active=is_active,
+        groups=list(group_names),
     )
-    user.is_active = is_active
-    user.save()
-    for name in group_names:
-        group, _ = Group.objects.get_or_create(name=name)
-        user.groups.add(group)
-    return user
 
 
 def _formador(label: str = "formador", is_active: bool = True) -> Usuario:
@@ -137,12 +133,7 @@ class TestDelegationAllowed:
         assert block.created_by_id == delegate.id
 
     def test_superuser_delega_para_formador(self):
-        delegate = Usuario.objects.create_superuser(
-            username="su_pr13",
-            email="su_pr13@example.com",
-            password="x",
-            cpf="72099999999",
-        )
+        delegate = UsuarioFactory(superuser=True)
         target = _formador(label="target_su")
         client = APIClient()
         client.force_authenticate(delegate)

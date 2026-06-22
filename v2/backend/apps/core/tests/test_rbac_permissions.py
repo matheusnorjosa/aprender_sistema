@@ -21,6 +21,7 @@ import pytest
 
 from apps.core.constants import FUNCAO_GROUPS, SETOR_GROUPS
 from apps.core.models import Usuario
+from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 
 class TestRBACConstants(TestCase):
@@ -76,15 +77,15 @@ class TestCanApproveSuperLogic(TestCase):
 
         # Criar todos os grupos
         for setor in SETOR_GROUPS:
-            Group.objects.get_or_create(name=setor)
+            GroupFactory(name=setor)
         for funcao in FUNCAO_GROUPS:
-            Group.objects.get_or_create(name=funcao)
+            GroupFactory(name=funcao)
 
     def _create_user_with_groups(
         self, username: str, setores: list, funcoes: list, is_superuser: bool = False
     ) -> Usuario:
         """Helper para criar usuário com grupos específicos."""
-        user = Usuario.objects.create_user(
+        user = UsuarioFactory(
             username=username,
             email=f"{username}@test.com",
             password="test123",
@@ -250,13 +251,13 @@ class TestApiMeEndpoint(TestCase):
 
         # Criar grupos
         for setor in SETOR_GROUPS:
-            Group.objects.get_or_create(name=setor)
+            GroupFactory(name=setor)
         for funcao in FUNCAO_GROUPS:
-            Group.objects.get_or_create(name=funcao)
+            GroupFactory(name=funcao)
 
     def test_api_me_returns_setores_and_funcoes(self):
         """Endpoint /api/me/ deve retornar setores e funcoes separados."""
-        user = Usuario.objects.create_user(
+        user = UsuarioFactory(
             username="test_user",
             email="test@test.com",
             password="test123",
@@ -276,7 +277,7 @@ class TestApiMeEndpoint(TestCase):
 
     def test_api_me_separates_groups_correctly(self):
         """Endpoint /api/me/ deve separar corretamente setores e funções."""
-        user = Usuario.objects.create_user(
+        user = UsuarioFactory(
             username="mixed_user",
             email="mixed@test.com",
             password="test123",
@@ -306,7 +307,7 @@ class TestApiMeEndpoint(TestCase):
 
     def test_is_superintendencia_with_setor(self):
         """is_superintendencia deve ser True se usuário está no setor Superintendência."""
-        user = Usuario.objects.create_user(
+        user = UsuarioFactory(
             username="super_user",
             email="super@test.com",
             password="test123",
@@ -322,7 +323,7 @@ class TestApiMeEndpoint(TestCase):
 
     def test_is_superintendencia_with_superuser(self):
         """is_superintendencia deve ser True se usuário é superuser."""
-        user = Usuario.objects.create_user(
+        user = UsuarioFactory(
             username="admin_user",
             email="admin@test.com",
             password="test123",
@@ -338,7 +339,7 @@ class TestApiMeEndpoint(TestCase):
 
     def test_is_superintendencia_without_setor(self):
         """is_superintendencia deve ser False se usuário não está no setor."""
-        user = Usuario.objects.create_user(
+        user = UsuarioFactory(
             username="dat_user",
             email="dat@test.com",
             password="test123",

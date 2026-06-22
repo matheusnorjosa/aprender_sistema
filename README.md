@@ -1,6 +1,7 @@
 # Aprender Sistema
 
 [![CI](https://github.com/matheusnorjosa/aprender_sistema/actions/workflows/ci.yaml/badge.svg)](https://github.com/matheusnorjosa/aprender_sistema/actions/workflows/ci.yaml)
+[![codecov](https://codecov.io/gh/matheusnorjosa/aprender_sistema/graph/badge.svg)](https://codecov.io/gh/matheusnorjosa/aprender_sistema)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
 [![Django 5.2](https://img.shields.io/badge/django-5.2-green.svg)](https://www.djangoproject.com/)
 

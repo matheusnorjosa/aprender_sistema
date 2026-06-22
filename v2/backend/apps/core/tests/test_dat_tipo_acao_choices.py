@@ -35,6 +35,7 @@ def test_todos_tipos_validos_aceitos():
         assert serializer.is_valid(), serializer.errors
 
 
+@pytest.mark.migrations
 def test_data_migration_normaliza_existentes():
     """Data migration deve normalizar variantes históricas para o valor canônico."""
     municipio = Municipio.objects.create(nome="Fortaleza", uf="CE", ativo=True)

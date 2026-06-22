@@ -248,6 +248,34 @@ jobs:
       artifact_if_no_files: error
 
   # ----------------------------------------------------------------
+  # Job 2b2: Migrate-integrity — rede de seguranca da cadeia RunPython.
+  #
+  # Os gates core/ingest rodam com --no-migrations (schema dos models, setup
+  # rapido, #1404). Isso NAO exercita `manage.py migrate`, mas dev/prod aplicam
+  # a cadeia real de migrations no deploy. Este job preenche essa lacuna:
+  # run_migrations=true aplica as 24 RunPython em DB limpo (falha aqui = migration
+  # quebrada, pega ANTES do deploy) e roda os testes `-m migrations` contra o DB
+  # migrado. E gated pelo required `backend-tests` (needs + assert), sem mexer no
+  # ruleset de branch protection.
+  # ----------------------------------------------------------------
+  backend-migrate-integrity:
+    name: "[info] backend migrate-integrity"
+    needs:
+      - backend-impact
+    if: needs.backend-impact.outputs.backend_changed == 'true'
+    uses: ./.github/workflows/_backend-test.yml
+    with:
+      runner_timeout: 20
+      pytest_paths: apps/core/tests
+      # run_migrations=true (default): aplica a cadeia RunPython em DB limpo.
+      run_migrations: true
+      pytest_extra_args: -m migrations
+      summary_title: Backend Migrate-Integrity (cadeia RunPython)
+      artifact_name: backend-migrate-integrity
+      artifact_paths: v2/backend/.coverage.migrate_integrity
+      artifact_if_no_files: ignore
+
+  # ----------------------------------------------------------------
   # Job 2c: Backend coverage combine + required backend tests gate
   # ----------------------------------------------------------------
   backend-tests:
@@ -258,6 +286,7 @@ jobs:
       - backend-impact
       - backend-tests-core
       - backend-tests-ingest-devtools
+      - backend-migrate-integrity
     if: always() && needs.backend-impact.outputs.backend_changed == 'true'
     env:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
@@ -276,6 +305,10 @@ jobs:
         fi
         if [ "${{ needs.backend-tests-ingest-devtools.result }}" != "success" ]; then
           echo "backend-tests-ingest-devtools failed with result=${{ needs.backend-tests-ingest-devtools.result }}" >&2
+          exit 1
+        fi
+        if [ "${{ needs.backend-migrate-integrity.result }}" != "success" ]; then
+          echo "backend-migrate-integrity failed with result=${{ needs.backend-migrate-integrity.result }}" >&2
           exit 1
         fi
         echo "Split backend test jobs passed."

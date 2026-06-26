@@ -8,8 +8,8 @@ Este documento consolida práticas e contratos adotados nos testes para manter o
 - **Settings**: `DJANGO_SETTINGS_MODULE=config.settings`, `ENVIRONMENT=testing`, `REQUIRE_DOCKER=0`
 - **Integrações externas**:
   - `GCAL_CLIENT=fake`, `GCAL_SEND_UPDATES=none`
-- **Diretórios de ETL**:
-  - `ETL_OUTPUT_DIR` e `ETL_DATA_DIR` resolvidos no workspace do CI
+- **Diretórios de import**:
+  - `IMPORT_OUTPUT_DIR` e `IMPORT_DATA_DIR` resolvidos no workspace do CI
 - **Paths**:
   - Nunca usar `/app` hardcoded em testes
   - Preferir `Path(settings.BASE_DIR)` para paths absolutos
@@ -82,7 +82,7 @@ csv_path = Path(settings.BASE_DIR) / "apps/core/data/projetos_fluxo.csv"
 - Hardcoded `/app` (específico de container, não funciona localmente)
 
 **Artefatos de ETL**:
-- Devem ser gravados sob `ETL_OUTPUT_DIR` ou `BASE_DIR`, nunca em `/app`
+- Devem ser gravados sob `IMPORT_OUTPUT_DIR` ou `BASE_DIR`, nunca em `/app`
 
 ## Princípios
 

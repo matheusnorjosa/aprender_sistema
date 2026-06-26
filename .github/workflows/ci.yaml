@@ -234,10 +234,10 @@ jobs:
       artifact_if_no_files: error
 
   # ----------------------------------------------------------------
-  # Job 2b: Backend tests - ingest/devtools suite (paralelo, xdist -n auto)
+  # Job 2b: Backend tests - dev_tools suite (paralelo, xdist -n auto)
   # ----------------------------------------------------------------
-  backend-tests-ingest-devtools:
-    name: "[info] backend tests ingest/devtools (runner)"
+  backend-tests-devtools:
+    name: "[info] backend tests dev_tools (runner)"
     needs:
       - backend-impact
     if: needs.backend-impact.outputs.backend_changed == 'true'
@@ -248,16 +248,16 @@ jobs:
       pytest_paths: apps/dev_tools/tests
       run_migrations: false  # --no-migrations: schema dos models, sem replay das RunPython. #1404.
       pytest_extra_args: -n auto --dist loadscope --no-migrations  # xdist #1403 + --no-migrations #1404.
-      coverage_file: .coverage.ingest_devtools
-      summary_title: Backend Ingest/DevTools Tests Runtime
-      artifact_name: backend-coverage-ingest-devtools
-      artifact_paths: v2/backend/.coverage.ingest_devtools
+      coverage_file: .coverage.devtools
+      summary_title: Backend DevTools Tests Runtime
+      artifact_name: backend-coverage-devtools
+      artifact_paths: v2/backend/.coverage.devtools
       artifact_if_no_files: error
 
   # ----------------------------------------------------------------
   # Job 2b2: Migrate-integrity — rede de seguranca da cadeia RunPython.
   #
-  # Os gates core/ingest rodam com --no-migrations (schema dos models, setup
+  # Os gates core/devtools rodam com --no-migrations (schema dos models, setup
   # rapido, #1404). Isso NAO exercita `manage.py migrate`, mas dev/prod aplicam
   # a cadeia real de migrations no deploy. Este job preenche essa lacuna:
   # run_migrations=true aplica as 24 RunPython em DB limpo (falha aqui = migration
@@ -292,7 +292,7 @@ jobs:
     needs:
       - backend-impact
       - backend-tests-core
-      - backend-tests-ingest-devtools
+      - backend-tests-devtools
       - backend-migrate-integrity
     if: always() && needs.backend-impact.outputs.backend_changed == 'true'
     env:
@@ -310,8 +310,8 @@ jobs:
           echo "backend-tests-core failed with result=${{ needs.backend-tests-core.result }}" >&2
           exit 1
         fi
-        if [ "${{ needs.backend-tests-ingest-devtools.result }}" != "success" ]; then
-          echo "backend-tests-ingest-devtools failed with result=${{ needs.backend-tests-ingest-devtools.result }}" >&2
+        if [ "${{ needs.backend-tests-devtools.result }}" != "success" ]; then
+          echo "backend-tests-devtools failed with result=${{ needs.backend-tests-devtools.result }}" >&2
           exit 1
         fi
         if [ "${{ needs.backend-migrate-integrity.result }}" != "success" ]; then
@@ -333,24 +333,24 @@ jobs:
         cd v2/backend
 
         CORE_COV="/tmp/backend-coverage/backend-coverage-core/.coverage.core"
-        INGEST_COV="/tmp/backend-coverage/backend-coverage-ingest-devtools/.coverage.ingest_devtools"
+        DEVTOOLS_COV="/tmp/backend-coverage/backend-coverage-devtools/.coverage.devtools"
 
-        if [ ! -f "$CORE_COV" ] || [ ! -f "$INGEST_COV" ]; then
+        if [ ! -f "$CORE_COV" ] || [ ! -f "$DEVTOOLS_COV" ]; then
           echo "Missing coverage artifact(s) for combination." >&2
           ls -R /tmp/backend-coverage || true
           exit 1
         fi
 
         cp "$CORE_COV" .coverage.core
-        cp "$INGEST_COV" .coverage.ingest_devtools
+        cp "$DEVTOOLS_COV" .coverage.devtools
 
-        coverage combine .coverage.core .coverage.ingest_devtools
+        coverage combine .coverage.core .coverage.devtools
         coverage report --fail-under=85
         coverage xml -o coverage.xml
 
         {
           echo "### Backend Coverage Combine"
-          echo "- Source artifacts: core + ingest/devtools"
+          echo "- Source artifacts: core + dev_tools"
           echo "- Threshold enforced: 85%"
           echo "- Output XML: v2/backend/coverage.xml"
         } >> "${GITHUB_STEP_SUMMARY}"

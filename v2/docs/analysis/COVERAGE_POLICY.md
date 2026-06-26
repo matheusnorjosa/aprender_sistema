@@ -20,9 +20,9 @@ Observed on the last backend-touching main run before this policy unification
 | Slice | Coverage |
 |-------|---------:|
 | `apps/core` (core suite alone) | 87% |
-| `apps/dev_tools` (ingest/devtools suite alone) | 9% (low because the suite
+| `apps/dev_tools` (dev_tools suite alone) | 9% (low because the suite
 exercises a narrow slice of `apps/` — combine step is the authoritative number) |
-| **Combined (core + ingest/devtools)** | **90%** |
+| **Combined (core + dev_tools)** | **90%** |
 
 The 85% gate leaves a 5-point headroom above the current combined baseline.
 

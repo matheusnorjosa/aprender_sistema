@@ -1,6 +1,6 @@
 name: Security Scan
 
-# Security Audit 2025-01: Container and dependency vulnerability scanning
+# Security: Container and dependency vulnerability scanning
 # Refs:
 # - https://github.com/shieldfy/API-Security-Checklist
 # - https://github.com/The-Art-of-Hacking/h4cker

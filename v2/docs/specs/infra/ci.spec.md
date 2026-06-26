@@ -36,7 +36,7 @@ A nomenclatura dos checks é o contrato de governança: `[required]` bloqueia me
 
 ## Fonte de verdade no código
 
-- **Gate principal de PR** — [`.github/workflows/ci.yaml`](../../../../.github/workflows/ci.yaml): backend impact detector, lint, rbac-lint, testes backend (split core + ingest/devtools), combine de cobertura, pyright, docker parity e o agregador `[required] tests`.
+- **Gate principal de PR** — [`.github/workflows/ci.yaml`](../../../../.github/workflows/ci.yaml): backend impact detector, lint, rbac-lint, testes backend (split core + dev_tools), combine de cobertura, pyright, docker parity e o agregador `[required] tests`.
 - **Reusable de teste backend** — [`.github/workflows/_backend-test.yml`](../../../../.github/workflows/_backend-test.yml): SSOT do setup de teste (services postgres/redis, env vars, `migrate`, dirs, `pytest`, artifact). Consumido por `ci.yaml` e pelo canary (#1401).
 - **Canary xdist (não-bloqueante)** — [`.github/workflows/backend-xdist-canary.yml`](../../../../.github/workflows/backend-xdist-canary.yml) + report [`v2/scripts/xdist_canary_report.py`](../../../../v2/scripts/xdist_canary_report.py).
 - **Gate de staging (evidência)** — [`.github/workflows/staging-gate-audit.yml`](../../../../.github/workflows/staging-gate-audit.yml).
@@ -49,7 +49,7 @@ A nomenclatura dos checks é o contrato de governança: `[required]` bloqueia me
 
 - **Checks `[required]` (gate de merge em `main`)** — devem ficar obrigatórios no ruleset `Protect main`: `[required] tests`, `[required] lint`, `[required] backend rbac-lint`, `[required] build/lint do frontend`, `[required] checklist tests (meta, a11y, security)`, `[required] dependency review`, `[required] architecture dependency guardrails`, `[required] Python Dependencies`, `[required] Frontend Dependencies`, `[required] Container Scan`, `[required] Secret Detection`, `[required] staging gate evidence`. SSOT: [`ci-check-policy.md`](../../../../docs/operations/ci-check-policy.md).
 - **Least-privilege do `GITHUB_TOKEN`** — workflow-level default = `contents: read`; cada job que precisa de mais declara o seu (#1397). Em `deploy.yaml`, `contents: write` existe **apenas** no job `tag_and_release` (git tag + `gh release`); o job que builda/pusha imagem fica em `contents: read` (desacopla `contents:write` de alvo de supply-chain). No canary, `issues: write` vive só no job `canary-report` que comenta na issue #677.
-- **Cobertura backend ≥ 85%** — `coverage combine` dos dois jobs (core + ingest/devtools) com `coverage report --fail-under=85`. Falha abaixo do limiar bloqueia o gate.
+- **Cobertura backend ≥ 85%** — `coverage combine` dos dois jobs (core + dev_tools) com `coverage report --fail-under=85`. Falha abaixo do limiar bloqueia o gate.
 - **Paralelização xdist no gate (M3, #1402/#1403)** — gate usa `pytest -n auto --dist loadscope` (~15min→~5min). `loadscope` mantém testes da mesma classe/módulo no mesmo worker. Habilitado **só** após a suíte estabilizar (causa raiz: `transaction=True` truncava o seed RBAC; fix de re-seed pós-truncate). O canary cobre a matriz `workers×dist` mas **nunca** bloqueia (`fail_on_test_error=false`).
 - **Backend impact detector (fail-safe)** — eventos não-PR (push/dispatch) forçam `backend_changed=true` (modo full seguro); PR sem base/head SHA também. O agregador `[required] tests` exige que os jobs backend ou tenham passado (impacto) ou tenham `skipped` (sem impacto) — nunca silenciosamente verde por engano.
 - **Docker parity (#1401 carve-out)** — `docker-parity-backend` NÃO consome o reusable: usa topologia de container (`host.docker.internal`, `REQUIRE_DOCKER=1`, migrate in-container, build via buildx). Versões de postgres/redis aqui devem ser sincronizadas manualmente com o `services` do reusable (SSOT das versões: `postgres:15.13`, `redis:7.4`).
@@ -60,7 +60,7 @@ A nomenclatura dos checks é o contrato de governança: `[required]` bloqueia me
 
 ## API / Interface
 
-- **CI (`ci.yaml`)** — dispara em `push`/`pull_request` para `main`. Jobs: `backend-impact`, `lint`, `rbac-lint`, `backend-tests-core`, `backend-tests-ingest-devtools`, `backend-tests` (combine+threshold), `backend-typecheck`, `docker-parity-backend`, `tests` (agregador `[required]`).
+- **CI (`ci.yaml`)** — dispara em `push`/`pull_request` para `main`. Jobs: `backend-impact`, `lint`, `rbac-lint`, `backend-tests-core`, `backend-tests-devtools`, `backend-tests` (combine+threshold), `backend-typecheck`, `docker-parity-backend`, `tests` (agregador `[required]`).
 - **Reusable (`_backend-test.yml`)** — `workflow_call` com inputs: `pytest_paths`, `pytest_extra_args`, `coverage_file`, `validate_test_paths`, `fail_on_test_error`, `emit_canary_metadata`, `artifact_name`/`artifact_paths` (obrigatórios), entre outros. Roda em Python 3.12 com `COVERAGE_CORE=sysmon` (sys.monitoring do 3.12, #1399).
 - **Canary (`backend-xdist-canary.yml`)** — `schedule` (cron `20 10 * * *`), `workflow_dispatch` e `push` em paths do próprio canary. Matriz `workers=[2,auto] × dist=[loadscope,loadfile]`; publica snapshot na issue #677.
 - **Deploy (`deploy.yaml`)** — `push` em `main` → staging-auto; `workflow_dispatch` com `target_environment` (staging|production), `promotion_tag`, `rollback_tag`. Interface detalhada (modos, gate de promoção, polling): [`deploy.spec.md`](./deploy.spec.md).
@@ -71,7 +71,7 @@ A nomenclatura dos checks é o contrato de governança: `[required]` bloqueia me
 
 1. `backend-impact` decide se a suíte backend roda (PR sem impacto em backend pula os jobs pesados; push/dispatch sempre full).
 2. `lint` + `rbac-lint` (rápidos, paralelos).
-3. `backend-tests-core` e `backend-tests-ingest-devtools` rodam via reusable com `-n auto --dist loadscope`, cada um emitindo um artifact de cobertura.
+3. `backend-tests-core` e `backend-tests-devtools` rodam via reusable com `-n auto --dist loadscope`, cada um emitindo um artifact de cobertura.
 4. `backend-tests` baixa os dois artifacts, faz `coverage combine`, **exige ≥85% (gate bloqueante)** e sobe a cobertura para o Codecov (analytics **informational**, não bloqueia PR — config em `codecov.yml`; upload só quando o secret `CODECOV_TOKEN` existe).
 5. `backend-typecheck` (pyright em `apps/core config`) e `docker-parity-backend` (smoke em imagem `Dockerfile.prod`) rodam em paralelo.
 6. `tests` agrega: verde só se todos passaram (ou todos `skipped` quando sem impacto).

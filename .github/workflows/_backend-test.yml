@@ -9,7 +9,7 @@
 #   - upload de artifact
 #
 # Consumido por:
-#   - ci.yaml: backend-tests-core, backend-tests-ingest-devtools
+#   - ci.yaml: backend-tests-core, backend-tests-devtools
 #   - backend-xdist-canary.yml: xdist-canary (via strategy.matrix no caller)
 #
 # Fora de escopo (carve-out documentado): ci.yaml::docker-parity-backend usa env/topologia
@@ -53,7 +53,7 @@ on:
         type: string
         default: ""
       fail_on_test_error:
-        description: "Se true, o job falha quando o pytest falha (gates core/ingest). O canary usa false (non-blocking): exit real fica no metadata/report."
+        description: "Se true, o job falha quando o pytest falha (gates core/devtools). O canary usa false (non-blocking): exit real fica no metadata/report."
         type: boolean
         default: true
       emit_canary_metadata:
@@ -95,7 +95,7 @@ jobs:
     timeout-minutes: ${{ inputs.runner_timeout }}
 
     services:
-      # SSOT: bump de versao aqui cobre core/ingest/canary (#1401).
+      # SSOT: bump de versao aqui cobre core/devtools/canary (#1401).
       postgres:
         image: postgres:15.13
         env:
@@ -144,8 +144,8 @@ jobs:
           echo "GCAL_CLIENT=fake" >> "$GITHUB_ENV"
           echo "GCAL_SEND_UPDATES=none" >> "$GITHUB_ENV"
           echo "FEATURE_AUTO_APPLY_ENABLED=false" >> "$GITHUB_ENV"
-          echo "ETL_OUTPUT_DIR=${{ github.workspace }}/v2/backend/out_etl" >> "$GITHUB_ENV"
-          echo "ETL_DATA_DIR=${{ github.workspace }}/v2/backend/data/csv-import" >> "$GITHUB_ENV"
+          echo "IMPORT_OUTPUT_DIR=${{ github.workspace }}/v2/backend/out_etl" >> "$GITHUB_ENV"
+          echo "IMPORT_DATA_DIR=${{ github.workspace }}/v2/backend/data/csv-import" >> "$GITHUB_ENV"
           echo "PYTHONDONTWRITEBYTECODE=1" >> "$GITHUB_ENV"
 
       - name: Validate test paths (no /app hardcoded)
@@ -245,7 +245,7 @@ jobs:
             echo "- Exit code: ${TEST_EXIT}"
           } >> "${GITHUB_STEP_SUMMARY}"
 
-          # core/ingest sao gates reais (falham quando o pytest falha). O canary e
+          # core/devtools sao gates reais (falham quando o pytest falha). O canary e
           # non-blocking (fail_on_test_error=false): o exit real vive no metadata/report
           # da issue #677 e o job segue verde, preservando o contrato original.
           if [ "${FAIL_ON_TEST_ERROR}" = "true" ]; then

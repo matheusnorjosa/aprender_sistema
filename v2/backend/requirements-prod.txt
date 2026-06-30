@@ -65,7 +65,7 @@ python-decouple==3.8
 pytz==2024.2
 rapidfuzz==3.6.1
 requests==2.33.0
-django-environ==0.13.0
+django-environ==0.14.0
 
 # Resiliency
 pybreaker==1.2.0

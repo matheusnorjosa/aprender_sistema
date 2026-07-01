@@ -56,6 +56,9 @@ services:
       ENVIRONMENT: production
       DEBUG: "False"
       REQUIRE_DOCKER: "1"
+      # CP-08 / #1466: dev_tools NUNCA em prod. Fixo no compose (defense-in-depth)
+      # em vez de depender da stack.env, que some se a stack for recriada.
+      INCLUDE_DEV_TOOLS: "false"
       SERVICE_NAME: migrate
     # One-shot: nao reiniciar. Se falhar, os servicos dependentes nao sobem.
     restart: "no"
@@ -90,6 +93,9 @@ services:
       ENVIRONMENT: production
       DEBUG: "False"
       REQUIRE_DOCKER: "1"
+      # CP-08 / #1466: dev_tools NUNCA em prod. Fixo no compose (defense-in-depth)
+      # em vez de depender da stack.env, que some se a stack for recriada.
+      INCLUDE_DEV_TOOLS: "false"
       SERVICE_NAME: web
     ports:
       - "${BACKEND_HOST_PORT:-8000}:8000"
@@ -174,6 +180,9 @@ services:
       ENVIRONMENT: production
       DEBUG: "False"
       REQUIRE_DOCKER: "1"
+      # CP-08 / #1466: dev_tools NUNCA em prod. Fixo no compose (defense-in-depth)
+      # em vez de depender da stack.env, que some se a stack for recriada.
+      INCLUDE_DEV_TOOLS: "false"
       SERVICE_NAME: worker
     depends_on:
       redis:
@@ -221,6 +230,9 @@ services:
       ENVIRONMENT: production
       DEBUG: "False"
       REQUIRE_DOCKER: "1"
+      # CP-08 / #1466: dev_tools NUNCA em prod. Fixo no compose (defense-in-depth)
+      # em vez de depender da stack.env, que some se a stack for recriada.
+      INCLUDE_DEV_TOOLS: "false"
       SERVICE_NAME: beat
     depends_on:
       redis:

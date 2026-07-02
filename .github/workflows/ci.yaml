@@ -115,7 +115,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v5
         with:
           python-version: '3.12'
           cache: 'pip'
@@ -194,7 +194,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v5
         with:
           python-version: '3.12'
 
@@ -276,6 +276,8 @@ jobs:
       pytest_paths: apps/core/tests
       # run_migrations=true (default): aplica a cadeia RunPython em DB limpo.
       run_migrations: true
+      # #1456 (G11): falha o CI se um model mudou sem migration correspondente.
+      check_migrations: true
       pytest_extra_args: -m migrations
       summary_title: Backend Migrate-Integrity (cadeia RunPython)
       artifact_name: backend-migrate-integrity

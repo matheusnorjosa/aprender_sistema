@@ -26,8 +26,10 @@ import re
 import unicodedata
 from typing import Any
 
+from django.contrib.auth.models import Group
 from django.db import transaction
 
+from apps.core.constants import ALLOWED_USER_GROUPS
 from apps.core.models import (
     DATAcao,
     DATArea,
@@ -40,6 +42,7 @@ from apps.core.models import (
     TipoEvento,
     Usuario,
 )
+from apps.core.services.equipe_gerencia_import import PAPEL_MAPPING
 from apps.core.services.export_contract_projeto_resolver import build_projeto_index, resolve_projeto_export
 
 # Campos protegidos por entidade — NUNCA sobrescrever em update (decisão humana).
@@ -87,6 +90,22 @@ IMPLEMENTED = {
     "dat_acao",
     "plano_formacao",
 }
+
+# Papel canonico (PAPEL_MAPPING) -> nome do Django Group (FUNCAO_GROUPS). Fonte do papel no
+# import de usuario: equipe_gerencia.papel (primaria, por CPF) -> usuario.cargo (fallback).
+# NUNCA default Coordenador — conceder poder de criar solicitacao exige papel explicito.
+_PAPEL_TO_GROUP: dict[str, str] = {
+    "GERENTE": "Gerente",
+    "COORDENADOR": "Coordenador",
+    "APOIO": "Apoio de Coordenação",
+    "FORMADOR": "Formador",
+}
+
+
+def _resolve_papel(raw: str | None) -> str:
+    """Nome de papel bruto -> canonico (GERENTE/COORDENADOR/APOIO/FORMADOR) via PAPEL_MAPPING."""
+    s = (raw or "").strip()
+    return PAPEL_MAPPING.get(s) or PAPEL_MAPPING.get(s.upper()) or ""
 
 
 def _norm(s: str) -> str:
@@ -337,6 +356,10 @@ class ExportContractImporter:
             for name in self.allow:
                 if name not in IMPLEMENTED:
                     continue
+                if name == "usuario":
+                    # NK = CPF (nao `nome`); atribui Group -> handler dedicado.
+                    applied[name] = self._apply_usuario(self._load(name))
+                    continue
                 created = 0
                 for r in self._load(name):
                     nome = (r.get("nome") or "").strip()
@@ -353,5 +376,70 @@ class ExportContractImporter:
                     elif name == "projeto_geral" and not ProjetoGeral.objects.filter(nome__iexact=nome).exists():
                         ProjetoGeral.objects.create(nome=nome, usa_avaliar=_to_bool(r.get("usa_avaliar")))
                         created += 1
+                    elif name == "tipo_evento" and not TipoEvento.objects.filter(nome__iexact=nome).exists():
+                        TipoEvento.objects.create(
+                            nome=nome,
+                            descricao=(r.get("descricao") or ""),
+                            cor=(r.get("cor") or ""),
+                        )
+                        created += 1
                 applied[name] = created
         return applied
+
+    def _papel_index_from_equipe(self) -> dict[str, str]:
+        """Mapa cpf(11 dig) -> papel canonico, de equipe_gerencia.csv (fonte primaria do papel)."""
+        idx: dict[str, str] = {}
+        for r in self._load("equipe_gerencia"):
+            cpf = re.sub(r"\D", "", r.get("usuario_cpf") or "")
+            papel = _resolve_papel(r.get("papel"))
+            if len(cpf) == 11 and papel:
+                idx.setdefault(cpf, papel)
+        return idx
+
+    def _apply_usuario(self, rows: list[dict[str, Any]]) -> int:
+        """Cria usuarios (create-only) + atribui Django Group por papel. NK = CPF (fallback email).
+
+        Papel: equipe_gerencia.papel (primario, por CPF) -> usuario.cargo (fallback). NUNCA
+        default Coordenador. Sem papel ou grupo inexistente -> cria sem grupo. Senha
+        inutilizavel (login real via OAuth Google). len(cpf)==11 == RegexValidator do model.
+        """
+        papel_by_cpf = self._papel_index_from_equipe()
+        existing_cpfs = {
+            re.sub(r"\D", "", c) for c in Usuario.objects.values_list("cpf", flat=True) if re.sub(r"\D", "", c or "")
+        }
+        existing_emails = {(e or "").lower() for e in Usuario.objects.values_list("email", flat=True) if e}
+        created = 0
+        for r in rows:
+            cpf = re.sub(r"\D", "", r.get("cpf") or "")
+            email = (r.get("email") or "").strip().lower()
+            if len(cpf) != 11 and not email:
+                continue  # would_reject: sem NK
+            if (cpf and cpf in existing_cpfs) or (email and email in existing_emails):
+                continue  # ja existe -> skip (create-only)
+            if len(cpf) != 11:
+                continue  # cpf obrigatorio (11 digitos); sem cpf valido nao cria
+            nome = (r.get("nome_completo") or "").strip()
+            first, _, last = nome.partition(" ")
+            usuario = Usuario(
+                username=cpf,
+                cpf=cpf,
+                email=email,
+                first_name=first[:150],
+                last_name=last[:150],
+                telefone=(r.get("telefone") or "").strip()[:20],
+                cargo=(r.get("cargo") or "").strip()[:100],
+                is_active=True,
+            )
+            usuario.set_unusable_password()
+            usuario.save()
+            existing_cpfs.add(cpf)
+            if email:
+                existing_emails.add(email)
+            papel = papel_by_cpf.get(cpf) or _resolve_papel(r.get("cargo"))
+            group_name = _PAPEL_TO_GROUP.get(papel)
+            if group_name and group_name in ALLOWED_USER_GROUPS:
+                grupo = Group.objects.filter(name__iexact=group_name).first()
+                if grupo:
+                    usuario.groups.add(grupo)
+            created += 1
+        return created

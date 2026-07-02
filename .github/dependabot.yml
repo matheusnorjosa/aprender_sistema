@@ -1,5 +1,11 @@
 # 🤖 Dependabot Configuration - Sistema Aprender
-# Automatically keep dependencies up to date
+#
+# MODO SOMENTE-SEGURANCA (2026-07): `open-pull-requests-limit: 0` em todos os ecossistemas
+# DESLIGA os version updates de rotina (bumps sem CVE). Os "Dependabot security updates"
+# (correcao de vulnerabilidade) sao um setting do REPO — independem deste arquivo — e seguem
+# ON, com limite interno proprio de 10 PRs. Resultado: so vem PR quando ha CVE/advisory.
+# Para reativar bumps de rotina de um ecossistema, volte o limit para > 0.
+# groups/ignore/directories abaixo ficam PRESERVADOS (inertes com limit 0) p/ facilitar o revert.
 # https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
 
 version: 2
@@ -71,7 +77,7 @@ updates:
           - "patch"
 
     # PR configuration
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 0  # MODO SOMENTE-SEGURANCA: version updates OFF (CVE segue via security updates do repo)
     
     # Commit message prefix
     commit-message:
@@ -119,7 +125,7 @@ updates:
           - "minor"
           - "patch"
     
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0  # MODO SOMENTE-SEGURANCA (ver cabecalho)
 
     commit-message:
       prefix: "docker"
@@ -173,7 +179,7 @@ updates:
           - "minor"
           - "patch"
     
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0  # MODO SOMENTE-SEGURANCA (ver cabecalho)
     
     commit-message:
       prefix: "ci"

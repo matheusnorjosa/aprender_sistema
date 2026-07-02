@@ -36,6 +36,10 @@ on:
         description: "Se true, roda `manage.py migrate` antes do pytest. O gate core usa false + `--no-migrations` (schema dos models, setup ~rapido, #1404); o job migrate-integrity usa true (exercita a cadeia RunPython em DB limpo)."
         type: boolean
         default: true
+      check_migrations:
+        description: "Se true, roda `makemigrations --check --dry-run` (falha o CI se algum model mudou sem gerar migration). Complementa run_migrations: aplicar migrations nao detecta model-drift. Usado pelo job migrate-integrity (#1456 G11)."
+        type: boolean
+        default: false
       coverage_file:
         description: "Se != '', exporta COVERAGE_FILE e adiciona --cov=apps --cov-report=term"
         type: string
@@ -147,6 +151,16 @@ jobs:
           echo "IMPORT_OUTPUT_DIR=${{ github.workspace }}/v2/backend/out_etl" >> "$GITHUB_ENV"
           echo "IMPORT_DATA_DIR=${{ github.workspace }}/v2/backend/data/csv-import" >> "$GITHUB_ENV"
           echo "PYTHONDONTWRITEBYTECODE=1" >> "$GITHUB_ENV"
+
+      - name: Check for missing migrations (makemigrations --check)
+        if: ${{ inputs.check_migrations }}
+        run: |
+          cd v2/backend
+          # --check --dry-run: exit 1 se um model mudou sem migration correspondente.
+          # Nao toca o DB (compara models vs arquivos de migration). #1456 (G11):
+          # um campo de model adicionado sem `makemigrations` passa em todo o resto
+          # do CI e quebra na 1a query em prod (ProgrammingError).
+          python manage.py makemigrations --check --dry-run
 
       - name: Validate test paths (no /app hardcoded)
         if: ${{ inputs.validate_test_paths }}

@@ -21,7 +21,7 @@ runs:
         node-version: ${{ inputs.node-version }}
 
     - name: Cache node_modules
-      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v4
+      uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v4
       id: npm-cache
       with:
         path: ${{ inputs.working-directory }}/node_modules

@@ -2,7 +2,10 @@ name: Backend xdist Canary (non-blocking)
 
 on:
   schedule:
-    - cron: "20 10 * * *"
+    # Semanal (segunda 10:20 UTC); antes era diario. A estabilizacao xdist ja esta
+    # consolidada ha semanas; o trigger `push` cobre o caso importante (codigo novo
+    # introduzindo flakiness), e o cron semanal cobre o de fundo (flaky por tempo).
+    - cron: "20 10 * * 1"
   workflow_dispatch:
     inputs:
       extra_pytest_args:
@@ -112,7 +115,7 @@ jobs:
             echo "xdist-canary-report.md not found." >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Publish evidence snapshot to issue #677
+      - name: Publish evidence snapshot to issue #677 (somente em falha)
         if: always()
         continue-on-error: true
         env:
@@ -120,6 +123,16 @@ jobs:
         run: |
           if [ ! -f xdist-canary-report.json ]; then
             echo "xdist-canary-report.json not found; skipping issue comment."
+            exit 0
+          fi
+
+          # Alerta so quando importa: comenta no #677 SO se houve falha xdist. Run limpo
+          # (0 falhas) nao comenta -> evita fadiga de alerta (email diario de "0 failures").
+          # A evidencia limpa continua no step summary + artifact (retencao 30d); o #677 vira
+          # um log de FLAKY REAL, com significado.
+          FAILS=$(python -c "import json; print(json.load(open('xdist-canary-report.json')).get('runs_with_failures', 0))")
+          if [ "$FAILS" = "0" ]; then
+            echo "xdist canary: 0 runs com falha -> nao comenta no #677 (evidencia limpa fica no summary/artifact)."
             exit 0
           fi
 

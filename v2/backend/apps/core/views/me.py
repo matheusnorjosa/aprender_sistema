@@ -15,10 +15,11 @@ frontend para menu condicional, redirects, mensagens de erro genéricas.
 Type-checked with Pyright (strict mode).
 """
 
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalSubscript=false, reportIndexIssue=false
 
 from __future__ import annotations
 
+from django.contrib.auth import update_session_auth_hash
 from django.db.models import QuerySet
 from rest_framework import generics, serializers
 from rest_framework.permissions import IsAuthenticated
@@ -29,9 +30,10 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema, extend_schema_view, inline_serializer
 
 from apps.core.api_schemas import COMMON_ERROR_RESPONSES
-from apps.core.models import Solicitacao
+from apps.core.models import AuditLog, Solicitacao
 from apps.core.rbac.policies import resolve_public_policies
 from apps.core.serializers.me import MeEventSerializer
+from apps.core.serializers.usuario import ChangePasswordSerializer
 
 
 @extend_schema_view(
@@ -126,3 +128,52 @@ class MePoliciesView(APIView):
 
     def get(self, request: Request) -> Response:
         return Response(resolve_public_policies(request.user))
+
+
+class ChangePasswordView(APIView):
+    """Troca self-service da propria senha.
+
+    POST /api/me/change-password/
+
+    Login e por CPF + senha (SessionAuthentication). Qualquer usuario autenticado troca
+    a propria senha: valida a senha atual + a nova (validadores do Django), atualiza o
+    hash da sessao (mantem a atual viva; invalida as OUTRAS) e audita (PA-05,
+    CHANGE_PASSWORD). Nunca loga a senha.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_scope = "change_password"
+
+    @extend_schema(
+        summary="Trocar a propria senha",
+        request=ChangePasswordSerializer,
+        responses={
+            200: inline_serializer(
+                name="ChangePasswordResponse",
+                fields={"detail": serializers.CharField()},
+            ),
+            401: COMMON_ERROR_RESPONSES[401],
+        },
+        tags=["me"],
+    )
+    def post(self, request: Request) -> Response:
+        serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        user = request.user
+        user.set_password(serializer.validated_data["new_password"])
+        user.save(update_fields=["password"])
+        # SessionAuthentication: mantem a sessao atual valida e invalida as demais.
+        update_session_auth_hash(request, user)
+        AuditLog.objects.create(
+            usuario=user,
+            action=AuditLog.Action.CHANGE_PASSWORD,
+            model_name="Usuario",
+            details={
+                "ip_address": (
+                    request.META.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip()
+                    or request.META.get("REMOTE_ADDR", "")
+                ),
+                "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
+            },
+        )
+        return Response({"detail": "Senha alterada com sucesso."})

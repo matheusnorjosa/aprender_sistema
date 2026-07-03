@@ -14,6 +14,7 @@ const ControlePage = lazy(() => import('../pages/Controle/ControlePage'));
 // /dat/importacoes. O componente continua existindo para o card "Cadastros
 // DAT" dentro de ImportacoesPage; remoção definitiva fica em PR-D.
 const DATImportacoesPage = lazy(() => import('../pages/DAT/ImportacoesPage'));
+const PerfilPage = lazy(() => import('../pages/Perfil/PerfilPage'));
 const NewSolicitacaoWizard = lazy(() => import('../pages/Solicitacoes/NewSolicitacaoWizard'));
 const EditSolicitacaoPage = lazy(() => import('../pages/Solicitacoes/EditSolicitacaoPage'));
 const MySolicitacoesPage = lazy(() => import('../pages/Solicitacoes/MySolicitacoesPage'));
@@ -127,6 +128,7 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
         <Route path="/solicitacoes/bloqueios" element={access.canAccessBlocks ? <DisponibilidadeBlocks /> : <Forbidden />} />
         <Route path="/solicitacoes/deslocamentos" element={access.can('view_all_availability') || canControle || canCoordenador || canDAT ? <DeslocamentosPage /> : <Forbidden />} />
         <Route path="/solicitacoes/meus-eventos" element={user ? <MeusEventosPage /> : <Forbidden />} />
+        <Route path="/perfil" element={user ? <PerfilPage user={user} /> : <Forbidden />} />
 
         {/* Redirects de URLs legadas → novas (preserva deep-links/bookmarks) */}
         <Route path="/aprovacoes" element={<Navigate to="/solicitacoes/aprovacoes" replace />} />

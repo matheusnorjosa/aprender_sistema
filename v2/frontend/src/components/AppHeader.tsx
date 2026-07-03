@@ -97,10 +97,15 @@ export function AppHeader({
         }}
       />
       <div className="flex items-center gap-4" style={{ whiteSpace: 'nowrap', marginLeft: 'auto' }}>
-        <div className="flex items-center gap-2">
+        <Link
+          to="/perfil"
+          className="flex items-center gap-2"
+          style={{ color: 'inherit' }}
+          title="Meu perfil"
+        >
           <UserOutlined />
           <Text strong>{user.name || user.username || 'Usuário'}</Text>
-        </div>
+        </Link>
         {canAcoesInternas && (
           <Popover
             trigger="click"

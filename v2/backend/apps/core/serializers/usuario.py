@@ -282,6 +282,37 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         return value
 
 
+class ChangePasswordSerializer(serializers.Serializer):
+    """Troca de senha self-service (POST /api/me/change-password/).
+
+    Valida a senha atual (``check_password`` do usuario no contexto) e a nova senha
+    com os validadores do Django (``AUTH_PASSWORD_VALIDATORS``), reusando o mesmo
+    padrao de ``UsuarioAdminSerializer.validate_password``. NAO persiste — a view chama
+    ``set_password`` + ``update_session_auth_hash``.
+    """
+
+    old_password = serializers.CharField(write_only=True, trim_whitespace=False)
+    new_password = serializers.CharField(write_only=True, trim_whitespace=False)
+
+    def validate_new_password(self, value: str) -> str:
+        if len(value) < 8:
+            raise serializers.ValidationError("A senha deve ter no minimo 8 caracteres.")
+        user = getattr(self.context.get("request"), "user", None)
+        try:
+            validate_password(value, user=user)
+        except ValidationError as e:
+            raise serializers.ValidationError(list(e.messages))
+        return value
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        user = getattr(self.context.get("request"), "user", None)
+        if user is None or not user.check_password(attrs["old_password"]):
+            raise serializers.ValidationError({"old_password": "Senha atual incorreta."})
+        if attrs["old_password"] == attrs["new_password"]:
+            raise serializers.ValidationError({"new_password": "A nova senha deve ser diferente da senha atual."})
+        return attrs
+
+
 class GroupSerializer(serializers.ModelSerializer):
     """
     Serializer for Django Group model (Admin CRUD).

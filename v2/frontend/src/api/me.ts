@@ -72,3 +72,30 @@ export async function getMyEvents(
 export async function getMyPolicies(): Promise<string[]> {
   return await fetchAPI<string[]>('/me/policies/');
 }
+
+/**
+ * Payload da troca de senha self-service.
+ */
+export interface ChangePasswordPayload {
+  old_password: string;
+  new_password: string;
+}
+
+/**
+ * Troca a própria senha (`POST /api/me/change-password/`).
+ *
+ * Backend valida a senha atual (`check_password`) e a nova senha com os
+ * validadores do Django (`AUTH_PASSWORD_VALIDATORS`), mantém a sessão viva
+ * (`update_session_auth_hash`) e audita (PA-05). Login é por CPF + senha.
+ *
+ * @param payload - senha atual + nova senha
+ * @returns `{ detail }` de sucesso; em erro, `fetchAPI` lança com a mensagem do backend.
+ */
+export async function changeMyPassword(
+  payload: ChangePasswordPayload
+): Promise<{ detail: string }> {
+  return await fetchAPI<{ detail: string }>('/me/change-password/', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}

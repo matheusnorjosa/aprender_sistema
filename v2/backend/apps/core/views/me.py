@@ -19,6 +19,8 @@ Type-checked with Pyright (strict mode).
 
 from __future__ import annotations
 
+from typing import cast
+
 from django.contrib.auth import update_session_auth_hash
 from django.db.models import QuerySet
 from rest_framework import generics, serializers
@@ -30,7 +32,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema, extend_schema_view, inline_serializer
 
 from apps.core.api_schemas import COMMON_ERROR_RESPONSES
-from apps.core.models import AuditLog, Solicitacao
+from apps.core.models import AuditLog, Solicitacao, Usuario
 from apps.core.rbac.policies import resolve_public_policies
 from apps.core.serializers.me import MeEventSerializer
 from apps.core.serializers.usuario import ChangePasswordSerializer
@@ -159,8 +161,9 @@ class ChangePasswordView(APIView):
     def post(self, request: Request) -> Response:
         serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        user = request.user
-        user.set_password(serializer.validated_data["new_password"])
+        user = cast(Usuario, request.user)
+        new_password = cast(str, serializer.validated_data["new_password"])
+        user.set_password(new_password)
         user.save(update_fields=["password"])
         # SessionAuthentication: mantem a sessao atual valida e invalida as demais.
         update_session_auth_hash(request, user)

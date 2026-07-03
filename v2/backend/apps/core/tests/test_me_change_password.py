@@ -5,7 +5,7 @@ do Django), nova == atual, e não autenticado. Login do sistema é por CPF + sen
 (auth_backends.CPFOrUsernameBackend); qualquer usuário logado pode trocar a própria senha.
 """
 
-# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportUnknownParameterType=false, reportMissingParameterType=false
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportOptionalMemberAccess=false, reportIndexIssue=false
 
 from __future__ import annotations
 

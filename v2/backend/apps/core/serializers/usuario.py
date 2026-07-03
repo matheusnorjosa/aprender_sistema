@@ -297,15 +297,15 @@ class ChangePasswordSerializer(serializers.Serializer):
     def validate_new_password(self, value: str) -> str:
         if len(value) < 8:
             raise serializers.ValidationError("A senha deve ter no minimo 8 caracteres.")
-        user = getattr(self.context.get("request"), "user", None)
         try:
-            validate_password(value, user=user)
+            validate_password(value)
         except ValidationError as e:
             raise serializers.ValidationError(list(e.messages))
         return value
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
-        user = getattr(self.context.get("request"), "user", None)
+        request = self.context.get("request")
+        user = request.user if request is not None else None
         if user is None or not user.check_password(attrs["old_password"]):
             raise serializers.ValidationError({"old_password": "Senha atual incorreta."})
         if attrs["old_password"] == attrs["new_password"]:

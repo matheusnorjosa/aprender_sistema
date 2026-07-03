@@ -48,6 +48,7 @@ class AuditLog(models.Model):
         LOGOUT = "LOGOUT", "Logout"
         LOGIN_FAILED = "LOGIN_FAILED", "Login falhou"
         LOGIN_BLOCKED = "LOGIN_BLOCKED", "Login bloqueado"
+        CHANGE_PASSWORD = "CHANGE_PASSWORD", "Trocar senha"
 
         # GCal lifecycle
         PREVIEW_GCAL = "PREVIEW_GCAL", "Preview GCal"

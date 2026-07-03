@@ -470,6 +470,8 @@ REST_FRAMEWORK = {
         # relaxado fora dela para não atrapalhar dev / testes E2E multi-role.
         # Sobrescrito abaixo com valor ambiente-dependente.
         "login": "10/minute",
+        # Troca de senha self-service: defesa contra brute-force do old_password.
+        "change_password": "20/min",
     },
     # Custom exception handler for standardized error responses
     "EXCEPTION_HANDLER": "apps.core.exceptions.custom_exception_handler",
@@ -540,6 +542,8 @@ if ENVIRONMENT == "development":
         # desenvolvimento manual (12+ logins em sequência). Em prod mantém
         # 10/min contra brute force (ver bloco DEFAULT_THROTTLE_RATES acima).
         "login": "1000/minute",
+        # Troca de senha: relaxado em dev/testes (prod usa 20/min, bloco acima).
+        "change_password": "200/min",
     }
 
 # ================================================================

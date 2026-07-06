@@ -14,10 +14,15 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import Any
 
 from pythonjsonlogger.jsonlogger import JsonFormatter
 
-from config.settings import LOGGING
+from config.settings import LOGGING as _RAW_LOGGING
+
+# LOGGING e um dict heterogeneo -> pyright infere __getitem__ estrito (so slice).
+# Tipar como dict[str, Any] libera o acesso por chave string nos asserts abaixo.
+LOGGING: dict[str, Any] = _RAW_LOGGING
 
 
 def _build_json_formatter() -> JsonFormatter:

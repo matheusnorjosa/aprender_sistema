@@ -58,6 +58,7 @@ google-api-python-client==2.197.0
 google-auth==2.55.0
 google-auth-httplib2==0.4.0
 google-auth-oauthlib==1.4.0
+httplib2==0.31.2  # import direto nos clients GCal (transporte http com timeout)
 
 # ================================================================
 # Production Server

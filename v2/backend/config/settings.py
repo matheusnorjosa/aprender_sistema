@@ -683,6 +683,14 @@ GCAL_CLIENT = os.getenv("GCAL_CLIENT", "fake")
 # Note: GCAL_CLIENT must be 'google' for either mode to work
 GCAL_AUTH_MODE = os.getenv("GCAL_AUTH_MODE", "service_account")
 
+# Timeout (segundos) do transporte httplib2 nas chamadas ao Google Calendar API.
+# Incidente 2026-07-06: o default do googleapiclient e 60s por operacao de socket
+# (build_http / DEFAULT_HTTP_TIMEOUT_SEC), alto demais p/ o request-path -> num stall
+# de rede uma rajada de chamadas segura os workers do gunicorn (gthread, 2 threads/
+# worker) por ate 60s = 504. Reduzido p/ 10s configuravel (libera o worker ~6x mais
+# rapido); aplicado via AuthorizedHttp nos clients GCal.
+GCAL_HTTP_TIMEOUT = int(os.getenv("GCAL_HTTP_TIMEOUT", "10"))
+
 # Google Calendar sendUpdates parameter (RF05/RF06 - PR19)
 # Controls whether email notifications are sent to attendees:
 # - 'none': No emails (default, recommended for testing)

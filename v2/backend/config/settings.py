@@ -12,6 +12,8 @@ import os
 import sys
 from pathlib import Path
 
+from pythonjsonlogger.jsonlogger import RESERVED_ATTRS as _PJL_RESERVED_ATTRS
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -591,6 +593,13 @@ LOGGING = {
         "json": {
             "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
             "format": "%(asctime)s %(levelname)s %(name)s %(message)s %(request_id)s %(environment)s %(service)s",
+            # python-json-logger 2.0.7 faz merge de TODO atributo nao-reservado do
+            # LogRecord no JSON. django.request.log_response injeta extra={"request":
+            # <WSGIRequest>, ...} em respostas 4xx/5xx -> sem isto, cada linha
+            # serializa o request inteiro (bloat + custo alto por log + vazamento
+            # LGPD). Excluimos "request" e "taskName" (ruido Py3.12); status_code
+            # (escalar util) continua sendo logado. Ver incidente 2026-07-06.
+            "reserved_attrs": (*_PJL_RESERVED_ATTRS, "request", "taskName"),
             "timestamp": True,
         },
         # Fallback para desenvolvimento local (human-readable)
@@ -633,6 +642,16 @@ LOGGING = {
         "django": {
             "handlers": ["console_json"] if ENVIRONMENT in ["production", "staging"] else ["console"],
             "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
+            "propagate": False,
+        },
+        # django.request loga TODA resposta 4xx como WARNING (django/utils/log.py
+        # log_response). Um flood de 4xx (scans 404, polling deslogado de /api/me/)
+        # saturava os workers do gunicorn -> 504 em prod (incidente 2026-07-06).
+        # Fixo em ERROR: 5xx seguem logando (server errors), 4xx param de floodar.
+        # propagate=False evita dupla emissao (nao sobe pro logger "django").
+        "django.request": {
+            "handlers": ["console_json"] if ENVIRONMENT in ["production", "staging"] else ["console"],
+            "level": "ERROR",
             "propagate": False,
         },
         "apps": {

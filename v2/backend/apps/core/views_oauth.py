@@ -30,6 +30,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 
+from apps.core.exceptions import ServiceUnavailableError
 from apps.core.models import AuditLog, GoogleOAuthCredential
 from apps.core.rbac.policies import CanUseGcal
 from apps.core.services.google_oauth import build_authorization_url, exchange_code_for_tokens, revoke_token
@@ -582,6 +583,10 @@ def google_oauth_list_events(request: Request) -> Response:
 
     except GoogleOAuthCredential.DoesNotExist:
         return Response({"error": "Nenhuma conexão Google encontrada"}, status=status.HTTP_404_NOT_FOUND)
+    except TimeoutError:
+        # socket.timeout IS TimeoutError (py3.12): 503 (Google indisponivel), nao 500.
+        logger.warning("⏱️ Timeout ao listar eventos do Google Calendar")
+        raise ServiceUnavailableError(service="Google Calendar", details="O Google demorou a responder")
     except Exception as e:
         logger.error(f"❌ Erro ao listar eventos: {e}")
         return Response({"error": "Erro ao listar eventos"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -639,6 +644,10 @@ def google_oauth_list_calendars(request: Request) -> Response:
 
     except GoogleOAuthCredential.DoesNotExist:
         return Response({"error": "Nenhuma conexão Google encontrada"}, status=status.HTTP_404_NOT_FOUND)
+    except TimeoutError:
+        # socket.timeout IS TimeoutError (py3.12): 503 (Google indisponivel), nao 500.
+        logger.warning("⏱️ Timeout ao listar calendários do Google Calendar")
+        raise ServiceUnavailableError(service="Google Calendar", details="O Google demorou a responder")
     except Exception as e:
         logger.error(f"❌ Erro ao listar calendários: {e}")
         return Response({"error": "Erro ao listar calendários"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

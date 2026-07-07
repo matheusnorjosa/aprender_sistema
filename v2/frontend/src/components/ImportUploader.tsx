@@ -111,7 +111,12 @@ export default function ImportUploader({ label, onDryRun, onApply, description }
       const report = await onDryRun(file);
       setValidationResult(report);
     } catch (err) {
-      setError((err as Error).message || 'Erro ao validar arquivo');
+      const httpStatus = (err as { response?: { status?: number } }).response?.status;
+      if (httpStatus === 429) {
+        setError('Muitas importações em pouco tempo. Aguarde um instante e tente novamente.');
+      } else {
+        setError((err as Error).message || 'Erro ao validar arquivo');
+      }
     } finally {
       setLoading(false);
     }
@@ -131,7 +136,12 @@ export default function ImportUploader({ label, onDryRun, onApply, description }
       setApplyResult(report);
       setValidationResult(null); // Limpar validação após apply
     } catch (err) {
-      setError((err as Error).message || 'Erro ao importar arquivo');
+      const httpStatus = (err as { response?: { status?: number } }).response?.status;
+      if (httpStatus === 429) {
+        setError('Muitas importações em pouco tempo. Aguarde um instante e tente novamente.');
+      } else {
+        setError((err as Error).message || 'Erro ao importar arquivo');
+      }
     } finally {
       setLoadingApply(false);
     }

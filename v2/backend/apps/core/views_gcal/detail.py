@@ -83,10 +83,12 @@ class DashboardEventsExportView(APIView):
     - end (ISO date): Filtro início <= end (formato: YYYY-MM-DD)
     - format: csv|json (default: csv)
 
-    Permissions: HasPerm("import_spreadsheet")
+    Permissions: IsAuthenticated + CanUseGcal
+    Throttle: scope "export" (rate-limit de export pesado CSV/JSON)
     """
 
     permission_classes = [IsAuthenticated, CanUseGcal]
+    throttle_scope = "export"
 
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response | HttpResponse:
         # Usar helper unificado timezone-aware (Issue #96 follow-up #124)

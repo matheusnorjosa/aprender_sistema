@@ -525,7 +525,12 @@ export default function PreAgendaPage(): JSX.Element {
       );
       setGcalEvents(data.events || []);
     } catch (error) {
-      message.error('Erro ao carregar eventos do Google Calendar');
+      const httpStatus = (error as { response?: { status?: number } }).response?.status;
+      if (httpStatus === 503) {
+        message.error('O Google Calendar demorou a responder. Tente novamente em instantes.');
+      } else {
+        message.error('Erro ao carregar eventos do Google Calendar');
+      }
       logger.error('Erro ao carregar eventos GCal:', error);
     } finally {
       setLoadingGcalEvents(false);

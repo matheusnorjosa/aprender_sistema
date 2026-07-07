@@ -99,7 +99,12 @@ const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }: GoogleIntegr
       setCalendars(data.calendars || []);
     } catch (error) {
       logger.error('Erro ao carregar calendários:', error);
-      message.error('Não foi possível carregar seus calendários');
+      const httpStatus = (error as { response?: { status?: number } }).response?.status;
+      if (httpStatus === 503) {
+        message.error('O Google Calendar demorou a responder. Tente novamente em instantes.');
+      } else {
+        message.error('Não foi possível carregar seus calendários');
+      }
     } finally {
       setLoadingCalendars(false);
     }

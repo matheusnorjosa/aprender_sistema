@@ -574,3 +574,21 @@ def test_batch_resync_valida_limite_500_ids(api_client, usuario_controle):
     # Validar 400
     assert response.status_code == http_status.HTTP_400_BAD_REQUEST
     assert "Limite de 500 IDs" in response.data["detail"]
+
+
+@pytest.mark.django_db
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")
+def test_batch_publish_valida_limite_500_ids(api_client, usuario_controle):
+    """Publish-batch valida limite de 500 IDs (Onda 3 hardening — espelha reapply/resync)."""
+    api_client.force_authenticate(user=usuario_controle)
+
+    solicitacao_ids = list(range(1, 502))  # 501 IDs
+
+    response = api_client.post(
+        "/api/gcal/publish-batch/",
+        {"solicitacao_ids": solicitacao_ids, "dry_run": False, "apply_blocked": True},
+        format="json",
+    )
+
+    assert response.status_code == http_status.HTTP_400_BAD_REQUEST
+    assert "Limite de 500 IDs" in response.data["detail"]

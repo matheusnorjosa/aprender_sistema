@@ -172,7 +172,9 @@ def refresh_access_token_safe(credential: GoogleOAuthCredential) -> GoogleOAuthC
         logger.info(f"🔄 Refreshing access token para {cred.google_email}")
 
         try:
-            response: requests.Response = requests.post(token_url, data=payload, timeout=10)
+            response: requests.Response = requests.post(
+                token_url, data=payload, timeout=settings.GCAL_OAUTH_TOKEN_TIMEOUT
+            )
             response.raise_for_status()
             data: dict[str, Any] = response.json()
 
@@ -252,7 +254,7 @@ def revoke_token(credential: GoogleOAuthCredential) -> bool:
 
         logger.info(f"🔓 Revogando refresh token para {credential.google_email}")
 
-        response: requests.Response = requests.post(revoke_url, data=payload, timeout=10)
+        response: requests.Response = requests.post(revoke_url, data=payload, timeout=settings.GCAL_OAUTH_TOKEN_TIMEOUT)
 
         # 200 OK: revogado com sucesso
         # 400 Bad Request: token já inválido (ok, continuar)

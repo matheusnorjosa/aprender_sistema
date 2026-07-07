@@ -1,8 +1,11 @@
 """Guard LGPD do log de INSERT do sync GCal.
 
-O #1506 trocou o dump do payload inteiro por um resumo (summary[:80] + contagem de
-attendees + flag online). Este teste TRAVA essa garantia: o log de INSERT NAO pode
-conter e-mail de attendee nem a descricao completa do evento.
+O #1506 trocou o dump do payload inteiro por um resumo; a Onda 4 removeu tambem o
+summary/titulo e o calendar_id (CodeQL py/clear-text-logging-sensitive-data + defesa a
+mais, pois o titulo pode conter nome de pessoa). Restam so escalares nao-sensiveis:
+id da Solicitacao, event_id deterministico, contagem de attendees e flag online. Este
+teste TRAVA a garantia: o log de INSERT NAO pode conter e-mail de attendee, a descricao
+completa NEM o titulo do evento.
 
 Gotcha (por que handler direto e nao caplog): o logger `apps` tem propagate=False
 (config/settings.py) e `apps.core.services.gcal.sync` herda dele -> o registro nao sobe
@@ -63,5 +66,8 @@ def test_insert_log_nao_vaza_email_nem_descricao_lgpd():
 
     assert email_secreto not in txt, "LGPD: e-mail do attendee vazou no log"
     assert "CONFIDENCIAL_LGPD" not in txt, "descricao completa vazou no log"
-    assert "Fortaleza - CE Online [ACERTA]" in txt  # summary[:80] esta (dentro do repr)
+    # Nem o titulo do evento entra no log (pode conter nome de pessoa; py/clear-text-logging).
+    assert "Fortaleza - CE Online [ACERTA]" not in txt, "titulo/summary do evento vazou no log"
+    # Correlacao preservada sem dado sensivel: id da Solicitacao + event_id + contagem + flag.
+    assert f"#{sol.id}" in txt and "event_id=" in txt
     assert "attendees=2" in txt and "online=False" in txt  # contagem + flag estao

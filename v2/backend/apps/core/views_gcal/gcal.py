@@ -49,6 +49,11 @@ def gcal_calendars(request: Request) -> Response:
 
         return Response(calendars, status=status.HTTP_200_OK)
 
+    except TimeoutError:
+        # socket.timeout IS TimeoutError (py3.12): o Google nao respondeu a tempo.
+        # 503 (servico externo indisponivel) em vez de 500 — nao e erro do nosso servidor.
+        logger.warning("Timeout ao listar calendarios do Google Calendar")
+        raise ServiceUnavailableError(service="Google Calendar", details="O Google demorou a responder")
     except Exception as e:
         logger.error(f"Error listing calendars: {e}", exc_info=True)
         return Response(

@@ -294,7 +294,7 @@ def exchange_code_for_tokens(code: str) -> dict:
     logger.info("🔐 Trocando authorization code por tokens (grant_type=authorization_code)")
 
     try:
-        response: requests.Response = requests.post(token_url, data=payload, timeout=10)
+        response: requests.Response = requests.post(token_url, data=payload, timeout=settings.GCAL_OAUTH_TOKEN_TIMEOUT)
         response.raise_for_status()
         data: dict[str, Any] = response.json()
 
@@ -310,7 +310,9 @@ def exchange_code_for_tokens(code: str) -> dict:
         access_token: str = data["access_token"]
         userinfo_url: str = "https://www.googleapis.com/oauth2/v2/userinfo"
         headers: dict[str, str] = {"Authorization": f"Bearer {access_token}"}
-        userinfo_response: requests.Response = requests.get(userinfo_url, headers=headers, timeout=10)
+        userinfo_response: requests.Response = requests.get(
+            userinfo_url, headers=headers, timeout=settings.GCAL_OAUTH_TOKEN_TIMEOUT
+        )
         userinfo_response.raise_for_status()
         userinfo: dict[str, Any] = userinfo_response.json()
 

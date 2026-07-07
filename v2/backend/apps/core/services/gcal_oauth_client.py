@@ -357,7 +357,7 @@ class OAuthCalendarClient(CalendarClientAdapter):
                 for cal in items
             ]
 
-        return self._retry_with_backoff(_list_calendars)
+        return self._retry_with_backoff(_list_calendars, max_retries=settings.GCAL_REQUEST_MAX_RETRIES)
 
     def list_events(
         self,
@@ -410,7 +410,7 @@ class OAuthCalendarClient(CalendarClientAdapter):
                 for evt in items
             ]
 
-        return self._retry_with_backoff(_list_events)
+        return self._retry_with_backoff(_list_events, max_retries=settings.GCAL_REQUEST_MAX_RETRIES)
 
     def health_check(self) -> JsonDict:
         """

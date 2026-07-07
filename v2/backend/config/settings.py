@@ -695,6 +695,18 @@ GCAL_AUTH_MODE = os.getenv("GCAL_AUTH_MODE", "service_account")
 # rapido); aplicado via AuthorizedHttp nos clients GCal.
 GCAL_HTTP_TIMEOUT = int(os.getenv("GCAL_HTTP_TIMEOUT", "10"))
 
+# Retries no request-path do GCal (list_calendars/list_events/health_check). O backoff de
+# 429/5xx (1+2+4s = ate 7s) empilha sobre GCAL_HTTP_TIMEOUT e segura o worker do gunicorn;
+# 1 retry (<=1s) cobre blip transitorio. insert/update/delete seguem em 3 (resiliencia no
+# Celery, fora do request-path). Incidente 2026-07-06.
+GCAL_REQUEST_MAX_RETRIES = max(0, int(os.getenv("GCAL_REQUEST_MAX_RETRIES", "1")))
+
+# Timeout (s) das chamadas `requests` ao endpoint de token OAuth do Google (troca de code,
+# refresh, revoke). O refresh roda no request-path SOB select_for_update (lock de linha) ->
+# um stall de 10s segura worker+lock; o endpoint de token e rapido (p99 << 2s), 5s e folga
+# (casa com Redis SOCKET_TIMEOUT=5).
+GCAL_OAUTH_TOKEN_TIMEOUT = int(os.getenv("GCAL_OAUTH_TOKEN_TIMEOUT", "5"))
+
 # Google Calendar sendUpdates parameter (RF05/RF06 - PR19)
 # Controls whether email notifications are sent to attendees:
 # - 'none': No emails (default, recommended for testing)

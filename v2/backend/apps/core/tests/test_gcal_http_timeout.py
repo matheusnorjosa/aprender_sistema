@@ -76,3 +76,38 @@ def test_oauth_client_aplica_timeout_no_transporte(monkeypatch, settings):
     OAuthCalendarClient(cred)
 
     assert captured["http"].http.timeout == 9
+
+
+def test_gcal_settings_defaults_no_ambiente_limpo():
+    """Defaults REAIS dos 3 settings GCal com as envs ausentes, via subprocess isolado.
+
+    Robusto vs estado do CI: os settings sao avaliados no IMPORT, entao um assert in-process
+    dependeria do estado de env do processo de teste. Subprocess com env limpa afirma os
+    defaults de fato (HTTP_TIMEOUT=10, REQUEST_MAX_RETRIES=1, OAUTH_TOKEN_TIMEOUT=5), sem
+    recarregar o settings (que tem side effects no import).
+    """
+    import os
+    import subprocess
+    import sys
+
+    overridable = {"GCAL_HTTP_TIMEOUT", "GCAL_REQUEST_MAX_RETRIES", "GCAL_OAUTH_TOKEN_TIMEOUT"}
+    env = {k: v for k, v in os.environ.items() if k not in overridable}
+    env["DJANGO_SETTINGS_MODULE"] = "config.settings"
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import django; django.setup(); "
+            "from django.conf import settings as s; "
+            "print('GCAL_HTTP_TIMEOUT_DEFAULT=%d' % s.GCAL_HTTP_TIMEOUT); "
+            "print('GCAL_REQUEST_MAX_RETRIES_DEFAULT=%d' % s.GCAL_REQUEST_MAX_RETRIES); "
+            "print('GCAL_OAUTH_TOKEN_TIMEOUT_DEFAULT=%d' % s.GCAL_OAUTH_TOKEN_TIMEOUT)",
+        ],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "GCAL_HTTP_TIMEOUT_DEFAULT=10" in proc.stdout
+    assert "GCAL_REQUEST_MAX_RETRIES_DEFAULT=1" in proc.stdout
+    assert "GCAL_OAUTH_TOKEN_TIMEOUT_DEFAULT=5" in proc.stdout

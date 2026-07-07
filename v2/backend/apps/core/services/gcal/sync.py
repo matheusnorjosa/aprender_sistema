@@ -264,11 +264,13 @@ def upsert_one(
 
             if not dry_run:
                 try:
-                    # Resumo em vez do payload inteiro: evita inflar/floodar o log se
-                    # DEBUG for ligado por engano E nao vaza os e-mails dos attendees (LGPD).
+                    # So escalares nao-sensiveis derivados do nosso DB (id da Solicitacao +
+                    # event_id deterministico) + contagem/flag. Evita inflar/floodar o log se
+                    # DEBUG for ligado por engano e NAO expoe e-mails de attendee, o titulo do
+                    # evento (pode conter nome de pessoa) nem o calendar_id
+                    # (LGPD + CodeQL py/clear-text-logging-sensitive-data).
                     logger.debug(
-                        f"🔍 GCal INSERT #{s.id} - calendar_id={calendar_id}, "
-                        f"event_id={deterministic_eid}, summary={str(payload.get('summary', ''))[:80]!r}, "
+                        f"🔍 GCal INSERT #{s.id} - event_id={deterministic_eid}, "
                         f"attendees={len(payload.get('attendees', []))}, online={'conferenceData' in payload}"
                     )
                     # RF05: Retry com backoff exponencial (PR19)

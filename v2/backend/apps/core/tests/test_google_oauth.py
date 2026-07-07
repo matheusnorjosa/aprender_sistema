@@ -433,24 +433,30 @@ class TestGoogleOAuthEndpoints:
             "GCAL_OAUTH_REDIRECT_URI": "http://localhost:8002/api/oauth/google/callback/",
         },
     )
-    def test_google_oauth_start_throttling(self, db):
+    def test_google_oauth_start_throttling(self, db, monkeypatch):
         """
-        GAP-3: Rate limiting 10 req/h em /oauth/google/start/.
+        GAP-3: Rate limiting em /oauth/google/start/.
 
         Valida:
         - Primeiras 10 requests → 302 Redirect (sucesso)
         - 11ª request → 429 Too Many Requests
 
-        Nota: Requer configuração de throttle em settings.py:
-        REST_FRAMEWORK['DEFAULT_THROTTLE_RATES']['oauth'] = '10/hour'
+        O rate de 'oauth' vem de DEFAULT_THROTTLE_RATES (10/hour em prod). Como dev/testes
+        relaxam p/ 1000/hour, este teste forca 10/hour via monkeypatch para exercitar o
+        limite. O rate hardcodado saiu da OAuthThrottle na Onda 2 (scope-driven); ver
+        test_throttle_scopes_sentinela.
 
         IMPORTANTE: Cria usuário único para evitar conflito de throttle
         com outros testes que usam usuario_controle fixture.
         """
         # Limpar cache de throttle antes do teste
+        from django.conf import settings
         from django.core.cache import cache
 
         cache.clear()
+        # Forca o limite de 10/hour (dev relaxa p/ 1000/hour). Mutar o dict in-place e
+        # visto pelo SimpleRateThrottle.THROTTLE_RATES (mesma referencia); monkeypatch restaura.
+        monkeypatch.setitem(settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"], "oauth", "10/hour")
 
         # Criar usuário único para este teste (evitar throttle compartilhado)
         unique_user = UsuarioFactory(

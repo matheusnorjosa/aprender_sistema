@@ -223,7 +223,10 @@ class OAuthThrottle(UserRateThrottle):
     GAP-3: Prevenir abuso com 10 requests/hora por usuário.
     """
 
-    rate = "10/hour"
+    # rate NAO hardcodado: vem de settings.DEFAULT_THROTTLE_RATES["oauth"] via
+    # SimpleRateThrottle.get_rate() -> self.scope (10/hour em prod, relaxado em dev).
+    # Scope orfao (usado sem rate no dict) quebraria em runtime; ver o teste
+    # sentinela test_throttle_scopes_sentinela.py.
     scope = "oauth"
 
 

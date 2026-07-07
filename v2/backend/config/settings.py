@@ -474,6 +474,8 @@ REST_FRAMEWORK = {
         "login": "10/minute",
         # Troca de senha self-service: defesa contra brute-force do old_password.
         "change_password": "20/min",
+        # OAuth connect (GAP-3): conectar conta Google no /pre-agenda, anti-abuso por usuario.
+        "oauth": "10/hour",
     },
     # Custom exception handler for standardized error responses
     "EXCEPTION_HANDLER": "apps.core.exceptions.custom_exception_handler",
@@ -546,6 +548,8 @@ if ENVIRONMENT == "development":
         "login": "1000/minute",
         # Troca de senha: relaxado em dev/testes (prod usa 20/min, bloco acima).
         "change_password": "200/min",
+        # OAuth connect: relaxado em dev/testes (prod usa 10/hour, bloco acima).
+        "oauth": "1000/hour",
     }
 
 # ================================================================

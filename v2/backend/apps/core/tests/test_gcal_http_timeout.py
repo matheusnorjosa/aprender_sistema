@@ -28,7 +28,7 @@ def test_setting_gcal_http_timeout_e_inteiro_positivo():
 def test_google_client_aplica_timeout_no_transporte(monkeypatch, settings):
     """GoogleCalendarClient (Service Account) constroi o service com o timeout."""
     settings.GCAL_HTTP_TIMEOUT = 13
-    captured: dict = {}
+    captured: dict[str, object] = {}
 
     monkeypatch.setattr(
         "apps.core.services.gcal_google_client.service_account.Credentials.from_service_account_info",
@@ -51,7 +51,7 @@ def test_google_client_aplica_timeout_no_transporte(monkeypatch, settings):
 def test_oauth_client_aplica_timeout_no_transporte(monkeypatch, settings):
     """OAuthCalendarClient (o client de prod, GCAL_AUTH_MODE=oauth) usa o timeout."""
     settings.GCAL_HTTP_TIMEOUT = 9
-    captured: dict = {}
+    captured: dict[str, object] = {}
 
     monkeypatch.setenv("GCAL_OAUTH_CLIENT_ID", "cid")
     monkeypatch.setenv("GCAL_OAUTH_CLIENT_SECRET", "secret")

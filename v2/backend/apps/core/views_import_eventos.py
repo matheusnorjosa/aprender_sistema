@@ -75,6 +75,7 @@ class ImportEventosView(APIView):
     # `HasPerm("import_spreadsheet")`. Controle perde acesso ao import em
     # massa (D-1 do plano).
     permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
+    throttle_scope = "import"
 
     @extend_schema(
         summary="Importar solicitações/eventos",

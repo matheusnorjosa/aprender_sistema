@@ -65,6 +65,7 @@ class ImportJobBloqueiosUploadView(APIView):
 
     # Issue #1222 (Epic 1): import operacional aceita Controle (run_daily_operations) ou DAT (import_spreadsheet)
     permission_classes = [IsAuthenticated, CanImportGenericSpreadsheet]
+    throttle_scope = "import"
 
     @extend_schema(
         summary="Dispara import assincrono de bloqueios",

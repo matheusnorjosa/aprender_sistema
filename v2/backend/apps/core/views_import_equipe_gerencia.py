@@ -52,6 +52,7 @@ class ImportEquipeGerenciaView(APIView):
     """
 
     permission_classes = [IsAuthenticated, HasPerm("manage_admin_registries")]
+    throttle_scope = "import"
 
     @extend_schema(
         summary="Importar vínculos de equipe-gerência",

@@ -76,6 +76,7 @@ class ImportComprasView(APIView):
     # passam a ser DAT-only via `HasPerm("import_spreadsheet")`. Controle
     # consome o dado mas não importa (D-1 do plano DAT-Imports).
     permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
+    throttle_scope = "import"
 
     @extend_schema(
         summary="Importar compras",

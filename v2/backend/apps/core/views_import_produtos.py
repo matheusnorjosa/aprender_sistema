@@ -67,6 +67,7 @@ class ImportProdutosView(APIView):
     # PR-A1 DAT-Imports (2026-04-29): centralização DAT-only via
     # `HasPerm("import_spreadsheet")`. Controle perde acesso (D-1).
     permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
+    throttle_scope = "import"
 
     @extend_schema(
         summary="Importar produtos",

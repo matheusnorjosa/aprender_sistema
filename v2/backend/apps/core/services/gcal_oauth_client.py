@@ -18,7 +18,9 @@ from typing import TYPE_CHECKING, Any
 from django.conf import settings
 from django.utils import timezone
 
+import httplib2
 from google.oauth2.credentials import Credentials
+from google_auth_httplib2 import AuthorizedHttp
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
@@ -100,8 +102,12 @@ class OAuthCalendarClient(CalendarClientAdapter):
             scopes=self.SCOPES,
         )
 
-        # Build service
-        self.service = build("calendar", "v3", credentials=self.credentials, cache_discovery=False)
+        # Build service com timeout explicito no transporte httplib2 (GCAL_HTTP_TIMEOUT,
+        # default 10s) em vez do default de 60s do googleapiclient -> num stall de rede a
+        # chamada .execute() falha ~6x mais rapido e libera o worker do gunicorn (incidente
+        # 2026-07-06). AuthorizedHttp reaplica as credenciais sobre o http com timeout.
+        authorized_http = AuthorizedHttp(self.credentials, http=httplib2.Http(timeout=settings.GCAL_HTTP_TIMEOUT))
+        self.service = build("calendar", "v3", http=authorized_http, cache_discovery=False)
 
         # Armazenar referência ao credential para logging
         self.credential = credential

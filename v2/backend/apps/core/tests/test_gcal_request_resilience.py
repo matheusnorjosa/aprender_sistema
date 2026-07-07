@@ -114,7 +114,7 @@ def test_exchange_code_passa_oauth_token_timeout_ao_requests(monkeypatch, settin
     class _Resp:
         def raise_for_status(self) -> None: ...
 
-        def json(self) -> dict:
+        def json(self) -> dict[str, object]:
             return {
                 "refresh_token": "r",
                 "access_token": "a",

@@ -68,6 +68,7 @@ class ImportBloqueiosView(APIView):
     # AvailabilityBlockViewSet (formador declara o próprio); só o import
     # em massa é restrito (D-2 do plano).
     permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
+    throttle_scope = "import"
 
     @extend_schema(
         summary="Importar bloqueios de disponibilidade",

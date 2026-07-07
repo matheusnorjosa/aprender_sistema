@@ -67,6 +67,7 @@ class ImportDeslocamentosView(APIView):
     # `HasPerm("import_spreadsheet")`. Lançamento individual de deslocamento
     # continua via UI dedicada; só o import em massa é restrito (D-3 do plano).
     permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
+    throttle_scope = "import"
 
     @extend_schema(
         summary="Importar deslocamentos",

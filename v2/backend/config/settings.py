@@ -465,9 +465,12 @@ REST_FRAMEWORK = {
         "availability_check": "60/min",  # 60 requests por minuto para availability check
         "metrics": "30/min",  # Geo queries + aggregations
         "reports": "30/min",  # Heavy aggregations
-        "gcal_read": "60/min",  # Google Calendar reads
         "gcal_write": "10/min",  # Google Calendar writes (publish)
         "export": "10/min",  # CSV/JSON exports
+        # Import: uploads pesados (parse de arquivo + writes SINCRONOS) seguram o worker do
+        # gunicorn — tier pesado como metrics/reports. Balde unico por usuario, compartilhado
+        # por todos os endpoints de import (Onda 4, pos-incidente 2026-07-06).
+        "import": "30/min",
         # Login: restrito em produção (brute-force protection — Issue #133),
         # relaxado fora dela para não atrapalhar dev / testes E2E multi-role.
         # Sobrescrito abaixo com valor ambiente-dependente.
@@ -539,9 +542,9 @@ if ENVIRONMENT == "development":
         "availability_check": "600/min",
         "metrics": "300/min",
         "reports": "300/min",
-        "gcal_read": "600/min",
         "gcal_write": "100/min",
         "export": "100/min",
+        "import": "300/min",  # 10x prod — uploads em dev/testes E2E nao devem bloquear
         # Login: 1000/min em dev para não bloquear testes E2E multi-role e
         # desenvolvimento manual (12+ logins em sequência). Em prod mantém
         # 10/min contra brute force (ver bloco DEFAULT_THROTTLE_RATES acima).

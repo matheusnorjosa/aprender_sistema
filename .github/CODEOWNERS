@@ -1,0 +1,19 @@
+# CODEOWNERS — superfície crítica de deploy/CI
+#
+# ADR-018 Fase 0 (pré-requisitos de segurança, issue #1512).
+# Objetivo: exigir revisão do code owner nos caminhos que, se alterados por um
+# fork-PR malicioso ou por engano, comprometeriam o deploy de produção
+# (o repo é PÚBLICO). A enforcement depende de ligar em Branch protection de `main`
+# a opção "Require review from Code Owners" — ver #1512.
+#
+# GitHub usa o ÚLTIMO padrão que casa. Owner = mantenedor solo.
+
+# Pipeline de CI/CD (build, scan, deploy, provenance/cosign)
+/.github/workflows/   @matheusnorjosa
+
+# O próprio CODEOWNERS e configs de segurança do repo
+/.github/CODEOWNERS   @matheusnorjosa
+
+# Infra de deploy: compose de produção, Dockerfiles prod, scripts de infra
+# e (Fase 1) o código-fonte do agente pull on-box na VM01.
+/v2/infra/            @matheusnorjosa

@@ -635,3 +635,11 @@ graphify-out/cost.json
 
 # Staging gate evidence (local artifacts)
 evidence/
+
+# ADR-018 pull-based deployer (v2/infra/deployer) — codigo/ancoras versionados que
+# casam com regras genericas acima (lib/ de venv; *.env.* de segredos). NAO sao
+# segredos: identity.env = info publica (issuer OIDC, regexes, repos); config.env.example
+# = template com placeholders; lib/ = codigo do agente. Ver #1513.
+!v2/infra/deployer/lib/
+!v2/infra/deployer/config.env.example
+!v2/infra/deployer/trust/identity.env

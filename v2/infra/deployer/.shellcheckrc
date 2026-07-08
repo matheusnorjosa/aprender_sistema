@@ -1,0 +1,8 @@
+# shellcheck config do agente aprender-deployer.
+# SC2016: os programas jq usam aspas simples DE PROPOSITO (valores entram por --arg,
+#         nao por expansao do shell). Nao e um bug.
+disable=SC2016
+# SC2153: varias variaveis (BACKEND_REPO, OIDC_ISSUER, PORTAINER_*, etc.) vem de
+#         arquivos sourced (trust/identity.env, /etc/.../config.env) que o shellcheck
+#         nao resolve estaticamente. Nao sao erros de digitacao.
+disable=SC2153

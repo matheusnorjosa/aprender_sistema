@@ -1,0 +1,51 @@
+[Unit]
+Description=aprender-applier (pull-based: re-verifica + PUT + confirma + sela)
+Documentation=https://github.com/matheusnorjosa/aprender_sistema/issues/1513
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=aprender-applier
+Group=aprender-deploy
+UMask=0027
+ExecStart=/opt/aprender-deployer/current/apply.sh
+WorkingDirectory=/opt/aprender-deployer/current
+EnvironmentFile=/etc/aprender-deployer/config.env
+RuntimeMaxSec=900
+TimeoutStartSec=900
+
+# --- sandbox / hardening (idêntico ao deployer) ---
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @mount @debug @swap @reboot @raw-io
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+# lê config + o token (curlrc, 0400 aprender-applier) + o código/âncoras (RO);
+# escreve só o próprio estado em /var/lib (lock+payload+selo+breaker+rollback_ref)
+# e LÊ o handoff. O `-` torna o mount do handoff não-fatal se o dir não existir
+# (degrada para REFUSE handoff_missing em vez de 226/NAMESPACE).
+ReadOnlyPaths=/opt/aprender-deployer /etc/aprender-deployer
+ReadWritePaths=/var/lib/aprender-applier -/run/aprender-deployer/handoff
+InaccessiblePaths=/var/run/docker.sock /run/docker.sock
+StateDirectory=aprender-applier
+StateDirectoryMode=0750

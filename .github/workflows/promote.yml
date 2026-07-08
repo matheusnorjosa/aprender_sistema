@@ -1,0 +1,233 @@
+name: Promote (assina o ponteiro de release)
+
+# ADR-018 Fase 2 (#1514) — a AUTORIDADE DE ASSINATURA do ponteiro pull-based.
+# Atras do gate GitHub Environment `production` (required reviewer): resolve
+# tag->digest, VERIFICA que as imagens ja estao assinadas (slsa-provenance.yml),
+# monta o production.json, faz `cosign sign-blob` (keyless, identidade = ESTE
+# workflow em refs/heads/main) e publica no branch protegido `deploy-pointer`.
+# O agente aprender-deployer (v2/infra/deployer) le e verifica esse ponteiro.
+#
+# NAO faz deploy. Na Fase 2 (dual-write) o deploy de prod segue pelo push-PUT
+# legado do deploy.yaml; o push-PUT so e removido no cutover (Fase 3).
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Release tag imutavel (vYYYY.MM.DD-<sha7>) ja buildada e assinada"
+        required: true
+        type: string
+      rollback:
+        description: "Downgrade intencional assinado (ainda exige sequence > selo)"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  # serializa promocoes -> sequence monotonica sem corrida
+  group: promote-production
+  cancel-in-progress: false
+
+env:
+  DOCKER_USERNAME: norjosamatheus
+  BACKEND_IMAGE: norjosamatheus/aprender-backend
+  FRONTEND_IMAGE: norjosamatheus/aprender-frontend
+  POINTER_BRANCH: deploy-pointer
+  OIDC_ISSUER: https://token.actions.githubusercontent.com
+
+jobs:
+  promote:
+    name: "[ops] promote (assina ponteiro)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production   # <-- GATE: pausa para o required reviewer
+    permissions:
+      id-token: write   # cosign keyless (sign-blob)
+      contents: write   # push no branch deploy-pointer
+    steps:
+      - name: Checkout (fetch-depth 0 p/ ler o ponteiro atual)
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Validar release tag (imutavel)
+        id: rel
+        env:
+          RELEASE_INPUT: ${{ github.event.inputs.release }}
+        run: |
+          set -euo pipefail
+          # trim seguro (parameter-expansion; NAO usar xargs, que interpreta aspas/backslash)
+          release="${RELEASE_INPUT}"
+          release="${release#"${release%%[![:space:]]*}"}"
+          release="${release%"${release##*[![:space:]]}"}"
+          if [ "$release" = "latest" ]; then
+            echo "Tag 'latest' invalida; use vYYYY.MM.DD-<sha>." >&2; exit 1
+          fi
+          if ! printf '%s' "$release" | grep -Eq '^v[0-9]{4}\.[0-9]{2}\.[0-9]{2}-[0-9A-Za-z._-]+$'; then
+            echo "Formato invalido: $release" >&2; exit 1
+          fi
+          echo "release=${release}" >> "$GITHUB_OUTPUT"
+          echo "commit=${release##*-}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Resolver digests da tag imutavel
+        id: digests
+        env:
+          RELEASE: ${{ steps.rel.outputs.release }}
+        run: |
+          set -euo pipefail
+          be="$(docker buildx imagetools inspect "${BACKEND_IMAGE}:${RELEASE}"  | awk '/Digest:/ {print $2; exit}')"
+          fe="$(docker buildx imagetools inspect "${FRONTEND_IMAGE}:${RELEASE}" | awk '/Digest:/ {print $2; exit}')"
+          if ! printf '%s' "$be" | grep -Eq '^sha256:[0-9a-f]{64}$'; then echo "backend digest invalido: $be" >&2; exit 1; fi
+          if ! printf '%s' "$fe" | grep -Eq '^sha256:[0-9a-f]{64}$'; then echo "frontend digest invalido: $fe" >&2; exit 1; fi
+          echo "backend=${be}"  >> "$GITHUB_OUTPUT"
+          echo "frontend=${fe}" >> "$GITHUB_OUTPUT"
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Gate duro — imagens DEVEM estar assinadas (cosign + attestation)
+        env:
+          BE: ${{ steps.digests.outputs.backend }}
+          FE: ${{ steps.digests.outputs.frontend }}
+          IMAGE_IDENTITY_RE: ^https://github\.com/${{ github.repository }}/\.github/workflows/slsa-provenance\.yml@refs/(heads/main|tags/.+)$
+          SIGNER_WORKFLOW: ${{ github.repository }}/.github/workflows/slsa-provenance.yml
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for pair in "${BACKEND_IMAGE}@${BE}" "${FRONTEND_IMAGE}@${FE}"; do
+            cosign verify "$pair" \
+              --certificate-oidc-issuer "${OIDC_ISSUER}" \
+              --certificate-identity-regexp "${IMAGE_IDENTITY_RE}" >/dev/null
+            gh attestation verify "oci://${pair}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --signer-workflow "${SIGNER_WORKFLOW}" \
+              --bundle-from-oci >/dev/null
+          done
+          echo "Imagens verificadas (assinatura + attestation)."
+
+      - name: Montar production.json
+        id: build
+        env:
+          RELEASE: ${{ steps.rel.outputs.release }}
+          COMMIT: ${{ steps.rel.outputs.commit }}
+          BE: ${{ steps.digests.outputs.backend }}
+          FE: ${{ steps.digests.outputs.frontend }}
+          ROLLBACK: ${{ github.event.inputs.rollback }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          # sequence = (sequence do ponteiro atual) + 1; monotonica.
+          # FAIL-CLOSED: branch ausente => prev=0 (1o run). Branch PRESENTE => a leitura
+          # E a verificacao de assinatura do ponteiro anterior DEVEM ter sucesso, senao
+          # aborta (nunca colapsar prev p/ 0, que assinaria um seq=1 sobre um seq maior).
+          # Verificar a assinatura do prev impede que um ponteiro forjado/nao-assinado no
+          # branch sirva de base. (Replay-para-antigo-assinado e barrado por: branch
+          # protegido contra force-push + o SELO do applier, a ancora anti-rollback real.)
+          prev=0
+          if git rev-parse --verify "origin/${POINTER_BRANCH}" >/dev/null 2>&1; then
+            git show "origin/${POINTER_BRANCH}:production.json" > "${RUNNER_TEMP}/prev.json" \
+              || { echo "nao consegui ler o ponteiro atual" >&2; exit 1; }
+            git show "origin/${POINTER_BRANCH}:production.json.sigstore.json" > "${RUNNER_TEMP}/prev.sig" \
+              || { echo "nao consegui ler a assinatura do ponteiro atual" >&2; exit 1; }
+            cosign verify-blob "${RUNNER_TEMP}/prev.json" --new-bundle-format --bundle "${RUNNER_TEMP}/prev.sig" \
+              --certificate-oidc-issuer "${OIDC_ISSUER}" \
+              --certificate-identity-regexp "^https://github\.com/${GITHUB_REPOSITORY}/\.github/workflows/promote\.yml@refs/heads/main$" \
+              >/dev/null || { echo "ponteiro atual nao passa na verificacao de assinatura" >&2; exit 1; }
+            prev="$(jq -e -r '.sequence' "${RUNNER_TEMP}/prev.json")" \
+              || { echo "sequence ausente/invalida no ponteiro atual" >&2; exit 1; }
+            case "$prev" in ''|*[!0-9]*) echo "sequence nao-inteira: $prev" >&2; exit 1 ;; esac
+          fi
+          next=$((prev + 1))
+
+          issued="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          expires="$(date -u -d '+24 hours' +%Y-%m-%dT%H:%M:%SZ)"
+          rb=false; [ "${ROLLBACK}" = "true" ] && rb=true
+
+          out="${RUNNER_TEMP}/production.json"
+          jq -n \
+            --argjson seq "$next" --argjson prev "$prev" \
+            --arg rel "$RELEASE" --arg commit "$COMMIT" \
+            --arg berepo "$BACKEND_IMAGE" --arg bedig "$BE" \
+            --arg ferepo "$FRONTEND_IMAGE" --arg fedig "$FE" \
+            --argjson rb "$rb" --arg issued "$issued" --arg expires "$expires" \
+            --arg run "$RUN_URL" \
+            '{schema:1, sequence:$seq, release:$rel,
+              backend:{repo:$berepo,digest:$bedig},
+              frontend:{repo:$ferepo,digest:$fedig},
+              rollback:$rb, issued_at:$issued, expires_at:$expires,
+              promoted_by:"promote.yml", run_url:$run, commit:$commit, prev_sequence:$prev}' \
+            > "$out"
+          echo "sequence=${next}" >> "$GITHUB_OUTPUT"
+          echo "pointer=${out}"   >> "$GITHUB_OUTPUT"
+          echo "----- production.json -----"; cat "$out"
+
+      - name: Assinar o ponteiro (cosign sign-blob keyless)
+        id: sign
+        env:
+          POINTER: ${{ steps.build.outputs.pointer }}
+        run: |
+          set -euo pipefail
+          sig="${POINTER}.sigstore.json"
+          cosign sign-blob --yes --new-bundle-format \
+            --bundle "$sig" "$POINTER"
+          echo "sig=${sig}" >> "$GITHUB_OUTPUT"
+          # sanity: re-verifica localmente com a identidade deste workflow
+          cosign verify-blob "$POINTER" --new-bundle-format --bundle "$sig" \
+            --certificate-oidc-issuer "${OIDC_ISSUER}" \
+            --certificate-identity-regexp "^https://github\.com/${GITHUB_REPOSITORY}/\.github/workflows/promote\.yml@refs/heads/main$" \
+            >/dev/null
+          echo "Ponteiro assinado e verificado localmente."
+
+      - name: Publicar no branch deploy-pointer (git plumbing, sem tocar o working-tree)
+        env:
+          POINTER: ${{ steps.build.outputs.pointer }}
+          SIG: ${{ steps.sign.outputs.sig }}
+          SEQ: ${{ steps.build.outputs.sequence }}
+          RELEASE: ${{ steps.rel.outputs.release }}
+        run: |
+          set -euo pipefail
+          git config user.name  "aprender-promote[bot]"
+          git config user.email "aprender-promote[bot]@users.noreply.github.com"
+
+          blob_p="$(git hash-object -w "$POINTER")"
+          blob_s="$(git hash-object -w "$SIG")"
+          tree="$(printf '100644 blob %s\tproduction.json\n100644 blob %s\tproduction.json.sigstore.json\n' \
+                    "$blob_p" "$blob_s" | git mktree)"
+
+          parent=""
+          if git rev-parse --verify "origin/${POINTER_BRANCH}" >/dev/null 2>&1; then
+            parent="-p $(git rev-parse "origin/${POINTER_BRANCH}")"
+          fi
+          # shellcheck disable=SC2086
+          commit="$(printf 'promote: seq %s -> %s\n' "$SEQ" "$RELEASE" | git commit-tree "$tree" $parent)"
+          git push origin "${commit}:refs/heads/${POINTER_BRANCH}"
+          echo "Publicado seq=${SEQ} em ${POINTER_BRANCH}."
+
+      - name: Resumo
+        if: always()
+        env:
+          RELEASE: ${{ steps.rel.outputs.release }}
+          SEQ: ${{ steps.build.outputs.sequence }}
+          BE: ${{ steps.digests.outputs.backend }}
+          FE: ${{ steps.digests.outputs.frontend }}
+        run: |
+          {
+            echo "# Promote"
+            echo
+            echo "- release: \`${RELEASE}\`  (sequence \`${SEQ:-?}\`)"
+            echo "- backend: \`${BE:-?}\`"
+            echo "- frontend: \`${FE:-?}\`"
+            echo "- branch: \`${POINTER_BRANCH}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

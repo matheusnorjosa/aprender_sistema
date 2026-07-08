@@ -1,0 +1,10 @@
+[Unit]
+Description=Dispara aprender-applier quando o deployer escreve o handoff
+Documentation=https://github.com/matheusnorjosa/aprender_sistema/issues/1513
+
+[Path]
+PathModified=/run/aprender-deployer/handoff/trigger
+Unit=aprender-applier.service
+
+[Install]
+WantedBy=multi-user.target

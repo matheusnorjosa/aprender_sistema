@@ -1,0 +1,13 @@
+[Unit]
+Description=aprender-deployer reconcile a cada ~60s (pull-based)
+Documentation=https://github.com/matheusnorjosa/aprender_sistema/issues/1513
+
+[Timer]
+OnBootSec=90s
+OnUnitInactiveSec=60s
+RandomizedDelaySec=20s
+AccuracySec=10s
+Persistent=false
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,53 @@
+[Unit]
+Description=aprender-deployer reconcile (pull-based: fetch+verify, sem token)
+Documentation=https://github.com/matheusnorjosa/aprender_sistema/issues/1513
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=aprender-deployer
+Group=aprender-deploy
+UMask=0027
+ExecStart=/opt/aprender-deployer/current/reconcile.sh
+WorkingDirectory=/opt/aprender-deployer/current
+EnvironmentFile=/etc/aprender-deployer/config.env
+RuntimeMaxSec=600
+TimeoutStartSec=600
+
+# --- sandbox / hardening ---
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @mount @debug @swap @reboot @raw-io
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadOnlyPaths=/opt/aprender-deployer /etc/aprender-deployer
+ReadWritePaths=/var/lib/aprender-deployer /run/aprender-deployer
+InaccessiblePaths=/var/run/docker.sock /run/docker.sock
+RuntimeDirectory=aprender-deployer
+RuntimeDirectoryMode=0750
+# NAO apagar /run/aprender-deployer ao sair (oneshot): o handoff precisa sobreviver
+# ate o aprender-applier consumi-lo. Sem isto, o systemd remove o dir na desativacao
+# e o applier corre para 226/NAMESPACE ou handoff_missing (bug pego no red-team).
+RuntimeDirectoryPreserve=yes
+StateDirectory=aprender-deployer
+StateDirectoryMode=0750

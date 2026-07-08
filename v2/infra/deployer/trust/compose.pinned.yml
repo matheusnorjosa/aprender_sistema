@@ -1,0 +1,23 @@
+# =====================================================================
+# PLACEHOLDER — regenerado no bootstrap (bootstrap/migrate-stack.sh).
+# =====================================================================
+#
+# Este arquivo e o SSOT do StackFileContent que o APPLIER reenvia no PUT.
+# A guarda de integridade (lib/compose.sh: compose_check_drift) compara o
+# sha256 do compose VIVO na stack (GET /api/stacks/{id}/file) com o sha256
+# DESTE arquivo. Portanto ele tem de ser BYTE-IDENTICO a forma NORMALIZADA
+# que o Portainer devolve — coisa que so se captura no host, no bootstrap.
+#
+# Conteudo final = docker-compose.prod.yml na forma "Opcao B" (deploy por
+# digest): cada imagem vira
+#     norjosamatheus/aprender-backend:${IMAGE_TAG:?...}@${BACKEND_DIGEST:?...}
+#     norjosamatheus/aprender-frontend:${IMAGE_TAG:?...}@${FRONTEND_DIGEST:?...}
+# capturado via `GET /file` apos o PUT inicial e pinado aqui (chattr +i).
+#
+# ATENCAO (landmine #13): a guarda @${DIGEST:?} QUEBRA o deploy push legado
+# (que so seta IMAGE_TAG). A troca do compose para Opcao B tem de ser ATOMICA
+# com a desativacao do escritor legado (escritor unico = o agente). Ver
+# bootstrap/migrate-stack.sh e o checklist do blueprint (issue #1513, §I).
+#
+# Enquanto este placeholder nao for substituido, compose_check_drift FALHA
+# de proposito (fail-closed) — o agente nao aplica nada sem o compose pinado real.

@@ -101,14 +101,16 @@ jobs:
       - name: Generate SLSA provenance attestation (backend)
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
-          subject-name: ${{ env.BACKEND_IMAGE }}
+          # registry-qualified (index.docker.io/): sem o prefixo o attest interpreta
+          # 'norjosamatheus' como host de registry -> "No credentials found for registry".
+          subject-name: index.docker.io/${{ env.BACKEND_IMAGE }}
           subject-digest: ${{ steps.digests.outputs.backend_digest }}
           push-to-registry: true
 
       - name: Generate SLSA provenance attestation (frontend)
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
-          subject-name: ${{ env.FRONTEND_IMAGE }}
+          subject-name: index.docker.io/${{ env.FRONTEND_IMAGE }}
           subject-digest: ${{ steps.digests.outputs.frontend_digest }}
           push-to-registry: true
 

@@ -68,17 +68,23 @@ echo "==> instala arvore imutavel"
 VER="$(cat "$SRC/VERSION" 2>/dev/null || date -u +%Y%m%dT%H%M%SZ)"
 DEST="$PREFIX/$VER"
 mkdir -p "$PREFIX"
-# se ja existe (re-run), remove o imutavel antes
-if [ -d "$DEST" ]; then chattr -R -i "$DEST" 2>/dev/null || true; rm -rf "$DEST"; fi
+# se ja existe (re-run), remove o imutavel antes. Destrava tambem o PAI defensivamente
+# (instalacoes antigas podiam te-lo deixado +i, o que impede remover o version dir).
+if [ -d "$DEST" ]; then
+  chattr -i "$PREFIX" 2>/dev/null || true
+  chattr -R -i "$DEST" 2>/dev/null || true
+  rm -rf "$DEST"
+fi
 cp -a "$SRC" "$DEST"
 chown -R root:"$SHARED_GROUP" "$DEST"
 chmod -R a-w,g-w "$DEST"
 find "$DEST" -type d -exec chmod 0755 {} +
 find "$DEST" -name '*.sh' -exec chmod 0755 {} +
 ln -sfn "$DEST" "$PREFIX/current"
-# imutavel: codigo, trust/, current e o pai
+# imutavel: SO o codigo/ancoras da versao ($DEST). O pai $PREFIX fica MUTAVEL — ele
+# precisa aceitar novas versoes e repontar o symlink 'current' nos updates; torna-lo
+# imutavel quebraria o proprio re-install (rm do version dir falha com o pai +i).
 chattr -R +i "$DEST" 2>/dev/null || echo "    (chattr +i indisponivel neste FS — garantir RO por outro meio)"
-chattr +i "$PREFIX" 2>/dev/null || true
 
 echo "==> /etc/aprender-deployer"
 mkdir -p "$ETC"

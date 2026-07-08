@@ -605,11 +605,33 @@ jobs:
           curl_opts+=(--config "$portainer_hdr_file")
 
           # --- Read current stack state ---
-          stack_json="$(curl "${curl_opts[@]}" \
-            "${portainer_url}/api/stacks/${PORTAINER_STACK_ID}")"
+          # Retry helper: um curl 28/000 transiente ao Portainer (blips de
+          # firewall/Kaspersky no caminho runner->:9443) NAO pode abortar o deploy
+          # inteiro logo no primeiro GET. Espelha o retry que o PUT ja tem (3
+          # tentativas, 10s de backoff). GET e idempotente -> retry simples e seguro.
+          get_response_file="$(mktemp)"
+          trap 'rm -f "$portainer_hdr_file" "$get_response_file"' EXIT
+          fetch_stack_json_with_retry() {
+            local url="$1" http_code attempt
+            local max_attempts=3 retry_sleep=10
+            for attempt in $(seq 1 "$max_attempts"); do
+              # --max-time 30: um GET de leitura e rapido; timeout curto detecta o
+              # blip cedo e re-tenta (os 300s de curl_opts sao p/ o PUT+redeploy).
+              http_code="$(curl "${curl_opts[@]}" --max-time 30 \
+                -o "$get_response_file" -w '%{http_code}' "$url" || true)"
+              if [[ "$http_code" =~ ^[0-9]+$ ]] && [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+                cat "$get_response_file"
+                return 0
+              fi
+              echo "Portainer GET falhou (HTTP ${http_code:-curl_error}) tentativa ${attempt}/${max_attempts}: ${url}" >&2
+              [ "$attempt" -lt "$max_attempts" ] && sleep "$retry_sleep"
+            done
+            echo "Portainer GET esgotou ${max_attempts} tentativas: ${url}" >&2
+            return 1
+          }
 
-          stack_file_json="$(curl "${curl_opts[@]}" \
-            "${portainer_url}/api/stacks/${PORTAINER_STACK_ID}/file")"
+          stack_json="$(fetch_stack_json_with_retry "${portainer_url}/api/stacks/${PORTAINER_STACK_ID}")"
+          stack_file_json="$(fetch_stack_json_with_retry "${portainer_url}/api/stacks/${PORTAINER_STACK_ID}/file")"
 
           stack_file_content="$(printf '%s' "$stack_file_json" | jq -r '.StackFileContent')"
           if [ -z "$stack_file_content" ] || [ "$stack_file_content" = "null" ]; then

@@ -1,0 +1,15 @@
+# portainer.curlrc.example — copiar para /etc/aprender-deployer/portainer.curlrc
+#                            (0400 aprender-applier:aprender-applier)
+#
+# UNICO segredo do agente. Lido SO pelo applier, via `curl -K` — o token nunca
+# aparece em argv (/proc/<pid>/cmdline e world-readable). Recomenda-se `hidepid=2`
+# no host. O token deve ser LEAST-PRIVILEGE (usuario Portainer nao-admin com
+# resource-access apenas nesta stack+endpoint); ainda assim, trate-o como
+# root-equivalente (ver §H do blueprint) e proteja o arquivo.
+#
+# Substituir ptr_xxxx pelo token real (NUNCA commitar o arquivo real).
+
+header = "X-API-KEY: ptr_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# Portainer local usa certificado self-signed => aceitar TLS local:
+insecure

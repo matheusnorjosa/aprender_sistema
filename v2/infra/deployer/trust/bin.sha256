@@ -1,0 +1,12 @@
+# bin.sha256 — hashes esperados dos binarios de verificacao (formato sha256sum).
+#
+# bootstrap/install.sh valida os binarios do host contra estas linhas ANTES de
+# habilitar o agente. Preencher com os hashes das versoes auditadas instaladas
+# no host (cosign, gh, jq, curl). Ate estar preenchido, install.sh roda em modo
+# --record (TOFU) OU recusa habilitar, conforme a flag.
+#
+# Exemplo (substituir pelos hashes reais do host):
+# <sha256>  /usr/local/bin/cosign
+# <sha256>  /usr/local/bin/gh
+# <sha256>  /usr/bin/jq
+# <sha256>  /usr/bin/curl

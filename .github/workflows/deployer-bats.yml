@@ -1,0 +1,49 @@
+name: Deployer Bats
+
+# Roda a suite bats do agente pull-based (v2/infra/deployer, ADR-018 / issue #1513).
+# Ate agora esses testes (guards de seguranca, units systemd, reconcile+apply com
+# mocks, gate de backup) so rodavam manualmente (README: `bats tests/`) — sem gate de
+# CI para codigo critico de deploy. Este workflow fecha esse gap.
+#
+# NAO e [required] no ruleset da main (por isso o path filter e seguro: PR que nao
+# toca o deployer nem dispara). Promover a required = passo de settings (follow-up).
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "v2/infra/deployer/**"
+      - ".github/workflows/deployer-bats.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "v2/infra/deployer/**"
+      - ".github/workflows/deployer-bats.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  bats:
+    name: deployer bats (guards + units + gate de backup)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
+
+      # jq/curl/flock/sha256sum ja vem no ubuntu-latest; cosign/gh sao MOCKADOS pelo
+      # helper (nao precisam existir). So o bats precisa ser instalado.
+      - name: Instala bats
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq bats
+
+      - name: bats tests/
+        working-directory: v2/infra/deployer
+        run: bats tests/

@@ -407,11 +407,19 @@ jobs:
       - prepare
       - build_and_push
       - validate_existing_tag
-    if: |
-      always() &&
-      needs.prepare.result == 'success' &&
-      (needs.build_and_push.result == 'success' || needs.build_and_push.result == 'skipped') &&
-      (needs.validate_existing_tag.result == 'success' || needs.validate_existing_tag.result == 'skipped')
+    # ADR-018 cutover (#1515): PUT legado ao Portainer :9443 PUBLICO foi DESLIGADO.
+    # O deploy agora e PULL-BASED — o agente aprender-deployer (VM01) le o ponteiro
+    # assinado (promote.yml, gated) e deploya por DIGEST em 127.0.0.1:9443, imune ao
+    # false-red. build_and_push + sign CONTINUAM (o agente so deploya imagem que
+    # existe e esta assinada com cosign). Reverter em emergencia = restaurar a
+    # condicao original abaixo (git blame). Fase 4 (#1516): DELETAR este job inteiro
+    # + remover os secrets PRODUCTION_PORTAINER_* (estado final limpo).
+    #
+    # Condicao original (para revert de emergencia):
+    #   always() && needs.prepare.result == 'success' &&
+    #   (needs.build_and_push.result == 'success' || needs.build_and_push.result == 'skipped') &&
+    #   (needs.validate_existing_tag.result == 'success' || needs.validate_existing_tag.result == 'skipped')
+    if: false
     steps:
       - name: Resolve deploy endpoints and configuration
         id: resolve

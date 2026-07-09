@@ -213,6 +213,15 @@ services:
       - /run:size=10M
       - /home/appuser:size=10M
       - /app/out_etl:size=50M
+    # #1455 / ADR-018 B2: bind-mount GRAVAVEL para os dumps de DB. A task Celery
+    # backup.perform_database_backup roda no worker e chama backup_db.sh, que grava
+    # backup_full_*.sql.gz.age em /backups (default do script). Sem este mount o job
+    # falha em silencio (root FS read_only) — causa raiz do #1455. O mount explicito
+    # e gravavel apesar do read_only do root. Host: /var/backups/aprender (criar ANTES,
+    # 0755, dono = UID do appuser); o applier (ADR-018) le a idade daqui como gate de
+    # deploy. Dumps sao .age (cifrados, SEC-017).
+    volumes:
+      - /var/backups/aprender:/backups
     # SEC-015: Worker only needs backend services
     networks:
       - backend-internal

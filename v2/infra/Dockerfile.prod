@@ -46,12 +46,14 @@ ARG GIT_SHA=unknown
 
 # Runtime OS packages only (NO compilers, NO headers)
 # - postgresql-client: required for backup scripts (Issue #562 C-05)
+# - age: cifra os dumps de DB em repouso (backup_db.sh + BACKUP_AGE_RECIPIENT; #1455).
+#        O recipient (chave publica) ja esta no Env de prod, mas o binario faltava.
 # - libmagic1: required by python-magic at runtime
 RUN echo "os-security-upgrade for ${GIT_SHA}" \
  && apt-get update \
  && apt-get upgrade -y \
  && apt-get install -y --no-install-recommends \
-    curl tzdata ca-certificates libpq5 postgresql-client libmagic1 \
+    curl tzdata ca-certificates libpq5 postgresql-client age libmagic1 \
  && rm -rf /var/lib/apt/lists/*
 
 # Pre-built virtualenv from builder stage

@@ -1,0 +1,5 @@
+# O agente aprender-deployer roda em Linux (VM01). TODOS os arquivos aqui sao
+# texto com fim de linha LF — inclusive .env/.json/.yml/.bats/units, que sao
+# sourced/lidos e QUEBRARIAM com CRLF (ex.: `source identity.env` deixaria um \r
+# no fim de cada valor -> a identidade do cosign nao casaria).
+* text eol=lf

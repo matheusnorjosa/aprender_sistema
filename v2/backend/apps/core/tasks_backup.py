@@ -195,7 +195,14 @@ def verify_backup_health() -> dict[str, str | int | list[str]]:
         checks_passed += 1
 
     # Check 2: Recent backup exists (within last 25 hours)
-    recent_backups = list(backup_dir.glob("backup_full_*.sql.gz"))
+    #
+    # Dois sufixos: `.sql.gz` (sem cifra) e `.sql.gz.age` (SEC-017 — o que producao
+    # realmente grava). `glob("*.sql.gz")` NAO casa `.sql.gz.age`: o alarme olharia um
+    # diretorio cheio de backups validos e diria "No backups found" (#1455).
+    recent_backups = [
+        *backup_dir.glob("backup_full_*.sql.gz"),
+        *backup_dir.glob("backup_full_*.sql.gz.age"),
+    ]
     if recent_backups:
         latest_backup = max(recent_backups, key=lambda p: p.stat().st_mtime)
         age_hours = (datetime.now().timestamp() - latest_backup.stat().st_mtime) / 3600

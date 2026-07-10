@@ -184,6 +184,17 @@ services:
       # em vez de depender da stack.env, que some se a stack for recriada.
       INCLUDE_DEV_TOOLS: "false"
       SERVICE_NAME: worker
+      # SEC-017 / #1455: chave PUBLICA age (recipient) dos dumps cifrados. Publica por
+      # definicao — cifra, nao decifra; a PRIVADA nunca entra no repo nem na VM (fica
+      # no gerenciador de senhas do mantenedor). Fixa AQUI, e nao na stack.env, por dois
+      # motivos: (1) `environment:` sobrepoe o env_file, entao um recipient antigo/
+      # corrompido remanescente na stack.env nao volta a valer — foi exatamente o que
+      # aconteceu (o valor original tinha um caractere invalido de bech32 e o `age`
+      # falhava, gerando dump 0-byte); (2) sobrevive a recriacao da stack.
+      # ATENCAO: se este valor sumir, backup_db.sh grava .sql.gz em TEXTO CLARO (com
+      # PII) em vez de falhar — a cifragem e opt-in no script (backup_db.sh:36).
+      # Ao rotacionar a chave, trocar aqui E no `environment:` do worker no Portainer.
+      BACKUP_AGE_RECIPIENT: age1h52qdv3m73yv75ussvuten7ckhkhr5axl3kgjnadl89j5ux265ls2jda8c
     depends_on:
       redis:
         condition: service_started

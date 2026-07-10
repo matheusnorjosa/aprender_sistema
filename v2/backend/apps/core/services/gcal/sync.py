@@ -208,9 +208,15 @@ def upsert_one(
                             operation_name=f"GCal DELETE #{s.id}",
                         )
                     except Exception as e:
-                        # Ignora se evento já foi deletado, mas registra outros erros
+                        # 404 = evento já deletado no Google (idempotência OK). Para
+                        # QUALQUER outro erro, RE-LEVANTA (#1541): limpar
+                        # external_event_id e retornar action="DELETE" aqui deixava o
+                        # evento VIVO no Google (participantes ainda o viam) e
+                        # descartava o único ponteiro para ele — evento órfão
+                        # permanente, reportado como sucesso. Espelha
+                        # cancel_solicitacao; o caller marca gcal_status=ERROR.
                         if "404" not in str(e):
-                            error_msg = f"Erro ao deletar: {str(e)}"
+                            raise
 
                     s.external_event_id = None
                     s.last_synced_at = timezone.now()

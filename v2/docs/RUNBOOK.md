@@ -2,7 +2,7 @@
 
 **Versão:** 1.0
 **Projeto Docker:** `aprender_v2`
-**Última atualização:** 2026-02-24
+**Última atualização:** 2026-07-10
 
 ---
 
@@ -20,76 +20,48 @@
 
 ## 🚀 Deploy Workflow (Canônico)
 
-Workflow oficial:
-- `.github/workflows/deploy.yaml`
+> **Modelo atual: pull-based (ADR-018).** SSOT: [`specs/infra/deploy.spec.md`](specs/infra/deploy.spec.md).
+> O modelo antigo (o CI fazia `PUT` no Portainer `:9443` **público**) foi desligado no cutover (#1515) e o job
+> `deploy` foi **removido** na Fase 4 (#1516).
 
-Comportamento:
-- `push` na `main` -> deploy automático em `staging`.
-- `workflow_dispatch`:
-  - `target_environment=staging` (build e deploy de staging),
-  - `target_environment=production` + `promotion_tag`,
-  - `target_environment=production` + `rollback_tag`.
+Workflows oficiais:
+- `.github/workflows/deploy.yaml` (hoje **"Build, sign and release (main)"**)
+- `.github/workflows/promote.yml` (promoção/rollback, gated)
 
-Regra de produção:
-- usar somente tag imutável `vYYYY.MM.DD-<sha-or-id>`;
-- `latest` é bloqueada para promoção/rollback.
-- o pipeline publica apenas a tag imutável da release (sem retag `latest`).
-- promoção deve partir de PR com check `[required] staging gate evidence` aprovado.
+### Merge na `main` NÃO deploya
 
-### Variáveis obrigatórias por ambiente
+`push`/merge na `main` dispara apenas `deploy.yaml`, que faz **build → scan (Trivy) → push no Docker Hub →
+assina** as imagens (cosign keyless + provenance SLSA) → cria a **tag imutável** `vYYYY.MM.DD-<sha7>` + GitHub
+Release. Nenhum ambiente é atualizado nesse passo.
 
-Portainer:
-- `STAGING_PORTAINER_URL` / `PRODUCTION_PORTAINER_URL` ou `PORTAINER_URL`
-- `STAGING_PORTAINER_STACK_ID` / `PRODUCTION_PORTAINER_STACK_ID` ou `PORTAINER_STACK_ID`
-- `STAGING_PORTAINER_ENDPOINT_ID` / `PRODUCTION_PORTAINER_ENDPOINT_ID` ou `PORTAINER_ENDPOINT_ID`
-- `STAGING_PORTAINER_ACCESS_TOKEN` / `PRODUCTION_PORTAINER_ACCESS_TOKEN` ou `PORTAINER_ACCESS_TOKEN`
+### Produção muda em dois passos deliberados
 
-Verificação:
-- `STAGING_HEALTHCHECK_URL` / `PRODUCTION_HEALTHCHECK_URL`
-- `STAGING_VERSIONCHECK_URL` / `PRODUCTION_VERSIONCHECK_URL`
+1. **Promoção (`promote.yml`)** — `workflow_dispatch` atrás do GitHub Environment `production` (*required
+   reviewer*, 1 aprovação). Resolve tag→digest, exige imagens assinadas, monta e **assina** o ponteiro de
+   release (`cosign sign-blob`, identidade OIDC do workflow) e publica no branch protegido **`deploy-pointer`**.
 
-### Evidências geradas
+   ```bash
+   gh workflow run promote.yml -f release=vYYYY.MM.DD-<sha7>
+   ```
 
-Artifacts relevantes:
-- `deploy-evidence.txt`
-- `post-deploy-health-response.txt`
-- `post-deploy-version-response.txt`
-- `post-deploy-debug.txt`
-- `portainer-stack-update-attempts.txt` (quando houver retries/falhas no update da stack)
+2. **Aplicação (agente `aprender-deployer` na VM01)** — systemd na própria VM lê o ponteiro assinado,
+   verifica com **cosign** contra um trusted-root pinado offline, verifica as imagens **por digest**, checa
+   anti-rollback (selo monotônico) + drift do compose + backup de DB fresco, faz o `PUT` em
+   **`127.0.0.1:9443`** com o compose pinado que ele mesmo detém e confirma de dentro da VM
+   (`/api/readyz/` + `/api/version/`). Por confirmar em `localhost`, é imune ao *false-red* do `:9443` público.
 
-### Troubleshooting do post-deploy
+### Regras de produção
 
-Quando falhar a verificação de versão/health no `deploy.yaml`, usar:
+- Só tag imutável `vYYYY.MM.DD-<sha7>`; `latest` é bloqueada para promoção. O pipeline não faz retag `latest`.
+- **Rollback = promover a tag anterior** pelo mesmo caminho gated: `gh workflow run promote.yml -f release=<tag-anterior>`.
+- Alterar o compose exige edição **manual** no Editor do Portainer + re-captura do pinado (senão o agente recusa por `compose_drift`).
 
-1. `deploy-evidence.txt` para contexto do run.
-2. `post-deploy-debug.txt` para causa classificada (`failure_cause`):
-   - `network_unavailable`
-   - `endpoint_not_ready`
-   - `version_mismatch`
-3. `post-deploy-*.txt` para última resposta dos endpoints.
+### Depreciado / removido
 
-### Comandos canônicos
-
-```bash
-# Staging manual
-gh workflow run deploy.yaml -f target_environment=staging
-
-# Produção (promoção)
-gh workflow run deploy.yaml -f target_environment=production -f promotion_tag=vYYYY.MM.DD-<sha>
-
-# Produção (rollback)
-gh workflow run deploy.yaml -f target_environment=production -f rollback_tag=vYYYY.MM.DD-<sha-anterior>
-```
-
-### Deprecação aplicada
-
-Workflows removidos:
-- `.github/workflows/release.yaml`
-- `.github/workflows/dockerhub-rebuild.yml`
-
-Variáveis obsoletas:
-- `STAGING_DEPLOY_COMMAND`
-- `PRODUCTION_DEPLOY_COMMAND`
+- Job `deploy` (PUT ao Portainer `:9443` público) e `validate_existing_tag` — **removidos** (#1516).
+- `workflow_dispatch` do `deploy.yaml` **não** tem mais os inputs `target_environment` / `promotion_tag` / `rollback_tag`.
+- Secrets/vars `PORTAINER_*`, `STAGING_*`, `PRODUCTION_*` e `*_DEPLOY_COMMAND` — **removidos do GitHub** (não configurar mais).
+- Workflows `release.yaml` e `dockerhub-rebuild.yml` — removidos (issue #814).
 
 ## 🔄 Recarregar Variáveis de Ambiente (.env)
 

@@ -15,13 +15,19 @@
 #
 # Refs: Issue #562 (C-05), MP5
 
-set -e
+# pipefail (audit #1541): sem ele, uma falha do pg_dump no MEIO do pipe
+# `pg_dump | gzip | age` era MASCARADA — gzip/age no fim saem 0 e o `set -e` nao
+# dispara, gravando um backup truncado que se disfarca de sucesso (a task Celery
+# via check=True enxergava returncode 0). Com pipefail a falha do pg_dump aborta e
+# propaga exit != 0 (retry + alerta), em vez de virar um dump silenciosamente ruim.
+set -euo pipefail
 
 # Configuration with environment variable support
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5432}"
 DB_NAME="${DB_NAME:-aprender_db}"
 DB_USER="${DB_USER:-postgres}"
+DB_PASSWORD="${DB_PASSWORD:-}"
 BACKUP_DIR="${BACKUP_DIR:-/backups}"
 BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-7}"
 DATE=$(date +%Y%m%d_%H%M%S)
@@ -29,8 +35,17 @@ S3_BUCKET="${S3_BUCKET:-}"
 # Normalize bucket name if provided with scheme
 S3_BUCKET="${S3_BUCKET#s3://}"
 
-# SEC-017: Optional encryption via age (when BACKUP_AGE_RECIPIENT is set)
+# SEC-017: encryption via age. Fail-CLOSED (audit #1541 / #1536): sem recipient o
+# script gravava o dump de PII em TEXTO CLARO, em silencio. Agora RECUSA, salvo
+# opt-out explicito BACKUP_ALLOW_PLAINTEXT=1 (dev / restore-test). Em prod o
+# recipient vem do environment do worker -> o caminho cifrado segue inalterado.
 BACKUP_AGE_RECIPIENT="${BACKUP_AGE_RECIPIENT:-}"
+BACKUP_ALLOW_PLAINTEXT="${BACKUP_ALLOW_PLAINTEXT:-0}"
+if [ -z "$BACKUP_AGE_RECIPIENT" ] && [ "$BACKUP_ALLOW_PLAINTEXT" != "1" ]; then
+    echo "[$(date)] ERROR: BACKUP_AGE_RECIPIENT ausente e BACKUP_ALLOW_PLAINTEXT!=1." >&2
+    echo "[$(date)] Recusando gerar backup de PII em texto claro (SEC-017, fail-closed)." >&2
+    exit 1
+fi
 
 # Naming convention: backup_full_YYYYMMDD_HHMMSS.sql.gz[.age]
 if [ -n "$BACKUP_AGE_RECIPIENT" ]; then
@@ -71,7 +86,12 @@ if [ -f "$BACKUP_FILE" ] && [ -s "$BACKUP_FILE" ]; then
     # Optional: Copy to S3 (if S3_BUCKET is configured)
     if [ -n "$S3_BUCKET" ]; then
         echo "[$(date)] Uploading to S3: s3://$S3_BUCKET/backups/"
-        aws s3 cp "$BACKUP_FILE" "s3://$S3_BUCKET/backups/" || echo "[$(date)] WARNING: S3 upload failed"
+        if ! aws s3 cp "$BACKUP_FILE" "s3://$S3_BUCKET/backups/"; then
+            # A copia offsite falhou, mas o backup LOCAL e valido — nao re-rodar
+            # pg_dump. Marcador distinto no STDERR (audit #1541) p/ um alerta de log
+            # (level>=WARNING) pegar, ja que o Sentry esta vazio em prod.
+            echo "[$(date)] WARNING: S3 upload FAILED (offsite copy missing) for $BACKUP_FILE" >&2
+        fi
     fi
 else
     echo "[$(date)] ERROR: Backup failed or file is empty!"

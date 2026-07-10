@@ -32,7 +32,8 @@ echo ""
 
 # Determine backup file
 if [ "$1" == "--latest" ]; then
-    BACKUP_FILE=$(ls -t $BACKUP_DIR/*.sql.gz 2>/dev/null | head -1)
+    # inclui os cifrados .sql.gz.age (o que prod grava, SEC-017) — audit #1541.
+    BACKUP_FILE=$(ls -t $BACKUP_DIR/*.sql.gz $BACKUP_DIR/*.sql.gz.age 2>/dev/null | head -1)
     if [ -z "$BACKUP_FILE" ]; then
         echo -e "${RED}ERROR: No backup files found in $BACKUP_DIR${NC}"
         exit 1
@@ -51,12 +52,13 @@ else
     # Interactive mode - list available backups
     echo "Available backups:"
     echo ""
-    ls -lh $BACKUP_DIR/*.sql.gz 2>/dev/null | awk '{print NR". "$9" ("$5")"}'
+    # -t nos DOIS (lista e selecao) p/ numeracao consistente por tempo; inclui .age.
+    ls -lht $BACKUP_DIR/*.sql.gz $BACKUP_DIR/*.sql.gz.age 2>/dev/null | awk '{print NR". "$9" ("$5")"}'
     echo ""
     read -p "Enter backup number or full path: " SELECTION
-    
+
     if [[ "$SELECTION" =~ ^[0-9]+$ ]]; then
-        BACKUP_FILE=$(ls -t $BACKUP_DIR/*.sql.gz | sed -n "${SELECTION}p")
+        BACKUP_FILE=$(ls -t $BACKUP_DIR/*.sql.gz $BACKUP_DIR/*.sql.gz.age 2>/dev/null | sed -n "${SELECTION}p")
     else
         BACKUP_FILE="$SELECTION"
     fi

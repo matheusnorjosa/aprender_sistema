@@ -11,7 +11,7 @@ Agendamento via CELERY_BEAT_SCHEDULE no settings.py:
   - Janela padrão: 90 dias atrás até 180 dias à frente
 """
 
-# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false, reportGeneralTypeIssues=false
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false, reportGeneralTypeIssues=false, reportFunctionMemberAccess=false
 
 from __future__ import annotations
 
@@ -187,6 +187,19 @@ def task_publish_solicitacao_to_gcal(
             "error": "DoesNotExist",
         }
     except Exception as e:
+        # #1541: se o publish caiu porque o circuit breaker do GCal está ABERTO,
+        # enfileira o auto-retry que espera o breaker fechar. A task
+        # queue_gcal_sync_retry existia (Gap 6) mas NUNCA era enfileirada — a sync
+        # derrubada pelo breaker ficava perdida até re-disparo MANUAL, em silêncio.
+        from apps.core.services.gcal.circuit_breaker import CircuitBreakerError
+
+        if isinstance(e, CircuitBreakerError) and not dry_run:
+            queue_gcal_sync_retry.apply_async(
+                (solicitation_id,),
+                kwargs={"dry_run": dry_run, "apply_blocked": apply_blocked},
+                countdown=60,
+            )
+
         # Tentar registrar erro e estado se a solicitação existir
         try:
             s = Solicitacao.objects.get(id=solicitation_id)

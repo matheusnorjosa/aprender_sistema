@@ -232,6 +232,12 @@ test.describe('Checklist: Resource Loading', () => {
 
 test.describe('Checklist: Caching', () => {
   test('🔴 assets estáticos devem ter cache headers', async ({ page }) => {
+    // #1541: cache headers só existem no build de produção (CI); em dev o Vite serve
+    // sem cache-control. O skip ficava no FIM, depois de um mero console.log — então
+    // em CI o teste 🔴 passava mesmo com TODOS os assets sem cache-control (nenhum
+    // expect). Agora: skip no topo (SKIP honesto em dev) + asserção de verdade em CI.
+    test.skip(!process.env.CI, 'Cache headers verificados apenas em CI');
+
     const assetsWithoutCache: string[] = [];
 
     page.on('response', async (response) => {
@@ -246,10 +252,7 @@ test.describe('Checklist: Caching', () => {
         url.endsWith('.jpg') ||
         url.endsWith('.svg')
       ) {
-        const cacheControl = response.headers()['cache-control'];
-
-        // Em desenvolvimento, cache pode não estar configurado
-        if (process.env.CI && !cacheControl) {
+        if (!response.headers()['cache-control']) {
           assetsWithoutCache.push(url.split('/').pop() || url);
         }
       }
@@ -257,14 +260,10 @@ test.describe('Checklist: Caching', () => {
 
     await page.goto('/', { waitUntil: 'networkidle' });
 
-    if (assetsWithoutCache.length > 0) {
-      console.log('Assets sem cache headers:', assetsWithoutCache);
-    }
-
-    // Não falha em desenvolvimento
-    if (!process.env.CI) {
-      test.skip(true, 'Cache headers verificados apenas em CI');
-    }
+    expect(
+      assetsWithoutCache,
+      `Assets sem cache-control: ${assetsWithoutCache.join(', ')}`
+    ).toHaveLength(0);
   });
 
   test('🟡 deve usar preconnect para APIs externas', async ({ page }) => {

@@ -93,6 +93,59 @@ _setup_apply_fixtures() {
   [ "$status" -eq 10 ]
 }
 
+# ---------------- confirm pos-PUT (regressao do BUG #4, ADR-018 3e) ----------------
+#
+# Na 1a promocao REAL o PUT respondeu http=000 (false-red: a resposta nao volta
+# durante o recreate) e o applier releu o Env UMA vez, IMEDIATAMENTE — o Portainer
+# ainda nao tinha commitado => `put_unconfirmed_env` FAIL + breaker armado, num
+# deploy que na verdade deu certo. O confirm pos-PUT agora faz POLL com deadline.
+
+@test "apply: PUT false-red (000) + Env commitado com atraso -> confirma, SELA, sem breaker" {
+  seed_seal 4; _setup_apply_fixtures
+  MOCK_COSIGN_RC=0 MOCK_GH_RC=0 BACKUP_REQUIRED=0 CONFIRM_INTERVAL=1 \
+    MOCK_PUT_CODE=000 MOCK_ENV_COMMIT_DELAY=2 \
+    PUT_CONFIRM_INTERVAL=1 PUT_CONFIRM_TIMEOUT=30 \
+    run bash "$DEPLOYER_HOME/apply.sh"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$APPLIER_STATE_DIR/seal/last_sequence")" = "5" ]
+  [ ! -f "$APPLIER_STATE_DIR/breaker/5" ]
+}
+
+@test "apply: API do Portainer indisponivel no recreate -> retenta a releitura e converge" {
+  seed_seal 4; _setup_apply_fixtures
+  MOCK_COSIGN_RC=0 MOCK_GH_RC=0 BACKUP_REQUIRED=0 CONFIRM_INTERVAL=1 \
+    MOCK_PUT_CODE=000 MOCK_STACK_READ_FAIL=2 \
+    PUT_CONFIRM_INTERVAL=1 PUT_CONFIRM_TIMEOUT=30 \
+    run bash "$DEPLOYER_HOME/apply.sh"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$APPLIER_STATE_DIR/seal/last_sequence")" = "5" ]
+}
+
+@test "apply: Env nunca commita -> FAIL fail-closed (nao sela, arma o breaker)" {
+  seed_seal 4; _setup_apply_fixtures
+  MOCK_COSIGN_RC=0 MOCK_GH_RC=0 BACKUP_REQUIRED=0 \
+    MOCK_PUT_CODE=000 MOCK_ENV_COMMIT_DELAY=999 \
+    PUT_CONFIRM_INTERVAL=1 PUT_CONFIRM_TIMEOUT=2 \
+    run bash "$DEPLOYER_HOME/apply.sh"
+  [ "$status" -eq 1 ]                                            # FAIL (nao REFUSE)
+  [ "$(cat "$APPLIER_STATE_DIR/seal/last_sequence")" = "4" ]     # selo intacto
+  [ "$(cat "$APPLIER_STATE_DIR/breaker/5")" = "1" ]
+}
+
+# O Env tem de refletir os DOIS digests: um PUT que so commitou o backend deixaria
+# o frontend na imagem antiga — convergencia parcial nao pode selar.
+@test "apply: Env commita so o backend -> FAIL (confirm exige backend E frontend)" {
+  seed_seal 4; _setup_apply_fixtures
+  local a; a="$(printf 'a%.0s' $(seq 1 64))"
+  MOCK_STACK_AFTER="$("$JQ_BIN" -nc --arg bd "sha256:$a" \
+    '{Env:[{name:"BACKEND_HOST_PORT",value:"8000"},{name:"BACKEND_DIGEST",value:$bd}]}')"
+  MOCK_COSIGN_RC=0 MOCK_GH_RC=0 BACKUP_REQUIRED=0 \
+    PUT_CONFIRM_INTERVAL=1 PUT_CONFIRM_TIMEOUT=2 \
+    run bash "$DEPLOYER_HOME/apply.sh"
+  [ "$status" -eq 1 ]
+  [ "$(cat "$APPLIER_STATE_DIR/seal/last_sequence")" = "4" ]
+}
+
 # Regressao do bug (red-team #1): sob systemd o pai RUN_DIR e READ-ONLY para o
 # applier. O applier NAO pode gravar lock/payload em RUN_DIR — so em /var/lib.
 # Simulamos deixando RUN_DIR sem permissao de escrita e conferindo que o deploy

@@ -108,11 +108,12 @@ main() {
   if ! portainer_put "$payload"; then rm -f "$payload"; _breaker_inc "$P_SEQUENCE"; FAIL "put_failed"; fi
   rm -f "$payload"
 
-  # Confirma (false-red-safe): rele o Env e confere o digest aplicado.
-  local stack2 be2
-  stack2="$(portainer_get_stack)" || FAIL "portainer_reread"
-  be2="$(portainer_env_value "$stack2" "BACKEND_DIGEST")"
-  if [ "$be2" != "$P_BACKEND_DIGEST" ]; then _breaker_inc "$P_SEQUENCE"; FAIL "put_unconfirmed_env"; fi
+  # Confirma (false-red-safe): faz POLL do Env ate refletir os digests do PUT. O PUT
+  # pode responder 000 (resposta perdida) e o Portainer leva alguns segundos para
+  # commitar; uma releitura unica reprovaria um deploy bom e armaria o breaker.
+  if ! portainer_wait_env_digest "$P_BACKEND_DIGEST" "$P_FRONTEND_DIGEST"; then
+    _breaker_inc "$P_SEQUENCE"; FAIL "put_unconfirmed_env"
+  fi
 
   # Liveness em localhost (readyz 200 + version == release).
   if confirm_localhost "$P_RELEASE" "$port"; then

@@ -169,6 +169,22 @@ test.describe('Checklist: Cookies Security', () => {
         c.name.toLowerCase().includes('token')
     );
 
+    // #1541: sem esta guarda, um sessionCookies VAZIO (o pior caso — auth mockada
+    // sem Set-Cookie real) fazia o for não executar nenhuma assertiva, e o teste 🔴
+    // passava vazio. Em STRICT_MODE exige que haja cookie para validar; em dev/mock
+    // registra SKIP em vez de PASS falso.
+    if (STRICT_MODE) {
+      expect(
+        sessionCookies.length,
+        'nenhum cookie de sessão encontrado para validar flags'
+      ).toBeGreaterThan(0);
+    } else {
+      test.skip(
+        sessionCookies.length === 0,
+        'sem cookies de sessão no ambiente mockado'
+      );
+    }
+
     for (const cookie of sessionCookies) {
       // HttpOnly para cookies de sessão
       if (cookie.name.toLowerCase().includes('session')) {

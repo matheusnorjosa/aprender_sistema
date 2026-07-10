@@ -12,7 +12,11 @@ UMask=0027
 ExecStart=/opt/aprender-deployer/current/reconcile.sh
 WorkingDirectory=/opt/aprender-deployer/current
 EnvironmentFile=/etc/aprender-deployer/config.env
-RuntimeMaxSec=600
+# Em Type=oneshot o systemd IGNORA RuntimeMaxSec e avisa no journal
+# ("RuntimeMaxSec= has no effect in combination with Type=oneshot").
+# Quem limita o tempo de vida aqui e o TimeoutStartSec — o oneshot vive
+# inteiro dentro do "start". Manter RuntimeMaxSec seria config que mente
+# sobre o que protege.
 TimeoutStartSec=600
 
 # --- sandbox / hardening ---

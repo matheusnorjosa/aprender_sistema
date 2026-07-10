@@ -12,7 +12,11 @@ UMask=0027
 ExecStart=/opt/aprender-deployer/current/apply.sh
 WorkingDirectory=/opt/aprender-deployer/current
 EnvironmentFile=/etc/aprender-deployer/config.env
-RuntimeMaxSec=900
+# Ver nota em aprender-deployer.service: RuntimeMaxSec nao vale em Type=oneshot.
+# Orcamento real do applier, dentro destes 900s:
+#   PUT (<=3 tentativas, PORTAINER_MAX_TIME=30 + backoff) ~120s
+# + poll do Env pos-PUT (PUT_CONFIRM_TIMEOUT)             ~180s
+# + confirm_localhost (CONFIRM_TIMEOUT)                   ~300s
 TimeoutStartSec=900
 
 # --- sandbox / hardening (idêntico ao deployer) ---

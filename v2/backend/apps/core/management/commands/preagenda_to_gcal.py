@@ -219,7 +219,9 @@ class Command(BaseCommand):
         # Lock key com escopo: preagenda_to_gcal:lock:{calendar_id}:{since}:{until}
         # Evita execuções concorrentes do mesmo escopo
         lock_key = f"preagenda_to_gcal:lock:{cal_id}:{since.isoformat()}:{until.isoformat()}"
-        lock_timeout = 300  # 5 minutos TTL
+        # #1541: usa o knob REDIS_LOCK_TIMEOUT (antes era 300 literal — o setting
+        # existia mas ninguém o lia, então mudar o env não tinha efeito).
+        lock_timeout = settings.REDIS_LOCK_TIMEOUT
 
         if not cache.add(lock_key, "locked", timeout=lock_timeout):
             self.stderr.write(self.style.ERROR("❌ Outra instância já está processando este escopo."))

@@ -31,6 +31,28 @@ class TestVerifyBackupHealth:
             assert result["status"] == "degraded"
             assert "No backups found" in str(result["warnings"])
 
+    def test_health_check_degraded_logs_error_for_alerting(self, tmp_path: Path) -> None:
+        """#1541: 'degraded' (backup morto) deve sair em logger.error — não info.
+
+        SENTRY_DSN está vazio em prod (o capture_message é no-op) e o INFO era
+        engolido por alertas de log (level>=WARNING). Se o resumo final voltar a INFO,
+        o detector de backup morto acha o problema e o alarme não chega a ninguém.
+        """
+        with (
+            patch("apps.core.tasks_backup.getattr") as mock_getattr,
+            patch("apps.core.tasks_backup.logger") as mock_logger,
+        ):
+            mock_getattr.return_value = str(tmp_path)  # dir vazio → "No backups found" → degraded
+            result = verify_backup_health()
+
+            assert result["status"] == "degraded"
+            assert mock_logger.error.called, "degraded deve logar em ERROR"
+            error_text = " ".join(str(c) for c in mock_logger.error.call_args_list)
+            assert "degraded" in error_text
+            # o resumo de conclusão NÃO pode sair em info quando degraded
+            info_text = " ".join(str(c) for c in mock_logger.info.call_args_list)
+            assert "completed: degraded" not in info_text
+
     def test_health_check_with_recent_backup_returns_healthy(self, tmp_path: Path) -> None:
         """Test that health check returns healthy when recent backup exists."""
         # Create a recent backup file

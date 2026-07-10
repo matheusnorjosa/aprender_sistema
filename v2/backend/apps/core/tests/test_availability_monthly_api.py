@@ -93,7 +93,9 @@ def setup_data():
 
     # Dependências
     municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = ProjetoFactory(nome="Gestão Escolar", ativo=True)
+    # #1541: super=True (fluxo=SUPER) — sem isto as Solicitações não populam a grade
+    # e os testes de códigos/CH ficavam vazios (parte do motivo do skip 'TEMP').
+    projeto = ProjetoFactory(nome="Gestão Escolar", ativo=True, super=True)
     tipo_evento = TipoEventoFactory(nome="Formação")
 
     # Eventos aprovados
@@ -185,7 +187,6 @@ def setup_data():
     }
 
 
-@pytest.mark.skip(reason="TEMP: Conflito com PRs 17/18/19 - será corrigido após merge sequencial")
 def test_monthly_availability_codes(api_client, user_auth, setup_data):
     """
     Testa códigos E/2/P/X para grade mensal.
@@ -273,7 +274,6 @@ def test_monthly_availability_codes(api_client, user_auth, setup_data):
     assert detail["tipo"] == "Formação"
 
 
-@pytest.mark.skip(reason="TEMP: Conflito com PRs 17/18/19 - será corrigido após merge sequencial")
 def test_monthly_availability_ch_and_ranking(api_client, user_auth, setup_data):
     """
     Testa CH mês/ano e ranking denso.

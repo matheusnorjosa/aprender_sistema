@@ -5,7 +5,7 @@
 # This file is used by Dockerfile.prod for lean production images.
 
 # Core Framework
-Django==5.2.15
+Django==5.2.16
 djangorestframework==3.17.1
 djangorestframework-simplejwt==5.5.1
 

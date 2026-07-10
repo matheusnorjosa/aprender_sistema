@@ -126,17 +126,23 @@ teardown() { teardown_sandbox; }
 
 # ---------------- image_verify (gate duro) ----------------
 
-@test "image_verify: cosign+attestation ok -> passa" {
-  MOCK_COSIGN_RC=0 MOCK_GH_RC=0 run image_verify "norjosamatheus/aprender-backend" "sha256:deadbeef"
+@test "image_verify: cosign ok, default cosign-only -> passa (attestation nao barra)" {
+  # default REQUIRE_ATTESTATION=0: mesmo com gh falhando, cosign ok => passa
+  MOCK_COSIGN_RC=0 MOCK_GH_RC=1 run image_verify "norjosamatheus/aprender-backend" "sha256:deadbeef"
   [ "$status" -eq 0 ]
 }
 
-@test "image_verify: cosign falha -> recusa" {
-  MOCK_COSIGN_RC=1 MOCK_GH_RC=0 run image_verify "norjosamatheus/aprender-backend" "sha256:deadbeef"
+@test "image_verify: cosign falha -> recusa (gate sempre ativo)" {
+  MOCK_COSIGN_RC=1 run image_verify "norjosamatheus/aprender-backend" "sha256:deadbeef"
   [ "$status" -ne 0 ]
 }
 
-@test "image_verify: attestation falha -> recusa" {
-  MOCK_COSIGN_RC=0 MOCK_GH_RC=1 run image_verify "norjosamatheus/aprender-backend" "sha256:deadbeef"
+@test "image_verify: REQUIRE_ATTESTATION=1 + attestation falha -> recusa" {
+  MOCK_COSIGN_RC=0 MOCK_GH_RC=1 REQUIRE_ATTESTATION=1 run image_verify "norjosamatheus/aprender-backend" "sha256:deadbeef"
   [ "$status" -ne 0 ]
+}
+
+@test "image_verify: REQUIRE_ATTESTATION=1 + cosign+attestation ok -> passa" {
+  MOCK_COSIGN_RC=0 MOCK_GH_RC=0 REQUIRE_ATTESTATION=1 run image_verify "norjosamatheus/aprender-backend" "sha256:deadbeef"
+  [ "$status" -eq 0 ]
 }

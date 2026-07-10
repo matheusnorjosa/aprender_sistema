@@ -57,6 +57,11 @@ seed_seal() { printf '%s' "$1" > "${APPLIER_STATE_DIR}/seal/last_sequence"; }
 
 # install_mock_curl — CURL_BIN vira um mock que serve fixtures do Portainer/ponteiro.
 # Vars: MOCK_POINTER, MOCK_SIG (arquivos), MOCK_STACK, MOCK_STACKFILE, MOCK_RELEASE (strings).
+#
+# Modelagem do PUT real (ADR-018 3e), para exercitar o confirm pos-PUT:
+#   MOCK_PUT_CODE          http_code devolvido pelo PUT (default 200; use 000 = false-red)
+#   MOCK_ENV_COMMIT_DELAY  N primeiras releituras pos-PUT ainda veem o Env ANTIGO
+#   MOCK_STACK_READ_FAIL   N primeiras releituras pos-PUT falham (API ocupada no recreate)
 install_mock_curl() {
   _mk "$SANDBOX/mock_curl" '#!/usr/bin/env bash
 # mock stateful: apos um PUT, o GET da stack passa a devolver MOCK_STACK_AFTER
@@ -73,9 +78,21 @@ case "$url" in
   *production.json*) cp "$MOCK_POINTER" "$out"; exit 0 ;;
   */api/stacks/*/file) printf "%s" "$MOCK_STACKFILE"; exit 0 ;;
   */api/stacks/*)
-     if [ "$method" = PUT ]; then touch "$MOCK_STATE_DIR/put_done"; [ "$want_code" = 1 ] && printf "200"; exit 0; fi
-     if [ -f "$MOCK_STATE_DIR/put_done" ] && [ -n "${MOCK_STACK_AFTER:-}" ]; then printf "%s" "$MOCK_STACK_AFTER"; else printf "%s" "$MOCK_STACK"; fi
-     exit 0 ;;
+     if [ "$method" = PUT ]; then
+       touch "$MOCK_STATE_DIR/put_done"
+       [ "$want_code" = 1 ] && printf "%s" "${MOCK_PUT_CODE:-200}"
+       exit 0
+     fi
+     # GET da stack. Antes do PUT (ou sem fixture "depois") serve sempre o Env atual.
+     if [ ! -f "$MOCK_STATE_DIR/put_done" ] || [ -z "${MOCK_STACK_AFTER:-}" ]; then
+       printf "%s" "$MOCK_STACK"; exit 0
+     fi
+     # Releituras pos-PUT: contam para simular atraso de commit / API indisponivel.
+     n=$(cat "$MOCK_STATE_DIR/reread_n" 2>/dev/null || printf 0)
+     n=$((n + 1)); printf "%s" "$n" > "$MOCK_STATE_DIR/reread_n"
+     [ "$n" -le "${MOCK_STACK_READ_FAIL:-0}" ] && exit 7
+     [ "$n" -le "${MOCK_ENV_COMMIT_DELAY:-0}" ] && { printf "%s" "$MOCK_STACK"; exit 0; }
+     printf "%s" "$MOCK_STACK_AFTER"; exit 0 ;;
   *readyz*)  [ "$want_code" = 1 ] && printf "200"; exit 0 ;;
   *version*) printf "{\"version\":\"%s\"}" "$MOCK_RELEASE"; exit 0 ;;
 esac

@@ -1,27 +1,22 @@
-name: Deploy (Portainer CE)
+name: Build, sign and release (main)
+
+# ESTE WORKFLOW NAO DEPLOYA. (Nome do arquivo mantido para preservar o historico de runs.)
+#
+# ADR-018 Fase 4 (#1516): o job `deploy` (PUT ao Portainer :9443 publico) foi DELETADO,
+# junto com o `validate_existing_tag`, que so existia como `needs` dele. O deploy de
+# producao e PULL-BASED: `promote.yml` (gated no Environment `production`) assina um
+# ponteiro de release, e o agente aprender-deployer, na VM01, o le, verifica com cosign
+# e aplica por digest em 127.0.0.1:9443 — imune ao "false-red" do :9443 publico.
+#
+# Aqui sobrou o que sempre foi o papel legitimo do CI: build + scan + push + assinar +
+# tag/release. Promocao e rollback vivem no promote.yml.
 
 on:
   push:
     branches:
       - main
+  # Rebuild manual da main. NAO deploya, e nao promove: use o promote.yml.
   workflow_dispatch:
-    inputs:
-      target_environment:
-        description: "Target environment"
-        required: true
-        default: "production"
-        type: choice
-        options:
-          - staging
-          - production
-      promotion_tag:
-        description: "Production promotion tag (immutable, ex: v2026.03.09-abc1234)"
-        required: false
-        type: string
-      rollback_tag:
-        description: "Production rollback tag (immutable, ex: v2026.03.05-def5678)"
-        required: false
-        type: string
 
 env:
   DOCKER_USERNAME: norjosamatheus
@@ -34,7 +29,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: deploy-${{ github.event_name == 'push' && 'staging' || github.event.inputs.target_environment || 'production' }}
+  # Serializa builds da main: a tag imutavel e o release sao criados aqui.
+  group: build-sign-release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -43,113 +39,44 @@ jobs:
     runs-on: ubuntu-latest
     permissions: {}
     outputs:
-      target_environment: ${{ steps.compute.outputs.target_environment }}
       release_mode: ${{ steps.compute.outputs.release_mode }}
       release_version: ${{ steps.compute.outputs.release_version }}
-      should_build: ${{ steps.compute.outputs.should_build }}
       build_date: ${{ steps.compute.outputs.build_date }}
     steps:
       - name: Compute mode and release version
         id: compute
         env:
           EVENT_NAME: ${{ github.event_name }}
-          TARGET_ENV_INPUT: ${{ github.event.inputs.target_environment || '' }}
-          PROMOTION_TAG_INPUT: ${{ github.event.inputs.promotion_tag || '' }}
-          ROLLBACK_TAG_INPUT: ${{ github.event.inputs.rollback_tag || '' }}
           GIT_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
 
-          validate_immutable_tag() {
-            local tag_value="$1"
-            local input_name="$2"
-            local immutable_regex='^v[0-9]{4}\.[0-9]{2}\.[0-9]{2}-[0-9A-Za-z._-]+$'
-
-            if [ "$tag_value" = "latest" ]; then
-              echo "Invalid ${input_name}: 'latest' is not allowed for production promotion/rollback. Use an immutable release tag." >&2
-              exit 1
-            fi
-
-            if ! printf '%s' "$tag_value" | grep -Eq "$immutable_regex"; then
-              echo "Invalid ${input_name}: '${tag_value}'. Expected format: vYYYY.MM.DD-<sha-or-id>." >&2
-              exit 1
-            fi
-          }
+          # `should_build` e `target_environment` sumiram junto com o job `deploy`
+          # (#1516): sem deploy, so existe um modo — buildar o commit atual. Promocao e
+          # rollback de producao vivem no promote.yml (gated) + agente na VM01.
+          case "$EVENT_NAME" in
+            push)              release_mode="build-auto"   ;;
+            workflow_dispatch) release_mode="build-manual" ;;
+            *) echo "Unsupported event: $EVENT_NAME" >&2; exit 1 ;;
+          esac
 
           short_sha="${GIT_SHA:0:7}"
-          auto_version="v$(date -u +%Y.%m.%d)-${short_sha}"
+          release_version="v$(date -u +%Y.%m.%d)-${short_sha}"
           build_date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-          target_environment=""
-          release_mode=""
-          release_version=""
-          should_build="false"
-
-          if [ "$EVENT_NAME" = "push" ]; then
-            target_environment="staging"
-            release_mode="staging-auto"
-            release_version="$auto_version"
-            should_build="true"
-          elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            target_environment="${TARGET_ENV_INPUT:-production}"
-            promotion_tag="$(echo "${PROMOTION_TAG_INPUT:-}" | xargs)"
-            rollback_tag="$(echo "${ROLLBACK_TAG_INPUT:-}" | xargs)"
-
-            if [ "$target_environment" = "staging" ]; then
-              if [ -n "$promotion_tag" ] || [ -n "$rollback_tag" ]; then
-                echo "For staging dispatch, leave promotion_tag and rollback_tag empty." >&2
-                exit 1
-              fi
-              release_mode="staging-manual"
-              release_version="$auto_version"
-              should_build="true"
-            elif [ "$target_environment" = "production" ]; then
-              if [ -n "$promotion_tag" ] && [ -n "$rollback_tag" ]; then
-                echo "Provide only one of promotion_tag or rollback_tag for production." >&2
-                exit 1
-              fi
-              if [ -z "$promotion_tag" ] && [ -z "$rollback_tag" ]; then
-                echo "For production dispatch, provide promotion_tag or rollback_tag." >&2
-                exit 1
-              fi
-
-              if [ -n "$promotion_tag" ]; then
-                release_mode="production-promotion"
-                release_version="$promotion_tag"
-                validate_immutable_tag "$release_version" "promotion_tag"
-              else
-                release_mode="production-rollback"
-                release_version="$rollback_tag"
-                validate_immutable_tag "$release_version" "rollback_tag"
-              fi
-              should_build="false"
-            else
-              echo "Invalid target environment: $target_environment" >&2
-              exit 1
-            fi
-          else
-            echo "Unsupported event: $EVENT_NAME" >&2
-            exit 1
-          fi
-
           {
-            echo "target_environment=$target_environment"
             echo "release_mode=$release_mode"
             echo "release_version=$release_version"
-            echo "should_build=$should_build"
             echo "build_date=$build_date"
           } >> "$GITHUB_OUTPUT"
 
           echo "Release mode: $release_mode"
-          echo "Target environment: $target_environment"
           echo "Release version: $release_version"
-          echo "Should build: $should_build"
 
   build_and_push:
     name: Build, scan, and push images
     runs-on: ubuntu-latest
     needs: prepare
-    if: needs.prepare.outputs.should_build == 'true'
     permissions:
       # build/push de imagem NAO precisa escrever no repo. O git tag + gh release
       # foram movidos p/ o job `tag_and_release` (desacopla contents:write de um
@@ -280,13 +207,16 @@ jobs:
     # ADR-018 #1524: auto-assina TODA imagem de prod (cosign keyless + attestation SLSA),
     # reutilizando o slsa-provenance.yml. A identidade OIDC keyless de um reusable LOCAL
     # e slsa-provenance.yml@refs/heads/main -> casa com o IMAGE_IDENTITY_RE do agente/promote
-    # (nenhuma mudanca no agente). Roda EM PARALELO ao PUT legado (nao e needs do `deploy`),
-    # entao um sign vermelho NAO bloqueia o deploy atual — seguro ate o cutover.
-    # Gate `ref == main`: dispatch de staging a partir de branch assinaria com identidade
+    # (nenhuma mudanca no agente).
+    #
+    # A assinatura e PRE-REQUISITO do deploy: o promote.yml recusa promover imagem nao
+    # assinada, e o agente recusa aplicar digest que nao passe no `cosign verify`.
+    #
+    # Gate `ref == main`: um dispatch a partir de outra branch assinaria com identidade
     # que o agente rejeita; entao so assina no caminho main.
     name: Sign images (cosign keyless + SLSA)
     needs: [prepare, build_and_push]
-    if: needs.prepare.outputs.should_build == 'true' && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main'
     permissions:
       id-token: write       # cosign keyless (Fulcio) — DEVE estar no caller
       attestations: write   # actions/attest-build-provenance
@@ -333,14 +263,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_VERSION: ${{ needs.prepare.outputs.release_version }}
           RELEASE_MODE: ${{ needs.prepare.outputs.release_mode }}
-          TARGET_ENV: ${{ needs.prepare.outputs.target_environment }}
         run: |
           set -euo pipefail
           {
             echo "# Release ${RELEASE_VERSION}"
             echo
-            echo "- Environment: \`${TARGET_ENV}\`"
             echo "- Mode: \`${RELEASE_MODE}\`"
+            echo "- Deploy: nao automatico. Para levar a producao, rode o workflow"
+            echo "  \`promote.yml\` com \`release=${RELEASE_VERSION}\` (gate \`production\`)."
             echo "- Backend: \`${{ env.BACKEND_IMAGE }}:${RELEASE_VERSION}\`"
             echo "- Frontend: \`${{ env.FRONTEND_IMAGE }}:${RELEASE_VERSION}\`"
             echo
@@ -362,823 +292,3 @@ jobs:
               --notes-file release_notes.md
           fi
 
-  validate_existing_tag:
-    name: Validate immutable tag exists (promotion/rollback)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    needs: prepare
-    if: needs.prepare.outputs.should_build != 'true'
-    steps:
-      - name: Login to Docker Hub
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
-        with:
-          username: ${{ env.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_TOKEN }}
-
-      - name: Check backend and frontend tags
-        env:
-          RELEASE_VERSION: ${{ needs.prepare.outputs.release_version }}
-        run: |
-          set -euo pipefail
-
-          if [ "$RELEASE_VERSION" = "latest" ]; then
-            echo "Invalid production tag: 'latest' is not allowed. Use immutable tag vYYYY.MM.DD-<sha-or-id>." >&2
-            exit 1
-          fi
-
-          if ! printf '%s' "$RELEASE_VERSION" | grep -Eq '^v[0-9]{4}\.[0-9]{2}\.[0-9]{2}-[0-9A-Za-z._-]+$'; then
-            echo "Invalid production tag format: '$RELEASE_VERSION'. Expected vYYYY.MM.DD-<sha-or-id>." >&2
-            exit 1
-          fi
-
-          docker buildx imagetools inspect "${{ env.BACKEND_IMAGE }}:${RELEASE_VERSION}" >/dev/null
-          docker buildx imagetools inspect "${{ env.FRONTEND_IMAGE }}:${RELEASE_VERSION}" >/dev/null
-          echo "Tag ${RELEASE_VERSION} exists for backend and frontend."
-
-  deploy:
-    name: Deploy via Portainer CE API
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    environment:
-      name: ${{ needs.prepare.outputs.target_environment }}
-    needs:
-      - prepare
-      - build_and_push
-      - validate_existing_tag
-    # ADR-018 cutover (#1515): PUT legado ao Portainer :9443 PUBLICO foi DESLIGADO.
-    # O deploy agora e PULL-BASED — o agente aprender-deployer (VM01) le o ponteiro
-    # assinado (promote.yml, gated) e deploya por DIGEST em 127.0.0.1:9443, imune ao
-    # false-red. build_and_push + sign CONTINUAM (o agente so deploya imagem que
-    # existe e esta assinada com cosign). Reverter em emergencia = restaurar a
-    # condicao original abaixo (git blame). Fase 4 (#1516): DELETAR este job inteiro
-    # + remover os secrets PRODUCTION_PORTAINER_* (estado final limpo).
-    #
-    # Condicao original (para revert de emergencia):
-    #   always() && needs.prepare.result == 'success' &&
-    #   (needs.build_and_push.result == 'success' || needs.build_and_push.result == 'skipped') &&
-    #   (needs.validate_existing_tag.result == 'success' || needs.validate_existing_tag.result == 'skipped')
-    if: false
-    steps:
-      - name: Resolve deploy endpoints and configuration
-        id: resolve
-        env:
-          TARGET_ENV: ${{ needs.prepare.outputs.target_environment }}
-          RELEASE_MODE: ${{ needs.prepare.outputs.release_mode }}
-          STAGING_PORTAINER_URL_SECRET: ${{ secrets.STAGING_PORTAINER_URL || '' }}
-          STAGING_PORTAINER_URL_VAR: ${{ vars.STAGING_PORTAINER_URL || '' }}
-          PRODUCTION_PORTAINER_URL_SECRET: ${{ secrets.PRODUCTION_PORTAINER_URL || '' }}
-          PRODUCTION_PORTAINER_URL_VAR: ${{ vars.PRODUCTION_PORTAINER_URL || '' }}
-          PORTAINER_URL_SECRET: ${{ secrets.PORTAINER_URL || '' }}
-          PORTAINER_URL_VAR: ${{ vars.PORTAINER_URL || '' }}
-          STAGING_PORTAINER_STACK_ID_SECRET: ${{ secrets.STAGING_PORTAINER_STACK_ID || '' }}
-          STAGING_PORTAINER_STACK_ID_VAR: ${{ vars.STAGING_PORTAINER_STACK_ID || '' }}
-          PRODUCTION_PORTAINER_STACK_ID_SECRET: ${{ secrets.PRODUCTION_PORTAINER_STACK_ID || '' }}
-          PRODUCTION_PORTAINER_STACK_ID_VAR: ${{ vars.PRODUCTION_PORTAINER_STACK_ID || '' }}
-          PORTAINER_STACK_ID_SECRET: ${{ secrets.PORTAINER_STACK_ID || '' }}
-          PORTAINER_STACK_ID_VAR: ${{ vars.PORTAINER_STACK_ID || '' }}
-          STAGING_PORTAINER_ENDPOINT_ID_SECRET: ${{ secrets.STAGING_PORTAINER_ENDPOINT_ID || '' }}
-          STAGING_PORTAINER_ENDPOINT_ID_VAR: ${{ vars.STAGING_PORTAINER_ENDPOINT_ID || '' }}
-          PRODUCTION_PORTAINER_ENDPOINT_ID_SECRET: ${{ secrets.PRODUCTION_PORTAINER_ENDPOINT_ID || '' }}
-          PRODUCTION_PORTAINER_ENDPOINT_ID_VAR: ${{ vars.PRODUCTION_PORTAINER_ENDPOINT_ID || '' }}
-          PORTAINER_ENDPOINT_ID_SECRET: ${{ secrets.PORTAINER_ENDPOINT_ID || '' }}
-          PORTAINER_ENDPOINT_ID_VAR: ${{ vars.PORTAINER_ENDPOINT_ID || '' }}
-          STAGING_PORTAINER_SKIP_TLS_VERIFY_VAR: ${{ vars.STAGING_PORTAINER_SKIP_TLS_VERIFY || '' }}
-          PRODUCTION_PORTAINER_SKIP_TLS_VERIFY_VAR: ${{ vars.PRODUCTION_PORTAINER_SKIP_TLS_VERIFY || '' }}
-          PORTAINER_SKIP_TLS_VERIFY_VAR: ${{ vars.PORTAINER_SKIP_TLS_VERIFY || '' }}
-          STAGING_HEALTHCHECK_URL_SECRET: ${{ secrets.STAGING_HEALTHCHECK_URL || '' }}
-          STAGING_HEALTHCHECK_URL_VAR: ${{ vars.STAGING_HEALTHCHECK_URL || '' }}
-          PRODUCTION_HEALTHCHECK_URL_SECRET: ${{ secrets.PRODUCTION_HEALTHCHECK_URL || '' }}
-          PRODUCTION_HEALTHCHECK_URL_VAR: ${{ vars.PRODUCTION_HEALTHCHECK_URL || '' }}
-          STAGING_VERSIONCHECK_URL_SECRET: ${{ secrets.STAGING_VERSIONCHECK_URL || '' }}
-          STAGING_VERSIONCHECK_URL_VAR: ${{ vars.STAGING_VERSIONCHECK_URL || '' }}
-          PRODUCTION_VERSIONCHECK_URL_SECRET: ${{ secrets.PRODUCTION_VERSIONCHECK_URL || '' }}
-          PRODUCTION_VERSIONCHECK_URL_VAR: ${{ vars.PRODUCTION_VERSIONCHECK_URL || '' }}
-          POST_DEPLOY_SKIP_TLS_VERIFY_VAR: ${{ vars.POST_DEPLOY_SKIP_TLS_VERIFY || '' }}
-        run: |
-          set -euo pipefail
-
-          pick_first_non_empty() {
-            for candidate in "$@"; do
-              if [ -n "${candidate:-}" ]; then
-                echo "$candidate"
-                return 0
-              fi
-            done
-            return 1
-          }
-
-          portainer_url=""
-          portainer_stack_id=""
-          portainer_endpoint_id=""
-          portainer_skip_tls_verify="true"
-          post_deploy_skip_tls_verify="${POST_DEPLOY_SKIP_TLS_VERIFY_VAR:-false}"
-
-          healthcheck_url=""
-          versioncheck_url=""
-          staging_versioncheck_url=""
-
-          if [ "$TARGET_ENV" = "staging" ]; then
-            portainer_url="$(pick_first_non_empty \
-              "$STAGING_PORTAINER_URL_SECRET" "$STAGING_PORTAINER_URL_VAR" \
-              "$PORTAINER_URL_SECRET" "$PORTAINER_URL_VAR" || true)"
-            portainer_stack_id="$(pick_first_non_empty \
-              "$STAGING_PORTAINER_STACK_ID_SECRET" "$STAGING_PORTAINER_STACK_ID_VAR" \
-              "$PORTAINER_STACK_ID_SECRET" "$PORTAINER_STACK_ID_VAR" || true)"
-            portainer_endpoint_id="$(pick_first_non_empty \
-              "$STAGING_PORTAINER_ENDPOINT_ID_SECRET" "$STAGING_PORTAINER_ENDPOINT_ID_VAR" \
-              "$PORTAINER_ENDPOINT_ID_SECRET" "$PORTAINER_ENDPOINT_ID_VAR" || true)"
-            portainer_skip_tls_verify="$(pick_first_non_empty \
-              "$STAGING_PORTAINER_SKIP_TLS_VERIFY_VAR" "$PORTAINER_SKIP_TLS_VERIFY_VAR" "true" || true)"
-
-            healthcheck_url="$STAGING_HEALTHCHECK_URL_SECRET"
-            [ -z "$healthcheck_url" ] && healthcheck_url="$STAGING_HEALTHCHECK_URL_VAR"
-            versioncheck_url="$STAGING_VERSIONCHECK_URL_SECRET"
-            [ -z "$versioncheck_url" ] && versioncheck_url="$STAGING_VERSIONCHECK_URL_VAR"
-          elif [ "$TARGET_ENV" = "production" ]; then
-            portainer_url="$(pick_first_non_empty \
-              "$PRODUCTION_PORTAINER_URL_SECRET" "$PRODUCTION_PORTAINER_URL_VAR" \
-              "$PORTAINER_URL_SECRET" "$PORTAINER_URL_VAR" || true)"
-            portainer_stack_id="$(pick_first_non_empty \
-              "$PRODUCTION_PORTAINER_STACK_ID_SECRET" "$PRODUCTION_PORTAINER_STACK_ID_VAR" \
-              "$PORTAINER_STACK_ID_SECRET" "$PORTAINER_STACK_ID_VAR" || true)"
-            portainer_endpoint_id="$(pick_first_non_empty \
-              "$PRODUCTION_PORTAINER_ENDPOINT_ID_SECRET" "$PRODUCTION_PORTAINER_ENDPOINT_ID_VAR" \
-              "$PORTAINER_ENDPOINT_ID_SECRET" "$PORTAINER_ENDPOINT_ID_VAR" || true)"
-            portainer_skip_tls_verify="$(pick_first_non_empty \
-              "$PRODUCTION_PORTAINER_SKIP_TLS_VERIFY_VAR" "$PORTAINER_SKIP_TLS_VERIFY_VAR" "true" || true)"
-
-            healthcheck_url="$PRODUCTION_HEALTHCHECK_URL_SECRET"
-            [ -z "$healthcheck_url" ] && healthcheck_url="$PRODUCTION_HEALTHCHECK_URL_VAR"
-            versioncheck_url="$PRODUCTION_VERSIONCHECK_URL_SECRET"
-            [ -z "$versioncheck_url" ] && versioncheck_url="$PRODUCTION_VERSIONCHECK_URL_VAR"
-            staging_versioncheck_url="$STAGING_VERSIONCHECK_URL_SECRET"
-            [ -z "$staging_versioncheck_url" ] && staging_versioncheck_url="$STAGING_VERSIONCHECK_URL_VAR"
-          else
-            echo "Invalid target environment: $TARGET_ENV" >&2
-            exit 1
-          fi
-
-          if [ -z "$portainer_url" ] || [ -z "$portainer_stack_id" ] || [ -z "$portainer_endpoint_id" ]; then
-            echo "Portainer settings are incomplete for ${TARGET_ENV}." >&2
-            echo "Configure ${TARGET_ENV^^}_PORTAINER_* or fallback PORTAINER_* values." >&2
-            exit 1
-          fi
-
-          if [ -z "$healthcheck_url" ] || [ -z "$versioncheck_url" ]; then
-            echo "Healthcheck/versioncheck URLs are not configured for ${TARGET_ENV}." >&2
-            exit 1
-          fi
-
-          if [ "$RELEASE_MODE" = "production-promotion" ] && [ -z "$staging_versioncheck_url" ]; then
-            echo "STAGING_VERSIONCHECK_URL is required for production promotion gate." >&2
-            exit 1
-          fi
-
-          echo "::add-mask::$portainer_url"
-          echo "::add-mask::$healthcheck_url"
-          echo "::add-mask::$versioncheck_url"
-          if [ -n "$staging_versioncheck_url" ]; then
-            echo "::add-mask::$staging_versioncheck_url"
-          fi
-
-          {
-            echo "portainer_url=$portainer_url"
-            echo "portainer_stack_id=$portainer_stack_id"
-            echo "portainer_endpoint_id=$portainer_endpoint_id"
-            echo "portainer_skip_tls_verify=$portainer_skip_tls_verify"
-            echo "post_deploy_skip_tls_verify=$post_deploy_skip_tls_verify"
-            echo "healthcheck_url=$healthcheck_url"
-            echo "versioncheck_url=$versioncheck_url"
-            echo "staging_versioncheck_url=$staging_versioncheck_url"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Verify staging is serving requested tag (production gate)
-        if: needs.prepare.outputs.release_mode == 'production-promotion'
-        env:
-          RELEASE_VERSION: ${{ needs.prepare.outputs.release_version }}
-          STAGING_VERSIONCHECK_URL: ${{ steps.resolve.outputs.staging_versioncheck_url }}
-          POST_DEPLOY_SKIP_TLS_VERIFY: ${{ steps.resolve.outputs.post_deploy_skip_tls_verify }}
-        run: |
-          set -euo pipefail
-
-          curl_opts=(--silent --show-error --location --max-time 20)
-          if [ "$POST_DEPLOY_SKIP_TLS_VERIFY" = "true" ]; then
-            curl_opts+=(--insecure)
-          fi
-
-          attempts=8
-          sleep_seconds=8
-          response_file="$(mktemp)"
-
-          for attempt in $(seq 1 "$attempts"); do
-            http_code="$(curl "${curl_opts[@]}" -o "$response_file" -w '%{http_code}' "$STAGING_VERSIONCHECK_URL" || true)"
-            if [ "$http_code" = "200" ]; then
-              break
-            fi
-            if [ "$attempt" -eq "$attempts" ]; then
-              echo "Could not read staging version endpoint (HTTP=${http_code:-curl_error})." >&2
-              exit 1
-            fi
-            echo "Attempt ${attempt}/${attempts} failed (HTTP=${http_code:-curl_error}). Retrying in ${sleep_seconds}s..."
-            sleep "$sleep_seconds"
-          done
-
-          if ! grep -Fq "$RELEASE_VERSION" "$response_file"; then
-            echo "Staging endpoint does not contain release version '${RELEASE_VERSION}'." >&2
-            cat "$response_file" >&2
-            exit 1
-          fi
-
-      - name: Deploy via Portainer CE API (update IMAGE_TAG)
-        id: deploy-stack-update
-        env:
-          TARGET_ENV: ${{ needs.prepare.outputs.target_environment }}
-          STAGING_PORTAINER_ACCESS_TOKEN: ${{ secrets.STAGING_PORTAINER_ACCESS_TOKEN || '' }}
-          PRODUCTION_PORTAINER_ACCESS_TOKEN: ${{ secrets.PRODUCTION_PORTAINER_ACCESS_TOKEN || '' }}
-          PORTAINER_ACCESS_TOKEN_DEFAULT: ${{ secrets.PORTAINER_ACCESS_TOKEN || '' }}
-          PORTAINER_URL: ${{ steps.resolve.outputs.portainer_url }}
-          PORTAINER_STACK_ID: ${{ steps.resolve.outputs.portainer_stack_id }}
-          PORTAINER_ENDPOINT_ID: ${{ steps.resolve.outputs.portainer_endpoint_id }}
-          PORTAINER_SKIP_TLS_VERIFY: ${{ steps.resolve.outputs.portainer_skip_tls_verify }}
-          RELEASE_VERSION: ${{ needs.prepare.outputs.release_version }}
-        run: |
-          set -euo pipefail
-
-          portainer_access_token="$PORTAINER_ACCESS_TOKEN_DEFAULT"
-          if [ "$TARGET_ENV" = "staging" ] && [ -n "$STAGING_PORTAINER_ACCESS_TOKEN" ]; then
-            portainer_access_token="$STAGING_PORTAINER_ACCESS_TOKEN"
-          elif [ "$TARGET_ENV" = "production" ] && [ -n "$PRODUCTION_PORTAINER_ACCESS_TOKEN" ]; then
-            portainer_access_token="$PRODUCTION_PORTAINER_ACCESS_TOKEN"
-          fi
-
-          if [ -z "${portainer_access_token:-}" ]; then
-            echo "Missing Portainer token. Configure ${TARGET_ENV^^}_PORTAINER_ACCESS_TOKEN or PORTAINER_ACCESS_TOKEN." >&2
-            exit 1
-          fi
-
-          portainer_url="${PORTAINER_URL:-}"
-          if [ -z "$portainer_url" ]; then
-            echo "Resolved PORTAINER_URL is empty." >&2
-            exit 1
-          fi
-          portainer_url="${portainer_url%/}"
-
-          # --- Curl base options ---
-          # 300s accommodates stack update (image pull + container recreate)
-          curl_opts=(--silent --show-error --location --max-time 300)
-          if [ "$PORTAINER_SKIP_TLS_VERIFY" = "true" ]; then
-            curl_opts+=(--insecure)
-          fi
-
-          # API key via curl --config (arquivo mode 600): mantém o token fora de
-          # argv (/proc/<pid>/cmdline). A requisição HTTP enviada é idêntica. #1394.
-          portainer_hdr_file="$(mktemp)"
-          chmod 600 "$portainer_hdr_file"
-          printf 'header = "X-API-KEY: %s"\n' "$portainer_access_token" > "$portainer_hdr_file"
-          trap 'rm -f "$portainer_hdr_file"' EXIT
-          curl_opts+=(--config "$portainer_hdr_file")
-
-          # --- Read current stack state ---
-          # Retry helper: um curl 28/000 transiente ao Portainer (blips de
-          # firewall/Kaspersky no caminho runner->:9443) NAO pode abortar o deploy
-          # inteiro logo no primeiro GET. Espelha o retry que o PUT ja tem (3
-          # tentativas, 10s de backoff). GET e idempotente -> retry simples e seguro.
-          get_response_file="$(mktemp)"
-          trap 'rm -f "$portainer_hdr_file" "$get_response_file"' EXIT
-          fetch_stack_json_with_retry() {
-            local url="$1" http_code attempt
-            local max_attempts=3 retry_sleep=10
-            for attempt in $(seq 1 "$max_attempts"); do
-              # --max-time 30: um GET de leitura e rapido; timeout curto detecta o
-              # blip cedo e re-tenta (os 300s de curl_opts sao p/ o PUT+redeploy).
-              http_code="$(curl "${curl_opts[@]}" --max-time 30 \
-                -o "$get_response_file" -w '%{http_code}' "$url" || true)"
-              if [[ "$http_code" =~ ^[0-9]+$ ]] && [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
-                cat "$get_response_file"
-                return 0
-              fi
-              echo "Portainer GET falhou (HTTP ${http_code:-curl_error}) tentativa ${attempt}/${max_attempts}: ${url}" >&2
-              [ "$attempt" -lt "$max_attempts" ] && sleep "$retry_sleep"
-            done
-            echo "Portainer GET esgotou ${max_attempts} tentativas: ${url}" >&2
-            return 1
-          }
-
-          stack_json="$(fetch_stack_json_with_retry "${portainer_url}/api/stacks/${PORTAINER_STACK_ID}")"
-          stack_file_json="$(fetch_stack_json_with_retry "${portainer_url}/api/stacks/${PORTAINER_STACK_ID}/file")"
-
-          stack_file_content="$(printf '%s' "$stack_file_json" | jq -r '.StackFileContent')"
-          if [ -z "$stack_file_content" ] || [ "$stack_file_content" = "null" ]; then
-            echo "Could not read StackFileContent from Portainer." >&2
-            exit 1
-          fi
-
-          current_env_json="$(printf '%s' "$stack_json" | jq -c '.Env // []')"
-          previous_image_tag="$(printf '%s' "$current_env_json" | jq -r '([.[] | select(.name == "IMAGE_TAG") | .value] | first) // ""')"
-          updated_env_json="$(printf '%s' "$current_env_json" | jq -c --arg tag "$RELEASE_VERSION" '
-            map(select(.name != "IMAGE_TAG")) + [{"name":"IMAGE_TAG","value":$tag}]
-          ')"
-
-          payload="$(jq -n \
-            --arg stack_file_content "$stack_file_content" \
-            --argjson env "$updated_env_json" \
-            '{
-              StackFileContent: $stack_file_content,
-              Env: $env,
-              Prune: false,
-              RepullImageAndRedeploy: true
-            }')"
-
-          # --- Fire-and-forget: send PUT, don't wait for full response ---
-          # The Portainer stack update triggers image pull + container recreate,
-          # which takes longer than the firewall's TCP timeout allows for the
-          # response to travel back. We use a short --max-time (30s) — enough
-          # for Portainer to accept the request — and treat timeouts as
-          # "request accepted". Post-deploy verification confirms the deploy.
-          : > /tmp/portainer-stack-update-attempts.log
-          {
-            echo "target_environment=${TARGET_ENV}"
-            echo "release_version=${RELEASE_VERSION}"
-            echo "previous_image_tag=${previous_image_tag:-none}"
-            echo "---"
-          } >> /tmp/portainer-stack-update-attempts.log
-
-          max_attempts=3
-          retry_sleep=10
-          deploy_sent=false
-
-          for attempt in $(seq 1 "$max_attempts"); do
-            http_code="$(curl "${curl_opts[@]}" --max-time 30 \
-              -o /tmp/portainer-stack-update-response.json \
-              -w '%{http_code}' \
-              -X PUT \
-              -H "Content-Type: application/json" \
-              "${portainer_url}/api/stacks/${PORTAINER_STACK_ID}?endpointId=${PORTAINER_ENDPOINT_ID}" \
-              --data-raw "$payload" || true)"
-
-            response_body="$(cat /tmp/portainer-stack-update-response.json 2>/dev/null || true)"
-            {
-              echo "attempt=${attempt}"
-              echo "http_code=${http_code}"
-              if [ -n "$response_body" ]; then
-                echo "response_body=${response_body}"
-              fi
-              echo "---"
-            } >> /tmp/portainer-stack-update-attempts.log
-
-            if [[ "$http_code" =~ ^[0-9]+$ ]] && [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
-              echo "Portainer stack update confirmed (HTTP ${http_code}) on attempt ${attempt}."
-              deploy_sent=true
-              break
-            fi
-
-            # Timeout (000): o firewall pode ter dropado a RESPOSTA mas o Portainer
-            # recebeu o PUT — OU o PUT nao chegou (deploy fantasma). NAO assumir sucesso
-            # cego: confirmar via GET que o stack realmente recebeu a IMAGE_TAG nova.
-            # Fail-fast (#1396): se nao confirmar, faz retry; se esgotar, deploy_sent
-            # fica false -> exit 1 abaixo (em vez de depender so do timeout de 360s).
-            if [ "$http_code" = "000" ]; then
-              echo "Portainer PUT timed out (attempt ${attempt}/${max_attempts}). Confirming stack IMAGE_TAG before assuming success..."
-              confirm_json="$(curl "${curl_opts[@]}" --max-time 30 \
-                "${portainer_url}/api/stacks/${PORTAINER_STACK_ID}" 2>/dev/null || true)"
-              live_tag="$(printf '%s' "$confirm_json" | jq -r '([.Env[]? | select(.name == "IMAGE_TAG") | .value] | first) // ""' 2>/dev/null || true)"
-              if [ "$live_tag" = "$RELEASE_VERSION" ]; then
-                echo "Confirmed: stack IMAGE_TAG=${RELEASE_VERSION} despite the timeout. Treating as sent."
-                deploy_sent=true
-                break
-              fi
-              echo "Not confirmed: stack IMAGE_TAG='${live_tag:-unknown}' != '${RELEASE_VERSION}' after timeout."
-              if [ "$attempt" -lt "$max_attempts" ]; then
-                echo "Retrying PUT in ${retry_sleep}s... (${attempt}/${max_attempts})"
-                sleep "$retry_sleep"
-                continue
-              fi
-              echo "Exhausted ${max_attempts} attempts after timeout without IMAGE_TAG confirmation." >&2
-              # deploy_sent permanece false -> exit 1 logo abaixo.
-            fi
-
-            # Server errors are retryable
-            if [[ "$http_code" =~ ^[0-9]+$ ]] && [ "$http_code" -ge 500 ] && [ "$attempt" -lt "$max_attempts" ]; then
-              echo "Portainer returned HTTP ${http_code}. Retrying in ${retry_sleep}s... (${attempt}/${max_attempts})"
-              sleep "$retry_sleep"
-              continue
-            fi
-
-            # 4xx = client error, not retryable
-            echo "Portainer stack update failed with HTTP ${http_code}." >&2
-            cat /tmp/portainer-stack-update-response.json >&2 || true
-          done
-
-          cp /tmp/portainer-stack-update-attempts.log portainer-stack-update-attempts.txt || true
-
-          if [ "$deploy_sent" != "true" ]; then
-            echo "All ${max_attempts} attempts failed to reach Portainer." >&2
-            cat /tmp/portainer-stack-update-attempts.log >&2 || true
-            exit 1
-          fi
-
-          {
-            echo "previous_image_tag=${previous_image_tag}"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Post-deploy verification (version-aware polling)
-        id: post-deploy-verification
-        env:
-          RELEASE_VERSION: ${{ needs.prepare.outputs.release_version }}
-          HEALTHCHECK_URL: ${{ steps.resolve.outputs.healthcheck_url }}
-          VERSIONCHECK_URL: ${{ steps.resolve.outputs.versioncheck_url }}
-          POST_DEPLOY_SKIP_TLS_VERIFY: ${{ steps.resolve.outputs.post_deploy_skip_tls_verify }}
-          PORTAINER_URL: ${{ steps.resolve.outputs.portainer_url }}
-          PORTAINER_ENDPOINT_ID: ${{ steps.resolve.outputs.portainer_endpoint_id }}
-          PORTAINER_ACCESS_TOKEN: ${{ secrets.PRODUCTION_PORTAINER_ACCESS_TOKEN || secrets.PORTAINER_ACCESS_TOKEN || '' }}
-          PORTAINER_SKIP_TLS_VERIFY: ${{ steps.resolve.outputs.portainer_skip_tls_verify }}
-        run: |
-          set -euo pipefail
-
-          curl_opts=(--silent --show-error --location --max-time 20)
-          if [ "$POST_DEPLOY_SKIP_TLS_VERIFY" = "true" ]; then
-            curl_opts+=(--insecure)
-          fi
-
-          timeout=360
-          base_interval=8
-          max_interval=20
-          elapsed=0
-          attempt=0
-          last_health_response=""
-          last_version_response=""
-          last_health_status=""
-          last_version_status=""
-          last_health_error=""
-          last_version_error=""
-          network_failures=0
-          health_200_seen=0
-          version_200_seen=0
-          version_mismatch_seen=0
-
-          mask_url() {
-            local raw="$1"
-            printf '%s' "$raw" | sed -E 's#^(https?://[^/]+).*$#\1/***#'
-          }
-
-          request_endpoint() {
-            local url="$1"
-            local body_file="$2"
-            local err_file="$3"
-            local http_code=""
-
-            if http_code="$(curl "${curl_opts[@]}" -o "$body_file" -w '%{http_code}' "$url" 2>"$err_file")"; then
-              echo "${http_code}|0"
-              return 0
-            fi
-
-            local curl_exit=$?
-            echo "000|${curl_exit}"
-          }
-
-          health_url_masked="$(mask_url "$HEALTHCHECK_URL")"
-          version_url_masked="$(mask_url "$VERSIONCHECK_URL")"
-          : > post-deploy-debug.txt
-
-          echo "Waiting for version ${RELEASE_VERSION} (timeout=${timeout}s)..."
-          {
-            echo "health_url_masked=${health_url_masked}"
-            echo "version_url_masked=${version_url_masked}"
-            echo "expected_release_version=${RELEASE_VERSION}"
-            echo "timeout_seconds=${timeout}"
-            echo "post_deploy_skip_tls_verify=${POST_DEPLOY_SKIP_TLS_VERIFY}"
-          } >> post-deploy-debug.txt
-
-          while (( elapsed < timeout )); do
-            attempt=$(( attempt + 1 ))
-            health_result="$(request_endpoint "$HEALTHCHECK_URL" /tmp/health_resp.json /tmp/health_err.log)"
-            version_result="$(request_endpoint "$VERSIONCHECK_URL" /tmp/version_resp.json /tmp/version_err.log)"
-
-            health_code="${health_result%%|*}"
-            health_exit="${health_result##*|}"
-            version_code="${version_result%%|*}"
-            version_exit="${version_result##*|}"
-
-            last_health_status="$health_code"
-            last_version_status="$version_code"
-
-            if [ "$health_exit" != "0" ]; then
-              network_failures=$(( network_failures + 1 ))
-              last_health_error="$(tr '\n' ' ' </tmp/health_err.log | sed -E 's/[[:space:]]+/ /g' | cut -c1-240)"
-            fi
-            if [ "$version_exit" != "0" ]; then
-              network_failures=$(( network_failures + 1 ))
-              last_version_error="$(tr '\n' ' ' </tmp/version_err.log | sed -E 's/[[:space:]]+/ /g' | cut -c1-240)"
-            fi
-
-            if [ "$health_code" = "200" ]; then
-              last_health_response="$(cat /tmp/health_resp.json)"
-              health_200_seen=1
-            fi
-            if [ "$version_code" = "200" ]; then
-              last_version_response="$(cat /tmp/version_resp.json)"
-              version_200_seen=1
-            fi
-
-            if [ "$health_code" = "200" ] && [ "$version_code" = "200" ]; then
-              if grep -Fq "$RELEASE_VERSION" /tmp/version_resp.json; then
-                echo "[${elapsed}s] Version ${RELEASE_VERSION} is live. Health OK."
-                printf '%s\n' "$last_health_response" > post-deploy-health-response.txt
-                printf '%s\n' "$last_version_response" > post-deploy-version-response.txt
-                {
-                  echo "result=success"
-                  echo "failure_cause=none"
-                  echo "attempts=${attempt}"
-                  echo "elapsed_seconds=${elapsed}"
-                } >> post-deploy-debug.txt
-                exit 0
-              fi
-              version_mismatch_seen=$(( version_mismatch_seen + 1 ))
-              live_version="$(grep -o '"version":"[^"]*"' /tmp/version_resp.json || echo 'unknown')"
-              echo "[${elapsed}s] Version mismatch: expected=${RELEASE_VERSION}, got=${live_version} -- container still updating"
-            elif [ "$health_exit" != "0" ] || [ "$version_exit" != "0" ]; then
-              echo "[${elapsed}s] Network unavailable (health=${health_code}/curl_exit=${health_exit}, version=${version_code}/curl_exit=${version_exit})"
-            else
-              echo "[${elapsed}s] Not ready (health=HTTP${health_code}, version=HTTP${version_code})"
-            fi
-
-            {
-              echo "attempt=${attempt} elapsed_seconds=${elapsed} health_status=${health_code} health_curl_exit=${health_exit} version_status=${version_code} version_curl_exit=${version_exit}"
-              if [ -n "$last_health_error" ]; then
-                echo "last_health_error=${last_health_error}"
-              fi
-              if [ -n "$last_version_error" ]; then
-                echo "last_version_error=${last_version_error}"
-              fi
-            } >> post-deploy-debug.txt
-
-            interval=$(( base_interval + (attempt * 2) ))
-            if [ "$interval" -gt "$max_interval" ]; then
-              interval="$max_interval"
-            fi
-            sleep "$interval"
-            elapsed=$(( elapsed + interval ))
-          done
-
-          failure_cause="endpoint_not_ready"
-          if [ "$health_200_seen" -eq 0 ] && [ "$version_200_seen" -eq 0 ] && [ "$network_failures" -gt 0 ]; then
-            failure_cause="network_unavailable"
-          elif [ "$health_200_seen" -eq 1 ] && [ "$version_200_seen" -eq 1 ] && [ "$version_mismatch_seen" -gt 0 ]; then
-            failure_cause="version_mismatch"
-          fi
-
-          echo "TIMEOUT: Version ${RELEASE_VERSION} did not appear within ${timeout}s." >&2
-          echo "Failure cause: ${failure_cause}" >&2
-          echo "Last health status: HTTP ${last_health_status}" >&2
-          echo "Last version status: HTTP ${last_version_status}" >&2
-          if [ -n "$last_health_error" ]; then
-            echo "Last health curl error: ${last_health_error}" >&2
-          fi
-          if [ -n "$last_version_error" ]; then
-            echo "Last version curl error: ${last_version_error}" >&2
-          fi
-          if [ -n "$last_version_response" ]; then
-            echo "Last version response:" >&2
-            printf '%s\n' "$last_version_response" >&2
-          fi
-
-          # Fallback: when external health check is unreachable (network_unavailable),
-          # verify containers via Portainer API (which IS reachable from CI).
-          if [ "$failure_cause" = "network_unavailable" ] && [ -n "${PORTAINER_URL:-}" ] && [ -n "${PORTAINER_ACCESS_TOKEN:-}" ]; then
-            echo "External health check unreachable. Falling back to Portainer API verification..."
-            portainer_curl_opts=(--silent --show-error --location --max-time 30)
-            if [ "${PORTAINER_SKIP_TLS_VERIFY:-}" = "true" ]; then
-              portainer_curl_opts+=(--insecure)
-            fi
-            # API key via curl --config (mode 600), fora do argv. #1394.
-            portainer_hdr_file="$(mktemp)"
-            chmod 600 "$portainer_hdr_file"
-            printf 'header = "X-API-KEY: %s"\n' "$PORTAINER_ACCESS_TOKEN" > "$portainer_hdr_file"
-            trap 'rm -f "$portainer_hdr_file"' EXIT
-            portainer_curl_opts+=(--config "$portainer_hdr_file")
-
-            containers_json="$(curl "${portainer_curl_opts[@]}" \
-              "${PORTAINER_URL}/api/endpoints/${PORTAINER_ENDPOINT_ID}/docker/containers/json?all=true&filters=%7B%22label%22%3A%5B%22com.docker.compose.project%3Daprender_prod%22%5D%7D" 2>/dev/null || echo "[]")"
-
-            web_state="$(printf '%s' "$containers_json" | jq -r '[.[] | select(.Names[] | contains("web"))] | .[0].State // "unknown"' 2>/dev/null || echo "unknown")"
-            web_health="$(printf '%s' "$containers_json" | jq -r '[.[] | select(.Names[] | contains("web"))] | .[0].Status // "unknown"' 2>/dev/null || echo "unknown")"
-            web_image="$(printf '%s' "$containers_json" | jq -r '[.[] | select(.Names[] | contains("web"))] | .[0].Image // "unknown"' 2>/dev/null || echo "unknown")"
-
-            echo "Portainer fallback: web_state=${web_state}, web_health=${web_health}, web_image=${web_image}"
-
-            if [ "$web_state" = "running" ] && printf '%s' "$web_health" | grep -qi "healthy"; then
-              echo "Portainer confirms web container is running and healthy."
-              if printf '%s' "$web_image" | grep -qF "${RELEASE_VERSION}"; then
-                echo "[Portainer] Version ${RELEASE_VERSION} is live and healthy (verified via Portainer API)."
-                printf '%s\n' "Verified via Portainer API fallback" > post-deploy-health-response.txt
-                printf '%s\n' "{\"source\": \"portainer\", \"web_state\": \"${web_state}\", \"web_image\": \"${web_image}\"}" > post-deploy-version-response.txt
-                {
-                  echo "result=success_portainer_fallback"
-                  echo "failure_cause=none"
-                  echo "attempts=${attempt}"
-                  echo "elapsed_seconds=${elapsed}"
-                  echo "portainer_web_state=${web_state}"
-                  echo "portainer_web_image=${web_image}"
-                } >> post-deploy-debug.txt
-                exit 0
-              else
-                echo "Portainer: web container running but image tag does not match ${RELEASE_VERSION}."
-              fi
-            else
-              echo "Portainer: web container not healthy (state=${web_state}, status=${web_health})."
-            fi
-          fi
-
-          {
-            echo "result=timeout"
-            echo "failure_cause=${failure_cause}"
-            echo "attempts=${attempt}"
-            echo "elapsed_seconds=${elapsed}"
-            echo "last_health_status=${last_health_status}"
-            echo "last_version_status=${last_version_status}"
-            echo "last_health_error=${last_health_error:-none}"
-            echo "last_version_error=${last_version_error:-none}"
-          } >> post-deploy-debug.txt
-
-          printf '%s\n' "${last_health_response:-no response}" > post-deploy-health-response.txt
-          printf '%s\n' "${last_version_response:-no response}" > post-deploy-version-response.txt
-          exit 1
-
-      - name: Cleanup old deploy images on target endpoint (keep current + previous)
-        if: steps.post-deploy-verification.outcome == 'success'
-        env:
-          TARGET_ENV: ${{ needs.prepare.outputs.target_environment }}
-          STAGING_PORTAINER_ACCESS_TOKEN: ${{ secrets.STAGING_PORTAINER_ACCESS_TOKEN || '' }}
-          PRODUCTION_PORTAINER_ACCESS_TOKEN: ${{ secrets.PRODUCTION_PORTAINER_ACCESS_TOKEN || '' }}
-          PORTAINER_ACCESS_TOKEN_DEFAULT: ${{ secrets.PORTAINER_ACCESS_TOKEN || '' }}
-          PORTAINER_URL: ${{ steps.resolve.outputs.portainer_url }}
-          PORTAINER_ENDPOINT_ID: ${{ steps.resolve.outputs.portainer_endpoint_id }}
-          PORTAINER_SKIP_TLS_VERIFY: ${{ steps.resolve.outputs.portainer_skip_tls_verify }}
-          RELEASE_VERSION: ${{ needs.prepare.outputs.release_version }}
-          PREVIOUS_IMAGE_TAG: ${{ steps.deploy-stack-update.outputs.previous_image_tag }}
-          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
-          FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
-        run: |
-          set -euo pipefail
-
-          : > post-deploy-image-cleanup.txt
-
-          log() {
-            echo "$1"
-            echo "$1" >> post-deploy-image-cleanup.txt
-          }
-
-          portainer_access_token="$PORTAINER_ACCESS_TOKEN_DEFAULT"
-          if [ "$TARGET_ENV" = "staging" ] && [ -n "$STAGING_PORTAINER_ACCESS_TOKEN" ]; then
-            portainer_access_token="$STAGING_PORTAINER_ACCESS_TOKEN"
-          elif [ "$TARGET_ENV" = "production" ] && [ -n "$PRODUCTION_PORTAINER_ACCESS_TOKEN" ]; then
-            portainer_access_token="$PRODUCTION_PORTAINER_ACCESS_TOKEN"
-          fi
-
-          if [ -z "${portainer_access_token:-}" ]; then
-            log "Image cleanup skipped: missing Portainer token."
-            exit 0
-          fi
-
-          portainer_url="${PORTAINER_URL:-}"
-          if [ -z "$portainer_url" ] || [ -z "${PORTAINER_ENDPOINT_ID:-}" ]; then
-            log "Image cleanup skipped: missing Portainer URL or endpoint ID."
-            exit 0
-          fi
-          portainer_url="${portainer_url%/}"
-
-          curl_opts=(--silent --show-error --location --max-time 300)
-          if [ "${PORTAINER_SKIP_TLS_VERIFY:-false}" = "true" ]; then
-            curl_opts+=(--insecure)
-          fi
-          # API key via curl --config (arquivo mode 600), fora do argv. #1394.
-          portainer_hdr_file="$(mktemp)"
-          chmod 600 "$portainer_hdr_file"
-          printf 'header = "X-API-KEY: %s"\n' "$portainer_access_token" > "$portainer_hdr_file"
-          trap 'rm -f "$portainer_hdr_file"' EXIT
-          curl_opts+=(--config "$portainer_hdr_file")
-
-          docker_api_base="${portainer_url}/api/endpoints/${PORTAINER_ENDPOINT_ID}/docker"
-
-          containers_json="$(curl "${curl_opts[@]}" \
-            "${docker_api_base}/containers/json?all=1" || true)"
-          images_json="$(curl "${curl_opts[@]}" \
-            "${docker_api_base}/images/json?all=1" || true)"
-
-          if [ -z "$containers_json" ] || [ -z "$images_json" ]; then
-            log "Image cleanup skipped: could not fetch Docker API data from Portainer endpoint."
-            exit 0
-          fi
-
-          in_use_refs="$(printf '%s' "$containers_json" | jq -r '.[].Image // empty' | sort -u || true)"
-          removed_count=0
-          kept_count=0
-          failed_count=0
-
-          log "cleanup_target_env=${TARGET_ENV}"
-          log "keep_release_tag=${RELEASE_VERSION}"
-          log "keep_previous_tag=${PREVIOUS_IMAGE_TAG:-none}"
-          log "---"
-
-          for repo in "$BACKEND_IMAGE" "$FRONTEND_IMAGE"; do
-            repo_refs="$(printf '%s' "$images_json" | jq -r --arg repo "$repo" '
-              [.[] | (.RepoTags // [])[]? | select(startswith($repo + ":"))] | unique | .[]
-            ' || true)"
-
-            if [ -z "$repo_refs" ]; then
-              log "repo=${repo} no tagged images found on endpoint."
-              continue
-            fi
-
-            while IFS= read -r ref; do
-              [ -z "$ref" ] && continue
-              tag="${ref##*:}"
-
-              keep_reason=""
-              if [ "$tag" = "$RELEASE_VERSION" ]; then
-                keep_reason="current_release"
-              elif [ -n "${PREVIOUS_IMAGE_TAG:-}" ] && [ "$tag" = "$PREVIOUS_IMAGE_TAG" ]; then
-                keep_reason="previous_release"
-              elif printf '%s\n' "$in_use_refs" | grep -Fxq "$ref"; then
-                keep_reason="in_use_by_container"
-              fi
-
-              if [ -n "$keep_reason" ]; then
-                kept_count=$((kept_count + 1))
-                log "keep ${ref} (${keep_reason})"
-                continue
-              fi
-
-              encoded_ref="$(jq -rn --arg ref "$ref" '$ref|@uri')"
-              http_code="$(curl "${curl_opts[@]}" \
-                -o /tmp/portainer-image-delete-response.json \
-                -w '%{http_code}' \
-                -X DELETE \
-                "${docker_api_base}/images/${encoded_ref}?force=false&noprune=false" || true)"
-
-              if [[ "$http_code" =~ ^[0-9]+$ ]] && [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
-                removed_count=$((removed_count + 1))
-                log "removed ${ref} (HTTP ${http_code})"
-              else
-                failed_count=$((failed_count + 1))
-                body="$(cat /tmp/portainer-image-delete-response.json 2>/dev/null || true)"
-                log "failed_remove ${ref} (HTTP ${http_code}) ${body}"
-              fi
-            done <<< "$repo_refs"
-          done
-
-          log "---"
-          log "cleanup_summary kept=${kept_count} removed=${removed_count} failed=${failed_count}"
-
-      - name: Generate deploy evidence
-        if: always()
-        env:
-          TARGET_ENV: ${{ needs.prepare.outputs.target_environment }}
-          RELEASE_MODE: ${{ needs.prepare.outputs.release_mode }}
-          RELEASE_VERSION: ${{ needs.prepare.outputs.release_version }}
-          HEALTHCHECK_URL: ${{ steps.resolve.outputs.healthcheck_url }}
-          VERSIONCHECK_URL: ${{ steps.resolve.outputs.versioncheck_url }}
-          VERIFICATION_OUTCOME: ${{ steps.post-deploy-verification.outcome }}
-        run: |
-          set -euo pipefail
-
-          mask_url() {
-            local raw="$1"
-            printf '%s' "$raw" | sed -E 's#^(https?://[^/]+).*$#\1/***#'
-          }
-
-          health_url_masked="$(mask_url "$HEALTHCHECK_URL")"
-          version_url_masked="$(mask_url "$VERSIONCHECK_URL")"
-
-          {
-            echo "workflow=${{ github.workflow }}"
-            echo "run_id=${{ github.run_id }}"
-            echo "run_attempt=${{ github.run_attempt }}"
-            echo "repository=${{ github.repository }}"
-            echo "target_environment=$TARGET_ENV"
-            echo "release_mode=$RELEASE_MODE"
-            echo "release_version=$RELEASE_VERSION"
-            echo "verification_outcome=$VERIFICATION_OUTCOME"
-            echo "backend_image=${{ env.BACKEND_IMAGE }}:${RELEASE_VERSION}"
-            echo "frontend_image=${{ env.FRONTEND_IMAGE }}:${RELEASE_VERSION}"
-            echo "healthcheck_url=$health_url_masked"
-            echo "versioncheck_url=$version_url_masked"
-            echo "generated_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          } > deploy-evidence.txt
-
-      - name: Upload deploy evidence
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4
-        with:
-          name: deploy-evidence-${{ github.run_id }}
-          path: |
-            deploy-evidence.txt
-            post-deploy-health-response.txt
-            post-deploy-version-response.txt
-            post-deploy-debug.txt
-            post-deploy-image-cleanup.txt
-            portainer-stack-update-attempts.txt
-          if-no-files-found: warn
-          retention-days: 30

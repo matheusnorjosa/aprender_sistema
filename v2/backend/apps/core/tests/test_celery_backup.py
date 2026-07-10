@@ -119,6 +119,30 @@ class TestVerifyBackupHealth:
             # Should find the backup now
             assert result["status"] == "healthy"
 
+    def test_health_check_encontra_backup_cifrado_age(self, tmp_path: Path) -> None:
+        """O health check DEVE enxergar `.sql.gz.age`, que e o que producao grava.
+
+        `glob("backup_full_*.sql.gz")` nao casa `backup_full_*.sql.gz.age` (fnmatch
+        exige que o padrao termine o nome). Antes do fix, o alarme olhava um diretorio
+        cheio de dumps cifrados validos e reportava "No backups found" — um alarme que
+        grita lobo toda semana e some no ruido. Ver #1455 / SEC-017.
+        """
+        cifrado = tmp_path / "backup_full_20260710_020000.sql.gz.age"
+        cifrado.write_bytes(b"age-encryption.org/v1\nfake payload")
+
+        with patch("apps.core.tasks_backup.getattr") as mock_getattr:
+
+            def getattr_side_effect(obj, name, default=None):  # type: ignore[no-untyped-def]
+                if name == "BACKUP_DIR":
+                    return str(tmp_path)
+                return default
+
+            mock_getattr.side_effect = getattr_side_effect
+            result = verify_backup_health()
+
+            assert result["status"] == "healthy", result["warnings"]
+            assert not any("No backups found" in w for w in result["warnings"])
+
 
 class TestPerformDatabaseBackupScriptPath:
     """Tests for perform_database_backup script path validation."""

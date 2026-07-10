@@ -1,7 +1,7 @@
 ---
 title: Deploy & Produção (spec)
 status: canonical
-last_verified: 2026-06-19
+last_verified: 2026-07-10
 sources_of_truth:
   - v2/infra/docker-compose.prod.yml
   - v2/infra/Dockerfile.prod
@@ -37,15 +37,40 @@ related:
 auto-load), `docker-compose.staging-gate.yml` (gate), `docker-compose.observability.yml` (local, gitignored),
 `Dockerfile.dev`, `v2/frontend/Dockerfile`.
 
-## Mecanismo de deploy (e risco de drift)
+## Mecanismo de deploy — PULL-BASED (ADR-018)
 
-`deploy.yaml` (GitHub Actions): build/push das imagens no Docker Hub → atualiza **apenas o `IMAGE_TAG`** da stack
-via **Portainer CE API**. **O corpo do compose NÃO é enviado no deploy** — ele vive dentro da stack no Portainer e
-só muda por edição **manual** no Editor (CP do hook: *"Compose changes require manual Portainer Editor update"*).
+> **Mudou em 2026-07-09/10.** O modelo antigo (o CI fazia `PUT` no `:9443` **público**) foi desligado no
+> cutover (#1515) e o job `deploy` foi **deletado** na Fase 4 (#1516). O texto abaixo é o fluxo atual.
 
-> **Risco de drift:** `docker-compose.prod.yml` no repo é a *intenção*; a verdade é o Editor do Portainer. Em
-> 2026-06-19 estavam idênticos (verificado), mas mudanças no repo não propagam sozinhas — re-verificar a cada
-> alteração estrutural de infra.
+**Merge na `main` NÃO deploya.** Ele dispara `deploy.yaml` (hoje *"Build, sign and release"*), que faz
+build → scan → push no Docker Hub → **assina** as imagens (cosign keyless + provenance SLSA) → cria a tag
+imutável `vYYYY.MM.DD-<sha7>` e o GitHub Release. Fim.
+
+Produção muda em **dois passos deliberados**:
+
+1. **`promote.yml`** (`workflow_dispatch`, gated no GitHub Environment `production` com *required reviewer*):
+   resolve tag→digest, **exige** que as imagens estejam assinadas, monta o `production.json` (release, digests,
+   `sequence` monotônica, `expires_at`) e o **assina** (`cosign sign-blob`, identidade OIDC do próprio workflow).
+   Publica no branch protegido **`deploy-pointer`**.
+2. **Agente `aprender-deployer` na VM01** (systemd, ~60s): lê o ponteiro *tokenless* por `raw.githubusercontent.com`,
+   verifica a assinatura contra um trusted-root **pinado offline**, verifica as duas imagens **por digest**
+   (`cosign verify`), e entrega ao `aprender-applier` (o único que detém o token do Portainer). O applier
+   re-verifica tudo dos bytes, confere anti-rollback (**selo** monotônico), confere **drift do compose**, exige
+   **backup de DB fresco**, faz o `PUT` em **`127.0.0.1:9443`** com o compose que ele mesmo detém, confirma em
+   `localhost` (`/api/readyz/` + `/api/version/`) e só então **sela** a sequence. Cada degrau é **fail-closed**.
+
+Consequências que mudam o modelo mental antigo:
+
+- **O corpo do compose É enviado** no PUT do applier — mas é o `trust/compose.pinned.yml`, imutável na VM, nunca
+  um texto vindo da rede. Alterar o compose continua exigindo edição **manual** no Editor do Portainer, seguida de
+  re-captura do pinado (senão o `compose_check_drift` recusa o deploy).
+- As imagens são fixadas **por digest** (`repo:${IMAGE_TAG}@${DIGEST:?}`), não por tag.
+- A confirmação é feita **de dentro da VM**, o que a torna imune ao *false-red* do `:9443` (o `PUT` chega, prod
+  atualiza, mas a resposta não volta pelo firewall).
+
+> **Risco de drift:** `docker-compose.prod.yml` no repo é a *intenção*; a verdade é o Editor do Portainer — e o
+> `trust/compose.pinned.yml` na VM é o que o agente reenvia. Divergência entre o pinado e o vivo **bloqueia** o
+> deploy (`REFUSE compose_drift`), o que é o comportamento desejado.
 
 **Depreciado (issue #814):** os workflows `.github/workflows/release.yaml` e
 `.github/workflows/dockerhub-rebuild.yml` foram **removidos** — o `deploy.yaml` é o único pipeline de deploy.

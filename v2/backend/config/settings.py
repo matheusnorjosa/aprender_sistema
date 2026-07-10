@@ -562,6 +562,9 @@ CELERY_BROKER_URL = (
     f"redis://:{os.getenv('REDIS_PASSWORD', '')}@{os.getenv('REDIS_HOST', 'redis')}:{os.getenv('REDIS_PORT', '6379')}/1"
 )
 CELERY_RESULT_BACKEND = "django-db"
+# Sem isto o TaskResult grava task_name=None e uma falha so pode ser identificada
+# cruzando o horario com o beat_schedule. Foi o que atrasou o diagnostico do #1455.
+CELERY_RESULT_EXTENDED = True
 CELERY_CACHE_BACKEND = "default"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True

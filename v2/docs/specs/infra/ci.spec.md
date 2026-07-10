@@ -1,7 +1,7 @@
 ---
 title: CI/CD (GitHub Actions)
 status: canonical
-last_verified: 2026-06-22
+last_verified: 2026-07-10
 sources_of_truth:
   - .github/workflows/ci.yaml
   - codecov.yml
@@ -30,7 +30,7 @@ related:
 
 ## Propósito
 
-Pipeline de integração e entrega contínua do AS v2 sobre GitHub Actions. A CI valida cada PR para `main` (lint, RBAC lint, type-check, testes backend paralelos, paridade Docker, frontend) e bloqueia merge enquanto os gates `[required]` não passarem; o deploy publica imagens no Docker Hub e atualiza a stack via **Portainer CE API**. Como **não existe staging remoto** (merge na `main` = deploy direto em produção, ADR-010), os gates de PR são a única rede de proteção antes da produção.
+Pipeline de integração e entrega contínua do AS v2 sobre GitHub Actions. A CI valida cada PR para `main` (lint, RBAC lint, type-check, testes backend paralelos, paridade Docker, frontend) e bloqueia merge enquanto os gates `[required]` não passarem. **Merge na `main` NÃO deploya** (modelo pull-based, ADR-018): dispara `deploy.yaml` ("Build, sign and release"), que faz build+scan+push das imagens no Docker Hub, **assina** (cosign keyless + provenance SLSA) e cria a tag imutável `vYYYY.MM.DD-<sha7>` + Release. Produção só muda por **promoção deliberada** (`promote.yml`, gated no Environment `production`) aplicada pelo agente `aprender-deployer` na VM01 (ver [`deploy.spec.md`](./deploy.spec.md)). Como **não existe staging remoto**, os gates de PR + o staging-gate local são a única rede de proteção antes da produção.
 
 A nomenclatura dos checks é o contrato de governança: `[required]` bloqueia merge, `[info]` é informativo, `[ops]` é rotina manual/agendada fora do gate de PR. A SSOT desta convenção e da lista de checks obrigatórios é [`docs/operations/ci-check-policy.md`](../../../../docs/operations/ci-check-policy.md).
 
@@ -48,14 +48,14 @@ A nomenclatura dos checks é o contrato de governança: `[required]` bloqueia me
 ## Contratos e invariantes
 
 - **Checks `[required]` (gate de merge em `main`)** — devem ficar obrigatórios no ruleset `Protect main`: `[required] tests`, `[required] lint`, `[required] backend rbac-lint`, `[required] build/lint do frontend`, `[required] checklist tests (meta, a11y, security)`, `[required] dependency review`, `[required] architecture dependency guardrails`, `[required] Python Dependencies`, `[required] Frontend Dependencies`, `[required] Container Scan`, `[required] Secret Detection`, `[required] staging gate evidence`. SSOT: [`ci-check-policy.md`](../../../../docs/operations/ci-check-policy.md).
-- **Least-privilege do `GITHUB_TOKEN`** — workflow-level default = `contents: read`; cada job que precisa de mais declara o seu (#1397). Em `deploy.yaml`, `contents: write` existe **apenas** no job `tag_and_release` (git tag + `gh release`); o job que builda/pusha imagem fica em `contents: read` (desacopla `contents:write` de alvo de supply-chain). No canary, `issues: write` vive só no job `canary-report` que comenta na issue #677.
+- **Least-privilege do `GITHUB_TOKEN`** — workflow-level default = `contents: read`; cada job que precisa de mais declara o seu (#1397). Em `deploy.yaml`, `contents: write` existe **apenas** no job de tag/release (git tag + `gh release`); o job que builda/pusha imagem fica em `contents: read` (desacopla `contents:write` de alvo de supply-chain). A assinatura das imagens usa `id-token: write` (cosign keyless OIDC). No canary, `issues: write` vive só no job `canary-report` que comenta na issue #677.
 - **Cobertura backend ≥ 85%** — `coverage combine` dos dois jobs (core + dev_tools) com `coverage report --fail-under=85`. Falha abaixo do limiar bloqueia o gate.
 - **Paralelização xdist no gate (M3, #1402/#1403)** — gate usa `pytest -n auto --dist loadscope` (~15min→~5min). `loadscope` mantém testes da mesma classe/módulo no mesmo worker. Habilitado **só** após a suíte estabilizar (causa raiz: `transaction=True` truncava o seed RBAC; fix de re-seed pós-truncate). O canary cobre a matriz `workers×dist` mas **nunca** bloqueia (`fail_on_test_error=false`).
 - **Backend impact detector (fail-safe)** — eventos não-PR (push/dispatch) forçam `backend_changed=true` (modo full seguro); PR sem base/head SHA também. O agregador `[required] tests` exige que os jobs backend ou tenham passado (impacto) ou tenham `skipped` (sem impacto) — nunca silenciosamente verde por engano.
 - **Docker parity (#1401 carve-out)** — `docker-parity-backend` NÃO consome o reusable: usa topologia de container (`host.docker.internal`, `REQUIRE_DOCKER=1`, migrate in-container, build via buildx). Versões de postgres/redis aqui devem ser sincronizadas manualmente com o `services` do reusable (SSOT das versões: `postgres:15.13`, `redis:7.4`).
 - **Gate de staging (evidência)** — para PRs com impacto em runtime (`v2/backend/apps|config|requirements.txt`, `v2/frontend/src|public|Dockerfile.prod`, `v2/infra/...`), o corpo do PR precisa de 3 marcadores literais (sem acento, crase normalizada): checkbox `make staging-full ... (8/8 PASS)`, checkbox `Evidencia anexada no PR`, e o texto `ALL 8 CHECKS PASSED`. PRs em draft ou sem impacto em runtime são pulados.
 - **Guard rails de lint** — Black/isort/Flake8 + ban de `/api/v1/` fora da allowlist (#796); RBAC lint AST bane `user.groups.filter(name=...)` e classes `Is<Role>` fora da whitelist (idioma canônico: `permission_classes=[HasPerm("codename")]`).
-- **Deploy/security gate** — invariantes de imutabilidade de tag, fire-and-forget com confirmação (#1396) e gate Trivy (bloqueia HIGH/CRITICAL) são contrato do deploy: ver [`deploy.spec.md`](./deploy.spec.md).
+- **Deploy/security gate** — imutabilidade de tag, assinatura das imagens (cosign keyless + provenance SLSA) e gate Trivy (bloqueia HIGH/CRITICAL) são contrato do deploy; a aplicação em prod é **por digest**, verificada pelo agente na VM01 (`promote.yml` → `deploy-pointer` → `aprender-deployer`): ver [`deploy.spec.md`](./deploy.spec.md).
 - **Não usar `paths` no gatilho `pull_request` de workflow que publica check `[required]`** (senão o check fica pendente para sempre e trava o ruleset). `frontend-ci.yml` removeu path filters de PR exatamente por isso.
 
 ## API / Interface
@@ -63,7 +63,7 @@ A nomenclatura dos checks é o contrato de governança: `[required]` bloqueia me
 - **CI (`ci.yaml`)** — dispara em `push`/`pull_request` para `main`. Jobs: `backend-impact`, `lint`, `rbac-lint`, `backend-tests-core`, `backend-tests-devtools`, `backend-tests` (combine+threshold), `backend-typecheck`, `docker-parity-backend`, `tests` (agregador `[required]`).
 - **Reusable (`_backend-test.yml`)** — `workflow_call` com inputs: `pytest_paths`, `pytest_extra_args`, `coverage_file`, `validate_test_paths`, `fail_on_test_error`, `emit_canary_metadata`, `artifact_name`/`artifact_paths` (obrigatórios), entre outros. Roda em Python 3.12 com `COVERAGE_CORE=sysmon` (sys.monitoring do 3.12, #1399).
 - **Canary (`backend-xdist-canary.yml`)** — `schedule` (cron `20 10 * * *`), `workflow_dispatch` e `push` em paths do próprio canary. Matriz `workers=[2,auto] × dist=[loadscope,loadfile]`; publica snapshot na issue #677.
-- **Deploy (`deploy.yaml`)** — `push` em `main` → staging-auto; `workflow_dispatch` com `target_environment` (staging|production), `promotion_tag`, `rollback_tag`. Interface detalhada (modos, gate de promoção, polling): [`deploy.spec.md`](./deploy.spec.md).
+- **Deploy (`deploy.yaml`)** — `push` em `main` → build+scan+push+**sign**+tag/release (não deploya). Promoção/rollback e mudança de prod ficam no `promote.yml` (gated no Environment `production`) + agente `aprender-deployer` na VM01. O `workflow_dispatch` do `deploy.yaml` **não** tem mais `target_environment`/`promotion_tag`/`rollback_tag`. Interface detalhada: [`deploy.spec.md`](./deploy.spec.md).
 
 ## Fluxos principais
 
@@ -76,25 +76,25 @@ A nomenclatura dos checks é o contrato de governança: `[required]` bloqueia me
 5. `backend-typecheck` (pyright em `apps/core config`) e `docker-parity-backend` (smoke em imagem `Dockerfile.prod`) rodam em paralelo.
 6. `tests` agrega: verde só se todos passaram (ou todos `skipped` quando sem impacto).
 7. `frontend-ci` (react doctor + build/lint + checklist) e `staging-gate-audit` (evidência no corpo) completam o gate.
-8. Merge em `main` dispara `deploy.yaml`.
+8. Merge em `main` dispara `deploy.yaml` (build+sign+release; **não** deploya — prod só muda por `promote.yml` gated).
 
-**Deploy (resumo — detalhe em `deploy.spec.md`):** build+scan(Trivy)+push das imagens → `validate_existing_tag` (promotion/rollback) → `deploy` chama Portainer CE API atualizando só o `IMAGE_TAG` → post-deploy verification (polling de versão + fallback via Portainer API quando o health externo está inacessível por rede).
+**Deploy (resumo — detalhe em `deploy.spec.md`):** merge na `main` → build+scan(Trivy)+push das imagens → **assina** (cosign keyless + provenance SLSA) → cria tag imutável `vYYYY.MM.DD-<sha7>` + Release. Prod muda depois em dois passos deliberados: `promote.yml` (gated no Environment `production`) resolve tag→digest e assina o ponteiro no branch `deploy-pointer`; o agente `aprender-deployer` na VM01 verifica com cosign e aplica **por digest** em `127.0.0.1:9443`, confirmando de dentro da VM.
 
 **Erros relevantes:**
 
 - Cobertura < 85% → `backend-tests` falha → `tests` vermelho.
 - xdist instável → fica **isolado** no canary (não bloqueia); recorrências viram issues de estabilização antes de promover ao gate.
 - Corpo de PR sem os 3 marcadores → `staging gate evidence` falha (exceto draft / sem runtime impact).
-- Deploy timeout (HTTP 000 por firewall) → confirmação fail-fast via GET do `IMAGE_TAG` e fallback Portainer (não assume sucesso cego).
+- Aplicação em prod (agente na VM01) é **fail-closed** por degrau (assinatura, digest, anti-rollback, drift do compose, backup fresco) e confirma em `localhost` — imune ao *false-red* do `:9443` público.
 
 ## Decisões relacionadas (ADRs)
 
-- **ADR-010** — Deploy Portainer→prod, sem staging remoto (referenciado em [`deploy.spec.md`](./deploy.spec.md) e no índice de infra).
+- **ADR-018** — deploy **pull-based**: `promote.yml` (gated) → ponteiro assinado no branch `deploy-pointer` → agente `aprender-deployer` aplica por digest na VM01. **Supersede** o ADR-010 (PUT do CI ao Portainer `:9443` público), desligado no cutover #1515 e removido na Fase 4 #1516. Detalhe em [`deploy.spec.md`](./deploy.spec.md).
 - **#1397** — least-privilege do `GITHUB_TOKEN` (M2).
 - **#1401** — reusable `_backend-test.yml` (SSOT de setup de teste).
 - **#1402 / #1403** — estabilização xdist + promoção de `-n auto --dist loadscope` no gate (M3).
 - **#1399** — `COVERAGE_CORE=sysmon` (sys.monitoring do Python 3.12).
-- **#1396 / #1394** — fail-fast pós-timeout do Portainer + token via `curl --config` (fora do argv).
+- **#1396 / #1394** (histórico, modelo antigo) — fail-fast pós-timeout do Portainer + token via `curl --config` (fora do argv); superados pelo modelo pull-based (ADR-018).
 
 ## Testes que cobrem
 
@@ -114,4 +114,4 @@ A CI é infra-as-code; sua "prova" são os próprios checks de gate e o canary, 
 - **Canary só mostra top-5** — o report da issue #677 lista os 5 piores; a magnitude total de falhas pode ficar subdimensionada no comentário (vide M3: a issue citava 6 testes, eram 537).
 - **`pull_request` sem path filters em checks `[required]`** — necessário para o ruleset, mas faz `frontend-ci` rodar mesmo em PRs sem mudança de frontend (custo aceito por governança).
 - **react-doctor exige `--offline`** — o score depende de telemetria remota; sem `--offline` o gate é não-determinístico (memória `react-doctor-offline-determinism`).
-- **Deploy é Portainer→prod sem staging remoto** — o gate de evidência de staging depende de `make staging-full` **local** do autor; não há ambiente staging que a CI valide. Detalhe e gaps de deploy em [`deploy.spec.md`](./deploy.spec.md).
+- **Sem staging remoto; prod só muda por promoção gated (pull-based)** — merge na `main` não deploya; o gate de evidência de staging depende de `make staging-full` **local** do autor; não há ambiente staging que a CI valide. Detalhe e gaps de deploy em [`deploy.spec.md`](./deploy.spec.md).

@@ -401,6 +401,28 @@ def user_can_delegate_availability_block(user: AbstractBaseUser | AnonymousUser 
     return user_has_any_perm(user, "manage_admin_registries")
 
 
+def user_can_delegate_deslocamento(user: AbstractBaseUser | AnonymousUser | None) -> bool:
+    """
+    Composite check (#1454, 2026-07-09): autoriza registrar deslocamento em
+    nome de outro usuário.
+
+    Habilitado para:
+    - Superuser (bypass)
+    - Perfis operacionais / suporte transversal:
+      `operate_preagenda` (Controle) OU `view_all_availability` (Controle, DAT).
+
+    Demais (Coordenador, Apoio, Gerente, Diretoria, Formador) → False; cada um
+    registra apenas a própria viagem (self-service).
+
+    Não cria capability nova: composição de capabilities SSOT existentes.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    return user_has_any_perm(user, "operate_preagenda", "view_all_availability")
+
+
 def user_has_policy(user: AbstractBaseUser | AnonymousUser | None, key: str) -> bool:
     """
     True sse o usuário possui a policy identificada por `key`.

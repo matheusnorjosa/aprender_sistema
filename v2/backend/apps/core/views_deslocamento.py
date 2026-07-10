@@ -8,8 +8,11 @@ Endpoints:
 - PUT /api/deslocamentos/{id}/ - Update (AuditLog)
 - DELETE /api/deslocamentos/{id}/ - Delete (AuditLog)
 
-Permissions:
-- HasPerm("operate_preagenda") (Controle, DAT, Superintendência)
+Permissions (#1454):
+- IsAuthenticated. Escrita é owner-forced: cada usuário registra a própria
+  viagem. Registrar/transferir em nome de outro exige delegação
+  (operate_preagenda | view_all_availability). Leitura escopada por
+  EquipeGerencia + próprio (owner).
 
 Filters:
 - usuario_id: Filter by usuario ID
@@ -30,10 +33,9 @@ Pagination:
 
 from __future__ import annotations
 
-from typing import Any
-
 from django.db.models import Q, QuerySet
 from rest_framework import viewsets
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.filters import OrderingFilter
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
@@ -43,6 +45,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import AuditLog, Deslocamento, EquipeGerencia
 from .rbac.helpers import user_has_any_perm
+from .rbac.policies import user_can_delegate_deslocamento
 from .serializers import DeslocamentoSerializer
 
 
@@ -83,8 +86,10 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
 
     Provides full CRUD operations for travel records between municipalities.
 
-    Permissions:
-        - HasPerm("operate_preagenda") (Controle, DAT, Superintendência)
+    Permissions (#1454):
+        - IsAuthenticated. Escrita owner-forced (self-service); delegação
+          (registrar/transferir p/ outro) exige operate_preagenda |
+          view_all_availability. Leitura escopada por EquipeGerencia + owner.
 
     Filters:
         - usuario_id: Filter by usuario ID
@@ -141,7 +146,11 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
         # mas antes dos filtros de query params (não filtra duas vezes).
         if not getattr(user, "is_superuser", False) and not user_has_any_perm(user, "view_all_availability"):
             user_gerencia_ids = list(EquipeGerencia.objects.filter(usuario=user).values_list("gerencia_id", flat=True))
-            queryset = queryset.filter(usuario__equipes__gerencia_id__in=user_gerencia_ids).distinct()
+            # #1454: o próprio dono sempre vê/edita os próprios deslocamentos
+            # (self-service), além dos de usuários na(s) gerência(s) vinculada(s).
+            queryset = queryset.filter(
+                Q(usuario=user) | Q(usuario__equipes__gerencia_id__in=user_gerencia_ids)
+            ).distinct()
 
         # Filter by usuario_id
         usuario_id = self.request.query_params.get("usuario_id")
@@ -170,15 +179,47 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
 
         return queryset
 
+    def _ensure_owner_or_delegate(self, instance: Deslocamento) -> None:
+        """#1454 (audit 2026-07-10): a ESCRITA é owner-forced.
+
+        A leitura é escopada por EquipeGerencia (o usuário vê os deslocamentos dos
+        colegas da gerência, para o mapa de disponibilidade), mas editar ou remover
+        a viagem de outro exige delegação (`user_can_delegate_deslocamento`). Sem
+        este gate objeto-nível, `get_queryset` entrega o registro do colega e
+        `perform_update`/`perform_destroy` o alterariam sem 403 — a mesma família do
+        IDOR do CREATE, só que na mutação/remoção.
+        """
+        user = self.request.user
+        if instance.usuario_id != user.id and not user_can_delegate_deslocamento(user):
+            raise PermissionDenied("Você não tem permissão para alterar deslocamento de outro usuário.")
+
     def perform_create(self, serializer: DeslocamentoSerializer) -> None:
         """
-        Create Deslocamento and log to AuditLog.
+        Cria Deslocamento (owner-forced) e registra AuditLog.
+
+        #1454 (2026-07-09): self-service por padrão — cada pessoa registra a
+        própria viagem. `usuario` omitido ou == request.user → grava para o
+        próprio. `usuario` != request.user → exige capability de delegação
+        (`user_can_delegate_deslocamento`); caso contrário 403 (IDOR bloqueado).
+        Delegação registra AuditLog com `delegated=True`.
 
         AuditLog records:
         - action: CREATE_DESLOCAMENTO
-        - details: usuario_id, origem, destino, start_date, end_date, ip_address, user_agent
+        - details: usuario_id, origem, destino, start_date, end_date, delegated,
+          ip_address, user_agent
         """
-        deslocamento = serializer.save()
+        request_user = self.request.user
+        target = serializer.validated_data.get("usuario")
+
+        # Anti-IDOR: delegação (alvo != próprio) exige capability explícita.
+        if target is None or target.id == request_user.id:
+            deslocamento = serializer.save(usuario=request_user)
+            delegated = False
+        else:
+            if not user_can_delegate_deslocamento(request_user):
+                raise PermissionDenied("Você não tem permissão para registrar deslocamento em nome de outro usuário.")
+            deslocamento = serializer.save()
+            delegated = True
 
         # Create AuditLog
         AuditLog.objects.create(
@@ -193,6 +234,7 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
                 "start_date": deslocamento.start_date.isoformat(),
                 "end_date": deslocamento.end_date.isoformat(),
                 "observacao": deslocamento.observacao or "",
+                "delegated": delegated,
                 "ip_address": _get_client_ip(self.request),
                 "user_agent": self.request.META.get("HTTP_USER_AGENT", "")[:200],
             },
@@ -207,6 +249,21 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
         - details: deslocamento_id, changed_fields, prev_values, new_values, ip_address, user_agent
         """
         instance = self.get_object()
+
+        # #1454 (audit 2026-07-10): editar viagem de outro exige delegação, mesmo
+        # que o escopo de leitura entregue o registro do colega.
+        self._ensure_owner_or_delegate(instance)
+
+        # #1454: bloqueia reatribuição do dono para terceiro sem delegação.
+        request_user = self.request.user
+        reassign_target = serializer.validated_data.get("usuario")
+        if (
+            reassign_target is not None
+            and reassign_target.id != instance.usuario_id
+            and reassign_target.id != request_user.id
+            and not user_can_delegate_deslocamento(request_user)
+        ):
+            raise PermissionDenied("Você não tem permissão para transferir deslocamento para outro usuário.")
 
         # Track changed fields
         changed_fields = {}
@@ -257,6 +314,9 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
         - action: DELETE_DESLOCAMENTO
         - details: deslocamento_id, usuario_id, origem, destino, start_date, end_date, ip_address, user_agent
         """
+        # #1454 (audit 2026-07-10): só o dono (ou delegado) remove a viagem.
+        self._ensure_owner_or_delegate(instance)
+
         # Create AuditLog before deletion
         AuditLog.objects.create(
             usuario=self.request.user,

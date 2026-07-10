@@ -111,7 +111,8 @@ class DeslocamentoSerializer(serializers.ModelSerializer):
         - start_date < end_date (error: "Data fim deve ser posterior à data início")
         - origem != destino (error: "Origem e destino devem ser diferentes")
 
-    Permissions: HasPerm("operate_preagenda") (Controle, DAT, Superintendência)
+    Escrita owner-forced (#1454): `usuario` opcional; omitido → self-service.
+    Registrar em nome de outro exige delegação (validada na view).
     """
 
     usuario_nome = serializers.SerializerMethodField()
@@ -132,6 +133,12 @@ class DeslocamentoSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "external_hash", "created_at", "updated_at"]
+        extra_kwargs = {
+            # #1454: `usuario` é opcional na entrada. Omitido → self-service
+            # (a view força request.user). Preenchido ≠ self → exige capability
+            # de delegação (validada em DeslocamentoViewSet.perform_create).
+            "usuario": {"required": False},
+        }
 
     def get_usuario_nome(self, obj: Deslocamento) -> str:
         """Retorna nome completo do usuário ou username como fallback."""

@@ -231,11 +231,18 @@ DATABASES = {
             "connect_timeout": 10,
             # 30s query timeout em produção (evita queries lentas)
             "options": "-c statement_timeout=30000" if ENVIRONMENT == "production" else "",
-            # SEC-016: TLS encryption for Django↔PostgreSQL (production only)
-            # Requires: PostgreSQL ssl=on on VM02, DB_SSLMODE=require in env
-            # Client cert paths handled by PGSSLCERT/PGSSLKEY/PGSSLROOTCERT env
-            # vars set in Dockerfile.prod (pointing to /app/.postgresql/)
-            **({"sslmode": os.getenv("DB_SSLMODE")} if os.getenv("DB_SSLMODE") else {}),
+            # SEC-016 / audit #1541 (G): TLS Django↔PostgreSQL. Em PRODUÇÃO é
+            # obrigatório — sem DB_SSLMODE o libpq usaria 'prefer', que aceita a
+            # conexão em TEXTO CLARO se o servidor não oferecer TLS e NUNCA verifica
+            # o certificado, tudo em silêncio. Fail-closed: em prod, default 'require'
+            # (garante cifragem). Em dev/test mantém o padrão do libpq (postgres local
+            # sem TLS). verify-full exigiria PGSSLROOTCERT — hardening à parte.
+            # Cert paths via PGSSLCERT/PGSSLKEY/PGSSLROOTCERT (Dockerfile.prod).
+            **(
+                {"sslmode": os.getenv("DB_SSLMODE") or "require"}
+                if (os.getenv("DB_SSLMODE") or ENVIRONMENT == "production")
+                else {}
+            ),
         },
     }
 }
@@ -389,18 +396,17 @@ CACHE_DEFAULT_TIMEOUT = int(os.getenv("CACHE_DEFAULT_TIMEOUT", 300))  # 5 minute
 # Redis distributed lock
 REDIS_LOCK_TIMEOUT = int(os.getenv("REDIS_LOCK_TIMEOUT", 300))  # 5 minutes
 
-# Google API timeouts
-GOOGLE_API_TIMEOUT = int(os.getenv("GOOGLE_API_TIMEOUT", 10))  # 10 seconds
-GOOGLE_OAUTH_TIMEOUT = int(os.getenv("GOOGLE_OAUTH_TIMEOUT", 600))  # 10 minutes
-GOOGLE_API_MAX_RETRIES = int(os.getenv("GOOGLE_API_MAX_RETRIES", 3))
+# GOOGLE_API_TIMEOUT / GOOGLE_OAUTH_TIMEOUT / GOOGLE_API_MAX_RETRIES removidos
+# (#1541): knobs mortos, ninguém os lia. Os clients GCal usam GCAL_HTTP_TIMEOUT,
+# GCAL_REQUEST_MAX_RETRIES e GCAL_OAUTH_TOKEN_TIMEOUT — tunar aqueles, não estes.
 
 # Circuit Breaker (GCal)
 GCAL_CIRCUIT_BREAKER_FAIL_MAX = int(os.getenv("GCAL_CB_FAIL_MAX", 5))
 GCAL_CIRCUIT_BREAKER_RESET_TIMEOUT = int(os.getenv("GCAL_CB_RESET_TIMEOUT", 60))
 
-# Celery task retry
-CELERY_DEFAULT_RETRY_DELAY = int(os.getenv("CELERY_RETRY_DELAY", 300))  # 5 minutes
-CELERY_CIRCUIT_BREAKER_COUNTDOWN = int(os.getenv("CELERY_CB_COUNTDOWN", 60))  # 1 minute
+# CELERY_DEFAULT_RETRY_DELAY / CELERY_CIRCUIT_BREAKER_COUNTDOWN removidos (#1541):
+# nunca lidos (tasks.py hardcoda os valores), e CELERY_DEFAULT_RETRY_DELAY nem é o
+# nome que o namespace do Celery reconhece (seria CELERY_TASK_DEFAULT_RETRY_DELAY).
 
 # ================================================================
 # EXTERNAL PLATFORMS (Issue #446)
@@ -773,24 +779,11 @@ BACKUP_RETENTION_DAYS = int(os.getenv("BACKUP_RETENTION_DAYS", "7"))
 # S3 bucket name (without s3://). Use empty string to disable uploads.
 BACKUP_S3_BUCKET = os.getenv("BACKUP_S3_BUCKET", "")
 
-# ================================================================
-# PR21: external_hash v2 + Data Quality Gates
-# ================================================================
-# Feature flag: usa hash v2 (17 campos) ao invés de v1 (8 campos)
-USE_EXTERNAL_HASH_V2 = os.getenv("USE_EXTERNAL_HASH_V2", "True") == "True"
-
-# Data Quality Gates: limites para abortar ETL apply
-ETL_MAX_DUPLICATES_PCT = float(os.getenv("ETL_MAX_DUPLICATES_PCT", "1.0"))  # 1.0% máximo de duplicatas
-
-ETL_MAX_UNKNOWN_USERS = int(os.getenv("ETL_MAX_UNKNOWN_USERS", "100"))  # Máximo de pessoas sem cadastro
-
-ETL_REQUIRE_ZERO_INVALID_INTERVALS = (
-    os.getenv("ETL_REQUIRE_ZERO_INVALID_INTERVALS", "True") == "True"
-)  # Se True, aborta se houver intervalos inválidos (fim <= início)
-
-ETL_REQUIRE_ZERO_INVALID_DATES = (
-    os.getenv("ETL_REQUIRE_ZERO_INVALID_DATES", "True") == "True"
-)  # Se True, aborta se houver datas/horas inválidas
+# Removidos (#1541): USE_EXTERNAL_HASH_V2 (nunca lido — auditoria_planilhas_v2 usa
+# compute_hash_v2 incondicional) e os gates ETL_MAX_DUPLICATES_PCT /
+# ETL_MAX_UNKNOWN_USERS / ETL_REQUIRE_ZERO_INVALID_* ("abortar ETL apply" — o ETL
+# legado apps.dat_ingest foi REMOVIDO, nada os lia). Import atual =
+# import_export_contract + endpoints DRF; um gate de qualidade real vive lá, não aqui.
 
 # ================================================================
 # RBAC: Grupos permitidos para usuários (Issue #254)

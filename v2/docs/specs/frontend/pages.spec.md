@@ -1,7 +1,7 @@
 ---
 title: Páginas (React)
 status: canonical
-last_verified: 2026-06-19
+last_verified: 2026-07-10
 sources_of_truth:
   - v2/frontend/src/App.tsx
   - v2/frontend/src/components/AppRoutes.tsx
@@ -33,13 +33,13 @@ Esta spec é o **índice canônico do inventário de páginas**: domínio, rota 
 ## Fonte de verdade no código
 
 - [`v2/frontend/src/App.tsx`](../../../frontend/src/App.tsx) — shell: carrega `getMe()` + `getMyPolicies()`, decide login vs app, monta sidebar/header/`<AppRoutes>`. `LoginPage` é a única página lazy fora de `AppRoutes`.
-- [`v2/frontend/src/components/AppRoutes.tsx`](../../../frontend/src/components/AppRoutes.tsx) — **registro único de rotas**. 39 páginas lazy + 50 `<Route>` (inclui 7 redirects de URLs legadas). Cada rota guardada usa o padrão `element={guard ? <Page /> : <Forbidden />}`.
+- [`v2/frontend/src/components/AppRoutes.tsx`](../../../frontend/src/components/AppRoutes.tsx) — **registro único de rotas**. 40 páginas lazy + 52 `<Route>` (inclui 6 redirects de URLs legadas). Cada rota guardada usa o padrão `element={guard ? <Page /> : <Forbidden />}`.
 - [`v2/frontend/src/hooks/usePermissions.ts`](../../../frontend/src/hooks/usePermissions.ts) — deriva flags `canControle`/`canDAT`/`canDashboard*`/`canDisponibilidade`/… de `setores`+`funcoes`+`is_superuser` do payload de `/api/me/`.
 - [`v2/frontend/src/hooks/useCanAccess.ts`](../../../frontend/src/hooks/useCanAccess.ts) — camada de tradução semântica: converte `policies` públicas (de `GET /api/me/policies/`) em flags como `canAccessApprovals`, `canCreateSolicitation`, `canViewComprasDashboard`.
 - [`v2/frontend/src/components/AppSidebar.tsx`](../../../frontend/src/components/AppSidebar.tsx) — menu lateral; usa as mesmas flags para esconder itens (UX, não é o gate autoritativo).
-- Diretório [`v2/frontend/src/pages/`](../../../frontend/src/pages) — **14 diretórios de domínio** (AdminDAT, Aprovacoes, Auth, Controle, DAT, DATModule, Dashboards, Deslocamentos, Disponibilidade, Home, MapaBrasil, MeusEventos, PreAgenda, Solicitacoes) + `__tests__`.
+- Diretório [`v2/frontend/src/pages/`](../../../frontend/src/pages) — **15 diretórios de domínio** (AdminDAT, Aprovacoes, Auth, Controle, DAT, DATModule, Dashboards, Deslocamentos, Disponibilidade, Home, MapaBrasil, MeusEventos, Perfil, PreAgenda, Solicitacoes) + `__tests__`.
 
-> **Correção de mito:** o número real é **40 páginas lazy-loaded** (39 em `AppRoutes` + `LoginPage` em `App.tsx`), não "45+". `Solicitacoes.tsx` e `Disponibilidade.tsx` na raiz de `pages/` ainda existem; `pages/Disponibilidade` (dir) é o que está roteado em `/solicitacoes/bloqueios`.
+> **Correção de mito:** o número real é **41 páginas lazy-loaded** (40 em `AppRoutes` + `LoginPage` em `App.tsx`), não "45+". `Solicitacoes.tsx` e `Disponibilidade.tsx` na raiz de `pages/` ainda existem; `pages/Disponibilidade` (dir) é o que está roteado em `/solicitacoes/bloqueios`.
 
 ## Contratos e invariantes
 
@@ -66,6 +66,12 @@ Inventário por domínio (rota → componente → guard). Detalhe da capability 
 | Rota | Página | Guard |
 |---|---|---|
 | (sem rota — render condicional em `App.tsx`) | `Auth/LoginPage` | anônimo |
+
+### Perfil
+
+| Rota | Página | Guard |
+|---|---|---|
+| `/perfil` | `Perfil/PerfilPage` | autenticado |
 
 ### Solicitações (agrupadas sob `/solicitacoes/*`)
 
@@ -152,4 +158,4 @@ Inventário por domínio (rota → componente → guard). Detalhe da capability 
 - **`DATPage` (`pages/DAT/DATPage.tsx`) órfã.** Não está mais roteada (substituída por `ImportacoesPage`); remoção definitiva ficou para "PR-D" (ver comentário no `AppRoutes`).
 - **Páginas raiz legadas.** `pages/Solicitacoes.tsx` e `pages/Disponibilidade.tsx` (arquivos soltos na raiz de `pages/`) coexistem com os diretórios homônimos roteados — risco de confusão; conferir o import do `AppRoutes` antes de editar.
 - **Logout via `window.location.reload()`.** Tech-debt assumido (#927) — sem auth store centralizado, logout força reload em vez de limpeza de estado.
-- **README de specs frontend desatualizado.** [`./README.md`](./README.md) ainda diz "6/14 documentadas" e "45+ pages"; esta spec corrige a contagem para 14 dirs / 40 páginas lazy.
+- **README de specs frontend desatualizado.** [`./README.md`](./README.md) ainda diz "6/14 documentadas" e "45+ pages"; esta spec corrige a contagem para 15 dirs / 41 páginas lazy.

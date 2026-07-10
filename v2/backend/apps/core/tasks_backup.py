@@ -247,10 +247,15 @@ def verify_backup_health() -> dict[str, str | int | list[str]]:
 
     health_status = "healthy" if checks_passed == checks_total else "degraded"
 
-    logger.info(
-        f"Backup health check completed: {health_status} ({checks_passed}/{checks_total} passed)",
-        extra={"warnings": warnings},
-    )
+    _msg = f"Backup health check completed: {health_status} ({checks_passed}/{checks_total} passed)"
+    if health_status == "healthy":
+        logger.info(_msg, extra={"warnings": warnings})
+    else:
+        # #1541: 'degraded' e o sinal de backup morto — a razao de a task existir.
+        # SENTRY_DSN esta VAZIO em prod (o capture_message acima e no-op) e o INFO era
+        # engolido por alertas baseados em log (level>=WARNING). Logar em ERROR faz o
+        # alarme chegar a alguem, independente do Sentry.
+        logger.error(_msg, extra={"warnings": warnings})
 
     return {
         "status": health_status,

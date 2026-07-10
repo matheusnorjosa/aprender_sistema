@@ -155,6 +155,10 @@ jobs:
       # foram movidos p/ o job `tag_and_release` (desacopla contents:write de um
       # alvo classico de supply-chain: o job que builda/pusha imagem). #1397.
       contents: read
+    outputs:
+      # digests dos pushes -> consumidos pelo job `sign` (assinatura por digest, ADR-018 #1524)
+      backend_digest: ${{ steps.push_backend.outputs.digest }}
+      frontend_digest: ${{ steps.push_frontend.outputs.digest }}
     steps:
       - name: Checkout code
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
@@ -243,6 +247,7 @@ jobs:
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
       - name: Build and push backend image
+        id: push_backend
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: ./v2
@@ -258,6 +263,7 @@ jobs:
             BUILD_DATE=${{ needs.prepare.outputs.build_date }}
 
       - name: Build and push frontend image
+        id: push_frontend
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: ./v2/frontend
@@ -269,6 +275,28 @@ jobs:
           cache-to: type=gha,mode=max
           build-args: |
             GIT_SHA=${{ github.sha }}
+
+  sign:
+    # ADR-018 #1524: auto-assina TODA imagem de prod (cosign keyless + attestation SLSA),
+    # reutilizando o slsa-provenance.yml. A identidade OIDC keyless de um reusable LOCAL
+    # e slsa-provenance.yml@refs/heads/main -> casa com o IMAGE_IDENTITY_RE do agente/promote
+    # (nenhuma mudanca no agente). Roda EM PARALELO ao PUT legado (nao e needs do `deploy`),
+    # entao um sign vermelho NAO bloqueia o deploy atual — seguro ate o cutover.
+    # Gate `ref == main`: dispatch de staging a partir de branch assinaria com identidade
+    # que o agente rejeita; entao so assina no caminho main.
+    name: Sign images (cosign keyless + SLSA)
+    needs: [prepare, build_and_push]
+    if: needs.prepare.outputs.should_build == 'true' && github.ref == 'refs/heads/main'
+    permissions:
+      id-token: write       # cosign keyless (Fulcio) — DEVE estar no caller
+      attestations: write   # actions/attest-build-provenance
+      contents: read
+    uses: ./.github/workflows/slsa-provenance.yml
+    with:
+      release_tag: ${{ needs.prepare.outputs.release_version }}
+      backend_digest: ${{ needs.build_and_push.outputs.backend_digest }}
+      frontend_digest: ${{ needs.build_and_push.outputs.frontend_digest }}
+    secrets: inherit
 
   tag_and_release:
     name: Tag and GitHub Release
@@ -379,11 +407,19 @@ jobs:
       - prepare
       - build_and_push
       - validate_existing_tag
-    if: |
-      always() &&
-      needs.prepare.result == 'success' &&
-      (needs.build_and_push.result == 'success' || needs.build_and_push.result == 'skipped') &&
-      (needs.validate_existing_tag.result == 'success' || needs.validate_existing_tag.result == 'skipped')
+    # ADR-018 cutover (#1515): PUT legado ao Portainer :9443 PUBLICO foi DESLIGADO.
+    # O deploy agora e PULL-BASED — o agente aprender-deployer (VM01) le o ponteiro
+    # assinado (promote.yml, gated) e deploya por DIGEST em 127.0.0.1:9443, imune ao
+    # false-red. build_and_push + sign CONTINUAM (o agente so deploya imagem que
+    # existe e esta assinada com cosign). Reverter em emergencia = restaurar a
+    # condicao original abaixo (git blame). Fase 4 (#1516): DELETAR este job inteiro
+    # + remover os secrets PRODUCTION_PORTAINER_* (estado final limpo).
+    #
+    # Condicao original (para revert de emergencia):
+    #   always() && needs.prepare.result == 'success' &&
+    #   (needs.build_and_push.result == 'success' || needs.build_and_push.result == 'skipped') &&
+    #   (needs.validate_existing_tag.result == 'success' || needs.validate_existing_tag.result == 'skipped')
+    if: false
     steps:
       - name: Resolve deploy endpoints and configuration
         id: resolve

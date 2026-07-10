@@ -87,10 +87,35 @@ jobs:
           RELEASE: ${{ steps.rel.outputs.release }}
         run: |
           set -euo pipefail
-          be="$(docker buildx imagetools inspect "${BACKEND_IMAGE}:${RELEASE}"  | awk '/Digest:/ {print $2; exit}')"
-          fe="$(docker buildx imagetools inspect "${FRONTEND_IMAGE}:${RELEASE}" | awk '/Digest:/ {print $2; exit}')"
-          if ! printf '%s' "$be" | grep -Eq '^sha256:[0-9a-f]{64}$'; then echo "backend digest invalido: $be" >&2; exit 1; fi
-          if ! printf '%s' "$fe" | grep -Eq '^sha256:[0-9a-f]{64}$'; then echo "frontend digest invalido: $fe" >&2; exit 1; fi
+
+          # O Docker Hub flaka: `imagetools inspect` ja saiu 255 em 0.3s com a imagem
+          # existindo e assinada (ADR-018 3e; o re-run passou). Sem retry, uma promocao
+          # perfeitamente valida morre e ainda queima o gate `production` (o reviewer
+          # tem de aprovar de novo). Retry com backoff; fail-closed ao esgotar.
+          #
+          # Diagnostico SEMPRE em stderr: o stdout desta funcao e capturado por $( ).
+          resolve_digest() {
+            local ref="$1" attempt rc out digest
+            for attempt in 1 2 3 4 5; do
+              rc=0; out="$(docker buildx imagetools inspect "$ref" 2>&1)" || rc=$?
+              if [ "$rc" -eq 0 ]; then
+                digest="$(printf '%s\n' "$out" | awk '/Digest:/ {print $2; exit}')"
+                if printf '%s' "$digest" | grep -Eq '^sha256:[0-9a-f]{64}$'; then
+                  printf '%s' "$digest"; return 0
+                fi
+                echo "aviso: ${ref}: digest ausente/invalido (tentativa ${attempt})" >&2
+              else
+                echo "aviso: ${ref}: imagetools inspect saiu ${rc} (tentativa ${attempt})" >&2
+              fi
+              printf '%s\n' "$out" >&2
+              if [ "$attempt" -lt 5 ]; then sleep "$(( attempt * 5 ))"; fi
+            done
+            echo "${ref}: digest nao resolvido apos 5 tentativas" >&2
+            return 1
+          }
+
+          be="$(resolve_digest "${BACKEND_IMAGE}:${RELEASE}")"
+          fe="$(resolve_digest "${FRONTEND_IMAGE}:${RELEASE}")"
           echo "backend=${be}"  >> "$GITHUB_OUTPUT"
           echo "frontend=${fe}" >> "$GITHUB_OUTPUT"
 

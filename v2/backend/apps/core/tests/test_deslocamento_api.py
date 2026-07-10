@@ -329,13 +329,16 @@ class TestDeslocamentoAPI:
         # Cobertura granular do scope em test_deslocamento_rbac.py (Onda 1 C2).
         client = APIClient()
 
-        # Formador autenticado sem EquipeGerencia → 200 + 0 deslocamentos
-        # (antes: 403; bloqueio agora vira fail-safe via scope filter)
+        # Formador autenticado sem EquipeGerencia → 200. #1454: o dono SEMPRE vê
+        # os próprios deslocamentos (self-service). `deslocamento_sample` pertence
+        # a user_formador, então ele o enxerga (antes retornava [] — bug de
+        # owner-visibility corrigido). Não vê deslocamentos de OUTROS usuários.
         client.force_authenticate(user=user_formador)
         response = client.get("/api/deslocamentos/")
         assert response.status_code == status.HTTP_200_OK
         results = response.json().get("results", response.json())
-        assert results == []
+        assert len(results) == 1
+        assert results[0]["usuario"] == user_formador.id
 
         # Controle → 200 + tudo (capability view_all_availability libera)
         client.force_authenticate(user=user_controle)

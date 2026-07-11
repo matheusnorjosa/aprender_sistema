@@ -54,7 +54,7 @@ common_write_atomic() {
 }
 
 # Source das demais libs (log primeiro — todas dependem dele).
-for _lib in log notify state seal fetch pointer verify_image portainer compose confirm backup; do
+for _lib in log notify state seal fetch pointer verify_image portainer compose confirm backup gc; do
   # shellcheck source=/dev/null
   . "${DEPLOYER_HOME}/lib/${_lib}.sh"
 done

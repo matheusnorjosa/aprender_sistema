@@ -118,6 +118,7 @@ main() {
   # Liveness em localhost (readyz 200 + version == release).
   if confirm_localhost "$P_RELEASE" "$port"; then
     seal_bump "$P_SEQUENCE"; _breaker_reset "$P_SEQUENCE"
+    gc_run || log_warn "gc_failed"   # retencao de imagens best-effort; NUNCA aborta (pos-selo)
     notify "OK" "deployed" "$P_RELEASE"; log_info "deploy_ok" "release=${P_RELEASE}"; exit 0
   fi
 

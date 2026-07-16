@@ -19,6 +19,7 @@ from django.utils import timezone
 from apps.core.exceptions import ValidationAPIError
 from apps.core.models import AuditLog, Solicitacao, Usuario
 from apps.core.services.db_retry import retry_on_deadlock
+from apps.core.services.solicitacao_availability import enforce_solicitacao_availability
 
 logger = logging.getLogger(__name__)
 
@@ -119,13 +120,20 @@ def approve_solicitacao(
         ApprovalResult with operation details
 
     Raises:
-        ValidationAPIError: If solicitacao is not pending
+        ValidationAPIError: If solicitacao is not pending, or if any participant has a
+            conflict (#1452)
     """
     client_ip = _get_client_ip(request)
     with transaction.atomic():
         solicitacao = Solicitacao.objects.select_for_update().get(pk=solicitacao.pk)
         if solicitacao.status != "pendente":
             _raise_invalid_status_error(solicitacao)
+
+        # #1452: aprovar é o momento em que o evento passa a ocupar a agenda, e pode ter
+        # ficado pendente por dias. Revalidar aqui — o `select_for_update` acima tranca só
+        # esta linha, então quem garante exclusão entre solicitações distintas do mesmo
+        # formador é o advisory lock por participante dentro do guard.
+        enforce_solicitacao_availability(solicitacao, action="approve")
 
         prev_status = solicitacao.status
         solicitacao.status = "aprovado"
@@ -288,6 +296,17 @@ def batch_approve_solicitacoes(
 
         # Approve in batch
         for sol in solicitacoes:
+            # #1452: cada solicitação é revalidada imediatamente antes de ser aprovada.
+            # Como aprovamos em sequência dentro da mesma transação, a checagem da
+            # próxima já enxerga as anteriores como aprovadas — é isso que impede um
+            # lote de aprovar dois eventos conflitantes do mesmo formador de uma vez.
+            # Conflito reprova só aquele item; o resto do lote segue.
+            try:
+                enforce_solicitacao_availability(sol, action="batch_approve")
+            except ValidationAPIError as exc:
+                errors.append({"id": sol.id, "detail": exc.message})
+                continue
+
             prev_status = sol.status
             sol.status = "aprovado"
             sol.save()

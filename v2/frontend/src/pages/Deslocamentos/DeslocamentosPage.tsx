@@ -46,6 +46,16 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getMe } from '../../api/availability';
+import {
+  listDeslocamentos,
+  listFormadoresDoSetor,
+  createDeslocamento,
+  updateDeslocamento,
+  deleteDeslocamento,
+  type DeslocamentoRecord,
+  type DeslocamentoFilters as FiltersType,
+  type FormadorOption as UsuarioOptionType,
+} from '../../api/deslocamentos';
 import { computePermissions } from '../../hooks/usePermissions';
 import DatImportsCentralizedBanner from '../../components/DatImportsCentralizedBanner';
 import logger from '../../utils/logger';
@@ -54,38 +64,6 @@ import type { ID } from '../../types';
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
 const { TextArea } = Input;
-
-// API Base URL
-const API_BASE = '/api';
-
-/** Deslocamento record type */
-interface DeslocamentoRecord {
-  id: ID;
-  usuario: ID;
-  usuario_nome: string;
-  origem: string;
-  destino: string;
-  start_date: string;
-  end_date: string;
-  observacao?: string;
-}
-
-/** Usuario option type */
-interface UsuarioOptionType {
-  id: ID;
-  first_name: string;
-  last_name: string;
-}
-
-/** Filters type */
-interface FiltersType {
-  usuario_id?: ID;
-  data_inicio?: string;
-  data_fim?: string;
-  origem?: string;
-  destino?: string;
-  page?: number;
-}
 
 /** Form values type */
 interface FormValuesType {
@@ -102,97 +80,6 @@ interface ApiErrorType {
   end_date?: string[];
   destino?: string[];
   [key: string]: string[] | undefined;
-}
-
-/**
- * Fetch deslocamentos with filters
- */
-async function fetchDeslocamentos(filters: FiltersType = {}): Promise<{ results: DeslocamentoRecord[]; count: number }> {
-  const params = new URLSearchParams();
-  if (filters.usuario_id) params.append('usuario_id', String(filters.usuario_id));
-  if (filters.data_inicio) params.append('data_inicio', filters.data_inicio);
-  if (filters.data_fim) params.append('data_fim', filters.data_fim);
-  if (filters.origem) params.append('origem', filters.origem);
-  if (filters.destino) params.append('destino', filters.destino);
-  if (filters.page) params.append('page', String(filters.page));
-
-  const response = await fetch(`${API_BASE}/deslocamentos/?${params.toString()}`, {
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    throw new Error(`Erro ao buscar deslocamentos: ${response.statusText}`);
-  }
-
-  return response.json();
-}
-
-/**
- * Fetch formadores do setor do usuário logado para select.
- * Usa endpoint que filtra automaticamente pela gerencia do usuário.
- */
-async function fetchFormadoresDoSetor(): Promise<UsuarioOptionType[]> {
-  const response = await fetch(`${API_BASE}/options/formadores-do-setor/`, {
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    throw new Error('Erro ao buscar formadores');
-  }
-
-  return response.json();
-}
-
-/**
- * Create deslocamento
- */
-async function createDeslocamento(data: Record<string, unknown>): Promise<DeslocamentoRecord> {
-  const response = await fetch(`${API_BASE}/deslocamentos/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw error;
-  }
-
-  return response.json();
-}
-
-/**
- * Update deslocamento
- */
-async function updateDeslocamento(id: ID, data: Record<string, unknown>): Promise<DeslocamentoRecord> {
-  const response = await fetch(`${API_BASE}/deslocamentos/${id}/`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw error;
-  }
-
-  return response.json();
-}
-
-/**
- * Delete deslocamento
- */
-async function deleteDeslocamento(id: ID): Promise<void> {
-  const response = await fetch(`${API_BASE}/deslocamentos/${id}/`, {
-    method: 'DELETE',
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    throw new Error('Erro ao deletar deslocamento');
-  }
 }
 
 export default function DeslocamentosPage(): JSX.Element {
@@ -233,7 +120,7 @@ export default function DeslocamentosPage(): JSX.Element {
   const loadDeslocamentos = useCallback(async (page = 1): Promise<void> => {
     setLoading(true);
     try {
-      const data = await fetchDeslocamentos({ ...filters, page });
+      const data = await listDeslocamentos({ ...filters, page });
       setDeslocamentos(data.results || []);
       setPagination({
         current: page,
@@ -250,7 +137,7 @@ export default function DeslocamentosPage(): JSX.Element {
   // Load formadores do setor do usuário logado
   const loadFormadores = useCallback(async (): Promise<void> => {
     try {
-      const data = await fetchFormadoresDoSetor();
+      const data = await listFormadoresDoSetor();
       setUsuarios(data);
     } catch (error) {
       logger.error('Erro ao carregar formadores:', error);

@@ -278,28 +278,28 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         - NAO_SUPER: status='aprovado' (auto-aprovado)
 
         PR15: Suporta extra_participants para criar Participation automaticamente.
+
+        #1452: a disponibilidade é checada para TODOS os participantes, não só para quem
+        cria. Por isso a checagem roda depois de gravar as Participation, dentro da mesma
+        transação: o guard lê a tabela, e um conflito desfaz o evento inteiro.
         """
-        from .exceptions import ValidationAPIError
-        from .services.availability_service import check_conflicts
+        from django.db import transaction
 
-        inicio = serializer.validated_data.get("inicio")
-        fim = serializer.validated_data.get("fim")
-        municipio = serializer.validated_data.get("municipio")
-
-        if inicio is not None and fim is not None:
-            result = check_conflicts(usuario=self.request.user, inicio=inicio, fim=fim, municipio=municipio)
-            if not result.ok:
-                raise ValidationAPIError(
-                    message="Conflito de disponibilidade detectado.",
-                    code="availability_conflict",
-                    extra={"conflicts": [c.__dict__ for c in result.conflicts]},
-                )
+        from .services.solicitacao_availability import enforce_solicitacao_availability
 
         projeto = serializer.validated_data.get("projeto")
         initial_status = resolve_initial_status(projeto=projeto)
 
-        # ASQ-002: status inicial decidido em camada de serviço (não no model.save()).
-        instance = serializer.save(usuario=self.request.user, status=initial_status.status)
+        with transaction.atomic():
+            # ASQ-002: status inicial decidido em camada de serviço (não no model.save()).
+            instance = serializer.save(usuario=self.request.user, status=initial_status.status)
+
+            # PR15: Processar extra_participants
+            extra_participants = self.request.data.get("extra_participants", {})
+            if extra_participants:
+                self._create_participants(instance, extra_participants)
+
+            enforce_solicitacao_availability(instance, action="create")
 
         logger.info(
             "solicitacao_initial_status_decided",
@@ -314,11 +314,6 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 "reason": initial_status.reason,
             },
         )
-
-        # PR15: Processar extra_participants
-        extra_participants = self.request.data.get("extra_participants", {})
-        if extra_participants:
-            self._create_participants(instance, extra_participants)
 
     def _create_participants(self, solicitacao, extra):
         """
@@ -406,8 +401,14 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         - Formadores alterados (adicionados/removidos)
         - Usuário que editou
         - IP e User-Agent
+
+        #1452: editar data, município ou formadores realoca gente — a checagem roda depois
+        das alterações, sobre o estado final, e um conflito desfaz a edição inteira.
         """
+        from django.db import transaction
+
         from .models import Participation, Usuario
+        from .services.solicitacao_availability import enforce_solicitacao_availability
 
         instance = serializer.instance
 
@@ -433,13 +434,16 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             "formador_ids": list(old_formador_ids),
         }
 
-        # Salva as alterações
-        serializer.save()
+        with transaction.atomic():
+            # Salva as alterações
+            serializer.save()
 
-        # Processa extra_participants se presente
-        extra_participants = self.request.data.get("extra_participants", {})
-        if extra_participants and "formador_ids" in extra_participants:
-            self._update_formadores(instance, extra_participants)
+            # Processa extra_participants se presente
+            extra_participants = self.request.data.get("extra_participants", {})
+            if extra_participants and "formador_ids" in extra_participants:
+                self._update_formadores(instance, extra_participants)
+
+            enforce_solicitacao_availability(instance, action="update")
 
         # Coleta dados novos após save
         instance.refresh_from_db()

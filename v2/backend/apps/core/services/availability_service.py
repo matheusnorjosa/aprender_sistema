@@ -112,14 +112,21 @@ def _fmt_interval_local(start: datetime, end: datetime) -> str:
     return f"{s:%H:%M %d/%m}–{e:%H:%M %d/%m}"
 
 
-@cache_availability_check(timeout=300)  # CP3: Cache 5 min (TTL curto, dados mudam frequentemente)
-def check_conflicts(
-    *, usuario: Usuario, inicio: datetime, fim: datetime, municipio: Municipio | None = None
+def _check_conflicts_impl(
+    *,
+    usuario: Usuario,
+    inicio: datetime,
+    fim: datetime,
+    municipio: Municipio | None = None,
+    exclude_solicitacao_id: int | None = None,
 ) -> CheckResult:
     """
-    Verifica conflitos para um novo intervalo (inicio, fim) de um usuário.
+    Implementação pura da checagem RD-01..RD-08. Não usar diretamente.
 
-    NÃO grava nada. NÃO aprova nada. Checagem consultiva apenas.
+    Público: `check_conflicts` (cacheado, consultivo) e `check_conflicts_uncached`
+    (sem cache, para enforcement transacional).
+
+    NÃO grava nada. NÃO aprova nada.
 
     Considera:
     - Solicitações aprovadas (eventos confirmados) → RD-01 (X)
@@ -132,6 +139,11 @@ def check_conflicts(
         inicio: datetime início do intervalo (timezone-aware UTC)
         fim: datetime fim do intervalo (timezone-aware UTC)
         municipio: Município opcional (necessário para checagem RD-04)
+        exclude_solicitacao_id: Ignora esta solicitação em TODOS os checks. Usado ao
+            revalidar um evento já gravado (update/aprovação), para que ele não
+            conflite consigo mesmo. Precisa ser aplicado na origem (`events_qs`) e não
+            filtrado depois por `ref_id`: o conflito M (RD-05) não tem `ref_id` e
+            somaria as horas do próprio evento em dobro.
 
     Returns:
         CheckResult com ok=True/False e lista de conflitos
@@ -154,6 +166,8 @@ def check_conflicts(
     events_qs = Solicitacao.objects.filter(status=Solicitacao.Status.APROVADO).filter(
         Q(usuario=usuario) | Q(participations__usuario=usuario)
     )
+    if exclude_solicitacao_id is not None:
+        events_qs = events_qs.exclude(pk=exclude_solicitacao_id)
 
     # ================================================================
     # RD-02, RD-03: BLOQUEIOS aprovados
@@ -307,3 +321,64 @@ def check_conflicts(
     # RD-07: Retornar todos os conflitos encontrados
     # ================================================================
     return CheckResult(ok=(len(conflicts) == 0), conflicts=conflicts)
+
+
+@cache_availability_check(timeout=300)  # CP3: Cache 5 min (TTL curto, dados mudam frequentemente)
+def check_conflicts(
+    *, usuario: Usuario, inicio: datetime, fim: datetime, municipio: Municipio | None = None
+) -> CheckResult:
+    """
+    Checagem consultiva de disponibilidade (RD-01..RD-08), com cache de 5 min.
+
+    Para leitura/preview: telas de disponibilidade, feedback antecipado no wizard.
+    NÃO usar para enforcement — o resultado pode ter até 5 min de atraso.
+    Enforcement usa `check_conflicts_uncached` dentro da transação.
+
+    A assinatura não expõe `exclude_solicitacao_id` de propósito: a chave de cache
+    (`cache_utils.py`) é montada a partir de uma whitelist fixa de campos, então um
+    argumento extra alteraria o resultado sem alterar a chave — envenenando o cache.
+
+    Args:
+        usuario: Usuário para verificar disponibilidade
+        inicio: datetime início do intervalo (timezone-aware UTC)
+        fim: datetime fim do intervalo (timezone-aware UTC)
+        municipio: Município opcional (necessário para checagem RD-04)
+
+    Returns:
+        CheckResult com ok=True/False e lista de conflitos
+    """
+    return _check_conflicts_impl(usuario=usuario, inicio=inicio, fim=fim, municipio=municipio)
+
+
+def check_conflicts_uncached(
+    *,
+    usuario: Usuario,
+    inicio: datetime,
+    fim: datetime,
+    municipio: Municipio | None = None,
+    exclude_solicitacao_id: int | None = None,
+) -> CheckResult:
+    """
+    Mesma checagem de `check_conflicts`, sempre lendo do banco.
+
+    Usar em enforcement (criação, edição, aprovação, publicação): dentro da transação,
+    depois de travar os participantes, um resultado cacheado deixaria passar o
+    double-booking que o lock existe para impedir.
+
+    Args:
+        usuario: Usuário para verificar disponibilidade
+        inicio: datetime início do intervalo (timezone-aware UTC)
+        fim: datetime fim do intervalo (timezone-aware UTC)
+        municipio: Município opcional (necessário para checagem RD-04)
+        exclude_solicitacao_id: Ignora esta solicitação (revalidar evento já gravado)
+
+    Returns:
+        CheckResult com ok=True/False e lista de conflitos
+    """
+    return _check_conflicts_impl(
+        usuario=usuario,
+        inicio=inicio,
+        fim=fim,
+        municipio=municipio,
+        exclude_solicitacao_id=exclude_solicitacao_id,
+    )

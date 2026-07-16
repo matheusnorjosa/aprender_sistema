@@ -143,6 +143,28 @@ def preview_gcal(
     )
 
 
+def _warn_if_participants_unavailable(solicitacao: Solicitacao) -> None:
+    """
+    Registra (sem bloquear) participantes com conflito num evento já aprovado (#1452).
+
+    Sinaliza double-booking legado, anterior ao enforcement na criação/aprovação.
+    """
+    from apps.core.services.solicitacao_availability import check_solicitacao_availability
+
+    guard = check_solicitacao_availability(solicitacao, lock=False)
+    if guard.ok:
+        return
+
+    logger.warning(
+        "publish_availability_conflict_detected",
+        extra={
+            "event": "publish_availability_conflict_detected",
+            "solicitacao_id": solicitacao.id,
+            "blocked_usuario_ids": [p.usuario_id for p in guard.blocked],
+        },
+    )
+
+
 def publish_to_gcal(
     solicitacao: Solicitacao,
     user: Usuario,
@@ -177,6 +199,15 @@ def publish_to_gcal(
             message="Apenas solicitações aprovadas podem ser publicadas no Google Calendar.",
             code="not_approved",
         )
+
+    # #1452: revalidação NÃO bloqueante, de propósito.
+    #
+    # Publicar não aloca nada — o evento já está aprovado e ocupa a agenda desde então.
+    # Com o enforcement na criação e na aprovação, dois eventos aprovados conflitantes só
+    # existem em dados anteriores a esta correção; bloquear a publicação deles puniria o
+    # operador por um evento que a instituição já assumiu. Então aqui só registramos, para
+    # que o double-booking legado apareça em vez de passar despercebido.
+    _warn_if_participants_unavailable(solicitacao)
 
     # Check if apply is blocked
     gcal_client = getattr(settings, "GCAL_CLIENT", None)

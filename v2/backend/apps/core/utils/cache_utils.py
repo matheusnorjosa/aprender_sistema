@@ -40,13 +40,18 @@ def cache_availability_check(timeout: int | None = None) -> Callable[[F], F]:
     Cache key includes a per-user version counter. When user's data changes,
     the version increments and all old entries become cache misses naturally.
 
+    A chave é montada a partir destes 4 argumentos e mais nada. Por isso o wrapper
+    aceita SÓ eles: um kwarg extra mudaria o resultado sem mudar a chave, e a próxima
+    chamada com a chave antiga receberia a resposta errada. Quem precisa de argumentos
+    extras (ex.: `exclude_solicitacao_id`) chama a versão sem cache.
+
     Args:
         timeout: TTL in seconds (default: 300 + jitter)
     """
 
     def decorator(func: F) -> F:
         @wraps(func)
-        def wrapper(*, usuario: Any, inicio: Any, fim: Any, municipio: Any = None, **kwargs: Any) -> Any:
+        def wrapper(*, usuario: Any, inicio: Any, fim: Any, municipio: Any = None) -> Any:
             usuario_id = usuario.id
             version = _get_cache_version(usuario_id)
 
@@ -65,7 +70,7 @@ def cache_availability_check(timeout: int | None = None) -> Callable[[F], F]:
             if cached_result is not None:
                 return cached_result
 
-            result = func(usuario=usuario, inicio=inicio, fim=fim, municipio=municipio, **kwargs)
+            result = func(usuario=usuario, inicio=inicio, fim=fim, municipio=municipio)
 
             ttl = timeout if timeout is not None else _ttl_with_jitter()
             cache.set(cache_key, result, timeout=ttl)

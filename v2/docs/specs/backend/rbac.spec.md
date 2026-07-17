@@ -27,6 +27,13 @@ related:
 
 # RBAC — Controle de Acesso
 
+> ⚠️ **Gaps de segurança conhecidos (auditoria 2026-07-17, P0 confirmados VIVOS em produção)**: esta spec descreve a
+> intenção; o código atual **diverge** dela em pontos críticos — takeover de superuser (P0-0), escalada via GroupViewSet
+> (P0-1), solicitações cross-gerência (P0-2), Grade Mensal por papel/vínculo indevido, cache de revogação e seed
+> destrutiva. Ver `v2/docs/audits/2026-07-17-rbac-security-audit.md` e o plano `v2/docs/plans/2026-07-17-rbac-correcao-definitiva.md`.
+> **P0-0 corrigido** na branch `fix/rbac-superuser-target-protection` (superuser intocável por não-superuser em todos os
+> writers; anti-lockout). Cada correção deve atualizar a seção correspondente desta spec ao ser mergeada.
+
 ## Propósito
 
 O módulo `apps.core.rbac` é o SSOT da autorização do Aprender Sistema v2. Implementa o modelo NIST RBAC de 3 camadas — `User → Roles (Groups Django) → Capabilities (PermissaoFuncional) ← Policies (CanXxx) ← Views` — separando **o que** a pessoa pode fazer (capability) de **quem** ela é organizacionalmente (setor/função). A consequência prática: se a organização reestrutura (DAT vira "Operações Administrativas"), só muda `Group.name`; zero linha de código de autorização muda.

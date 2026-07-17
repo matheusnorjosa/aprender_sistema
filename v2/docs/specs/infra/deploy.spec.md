@@ -87,7 +87,7 @@ pelo pipeline canônico (ver `DEPLOY_CHECKLIST.md` §7).
 | Sentry | **DESLIGADO** — `SENTRY_DSN` ausente no stack.env | off (salvo se setar DSN) |
 | Backup Celery | **morto e silencioso** — ver abaixo | grava em `backup_data:/backups` (base) |
 | Redis auth | **ATIVO** — `REDIS_PASSWORD` preenchido; isolado em `backend-internal` sem porta no host | conforme `.env` |
-| Migrations | **manuais** — nenhum serviço roda `migrate` (web=gunicorn, worker/beat=celery) | idem |
+| Migrations | **automáticas no deploy** — serviço one-shot `migrate` roda `python manage.py migrate --noinput`; web/worker/beat aguardam via `depends_on: service_completed_successfully` (docker-compose.prod.yml:47-50,106-107,202-203,261-262; add. #1495 2026-07-02; corrigido nesta spec 2026-07-17) | via `make up` |
 | Guards de prod | **OK** — `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `SECRET_KEY`, `SECURE_SSL_REDIRECT`, `DB_SSLMODE` setados | guards não se aplicam |
 | GCal | **configurado** (`GCAL_*` completos) | conforme `.env` |
 | dev_tools (CP-08) | **off** — `INCLUDE_DEV_TOOLS` ausente → default `false` | on em dev |

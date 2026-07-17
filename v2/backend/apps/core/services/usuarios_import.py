@@ -52,11 +52,12 @@ def import_usuarios_from_file(*, path: str, dry_run: bool = True) -> dict[str, A
         "created": 0,
         "updated": 0,
         "unchanged": 0,
-        "skipped": {"cpf_invalid": 0, "nome_missing": 0, "other": 0},
+        "skipped": {"cpf_invalid": 0, "nome_missing": 0, "superuser_protected": 0, "other": 0},
     }
     pendencias: dict[str, list[dict[str, Any]]] = {
         "cpf_invalid": [],
         "nome_missing": [],
+        "superuser_protected": [],
         "outros": [],
     }
 
@@ -283,6 +284,20 @@ def _process_row(
 
     # Verificar existencia por CPF (idempotencia)
     existing = Usuario.objects.filter(cpf=cpf).first()
+
+    # P0-0 (Tier-0, auditoria 2026-07-17): importacao em lote NUNCA altera conta
+    # superuser (senha/is_active/grupos/cadastrais). Um CSV nao e caminho
+    # legitimo para mexer em privilegio Tier-0 — protecao incondicional.
+    if existing is not None and existing.is_superuser:
+        stats["skipped"]["superuser_protected"] += 1
+        pendencias["superuser_protected"].append(
+            {
+                "linha": linha_num,
+                "cpf": cpf,
+                "erro": "Conta de superusuario nao pode ser alterada por importacao.",
+            }
+        )
+        return
 
     if existing:
         # Atualizar campos se houver mudancas

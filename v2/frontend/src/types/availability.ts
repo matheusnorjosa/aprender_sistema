@@ -74,6 +74,56 @@ export interface AvailabilityCheckResponse {
 }
 
 /**
+ * Availability check-many request (#1452) — checa vários usuários de uma vez.
+ */
+export interface AvailabilityCheckManyRequest {
+  usuarios_ids: ID[];
+  inicio: string;
+  fim: string;
+  municipio_id?: ID;
+}
+
+/**
+ * Resultado por usuário no check-many.
+ */
+export interface AvailabilityCheckManyResult {
+  usuario_id: ID;
+  ok: boolean;
+  conflicts: ConflictDetail[];
+}
+
+/**
+ * Availability check-many response.
+ */
+export interface AvailabilityCheckManyResponse {
+  ok: boolean;
+  results: AvailabilityCheckManyResult[];
+}
+
+/**
+ * Participante bloqueado no payload de erro 400 `availability_conflict` do backend
+ * (`solicitacao_availability.py:raise_if_blocked`).
+ */
+export interface BlockedParticipant {
+  usuario_id: ID;
+  usuario_nome: string;
+  conflicts: ConflictDetail[];
+}
+
+/**
+ * Shape do erro 400 `availability_conflict` retornado no submit (#1452).
+ */
+export interface AvailabilityConflictErrorPayload {
+  detail: string;
+  code: 'availability_conflict';
+  errors: {
+    conflicts: ConflictDetail[];
+    blocked_participants: BlockedParticipant[];
+    skipped_guests: unknown[];
+  };
+}
+
+/**
  * Monthly availability grid response
  */
 export type AvailabilityCode = 'E' | '2' | 'P' | 'T' | 'X' | 'D' | 'D1' | '';

@@ -195,7 +195,14 @@ def verify_backup_health() -> dict[str, str | int | list[str]]:
         checks_passed += 1
 
     # Check 2: Recent backup exists (within last 25 hours)
-    recent_backups = list(backup_dir.glob("backup_full_*.sql.gz"))
+    #
+    # Dois sufixos: `.sql.gz` (sem cifra) e `.sql.gz.age` (SEC-017 — o que producao
+    # realmente grava). `glob("*.sql.gz")` NAO casa `.sql.gz.age`: o alarme olharia um
+    # diretorio cheio de backups validos e diria "No backups found" (#1455).
+    recent_backups = [
+        *backup_dir.glob("backup_full_*.sql.gz"),
+        *backup_dir.glob("backup_full_*.sql.gz.age"),
+    ]
     if recent_backups:
         latest_backup = max(recent_backups, key=lambda p: p.stat().st_mtime)
         age_hours = (datetime.now().timestamp() - latest_backup.stat().st_mtime) / 3600
@@ -240,10 +247,15 @@ def verify_backup_health() -> dict[str, str | int | list[str]]:
 
     health_status = "healthy" if checks_passed == checks_total else "degraded"
 
-    logger.info(
-        f"Backup health check completed: {health_status} ({checks_passed}/{checks_total} passed)",
-        extra={"warnings": warnings},
-    )
+    _msg = f"Backup health check completed: {health_status} ({checks_passed}/{checks_total} passed)"
+    if health_status == "healthy":
+        logger.info(_msg, extra={"warnings": warnings})
+    else:
+        # #1541: 'degraded' e o sinal de backup morto — a razao de a task existir.
+        # SENTRY_DSN esta VAZIO em prod (o capture_message acima e no-op) e o INFO era
+        # engolido por alertas baseados em log (level>=WARNING). Logar em ERROR faz o
+        # alarme chegar a alguem, independente do Sentry.
+        logger.error(_msg, extra={"warnings": warnings})
 
     return {
         "status": health_status,

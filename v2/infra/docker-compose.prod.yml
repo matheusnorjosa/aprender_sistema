@@ -184,6 +184,17 @@ services:
       # em vez de depender da stack.env, que some se a stack for recriada.
       INCLUDE_DEV_TOOLS: "false"
       SERVICE_NAME: worker
+      # SEC-017 / #1455: chave PUBLICA age (recipient) dos dumps cifrados. Publica por
+      # definicao — cifra, nao decifra; a PRIVADA nunca entra no repo nem na VM (fica
+      # no gerenciador de senhas do mantenedor). Fixa AQUI, e nao na stack.env, por dois
+      # motivos: (1) `environment:` sobrepoe o env_file, entao um recipient antigo/
+      # corrompido remanescente na stack.env nao volta a valer — foi exatamente o que
+      # aconteceu (o valor original tinha um caractere invalido de bech32 e o `age`
+      # falhava, gerando dump 0-byte); (2) sobrevive a recriacao da stack.
+      # ATENCAO: se este valor sumir, backup_db.sh grava .sql.gz em TEXTO CLARO (com
+      # PII) em vez de falhar — a cifragem e opt-in no script (backup_db.sh:36).
+      # Ao rotacionar a chave, trocar aqui E no `environment:` do worker no Portainer.
+      BACKUP_AGE_RECIPIENT: age1h52qdv3m73yv75ussvuten7ckhkhr5axl3kgjnadl89j5ux265ls2jda8c
     depends_on:
       redis:
         condition: service_started
@@ -213,6 +224,15 @@ services:
       - /run:size=10M
       - /home/appuser:size=10M
       - /app/out_etl:size=50M
+    # #1455 / ADR-018 B2: bind-mount GRAVAVEL para os dumps de DB. A task Celery
+    # backup.perform_database_backup roda no worker e chama backup_db.sh, que grava
+    # backup_full_*.sql.gz.age em /backups (default do script). Sem este mount o job
+    # falha em silencio (root FS read_only) — causa raiz do #1455. O mount explicito
+    # e gravavel apesar do read_only do root. Host: /var/backups/aprender (criar ANTES,
+    # 0755, dono = UID do appuser); o applier (ADR-018) le a idade daqui como gate de
+    # deploy. Dumps sao .age (cifrados, SEC-017).
+    volumes:
+      - /var/backups/aprender:/backups
     # SEC-015: Worker only needs backend services
     networks:
       - backend-internal

@@ -3,8 +3,8 @@ AS v2 — Celery App Configuration
 
 Configuração da aplicação Celery para tarefas assíncronas:
 - Broker: Redis (CELERY_BROKER_URL)
-- Backend: Redis (CELERY_RESULT_BACKEND)
-- Autodiscovery: apps.core.tasks
+- Backend: django-db (CELERY_RESULT_BACKEND)
+- Autodiscovery: apps.core.tasks + apps.core.tasks_backup
 - Timezone: America/Fortaleza
 
 Comandos:
@@ -57,8 +57,20 @@ existing_schedule.update(
 )
 app.conf.update(CELERY_BEAT_SCHEDULE=existing_schedule)
 
-# Auto-discover tasks in all installed apps (ex: apps.core.tasks)
+# Auto-discover tasks in all installed apps.
+#
+# ATENCAO: `autodiscover_tasks()` importa APENAS o modulo `tasks` de cada app
+# instalada. As tasks de backup vivem em `apps/core/tasks_backup.py` e por isso
+# NUNCA eram registradas no worker: o beat despachava
+# `backup.perform_database_backup` todo dia as 02:00 e o worker respondia
+# NotRegistered, em silencio, por meses (#1455). Os testes nao pegavam porque
+# importam `tasks_backup` diretamente — o registro vazava para o processo de teste.
+#
+# A segunda chamada cobre qualquer app que tenha um `tasks_backup.py`.
+# Sentinela contra regressao: apps/core/tests/test_celery_beat_registration.py
+# (roda num interpretador novo; um `import` no pytest mascararia o defeito).
 app.autodiscover_tasks()
+app.autodiscover_tasks(related_name="tasks_backup")
 
 
 @app.task(bind=True)

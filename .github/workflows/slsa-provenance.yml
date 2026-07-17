@@ -1,6 +1,25 @@
 name: SLSA Provenance and Signing
 
 on:
+  # Chamado pelo deploy.yaml (job `sign`) após o build+push — auto-assinatura de
+  # toda release de prod (ADR-018 #1524). Reusable LOCAL => identidade keyless
+  # continua slsa-provenance.yml@refs/heads/main (o agente/promote nao mudam).
+  workflow_call:
+    inputs:
+      release_tag:
+        description: "Tag imutável já buildada e pushada (vYYYY.MM.DD-<sha7>)"
+        required: true
+        type: string
+      backend_digest:
+        description: "Digest do backend (sha256:...) — evita TOCTOU de tag mutável"
+        required: false
+        type: string
+        default: ""
+      frontend_digest:
+        description: "Digest do frontend (sha256:...)"
+        required: false
+        type: string
+        default: ""
   workflow_dispatch:
     inputs:
       release_tag:
@@ -37,20 +56,16 @@ jobs:
       - name: Resolve release tag
         id: resolve
         env:
-          EVENT_NAME: ${{ github.event_name }}
-          RELEASE_TAG_INPUT: ${{ github.event.inputs.release_tag || '' }}
+          # inputs.* cobre workflow_call E workflow_dispatch; release usa o evento.
+          RELEASE_TAG_INPUT: ${{ inputs.release_tag || '' }}
           RELEASE_TAG_EVENT: ${{ github.event.release.tag_name || '' }}
         run: |
           set -euo pipefail
-          release_tag=""
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            release_tag="$(echo "${RELEASE_TAG_INPUT}" | xargs)"
-          elif [ "$EVENT_NAME" = "release" ]; then
-            release_tag="$(echo "${RELEASE_TAG_EVENT}" | xargs)"
-          fi
+          release_tag="$(echo "${RELEASE_TAG_INPUT}" | xargs)"
+          if [ -z "$release_tag" ]; then release_tag="$(echo "${RELEASE_TAG_EVENT}" | xargs)"; fi
 
           if [ -z "$release_tag" ]; then
-            echo "Unable to resolve release tag for event=${EVENT_NAME}." >&2
+            echo "Unable to resolve release tag." >&2
             exit 1
           fi
 
@@ -75,28 +90,55 @@ jobs:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
-      - name: Resolve image digests from immutable tag
+      - name: Resolve image digests
         id: digests
         env:
           RELEASE_TAG: ${{ steps.resolve.outputs.release_tag }}
+          # Digests passados pelo caller (deploy.yaml) evitam TOCTOU de tag mutavel.
+          # Fallback: resolve por tag (backfill via workflow_dispatch/release). Mesmo
+          # metodo (imagetools inspect) que o gate-duro do promote.yml usa.
+          BACKEND_DIGEST_IN: ${{ inputs.backend_digest || '' }}
+          FRONTEND_DIGEST_IN: ${{ inputs.frontend_digest || '' }}
         run: |
           set -euo pipefail
 
-          backend_ref="${BACKEND_IMAGE}:${RELEASE_TAG}"
-          frontend_ref="${FRONTEND_IMAGE}:${RELEASE_TAG}"
+          # Mesma flake do promote.yml: o Docker Hub devolve exit 255 esporadico com a
+          # imagem existindo. Retry com backoff; fail-closed ao esgotar. Diagnostico em
+          # stderr (o stdout desta funcao e capturado por $( )).
+          resolve_digest() {
+            local ref="$1" attempt rc out digest
+            for attempt in 1 2 3 4 5; do
+              rc=0; out="$(docker buildx imagetools inspect "$ref" 2>&1)" || rc=$?
+              if [ "$rc" -eq 0 ]; then
+                digest="$(printf '%s\n' "$out" | awk '/Digest:/ {print $2; exit}')"
+                if printf '%s' "$digest" | grep -Eq '^sha256:[0-9a-f]{64}$'; then
+                  printf '%s' "$digest"; return 0
+                fi
+                echo "aviso: ${ref}: digest ausente/invalido (tentativa ${attempt})" >&2
+              else
+                echo "aviso: ${ref}: imagetools inspect saiu ${rc} (tentativa ${attempt})" >&2
+              fi
+              printf '%s\n' "$out" >&2
+              if [ "$attempt" -lt 5 ]; then sleep "$(( attempt * 5 ))"; fi
+            done
+            echo "${ref}: digest nao resolvido apos 5 tentativas" >&2
+            return 1
+          }
 
-          backend_digest="$(docker buildx imagetools inspect "${backend_ref}" | awk '/Digest:/ {print $2; exit}')"
-          frontend_digest="$(docker buildx imagetools inspect "${frontend_ref}" | awk '/Digest:/ {print $2; exit}')"
-
-          if [ -z "${backend_digest}" ] || [ -z "${frontend_digest}" ]; then
-            echo "Could not resolve backend/frontend digest for tag ${RELEASE_TAG}." >&2
-            exit 1
+          be="$BACKEND_DIGEST_IN"; fe="$FRONTEND_DIGEST_IN"
+          if [ -z "$be" ] || [ -z "$fe" ]; then
+            be="$(resolve_digest "${BACKEND_IMAGE}:${RELEASE_TAG}")"
+            fe="$(resolve_digest "${FRONTEND_IMAGE}:${RELEASE_TAG}")"
           fi
-
-          echo "backend_ref=${backend_ref}" >> "$GITHUB_OUTPUT"
-          echo "frontend_ref=${frontend_ref}" >> "$GITHUB_OUTPUT"
-          echo "backend_digest=${backend_digest}" >> "$GITHUB_OUTPUT"
-          echo "frontend_digest=${frontend_digest}" >> "$GITHUB_OUTPUT"
+          for d in "$be" "$fe"; do
+            printf '%s' "$d" | grep -Eq '^sha256:[0-9a-f]{64}$' || { echo "digest invalido: $d" >&2; exit 1; }
+          done
+          {
+            echo "backend_ref=${BACKEND_IMAGE}:${RELEASE_TAG}"
+            echo "frontend_ref=${FRONTEND_IMAGE}:${RELEASE_TAG}"
+            echo "backend_digest=${be}"
+            echo "frontend_digest=${fe}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Generate SLSA provenance attestation (backend)
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
@@ -154,6 +196,7 @@ jobs:
           BACKEND_DIGEST: ${{ steps.digests.outputs.backend_digest }}
           FRONTEND_DIGEST: ${{ steps.digests.outputs.frontend_digest }}
           SIGNER_WORKFLOW: ${{ github.repository }}/.github/workflows/slsa-provenance.yml
+          GH_TOKEN: ${{ github.token }}   # gh attestation verify precisa de auth (self-check)
         run: |
           set -euo pipefail
           gh attestation verify "oci://${BACKEND_IMAGE}@${BACKEND_DIGEST}" \

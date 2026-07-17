@@ -5,7 +5,17 @@
 # (Fulcio/Rekor, trusted-root pinado offline) + gh attestation verify (SLSA).
 # Fail-closed: qualquer falha => o chamador REFUSE, nunca deploy.
 
-# image_verify <repo> <digest> -> 0 se ambos passarem; !=0 caso contrario.
+# image_verify <repo> <digest> -> 0 se passar; !=0 caso contrario.
+#
+# GATE DURO = a ASSINATURA cosign (keyless, identidade OIDC do slsa-provenance.yml,
+# contra o trusted root). So imagem assinada pelo nosso CI passa — e a garantia de
+# supply-chain que importa pro modelo de ameaca (nunca deployar imagem nao-nossa).
+#
+# A attestation SLSA (provenance) e defesa-em-profundidade e amarra na MESMA
+# identidade OIDC — redundante com a assinatura pro nosso caso. `gh attestation
+# verify` EXIGE um GH_TOKEN (fala com a API do GitHub), o que e INCOMPATIVEL com o
+# design tokenless do deployer. Por isso e OPT-IN: default pulado (cosign-only);
+# so roda se REQUIRE_ATTESTATION=1 (e ai exige GH_TOKEN no ambiente). Decisao #4.
 image_verify() {
   local repo="$1" digest="$2" ref="${1}@${2}"
 
@@ -16,15 +26,17 @@ image_verify() {
     >/dev/null 2>&1 \
     || { log_error "cosign_verify_failed" "repo=${repo}"; return 1; }
 
-  # --bundle-from-oci evita depender de api.github.com no caminho quente.
-  "$GH_BIN" attestation verify "oci://${ref}" \
-    --repo "$GH_REPO" \
-    --signer-workflow "$SIGNER_WORKFLOW" \
-    --bundle-from-oci \
-    >/dev/null 2>&1 \
-    || { log_error "attestation_verify_failed" "repo=${repo}"; return 1; }
+  if [ "${REQUIRE_ATTESTATION:-0}" = "1" ]; then
+    # --bundle-from-oci evita depender de api.github.com no caminho quente.
+    "$GH_BIN" attestation verify "oci://${ref}" \
+      --repo "$GH_REPO" \
+      --signer-workflow "$SIGNER_WORKFLOW" \
+      --bundle-from-oci \
+      >/dev/null 2>&1 \
+      || { log_error "attestation_verify_failed" "repo=${repo}"; return 1; }
+  fi
 
-  log_info "image_verified" "repo=${repo}" "digest=${digest}"
+  log_info "image_verified" "repo=${repo}" "digest=${digest}" "attestation=${REQUIRE_ATTESTATION:-0}"
   return 0
 }
 

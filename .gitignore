@@ -643,3 +643,7 @@ evidence/
 !v2/infra/deployer/lib/
 !v2/infra/deployer/config.env.example
 !v2/infra/deployer/trust/identity.env
+
+# Slot de isolamento Docker por worktree (multi-worktree dev). Não versionar —
+# cada worktree tem o seu. Ver v2/infra/scripts/worktree-env.sh
+.dev-slot

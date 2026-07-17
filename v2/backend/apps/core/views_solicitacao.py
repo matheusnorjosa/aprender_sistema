@@ -534,12 +534,14 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
             if participations_to_create:
                 Participation.objects.bulk_create(participations_to_create, ignore_conflicts=True)
-                # bulk_create NÃO dispara post_save → o receiver de Participation
-                # (#1556) não roda aqui; invalida o cache de disponibilidade dos
-                # formadores recém-adicionados manualmente.
-                for formador_id in usuarios_map:
-                    invalidate_availability_cache(usuario_id=formador_id)
                 changed = True
+
+        # #1556: bulk_create não dispara post_save (o receiver de Participation é inerte
+        # para os adds). Invalida o cache de disponibilidade explicitamente para
+        # adicionados E removidos — não depende de o QuerySet.delete() acima disparar
+        # post_delete (mais robusto a refactors futuros de fast-delete).
+        for usuario_id in to_add | to_remove:
+            invalidate_availability_cache(usuario_id=usuario_id)
 
         return changed
 

@@ -43,12 +43,14 @@ import {
 } from '../../api/lookup';
 import { getMe } from '../../api/availability';
 import { computePermissions } from '../../hooks/usePermissions';
+import { useAvailabilityPreview, type PreviewParticipant } from '../../hooks/useAvailabilityPreview';
 import DateTimeRange from '../../components/DateTimeRange';
 import ComboBox from '../../components/ComboBox';
 import FormadoresPicker from '../../components/FormadoresPicker';
 import CoordenadoresPicker from '../../components/CoordenadoresPicker';
+import AvailabilityConflictAlert from '../../components/AvailabilityConflictAlert';
 import logger from '../../utils/logger';
-import type { ID, FluxoType } from '../../types';
+import type { ID, FluxoType, BlockedParticipant, AvailabilityConflictErrorPayload } from '../../types';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -118,6 +120,11 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   const [loading, setLoading] = useState<boolean>(false);
   const [isSuperuser, setIsSuperuser] = useState<boolean>(false);
   const [municipioLookupHasResults, setMunicipioLookupHasResults] = useState<boolean | null>(null);
+  // #1452: identidade do criador — sempre entra na checagem de disponibilidade
+  // (o backend também o checa), e o nome preenche o alerta de conflito.
+  const [me, setMe] = useState<{ id: ID; nome: string } | null>(null);
+  // #1452: conflito devolvido pelo backend no submit (fecha o TOCTOU / cache).
+  const [submitConflito, setSubmitConflito] = useState<BlockedParticipant[]>([]);
 
   // Estado do formulário
   const [formData, setFormData] = useState<FormDataType>({
@@ -149,6 +156,8 @@ export default function NewSolicitacaoWizard(): JSX.Element {
           // Epic 3.3 cleanup: usa flag derivada (SSOT). Admin escape hatch
           // do wizard — bypassa exigência de projeto/município no Step 2.
           setIsSuperuser(computePermissions(me).isAdmin);
+          // #1452: guarda o criador para a checagem de disponibilidade.
+          setMe({ id: me.id, nome: me.name || me.username || 'Você' });
         }
       } catch (error) {
         logger.warn('Falha ao carregar perfil do usuário no wizard:', error);
@@ -239,8 +248,22 @@ export default function NewSolicitacaoWizard(): JSX.Element {
 
   // Navegação entre passos
   const next = (): void => {
+    // DateTimeRange (Step 0) fica fora de Form.Item, então validateFields() não o vê.
+    // Sem esta guarda dá para avançar sem data, e o gatilho da checagem (#1452) depende dela.
+    if (currentStep === 0 && (!formData.inicio || !formData.fim)) {
+      message.error('Por favor, selecione a data e o horário do evento');
+      return;
+    }
+
     form.validateFields().then(values => {
-      setFormData({ ...formData, ...values });
+      // validateFields() sem args devolve a chave de TODO field montado, inclusive os
+      // opcionais não tocados — com valor `undefined`. Sem filtrar, o spread abaixo
+      // sobrescreve `coordenadores: []` por `undefined` e o render do resumo estoura em
+      // `.length` (#1452). Só mescla o que realmente tem valor.
+      const definidos = Object.fromEntries(
+        Object.entries(values).filter(([, v]) => v !== undefined)
+      );
+      setFormData({ ...formData, ...definidos });
       setCurrentStep(currentStep + 1);
     }).catch(err => {
       logger.debug('Validação falhou:', err);
@@ -254,6 +277,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   // Submit final
   const handleSubmit = async (): Promise<void> => {
     setLoading(true);
+    setSubmitConflito([]);
     try {
       // Garantir que formadores é um array
       const formadores = Array.isArray(formData.formadores) ? formData.formadores : [];
@@ -318,10 +342,82 @@ export default function NewSolicitacaoWizard(): JSX.Element {
       navigate('/solicitacoes/minhas');
     } catch (error) {
       logger.error('Erro ao criar solicitação:', error);
-      message.error('Erro ao criar solicitação. Verifique os dados e tente novamente.');
+
+      // #1452: o backend recusa o double-booking com 400 `availability_conflict` e a
+      // mensagem nomeando o formador. Antes o catch engolia isso e mostrava um genérico.
+      const data = (error as { response?: { data?: unknown } })?.response?.data;
+      const payloadErro = data as Partial<AvailabilityConflictErrorPayload> | undefined;
+
+      if (payloadErro?.code === 'availability_conflict') {
+        const bloqueados = payloadErro.errors?.blocked_participants ?? [];
+        setSubmitConflito(bloqueados);
+        message.error(payloadErro.detail || 'Um participante já está alocado neste horário.');
+      } else {
+        const detail = (data as { detail?: string })?.detail;
+        message.error(detail || 'Erro ao criar solicitação. Verifique os dados e tente novamente.');
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  // #1452: quem entra na checagem de disponibilidade. Espelha o backend (PR A):
+  // criador + FORMADOR + COORD_ACOMPANHA, deduplicados por id. O criador frequentemente
+  // também está em coordenadores — sem dedup as horas dele contariam 2x (RD-05).
+  // CONVIDADO fica fora (o wizard não coleta convidados).
+  const participantes = useMemo((): PreviewParticipant[] => {
+    const formadores = Array.isArray(formData.formadores) ? formData.formadores : [];
+    const coordenadores = Array.isArray(formData.coordenadores) ? formData.coordenadores : [];
+    const lista: PreviewParticipant[] = [
+      ...(me ? [{ id: me.id, nome: me.nome, criador: true }] : []),
+      ...formadores.map(f => ({ id: f.id, nome: f.label || f.name || `#${f.id}`, criador: false })),
+      ...coordenadores.map(c => ({ id: c.id, nome: c.label || c.name || `#${c.id}`, criador: false })),
+    ];
+    const vistos = new Set<ID>();
+    return lista.filter(p => (vistos.has(p.id) ? false : (vistos.add(p.id), true)));
+  }, [me, formData.formadores, formData.coordenadores]);
+
+  const preview = useAvailabilityPreview({
+    inicio: formData.inicio,
+    fim: formData.fim,
+    municipioId: formData.municipio?.id ?? null,
+    participantes,
+    enabled: currentStep >= 1,
+  });
+
+  const conflitoAntecipado = preview.status === 'conflito';
+
+  // Bloco de UX da checagem (aviso antecipado). Só render — o gate real é o backend.
+  const renderPreviewAviso = (): ReactNode => {
+    if (preview.status === 'conflito') {
+      return <AvailabilityConflictAlert bloqueados={preview.bloqueados} id="preview-conflito" />;
+    }
+    if (preview.status === 'checking') {
+      return (
+        <Alert
+          type="info"
+          showIcon
+          className="mb-4"
+          message="Verificando disponibilidade dos participantes…"
+        />
+      );
+    }
+    if (preview.status === 'indisponivel') {
+      return (
+        <Alert
+          type="warning"
+          showIcon
+          className="mb-4"
+          message="Não foi possível verificar a disponibilidade agora"
+          description={
+            preview.motivo === 'throttled'
+              ? 'Muitas verificações em sequência. Aguarde alguns segundos. Você pode continuar; o sistema recusa o evento na criação se houver conflito.'
+              : 'Você pode continuar; o sistema recusa o evento na criação se houver conflito.'
+          }
+        />
+      );
+    }
+    return null;
   };
 
   // Passos do wizard memoizados (Issue #426)
@@ -445,6 +541,10 @@ export default function NewSolicitacaoWizard(): JSX.Element {
             />
           </Form.Item>
 
+          {/* #1452: aviso antecipado de conflito, no ponto em que o coordenador
+              acabou de escolher formador + data. */}
+          {renderPreviewAviso()}
+
           {formData.projeto && (
             <Alert
               message={formData.projeto.fluxo === 'SUPER' ? 'Aprovação Manual Requerida' : 'Aprovação Automática'}
@@ -555,6 +655,12 @@ export default function NewSolicitacaoWizard(): JSX.Element {
         <>
           <Title level={4}>Revise sua solicitação</Title>
 
+          {/* #1452: o conflito não pode sumir entre o passo 1 e a criação. */}
+          {renderPreviewAviso()}
+          {submitConflito.length > 0 && (
+            <AvailabilityConflictAlert bloqueados={submitConflito} id="submit-conflito" />
+          )}
+
           <Descriptions bordered column={1} size="small">
             <Descriptions.Item label="Projeto">
               {formData.projeto?.label}
@@ -574,12 +680,12 @@ export default function NewSolicitacaoWizard(): JSX.Element {
                 : 'Não informado'}
             </Descriptions.Item>
             <Descriptions.Item label="Formadores">
-              {formData.formadores.length > 0
+              {Array.isArray(formData.formadores) && formData.formadores.length > 0
                 ? formData.formadores.map(f => f.label || f.name).join(', ')
                 : 'Nenhum'}
             </Descriptions.Item>
             <Descriptions.Item label="Coordenadores Acompanhantes">
-              {formData.coordenadores.length > 0
+              {Array.isArray(formData.coordenadores) && formData.coordenadores.length > 0
                 ? formData.coordenadores.map(c => c.label || c.name).join(', ')
                 : 'Nenhum'}
             </Descriptions.Item>
@@ -623,7 +729,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
         </>
       ),
     },
-  ], [formData, rangeValue, handleRangeChange, handleProjetoChange, lookupMunicipiosElegiveis, isSuperuser, municipioLookupHasResults]);
+  ], [formData, rangeValue, handleRangeChange, handleProjetoChange, lookupMunicipiosElegiveis, isSuperuser, municipioLookupHasResults, preview, submitConflito]);
 
   return (
     <section className="p-6 max-w-4xl mx-auto" aria-labelledby="nova-solicitacao-title">
@@ -667,12 +773,28 @@ export default function NewSolicitacaoWizard(): JSX.Element {
             </Button>
           )}
           {currentStep < steps.length - 1 && (
-            <Button type="primary" onClick={next} aria-label="Ir para proximo passo">
+            <Button
+              type="primary"
+              onClick={next}
+              aria-label="Ir para proximo passo"
+              // #1452: no passo de participantes, conflito confirmado bloqueia o avanço.
+              disabled={currentStep === 1 && conflitoAntecipado}
+              aria-describedby={currentStep === 1 && conflitoAntecipado ? 'preview-conflito' : undefined}
+            >
               Próximo
             </Button>
           )}
           {currentStep === steps.length - 1 && (
-            <Button type="primary" onClick={handleSubmit} loading={loading}>
+            <Button
+              type="primary"
+              onClick={handleSubmit}
+              loading={loading}
+              // #1452: não deixa confirmar com conflito antecipado nem após o 400 do backend.
+              disabled={conflitoAntecipado || submitConflito.length > 0}
+              aria-describedby={
+                conflitoAntecipado ? 'preview-conflito' : submitConflito.length > 0 ? 'submit-conflito' : undefined
+              }
+            >
               Confirmar Solicitação
             </Button>
           )}

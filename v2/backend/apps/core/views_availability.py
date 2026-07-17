@@ -24,7 +24,7 @@ from .api_schemas import AVAILABILITY_CONFLICT_EXAMPLE, AVAILABILITY_OK_EXAMPLE,
 from .models import AvailabilityBlock, EquipeGerencia, Municipio, Usuario
 from .permissions import HasPerm
 from .serializers import AvailabilityBlockSerializer
-from .services.availability_service import check_conflicts
+from .services.availability_service import check_conflicts, check_conflicts_uncached
 
 
 def is_privileged_user(user):
@@ -448,7 +448,15 @@ class AvailabilityCheckManyView(APIView):
                 all_ok = False
                 continue
 
-            result = check_conflicts(usuario=usuario, inicio=inicio, fim=fim, municipio=municipio)
+            # #1452: lê SEM cache. Este endpoint checa participantes (formadores/
+            # coordenadores), e a invalidação de cache só cobre Solicitacao.usuario_id
+            # (o criador) — não há signal em Participation (`signals.py:72-93`), então
+            # alocar um formador nunca invalida o cache dele. Um preview cacheado poderia
+            # dizer "livre" e o enforcement (que lê uncached, PR A) recusar no submit;
+            # como o wizard bloqueia o botão com base nesta resposta, a fonte precisa ser
+            # a mesma do enforcement. O throttle `availability_check` (60/min) + debounce
+            # no cliente cobrem o custo de não cachear.
+            result = check_conflicts_uncached(usuario=usuario, inicio=inicio, fim=fim, municipio=municipio)
 
             results.append(
                 {

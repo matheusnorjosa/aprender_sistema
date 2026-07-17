@@ -18,6 +18,9 @@ export const TIMING = {
   // Debounce
   DEBOUNCE_DEFAULT_MS: 300,
   DEBOUNCE_SEARCH_MS: 400,
+  // #1452: checagem de disponibilidade no wizard. Constante própria (não reusar
+  // SEARCH) para poder ajustar sem acoplar à busca; o gatilho é seleção, não digitação.
+  DEBOUNCE_AVAILABILITY_CHECK_MS: 400,
 
   // Delays
   GCAL_DETAIL_LOAD_DELAY_MS: 2000,

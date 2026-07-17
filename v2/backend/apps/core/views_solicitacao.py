@@ -501,6 +501,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         Retorna True se houve alteração.
         """
         from .models import Participation, Usuario
+        from .utils.cache_utils import invalidate_availability_cache
 
         new_formador_ids = set(extra.get("formador_ids", []))
 
@@ -533,6 +534,11 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
             if participations_to_create:
                 Participation.objects.bulk_create(participations_to_create, ignore_conflicts=True)
+                # bulk_create NÃO dispara post_save → o receiver de Participation
+                # (#1556) não roda aqui; invalida o cache de disponibilidade dos
+                # formadores recém-adicionados manualmente.
+                for formador_id in usuarios_map:
+                    invalidate_availability_cache(usuario_id=formador_id)
                 changed = True
 
         return changed

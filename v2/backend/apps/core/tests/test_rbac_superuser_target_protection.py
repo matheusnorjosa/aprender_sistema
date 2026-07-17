@@ -13,13 +13,14 @@ Invariante de segurança (o que estes testes asseguram):
   decisão G2 é separada). O bypass do superuser permanece total.
 - O último superuser ativo não pode ser removido por esta API (anti-lockout).
 - Importação em lote por CPF nunca modifica conta superuser.
-- Vale para os dois aliases de rota: `/api/` e `/api/v1/`.
+- Vale para os dois aliases de rota (path canônico e o alias v1 deprecado).
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportIndexIssue=false, reportOptionalSubscript=false
 
 from __future__ import annotations
 
+from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -68,16 +69,33 @@ def common_user(db):
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("prefix", ["/api", "/api/v1"])
+@pytest.mark.parametrize("ns", ["core", "core-v1"])
 class TestSuperuserTargetProtectionAPI:
-    """DAT (não-superuser) não alcança superusers pelo UsuarioAdminViewSet."""
+    """DAT (não-superuser) não alcança superusers pelo UsuarioAdminViewSet.
+
+    Parametrizado por namespace de rota: `core` (path canônico) e `core-v1`
+    (alias v1 deprecado) — ambos incluem `apps.core.urls` e apontam para o mesmo
+    viewset. Via `reverse` (sem literal do alias) p/ respeitar o guard rail #796.
+    """
+
+    @staticmethod
+    def _detail(ns, pk):
+        return reverse(f"{ns}:usuario-admin-detail", args=[pk])
+
+    @staticmethod
+    def _list(ns):
+        return reverse(f"{ns}:usuario-admin-list")
+
+    @staticmethod
+    def _assign_groups(ns, pk):
+        return reverse(f"{ns}:usuario-admin-assign-groups", args=[pk])
 
     def test_dat_patch_superuser_password_returns_404_and_password_unchanged(
-        self, api_client, usuario_dat, superuser, prefix
+        self, api_client, usuario_dat, superuser, ns
     ):
         api_client.force_authenticate(user=usuario_dat)
         resp = api_client.patch(
-            f"{prefix}/usuarios-admin/{superuser.id}/",
+            self._detail(ns, superuser.id),
             {"password": "Hacked!newpass9"},
             format="json",
         )
@@ -86,12 +104,10 @@ class TestSuperuserTargetProtectionAPI:
         assert superuser.check_password(SUPERUSER_PASSWORD)
         assert not superuser.check_password("Hacked!newpass9")
 
-    def test_dat_patch_superuser_is_active_returns_404_and_still_active(
-        self, api_client, usuario_dat, superuser, prefix
-    ):
+    def test_dat_patch_superuser_is_active_returns_404_and_still_active(self, api_client, usuario_dat, superuser, ns):
         api_client.force_authenticate(user=usuario_dat)
         resp = api_client.patch(
-            f"{prefix}/usuarios-admin/{superuser.id}/",
+            self._detail(ns, superuser.id),
             {"is_active": False},
             format="json",
         )
@@ -99,10 +115,10 @@ class TestSuperuserTargetProtectionAPI:
         superuser.refresh_from_db()
         assert superuser.is_active is True
 
-    def test_dat_patch_superuser_cadastrais_returns_404_and_unchanged(self, api_client, usuario_dat, superuser, prefix):
+    def test_dat_patch_superuser_cadastrais_returns_404_and_unchanged(self, api_client, usuario_dat, superuser, ns):
         api_client.force_authenticate(user=usuario_dat)
         resp = api_client.patch(
-            f"{prefix}/usuarios-admin/{superuser.id}/",
+            self._detail(ns, superuser.id),
             {"email": "hacked@example.com", "first_name": "Hacker"},
             format="json",
         )
@@ -112,12 +128,12 @@ class TestSuperuserTargetProtectionAPI:
         assert superuser.first_name == ""
 
     def test_dat_patch_superuser_group_ids_returns_404_and_groups_unchanged(
-        self, api_client, usuario_dat, superuser, prefix
+        self, api_client, usuario_dat, superuser, ns
     ):
         grupo = GroupFactory(name="Formador")
         api_client.force_authenticate(user=usuario_dat)
         resp = api_client.patch(
-            f"{prefix}/usuarios-admin/{superuser.id}/",
+            self._detail(ns, superuser.id),
             {"group_ids": [grupo.id]},
             format="json",
         )
@@ -125,19 +141,19 @@ class TestSuperuserTargetProtectionAPI:
         superuser.refresh_from_db()
         assert superuser.groups.count() == 0
 
-    def test_dat_delete_superuser_returns_404_and_still_exists(self, api_client, usuario_dat, superuser, prefix):
+    def test_dat_delete_superuser_returns_404_and_still_exists(self, api_client, usuario_dat, superuser, ns):
         api_client.force_authenticate(user=usuario_dat)
-        resp = api_client.delete(f"{prefix}/usuarios-admin/{superuser.id}/")
+        resp = api_client.delete(self._detail(ns, superuser.id))
         assert resp.status_code == status.HTTP_404_NOT_FOUND
         assert Usuario.objects.filter(pk=superuser.id).exists()
 
     def test_dat_assign_groups_to_superuser_returns_404_and_groups_unchanged(
-        self, api_client, usuario_dat, superuser, prefix
+        self, api_client, usuario_dat, superuser, ns
     ):
         grupo = GroupFactory(name="Formador")
         api_client.force_authenticate(user=usuario_dat)
         resp = api_client.post(
-            f"{prefix}/usuarios-admin/{superuser.id}/assign_groups/",
+            self._assign_groups(ns, superuser.id),
             {"group_ids": [grupo.id]},
             format="json",
         )
@@ -145,22 +161,22 @@ class TestSuperuserTargetProtectionAPI:
         superuser.refresh_from_db()
         assert superuser.groups.count() == 0
 
-    def test_dat_retrieve_superuser_returns_404(self, api_client, usuario_dat, superuser, prefix):
+    def test_dat_retrieve_superuser_returns_404(self, api_client, usuario_dat, superuser, ns):
         api_client.force_authenticate(user=usuario_dat)
-        resp = api_client.get(f"{prefix}/usuarios-admin/{superuser.id}/")
+        resp = api_client.get(self._detail(ns, superuser.id))
         assert resp.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_dat_list_excludes_superuser(self, api_client, usuario_dat, superuser, common_user, prefix):
+    def test_dat_list_excludes_superuser(self, api_client, usuario_dat, superuser, common_user, ns):
         api_client.force_authenticate(user=usuario_dat)
-        resp = api_client.get(f"{prefix}/usuarios-admin/")
+        resp = api_client.get(self._list(ns))
         assert resp.status_code == status.HTTP_200_OK
         ids = {item["id"] for item in resp.data["results"]}
         assert superuser.id not in ids
         assert common_user.id in ids
 
-    def test_dat_filter_is_superuser_true_returns_empty(self, api_client, usuario_dat, superuser, prefix):
+    def test_dat_filter_is_superuser_true_returns_empty(self, api_client, usuario_dat, superuser, ns):
         api_client.force_authenticate(user=usuario_dat)
-        resp = api_client.get(f"{prefix}/usuarios-admin/?is_superuser=true")
+        resp = api_client.get(self._list(ns) + "?is_superuser=true")
         assert resp.status_code == status.HTTP_200_OK
         assert resp.data["results"] == []
 

@@ -1,4 +1,10 @@
-DC = COMPOSE_PROJECT_NAME=aprender_dev IMAGE_TAG=latest docker compose -f infra/docker-compose.yml -f infra/docker-compose.override.yml
+# PROJECT nomeia o stack Docker. Default = aprender_dev (comportamento de sempre).
+# Para rodar múltiplos worktrees em paralelo, cada um exporta um PROJECT distinto
+# + portas próprias (DB_HOST_PORT/REDIS_HOST_PORT/BACKEND_HOST_PORT/FRONTEND_HOST_PORT,
+# lidas direto pelo compose). Use `source infra/scripts/worktree-env.sh <slot>` para
+# derivar tudo de um número. `?=` respeita env/CLI, então quem não exporta nada não muda.
+PROJECT ?= aprender_dev
+DC = COMPOSE_PROJECT_NAME=$(PROJECT) IMAGE_TAG=latest docker compose -f infra/docker-compose.yml -f infra/docker-compose.override.yml
 WEB = $(DC) exec -T web
 
 .PHONY: up down build logs shell migrate collect seed seed-demo seed-rbac \

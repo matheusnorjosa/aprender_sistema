@@ -162,6 +162,19 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         request_user: Any = getattr(request, "user", None)
         instance: Any = self.instance
 
+        # P0-0 (Tier-0, auditoria 2026-07-17): um não-superuser nunca altera uma
+        # conta que já é superuser. Defense-in-depth — a queryset de
+        # `UsuarioAdminViewSet` já retorna 404 antes daqui; esta checagem
+        # protege qualquer reuso futuro do serializer fora daquela view.
+        if (
+            instance is not None
+            and getattr(instance, "is_superuser", False)
+            and not (request_user and getattr(request_user, "is_superuser", False))
+        ):
+            raise serializers.ValidationError(
+                {"detail": "Você não tem permissão para alterar uma conta de superusuário."}
+            )
+
         current_is_superuser = bool(getattr(instance, "is_superuser", False)) if instance is not None else False
         current_is_active = bool(getattr(instance, "is_active", True)) if instance is not None else True
         target_is_superuser = (

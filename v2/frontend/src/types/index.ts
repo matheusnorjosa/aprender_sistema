@@ -72,6 +72,11 @@ export type {
   AvailabilityCheckRequest,
   ConflictDetail,
   AvailabilityCheckResponse,
+  AvailabilityCheckManyRequest,
+  AvailabilityCheckManyResult,
+  AvailabilityCheckManyResponse,
+  BlockedParticipant,
+  AvailabilityConflictErrorPayload,
   MonthlyGridResponse,
 } from './availability';
 

@@ -12,6 +12,8 @@ import type {
   AvailabilityBlock,
   AvailabilityBlockPayload,
   AvailabilityCheckResponse,
+  AvailabilityCheckManyRequest,
+  AvailabilityCheckManyResponse,
   MonthlyGridResponse,
   Gerencia,
 } from '../types';
@@ -112,6 +114,27 @@ export async function deleteBlock(id: ID): Promise<void> {
 export async function checkAvailability(params: AvailabilityCheckParams): Promise<AvailabilityCheckResponse> {
   const url = buildUrl('/availability/check/', params as unknown as QueryParams);
   return await fetchAPI(url);
+}
+
+/**
+ * Checa disponibilidade de vários usuários de uma vez (#1452).
+ *
+ * Usado pelo wizard de nova solicitação para avisar cedo quando um participante
+ * (formador/coordenador) já está alocado. Uma chamada em vez de N, para não estourar
+ * o throttle `availability_check`. Aceita `signal` para cancelar respostas obsoletas.
+ *
+ * @param params - usuarios_ids + intervalo + município
+ * @param options - opções do fetch (ex.: `signal` de um AbortController)
+ */
+export async function checkAvailabilityMany(
+  params: AvailabilityCheckManyRequest,
+  options: { signal?: AbortSignal } = {}
+): Promise<AvailabilityCheckManyResponse> {
+  return await fetchAPI('/availability/check-many/', {
+    ...options,
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
 }
 
 /**

@@ -368,6 +368,34 @@ class UsuarioAdminViewSet(viewsets.ModelViewSet):
     ordering_fields = ["username", "email", "date_joined", "id"]
     ordering = ["username"]
 
+    def get_queryset(self) -> QuerySet[Usuario]:
+        """
+        P0-0 (Tier-0, auditoria 2026-07-17): contas superuser são invisíveis e
+        inalcançáveis para não-superusers.
+
+        Efeito único e transversal: `list`/filtro as omitem; `retrieve`,
+        `update`, `destroy` e `assign_groups` chamam `get_object()` sobre esta
+        queryset → **404** (inacessível == inexistente, não distinguível de não
+        existir). O DAT segue administrando contas comuns normalmente.
+        """
+        qs = super().get_queryset()
+        if not getattr(self.request.user, "is_superuser", False):
+            qs = qs.exclude(is_superuser=True)
+        return qs
+
+    def perform_destroy(self, instance: Usuario) -> None:
+        """
+        P0-0: anti-lockout — impede remover o último superuser ativo. Não-
+        superusers já recebem 404 (via `get_queryset`) antes de chegar aqui.
+        """
+        if instance.is_superuser:
+            has_other_active_superuser = (
+                Usuario.objects.filter(is_superuser=True, is_active=True).exclude(pk=instance.pk).exists()
+            )
+            if not has_other_active_superuser:
+                raise ValidationError({"detail": "Não é possível remover o último superusuário ativo."})
+        instance.delete()
+
     @action(detail=True, methods=["post"], permission_classes=[HasPerm("manage_purchases_and_materials")])
     def assign_groups(self, request, pk=None):
         """

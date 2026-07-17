@@ -512,6 +512,41 @@ jobs:
               apps/core/tests/test_auth_backends.py
           '
 
+    - name: Validate prod-like env template boots under production guards (#1458)
+      # Reusa a imagem prod recem-buildada: roda `manage.py check` com o
+      # .env.prodlike.example. Se o template regredir e violar um guard de
+      # settings.py:64-95 (ENVIRONMENT=production), o boot aborta (exit 1) e
+      # este job [required] fica vermelho — pega o drift template<->guards (#2).
+      run: |
+        set -euo pipefail
+        # --entrypoint python pula o entrypoint.sh (que espera DB): o check so
+        # precisa importar settings (onde rodam os guards de producao), nao conectar.
+        docker run --rm --entrypoint python \
+          --env-file v2/infra/.env.prodlike.example \
+          aprender-backend:ci-parity-${{ github.sha }} \
+          manage.py check
+
+  # ----------------------------------------------------------------
+  # Job 4b: Prod compose contract lint (#1458 achado #5)
+  # Valida que docker-compose.prod.yml continua um contrato coerente
+  # (interpolacao, sintaxe, volumes, redes) usando o template prod-like.
+  # Barato (~segundos, sem build). Complementa o guard-smoke do template acima.
+  # ----------------------------------------------------------------
+  prod-compose-contract:
+    name: "prod compose contract"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
+    - name: docker compose config -q (contrato de prod via template prod-like)
+      run: |
+        set -euo pipefail
+        docker compose \
+          --env-file v2/infra/.env.prodlike.example \
+          -f v2/infra/docker-compose.prod.yml \
+          config -q
+        echo "OK docker-compose.prod.yml: contrato valido com o template prod-like"
+
   # ----------------------------------------------------------------
   # Job 5: Required backend gate
   # Keeps the required "tests" check in ruleset while aggregating

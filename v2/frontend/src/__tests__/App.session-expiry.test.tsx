@@ -79,8 +79,16 @@ describe('App — sessão expirada global (Issue #1376)', () => {
     await screen.findByTestId('app-routes');
     expect(screen.queryByText('LOGIN_PAGE')).not.toBeInTheDocument();
 
+    // Assenta os passive effects antes de disparar o evento. O commit do DOM
+    // (app-routes visível) pode preceder o flush do effect que sincroniza
+    // `userRef.current` (App.tsx). Sem esta barreira, o handler `auth:expired`
+    // às vezes vê `userRef.current === null`, cai no early-return e a transição
+    // para o login nunca ocorre → `findByText('LOGIN_PAGE')` estoura o timeout
+    // de forma intermitente (flaky #1577). Determinístico, sem tocar produção.
+    await act(async () => {});
+
     // Simula 401 emitido por qualquer chamada da UI → fetchAPI dispara o evento.
-    act(() => {
+    await act(async () => {
       window.dispatchEvent(new Event('auth:expired'));
     });
 

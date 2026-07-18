@@ -207,6 +207,7 @@ pull-prod-like: ## Pull das imagens do ambiente PROD-LIKE local
 
 up-prod-like: ## Subir ambiente PROD-LIKE local (sem build)
 	@echo "🚀 [PROD-LIKE] subindo ambiente..."
+	@docker network inspect shared_proxy >/dev/null 2>&1 || docker network create shared_proxy
 	$(PRODLIKE_COMPOSE) up -d --no-build
 	@echo "✅ [PROD-LIKE] ambiente iniciado"
 	@echo "🌐 [PROD-LIKE] backend: http://localhost:28000"

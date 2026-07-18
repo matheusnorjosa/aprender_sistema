@@ -27,6 +27,7 @@ from apps.core.models import (
     AvailabilityBlock,
     Config,
     Municipio,
+    Participation,
     PermissaoFuncional,
     Projeto,
     Solicitacao,
@@ -91,6 +92,31 @@ def _invalidate_cache_on_block_change(
     ASQ-007: Scoped invalidation — only bumps version for the affected user.
     """
     invalidate_availability_cache(usuario_id=getattr(instance, "usuario_id", None))
+
+
+@receiver([post_save, post_delete], sender=Participation)
+def _invalidate_cache_on_participation_change(
+    sender: type[Participation], instance: Participation, **kwargs: Any
+) -> None:  # pyright: ignore[reportUnusedFunction]
+    """
+    Invalida cache de availability quando um usuário entra/sai de um evento como
+    participante (Participation).
+
+    #1556: sem este receiver, alocar um formador como participante (e não como
+    criador da Solicitacao) deixava o cache dele (``avail_ver:<id>``) obsoleto —
+    o caminho cacheado (check_conflicts / grade mensal) podia dizer "livre" para
+    quem acabou de ser alocado.
+
+    Convidados externos (``usuario_id=None`` + ``guest_email``) não têm
+    disponibilidade; pular evita um bump GLOBAL indevido, já que
+    ``invalidate_availability_cache(None)`` invalidaria o cache de TODOS.
+
+    NOTA: ``bulk_create`` não dispara ``post_save`` — os call-sites que usam
+    bulk (perform_update em views_solicitacao.py) invalidam explicitamente.
+    """
+    usuario_id = getattr(instance, "usuario_id", None)
+    if usuario_id is not None:
+        invalidate_availability_cache(usuario_id=usuario_id)
 
 
 # ================================================================

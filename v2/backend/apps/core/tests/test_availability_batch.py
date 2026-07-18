@@ -323,14 +323,14 @@ class TestAvailabilityCheckManyEndpoint:
         assert "fim" in str(response.data).lower() or "posterior" in str(response.data).lower()
 
     def test_check_many_le_sem_cache_ve_evento_de_participante_recem_criado(self, user_controle, formador_1, municipio):
-        """#1452: check-many lê SEM cache e enxerga um evento onde o formador entra
-        como participante, mesmo quando o caminho cacheado ainda diria 'livre'.
+        """#1452/#1556: check-many lê SEM cache e enxerga um evento onde o formador
+        entra como participante.
 
-        Reproduz o gap: a invalidação de cache só cobre `Solicitacao.usuario_id` (o
-        criador); não há signal em `Participation`. Então, quando o coordenador cria o
-        evento e o formador entra só como participante, o cache do formador não é
-        invalidado. Um preview cacheado mentiria 'livre' e o botão do wizard seria
-        liberado para um evento que o backend recusa.
+        Antes do #1556, a invalidação de cache só cobria `Solicitacao.usuario_id` (o
+        criador) — não havia receiver em `Participation`, então o caminho cacheado
+        mentia 'livre' para o formador alocado só como participante. O #1556 fechou
+        esse gap (o cache do formador passa a ser invalidado). check-many, por
+        segurança, continua lendo SEM cache (cinto e suspensório).
         """
         client = APIClient()
         client.force_authenticate(user=user_controle)
@@ -343,8 +343,8 @@ class TestAvailabilityCheckManyEndpoint:
         assert primed.ok is True
 
         # 2) O coordenador cria o evento; o formador entra como PARTICIPANTE (não como
-        #    criador). O signal de invalidação bumpa o cache do coordenador — nunca o
-        #    do formador (não existe receiver em Participation).
+        #    criador). Com o #1556, o post_save de Participation invalida o cache do
+        #    formador (antes só o cache do coordenador era invalidado).
         coordenador = UsuarioFactory(username=f"coord_{uuid4().hex[:8]}", cpf=str(uuid4().int % 10**11).zfill(11))
         evento = SolicitacaoFactory(
             usuario=coordenador,
@@ -357,9 +357,9 @@ class TestAvailabilityCheckManyEndpoint:
         )
         Participation.objects.create(solicitacao=evento, usuario=formador_1, role=Participation.Role.FORMADOR)
 
-        # 3) O caminho CACHEADO ainda mente "livre" (cache do formador não foi invalidado).
-        stale = check_conflicts(usuario=formador_1, inicio=inicio, fim=fim, municipio=municipio)
-        assert stale.ok is True, "pré-condição: o cache do formador está obsoleto (é o bug que motiva o uncached)"
+        # 3) #1556: o caminho CACHEADO também enxerga o conflito (cache invalidado).
+        cacheado = check_conflicts(usuario=formador_1, inicio=inicio, fim=fim, municipio=municipio)
+        assert cacheado.ok is False, "#1556: criar Participation invalida o cache do formador"
 
         # 4) check-many, por ler SEM cache, enxerga o conflito na hora.
         response = client.post(

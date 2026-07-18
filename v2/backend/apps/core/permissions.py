@@ -17,6 +17,7 @@ from apps.core.rbac.permissions import (  # noqa: F401
     HasSectorAccess,
     IsGerenteSuperintendencia,
     IsOwnerOrPrivileged,
+    SuperuserOnly,
 )
 
 __all__ = [
@@ -25,4 +26,5 @@ __all__ = [
     "HasSectorAccess",
     "IsGerenteSuperintendencia",
     "IsOwnerOrPrivileged",
+    "SuperuserOnly",
 ]

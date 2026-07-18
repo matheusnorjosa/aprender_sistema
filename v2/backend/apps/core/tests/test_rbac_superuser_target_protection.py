@@ -147,9 +147,10 @@ class TestSuperuserTargetProtectionAPI:
         assert resp.status_code == status.HTTP_404_NOT_FOUND
         assert Usuario.objects.filter(pk=superuser.id).exists()
 
-    def test_dat_assign_groups_to_superuser_returns_404_and_groups_unchanged(
-        self, api_client, usuario_dat, superuser, ns
-    ):
+    def test_dat_assign_groups_returns_403_and_groups_unchanged(self, api_client, usuario_dat, superuser, ns):
+        # P0-1 Tier-0: assign_groups virou superuser-only → o DAT recebe 403
+        # (a permissão barra antes do 404-por-invisibilidade do P0-0). O
+        # superuser segue intocado de qualquer forma.
         grupo = GroupFactory(name="Formador")
         api_client.force_authenticate(user=usuario_dat)
         resp = api_client.post(
@@ -157,7 +158,7 @@ class TestSuperuserTargetProtectionAPI:
             {"group_ids": [grupo.id]},
             format="json",
         )
-        assert resp.status_code == status.HTTP_404_NOT_FOUND
+        assert resp.status_code == status.HTTP_403_FORBIDDEN
         superuser.refresh_from_db()
         assert superuser.groups.count() == 0
 

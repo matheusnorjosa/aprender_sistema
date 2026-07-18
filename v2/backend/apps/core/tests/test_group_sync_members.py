@@ -23,13 +23,11 @@ def api_client() -> APIClient:
 
 @pytest.fixture
 def usuario_dat(db) -> Usuario:
-    return UsuarioFactory(
-        username="dat_sync",
-        email="dat_sync@example.com",
-        password="senha123",
-        cpf="81234567890",
-        groups=["DAT"],
-    )
+    # P0-1 Tier-0: sync-members virou superuser-only. O ator das mecânicas
+    # (add/remove/idempotência/auditoria) é superuser. Que um não-superuser
+    # recebe 403 segue em test_sync_members_requires_dat_permission +
+    # test_rbac_tier0_group_gate.py.
+    return UsuarioFactory(username="root_sync", cpf="81234567890", superuser=True)
 
 
 @pytest.fixture

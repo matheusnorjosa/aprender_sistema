@@ -35,7 +35,7 @@ from apps.core.models import (
     Projeto,
     Usuario,
 )
-from apps.core.permissions import HasPerm
+from apps.core.permissions import HasPerm, SuperuserOnly
 from apps.core.rbac.policies import CanAccessAuditLogs
 from apps.core.serializers import (
     AuditLogSerializer,
@@ -396,7 +396,7 @@ class UsuarioAdminViewSet(viewsets.ModelViewSet):
                 raise ValidationError({"detail": "Não é possível remover o último superusuário ativo."})
         instance.delete()
 
-    @action(detail=True, methods=["post"], permission_classes=[HasPerm("manage_purchases_and_materials")])
+    @action(detail=True, methods=["post"], permission_classes=[SuperuserOnly])
     def assign_groups(self, request, pk=None):
         """
         Atribui grupos a um usuário.
@@ -491,6 +491,14 @@ class GroupViewSet(viewsets.ModelViewSet):
     ordering_fields = ["name", "id"]
     ordering = ["name"]
 
+    def get_permissions(self):  # type: ignore[override]
+        # P0-1 Tier-0 (D-1=2a): leitura fica com quem administra cadastros (a
+        # tela vira read-only p/ não-superuser); TODA escrita — create/update/
+        # destroy e a ação sync_members — é superuser-only.
+        if self.action in ("list", "retrieve"):
+            return [HasPerm("manage_purchases_and_materials")()]
+        return [SuperuserOnly()]
+
     def perform_destroy(self, instance: Group) -> None:
         is_reserved = instance.name in RESERVED_GROUPS
         confirmed = str(self.request.query_params.get("confirm_reserved", "")).lower() == "true"
@@ -504,7 +512,6 @@ class GroupViewSet(viewsets.ModelViewSet):
         detail=True,
         methods=["post"],
         url_path="sync-members",
-        permission_classes=[HasPerm("manage_purchases_and_materials")],
     )
     def sync_members(self, request: Request, pk: str | None = None) -> Response:
         """

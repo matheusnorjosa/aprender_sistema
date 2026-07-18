@@ -125,6 +125,26 @@ class HasFunctionalPermission(permissions.BasePermission):  # type: ignore[misc]
         return self.functional_codename in get_user_functional_permissions(user)
 
 
+class SuperuserOnly(permissions.BasePermission):  # type: ignore[misc]
+    """
+    Tier-0: apenas superusuários (P0-1, auditoria 2026-07-17).
+
+    Usada nos endpoints de administração de privilégio/identidade — CRUD de
+    grupo, matriz Grupo×Capability e membership — onde NENHUMA capability
+    operacional deve conceder acesso. Fecha o vetor de escalada onde um DAT
+    editava a matriz / cunhava aprovadores.
+
+    NÃO usar `rest_framework.permissions.IsAdminUser`: ele checa `is_staff`,
+    não `is_superuser`.
+    """
+
+    message = "Apenas superusuários podem realizar esta ação."
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        user = request.user
+        return bool(user and user.is_authenticated and getattr(user, "is_superuser", False))
+
+
 # ============================================================================
 # 3 classes mantidas pós-Epic 5.3 — expressam lógica que `HasPerm(codename)`
 # não cobre:

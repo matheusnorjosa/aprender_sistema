@@ -91,12 +91,18 @@ fi
 if [ "$CREATE_SUPERUSER" = "1" ]; then
     log_info "Criando superuser..."
 
+    if [ -z "$DJANGO_SUPERUSER_PASSWORD" ]; then
+        log_error "DJANGO_SUPERUSER_PASSWORD não definida — abortando criação do superuser."
+        exit 1
+    fi
+
     python manage.py shell <<EOF
+import os
 from django.contrib.auth import get_user_model
 User = get_user_model()
 if not User.objects.filter(username='admin').exists():
-    User.objects.create_superuser('admin', 'admin@aprender.com.br', 'admin123')
-    print('Superuser criado: admin / admin123')
+    User.objects.create_superuser('admin', 'admin@aprender.com.br', os.environ['DJANGO_SUPERUSER_PASSWORD'])
+    print('Superuser criado: admin / (senha definida por DJANGO_SUPERUSER_PASSWORD)')
 else:
     print('Superuser já existe')
 EOF

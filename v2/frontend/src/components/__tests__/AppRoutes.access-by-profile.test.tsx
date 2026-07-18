@@ -72,6 +72,11 @@ vi.mock('../../api/availability', () => ({
 vi.mock('../../api/stats', () => ({
   getHomeStats: vi.fn().mockResolvedValue({}),
 }));
+// Issue #1169: este teste cobre o GATE de rota de /solicitacoes/:id/editar, não a
+// página em si (que depende de getSolicitacao/lookup não mockados aqui). Stub isola o gate.
+vi.mock('../../pages/Solicitacoes/EditSolicitacaoPage', () => ({
+  default: () => 'EDIT_PAGE',
+}));
 
 // ============================================================================
 // Setup
@@ -598,5 +603,32 @@ describe('AppRoutes — sanity da matriz', () => {
     ]);
     const actual = new Set(ACTORS.map((a) => a.actor));
     expect(actual).toEqual(expected);
+  });
+});
+
+// ============================================================================
+// Gate de /solicitacoes/:id/editar (Issue #1169, Item 1)
+// ============================================================================
+// Antes: `element={user ? <EditSolicitacaoPage /> : <Forbidden />}` — qualquer
+// autenticado abria a tela e falhava no submit (backend IsOwnerOrPrivileged → 403).
+// Depois: gate alinhado ao menu — só canCoordenador (owner plausível) ou
+// canApproveSuper (privilegiado) carregam. Backend segue autoritativo.
+describe('AppRoutes — gate de /solicitacoes/:id/editar (Issue #1169)', () => {
+  const EDITAR = '/solicitacoes/42/editar';
+
+  test('autenticado sem canCoordenador nem canApproveSuper → Forbidden', async () => {
+    renderRoute(EDITAR, BASE_USER, { ...EMPTY_PERMISSIONS }, []);
+    expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
+  });
+
+  test('canCoordenador → carrega a edição (não Forbidden)', async () => {
+    renderRoute(EDITAR, BASE_USER, { ...EMPTY_PERMISSIONS, canCoordenador: true }, []);
+    expect(await screen.findByText('EDIT_PAGE')).toBeInTheDocument();
+    expect(screen.queryByText(FORBIDDEN_TEXT)).not.toBeInTheDocument();
+  });
+
+  test('canApproveSuper → carrega a edição (não Forbidden)', async () => {
+    renderRoute(EDITAR, BASE_USER, { ...EMPTY_PERMISSIONS, canApproveSuper: true }, []);
+    expect(await screen.findByText('EDIT_PAGE')).toBeInTheDocument();
   });
 });

@@ -16,7 +16,7 @@ const { Text } = Typography;
 
 interface AppHeaderProps {
   user: { name?: string; username?: string };
-  canAcoesInternas: boolean;
+  canManageInternalActions: boolean;
   unreadNotifications: number;
   isMobile: boolean;
   sidebarCollapsed: boolean;
@@ -30,7 +30,7 @@ interface AppHeaderProps {
 
 export function AppHeader({
   user,
-  canAcoesInternas,
+  canManageInternalActions,
   unreadNotifications,
   isMobile,
   sidebarCollapsed,
@@ -106,7 +106,7 @@ export function AppHeader({
           <UserOutlined />
           <Text strong>{user.name || user.username || 'Usuário'}</Text>
         </Link>
-        {canAcoesInternas && (
+        {canManageInternalActions && (
           <Popover
             trigger="click"
             open={popoverOpen}

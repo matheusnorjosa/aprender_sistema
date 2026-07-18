@@ -57,8 +57,10 @@ export interface AccessState {
   canAccessBlocks: boolean;
 
   /**
-   * Pode criar nova solicitação. Hoje: 100% legacy (Coordenador / Apoio de Coordenação / Gerente / Superuser).
-   * Sem policy pública mapeada — frontend confere flag, backend ainda valida via permission_classes específica.
+   * Pode criar nova solicitação. Fonte primária: policy pública `create_solicitation`
+   * (Issue #1265). Fallback legacy `canCoordenador` preservado durante a transição —
+   * remover em Onda 3+ quando o staging validar a policy. Backend continua validando
+   * via permission_classes específica.
    */
   canCreateSolicitation: boolean;
 
@@ -68,6 +70,15 @@ export interface AccessState {
    * Legacy fallback preservado durante transição.
    */
   canViewComprasDashboard: boolean;
+
+  /**
+   * Pode gerenciar ações internas (notificações internas + timeline). Fonte de
+   * verdade exclusiva: policy pública `manage_internal_actions` (Issue #1263).
+   * SEM fallback legacy — o backend exige a policy (0 grupos no seed atual), então
+   * decidir por grupo (`usePermissions.canAcoesInternas`) sobre-concedia e o menu
+   * levava a 403. Superuser recebe todas as policies, logo obtém a flag.
+   */
+  canManageInternalActions: boolean;
 }
 
 /**
@@ -90,12 +101,19 @@ export function computeAccess(
     can('view_all_availability') ||
     legacy.canBloqueios === true;
 
+  // Issue #1265: policy `create_solicitation` como fonte primária; legacy `canCoordenador`
+  // mantido como fallback durante a transição (remover em Onda 3+ após validar em staging).
   const canCreateSolicitation =
+    can('create_solicitation') ||
     legacy.canCoordenador === true;
 
   const canViewComprasDashboard =
     can('view_compras_dashboard') ||
     legacy.canDashboardCompras === true;
+
+  // Issue #1263: policy-only (sem legacy). Backend exige `manage_internal_actions`;
+  // decidir por grupo mostrava o menu de Ações Internas que o backend nega (403).
+  const canManageInternalActions = can('manage_internal_actions');
 
   return {
     policies,
@@ -104,6 +122,7 @@ export function computeAccess(
     canAccessBlocks,
     canCreateSolicitation,
     canViewComprasDashboard,
+    canManageInternalActions,
   };
 }
 

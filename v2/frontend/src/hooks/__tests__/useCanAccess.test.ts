@@ -100,14 +100,49 @@ describe('computeAccess.canViewComprasDashboard — Onda 2 A2 consome policy', (
   });
 });
 
-describe('computeAccess.canCreateSolicitation — legacy-only today', () => {
-  test('legacy canCoordenador=true → true', () => {
+describe('computeAccess.canCreateSolicitation — policy create_solicitation + legacy (Issue #1265)', () => {
+  test('policy create_solicitation → true (mesmo sem legacy)', () => {
+    const access = computeAccess(['create_solicitation']);
+    expect(access.canCreateSolicitation).toBe(true);
+  });
+
+  test('legacy canCoordenador=true sem policy → true (fallback durante transição)', () => {
     const access = computeAccess([], { canCoordenador: true });
     expect(access.canCreateSolicitation).toBe(true);
   });
 
-  test('no legacy → false (no public policy maps to this today)', () => {
+  test('policy + legacy → true', () => {
+    const access = computeAccess(['create_solicitation'], { canCoordenador: true });
+    expect(access.canCreateSolicitation).toBe(true);
+  });
+
+  test('sem policy e sem legacy → false', () => {
     const access = computeAccess(['view_compras_dashboard'], {});
     expect(access.canCreateSolicitation).toBe(false);
+  });
+});
+
+describe('computeAccess.canManageInternalActions — policy-only (Issue #1263)', () => {
+  test('sem policy → false (grupo DAT/Coordenador/Gerente não basta)', () => {
+    const access = computeAccess([]);
+    expect(access.canManageInternalActions).toBe(false);
+  });
+
+  test('policy manage_internal_actions presente → true (superuser recebe todas)', () => {
+    const access = computeAccess(['manage_internal_actions']);
+    expect(access.canManageInternalActions).toBe(true);
+  });
+
+  test('policy unrelated → false', () => {
+    const access = computeAccess(['view_compras_dashboard']);
+    expect(access.canManageInternalActions).toBe(false);
+  });
+
+  test('não depende de flags legacy — grupo não concede a capability', () => {
+    // O bug do #1263: a flag legacy `canAcoesInternas` retornava true para DAT/
+    // Coordenador/Gerente, mas o backend exige a policy `manage_internal_actions`
+    // (0 grupos no seed). A nova flag ignora legacy: sem policy → sem acesso.
+    const access = computeAccess([], { canCoordenador: true, canBloqueios: true });
+    expect(access.canManageInternalActions).toBe(false);
   });
 });

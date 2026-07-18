@@ -83,7 +83,7 @@ interface AppRoutesProps {
 
 export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.Element {
   const {
-    canCoordenador, canControle, canDAT, canAcoesInternas,
+    canCoordenador, canControle, canDAT, canApproveSuper,
     canDashboardOverview, canDashboardEquipe, canDashboardGcal, canDashboardCompras,
     canMapaBrasil, canDisponibilidade, isFormador,
   } = permissions;
@@ -116,7 +116,7 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
         {/* Páginas pré-existentes mantidas */}
         <Route path="/solicitacoes/minhas" element={access.canCreateSolicitation ? <MySolicitacoesPage /> : <Forbidden />} />
         <Route path="/solicitacoes/nova" element={access.canCreateSolicitation ? <NewSolicitacaoWizard /> : <Forbidden />} />
-        <Route path="/solicitacoes/:id/editar" element={user ? <EditSolicitacaoPage /> : <Forbidden />} />
+        <Route path="/solicitacoes/:id/editar" element={canCoordenador || canApproveSuper ? <EditSolicitacaoPage /> : <Forbidden />} />
 
         {/* Páginas movidas para sob /solicitacoes/* (com redirects abaixo) */}
         <Route path="/solicitacoes/aprovacoes" element={access.canAccessApprovals ? <ApprovalsPage /> : <Forbidden />} />
@@ -146,9 +146,9 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
         <Route path="/pre-agenda" element={canControle ? <PreAgendaPage /> : <Forbidden />} />
 
         {/* Ações/Notificações */}
-        <Route path="/acoes-notificacao" element={canAcoesInternas ? <AcoesNotificacaoPage /> : <Forbidden />} />
-        <Route path="/acoes-notificacao/timeline" element={canAcoesInternas ? <AcoesTimelinePage /> : <Forbidden />} />
-        <Route path="/notificacoes-internas" element={canAcoesInternas ? <NotificacoesInternasPage /> : <Forbidden />} />
+        <Route path="/acoes-notificacao" element={access.canManageInternalActions ? <AcoesNotificacaoPage /> : <Forbidden />} />
+        <Route path="/acoes-notificacao/timeline" element={access.canManageInternalActions ? <AcoesTimelinePage /> : <Forbidden />} />
+        <Route path="/notificacoes-internas" element={access.canManageInternalActions ? <NotificacoesInternasPage /> : <Forbidden />} />
         {/* DAT Module */}
         <Route path="/dat/admin" element={canDAT ? <AdminDATHomePage /> : <Forbidden />} />
         <Route path="/dat/admin/usuarios" element={canDAT ? <UsuariosPage /> : <Forbidden />} />

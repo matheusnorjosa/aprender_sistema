@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # worktree-env.sh — isola o stack Docker de dev por worktree (multi-worktree paralelo).
 #
-# Cada worktree paralelo precisa de um stack Docker próprio (nome + portas + volumes)
-# para não colidir com os outros. Este script deriva TUDO de um número de slot e exporta
-# as variáveis que o Makefile (PROJECT) e o compose (portas) leem.
+# Cada worktree paralelo precisa de um stack Docker próprio (nome + portas + volumes +
+# tag de imagem) para não colidir com os outros. Este script deriva TUDO de um número de
+# slot e exporta as variáveis que o Makefile (PROJECT, IMAGE_TAG) e o compose (portas) leem.
 #
 # USO (precisa ser SOURCED, não executado — export só persiste no shell atual):
 #   source infra/scripts/worktree-env.sh 1    # slot explícito
@@ -19,6 +19,9 @@
 #
 # Portas por slot (host): backend=8002+slot*10 · db=5434+slot*10 · redis=6380+slot*10 ·
 # frontend=5173+slot*10  (slot1 -> 8012/5444/6390/5183, slot2 -> 8022/5454/6400/5193, ...)
+#
+# IMAGE_TAG por slot: slot 0 -> `latest` (inalterado); slot N -> `sN`. Sem isso os stacks
+# compartilham a mesma tag e um `up -d` sem `--build` sobe o código do outro worktree.
 
 _wt_slot="${1:-}"
 
@@ -43,8 +46,10 @@ fi
 
 if [ "$_wt_slot" = "0" ]; then
   export PROJECT="aprender_dev"
+  export IMAGE_TAG="latest"
 else
   export PROJECT="aprender_dev_s${_wt_slot}"
+  export IMAGE_TAG="s${_wt_slot}"
 fi
 
 export BACKEND_HOST_PORT=$((8002 + _wt_slot * 10))
@@ -52,6 +57,6 @@ export DB_HOST_PORT=$((5434 + _wt_slot * 10))
 export REDIS_HOST_PORT=$((6380 + _wt_slot * 10))
 export FRONTEND_HOST_PORT=$((5173 + _wt_slot * 10))
 
-echo "worktree slot ${_wt_slot} -> PROJECT=${PROJECT} | backend :${BACKEND_HOST_PORT} | db :${DB_HOST_PORT} | redis :${REDIS_HOST_PORT} | frontend :${FRONTEND_HOST_PORT}"
+echo "worktree slot ${_wt_slot} -> PROJECT=${PROJECT} | IMAGE_TAG=${IMAGE_TAG} | backend :${BACKEND_HOST_PORT} | db :${DB_HOST_PORT} | redis :${REDIS_HOST_PORT} | frontend :${FRONTEND_HOST_PORT}"
 
 unset _wt_slot

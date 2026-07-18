@@ -36,6 +36,7 @@ from .models import (
     TipoEvento,
     Usuario,
 )
+from .utils.csv_sanitize import sanitize_csv_value
 
 # pyright: reportMissingTypeArgument=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false
 
@@ -83,11 +84,11 @@ class UsuarioAdmin(admin.ModelAdmin):
             nome_completo = f"{user.first_name} {user.last_name}".strip()
             writer.writerow(
                 [
-                    user.username,
-                    user.email,
-                    nome_completo,
+                    sanitize_csv_value(user.username),
+                    sanitize_csv_value(user.email),
+                    sanitize_csv_value(nome_completo),
                     user.cpf or "",
-                    user.cargo or "",
+                    sanitize_csv_value(user.cargo or ""),
                     "Sim" if user.is_active else "Não",
                 ]
             )
@@ -105,11 +106,11 @@ class UsuarioAdmin(admin.ModelAdmin):
                     nome_completo = f"{user.first_name} {user.last_name}".strip()
                     writer_file.writerow(
                         [
-                            user.username,
-                            user.email,
-                            nome_completo,
+                            sanitize_csv_value(user.username),
+                            sanitize_csv_value(user.email),
+                            sanitize_csv_value(nome_completo),
                             user.cpf or "",
-                            user.cargo or "",
+                            sanitize_csv_value(user.cargo or ""),
                             "Sim" if user.is_active else "Não",
                         ]
                     )

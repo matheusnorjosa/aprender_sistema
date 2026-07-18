@@ -42,6 +42,7 @@ import {
   type ComprasPendenciasResponse,
 } from '../../api/datModule';
 import { UF_OPTIONS } from '../../constants';
+import { buildCsvRow } from '../../utils/csvSanitize';
 import './ComprasDashboardPage.css';
 
 const { Title, Text } = Typography;
@@ -360,11 +361,6 @@ export default function ComprasDashboardPage(): JSX.Element {
   const handleExportPendenciasCsv = () => {
     if (!pendencias || pendencias.pendentes.length === 0) return;
 
-    const escapeCsv = (value: string | number | null) => {
-      const text = value === null ? '' : String(value);
-      return `"${text.replace(/"/g, '""')}"`;
-    };
-
     const header = [
       'municipio_id',
       'municipio',
@@ -376,8 +372,9 @@ export default function ComprasDashboardPage(): JSX.Element {
       'ultima_compra',
     ];
 
+    // Sanitiza contra formula injection e aplica quoting RFC-4180 (SEC-007).
     const lines = pendencias.pendentes.map((item) =>
-      [
+      buildCsvRow([
         item.municipio_id,
         item.municipio,
         item.uf,
@@ -386,12 +383,10 @@ export default function ComprasDashboardPage(): JSX.Element {
         item.total_itens,
         item.total_compras,
         item.ultima_compra ?? '',
-      ]
-        .map(escapeCsv)
-        .join(';')
+      ], ';')
     );
 
-    const csv = `${header.join(';')}\n${lines.join('\n')}`;
+    const csv = `${buildCsvRow(header, ';')}\n${lines.join('\n')}`;
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');

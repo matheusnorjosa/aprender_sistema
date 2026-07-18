@@ -190,8 +190,15 @@ export async function fetchAPI<T = unknown>(url: string, options: FetchOptions =
     }
 
     // Issue #258: Invalidar cache em 401 (sessão expirada)
+    // Issue #1376: emitir evento global `auth:expired` para tratamento único no
+    // App (limpar sessão + voltar ao login), em vez de cada tela lidar com o 401
+    // isoladamente. fetchAPI não sabe se havia usuário logado — o guard vive no
+    // App (só age se havia sessão), evitando loop no load inicial / rotas públicas.
     if (response.status === 401) {
       clearCsrfCache();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('auth:expired'));
+      }
     }
 
     const isAuthError = response.status === 401 || response.status === 403;

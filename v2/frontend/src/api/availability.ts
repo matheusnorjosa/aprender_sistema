@@ -11,7 +11,6 @@ import type {
   CurrentUser,
   AvailabilityBlock,
   AvailabilityBlockPayload,
-  AvailabilityCheckResponse,
   AvailabilityCheckManyRequest,
   AvailabilityCheckManyResponse,
   MonthlyGridResponse,
@@ -25,16 +24,6 @@ import { assertCurrentUserPayload } from '../types';
 export interface BlockFilters {
   owner?: string;
   [key: string]: string | undefined;
-}
-
-/**
- * Availability check parameters
- */
-export interface AvailabilityCheckParams {
-  usuario_id: ID;
-  inicio: string;
-  fim: string;
-  municipio_id?: ID;
 }
 
 /**
@@ -104,16 +93,6 @@ export async function deleteBlock(id: ID): Promise<void> {
     method: 'DELETE',
   });
   syncChannel.publish('availability', { action: 'block_deleted' });
-}
-
-/**
- * Checa disponibilidade de um usuário (consultivo).
- *
- * @param params - Parâmetros da checagem
- */
-export async function checkAvailability(params: AvailabilityCheckParams): Promise<AvailabilityCheckResponse> {
-  const url = buildUrl('/availability/check/', params as unknown as QueryParams);
-  return await fetchAPI(url);
 }
 
 /**

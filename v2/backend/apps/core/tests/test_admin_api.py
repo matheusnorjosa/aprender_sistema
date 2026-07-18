@@ -58,6 +58,12 @@ def usuario_dat(db):
 
 
 @pytest.fixture
+def usuario_super(db):
+    """P0-1 Tier-0: administração de grupo/matriz/membership virou superuser-only."""
+    return UsuarioFactory(username="root_admin_api", cpf="12345670009", superuser=True)
+
+
+@pytest.fixture
 def usuario_controle(db):
     """Usuário do grupo Controle"""
     user = UsuarioFactory(
@@ -695,9 +701,9 @@ class TestRbacFunctionalAPI:
         assert "Gerente" in response.data["funcao_groups"]
         assert "governanca" in response.data["categories"]
 
-    def test_dat_can_create_group_as_funcao_and_meta_reflects(self, api_client, usuario_dat):
-        """Grupo criado como função aparece em funcao_groups do /rbac/meta/."""
-        api_client.force_authenticate(user=usuario_dat)
+    def test_superuser_can_create_group_as_funcao_and_meta_reflects(self, api_client, usuario_super):
+        """Grupo criado como função aparece em funcao_groups do /rbac/meta/ (P0-1: só superuser cria)."""
+        api_client.force_authenticate(user=usuario_super)
 
         create_response = api_client.post(
             "/api/grupos/",
@@ -716,9 +722,9 @@ class TestRbacFunctionalAPI:
         assert meta_response.status_code == status.HTTP_200_OK
         assert "Analista de Campo" in meta_response.data["funcao_groups"]
 
-    def test_dat_create_group_rejects_invalid_group_type(self, api_client, usuario_dat):
-        """Criação de grupo rejeita tipo inválido."""
-        api_client.force_authenticate(user=usuario_dat)
+    def test_superuser_create_group_rejects_invalid_group_type(self, api_client, usuario_super):
+        """Criação de grupo rejeita tipo inválido (P0-1: só superuser cria)."""
+        api_client.force_authenticate(user=usuario_super)
 
         response = api_client.post(
             "/api/grupos/",
@@ -729,8 +735,8 @@ class TestRbacFunctionalAPI:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "group_type_input" in response.data["errors"]
 
-    def test_dat_can_patch_group_permissoes_funcionais(self, api_client, usuario_dat):
-        """DAT pode vincular permissões funcionais a um grupo."""
+    def test_superuser_can_patch_group_permissoes_funcionais(self, api_client, usuario_super):
+        """Superuser vincula permissões funcionais a um grupo (P0-1: matriz superuser-only)."""
         group = GroupFactory(name="Equipe Operacional")
         permissao_a = PermissaoFuncional.objects.create(
             codename="rbac.group_patch_a",
@@ -747,7 +753,7 @@ class TestRbacFunctionalAPI:
             is_system=False,
         )
 
-        api_client.force_authenticate(user=usuario_dat)
+        api_client.force_authenticate(user=usuario_super)
         payload = {"permissao_funcional_ids": [permissao_a.id, permissao_b.id]}
         response = api_client.patch(f"/api/grupos/{group.id}/", payload, format="json")
 
@@ -758,20 +764,20 @@ class TestRbacFunctionalAPI:
         returned_ids = {item["id"] for item in response.data["permissoes_funcionais"]}
         assert returned_ids == {permissao_a.id, permissao_b.id}
 
-    def test_rename_reserved_group_requires_confirmation(self, api_client, usuario_dat):
-        """Renomeio de grupo reservado exige ?confirm_reserved=true."""
+    def test_rename_reserved_group_requires_confirmation(self, api_client, usuario_super):
+        """Renomeio de grupo reservado exige ?confirm_reserved=true (P0-1: só superuser)."""
         group = GroupFactory(name="Controle")
-        api_client.force_authenticate(user=usuario_dat)
+        api_client.force_authenticate(user=usuario_super)
 
         response = api_client.patch(f"/api/grupos/{group.id}/", {"name": "Controle Novo"}, format="json")
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "confirm_reserved=true" in str(response.data)
 
-    def test_delete_reserved_group_requires_confirmation(self, api_client, usuario_dat):
-        """Exclusão de grupo reservado exige ?confirm_reserved=true."""
+    def test_delete_reserved_group_requires_confirmation(self, api_client, usuario_super):
+        """Exclusão de grupo reservado exige ?confirm_reserved=true (P0-1: só superuser)."""
         group = GroupFactory(name="Formador")
-        api_client.force_authenticate(user=usuario_dat)
+        api_client.force_authenticate(user=usuario_super)
 
         response = api_client.delete(f"/api/grupos/{group.id}/")
 

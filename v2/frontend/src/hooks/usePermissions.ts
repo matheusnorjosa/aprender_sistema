@@ -1,6 +1,12 @@
 import { useMemo } from 'react';
 import type { CurrentUser } from '../types';
 
+/**
+ * @deprecated (Issue #1269) Mistura identidade (setor/função) e capabilities num
+ * único objeto, sem separar "quem é" de "o que pode". Prefira `useIdentity()`
+ * (display) + `useCapabilities(policies)` (autorização por policy). Mantido até a
+ * migração de callers (ondas 3.2/3.3); remoção na onda 4.5. Não usar em novos call sites.
+ */
 export interface Permissions {
   /**
    * `is_superuser` exposto via flag canônica para escape hatches de admin
@@ -162,6 +168,9 @@ function computePermissionsInternal(user: CurrentUser): Permissions {
 /**
  * Compute all RBAC permission flags from user data.
  * Single source of truth for permission checks (Setor + Função).
+ *
+ * @deprecated (Issue #1269) Prefira `useIdentity()` (quem é) + `useCapabilities(policies)`
+ * (o que pode). Mantido durante a migração de callers; remoção na onda 4.5.
  */
 export function usePermissions(user: CurrentUser | null): Permissions {
   return useMemo(() => {
@@ -172,6 +181,8 @@ export function usePermissions(user: CurrentUser | null): Permissions {
 
 /**
  * Pure function version for testing (no React dependency).
+ *
+ * @deprecated (Issue #1269) Ver `computeIdentity` + `computeCapabilities`.
  */
 export function computePermissions(user: CurrentUser | null): Permissions {
   if (!user) return EMPTY_PERMISSIONS;

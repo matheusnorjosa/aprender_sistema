@@ -20,6 +20,7 @@ import { logout as apiLogout } from './api/auth';
 import { Toaster } from 'react-hot-toast';
 import { LAYOUT } from './constants';
 import { preloadSearchData } from './services/preloadSearchData';
+import { clearApiCaches } from './services/swCache';
 import OfflineBanner from './components/OfflineBanner';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FullscreenLoader } from './components/FullscreenLoader';
@@ -154,6 +155,10 @@ function AppContent(): JSX.Element {
       logger.error('Erro no logout:', error);
       message.warning('Sessão encerrada localmente');
     } finally {
+      // Remove os caches de identidade do SW antes do reload (Issue #1461):
+      // impede servir /api/me/* de um usuário anterior offline. Roda mesmo se o
+      // POST de logout falhar (está no finally) e nunca lança (no-op seguro).
+      await clearApiCaches();
       setUser(null);
       window.location.reload();
     }

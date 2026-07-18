@@ -5,7 +5,7 @@
  * and network-first with cache fallback for API requests.
  */
 
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const STATIC_CACHE_NAME = `aprender-v2-static-${CACHE_VERSION}`;
 const API_CACHE_NAME = `aprender-v2-api-${CACHE_VERSION}`;
 
@@ -18,10 +18,12 @@ const STATIC_ASSETS = [
   '/manifest.json',
 ];
 
-// API routes that can be cached for offline use
+// API routes that can be cached for offline use.
+// NB: /api/me/* é intencionalmente EXCLUÍDO — identidade e policies nunca são
+// cacheadas (Issue #1461), para não servir dados de um usuário anterior offline
+// em dispositivo compartilhado. Ver isCacheableApiRoute().
 const CACHEABLE_API_ROUTES = [
   '/api/options/',
-  '/api/me/',
   '/api/config/',
 ];
 
@@ -162,7 +164,12 @@ async function cacheFirstWithNetwork(request) {
  * Check if URL is a cacheable API route.
  */
 function isCacheableApiRoute(url) {
-  return CACHEABLE_API_ROUTES.some((route) => url.includes(route));
+  const { pathname } = new URL(url);
+  // Identidade/policies NUNCA são cacheadas (Issue #1461): exclusão explícita,
+  // não por substring — impede vazamento cross-user offline. Mesmo que /api/me/
+  // volte a CACHEABLE_API_ROUTES por engano, este guard mantém a exclusão.
+  if (pathname.startsWith('/api/me/')) return false;
+  return CACHEABLE_API_ROUTES.some((route) => pathname.startsWith(route));
 }
 
 // Handle messages from clients

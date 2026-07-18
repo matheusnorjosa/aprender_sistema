@@ -501,6 +501,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         Retorna True se houve alteração.
         """
         from .models import Participation, Usuario
+        from .utils.cache_utils import invalidate_availability_cache
 
         new_formador_ids = set(extra.get("formador_ids", []))
 
@@ -534,6 +535,13 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             if participations_to_create:
                 Participation.objects.bulk_create(participations_to_create, ignore_conflicts=True)
                 changed = True
+
+        # #1556: bulk_create não dispara post_save (o receiver de Participation é inerte
+        # para os adds). Invalida o cache de disponibilidade explicitamente para
+        # adicionados E removidos — não depende de o QuerySet.delete() acima disparar
+        # post_delete (mais robusto a refactors futuros de fast-delete).
+        for usuario_id in to_add | to_remove:
+            invalidate_availability_cache(usuario_id=usuario_id)
 
         return changed
 

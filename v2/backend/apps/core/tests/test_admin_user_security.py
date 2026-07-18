@@ -54,6 +54,10 @@ class AdminUserSecurityTests(TestCase):
             cpf="22222222222",  # Unique CPF
         )
 
+        # P0-1 Tier-0 (D-1=2a): atribuição de grupo (membership) via serializer é
+        # superuser-only. Ator das checagens de mecânica de grupo agora é superuser.
+        self.user_super = UsuarioFactory(username="root_sec", cpf="10000000009", superuser=True)
+
         self.factory = APIRequestFactory()
 
     def test_dat_cannot_set_is_superuser_or_is_staff(self):
@@ -143,24 +147,18 @@ class AdminUserSecurityTests(TestCase):
             str(serializer.errors["group_ids"][0]),
         )
 
-    def test_dat_can_assign_whitelisted_groups_to_others(self):
+    def test_superuser_can_assign_whitelisted_groups_to_others(self):
         """
-        P1.1 - DAT pode atribuir grupos da whitelist para OUTROS usuários
-
-        Cenário:
-        - DAT atualiza user_comum
-        - DAT adiciona grupos: Coordenador, Formador (ambos na whitelist)
-
-        Expectativa:
-        - Update bem-sucedido
-        - user_comum recebe os grupos
+        P0-1 Tier-0: atribuição de grupo (membership) é superuser-only. Superuser
+        atribui grupos da whitelist a OUTROS usuários. Que o DAT tem group_ids
+        ignorado é coberto em test_rbac_tier0_group_gate.py.
         """
         data = {
             "group_ids": [self.group_coord.id, self.group_formador.id],
         }
 
         request = self.factory.patch(f"/api/usuarios/{self.user_comum.id}/", data)
-        request.user = self.user_dat
+        request.user = self.user_super
 
         # Update de OUTRO usuário (não de si mesmo)
         serializer = UsuarioAdminSerializer(
@@ -256,13 +254,13 @@ class AdminUserSecurityTests(TestCase):
         - Resposta contém groups: ["Coordenador", "Formador"] (nomes)
         - Não contém group_ids na resposta (write-only)
         """
-        # Atribuir grupos via group_ids
+        # Atribuir grupos via group_ids (P0-1: membership é superuser-only)
         data = {
             "group_ids": [self.group_coord.id, self.group_formador.id],
         }
 
         request = self.factory.patch(f"/api/usuarios/{self.user_comum.id}/", data)
-        request.user = self.user_dat
+        request.user = self.user_super
 
         serializer = UsuarioAdminSerializer(
             instance=self.user_comum,
@@ -337,7 +335,7 @@ class AdminUserSecurityTests(TestCase):
             "group_ids": [dynamic_group.id],
         }
         request = self.factory.patch(f"/api/usuarios/{self.user_comum.id}/", data)
-        request.user = self.user_dat
+        request.user = self.user_super
 
         serializer = UsuarioAdminSerializer(
             instance=self.user_comum,
@@ -400,6 +398,10 @@ class AdminUserSecurityTests(TestCase):
         actor_super = UsuarioFactory(superuser=True, cpf="77777777777")
         actor_super.is_active = False
         actor_super.save(update_fields=["is_active"])
+        # P0-1: setUp cria um superuser ativo (user_super); desativa aqui para
+        # que last_super seja de fato o ÚLTIMO superuser ATIVO neste cenário.
+        self.user_super.is_active = False
+        self.user_super.save(update_fields=["is_active"])
 
         data = {"is_superuser": False}
         request = self.factory.patch(f"/api/usuarios/{last_super.id}/", data)
@@ -424,6 +426,10 @@ class AdminUserSecurityTests(TestCase):
         actor_super = UsuarioFactory(superuser=True, cpf="99999999999")
         actor_super.is_active = False
         actor_super.save(update_fields=["is_active"])
+        # P0-1: ver test_cannot_remove_last_active_superuser — desativa o
+        # user_super do setUp p/ last_super ser o último ATIVO.
+        self.user_super.is_active = False
+        self.user_super.save(update_fields=["is_active"])
 
         data = {"is_active": False}
         request = self.factory.patch(f"/api/usuarios/{last_super.id}/", data)

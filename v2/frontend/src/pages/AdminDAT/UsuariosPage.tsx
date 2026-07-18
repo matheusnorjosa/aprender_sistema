@@ -693,7 +693,10 @@ export default function UsuariosPage(): JSX.Element {
             name="setor_ids"
             label="Setor (onde trabalha)"
             tooltip="Unidade/área de atuação da pessoa"
-            rules={[{ required: true, message: 'Selecione pelo menos um setor' }]}
+            // P0-1 Tier-0 (D-1=2a): membership é superuser-only. Não-superuser vê
+            // o valor atual, mas não edita (e o helper não envia group_ids). Relaxa
+            // o required p/ não travar o submit de conta comum com o Select disabled.
+            rules={currentIsSuperuser ? [{ required: true, message: 'Selecione pelo menos um setor' }] : []}
           >
             <Select
               mode="multiple"
@@ -703,6 +706,7 @@ export default function UsuariosPage(): JSX.Element {
               maxTagCount="responsive"
               placeholder="Selecione um ou mais setores"
               options={setorOptions}
+              disabled={!currentIsSuperuser}
             />
           </Form.Item>
 
@@ -710,7 +714,8 @@ export default function UsuariosPage(): JSX.Element {
             name="funcao_ids"
             label="Função (o que pode fazer)"
             tooltip="Papel da pessoa no processo"
-            rules={[{ required: true, message: 'Selecione pelo menos uma função' }]}
+            // P0-1 Tier-0 (D-1=2a): membership é superuser-only (ver setor_ids acima).
+            rules={currentIsSuperuser ? [{ required: true, message: 'Selecione pelo menos uma função' }] : []}
           >
             <Select
               mode="multiple"
@@ -720,6 +725,7 @@ export default function UsuariosPage(): JSX.Element {
               maxTagCount="responsive"
               placeholder="Selecione uma ou mais funções"
               options={funcaoOptions}
+              disabled={!currentIsSuperuser}
             />
           </Form.Item>
 

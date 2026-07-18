@@ -18,7 +18,6 @@ Regras de negócio:
 from __future__ import annotations
 
 import csv
-import hashlib
 import json
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -27,6 +26,7 @@ from typing import Any
 from django.conf import settings
 from django.db import transaction
 
+from apps.core.imports.hashing import stable_import_hash
 from apps.core.models import AcaoDAT, Municipio, Projeto, TipoAcaoDAT, Usuario
 from apps.core.services.normalize import norm_text
 from apps.core.services.resolvers import resolve_municipio, resolve_user_by_email, resolve_user_by_name
@@ -297,8 +297,7 @@ def _process_row(
     # external_hash baseado em identidade (município, projeto, tipo_acao, responsável).
     # Dados variáveis (data_registro/obs) atualizam o mesmo registro.
     resp_id: int | str = getattr(responsavel, "id", "NA")
-    hash_key: str = f"{municipio.id}|{projeto.id}|{tipo_norm}|{resp_id}"
-    external_hash: ExternalHash = hashlib.sha1(hash_key.encode(), usedforsecurity=False).hexdigest()
+    external_hash: ExternalHash = stable_import_hash(str(municipio.id), str(projeto.id), tipo_norm, str(resp_id))
 
     # Verificar se já existe registro com este external_hash
     existing: AcaoDAT | None = AcaoDAT.objects.filter(external_hash=external_hash).first()

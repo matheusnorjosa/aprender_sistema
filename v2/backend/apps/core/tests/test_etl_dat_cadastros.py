@@ -15,6 +15,7 @@ Valida:
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import tempfile
 from datetime import date
@@ -26,6 +27,7 @@ import pytest
 
 from apps.core.models import AcaoDAT, TipoAcaoDAT
 from apps.core.services.dat_cadastros_import import import_dat_cadastros
+from apps.core.services.normalize import norm_text
 from apps.core.tests.factories import MunicipioFactory, ProjetoFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
@@ -322,6 +324,50 @@ def test_external_hash_includes_tipo_acao():
 
     acoes = list(AcaoDAT.objects.all())
     assert acoes[0].external_hash != acoes[1].external_hash  # Hashes diferentes
+
+
+def test_external_hash_byte_equivalence_with_legacy_formula():
+    """external_hash gravado é byte-idêntico à fórmula SHA1 legada.
+
+    Prova que a migração para ``stable_import_hash`` não alterou o digest
+    persistido (mesma ordem de campos, incluindo ``norm_text(tipo_acao)``,
+    mesmo delimitador pipe, mesmo UTF-8, mesmo SHA1). Protege valores
+    históricos de ``AcaoDAT.external_hash``.
+    """
+    UsuarioFactory(
+        username="resphash",
+        email="resphash@example.com",
+        password="test123",
+        cpf="22222222222",
+        first_name="Ana",
+        last_name="Hash",
+    )
+    MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    ProjetoFactory(nome="ACerta", ativo=True)
+
+    csv_file = _create_csv_file(
+        rows=[
+            {
+                "Município": "Fortaleza",
+                "Projeto": "ACerta",
+                "Tipo de Ação": TipoAcaoDAT.CRIACAO_CURSO,
+                "Responsável": "resphash@example.com",
+                "Data Registro": "2025-01-15",
+            }
+        ],
+        fieldnames=["Município", "Projeto", "Tipo de Ação", "Responsável", "Data Registro"],
+    )
+
+    import_dat_cadastros(csv_file, dry_run=False)
+
+    acao = AcaoDAT.objects.first()
+    resp_part = acao.responsavel_id if acao.responsavel_id else "NA"
+    expected = hashlib.sha1(
+        f"{acao.municipio_id}|{acao.projeto_id}|{norm_text(acao.tipo_acao)}|{resp_part}".encode(),
+        usedforsecurity=False,
+    ).hexdigest()
+
+    assert acao.external_hash == expected
 
 
 def test_date_parsing_formats():

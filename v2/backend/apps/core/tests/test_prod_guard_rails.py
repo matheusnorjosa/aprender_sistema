@@ -131,6 +131,7 @@ class ProductionGuardRailsTests(TestCase):
         env["DEBUG"] = "0"
         env["ALLOWED_HOSTS"] = "example.com,api.example.com"
         env["SECRET_KEY"] = "a" * 64  # 64 chars (>= 50 recomendado)
+        env["REDIS_PASSWORD"] = "senha-redis-valida"  # SEC-002 #1457: passar o outro guard
         env["DB_NAME"] = "test_db"
         env["DB_USER"] = "test_user"
         env["DB_PASSWORD"] = "test_password"
@@ -220,6 +221,7 @@ class DevToolsProductionGuardTests(TestCase):
         env["DEBUG"] = "0"
         env["ALLOWED_HOSTS"] = "example.com"
         env["SECRET_KEY"] = "a" * 64
+        env["REDIS_PASSWORD"] = "senha-redis-valida"  # SEC-002 #1457: passar o outro guard
         env["DB_NAME"] = "test_db"
         env["DB_USER"] = "test_user"
         env["DB_PASSWORD"] = "test_password"
@@ -270,3 +272,64 @@ class DevToolsProductionGuardTests(TestCase):
 
         self.assertEqual(code, 0, f"Django não subiu. stderr: {stderr}")
         self.assertIn("apps.dev_tools", stdout.split("\n"))
+
+
+class RedisPasswordProductionGuardTests(TestCase):
+    """
+    SEC-002 (#1457, regressão de #800) — REDIS_PASSWORD vazio aborta o boot em produção.
+
+    `settings.py` monta as URLs de cache/broker com `os.getenv('REDIS_PASSWORD', '')`
+    (linhas 274, 304, 585). Com valor vazio a URL vira `redis://:@host:6379/N` e o
+    compose de prod propaga `--requirepass ""` — Redis sobe **sem autenticação**, em
+    silêncio. Os templates entregam `REDIS_PASSWORD=` vazio, então o footgun é o
+    caminho default: basta o operador esquecer o secret.
+
+    Aqui o `sys.exit(1)` é adequado (ao contrário do #1466): produção já define a senha
+    (#1089), então o guard não derruba deploy nenhum — só impede que a ausência passe
+    despercebida. Mesmo padrão dos guards de SECRET_KEY/ALLOWED_HOSTS.
+    """
+
+    def _run_check(self, **overrides: str) -> subprocess.CompletedProcess[str]:
+        env = os.environ.copy()
+        env["ENVIRONMENT"] = "production"
+        env["DEBUG"] = "0"
+        env["ALLOWED_HOSTS"] = "example.com"
+        env["SECRET_KEY"] = "a" * 64
+        env["DB_NAME"] = "test_db"
+        env["DB_USER"] = "test_user"
+        env["DB_PASSWORD"] = "test_password"
+        env["DB_HOST"] = "localhost"
+        env["DB_PORT"] = "5434"
+        # Herdar REDIS_PASSWORD do ambiente mascararia o cenário sob teste.
+        env.pop("REDIS_PASSWORD", None)
+        env.update(overrides)
+
+        return subprocess.run(
+            [sys.executable, "manage.py", "check", "--deploy"],
+            cwd=str(Path(settings.BASE_DIR)),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+    def test_startup_fails_when_redis_password_missing_in_production(self):
+        """REDIS_PASSWORD ausente em produção -> sys.exit(1)."""
+        result = self._run_check()
+
+        self.assertEqual(result.returncode, 1, f"stdout: {result.stdout}")
+        self.assertIn("REDIS_PASSWORD", result.stderr)
+        self.assertIn("ERRO CRÍTICO", result.stderr)
+
+    def test_startup_fails_when_redis_password_empty_in_production(self):
+        """REDIS_PASSWORD='' (o que os templates entregam) -> sys.exit(1)."""
+        result = self._run_check(REDIS_PASSWORD="")
+
+        self.assertEqual(result.returncode, 1, f"stdout: {result.stdout}")
+        self.assertIn("REDIS_PASSWORD", result.stderr)
+
+    def test_startup_succeeds_when_redis_password_set_in_production(self):
+        """Com senha definida o boot segue normal (sem regressão)."""
+        result = self._run_check(REDIS_PASSWORD="uma-senha-forte-de-redis")
+
+        self.assertNotEqual(result.returncode, 1, f"stderr: {result.stderr}")

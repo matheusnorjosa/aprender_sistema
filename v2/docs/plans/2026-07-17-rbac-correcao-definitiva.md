@@ -51,6 +51,8 @@ Arquivos prováveis: `apps/core/views/admin.py`, `apps/core/serializers/usuario.
 - **Pós-deploy**: revisar access logs; **rotacionar senha de todos os superusers**; invalidar sessões; validar primário+backup. (Rotação = precaução responsável, não afirmação de exploração.)
 
 ## Wave 2 — P0-A Tier-0 (co-deploy backend+frontend)
+> **Detalhamento + D-1 ratificada (2a, bloqueio total):** `v2/docs/plans/2026-07-17-p0-1-tier0-groupviewset.md`.
+> Ordem: PR-A (frontend read-only p/ não-superuser) → PR-B (gate backend superuser-only + P1-3 + P2-2).
 Pré-requisito: continuidade operacional (Wave 0) definida.
 - Grupo × Capability **só no Django Admin superuser-only**; memberships **só superuser**.
 - remover `permissao_funcional_ids` da escrita REST; proteger `assign_groups`, `sync_members`, rename/delete de grupo reservado (remover bypass `confirm_reserved`).

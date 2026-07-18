@@ -75,8 +75,11 @@ jobs:
         CHANGED_COUNT="$(printf '%s\n' "$CHANGED_FILES" | sed '/^$/d' | wc -l | tr -d ' ')"
 
         # Conservative impact patterns to prevent false green:
-        # includes backend app, backend runtime infra, backend tests and this CI workflow itself.
-        BACKEND_IMPACT_REGEX='^(v2/backend/|v2/infra/|v2/tests/|v2/.dockerignore$|\.github/workflows/ci\.yaml$|\.github/workflows/_backend-test\.yml$)'
+        # includes backend app, backend runtime infra, backend tests, this CI workflow itself,
+        # the reusable backend-test workflow and the setup-python-deps composite action that the
+        # backend jobs consume (a change there — e.g. bump de actions/setup-python, pip install ou
+        # cache — precisa exercitar a suite backend, senao o PR fica verde-falso; ver #1459).
+        BACKEND_IMPACT_REGEX='^(v2/backend/|v2/infra/|v2/tests/|v2/.dockerignore$|\.github/workflows/ci\.yaml$|\.github/workflows/_backend-test\.yml$|\.github/actions/setup-python-deps/)'
         BACKEND_MATCHED_FILES="$(printf '%s\n' "$CHANGED_FILES" | grep -E "$BACKEND_IMPACT_REGEX" || true)"
         BACKEND_MATCHED_COUNT="$(printf '%s\n' "$BACKEND_MATCHED_FILES" | sed '/^$/d' | wc -l | tr -d ' ')"
 
@@ -508,6 +511,45 @@ jobs:
               apps/core/tests/test_modular_imports.py \
               apps/core/tests/test_auth_backends.py
           '
+
+    - name: Validate prod-like env template boots under production guards (#1458)
+      # Reusa a imagem prod recem-buildada: roda `manage.py check` com o
+      # .env.prodlike.example. Se o template regredir e violar um guard de
+      # settings.py:64-95 (ENVIRONMENT=production), o boot aborta (exit 1) e
+      # este job [required] fica vermelho — pega o drift template<->guards (#2).
+      run: |
+        set -euo pipefail
+        # --entrypoint python pula o entrypoint.sh (que espera DB): o check so
+        # precisa importar settings (onde rodam os guards de producao), nao conectar.
+        docker run --rm --entrypoint python \
+          --env-file v2/infra/.env.prodlike.example \
+          aprender-backend:ci-parity-${{ github.sha }} \
+          manage.py check
+
+  # ----------------------------------------------------------------
+  # Job 4b: Prod compose contract lint (#1458 achado #5)
+  # Valida que docker-compose.prod.yml continua um contrato coerente
+  # (interpolacao, sintaxe, volumes, redes) usando o template prod-like.
+  # Barato (~segundos, sem build). Complementa o guard-smoke do template acima.
+  # ----------------------------------------------------------------
+  prod-compose-contract:
+    name: "prod compose contract"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
+    - name: docker compose config -q (contrato de prod via template prod-like)
+      run: |
+        set -euo pipefail
+        # O compose usa `env_file: APP_ENV_FILE` e o template aponta para
+        # .env.prodlike.local (gitignored, ausente na CI). Materializa o .local a
+        # partir do .example — o mesmo fluxo do dev (`cp .example .local`).
+        cp v2/infra/.env.prodlike.example v2/infra/.env.prodlike.local
+        docker compose \
+          --env-file v2/infra/.env.prodlike.example \
+          -f v2/infra/docker-compose.prod.yml \
+          config -q
+        echo "OK docker-compose.prod.yml: contrato valido com o template prod-like"
 
   # ----------------------------------------------------------------
   # Job 5: Required backend gate

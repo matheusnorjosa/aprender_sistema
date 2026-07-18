@@ -242,6 +242,11 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
 
         return value
 
+    def _actor_is_superuser(self) -> bool:
+        request: Any = self.context.get("request")
+        actor: Any = getattr(request, "user", None)
+        return bool(actor and getattr(actor, "is_superuser", False))
+
     def create(self, validated_data: dict[str, Any]) -> Any:
         """Create user with hashed password and groups."""
         groups = validated_data.pop("groups", [])
@@ -253,8 +258,11 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             user.set_password(password)
             user.save()
 
-        # Assign groups after user creation
-        if groups:
+        # P0-1 Tier-0 (D-1=2a): membership é superuser-only. group_ids de
+        # não-superuser é ignorado (o frontend já não envia — aqui é a
+        # fronteira real). DAT cria a conta comum; o vínculo a grupo fica a
+        # cargo do superuser.
+        if groups and self._actor_is_superuser():
             user.groups.set(groups)
 
         return user
@@ -270,8 +278,9 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             user.set_password(password)
             user.save()
 
-        # Update groups if provided (P1.1 validation already applied)
-        if groups is not None:
+        # P0-1 Tier-0 (D-1=2a): membership é superuser-only (ver create()).
+        # group_ids de não-superuser é ignorado.
+        if groups is not None and self._actor_is_superuser():
             user.groups.set(groups)
 
         return user

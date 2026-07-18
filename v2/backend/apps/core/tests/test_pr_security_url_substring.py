@@ -11,18 +11,46 @@ teste, trocando ``"meet.google.com" in url`` por ``urlparse(url).hostname == "me
 
 from __future__ import annotations
 
-import sys
+import importlib.util
 from pathlib import Path
 
 import pytest
 
-# ``validate_oauth_config.py`` vive em ``v2/infra/`` (script standalone fora do
-# pacote Django). Adiciona ao sys.path para conseguir importar nos testes.
-_INFRA_DIR = Path(__file__).resolve().parents[4] / "infra"
-if str(_INFRA_DIR) not in sys.path:
-    sys.path.insert(0, str(_INFRA_DIR))
+# ``validate_oauth_config.py`` é um script standalone que vive em ``v2/infra/``
+# (fora do pacote Django). No checkout completo (host/CI) ele fica ao lado de
+# ``v2/backend``; no container de dev o backend é montado como raiz ``/app`` e
+# ``infra`` não é montado. Localizamos o arquivo varrendo os ancestrais (robusto
+# a qualquer layout) e o carregamos via ``importlib`` sem poluir ``sys.path``.
+# Se ausente, pulamos o módulo inteiro em vez de abortar a coleta do pytest
+# (o ``ModuleNotFoundError`` no topo interrompia a run inteira no Docker dev).
 
-from validate_oauth_config import validate_client_id, validate_redirect_uri  # noqa: E402
+
+def _load_validate_oauth_config():
+    here = Path(__file__).resolve()
+    candidates = [
+        *(parent / "infra" / "validate_oauth_config.py" for parent in here.parents),
+        *(parent / "validate_oauth_config.py" for parent in here.parents),
+    ]
+    for path in candidates:
+        if path.is_file():
+            spec = importlib.util.spec_from_file_location("validate_oauth_config", path)
+            assert spec and spec.loader
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            return module
+    return None
+
+
+_module = _load_validate_oauth_config()
+if _module is None:
+    pytest.skip(
+        "validate_oauth_config.py indisponível (v2/infra não montado neste ambiente)",
+        allow_module_level=True,
+    )
+
+assert _module is not None  # pytest.skip(allow_module_level=True) acima aborta o módulo
+validate_client_id = _module.validate_client_id
+validate_redirect_uri = _module.validate_redirect_uri
 
 
 class TestValidateClientId:

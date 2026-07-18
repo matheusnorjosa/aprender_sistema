@@ -303,6 +303,3 @@ export async function rejectSolicitacoesBatch(ids: ID[]): Promise<BatchOperation
   syncChannel.publish('aprovacoes', { action: 'changed' });
   return result;
 }
-
-// Re-exportar checkAvailability de availability
-export { checkAvailability } from './availability';

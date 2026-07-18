@@ -4,7 +4,11 @@
 # lidas direto pelo compose). Use `source infra/scripts/worktree-env.sh <slot>` para
 # derivar tudo de um número. `?=` respeita env/CLI, então quem não exporta nada não muda.
 PROJECT ?= aprender_dev
-DC = COMPOSE_PROJECT_NAME=$(PROJECT) IMAGE_TAG=latest docker compose -f infra/docker-compose.yml -f infra/docker-compose.override.yml
+# IMAGE_TAG precisa do mesmo tratamento que PROJECT: o override.yml tem `build:`, então
+# `up --build` re-tagueia a imagem. Com o valor chumbado, dois stacks paralelos brigam
+# pela mesma tag e um recreate sem build sobe o código do outro worktree.
+IMAGE_TAG ?= latest
+DC = COMPOSE_PROJECT_NAME=$(PROJECT) IMAGE_TAG=$(IMAGE_TAG) docker compose -f infra/docker-compose.yml -f infra/docker-compose.override.yml
 WEB = $(DC) exec -T web
 
 .PHONY: up down build logs shell migrate collect seed seed-demo seed-rbac \

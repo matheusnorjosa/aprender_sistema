@@ -198,3 +198,75 @@ class ProductionGuardRailsTests(TestCase):
         # Validar mensagem de erro no stderr
         self.assertIn("SECRET_KEY muito curta", result.stderr)
         self.assertIn("ERRO CRÍTICO", result.stderr)
+
+
+class DevToolsProductionGuardTests(TestCase):
+    """
+    CP-08 (#1466) — `apps.dev_tools` NUNCA carrega sob ENVIRONMENT=production.
+
+    O default de INCLUDE_DEV_TOOLS é `true` e a stack de produção não define a
+    variável, então o app entrava em prod por omissão. O guard força `False` em
+    produção independente da env var (defense-in-depth, mesmo espírito dos guards
+    de SECRET_KEY/ALLOWED_HOSTS).
+
+    Optou-se por forçar o valor em vez de `sys.exit(1)`: produção hoje não define
+    a variável, então abortar o boot transformaria o footgun em indisponibilidade
+    no primeiro deploy.
+    """
+
+    def _installed_apps_under(self, **overrides: str) -> tuple[int, str, str]:
+        """Sobe o Django em subprocess e imprime INSTALLED_APPS."""
+        env = os.environ.copy()
+        env["DEBUG"] = "0"
+        env["ALLOWED_HOSTS"] = "example.com"
+        env["SECRET_KEY"] = "a" * 64
+        env["DB_NAME"] = "test_db"
+        env["DB_USER"] = "test_user"
+        env["DB_PASSWORD"] = "test_password"
+        env["DB_HOST"] = "localhost"
+        env["DB_PORT"] = "5434"
+        env.update(overrides)
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "import django;django.setup();"
+                "from django.conf import settings;"
+                "print('\\n'.join(settings.INSTALLED_APPS))",
+            ],
+            cwd=str(Path(settings.BASE_DIR)),
+            env={**env, "DJANGO_SETTINGS_MODULE": "config.settings"},
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        return result.returncode, result.stdout, result.stderr
+
+    def test_dev_tools_absent_in_production_by_default(self):
+        """CP-08: sem INCLUDE_DEV_TOOLS definido, prod NÃO carrega dev_tools."""
+        code, stdout, stderr = self._installed_apps_under(ENVIRONMENT="production")
+
+        self.assertEqual(code, 0, f"Django não subiu. stderr: {stderr}")
+        self.assertNotIn("apps.dev_tools", stdout.split("\n"))
+
+    def test_dev_tools_absent_in_production_even_if_explicitly_enabled(self):
+        """CP-08: INCLUDE_DEV_TOOLS=true NÃO vence o guard de produção."""
+        code, stdout, stderr = self._installed_apps_under(
+            ENVIRONMENT="production",
+            INCLUDE_DEV_TOOLS="true",
+        )
+
+        self.assertEqual(code, 0, f"Django não subiu. stderr: {stderr}")
+        self.assertNotIn("apps.dev_tools", stdout.split("\n"))
+        self.assertIn("INCLUDE_DEV_TOOLS=true ignorado", stderr)
+
+    def test_dev_tools_present_in_development(self):
+        """Sem regressão: fora de produção o app continua disponível."""
+        code, stdout, stderr = self._installed_apps_under(
+            ENVIRONMENT="development",
+            INCLUDE_DEV_TOOLS="true",
+        )
+
+        self.assertEqual(code, 0, f"Django não subiu. stderr: {stderr}")
+        self.assertIn("apps.dev_tools", stdout.split("\n"))

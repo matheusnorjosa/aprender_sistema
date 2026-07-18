@@ -7,6 +7,8 @@ resposta HTTP quanto no arquivo de auditoria.
 Não pertence a `test_admin_user_security.py` (esse cobre o serializer DRF).
 """
 
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportArgumentType=false
+
 from __future__ import annotations
 
 from pathlib import Path

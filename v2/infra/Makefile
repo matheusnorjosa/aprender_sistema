@@ -251,7 +251,7 @@ collectstatic:  ## Coletar arquivos estáticos
 
 test:  ## Executar todos os testes
 	@echo "🧪 Executando testes..."
-	$(DEV_COMPOSE) exec $(SERVICE_WEB) pytest apps/core/tests apps/dat_ingest/tests apps/dev_tools/tests -v --cov=apps --cov-report=term-missing
+	$(DEV_COMPOSE) exec $(SERVICE_WEB) pytest apps/core/tests apps/dev_tools/tests -v --cov=apps --cov-report=term-missing
 
 test-unit:  ## Executar apenas unit tests
 	@echo "🔬 Executando unit tests..."
@@ -267,7 +267,7 @@ test-e2e:  ## Executar E2E tests (Playwright)
 
 coverage:  ## Gerar relatório de cobertura HTML
 	@echo "📊 Gerando relatório de cobertura..."
-	$(DEV_COMPOSE) exec $(SERVICE_WEB) pytest apps/core/tests apps/dat_ingest/tests apps/dev_tools/tests --cov=apps --cov-report=html
+	$(DEV_COMPOSE) exec $(SERVICE_WEB) pytest apps/core/tests apps/dev_tools/tests --cov=apps --cov-report=html
 	@echo "✅ Relatório gerado em: backend/htmlcov/index.html"
 
 # ================================================================

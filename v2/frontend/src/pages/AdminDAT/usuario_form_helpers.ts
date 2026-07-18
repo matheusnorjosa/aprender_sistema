@@ -61,10 +61,16 @@ export function buildUsuarioPayload(
   // is_superuser: incluir apenas se quem está editando é superuser
   const superuserPayload = currentIsSuperuser ? { is_superuser } : {};
 
+  // group_ids (memberships): P0-1 Tier-0 (D-1=2a) — gestão de grupo é
+  // superuser-only. Editor não-superuser NÃO envia group_ids (co-deploy: para
+  // de enviar antes de o backend rejeitar). DAT segue editando conta comum
+  // (cadastral/senha/ativo) sem tocar em memberships.
+  const groupsPayload = currentIsSuperuser ? { group_ids: [...setor_ids, ...funcao_ids] } : {};
+
   return {
     ...rest,
     ...cpfPayload,
     ...superuserPayload,
-    group_ids: [...setor_ids, ...funcao_ids],
+    ...groupsPayload,
   };
 }

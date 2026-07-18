@@ -43,6 +43,7 @@ import {
   updateGroup,
 } from '../../api/adminDAT';
 import type { PermissaoFuncional, RBACMetaPayload } from '../../api/adminDAT';
+import { checkAuth } from '../../api/auth';
 import { PAGE_SIZES } from '../../constants';
 import type { ID } from '../../types';
 
@@ -126,6 +127,10 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
   const [editingGroup, setEditingGroup] = useState<GroupRecord | null>(null);
   const [savingGroup, setSavingGroup] = useState(false);
   const [deletingGroupId, setDeletingGroupId] = useState<ID | null>(null);
+  // P0-1 Tier-0 (D-1=2a): gestão de grupo/matriz/membership é superuser-only.
+  // Não-superuser vê a lista, mas sem ações de escrita (co-deploy: UI para de
+  // oferecer escrita antes de o backend rejeitar).
+  const [currentIsSuperuser, setCurrentIsSuperuser] = useState(false);
 
   const [usuarios, setUsuarios] = useState<UserRecord[]>([]);
 
@@ -254,6 +259,14 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
   useEffect(() => {
     fetchUsuarios();
     fetchPermissoesAndMeta();
+    void (async () => {
+      try {
+        const auth = await checkAuth();
+        setCurrentIsSuperuser(Boolean(auth.user?.is_superuser));
+      } catch {
+        setCurrentIsSuperuser(false);
+      }
+    })();
   }, []);
 
   const handleCreate = (): void => {
@@ -439,6 +452,9 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
       width: 220,
       render: (_, record) => {
         const reserved = isReservedGroup(record.name);
+        if (!currentIsSuperuser) {
+          return <Text type="secondary">Somente superusuário</Text>;
+        }
         return (
           <Space>
             <Button type="link" size="small" icon={<EditOutlined />} onClick={() => void handleEdit(record)}>
@@ -487,9 +503,11 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
             <Button icon={<ReloadOutlined />} onClick={() => void fetchGrupos()} loading={loading}>
               Atualizar
             </Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-              {pageTypeMeta ? pageTypeMeta.create : 'Novo Grupo'}
-            </Button>
+            {currentIsSuperuser ? (
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+                {pageTypeMeta ? pageTypeMeta.create : 'Novo Grupo'}
+              </Button>
+            ) : null}
           </Space>
         </header>
 

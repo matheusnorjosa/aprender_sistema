@@ -49,13 +49,6 @@ export interface UserPayload {
 }
 
 /**
- * Group assignment payload
- */
-export interface AssignGroupsPayload {
-  group_ids: ID[];
-}
-
-/**
  * Group member sync payload
  */
 export interface SyncGroupMembersPayload {
@@ -196,16 +189,6 @@ export async function updateUser(id: ID, data: UserPayload): Promise<AdminUser> 
 export async function deleteUser(id: ID): Promise<void> {
   await fetchWithErrorMapping(`/usuarios-admin/${id}/`, { method: 'DELETE' }, ADMIN_ERROR_MAP);
   syncChannel.publish('usuarios', { action: 'deleted' });
-}
-
-export async function assignGroups(userId: ID, data: AssignGroupsPayload): Promise<AdminUser> {
-  const result = await fetchWithErrorMapping<AdminUser>(
-    `/usuarios-admin/${userId}/assign_groups/`,
-    { method: 'POST', body: JSON.stringify(data) },
-    ADMIN_ERROR_MAP,
-  );
-  syncChannel.publish('usuarios', { action: 'groups_assigned' });
-  return result;
 }
 
 // ========== GRUPOS ==========

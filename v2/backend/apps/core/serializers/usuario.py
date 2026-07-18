@@ -243,8 +243,8 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         return value
 
     def _actor_is_superuser(self) -> bool:
-        request = self.context.get("request")
-        actor = getattr(request, "user", None)
+        request: Any = self.context.get("request")
+        actor: Any = getattr(request, "user", None)
         return bool(actor and getattr(actor, "is_superuser", False))
 
     def create(self, validated_data: dict[str, Any]) -> Any:

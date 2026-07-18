@@ -28,16 +28,11 @@ def api_client():
 
 @pytest.fixture
 def usuario_dat(db):
-    """Usuário com permissão DAT."""
-    user = UsuarioFactory(
-        username="dat_user",
-        email="dat@example.com",
-        password="testpass123",
-        cpf="11111111111",
-    )
-    grupo_dat = GroupFactory(name="DAT")
-    user.groups.add(grupo_dat)
-    return user
+    """P0-1 Tier-0: `assign_groups` virou superuser-only. O ator destes testes
+    de MECÂNICA (whitelist / self-block / dedup / payload inválido) agora é
+    superuser — a mecânica continua igual, só muda quem pode. Que um DAT (não-
+    superuser) recebe 403 é coberto em `test_rbac_tier0_group_gate.py`."""
+    return UsuarioFactory(username="root_assign", cpf="11111111111", superuser=True)
 
 
 @pytest.fixture

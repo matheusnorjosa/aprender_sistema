@@ -390,22 +390,13 @@ class TestSolicitacaoEditBusinessRules:
 class TestSolicitacaoEditAuditLog:
     """Testes de audit log para edições."""
 
-    @pytest.mark.skip(reason="AuditLog para edições em investigação - funcionalidade principal de edição funciona")
     def test_edit_creates_audit_log(self, api_client, usuario_owner, solicitacao_editavel):
-        """Edição cria registro no AuditLog com campos alterados.
+        """Edição cria registro no AuditLog com campos alterados (action UPDATE).
 
-        Nota: O AuditLog é criado no perform_update() do ViewSet quando
-        há campos alterados. Este teste verifica que o mecanismo funciona.
-
-        TODO: Investigar por que perform_update não está gerando AuditLog em testes.
+        O AuditLog é criado no perform_update() do ViewSet quando há campos
+        alterados, com details.changed_fields (old/new), ip_address e user_agent.
         """
         api_client.force_authenticate(user=usuario_owner)
-
-        # Guardar contagem inicial de logs
-        initial_count = AuditLog.objects.filter(
-            action="UPDATE",
-            model_name="Solicitacao",
-        ).count()
 
         response = api_client.patch(
             f"/api/solicitacoes/{solicitacao_editavel.id}/",
@@ -414,6 +405,8 @@ class TestSolicitacaoEditAuditLog:
                 "observacoes": "Novas observações para Audit",
             },
             format="json",
+            REMOTE_ADDR="203.0.113.7",
+            HTTP_USER_AGENT="pytest-edit-agent",
         )
 
         assert response.status_code == status.HTTP_200_OK
@@ -422,20 +415,28 @@ class TestSolicitacaoEditAuditLog:
         solicitacao_editavel.refresh_from_db()
         assert solicitacao_editavel.local == "Novo Local para Audit"
 
-        # Verificar AuditLog - pode haver mais de um se testes anteriores criaram
+        # AuditLog de UPDATE escopado por esta solicitação (rollback por teste
+        # garante isolamento, então esperamos exatamente 1).
         logs = AuditLog.objects.filter(
             action="UPDATE",
             model_name="Solicitacao",
             details__solicitacao_id=solicitacao_editavel.id,
         )
-        assert logs.count() >= 1, "Deveria haver pelo menos 1 AuditLog de UPDATE"
+        assert logs.count() == 1, "Deveria haver exatamente 1 AuditLog de UPDATE"
 
-        # Verificar o log mais recente
-        log = logs.order_by("-created_at").first()
+        log = logs.first()
         assert log is not None
+        assert log.action == "UPDATE"
         assert log.usuario == usuario_owner
         assert log.details["solicitacao_id"] == solicitacao_editavel.id
+        assert log.details["ip_address"] == "203.0.113.7"
+        assert log.details["user_agent"] == "pytest-edit-agent"
         assert "local" in log.details["changed_fields"]
+        assert "observacoes" in log.details["changed_fields"]
+        assert log.details["changed_fields"]["local"] == {
+            "old": "Local Original",
+            "new": "Novo Local para Audit",
+        }
 
     def test_no_audit_log_when_no_changes(self, api_client, usuario_owner, solicitacao_editavel):
         """Não cria AuditLog quando não há mudanças."""

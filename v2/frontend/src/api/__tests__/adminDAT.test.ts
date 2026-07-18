@@ -16,7 +16,6 @@ vi.mock('../../services/syncChannel', () => ({
 }));
 
 import {
-  assignGroups,
   autocompleteMunicipiosAdmin,
   createGroup,
   createUser,
@@ -97,17 +96,6 @@ describe('adminDAT API wrappers (MSW)', () => {
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('POST');
     expect(calls[0].body).toMatchObject(payload);
-  });
-
-  test('assignGroups uses /usuarios-admin/{id}/assign_groups/', async () => {
-    server.use(
-      spyHandler(http.post, apiUrl('/usuarios-admin/10/assign_groups/'), { json: { id: 10 } }, calls),
-    );
-
-    await assignGroups(10, { group_ids: [1, 2, 3] });
-
-    expect(calls).toHaveLength(1);
-    expect(calls[0].body).toEqual({ group_ids: [1, 2, 3] });
   });
 
   test('createGroup accepts group_type_input payload', async () => {

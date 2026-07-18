@@ -144,3 +144,40 @@ describe('buildUsuarioPayload — CPF write-only LGPD (Bug 3 fix)', () => {
     });
   });
 });
+
+describe('buildUsuarioPayload — group_ids gated por superuser (P0-1 Tier-0)', () => {
+  // Memberships (User→Group) viram superuser-only (D-1=2a). O frontend NAO
+  // envia group_ids para editor nao-superuser (co-deploy: para de enviar ANTES
+  // do backend rejeitar). DAT segue editando conta comum (cadastral/senha).
+  test('currentIsSuperuser=false → group_ids OMITIDO', () => {
+    const values = makeValues({ setor_ids: [1], funcao_ids: [2] });
+    const payload = buildUsuarioPayload(values, {
+      isEditing: true,
+      cpfEditUnlocked: false,
+      currentIsSuperuser: false,
+    });
+    expect(payload).not.toHaveProperty('group_ids');
+  });
+
+  test('currentIsSuperuser=true → group_ids presente (superuser mantem gestao)', () => {
+    const values = makeValues({ setor_ids: [1], funcao_ids: [2] });
+    const payload = buildUsuarioPayload(values, {
+      isEditing: false,
+      cpfEditUnlocked: true,
+      currentIsSuperuser: true,
+    });
+    expect(payload.group_ids).toEqual([1, 2]);
+  });
+
+  test('nao-superuser: campos comuns preservados (so group_ids sai)', () => {
+    const values = makeValues({ setor_ids: [1], funcao_ids: [2] });
+    const payload = buildUsuarioPayload(values, {
+      isEditing: true,
+      cpfEditUnlocked: false,
+      currentIsSuperuser: false,
+    });
+    expect(payload.username).toBe('fabiana.veras');
+    expect(payload.telefone).toBe('85999991111');
+    expect(payload.is_active).toBe(true);
+  });
+});

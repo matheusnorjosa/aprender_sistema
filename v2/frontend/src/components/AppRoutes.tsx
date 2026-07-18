@@ -83,7 +83,7 @@ interface AppRoutesProps {
 
 export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.Element {
   const {
-    canCoordenador, canControle, canDAT,
+    canCoordenador, canControle, canDAT, canApproveSuper,
     canDashboardOverview, canDashboardEquipe, canDashboardGcal, canDashboardCompras,
     canMapaBrasil, canDisponibilidade, isFormador,
   } = permissions;
@@ -116,7 +116,7 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
         {/* Páginas pré-existentes mantidas */}
         <Route path="/solicitacoes/minhas" element={access.canCreateSolicitation ? <MySolicitacoesPage /> : <Forbidden />} />
         <Route path="/solicitacoes/nova" element={access.canCreateSolicitation ? <NewSolicitacaoWizard /> : <Forbidden />} />
-        <Route path="/solicitacoes/:id/editar" element={user ? <EditSolicitacaoPage /> : <Forbidden />} />
+        <Route path="/solicitacoes/:id/editar" element={canCoordenador || canApproveSuper ? <EditSolicitacaoPage /> : <Forbidden />} />
 
         {/* Páginas movidas para sob /solicitacoes/* (com redirects abaixo) */}
         <Route path="/solicitacoes/aprovacoes" element={access.canAccessApprovals ? <ApprovalsPage /> : <Forbidden />} />

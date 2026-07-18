@@ -28,6 +28,11 @@ import {
 } from '@ant-design/icons';
 import { fetchAPI } from '../../api/config';
 import logger from '../../utils/logger';
+import type { GoogleIntegrationStatus } from '../../types/gcal';
+
+// Re-export do tipo de domínio (SSOT em types/gcal) para os consumidores que
+// historicamente importavam `GoogleIntegrationStatus` deste módulo (ex.: testes).
+export type { GoogleIntegrationStatus } from '../../types/gcal';
 
 const { Text, Title } = Typography;
 
@@ -40,18 +45,12 @@ interface CalendarItem {
   primary?: boolean;
 }
 
-
 /**
- * Google integration status interface
+ * Calendário-sentinela do Google para o calendário principal do usuário.
+ * Usado como fallback quando não há `defaultCalendarId` salvo — nunca o email,
+ * pois email ≠ calendarId.
  */
-export interface GoogleIntegrationStatus {
-  connected: boolean;
-  googleEmail?: string | null;
-  tokenExpiry?: string | null;
-  expiresInDays?: number | null;
-  isExpired?: boolean;
-  defaultCalendarId?: string | null;
-}
+const PRIMARY_CALENDAR_ID = 'primary';
 
 /**
  * GoogleIntegrationCard props interface
@@ -67,8 +66,18 @@ const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }: GoogleIntegr
   const [loadingCalendars, setLoadingCalendars] = useState(false);
   const [selectedCalendar, setSelectedCalendar] = useState<string | null>(null);
   const [savingCalendar, setSavingCalendar] = useState(false);
-  // Extrair valores de status (ou usar defaults se status for null)
-  const { connected, googleEmail, tokenExpiry, expiresInDays, isExpired, defaultCalendarId } = status || {};
+  // Extrair valores de status (ou usar defaults se status for null). `status`
+  // pode ser null antes do fetch inicial; a renderização real só ocorre após o
+  // early return abaixo, mas os hooks precisam rodar incondicionalmente.
+  const { connected, googleEmail, tokenExpiry, expiresInDays, isExpired, defaultCalendarId } =
+    status ?? {
+      connected: false,
+      googleEmail: null,
+      tokenExpiry: null,
+      expiresInDays: null,
+      isExpired: false,
+      defaultCalendarId: null,
+    };
 
   // Carregar calendários quando conectado
   useEffect(() => {
@@ -77,15 +86,13 @@ const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }: GoogleIntegr
     }
   }, [connected, isExpired]);
 
-  // Atualizar calendário selecionado quando defaultCalendarId mudar
+  // Atualizar calendário selecionado quando defaultCalendarId mudar.
+  // Sem defaultCalendarId salvo, cair para o calendário principal ('primary'),
+  // NUNCA o email — email ≠ calendarId (isso exibiria o email como se fosse um
+  // calendário selecionado).
   useEffect(() => {
-    if (defaultCalendarId) {
-      setSelectedCalendar(defaultCalendarId);
-    } else if (googleEmail) {
-      // Se não houver defaultCalendarId, usar email como fallback
-      setSelectedCalendar(googleEmail);
-    }
-  }, [defaultCalendarId, googleEmail]);
+    setSelectedCalendar(defaultCalendarId || PRIMARY_CALENDAR_ID);
+  }, [defaultCalendarId]);
 
   // Early return após todos os hooks
   if (!status) {

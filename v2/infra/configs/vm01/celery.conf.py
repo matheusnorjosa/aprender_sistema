@@ -48,7 +48,6 @@ task_queues = {
 task_routes = {
     "apps.core.tasks.sync_solicitacao_gcal": {"queue": "high"},
     "apps.core.tasks.send_notification_email": {"queue": "default"},
-    "apps.dat_ingest.tasks.*": {"queue": "low"},
 }
 
 # Beat schedule

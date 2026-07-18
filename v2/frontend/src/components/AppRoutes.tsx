@@ -9,10 +9,6 @@ import type { CurrentUser } from '../types';
 const DisponibilidadeBlocks = lazy(() => import('../pages/Disponibilidade'));
 const MonthlyPage = lazy(() => import('../pages/Disponibilidade/MonthlyPage'));
 const ControlePage = lazy(() => import('../pages/Controle/ControlePage'));
-// DATPage (página antiga de /dat/importacao, Cadastros DAT) deixou de ser
-// usada após PR-C DAT Imports (2026-04-29) — rota agora redireciona para
-// /dat/importacoes. O componente continua existindo para o card "Cadastros
-// DAT" dentro de ImportacoesPage; remoção definitiva fica em PR-D.
 const DATImportacoesPage = lazy(() => import('../pages/DAT/ImportacoesPage'));
 const PerfilPage = lazy(() => import('../pages/Perfil/PerfilPage'));
 const NewSolicitacaoWizard = lazy(() => import('../pages/Solicitacoes/NewSolicitacaoWizard'));

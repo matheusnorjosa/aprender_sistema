@@ -45,7 +45,8 @@ export default defineConfig({
     chunkSizeWarningLimit: 1500,
     // CSS code splitting — carrega CSS por chunk em vez de inline
     cssCodeSplit: true,
-    // Source maps for production debugging (hidden from browser DevTools)
-    sourcemap: 'hidden',
+    // No source maps in production — sem Sentry, maps não têm uso remoto e
+    // vazariam o código-fonte se servidos. Ver #1463 (audit 2026-06-19).
+    sourcemap: false,
   },
 })

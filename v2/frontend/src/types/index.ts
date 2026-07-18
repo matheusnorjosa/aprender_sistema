@@ -84,6 +84,7 @@ export type {
 export type {
   GoogleConnectionStatus,
   GoogleIntegrationStatus,
+  GoogleIntegrationStatusRaw,
   GoogleCalendar,
   GCalDashboardMetrics,
   GCalDashboardEvent,

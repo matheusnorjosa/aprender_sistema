@@ -541,6 +541,10 @@ jobs:
     - name: docker compose config -q (contrato de prod via template prod-like)
       run: |
         set -euo pipefail
+        # O compose usa `env_file: APP_ENV_FILE` e o template aponta para
+        # .env.prodlike.local (gitignored, ausente na CI). Materializa o .local a
+        # partir do .example — o mesmo fluxo do dev (`cp .example .local`).
+        cp v2/infra/.env.prodlike.example v2/infra/.env.prodlike.local
         docker compose \
           --env-file v2/infra/.env.prodlike.example \
           -f v2/infra/docker-compose.prod.yml \

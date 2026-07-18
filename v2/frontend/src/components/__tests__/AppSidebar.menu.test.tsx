@@ -151,14 +151,26 @@ const ACTORS: ActorSnapshot[] = [
       canSeeAllSectors: true,
       canApproveSuper: true,
     },
+    // Policies verificadas em produção (#1588): superuser recebe todas as 18 PUBLIC_POLICY_KEYS.
     policies: [
       'access_audit_logs',
       'access_solicitation_approvals',
+      'create_solicitation',
+      'import_availability_blocks',
+      'import_compras',
+      'import_generic_spreadsheet',
+      'manage_admin_registries',
       'manage_internal_actions',
+      'manage_purchases_and_materials',
+      'manage_solicitacao_status',
+      'use_gcal',
       'view_all_availability',
       'view_compras_dashboard',
-      'view_overview_dashboard',
+      'view_compras_pendencias',
+      'view_compras_stats',
       'view_map_metrics',
+      'view_overview_dashboard',
+      'view_reports',
     ],
     expectedVisible: [
       'Página Inicial',
@@ -197,6 +209,7 @@ const ACTORS: ActorSnapshot[] = [
       canDashboardsMenu: true,
       canDisponibilidade: true,
     },
+    // Policies verificadas em produção (#1588).
     policies: [
       'access_audit_logs',
       'import_availability_blocks',
@@ -204,7 +217,11 @@ const ACTORS: ActorSnapshot[] = [
       'import_generic_spreadsheet',
       'manage_admin_registries',
       'manage_purchases_and_materials',
+      'view_all_availability',
       'view_compras_dashboard',
+      'view_compras_pendencias',
+      'view_compras_stats',
+      'view_reports',
     ],
     // Sem 'Aprovações' (sem policy), sem 'Controle' (canControle=false).
     // Sem 'Ações Internas': agora policy-gated por `manage_internal_actions` (#1263),
@@ -239,12 +256,18 @@ const ACTORS: ActorSnapshot[] = [
       canDashboardsMenu: true,
       canDisponibilidade: true,
     },
+    // Policies verificadas em produção (#1588).
     policies: [
       'access_audit_logs',
+      'import_availability_blocks',
+      'import_compras',
+      'import_generic_spreadsheet',
       'manage_purchases_and_materials',
       'manage_solicitacao_status',
       'use_gcal',
       'view_all_availability',
+      'view_compras_pendencias',
+      'view_compras_stats',
       'view_reports',
     ],
     // Sem 'Aprovações' (sem policy access_solicitation_approvals — Controle puro).
@@ -275,7 +298,8 @@ const ACTORS: ActorSnapshot[] = [
       canDashboardsMenu: true,
       // canDisponibilidade=false (D8/D9: Diretoria removida da Grade Mensal).
     },
-    policies: ['view_compras_dashboard', 'view_overview_dashboard', 'view_map_metrics'],
+    // Policies verificadas em produção (#1588).
+    policies: ['view_compras_dashboard', 'view_compras_pendencias', 'view_map_metrics', 'view_overview_dashboard'],
     expectedVisible: ['Página Inicial', 'Meus Eventos', 'Dashboards'],
     expectedDashboardsChildren: [
       'Dashboard Geral',
@@ -296,23 +320,25 @@ const ACTORS: ActorSnapshot[] = [
       canAcoesInternas: true, // canAcoesInternas inclui isGerente
       canDisponibilidade: true, // canDisponibilidade inclui isGerente
     },
+    // Policies verificadas em produção (#1588): Gerente Sup NÃO tem view_all_availability
+    // (scoped via EquipeGerencia, não policy global) nem access_audit_logs (PR6); TEM create_solicitation.
     policies: [
-      'access_audit_logs',
       'access_solicitation_approvals',
+      'create_solicitation',
       'manage_solicitacao_status',
       'use_gcal',
-      'view_all_availability',
       'view_reports',
     ],
-    // Aprovações via policy. Bloqueios via view_all_availability.
-    // Sem 'Ações Internas': policy-gated por `manage_internal_actions` (#1263),
-    // ausente para Gerente Sup. Sem dashboards (Gerente Sup não tem dashboard próprio).
+    // Aprovações via policy access_solicitation_approvals (composite).
+    // Sem 'Bloqueios'/'Deslocamentos': dependem de view_all_availability (que Gerente Sup
+    //   NÃO tem em produção) e não há fallback legacy (canControle/canCoordenador/isFormador
+    //   todos false). #1588 corrigiu a fixture que afirmava o contrário.
+    // 'Grade Mensal' aparece via canDisponibilidade (legacy, inclui isGerente).
+    // Sem 'Ações Internas' (manage_internal_actions ausente) e sem dashboards próprios.
     expectedVisible: [
       'Página Inicial',
       'Meus Eventos',
       'Aprovações',
-      'Bloqueios',
-      'Deslocamentos',
       'Grade Mensal',
     ],
     expectedDashboardsChildren: [],
@@ -328,7 +354,9 @@ const ACTORS: ActorSnapshot[] = [
       canDisponibilidade: true,
     },
     // Gerente pedagógico/Vidas é scoped (sem view_all_availability após D9).
-    policies: [],
+    // Produção (#1588): tem create_solicitation (Função Gerente). Não afeta o menu
+    // (Solicitações usa canCoordenador legacy, false aqui) — só acurácia da fixture.
+    policies: ['create_solicitation'],
     // Sem 'Aprovações' (não é Sup), sem 'Bloqueios' (sem view_all e sem canBloqueios).
     // Sem 'Deslocamentos' (não tem nenhuma das 4 condições).
     // Sem 'Ações Internas': policy-gated por `manage_internal_actions` (#1263), ausente aqui.
@@ -349,7 +377,8 @@ const ACTORS: ActorSnapshot[] = [
       canAcoesInternas: true,
       canDisponibilidade: true,
     },
-    policies: [],
+    // Produção (#1588): create_solicitation (Função Coordenador).
+    policies: ['create_solicitation'],
     expectedVisible: [
       'Página Inicial',
       'Meus Eventos',
@@ -372,7 +401,8 @@ const ACTORS: ActorSnapshot[] = [
       canAcoesInternas: true,
       canDisponibilidade: true,
     },
-    policies: [],
+    // Produção (#1588): create_solicitation (Função Apoio de Coordenação).
+    policies: ['create_solicitation'],
     // Sem 'Ações Internas': policy-gated por `manage_internal_actions` (#1263), ausente aqui.
     expectedVisible: [
       'Página Inicial',
@@ -414,13 +444,19 @@ const ACTORS: ActorSnapshot[] = [
       canDashboardsMenu: true,
       canDisponibilidade: true,
     },
+    // Policies verificadas em produção (#1588): setor Controle + composite de aprovação.
     policies: [
       'access_audit_logs',
       'access_solicitation_approvals',
+      'import_availability_blocks',
+      'import_compras',
+      'import_generic_spreadsheet',
       'manage_purchases_and_materials',
       'manage_solicitacao_status',
       'use_gcal',
       'view_all_availability',
+      'view_compras_pendencias',
+      'view_compras_stats',
       'view_reports',
     ],
     expectedVisible: [

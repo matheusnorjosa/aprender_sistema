@@ -68,6 +68,15 @@ export interface AccessState {
    * Legacy fallback preservado durante transição.
    */
   canViewComprasDashboard: boolean;
+
+  /**
+   * Pode gerenciar ações internas (notificações internas + timeline). Fonte de
+   * verdade exclusiva: policy pública `manage_internal_actions` (Issue #1263).
+   * SEM fallback legacy — o backend exige a policy (0 grupos no seed atual), então
+   * decidir por grupo (`usePermissions.canAcoesInternas`) sobre-concedia e o menu
+   * levava a 403. Superuser recebe todas as policies, logo obtém a flag.
+   */
+  canManageInternalActions: boolean;
 }
 
 /**
@@ -97,6 +106,10 @@ export function computeAccess(
     can('view_compras_dashboard') ||
     legacy.canDashboardCompras === true;
 
+  // Issue #1263: policy-only (sem legacy). Backend exige `manage_internal_actions`;
+  // decidir por grupo mostrava o menu de Ações Internas que o backend nega (403).
+  const canManageInternalActions = can('manage_internal_actions');
+
   return {
     policies,
     can,
@@ -104,6 +117,7 @@ export function computeAccess(
     canAccessBlocks,
     canCreateSolicitation,
     canViewComprasDashboard,
+    canManageInternalActions,
   };
 }
 

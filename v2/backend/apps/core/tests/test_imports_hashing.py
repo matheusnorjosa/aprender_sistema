@@ -111,6 +111,42 @@ class TestDeslocamentoExternalHashEquivalence:
         assert new == legacy
 
 
+class TestEventosExternalHashEquivalence:
+    """
+    Snapshot test pinning the exact digest produced by
+    ``eventos_import._compute_external_hash`` so the migration to
+    ``stable_import_hash`` cannot silently change ``Solicitacao.external_hash``.
+
+    Replicates the legacy call:
+
+        parts = [str(municipio_id), str(projeto_id), str(tipo_evento_id),
+                 data_evento.isoformat(), hora_inicio.strftime("%H:%M"),
+                 hora_fim.strftime("%H:%M")]
+        content = "|".join(parts)
+        return hashlib.sha1(content.encode("utf-8"), usedforsecurity=False).hexdigest()
+    """
+
+    def test_byte_equivalence_for_representative_row(self):
+        from datetime import date, time
+
+        # Lazy import: keeps this module free of Django/service imports at
+        # collection time and mirrors TestDeslocamentoExternalHashEquivalence.
+        from apps.core.services.eventos_import import _compute_external_hash
+
+        digest = _compute_external_hash(
+            7,  # municipio_id
+            3,  # projeto_id
+            5,  # tipo_evento_id
+            date(2026, 5, 16),  # data_evento -> "2026-05-16"
+            time(8, 0),  # hora_inicio -> "08:00"
+            time(12, 30),  # hora_fim -> "12:30"
+        )
+
+        legacy = _legacy_sha1("|".join(["7", "3", "5", "2026-05-16", "08:00", "12:30"]))
+
+        assert digest == legacy
+
+
 class TestSha1StrWrapperEquivalence:
     """
     ``apps.core.services.controle_imports.sha1_str`` is migrated to a thin

@@ -380,6 +380,7 @@ nunca em deploy automático). Em prod o command nem é registrado
 Limitar prefixos de Policy keys ao vocabulário:
 
 - `access_X` — acesso de leitura ao módulo (ex: `access_audit_logs`)
+- `create_X` — criação de recurso (ex: `create_solicitation`)
 - `use_X` — operação ativa (ex: `use_gcal_endpoints`)
 - `import_X` — importação de dados
 - `manage_X` — CRUD administrativo

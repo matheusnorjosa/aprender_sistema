@@ -24,6 +24,7 @@ from django.db import transaction
 
 import pandas as pd
 
+from apps.core.imports.normalization import normalize_active_flag, normalize_blank, normalize_cpf_digits
 from apps.core.models import EquipeGerencia, Gerencia, Usuario
 from apps.core.services.resolvers import resolve_user_by_email, resolve_user_by_name
 
@@ -171,8 +172,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Setor / Gerencia
     for key in ["setor", "gerencia", "gerência", "nome_setor", "setor_nome"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["setor"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["setor"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["setor"] = ""
@@ -180,8 +180,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Papel / Funcao
     for key in ["papel", "funcao", "função", "role", "cargo"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["papel"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["papel"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["papel"] = ""
@@ -189,24 +188,21 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Usuario identificadores
     for key in ["usuario_cpf", "cpf", "documento", "doc"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["usuario_cpf"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["usuario_cpf"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["usuario_cpf"] = ""
 
     for key in ["usuario_email", "email", "e-mail"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["usuario_email"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["usuario_email"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["usuario_email"] = ""
 
     for key in ["usuario_nome", "nome", "nome_completo", "usuario"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["usuario_nome"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["usuario_nome"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["usuario_nome"] = ""
@@ -214,8 +210,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Coordenador supervisor (apenas para APOIO)
     for key in ["coordenador_supervisor", "supervisor", "coordenador"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["coordenador_supervisor"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["coordenador_supervisor"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["coordenador_supervisor"] = ""
@@ -223,9 +218,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Status ativo
     for key in ["ativo", "is_active", "active", "status"]:
         if key in lower_map:
-            val = lower_map[key]
-            val_str = str(val).strip().lower() if val and str(val) != "nan" else ""
-            normalized["is_active"] = val_str not in ("nao", "não", "false", "0", "inativo", "n")
+            normalized["is_active"] = normalize_active_flag(lower_map[key])
             break
     else:
         normalized["is_active"] = True
@@ -288,7 +281,7 @@ def _get_or_create_gerencia(nome_setor: str, stats: dict[str, Any]) -> Gerencia 
 
 def _resolve_usuario(cpf: str, email: str, nome: str) -> Usuario | None:
     """Resolve usuario por CPF > email > nome."""
-    cpf_norm = "".join([c for c in cpf if c.isdigit()])
+    cpf_norm = normalize_cpf_digits(cpf)
     if cpf_norm:
         user = Usuario.objects.filter(cpf=cpf_norm).first()
         if user:
@@ -319,7 +312,7 @@ def _resolve_usuario_from_value(value: str) -> Usuario | None:
     if "@" in value:
         return resolve_user_by_email(value)
 
-    digits = "".join([c for c in value if c.isdigit()])
+    digits = normalize_cpf_digits(value)
     if len(digits) >= 11:
         user = Usuario.objects.filter(cpf=digits).first()
         if user:

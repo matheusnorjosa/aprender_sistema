@@ -40,6 +40,7 @@ import {
   SafetyOutlined,
 } from '@ant-design/icons';
 import logger from '../../utils/logger';
+import { buildCsvRow } from '../../utils/csvSanitize';
 import {
   getTeamProductivity,
   getTeamFormadores,
@@ -104,10 +105,10 @@ export default function EquipeDashboardPage(): JSX.Element {
       f.municipios_atendidos,
     ]);
 
-    // Gerar CSV
+    // Gerar CSV (sanitizado contra formula injection — SEC-007)
     const csvContent = [
-      headers.join(','),
-      ...rows.map((row) => row.join(',')),
+      buildCsvRow(headers, ','),
+      ...rows.map((row) => buildCsvRow(row, ',')),
     ].join('\n');
 
     // Download

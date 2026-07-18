@@ -38,7 +38,7 @@ pytestmark = pytest.mark.django_db
 # ============================================================================
 
 # Snake_case canonical verb prefixes (decisão #4 do stakeholder, 2026-04-26).
-CANONICAL_VERB_PREFIX = re.compile(r"^(access|use|import|manage|view)_[a-z][a-z0-9_]*$")
+CANONICAL_VERB_PREFIX = re.compile(r"^(access|create|use|import|manage|view)_[a-z][a-z0-9_]*$")
 
 # Roles do projeto — NÃO devem aparecer na matriz (decisão #6 — só capabilities).
 ROLE_NAMES = frozenset(

@@ -91,6 +91,10 @@ ACCESS_POLICIES: Final[dict[str, frozenset[str]]] = {
     # Transições GCal (publish/cancel/resync) — Controle (operação) +
     # Superintendência (decisão pós-aprovação).
     "manage_solicitacao_status": frozenset({"operate_preagenda", "approve_solicitation"}),
+    # Criação de solicitação (motivo legítimo: operar) — Coordenador / Apoio de
+    # Coordenação / Gerente (seed). Single-cap elevada a policy pública para o
+    # frontend consumir o mesmo gate de HasPerm("create_solicitation") (#1262).
+    "create_solicitation": frozenset({"create_solicitation"}),
     # --- Dashboards executivos ---
     # Dashboard Compras: Diretoria (decidir) + DAT (suportar/validar).
     # Confirmado Epic 1.6 — DAT é ator transversal.
@@ -146,6 +150,10 @@ ACCESS_POLICIES: Final[dict[str, frozenset[str]]] = {
     # --- Admin registries (single-cap, mas vira policy pra estabilizar contrato) ---
     "manage_admin_registries": frozenset({"manage_admin_registries"}),
     "manage_purchases_and_materials": frozenset({"manage_purchases_and_materials"}),
+    # CRUD de ações internas / notificações (motivo legítimo: operar). Seed = 0
+    # grupos (só superuser bypassa); elevada a policy pública para #1263
+    # (canAcoesInternas consome manage_internal_actions em vez do organograma).
+    "manage_internal_actions": frozenset({"manage_internal_actions"}),
     # --- Aprovação de solicitações (PR 3 hardening RBAC, 2026-04-29) ---
     # Policy COMPOSITE: a semântica não cabe em "OR de capabilities" porque
     # exige composite Setor × Função (Gerente da Superintendência OU
@@ -275,6 +283,14 @@ class CanManagePurchasesAndMaterials(_PolicyPermission):
     policy = "manage_purchases_and_materials"
 
 
+class CanCreateSolicitation(_PolicyPermission):
+    policy = "create_solicitation"
+
+
+class CanManageInternalActions(_PolicyPermission):
+    policy = "manage_internal_actions"
+
+
 class CanAccessSolicitationApprovals(_PolicyPermission):
     """
     Policy composta de aprovação de solicitações (PR 3, 2026-04-29).
@@ -324,6 +340,7 @@ PUBLIC_POLICY_KEYS: Final[frozenset[str]] = frozenset(
     {
         "access_audit_logs",
         "access_solicitation_approvals",
+        "create_solicitation",
         "manage_solicitacao_status",
         "view_compras_dashboard",
         "view_compras_pendencias",
@@ -337,6 +354,7 @@ PUBLIC_POLICY_KEYS: Final[frozenset[str]] = frozenset(
         "import_compras",
         "import_generic_spreadsheet",
         "manage_admin_registries",
+        "manage_internal_actions",
         "manage_purchases_and_materials",
     }
 )

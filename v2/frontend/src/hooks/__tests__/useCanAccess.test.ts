@@ -100,13 +100,23 @@ describe('computeAccess.canViewComprasDashboard — Onda 2 A2 consome policy', (
   });
 });
 
-describe('computeAccess.canCreateSolicitation — legacy-only today', () => {
-  test('legacy canCoordenador=true → true', () => {
+describe('computeAccess.canCreateSolicitation — policy create_solicitation + legacy (Issue #1265)', () => {
+  test('policy create_solicitation → true (mesmo sem legacy)', () => {
+    const access = computeAccess(['create_solicitation']);
+    expect(access.canCreateSolicitation).toBe(true);
+  });
+
+  test('legacy canCoordenador=true sem policy → true (fallback durante transição)', () => {
     const access = computeAccess([], { canCoordenador: true });
     expect(access.canCreateSolicitation).toBe(true);
   });
 
-  test('no legacy → false (no public policy maps to this today)', () => {
+  test('policy + legacy → true', () => {
+    const access = computeAccess(['create_solicitation'], { canCoordenador: true });
+    expect(access.canCreateSolicitation).toBe(true);
+  });
+
+  test('sem policy e sem legacy → false', () => {
     const access = computeAccess(['view_compras_dashboard'], {});
     expect(access.canCreateSolicitation).toBe(false);
   });

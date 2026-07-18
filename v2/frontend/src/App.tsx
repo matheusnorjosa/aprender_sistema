@@ -30,6 +30,8 @@ import { usePermissions } from './hooks/usePermissions';
 import { useResponsive } from './hooks/useResponsive';
 import { useGCalAlertsPolling } from './hooks/useGCalAlertsPolling';
 import { useUnreadNotificationsPolling } from './hooks/useUnreadNotificationsPolling';
+import useSessionMonitor from './hooks/useSessionMonitor';
+import SessionExpiryWarning from './components/SessionExpiryWarning';
 import type { CurrentUser } from './types';
 import './App.css';
 
@@ -114,6 +116,33 @@ function AppContent(): JSX.Element {
     userId: user?.id,
   });
 
+  // ── Monitor proativo de sessão (Issue #164, religado em #1376) ──
+  // Aviso de expiração iminente + renovação via /api/auth/ping/. Até então era
+  // dead code (nunca montado). A UI (SessionExpiryWarning) é renderizada dentro
+  // do <Router> no fluxo autenticado (usa useNavigate).
+  const sessionMonitor = useSessionMonitor();
+
+  // ── Tratamento global de sessão expirada no 401 (Issue #1376) ──
+  // `fetchAPI` dispara `auth:expired` em qualquer 401. Se havia usuário logado,
+  // limpamos o estado de sessão → App re-renderiza a LoginPage (redirect global
+  // para o login, sem cada tela tratar o 401). O guard `userRef.current` evita
+  // loop no load inicial e em rotas públicas: um 401 sem sessão prévia é ignorado.
+  const userRef = useRef<CurrentUser | null>(null);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
+  useEffect(() => {
+    const handleAuthExpired = (): void => {
+      if (!userRef.current || !isMountedRef.current) return;
+      message.warning('Sua sessão expirou. Faça login novamente.');
+      setUser(null);
+      setPolicies([]);
+    };
+    window.addEventListener('auth:expired', handleAuthExpired);
+    return () => window.removeEventListener('auth:expired', handleAuthExpired);
+  }, []);
+
   // ── Logout ──
   // TODO(tech-debt): replace window.location.reload() with state-driven
   // cleanup once a centralized auth store is in place (#927)
@@ -150,6 +179,11 @@ function AppContent(): JSX.Element {
       <Toaster position="top-right" toastOptions={{ duration: 5000 }} />
       <Router>
         <OfflineBanner />
+        <SessionExpiryWarning
+          showWarning={sessionMonitor.showWarning}
+          timeLeft={sessionMonitor.timeLeft}
+          renewSession={sessionMonitor.renewSession}
+        />
         <Layout style={{ minHeight: '100vh', background: colors.pageBackground }}>
           <AppSidebar
             permissions={permissions}

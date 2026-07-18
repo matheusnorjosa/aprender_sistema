@@ -128,6 +128,54 @@ describe('API Config', () => {
   })
 
   // ============================================================================
+  // TESTES DE fetchAPI — sessão expirada global (Issue #1376)
+  // ============================================================================
+
+  describe('fetchAPI — 401 dispara evento global auth:expired (Issue #1376)', () => {
+    function authExpiredFired(spy: ReturnType<typeof vi.spyOn>): boolean {
+      return spy.mock.calls.some(
+        ([event]) => event instanceof Event && event.type === 'auth:expired',
+      )
+    }
+
+    test('emite window event "auth:expired" ao receber 401', async () => {
+      const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
+      server.use(
+        http.get(apiUrl('/expired/'), () => new HttpResponse(null, { status: 401 })),
+      )
+
+      await expect(fetchAPI('/expired/')).rejects.toThrow()
+
+      expect(authExpiredFired(dispatchSpy)).toBe(true)
+      dispatchSpy.mockRestore()
+    })
+
+    test('NÃO emite "auth:expired" em 403 (permissão, não sessão)', async () => {
+      const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
+      server.use(
+        http.get(apiUrl('/forbidden/'), () => new HttpResponse(null, { status: 403 })),
+      )
+
+      await expect(fetchAPI('/forbidden/')).rejects.toThrow()
+
+      expect(authExpiredFired(dispatchSpy)).toBe(false)
+      dispatchSpy.mockRestore()
+    })
+
+    test('NÃO emite "auth:expired" em resposta 200 de sucesso', async () => {
+      const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
+      server.use(
+        http.get(apiUrl('/ok2/'), () => HttpResponse.json({ ok: true })),
+      )
+
+      await fetchAPI('/ok2/')
+
+      expect(authExpiredFired(dispatchSpy)).toBe(false)
+      dispatchSpy.mockRestore()
+    })
+  })
+
+  // ============================================================================
   // TESTES DE fetchAPI (regression: 204 / empty body handling)
   // ============================================================================
 

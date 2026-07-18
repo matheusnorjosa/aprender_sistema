@@ -30,7 +30,6 @@ Regras de negocio (PA-01/PA-04):
 
 from __future__ import annotations
 
-import hashlib
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from typing import Any
@@ -41,6 +40,8 @@ from django.utils import timezone
 
 import pandas as pd
 
+from apps.core.imports.hashing import stable_import_hash
+from apps.core.imports.normalization import normalize_blank
 from apps.core.models import Participation, Solicitacao
 from apps.core.services.resolvers import (
     resolve_municipio,
@@ -166,8 +167,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Municipio
     for key in ["município", "municipio", "cidade", "city"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["municipio"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["municipio"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["municipio"] = ""
@@ -175,8 +175,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Projeto
     for key in ["projeto", "project", "setor"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["projeto"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["projeto"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["projeto"] = ""
@@ -184,8 +183,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Tipo Evento
     for key in ["tipo_evento", "tipo", "type", "event_type"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["tipo_evento"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["tipo_evento"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["tipo_evento"] = ""
@@ -217,8 +215,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Coordenador
     for key in ["coordenador", "coord", "coord_email", "coordinator"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["coordenador"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["coordenador"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["coordenador"] = ""
@@ -227,8 +224,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     for i in range(1, 6):
         for key in [f"formador{i}", f"formador_{i}", f"trainer{i}"]:
             if key in lower_map:
-                val = lower_map[key]
-                normalized[f"formador{i}"] = str(val).strip() if val and str(val) != "nan" else ""
+                normalized[f"formador{i}"] = normalize_blank(lower_map[key])
                 break
         else:
             normalized[f"formador{i}"] = ""
@@ -236,8 +232,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Encontro
     for key in ["encontro", "ef", "encounter", "meeting"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["encontro"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["encontro"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["encontro"] = ""
@@ -245,8 +240,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Segmento
     for key in ["segmento", "segment", "nivel"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["segmento"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["segmento"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["segmento"] = ""
@@ -254,8 +248,7 @@ def _normalize_row(row: Any) -> dict[str, Any]:
     # Local
     for key in ["local", "location", "endereco", "endereço"]:
         if key in lower_map:
-            val = lower_map[key]
-            normalized["local"] = str(val).strip() if val and str(val) != "nan" else ""
+            normalized["local"] = normalize_blank(lower_map[key])
             break
     else:
         normalized["local"] = ""
@@ -369,8 +362,7 @@ def _compute_external_hash(
         hora_inicio.strftime("%H:%M"),
         hora_fim.strftime("%H:%M"),
     ]
-    content = "|".join(parts)
-    return hashlib.sha1(content.encode("utf-8"), usedforsecurity=False).hexdigest()
+    return stable_import_hash(*parts)
 
 
 def _resolve_user(identifier: str) -> Any:

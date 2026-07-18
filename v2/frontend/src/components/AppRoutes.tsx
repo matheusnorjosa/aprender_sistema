@@ -83,7 +83,7 @@ interface AppRoutesProps {
 
 export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.Element {
   const {
-    canCoordenador, canControle, canDAT, canAcoesInternas,
+    canCoordenador, canControle, canDAT,
     canDashboardOverview, canDashboardEquipe, canDashboardGcal, canDashboardCompras,
     canMapaBrasil, canDisponibilidade, isFormador,
   } = permissions;
@@ -146,9 +146,9 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
         <Route path="/pre-agenda" element={canControle ? <PreAgendaPage /> : <Forbidden />} />
 
         {/* Ações/Notificações */}
-        <Route path="/acoes-notificacao" element={canAcoesInternas ? <AcoesNotificacaoPage /> : <Forbidden />} />
-        <Route path="/acoes-notificacao/timeline" element={canAcoesInternas ? <AcoesTimelinePage /> : <Forbidden />} />
-        <Route path="/notificacoes-internas" element={canAcoesInternas ? <NotificacoesInternasPage /> : <Forbidden />} />
+        <Route path="/acoes-notificacao" element={access.canManageInternalActions ? <AcoesNotificacaoPage /> : <Forbidden />} />
+        <Route path="/acoes-notificacao/timeline" element={access.canManageInternalActions ? <AcoesTimelinePage /> : <Forbidden />} />
+        <Route path="/notificacoes-internas" element={access.canManageInternalActions ? <NotificacoesInternasPage /> : <Forbidden />} />
         {/* DAT Module */}
         <Route path="/dat/admin" element={canDAT ? <AdminDATHomePage /> : <Forbidden />} />
         <Route path="/dat/admin/usuarios" element={canDAT ? <UsuariosPage /> : <Forbidden />} />

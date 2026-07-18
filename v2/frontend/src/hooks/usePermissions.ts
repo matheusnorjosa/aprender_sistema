@@ -24,6 +24,12 @@ export interface Permissions {
   canCoordenador: boolean;
   canControle: boolean;
   canDAT: boolean;
+  /**
+   * @deprecated Use `useCanAccess(policies).canManageInternalActions` (Issue #1263).
+   * Decide por grupo (DAT/Coordenador/Gerente) e sobre-concede: o backend exige a
+   * policy `manage_internal_actions` (0 grupos no seed), então esta flag levava o
+   * menu de Ações Internas a 403. Mantida por compat; não usar em novos call sites.
+   */
   canAcoesInternas: boolean;
   canDashboardOverview: boolean;
   canDashboardEquipe: boolean;

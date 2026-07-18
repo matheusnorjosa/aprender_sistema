@@ -146,6 +146,13 @@ export default function PreAgendaPage(): JSX.Element {
   const [viewMode, setViewMode] = useState<ViewMode>('preagenda');
   const [gcalEvents, setGcalEvents] = useState<GoogleCalendarEvent[]>([]);
   const [loadingGcalEvents, setLoadingGcalEvents] = useState(false);
+  // #1294: filtro de datas próprio do modo gcal-events, isolado do `dateRange`
+  // das Solicitações. Sem isso, um período escolhido em "Solicitações" vazava
+  // como time_min/time_max na request de eventos (falso-vazio) e mexer no
+  // RangePicker de eventos recriava `loadData` (refetch cruzado de Solicitações).
+  const [gcalDateRange, setGcalDateRange] = useState<[Dayjs | null, Dayjs | null]>([null, null]);
+  const [gcalCalendarId, setGcalCalendarId] = useState<string | null>(null);
+  const gcalHasDateFilter = !!(gcalDateRange[0] || gcalDateRange[1]);
 
   // OAuth Phase 5: Estado do usuário e integração Google
   const [user, setUser] = useState<CurrentUser | null>(null);
@@ -516,14 +523,15 @@ export default function PreAgendaPage(): JSX.Element {
     try {
       setLoadingGcalEvents(true);
       const params = new URLSearchParams();
-      if (dateRange[0]) params.set('time_min', dateRange[0].format('YYYY-MM-DD'));
-      if (dateRange[1]) params.set('time_max', dateRange[1].format('YYYY-MM-DD'));
+      if (gcalDateRange[0]) params.set('time_min', gcalDateRange[0].format('YYYY-MM-DD'));
+      if (gcalDateRange[1]) params.set('time_max', gcalDateRange[1].format('YYYY-MM-DD'));
       params.set('max_results', '250');
 
-      const data = await fetchAPI<{ events: GoogleCalendarEvent[]; count: number }>(
+      const data = await fetchAPI<{ events: GoogleCalendarEvent[]; calendar_id: string; count: number }>(
         `/integrations/google/events/?${params.toString()}`
       );
       setGcalEvents(data.events || []);
+      setGcalCalendarId(data.calendar_id ?? null);
     } catch (error) {
       const httpStatus = (error as { response?: { status?: number } }).response?.status;
       if (httpStatus === 503) {
@@ -535,7 +543,7 @@ export default function PreAgendaPage(): JSX.Element {
     } finally {
       setLoadingGcalEvents(false);
     }
-  }, [dateRange]);
+  }, [gcalDateRange]);
 
   // Carregar eventos GCal quando mudar para a aba
   useEffect(() => {
@@ -801,22 +809,39 @@ export default function PreAgendaPage(): JSX.Element {
         {viewMode === 'gcal-events' && (
           <>
             <Card size="small">
-              <Space>
-                <RangePicker
-                  value={dateRange}
-                  onChange={(dates) => setDateRange(dates || [null, null])}
-                  format="DD/MM/YYYY"
-                  placeholder={['Data inicial', 'Data final']}
-                />
-                <Button
-                  type="primary"
-                  icon={<SyncOutlined />}
-                  onClick={loadGcalEvents}
-                  loading={loadingGcalEvents}
-                >
-                  Atualizar
-                </Button>
-                <Tag color="blue">{gcalEvents.length} eventos</Tag>
+              <Space direction="vertical" style={{ width: '100%' }} size="small">
+                <Space wrap>
+                  <RangePicker
+                    value={gcalDateRange}
+                    onChange={(dates) => setGcalDateRange(dates || [null, null])}
+                    format="DD/MM/YYYY"
+                    placeholder={['Data inicial', 'Data final']}
+                  />
+                  <Button
+                    type="primary"
+                    icon={<SyncOutlined />}
+                    onClick={loadGcalEvents}
+                    loading={loadingGcalEvents}
+                  >
+                    Atualizar
+                  </Button>
+                  <Tag color="blue">{gcalEvents.length} eventos</Tag>
+                </Space>
+                {/* #1295: contexto do que está sendo exibido (calendário + janela) */}
+                <Space size="middle" wrap>
+                  <Text type="secondary">
+                    <CalendarOutlined /> Calendário:{' '}
+                    <Text strong>{gcalCalendarId ?? googleStatus?.googleEmail ?? '—'}</Text>
+                  </Text>
+                  <Text type="secondary">
+                    <ClockCircleOutlined /> Período:{' '}
+                    <Text strong>
+                      {gcalHasDateFilter
+                        ? `${gcalDateRange[0]?.format('DD/MM/YYYY') ?? '…'} – ${gcalDateRange[1]?.format('DD/MM/YYYY') ?? '…'}`
+                        : 'todas as datas'}
+                    </Text>
+                  </Text>
+                </Space>
               </Space>
             </Card>
 
@@ -829,10 +854,24 @@ export default function PreAgendaPage(): JSX.Element {
                   </div>
                 </div>
               ) : gcalEvents.length === 0 ? (
-                <Empty
-                  description="Nenhum evento encontrado neste calendário"
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                />
+                gcalHasDateFilter ? (
+                  // #1295: vazio COM filtro de data → orienta a ajustar a janela,
+                  // em vez de sugerir que o calendário está vazio.
+                  <Empty
+                    description={
+                      <span>
+                        Nenhum evento no período selecionado. Ajuste o filtro de datas
+                        (ou limpe-o) para ver todos os eventos do calendário.
+                      </span>
+                    }
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  />
+                ) : (
+                  <Empty
+                    description="Nenhum evento encontrado neste calendário"
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  />
+                )
               ) : (
                 <Table
                   scroll={{ x: "max-content" }}

@@ -57,8 +57,10 @@ export interface AccessState {
   canAccessBlocks: boolean;
 
   /**
-   * Pode criar nova solicitação. Hoje: 100% legacy (Coordenador / Apoio de Coordenação / Gerente / Superuser).
-   * Sem policy pública mapeada — frontend confere flag, backend ainda valida via permission_classes específica.
+   * Pode criar nova solicitação. Fonte primária: policy pública `create_solicitation`
+   * (Issue #1265). Fallback legacy `canCoordenador` preservado durante a transição —
+   * remover em Onda 3+ quando o staging validar a policy. Backend continua validando
+   * via permission_classes específica.
    */
   canCreateSolicitation: boolean;
 
@@ -99,7 +101,10 @@ export function computeAccess(
     can('view_all_availability') ||
     legacy.canBloqueios === true;
 
+  // Issue #1265: policy `create_solicitation` como fonte primária; legacy `canCoordenador`
+  // mantido como fallback durante a transição (remover em Onda 3+ após validar em staging).
   const canCreateSolicitation =
+    can('create_solicitation') ||
     legacy.canCoordenador === true;
 
   const canViewComprasDashboard =

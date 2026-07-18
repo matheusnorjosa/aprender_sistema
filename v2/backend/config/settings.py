@@ -114,6 +114,23 @@ if os.getenv("INCLUDE_ETL", "false").lower() == "true":
 # Para excluir do deploy: INCLUDE_DEV_TOOLS=false
 INCLUDE_DEV_TOOLS = os.getenv("INCLUDE_DEV_TOOLS", "true").lower() == "true"
 
+# CP-08 (#1466): em produção o app NUNCA carrega, independente da env var.
+# O default acima é `true` e a stack de produção não define INCLUDE_DEV_TOOLS, então
+# `apps.dev_tools` (seeds/backfills/cleanup) entrava em prod por omissão — um seed
+# destrutivo a um `manage.py` de distância. Guard rígido, no espírito dos guards de
+# SECRET_KEY/ALLOWED_HOSTS acima.
+#
+# Força-se o valor em vez de `sys.exit(1)` de propósito: como produção hoje não define
+# a variável, abortar o boot converteria o footgun em indisponibilidade no primeiro
+# deploy. O warning cobre o caso de alguém pedir `true` explicitamente.
+if ENVIRONMENT == "production":
+    if INCLUDE_DEV_TOOLS and os.getenv("INCLUDE_DEV_TOOLS"):
+        print(
+            "⚠️  WARNING: INCLUDE_DEV_TOOLS=true ignorado — apps.dev_tools é proibido em produção (CP-08)",
+            file=sys.stderr,
+        )
+    INCLUDE_DEV_TOOLS = False
+
 # Debug E2E — habilita middlewares auxiliares para testes Playwright
 # (ex: FreezeTimeMiddleware). Gate duplo com INCLUDE_DEV_TOOLS garante que
 # nunca vaza para produção. CP-08: INCLUDE_DEV_TOOLS=false em prod.

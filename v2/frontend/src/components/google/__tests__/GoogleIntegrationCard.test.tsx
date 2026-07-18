@@ -45,10 +45,11 @@ describe('GoogleIntegrationCard', () => {
   test('deve renderizar card vermelho quando desconectado', () => {
     const status: GoogleIntegrationStatus = {
       connected: false,
-      googleEmail: undefined,
-      tokenExpiry: undefined,
+      googleEmail: null,
+      tokenExpiry: null,
       expiresInDays: null,
       isExpired: false,
+      defaultCalendarId: null,
     };
 
     const onConnect = vi.fn();
@@ -139,8 +140,9 @@ describe('GoogleIntegrationCard', () => {
       connected: true,
       googleEmail: 'controle@aprendereditora.com.br',
       tokenExpiry: '2025-01-01T00:00:00Z',
-      expiresInDays: -10,
+      expiresInDays: 0,
       isExpired: true,
+      defaultCalendarId: null,
     };
 
     const onConnect = vi.fn();
@@ -168,9 +170,10 @@ describe('GoogleIntegrationCard', () => {
     const status: GoogleIntegrationStatus = {
       connected: true,
       googleEmail: 'controle@aprendereditora.com.br',
-      tokenExpiry: undefined,
+      tokenExpiry: null,
       expiresInDays: null,
       isExpired: false,
+      defaultCalendarId: null,
     };
 
     render(
@@ -312,5 +315,57 @@ describe('GoogleIntegrationCard', () => {
     // Regex para validar formato de data (tolerante a variações de locale)
     const dateText = screen.getByText(/\d{2}\/\d{2}\/\d{4}/);
     expect(dateText).toBeInTheDocument();
+  });
+
+  // ============================================================================
+  // TESTES DE SELEÇÃO DE CALENDÁRIO (defaultCalendarId) — #1291
+  // ============================================================================
+
+  test('conectado SEM defaultCalendarId: value do Select NÃO é o email (fallback = primary)', () => {
+    // Contrato: o id do calendário salvo (defaultCalendarId) é DIFERENTE do email.
+    // O bug (L84-87) usava googleEmail como fallback do calendário selecionado,
+    // fazendo o Select exibir o email como se fosse um calendário salvo.
+    const status: GoogleIntegrationStatus = {
+      connected: true,
+      googleEmail: 'controle@aprendereditora.com.br',
+      tokenExpiry: '2025-12-31T23:59:59Z',
+      expiresInDays: 45,
+      isExpired: false,
+      defaultCalendarId: null,
+    };
+
+    const { container } = render(
+      <GoogleIntegrationCard status={status} onConnect={() => {}} onDisconnect={() => {}} />
+    );
+
+    // O item selecionado do Select NÃO pode ser o email (email ≠ calendarId).
+    const selectionItem = container.querySelector('.ant-select-selection-item');
+    expect(selectionItem).not.toBeNull();
+    expect(selectionItem?.textContent).not.toBe('controle@aprendereditora.com.br');
+
+    // Texto explícito de fallback ("calendário principal por padrão") permanece.
+    expect(screen.getByText('Usando calendário principal por padrão')).toBeInTheDocument();
+  });
+
+  test('conectado COM defaultCalendarId: Select mostra o id salvo e sem texto de fallback', () => {
+    const status: GoogleIntegrationStatus = {
+      connected: true,
+      googleEmail: 'controle@aprendereditora.com.br',
+      tokenExpiry: '2025-12-31T23:59:59Z',
+      expiresInDays: 45,
+      isExpired: false,
+      defaultCalendarId: 'time-dat@group.calendar.google.com',
+    };
+
+    const { container } = render(
+      <GoogleIntegrationCard status={status} onConnect={() => {}} onDisconnect={() => {}} />
+    );
+
+    // O Select mostra o calendarId salvo (não o email, não o fallback).
+    const selectionItem = container.querySelector('.ant-select-selection-item');
+    expect(selectionItem?.textContent).toBe('time-dat@group.calendar.google.com');
+
+    // Sem defaultCalendarId ausente → não exibe o texto de fallback.
+    expect(screen.queryByText('Usando calendário principal por padrão')).not.toBeInTheDocument();
   });
 });

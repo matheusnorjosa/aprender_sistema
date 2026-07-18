@@ -24,16 +24,50 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchAPI } from '../api/config';
 import logger from '../utils/logger';
+import type { GoogleIntegrationStatus, GoogleIntegrationStatusRaw } from '../types/gcal';
+
+// Re-export do tipo de domínio (SSOT em types/gcal) por conveniência dos consumidores.
+export type { GoogleIntegrationStatus } from '../types/gcal';
 
 /**
- * Google integration status
+ * Estado de domínio para o estado inicial / reset (desconectado).
+ *
+ * Defaults defensivos: qualquer campo ausente/nulo no payload cai para um
+ * valor seguro. `connected` e `isExpired` defaultam para `false`; os demais
+ * para `null`.
  */
-export interface GoogleIntegrationStatus {
-  connected: boolean;
-  googleEmail: string | null;
-  tokenExpiry: string | null;
-  expiresInDays: number | null;
-  isExpired: boolean;
+const EMPTY_STATUS: GoogleIntegrationStatus = {
+  connected: false,
+  googleEmail: null,
+  tokenExpiry: null,
+  expiresInDays: null,
+  isExpired: false,
+  defaultCalendarId: null,
+};
+
+/**
+ * Normaliza o payload RAW snake_case do backend para o tipo de domínio
+ * camelCase.
+ *
+ * O endpoint `/integrations/google/status/` responde SEMPRE em snake_case
+ * (apps/core/views_oauth.py). Sem esta normalização, `fetchAPI<T>` faria
+ * apenas um cast não-verificado e os campos camelCase ficariam `undefined`
+ * em runtime. Função PURA: mesma entrada → mesma saída, sem efeitos.
+ */
+export function normalizeGoogleStatus(
+  raw: Partial<GoogleIntegrationStatusRaw> | null | undefined
+): GoogleIntegrationStatus {
+  if (!raw) {
+    return { ...EMPTY_STATUS };
+  }
+  return {
+    connected: raw.connected ?? false,
+    googleEmail: raw.google_email ?? null,
+    tokenExpiry: raw.token_expiry ?? null,
+    expiresInDays: raw.expires_in_days ?? null,
+    isExpired: raw.is_expired ?? false,
+    defaultCalendarId: raw.default_calendar_id ?? null,
+  };
 }
 
 /**
@@ -56,13 +90,7 @@ export interface UseGoogleIntegrationReturn {
 }
 
 const useGoogleIntegration = (): UseGoogleIntegrationReturn => {
-  const [status, setStatus] = useState<GoogleIntegrationStatus>({
-    connected: false,
-    googleEmail: null,
-    tokenExpiry: null,
-    expiresInDays: null,
-    isExpired: false,
-  });
+  const [status, setStatus] = useState<GoogleIntegrationStatus>({ ...EMPTY_STATUS });
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,8 +102,8 @@ const useGoogleIntegration = (): UseGoogleIntegrationReturn => {
     setError(null);
 
     try {
-      const data = await fetchAPI<GoogleIntegrationStatus>('/integrations/google/status/');
-      setStatus(data);
+      const data = await fetchAPI<GoogleIntegrationStatusRaw>('/integrations/google/status/');
+      setStatus(normalizeGoogleStatus(data));
     } catch (err) {
       logger.error('Erro ao carregar status Google:', err);
       const httpError = err as { response?: { data?: { error?: string } } };
@@ -96,13 +124,7 @@ const useGoogleIntegration = (): UseGoogleIntegrationReturn => {
       await fetchAPI('/integrations/google/disconnect/', { method: 'POST' });
 
       // Atualizar estado local
-      setStatus({
-        connected: false,
-        googleEmail: null,
-        tokenExpiry: null,
-        expiresInDays: null,
-        isExpired: false,
-      });
+      setStatus({ ...EMPTY_STATUS });
 
       return { success: true };
     } catch (err) {

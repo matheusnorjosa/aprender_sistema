@@ -13,14 +13,34 @@ import type { ID, ISODateTime } from './common';
 export type GoogleConnectionStatus = 'connected' | 'disconnected' | 'expired';
 
 /**
- * Google integration status response
+ * Google integration status — payload RAW do backend (snake_case).
+ *
+ * SSOT do contrato: `apps/core/views_oauth.py` `google_oauth_status`
+ * (ramos conectado e desconectado). O frontend NUNCA deve consumir este
+ * shape diretamente — normalize via `normalizeGoogleStatus` antes de usar.
+ */
+export interface GoogleIntegrationStatusRaw {
+  connected: boolean;
+  google_email: string | null;
+  token_expiry: ISODateTime | null;
+  expires_in_days: number | null;
+  is_expired: boolean;
+  default_calendar_id: string | null;
+}
+
+/**
+ * Google integration status — tipo de DOMÍNIO (camelCase), SSOT do frontend.
+ *
+ * Produzido por `normalizeGoogleStatus(raw)` a partir do payload snake_case.
+ * Consumido pelo hook `useGoogleIntegration` e por `GoogleIntegrationCard`.
  */
 export interface GoogleIntegrationStatus {
   connected: boolean;
-  email: string | null;
-  calendars: GoogleCalendar[];
-  expires_at: ISODateTime | null;
-  needs_refresh: boolean;
+  googleEmail: string | null;
+  tokenExpiry: ISODateTime | null;
+  expiresInDays: number | null;
+  isExpired: boolean;
+  defaultCalendarId: string | null;
 }
 
 /**

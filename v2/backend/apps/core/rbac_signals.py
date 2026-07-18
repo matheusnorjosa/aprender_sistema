@@ -17,6 +17,7 @@ from apps.core.services.rbac_permissions import (
     bump_functional_permissions_cache_version,
     invalidate_group_functional_permissions_cache,
     invalidate_user_functional_permissions_cache,
+    invalidate_users_functional_permissions_cache,
 )
 from apps.core.services.rbac_service import invalidate_assignable_groups_cache
 
@@ -28,12 +29,31 @@ def _invalidate_funcperm_on_user_groups_change(
     sender: type[Any],
     instance: Any,
     action: str,
+    reverse: bool = False,
+    pk_set: set[int] | None = None,
     **kwargs: Any,
 ) -> None:
-    if action in {"post_add", "post_remove", "post_clear"}:
-        user_id = getattr(instance, "id", None)
-        if isinstance(user_id, int):
-            invalidate_user_functional_permissions_cache(user_id)
+    # P1-3: Forward (reverse=False) → instance é o User que mudou de grupos.
+    # Reverse (reverse=True) → instance é o Group (ex.: sync_members via
+    # `group.user_set.set(...)`); os usuários afetados vêm em `pk_set`. O handler
+    # antigo assumia sempre instance=User (`instance.id`), então no reverse
+    # invalidava a chave errada e deixava a autorização revogada em cache até o
+    # TTL (300s).
+    if not reverse:
+        if action in {"post_add", "post_remove", "post_clear"}:
+            user_id = getattr(instance, "id", None)
+            if isinstance(user_id, int):
+                invalidate_user_functional_permissions_cache(user_id)
+        return
+
+    if action in {"post_add", "post_remove"} and pk_set:
+        invalidate_users_functional_permissions_cache(pk_set)
+    elif action == "pre_clear":
+        # `group.user_set.clear()` não fornece pk_set → snapshot dos membros
+        # atuais ANTES do clear.
+        member_ids = list(instance.user_set.values_list("id", flat=True))
+        if member_ids:
+            invalidate_users_functional_permissions_cache(member_ids)
 
 
 @receiver(m2m_changed, sender=PermissaoFuncional.groups.through)

@@ -154,6 +154,7 @@ const ACTORS: ActorSnapshot[] = [
     policies: [
       'access_audit_logs',
       'access_solicitation_approvals',
+      'manage_internal_actions',
       'view_all_availability',
       'view_compras_dashboard',
       'view_overview_dashboard',
@@ -206,12 +207,13 @@ const ACTORS: ActorSnapshot[] = [
       'view_compras_dashboard',
     ],
     // Sem 'Aprovações' (sem policy), sem 'Controle' (canControle=false).
+    // Sem 'Ações Internas': agora policy-gated por `manage_internal_actions` (#1263),
+    // ausente no seed do DAT — antes aparecia via grupo e levava a 403.
     // 'Bloqueios' aparece via canBloqueios = canCoordenador (DAT atua como coord operacional).
     expectedVisible: [
       'Página Inicial',
       'Meus Eventos',
       'Bloqueios',
-      'Ações Internas',
       'Deslocamentos',
       'Dashboards',
       'DAT',
@@ -303,13 +305,13 @@ const ACTORS: ActorSnapshot[] = [
       'view_reports',
     ],
     // Aprovações via policy. Bloqueios via view_all_availability.
-    // Sem dashboards (Gerente Sup não tem dashboard próprio).
+    // Sem 'Ações Internas': policy-gated por `manage_internal_actions` (#1263),
+    // ausente para Gerente Sup. Sem dashboards (Gerente Sup não tem dashboard próprio).
     expectedVisible: [
       'Página Inicial',
       'Meus Eventos',
       'Aprovações',
       'Bloqueios',
-      'Ações Internas',
       'Deslocamentos',
       'Grade Mensal',
     ],
@@ -329,10 +331,10 @@ const ACTORS: ActorSnapshot[] = [
     policies: [],
     // Sem 'Aprovações' (não é Sup), sem 'Bloqueios' (sem view_all e sem canBloqueios).
     // Sem 'Deslocamentos' (não tem nenhuma das 4 condições).
+    // Sem 'Ações Internas': policy-gated por `manage_internal_actions` (#1263), ausente aqui.
     expectedVisible: [
       'Página Inicial',
       'Meus Eventos',
-      'Ações Internas',
       'Grade Mensal',
     ],
     expectedDashboardsChildren: [],
@@ -352,7 +354,7 @@ const ACTORS: ActorSnapshot[] = [
       'Página Inicial',
       'Meus Eventos',
       'Bloqueios', // canBloqueios via canCoordenador
-      'Ações Internas',
+      // Sem 'Ações Internas': policy-gated por `manage_internal_actions` (#1263), ausente aqui.
       'Deslocamentos', // via canCoordenador
       'Grade Mensal',
       'Solicitações',
@@ -371,11 +373,11 @@ const ACTORS: ActorSnapshot[] = [
       canDisponibilidade: true,
     },
     policies: [],
+    // Sem 'Ações Internas': policy-gated por `manage_internal_actions` (#1263), ausente aqui.
     expectedVisible: [
       'Página Inicial',
       'Meus Eventos',
       'Bloqueios',
-      'Ações Internas',
       'Deslocamentos',
       'Grade Mensal',
       'Solicitações',
@@ -598,5 +600,23 @@ describe('AppSidebar — Aprovações é policy-only (PR 10 hardening RBAC)', ()
   test('policy access_solicitation_approvals sem flag legacy → Aprovações VISÍVEL', () => {
     renderSidebar(EMPTY_PERMISSIONS, ['access_solicitation_approvals']);
     expect(screen.getByRole('link', { name: /^Aprovações$/i })).toBeInTheDocument();
+  });
+});
+
+describe('AppSidebar — Ações Internas é policy-only (Issue #1263)', () => {
+  test('legacy canAcoesInternas=true sem policy → Ações Internas ESCONDIDA', () => {
+    // Bug #1263: a flag legacy por grupo mostrava o menu para DAT/Coordenador/
+    // Gerente, mas o backend exige `manage_internal_actions` (0 grupos no seed).
+    // Sem a policy, o item some — alinhando frontend e backend (fim do menu→403).
+    renderSidebar(
+      { ...EMPTY_PERMISSIONS, canAcoesInternas: true, inDAT: true, canCoordenador: true },
+      [], // policy ausente
+    );
+    expect(isTopLevelVisible('Ações Internas')).toBe(false);
+  });
+
+  test('policy manage_internal_actions sem flag legacy → Ações Internas VISÍVEL', () => {
+    renderSidebar(EMPTY_PERMISSIONS, ['manage_internal_actions']);
+    expect(isTopLevelVisible('Ações Internas')).toBe(true);
   });
 });

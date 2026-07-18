@@ -28,6 +28,7 @@ import { AppSidebar } from './components/AppSidebar';
 import { AppHeader } from './components/AppHeader';
 import { AppRoutes } from './components/AppRoutes';
 import { usePermissions } from './hooks/usePermissions';
+import { useCanAccess } from './hooks/useCanAccess';
 import { useResponsive } from './hooks/useResponsive';
 import { useGCalAlertsPolling } from './hooks/useGCalAlertsPolling';
 import { useUnreadNotificationsPolling } from './hooks/useUnreadNotificationsPolling';
@@ -57,6 +58,9 @@ function AppContent(): JSX.Element {
 
   // ── Permissions (single source of truth) ──
   const permissions = usePermissions(user);
+  // Issue #1263: Ações Internas é policy-driven (manage_internal_actions), não mais
+  // a flag legacy por grupo. Policy-only, então basta `policies` (sem legacy flags).
+  const access = useCanAccess(policies);
 
   // ── Load user ──
   // `getMe()` primeiro (estabelece sessão); `getMyPolicies()` depois APENAS se
@@ -113,7 +117,7 @@ function AppContent(): JSX.Element {
 
   // ── Notification badge polling ──
   const { unreadNotifications } = useUnreadNotificationsPolling({
-    enabled: permissions.canAcoesInternas,
+    enabled: access.canManageInternalActions,
     userId: user?.id,
   });
 
@@ -208,7 +212,7 @@ function AppContent(): JSX.Element {
           }}>
             <AppHeader
               user={user}
-              canAcoesInternas={permissions.canAcoesInternas}
+              canManageInternalActions={access.canManageInternalActions}
               unreadNotifications={unreadNotifications}
               isMobile={isMobile}
               sidebarCollapsed={sidebarCollapsed}

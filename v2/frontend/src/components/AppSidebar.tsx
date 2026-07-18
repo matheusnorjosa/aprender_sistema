@@ -195,7 +195,7 @@ export function AppSidebar({
   const { openKeys, onOpenChange, closeAllSubmenus } = useMenuOpenKeys();
 
   const {
-    canCoordenador, canControle, canDAT, canAcoesInternas, isFormador,
+    canCoordenador, canControle, canDAT, isFormador,
     canDashboardOverview, canDashboardEquipe, canDashboardGcal, canDashboardCompras,
     canMapaBrasil, canDashboardsMenu, canDisponibilidade,
   } = permissions;
@@ -308,7 +308,7 @@ export function AppSidebar({
               </SubMenu>
             )}
 
-            {canAcoesInternas && (
+            {access.canManageInternalActions && (
               <SubMenu
                 key="acoes-notificacao-submenu"
                 icon={<Badge count={unreadNotifications} size="small" offset={[6, 0]}><BellOutlined /></Badge>}

@@ -647,3 +647,7 @@ evidence/
 # Slot de isolamento Docker por worktree (multi-worktree dev). Não versionar —
 # cada worktree tem o seu. Ver v2/infra/scripts/worktree-env.sh
 .dev-slot
+
+# Artefato local do codegraph/graphify (banco AST, não referenciado no repo;
+# o SSOT do grafo versionado é graphify-out/). Local — não versionar.
+.codegraph/

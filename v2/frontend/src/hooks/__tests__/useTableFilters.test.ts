@@ -105,7 +105,7 @@ describe('useTableFilters', () => {
   });
 
   test('default buildParams strips undefined and empty string', async () => {
-    const { result } = renderHook(() =>
+    renderHook(() =>
       useTableFilters<MockFilters, MockRecord, MockStats>({
         defaultFilters,
         listFn: mockListFn,
@@ -148,7 +148,7 @@ describe('useTableFilters', () => {
       ...(f.municipio ? { municipio_id: f.municipio } : {}),
     }));
 
-    const { result } = renderHook(() =>
+    renderHook(() =>
       useTableFilters<MockFilters, MockRecord, MockStats>({
         defaultFilters: { search: 'x', uf: undefined, municipio: 7 },
         listFn: mockListFn,

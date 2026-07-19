@@ -192,13 +192,30 @@ const ACTORS: ActorSnapshot[] = [
       canSeeAllSectors: true,
       canApproveSuper: true,
     },
+    // Superuser recebe todas as PUBLIC_POLICY_KEYS (bypass no backend). #1271: inclui
+    // as 3 policies de menu do #1589.
     policies: [
       'access_audit_logs',
       'access_solicitation_approvals',
+      'access_controle_section',
+      'create_solicitation',
+      'import_availability_blocks',
+      'import_compras',
+      'import_generic_spreadsheet',
+      'manage_admin_registries',
+      'manage_internal_actions',
+      'manage_purchases_and_materials',
+      'manage_solicitacao_status',
+      'use_gcal',
       'view_all_availability',
       'view_compras_dashboard',
-      'view_overview_dashboard',
+      'view_compras_pendencias',
+      'view_compras_stats',
+      'view_gcal_dashboard',
       'view_map_metrics',
+      'view_overview_dashboard',
+      'view_reports',
+      'view_team_dashboard',
     ],
     expectedAccess: {
       '/dashboards': true,
@@ -230,6 +247,7 @@ const ACTORS: ActorSnapshot[] = [
       canDashboardsMenu: true,
       canDisponibilidade: true,
     },
+    // Prod-verificado (#1588) + view_team/gcal_dashboard (#1589: DAT via manage_admin_registries).
     policies: [
       'access_audit_logs',
       'import_availability_blocks',
@@ -237,14 +255,20 @@ const ACTORS: ActorSnapshot[] = [
       'import_generic_spreadsheet',
       'manage_admin_registries',
       'manage_purchases_and_materials',
+      'view_all_availability',
       'view_compras_dashboard',
+      'view_compras_pendencias',
+      'view_compras_stats',
+      'view_reports',
+      'view_team_dashboard',
+      'view_gcal_dashboard',
     ],
     expectedAccess: {
-      '/dashboards': false, // canDashboardOverview=false (Diretoria/superuser only)
+      '/dashboards': false, // sem view_overview_dashboard (Diretoria/superuser only)
       '/dashboards/compras': true,
-      '/dashboards/equipe': true,
-      '/dashboards/gcal': true,
-      '/mapa-brasil': true,
+      '/dashboards/equipe': true, // view_team_dashboard (via manage_admin_registries)
+      '/dashboards/gcal': true, // view_gcal_dashboard
+      '/mapa-brasil': false, // #1271: sem view_map_metrics (Diretoria-only) — antes via grupo
       '/solicitacoes/aprovacoes': false, // sem policy
       '/solicitacoes/disponibilidade': true, // canDisponibilidade
       '/solicitacoes/bloqueios': true, // canCoordenador (via inDAT) → canBloqueios
@@ -266,17 +290,19 @@ const ACTORS: ActorSnapshot[] = [
     },
     policies: [
       'access_audit_logs',
+      'access_controle_section',
       'manage_purchases_and_materials',
       'manage_solicitacao_status',
       'use_gcal',
       'view_all_availability',
+      'view_gcal_dashboard',
       'view_reports',
     ],
     expectedAccess: {
       '/dashboards': false,
-      '/dashboards/compras': false, // sem policy view_compras_dashboard nem canDashboardCompras
-      '/dashboards/equipe': false,
-      '/dashboards/gcal': true,
+      '/dashboards/compras': false, // sem policy view_compras_dashboard
+      '/dashboards/equipe': false, // sem view_team_dashboard
+      '/dashboards/gcal': true, // view_gcal_dashboard
       '/mapa-brasil': false,
       '/solicitacoes/aprovacoes': false, // Controle puro: sem policy
       '/solicitacoes/disponibilidade': true,
@@ -299,12 +325,18 @@ const ACTORS: ActorSnapshot[] = [
       canMapaBrasil: true,
       canDashboardsMenu: true,
     },
-    policies: ['view_compras_dashboard', 'view_overview_dashboard', 'view_map_metrics'],
+    policies: [
+      'view_compras_dashboard',
+      'view_gcal_dashboard',
+      'view_map_metrics',
+      'view_overview_dashboard',
+      'view_team_dashboard',
+    ],
     expectedAccess: {
       '/dashboards': true,
       '/dashboards/compras': true,
-      '/dashboards/equipe': true,
-      '/dashboards/gcal': true,
+      '/dashboards/equipe': true, // view_team_dashboard
+      '/dashboards/gcal': true, // view_gcal_dashboard
       '/mapa-brasil': true,
       '/solicitacoes/aprovacoes': false,
       '/solicitacoes/disponibilidade': false, // D8/D9: removida
@@ -457,20 +489,22 @@ const ACTORS: ActorSnapshot[] = [
     },
     policies: [
       'access_audit_logs',
+      'access_controle_section',
       'access_solicitation_approvals',
       'manage_purchases_and_materials',
       'manage_solicitacao_status',
       'use_gcal',
       'view_all_availability',
+      'view_gcal_dashboard',
       'view_reports',
     ],
     expectedAccess: {
       '/dashboards': false,
       '/dashboards/compras': false,
-      '/dashboards/equipe': false,
-      '/dashboards/gcal': true,
+      '/dashboards/equipe': false, // sem view_team_dashboard
+      '/dashboards/gcal': true, // view_gcal_dashboard
       '/mapa-brasil': false,
-      '/solicitacoes/aprovacoes': true, // composite recebe policy
+      '/solicitacoes/aprovacoes': true, // access_solicitation_approvals
       '/solicitacoes/disponibilidade': true,
       '/solicitacoes/bloqueios': true,
       '/solicitacoes/deslocamentos': true,

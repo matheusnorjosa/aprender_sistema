@@ -70,11 +70,17 @@ const DAT_PERMISSIONS: Permissions = {
   canSeeAllSectors: false,
 };
 
+// #1271: as rotas /dat/* passaram a ser gateadas por <RequirePolicy
+// policy="manage_admin_registries"> (antes: flag legacy canDAT). O DAT em
+// produção possui essa policy pública — o fixture reflete isso para exercitar
+// o caminho autorizado (redirect + load direto).
+const DAT_POLICIES = ['manage_admin_registries'];
+
 describe('AppRoutes — DAT Imports redirect (PR-C)', () => {
   test('rota /dat/importacao redireciona para /dat/importacoes', async () => {
     render(
       <MemoryRouter initialEntries={['/dat/importacao']}>
-        <AppRoutes user={DAT_USER} permissions={DAT_PERMISSIONS} policies={[]} />
+        <AppRoutes user={DAT_USER} permissions={DAT_PERMISSIONS} policies={DAT_POLICIES} />
       </MemoryRouter>,
     );
 
@@ -87,7 +93,7 @@ describe('AppRoutes — DAT Imports redirect (PR-C)', () => {
   test('rota /dat/importacoes carrega ImportacoesPage diretamente para DAT', async () => {
     render(
       <MemoryRouter initialEntries={['/dat/importacoes']}>
-        <AppRoutes user={DAT_USER} permissions={DAT_PERMISSIONS} policies={[]} />
+        <AppRoutes user={DAT_USER} permissions={DAT_PERMISSIONS} policies={DAT_POLICIES} />
       </MemoryRouter>,
     );
 

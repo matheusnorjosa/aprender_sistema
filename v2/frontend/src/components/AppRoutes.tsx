@@ -1,8 +1,9 @@
 import { lazy, Suspense } from 'react';
-import { Routes, Route, Navigate, Link } from 'react-router-dom';
-import { Spin, Result, Button } from 'antd';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { Spin } from 'antd';
 import type { Permissions } from '../hooks/usePermissions';
 import { useCanAccess } from '../hooks/useCanAccess';
+import { RequirePolicy } from './access/RequirePolicy';
 import type { CurrentUser } from '../types';
 
 // Lazy-loaded pages (code-splitting)
@@ -55,26 +56,6 @@ function PageLoader(): JSX.Element {
   );
 }
 
-/**
- * Forbidden inline (mantido para rotas que ainda não usam <RequirePolicy>).
- * Mesma mensagem genérica do `RequirePolicy` (OWASP — não revelar
- * existência do recurso ou permission necessária).
- */
-function Forbidden(): JSX.Element {
-  return (
-    <Result
-      status="info"
-      title="Recurso indisponível"
-      subTitle="Esta página não está disponível ou não pode ser acessada pela sua conta."
-      extra={
-        <Link to="/">
-          <Button type="primary">Voltar ao início</Button>
-        </Link>
-      }
-    />
-  );
-}
-
 interface AppRoutesProps {
   user: CurrentUser;
   permissions: Permissions;
@@ -83,20 +64,14 @@ interface AppRoutesProps {
 
 export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.Element {
   const {
-    canCoordenador, canControle, canDAT, canApproveSuper,
-    canDashboardOverview, canDashboardEquipe, canDashboardGcal, canDashboardCompras,
-    canMapaBrasil, canDisponibilidade, isFormador,
+    canCoordenador, canControle, canDAT, canApproveSuper, canDisponibilidade, isFormador,
   } = permissions;
 
-  // Camada de tradução semântica (Epic 3): derived flags a partir de policies + legacy.
-  // Componentes consomem `access.canAccessApprovals` direto.
-  // PR 10 hardening RBAC (2026-04-30): aprovações dependem exclusivamente
-  // da policy `access_solicitation_approvals`; legacy `canApproveSuper`
-  // saiu do contrato deste hook.
+  // #1271: rotas gateadas por <RequirePolicy> (policy= direto p/ policies públicas, allow=
+  // p/ composites/auth). `access` (useCanAccess) permanece só para os composites de
+  // disponibilidade/bloqueios (view_all_availability OU escopo próprio, sem policy única).
   const access = useCanAccess(policies, {
     canBloqueios: canControle || canCoordenador || isFormador,
-    canCoordenador,
-    canDashboardCompras,
   });
 
   return (
@@ -105,26 +80,30 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
         <Route path="/" element={<HomePage />} />
         <Route path="/home" element={<HomePage />} />
 
-        {/* Dashboards */}
-        <Route path="/dashboards" element={canDashboardOverview ? <DashboardsPage /> : <Forbidden />} />
-        <Route path="/dashboards/compras" element={access.canViewComprasDashboard ? <ComprasDashboardPage /> : <Forbidden />} />
-        <Route path="/dashboards/equipe" element={canDashboardEquipe ? <EquipeDashboardPage /> : <Forbidden />} />
-        <Route path="/dashboards/gcal" element={canDashboardGcal ? <GCalDashboardPage /> : <Forbidden />} />
-        <Route path="/mapa-brasil" element={canMapaBrasil ? <MapaBrasilPage /> : <Forbidden />} />
+        {/* Dashboards — #1271: gate por policy pública (RequirePolicy). Fallback padrão
+            do RequirePolicy é a mesma tela genérica ("Recurso indisponível", OWASP). */}
+        <Route path="/dashboards" element={<RequirePolicy policy="view_overview_dashboard" policies={policies}><DashboardsPage /></RequirePolicy>} />
+        <Route path="/dashboards/compras" element={<RequirePolicy policy="view_compras_dashboard" policies={policies}><ComprasDashboardPage /></RequirePolicy>} />
+        <Route path="/dashboards/equipe" element={<RequirePolicy policy="view_team_dashboard" policies={policies}><EquipeDashboardPage /></RequirePolicy>} />
+        <Route path="/dashboards/gcal" element={<RequirePolicy policy="view_gcal_dashboard" policies={policies}><GCalDashboardPage /></RequirePolicy>} />
+        <Route path="/mapa-brasil" element={<RequirePolicy policy="view_map_metrics" policies={policies}><MapaBrasilPage /></RequirePolicy>} />
 
         {/* === Solicitações (agrupamento — Epic 3, Issue #1227) === */}
         {/* Páginas pré-existentes mantidas */}
-        <Route path="/solicitacoes/minhas" element={access.canCreateSolicitation ? <MySolicitacoesPage /> : <Forbidden />} />
-        <Route path="/solicitacoes/nova" element={access.canCreateSolicitation ? <NewSolicitacaoWizard /> : <Forbidden />} />
-        <Route path="/solicitacoes/:id/editar" element={canCoordenador || canApproveSuper ? <EditSolicitacaoPage /> : <Forbidden />} />
+        <Route path="/solicitacoes/minhas" element={<RequirePolicy policy="create_solicitation" policies={policies}><MySolicitacoesPage /></RequirePolicy>} />
+        <Route path="/solicitacoes/nova" element={<RequirePolicy policy="create_solicitation" policies={policies}><NewSolicitacaoWizard /></RequirePolicy>} />
+        {/* :id/editar — composite (#1169): owner plausível OU privilegiado, sem policy única. */}
+        <Route path="/solicitacoes/:id/editar" element={<RequirePolicy allow={canCoordenador || canApproveSuper}><EditSolicitacaoPage /></RequirePolicy>} />
 
         {/* Páginas movidas para sob /solicitacoes/* (com redirects abaixo) */}
-        <Route path="/solicitacoes/aprovacoes" element={access.canAccessApprovals ? <ApprovalsPage /> : <Forbidden />} />
-        <Route path="/solicitacoes/disponibilidade" element={access.can('view_all_availability') || canDisponibilidade ? <MonthlyPage /> : <Forbidden />} />
-        <Route path="/solicitacoes/bloqueios" element={access.canAccessBlocks ? <DisponibilidadeBlocks /> : <Forbidden />} />
-        <Route path="/solicitacoes/deslocamentos" element={access.can('view_all_availability') || canControle || canCoordenador || canDAT ? <DeslocamentosPage /> : <Forbidden />} />
-        <Route path="/solicitacoes/meus-eventos" element={user ? <MeusEventosPage /> : <Forbidden />} />
-        <Route path="/perfil" element={user ? <PerfilPage user={user} /> : <Forbidden />} />
+        <Route path="/solicitacoes/aprovacoes" element={<RequirePolicy policy="access_solicitation_approvals" policies={policies}><ApprovalsPage /></RequirePolicy>} />
+        {/* Grade Mensal / Bloqueios / Deslocamentos — composites: policy view_all_availability
+            OU acesso scoped/próprio (Coordenador/Formador) sem policy pública. */}
+        <Route path="/solicitacoes/disponibilidade" element={<RequirePolicy allow={access.can('view_all_availability') || canDisponibilidade}><MonthlyPage /></RequirePolicy>} />
+        <Route path="/solicitacoes/bloqueios" element={<RequirePolicy allow={access.canAccessBlocks}><DisponibilidadeBlocks /></RequirePolicy>} />
+        <Route path="/solicitacoes/deslocamentos" element={<RequirePolicy allow={access.can('view_all_availability') || canControle || canCoordenador || canDAT}><DeslocamentosPage /></RequirePolicy>} />
+        <Route path="/solicitacoes/meus-eventos" element={<RequirePolicy allow={!!user}><MeusEventosPage /></RequirePolicy>} />
+        <Route path="/perfil" element={<RequirePolicy allow={!!user}><PerfilPage user={user} /></RequirePolicy>} />
 
         {/* Redirects de URLs legadas → novas (preserva deep-links/bookmarks) */}
         <Route path="/aprovacoes" element={<Navigate to="/solicitacoes/aprovacoes" replace />} />
@@ -133,44 +112,45 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
         <Route path="/deslocamentos" element={<Navigate to="/solicitacoes/deslocamentos" replace />} />
         <Route path="/meus-eventos" element={<Navigate to="/solicitacoes/meus-eventos" replace />} />
 
-        {/* Controle Module */}
-        <Route path="/controle" element={canControle ? <ControlePage /> : <Forbidden />} />
-        <Route path="/controle/acoes" element={canControle ? <AcoesPage /> : <Forbidden />} />
-        <Route path="/controle/compras" element={(canControle || canDAT) ? <DATComprasPage /> : <Forbidden />} />
-        <Route path="/controle/coordenadores" element={canControle ? <CoordenadoresPage /> : <Forbidden />} />
-        <Route path="/compras-materiais" element={(canControle || canDAT) ? <DATComprasPage /> : <Forbidden />} />
+        {/* Controle Module — #1271: policy access_controle_section (paridade com canControle);
+            compras somam DAT via allow (composite sem policy única). */}
+        <Route path="/controle" element={<RequirePolicy policy="access_controle_section" policies={policies}><ControlePage /></RequirePolicy>} />
+        <Route path="/controle/acoes" element={<RequirePolicy policy="access_controle_section" policies={policies}><AcoesPage /></RequirePolicy>} />
+        <Route path="/controle/compras" element={<RequirePolicy allow={canControle || canDAT}><DATComprasPage /></RequirePolicy>} />
+        <Route path="/controle/coordenadores" element={<RequirePolicy policy="access_controle_section" policies={policies}><CoordenadoresPage /></RequirePolicy>} />
+        <Route path="/compras-materiais" element={<RequirePolicy allow={canControle || canDAT}><DATComprasPage /></RequirePolicy>} />
         {/* /deslocamentos movido para /solicitacoes/deslocamentos (Epic 3, Issue #1227 — redirect já registrado acima) */}
-        <Route path="/controle/formacoes" element={canControle ? <FormacoesPage /> : <Forbidden />} />
-        <Route path="/controle/plano-formacoes" element={canControle ? <PlanoFormacoesPage /> : <Forbidden />} />
-        <Route path="/controle/pre-agenda" element={canControle ? <PreAgendaPage /> : <Forbidden />} />
-        <Route path="/pre-agenda" element={canControle ? <PreAgendaPage /> : <Forbidden />} />
+        <Route path="/controle/formacoes" element={<RequirePolicy policy="access_controle_section" policies={policies}><FormacoesPage /></RequirePolicy>} />
+        <Route path="/controle/plano-formacoes" element={<RequirePolicy policy="access_controle_section" policies={policies}><PlanoFormacoesPage /></RequirePolicy>} />
+        <Route path="/controle/pre-agenda" element={<RequirePolicy policy="access_controle_section" policies={policies}><PreAgendaPage /></RequirePolicy>} />
+        <Route path="/pre-agenda" element={<RequirePolicy policy="access_controle_section" policies={policies}><PreAgendaPage /></RequirePolicy>} />
 
-        {/* Ações/Notificações */}
-        <Route path="/acoes-notificacao" element={access.canManageInternalActions ? <AcoesNotificacaoPage /> : <Forbidden />} />
-        <Route path="/acoes-notificacao/timeline" element={access.canManageInternalActions ? <AcoesTimelinePage /> : <Forbidden />} />
-        <Route path="/notificacoes-internas" element={access.canManageInternalActions ? <NotificacoesInternasPage /> : <Forbidden />} />
-        {/* DAT Module */}
-        <Route path="/dat/admin" element={canDAT ? <AdminDATHomePage /> : <Forbidden />} />
-        <Route path="/dat/admin/usuarios" element={canDAT ? <UsuariosPage /> : <Forbidden />} />
-        <Route path="/dat/admin/municipios" element={canDAT ? <MunicipiosPage /> : <Forbidden />} />
-        <Route path="/dat/admin/projetos" element={canDAT ? <ProjetosPage /> : <Forbidden />} />
-        <Route path="/dat/admin/grupos" element={canDAT ? <GruposPage /> : <Forbidden />} />
-        <Route path="/dat/admin/setores" element={canDAT ? <SetoresPage /> : <Forbidden />} />
-        <Route path="/dat/admin/funcoes" element={canDAT ? <FuncoesPage /> : <Forbidden />} />
-        <Route path="/dat/admin/gerencias" element={canDAT ? <GerenciasPage /> : <Forbidden />} />
-        <Route path="/dat/admin/produtos" element={canDAT ? <ProdutosPage /> : <Forbidden />} />
-        <Route path="/dat/admin/configuracoes" element={canDAT ? <ConfiguracoesPage /> : <Forbidden />} />
-        <Route path="/dat/admin/colecoes" element={canDAT ? <ColecoesImportPage /> : <Forbidden />} />
-        <Route path="/dat/admin/equipe-gerencia" element={canDAT ? <EquipeGerenciaImportPage /> : <Forbidden />} />
-        <Route path="/dat/cadastros" element={canDAT ? <CadastrosPage /> : <Forbidden />} />
-        <Route path="/dat/compras-materiais" element={(canControle || canDAT) ? <DATComprasPage /> : <Forbidden />} />
-        <Route path="/dat/coordenadores" element={canControle ? <CoordenadoresPage /> : <Forbidden />} />
+        {/* Ações/Notificações — #1271: policy manage_internal_actions. */}
+        <Route path="/acoes-notificacao" element={<RequirePolicy policy="manage_internal_actions" policies={policies}><AcoesNotificacaoPage /></RequirePolicy>} />
+        <Route path="/acoes-notificacao/timeline" element={<RequirePolicy policy="manage_internal_actions" policies={policies}><AcoesTimelinePage /></RequirePolicy>} />
+        <Route path="/notificacoes-internas" element={<RequirePolicy policy="manage_internal_actions" policies={policies}><NotificacoesInternasPage /></RequirePolicy>} />
+        {/* DAT Module — #1271: policy manage_admin_registries (paridade com canDAT). */}
+        <Route path="/dat/admin" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><AdminDATHomePage /></RequirePolicy>} />
+        <Route path="/dat/admin/usuarios" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><UsuariosPage /></RequirePolicy>} />
+        <Route path="/dat/admin/municipios" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><MunicipiosPage /></RequirePolicy>} />
+        <Route path="/dat/admin/projetos" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><ProjetosPage /></RequirePolicy>} />
+        <Route path="/dat/admin/grupos" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><GruposPage /></RequirePolicy>} />
+        <Route path="/dat/admin/setores" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><SetoresPage /></RequirePolicy>} />
+        <Route path="/dat/admin/funcoes" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><FuncoesPage /></RequirePolicy>} />
+        <Route path="/dat/admin/gerencias" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><GerenciasPage /></RequirePolicy>} />
+        <Route path="/dat/admin/produtos" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><ProdutosPage /></RequirePolicy>} />
+        <Route path="/dat/admin/configuracoes" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><ConfiguracoesPage /></RequirePolicy>} />
+        <Route path="/dat/admin/colecoes" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><ColecoesImportPage /></RequirePolicy>} />
+        <Route path="/dat/admin/equipe-gerencia" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><EquipeGerenciaImportPage /></RequirePolicy>} />
+        <Route path="/dat/cadastros" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><CadastrosPage /></RequirePolicy>} />
+        <Route path="/dat/compras-materiais" element={<RequirePolicy allow={canControle || canDAT}><DATComprasPage /></RequirePolicy>} />
+        <Route path="/dat/coordenadores" element={<RequirePolicy policy="access_controle_section" policies={policies}><CoordenadoresPage /></RequirePolicy>} />
         {/* PR-C DAT Imports (2026-04-29): /dat/importacao (singular, página antiga
             de Cadastros DAT) redireciona para /dat/importacoes (plural, página
             unificada de imports). Evita 404 em links antigos. */}
         <Route path="/dat/importacao" element={<Navigate to="/dat/importacoes" replace />} />
-        <Route path="/dat/importacoes" element={canDAT ? <DATImportacoesPage /> : <Forbidden />} />
-        <Route path="/dat/registros" element={canDAT ? <DATRegistrosPage /> : <Forbidden />} />
+        <Route path="/dat/importacoes" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><DATImportacoesPage /></RequirePolicy>} />
+        <Route path="/dat/registros" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><DATRegistrosPage /></RequirePolicy>} />
       </Routes>
     </Suspense>
   );

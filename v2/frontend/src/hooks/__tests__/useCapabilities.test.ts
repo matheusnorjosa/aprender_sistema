@@ -78,7 +78,18 @@ describe('computeCapabilities — flags nomeadas por ator', () => {
     expect(caps.canManageInternalActions).toBe(false);
   });
 
-  test('cada uma das 18 flags reflete exatamente sua policy', () => {
+  test('policies de seção de menu (#1270): controle, team dashboard, gcal dashboard', () => {
+    expect(computeCapabilities(['access_controle_section']).canAccessControleSection).toBe(true);
+    expect(computeCapabilities(['view_team_dashboard']).canViewTeamDashboard).toBe(true);
+    expect(computeCapabilities(['view_gcal_dashboard']).canViewGcalDashboard).toBe(true);
+    // Não vazam entre si nem para flags não relacionadas.
+    const c = computeCapabilities(['access_controle_section']);
+    expect(c.canViewTeamDashboard).toBe(false);
+    expect(c.canViewGcalDashboard).toBe(false);
+    expect(c.canManageInternalActions).toBe(false);
+  });
+
+  test('cada uma das 21 flags reflete exatamente sua policy', () => {
     const CASES: ReadonlyArray<readonly [keyof ReturnType<typeof computeCapabilities>, string]> = [
       ['canAccessAuditLogs', 'access_audit_logs'],
       ['canAccessApprovals', 'access_solicitation_approvals'],
@@ -98,6 +109,9 @@ describe('computeCapabilities — flags nomeadas por ator', () => {
       ['canManageAdminRegistries', 'manage_admin_registries'],
       ['canManageInternalActions', 'manage_internal_actions'],
       ['canManagePurchasesAndMaterials', 'manage_purchases_and_materials'],
+      ['canAccessControleSection', 'access_controle_section'],
+      ['canViewTeamDashboard', 'view_team_dashboard'],
+      ['canViewGcalDashboard', 'view_gcal_dashboard'],
     ];
     for (const [flag, policy] of CASES) {
       const caps = computeCapabilities([policy]);

@@ -47,9 +47,9 @@ O sistema original funcionava integralmente sobre planilhas Google/Excel, que ac
 ### 2.2 Estrutura de Código
 
 #### Backend (`v2/backend`)
-- **Apps**: `apps.core` (domínio principal) e `apps.dat_ingest` (ETLs e ingestão)
+- **Apps**: `apps.core` (domínio principal). O antigo `apps.dat_ingest` (ETLs e ingestão) foi removido (ver §2.4)
 - **Configurações**: `config/` (settings, urls, wsgi, celery)
-- **Comandos ETL**: `apps/dat_ingest/management/commands/` (21 comandos)
+- **Importação de Dados**: `apps/core/imports/` (pipeline export-contract, ADR-012)
 
 #### Frontend (`v2/frontend`)
 - **Framework**: React 18 + Vite 7

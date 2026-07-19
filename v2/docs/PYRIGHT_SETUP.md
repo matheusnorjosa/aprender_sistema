@@ -45,13 +45,13 @@ Configuração principal em `v2/backend/pyproject.toml`:
 [tool.pyright]
 typeCheckingMode = "strict"  # Modo mais rigoroso
 pythonVersion = "3.12"       # Python 3.12.12
-include = ["apps/core", "apps/dat_ingest", "config"]
+include = ["apps/core", "apps/dev_tools", "config"]
 exclude = ["**/migrations", "**/tests", "**/__pycache__"]
 ```
 
 **Arquivos incluídos** (35% do projeto):
 - `apps/core/` - 24 services, 5 models, 21 views, 1 serializer, 1 tasks
-- `apps/dat_ingest/` - 11 services, models, views
+- `apps/dev_tools/`
 - `config/` - Settings, URLs
 
 **Arquivos excluídos** (temporário):
@@ -106,7 +106,7 @@ O CI roda automaticamente em cada push/PR:
 - name: Type check with Pyright
   run: |
     cd v2/backend
-    pyright apps/core apps/dat_ingest config
+    pyright apps/core apps/dev_tools config
   continue-on-error: true  # Não bloqueia CI (baseline)
 ```
 
@@ -274,7 +274,7 @@ print(f\"Files: {summary['filesAnalyzed']}\")
 
 ```bash
 cd v2/backend
-pyright apps/core/services/ apps/dat_ingest/services/
+pyright apps/core/services/
 ```
 
 ---
@@ -305,7 +305,7 @@ pyright --outputjson > pyright-baseline.json
 - name: Type check with Pyright
   run: |
     cd v2/backend
-    pyright apps/core apps/dat_ingest config
+    pyright apps/core apps/dev_tools config
   continue-on-error: true  # Baseline: não bloqueia
 ```
 

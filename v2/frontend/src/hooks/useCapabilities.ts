@@ -38,6 +38,12 @@ export interface Capabilities {
   canManageAdminRegistries: boolean;
   canManageInternalActions: boolean;
   canManagePurchasesAndMaterials: boolean;
+  // Policies de seção de menu (#1589) — paridade exata com os gates legacy do
+  // usePermissions (canControle / canDashboardEquipe / canDashboardGcal). Consumidas
+  // pelo AppSidebar em #1270.
+  canAccessControleSection: boolean;
+  canViewTeamDashboard: boolean;
+  canViewGcalDashboard: boolean;
 }
 
 /** Versão pura (sem React) — usada em tests e call sites sem render. */
@@ -66,6 +72,9 @@ export function computeCapabilities(policies: readonly string[]): Capabilities {
     canManageAdminRegistries: can('manage_admin_registries'),
     canManageInternalActions: can('manage_internal_actions'),
     canManagePurchasesAndMaterials: can('manage_purchases_and_materials'),
+    canAccessControleSection: can('access_controle_section'),
+    canViewTeamDashboard: can('view_team_dashboard'),
+    canViewGcalDashboard: can('view_gcal_dashboard'),
   };
 }
 

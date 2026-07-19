@@ -41,10 +41,20 @@ def is_privileged_user(user):
     bloqueios de terceiros em `AvailabilityBlockViewSet.get_queryset` e
     alargá-lo expõe dados sensíveis. Para consulta de conflito (RD-04 etc.)
     via /api/availability/check/, usar `can_check_availability_for_others`.
-    """
-    from apps.core.rbac_helpers import user_has_any_perm
 
-    return user_has_any_perm(user, "view_all_availability")
+    Invariante (RBAC 3.4, #1272): `view_all_availability` é BYPASS de escopo
+    aplicado DENTRO do `get_queryset`, NUNCA gate de entrada. A `permission_classes`
+    do `AvailabilityBlockViewSet` permanece `[IsAuthenticated]` — mover a capability
+    para lá quebraria o fluxo own-block do Formador (RD-02/RD-03: declara o próprio
+    bloqueio sem ter a capability). Travado por `test_availability_privileged_invariant`.
+
+    Roteia pela SSOT da camada de Policy (`user_has_policy`) em vez de checar a
+    capability crua — `view_all_availability` é policy single-cap, então a semântica
+    é idêntica (superuser bypassa em ambos; mesma capability única).
+    """
+    from apps.core.rbac.policies import user_has_policy
+
+    return user_has_policy(user, "view_all_availability")
 
 
 def can_check_availability_for_others(user):

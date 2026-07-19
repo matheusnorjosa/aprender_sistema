@@ -1,0 +1,93 @@
+# RBAC matrix doc drift guard (#1276, RBAC 3.9)
+#
+# Liga no CI o `--check` do management command existente
+# `apps/core/management/commands/rbac_matrix_doc.py` (PR 14 / #1319), que
+# regenera o bloco `<!-- BEGIN AUTOGEN: ACCESS_MATRIX -->` de
+# v2/docs/rbac_authorization_matrix.md a partir de apps/core/rbac/matrix.py
+# (SSOT executavel) e falha (exit 1) em drift.
+#
+# Por que um workflow dedicado (e nao um 2o gerador em v2/scripts/):
+#   - Fonte de render UNICA — reusa o command existente, sem duplicar logica
+#     (a "letra" do #1276 pedia v2/scripts/generate_*.py, escrita ANTES do
+#     command existir; aqui seguimos o ESPIRITO anti-drift). Ver #1276.
+#   - O teste `test_pr14_rbac_matrix_doc_sync.py::TestRealDocInSync` ja roda
+#     na suite backend (backend-tests-core), mas SO quando paths de backend
+#     mudam. Este job fecha o vetor descoberto: edicao doc-only
+#     (v2/docs/rbac_authorization_matrix.md) nao dispara a suite backend.
+#   - Nao toca v2/backend/ nem ci.yaml: matrix.py e' apenas LIDO.
+#
+# Para tornar bloqueante de verdade: adicionar o check
+# "[required] rbac matrix doc drift" a branch protection de `main` (acao de
+# admin — nao e' um arquivo).
+
+name: RBAC doc drift
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'v2/backend/apps/core/rbac/matrix.py'
+      - 'v2/docs/rbac_authorization_matrix.md'
+      - '.github/workflows/rbac-doc-drift.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'v2/backend/apps/core/rbac/matrix.py'
+      - 'v2/docs/rbac_authorization_matrix.md'
+      - '.github/workflows/rbac-doc-drift.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rbac-doc-drift-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  drift:
+    name: "[required] rbac matrix doc drift"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
+
+      # Reusa o composite oficial de install (mesmo usado por _backend-test.yml).
+      # requirements.txt basta: o command so precisa do Django importavel — nao
+      # toca o banco (le matrix.py + le/escreve o .md), entao nao ha service
+      # postgres/redis aqui.
+      - uses: ./.github/actions/setup-python-deps
+        with:
+          requirements: 'requirements.txt'
+
+      # Valores test-only, o suficiente para `config.settings` importar. SSOT do
+      # conjunto completo de env de teste e' _backend-test.yml (#1401); aqui e'
+      # um subset estatico porque o command nao conecta em DB/redis.
+      - name: Set up environment variables
+        run: |
+          {
+            echo "DJANGO_SETTINGS_MODULE=config.settings"
+            echo "ENVIRONMENT=testing"
+            echo "DEBUG=0"
+            echo "SECRET_KEY=test-secret-key-for-ci-only"
+            echo "DB_HOST=localhost"
+            echo "DB_PORT=5432"
+            echo "DB_NAME=test_aprender"
+            echo "DB_USER=postgres"
+            echo "DB_PASSWORD=postgres"
+            echo "REDIS_HOST=localhost"
+            echo "REDIS_PORT=6379"
+            echo "TZ=America/Fortaleza"
+            echo "REQUIRE_DOCKER=0"
+            echo "GCAL_CLIENT=fake"
+            echo "GCAL_SEND_UPDATES=none"
+            echo "FEATURE_AUTO_APPLY_ENABLED=false"
+            echo "IMPORT_OUTPUT_DIR=${{ github.workspace }}/v2/backend/out_etl"
+            echo "IMPORT_DATA_DIR=${{ github.workspace }}/v2/backend/data/csv-import"
+            echo "PYTHONDONTWRITEBYTECODE=1"
+          } >> "$GITHUB_ENV"
+
+      # --check (default do command): exit 1 se o bloco autogen do doc divergir
+      # do que ACCESS_MATRIX produziria. Correcao: rodar `--write` e commitar.
+      - name: RBAC matrix doc in sync with matrix.py
+        working-directory: v2/backend
+        run: python manage.py rbac_matrix_doc --check

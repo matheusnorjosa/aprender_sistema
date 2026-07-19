@@ -12,8 +12,9 @@ Query params:
 
 Permissões (Bug 1 fix pós RBAC Access Policy Realignment, 2026-04-27):
     - Superusers: acesso a todas as gerências
-    - Capability `view_all_availability` (Controle/Gerente/Coordenador/
-      Apoio de Coordenação por seed 0077): acesso a todas as gerências
+    - Capability `view_all_availability` (grupos atribuídos por seed — SSOT em
+      `functional_permissions_seed.py`; não duplicar a lista aqui p/ evitar drift):
+      acesso a todas as gerências
     - Sem capability + sem gerencia_id: comportamento SUPER (permitido)
     - Sem capability + com gerencia_id: verifica EquipeGerencia
 
@@ -72,9 +73,9 @@ class MonthlyAvailabilityView(APIView):
     """
 
     # Bug 1 fix (2026-04-27): camada de tradução semântica.
-    # Quem tem capability `view_all_availability` (Controle/Gerente via seed
-    # 0078 — realinhada para excluir Coord/Apoio que devem ser scoped por
-    # setor vinculado) bypassa scope. Quem não tem cai em HasSectorAccess
+    # Quem tem capability `view_all_availability` (grupos por seed — SSOT em
+    # functional_permissions_seed.py; Coord/Apoio ficam scoped por setor vinculado,
+    # não recebem a cap) bypassa scope. Quem não tem cai em HasSectorAccess
     # (verificação por gerencia_id via EquipeGerencia).
     permission_classes = [IsAuthenticated, CanViewAllAvailability | HasSectorAccess]  # type: ignore[list-item]
 
@@ -172,7 +173,7 @@ class MonthlyAvailabilityView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
         # Sem gerencia_id, restringir escopo para evitar vazamento global:
-        # - Perfis amplos (super/capability pode_ver_todas_disponibilidades): visão ampla
+        # - Perfis amplos (super/capability view_all_availability): visão ampla
         # - Demais perfis: limitar aos usuários das gerências vinculadas
         #
         # Epic 3.2 RBAC Refactor (2026-04-23): hardcoded

@@ -138,7 +138,10 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     ViewSet para Solicitações de Evento.
 
     PA-01: Status sempre começa pendente.
-    PA-02 (Adaptada): Superintendência, DAT e Superusuários podem aprovar/reprovar.
+    PA-02 (Adaptada): aprovar/reprovar exige a policy `access_solicitation_approvals`
+    (CanAccessSolicitationApprovals) — Gerente da Superintendência OU Assistente
+    Administrativo do Controle OU superuser. (Doc antiga dizia "Superintendência, DAT
+    e Superusuários"; corrigido em #1378 — regra real em rbac/policies.py.)
     PR 8/N: Apenas Coordenador ou DAT podem criar solicitações.
     """
 
@@ -608,7 +611,10 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
     @extend_schema(
         summary="Aprovar solicitação",
-        description="Aprova uma solicitação pendente. Apenas Superintendência, DAT ou superuser (PA-02).",
+        description=(
+            "Aprova uma solicitação pendente. Requer a policy access_solicitation_approvals "
+            "(PA-02): Gerente da Superintendência, Assistente Administrativo do Controle ou superuser."
+        ),
         request=None,
         responses={
             200: SolicitacaoSerializer,
@@ -624,7 +630,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         url_path="approve",
     )
     def approve(self, request, pk=None):
-        """Aprovar solicitação (PA-02 Adaptada: Superintendência, DAT e Superusuários)."""
+        """Aprovar solicitação (PA-02: Gerente da Superintendência, Assistente Administrativo do Controle ou superuser)."""
         solicitacao = self.get_object()
         justificativa = request.data.get("reason") or request.data.get("justificativa", "")
 
@@ -646,7 +652,11 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
     @extend_schema(
         summary="Reprovar solicitação",
-        description="Reprova uma solicitação pendente. Requer justificativa. Apenas Superintendência, DAT ou superuser (PA-02).",
+        description=(
+            "Reprova uma solicitação pendente. Requer justificativa e a policy "
+            "access_solicitation_approvals (PA-02): Gerente da Superintendência, "
+            "Assistente Administrativo do Controle ou superuser."
+        ),
         request=None,
         responses={
             200: SolicitacaoSerializer,
@@ -662,7 +672,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         url_path="reject",
     )
     def reject(self, request, pk=None):
-        """Reprovar solicitação (PA-02 Adaptada: Superintendência, DAT e Superusuários)."""
+        """Reprovar solicitação (PA-02: Gerente da Superintendência, Assistente Administrativo do Controle ou superuser)."""
         solicitacao = self.get_object()
         justificativa = request.data.get("reason") or request.data.get("justificativa", "")
 
@@ -836,7 +846,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         Response 200: { "approved": 2, "errors": [{"id": 3, "detail": "..."}] }
 
-        Permissão: Superintendência, DAT ou superusers (PA-02 Adaptada).
+        Permissão: policy access_solicitation_approvals (PA-02) — Gerente da
+        Superintendência, Assistente Administrativo do Controle ou superuser.
         PA-05: Cada solicitação gera um AuditLog individual com batch=true.
         Limite: máximo 100 solicitações por requisição.
         """
@@ -872,7 +883,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         Response 200: { "rejected": 2, "errors": [{"id": 3, "detail": "..."}] }
 
-        Permissão: Superintendência, DAT ou superusers (PA-02 Adaptada).
+        Permissão: policy access_solicitation_approvals (PA-02) — Gerente da
+        Superintendência, Assistente Administrativo do Controle ou superuser.
         PA-05: Cada solicitação gera um AuditLog individual com batch=true.
         Limite: máximo 100 solicitações por requisição.
         """

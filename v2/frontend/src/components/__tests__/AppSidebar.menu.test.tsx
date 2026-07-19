@@ -171,6 +171,9 @@ const ACTORS: ActorSnapshot[] = [
       'view_map_metrics',
       'view_overview_dashboard',
       'view_reports',
+      'access_controle_section',
+      'view_team_dashboard',
+      'view_gcal_dashboard',
     ],
     expectedVisible: [
       'Página Inicial',
@@ -222,8 +225,12 @@ const ACTORS: ActorSnapshot[] = [
       'view_compras_pendencias',
       'view_compras_stats',
       'view_reports',
+      'view_team_dashboard',
+      'view_gcal_dashboard',
     ],
-    // Sem 'Aprovações' (sem policy), sem 'Controle' (canControle=false).
+    // Sem 'Aprovações' (sem policy), sem 'Controle' (sem access_controle_section).
+    // #1270: 'Solicitações' e 'Mapa do Brasil' saem — DAT não tem create_solicitation
+    // nem view_map_metrics; antes apareciam via grupo (over-showing), backend nega.
     // Sem 'Ações Internas': agora policy-gated por `manage_internal_actions` (#1263),
     // ausente no seed do DAT — antes aparecia via grupo e levava a 403.
     // 'Bloqueios' aparece via canBloqueios = canCoordenador (DAT atua como coord operacional).
@@ -235,14 +242,13 @@ const ACTORS: ActorSnapshot[] = [
       'Dashboards',
       'DAT',
       'Grade Mensal',
-      'Solicitações',
     ],
     expectedDashboardsChildren: [
-      // 'Dashboard Geral' escondido (canDashboardOverview=false; só Diretoria/superuser)
+      // 'Dashboard Geral' escondido (sem view_overview_dashboard; só Diretoria/superuser)
+      // 'Mapa do Brasil' escondido (#1270: sem view_map_metrics — Diretoria-only)
       'Dashboard Compras',
       'Dashboard Equipe',
       'Dashboard GCal',
-      'Mapa do Brasil',
     ],
     expectedDatChildren: ['Administração', 'Cadastros', 'Importações', 'Registros de Turmas'],
   },
@@ -269,6 +275,8 @@ const ACTORS: ActorSnapshot[] = [
       'view_compras_pendencias',
       'view_compras_stats',
       'view_reports',
+      'access_controle_section',
+      'view_gcal_dashboard',
     ],
     // Sem 'Aprovações' (sem policy access_solicitation_approvals — Controle puro).
     // Sem 'DAT', sem 'Solicitações', sem 'Ações Internas'.
@@ -299,7 +307,7 @@ const ACTORS: ActorSnapshot[] = [
       // canDisponibilidade=false (D8/D9: Diretoria removida da Grade Mensal).
     },
     // Policies verificadas em produção (#1588).
-    policies: ['view_compras_dashboard', 'view_compras_pendencias', 'view_map_metrics', 'view_overview_dashboard'],
+    policies: ['view_compras_dashboard', 'view_compras_pendencias', 'view_map_metrics', 'view_overview_dashboard', 'view_team_dashboard', 'view_gcal_dashboard'],
     expectedVisible: ['Página Inicial', 'Meus Eventos', 'Dashboards'],
     expectedDashboardsChildren: [
       'Dashboard Geral',
@@ -334,12 +342,15 @@ const ACTORS: ActorSnapshot[] = [
     //   NÃO tem em produção) e não há fallback legacy (canControle/canCoordenador/isFormador
     //   todos false). #1588 corrigiu a fixture que afirmava o contrário.
     // 'Grade Mensal' aparece via canDisponibilidade (legacy, inclui isGerente).
+    // #1270: 'Solicitações' passa a aparecer — Gerente Sup TEM create_solicitation
+    // (antes escondido: o gate legacy era canCoordenador, false aqui — under-showing).
     // Sem 'Ações Internas' (manage_internal_actions ausente) e sem dashboards próprios.
     expectedVisible: [
       'Página Inicial',
       'Meus Eventos',
       'Aprovações',
       'Grade Mensal',
+      'Solicitações',
     ],
     expectedDashboardsChildren: [],
     expectedDatChildren: [],
@@ -360,10 +371,13 @@ const ACTORS: ActorSnapshot[] = [
     // Sem 'Aprovações' (não é Sup), sem 'Bloqueios' (sem view_all e sem canBloqueios).
     // Sem 'Deslocamentos' (não tem nenhuma das 4 condições).
     // Sem 'Ações Internas': policy-gated por `manage_internal_actions` (#1263), ausente aqui.
+    // #1270: 'Solicitações' passa a aparecer — tem create_solicitation (antes escondido
+    // pelo gate legacy canCoordenador, false p/ Função Gerente — under-showing).
     expectedVisible: [
       'Página Inicial',
       'Meus Eventos',
       'Grade Mensal',
+      'Solicitações',
     ],
     expectedDashboardsChildren: [],
     expectedDatChildren: [],
@@ -458,6 +472,8 @@ const ACTORS: ActorSnapshot[] = [
       'view_compras_pendencias',
       'view_compras_stats',
       'view_reports',
+      'access_controle_section',
+      'view_gcal_dashboard',
     ],
     expectedVisible: [
       'Página Inicial',

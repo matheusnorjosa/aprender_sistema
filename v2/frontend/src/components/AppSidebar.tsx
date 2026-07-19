@@ -13,7 +13,7 @@ import {
   TableOutlined,
 } from '@ant-design/icons';
 import type { Permissions } from '../hooks/usePermissions';
-import { useCanAccess } from '../hooks/useCanAccess';
+import { useCapabilities } from '../hooks/useCapabilities';
 import { LAYOUT } from '../constants';
 
 const { Sider } = Layout;
@@ -194,22 +194,16 @@ export function AppSidebar({
 }: AppSidebarProps): JSX.Element {
   const { openKeys, onOpenChange, closeAllSubmenus } = useMenuOpenKeys();
 
+  // #1270 (RBAC 3.2): os itens de menu derivam de `useCapabilities` (policy pura,
+  // fonte de verdade do backend). As flags legacy de organograma permanecem SÓ onde
+  // não há policy pública equivalente: escopo próprio de Formador/Coordenador em
+  // Bloqueios/Deslocamentos e o acesso scoped da Grade Mensal (`canDisponibilidade`).
+  // Todas são flags can*/is* (não `in*`).
   const {
-    canCoordenador, canControle, canDAT, isFormador,
-    canDashboardOverview, canDashboardEquipe, canDashboardGcal, canDashboardCompras,
-    canMapaBrasil, canDashboardsMenu, canDisponibilidade,
+    canCoordenador, canControle, canDAT, isFormador, canDisponibilidade,
   } = permissions;
 
-  // Camada de tradução semântica (Epic 3, Issue #1228): derived flags do policy layer.
-  // Itens de menu consomem `access.canAccessApprovals` etc. — origem (policy vs legacy) é detalhe.
-  // PR 10 hardening RBAC (2026-04-30): Aprovações depende exclusivamente da
-  // policy `access_solicitation_approvals`. Legacy `canApproveSuper` não é
-  // mais passado ao hook (campo segue na API, mas não decide acesso aqui).
-  const access = useCanAccess(policies, {
-    canBloqueios: canControle || canCoordenador || isFormador,
-    canDashboardCompras,
-    canCoordenador,
-  });
+  const caps = useCapabilities(policies);
 
   return (
     <>
@@ -284,19 +278,21 @@ export function AppSidebar({
               <Link to="/solicitacoes/meus-eventos">Meus Eventos</Link>
             </Menu.Item>
 
-            {access.canAccessApprovals && (
+            {caps.canAccessApprovals && (
               <Menu.Item key="aprovacoes" icon={<SafetyOutlined />} onClick={closeAllSubmenus}>
                 <Link to="/solicitacoes/aprovacoes">Aprovações</Link>
               </Menu.Item>
             )}
 
-            {access.canAccessBlocks && (
+            {/* Bloqueios: policy view_all_availability + escopo próprio de Formador/Coordenador
+                (sem policy pública) e Controle (access_controle_section). */}
+            {(caps.canViewAllAvailability || canControle || canCoordenador || isFormador) && (
               <Menu.Item key="bloqueios" icon={<CalendarOutlined />} onClick={closeAllSubmenus}>
                 <Link to="/solicitacoes/bloqueios">Bloqueios</Link>
               </Menu.Item>
             )}
 
-            {canControle && (
+            {caps.canAccessControleSection && (
               <SubMenu key="controle-submenu" icon={<CheckCircleOutlined />} title="Controle">
                 <Menu.Item key="controle-acoes"><Link to="/controle/acoes">Ações</Link></Menu.Item>
                 <Menu.Item key="controle-compras"><Link to="/controle/compras">Compras</Link></Menu.Item>
@@ -308,7 +304,7 @@ export function AppSidebar({
               </SubMenu>
             )}
 
-            {access.canManageInternalActions && (
+            {caps.canManageInternalActions && (
               <SubMenu
                 key="acoes-notificacao-submenu"
                 icon={<Badge count={unreadNotifications} size="small" offset={[6, 0]}><BellOutlined /></Badge>}
@@ -320,37 +316,41 @@ export function AppSidebar({
               </SubMenu>
             )}
 
-            {(access.can('view_all_availability') || canControle || canCoordenador || canDAT) && (
+            {(caps.canViewAllAvailability || canControle || canCoordenador || canDAT) && (
               <Menu.Item key="deslocamentos" icon={<CalendarOutlined />} onClick={closeAllSubmenus}>
                 <Link to="/solicitacoes/deslocamentos">Deslocamentos</Link>
               </Menu.Item>
             )}
 
-            {canDashboardsMenu && (
+            {(caps.canViewOverviewDashboard ||
+              caps.canViewComprasDashboard ||
+              caps.canViewTeamDashboard ||
+              caps.canViewGcalDashboard ||
+              caps.canViewMapMetrics) && (
               <SubMenu key="dashboards-submenu" icon={<BarChartOutlined />} title="Dashboards">
-                {canDashboardOverview && (
+                {caps.canViewOverviewDashboard && (
                   <Menu.Item key="dashboard-geral"><Link to="/dashboards">Dashboard Geral</Link></Menu.Item>
                 )}
-                {access.canViewComprasDashboard && (
+                {caps.canViewComprasDashboard && (
                   <Menu.Item key="dashboard-compras"><Link to="/dashboards/compras">Dashboard Compras</Link></Menu.Item>
                 )}
-                {canDashboardEquipe && (
+                {caps.canViewTeamDashboard && (
                   <Menu.Item key="dashboard-equipe"><Link to="/dashboards/equipe">Dashboard Equipe</Link></Menu.Item>
                 )}
-                {canDashboardGcal && (
+                {caps.canViewGcalDashboard && (
                   <Menu.Item key="gcal-dashboard">
                     <Link to="/dashboards/gcal">
                       <Badge count={gcalErrorCount} offset={[10, 0]} size="small">Dashboard GCal</Badge>
                     </Link>
                   </Menu.Item>
                 )}
-                {canMapaBrasil && (
+                {caps.canViewMapMetrics && (
                   <Menu.Item key="mapa-brasil"><Link to="/mapa-brasil">Mapa do Brasil</Link></Menu.Item>
                 )}
               </SubMenu>
             )}
 
-            {canDAT && (
+            {caps.canManageAdminRegistries && (
               <SubMenu key="dat-submenu" icon={<SolutionOutlined />} title="DAT">
                 <Menu.Item key="dat-admin"><Link to="/dat/admin">Administração</Link></Menu.Item>
                 <Menu.Item key="dat-cadastros"><Link to="/dat/cadastros">Cadastros</Link></Menu.Item>
@@ -359,13 +359,15 @@ export function AppSidebar({
               </SubMenu>
             )}
 
-            {(access.can('view_all_availability') || canDisponibilidade) && (
+            {/* Grade Mensal: policy view_all_availability (Controle/DAT global) + acesso
+                scoped de Coordenador/Apoio/Gerente via canDisponibilidade (sem policy pública). */}
+            {(caps.canViewAllAvailability || canDisponibilidade) && (
               <Menu.Item key="grade-mensal" icon={<TableOutlined />} onClick={closeAllSubmenus}>
                 <Link to="/solicitacoes/disponibilidade">Grade Mensal</Link>
               </Menu.Item>
             )}
 
-            {canCoordenador && (
+            {caps.canCreateSolicitation && (
               <SubMenu key="solicitacoes-submenu" icon={<FileTextOutlined />} title="Solicitações">
                 <Menu.Item key="minhas-solicitacoes"><Link to="/solicitacoes/minhas">Minhas Solicitações</Link></Menu.Item>
                 <Menu.Item key="nova-solicitacao"><Link to="/solicitacoes/nova">Nova Solicitação</Link></Menu.Item>

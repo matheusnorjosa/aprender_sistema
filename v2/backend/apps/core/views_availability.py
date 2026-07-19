@@ -32,9 +32,10 @@ def is_privileged_user(user):
     Verifica se o usuário tem permissão para acessar dados de outros usuários.
 
     Epic 3.2 RBAC Refactor (2026-04-23): hardcoded
-    `groups.filter(name__in=["Superintendência", "Controle"])` trocado por
-    capability `pode_ver_todas_disponibilidades`. Expansão deliberada para
-    Gerência+Diretoria (documentada no PR #1183).
+    `groups.filter(name__in=["Superintendência", "Controle"])` trocado pela
+    capability `view_all_availability` (renomeada de `pode_ver_todas_disponibilidades`
+    nas migrations 0075/0076; grupos atribuídos por seed — SSOT em
+    `functional_permissions_seed.py`).
 
     Semântica restrita a `view_all_availability`. NÃO incluir caps de
     create/approve solicitação aqui — esse helper governa visibilidade de

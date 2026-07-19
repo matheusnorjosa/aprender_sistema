@@ -239,7 +239,10 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             qs = qs.filter(projeto__fluxo=flow)
 
         if sector:
-            qs = qs.filter(projeto__nome__icontains=sector)
+            # #1164: filtra por SETOR REAL (projeto.gerencia.nome_setor), não por
+            # substring no nome do projeto — que fazia um projeto Fluir chamado
+            # "Vidas ..." aparecer indevidamente em ?sector=Vidas.
+            qs = qs.filter(projeto__gerencia__nome_setor__iexact=sector)
 
         if date_from:
             try:

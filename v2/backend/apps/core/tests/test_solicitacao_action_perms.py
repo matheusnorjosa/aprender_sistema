@@ -40,7 +40,6 @@ import pytest
 from apps.core.rbac import (
     CanAccessSolicitationApprovals,
     CanUseGcal,
-    HasPerm,
     IsOwnerOrPrivileged,
 )
 from apps.core.views_solicitacao import SolicitacaoViewSet
@@ -100,6 +99,7 @@ class TestSolicitacaoActionPermissionSentinel:
         perm = perms[0]
 
         if kind == "class":
+            assert isinstance(spec, type)  # narrow p/ pyright + valida os dados do sentinela
             assert isinstance(perm, spec), (
                 f"action '{action}' deveria ser gateada por {spec.__name__}, "
                 f"mas resolveu {type(perm).__name__}. "

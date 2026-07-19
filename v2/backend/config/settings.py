@@ -94,6 +94,17 @@ if ENVIRONMENT == "production":
         print("❌ ERRO CRÍTICO: SECRET_KEY muito curta (mínimo: 50 caracteres)", file=sys.stderr)
         sys.exit(1)
 
+    # SEC-002 (#1457, regressão de #800): REDIS_PASSWORD vazio deixa o Redis sem auth.
+    # As URLs de cache/broker usam os.getenv("REDIS_PASSWORD", "") e viram
+    # redis://:@host:6379/N; o compose de prod propaga --requirepass "" e o Redis sobe
+    # anônimo, em silêncio. Os templates entregam a variável vazia, então esse é o
+    # caminho default — basta esquecer o secret.
+    if not os.getenv("REDIS_PASSWORD", "").strip():
+        print("❌ ERRO CRÍTICO: REDIS_PASSWORD vazio ou ausente em produção", file=sys.stderr)
+        print("   Redis subiria sem autenticação (--requirepass vazio).", file=sys.stderr)
+        print("   Defina REDIS_PASSWORD com um secret forte.", file=sys.stderr)
+        sys.exit(1)
+
     # WARNING: GCAL_CLIENT=fake em produção
     if os.getenv("GCAL_CLIENT", "fake") == "fake":
         print("⚠️  WARNING: GCAL_CLIENT=fake em produção", file=sys.stderr)

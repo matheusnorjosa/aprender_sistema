@@ -160,6 +160,18 @@ ACCESS_POLICIES: Final[dict[str, frozenset[str]]] = {
     # Assistente Administrativo do Controle). Frozenset vazio é sentinela —
     # `user_has_policy` trata a key via `_user_has_solicitation_approvals`.
     "access_solicitation_approvals": frozenset(),
+    # Menu policy-only (#1589, destrava #1270). Paridade com gates legacy do
+    # frontend (usePermissions.ts): as capabilities-âncora abaixo são exclusivas
+    # de um setor no seed (functional_permissions_seed.py), então o OR reproduz
+    # exatamente os setores dos gates `can*`.
+    #   canControle        = Controle          -> operate_preagenda|run_daily_operations
+    #   canDashboardEquipe = Diretoria|DAT      -> supervise_operations|manage_admin_registries
+    #   canDashboardGcal   = Diretoria|DAT|Controle
+    "access_controle_section": frozenset({"operate_preagenda", "run_daily_operations"}),
+    "view_team_dashboard": frozenset({"supervise_operations", "manage_admin_registries"}),
+    "view_gcal_dashboard": frozenset(
+        {"supervise_operations", "manage_admin_registries", "operate_preagenda", "run_daily_operations"}
+    ),
 }
 
 
@@ -287,6 +299,18 @@ class CanCreateSolicitation(_PolicyPermission):
     policy = "create_solicitation"
 
 
+class CanAccessControleSection(_PolicyPermission):
+    policy = "access_controle_section"
+
+
+class CanViewTeamDashboard(_PolicyPermission):
+    policy = "view_team_dashboard"
+
+
+class CanViewGcalDashboard(_PolicyPermission):
+    policy = "view_gcal_dashboard"
+
+
 class CanManageInternalActions(_PolicyPermission):
     policy = "manage_internal_actions"
 
@@ -356,6 +380,9 @@ PUBLIC_POLICY_KEYS: Final[frozenset[str]] = frozenset(
         "manage_admin_registries",
         "manage_internal_actions",
         "manage_purchases_and_materials",
+        "access_controle_section",
+        "view_team_dashboard",
+        "view_gcal_dashboard",
     }
 )
 

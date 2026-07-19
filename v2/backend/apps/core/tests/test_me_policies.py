@@ -254,3 +254,77 @@ class TestParity:
         """PUBLIC_POLICY_KEYS é subset de ACCESS_POLICIES (sem keys fantasmas)."""
         orphans = set(PUBLIC_POLICY_KEYS) - set(ACCESS_POLICIES.keys())
         assert not orphans, f"PUBLIC_POLICY_KEYS contém keys ausentes de ACCESS_POLICIES: {sorted(orphans)}"
+
+
+# ============================================================================
+# F. Policies de menu (#1589) — paridade com gates legacy do frontend
+# ============================================================================
+#
+# Expectativas HAND-WRITTEN (não derivadas da matriz) para provar comportamento,
+# não tautologia. Paridade a preservar (usePermissions.ts:106,115,116):
+#   canControle       = is_superuser OR Setor Controle
+#   canDashboardEquipe = is_superuser OR Diretoria OR DAT
+#   canDashboardGcal   = is_superuser OR Diretoria OR DAT OR Controle
+#
+# As capabilities-âncora (verificadas em functional_permissions_seed.py):
+#   operate_preagenda / run_daily_operations -> só Controle
+#   supervise_operations                     -> só Diretoria
+#   manage_admin_registries                  -> só DAT
+# então o OR sobre elas reproduz exatamente os setores dos gates legacy.
+
+
+def _policies_for(user) -> set[str]:
+    from apps.core.rbac.policies import resolve_public_policies
+
+    return set(resolve_public_policies(user))
+
+
+class TestMenuPolicies1589:
+    """#1589 — 3 policies públicas que destravam o menu policy-only do #1270."""
+
+    NEW_KEYS = ("access_controle_section", "view_team_dashboard", "view_gcal_dashboard")
+
+    def test_new_keys_are_public(self):
+        for key in self.NEW_KEYS:
+            assert key in PUBLIC_POLICY_KEYS, f"{key} deveria estar em PUBLIC_POLICY_KEYS"
+
+    def test_controle_user_gets_controle_section_and_gcal(self, seeded_db):
+        # Setor Controle recebe operate_preagenda E run_daily_operations no seed.
+        user = _make_user("m1589_controle", "operate_preagenda", "run_daily_operations")
+        policies = _policies_for(user)
+        assert "access_controle_section" in policies
+        assert "view_gcal_dashboard" in policies
+        assert "view_team_dashboard" not in policies  # Controle NÃO é Diretoria/DAT
+
+    def test_controle_via_run_daily_only_still_gets_section(self, seeded_db):
+        # Robustez: qualquer uma das capabilities de Controle basta.
+        user = _make_user("m1589_controle_rdo", "run_daily_operations")
+        policies = _policies_for(user)
+        assert "access_controle_section" in policies
+        assert "view_gcal_dashboard" in policies
+
+    def test_diretoria_user_gets_team_and_gcal(self, seeded_db):
+        user = _make_user("m1589_diretoria", "supervise_operations")
+        policies = _policies_for(user)
+        assert "view_team_dashboard" in policies
+        assert "view_gcal_dashboard" in policies
+        assert "access_controle_section" not in policies  # Diretoria NÃO é Controle
+
+    def test_dat_user_gets_team_and_gcal(self, seeded_db):
+        user = _make_user("m1589_dat", "manage_admin_registries")
+        policies = _policies_for(user)
+        assert "view_team_dashboard" in policies
+        assert "view_gcal_dashboard" in policies
+        assert "access_controle_section" not in policies  # DAT NÃO é Controle
+
+    def test_unrelated_user_gets_none_of_the_three(self, seeded_db):
+        # create_solicitation não pertence a nenhum dos 3 gates de menu.
+        user = _make_user("m1589_unrelated", "create_solicitation")
+        policies = _policies_for(user)
+        for key in self.NEW_KEYS:
+            assert key not in policies, f"{key} não deveria aparecer para usuário sem os setores"
+
+    def test_superuser_gets_all_three(self, seeded_db):
+        policies = _policies_for(UsuarioFactory(superuser=True))
+        for key in self.NEW_KEYS:
+            assert key in policies, f"superuser deveria ter {key} (bypass)"

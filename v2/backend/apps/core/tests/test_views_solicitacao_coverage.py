@@ -23,7 +23,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AuditLog, Compra, Participation
+from apps.core.models import AuditLog, Compra, Gerencia, Participation
 from apps.core.tests.factories import (
     GroupFactory,
     MunicipioFactory,
@@ -240,18 +240,18 @@ class TestSolicitacaoFilters:
         municipio,
         tipo_evento,
     ):
-        """Sector filter works correctly (line 134)."""
+        """
+        Sector filter filtra por SETOR REAL (projeto.gerencia.nome_setor), não por
+        substring no nome do projeto (#1164). Projetos são atribuídos a gerências de
+        setores distintos; o filtro deve respeitar o setor, não o nome.
+        """
+        ger_acerta = Gerencia.objects.create(nome="GER-ACERTA-COV", nome_setor="ACerta")
+        ger_vidas = Gerencia.objects.create(nome="GER-VIDAS-COV", nome_setor="Vidas")
         projeto_acerta = ProjetoFactory(
-            nome="ACerta Teste",
-            codigo="ACERTA",
-            fluxo="SUPER",
-            ativo=True,
+            nome="Projeto Um", codigo="ACERTA", fluxo="SUPER", ativo=True, gerencia=ger_acerta
         )
         projeto_vidas = ProjetoFactory(
-            nome="Vidas Teste",
-            codigo="VIDAS",
-            fluxo="SUPER",
-            ativo=True,
+            nome="Projeto Dois", codigo="VIDAS", fluxo="SUPER", ativo=True, gerencia=ger_vidas
         )
 
         sol_acerta = SolicitacaoFactory(
@@ -263,7 +263,7 @@ class TestSolicitacaoFilters:
             fim=timezone.now() + timedelta(days=1, hours=2),
             status="pendente",
         )
-        sol_vidas = SolicitacaoFactory(
+        SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
             projeto=projeto_vidas,
@@ -275,12 +275,62 @@ class TestSolicitacaoFilters:
 
         api_client.force_authenticate(user=usuario_coordenador)
 
-        # Filter by sector=ACerta
         response = api_client.get("/api/solicitacoes/?sector=ACerta")
         assert response.status_code == 200
         data = response.json()
         assert data["count"] == 1
         assert data["results"][0]["id"] == sol_acerta.id
+
+    def test_sector_filter_uses_real_sector_not_project_name(
+        self,
+        api_client,
+        usuario_coordenador,
+        municipio,
+        tipo_evento,
+    ):
+        """
+        #1164 (bug fix): o filtro NÃO pode casar por substring no nome do projeto.
+        Um projeto do setor Fluir cujo NOME contém "Vidas" não pode aparecer em
+        ?sector=Vidas — só projetos cujo setor real é Vidas.
+        """
+        ger_vidas = Gerencia.objects.create(nome="GER-VIDAS-REAL", nome_setor="Vidas")
+        ger_fluir = Gerencia.objects.create(nome="GER-FLUIR-REAL", nome_setor="Fluir")
+        # Projeto realmente do setor Vidas (nome neutro).
+        projeto_vidas = ProjetoFactory(nome="Alfabetiza", codigo="VDS1", fluxo="SUPER", ativo=True, gerencia=ger_vidas)
+        # Projeto do setor Fluir MAS com "Vidas" no nome — a armadilha do substring.
+        projeto_fluir = ProjetoFactory(
+            nome="Vidas em Movimento", codigo="FLR1", fluxo="SUPER", ativo=True, gerencia=ger_fluir
+        )
+
+        sol_vidas = SolicitacaoFactory(
+            usuario=usuario_coordenador,
+            municipio=municipio,
+            projeto=projeto_vidas,
+            tipo_evento=tipo_evento,
+            inicio=timezone.now() + timedelta(days=1),
+            fim=timezone.now() + timedelta(days=1, hours=2),
+            status="pendente",
+        )
+        SolicitacaoFactory(
+            usuario=usuario_coordenador,
+            municipio=municipio,
+            projeto=projeto_fluir,
+            tipo_evento=tipo_evento,
+            inicio=timezone.now() + timedelta(days=2),
+            fim=timezone.now() + timedelta(days=2, hours=2),
+            status="pendente",
+        )
+
+        api_client.force_authenticate(user=usuario_coordenador)
+
+        response = api_client.get("/api/solicitacoes/?sector=Vidas")
+        assert response.status_code == 200
+        data = response.json()
+        ids = {r["id"] for r in data["results"]}
+        assert ids == {sol_vidas.id}, (
+            "sector=Vidas deve retornar SÓ o projeto do setor Vidas, nunca o projeto "
+            "do setor Fluir que tem 'Vidas' no nome (bug do substring, #1164)."
+        )
 
     def test_date_from_filter(
         self,

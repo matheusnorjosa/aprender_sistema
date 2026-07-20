@@ -322,6 +322,8 @@
 | Ver SLOs definidos | [SLO_DEFINITIONS.md](./SLO_DEFINITIONS.md) |
 | Procedimentos de DR | [DISASTER_RECOVERY.md](./DISASTER_RECOVERY.md) |
 | Auditoria de regras hardcoded (2026-05) | [audits/PLATFORM_HARDCODED_RULES_AUDIT_2026-05.md](./audits/PLATFORM_HARDCODED_RULES_AUDIT_2026-05.md) |
+| Auditoria de segurança RBAC (2026-07) | [audits/2026-07-17-rbac-security-audit.md](./audits/2026-07-17-rbac-security-audit.md) |
+| Auditoria modular M00–M28 (2026-07) | [audits/2026-07-17-system-module-audit.md](./audits/2026-07-17-system-module-audit.md) |
 
 ---
 

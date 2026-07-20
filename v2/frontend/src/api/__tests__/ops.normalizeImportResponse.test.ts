@@ -171,11 +171,25 @@ describe('normalizeImportResponse — bug fix #DAT-imports response shape', () =
       pendencias: {
         cpf_invalid: [{ linha: 3, erro: 'CPF invalido' }],
         grupos_ignorados: [{ linha: 1, erro: "Coluna 'grupos' ignorada" }],
+        grupos_desconhecidos: [{ linha: 2, erro: 'Grupo nao encontrado' }],
       },
     };
     const r = normalizeImportResponse(raw);
     expect(r.errors).toHaveLength(1);
     expect(r.errors[0].message).toContain('[cpf_invalid]');
+    expect(r.warnings).toHaveLength(2);
+  });
+
+  test('grupos_desconhecidos tambem e aviso, nao erro', () => {
+    // A linha foi importada com os grupos validos; so um nome nao existia.
+    const raw = {
+      stats: { created: 1, grupos_desconhecidos: 1 },
+      pendencias: {
+        grupos_desconhecidos: [{ linha: 1, erro: 'Grupo nao encontrado' }],
+      },
+    };
+    const r = normalizeImportResponse(raw);
+    expect(r.errors).toEqual([]);
     expect(r.warnings).toHaveLength(1);
   });
 

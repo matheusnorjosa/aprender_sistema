@@ -20,7 +20,7 @@ import logger from '../utils/logger';
  * bloqueante e esconde o botao Aplicar, o que derrubaria o import inteiro por
  * causa de uma unica coluna que o ator nao tem autoridade para gravar.
  */
-const NON_BLOCKING_PENDENCIA_CATEGORIES = new Set(['grupos_ignorados']);
+const NON_BLOCKING_PENDENCIA_CATEGORIES = new Set(['grupos_ignorados', 'grupos_desconhecidos']);
 
 /**
  * Import operation result

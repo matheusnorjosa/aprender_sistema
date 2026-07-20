@@ -574,6 +574,65 @@ class TestImportGrupoGateTier0:
         assert result["stats"]["grupos_ignorados"] == 0
         assert result["pendencias"]["grupos_ignorados"] == []
 
+    # --- nome de grupo inexistente: mesma familia, mesma regra ------------
+
+    def test_grupo_inexistente_reportado_no_apply(self, tmp_path, superuser, grupos_de_autoridade):
+        """Nome de grupo que nao existe no banco nao pode sumir calado."""
+        path = _write_csv(tmp_path, 'cpf,nome,grupos\n99988877766,Novo Usuario,"Gerente,NaoExiste"\n')
+
+        result = import_usuarios_from_file(path=path, dry_run=False, actor=superuser)
+
+        desconhecidos = result["pendencias"]["grupos_desconhecidos"]
+        assert len(desconhecidos) == 1
+        assert desconhecidos[0]["linha"] == 1
+        assert desconhecidos[0]["grupos"] == ["NaoExiste"]
+        assert result["stats"]["grupos_desconhecidos"] == 1
+
+    def test_grupo_inexistente_nao_impede_os_validos(self, tmp_path, superuser, grupos_de_autoridade):
+        """Um nome errado nao derruba os grupos corretos da mesma linha."""
+        path = _write_csv(tmp_path, 'cpf,nome,grupos\n99988877766,Novo Usuario,"Gerente,NaoExiste"\n')
+
+        import_usuarios_from_file(path=path, dry_run=False, actor=superuser)
+
+        assert User.objects.get(cpf="99988877766").groups.filter(name="Gerente").exists()
+
+    def test_dry_run_e_apply_reportam_grupo_inexistente_igual(self, tmp_path, superuser, grupos_de_autoridade):
+        """Paridade: o preview nao pode calar sobre o que o apply vai descartar.
+
+        Antes, `dry_run` sequer resolvia os nomes de grupo — era estruturalmente
+        incapaz de avisar, enquanto o apply descartava em silencio.
+        """
+        path = _write_csv(tmp_path, 'cpf,nome,grupos\n99988877766,Novo Usuario,"Gerente,NaoExiste"\n')
+
+        preview = import_usuarios_from_file(path=path, dry_run=True, actor=superuser)
+        aplicado = import_usuarios_from_file(path=path, dry_run=False, actor=superuser)
+
+        assert preview["pendencias"]["grupos_desconhecidos"] == aplicado["pendencias"]["grupos_desconhecidos"]
+        assert preview["stats"]["grupos_desconhecidos"] == aplicado["stats"]["grupos_desconhecidos"] == 1
+
+    def test_todos_os_grupos_validos_nao_reporta_desconhecidos(self, tmp_path, superuser, grupos_de_autoridade):
+        """Ancora: arquivo correto nao gera ruido no relatorio."""
+        path = _write_csv(tmp_path, 'cpf,nome,grupos\n99988877766,Novo Usuario,"Gerente,Superintendência"\n')
+
+        result = import_usuarios_from_file(path=path, dry_run=False, actor=superuser)
+
+        assert result["stats"]["grupos_desconhecidos"] == 0
+        assert result["pendencias"]["grupos_desconhecidos"] == []
+
+    def test_nao_superuser_nao_reporta_grupo_desconhecido(self, tmp_path, dat_user):
+        """Para quem nao pode atribuir, a coluna inteira ja foi ignorada.
+
+        Reportar tambem "grupo desconhecido" vazaria a existencia (ou nao) de
+        grupos para quem nao tem autoridade sobre eles.
+        """
+        path = _write_csv(tmp_path, "cpf,nome,grupos\n99988877766,Novo Usuario,NaoExiste\n")
+
+        result = import_usuarios_from_file(path=path, dry_run=False, actor=dat_user)
+
+        assert result["stats"]["grupos_ignorados"] == 1
+        assert result["stats"]["grupos_desconhecidos"] == 0
+        assert result["pendencias"]["grupos_desconhecidos"] == []
+
     # --- view: prova que o ator chega mesmo ao service --------------------
 
     def test_dat_nao_escala_o_proprio_privilegio_via_import(self, api_client, dat_user, grupos_de_autoridade, tmp_path):

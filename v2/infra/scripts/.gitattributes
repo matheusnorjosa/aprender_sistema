@@ -1,0 +1,5 @@
+# Scripts de shell e suites bats rodam no CI (ubuntu-latest) e localmente via bash.
+# CRLF quebraria o shebang / a execucao (ex.: `bash staging-gate-scope.sh` no workflow).
+# Forca LF no blob independentemente do core.autocrlf do cliente (ex.: Windows).
+*.sh   text eol=lf
+*.bats text eol=lf

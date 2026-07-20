@@ -55,6 +55,9 @@ function toValidationResult(result: ImportResult): ValidationResult {
       unchanged: result.skipped,
     },
     errors: result.errors.map((e) => `Linha ${e.row}: ${e.message}`),
+    // Avisos não-bloqueantes (ex.: coluna `grupos` ignorada por falta de
+    // privilégio) vão para o alerta de Pendências, que não gateia o Aplicar.
+    ...(result.warnings.length > 0 ? { pendencias: { avisos: result.warnings } } : {}),
   };
 }
 

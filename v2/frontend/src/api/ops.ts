@@ -13,6 +13,16 @@ import { API_BASE, ensureCsrfToken, fetchAPI, buildUrl } from './config';
 import logger from '../utils/logger';
 
 /**
+ * Categorias de `pendencias` que descrevem um ajuste PARCIAL: a linha foi
+ * importada, apenas um campo foi desconsiderado.
+ *
+ * Elas NAO podem virar `errors[]` — o ImportUploader trata `errors[]` como
+ * bloqueante e esconde o botao Aplicar, o que derrubaria o import inteiro por
+ * causa de uma unica coluna que o ator nao tem autoridade para gravar.
+ */
+const NON_BLOCKING_PENDENCIA_CATEGORIES = new Set(['grupos_ignorados']);
+
+/**
  * Import operation result
  */
 export interface ImportResult {
@@ -193,11 +203,13 @@ function normalizeImportResponse(raw: unknown): ImportResult {
   // didn't create or update.
   skippedTotal += toNum(baseStats.unchanged);
 
-  // Flatten pendencias dict-of-arrays into errors[]
+  // Flatten pendencias dict-of-arrays into errors[] / warnings[]
   const pendencias = (r.pendencias ?? {}) as Record<string, unknown>;
   const errors: Array<{ row: number; message: string }> = [];
+  const warnings: string[] = [];
   for (const [cat, items] of Object.entries(pendencias)) {
     if (!Array.isArray(items)) continue;
+    const isBlocking = !NON_BLOCKING_PENDENCIA_CATEGORIES.has(cat);
     for (const e of items) {
       if (typeof e !== 'object' || e === null) continue;
       const item = e as Record<string, unknown>;
@@ -205,10 +217,14 @@ function normalizeImportResponse(raw: unknown): ImportResult {
       const detail = [item.erro, item.nome, item.message]
         .filter((x): x is string => typeof x === 'string' && x.length > 0)
         .join(' — ');
-      errors.push({
-        row: rowNum,
-        message: detail ? `[${cat}] ${detail}` : `[${cat}]`,
-      });
+      if (isBlocking) {
+        errors.push({
+          row: rowNum,
+          message: detail ? `[${cat}] ${detail}` : `[${cat}]`,
+        });
+      } else {
+        warnings.push(detail ? `Linha ${rowNum}: ${detail}` : `Linha ${rowNum}: [${cat}]`);
+      }
     }
   }
 
@@ -217,7 +233,7 @@ function normalizeImportResponse(raw: unknown): ImportResult {
     updated: toNum(baseStats.updated),
     skipped: skippedTotal,
     errors,
-    warnings: [],
+    warnings,
   };
 }
 

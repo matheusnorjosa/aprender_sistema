@@ -144,6 +144,41 @@ describe('normalizeImportResponse — bug fix #DAT-imports response shape', () =
     expect(r.errors.map((e) => e.message)).toEqual([]);
   });
 
+  test('categoria nao-bloqueante vai para warnings[], nunca para errors[]', () => {
+    // `grupos_ignorados` significa "a linha foi importada, menos esta coluna".
+    // Se virar error[], o ImportUploader esconde o botao Aplicar e o import
+    // inteiro morre — inclusive os campos que o ator TEM autoridade para gravar.
+    const raw = {
+      stats: { created: 2, updated: 0, unchanged: 0, grupos_ignorados: 2 },
+      pendencias: {
+        grupos_ignorados: [
+          { linha: 1, cpf: '99988877766', grupos: 'Gerente', erro: "Coluna 'grupos' ignorada" },
+          { linha: 2, cpf: '11122233344', grupos: 'Superintendência', erro: "Coluna 'grupos' ignorada" },
+        ],
+      },
+      dry_run: true,
+    };
+    const r = normalizeImportResponse(raw);
+    expect(r.errors).toEqual([]);
+    expect(r.warnings).toHaveLength(2);
+    expect(r.warnings[0]).toContain('Linha 1');
+    expect(r.warnings[0]).toContain("Coluna 'grupos' ignorada");
+  });
+
+  test('separa bloqueante de nao-bloqueante no mesmo relatorio', () => {
+    const raw = {
+      stats: { created: 1 },
+      pendencias: {
+        cpf_invalid: [{ linha: 3, erro: 'CPF invalido' }],
+        grupos_ignorados: [{ linha: 1, erro: "Coluna 'grupos' ignorada" }],
+      },
+    };
+    const r = normalizeImportResponse(raw);
+    expect(r.errors).toHaveLength(1);
+    expect(r.errors[0].message).toContain('[cpf_invalid]');
+    expect(r.warnings).toHaveLength(1);
+  });
+
   test('handles row number from alternative key (linha_num for municipios)', () => {
     const raw = {
       stats: { created: 0, updated: 0, skipped: { municipios: 1 } },

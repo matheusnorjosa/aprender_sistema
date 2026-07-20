@@ -30,6 +30,7 @@ from django.contrib.auth.models import Group
 from django.db import transaction
 
 from apps.core.constants import ALLOWED_USER_GROUPS
+from apps.core.imports.normalization import normalize_cpf_digits
 from apps.core.models import (
     DATAcao,
     DATArea,
@@ -44,6 +45,7 @@ from apps.core.models import (
 )
 from apps.core.services.equipe_gerencia_import import PAPEL_MAPPING
 from apps.core.services.export_contract_projeto_resolver import build_projeto_index, resolve_projeto_export
+from apps.core.validators import CPF_ABSENT, CPF_INVALID, classify_cpf, is_valid_cpf
 
 # Campos protegidos por entidade — NUNCA sobrescrever em update (decisão humana).
 PROTECTED_FIELDS: dict[str, set[str]] = {
@@ -188,9 +190,11 @@ class ExportContractImporter:
         return {(_norm(n), (u or "").upper()): mid for mid, n, u in Municipio.objects.values_list("id", "nome", "uf")}
 
     # ── handlers da fatia implementada ──
-    def _classify_master(self, name: str) -> dict[str, int]:
+    def _classify_master(self, name: str) -> dict[str, Any]:
         rows = self._load(name)
-        tally = {k: 0 for k in ("would_create", "would_update", "would_skip_same", "protected_diff", "would_reject")}
+        tally: dict[str, Any] = {
+            k: 0 for k in ("would_create", "would_update", "would_skip_same", "protected_diff", "would_reject")
+        }
         protected = PROTECTED_FIELDS.get(name, set())
 
         if name == "dat_area":
@@ -246,23 +250,37 @@ class ExportContractImporter:
                 tally[st] += 1
 
         elif name == "usuario":
-            # NK = CPF (unique), fallback email. PII: só conta/resolve, nunca imprime valores.
+            # NK = CPF válido (mod-11), fallback email para dedup. CPF estruturalmente
+            # inválido ou placeholder NÃO é NK: rejeita com motivo explícito (não infla
+            # would_create). Os três skips ficam distinguíveis em `reject_reasons`:
+            #   sem_nk       -> sem CPF e sem email (nada para identificar);
+            #   cpf_invalido -> tem CPF, não-placeholder, mas DV/comprimento inválido;
+            #   sem_cpf      -> tem email mas CPF ausente/placeholder (username=cpf exige CPF).
+            # ("já existe" já aparece como would_skip_same.) PII: só conta, nunca imprime.
             cpfs = {
-                re.sub(r"\D", "", c)
+                normalize_cpf_digits(c)
                 for c in Usuario.objects.values_list("cpf", flat=True)
-                if re.sub(r"\D", "", c or "")
+                if normalize_cpf_digits(c)
             }
             emails = {(e or "").lower() for e in Usuario.objects.values_list("email", flat=True) if e}
+            reasons = {"sem_nk": 0, "cpf_invalido": 0, "sem_cpf": 0}
             for r in rows:
-                cpf = re.sub(r"\D", "", r.get("cpf") or "")
+                cpf = normalize_cpf_digits(r.get("cpf") or "")
                 email = (r.get("email") or "").lower().strip()
-                if not cpf and not email:
+                cpf_status = classify_cpf(r.get("cpf") or "")
+                if cpf_status == CPF_INVALID:
                     tally["would_reject"] += 1
+                    reasons["cpf_invalido"] += 1
+                    continue
+                if cpf_status == CPF_ABSENT:
+                    tally["would_reject"] += 1
+                    reasons["sem_cpf" if email else "sem_nk"] += 1
                     continue
                 existe = (cpf in cpfs) or (email in emails)
                 # sem comparação de campo (evita PII); existência decide skip vs create.
                 st, _ = diff_and_classify({} if existe else None, {}, protected)
                 tally[st] += 1
+            tally["reject_reasons"] = reasons
 
         elif name == "tipo_evento":
             idx = {_norm(n): {"cor": (c or "")} for n, c in TipoEvento.objects.values_list("nome", "cor")}
@@ -390,7 +408,7 @@ class ExportContractImporter:
         """Mapa cpf(11 dig) -> papel canonico, de equipe_gerencia.csv (fonte primaria do papel)."""
         idx: dict[str, str] = {}
         for r in self._load("equipe_gerencia"):
-            cpf = re.sub(r"\D", "", r.get("usuario_cpf") or "")
+            cpf = normalize_cpf_digits(r.get("usuario_cpf") or "")
             papel = _resolve_papel(r.get("papel"))
             if len(cpf) == 11 and papel:
                 idx.setdefault(cpf, papel)
@@ -401,23 +419,25 @@ class ExportContractImporter:
 
         Papel: equipe_gerencia.papel (primario, por CPF) -> usuario.cargo (fallback). NUNCA
         default Coordenador. Sem papel ou grupo inexistente -> cria sem grupo. Senha
-        inutilizavel (login real via OAuth Google). len(cpf)==11 == RegexValidator do model.
+        inutilizavel (login real via OAuth Google). NK exige CPF valido por mod-11
+        (is_valid_cpf): placeholder/DV-invalido NAO cria — o dry-run reporta o motivo.
         """
         papel_by_cpf = self._papel_index_from_equipe()
         existing_cpfs = {
-            re.sub(r"\D", "", c) for c in Usuario.objects.values_list("cpf", flat=True) if re.sub(r"\D", "", c or "")
+            normalize_cpf_digits(c) for c in Usuario.objects.values_list("cpf", flat=True) if normalize_cpf_digits(c)
         }
         existing_emails = {(e or "").lower() for e in Usuario.objects.values_list("email", flat=True) if e}
         created = 0
         for r in rows:
-            cpf = re.sub(r"\D", "", r.get("cpf") or "")
+            cpf = normalize_cpf_digits(r.get("cpf") or "")
             email = (r.get("email") or "").strip().lower()
-            if len(cpf) != 11 and not email:
-                continue  # would_reject: sem NK
-            if (cpf and cpf in existing_cpfs) or (email and email in existing_emails):
+            # NK exige CPF estruturalmente valido (mod-11). Placeholder/DV-invalido NAO
+            # cria (username=cpf); nunca escreve CPF bogus (evita usuario fantasma e
+            # colisao de unique). O dry-run ja reporta sem_nk/cpf_invalido/sem_cpf.
+            if not is_valid_cpf(r.get("cpf") or ""):
+                continue
+            if (cpf in existing_cpfs) or (email and email in existing_emails):
                 continue  # ja existe -> skip (create-only)
-            if len(cpf) != 11:
-                continue  # cpf obrigatorio (11 digitos); sem cpf valido nao cria
             nome = (r.get("nome_completo") or "").strip()
             first, _, last = nome.partition(" ")
             usuario = Usuario(

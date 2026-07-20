@@ -182,9 +182,9 @@ def test_classify_produto(tmp_path):
 
 
 def test_classify_usuario(tmp_path):
-    UsuarioFactory(username="u_imp_exist", password="x", cpf="11122233344", email="u.exist@ex.com")
+    UsuarioFactory(username="u_imp_exist", password="x", cpf="11144477735", email="u.exist@ex.com")
     # existente por cpf -> skip; novo -> create; sem cpf/email -> reject
-    csv = "nome_completo,cpf,email\nFulano,11122233344,u.exist@ex.com\nBeltrano,55566677788,novo@ex.com\nSem Id,,\n"
+    csv = "nome_completo,cpf,email\nFulano,11144477735,u.exist@ex.com\nBeltrano,22255588846,novo@ex.com\nSem Id,,\n"
     r = ExportContractImporter(path=_write_export(tmp_path, {"usuario": csv})).run()["por_entidade"]["usuario"]
     assert r["would_skip_same"] == 1
     assert r["would_create"] == 1
@@ -300,7 +300,7 @@ def test_demo_dez_entidades_implementadas(tmp_path):
         "municipio": "nome,uf,ativo\nC,CE,True\n",
         "projeto_geral": "nome,usa_avaliar\nPG,True\n",
         "produto": "codigo,nome\nC1,N\n",
-        "usuario": "nome_completo,cpf,email\nF,11111111111,f@ex.com\n",
+        "usuario": "nome_completo,cpf,email\nF,11144477735,f@ex.com\n",
         "tipo_evento": "nome,cor\nT,#000000\n",
         "gerencia": "nome,nome_setor\nSetor,Setor\n",
         "dat_coordenador": "usuario,area\ncoord@ex.com,Area\n",

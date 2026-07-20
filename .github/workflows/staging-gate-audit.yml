@@ -40,13 +40,11 @@ jobs:
           changed_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
           printf '%s\n' "$changed_files"
 
-          requires_staging_gate=false
           # Staging gate evidence is required only for runtime-impacting changes.
-          # CI/docs/test-only changes are intentionally excluded.
-          runtime_regex='^(v2/backend/(apps/|config/|requirements\.txt$)|v2/frontend/(src/|public/|Dockerfile\.prod$)|v2/infra/(docker-compose(\.[^/]*)?\.yml$|Dockerfile(\.prod|\.dev)?$|scripts/smoke_test_staging\.sh$))'
-          if echo "$changed_files" | grep -Eq "$runtime_regex"; then
-            requires_staging_gate=true
-          fi
+          # CI/docs/test-only changes are intentionally excluded. A detecção test-aware
+          # vive em v2/infra/scripts/staging-gate-scope.sh (testada em bats) para que
+          # PRs somente-de-teste (que moram sob src/ e apps/) não disparem o gate — #1582.
+          requires_staging_gate="$(printf '%s\n' "$changed_files" | bash v2/infra/scripts/staging-gate-scope.sh)"
 
           echo "requires_staging_gate=$requires_staging_gate" >> "$GITHUB_OUTPUT"
 

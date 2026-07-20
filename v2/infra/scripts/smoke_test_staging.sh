@@ -26,6 +26,9 @@ BACKEND_URL="${BACKEND_URL:-http://localhost:18002}"
 FRONTEND_URL="${FRONTEND_URL:-http://localhost:15173}"
 MAX_WAIT="${MAX_WAIT:-120}"
 STAGING_TAG="${STAGING_TAG:-staging-local}"
+# Projeto Compose do gate isolado por slot (#1581). Vazio = usa o do --env-file
+# (aprender_staging), preservando o comportamento standalone historico.
+STAGING_PROJECT="${STAGING_PROJECT:-}"
 
 # Python interpreter: verify it actually works (Windows python3 alias may be a Store stub)
 if [ -z "${PYTHON:-}" ]; then
@@ -42,13 +45,18 @@ PYTHON="${PYTHON:-python3}"
 BACKEND_CURL="curl -sf -H X-Forwarded-Proto:https"
 
 # ── Compose helper (anchored to INFRA_DIR) ───────────────────────
+# Passa -p quando STAGING_PROJECT estiver setado (gate isolado por slot, #1581): sem
+# isso os checks de Celery (worker/beat) procurariam containers no projeto errado.
 compose_cmd() {
   (
     cd "${INFRA_DIR}"
-    IMAGE_TAG="${STAGING_TAG}" docker compose \
-      --env-file .env.staging \
-      -f docker-compose.yml \
-      "$@"
+    if [ -n "${STAGING_PROJECT}" ]; then
+      IMAGE_TAG="${STAGING_TAG}" docker compose -p "${STAGING_PROJECT}" \
+        --env-file .env.staging -f docker-compose.yml "$@"
+    else
+      IMAGE_TAG="${STAGING_TAG}" docker compose \
+        --env-file .env.staging -f docker-compose.yml "$@"
+    fi
   )
 }
 

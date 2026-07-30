@@ -60,9 +60,11 @@ jobs:
         uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
         with:
           fail-on-severity: high
-          # Precisa espelhar a allowlist de .github/scripts/npm-audit-gate.mjs:
-          # sao dois gates [required] sobre o mesmo fato, e se discordarem um PR
-          # aprovado num reprova no outro. Ao mexer aqui, mexer la tambem.
+          # ATENCAO: este step NAO roda hoje — o repositorio e' privado, entao
+          # quem avalia o frontend e' o step de fallback mais abaixo (que usa
+          # .github/scripts/npm-audit-gate.mjs). Mantido correto para o caso de
+          # a visibilidade mudar; se isso acontecer, a allowlist daqui precisa
+          # continuar espelhando a do script, senao os dois gates divergem.
           #
           # GHSA-qwww-vcr4-c8h2 (react-router) — TTL 2026-10-30.
           # CSRF no RSC Mode. Nao alcancavel aqui: SPA cliente puro, build
@@ -97,7 +99,20 @@ jobs:
         run: |
           set -euo pipefail
           cd v2/frontend
-          npm audit --omit=dev --audit-level=high
+          # Usa o MESMO gate do job `[required] Frontend Dependencies`
+          # (security-scan.yml) em vez de `npm audit --audit-level=high` cru.
+          #
+          # Motivo: os dois sao checks [required] sobre o mesmo fato. Com
+          # logicas diferentes, um PR aprovado num reprova no outro — foi
+          # exatamente o que aconteceu ao adotar react-router 7.18.2.
+          # Alem disso o `--audit-level=high` nao distingue advisory de
+          # pacote e nao aceita excecao, entao nao ha onde registrar um
+          # aceite com TTL.
+          #
+          # `npm audit` sai com codigo != 0 quando encontra qualquer
+          # vulnerabilidade; quem decide bloquear e' o script.
+          npm audit --omit=dev --json > npm-audit-report.json || true
+          node "${GITHUB_WORKSPACE}/.github/scripts/npm-audit-gate.mjs" npm-audit-report.json
 
       - name: Dependency gate summary
         if: always()

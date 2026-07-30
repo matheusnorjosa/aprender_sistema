@@ -122,7 +122,21 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
-      - name: Gate duro — imagens DEVEM estar assinadas (cosign + attestation)
+      # GATE DURO = assinatura cosign. Ela amarra o digest a identidade OIDC do
+      # slsa-provenance.yml e funciona em repo publico ou privado — nunca e' opcional:
+      # falha aqui aborta a promocao.
+      #
+      # A attestation SLSA e' defesa-em-profundidade sobre a MESMA identidade OIDC. A
+      # API do GitHub que a persiste nao atende repositorio privado de conta pessoal,
+      # entao exigi-la incondicionalmente tornava QUALQUER release impromovivel a
+      # partir do momento em que o repo deixou de ser publico (2026-07-20).
+      #
+      # Semantica adotada, alinhada ao deployer (lib/verify_image.sh, REQUIRE_ATTESTATION
+      # default 0 — decisao #4 do ADR-018): se a attestation EXISTE, ela e' verificada e
+      # um bundle invalido REPROVA. Se nao existe, registra aviso e segue com o cosign.
+      # Ausente != adulterada. Nada aqui testa visibilidade do repo: se o repo voltar a
+      # ser publico, a attestation passa a existir e volta a ser exigida sozinha.
+      - name: Gate duro — imagens DEVEM estar assinadas (cosign)
         env:
           BE: ${{ steps.digests.outputs.backend }}
           FE: ${{ steps.digests.outputs.frontend }}
@@ -131,16 +145,43 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          attested=0
+          missing=0
+
           for pair in "${BACKEND_IMAGE}@${BE}" "${FRONTEND_IMAGE}@${FE}"; do
+            # --- obrigatorio ---
             cosign verify "$pair" \
               --certificate-oidc-issuer "${OIDC_ISSUER}" \
               --certificate-identity-regexp "${IMAGE_IDENTITY_RE}" >/dev/null
-            gh attestation verify "oci://${pair}" \
+            echo "cosign OK: ${pair}"
+
+            # --- defesa em profundidade: so exigido se a attestation existir ---
+            att_out="$(gh attestation verify "oci://${pair}" \
               --repo "${GITHUB_REPOSITORY}" \
               --signer-workflow "${SIGNER_WORKFLOW}" \
-              --bundle-from-oci >/dev/null
+              --bundle-from-oci 2>&1)" && att_rc=0 || att_rc=$?
+
+            if [ "$att_rc" -eq 0 ]; then
+              echo "attestation OK: ${pair}"
+              attested=$((attested + 1))
+            # Padrao ESTREITO de proposito. A mensagem exata do gh quando nao ha
+            # provenance publicada e "no attestations found in the OCI registry"
+            # (verificada contra a imagem real de v2026.07.30-e686d42, rc=1).
+            # Algo como 'not found' generico casaria com falha de verificacao de
+            # assinatura e trataria adulteracao como ausencia. Qualquer erro que
+            # nao seja este cai no ramo de baixo e REPROVA — fail-closed.
+            elif printf '%s' "$att_out" | grep -qiF 'no attestations found'; then
+              echo "::warning title=Attestation ausente::${pair} nao tem provenance SLSA (esperado em repo privado de conta pessoal). Gate mantido pela assinatura cosign."
+              missing=$((missing + 1))
+            else
+              # Existe mas nao validou: adulteracao ou identidade errada. Fail-closed.
+              echo "::error title=Attestation invalida::${pair}" >&2
+              printf '%s\n' "$att_out" >&2
+              exit 1
+            fi
           done
-          echo "Imagens verificadas (assinatura + attestation)."
+
+          echo "Imagens verificadas — cosign: 2/2 | attestation: ${attested}/2 (ausentes: ${missing})."
 
       - name: Montar production.json
         id: build

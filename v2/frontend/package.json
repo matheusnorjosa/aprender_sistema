@@ -68,7 +68,7 @@
     "jsdom": "^27.1.0",
     "lighthouse": "^12.6.1",
     "msw": "^2.13.4",
-    "postcss": "^8.5.14",
+    "postcss": "^8.5.25",
     "react-doctor": "0.0.42",
     "rollup-plugin-visualizer": "^5.14.0",
     "size-limit": "^11.2.0",

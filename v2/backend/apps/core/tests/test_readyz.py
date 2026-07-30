@@ -105,7 +105,8 @@ def test_readyz_returns_503_when_database_fails():
 
     data = res.json()
     assert data["status"] == "unhealthy"
-    assert "error:" in data["checks"]["database"]
+    # SEC/CodeQL py/stack-trace-exposure: status generico, sem a mensagem crua da excecao.
+    assert data["checks"]["database"] == "error"
 
 
 @patch("django.core.cache.cache.set")
@@ -123,7 +124,8 @@ def test_readyz_cache_failure_is_warning_not_503(mock_cache_set):
 
     data = res.json()
     assert data["status"] == "healthy"
-    assert "warning:" in data["checks"]["cache"]
+    # SEC/CodeQL py/stack-trace-exposure: warning generico, sem a mensagem crua da excecao.
+    assert data["checks"]["cache"] == "warning"
 
 
 # ============================================================================

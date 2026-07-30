@@ -23,6 +23,7 @@ from django.db import transaction
 import pandas as pd
 
 from apps.core.imports.normalization import normalize_active_flag, normalize_blank
+from apps.core.imports.row_errors import registrar_erro_import
 from apps.core.models import Produto, Projeto
 from apps.core.services.resolvers import _nfkd
 
@@ -70,12 +71,12 @@ def import_produtos_from_file(*, path: str, dry_run: bool = True) -> dict[str, A
             try:
                 with transaction.atomic():  # savepoint
                     _process_row(row, idx, stats, pendencias, projeto_cache, dry_run)
-            except Exception as e:
+            except Exception:
                 stats["skipped"]["other"] += 1
                 pendencias["outros"].append(
                     {
                         "linha": idx,
-                        "erro": str(e),
+                        "erro": registrar_erro_import(importer="produtos", linha=idx),
                         "row": str(row),
                     }
                 )

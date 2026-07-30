@@ -267,7 +267,10 @@ jobs:
               parse_exit=2
             else
               set +e
-              node -e 'const fs=require("fs"); let report; try {report=JSON.parse(fs.readFileSync("npm-audit-report.json","utf8"));} catch {process.exit(2);} if (report?.metadata?.vulnerabilities) {const high=Number(report.metadata.vulnerabilities.high||0); const critical=Number(report.metadata.vulnerabilities.critical||0); console.log(`npm audit (prod) high=${high} critical=${critical}`); process.exit(high+critical>0?10:0);} if (report?.error){console.log(`npm audit reported API error: ${report.error.summary || report.error.message || "unknown"}`); process.exit(3);} process.exit(2);'
+              # Contrato de saida preservado (0 ok / 10 bloqueia / 2 ilegivel /
+              # 3 erro de API). O script raciocina por ADVISORY, nao pelo
+              # contador agregado de pacotes — ver o cabecalho dele.
+              node "${GITHUB_WORKSPACE}/.github/scripts/npm-audit-gate.mjs" npm-audit-report.json
               parse_exit=$?
               set -e
             fi

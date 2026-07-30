@@ -69,8 +69,25 @@ RUN chmod +x /app/infra/scripts/*.sh
 
 # Cleanup: remove __pycache__ and .pyc files
 # Note: do NOT remove "test"/"tests" dirs — django.test is a runtime module
+#
+# Tambem remove o SBOM CycloneDX que o pip >= 26.2 passou a embarcar em
+# pip/_vendor/bom.cdx.json. O Trivy trata esse arquivo como INVENTARIO DE
+# PACOTES INSTALADOS e reporta as dependencias vendorizadas do pip como se
+# estivessem instaladas na imagem — o proprio Trivy avisa no log
+# ("Third-party SBOM may lead to inaccurate vulnerability detection").
+#
+# Resultado pratico: o gate de publicacao passou a bloquear com 2 HIGH que
+# nao existem como pacote instalado. `setuptools 70.3.0` e' fantasma (o real
+# na venv e' 83.0.0, acima do fix) e `msgpack 1.1.2` e' copia privada que so
+# o cache HTTP do proprio pip usa — nao importavel pela aplicacao. Ambos com
+# PkgPath vazio no relatorio, prova de que nao vieram de .dist-info.
+#
+# Isto NAO cega o scanner: os pacotes reais continuam sendo detectados via
+# .dist-info (verificado — as vulnerabilidades MEDIUM do pip seguem sendo
+# reportadas depois da remocao).
 RUN find /opt/venv -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null; \
     find /opt/venv -name "*.pyc" -delete 2>/dev/null; \
+    find /opt/venv -name "bom.cdx.json" -delete 2>/dev/null; \
     find /app -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null; \
     true
 

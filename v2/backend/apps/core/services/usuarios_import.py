@@ -10,7 +10,11 @@ Colunas esperadas:
 - telefone (opcional): telefone
 - cargo (opcional): cargo/funcao
 - is_active (opcional): ativo/inativo (default: True)
-- grupos (opcional): grupos separados por virgula
+- grupos (opcional): grupos separados por virgula — so aplicado quando o ator
+  e superusuario (ver `_actor_pode_atribuir_grupos`); nos demais casos a coluna
+  e ignorada e reportada em `pendencias["grupos_ignorados"]`. Nome de grupo que
+  nao existe no banco sai em `pendencias["grupos_desconhecidos"]`, identico em
+  dry_run e no apply.
 """
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false
@@ -32,18 +36,25 @@ from apps.core.imports.normalization import normalize_active_flag, normalize_bla
 from apps.core.models import Usuario
 
 
-def import_usuarios_from_file(*, path: str, dry_run: bool = True) -> dict[str, Any]:
+def import_usuarios_from_file(*, path: str, dry_run: bool = True, actor: Any = None) -> dict[str, Any]:
     """
     Importa usuarios de CSV/XLSX.
 
     Args:
         path: Caminho do arquivo CSV/XLSX
         dry_run: Se True, nao persiste (rollback)
+        actor: Usuario que disparou a importacao. Decide se a coluna `grupos`
+            vale (ver `_actor_pode_atribuir_grupos`). Fail-closed: sem ator,
+            nenhum grupo e atribuido.
 
     Returns:
         {
-            "stats": {"created": N, "updated": N, "unchanged": N, "skipped": {...}},
-            "pendencias": {"cpf_invalid": [...], "nome_missing": [...], "outros": [...]},
+            "stats": {"created": N, "updated": N, "unchanged": N,
+                      "grupos_ignorados": N, "grupos_desconhecidos": N,
+                      "skipped": {...}},
+            "pendencias": {"cpf_invalid": [...], "nome_missing": [...],
+                           "grupos_ignorados": [...], "grupos_desconhecidos": [...],
+                           "outros": [...]},
             "dry_run": bool,
             "file": str
         }
@@ -52,12 +63,16 @@ def import_usuarios_from_file(*, path: str, dry_run: bool = True) -> dict[str, A
         "created": 0,
         "updated": 0,
         "unchanged": 0,
+        "grupos_ignorados": 0,
+        "grupos_desconhecidos": 0,
         "skipped": {"cpf_invalid": 0, "nome_missing": 0, "superuser_protected": 0, "other": 0},
     }
     pendencias: dict[str, list[dict[str, Any]]] = {
         "cpf_invalid": [],
         "nome_missing": [],
         "superuser_protected": [],
+        "grupos_ignorados": [],
+        "grupos_desconhecidos": [],
         "outros": [],
     }
 
@@ -71,7 +86,7 @@ def import_usuarios_from_file(*, path: str, dry_run: bool = True) -> dict[str, A
         for idx, row in enumerate(rows, start=1):
             try:
                 with transaction.atomic():  # savepoint
-                    _process_row(row, idx, stats, pendencias, dry_run)
+                    _process_row(row, idx, stats, pendencias, dry_run, actor)
             except Exception as e:
                 stats["skipped"]["other"] += 1
                 pendencias["outros"].append(
@@ -239,12 +254,26 @@ def _generate_username(cpf: str, email: str) -> str:
     return username
 
 
+def _actor_pode_atribuir_grupos(actor: Any) -> bool:
+    """Atribuir grupo e conceder privilegio, entao e exclusivo de superusuario.
+
+    Mesma regra de `UsuarioAdminSerializer._actor_is_superuser` (P0-1, #1567):
+    o import e um segundo caminho de escrita para a mesma coisa e precisa do
+    mesmo gate. `manage_admin_registries` — a capability que abre o endpoint —
+    e operacional (cadastro), nao Tier-0.
+
+    Fail-closed: sem ator identificado, nenhum grupo e atribuido.
+    """
+    return bool(actor is not None and getattr(actor, "is_superuser", False))
+
+
 def _process_row(
     row: dict[str, Any],
     linha_num: int,
     stats: dict[str, Any],
     pendencias: dict[str, list[dict[str, Any]]],
     dry_run: bool,
+    actor: Any = None,
 ) -> None:
     """Processa uma linha do arquivo."""
     # Validar CPF
@@ -299,6 +328,44 @@ def _process_row(
         )
         return
 
+    # P0 Tier-0 (auditoria 2026-07-18): a coluna `grupos` concede privilegio —
+    # inclusive autoridade de aprovacao (PA-01) — e nao cadastro. Quem nao e
+    # superusuario importa dados, nunca privilegio. Decidido uma vez por linha
+    # para que o relatorio saia identico em dry_run e no apply: o preview nao
+    # pode prometer o que o apply nao faz.
+    aplicar_grupos = bool(grupos_str) and _actor_pode_atribuir_grupos(actor)
+    if grupos_str and not aplicar_grupos:
+        stats["grupos_ignorados"] += 1
+        pendencias["grupos_ignorados"].append(
+            {
+                "linha": linha_num,
+                "cpf": cpf,
+                "grupos": grupos_str,
+                "erro": "Coluna 'grupos' ignorada: atribuicao de grupo e exclusiva de superusuario.",
+            }
+        )
+
+    # Resolver os nomes ANTES de decidir persistir. Antes, dry_run nem consultava
+    # o banco: era estruturalmente incapaz de avisar sobre um nome que o apply ia
+    # descartar calado. Resolver aqui da a paridade e mata o silencio de uma vez.
+    #
+    # Nao resolvemos para ator sem autoridade: a coluna inteira ja foi ignorada, e
+    # dizer "esse grupo nao existe" vazaria quais grupos existem para quem nao
+    # manda neles.
+    grupos_encontrados: list[Group] = []
+    if aplicar_grupos:
+        grupos_encontrados, grupos_desconhecidos = _resolve_grupos(grupos_str)
+        if grupos_desconhecidos:
+            stats["grupos_desconhecidos"] += 1
+            pendencias["grupos_desconhecidos"].append(
+                {
+                    "linha": linha_num,
+                    "cpf": cpf,
+                    "grupos": grupos_desconhecidos,
+                    "erro": "Grupo nao encontrado; os demais grupos da linha foram aplicados.",
+                }
+            )
+
     if existing:
         # Atualizar campos se houver mudancas
         updated = False
@@ -342,8 +409,8 @@ def _process_row(
             stats["unchanged"] += 1
 
         # Atualizar grupos mesmo se nao houve outras mudancas
-        if grupos_str and not dry_run:
-            _assign_groups(existing, grupos_str)
+        if aplicar_grupos and not dry_run:
+            _assign_groups(existing, grupos_encontrados, actor=actor)
 
     else:
         # Criar novo usuario
@@ -365,18 +432,43 @@ def _process_row(
             usuario.save(update_fields=["password"])
 
             # Atribuir grupos
-            if grupos_str:
-                _assign_groups(usuario, grupos_str)
+            if aplicar_grupos:
+                _assign_groups(usuario, grupos_encontrados, actor=actor)
 
         stats["created"] += 1
 
 
-def _assign_groups(usuario: Usuario, grupos_str: str) -> None:
-    """Atribui grupos ao usuario (comma-separated)."""
-    grupos_nomes = [g.strip() for g in grupos_str.split(",") if g.strip()]
+def _resolve_grupos(grupos_str: str) -> tuple[list[Group], list[str]]:
+    """Resolve nomes de grupo (comma-separated, case-insensitive) em objetos.
 
-    for nome_grupo in grupos_nomes:
-        # Busca case-insensitive
+    Devolve `(encontrados, desconhecidos)`. Chamada tanto em dry_run quanto no
+    apply, para que o preview enxergue exatamente o que o apply fara — inclusive
+    os nomes que serao descartados.
+    """
+    encontrados: list[Group] = []
+    desconhecidos: list[str] = []
+
+    for nome_grupo in [g.strip() for g in grupos_str.split(",") if g.strip()]:
         grupo = Group.objects.filter(name__iexact=nome_grupo).first()
-        if grupo and grupo not in usuario.groups.all():
-            usuario.groups.add(grupo)
+        if grupo is None:
+            desconhecidos.append(nome_grupo)
+        elif grupo not in encontrados:
+            encontrados.append(grupo)
+
+    return encontrados, desconhecidos
+
+
+def _assign_groups(usuario: Usuario, grupos: list[Group], *, actor: Any = None) -> None:
+    """Vincula os grupos ja resolvidos ao usuario.
+
+    O gate de `actor` e repetido aqui de proposito: esta e a primitiva que
+    escreve privilegio, e nao deve depender do chamador lembrar de verificar.
+    Resolver nomes e reportar o que foi descartado sao responsabilidade de
+    `_resolve_grupos` / `_process_row`, que tem o contexto do relatorio.
+    """
+    if not _actor_pode_atribuir_grupos(actor):
+        return
+
+    if grupos:
+        # `add` e idempotente para M2M — nao precisa checar pertinencia antes.
+        usuario.groups.add(*grupos)

@@ -131,7 +131,7 @@ normalize_cpf(cpf) + "|" + normalize_email(email)
 | Model `Usuario` | `apps/core/models/usuario.py` | `AbstractUser` custom + cpf único, telefone, cargo | ✅ existe |
 | Model `Group` | Django auth | Setor (13) + Função (5) | ✅ existe |
 | Constantes | `apps/core/constants.py:16-45` | `SETOR_GROUPS`, `FUNCAO_GROUPS`, `ALLOWED_USER_GROUPS` | ✅ existe |
-| **Service** | `apps/core/services/usuarios_import.py` | `import_usuarios_from_file(path: str, dry_run: bool = True) -> dict` | ✅ **já implementado** |
+| **Service** | `apps/core/services/usuarios_import.py` | `import_usuarios_from_file(*, path: str, dry_run: bool = True, actor: Any = None) -> dict` | ✅ **já implementado** |
 | **Endpoint síncrono** | `POST /api/usuarios/import/` (`ImportUsuariosView` em `apps/core/views_import_usuarios.py`) | dry_run via query param `?dry_run=true\|false`; multipart `file=` no body | ✅ **já funciona** |
 | Endpoint async | (não implementado para usuarios) | ASQ-005 Fase 1 só cobre `bloqueios`; Fase 2 migrará usuarios | ⏳ Fase 2 do ImportJob |
 | Gate RBAC efetivo | `IsAuthenticated + HasPerm("manage_admin_registries")` | DAT + Diretoria (via cap `manage_admin_registries`) — **NÃO** `import_spreadsheet` | ✅ aplicado em prod |
@@ -145,20 +145,49 @@ normalize_cpf(cpf) + "|" + normalize_email(email)
 - **Retorno**:
   ```python
   {
-      "stats": {"created": N, "updated": N, "unchanged": N, "skipped": {"cpf_invalid": N, "nome_missing": N, "other": N}},
-      "pendencias": {"cpf_invalid": [...], "nome_missing": [...], "outros": [...]},
+      "stats": {
+          "created": N, "updated": N, "unchanged": N,
+          "grupos_ignorados": N, "grupos_desconhecidos": N,
+          "skipped": {"cpf_invalid": N, "nome_missing": N, "superuser_protected": N, "other": N},
+      },
+      "pendencias": {
+          "cpf_invalid": [...], "nome_missing": [...], "superuser_protected": [...],
+          "grupos_ignorados": [...], "grupos_desconhecidos": [...], "outros": [...],
+      },
       "dry_run": bool,
       "file": str,
   }
   ```
-- **Colunas esperadas pelo service** (docstring linha 6-13):
+- **Colunas esperadas pelo service** (docstring linha 6-16):
   - `cpf` (obrigatório, 11 dígitos)
   - `nome` (obrigatório, completo — vira first_name + last_name)
   - `email` (opcional)
   - `telefone` (opcional)
   - `cargo` (opcional)
   - `is_active` (opcional, default `True`)
-  - `grupos` (opcional, separados por vírgula)
+  - `grupos` (opcional, separados por vírgula) — **só aplicado se o ator for
+    superusuário**; ver §8.1.
+
+### 8.1 Gate Tier-0 da coluna `grupos` (PR #1608)
+
+Associação a grupo define autoridade no RBAC, inclusive a de aprovação (PA-01).
+`manage_admin_registries` — a capability que abre o endpoint — é **operacional**
+(cadastro), então o import **não** é caminho para conceder privilégio.
+
+- Ator **superusuário**: a coluna `grupos` é aplicada normalmente.
+- Ator **não-superusuário**: a coluna é ignorada por completo, e cada linha afetada
+  sai em `pendencias["grupos_ignorados"]`. Os demais campos são importados normalmente.
+- **Fail-closed**: chamada sem `actor` não atribui grupo nenhum. Um caller novo que
+  esquecer de passar `actor=` verá os grupos silenciosamente descartados.
+- Nome de grupo **inexistente** no banco sai em `pendencias["grupos_desconhecidos"]`,
+  **idêntico em `dry_run` e no apply** — os nomes são resolvidos antes de decidir
+  persistir, para o preview não calar sobre o que o apply vai descartar.
+- Conta superusuário **alvo** nunca é alterada por importação
+  (`skipped["superuser_protected"]`).
+
+As duas categorias `grupos_*` são **avisos, não erros**: a linha foi importada, apenas
+um campo foi desconsiderado. O frontend as roteia para `warnings[]`
+(`v2/frontend/src/api/ops.ts`) justamente para não bloquear o botão Aplicar.
 
 > ⚠️ **Atenção template CSV**: o cabeçalho atual do template (`nome,nome_completo,cpf,telefone,email,cargo,gerencia`) **não bate** com o cabeçalho aceito pelo service (`cpf,nome,email,telefone,cargo,is_active,grupos`). Ver §15 abaixo.
 
@@ -168,8 +197,9 @@ normalize_cpf(cpf) + "|" + normalize_email(email)
 
 ### Pode criar
 - Novo `Usuario` (sem `is_superuser`, sem `is_staff`).
-- Atribuir **Setor** (1 grupo) conforme `Gerência`.
-- Atribuir **Função** (1 grupo) conforme `Cargo`, se estiver no whitelist do mapa.
+- Atribuir **Setor** (1 grupo) conforme `Gerência` — **só com ator superusuário** (§8.1).
+- Atribuir **Função** (1 grupo) conforme `Cargo`, se estiver no whitelist do mapa —
+  **só com ator superusuário** (§8.1).
 
 ### Pode atualizar
 - `telefone`, `cargo` (string livre), `email` (com warning).
@@ -242,7 +272,8 @@ AuditLog.objects.filter(
 3. **Coluna `grupos` no service real** aceita lista separada por vírgula (`"DAT,Vidas,Formador"`). Confirmar se `sheets.banco` exporta nesse formato ou se prefere `gerencia` + `cargo` separados (transformação no client).
 4. **Política de email**: aceita emails pessoais (`@gmail.com`) ou só institucional?
 5. **Senha inicial**: o service hoje usa `set_unusable_password()` + token de reset (não confirmado se já dispara email; verificar `_process_row`). Se não dispara, criar fluxo de envio é PR separada.
-6. **Cargo `"Gerente"`** + Setor `"Superintendência"`: política definitiva. Hoje o service simplesmente grava no campo `cargo` (texto) — não atribui grupo `Gerente` automaticamente. Atribuição via grupos só acontece pela coluna `grupos` explícita.
+6. **Cargo `"Gerente"`** + Setor `"Superintendência"`: política definitiva. Hoje o service simplesmente grava no campo `cargo` (texto) — não atribui grupo `Gerente` automaticamente. Atribuição via grupos só acontece pela coluna `grupos` explícita **e com ator
+superusuário** (§8.1) — a coluna explícita é condição necessária, não suficiente.
 7. **`Assistente Administrativo` + `Controle`** (composite de aprovação): mesma situação. Atribuição automática violaria D17; só admin manual.
 8. **Telefone obrigatório?** Hoje no model é opcional; service aceita vazio.
 

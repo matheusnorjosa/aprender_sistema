@@ -22,6 +22,7 @@ from django.db import transaction
 import pandas as pd
 
 from apps.core.imports.normalization import normalize_active_flag, normalize_blank
+from apps.core.imports.row_errors import registrar_erro_import
 from apps.core.models import Colecao, Projeto
 from apps.core.services.resolvers import resolve_projeto
 
@@ -67,12 +68,12 @@ def import_colecoes_from_file(*, path: str, dry_run: bool = True) -> dict[str, A
             try:
                 with transaction.atomic():  # savepoint
                     _process_row(row, idx, stats, pendencias, projeto_cache)
-            except Exception as e:
+            except Exception:
                 stats["skipped"]["other"] += 1
                 pendencias["outros"].append(
                     {
                         "linha": idx,
-                        "erro": str(e),
+                        "erro": registrar_erro_import(importer="colecoes", linha=idx),
                         "row": str(row),
                     }
                 )

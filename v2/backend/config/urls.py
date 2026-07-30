@@ -6,6 +6,7 @@ URL configuration for AS v2 project.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from django.conf import settings
@@ -14,6 +15,8 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.urls import include, path
 
 from apps.core.admin_site import admin_site  # Custom admin site (superusers only)
+
+logger = logging.getLogger(__name__)
 
 
 def _metrics_gate(request: HttpRequest) -> HttpResponse:
@@ -63,16 +66,18 @@ def healthz_detailed(request: HttpRequest) -> JsonResponse:
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
         checks["database"] = "ok"
-    except Exception as e:
-        checks["database"] = f"error: {str(e)[:100]}"
+    except Exception:
+        logger.exception("healthz_detailed: falha no check de banco")
+        checks["database"] = "error"
 
     # Redis cache check
     try:
         cache.set("health_check_key", "ok", 1)
         result = cache.get("health_check_key")
         checks["redis"] = "ok" if result == "ok" else "fail"
-    except Exception as e:
-        checks["redis"] = f"error: {str(e)[:100]}"
+    except Exception:
+        logger.exception("healthz_detailed: falha no check de redis")
+        checks["redis"] = "error"
 
     # GCal circuit breaker check
     try:
@@ -81,8 +86,9 @@ def healthz_detailed(request: HttpRequest) -> JsonResponse:
         checks["gcal_circuit"] = get_circuit_state()
     except ImportError:
         checks["gcal_circuit"] = "not_configured"
-    except Exception as e:
-        checks["gcal_circuit"] = f"error: {str(e)[:100]}"
+    except Exception:
+        logger.exception("healthz_detailed: falha no check do circuit breaker do GCal")
+        checks["gcal_circuit"] = "error"
 
     # Determine overall status
     core_checks = [checks.get("database"), checks.get("redis")]

@@ -140,7 +140,23 @@ jobs:
             echo "frontend_digest=${fe}"
           } >> "$GITHUB_OUTPUT"
 
+      # A attestation SLSA do GitHub NAO esta disponivel em repositorio privado de
+      # conta pessoal — o proprio action falha com "Failed to persist attestation:
+      # Feature not available for user-owned private repositories". Este repo era
+      # publico ate 2026-07-20 (quando o job passava inteiro) e virou privado depois.
+      #
+      # `continue-on-error` em vez de `if:` por VISIBILIDADE de proposito: nada aqui
+      # afirma "o repo e privado". A attestation simplesmente TENTA. Se o repo voltar
+      # a ser publico, ela passa, o step de verificacao abaixo volta a rodar sozinho e
+      # a exigencia se restabelece — sem precisar editar workflow de novo.
+      #
+      # O que NAO e opcional: a assinatura cosign logo abaixo. Ela nao depende da API
+      # de attestation do GitHub (usa Fulcio/Rekor) e funciona em repo privado. E ela
+      # que amarra o digest a identidade OIDC deste workflow, e e' o gate duro do
+      # promote.yml e do deployer (que ja tratava attestation como opt-in — #1526).
       - name: Generate SLSA provenance attestation (backend)
+        id: attest_backend
+        continue-on-error: true
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           # registry-qualified (index.docker.io/): sem o prefixo o attest interpreta
@@ -150,6 +166,8 @@ jobs:
           push-to-registry: true
 
       - name: Generate SLSA provenance attestation (frontend)
+        id: attest_frontend
+        continue-on-error: true
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-name: index.docker.io/${{ env.FRONTEND_IMAGE }}
@@ -189,7 +207,12 @@ jobs:
             --certificate-identity-regexp "${CERT_IDENTITY_REGEX}" \
             > cosign-verify-frontend.json
 
+      # So verifica o que foi efetivamente gerado. Se as duas attestations passaram
+      # (repo publico), a verificacao roda e continua sendo bloqueante — um bundle
+      # invalido derruba o job. Se nao foram geradas, nao ha o que verificar e o
+      # gate segue sendo a assinatura cosign, ja verificada acima.
       - name: Verify provenance attestations
+        if: steps.attest_backend.outcome == 'success' && steps.attest_frontend.outcome == 'success'
         env:
           BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
           FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
@@ -220,6 +243,7 @@ jobs:
           FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
           BACKEND_DIGEST: ${{ steps.digests.outputs.backend_digest }}
           FRONTEND_DIGEST: ${{ steps.digests.outputs.frontend_digest }}
+          ATTESTATION_OK: ${{ steps.attest_backend.outcome == 'success' && steps.attest_frontend.outcome == 'success' }}
         run: |
           set -euo pipefail
           {
@@ -228,8 +252,15 @@ jobs:
             echo "- Release tag: \`${RELEASE_TAG}\`"
             echo "- Backend: \`${BACKEND_IMAGE}@${BACKEND_DIGEST}\`"
             echo "- Frontend: \`${FRONTEND_IMAGE}@${FRONTEND_DIGEST}\`"
-            echo "- Attestation predicate: \`https://slsa.dev/provenance/v1\`"
+            echo "- Assinatura cosign (keyless, OIDC): **obrigatoria e verificada**"
             echo "- Signer workflow: \`${GITHUB_REPOSITORY}/.github/workflows/slsa-provenance.yml\`"
+            if [ "${ATTESTATION_OK}" = "true" ]; then
+              echo "- Attestation SLSA: **gerada e verificada** (\`https://slsa.dev/provenance/v1\`)"
+            else
+              echo "- Attestation SLSA: **indisponivel** — a API do GitHub nao suporta"
+              echo "  repositorio privado de conta pessoal. O gate segue sendo a assinatura"
+              echo "  cosign acima. Volta a ser gerada e exigida sozinha se o repo virar publico."
+            fi
           } | tee slsa-summary.md
 
           cat slsa-summary.md >> "$GITHUB_STEP_SUMMARY"
@@ -239,11 +270,14 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4
         with:
           name: slsa-provenance-${{ github.run_id }}
+          # `warn` e nao `error`: os arquivos de attestation-verify so existem quando
+          # a attestation foi gerada. Com `error` o upload derruba o job justamente
+          # no cenario que este PR trata — foi o segundo erro do run 30555294751.
           path: |
             slsa-summary.md
             cosign-verify-backend.json
             cosign-verify-frontend.json
             attestation-verify-backend.json
             attestation-verify-frontend.json
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30

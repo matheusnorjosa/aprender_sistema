@@ -38,7 +38,7 @@ def dat_user(db):
         username="dat_user",
         email="dat@test.com",
         password="testpass123",
-        cpf="11111111111",
+        cpf="10000007021",
         first_name="DAT",
         last_name="User",
     )
@@ -79,8 +79,8 @@ def api_client():
 def sample_csv(db):
     """Cria arquivo CSV de teste com usuarios validos."""
     content = """cpf,nome,email,telefone,cargo
-12345678901,Maria Silva Santos,maria.silva@test.com,85999990001,Formadora
-98765432109,Joao Pedro Souza,joao.pedro@test.com,85999990002,Coordenador
+10000000019,Maria Silva Santos,maria.silva@test.com,85999990001,Formadora
+10000000795,Joao Pedro Souza,joao.pedro@test.com,85999990002,Coordenador
 """
     temp = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8")
     temp.write(content)
@@ -97,8 +97,8 @@ def sample_csv_with_groups(db):
     GroupFactory(name="Coordenador")
 
     content = """cpf,nome,email,grupos
-55555555555,Ana Costa Lima,ana.costa@test.com,Formador
-66666666666,Carlos Mendes,carlos.mendes@test.com,"Formador,Coordenador"
+10000001414,Ana Costa Lima,ana.costa@test.com,Formador
+10000002143,Carlos Mendes,carlos.mendes@test.com,"Formador,Coordenador"
 """
     temp = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8")
     temp.write(content)
@@ -126,8 +126,8 @@ abc,Outro Invalido,outro@test.com
 def sample_csv_missing_nome(db):
     """CSV com nome ausente."""
     content = """cpf,nome,email
-77777777777,,semnome@test.com
-88888888888,  ,espacos@test.com
+10000002810,,semnome@test.com
+10000003549,  ,espacos@test.com
 """
     temp = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8")
     temp.write(content)
@@ -140,7 +140,7 @@ def sample_csv_missing_nome(db):
 def sample_csv_flexible_headers(db):
     """CSV com headers alternativos."""
     content = """CPF,NOME_COMPLETO,E-MAIL,TEL,FUNCAO,ATIVO
-11122233344,Pedro Alves Costa,pedro.alves@test.com,85988887777,Apoio,sim
+10000004278,Pedro Alves Costa,pedro.alves@test.com,85988887777,Apoio,sim
 """
     temp = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8")
     temp.write(content)
@@ -157,7 +157,7 @@ def sample_csv_update_existing(db):
         username="existing_user",
         email="old@test.com",
         password="testpass123",
-        cpf="33333333333",
+        cpf="10000004944",
         first_name="Old",
         last_name="Name",
         telefone="85999990000",
@@ -165,7 +165,7 @@ def sample_csv_update_existing(db):
     )
 
     content = """cpf,nome,email,telefone,cargo
-33333333333,New First New Last,new@test.com,85999991111,Cargo Novo
+10000004944,New First New Last,new@test.com,85999991111,Cargo Novo
 """
     temp = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8")
     temp.write(content)
@@ -209,14 +209,14 @@ class TestUsuariosImportService:
         assert User.objects.count() == initial_count + 2
 
         # Verificar dados
-        maria = User.objects.get(cpf="12345678901")
+        maria = User.objects.get(cpf="10000000019")
         assert maria.first_name == "Maria"
         assert maria.last_name == "Silva Santos"
         assert maria.email == "maria.silva@test.com"
         assert maria.telefone == "85999990001"
         assert maria.cargo == "Formadora"
 
-        joao = User.objects.get(cpf="98765432109")
+        joao = User.objects.get(cpf="10000000795")
         assert joao.first_name == "Joao"
         assert joao.last_name == "Pedro Souza"
 
@@ -237,7 +237,7 @@ class TestUsuariosImportService:
 
     def test_updates_existing_user(self, sample_csv_update_existing):
         """Atualiza usuario existente com novos dados."""
-        user_before = User.objects.get(cpf="33333333333")
+        user_before = User.objects.get(cpf="10000004944")
         assert user_before.email == "old@test.com"
 
         result = import_usuarios_from_file(path=sample_csv_update_existing, dry_run=False)
@@ -245,7 +245,7 @@ class TestUsuariosImportService:
         assert result["stats"]["updated"] == 1
         assert result["stats"]["created"] == 0
 
-        user_after = User.objects.get(cpf="33333333333")
+        user_after = User.objects.get(cpf="10000004944")
         assert user_after.email == "new@test.com"
         assert user_after.telefone == "85999991111"
         assert user_after.cargo == "Cargo Novo"
@@ -272,7 +272,7 @@ class TestUsuariosImportService:
 
         assert result["stats"]["created"] == 1
 
-        user = User.objects.get(cpf="11122233344")
+        user = User.objects.get(cpf="10000004278")
         assert user.first_name == "Pedro"
         assert user.last_name == "Alves Costa"
         assert user.email == "pedro.alves@test.com"
@@ -290,11 +290,11 @@ class TestUsuariosImportService:
 
         assert result["stats"]["created"] == 2
 
-        ana = User.objects.get(cpf="55555555555")
+        ana = User.objects.get(cpf="10000001414")
         assert ana.groups.filter(name="Formador").exists()
         assert ana.groups.count() == 1
 
-        carlos = User.objects.get(cpf="66666666666")
+        carlos = User.objects.get(cpf="10000002143")
         assert carlos.groups.filter(name="Formador").exists()
         assert carlos.groups.filter(name="Coordenador").exists()
         assert carlos.groups.count() == 2
@@ -302,7 +302,7 @@ class TestUsuariosImportService:
     def test_cpf_formatting_is_cleaned(self, db):
         """CPF com formatacao (pontos/tracos) e limpo."""
         content = """cpf,nome,email
-123.456.789-01,Usuario Formatado,formatado@test.com
+100.000.000-19,Usuario Formatado,formatado@test.com
 """
         temp = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8")
         temp.write(content)
@@ -311,7 +311,7 @@ class TestUsuariosImportService:
         result = import_usuarios_from_file(path=temp.name, dry_run=False)
 
         assert result["stats"]["created"] == 1
-        user = User.objects.get(cpf="12345678901")
+        user = User.objects.get(cpf="10000000019")
         assert user.first_name == "Usuario"
 
         Path(temp.name).unlink()
@@ -456,51 +456,51 @@ class TestImportGrupoGateTier0:
 
     def test_ator_nao_superuser_nao_atribui_grupos(self, tmp_path, dat_user, grupos_de_autoridade):
         """Ator sem superuser cria o usuario, mas a coluna `grupos` nao vale."""
-        path = _write_csv(tmp_path, 'cpf,nome,grupos\n99988877766,Novo Usuario,"Superintendência,Gerente"\n')
+        path = _write_csv(tmp_path, 'cpf,nome,grupos\n10000005673,Novo Usuario,"Superintendência,Gerente"\n')
 
         result = import_usuarios_from_file(path=path, dry_run=False, actor=dat_user)
 
         assert result["stats"]["created"] == 1
-        novo = User.objects.get(cpf="99988877766")
+        novo = User.objects.get(cpf="10000005673")
         assert novo.groups.count() == 0
 
     def test_ator_nao_superuser_reporta_grupos_ignorados(self, tmp_path, dat_user, grupos_de_autoridade):
         """O que foi ignorado aparece no relatorio — nunca falha silenciosa."""
-        path = _write_csv(tmp_path, 'cpf,nome,grupos\n99988877766,Novo Usuario,"Superintendência,Gerente"\n')
+        path = _write_csv(tmp_path, 'cpf,nome,grupos\n10000005673,Novo Usuario,"Superintendência,Gerente"\n')
 
         result = import_usuarios_from_file(path=path, dry_run=False, actor=dat_user)
 
         ignorados = result["pendencias"]["grupos_ignorados"]
         assert len(ignorados) == 1
         assert ignorados[0]["linha"] == 1
-        assert ignorados[0]["cpf"] == "99988877766"
+        assert ignorados[0]["cpf"] == "10000005673"
         assert "Superintendência" in ignorados[0]["grupos"]
         assert result["stats"]["grupos_ignorados"] == 1
 
     def test_sem_ator_nao_atribui_grupos(self, tmp_path, grupos_de_autoridade):
         """Fail-closed: sem ator identificado, nenhum grupo e atribuido."""
-        path = _write_csv(tmp_path, "cpf,nome,grupos\n99988877766,Novo Usuario,Gerente\n")
+        path = _write_csv(tmp_path, "cpf,nome,grupos\n10000005673,Novo Usuario,Gerente\n")
 
         result = import_usuarios_from_file(path=path, dry_run=False)
 
-        assert User.objects.get(cpf="99988877766").groups.count() == 0
+        assert User.objects.get(cpf="10000005673").groups.count() == 0
         assert result["stats"]["grupos_ignorados"] == 1
 
     def test_superuser_atribui_grupos(self, tmp_path, superuser, grupos_de_autoridade):
         """Superusuario continua podendo atribuir grupos pelo import."""
-        path = _write_csv(tmp_path, 'cpf,nome,grupos\n99988877766,Novo Usuario,"Superintendência,Gerente"\n')
+        path = _write_csv(tmp_path, 'cpf,nome,grupos\n10000005673,Novo Usuario,"Superintendência,Gerente"\n')
 
         result = import_usuarios_from_file(path=path, dry_run=False, actor=superuser)
 
-        novo = User.objects.get(cpf="99988877766")
+        novo = User.objects.get(cpf="10000005673")
         assert novo.groups.count() == 2
         assert result["pendencias"]["grupos_ignorados"] == []
         assert result["stats"]["grupos_ignorados"] == 0
 
     def test_usuario_existente_nao_recebe_grupos_de_nao_superuser(self, tmp_path, dat_user, grupos_de_autoridade):
         """O ramo de update tambem e gateado, nao so o de create."""
-        alvo = UsuarioFactory(username="alvo", cpf="44444444444", first_name="Alvo", last_name="Silva")
-        path = _write_csv(tmp_path, 'cpf,nome,telefone,grupos\n44444444444,Alvo Silva,85999998888,"Gerente"\n')
+        alvo = UsuarioFactory(username="alvo", cpf="10000006300", first_name="Alvo", last_name="Silva")
+        path = _write_csv(tmp_path, 'cpf,nome,telefone,grupos\n10000006300,Alvo Silva,85999998888,"Gerente"\n')
 
         result = import_usuarios_from_file(path=path, dry_run=False, actor=dat_user)
 
@@ -515,8 +515,8 @@ class TestImportGrupoGateTier0:
         Sem este teste, desligar `_assign_groups` no ramo `if existing:` passaria
         verde — todo o resto da cobertura desse ramo e negativa.
         """
-        alvo = UsuarioFactory(username="alvo", cpf="44444444444", first_name="Alvo", last_name="Silva")
-        path = _write_csv(tmp_path, 'cpf,nome,grupos\n44444444444,Alvo Silva,"Superintendência,Gerente"\n')
+        alvo = UsuarioFactory(username="alvo", cpf="10000006300", first_name="Alvo", last_name="Silva")
+        path = _write_csv(tmp_path, 'cpf,nome,grupos\n10000006300,Alvo Silva,"Superintendência,Gerente"\n')
 
         result = import_usuarios_from_file(path=path, dry_run=False, actor=superuser)
 
@@ -530,7 +530,7 @@ class TestImportGrupoGateTier0:
         Sem esta ancora, remover a guarda encheria o relatorio de falso-positivo
         para todo arquivo importado por nao-superusuario.
         """
-        path = _write_csv(tmp_path, "cpf,nome,email\n99988877766,Novo Usuario,novo@test.com\n")
+        path = _write_csv(tmp_path, "cpf,nome,email\n10000005673,Novo Usuario,novo@test.com\n")
 
         result = import_usuarios_from_file(path=path, dry_run=False, actor=dat_user)
 
@@ -543,12 +543,12 @@ class TestImportGrupoGateTier0:
         path = _write_csv(
             tmp_path,
             "cpf,nome,email,telefone,cargo,grupos\n"
-            "99988877766,Novo Usuario,novo@test.com,85911112222,Apoio,Gerente\n",
+            "10000005673,Novo Usuario,novo@test.com,85911112222,Apoio,Gerente\n",
         )
 
         import_usuarios_from_file(path=path, dry_run=False, actor=dat_user)
 
-        novo = User.objects.get(cpf="99988877766")
+        novo = User.objects.get(cpf="10000005673")
         assert novo.email == "novo@test.com"
         assert novo.telefone == "85911112222"
         assert novo.cargo == "Apoio"
@@ -557,17 +557,17 @@ class TestImportGrupoGateTier0:
 
     def test_dry_run_reporta_grupos_ignorados_para_nao_superuser(self, tmp_path, dat_user, grupos_de_autoridade):
         """Preview avisa que a coluna `grupos` sera ignorada."""
-        path = _write_csv(tmp_path, "cpf,nome,grupos\n99988877766,Novo Usuario,Gerente\n")
+        path = _write_csv(tmp_path, "cpf,nome,grupos\n10000005673,Novo Usuario,Gerente\n")
 
         result = import_usuarios_from_file(path=path, dry_run=True, actor=dat_user)
 
         assert result["stats"]["grupos_ignorados"] == 1
         assert len(result["pendencias"]["grupos_ignorados"]) == 1
-        assert not User.objects.filter(cpf="99988877766").exists()
+        assert not User.objects.filter(cpf="10000005673").exists()
 
     def test_dry_run_nao_reporta_ignorados_para_superuser(self, tmp_path, superuser, grupos_de_autoridade):
         """Para superusuario o preview nao acusa nada — o apply vai atribuir."""
-        path = _write_csv(tmp_path, "cpf,nome,grupos\n99988877766,Novo Usuario,Gerente\n")
+        path = _write_csv(tmp_path, "cpf,nome,grupos\n10000005673,Novo Usuario,Gerente\n")
 
         result = import_usuarios_from_file(path=path, dry_run=True, actor=superuser)
 
@@ -578,7 +578,7 @@ class TestImportGrupoGateTier0:
 
     def test_grupo_inexistente_reportado_no_apply(self, tmp_path, superuser, grupos_de_autoridade):
         """Nome de grupo que nao existe no banco nao pode sumir calado."""
-        path = _write_csv(tmp_path, 'cpf,nome,grupos\n99988877766,Novo Usuario,"Gerente,NaoExiste"\n')
+        path = _write_csv(tmp_path, 'cpf,nome,grupos\n10000005673,Novo Usuario,"Gerente,NaoExiste"\n')
 
         result = import_usuarios_from_file(path=path, dry_run=False, actor=superuser)
 
@@ -590,11 +590,11 @@ class TestImportGrupoGateTier0:
 
     def test_grupo_inexistente_nao_impede_os_validos(self, tmp_path, superuser, grupos_de_autoridade):
         """Um nome errado nao derruba os grupos corretos da mesma linha."""
-        path = _write_csv(tmp_path, 'cpf,nome,grupos\n99988877766,Novo Usuario,"Gerente,NaoExiste"\n')
+        path = _write_csv(tmp_path, 'cpf,nome,grupos\n10000005673,Novo Usuario,"Gerente,NaoExiste"\n')
 
         import_usuarios_from_file(path=path, dry_run=False, actor=superuser)
 
-        assert User.objects.get(cpf="99988877766").groups.filter(name="Gerente").exists()
+        assert User.objects.get(cpf="10000005673").groups.filter(name="Gerente").exists()
 
     def test_dry_run_e_apply_reportam_grupo_inexistente_igual(self, tmp_path, superuser, grupos_de_autoridade):
         """Paridade: o preview nao pode calar sobre o que o apply vai descartar.
@@ -602,7 +602,7 @@ class TestImportGrupoGateTier0:
         Antes, `dry_run` sequer resolvia os nomes de grupo — era estruturalmente
         incapaz de avisar, enquanto o apply descartava em silencio.
         """
-        path = _write_csv(tmp_path, 'cpf,nome,grupos\n99988877766,Novo Usuario,"Gerente,NaoExiste"\n')
+        path = _write_csv(tmp_path, 'cpf,nome,grupos\n10000005673,Novo Usuario,"Gerente,NaoExiste"\n')
 
         preview = import_usuarios_from_file(path=path, dry_run=True, actor=superuser)
         aplicado = import_usuarios_from_file(path=path, dry_run=False, actor=superuser)
@@ -612,7 +612,7 @@ class TestImportGrupoGateTier0:
 
     def test_todos_os_grupos_validos_nao_reporta_desconhecidos(self, tmp_path, superuser, grupos_de_autoridade):
         """Ancora: arquivo correto nao gera ruido no relatorio."""
-        path = _write_csv(tmp_path, 'cpf,nome,grupos\n99988877766,Novo Usuario,"Gerente,Superintendência"\n')
+        path = _write_csv(tmp_path, 'cpf,nome,grupos\n10000005673,Novo Usuario,"Gerente,Superintendência"\n')
 
         result = import_usuarios_from_file(path=path, dry_run=False, actor=superuser)
 
@@ -625,7 +625,7 @@ class TestImportGrupoGateTier0:
         Reportar tambem "grupo desconhecido" vazaria a existencia (ou nao) de
         grupos para quem nao tem autoridade sobre eles.
         """
-        path = _write_csv(tmp_path, "cpf,nome,grupos\n99988877766,Novo Usuario,NaoExiste\n")
+        path = _write_csv(tmp_path, "cpf,nome,grupos\n10000005673,Novo Usuario,NaoExiste\n")
 
         result = import_usuarios_from_file(path=path, dry_run=False, actor=dat_user)
 
@@ -651,7 +651,7 @@ class TestImportGrupoGateTier0:
 
     def test_resposta_da_api_expoe_grupos_ignorados(self, api_client, dat_user, grupos_de_autoridade, tmp_path):
         """A UI precisa conseguir mostrar o que foi ignorado."""
-        path = _write_csv(tmp_path, "cpf,nome,grupos\n99988877766,Novo Usuario,Gerente\n")
+        path = _write_csv(tmp_path, "cpf,nome,grupos\n10000005673,Novo Usuario,Gerente\n")
         api_client.force_authenticate(user=dat_user)
 
         with open(path, "rb") as f:
@@ -662,11 +662,55 @@ class TestImportGrupoGateTier0:
 
     def test_superuser_ainda_atribui_grupos_via_api(self, api_client, superuser, grupos_de_autoridade, tmp_path):
         """O caminho legitimo (superusuario) continua funcionando pela API."""
-        path = _write_csv(tmp_path, "cpf,nome,grupos\n99988877766,Novo Usuario,Gerente\n")
+        path = _write_csv(tmp_path, "cpf,nome,grupos\n10000005673,Novo Usuario,Gerente\n")
         api_client.force_authenticate(user=superuser)
 
         with open(path, "rb") as f:
             response = api_client.post(IMPORT_USUARIOS_URL + "?dry_run=false", {"file": f}, format="multipart")
 
         assert response.status_code == status.HTTP_200_OK
-        assert User.objects.get(cpf="99988877766").groups.filter(name="Gerente").exists()
+        assert User.objects.get(cpf="10000005673").groups.filter(name="Gerente").exists()
+
+
+# =============================================================================
+# #1670: validador mod-11 de CPF (antes so checava len==11 + isdigit)
+# =============================================================================
+
+
+@pytest.mark.django_db
+class TestUsuariosImportCpfMod11:
+    """usuarios_import passa a rejeitar CPF estruturalmente invalido (mod-11)."""
+
+    def test_cpf_11_digitos_com_dv_invalido_e_rejeitado(self, tmp_path):
+        """REGRESSAO #1670: 11 digitos mas digito verificador errado -> nao cria.
+
+        `12345678901` tem 11 digitos e passava no validador antigo (len+isdigit);
+        agora `classify_cpf` reprova (DV mod-11 nao confere).
+        """
+        path = _write_csv(tmp_path, "cpf,nome,email\n12345678901,Fulano de Tal,fulano@test.com\n")
+
+        result = import_usuarios_from_file(path=path, dry_run=True)
+
+        assert result["stats"]["created"] == 0
+        assert result["stats"]["skipped"]["cpf_invalid"] == 1
+        pend = result["pendencias"]["cpf_invalid"]
+        assert len(pend) == 1
+        assert pend[0]["status"] == "invalid"
+
+    def test_cpf_placeholder_repetido_classifica_como_ausente(self, tmp_path):
+        """Placeholder de digito repetido -> `status == 'absent'`, nao 'invalid'."""
+        path = _write_csv(tmp_path, "cpf,nome,email\n11111111111,Fulano de Tal,fulano@test.com\n")
+
+        result = import_usuarios_from_file(path=path, dry_run=True)
+
+        assert result["stats"]["skipped"]["cpf_invalid"] == 1
+        assert result["pendencias"]["cpf_invalid"][0]["status"] == "absent"
+
+    def test_cpf_valido_mod11_cria_normalmente(self, tmp_path):
+        """CPF com digitos verificadores corretos passa e cria."""
+        path = _write_csv(tmp_path, "cpf,nome,email\n10000000019,Fulano de Tal,fulano@test.com\n")
+
+        result = import_usuarios_from_file(path=path, dry_run=False)
+
+        assert result["stats"]["created"] == 1
+        assert User.objects.filter(cpf="10000000019").exists()

@@ -4,7 +4,8 @@ Service para importacao de Usuarios via upload.
 Padrao: dry_run + CPF para idempotencia (campo unico).
 
 Colunas esperadas:
-- cpf (obrigatorio): 11 digitos
+- cpf (obrigatorio): 11 digitos com digitos verificadores mod-11 validos
+  (validacao via `apps.core.validators.classify_cpf`, SSOT do #1578)
 - nome (obrigatorio): nome completo (first_name + last_name)
 - email (opcional): email do usuario
 - telefone (opcional): telefone
@@ -35,6 +36,7 @@ import pandas as pd
 from apps.core.imports.normalization import normalize_active_flag, normalize_blank, normalize_cpf_digits
 from apps.core.imports.row_errors import registrar_erro_import
 from apps.core.models import Usuario
+from apps.core.validators import CPF_ABSENT, CPF_VALID, classify_cpf
 
 
 def import_usuarios_from_file(*, path: str, dry_run: bool = True, actor: Any = None) -> dict[str, Any]:
@@ -211,12 +213,6 @@ def _clean_cpf(cpf: str) -> str:
     return normalize_cpf_digits(cpf)
 
 
-def _validate_cpf(cpf: str) -> bool:
-    """Valida se CPF tem 11 digitos numericos."""
-    cleaned = _clean_cpf(cpf)
-    return len(cleaned) == 11 and cleaned.isdigit()
-
-
 def _parse_name(nome: str) -> tuple[str, str]:
     """Divide nome completo em first_name e last_name."""
     parts = nome.strip().split(maxsplit=1)
@@ -277,17 +273,27 @@ def _process_row(
     actor: Any = None,
 ) -> None:
     """Processa uma linha do arquivo."""
-    # Validar CPF
+    # Validar CPF — mod-11 via SSOT (#1578/#1670). Antes so checava len==11+isdigit,
+    # aceitando CPF estruturalmente invalido. `classify_cpf` distingue AUSENTE
+    # (vazio/placeholder de digito repetido) de INVALIDO (digito verificador errado);
+    # ambos vao ao mesmo canal `cpf_invalid`, com o motivo no campo `status`.
     cpf_raw = row.get("cpf", "")
     cpf = _clean_cpf(cpf_raw)
+    cpf_status = classify_cpf(cpf_raw)
 
-    if not _validate_cpf(cpf_raw):
+    if cpf_status != CPF_VALID:
         stats["skipped"]["cpf_invalid"] += 1
+        motivo = (
+            "CPF ausente ou placeholder (digito repetido)."
+            if cpf_status == CPF_ABSENT
+            else "CPF estruturalmente invalido (digito verificador nao confere)."
+        )
         pendencias["cpf_invalid"].append(
             {
                 "linha": linha_num,
                 "cpf": cpf_raw,
-                "erro": "CPF invalido (deve ter 11 digitos)",
+                "status": cpf_status,
+                "erro": motivo,
             }
         )
         return

@@ -328,3 +328,16 @@ class TestMenuPolicies1589:
         policies = _policies_for(UsuarioFactory(superuser=True))
         for key in self.NEW_KEYS:
             assert key in policies, f"superuser deveria ter {key} (bypass)"
+
+
+def test_openapi_me_policies_declara_array_de_strings():
+    """Guard de drift (#1463 item #10): o schema OpenAPI de GET /api/me/policies/
+    deve declarar um ARRAY de strings — nao um objeto {policies: [...]} — porque o
+    runtime devolve a lista crua (`Response(resolve_public_policies(...))`).
+    Regenera o schema e trava a forma para pegar regressao de annotation.
+    """
+    from drf_spectacular.generators import SchemaGenerator
+
+    schema = SchemaGenerator().get_schema(request=None, public=True)
+    resp = schema["paths"]["/api/me/policies/"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+    assert resp == {"type": "array", "items": {"type": "string"}}

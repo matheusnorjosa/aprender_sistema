@@ -100,11 +100,11 @@ class MeEventsListView(generics.ListAPIView):
             "expõe apenas policy keys do registro público. Keys são imutáveis "
             "após release (renomear = breaking; ver `feedback_capability_policy_layer_pattern.md` §6)."
         ),
+        # Schema drift (#1463 item #10): o runtime devolve um ARRAY de strings
+        # (`Response(resolve_public_policies(...))`), nao `{policies: [...]}`.
+        # ListSerializer(child=CharField) gera `{type: array, items: {type: string}}`.
         responses={
-            200: inline_serializer(
-                name="MePoliciesResponse",
-                fields={"policies": serializers.ListField(child=serializers.CharField())},
-            ),
+            200: serializers.ListSerializer(child=serializers.CharField()),
             401: COMMON_ERROR_RESPONSES[401],
         },
         tags=["me"],

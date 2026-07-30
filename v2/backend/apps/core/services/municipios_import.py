@@ -22,6 +22,7 @@ from django.db import transaction
 import pandas as pd
 
 from apps.core.imports.normalization import normalize_active_flag, normalize_blank, normalize_uf
+from apps.core.imports.row_errors import registrar_erro_import
 from apps.core.models import Municipio
 from apps.core.services.options_cache import invalidate_municipios_options_cache
 
@@ -63,12 +64,12 @@ def import_municipios_from_file(*, path: str, dry_run: bool = True) -> dict[str,
             try:
                 with transaction.atomic():  # savepoint
                     _process_row(row, idx, stats, pendencias)
-            except Exception as e:
+            except Exception:
                 stats["skipped"]["other"] += 1
                 pendencias["outros"].append(
                     {
                         "linha": idx,
-                        "erro": str(e),
+                        "erro": registrar_erro_import(importer="municipios", linha=idx),
                         "row": str(row),
                     }
                 )

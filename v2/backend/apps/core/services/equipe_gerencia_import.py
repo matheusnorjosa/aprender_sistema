@@ -25,6 +25,7 @@ from django.db import transaction
 import pandas as pd
 
 from apps.core.imports.normalization import normalize_active_flag, normalize_blank, normalize_cpf_digits
+from apps.core.imports.row_errors import registrar_erro_import
 from apps.core.models import EquipeGerencia, Gerencia, Usuario
 from apps.core.services.resolvers import resolve_user_by_email, resolve_user_by_name
 
@@ -116,12 +117,12 @@ def import_equipe_gerencia_from_file(*, path: str, dry_run: bool = True) -> dict
             try:
                 with transaction.atomic():  # savepoint
                     _process_row(row, idx, stats, pendencias)
-            except Exception as e:
+            except Exception:
                 stats["skipped"]["other"] += 1
                 pendencias["outros"].append(
                     {
                         "linha": idx,
-                        "erro": str(e),
+                        "erro": registrar_erro_import(importer="equipe_gerencia", linha=idx),
                         "row": str(row),
                     }
                 )

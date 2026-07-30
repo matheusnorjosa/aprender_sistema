@@ -14,6 +14,8 @@ Covers:
 
 from __future__ import annotations
 
+from unittest import mock
+
 from django.test import TestCase, override_settings
 
 from apps.core.views_auth import (
@@ -61,6 +63,30 @@ class TestHealthzMinimalPayload(TestCase):
         assert response.status_code == 200
         data = response.json()
         assert "checks" in data
+
+
+class TestHealthzDetailedNoErrorLeak(TestCase):
+    """SEC-RECON-01 / CodeQL py/stack-trace-exposure: uma falha de dependencia
+    reporta status generico, nunca a mensagem crua da excecao."""
+
+    def test_cache_error_reported_as_generic_status(self):
+        from django.core.cache import cache
+
+        sentinel = "LEAK_redis_AUTH_password_wrong_SECRET"
+        real_set = cache.set
+
+        def _fail_only_probe(key, *args, **kwargs):
+            # Falha so no probe do health check; deixa a sessao (outra chave) passar.
+            if key == "health_check_key":
+                raise RuntimeError(sentinel)
+            return real_set(key, *args, **kwargs)
+
+        with mock.patch.object(cache, "set", side_effect=_fail_only_probe):
+            response = self.client.get("/healthz/detailed/", REMOTE_ADDR="127.0.0.1")
+
+        assert response.status_code == 200
+        assert sentinel not in response.content.decode()
+        assert response.json()["checks"]["redis"] == "error"
 
 
 # ================================================================
@@ -112,6 +138,31 @@ class TestReadyzConditionalPayload(TestCase):
         data = response.json()
         assert "status" in data
         assert "checks" in data
+
+    def test_readyz_cache_error_reported_as_generic_status(self):
+        """CodeQL py/stack-trace-exposure: falha de cache nao vaza a excecao crua."""
+        from django.contrib.auth import get_user_model
+        from django.core.cache import cache
+
+        User = get_user_model()
+        admin = User.objects.create_user("admin_readyz_leak", "rl@b.com", "pass1234", is_staff=True)
+        self.client.force_login(admin)
+
+        sentinel = "LEAK_redis_connection_refused_10_0_0_5_SECRET"
+        real_set = cache.set
+
+        def _fail_only_probe(key, *args, **kwargs):
+            # Falha so no probe do readyz; deixa a sessao (outra chave) salvar.
+            if key == "_healthcheck":
+                raise RuntimeError(sentinel)
+            return real_set(key, *args, **kwargs)
+
+        with mock.patch.object(cache, "set", side_effect=_fail_only_probe):
+            response = self.client.get("/api/readyz/")
+
+        assert response.status_code == 200
+        assert sentinel not in response.content.decode()
+        assert response.json()["checks"]["cache"] == "warning"
 
 
 class TestVersionConditionalPayload(TestCase):

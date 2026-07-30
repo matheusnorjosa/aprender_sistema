@@ -27,6 +27,7 @@ from django.conf import settings
 from django.db import transaction
 
 from apps.core.imports.hashing import stable_import_hash
+from apps.core.imports.row_errors import registrar_erro_import
 from apps.core.models import AcaoDAT, Municipio, Projeto, TipoAcaoDAT, Usuario
 from apps.core.services.normalize import norm_text
 from apps.core.services.resolvers import resolve_municipio, resolve_user_by_email, resolve_user_by_name
@@ -112,12 +113,12 @@ def import_dat_cadastros(file_path: str, dry_run: bool = False) -> dict[str, Any
                     result: str | None = _process_row(row, idx, stats, pendencias)
                     if result == "skip":
                         continue
-            except Exception as e:
+            except Exception:
                 stats["skipped"]["other"] += 1
                 pendencias["outros"].append(
                     {
                         "linha": idx,
-                        "erro": str(e),
+                        "erro": registrar_erro_import(importer="dat_cadastros", linha=idx),
                         "row": row,
                     }
                 )

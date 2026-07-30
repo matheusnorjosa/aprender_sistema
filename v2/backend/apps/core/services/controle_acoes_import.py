@@ -27,6 +27,7 @@ from django.conf import settings
 from django.db import transaction
 
 from apps.core.imports.hashing import stable_import_hash
+from apps.core.imports.row_errors import registrar_erro_import
 from apps.core.models import AcaoControle, Municipio, Projeto, Usuario
 from apps.core.services.resolvers import (
     resolve_municipio,
@@ -78,12 +79,12 @@ def import_acoes_controle(file_path: str, dry_run: bool = False) -> dict[str, An
                     result: str | None = _process_row(row, idx, stats, pendencias)
                     if result == "skip":
                         continue
-            except Exception as e:
+            except Exception:
                 stats["skipped"]["other"] += 1
                 pendencias["outros"].append(
                     {
                         "linha": idx,
-                        "erro": str(e),
+                        "erro": registrar_erro_import(importer="controle_acoes", linha=idx),
                         "row": row,
                     }
                 )

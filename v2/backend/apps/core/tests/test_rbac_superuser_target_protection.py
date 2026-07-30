@@ -52,7 +52,9 @@ def superuser(db):
     """Alvo Tier-0: único superuser ativo, senha conhecida, sem grupos, sem nome."""
     return UsuarioFactory(
         username="super_admin_p0",
-        cpf="90000000002",
+        # CPF mod-11 valido: e importado por CPF em test_import_by_cpf_* (#1670),
+        # e o importer passou a rejeitar CPF invalido antes do gate de superuser.
+        cpf="10000007706",
         password=SUPERUSER_PASSWORD,
         superuser=True,
     )
@@ -63,7 +65,8 @@ def common_user(db):
     """Conta comum administrável pelo DAT."""
     return UsuarioFactory(
         username="comum_p0",
-        cpf="90000000003",
+        # CPF mod-11 valido: e importado por CPF em test_import_still_updates_* (#1670).
+        cpf="10000008427",
         password=COMMON_PASSWORD,
     )
 

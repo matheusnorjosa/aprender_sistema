@@ -7,6 +7,7 @@ Health Check and Features Views
 from __future__ import annotations
 
 import json
+import logging
 import os
 from pathlib import Path
 
@@ -17,6 +18,8 @@ from rest_framework.decorators import api_view, permission_classes, throttle_cla
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
+
+logger = logging.getLogger(__name__)
 
 
 @api_view(["GET"])
@@ -41,8 +44,9 @@ def readyz(request: Request) -> Response:
                 checks["database"] = "ok"
             else:
                 checks["database"] = "error: unexpected result"
-    except Exception as e:
-        checks["database"] = f"error: {str(e)}"
+    except Exception:
+        logger.exception("readyz: falha no check de banco")
+        checks["database"] = "error"
 
     # Redis/Cache check (optional - warnings only)
     try:
@@ -52,8 +56,9 @@ def readyz(request: Request) -> Response:
             checks["cache"] = "ok"
         else:
             checks["cache"] = "warning: set/get failed"
-    except Exception as e:
-        checks["cache"] = f"warning: {str(e)}"
+    except Exception:
+        logger.exception("readyz: falha no check de cache")
+        checks["cache"] = "warning"
 
     # Only database failures cause unhealthy status
     db_ok = checks["database"] == "ok"

@@ -99,13 +99,13 @@ def test_apply_tipo_evento_rejects_empty_nome(tmp_path):
 
 # ══════════════════════════ usuario (PR-C, + atribuicao de Group) ══════════════════════════
 def test_apply_usuario_creates_username_cpf_unusable_password(tmp_path):
-    csv = "nome_completo,cpf,email,cargo\nMaria Silva Souza,11122233344,maria@ex.com,Coordenadores\n"
+    csv = "nome_completo,cpf,email,cargo\nMaria Silva Souza,11144477735,maria@ex.com,Coordenadores\n"
     path = _write_export(tmp_path, {"usuario": csv})
     _seed_funcao_groups()
     r = ExportContractImporter(path=path, apply=True, allow=("usuario",)).run()
     assert r["applied"]["usuario"] == 1
-    u = Usuario.objects.get(cpf="11122233344")
-    assert u.username == "11122233344"  # username derivado do CPF (estavel, unique)
+    u = Usuario.objects.get(cpf="11144477735")
+    assert u.username == "11144477735"  # username derivado do CPF (estavel, unique)
     assert u.has_usable_password() is False  # senha inutilizavel (login via OAuth Google)
     assert u.first_name == "Maria"
     assert u.last_name == "Silva Souza"
@@ -114,82 +114,82 @@ def test_apply_usuario_creates_username_cpf_unusable_password(tmp_path):
 
 def test_apply_usuario_assigns_group_from_cargo(tmp_path):
     csv = (
-        "nome_completo,cpf,email,cargo\n" "Joao Coord,11122233344,,Coordenadores\n" "Ana Form,55566677788,,Formadores\n"
+        "nome_completo,cpf,email,cargo\n" "Joao Coord,11144477735,,Coordenadores\n" "Ana Form,22255588846,,Formadores\n"
     )
     path = _write_export(tmp_path, {"usuario": csv})
     _seed_funcao_groups()
     ExportContractImporter(path=path, apply=True, allow=("usuario",)).run()
-    assert Usuario.objects.get(cpf="11122233344").groups.filter(name="Coordenador").exists()
-    assert Usuario.objects.get(cpf="55566677788").groups.filter(name="Formador").exists()
+    assert Usuario.objects.get(cpf="11144477735").groups.filter(name="Coordenador").exists()
+    assert Usuario.objects.get(cpf="22255588846").groups.filter(name="Formador").exists()
 
 
 def test_apply_usuario_equipe_gerencia_papel_takes_precedence(tmp_path):
     # cargo diz Formadores, mas equipe_gerencia diz COORDENADOR (fonte primaria) -> Coordenador
     files = {
-        "usuario": "nome_completo,cpf,email,cargo\nBia,11122233344,,Formadores\n",
-        "equipe_gerencia": "gerencia,usuario_cpf,usuario_email,papel\nG,11122233344,,COORDENADOR\n",
+        "usuario": "nome_completo,cpf,email,cargo\nBia,11144477735,,Formadores\n",
+        "equipe_gerencia": "gerencia,usuario_cpf,usuario_email,papel\nG,11144477735,,COORDENADOR\n",
     }
     path = _write_export(tmp_path, files)
     _seed_funcao_groups()
     ExportContractImporter(path=path, apply=True, allow=("usuario",)).run()
-    u = Usuario.objects.get(cpf="11122233344")
+    u = Usuario.objects.get(cpf="11144477735")
     assert u.groups.filter(name="Coordenador").exists()
     assert not u.groups.filter(name="Formador").exists()
 
 
 def test_apply_usuario_no_papel_creates_without_group(tmp_path):
     # sem cargo e sem equipe_gerencia -> cria SEM grupo (NUNCA chuta Coordenador)
-    csv = "nome_completo,cpf,email,cargo\nSem Papel,11122233344,,\n"
+    csv = "nome_completo,cpf,email,cargo\nSem Papel,11144477735,,\n"
     path = _write_export(tmp_path, {"usuario": csv})
     _seed_funcao_groups()
     ExportContractImporter(path=path, apply=True, allow=("usuario",)).run()
-    assert Usuario.objects.get(cpf="11122233344").groups.count() == 0
+    assert Usuario.objects.get(cpf="11144477735").groups.count() == 0
 
 
 def test_apply_usuario_group_missing_creates_without_group(tmp_path):
     # Simula prod ANTES do seed_rbac: o grupo alvo nao existe. (Nos testes, uma fixture
     # autouse semeia os grupos RBAC, entao deletamos explicitamente para reproduzir o caso.)
     Group.objects.filter(name__iexact="Coordenador").delete()
-    csv = "nome_completo,cpf,email,cargo\nSemGrupo,11122233344,,Coordenadores\n"
+    csv = "nome_completo,cpf,email,cargo\nSemGrupo,11144477735,,Coordenadores\n"
     path = _write_export(tmp_path, {"usuario": csv})
     r = ExportContractImporter(path=path, apply=True, allow=("usuario",)).run()
     assert r["applied"]["usuario"] == 1  # usuario e criado mesmo sem o grupo (nao quebra)
-    assert Usuario.objects.get(cpf="11122233344").groups.count() == 0
+    assert Usuario.objects.get(cpf="11144477735").groups.count() == 0
 
 
 def test_apply_usuario_idempotent(tmp_path):
-    csv = "nome_completo,cpf,email,cargo\nRepetido,11122233344,,Coordenadores\n"
+    csv = "nome_completo,cpf,email,cargo\nRepetido,11144477735,,Coordenadores\n"
     path = _write_export(tmp_path, {"usuario": csv})
     _seed_funcao_groups()
     ExportContractImporter(path=path, apply=True, allow=("usuario",)).run()
     r2 = ExportContractImporter(path=path, apply=True, allow=("usuario",)).run()
     assert r2["applied"]["usuario"] == 0
-    assert Usuario.objects.filter(cpf="11122233344").count() == 1
+    assert Usuario.objects.filter(cpf="11144477735").count() == 1
 
 
 def test_apply_usuario_create_only_skips_existing(tmp_path):
-    UsuarioFactory(username="u_exist_ap", password="x", cpf="11122233344", email="exist@ex.com", first_name="Antigo")
-    csv = "nome_completo,cpf,email,cargo\nNome Novo,11122233344,exist@ex.com,Coordenadores\n"
+    UsuarioFactory(username="u_exist_ap", password="x", cpf="11144477735", email="exist@ex.com", first_name="Antigo")
+    csv = "nome_completo,cpf,email,cargo\nNome Novo,11144477735,exist@ex.com,Coordenadores\n"
     path = _write_export(tmp_path, {"usuario": csv})
     _seed_funcao_groups()
     r = ExportContractImporter(path=path, apply=True, allow=("usuario",)).run()
     assert r["applied"]["usuario"] == 0
-    assert Usuario.objects.get(cpf="11122233344").first_name == "Antigo"  # nao sobrescreve
+    assert Usuario.objects.get(cpf="11144477735").first_name == "Antigo"  # nao sobrescreve
 
 
 def test_apply_usuario_rejects_invalid_cpf(tmp_path):
     # cpf invalido (nao 11 dig) e sem email -> nao cria; linha valida cria
-    csv = "nome_completo,cpf,email,cargo\nInvalidoXYZ,123,,\nValido,11122233344,,\n"
+    csv = "nome_completo,cpf,email,cargo\nInvalidoXYZ,123,,\nValido,11144477735,,\n"
     path = _write_export(tmp_path, {"usuario": csv})
     _seed_funcao_groups()
     r = ExportContractImporter(path=path, apply=True, allow=("usuario",)).run()
     assert r["applied"]["usuario"] == 1
-    assert Usuario.objects.filter(username="11122233344").exists()
+    assert Usuario.objects.filter(username="11144477735").exists()
     assert not Usuario.objects.filter(first_name="InvalidoXYZ").exists()
 
 
 def test_apply_usuario_allowlist_blocks(tmp_path):
-    csv = "nome_completo,cpf,email,cargo\nBloq,11122233344,,Coordenadores\n"
+    csv = "nome_completo,cpf,email,cargo\nBloq,11144477735,,Coordenadores\n"
     path = _write_export(tmp_path, {"usuario": csv})
     before = Usuario.objects.count()
     r = ExportContractImporter(path=path, apply=True, allow=()).run()

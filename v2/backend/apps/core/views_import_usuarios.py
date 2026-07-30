@@ -44,6 +44,9 @@ class ImportUsuariosView(APIView):
 
     Requer permissao: HasPerm("manage_admin_registries") (grupos DAT ou Superintendencia, ou superuser)
 
+    A coluna `grupos` do arquivo so e aplicada quando o ator e superusuario;
+    para os demais ela e ignorada e reportada em `pendencias.grupos_ignorados`.
+
     Query params:
         dry_run: "true" (default) para preview, "false" para aplicar
 
@@ -118,8 +121,14 @@ class ImportUsuariosView(APIView):
                 temp_file.write(chunk)
             temp_file.close()
 
-            # Executar import
-            report = import_usuarios_from_file(path=temp_file.name, dry_run=dry_run)
+            # Executar import. O ator vai junto: `manage_admin_registries` abre
+            # o endpoint para cadastro, mas so superusuario aplica a coluna
+            # `grupos` (gate Tier-0 em usuarios_import._actor_pode_atribuir_grupos).
+            report = import_usuarios_from_file(
+                path=temp_file.name,
+                dry_run=dry_run,
+                actor=request.user,
+            )
 
             return Response(report, status=status.HTTP_200_OK)
 

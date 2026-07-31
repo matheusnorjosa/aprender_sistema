@@ -5,7 +5,7 @@ Serializers para Usuario e Group.
 Type-checked with Pyright (strict mode).
 """
 
-# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false
 
 from __future__ import annotations
 
@@ -19,6 +19,11 @@ from rest_framework import serializers  # type: ignore[attr-defined]
 
 from apps.core.constants import FUNCAO_GROUPS, RESERVED_GROUPS, SETOR_GROUPS
 from apps.core.models import GroupClassificacao, PermissaoFuncional
+from apps.core.services.audit import (
+    auditar_assign_groups,
+    auditar_group_capabilities_set,
+    auditar_reset_senha,
+)
 from apps.core.services.rbac_service import get_assignable_group_names
 
 
@@ -247,16 +252,22 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         actor: Any = getattr(request, "user", None)
         return bool(actor and getattr(actor, "is_superuser", False))
 
+    def _actor(self) -> Any:
+        return getattr(self.context.get("request"), "user", None)
+
     def create(self, validated_data: dict[str, Any]) -> Any:
         """Create user with hashed password and groups."""
         groups = validated_data.pop("groups", [])
         password = validated_data.pop("password", None)
 
         user = super().create(validated_data)
+        actor = self._actor()
 
         if password:
             user.set_password(password)
             user.save()
+            # #1672: senha definida por um admin para outro usuario -> trilha.
+            auditar_reset_senha(actor=actor, target_user=user, contexto="create")
 
         # P0-1 Tier-0 (D-1=2a): membership é superuser-only. group_ids de
         # não-superuser é ignorado (o frontend já não envia — aqui é a
@@ -264,6 +275,13 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         # cargo do superuser.
         if groups and self._actor_is_superuser():
             user.groups.set(groups)
+            # #1672: atribuicao de grupos (privilegio) auditada.
+            auditar_assign_groups(
+                actor=actor,
+                target_user=user,
+                before_group_ids=[],
+                after_group_ids=list(user.groups.values_list("pk", flat=True)),
+            )
 
         return user
 
@@ -271,17 +289,28 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         """Update user and hash password if provided."""
         groups = validated_data.pop("groups", None)
         password = validated_data.pop("password", None)
+        actor = self._actor()
+        before_group_ids = set(instance.groups.values_list("pk", flat=True))
 
         user = super().update(instance, validated_data)
 
         if password:
             user.set_password(password)
             user.save()
+            # #1672: senha redefinida por um admin para outro usuario -> trilha.
+            auditar_reset_senha(actor=actor, target_user=user, contexto="update")
 
         # P0-1 Tier-0 (D-1=2a): membership é superuser-only (ver create()).
         # group_ids de não-superuser é ignorado.
         if groups is not None and self._actor_is_superuser():
             user.groups.set(groups)
+            # #1672: mudanca de membership (privilegio) auditada.
+            auditar_assign_groups(
+                actor=actor,
+                target_user=user,
+                before_group_ids=before_group_ids,
+                after_group_ids=set(user.groups.values_list("pk", flat=True)),
+            )
 
         return user
 
@@ -418,6 +447,9 @@ class GroupSerializer(serializers.ModelSerializer):
                 )
         return value
 
+    def _actor(self) -> Any:
+        return getattr(self.context.get("request"), "user", None)
+
     def create(self, validated_data: dict[str, Any]) -> Group:
         group_type = validated_data.pop("group_type_input", None)
         permissoes_funcionais = validated_data.pop("permissoes_funcionais", [])
@@ -426,16 +458,32 @@ class GroupSerializer(serializers.ModelSerializer):
             GroupClassificacao.objects.update_or_create(group=instance, defaults={"tipo": group_type})
         if permissoes_funcionais:
             instance.permissoes_funcionais.set(permissoes_funcionais)
+            # #1672: mudanca Group x Capability via REST tambem e auditada — este
+            # e o path que antes perdia o registro por nao passar pelo Admin.
+            auditar_group_capabilities_set(
+                actor=self._actor(),
+                group=instance,
+                before_cap_ids=[],
+                after_cap_ids=[c.pk for c in permissoes_funcionais],
+            )
         return instance
 
     def update(self, instance: Group, validated_data: dict[str, Any]) -> Group:
         group_type = validated_data.pop("group_type_input", None)
         permissoes_funcionais = validated_data.pop("permissoes_funcionais", None)
+        before_cap_ids = set(instance.permissoes_funcionais.values_list("pk", flat=True))
         instance = super().update(instance, validated_data)
         if group_type:
             GroupClassificacao.objects.update_or_create(group=instance, defaults={"tipo": group_type})
         if permissoes_funcionais is not None:
             instance.permissoes_funcionais.set(permissoes_funcionais)
+            # #1672: idem — REST auditado (antes so o Admin persistia a trilha).
+            auditar_group_capabilities_set(
+                actor=self._actor(),
+                group=instance,
+                before_cap_ids=before_cap_ids,
+                after_cap_ids=set(instance.permissoes_funcionais.values_list("pk", flat=True)),
+            )
         return instance
 
 

@@ -1,6 +1,10 @@
 """
-PR 16 hardening RBAC (2026-05-04, último do programa): Admin UI
-superuser-only para atribuição Group × Capability.
+PR 16 hardening RBAC (2026-05-04): Admin UI superuser-only para atribuição
+Group × Capability. Atualizado no #1672: a auditoria não usa mais o buffer
+global `_PENDING_GROUP_CAP_DELTAS` — o Admin `save_related` captura before/after
+e delega ao serviço transacional `apps.core.services.audit`, que emite o
+AuditLog em `transaction.on_commit`. Por isso os POSTs que verificam AuditLog
+rodam dentro de `django_capture_on_commit_callbacks(execute=True)`.
 
 Cobre:
 - Guarda de acesso: superuser passa, staff puro nega, anonymous redireciona.
@@ -59,29 +63,10 @@ def staff_user() -> Usuario:
     return _make_user(is_staff=True, label="staff")
 
 
-@pytest.fixture(autouse=True)
-def _reset_rbac_audit_buffer():
-    """
-    O seed `seed_functional_permissions(assign_default_groups=False)`
-    dispara `m2m_changed.pre_clear` em todas as 16 capabilities, populando
-    `_PENDING_GROUP_CAP_DELTAS`. Sem reset entre testes, o `save_related`
-    do Admin flushaaria deltas vindos do seed — falsos positivos.
-    """
-    from apps.core.signals import _PENDING_GROUP_CAP_DELTAS
-
-    _PENDING_GROUP_CAP_DELTAS.clear()
-    yield
-    _PENDING_GROUP_CAP_DELTAS.clear()
-
-
 @pytest.fixture
 def capability() -> PermissaoFuncional:
     """Garante que `view_compras_dashboard` exista (do seed). Sem grupos."""
     seed_functional_permissions(assign_default_groups=False)
-    # Limpa o buffer poluído pelo seed antes do test rodar.
-    from apps.core.signals import _PENDING_GROUP_CAP_DELTAS
-
-    _PENDING_GROUP_CAP_DELTAS.clear()
     AuditLog.objects.filter(action="GROUP_CAPABILITY_CHANGED").delete()
     return PermissaoFuncional.objects.get(codename="view_compras_dashboard")
 
@@ -193,11 +178,6 @@ class TestAdminGroupEditing:
 
     def test_superuser_remove_grupo(self, superuser, capability, group_dat):
         capability.groups.add(group_dat)
-        # Limpa AuditLog gerado pelo signal m2m_changed direto (fora de Admin)
-        AuditLog.objects.filter(action="GROUP_CAPABILITY_CHANGED").delete()
-        from apps.core.signals import _PENDING_GROUP_CAP_DELTAS
-
-        _PENDING_GROUP_CAP_DELTAS.clear()
 
         c = Client()
         c.force_login(superuser)
@@ -242,21 +222,25 @@ class TestCacheInvalidation:
 
 # ============================================================================
 # AuditLog consolidado (GROUP_CAPABILITY_CHANGED)
+#
+# #1672: o AuditLog é emitido em `transaction.on_commit` pelo serviço de
+# auditoria. Em teste `django_db` (transação externa que dá rollback) os
+# callbacks só rodam sob `django_capture_on_commit_callbacks(execute=True)`.
 # ============================================================================
 
 
 class TestAuditLog:
-    def test_auditlog_criado_com_actor_e_deltas(self, superuser, capability, group_dat):
+    def test_auditlog_criado_com_actor_e_deltas(
+        self, superuser, capability, group_dat, django_capture_on_commit_callbacks
+    ):
         AuditLog.objects.filter(action="GROUP_CAPABILITY_CHANGED").delete()
-        from apps.core.signals import _PENDING_GROUP_CAP_DELTAS
-
-        _PENDING_GROUP_CAP_DELTAS.clear()
         c = Client()
         c.force_login(superuser)
-        c.post(
-            f"/admin/core/permissaofuncional/{capability.pk}/change/",
-            data={"groups": [str(group_dat.pk)], "_save": "Salvar"},
-        )
+        with django_capture_on_commit_callbacks(execute=True):
+            c.post(
+                f"/admin/core/permissaofuncional/{capability.pk}/change/",
+                data={"groups": [str(group_dat.pk)], "_save": "Salvar"},
+            )
         log = AuditLog.objects.filter(action="GROUP_CAPABILITY_CHANGED").latest("created_at")
         assert log.usuario_id == superuser.id
         assert log.model_name == "PermissaoFuncional"
@@ -267,19 +251,19 @@ class TestAuditLog:
         assert d["removed_groups"] == []
         assert d["groups_after"] == ["DAT"]
 
-    def test_remocao_explicita_lista_grupos_removidos(self, superuser, capability, group_dat, group_diretoria):
+    def test_remocao_explicita_lista_grupos_removidos(
+        self, superuser, capability, group_dat, group_diretoria, django_capture_on_commit_callbacks
+    ):
         capability.groups.add(group_dat, group_diretoria)
         AuditLog.objects.filter(action="GROUP_CAPABILITY_CHANGED").delete()
-        from apps.core.signals import _PENDING_GROUP_CAP_DELTAS
-
-        _PENDING_GROUP_CAP_DELTAS.clear()
 
         c = Client()
         c.force_login(superuser)
-        c.post(
-            f"/admin/core/permissaofuncional/{capability.pk}/change/",
-            data={"groups": [], "_save": "Salvar"},
-        )
+        with django_capture_on_commit_callbacks(execute=True):
+            c.post(
+                f"/admin/core/permissaofuncional/{capability.pk}/change/",
+                data={"groups": [], "_save": "Salvar"},
+            )
         log = AuditLog.objects.filter(action="GROUP_CAPABILITY_CHANGED").latest("created_at")
         d = log.details
         assert d["added_groups"] == []
@@ -288,21 +272,19 @@ class TestAuditLog:
         assert d["groups_after"] == []
 
     def test_uma_operacao_admin_gera_um_auditlog_por_capability(
-        self, superuser, capability, group_dat, group_diretoria
+        self, superuser, capability, group_dat, group_diretoria, django_capture_on_commit_callbacks
     ):
         capability.groups.add(group_dat)
         AuditLog.objects.filter(action="GROUP_CAPABILITY_CHANGED").delete()
-        from apps.core.signals import _PENDING_GROUP_CAP_DELTAS
-
-        _PENDING_GROUP_CAP_DELTAS.clear()
 
         c = Client()
         c.force_login(superuser)
         # Em uma única operação Admin: remove DAT + adiciona Diretoria.
-        c.post(
-            f"/admin/core/permissaofuncional/{capability.pk}/change/",
-            data={"groups": [str(group_diretoria.pk)], "_save": "Salvar"},
-        )
+        with django_capture_on_commit_callbacks(execute=True):
+            c.post(
+                f"/admin/core/permissaofuncional/{capability.pk}/change/",
+                data={"groups": [str(group_diretoria.pk)], "_save": "Salvar"},
+            )
         # Apenas UM AuditLog para essa capability nesta operação.
         logs = AuditLog.objects.filter(
             action="GROUP_CAPABILITY_CHANGED",
@@ -316,18 +298,18 @@ class TestAuditLog:
         assert d["removed_groups"] == ["DAT"]
         assert d["groups_after"] == ["Diretoria"]
 
-    def test_save_sem_mudanca_em_groups_nao_emite_auditlog(self, superuser, capability, group_dat):
+    def test_save_sem_mudanca_em_groups_nao_emite_auditlog(
+        self, superuser, capability, group_dat, django_capture_on_commit_callbacks
+    ):
         capability.groups.add(group_dat)
         AuditLog.objects.filter(action="GROUP_CAPABILITY_CHANGED").delete()
-        from apps.core.signals import _PENDING_GROUP_CAP_DELTAS
-
-        _PENDING_GROUP_CAP_DELTAS.clear()
 
         c = Client()
         c.force_login(superuser)
         # Re-salva com o mesmo set → sem delta.
-        c.post(
-            f"/admin/core/permissaofuncional/{capability.pk}/change/",
-            data={"groups": [str(group_dat.pk)], "_save": "Salvar"},
-        )
+        with django_capture_on_commit_callbacks(execute=True):
+            c.post(
+                f"/admin/core/permissaofuncional/{capability.pk}/change/",
+                data={"groups": [str(group_dat.pk)], "_save": "Salvar"},
+            )
         assert not AuditLog.objects.filter(action="GROUP_CAPABILITY_CHANGED").exists()

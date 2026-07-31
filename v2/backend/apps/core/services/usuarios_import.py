@@ -35,7 +35,8 @@ import pandas as pd
 
 from apps.core.imports.normalization import normalize_active_flag, normalize_blank, normalize_cpf_digits
 from apps.core.imports.row_errors import registrar_erro_import
-from apps.core.models import Usuario
+from apps.core.models import AuditLog, Usuario
+from apps.core.services.audit import registrar_auditoria
 from apps.core.validators import CPF_ABSENT, CPF_VALID, classify_cpf
 
 
@@ -102,6 +103,24 @@ def import_usuarios_from_file(*, path: str, dry_run: bool = True, actor: Any = N
 
         if dry_run:
             transaction.set_rollback(True)
+        else:
+            # #1672: import real (apply) deixa trilha de auditoria. Registrado
+            # dentro do outer atomic com on_commit -> so grava se o apply
+            # commitar; o rollback do dry_run descarta o callback naturalmente.
+            registrar_auditoria(
+                actor=actor,
+                action=AuditLog.Action.USER_IMPORT,
+                model_name="Usuario",
+                details={
+                    "file": path,
+                    "created": stats["created"],
+                    "updated": stats["updated"],
+                    "unchanged": stats["unchanged"],
+                    "grupos_ignorados": stats["grupos_ignorados"],
+                    "grupos_desconhecidos": stats["grupos_desconhecidos"],
+                    "skipped": dict(stats["skipped"]),
+                },
+            )
 
     return {
         "stats": stats,

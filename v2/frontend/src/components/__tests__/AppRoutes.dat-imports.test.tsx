@@ -6,7 +6,7 @@
  * (PR 11/12 do programa hardening RBAC fazem cobertura ampla por perfil).
  */
 
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 

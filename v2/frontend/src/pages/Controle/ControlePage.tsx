@@ -7,7 +7,7 @@
  * - Campos corretos: Data, Município, UF, Projeto, Código, Quant., Uso
  */
 
-import { useState, useEffect, useCallback, ChangeEvent } from 'react';
+import { useState, useEffect, useCallback, ChangeEvent, type JSX } from 'react';
 import { listCompras } from '../../api/ops';
 import type { Compra, ComprasFilters } from '../../api/ops';
 import DatImportsCentralizedBanner from '../../components/DatImportsCentralizedBanner';

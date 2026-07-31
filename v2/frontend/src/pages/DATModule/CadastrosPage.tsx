@@ -7,7 +7,7 @@
  * Workflow AVALIAR: Recebidos → Validados → Importados
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type JSX } from 'react';
 import { useTableFilters, type TableFilterParams } from '../../hooks/useTableFilters';
 import type { PaginatedResponse } from '../../types';
 import {

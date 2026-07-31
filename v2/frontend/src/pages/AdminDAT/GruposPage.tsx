@@ -5,7 +5,7 @@
  * Fase 4a - RBAC funcional (Issue #830)
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type JSX } from 'react';
 import {
   Button,
   Card,
@@ -30,7 +30,7 @@ import {
   ReloadOutlined,
   TeamOutlined,
 } from '@ant-design/icons';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import {
   createGroup,
   deleteGroup,

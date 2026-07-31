@@ -4,7 +4,7 @@
  * Métricas de municípios atendidos, volumes por coleção/produto e ranking de compras.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type JSX } from 'react';
 import {
   Alert,
   Button,

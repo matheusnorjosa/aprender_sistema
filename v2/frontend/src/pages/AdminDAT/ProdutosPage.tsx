@@ -4,12 +4,12 @@
  * CRUD de produtos por projeto com codigo e status ativo.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type JSX } from 'react';
 import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, Form, Checkbox, Select } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { TablePaginationConfig } from 'antd/es/table';
 import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { listProdutos, createProduto, updateProduto, deleteProduto, listProjetos } from '../../api/adminDAT';
 import type { ProdutoRecord, ProdutoPayload } from '../../api/adminDAT';
 import { DEFAULT_PAGE_SIZE } from '../../constants';

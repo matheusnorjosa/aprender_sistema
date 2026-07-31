@@ -12,6 +12,8 @@ import {
 import type { Etapa } from './constants';
 import type { CadastroRecord } from './types';
 
+import type { JSX } from "react";
+
 /**
  * Status type for workflow steps
  */

@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo, ChangeEvent, JSX } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router';
 // antd - direct imports for tree-shaking (Issue #424)
 import Table from 'antd/es/table';
 import Card from 'antd/es/card';

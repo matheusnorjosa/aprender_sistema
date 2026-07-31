@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, type JSX } from 'react';
 import { Layout, Menu, Badge } from 'antd';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router';
 import {
   CalendarOutlined,
   CheckCircleOutlined,

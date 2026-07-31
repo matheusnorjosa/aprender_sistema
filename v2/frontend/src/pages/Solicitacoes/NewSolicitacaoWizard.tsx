@@ -11,7 +11,7 @@
  */
 
 import { useState, useMemo, useCallback, useEffect, ChangeEvent, JSX, ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 // antd - direct imports for tree-shaking (Issue #424)
 import Steps from 'antd/es/steps';
 import Form from 'antd/es/form';

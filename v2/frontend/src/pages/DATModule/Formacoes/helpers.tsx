@@ -6,6 +6,8 @@
 import { Tag } from 'antd';
 import { STATUS_OPTIONS, MODALIDADE_OPTIONS } from './constants';
 
+import type { JSX } from "react";
+
 /**
  * Renders a status tag with appropriate color
  * @param status - Status value

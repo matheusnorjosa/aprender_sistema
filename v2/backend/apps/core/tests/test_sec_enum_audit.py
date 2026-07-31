@@ -189,6 +189,13 @@ class TestAuditLogPIIRedaction(TestCase):
         redacted = _redact_details(details)
         assert redacted["google_email"] == "u***@gmail.com"
 
+    def test_redact_masks_target_username(self):
+        # #1672: target_username pode ser um CPF (username=cpf no import) -> PII.
+        details = {"target_username": "11144477735", "target_user_id": 42}
+        redacted = _redact_details(details)
+        assert redacted["target_username"] == "***"
+        assert redacted["target_user_id"] == 42  # id nao e PII, preservado
+
     def test_redact_preserves_non_pii(self):
         details = {
             "username": "admin",

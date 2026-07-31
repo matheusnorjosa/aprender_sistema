@@ -91,6 +91,18 @@ class AuditLog(models.Model):
         GROUP_CAPABILITY_CHANGED = "GROUP_CAPABILITY_CHANGED", "Capability de grupo alterada"
         UPDATE_CONFIG = "UPDATE_CONFIG", "Atualizar configuracao"
 
+        # Usuarios / privilegio (#1672) — mutacoes de privilegio fora do Admin
+        # tambem precisam de trilha. Emitidas pelo servico transacional
+        # `apps.core.services.audit`.
+        RESET_PASSWORD = "RESET_PASSWORD", "Redefinir senha de usuario"
+        USER_DELETE = "USER_DELETE", "Excluir usuario"
+        ASSIGN_GROUPS = "ASSIGN_GROUPS", "Atribuir grupos a usuario"
+        USER_IMPORT = "USER_IMPORT", "Importar usuarios"
+        USER_PRIVILEGE_CHANGED = (
+            "USER_PRIVILEGE_CHANGED",
+            "Alterar flags de privilegio (is_superuser/is_staff/is_active)",
+        )
+
     usuario = models.ForeignKey(  # type: ignore[misc]
         "core.Usuario",
         on_delete=models.SET_NULL,

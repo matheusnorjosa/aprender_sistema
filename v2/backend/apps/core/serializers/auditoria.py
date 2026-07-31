@@ -19,7 +19,9 @@ from apps.core.models import AuditLog
 
 # SEC-AUDIT-01: PII fields to redact for non-superuser access
 _PII_KEYS_TO_REMOVE = {"user_agent"}
-_PII_KEYS_TO_MASK = {"ip_address", "google_email"}
+# `target_username` pode ser um CPF (username=cpf no import de usuarios) — mascarar
+# para nao-superuser na trilha de privilegio (#1672).
+_PII_KEYS_TO_MASK = {"ip_address", "google_email", "target_username"}
 
 
 def _mask_ip(ip: str) -> str:

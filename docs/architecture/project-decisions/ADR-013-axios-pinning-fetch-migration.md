@@ -30,6 +30,14 @@ Alternativas rejeitadas:
 - Fetch é nativa do browser — zero supply chain risk
 - Interceptors (CSRF, error handling) reimplementados em wrapper fino
 
+## Resultado (verificado em 2026-07-24)
+
+**A migração planejada foi concluída.** `axios` não aparece em `v2/frontend/package.json`
+(nem em `dependencies` nem em `devDependencies`) e não há nenhum `import ... from 'axios'`
+em `v2/frontend/src/`. O `npm uninstall axios` do passo 4 aconteceu — a dependência foi
+eliminada, não apenas pinada. A parte "Imediato" (pin exato) ficou, portanto, obsoleta por
+ter sido superada pela parte "Planejado".
+
 ## References
 
 - CVE-2025-27152

@@ -1,8 +1,16 @@
 # Guia de Logging - AS v2
 
-**Data**: 2025-12-03
+**Data**: 2026-07-24 (revisão contra o código)
 **Status**: Ativo
 **Issue**: #227
+
+> **Onde os logs vivem em produção:** no **stdout dos containers**, coletado pelo driver
+> `json-file` do Docker com rotação `max-size: 50m` / `max-file: 10`
+> (`v2/infra/docker-compose.prod.yml`). **Não há Loki, nem ELK, nem agregador** — ver
+> [OBSERVABILITY.md](./OBSERVABILITY.md). Para investigar um incidente:
+> `docker compose logs --tail=N <serviço>`, lembrando que `web`, `worker` e `beat` têm
+> logs **separados** (o campo `service` no JSON identifica a origem). Com a rotação acima,
+> o histórico é finito: **em incidente, colete os logs antes de reiniciar qualquer coisa.**
 
 ---
 
@@ -36,10 +44,14 @@ logger.error("Erros que precisam atenção")
 
 ### Configuração
 
-A configuração está em `config/settings.py`:
+A configuração está em `config/settings.py:632-690` (bloco `LOGGING`):
 
-- **Development**: Logs legíveis no console
-- **Staging/Production**: Logs JSON estruturados com correlation ID
+- **Development**: formatter `verbose`, legível no console
+- **Staging/Production**: formatter `json` (`pythonjsonlogger`) em stdout, com os filtros
+  `RequestIDFilter` e `ContextFilter` (`apps/core/logging_filters.py`) injetando
+  `request_id`, `environment` e `service`
+- `SERVICE_NAME` (`web`/`worker`/`beat`) vem do compose e é o que permite distinguir a
+  origem da linha
 
 ### Boas Práticas
 
@@ -90,20 +102,14 @@ logger.api('Request', { url, method });
 
 ### Implementação
 
-```javascript
-// src/utils/logger.ts
-const isDev = import.meta.env.DEV;
+Fonte: `v2/frontend/src/utils/logger.ts`. Os cinco métodos (`log`, `debug`, `warn`,
+`error`, `api`) são **todos** condicionados a `import.meta.env.DEV`.
 
-const logger = {
-  log: (...args) => isDev && console.log(...args),
-  debug: (...args) => isDev && console.log('[DEBUG]', ...args),
-  warn: (...args) => isDev && console.warn(...args),
-  error: (...args) => isDev && console.error(...args),
-  api: (label, data) => isDev && console.log(`[API] ${label}:`, data),
-};
-
-export default logger;
-```
+> ⚠️ **Consequência operacional: em produção o frontend não emite nada — nem erros.**
+> `logger.error` também é suprimido (`logger.ts:49-55`), e o envio para Sentry está apenas
+> comentado como intenção futura. Ao depurar um problema de frontend em produção, **não
+> espere achar rastro no console do navegador**: use a aba Network, os logs do `web` no
+> backend (correlacionados por `request_id`) e reprodução local com `DEV=true`.
 
 ### Boas Práticas
 
@@ -154,18 +160,28 @@ async function badFetch() {
 
 ## Correlation ID (Backend)
 
-O middleware `RequestIDMiddleware` adiciona correlation ID a todos os logs:
+O middleware `RequestIDMiddleware` (`config/settings.py:193`) adiciona correlation ID a
+todos os logs. Formato real emitido em staging/produção:
 
 ```json
 {
-  "timestamp": "2025-12-03T10:00:00",
-  "level": "INFO",
+  "asctime": "2026-07-24 10:00:00,123",
+  "levelname": "INFO",
+  "name": "apps.core.services.solicitacao_approval",
+  "message": "Solicitação aprovada",
   "request_id": "abc123",
-  "message": "Solicitação aprovada"
+  "environment": "production",
+  "service": "web"
 }
 ```
 
-Usar para rastrear requests através de múltiplos serviços.
+Usar `request_id` para rastrear um mesmo request entre `web` e `worker`; usar `service`
+para saber de qual container a linha veio.
+
+> **Nota de incidente (2026-07-06):** o formatter exclui explicitamente os atributos
+> `request` e `taskName` do LogRecord (`settings.py:646`). Sem isso, cada resposta 4xx/5xx
+> serializava o objeto `WSGIRequest` inteiro na linha de log — inundação de disco e
+> vazamento de PII. Não remova esse `reserved_attrs`.
 
 ---
 

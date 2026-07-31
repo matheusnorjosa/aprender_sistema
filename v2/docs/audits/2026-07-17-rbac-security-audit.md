@@ -1,10 +1,40 @@
 # Auditoria de Segurança RBAC — 2026-07-17
 
-Status: **P0 CONFIRMADOS VIVOS EM PRODUÇÃO** — remediação não iniciada
+Status: **registro histórico — parcialmente remediado.** Ver a nota de estado abaixo.
 Base: `main` (auditoria refeita sobre `e80a61d2`; verificação de prod sobre a stack viva)
 Método: leitura de código + migrations + specs + testes + **verificação read-only na VM01 de produção**
 Plano de correção definitiva: `v2/docs/plans/2026-07-17-rbac-correcao-definitiva.md`
 Escopo: nenhum arquivo de aplicação alterado nesta auditoria.
+
+---
+
+## Nota de estado — 2026-07-24
+
+O cabeçalho original dizia "remediação não iniciada". **Isso deixou de ser verdade.** Os
+quatro commits abaixo estão no histórico de `94f27651`, que é o commit em produção
+(`v2026.07.18-94f2765`):
+
+| Commit | PR | O que fechou |
+|---|---|---|
+| `86afdef3` | #1558 | P0-0 — superuser intocável por não-superuser |
+| `f555d22b` | #1563 | P0-1 — frontend read-only para não-superuser |
+| `82dfa0f2` | #1567 | P0-1 — gate Tier-0 backend superuser-only (`GroupViewSet.get_permissions`, `v2/backend/apps/core/views/admin.py:494-500`) |
+| `a545d5f8` | #1572 | P1-3 — invalidação reversa do cache de permissões |
+
+**O que continua aberto — e por quê importa:** o hotfix P0-0 protegeu o *alvo* superuser,
+mas deixou o **autoalvo** e a **allowlist de grupos** abertos, no mesmo arquivo e na mesma
+função. Nenhum dos quatro PRs tocou `usuarios_import._assign_groups`. Resultado: um operador
+do grupo DAT (**3 contas reais e ativas** em produção) ainda faz
+`POST /api/usuarios/import/?dry_run=false` com o próprio CPF e `grupos="Gerente,Superintendencia"`
+e recebe **HTTP 200**, sem pendência nem skip. É o achado **`M03-01`, P0, issue #1610** —
+a terceira porta da fronteira Tier-0.
+
+Efeito colateral do #1567 a considerar: a administração de Grupo×Capability virou
+**superuser-only** e há **1 único superuser ativo** em produção. **Bus factor de 1** — se
+essa conta cair, ninguém administra RBAC.
+
+**Este arquivo é registro histórico.** A fila de trabalho viva é
+[`ACHADOS_REAIS.md`](./ACHADOS_REAIS.md); as severidades de lá prevalecem sobre as daqui.
 
 ---
 

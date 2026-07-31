@@ -1,11 +1,20 @@
 # Contratos de Importação — `sheets.banco` → Aprender Sistema v2
 
-Status: **PR 1 — documentação e contratos (revisada 2026-05-05 contra código real)**
-Versão: 2026-05-05 v0.2
+Status: **PR 1 — documentação e contratos (revisada 2026-07-24 contra código real)**
+Versão: 2026-07-24 v0.3
 Origem: `sheets.banco` (planilha consolidada externa)
 Destino: PostgreSQL (`apps.core`) via endpoints HTTP DRF (síncronos `POST /api/<recurso>/import/`) ou async (`POST /api/imports/<tipo>/` — ASQ-005 Fase 1, apenas `bloqueios` por enquanto)
 
 > ⚠️ **Atualização v0.2 (2026-05-05)**: a versão inicial v0.1 tratou como "futuro" várias coisas que **já existem no código**. Esta versão corrige o drift, lista paths reais, e reorienta o roadmap. Ver §3.1 "Estado real do código" e §8 "Roadmap revisto".
+
+> 🔴 **Atualização v0.3 (2026-07-24)** — varredura pós-auditoria modular M00–M28. A v0.2 errou no
+> sentido oposto ao da v0.1: descreveu **garantias que o código não dá**. Corrigidos nesta versão:
+> §2.1 (targets `make etl-*` não existem — ETL removido; `dry_run` desconhecido = apply),
+> §2.2 (SHA-1, não SHA-256; nem todo import tem hash; reimport sobrescreve),
+> §2.3 (gate não tem noção de alvo), §2.4 (**não existe `AuditLog` em import síncrono**),
+> §2.6 (3 das 5 garantias eram falsas), §3.1 (resolvers escolhem em vez de rejeitar),
+> §6 e §7 (paths inexistentes removidos).
+> Documento vivo dos achados: [../audits/ACHADOS_REAIS.md](../audits/ACHADOS_REAIS.md).
 
 ---
 
@@ -34,51 +43,103 @@ Toda importação tem 2 etapas:
 1. **Dry-run** — valida + retorna preview, **não persiste**.
 2. **Apply** — só após dry-run sem erros bloqueantes.
 
-Comandos atuais (referência — não implementados nesta PR):
-- `make etl-acomp-dry` / `etl-acomp-apply` — acompanhamento legacy.
-- `make etl-desloc-dry` / `etl-desloc-apply` — deslocamentos.
-- `make etl-acoes-dry` / `etl-acoes-apply` — ações controle.
-- `make etl-dat-dry` / `etl-dat-apply` — DAT cadastros.
-- `make import-compras-dry` / `import-cadastros-dry` / `import-acoes-dry`.
+> 🔴 **Corrigido em 2026-07-24**: o **ETL legado foi removido**. Nenhum target `make etl-*` existe
+> (`v2/Makefile` — os únicos alvos de import são `import-compras-dry`, `import-acoes-dry`,
+> `import-cadastros-dry`, `:15,56,69,82`), e não há management command `etl_*.py`
+> (`apps/core/management/commands/` — ver §7).
+
+Comandos que **existem hoje**:
+- `make import-compras-dry FILE=...` → `curl POST /api/controle/import-compras/?dry_run=true` (`v2/Makefile:56-67`).
+- `make import-acoes-dry FILE=...` → `POST /api/controle/import-acoes/?dry_run=true` (`v2/Makefile:69-80`).
+- `make import-cadastros-dry FILE=...` → `POST /api/dat/import-cadastros/?dry_run=true` (`v2/Makefile:82-93`).
+- `python manage.py import_export_contract` — dry-run por padrão, `--apply` com allowlist
+  (`apps/core/management/commands/import_export_contract.py`). É o caminho canônico que substituiu o ETL.
+
+> 🔴 **Atenção — `dry_run` não é fail-closed.** O default (parâmetro ausente) é `true`, mas
+> **qualquer valor desconhecido é tratado como APPLY** em 11 views. `?dry_run=maybe` persiste.
+> Achado `M04-05`, issue [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649) —
+> detalhe em [dry_run_response_contract.md](./dry_run_response_contract.md).
 
 ### 2.2 Idempotência via `external_hash`
 
-Imports históricos usam SHA1 (ou SHA256 nos services novos) sobre uma chave natural composta. Re-rodar o mesmo arquivo **não duplica linhas**.
+Onde existe hash, é **SHA-1** — nunca SHA-256. O helper canônico é
+`apps/core/imports/hashing.py::stable_import_hash` (`:37-60`), e o algoritmo é **congelado por
+ADR-012** (`v2/docs/adr/ADR-012-sha1-idempotency-hashes.md`): trocar quebraria os `external_hash`
+já gravados em `Compra`, `Solicitacao`, `Deslocamento`, `AcaoControle`, `AcaoDAT` e `Acompanhamento`
+(`apps/core/imports/hashing.py:4-11`).
 
-Implementação atual: vista em `apps/core/services/dat_cadastros_import.py:301`, `controle_acoes_import.py:265`, `controle_imports.py:36`, `deslocamentos_import.py:257` (auditoria 2026-05 sugere consolidar em `services/hash_utils.py::compute_external_hash`).
+⚠️ **Nem todo import usa hash.** `usuarios` reconcilia por CPF (campo unique) e `bloqueios` por
+tupla natural `(usuario, inicio, fim, tipo)` — nenhum dos dois calcula `external_hash`, apesar de a
+docstring de `bloqueios_import.py:4` afirmar o contrário. Tabela por service em
+[dry_run_response_contract.md](./dry_run_response_contract.md) §2.
+
+⚠️ **"Re-rodar não duplica" não significa "re-rodar não muda nada".** Três imports usam
+`update_or_create` e **sobrescrevem** o registro existente: eventos (status/owner/datas —
+[#1628](https://github.com/matheusnorjosa/aprender_sistema/issues/1628)), compras e ações/cadastros.
+Ver §2.6.
 
 ### 2.3 RBAC — quem pode importar
 
-- Imports históricos (legacy): exigem `import_spreadsheet` (DAT).
-- Imports operacionais: cobertas por policies públicas:
-  - `import_availability_blocks` — DAT + Controle/Gerente/Coord.
-  - `import_compras` — DAT + Compras + Controle.
-  - `import_generic_spreadsheet` — DAT + Controle.
+Gates efetivos, lidos nas views (tabela completa em §3.1):
+
+- `HasPerm("import_spreadsheet")` — solicitações, bloqueios, produtos, compras, ações de controle.
+- `HasPerm("manage_admin_registries")` — usuários, municípios, coleções, equipe/gerência, cadastros DAT.
+
+No seed (`apps/core/services/functional_permissions_seed.py`), **ambas** as capabilities são
+atribuídas apenas ao grupo **DAT** (`:93-94`, `:97-102`). As policies públicas
+`import_availability_blocks`, `import_compras` e `import_generic_spreadsheet` existem para
+**exposição em `/api/me/policies/`** e não são o gate destes endpoints.
 
 Atribuição via Django Admin (D17 — admin-driven, ratificado 2026-05-04). Não automático em deploy.
+Como é admin-driven, **o conjunto real em produção depende de verificação humana** no Django Admin.
 
-### 2.4 Audit trail
+🔴 **O gate responde "pode importar?", nunca "pode importar *este alvo*?".** Não existe política
+ator×alvo em nenhum import. É o que permite a auto-escalação do import de usuários
+([#1610](https://github.com/matheusnorjosa/aprender_sistema/issues/1610), P0) — ver
+[usuarios.md](./usuarios.md).
 
-Toda importação real grava `AuditLog` com:
-- `usuario` (quem rodou).
-- `action` (ex: `IMPORT_USUARIOS`, `IMPORT_COMPRAS`).
-- `model_name`.
-- `details` (JSON): `arquivo_hash`, `linhas_processadas`, `linhas_criadas`, `linhas_atualizadas`, `linhas_ignoradas`, `linhas_erro`.
+### 2.4 Audit trail — 🔴 **não existe nos imports síncronos**
 
-Nota: a estrutura `ImportBatch` proposta na PR 4 (futura) substitui parte do `details` por modelo dedicado com rastreabilidade rica.
+Corrigido em 2026-07-24. As ações `IMPORT_USUARIOS`, `IMPORT_COMPRAS`, `IMPORT_AGENDA`,
+`IMPORT_AVAILABILITY_BLOCKS` e `IMPORT_PRODUTOS_CONTROLE` **nunca existiram**.
+`AuditLog.Action` (`apps/core/models/auditoria.py:72-73`) define apenas:
+
+- `IMPORT_JOB_COMPLETED`
+- `IMPORT_JOB_FAILED`
+
+e as duas são emitidas **só** pelo caminho assíncrono (`apps/core/tasks.py:634,669`), que hoje
+cobre exclusivamente `bloqueios`. Nenhuma das 10 views síncronas nem nenhum dos 11 services grava
+`AuditLog`.
+
+Consequência: **um apply síncrono não deixa rastro de quem rodou, com qual arquivo, nem do que
+mudou.** É o que torna #1610 e #1628 silenciosos.
+
+`ImportBatch` nunca foi criado; o modelo real é `ImportJob`
+([apps/core/models/import_job.py](../../backend/apps/core/models/import_job.py)).
 
 ### 2.5 Timezone
 
 Datas de calendário (Solicitação, AvailabilityBlock) **são armazenadas em UTC** e comparadas em **`America/Fortaleza`** (RD-06). Toda data/hora vinda do CSV deve ser tratada como horário local Fortaleza antes de virar UTC.
 
-### 2.6 Nenhum efeito colateral perigoso
+### 2.6 Efeitos colaterais — o que é garantido e o que **não** é
 
-Importação **NUNCA**:
-- Publica eventos no Google Calendar (mesmo se `external_event_id` vier preenchido).
-- Aprova solicitações (PA-01: fluxo SUPER exige aprovação manual).
-- Atribui grupos `Gerente`/`Superintendência` automaticamente.
-- Cria usuário com `is_superuser=True`.
-- Sobrescreve dados sem `external_hash` confirmando match.
+> 🔴 Corrigido em 2026-07-24. A lista original afirmava cinco garantias; **três eram falsas**.
+> Todas as linhas ❌ foram reconfirmadas vivas em produção pela auditoria M00–M28
+> ([../audits/ACHADOS_REAIS.md](../audits/ACHADOS_REAIS.md)).
+
+| Garantia alegada | Real | Prova |
+|---|---|---|
+| Nunca publica no Google Calendar | ✅ verdadeiro | nenhum service de import importa client GCal |
+| Nunca cria usuário com `is_superuser=True` | ✅ verdadeiro | o campo não é entrada de `usuarios_import` |
+| Nunca altera conta superuser existente | ✅ verdadeiro | `usuarios_import.py:291-300` (P0-0) |
+| ~~Nunca aprova solicitações~~ | ❌ **falso** | `fluxo == NAO_SUPER` grava `status='aprovado'` **sem o hard gate de disponibilidade** — `M08-12` / [#1620](https://github.com/matheusnorjosa/aprender_sistema/issues/1620). (SUPER continua nascendo `pendente`, isso é verdade.) |
+| ~~Nunca atribui `Gerente`/`Superintendência`~~ | ❌ **falso** | a coluna `grupos` concede qualquer grupo, sem allowlist — `M03-01` / [#1610](https://github.com/matheusnorjosa/aprender_sistema/issues/1610), **P0** |
+| ~~Nunca sobrescreve sem match confirmado~~ | ❌ **falso** | o match **é** o gatilho da sobrescrita: `update_or_create` apaga status, owner e datas e reporta `unchanged` — `M10-07` / [#1628](https://github.com/matheusnorjosa/aprender_sistema/issues/1628) |
+| (não alegado) Nunca resolve pessoa/município errado | ❌ **falso** | resolvers usam fallback por substring e desempatam com `.first()` — `M02-09`/[#1613](https://github.com/matheusnorjosa/aprender_sistema/issues/1613), `M22-14`/[#1643](https://github.com/matheusnorjosa/aprender_sistema/issues/1643), `M15-05`/[#1635](https://github.com/matheusnorjosa/aprender_sistema/issues/1635), `M04-01`/[#1615](https://github.com/matheusnorjosa/aprender_sistema/issues/1615) — épico [#1658](https://github.com/matheusnorjosa/aprender_sistema/issues/1658) |
+| (não alegado) Nunca grava linha inválida | ❌ **falso** | compras aceita quantidade vazia/negativa/decimal e data ausente — `M15-04` / [#1634](https://github.com/matheusnorjosa/aprender_sistema/issues/1634) |
+
+Épico de causa raiz para os itens de invariante:
+[#1659](https://github.com/matheusnorjosa/aprender_sistema/issues/1659) (import bypassa invariantes).
 
 ---
 
@@ -119,12 +180,29 @@ Para os 4 tipos acima, o backend **já tem implementação funcional** em produ�
 
 Helpers de reconciliação compartilhados em `apps/core/services/resolvers.py`:
 
-- `resolve_user_by_email(email)`, `resolve_user_by_name(name)` (com fallback heurístico por partes do nome).
-- `resolve_municipio(nome)` — aceita formatos `"Cidade"`, `"Cidade - UF"`, `"Cidade (UF)"`, `"Cidade/UF"`; normaliza com NFKD.
-- `resolve_projeto(nome)` — aceita código ou nome; aplica `normalize_projeto_name` com aliases (IDEB→GESTÃO ESCOLAR, "Nível 1"→N1, "Vida &"→"VIDA E", etc.).
-- `resolve_tipo_evento(nome)`.
-- `_nfkd(value)` para normalização case-insensitive sem acento.
+- `resolve_user_by_email(email)` (`:32-53`), `resolve_user_by_name(name)` (`:56-98`).
+- `resolve_municipio(nome)` (`:181-227`) — aceita `"Cidade"`, `"Cidade - UF"`, `"Cidade (UF)"`, `"Cidade/UF"`; normaliza com NFKD.
+- `resolve_projeto(nome)` (`:312-369`) — aceita código ou nome; aplica `normalize_projeto_name` com aliases (IDEB→GESTÃO ESCOLAR, "Nível 1"→N1, "Vida &"→"VIDA E", etc.).
+- `resolve_tipo_evento(nome)` (`:372-397`).
+- `_nfkd(value)` (`:101-112`) para normalização case-insensitive sem acento.
 - Texto base em `apps/core/services/normalize.py::norm_text()`.
+
+> 🔴 **Todos estes resolvers escolhem em vez de rejeitar** (épico
+> [#1658](https://github.com/matheusnorjosa/aprender_sistema/issues/1658), "resolvers por rótulo
+> humano"). Dois padrões se repetem:
+>
+> 1. **`.first()` em ambiguidade** — `resolve_user_by_email:53`, `resolve_user_by_name:75,87,93`,
+>    `resolve_municipio:208,213`, `resolve_projeto:335,340`, `resolve_tipo_evento:397`.
+>    Dois registros que casam ⇒ pega um e segue, sem pendência e sem log.
+> 2. **Fallback por substring** — `resolve_user_by_name:87,93` usa `first_name__icontains` /
+>    `last_name__icontains`; a terceira tentativa (`:93`) é um **OR**, que casa com qualquer
+>    pessoa que compartilhe um pedaço do primeiro *ou* do último nome.
+>
+> Efeitos já confirmados: bloqueio auto-aprovado na agenda da pessoa errada
+> ([#1643](https://github.com/matheusnorjosa/aprender_sistema/issues/1643)), Gerência duplicada
+> ([#1615](https://github.com/matheusnorjosa/aprender_sistema/issues/1615)), município homônimo em
+> UF errada ([#1635](https://github.com/matheusnorjosa/aprender_sistema/issues/1635)).
+> A correção estrutural é **rejeitar ambiguidade como pendência**, não melhorar a heurística.
 
 ### Endpoints HTTP
 
@@ -143,7 +221,24 @@ Helpers de reconciliação compartilhados em `apps/core/services/resolvers.py`:
 | `POST /api/controle/import-acoes/` | `ControleImportAcoesView` | `HasPerm("import_spreadsheet")` |
 | `POST /api/dat/import-cadastros/` | `DATImportCadastrosView` | `HasPerm("manage_admin_registries")` |
 
-Todos aceitam `?dry_run=true|false` (default `true`).
+Todos aceitam `?dry_run=true|false` (default `true`) — mas **valor desconhecido = apply** (§2.1, #1649).
+
+> ⚠️ **`POST /api/dat/import-cadastros/` grava `AcaoDAT`, que nenhuma tela lê.** O card "Importar
+> CADASTROS DAT" do frontend chama este endpoint (`v2/frontend/src/api/ops.ts:253`), e o service
+> `dat_cadastros_import.py` alimenta o model **`AcaoDAT`** (legacy). Mas a tela de Cadastros
+> (`v2/frontend/src/pages/DATModule/CadastrosPage.tsx:49-58`) lê `/dat/cadastros/`
+> (`v2/frontend/src/api/datModule.ts:275-277`) — outro model, outro workflow (FORMAR/AVALIAR).
+> A única função de frontend que consome `/dat/acoes/` é `listCadastros` em
+> `v2/frontend/src/api/ops.ts:387-391`, **que nenhuma página importa** (é sombreada pela homônima
+> de `datModule.ts`). Resultado: o operador importa, recebe 200, e o dado some de vista.
+> Achado `M17-01`, issue [#1640](https://github.com/matheusnorjosa/aprender_sistema/issues/1640).
+
+> ⚠️ **`POST /api/equipe-gerencia/import/` pode criar Gerência duplicada.**
+> `_get_or_create_gerencia` (`apps/core/services/equipe_gerencia_import.py:248-278`) tenta três
+> lookups (`nome_setor__iexact`, `nome__iexact` do setor, `nome__iexact` do nome gerado) e, se
+> nenhum casar, cria com o nome derivado de `_generate_gerencia_nome`. Variações de rótulo humano
+> na planilha geram gerências novas em vez de reaproveitar a existente.
+> Achado `M04-01`, issue [#1615](https://github.com/matheusnorjosa/aprender_sistema/issues/1615).
 
 **Assíncronos (ASQ-005 Fase 1)** — apenas `bloqueios` por enquanto:
 
@@ -172,7 +267,11 @@ Comentário do código: **"Fase 2 migrará USUARIOS, COMPRAS, ACOES, DESLOCAMENT
 
 ### Makefile (chama endpoints HTTP via curl)
 
-Targets atuais em `v2/Makefile` (ex: `make import-compras-dry FILE=...`) **chamam `curl` para `/api/<recurso>/import/?dry_run=true`** — **não** existem `management commands` `etl_*.py` nem `import_*.py` em `apps/core/management/commands/`. Documentação `make etl-acomp-dry` em outros docs do projeto é referência histórica.
+Targets atuais em `v2/Makefile:15,56,69,82` (`import-compras-dry`, `import-acoes-dry`,
+`import-cadastros-dry`) **chamam `curl` para `/api/<recurso>/import/?dry_run=true`**.
+**Não** existem management commands `etl_*.py` — o ETL legado foi removido. O único management
+command de import é `import_export_contract.py`. Qualquer referência a `make etl-*` em outros docs
+do projeto é histórica e **não funciona**.
 
 ---
 
@@ -207,22 +306,45 @@ Mudanças que quebram contrato (renomear coluna obrigatória, mudar tipo de dado
 
 ## 6. Pendências cross-cutting (para Matheus)
 
-- **Reconciliação de Usuario por nome** vs por email vs por CPF: em Agenda (Formador 1..5), qual chave usar? CPF não aparece na planilha de agenda. Atualmente, services legacy fazem fuzzy-match por nome — **risco de match errado**.
-- **Mapeamento Cargo → Função RBAC**: `usuarios.md` propõe tabela; falta confirmar todos os termos da planilha original.
-- **Disponibilidade** ainda não tem contrato estável — formato em aberto.
-- **Decisão D17 e Imports**: imports não devem atribuir capabilities (admin-driven). Confirmar que `seed_rbac` automático não é parte do pipeline de import.
+> 🔴 **Fila real de correção** — as quatro primeiras são achados vivos em produção, não pendências
+> de design. Detalhe e evidência em [../audits/ACHADOS_REAIS.md](../audits/ACHADOS_REAIS.md).
+
+1. **P0 — política ator×alvo e allowlist de grupos no import de usuários**
+   ([#1610](https://github.com/matheusnorjosa/aprender_sistema/issues/1610)).
+2. **Resolvers devem rejeitar ambiguidade em vez de escolher com `.first()`** — épico
+   [#1658](https://github.com/matheusnorjosa/aprender_sistema/issues/1658)
+   (#1613, #1615, #1635, #1643). Inclui a pergunta antiga: qual chave usar para Formador 1..5 na
+   planilha de Agenda, já que CPF não aparece lá.
+3. **Import não pode bypassar invariante de domínio** — épico
+   [#1659](https://github.com/matheusnorjosa/aprender_sistema/issues/1659) (#1620, #1628, #1634, #1640).
+4. **`dry_run` fail-closed** ([#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649))
+   e **auditoria do apply** (§2.4).
+5. **Mapeamento Cargo → Função RBAC**: `usuarios.md` propõe tabela; **não implementado**. Falta
+   confirmar os termos reais da planilha antes de decidir se vale implementar.
+6. **Disponibilidade**: tipo `D` e recorrência continuam sem contrato — ver
+   [disponibilidade.md](./disponibilidade.md) §14.
+7. **Decisão D17 e Imports**: imports não devem atribuir capabilities (admin-driven). ✅ Confirmado
+   — nenhum service de import toca `PermissaoFuncional`; o import de usuários mexe em `Group`
+   (o que é justamente o problema de #1610). `seed_rbac` é um command de `apps/dev_tools`, manual,
+   fora do pipeline de import.
 
 ---
 
 ## 7. Referências internas
 
-- `v2/docs/RBAC_NAMING.md` — convenção RBAC.
-- `v2/docs/IMPLEMENTACAO_PA.md` — política de aprovação (PA-01..07).
-- `v2/docs/GUIDE_AVAILABILITY.md` — RD-01..08.
-- `v2/docs/GUIDE_GCAL.md` — integração GCal.
-- `v2/docs/MAPEAMENTO_COMPLETO_SETORES_GERENCIAS.md` — gerência ↔ setor.
-- `apps/core/services/dat_cadastros_import.py` — service exemplar (idempotência via SHA1).
-- `apps/core/management/commands/etl_*.py` — comandos atuais.
+- [../audits/ACHADOS_REAIS.md](../audits/ACHADOS_REAIS.md) — **documento vivo** dos achados da auditoria M00–M28.
+- [../RBAC_NAMING.md](../RBAC_NAMING.md) — convenção RBAC.
+- [../IMPLEMENTACAO_PA.md](../IMPLEMENTACAO_PA.md) — política de aprovação (PA-01..07).
+- [../GUIDE_AVAILABILITY.md](../GUIDE_AVAILABILITY.md) — grade mensal e bloqueios.
+- [../GUIDE_GCAL.md](../GUIDE_GCAL.md) — integração GCal.
+- [../adr/ADR-012-sha1-idempotency-hashes.md](../adr/ADR-012-sha1-idempotency-hashes.md) — SHA-1 congelado.
+- `apps/core/imports/hashing.py` — `stable_import_hash`, helper canônico de `external_hash`.
+- `apps/core/services/resolvers.py` — resolvers compartilhados (ver aviso em §3.1).
+- `apps/core/management/commands/import_export_contract.py` — command canônico (dry-run + `--apply`).
+
+*(Removidas em 2026-07-24: `v2/docs/MAPEAMENTO_COMPLETO_SETORES_GERENCIAS.md`, que não existe, e
+`apps/core/management/commands/etl_*.py`, que não existem — ETL legado removido. O SSOT de
+Setor/Função é `apps/core/constants.py:16-45`.)*
 
 ---
 

@@ -11,10 +11,20 @@ Gate automatizado:
 
 ## Casos críticos atuais
 
-| ID | Rota | Endpoint(s) | Campo crítico validado |
+Espelho de `FUNCTIONAL_CRITICAL_MATRIX` (`functional-contract.matrix.ts:29-76`). Em caso de
+divergência, o arquivo `.ts` é a fonte — este documento é o resumo legível.
+
+| ID | Rota | Endpoint(s) | Texto crítico asserido |
 |---|---|---|---|
-| `controle-compras-core-compra` | `/controle/compras` | `/api/controle/compras/` | tabela exibe código e município seedados |
-| `dashboard-compras-pendencias` | `/dashboards/compras` | `/api/dat/compras-materiais/dashboard/`, `/api/dat/compras-materiais/pendencias/` | seção de pendências e item de produto pendente |
+| `controle-compras-core-compra` | `/controle/compras` | `/api/dat/compras-materiais/` (`:34`) | `Produto` e `Total da Página` na `table` (`:37-47`) |
+| `dashboard-compras-pendencias` | `/dashboards/compras` | `/api/dat/compras-materiais/dashboard/`, `/api/dat/compras-materiais/pendencias/` (`:54`) | `Municípios pendentes de agendamento`, `Matrizopolis`, `KIT MATRIX CONTRACT` (`:56-73`) |
+
+> **Atenção ao nome do primeiro caso.** O id diz `core-compra`, mas o endpoint exercitado é o
+> de `core_dat_compra` — a rota `/controle/compras` renderiza `DATModule/ComprasPage`
+> (`v2/frontend/src/components/AppRoutes.tsx:119`), o mesmo componente de
+> `/dat/compras-materiais`. Quem consome `/api/controle/compras/` (`core_compra`) é a rota
+> `/controle` via `listCompras` (`v2/frontend/src/api/ops.ts:369-373`, usado em
+> `pages/Controle/ControlePage.tsx:11`). Nenhum caso da matriz cobre esse endpoint hoje.
 
 ## Estratégia
 

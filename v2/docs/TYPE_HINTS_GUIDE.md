@@ -1,9 +1,11 @@
 # 🐍 Type Hints — Guia do Desenvolvedor
 
 **Projeto**: Aprender Sistema v2
-**Python**: 3.12.12 (PEP 695 support)
-**Type Checker**: Pyright (strict mode)
-**Última Atualização**: 11 de Novembro de 2025
+**Python**: 3.12 (`v2/backend/pyproject.toml:11`) — PEP 695 é suportado pelo runtime, mas **o
+projeto não o usa**: os aliases são declarados com `TypeAlias` em `apps/core/types.py`
+**Type Checker**: Pyright strict, **gate bloqueante no CI** (`v2/backend/pyproject.toml:8`;
+`.github/workflows/ci.yaml:380,393-396`)
+**Última Atualização**: 24 de julho de 2026 — revisão contra o código real
 
 ---
 
@@ -212,43 +214,56 @@ class SolicitacaoViewSet(viewsets.ModelViewSet[Solicitacao]):
 
 ### Dataclasses para Estruturas
 
+> ✅ **Este é o código real, transcrito em 2026-07-24.** A versão anterior deste bloco inventava
+> `ConflictDetail` / `AvailabilityResult`, omitia o código `"E"` e mostrava uma assinatura
+> posicional. Os nomes reais são `Conflict` e `CheckResult`.
+
 ```python
-from dataclasses import dataclass
-from typing import Literal
+# apps/core/types.py:81 — TypeAlias, NÃO a sintaxe PEP 695 `type X = ...`
+from typing import Literal, TypeAlias
 
-# PEP 695: Type alias moderno
-type ConflictCode = Literal["X", "T", "P", "D", "M"]
+ConflictCode: TypeAlias = Literal["X", "T", "P", "D", "M", "E"]
+#   X=evento+bloqueio · T=bloqueio total · P=bloqueio parcial
+#   D=deslocamento · M=capacidade diária · E=evento existente (informativo, types.py:90)
 
+# apps/core/services/availability_service.py:35-49
 @dataclass
-class ConflictDetail:
+class Conflict:
     code: ConflictCode
     title: str
     detail: str
     ref_id: int | None = None
 
+# apps/core/services/availability_service.py:52-62
 @dataclass
-class AvailabilityResult:
+class CheckResult:
     ok: bool
-    conflicts: list[ConflictDetail]
+    conflicts: list[Conflict]
 
+# apps/core/services/availability_service.py:326-329 — keyword-only, municipio OPCIONAL
+@cache_availability_check(timeout=300)
 def check_conflicts(
+    *,
     usuario: Usuario,
     inicio: datetime,
     fim: datetime,
-    municipio: Municipio,
-) -> AvailabilityResult:
+    municipio: Municipio | None = None,
+) -> CheckResult:
     """Verifica conflitos de disponibilidade (RD-01 a RD-08)."""
-    conflicts: list[ConflictDetail] = []
-
-    # Lógica de verificação...
-
-    return AvailabilityResult(
-        ok=len(conflicts) == 0,
-        conflicts=conflicts
-    )
+    ...
 ```
 
+> ⚠️ Existe também `check_conflicts_uncached` (`availability_service.py:353`), usado no caminho de
+> **enforcement** (aprovação/criação de solicitação) justamente para não ler cache de 5 min.
+> Não use a versão cacheada para decidir escrita.
+
 ### TypedDict para Dicionários Estruturados
+
+> ⚠️ **Padrão aspiracional, ainda não adotado.** Em 2026-07-24 não há **nenhum** uso de `TypedDict`
+> ou `NotRequired` em `v2/backend/apps/`, e a classe `GCalEventPayload` abaixo não existe.
+> O payload real do GCal é montado por `build_event_payload`
+> (`apps/core/services/gcal/payload.py:274`) devolvendo `dict[str, Any]`.
+> O exemplo permanece como referência de estilo para código novo.
 
 ```python
 from typing import TypedDict, NotRequired
@@ -282,23 +297,30 @@ def build_gcal_payload(
 
 ## 🎯 Python 3.12 (PEP 695)
 
-### Type Aliases Modernos
+### Type Aliases — o projeto usa `TypeAlias`, **não** PEP 695
+
+> 🔴 **Corrigido em 2026-07-24.** Este bloco marcava a sintaxe PEP 695 (`type X = ...`) como
+> "✅ Agora", dando a entender que era o padrão do projeto. **Não é**: não existe um único
+> `type X = ...` em `v2/backend`. O SSOT de aliases (`apps/core/types.py`) declara explicitamente
+> "usando TypeAlias (Python 3.10+)" (`types.py:4`) e importa `TypeAlias` (`types.py:20`).
 
 ```python
-# ❌ Antes (Python 3.11)
-from typing import TypeAlias
-UserId: TypeAlias = int
+# ✅ Padrão do projeto — apps/core/types.py
+from typing import Any, Literal, TypeAlias
 
-# ✅ Agora (Python 3.12 com PEP 695)
-type UserId = int
-type EventId = str
-type JsonDict = dict[str, Any]
-type Handler[T] = Callable[[T], bool]
+JsonDict: TypeAlias = dict[str, Any]                                    # types.py:125
+Status: TypeAlias = Literal["pendente", "aprovado", "reprovado"]        # types.py:54
+ConflictCode: TypeAlias = Literal["X", "T", "P", "D", "M", "E"]         # types.py:81
 
 # Uso
-def obter_usuario(id: UserId) -> Usuario | None:
+def obter_usuario(id: int) -> Usuario | None:
     return Usuario.objects.filter(id=id).first()
 ```
+
+**Por que não migrar para PEP 695 agora?** Aliases novos devem seguir o padrão existente em
+`apps/core/types.py`. Trocar a sintaxe é uma decisão de codebase inteira (um alias em PEP 695 não
+é utilizável como valor em runtime da mesma forma), não algo a decidir arquivo a arquivo.
+Se a migração for desejada, ela precisa de ADR próprio.
 
 ### Generics Modernos
 
@@ -345,8 +367,8 @@ def criar(dados: dict[str, int | str | bool | None]) -> None:
 def atualizar(dados: dict[str, int | str | bool | None]) -> None:
     pass
 
-# ✅ Type alias reutilizável
-type UserData = dict[str, int | str | bool | None]
+# ✅ Type alias reutilizável (sintaxe do projeto: TypeAlias)
+UserData: TypeAlias = dict[str, int | str | bool | None]
 
 def criar(dados: UserData) -> None:
     pass
@@ -363,8 +385,8 @@ def atualizar_status(status: str) -> None:
     # Aceita qualquer string (bug-prone)
     solicitacao.status = status
 
-# ✅ Literal com valores fixos
-type Status = Literal["pendente", "aprovado", "reprovado"]
+# ✅ Literal com valores fixos — este alias já existe em apps/core/types.py:54, reutilize-o
+Status: TypeAlias = Literal["pendente", "aprovado", "reprovado"]
 
 def atualizar_status(status: Status) -> None:
     # Apenas valores válidos aceitos
@@ -436,7 +458,8 @@ def processar(dados: Any) -> Any:
 
 ### "Preciso tipar tudo?"
 
-**Não!** Foque em código crítico (35% do projeto):
+**Não!** Foque no que o pyright já analisa — `apps/core`, `apps/dev_tools` e `config`
+(`v2/backend/pyproject.toml:21-25`), com prioridade para:
 - ✅ Services (lógica de negócio)
 - ✅ Models (métodos personalizados)
 - ✅ Serializers (validate)

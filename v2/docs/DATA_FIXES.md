@@ -104,12 +104,21 @@ get_canonical_name("GESTÃO ESCOLAR")  # → None (já é canônico)
 - `v2/backend/apps/core/tests/test_project_dedup_migration.py` (11 testes)
 
 **Documentação**:
-- `v2/docs/PLANO_GERENCIAS_SETORES.md` (Task 3 - status atualizado)
+- ~~`v2/docs/PLANO_GERENCIAS_SETORES.md` (Task 3)~~ — ⚠️ **arquivo inexistente** (verificado 2026-07-24: ausente do disco e do `git ls-files`)
 - `v2/docs/DATA_FIXES.md` (este arquivo)
 
 ### Próximos Passos
 
-**Para novos imports ETL**:
+> 🔴 **Corrigido em 2026-07-24.** O ETL legado foi **removido**; o caminho atual é
+> `import_export_contract` (dry-run por padrão, `--apply` com allowlist) + endpoints DRF.
+> Mais importante: **`normalize_project_name()` não tem nenhum chamador de produção** —
+> as únicas referências fora do próprio `services/project_normalizer.py` estão em
+> `apps/core/tests/test_project_normalizer.py`. O importador atual resolve projeto por
+> `services/export_contract_projeto_resolver.py`, que **não** importa `project_normalizer`.
+> Ou seja: a recomendação abaixo descreve um fluxo que o código não segue. Antes de aplicá-la,
+> decidir se `project_normalizer` deve ser ligado ao resolver ou se deve ser removido.
+
+**Para novos imports** (recomendação **não implementada**):
 1. Sempre use `normalize_project_name()` antes de buscar/criar projetos
 2. Exemplo:
 ```python
@@ -202,7 +211,7 @@ ORDER BY s.created_at DESC;
 - `v2/backend/apps/core/tests/test_fix_superintendencia_migration.py` (9 testes)
 
 **Documentação**:
-- `v2/docs/PLANO_GERENCIAS_SETORES.md` (Task 5 - status atualizado)
+- ~~`v2/docs/PLANO_GERENCIAS_SETORES.md` (Task 5)~~ — ⚠️ **arquivo inexistente** (verificado 2026-07-24)
 - `v2/docs/DATA_FIXES.md` (este arquivo)
 
 ### Reversão (Se Necessário)
@@ -324,15 +333,16 @@ docker compose exec web python manage.py migrate core 0038
 ### Arquivos Relacionados
 
 **Migration**:
-- `v2/backend/apps/core/migrations/0038_mark_test_projects.py` (117 linhas)
+- `v2/backend/apps/core/migrations/0038_mark_test_projects.py` (115 linhas)
 
-**Views Modificadas**:
-- `v2/backend/apps/core/views.py` (`ProjetoViewSet.get_queryset()`)
+**Views Modificadas** *(caminhos corrigidos em 2026-07-24 — `apps/core/views.py` não existe;
+`apps/core/views/` é um pacote)*:
+- `v2/backend/apps/core/views/admin.py:182` (`ProjetoViewSet`), `get_queryset()` em `:207`
 - `v2/backend/apps/core/views_options.py` (`projetos_options()` function)
 
 **Testes**:
-- `v2/backend/apps/core/tests/test_mark_test_projects_migration.py` (8 testes, 224 linhas)
-- `v2/backend/apps/core/tests/test_projeto_is_test_filter.py` (12 testes, 309 linhas)
+- `v2/backend/apps/core/tests/test_mark_test_projects_migration.py` (8 testes, 201 linhas)
+- `v2/backend/apps/core/tests/test_projeto_is_test_filter.py` (12 testes, 311 linhas)
 
 **Documentação**:
 - `v2/docs/DATA_FIXES.md` (este arquivo)
@@ -359,9 +369,9 @@ docker compose exec web python manage.py migrate core 0038
 
 **URL Routing**:
 ```python
-# v2/backend/apps/core/urls.py
-path("options/projetos/", projetos_options, name="options-projetos"),  # Função
-path("projetos/", ProjetoViewSet.as_view(...), name="projetos"),      # ViewSet
+# v2/backend/apps/core/urls.py — código real (corrigido 2026-07-24)
+path("options/projetos/", projetos_options, name="options-projetos"),   # urls.py:329 (função)
+router.register(r"projetos", ProjetoViewSet, basename="projeto")        # urls.py:126 (router, não path())
 ```
 
 ---

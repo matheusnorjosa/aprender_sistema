@@ -17,7 +17,7 @@ Cada ADR documenta: contexto (problema), decisão (o que foi escolhido e por qu�
 | [ADR-007](ADR-007-django-5.2-lts-upgrade.md) | Upgrade Django 5.2 LTS | Accepted | 2026-03-31 |
 | [ADR-008](ADR-008-gcal-deterministic-requestid.md) | RequestId Determinístico para Google Calendar | Accepted | 2026-03-31 |
 | [ADR-009](ADR-009-public-repo-sanitization.md) | Repositório Público com Sanitização | Accepted | 2026-03-09 |
-| [ADR-010](ADR-010-deploy-portainer-direct-to-prod.md) | Deploy Direto para Produção via Portainer | Accepted | 2026-01-12 |
+| [ADR-010](ADR-010-deploy-portainer-direct-to-prod.md) | Deploy Direto para Produção via Portainer | **Superseded by ADR-018** | 2026-01-12 |
 | [ADR-011](ADR-011-polling-over-websocket.md) | Polling HTTP sobre WebSocket | Accepted | 2026-03-31 |
 | [ADR-012](ADR-012-dependency-guardrails.md) | Guardrails Arquiteturais de Dependência | Accepted | 2026-01-15 |
 | [ADR-013](ADR-013-axios-pinning-fetch-migration.md) | Pin Axios + Migração Fetch API | Accepted | 2026-03-31 |
@@ -25,6 +25,12 @@ Cada ADR documenta: contexto (problema), decisão (o que foi escolhido e por qu�
 | [ADR-015](ADR-015-testing-policy.md) | Política de Testes | Accepted | 2026-02-24 |
 | [ADR-016](ADR-016-asymmetric-crypto-strategy.md) | Estratégia de Criptografia Assimétrica | Accepted | 2026-04-13 |
 | [ADR-017](ADR-017-spec-driven-documentation.md) | Documentação Spec-Driven (SDD) | Accepted | 2026-06-19 |
+| [ADR-018](ADR-018-pull-based-deploy.md) | Deploy Pull-Based com Ponteiro Assinado | Accepted | 2026-07-10 |
+
+> **Colisão de numeração conhecida:** existe um `ADR-012-sha1-idempotency-hashes.md` em
+> `v2/docs/adr/`, fora desta pasta, com o mesmo número do
+> [ADR-012](ADR-012-dependency-guardrails.md) daqui. São decisões diferentes. Pendente de
+> renumeração — ver `v2/docs/audits/VARREDURA_DOCS_2026-07-24.md`.
 
 ## Como Adicionar um Novo ADR
 

@@ -1,7 +1,7 @@
 # Service Level Objectives (SLOs)
 
-**Data**: 2026-01-12
-**Status**: Ativo
+**Data**: 2026-07-24 (revisão contra o código)
+**Status**: Ativo — **metas declaradas; não medidas em produção**
 **Referência**: PLAN_maturity_gaps.md (Gap 3)
 
 ---
@@ -10,6 +10,15 @@
 
 Este documento define os Service Level Objectives (SLOs) para o Aprender Sistema v2.
 SLOs são metas internas de qualidade de serviço que guiam decisões de arquitetura e operações.
+
+> ⚠️ **Nenhum destes SLOs é medido hoje.** Prometheus e Grafana **não rodam em produção**
+> (são stack local opcional, `make up-obs`, com arquivos gitignored — ver
+> [OBSERVABILITY.md](./OBSERVABILITY.md)). Em prod existe só o `/metrics` do
+> `django-prometheus`, **gated** por staff/IP interno, dependente de um scraper externo que
+> não está documentado como configurado. **Não existe nenhuma regra de alerta versionada**
+> neste repositório. Consequência prática: os números abaixo são **alvos de projeto**, e
+> "estamos dentro do SLO" **não é uma afirmação verificável hoje** — não a use em
+> post-mortem sem antes apontar a fonte de medição.
 
 ---
 
@@ -109,14 +118,18 @@ Error Budget (horas/mês) = (100 - SLO%) × 720 / 100
 
 ### 6.1 Durabilidade
 
-| Dado | RPO | RTO | Backup |
+| Dado | RPO (alvo) | RTO (alvo) | Backup |
 |------|-----|-----|--------|
-| Banco de Dados | 5 min | 1 hora | WAL + Daily dump — ver SSOT [`BACKUP_OPERATIONS.md`](./BACKUP_OPERATIONS.md) |
-| Redis (cache) | N/A | 5 min | Não persistido |
+| Banco de Dados | 5 min | 1 hora | WAL + dump diário cifrado — ver SSOT [`BACKUP_OPERATIONS.md`](./BACKUP_OPERATIONS.md) |
+| Redis (cache **e sessões**) | N/A | 5 min | Não persistido — reiniciar o Redis **desloga todos os usuários** (`SESSION_ENGINE=cache`) |
 | Google Calendar | 0 | 24 horas | Resync automático |
 
-> Para detalhes de backup (frequência, retenção, criptografia opcional, S3,
-> health checks) consultar o SSOT [`BACKUP_OPERATIONS.md`](./BACKUP_OPERATIONS.md).
+> ⚠️ **Estes são alvos, não capacidade demonstrada.** Hoje: o WAL archiving da VM02 **não
+> foi verificado** (sem ele o RPO efetivo é ~24h, o intervalo do dump diário), a ferramenta
+> oficial de restore **não funciona** com o formato de backup de produção
+> ([#1611](https://github.com/matheusnorjosa/aprender_sistema/issues/1611)) e **nenhum
+> ensaio de restore foi registrado**. Antes de comprometer RPO/RTO com terceiros, leia
+> [BACKUP_OPERATIONS.md → Estado real do restore](./BACKUP_OPERATIONS.md#estado-real-do-restore).
 
 ### 6.2 Consistência
 
@@ -132,25 +145,51 @@ Error Budget (horas/mês) = (100 - SLO%) × 720 / 100
 
 ### 7.1 Métricas Prometheus
 
+> ⚠️ **As séries `http_request_duration_seconds_bucket`, `http_responses_total` e
+> `http_requests_total` não são exportadas por este sistema.** A instrumentação é o
+> `django-prometheus` (2.5.0), que publica métricas com prefixo **`django_http_*`** —
+> nomes diferentes dos usados abaixo. Copiar estas queries para um painel resulta em
+> gráfico vazio.
+>
+> **Antes de escrever qualquer query**, leia os nomes reais na própria instância:
+> ```bash
+> # de dentro da VM (o /metrics é gated: staff ou IP interno)
+> curl -s http://127.0.0.1:8000/metrics | grep -E '^# (HELP|TYPE) django_http' | head -40
+> ```
+> A única métrica customizada do projeto é `as_db_transaction_retries_total`
+> (`apps/core/services/db_retry.py:64`) — ver
+> [RUNBOOK_concurrency.md](./RUNBOOK_concurrency.md).
+
+Forma das queries (substituindo pelos nomes reais lidos acima):
+
 ```promql
-# Latência p95 (histograma)
-histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, path))
+# Latência p95
+histogram_quantile(0.95, sum(rate(<histograma_de_latencia>_bucket[5m])) by (le, view))
 
 # Error rate 5xx
-sum(rate(http_responses_total{status=~"5.."}[5m])) / sum(rate(http_responses_total[5m]))
+sum(rate(<contador_de_respostas>{status=~"5.."}[5m]))
+  / sum(rate(<contador_de_respostas>[5m]))
 
 # Throughput
-sum(rate(http_requests_total[5m]))
+sum(rate(<contador_de_requests>[5m]))
 ```
 
-### 7.2 Alertas Recomendados
+### 7.2 Alertas — ❌ nenhum implementado
 
-| Alerta | Condição | Severidade |
-|--------|----------|------------|
-| HighLatencyP95 | p95 > 500ms por 5min | Warning |
-| HighLatencyP99 | p99 > 1s por 5min | Critical |
-| HighErrorRate | 5xx > 1% por 5min | Critical |
-| LowAvailability | Uptime < 99% em 1h | Critical |
+Não existe arquivo de regra de alerta versionado no repositório (busca por `expr:` em
+`*.yml`/`*.yaml` não retorna nenhuma regra Prometheus), e o Grafana não roda em produção.
+A tabela abaixo é o **backlog** de alertas desejados, não o que está ativo:
+
+| Alerta | Condição | Severidade | Status |
+|--------|----------|------------|--------|
+| HighLatencyP95 | p95 > 500ms por 5min | Warning | ❌ não implementado |
+| HighLatencyP99 | p99 > 1s por 5min | Critical | ❌ não implementado |
+| HighErrorRate | 5xx > 1% por 5min | Critical | ❌ não implementado |
+| LowAvailability | Uptime < 99% em 1h | Critical | ❌ não implementado |
+
+O único mecanismo automático de detecção hoje é o **Sentry**, e ele só está ativo se
+`SENTRY_DSN` estiver configurado — ausente em produção na última verificação
+([OBSERVABILITY.md](./OBSERVABILITY.md)).
 
 ---
 
@@ -167,6 +206,7 @@ sum(rate(http_requests_total[5m]))
 | Versão | Data | Mudanças |
 |--------|------|----------|
 | 1.0 | 2026-01-12 | Versão inicial |
+| 1.1 | 2026-07-24 | Marcado como **não medido em produção**; corrigidos os nomes de métrica PromQL (não são as séries do `django-prometheus`); alertas reclassificados de "recomendados" para **não implementados**; ressalva de RPO/RTO ligada a #1611 |
 
 ---
 
@@ -174,4 +214,6 @@ sum(rate(http_requests_total[5m]))
 
 - [Google SRE Book - SLOs](https://sre.google/sre-book/service-level-objectives/)
 - [PLAN_maturity_gaps.md](./_archive/plans/PLAN_maturity_gaps.md)
-- Prometheus Alerting Rules: configuradas via Grafana dashboard (não versionadas em arquivo yml)
+- [OBSERVABILITY.md](./OBSERVABILITY.md) — o que existe de fato em cada ambiente
+- **Prometheus Alerting Rules: não existem.** Nem versionadas no repositório, nem em
+  Grafana de produção (o Grafana é dev-only).

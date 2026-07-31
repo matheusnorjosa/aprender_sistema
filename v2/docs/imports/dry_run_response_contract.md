@@ -1,10 +1,37 @@
 # Contrato de resposta de dry-run / import — auditoria + proposta
 
 Status: **PR 2 — docs-only (sem alteração de runtime)**
-Versão: 2026-05-05 v0.1
+Versão: 2026-07-24 v0.2
 Escopo: auditoria dos 11 services `*_import.py` existentes + proposta de contrato unificado de resposta.
 
 > Esta PR não altera código. Apenas inspeciona o estado atual, identifica inconsistências e propõe um contrato futuro. Implementação fica para PRs subsequentes.
+
+> 🔴 **Como `dry_run` é realmente parseado (auditoria 2026-07-24, achado `M04-05`, issue
+> [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649))**
+>
+> Onze views repetem literalmente estas duas linhas:
+>
+> ```python
+> dry_run_param = str(request.query_params.get("dry_run", "true")).lower()
+> dry_run = dry_run_param in {"1", "true", "t", "yes", "y"}
+> ```
+>
+> O default é fail-safe (**ausência** do parâmetro → `dry_run=True`), mas **qualquer valor
+> desconhecido é tratado como APPLY**. `?dry_run=maybe`, `?dry_run=sim`, `?dry_run=verdadeiro`,
+> `?dry_run=TRUE ` (com espaço — não há `.strip()`) e até `?dry_run=dry_run` caem no `else`
+> implícito e **persistem no banco**. Não existe validação nem 400.
+>
+> Ocorrências (todas idênticas): `views_controle_imports.py:105-106`, `views_import_bloqueios.py:97-98`,
+> `views_import_colecoes.py:81-82`, `views_import_deslocamentos.py:96-97`,
+> `views_import_equipe_gerencia.py:81-82`, `views_import_eventos.py:104-105`,
+> `views_import_municipios.py:81-82`, `views_import_produtos.py:96-97`,
+> `views_import_usuarios.py:93-94`, `views_imports.py:102-103` e `views_imports.py:200-201`.
+>
+> A **única** view que não repete o bloco é o upload assíncrono
+> `apps/core/views/imports.py:92`, que usa o helper `_parse_dry_run` (`:45-49`). Ele **tem `.strip()`**
+> mas herda a mesma semântica de allowlist — `?dry_run=maybe` também vira apply lá.
+>
+> O contrato proposto em §4 deve incluir: **valor não reconhecido ⇒ HTTP 400**, nunca apply.
 
 ---
 
@@ -55,7 +82,9 @@ Escopo: auditoria dos 11 services `*_import.py` existentes + proposta de contrat
 
 | Inconsistência | Services afetados | Risco |
 |---|---|---|
-| **`dry_run` default `False`** em vez de `True` | `controle_acoes_import`, `dat_cadastros_import` | **Alto** — chamada interna sem keyword vai persistir. Endpoints externos protegem via query-param, mas chamada Python direta é perigosa |
+| **`dry_run` desconhecido = APPLY** (`M04-05`, [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649)) | **11 views** — ver bloco no topo deste documento | **Alto e vivo em produção** — `?dry_run=maybe` persiste. O default (parâmetro ausente) é fail-safe; o **valor inválido** não é |
+| **`dry_run` default `False`** em vez de `True` | `controle_acoes_import` (`services/controle_acoes_import.py:43`), `dat_cadastros_import` (`services/dat_cadastros_import.py:77`) | **Alto** — chamada interna sem keyword vai persistir. Endpoints externos passam o valor explicitamente, mas chamada Python direta é perigosa. Confirmado ainda vivo em 2026-07-24 |
+| **Nenhum import síncrono grava `AuditLog`** | todos os 10 endpoints síncronos | **Alto** — um apply não deixa rastro de quem rodou nem do que mudou. `AuditLog.Action` (`models/auditoria.py:72-73`) só tem `IMPORT_JOB_COMPLETED`/`IMPORT_JOB_FAILED`, emitidos apenas pelo caminho async em `tasks.py:634,669` (hoje só `bloqueios`) |
 | **Stats com 4 campos vs 4+aninhado** | `controle_imports` (dataclass `{created,updated,skipped,errors}`) vs demais (dict `{created,updated,unchanged,skipped:{...}}`) | Médio — frontend precisa branch lógica |
 | **`pendencias` com chaves diferentes** | Cada service define categorias próprias (`municipios`, `projetos`, `cpf_invalid`, `dates`, `usuarios`, `outros`, etc.) | Médio — frontend não pode tratar genericamente |
 | **`created_ids` só em compras** | `controle_imports` retorna lista; demais não | Baixo — não é semântica universal |
@@ -120,6 +149,9 @@ Unificar resposta entre os 11 services + `ImportJob.stats` + `ImportJob.pendenci
 
 ### 4.2 Princípios
 
+0. **`dry_run` fail-closed**: valor não reconhecido ⇒ **HTTP 400**, nunca apply. Hoje 11 views
+   fazem o oposto (`M04-05` / [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649)).
+   Isto vem antes de qualquer padronização de shape.
 1. **Compatibilidade gradual**: adicionar campos novos sem remover os antigos por 1 release. Migrar service-by-service.
 2. **Códigos estáveis** em vez de chaves descritivas: `INVALID_CPF` em vez de `cpf_invalid`. Permite i18n no frontend.
 3. **`row_number` obrigatório** em cada erro/warning: ancora ao CSV original.
@@ -235,7 +267,7 @@ Critérios: complexidade, models afetados, dry_run real, idempotência, uso em p
 |---|---|
 | `municipios_import.py` | Cadastro mestre. Sem FK para nada crítico. Sem GCal. Cache de options para invalidar é simples. |
 | `colecoes_import.py` | Cadastro mestre. FK apenas `Projeto`. Sem GCal. |
-| `usuarios_import.py` | Cadastro de identidade. Atribuição de grupos via coluna `grupos` (não automática para Função sensível). Sem GCal. Padrão moderno já bem alinhado ao contrato. |
+| `usuarios_import.py` | ⚠️ **Reclassificado em 2026-07-24: NÃO é baixo risco.** A coluna `grupos` concede **qualquer** grupo, sem allowlist e sem política ator×alvo (`services/usuarios_import.py:374-382`) — achado `M03-01`/**P0**, issue [#1610](https://github.com/matheusnorjosa/aprender_sistema/issues/1610). Padronizar o shape de retorno é seguro; **mexer neste service sem corrigir #1610 antes não é**. Ver [usuarios.md](./usuarios.md) §10. |
 | `produtos_import.py` | Cadastro mestre. FK apenas `Projeto`. |
 | `equipe_gerencia_import.py` | Cadastro de vínculo. Tem extras `gerencias_created/existing` no stats — bom caso de teste para extensibilidade do contrato. |
 
@@ -311,7 +343,8 @@ Quem ler este documento consegue responder:
 | Quais retornam stats? | Todos os 11. Mas com shape diferente (4-campos vs 4+aninhado). Ver §3. |
 | Quais retornam pendências? | Todos os 11. Mas com chaves de categoria diferentes por service. Ver §2.3. |
 | Quais retornam erro por linha? | **Nenhum nativamente** — alguns colocam `linha`/`row` dentro do dict de pendência; nenhum tem array `rows[*]` com `row_number` estruturado. **Lacuna real para padronizar.** |
-| Quais têm dry_run real? | Todos os 11. Mas 2 têm default `False` (`controle_acoes_import`, `dat_cadastros_import`) — risco se chamado via Python direto. |
+| Quais têm dry_run real? | Todos os 11. **Mas o parsing não é fail-safe**: valor desconhecido vira apply em 11 views (`M04-05` / [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649) — ver bloco no topo). Além disso 2 services têm default `False` (`controle_acoes_import:43`, `dat_cadastros_import:77`) — risco se chamado via Python direto. |
+| O apply fica auditado? | **Não.** Nenhum endpoint síncrono grava `AuditLog` — ver §2.3. Só o caminho async (`ImportJob` → `tasks.py:634,669`, hoje só `bloqueios`) registra. |
 | Quais têm idempotência? | **Todos** — 4 via SHA1 explícito (compras, ações controle, DAT cadastros, eventos), 3 via campo unique (usuarios=cpf, produtos=codigo, municipios=nome+uf), 4 via tupla natural sem hash visível (bloqueios, colecoes, equipe_gerencia, deslocamentos). |
 | Quais podem ser migrados para `ImportJob` async? | **Todos os 11**, conforme comentário em `apps/core/models/import_job.py:41-44`. Hoje só `bloqueios` está async (piloto ASQ-005 Fase 1). |
 | Qual deve ser o contrato padrão futuro? | Schema em §4.3. Resume: `summary` agregado, `rows[*]` com `row_number`+`errors[{code,field,message}]`+`warnings[]`+`normalized`+`import_hash`, `errors_by_code`/`warnings_by_code` agregados, `metadata`. |
@@ -324,11 +357,12 @@ Quem ler este documento consegue responder:
 | Item | O que falta verificar |
 |---|---|
 | Shape final de `usuarios_import._process_row` | Confirmar que tem `import_hash` em alguma forma. Hoje a docstring lista apenas `created/updated/unchanged/skipped` em stats. |
-| Shape final de `eventos_import.py` apply (linha que cria Solicitacao + Participation) | Confirmar valor de `external_hash` exato e como Participation é registrada (1 linha por participante? embebida em row?). |
-| Shape final de `bloqueios_import.py` apply | Confirmar `external_hash` ou chave natural. |
+| ~~Shape final de `eventos_import.py` apply~~ | ✅ **Resolvido 2026-07-24**: `external_hash = stable_import_hash(municipio_id, projeto_id, tipo_evento_id, data, hora_inicio, hora_fim)` — **SHA-1**, sem coordenador (`services/eventos_import.py:344-365`). `Participation` é 1 linha por participante via `get_or_create` (`:562-607`). ⚠️ O upsert usa `update_or_create` com `defaults` que **sobrescrevem status, owner e datas** (`:523-539`) e o cálculo de `changed` roda **depois** do save, sempre reportando `unchanged` (`:544-556`) — achado `M10-07` / [#1628](https://github.com/matheusnorjosa/aprender_sistema/issues/1628). |
+| ~~Shape final de `bloqueios_import.py` apply~~ | ✅ **Resolvido 2026-07-24**: **não há `external_hash`.** Idempotência é filtro pela tupla natural `(usuario, inicio, fim, tipo)` (`services/bloqueios_import.py`, `_process_row`). O bloco é criado com `status="aprovado"` e **sem `created_by`**. |
 | `_process_row` de `colecoes_import.py`, `municipios_import.py`, `produtos_import.py`, `equipe_gerencia_import.py`, `deslocamentos_import.py` | Confirmar exatamente quais campos vão para `pendencias.outros` vs categorias específicas. |
-| Endpoint sync de **`deslocamentos`** | Existe view DRF correspondente? `views_import_deslocamentos.py` existe na pasta — falta confirmar rota e gate. |
-| Default `dry_run=False` em `controle_acoes_import` e `dat_cadastros_import` | Decidir se é bug a corrigir ou intencional (Makefile chama com `?dry_run=true|false` explícito). |
+| ~~Endpoint sync de **`deslocamentos`**~~ | ✅ **Resolvido 2026-07-24**: rota `deslocamentos/import/` → `ImportDeslocamentosView` (`apps/core/urls.py:76,235-236`). |
+| Default `dry_run=False` em `controle_acoes_import` e `dat_cadastros_import` | **Ainda aberto em 2026-07-24** (`controle_acoes_import.py:43`, `dat_cadastros_import.py:77`). Decidir se é bug a corrigir ou intencional (Makefile chama com `?dry_run=true\|false` explícito). |
+| Parsing de `dry_run` nas 11 views | **Aberto — `M04-05` / [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649).** Valor desconhecido ⇒ apply. Ver bloco no topo. |
 
 ---
 
@@ -346,3 +380,7 @@ Quem ler este documento consegue responder:
 ## 10. Histórico de versões
 
 - 2026-05-05 — v0.1 — PR 2. Auditoria inicial dos 11 services. Proposta de contrato padrão + plano de migração em 5 fases. Cabeçalho de Compras (`CÓD,Produto,Quant.,Município,UF,Data,Uso das coleções`) confirmado lendo `controle_imports.py:156-163`.
+- 2026-07-24 — v0.2 — Varredura de docs pós-auditoria M00–M28. Documentado como `dry_run` é
+  **realmente** parseado (`M04-05` / #1649: valor desconhecido = apply em 11 views) e a ausência
+  de `AuditLog` nos imports síncronos. Resolvidas 3 pendências de leitura de §8 lendo o código.
+  `usuarios_import.py` reclassificado de "baixo risco" por causa do P0 #1610.

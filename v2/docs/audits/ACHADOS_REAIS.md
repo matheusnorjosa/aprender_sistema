@@ -186,6 +186,7 @@ Cobertura: zero. `find . -name "*.bats"` => apenas v2/infra/deployer/tests/{hook
 Achado adicional (mesma correcao): restore_db.sh:17 hardcoda BACKUP_DIR="/var/backups/aprender" e ignora a env var, enquanto backup_db.sh:31 usa BACKUP_DIR="${BACKUP_DIR:-/backups}". Provado: com -e B
 
 Nota operacional: `command -v age` no container web => MISSING. Mesmo apos corrigir a ordem, o restore precisa rodar onde o binario `age` exista — verificar host/imagem alvo.
+[CORRIGIDO EM 2026-07-24 — ver "Retificacao" abaixo: o probe rodou num container de DEV. A imagem de PRODUCAO tem o binario `age` (Dockerfile.prod:56).]
 
 Higiene: nenhum arquivo de probe criado no host; artefatos de container removidos (/tmp/m26probe e /var/backups/aprender). `git status --porcelain` mostra apenas test_probe_m1608.py e test_probe_m1702
 ```
@@ -289,7 +290,24 @@ echo -e "${GREEN}Backup integrity OK${NC}"
 Notas:
 - `set -o pipefail` no topo (hoje so `set -e`) para que a falha do `age` no pipe nao seja mascarada pelo exit 0 do `gzip -t` — mesma classe de bug ja corrigida em `backup_db.sh` pelo #1543.
 - Corrigir junto `restore_db.sh:17` para `BACKUP_DIR="${BACKUP_DIR:-/var/backups/aprender}"`.
-- Falhar cedo se `age` nao estiver no PATH e o alvo for `.age` (a imagem `web` atual **nao tem** o binario `age` — confirmado por `command -v age` => MISSING; verificar em qual host/imagem o restore e realmente executado).
+- Falhar cedo se `age` nao estiver no PATH e o alvo for `.age`. ~~a imagem `web` atual **nao tem** o binario `age`~~ — **retificado em 2026-07-24**: a imagem de **producao** instala `age` (`v2/infra/Dockerfile.prod:56`, junto com `postgresql-client`); quem **nao** tem e a imagem de **dev** (`v2/infra/Dockerfile.dev`, sem `age`). O guard continua valendo como defesa, mas o restore em producao roda onde `age` existe.
+
+#### Retificacao de 2026-07-24 — o probe do `age` mediu o ambiente errado
+
+O probe original (`command -v age` no container `aprender_vmain-web-1`) rodou sobre a imagem de
+**desenvolvimento**, e a conclusao "a imagem web nao tem `age`" foi generalizada para producao.
+
+Evidencia contraria: `v2/infra/Dockerfile.prod:47-57` instala explicitamente `age` na camada de
+runtime, com o comentario *"cifra os dumps de DB em repouso (backup_db.sh + BACKUP_AGE_RECIPIENT;
+#1455). O recipient (chave publica) ja esta no Env de prod, mas o binario faltava"* — ou seja, a
+ausencia foi um bug **ja corrigido**. `v2/infra/Dockerfile.dev` nao instala `age`.
+
+Consequencia pratica: o contorno manual `age -d -i <chave> <arq> | gunzip | psql` **roda** no
+worker de producao. O `M26-01` continua **P0 e vivo** — o defeito e a ordem das operacoes em
+`restore_db.sh:91`, nao a falta do binario.
+
+Mesma classe de erro que o `M27-05` (porta 8000): conclusao tirada de um ponto de observacao que
+nao era o ambiente sob analise.
 
 #### Teste RED
 

@@ -1,7 +1,7 @@
 ---
 title: Notificações (32 Passos)
 status: canonical
-last_verified: 2026-06-19
+last_verified: 2026-07-24
 sources_of_truth:
   - v2/backend/apps/core/models/acoes_notificacao.py
   - v2/backend/apps/core/services/prazo_engine_service.py
@@ -51,10 +51,10 @@ O objetivo é substituir o acompanhamento manual de prazos por uma régua determ
 ## Contratos e invariantes
 
 - **32 ações exatas**: o seed valida `ordens == 1..32` sem gaps; cada ação tem ≥1 grupo executor. Templates são idempotentes (`update_or_create` por `ordem`).
-- **Âncoras (`TipoAncoraChoices`)**: `EVENTO_EXTERNO` exige `ref_evento_externo` não-vazio (data manual via `data_ancora`); `ACAO_ANTERIOR` exige `ref_acao_template` (âncora = `data_realizacao` da ação referenciada no mesmo ciclo); `MARCO_CALENDARIO` ancora no início do semestre (`1S` → 01/03, `2S` → 01/08). CheckConstraints no DB reforçam `ancora_acao_requer_ref` e `ancora_evento_requer_ref`.
-- **Prazo em dias úteis**: vencimento = `add_business_days(âncora, dias_prazo_uteis)`. `dias_prazo_uteis > 0` (CheckConstraint). Calendário útil = fins de semana + feriados nacionais/CE/Fortaleza + `FeriadoLocal` ativos. Timezone do projeto: **America/Fortaleza**.
-- **Unicidade de ciclo**: um único `CicloAcoes` por `(projeto, municipio, semestre, ano)`; `ano >= 2020`. Ao criar o ciclo, gera-se uma `AcaoInstancia` por template ativo (`unique (ciclo, ordem)` e `unique (ciclo, template)`); `instancia.ordem == template.ordem` (validado em `clean()`).
-- **Conclusão irreversível (MVP)**: `concluir()` exige `observacao` não-vazia e `data_realizacao` (CheckConstraints `concluida_requer_observacao`/`concluida_requer_data_realizacao`); cria `RegistroConclusaoAcao` (OneToOne) — **reabertura não permitida**. Concluir dispara `recalculate_dependents` (recálculo das ações que ancoram nesta, com proteção contra ciclo via `visited`). Não é permitido registrar/alterar âncora de ação já concluída.
+- **Âncoras (`TipoAncoraChoices`)**: `EVENTO_EXTERNO` exige `ref_evento_externo` não-vazio (data manual via `data_ancora`); `ACAO_ANTERIOR` exige `ref_acao_template` (âncora = `data_realizacao` da ação referenciada no mesmo ciclo); `MARCO_CALENDARIO` ancora no início do semestre (`1S` → 01/03, `2S` → 01/08 — `services/prazo_engine_service.py:27-30`). CheckConstraints no DB reforçam `acao_template_ancora_acao_requer_ref` e `acao_template_ancora_evento_requer_ref` (`models/acoes_notificacao.py:123-134`).
+- **Prazo em dias úteis**: vencimento = `add_business_days(âncora, dias_prazo_uteis)` (`prazo_engine_service.py:80-81`). `dias_prazo_uteis > 0` (CheckConstraint `acao_template_prazo_gt_zero`, `models/acoes_notificacao.py:119-122`). Calendário útil = fins de semana + feriados nacionais/CE/Fortaleza + `FeriadoLocal` ativos. Timezone do projeto: **America/Fortaleza**.
+- **Unicidade de ciclo**: um único `CicloAcoes` por `(projeto, municipio, semestre, ano)` (`unique_ciclo_acoes_contexto`); `ano >= 2020` (`ciclo_acoes_ano_min_2020`). Ao criar o ciclo, gera-se uma `AcaoInstancia` por template ativo (`unique (ciclo, ordem)` e `unique (ciclo, template)`, `models/acoes_notificacao.py:270-277`); `instancia.ordem == template.ordem` é validado em `clean()` (`:292-295`) — nota: o `create` da view usa `bulk_create` (`views/acoes_notificacao.py:86`), que **não** chama `clean()`, então essa garantia vale só para os caminhos que invocam `full_clean()`; a barreira real é a constraint de unicidade.
+- **Conclusão irreversível (MVP)**: `concluir()` exige `observacao` não-vazia e `data_realizacao` (CheckConstraints `acao_instancia_concluida_requer_observacao`/`acao_instancia_concluida_requer_data_realizacao`, `models/acoes_notificacao.py:279-286`); cria `RegistroConclusaoAcao` (OneToOne) — **reabertura não permitida** (`:330-331`). Concluir dispara `recalculate_dependents` (recálculo das ações que ancoram nesta, com proteção contra ciclo via `visited`). Não é permitido registrar/alterar âncora de ação já concluída.
 - **Idempotência de notificação**: `NotificacaoInterna` tem `unique (destinatario, acao_instancia, fase_disparo, referencia_data)`; o `get_or_create` + tratamento de `IntegrityError` garantem que rodar o processador N vezes no mesmo dia não duplica (contabilizado como `deduplicated`). O processador ignora ações `CONCLUIDA` e ciclos não `EM_ANDAMENTO`.
 - **Acesso (CP-02/RBAC)**: ciclos e ações exigem `permission_classes = [HasPerm("manage_internal_actions")]`. No seed essa capability **não recebe grupos** → na prática **somente superuser** passa (matriz `ciclos_acoes`: SUPERUSER=ALLOW, todos os demais DENY). A inbox (`NotificacaoInterna`) é `IsAuthenticated` e escopada ao `destinatario == request.user` (cada um só vê o próprio inbox).
 

@@ -7,8 +7,13 @@ integração. Feature branches curtas no padrão `type/nome` (ex.: `feat/gcal-sy
 `fix/availability-buffer`) saem de `main` e voltam por **Pull Request com squash-merge**
 (CP-05/CP-06). **Não há branch `develop`** nem fluxo gitflow. Como `main` é a única base de
 PR, gatear `pull_request` → `main` cobre todo o fluxo de integração — não existe branch
-intermediária ungated. **Merge na `main` dispara deploy de produção**, então cada PR passa
-pela suíte completa de CI antes do merge.
+intermediária ungated. **Merge na `main` NÃO deploya** (modelo pull-based,
+[ADR-018](docs/architecture/project-decisions/ADR-018-pull-based-deploy.md)): ele dispara
+build + scan + push + assinatura das imagens e a tag imutável `vYYYY.MM.DD-<sha7>`.
+Produção só muda por **promoção deliberada** (`promote.yml`, gated no GitHub Environment
+`production`), aplicada pelo agente `aprender-deployer` na VM01. Ainda assim cada PR passa
+pela suíte completa de CI antes do merge: como **não há staging remoto**, os gates de PR
+mais o staging gate local são a única rede de proteção antes de uma promoção.
 
 ## Convenções
 

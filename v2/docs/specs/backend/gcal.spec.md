@@ -1,7 +1,7 @@
 ---
 title: Integração Google Calendar + Meet
 status: canonical
-last_verified: 2026-06-19
+last_verified: 2026-07-24
 sources_of_truth:
   - v2/backend/apps/core/services/gcal_client_factory.py
   - v2/backend/apps/core/services/gcal_google_client.py
@@ -41,6 +41,8 @@ Publica eventos de formações aprovadas no Google Calendar e gera links Google 
 
 O módulo isola o acesso à Google Calendar API atrás de um adaptador único (`CalendarClientAdapter`), com três implementações intercambiáveis selecionadas por configuração: `fake` (in-memory, default seguro), `google` via Service Account e `google` via OAuth 2.0 por usuário. Toda escrita real no Calendar passa por idempotência (event id derivado da solicitação), retry com backoff e auditoria.
 
+> **Configuração de produção — confirmada pelo dono em 2026-07-20** (`ACHADOS_REAIS.md` §F4): `GCAL_AUTH_MODE=oauth`, `GCAL_CLIENT=google` (**cliente real, não stub**), `GCAL_ALLOWED_DOMAIN=aprendereditora.com.br`, `GCAL_OAUTH_CLIENT_ID/SECRET`, `GCAL_ENCRYPTION_KEY` e `GCAL_OAUTH_REDIRECT_URI` preenchidos, `GCAL_SERVICE_ACCOUNT_JSON` **inexistente**. Ou seja: o caminho OAuth é o caminho quente e escreve num calendário real. Achados deste módulo **não são teóricos** — em especial `M12-15` (binding do state) e `M10-06` (seção "Equipe" vazia), descritos abaixo.
+
 ## Fonte de verdade no código
 
 - Guia operacional detalhado (setup Google Cloud, troubleshooting): [`v2/docs/GUIDE_GCAL.md`](../../GUIDE_GCAL.md). Esta spec é o índice/contrato; o guia mantém os passos de configuração.
@@ -57,17 +59,19 @@ O módulo isola o acesso à Google Calendar API atrás de um adaptador único (`
 
 ## Contratos e invariantes
 
-- **Modo de cliente vs modo de auth são variáveis distintas**: `GCAL_CLIENT` ∈ `{fake, google}` decide cliente real vs in-memory; `GCAL_AUTH_MODE` ∈ `{service_account, oauth}` decide a autenticação no modo real. **Não existe `GCAL_CLIENT_MODE`.** Default: `GCAL_CLIENT=fake`, `GCAL_AUTH_MODE=service_account`.
+- **Modo de cliente vs modo de auth são variáveis distintas**: `GCAL_CLIENT` decide cliente real vs in-memory; `GCAL_AUTH_MODE` decide a autenticação no modo real. **Não existe `GCAL_CLIENT_MODE`** (o nome só sobrevive em doc arquivada). Defaults: `GCAL_CLIENT=fake` (`settings.py:722`), `GCAL_AUTH_MODE=service_account` (`:728`). ⚠️ Os conjuntos `{fake, google}` e `{service_account, oauth}` são **convenção documental, não invariante**: nenhuma das duas é validada no boot (contraste com `GCAL_SEND_UPDATES`, validada em `settings.py:759-766`). Na prática, qualquer valor `!= "google"` cai no fake (`gcal_client_factory.py:44-52`) e qualquer valor `!= "oauth"` cai em service account (`:83-88`) — um typo degrada em silêncio.
 - **Governança de escrita real**: publicação real só ocorre com `GCAL_CLIENT=google`. Com `GCAL_CLIENT != "google"`, `apply_blocked=false` e `dry_run=false`, o serviço retorna **409 Conflict** (`code=gcal_client_not_configured`) e não persiste nada. `apply_blocked=true` força via cliente fake (somente testes).
 - **Pré-condição de publicação**: apenas `Solicitacao.status == "aprovado"` pode publicar/re-sincronizar (`code=not_approved` caso contrário).
 - **OAuth obrigatório por usuário**: em `GCAL_AUTH_MODE=oauth`, o operador precisa de `GoogleOAuthCredential`. Sem credencial, publish/resync/cancel retornam **403 Forbidden** (`code=google_not_connected`); com credencial, a task recebe `operator_user_id` e a resposta é **202 Accepted**.
-- **Domínio restrito (OAuth)**: o callback só aceita contas `@{GCAL_ALLOWED_DOMAIN}` (default `aprendereditora.com.br`); outras levantam erro na troca de código.
+- **Domínio restrito (OAuth)**: o callback só aceita contas `@{GCAL_ALLOWED_DOMAIN}` (default `aprendereditora.com.br`, lido de `os.getenv` em `oauth/oauth_flow.py:324-326`); outras levantam `ValueError` na troca de código, que vira redirect `?google=error&reason=validation` (`views_oauth.py:408-413`).
+- **O `state` do OAuth NÃO é vinculado à sessão que o criou** (comportamento real, achado `M12-15`, issue #1652). O state é o texto claro `f"{csrf_token}|{return_to}|{user.id}"` (`oauth/oauth_flow.py:214-216`), **sem assinatura/HMAC**. Na validação (`:128-164`, chamada em `views_oauth.py:358`), o binding de identidade é feito comparando o **terceiro campo do state** com `request.user.id` (`:132-136`); do cache só se extrai o `return_to` (`:155`). O `user_id` gravado no cache em `:222` **nunca é lido nem comparado**. Ou seja: a checagem "este state é meu" é auto-declarada pelo portador, não derivada da sessão. O que limita a janela é o `csrf_token` ser one-time (`cache.delete` em `:161`) com TTL de 600 s (`:226`), e a credencial resultante ser sempre gravada para `request.user` (`views_oauth.py:376-385`) — não há roubo direto do token da vítima. O binding correto seria comparar contra o `user_id` do cache (ou contra a sessão), não contra o sufixo mutável.
 - **Idempotência**: o event id é derivado da solicitação; `insert`/`update`/`delete` são idempotentes. `delete`/`cancel` tratam **404 como sucesso** (evento já removido). `cancel_solicitacao` exige evento publicado, senão `ValueError` (→ **409** no endpoint).
 - **Modalidade (`is_online`)**: `conferenceData`/`requestId` (`conferenceSolutionKey=hangoutsMeet`) só é incluído quando `is_online=true`; `conferenceDataVersion=1` é obrigatório no `insert`/`patch` para o Meet ser criado. Eventos presenciais nunca geram nem persistem `meet_link`.
 - **Persistência de `meet_link` apenas em APPLY real**: preview, `dry_run=true` e o caminho bloqueado (409) **não** persistem `meet_link`/`external_event_id`/`gcal_payload_hash`.
 - **`GCAL_SEND_UPDATES`** ∈ `{none, all, externalOnly}` (default `none`) é validado *fail-fast* no boot (`sys.exit(1)` em valor inválido) e repassado como `sendUpdates` em insert/update/delete.
 - **Tokens OAuth criptografados em repouso** (Fernet, AES-128-CBC + HMAC-SHA256) via `GCAL_ENCRYPTION_KEY`. Em produção a chave é **obrigatória** (ausência → `ValueError`); em dev/staging há fallback derivado de `SECRET_KEY` com warning. Refresh é thread-safe (`select_for_update` + double-check). `invalid_grant` no refresh remove a credencial e exige reconexão.
-- **RBAC**: todas as ações GCal usam `permission_classes=[CanUseGcal]` (Policy `use_gcal` = `operate_preagenda | approve_solicitation`, ou seja Controle + Superintendência). Nenhum acesso a grupo direto (banido por `scripts/rbac_lint.py`). Endpoints OAuth também exigem autenticação + RBAC e têm rate limit (`UserRateThrottle`, ~10/h no start).
+- **RBAC**: as 4 ações GCal sobre `Solicitacao` usam `permission_classes=[CanUseGcal]` (`views_solicitacao.py:704`, `:732`, `:765`, `:799`; preservadas de `get_permissions` pela allowlist em `:167-178`). Policy `use_gcal` = `operate_preagenda | approve_solicitation` (`policies.py:129`), ou seja Controle + Superintendência. Nenhum acesso a grupo direto (banido por `scripts/rbac_lint.py`).
+- **Endpoints OAuth — o gate NÃO é uniforme**: `start`, `status`, `disconnect`, `calendars`, `select-calendar` e `events` são `[CanUseGcal]`. O **`callback` não declara `permission_classes`** (`views_oauth.py:291-292`): cai no default `IsAuthenticated` e faz a checagem de identidade à mão em `:350-353`. Rate limit `OAuthThrottle` (scope `oauth` = `10/hour` em prod, `settings.py:515`) existe **apenas no `start`** (`views_oauth.py:241`); os demais só têm os throttles anon/user default.
 - **Auditoria obrigatória (PA-05)**: cada operação grava `AuditLog` — ações `PREVIEW_GCAL`, `PUBLISH_GCAL_REQUESTED`/`PUBLISH_GCAL`/`PUBLISH_GCAL_ERROR`, `RESYNC_GCAL_REQUESTED`, `CANCEL_GCAL_REQUESTED`/`CANCEL_GCAL`, `GCAL_ENCRYPTION_KEY_ROTATION`, `GOOGLE_CONNECT`/`GOOGLE_DISCONNECT`/`GOOGLE_REFRESH_TOKEN`.
 
 ## API / Interface
@@ -91,7 +95,7 @@ Comandos de gestão:
 - `python manage.py preagenda_to_gcal [--dry-run] [--client=fake|google] [--ids …] [--since/--until …]` — sync em lote da Pré-agenda (substitui a referência stale a `sync_calendar` no guia).
 - `python manage.py rotate_gcal_encryption_key --old-key … --new-key …` — rotação zero-downtime da chave Fernet.
 
-Beat automático: `preview_then_apply_gcal` (CELERY_BEAT_SCHEDULE, quando habilitado).
+Beat automático: `preview_then_apply_gcal`, chave `gcal-sync-every-5-minutes`, `schedule=300.0`. **Não fica em `config/celery.py`** e sim em [`config/settings.py:616-627`](../../../backend/config/settings.py), atrás de `FEATURE_AUTO_APPLY_ENABLED` (`:612`, default `"0"` → `CELERY_BEAT_SCHEDULE = {}`). O merge com o schedule fixo do `celery.py` acontece em `celery.py:34,58`. **Desabilitado por default.**
 
 ## Fluxos principais
 
@@ -127,3 +131,6 @@ Beat automático: `preview_then_apply_gcal` (CELERY_BEAT_SCHEDULE, quando habili
 - **Mismatch `GCAL_CLIENT` configurado vs valor**: `apply_one_solicitacao` libera escrita quando `settings.GCAL_CLIENT is not None` (qualquer valor), mas a factory só instancia cliente real com `=="google"`. Com `GCAL_CLIENT=fake` a guarda passa e cai no fake client — comportamento intencional para testes, porém a governança 409 fica concentrada em `publish_to_gcal`/`apply_blocked`, não no `apply_one`. Atenção ao chamar `apply_one_solicitacao` fora do fluxo de endpoint.
 - **Fallback de chave em dev/staging**: tokens cifrados com chave derivada de `SECRET_KEY` ficam ilegíveis se `SECRET_KEY` mudar; em produção `GCAL_ENCRYPTION_KEY` é mandatória. Rotação exige restart dos containers (web, worker, beat).
 - **TOCTOU brando no cancel**: validação de "publicado" no endpoint e o `delete` na task são separados; concorrência é mitigada por idempotência (404 = sucesso), não por lock.
+- **A seção "Equipe" da descrição sai vazia** (comportamento real, achado `M10-06`, épico #1666). `build_event_payload` monta a Seção 6 a partir da M2M **legada** `s.formadores` (`gcal/payload.py:186`) e da FK `coordenador` (`:192`). Mas o fluxo de escrita atual não popula `formadores`: `views_solicitacao._update_formadores` grava `Participation(role="FORMADOR")` (`:499-543`, `bulk_create` em `:542`) a partir de `extra_participants`. As únicas escritas em `.formadores` no repo estão em testes. Como o bloco só é emitido se `equipe_parts` for não-vazio (`payload.py:196`), eventos criados hoje publicam **sem a linha "Formador(es)"** — sobra no máximo o "Coordenador(a)". Contraste dentro do próprio arquivo: os **attendees** já usam a fonte certa (`payload.py:45,258`, `s.participations.filter(role__in=...)`). A regra pretendida é ler `Participation` também na descrição.
+- **Não há bloqueio de edição/exclusão enquanto `gcal_status=PENDING`** (achado `M10-03`, issue #1625). `destroy` só barra `PUBLISHED` (`views_solicitacao.py:567`) e `perform_update` não consulta `gcal_status`. Entre o `mark_gcal(PENDING)` (`solicitacao_publish.py:229-233`) e a execução da task existe janela para alterar o conteúdo que será publicado — o Calendar recebe algo diferente do que foi aprovado.
+- **`cancel` não valida `status == "aprovado"`** (só `publish`/`resync` validam, `solicitacao_publish.py:197-201`, `:317-321`); ele valida apenas "está publicado" (`:408-415`). Intencional, mas não é simétrico com o resto.

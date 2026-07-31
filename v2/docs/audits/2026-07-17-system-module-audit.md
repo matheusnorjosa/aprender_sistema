@@ -1,7 +1,7 @@
 ---
 title: Auditoria modular completa do Aprender Sistema v2
-status: draft
-last_verified: 2026-07-18
+status: historical
+last_verified: 2026-07-20
 sources_of_truth:
   - v2/backend/config/settings.py
   - v2/backend/config/urls.py
@@ -24,7 +24,27 @@ related:
 
 # Auditoria modular completa do Aprender Sistema v2
 
-> Documento vivo e incremental. O inventário estático inicial está completo; a auditoria profunda ainda não está. Uma linha neste documento só é um achado final quando estiver no registro de achados com evidência e reprodução suficientes.
+> ## ⚠️ Registro histórico — não é a fila de trabalho
+>
+> **O documento vivo é [`ACHADOS_REAIS.md`](./ACHADOS_REAIS.md).** Este relatório guarda as
+> 498 hipóteses da investigação, os vereditos e os erros do processo. Ele **não** deve ser
+> lido como backlog.
+>
+> **As severidades deste arquivo estão substituídas.** O pente fino adversarial (seção 15)
+> e a reverificação por execução derrubaram **P0 de 11 para 5** e **P1 de 181 para 52**;
+> depois da confrontação contra `main d08acfa5` restaram **57 achados acionáveis (2 P0,
+> 36 P1, 19 P2)**. Ao citar um achado daqui, use **sempre** a severidade de
+> `ACHADOS_REAIS.md`, nunca a das seções 10 e 14.
+>
+> **Por quê:** a auditoria **acertava os mecanismos e errava as consequências**. O erro mais
+> caro não foi um achado falso, e sim um achado certo no mecanismo e errado no impacto,
+> apoiado numa premissa de ambiente que ninguém tinha medido — o caso `M27-05` ("porta 8000
+> aberta na internet"), concluído a partir de probes rodados de dentro da rede allowlisted e
+> refutado pelo dono testando por 4G.
+>
+> Baseline da investigação: `90f6a048`. O código andou desde então (3 de 12 achados
+> reverificados já estavam corrigidos). Revalide contra `HEAD` antes de agir sobre qualquer
+> linha daqui.
 
 ## 1. Estado, baseline e limites
 

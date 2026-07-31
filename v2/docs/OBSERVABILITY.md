@@ -1,7 +1,7 @@
 ---
 title: Observabilidade (v2)
 status: active
-last_verified: 2026-06-19
+last_verified: 2026-07-24
 sources_of_truth:
   - v2/backend/config/settings.py
   - v2/backend/config/urls.py
@@ -37,7 +37,23 @@ Documento-índice criado em 2026-06-19 (Fase 0 do plano SDD) para resolver ponte
 | Sentry (erros/tracing) | se `SENTRY_DSN` setado | se `SENTRY_DSN` setado (secret do Portainer — **atualmente OFF**: `SENTRY_DSN` ausente em prod, verificado 2026-06-19) |
 
 > Os arquivos da stack local (`docker-compose.observability.yml`, `prometheus.yml`, `grafana/`) são **locais e
-> não versionados** (gitignored). `docker-compose.prod.yml` não contém nenhum serviço de Prometheus/Grafana.
+> não versionados** (gitignored). `docker-compose.prod.yml` não contém nenhum serviço de Prometheus/Grafana —
+> os únicos serviços são `migrate`, `web`, `redis`, `worker`, `beat` e `frontend`.
+
+## O que NÃO existe (reconfirmado 2026-07-24)
+
+Registrado explicitamente porque outros runbooks já assumiram o contrário:
+
+| Item | Estado | Consequência para quem opera |
+|---|---|---|
+| **Loki / agregador de logs** | ❌ não existe (nenhuma referência no repositório) | Logs = `docker compose logs` no stdout dos containers, driver `json-file`, `max-size 50m` / `max-file 10`. **Colete antes de reiniciar.** Ver [LOGGING.md](./LOGGING.md) |
+| **Regras de alerta Prometheus** | ❌ nenhuma versionada | Nada dispara sozinho por latência/erro. Ver [SLO_DEFINITIONS.md](./SLO_DEFINITIONS.md) |
+| **Métricas de backup** (`as_backup_*`) | ❌ não implementadas | O único gate automático de backup é `deployer/hooks/check_backup.sh` (idade + tamanho). Ver [BACKUP_OPERATIONS.md](./BACKUP_OPERATIONS.md) |
+| **Uptime/synthetic monitoring** | ❌ não configurado no repositório | "Disponibilidade" não é medida; os SLOs são alvos |
+
+A única métrica customizada do projeto é **`as_db_transaction_retries_total`**
+(`apps/core/services/db_retry.py:64`). Todo o resto em `/metrics` vem do `django-prometheus`
+(prefixo `django_*`) — confira os nomes reais em `/metrics` antes de escrever query.
 
 ## Versões da stack (DEV-only)
 

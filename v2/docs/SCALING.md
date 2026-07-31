@@ -1,15 +1,23 @@
 # Horizontal Scaling Guide
 
-**Data**: 2026-01-12
-**Status**: Ativo
+**Data**: 2026-07-24 (revisão contra o código)
+**Status**: Ativo — **documento de projeto/capacidade, não de operação corrente**
 **Referência**: PLAN_maturity_gaps.md (Gap 7)
+
+> ⚠️ **Nada aqui está em uso em produção hoje.** A produção roda **uma instância de cada
+> serviço** numa stack Docker Compose sob Portainer na VM01
+> (`v2/infra/docker-compose.prod.yml`): `migrate` (one-shot), `web`, `redis`, `worker`,
+> `beat`, `frontend`. **Não há `replicas`, não há Kubernetes, não há load balancer interno**
+> — o edge é um Nginx Proxy Manager externo ao repositório. Este documento descreve o que a
+> arquitetura *permite*, para quando houver necessidade. Antes de citar qualquer trecho como
+> "é assim que roda", confira o compose.
 
 ---
 
 ## 1. Visão Geral
 
 O AS v2 foi projetado para scaling horizontal desde o início. Este documento descreve
-a arquitetura stateless e como escalar a aplicação.
+a arquitetura stateless e como escalar a aplicação **quando for preciso**.
 
 ---
 
@@ -17,34 +25,43 @@ a arquitetura stateless e como escalar a aplicação.
 
 ### 2.1 Componentes
 
-| Componente | State | Storage |
-|------------|-------|---------|
-| Django App | Stateless | - |
-| Sessions | Redis | `django-redis` |
-| Cache | Redis | `django-redis` |
-| Media Files | S3/MinIO | `django-storages` |
-| Task Queue | Redis | Celery broker |
-| Database | PostgreSQL | Persistente |
+| Componente | State | Storage | Estado real |
+|------------|-------|---------|---|
+| Django App | Stateless | - | ✅ |
+| Sessions | Redis | `SESSION_ENGINE=cache` (`settings.py:328-329`) | ✅ em uso |
+| Cache | Redis | `django_redis.cache.RedisCache` | ✅ em uso |
+| Media Files | S3 (opcional) | `django-storages` **só se `AWS_STORAGE_BUCKET_NAME` estiver setado** (`settings.py:385-386`) | ⚠️ **não configurado**; cai em `MEDIA_ROOT = BASE_DIR/"media"` (disco local, `settings.py:379`). Hoje nenhum model usa `FileField`/`ImageField`, então isso não bloqueia réplicas — **passaria a bloquear** no primeiro upload persistente |
+| Task Queue | Redis | Celery broker | ✅ em uso |
+| Database | PostgreSQL | Externo (VM02) | ✅ |
 
 ### 2.2 Verificação de Statelessness
 
 ```bash
-# Verificar settings.py
-grep -E "SESSION_ENGINE|CACHES|DEFAULT_FILE_STORAGE" config/settings.py
+cd v2/backend
+grep -nE "SESSION_ENGINE|SESSION_CACHE_ALIAS|AWS_STORAGE_BUCKET_NAME" config/settings.py
 
 # Esperado:
 # SESSION_ENGINE = "django.contrib.sessions.backends.cache"
-# CACHES = { "default": { "BACKEND": "django_redis.cache.RedisCache" } }
+# SESSION_CACHE_ALIAS = "default"
 ```
+
+> `DEFAULT_FILE_STORAGE` **não existe** neste projeto (Django 5.2 usa `STORAGES`); procurar
+> por ele não retorna nada e não prova nada.
 
 ---
 
 ## 3. Deploy com Múltiplas Instâncias
 
-### 3.1 Docker Compose (Desenvolvimento/Staging)
+> **Exemplos ilustrativos.** Nenhum dos blocos desta seção reflete o compose real. O
+> compose de produção não declara `deploy.replicas`, não tem serviço `db` (Postgres é
+> externo) e trata migrations com um serviço one-shot `migrate` +
+> `depends_on: service_completed_successfully` (`docker-compose.prod.yml:47-51`) — não com
+> `RUN_MIGRATIONS`.
+
+### 3.1 Docker Compose (exemplo)
 
 ```yaml
-# docker-compose.yml
+# EXEMPLO — não é o docker-compose.yml deste repositório
 services:
   web:
     build: .
@@ -78,10 +95,17 @@ services:
       replicas: 2
 ```
 
-### 3.2 Nginx Load Balancer
+### 3.2 Nginx Load Balancer (exemplo — não existe hoje)
+
+> Em produção o roteamento é feito pelo **Nginx Proxy Manager**, que é **externo ao
+> repositório**: o compose apenas se conecta à rede `shared_proxy`, declarada
+> `external: true` (`docker-compose.prod.yml:322-323,341-342`). A configuração do NPM
+> (rotas, TLS, headers, tratamento de `X-Forwarded-For`) **não está versionada aqui** e
+> precisa ser inspecionada no próprio NPM. O `nginx.conf` versionado é o do container
+> `frontend` (SPA + proxy `/api/`), não um balanceador.
 
 ```nginx
-# nginx.conf
+# EXEMPLO ilustrativo — não é nenhum arquivo deste repositório
 upstream django {
     least_conn;  # Distribuir para conexão com menos requests
     server web1:8000 weight=1;
@@ -111,10 +135,14 @@ server {
 }
 ```
 
-### 3.3 Kubernetes (Produção)
+### 3.3 Kubernetes — ❌ NÃO USADO
+
+> **Não existe Kubernetes neste projeto.** Não há diretório `k8s/`, nem manifesto, nem
+> cluster. Produção é Docker Compose sob Portainer (ADR-001, ADR-018). O bloco abaixo é
+> material de referência caso um dia se migre — **não** um artefato deste repositório.
 
 ```yaml
-# k8s/deployment.yaml
+# EXEMPLO — arquivo inexistente (não há k8s/ neste repositório)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -178,18 +206,18 @@ spec:
 
 **Problema**: Múltiplas instâncias não podem rodar migrations simultaneamente.
 
-**Solução**:
-1. **Job separado**: Rodar migrations em job/container separado antes do deploy
-2. **Variável RUN_MIGRATIONS**: Usar `RUN_MIGRATIONS=1` apenas em 1 instância
-3. **Init Container (K8s)**: Container que roda migrations antes do pod principal
+**Como o projeto já resolve isso (produção, hoje)**: um serviço **one-shot `migrate`**
+(`docker-compose.prod.yml:47-51`) espera o Postgres da VM02 responder, roda
+`manage.py migrate --noinput` e sai. `web`, `worker` e `beat` só sobem depois que ele
+termina com **êxito** (`depends_on: condition: service_completed_successfully`, #1456).
+Uma migration quebrada **bloqueia o deploy** em vez de servir um schema meio-migrado.
 
-```yaml
-# Kubernetes init container
-initContainers:
-  - name: migrations
-    image: as-backend:latest
-    command: ["python", "manage.py", "migrate", "--noinput"]
-```
+> A `Dockerfile.prod` não tem `ENTRYPOINT`, então o `entrypoint.sh` (que migraria sob
+> `RUN_MIGRATIONS=1`) **nunca roda em produção**. Não conte com `RUN_MIGRATIONS` em prod.
+
+Alternativas equivalentes em outros orquestradores (não usados aqui):
+1. **Job separado** antes do rollout
+2. **Init Container (K8s)** — ver a ressalva da seção 3.3
 
 ### 4.2 Celery Workers
 
@@ -204,29 +232,45 @@ celery -A config worker -l info --concurrency=4
 
 ### 4.3 Database Pool
 
+Configuração real, em `v2/backend/config/settings.py:247-276`:
+
 ```python
-# settings.py
 DATABASES = {
     "default": {
+        "ENGINE": "django_prometheus.db.backends.postgresql",
         # ...
-        "CONN_MAX_AGE": 60,  # Reutilizar conexões por 60s
-        "CONN_HEALTH_CHECKS": True,  # Django 4.1+
+        "CONN_MAX_AGE": 60,          # Reutiliza conexões por 60s
+        "CONN_HEALTH_CHECKS": True,  # Valida conexões antes de reutilizar
         "OPTIONS": {
-            "MAX_CONNS": 20,  # Pool máximo por processo
+            "connect_timeout": 10,
+            "options": "-c statement_timeout=30000",  # só em produção
+            "sslmode": "require",                     # fail-closed em produção (SEC-016)
         },
     }
 }
 ```
 
-**Cálculo de conexões**:
-```
-max_connections (PostgreSQL) = (web_replicas * pool_per_worker) + (celery_workers * concurrency) + buffer
+> ⚠️ **`MAX_CONNS` não existe** no backend PostgreSQL do Django — versões anteriores deste
+> documento sugeriam colocá-lo em `OPTIONS`, onde ele seria repassado ao driver e causaria
+> erro de conexão. O Django não faz pooling próprio: cada processo gunicorn/celery mantém
+> **uma** conexão persistente por `CONN_MAX_AGE`. Para pooling real, use PgBouncer.
 
-Exemplo:
-- 3 web replicas * 20 pool = 60
-- 2 celery workers * 4 concurrency = 8
-- buffer = 32
-- Total: 100 conexões
+**Cálculo de conexões** (sem pooling externo; o Django abre **1 conexão por thread**):
+```
+max_connections (PostgreSQL) >= (web_replicas * gunicorn_workers * gunicorn_threads)
+                              + (celery_replicas * concurrency)
+                              + beat + migrate + operadores (psql/admin)
+                              + buffer
+```
+
+O gunicorn roda `worker_class = "gthread"` com `workers = GUNICORN_WORKERS` (default =
+nº de CPUs) e `threads = GUNICORN_THREADS` (default 2) — `v2/infra/gunicorn.conf.py:16-18`.
+São esses dois, e não um "pool", que multiplicam as conexões. Confira o limite real do
+servidor antes de escalar:
+
+```sql
+SHOW max_connections;
+SELECT count(*), state FROM pg_stat_activity GROUP BY state;
 ```
 
 ### 4.4 Redis
@@ -241,44 +285,19 @@ Exemplo:
 
 ### 5.1 Endpoints
 
-| Endpoint | Propósito | Checks |
-|----------|-----------|--------|
-| `/healthz/` | Load balancer | Básico (app running) |
-| `/healthz/detailed/` | Monitoring | DB + Redis + GCal |
+| Endpoint | Propósito | Checks | Acesso |
+|----------|-----------|--------|--------|
+| `/healthz/` | Liveness | Básico (app running) | aberto |
+| `/api/readyz/` | Readiness | DB + Redis — é o que o healthcheck do container `web` usa (`docker-compose.prod.yml:109`) e o que o applier confirma no deploy | aberto |
+| `/healthz/detailed/` | Monitoring | DB + Redis + circuit breaker do GCal | ⚠️ **gated**: superuser **ou** IP interno (`config/urls.py:46-54`); de fora responde **403** |
+| `/api/version/` | Identificar a release aplicada | SHA/tag em execução | aberto |
 
 ### 5.2 Implementação
 
-```python
-# apps/core/views.py
-def health_detailed(request):
-    """Detailed health check for monitoring."""
-    checks = {}
-
-    # Database
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT 1")
-        checks["database"] = "ok"
-    except Exception as e:
-        checks["database"] = f"error: {str(e)}"
-
-    # Redis
-    try:
-        cache.set("health_check", "ok", 1)
-        checks["redis"] = "ok" if cache.get("health_check") == "ok" else "fail"
-    except Exception as e:
-        checks["redis"] = f"error: {str(e)}"
-
-    # GCal Circuit Breaker
-    try:
-        from apps.core.services.gcal.circuit_breaker import get_circuit_state
-        checks["gcal_circuit"] = get_circuit_state()
-    except Exception:
-        checks["gcal_circuit"] = "unknown"
-
-    status = "ok" if all(v == "ok" for v in checks.values() if v != "unknown") else "degraded"
-    return JsonResponse({"status": status, "checks": checks})
-```
+A implementação real é `healthz_detailed` em **`v2/backend/config/urls.py:40-95`** (não em
+`apps/core/views.py`). Ela devolve `{"status": ..., "checks": {"database", "redis",
+"gcal_circuit"}}`, e o `status` global considera apenas `database` e `redis` como *core
+checks* — um `gcal_circuit` aberto **não** derruba o health.
 
 ---
 

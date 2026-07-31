@@ -22,10 +22,15 @@
           ▼                              ▼
 ┌─────────────────┐          ┌─────────────────┐
 │   PostgreSQL    │          │      Redis      │
-│   (porta 5433)  │          │   (porta 6379)  │
-│   Dados         │          │   Cache/Filas   │
+│   (porta 5434)  │          │   (porta 6380)  │
+│   Dados         │          │  Cache/Filas/   │
+│                 │          │  Sessões        │
 └─────────────────┘          └─────────────────┘
 ```
+
+> As portas do diagrama são as **publicadas no host em DEV** (`DB_HOST_PORT=5434`,
+> `REDIS_HOST_PORT=6380`, `BACKEND_HOST_PORT=8002`, `FRONTEND_HOST_PORT=5173`).
+> Dentro da rede do compose os serviços continuam em 5432/6379/8000.
 
 ## Componentes Principais
 
@@ -33,9 +38,12 @@
 
 - **Django 5.2 LTS**: Framework web principal
 - **DRF**: API REST
-- **Celery**: Tarefas assíncronas (sync GCal, ETL)
+- **Celery**: Tarefas assíncronas (sync GCal, imports assíncronos, backup agendado)
 - **PostgreSQL**: Banco de dados relacional
-- **Redis**: Cache e broker de mensagens
+- **Redis**: Cache, sessões (`SESSION_ENGINE=cache`) e broker do Celery
+
+> O pipeline ETL legado (`apps.dat_ingest`) foi **removido** (#967/#971). Importação
+> hoje é o pipeline export-contract — ver [ETL e Importação](../guides/etl.md).
 
 ### Frontend (`v2/frontend/`)
 
@@ -56,10 +64,13 @@ v2/
 ├── backend/
 │   ├── apps/
 │   │   ├── core/          # App principal
-│   │   │   ├── models/    # Modelos Django
-│   │   │   ├── views/     # ViewSets DRF
-│   │   │   ├── services/  # Lógica de negócio
-│   │   │   └── tests/     # Testes
+│   │   │   ├── models/      # Modelos Django
+│   │   │   ├── serializers/ # DRF Serializers
+│   │   │   ├── views/       # ViewSets DRF
+│   │   │   ├── services/    # Lógica de negócio
+│   │   │   ├── rbac/        # Capabilities, policies, matrix.py (SSOT executável)
+│   │   │   ├── imports/     # Pipeline export-contract (hashing, normalização)
+│   │   │   └── tests/       # Testes
 │   │   └── dev_tools/     # Seeds (desabilitado em prod)
 │   ├── config/            # Configurações Django
 │   └── manage.py
@@ -68,10 +79,13 @@ v2/
 │   │   ├── pages/         # Páginas React
 │   │   ├── components/    # Componentes
 │   │   ├── api/           # Chamadas API
+│   │   ├── contexts/      # Providers (auth, permissões)
 │   │   └── hooks/         # React hooks
-│   └── vite.config.js
+│   └── vite.config.ts
 └── infra/
-    └── docker-compose.yml
+    ├── docker-compose.yml       # base (dev + staging)
+    ├── docker-compose.override.yml  # dev
+    └── docker-compose.prod.yml      # produção (usado sozinho)
 ```
 
 ## Fluxo de Dados

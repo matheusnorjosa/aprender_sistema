@@ -4,7 +4,8 @@
 
 A importação de dados agora usa o **pipeline export-contract** (`apps/core/imports/`), com idempotência por `external_hash` SHA1 (ADR-012) e os contratos documentados no SSOT:
 
-> **[v2/docs/imports/README.md](https://github.com/matheusnorjosa/aprender_sistema/blob/main/v2/docs/imports/README.md)** — contratos por entidade (usuários, disponibilidade, agenda/solicitações, produtos/controle), ordem de importação e contrato de resposta de dry-run.
+> - **[specs/backend/imports.spec.md](https://github.com/matheusnorjosa/aprender_sistema/blob/main/v2/docs/specs/backend/imports.spec.md)** — spec canônica: contrato, invariantes e campos protegidos.
+> - **[v2/docs/imports/README.md](https://github.com/matheusnorjosa/aprender_sistema/blob/main/v2/docs/imports/README.md)** — contratos por entidade (usuários, disponibilidade, agenda/solicitações, produtos/controle), ordem de importação e contrato de resposta de dry-run.
 
 Mecanismos:
 

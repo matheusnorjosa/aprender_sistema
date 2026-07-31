@@ -1,12 +1,41 @@
 # Backup Operations Guide — AS v2
 
-**Status**: ✅ Production-ready
-**Refs**: Issue #169, PR #186, SEC-017 (criptografia opcional)
-**Last Updated**: 2026-05-17
+**Status**: ⚠️ Backup grava; **restore pela ferramenta oficial está quebrado** (#1611)
+**Refs**: Issue #169, PR #186, SEC-017 (criptografia), #1455, #1541
+**Last Updated**: 2026-07-24 (revisão contra o código — auditoria M26)
 
 > **SSOT de operações de backup do AS v2.** Outros docs (`DISASTER_RECOVERY.md`,
 > `GUIDE_DR.md`, `SLO_DEFINITIONS.md`, `docs/operations/backup.md`) devem apontar
 > para este arquivo em vez de duplicar parâmetros.
+
+## Estado real do restore
+
+⛔ **Leia esta seção antes de confiar neste pipeline.**
+
+| Pergunta | Resposta honesta |
+|---|---|
+| O backup é gerado? | O wiring existe e é *fail-closed*: task Celery no `worker` às 02:00, bind-mount `/backups`, recipient `age` fixo no compose. **Se está rodando hoje em prod, não foi verificado neste documento.** |
+| O backup é cifrado? | Sim, sempre. `backup_db.sh:44-48` **aborta** sem `BACKUP_AGE_RECIPIENT`. Produção grava só `.sql.gz.age`. |
+| O backup é restaurável? | **Não sabemos.** Nenhum ensaio de restore com a chave privada foi registrado (ver [Último ensaio de restore](#último-ensaio-de-restore)). |
+| `restore_db.sh` funciona? | **Não, para backups de produção.** `restore_db.sh:91` roda `gzip -t` incondicionalmente, antes do branch `.age` de `:113-119`, e aborta com `ERROR: Backup file is corrupted!` — mensagem **falsa**. Issue [#1611](https://github.com/matheusnorjosa/aprender_sistema/issues/1611). |
+
+O restore que funciona hoje é manual e precisa da **chave privada `age`**, que por design
+**não fica na VM** (`verify_backup.sh:41-43`) — está no gerenciador de senhas do mantenedor:
+
+```bash
+# 1) verificar SEM destruir
+age -d -i /etc/backup-key.txt backup_full_<DATA>.sql.gz.age | gzip -t && echo OK
+# 2) restaurar
+age -d -i /etc/backup-key.txt backup_full_<DATA>.sql.gz.age | gunzip \
+  | psql -h "$DB_HOST" -U postgres -d aprender_db -v ON_ERROR_STOP=1
+```
+
+Passo a passo completo:
+[GUIDE_DR.md → Restore Completo](./GUIDE_DR.md#restore-completo-desastre-total).
+
+Precedente que justifica esse ceticismo: issue
+[#1537](https://github.com/matheusnorjosa/aprender_sistema/issues/1537) — um backup que
+nunca rodou, e ninguém percebeu porque o runbook dizia que rodava.
 
 ## Parâmetros canônicos (RPO / RTO / Retenção / Frequência)
 
@@ -20,42 +49,64 @@
 
 ## Overview
 
-The AS v2 backup system provides automated, reliable PostgreSQL backups with:
+The AS v2 backup system provides automated PostgreSQL backups with:
 
 - **Daily full backups** (parâmetros acima)
-- **S3/MinIO upload** support (optional)
-- **Optional age encryption at rest** (SEC-017, set `BACKUP_AGE_RECIPIENT`)
-- **Automated health checks** (weekly)
-- **Failure alerting** via Sentry
-- **Disaster recovery** with tested restore procedures
+- **age encryption at rest** (SEC-017) — **obrigatória na prática**: sem
+  `BACKUP_AGE_RECIPIENT` e sem `BACKUP_ALLOW_PLAINTEXT=1` o script **recusa gerar o dump**
+  (`backup_db.sh:44-48`, fail-closed). Produção define o recipient em
+  `docker-compose.prod.yml:197`.
+- **S3/MinIO upload** (opt-in via `S3_BUCKET`) — ⚠️ **indisponível nas imagens atuais**:
+  nenhum Dockerfile do projeto instala o `aws` CLI (`Dockerfile.prod:56`,
+  `Dockerfile.dev:19-21`).
+- **Health checks** semanais — ver a ressalva em [Health Monitoring](#health-monitoring):
+  para artefatos `.age` eles conferem **presença/tamanho/frescor**, não restaurabilidade.
+- **Failure alerting** via Sentry — **só se `SENTRY_DSN` estiver configurado**; estava
+  ausente em produção na última verificação (ver [OBSERVABILITY.md](./OBSERVABILITY.md)).
+- **Disaster recovery** — ⛔ procedimento de restore **não testado** e ferramenta oficial
+  quebrada (#1611).
 
 ## Contextos suportados (mesmo script `backup_db.sh`)
 
-| Contexto | Schedule | Storage | Doc complementar |
+| Contexto | Quem dispara | Storage | Doc complementar |
 |---|---|---|---|
-| **Docker Compose** (dev/staging/prod-like) | Celery Beat 2:00 AM (`tasks_backup.py`) | volume `backup_data` → `/backups` (+ S3 opcional) | `DISASTER_RECOVERY.md` (cenários de recovery) |
-| **VM de produção** (systemd + PostgreSQL nativo) | Cron 3:00 AM (`/etc/cron.d/aprender-backup`) | `/var/backups/aprender` (+ S3 opcional) | `GUIDE_DR.md` (PITR via WAL) |
+| **Produção (VM01, Docker/Portainer)** | Celery Beat 2:00 AM → task no serviço **`worker`** (`config/celery.py:38-40`, `tasks_backup.py:57`) | bind-mount **`/var/backups/aprender:/backups`** no `worker` (`docker-compose.prod.yml:235`) | `DISASTER_RECOVERY.md` (cenários de recovery) |
+| **Dev/staging (Docker Compose)** | Celery Beat 2:00 AM | volume `backup_data` → `/backups` (`docker-compose.yml:16`) | `DISASTER_RECOVERY.md` |
+| **VM02 (PostgreSQL nativo)** | Cron 3:00 AM (`/etc/cron.d/aprender-backup`) — **instalação não verificada** | `/var/backups/aprender` | `GUIDE_DR.md` (PITR via WAL) |
 
-Em ambos os contextos, o script `v2/infra/scripts/backup_db.sh` é o **mesmo**;
-muda apenas a chamada (Celery vs cron) e os defaults das env vars
-(`DB_HOST=db` em Docker, `DB_HOST=localhost` em VM; `BACKUP_DIR=/backups` vs
-`/var/backups/aprender`).
+Em todos os contextos o script `v2/infra/scripts/backup_db.sh` é o **mesmo**; muda a
+chamada (Celery vs cron) e os defaults das env vars (`BACKUP_DIR=/backups` no container
+vs `/var/backups/aprender` na VM).
+
+> **Atenção ao alvo do `docker compose exec`:** o `/backups` existe **apenas no serviço
+> `worker`** em produção. `docker compose exec web ls /backups` e
+> `docker compose exec db ls /backups` **falham** — e em produção nem existe serviço `db`
+> (o PostgreSQL é externo, na VM02).
 
 ## Architecture
 
 ### Components
 
 1. **Backup Script** (`v2/infra/scripts/backup_db.sh`)
-   - PostgreSQL pg_dump execution
-   - gzip compression
-   - S3 upload (optional)
-   - Retention policy enforcement
-   - Comprehensive logging
+   - `pg_dump | gzip | age -r $BACKUP_AGE_RECIPIENT` (`:69-72`) — **cifrado**, não só
+     comprimido
+   - `set -euo pipefail` (`:23`): falha do `pg_dump` no meio do pipe **aborta** em vez de
+     gravar um dump truncado que se disfarça de sucesso (audit #1541)
+   - Fail-closed sem recipient (`:44-48`)
+   - S3 upload (opt-in via `S3_BUCKET`; hoje sem `aws` CLI na imagem)
+   - Retention com glob que cobre `.sql.gz` **e** `.sql.gz.age` (`:103`)
+   - Log em stdout (capturado pelo Docker; sem arquivo `.log` em Docker)
 
-2. **Restore Script** (`v2/infra/scripts/restore_db.sh`)
+2. **Restore Script** (`v2/infra/scripts/restore_db.sh`) — ⛔ **quebrado para prod (#1611)**
    - Interactive restoration with confirmation
-   - Connection management
-   - Post-restore verification
+   - `:91` roda `gzip -t` **antes** do branch `.age` de `:113-119` → aborta em todo backup
+     de produção com `ERROR: Backup file is corrupted!` (mensagem falsa)
+   - `:17` hardcoda `BACKUP_DIR=/var/backups/aprender` e **ignora** a env var, então
+     `--latest` não acha nada de dentro do container (onde o diretório é `/backups`)
+   - `:128` declara `Restore completed successfully!` com exit 0 mesmo após restore
+     incompleto — não há `ON_ERROR_STOP` no `psql` de `:116/:118`
+     (issue [#1645](https://github.com/matheusnorjosa/aprender_sistema/issues/1645))
+   - Zero cobertura: não existe `.bats` para este script
 
 3. **Celery Tasks** (`v2/backend/apps/core/tasks_backup.py`)
    - `backup.perform_database_backup` - Main backup task
@@ -84,20 +135,24 @@ muda apenas a chamada (Celery vs cron) e os defaults das env vars
                       ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ backup_db.sh                                                │
-│ 1. Test database connection                                │
-│ 2. Execute pg_dump + gzip                                   │
-│ 3. Upload to S3 (if configured)                             │
-│ 4. Apply retention policy (delete old backups)             │
-│ 5. Log results + send Sentry alerts on failure             │
+│ 1. Exige BACKUP_AGE_RECIPIENT (senão ABORTA — fail-closed)  │
+│ 2. pg_dump | gzip | age -r  -> backup_full_*.sql.gz.age     │
+│ 3. Upload S3 (opt-in; sem `aws` na imagem hoje)             │
+│ 4. Retenção (.sql.gz E .sql.gz.age)                         │
+│ 5. Log em stdout + Sentry na falha (se SENTRY_DSN)          │
 └─────────────────────┬───────────────────────────────────────┘
                       │
                       ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ Storage Destinations                                        │
-│ - Local: /backups volume (Docker persistent)               │
-│ - Remote: S3/MinIO bucket (optional)                        │
+│ - prod:  bind-mount host /var/backups/aprender  (worker)    │
+│ - dev:   volume Docker `backup_data` -> /backups            │
+│ - Remote: S3/MinIO (opt-in, hoje NÃO funcional)             │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+> O `worker` é o **único** serviço com `/backups`. Se `docker compose exec web ls /backups`
+> falhar, isso é o esperado — não é sintoma de backup quebrado.
 
 ## Configuration
 
@@ -117,37 +172,50 @@ SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
 
 ### Docker Volumes
 
-The `backup_data` volume is already configured in `v2/infra/docker-compose.yml`:
+**Dev/staging** (`v2/infra/docker-compose.yml:16-17`) — volume nomeado, montado nos
+serviços que compartilham o bloco comum:
 
 ```yaml
-services:
-  web:
-    volumes:
-      - backup_data:/backups  # Persistent backup storage
-      - ./scripts:/app/infra/scripts:ro  # Backup/restore scripts
+      - backup_data:/backups            # MP5: Database backups storage
+      - ./scripts:/app/infra/scripts:ro # MP5: Backup scripts
 
 volumes:
-  backup_data:  # PostgreSQL backups storage
+  backup_data:
 ```
 
-### S3/MinIO Setup (Optional)
+**Produção** (`v2/infra/docker-compose.prod.yml:235`) — bind-mount do host, **só no
+`worker`**, porque o root filesystem dos containers é `read_only`:
 
-If using S3/MinIO for remote backups:
+```yaml
+  worker:
+    volumes:
+      - /var/backups/aprender:/backups
+```
 
-1. **AWS Credentials** (for web/worker/beat containers):
+O diretório do host precisa existir **antes** do deploy (0755, dono = UID do `appuser`).
+Sem esse mount, o job falha em silêncio — foi a causa raiz do
+[#1455](https://github.com/matheusnorjosa/aprender_sistema/issues/1455). Os scripts vêm da
+**imagem** (`Dockerfile.prod:67`), não de bind-mount, em prod.
+
+### S3/MinIO Setup (opt-in, hoje não funcional)
+
+`backup_db.sh:87-89` só tenta o upload se a env var **`S3_BUCKET`** estiver preenchida (a
+task Celery mapeia a setting Django `BACKUP_S3_BUCKET` → `S3_BUCKET` em
+`tasks_backup.py:78`). **Mas nenhuma imagem do projeto instala o `aws` CLI** — conferido em
+`Dockerfile.prod:56` e `Dockerfile.dev:19-21`. Com `S3_BUCKET` preenchido hoje, o upload
+falha e o script emite `WARNING: S3 upload FAILED (offsite copy missing)` no stderr
+(`backup_db.sh:90-94`) sem abortar o backup local.
+
+Para habilitar de verdade seria preciso, além do abaixo, **adicionar o `aws` CLI à imagem**:
+
+1. **AWS Credentials** (no environment do serviço `worker`):
    ```bash
-   # In .env or container environment
    AWS_ACCESS_KEY_ID=your-access-key
    AWS_SECRET_ACCESS_KEY=your-secret-key
-   AWS_DEFAULT_REGION=us-east-1  # Or your region
+   AWS_DEFAULT_REGION=us-east-1
    ```
 
-2. **Install AWS CLI** (already in Dockerfile):
-   ```dockerfile
-   RUN apt-get update && apt-get install -y awscli
-   ```
-
-3. **Configure Bucket**:
+2. **Configure Bucket** (`.env` / stack.env):
    ```bash
    BACKUP_S3_BUCKET=s3://aprender-backups/v2/
    ```
@@ -156,33 +224,72 @@ If using S3/MinIO for remote backups:
 
 ### Manual Backup
 
-Execute a manual backup from the web container:
+Execute a partir do container **`worker`** (é ele que tem `/backups` e o
+`BACKUP_AGE_RECIPIENT`):
 
 ```bash
-# Full backup
 cd v2/infra
-docker compose exec web /app/infra/scripts/backup_db.sh full
+docker compose exec -T worker /app/infra/scripts/backup_db.sh
 
-# Check backup files
-docker compose exec web ls -lh /backups/
+# Conferir os arquivos gerados (nome real: backup_full_*.sql.gz.age)
+docker compose exec -T worker ls -lh /backups/
 ```
+
+> O script **não aceita argumentos**: `backup_db.sh` nunca lê `$1`. O `full` que a task
+> Celery passa (`tasks_backup.py:85`) é inerte — o dump é sempre completo.
+> Em dev, sem `BACKUP_AGE_RECIPIENT`, o script **aborta** (fail-closed); para um dump em
+> texto claro local, use `BACKUP_ALLOW_PLAINTEXT=1` explicitamente
+> (`backup_db.sh:43-48`).
 
 ### Manual Restore
 
-Restore from a backup file:
+⛔ **Não use `restore_db.sh` contra um backup de produção** — ver
+[Estado real do restore](#estado-real-do-restore)
+e issue #1611. Procedimento que funciona:
 
 ```bash
-# List available backups
-docker compose exec web ls -lh /backups/
+# 1. Listar backups reais
+docker compose exec -T worker ls -lht /backups/
 
-# Restore (DANGEROUS - will overwrite database!)
-docker compose exec web /app/infra/scripts/restore_db.sh /backups/backup_full_20251118_020000.sql.gz
+# 2. Verificar integridade SEM destruir nada (precisa da chave privada age)
+docker compose exec -T worker sh -c \
+  'age -d -i /etc/backup-key.txt /backups/backup_full_<DATA>.sql.gz.age | gzip -t' \
+  && echo "INTEGRIDADE OK"
+
+# 3. Restaurar (DESTRUTIVO — só após o passo 2 sair 0)
+docker compose exec -T worker sh -c \
+  'age -d -i /etc/backup-key.txt /backups/backup_full_<DATA>.sql.gz.age | gunzip \
+   | psql -h "$DB_HOST" -U postgres -d "$DB_NAME" -v ON_ERROR_STOP=1'
+
+# 4. Conferir explicitamente (não confie em exit 0 — ver #1645)
+docker compose exec -T worker psql -h "$DB_HOST" -U postgres -d "$DB_NAME" \
+  -c "SELECT count(*) FROM core_usuario;"
 ```
 
-**Warning**: Restore will:
-1. Drop all existing connections to the database
-2. Overwrite all data with backup contents
-3. Require interactive confirmation (unless in non-interactive mode)
+**Pré-requisitos**:
+- Chave privada `age` — **não fica na VM por design** (`verify_backup.sh:41-43`); está no
+  gerenciador de senhas do mantenedor. Copie para `/etc/backup-key.txt` com `chmod 600` e
+  **apague ao final**.
+- Binário `age` — presente na imagem de **produção** (`Dockerfile.prod:56`),
+  **ausente** na imagem dev (`Dockerfile.dev:19-21`).
+
+**Warning**: o restore sobrescreve todos os dados, e a aplicação precisa estar parada
+(`web`, `worker`, `beat`) para não escrever durante a operação. Isso conflita com rodar os
+comandos acima *dentro* do `worker`. Escolha um dos dois veículos:
+
+- **Do host da VM** — precisa de `age` e `postgresql-client` instalados lá; o dump está em
+  `/var/backups/aprender`. É o caminho descrito em
+  [GUIDE_DR.md → Restore Completo](./GUIDE_DR.md#restore-completo-desastre-total).
+- **Container efêmero** da mesma imagem de backend (tem `age` e `psql`), com os serviços da
+  stack parados:
+  ```bash
+  docker run --rm -i \
+    -v /var/backups/aprender:/backups:ro \
+    -v /etc/backup-key.txt:/etc/backup-key.txt:ro \
+    norjosamatheus/aprender-backend:<IMAGE_TAG> \
+    sh -c 'age -d -i /etc/backup-key.txt /backups/backup_full_<DATA>.sql.gz.age | gunzip \
+           | psql -h <DB_HOST> -U postgres -d aprender_db -v ON_ERROR_STOP=1'
+  ```
 
 ### Trigger Backup Task via Celery
 
@@ -199,14 +306,13 @@ print(f"Task ID: {result.id}")
 ### Monitor Backup Status
 
 ```bash
-# View Celery logs
-docker compose logs -f worker
+# Logs do backup — saem no stdout do worker (o script não escreve arquivo .log
+# em Docker; o redirecionamento para /var/log/aprender/backup.log só existe no
+# cron da VM, v2/infra/cron/aprender-backup:14)
+docker compose logs --tail=200 worker | grep -i backup
 
-# View backup logs
-docker compose exec web cat /backups/backup_*.log
-
-# Check latest backup
-docker compose exec web ls -lht /backups/ | head -5
+# Último backup (o /backups só existe no worker)
+docker compose exec -T worker ls -lht /backups/ | head -5
 ```
 
 ## Scheduled Backups
@@ -222,13 +328,24 @@ Configured in `v2/backend/config/celery.py`:
 
 ### Verify Schedule
 
-```bash
-# Check Celery Beat schedule
-docker compose exec beat celery -A config inspect scheduled
+A SSOT do schedule é `v2/backend/config/celery.py:35-56` (`daily-database-backup` às 02:00,
+`weekly-backup-health-check` domingos 03:00). Em produção o beat roda com o **scheduler
+padrão** (`docker-compose.prod.yml:243`:
+`celery -A config beat -l info --schedule /tmp/celerybeat-schedule`), que é quem lê esse
+schedule do código — e **não** o `DatabaseScheduler` do `django_celery_beat`.
 
-# View beat logs
-docker compose logs -f beat
+```bash
+# O beat está disparando? (logs do próprio beat)
+docker compose logs --tail=200 beat | grep -i "database-backup"
+
+# O worker executou? (é ele que roda a task e grava o dump)
+docker compose logs --tail=200 worker | grep -i "perform_database_backup"
 ```
+
+> `celery -A config inspect scheduled` **não** mostra o `beat_schedule`: ele consulta os
+> *workers* pelo broker e lista tarefas com ETA/countdown. Para saber se o beat está
+> agendando, olhe os logs do `beat`; para saber se o worker executou, olhe os logs do
+> `worker`.
 
 ## Health Monitoring
 
@@ -240,7 +357,16 @@ The `backup.verify_backup_health` task runs every Sunday at 3:00 AM and checks:
 2. **Recent backup exists** (within last 25 hours)
 3. **S3 connectivity** (if configured)
 
-Results are logged and sent to Sentry if warnings are detected.
+Results are logged and sent to Sentry **se `SENTRY_DSN` estiver configurado** — o que não
+era o caso em produção na última verificação.
+
+> ⚠️ **O que esses checks NÃO provam.** Nem esta task nem o `verify_backup.sh` abrem um
+> artefato `.age`: `verify_backup.sh:44-48` pula explicitamente a checagem de conteúdo
+> porque a chave privada não vive na VM. O mesmo vale para o gate de deploy
+> `v2/infra/deployer/hooks/check_backup.sh`, que só faz `stat` (idade ≤ 28h, tamanho ≥
+> 1024B). Ou seja: **"health check verde" significa "existe, é recente e não é minúsculo"**,
+> não "é restaurável". A única evidência de restaurabilidade é um ensaio com a chave —
+> ver [Último ensaio de restore](#último-ensaio-de-restore).
 
 ### Manual Health Check
 
@@ -284,10 +410,12 @@ Failures are sent to Sentry when `SENTRY_DSN` is configured:
 
 | Issue | Cause | Solution |
 |-------|-------|----------|
-| `pg_dump: connection failed` | Database unreachable | Check `DB_HOST`, `DB_PORT`, ensure `db` service is running |
-| `Permission denied: /backups` | Volume not writable | Check Docker volume permissions |
-| `S3 upload failed` | AWS CLI not configured | Set `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, or leave `BACKUP_S3_BUCKET` empty |
-| `Backup timed out` | Large database (>1h) | Increase timeout in `tasks_backup.py:89` |
+| `ERROR: BACKUP_AGE_RECIPIENT ausente...` | Recipient sumiu do environment do `worker` | Fail-closed proposital (`backup_db.sh:44-48`). Repor o valor em `docker-compose.prod.yml:197` **e** no Portainer. Em dev, `BACKUP_ALLOW_PLAINTEXT=1` |
+| `pg_dump: connection failed` | Banco inalcançável | Conferir `DB_HOST`/`DB_PORT`. **Em produção não existe serviço `db`** — o PostgreSQL é externo (VM02) |
+| `Permission denied: /backups` | Bind-mount ausente ou dono errado | Criar `/var/backups/aprender` no host (0755, dono = UID do `appuser`); o root FS do container é `read_only`, só o mount é gravável |
+| Nada em `/backups` e nenhum erro | `docker compose exec` no serviço errado | O `/backups` só existe no **`worker`** (`docker-compose.prod.yml:235`) |
+| `S3 upload FAILED (offsite copy missing)` | `aws` CLI **não existe na imagem** | Ver [S3/MinIO Setup](#s3minio-setup-opt-in-hoje-não-funcional). O backup **local** segue válido — o script não re-roda o `pg_dump` (`backup_db.sh:90-94`) |
+| `Backup timed out` | Banco grande (>1h) | Aumentar o `timeout` de `subprocess.run` em `tasks_backup.py:90` |
 
 ## Disaster Recovery
 
@@ -295,92 +423,101 @@ Failures are sent to Sentry when `SENTRY_DSN` is configured:
 
 **Scenario**: Production database corrupted, need to restore from backup.
 
-1. **Stop all services** (prevent writes during restore):
+O procedimento canônico está em
+[GUIDE_DR.md → Restore Completo](./GUIDE_DR.md#restore-completo-desastre-total). Resumo:
+
+1. **Obter a chave privada `age`** do gerenciador de senhas e colocá-la em
+   `/etc/backup-key.txt` (`chmod 600`). Sem ela, nenhum backup de produção pode ser lido.
+
+2. **Parar os serviços** (evitar escrita durante o restore):
    ```bash
-   cd v2/infra
-   docker compose stop web worker beat
+   docker compose -f docker-compose.prod.yml stop web worker beat
    ```
 
-2. **List available backups**:
+3. **Listar backups** — no host da VM, onde o bind-mount aponta:
    ```bash
-   docker compose exec db ls -lh /backups/
-   # OR from S3
-   aws s3 ls s3://aprender-backups/v2/backups/
+   ls -lht /var/backups/aprender/backup_full_*.sql.gz.age | head -5
    ```
 
-3. **Download from S3** (if needed):
+4. **Verificar ANTES de destruir**:
    ```bash
-   docker compose exec web aws s3 cp \
-     s3://aprender-backups/v2/backups/backup_full_20251118_020000.sql.gz \
-     /backups/
+   age -d -i /etc/backup-key.txt \
+     /var/backups/aprender/backup_full_<DATA>.sql.gz.age | gzip -t && echo OK
    ```
 
-4. **Restore database**:
+5. **Restaurar** (pipeline manual — `restore_db.sh` está quebrado, #1611):
    ```bash
-   docker compose exec web /app/infra/scripts/restore_db.sh \
-     /backups/backup_full_20251118_020000.sql.gz
+   age -d -i /etc/backup-key.txt \
+     /var/backups/aprender/backup_full_<DATA>.sql.gz.age | gunzip \
+     | psql -h "$DB_HOST" -U postgres -d aprender_db -v ON_ERROR_STOP=1
    ```
 
-5. **Verify restoration**:
+6. **Verificar a restauração explicitamente** (exit 0 não é prova — #1645):
    ```bash
-   docker compose exec db psql -U aprender_user -d aprender_db -c \
-     "SELECT COUNT(*) FROM core_solicitacao;"
+   psql -h "$DB_HOST" -U postgres -d aprender_db \
+     -c "SELECT COUNT(*) FROM core_solicitacao;"
    ```
 
-6. **Restart services**:
+7. **Subir a stack** (o one-shot `migrate` aplica migrations antes de web/worker/beat):
    ```bash
-   docker compose start web worker beat
+   docker compose -f docker-compose.prod.yml up -d
    ```
+
+8. **Apagar a chave privada do host**: `shred -u /etc/backup-key.txt`
 
 ### Recovery Time Objective (RTO)
 
-- **Expected RTO**: 10-30 minutes (depending on database size)
+- **Expected RTO**: 10-30 minutos de restore puro (dentro do RTO canônico de 1h)
 - **Bottlenecks**:
-  - S3 download speed (if remote backup)
-  - Database size (gunzip + psql restore)
-  - Connection dropping (minimal)
+  - Obter a **chave privada `age`** do gerenciador de senhas (não está na VM) —
+    contabilize esse tempo, é serial e depende de uma pessoa
+  - Tamanho do banco (`age -d | gunzip | psql`)
+  - Derrubar conexões ativas (mínimo)
+- ⚠️ **Risco de estourar o RTO**: um operador que siga o runbook antigo roda
+  `restore_db.sh`, recebe `ERROR: Backup file is corrupted!` (#1611) e pode concluir que a
+  cadeia inteira de backups está corrompida. Esse desvio custa mais tempo do que o restore
+  em si. Use o pipeline manual desde o início.
 
 ### Recovery Point Objective (RPO)
 
-- **Expected RPO**: 5 minutes (WAL archiving + daily full dump)
-- **Data loss**: Up to 5 minutes of transactions (WAL archive_timeout=300)
-- **Daily dump**: Full pg_dump backup as baseline for PITR
+- **RPO alvo**: 5 minutos (WAL archiving + daily full dump)
+- ⚠️ **RPO efetivo, hoje**: **até 24h** — o WAL archiving da VM02 **não foi verificado**
+  (ver [GUIDE_DR.md → WAL Archiving](./GUIDE_DR.md#1-wal-archiving-point-in-time-recovery)).
+  Sem WAL confirmado, a única linha de defesa é o dump diário das 02:00.
+- **Daily dump**: `pg_dump` completo, cifrado, como baseline para PITR
 
 ## Testing
 
 ### Test Backup Script
 
 ```bash
-# Dry-run backup (won't upload to S3)
-docker compose exec web bash -c '
-  BACKUP_S3_BUCKET="" \
-  /app/infra/scripts/backup_db.sh full
-'
+# Sem upload offsite: a env var lida pelo SCRIPT é S3_BUCKET
+# (a task Celery é que mapeia a setting Django BACKUP_S3_BUCKET → S3_BUCKET,
+#  tasks_backup.py:78). Passar BACKUP_S3_BUCKET="" ao script direto NÃO tem efeito.
+docker compose exec -T worker sh -c 'S3_BUCKET="" /app/infra/scripts/backup_db.sh'
 
-# Verify backup file created
-docker compose exec web ls -lh /backups/
+# Verificar o arquivo gerado
+docker compose exec -T worker ls -lh /backups/
 ```
 
 ### Test Restore Script
 
-```bash
-# Create test backup
-docker compose exec web /app/infra/scripts/backup_db.sh full
+⛔ **`restore_db.sh` não pode ser usado como teste de DR hoje**: contra o formato de
+produção (`.age`) ele sempre aborta com `ERROR: Backup file is corrupted!` (#1611); contra
+um `.sql.gz` em texto claro ele passa, mas então o teste **não** exercita o formato real —
+é a mesma cegueira do `test_dr.sh` (#1646).
 
-# Restore in non-interactive mode
-docker compose exec -T web /app/infra/scripts/restore_db.sh \
-  /backups/backup_full_*.sql.gz
+O ensaio válido, com a chave privada e fora de produção, está em
+[GUIDE_DR.md → Ensaio de DR](./GUIDE_DR.md#ensaio-de-dr-o-único-teste-que-vale).
 
-# Verify restoration
-docker compose exec db psql -U aprender_user -d aprender_db -c \
-  "SELECT version();"
-```
+Cobertura de teste automatizado do `restore_db.sh`: **zero**. Não existe `.bats` para ele
+(os únicos bats do repositório cobrem `v2/infra/deployer/`).
 
 ### Test Celery Tasks
 
 ```bash
-# Run pytest on backup tasks
-docker compose exec web pytest apps/core/tests/test_tasks_backup.py -v
+# Testes das tasks de backup (MP5)
+docker compose exec -T web pytest apps/core/tests/test_tasks_mp5.py -v
 ```
 
 ## Metrics and Monitoring
@@ -411,15 +548,26 @@ backup_failure_total = Counter('backup_failure_total', 'Failed backups')
 
 ### Access Control
 
-- **Backup files**: Only accessible by web/worker/beat containers
+- **Backup files**: em produção ficam no host (`/var/backups/aprender`) e são visíveis
+  apenas pelo container **`worker`** (único com o bind-mount) e por quem tem SSH na VM
 - **S3 bucket**: Use IAM roles with minimal permissions (s3:PutObject, s3:GetObject)
 - **Database credentials**: Never log `PGPASSWORD` in backup logs
 
 ### Data Encryption
 
-- **At rest**: S3 bucket encryption (AES-256 or KMS)
+- **Backup files**: **cifrados com `age`** (SEC-017). O dump é
+  `pg_dump | gzip | age -r $BACKUP_AGE_RECIPIENT` (`backup_db.sh:69-72`). O recipient é a
+  chave **pública** (só cifra) e está fixo em `docker-compose.prod.yml:197`; a chave
+  **privada** nunca entra no repositório nem na VM — fica no gerenciador de senhas do
+  mantenedor.
+- **Consequência operacional**: quem tem acesso ao disco de backup **não** consegue ler PII;
+  e quem restaura **precisa** buscar a chave privada antes. Sem a chave, o backup é
+  inutilizável — o que faz da custódia dessa chave um ponto único de falha do DR.
+- **Rotação**: trocar o valor em `docker-compose.prod.yml` **e** no `environment:` do
+  `worker` no Portainer. Dumps antigos continuam exigindo a chave privada **antiga** —
+  guarde as duas até a retenção expirar.
+- **At rest (S3)**: S3 bucket encryption (AES-256 ou KMS), se o offsite for habilitado
 - **In transit**: HTTPS for S3 uploads, TLS for database connections
-- **Backup files**: gzip compression (not encryption)
 
 **Recommendation**: Enable S3 server-side encryption (SSE-S3 or SSE-KMS):
 
@@ -441,30 +589,37 @@ aws s3api put-bucket-encryption \
 
 Default: 7 days (configurable via `BACKUP_RETENTION_DAYS`)
 
-**Policy logic** (in `backup_db.sh`):
+**Policy logic** — literal de `backup_db.sh:103`:
 ```bash
-find "$BACKUP_DIR" -name "backup_*.sql.gz" -mtime +$RETENTION_DAYS -delete
+find "$BACKUP_DIR" \
+  \( -name "backup_full_*.sql.gz" -o -name "backup_full_*.sql.gz.age" \) \
+  -mtime +"$BACKUP_RETENTION_DAYS" -delete 2>/dev/null || true
 ```
+
+> ⚠️ **Qualquer limpeza que use só `*.sql.gz` é cega aos arquivos reais.** É o caso da linha
+> 17 de `v2/infra/cron/aprender-backup`
+> (`find /var/backups/aprender -name "*.sql.gz" -mtime +7 -delete`), que nunca casa com
+> `backup_full_*.sql.gz.age` — e é redundante, já que o script acima faz a retenção. Se
+> escrever limpeza manual, use **os dois globs**.
 
 **Manual cleanup**:
 ```bash
-# List old backups (>30 days)
-docker compose exec web find /backups -name "backup_*.sql.gz" -mtime +30
+# Listar backups com mais de 30 dias
+docker compose exec -T worker find /backups \
+  \( -name "backup_full_*.sql.gz" -o -name "backup_full_*.sql.gz.age" \) -mtime +30
 
-# Delete old backups (>30 days)
-docker compose exec web find /backups -name "backup_*.sql.gz" -mtime +30 -delete
+# Apagar
+docker compose exec -T worker find /backups \
+  \( -name "backup_full_*.sql.gz" -o -name "backup_full_*.sql.gz.age" \) -mtime +30 -delete
 ```
 
 ### Storage Capacity
 
-Monitor disk usage:
+Monitor disk usage (do host ou do `worker` — os demais serviços não montam `/backups`):
 
 ```bash
-# Check backup volume usage
-docker compose exec web df -h /backups
-
-# Check individual backup sizes
-docker compose exec web du -h /backups/*.sql.gz | sort -h
+docker compose exec -T worker df -h /backups
+docker compose exec -T worker du -h /backups/backup_full_* | sort -h
 ```
 
 **Capacity planning**:
@@ -520,6 +675,11 @@ docker compose logs worker | grep "backup.perform_database_backup"
 - Beat container not running: `docker compose up -d beat`
 - Wrong timezone: Verify `CELERY_TIMEZONE=America/Fortaleza` in settings
 - Task queue full: `docker compose exec worker celery -A config purge`
+- **Bind-mount `/backups` ausente/não gravável no `worker`** — causa raiz do #1455; o root
+  FS é `read_only`, então sem o mount o job falha em silêncio
+- **`BACKUP_AGE_RECIPIENT` sumiu** do environment do `worker` → o script aborta
+  (fail-closed). Conferir:
+  `docker compose exec -T worker printenv | grep BACKUP_AGE_RECIPIENT`
 
 ### Backup Fails with "pg_dump: connection failed"
 
@@ -527,17 +687,18 @@ docker compose logs worker | grep "backup.perform_database_backup"
 
 **Diagnosis**:
 ```bash
-# Test database connection from web container
-docker compose exec web psql -h db -U aprender_user -d aprender_db -c "SELECT 1;"
+# Em PRODUÇÃO não existe serviço `db` — o PostgreSQL é externo (VM02, via DB_HOST).
+# Testar a partir do worker, que é quem roda o backup:
+docker compose exec -T worker sh -c 'psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1;"'
 
-# Check database is running
+# Em dev/staging (compose com serviço db):
 docker compose ps db
 ```
 
 **Solutions**:
-- Database not running: `docker compose up -d db`
-- Wrong credentials: Verify `DB_USER`, `DB_PASSWORD` in `.env`
-- Network issue: `docker compose restart db web`
+- Em dev: banco parado → `docker compose up -d db`
+- Em prod: conferir alcançabilidade da VM02 e a rede `backend-internal`
+- Credenciais erradas: verificar `DB_USER`, `DB_PASSWORD` no `stack.env` (Portainer)
 
 ### S3 Upload Fails
 
@@ -545,33 +706,52 @@ docker compose ps db
 
 **Diagnosis**:
 ```bash
-# Test AWS CLI from container
-docker compose exec web aws s3 ls s3://aprender-backups/
+# Primeiro: o binário existe? (Hoje a resposta é NÃO em ambas as imagens.)
+docker compose exec -T worker sh -c 'command -v aws || echo "aws CLI AUSENTE"'
 
-# Check AWS credentials
-docker compose exec web env | grep AWS
+# Se estiver presente (imagem customizada):
+docker compose exec -T worker aws s3 ls s3://aprender-backups/
+docker compose exec -T worker env | grep AWS
 ```
 
 **Solutions**:
+- **`aws` ausente da imagem** (caso atual): o upload nunca vai funcionar sem adicionar o CLI
+  ao `Dockerfile.prod`. Ver
+  [S3/MinIO Setup](#s3minio-setup-opt-in-hoje-não-funcional)
 - Missing credentials: Set `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
 - Wrong bucket: Verify `BACKUP_S3_BUCKET` format (`s3://bucket-name/prefix/`)
 - Permission denied: Check IAM policy allows `s3:PutObject`
 
-### Restore Hangs or Times Out
+### Restore "diz que o backup está corrompido"
 
-**Symptoms**: Restore script runs for hours without completing
+**Symptoms**: `restore_db.sh` aborta com `ERROR: Backup file is corrupted!`
 
 **Diagnosis**:
 ```bash
-# Check database activity
-docker compose exec db psql -U aprender_user -d postgres -c \
-  "SELECT pid, state, query FROM pg_stat_activity WHERE datname = 'aprender_db';"
+head -c 22 /var/backups/aprender/backup_full_<DATA>.sql.gz.age
+# "age-encryption.org/v1" => o arquivo está CIFRADO e provavelmente íntegro
+```
+
+**Solution**: é o bug #1611, não corrupção. Use o pipeline manual
+(`age -d | gunzip | psql`) descrito em
+[Manual Restore](#manual-restore).
+
+### Restore Hangs or Times Out
+
+**Symptoms**: o restore roda por horas sem completar
+
+**Diagnosis**:
+```bash
+# Em prod (PostgreSQL externo), a partir do worker:
+docker compose exec -T worker sh -c \
+  'psql -h "$DB_HOST" -U postgres -d postgres -c \
+   "SELECT pid, state, query FROM pg_stat_activity WHERE datname = '"'"'aprender_db'"'"';"'
 ```
 
 **Solutions**:
-- Active connections blocking: Manually terminate connections before restore
-- Large backup file: Expect ~5-10 minutes per GB
-- Insufficient resources: Increase Docker memory/CPU limits
+- Conexões ativas bloqueando: encerrar com `pg_terminate_backend` antes do restore
+- Arquivo grande: espere ~5-10 minutos por GB
+- Recursos insuficientes: aumentar limites de memória/CPU do container
 
 ## Performance Optimization
 
@@ -609,9 +789,13 @@ See: [PostgreSQL WAL Archiving](https://www.postgresql.org/docs/current/continuo
 
 ## Estratégia 3-2-1 (recomendada / alvo)
 
-> **Nota de realidade (2026-06):** a stack roda na **VM01** (containers) e o job de backup automatizado está
-> **silencioso/morto em produção** (issue #1455). A estratégia abaixo descreve o **alvo recomendado**, não um
-> pipeline 3-2-1 hoje ativo. Trate como aspiracional até o job ser ressuscitado e validado.
+> **Nota de realidade (2026-07-24):** o wiring que faltava no #1455 **existe hoje no
+> compose** — bind-mount gravável `/var/backups/aprender:/backups` no `worker`
+> (`docker-compose.prod.yml:227-235`), recipient `age` fixo (`:197`), script fail-closed
+> (`backup_db.sh:44-48`) e gate de frescor no deploy (`deployer/hooks/check_backup.sh`).
+> **O que continua NÃO verificado** é se o beat/worker estão de fato produzindo dumps em
+> produção hoje, e se algum deles já foi restaurado com sucesso. Trate o 3-2-1 abaixo como
+> **alvo**, não como estado.
 
 - **3** cópias dos dados
 - **2** tipos de mídia diferentes
@@ -619,9 +803,25 @@ See: [PostgreSQL WAL Archiving](https://www.postgresql.org/docs/current/continuo
 
 | Camada | Destino | Status |
 |---|---|---|
-| Local | Volume Docker `backup_data` (`/backups`) — restore rápido | wiring existe (`docker-compose.yml`), execução em prod **inativa** (#1455) |
-| Cloud | S3/GCS (redundância geográfica) — `BACKUP_S3_BUCKET` opcional | opcional, não configurado por padrão |
-| Offsite | Backup semanal em storage separado | aspiracional |
+| Local | Bind-mount do host `/var/backups/aprender` (prod) / volume `backup_data` (dev) | wiring ✅ presente; **execução em prod não verificada** |
+| Cloud | S3/GCS via `S3_BUCKET` | ❌ **não funcional**: nenhuma imagem do projeto tem o `aws` CLI (`Dockerfile.prod:56`) |
+| Offsite | Cópia semanal em storage separado | ❌ aspiracional — **hoje existe 1 cópia, no mesmo host da aplicação** |
+
+> **Risco concreto:** perder a VM01 (ou o disco onde vive `/var/backups/aprender`) hoje
+> significa perder o banco **e** os backups juntos. Não há segunda cópia.
+
+## Último ensaio de restore
+
+| Data | Origem do dump | Executado por | Resultado | Evidência |
+|---|---|---|---|---|
+| — | — | — | **NUNCA REGISTRADO** | — |
+
+Preencha esta tabela após cada ensaio (procedimento:
+[GUIDE_DR.md → Ensaio de DR](./GUIDE_DR.md#ensaio-de-dr-o-único-teste-que-vale)).
+Enquanto a linha estiver vazia, a resposta correta para "temos backup restaurável?" é
+**"não sabemos"** — e este documento não deve ser citado como prova do contrário.
+Cadência recomendada: **trimestral**, e obrigatoriamente após qualquer mudança em
+`backup_db.sh`, `restore_db.sh` ou na chave `age`.
 
 ## Cobertura além do PostgreSQL
 
@@ -657,14 +857,22 @@ A fonte de verdade dos secrets de prod permanece o Portainer.
 
 ## Next Steps (Post-MP5)
 
-1. **Monthly restore drills** (verify backups are restorable)
-2. **Prometheus metrics** integration (MP1)
-3. **Incremental backups** (WAL archiving)
-4. **Cross-region replication** (S3 versioning + replication)
-5. **Automated testing** (restore to ephemeral database, run tests)
+Em ordem de risco (o primeiro item é o que impede um restore hoje):
+
+1. **Corrigir `restore_db.sh` (#1611)** — tornar a Step 1 ciente do formato `.age`,
+   adicionar `set -o pipefail`, respeitar `BACKUP_DIR` (`:17`) e falhar cedo se `age` não
+   estiver no PATH
+2. **`ON_ERROR_STOP=1` + verificação real de sucesso no restore (#1645)** — hoje o script
+   diz "successfully" com exit 0 mesmo perdendo objetos
+3. **Cobrir `restore_db.sh` com `.bats`**, incluindo o round-trip cifrado (#1646)
+4. **Ensaio de restore com a chave privada** e registro em
+   [Último ensaio de restore](#último-ensaio-de-restore)
+5. **Cópia offsite de verdade** (exige `aws` CLI na imagem, ou outro transporte)
+6. **Prometheus metrics** integration (MP1) — nenhuma métrica de backup existe hoje
+7. **Incremental backups** (WAL archiving) — confirmar antes se WAL archiving está ligado
 
 ---
 
 **Document Owner**: DevOps/SRE Team
 **Review Cycle**: Quarterly
-**Last Reviewed**: 2025-11-18
+**Last Reviewed**: 2026-07-24 (revisão contra o código — auditoria M26)

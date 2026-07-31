@@ -1,9 +1,10 @@
 ---
 title: Regras de Disponibilidade (RD-01..RD-08)
 status: canonical
-last_verified: 2026-06-19
+last_verified: 2026-07-24
 sources_of_truth:
   - v2/backend/apps/core/services/availability_service.py
+  - v2/backend/apps/core/services/solicitacao_availability.py
   - v2/backend/apps/core/views_availability.py
   - v2/backend/apps/core/views_availability_monthly.py
   - v2/backend/apps/core/types.py
@@ -26,13 +27,23 @@ related:
 
 ## Proposito
 
-As Regras de Disponibilidade (RD-01 a RD-08, **CP-03**) definem como o sistema detecta conflitos de agenda de um formador/coordenador ao se considerar um novo intervalo de evento. Substituem as antigas formulas Excel que falhavam em bordas de timezone (eventos proximos da meia-noite caiam no dia errado). O nucleo e um servico **puro e consultivo**: dado um usuario, um intervalo `(inicio, fim)` e um municipio opcional, devolve uma lista estruturada de conflitos. Nao grava, nao aprova, nao bloqueia nada por si so.
+As Regras de Disponibilidade (RD-01 a RD-08, **CP-03**) definem como o sistema detecta conflitos de agenda de um formador/coordenador ao se considerar um novo intervalo de evento. Substituem as antigas formulas Excel que falhavam em bordas de timezone (eventos proximos da meia-noite caiam no dia errado). O nucleo e uma funcao pura de calculo: dado um usuario, um intervalo `(inicio, fim)` e um municipio opcional, devolve uma lista estruturada de conflitos. Ela propria nao grava e nao aprova.
 
-O servico e a SSOT da logica de conflito. Os endpoints DRF (`/api/availability/check/`, `check-many/`) e a Grade Mensal apenas o consomem. A decisao final de disponibilidade e operacional/humana (Superintendencia via Grade Mensal); o check e ferramenta de apoio a criacao e aprovacao de solicitacoes.
+O calculo e a SSOT da logica de conflito, e hoje ele tem **dois consumidores com semanticas diferentes** (#1452):
+
+| Camada | Funcao | Cache | Efeito |
+|---|---|---|---|
+| **Consultiva** | `check_conflicts` | 300s | So informa. Telas de disponibilidade, Grade Mensal, feedback no wizard. |
+| **Enforcement** | `check_conflicts_uncached` via `solicitacao_availability.enforce_solicitacao_availability` | nenhum | **Bloqueia** create/update/approve/batch_approve com HTTP 400 `availability_conflict`. |
+
+A afirmacao "RD e apenas consultivo" era verdadeira ate o #1452 e **nao vale mais**: conflito e bloqueio duro, sem override, inclusive no fluxo `NAO_SUPER` ([`solicitacao_availability.py:196-225`](../../../backend/apps/core/services/solicitacao_availability.py)). A decisao humana da Superintendencia continua sendo o gate de *aprovacao* (PA), mas ela nao consegue mais aprovar por cima de um conflito.
 
 ## Fonte de verdade no codigo
 
-- [`v2/backend/apps/core/services/availability_service.py`](../../../backend/apps/core/services/availability_service.py) — `check_conflicts(*, usuario, inicio, fim, municipio=None) -> CheckResult`; dataclasses `Conflict` e `CheckResult`; helpers `to_local`, `same_day_local`, `_fmt_interval_local`. Decorado com `@cache_availability_check(timeout=300)`.
+- [`v2/backend/apps/core/services/availability_service.py`](../../../backend/apps/core/services/availability_service.py) — `_check_conflicts_impl` (`:115`) e o calculo RD-01..RD-08; dataclasses `Conflict` e `CheckResult`; helpers `to_local`, `same_day_local`, `_fmt_interval_local`. Duas entradas publicas:
+  - `check_conflicts` (`:327`) — consultiva, decorada com `@cache_availability_check(timeout=300)`. A assinatura **nao** expoe `exclude_solicitacao_id` de proposito: a chave de cache vem de uma whitelist fixa de campos, entao um argumento extra mudaria o resultado sem mudar a chave (envenenamento de cache).
+  - `check_conflicts_uncached` (`:353`) — enforcement, sempre le do banco, aceita `exclude_solicitacao_id` para o evento nao conflitar consigo mesmo ao ser revalidado.
+- [`v2/backend/apps/core/services/solicitacao_availability.py`](../../../backend/apps/core/services/solicitacao_availability.py) — guard por participante (#1452). `collect_participants` (`:74`) le a tabela `Participation` ja gravada (nunca o payload) filtrando `role__in=ENFORCED_ROLES`; `lock_participants` (`:114`) toma `pg_advisory_xact_lock` por `usuario_id` em ordem ASC; `enforce_solicitacao_availability` (`:228`) e o ponto de entrada de create/update/approve. Antes do #1452 a checagem rodava **so no criador** da solicitacao — como o coordenador que cria tipicamente nao e o formador que atende, as regras rodavam na pessoa errada.
 - [`v2/backend/apps/core/types.py`](../../../backend/apps/core/types.py) — `ConflictCode: TypeAlias = Literal["X", "T", "P", "D", "M", "E"]`.
 - [`v2/backend/apps/core/views_availability.py`](../../../backend/apps/core/views_availability.py) — `AvailabilityCheckView`, `AvailabilityCheckManyView`, `AvailabilityBlockViewSet`, helpers `is_privileged_user` / `can_check_availability_for_others`.
 - [`v2/backend/apps/core/views_availability_monthly.py`](../../../backend/apps/core/views_availability_monthly.py) — `MonthlyAvailabilityView` (grade mensal, codigos de celula).
@@ -58,12 +69,14 @@ Invariantes (NAO podem ser violados):
 - **CP-03** — RD-01..RD-08 sao clausula petrea. Timezone Fortaleza com storage UTC.
 - **RD-01 (adjacencia)**: `fim == inicio_vizinho` NAO conflita. Interseccao usa `<`/`>` estritos, nunca `<=`/`>=`.
 - **RD-04 (limite exato)**: gap exatamente igual ao buffer **passa**; so `mins < buffer_min` conflita. `municipio=None` (de qualquer lado) e tratado como **cidade diferente** → exige buffer (fix #588). Mesmo municipio → buffer 0.
-- **RD-05**: a duracao do **novo** intervalo entra na soma do dia; o recorte por dia usa range de datetime UTC derivado do dia local (`day_start`/`day_end`), nunca `.date()` cru (fix #249, bordas de meia-noite).
+- **RD-05**: a duracao do **novo** intervalo entra na soma do dia; a *selecao* dos eventos ja existentes usa range de datetime UTC derivado do dia local (`day_start`/`day_end`), nunca `.date()` cru (fix #249). ⚠️ O recorte por dia e **assimetrico** e a regra nao vale para intervalos que cruzam a meia-noite — ver §Divergencias (`M08-09`).
 - **RD-06**: comparacao sempre em `America/Fortaleza` via `to_local()`; entradas naive sao assumidas UTC (`make_aware(..., utc)`).
 - **RD-07**: o servico **reporta TODOS** os conflitos encontrados, na ordem Bloqueios (T/P) → Sobreposicao (X) → Buffer (D) → Capacidade (M). Nao ha short-circuit.
 - **RD-08**: cada `Conflict` carrega `code`, `title`, `detail` (com intervalo formatado `HH:MM dd/mm`) e `ref_id` opcional.
-- **Pureza**: `check_conflicts` so le; considera apenas `Solicitacao.status == APROVADO` e `AvailabilityBlock.status == APROVADO`. Validacao basica: `fim <= inicio` → `ok=False` com conflito `X` "Intervalo invalido".
-- **Cache**: resultado cacheado por 300s (`@cache_availability_check`); TTL curto porque dados mudam com frequencia.
+- **Pureza do calculo**: o calculo so le; considera apenas `Solicitacao.status == APROVADO` e `AvailabilityBlock.status == APROVADO`. Validacao basica: `fim <= inicio` → `ok=False` com conflito `X` "Intervalo invalido". Solicitacao `pendente` e **invisivel** para a checagem — e por isso que o guard precisa do advisory lock (duas transacoes concorrentes leriam a outra como inexistente).
+- **Cache**: so na camada consultiva (`check_conflicts`, 300s via `@cache_availability_check`); TTL curto porque dados mudam com frequencia. O caminho de enforcement **nunca** le do cache.
+- **Quem e checado (enforcement)**: todos os participantes gravados com `role` em `ENFORCED_ROLES` = `COORDENADOR`, `FORMADOR`, `COORD_ACOMPANHA` ([`solicitacao_availability.py:33-37`](../../../backend/apps/core/services/solicitacao_availability.py)), mais o criador (`solicitacao.usuario`), deduplicados por id. `CONVIDADO` fica de fora **de proposito** — e audiencia, nao recurso alocado; checa-lo estouraria o RD-05 de quem e convidado a varios eventos no mesmo dia. Convidado externo sem cadastro (`usuario=NULL` + `guest_email`) e fisicamente nao-checavel e volta em `skipped_guests`, sempre logado como `availability_guest_check_skipped` — nunca ignorado em silencio.
+- **Exclusao mutua (enforcement)**: `pg_advisory_xact_lock(1452, usuario_id)` em ordem ASC de id antes de ler. `select_for_update` sozinho tranca so a linha da propria solicitacao; duas solicitacoes distintas do mesmo formador trancam linhas disjuntas e ambas commitariam.
 
 > Nota: `ConflictCode` inclui `E`, mas o servico **nao emite `E`** — `E`/`D1`/`2` sao codigos de celula da legenda da Grade Mensal (`GUIDE_AVAILABILITY.md`), nao saidas de `check_conflicts`.
 
@@ -90,8 +103,18 @@ Caminho feliz / deteccao (`check_conflicts`):
 4. RD-02/RD-03: itera blocos aprovados que intersectam → emite `T` ou `P`.
 5. RD-01: itera eventos aprovados que intersectam → emite `X`.
 6. RD-04: pega evento imediatamente anterior (`fim__lte=inicio`) e posterior (`inicio__gte=fim`); se cidade difere e gap `< buffer_min`, emite `D`.
-7. RD-05: soma minutos dos eventos que tocam o dia local + duracao do novo intervalo; se `> limite`, emite `M`.
+7. RD-05: soma minutos dos eventos que tocam o dia local de `inicio` (recortados ao dia) + duracao **integral** do novo intervalo; se `> limite`, emite `M`. Ver `M08-09` em §Divergencias.
 8. Retorna `CheckResult(ok=(len(conflicts)==0), conflicts=...)`.
+
+Caminho de enforcement (`enforce_solicitacao_availability`, dentro de `transaction.atomic()`):
+
+1. `collect_participants` le `Participation` gravada (`role__in=ENFORCED_ROLES`) + o criador, dedup por id.
+2. `lock_participants` toma `pg_advisory_xact_lock(1452, usuario_id)` em ordem ASC.
+3. Para cada participante, `check_conflicts_uncached(..., exclude_solicitacao_id=solicitacao.pk)`.
+4. `skipped_guests` nao vazio → `logger.warning("availability_guest_check_skipped")` (nao bloqueia).
+5. Qualquer bloqueado → `ValidationAPIError` **400 `availability_conflict`**, com `conflicts` achatado (contrato legado) e `blocked_participants` por pessoa. A transacao inteira e desfeita — no `update`, a edicao nao persiste.
+
+Call-sites: `perform_create` ([`views_solicitacao.py:308`](../../../backend/apps/core/views_solicitacao.py)), `perform_update` (`:452`), `approve_solicitacao` ([`solicitacao_approval.py:136`](../../../backend/apps/core/services/solicitacao_approval.py)) e `batch_approve_solicitacoes` (`:305`).
 
 Caminhos de erro do endpoint `check/`: `usuario_id` ausente/invalido → 400; usuario inexistente → 404; consultar outro sem permissao → 403; `municipio_id` invalido → 400; `inicio`/`fim` ausentes ou nao-ISO → 400; `fim <= inicio` → 400; nao autenticado → 401/403. Datetimes naive sao convertidos para UTC antes do servico (RD-06).
 
@@ -108,10 +131,52 @@ Caminhos de erro do endpoint `check/`: `usuario_id` ausente/invalido → 400; us
 - `TestAvailabilityCheckEndpoint` — 200/400/401-403/404, `usuario_id` obrigatorio, validacao de datas, batch `check-many/`, e `test_permission_only_self_or_privileged` (403 RBAC ao checar outro).
 - `TestAvailabilityServiceAdditional` — `test_multi_formador_any_conflict_blocks` (RD-01 multi-formador), `test_conflict_messages_include_codes_and_intervals` (RD-08: estrutura `{code,title,detail}` + intervalo).
 
+## Divergencias entre a regra escrita e o codigo
+
+> Reconfirmadas por execucao contra `main d08acfa5` e **vivas em producao**. Fonte:
+> [`ACHADOS_REAIS.md`](../../audits/ACHADOS_REAIS.md). Estao aqui porque uma RD que o codigo
+> nao cumpre e um fato do contrato, nao uma omissao.
+
+### `M08-09` — RD-05 nao vale para intervalos que cruzam a meia-noite
+
+**Severidade P2 · aberto · epico #1664 (`motor-disponibilidade-sem-ssot-de-regra`).**
+
+O que a regra diz: nenhum usuario acumula mais de `AVAILABILITY_DAILY_LIMIT_HOURS` por dia local.
+
+O que o codigo faz ([`availability_service.py:280-306`](../../../backend/apps/core/services/availability_service.py)):
+
+1. Deriva `inicio_date` **apenas** do dia local de `inicio` (`:280-281`). Nenhum outro dia e avaliado.
+2. Os eventos **ja existentes** sao recortados ao dia (`overlap_start`/`overlap_end`, `:299-301`).
+3. O **novo** intervalo entra inteiro, sem recorte (`new_duration = int((fim - inicio) ...)`, `:305`).
+
+Consequencia: um evento das 22:00 as 06:00 debita 480 min no dia 1 (onde so 120 min sao reais) e
+**nao debita nada no dia 2** — a carga ja agendada do dia 2 nunca e somada. A regra falha nos dois
+sentidos: falso positivo no dia de inicio, falso negativo no dia seguinte.
+
+O fix #249 citado no invariante RD-05 corrigiu a **query** dos eventos existentes (range UTC em vez
+de `.date()` cru); ele nao cobre o novo intervalo nem a avaliacao multi-dia.
+
+### `M08-07` — a query de eventos existentes nao filtra papeis ocupantes
+
+**Severidade P2 · aberto · epico #1664.**
+
+`ENFORCED_ROLES` exclui `CONVIDADO` ao decidir **quem** e checado, mas `events_qs`
+([`availability_service.py:166-168`](../../../backend/apps/core/services/availability_service.py))
+monta os eventos ja existentes com `Q(usuario=usuario) | Q(participations__usuario=usuario)`,
+**sem** `role__in`. As duas pontas discordam:
+
+- Como *sujeito* da checagem, o convidado e ignorado (correto, por design).
+- Como *evento existente*, uma participacao `CONVIDADO` bloqueia — conta em RD-01 (X), em RD-04 (D)
+  e nos minutos de RD-05 (M).
+
+Efeito pratico: a pessoa convidada a um evento fica indisponivel para ser **alocada** em outro,
+que e exatamente o caso que a exclusao de `CONVIDADO` existia para evitar. Alcance atual e
+estreito — hoje so o superuser (1 ativo) cria `Participation` `CONVIDADO` por `ParticipationAdmin`.
+
 ## Pontos de atencao / dividas conhecidas
 
 - **Codigo `E` orfao no `ConflictCode`**: presente no `Literal` mas nunca emitido pelo servico (so legenda da grade). Possivel fonte de confusao entre saida do check e celulas da Grade Mensal.
-- **TOCTOU**: `check_conflicts` e consultivo e cacheado por 300s; entre o check e a aprovacao/criacao real outro evento pode ser aprovado. A decisao final NAO e atomica com o check — por design, a aprovacao manual (Superintendencia) e o gate. Nao tratar o `ok=True` como garantia transacional.
+- **TOCTOU: depende da camada.** No caminho **consultivo** (`check_conflicts`) o `ok=True` continua sem valor transacional — resultado cacheado por 300s, e outro evento pode ser aprovado no meio. No caminho de **enforcement** a janela esta fechada: `enforce_solicitacao_availability` roda dentro de `transaction.atomic()`, depois de `pg_advisory_xact_lock` por participante, lendo sem cache. Nao trocar um pelo outro: usar `check_conflicts` em enforcement reabre o double-booking que o lock existe para impedir.
 - **Sem checagem de buffer transitivo**: RD-04 so olha o evento imediatamente anterior e o imediatamente posterior; cadeias com 3+ eventos no mesmo dia nao reavaliam o buffer entre pares nao-adjacentes.
 - **Participacoes**: `events_qs` inclui solicitacoes onde o usuario e participante (`participations__usuario`) alem de dono; confirmar que novas relacoes de participacao mantenham esse filtro ao evoluir o modelo.
 - **GUIDE_AVAILABILITY.md** descreve gerencias/setores de forma resumida (lista parcial); a SSOT de setores/funcoes e `apps.core.constants` (13 setores / 5 funcoes, sendo 4 funcoes RBAC + Gerente). Nao tratar a tabela do guia como SSOT organizacional.

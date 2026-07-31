@@ -2,21 +2,33 @@
 
 Companion to [`ACID_POLICY.md`](ACID_POLICY.md). Tracks how to diagnose and respond to the concurrency failure modes the policy defends against.
 
+> ⚠️ **Não existe Loki nem Grafana em produção.** A stack de coleta/painéis
+> (Prometheus + Grafana) é **local e opcional** (`make up-obs`, arquivos gitignored) e
+> **não roda em prod** — ver [OBSERVABILITY.md](./OBSERVABILITY.md). Não há **nenhuma**
+> referência a Loki no repositório fora deste runbook. Em produção, a fonte de sinal é o
+> **stdout dos containers** (`docker compose logs`, driver `json-file`, `max-size: 50m` /
+> `max-file: 10`), e o `/metrics` do Django, que é gated (staff / IP interno) e depende de
+> scraping externo. As queries LogQL/PromQL abaixo servem para o ambiente local com
+> `make up-obs`; em prod, traduza para `docker compose logs … | grep`.
+
 ## Signals to watch
 
-| Signal | Where | What it means |
+| Signal | Where (prod) | What it means |
 |---|---|---|
-| **Prometheus counter rate** `rate(as_db_transaction_retries_total[5m]) > 0` | Grafana `aprender-db-concurrency` board | A retry fired in the last 5 minutes. A low, bursty rate is normal; a sustained non-zero rate means a hotspot. |
-| **Log event** `db_retry_exhausted` | Loki / stdout | A user actually hit the ceiling on `max_attempts`. A single burst after a deploy can be noise; sustained events are a bug. |
-| **Log event** `solicitacao_batch_approved` over **10 s** | Loki | Batch approvals normally complete in < 1 s. Slowness usually means `skip_locked` is hitting contention somewhere upstream. |
-| **Circuit breaker `state=open`** | `GET /api/gcal/circuit-breaker/` | Google Calendar is rejecting us. Not strictly a concurrency issue, but related: approvals no longer publish, so the task retry task (`task_retry_gcal_sync_when_breaker_closes`) should be firing. |
+| **Prometheus counter** `as_db_transaction_retries_total` (`apps/core/services/db_retry.py:64`) | `/metrics` do serviço `web` (gated). Sem scraper externo configurado, só dá para ler pontualmente | A retry fired. A low, bursty rate is normal; a sustained non-zero rate means a hotspot. |
+| **Log event** `db_retry_exhausted` | `docker compose logs worker web \| grep db_retry_exhausted` | A user actually hit the ceiling on `max_attempts`. A single burst after a deploy can be noise; sustained events are a bug. |
+| **Log event** `solicitacao_batch_approved` over **10 s** | `docker compose logs web \| grep solicitacao_batch_approved` | Batch approvals normally complete in < 1 s. Slowness usually means `skip_locked` is hitting contention somewhere upstream. |
+| **Circuit breaker `state=open`** | `GET /api/gcal/circuit-breaker/` (`apps/core/urls.py:315`) — autenticado | Google Calendar is rejecting us. Not strictly a concurrency issue, but related: approvals no longer publish, so the retry task **`apps.core.tasks.queue_gcal_sync_retry`** (`apps/core/tasks.py:690-696`) deve estar re-agendando (`max_retries=10`, `default_retry_delay=300`). Ela é **enfileirada por evento**, não pelo beat — não há entrada dela em `config/celery.py`. |
 
 ## Triage — "deadlock_detected in production"
 
-1. **Grab the event** from Loki:
+1. **Grab the event** (`db_retry_scheduled` é emitido em `services/db_retry.py:173`):
+   ```bash
+   # Produção (sem Loki): stdout dos containers
+   docker compose logs --tail=2000 web worker | grep db_retry_scheduled | grep 40P01
    ```
-   {event="db_retry_scheduled"} | operation=~"solicitacao.*" | pgcode="40P01"
-   ```
+   Com a stack local de observabilidade (`make up-obs`), o equivalente LogQL seria
+   `{event="db_retry_scheduled"} | operation=~"solicitacao.*" | pgcode="40P01"`.
 2. **Check recent activity**: was there a bulk import or migration running? A deploy in the last 10 min?
 3. **Identify the two transactions** in Postgres logs (`log_lock_waits=on` must be enabled):
    ```sql
@@ -41,8 +53,8 @@ Rare under `READ COMMITTED`. If you see it:
 Symptoms: `Solicitacao.gcal_status = PUBLISHED` but `external_event_id = NULL`, or two different `last_sync_action` values flipping.
 
 1. Check for duplicate Celery task enqueues for the same `solicitacao_id`:
-   ```
-   {event="task_publish_solicitacao_to_gcal"} | solicitation_id=<ID>
+   ```bash
+   docker compose logs --tail=5000 worker | grep task_publish_solicitacao_to_gcal | grep "<ID>"
    ```
 2. If count > 1 in < 30 s, the upstream dispatcher is double-queuing — fix the dispatcher, not the task.
 3. As a safety net, `apply_one_solicitacao` is decorated with `@retry_on_deadlock`. A torn state should not be possible from a single dispatch — it requires two parallel dispatches.

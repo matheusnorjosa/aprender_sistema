@@ -1,7 +1,7 @@
 ---
 title: RBAC — Controle de Acesso
 status: canonical
-last_verified: 2026-06-19
+last_verified: 2026-07-24
 sources_of_truth:
   - v2/backend/apps/core/rbac/__init__.py
   - v2/backend/apps/core/rbac/permissions.py
@@ -21,18 +21,38 @@ supersedes:
   - v2/docs/rbac_authorization_matrix.md
   - v2/docs/GUIA_ADMIN_RBAC.md
 related:
-  - v2/docs/specs/backend/approvals.spec.md
+  - v2/docs/specs/backend/solicitacao-approval.spec.md
   - v2/docs/specs/backend/availability.spec.md
+  - v2/docs/audits/ACHADOS_REAIS.md
 ---
 
 # RBAC — Controle de Acesso
 
-> ⚠️ **Gaps de segurança conhecidos (auditoria 2026-07-17, P0 confirmados VIVOS em produção)**: esta spec descreve a
-> intenção; o código atual **diverge** dela em pontos críticos — takeover de superuser (P0-0), escalada via GroupViewSet
-> (P0-1), solicitações cross-gerência (P0-2), Grade Mensal por papel/vínculo indevido, cache de revogação e seed
-> destrutiva. Ver `v2/docs/audits/2026-07-17-rbac-security-audit.md` e o plano `v2/docs/plans/2026-07-17-rbac-correcao-definitiva.md`.
-> **P0-0 corrigido** na branch `fix/rbac-superuser-target-protection` (superuser intocável por não-superuser em todos os
-> writers; anti-lockout). Cada correção deve atualizar a seção correspondente desta spec ao ser mergeada.
+> ⚠️ **Estado dos gaps de segurança — reverificado em 2026-07-24.** A fila de trabalho viva é
+> [`v2/docs/audits/ACHADOS_REAIS.md`](../../audits/ACHADOS_REAIS.md); as severidades daquele documento são as que valem.
+> O relatório longo `2026-07-17-system-module-audit.md` acerta os mecanismos e erra as consequências — **não citar
+> severidade dele**.
+>
+> **Já fechados e presentes no SHA de produção (`94f27651`):**
+>
+> - **Takeover de superuser** (antigo P0-0) — `86afdef3` / #1558. `UsuarioAdminViewSet.get_queryset` faz
+>   `exclude(is_superuser=True)` para não-superuser (`views/admin.py:371-384`), há anti-lockout (`:386-397`) e
+>   `assign_groups` é `SuperuserOnly` (`:399`). Teste: `tests/test_rbac_superuser_target_protection.py`.
+>   (A branch `fix/rbac-superuser-target-protection` citada aqui antes **não existe mais** — foi mergeada.)
+> - **Escalada via `GroupViewSet`** (antigo P0-1) — #1567. `get_permissions` devolve `SuperuserOnly` para tudo que não
+>   seja `list`/`retrieve` (`views/admin.py:494-500`). Registrado como `M05-01`/`M05-02` em `ACHADOS_REAIS.md`
+>   (§"Já corrigidos").
+>
+> **Ainda abertos e reconfirmados vivos** (ver a tabela de `ACHADOS_REAIS.md` para severidade e issue):
+> escopo ator×alvo ausente em vários writers (épico #1656, inclui `M10-01` solicitações cross-gerência,
+> `M07-02` takeover de conta aprovadora pelo DAT e `M14-01` `HasSectorAccess`); auditoria não-invariante
+> (épico #1657, inclui `M05-05`); cache de revogação (`M05-03`, épico #1667); e a auto-escalação via import de
+> usuários (`M03-01`, **P0**, #1610 — ver [imports.spec](./imports.spec.md)). As seções abaixo descrevem o código
+> **como ele é**; onde a intenção diverge do real, isso está marcado explicitamente.
+>
+> **Bus factor de 1.** Há **1 superuser ativo** em produção (censo de 2026-07-20, `ACHADOS_REAIS.md` §F3), e o #1567
+> tornou a administração de Grupo×Capability superuser-only. Se essa conta cair, ninguém administra RBAC. A decisão
+> "superuser primário + backup" segue pendente.
 
 ## Propósito
 
@@ -43,16 +63,16 @@ Existem três conceitos ortogonais: **capability** (autorização binária por f
 ## Fonte de verdade no código
 
 - [`v2/backend/apps/core/rbac/__init__.py`](../../../backend/apps/core/rbac/__init__.py) — superfície pública do módulo (re-exporta classes, helpers e a matriz de policies).
-- [`v2/backend/apps/core/rbac/permissions.py`](../../../backend/apps/core/rbac/permissions.py) — classes DRF: `HasPerm` (paramétrica), `HasFunctionalPermission` (base) e as 3 classes não-reduzíveis + 1 composite (`IsGerenteSuperintendencia`, `IsOwnerOrPrivileged`, `HasSectorAccess`, `IsAssistenteAdministrativoControle`). Aplica o monkey-patch de `permissions.OR/AND/NOT.__call__` que habilita composition em instâncias.
-- [`v2/backend/apps/core/rbac/policies.py`](../../../backend/apps/core/rbac/policies.py) — Capability Policy Layer: matriz `ACCESS_POLICIES` (policy key → frozenset de capabilities elegíveis, semântica OR), classes `Can*`, `PUBLIC_POLICY_KEYS`, e os SSOT `user_has_policy` / `resolve_public_policies`.
+- [`v2/backend/apps/core/rbac/permissions.py`](../../../backend/apps/core/rbac/permissions.py) — **7 classes DRF**: `HasPerm` (paramétrica, `:39`), `HasFunctionalPermission` (base, `:105`), `SuperuserOnly` (`:128`) e as 4 não-reduzíveis/composite `IsGerenteSuperintendencia` (`:157`), `IsAssistenteAdministrativoControle` (`:177`), `IsOwnerOrPrivileged` (`:212`), `HasSectorAccess` (`:240`). Aplica o monkey-patch de `permissions.OR/AND/NOT.__call__` (`:34-36`) que habilita composition em instâncias. **`SuperuserOnly` é a classe Tier-0** que sustenta o gate de escrita do `GroupViewSet` e do `assign_groups` (#1567/#1558) — ela **não** é re-exportada por `rbac/__init__.py`; as views a importam pelo shim `apps/core/permissions.py`.
+- [`v2/backend/apps/core/rbac/policies.py`](../../../backend/apps/core/rbac/policies.py) — Capability Policy Layer: matriz `ACCESS_POLICIES` (`:78`, policy key → frozenset de capabilities elegíveis, semântica OR), **21 classes `Can*`** (`:238-337`), `PUBLIC_POLICY_KEYS` (`:363`), e os SSOT `user_has_policy` (`:471`) / `resolve_public_policies` (`:503`). Também hospeda os helpers de delegação `user_can_delegate_availability_block` (`:424`) e `user_can_delegate_deslocamento` (`:449`).
 - [`v2/backend/apps/core/rbac/matrix.py`](../../../backend/apps/core/rbac/matrix.py) — Matriz Viva `ACCESS_MATRIX` (10 atores × recursos discriminantes → status HTTP esperado) para testes parametrizados.
-- [`v2/backend/apps/core/rbac/helpers.py`](../../../backend/apps/core/rbac/helpers.py) — `user_has_any_perm`, `user_has_all_perms`, `user_is_assistente_administrativo_controle`.
+- [`v2/backend/apps/core/rbac/helpers.py`](../../../backend/apps/core/rbac/helpers.py) — `user_has_any_perm` (`:24`), `user_is_assistente_administrativo_controle` (`:50`), `user_has_all_perms` (`:74`). Os helpers de **delegação** vivem em `policies.py`, não aqui.
 - [`v2/backend/apps/core/rbac/constants.py`](../../../backend/apps/core/rbac/constants.py) — constantes de **data scope** (`COORDENADOR_ROLE_GROUPS`, `FORMADOR_ROLE_GROUPS`) — usadas para filtrar queryset, não para autorizar.
 - [`v2/backend/apps/core/constants.py`](../../../backend/apps/core/constants.py) — `SETOR_GROUPS` (13 setores), `FUNCAO_GROUPS` (5 funções), `ALLOWED_USER_GROUPS`, `RESERVED_GROUPS`.
 - [`v2/backend/apps/core/services/rbac_permissions.py`](../../../backend/apps/core/services/rbac_permissions.py) — `get_user_functional_permissions` (resolução cache-aware das capabilities do usuário) + helpers de invalidação por usuário/grupo.
 - [`v2/backend/apps/core/services/functional_permissions_seed.py`](../../../backend/apps/core/services/functional_permissions_seed.py) — `FUNCTIONAL_PERMISSIONS_SEED`: SSOT dos codenames, labels, categorias e grupos default de cada capability.
 - [`v2/backend/apps/core/views/me.py`](../../../backend/apps/core/views/me.py) — `MePoliciesView` (`GET /api/me/policies/`).
-- [`v2/backend/apps/core/signals.py`](../../../backend/apps/core/signals.py) — signal `m2m_changed` em `PermissaoFuncional.groups`: invalida cache + grava `AuditLog GROUP_CAPABILITY_CHANGED`.
+- [`v2/backend/apps/core/signals.py`](../../../backend/apps/core/signals.py) — signal `m2m_changed` em `PermissaoFuncional.groups` (`:201-264`): invalida cache (`:250`) e **acumula** o delta num buffer de módulo `_PENDING_GROUP_CAP_DELTAS` (`:47`). O `AuditLog GROUP_CAPABILITY_CHANGED` só é persistido por `flush_group_capability_audit()` (`:267-329`, `AuditLog.objects.create` em `:315`) — ver a ressalva de D17 abaixo.
 - [`v2/backend/scripts/rbac_lint.py`](../../../backend/scripts/rbac_lint.py) — lint AST (V001/V002/V003) que enforça a convenção em CI.
 
 Doc canônico detalhado (não duplicado aqui): convenção de nomes em [`RBAC_NAMING.md`](../../RBAC_NAMING.md), matriz declarativa ator × recurso em [`rbac_authorization_matrix.md`](../../rbac_authorization_matrix.md), e operação via Admin em [`GUIA_ADMIN_RBAC.md`](../../GUIA_ADMIN_RBAC.md).
@@ -64,10 +84,12 @@ Doc canônico detalhado (não duplicado aqui): convenção de nomes em [`RBAC_NA
 - **Codename é capacidade, não identidade**: formato `verb_noun[_qualifier]` snake_case inglês. Proibido nome de setor/função/grupo. Exceções bundle conscientes: `manage_admin_registries`, `manage_purchases_and_materials`.
 - **Superuser sempre bypassa**: toda classe e helper retorna `True` para `is_superuser` antes de qualquer checagem.
 - **Fail-secure**: usuário anônimo/`None` → `False`; policy key ausente da matriz → `False`; capability sem grupos no seed → só superuser passa (feature em incubação).
-- **D17 — Admin-driven Group × Capability**: a atribuição grupo↔capability migra para o Django Admin superuser-only (`PermissaoFuncionalAdmin`). Codename/label/category/existência da capability são read-only (SSOT no seed); só `groups` é editável. Toda edição invalida cache (signal `m2m_changed`) e grava `AuditLog GROUP_CAPABILITY_CHANGED`.
+- **D17 — Admin-driven Group × Capability**: a atribuição grupo↔capability migra para o Django Admin superuser-only (`PermissaoFuncionalAdmin`). Codename/label/category/existência da capability são read-only (SSOT no seed); só `groups` é editável. Toda edição invalida cache (signal `m2m_changed`).
+  - ⚠️ **O AuditLog só sai pelo Django Admin** (comportamento real, achado `M05-05`, épico #1657). O único chamador de produção de `flush_group_capability_audit()` é `PermissaoFuncionalAdmin.save_related()` (`apps/core/admin.py:416-419`). **Nenhuma view DRF chama o flush.** Como `GroupSerializer.permissao_funcional_ids` é gravável (`serializers/usuario.py:356-363`), um `PATCH /api/grupos/{id}/` altera a matriz Grupo×Capability, dispara o signal, invalida o cache — e o delta fica no buffer **sem nunca ser drenado**: zero AuditLog. Agravante: `_PENDING_GROUP_CAP_DELTAS` (`signals.py:47`) é um `dict` de módulo, **não** um thread-local (apesar do comentário em `:44`), então o lixo acumulado por uma mudança via API é drenado pelo **próximo** `save_related` no Admin e **atribuído ao ator errado**.
 - **Policy key = contrato externo estável** (uma vez em `PUBLIC_POLICY_KEYS`): adicionar key é compatível; renomear/remover é breaking (deprecation de 2 releases); mudar capabilities elegíveis (`ACCESS_POLICIES[k]`) é compatível (frontend não depende). O endpoint nunca vaza capability codenames.
 - **SSOT da semântica de policy**: `user_has_policy(user, key)` é a fonte única; `_PolicyPermission.has_permission`, os testes e `resolve_public_policies` delegam para ele. Mudar avaliação = mudar num só lugar.
-- **Aprovação de solicitações (CP-02, PA-01)**: gate composite `CanAccessSolicitationApprovals` = Gerente da Superintendência (Setor `Superintendência` + Função `Gerente`) **OU** Assistente Administrativo do Controle (Setor `Controle` + Função `Assistente Administrativo`). Superuser nunca auto-aprova evento próprio (regra do importer, fora deste módulo). Detalhe em `approvals.spec.md`.
+- **Revogação NÃO é imediata quando o Group é excluído** (comportamento real, achado `M05-03`, épico #1667). O cache funcional tem TTL de **300 s** (`services/rbac_permissions.py:15`). O `post_delete` em `Group` (`rbac_signals.py:102-112`) chama `invalidate_group_functional_permissions_cache`, que resolve os usuários impactados **consultando o M2M** (`rbac_permissions.py:63`). Em `post_delete` as linhas de `auth_user_groups` já foram removidas em cascata → a query volta vazia → nenhuma chave é apagada. Não há `pre_delete` com snapshot dos membros (contraste: o `pre_clear` de `rbac_signals.py:51-56` faz o snapshot de propósito). Consequência: após `DELETE /api/grupos/{id}/` os ex-membros mantêm as capabilities revogadas por até 5 minutos.
+- **Aprovação de solicitações (CP-02, PA-02)**: gate composite `CanAccessSolicitationApprovals` = Gerente da Superintendência (Setor `Superintendência` + Função `Gerente`) **OU** Assistente Administrativo do Controle (Setor `Controle` + Função `Assistente Administrativo`) **OU** superuser (`policies.py:395-421`). Detalhe em [`solicitacao-approval.spec.md`](./solicitacao-approval.spec.md).
 
 ## API / Interface
 
@@ -78,7 +100,8 @@ Doc canônico detalhado (não duplicado aqui): convenção de nomes em [`RBAC_NA
 - `IsGerenteSuperintendencia` — composite funcperm `approve_solicitation_batch` + grupo `Gerente`.
 - `IsOwnerOrPrivileged` — object-level: superuser/privilegiado ou `obj.usuario == user`.
 - `IsAssistenteAdministrativoControle` — composite Setor `Controle` + Função `Assistente Administrativo`.
-- 17 classes `Can*` (`CanAccessAuditLogs`, `CanViewComprasDashboard`, `CanViewAllAvailability`, `CanAccessSolicitationApprovals`, ...) mapeadas em `ACCESS_POLICIES`.
+- `SuperuserOnly` — só `is_superuser`. Gate de escrita do `GroupViewSet` e do `assign_groups`.
+- 21 classes `Can*` (`CanAccessAuditLogs`, `CanViewComprasDashboard`, `CanViewAllAvailability`, `CanAccessSolicitationApprovals`, `CanUseGcal`, `CanManageInternalActions`, ...) mapeadas em `ACCESS_POLICIES` — lista completa em `policies.py:238-337`.
 
 **Helpers** (não-DRF): `user_has_any_perm(user, *codenames)`, `user_has_all_perms(...)`, `user_has_policy(user, key)`, `user_is_assistente_administrativo_controle(user)`, `user_can_delegate_availability_block(user)`.
 
@@ -90,8 +113,8 @@ Doc canônico detalhado (não duplicado aqui): convenção de nomes em [`RBAC_NA
 
 1. **Checagem em request DRF**: DRF instancia a classe → `has_permission` rejeita não-autenticado, libera superuser, e consulta `get_user_functional_permissions(user)` (cache Redis, TTL) testando `codename in perms`. Composition `A | B` é resolvida pelas classes `OR/AND/NOT` do DRF (habilitadas em instâncias pelo monkey-patch).
 2. **Resolução de policy**: `user_has_policy(user, key)` → anônimo `False` → superuser `True` → composite key delega a helper dedicado (ex: `_user_has_solicitation_approvals`) → caso geral `user_has_any_perm(user, *ACCESS_POLICIES[key])`.
-3. **Mudança de atribuição (admin)**: superuser edita `PermissaoFuncional.groups` no Admin → signal `m2m_changed` consolida as 6 disparadas (pre/post × add/remove/clear) → invalida cache funcional dos usuários afetados (sem restart) → grava `AuditLog GROUP_CAPABILITY_CHANGED` (added/removed/groups_after).
-4. **Erros relevantes**: capability sem grupo no seed → 403 a todos exceto superuser; `gerencia_id` não-inteiro em `HasSectorAccess` → 403 com mensagem "gerencia_id deve ser um número inteiro"; Controle puro tentando aprovar (sem Função `Assistente Administrativo`) → 403.
+3. **Mudança de atribuição (admin)**: superuser edita `PermissaoFuncional.groups` no Admin → signal `m2m_changed` consolida as 6 disparadas (pre/post × add/remove/clear) → invalida cache funcional dos usuários afetados (sem restart) → `save_related` chama `flush_group_capability_audit` → grava `AuditLog GROUP_CAPABILITY_CHANGED` (added/removed/groups_after). **Pelo caminho DRF (`PATCH /api/grupos/{id}/`) os dois primeiros passos acontecem e o AuditLog não** — ver a ressalva de D17.
+4. **Erros relevantes**: capability sem grupo no seed → 403 a todos exceto superuser; `gerencia_id` não-inteiro em `HasSectorAccess` → 403 com a mensagem `"gerencia_id deve ser um número inteiro."` (`permissions.py:307`); Controle puro tentando aprovar (sem Função `Assistente Administrativo`) → 403.
 
 ## Decisões relacionadas (ADRs)
 
@@ -117,4 +140,6 @@ Doc canônico detalhado (não duplicado aqui): convenção de nomes em [`RBAC_NA
 - **Cutoff D17 hardcoded** (`D17_LEGACY_MIGRATIONS_MAX = 82`): migrations futuras que precisem backfill legítimo de grupos exigem `# noqa: RBAC-migration-allowed` consciente.
 - **Composition OR em instâncias depende de monkey-patch** (`permissions.OR/AND/NOT.__call__ = lambda self: self`) aplicado em `permissions.py`; `policies.py` força o import por side-effect. Remover o patch quebra silenciosamente todo `permission_classes = [A | B]`.
 - **`HasSectorAccess` é o único ponto com TOCTOU residual** de scope: a checagem de `EquipeGerencia` ativa e a leitura de dados acontecem em requests separados; mudança de vínculo entre eles não é transacional (aceitável para o caso de uso atual).
-- **Schema OpenAPI de `/api/me/policies/`** declara `{policies: [...]}` via `inline_serializer`, mas o código retorna o array bruto. Divergência de documentação de schema (não afeta o contrato real consumido pelo frontend).
+- **Schema OpenAPI de `/api/me/policies/`** declara `{policies: [...]}` via `inline_serializer` (`views/me.py:104-107`), mas o código retorna o array bruto (`:132`). Divergência de documentação de schema (não afeta o contrato real consumido pelo frontend).
+- **Escopo ator×alvo é a dívida estrutural do módulo** (épico #1656). O idioma `HasPerm(codename)` responde "esta pessoa pode executar esta ação?", nunca "sobre QUEM ela pode executar". Onde o alvo importa — administração de usuários (`M07-02`), solicitações de outra gerência (`M10-01`), `HasSectorAccess` na Grade Mensal (`M14-01`) — a checagem de alvo precisa ser feita no queryset/serializer da view, e hoje falta em vários pontos. Ao criar uma capability nova, decidir explicitamente se ela precisa de escopo e onde ele é aplicado.
+- **`SuperuserOnly` fora da superfície pública**: não está em `rbac/__init__.py`; importar via `apps.core.permissions`. Se for promovida ao `__init__`, atualizar esta spec e o `__all__` juntos.

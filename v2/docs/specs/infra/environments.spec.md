@@ -158,7 +158,7 @@ PostgreSQL externo da VM02; Redis é local na stack. Backend em `:28000`, fronte
   spec passa a ser a SSOT do tópico; quando o doc longo existir, deve ser linkado aqui (não duplicado).
 - **`make health-*` usa health externo via curl,** que em algumas redes (Kaspersky/Golden) retorna HTTP 000
   para `:443` mesmo com containers `healthy` — não confundir falha de rede com falha de app (ver deploy.spec).
-- **Prod sem staging remoto; deploy pull-based (ADR-018):** não há ambiente de staging em VM. Merge na `main`
+- **Prod sem staging remoto; deploy pull-based ([ADR-018](../../../../docs/architecture/project-decisions/ADR-018-pull-based-deploy.md)):** não há ambiente de staging em VM. Merge na `main`
   **não** deploya — só faz build+scan+push+sign+tag/release. Produção muda em dois passos deliberados:
   `promote.yml` (gated no Environment `production`) assina um ponteiro de release no branch `deploy-pointer`, e
   o agente `aprender-deployer` na VM01 verifica e aplica **por digest** em `127.0.0.1:9443` (ver

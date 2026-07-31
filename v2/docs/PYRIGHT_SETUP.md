@@ -1,9 +1,9 @@
 # ⚙️ Pyright Setup & Troubleshooting
 
 **Projeto**: Aprender Sistema v2
-**Type Checker**: Pyright 1.1.382
-**Python**: 3.12.12
-**Última Atualização**: 11 de Novembro de 2025
+**Type Checker**: Pyright 1.1.382 (`v2/backend/requirements-dev.txt:42`)
+**Python**: 3.12 (`v2/backend/pyproject.toml:11`; CI em `.github/actions/setup-python-deps/action.yml:12`)
+**Última Atualização**: 24 de julho de 2026 — revisão contra a config real
 
 ---
 
@@ -16,13 +16,15 @@ cd v2/backend
 pip install -r requirements-dev.txt
 ```
 
-**Pacotes instalados**:
+**Pacotes instalados** (versões conforme `v2/backend/requirements-dev.txt:42-47`):
 - `pyright==1.1.382` - Type checker
-- `django-types==0.19.1` - Type stubs Django
-- `djangorestframework-types==0.8.0` - Type stubs DRF
+- `django-types==0.24.0` - Type stubs Django
+- `djangorestframework-types==0.9.0` - Type stubs DRF
 - `types-requests==2.32.0.20240914` - Type stubs requests
 - `types-redis==4.6.0.20240903` - Type stubs Redis
 - `celery-types==0.22.0` - Type stubs Celery
+
+> Fonte de verdade das versões é o `requirements-dev.txt`. Se este doc divergir, o arquivo vence.
 
 ### 2. Verificar Instalação
 
@@ -43,32 +45,46 @@ Configuração principal em `v2/backend/pyproject.toml`:
 
 ```toml
 [tool.pyright]
-typeCheckingMode = "strict"  # Modo mais rigoroso
-pythonVersion = "3.12"       # Python 3.12.12
-include = ["apps/core", "apps/dat_ingest", "config"]
-exclude = ["**/migrations", "**/tests", "**/__pycache__"]
+typeCheckingMode = "strict"                              # pyproject.toml:8
+pythonVersion = "3.12"                                   # pyproject.toml:11
+venvPath = "."                                           # pyproject.toml:14
+include = ["apps/core", "apps/dev_tools", "config"]      # pyproject.toml:21-25
+exclude = [                                              # pyproject.toml:28-34
+    "**/__pycache__", "**/migrations",
+    "**/.venv", "**/venv", "**/node_modules",
+]
+stubPath = "typings"                                     # pyproject.toml:37
 ```
 
-**Arquivos incluídos** (35% do projeto):
-- `apps/core/` - 24 services, 5 models, 21 views, 1 serializer, 1 tasks
-- `apps/dat_ingest/` - 11 services, models, views
-- `config/` - Settings, URLs
+**Arquivos incluídos**:
+- `apps/core/` — services, models, views, serializers, tasks
+- `apps/dev_tools/` — commands de desenvolvimento (ex.: `seed_rbac`)
+- `config/` — settings, URLs
 
-**Arquivos excluídos** (temporário):
-- `**/migrations/` - Gerados automaticamente
-- `**/tests/` - Fixtures serão incluídas no PR #7
+**Arquivos excluídos**: `**/migrations/`, `**/__pycache__`, `**/.venv`, `**/venv`, `**/node_modules`.
+
+> ⚠️ **Corrigido em 2026-07-24**: a app **`apps/dat_ingest` não existe** — foi removida junto com o
+> ETL legado. `v2/backend/apps/` contém apenas `core/` e `dev_tools/`. Toda referência a
+> `dat_ingest` neste documento foi substituída.
+>
+> ⚠️ **`**/tests` NÃO está em `exclude`** (`pyproject.toml:28-34`). Os testes não são analisados
+> porque também não estão em `include` — não porque estejam explicitamente excluídos.
 
 ### Type Stubs Customizados
 
-Type stubs em `v2/backend/typings/`:
+Type stubs em `v2/backend/typings/` (`stubPath`, `pyproject.toml:37`):
 
 ```
 typings/
-├── django/
-│   └── __init__.pyi       # QuerySet[T], Manager[T]
-└── rest_framework/
-    └── __init__.pyi       # ModelSerializer[T], ViewSet[T]
+├── rest_framework/
+│   └── __init__.pyi       # ModelSerializer[T], ViewSet[T]
+└── django_filters/
+    ├── __init__.pyi
+    └── rest_framework/
+        └── __init__.pyi
 ```
+
+*(Não existe `typings/django/` — Django é tipado pelo pacote `django-types`.)*
 
 **Por que stubs customizados?**
 - Django/DRF têm tipagem complexa
@@ -102,16 +118,16 @@ pyright --outputjson > pyright-report.json
 O CI roda automaticamente em cada push/PR:
 
 ```yaml
-# .github/workflows/v2-ci.yml
+# .github/workflows/ci.yaml — job "[required] backend typecheck (pyright)" (ci.yaml:380)
 - name: Type check with Pyright
   run: |
     cd v2/backend
-    pyright apps/core apps/dat_ingest config
-  continue-on-error: true  # Não bloqueia CI (baseline)
+    pyright apps/core config        # ci.yaml:396
 ```
 
-**Status atual**: `continue-on-error: true` (baseline)
-**Após PR #8**: `continue-on-error: false` (strict enforcement)
+> ✅ **Atualizado em 2026-07-24**: pyright é hoje um **gate obrigatório e bloqueante**.
+> O step em `.github/workflows/ci.yaml:393-396` **não tem** `continue-on-error`, e o job se chama
+> `[required] backend typecheck (pyright)` (`ci.yaml:380`). O marco "PR #8" já foi entregue.
 
 ---
 
@@ -179,7 +195,7 @@ cat pyproject.toml | grep venvPath
 pip list | grep django-types
 
 # 2. Se não estiver, instalar
-pip install django-types==0.19.1
+pip install django-types==0.24.0
 
 # 3. Recarregar VS Code
 # Ctrl + Shift + P -> "Reload Window"
@@ -220,7 +236,8 @@ extraPaths = ["apps", "config"]
 2. ✅ PRs #2-#8: Corrigir gradualmente (8 PRs, ~144h)
 3. ✅ Após PR #8: Código crítico 100% tipado
 
-**Ver progress**: `TYPE_HINTS_REFERENCE_FULL.md` (tracking dashboard)
+**Ver também**: [TYPE_HINTS_GUIDE.md](./TYPE_HINTS_GUIDE.md).
+*(O `TYPE_HINTS_REFERENCE_FULL.md` citado até 2026-07-24 nunca existiu no repositório.)*
 
 ---
 
@@ -274,7 +291,7 @@ print(f\"Files: {summary['filesAnalyzed']}\")
 
 ```bash
 cd v2/backend
-pyright apps/core/services/ apps/dat_ingest/services/
+pyright apps/core/services/ apps/dev_tools/
 ```
 
 ---
@@ -301,15 +318,15 @@ pyright --outputjson > pyright-baseline.json
 ### GitHub Actions
 
 ```yaml
-# .github/workflows/v2-ci.yml
+# .github/workflows/ci.yaml — job "[required] backend typecheck (pyright)" (ci.yaml:380)
 - name: Type check with Pyright
   run: |
     cd v2/backend
-    pyright apps/core apps/dat_ingest config
-  continue-on-error: true  # Baseline: não bloqueia
+    pyright apps/core config        # ci.yaml:396
 ```
 
-**Após PR #8**: Remover `continue-on-error` (strict enforcement)
+**Estado em 2026-07-24**: gate **bloqueante**. Não há `continue-on-error` no step
+(`.github/workflows/ci.yaml:393-396`) — pyright reprovando reprova o PR.
 
 ### Pre-commit Hook (Futuro)
 

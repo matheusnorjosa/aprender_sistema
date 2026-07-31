@@ -2,12 +2,19 @@
 
 Este fluxo cria uma trilha de experimento para `pytest-xdist` sem alterar os gates obrigatorios de PR.
 
+> **Estado atual: a promocao ja aconteceu.** Desde 2026-06-19 (#1403) o gate obrigatorio
+> roda `-n auto --dist loadscope` (`ci.yaml:231` e `ci.yaml:253`). A canary deixou de ser
+> um experimento pre-promocao e passou a ser **tripwire de regressao**: pega teste novo
+> xdist-inseguro em combinacoes que o gate nao exercita. Os criterios formais abaixo ficam
+> como registro do processo que autorizou a promocao (que foi por fast-track — ver o
+> [backlog de estabilizacao](ci-backend-xdist-stabilization-backlog.md)).
+
 ## Workflow
 
 Arquivo: `.github/workflows/backend-xdist-canary.yml`
 
 Gatilhos:
-- `schedule` diario
+- `schedule` **semanal** (segunda, 10:20 UTC) — era diario ate a estabilizacao consolidar
 - `workflow_dispatch` (manual)
 - `push` em `main` para mudancas no proprio workflow/script/doc da trilha
 
@@ -43,7 +50,12 @@ Regra de triagem:
 - teste/assinatura com reincidencia em `2+` execucoes precisa ter issue de estabilizacao vinculada ao epic da fase (`#677`).
 - backlog com owner/status: [CI Backend xdist Stabilization Backlog](ci-backend-xdist-stabilization-backlog.md)
 
-## Trilha de evidencia (14 dias)
+## Trilha de evidencia (14 dias) — historico
+
+> Registro do processo original. O criterio de 14 dias **nao** foi o caminho usado: a
+> promocao de 2026-06-19 foi por fast-track (fix deterministico + canary 0/4 em 2 runs).
+
+
 
 - O job `[ops] backend xdist canary summary` publica:
   - artifact consolidado (`xdist-canary-report`)
@@ -51,7 +63,10 @@ Regra de triagem:
   - snapshot em comentario na issue `#677`
 - Esses snapshots formam a trilha objetiva para o criterio de 14 dias antes de qualquer promocao para gate obrigatorio.
 
-## Criterio formal para promocao ao caminho obrigatorio
+## Criterio formal para promocao ao caminho obrigatorio — historico
+
+> Ja cumprido/dispensado em 2026-06-19. Mantido como referencia para uma eventual
+> proxima mudanca de modo do gate (ex.: trocar `loadscope` por `loadfile`).
 
 Promover `xdist` para gate obrigatorio so quando TODOS os criterios abaixo forem atendidos:
 

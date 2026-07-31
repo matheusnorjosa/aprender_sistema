@@ -67,22 +67,26 @@ def _decrypt_token_for_tests(encrypted: bytes) -> str:
 - O builder inclui apenas: `COORDENADOR`, `FORMADOR`, `COORD_ACOMPANHA`
 - `guest_email` mantém o papel formal quando não há usuário (aparece como attendee)
 
-## Seed / ETL / Arquivos
+## Seed / Imports / Arquivos
 
 **Paths robustos**:
 ```python
 from pathlib import Path
 from django.conf import settings
 
-csv_path = Path(settings.BASE_DIR) / "apps/core/data/projetos_fluxo.csv"
+csv_path = Path(settings.BASE_DIR) / "data/municipios_coordenadas.csv"
 ```
+
+*(Corrigido em 2026-07-24: o exemplo anterior apontava para `apps/core/data/projetos_fluxo.csv`,
+que **não existe** — nem o arquivo, nem o diretório `apps/core/data/`.)*
 
 **Evitar**:
 - Caminhos relativos ao CWD (quebram conforme diretório de execução)
 - Hardcoded `/app` (específico de container, não funciona localmente)
 
-**Artefatos de ETL**:
-- Devem ser gravados sob `IMPORT_OUTPUT_DIR` ou `BASE_DIR`, nunca em `/app`
+**Artefatos de import**:
+- Devem ser gravados sob `IMPORT_OUTPUT_DIR` ou `BASE_DIR`, nunca em `/app`.
+  *(O ETL legado foi removido; o caminho atual é `import_export_contract` + endpoints DRF.)*
 
 ## Princípios
 
@@ -91,21 +95,36 @@ csv_path = Path(settings.BASE_DIR) / "apps/core/data/projetos_fluxo.csv"
 3. **Ajustar código** só quando o comportamento real estiver incorreto
 4. **Fixtures idempotentes**: usar `get_or_create()` para evitar cross-poluição
 5. **Security-first**: validar permissões antes de parâmetros (403 → 400 → 200)
+6. **xdist-safe** (ADR-015): a suite roda em paralelo
+   (`v2/backend/pytest.ini:14` — `django_db_suffix = _{worker_id}`). Portanto:
+   sufixar CPFs/usernames com UUID, **nunca** usar `AuditLog.objects.all().delete()`, e
+   contar sempre com queryset filtrado — nunca `.count()` global.
+
+## Cobertura
+
+| Lado | Threshold configurado | Enforçado no CI? |
+|---|---|---|
+| Backend | **85%** — `v2/backend/pytest.ini:40` (`fail_under = 85`) | ✅ sim — `.github/workflows/ci.yaml:353` (`coverage report --fail-under=85`) |
+| Frontend | **70%** (statements/branches/functions/lines) — `v2/frontend/vitest.config.ts:44-49` | ❌ **não** — `.github/workflows/frontend-ci.yml:66` roda `npm run test` (= `vitest`), não `test:coverage` |
+
+Política e histórico do gate de 85%: [analysis/COVERAGE_POLICY.md](./analysis/COVERAGE_POLICY.md).
+O alvo de 90% (Fase 2) segue como meta, não como gate.
+
+> ⚠️ O threshold de 70% do frontend existe no `vitest.config.ts` mas **nenhum workflow o executa**.
+> Quem lê só a config assume que o gate está ativo; não está.
 
 ## Baseline CI
 
-**Suite completa** (após correções da Issue #69):
-```
-=========== 809 passed, 27 skipped, 6 warnings in 277.23s (0:04:37) ============
-```
+**Suite completa**: `1942 passed, 28 skipped, 0 failed`
+(ADR-015 §Baseline — [ADR-015-testing-policy.md](../../docs/architecture/project-decisions/ADR-015-testing-policy.md), linha 24;
+baseline estabelecido no PR #1030).
 
-**PRs relacionados**:
-- #72 - CI/CD alignment (runtime, TZ, fake GCAL)
-- #73 - Celery/GCal Safety (FEATURE_AUTO_APPLY)
-- #74 - Availability RBAC (security-first 403/400)
+*(Corrigido em 2026-07-24: este documento citava `809 passed, 27 skipped` da Issue #69 — baseline de
+2025, defasado por um fator de ~2,4. O SSOT do baseline é o ADR-015.)*
 
 ## Referências
 
-- **Issue #69**: Correção de testes CI (809/809 passando)
+- **ADR-015** — [Política de Testes](../../docs/architecture/project-decisions/ADR-015-testing-policy.md) (SSOT: baseline, xdist-safety, ordem de validação)
+- **COVERAGE_POLICY** — [analysis/COVERAGE_POLICY.md](./analysis/COVERAGE_POLICY.md)
 - **CP-01 a CP-06**: Cláusulas Pétreas (REQUIRE_DOCKER, PA, RD, etc.)
-- **Contexto Consolidado v2**: Regras de negócio documentadas em `.claude/CLAUDE.md`
+- **Contexto Consolidado v2**: regras de negócio no `CLAUDE.md` da raiz do repositório

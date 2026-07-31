@@ -1,11 +1,13 @@
 ---
 title: Índice SDD (Spec-Driven Development)
 status: active
-last_verified: 2026-06-19
+last_verified: 2026-07-24
 owner: docs
 related:
   - ../plans/PLAN_sdd_migration_2026-06-19.md
   - ../reports/AUDITORIA_DOCUMENTAL_2026-06-19.md
+  - ../audits/ACHADOS_REAIS.md
+  - ../audits/VARREDURA_DOCS_2026-07-24.md
 ---
 
 # Índice SDD — Specs vivas do AS v2
@@ -15,9 +17,18 @@ contrato em produção tem (ou terá) uma spec versionada, datada e rastreável 
 e as fases estão no [plano SDD](../plans/PLAN_sdd_migration_2026-06-19.md), apoiado na
 [auditoria documental 2026-06-19](../reports/AUDITORIA_DOCUMENTAL_2026-06-19.md).
 
-> Estado: **specs escritas (Fases 3-4, 2026-06-19)**. Cada spec abaixo foi autorada e verificada contra o
-> código (`sources_of_truth` confirmados). O modelo SDD está formalizado na
+> Estado: **as 20 specs foram reverificadas contra o código em 2026-07-24** (varredura documental
+> pós-auditoria M00–M28), e todas estão hoje como `canonical`. O modelo SDD está formalizado na
 > [ADR-017](../../../docs/architecture/project-decisions/ADR-017-spec-driven-documentation.md).
+>
+> **Leia junto:** [`ACHADOS_REAIS.md`](../audits/ACHADOS_REAIS.md) é a fila viva de defeitos (57
+> achados: 2 P0, 36 P1, 19 P2). Várias specs abaixo têm uma seção **Divergências**, que registra
+> onde o código **não** cumpre a regra descrita — com link para o achado. Uma spec descrever o
+> comportamento real, inclusive quando ele é o errado, é intencional: o comportamento pretendido
+> só entra como "pretendido", nunca como se já existisse.
+>
+> O que foi corrigido, o que ficou pendente de decisão humana e o que já estava certo está em
+> [`VARREDURA_DOCS_2026-07-24.md`](../audits/VARREDURA_DOCS_2026-07-24.md).
 
 ## Convenção de frontmatter (obrigatória em todo doc vivo)
 
@@ -66,10 +77,10 @@ related: []                   # links a specs/ADRs relacionados
 | [solicitacao-approval.spec.md](./backend/solicitacao-approval.spec.md) | fluxo de aprovação (PA/RF04) | canonical |
 | [gcal.spec.md](./backend/gcal.spec.md) | Google Calendar + Meet (RF05/06) | canonical |
 | [imports.spec.md](./backend/imports.spec.md) | pipeline export-contract | canonical |
-| [backup-dr.spec.md](./backend/backup-dr.spec.md) | backup & disaster recovery (dívida #1455) | active |
+| [backup-dr.spec.md](./backend/backup-dr.spec.md) | backup & disaster recovery (#1455 fechado; **restore quebrado, #1611 P0**) | canonical |
 | [dat.spec.md](./backend/dat.spec.md) | módulo DAT (ações/cadastros/registros) | canonical |
 | [notificacoes.spec.md](./backend/notificacoes.spec.md) | sistema 32 Passos | canonical |
-| [deslocamento.spec.md](./backend/deslocamento.spec.md) | deslocamento (GAP preenchido) | active |
+| [deslocamento.spec.md](./backend/deslocamento.spec.md) | deslocamento (gate owner-or-delegate, #1454) | canonical |
 | [dev-tools.spec.md](./backend/dev-tools.spec.md) | catálogo de seeds (CP-08) | canonical |
 
 ### `frontend/` — pages, hooks, api clients
@@ -84,7 +95,7 @@ related: []                   # links a specs/ADRs relacionados
 
 | Spec | Cobre | Status |
 |---|---|---|
-| [deploy.spec.md](./infra/deploy.spec.md) | deploy → Portainer (prod verificado) | canonical |
+| [deploy.spec.md](./infra/deploy.spec.md) | deploy pull-based (ADR-018): promote → ponteiro assinado → agente na VM01 | canonical |
 | [environments.spec.md](./infra/environments.spec.md) | dev / staging / prod-like | canonical |
 | [ci.spec.md](./infra/ci.spec.md) | GitHub Actions, gates, deploy | canonical |
 

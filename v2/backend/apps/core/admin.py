@@ -121,6 +121,60 @@ class UsuarioAdmin(admin.ModelAdmin):
 
         return response
 
+    def save_model(self, request: HttpRequest, obj: Usuario, form: Any, change: bool) -> None:
+        """
+        #1672: audita flips de flags de privilégio (is_superuser/is_staff/is_active)
+        feitos pelo Django admin — caminho superuser-only que antes não deixava
+        trilha (contraste com a mutação equivalente via API, que gera auditoria).
+        Mudança de grupos vai pelo `save_related` (m2m). O change_view do admin já
+        roda em `transaction.atomic()`, então o on_commit reflete o commit real.
+        """
+        from apps.core.services.audit import registrar_auditoria
+
+        before: dict[str, Any] = {}
+        if change and obj.pk:
+            before = Usuario.objects.filter(pk=obj.pk).values("is_superuser", "is_staff", "is_active").first() or {}
+        super().save_model(request, obj, form, change)
+
+        changes: dict[str, Any] = {}
+        for flag in ("is_superuser", "is_staff", "is_active"):
+            after_val = bool(getattr(obj, flag))
+            before_val = before.get(flag)
+            # Em criação (change=False) só audita flag LIGADA (concessão inicial).
+            if (change and before_val != after_val) or (not change and after_val):
+                changes[flag] = {"before": before_val, "after": after_val}
+        if changes:
+            registrar_auditoria(
+                actor=request.user,
+                action=AuditLog.Action.USER_PRIVILEGE_CHANGED,
+                model_name="Usuario",
+                details={
+                    "target_user_id": obj.pk,
+                    "target_username": obj.username,
+                    "changes": changes,
+                    "via": "django_admin",
+                },
+            )
+
+    def save_related(self, request: HttpRequest, form: Any, formsets: Any, change: bool) -> None:
+        """
+        #1672: audita mudança de grupos (membership = privilégio) feita pelo Django
+        admin. Captura before/after e delega a `auditar_assign_groups` — mesma trilha
+        ASSIGN_GROUPS emitida pela API REST.
+        """
+        from apps.core.services.audit import auditar_assign_groups
+
+        obj: Usuario = form.instance
+        before_group_ids = set(obj.groups.values_list("pk", flat=True)) if obj.pk else set()
+        super().save_related(request, form, formsets, change)
+        after_group_ids = set(obj.groups.values_list("pk", flat=True))
+        auditar_assign_groups(
+            actor=request.user,
+            target_user=obj,
+            before_group_ids=before_group_ids,
+            after_group_ids=after_group_ids,
+        )
+
 
 class MunicipioAdmin(admin.ModelAdmin):
     list_display = ("nome", "uf", "ativo")
@@ -409,14 +463,25 @@ class PermissaoFuncionalAdmin(admin.ModelAdmin):
 
     def save_related(self, request: HttpRequest, form: Any, formsets: Any, change: bool) -> None:
         """
-        Após persistir os m2m (`groups`), emite o AuditLog consolidado por
-        operação Admin. O signal `m2m_changed` em `signals.py` já cuidou
-        do cache bust e acumulou os deltas; aqui flushamos uma vez.
-        """
-        from apps.core.signals import flush_group_capability_audit
+        Emite o AuditLog `GROUP_CAPABILITY_CHANGED` desta operação Admin (#1672).
 
+        Captura o snapshot dos grupos ANTES de persistir os m2m e compara com o
+        DEPOIS, delegando ao serviço transacional (emite em `on_commit`). O
+        signal `m2m_changed` já cuidou do cache bust. Substitui o antigo
+        buffer global + `flush_group_capability_audit`, que só persistia daqui.
+        """
+        from apps.core.services.audit import auditar_group_capability_change
+
+        capability = form.instance
+        before_group_ids = set(capability.groups.values_list("pk", flat=True)) if capability.pk else set()
         super().save_related(request, form, formsets, change)
-        flush_group_capability_audit(actor_user=request.user)
+        after_group_ids = set(capability.groups.values_list("pk", flat=True))
+        auditar_group_capability_change(
+            actor=request.user,
+            capability=capability,
+            before_group_ids=before_group_ids,
+            after_group_ids=after_group_ids,
+        )
 
 
 # Registro funcional (evita problemas de importação circular com decoradores)

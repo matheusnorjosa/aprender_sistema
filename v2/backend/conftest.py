@@ -48,12 +48,8 @@ def ensure_rbac_seed(db):
     if not PermissaoFuncional.objects.filter(groups__isnull=False).exists():
         ensure_base_groups()
         seed_functional_permissions(assign_default_groups=True)
-        # O groups.set do seed dispara m2m_changed e popula o buffer de auditoria de
-        # capability; essas mudancas sao infraestrutura de teste (nao operacoes
-        # auditaveis) -> limpar para nao contaminar contagens de AuditLog.
-        from apps.core.signals import _PENDING_GROUP_CAP_DELTAS
-
-        _PENDING_GROUP_CAP_DELTAS.clear()
+        # #1672: a auditoria de capability nao usa mais buffer global — o
+        # `groups.set` do seed so dispara cache bust (nenhum AuditLog a limpar).
 
 
 @pytest.fixture(autouse=True, scope="function")

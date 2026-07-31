@@ -48,6 +48,11 @@ from apps.core.serializers import (
     ProjetoSerializer,
     UsuarioAdminSerializer,
 )
+from apps.core.services.audit import (
+    auditar_assign_groups,
+    auditar_user_delete,
+    registrar_auditoria,
+)
 from apps.core.services.options_cache import invalidate_municipios_options_cache
 from apps.core.services.rbac_service import get_assignable_group_names
 
@@ -394,7 +399,14 @@ class UsuarioAdminViewSet(viewsets.ModelViewSet):
             )
             if not has_other_active_superuser:
                 raise ValidationError({"detail": "Não é possível remover o último superusuário ativo."})
-        instance.delete()
+        # #1672: auditoria + delete no MESMO atomic. Sem isso, em autocommit
+        # (ATOMIC_REQUESTS off) o on_commit dispararia ANTES do delete e um
+        # ProtectedError (Solicitacao/AvailabilityBlock/dat_* referenciam Usuario
+        # com PROTECT) deixaria trilha-fantasma de uma exclusao que nao ocorreu.
+        # O helper trata auto-exclusao (FK None, ator preservado em details).
+        with transaction.atomic():
+            auditar_user_delete(actor=self.request.user, target_user=instance)
+            instance.delete()
 
     @action(detail=True, methods=["post"], permission_classes=[SuperuserOnly])
     def assign_groups(self, request, pk=None):
@@ -462,7 +474,15 @@ class UsuarioAdminViewSet(viewsets.ModelViewSet):
                 )
 
         # Atribuir grupos (substitui grupos existentes)
+        before_group_ids = set(usuario.groups.values_list("id", flat=True))
         usuario.groups.set(groups)
+        # #1672: mudanca de membership (privilegio) auditada.
+        auditar_assign_groups(
+            actor=request.user,
+            target_user=usuario,
+            before_group_ids=before_group_ids,
+            after_group_ids=set(usuario.groups.values_list("id", flat=True)),
+        )
 
         # Retornar usuário atualizado com grupos
         serializer = self.get_serializer(usuario)
@@ -506,7 +526,22 @@ class GroupViewSet(viewsets.ModelViewSet):
             raise ValidationError(
                 {"detail": "Grupo reservado. Para excluir, use ?confirm_reserved=true na requisição."}
             )
-        super().perform_destroy(instance)
+        # #1672: auditoria + delete no MESMO atomic (ver perform_destroy de Usuario):
+        # o on_commit só grava se o delete commitar, evitando trilha-fantasma quando
+        # um ProtectedError (ex.: AcaoTemplateExecutor.group) impede a remoção.
+        # Registra as capabilities que o grupo carregava no momento da remoção.
+        with transaction.atomic():
+            registrar_auditoria(
+                actor=self.request.user,
+                action=AuditLog.Action.DELETE,
+                model_name="Group",
+                details={
+                    "group_id": instance.pk,
+                    "group_name": instance.name,
+                    "capabilities": list(instance.permissoes_funcionais.values_list("codename", flat=True)),
+                },
+            )
+            super().perform_destroy(instance)
 
     @action(
         detail=True,

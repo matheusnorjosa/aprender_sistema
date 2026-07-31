@@ -1,7 +1,7 @@
 # Documento Consolidado — Projeto Aprender Sistema (AS)
 
-> **Última atualização**: Janeiro 2026
-> **Versão do Sistema**: 2.0 (Produção)
+> **Última atualização**: 2026-07-24 (§2.2, §2.3, §9 e §10 revistos contra o código)
+> **Versão em produção**: `v2026.07.18-94f2765` — confirme sempre em `GET /api/version/`
 
 ## 1. Origem do Projeto: Lógica das Planilhas
 
@@ -42,21 +42,38 @@ O sistema original funcionava integralmente sobre planilhas Google/Excel, que ac
 - **Infraestrutura**: Docker + Docker Compose (`v2/infra/docker-compose.yml`)
 - **Frontend**: React (Vite) + Tailwind + Ant Design
 - **Type Checking**: Pyright (strict mode)
-- **Testes E2E**: Playwright (46 testes)
+- **Testes E2E**: Playwright — **137 testes** em 23 arquivos `.spec.ts` sob `v2/frontend/e2e/`
 
 ### 2.2 Estrutura de Código
 
 #### Backend (`v2/backend`)
-- **Apps**: `apps.core` (domínio principal) e `apps.dat_ingest` (ETLs e ingestão)
+
+> 🔴 **Corrigido em 2026-07-24.** Esta seção ainda descrevia `apps.dat_ingest`, removida junto com
+> o ETL legado — contradizendo a própria §2.4 deste documento.
+
+- **Apps**: `apps.core` (domínio principal) e `apps.dev_tools` (seeds e tooling de dev).
+  **`apps.dat_ingest` não existe mais.**
 - **Configurações**: `config/` (settings, urls, wsgi, celery)
-- **Comandos ETL**: `apps/dat_ingest/management/commands/` (21 comandos)
+- **Management commands**: 13 em `apps/core/management/commands/` + 15 em
+  `apps/dev_tools/management/commands/`. **Nenhum comando `etl_*`.** O comando canônico de
+  importação é `import_export_contract` (ver §2.4).
 
 #### Frontend (`v2/frontend`)
 - **Framework**: React 18 + Vite 7
 - **UI**: Ant Design 5 + Tailwind CSS
-- **Páginas**: 45+ páginas organizadas em módulos
+- **Páginas**: 57 arquivos `.tsx` em `src/pages` (o projeto é 100% TypeScript — não há `.jsx`)
 
-### 2.3 Modelos do Sistema (28 modelos)
+### 2.3 Modelos do Sistema
+
+> 🔴 **Corrigido em 2026-07-24.** O título dizia "28 modelos", a tabela abaixo lista 29 e o código
+> exporta **43 nomes** em `apps/core/models/__init__.py:84-142`. Não confie na contagem daqui:
+> o **SSOT é `apps/core/models/__init__.py`**.
+>
+> Ausentes da tabela abaixo: `Colecao`, `MunicipioReferencia`, `ImportJob`, `PermissaoFuncional`,
+> `GroupClassificacao` e os 8 modelos de ações/notificações (`AcaoTemplate`,
+> `AcaoTemplateExecutor`, `CicloAcoes`, `AcaoInstancia`, `RegistroAncora`,
+> `RegistroConclusaoAcao`, `FeriadoLocal`, `NotificacaoInterna`) —
+> `models/__init__.py:41-50, 64, 66-77`.
 
 #### Usuários e Organização
 | Modelo | Descrição |
@@ -235,15 +252,20 @@ Contratos por entidade e ordem de importação: `v2/docs/imports/README.md`.
 | Approval Policy (PA-01→PA-07) | 5 | ✅ |
 | RBAC Permissions | 20+ | ✅ |
 | Google Calendar | 6+ | ✅ |
-| ETL Imports | 40+ | ✅ |
-| E2E Playwright | 46 | ✅ |
+| Imports (10 services `*_import.py` + `import_export_contract`) | 40+ | ✅ |
+| E2E Playwright | 137 (23 arquivos `.spec.ts`) | ✅ |
 
 ---
 
 ## 10. Referências
 
-- **CLAUDE.md**: Regras completas e cláusulas pétreas
-- **GUIDE_GCAL.md**: Integração Google Calendar
-- **RBAC_COMPLETO.md**: Sistema de permissões
-- **TESTING_POLICY.md**: Políticas de teste
-- **OBSERVABILITY.md**: Prometheus/Grafana/Logging
+- [**audits/ACHADOS_REAIS.md**](./audits/ACHADOS_REAIS.md): documento vivo — fila de defeitos confirmados em produção
+- [**GUIDE_GCAL.md**](./GUIDE_GCAL.md): Integração Google Calendar (produção roda em modo **OAuth**)
+- [**rbac_authorization_matrix.md**](./rbac_authorization_matrix.md): matriz de autorização (gerada; guard de drift no CI)
+- [**RBAC_NAMING.md**](./RBAC_NAMING.md) e [**GUIA_ADMIN_RBAC.md**](./GUIA_ADMIN_RBAC.md): convenção e guia operacional de RBAC
+- [**TESTING_POLICY.md**](./TESTING_POLICY.md): Políticas de teste
+- [**OBSERVABILITY.md**](./OBSERVABILITY.md): Prometheus/Grafana/Logging
+- [**imports/README.md**](./imports/README.md): contratos de importação
+
+*(Corrigido em 2026-07-24: `RBAC_COMPLETO.md` só existe em `_archive/` — não é doc vivo.
+`CLAUDE.md` não é rastreado por este repositório.)*

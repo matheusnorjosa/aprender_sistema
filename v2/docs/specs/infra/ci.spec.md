@@ -1,9 +1,11 @@
 ---
 title: CI/CD (GitHub Actions)
 status: canonical
-last_verified: 2026-07-10
+last_verified: 2026-07-24
 sources_of_truth:
   - .github/workflows/ci.yaml
+  - .github/workflows/promote.yml
+  - v2/infra/docker-compose.prod.yml
   - codecov.yml
   - .github/workflows/deploy.yaml
   - .github/workflows/_backend-test.yml
@@ -30,7 +32,7 @@ related:
 
 ## Propósito
 
-Pipeline de integração e entrega contínua do AS v2 sobre GitHub Actions. A CI valida cada PR para `main` (lint, RBAC lint, type-check, testes backend paralelos, paridade Docker, frontend) e bloqueia merge enquanto os gates `[required]` não passarem. **Merge na `main` NÃO deploya** (modelo pull-based, ADR-018): dispara `deploy.yaml` ("Build, sign and release"), que faz build+scan+push das imagens no Docker Hub, **assina** (cosign keyless + provenance SLSA) e cria a tag imutável `vYYYY.MM.DD-<sha7>` + Release. Produção só muda por **promoção deliberada** (`promote.yml`, gated no Environment `production`) aplicada pelo agente `aprender-deployer` na VM01 (ver [`deploy.spec.md`](./deploy.spec.md)). Como **não existe staging remoto**, os gates de PR + o staging-gate local são a única rede de proteção antes da produção.
+Pipeline de integração e entrega contínua do AS v2 sobre GitHub Actions. A CI valida cada PR para `main` (lint, RBAC lint, type-check, testes backend paralelos, paridade Docker, frontend) e bloqueia merge enquanto os gates `[required]` não passarem. **Merge na `main` NÃO deploya** (modelo pull-based, [ADR-018](../../../../docs/architecture/project-decisions/ADR-018-pull-based-deploy.md)): dispara `deploy.yaml` ("Build, sign and release"), que faz build+scan+push das imagens no Docker Hub, **assina** (cosign keyless + provenance SLSA) e cria a tag imutável `vYYYY.MM.DD-<sha7>` + Release. Produção só muda por **promoção deliberada** (`promote.yml`, gated no Environment `production`) aplicada pelo agente `aprender-deployer` na VM01 (ver [`deploy.spec.md`](./deploy.spec.md)). Como **não existe staging remoto**, os gates de PR + o staging-gate local são a única rede de proteção antes da produção.
 
 A nomenclatura dos checks é o contrato de governança: `[required]` bloqueia merge, `[info]` é informativo, `[ops]` é rotina manual/agendada fora do gate de PR. A SSOT desta convenção e da lista de checks obrigatórios é [`docs/operations/ci-check-policy.md`](../../../../docs/operations/ci-check-policy.md).
 
@@ -89,7 +91,7 @@ A nomenclatura dos checks é o contrato de governança: `[required]` bloqueia me
 
 ## Decisões relacionadas (ADRs)
 
-- **ADR-018** — deploy **pull-based**: `promote.yml` (gated) → ponteiro assinado no branch `deploy-pointer` → agente `aprender-deployer` aplica por digest na VM01. **Supersede** o ADR-010 (PUT do CI ao Portainer `:9443` público), desligado no cutover #1515 e removido na Fase 4 #1516. Detalhe em [`deploy.spec.md`](./deploy.spec.md).
+- **[ADR-018](../../../../docs/architecture/project-decisions/ADR-018-pull-based-deploy.md)** — deploy **pull-based**: `promote.yml` (gated) → ponteiro assinado no branch `deploy-pointer` → agente `aprender-deployer` aplica por digest na VM01. **Supersede** o [ADR-010](../../../../docs/architecture/project-decisions/ADR-010-deploy-portainer-direct-to-prod.md) (PUT do CI ao Portainer `:9443` público), desligado no cutover #1515 e removido na Fase 4 #1516. Detalhe em [`deploy.spec.md`](./deploy.spec.md).
 - **#1397** — least-privilege do `GITHUB_TOKEN` (M2).
 - **#1401** — reusable `_backend-test.yml` (SSOT de setup de teste).
 - **#1402 / #1403** — estabilização xdist + promoção de `-n auto --dist loadscope` no gate (M3).
@@ -110,7 +112,7 @@ A CI é infra-as-code; sua "prova" são os próprios checks de gate e o canary, 
 ## Pontos de atenção / dívidas conhecidas
 
 - **Drift de versões postgres/redis** — `docker-parity-backend` é carve-out do reusable; bump no reusable não propaga sozinho (sincronizar manualmente). Apps = `core` + `dev_tools` apenas.
-- **Sem `makemigrations --check` na CI** — migrations não são validadas no gate e o deploy não aplica migrations automaticamente (manuais em prod). Rastreado em **#1456**.
+- **`makemigrations --check` roda, mas não bloqueia merge** — o check existe (`_backend-test.yml:155-163`, `python manage.py makemigrations --check --dry-run`) e é acionado por `ci.yaml:283` (`check_migrations: true`) no job `backend-migrate-integrity`. Só que esse job é **`[info]`** (`ci.yaml:271`) e **não está no `needs` do agregador `[required] tests`** (`ci.yaml:562-566`), que só assere `backend-tests`, `backend-typecheck` e `docker-parity-backend`. Resultado: model-drift sem migration é **detectado e reportado, mas não impede o merge**. O comentário em `ci.yaml:268-270` afirma que o job "é gated pelo required `backend-tests` (needs + assert)" — isso **não** corresponde ao `needs:` declarado. Rastreado em **#1456**; a lacuna de gating está registrada na varredura documental de 2026-07-24. (O **deploy**, esse sim, aplica migrations automaticamente via serviço one-shot `migrate` — ver [`deploy.spec.md`](./deploy.spec.md).)
 - **Canary só mostra top-5** — o report da issue #677 lista os 5 piores; a magnitude total de falhas pode ficar subdimensionada no comentário (vide M3: a issue citava 6 testes, eram 537).
 - **`pull_request` sem path filters em checks `[required]`** — necessário para o ruleset, mas faz `frontend-ci` rodar mesmo em PRs sem mudança de frontend (custo aceito por governança).
 - **react-doctor exige `--offline`** — o score depende de telemetria remota; sem `--offline` o gate é não-determinístico (memória `react-doctor-offline-determinism`).

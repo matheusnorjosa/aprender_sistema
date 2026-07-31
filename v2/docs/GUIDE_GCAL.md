@@ -9,7 +9,26 @@ Este guia documenta a configuração e uso da integração do **Aprender Sistema
 - ✅ Sincronização idempotente e resiliente (retry/backoff)
 - ✅ Suporte a dry-run para testes sem impacto
 
-## 1. Autenticação: Service Account
+> 🔴 **Leia antes de configurar (revisto 2026-07-24).**
+> **Produção roda em modo OAuth, não Service Account.** Configuração confirmada em produção:
+> `GCAL_AUTH_MODE=oauth`, `GCAL_CLIENT=google` (cliente real, **não** stub),
+> `GCAL_ALLOWED_DOMAIN=aprendereditora.com.br`, com `GCAL_OAUTH_CLIENT_ID`,
+> `GCAL_OAUTH_CLIENT_SECRET`, `GCAL_OAUTH_REDIRECT_URI` e `GCAL_ENCRYPTION_KEY` preenchidos.
+> **`GCAL_SERVICE_ACCOUNT_JSON` não existe em produção.**
+>
+> Consequência para quem lê este guia:
+> - A **§1 (Service Account)** abaixo é o caminho **legado/alternativo**. Não use como referência
+>   para produção.
+> - O caminho de produção é a **§2 (OAuth)**.
+> - O bloco "Exemplo para Produção" da §3 aponta para Service Account e **está errado para o
+>   ambiente atual** — há um aviso no local.
+> - `service_account` continua sendo o default **no código** (`config/settings.py:728`), o que
+>   torna fácil configurar um ambiente novo no modo errado. Sempre defina `GCAL_AUTH_MODE`
+>   explicitamente.
+>
+> Fonte dos fatos de ambiente: [audits/ACHADOS_REAIS.md](./audits/ACHADOS_REAIS.md), premissa F4.
+
+## 1. Autenticação: Service Account (legado / alternativo)
 
 ### Criar Service Account no Google Cloud
 
@@ -50,14 +69,23 @@ Este guia documenta a configuração e uso da integração do **Aprender Sistema
 2. Seção "Integrar calendário"
 3. Copie o **ID do calendário** (ex: `primary` ou `abc123@group.calendar.google.com`)
 
-### Modo OAuth (alternativa ao Service Account)
+### Modo OAuth — **o modo usado em produção**
 
 O sistema suporta dois modos de autenticação com o Google Calendar, selecionados por `GCAL_AUTH_MODE`:
 
 | Modo | Variável | Credenciais | Uso |
 |------|----------|-------------|-----|
-| **Service Account** (padrão) | `GCAL_AUTH_MODE=service_account` (ou omitir) | `GOOGLE_SERVICE_ACCOUNT_JSON` / `GOOGLE_SERVICE_ACCOUNT_FILE` | Autenticação servidor-a-servidor |
-| **OAuth** | `GCAL_AUTH_MODE=oauth` | Credenciais OAuth 2.0 por usuário (Controle/Superintendência) | Cada usuário conecta sua conta Google |
+| **OAuth** — ✅ **produção** | `GCAL_AUTH_MODE=oauth` | Credenciais OAuth 2.0 por usuário, cifradas em `GoogleOAuthCredential` | Cada usuário conecta sua conta Google |
+| Service Account — legado | `GCAL_AUTH_MODE=service_account` (**default do código**, `config/settings.py:728`) | `GOOGLE_SERVICE_ACCOUNT_JSON` | Autenticação servidor-a-servidor |
+
+> ⚠️ `service_account` ser o **default do código** não significa que seja o modo em uso.
+> Em produção `GCAL_AUTH_MODE=oauth` está definido explicitamente e
+> `GCAL_SERVICE_ACCOUNT_JSON` não existe. **Sempre defina `GCAL_AUTH_MODE` explicitamente**
+> em ambientes novos, ou eles cairão no caminho errado em silêncio.
+>
+> ⚠️ Apenas `GOOGLE_SERVICE_ACCOUNT_JSON` é lido por `config/settings.py:717`.
+> `GOOGLE_SERVICE_ACCOUNT_FILE` **não** passa pelo settings — é lido direto via `os.getenv`
+> em `apps/core/services/gcal_google_client.py:67`.
 
 > Em ambos os modos, `GCAL_CLIENT=google` é obrigatório para chamar a API real. A variável de modo é `GCAL_AUTH_MODE` (**não** `GCAL_CLIENT_MODE`).
 
@@ -130,13 +158,25 @@ GCAL_CALENDAR_ID=primary
 
 ### Exemplo para Produção
 
+> 🔴 Corrigido em 2026-07-24. O exemplo anterior usava
+> `GOOGLE_SERVICE_ACCOUNT_FILE=/app/secrets/aprender-prod-sa.json` — **não é a configuração de
+> produção**, e a variável nem é lida pelo `settings.py`.
+
 ```bash
-# .env produção
+# .env produção — modo OAuth (o que roda hoje)
 GCAL_CLIENT=google
+GCAL_AUTH_MODE=oauth
 GCAL_SEND_UPDATES=externalOnly
-GCAL_CALENDAR_ID=abc123@group.calendar.google.com
-GOOGLE_SERVICE_ACCOUNT_FILE=/app/secrets/aprender-prod-sa.json
+GCAL_ALLOWED_DOMAIN=aprendereditora.com.br
+GCAL_CALENDAR_ID=primary
+
+GCAL_OAUTH_CLIENT_ID=<oauth-client-id>
+GCAL_OAUTH_CLIENT_SECRET=<oauth-client-secret>
+GCAL_OAUTH_REDIRECT_URI=https://seu-dominio.com/api/oauth/google/callback/
+GCAL_ENCRYPTION_KEY=<fernet-key-base64>          # obrigatório em prod — ver §8 (SEC-011)
 ```
+
+Os segredos reais vivem no Portainer, não no repositório.
 
 ### Validação fail-fast (boot)
 
@@ -259,7 +299,10 @@ GET /api/solicitacoes/
 
 ### UI: Componente MeetLink
 
-**Componente Reutilizável** (`frontend/src/components/MeetLink.jsx`):
+> ⚠️ Corrigido em 2026-07-24: o frontend migrou para TypeScript. Todos os arquivos citados nesta
+> seção e nas seguintes são `.tsx`, não `.jsx`.
+
+**Componente Reutilizável** (`v2/frontend/src/components/MeetLink.tsx`):
 - Props: `href` (string | null | undefined)
 - Retorna `null` se href não existir
 - Renderiza dois botões:
@@ -268,15 +311,15 @@ GET /api/solicitacoes/
 
 **3 locais integrados:**
 
-1. **Solicitacoes.jsx** (drawer de detalhes):
+1. **`src/pages/Solicitacoes.tsx`** (drawer de detalhes):
    - Campo "Reunião Online" com `<MeetLink href={selectedSolicitacao.meet_link} />`
    - Exibido apenas se meet_link existir
 
-2. **PreAgendaPage.jsx** (coluna ações):
+2. **`src/pages/PreAgenda/PreAgendaPage.tsx`** (coluna ações):
    - `<MeetLink href={record.meet_link} />` na coluna "Ações"
    - Aparece ao lado de Preview/Publicar
 
-3. **MySolicitacoesPage.jsx** (coluna reunião):
+3. **`src/pages/Solicitacoes/MySolicitacoesPage.tsx`** (coluna reunião):
    - Coluna dedicada "Reunião"
    - `<MeetLink href={meet_link} />` (retorna null se vazio)
 
@@ -292,7 +335,7 @@ O campo `is_online` determina a modalidade do evento:
 
 **Campo**:
 ```python
-# v2/backend/apps/core/models.py (linha 86)
+# v2/backend/apps/core/models/solicitacao.py:204
 is_online = models.BooleanField(
     default=False,
     verbose_name='Evento Online?',
@@ -337,7 +380,7 @@ is_online = models.BooleanField(
 
 ### UI: Checkbox no Wizard
 
-**Localização**: `v2/frontend/src/pages/Solicitacoes/NewSolicitacaoWizard.jsx` (linhas 358-365)
+**Localização**: `v2/frontend/src/pages/Solicitacoes/NewSolicitacaoWizard.tsx:629` (`<Form.Item name="is_online">`)
 
 ```jsx
 <Form.Item name="is_online" valuePropName="checked">
@@ -363,9 +406,17 @@ is_online = models.BooleanField(
 
 ### Comportamento no Backend
 
-**Payload Building** (`gcal_sync_service.py`):
+**Payload Building** — implementação real em `apps/core/services/gcal/payload.py:274`.
+
+> ⚠️ Corrigido em 2026-07-24. Dois pontos: (a) `apps/core/services/gcal_sync_service.py` é hoje
+> apenas uma **fachada de re-export** (`:1-60`) — o código vive no pacote
+> `apps/core/services/gcal/` (`payload.py`, `sync.py`); (b) a assinatura real é
+> **keyword-only e com default `False`**:
+> `build_event_payload(s: Solicitacao, *, enable_meet: bool = False)`.
+
 ```python
-def build_event_payload(solicitacao, enable_meet=True):
+# apps/core/services/gcal/payload.py:274
+def build_event_payload(s, *, enable_meet: bool = False):
     payload = {
         "summary": "...",
         "start": {...},
@@ -412,7 +463,9 @@ A **Fase 4** implementa funcionalidades para **reenviar (resync)** e **cancelar*
 
 **Descrição**: Republicar solicitação no Google Calendar (força UPDATE)
 
-**Permissão**: `IsControleOrSuper`
+**Permissão**: `CanUseGcal` (policy `use_gcal` = `{operate_preagenda, approve_solicitation}`,
+`apps/core/rbac/policies.py:129`). *(Corrigido em 2026-07-24: a classe `IsControleOrSuper`
+não existe no codebase.)*
 
 **Fluxo**:
 1. Valida `status == 'aprovado'`
@@ -443,7 +496,9 @@ curl -X POST http://localhost:8002/api/solicitacoes/123/resync-gcal/ \
 
 **Descrição**: Cancelar evento no Google Calendar e limpar campos
 
-**Permissão**: `IsControleOrSuper`
+**Permissão**: `CanUseGcal` (policy `use_gcal` = `{operate_preagenda, approve_solicitation}`,
+`apps/core/rbac/policies.py:129`). *(Corrigido em 2026-07-24: a classe `IsControleOrSuper`
+não existe no codebase.)*
 
 **Fluxo**:
 1. Valida que evento foi publicado (`external_event_id` existe ou `gcal_status == PUBLISHED`)
@@ -477,7 +532,14 @@ curl -X POST http://localhost:8002/api/solicitacoes/123/cancel-gcal/ \
 
 ### Helpers (Service Layer)
 
-**Arquivo**: `v2/backend/apps/core/services/gcal_sync_service.py`
+**Arquivo real**: pacote `v2/backend/apps/core/services/gcal/`
+— `payload.py` (`build_event_payload:274`) e `sync.py`
+(`upsert_one:143`, `resync_solicitacao:388`, `cancel_solicitacao:416`).
+
+`v2/backend/apps/core/services/gcal_sync_service.py` continua importável, mas é apenas uma
+**fachada de re-export** (`:1-60`). Ao procurar código, vá no pacote.
+*(Corrigido em 2026-07-24; os números de linha antigos — "cancel_solicitacao linha ~1015",
+"upsert_one linhas 748-750" — eram do arquivo monolítico anterior ao split.)*
 
 #### resync_solicitacao(s, *, apply_blocked=False)
 
@@ -515,7 +577,7 @@ outcome = cancel_solicitacao(solicitacao)
 
 ### UI: Botões em PreAgendaPage
 
-**Arquivo**: `v2/frontend/src/pages/PreAgenda/PreAgendaPage.jsx`
+**Arquivo**: `v2/frontend/src/pages/PreAgenda/PreAgendaPage.tsx`
 
 **Botões condicionais** na coluna "Ações":
 
@@ -588,7 +650,7 @@ docker compose exec -T web pytest apps/core/tests/test_gcal_cancel_resync.py -v
 
 **Cancel é idempotente**: Se o evento já foi deletado do Calendar (404), a operação é tratada como sucesso. Isso permite múltiplas tentativas sem erro.
 
-**Implementação** (`cancel_solicitacao` linha ~1015):
+**Implementação** (`apps/core/services/gcal/sync.py:416`):
 ```python
 try:
     _retry_with_backoff(
@@ -617,16 +679,18 @@ docker compose exec web python manage.py shell
 
 ### Publish via Management Command
 
-```bash
-# Dry-run (simulação)
-docker compose exec web python manage.py sync_calendar \
-  --solicitacao-id 123 \
-  --dry-run
+> 🔴 **Corrigido em 2026-07-24: o command `sync_calendar` NÃO EXISTE.** Nunca existiu neste
+> repositório. O único management command relacionado a GCal é
+> `apps/core/management/commands/preagenda_to_gcal.py`:
 
-# Publish real (requer GCAL_CLIENT=google)
-docker compose exec web python manage.py sync_calendar \
-  --solicitacao-id 123
+```bash
+# Consultar as opções reais antes de usar
+docker compose exec web python manage.py preagenda_to_gcal --help
 ```
+
+Para publicar uma solicitação específica, o caminho suportado é o endpoint
+`POST /api/solicitacoes/{id}/publish/` (gate `CanUseGcal`), que despacha a task
+`task_publish_solicitacao_to_gcal`.
 
 ### Testes
 
@@ -685,7 +749,7 @@ export GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}'
 - ✅ `conferenceDataVersion=1` está sendo passado? (ver `gcal_google_client.py`)
 - ✅ Payload inclui `conferenceData`? (ver `_build_payload` com `enable_meet=True`)
 - ✅ Response do Google inclui `hangoutLink`? (verificar logs)
-- ✅ `s.meet_link` está sendo persistido? (ver `upsert_one` linhas 748-750)
+- ✅ `s.meet_link` está sendo persistido? (ver `upsert_one` em `apps/core/services/gcal/sync.py:143`; a gravação está em `sync.py:292` e `:346`)
 
 **Debug:**
 ```python

@@ -1,8 +1,19 @@
 # 📘 Aprender Sistema v2 — Runbook Operacional
 
-**Versão:** 1.0
+**Versão:** 1.1
 **Projeto Docker:** `aprender_v2`
-**Última atualização:** 2026-07-10
+**Última atualização:** 2026-07-24
+
+> ⚠️ **Escopo: este runbook é majoritariamente DEV/LOCAL.** Portas `8002`/`5434`/`6380`,
+> serviço `db`, `GCAL_CLIENT=fake`, credenciais de admin e `make` targets são do ambiente
+> local (`infra/docker-compose.yml`, projeto `aprender_v2`).
+>
+> **Em produção nada disso vale:** a stack roda sob Portainer na VM01 com
+> `infra/docker-compose.prod.yml` (serviços `migrate`, `web`, `redis`, `worker`, `beat`,
+> `frontend` — **não existe serviço `db`**; o PostgreSQL é externo, na VM02), o GCal usa o
+> cliente real via OAuth, e o único procedimento válido de mudança é o **pull-based**
+> descrito abaixo. Para incidentes de dados/DR, vá direto para
+> [DISASTER_RECOVERY.md](./DISASTER_RECOVERY.md) e [GUIDE_DR.md](./GUIDE_DR.md).
 
 ---
 
@@ -20,9 +31,13 @@
 
 ## 🚀 Deploy Workflow (Canônico)
 
-> **Modelo atual: pull-based (ADR-018).** SSOT: [`specs/infra/deploy.spec.md`](specs/infra/deploy.spec.md).
+> **Modelo atual: pull-based (ADR-018).** Decisão:
+> [ADR-018 — Pull-based deploy](../../docs/architecture/project-decisions/ADR-018-pull-based-deploy.md)
+> (supersede o ADR-010).
+> SSOT do mecanismo: [`specs/infra/deploy.spec.md`](specs/infra/deploy.spec.md).
 > O modelo antigo (o CI fazia `PUT` no Portainer `:9443` **público**) foi desligado no cutover (#1515) e o job
-> `deploy` foi **removido** na Fase 4 (#1516).
+> `deploy` foi **removido** na Fase 4 (#1516) — conferido em `.github/workflows/deploy.yaml`, cujos únicos
+> jobs hoje são `prepare`, `build_and_push`, `sign` e `tag_and_release`.
 
 Workflows oficiais:
 - `.github/workflows/deploy.yaml` (hoje **"Build, sign and release (main)"**)
@@ -214,8 +229,14 @@ docker compose -p aprender_v2 -f infra/docker-compose.yml ps worker beat
 ```
 
 Notas operacionais:
-- Em produção/systemd, usar scheduler padrão do Celery para respeitar `app.conf.beat_schedule` definido em `config/celery.py`.
+- Em **produção** (Docker/Portainer na VM01, **não** systemd) o beat roda com o **scheduler padrão** do
+  Celery: `celery -A config beat -l info --schedule /tmp/celerybeat-schedule`
+  (`v2/infra/docker-compose.prod.yml:243`; o `--schedule` aponta para tmpfs porque o root FS é `read_only`).
+  É esse scheduler que respeita o schedule definido em código, em `config/celery.py:35-56`.
 - Só usar `django_celery_beat.schedulers:DatabaseScheduler` se as `PeriodicTask` estiverem cadastradas no banco.
+- **O beat só agenda; quem executa é o `worker`.** Ao investigar um job que não rodou (ex.: o backup diário
+  das 02:00), olhe os **dois**: `logs beat` para o disparo, `logs worker` para a execução. Só o `worker` tem o
+  bind-mount `/backups` (`docker-compose.prod.yml:235`) — ver [BACKUP_OPERATIONS.md](./BACKUP_OPERATIONS.md).
 
 ---
 
@@ -473,6 +494,14 @@ docker compose -p aprender_v2 exec web python manage.py shell
 
 ### Seeds RBAC
 
+> ⛔ **DEV/STAGING APENAS — o comando não existe em produção.** `seed_rbac` vive em
+> `apps/dev_tools` (`v2/backend/apps/dev_tools/management/commands/seed_rbac.py`), e
+> `config/settings.py:137-143` **força `INCLUDE_DEV_TOOLS=False` quando
+> `ENVIRONMENT == "production"`**, independentemente da env var (CP-08 / #1466). O app não
+> entra em `INSTALLED_APPS`, então `manage.py seed_rbac` responde *Unknown command* em prod.
+> `docker-compose.prod.yml` ainda fixa `INCLUDE_DEV_TOOLS: "false"` como defesa em
+> profundidade. **Não** tente "seedar RBAC" em produção por aqui.
+
 Cria grupos e permissões mínimas (idempotente):
 
 ```bash
@@ -483,15 +512,23 @@ make seed-rbac
 docker compose -p aprender_v2 exec -T web python manage.py seed_rbac
 ```
 
-**Grupos criados:**
-- Superintendência
-- Coordenador
-- Formador
-- Controle
-- DAT
-- Gerência
+**Grupos criados:** a união de `SETOR_GROUPS` (13) + `FUNCAO_GROUPS` (5), definidos em
+`v2/backend/apps/core/constants.py:16-45` — essa é a SSOT, não esta lista.
 
-**Permissões atribuídas:** view/add/change para Solicitacao conforme grupo.
+- **Setores (13):** Superintendência, Vidas, Fluir, ACerta, Brincando, Sou da Paz, DAT,
+  Controle, Diretoria, Comercial, Relacionamento, Logística Viagens, Logística Galpão
+- **Funções (5):** Formador, Coordenador, Apoio de Coordenação, Gerente,
+  Assistente Administrativo
+
+> O grupo **"Gerência"** foi **descontinuado** em favor da função **"Gerente"** (#1222). Ele
+> ainda aparece em `PERMS_BY_GROUP` do seed por compatibilidade com testes legados
+> (`seed_rbac.py:89,124-126`), mas **não** está em `ALLOWED_USER_GROUPS` — não atribua
+> usuários a ele.
+
+**Permissões atribuídas:** ver `PERMS_BY_GROUP` em `seed_rbac.py:32-92`. A matriz de
+autorização real (capabilities/policies) está em
+[rbac_authorization_matrix.md](./rbac_authorization_matrix.md) — as Django permissions do
+seed são só o piso.
 
 ---
 

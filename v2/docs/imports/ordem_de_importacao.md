@@ -1,9 +1,14 @@
 # Ordem de Importação
 
-Status: PR 1 — documentação (revista 2026-05-05)
-Versão: 2026-05-05 v0.2
+Status: PR 1 — documentação (revista 2026-07-24)
+Versão: 2026-07-24 v0.3
 
 > ⚠️ **Atualização v0.2**: substituiu pendências que o código já responde por pendências reais. Os 11 services `*_import.py` já existem; a "ordem" é operacional (sequência de execução em produção) e não mais um roadmap de implementação.
+
+> 🔴 **Atualização v0.3 (2026-07-24)** — varredura pós-auditoria M00–M28. Correções nesta versão:
+> passo 2 (`seed_rbac` vive em `apps/dev_tools`, não em `apps/core`), passo 8 (a **data do evento
+> não** decide o status; e o import grava `aprovado` sem hard gate de disponibilidade),
+> e a seção "Reentrância", que afirmava idempotência total — **falso**, o reimport sobrescreve.
 
 A ordem abaixo respeita as dependências de chave estrangeira e regras de domínio. **Não pular passos**: cada etapa cria os referenciais usados pela próxima.
 
@@ -19,8 +24,9 @@ A ordem abaixo respeita as dependências de chave estrangeira e regras de domín
 
 ### 2. Cadastros base — Grupos / Setores / Funções
 
-- **Por quê**: definir 13 Setores + 5 Funções (SSOT em `apps/core/constants.py`).
-- **Como**: management command `seed_rbac` (manual, com `--verbose`). **NÃO automatizar** em deploy (D17).
+- **Por quê**: definir 13 Setores + 5 Funções (SSOT em `apps/core/constants.py:16-45`).
+- **Como**: management command `seed_rbac`, que vive em **`apps/dev_tools/management/commands/seed_rbac.py`**
+  (não em `apps/core`). Manual. **NÃO automatizar** em deploy (D17).
 - **Atribuição Group × Capability**: via Django Admin (`/admin/core/permissaofuncional/`), nunca em migration.
 - **Sem documento de import** porque cadastros base já existem no schema (não vêm de planilha).
 
@@ -64,17 +70,24 @@ A ordem abaixo respeita as dependências de chave estrangeira e regras de domín
 
 - **Por quê**: agendamento concreto de eventos.
 - **Documento**: [agenda_solicitacoes.md](./agenda_solicitacoes.md)
-- **Service real**: `apps/core/services/eventos_import.py` (`import_eventos_from_file`). Cria 1 `Solicitacao` + N `Participation` (coord + formadores 1..5). PA-01 aplicada automaticamente.
+- **Service real**: `apps/core/services/eventos_import.py` (`import_eventos_from_file`). Cria 1 `Solicitacao` + N `Participation` (coord + formadores 1..5).
 - **Endpoint**: `POST /api/solicitacoes/import/` — gate `HasPerm("import_spreadsheet")`.
 - **Pré-requisitos**: Usuários (passo 1), Municípios (passo 3), Projetos (passo 4).
-- **Crítico**: PA-01 aplicada — SUPER + data futura → `pendente`. GCal **nunca é tocado** pelo import.
+- **Status inicial**: decidido **só pelo `projeto.fluxo`** (`eventos_import.py:497`) —
+  `SUPER` → `pendente`, `NAO_SUPER` → `aprovado`. 🔴 **A data do evento não influencia nada**
+  (docstring `eventos_import.py:23`); a v0.2 dizia "SUPER + data futura", o que era falso.
+- **GCal**: ✅ **nunca é tocado** pelo import.
+- 🔴 **Cuidado**: linhas `NAO_SUPER` entram **aprovadas sem passar pelo hard gate de
+  disponibilidade** — `check_conflicts` não é chamado pelo import
+  ([#1620](https://github.com/matheusnorjosa/aprender_sistema/issues/1620)). Rodar o passo 7
+  (Disponibilidade) **antes** do passo 8 não impede o conflito; apenas facilita detectá-lo depois.
 
 ### 9. Google Calendar — somente após validação manual
 
 - **Por quê**: publicar é efeito externo (cria evento no calendar de produção).
 - **NÃO faz parte do import** automatizado.
 - **Fluxo correto**:
-  1. Importar Agenda (passo 8) → solicitações ficam `pendente` ou `aprovado` por reconciliação.
+  1. Importar Agenda (passo 8) → solicitações ficam `pendente` (SUPER) ou `aprovado` (NAO_SUPER).
   2. Revisão manual no frontend (`/aprovacoes`).
   3. Preview GCal (`POST /api/solicitacoes/{id}/preview-gcal/`).
   4. Publish (`POST /api/solicitacoes/{id}/publish/`) — só após aprovação manual.
@@ -106,13 +119,35 @@ Cada seta indica dependência de FK ou de validação de domínio.
 
 ## Reentrância (re-execução de imports)
 
-Todos os imports são **idempotentes** via `external_hash`. Re-rodar o mesmo arquivo:
+> 🔴 Corrigido em 2026-07-24. A v0.2 dizia "todos idempotentes via `external_hash`, linhas com hash
+> existente são ignoradas". **As duas metades da frase são falsas.**
 
-- **Sem mudança**: nenhuma operação (linhas com hash existente são ignoradas).
-- **Atualização tolerada**: campos não-chave podem ser atualizados se `external_hash` bater e linha vier com dados diferentes (depende do tipo — ver doc específico).
-- **Re-criação**: para forçar re-criação, deletar a linha do banco antes (com cuidado em FKs).
+**Nem todos usam `external_hash`:**
 
-Auditar reentrância via `AuditLog` filtrado por `action LIKE 'IMPORT_%'` e `usuario`.
+| Import | Chave de reentrância |
+|---|---|
+| usuários | `Usuario.cpf` (campo unique) — **sem hash** |
+| bloqueios | tupla `(usuario, inicio, fim, tipo)` — **sem hash** |
+| eventos, compras, ações de controle, cadastros DAT, deslocamentos | `external_hash` **SHA-1** |
+| produtos, municípios, coleções, equipe/gerência | campo unique ou tupla natural |
+
+**"Hash existente" não significa "ignorado":**
+
+- **Eventos** — `update_or_create` sobrescreve `status`, `usuario`, `coordenador`, `inicio`, `fim`
+  e mais 6 campos, e ainda **reporta `unchanged`**
+  ([#1628](https://github.com/matheusnorjosa/aprender_sistema/issues/1628)). Um reimport pode
+  apagar uma decisão de aprovação sem ninguém notar.
+- **Compras** — `quantidade` e `uso` fazem **parte** do hash, então corrigir a quantidade na
+  planilha **cria uma linha nova** em vez de atualizar
+  ([#1633](https://github.com/matheusnorjosa/aprender_sistema/issues/1633)).
+- **Bloqueios** — reimport atualiza `motivo`.
+- **Usuários** — reimport **adiciona** os grupos da coluna `grupos`, sem allowlist
+  ([#1610](https://github.com/matheusnorjosa/aprender_sistema/issues/1610), P0).
+
+**Antes de reimportar em produção**: rodar dry-run e ler a resposta HTTP — ela é a **única**
+evidência que existe. `AuditLog` filtrado por `action LIKE 'IMPORT_%'` **não devolve nada**: as
+únicas ações de import são `IMPORT_JOB_COMPLETED`/`IMPORT_JOB_FAILED`
+(`apps/core/models/auditoria.py:72-73`), emitidas só pelo caminho assíncrono (`bloqueios`).
 
 ---
 
@@ -121,4 +156,9 @@ Auditar reentrância via `AuditLog` filtrado por `action LIKE 'IMPORT_%'` e `usu
 - Existe pipeline automatizado entre `sheets.banco` e o sistema (ex: cron + API) ou todo import é manual via UI/CLI?
 - Municípios e Projetos têm uma fonte de cadastro contínua na planilha ou ficam congelados após o seed inicial?
 - Em quais cenários **Cadastros base** (passo 2) precisam ser refeitos pós-deploy? Sentinela D17 deveria bloquear?
-- Disponibilidade deve preceder Agenda no fluxo real ou as duas chegam juntas?
+- Disponibilidade deve preceder Agenda no fluxo real ou as duas chegam juntas? *(Nota 2026-07-24:
+  hoje a ordem não protege nada — o import de eventos não consulta disponibilidade, #1620.)*
+- 🔴 **Antes do próximo reimport em massa**: fechar #1610 (auto-escalação), #1628 (sobrescrita
+  silenciosa de aprovação) e #1633 (duplicação de `Compra`). Sem isso, "re-rodar o arquivo
+  corrigido" é uma operação destrutiva sem rastro. Ver
+  [../audits/ACHADOS_REAIS.md](../audits/ACHADOS_REAIS.md).

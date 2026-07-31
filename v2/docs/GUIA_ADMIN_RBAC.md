@@ -2,6 +2,13 @@
 
 Este guia explica como gerenciar permissões de usuários no Aprender Sistema v2.
 
+**Revisto em 2026-07-24** contra `apps/core/constants.py`, `apps/core/rbac/policies.py`,
+`apps/core/views/admin.py` e as telas do frontend. Correções principais desta revisão:
+as listas de Setor (9 → **13**) e Função (4 → **5**), o terceiro caminho de aprovação SUPER
+(Assistente Administrativo do Controle) e o fato de que **editar grupos virou superuser-only**.
+
+SSOT das listas: `v2/backend/apps/core/constants.py:16-45`.
+
 ---
 
 ## Conceito Básico
@@ -17,6 +24,9 @@ Cada usuário pode ter **um ou mais setores** e **uma ou mais funções**.
 
 ## Grupos de SETOR
 
+São **13** (`apps/core/constants.py:16-33`). A lista abaixo estava com 9 até 2026-07-24 e ainda
+incluía um grupo **"Gerência"** que não existe.
+
 | Setor | Descrição | Fluxo |
 |-------|-----------|-------|
 | **Superintendência** | Setor estratégico | SUPER (requer aprovação) |
@@ -27,42 +37,55 @@ Cada usuário pode ter **um ou mais setores** e **uma ou mais funções**.
 | **Sou da Paz** | Gerência 6 - Projeto Sou da Paz | NAO_SUPER |
 | **DAT** | Departamento de Apoio Técnico | - |
 | **Controle** | Setor de Controle (operações) | - |
-| **Gerência** | Gerência genérica | - |
+| **Diretoria** | Acesso a dashboards | - |
+| **Comercial** | Operação de ações/notificações | - |
+| **Relacionamento** | Operação de ações/notificações | - |
+| **Logística Viagens** | Operação de ações/notificações | - |
+| **Logística Galpão** | Operação de ações/notificações | - |
+
+> ❌ **Não existe grupo "Gerência".** "Gerente" é uma **Função**; as gerências de projeto são os
+> setores nomeados acima (Vidas, Fluir, ACerta, …).
 
 ---
 
 ## Grupos de FUNÇÃO
+
+São **5** (`apps/core/constants.py:36-45`).
 
 | Função | O que pode fazer |
 |--------|------------------|
 | **Formador** | Visualiza grade mensal, gerencia bloqueios pessoais |
 | **Coordenador** | Cria solicitações de eventos para sua equipe |
 | **Apoio de Coordenação** | Auxilia coordenação, visualiza solicitações |
-| **Gerente** | Aprova/reprova solicitações, acessa dashboards e relatórios |
+| **Gerente** | Aprova/reprova solicitações (quando no Setor Superintendência), acessa dashboards |
+| **Assistente Administrativo** | Combinada com o Setor **Controle**, aprova solicitações (composite, PR 3 / #1308) |
 
 ---
 
 ## Quem Pode Aprovar Solicitações SUPER?
 
-Para aprovar solicitações do fluxo SUPER, o usuário precisa:
+São **três** caminhos (`apps/core/rbac/policies.py:395-421`, espelhado em
+`apps/core/views_basic.py:107-109`). A versão anterior deste guia listava só os dois primeiros.
 
-✅ Ser **superusuário** (is_superuser = true)
+✅ Ser **superusuário** (`policies.py:411-412`)
 
-**OU**
+**OU** ter **ambos** (`policies.py:415-418`):
+- Função **Gerente** + Setor **Superintendência**
 
-✅ Ter **ambos**:
-- Função: **Gerente**
-- Setor: **Superintendência**
+**OU** ter **ambos** (`policies.py:421`):
+- Função **Assistente Administrativo** + Setor **Controle**
 
 ### Exemplos
 
 | Usuário | Setor | Função | Pode Aprovar? |
 |---------|-------|--------|---------------|
 | Maria | Superintendência | Gerente | ✅ **Sim** |
+| Beatriz | Controle | Assistente Administrativo | ✅ **Sim** (composite #1308) |
 | João | DAT | Gerente | ❌ Não (não é Superintendência) |
 | Pedro | Superintendência | Formador | ❌ Não (não é Gerente) |
 | Ana | Superintendência | Coordenador | ❌ Não (não é Gerente) |
 | Carlos | Vidas | Gerente | ❌ Não (não é Superintendência) |
+| Rita | Controle | Coordenador | ❌ Não (Controle puro não aprova) |
 | Admin | - | - (superuser) | ✅ **Sim** |
 
 ---
@@ -71,17 +94,39 @@ Para aprovar solicitações do fluxo SUPER, o usuário precisa:
 
 ### Acessar a Interface
 
-1. Faça login como administrador
-2. Acesse **Admin DAT** no menu lateral
-3. Clique em **Usuários**
+1. Faça login
+2. No menu lateral, abra **DAT** → **Administração** (`/dat/admin`)
+   — `v2/frontend/src/components/AppSidebar.tsx:354-355`
+3. A tela de usuários fica em `/dat/admin/usuarios`
+   (`v2/frontend/src/components/AppRoutes.tsx:134`); não há item de menu direto para ela
 
-### Atribuir Grupos a um Usuário
+*(Corrigido em 2026-07-24: não existe item "Admin DAT" no menu lateral.)*
+
+### Atribuir Grupos a um Usuário — 🔒 **somente superusuário**
+
+> 🔴 **Mudou com o hardening Tier-0 (P0-1).** Editar Setor/Função de um usuário **não é mais
+> operação de "administrador"**: é restrita ao superusuário.
+>
+> - **Frontend**: os selects `setor_ids` e `funcao_ids` são renderizados com
+>   `disabled={!currentIsSuperuser}` (`v2/frontend/src/pages/AdminDAT/UsuariosPage.tsx:699,709` e
+>   `:718,728`), e o payload de salvamento **não envia `group_ids`** para não-superuser
+>   (comentário `:696-698`).
+> - **Backend**: a action `assign_groups` é `permission_classes=[SuperuserOnly]`
+>   (`apps/core/views/admin.py:399`).
+>
+> Em produção há **1 superusuário ativo**. Consequência operacional: se essa conta ficar
+> indisponível, **ninguém** consegue atribuir Setor/Função. Isso é um bus factor conhecido —
+> ver [audits/ACHADOS_REAIS.md](./audits/ACHADOS_REAIS.md), premissa F3.
+
+Passos (como superusuário):
 
 1. Na lista de usuários, clique no botão **Editar** (ícone de lápis)
-2. No modal que abrir, você verá:
-   - **Setor (onde trabalha)**: Selecione um ou mais setores
-   - **Função (o que pode fazer)**: Selecione uma ou mais funções
+2. No modal, você verá:
+   - **Setor (onde trabalha)**: selecione um ou mais setores
+   - **Função (o que pode fazer)**: selecione uma ou mais funções
 3. Clique em **Salvar**
+
+Se os campos aparecerem **desabilitados**, é porque sua conta não é superusuário — não é bug.
 
 ### Visualização na Tabela
 
@@ -171,22 +216,53 @@ GET /api/me/policies/
 ## Dúvidas Frequentes
 
 ### Por que um Gerente não consegue aprovar?
-Verifique se ele está no setor **Superintendência**. Apenas Gerentes da Superintendência podem aprovar fluxo SUPER.
+Verifique se ele está no setor **Superintendência**. Gerente em outro setor não aprova.
+O outro caminho é Assistente Administrativo **do Controle**.
+
+### Por que os campos de Setor/Função aparecem desabilitados para mim?
+Porque desde o hardening Tier-0 essa edição é **somente superusuário**
+(`apps/core/views/admin.py:399`; UI em `UsuariosPage.tsx:699,709`). Não é bug.
 
 ### Posso dar múltiplas funções a um usuário?
 Sim. Por exemplo, alguém pode ser Coordenador e Gerente ao mesmo tempo.
 
 ### Como remover um grupo de um usuário?
-Na edição do usuário, desmarque o grupo desejado e salve.
+Na edição do usuário (como superusuário), desmarque o grupo desejado e salve.
+
+⚠️ **O import de usuários NÃO remove grupos — só adiciona, e sem allowlist.**
+`POST /api/usuarios/import/` com a coluna `grupos` concede **qualquer** grupo, inclusive
+`Gerente` e `Superintendência`, sem verificar quem é o ator. Achado **P0**, issue
+[#1610](https://github.com/matheusnorjosa/aprender_sistema/issues/1610) —
+ver [imports/usuarios.md](./imports/usuarios.md).
 
 ### Os grupos são case-sensitive?
-Sim. Use exatamente: "Superintendência", "Gerente", etc.
+Sim para a atribuição via admin. Use exatamente: "Superintendência", "Gerente", etc.
+*(O import de usuários resolve com `name__iexact`, ou seja, ignora caixa — mais uma razão
+para não usá-lo como via de administração.)*
 
 ---
 
 ## Referências Técnicas
 
-- **Código Backend**: `apps/core/views_basic.py` (SETOR_GROUPS, FUNCAO_GROUPS)
-- **Testes**: `apps/core/tests/test_rbac_permissions.py` (20 testes)
-- **Frontend**: `src/pages/AdminDAT/UsuariosPage.jsx`
-- **Documentação Técnica**: `.claude/PLANO_RBAC_SETOR_FUNCAO.md`
+- **SSOT das listas**: `apps/core/constants.py:16` (`SETOR_GROUPS`) e `:36` (`FUNCAO_GROUPS`).
+  `apps/core/views_basic.py:21` apenas as importa; em runtime a classificação prefere o model
+  `GroupClassificacao` (`views_basic.py:81-97`), com as constantes como fallback (`:94-97`).
+- **Policies de aprovação**: `apps/core/rbac/policies.py:395-421`
+- **Gate de edição de grupos**: `apps/core/views/admin.py:399` (`SuperuserOnly`)
+- **Testes**: `apps/core/tests/test_rbac_permissions.py` (21 testes)
+- **Frontend**: `v2/frontend/src/pages/AdminDAT/UsuariosPage.tsx`
+- **Convenção RBAC**: [RBAC_NAMING.md](./RBAC_NAMING.md)
+- **Matriz de autorização**: [rbac_authorization_matrix.md](./rbac_authorization_matrix.md)
+  *(gerada e verificada por guard de drift no CI — não editar à mão)*
+
+*(Removida em 2026-07-24 a referência a `.claude/PLANO_RBAC_SETOR_FUNCAO.md`, que não existe.)*
+
+---
+
+## Telas administrativas existentes (não cobertas por este guia)
+
+Rotas em `v2/frontend/src/components/AppRoutes.tsx:134-142`:
+`/dat/admin/usuarios`, `/grupos`, `/setores`, `/funcoes`, `/gerencias`, `/produtos`, `/configuracoes`.
+
+A administração de **Grupo × Capability** não fica no frontend: é o Django Admin
+(`/admin/core/permissaofuncional/`, `apps/core/admin.py:348`), **superuser-only** desde o #1567.

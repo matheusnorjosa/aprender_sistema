@@ -125,13 +125,21 @@ props. Those are not HTTP — they are plain JS contracts. Keep using
 ## Roadmap
 
 1. ✅ **Phase 1** — Infrastructure + one pilot migration (`availability.test.ts`).
-2. **Phase 2** — Migrate the Tier-1 API client tests (`adminDAT`, `datModule`,
-   `gcal`, `lookup`, `systemConfig`). Each can be its own PR.
+2. ✅ **Phase 2** — Tier-1 API client tests migrated: `adminDAT`, `datModule`, `gcal`,
+   `lookup`, `systemConfig` — todos importam `msw` + `../../test/mocks/server` e nenhum
+   ainda usa `vi.mock('../config')`. `config.test.ts` migrou junto (não estava no plano).
+   *(Marcado como concluído em 2026-07-24 — a fase já tinha sido entregue.)*
 3. **Phase 3** — Migrate component/page tests that mock API modules
-   (`NewSolicitacaoWizard`, etc.). These produce the biggest fidelity gain.
-4. **Phase 4** — Flip `onUnhandledRequest` from `'bypass'` to `'error'` once
-   the long tail is covered, and remove the remaining `vi.mock('../config')`
-   callsites.
+   (`NewSolicitacaoWizard.test.tsx` e `NewSolicitacaoWizard.availability.test.tsx` ainda
+   usam `vi.mock` em módulos de API). These produce the biggest fidelity gain.
+4. **Phase 4** — Flip `onUnhandledRequest` from `'bypass'` to `'error'`
+   (`v2/frontend/src/test/setup.js:18`) once the long tail is covered, and remove the two
+   remaining `vi.mock('../config')` callsites: `src/api/__tests__/teamMetrics.test.ts:8`
+   e `src/api/__tests__/dashboard.test.ts:7`.
+
+> ⚠️ Drift no código, não neste doc: o comentário em `v2/frontend/src/test/mocks/server.ts:5`
+> afirma `onUnhandledRequest: 'error'`, mas o valor real em `src/test/setup.js:18` é `'bypass'`.
+> Corrigir o comentário junto com a Phase 4.
 
 ## Related
 

@@ -1,6 +1,14 @@
 # Go-Live Checklist
 
-Checklist para entrada em produção do Aprender Sistema v2.
+> **Histórico, não pendência.** O go-live do AS v2 já ocorreu; produção roda
+> `v2026.07.18-94f2765` com 148 usuários ativos. Este checklist é mantido como
+> referência de *o que precisa estar verde* antes de uma promoção — não como uma
+> lista de tarefas por fazer.
+>
+> O procedimento operacional canônico é o
+> **[Deploy Checklist](https://github.com/matheusnorjosa/aprender_sistema/blob/main/v2/docs/DEPLOY_CHECKLIST.md)**;
+> o mecanismo está em
+> **[deploy.spec.md](https://github.com/matheusnorjosa/aprender_sistema/blob/main/v2/docs/specs/infra/deploy.spec.md)**.
 
 ## Pré-Requisitos
 
@@ -15,7 +23,7 @@ Checklist para entrada em produção do Aprender Sistema v2.
 
 ### Configurações
 
-- [ ] `.env` de produção configurado
+- [ ] `stack.env` de produção configurado no Portainer (o `.env.production` do repo é template)
 - [ ] `SECRET_KEY` gerada (única para produção)
 - [ ] `ALLOWED_HOSTS` configurado
 - [ ] `DEBUG=False`
@@ -24,42 +32,52 @@ Checklist para entrada em produção do Aprender Sistema v2.
 
 - [ ] PostgreSQL 15 configurado
 - [ ] Credenciais seguras
-- [ ] Backup automatizado
-- [ ] Migrations aplicadas
+- [ ] Backup automatizado **funcionando e verificado por restore drill** — ver
+      [Backup](backup.md): hoje o job está morto/silencioso (#1455) e a ferramenta
+      oficial de restore rejeita todo artefato `.age` de produção (#1611)
+- [ ] Migrations aplicadas — em prod o serviço one-shot `migrate` roda antes de
+      `web`/`worker`/`beat` (`docker-compose.prod.yml`)
 
 ### Google Calendar
 
-- [ ] Service Account criada
-- [ ] Calendário compartilhado com SA
+Produção usa **OAuth**, não service account:
+
 - [ ] `GCAL_CLIENT=google`
-- [ ] Credenciais montadas no container
+- [ ] `GCAL_AUTH_MODE=oauth`
+- [ ] `GCAL_OAUTH_CLIENT_ID` / `GCAL_OAUTH_CLIENT_SECRET` / `GCAL_OAUTH_REDIRECT_URI`
+- [ ] `GCAL_ENCRYPTION_KEY` (Fernet, criptografia dos tokens — SEC-011)
+- [ ] `GCAL_ALLOWED_DOMAIN` e `GCAL_CALENDAR_ID`
+
+Detalhe em **[GUIDE_GCAL.md](https://github.com/matheusnorjosa/aprender_sistema/blob/main/v2/docs/GUIDE_GCAL.md)**.
 
 ### Monitoramento
 
-- [ ] Sentry configurado
-- [ ] Prometheus/Grafana (opcional)
+- [ ] Sentry configurado (`SENTRY_DSN`) — hoje **ausente** em produção, o que torna
+      silenciosa qualquer falha de task Celery
+- [ ] Prometheus/Grafana: **não rodam em produção** (só `make up-obs` local);
+      o app expõe `/metrics` gated para scraping externo
 - [ ] Alertas configurados
 
 ## Deploy
 
-```bash
-# 1. Subir ambiente
-make up
+Produção **não** sobe por `make up` — esses alvos apontam para `localhost:8002`, ou
+seja, o ambiente local. O caminho real é o pull-based (ADR-018):
 
-# 2. Verificar readiness
-make readyz
+1. Merge na `main` → `deploy.yaml` builda, escaneia, assina e publica a tag imutável
+   `vYYYY.MM.DD-<sha7>`. **Isso não deploya.**
+2. `promote.yml` (`workflow_dispatch`, gated no Environment `production` com required
+   reviewer) assina o ponteiro no branch `deploy-pointer`.
+3. O agente `aprender-deployer` na VM01 verifica assinatura + digests e aplica em
+   `127.0.0.1:9443`, confirmando `localhost/api/readyz/` e `/api/version/` de dentro
+   da VM antes de selar a `sequence`.
 
-# 3. Verificar health
-make healthz
-
-# 4. Bloquear v1
-make ban-v1
-```
+Ver [Deploy](deploy.md).
 
 ## Verificações Pós-Deploy
 
 ### Funcionais
 
+- [ ] `/api/version/` reporta a tag promovida
 - [ ] Login funciona
 - [ ] Criar solicitação funciona
 - [ ] Aprovar solicitação funciona
@@ -77,7 +95,7 @@ make ban-v1
 
 - [ ] Logs sem erros críticos
 - [ ] Métricas coletando
-- [ ] Sentry recebendo eventos
+- [ ] Sentry recebendo eventos (bloqueado enquanto `SENTRY_DSN` estiver ausente)
 - [ ] HTTPS funcionando
 - [ ] CSRF funcionando
 
@@ -89,15 +107,13 @@ make ban-v1
 
 ## Rollback
 
-Se necessário reverter:
+Rollback é uma **promoção assinada da tag anterior**, não um `git checkout`: rode o
+`promote.yml` com o input `rollback: true` apontando para a release anterior (o agente
+continua exigindo `sequence` maior que o selo — o anti-rollback protege contra replay,
+não contra downgrade deliberado).
 
-```bash
-# 1. Parar v2
-docker compose down
-
-# 2. Restaurar v1 (se aplicável)
-git checkout v1-freeze
-```
+`make ban-v1` (`v2/scripts/ban_v1.sh`) não faz parte de rollback: ele remove containers
+e redes do projeto Docker legado `aprendersistema` e é higiene de máquina local.
 
 ## Comunicação
 
@@ -125,4 +141,4 @@ git checkout v1-freeze
 
 | Data | Versão | Status |
 |------|--------|--------|
-| - | v2.0.0 | Planejado |
+| 2026-07-18 | `v2026.07.18-94f2765` | em produção |

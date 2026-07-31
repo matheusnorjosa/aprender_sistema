@@ -52,12 +52,21 @@ dat_full_access                   # setor + bundle indefinido
 
 ### Exceções conscientes ao "no `manage_`"
 
-Duas permissões bundle foram mantidas por decisão YAGNI (ver master-plan §9.3):
+**Três** permissões bundle foram mantidas por decisão YAGNI (ver master-plan §9.3):
 
 - `manage_admin_registries` — CRUD de cadastros administrativos (municípios, projetos, produtos, etc.)
 - `manage_purchases_and_materials` — CRUD de compras e materiais
+- `manage_internal_actions` — ações internas (`functional_permissions_seed.py:160`, Onda 1 C3, 2026-04-27)
+
+*(Corrigido em 2026-07-24: o texto dizia "duas" e omitia `manage_internal_actions`.)*
 
 Decompor cada uma em `create/read/update/delete` hoje produziria 8+ codenames sempre atribuídos juntos (ruído puro). Decompõe-se quando surgir primeiro papel com subset diferente (ex: auditor read-only).
+
+### Exceção consciente ao "no `edit_`"
+
+- `edit_solicitation_as_owner_or_privileged` (`functional_permissions_seed.py:153`) — usa o verbo
+  proibido `edit_` porque o codename carrega a **condição de escopo** (owner OU privilegiado),
+  não só a ação. Registrada aqui para não ser tratada como violação nova.
 
 ---
 
@@ -134,20 +143,33 @@ permission_classes = [IsAuthenticated, ~HasPerm("b")]
 
 Só para lógica que **não** pode ser expressa por `HasPerm(codename)`:
 
-- **Object-level check**: `IsSolicitationOwner` / `IsOwnerOrPrivileged` (verifica `obj.usuario`).
+- **Object-level check**: `IsOwnerOrPrivileged` (`apps/core/rbac/permissions.py:212`) — verifica `obj.usuario`.
 - **Dynamic scope por query param**: `HasSectorAccess` (lê `gerencia_id` do request).
-- **Composite rule fixa**: `IsGerenteSuperintendencia` (permission funcional + grupo "Gerente").
+- **Composite rule fixa**: `IsGerenteSuperintendencia` (permission funcional + grupo "Gerente")
+  e `IsAssistenteAdministrativoControle` (`apps/core/rbac/permissions.py:177`).
 
-Nomear como **condição** (não como identidade): `IsSolicitationOwner`, `IsWithinEditWindow`, `HasSectorAccess`. **Nunca** `Is<Role>`, `Is<Setor>`, `Is<Group>`.
+*(Corrigido em 2026-07-24: `IsSolicitationOwner` **não existe** no codebase.)*
+
+Nomear como **condição** (não como identidade): `IsOwnerOrPrivileged`, `IsWithinEditWindow`,
+`HasSectorAccess`. **Nunca** `Is<Role>`, `Is<Setor>`, `Is<Group>`.
+
+> ⚠️ **Exceção existente à regra acima**: `IsAssistenteAdministrativoControle` é um nome de
+> identidade Função×Setor. Ele escapa do V002 porque `apps/core/rbac/` é caminho whitelisted
+> (`scripts/rbac_lint.py:108-109`), **não** porque esteja em `WHITELISTED_CLASS_NAMES`
+> (`rbac_lint.py:91-96`). Registrado aqui para que não se replique o padrão fora de `rbac/`.
 
 ### Proibido
 
 ```python
-# Não faça isto em endpoints novos (Epic 5 remove estas 12 classes):
-from apps.core.permissions import IsDAT, IsControle, IsSuperintendencia
-permission_classes = [IsDAT]          # ❌ DeprecationWarning
-permission_classes = [IsControleOrDAT] # ❌ mesmo motivo
+# Estas classes NÃO EXISTEM MAIS (Epic 5 concluído):
+from apps.core.permissions import IsDAT, IsControle, IsSuperintendencia  # ❌ ImportError
 ```
+
+> ✅ **Atualizado em 2026-07-24.** O texto anterior dizia "Epic 5 remove estas 12 classes" e
+> "❌ DeprecationWarning". A Epic 5 **já foi entregue**: `apps/core/permissions.py:14-21` exporta
+> somente `HasFunctionalPermission`, `HasPerm`, `HasSectorAccess`, `IsGerenteSuperintendencia`,
+> `IsOwnerOrPrivileged` e `SuperuserOnly`. Importar `IsDAT` hoje levanta **`ImportError`**,
+> não warning.
 
 ---
 
@@ -218,29 +240,40 @@ Lint AST custom em `v2/backend/scripts/rbac_lint.py` falha PRs que:
 - **V002**: definem classe `class Is<Word>(...)` fora da whitelist
   `{IsGerenteSuperintendencia, IsOwnerOrPrivileged}`.
 
-**V003 (import de Group) foi descartado** — V001 já cobre o padrão observável
-na prática; V003 gerava 100+ falsos positivos (seeds, fixtures, serializers,
-admin views têm imports legítimos) com zero violações reais a ganhar.
+- **V003 (D17, 2026-05-04)**: proíbe mutação M2M de `groups`/`permissions`
+  (`.set()`, `.add()`, `.clear()`) em migrations **numeradas acima do corte D17**
+  (`D17_LEGACY_MIGRATIONS_MAX = 82`, `scripts/rbac_lint.py:131-140`).
+  Implementação: `MigrationLintVisitor` (`rbac_lint.py:220-271`), dispatch em `:307-323`,
+  documentação no docblock `:54-60`.
 
-**Paths whitelisted** (o lint pula):
+> 🔴 **Corrigido em 2026-07-24.** Este documento afirmava que "V003 (import de `Group`) foi
+> descartado". **Existe um V003 — com outra semântica.** Ele não é sobre *import* de `Group`,
+> é sobre *mutação de grupos dentro de migrations*, e **está ativo no CI**.
+> Consequência prática: `apps/core/migrations/` **não é mais totalmente whitelisted** —
+> V003 inverte a whitelist para migrations acima da 82. A migration mais recente é a `0083`,
+> portanto já sob enforcement.
 
-- `tests/`, `migrations/`, `fixtures/`
+**Paths whitelisted** (o lint pula — `rbac_lint.py:101-126`):
+
+- `tests/`, `fixtures/`
+- `migrations/` — ⚠️ **apenas para V001/V002**; V003 se aplica às numeradas acima de 82
 - `apps/core/rbac/` (o próprio módulo RBAC)
 - `apps/dev_tools/` (seeds e admin tooling manipulam grupos por design)
 - `apps/core/constants.py`, `apps/core/permissions.py`, `apps/core/rbac_helpers.py` (shims e data-scope SSOT)
 - `scripts/rbac_lint.py`, `scripts/rbac_codemod.py`
 
-**Markers `# noqa: RBAC-*-allowed` em uso**:
+**Markers `# noqa: RBAC-*-allowed` em uso** — são **quatro**:
 
 | Marker                      | Uso legítimo                                           |
 | --------------------------- | ------------------------------------------------------ |
 | `RBAC-composite-allowed`    | Classe composite (funcperm + grupo Django)             |
 | `RBAC-block-allowed`        | Bloqueio explícito de um grupo por design documentado  |
 | `RBAC-data-scope-allowed`   | Filtro de escopo de dados (não authz)                  |
+| `RBAC-migration-allowed`    | Mutação de grupos em migration, justificada (V003 — `rbac_lint.py:266-271`) |
 
 **CI job**: `[required] backend rbac-lint` em `.github/workflows/ci.yaml` — falha o PR automaticamente.
 
-**Self-test**: `apps/core/tests/test_rbac_lint.py` valida que o lint aceita o baseline atual e rejeita os padrões proibidos (10 testes).
+**Self-test**: `apps/core/tests/test_rbac_lint.py` valida que o lint aceita o baseline atual e rejeita os padrões proibidos (**23 testes**).
 
 Rodar localmente:
 
@@ -298,9 +331,10 @@ perm.groups.set([Group.objects.get(name="Diretoria")])
 perm.groups.clear()
 ```
 
-Esses padrões existem em migrations 0077-0080 (one-shot, já rodaram em prod
-e não rodam de novo). Migrations futuras de redistribuição ferem D17 —
-**use Admin**.
+Esses padrões existem em migrations legadas (até a `0082`, one-shot, já rodaram em prod
+e não rodam de novo). Migrations **acima da 82** de redistribuição ferem D17 e são
+**bloqueadas pelo V003 no CI** (`scripts/rbac_lint.py:131-140`) — **use Admin**.
+A migration mais recente é a `0083`, ou seja, o enforcement já vale para tudo que vier agora.
 
 **Permitido em migration nova:**
 
@@ -349,7 +383,14 @@ nunca em deploy automático). Em prod o command nem é registrado
 
 ---
 
-## 9. Policy Resolution Rules (Epic 4 — Capability Policy Layer)
+## 9-bis. Policy Resolution Rules (Epic 4 — Capability Policy Layer)
+
+> ⚠️ **Numeração duplicada, conhecida (2026-07-24).** Existiam **duas** seções "## 9" neste
+> documento: "Referência rápida" e esta. Como o código referencia "RBAC_NAMING §9" em pelo menos
+> dois lugares (`apps/core/rbac/policies.py:29`, `scripts/rbac_lint.py:174`), renumerar de fato
+> exigiria atualizar esses comentários — o que está **fora do escopo de uma varredura de docs**.
+> Marcada como `9-bis` para desambiguar a leitura sem quebrar as referências existentes.
+> Decisão sobre a renumeração definitiva: humana.
 
 **Implementada (Issues #1231, #1232, #1233, #1234, #1235)** — 3ª camada NIST RBAC: `User → Roles → Capabilities → Policies → Views`.
 
@@ -395,13 +436,16 @@ NUNCA usar `if user.is_dat: return True` espalhado em views. DAT-as-suporte SEMP
 if user.groups.filter(name="DAT").exists():
     return True
 
-# ✅ CORRETO
+# ✅ CORRETO — valor real em apps/core/rbac/policies.py:85-90
 ACCESS_POLICIES["access_audit_logs"] = frozenset({
     "manage_admin_registries",  # DAT entra como capability declarada
     "operate_preagenda",
-    "approve_solicitation",
 })
 ```
+
+*(Corrigido em 2026-07-24: o exemplo incluía `approve_solicitation`. Ele foi **removido** desta
+policy no PR 6 — ver comentário em `apps/core/rbac/policies.py:80-84`. Copiá-lo daqui reintroduziria
+o acesso de aprovadores aos logs de auditoria.)*
 
 ### Public surface — `GET /api/me/policies/` (Epic 4.4, Issue #1235)
 
@@ -429,9 +473,12 @@ PUBLIC_POLICY_KEYS: Final[frozenset[str]] = frozenset({
     "access_audit_logs",
     "use_gcal",
     "view_compras_dashboard",
-    # ... 12 outras
+    # ... 18 outras — total 21 (apps/core/rbac/policies.py:363-387)
 })
 ```
+
+*(Corrigido em 2026-07-24: o comentário dizia "12 outras", implicando 15 chaves. São **21**.
+O SSOT é `apps/core/rbac/policies.py:363-387` — não replique a lista aqui, ela envelhece.)*
 
 Internal-only policies futuras (não expostas via endpoint) ficam fora deste registro. Test de paridade em `test_me_policies.py::TestParity` garante que dev não esqueça de registrar Can* nova como pública conscientemente.
 

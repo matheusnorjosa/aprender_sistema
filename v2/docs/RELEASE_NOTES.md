@@ -1,6 +1,33 @@
 # Release Notes - Aprender Sistema v2
 
-## PR #52 – Auditoria e Atribuição de CPF
+> 🔴 **DOCUMENTO DEFASADO — não use como referência do estado atual (aviso de 2026-07-24).**
+>
+> A última entrada aqui é o **PR #52, de 2025-10-29**. Desde então o repositório acumulou
+> **448 tags `v2026.*`** — de `v2026.01.27` a `v2026.07.20-5dc519f` — e **nenhuma** está
+> documentada neste arquivo. Produção roda **`v2026.07.18-94f2765`**.
+>
+> Boa parte do conteúdo abaixo descreve código que **não existe mais**:
+> - a app **`apps/dat_ingest`** foi removida com o ETL legado;
+> - os commands **`audit_agenda_users`** e **`assign_cpf_from_excel`** não existem
+>   (o único command de import hoje é `import_export_contract`);
+> - o diretório de saída `out_etl` pertence ao pipeline legado;
+> - **`USERS_CPF_GUIDE.md`** nunca existiu neste repositório.
+>
+> **Onde olhar em vez disto:**
+> - versão em produção: `GET /api/version/`
+> - histórico real: `git tag --list 'v2026*' | sort -V` e `git log --oneline`
+> - estado conhecido do sistema: [audits/ACHADOS_REAIS.md](./audits/ACHADOS_REAIS.md)
+>
+> **Decisão pendente (humana)**: este arquivo deve ser (a) arquivado em `_archive/` como
+> registro histórico do PR #52, ou (b) reconstruído a partir das tags com um processo que o
+> mantenha atualizado a cada release? Enquanto isso não for decidido, ele fica com este aviso.
+>
+> O conteúdo abaixo é preservado **como registro histórico de 2025-10-29**. Os caminhos de
+> arquivo e comandos citados não devem ser executados.
+
+---
+
+## PR #52 – Auditoria e Atribuição de CPF *(histórico, 2025-10-29)*
 
 ### Comandos de Gerenciamento
 
@@ -42,7 +69,7 @@
 
 ### Documentação
 
-**USERS_CPF_GUIDE.md** (460 linhas)
+**USERS_CPF_GUIDE.md** (460 linhas) — ⚠️ **este arquivo não existe no repositório**
 - Guia completo de auditoria e atribuição de CPF
 - Estrutura das planilhas e lógica de matching
 - Seção 8: CPF Placeholder (apenas para testes)
@@ -107,12 +134,13 @@
 - Validação de senha e status do usuário (`user_can_authenticate`)
 - Implementação reversível, sem migrations
 - Arquivo: `v2/backend/apps/core/auth_backends.py`
-- Configuração: `AUTHENTICATION_BACKENDS` em `config/settings.py` (linhas 95-101)
+- Configuração: `AUTHENTICATION_BACKENDS` em `config/settings.py:183-186` (linha atual;
+  o doc citava 95-101, de 2025)
 
 **Frontend: Placeholder/Label Atualizado**
 - Label: "CPF ou usuário"
 - Placeholder: "CPF (com ou sem máscara) ou usuário"
-- Arquivo: `v2/frontend/src/pages/Auth/LoginPage.jsx`
+- Arquivo: `v2/frontend/src/pages/Auth/LoginPage.tsx` (migrado para TypeScript)
 
 **Pré-requisito**
 - Campo `Usuario.cpf` deve estar populado com 11 dígitos (sem pontuação)
@@ -275,7 +303,7 @@ python manage.py assign_cpf_from_excel \
 
 ### Documentação
 
-- **Guia completo**: `v2/docs/USERS_CPF_GUIDE.md`
+- **Guia completo**: `v2/docs/USERS_CPF_GUIDE.md` — ⚠️ **arquivo inexistente** (verificado 2026-07-24)
   - Workflow recomendado (DRY-RUN → APPLY)
   - Estrutura das planilhas
   - Lógica de matching
@@ -303,4 +331,4 @@ python manage.py assign_cpf_from_excel \
 ---
 
 **Data**: 2025-10-29
-**Responsável**: Claude Code + Matheus Norjosa
+**Responsável**: Matheus Norjosa

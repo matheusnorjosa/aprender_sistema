@@ -2,6 +2,12 @@
 
 Regras imutáveis do sistema que não podem ser alteradas.
 
+!!! info "SSOT técnica"
+    O contrato detalhado — qual arquivo faz cumprir cada CP, o que é convenção sem gate de CI,
+    e as divergências vivas entre a cláusula e o código — está em
+    [`v2/docs/specs/domain/clausulas-petreas.spec.md`](https://github.com/matheusnorjosa/aprender_sistema/blob/main/v2/docs/specs/domain/clausulas-petreas.spec.md).
+    Esta página é o resumo legível. Em caso de conflito, a spec vence.
+
 ## CP-01: REQUIRE_DOCKER=1
 
 - **v2 DEVE rodar APENAS em Docker**
@@ -13,8 +19,14 @@ Regras imutáveis do sistema que não podem ser alteradas.
 Ver [Política de Aprovação (PA)](politica-aprovacao.md).
 
 - Sem auto-aprovação para fluxo SUPER
-- Apenas Superintendência pode aprovar
+- Aprovam: superuser, **Gerente da Superintendência** ou **Assistente Administrativo do
+  Controle** (PA-02). DAT e Controle puro não aprovam
 - Integrações só executam após aprovação
+
+!!! danger "Cláusula não cumprida hoje (P0 · #1610)"
+    A **imutabilidade** desta autoridade não existe: o import de usuários permite que um
+    membro do grupo DAT conceda a si próprio `Gerente` + `Superintendência` e passe a aprovar.
+    Detalhe em [PA-02](politica-aprovacao.md#pa-02-perfil-exigido).
 
 ## CP-03: Regras de Disponibilidade
 
@@ -61,6 +73,11 @@ Ordem obrigatória para agentes autônomos:
 
 ## CP-08: dev_tools Desabilitado em Produção
 
-- **`apps.dev_tools` (seeds/backfills/cleanup) NÃO deve rodar em produção** — definir `INCLUDE_DEV_TOOLS=false`
-- Mecanismo: `config/settings.py` inclui `apps.dev_tools` apenas se `INCLUDE_DEV_TOOLS != "false"`
-- ⚠️ **Default é `true`** (conveniência de dev) e **não há guard por `ENVIRONMENT`** → produção PRECISA setar `INCLUDE_DEV_TOOLS=false` explicitamente; se a variável não existir no `stack.env`, o app de dev é carregado (CP-08 violado)
+- **`apps.dev_tools` (seeds/backfills/cleanup) NÃO deve rodar em produção**
+- Mecanismo: `config/settings.py:126` inclui `apps.dev_tools` apenas se `INCLUDE_DEV_TOOLS != "false"`
+- **Default é `true`** (conveniência de dev), mas desde o #1466 há guard rígido em
+  `config/settings.py:137-143`: quando `ENVIRONMENT == "production"`, `INCLUDE_DEV_TOOLS` é
+  forçado a `False` **independentemente** da env var. Pedir `true` em produção emite warning e
+  é ignorado — omitir a variável no `stack.env` deixou de violar a CP-08
+- ⚠️ O guard casa `ENVIRONMENT` com a string exata `"production"`; um ambiente rotulado de
+  outra forma volta a herdar o default `true`

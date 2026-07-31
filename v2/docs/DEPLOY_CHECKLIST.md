@@ -1,9 +1,13 @@
 # Deploy Checklist
 
-> **Modelo atual: pull-based (ADR-018).** A SSOT do mecanismo de deploy é
+> **Modelo atual: pull-based (ADR-018).** A decisão está em
+> [ADR-018 — Pull-based deploy](../../docs/architecture/project-decisions/ADR-018-pull-based-deploy.md)
+> (que **supersede** o ADR-010); a SSOT do mecanismo é
 > [`specs/infra/deploy.spec.md`](specs/infra/deploy.spec.md) — este checklist só resume os passos operacionais.
 > O modelo antigo (o CI fazia `PUT` no Portainer `:9443` **público**) foi desligado no cutover (#1515) e o job
-> `deploy` removido na Fase 4 (#1516). **Não** há mais secrets `PORTAINER_*` / `STAGING_*` / `PRODUCTION_*`.
+> `deploy` removido na Fase 4 (#1516) — conferido em `.github/workflows/deploy.yaml:5-9,36-231`, que hoje só
+> tem os jobs `prepare`, `build_and_push`, `sign` e `tag_and_release`. **Não** há mais secrets
+> `PORTAINER_*` / `STAGING_*` / `PRODUCTION_*`.
 
 Workflows canônicos:
 
@@ -44,9 +48,14 @@ Produção muda em **dois passos deliberados**:
 gh workflow run promote.yml -f release=vYYYY.MM.DD-<sha7>
 ```
 
-- [ ] `promote.yml` resolve tag→digest, exige imagens assinadas e publica o ponteiro **assinado** (`cosign sign-blob`) no branch `deploy-pointer`
-- [ ] O agente `aprender-deployer` (VM01) lê o ponteiro, verifica com cosign contra o trusted-root pinado, aplica **por digest** em `127.0.0.1:9443` e confirma de dentro da VM (`/api/readyz/` + `/api/version/`)
+- [ ] `promote.yml` resolve tag→digest, exige imagens assinadas (`promote.yml:125-135`) e publica o ponteiro **assinado** (`cosign sign-blob`, `promote.yml:201-218`) no branch `deploy-pointer`
+- [ ] O agente `aprender-deployer` (VM01) lê o ponteiro, verifica com cosign contra o trusted-root pinado, aplica **por digest** em `127.0.0.1:9443` e confirma de dentro da VM (`deployer/apply.sh:80,118-119` — `confirm_localhost` = `/api/readyz/` + `/api/version/`)
+- [ ] **Gate de backup fresco**: o applier roda `deployer/hooks/check_backup.sh` e **recusa aplicar** se não houver dump com idade ≤ `BACKUP_MAX_AGE` (28h) e tamanho ≥ `BACKUP_MIN_SIZE` (1024B) em `/var/backups/aprender`. Ele só faz `stat` — **não** valida que o backup é restaurável (ver [BACKUP_OPERATIONS.md](BACKUP_OPERATIONS.md))
 - [ ] **Rollback** = promover a tag anterior pelo mesmo caminho gated: `gh workflow run promote.yml -f release=<tag-anterior>`
+
+> Rollback de **imagem** não desfaz **migration**. Se a release promovida aplicou migration
+> destrutiva, o caminho de volta é restore de banco — e hoje esse caminho está quebrado na
+> ferramenta oficial (#1611). Ver [DISASTER_RECOVERY.md](DISASTER_RECOVERY.md).
 
 Observação:
 

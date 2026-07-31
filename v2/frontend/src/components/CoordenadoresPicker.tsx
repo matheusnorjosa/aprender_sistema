@@ -5,7 +5,7 @@
  * Permite selecionar múltiplos coordenadores acompanhantes.
  */
 
-import { useState } from 'react';
+import { useState, type JSX } from 'react';
 import { Tag, AutoComplete, Spin } from 'antd';
 import { lookupUsuarios } from '../api/lookup';
 import logger from '../utils/logger';

@@ -9,7 +9,7 @@
  * RBAC: Controle + Gerência (validado em App.jsx)
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type JSX } from 'react';
 import {
   Card,
   Row,

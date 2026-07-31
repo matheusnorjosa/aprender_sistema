@@ -22,32 +22,15 @@
 import { readFileSync } from "node:fs";
 
 // ---------------------------------------------------------------------------
-// Advisories aceitas conscientemente (TTL — revisar trimestralmente,
-// proxima revisao 2026-10-30). Mesmo padrao ja usado no gate Python
-// (`pip-audit --ignore-vuln`, security-scan.yml).
-//
+// Advisories aceitas conscientemente (TTL — revisar trimestralmente).
+// Mesmo padrao do gate Python (`pip-audit --ignore-vuln`, security-scan.yml).
 // Cada entrada precisa de: por que nao se aplica AQUI e qual o plano de saida.
+//
+// VAZIO: a excecao GHSA-qwww-vcr4-c8h2 (react-router, CSRF no RSC Mode) foi
+// removida em #1675 ao concluir o upgrade React 18->19 + react-router 8.3.0
+// (a versao que carrega o patch da advisory). Nenhuma excecao ativa hoje.
 // ---------------------------------------------------------------------------
-const ADVISORIES_ACEITAS = new Map([
-  [
-    "GHSA-qwww-vcr4-c8h2",
-    {
-      pacote: "react-router",
-      motivo:
-        "CSRF bypass no RSC Mode (React Server Components). Este frontend e' " +
-        "SPA cliente puro: build `tsc --noEmit && vite build`, roteamento por " +
-        "<BrowserRouter>, sem @react-router/*, sem entrypoint SSR e a imagem de " +
-        "producao so serve /dist por nginx. Nao existe RSC em execucao, entao o " +
-        "vetor nao e' alcancavel.",
-      saida:
-        "sem correcao no pacote em uso: react-router-dom nao tem linha 8.x " +
-        "publicada (ultima e' 7.18.2, ja adotada). O patch so existe em " +
-        "react-router 8.3.0, que exige React >= 19.2.7 — o projeto esta no " +
-        "React 18.3.1. Remover esta excecao ao concluir o upgrade para " +
-        "React 19 (issue #1675).",
-    },
-  ],
-]);
+const ADVISORIES_ACEITAS = new Map();
 
 const CAMINHO = process.argv[2] ?? "npm-audit-report.json";
 const BLOQUEANTES = new Set(["high", "critical"]);
@@ -127,7 +110,7 @@ console.log(
 );
 
 if (dispensadas.length > 0) {
-  console.log("\nAdvisories aceitas conscientemente (TTL 2026-10-30):");
+  console.log("\nAdvisories aceitas conscientemente:");
   for (const d of new Map(dispensadas.map((x) => [x.id, x])).values()) {
     const ctx = ADVISORIES_ACEITAS.get(d.id);
     console.log(`  - ${d.id} (${ctx.pacote}): ${d.titulo}`);

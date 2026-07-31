@@ -20,7 +20,7 @@
  * `rbac_matrix.test.ts` em paralelo.
  */
 
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { render, screen, within, fireEvent } from '@testing-library/react';
 import { describe, expect, test } from 'vitest';
 

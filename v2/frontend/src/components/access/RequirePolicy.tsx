@@ -16,9 +16,9 @@
  * Testabilidade alta, zero side-effects.
  */
 
-import type { ReactNode } from 'react';
+import type { ReactNode, JSX } from 'react';
 import { Button, Result } from 'antd';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 
 interface RequirePolicyProps {
   children: ReactNode;

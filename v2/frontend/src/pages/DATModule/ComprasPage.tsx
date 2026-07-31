@@ -8,7 +8,7 @@
  * 1.798 registros, 502.771 itens, 307 produtos, 94 municípios
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, type JSX } from 'react';
 import {
   Table,
   Button,

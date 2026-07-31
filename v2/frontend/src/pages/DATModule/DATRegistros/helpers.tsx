@@ -10,6 +10,8 @@ import {
   MinusCircleFilled,
 } from '@ant-design/icons';
 
+import type { JSX } from "react";
+
 /**
  * Status type for workflow steps
  */

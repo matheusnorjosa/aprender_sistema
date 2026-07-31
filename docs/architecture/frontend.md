@@ -22,7 +22,7 @@ Conferido em `v2/frontend/package.json` (2026-07-24):
 - **Vite 7** (`vite` 7.3.5) para build e dev server
 - **Ant Design 5** (`antd` 5.27.4) para componentes UI
 - **Tailwind CSS 3** (`tailwindcss` 3.4.18) para utilitários
-- **React Router 7** (`react-router-dom` 7.15.0)
+- **React Router 8** (`react-router` 8.3.0)
 - **TypeScript 5** (`typescript` 5.9.3); testes com Vitest + MSW, E2E com Playwright
 - **Sem `axios`** — o transporte é `fetch()` nativo (ADR-013; detalhe na spec de clientes de API)
 

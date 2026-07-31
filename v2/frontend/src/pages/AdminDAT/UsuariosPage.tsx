@@ -8,7 +8,7 @@
  * GAP-001 (resolvido): Endpoint /api/usuarios-admin/ reativado
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type JSX } from 'react';
 import {
   Table,
   Button,
@@ -30,7 +30,7 @@ import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
 import type { FilterValue, SorterResult } from 'antd/es/table/interface';
 import type { RadioChangeEvent } from 'antd/es/radio';
 import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { checkAuth } from '../../api/auth';
 import { listUsers, createUser, updateUser, deleteUser, listGroups, getRBACMeta } from '../../api/adminDAT';
 import { buildUsuarioPayload } from './usuario_form_helpers';
@@ -535,7 +535,7 @@ export default function UsuariosPage(): JSX.Element {
 
         {viewMode === 'lista' ? (
           /* Tabela */
-          <Table
+          (<Table
             columns={columns}
             dataSource={usuarios}
             rowKey="id"
@@ -547,10 +547,10 @@ export default function UsuariosPage(): JSX.Element {
             }}
             onChange={handleTableChange}
             scroll={{ x: 1200 }}
-          />
+          />)
         ) : (
           /* Importação */
-          <ImportUploader
+          (<ImportUploader
             label="Importar Usuários de CSV/XLSX"
             description="Colunas obrigatórias: cpf, nome. Opcionais: email, telefone, cargo, grupos (separados por vírgula). O CPF é a chave de idempotência."
             onDryRun={async (file: File) => toValidationResult(await importUsuarios(file, true) as unknown as ImportResult)}
@@ -560,7 +560,7 @@ export default function UsuariosPage(): JSX.Element {
               fetchUsuarios();
               return toApplyResult(result as unknown as ImportResult);
             }}
-          />
+          />)
         )}
       </Card>
 

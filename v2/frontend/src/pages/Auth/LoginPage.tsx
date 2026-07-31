@@ -7,7 +7,7 @@
  * - Campos minimalistas
  */
 
-import { useState } from 'react';
+import { useState, type JSX } from 'react';
 import { Form, Input, Button, message } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { login } from '../../api/auth';

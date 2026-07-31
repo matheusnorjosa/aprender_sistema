@@ -11,7 +11,7 @@
  * através da Grade Mensal (/disponibilidade), não há checagem em tempo real.
  */
 
-import { useState } from 'react';
+import { useState, type JSX } from 'react';
 import { Form, DatePicker, Select, Input, Button } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 

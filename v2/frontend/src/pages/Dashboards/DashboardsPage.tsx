@@ -10,7 +10,7 @@
  * Ref: Issue #311 - Substituir mock data por API real
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type JSX } from 'react';
 import {
   Card,
   Row,

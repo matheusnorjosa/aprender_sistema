@@ -1,7 +1,7 @@
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, ReactNode, JSX } from 'react';
 import { useEffect, useState } from 'react';
 import { Alert } from 'antd';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { getMe } from '../api/availability';
 import { computePermissions } from '../hooks/usePermissions';
 

@@ -6,7 +6,7 @@
  */
 
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, type ReactNode, type JSX } from 'react';
 import { theme, type ThemeConfig } from 'antd';
 
 /**

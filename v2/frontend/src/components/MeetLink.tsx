@@ -13,6 +13,8 @@
 import { Button, Space, message } from 'antd';
 import { VideoCameraOutlined, CopyOutlined } from '@ant-design/icons';
 
+import type { JSX } from "react";
+
 /**
  * MeetLink props interface
  */

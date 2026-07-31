@@ -64,11 +64,11 @@ jobs:
         echo "target_url=$TARGET_URL" >> "$GITHUB_OUTPUT"
         echo "skip_run=$SKIP_RUN" >> "$GITHUB_OUTPUT"
 
-    - name: Setup Node.js 20.x
+    - name: Setup Node.js 22.x
       if: steps.target.outputs.skip_run != '1'
       uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v4
       with:
-        node-version: '20.x'
+        node-version: '22.x'
         cache: 'npm'
         cache-dependency-path: 'v2/frontend/package-lock.json'
 

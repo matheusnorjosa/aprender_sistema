@@ -8,7 +8,7 @@
  * Usa dayjs com timezone America/Fortaleza.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type JSX } from 'react';
 import { DatePicker, TimePicker, Space, Typography } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';

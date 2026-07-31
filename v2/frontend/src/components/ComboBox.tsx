@@ -5,7 +5,7 @@
  * Trabalha com objetos {id, label} e fornece busca via lookup API
  */
 
-import { ReactNode, useState, useEffect } from 'react';
+import { ReactNode, useState, useEffect, type JSX } from 'react';
 import { AutoComplete, Spin } from 'antd';
 import logger from '../utils/logger';
 import type { ID } from '../types';

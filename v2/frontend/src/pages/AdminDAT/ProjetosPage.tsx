@@ -5,12 +5,12 @@
  * Fase 1 Iteração 2 - Plano DAT/GCal 2025-10-29
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type JSX } from 'react';
 import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, Form, Radio, Checkbox } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { TablePaginationConfig } from 'antd/es/table';
 import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { listProjetos, createProjeto, updateProjeto, deleteProjeto } from '../../api/adminDAT';
 import { DEFAULT_PAGE_SIZE } from '../../constants';
 import type { ID } from '../../types';

@@ -8,7 +8,7 @@
  * - Integração com /api/gcal/dashboard/metrics e /api/gcal/dashboard/events
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, type JSX } from 'react';
 import {
   Card,
   Row,

@@ -67,6 +67,13 @@ COPY infra/gunicorn.conf.py /app/infra/gunicorn.conf.py
 COPY infra/scripts /app/infra/scripts
 RUN chmod +x /app/infra/scripts/*.sh
 
+# #1671: coleta os estaticos (admin CSS/JS) no BUILD para o whitenoise servir em
+# /static/ em producao. Feito no build (nao no boot) para deployar pela imagem, sem
+# tocar o stack. Aqui ENVIRONMENT nao esta setado (=development), entao os guards de
+# producao (SECRET_KEY etc.) nao disparam e a chave dev serve; collectstatic nao
+# acessa o banco. O chown -R appuser mais abaixo cobre /app/staticfiles.
+RUN DJANGO_SETTINGS_MODULE=config.settings python manage.py collectstatic --noinput
+
 # Cleanup: remove __pycache__ and .pyc files
 # Note: do NOT remove "test"/"tests" dirs — django.test is a runtime module
 #

@@ -44,6 +44,8 @@ import type { ImportResult } from '../../api/ops';
 import ImportUploader from '../../components/ImportUploader';
 import type { ApplyResult, ValidationResult } from '../../components/ImportUploader';
 
+import type { JSX } from "react";
+
 const { Title, Text } = Typography;
 
 /** Helper para converter ImportResult → ValidationResult (mesmo padrão de ControlePage). */

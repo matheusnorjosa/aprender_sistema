@@ -1,5 +1,5 @@
-import { lazy, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense, type JSX } from 'react';
+import { Routes, Route, Navigate } from 'react-router';
 import { Spin } from 'antd';
 import type { Permissions } from '../hooks/usePermissions';
 import { useCanAccess } from '../hooks/useCanAccess';

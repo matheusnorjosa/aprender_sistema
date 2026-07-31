@@ -14,6 +14,8 @@ import { Alert } from 'antd';
 import { WifiOutlined } from '@ant-design/icons';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
+import type { JSX } from "react";
+
 /**
  * Banner that shows when user is offline.
  */

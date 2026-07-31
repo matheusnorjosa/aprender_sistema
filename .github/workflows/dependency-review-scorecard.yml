@@ -63,18 +63,12 @@ jobs:
           # ATENCAO: este step NAO roda hoje — o repositorio e' privado, entao
           # quem avalia o frontend e' o step de fallback mais abaixo (que usa
           # .github/scripts/npm-audit-gate.mjs). Mantido correto para o caso de
-          # a visibilidade mudar; se isso acontecer, a allowlist daqui precisa
-          # continuar espelhando a do script, senao os dois gates divergem.
+          # a visibilidade mudar; se voltar a rodar e alguma excecao vier a ser
+          # necessaria, a allowlist daqui precisa espelhar a do script.
           #
-          # GHSA-qwww-vcr4-c8h2 (react-router) — TTL 2026-10-30.
-          # CSRF no RSC Mode. Nao alcancavel aqui: SPA cliente puro, build
-          # `tsc --noEmit && vite build`, <BrowserRouter>, sem @react-router/*,
-          # sem entrypoint SSR, imagem de producao so serve /dist por nginx.
-          # Sem correcao disponivel no pacote em uso: react-router-dom nao tem
-          # linha 8.x publicada (ultima e' 7.18.2, ja adotada aqui) — o patch
-          # so existe em react-router 8.3.0, que exige React >= 19.2.7.
-          # Plano de saida: issue #1675 (upgrade React 18 -> 19). Remover ao concluir.
-          allow-ghsas: GHSA-qwww-vcr4-c8h2
+          # Sem allow-ghsas: a excecao GHSA-qwww-vcr4-c8h2 (react-router) foi
+          # removida em #1675 (upgrade React 19 + react-router 8.3.0, que
+          # carrega o patch). Nenhuma excecao ativa nos dois gates.
 
       # Private repositories without GHAS can not use dependency-review-action.
       # Fallback keeps a blocking dependency gate for changed dependency manifests.

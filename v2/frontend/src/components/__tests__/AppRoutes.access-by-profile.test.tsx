@@ -13,7 +13,7 @@
  * próprios. Mockamos APIs internas para evitar fetch real.
  */
 
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 

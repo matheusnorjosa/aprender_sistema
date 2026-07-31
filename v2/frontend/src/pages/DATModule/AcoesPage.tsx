@@ -8,7 +8,7 @@
  * 688 registros, 103 municípios, 88 projetos, 28 coordenadores
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, type JSX } from 'react';
 import { useTableFilters, type TableFilterParams } from '../../hooks/useTableFilters';
 import type { PaginatedResponse } from '../../types';
 import {

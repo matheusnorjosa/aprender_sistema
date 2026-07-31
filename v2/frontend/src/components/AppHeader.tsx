@@ -1,6 +1,6 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, type JSX } from 'react';
 import { Layout, Button, Badge, Popover, List, Tag, Empty, Spin, Typography, message } from 'antd';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import {
   UserOutlined,
   LogoutOutlined,

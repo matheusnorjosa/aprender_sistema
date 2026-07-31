@@ -8,7 +8,7 @@
  * 4. Apply persiste no banco
  */
 
-import { useState } from 'react';
+import { useState, type JSX } from 'react';
 import {
   Upload,
   Button,

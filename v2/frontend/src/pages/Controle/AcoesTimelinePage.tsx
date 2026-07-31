@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type JSX } from 'react';
 import { Card, Empty, Select, Space, Timeline, Typography, message } from 'antd';
 
 import { listAcoesByCiclo, listCiclosAcoes } from '../../api/acoesNotificacao';

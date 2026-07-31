@@ -7,8 +7,8 @@
  * Issue #927: App.tsx decomposition (Frente A — Arquitetura Frontend)
  */
 
-import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
-import { BrowserRouter as Router } from 'react-router-dom';
+import { useState, useEffect, useRef, useCallback, lazy, Suspense, type JSX } from 'react';
+import { BrowserRouter as Router } from 'react-router';
 import { ConfigProvider, Layout, message } from 'antd';
 import logger from './utils/logger';
 import { isAuthError } from './utils/errors';

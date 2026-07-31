@@ -9,6 +9,8 @@ import { importColecoes } from '../../api/ops';
 import ImportUploader from '../../components/ImportUploader';
 import type { ValidationResult, ApplyResult } from '../../components/ImportUploader';
 
+import type { JSX } from "react";
+
 const { Title, Text } = Typography;
 
 function toValidationResult(report: Record<string, unknown>): ValidationResult {

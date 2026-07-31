@@ -11,10 +11,10 @@
  * Fase 1 - Plano DAT/GCal 2025-10-29
  */
 
-import type { ReactNode } from 'react';
+import type { ReactNode, JSX } from 'react';
 import { Card, Row, Col, Typography } from 'antd';
 import { UserOutlined, EnvironmentOutlined, TeamOutlined, ProjectOutlined, SettingOutlined, SafetyOutlined, BankOutlined, ShoppingOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 const { Title, Text } = Typography;
 

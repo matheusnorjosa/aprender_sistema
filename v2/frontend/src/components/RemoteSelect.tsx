@@ -6,7 +6,7 @@
  */
 
 import { Select, Spin } from 'antd';
-import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, useRef, type ReactNode, type JSX } from 'react';
 import logger from '../utils/logger';
 import { TIMING } from '../constants';
 import type { ID } from '../types';

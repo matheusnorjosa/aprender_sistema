@@ -7,7 +7,7 @@
  * tabela com cabeçalhos agrupados e legenda de status.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type JSX } from 'react';
 import { useTableFilters, type TableFilterParams } from '../../hooks/useTableFilters';
 import type { PaginatedResponse } from '../../types';
 import {

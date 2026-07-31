@@ -8,7 +8,7 @@ description: 'Install Node.js and npm dependencies with node_modules caching'
 inputs:
   node-version:
     description: 'Node.js version'
-    default: '20.x'
+    default: '22.x'
   working-directory:
     description: 'Directory containing package.json'
     default: 'v2/frontend'

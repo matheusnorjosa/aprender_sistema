@@ -8,7 +8,7 @@
  */
 
 import { useState, useEffect, ReactNode, JSX } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { Row, Col, Card, Typography, Badge, Space, Spin, Statistic } from 'antd';
 import {
   UserOutlined,

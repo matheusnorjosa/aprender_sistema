@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect, useMemo, useCallback, ChangeEvent, JSX } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router';
 // antd - direct imports for tree-shaking (Issue #424)
 import Form from 'antd/es/form';
 import Input from 'antd/es/input';

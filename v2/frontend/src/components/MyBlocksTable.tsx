@@ -14,6 +14,8 @@ import dayjs from 'dayjs';
 import type { ColumnsType, ColumnType } from 'antd/es/table';
 import type { ID } from '../types';
 
+import type { JSX } from "react";
+
 /**
  * Block type
  */

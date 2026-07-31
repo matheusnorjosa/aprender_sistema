@@ -35,7 +35,9 @@
 
 import { Modal, Button, Space, Typography } from 'antd';
 import { ClockCircleOutlined, LogoutOutlined, CheckCircleOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
+
+import type { JSX } from "react";
 
 const { Text, Title } = Typography;
 

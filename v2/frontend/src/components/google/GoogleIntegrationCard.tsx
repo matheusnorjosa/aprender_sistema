@@ -17,7 +17,7 @@
  * - PA-06: Controle explícito (ISO 9241-110)
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type JSX } from 'react';
 import { Card, Button, Space, Tag, Typography, Popconfirm, Select, message } from 'antd';
 import {
   GoogleOutlined,

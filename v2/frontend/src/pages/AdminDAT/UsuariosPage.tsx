@@ -29,10 +29,10 @@ import {
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
 import type { FilterValue, SorterResult } from 'antd/es/table/interface';
 import type { RadioChangeEvent } from 'antd/es/radio';
-import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined, KeyOutlined } from '@ant-design/icons';
 import { Link } from 'react-router';
 import { checkAuth } from '../../api/auth';
-import { listUsers, createUser, updateUser, deleteUser, listGroups, getRBACMeta } from '../../api/adminDAT';
+import { listUsers, createUser, updateUser, deleteUser, resetUserPassword, listGroups, getRBACMeta } from '../../api/adminDAT';
 import { buildUsuarioPayload } from './usuario_form_helpers';
 import type { PermissaoFuncional, RBACMetaPayload } from '../../api/adminDAT';
 import { importUsuarios } from '../../api/ops';
@@ -155,6 +155,11 @@ export default function UsuariosPage(): JSX.Element {
   });
   const [modalVisible, setModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
+  // #1675 follow-up: redefinição de senha de OUTRO usuário (ação de admin).
+  // Modal dedicado, separado do form de edição — intenção explícita e a
+  // auditoria RESET_PASSWORD (#1672) dispara só aqui.
+  const [resetPasswordUser, setResetPasswordUser] = useState<UserRecord | null>(null);
+  const [resetSaving, setResetSaving] = useState(false);
   // Bug 3 fix (2026-04-27): CPF é write-only por LGPD (serializer), então API
   // nunca retorna o CPF raw — apenas `cpf_masked`. No modo edit, manter o
   // campo disabled mostrando o mascarado, e exigir clique em "Alterar CPF"
@@ -166,6 +171,7 @@ export default function UsuariosPage(): JSX.Element {
   const [viewMode, setViewMode] = useState<ViewMode>('lista');
 
   const [form] = Form.useForm<UserFormValues>();
+  const [resetForm] = Form.useForm<{ nova_senha: string; confirmar_nova_senha: string }>();
   const selectedSetorIds = Form.useWatch('setor_ids', form) || [];
   const selectedFuncaoIds = Form.useWatch('funcao_ids', form) || [];
 
@@ -371,6 +377,26 @@ export default function UsuariosPage(): JSX.Element {
     }
   };
 
+  const handleOpenResetPassword = (user: UserRecord): void => {
+    setResetPasswordUser(user);
+    resetForm.resetFields();
+  };
+
+  const handleResetPassword = async (values: { nova_senha: string }): Promise<void> => {
+    if (!resetPasswordUser) return;
+    setResetSaving(true);
+    try {
+      await resetUserPassword(resetPasswordUser.id, values.nova_senha);
+      message.success(`Senha de "${resetPasswordUser.username}" redefinida com sucesso`);
+      setResetPasswordUser(null);
+      resetForm.resetFields();
+    } catch (error) {
+      message.error(`Erro ao redefinir senha: ${(error as Error).message}`);
+    } finally {
+      setResetSaving(false);
+    }
+  };
+
   const columns: ColumnsType<UserRecord> = [
     {
       title: 'ID',
@@ -465,7 +491,7 @@ export default function UsuariosPage(): JSX.Element {
     {
       title: 'Ações',
       key: 'acoes',
-      width: 200,
+      width: 280,
       render: (_, record) => (
         <Space size="small">
           <Button
@@ -475,6 +501,15 @@ export default function UsuariosPage(): JSX.Element {
             onClick={() => handleEdit(record)}
           >
             Editar
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<KeyOutlined />}
+            onClick={() => handleOpenResetPassword(record)}
+            aria-label={`Redefinir senha de ${record.username}`}
+          >
+            Senha
           </Button>
           <Button
             type="link"
@@ -794,6 +829,61 @@ export default function UsuariosPage(): JSX.Element {
               <Input.Password placeholder="Senha inicial" />
             </Form.Item>
           )}
+        </Form>
+      </Modal>
+
+      {/* #1675: Modal dedicado de redefinição de senha (admin -> outro usuário).
+          O backend audita como RESET_PASSWORD (#1672); a senha nunca é exibida. */}
+      <Modal
+        title={resetPasswordUser ? `Redefinir senha — ${resetPasswordUser.username}` : 'Redefinir senha'}
+        open={resetPasswordUser !== null}
+        onCancel={() => { setResetPasswordUser(null); resetForm.resetFields(); }}
+        onOk={() => resetForm.submit()}
+        okText="Redefinir senha"
+        cancelText="Cancelar"
+        confirmLoading={resetSaving}
+        width={480}
+      >
+        <Alert
+          type="info"
+          showIcon
+          className="mb-4"
+          message="A nova senha entra em vigor imediatamente."
+        />
+        <Form
+          form={resetForm}
+          layout="vertical"
+          autoComplete="off"
+          onFinish={handleResetPassword}
+        >
+          <Form.Item
+            name="nova_senha"
+            label="Nova senha"
+            rules={[
+              { required: true, message: 'Informe a nova senha.' },
+              { min: 8, message: 'A senha deve ter no mínimo 8 caracteres.' },
+            ]}
+          >
+            <Input.Password placeholder="Nova senha" autoComplete="new-password" />
+          </Form.Item>
+          <Form.Item
+            name="confirmar_nova_senha"
+            label="Confirmar nova senha"
+            dependencies={['nova_senha']}
+            rules={[
+              { required: true, message: 'Confirme a nova senha.' },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue('nova_senha') === value) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error('As senhas não coincidem.'));
+                },
+              }),
+            ]}
+          >
+            <Input.Password placeholder="Confirmar nova senha" autoComplete="new-password" />
+          </Form.Item>
         </Form>
       </Modal>
     </section>

@@ -191,6 +191,20 @@ export async function deleteUser(id: ID): Promise<void> {
   syncChannel.publish('usuarios', { action: 'deleted' });
 }
 
+/**
+ * Redefine a senha de OUTRO usuário (ação de admin/DAT). PATCH parcial só com
+ * `password` — o backend faz o hash e audita como `RESET_PASSWORD` (#1672).
+ * A senha nunca é retornada nem logada. Endpoint compartilhado com updateUser.
+ */
+export async function resetUserPassword(id: ID, password: string): Promise<void> {
+  await fetchWithErrorMapping(
+    `/usuarios-admin/${id}/`,
+    { method: 'PATCH', body: JSON.stringify({ password }) },
+    ADMIN_ERROR_MAP,
+  );
+  syncChannel.publish('usuarios', { action: 'updated' });
+}
+
 // ========== GRUPOS ==========
 
 export async function listGroups(params: ListParams = {}): Promise<PaginatedResponse<Group>> {

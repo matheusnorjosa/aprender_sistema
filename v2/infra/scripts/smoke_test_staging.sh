@@ -226,22 +226,33 @@ fi
 echo ""
 
 # ── [7/8] Frontend HTTP ─────────────────────────────────────────
+# Retry como worker/beat: logo apos o `up`, o container nginx pode responder
+# antes de servir o index.html completo -> o check single-shot dava
+# "root div not found" transitorio (falso-negativo, index.html tem o root div).
 echo -n "[7/${TOTAL}] Frontend HTTP: "
-FE_BODY="$(curl -sf "${FRONTEND_URL}/" 2>/dev/null || true)"
-if echo "$FE_BODY" | grep -q '<div id="root"'; then
+frontend_root_check() {
+  local body
+  body="$(curl -sf "${FRONTEND_URL}/" 2>/dev/null)" || return 1
+  echo "$body" | grep -q '<div id="root"'
+}
+if retry 12 5 frontend_root_check; then
   pass "Frontend HTTP"
 else
-  fail "Frontend HTTP" "root div not found"
+  fail "Frontend HTTP" "root div not found after 12 attempts"
 fi
 echo ""
 
 # ── [8/8] Frontend health ────────────────────────────────────────
 echo -n "[8/${TOTAL}] Frontend health: "
-FE_HEALTH="$(curl -sf -o /dev/null -w '%{http_code}' "${FRONTEND_URL}/health" 2>/dev/null || echo "000")"
-if [ "$FE_HEALTH" = "200" ]; then
+frontend_health_check() {
+  local code
+  code="$(curl -sf -o /dev/null -w '%{http_code}' "${FRONTEND_URL}/health" 2>/dev/null || echo "000")"
+  [ "$code" = "200" ]
+}
+if retry 12 5 frontend_health_check; then
   pass "Frontend health"
 else
-  fail "Frontend health" "HTTP ${FE_HEALTH}"
+  fail "Frontend health" "not 200 after 12 attempts"
 fi
 echo ""
 

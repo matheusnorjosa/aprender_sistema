@@ -22,6 +22,7 @@ import {
   deleteGroup,
   getRBACMeta,
   listUsers,
+  resetUserPassword,
   syncGroupMembers,
   updateGroup,
 } from '../adminDAT';
@@ -63,6 +64,21 @@ describe('adminDAT API wrappers (MSW)', () => {
 
   beforeEach(() => {
     calls = [];
+  });
+
+  test('resetUserPassword PATCHes /usuarios-admin/:id/ with only the password', async () => {
+    server.use(
+      spyHandler(http.patch, apiUrl('/usuarios-admin/5/'), { json: { id: 5 } }, calls),
+    );
+
+    const senha = 'trocar-em-teste-123'; // gitleaks:allow (literal de teste, nao e segredo)
+    await resetUserPassword(5, senha);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe('PATCH');
+    expect(calls[0].url).toContain('/usuarios-admin/5/');
+    // Só a senha vai no corpo — nenhum outro campo do usuário é tocado.
+    expect(calls[0].body).toEqual({ password: senha });
   });
 
   test('listUsers calls /usuarios-admin/ with params', async () => {

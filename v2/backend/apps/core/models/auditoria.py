@@ -71,6 +71,9 @@ class AuditLog(models.Model):
         # Import jobs
         IMPORT_JOB_COMPLETED = "IMPORT_JOB_COMPLETED", "Import job concluido"
         IMPORT_JOB_FAILED = "IMPORT_JOB_FAILED", "Import job falhou"
+        # LGPD retencao (arts. 6/16): expurgo dos artefatos de PII de jobs antigos
+        # (arquivo submetido + pendencias + traceback). Ver apps.core.tasks.
+        IMPORT_ARTIFACT_PURGE = "IMPORT_ARTIFACT_PURGE", "Expurgo de artefatos de import (retencao LGPD)"
 
         # Deslocamento
         CREATE_DESLOCAMENTO = "CREATE_DESLOCAMENTO", "Criar deslocamento"

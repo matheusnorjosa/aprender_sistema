@@ -612,19 +612,23 @@ CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
 FEATURE_AUTO_APPLY_ENABLED = os.getenv("FEATURE_AUTO_APPLY_ENABLED", "0") == "1"
 
 # Celery Beat Schedule (tarefas periódicas)
-# Governança Fase 3: schedule só é registrado quando FEATURE_AUTO_APPLY_ENABLED=True
+from celery.schedules import crontab  # noqa: E402 — usado só pelo beat schedule abaixo
+
+# LGPD retenção/minimização (arts. 6/16): o expurgo diário dos artefatos de PII de
+# ImportJobs antigos é SEMPRE registrado — não depende de FEATURE_AUTO_APPLY_ENABLED.
+CELERY_BEAT_SCHEDULE = {
+    "purge-import-artifacts-daily": {
+        "task": "apps.core.tasks.purge_import_job_artifacts",
+        "schedule": crontab(hour=3, minute=0),  # 03:00 (off-peak)
+    },
+}
+# Governança Fase 3: o gcal-sync só é registrado quando FEATURE_AUTO_APPLY_ENABLED=True.
 if FEATURE_AUTO_APPLY_ENABLED:
-    CELERY_BEAT_SCHEDULE = {
-        "gcal-sync-every-5-minutes": {
-            "task": "apps.core.tasks.preview_then_apply_gcal",
-            "schedule": 300.0,  # 5 minutos (em segundos)
-            "options": {
-                "expires": 60.0,  # Tarefa expira após 60s se não iniciar
-            },
-        },
+    CELERY_BEAT_SCHEDULE["gcal-sync-every-5-minutes"] = {
+        "task": "apps.core.tasks.preview_then_apply_gcal",
+        "schedule": 300.0,  # 5 minutos (em segundos)
+        "options": {"expires": 60.0},  # Tarefa expira após 60s se não iniciar
     }
-else:
-    CELERY_BEAT_SCHEDULE = {}
 
 # ================================================================
 # LOGGING (MP2: Structured Logging)
@@ -804,6 +808,10 @@ DATA_IMPORT_DIR = os.getenv("DATA_IMPORT_DIR", "/app/data/csv-import")
 # ================================================================
 BACKUP_DIR = os.getenv("BACKUP_DIR", "/backups")
 BACKUP_RETENTION_DAYS = int(os.getenv("BACKUP_RETENTION_DAYS", "7"))
+# LGPD retencao/minimizacao (arts. 6-III/16): apos N dias, os artefatos de PII dos
+# ImportJobs (arquivo submetido + pendencias + traceback) sao expurgados pela task
+# `purge_import_job_artifacts`, preservando a metadata operacional. Default 90 dias.
+IMPORT_JOB_ARTIFACT_RETENTION_DAYS = int(os.getenv("IMPORT_JOB_ARTIFACT_RETENTION_DAYS", "90"))
 # S3 bucket name (without s3://). Use empty string to disable uploads.
 BACKUP_S3_BUCKET = os.getenv("BACKUP_S3_BUCKET", "")
 

@@ -12,9 +12,15 @@
 #   - Sufficient disk space
 #   - Application stopped (recommended)
 
+# NB: pipefail NAO e' global de proposito. As selecoes de backup usam `ls A B | head`,
+# e com so `.age` em prod o glob `*.sql.gz` nao casa -> `ls` sai 2 e, sob pipefail+set -e,
+# abortaria a selecao antes do guard de "nenhum backup". Onde a falha do pipe importa
+# (os pipes do `age`), habilitamos pipefail LOCALMENTE via subshell.
 set -e
 
-BACKUP_DIR="/var/backups/aprender"
+# BACKUP_DIR respeita a env var (o mount do container aponta /backups). Antes estava
+# hardcoded, entao `--latest` dentro do container nao achava os backups (#1611).
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/aprender}"
 DB_NAME="${DB_NAME:-aprender_db}"
 DB_USER="${DB_USER:-aprender_user}"
 DB_HOST="${DB_HOST:-localhost}"
@@ -87,10 +93,31 @@ echo ""
 echo "[$(date)] Starting restore..."
 
 # Step 1: Verify backup integrity
+# SEC-017/#1611: a verificacao precisa ser CIENTE DO FORMATO. Producao grava so
+# `.sql.gz.age`, cujo cabecalho e' texto ("age-encryption.org/v1"), nao gzip. Rodar
+# `gzip -t` direto no .age falhava com "corrupted" (falso) e travava TODO restore de
+# prod. Espelhamos aqui o branch que a Step 4 ja tinha: decifrar e SO ENTAO testar o gzip.
 echo "[$(date)] Verifying backup integrity..."
-if ! gzip -t "$BACKUP_FILE"; then
-    echo -e "${RED}ERROR: Backup file is corrupted!${NC}"
-    exit 1
+if echo "$BACKUP_FILE" | grep -q '\.age$'; then
+    BACKUP_AGE_KEY="${BACKUP_AGE_KEY:-/etc/backup-key.txt}"
+    if ! command -v age > /dev/null 2>&1; then
+        echo -e "${RED}ERROR: 'age' nao esta no PATH — necessario para verificar/restaurar backup .age${NC}"
+        exit 1
+    fi
+    if [ ! -r "$BACKUP_AGE_KEY" ]; then
+        echo -e "${RED}ERROR: chave age nao legivel: $BACKUP_AGE_KEY${NC}"
+        exit 1
+    fi
+    # pipefail LOCAL (subshell): sem ele a falha do `age` seria mascarada pelo exit do gzip -t.
+    if ! ( set -o pipefail; age -d -i "$BACKUP_AGE_KEY" "$BACKUP_FILE" | gzip -t ); then
+        echo -e "${RED}ERROR: backup cifrado invalido (falha ao decifrar ou gzip corrompido)!${NC}"
+        exit 1
+    fi
+else
+    if ! gzip -t "$BACKUP_FILE"; then
+        echo -e "${RED}ERROR: Backup file is corrupted!${NC}"
+        exit 1
+    fi
 fi
 echo -e "${GREEN}Backup integrity OK${NC}"
 
@@ -113,7 +140,9 @@ echo "[$(date)] Restoring backup (this may take a while)..."
 if echo "$BACKUP_FILE" | grep -q '\.age$'; then
     BACKUP_AGE_KEY="${BACKUP_AGE_KEY:-/etc/backup-key.txt}"
     echo "[$(date)] Decrypting encrypted backup with age..."
-    age -d -i "$BACKUP_AGE_KEY" "$BACKUP_FILE" | gunzip | psql -h $DB_HOST -U postgres -d $DB_NAME -q
+    # pipefail LOCAL: uma falha do `age` (chave errada, arquivo truncado) deve abortar o
+    # restore — sem isso, o psql receberia stream vazio e "restauraria" um banco incompleto.
+    ( set -o pipefail; age -d -i "$BACKUP_AGE_KEY" "$BACKUP_FILE" | gunzip | psql -h $DB_HOST -U postgres -d $DB_NAME -q )
 else
     gunzip -c "$BACKUP_FILE" | psql -h $DB_HOST -U postgres -d $DB_NAME -q
 fi

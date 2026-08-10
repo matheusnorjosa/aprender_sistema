@@ -15,6 +15,7 @@ on:
       - "v2/infra/scripts/staging-gate.sh"
       - "v2/infra/scripts/staging-gate-scope.sh"
       - "v2/infra/scripts/smoke_test_staging.sh"
+      - "v2/infra/scripts/restore_db.sh"
       - "v2/infra/scripts/tests/**"
       - ".github/workflows/staging-gate-bats.yml"
   push:
@@ -24,6 +25,7 @@ on:
       - "v2/infra/scripts/staging-gate.sh"
       - "v2/infra/scripts/staging-gate-scope.sh"
       - "v2/infra/scripts/smoke_test_staging.sh"
+      - "v2/infra/scripts/restore_db.sh"
       - "v2/infra/scripts/tests/**"
       - ".github/workflows/staging-gate-bats.yml"
   workflow_dispatch:

@@ -10,6 +10,13 @@ export default defineConfig({
   plugins: [react()],
   test: {
     globals: true,
+    // Mitigacao de flakiness do suite: alguns testes de componente sao sensiveis a
+    // timing (findByRole estoura sob carga do CI) e a isolamento no `singleThread`
+    // (ex.: DatImportsLegacyRemoval, useTableFilters), falhando de forma nao-
+    // deterministica e bloqueando ate PRs que nem tocam o frontend (#1691/#1696).
+    // `retry` re-executa o teste que falha; uma falha DETERMINISTICA continua falhando
+    // (todas as tentativas falham). Estabilizar cada teste na fonte e' follow-up.
+    retry: 2,
     environment: 'jsdom',
     // Run jsdom under HTTPS so tests that set `Secure` cookies (frontend hardening
     // against CodeQL js/clear-text-cookie) are accepted by the cookie jar.

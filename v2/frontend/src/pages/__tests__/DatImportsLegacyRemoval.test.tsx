@@ -32,6 +32,10 @@ vi.mock('../../api/availability', () => ({
   getBlocks: vi.fn(),
   createBlock: vi.fn(),
   deleteBlock: vi.fn(),
+  // FiltersBar (dentro da DeslocamentosPage) chama getGerencias; sem este export o
+  // mock estoura "No getGerencias export defined" ao renderizar, e o heading intermitente-
+  // mente não pinta sob carga do CI (flake que bloqueava PRs alheios). Ver #1691.
+  getGerencias: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('../../api/ops', () => ({

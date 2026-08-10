@@ -18,6 +18,7 @@ Voltar ao [índice SDD](../INDEX_SDD.md).
 | [`deploy.spec.md`](./deploy.spec.md) | ✅ escrita | `docker-compose.prod.yml`, `deploy.yaml`, `promote.yml`, `v2/infra/deployer/`, ADR-018 |
 | [`environments.spec.md`](./environments.spec.md) | ✅ escrita | `v2/infra/ENVIRONMENTS.md`, `docker-compose*.yml` |
 | [`ci.spec.md`](./ci.spec.md) | ✅ escrita | `.github/workflows/`, `docs/operations/ci-*.md` |
+| [`at-rest-encryption.spec.md`](./at-rest-encryption.spec.md) | 📝 draft | `docker-compose.prod.yml`, `usuario.py`, `backup_db.sh` (decisão: cifra de disco VM02) |
 
 > **Modelo de deploy: pull-based** ([ADR-018](../../../../docs/architecture/project-decisions/ADR-018-pull-based-deploy.md),
 > que **supersede** o ADR-010). **Merge na `main` NÃO deploya** — ele só faz build, scan,

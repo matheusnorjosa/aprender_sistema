@@ -616,7 +616,10 @@ from celery.schedules import crontab  # noqa: E402 — usado só pelo beat sched
 
 # LGPD retenção/minimização (arts. 6/16): o expurgo diário dos artefatos de PII de
 # ImportJobs antigos é SEMPRE registrado — não depende de FEATURE_AUTO_APPLY_ENABLED.
-CELERY_BEAT_SCHEDULE = {
+# Anotacao explicita: as entradas sao heterogeneas (crontab vs float + options),
+# entao sem o tipo declarado o pyright estreita o valor pela 1a entrada e reprova o
+# __setitem__ da entrada do gcal. `dict[str, object]` por entrada aceita ambas.
+CELERY_BEAT_SCHEDULE: dict[str, dict[str, object]] = {
     "purge-import-artifacts-daily": {
         "task": "apps.core.tasks.purge_import_job_artifacts",
         "schedule": crontab(hour=3, minute=0),  # 03:00 (off-peak)

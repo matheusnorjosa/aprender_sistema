@@ -98,6 +98,7 @@ related: []                   # links a specs/ADRs relacionados
 | [deploy.spec.md](./infra/deploy.spec.md) | deploy pull-based (ADR-018): promote → ponteiro assinado → agente na VM01 | canonical |
 | [environments.spec.md](./infra/environments.spec.md) | dev / staging / prod-like | canonical |
 | [ci.spec.md](./infra/ci.spec.md) | GitHub Actions, gates, deploy | canonical |
+| [at-rest-encryption.spec.md](./infra/at-rest-encryption.spec.md) | cifra de dados em repouso (CPF/PII): decisão = cifra de disco VM02 | draft |
 
 > READMEs de área: [`domain/`](./domain/README.md) · [`backend/`](./backend/README.md) ·
 > [`frontend/`](./frontend/README.md) · [`infra/`](./infra/README.md).

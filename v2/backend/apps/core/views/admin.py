@@ -48,6 +48,7 @@ from apps.core.serializers import (
     ProjetoSerializer,
     UsuarioAdminSerializer,
 )
+from apps.core.services.anonimizacao import anonimizar_usuario
 from apps.core.services.audit import (
     auditar_assign_groups,
     auditar_user_delete,
@@ -407,6 +408,35 @@ class UsuarioAdminViewSet(viewsets.ModelViewSet):
         with transaction.atomic():
             auditar_user_delete(actor=self.request.user, target_user=instance)
             instance.delete()
+
+    @action(detail=True, methods=["post"], permission_classes=[HasPerm("manage_admin_registries")])
+    def anonimizar(self, request: Request, pk: str | None = None) -> Response:
+        """
+        LGPD art. 18-VI (direito ao esquecimento) — anonimiza a PII do usuário,
+        preservando o histórico.
+
+        Alternativa ao hard-delete (`perform_destroy`) quando FKs PROTECT
+        (Solicitacao/AvailabilityBlock/dat_*) barram a exclusão: em vez de falhar
+        com ProtectedError, remove a PII e mantém a linha. Idempotente.
+
+        Segurança: superuser-alvo já recebe 404 via `get_queryset` (P0-0); além
+        disso o último superusuário ativo não pode ser anonimizado (anti-lockout,
+        espelha `perform_destroy`).
+
+        Endpoint: POST /api/usuarios-admin/{id}/anonimizar/
+        """
+        usuario = self.get_object()
+        if usuario.is_superuser:
+            has_other_active_superuser = (
+                Usuario.objects.filter(is_superuser=True, is_active=True).exclude(pk=usuario.pk).exists()
+            )
+            if not has_other_active_superuser:
+                raise ValidationError({"detail": "Não é possível anonimizar o último superusuário ativo."})
+        anonimizado = anonimizar_usuario(usuario=usuario, actor=request.user)
+        return Response(
+            {"detail": "Usuário anonimizado.", "id": usuario.pk, "anonimizado": anonimizado},
+            status=status.HTTP_200_OK,
+        )
 
     @action(detail=True, methods=["post"], permission_classes=[SuperuserOnly])
     def assign_groups(self, request, pk=None):

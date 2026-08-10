@@ -102,6 +102,9 @@ class AuditLog(models.Model):
             "USER_PRIVILEGE_CHANGED",
             "Alterar flags de privilegio (is_superuser/is_staff/is_active)",
         )
+        # LGPD art. 18-VI (direito ao esquecimento). Anonimizacao preserva a linha
+        # (FKs PROTECT) e remove a PII — ver apps.core.services.anonimizacao.
+        USER_ANONYMIZE = "USER_ANONYMIZE", "Anonimizar usuario (LGPD art. 18-VI)"
 
     usuario = models.ForeignKey(  # type: ignore[misc]
         "core.Usuario",

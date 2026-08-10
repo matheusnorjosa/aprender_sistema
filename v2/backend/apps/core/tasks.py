@@ -45,6 +45,53 @@ def debug_task(self: Any) -> str:
 
 
 @shared_task
+def purge_import_job_artifacts() -> dict[str, Any]:
+    """LGPD retencao/minimizacao (arts. 6-III/16): expurga os artefatos de PII de
+    ImportJobs antigos.
+
+    Apos `IMPORT_JOB_ARTIFACT_RETENTION_DAYS` (default 90), remove do storage o
+    arquivo submetido e limpa `pendencias` + `error_traceback` (que podem carregar
+    CPF/e-mail/nome de linhas rejeitadas), MANTENDO a linha do job — a metadata
+    operacional (quem/quando/status/contagens) fica para a trilha (art. 37).
+    Idempotente. Registrada no CELERY_BEAT_SCHEDULE (diaria, 03:00).
+    """
+    from datetime import timedelta
+
+    from django.conf import settings
+    from django.utils import timezone
+
+    from apps.core.models import AuditLog, ImportJob
+    from apps.core.services.audit import registrar_auditoria
+
+    days = int(getattr(settings, "IMPORT_JOB_ARTIFACT_RETENTION_DAYS", 90))
+    cutoff = timezone.now() - timedelta(days=days)
+
+    purged = 0
+    for job in ImportJob.objects.filter(created_at__lt=cutoff).iterator():
+        tem_pii = bool(job.file) or bool(job.pendencias) or bool(job.error_traceback)
+        if not tem_pii:
+            continue  # ja expurgado — idempotente
+        if job.file:
+            job.file.delete(save=False)  # apaga do storage e limpa o FileField
+        job.pendencias = {}
+        job.error_traceback = ""
+        job.save(update_fields=["file", "pendencias", "error_traceback", "updated_at"])
+        purged += 1
+
+    if purged:
+        registrar_auditoria(
+            actor=None,
+            action=AuditLog.Action.IMPORT_ARTIFACT_PURGE,
+            model_name="ImportJob",
+            details={"purged": purged, "retention_days": days, "cutoff": cutoff.isoformat()},
+            imediato=True,
+        )
+
+    logger.info("purge_import_job_artifacts: %d job(s) expurgado(s) (retencao=%dd)", purged, days)
+    return {"purged": purged, "retention_days": days}
+
+
+@shared_task
 def gcal_sync_task() -> None:
     """
     DEPRECATED: Tarefa stub para sincronização com Google Calendar.

@@ -3,12 +3,14 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { MemoryRouter } from 'react-router';
 import { message } from 'antd';
 
-const { changeMyPasswordMock } = vi.hoisted(() => ({
+const { changeMyPasswordMock, updateMyContactMock } = vi.hoisted(() => ({
   changeMyPasswordMock: vi.fn(),
+  updateMyContactMock: vi.fn(),
 }));
 
 vi.mock('../../../api/me', () => ({
   changeMyPassword: changeMyPasswordMock,
+  updateMyContact: updateMyContactMock,
 }));
 
 import PerfilPage from '../PerfilPage';
@@ -48,6 +50,7 @@ function fill(placeholder: string, value: string) {
 describe('PerfilPage', () => {
   beforeEach(() => {
     changeMyPasswordMock.mockReset();
+    updateMyContactMock.mockReset();
     vi.restoreAllMocks();
   });
 
@@ -57,6 +60,35 @@ describe('PerfilPage', () => {
     // CPF mascarado (LGPD): 3 primeiros + 2 últimos.
     expect(screen.getByText('049.***.***-05')).toBeInTheDocument();
     expect(screen.getByText('coord@aprendereditora.com.br')).toBeInTheDocument();
+  });
+
+  test('mascara o CPF do campo cpf (não do username) e mostra telefone/cargo', async () => {
+    renderPage(
+      makeUser({
+        username: 'amanda.rodrigues', // username != cpf
+        cpf: '11144477735',
+        telefone: '(85) 98888-1111',
+        cargo: 'Coordenadora',
+      })
+    );
+    // Mascara o CPF real, não o username.
+    expect(await screen.findByText('111.***.***-35')).toBeInTheDocument();
+    expect(screen.getByText('(85) 98888-1111')).toBeInTheDocument();
+    expect(screen.getByText('Coordenadora')).toBeInTheDocument();
+  });
+
+  test('salvar telefone chama updateMyContact e avisa sucesso (art. 18-III)', async () => {
+    updateMyContactMock.mockResolvedValueOnce(makeUser({ telefone: '(85) 97777-2222' }));
+    const successSpy = vi.spyOn(message, 'success');
+    renderPage();
+
+    fill('(85) 99999-0000', '(85) 97777-2222');
+    fireEvent.click(screen.getByRole('button', { name: /salvar telefone/i }));
+
+    await waitFor(() =>
+      expect(updateMyContactMock).toHaveBeenCalledWith({ telefone: '(85) 97777-2222' })
+    );
+    await waitFor(() => expect(successSpy).toHaveBeenCalled());
   });
 
   test('submit válido chama changeMyPassword e avisa sucesso', async () => {

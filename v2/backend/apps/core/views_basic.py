@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.db import transaction
 from django.http import HttpRequest, JsonResponse
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -19,8 +20,9 @@ from drf_spectacular.utils import extend_schema
 
 from .api_schemas import COMMON_ERROR_RESPONSES
 from .constants import FUNCAO_GROUPS, SETOR_GROUPS
-from .models import GroupClassificacao
-from .serializers import CurrentUserSerializer
+from .models import AuditLog, GroupClassificacao
+from .serializers import CurrentUserSerializer, MeContactUpdateSerializer
+from .services.audit import registrar_auditoria
 from .services.rbac_permissions import get_user_functional_permissions
 
 
@@ -121,6 +123,10 @@ class CurrentUserView(APIView):
                 "first_name": user.first_name,
                 "last_name": user.last_name,
                 "name": name,
+                # LGPD art. 18-II (acesso): o titular confirma os próprios dados de cadastro.
+                "cpf": user.cpf,
+                "telefone": user.telefone,
+                "cargo": user.cargo,
                 "groups": groups,
                 "setores": setores,
                 "funcoes": funcoes,
@@ -131,3 +137,39 @@ class CurrentUserView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+    @extend_schema(
+        summary="Corrigir os próprios dados de contato",
+        description=(
+            "LGPD art. 18-III (correção). O titular corrige o próprio telefone. "
+            "Campos de identidade (cpf), organização (cargo/grupos) e privilégio não "
+            "são autocorrigíveis e são ignorados."
+        ),
+        request=MeContactUpdateSerializer,
+        responses={
+            200: CurrentUserSerializer,
+            400: COMMON_ERROR_RESPONSES[400],
+            401: COMMON_ERROR_RESPONSES[401],
+        },
+        tags=["me"],
+    )
+    def patch(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        serializer = MeContactUpdateSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        telefone = serializer.validated_data.get("telefone")
+        if telefone is None:
+            return self.get(request, *args, **kwargs)
+
+        user = request.user
+        # LGPD [[feedback-on-commit-needs-atomic-or-phantom]]: mutação + auditoria no
+        # mesmo atomic(). Auditamos o FATO (campo alterado), nunca o valor de PII.
+        with transaction.atomic():
+            user.telefone = telefone
+            user.save(update_fields=["telefone"])
+            registrar_auditoria(
+                actor=user,
+                action=AuditLog.Action.USER_SELF_UPDATE,
+                model_name="Usuario",
+                details={"campos": ["telefone"]},
+            )
+        return self.get(request, *args, **kwargs)

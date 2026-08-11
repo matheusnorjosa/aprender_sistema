@@ -14,7 +14,7 @@
  */
 import { test, expect, Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { mockChecklistAuthBootstrap } from './checklist-network-mocks';
+import { mockChecklistAuthBootstrap, mockChecklistAuthenticated } from './checklist-network-mocks';
 
 test.beforeEach(async ({ page }) => {
   await mockChecklistAuthBootstrap(page);
@@ -403,4 +403,61 @@ test.describe('Checklist: Formulários Acessíveis', () => {
     // Não falha - é recomendação
     expect(true).toBeTruthy();
   });
+});
+
+test.describe('Checklist: Acessibilidade — páginas autenticadas (axe-core)', () => {
+  // O bootstrap padrão (beforeEach) mocka /api/me como 401 -> tela anônima. Aqui
+  // sobrescrevemos com um titular autenticado (a rota registrada por último vence no
+  // Playwright) para rodar o axe em páginas LOGADAS — antes o gate só cobria a home
+  // anônima. Foco em /perfil: renderiza só do prop `user`, sem dados extras a mockar.
+  const AUTH_PAGES = [{ path: '/perfil', name: 'Perfil' }];
+
+  for (const { path, name } of AUTH_PAGES) {
+    test(`🔴 ${name} (${path}) sem violações críticas de acessibilidade (autenticado)`, async ({
+      page,
+    }) => {
+      await mockChecklistAuthenticated(page);
+      await page.goto(path);
+      await page.waitForLoadState('networkidle');
+      await waitForLoadingOverlayToDisappear(page);
+
+      const results = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+        .exclude('.ant-spin-fullscreen')
+        .exclude('.ant-spin-text')
+        .analyze();
+
+      const critical = results.violations.filter(
+        (v) => v.impact === 'critical' || v.impact === 'serious'
+      );
+
+      // `color-contrast` é reportado mas NÃO falha: os gaps atuais (label #8c8c8c do
+      // Descriptions, botão danger #ff4d4f) são dos TOKENS GLOBAIS do tema Antd — afetam
+      // o app inteiro, então corrigi-los é uma decisão de tema à parte (ConfigProvider),
+      // não desta cobertura. Aqui travamos os críticos ESTRUTURAIS (label, *-name, alt,
+      // aria) em páginas autenticadas — antes o gate só via a home anônima.
+      const contrast = critical.filter((v) => v.id === 'color-contrast');
+      const structural = critical.filter((v) => v.id !== 'color-contrast');
+
+      if (contrast.length > 0) {
+        console.log(
+          `[report-only] ${contrast.length} violação(ões) de contraste em ${path} ` +
+            `(tokens globais do tema Antd — decisão de tema à parte).`
+        );
+      }
+      if (structural.length > 0) {
+        console.log(
+          `Violações estruturais de acessibilidade em ${path}:\n` +
+            structural
+              .map((v) => `[${v.impact}] ${v.id}: ${v.help} — ${v.nodes.length} elemento(s)`)
+              .join('\n')
+        );
+      }
+
+      expect(
+        structural,
+        `${structural.length} violações críticas estruturais de acessibilidade em ${path}`
+      ).toHaveLength(0);
+    });
+  }
 });

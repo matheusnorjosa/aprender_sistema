@@ -7,7 +7,7 @@ import { Space, Tag, Typography, Tooltip, Button } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { STATUS_OPTIONS } from './constants';
+import { ETAPA_STATUS_OPTIONS } from './constants';
 import { renderStatusIcon } from './helpers';
 import type { ID } from '../../../types';
 
@@ -119,6 +119,22 @@ export function getColumns({ onEdit, onDelete }: ColumnHandlers): ColumnsType<DA
         ),
     },
     {
+      title: 'Status Turma',
+      dataIndex: 'turma_formar_status',
+      key: 'turma_formar_status',
+      width: 100,
+      render: (status: string | undefined) => {
+        if (!status) return <Text type="secondary">-</Text>;
+        const map: Record<string, { color: string; label: string }> = {
+          criada: { color: 'green', label: 'Criada' },
+          pendente: { color: 'default', label: 'Pendente' },
+          erro: { color: 'red', label: 'Erro' },
+        };
+        const it = map[status];
+        return <Tag color={it?.color ?? 'default'}>{it?.label ?? status}</Tag>;
+      },
+    },
+    {
       title: 'Códs',
       dataIndex: 'nr_codigos',
       key: 'nr_codigos',
@@ -132,17 +148,24 @@ export function getColumns({ onEdit, onDelete }: ColumnHandlers): ColumnsType<DA
       key: 'chaves',
       width: 100,
       render: (status: string | undefined) => {
+        if (!status) return <Text type="secondary">-</Text>;
+        // M16-08: `erro` e `nao_aplicavel` faltavam nos mapas -> Tag vazia. Fallback mostra o
+        // valor cru em vez de sumir com o dado.
         const colors: Record<string, string> = {
           concluido: 'green',
           em_andamento: 'gold',
           pendente: 'default',
+          nao_aplicavel: 'default',
+          erro: 'red',
         };
         const labels: Record<string, string> = {
           concluido: 'Geradas',
           em_andamento: 'Pend.',
           pendente: 'Pend.',
+          nao_aplicavel: 'N/A',
+          erro: 'Erro',
         };
-        return <Tag color={status ? colors[status] : 'default'}>{status ? labels[status] : status}</Tag>;
+        return <Tag color={colors[status] ?? 'default'}>{labels[status] ?? status}</Tag>;
       },
     },
     {
@@ -152,7 +175,7 @@ export function getColumns({ onEdit, onDelete }: ColumnHandlers): ColumnsType<DA
       width: 70,
       align: 'center',
       render: (status: string | undefined) => (
-        <Tooltip title={STATUS_OPTIONS.find((s) => s.value === status)?.label || status}>
+        <Tooltip title={ETAPA_STATUS_OPTIONS.find((s) => s.value === status)?.label || status}>
           {renderStatusIcon(status)}
         </Tooltip>
       ),

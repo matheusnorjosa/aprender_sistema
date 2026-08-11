@@ -39,6 +39,7 @@ import {
   ClockCircleFilled,
   ExclamationCircleFilled,
   MinusCircleFilled,
+  CloseCircleFilled,
   DatabaseOutlined,
   BookOutlined,
   BarChartOutlined,
@@ -56,7 +57,8 @@ import {
 } from '../../api/datModule';
 import dayjs, { type Dayjs } from 'dayjs';
 import {
-  STATUS_OPTIONS,
+  TURMA_STATUS_OPTIONS,
+  ETAPA_STATUS_OPTIONS,
   UF_OPTIONS,
   REGIAO_UFS,
   REGIAO_OPTIONS,
@@ -567,6 +569,10 @@ export default function DATRegistrosPage(): JSX.Element {
             <MinusCircleFilled className="text-gray-400" />
             <Text type="secondary">Não Aplicável</Text>
           </Space>
+          <Space>
+            <CloseCircleFilled className="text-red-600" />
+            <Text type="secondary">Erro</Text>
+          </Space>
           <Divider type="vertical" />
           <Space>
             <Tag color="green">Chaves Geradas</Tag>
@@ -706,8 +712,8 @@ export default function DATRegistrosPage(): JSX.Element {
                     </Form.Item>
                   </Col>
                   <Col span={12}>
-                    <Form.Item name="turma_formar_status" label="Status Turma">
-                      <Select placeholder="Selecione..." options={STATUS_OPTIONS} allowClear />
+                    <Form.Item name="turma_formar_status" label="Status Turma (Criada / Pendente / Erro)">
+                      <Select placeholder="Selecione..." options={TURMA_STATUS_OPTIONS} allowClear />
                     </Form.Item>
                   </Col>
                 </Row>
@@ -732,7 +738,7 @@ export default function DATRegistrosPage(): JSX.Element {
                     <Form.Item name="chaves_inscricao_status" noStyle>
                       <Select
                         placeholder="Status"
-                        options={STATUS_OPTIONS}
+                        options={ETAPA_STATUS_OPTIONS}
                         style={{ width: '100%', maxWidth: 140 }}
                         allowClear
                       />
@@ -747,7 +753,7 @@ export default function DATRegistrosPage(): JSX.Element {
                     <Form.Item name="instrucoes_status" noStyle>
                       <Select
                         placeholder="Status"
-                        options={STATUS_OPTIONS}
+                        options={ETAPA_STATUS_OPTIONS}
                         style={{ width: '100%', maxWidth: 140 }}
                         allowClear
                       />
@@ -762,7 +768,7 @@ export default function DATRegistrosPage(): JSX.Element {
                     <Form.Item name="envio_codigos_status" noStyle>
                       <Select
                         placeholder="Status"
-                        options={STATUS_OPTIONS}
+                        options={ETAPA_STATUS_OPTIONS}
                         style={{ width: '100%', maxWidth: 140 }}
                         allowClear
                       />
@@ -807,7 +813,7 @@ export default function DATRegistrosPage(): JSX.Element {
                         <Form.Item name="alunos_recebidos_status" noStyle>
                           <Select
                             placeholder="Status"
-                            options={STATUS_OPTIONS}
+                            options={ETAPA_STATUS_OPTIONS}
                             style={{ width: '100%', maxWidth: 140 }}
                             allowClear
                           />
@@ -827,7 +833,7 @@ export default function DATRegistrosPage(): JSX.Element {
                         <Form.Item name="alunos_validados_status" noStyle>
                           <Select
                             placeholder="Status"
-                            options={STATUS_OPTIONS}
+                            options={ETAPA_STATUS_OPTIONS}
                             style={{ width: '100%', maxWidth: 140 }}
                             allowClear
                           />
@@ -847,7 +853,7 @@ export default function DATRegistrosPage(): JSX.Element {
                         <Form.Item name="alunos_importados_status" noStyle>
                           <Select
                             placeholder="Status"
-                            options={STATUS_OPTIONS}
+                            options={ETAPA_STATUS_OPTIONS}
                             style={{ width: '100%', maxWidth: 140 }}
                             allowClear
                           />

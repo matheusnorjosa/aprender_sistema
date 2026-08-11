@@ -5,7 +5,7 @@
  * Issue #1225 (Epic 2): página `/meus-eventos` (caso primário: Formador).
  */
 
-import { fetchAPI, buildUrl, type QueryParams } from './config';
+import { fetchAPI, fetchBlob, buildUrl, type QueryParams } from './config';
 import type { ID, PaginatedResponse } from '../types';
 import type { CurrentUser } from '../types/usuario';
 
@@ -117,4 +117,16 @@ export async function updateMyContact(
     method: 'PATCH',
     body: JSON.stringify(payload),
   });
+}
+
+/**
+ * Exporta os próprios dados (`GET /api/me/export/`) — portabilidade LGPD art. 18-V.
+ *
+ * Retorna o dossiê do titular como Blob JSON (backend responde com
+ * `Content-Disposition: attachment`). A exportação é auditada no backend.
+ *
+ * @returns Blob com o JSON dos dados do titular
+ */
+export async function exportMyData(): Promise<Blob> {
+  return await fetchBlob('/me/export/');
 }

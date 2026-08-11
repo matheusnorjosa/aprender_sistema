@@ -23,12 +23,14 @@ from typing import cast
 
 from django.contrib.auth import update_session_auth_hash
 from django.db.models import QuerySet
+from django.http import JsonResponse
 from rest_framework import generics, serializers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema, extend_schema_view, inline_serializer
 
 from apps.core.api_schemas import COMMON_ERROR_RESPONSES
@@ -36,6 +38,8 @@ from apps.core.models import AuditLog, Solicitacao, Usuario
 from apps.core.rbac.policies import resolve_public_policies
 from apps.core.serializers.me import MeEventSerializer
 from apps.core.serializers.usuario import ChangePasswordSerializer
+from apps.core.services.audit import registrar_auditoria
+from apps.core.services.lgpd_export_service import build_lgpd_export_data, export_counts
 
 
 @extend_schema_view(
@@ -180,3 +184,49 @@ class ChangePasswordView(APIView):
             },
         )
         return Response({"detail": "Senha alterada com sucesso."})
+
+
+class MeExportView(APIView):
+    """Exportação self-service dos próprios dados (LGPD art. 18-V, portabilidade).
+
+    GET /api/me/export/
+
+    Baixa o dossiê do titular autenticado como JSON (mesmo SSOT do command
+    `lgpd_export`, via `build_lgpd_export_data`). Escopo é sempre `request.user` —
+    não há como um titular exportar dados de outro. Audita o FATO (EXPORT: alvo=self,
+    canal, contagens), nunca os valores de PII exportados.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Exportar os próprios dados (portabilidade LGPD)",
+        description="Baixa o dossiê do titular autenticado como arquivo JSON (art. 18-V).",
+        responses={
+            (200, "application/json"): OpenApiTypes.BINARY,
+            401: COMMON_ERROR_RESPONSES[401],
+        },
+        tags=["me"],
+    )
+    def get(self, request: Request) -> JsonResponse:
+        user = cast(Usuario, request.user)
+        # Metadados da credencial GCal (sem tokens) fazem parte do dossiê do titular.
+        data = build_lgpd_export_data(user, include_audit=True, include_gcal=True)
+
+        # LGPD art. 37 (accountability): a exportação é operação sensível -> trilha do
+        # FATO. Leitura pura (sem mutação) -> imediato=True (não há commit a atrelar).
+        registrar_auditoria(
+            actor=user,
+            action=AuditLog.Action.EXPORT,
+            model_name="Usuario",
+            details={
+                "target_user_id": user.pk,
+                "channel": "self-service",
+                "counts": export_counts(data),
+            },
+            imediato=True,
+        )
+
+        response = JsonResponse(data, json_dumps_params={"ensure_ascii": False, "indent": 2})
+        response["Content-Disposition"] = 'attachment; filename="meus-dados-aprender.json"'
+        return response

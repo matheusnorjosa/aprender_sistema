@@ -16,7 +16,6 @@ import json
 from typing import TYPE_CHECKING, Any
 
 from django.core.management.base import BaseCommand, CommandError
-from django.utils import timezone
 
 if TYPE_CHECKING:
     from argparse import ArgumentParser
@@ -60,7 +59,8 @@ class Command(BaseCommand):
 
     def handle(self, *args: Any, **options: Any) -> None:
         """Execute LGPD data export."""
-        from apps.core.models import AuditLog, AvailabilityBlock, GoogleOAuthCredential, Solicitacao, Usuario
+        from apps.core.models import AuditLog, Usuario
+        from apps.core.services.lgpd_export_service import build_lgpd_export_data, export_counts
 
         cpf = options.get("cpf")
         email = options.get("email")
@@ -86,125 +86,9 @@ class Command(BaseCommand):
 
         self.stdout.write(f"Exporting data for user: {user.username} (ID: {user.id})")
 
-        # Build export data
-        data: dict[str, Any] = {
-            "export_info": {
-                "generated_at": timezone.now().isoformat(),
-                "system": "Aprender Sistema v2",
-                "purpose": "LGPD Data Portability (Art. 18, V)",
-            },
-            "personal_data": {
-                "id": user.id,
-                "username": user.username,
-                "cpf": user.cpf,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "email": user.email,
-                "cargo": getattr(user, "cargo", None),
-                "matricula": getattr(user, "matricula", None),
-                "telefone": getattr(user, "telefone", None),
-                "setores": list(user.setores) if hasattr(user, "setores") else [],
-                "funcoes": list(user.funcoes) if hasattr(user, "funcoes") else [],
-                "groups": list(user.groups.values_list("name", flat=True)),
-                "is_active": user.is_active,
-                "is_staff": user.is_staff,
-                "is_superuser": user.is_superuser,
-                "date_joined": user.date_joined.isoformat(),
-                "last_login": user.last_login.isoformat() if user.last_login else None,
-            },
-        }
-
-        # Solicitations created by user. NB: os campos reais sao usuario/inicio/fim — o
-        # command usava solicitante/data_inicio/data_fim/titulo/fluxo (inexistentes), entao
-        # a ferramenta de portabilidade LGPD estourava FieldError em qualquer invocacao real.
-        solicitations = Solicitacao.objects.filter(usuario=user)
-        data["solicitations_created"] = list(
-            solicitations.values(
-                "id",
-                "status",
-                "inicio",
-                "fim",
-                "municipio__nome",
-                "projeto__nome",
-                "tipo_evento__nome",
-                "created_at",
-                "updated_at",
-            )
-        )
-
-        # Solicitations where user is a formador (formadores is M2M to Usuario)
-        formador_events = Solicitacao.objects.filter(formadores=user)
-        data["events_as_formador"] = list(
-            formador_events.values(
-                "id",
-                "status",
-                "inicio",
-                "fim",
-                "municipio__nome",
-            )
-        )
-
-        # Availability blocks for user (o dono do bloco e' `usuario`, nao `formador`)
-        blocks = AvailabilityBlock.objects.filter(usuario=user)
-        data["availability_blocks"] = list(
-            blocks.values(
-                "id",
-                "tipo",
-                "inicio",
-                "fim",
-                "motivo",
-                "created_at",
-            )
-        )
-
-        # Approvals made by user (from AuditLog)
-        approval_logs = AuditLog.objects.filter(
-            usuario=user,
-            action__in=["APROVAR", "APPROVE", "REPROVAR", "REJECT"],
-        ).order_by("-created_at")[:50]
-        data["approvals_made"] = list(
-            approval_logs.values(
-                "id",
-                "action",
-                "details",
-                "created_at",
-            )
-        )
-
-        # Audit logs (if requested)
-        if include_audit:
-            audit_logs = AuditLog.objects.filter(usuario=user).order_by("-created_at")[:100]
-            data["audit_logs"] = list(
-                audit_logs.values(
-                    "id",
-                    "action",
-                    "model_name",
-                    "details",
-                    "created_at",
-                )
-            )
-        else:
-            data["audit_logs"] = "(excluded from export)"
-
-        # GCal credentials (if requested)
-        if include_gcal:
-            gcal_cred = GoogleOAuthCredential.objects.filter(user=user).first()
-            if gcal_cred:
-                data["gcal_credentials"] = {
-                    "has_credential": True,
-                    "google_email": gcal_cred.google_email,
-                    "created_at": gcal_cred.created_at.isoformat(),
-                    "last_used_at": (gcal_cred.last_used_at.isoformat() if gcal_cred.last_used_at else None),
-                    # Note: We don't export actual tokens for security
-                    "tokens": "(excluded for security)",
-                }
-            else:
-                data["gcal_credentials"] = None
-        else:
-            data["gcal_credentials"] = "(excluded from export)"
-
-        # Convert all datetime objects to ISO format strings
-        data = self._serialize_data(data)
+        # Dossiê montado pelo serviço compartilhado (SSOT — mesma lógica do endpoint
+        # self-service `GET /api/me/export/`). Já vem JSON-serializável.
+        data = build_lgpd_export_data(user, include_audit=include_audit, include_gcal=include_gcal)
 
         # Write to file
         with open(output_path, "w", encoding="utf-8") as f:
@@ -225,41 +109,17 @@ class Command(BaseCommand):
                 "target_user_id": user.pk,
                 "output_path": str(output_path),
                 "include_audit": bool(include_audit),
-                "counts": {
-                    "solicitations_created": len(data["solicitations_created"]),
-                    "events_as_formador": len(data["events_as_formador"]),
-                    "availability_blocks": len(data["availability_blocks"]),
-                    "approvals_made": len(data["approvals_made"]),
-                },
+                "counts": export_counts(data),
             },
             imediato=True,
         )
 
         # Summary
+        counts = export_counts(data)
         self.stdout.write("  - Personal data: exported")
-        self.stdout.write(f"  - Solicitations created: {len(data['solicitations_created'])}")
-        self.stdout.write(f"  - Events as formador: {len(data['events_as_formador'])}")
-        self.stdout.write(f"  - Availability blocks: {len(data['availability_blocks'])}")
-        self.stdout.write(f"  - Approvals made: {len(data['approvals_made'])}")
-        if include_audit:
+        self.stdout.write(f"  - Solicitations created: {counts['solicitations_created']}")
+        self.stdout.write(f"  - Events as formador: {counts['events_as_formador']}")
+        self.stdout.write(f"  - Availability blocks: {counts['availability_blocks']}")
+        self.stdout.write(f"  - Approvals made: {counts['approvals_made']}")
+        if include_audit and isinstance(data["audit_logs"], list):
             self.stdout.write(f"  - Audit logs: {len(data['audit_logs'])}")
-
-    def _serialize_data(self, obj: Any) -> Any:
-        """Recursively convert datetime objects to ISO format strings."""
-        import datetime
-        from decimal import Decimal
-
-        if isinstance(obj, dict):
-            return {k: self._serialize_data(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [self._serialize_data(item) for item in obj]
-        elif isinstance(obj, datetime.datetime):
-            return obj.isoformat()
-        elif isinstance(obj, datetime.date):
-            return obj.isoformat()
-        elif isinstance(obj, datetime.time):
-            return obj.isoformat()
-        elif isinstance(obj, Decimal):
-            return float(obj)
-        else:
-            return obj

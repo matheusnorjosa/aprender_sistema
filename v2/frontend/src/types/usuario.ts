@@ -41,6 +41,10 @@ export interface CurrentUser {
   first_name: string;
   last_name: string;
   name: string;
+  /** LGPD art. 18-II: dados de cadastro do próprio titular (backend sempre envia). */
+  cpf?: string;
+  telefone?: string;
+  cargo?: string;
   groups: string[];
   setores: string[];
   funcoes: string[];

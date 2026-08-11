@@ -74,6 +74,7 @@ from apps.core.serializers.solicitacao import (
 from apps.core.serializers.usuario import (
     CurrentUserSerializer,
     GroupSerializer,
+    MeContactUpdateSerializer,
     PermissaoFuncionalSerializer,
     UserSlimSerializer,
     UsuarioAdminSerializer,
@@ -95,6 +96,7 @@ __all__ = [
     "NotificacaoInternaSerializer",
     # Usuario
     "CurrentUserSerializer",
+    "MeContactUpdateSerializer",
     "UserSlimSerializer",
     "UsuarioOptionSerializer",
     "UsuarioAdminSerializer",

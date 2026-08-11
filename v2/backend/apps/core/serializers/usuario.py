@@ -49,6 +49,10 @@ class CurrentUserSerializer(serializers.Serializer):  # type: ignore[misc]
     first_name = serializers.CharField(allow_blank=True, required=False)
     last_name = serializers.CharField(allow_blank=True, required=False)
     name = serializers.CharField()
+    # LGPD art. 18-II (acesso): o titular confirma os proprios dados de cadastro.
+    cpf = serializers.CharField()
+    telefone = serializers.CharField(allow_blank=True, required=False)
+    cargo = serializers.CharField(allow_blank=True, required=False)
     groups = serializers.ListField(child=serializers.CharField())
     setores = serializers.ListField(child=serializers.CharField())
     funcoes = serializers.ListField(child=serializers.CharField())
@@ -56,6 +60,17 @@ class CurrentUserSerializer(serializers.Serializer):  # type: ignore[misc]
     is_superintendencia = serializers.BooleanField()
     can_approve_super = serializers.BooleanField()
     permissions = serializers.ListField(child=serializers.CharField())
+
+
+class MeContactUpdateSerializer(serializers.Serializer):  # type: ignore[misc]
+    """PATCH /api/me/ — autocorreção de contato pelo titular (LGPD art. 18-III).
+
+    Apenas `telefone` é autocorrigível. Identidade (cpf), organização (cargo, groups)
+    e privilégio (is_superuser/is_staff) ficam de fora: são dados que o titular não
+    define sozinho. Campos não declarados aqui são simplesmente ignorados no PATCH.
+    """
+
+    telefone = serializers.CharField(max_length=20, allow_blank=True, trim_whitespace=True)
 
 
 class UsuarioOptionSerializer(serializers.ModelSerializer):

@@ -333,3 +333,60 @@ class RedisPasswordProductionGuardTests(TestCase):
         result = self._run_check(REDIS_PASSWORD="uma-senha-forte-de-redis")
 
         self.assertNotEqual(result.returncode, 1, f"stderr: {result.stderr}")
+
+
+class DbPasswordProductionGuardTests(TestCase):
+    """
+    LGPD art. 46 / SEC — DB_PASSWORD vazio/ausente aborta o boot em produção.
+
+    `DATABASES["default"]["PASSWORD"]` usa `os.getenv("DB_PASSWORD", "aprender_password")`:
+    se o operador esquece o secret, o app tenta conectar com a senha pública de dev, em
+    silêncio. Fail-closed no mesmo espírito do guard de REDIS_PASSWORD. Como o guard de
+    Redis roda antes, aqui sempre fornecemos um REDIS_PASSWORD válido para isolar o cenário
+    de DB_PASSWORD sob teste.
+    """
+
+    def _run_check(self, **overrides: str) -> subprocess.CompletedProcess[str]:
+        env = os.environ.copy()
+        env["ENVIRONMENT"] = "production"
+        env["DEBUG"] = "0"
+        env["ALLOWED_HOSTS"] = "example.com"
+        env["SECRET_KEY"] = "a" * 64
+        env["REDIS_PASSWORD"] = "uma-senha-forte-de-redis"  # passa o guard anterior
+        env["DB_NAME"] = "test_db"
+        env["DB_USER"] = "test_user"
+        env["DB_HOST"] = "localhost"
+        env["DB_PORT"] = "5434"
+        # Herdar DB_PASSWORD do ambiente mascararia o cenário sob teste.
+        env.pop("DB_PASSWORD", None)
+        env.update(overrides)
+
+        return subprocess.run(
+            [sys.executable, "manage.py", "check", "--deploy"],
+            cwd=str(Path(settings.BASE_DIR)),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+    def test_startup_fails_when_db_password_missing_in_production(self):
+        """DB_PASSWORD ausente em produção -> sys.exit(1)."""
+        result = self._run_check()
+
+        self.assertEqual(result.returncode, 1, f"stdout: {result.stdout}")
+        self.assertIn("DB_PASSWORD", result.stderr)
+        self.assertIn("ERRO CRÍTICO", result.stderr)
+
+    def test_startup_fails_when_db_password_empty_in_production(self):
+        """DB_PASSWORD='' (o que os templates entregam) -> sys.exit(1)."""
+        result = self._run_check(DB_PASSWORD="")
+
+        self.assertEqual(result.returncode, 1, f"stdout: {result.stdout}")
+        self.assertIn("DB_PASSWORD", result.stderr)
+
+    def test_startup_succeeds_when_db_password_set_in_production(self):
+        """Com senha definida o boot segue normal (sem regressão)."""
+        result = self._run_check(DB_PASSWORD="uma-senha-forte-de-postgres")
+
+        self.assertNotEqual(result.returncode, 1, f"stderr: {result.stderr}")

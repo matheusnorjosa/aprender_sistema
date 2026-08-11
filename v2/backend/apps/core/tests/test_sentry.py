@@ -53,6 +53,8 @@ class TestSentryConfiguration:
 
                 # Verificar configurações de privacidade (LGPD/GDPR)
                 assert call_kwargs.get("send_default_pii") is False
+                # LGPD art. 46: locais de frame (senha/CPF/token) NÃO vão ao Sentry.
+                assert call_kwargs.get("include_local_variables") is False
 
                 # Verificar sample rates
                 assert 0.0 <= call_kwargs.get("traces_sample_rate", 0.1) <= 1.0

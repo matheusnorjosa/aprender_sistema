@@ -16,6 +16,7 @@ from django.conf import settings
 from apps.core.models import Solicitacao
 from apps.core.types import JsonDict, PayloadHash
 
+from .minimize import minimize_free_text
 from .utils import _payload_hash
 from .validation import GCAL_EVENT_ID_PREFIX, _event_id_for, _request_id_for
 
@@ -200,7 +201,9 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> JsonDict:
             description_lines.append(f"  • {equipe_line}")
 
     # Seção 7: Links e Observações
-    observacoes = getattr(s, "observacoes", "")
+    # LGPD arts. 6-III/33: `observacoes` é texto livre transferido ao Google — redige
+    # PII incidental (CPF/e-mail) antes da transferência, preservando o restante da nota.
+    observacoes = minimize_free_text(getattr(s, "observacoes", ""))
     if observacoes:
         description_lines.append("")
         description_lines.append("📝 Observações:")

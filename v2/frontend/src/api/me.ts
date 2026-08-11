@@ -7,6 +7,7 @@
 
 import { fetchAPI, buildUrl, type QueryParams } from './config';
 import type { ID, PaginatedResponse } from '../types';
+import type { CurrentUser } from '../types/usuario';
 
 /**
  * Evento na visão do participante (saída de `GET /api/me/events/`).
@@ -96,6 +97,24 @@ export async function changeMyPassword(
 ): Promise<{ detail: string }> {
   return await fetchAPI<{ detail: string }>('/me/change-password/', {
     method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * Corrige os próprios dados de contato (`PATCH /api/me/`) — LGPD art. 18-III.
+ *
+ * Só `telefone` é autocorrigível pelo titular; cpf/cargo/grupos/privilégio são
+ * ignorados pelo backend. A resposta é o payload completo de `/api/me/` atualizado.
+ *
+ * @param payload - novo telefone
+ * @returns o `CurrentUser` atualizado
+ */
+export async function updateMyContact(
+  payload: { telefone: string }
+): Promise<CurrentUser> {
+  return await fetchAPI<CurrentUser>('/me/', {
+    method: 'PATCH',
     body: JSON.stringify(payload),
   });
 }

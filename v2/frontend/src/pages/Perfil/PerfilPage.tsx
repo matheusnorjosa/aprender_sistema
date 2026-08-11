@@ -10,10 +10,10 @@
 
 import { useState } from 'react';
 import { Button, Card, Descriptions, Form, Input, Space, Tag, Typography, message } from 'antd';
-import { LockOutlined, UserOutlined } from '@ant-design/icons';
+import { LockOutlined, PhoneOutlined, UserOutlined } from '@ant-design/icons';
 
 import type { CurrentUser } from '../../types/usuario';
-import { changeMyPassword } from '../../api/me';
+import { changeMyPassword, updateMyContact } from '../../api/me';
 
 const { Title } = Typography;
 
@@ -21,6 +21,10 @@ interface ChangePasswordForm {
   senha_atual: string;
   nova_senha: string;
   confirmar: string;
+}
+
+interface ContatoForm {
+  telefone: string;
 }
 
 /** Mascara o CPF (LGPD): mostra só os 3 primeiros e os 2 últimos dígitos. */
@@ -43,7 +47,11 @@ function TagList({ items }: { items: readonly string[] }) {
 
 export default function PerfilPage({ user }: { user: CurrentUser }) {
   const [form] = Form.useForm<ChangePasswordForm>();
+  const [contatoForm] = Form.useForm<ContatoForm>();
   const [saving, setSaving] = useState(false);
+  const [savingContato, setSavingContato] = useState(false);
+  // Telefone exibido: estado local para refletir a correção sem recarregar a página.
+  const [telefone, setTelefone] = useState(user.telefone ?? '');
 
   const onFinish = async (values: ChangePasswordForm) => {
     setSaving(true);
@@ -61,6 +69,20 @@ export default function PerfilPage({ user }: { user: CurrentUser }) {
     }
   };
 
+  // LGPD art. 18-III: o titular corrige o próprio telefone.
+  const onFinishContato = async (values: ContatoForm) => {
+    setSavingContato(true);
+    try {
+      const atualizado = await updateMyContact({ telefone: values.telefone.trim() });
+      setTelefone(atualizado.telefone ?? values.telefone.trim());
+      message.success('Telefone atualizado com sucesso.');
+    } catch (error) {
+      message.error((error as Error).message || 'Não foi possível atualizar o telefone.');
+    } finally {
+      setSavingContato(false);
+    }
+  };
+
   return (
     <section className="p-6 bg-gray-100 min-h-full" aria-labelledby="perfil-title">
       <Space direction="vertical" size="large" style={{ width: '100%', maxWidth: 640 }}>
@@ -75,8 +97,10 @@ export default function PerfilPage({ user }: { user: CurrentUser }) {
         }>
           <Descriptions column={1} size="small">
             <Descriptions.Item label="Nome">{user.name || user.username}</Descriptions.Item>
-            <Descriptions.Item label="CPF">{maskCpf(user.username)}</Descriptions.Item>
+            <Descriptions.Item label="CPF">{maskCpf(user.cpf ?? user.username)}</Descriptions.Item>
             <Descriptions.Item label="E-mail">{user.email || '—'}</Descriptions.Item>
+            <Descriptions.Item label="Telefone">{telefone || '—'}</Descriptions.Item>
+            <Descriptions.Item label="Cargo">{user.cargo || '—'}</Descriptions.Item>
             <Descriptions.Item label="Setores">
               <TagList items={user.setores} />
             </Descriptions.Item>
@@ -84,6 +108,34 @@ export default function PerfilPage({ user }: { user: CurrentUser }) {
               <TagList items={user.funcoes} />
             </Descriptions.Item>
           </Descriptions>
+        </Card>
+
+        <Card title={
+          <span>
+            <PhoneOutlined /> Atualizar telefone
+          </span>
+        }>
+          <Form<ContatoForm>
+            form={contatoForm}
+            layout="vertical"
+            autoComplete="off"
+            initialValues={{ telefone }}
+            onFinish={onFinishContato}
+          >
+            <Form.Item
+              name="telefone"
+              label="Telefone"
+              rules={[{ max: 20, message: 'O telefone deve ter no máximo 20 caracteres.' }]}
+            >
+              <Input placeholder="(85) 99999-0000" allowClear />
+            </Form.Item>
+
+            <Form.Item>
+              <Button type="primary" htmlType="submit" icon={<PhoneOutlined />} loading={savingContato}>
+                Salvar telefone
+              </Button>
+            </Form.Item>
+          </Form>
         </Card>
 
         <Card title={

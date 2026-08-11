@@ -39,11 +39,26 @@ export interface DATRegistrosFilters {
   status_formar: string | undefined;
 }
 
-// Status options for workflow steps
-export const STATUS_OPTIONS: StatusOption[] = [
+// Opções de status. Espelham os choices do backend (M16-08):
+// DATRegistro.TURMA_STATUS_CHOICES e DATRegistro.STATUS_CHOICES. Divergir daqui faz
+// o Select oferecer valores que o serializer rejeita com 400 (perdendo o formulário
+// inteiro) ou esconder valores válidos. O contrato é travado por
+// __tests__/statusOptionsContract.test.ts.
+
+// turma_formar_status -> DATRegistro.TURMA_STATUS_CHOICES
+export const TURMA_STATUS_OPTIONS: StatusOption[] = [
+  { label: 'Criada', value: 'criada' },
+  { label: 'Pendente', value: 'pendente' },
+  { label: 'Erro', value: 'erro' },
+];
+
+// etapas FORMAR/AVALIAR (*_status) -> DATRegistro.STATUS_CHOICES
+export const ETAPA_STATUS_OPTIONS: StatusOption[] = [
+  { label: 'Concluído', value: 'concluido' },
   { label: 'Pendente', value: 'pendente' },
   { label: 'Em Andamento', value: 'em_andamento' },
-  { label: 'Concluído', value: 'concluido' },
+  { label: 'Não Aplicável', value: 'nao_aplicavel' },
+  { label: 'Erro', value: 'erro' },
 ];
 
 // Brazilian states

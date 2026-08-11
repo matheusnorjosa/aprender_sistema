@@ -191,17 +191,20 @@ class Command(BaseCommand):
         # ================================================================
         # Audit Log Completeness
         # ================================================================
+        # `details__solicitacao_id` é um valor JSONB (o campo `details` é JSONField).
+        # Usá-lo direto em `id__in=<subquery>` faz o Postgres comparar bigint = jsonb
+        # -> ProgrammingError. Materializamos os ids em Python, coagindo para int
+        # (o details pode gravar o id como número ou string), e então excluímos.
+        audited_ids = {
+            int(sid)
+            for sid in AuditLog.objects.filter(
+                model_name="Solicitacao",
+                action__in=["CREATE", "CRIAR_SOLICITACAO"],
+            ).values_list("details__solicitacao_id", flat=True)
+            if sid is not None and str(sid).isdigit()
+        }
         solicitations_without_audit = (
-            Solicitacao.objects.filter(
-                created_at__gte=since,
-            )
-            .exclude(
-                id__in=AuditLog.objects.filter(
-                    model_name="Solicitacao",
-                    action__in=["CREATE", "CRIAR_SOLICITACAO"],
-                ).values_list("details__solicitacao_id", flat=True)
-            )
-            .count()
+            Solicitacao.objects.filter(created_at__gte=since).exclude(id__in=audited_ids).count()
         )
 
         report["checks"].append(

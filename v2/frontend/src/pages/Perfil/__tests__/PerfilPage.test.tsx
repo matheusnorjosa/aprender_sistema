@@ -3,14 +3,16 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { MemoryRouter } from 'react-router';
 import { message } from 'antd';
 
-const { changeMyPasswordMock, updateMyContactMock } = vi.hoisted(() => ({
+const { changeMyPasswordMock, updateMyContactMock, exportMyDataMock } = vi.hoisted(() => ({
   changeMyPasswordMock: vi.fn(),
   updateMyContactMock: vi.fn(),
+  exportMyDataMock: vi.fn(),
 }));
 
 vi.mock('../../../api/me', () => ({
   changeMyPassword: changeMyPasswordMock,
   updateMyContact: updateMyContactMock,
+  exportMyData: exportMyDataMock,
 }));
 
 import PerfilPage from '../PerfilPage';
@@ -51,7 +53,26 @@ describe('PerfilPage', () => {
   beforeEach(() => {
     changeMyPasswordMock.mockReset();
     updateMyContactMock.mockReset();
+    exportMyDataMock.mockReset();
     vi.restoreAllMocks();
+  });
+
+  test('exportar meus dados chama exportMyData e dispara o download (art. 18-V)', async () => {
+    const blob = new Blob(['{"personal_data":{}}'], { type: 'application/json' });
+    exportMyDataMock.mockResolvedValueOnce(blob);
+    const createObjectURL = vi.fn(() => 'blob:fake');
+    const revokeObjectURL = vi.fn();
+    (URL as unknown as { createObjectURL: unknown }).createObjectURL = createObjectURL;
+    (URL as unknown as { revokeObjectURL: unknown }).revokeObjectURL = revokeObjectURL;
+    const successSpy = vi.spyOn(message, 'success');
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /exportar meus dados/i }));
+
+    await waitFor(() => expect(exportMyDataMock).toHaveBeenCalled());
+    await waitFor(() => expect(successSpy).toHaveBeenCalled());
+    expect(createObjectURL).toHaveBeenCalledWith(blob);
+    expect(revokeObjectURL).toHaveBeenCalled();
   });
 
   test('mostra os dados do usuário com CPF mascarado', async () => {

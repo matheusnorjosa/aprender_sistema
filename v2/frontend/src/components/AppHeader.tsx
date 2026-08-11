@@ -182,8 +182,6 @@ export function AppHeader({
           </Popover>
         )}
         <Button
-          type="primary"
-          danger
           icon={<LogoutOutlined />}
           onClick={onLogout}
         >

@@ -92,6 +92,30 @@ def purge_import_job_artifacts() -> dict[str, Any]:
 
 
 @shared_task
+def purge_old_audit_logs() -> dict[str, Any]:
+    """LGPD retencao/minimizacao (arts. 6-III/16): expurga entradas de AuditLog mais
+    antigas que AUDITLOG_RETENTION_DAYS.
+
+    A trilha acumula ip_address/user_agent/CPF-as-username indefinidamente; manter para
+    sempre tensiona a minimizacao. O prazo (default 5 anos; Marco Civil exige >= 6 meses
+    p/ logs de acesso) equilibra accountability e minimizacao. NAO se auto-audita (seria
+    recursivo) — registra o resultado no log do servidor. Agendada semanalmente.
+    """
+    from datetime import timedelta
+
+    from django.conf import settings
+    from django.utils import timezone
+
+    from apps.core.models import AuditLog
+
+    days = int(getattr(settings, "AUDITLOG_RETENTION_DAYS", 1825))
+    cutoff = timezone.now() - timedelta(days=days)
+    deleted, _ = AuditLog.objects.filter(created_at__lt=cutoff).delete()
+    logger.info("purge_old_audit_logs: %d registro(s) expurgado(s) (retencao=%dd)", deleted, days)
+    return {"deleted": deleted, "retention_days": days}
+
+
+@shared_task
 def gcal_sync_task() -> None:
     """
     DEPRECATED: Tarefa stub para sincronização com Google Calendar.

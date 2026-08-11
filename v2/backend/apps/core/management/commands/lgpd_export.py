@@ -114,18 +114,19 @@ class Command(BaseCommand):
             },
         }
 
-        # Solicitations created by user
-        solicitations = Solicitacao.objects.filter(solicitante=user)
+        # Solicitations created by user. NB: os campos reais sao usuario/inicio/fim — o
+        # command usava solicitante/data_inicio/data_fim/titulo/fluxo (inexistentes), entao
+        # a ferramenta de portabilidade LGPD estourava FieldError em qualquer invocacao real.
+        solicitations = Solicitacao.objects.filter(usuario=user)
         data["solicitations_created"] = list(
             solicitations.values(
                 "id",
-                "titulo",
                 "status",
-                "fluxo",
-                "data_inicio",
-                "data_fim",
+                "inicio",
+                "fim",
                 "municipio__nome",
                 "projeto__nome",
+                "tipo_evento__nome",
                 "created_at",
                 "updated_at",
             )
@@ -136,22 +137,21 @@ class Command(BaseCommand):
         data["events_as_formador"] = list(
             formador_events.values(
                 "id",
-                "titulo",
                 "status",
-                "data_inicio",
-                "data_fim",
+                "inicio",
+                "fim",
                 "municipio__nome",
             )
         )
 
-        # Availability blocks for user
-        blocks = AvailabilityBlock.objects.filter(formador=user)
+        # Availability blocks for user (o dono do bloco e' `usuario`, nao `formador`)
+        blocks = AvailabilityBlock.objects.filter(usuario=user)
         data["availability_blocks"] = list(
             blocks.values(
                 "id",
                 "tipo",
-                "data_inicio",
-                "data_fim",
+                "inicio",
+                "fim",
                 "motivo",
                 "created_at",
             )
@@ -211,6 +211,29 @@ class Command(BaseCommand):
             json.dump(data, f, indent=2, ensure_ascii=False, default=str)
 
         self.stdout.write(self.style.SUCCESS(f"Data exported to: {output_path}"))
+
+        # LGPD art. 18 (acesso/portabilidade): a exportacao do dossie de um titular e'
+        # operacao sensivel e precisa de trilha (art. 37). Registra o FATO — alvo, destino,
+        # contagens — NUNCA os valores de PII exportados.
+        from apps.core.services.audit import registrar_auditoria
+
+        registrar_auditoria(
+            actor=None,  # comando CLI de admin; sem request user
+            action=AuditLog.Action.EXPORT,
+            model_name="Usuario",
+            details={
+                "target_user_id": user.pk,
+                "output_path": str(output_path),
+                "include_audit": bool(include_audit),
+                "counts": {
+                    "solicitations_created": len(data["solicitations_created"]),
+                    "events_as_formador": len(data["events_as_formador"]),
+                    "availability_blocks": len(data["availability_blocks"]),
+                    "approvals_made": len(data["approvals_made"]),
+                },
+            },
+            imediato=True,
+        )
 
         # Summary
         self.stdout.write("  - Personal data: exported")

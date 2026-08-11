@@ -14,6 +14,7 @@ import { login } from '../../api/auth';
 import logoLogin from '../../assets/logo-login.webp';
 import logger from '../../utils/logger';
 import { BRAND_COLORS } from '../../contexts/ThemeContext';
+import AvisoTransparenciaLGPD from '../../components/lgpd/AvisoTransparenciaLGPD';
 
 /**
  * Login form values interface
@@ -145,6 +146,9 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps): JSX.Eleme
           </Form.Item>
         </Form>
       </article>
+
+      {/* LGPD art. 9º: aviso de transparência no momento da coleta (não é consentimento). */}
+      <AvisoTransparenciaLGPD />
       </main>
     </>
   );

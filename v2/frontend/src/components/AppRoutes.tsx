@@ -12,6 +12,7 @@ const MonthlyPage = lazy(() => import('../pages/Disponibilidade/MonthlyPage'));
 const ControlePage = lazy(() => import('../pages/Controle/ControlePage'));
 const DATImportacoesPage = lazy(() => import('../pages/DAT/ImportacoesPage'));
 const PerfilPage = lazy(() => import('../pages/Perfil/PerfilPage'));
+const PoliticaPrivacidadePage = lazy(() => import('../pages/Politica/PoliticaPrivacidadePage'));
 const NewSolicitacaoWizard = lazy(() => import('../pages/Solicitacoes/NewSolicitacaoWizard'));
 const EditSolicitacaoPage = lazy(() => import('../pages/Solicitacoes/EditSolicitacaoPage'));
 const MySolicitacoesPage = lazy(() => import('../pages/Solicitacoes/MySolicitacoesPage'));
@@ -104,6 +105,7 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
         <Route path="/solicitacoes/deslocamentos" element={<RequirePolicy allow={access.can('view_all_availability') || canControle || canCoordenador || canDAT}><DeslocamentosPage /></RequirePolicy>} />
         <Route path="/solicitacoes/meus-eventos" element={<RequirePolicy allow={!!user}><MeusEventosPage /></RequirePolicy>} />
         <Route path="/perfil" element={<RequirePolicy allow={!!user}><PerfilPage user={user} /></RequirePolicy>} />
+        <Route path="/politica-privacidade" element={<RequirePolicy allow={!!user}><PoliticaPrivacidadePage /></RequirePolicy>} />
 
         {/* Redirects de URLs legadas → novas (preserva deep-links/bookmarks) */}
         <Route path="/aprovacoes" element={<Navigate to="/solicitacoes/aprovacoes" replace />} />

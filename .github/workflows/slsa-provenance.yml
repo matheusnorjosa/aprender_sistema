@@ -183,10 +183,40 @@ jobs:
           FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
           BACKEND_DIGEST: ${{ steps.digests.outputs.backend_digest }}
           FRONTEND_DIGEST: ${{ steps.digests.outputs.frontend_digest }}
+          CERT_IDENTITY_REGEX: ^https://github.com/${{ github.repository }}/.github/workflows/slsa-provenance.yml@refs/(heads/main|tags/.+)$
         run: |
           set -euo pipefail
-          cosign sign --yes "${BACKEND_IMAGE}@${BACKEND_DIGEST}"
-          cosign sign --yes "${FRONTEND_IMAGE}@${FRONTEND_DIGEST}"
+
+          # `cosign sign` pega 409 transitorio do Rekor ("an equivalent entry already
+          # exists in the transparency log") quando o retry INTERNO do cosign re-submete
+          # ao tlog a entrada que o 1o POST ja criou (rede engasgou). Mesma classe de flake
+          # que o resolve_digest acima ja trata para o exit-255 do Docker Hub — mesmo idioma
+          # de retry com backoff. Keyless usa cert efemero NOVO a cada tentativa, entao um
+          # sign fresco nao colide. Se, apos um erro, a assinatura ja verificar, o 409 foi
+          # benigno (a entrada equivalente E' a assinatura valida) -> sucesso. Fail-closed ao
+          # esgotar; o step "Verify Cosign signatures" abaixo segue como gate duro autoritativo.
+          sign_with_retry() {
+            local ref="$1" attempt
+            for attempt in 1 2 3; do
+              if cosign sign --yes "$ref"; then
+                return 0
+              fi
+              if cosign verify "$ref" \
+                   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+                   --certificate-identity-regexp "${CERT_IDENTITY_REGEX}" \
+                   >/dev/null 2>&1; then
+                echo "aviso: ${ref}: cosign sign retornou erro, mas a assinatura verifica (Rekor 409 benigno)" >&2
+                return 0
+              fi
+              echo "aviso: ${ref}: cosign sign falhou (tentativa ${attempt}/3)" >&2
+              if [ "$attempt" -lt 3 ]; then sleep "$(( attempt * 5 ))"; fi
+            done
+            echo "${ref}: cosign sign nao concluiu apos 3 tentativas" >&2
+            return 1
+          }
+
+          sign_with_retry "${BACKEND_IMAGE}@${BACKEND_DIGEST}"
+          sign_with_retry "${FRONTEND_IMAGE}@${FRONTEND_DIGEST}"
 
       - name: Verify Cosign signatures
         env:

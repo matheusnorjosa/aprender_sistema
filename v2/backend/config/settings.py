@@ -675,18 +675,23 @@ LOGGING = {
             "environment": ENVIRONMENT,
             "service": os.getenv("SERVICE_NAME", "web"),  # web/worker/beat
         },
+        # LGPD art. 46: mascara e-mail/CPF de QUALQUER mensagem antes de formatar.
+        "pii_redaction": {
+            "()": "apps.core.logging_filters.PIIRedactionFilter",
+        },
     },
     "handlers": {
         # Handler JSON para stdout (production/staging)
         "console_json": {
             "class": "logging.StreamHandler",
             "formatter": "json",
-            "filters": ["request_id", "context"],
+            "filters": ["request_id", "context", "pii_redaction"],
         },
         # Handler human-readable para development
         "console": {
             "class": "logging.StreamHandler",
             "formatter": "verbose",
+            "filters": ["pii_redaction"],
         },
     },
     "root": {

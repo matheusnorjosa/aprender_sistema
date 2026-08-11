@@ -439,6 +439,61 @@ class TestPlanoFormacoesAPI:
         assert str(formacao.data_formacao) == "2025-05-01"
         assert formacao.realizada is True
 
+    def test_update_formacao_recalcula_ch_no_primeiro_patch(self, client, user, plano):
+        """RED (M19-01): a CH deve ser recalculada JA no 1o PATCH, nao uma edicao atrasada.
+
+        O endpoint carrega o prefetch de `formacoes` em get_object() ANTES da escrita;
+        recalcular_ch() nao pode ler esse cache obsoleto (senao ch_total/ch_anual ficam
+        um PATCH atras). Este teste passa pelo viewset de proposito — o unitario
+        test_recalcular_ch opera num objeto sem prefetch e por isso nao pega o bug.
+        """
+        # Formacao de 4h SEM data -> ainda nao conta na CH (ch_total deve ser 0 antes).
+        Formacao.objects.create(
+            plano=plano,
+            numero_formacao=1,
+            carga_horaria=Decimal("4.00"),
+        )
+
+        client.force_login(user)
+        response = client.patch(
+            f"/api/dat/plano-formacoes/{plano.id}/formacao/1/",
+            data={"data_formacao": "2026-03-10"},
+            content_type="application/json",
+        )
+
+        assert response.status_code == 200
+        plano.refresh_from_db()
+        # Antes do fix: ch_total=0.00 / ch_anual=10.00 (cache de prefetch obsoleto).
+        assert plano.ch_total == Decimal("4.00")
+        assert plano.ch_anual == Decimal("14.00")  # 4 + ch_estudo(10)
+
+    def test_update_formacao_ch_acompanha_edicoes_sequenciais(self, client, user, plano):
+        """RED (M19-01): duas edicoes em sequencia — cada PATCH deve refletir na CH
+        imediatamente, travando a regressao de 'um PATCH atrasado'."""
+        Formacao.objects.create(plano=plano, numero_formacao=1, carga_horaria=Decimal("4.00"))
+        Formacao.objects.create(plano=plano, numero_formacao=2, carga_horaria=Decimal("6.00"))
+        client.force_login(user)
+
+        r1 = client.patch(
+            f"/api/dat/plano-formacoes/{plano.id}/formacao/1/",
+            data={"data_formacao": "2026-03-10"},
+            content_type="application/json",
+        )
+        assert r1.status_code == 200
+        plano.refresh_from_db()
+        assert plano.ch_total == Decimal("4.00")  # so a formacao 1 tem data
+        assert plano.ch_anual == Decimal("14.00")
+
+        r2 = client.patch(
+            f"/api/dat/plano-formacoes/{plano.id}/formacao/2/",
+            data={"data_formacao": "2026-04-10"},
+            content_type="application/json",
+        )
+        assert r2.status_code == 200
+        plano.refresh_from_db()
+        assert plano.ch_total == Decimal("10.00")  # 4 + 6
+        assert plano.ch_anual == Decimal("20.00")  # 10 + ch_estudo(10)
+
     def test_calendario_endpoint(self, client, user, plano):
         """Test calendario endpoint."""
         # Create formacao with date

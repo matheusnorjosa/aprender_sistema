@@ -14,6 +14,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from django.db import models
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 if TYPE_CHECKING:
@@ -110,10 +111,24 @@ class PlanoFormacoes(models.Model):
         return f"{self.municipio} - {self.projeto}"
 
     def recalcular_ch(self) -> None:
-        """Recalcula CH total e anual baseado nas formacoes."""
+        """Recalcula CH total e anual baseado nas formacoes.
+
+        Agrega no banco (nao itera `self.formacoes.all()` em Python) para nao ler um
+        cache de prefetch obsoleto: `update_formacao` carrega o prefetch em get_object()
+        ANTES de gravar a formacao, entao iterar o cache deixaria a CH um PATCH atrasada
+        (M19-01). `.filter().aggregate()` sempre emite SQL fresco, imune ao cache.
+        """
         from decimal import Decimal
 
-        total = sum((f.carga_horaria for f in self.formacoes.all() if f.data_formacao), Decimal("0.00"))
+        # Coalesce -> a soma ja vem 0.00 do proprio SQL quando nao ha formacao com data,
+        # dispensando guard em Python; `total` permanece o resultado do ORM (nunca None).
+        total = self.formacoes.filter(data_formacao__isnull=False).aggregate(
+            total=Coalesce(
+                models.Sum("carga_horaria"),
+                Decimal("0.00"),
+                output_field=models.DecimalField(max_digits=6, decimal_places=2),
+            )
+        )["total"]
         self.ch_total = total
         self.ch_anual = total + self.ch_estudo
 

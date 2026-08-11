@@ -431,32 +431,22 @@ test.describe('Checklist: Acessibilidade — páginas autenticadas (axe-core)', 
         (v) => v.impact === 'critical' || v.impact === 'serious'
       );
 
-      // `color-contrast` é reportado mas NÃO falha: os gaps atuais (label #8c8c8c do
-      // Descriptions, botão danger #ff4d4f) são dos TOKENS GLOBAIS do tema Antd — afetam
-      // o app inteiro, então corrigi-los é uma decisão de tema à parte (ConfigProvider),
-      // não desta cobertura. Aqui travamos os críticos ESTRUTURAIS (label, *-name, alt,
-      // aria) em páginas autenticadas — antes o gate só via a home anônima.
-      const contrast = critical.filter((v) => v.id === 'color-contrast');
-      const structural = critical.filter((v) => v.id !== 'color-contrast');
-
-      if (contrast.length > 0) {
+      // Inclui `color-contrast`: os 2 gaps globais do tema Antd (label #8c8c8c do
+      // Descriptions e botão danger #ff4d4f) foram corrigidos no tema (colorTextTertiary
+      // mais escuro + logout des-danger). Agora o contraste fica GUARDADO nas páginas
+      // autenticadas, além dos críticos estruturais (label, *-name, alt, aria).
+      if (critical.length > 0) {
         console.log(
-          `[report-only] ${contrast.length} violação(ões) de contraste em ${path} ` +
-            `(tokens globais do tema Antd — decisão de tema à parte).`
-        );
-      }
-      if (structural.length > 0) {
-        console.log(
-          `Violações estruturais de acessibilidade em ${path}:\n` +
-            structural
+          `Violações críticas de acessibilidade em ${path}:\n` +
+            critical
               .map((v) => `[${v.impact}] ${v.id}: ${v.help} — ${v.nodes.length} elemento(s)`)
               .join('\n')
         );
       }
 
       expect(
-        structural,
-        `${structural.length} violações críticas estruturais de acessibilidade em ${path}`
+        critical,
+        `${critical.length} violações críticas de acessibilidade em ${path}`
       ).toHaveLength(0);
     });
   }

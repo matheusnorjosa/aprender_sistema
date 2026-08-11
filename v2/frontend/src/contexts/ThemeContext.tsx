@@ -104,6 +104,10 @@ const darkThemeTokens = {
 const lightThemeTokens = {
   colorPrimary: '#006B52',
   borderRadius: 6,
+  // A11y (WCAG AA): o default do Antd para texto terciário é rgba(0,0,0,0.45)=#8c8c8c,
+  // que dá só 3.36:1 em branco (ex.: labels do Descriptions) e reprova 4.5:1. Escurecemos
+  // para rgba(0,0,0,0.55)≈#737373 (~4.8:1). Só aumenta contraste — mudança sutil.
+  colorTextTertiary: 'rgba(0, 0, 0, 0.55)',
 };
 
 export function ThemeProvider({ children }: ThemeProviderProps): JSX.Element {

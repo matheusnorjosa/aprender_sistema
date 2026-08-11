@@ -624,6 +624,11 @@ CELERY_BEAT_SCHEDULE: dict[str, dict[str, object]] = {
         "task": "apps.core.tasks.purge_import_job_artifacts",
         "schedule": crontab(hour=3, minute=0),  # 03:00 (off-peak)
     },
+    # Retencao LGPD da trilha de auditoria (arts. 6/16). Semanal (domingo 04:00).
+    "purge-audit-logs-weekly": {
+        "task": "apps.core.tasks.purge_old_audit_logs",
+        "schedule": crontab(hour=4, minute=0, day_of_week=0),
+    },
 }
 # Governança Fase 3: o gcal-sync só é registrado quando FEATURE_AUTO_APPLY_ENABLED=True.
 if FEATURE_AUTO_APPLY_ENABLED:
@@ -815,6 +820,11 @@ BACKUP_RETENTION_DAYS = int(os.getenv("BACKUP_RETENTION_DAYS", "7"))
 # ImportJobs (arquivo submetido + pendencias + traceback) sao expurgados pela task
 # `purge_import_job_artifacts`, preservando a metadata operacional. Default 90 dias.
 IMPORT_JOB_ARTIFACT_RETENTION_DAYS = int(os.getenv("IMPORT_JOB_ARTIFACT_RETENTION_DAYS", "90"))
+# LGPD retencao/minimizacao (arts. 6-III/16) da trilha de auditoria: o AuditLog acumula
+# ip_address/user_agent/CPF-as-username indefinidamente. Apos N dias os registros sao
+# expurgados por `purge_old_audit_logs`. Default 5 anos: Marco Civil art. 15 exige >= 6
+# meses para logs de acesso, e 5 anos cobre com folga a prescricao usual.
+AUDITLOG_RETENTION_DAYS = int(os.getenv("AUDITLOG_RETENTION_DAYS", "1825"))
 # S3 bucket name (without s3://). Use empty string to disable uploads.
 BACKUP_S3_BUCKET = os.getenv("BACKUP_S3_BUCKET", "")
 

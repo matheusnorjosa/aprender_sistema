@@ -38,4 +38,6 @@ class Usuario(AbstractUser):
         verbose_name_plural = "Usuarios"
 
     def __str__(self) -> str:
-        return f"{self.get_full_name() or self.username} ({self.cpf})"
+        # LGPD: nao expor CPF (nem o username, que == CPF para importados) no __str__,
+        # que vaza em logs/reprs/mensagens de erro do DRF. Nome, ou um id nao-PII.
+        return self.get_full_name() or f"Usuario #{self.pk}"

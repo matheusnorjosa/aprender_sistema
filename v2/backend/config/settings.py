@@ -105,6 +105,17 @@ if ENVIRONMENT == "production":
         print("   Defina REDIS_PASSWORD com um secret forte.", file=sys.stderr)
         sys.exit(1)
 
+    # LGPD art. 46 / SEC: DB_PASSWORD ausente em produção cai no default de dev.
+    # DATABASES["default"]["PASSWORD"] usa os.getenv("DB_PASSWORD", "aprender_password"):
+    # se o operador esquecer o secret, o app tenta conectar com a senha pública bem
+    # conhecida — credencial fraca em silêncio. Fail-closed, mesmo padrão do guard de
+    # REDIS_PASSWORD acima. (O default "aprender_password" jamais deve ser usado em prod.)
+    if not os.getenv("DB_PASSWORD", "").strip():
+        print("❌ ERRO CRÍTICO: DB_PASSWORD vazio ou ausente em produção", file=sys.stderr)
+        print("   O app cairia no default de desenvolvimento ('aprender_password').", file=sys.stderr)
+        print("   Defina DB_PASSWORD com um secret forte.", file=sys.stderr)
+        sys.exit(1)
+
     # WARNING: GCAL_CLIENT=fake em produção
     if os.getenv("GCAL_CLIENT", "fake") == "fake":
         print("⚠️  WARNING: GCAL_CLIENT=fake em produção", file=sys.stderr)
@@ -675,18 +686,23 @@ LOGGING = {
             "environment": ENVIRONMENT,
             "service": os.getenv("SERVICE_NAME", "web"),  # web/worker/beat
         },
+        # LGPD art. 46: mascara e-mail/CPF de QUALQUER mensagem antes de formatar.
+        "pii_redaction": {
+            "()": "apps.core.logging_filters.PIIRedactionFilter",
+        },
     },
     "handlers": {
         # Handler JSON para stdout (production/staging)
         "console_json": {
             "class": "logging.StreamHandler",
             "formatter": "json",
-            "filters": ["request_id", "context"],
+            "filters": ["request_id", "context", "pii_redaction"],
         },
         # Handler human-readable para development
         "console": {
             "class": "logging.StreamHandler",
             "formatter": "verbose",
+            "filters": ["pii_redaction"],
         },
     },
     "root": {
@@ -923,6 +939,11 @@ if SENTRY_DSN:
         release=os.getenv("GIT_COMMIT_SHA", "unknown"),  # Track deployments
         # Additional context
         send_default_pii=False,  # Don't send PII (LGPD/GDPR compliance)
+        # LGPD art. 46: por padrão o SDK captura as variáveis locais de cada frame do
+        # stack trace — que podem conter senha, CPF, token OAuth (ex.: `password` numa
+        # view de login, `cpf` num serializer). Desligamos para não vazar PII a um
+        # processador externo (Sentry). send_default_pii=False não cobre locais de frame.
+        include_local_variables=False,
         attach_stacktrace=True,  # Include stack traces for breadcrumbs
         # Performance options
         profiles_sample_rate=float(os.getenv("SENTRY_PROFILES_SAMPLE_RATE", "0.0")),  # Profiling (disabled by default)

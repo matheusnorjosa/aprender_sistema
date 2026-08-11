@@ -10,10 +10,10 @@
 
 import { useState } from 'react';
 import { Button, Card, Descriptions, Form, Input, Space, Tag, Typography, message } from 'antd';
-import { LockOutlined, PhoneOutlined, UserOutlined } from '@ant-design/icons';
+import { DownloadOutlined, LockOutlined, PhoneOutlined, UserOutlined } from '@ant-design/icons';
 
 import type { CurrentUser } from '../../types/usuario';
-import { changeMyPassword, updateMyContact } from '../../api/me';
+import { changeMyPassword, exportMyData, updateMyContact } from '../../api/me';
 
 const { Title } = Typography;
 
@@ -50,8 +50,30 @@ export default function PerfilPage({ user }: { user: CurrentUser }) {
   const [contatoForm] = Form.useForm<ContatoForm>();
   const [saving, setSaving] = useState(false);
   const [savingContato, setSavingContato] = useState(false);
+  const [exporting, setExporting] = useState(false);
   // Telefone exibido: estado local para refletir a correção sem recarregar a página.
   const [telefone, setTelefone] = useState(user.telefone ?? '');
+
+  // LGPD art. 18-V (portabilidade): baixa o dossiê do titular como JSON.
+  const onExport = async () => {
+    setExporting(true);
+    try {
+      const blob = await exportMyData();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'meus-dados-aprender.json';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      message.success('Seus dados foram exportados.');
+    } catch (error) {
+      message.error((error as Error).message || 'Não foi possível exportar seus dados.');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const onFinish = async (values: ChangePasswordForm) => {
     setSaving(true);
@@ -108,6 +130,15 @@ export default function PerfilPage({ user }: { user: CurrentUser }) {
               <TagList items={user.funcoes} />
             </Descriptions.Item>
           </Descriptions>
+
+          <div className="mt-4">
+            <Button icon={<DownloadOutlined />} loading={exporting} onClick={onExport}>
+              Exportar meus dados
+            </Button>
+            <Typography.Text type="secondary" className="ml-2">
+              Baixa uma cópia dos seus dados (portabilidade — LGPD art. 18-V).
+            </Typography.Text>
+          </div>
         </Card>
 
         <Card title={

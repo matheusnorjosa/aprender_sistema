@@ -108,6 +108,9 @@ class AuditLog(models.Model):
         # LGPD art. 18-VI (direito ao esquecimento). Anonimizacao preserva a linha
         # (FKs PROTECT) e remove a PII — ver apps.core.services.anonimizacao.
         USER_ANONYMIZE = "USER_ANONYMIZE", "Anonimizar usuario (LGPD art. 18-VI)"
+        # LGPD art. 18 (acesso/portabilidade): exportacao do dossie de um titular
+        # (management command lgpd_export). Registra o FATO, nunca os valores de PII.
+        EXPORT = "EXPORT", "Exportar dados de usuario (LGPD art. 18)"
         # LGPD art. 18-III (correcao). O proprio titular corrige seus dados de
         # contato em /api/me/ (PATCH). Auditamos o FATO, nunca o valor de PII.
         USER_SELF_UPDATE = "USER_SELF_UPDATE", "Autocorrecao de dados pelo titular (LGPD art. 18-III)"

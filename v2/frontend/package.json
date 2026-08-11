@@ -23,7 +23,8 @@
     "lighthouse": "node scripts/lighthouse-ci.mjs",
     "lighthouse:ci": "node scripts/lighthouse-ci.mjs",
     "size": "size-limit",
-    "size:check": "npm run build && size-limit"
+    "size:check": "npm run build && size-limit",
+    "notices": "node scripts/gen-third-party-notices.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",

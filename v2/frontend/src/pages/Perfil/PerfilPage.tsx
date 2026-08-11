@@ -11,6 +11,7 @@
 import { useState } from 'react';
 import { Button, Card, Descriptions, Form, Input, Space, Tag, Typography, message } from 'antd';
 import { DownloadOutlined, LockOutlined, PhoneOutlined, UserOutlined } from '@ant-design/icons';
+import { Link } from 'react-router';
 
 import type { CurrentUser } from '../../types/usuario';
 import { changeMyPassword, exportMyData, updateMyContact } from '../../api/me';
@@ -138,6 +139,9 @@ export default function PerfilPage({ user }: { user: CurrentUser }) {
             <Typography.Text type="secondary" className="ml-2">
               Baixa uma cópia dos seus dados (portabilidade — LGPD art. 18-V).
             </Typography.Text>
+          </div>
+          <div className="mt-3">
+            <Link to="/politica-privacidade">Política de Privacidade</Link>
           </div>
         </Card>
 

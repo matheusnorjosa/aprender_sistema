@@ -330,6 +330,15 @@ def upsert_one(
                 # DB não tinha o ID, mas evento existe → ADOPT
                 action = "ADOPT"
 
+            # #1722 (RF05 idempotência): se o evento já está publicado (DB tem o ID)
+            # e o payload não mudou desde a última publicação, PULA o UPDATE. Sem isto,
+            # todo re-publish de um evento inalterado chama client.update() e, com
+            # GCAL_SEND_UPDATES=all, reenvia e-mail a TODOS os convidados sem mudança
+            # real. O resync zera gcal_payload_hash de propósito (resync_solicitacao /
+            # batch resync), então o SKIP nunca bloqueia um reenvio intencional.
+            if action == "UPDATE" and s.gcal_payload_hash and s.gcal_payload_hash == _payload_hash(payload):
+                return SyncOutcome("SKIP", s.id, s.external_event_id, payload["summary"])
+
             if not dry_run:
                 try:
                     # RF05: Retry com backoff exponencial (PR19)

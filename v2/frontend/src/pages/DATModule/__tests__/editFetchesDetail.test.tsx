@@ -77,25 +77,36 @@ import { getAcao, getCadastro } from '../../../api/datModule';
 describe('M17-02: editar busca o DETAIL antes de abrir o modal', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  test('AcoesPage: clicar em Editar dispara getAcao(id) (não usa a linha da lista)', async () => {
-    render(
-      <MemoryRouter>
-        <AcoesPage />
-      </MemoryRouter>,
-    );
-    const btn = await screen.findByLabelText('Editar ação');
-    await userEvent.click(btn);
-    await waitFor(() => expect(getAcao).toHaveBeenCalledWith(7));
-  });
+  // Timeouts folgados: renderizar a pagina inteira (Table + useTableFilters + options) em
+  // jsdom sob carga do CI passa dos 5s default e estoura flaky. O comportamento testado
+  // (handleEdit busca o detail) e' rapido; o que e' lento e' o render — dai a margem.
+  test(
+    'AcoesPage: clicar em Editar dispara getAcao(id) (não usa a linha da lista)',
+    async () => {
+      render(
+        <MemoryRouter>
+          <AcoesPage />
+        </MemoryRouter>,
+      );
+      const btn = await screen.findByLabelText('Editar ação', {}, { timeout: 15000 });
+      await userEvent.click(btn);
+      await waitFor(() => expect(getAcao).toHaveBeenCalledWith(7), { timeout: 10000 });
+    },
+    20000,
+  );
 
-  test('CadastrosPage: clicar em Editar dispara getCadastro(id)', async () => {
-    render(
-      <MemoryRouter>
-        <CadastrosPage />
-      </MemoryRouter>,
-    );
-    const btn = await screen.findByLabelText('Editar cadastro');
-    await userEvent.click(btn);
-    await waitFor(() => expect(getCadastro).toHaveBeenCalledWith(9));
-  });
+  test(
+    'CadastrosPage: clicar em Editar dispara getCadastro(id)',
+    async () => {
+      render(
+        <MemoryRouter>
+          <CadastrosPage />
+        </MemoryRouter>,
+      );
+      const btn = await screen.findByLabelText('Editar cadastro', {}, { timeout: 15000 });
+      await userEvent.click(btn);
+      await waitFor(() => expect(getCadastro).toHaveBeenCalledWith(9), { timeout: 10000 });
+    },
+    20000,
+  );
 });

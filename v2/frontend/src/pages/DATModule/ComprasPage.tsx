@@ -88,6 +88,24 @@ interface CompraFormValues {
   [key: string]: any;
 }
 
+/**
+ * Monta o payload de compra a partir dos valores do form (M15-10):
+ * - datas viram `YYYY-MM-DD`;
+ * - `uf` NÃO vai (é só filtro de UI; o `municipio` já carrega a UF);
+ * - `status_uso` NÃO vai (é read-only, recalculado no `save()` do backend — enviar
+ *   `esgotado` gravava `em_uso`).
+ */
+export function buildCompraPayload(values: CompraFormValues): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    ...values,
+    data_compra: values.data_compra ? values.data_compra.format('YYYY-MM-DD') : null,
+    data_entrega: values.data_entrega ? values.data_entrega.format('YYYY-MM-DD') : null,
+  };
+  delete payload.uf;
+  delete payload.status_uso;
+  return payload;
+}
+
 interface ComprasFilters {
   search: string;
   uf: string | undefined;
@@ -225,11 +243,7 @@ export default function ComprasPage(): JSX.Element {
   };
 
   const handleSave = async (values: CompraFormValues) => {
-    const payload = {
-      ...values,
-      data_compra: values.data_compra ? values.data_compra.format('YYYY-MM-DD') : null,
-      data_entrega: values.data_entrega ? values.data_entrega.format('YYYY-MM-DD') : null,
-    };
+    const payload = buildCompraPayload(values);
 
     try {
       if (editingCompra) {
@@ -243,7 +257,21 @@ export default function ComprasPage(): JSX.Element {
       form.resetFields();
       void refresh();
     } catch (error) {
-      message.error(`Erro: ${(error as Error).message}`);
+      // M15-10: o backend manda `errors: {campo: [...]}`; exibir inline no proprio campo em
+      // vez do toast generico que engolia a orientacao (ex.: ano_uso obrigatorio virava 400 mudo).
+      const err = error as Error & { response?: { data?: { errors?: Record<string, unknown>; detail?: string } } };
+      const fieldErrors = err.response?.data?.errors;
+      if (fieldErrors && typeof fieldErrors === 'object') {
+        form.setFields(
+          Object.entries(fieldErrors).map(([name, msgs]) => ({
+            name,
+            errors: Array.isArray(msgs) ? msgs.map(String) : [String(msgs)],
+          })),
+        );
+        message.error('Corrija os campos destacados.');
+      } else {
+        message.error(`Erro: ${err.message}`);
+      }
     }
   };
 
@@ -837,13 +865,24 @@ export default function ComprasPage(): JSX.Element {
                 </Form.Item>
               </Col>
               <Col xs={12} sm={6}>
-                <Form.Item name="ano_uso" label="Ano de Uso">
+                <Form.Item
+                  name="ano_uso"
+                  label="Ano de Uso"
+                  rules={[{ required: true, message: 'Selecione o ano de uso' }]}
+                >
                   <Select placeholder="Selecione..." options={ANO_OPTIONS} allowClear />
                 </Form.Item>
               </Col>
               <Col xs={12} sm={6}>
-                <Form.Item name="status_uso" label="Status">
-                  <Select placeholder="Automático..." options={STATUS_OPTIONS} allowClear />
+                {/* M15-10: valor_unitario existe no serializer mas nao tinha campo -> toda compra
+                    nascia com valor 0.00 e zerava o dashboard financeiro. status_uso saiu daqui
+                    (era read-only, recalculado no backend). */}
+                <Form.Item
+                  name="valor_unitario"
+                  label="Valor Unitário (R$)"
+                  rules={[{ required: true, message: 'Informe o valor unitário' }]}
+                >
+                  <InputNumber min={0} precision={2} style={{ width: '100%' }} placeholder="0,00" />
                 </Form.Item>
               </Col>
             </Row>

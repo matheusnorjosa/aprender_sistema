@@ -55,7 +55,6 @@ import {
   CodeOutlined,
   UnorderedListOutlined,
 } from '@ant-design/icons';
-import dayjs from 'dayjs';
 
 import { fetchAPI } from '../../api/config';
 import {
@@ -75,6 +74,7 @@ import GoogleIntegrationCard from '../../components/google/GoogleIntegrationCard
 import { TIMING } from '../../constants/timing';
 import { usePolling } from '../../hooks/usePolling';
 import { syncChannel } from '../../services/syncChannel';
+import { formatFortaleza } from '../../utils/datetime';
 import logger from '../../utils/logger';
 import type { ID, Solicitacao, GCalStatus, CurrentUser, PaginatedResponse } from '../../types';
 
@@ -431,7 +431,7 @@ export default function PreAgendaPage(): JSX.Element {
       title: 'Data/Hora',
       dataIndex: 'inicio',
       key: 'inicio',
-      render: (inicio: string) => dayjs(inicio).format('DD/MM/YYYY HH:mm'),
+      render: (inicio: string) => formatFortaleza(inicio),
       width: 150,
     },
     {
@@ -555,7 +555,7 @@ export default function PreAgendaPage(): JSX.Element {
   const formatGcalDate = (dateStr: string): string => {
     if (!dateStr) return '-';
     try {
-      return dayjs(dateStr).format('DD/MM/YYYY HH:mm');
+      return formatFortaleza(dateStr);
     } catch {
       return dateStr;
     }
@@ -927,13 +927,13 @@ export default function PreAgendaPage(): JSX.Element {
                 {previewData.preview.payload?.start?.dateTime && (
                   <Space>
                     <Tag color="blue">
-                      {dayjs(previewData.preview.payload.start.dateTime).format('DD/MM/YYYY')}
+                      {formatFortaleza(previewData.preview.payload.start.dateTime, 'DD/MM/YYYY')}
                     </Tag>
                     <Text>
-                      {dayjs(previewData.preview.payload.start.dateTime).format('HH:mm')}
+                      {formatFortaleza(previewData.preview.payload.start.dateTime, 'HH:mm')}
                       {' - '}
                       {previewData.preview.payload?.end?.dateTime &&
-                        dayjs(previewData.preview.payload.end.dateTime).format('HH:mm')}
+                        formatFortaleza(previewData.preview.payload.end.dateTime, 'HH:mm')}
                     </Text>
                   </Space>
                 )}

@@ -23,15 +23,24 @@ describe('buildCompraPayload (M15-10)', () => {
     expect(buildCompraPayload({ ...base, valor_unitario: 12.5 }).valor_unitario).toBe(12.5);
   });
 
-  it('formata datas para YYYY-MM-DD (nunca datetime ISO)', () => {
+  it('formata data_compra para YYYY-MM-DD (nunca datetime ISO)', () => {
+    const p = buildCompraPayload({ ...base, data_compra: dayjs('2026-03-10') });
+    expect(p.data_compra).toBe('2026-03-10');
+    expect(String(p.data_compra)).not.toMatch(/T\d{2}:/);
+  });
+
+  it('#1637: nao envia procurement (do Controle) nem codigo_produto (derivado do Produto)', () => {
     const p = buildCompraPayload({
       ...base,
-      data_compra: dayjs('2026-03-10'),
+      codigo_produto: 'KIT-001',
+      fornecedor: 'Editora X',
+      numero_nota_fiscal: 'NF-123',
       data_entrega: dayjs('2026-04-01'),
     });
-    expect(p.data_compra).toBe('2026-03-10');
-    expect(p.data_entrega).toBe('2026-04-01');
-    expect(String(p.data_compra)).not.toMatch(/T\d{2}:/);
+    expect(p).not.toHaveProperty('codigo_produto');
+    expect(p).not.toHaveProperty('fornecedor');
+    expect(p).not.toHaveProperty('numero_nota_fiscal');
+    expect(p).not.toHaveProperty('data_entrega');
   });
 
   it('preserva os demais campos (projeto, produto, municipio, quantidade)', () => {

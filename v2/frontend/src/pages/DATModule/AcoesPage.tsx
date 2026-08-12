@@ -51,6 +51,7 @@ import {
 } from '@ant-design/icons';
 import {
   listAcoes,
+  getAcao,
   createAcao,
   updateAcao,
   deleteAcao,
@@ -207,16 +208,25 @@ export default function AcoesPage(): JSX.Element {
   };
 
   // Memoized handlers (§3 Epic #459)
-  const handleEdit = useCallback((record: AcaoRecord) => {
-    setEditingAcao(record);
-    form.setFieldsValue({
-      ...record,
-      data_carta: record.data_carta ? dayjs(record.data_carta) : null,
-      data_contato: record.data_contato ? dayjs(record.data_contato) : null,
-      data_reuniao: record.data_reuniao ? dayjs(record.data_reuniao) : null,
-      data_entrega: record.data_entrega ? dayjs(record.data_entrega) : null,
-    });
-    setModalVisible(true);
+  // M17-02: a linha da LISTA nao expoe as datas; alimentar o form com ela gravaria `null`
+  // e o PATCH apagaria as datas em silencio. Buscar o DETAIL antes de abrir o modal.
+  const handleEdit = useCallback(async (record: AcaoRecord) => {
+    try {
+      const detail = await getAcao(record.id);
+      form.resetFields(); // evita vazar valores do registro anterior (setFieldsValue faz merge)
+      form.setFieldsValue({
+        ...detail,
+        data_carta: detail.data_carta ? dayjs(detail.data_carta as string) : null,
+        data_contato: detail.data_contato ? dayjs(detail.data_contato as string) : null,
+        data_reuniao: detail.data_reuniao ? dayjs(detail.data_reuniao as string) : null,
+        data_entrega: detail.data_entrega ? dayjs(detail.data_entrega as string) : null,
+      });
+      setEditingAcao(record);
+      setModalVisible(true);
+    } catch (error) {
+      // Nao abrir o modal com form vazio: recriaria o bug por outro caminho.
+      message.error(`Erro ao carregar a acao para edicao: ${(error as Error).message}`);
+    }
   }, [form]);
 
   const handleSave = async (values: AcaoFormValues) => {

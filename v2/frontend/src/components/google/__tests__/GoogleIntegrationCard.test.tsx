@@ -17,6 +17,16 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, test, expect, vi } from 'vitest';
 import GoogleIntegrationCard, { type GoogleIntegrationStatus } from '../GoogleIntegrationCard';
 
+// Quando `connected`, o componente dispara loadCalendars() ->
+// fetchAPI('/integrations/google/calendars/') num useEffect. Sem mock, esse fetch REJEITA
+// no jsdom e loga async DEPOIS do teste -> "onUserConsoleLog pending" no teardown do worker
+// -> EnvironmentTeardownError, que reprovava o CI (exit 1) mesmo com todos os testes passando.
+// Mockar fetchAPI resolvendo elimina o fetch pendente e o log no teardown.
+vi.mock('../../../api/config', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../api/config')>();
+  return { ...actual, fetchAPI: vi.fn().mockResolvedValue({ calendars: [] }) };
+});
+
 describe('GoogleIntegrationCard', () => {
   // ============================================================================
   // TESTES DE RENDERIZAÇÃO CONDICIONAL

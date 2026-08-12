@@ -48,6 +48,7 @@ import {
 } from '@ant-design/icons';
 import {
   listCadastros,
+  getCadastro,
   createCadastro,
   updateCadastro,
   deleteCadastro,
@@ -192,19 +193,28 @@ export default function CadastrosPage(): JSX.Element {
     setModalVisible(true);
   };
 
-  const handleEdit = (record: CadastroRecord) => {
-    setEditingCadastro(record);
-    form.setFieldsValue({
-      ...record,
-      data_criacao_curso: record.data_criacao_curso ? dayjs(record.data_criacao_curso) : null,
-      data_chaves: record.data_chaves ? dayjs(record.data_chaves) : null,
-      data_instrucoes: record.data_instrucoes ? dayjs(record.data_instrucoes) : null,
-      data_envio: record.data_envio ? dayjs(record.data_envio) : null,
-      data_recebidos: record.data_recebidos ? dayjs(record.data_recebidos) : null,
-      data_validados: record.data_validados ? dayjs(record.data_validados) : null,
-      data_importados: record.data_importados ? dayjs(record.data_importados) : null,
-    });
-    setModalVisible(true);
+  // M17-02: a linha da LISTA nao expoe as datas; alimentar o form com ela gravaria `null`
+  // e o PATCH apagaria as 7 datas em silencio. Buscar o DETAIL antes de abrir o modal.
+  const handleEdit = async (record: CadastroRecord) => {
+    try {
+      const detail = await getCadastro(record.id);
+      form.resetFields(); // evita vazar valores do registro anterior (setFieldsValue faz merge)
+      form.setFieldsValue({
+        ...detail,
+        data_criacao_curso: detail.data_criacao_curso ? dayjs(detail.data_criacao_curso as string) : null,
+        data_chaves: detail.data_chaves ? dayjs(detail.data_chaves as string) : null,
+        data_instrucoes: detail.data_instrucoes ? dayjs(detail.data_instrucoes as string) : null,
+        data_envio: detail.data_envio ? dayjs(detail.data_envio as string) : null,
+        data_recebidos: detail.data_recebidos ? dayjs(detail.data_recebidos as string) : null,
+        data_validados: detail.data_validados ? dayjs(detail.data_validados as string) : null,
+        data_importados: detail.data_importados ? dayjs(detail.data_importados as string) : null,
+      });
+      setEditingCadastro(record);
+      setModalVisible(true);
+    } catch (error) {
+      // Nao abrir o modal com form vazio: recriaria o bug por outro caminho.
+      message.error(`Erro ao carregar o cadastro para edicao: ${(error as Error).message}`);
+    }
   };
 
   const handleSave = async (values: CadastroFormValues) => {

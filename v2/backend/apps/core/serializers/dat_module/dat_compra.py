@@ -22,6 +22,8 @@ class DATCompraSerializer(serializers.ModelSerializer["DATCompra"]):
     municipio_uf = serializers.CharField(source="municipio.uf", read_only=True)
     projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
     produto_nome = serializers.CharField(source="produto.nome", read_only=True, allow_null=True)
+    # #1637: codigo e' do Produto (SSOT), nao por-compra. Espelho read-only.
+    codigo_produto = serializers.CharField(source="produto.codigo", read_only=True, allow_null=True)
 
     # Computed
     disponivel = serializers.IntegerField(read_only=True)
@@ -42,6 +44,7 @@ class DATCompraSerializer(serializers.ModelSerializer["DATCompra"]):
             "projeto_nome",
             "produto",
             "produto_nome",
+            "codigo_produto",
             "descricao_produto",
             "tipo_compra",
             # Quantidades
@@ -74,6 +77,7 @@ class DATCompraListSerializer(serializers.ModelSerializer["DATCompra"]):
     municipio_uf = serializers.CharField(source="municipio.uf", read_only=True)
     projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
     produto_nome = serializers.CharField(source="produto.nome", read_only=True, allow_null=True)
+    codigo_produto = serializers.CharField(source="produto.codigo", read_only=True, allow_null=True)
     disponivel = serializers.IntegerField(read_only=True)
     valor_total = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
 
@@ -85,6 +89,7 @@ class DATCompraListSerializer(serializers.ModelSerializer["DATCompra"]):
             "municipio_uf",
             "projeto_nome",
             "produto_nome",
+            "codigo_produto",
             "descricao_produto",
             "tipo_compra",
             "quantidade",

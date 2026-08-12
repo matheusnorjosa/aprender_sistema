@@ -118,6 +118,9 @@ def test_dat_endpoint_exposes_dat_compra_contract(
 
     assert dat_record["quantidade"] == 20
     assert "valor_unitario" in dat_record
+    # #1637: codigo do produto e' espelho read-only (source="produto.codigo"), nao coluna
+    # gravavel por-compra. Deve estar no contrato do DAT (a coluna "Cod:" da tabela o consome).
+    assert "codigo_produto" in dat_record
     assert dat_record["municipio_nome"] == compra_dat.municipio.nome
 
 

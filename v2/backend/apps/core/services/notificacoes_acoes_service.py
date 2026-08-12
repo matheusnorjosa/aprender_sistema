@@ -271,6 +271,32 @@ class AcoesNotificacaoDailyService:
     ) -> dict[str, object]:
         ref_date = reference_date or timezone.localdate()
 
+        # #1721: a task diaria roda todo dia do calendario, mas a distancia em dias
+        # uteis ate um vencimento util e IDENTICA para sexta/sabado/domingo. Como a
+        # chave de dedupe da NotificacaoInterna inclui referencia_data (= hoje),
+        # processar num dia nao-util cria copias das notificacoes ja enviadas na
+        # sexta (cada fase dispararia ate 3x no fim de semana). Pular dias nao-uteis
+        # (fim de semana + feriados) mantem 1 disparo por fase. O skip continua
+        # auditado para nao cegar o monitoramento de "a task rodou?".
+        if not BusinessCalendarService.is_business_day(ref_date):
+            skipped_metrics: dict[str, object] = {
+                "reference_date": ref_date.isoformat(),
+                "skipped_non_business_day": True,
+                "actions_evaluated": 0,
+                "actions_triggered": 0,
+                "notifications_created": 0,
+                "notifications_deduplicated": 0,
+                "fallback_actions": 0,
+                "phases": {},
+            }
+            AuditLog.objects.create(
+                usuario=None,
+                action=AuditLog.Action.ACOES_NOTIFICACOES_DAILY,
+                model_name="AcaoInstancia",
+                details=skipped_metrics,
+            )
+            return skipped_metrics
+
         actions_qs = (
             AcaoInstancia.objects.select_related(
                 "template",

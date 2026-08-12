@@ -200,3 +200,34 @@ def test_task_wrapper_returns_metrics_and_writes_audit_log(base_context, user_fa
     assert audit is not None
     assert audit.details["reference_date"] == "2026-03-10"
     assert audit.details["notifications_created"] == 2
+
+
+@pytest.mark.django_db
+def test_weekend_run_creates_no_notifications(base_context, user_factory):
+    """#1721: escalonamento nao deve rodar (nem duplicar) em dia nao-util.
+
+    business_days_between() devolve o mesmo inteiro para sexta, sabado e domingo
+    contra um vencimento util futuro; como referencia_data (=hoje) entra na chave de
+    dedupe, sab/dom recriavam a notificacao de sexta (ate 3x). A task deve pular o
+    dia nao-util.
+    """
+    ciclo = base_context["ciclo"]
+    # vencimento = quarta 2026-03-18 (anchor terca 2026-03-17 + 1 dia util)
+    action = _create_action(ciclo=ciclo, ordem=507, anchor=date(2026, 3, 17), executor_group="Comercial")
+    user_factory(prefix="coord", groups=["Comercial", "Coordenador"])
+    user_factory(prefix="manager", groups=["Comercial", "Gerente"])
+
+    # Sexta 2026-03-13 (dia util): D-3 dispara -> prova que a notificacao existe.
+    friday = AcoesNotificacaoDailyService.run(reference_date=date(2026, 3, 13))
+    assert friday["notifications_created"] == 2
+    assert friday["phases"] == {"D-3": 1}
+
+    # Sabado/Domingo (dia nao-util): business_days_between ainda da 3 -> D-3 dispararia
+    # (o bug), mas nada novo deve ser criado.
+    saturday = AcoesNotificacaoDailyService.run(reference_date=date(2026, 3, 14))
+    sunday = AcoesNotificacaoDailyService.run(reference_date=date(2026, 3, 15))
+    assert saturday["notifications_created"] == 0
+    assert sunday["notifications_created"] == 0
+
+    # Total permanece 2 (so os de sexta), nao 6.
+    assert NotificacaoInterna.objects.filter(acao_instancia=action).count() == 2

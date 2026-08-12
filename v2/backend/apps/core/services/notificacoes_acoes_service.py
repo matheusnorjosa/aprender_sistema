@@ -271,6 +271,31 @@ class AcoesNotificacaoDailyService:
     ) -> dict[str, object]:
         ref_date = reference_date or timezone.localdate()
 
+        # #1721: escalonamento e um conceito de dia util. Rodar num dia nao-util
+        # (fim de semana/feriado) recria as notificacoes do ultimo dia util:
+        # business_days_between() devolve o mesmo inteiro para sex/sab/dom e a
+        # referencia_data (=ref_date) muda a cada dia, escapando do dedupe. Pula
+        # o dia nao-util para nao duplicar.
+        if not BusinessCalendarService.is_business_day(ref_date):
+            skip_metrics: dict[str, object] = {
+                "reference_date": ref_date.isoformat(),
+                "skipped": True,
+                "reason": "not_a_business_day",
+                "actions_evaluated": 0,
+                "actions_triggered": 0,
+                "notifications_created": 0,
+                "notifications_deduplicated": 0,
+                "fallback_actions": 0,
+                "phases": {},
+            }
+            AuditLog.objects.create(
+                usuario=None,
+                action=AuditLog.Action.ACOES_NOTIFICACOES_DAILY,
+                model_name="AcaoInstancia",
+                details=skip_metrics,
+            )
+            return skip_metrics
+
         actions_qs = (
             AcaoInstancia.objects.select_related(
                 "template",

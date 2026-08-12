@@ -4,6 +4,7 @@ Esta pasta concentra planos tecnicos ativos (nao arquivados).
 
 ## Prioritarios
 
+- `PLANO_IMPORTS_ORFAOS.md` — programa: imports orfaos -> telas operacionais (DAT) + posse dos dados de compra; base em 4 investigacoes de codigo (2026-08-11). Issues #1640, #1637
 - `PLAN_sdd_migration_2026-06-19.md` — migracao da documentacao para modelo SDD (Spec-Driven Development); base em `../reports/AUDITORIA_DOCUMENTAL_2026-06-19.md`
 - `PLAN_API_CANONICA_DEFINITIVA_2026-03-09.md`
 - `PLAN_cybersecurity_hardening_2026-03-09.md`

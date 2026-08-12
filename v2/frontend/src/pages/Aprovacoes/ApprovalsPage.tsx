@@ -56,6 +56,7 @@ import { computeAccess } from '../../hooks/useCanAccess';
 import { TIMING } from '../../constants/timing';
 import { usePolling } from '../../hooks/usePolling';
 import { syncChannel } from '../../services/syncChannel';
+import { formatFortaleza, FORTALEZA_TZ } from '../../utils/datetime';
 import logger from '../../utils/logger';
 import type { ID, Solicitacao, SolicitacaoStatus, PaginatedResponse, Participation, BatchOperationResult } from '../../types';
 
@@ -298,9 +299,9 @@ export default function ApprovalsPage(): JSX.Element {
       width: 140,
       render: (_, record) => (
         <div>
-          <div>{dayjs(record.inicio).format('DD/MM/YYYY')}</div>
+          <div>{formatFortaleza(record.inicio, 'DD/MM/YYYY')}</div>
           <small className="text-gray-500">
-            {dayjs(record.inicio).format('HH:mm')} - {dayjs(record.fim).format('HH:mm')}
+            {formatFortaleza(record.inicio, 'HH:mm')} - {formatFortaleza(record.fim, 'HH:mm')}
           </small>
         </div>
       ),
@@ -519,8 +520,8 @@ export default function ApprovalsPage(): JSX.Element {
       >
         {previewData?.preview?.payload && (() => {
           const payload = previewData.preview.payload;
-          const start = payload.start?.dateTime ? dayjs(payload.start.dateTime) : null;
-          const end = payload.end?.dateTime ? dayjs(payload.end.dateTime) : null;
+          const start = payload.start?.dateTime ? dayjs(payload.start.dateTime).tz(FORTALEZA_TZ) : null;
+          const end = payload.end?.dateTime ? dayjs(payload.end.dateTime).tz(FORTALEZA_TZ) : null;
 
           return (
             <div style={{ maxHeight: 500, overflow: 'auto' }}>

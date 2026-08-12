@@ -28,11 +28,11 @@ import PlusOutlined from '@ant-design/icons/PlusOutlined';
 import SearchOutlined from '@ant-design/icons/SearchOutlined';
 import EditOutlined from '@ant-design/icons/EditOutlined';
 import DeleteOutlined from '@ant-design/icons/DeleteOutlined';
-import dayjs from 'dayjs';
 
 import { listSolicitacoes, deleteSolicitacao } from '../../api/solicitacoes';
 import { MeetLink } from '../../components/MeetLink';
 import type { ID, Solicitacao, SolicitacaoStatus, FluxoType, GCalStatus, Participation, PaginatedResponse } from '../../types';
+import { formatFortaleza } from '../../utils/datetime';
 
 const { Title } = Typography;
 
@@ -135,7 +135,7 @@ export default function MySolicitacoesPage(): JSX.Element {
       title: 'Data/Hora',
       dataIndex: 'inicio',
       key: 'inicio',
-      render: (inicio: string) => dayjs(inicio).format('DD/MM/YYYY HH:mm'),
+      render: (inicio: string) => formatFortaleza(inicio),
       width: 150,
     },
     {

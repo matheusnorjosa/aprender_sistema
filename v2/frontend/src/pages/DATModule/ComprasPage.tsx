@@ -99,10 +99,13 @@ export function buildCompraPayload(values: CompraFormValues): Record<string, unk
   const payload: Record<string, unknown> = {
     ...values,
     data_compra: values.data_compra ? values.data_compra.format('YYYY-MM-DD') : null,
-    data_entrega: values.data_entrega ? values.data_entrega.format('YYYY-MM-DD') : null,
   };
-  delete payload.uf;
-  delete payload.status_uso;
+  // O DAT nao envia: uf/status_uso (read-only/derivado) + os campos de procurement
+  // (fornecedor/NF/data_entrega, que sao do CONTROLE — #1637) + codigo_produto (derivado
+  // de Produto, read-only). Colocar ownership no lado errado = perda silenciosa de dado.
+  for (const k of ['uf', 'status_uso', 'codigo_produto', 'fornecedor', 'numero_nota_fiscal', 'data_entrega']) {
+    delete payload[k];
+  }
   return payload;
 }
 
@@ -237,7 +240,6 @@ export default function ComprasPage(): JSX.Element {
     form.setFieldsValue({
       ...record,
       data_compra: record.data_compra ? dayjs(record.data_compra) : null,
-      data_entrega: record.data_entrega ? dayjs(record.data_entrega) : null,
     });
     setModalVisible(true);
   };
@@ -801,12 +803,9 @@ export default function ComprasPage(): JSX.Element {
               </Col>
             </Row>
             <Row gutter={16}>
-              <Col xs={24} sm={12}>
-                <Form.Item name="codigo_produto" label="Código do Produto">
-                  <Input placeholder="Ex: KIT-001" />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={12}>
+              {/* #1637: codigo_produto saiu do form — e derivado do Produto (read-only,
+                  exposto pelo serializer via produto.codigo). A tabela ja mostra "Cod:". */}
+              <Col xs={24}>
                 <Form.Item name="descricao_produto" label="Descrição">
                   <Input placeholder="Descrição adicional..." />
                 </Form.Item>
@@ -888,38 +887,23 @@ export default function ComprasPage(): JSX.Element {
             </Row>
           </Card>
 
-          {/* Dados da Compra */}
+          {/* Dados da Compra. #1637: fornecedor / nota fiscal / data de entrega saíram do
+              modal do DAT — são fatos de PROCUREMENT do setor Controle (o DAT só visualiza).
+              Enquanto o Controle não os registra na fonte, coletá-los aqui só perdia dado. */}
           <Card size="small" title="Dados da Compra" className="mb-4">
             <Row gutter={16}>
-              <Col xs={12} sm={6}>
+              <Col xs={24} sm={12}>
                 <Form.Item name="data_compra" label="Data Compra">
                   <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
                 </Form.Item>
               </Col>
-              <Col xs={12} sm={6}>
+              <Col xs={24} sm={12}>
                 <Form.Item
                   name="tipo_compra"
                   label="Tipo de Compra"
                   rules={[{ required: true, message: 'Selecione o tipo de compra' }]}
                 >
                   <Select placeholder="Selecione..." options={TIPO_COMPRA_OPTIONS} />
-                </Form.Item>
-              </Col>
-              <Col xs={12} sm={6}>
-                <Form.Item name="data_entrega" label="Data Entrega">
-                  <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
-                </Form.Item>
-              </Col>
-              <Col xs={12} sm={6}>
-                <Form.Item name="numero_nota_fiscal" label="Nota Fiscal">
-                  <Input placeholder="NF-12345" />
-                </Form.Item>
-              </Col>
-            </Row>
-            <Row gutter={16}>
-              <Col xs={24}>
-                <Form.Item name="fornecedor" label="Fornecedor">
-                  <Input placeholder="Nome do fornecedor..." />
                 </Form.Item>
               </Col>
             </Row>

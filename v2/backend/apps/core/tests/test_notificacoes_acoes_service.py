@@ -200,3 +200,34 @@ def test_task_wrapper_returns_metrics_and_writes_audit_log(base_context, user_fa
     assert audit is not None
     assert audit.details["reference_date"] == "2026-03-10"
     assert audit.details["notifications_created"] == 2
+
+
+@pytest.mark.django_db
+def test_run_skips_non_business_day_weekend(base_context, user_factory):
+    """#1721: a distancia em dias uteis ate um vencimento util e IDENTICA para
+    sexta, sabado e domingo. Como a task diaria roda todo dia do calendario e a
+    chave de dedupe inclui referencia_data, cada fase (D-7/D-3/D-1) dispararia
+    ate 3x no fim de semana. Rodar num dia nao-util deve PULAR (0 notificacoes)."""
+    ciclo = base_context["ciclo"]
+    # data_vencimento = add_business_days(anchor, 1) = 2026-03-18 (quarta-feira).
+    action = _create_action(ciclo=ciclo, ordem=510, anchor=date(2026, 3, 17), executor_group="Comercial")
+    user_factory(prefix="coord", groups=["Comercial", "Coordenador"])
+    user_factory(prefix="manager", groups=["Comercial", "Gerente"])
+
+    # Sanidade: sexta 2026-03-13 e dia util e esta a 3 dias uteis do vencimento -> D-3 dispara (2 notifs).
+    metrics_friday = AcoesNotificacaoDailyService.run(reference_date=date(2026, 3, 13))
+    assert metrics_friday["phases"] == {"D-3": 1}
+    assert metrics_friday["notifications_created"] == 2
+
+    # Sabado 2026-03-14 tambem esta a 3 dias uteis do vencimento (o bug criaria +2 duplicatas).
+    metrics_saturday = AcoesNotificacaoDailyService.run(reference_date=date(2026, 3, 14))
+    assert metrics_saturday["notifications_created"] == 0
+    assert metrics_saturday.get("skipped_non_business_day") is True
+
+    # Apenas as 2 notificacoes de sexta permanecem.
+    assert NotificacaoInterna.objects.filter(acao_instancia=action).count() == 2
+
+    # O skip continua auditado (nao cega o monitoramento de "a task rodou?").
+    audit = AuditLog.objects.filter(action="ACOES_NOTIFICACOES_DAILY").order_by("-created_at").first()
+    assert audit is not None
+    assert audit.details.get("skipped_non_business_day") is True

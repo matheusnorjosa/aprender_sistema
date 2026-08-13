@@ -84,7 +84,12 @@ interface ApiErrorType {
 
 export default function DeslocamentosPage(): JSX.Element {
   const [canAccess, setCanAccess] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
+  // #1622: dois loadings separados. `pageLoading` gateia a página inteira (só o
+  // carregamento inicial de usuário/permissão); `tableLoading` gateia SÓ a tabela.
+  // Antes um `loading` único fazia o fetch de filtro desmontar a página (input
+  // perdia foco/valor).
+  const [pageLoading, setPageLoading] = useState<boolean>(true);
+  const [tableLoading, setTableLoading] = useState<boolean>(false);
   const [deslocamentos, setDeslocamentos] = useState<DeslocamentoRecord[]>([]);
   const [usuarios, setUsuarios] = useState<UsuarioOptionType[]>([]);
   const [pagination, setPagination] = useState<TablePaginationConfig>({ current: 1, pageSize: 50, total: 0 });
@@ -109,7 +114,7 @@ export default function DeslocamentosPage(): JSX.Element {
         logger.error('Erro ao carregar usuário:', error);
         setCanAccess(false);
       } finally {
-        setLoading(false);
+        setPageLoading(false);
       }
     }
 
@@ -118,7 +123,7 @@ export default function DeslocamentosPage(): JSX.Element {
 
   // Load deslocamentos
   const loadDeslocamentos = useCallback(async (page = 1): Promise<void> => {
-    setLoading(true);
+    setTableLoading(true);
     try {
       const data = await listDeslocamentos({ ...filters, page });
       setDeslocamentos(data.results || []);
@@ -130,7 +135,7 @@ export default function DeslocamentosPage(): JSX.Element {
     } catch (error) {
       message.error((error as Error).message);
     } finally {
-      setLoading(false);
+      setTableLoading(false);
     }
   }, [filters]);
 
@@ -144,12 +149,23 @@ export default function DeslocamentosPage(): JSX.Element {
     }
   }, []);
 
+  // Opções de formador carregam UMA vez (não dependem dos filtros).
   useEffect(() => {
     if (canAccess) {
-      loadDeslocamentos();
       loadFormadores();
     }
-  }, [canAccess, filters, loadDeslocamentos, loadFormadores]);
+  }, [canAccess, loadFormadores]);
+
+  // Lista recarrega ao mudar filtros, com debounce (evita 1 request por tecla).
+  useEffect(() => {
+    if (!canAccess) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      loadDeslocamentos(1);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [canAccess, filters, loadDeslocamentos]);
 
   // Handle table change (pagination)
   const handleTableChange = (paginationConfig: TablePaginationConfig): void => {
@@ -321,7 +337,7 @@ export default function DeslocamentosPage(): JSX.Element {
   ];
 
   // Permission check
-  if (loading) {
+  if (pageLoading) {
     return <div className="p-6">Carregando...</div>;
   }
 
@@ -388,6 +404,7 @@ export default function DeslocamentosPage(): JSX.Element {
             <Input
               placeholder="Origem"
               prefix={<SearchOutlined />}
+              value={filters.origem ?? ''}
               onChange={(e: ChangeEvent<HTMLInputElement>) => handleFilterChange('origem', e.target.value)}
             />
           </Col>
@@ -395,6 +412,7 @@ export default function DeslocamentosPage(): JSX.Element {
             <Input
               placeholder="Destino"
               prefix={<SearchOutlined />}
+              value={filters.destino ?? ''}
               onChange={(e: ChangeEvent<HTMLInputElement>) => handleFilterChange('destino', e.target.value)}
             />
           </Col>
@@ -407,7 +425,7 @@ export default function DeslocamentosPage(): JSX.Element {
           columns={columns}
           dataSource={deslocamentos}
           rowKey="id"
-          loading={loading}
+          loading={tableLoading}
           pagination={pagination}
           onChange={handleTableChange}
           scroll={{ x: 1000 }}

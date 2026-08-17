@@ -166,6 +166,41 @@ def perform_database_backup(
         raise
 
 
+def _latest_backup_age_hours(backup_dir: Path) -> tuple[Path | None, float]:
+    """Retorna (backup mais recente, idade em horas) ou (None, 0.0) se nao houver.
+
+    Cobre os DOIS sufixos: `.sql.gz` (sem cifra) e `.sql.gz.age` (SEC-017 — o que
+    producao realmente grava). `glob("backup_full_*.sql.gz")` NAO casa
+    `backup_full_*.sql.gz.age` (fnmatch exige que o padrao termine o nome): sem os
+    dois globs, um diretorio cheio de dumps cifrados validos seria lido como vazio e
+    o alarme gritaria "sem backup" toda vez (#1455). Diretorio inexistente → `glob`
+    devolve vazio → (None, 0.0). SSOT do frescor: usado pelo health check semanal e
+    pelo dead-man diario.
+    """
+    backups = [
+        *backup_dir.glob("backup_full_*.sql.gz"),
+        *backup_dir.glob("backup_full_*.sql.gz.age"),
+    ]
+    if not backups:
+        return None, 0.0
+    latest = max(backups, key=lambda p: p.stat().st_mtime)
+    age_hours = (datetime.now().timestamp() - latest.stat().st_mtime) / 3600
+    return latest, age_hours
+
+
+def _alert_backup_deadman(message: str) -> None:
+    """Dispara o alarme do dead-man: ERROR no log (chega a alguem mesmo sem Sentry,
+    ja que SENTRY_DSN e vazio em prod) + evento de erro no Sentry quando configurado."""
+    logger.error(message)
+    if getattr(settings, "SENTRY_DSN", ""):
+        try:
+            import sentry_sdk
+
+            sentry_sdk.capture_message(message, level="error")
+        except ImportError:
+            pass
+
+
 @shared_task(name="backup.verify_backup_health")
 def verify_backup_health() -> dict[str, str | int | list[str]]:
     """
@@ -194,19 +229,11 @@ def verify_backup_health() -> dict[str, str | int | list[str]]:
     else:
         checks_passed += 1
 
-    # Check 2: Recent backup exists (within last 25 hours)
-    #
-    # Dois sufixos: `.sql.gz` (sem cifra) e `.sql.gz.age` (SEC-017 — o que producao
-    # realmente grava). `glob("*.sql.gz")` NAO casa `.sql.gz.age`: o alarme olharia um
-    # diretorio cheio de backups validos e diria "No backups found" (#1455).
-    recent_backups = [
-        *backup_dir.glob("backup_full_*.sql.gz"),
-        *backup_dir.glob("backup_full_*.sql.gz.age"),
-    ]
-    if recent_backups:
-        latest_backup = max(recent_backups, key=lambda p: p.stat().st_mtime)
-        age_hours = (datetime.now().timestamp() - latest_backup.stat().st_mtime) / 3600
-
+    # Check 2: Recent backup exists (within last 25 hours). O glob dos dois sufixos
+    # (`.sql.gz` + `.sql.gz.age`, SEC-017/#1455) vive em `_latest_backup_age_hours` —
+    # mesma fonte de frescor que o dead-man diario (`check_backup_freshness`) usa.
+    latest_backup, age_hours = _latest_backup_age_hours(backup_dir)
+    if latest_backup is not None:
         if age_hours > 25:
             warnings.append(f"Latest backup is {age_hours:.1f}h old (expected < 25h)")
         else:
@@ -262,4 +289,62 @@ def verify_backup_health() -> dict[str, str | int | list[str]]:
         "checks_passed": checks_passed,
         "checks_total": checks_total,
         "warnings": warnings,
+    }
+
+
+@shared_task(name="backup.check_backup_freshness")
+def check_backup_freshness() -> dict[str, str | float | None]:
+    """Dead-man switch DIARIO: alarme quando o backup mais recente fica velho demais.
+
+    O backup roda diariamente as 2am (`backup.perform_database_backup`). Esta task
+    roda de manha e, se o backup mais novo passar de `BACKUP_DEADMAN_MAX_AGE_HOURS`
+    (default 24h) — ou se nao houver backup nenhum — dispara alarme via
+    `_alert_backup_deadman` (ERROR no log + Sentry quando ha DSN).
+
+    Foi a AUSENCIA deste alarme que deixou o backup diario morrer em silencio por
+    ~10 dias (2026-08-03 -> 08-17), so descoberto quando o gate de backup fresco do
+    deploy travou. O `verify_backup_health` e mais largo (dir/S3/frescor) mas so
+    roda aos domingos; este e o dead-man de cadencia diaria, focado em frescor.
+
+    Limitacao residual (honesta): se o proprio beat/worker estiver morto, esta task
+    tambem nao roda — o backstop externo continua sendo o gate `check_backup.sh` do
+    `aprender-applier`, que recusa deploy sem backup fresco.
+
+    Returns:
+        dict com `status` ('fresh' | 'stale' | 'missing'), nome do backup, idade em
+        horas e o limite aplicado.
+    """
+    backup_dir = Path(getattr(settings, "BACKUP_DIR", "/backups"))
+    max_age_hours = float(getattr(settings, "BACKUP_DEADMAN_MAX_AGE_HOURS", 24))
+
+    latest_backup, age_hours = _latest_backup_age_hours(backup_dir)
+
+    if latest_backup is None:
+        _alert_backup_deadman(
+            f"DEAD-MAN de backup: nenhum backup encontrado em {backup_dir} — o backup diario pode ter parado de rodar"
+        )
+        return {
+            "status": "missing",
+            "latest_backup": None,
+            "age_hours": None,
+            "max_age_hours": max_age_hours,
+        }
+
+    if age_hours > max_age_hours:
+        _alert_backup_deadman(
+            f"DEAD-MAN de backup: o backup mais recente ({latest_backup.name}) tem {age_hours:.1f}h (limite {max_age_hours:.0f}h) — o backup diario pode ter parado"
+        )
+        return {
+            "status": "stale",
+            "latest_backup": latest_backup.name,
+            "age_hours": round(age_hours, 1),
+            "max_age_hours": max_age_hours,
+        }
+
+    logger.info(f"Dead-man de backup OK: {latest_backup.name} ({age_hours:.1f}h, limite {max_age_hours:.0f}h)")
+    return {
+        "status": "fresh",
+        "latest_backup": latest_backup.name,
+        "age_hours": round(age_hours, 1),
+        "max_age_hours": max_age_hours,
     }

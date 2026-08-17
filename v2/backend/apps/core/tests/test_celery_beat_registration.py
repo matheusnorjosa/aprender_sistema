@@ -77,3 +77,6 @@ def test_beat_agenda_o_backup_diario() -> None:
     dados = _sondar()
     assert "backup.perform_database_backup" in dados["agendadas"]
     assert "backup.verify_backup_health" in dados["agendadas"]
+    # Dead-man diario: foi a ausencia deste agendamento que deixou o backup morrer
+    # 10 dias em silencio (2026-08). Se alguem remover a entrada, o alarme some.
+    assert "backup.check_backup_freshness" in dados["agendadas"]

@@ -47,6 +47,16 @@ existing_schedule.update(
             "schedule": crontab(hour=3, minute=0, day_of_week=0),
             "options": {"expires": 1800},
         },
+        # Dead-man DIARIO de backup: alarme se o backup mais novo passar de 24h.
+        # O backup roda as 2am (timeout 1h) — checar as 6am da folga p/ ele concluir
+        # e separa o dia saudavel (~4h) do primeiro dia perdido (~28h). O health check
+        # acima e largo mas so roda aos domingos; este fecha a janela que deixou o
+        # backup morrer 10 dias em silencio (2026-08). Ver apps/core/tasks_backup.py.
+        "daily-backup-deadman-check": {
+            "task": "backup.check_backup_freshness",
+            "schedule": crontab(hour=6, minute=0),
+            "options": {"expires": 3600},
+        },
         # #871: Daily notifications/escalation processing at 08:00 (America/Fortaleza)
         "acoes-notificacoes-diarias": {
             "task": "apps.core.tasks.processar_notificacoes_acoes_diarias",

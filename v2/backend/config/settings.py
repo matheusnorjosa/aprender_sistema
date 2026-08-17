@@ -843,6 +843,12 @@ IMPORT_JOB_ARTIFACT_RETENTION_DAYS = int(os.getenv("IMPORT_JOB_ARTIFACT_RETENTIO
 AUDITLOG_RETENTION_DAYS = int(os.getenv("AUDITLOG_RETENTION_DAYS", "1825"))
 # S3 bucket name (without s3://). Use empty string to disable uploads.
 BACKUP_S3_BUCKET = os.getenv("BACKUP_S3_BUCKET", "")
+# Dead-man do backup (task `backup.check_backup_freshness`, roda diariamente): se o
+# backup mais recente passar deste limite — ou se nao houver backup — dispara alarme
+# (logger.error + Sentry). Default 24h: o backup e diario as 2am e a checagem das 6am
+# separa o dia saudavel (~4h) do primeiro dia perdido (~28h). Foi a ausencia deste
+# alarme que deixou o backup morrer 10 dias em silencio (2026-08).
+BACKUP_DEADMAN_MAX_AGE_HOURS = int(os.getenv("BACKUP_DEADMAN_MAX_AGE_HOURS", "24"))
 
 # Removidos (#1541): USE_EXTERNAL_HASH_V2 (nunca lido — auditoria_planilhas_v2 usa
 # compute_hash_v2 incondicional) e os gates ETL_MAX_DUPLICATES_PCT /

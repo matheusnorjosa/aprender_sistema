@@ -196,6 +196,14 @@ class TestAuditLogPIIRedaction(TestCase):
         assert redacted["target_username"] == "***"
         assert redacted["target_user_id"] == 42  # id nao e PII, preservado
 
+    def test_redact_username_cpf_by_value(self):
+        # M03-10 (#1657): 'username' (login) que E um CPF e redigido POR VALOR na leitura,
+        # nas duas formas (cru e formatado); username nao-CPF e preservado — nao e mask
+        # por chave (senao 'admin' viraria '***' e quebraria test_redact_preserves_non_pii).
+        assert _redact_details({"username": "11144477735"})["username"] == "<cpf>"
+        assert _redact_details({"username": "111.444.777-35"})["username"] == "<cpf>"
+        assert _redact_details({"username": "admin"})["username"] == "admin"
+
     def test_redact_preserves_non_pii(self):
         details = {
             "username": "admin",

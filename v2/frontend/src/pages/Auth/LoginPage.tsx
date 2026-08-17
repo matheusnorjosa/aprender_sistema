@@ -14,7 +14,9 @@ import { login } from '../../api/auth';
 import logoLogin from '../../assets/logo-login.webp';
 import logger from '../../utils/logger';
 import { BRAND_COLORS } from '../../contexts/ThemeContext';
-import AvisoTransparenciaLGPD from '../../components/lgpd/AvisoTransparenciaLGPD';
+// Aviso LGPD ocultado temporariamente ate o juridico preencher a base legal e o Encarregado (DPO)
+// em AvisoTransparenciaLGPD (placeholders [A PREENCHER]). Reativar: descomentar este import e o uso abaixo.
+// import AvisoTransparenciaLGPD from '../../components/lgpd/AvisoTransparenciaLGPD';
 
 /**
  * Login form values interface
@@ -147,8 +149,11 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps): JSX.Eleme
         </Form>
       </article>
 
-      {/* LGPD art. 9º: aviso de transparência no momento da coleta (não é consentimento). */}
-      <AvisoTransparenciaLGPD />
+      {/* LGPD art. 9º: aviso de transparência no momento da coleta (não é consentimento).
+          Ocultado temporariamente ate o juridico preencher a base legal e o Encarregado (DPO) —
+          os placeholders [A PREENCHER] apareciam ao usuario. Reativar: descomentar o import (topo)
+          e a linha abaixo. O componente e a Politica de Privacidade permanecem intactos. */}
+      {/* <AvisoTransparenciaLGPD /> */}
       </main>
     </>
   );

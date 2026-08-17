@@ -18,11 +18,13 @@ from django.core.exceptions import ValidationError
 from rest_framework import serializers  # type: ignore[attr-defined]
 
 from apps.core.constants import FUNCAO_GROUPS, RESERVED_GROUPS, SETOR_GROUPS
-from apps.core.models import GroupClassificacao, PermissaoFuncional
+from apps.core.models import AuditLog, GroupClassificacao, PermissaoFuncional
 from apps.core.services.audit import (
     auditar_assign_groups,
     auditar_group_capabilities_set,
+    auditar_privilege_flags,
     auditar_reset_senha,
+    registrar_auditoria,
 )
 from apps.core.services.rbac_service import get_assignable_group_names
 
@@ -278,6 +280,16 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         user = super().create(validated_data)
         actor = self._actor()
 
+        # M07-03 (#1618): a criacao e a concessao inicial de flags auditam igual ao
+        # Django Admin (antes o path REST so auditava senha e grupos).
+        registrar_auditoria(
+            actor=actor,
+            action=AuditLog.Action.CREATE,
+            model_name="Usuario",
+            details={"target_user_id": user.pk, "target_username": user.username},
+        )
+        auditar_privilege_flags(actor=actor, target_user=user, before=None, via="rest_api")
+
         if password:
             user.set_password(password)
             user.save()
@@ -306,8 +318,23 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         password = validated_data.pop("password", None)
         actor = self._actor()
         before_group_ids = set(instance.groups.values_list("pk", flat=True))
+        # M07-03 (#1618): snapshot dos flags ANTES do super().update (DRF muta a instance
+        # in-place — ler depois daria before==after e nada auditaria).
+        before_flags = {f: bool(getattr(instance, f)) for f in ("is_superuser", "is_staff", "is_active")}
+        cadastral_keys = sorted(k for k in validated_data if k not in ("is_superuser", "is_staff", "is_active"))
 
         user = super().update(instance, validated_data)
+
+        # M07-03: flip de privilegio via REST (activate/deactivate/promote) audita igual ao Admin.
+        auditar_privilege_flags(actor=actor, target_user=user, before=before_flags, via="rest_api")
+        # M07-03: alteracao cadastral — so os NOMES dos campos escritos (nunca valores/PII).
+        if cadastral_keys:
+            registrar_auditoria(
+                actor=actor,
+                action=AuditLog.Action.UPDATE,
+                model_name="Usuario",
+                details={"target_user_id": user.pk, "target_username": user.username, "campos": cadastral_keys},
+            )
 
         if password:
             user.set_password(password)

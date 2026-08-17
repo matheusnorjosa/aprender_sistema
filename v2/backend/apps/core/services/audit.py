@@ -283,3 +283,43 @@ def auditar_user_delete(
         },
         imediato=imediato,
     )
+
+
+def auditar_privilege_flags(
+    *,
+    actor: Any,
+    target_user: Any,
+    before: dict[str, Any] | None,
+    via: str,
+    imediato: bool = False,
+) -> bool:
+    """Auditoria dos flips de flags de PRIVILEGIO (is_superuser/is_staff/is_active).
+
+    `before` = snapshot {flag: valor} lido ANTES da mutacao, ou None na criacao. Em
+    update audita cada flag que mudou; em create (before=None) audita a flag LIGADA
+    (concessao inicial). Emite UM `USER_PRIVILEGE_CHANGED` com o contrato do Django
+    Admin (target_user_id, target_username, changes, via) — SSOT para os dois caminhos
+    (Admin e REST), para nao voltarem a divergir (#1618). Retorna True se registrou.
+    """
+    is_create = before is None
+    changes: dict[str, Any] = {}
+    for flag in ("is_superuser", "is_staff", "is_active"):
+        after_val = bool(getattr(target_user, flag))
+        before_val = None if is_create else before.get(flag)
+        if (not is_create and before_val != after_val) or (is_create and after_val):
+            changes[flag] = {"before": before_val, "after": after_val}
+    if not changes:
+        return False
+    registrar_auditoria(
+        actor=actor,
+        action=AuditLog.Action.USER_PRIVILEGE_CHANGED,
+        model_name="Usuario",
+        details={
+            "target_user_id": target_user.pk,
+            "target_username": getattr(target_user, "username", None),
+            "changes": changes,
+            "via": via,
+        },
+        imediato=imediato,
+    )
+    return True

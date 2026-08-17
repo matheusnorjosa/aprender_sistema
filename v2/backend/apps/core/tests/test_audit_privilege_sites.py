@@ -220,6 +220,74 @@ class TestDeletions:
 
 
 # ============================================================================
+# M07-03 (#1618): usuarios-admin REST audita create/update/activate/deactivate
+# (o path REST antes so auditava senha e grupos; o flip de flags e a criacao
+#  ficavam sem trilha — assimetria com o Django Admin, que ja auditava)
+# ============================================================================
+
+
+class TestUsuarioCadastralViaREST:
+    def test_deactivate_audita_privilege(self, api_client, superuser, common_user, django_capture_on_commit_callbacks):
+        api_client.force_authenticate(user=superuser)
+        AuditLog.objects.filter(action="USER_PRIVILEGE_CHANGED").delete()
+        with django_capture_on_commit_callbacks(execute=True):
+            resp = api_client.patch(f"/api/usuarios-admin/{common_user.id}/", {"is_active": False}, format="json")
+        assert resp.status_code == 200, resp.content
+        log = AuditLog.objects.filter(action="USER_PRIVILEGE_CHANGED").latest("created_at")
+        assert log.details["changes"]["is_active"] == {"before": True, "after": False}
+        assert log.details["via"] == "rest_api"
+        assert log.details["target_user_id"] == common_user.id
+
+    def test_promote_superuser_audita_privilege(
+        self, api_client, superuser, common_user, django_capture_on_commit_callbacks
+    ):
+        api_client.force_authenticate(user=superuser)
+        AuditLog.objects.filter(action="USER_PRIVILEGE_CHANGED").delete()
+        with django_capture_on_commit_callbacks(execute=True):
+            resp = api_client.patch(f"/api/usuarios-admin/{common_user.id}/", {"is_superuser": True}, format="json")
+        assert resp.status_code == 200, resp.content
+        log = AuditLog.objects.filter(action="USER_PRIVILEGE_CHANGED").latest("created_at")
+        assert log.details["changes"]["is_superuser"] == {"before": False, "after": True}
+        assert log.details["via"] == "rest_api"
+
+    def test_create_usuario_audita(self, api_client, superuser, django_capture_on_commit_callbacks):
+        api_client.force_authenticate(user=superuser)
+        AuditLog.objects.filter(action="CREATE", model_name="Usuario").delete()
+        with django_capture_on_commit_callbacks(execute=True):
+            resp = api_client.post(
+                "/api/usuarios-admin/",
+                {
+                    "username": "novo_m0703",
+                    "cpf": "11144477735",
+                    "password": "SenhaForte123",  # gitleaks:allow (literal de teste, nao e segredo)
+                    "email": "novo_m0703@t.com",
+                    "first_name": "Novo",
+                    "last_name": "User",
+                },
+                format="json",
+            )
+        assert resp.status_code == 201, resp.content
+        log = AuditLog.objects.filter(action="CREATE", model_name="Usuario").latest("created_at")
+        assert log.details["target_username"] == "novo_m0703"
+        assert "target_user_id" in log.details
+
+    def test_update_cadastral_audita_sem_pii(
+        self, api_client, superuser, common_user, django_capture_on_commit_callbacks
+    ):
+        api_client.force_authenticate(user=superuser)
+        AuditLog.objects.filter(action="UPDATE", model_name="Usuario").delete()
+        with django_capture_on_commit_callbacks(execute=True):
+            resp = api_client.patch(
+                f"/api/usuarios-admin/{common_user.id}/", {"email": "novo_email@t.com"}, format="json"
+            )
+        assert resp.status_code == 200, resp.content
+        log = AuditLog.objects.filter(action="UPDATE", model_name="Usuario").latest("created_at")
+        assert "email" in log.details["campos"]
+        # contrato PII: o VALOR do campo nunca entra nos details, so o NOME do campo
+        assert "novo_email@t.com" not in str(log.details)
+
+
+# ============================================================================
 # Import de usuários (apply audita; dry-run não)
 # ============================================================================
 

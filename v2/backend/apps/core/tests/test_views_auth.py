@@ -214,6 +214,18 @@ def test_login_invalid_credentials_rejected(api_client, usuario_ativo):
     assert "lockout_minutes" not in response.data
 
 
+@pytest.mark.parametrize("cpf_username", ["11144477735", "111.444.777-35"])
+def test_login_failed_redige_cpf_no_details_username(api_client, cpf_username):
+    """M03-10 (#1657): CPF usado como username em login falho NAO pode ser gravado em
+    claro no AuditLog.details (PII-at-rest, LGPD art. 46). Redige na ESCRITA, nas duas
+    formas (cru e formatado)."""
+    resp = api_client.post("/api/auth/login/", {"username": cpf_username, "password": "wrongpass"}, format="json")
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    log = AuditLog.objects.filter(action="LOGIN_FAILED").latest("created_at")
+    assert log.details["username"] == "<cpf>"
+    assert cpf_username not in str(log.details)
+
+
 @override_settings(ACCOUNT_LOCKOUT_THRESHOLD=1, ACCOUNT_LOCKOUT_DURATION=900)
 def test_login_locked_account_returns_generic_error_response(api_client, usuario_ativo):
     """

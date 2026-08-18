@@ -256,12 +256,18 @@ def revoke_token(credential: GoogleOAuthCredential) -> bool:
 
         response: requests.Response = requests.post(revoke_url, data=payload, timeout=settings.GCAL_OAUTH_TOKEN_TIMEOUT)
 
-        # 200 OK: revogado com sucesso
-        # 400 Bad Request: token já inválido (ok, continuar)
+        # 200 OK: revogado com sucesso. 400: token já inválido no Google (também
+        # efetivamente revogado). Qualquer OUTRO status = revogação NÃO confirmada →
+        # S4 (#1742): NÃO apagar a credencial local, senão o refresh_token fica vivo
+        # no Google e órfão localmente (sem como retentar). Preserva p/ retry + sinaliza
+        # falha. (Exceções de rede já caem no except abaixo, que também preserva.)
         if response.status_code not in [200, 400]:
-            logger.warning(f"⚠️ Revoke retornou status {response.status_code}")
+            logger.error(
+                f"❌ Revoke Google retornou status {response.status_code}; " "credencial local preservada para retry"
+            )
+            return False
 
-        # Remover credencial local
+        # Revogado com sucesso → remover credencial local
         user: Usuario = credential.user
         google_email: str = credential.google_email
         credential.delete()

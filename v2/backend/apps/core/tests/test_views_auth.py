@@ -442,12 +442,15 @@ def test_lockout_compartilha_bucket_entre_grafias_do_mesmo_cpf(api_client, usuar
     mascarada autentica (200). GREEN: o bucket é derivado do identificador canônico →
     a conta está bloqueada e a resposta é a genérica 400.
     """
-    for _ in range(10):
-        resp = _post_login(api_client, _CPF_CRU, "wrongpass")
-        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    # Bypass do throttle: este teste é sobre LOCKOUT (precisa de >10 POSTs). O rate de
+    # login em CI é 10/min e mascararia o lockout com 429 — concerns separados.
+    with patch("apps.core.views_auth.LoginThrottle.allow_request", return_value=True):
+        for _ in range(10):
+            resp = _post_login(api_client, _CPF_CRU, "wrongpass")
+            assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
-    # Senha CORRETA, mas na grafia mascarada → deve estar bloqueado (mesmo bucket do CPF cru).
-    locked = _post_login(api_client, _CPF_MASCARA, "testpass123")
+        # Senha CORRETA, mas na grafia mascarada → deve estar bloqueado (mesmo bucket do CPF cru).
+        locked = _post_login(api_client, _CPF_MASCARA, "testpass123")
     assert locked.status_code == status.HTTP_400_BAD_REQUEST
     assert locked.data == {"error": "Credenciais inválidas."}
 
@@ -461,13 +464,15 @@ def test_lockout_nao_e_evadido_por_espacos(api_client, usuario_cpf_conhecido):
     correta autentica (200). GREEN: colapsam no bucket canônico → global=6 → bloqueado (400).
     """
     grafias = [_CPF_ESPACOS, "11144 477 735", "1 1 1 4 4 4 7 7 7 3 5"]  # todas = 11144477735 (11 díg.)
-    for grafia in grafias:
-        for _ in range(2):
-            resp = _post_login(api_client, grafia, "wrongpass")
-            assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    # Bypass do throttle (rate 10/min em CI mascararia o lockout global com 429).
+    with patch("apps.core.views_auth.LoginThrottle.allow_request", return_value=True):
+        for grafia in grafias:
+            for _ in range(2):
+                resp = _post_login(api_client, grafia, "wrongpass")
+                assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
-    # 7ª tentativa — senha CORRETA no CPF cru → global lockout deve bloquear.
-    locked = _post_login(api_client, _CPF_CRU, "testpass123")
+        # 7ª tentativa — senha CORRETA no CPF cru → global lockout deve bloquear.
+        locked = _post_login(api_client, _CPF_CRU, "testpass123")
     assert locked.status_code == status.HTTP_400_BAD_REQUEST
 
 

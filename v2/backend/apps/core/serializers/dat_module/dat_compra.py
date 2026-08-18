@@ -77,7 +77,7 @@ class DATCompraSerializer(serializers.ModelSerializer["DATCompra"]):
         Em PATCH, monta os valores EFETIVOS a partir da instância antes de comparar
         (o payload pode conter só um subconjunto dos campos).
         """
-        inst = self.instance
+        inst: DATCompra | None = self.instance
 
         def eff(field: str) -> Any:
             if field in attrs:

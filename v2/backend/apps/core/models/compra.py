@@ -40,7 +40,7 @@ class Compra(models.Model):
     quantidade = models.IntegerField(help_text="Quantidade de itens comprados")
     data = models.DateField(help_text="Data da compra")
     uso = models.TextField(help_text="Uso/finalidade da compra (ex: Formacao inicial)")
-    external_hash = models.CharField(max_length=64, db_index=True, help_text="Hash SHA256 para idempotencia de import")
+    external_hash = models.CharField(max_length=64, help_text="Hash SHA256 para idempotencia de import")
 
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
@@ -53,9 +53,11 @@ class Compra(models.Model):
         indexes = [
             models.Index(fields=["codigo", "data"]),
             models.Index(fields=["projeto", "municipio"]),
-            models.Index(fields=["external_hash"]),
         ]
         constraints = [
+            # #1742 PR-B: a UniqueConstraint ja cria um indice unico em external_hash,
+            # suficiente para lookups de idempotencia. O `db_index=True` no campo e um
+            # `models.Index(external_hash)` eram redundantes (3 btrees na mesma coluna).
             models.UniqueConstraint(
                 fields=["external_hash"],
                 name="core_compra_external_hash_unique",

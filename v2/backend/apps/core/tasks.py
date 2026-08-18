@@ -212,34 +212,40 @@ def task_publish_solicitacao_to_gcal(
             }
 
     try:
-        # Buscar solicitação
-        s = Solicitacao.objects.get(id=solicitation_id)
+        from django.db import transaction
 
-        # Aplicar publicação (com cliente OAuth se disponível)
-        outcome = apply_one_solicitacao(s, dry_run=dry_run, apply_blocked=apply_blocked, client=client)
+        # #1726: lock de linha + atomic — evita lost-update entre publish/cancel concorrentes
+        # do mesmo evento (o corpo re-lê a Solicitacao e persiste os campos de sync). O
+        # `except` de erro fica FORA deste bloco, para marcar ERROR mesmo após rollback.
+        with transaction.atomic():
+            # Buscar solicitação (com lock de linha)
+            s = Solicitacao.objects.select_for_update().get(id=solicitation_id)
 
-        # Criar AuditLog (apenas se não for dry_run)
-        if not dry_run:
-            audit_details = {
-                "solicitacao_id": s.id,
-                "action": outcome.action,
-                "external_event_id": outcome.external_event_id,
-                "summary": outcome.summary,
-                "dry_run": dry_run,
-                "apply_blocked": apply_blocked,
-            }
+            # Aplicar publicação (com cliente OAuth se disponível)
+            outcome = apply_one_solicitacao(s, dry_run=dry_run, apply_blocked=apply_blocked, client=client)
 
-            # OAuth Phase 3: Incluir google_email no AuditLog se disponível
-            if google_email:
-                audit_details["google_email"] = google_email
-                audit_details["operator_user_id"] = operator_user_id
+            # Criar AuditLog (apenas se não for dry_run)
+            if not dry_run:
+                audit_details = {
+                    "solicitacao_id": s.id,
+                    "action": outcome.action,
+                    "external_event_id": outcome.external_event_id,
+                    "summary": outcome.summary,
+                    "dry_run": dry_run,
+                    "apply_blocked": apply_blocked,
+                }
 
-            AuditLog.objects.create(
-                usuario=operator,  # OAuth: registrar operador; service_account: None
-                action=AuditLog.Action.PUBLISH_GCAL,
-                model_name="Solicitacao",
-                details=audit_details,
-            )
+                # OAuth Phase 3: Incluir google_email no AuditLog se disponível
+                if google_email:
+                    audit_details["google_email"] = google_email
+                    audit_details["operator_user_id"] = operator_user_id
+
+                AuditLog.objects.create(
+                    usuario=operator,  # OAuth: registrar operador; service_account: None
+                    action=AuditLog.Action.PUBLISH_GCAL,
+                    model_name="Solicitacao",
+                    details=audit_details,
+                )
 
         return {
             "action": outcome.action,
@@ -358,24 +364,29 @@ def task_cancel_solicitacao_from_gcal(
             }
 
     try:
-        # Buscar solicitação
-        s = Solicitacao.objects.get(id=solicitation_id)
+        from django.db import transaction
 
-        # Cancelar evento no Calendar e limpar campos
-        outcome = cancel_solicitacao(s, client=client)
+        # #1726: lock de linha + atomic — evita lost-update entre cancel/publish concorrentes
+        # do mesmo evento (cancel_solicitacao deleta no Google e limpa os campos de sync).
+        with transaction.atomic():
+            # Buscar solicitação (com lock de linha)
+            s = Solicitacao.objects.select_for_update().get(id=solicitation_id)
 
-        # Criar AuditLog
-        AuditLog.objects.create(
-            usuario=None,  # Task assíncrona, sem usuário direto
-            action=AuditLog.Action.CANCEL_GCAL,
-            model_name="Solicitacao",
-            details={
-                "solicitacao_id": s.id,
-                "action": outcome.action,
-                "external_event_id": outcome.external_event_id,
-                "summary": outcome.summary,
-            },
-        )
+            # Cancelar evento no Calendar e limpar campos
+            outcome = cancel_solicitacao(s, client=client)
+
+            # Criar AuditLog
+            AuditLog.objects.create(
+                usuario=None,  # Task assíncrona, sem usuário direto
+                action=AuditLog.Action.CANCEL_GCAL,
+                model_name="Solicitacao",
+                details={
+                    "solicitacao_id": s.id,
+                    "action": outcome.action,
+                    "external_event_id": outcome.external_event_id,
+                    "summary": outcome.summary,
+                },
+            )
 
         return {
             "action": outcome.action,

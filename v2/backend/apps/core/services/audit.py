@@ -31,6 +31,7 @@ from django.contrib.auth.models import Group
 from django.db import transaction
 
 from apps.core.models import AuditLog, PermissaoFuncional
+from apps.core.pii import redact_cpf
 
 # Sentinela para distinguir "nao passei usuario_id" de "passei usuario_id=None".
 _UNSET: Any = object()
@@ -218,7 +219,7 @@ def auditar_assign_groups(
         details={
             "actor_user_id": _actor_id(actor),
             "target_user_id": target_user.pk,
-            "target_username": getattr(target_user, "username", None),
+            "target_username": redact_cpf(getattr(target_user, "username", None)),
             "added_groups": _group_names(added),
             "removed_groups": _group_names(removed),
             "groups_after": _group_names(after),
@@ -248,7 +249,7 @@ def auditar_reset_senha(
         details={
             "actor_user_id": _actor_id(actor),
             "target_user_id": target_user.pk,
-            "target_username": getattr(target_user, "username", None),
+            "target_username": redact_cpf(getattr(target_user, "username", None)),
             "contexto": contexto,
         },
         imediato=imediato,
@@ -278,7 +279,7 @@ def auditar_user_delete(
         details={
             "actor_user_id": actor_id,
             "target_user_id": target_user.pk,
-            "target_username": getattr(target_user, "username", None),
+            "target_username": redact_cpf(getattr(target_user, "username", None)),
             "target_is_superuser": bool(getattr(target_user, "is_superuser", False)),
         },
         imediato=imediato,
@@ -316,7 +317,7 @@ def auditar_privilege_flags(
         model_name="Usuario",
         details={
             "target_user_id": target_user.pk,
-            "target_username": getattr(target_user, "username", None),
+            "target_username": redact_cpf(getattr(target_user, "username", None)),
             "changes": changes,
             "via": via,
         },

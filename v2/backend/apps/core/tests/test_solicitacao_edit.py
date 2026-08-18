@@ -996,3 +996,86 @@ class TestSolicitacaoDelete:
 
         # DRF retorna 403 para não autenticados (configuração padrão)
         assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+# ============================================================================
+# TESTES DE ELEGIBILIDADE DE COMPRA NA EDIÇÃO (#1738)
+# ============================================================================
+
+
+class TestSolicitacaoEditCompraEligibility:
+    """
+    #1738: a validação de elegibilidade de compra (Regra 4 do serializer) era
+    create-only — um PATCH que (re)atribuía município/projeto para um par sem
+    Compra contornava a regra. Estes testes garantem que a checagem roda também
+    no update quando o par é alterado, e SOMENTE quando é alterado (não quebra
+    a edição de solicitações antigas cujo par não tem Compra registrada).
+    """
+
+    def _make_compra(self, municipio, projeto):
+        from apps.core.models import Compra
+
+        return Compra.objects.create(
+            codigo=f"COMP-{uuid4().hex[:8]}",
+            projeto=projeto,
+            municipio=municipio,
+            quantidade=1,
+            data=timezone.now().date(),
+            uso="teste elegibilidade",
+            external_hash=uuid4().hex,
+        )
+
+    def test_patch_changing_projeto_to_pair_without_compra_is_rejected(
+        self, api_client, usuario_owner, solicitacao_editavel
+    ):
+        """PATCH que troca o projeto para um par município+projeto SEM Compra é rejeitado (400)."""
+        api_client.force_authenticate(user=usuario_owner)
+        projeto_sem_compra = ProjetoFactory(nome=f"Projeto sem compra {uuid4().hex[:8]}", fluxo="SUPER")
+
+        response = api_client.patch(
+            f"/api/solicitacoes/{solicitacao_editavel.id}/",
+            {"projeto": projeto_sem_compra.id},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        # A API embrulha erros de validação em {code, detail, errors}.
+        errors = response.data.get("errors", response.data)
+        assert "municipio" in errors
+        solicitacao_editavel.refresh_from_db()
+        assert solicitacao_editavel.projeto_id != projeto_sem_compra.id
+
+    def test_patch_changing_projeto_to_pair_with_compra_is_allowed(
+        self, api_client, usuario_owner, solicitacao_editavel, municipio
+    ):
+        """PATCH que troca o projeto para um par COM Compra registrada é permitido (200)."""
+        api_client.force_authenticate(user=usuario_owner)
+        projeto_com_compra = ProjetoFactory(nome=f"Projeto com compra {uuid4().hex[:8]}", fluxo="SUPER")
+        self._make_compra(municipio, projeto_com_compra)
+
+        response = api_client.patch(
+            f"/api/solicitacoes/{solicitacao_editavel.id}/",
+            {"projeto": projeto_com_compra.id},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        solicitacao_editavel.refresh_from_db()
+        assert solicitacao_editavel.projeto_id == projeto_com_compra.id
+
+    def test_patch_unrelated_field_does_not_require_compra(self, api_client, usuario_owner, solicitacao_editavel):
+        """
+        Editar um campo que não é o par (ex.: observacoes) NÃO dispara a checagem de
+        compra — preserva a edição de solicitações antigas cujo par não tem Compra.
+        """
+        api_client.force_authenticate(user=usuario_owner)
+
+        response = api_client.patch(
+            f"/api/solicitacoes/{solicitacao_editavel.id}/",
+            {"observacoes": "editado sem mexer no par"},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        solicitacao_editavel.refresh_from_db()
+        assert solicitacao_editavel.observacoes == "editado sem mexer no par"

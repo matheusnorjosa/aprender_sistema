@@ -31,6 +31,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 
+from apps.core.pii import redact_cpf
 from apps.core.views.utils import _get_client_ip
 
 from .models import AuditLog
@@ -226,7 +227,7 @@ def login(request: Request) -> Response:
             action=AuditLog.Action.LOGIN_BLOCKED,
             model_name="Usuario",
             details={
-                "username": username,
+                "username": redact_cpf(username),
                 "ip_address": client_ip,
                 "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
                 "reason": "account_locked",
@@ -249,7 +250,7 @@ def login(request: Request) -> Response:
             action=AuditLog.Action.LOGIN_FAILED,
             model_name="Usuario",
             details={
-                "username": username,
+                "username": redact_cpf(username),
                 "ip_address": client_ip,
                 "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
                 "reason": "invalid_credentials",
@@ -269,7 +270,7 @@ def login(request: Request) -> Response:
             action=AuditLog.Action.LOGIN_FAILED,
             model_name="Usuario",
             details={
-                "username": username,
+                "username": redact_cpf(username),
                 "ip_address": client_ip,
                 "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
                 "reason": "inactive_user",

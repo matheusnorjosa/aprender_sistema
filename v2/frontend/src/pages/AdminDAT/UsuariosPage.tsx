@@ -262,8 +262,14 @@ export default function UsuariosPage(): JSX.Element {
   useEffect(() => {
     void fetchRbacContext();
     void (async () => {
-      const auth = await checkAuth();
-      setCurrentIsSuperuser(Boolean(auth.user?.is_superuser));
+      // #1741: checkAuth agora relança erros não-auth (5xx/rede). Fail-closed para
+      // read-only (espelha GruposPage) em vez de deixar uma unhandled rejection.
+      try {
+        const auth = await checkAuth();
+        setCurrentIsSuperuser(Boolean(auth.user?.is_superuser));
+      } catch {
+        setCurrentIsSuperuser(false);
+      }
     })();
   }, []);
 

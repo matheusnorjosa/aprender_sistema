@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useRef, useCallback, lazy, Suspense, type JSX } from 'react';
 import { BrowserRouter as Router } from 'react-router';
-import { ConfigProvider, Layout, message } from 'antd';
+import { ConfigProvider, Layout, message, Result, Button } from 'antd';
 import logger from './utils/logger';
 import { isAuthError } from './utils/errors';
 import { ThemeProvider, useTheme, useBrandColors } from './contexts/ThemeContext';
@@ -51,6 +51,9 @@ function AppContent(): JSX.Element {
   // Empty array = "ainda não carregadas" OU "anonymous" — distinção via `loading`.
   const [policies, setPolicies] = useState<readonly string[]>([]);
   const [loading, setLoading] = useState(true);
+  // #1741 (F2): erro transitório (5xx/rede) no boot → tela de erro com retry,
+  // NÃO logout. Distingue "falhou ao carregar" de "sessão ausente".
+  const [bootError, setBootError] = useState(false);
   const isMountedRef = useRef(true);
 
   // ── Mobile responsiveness ──
@@ -68,6 +71,8 @@ function AppContent(): JSX.Element {
   // console pre-login (DRF IsAuthenticated → 403) que poluía console-errors
   // E2E checks. Latência adicional ~100-300ms apenas no primeiro mount.
   const loadUser = useCallback(async () => {
+    setLoading(true);
+    setBootError(false);
     try {
       const userData = await getMe();
       if (!isMountedRef.current) return;
@@ -85,11 +90,16 @@ function AppContent(): JSX.Element {
       }
     } catch (error) {
       if (isMountedRef.current) {
-        if (!isAuthError(error)) {
+        if (isAuthError(error)) {
+          // Genuinamente sem sessão (401/403) → login.
+          setUser(null);
+          setPolicies([]);
+        } else {
+          // #1741 (F2): erro transitório (5xx/rede) NÃO desloga uma sessão
+          // possivelmente válida — mostra tela de erro com retry em vez do login.
           logger.error('Erro ao carregar usuário:', error);
+          setBootError(true);
         }
-        setUser(null);
-        setPolicies([]);
       }
     } finally {
       if (isMountedRef.current) setLoading(false);
@@ -171,6 +181,25 @@ function AppContent(): JSX.Element {
   // ── Render ──
   if (loading) {
     return <FullscreenLoader />;
+  }
+
+  // #1741 (F2): boot falhou por erro transitório (5xx/rede) — NÃO deslogar; oferecer
+  // retry. Só 401/403 caem no fluxo de login abaixo (via `setUser(null)`).
+  if (bootError) {
+    return (
+      <ConfigProvider locale={ptBR} theme={antThemeConfig}>
+        <Result
+          status="warning"
+          title="Não foi possível carregar sua sessão"
+          subTitle="Ocorreu um erro temporário e sua sessão pode continuar válida. Tente novamente."
+          extra={
+            <Button type="primary" onClick={() => void loadUser()}>
+              Tentar novamente
+            </Button>
+          }
+        />
+      </ConfigProvider>
+    );
   }
 
   if (!user) {

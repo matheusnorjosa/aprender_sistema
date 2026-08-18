@@ -15,13 +15,15 @@ Valida:
 
 from __future__ import annotations
 
+import threading
 from unittest.mock import patch
 from uuid import uuid4
 
 from django.core.cache import cache
 from django.test import override_settings
 from rest_framework import status
-from rest_framework.test import APIClient
+from rest_framework.request import Request
+from rest_framework.test import APIClient, APIRequestFactory
 
 import pytest
 
@@ -29,6 +31,12 @@ from apps.core.models import AuditLog
 from apps.core.tests.factories import UsuarioFactory
 
 pytestmark = pytest.mark.django_db
+
+# CPF válido (mod-11) fixo para os testes de bucket de lockout — as três grafias
+# abaixo canonicalizam para o MESMO identificador.
+_CPF_CRU = "11144477735"
+_CPF_MASCARA = "111.444.777-35"
+_CPF_ESPACOS = "111 444 777 35"
 
 
 @pytest.fixture(autouse=True)
@@ -402,3 +410,155 @@ def test_logout_clears_session(api_client, usuario_ativo):
     # Tentar logout novamente sem auth (deve falhar)
     response = api_client.post("/api/auth/logout/")
     assert response.status_code in [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN]
+
+
+# ===================================================================
+# M03-03 (#1614) — LOCKOUT/THROTTLE NÃO EVADÍVEIS
+# ===================================================================
+
+
+@pytest.fixture
+def usuario_cpf_conhecido():
+    """Usuário com CPF fixo (mod-11 válido) para exercitar bucket de lockout por grafia."""
+    uid = uuid4().hex
+    return UsuarioFactory(
+        username=f"cpfuser_{uid}",
+        email=f"cpfuser_{uid}@example.com",
+        password="testpass123",
+        cpf=_CPF_CRU,
+        is_active=True,
+    )
+
+
+def _post_login(client: APIClient, username: str, password: str):
+    return client.post("/api/auth/login/", {"username": username, "password": password}, format="json")
+
+
+@override_settings(ACCOUNT_LOCKOUT_THRESHOLD=10)
+def test_lockout_compartilha_bucket_entre_grafias_do_mesmo_cpf(api_client, usuario_cpf_conhecido):
+    """10 falhas no CPF cru devem bloquear TAMBÉM a grafia com máscara (mesmo bucket).
+
+    RED (bug M03-03): cada grafia é um bucket independente → a senha correta na grafia
+    mascarada autentica (200). GREEN: o bucket é derivado do identificador canônico →
+    a conta está bloqueada e a resposta é a genérica 400.
+    """
+    for _ in range(10):
+        resp = _post_login(api_client, _CPF_CRU, "wrongpass")
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+    # Senha CORRETA, mas na grafia mascarada → deve estar bloqueado (mesmo bucket do CPF cru).
+    locked = _post_login(api_client, _CPF_MASCARA, "testpass123")
+    assert locked.status_code == status.HTTP_400_BAD_REQUEST
+    assert locked.data == {"error": "Credenciais inválidas."}
+
+
+@override_settings(ACCOUNT_LOCKOUT_THRESHOLD=100)  # isola o caminho GLOBAL (IP-path nunca dispara)
+@patch("apps.core.views_auth._GLOBAL_LOCKOUT_THRESHOLD", 6)
+def test_lockout_nao_e_evadido_por_espacos(api_client, usuario_cpf_conhecido):
+    """Falhas espalhadas por grafias com espaços diferentes acumulam no MESMO bucket global.
+
+    RED: 3 grafias × 2 falhas = 6 falhas, mas em 3 buckets distintos (máx 2 < 6) → a senha
+    correta autentica (200). GREEN: colapsam no bucket canônico → global=6 → bloqueado (400).
+    """
+    grafias = [_CPF_ESPACOS, "11144 477 735", "1 1 1 4 4 4 7 7 7 3 5"]  # todas = 11144477735 (11 díg.)
+    for grafia in grafias:
+        for _ in range(2):
+            resp = _post_login(api_client, grafia, "wrongpass")
+            assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+    # 7ª tentativa — senha CORRETA no CPF cru → global lockout deve bloquear.
+    locked = _post_login(api_client, _CPF_CRU, "testpass123")
+    assert locked.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_login_throttle_keia_caller_autenticado_wiring():
+    """WIRING/regressão: LoginThrottle.get_cache_key NUNCA retorna None (nem p/ autenticado).
+
+    RED (AnonRateThrottle): retorna None quando request.user.is_authenticated → sem throttle.
+    """
+    from apps.core.views_auth import LoginThrottle
+
+    class _Authed:
+        is_authenticated = True
+
+    raw = APIRequestFactory().post("/api/auth/login/", REMOTE_ADDR=f"10.0.0.{uuid4().int % 250}")
+    req = Request(raw)
+    req.user = _Authed()  # type: ignore[assignment]
+
+    key = LoginThrottle().get_cache_key(req, view=object())
+    assert key is not None
+
+
+def test_login_throttla_caller_autenticado():
+    """COMPORTAMENTAL (nível-classe, determinístico): caller autenticado É throttleado.
+
+    Cache locmem dedicado + ident único + rate baixo distintivo (2/min) → imune ao
+    cache.clear() paralelo. RED: autenticado nunca chaveia → [True, True, True].
+    GREEN: chaveia por IP → [True, True, False].
+    """
+    from apps.core.views_auth import LoginThrottle
+
+    class _Authed:
+        is_authenticated = True
+
+    unique_ip = f"172.16.0.{uuid4().int % 250}"
+    cache_loc = f"throttle-authed-{uuid4().hex}"
+
+    with override_settings(
+        CACHES={
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": cache_loc,
+            }
+        }
+    ):
+        throttle = LoginThrottle()
+        throttle.rate = "2/minute"
+        throttle.num_requests, throttle.duration = throttle.parse_rate("2/minute")
+        view = object()
+
+        results = []
+        for _ in range(3):
+            raw = APIRequestFactory().post("/api/auth/login/", REMOTE_ADDR=unique_ip)
+            req = Request(raw)
+            req.user = _Authed()  # type: ignore[assignment]
+            results.append(throttle.allow_request(req, view))
+
+    assert results == [True, True, False]
+
+
+def test_incremento_concorrente_nao_perde_tentativa():
+    """30 incrementos concorrentes de _safe_increment não podem perder tentativa.
+
+    RED (_safe_increment = cache.get + cache.set, não atômico): contador < 30.
+    GREEN (cache.add + cache.incr atômico do Redis): contador == 30.
+    """
+    from apps.core.views_auth import _safe_increment
+
+    key = f"test_incr_concurrency_{uuid4().hex}"
+    cache.delete(key)
+    n_threads = 30
+    barrier = threading.Barrier(n_threads)
+
+    def worker():
+        barrier.wait()  # dispara todas ~ao mesmo tempo p/ maximizar contenção
+        _safe_increment(key, timeout=60)
+
+    threads = [threading.Thread(target=worker) for _ in range(n_threads)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert int(cache.get(key)) == n_threads
+    cache.delete(key)
+
+
+def test_login_rejeita_username_nao_string(api_client, usuario_cpf_conhecido):
+    """Payload com username não-string deve retornar 400, nunca 500 (M03-12, mesma raiz).
+
+    RED: authenticate(username=["a"]) → re.sub sobre lista → TypeError → 500.
+    GREEN: validação de tipo na entrada → 400.
+    """
+    resp = api_client.post("/api/auth/login/", {"username": ["a"], "password": "testpass123"}, format="json")
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST

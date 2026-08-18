@@ -61,17 +61,20 @@ def test_login_throttle_instantiates_successfully():
     assert throttle.duration > 0
 
 
-def test_login_throttle_extends_anon_rate_throttle():
+def test_login_throttle_extends_simple_rate_throttle():
     """
-    SEC-P1: LoginThrottle deve herdar de AnonRateThrottle.
+    SEC-P1 / M03-03 (#1614): LoginThrottle herda de SimpleRateThrottle e chaveia
+    por IP **inclusive** para caller autenticado.
 
-    Garante throttling por IP (não por usuário autenticado).
+    Antes herdava de AnonRateThrottle, cujo get_cache_key retorna None quando
+    request.user.is_authenticated — deixando um usuário logado fazer brute force
+    em /api/auth/login/ sem throttle. Agora o balde é sempre o IP.
     """
-    from rest_framework.throttling import AnonRateThrottle
+    from rest_framework.throttling import SimpleRateThrottle
 
     assert issubclass(
-        LoginThrottle, AnonRateThrottle
-    ), "LoginThrottle deve herdar de AnonRateThrottle (throttling por IP)"
+        LoginThrottle, SimpleRateThrottle
+    ), "LoginThrottle deve herdar de SimpleRateThrottle (throttle por IP, anon E autenticado)"
 
 
 def test_login_view_has_throttle_applied():

@@ -9,6 +9,8 @@ Extracted from serializers/dat_module.py.
 
 from __future__ import annotations
 
+from typing import Any
+
 from rest_framework import serializers  # type: ignore[attr-defined]
 
 from apps.core.models import DATCompra
@@ -69,7 +71,7 @@ class DATCompraSerializer(serializers.ModelSerializer["DATCompra"]):
         ]
         read_only_fields = ["id", "created_by", "status_uso", "created_at", "updated_at"]
 
-    def validate(self, attrs: dict) -> dict:
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         """M15-02 (#1632): invariantes de estoque/valor/coerência (SSOT de entrada).
 
         Em PATCH, monta os valores EFETIVOS a partir da instância antes de comparar
@@ -77,7 +79,7 @@ class DATCompraSerializer(serializers.ModelSerializer["DATCompra"]):
         """
         inst = self.instance
 
-        def eff(field: str):
+        def eff(field: str) -> Any:
             if field in attrs:
                 return attrs[field]
             return getattr(inst, field) if inst is not None else None

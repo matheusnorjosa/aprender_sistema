@@ -297,4 +297,46 @@ describe('useTableFilters', () => {
     const lastCall = mockListFn.mock.calls[mockListFn.mock.calls.length - 1][0];
     expect(lastCall.page).toBe(2);
   });
+
+  // #1668 (F1 amplo): corrida last-writer-wins. Ao mudar o filtro em sequência,
+  // uma resposta antiga (obsoleta) que chega DEPOIS da atual sobrescrevia a
+  // tabela — protege as 7 telas DAT que consomem o hook.
+  test('latest-wins: resposta obsoleta não sobrescreve a mais recente', async () => {
+    const deferreds: Array<(v: unknown) => void> = [];
+    mockListFn.mockImplementation(() => new Promise((resolve) => deferreds.push(resolve)));
+
+    const { result } = renderHook(() =>
+      useTableFilters<MockFilters, MockRecord, MockStats>({
+        defaultFilters,
+        listFn: mockListFn,
+      }),
+    );
+
+    // Fetch inicial (mount).
+    await waitFor(() => expect(deferreds.length).toBe(1));
+
+    // Filtro 'a' → fetch #2 (será o OBSOLETO, resolvido por último).
+    act(() => {
+      result.current.setFilters({ search: 'a', uf: undefined, municipio: undefined });
+    });
+    await waitFor(() => expect(deferreds.length).toBe(2));
+
+    // Filtro 'ab' → fetch #3 (o MAIS RECENTE, resolvido primeiro).
+    act(() => {
+      result.current.setFilters({ search: 'ab', uf: undefined, municipio: undefined });
+    });
+    await waitFor(() => expect(deferreds.length).toBe(3));
+
+    // Resolve o MAIS RECENTE (#3) primeiro.
+    await act(async () => {
+      deferreds[2]({ results: [{ id: 99, nome: 'FRESH' }], count: 1 });
+    });
+    expect(result.current.data).toEqual([{ id: 99, nome: 'FRESH' }]);
+
+    // O OBSOLETO (#2) chega DEPOIS (fora de ordem) — NÃO pode sobrescrever.
+    await act(async () => {
+      deferreds[1]({ results: [{ id: 11, nome: 'STALE' }], count: 1 });
+    });
+    expect(result.current.data).toEqual([{ id: 99, nome: 'FRESH' }]);
+  });
 });

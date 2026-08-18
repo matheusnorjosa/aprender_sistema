@@ -8,7 +8,7 @@
  *
  * Estratégia: mesma do App.session-expiry — filhos pesados stubados; getMe controlado.
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import type { CurrentUser } from '../types';

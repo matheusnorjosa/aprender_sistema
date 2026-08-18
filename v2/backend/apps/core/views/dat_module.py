@@ -173,9 +173,15 @@ class DATCoordenadorViewSet(viewsets.ModelViewSet):
         """
         coordenador = self.get_object()
 
-        acoes = DATAcaoListSerializer(coordenador.dat_acoes.filter(ativo=True)[:10], many=True).data
+        acoes = DATAcaoListSerializer(
+            coordenador.dat_acoes.filter(ativo=True).select_related("municipio", "projeto", "created_by")[:10],
+            many=True,
+        ).data
 
-        formacoes = DATFormacaoListSerializer(coordenador.dat_formacoes.filter(ativo=True)[:10], many=True).data
+        formacoes = DATFormacaoListSerializer(
+            coordenador.dat_formacoes.filter(ativo=True).select_related("municipio", "projeto", "created_by")[:10],
+            many=True,
+        ).data
 
         return Response(
             {
@@ -264,7 +270,14 @@ class DATAcaoViewSet(viewsets.ModelViewSet):
         """Set updated_by on update."""
         serializer.save(updated_by=self.request.user)
 
-    @action(detail=False, methods=["get"], permission_classes=[HasPerm("manage_admin_registries")])
+    @action(
+        detail=False,
+        methods=["get"],
+        # NOTA: com get_permissions() override, o DRF NAO consulta este permission_classes
+        # (feedback_drf_get_permissions_override). O efetivo e o modelo "DAT | Controle" do
+        # #1220 devolvido por get_permissions; declarado igual aqui para nao enganar o leitor.
+        permission_classes=[HasPerm("manage_admin_registries") | HasPerm("run_daily_operations")],
+    )
     def stats(self, request: Request) -> Response:
         """
         Estatísticas agregadas das ações.

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from django.db import transaction
 from django.db.models import Count, Sum
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -25,7 +26,8 @@ from rest_framework.response import Response
 from django_filters import rest_framework as filters
 from django_filters.rest_framework import DjangoFilterBackend
 
-from apps.core.models import Acompanhamento, Formacao, PlanoFormacoes, Prova
+from apps.core.exceptions import ConflictError
+from apps.core.models import Acompanhamento, AuditLog, Formacao, PlanoFormacoes, Prova
 from apps.core.permissions import HasPerm
 from apps.core.serializers import (
     AcompanhamentoSerializer,
@@ -35,6 +37,7 @@ from apps.core.serializers import (
     PlanoFormacoesSerializer,
     ProvaSerializer,
 )
+from apps.core.services.audit import registrar_auditoria
 
 if TYPE_CHECKING:
     from rest_framework.request import Request
@@ -123,6 +126,46 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer: Any) -> None:
         """Set updated_by on update."""
         serializer.save(updated_by=self.request.user)
+
+    def perform_destroy(self, instance: PlanoFormacoes) -> None:
+        """Protege o histórico contra exclusão em cascata silenciosa (#1740, H2).
+
+        Formação/Acompanhamento/Prova apontam para o plano com `on_delete=CASCADE`;
+        o `destroy` default do DRF apagaria tudo — inclusive formações concluídas
+        (`realizada=True`), que são registro histórico — de forma irreversível e sem
+        trilha. Por isso:
+
+        - Se houver QUALQUER formação concluída → bloqueia com 409. A via correta é
+          inativar o plano (campo `ativo`), preservando o histórico.
+        - Sem concluídas → a exclusão é permitida, mas auditada (ator + snapshot dos
+          filhos cascateados), reusando o padrão #1672: `registrar_auditoria` + delete
+          no MESMO `atomic()` (o `on_commit` só grava se o delete commitar, evitando
+          trilha-fantasma).
+        """
+        realizadas = instance.formacoes.filter(realizada=True).count()
+        if realizadas > 0:
+            raise ConflictError(
+                message=(
+                    f"Este plano possui {realizadas} formação(ões) concluída(s) e não pode ser "
+                    "excluído, para preservar o histórico. Inative o plano em vez de excluí-lo."
+                ),
+                details={"plano_id": instance.pk, "formacoes_realizadas": realizadas},
+            )
+        with transaction.atomic():
+            registrar_auditoria(
+                actor=self.request.user,
+                action=AuditLog.Action.DELETE,
+                model_name="PlanoFormacoes",
+                details={
+                    "plano_id": instance.pk,
+                    "municipio": instance.municipio.nome,
+                    "projeto": instance.projeto.nome,
+                    "formacoes": instance.formacoes.count(),
+                    "acompanhamentos": instance.acompanhamentos.count(),
+                    "provas": instance.provas.count(),
+                },
+            )
+            super().perform_destroy(instance)
 
     @action(detail=False, methods=["get"], permission_classes=[HasPerm("manage_admin_registries")])
     def stats(self, request: Request) -> Response:

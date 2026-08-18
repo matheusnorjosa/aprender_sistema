@@ -20,7 +20,7 @@ from django.core.exceptions import ValidationError
 
 import pytest
 
-from apps.core.models import Acompanhamento, Formacao, PlanoFormacoes, Prova
+from apps.core.models import Acompanhamento, AuditLog, Formacao, PlanoFormacoes, Prova
 from apps.core.tests.factories import MunicipioFactory, ProjetoFactory, UsuarioFactory
 
 
@@ -62,6 +62,22 @@ def plano(db, municipio, projeto, user):
         projeto=projeto,
         ch_estudo=Decimal("10.00"),
         created_by=user,
+    )
+
+
+@pytest.fixture
+def superintendente(db):
+    """Usuario com poder de destroy de plano (execute_restricted_operations).
+
+    Usa superuser (HasPerm faz bypass, permissions.py:77) para isolar o *guard*
+    do #1740 do wiring de permissao (ja testado noutro lugar).
+    """
+    return UsuarioFactory(
+        username="super_destroy",
+        cpf="11144477735",
+        password="testpass123",
+        is_superuser=True,
+        is_staff=True,
     )
 
 
@@ -522,3 +538,52 @@ class TestPlanoFormacoesAPI:
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
+
+
+@pytest.mark.django_db
+class TestPlanoFormacoesDeleteProtection:
+    """#1740 (H2): excluir um plano cascateia HARD DELETE em formacoes/acompanhamentos/
+    provas. Formacoes concluidas (realizada=True) sao registro historico e nao podem
+    sumir em silencio. Exclusoes que ficam permitidas (sem concluidas) sao auditadas."""
+
+    def test_destroy_bloqueado_quando_ha_formacao_realizada(self, client, superintendente, plano):
+        """RED: hoje o DELETE cai no destroy default do DRF -> apaga o plano e a
+        formacao realizada=True em cascata, retornando 204. Esperado: 409 e nada apagado."""
+        Formacao.objects.create(
+            plano=plano,
+            numero_formacao=1,
+            data_formacao="2025-03-01",
+            realizada=True,
+        )
+        client.force_login(superintendente)
+
+        response = client.delete(f"/api/dat/plano-formacoes/{plano.id}/")
+
+        assert response.status_code == 409, response.content
+        assert PlanoFormacoes.objects.filter(id=plano.id).exists()
+        assert Formacao.objects.filter(plano_id=plano.id, realizada=True).count() == 1
+
+    def test_destroy_permitido_sem_realizadas_e_auditado(
+        self, client, superintendente, plano, django_capture_on_commit_callbacks
+    ):
+        """Plano sem formacoes concluidas pode ser excluido, mas gera AuditLog(DELETE)
+        com snapshot dos filhos cascateados."""
+        Formacao.objects.create(
+            plano=plano,
+            numero_formacao=1,
+            data_formacao="2025-03-01",
+            realizada=False,
+        )
+        plano_id = plano.id
+        client.force_login(superintendente)
+
+        with django_capture_on_commit_callbacks(execute=True):
+            response = client.delete(f"/api/dat/plano-formacoes/{plano_id}/")
+
+        assert response.status_code == 204, response.content
+        assert not PlanoFormacoes.objects.filter(id=plano_id).exists()
+        assert AuditLog.objects.filter(
+            action=AuditLog.Action.DELETE,
+            model_name="PlanoFormacoes",
+            details__plano_id=plano_id,
+        ).exists()

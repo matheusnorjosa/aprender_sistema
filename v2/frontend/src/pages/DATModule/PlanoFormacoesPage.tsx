@@ -69,6 +69,8 @@ import {
   // updateProvaInline,
 } from '../../api/datModule';
 import { getMunicipiosOptions, getProjetosOptions, getCoordenadoresOptions } from '../../api/datModule';
+import { getMe } from '../../api/availability';
+import { computePermissions } from '../../hooks/usePermissions';
 
 const { Title, Text } = Typography;
 
@@ -240,6 +242,9 @@ export default function PlanoFormacoesPage(): JSX.Element {
   const [detailModalVisible, setDetailModalVisible] = useState<boolean>(false);
   const [detailPlano, setDetailPlano] = useState<PlanoFormacaoRecord | null>(null);
 
+  // Gate do botao Excluir (#1740): so quem pode executar a operacao restrita.
+  const [canDeletePlano, setCanDeletePlano] = useState<boolean>(false);
+
   // ============================================================
   // DATA LOADING
   // ============================================================
@@ -261,6 +266,23 @@ export default function PlanoFormacoesPage(): JSX.Element {
       }
     };
     loadOptions();
+  }, []);
+
+  // Gate do botao Excluir (#1740): o destroy exige `execute_restricted_operations`
+  // (superuser OU Superintendencia). O backend ja e autoritativo (403 + bloqueio de
+  // historico); este check e defesa em camadas — evita exibir um botao que so
+  // retornaria erro.
+  useEffect(() => {
+    const loadPermissions = async () => {
+      try {
+        const userData = await getMe();
+        const perms = computePermissions(userData);
+        setCanDeletePlano(perms.isAdmin || perms.inSuperintendencia);
+      } catch {
+        setCanDeletePlano(false);
+      }
+    };
+    loadPermissions();
   }, []);
 
   // ============================================================
@@ -549,20 +571,22 @@ export default function PlanoFormacoesPage(): JSX.Element {
               aria-label="Editar plano de formações"
             />
           </Tooltip>
-          <Tooltip title="Excluir">
-            <Button
-              type="text"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => handleDelete(record)}
-              aria-label="Excluir plano de formações"
-            />
-          </Tooltip>
+          {canDeletePlano && (
+            <Tooltip title="Excluir">
+              <Button
+                type="text"
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => handleDelete(record)}
+                aria-label="Excluir plano de formações"
+              />
+            </Tooltip>
+          )}
         </Space>
       ),
     },
-  ], []);
+  ], [canDeletePlano]);
 
   // ============================================================
   // RENDER

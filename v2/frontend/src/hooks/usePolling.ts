@@ -7,6 +7,12 @@ export interface UsePollingOptions {
   intervalMs: number;
   /** Custom DOM events that trigger an immediate fetch (e.g. 'notificacoes:refresh'). */
   events?: string[];
+  /**
+   * When false, skips the fetch-on-mount. The interval and the fetch-on-visible
+   * (returning to a hidden tab) still run. Use it when the page already owns the
+   * initial load elsewhere, to avoid a duplicate request on mount. Default true.
+   */
+  immediate?: boolean;
 }
 
 /**
@@ -27,7 +33,7 @@ export function usePolling(
   fetchFn: () => void | Promise<void>,
   options: UsePollingOptions,
 ): void {
-  const { enabled, intervalMs, events } = options;
+  const { enabled, intervalMs, events, immediate = true } = options;
 
   // Always call the latest fetchFn without restarting the effect
   const fetchRef = useRef(fetchFn);
@@ -79,8 +85,9 @@ export function usePolling(
     // Page Visibility API
     document.addEventListener('visibilitychange', handleVisibility);
 
-    // Initial fetch + start polling if tab is visible
-    doFetch();
+    // Initial fetch + start polling if tab is visible. `immediate: false` skips
+    // only the mount fetch (the interval and fetch-on-visible still run).
+    if (immediate) doFetch();
     if (!document.hidden) startPolling();
 
     // Custom events (e.g. 'notificacoes:refresh')
@@ -96,5 +103,5 @@ export function usePolling(
         window.removeEventListener(event, doFetch);
       }
     };
-  }, [enabled, intervalMs, eventsKey]);
+  }, [enabled, intervalMs, eventsKey, immediate]);
 }

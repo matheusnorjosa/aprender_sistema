@@ -108,8 +108,14 @@ export function useTableFilters<F extends object, T, S = unknown>({
   const defaultFiltersRef = useRef(defaultFilters);
   defaultFiltersRef.current = defaultFilters;
 
+  // #1668 (F1 amplo): guarda de sequência (latest-wins). Ao trocar o filtro em
+  // sequência, um fetch antigo que resolve DEPOIS do atual não pode sobrescrever
+  // a tabela. Espelha o idioma de useAvailabilityPreview.
+  const seqRef = useRef(0);
+
   const fetchData = useCallback(
     async (page = 1, pageSizeOverride?: number): Promise<void> => {
+      const seq = ++seqRef.current;
       setLoading(true);
       try {
         const requestPageSize = pageSizeOverride ?? pagination.pageSize;
@@ -133,6 +139,8 @@ export function useTableFilters<F extends object, T, S = unknown>({
           statsFn ? statsFn(params) : Promise.resolve(undefined),
         ]);
 
+        if (seq !== seqRef.current) return; // resposta obsoleta: uma busca mais nova venceu
+
         const results =
           (listResp as PaginatedResponse<T>).results ??
           (Array.isArray(listResp) ? (listResp as T[]) : []);
@@ -145,10 +153,11 @@ export function useTableFilters<F extends object, T, S = unknown>({
           setStats((statsResp as S) ?? null);
         }
       } catch (error) {
+        if (seq !== seqRef.current) return; // erro de busca obsoleta: não polui a UI atual
         const err = error as Error;
         message.error(`Erro ao carregar ${entityName}: ${err.message}`);
       } finally {
-        setLoading(false);
+        if (seq === seqRef.current) setLoading(false);
       }
     },
     [buildParams, filters, listFn, statsFn, defaultOrdering, entityName, pagination.pageSize],

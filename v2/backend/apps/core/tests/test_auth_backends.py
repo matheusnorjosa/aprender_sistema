@@ -322,3 +322,41 @@ def test_authenticate_alphanumeric_tries_username(backend, request_factory, usua
 
     assert user is not None
     assert user == user_alpha
+
+
+# ===================================================================
+# M03-03 (#1614) — NORMALIZAÇÃO SSOT DO IDENTIFICADOR
+# ===================================================================
+
+
+def test_normalize_login_identifier_colapsa_grafias_de_cpf():
+    """SSOT: todas as grafias do mesmo CPF canonicalizam para os 11 dígitos.
+
+    RED: `apps.core.auth_normalize` ainda não existe.
+    """
+    from apps.core.auth_normalize import normalize_login_identifier
+
+    assert normalize_login_identifier("111.444.777-35") == "11144477735"
+    assert normalize_login_identifier("111 444 777 35") == "11144477735"
+    assert normalize_login_identifier("1 1 1 4 4 4 7 7 7 3 5") == "11144477735"
+    assert normalize_login_identifier("11144477735") == "11144477735"
+
+
+def test_normalize_login_identifier_preserva_username():
+    """SSOT: identificador que não é CPF de 11 dígitos é devolvido cru (case-sensitive),
+    exatamente como o backend faz `User.objects.get(username=...)`."""
+    from apps.core.auth_normalize import normalize_login_identifier
+
+    assert normalize_login_identifier("joao") == "joao"
+    assert normalize_login_identifier("user123") == "user123"
+    assert normalize_login_identifier("Joao") == "Joao"  # não força lowercase
+    assert normalize_login_identifier("1234567890") == "1234567890"  # 10 dígitos → username path
+    assert normalize_login_identifier("joao@example.com") == "joao@example.com"
+
+
+def test_backend_usa_normalizacao_ssot():
+    """Sentinela de wiring: o backend consome a MESMA função SSOT (uma única definição)."""
+    import apps.core.auth_backends as ab
+    from apps.core.auth_normalize import normalize_login_identifier
+
+    assert ab.normalize_login_identifier is normalize_login_identifier

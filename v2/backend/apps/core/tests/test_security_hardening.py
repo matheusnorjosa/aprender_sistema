@@ -24,6 +24,7 @@ from apps.core.views_auth import (
     _get_lockout_key,
     _increment_failed_attempts,
     _is_account_locked,
+    _lockout_bucket,
 )
 
 
@@ -211,10 +212,17 @@ class TestCompoundLockout(TestCase):
         assert "global" in key
         assert "admin" in key
 
-    def test_lockout_key_case_insensitive(self):
-        key1 = _get_lockout_key("Admin", "1.2.3.4")
-        key2 = _get_lockout_key("admin", "1.2.3.4")
-        assert key1 == key2
+    def test_lockout_bucket_colapsa_grafias_do_mesmo_cpf(self):
+        """M03-03 (#1614): o balde de lockout é o MESMO para todas as grafias do CPF.
+
+        Antes o key lowercaseava o username cru (evadível por pontuação/espaço).
+        Agora o balde vem de HMAC(identificador-canônico): pontos, hífens e espaços
+        colapsam. (Username segue case-sensitive, casando com a identidade que autentica.)
+        """
+        assert _lockout_bucket("111.444.777-35") == _lockout_bucket("11144477735")
+        assert _lockout_bucket("111 444 777 35") == _lockout_bucket("11144477735")
+        # baldes de contas diferentes não colidem
+        assert _lockout_bucket("11144477735") != _lockout_bucket("22255588846")
 
     @override_settings(ACCOUNT_LOCKOUT_THRESHOLD=3, ACCOUNT_LOCKOUT_DURATION=60)
     def test_lockout_by_ip_username(self):

@@ -99,48 +99,41 @@ interface DATRegistroFormValues {
   envio_codigos_status?: string | null;
   envio_codigos_data?: Dayjs | null;
   obs_formar?: string | null;
-  // AVALIAR (a UI usa nome singular; o serializer usa o plural — ver buildDATRegistroPayload)
+  // AVALIAR: multivalorado (JSONField array). O nome do form já é o plural do serializer.
   usa_avaliar?: boolean;
   alunos_recebidos_status?: string | null;
-  alunos_recebidos_data?: Dayjs | null;
+  alunos_recebidos_datas?: Dayjs[] | null;
   alunos_validados_status?: string | null;
-  alunos_validados_data?: Dayjs | null;
+  alunos_validados_datas?: Dayjs[] | null;
   alunos_importados_status?: string | null;
-  alunos_importados_data?: Dayjs | null;
+  alunos_importados_datas?: Dayjs[] | null;
   obs_avaliar?: string | null;
 }
 
-// Mapeia o nome singular do DatePicker AVALIAR (form) para o campo plural do serializer (JSONField).
-const AVALIAR_DATE_FIELDS = [
-  ['alunos_recebidos_data', 'alunos_recebidos_datas'],
-  ['alunos_validados_data', 'alunos_validados_datas'],
-  ['alunos_importados_data', 'alunos_importados_datas'],
-] as const;
-
 const toISODate = (d?: Dayjs | null): string | null => (d ? d.format('YYYY-MM-DD') : null);
-const toISODateList = (d?: Dayjs | null): string[] => (d ? [d.format('YYYY-MM-DD')] : []);
+// M16-07: as datas AVALIAR são multivaloradas (JSONField array no serializer). Mapeia TODAS
+// as datas do DatePicker `multiple`, sem truncar ao primeiro item (o resíduo do parcial 3954e208).
+const toISODateArray = (ds?: Dayjs[] | null): string[] => (ds ?? []).map((d) => d.format('YYYY-MM-DD'));
 
 /**
  * Converte os valores do formulário no payload que os serializers DRF aceitam (M16-07):
  * - datas FORMAR (DateField) viram `YYYY-MM-DD`; sem isso o Dayjs cru vira datetime ISO
  *   (`2026-07-20T03:00:00.000Z`) e o DateField rejeita com 400, perdendo o formulário inteiro;
- * - datas AVALIAR migram do nome singular do form para o plural do serializer (JSONField
- *   multivalorado), como array de um elemento; sem isso o backend responde 200/201 e
- *   descarta as datas em silêncio.
+ * - datas AVALIAR são multivaloradas (JSONField array): o nome do form já é o plural do
+ *   serializer, então envia o array INTEIRO. Antes truncava ao primeiro item e perdia o
+ *   histórico das demais datas em silêncio.
  */
 export function buildDATRegistroPayload(values: DATRegistroFormValues): Record<string, unknown> {
-  const payload: Record<string, unknown> = {
+  return {
     ...values,
     reuniao_dat: toISODate(values.reuniao_dat),
     chaves_inscricao_data: toISODate(values.chaves_inscricao_data),
     instrucoes_data: toISODate(values.instrucoes_data),
     envio_codigos_data: toISODate(values.envio_codigos_data),
+    alunos_recebidos_datas: toISODateArray(values.alunos_recebidos_datas),
+    alunos_validados_datas: toISODateArray(values.alunos_validados_datas),
+    alunos_importados_datas: toISODateArray(values.alunos_importados_datas),
   };
-  for (const [singular, plural] of AVALIAR_DATE_FIELDS) {
-    payload[plural] = toISODateList(values[singular]);
-    delete payload[singular];
-  }
-  return payload;
 }
 
 interface ProjetoGeralOption {
@@ -271,11 +264,12 @@ export default function DATRegistrosPage(): JSX.Element {
 
   const handleEdit = (record: DATRegistroRecord) => {
     setEditingRegistro(record);
-    // Reconstrução explícita (record é frouxo, `[key: string]: unknown`): hidrata os 7
-    // DatePickers e mapeia as datas AVALIAR do plural persistido de volta ao singular do form.
+    // Reconstrução explícita (record é frouxo, `[key: string]: unknown`): hidrata os
+    // DatePickers. As datas AVALIAR persistem como array (JSONField) e voltam INTEIRAS
+    // ao DatePicker `multiple` — antes só o primeiro item era hidratado (M16-07).
     const r = record as Record<string, unknown>;
     const asDate = (v: unknown): Dayjs | null => (v ? dayjs(v as string) : null);
-    const firstOf = (v: unknown): Dayjs | null => asDate((v as string[] | undefined)?.[0]);
+    const toDateArray = (v: unknown): Dayjs[] => ((v as string[] | undefined) ?? []).map((s) => dayjs(s));
     form.setFieldsValue({
       municipio: record.municipio,
       projeto_geral: record.projeto_geral,
@@ -295,11 +289,11 @@ export default function DATRegistrosPage(): JSX.Element {
       obs_formar: record.obs_formar,
       usa_avaliar: record.usa_avaliar,
       alunos_recebidos_status: record.alunos_recebidos_status,
-      alunos_recebidos_data: firstOf(r.alunos_recebidos_datas),
+      alunos_recebidos_datas: toDateArray(r.alunos_recebidos_datas),
       alunos_validados_status: record.alunos_validados_status,
-      alunos_validados_data: firstOf(r.alunos_validados_datas),
+      alunos_validados_datas: toDateArray(r.alunos_validados_datas),
       alunos_importados_status: record.alunos_importados_status,
-      alunos_importados_data: firstOf(r.alunos_importados_datas),
+      alunos_importados_datas: toDateArray(r.alunos_importados_datas),
       obs_avaliar: record.obs_avaliar,
     });
     setModalVisible(true);
@@ -820,8 +814,8 @@ export default function DATRegistrosPage(): JSX.Element {
                         </Form.Item>
                         <Text strong>Alunos Recebidos</Text>
                       </Space>
-                      <Form.Item name="alunos_recebidos_data" noStyle>
-                        <DatePicker format="DD/MM/YYYY" placeholder="Data" style={{ width: '100%', maxWidth: 130 }} />
+                      <Form.Item name="alunos_recebidos_datas" noStyle>
+                        <DatePicker multiple format="DD/MM/YYYY" placeholder="Datas" style={{ width: '100%', minWidth: 130 }} />
                       </Form.Item>
                     </div>
                   </Card>
@@ -840,8 +834,8 @@ export default function DATRegistrosPage(): JSX.Element {
                         </Form.Item>
                         <Text strong>Alunos Validados</Text>
                       </Space>
-                      <Form.Item name="alunos_validados_data" noStyle>
-                        <DatePicker format="DD/MM/YYYY" placeholder="Data" style={{ width: '100%', maxWidth: 130 }} />
+                      <Form.Item name="alunos_validados_datas" noStyle>
+                        <DatePicker multiple format="DD/MM/YYYY" placeholder="Datas" style={{ width: '100%', minWidth: 130 }} />
                       </Form.Item>
                     </div>
                   </Card>
@@ -860,8 +854,8 @@ export default function DATRegistrosPage(): JSX.Element {
                         </Form.Item>
                         <Text strong>Alunos Importados</Text>
                       </Space>
-                      <Form.Item name="alunos_importados_data" noStyle>
-                        <DatePicker format="DD/MM/YYYY" placeholder="Data" style={{ width: '100%', maxWidth: 130 }} />
+                      <Form.Item name="alunos_importados_datas" noStyle>
+                        <DatePicker multiple format="DD/MM/YYYY" placeholder="Datas" style={{ width: '100%', minWidth: 130 }} />
                       </Form.Item>
                     </div>
                   </Card>

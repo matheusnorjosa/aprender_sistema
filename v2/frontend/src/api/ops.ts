@@ -48,32 +48,6 @@ export interface Compra {
 }
 
 /**
- * Acao record
- */
-export interface Acao {
-  id: number;
-  municipio: string;
-  projeto: string;
-  uf: string;
-  data: string;
-  descricao: string;
-  status: string;
-}
-
-/**
- * Cadastro record
- */
-export interface Cadastro {
-  id: number;
-  municipio: string;
-  projeto: string;
-  uf: string;
-  data: string;
-  tipo: string;
-  status: string;
-}
-
-/**
  * Compras filter parameters
  */
 export interface ComprasFilters {
@@ -84,13 +58,6 @@ export interface ComprasFilters {
   to?: string;
   q?: string;
   [key: string]: string | undefined;
-}
-
-/**
- * Generic filter parameters
- */
-export interface GenericFilters {
-  [key: string]: string | number | undefined;
 }
 
 /**
@@ -386,22 +353,4 @@ export async function listCompras(filters: ComprasFilters = {}): Promise<Compra[
   const url = buildUrl('/controle/compras/', filters);
   const data = await fetchAPI<{ results?: Compra[] } | Compra[]>(url);
   return (data as { results: Compra[] }).results || (data as Compra[]);
-}
-
-/**
- * Lista AÇÕES de Controle com filtros opcionais.
- */
-export async function listAcoes(filters: GenericFilters = {}): Promise<Acao[]> {
-  const url = buildUrl('/controle/acoes/', filters);
-  const data = await fetchAPI<{ results?: Acao[] } | Acao[]>(url);
-  return (data as { results: Acao[] }).results || (data as Acao[]);
-}
-
-/**
- * Lista CADASTROS DAT com filtros opcionais.
- */
-export async function listCadastros(filters: GenericFilters = {}): Promise<Cadastro[]> {
-  const url = buildUrl('/dat/acoes/', filters);
-  const data = await fetchAPI<{ results?: Cadastro[] } | Cadastro[]>(url);
-  return (data as { results: Cadastro[] }).results || (data as Cadastro[]);
 }

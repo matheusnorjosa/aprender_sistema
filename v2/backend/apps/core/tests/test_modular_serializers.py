@@ -20,7 +20,6 @@ class TestSerializersBackwardsCompatibility:
     def test_import_from_serializers_module(self) -> None:
         """Import tradicional: from apps.core.serializers import X"""
         from apps.core.serializers import (
-            AcaoControleSerializer,
             AcaoDATCreateSerializer,
             AcaoDATSerializer,
             AuditLogSerializer,
@@ -70,7 +69,6 @@ class TestSerializersBackwardsCompatibility:
         # Compra
         assert CompraSerializer is not None
         # Workflow
-        assert AcaoControleSerializer is not None
         assert AcaoDATSerializer is not None
         assert AcaoDATCreateSerializer is not None
         assert DeslocamentoSerializer is not None
@@ -144,13 +142,11 @@ class TestSerializersBackwardsCompatibility:
     def test_direct_import_workflow(self) -> None:
         """Import direto: from apps.core.serializers.workflow import X"""
         from apps.core.serializers.workflow import (
-            AcaoControleSerializer,
             AcaoDATCreateSerializer,
             AcaoDATSerializer,
             DeslocamentoSerializer,
         )
 
-        assert AcaoControleSerializer is not None
         assert AcaoDATSerializer is not None
         assert AcaoDATCreateSerializer is not None
         assert DeslocamentoSerializer is not None

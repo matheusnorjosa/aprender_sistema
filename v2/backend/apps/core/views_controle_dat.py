@@ -1,8 +1,7 @@
 """
-DRF Views para AcaoControle e AcaoDAT.
+DRF Views para AcaoDAT (legacy).
 
 Endpoints:
-- GET /api/controle/acoes/ - Lista AcaoControle com filtros de data
 - GET /api/dat/acoes/ - Lista AcaoDAT
 - POST /api/dat/acoes/ - Cria AcaoDAT
 """
@@ -13,88 +12,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from django.db.models import Q, QuerySet
+from django.db.models import QuerySet
 from rest_framework import generics, status
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from .models import AcaoControle, AcaoDAT
+from .models import AcaoDAT
 from .permissions import HasPerm
-from .serializers import AcaoControleSerializer, AcaoDATCreateSerializer, AcaoDATSerializer
-
-
-class ControleAcoesListView(generics.ListAPIView):
-    """
-    Lista AcaoControle com filtros de data.
-
-    Permissão: HasPerm("import_spreadsheet") (grupos Controle ou Superintendência)
-
-    Query params opcionais:
-        data_inicio: YYYY-MM-DD - filtra por qualquer data >= data_inicio
-        data_fim: YYYY-MM-DD - filtra por qualquer data <= data_fim
-
-    Campos de data considerados:
-        - data_entrega
-        - data_carta
-        - contato_inicial
-        - data_reuniao
-
-    Exemplo:
-        GET /api/controle/acoes/?data_inicio=2025-01-01&data_fim=2025-12-31
-        Retorna ações onde pelo menos uma das datas está no intervalo
-    """
-
-    # Issue #1219 (Epic 1 RBAC Access Policy Realignment): semântica correta é
-    # "operações diárias do Controle" — listar ações do controle é escopo de
-    # `run_daily_operations`, não de `import_spreadsheet` (artefato do codemod
-    # Epic 5.2 que aplicou o mesmo codename em múltiplas views com intent
-    # semântico diferente).
-    permission_classes = [HasPerm("run_daily_operations")]
-    serializer_class = AcaoControleSerializer
-    queryset = AcaoControle.objects.select_related("municipio", "projeto", "coordenador").order_by(
-        "-data_reuniao", "-data_entrega"
-    )
-
-    def get_queryset(self) -> QuerySet:
-        """
-        Filtra por data usando Q() para considerar qualquer uma das datas.
-        """
-        queryset = super().get_queryset()
-
-        # Filtros de data via query params
-        data_inicio = self.request.query_params.get("data_inicio")
-        data_fim = self.request.query_params.get("data_fim")
-
-        if data_inicio or data_fim:
-            # Construir filtro Q() que considera todas as datas
-            date_fields = [
-                "data_entrega",
-                "data_carta",
-                "contato_inicial",
-                "data_reuniao",
-            ]
-
-            q_filter = Q()
-
-            for field in date_fields:
-                if data_inicio and data_fim:
-                    # Intervalo: data_inicio <= field <= data_fim
-                    q_filter |= Q(
-                        **{
-                            f"{field}__gte": data_inicio,
-                            f"{field}__lte": data_fim,
-                        }
-                    )
-                elif data_inicio:
-                    # Apenas início: field >= data_inicio
-                    q_filter |= Q(**{f"{field}__gte": data_inicio})
-                elif data_fim:
-                    # Apenas fim: field <= data_fim
-                    q_filter |= Q(**{f"{field}__lte": data_fim})
-
-            queryset = queryset.filter(q_filter).distinct()
-
-        return queryset
+from .serializers import AcaoDATCreateSerializer, AcaoDATSerializer
 
 
 class DATAcoesListCreateView(generics.ListCreateAPIView):

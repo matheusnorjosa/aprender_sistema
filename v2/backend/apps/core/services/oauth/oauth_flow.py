@@ -117,27 +117,24 @@ def validate_oauth_state(state: str, user_id: int) -> dict:
 
     Security:
         - Valida CSRF token contra cache (one-time use)
-        - Verifica user_id match
+        - Verifica ownership pelo CACHE (não pelo sufixo adulterável do state) — M12-15
         - Valida return_to (previne open redirect)
-        - Remove state do cache após validação
+        - Consome o state atomicamente (anti-replay concorrente) — M12-15
+
+    M12-15 (#1652): o dono do fluxo NÃO é mais lido do sufixo `|user_id` do state (que vem
+    por query string e é 100% controlado por quem monta a URL). A fonte de verdade é o
+    `user_id` gravado no cache por :func:`build_authorization_url`. O sufixo, se presente,
+    é dado morto — mantido só por compatibilidade de formato até o state ficar opaco.
     """
     from django.core.cache import cache
 
     try:
-        # Parse state
+        # Parse state — só o csrf_token importa; return_to e user_id vêm do CACHE.
         parts: list[str] = state.split("|")
         if len(parts) != 3:
             return {"valid": False, "return_to": "/pre-agenda", "error": "State format invalid"}
 
-        csrf_token, return_to, state_user_id_str = parts
-        state_user_id: int = int(state_user_id_str)
-
-        # Verificar user_id match
-        if state_user_id != user_id:
-            logger.error(
-                f"❌ OAuth state validation: user_id mismatch " f"(state={state_user_id}, authenticated={user_id})"
-            )
-            return {"valid": False, "return_to": "/pre-agenda", "error": "User ID mismatch"}
+        csrf_token: str = parts[0]
 
         # Buscar state no cache
         cache_key: str = f"oauth_state:{csrf_token}"
@@ -151,14 +148,26 @@ def validate_oauth_state(state: str, user_id: int) -> dict:
                 "error": "State token invalid or expired",
             }
 
+        # M12-15: autenticar o DONO pelo cache (não pelo sufixo do state, adulterável).
+        if cached_state.get("user_id") != user_id:
+            logger.error(
+                "❌ OAuth state validation: ownership mismatch "
+                f"(cache={cached_state.get('user_id')}, authenticated={user_id})"
+            )
+            return {"valid": False, "return_to": "/pre-agenda", "error": "State ownership mismatch"}
+
         # Validar return_to
         cached_return_to: str = cached_state.get("return_to", "/pre-agenda")
         if not _is_safe_url(cached_return_to):
             logger.warning(f"⚠️ OAuth state validation: unsafe return_to in cache ({cached_return_to})")
             cached_return_to = "/pre-agenda"
 
-        # Remover state do cache (one-time use)
-        cache.delete(cache_key)
+        # M12-15: consumo ATÔMICO (one-time). ``cache.delete`` devolve se removeu — só o
+        # primeiro a consumir vence, fechando a janela de replay concorrente.
+        if not cache.delete(cache_key):
+            logger.warning(f"⚠️ OAuth state validation: já consumido (replay?) ({csrf_token[:8]}...)")
+            return {"valid": False, "return_to": "/pre-agenda", "error": "State token invalid or expired"}
+
         logger.info(f"✅ OAuth state validado: {csrf_token[:8]}... (user={user_id})")
 
         return {"valid": True, "return_to": cached_return_to, "error": None}

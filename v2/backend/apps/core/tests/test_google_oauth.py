@@ -123,6 +123,19 @@ def usuario_formador(db):
 
 
 @pytest.fixture
+def usuario_super(db):
+    """Usuário do grupo Superintendência (tem CanUseGcal) — vítima do fluxo forjado que
+    AINDA passa pela policy do callback, isolando o check de ownership (M12-15, item 1)."""
+    return UsuarioFactory(
+        username="super_oauth_test",
+        email="super_oauth@aprendereditora.com.br",
+        password="testpass123",
+        cpf="33333333333",
+        groups=["Superintendência"],
+    )
+
+
+@pytest.fixture
 def google_oauth_credential(usuario_controle):
     """
     Cria credencial OAuth para testes.
@@ -683,7 +696,89 @@ class TestOAuthSecurity:
     - State/CSRF validation
     - Open redirect
     - Replay attacks
+    - Ownership do state lido do cache, não do sufixo adulterável (M12-15 / #1652)
     """
+
+    def test_validate_state_rejeita_dono_diferente_do_cache(self, usuario_controle, usuario_super):
+        """M12-15 (#1652): a validação do state deve autenticar o dono pelo CACHE, não pelo
+        sufixo (adulterável) do state. State criado por A (controle); atacante troca o sufixo
+        para o id da vítima B (super) e a envia. Deve ser REJEITADO.
+
+        RED: hoje o check compara o sufixo do state com o usuário autenticado (ambos = B) e
+        aceita — o dono real gravado no cache (A) nunca é lido.
+        """
+        from django.core.cache import cache
+
+        from apps.core.services.google_oauth import validate_oauth_state
+
+        csrf = "csrf_forjado_owner_123"
+        # A (controle) iniciou o fluxo → o cache pertence a A.
+        cache.set(
+            f"oauth_state:{csrf}",
+            {"user_id": usuario_controle.id, "return_to": "/pre-agenda", "created_at": timezone.now().isoformat()},
+            timeout=600,
+        )
+        # Atacante troca o sufixo para o id da vítima B e valida como B.
+        forjado = f"{csrf}|/pre-agenda|{usuario_super.id}"
+        result = validate_oauth_state(forjado, usuario_super.id)
+        assert result["valid"] is False  # hoje retorna True (bug M12-15)
+
+    @patch.dict(
+        "os.environ",
+        {
+            "GCAL_OAUTH_CLIENT_ID": "test_client_id_123",
+            "GCAL_OAUTH_CLIENT_SECRET": "test_client_secret_456",
+            "GCAL_OAUTH_REDIRECT_URI": "http://localhost:8002/api/oauth/google/callback/",
+            "GCAL_ALLOWED_DOMAIN": "aprendereditora.com.br",
+        },
+    )
+    @patch("apps.core.services.google_oauth.requests.post")
+    @patch("apps.core.services.google_oauth.requests.get")
+    def test_callback_forjado_nao_grava_credencial_para_vitima(
+        self, mock_get, mock_post, usuario_controle, usuario_super, mock_google_api
+    ):
+        """M12-15: callback com state forjado (cache pertence a A, sufixo = vítima B) NÃO pode
+        gravar GoogleOAuthCredential para B. B tem CanUseGcal (Superintendência), então a policy
+        não mascara o check de ownership.
+
+        RED: hoje o fluxo aceita o state forjado e grava a credencial de A na conta de B.
+        """
+        from django.core.cache import cache
+
+        mock_post.return_value = MagicMock(status_code=200, json=mock_google_api["exchange"])
+        mock_get.return_value = MagicMock(status_code=200, json=lambda: {"email": "controle@aprendereditora.com.br"})
+
+        csrf = "csrf_forjado_callback_456"
+        cache.set(
+            f"oauth_state:{csrf}",
+            {"user_id": usuario_controle.id, "return_to": "/pre-agenda", "created_at": timezone.now().isoformat()},
+            timeout=600,
+        )
+
+        client = APIClient()
+        client.force_authenticate(user=usuario_super)  # vítima B
+        client.get(
+            "/api/oauth/google/callback/",
+            {"code": "fake_code_de_A", "state": f"{csrf}|/pre-agenda|{usuario_super.id}"},
+        )
+
+        # Nenhuma credencial nem auditoria de conexão pode nascer para a vítima.
+        assert not GoogleOAuthCredential.objects.filter(user=usuario_super).exists()
+        assert not AuditLog.objects.filter(usuario=usuario_super, action="GOOGLE_CONNECT").exists()
+
+    def test_callback_exige_can_use_gcal(self, usuario_formador):
+        """M12-15 (item 4): o callback deve reaplicar CanUseGcal. Um usuário autenticado SEM a
+        policy (Formador) não pode receber credencial GCal → 403.
+
+        RED: hoje o callback só exige IsAuthenticated (sem @permission_classes([CanUseGcal])).
+        """
+        client = APIClient()
+        client.force_authenticate(user=usuario_formador)
+        response = client.get(
+            "/api/oauth/google/callback/",
+            {"code": "x", "state": "y|/pre-agenda|1"},
+        )
+        assert response.status_code == http_status.HTTP_403_FORBIDDEN
 
     def test_oauth_state_validated_in_callback(self, usuario_controle):
         """

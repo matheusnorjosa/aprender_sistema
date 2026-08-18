@@ -5,10 +5,11 @@ import { buildDATRegistroPayload } from '../DATRegistrosPage';
 
 /**
  * M16-07: o formulário de /dat/registros perdia datas em silêncio.
- * Estas asserções codificam o contrato que o payload precisa cumprir — exatamente o
- * que a lógica inline anterior violava (só `reuniao_dat` era adaptada; as demais iam
- * como Dayjs cru -> datetime ISO -> 400; as datas AVALIAR iam no nome singular ->
- * ignoradas pelo serializer -> 201/200 sem persistir).
+ * Estas asserções codificam o contrato que o payload precisa cumprir:
+ * - datas FORMAR viram `YYYY-MM-DD` (Dayjs cru -> datetime ISO -> 400 no DateField);
+ * - datas AVALIAR são multivaloradas (JSONField array): o payload envia TODAS as datas
+ *   escolhidas no DatePicker `multiple`. O resíduo do parcial 3954e208 truncava ao
+ *   primeiro item (single-picker + firstOf/toISODateList), perdendo o histórico.
  */
 describe('buildDATRegistroPayload (M16-07)', () => {
   const base = { municipio: 1, projeto_geral: 2, projeto: 3 } as const;
@@ -32,20 +33,20 @@ describe('buildDATRegistroPayload (M16-07)', () => {
     }
   });
 
-  it('mapeia datas AVALIAR do singular do form para o plural do serializer (array), removendo o singular', () => {
+  it('AVALIAR multivalorado: envia TODAS as datas escolhidas (array), sem truncar ao primeiro', () => {
     const payload = buildDATRegistroPayload({
       ...base,
-      alunos_recebidos_data: dayjs('2026-07-20'),
-      alunos_validados_data: dayjs('2026-07-21'),
-      alunos_importados_data: dayjs('2026-07-22'),
+      alunos_recebidos_datas: [dayjs('2026-07-20'), dayjs('2026-08-01')],
+      alunos_validados_datas: [dayjs('2026-07-21')],
+      alunos_importados_datas: [dayjs('2026-07-22'), dayjs('2026-09-10'), dayjs('2026-10-05')],
     });
 
-    expect(payload.alunos_recebidos_datas).toEqual(['2026-07-20']);
+    // TODAS as datas preservadas — o resíduo antigo reduzia o array ao primeiro item.
+    expect(payload.alunos_recebidos_datas).toEqual(['2026-07-20', '2026-08-01']);
     expect(payload.alunos_validados_datas).toEqual(['2026-07-21']);
-    expect(payload.alunos_importados_datas).toEqual(['2026-07-22']);
+    expect(payload.alunos_importados_datas).toEqual(['2026-07-22', '2026-09-10', '2026-10-05']);
 
-    // O nome singular NÃO pode vazar no payload (é o campo que o serializer ignora hoje
-    // e que passaria a dar 400 quando a rejeição de campo desconhecido for ligada).
+    // Os nomes singulares antigos não existem mais (o form usa o plural do serializer).
     expect(payload).not.toHaveProperty('alunos_recebidos_data');
     expect(payload).not.toHaveProperty('alunos_validados_data');
     expect(payload).not.toHaveProperty('alunos_importados_data');

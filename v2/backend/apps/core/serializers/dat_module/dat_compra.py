@@ -77,12 +77,12 @@ class DATCompraSerializer(serializers.ModelSerializer["DATCompra"]):
         Em PATCH, monta os valores EFETIVOS a partir da instância antes de comparar
         (o payload pode conter só um subconjunto dos campos).
         """
-        inst: DATCompra | None = self.instance
+        # Padrão que passa pyright strict (espelha serializers/solicitacao.py): getattr(self,
+        # "instance", None) devolve Any (conhecido); getattr(instance, field, None) com default.
+        instance = getattr(self, "instance", None)
 
         def eff(field: str) -> Any:
-            if field in attrs:
-                return attrs[field]
-            return getattr(inst, field) if inst is not None else None
+            return attrs.get(field, getattr(instance, field, None))
 
         quantidade = eff("quantidade")
         quantidade_utilizada = eff("quantidade_utilizada")

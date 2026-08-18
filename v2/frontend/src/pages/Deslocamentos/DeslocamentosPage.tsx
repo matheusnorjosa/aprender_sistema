@@ -17,7 +17,7 @@
  * - DELETE /api/deslocamentos/{id}/ (delete)
  */
 
-import { useState, useEffect, useCallback, ChangeEvent, JSX } from 'react';
+import { useState, useEffect, useCallback, useRef, ChangeEvent, JSX } from 'react';
 import {
   Table,
   Button,
@@ -121,11 +121,19 @@ export default function DeslocamentosPage(): JSX.Element {
     loadUser();
   }, []);
 
+  // M09-06 (#1622): guarda de sequência (latest-wins). O debounce reduz mas não
+  // elimina a corrida — se um request antigo (filtro obsoleto) resolver DEPOIS do
+  // atual, ele sobrescreveria a tabela com o resultado errado. Espelha o idioma
+  // canônico de useAvailabilityPreview.ts (seqRef + AbortController).
+  const seqRef = useRef(0);
+
   // Load deslocamentos
-  const loadDeslocamentos = useCallback(async (page = 1): Promise<void> => {
+  const loadDeslocamentos = useCallback(async (page = 1, signal?: AbortSignal): Promise<void> => {
+    const seq = ++seqRef.current;
     setTableLoading(true);
     try {
-      const data = await listDeslocamentos({ ...filters, page });
+      const data = await listDeslocamentos({ ...filters, page }, { signal });
+      if (seq !== seqRef.current) return; // resposta obsoleta: um filtro/página mais novo venceu
       setDeslocamentos(data.results || []);
       setPagination({
         current: page,
@@ -133,9 +141,11 @@ export default function DeslocamentosPage(): JSX.Element {
         total: data.count || 0,
       });
     } catch (error) {
+      if (signal?.aborted) return; // cancelamento no cleanup não é falha
+      if (seq !== seqRef.current) return; // erro de request obsoleto: não polui a UI atual
       message.error((error as Error).message);
     } finally {
-      setTableLoading(false);
+      if (seq === seqRef.current) setTableLoading(false);
     }
   }, [filters]);
 
@@ -157,14 +167,20 @@ export default function DeslocamentosPage(): JSX.Element {
   }, [canAccess, loadFormadores]);
 
   // Lista recarrega ao mudar filtros, com debounce (evita 1 request por tecla).
+  // O AbortController cancela o request em voo quando o filtro muda de novo (o
+  // seqRef já descarta a resposta obsoleta; o abort evita o trabalho de rede).
   useEffect(() => {
     if (!canAccess) {
       return;
     }
+    const controller = new AbortController();
     const timer = setTimeout(() => {
-      loadDeslocamentos(1);
+      loadDeslocamentos(1, controller.signal);
     }, 350);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [canAccess, filters, loadDeslocamentos]);
 
   // Handle table change (pagination)

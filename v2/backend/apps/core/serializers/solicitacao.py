@@ -184,14 +184,19 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
                     }
                 )
 
-        # Regra 4: Elegibilidade de compra por município+projeto (somente criação)
+        # Regra 4: Elegibilidade de compra por município+projeto.
+        # Aplica na criação e sempre que o par município/projeto for (re)atribuído
+        # num update. (#1738: a checagem era create-only, então um PATCH trocando o
+        # par para um sem compra contornava a regra.) Edições que não mexem no par
+        # não disparam a checagem, preservando a edição de solicitações antigas.
         # Superuser mantém bypass explícito.
-        if instance is None:
-            request = cast(Any, self.context.get("request"))
-            user = getattr(request, "user", None)
-            if not (user and getattr(user, "is_superuser", False)):
-                municipio = attrs.get("municipio")
-                projeto = attrs.get("projeto")
+        request = cast(Any, self.context.get("request"))
+        user = getattr(request, "user", None)
+        if not (user and getattr(user, "is_superuser", False)):
+            reatribui_par = instance is None or "municipio" in attrs or "projeto" in attrs
+            if reatribui_par:
+                municipio = attrs.get("municipio", getattr(instance, "municipio", None))
+                projeto = attrs.get("projeto", getattr(instance, "projeto", None))
                 if municipio is not None and projeto is not None:
                     has_compra = Compra.objects.filter(municipio=municipio, projeto=projeto).exists()
                     if not has_compra:
@@ -199,7 +204,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
                             {
                                 "municipio": (
                                     f"O município '{municipio.nome} - {municipio.uf}' não possui compra registrada "
-                                    f"para o projeto '{projeto.nome}'. Registre a compra antes de criar a solicitação."
+                                    f"para o projeto '{projeto.nome}'. Registre a compra antes de vincular esse par."
                                 )
                             }
                         )

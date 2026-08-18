@@ -13,10 +13,6 @@ import type {
   Solicitacao,
   SolicitacaoPayload,
   SolicitacaoFilters,
-  MunicipioOption,
-  ProjetoOption,
-  TipoEventoOption,
-  UsuarioOption,
   BatchOperationResult,
   PublishResult,
 } from '../types';
@@ -232,41 +228,6 @@ export async function cancelSolicitacao(id: ID): Promise<PublishResult> {
   syncChannel.publish('preagenda', { action: 'cancelled' });
   syncChannel.publish('solicitacoes', { action: 'updated' });
   return result;
-}
-
-// ========================================
-// Endpoints de opções (dropdowns/selects)
-// ========================================
-
-/**
- * Lista municípios para seleção.
- */
-export async function listMunicipiosOptions(): Promise<MunicipioOption[]> {
-  return await fetchAPI('/options/municipios/');
-}
-
-/**
- * Lista projetos para seleção.
- */
-export async function listProjetosOptions(): Promise<ProjetoOption[]> {
-  return await fetchAPI('/options/projetos/');
-}
-
-/**
- * Lista tipos de evento para seleção.
- */
-export async function listTiposEventoOptions(): Promise<TipoEventoOption[]> {
-  return await fetchAPI('/options/tipos-evento/');
-}
-
-/**
- * Lista usuários para seleção.
- *
- * @param params - Parâmetros opcionais (ex: search)
- */
-export async function listUsuariosOptions(params: QueryParams = {}): Promise<UsuarioOption[]> {
-  const url = buildUrl('/options/usuarios/', params);
-  return await fetchAPI(url);
 }
 
 // ========================================

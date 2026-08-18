@@ -16,6 +16,10 @@ Security Audit 2025-01:
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import logging
+
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth import login as django_login
@@ -29,12 +33,15 @@ from rest_framework.decorators import api_view, permission_classes, throttle_cla
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
-from rest_framework.throttling import AnonRateThrottle
+from rest_framework.throttling import SimpleRateThrottle
 
+from apps.core.auth_normalize import normalize_login_identifier
 from apps.core.pii import redact_cpf
 from apps.core.views.utils import _get_client_ip
 
 from .models import AuditLog
+
+logger = logging.getLogger(__name__)
 
 # ================================================================
 # Account Lockout (Security Audit 2025-01, SEC-AUTH-01)
@@ -47,21 +54,37 @@ _GLOBAL_LOCKOUT_THRESHOLD = 50
 _GLOBAL_LOCKOUT_DURATION = 1800  # 30 minutes
 
 
-def _get_lockout_key(username: str, ip: str = "") -> str:
-    """Gera chave Redis para tracking de tentativas de login por IP+username."""
+def _lockout_bucket(username: str) -> str:
+    """Deriva um balde estável e sem-PII para o identificador de login.
+
+    HMAC-SHA256(SECRET_KEY, identificador-canônico) — usa a SSOT
+    :func:`normalize_login_identifier` para que **todas as grafias do mesmo CPF**
+    colapsem no mesmo balde (M03-03), e o HMAC evita gravar CPF em claro nas
+    chaves do Redis (PII-at-rest, LGPD). SECRET_KEY torna o digest não-enumerável.
+    """
+    canonical = normalize_login_identifier(username)
+    return hmac.new(
+        settings.SECRET_KEY.encode("utf-8"),
+        canonical.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def _get_lockout_key(bucket: str, ip: str = "") -> str:
+    """Gera chave Redis para tracking de tentativas por IP+bucket (ou global por bucket)."""
     if ip:
-        return f"login_attempts:{username.lower()}:{ip}"
-    return f"login_attempts_global:{username.lower()}"
+        return f"login_attempts:{bucket}:{ip}"
+    return f"login_attempts_global:{bucket}"
 
 
-def _get_failed_attempts(username: str, ip: str = "") -> int:
-    """Retorna número de tentativas falhas de login."""
-    key = _get_lockout_key(username, ip)
+def _get_failed_attempts(bucket: str, ip: str = "") -> int:
+    """Retorna número de tentativas falhas de login para o balde."""
+    key = _get_lockout_key(bucket, ip)
     attempts = cache.get(key)
     return int(attempts) if attempts else 0
 
 
-def _increment_failed_attempts(username: str, ip: str) -> int:
+def _increment_failed_attempts(bucket: str, ip: str) -> int:
     """
     Incrementa contadores de tentativas falhas (IP-specific e global).
     Retorna o novo total de tentativas IP-specific.
@@ -69,55 +92,60 @@ def _increment_failed_attempts(username: str, ip: str) -> int:
     lockout_duration = getattr(settings, "ACCOUNT_LOCKOUT_DURATION", 900)
 
     # Increment IP-specific counter
-    ip_key = _get_lockout_key(username, ip)
+    ip_key = _get_lockout_key(bucket, ip)
     ip_attempts = _safe_increment(ip_key, lockout_duration)
 
     # Increment global counter
-    global_key = _get_lockout_key(username)
+    global_key = _get_lockout_key(bucket)
     _safe_increment(global_key, _GLOBAL_LOCKOUT_DURATION)
 
     return ip_attempts
 
 
 def _safe_increment(key: str, timeout: int) -> int:
-    """Safely increment a Redis counter with TTL."""
+    """Incrementa um contador no Redis de forma ATÔMICA, com TTL de janela fixa.
+
+    ``cache.add`` faz o bootstrap via SETNX (só cria se ausente, atômico) e ``cache.incr``
+    mapeia para o INCR do Redis (atômico) — tentativas concorrentes não se perdem
+    (M03-03). O TTL é ancorado na PRIMEIRA falha (janela fixa; ``incr`` não reseta o TTL),
+    semântica correta de "N falhas em T minutos".
+
+    Falha de cache é **observável** (log) e **fail-closed**: devolve o teto global para
+    não conceder tentativas grátis quando o contador não pôde ser persistido.
+    """
     try:
-        current = cache.get(key)
-        if current is None:
-            cache.set(key, 1, timeout=timeout)
-            return 1
-        new_value = int(current) + 1
-        cache.set(key, new_value, timeout=timeout)
-        return new_value
+        cache.add(key, 0, timeout=timeout)
+        return int(cache.incr(key))
     except Exception:
-        return 1
+        logger.warning("lockout: falha ao incrementar contador de tentativas (fail-closed)", exc_info=True)
+        return _GLOBAL_LOCKOUT_THRESHOLD
 
 
-def _clear_failed_attempts(username: str, ip: str) -> None:
+def _clear_failed_attempts(bucket: str, ip: str) -> None:
     """Limpa contadores de tentativas após login bem-sucedido."""
-    cache.delete(_get_lockout_key(username, ip))
-    cache.delete(_get_lockout_key(username))
+    cache.delete(_get_lockout_key(bucket, ip))
+    cache.delete(_get_lockout_key(bucket))
 
 
-def _is_account_locked(username: str, ip: str) -> bool:
+def _is_account_locked(bucket: str, ip: str) -> bool:
     """Verifica se a conta está bloqueada (IP-specific OU global)."""
     threshold = getattr(settings, "ACCOUNT_LOCKOUT_THRESHOLD", 10)
 
     # Check IP-specific lockout
-    if _get_failed_attempts(username, ip) >= threshold:
+    if _get_failed_attempts(bucket, ip) >= threshold:
         return True
 
     # Check global lockout (distributed attack protection)
-    if _get_failed_attempts(username) >= _GLOBAL_LOCKOUT_THRESHOLD:
+    if _get_failed_attempts(bucket) >= _GLOBAL_LOCKOUT_THRESHOLD:
         return True
 
     return False
 
 
-def _get_lockout_remaining_time(username: str, ip: str) -> int | None:
+def _get_lockout_remaining_time(bucket: str, ip: str) -> int | None:
     """Retorna tempo restante de bloqueio em segundos, ou None se não bloqueado."""
     # Check IP-specific first, then global
-    for key in [_get_lockout_key(username, ip), _get_lockout_key(username)]:
+    for key in [_get_lockout_key(bucket, ip), _get_lockout_key(bucket)]:
         ttl = cache.ttl(key) if hasattr(cache, "ttl") else None
         if ttl and ttl > 0:
             return ttl
@@ -157,8 +185,8 @@ def csrf_token(request: Request) -> Response:
     return Response({"csrfToken": get_token(request)}, status=status.HTTP_200_OK)
 
 
-# Issue #133: Rate limiting para prevenir brute force (SEC-P1)
-class LoginThrottle(AnonRateThrottle):
+# Issue #133 / M03-03 (#1614): Rate limiting para prevenir brute force (SEC-P1)
+class LoginThrottle(SimpleRateThrottle):
     """
     Rate limiting para endpoint de login — configurado por ambiente.
 
@@ -169,10 +197,21 @@ class LoginThrottle(AnonRateThrottle):
     A taxa é lida de `REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["login"]`
     em `config/settings.py` — `10/minute` por padrão, sobrescrito para
     `1000/minute` quando `ENVIRONMENT=development`.
+
+    M03-03 (#1614): herda de `SimpleRateThrottle` (não `AnonRateThrottle`) e
+    **sempre** chaveia por IP — inclusive para caller já autenticado. O
+    `AnonRateThrottle.get_cache_key` retorna ``None`` quando
+    ``request.user.is_authenticated``, deixando um usuário logado fazer brute
+    force em ``/api/auth/login/`` contra outra conta sem throttle. Aqui o balde é
+    sempre o IP (via ``get_ident``, que respeita ``NUM_PROXIES``).
     """
 
     # Escopo dedicado — DRF resolve a taxa via DEFAULT_THROTTLE_RATES[scope].
     scope = "login"
+
+    def get_cache_key(self, request: Request, view: object) -> str:
+        # Nunca retorna None: throttle vale para anônimo E autenticado.
+        return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}
 
 
 @api_view(["POST"])
@@ -200,16 +239,24 @@ def login(request: Request) -> Response:
     username = request.data.get("username")
     password = request.data.get("password")
 
+    # M03-12 (#1614): identificador/senha não-string (ex.: {"username": ["a"]}) deve
+    # virar 400, nunca 500 — a normalização a jusante espera str.
+    if not isinstance(username, str) or not isinstance(password, str):
+        return Response({"error": "Username e password são obrigatórios."}, status=status.HTTP_400_BAD_REQUEST)
+
     if not username or not password:
         return Response({"error": "Username e password são obrigatórios."}, status=status.HTTP_400_BAD_REQUEST)
 
-    # SEC-AUTH-01: compound lockout key (IP + username)
+    # SEC-AUTH-01 / M03-03: balde de lockout derivado do identificador CANÔNICO
+    # (mesmo valor que autentica), sem PII em claro (HMAC). Todas as grafias do
+    # mesmo CPF caem no mesmo balde.
     client_ip = _get_client_ip(request)
+    bucket = _lockout_bucket(username)
 
     # Security hardening #745:
     # - Keep a generic client response for all auth failures
     # - Preserve detailed reason only in AuditLog
-    is_locked = _is_account_locked(username, client_ip)
+    is_locked = _is_account_locked(bucket, client_ip)
 
     user = authenticate(request, username=username, password=password)
     if user is None:
@@ -218,8 +265,8 @@ def login(request: Request) -> Response:
 
     if is_locked:
         threshold = getattr(settings, "ACCOUNT_LOCKOUT_THRESHOLD", 10)
-        attempts = _get_failed_attempts(username, client_ip)
-        lockout_remaining_seconds = _get_lockout_remaining_time(username, client_ip)
+        attempts = _get_failed_attempts(bucket, client_ip)
+        lockout_remaining_seconds = _get_lockout_remaining_time(bucket, client_ip)
 
         # Log tentativa de login em conta bloqueada (detalhes só internamente)
         AuditLog.objects.create(
@@ -241,7 +288,7 @@ def login(request: Request) -> Response:
 
     if user is None:
         # Incrementa contador de tentativas falhas (estado interno)
-        attempts = _increment_failed_attempts(username, client_ip)
+        attempts = _increment_failed_attempts(bucket, client_ip)
         threshold = getattr(settings, "ACCOUNT_LOCKOUT_THRESHOLD", 10)
 
         # Log tentativa falha
@@ -263,7 +310,7 @@ def login(request: Request) -> Response:
 
     if not user.is_active:
         # Defensive fallback for alternate backends that might return inactive users.
-        attempts = _increment_failed_attempts(username, client_ip)
+        attempts = _increment_failed_attempts(bucket, client_ip)
         threshold = getattr(settings, "ACCOUNT_LOCKOUT_THRESHOLD", 10)
         AuditLog.objects.create(
             usuario=None,
@@ -281,7 +328,7 @@ def login(request: Request) -> Response:
         return _invalid_credentials_response()
 
     # Login bem-sucedido: limpa contadores de tentativas (IP-specific e global)
-    _clear_failed_attempts(username, client_ip)
+    _clear_failed_attempts(bucket, client_ip)
 
     # Realiza login
     django_login(request, user)

@@ -6,16 +6,19 @@ Implements CPF-based authentication alongside username authentication.
 
 from __future__ import annotations
 
-import re
 from typing import Any, cast
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.backends import ModelBackend
 from django.http import HttpRequest
 
+from .auth_normalize import normalize_login_identifier
 from .models import Usuario
 
 User = get_user_model()
+
+# Um CPF só-dígitos tem 11 caracteres.
+_CPF_DIGITS = 11
 
 
 class CPFOrUsernameBackend(ModelBackend):
@@ -50,23 +53,26 @@ class CPFOrUsernameBackend(ModelBackend):
         Returns:
             Usuario instance if authentication succeeds, None otherwise
         """
-        if username is None or password is None:
+        # None E não-string (M03-12: DRF pode passar list/dict do JSON) num só guard:
+        # identificador não-string nunca deve chegar à normalização (evita
+        # AttributeError/TypeError → 500). Trata como credencial inválida.
+        if not isinstance(username, str) or not isinstance(password, str):
             return None
 
-        # Remove punctuation (dots, hyphens, spaces)
-        clean_input = re.sub(r"[.\-\s]", "", username)
+        # Canonicaliza via SSOT — o MESMO valor usado pelo contador de lockout (M03-03).
+        canonical = normalize_login_identifier(username)
 
-        # Try CPF if input is 11 digits
-        if clean_input.isdigit() and len(clean_input) == 11:
+        # Try CPF if canonical form is 11 digits
+        if len(canonical) == _CPF_DIGITS and canonical.isdigit():
             try:
-                user = User.objects.get(cpf=clean_input)
+                user = User.objects.get(cpf=canonical)
             except User.DoesNotExist:
                 # CPF not found, return None
                 return None
         else:
-            # Try username lookup
+            # Try username lookup (canonical == input cru para não-CPF)
             try:
-                user = User.objects.get(username=username)
+                user = User.objects.get(username=canonical)
             except User.DoesNotExist:
                 return None
 

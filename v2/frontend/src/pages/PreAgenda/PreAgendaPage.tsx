@@ -78,6 +78,12 @@ import { formatFortaleza } from '../../utils/datetime';
 import logger from '../../utils/logger';
 import type { ID, Solicitacao, GCalStatus, CurrentUser, PaginatedResponse } from '../../types';
 
+// #1668 (M12-19): orçamento de requisições da Pré-agenda.
+/** Carrega a pré-agenda inteira como lista única (paginação client-side). */
+const PREAGENDA_PAGE_SIZE = 100;
+/** Após um 429, pula N ticks de polling (N × intervalo ≈ janela de backoff). */
+const POLL_BACKOFF_TICKS = 3;
+
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
 
@@ -177,48 +183,90 @@ export default function PreAgendaPage(): JSX.Element {
     loadUser();
   }, []);
 
+  // #1668 (M12-19): controle do ciclo de requisições.
+  // - seqRef: guarda de sequência (latest-wins) — descarta resposta obsoleta.
+  // - pollBackoffRef: ticks de polling a pular após um 429.
+  // - filtersRef: mantém loadData estável (não recria a cada tecla).
+  const seqRef = useRef(0);
+  const pollBackoffRef = useRef(0);
+  const filtersRef = useRef({ searchTerm, sectorFilter, dateRange });
+  filtersRef.current = { searchTerm, sectorFilter, dateRange };
+
   const loadData = useCallback(async (): Promise<void> => {
+    const seq = ++seqRef.current;
     try {
       setLoading(true);
 
+      const { searchTerm, sectorFilter, dateRange } = filtersRef.current;
       const filters: Record<string, string> = { status: 'approved' };
       if (searchTerm) filters.q = searchTerm;
       if (sectorFilter) filters.sector = sectorFilter;
       if (dateRange[0]) filters.date_from = dateRange[0].format('YYYY-MM-DD');
       if (dateRange[1]) filters.date_to = dateRange[1].format('YYYY-MM-DD');
 
-      // Carregar ambos os fluxos e resumo
+      // page_size alto: a pré-agenda é uma lista única (paginação client-side),
+      // então carrega o conjunto de aprovados de uma vez, não só a 1ª página.
+      const listParams = { ...filters, page_size: PREAGENDA_PAGE_SIZE };
       const [superData, naoSuperData, summaryData] = await Promise.all([
-        listSolicitacoes({ ...filters, flow: 'SUPER' }) as Promise<PaginatedResponse<Solicitacao> | Solicitacao[]>,
-        listSolicitacoes({ ...filters, flow: 'NAO_SUPER' }) as Promise<PaginatedResponse<Solicitacao> | Solicitacao[]>,
+        listSolicitacoes({ ...listParams, flow: 'SUPER' }) as Promise<PaginatedResponse<Solicitacao> | Solicitacao[]>,
+        listSolicitacoes({ ...listParams, flow: 'NAO_SUPER' }) as Promise<PaginatedResponse<Solicitacao> | Solicitacao[]>,
         getStatusSummary(filters),
       ]);
 
+      if (seq !== seqRef.current) return; // carga obsoleta: uma mais nova venceu
+
       const superRows = 'results' in superData ? superData.results : superData;
       const naoRows = 'results' in naoSuperData ? naoSuperData.results : naoSuperData;
-      const superCount = 'count' in superData ? superData.count : (superData as Solicitacao[]).length;
-      const naoCount = 'count' in naoSuperData ? naoSuperData.count : (naoSuperData as Solicitacao[]).length;
+      const loadedRows = [...superRows, ...naoRows];
 
-      setRows([...superRows, ...naoRows]);
-      setTotal(superCount + naoCount);
+      pollBackoffRef.current = 0; // sucesso zera o backoff
+      setRows(loadedRows);
+      // Contador honesto: exibe o total efetivamente carregado, nunca o count do
+      // servidor sobre uma lista de 1 página (total inalcançável).
+      setTotal(loadedRows.length);
       setSummary(summaryData);
     } catch (error) {
+      if (seq !== seqRef.current) return; // erro de carga obsoleta: não polui a UI
+      const status = (error as { status?: number }).status;
+      if (status === 429) {
+        // O operador estourou o próprio throttle; recua alguns ticks de polling.
+        pollBackoffRef.current = POLL_BACKOFF_TICKS;
+      }
       message.error('Erro ao carregar pré-agenda: ' + (error as Error).message);
     } finally {
-      setLoading(false);
+      if (seq === seqRef.current) setLoading(false);
     }
-  }, [searchTerm, sectorFilter, dateRange]);
+  }, []);
 
+  // Carga inicial imediata no mount + recargas por filtro com debounce: o valor
+  // digitado nunca dispara um request por tecla, e não há carga dupla (o polling
+  // roda com immediate:false).
+  const firstRunRef = useRef(true);
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (firstRunRef.current) {
+      firstRunRef.current = false;
+      void loadData();
+      return;
+    }
+    const timer = setTimeout(() => {
+      void loadData();
+    }, TIMING.DEBOUNCE_SEARCH_MS);
+    return () => clearTimeout(timer);
+  }, [searchTerm, sectorFilter, dateRange, loadData]);
 
-  // RT-02: Polling 5s for cross-device sync (#1032)
-  const loadDataRef = useRef(loadData);
-  loadDataRef.current = loadData;
-  usePolling(() => loadDataRef.current(), {
+  // RT-02: Polling 5s para sync cross-device (#1032). immediate:false → a carga
+  // inicial é do efeito de filtro (sem carga dupla). O tick honra o backoff de 429.
+  const handlePollTick = useCallback((): void => {
+    if (pollBackoffRef.current > 0) {
+      pollBackoffRef.current -= 1;
+      return;
+    }
+    void loadData();
+  }, [loadData]);
+  usePolling(handlePollTick, {
     enabled: true,
     intervalMs: TIMING.SYNC_POLL_INTERVAL_MS,
+    immediate: false,
     events: ['preagenda:refresh', 'solicitacoes:refresh'],
   });
 

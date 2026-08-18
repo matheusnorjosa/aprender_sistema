@@ -33,6 +33,7 @@ import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 
 import { getSolicitacao, updateSolicitacao } from '../../api/solicitacoes';
+import { optionalText } from './optionalText';
 import {
   lookupMunicipios,
   lookupProjetos,
@@ -274,7 +275,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
         tipo: formData.tipo || null,
         encontro: formData.encontro || null,
         segmento: formData.segmento || null,
-        observacoes: formData.observacoes || null,
+        observacoes: optionalText(formData.observacoes),
         local: formData.local || '',
         is_online: !!formData.is_online,
         extra_participants: {

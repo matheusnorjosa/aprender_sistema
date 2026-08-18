@@ -101,6 +101,7 @@ interface FormacoesFilters {
 }
 
 interface FormacaoFormValues {
+  titulo: string;
   projeto: number;
   municipio: number;
   coordenador: number | null;
@@ -668,6 +669,13 @@ export default function FormacoesPage(): JSX.Element {
         <Form form={form} layout="vertical" autoComplete="off" onFinish={handleSave}>
           {/* Identificação */}
           <Card size="small" title="Identificação" className="mb-4">
+            <Form.Item
+              name="titulo"
+              label="Título da Formação"
+              rules={[{ required: true, message: 'Informe o título da formação' }]}
+            >
+              <Input placeholder="Ex.: Formação inicial de Língua Portuguesa" maxLength={200} />
+            </Form.Item>
             <Row gutter={16}>
               <Col xs={24} sm={8}>
                 <Form.Item

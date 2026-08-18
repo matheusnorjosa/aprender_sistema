@@ -74,10 +74,11 @@ export interface DeslocamentoPayload {
  * Lista deslocamentos visíveis ao usuário (paginado, 50 por página).
  */
 export async function listDeslocamentos(
-  filters: DeslocamentoFilters = {}
+  filters: DeslocamentoFilters = {},
+  options: { signal?: AbortSignal } = {}
 ): Promise<PaginatedResponse<DeslocamentoRecord>> {
   const url = buildUrl('/deslocamentos/', filters as QueryParams);
-  return await fetchAPI<PaginatedResponse<DeslocamentoRecord>>(url);
+  return await fetchAPI<PaginatedResponse<DeslocamentoRecord>>(url, { ...options });
 }
 
 /**

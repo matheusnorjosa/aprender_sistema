@@ -338,6 +338,7 @@ export default function DeslocamentosPage(): JSX.Element {
             icon={<EditOutlined />}
             onClick={() => handleEdit(record)}
             size="small"
+            aria-label="Editar deslocamento"
           />
           <Popconfirm
             title="Tem certeza que deseja deletar?"
@@ -345,7 +346,7 @@ export default function DeslocamentosPage(): JSX.Element {
             okText="Sim"
             cancelText="Não"
           >
-            <Button type="link" danger icon={<DeleteOutlined />} size="small" />
+            <Button type="link" danger icon={<DeleteOutlined />} size="small" aria-label="Excluir deslocamento" />
           </Popconfirm>
         </Space>
       ),

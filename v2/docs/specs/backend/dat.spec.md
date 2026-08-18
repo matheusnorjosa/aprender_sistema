@@ -1,8 +1,9 @@
 ---
 title: Módulo DAT
 status: canonical
-last_verified: 2026-07-24
+last_verified: 2026-08-18
 sources_of_truth:
+  - v2/backend/apps/core/services/controle_acoes_import.py
   - v2/backend/apps/core/models/dat_acao.py
   - v2/backend/apps/core/models/dat_cadastro.py
   - v2/backend/apps/core/models/dat_compra.py
@@ -35,7 +36,7 @@ O módulo DAT (Departamento de Apoio Técnico/Tecnologia) gerencia o ciclo opera
 No código convivem **dois conjuntos de models** com a mesma origem de dados (planilha DAT), mas finalidades diferentes — o que segue a distinção legacy×operacional do projeto:
 
 - **Operacional (UI/CRUD via DRF):** `DATAcao`, `DATCadastro`, `DATCompra`, `DATFormacao`, `DATCoordenador`/`DATArea`, `DATRegistro` (tabelas `core_dat_*`). É o que esta spec governa.
-- **Legacy (histórico de import ETL):** `AcaoDAT` em [`workflow.py:135`](../../../backend/apps/core/models/workflow.py) (tabela `core_acao_dat`), com o enum de choices `TipoAcaoDAT` (`workflow.py:124`, `models.TextChoices` — **não é model**). Alimentado por importação por `external_hash`; não é o caminho de edição da UI nova.
+- **Legacy (histórico de import ETL):** `AcaoDAT` em [`workflow.py:135`](../../../backend/apps/core/models/workflow.py) (tabela `core_acao_dat`), com o enum de choices `TipoAcaoDAT` (`workflow.py:124`, `models.TextChoices` — **não é model**). Alimentado por importação por `external_hash`; não é o caminho de edição da UI nova. **`AcaoControle`** ([`workflow.py:64`](../../../backend/apps/core/models/workflow.py), tabela `core_acao_controle`) também é legacy: o import de ações (`POST /api/controle/import-acoes/`) foi **redirecionado para `DATAcao`** na Onda 1 (ver [`docs/plans/PLANO_IMPORTS_ORFAOS.md`](../../plans/PLANO_IMPORTS_ORFAOS.md)); a tabela fica órfã até o drop.
 
 ## Fonte de verdade no código
 
@@ -109,7 +110,7 @@ Notas: a composition OR do #1220 vale só para Coordenador/Ação/Formação. Em
 
 ## Fluxos principais
 
-**Ação DAT (ciclo de implantação):** cria-se `DATAcao` para `(municipio, projeto)` → preenche as 4 etapas (status + data + observação) → `progresso`/`etapa_atual` refletem o avanço → `stats` agrega por etapa/projeto/coordenador. A constraint impede duplicar a mesma dupla município/projeto.
+**Ação DAT (ciclo de implantação):** cria-se `DATAcao` para `(municipio, projeto)` → preenche as 4 etapas (status + data + observação) → `progresso`/`etapa_atual` refletem o avanço → `stats` agrega por etapa/projeto/coordenador. A constraint impede duplicar a mesma dupla município/projeto. A `DATAcao` pode ser criada pela UI **ou** pelo import de ações (`POST /api/controle/import-acoes/`, dry-run por padrão) — que faz upsert pela chave natural `(municipio, projeto)`, mapeia o coordenador da origem para `DATCoordenador` (email→nome→null) e **deriva o status de cada etapa da presença da data** (tem data → concluído; senão pendente). Ver Onda 1 em [`docs/plans/PLANO_IMPORTS_ORFAOS.md`](../../plans/PLANO_IMPORTS_ORFAOS.md).
 
 **Cadastro de plataforma:** cria-se `DATCadastro` para `(municipio, projeto_geral, plataforma)` → workflow FORMAR (Criação Curso → Chaves → Instruções → Envio) ou AVALIAR (Recebimento → Validação → Importação) → `POST {id}/etapa/` atualiza uma etapa específica (`etapa` inválida → **400**) → `progresso` por plataforma.
 

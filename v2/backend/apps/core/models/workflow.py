@@ -1,7 +1,11 @@
 """
 AS v2 — Workflow Models
 
-Models de workflow operacional: Deslocamento, AcaoControle, AcaoDAT.
+Operacional: Deslocamento.
+LEGACY (nenhuma tela lê — ver v2/docs/plans/PLANO_IMPORTS_ORFAOS.md): AcaoControle, AcaoDAT.
+- AcaoControle: o import de ações foi redirecionado para DATAcao (Onda 1). A tabela
+  fica órfã até o drop (Onda 1 / PR de remoção). Use DATAcao (models/dat_acao.py).
+- AcaoDAT: destino operacional é DATCadastro (Onda 2, ainda pendente).
 Type-checked with Pyright (strict mode).
 """
 
@@ -63,6 +67,11 @@ class Deslocamento(models.Model):
 
 class AcaoControle(models.Model):
     """
+    LEGACY — não é lido por nenhuma tela. O import de ações grava em DATAcao
+    (models/dat_acao.py, lido por /dat/acoes-ciclo/) desde a Onda 1 do programa
+    de imports órfãos (v2/docs/plans/PLANO_IMPORTS_ORFAOS.md). Esta tabela fica
+    órfã até o drop (PR de remoção da Onda 1). Não escrever aqui.
+
     Acoes do setor Controle: acompanhamento de entregas, cartas, reunioes.
 
     Campos:
@@ -134,6 +143,10 @@ class TipoAcaoDAT(models.TextChoices):
 
 class AcaoDAT(models.Model):
     """
+    LEGACY — nenhuma tela lê. O destino operacional é DATCadastro
+    (Onda 2 do programa de imports órfãos, v2/docs/plans/PLANO_IMPORTS_ORFAOS.md,
+    ainda pendente). Evitar novos escritores.
+
     Acoes do setor DAT: cadastros diversos por municipio/projeto.
 
     Campos:

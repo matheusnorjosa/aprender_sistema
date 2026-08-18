@@ -112,6 +112,7 @@ revalidação dos 46 restantes.
 | `M10-04` | **P1** | aberto | solicitacoes: extra_participants aceita alvo arbitrário sem policy, sem limite e estoura 500 | Grande. `create` exige `HasPerm("create_solicitation")` (views_solicit… | #1626 | — |
 | `M10-05` | **P1** | aberto | solicitacoes: edição não reconcilia participantes — convidados e COORD_ACOMPANHA ficam órfãos e… | Existe e é o fluxo comum: 42 Coordenadores ativos + 9 Gerentes + 1 sup… | #1627 | — |
 | `M10-07` | **P1** | aberto | imports/eventos: reimport sobrescreve decisão de aprovação, owner e datas e reporta "unchanged" | DAT (3 membros ativos não-superuser) + superuser (1). `import_spreadsh… | #1628 | — |
+| `M10-08` | **P2** | em andamento | solicitações: PATCH (re)atribui município/projeto para par sem Compra — elegibilidade era create-only (auditoria dinâmica 2026-08-17) | Coordenador (42 ativos) e demais criadores editando a própria solicitação | #1738 | — |
 | `M12-19` | **P1** | aberto | Pré-agenda: polling estoura o throttle do operador e a lista mostra total inalcançável | Sim. Rota `/pre-agenda` e `/controle/pre-agenda` sao gateadas por `Req… | #1629 | — |
 | `M14-02` | **P1** | aberto | Grade mensal: evento com 2+ participantes multiplica CH, codigo e detalhes por participante | Amplo e real. `MonthlyAvailabilityView.permission_classes = [IsAuthent… | #1630 | — |
 | `M14-05` | **P1** | aberto | Disponibilidade/Grade Mensal: unificar a população da grade — visão "Todas" usa coorte históric… | Permanentemente: Controle (1 ativo), DAT (3 ativos), superuser (1) — t… | #1631 | — |

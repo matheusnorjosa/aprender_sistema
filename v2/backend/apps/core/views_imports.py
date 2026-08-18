@@ -125,8 +125,8 @@ class ControleImportAcoesView(APIView):
                 temp_file.write(chunk)
             temp_file.close()
 
-            # Executar import
-            report = import_acoes_controle(file_path=temp_file.name, dry_run=dry_run)
+            # Executar import — o ator (request.user) vira DATAcao.created_by
+            report = import_acoes_controle(file_path=temp_file.name, dry_run=dry_run, created_by=request.user)
 
             return Response(report, status=status.HTTP_200_OK)
 

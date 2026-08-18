@@ -1,15 +1,22 @@
 """
-Serviço de import para AcaoControle.
+Serviço de import de Ações → DATAcao (modelo operacional).
 
-Lê CSV/XLSX e cria/atualiza AcaoControle por external_hash único.
+Onda 1 do programa de imports órfãos (v2/docs/plans/PLANO_IMPORTS_ORFAOS.md):
+o import foi redirecionado do legacy ``AcaoControle`` (que nenhuma tela lê) para
+``DATAcao``, lido pela AcoesPage em ``/dat/acoes-ciclo/``.
 
 Regras de negócio:
-- Município/Projeto resolvidos por nome (norm_text)
-- Coordenador resolvido por email > nome
+- Município/Projeto resolvidos por nome (resolvers accent/alias-insensitive)
+- Coordenador da origem (email/nome) → DATCoordenador (email → nome → null)
 - Datas parseadas: ISO, dd/mm/yyyy, dd/mm/yy, Excel serial
-- Idempotência: SHA1(municipio_id|projeto_id|coordenador_id)
-  - external_hash baseado em identidade estável
-  - Dados variáveis (datas/obs) atualizam o mesmo registro
+- Mapa de datas: data_carta→data_carta, contato_inicial→data_contato,
+  data_reuniao→data_reuniao, data_entrega→data_entrega
+- Status por etapa DERIVADO: etapa com data preenchida → "concluído"; senão "pendente".
+  (Inserção manual pela tela constrói a linha do tempo passo a passo; o import
+  apenas reflete o que a data já indica.)
+- observacao única da origem → observacao_carta (1ª etapa)
+- created_by OBRIGATÓRIO (DATAcao.created_by é NOT NULL) — o endpoint passa request.user
+- Idempotência: chave natural (municipio, projeto) via upsert
 - Relatório em out_etl/import_acoes_controle_report.json
 """
 
@@ -25,33 +32,37 @@ from typing import Any
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 
-from apps.core.imports.hashing import stable_import_hash
 from apps.core.imports.row_errors import registrar_erro_import
-from apps.core.models import AcaoControle, Municipio, Projeto, Usuario
-from apps.core.services.resolvers import (
-    resolve_municipio,
-    resolve_projeto,
-    resolve_user_by_email,
-    resolve_user_by_name,
-)
-from apps.core.types import ExternalHash
+from apps.core.models import DATAcao, DATCoordenador, Municipio, Projeto, Usuario
+from apps.core.services.resolvers import resolve_municipio, resolve_projeto
 
 OUT_DIR: Path = Path(settings.BASE_DIR) / "out_etl"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def import_acoes_controle(file_path: str, dry_run: bool = False) -> dict[str, Any]:
+def import_acoes_controle(
+    file_path: str, dry_run: bool = False, *, created_by: Usuario | None = None
+) -> dict[str, Any]:
     """
-    Importa ações de controle de CSV/XLSX.
+    Importa ações de CSV/XLSX para ``DATAcao``.
 
     Args:
         file_path: Caminho do arquivo
-        dry_run: Se True, simula sem gravar
+        dry_run: Se True, simula sem gravar (rollback)
+        created_by: Usuário responsável pela importação (obrigatório —
+            ``DATAcao.created_by`` é NOT NULL). O endpoint passa ``request.user``.
 
     Returns:
         Dict com stats e pendências
+
+    Raises:
+        ValueError: se ``created_by`` não for informado.
     """
+    if created_by is None:
+        raise ValueError("created_by é obrigatório (DATAcao.created_by é NOT NULL; o endpoint passa request.user).")
+
     stats: dict[str, Any] = {
         "created": 0,
         "updated": 0,
@@ -76,7 +87,7 @@ def import_acoes_controle(file_path: str, dry_run: bool = False) -> dict[str, An
         for idx, row in enumerate(rows, start=1):
             try:
                 with transaction.atomic():  # savepoint
-                    result: str | None = _process_row(row, idx, stats, pendencias)
+                    result: str | None = _process_row(row, idx, stats, pendencias, created_by)
                     if result == "skip":
                         continue
             except Exception:
@@ -205,104 +216,116 @@ def _normalize_headers(row: dict[str, Any]) -> dict[str, str | None]:
     return normalized
 
 
+def _resolve_dat_coordenador(value: str) -> DATCoordenador | None:
+    """Mapeia o coordenador da origem (email ou nome) para um DATCoordenador.
+
+    Ordem: email (principal ou alternativo) → nome → None. Coordenador é
+    opcional em DATAcao (SET_NULL), então não-encontrado devolve None.
+    """
+    v = value.strip()
+    if not v:
+        return None
+    if "@" in v:
+        return DATCoordenador.objects.filter(Q(email__iexact=v) | Q(email_alternativo__iexact=v)).order_by("id").first()
+    return DATCoordenador.objects.filter(nome__iexact=v).order_by("id").first()
+
+
+def _derive_status(data_etapa: date | None) -> str:
+    """Deriva o status de uma etapa: tem data → concluído; senão pendente."""
+    return DATAcao.StatusEtapa.CONCLUIDO if data_etapa else DATAcao.StatusEtapa.PENDENTE
+
+
 def _process_row(
-    row: dict[str, Any], idx: int, stats: dict[str, Any], pendencias: dict[str, list[dict[str, Any]]]
+    row: dict[str, Any],
+    idx: int,
+    stats: dict[str, Any],
+    pendencias: dict[str, list[dict[str, Any]]],
+    created_by: Usuario,
 ) -> str | None:
     """
-    Processa uma linha do CSV/XLSX.
+    Processa uma linha do CSV/XLSX, gravando em ``DATAcao``.
 
     Returns:
         "skip" se linha deve ser pulada, None caso contrário
     """
     norm: dict[str, str | None] = _normalize_headers(row)
 
-    # Resolver município
+    # Resolver município (obrigatório)
     municipio_nome: str | None = norm["municipio"]
     if not municipio_nome:
         stats["skipped"]["municipio"] += 1
         pendencias["municipios"].append({"linha": idx, "nome": None})
         return "skip"
 
-    # `resolve_municipio` is accent-insensitive (NFKD fallback) and parses
-    # "Cidade - UF" / "Cidade/UF" formats. The previous direct
-    # `nome__iexact=norm_text(...)` query stripped accents from the input but
-    # not from the DB column, so accented entries (e.g. "Iguatú") never matched.
+    # `resolve_municipio` é accent-insensitive (fallback NFKD) e parseia
+    # formatos "Cidade - UF" / "Cidade/UF".
     municipio: Municipio | None = resolve_municipio(municipio_nome)
     if not municipio:
         stats["skipped"]["municipio"] += 1
         pendencias["municipios"].append({"linha": idx, "nome": municipio_nome})
         return "skip"
 
-    # Resolver projeto
+    # Resolver projeto (obrigatório)
     projeto_nome: str | None = norm["projeto"]
     if not projeto_nome:
         stats["skipped"]["projeto"] += 1
         pendencias["projetos"].append({"linha": idx, "nome": None})
         return "skip"
 
-    # Same accent/alias-insensitive resolver used elsewhere in the codebase.
     projeto: Projeto | None = resolve_projeto(projeto_nome)
     if not projeto:
         stats["skipped"]["projeto"] += 1
         pendencias["projetos"].append({"linha": idx, "nome": projeto_nome})
         return "skip"
 
-    # Resolver coordenador (opcional)
-    coordenador: Usuario | None = None
+    # Resolver coordenador (opcional) → DATCoordenador
+    coordenador: DATCoordenador | None = None
     coordenador_val: str | None = norm["coordenador"]
     if coordenador_val:
-        if "@" in coordenador_val:
-            coordenador = resolve_user_by_email(coordenador_val)
-        else:
-            coordenador = resolve_user_by_name(coordenador_val)
-
+        coordenador = _resolve_dat_coordenador(coordenador_val)
         if not coordenador:
             stats["skipped"]["coordenador"] += 1
             pendencias["coordenadores"].append({"linha": idx, "valor": coordenador_val})
-            # Não retorna skip, coordenador é opcional
+            # Não retorna skip — coordenador é opcional (SET_NULL)
 
-    # Parsear datas
-    data_entrega: date | None = _parse_date(norm["data_entrega"])
+    # Parsear datas (mapa AcaoControle → DATAcao)
     data_carta: date | None = _parse_date(norm["data_carta"])
-    contato_inicial: date | None = _parse_date(norm["contato_inicial"])
+    data_contato: date | None = _parse_date(norm["contato_inicial"])
     data_reuniao: date | None = _parse_date(norm["data_reuniao"])
+    data_entrega: date | None = _parse_date(norm["data_entrega"])
 
-    # Criar external_hash (baseado em identidade estável)
-    # external_hash baseado em identidade (município, projeto, coordenador).
-    # Dados variáveis (datas/obs) atualizam o mesmo registro.
-    coord_id: int | str = getattr(coordenador, "id", "NA")
-    external_hash: ExternalHash = stable_import_hash(str(municipio.id), str(projeto.id), str(coord_id))
+    # observacao única da origem → observacao_carta (respeita max_length=500)
+    observacao: str = (norm["observacao"] or "")[:500]
 
-    # Verificar se já existe registro com este external_hash
-    existing: AcaoControle | None = AcaoControle.objects.filter(external_hash=external_hash).first()
-
-    # Preparar campos para criação/atualização
+    # Campos operacionais (mutáveis) — base da detecção de mudança no upsert
     defaults: dict[str, Any] = {
-        "municipio": municipio,
-        "projeto": projeto,
         "coordenador": coordenador,
-        "data_entrega": data_entrega,
+        "status_carta": _derive_status(data_carta),
         "data_carta": data_carta,
-        "contato_inicial": contato_inicial,
+        "status_contato": _derive_status(data_contato),
+        "data_contato": data_contato,
+        "status_reuniao": _derive_status(data_reuniao),
         "data_reuniao": data_reuniao,
-        "observacao": norm["observacao"],
+        "status_entrega": _derive_status(data_entrega),
+        "data_entrega": data_entrega,
+        "observacao_carta": observacao,
     }
 
-    if existing:
-        # Detectar mudanças comparando campos
-        changed: bool = any(getattr(existing, k) != v for k, v in defaults.items())
+    # Upsert idempotente pela chave natural (municipio, projeto)
+    existing: DATAcao | None = DATAcao.objects.filter(municipio=municipio, projeto=projeto).first()
 
+    if existing:
+        changed: bool = any(getattr(existing, k) != v for k, v in defaults.items())
         if changed:
-            # Atualizar campos modificados
             for k, v in defaults.items():
                 setattr(existing, k, v)
-            existing.save(update_fields=list(defaults.keys()))
+            existing.updated_by = created_by
+            existing.save(update_fields=[*defaults.keys(), "updated_by"])
             stats["updated"] += 1
         else:
             stats["unchanged"] += 1
     else:
-        # Criar novo registro
-        AcaoControle.objects.create(external_hash=external_hash, **defaults)
+        DATAcao.objects.create(municipio=municipio, projeto=projeto, created_by=created_by, **defaults)
         stats["created"] += 1
 
     return None

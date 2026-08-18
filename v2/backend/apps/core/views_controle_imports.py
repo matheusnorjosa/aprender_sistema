@@ -32,17 +32,9 @@ from apps.core.serializers.openapi_critical_contract import (
     ImportOperationResponseSerializer,
 )
 from apps.core.services.controle_imports import import_compras_from_file
-from apps.core.upload_validators import safe_temp_upload_file
+from apps.core.upload_validators import safe_temp_upload_file, validate_upload
 
 logger = logging.getLogger(__name__)
-
-# Issue #569: Upload validation hardening (DoS/malicious file prevention)
-MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB
-ALLOWED_CONTENT_TYPES = {
-    "text/csv",
-    "application/vnd.ms-excel",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-}
 
 
 class ImportComprasView(APIView):
@@ -111,17 +103,12 @@ class ImportComprasView(APIView):
         except (KeyError, MultiValueDictKeyError):
             return Response({"detail": "Campo 'file' é obrigatório."}, status=status.HTTP_400_BAD_REQUEST)
 
-        if upload.size > MAX_UPLOAD_SIZE:
-            return Response(
-                {"detail": f"Arquivo muito grande. Máximo: {MAX_UPLOAD_SIZE / 1024 / 1024:.0f}MB"},
-                status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            )
-
-        if upload.content_type not in ALLOWED_CONTENT_TYPES:
-            return Response(
-                {"detail": f"Tipo de arquivo não permitido. Aceitos: CSV, XLS, XLSX. Recebido: {upload.content_type}"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        # S6 (#1742): valida tamanho + Content-Type + MAGIC BYTES (anti-spoofing),
+        # igual aos ~10 outros endpoints de import (validate_upload). Antes so checava
+        # size + content_type (header spoofavel). Devolve Response de erro ou None.
+        upload_error = validate_upload(upload)
+        if upload_error is not None:
+            return upload_error
 
         # Salvar upload em /tmp via tempfile
         temp_file = None

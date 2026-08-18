@@ -372,3 +372,45 @@ class TestUsuarioAdminAudit:
         assert log.usuario_id == superuser.id
         assert log.details["target_user_id"] == common_user.id
         assert log.details["added_groups"] == ["DAT"]
+
+
+# ============================================================================
+# M23-02 / #1657: `target_username` (que pode ser CPF) e redigido na ESCRITA —
+# o AuditLog "nasce sem PII integral", nao depende da redacao de leitura.
+# ============================================================================
+
+
+class TestTargetUsernameRedigidoNaEscrita:
+    def test_target_username_cpf_redigido_na_escrita(self, superuser, django_capture_on_commit_callbacks):
+        from apps.core.services.audit import auditar_reset_senha
+
+        alvo = UsuarioFactory(username="11144477735", cpf="11144477735")
+        AuditLog.objects.filter(action="RESET_PASSWORD").delete()
+        with django_capture_on_commit_callbacks(execute=True):
+            auditar_reset_senha(actor=superuser, target_user=alvo)
+        log = AuditLog.objects.filter(action="RESET_PASSWORD").latest("created_at")
+        assert log.details["target_username"] == "<cpf>"
+        assert "11144477735" not in str(log.details)
+
+    def test_sentinela_identidade_nao_persiste_cpf_cru(self, superuser, django_capture_on_commit_callbacks):
+        import re
+
+        from apps.core.services.audit import auditar_assign_groups, auditar_privilege_flags, auditar_reset_senha
+
+        cpf = "11144477735"
+        alvo = UsuarioFactory(username=cpf, cpf=cpf)
+        grupo = GroupFactory(name="DAT")
+        AuditLog.objects.all().delete()
+        with django_capture_on_commit_callbacks(execute=True):
+            auditar_reset_senha(actor=superuser, target_user=alvo)
+            auditar_privilege_flags(
+                actor=superuser,
+                target_user=alvo,
+                before={"is_superuser": False, "is_staff": False, "is_active": False},
+                via="rest_api",
+            )
+            auditar_assign_groups(actor=superuser, target_user=alvo, before_group_ids=[], after_group_ids=[grupo.pk])
+        logs = list(AuditLog.objects.all())
+        assert logs, "esperava AuditLogs das mutacoes de identidade"
+        for log in logs:
+            assert not re.search(r"\b\d{11}\b", str(log.details)), f"CPF cru persistido em {log.action}: {log.details}"

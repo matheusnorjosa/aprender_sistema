@@ -127,6 +127,7 @@ revalidação dos 46 restantes.
 | `M17-01` | **P1** | aberto | DAT/imports: card "Importar CADASTROS DAT" grava AcaoDAT legacy, que nenhuma tela le | DAT (3 membros ativos nao-superuser) + 1 superuser. O gate do card e d… | #1640 | — |
 | `M17-02` | **P1** | resolvido | DAT (Ações/Cadastros): editar pelo modal apaga silenciosamente as datas do registro | DAT, Controle e Assistente Administrativo | #1641 | `a0553fd7` (2026-08-11) |
 | `M19-01` | **P1** | resolvido | DAT/PlanoFormacoes: CH total e anual ficam um PATCH atrasadas ao atualizar formação inline | DAT e superuser | #1642 | `f9e40902` (2026-08-11) |
+| `M19-02` | **P2** | em andamento | field-drift form↔serializer: DATFormacao.titulo obrigatório sem Form.Item (400 no create) + Solicitacao.observacoes coage null para allow_null=False (auditoria dinâmica 2026-08-17; instância do épico #1655) | DAT (3 ativos) e Coordenador (42 ativos) criadores | #1739 | — |
 | `M22-14` | **P1** | aberto | Import de bloqueios: resolucao por nome com fallback substring cria bloqueio auto-aprovado na a… | Grupo DAT (3 membros ativos nao-superuser) + 1 superuser ativo, via `H… | #1643 | — |
 | `M23-02` | **P1** | aberto | auditoria: redigir CPF (`username`) nos AuditLog de LOGIN_FAILED, na escrita e na leitura | DAT (3 ativos), Controle (1), Superintendencia (1), Gerente (9) — 14 n… | #1644 | — |
 | `M26-02` | **P1** | aberto | DR: restore_db.sh declara "Restore completed successfully!" com exit 0 apos um restore que perd… | Operador de DR com SSH na VM02 (na pratica o unico superuser/dono). Na… | #1645 | — |

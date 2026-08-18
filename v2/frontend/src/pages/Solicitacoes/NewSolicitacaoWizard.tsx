@@ -36,6 +36,7 @@ import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 
 import { createSolicitacao } from '../../api/solicitacoes';
+import { optionalText } from './optionalText';
 import {
   lookupMunicipiosWithFilters,
   lookupProjetos,
@@ -325,7 +326,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
         tipo: formData.tipo || null,
         encontro: formData.encontro || null,
         segmento: formData.segmento || null,
-        observacoes: formData.observacoes || null,
+        observacoes: optionalText(formData.observacoes),
         local: formData.local || '',
         // PR19: incluir modalidade no payload
         is_online: !!formData.is_online,

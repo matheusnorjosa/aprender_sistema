@@ -129,32 +129,15 @@ class UsuarioAdmin(admin.ModelAdmin):
         Mudança de grupos vai pelo `save_related` (m2m). O change_view do admin já
         roda em `transaction.atomic()`, então o on_commit reflete o commit real.
         """
-        from apps.core.services.audit import registrar_auditoria
+        from apps.core.services.audit import auditar_privilege_flags
 
         before: dict[str, Any] = {}
         if change and obj.pk:
             before = Usuario.objects.filter(pk=obj.pk).values("is_superuser", "is_staff", "is_active").first() or {}
         super().save_model(request, obj, form, change)
-
-        changes: dict[str, Any] = {}
-        for flag in ("is_superuser", "is_staff", "is_active"):
-            after_val = bool(getattr(obj, flag))
-            before_val = before.get(flag)
-            # Em criação (change=False) só audita flag LIGADA (concessão inicial).
-            if (change and before_val != after_val) or (not change and after_val):
-                changes[flag] = {"before": before_val, "after": after_val}
-        if changes:
-            registrar_auditoria(
-                actor=request.user,
-                action=AuditLog.Action.USER_PRIVILEGE_CHANGED,
-                model_name="Usuario",
-                details={
-                    "target_user_id": obj.pk,
-                    "target_username": obj.username,
-                    "changes": changes,
-                    "via": "django_admin",
-                },
-            )
+        # SSOT com o path REST (#1618): mesma logica before/after + contrato de details,
+        # para os dois caminhos (Admin e API) nao voltarem a divergir.
+        auditar_privilege_flags(actor=request.user, target_user=obj, before=(before or None), via="django_admin")
 
     def save_related(self, request: HttpRequest, form: Any, formsets: Any, change: bool) -> None:
         """

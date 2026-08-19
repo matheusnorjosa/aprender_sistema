@@ -111,6 +111,15 @@ class DATRegistro(models.Model):
         verbose_name="Nº de Códigos",
         help_text="Calculado automaticamente baseado em projeto_geral",
     )
+    # Valor de "Nº de Códigos" como veio da planilha (export-contract), para
+    # reconciliar contra o nr_codigos que o sistema recalcula (compra + 10%).
+    # Não é autoridade; serve de base de comparação na migração das planilhas.
+    nr_codigos_planilha = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Nº de Códigos (planilha)",
+        help_text="Valor importado da planilha, para reconciliar com nr_codigos calculado.",
+    )
 
     # Status de envio FORMAR com datas
     chaves_inscricao_status = models.CharField(

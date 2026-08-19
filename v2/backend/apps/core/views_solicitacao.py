@@ -89,6 +89,25 @@ class _ExtraParticipantsSerializer(serializers.Serializer):
     )
 
 
+class _BatchIdsSerializer(serializers.Serializer):
+    """
+    M11-04 (#1650): valida o TIPO do corpo das ações batch-approve/batch-reject.
+
+    Sem esta validação, `ids` chegava cru ao serviço, que só checava falsiness e
+    tamanho: uma string `"8910"` era iterada por `id__in` decompondo em dígitos
+    (aprova alvos não nomeados 8/9/1/0) e um int escalar estourava `len()` (500).
+
+    Escopo deliberado: valida apenas que `ids` é uma LISTA de inteiros positivos.
+    Vazio e limite (>100) continuam a cargo do serviço (`batch_*_solicitacoes`),
+    preservando as mensagens de contrato ("obrigatório" / limite de 100).
+    """
+
+    ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        allow_empty=True,
+    )
+
+
 @extend_schema_view(
     list=extend_schema(
         summary="Lista solicitações",
@@ -888,7 +907,11 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         PA-05: Cada solicitação gera um AuditLog individual com batch=true.
         Limite: máximo 100 solicitações por requisição.
         """
-        ids = request.data.get("ids", [])
+        # M11-04 (#1650): valida o payload antes do serviço — `ids` cru deixava
+        # string/int/dict passar (id__in decompunha string em dígitos; int → 500).
+        input_serializer = _BatchIdsSerializer(data=request.data)
+        input_serializer.is_valid(raise_exception=True)
+        ids = input_serializer.validated_data["ids"]
 
         # §1 Epic #459: Delegate to service layer
         result = batch_approve_solicitacoes(
@@ -925,7 +948,10 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         PA-05: Cada solicitação gera um AuditLog individual com batch=true.
         Limite: máximo 100 solicitações por requisição.
         """
-        ids = request.data.get("ids", [])
+        # M11-04 (#1650): mesma validação de entrada do batch-approve.
+        input_serializer = _BatchIdsSerializer(data=request.data)
+        input_serializer.is_valid(raise_exception=True)
+        ids = input_serializer.validated_data["ids"]
 
         # §1 Epic #459: Delegate to service layer
         result = batch_reject_solicitacoes(

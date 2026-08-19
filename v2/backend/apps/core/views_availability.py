@@ -199,6 +199,28 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
             },
         )
 
+    def perform_update(self, serializer):
+        """
+        M08-01 (#1619): a titularidade de um bloqueio é IMUTÁVEL na edição.
+
+        O campo write-only `usuario_id` (attname da FK) chegava intacto ao
+        `ModelSerializer.update()` default (não havia `perform_update`), então um
+        PATCH/PUT reatribuía o dono do bloco — transferência silenciosa para um
+        usuário arbitrário, sem policy de delegação nem AuditLog. A concessão de
+        titularidade existe apenas no CREATE (`perform_create`, delegação PR 13);
+        editar um bloqueio altera horário/motivo, nunca o dono.
+
+        Aqui `usuario_id` é retirado do payload (não reatribui) e uma tentativa
+        de mudar o dono para outro usuário é rejeitada com 403.
+        """
+        from rest_framework.exceptions import PermissionDenied
+
+        instance = serializer.instance
+        target_id = serializer.validated_data.pop("usuario_id", None)
+        if target_id is not None and target_id != instance.usuario_id:
+            raise PermissionDenied("Não é possível transferir a titularidade de um bloqueio pela edição.")
+        serializer.save()
+
 
 class AvailabilityCheckView(APIView):
     """

@@ -1,8 +1,9 @@
 ---
 status: canonical
-last_verified: 2026-08-17
+last_verified: 2026-08-19
 audit_baseline: 90f6a048
 last_runtime_reverification: d08acfa5 (2026-07-20)
+last_v0_revalidation: f6eecd5f (2026-08-19; revalidação por código+git dos 46 itens `aberto`)
 last_confirmed_production_snapshot: 94f27651 (2026-07-20; estado atual não verificado)
 sources_of_truth:
   - v2/docs/audits/2026-07-17-system-module-audit.md
@@ -77,6 +78,56 @@ Esta é uma reconciliação de código e testes no repositório, não uma verifi
 Por isso nenhum item novo foi marcado `em prod`. A soma 51 (parciais + não revalidados) **não**
 é uma contagem de defeitos vivos em produção; o total acionável atual é indeterminado até a
 revalidação dos 46 restantes.
+
+## Revalidação V0 em 2026-08-19 (Onda V0 executada)
+
+Os **46 itens `aberto`** foram revalidados individualmente contra o `HEAD f6eecd5f`, por
+**código + git history + estado de issue/PR** (fan-out de 12 agentes, com verificação
+adversarial nos `resolvido` de alta severidade). **Não é verificação de deploy** — itens
+dependentes de nginx/DR/dados de prod seguem precisando de observação read-only em produção.
+
+| Veredito no `HEAD f6eecd5f` | Qtd |
+|---|---:|
+| **LIVE** — mecanismo ainda presente no código | **39** |
+| **parcial** — sintoma principal mitigado por PR recente, com residual | **6** |
+| **resolvido** — mecanismo não existe mais | **1** |
+
+### Reclassificados nesta passagem (7 dos 46)
+
+| ID | Sev. | Antes | Agora | PR/commit | Residual |
+|---|---|---|---|---|---|
+| `M12-15` | P2 | aberto | **resolvido** | #1760 (`9328227f`) | — (issue CLOSED; ownership do state pelo cache) |
+| `M03-03` | P1 | aberto | **resolvido** | #1758 (`9ae753e6`) | sub-ponto de IP no edge herda de `M01-01`/#1660 (não é código deste ID) |
+| `M12-19` | P1 | aberto | **parcial** | #1750 (`cdbc0d0c`) | paginação/total/dedup/backoff OK; residual: publish trata HTTP 202 como concluído |
+| `M15-02` | P1 | aberto | **parcial** | #1762 (`2f36b303`) | serializer + clamp do dashboard OK; falta CHECK-constraint no banco + datafix |
+| `M15-03` | P1 | aberto | **parcial** | #1764 | `external_hash` imutável no PATCH + `quantidade>0`; falta identidade natural-key + UniqueConstraint |
+| `M23-02` | P1 | aberto | **parcial** | #1735 (`20c6f48d`) | redação de CPF na escrita+leitura OK; resíduo teórico (username não-CPF por design) |
+| `M05-03` | P2 | aberto | **parcial** | #1572 (`a545d5f8`) | metade reverse-m2m corrigida; sintoma titulado (delete de Group deixa ex-membros stale) segue LIVE |
+
+O workflow ligou PR→achado **mesmo sem auto-close** da issue (M12-19/M23-02) e distinguiu
+"PR tocou o arquivo só por outro motivo" (M10-06/#1699 PII, M08-12/#1680 erro genérico) — sem
+falso-resolvido. Os 5 PRs desta leva (#1758/#1760/#1761/#1762/#1764) mais LGPD/RBAC anteriores
+respondem por esses 7.
+
+### Os 39 que seguem LIVE (mecanismo confirmado no `HEAD`, cada um com issue OPEN)
+
+`M01-01` `M01-07` `M02-09` `M03-02` `M04-01` `M04-05` `M05-07` `M06-04` `M07-01` `M07-02`
+`M08-01` `M08-07` `M08-09` `M08-12` `M09-05` `M10-01` `M10-02` `M10-03` `M10-04` `M10-05`
+`M10-06` `M10-07` `M11-04` `M14-01` `M14-02` `M14-03` `M14-05` `M15-04` `M15-05` `M15-08`
+`M15-09` `M16-04` `M17-01` `M18-05` `M18-06` `M22-14` `M26-02` `M26-03` `M27-24`
+
+> ⚠️ **`M07-01`/`M07-02` — reclassificar severidade (era P1):** `get_assignable_group_names`
+> (`services/rbac_service.py:41-50`) libera todo grupo `SETOR`/`FUNCAO` — inclui **Superintendência
+> (SETOR) + Gerente (FUNCAO)**, o combo aprovador (PA: `superuser OU Gerente+Superintendência`).
+> `validate_group_ids` (`serializers/usuario.py:243-263`) só barra auto-modificação e alvo superuser
+> — **não** barra montar o combo. Um portador de `manage_admin_registries` (DAT, não-superuser) cria
+> conta com senha + [Gerente, Superintendência] = **escalonamento a aprovador**. Mecanismo LIVE
+> (verificado 2026-08-19). A auditoria tratava a escopagem ator×alvo do admin de usuários como
+> **decisão de policy pendente (G2)**, não descuido — daí P1; decidir se vira P0.
+
+**Total acionável atual (por código, não deploy): 45** (39 LIVE + 6 parciais com residual). Os
+`resolvido` deixam de contar. Épicos-causa-raiz (V2) inalterados. Próxima onda: V1 (encerrar os
+parciais restantes) e V2 (épicos por causa raiz).
 
 ## Legenda de status
 

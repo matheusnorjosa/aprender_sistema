@@ -19,6 +19,7 @@ from rest_framework import serializers  # type: ignore[attr-defined]
 
 from apps.core.constants import FUNCAO_GROUPS, RESERVED_GROUPS, SETOR_GROUPS
 from apps.core.models import AuditLog, GroupClassificacao, PermissaoFuncional
+from apps.core.rbac import can_admin_mutate_target
 from apps.core.services.audit import (
     auditar_assign_groups,
     auditar_group_capabilities_set,
@@ -196,6 +197,14 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"detail": "Você não tem permissão para alterar uma conta de superusuário."}
             )
+
+        # M07-01/M07-02 (#1616/#1617): defense-in-depth ator×alvo — um não-superuser
+        # não muta conta APROVADORA (tomar a conta viabiliza auto-aprovação de
+        # solicitações, violando CP-02). A view (`UsuarioAdminViewSet.get_object`)
+        # já barra com 403 antes daqui; esta checagem protege reuso do serializer
+        # fora daquela view. SSOT: `can_admin_mutate_target`.
+        if instance is not None and request_user is not None and not can_admin_mutate_target(request_user, instance):
+            raise serializers.ValidationError({"detail": "Você não tem permissão para alterar esta conta."})
 
         current_is_superuser = bool(getattr(instance, "is_superuser", False)) if instance is not None else False
         current_is_active = bool(getattr(instance, "is_active", True)) if instance is not None else True

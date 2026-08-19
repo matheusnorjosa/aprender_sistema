@@ -204,9 +204,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         # já barra com 403 antes daqui; esta checagem protege reuso do serializer
         # fora daquela view. SSOT: `can_admin_mutate_target`.
         if instance is not None and request_user is not None and not can_admin_mutate_target(request_user, instance):
-            raise serializers.ValidationError(
-                {"detail": "Você não tem permissão para alterar esta conta."}
-            )
+            raise serializers.ValidationError({"detail": "Você não tem permissão para alterar esta conta."})
 
         current_is_superuser = bool(getattr(instance, "is_superuser", False)) if instance is not None else False
         current_is_active = bool(getattr(instance, "is_active", True)) if instance is not None else True

@@ -24,7 +24,9 @@ import pytest
 from apps.core.models import (
     DATAcao,
     DATArea,
+    DATCadastro,
     DATCoordenador,
+    DATRegistro,
     Gerencia,
     PlanoFormacoes,
     Produto,
@@ -306,8 +308,58 @@ def test_demo_dez_entidades_implementadas(tmp_path):
         "dat_coordenador": "usuario,area\ncoord@ex.com,Area\n",
         "dat_acao": "municipio,uf,projeto\nC,CE,P\n",
         "plano_formacao": "municipio,uf,projeto\nC,CE,P\n",
+        "dat_registro": "municipio,uf,projeto_geral,projeto\nC,CE,PG,P\n",
+        "dat_cadastro": "municipio,uf,projeto_geral,plataforma\nC,CE,PG,FORMAR\n",
     }
     r = ExportContractImporter(path=_write_export(tmp_path, files)).run()["por_entidade"]
     for ent in files:
         assert "status" not in r[ent], f"{ent} deveria estar implementada"
         assert "export_rows" in r[ent]
+
+
+# ───────── classify das fatias DAT (Onda 2: dat_registro + dat_cadastro) ─────────
+def test_classify_dat_registro_skip_create_reject(tmp_path):
+    """NK (municipio, projeto_geral, projeto): skip/create/reject (município e projeto_geral)."""
+    creator = UsuarioFactory(username="u_dr_creator", password="x", cpf="33344455566")
+    mun_a = MunicipioFactory(nome="Cidade Reg Um", uf="CE", ativo=True)
+    MunicipioFactory(nome="Cidade Reg Dois", uf="CE", ativo=True)
+    pg = ProjetoGeral.objects.create(nome="PG Registro Teste", usa_avaliar=False)
+    proj = ProjetoFactory(nome="Proj Registro Teste", fluxo="NAO_SUPER")
+    DATRegistro.objects.create(municipio=mun_a, projeto_geral=pg, projeto=proj, aluno_qtde=10, created_by=creator)
+    csv = (
+        "municipio,uf,projeto_geral,projeto\n"
+        "Cidade Reg Um,CE,PG Registro Teste,Proj Registro Teste\n"  # existe -> skip
+        "Cidade Reg Dois,CE,PG Registro Teste,Proj Registro Teste\n"  # resolve, sem registro -> create
+        "Cidade Fantasma XYZ,CE,PG Registro Teste,Proj Registro Teste\n"  # municipio nao resolve -> reject
+        "Cidade Reg Um,CE,PG Inexistente,Proj Registro Teste\n"  # projeto_geral nao resolve -> reject
+    )
+    r = ExportContractImporter(path=_write_export(tmp_path, {"dat_registro": csv})).run()["por_entidade"][
+        "dat_registro"
+    ]
+    assert r["would_skip_same"] == 1
+    assert r["would_create"] == 1
+    assert r["would_reject"] == 2
+    assert r["would_update"] == 0
+
+
+def test_classify_dat_cadastro_skip_create_reject(tmp_path):
+    """NK (municipio, projeto_geral, plataforma): plataforma faz parte da chave; inválida -> reject."""
+    creator = UsuarioFactory(username="u_dc_creator", password="x", cpf="44455566677")
+    mun_a = MunicipioFactory(nome="Cidade Cad Um", uf="CE", ativo=True)
+    MunicipioFactory(nome="Cidade Cad Dois", uf="CE", ativo=True)
+    pg = ProjetoGeral.objects.create(nome="PG Cadastro Teste", usa_avaliar=True)
+    DATCadastro.objects.create(municipio=mun_a, projeto_geral=pg, plataforma="FORMAR", created_by=creator)
+    csv = (
+        "municipio,uf,projeto_geral,plataforma\n"
+        "Cidade Cad Um,CE,PG Cadastro Teste,FORMAR\n"  # existe -> skip
+        "Cidade Cad Um,CE,PG Cadastro Teste,AVALIAR\n"  # mesmo mun/pg, plataforma nova -> create
+        "Cidade Cad Dois,CE,PG Cadastro Teste,FORMAR\n"  # resolve, sem cadastro -> create
+        "Cidade Cad Um,CE,PG Cadastro Teste,XPTO\n"  # plataforma invalida -> reject
+    )
+    r = ExportContractImporter(path=_write_export(tmp_path, {"dat_cadastro": csv})).run()["por_entidade"][
+        "dat_cadastro"
+    ]
+    assert r["would_skip_same"] == 1
+    assert r["would_create"] == 2
+    assert r["would_reject"] == 1
+    assert r["would_update"] == 0

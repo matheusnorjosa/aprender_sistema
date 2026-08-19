@@ -65,6 +65,7 @@ from apps.core.rbac.policies import (
     CanViewOverviewDashboard,
     CanViewReports,
     CanViewTeamDashboard,
+    can_admin_mutate_target,
     resolve_public_policies,
     user_has_policy,
 )
@@ -85,6 +86,7 @@ __all__ = [
     "PUBLIC_POLICY_KEYS",
     "user_has_policy",
     "resolve_public_policies",
+    "can_admin_mutate_target",
     "CanAccessAuditLogs",
     "CanAccessControleSection",
     "CanAccessSolicitationApprovals",

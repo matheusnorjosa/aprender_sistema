@@ -514,10 +514,47 @@ def resolve_public_policies(user: AbstractBaseUser | AnonymousUser | None) -> li
     return sorted(k for k in PUBLIC_POLICY_KEYS if user_has_policy(user, k))
 
 
+def can_admin_mutate_target(
+    actor: AbstractBaseUser | AnonymousUser | None,
+    target: AbstractBaseUser | AnonymousUser | None,
+    action: str | None = None,
+) -> bool:
+    """
+    SSOT ator×alvo (M07-01/M07-02, #1616/#1617): um admin não-superuser pode
+    mutar `target` (reset de senha, e-mail, is_active, delete/anonimizar)?
+
+    Regra (fail-secure):
+    - superuser-ator       → True  (bypass total; mantém P0-0/P0-1)
+    - target == actor      → True  (self-service nunca é escalonamento)
+    - target superuser     → False (Tier-0; a queryset da view já dá 404 antes)
+    - target APROVADOR     → False (tomar a conta viabiliza auto-aprovação de
+                                    solicitações, violando CP-02). "Aprovador" =
+                                    autoridade de aprovação — Gerente da
+                                    Superintendência OU Assistente Administrativo
+                                    do Controle (SSOT `access_solicitation_approvals`)
+    - demais (conta comum) → True
+
+    `action` fica reservado para o épico #1656 (escopo por operação); hoje a
+    invariante é agnóstica à ação — qualquer mutação sobre alvo mais privilegiado
+    é barrada.
+    """
+    if getattr(actor, "is_superuser", False):
+        return True
+    actor_pk = getattr(actor, "pk", None)
+    if actor_pk is not None and actor_pk == getattr(target, "pk", None):
+        return True
+    if getattr(target, "is_superuser", False):
+        return False
+    if user_has_policy(target, "access_solicitation_approvals"):
+        return False
+    return True
+
+
 __all__ = [
     "ACCESS_POLICIES",
     "PUBLIC_POLICY_KEYS",
     "_PolicyPermission",
+    "can_admin_mutate_target",
     "user_can_delegate_availability_block",
     "user_has_policy",
     "resolve_public_policies",

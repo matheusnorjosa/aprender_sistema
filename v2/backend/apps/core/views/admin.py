@@ -13,7 +13,7 @@ from django.db import transaction
 from django.db.models import Count, Q, QuerySet
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
@@ -36,7 +36,7 @@ from apps.core.models import (
     Usuario,
 )
 from apps.core.permissions import HasPerm, SuperuserOnly
-from apps.core.rbac.policies import CanAccessAuditLogs
+from apps.core.rbac.policies import CanAccessAuditLogs, can_admin_mutate_target
 from apps.core.serializers import (
     AuditLogSerializer,
     CompraSerializer,
@@ -388,6 +388,22 @@ class UsuarioAdminViewSet(viewsets.ModelViewSet):
         if not getattr(self.request.user, "is_superuser", False):
             qs = qs.exclude(is_superuser=True)
         return qs
+
+    def get_object(self) -> Usuario:
+        """
+        M07-01/M07-02 (#1616/#1617): guard ator×alvo nas ações de MUTAÇÃO. Um
+        não-superuser não toma conta APROVADORA (senha/e-mail/is_active/delete/
+        anonimizar) — tomar a conta viabiliza auto-aprovação (viola CP-02) → 403.
+
+        Leitura (retrieve/list) segue livre: aprovador NÃO é Tier-0 (o alvo
+        superuser já vira 404-invisível em `get_queryset`, P0-0). SSOT da regra:
+        `can_admin_mutate_target`.
+        """
+        obj = super().get_object()
+        mutating = {"update", "partial_update", "destroy", "anonimizar"}
+        if self.action in mutating and not can_admin_mutate_target(self.request.user, obj):
+            raise PermissionDenied("Você não tem permissão para alterar esta conta.")
+        return obj
 
     def perform_destroy(self, instance: Usuario) -> None:
         """

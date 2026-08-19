@@ -34,7 +34,9 @@ from apps.core.imports.normalization import normalize_cpf_digits
 from apps.core.models import (
     DATAcao,
     DATArea,
+    DATCadastro,
     DATCoordenador,
+    DATRegistro,
     Gerencia,
     Municipio,
     PlanoFormacoes,
@@ -91,6 +93,8 @@ IMPLEMENTED = {
     "dat_coordenador",
     "dat_acao",
     "plano_formacao",
+    "dat_registro",
+    "dat_cadastro",
 }
 
 # Papel canonico (PAPEL_MAPPING) -> nome do Django Group (FUNCAO_GROUPS). Fonte do papel no
@@ -188,6 +192,10 @@ class ExportContractImporter:
     def _municipio_index(self) -> dict[tuple[str, str], int]:
         """Índice (norm(nome), uf.upper()) → municipio_id, para resolver FK por nome+uf."""
         return {(_norm(n), (u or "").upper()): mid for mid, n, u in Municipio.objects.values_list("id", "nome", "uf")}
+
+    def _projeto_geral_index(self) -> dict[str, int]:
+        """Índice norm(nome) → projeto_geral_id (ProjetoGeral.nome é unique)."""
+        return {_norm(n): pid for pid, n in ProjetoGeral.objects.values_list("id", "nome")}
 
     # ── handlers da fatia implementada ──
     def _classify_master(self, name: str) -> dict[str, Any]:
@@ -331,6 +339,39 @@ class ExportContractImporter:
                     tally["would_reject"] += 1
                     continue
                 st, _ = diff_and_classify({} if (mun_id, proj_id) in existing else None, {}, protected)
+                tally[st] += 1
+
+        elif name == "dat_registro":
+            # NK = (municipio_id, projeto_geral_id, projeto_id). Município por (norm(nome), uf);
+            # projeto_geral por norm(nome); projeto via resolver (#1372). FK não-resolvida → would_reject.
+            # Existence-based (não compara campos operacionais; status/nr_codigos ficam para o apply).
+            mun_idx = self._municipio_index()
+            pg_idx = self._projeto_geral_index()
+            existing = set(DATRegistro.objects.values_list("municipio_id", "projeto_geral_id", "projeto_id"))
+            for r in rows:
+                mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
+                pg_id = pg_idx.get(_norm(r.get("projeto_geral") or ""))
+                proj_id = self.resolve_projeto(r.get("projeto") or "")
+                if mun_id is None or pg_id is None or proj_id is None:
+                    tally["would_reject"] += 1
+                    continue
+                st, _ = diff_and_classify({} if (mun_id, pg_id, proj_id) in existing else None, {}, protected)
+                tally[st] += 1
+
+        elif name == "dat_cadastro":
+            # NK = (municipio_id, projeto_geral_id, plataforma). plataforma faz parte da chave
+            # (FORMAR|AVALIAR); valor fora do domínio → would_reject. Existence-based.
+            mun_idx = self._municipio_index()
+            pg_idx = self._projeto_geral_index()
+            existing = set(DATCadastro.objects.values_list("municipio_id", "projeto_geral_id", "plataforma"))
+            for r in rows:
+                mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
+                pg_id = pg_idx.get(_norm(r.get("projeto_geral") or ""))
+                plataforma = (r.get("plataforma") or "").strip().upper()
+                if mun_id is None or pg_id is None or plataforma not in ("FORMAR", "AVALIAR"):
+                    tally["would_reject"] += 1
+                    continue
+                st, _ = diff_and_classify({} if (mun_id, pg_id, plataforma) in existing else None, {}, protected)
                 tally[st] += 1
 
         tally["export_rows"] = len(rows)

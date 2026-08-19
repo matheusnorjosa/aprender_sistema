@@ -99,11 +99,23 @@ jobs:
         key: ${{ runner.os }}-playwright-${{ hashFiles('v2/frontend/package-lock.json') }}
 
     - name: Install Playwright browsers
-      # timeout curto: se o download do browser travar (flake de rede no CDN,
-      # visto no run 32251606405 — 30min pendurado), falha rápido p/ re-run
-      # em vez de queimar o budget do job. Em cache-hit o download é pulado.
-      timeout-minutes: 10
-      run: npx playwright install chromium --with-deps
+      # Retry no download do browser: o CDN do Playwright pendura de forma
+      # transitória (visto em #1763/#1768/#1770). Cada tentativa tem timeout de
+      # 6min; até 3 tentativas. Um sucesso salva o cache (post-step) e destrava
+      # os próximos runs. Em cache-hit o download é pulado (segundos).
+      run: |
+        for attempt in 1 2 3; do
+          echo "::group::playwright install (tentativa $attempt/3)"
+          if timeout 360 npx playwright install chromium --with-deps; then
+            echo "::endgroup::"
+            exit 0
+          fi
+          echo "::endgroup::"
+          echo "tentativa $attempt falhou/timeout; aguardando 15s antes de tentar de novo…"
+          sleep 15
+        done
+        echo "playwright install falhou após 3 tentativas" >&2
+        exit 1
 
     - name: Start backend services for functional contract checklist
       working-directory: .
@@ -212,11 +224,23 @@ jobs:
         key: ${{ runner.os }}-playwright-${{ hashFiles('v2/frontend/package-lock.json') }}
 
     - name: Install Playwright browsers
-      # timeout curto: se o download do browser travar (flake de rede no CDN,
-      # visto no run 32251606405 — 30min pendurado), falha rápido p/ re-run
-      # em vez de queimar o budget do job. Em cache-hit o download é pulado.
-      timeout-minutes: 10
-      run: npx playwright install chromium --with-deps
+      # Retry no download do browser: o CDN do Playwright pendura de forma
+      # transitória (visto em #1763/#1768/#1770). Cada tentativa tem timeout de
+      # 6min; até 3 tentativas. Um sucesso salva o cache (post-step) e destrava
+      # os próximos runs. Em cache-hit o download é pulado (segundos).
+      run: |
+        for attempt in 1 2 3; do
+          echo "::group::playwright install (tentativa $attempt/3)"
+          if timeout 360 npx playwright install chromium --with-deps; then
+            echo "::endgroup::"
+            exit 0
+          fi
+          echo "::endgroup::"
+          echo "tentativa $attempt falhou/timeout; aguardando 15s antes de tentar de novo…"
+          sleep 15
+        done
+        echo "playwright install falhou após 3 tentativas" >&2
+        exit 1
 
     - name: Start backend services and seed E2E data
       working-directory: .

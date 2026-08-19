@@ -289,6 +289,7 @@ def google_oauth_start(request: Request) -> Response:
 
 
 @api_view(["GET"])
+@permission_classes([CanUseGcal])  # M12-15 (#1652): quem não pode usar GCal não recebe credencial GCal
 def google_oauth_callback(request: Request) -> Response:
     """
     Callback OAuth 2.0 após autorização do usuário no Google.

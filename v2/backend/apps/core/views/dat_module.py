@@ -21,7 +21,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from django.db.models import Count, Exists, F, Max, OuterRef, Q, Sum, Value
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, Greatest
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
@@ -495,8 +495,14 @@ class DATCompraViewSet(viewsets.ModelViewSet):
 
         total_itens = qs.aggregate(total=Sum("quantidade"))["total"] or 0
         total_entregue = qs.aggregate(total=Sum("quantidade_utilizada"))["total"] or 0
+        # M15-02 (#1632): clamp por linha via Greatest para a agregação concordar com a
+        # property DATCompra.disponivel (= max(0, quantidade - utilizada)). Sem o clamp,
+        # uma linha com sobreuso (utilizada > quantidade) puxava o KPI para negativo.
         total_disponivel = (
-            qs.aggregate(total=Sum(F("quantidade") - Coalesce(F("quantidade_utilizada"), 0)))["total"] or 0
+            qs.aggregate(total=Sum(Greatest(F("quantidade") - Coalesce(F("quantidade_utilizada"), 0), Value(0))))[
+                "total"
+            ]
+            or 0
         )
 
         municipios_atendidos = qs.values("municipio_id").distinct().count()

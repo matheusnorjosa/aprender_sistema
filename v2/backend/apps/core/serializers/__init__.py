@@ -81,7 +81,6 @@ from apps.core.serializers.usuario import (
     UsuarioOptionSerializer,
 )
 from apps.core.serializers.workflow import (
-    AcaoControleSerializer,
     AcaoDATCreateSerializer,
     AcaoDATSerializer,
     DeslocamentoSerializer,
@@ -123,7 +122,6 @@ __all__ = [
     # Compra
     "CompraSerializer",
     # Workflow
-    "AcaoControleSerializer",
     "AcaoDATSerializer",
     "AcaoDATCreateSerializer",
     "DeslocamentoSerializer",

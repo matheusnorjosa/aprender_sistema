@@ -1,8 +1,7 @@
 """
-Testes para APIs de AcaoControle e AcaoDAT.
+Testes para a API de AcaoDAT (legacy).
 
 Endpoints testados:
-- GET /api/controle/acoes/ (HasPerm("import_spreadsheet"))
 - GET /api/dat/acoes/ (HasPerm("manage_admin_registries"))
 - POST /api/dat/acoes/ (HasPerm("manage_admin_registries"))
 
@@ -11,20 +10,22 @@ Valida:
 - Filtros de query params
 - Serializers corretos (read vs write)
 - Status codes
+
+Nota: os testes de `/api/controle/acoes/` (AcaoControle) foram removidos na Onda 1
+do programa de imports órfãos — o modelo AcaoControle foi apagado (o import de ações
+grava em DATAcao). Ver v2/docs/plans/PLANO_IMPORTS_ORFAOS.md.
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
 
-from datetime import date
-
 from rest_framework import status
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AcaoControle, AcaoDAT, TipoAcaoDAT
+from apps.core.models import AcaoDAT, TipoAcaoDAT
 from apps.core.tests.factories import (
     GroupFactory,
     MunicipioFactory,
@@ -33,159 +34,6 @@ from apps.core.tests.factories import (
 )
 
 pytestmark = pytest.mark.django_db
-
-# ════════════════════════════════════════════════════════════════════════════
-# API: GET /api/controle/acoes/
-# ════════════════════════════════════════════════════════════════════════════
-
-
-def test_controle_user_can_list():
-    """Usuário do grupo Controle pode listar ações."""
-    # Criar grupo e usuário
-    controle_group = GroupFactory(name="Controle")
-    user = UsuarioFactory(
-        username="controle1",
-        email="controle@example.com",
-        password="test123",
-        cpf="11111111111",
-    )
-    user.groups.add(controle_group)
-
-    # Criar dados
-    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = ProjetoFactory(nome="ACerta", ativo=True)
-    coord = UsuarioFactory(
-        username="coord1",
-        email="coord@example.com",
-        password="test123",
-        cpf="22222222222",
-    )
-    AcaoControle.objects.create(
-        municipio=municipio,
-        projeto=projeto,
-        coordenador=coord,
-        data_entrega=date(2025, 1, 15),
-        data_reuniao=date(2025, 2, 1),
-        observacao="Teste controle",
-    )
-
-    # Requisição
-    client = APIClient()
-    client.force_authenticate(user=user)
-    response = client.get("/api/controle/acoes/")
-
-    assert response.status_code == status.HTTP_200_OK
-    assert response.data["count"] == 1
-    assert len(response.data["results"]) == 1
-    assert response.data["results"][0]["observacao"] == "Teste controle"
-
-
-def test_regular_user_cannot_list_controle_acoes():
-    """Usuário sem permissão recebe 403."""
-    user = UsuarioFactory(
-        username="regular",
-        email="regular@example.com",
-        password="test123",
-        cpf="33333333333",
-    )
-
-    # Criar dados
-    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = ProjetoFactory(nome="ACerta", ativo=True)
-    AcaoControle.objects.create(
-        municipio=municipio,
-        projeto=projeto,
-        data_entrega=date(2025, 1, 15),
-    )
-
-    client = APIClient()
-    client.force_authenticate(user=user)
-    response = client.get("/api/controle/acoes/")
-
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-
-
-def test_unauthenticated_cannot_list_controle_acoes():
-    """Usuário não autenticado recebe 401."""
-    client = APIClient()
-    response = client.get("/api/controle/acoes/")
-
-    assert response.status_code in [
-        status.HTTP_401_UNAUTHORIZED,
-        status.HTTP_403_FORBIDDEN,
-    ]
-
-
-def test_filter_by_date_range():
-    """Filtro por data_inicio e data_fim funciona."""
-    controle_group = GroupFactory(name="Controle")
-    user = UsuarioFactory(
-        username="controle1",
-        email="controle@example.com",
-        password="test123",
-        cpf="11111111111",
-    )
-    user.groups.add(controle_group)
-
-    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = ProjetoFactory(nome="ACerta", ativo=True)
-
-    # Criar ação dentro do intervalo
-    AcaoControle.objects.create(
-        municipio=municipio,
-        projeto=projeto,
-        data_entrega=date(2025, 1, 15),
-        observacao="Dentro do intervalo",
-    )
-
-    # Criar ação fora do intervalo
-    AcaoControle.objects.create(
-        municipio=municipio,
-        projeto=projeto,
-        data_entrega=date(2024, 12, 1),
-        observacao="Fora do intervalo",
-    )
-
-    client = APIClient()
-    client.force_authenticate(user=user)
-    response = client.get("/api/controle/acoes/", {"data_inicio": "2025-01-01", "data_fim": "2025-12-31"})
-
-    assert response.status_code == status.HTTP_200_OK
-    assert response.data["count"] == 1
-    assert len(response.data["results"]) == 1
-    assert response.data["results"][0]["observacao"] == "Dentro do intervalo"
-
-
-def test_controle_serializer_uses_string_related_field():
-    """Serializer retorna nomes legíveis (não IDs) para FKs."""
-    controle_group = GroupFactory(name="Controle")
-    user = UsuarioFactory(
-        username="controle1",
-        email="controle@example.com",
-        password="test123",
-        cpf="11111111111",
-    )
-    user.groups.add(controle_group)
-
-    municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = ProjetoFactory(nome="ACerta", ativo=True)
-    AcaoControle.objects.create(
-        municipio=municipio,
-        projeto=projeto,
-        data_entrega=date(2025, 1, 15),
-    )
-
-    client = APIClient()
-    client.force_authenticate(user=user)
-    response = client.get("/api/controle/acoes/")
-
-    assert response.status_code == status.HTTP_200_OK
-    assert response.data["count"] == 1
-    data = response.data["results"][0]
-
-    # StringRelatedField retorna __str__ do modelo
-    assert isinstance(data["municipio"], str)
-    assert isinstance(data["projeto"], str)
 
 
 # ════════════════════════════════════════════════════════════════════════════

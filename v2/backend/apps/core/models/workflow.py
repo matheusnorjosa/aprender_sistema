@@ -2,10 +2,9 @@
 AS v2 — Workflow Models
 
 Operacional: Deslocamento.
-LEGACY (nenhuma tela lê — ver v2/docs/plans/PLANO_IMPORTS_ORFAOS.md): AcaoControle, AcaoDAT.
-- AcaoControle: o import de ações foi redirecionado para DATAcao (Onda 1). A tabela
-  fica órfã até o drop (Onda 1 / PR de remoção). Use DATAcao (models/dat_acao.py).
+LEGACY (nenhuma tela lê — ver v2/docs/plans/PLANO_IMPORTS_ORFAOS.md): AcaoDAT.
 - AcaoDAT: destino operacional é DATCadastro (Onda 2, ainda pendente).
+  (AcaoControle foi REMOVIDO na Onda 1 — o import de ações grava em DATAcao.)
 Type-checked with Pyright (strict mode).
 """
 
@@ -63,71 +62,6 @@ class Deslocamento(models.Model):
         start_fmt = self.start_date.strftime("%d/%m/%Y")
         end_fmt = self.end_date.strftime("%d/%m/%Y")
         return f"{self.usuario_id} {start_fmt}->{end_fmt} {self.origem}->{self.destino}"  # type: ignore[attr-defined]
-
-
-class AcaoControle(models.Model):
-    """
-    LEGACY — não é lido por nenhuma tela. O import de ações grava em DATAcao
-    (models/dat_acao.py, lido por /dat/acoes-ciclo/) desde a Onda 1 do programa
-    de imports órfãos (v2/docs/plans/PLANO_IMPORTS_ORFAOS.md). Esta tabela fica
-    órfã até o drop (PR de remoção da Onda 1). Não escrever aqui.
-
-    Acoes do setor Controle: acompanhamento de entregas, cartas, reunioes.
-
-    Campos:
-    - municipio, projeto, coordenador
-    - datas: data_entrega, data_carta, contato_inicial, data_reuniao
-    - observacao, external_hash (idempotencia ETL)
-    """
-
-    municipio = models.ForeignKey(  # type: ignore[misc]
-        "core.Municipio",
-        on_delete=models.PROTECT,
-        related_name="acoes_controle",
-        verbose_name="Municipio",
-    )
-    projeto = models.ForeignKey(  # type: ignore[misc]
-        "core.Projeto",
-        on_delete=models.PROTECT,
-        related_name="acoes_controle",
-        verbose_name="Projeto",
-    )
-    coordenador = models.ForeignKey(  # type: ignore[misc]
-        "core.Usuario",
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="acoes_controle",
-        verbose_name="Coordenador",
-    )
-    data_entrega = models.DateField(null=True, blank=True, verbose_name="Data da Entrega")
-    data_carta = models.DateField(null=True, blank=True, verbose_name="Data da Carta")
-    contato_inicial = models.DateField(null=True, blank=True, verbose_name="Contato inicial")
-    data_reuniao = models.DateField(null=True, blank=True, verbose_name="Data Reuniao Alinhamento")
-    observacao = models.TextField(null=True, blank=True, verbose_name="Observacao")
-    external_hash = models.CharField(
-        max_length=64,
-        unique=True,
-        null=True,
-        blank=True,
-        db_index=True,
-        verbose_name="External Hash",
-    )
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:  # type: ignore[misc]
-        db_table = "core_acao_controle"
-        ordering = ["-data_reuniao", "-data_entrega", "municipio_id"]
-        indexes = [
-            models.Index(fields=["municipio", "projeto"]),
-            models.Index(fields=["coordenador"]),
-            models.Index(fields=["external_hash"]),
-        ]
-
-    def __str__(self) -> str:
-        data_display = self.data_entrega or self.data_reuniao or ""
-        return f"{self.municipio_id} | {self.projeto_id} | {data_display}"  # type: ignore[attr-defined]
 
 
 class TipoAcaoDAT(models.TextChoices):

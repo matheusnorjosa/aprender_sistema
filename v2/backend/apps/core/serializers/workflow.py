@@ -1,7 +1,7 @@
 """
 AS v2 — Workflow Serializers
 
-Serializers para AcaoControle, AcaoDAT, Deslocamento.
+Serializers para AcaoDAT, Deslocamento.
 Type-checked with Pyright (strict mode).
 """
 
@@ -13,36 +13,7 @@ from typing import Any
 
 from rest_framework import serializers  # type: ignore[attr-defined]
 
-from apps.core.models import AcaoControle, AcaoDAT, Deslocamento
-
-
-class AcaoControleSerializer(serializers.ModelSerializer):
-    """
-    Serializer for AcaoControle model (read operations).
-    Uses StringRelatedField for readable FK representation.
-    """
-
-    municipio = serializers.StringRelatedField()
-    projeto = serializers.StringRelatedField()
-    coordenador = serializers.StringRelatedField()
-
-    class Meta:
-        model = AcaoControle
-        fields = [
-            "id",
-            "municipio",
-            "projeto",
-            "coordenador",
-            "data_entrega",
-            "data_carta",
-            "contato_inicial",
-            "data_reuniao",
-            "observacao",
-            "external_hash",
-            "created_at",
-            "updated_at",
-        ]
-        read_only_fields = ["id", "external_hash", "created_at", "updated_at"]
+from apps.core.models import AcaoDAT, Deslocamento
 
 
 class AcaoDATSerializer(serializers.ModelSerializer):

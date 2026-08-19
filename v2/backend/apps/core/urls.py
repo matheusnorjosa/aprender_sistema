@@ -48,7 +48,7 @@ from .views_availability_monthly import MonthlyAvailabilityView
 from .views_basic import CurrentUserView, api_root
 from .views_compras import ControleComprasListView
 from .views_config import config_view  # Issue #187
-from .views_controle_dat import ControleAcoesListView, DATAcoesListCreateView
+from .views_controle_dat import DATAcoesListCreateView
 from .views_controle_imports import ImportComprasView
 from .views_dashboard import dashboard_overview  # Issue #311
 from .views_deslocamento import DeslocamentoViewSet  # Issue #188
@@ -216,11 +216,6 @@ urlpatterns = [
         "controle/compras/",
         ControleComprasListView.as_view(),
         name="controle-compras-list",
-    ),
-    path(
-        "controle/acoes/",
-        ControleAcoesListView.as_view(),
-        name="controle-acoes-list",
     ),
     path(
         "dat/import-cadastros/",

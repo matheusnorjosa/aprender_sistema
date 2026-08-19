@@ -14,7 +14,6 @@ from django.http import HttpRequest, HttpResponse
 # Fase 1 - Plano DAT/GCal: Admin restrito a superusers
 from .admin_site import admin_site
 from .models import (
-    AcaoControle,
     AcaoDAT,
     AcaoInstancia,
     AcaoTemplate,
@@ -260,29 +259,6 @@ class DeslocamentoAdmin(admin.ModelAdmin):
     date_hierarchy = "start_date"
 
 
-class AcaoControleAdmin(admin.ModelAdmin):
-    list_display = (
-        "municipio",
-        "projeto",
-        "coordenador",
-        "data_entrega",
-        "data_carta",
-        "contato_inicial",
-        "data_reuniao",
-    )
-    list_filter = ("projeto",)
-    search_fields = (
-        "municipio__nome",
-        "projeto__nome",
-        "coordenador__email",
-        "coordenador__first_name",
-        "coordenador__last_name",
-    )
-    autocomplete_fields = ("municipio", "projeto", "coordenador")
-    list_select_related = ("municipio", "projeto", "coordenador")
-    date_hierarchy = "data_reuniao"
-
-
 class AcaoDATAdmin(admin.ModelAdmin):
     list_display = ("municipio", "projeto", "tipo_acao", "responsavel", "data_registro")
     list_filter = ("projeto", "tipo_acao")
@@ -478,7 +454,6 @@ admin_site.register(Solicitacao, SolicitacaoAdmin)
 admin_site.register(Participation, ParticipationAdmin)
 admin_site.register(Compra, CompraAdmin)
 admin_site.register(Deslocamento, DeslocamentoAdmin)
-admin_site.register(AcaoControle, AcaoControleAdmin)
 admin_site.register(AcaoDAT, AcaoDATAdmin)
 admin_site.register(AuditLog, AuditLogAdmin)
 admin_site.register(AcaoTemplate, AcaoTemplateAdmin)

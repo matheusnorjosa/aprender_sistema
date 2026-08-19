@@ -93,13 +93,15 @@ deletado já, independente do redirect.
 - **Marcar `AcaoDAT`/`AcaoControle` como legacy** no header/docstring (hoje mentem "operacional").
 
 ### Onda 1 — órfãos de mapeamento fácil
-- **Ações → `DATAcao`** (shape ~1:1: `AcaoControle` tem `data_carta`/`contato_inicial`/
-  `data_reuniao`/`data_entrega`, `models/workflow.py:94-97`): redirecionar
-  `controle_acoes_import.py` para gravar `DATAcao` (adicionar StatusEtapa por etapa + FK
-  `Projeto`→`ProjetoGeral`), upsert idempotente; depois **apagar `AcaoControle`** + endpoint
-  `/controle/acoes/` + `ops.listAcoes`.
+- **Ações → `DATAcao`** — ✅ **FEITO** (PR #1759 redirect + PR do drop):
+  `controle_acoes_import.py` grava em `DATAcao` (StatusEtapa derivado da data por etapa;
+  upsert pela chave natural `(municipio, projeto)`; coordenador→`DATCoordenador` email→nome→null;
+  `created_by`=request.user). **Correção ao plano:** NÃO há remap `Projeto`→`ProjetoGeral` aqui
+  (ambos usam `Projeto`; o `ProjetoGeral` é da Onda 2/`DATCadastro`). `AcaoControle` **apagado**
+  (migration `0085_drop_acao_controle`) + endpoint `/controle/acoes/` + serializer + admin
+  removidos. (`ops.listAcoes` já não existia — Onda 0.)
 - **Vínculos → tela read-only de `EquipeGerencia`** (o dado já move o RBAC — scoping em
-  `views_availability.py`, `rbac/permissions.py`; só falta serializer/viewset/list + tela).
+  `views_availability.py`, `rbac/permissions.py`; só falta serializer/viewset/list + tela). — pendente.
 
 ### Onda 2 — órfãos difíceis / com desenho
 - **Cadastros DAT → `DATCadastro`** (#1640): `AcaoDAT` é **evento** (1 por

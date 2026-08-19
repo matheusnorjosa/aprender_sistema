@@ -452,7 +452,6 @@ ViewSet: só existem **GET** e **POST** na rota de coleção. **Não** existe
 |--------|----------|--------|-----------|-----------|
 | GET | `/api/dat/acoes/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar ações DAT | `manage_admin_registries` |
 | POST | `/api/dat/acoes/` | ![Stable](https://img.shields.io/badge/-stable-green) | Criar ação | `manage_admin_registries` |
-| GET | `/api/controle/acoes/` | ![Stable](https://img.shields.io/badge/-stable-green) | Visão Controle das ações (list-only) | `run_daily_operations` |
 
 ### Ciclos de Ação
 

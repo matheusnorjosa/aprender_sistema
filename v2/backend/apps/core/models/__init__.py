@@ -15,7 +15,7 @@ Estrutura:
     ├── solicitacao.py       # Solicitacao, Participation
     ├── agenda.py            # AvailabilityBlock
     ├── compra.py            # Compra
-    ├── workflow.py          # Deslocamento, AcaoControle, AcaoDAT
+    ├── workflow.py          # Deslocamento, AcaoDAT
     ├── config.py            # Config
     ├── auditoria.py         # AuditLog
     ├── integracao.py        # GoogleOAuthCredential
@@ -79,7 +79,7 @@ from apps.core.models.plano_formacoes import PlanoFormacoes
 from apps.core.models.prova import Prova
 from apps.core.models.solicitacao import Participation, Solicitacao
 from apps.core.models.usuario import Usuario
-from apps.core.models.workflow import AcaoControle, AcaoDAT, Deslocamento, TipoAcaoDAT
+from apps.core.models.workflow import AcaoDAT, Deslocamento, TipoAcaoDAT
 
 __all__ = [
     # Usuario
@@ -103,7 +103,6 @@ __all__ = [
     "Compra",
     # Workflow
     "Deslocamento",
-    "AcaoControle",
     "AcaoDAT",
     "TipoAcaoDAT",
     # DAT Registros

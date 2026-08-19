@@ -99,6 +99,37 @@ class TestPublishTask:
         assert result["action"] == "ERROR"
         assert "999999" in result["summary"]
 
+    def test_publish_task_usa_select_for_update(self, task_solicitacao):
+        """#1726: a task deve reler a Solicitacao com select_for_update() (dentro de atomic())
+        antes de mutar/persistir — evita lost-update entre publish/cancel concorrentes do
+        mesmo evento.
+
+        RED: hoje a task faz `Solicitacao.objects.get(id=...)` puro (sem lock).
+        """
+        from apps.core.services.gcal.sync import SyncOutcome
+        from apps.core.tasks import task_publish_solicitacao_to_gcal
+
+        task_solicitacao.gcal_status = Solicitacao.GCalStatus.NONE
+        task_solicitacao.external_event_id = None
+        task_solicitacao.save()
+
+        with (
+            patch("apps.core.services.gcal_sync_service.apply_one_solicitacao") as mock_apply,
+            patch.object(
+                Solicitacao.objects, "select_for_update", wraps=Solicitacao.objects.select_for_update
+            ) as spy_lock,
+        ):
+            mock_apply.return_value = SyncOutcome(
+                action="CREATE",
+                solicitation_id=task_solicitacao.id,
+                external_event_id=f"asv2-{task_solicitacao.id}",
+                summary=f"Solicitação #{task_solicitacao.id}",
+            )
+            result = task_publish_solicitacao_to_gcal(task_solicitacao.id, dry_run=True)
+
+        assert result["error"] is None
+        spy_lock.assert_called()  # a task travou a linha antes de operar
+
 
 class TestCancelTask:
     """Tests for task_cancel_solicitacao_from_gcal."""
@@ -121,6 +152,32 @@ class TestCancelTask:
 
             assert result["action"] == "DELETE"
             assert result["error"] is None
+
+    def test_cancel_task_usa_select_for_update(self, task_solicitacao):
+        """#1726: idem publish — a task de cancel deve travar a linha (select_for_update
+        dentro de atomic()) antes de deletar o evento e limpar os campos de sync.
+
+        RED: hoje faz `Solicitacao.objects.get(id=...)` puro (sem lock).
+        """
+        from apps.core.services.gcal.sync import SyncOutcome
+        from apps.core.tasks import task_cancel_solicitacao_from_gcal
+
+        with (
+            patch("apps.core.services.gcal_sync_service.cancel_solicitacao") as mock_cancel,
+            patch.object(
+                Solicitacao.objects, "select_for_update", wraps=Solicitacao.objects.select_for_update
+            ) as spy_lock,
+        ):
+            mock_cancel.return_value = SyncOutcome(
+                action="DELETE",
+                solicitation_id=task_solicitacao.id,
+                external_event_id=None,
+                summary=f"Solicitação #{task_solicitacao.id} (cancelada)",
+            )
+            result = task_cancel_solicitacao_from_gcal(task_solicitacao.id)
+
+        assert result["error"] is None
+        spy_lock.assert_called()
 
     def test_cancel_task_creates_audit_log(self, task_solicitacao):
         """Task creates AuditLog entry on success."""

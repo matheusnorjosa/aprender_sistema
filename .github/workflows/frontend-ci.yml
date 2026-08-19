@@ -99,22 +99,21 @@ jobs:
         key: ${{ runner.os }}-playwright-${{ hashFiles('v2/frontend/package-lock.json') }}
 
     - name: Install Playwright browsers
-      # Retry no download do browser: o CDN do Playwright pendura de forma
-      # transitória (visto em #1763/#1768/#1770). Cada tentativa tem timeout de
-      # 6min; até 3 tentativas. Um sucesso salva o cache (post-step) e destrava
-      # os próximos runs. Em cache-hit o download é pulado (segundos).
+      # Só o BROWSER — SEM --with-deps. Diagnóstico (log do run 32291923049): o
+      # flake NÃO era o download do browser; era o `apt-get` do --with-deps
+      # pendurando num mirror lento do Ubuntu (azure.archive.ubuntu.com, ~59kB/s:
+      # 3min só de update, depois hang instalando uma fonte → timeout de 10min).
+      # A imagem ubuntu-latest do GitHub já traz as libs de sistema dos browsers
+      # (actions/runner-images), então --with-deps era redundante E a fonte do
+      # flake. O browser é cacheado (cache-hit = segundos); retry leve cobre um
+      # hang raro do CDN do Playwright.
       run: |
         for attempt in 1 2 3; do
-          echo "::group::playwright install (tentativa $attempt/3)"
-          if timeout 360 npx playwright install chromium --with-deps; then
-            echo "::endgroup::"
-            exit 0
-          fi
-          echo "::endgroup::"
-          echo "tentativa $attempt falhou/timeout; aguardando 15s antes de tentar de novo…"
-          sleep 15
+          timeout 180 npx playwright install chromium && exit 0
+          echo "tentativa $attempt do install do browser falhou; retry em 10s…"
+          sleep 10
         done
-        echo "playwright install falhou após 3 tentativas" >&2
+        echo "playwright install (browser) falhou após 3 tentativas" >&2
         exit 1
 
     - name: Start backend services for functional contract checklist
@@ -224,22 +223,21 @@ jobs:
         key: ${{ runner.os }}-playwright-${{ hashFiles('v2/frontend/package-lock.json') }}
 
     - name: Install Playwright browsers
-      # Retry no download do browser: o CDN do Playwright pendura de forma
-      # transitória (visto em #1763/#1768/#1770). Cada tentativa tem timeout de
-      # 6min; até 3 tentativas. Um sucesso salva o cache (post-step) e destrava
-      # os próximos runs. Em cache-hit o download é pulado (segundos).
+      # Só o BROWSER — SEM --with-deps. Diagnóstico (log do run 32291923049): o
+      # flake NÃO era o download do browser; era o `apt-get` do --with-deps
+      # pendurando num mirror lento do Ubuntu (azure.archive.ubuntu.com, ~59kB/s:
+      # 3min só de update, depois hang instalando uma fonte → timeout de 10min).
+      # A imagem ubuntu-latest do GitHub já traz as libs de sistema dos browsers
+      # (actions/runner-images), então --with-deps era redundante E a fonte do
+      # flake. O browser é cacheado (cache-hit = segundos); retry leve cobre um
+      # hang raro do CDN do Playwright.
       run: |
         for attempt in 1 2 3; do
-          echo "::group::playwright install (tentativa $attempt/3)"
-          if timeout 360 npx playwright install chromium --with-deps; then
-            echo "::endgroup::"
-            exit 0
-          fi
-          echo "::endgroup::"
-          echo "tentativa $attempt falhou/timeout; aguardando 15s antes de tentar de novo…"
-          sleep 15
+          timeout 180 npx playwright install chromium && exit 0
+          echo "tentativa $attempt do install do browser falhou; retry em 10s…"
+          sleep 10
         done
-        echo "playwright install falhou após 3 tentativas" >&2
+        echo "playwright install (browser) falhou após 3 tentativas" >&2
         exit 1
 
     - name: Start backend services and seed E2E data

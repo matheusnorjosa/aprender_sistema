@@ -47,6 +47,11 @@ RUN rm /etc/nginx/conf.d/default.conf
 # Copiar configuracao customizada do nginx
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
+# M27-24 (#1647): snippet de security headers reincluído em cada location.
+# Fica FORA de conf.d/ (que o nginx auto-carrega como server) — é incluído
+# explicitamente pelo default.conf.
+COPY security-headers.conf /etc/nginx/security-headers.conf
+
 # Copiar arquivos buildados do stage anterior
 COPY --from=builder /app/dist /usr/share/nginx/html
 

@@ -604,6 +604,16 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 }
             )
 
+        # M10-03 (#1625): PENDING = task Celery de sincronização já enfileirada;
+        # excluir nessa janela deixa a task operar sobre um registro removido.
+        if instance.gcal_status == "PENDING":
+            raise ValidationError(
+                {
+                    "detail": "Não é possível excluir enquanto a sincronização com o Google Calendar está "
+                    "em andamento. Aguarde a conclusão."
+                }
+            )
+
         # Validação adicional para fluxo SUPER
         projeto_fluxo = instance.projeto.fluxo if instance.projeto else None
         if projeto_fluxo == "SUPER" and instance.status != "pendente":

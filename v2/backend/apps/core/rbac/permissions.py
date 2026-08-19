@@ -231,7 +231,13 @@ class IsOwnerOrPrivileged(HasFunctionalPermission):  # type: ignore[misc]
         if getattr(user, "is_superuser", False):
             return True
         if self.functional_codename in get_user_functional_permissions(user):
-            return True
+            # M10-01 (#1623): o privilégio de edição de solicitação só vale DENTRO
+            # do escopo do ator (global OU própria gerência OU dono) — não mais
+            # nacional. SSOT: `user_can_access_solicitacao`.
+            from apps.core.services.solicitacao_scope import user_can_access_solicitacao
+
+            if user_can_access_solicitacao(user, obj):
+                return True
 
         obj_usuario = getattr(obj, "usuario", None)
         return obj_usuario == user

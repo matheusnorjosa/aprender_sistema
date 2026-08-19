@@ -143,3 +143,76 @@ def test_dat_user_cannot_access_controle_compra_domain(
     api_client.force_authenticate(user=dat_user)
     response = api_client.get("/api/controle/compras/", secure=True)
     assert response.status_code == 403
+
+
+# ===================================================================
+# M15-03 (#1633) — external_hash imutável no PATCH + quantidade > 0
+# ===================================================================
+
+
+def _errs(response):
+    """Dict de erros de campo — a API embrulha validação em {code, detail, errors: {...}}."""
+    data = response.data
+    if isinstance(data, dict) and "errors" in data and isinstance(data["errors"], dict):
+        return data["errors"]
+    return data
+
+
+def test_patch_nao_reescreve_external_hash(
+    api_client: APIClient,
+    dat_user: Usuario,
+    compra_core: Compra,
+) -> None:
+    """M15-03 (#1633): external_hash é a chave de idempotência de import — imutável após
+    a criação. Um PATCH não pode reescrevê-la (quebraria a idempotência de imports futuros).
+
+    RED: hoje o PATCH reescreve o hash e retorna 200 com o valor forjado.
+    """
+    api_client.force_authenticate(user=dat_user)
+    original = compra_core.external_hash
+    response = api_client.patch(
+        f"/api/compras/{compra_core.id}/", {"external_hash": "f" * 64}, format="json", secure=True
+    )
+    assert response.status_code == 200
+    compra_core.refresh_from_db()
+    assert compra_core.external_hash == original  # RED: virava "f"*64
+
+
+def test_post_quantidade_zero_retorna_400(
+    api_client: APIClient,
+    dat_user: Usuario,
+    municipio: Municipio,
+    projeto: Projeto,
+) -> None:
+    """M15-03: compra de estoque zero é inválida (habilitava solicitação com estoque zerado).
+
+    RED: hoje quantidade=0 é aceito com 201 (validate_quantidade só barra negativo).
+    """
+    api_client.force_authenticate(user=dat_user)
+    payload = {
+        "codigo": "ZERO-001",
+        "projeto": projeto.id,
+        "municipio": municipio.id,
+        "quantidade": 0,
+        "data": "2026-03-01",
+        "uso": "teste",
+        "external_hash": "a" * 64,
+    }
+    response = api_client.post("/api/compras/", payload, format="json", secure=True)
+    assert response.status_code == 400, f"aceito com {response.status_code}"
+    assert "quantidade" in _errs(response)
+
+
+def test_patch_campo_normal_ok_hash_intacto(
+    api_client: APIClient,
+    dat_user: Usuario,
+    compra_core: Compra,
+) -> None:
+    """Não-regressão: PATCH de campo normal funciona e o external_hash fica intacto."""
+    api_client.force_authenticate(user=dat_user)
+    original = compra_core.external_hash
+    response = api_client.patch(f"/api/compras/{compra_core.id}/", {"quantidade": 9}, format="json", secure=True)
+    assert response.status_code == 200
+    compra_core.refresh_from_db()
+    assert compra_core.quantidade == 9
+    assert compra_core.external_hash == original

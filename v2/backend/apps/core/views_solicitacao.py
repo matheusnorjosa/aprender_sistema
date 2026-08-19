@@ -477,6 +477,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         )
 
         old_data = {
+            "status": instance.status,
             "municipio_id": instance.municipio_id,
             "projeto_id": instance.projeto_id,
             "tipo_evento_id": instance.tipo_evento_id,
@@ -497,6 +498,17 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             # Salva as alterações
             serializer.save()
 
+            # M10-02 (#1624): trocar o projeto de um item já "aprovado" para um de
+            # fluxo SUPER não pode manter o status — publicaria sem passar pela
+            # aprovação da Superintendência (lavagem de aprovação, viola CP-02/PA-01).
+            # Se o projeto mudou e o novo fluxo exige aprovação
+            # (resolve_initial_status → "pendente"), rebaixa para "pendente",
+            # forçando reaprovação. Fluxo NAO_SUPER (auto-aprovado) não é afetado.
+            if old_data["projeto_id"] != instance.projeto_id and instance.status == "aprovado":
+                if resolve_initial_status(projeto=instance.projeto).status == "pendente":
+                    instance.status = "pendente"
+                    instance.save(update_fields=["status"])
+
             # Processa extra_participants se presente
             extra_participants = self.request.data.get("extra_participants", {})
             if extra_participants and "formador_ids" in extra_participants:
@@ -513,6 +525,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         )
 
         new_data = {
+            "status": instance.status,
             "municipio_id": instance.municipio_id,
             "projeto_id": instance.projeto_id,
             "tipo_evento_id": instance.tipo_evento_id,
@@ -622,6 +635,16 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 {
                     "detail": "Não é possível excluir uma solicitação já publicada no Google Calendar. "
                     "Cancele o evento primeiro se precisar excluir."
+                }
+            )
+
+        # M10-03 (#1625): PENDING = task Celery de sincronização já enfileirada;
+        # excluir nessa janela deixa a task operar sobre um registro removido.
+        if instance.gcal_status == "PENDING":
+            raise ValidationError(
+                {
+                    "detail": "Não é possível excluir enquanto a sincronização com o Google Calendar está "
+                    "em andamento. Aguarde a conclusão."
                 }
             )
 

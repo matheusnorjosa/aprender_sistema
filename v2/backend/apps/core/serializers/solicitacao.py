@@ -161,7 +161,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
         """
         instance = getattr(self, "instance", None)
 
-        # Regra 2: Bloquear edição após publicação no GCal
+        # Regra 2: Bloquear edição durante a sincronização com o GCal.
         if instance is not None:
             if getattr(instance, "gcal_status", None) == "PUBLISHED":
                 raise serializers.ValidationError(
@@ -169,6 +169,19 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
                         "non_field_errors": [
                             "Não é possível editar uma solicitação já publicada no Google Calendar. "
                             "Cancele o evento primeiro se precisar fazer alterações."
+                        ]
+                    }
+                )
+
+            # M10-03 (#1625): PENDING = task Celery de publish/resync/cancel já
+            # enfileirada. Editar nessa janela faz a task publicar o conteúdo
+            # corrente em vez do snapshot aprovado (TOCTOU / drift).
+            if getattr(instance, "gcal_status", None) == "PENDING":
+                raise serializers.ValidationError(
+                    {
+                        "non_field_errors": [
+                            "Não é possível editar enquanto a sincronização com o Google Calendar está "
+                            "em andamento. Aguarde a conclusão da publicação."
                         ]
                     }
                 )

@@ -24,6 +24,7 @@ import json
 import os
 import re
 import unicodedata
+from datetime import date
 from typing import Any
 
 from django.contrib.auth.models import Group
@@ -133,6 +134,57 @@ def _to_bool(v: Any) -> bool:
     return str(v).strip().casefold() in {"true", "1", "yes", "sim", "t"}
 
 
+def _parse_iso_date(v: Any) -> date | None:
+    """Parseia data ISO YYYY-MM-DD do export-contract (v3). Vazio/inválido → None."""
+    s = str(v or "").strip()
+    if not s:
+        return None
+    try:
+        return date.fromisoformat(s)
+    except ValueError:
+        return None
+
+
+def _parse_int(v: Any) -> int | None:
+    """Parseia inteiro de string (o v3 emite quantidades como string). Vazio/inválido → None."""
+    s = str(v or "").strip()
+    if not s:
+        return None
+    try:
+        return int(float(s))
+    except ValueError:
+        return None
+
+
+def _parse_json_list(v: Any) -> list[Any]:
+    """Parseia array JSON de datas (ex.: '[\"2026-03-27\"]'). Vazio/inválido → []."""
+    s = str(v or "").strip()
+    if not s:
+        return []
+    try:
+        parsed = json.loads(s)
+    except (ValueError, TypeError):
+        return []
+    return parsed if isinstance(parsed, list) else []
+
+
+# dat_cadastro: etapaN da planilha → (campo status, campo data) do DATCadastro, por plataforma.
+# FORMAR tem 4 etapas; AVALIAR tem 3 (a etapa4 do CSV sai como 'na' e não tem campo no model).
+_CAD_ETAPAS: dict[str, list[tuple[str, str, str]]] = {
+    "FORMAR": [
+        ("etapa1", "status_criacao_curso", "data_criacao_curso"),
+        ("etapa2", "status_chaves", "data_chaves"),
+        ("etapa3", "status_instrucoes", "data_instrucoes"),
+        ("etapa4", "status_envio", "data_envio"),
+    ],
+    "AVALIAR": [
+        ("etapa1", "status_recebidos", "data_recebidos"),
+        ("etapa2", "status_validados", "data_validados"),
+        ("etapa3", "status_importados", "data_importados"),
+    ],
+}
+
+
 def diff_and_classify(
     existing: dict[str, Any] | None, export: dict[str, Any], protected: set[str]
 ) -> tuple[str, list[str]]:
@@ -160,12 +212,19 @@ class ExportContractImporter:
     """Importer dry-run-first do export-contract. Veja docstring do módulo."""
 
     def __init__(
-        self, path: str, *, mode: str = "create-only", apply: bool = False, allow: tuple[str, ...] = ()
+        self,
+        path: str,
+        *,
+        mode: str = "create-only",
+        apply: bool = False,
+        allow: tuple[str, ...] = (),
+        actor: Usuario | None = None,
     ) -> None:
         self.path = path
         self.mode = mode
         self.apply = apply
         self.allow = tuple(allow)
+        self.actor = actor  # created_by no apply de entidades com auditoria (dat_cadastro/dat_registro)
         self._pidx = None
 
     # ── resolver de Projeto (delegação ao módulo mergeado na #1372) ──
@@ -419,6 +478,12 @@ class ExportContractImporter:
                     # NK = CPF (nao `nome`); atribui Group -> handler dedicado.
                     applied[name] = self._apply_usuario(self._load(name))
                     continue
+                if name == "dat_cadastro":
+                    applied[name] = self._apply_dat_cadastro(self._load(name))
+                    continue
+                if name == "dat_registro":
+                    applied[name] = self._apply_dat_registro(self._load(name))
+                    continue
                 created = 0
                 for r in self._load(name):
                     nome = (r.get("nome") or "").strip()
@@ -444,6 +509,91 @@ class ExportContractImporter:
                         created += 1
                 applied[name] = created
         return applied
+
+    def _require_actor(self, entity: str) -> Usuario:
+        if self.actor is None:
+            raise ValueError(f"apply de {entity} exige um ator (created_by): rode com --as-user <cpf>.")
+        return self.actor
+
+    def _apply_dat_cadastro(self, rows: list[dict[str, str]]) -> int:
+        """Create-only de DATCadastro. NK (municipio, projeto_geral, plataforma).
+        Status/data já chegam normalizados (enum/ISO) do export-contract v3."""
+        actor = self._require_actor("dat_cadastro")
+        mun_idx = self._municipio_index()
+        pg_idx = self._projeto_geral_index()
+        created = 0
+        for r in rows:
+            mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
+            pg_id = pg_idx.get(_norm(r.get("projeto_geral") or ""))
+            plataforma = (r.get("plataforma") or "").strip().upper()
+            if mun_id is None or pg_id is None or plataforma not in _CAD_ETAPAS:
+                continue
+            if DATCadastro.objects.filter(municipio_id=mun_id, projeto_geral_id=pg_id, plataforma=plataforma).exists():
+                continue
+            campos: dict[str, Any] = {}
+            for prefix, status_field, data_field in _CAD_ETAPAS[plataforma]:
+                campos[status_field] = (r.get(f"{prefix}_status") or "pendente").strip() or "pendente"
+                campos[data_field] = _parse_iso_date(r.get(f"{prefix}_data"))
+            DATCadastro.objects.create(
+                municipio_id=mun_id,
+                projeto_geral_id=pg_id,
+                plataforma=plataforma,
+                created_by=actor,
+                **campos,
+            )
+            created += 1
+        return created
+
+    def _apply_dat_registro(self, rows: list[dict[str, str]]) -> int:
+        """Create-only de DATRegistro. NK (municipio, projeto_geral, projeto).
+        aluno_qtde é obrigatório → linha sem ele é pulada. DATRegistro.save()
+        recalcula nr_codigos + espelha usa_avaliar; nr_codigos_planilha guarda o
+        valor cru da planilha para reconciliação."""
+        actor = self._require_actor("dat_registro")
+        mun_idx = self._municipio_index()
+        pg_idx = self._projeto_geral_index()
+        created = 0
+        for r in rows:
+            mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
+            pg_id = pg_idx.get(_norm(r.get("projeto_geral") or ""))
+            proj_id = self.resolve_projeto(r.get("projeto") or "")
+            aluno_qtde = _parse_int(r.get("aluno_qtde"))
+            if mun_id is None or pg_id is None or proj_id is None or aluno_qtde is None:
+                continue  # FK não-resolvida ou aluno_qtde ausente (obrigatório)
+            if DATRegistro.objects.filter(municipio_id=mun_id, projeto_geral_id=pg_id, projeto_id=proj_id).exists():
+                continue
+            reg = DATRegistro(
+                municipio_id=mun_id,
+                projeto_geral_id=pg_id,
+                projeto_id=proj_id,
+                created_by=actor,
+                aluno_qtde=aluno_qtde,
+                professor_qtde=_parse_int(r.get("professor_qtde")),
+                nr_codigos_planilha=_parse_int(r.get("nr_codigos_planilha")),
+                reuniao_dat=_parse_iso_date(r.get("reuniao_dat")),
+                turma_formar_id=_parse_int(r.get("turma_formar_id")),
+                turma_formar_status=(r.get("turma_formar_status") or "pendente").strip() or "pendente",
+                chaves_inscricao_status=(r.get("chaves_inscricao_status") or "pendente").strip() or "pendente",
+                chaves_inscricao_data=_parse_iso_date(r.get("chaves_inscricao_data")),
+                instrucoes_status=(r.get("instrucoes_status") or "pendente").strip() or "pendente",
+                instrucoes_data=_parse_iso_date(r.get("instrucoes_data")),
+                envio_codigos_status=(r.get("envio_codigos_status") or "pendente").strip() or "pendente",
+                envio_codigos_data=_parse_iso_date(r.get("envio_codigos_data")),
+                obs_formar=(r.get("obs_formar") or "")[:1000],
+                alunos_recebidos_status=(r.get("alunos_recebidos_status") or "nao_aplicavel").strip()
+                or "nao_aplicavel",
+                alunos_recebidos_datas=_parse_json_list(r.get("alunos_recebidos_datas")),
+                alunos_validados_status=(r.get("alunos_validados_status") or "nao_aplicavel").strip()
+                or "nao_aplicavel",
+                alunos_validados_datas=_parse_json_list(r.get("alunos_validados_datas")),
+                alunos_importados_status=(r.get("alunos_importados_status") or "nao_aplicavel").strip()
+                or "nao_aplicavel",
+                alunos_importados_datas=_parse_json_list(r.get("alunos_importados_datas")),
+                obs_avaliar=(r.get("obs_avaliar") or "")[:1000],
+            )
+            reg.save()  # calcula nr_codigos + espelha usa_avaliar do projeto_geral
+            created += 1
+        return created
 
     def _papel_index_from_equipe(self) -> dict[str, str]:
         """Mapa cpf(11 dig) -> papel canonico, de equipe_gerencia.csv (fonte primaria do papel)."""

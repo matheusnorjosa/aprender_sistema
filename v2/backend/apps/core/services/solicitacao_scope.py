@@ -21,6 +21,8 @@ Consumido tanto pelo `get_queryset` do `SolicitacaoViewSet` quanto pelo
 fora do escopo → 404, não distinguível de inexistente).
 """
 
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingTypeArgument=false
+
 from __future__ import annotations
 
 from typing import Any
@@ -41,7 +43,12 @@ def user_is_solicitacao_global(user: Any) -> bool:
         return False
     if getattr(user, "is_superuser", False):
         return True
-    if user_has_any_perm(user, "operate_preagenda", "manage_admin_registries"):
+    # `approve_solicitation` é EXCLUSIVA do setor Superintendência (o órgão de
+    # oversight/aprovação) — visão global legítima. NÃO incluir
+    # `approve_solicitation_batch` aqui: essa é concedida ao grupo FUNÇÃO "Gerente"
+    # inteiro e é justamente o que vazava alcance nacional p/ Gerente pedagógico
+    # (por isso o escopo abaixo). `operate_preagenda`=Controle, `manage_admin_registries`=DAT.
+    if user_has_any_perm(user, "operate_preagenda", "manage_admin_registries", "approve_solicitation"):
         return True
     # Aprovador composto (Gerente-da-Superintendência OU Asst-Admin-Controle).
     return user_has_policy(user, "access_solicitation_approvals")

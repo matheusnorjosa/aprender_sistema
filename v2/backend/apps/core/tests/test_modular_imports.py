@@ -20,7 +20,6 @@ class TestModelsBackwardsCompatibility:
     def test_import_from_models_module(self) -> None:
         """Import tradicional: from apps.core.models import X"""
         from apps.core.models import (
-            AcaoControle,
             AcaoDAT,
             AuditLog,
             AvailabilityBlock,
@@ -51,7 +50,6 @@ class TestModelsBackwardsCompatibility:
         assert AvailabilityBlock is not None
         assert Compra is not None
         assert Deslocamento is not None
-        assert AcaoControle is not None
         assert AcaoDAT is not None
         assert Config is not None
         assert AuditLog is not None
@@ -99,10 +97,9 @@ class TestModelsBackwardsCompatibility:
 
     def test_direct_import_workflow(self) -> None:
         """Import direto: from apps.core.models.workflow import X"""
-        from apps.core.models.workflow import AcaoControle, AcaoDAT, Deslocamento
+        from apps.core.models.workflow import AcaoDAT, Deslocamento
 
         assert Deslocamento is not None
-        assert AcaoControle is not None
         assert AcaoDAT is not None
 
     def test_direct_import_config(self) -> None:

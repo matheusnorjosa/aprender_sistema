@@ -6,7 +6,7 @@ to detect already-imported rows. The SHA-1 digest with
 ``usedforsecurity=False`` is required by PEP 644 to silence weak-crypto
 linters. Migrating to SHA-256 would break historical ``external_hash``
 values stored in ``Compra``, ``Solicitacao``, ``Deslocamento``,
-``AcaoControle``, ``AcaoDAT``, ``Acompanhamento`` and is therefore
+``AcaoDAT``, ``Acompanhamento`` and is therefore
 forbidden.
 
 This module is split in two sections:

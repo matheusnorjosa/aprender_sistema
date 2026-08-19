@@ -92,7 +92,17 @@ jobs:
 
     - uses: ./.github/actions/setup-node-deps
 
+    - name: Cache Playwright browsers
+      uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-${{ hashFiles('v2/frontend/package-lock.json') }}
+
     - name: Install Playwright browsers
+      # timeout curto: se o download do browser travar (flake de rede no CDN,
+      # visto no run 32251606405 — 30min pendurado), falha rápido p/ re-run
+      # em vez de queimar o budget do job. Em cache-hit o download é pulado.
+      timeout-minutes: 10
       run: npx playwright install chromium --with-deps
 
     - name: Start backend services for functional contract checklist
@@ -195,7 +205,17 @@ jobs:
 
     - uses: ./.github/actions/setup-node-deps
 
+    - name: Cache Playwright browsers
+      uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-${{ hashFiles('v2/frontend/package-lock.json') }}
+
     - name: Install Playwright browsers
+      # timeout curto: se o download do browser travar (flake de rede no CDN,
+      # visto no run 32251606405 — 30min pendurado), falha rápido p/ re-run
+      # em vez de queimar o budget do job. Em cache-hit o download é pulado.
+      timeout-minutes: 10
       run: npx playwright install chromium --with-deps
 
     - name: Start backend services and seed E2E data

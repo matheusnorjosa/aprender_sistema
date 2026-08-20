@@ -62,6 +62,33 @@ def _get_client_ip(request: Request) -> str:
     return request.META.get("REMOTE_ADDR", "unknown")
 
 
+class _ExtraParticipantsSerializer(serializers.Serializer):
+    """
+    M10-04 (#1626): valida o shape de `extra_participants` antes de materializar
+    Participation.
+
+    Sem isso, o payload era lido cru de request.data: um item não-string em
+    *_emails estourava `.strip()` (500), listas gigantes não tinham limite, e
+    e-mails inválidos viravam guest_email. Aqui cada lista é de tamanho limitado,
+    ids são inteiros positivos e e-mails passam por EmailField (normalizados).
+    """
+
+    _MAX = 200
+    coordenador_id = serializers.IntegerField(required=False, allow_null=True)
+    formador_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1), required=False, default=list, max_length=_MAX
+    )
+    formador_emails = serializers.ListField(
+        child=serializers.EmailField(), required=False, default=list, max_length=_MAX
+    )
+    coord_acompanha_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1), required=False, default=list, max_length=_MAX
+    )
+    coord_acompanha_emails = serializers.ListField(
+        child=serializers.EmailField(), required=False, default=list, max_length=_MAX
+    )
+
+
 class _BatchIdsSerializer(serializers.Serializer):
     """
     M11-04 (#1650): valida o TIPO do corpo das ações batch-approve/batch-reject.
@@ -320,9 +347,13 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             instance = serializer.save(usuario=self.request.user, status=initial_status.status)
 
             # PR15: Processar extra_participants
+            # M10-04 (#1626): valida o shape antes de materializar Participation —
+            # mata o 500 em payload malformado, limita o tamanho e normaliza e-mails.
             extra_participants = self.request.data.get("extra_participants", {})
             if extra_participants:
-                self._create_participants(instance, extra_participants)
+                extra_serializer = _ExtraParticipantsSerializer(data=extra_participants)
+                extra_serializer.is_valid(raise_exception=True)
+                self._create_participants(instance, extra_serializer.validated_data)
 
             enforce_solicitacao_availability(instance, action="create")
 
@@ -366,13 +397,16 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         all_ids = set()
         all_ids.update(fid for fid in extra.get("formador_ids", []) if fid)
         all_ids.update(cid for cid in extra.get("coord_acompanha_ids", []) if cid)
-        usuarios_by_id = {u.id: u for u in Usuario.objects.filter(id__in=all_ids)} if all_ids else {}
+        # M10-04 (#1626): só usuários ATIVOS viram participantes por id.
+        usuarios_by_id = {u.id: u for u in Usuario.objects.filter(id__in=all_ids, is_active=True)} if all_ids else {}
 
         all_emails = set()
         all_emails.update(e.strip().lower() for e in extra.get("formador_emails", []) if e and e.strip())
         all_emails.update(e.strip().lower() for e in extra.get("coord_acompanha_emails", []) if e and e.strip())
         usuarios_by_email = (
-            {u.email.lower(): u for u in Usuario.objects.filter(email__in=all_emails)} if all_emails else {}
+            {u.email.lower(): u for u in Usuario.objects.filter(email__in=all_emails, is_active=True)}
+            if all_emails
+            else {}
         )
 
         # Formadores por ID

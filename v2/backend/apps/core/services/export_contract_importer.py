@@ -475,7 +475,7 @@ class ExportContractImporter:
             mun_idx = self._municipio_index()
             existing = set(
                 DATCompra.objects.values_list(
-                    "municipio_id", "projeto_id", "descricao_produto", "tipo", "quantidade", "ano_uso"
+                    "municipio_id", "projeto_id", "descricao_produto", "tipo", "quantidade", "ano_uso", "data_compra"
                 )
             )
             for r in rows:
@@ -493,7 +493,12 @@ class ExportContractImporter:
 
     @staticmethod
     def _dat_compra_nk(r: dict[str, str], mun_id: int | None, proj_id: int | None) -> tuple[Any, ...]:
-        """NK existence-based da compra: (mun, proj, descricao, tipo, quantidade, ano_uso)."""
+        """NK existence-based da compra: (mun, proj, descricao, tipo, quantidade, ano_uso, data_compra).
+
+        `data_compra` faz parte da NK (alinhado ao dedupe_key do contrato): duas compras iguais em
+        tudo menos a data (ex.: mesmo kit de professor comprado em 15/05 e 25/05) sao DISTINTAS —
+        sem a data elas colidiam e a 2a era descartada, causando under-count de nr_codigos.
+        """
         return (
             mun_id,
             proj_id,
@@ -501,6 +506,7 @@ class ExportContractImporter:
             (r.get("tipo") or "").strip() or None,
             _parse_int(r.get("quantidade")),
             _parse_int(r.get("ano_uso")),
+            _parse_iso_date(r.get("data_compra")),
         )
 
     def run(self) -> dict[str, Any]:
@@ -681,7 +687,7 @@ class ExportContractImporter:
         prod_idx = {(c or "").strip().upper(): pid for pid, c in Produto.objects.values_list("id", "codigo")}
         existing = set(
             DATCompra.objects.values_list(
-                "municipio_id", "projeto_id", "descricao_produto", "tipo", "quantidade", "ano_uso"
+                "municipio_id", "projeto_id", "descricao_produto", "tipo", "quantidade", "ano_uso", "data_compra"
             )
         )
         created = 0
@@ -702,7 +708,7 @@ class ExportContractImporter:
                 conta_para_codigos=_to_bool(r.get("conta_para_codigos")),
                 quantidade=nk[4] or 0,
                 ano_uso=nk[5],
-                data_compra=_parse_iso_date(r.get("data_compra")),
+                data_compra=nk[6],
                 created_by=actor,
             )
             existing.add(nk)

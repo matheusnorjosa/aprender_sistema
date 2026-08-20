@@ -40,6 +40,16 @@ def test_seed_create_only_no_fluxo_overwrite():
     assert Projeto.objects.get(nome="Proj Existe Seed").fluxo == "NAO_SUPER"  # nao sobrescreve
 
 
+def test_seed_skips_canonical_duplicate_different_casing():
+    # Regressao: golden dev tem os projetos em UPPERCASE; o catalogo canonico em Title Case.
+    # A idempotencia por canon-key (nao por `nome` exato) NAO pode criar quase-duplicata.
+    ProjetoFactory(nome="GESTÃO ESCOLAR", fluxo="NAO_SUPER")
+    stats = seed_projetos_canonicos([("Gestão Escolar", "NAO_SUPER")])
+    assert stats["created"] == 0
+    assert stats["existing"] == 1
+    assert Projeto.objects.filter(nome__iexact="gestão escolar").count() == 1, "nao pode duplicar por grafia"
+
+
 def test_seed_rejects_invalid_fluxo_and_empty_name():
     stats = seed_projetos_canonicos([("", "SUPER"), ("Proj Fluxo Ruim", "INVALIDO"), ("Proj Ok Seed", "SUPER")])
     assert stats["created"] == 1
@@ -48,11 +58,11 @@ def test_seed_rejects_invalid_fluxo_and_empty_name():
 
 
 def test_constant_well_formed():
-    assert len(PROJETOS_CANONICOS) == 33
+    assert len(PROJETOS_CANONICOS) == 40
     nomes = [n for n, _ in PROJETOS_CANONICOS]
-    assert len(set(nomes)) == 33, "nomes de projeto devem ser unicos"
+    assert len(set(nomes)) == 40, "nomes de projeto devem ser unicos"
     assert all(f in {"SUPER", "NAO_SUPER"} for _, f in PROJETOS_CANONICOS)
-    assert sum(1 for _, f in PROJETOS_CANONICOS if f == "SUPER") == 11
+    assert sum(1 for _, f in PROJETOS_CANONICOS if f == "SUPER") == 15
 
 
 def test_command_seeds_catalogo():
@@ -61,7 +71,7 @@ def test_command_seeds_catalogo():
     tema = Projeto.objects.get(nome="TEMA")
     assert tema.fluxo == "SUPER"
     assert Projeto.objects.get(nome="Superativar Matemática").fluxo == "NAO_SUPER"
-    assert Projeto.objects.filter(nome__in=[n for n, _ in PROJETOS_CANONICOS]).count() == 33
+    assert Projeto.objects.filter(nome__in=[n for n, _ in PROJETOS_CANONICOS]).count() == 40
 
 
 def test_command_idempotent():

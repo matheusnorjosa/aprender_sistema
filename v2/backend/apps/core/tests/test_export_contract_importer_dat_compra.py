@@ -10,6 +10,7 @@ Segurança: apply exige allowlist + actor; create-only; idempotente; fixtures si
 from __future__ import annotations
 
 import json
+from datetime import date
 from decimal import Decimal
 from typing import Any
 
@@ -60,6 +61,7 @@ def test_classify_dat_compra_skip_create_reject(tmp_path):
         tipo="Professor",
         quantidade=41,
         ano_uso=2026,
+        data_compra=date(2026, 6, 8),  # parte da NK: precisa casar a data do row p/ skip
         created_by=actor,
     )
     rows = "\n".join(
@@ -95,6 +97,29 @@ def test_apply_dat_compra_creates_and_recomputes(tmp_path):
     assert r["applied"]["dat_compra"] == 2
     reg.refresh_from_db()
     assert reg.nr_codigos == 59  # ceil(41×1.1)+ceil(11×1.1) = 46+13, NÃO ceil(52×1.1)=58
+
+
+def test_apply_dat_compra_distinct_by_data_compra(tmp_path):
+    """NK inclui data_compra: 2 compras iguais em tudo menos a DATA são distintas (não dedup).
+    Regressão real (PACATUBA/Vida & Ciências 9): mesmo kit de professor comprado em 2 datas —
+    sem a data na NK, a 2ª colidia e era descartada, causando under-count de nr_codigos."""
+    actor = _actor()
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
+    rows = "\n".join(
+        [
+            "Cidade X,CE,Proj X,99,Professor kit,Professor,true,5,2026,2026-05-15",
+            "Cidade X,CE,Proj X,99,Professor kit,Professor,true,5,2026,2026-05-25",
+        ]
+    )
+    r = ExportContractImporter(
+        path=_write_export(tmp_path, {"dat_compra": f"{COMPRA_HEADER}\n{rows}\n"}),
+        apply=True,
+        allow=("dat_compra",),
+        actor=actor,
+    ).run()
+    assert r["applied"]["dat_compra"] == 2  # sem data_compra na NK seria 1 (2ª colidiria)
+    assert DATCompra.objects.filter(descricao_produto="Professor kit", quantidade=5).count() == 2
 
 
 def test_apply_dat_compra_idempotent(tmp_path):

@@ -258,8 +258,11 @@ class DATRegistro(models.Model):
 
         if tipo == "por_professor":
             if self.professor_qtde and self.projeto_geral.multiplicador_professor:
-                mult = float(self.projeto_geral.multiplicador_professor)
-                return math.ceil(self.professor_qtde * mult)
+                # Aritmética Decimal (não float): float(Decimal("1.10")) == 1.1000000000000001,
+                # então professor_qtde * mult cai LOGO ACIMA do inteiro e math.ceil estoura
+                # em +1 (ex.: 100 * 1.10 -> 110.00000000000001 -> ceil 111). O campo
+                # multiplicador_professor já é Decimal; multiplicar direto preserva a exatidão.
+                return math.ceil(self.professor_qtde * self.projeto_geral.multiplicador_professor)
             return None
 
         return None

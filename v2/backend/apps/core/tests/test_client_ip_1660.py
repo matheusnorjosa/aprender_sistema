@@ -10,6 +10,7 @@ the resolver falls back to the unforgeable ``REMOTE_ADDR``.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from django.test import Client, RequestFactory, override_settings
 
@@ -19,7 +20,7 @@ _FACTORY = RequestFactory()
 
 
 def _req(xff: str | None = None, remote_addr: str = "10.0.0.9"):
-    extra: dict[str, str] = {"REMOTE_ADDR": remote_addr}
+    extra: dict[str, Any] = {"REMOTE_ADDR": remote_addr}
     if xff is not None:
         extra["HTTP_X_FORWARDED_FOR"] = xff
     return _FACTORY.get("/", **extra)

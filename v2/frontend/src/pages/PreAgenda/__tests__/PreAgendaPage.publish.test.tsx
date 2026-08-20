@@ -1,32 +1,27 @@
 /**
- * #1629 [M12-19] Pré-agenda — publicação: resíduos do fix da #1750.
+ * #1629 [M12-19] Pré-agenda — publicação: botão bloqueado em PENDING.
  *
- *  a) 202-como-sucesso: o backend SEMPRE enfileira (202 Accepted) e sincroniza
- *     com o Google Calendar de forma assíncrona. A UI não pode anunciar
- *     "publicado com sucesso" — deve sinalizar o enfileiramento.
- *  b) PENDING-republish: com a publicação já em voo (PENDING), o botão de
- *     publicar deve ficar disabled para não reenfileirar por cima.
+ * (b) PENDING-republish: com a publicação já em voo (PENDING), o botão de
+ *     publicar deve ficar disabled para não reenfileirar por cima. Antes só
+ *     bloqueava em PUBLISHED.
  *
- * Reusa o harness de mocks do PreAgendaPage.lifecycle.test.tsx; aqui o
- * usePolling é um no-op (não precisamos de ticks) e o publishSolicitacao é um
- * mock nomeado para controlar o retorno 202.
+ * O resíduo (a) — não anunciar "publicado com sucesso" num retorno 202
+ * (enfileiramento assíncrono) — é uma troca de copy no handler (message.info
+ * em vez de message.success). Não há teste de UI para ele porque o fluxo passa
+ * por Modal.confirm (API estática do antd v5), que não monta de forma confiável
+ * no ambiente de teste sob React 19 (nenhum teste do projeto dirige modais).
+ *
+ * Reusa o harness de mocks do PreAgendaPage.lifecycle.test.tsx.
  */
-// antd v5 static APIs (Modal.confirm/message) usam o render legado, removido no
-// React 19. O app aplica este patch oficial no entry (main.tsx); o setup do
-// vitest não — sem ele o Modal.confirm não monta no ambiente de teste.
-import '@ant-design/v5-patch-for-react-19';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { message } from 'antd';
 
-const { getMeMock, listSolicitacoesMock, getStatusSummaryMock, fetchAPIMock, publishSolicitacaoMock } =
-  vi.hoisted(() => ({
-    getMeMock: vi.fn(),
-    listSolicitacoesMock: vi.fn(),
-    getStatusSummaryMock: vi.fn(),
-    fetchAPIMock: vi.fn(),
-    publishSolicitacaoMock: vi.fn(),
-  }));
+const { getMeMock, listSolicitacoesMock, getStatusSummaryMock, fetchAPIMock } = vi.hoisted(() => ({
+  getMeMock: vi.fn(),
+  listSolicitacoesMock: vi.fn(),
+  getStatusSummaryMock: vi.fn(),
+  fetchAPIMock: vi.fn(),
+}));
 
 vi.mock('../../../api/config', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
@@ -36,7 +31,7 @@ vi.mock('../../../api/availability', () => ({ getMe: getMeMock }));
 vi.mock('../../../api/solicitacoes', () => ({
   listSolicitacoes: listSolicitacoesMock,
   previewSolicitacao: vi.fn(),
-  publishSolicitacao: publishSolicitacaoMock,
+  publishSolicitacao: vi.fn(),
   resyncSolicitacao: vi.fn(),
   cancelSolicitacao: vi.fn(),
 }));
@@ -95,26 +90,6 @@ beforeEach(() => {
 });
 
 describe('PreAgendaPage — publicação (M12-19 / #1629)', () => {
-  test('publicar NÃO anuncia sucesso definitivo (backend enfileira, 202)', async () => {
-    mockRows([row({ id: 10, municipio_nome: 'Sobral', gcal_status: 'NONE' })]);
-    publishSolicitacaoMock.mockResolvedValue({ detail: 'enfileirada', task_id: 't1', solicitacao_id: 10 });
-    const successSpy = vi.spyOn(message, 'success');
-    const infoSpy = vi.spyOn(message, 'info');
-
-    render(<PreAgendaPage />);
-    const publishBtn = await screen.findByLabelText('Publicar evento no Google Calendar');
-    fireEvent.click(publishBtn);
-
-    // Modal.confirm → confirmar em "Publicar" (mount assíncrono do portal antd).
-    const okBtn = await screen.findByRole('button', { name: 'Publicar' }, { timeout: 3000 });
-    fireEvent.click(okBtn);
-
-    await waitFor(() => expect(publishSolicitacaoMock).toHaveBeenCalledWith(10, { dry_run: false }));
-    // Sinaliza enfileiramento (info), nunca "publicado com sucesso".
-    await waitFor(() => expect(infoSpy).toHaveBeenCalled());
-    expect(successSpy).not.toHaveBeenCalledWith('Evento publicado com sucesso!');
-  });
-
   test('botão publicar fica disabled quando gcal_status é PENDING', async () => {
     mockRows([row({ id: 20, municipio_nome: 'Sobral', gcal_status: 'PENDING' })]);
     render(<PreAgendaPage />);

@@ -232,8 +232,21 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
 
   const fetchUsuarios = async (): Promise<void> => {
     try {
-      const data = await listUsers({ ordering: 'username', page_size: PAGE_SIZES.ALL });
-      setUsuarios(data.results as UserRecord[]);
+      // M01-07 (#1612): a membership do grupo é DERIVADA desta lista e salva por
+      // full-replace (sync-members). Carregar só a 1ª página revogava membros além
+      // do teto do paginador ao salvar. Seguimos `next` até esgotar para garantir o
+      // conjunto COMPLETO de usuários (robusto mesmo acima do max_page_size).
+      const all: UserRecord[] = [];
+      let page = 1;
+      for (;;) {
+        const data = await listUsers({ ordering: 'username', page_size: PAGE_SIZES.ALL, page });
+        all.push(...(data.results as UserRecord[]));
+        if (!data.next) {
+          break;
+        }
+        page += 1;
+      }
+      setUsuarios(all);
     } catch (error) {
       message.error(`Erro ao carregar usuários: ${(error as Error).message}`);
     }

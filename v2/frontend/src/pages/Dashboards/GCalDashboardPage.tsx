@@ -52,6 +52,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import logger from '../../utils/logger';
+import { formatFortaleza } from '../../utils/datetime';
 import { TIMING } from '../../constants';
 import {
   getDashboardMetrics,
@@ -398,7 +399,7 @@ export default function GCalDashboardPage(): JSX.Element {
       key: 'gcal_last_sync_at',
       width: 180,
       render: (datetime: string | null) =>
-        datetime ? dayjs(datetime).format('DD/MM/YYYY HH:mm') : '-',
+        datetime ? formatFortaleza(datetime) : '-',
     },
     {
       title: 'Erro',
@@ -587,7 +588,7 @@ export default function GCalDashboardPage(): JSX.Element {
                       <Text type="danger">{error.gcal_last_error}</Text>
                       <br />
                       <Text type="secondary" style={{ fontSize: 12 }}>
-                        {dayjs(error.updated_at).format('DD/MM/YYYY HH:mm')}
+                        {formatFortaleza(error.updated_at)}
                       </Text>
                     </div>
                   ))}
@@ -743,10 +744,10 @@ export default function GCalDashboardPage(): JSX.Element {
               <Descriptions.Item label="Projeto">{eventDetail.projeto_nome || '-'}</Descriptions.Item>
               <Descriptions.Item label="Tipo de Evento">{eventDetail.tipo_evento_nome || '-'}</Descriptions.Item>
               <Descriptions.Item label="Início">
-                {eventDetail.inicio ? dayjs(eventDetail.inicio).format('DD/MM/YYYY HH:mm') : '-'}
+                {eventDetail.inicio ? formatFortaleza(eventDetail.inicio) : '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Fim">
-                {eventDetail.fim ? dayjs(eventDetail.fim).format('DD/MM/YYYY HH:mm') : '-'}
+                {eventDetail.fim ? formatFortaleza(eventDetail.fim) : '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Usuário">{eventDetail.usuario_username || '-'}</Descriptions.Item>
               <Descriptions.Item label="Coordenador">{eventDetail.coordenador_username || '-'}</Descriptions.Item>
@@ -762,7 +763,7 @@ export default function GCalDashboardPage(): JSX.Element {
               </Descriptions.Item>
               <Descriptions.Item label="Event ID">{eventDetail.external_event_id || '-'}</Descriptions.Item>
               <Descriptions.Item label="Última Sincronização">
-                {eventDetail.gcal_last_sync_at ? dayjs(eventDetail.gcal_last_sync_at).format('DD/MM/YYYY HH:mm') : '-'}
+                {eventDetail.gcal_last_sync_at ? formatFortaleza(eventDetail.gcal_last_sync_at) : '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Meet Link">
                 {eventDetail.meet_link ? (
@@ -784,7 +785,7 @@ export default function GCalDashboardPage(): JSX.Element {
                 )}
               </Descriptions.Item>
               <Descriptions.Item label="Atualizado em">
-                {eventDetail.updated_at ? dayjs(eventDetail.updated_at).format('DD/MM/YYYY HH:mm') : '-'}
+                {eventDetail.updated_at ? formatFortaleza(eventDetail.updated_at) : '-'}
               </Descriptions.Item>
             </Descriptions>
 
@@ -823,7 +824,7 @@ export default function GCalDashboardPage(): JSX.Element {
                       <Text strong>{log.action}</Text>
                       <br />
                       <Text type="secondary">
-                        {log.usuario_nome} - {dayjs(log.created_at).format('DD/MM/YYYY HH:mm:ss')}
+                        {log.usuario_nome} - {formatFortaleza(log.created_at, 'DD/MM/YYYY HH:mm:ss')}
                       </Text>
                       {log.details && Object.keys(log.details).length > 0 && (
                         <div className="mt-1">

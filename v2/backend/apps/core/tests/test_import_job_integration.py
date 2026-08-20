@@ -130,3 +130,75 @@ class TestAsyncPipelineEndToEnd:
 
         # Apply mode: bloqueios persistidos de verdade
         assert AvailabilityBlock.objects.filter(usuario=target_user).count() == 2
+
+
+@pytest.fixture
+def malformed_csv():
+    """CSV que parseia mas referencia usuário inexistente → linha pulada."""
+    content = (
+        "usuario,inicio,fim,tipo,motivo\n"
+        "Fulano Inexistente Zzz,2026-03-01 08:00,2026-03-01 12:00,P,Consulta\n"
+    )
+    temp = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8")
+    temp.write(content)
+    temp.close()
+    yield temp.name
+    Path(temp.name).unlink(missing_ok=True)
+
+
+@pytest.mark.django_db
+class TestImportBloqueiosPermissions:
+    """Adversarial: autenticação, permissão e validação de entrada no upload."""
+
+    def test_upload_requires_authentication(self, api_client):
+        """Sem autenticação → 403 (SessionAuthentication rebaixa 401→403)."""
+        resp = api_client.post(UPLOAD_URL, {}, format="multipart")
+        assert resp.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_upload_forbidden_for_non_privileged_user(self, api_client, target_user, sample_csv):
+        """Usuário sem a policy import_generic_spreadsheet (não-Controle/DAT) → 403."""
+        api_client.force_authenticate(user=target_user)
+        with open(sample_csv, "rb") as f:
+            resp = api_client.post(UPLOAD_URL, {"file": f}, format="multipart")
+        assert resp.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_upload_without_file_returns_400(self, api_client, controle_user):
+        """POST sem o campo 'file' → 400 (validação antes de despachar a task)."""
+        api_client.force_authenticate(user=controle_user)
+        resp = api_client.post(UPLOAD_URL, {}, format="multipart")
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.django_db(transaction=True)
+class TestImportBloqueiosMalformed:
+    """Adversarial: CSV válido mas com dados ruins → job SUCCESS com linhas puladas (nunca FAILED)."""
+
+    @pytest.fixture(autouse=True)
+    def _celery_eager(self, settings):
+        settings.CELERY_TASK_ALWAYS_EAGER = True
+        settings.CELERY_TASK_EAGER_PROPAGATES = True
+
+    def test_malformed_csv_pula_linhas_job_success(
+        self, api_client, controle_user, malformed_csv
+    ):
+        api_client.force_authenticate(user=controle_user)
+
+        with open(malformed_csv, "rb") as f:
+            post = api_client.post(
+                UPLOAD_URL + "?dry_run=false",
+                {"file": f},
+                format="multipart",
+            )
+
+        # A entrada é aceita (202) — dados ruins não abortam o upload.
+        assert post.status_code == status.HTTP_202_ACCEPTED
+        job_id = post.data["id"]
+
+        detail = api_client.get(f"/api/imports/{job_id}/")
+        assert detail.status_code == status.HTTP_200_OK
+
+        # Linhas inválidas são puladas com segurança: job termina SUCCESS, não FAILED,
+        # e nada é persistido (usuário inexistente → skip, sem levantar).
+        assert detail.data["status"] == ImportJob.Status.SUCCESS
+        assert detail.data["stats"]["created"] == 0
+        assert AvailabilityBlock.objects.count() == 0

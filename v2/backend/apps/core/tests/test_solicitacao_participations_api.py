@@ -189,3 +189,60 @@ def test_solicitacao_api_no_formadores_field(factory_solicitacao):
 
     # Verificar que "formadores" NÃO está no payload
     assert "formadores" not in payload_str.lower(), "Campo 'formadores' não deve existir no payload"
+
+
+# ---------------------------------------------------------------------------
+# Casos adversariais: autenticação e escopo (data-scope #1779)
+# ---------------------------------------------------------------------------
+
+
+def test_solicitacao_list_requires_authentication():
+    """Adversarial: sem autenticação a listagem é negada.
+
+    SessionAuthentication não expõe WWW-Authenticate → DRF rebaixa
+    NotAuthenticated para PermissionDenied → 403 (não 401).
+    """
+    resp = APIClient().get("/api/solicitacoes/")
+    assert resp.status_code == 403
+
+
+def test_solicitacao_detail_de_outro_usuario_retorna_404(factory_solicitacao):
+    """Adversarial (escopo #1779): usuário comum não enxerga solicitação de outro.
+
+    Fora do queryset escopado → get_object levanta Http404 → 404-como-inexistente
+    (não vaza 200 nem sinaliza existência com 403).
+    """
+    solicitacao = factory_solicitacao()  # dono = usuário auto-gerado
+    outro = UsuarioFactory()
+
+    client = APIClient()
+    client.force_authenticate(user=outro)
+
+    resp = client.get(f"/api/solicitacoes/{solicitacao.id}/")
+    assert resp.status_code == 404
+
+
+def test_solicitacao_list_escopada_ao_dono(factory_solicitacao):
+    """Adversarial (escopo #1779): usuário comum vê apenas as próprias na listagem."""
+    dono = UsuarioFactory()
+    minha = factory_solicitacao(usuario=dono)
+    # Reutiliza as deps com unique constraint (municipio/tipo_evento/projeto);
+    # só o usuário difere (auto-gerado) → solicitação de "outro dono".
+    de_outro = factory_solicitacao(
+        municipio=minha.municipio,
+        tipo_evento=minha.tipo_evento,
+        projeto=minha.projeto,
+    )
+
+    client = APIClient()
+    client.force_authenticate(user=dono)
+
+    resp = client.get("/api/solicitacoes/")
+    assert resp.status_code == 200
+
+    content = resp.json()
+    results = content["results"] if "results" in content else content
+    ids = {item["id"] for item in results}
+
+    assert minha.id in ids
+    assert de_outro.id not in ids, "Listagem não deve vazar solicitação de outro usuário"

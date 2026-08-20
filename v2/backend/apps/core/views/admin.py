@@ -35,6 +35,7 @@ from apps.core.models import (
     Projeto,
     Usuario,
 )
+from apps.core.pagination import LargePagination
 from apps.core.permissions import HasPerm, SuperuserOnly
 from apps.core.rbac.policies import CanAccessAuditLogs, can_admin_mutate_target
 from apps.core.serializers import (
@@ -365,6 +366,12 @@ class UsuarioAdminViewSet(viewsets.ModelViewSet):
 
     queryset = Usuario.objects.prefetch_related("groups").all()
     serializer_class = UsuarioAdminSerializer
+    # M01-07 (#1612): o paginador global (PageNumberPagination) ignora ?page_size
+    # e capa em 100. A tela de grupos deriva a membership da lista de usuários e
+    # salva por full-replace (sync-members) — com a lista truncada, membros além
+    # dos 100 primeiros (por username) eram revogados em silêncio. LargePagination
+    # honra ?page_size (até 1000), destravando a carga completa que o frontend pede.
+    pagination_class = LargePagination
     # Issue #1222 (Epic 1): admin usuários é cadastro admin DAT puro
     permission_classes = [HasPerm("manage_admin_registries")]
 

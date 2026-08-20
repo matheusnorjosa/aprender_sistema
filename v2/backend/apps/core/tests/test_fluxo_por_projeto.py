@@ -395,6 +395,76 @@ class TestFluxoPorProjeto(TestCase):
         projeto_teste.refresh_from_db()
         self.assertEqual(projeto_teste.fluxo, "SUPER")
 
+    # -----------------------------------------------------------------
+    # Casos adversariais: autenticação, permissão e elegibilidade
+    # -----------------------------------------------------------------
+
+    def test_criar_sem_autenticacao_403(self):
+        """Adversarial: criar solicitação sem autenticação → 403.
+
+        SessionAuthentication rebaixa NotAuthenticated para PermissionDenied.
+        """
+        client = APIClient()  # sem force_authenticate
+        response = client.post(
+            "/api/solicitacoes/",
+            {
+                "municipio": self.municipio.id,
+                "projeto": self.projeto_super.id,
+                "tipo": "evento",
+                "tipo_evento": self.tipo_evento.id,
+                "inicio": self.inicio.isoformat(),
+                "fim": self.fim.isoformat(),
+                "formadores": [],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_criar_sem_capability_403(self):
+        """Adversarial: usuário sem a capability create_solicitation → 403."""
+        sem_perm = UsuarioFactory(username="sem_perm_fluxo")  # nenhum grupo → sem create_solicitation
+        self.client.force_authenticate(user=sem_perm)
+        response = self.client.post(
+            "/api/solicitacoes/",
+            {
+                "municipio": self.municipio.id,
+                "projeto": self.projeto_super.id,
+                "tipo": "evento",
+                "tipo_evento": self.tipo_evento.id,
+                "inicio": self.inicio.isoformat(),
+                "fim": self.fim.isoformat(),
+                "formadores": [],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_criar_sem_compra_registrada_400(self):
+        """Adversarial: par (municipio, projeto) sem Compra registrada → 400 keyed em 'municipio'."""
+        projeto_sem_compra = ProjetoFactory(
+            nome="Projeto Sem Compra",
+            codigo="",
+            fluxo="NAO_SUPER",
+            ativo=True,
+        )
+        self.client.force_authenticate(user=self.coordenador)
+        response = self.client.post(
+            "/api/solicitacoes/",
+            {
+                "municipio": self.municipio.id,
+                "projeto": projeto_sem_compra.id,
+                "tipo": "evento",
+                "tipo_evento": self.tipo_evento.id,
+                "inicio": self.inicio.isoformat(),
+                "fim": self.fim.isoformat(),
+                "formadores": [],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        # O handler de exceção aninha os erros de campo em data["errors"].
+        self.assertIn("municipio", response.data["errors"])
+
 
 class TestMigrationFluxoProjeto(TestCase):
     """

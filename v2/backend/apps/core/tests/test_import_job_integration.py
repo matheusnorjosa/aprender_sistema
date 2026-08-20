@@ -135,10 +135,7 @@ class TestAsyncPipelineEndToEnd:
 @pytest.fixture
 def malformed_csv():
     """CSV que parseia mas referencia usuário inexistente → linha pulada."""
-    content = (
-        "usuario,inicio,fim,tipo,motivo\n"
-        "Fulano Inexistente Zzz,2026-03-01 08:00,2026-03-01 12:00,P,Consulta\n"
-    )
+    content = "usuario,inicio,fim,tipo,motivo\n" "Fulano Inexistente Zzz,2026-03-01 08:00,2026-03-01 12:00,P,Consulta\n"
     temp = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8")
     temp.write(content)
     temp.close()
@@ -178,9 +175,7 @@ class TestImportBloqueiosMalformed:
         settings.CELERY_TASK_ALWAYS_EAGER = True
         settings.CELERY_TASK_EAGER_PROPAGATES = True
 
-    def test_malformed_csv_pula_linhas_job_success(
-        self, api_client, controle_user, malformed_csv
-    ):
+    def test_malformed_csv_pula_linhas_job_success(self, api_client, controle_user, malformed_csv):
         api_client.force_authenticate(user=controle_user)
 
         with open(malformed_csv, "rb") as f:

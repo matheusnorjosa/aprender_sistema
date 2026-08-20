@@ -13,6 +13,7 @@ import { DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { ColumnsType, ColumnType } from 'antd/es/table';
 import type { ID } from '../types';
+import { formatFortaleza } from '../utils/datetime';
 
 import type { JSX } from "react";
 
@@ -73,14 +74,14 @@ export default function MyBlocksTable({ blocks, onDelete, loading }: MyBlocksTab
       title: 'Início',
       dataIndex: 'inicio',
       key: 'inicio',
-      render: (text: string) => dayjs(text).format('DD/MM/YYYY HH:mm'),
+      render: (text: string) => formatFortaleza(text),
       sorter: (a, b) => dayjs(a.inicio).unix() - dayjs(b.inicio).unix(),
     },
     {
       title: 'Fim',
       dataIndex: 'fim',
       key: 'fim',
-      render: (text: string) => dayjs(text).format('DD/MM/YYYY HH:mm'),
+      render: (text: string) => formatFortaleza(text),
     },
     {
       title: 'Tipo',

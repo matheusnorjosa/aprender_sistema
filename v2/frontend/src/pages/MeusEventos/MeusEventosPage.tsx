@@ -19,8 +19,8 @@ import Tag from 'antd/es/tag';
 import Typography from 'antd/es/typography';
 import message from 'antd/es/message';
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
-import dayjs from 'dayjs';
 
+import { formatFortaleza } from '../../utils/datetime';
 import { getMyEvents, type MeEvent } from '../../api/me';
 import { MeetLink } from '../../components/MeetLink';
 
@@ -62,14 +62,14 @@ export default function MeusEventosPage(): JSX.Element {
       title: 'Data',
       dataIndex: 'inicio',
       key: 'data',
-      render: (inicio: string) => dayjs(inicio).format('DD/MM/YYYY'),
+      render: (inicio: string) => formatFortaleza(inicio, 'DD/MM/YYYY'),
       width: 110,
     },
     {
       title: 'Horário',
       key: 'horario',
       render: (_, record: MeEvent) =>
-        `${dayjs(record.inicio).format('HH:mm')} – ${dayjs(record.fim).format('HH:mm')}`,
+        `${formatFortaleza(record.inicio, 'HH:mm')} – ${formatFortaleza(record.fim, 'HH:mm')}`,
       width: 130,
     },
     {

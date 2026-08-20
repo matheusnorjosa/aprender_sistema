@@ -163,7 +163,13 @@ def build_monthly_grid(
     # fetch participant ids in a single batched values_list query below,
     # which is cheaper than materializing the RelatedManager for each
     # event (#777 phase 2).
-    events_q = events_q.select_related("municipio", "tipo_evento")
+    # `.distinct()`: o filtro por `participations__...` faz JOIN com Participation
+    # e materializa uma linha por participante. Sem o DISTINCT, o mesmo evento
+    # apareceria N vezes em `events` e seria redistribuído N vezes abaixo,
+    # inflando CH, contagem de eventos (código "2" em vez de "E") e detalhes.
+    # As colunas do SELECT (Solicitacao + municipio/tipo_evento via select_related)
+    # são determinísticas por evento, então o DISTINCT colapsa só as cópias. (#1630)
+    events_q = events_q.select_related("municipio", "tipo_evento").distinct()
     events = list(events_q)
 
     # Batch fetch participants for every event in one query. Returns a flat

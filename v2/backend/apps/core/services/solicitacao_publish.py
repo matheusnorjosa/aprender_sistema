@@ -18,6 +18,7 @@ from django.utils import timezone
 
 from apps.core.exceptions import APIError, ConflictError, ValidationAPIError
 from apps.core.models import AuditLog, GoogleOAuthCredential, Solicitacao, Usuario
+from apps.core.utils.net import get_client_ip
 
 logger = logging.getLogger(__name__)
 
@@ -50,17 +51,6 @@ class PreviewResult:
     success: bool
     preview: dict[str, Any]
     message: str
-
-
-def _get_client_ip(request: Any) -> str:
-    """Extract real client IP considering reverse proxies."""
-    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
-    if x_forwarded_for:
-        return x_forwarded_for.split(",")[0].strip()
-    x_real_ip = request.META.get("HTTP_X_REAL_IP")
-    if x_real_ip:
-        return x_real_ip.strip()
-    return request.META.get("REMOTE_ADDR", "unknown")
 
 
 def _check_google_oauth(user: Usuario) -> int | None:
@@ -109,7 +99,7 @@ def preview_gcal(
 
     preview = build_preview_for_solicitacao(solicitacao)
 
-    client_ip = _get_client_ip(request)
+    client_ip = get_client_ip(request)
     AuditLog.objects.create(
         usuario=user,
         action=AuditLog.Action.PREVIEW_GCAL,
@@ -249,7 +239,7 @@ def publish_to_gcal(
         )
 
     # AuditLog
-    client_ip = _get_client_ip(request)
+    client_ip = get_client_ip(request)
     AuditLog.objects.create(
         usuario=user,
         action=AuditLog.Action.PUBLISH_GCAL_REQUESTED,
@@ -344,7 +334,7 @@ def resync_to_gcal(
         )
 
     # AuditLog
-    client_ip = _get_client_ip(request)
+    client_ip = get_client_ip(request)
     AuditLog.objects.create(
         usuario=user,
         action=AuditLog.Action.RESYNC_GCAL_REQUESTED,
@@ -432,7 +422,7 @@ def cancel_from_gcal(
         task = task_cancel_solicitacao_from_gcal.delay(solicitacao.id)
 
     # AuditLog
-    client_ip = _get_client_ip(request)
+    client_ip = get_client_ip(request)
     AuditLog.objects.create(
         usuario=user,
         action=AuditLog.Action.CANCEL_GCAL_REQUESTED,

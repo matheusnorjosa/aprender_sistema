@@ -486,6 +486,14 @@ CSRF_COOKIE_HTTPONLY = True
 # ================================================================
 # REST FRAMEWORK
 # ================================================================
+# Trusted reverse-proxy count for client-IP resolution (SEC / #1660).
+# Production chain: NPM edge → nginx `frontend` container → gunicorn = 2 proxies,
+# both appending to X-Forwarded-For. DRF's throttle get_ident and
+# apps.core.utils.net.get_client_ip both read the (NUM_PROXIES)-th entry from the
+# RIGHT, so a forged left-most XFF entry is ignored. Override via env if the edge
+# topology differs (e.g. NPM set to OVERWRITE XFF → 1); 0 = trust only REMOTE_ADDR.
+NUM_PROXIES = int(os.getenv("NUM_PROXIES", "2"))
+
 REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
@@ -529,6 +537,11 @@ REST_FRAMEWORK = {
         # OAuth connect (GAP-3): conectar conta Google no /pre-agenda, anti-abuso por usuario.
         "oauth": "10/hour",
     },
+    # Bind throttle identity to the real client behind NUM_PROXIES trusted hops
+    # (#1660). Without it, get_ident concatenates the whole X-Forwarded-For chain,
+    # so an attacker rotating the left-most XFF entry earned a fresh throttle
+    # bucket per request — defeating anon/user/login throttles.
+    "NUM_PROXIES": NUM_PROXIES,
     # Custom exception handler for standardized error responses
     "EXCEPTION_HANDLER": "apps.core.exceptions.custom_exception_handler",
     # API Schema (drf-spectacular)

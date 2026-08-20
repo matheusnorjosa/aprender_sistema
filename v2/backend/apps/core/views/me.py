@@ -40,6 +40,7 @@ from apps.core.serializers.me import MeEventSerializer
 from apps.core.serializers.usuario import ChangePasswordSerializer
 from apps.core.services.audit import registrar_auditoria
 from apps.core.services.lgpd_export_service import build_lgpd_export_data, export_counts
+from apps.core.utils.net import get_client_ip
 
 
 @extend_schema_view(
@@ -176,10 +177,7 @@ class ChangePasswordView(APIView):
             action=AuditLog.Action.CHANGE_PASSWORD,
             model_name="Usuario",
             details={
-                "ip_address": (
-                    request.META.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip()
-                    or request.META.get("REMOTE_ADDR", "")
-                ),
+                "ip_address": get_client_ip(request),
                 "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
             },
         )

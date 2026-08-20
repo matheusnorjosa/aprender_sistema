@@ -32,13 +32,14 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.http import HttpRequest
+from rest_framework.request import Request
 
 # Preserved from the legacy helper contract: callers store this when neither a
 # trusted proxy header nor REMOTE_ADDR is available (e.g. synthetic requests).
 UNKNOWN_IP = "unknown"
 
 
-def get_client_ip(request: HttpRequest) -> str:
+def get_client_ip(request: HttpRequest | Request) -> str:
     """Return the client IP, counting ``NUM_PROXIES`` trusted hops from the right.
 
     A forged left-most ``X-Forwarded-For`` entry is ignored because we always

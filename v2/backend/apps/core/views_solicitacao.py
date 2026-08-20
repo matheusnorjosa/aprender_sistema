@@ -23,8 +23,6 @@ from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema, extend_schema_view
 
-from apps.core.rbac_helpers import user_has_any_perm
-
 from .api_schemas import (
     COMMON_ERROR_RESPONSES,
     SOLICITACAO_BATCH_APPROVE_REQUEST,
@@ -47,6 +45,7 @@ from .services.solicitacao_create import resolve_initial_status
 from .services.solicitacao_publish import cancel_from_gcal
 from .services.solicitacao_publish import preview_gcal as preview_gcal_service
 from .services.solicitacao_publish import publish_to_gcal, resync_to_gcal
+from .services.solicitacao_scope import scope_solicitacoes
 
 logger = logging.getLogger(__name__)
 
@@ -240,29 +239,18 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 .select_related("usuario", "municipio", "tipo_evento", "projeto", "coordenador")
                 .prefetch_related("participations__usuario")
             )
-        # Epic 3.2 RBAC Refactor (2026-04-23): hardcoded
-        # `groups.filter(name__in=["Superintendência", "Controle", "DAT"])`
-        # trocado por capability check.
-        # Issue #1222 (Epic 1 RBAC Access Policy Realignment, 2026-04-24):
-        # após realinhamento do seed, `operate_preagenda` ficou só em Controle.
-        # Super (que aprova solicitações) precisa ver todas; adicionada
-        # `approve_solicitation` ao OR para preservar visibilidade de Super.
-        elif user_has_any_perm(
-            self.request.user,
-            "operate_preagenda",
-            "approve_solicitation",
-            "approve_solicitation_batch",
-            "manage_admin_registries",
-        ):
-            qs = Solicitacao.objects.select_related(
+        # M10-01 (#1623): escopo ator×gerência (SSOT `scope_solicitacoes`).
+        # GLOBAL (superuser / Controle `operate_preagenda` / DAT
+        # `manage_admin_registries` / aprovador-composto) vê tudo; GESTOR não-global
+        # (Gerente com `approve_solicitation*`) é reduzido à(s) própria(s) gerência(s)
+        # + as próprias; DEMAIS veem só as próprias. Antes, as caps de aprovação
+        # (concedidas ao grupo FUNÇÃO Gerente inteiro) davam alcance NACIONAL a
+        # qualquer Gerente, inclusive os que não podem aprovar.
+        else:
+            base = Solicitacao.objects.select_related(
                 "usuario", "municipio", "tipo_evento", "projeto", "coordenador"
             ).prefetch_related("participations__usuario")
-        else:
-            qs = (
-                Solicitacao.objects.filter(usuario=self.request.user)
-                .select_related("usuario", "municipio", "tipo_evento", "projeto", "coordenador")
-                .prefetch_related("participations__usuario")
-            )
+            qs = scope_solicitacoes(base, self.request.user)
 
         # PR15: Filtros adicionais via query params
         sector = self.request.query_params.get("sector")

@@ -60,6 +60,7 @@ from apps.core.serializers import (
     DATFormacaoListSerializer,
     DATFormacaoSerializer,
 )
+from apps.core.services.dat_codigos import recompute_registros
 
 if TYPE_CHECKING:
     from rest_framework.request import Request
@@ -413,12 +414,25 @@ class DATCompraViewSet(viewsets.ModelViewSet):
         return [CanViewComprasStats()]
 
     def perform_create(self, serializer: Any) -> None:
-        """Set created_by on create."""
+        """Set created_by e recalcula nr_codigos do par (município, projeto)."""
         serializer.save(created_by=self.request.user)
+        c = serializer.instance
+        recompute_registros(c.municipio_id, c.projeto_id)
 
     def perform_update(self, serializer: Any) -> None:
-        """Set updated_by on update."""
+        """Set updated_by e recalcula nr_codigos (par novo e, se mudou, o antigo)."""
+        old_pair = (serializer.instance.municipio_id, serializer.instance.projeto_id)
         serializer.save(updated_by=self.request.user)
+        c = serializer.instance
+        recompute_registros(c.municipio_id, c.projeto_id)
+        if (c.municipio_id, c.projeto_id) != old_pair:
+            recompute_registros(*old_pair)
+
+    def perform_destroy(self, instance: Any) -> None:
+        """Deleta e recalcula nr_codigos do par afetado."""
+        municipio_id, projeto_id = instance.municipio_id, instance.projeto_id
+        instance.delete()
+        recompute_registros(municipio_id, projeto_id)
 
     @action(
         detail=False,

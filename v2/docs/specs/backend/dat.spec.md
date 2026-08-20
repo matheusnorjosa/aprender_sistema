@@ -1,7 +1,7 @@
 ---
 title: Módulo DAT
 status: canonical
-last_verified: 2026-08-18
+last_verified: 2026-08-20
 sources_of_truth:
   - v2/backend/apps/core/services/controle_acoes_import.py
   - v2/backend/apps/core/models/dat_acao.py
@@ -68,7 +68,8 @@ Roteamento: [`urls.py`](../../../backend/apps/core/urls.py). Serviço de import 
   - `DATCadastro`: único por `(municipio, projeto_geral, plataforma)` — `unique_dat_cadastro_mun_proj_plat`.
   - `DATRegistro`: único por `(municipio, projeto_geral, projeto)`; `external_hash` é unique (idempotência de import).
   - `AcaoDAT` (legacy): `external_hash` unique = `SHA1(municipio_id|projeto_id|tipo_acao|responsavel_id)`.
-- **Campos derivados em `DATRegistro.save()` (sempre recalculados):** `usa_avaliar` espelha `projeto_geral.usa_avaliar`; `nr_codigos` é calculado por `tipo_calculo_codigos` (`por_aluno` = ceil(alunos/divisor), `por_professor` = ceil(profs*mult), `nao_aplicavel` = None); se `usa_avaliar=False`, os 3 status AVALIAR viram `nao_aplicavel`. UI/import nunca devem gravar esses campos manualmente.
+- **Campos derivados em `DATRegistro.save()`:** `usa_avaliar` espelha `projeto_geral.usa_avaliar`; se `usa_avaliar=False`, os 3 status AVALIAR viram `nao_aplicavel`. UI/import nunca devem gravar esses campos manualmente.
+- **`nr_codigos` = SOMA por linha de compra** (contrato v5, `services/dat_codigos.py`): das `DATCompra` do par `(municipio, projeto)` com `conta_para_codigos=True`, `ceil` **por compra** em Decimal, por kit (`tipo=Aluno` → `ceil(qtde/divisor_aluno)`, `tipo=Professor` → `ceil(qtde*multiplicador)`); `nao_aplicavel`/sem PG → `None`. Difere do agregado quando uma variante tem 2+ compras de professor (~29 códigos, by-design). Recalculado no `save()` do registro, nos `perform_*` do `DATCompraViewSet`, na passada final do importer (`recompute_all`) e pelo command `recalcular_nr_codigos_dat`. `nr_codigos_planilha` guarda o valor cru da planilha para reconciliação (não é autoridade). `DATCompra.tipo`/`conta_para_codigos` (migration 0087) são a base do cálculo, resolvidos pelo Tipo do SKU no export-contract.
 - **Auto-status em `DATCompra.save()`** (`dat_compra.py:145-153`): `status_uso` é derivado das quantidades (`quantidade_utilizada >= quantidade` → `esgotado`; `> 0` → `em_uso`; senão `disponivel`) — sobrescrito **a cada save**, então o choice `DEVOLVIDO` (`:41`) nunca é produzido por este caminho. `disponivel` **não é campo**: é `@property` (`:135-138`, `max(0, quantidade - quantidade_utilizada)`) e portanto não é filtrável/ordenável no ORM.
 - **Workflow de 4 etapas (`DATAcao`):** Carta → Contato → Reunião → Entrega. Cada etapa tem status `pendente|em_andamento|concluido|cancelado`. `progresso` e `etapa_atual` são derivados (primeira não concluída).
 - **Auditoria obrigatória:** todos os models gravam `created_by` (PROTECT) e `updated_by` via `perform_create`/`perform_update`; FKs para `Municipio`/`Projeto`/`ProjetoGeral` são `PROTECT` (não deletar mestre com dependentes).

@@ -1,7 +1,7 @@
 ---
 title: Importação de Dados (export-contract)
 status: canonical
-last_verified: 2026-07-24
+last_verified: 2026-08-20
 sources_of_truth:
   - v2/backend/apps/core/imports/__init__.py
   - v2/backend/apps/core/imports/hashing.py
@@ -115,9 +115,9 @@ python manage.py import_export_contract --path <dir-com-manifest.json>
 python manage.py import_export_contract --path <dir> --apply --allow-entity municipio
 ```
 
-Entidades classificadas no importer (`IMPLEMENTED`, `export_contract_importer.py:81-92`): `municipio`, `projeto_geral`, `produto`, `usuario`, `gerencia`, `tipo_evento`, `dat_coordenador`, `dat_area`, `dat_acao`, `plano_formacao`. Demais (`solicitacao`, `formacao`, `acompanhamento`, ...) → `not_implemented` (só count reportado).
+Entidades classificadas no importer (`IMPLEMENTED`): `municipio`, `projeto_geral`, `produto`, `usuario`, `gerencia`, `tipo_evento`, `dat_coordenador`, `dat_area`, `dat_acao`, `plano_formacao`, `dat_registro`, `dat_cadastro`, `dat_compra`. Demais (`solicitacao`, `formacao`, `acompanhamento`, ...) → `not_implemented` (só count reportado).
 
-> ⚠️ `IMPLEMENTED` significa **classificado no dry-run**, não **gravável no `--apply`**. `_apply_create_only` (`:352-387`) só escreve para 5 entidades: `usuario` (`:359-361`), `dat_area` (`:368`), `municipio` (`:371`), `projeto_geral` (`:376`) e `tipo_evento` (`:379`). Um `--apply --allow-entity produto` (ou `gerencia`/`dat_coordenador`/`dat_acao`/`plano_formacao`) retorna `applied={"produto": 0}` **sem erro** — silêncio, não falha.
+> ⚠️ `IMPLEMENTED` significa **classificado no dry-run**; nem toda entidade é **gravável no `--apply`**. `_apply_create_only` escreve para: `usuario`, `dat_area`, `municipio`, `projeto_geral` (com config de cálculo v5 + guard de alias ambíguo), `tipo_evento`, `dat_registro`, `dat_cadastro` e `dat_compra` (estes três exigem `--as-user`/actor; `dat_compra` carrega `tipo`/`conta_para_codigos` e dispara o recompute de `nr_codigos`). Um `--apply --allow-entity produto` (ou `gerencia`/`dat_coordenador`/`dat_acao`/`plano_formacao`) retorna `applied={"produto": 0}` **sem erro** — silêncio, não falha.
 
 ## Fluxos principais
 

@@ -11,7 +11,6 @@ Type-checked with Pyright (strict mode).
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false
 from __future__ import annotations
 
-import math
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
@@ -82,7 +81,12 @@ class DATRegistro(models.Model):
         verbose_name="Projeto Específico",
         help_text="Ex: VIDA E LINGUAGEM 6, ACERTA BRASIL MATEMATICA",
     )
-    aluno_qtde = models.PositiveIntegerField(verbose_name="Quantidade de Alunos", help_text="Total de alunos na turma")
+    aluno_qtde = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Quantidade de Alunos",
+        help_text="Total de alunos na turma (vazio em registros professor-only)",
+    )
     professor_qtde = models.PositiveIntegerField(
         null=True,
         blank=True,
@@ -236,36 +240,14 @@ class DATRegistro(models.Model):
 
     def _calcular_nr_codigos(self) -> int | None:
         """
-        Calcula número de códigos baseado nas regras do projeto_geral.
+        Número de códigos = SOMA por linha de compra (contrato v5).
 
-        Regras:
-        - por_aluno: ceil(aluno_qtde / divisor)
-        - por_professor: ceil(professor_qtde * multiplicador)
-        - nao_aplicavel: None
+        `ceil` por compra (Decimal), respeitando `conta_para_codigos` e o Tipo do kit.
+        Delega ao serviço `dat_codigos` (import local evita ciclo com DATCompra).
         """
-        if not self.projeto_geral_id:
-            return None
+        from apps.core.services.dat_codigos import calcular_nr_codigos
 
-        tipo = self.projeto_geral.tipo_calculo_codigos
-
-        if tipo == "nao_aplicavel":
-            return None
-
-        if tipo == "por_aluno":
-            if self.aluno_qtde and self.projeto_geral.divisor_aluno:
-                return math.ceil(self.aluno_qtde / self.projeto_geral.divisor_aluno)
-            return None
-
-        if tipo == "por_professor":
-            if self.professor_qtde and self.projeto_geral.multiplicador_professor:
-                # Aritmética Decimal (não float): float(Decimal("1.10")) == 1.1000000000000001,
-                # então professor_qtde * mult cai LOGO ACIMA do inteiro e math.ceil estoura
-                # em +1 (ex.: 100 * 1.10 -> 110.00000000000001 -> ceil 111). O campo
-                # multiplicador_professor já é Decimal; multiplicar direto preserva a exatidão.
-                return math.ceil(self.professor_qtde * self.projeto_geral.multiplicador_professor)
-            return None
-
-        return None
+        return calcular_nr_codigos(self)
 
     @property
     def turma_formar_url(self) -> str | None:

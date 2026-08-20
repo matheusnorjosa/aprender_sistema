@@ -49,6 +49,8 @@ class DATCompraSerializer(serializers.ModelSerializer["DATCompra"]):
             "codigo_produto",
             "descricao_produto",
             "tipo_compra",
+            "tipo",
+            "conta_para_codigos",
             # Quantidades
             "quantidade",
             "quantidade_utilizada",
@@ -134,6 +136,8 @@ class DATCompraListSerializer(serializers.ModelSerializer["DATCompra"]):
             "codigo_produto",
             "descricao_produto",
             "tipo_compra",
+            "tipo",
+            "conta_para_codigos",
             "quantidade",
             "quantidade_utilizada",
             "disponivel",

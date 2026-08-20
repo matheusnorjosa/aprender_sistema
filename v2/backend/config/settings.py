@@ -493,7 +493,11 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.SessionAuthentication",
     ],
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    # StandardPagination (apps.core.pagination): mesmo PAGE_SIZE default (100), mas
+    # honra `?page_size` com teto `max_page_size=500`. Troca ADITIVA — a resposta
+    # sem o parâmetro é idêntica; antes, o PageNumberPagination cru ignorava
+    # `?page_size` e truncava toda listagem em 100. (#1653)
+    "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.StandardPagination",
     "PAGE_SIZE": 100,
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",

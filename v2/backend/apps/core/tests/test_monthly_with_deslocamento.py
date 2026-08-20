@@ -499,3 +499,45 @@ class TestMonthlyWithDeslocamento:
 
         # Dia 6 deve ser ""
         assert cells[5] == ""
+
+    def test_evento_com_dois_participantes_nao_multiplica(self):
+        """M14-02 (#1630): evento com 2+ participantes não pode multiplicar CH,
+        código nem detalhes por participante.
+
+        O JOIN Solicitacao × Participation materializa o mesmo evento uma vez
+        por participante; sem `.distinct()` cada cópia era distribuída de novo,
+        inflando CH (×N), virando o código "2" em vez de "E" e duplicando os
+        detalhes. Invariante: um evento conta UMA vez para cada participante.
+        """
+        u2 = UsuarioFactory(
+            username="formador2",
+            email="formador2@example.com",
+            password="password123",
+        )
+
+        # 1 evento de 4h no dia 15, com DOIS formadores participantes.
+        sol = SolicitacaoFactory(
+            usuario=self.user_formador,
+            municipio=self.municipio,
+            projeto=self.projeto,
+            tipo_evento=self.tipo_evento,
+            inicio=timezone.make_aware(datetime(2025, 10, 15, 8, 0), self.tz),
+            fim=timezone.make_aware(datetime(2025, 10, 15, 12, 0), self.tz),
+            status="aprovado",
+        )
+        for u in (self.user_formador, u2):
+            Participation.objects.create(solicitacao=sol, usuario=u, role="FORMADOR")
+
+        result = build_monthly_grid(year=2025, month=10, role="FORMADOR")
+
+        assert len(result["people"]) == 2
+        row_of = {p["id"]: idx for idx, p in enumerate(result["people"])}
+
+        for uid in (self.user_formador.id, u2.id):
+            row = row_of[uid]
+            # Dia 15 (índice 14): UM evento → "E", nunca "2".
+            assert result["cells"][row][14] == "E"
+            # CH contada uma vez (4h), não 8h.
+            assert result["people"][row]["ch_month"] == 4.0
+            # Detalhes com uma entrada, não duplicada.
+            assert len(result["details_index"][f"{row}:14"]) == 1

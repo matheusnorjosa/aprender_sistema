@@ -300,8 +300,13 @@ export default function PreAgendaPage(): JSX.Element {
       cancelText: 'Cancelar',
       onOk: async () => {
         try {
+          // O backend enfileira a publicação (sempre 202 Accepted) — a
+          // sincronização com o Google Calendar é assíncrona. Não anunciar
+          // "publicado" (isso implicaria conclusão); sinalizar o enfileiramento.
           await publishSolicitacao(id, { dry_run: false });
-          message.success('Evento publicado com sucesso!');
+          message.info(
+            'Publicação enfileirada no Google Calendar — o evento aparecerá como publicado em instantes.',
+          );
           loadData();
         } catch (error) {
           // Section 4 Epic #459: Use consolidated error handler
@@ -515,6 +520,9 @@ export default function PreAgendaPage(): JSX.Element {
       width: 200,
       render: (_, record) => {
         const isPublished = record.gcal_status === ('PUBLISHED' as GCalStatus);
+        // PENDING = publicação já enfileirada (task Celery em voo). Bloquear o
+        // botão evita reenfileirar em cima de uma publicação em andamento.
+        const isPending = record.gcal_status === ('PENDING' as GCalStatus);
         const hasError = record.gcal_status === ('ERROR' as GCalStatus);
         const hasEventId = !!record.external_event_id;
 
@@ -538,7 +546,7 @@ export default function PreAgendaPage(): JSX.Element {
               icon={<CloudUploadOutlined />}
               onClick={() => handlePublish(record.id)}
               aria-label="Publicar evento no Google Calendar"
-              disabled={isPublished}
+              disabled={isPublished || isPending}
             />
             {showResync && (
               <Button

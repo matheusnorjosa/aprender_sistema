@@ -20,6 +20,7 @@ from apps.core.exceptions import ValidationAPIError
 from apps.core.models import AuditLog, Solicitacao, Usuario
 from apps.core.services.db_retry import retry_on_deadlock
 from apps.core.services.solicitacao_availability import enforce_solicitacao_availability
+from apps.core.utils.net import get_client_ip
 
 logger = logging.getLogger(__name__)
 
@@ -42,17 +43,6 @@ class BatchApprovalResult:
     approved_count: int
     rejected_count: int
     errors: list[dict[str, Any]]
-
-
-def _get_client_ip(request: Any) -> str:
-    """Extract real client IP considering reverse proxies."""
-    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
-    if x_forwarded_for:
-        return x_forwarded_for.split(",")[0].strip()
-    x_real_ip = request.META.get("HTTP_X_REAL_IP")
-    if x_real_ip:
-        return x_real_ip.strip()
-    return request.META.get("REMOTE_ADDR", "unknown")
 
 
 def _raise_invalid_status_error(solicitacao: Solicitacao) -> None:
@@ -123,7 +113,7 @@ def approve_solicitacao(
         ValidationAPIError: If solicitacao is not pending, or if any participant has a
             conflict (#1452)
     """
-    client_ip = _get_client_ip(request)
+    client_ip = get_client_ip(request)
     with transaction.atomic():
         solicitacao = Solicitacao.objects.select_for_update().get(pk=solicitacao.pk)
         if solicitacao.status != "pendente":
@@ -200,7 +190,7 @@ def reject_solicitacao(
     Raises:
         ValidationAPIError: If solicitacao is not pending
     """
-    client_ip = _get_client_ip(request)
+    client_ip = get_client_ip(request)
     with transaction.atomic():
         solicitacao = Solicitacao.objects.select_for_update().get(pk=solicitacao.pk)
         if solicitacao.status != "pendente":
@@ -283,7 +273,7 @@ def batch_approve_solicitacoes(
 
     approved = 0
     errors: list[dict[str, Any]] = []
-    client_ip = _get_client_ip(request)
+    client_ip = get_client_ip(request)
 
     with transaction.atomic():
         # Fetch and lock pending solicitacoes to avoid double-approval races
@@ -382,7 +372,7 @@ def batch_reject_solicitacoes(
 
     rejected = 0
     errors: list[dict[str, Any]] = []
-    client_ip = _get_client_ip(request)
+    client_ip = get_client_ip(request)
 
     with transaction.atomic():
         # Fetch and lock pending solicitacoes to avoid double-reject races

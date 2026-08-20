@@ -39,7 +39,6 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.filters import OrderingFilter
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.request import Request
 
 from django_filters.rest_framework import DjangoFilterBackend
 
@@ -47,29 +46,7 @@ from .models import AuditLog, Deslocamento, EquipeGerencia
 from .rbac.helpers import user_has_any_perm
 from .rbac.policies import user_can_delegate_deslocamento
 from .serializers import DeslocamentoSerializer
-
-
-def _get_client_ip(request: Request) -> str:
-    """
-    Extrai o IP real do cliente, considerando proxies reversos.
-
-    Prioridade:
-    1. HTTP_X_FORWARDED_FOR (primeiro IP da lista)
-    2. HTTP_X_REAL_IP
-    3. REMOTE_ADDR
-
-    Returns:
-        str: IP do cliente
-    """
-    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
-    if x_forwarded_for:
-        return x_forwarded_for.split(",")[0].strip()
-
-    x_real_ip = request.META.get("HTTP_X_REAL_IP")
-    if x_real_ip:
-        return x_real_ip.strip()
-
-    return request.META.get("REMOTE_ADDR", "unknown")
+from .utils.net import get_client_ip
 
 
 class DeslocamentoPagination(PageNumberPagination):
@@ -235,7 +212,7 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
                 "end_date": deslocamento.end_date.isoformat(),
                 "observacao": deslocamento.observacao or "",
                 "delegated": delegated,
-                "ip_address": _get_client_ip(self.request),
+                "ip_address": get_client_ip(self.request),
                 "user_agent": self.request.META.get("HTTP_USER_AGENT", "")[:200],
             },
         )
@@ -301,7 +278,7 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
                     "changed_fields": list(changed_fields.keys()),
                     "prev_values": prev_values,
                     "new_values": new_values,
-                    "ip_address": _get_client_ip(self.request),
+                    "ip_address": get_client_ip(self.request),
                     "user_agent": self.request.META.get("HTTP_USER_AGENT", "")[:200],
                 },
             )
@@ -330,7 +307,7 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
                 "start_date": instance.start_date.isoformat(),
                 "end_date": instance.end_date.isoformat(),
                 "observacao": instance.observacao or "",
-                "ip_address": _get_client_ip(self.request),
+                "ip_address": get_client_ip(self.request),
                 "user_agent": self.request.META.get("HTTP_USER_AGENT", "")[:200],
             },
         )

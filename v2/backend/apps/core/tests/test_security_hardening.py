@@ -44,7 +44,7 @@ class TestHealthzMinimalPayload(TestCase):
         assert "timezone" not in data
 
     def test_healthz_detailed_anonymous_external_returns_403(self):
-        response = self.client.get("/healthz/detailed/", REMOTE_ADDR="203.0.113.1")
+        response = self.client.get("/healthz/detailed/", REMOTE_ADDR="8.8.8.8")
         assert response.status_code == 403
 
     def test_healthz_detailed_internal_ip_returns_200(self):
@@ -60,7 +60,7 @@ class TestHealthzMinimalPayload(TestCase):
         User = get_user_model()
         admin = User.objects.create_superuser("admin_health", "a@b.com", "pass1234")
         self.client.force_login(admin)
-        response = self.client.get("/healthz/detailed/", REMOTE_ADDR="203.0.113.1")
+        response = self.client.get("/healthz/detailed/", REMOTE_ADDR="8.8.8.8")
         assert response.status_code == 200
         data = response.json()
         assert "checks" in data
@@ -97,7 +97,7 @@ class TestMetricsAuthGate(TestCase):
     """SEC-RECON-02: /metrics must require staff or internal IP."""
 
     def test_metrics_anonymous_external_returns_403(self):
-        response = self.client.get("/metrics", REMOTE_ADDR="203.0.113.1")
+        response = self.client.get("/metrics", REMOTE_ADDR="8.8.8.8")
         assert response.status_code == 403
 
     def test_metrics_internal_ip_returns_200(self):
@@ -111,7 +111,7 @@ class TestMetricsAuthGate(TestCase):
         User = get_user_model()
         staff = User.objects.create_user("staff_metrics", "s@b.com", "pass1234", is_staff=True)
         self.client.force_login(staff)
-        response = self.client.get("/metrics", REMOTE_ADDR="203.0.113.1")
+        response = self.client.get("/metrics", REMOTE_ADDR="8.8.8.8")
         assert response.status_code != 403
 
 

@@ -16,7 +16,6 @@ from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.request import Request
 from rest_framework.response import Response
 
 from django_filters.rest_framework import DjangoFilterBackend
@@ -46,19 +45,9 @@ from .services.solicitacao_publish import cancel_from_gcal
 from .services.solicitacao_publish import preview_gcal as preview_gcal_service
 from .services.solicitacao_publish import publish_to_gcal, resync_to_gcal
 from .services.solicitacao_scope import scope_solicitacoes
+from .utils.net import get_client_ip
 
 logger = logging.getLogger(__name__)
-
-
-def _get_client_ip(request: Request) -> str:
-    """Extract real client IP considering reverse proxies."""
-    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
-    if x_forwarded_for:
-        return x_forwarded_for.split(",")[0].strip()
-    x_real_ip = request.META.get("HTTP_X_REAL_IP")
-    if x_real_ip:
-        return x_real_ip.strip()
-    return request.META.get("REMOTE_ADDR", "unknown")
 
 
 class _ExtraParticipantsSerializer(serializers.Serializer):
@@ -535,7 +524,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         # Se houver alterações, registra no AuditLog
         if changed_fields:
-            client_ip = _get_client_ip(self.request)
+            client_ip = get_client_ip(self.request)
 
             # AuditLog persistente
             AuditLog.objects.create(
@@ -659,7 +648,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             "status": instance.status,
         }
 
-        client_ip = _get_client_ip(self.request)
+        client_ip = get_client_ip(self.request)
 
         # Registrar exclusão no AuditLog ANTES de deletar
         AuditLog.objects.create(

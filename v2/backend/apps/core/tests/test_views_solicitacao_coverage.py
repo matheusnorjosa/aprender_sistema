@@ -18,6 +18,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from uuid import uuid4
 
+from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -153,9 +154,10 @@ def compra_projeto_super(municipio, projeto_super):
 
 @pytest.mark.django_db
 class TestGetClientIP:
-    """Tests for _get_client_ip helper function."""
+    """Tests for the canonical client-IP resolver (get_client_ip / #1660)."""
 
-    def test_x_forwarded_for_header(
+    @override_settings(NUM_PROXIES=2)
+    def test_x_forwarded_for_forged_prefix_is_ignored(
         self,
         api_client,
         usuario_superintendencia,
@@ -164,7 +166,11 @@ class TestGetClientIP:
         projeto_super,
         tipo_evento,
     ):
-        """X-Forwarded-For header is correctly extracted (line 36)."""
+        """Forged left-most X-Forwarded-For is ignored; audit logs the real client (#1660).
+
+        With NUM_PROXIES=2 the resolver reads the client from the RIGHT, so an
+        attacker-prepended ``1.2.3.4`` never reaches the AuditLog.
+        """
         sol = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
@@ -178,18 +184,21 @@ class TestGetClientIP:
         api_client.force_authenticate(user=usuario_superintendencia)
         AuditLog.objects.all().delete()
 
-        # Request with X-Forwarded-For header
+        # Attacker prepends "1.2.3.4"; the 2 trusted proxies append the real
+        # client + their peer, so the real client sits at position -2.
         response = api_client.patch(
             f"/api/solicitacoes/{sol.id}/approve/",
-            HTTP_X_FORWARDED_FOR="192.168.1.100, 10.0.0.1",
+            HTTP_X_FORWARDED_FOR="1.2.3.4, 192.168.1.100, 10.0.0.1",
         )
 
         assert response.status_code == 200
         audit = AuditLog.objects.filter(action="APPROVE").first()
         assert audit is not None
         assert audit.details["ip_address"] == "192.168.1.100"
+        assert audit.details["ip_address"] != "1.2.3.4"
 
-    def test_x_real_ip_header(
+    @override_settings(NUM_PROXIES=2)
+    def test_x_real_ip_no_longer_trusted_falls_back_to_remote_addr(
         self,
         api_client,
         usuario_superintendencia,
@@ -198,7 +207,11 @@ class TestGetClientIP:
         projeto_super,
         tipo_evento,
     ):
-        """X-Real-IP header is correctly extracted (line 39)."""
+        """X-Real-IP is client-controllable and no longer trusted (#1660).
+
+        With no X-Forwarded-For from a trusted proxy, the resolver uses the
+        unforgeable REMOTE_ADDR instead of the spoofable X-Real-IP header.
+        """
         sol = SolicitacaoFactory(
             usuario=usuario_coordenador,
             municipio=municipio,
@@ -212,16 +225,18 @@ class TestGetClientIP:
         api_client.force_authenticate(user=usuario_superintendencia)
         AuditLog.objects.all().delete()
 
-        # Request with X-Real-IP header (no X-Forwarded-For)
+        # X-Real-IP alone must NOT set the audit IP anymore; REMOTE_ADDR wins.
         response = api_client.patch(
             f"/api/solicitacoes/{sol.id}/approve/",
             HTTP_X_REAL_IP="10.0.0.50",
+            REMOTE_ADDR="203.0.113.5",
         )
 
         assert response.status_code == 200
         audit = AuditLog.objects.filter(action="APPROVE").first()
         assert audit is not None
-        assert audit.details["ip_address"] == "10.0.0.50"
+        assert audit.details["ip_address"] == "203.0.113.5"
+        assert audit.details["ip_address"] != "10.0.0.50"
 
 
 # ============================================================

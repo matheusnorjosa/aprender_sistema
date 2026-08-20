@@ -236,6 +236,20 @@ def login(request: Request) -> Response:
         400: Falha de autenticação (resposta genérica)
         429: Too Many Requests (rate limit excedido)
     """
+    # M03-02 (#1648): o login é anônimo, então o enforce_csrf do SessionAuthentication
+    # do DRF nunca dispara (só roda em request autenticado) e o @api_view é csrf_exempt
+    # — um POST cross-origin criava sessão (login-CSRF / session fixation). Enforçamos
+    # o CSRF manualmente. Em testes com APIClient padrão o check é PULADO
+    # (_dont_enforce_csrf_checks), preservando os testes existentes; em produção o token
+    # vem do frontend (fetchAPI já envia X-CSRFToken após buscar /api/csrf/).
+    from rest_framework.authentication import SessionAuthentication
+    from rest_framework.exceptions import PermissionDenied as _CsrfDenied
+
+    try:
+        SessionAuthentication().enforce_csrf(request)
+    except _CsrfDenied:
+        return Response({"error": "Requisição inválida."}, status=status.HTTP_403_FORBIDDEN)
+
     username = request.data.get("username")
     password = request.data.get("password")
 

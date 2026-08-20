@@ -238,7 +238,7 @@ class DATRegistroViewSet(viewsets.ModelViewSet):
                     sanitize_csv_value(r.municipio.uf),
                     sanitize_csv_value(r.projeto_geral.nome),
                     sanitize_csv_value(r.projeto.nome),
-                    r.aluno_qtde,
+                    r.aluno_qtde or "",
                     r.professor_qtde or "",
                     sanitize_csv_value(r.reuniao_dat or ""),
                     sanitize_csv_value(r.turma_formar_id or ""),

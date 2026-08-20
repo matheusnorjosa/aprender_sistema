@@ -25,6 +25,7 @@ import os
 import re
 import unicodedata
 from datetime import date
+from decimal import Decimal
 from typing import Any
 
 from django.contrib.auth.models import Group
@@ -36,6 +37,7 @@ from apps.core.models import (
     DATAcao,
     DATArea,
     DATCadastro,
+    DATCompra,
     DATCoordenador,
     DATRegistro,
     Gerencia,
@@ -46,6 +48,7 @@ from apps.core.models import (
     TipoEvento,
     Usuario,
 )
+from apps.core.services.dat_codigos import recompute_all
 from apps.core.services.equipe_gerencia_import import PAPEL_MAPPING
 from apps.core.services.export_contract_projeto_resolver import build_projeto_index, resolve_projeto_export
 from apps.core.validators import CPF_ABSENT, CPF_INVALID, classify_cpf, is_valid_cpf
@@ -96,6 +99,7 @@ IMPLEMENTED = {
     "plano_formacao",
     "dat_registro",
     "dat_cadastro",
+    "dat_compra",
 }
 
 # Papel canonico (PAPEL_MAPPING) -> nome do Django Group (FUNCAO_GROUPS). Fonte do papel no
@@ -166,6 +170,35 @@ def _parse_json_list(v: Any) -> list[Any]:
     except (ValueError, TypeError):
         return []
     return parsed if isinstance(parsed, list) else []
+
+
+# projeto_geral: config de cálculo do contrato v5 → choices do Django.
+_TIPO_CALCULO_MAP = {
+    "aluno_div_divisor": "por_aluno",
+    "professor_x_multiplicador": "por_professor",
+}
+# Nomes de projeto_geral ambíguos (aliases de outro PG com regra DIFERENTE): NUNCA criar
+# via import — decisão humana (CONTRATO-v4 §2). Criar com o default por_professor daria
+# nr_codigos errado onde a planilha usa aluno÷20 (ex.: ECS, ED FINANCEIRA).
+_AMBIGUOUS_PG_NAMES = {_norm("ESCREVER COMUNICAR E SER"), _norm("EDUCAÇÃO FINANCEIRA")}
+
+
+def _pg_calc_fields(r: dict[str, str]) -> dict[str, Any]:
+    """Config de cálculo do projeto_geral (v5 → Django); ausentes usam o default do model."""
+    fields: dict[str, Any] = {}
+    tc = _TIPO_CALCULO_MAP.get((r.get("tipo_calculo_codigos") or "").strip())
+    if tc:
+        fields["tipo_calculo_codigos"] = tc
+    divisor = _parse_int(r.get("divisor_aluno"))
+    if divisor:
+        fields["divisor_aluno"] = divisor
+    mult = (r.get("multiplicador_professor") or "").strip()
+    if mult:
+        try:
+            fields["multiplicador_professor"] = Decimal(mult)
+        except (ArithmeticError, ValueError):
+            pass
+    return fields
 
 
 # dat_cadastro: etapaN da planilha → (campo status, campo data) do DATCadastro, por plataforma.
@@ -297,6 +330,9 @@ class ExportContractImporter:
                 nome = (r.get("nome") or "").strip()
                 if not nome:
                     tally["would_reject"] += 1
+                    continue
+                if _norm(nome) not in idx and _norm(nome) in _AMBIGUOUS_PG_NAMES:
+                    tally["would_reject"] += 1  # alias ambíguo → decisão humana, não criar
                     continue
                 st, _ = diff_and_classify(
                     idx.get(_norm(nome)), {"usa_avaliar": _to_bool(r.get("usa_avaliar"))}, protected
@@ -433,8 +469,39 @@ class ExportContractImporter:
                 st, _ = diff_and_classify({} if (mun_id, pg_id, plataforma) in existing else None, {}, protected)
                 tally[st] += 1
 
+        elif name == "dat_compra":
+            # NK existence-based por tupla (idioma dos handlers DAT). Município por (norm, uf);
+            # Projeto via resolver (#1372). FK não-resolvida ou ano_uso ausente → would_reject.
+            mun_idx = self._municipio_index()
+            existing = set(
+                DATCompra.objects.values_list(
+                    "municipio_id", "projeto_id", "descricao_produto", "tipo", "quantidade", "ano_uso"
+                )
+            )
+            for r in rows:
+                mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
+                proj_id = self.resolve_projeto(r.get("projeto") or "")
+                nk = self._dat_compra_nk(r, mun_id, proj_id)
+                if mun_id is None or proj_id is None or nk[5] is None:
+                    tally["would_reject"] += 1
+                    continue
+                st, _ = diff_and_classify({} if nk in existing else None, {}, protected)
+                tally[st] += 1
+
         tally["export_rows"] = len(rows)
         return tally
+
+    @staticmethod
+    def _dat_compra_nk(r: dict[str, str], mun_id: int | None, proj_id: int | None) -> tuple[Any, ...]:
+        """NK existence-based da compra: (mun, proj, descricao, tipo, quantidade, ano_uso)."""
+        return (
+            mun_id,
+            proj_id,
+            (r.get("descricao_produto") or "").strip(),
+            (r.get("tipo") or "").strip() or None,
+            _parse_int(r.get("quantidade")),
+            _parse_int(r.get("ano_uso")),
+        )
 
     def run(self) -> dict[str, Any]:
         manifest = self._read_manifest()
@@ -484,6 +551,9 @@ class ExportContractImporter:
                 if name == "dat_registro":
                     applied[name] = self._apply_dat_registro(self._load(name))
                     continue
+                if name == "dat_compra":
+                    applied[name] = self._apply_dat_compra(self._load(name))
+                    continue
                 created = 0
                 for r in self._load(name):
                     nome = (r.get("nome") or "").strip()
@@ -498,7 +568,11 @@ class ExportContractImporter:
                             Municipio.objects.create(nome=nome, uf=uf, ativo=_to_bool(r.get("ativo")))
                             created += 1
                     elif name == "projeto_geral" and not ProjetoGeral.objects.filter(nome__iexact=nome).exists():
-                        ProjetoGeral.objects.create(nome=nome, usa_avaliar=_to_bool(r.get("usa_avaliar")))
+                        if _norm(nome) in _AMBIGUOUS_PG_NAMES:
+                            continue  # alias ambíguo (regra divergente) → decisão humana, não criar
+                        ProjetoGeral.objects.create(
+                            nome=nome, usa_avaliar=_to_bool(r.get("usa_avaliar")), **_pg_calc_fields(r)
+                        )
                         created += 1
                     elif name == "tipo_evento" and not TipoEvento.objects.filter(nome__iexact=nome).exists():
                         TipoEvento.objects.create(
@@ -508,6 +582,9 @@ class ExportContractImporter:
                         )
                         created += 1
                 applied[name] = created
+            if {"dat_compra", "dat_registro"} & set(self.allow):
+                # nr_codigos vem das compras: recomputa após aplicar (ordem-independente).
+                recompute_all()
         return applied
 
     def _require_actor(self, entity: str) -> Usuario:
@@ -558,8 +635,8 @@ class ExportContractImporter:
             pg_id = pg_idx.get(_norm(r.get("projeto_geral") or ""))
             proj_id = self.resolve_projeto(r.get("projeto") or "")
             aluno_qtde = _parse_int(r.get("aluno_qtde"))
-            if mun_id is None or pg_id is None or proj_id is None or aluno_qtde is None:
-                continue  # FK não-resolvida ou aluno_qtde ausente (obrigatório)
+            if mun_id is None or pg_id is None or proj_id is None:
+                continue  # FK não-resolvida (aluno_qtde é opcional: registros professor-only)
             if DATRegistro.objects.filter(municipio_id=mun_id, projeto_geral_id=pg_id, projeto_id=proj_id).exists():
                 continue
             reg = DATRegistro(
@@ -592,6 +669,43 @@ class ExportContractImporter:
                 obs_avaliar=(r.get("obs_avaliar") or "")[:1000],
             )
             reg.save()  # calcula nr_codigos + espelha usa_avaliar do projeto_geral
+            created += 1
+        return created
+
+    def _apply_dat_compra(self, rows: list[dict[str, str]]) -> int:
+        """Create-only de DATCompra. NK existence-based por tupla; `tipo`/`conta_para_codigos`
+        alimentam o cálculo de nr_codigos (recomputado ao fim do apply). Produto resolvido por
+        codigo (opcional; fallback descricao_produto). status_uso é derivado no save()."""
+        actor = self._require_actor("dat_compra")
+        mun_idx = self._municipio_index()
+        prod_idx = {(c or "").strip().upper(): pid for pid, c in Produto.objects.values_list("id", "codigo")}
+        existing = set(
+            DATCompra.objects.values_list(
+                "municipio_id", "projeto_id", "descricao_produto", "tipo", "quantidade", "ano_uso"
+            )
+        )
+        created = 0
+        for r in rows:
+            mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
+            proj_id = self.resolve_projeto(r.get("projeto") or "")
+            nk = self._dat_compra_nk(r, mun_id, proj_id)
+            if mun_id is None or proj_id is None or nk[5] is None:
+                continue  # FK não-resolvida ou ano_uso ausente
+            if nk in existing:
+                continue
+            DATCompra.objects.create(
+                municipio_id=mun_id,
+                projeto_id=proj_id,
+                produto_id=prod_idx.get((r.get("produto_codigo") or "").strip().upper()),
+                descricao_produto=nk[2],
+                tipo=nk[3],
+                conta_para_codigos=_to_bool(r.get("conta_para_codigos")),
+                quantidade=nk[4] or 0,
+                ano_uso=nk[5],
+                data_compra=_parse_iso_date(r.get("data_compra")),
+                created_by=actor,
+            )
+            existing.add(nk)
             created += 1
         return created
 

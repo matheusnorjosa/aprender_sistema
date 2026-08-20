@@ -46,6 +46,10 @@ class DATCompra(models.Model):
         ADICIONAL_2 = "adicional_2", "Compra adicional 2"
         ADICIONAL_3 = "adicional_3", "Compra adicional 3"
 
+    class Tipo(models.TextChoices):
+        ALUNO = "Aluno", "Aluno"
+        PROFESSOR = "Professor", "Professor"
+
     # Relacionamentos principais
     municipio: models.ForeignKey[Municipio] = models.ForeignKey(  # type: ignore[assignment]
         "core.Municipio", on_delete=models.PROTECT, related_name="dat_compras", verbose_name="Município"
@@ -96,6 +100,20 @@ class DATCompra(models.Model):
         blank=True,
         verbose_name="Tipo de Compra",
         help_text="Primeira compra ou compras adicionais",
+    )
+    # Base do cálculo de nr_codigos (SSOT do kit, resolvido pelo Tipo do SKU Protheus).
+    tipo = models.CharField(
+        max_length=10,
+        choices=Tipo.choices,
+        null=True,
+        blank=True,
+        verbose_name="Tipo (Aluno/Professor)",
+        help_text="Kit de aluno ou de professor — só kit de professor recebe o multiplicador",
+    )
+    conta_para_codigos = models.BooleanField(
+        default=True,
+        verbose_name="Conta para códigos",
+        help_text="False exclui a compra do cálculo de nr_codigos (ex.: kits AVALIAR de GESTÃO ESCOLAR)",
     )
     ativo = models.BooleanField(default=True)
 

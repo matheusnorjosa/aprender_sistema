@@ -9,7 +9,6 @@ Ref: v2/docs/SPEC_DAT_REGISTROS.md
 from __future__ import annotations
 
 import json
-import math
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
@@ -90,69 +89,35 @@ class DATRegistroModelTests(TestCase):
         )
         cls.user = UsuarioFactory(username="testuser", password="test123")
 
-    def test_nr_codigos_calculated_por_professor(self):
-        """nr_codigos should be calculated using professor * multiplicador."""
+    def test_nr_codigos_derivado_das_compras_via_save(self):
+        """
+        nr_codigos vem da SOMA por linha de compra (contrato v5), via `save()`.
+
+        Cobertura pura de `codigos_da_compra`/`calcular_nr_codigos` está em
+        `test_dat_codigos.py`; aqui prova-se a integração do model: sem compras → 0;
+        com compras → soma per-compra (o caso 41+11 = 59, não ceil(52×1.1)=58).
+        """
+        from apps.core.models.dat_compra import DATCompra
+
         reg = DATRegistro.objects.create(
             municipio=self.municipio,
             projeto_geral=self.projeto_geral_professor,
             projeto=self.projeto,
-            aluno_qtde=100,
-            professor_qtde=10,
+            professor_qtde=52,
             created_by=self.user,
         )
-        # 10 * 1.1 = 11 (ceiling)
-        self.assertEqual(reg.nr_codigos, 11)
-
-    def test_nr_codigos_por_professor_sem_overshoot_de_float(self):
-        """
-        Adversarial: o cálculo por_professor deve usar aritmética Decimal, não float.
-
-        `float(Decimal("1.1"))` == 1.1000000000000001, então `prof * float(mult)`
-        cai LOGO ACIMA de um inteiro para vários valores (50, 90, 100, 110, 200,
-        340, 450...) → `math.ceil` estoura em +1. O teste antigo usava prof=10, um
-        valor "limpo" (10*1.1 == 11.0), e por isso nunca expôs o bug.
-
-        Propriedade verificada (não um único par input→output):
-            nr_codigos == ceil(professor_qtde * Decimal(multiplicador))
-        para uma varredura de valores — incluindo os que quebram no float.
-        """
-        mult = self.projeto_geral_professor.multiplicador_professor  # Decimal("1.1")
-        # 'sujos' (overshoot no float) + 'limpos' (controle, não devem regredir)
-        casos = [10, 20, 30, 50, 90, 100, 110, 170, 200, 340, 410, 450, 500]
-        for prof in casos:
-            with self.subTest(professor_qtde=prof):
-                reg = DATRegistro(
-                    municipio=self.municipio,
-                    projeto_geral=self.projeto_geral_professor,
-                    projeto=self.projeto,
-                    professor_qtde=prof,
-                    aluno_qtde=1,
-                    created_by=self.user,
-                )
-                esperado = math.ceil(prof * mult)  # referência correta (Decimal)
-                self.assertEqual(
-                    reg._calcular_nr_codigos(),
-                    esperado,
-                    f"prof={prof}: esperado {esperado} (Decimal); float causa overshoot +1",
-                )
-
-    def test_nr_codigos_calculated_por_aluno(self):
-        """nr_codigos should be calculated using alunos / divisor."""
-        projeto_aluno = ProjetoFactory(
-            nome="Test Projeto Aluno",
-            codigo="TESTALUNO",
-            fluxo="NAO_SUPER",
-            projeto_geral=self.projeto_geral_aluno,
-        )
-        reg = DATRegistro.objects.create(
-            municipio=self.municipio,
-            projeto_geral=self.projeto_geral_aluno,
-            projeto=projeto_aluno,
-            aluno_qtde=200,
-            created_by=self.user,
-        )
-        # 200 / 20 = 10 (ceiling)
-        self.assertEqual(reg.nr_codigos, 10)
+        self.assertEqual(reg.nr_codigos, 0)  # ainda sem compras
+        for q in (41, 11):
+            DATCompra.objects.create(
+                municipio=self.municipio,
+                projeto=self.projeto,
+                tipo="Professor",
+                quantidade=q,
+                ano_uso=2026,
+                created_by=self.user,
+            )
+        reg.save()  # recalcula do zero a partir das compras
+        self.assertEqual(reg.nr_codigos, 59)
 
     def test_usa_avaliar_synced_from_projeto_geral(self):
         """usa_avaliar should be synced from projeto_geral on save."""

@@ -153,22 +153,22 @@ def test_apply_dat_registro_creates_derives_and_stores_planilha(tmp_path):
     assert dr.created_by_id == actor.id
     # save() derivou:
     assert dr.usa_avaliar is True
-    assert dr.nr_codigos == 11
+    assert dr.nr_codigos == 0  # sem compras importadas → 0 (cálculo per-compra em test_dat_codigos)
 
 
-def test_apply_dat_registro_skips_empty_aluno_qtde(tmp_path):
+def test_apply_dat_registro_creates_professor_only(tmp_path):
     actor = _actor()
     MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
     ProjetoGeral.objects.create(nome="PG X", usa_avaliar=False)
     ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
-    # aluno_qtde vazio → não cria (campo obrigatório no model)
+    # aluno_qtde vazio é LEGÍTIMO (registro professor-only) → cria (aluno_qtde nullable)
     row = "Cidade X,CIDADE X,CE,PG X,PG X,Proj X,Proj X,,,,,,pendente,pendente,,pendente,,pendente,,,nao_aplicavel,[],nao_aplicavel,[],nao_aplicavel,[],,,false"
     csv = f"{REG_HEADER}\n{row}\n"
     r = ExportContractImporter(
         path=_write_export(tmp_path, {"dat_registro": csv}), apply=True, allow=("dat_registro",), actor=actor
     ).run()
-    assert r["applied"]["dat_registro"] == 0
-    assert DATRegistro.objects.count() == 0
+    assert r["applied"]["dat_registro"] == 1
+    assert DATRegistro.objects.get().aluno_qtde is None
 
 
 def test_apply_dat_registro_skips_unresolved_projeto_geral(tmp_path):

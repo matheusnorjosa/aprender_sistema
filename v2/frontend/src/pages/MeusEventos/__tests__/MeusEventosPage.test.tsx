@@ -114,4 +114,21 @@ describe('MeusEventosPage', () => {
       expect(getMyEventsMock).toHaveBeenCalledWith({ page: 1, page_size: 20 });
     });
   });
+
+  // RD-06 (#1719): horário do evento é exibido fixando America/Fortaleza,
+  // não no fuso do navegador nem em UTC cru.
+  test('exibe horário do evento em America/Fortaleza, não em UTC', async () => {
+    // 13:00Z / 17:00Z → 10:00 / 14:00 em America/Fortaleza (UTC-3, sem DST)
+    getMyEventsMock.mockResolvedValueOnce(
+      makePage([makeEvent({ id: 40, inicio: '2026-05-10T13:00:00Z', fim: '2026-05-10T17:00:00Z' })])
+    );
+    renderPage();
+
+    // horário no fuso de Fortaleza...
+    expect(await screen.findByText(/10:00/)).toBeInTheDocument();
+    expect(screen.getByText(/14:00/)).toBeInTheDocument();
+    // ...e nunca o horário UTC cru (regressão RD-06)
+    expect(screen.queryByText(/13:00/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/17:00/)).not.toBeInTheDocument();
+  });
 });

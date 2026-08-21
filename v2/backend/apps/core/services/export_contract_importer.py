@@ -44,6 +44,7 @@ from apps.core.models import (
     Municipio,
     PlanoFormacoes,
     Produto,
+    Projeto,
     ProjetoGeral,
     TipoEvento,
     Usuario,
@@ -90,6 +91,7 @@ IMPLEMENTED = {
     "dat_area",
     "municipio",
     "projeto_geral",
+    "projeto",
     "produto",
     "usuario",
     "tipo_evento",
@@ -181,6 +183,9 @@ _TIPO_CALCULO_MAP = {
 # via import — decisão humana (CONTRATO-v4 §2). Criar com o default por_professor daria
 # nr_codigos errado onde a planilha usa aluno÷20 (ex.: ECS, ED FINANCEIRA).
 _AMBIGUOUS_PG_NAMES = {_norm("ESCREVER COMUNICAR E SER"), _norm("EDUCAÇÃO FINANCEIRA")}
+# projeto.fluxo autoritativo (SUPER exige aprovação — PA-01). Vazio/inválido → would_reject
+# (default NAO_SUPER faria um projeto SUPER auto-aprovar solicitações).
+_PROJETO_FLUXOS = {"SUPER", "NAO_SUPER"}
 
 
 def _pg_calc_fields(r: dict[str, str]) -> dict[str, Any]:
@@ -338,6 +343,41 @@ class ExportContractImporter:
                     idx.get(_norm(nome)), {"usa_avaliar": _to_bool(r.get("usa_avaliar"))}, protected
                 )
                 tally[st] += 1
+
+        elif name == "projeto":
+            # Master do catálogo de variantes (Onda A). Matching via resolver #1372 (canon-key,
+            # detecta ambiguidade); NUNCA nome__iexact (o resolver canoniza & vs E / hífen /
+            # prefixo PROJETO). Criar exige PG resolvível (coluna projeto_geral) + fluxo
+            # autoritativo (PA-01) → PG/fluxo ausente = would_reject rotulado, nunca órfã NULL.
+            if self._pidx is None:
+                self._pidx = build_projeto_index()
+            pg_idx = self._projeto_geral_index()
+            reasons = {"nome_vazio": 0, "ambiguous": 0, "pg_desconhecido": 0, "fluxo_ausente": 0}
+            for r in rows:
+                nome = (r.get("projeto") or r.get("nome") or "").strip()
+                if not nome:
+                    tally["would_reject"] += 1
+                    reasons["nome_vazio"] += 1
+                    continue
+                res = resolve_projeto_export(nome, index=self._pidx)
+                if res.status == "matched":
+                    tally["would_skip_same"] += 1  # já existe (canon-key) → create-only não toca
+                    continue
+                if res.status == "ambiguous":
+                    tally["would_reject"] += 1
+                    reasons["ambiguous"] += 1
+                    continue
+                # unmatched → candidato a create; exige PG resolvível + fluxo válido
+                if pg_idx.get(_norm(r.get("projeto_geral") or "")) is None:
+                    tally["would_reject"] += 1
+                    reasons["pg_desconhecido"] += 1
+                    continue
+                if (r.get("fluxo") or "").strip().upper() not in _PROJETO_FLUXOS:
+                    tally["would_reject"] += 1
+                    reasons["fluxo_ausente"] += 1
+                    continue
+                tally["would_create"] += 1
+            tally["reject_reasons"] = reasons
 
         elif name == "produto":
             # NK = codigo (unique). Compara nome (não-protegido).
@@ -563,6 +603,10 @@ class ExportContractImporter:
                 if name == "dat_compra":
                     applied[name] = self._apply_dat_compra(self._load(name))
                     continue
+                if name == "projeto":
+                    # Handler dedicado (resolver + PG + fluxo); NÃO o loop genérico (nome__iexact).
+                    applied[name] = self._apply_projeto(self._load(name))
+                    continue
                 created = 0
                 for r in self._load(name):
                     nome = (r.get("nome") or "").strip()
@@ -716,6 +760,51 @@ class ExportContractImporter:
             )
             existing.add(nk)
             created += 1
+        return created
+
+    def _apply_projeto(self, rows: list[dict[str, str]]) -> int:
+        """Create-only do master `projeto` (catálogo de variantes — Onda A). Matching via
+        resolver #1372 (canon-key): cria SÓ unmatched, COM projeto_geral resolvível + fluxo
+        válido (PA-01). NÃO usa actor (Projeto não tem created_by). PG/fluxo ausente → pula
+        (would_reject no dry-run). Dedup intra-CSV por canon-key: o índice do resolver é cacheado
+        antes do loop, então sem dedup 2 grafias da mesma variante quebrariam o unique de `nome`.
+        Invalida o índice ao fim para que resolves posteriores (na mesma instância) vejam os novos."""
+        if self._pidx is None:
+            self._pidx = build_projeto_index()
+        pg_idx = self._projeto_geral_index()
+        seen: set[str] = set()
+        seen_codigos: set[str] = set()
+        created = 0
+        for r in rows:
+            nome = (r.get("projeto") or r.get("nome") or "").strip()
+            if not nome:
+                continue
+            res = resolve_projeto_export(nome, index=self._pidx)
+            if res.status != "unmatched":
+                continue  # matched (já existe) ou ambiguous (decisão humana) → não cria
+            if res.canonical_key in seen:
+                continue  # mesma variante canônica repetida na run
+            pg_id = pg_idx.get(_norm(r.get("projeto_geral") or ""))
+            fluxo = (r.get("fluxo") or "").strip().upper()
+            if pg_id is None or fluxo not in _PROJETO_FLUXOS:
+                continue  # PG desconhecido / fluxo ausente → não cria (órfã/PA-01)
+            codigo = (r.get("codigo") or "").strip()[:50]
+            if codigo and codigo in seen_codigos:
+                codigo = ""  # codigo repetido na run quebraria o unique parcial → grava vazio
+            Projeto.objects.create(
+                nome=nome,
+                codigo=codigo,
+                fluxo=fluxo,
+                descricao=(r.get("descricao") or ""),
+                ativo=(_to_bool(r.get("ativo")) if (r.get("ativo") or "").strip() else True),
+                projeto_geral_id=pg_id,
+            )
+            seen.add(res.canonical_key)
+            if codigo:
+                seen_codigos.add(codigo)
+            created += 1
+        if created:
+            self._pidx = None  # invalida cache: resolves posteriores veem os recém-criados
         return created
 
     def _papel_index_from_equipe(self) -> dict[str, str]:

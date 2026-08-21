@@ -239,8 +239,8 @@ export default function ComprasDashboardPage(): JSX.Element {
           getProjetosOptions(),
           getProdutosOptions(),
         ]);
-        setProjetos((projData as any).results || projData || []);
-        setProdutos((prodData as any).results || prodData || []);
+        setProjetos(projData || []);
+        setProdutos((prodData || []) as unknown as OptionItem[]);
       } catch (_error) {
         // Sem opções não bloqueia dashboard
       }

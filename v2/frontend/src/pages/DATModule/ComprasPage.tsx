@@ -48,10 +48,11 @@ import {
   getProjetosOptions,
   getProdutosOptions,
 } from '../../api/datModule';
+import type { ColumnsType } from 'antd/es/table';
 import type { PaginatedResponse } from '../../types';
 import { useTableFilters, type TableFilterParams } from '../../hooks/useTableFilters';
 import DatImportsCentralizedBanner from '../../components/DatImportsCentralizedBanner';
-import dayjs from 'dayjs';
+import dayjs, { type Dayjs } from 'dayjs';
 import { UF_OPTIONS } from '../../constants';
 
 const { Title, Text } = Typography;
@@ -75,17 +76,23 @@ interface CompraRecord {
   quantidade: number;
   quantidade_utilizada: number | null;
   data_compra?: string | null;
-  [key: string]: any;
+  ano_uso?: number | null;
+  status_uso?: string | null;
 }
 
 interface CompraFormValues {
   projeto: number;
   produto: number;
+  descricao_produto?: string | null;
   tipo_compra?: string | null;
   uf: string;
   municipio: number;
   quantidade: number;
-  [key: string]: any;
+  quantidade_utilizada?: number | null;
+  ano_uso?: number | null;
+  valor_unitario?: number | null;
+  data_compra?: Dayjs | null;
+  observacoes?: string | null;
 }
 
 /**
@@ -218,9 +225,9 @@ export default function ComprasPage(): JSX.Element {
           getProjetosOptions(),
           getProdutosOptions(),
         ]);
-        setMunicipios((munData as any).results || munData || []);
-        setProjetos((projData as any).results || projData || []);
-        setProdutos((prodData as any).results || prodData || []);
+        setMunicipios(munData);
+        setProjetos(projData);
+        setProdutos(prodData as unknown as ProdutoOption[]);
       } catch (error) {
         message.error(`Erro ao carregar opções: ${(error as Error).message}`);
       }
@@ -268,7 +275,7 @@ export default function ComprasPage(): JSX.Element {
           Object.entries(fieldErrors).map(([name, msgs]) => ({
             name,
             errors: Array.isArray(msgs) ? msgs.map(String) : [String(msgs)],
-          })),
+          })) as unknown as Parameters<typeof form.setFields>[0],
         );
         message.error('Corrija os campos destacados.');
       } else {
@@ -325,7 +332,7 @@ export default function ComprasPage(): JSX.Element {
   };
 
   // Table columns (memoized §16 Epic #459)
-  const columns = useMemo(() => [
+  const columns: ColumnsType<CompraRecord> = useMemo(() => [
     {
       title: 'Projeto',
       dataIndex: 'projeto_nome',
@@ -443,7 +450,7 @@ export default function ComprasPage(): JSX.Element {
       width: 120,
       render: (_: unknown, record: CompraRecord) => {
         const disponivel = calcularDisponivel(record.quantidade, record.quantidade_utilizada);
-        return renderStatusTag(record.status_uso, disponivel, record.quantidade);
+        return renderStatusTag(record.status_uso ?? null, disponivel, record.quantidade);
       },
     },
     {
@@ -661,7 +668,7 @@ export default function ComprasPage(): JSX.Element {
         }
       >
         <Table
-          columns={columns as any}
+          columns={columns}
           dataSource={compras}
           rowKey="id"
           loading={loading}
@@ -674,8 +681,8 @@ export default function ComprasPage(): JSX.Element {
           }}
           size="middle"
           summary={(pageData) => {
-            const totalQtd = pageData.reduce((sum: number, r: any) => sum + (r.quantidade || 0), 0);
-            const totalUtilizado = pageData.reduce((sum: number, r: any) => sum + (r.quantidade_utilizada || 0), 0);
+            const totalQtd = pageData.reduce((sum: number, r: CompraRecord) => sum + (r.quantidade || 0), 0);
+            const totalUtilizado = pageData.reduce((sum: number, r: CompraRecord) => sum + (r.quantidade_utilizada || 0), 0);
             const totalDisponivel = totalQtd - totalUtilizado;
 
             return (

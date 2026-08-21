@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useCallback, useMemo, type JSX } from 'react';
 import { useTableFilters, type TableFilterParams } from '../../hooks/useTableFilters';
-import type { PaginatedResponse } from '../../types';
+import type { PaginatedResponse, ProjetoOption, MunicipioOption } from '../../types';
 import {
   Table,
   Button,
@@ -63,7 +63,7 @@ import {
   getProjetosOptions,
   getMunicipiosOptions,
 } from '../../api/datModule';
-import dayjs from 'dayjs';
+import dayjs, { type Dayjs } from 'dayjs';
 import logger from '../../utils/logger';
 import {
   AREAS_DEFAULT,
@@ -72,7 +72,7 @@ import {
   VIEW_MODES,
 } from './Coordenadores/constants';
 import { getColumns, type CoordenadorRecord } from './Coordenadores/columns';
-import { getAreaColor, getInitials, groupByArea } from './Coordenadores/helpers';
+import { getAreaColor, getInitials, groupByArea, type CoordenadorForGroup } from './Coordenadores/helpers';
 
 const { Title, Text } = Typography;
 
@@ -91,7 +91,12 @@ interface CoordenadorFormValues {
   area: string | null;
   cargo: string | null;
   ativo: boolean;
-  [key: string]: any;
+  data_admissao?: Dayjs | null;
+  email?: string | null;
+  email_alternativo?: string | null;
+  telefone?: string | null;
+  telefone_alternativo?: string | null;
+  observacoes?: string | null;
 }
 
 interface CoordenadoresStats {
@@ -146,9 +151,9 @@ export default function CoordenadoresPage(): JSX.Element {
   // Stats derived from current page (no API for stats on this entity).
   const stats = useMemo<CoordenadoresStats>(() => {
     const results = coordenadores;
-    const ativos = results.filter((c) => (c as any).ativo !== false).length;
-    const areasUnicas = [...new Set(results.map((c) => (c as any).area))].filter(Boolean).length;
-    const totalProjetos = results.reduce((sum, c) => sum + ((c as any).total_projetos || 0), 0);
+    const ativos = results.filter((c) => c.ativo !== false).length;
+    const areasUnicas = [...new Set(results.map((c) => c.area))].filter(Boolean).length;
+    const totalProjetos = results.reduce((sum, c) => sum + (c.total_projetos || 0), 0);
     const mediaProjetos = results.length > 0 ? (totalProjetos / results.length).toFixed(1) : 0;
     return {
       total: pagination.total,
@@ -160,8 +165,8 @@ export default function CoordenadoresPage(): JSX.Element {
 
   // Options for dropdowns (projetos/municipios reserved for future use)
   const [areas, setAreas] = useState<(AreaOption | string)[]>([]);
-  const [_projetos, setProjetos] = useState<any[]>([]);
-  const [_municipios, setMunicipios] = useState<any[]>([]);
+  const [_projetos, setProjetos] = useState<ProjetoOption[]>([]);
+  const [_municipios, setMunicipios] = useState<MunicipioOption[]>([]);
 
   // Modal states
   const [modalVisible, setModalVisible] = useState<boolean>(false);
@@ -184,13 +189,14 @@ export default function CoordenadoresPage(): JSX.Element {
         ]);
 
         // Use áreas da API ou padrão
-        const areasList = ((areasData as any).results || areasData || []).length > 0
-          ? (areasData as any).results || areasData
-          : AREAS_DEFAULT.map((a, i) => ({ id: i + 1, nome: a }));
+        const areasList: (AreaOption | string)[] =
+          areasData.length > 0
+            ? (areasData as AreaOption[])
+            : AREAS_DEFAULT.map((a, i) => ({ id: i + 1, nome: a }));
 
         setAreas(areasList);
-        setProjetos((projData as any).results || projData || []);
-        setMunicipios((munData as any).results || munData || []);
+        setProjetos(projData);
+        setMunicipios(munData);
       } catch (error) {
         message.error(`Erro ao carregar opções: ${(error as Error).message}`);
       }
@@ -203,7 +209,7 @@ export default function CoordenadoresPage(): JSX.Element {
     setLoadingAlocacoes(true);
     try {
       const data = await getCoordenadorAlocacoes(coordenadorId);
-      setAlocacoes((data as any).results || data || []);
+      setAlocacoes(data as unknown as AlocacaoRecord[]);
     } catch (error) {
       logger.error('Erro ao carregar alocações:', error);
       setAlocacoes([]);
@@ -299,7 +305,11 @@ export default function CoordenadoresPage(): JSX.Element {
   // Issue #303: Helper functions extracted to ./Coordenadores/helpers.js
   // Group coordenadores by area using extracted helper - memoized (§2 Epic #459)
   const coordenadoresByArea = useMemo(
-    () => groupByArea(coordenadores as any),
+    () =>
+      groupByArea(coordenadores as CoordenadorForGroup[]) as Record<
+        string,
+        CoordenadorRecord[]
+      >,
     [coordenadores]
   );
 
@@ -402,7 +412,7 @@ export default function CoordenadoresPage(): JSX.Element {
   // Area view renderer
   const renderAreaView = () => (
     <Collapse defaultActiveKey={Object.keys(coordenadoresByArea)}>
-      {Object.entries(coordenadoresByArea).map(([area, coords]: [string, any[]]) => (
+      {Object.entries(coordenadoresByArea).map(([area, coords]) => (
         <Panel
           key={area}
           header={
@@ -633,8 +643,8 @@ export default function CoordenadoresPage(): JSX.Element {
             </Space>
           }
         >
-          <Table
-            columns={columns as any}
+          <Table<CoordenadorRecord>
+            columns={columns}
             dataSource={coordenadores}
             rowKey="id"
             loading={loading}

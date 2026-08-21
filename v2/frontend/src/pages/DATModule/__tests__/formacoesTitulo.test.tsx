@@ -16,10 +16,10 @@ vi.mock('../../../api/datModule', () => ({
   updateFormacao: vi.fn().mockResolvedValue({}),
   deleteFormacao: vi.fn().mockResolvedValue({}),
   getFormacoesStats: vi.fn().mockResolvedValue({ total: 0, este_mes: 0, realizadas: 0 }),
-  getFormacoesCalendario: vi.fn().mockResolvedValue({ results: [] }),
-  getMunicipiosOptions: vi.fn().mockResolvedValue({ results: [] }),
-  getProjetosOptions: vi.fn().mockResolvedValue({ results: [] }),
-  getCoordenadoresOptions: vi.fn().mockResolvedValue({ results: [] }),
+  getFormacoesCalendario: vi.fn().mockResolvedValue([]),
+  getMunicipiosOptions: vi.fn().mockResolvedValue([]),
+  getProjetosOptions: vi.fn().mockResolvedValue([]),
+  getCoordenadoresOptions: vi.fn().mockResolvedValue([]),
 }));
 
 import FormacoesPage from '../FormacoesPage';

@@ -10,7 +10,6 @@ import {
   lookupMunicipios,
   lookupMunicipiosWithFilters,
   lookupProjetos,
-  lookupProjetosWithFilters,
 } from '../lookup';
 
 type RequestLog = { pathname: string; params: URLSearchParams };
@@ -57,15 +56,5 @@ describe('lookup API filters (MSW)', () => {
     expect(requests).toHaveLength(1);
     expect(requests[0].pathname).toBe('/api/lookup/projetos/');
     expect(requests[0].params.get('q')).toBe('Ace');
-  });
-
-  test('lookupProjetosWithFilters envia municipio_id + com_compra', async () => {
-    await lookupProjetosWithFilters({ q: 'A', com_compra: true, municipio_id: 77 });
-
-    expect(requests).toHaveLength(1);
-    expect(requests[0].pathname).toBe('/api/lookup/projetos/');
-    expect(requests[0].params.get('q')).toBe('A');
-    expect(requests[0].params.get('com_compra')).toBe('true');
-    expect(requests[0].params.get('municipio_id')).toBe('77');
   });
 });

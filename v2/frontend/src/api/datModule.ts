@@ -396,28 +396,6 @@ export async function getCoordenadorAlocacoes(id: ID): Promise<GenericRecord[]> 
   );
 }
 
-// ========== PRODUTOS ==========
-
-export async function listProdutosDAT(params: FilterParams = {}): Promise<PaginatedResponse<GenericRecord>> {
-  return fetchAPI(buildUrl('/produtos/', params as QueryParams));
-}
-
-export async function getProdutoDAT(id: ID): Promise<GenericRecord> {
-  return fetchAPI(`/produtos/${id}/`);
-}
-
-export async function createProdutoDAT(data: Record<string, unknown>): Promise<GenericRecord> {
-  return fetchAPI('/produtos/', { method: 'POST', body: JSON.stringify(data) });
-}
-
-export async function updateProdutoDAT(id: ID, data: Record<string, unknown>): Promise<GenericRecord> {
-  return fetchAPI(`/produtos/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
-}
-
-export async function deleteProdutoDAT(id: ID): Promise<void> {
-  await fetchAPI(`/produtos/${id}/`, { method: 'DELETE' });
-}
-
 // ========== ÁREAS ==========
 
 export async function listAreasDAT(params: FilterParams = {}): Promise<PaginatedResponse<GenericRecord>> {

@@ -127,16 +127,6 @@ export async function getMonthlyAvailability(params: MonthlyAvailabilityParams):
 }
 
 /**
- * Busca grade mensal de disponibilidade (versão genérica).
- *
- * @param params - Parâmetros da consulta
- */
-export async function getMonthly(params: QueryParams): Promise<MonthlyGridResponse> {
-  const url = buildUrl('/availability/monthly/', params);
-  return await fetchAPI(url);
-}
-
-/**
  * Busca feature flags do sistema.
  */
 export async function getFeatures(): Promise<FeatureFlags> {

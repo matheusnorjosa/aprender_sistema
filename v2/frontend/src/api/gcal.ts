@@ -7,7 +7,7 @@
 import { fetchAPI, buildUrl, type QueryParams } from './config';
 import { API_BASE } from './config';
 import { syncChannel } from '../services/syncChannel';
-import type { ID, PaginatedResponse, GCalDashboardEvent } from '../types';
+import type { ID, PaginatedResponse } from '../types';
 
 /**
  * GCal status summary counts
@@ -222,28 +222,6 @@ export interface GCalAlertsSummaryResponse {
 export async function getStatusSummary(filters: GCalFilters = {}): Promise<GCalStatusSummary> {
   const url = buildUrl('/gcal/status-summary/', filters as QueryParams);
   return await fetchAPI(url);
-}
-
-/**
- * Lista solicitações aprovadas com status GCal.
- *
- * @param filters - Filtros (date_from, date_to, sector, gcal_status, q)
- */
-export async function listApprovedWithGCalStatus(filters: GCalFilters = {}): Promise<PaginatedResponse<GCalDashboardEvent>> {
-  const url = buildUrl('/gcal/list/', filters as QueryParams);
-  return await fetchAPI(url);
-}
-
-/**
- * Publica múltiplas solicitações em lote no Google Calendar.
- *
- * @param body - { solicitacao_ids: [...], dry_run: bool, apply_blocked: bool }
- */
-export async function publishBatch(body: BatchPublishRequest): Promise<BatchOperationResponse> {
-  return await fetchAPI('/gcal/publish-batch/', {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
 }
 
 /**

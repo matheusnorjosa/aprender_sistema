@@ -61,13 +61,6 @@ vi.mock('../../api/availability', () => ({
     cells: [],
     details_index: {},
   }),
-  getMonthly: vi.fn().mockResolvedValue({
-    days: [],
-    legend: {},
-    people: [],
-    cells: [],
-    details_index: {},
-  }),
 }));
 vi.mock('../../api/stats', () => ({
   getHomeStats: vi.fn().mockResolvedValue({}),

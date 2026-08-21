@@ -98,16 +98,6 @@ export async function lookupProjetos(q: string = ''): Promise<LookupItem[]> {
 }
 
 /**
- * Buscar projetos (autocomplete) com filtros de elegibilidade.
- *
- * @param params - Filtros do lookup
- */
-export async function lookupProjetosWithFilters(params: LookupProjetosParams = {}): Promise<LookupItem[]> {
-  const url = buildUrl('/lookup/projetos/', params);
-  return await fetchAPI(url);
-}
-
-/**
  * Buscar tipos de evento (autocomplete)
  *
  * @param q - Query string

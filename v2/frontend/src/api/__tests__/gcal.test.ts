@@ -14,9 +14,7 @@ import {
   getDashboardSuccessRate,
   getDashboardTopInsights,
   getStatusSummary,
-  listApprovedWithGCalStatus,
   listDashboardEvents,
-  publishBatch,
   reapplyBatch,
   resyncBatch,
 } from '../gcal';
@@ -53,32 +51,6 @@ describe('gcal API endpoints (MSW)', () => {
     const u = new URL(requests[0].url);
     expect(u.pathname).toBe('/api/gcal/status-summary/');
     expect(u.searchParams.get('status')).toBe('approved');
-  });
-
-  test('listApprovedWithGCalStatus uses /gcal/list/', async () => {
-    server.use(
-      captureGet('/gcal/list/', { count: 0, next: null, previous: null, results: [] }, requests),
-    );
-
-    await listApprovedWithGCalStatus({ q: 'teste' });
-
-    expect(requests).toHaveLength(1);
-    const u = new URL(requests[0].url);
-    expect(u.pathname).toBe('/api/gcal/list/');
-    expect(u.searchParams.get('q')).toBe('teste');
-  });
-
-  test('publishBatch posts to /gcal/publish-batch/', async () => {
-    server.use(capturePost('/gcal/publish-batch/', { queued: 1, errors: [] }, requests));
-
-    await publishBatch({ solicitacao_ids: [1], dry_run: true, apply_blocked: true });
-
-    expect(requests).toHaveLength(1);
-    expect(requests[0].body).toEqual({
-      solicitacao_ids: [1],
-      dry_run: true,
-      apply_blocked: true,
-    });
   });
 
   test('reapplyBatch posts to /gcal/dashboard/batch/reapply/', async () => {

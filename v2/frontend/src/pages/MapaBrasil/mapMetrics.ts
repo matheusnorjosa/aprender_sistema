@@ -95,8 +95,9 @@ export function normalizeMapMetricsResponse(response: MapMetricsResponse): {
 
   // Fallback para contratos antigos sem by_uf.
   municipios.forEach((item) => {
-    if (!estados[item.uf]) {
-      estados[item.uf] = {
+    let estado = estados[item.uf]
+    if (!estado) {
+      estado = {
         uf: item.uf,
         eventos: 0,
         projetos: 0,
@@ -105,14 +106,15 @@ export function normalizeMapMetricsResponse(response: MapMetricsResponse): {
         municipios: [],
         municipiosTotal: 0,
       }
+      estados[item.uf] = estado
     }
-    estados[item.uf].eventos += item.eventos
-    estados[item.uf].projetos += item.projetos
-    estados[item.uf].coordenadores += item.coordenadores
-    estados[item.uf].compras += item.compras
-    if (!estados[item.uf].municipios.includes(item.municipio)) {
-      estados[item.uf].municipios.push(item.municipio)
-      estados[item.uf].municipiosTotal = estados[item.uf].municipios.length
+    estado.eventos += item.eventos
+    estado.projetos += item.projetos
+    estado.coordenadores += item.coordenadores
+    estado.compras += item.compras
+    if (!estado.municipios.includes(item.municipio)) {
+      estado.municipios.push(item.municipio)
+      estado.municipiosTotal = estado.municipios.length
     }
   })
 

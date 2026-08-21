@@ -40,8 +40,9 @@ export default function AcoesNotificacaoPage(): JSX.Element {
     try {
       const data = await listCiclosAcoes({ page_size: 100, ordering: '-ano' });
       setCycles(data.results);
-      if (!selectedCycleId && data.results.length > 0) {
-        setSelectedCycleId(data.results[0].id);
+      const firstCycle = data.results[0];
+      if (!selectedCycleId && firstCycle) {
+        setSelectedCycleId(firstCycle.id);
       }
     } catch (error) {
       message.error(`Erro ao carregar ciclos: ${(error as Error).message}`);

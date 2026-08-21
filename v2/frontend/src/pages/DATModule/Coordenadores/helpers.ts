@@ -36,8 +36,10 @@ export function getAreaColor(area: string | null | undefined): string {
 export function getInitials(nome: string | null | undefined): string {
   if (!nome) return '?';
   const parts = nome.split(' ');
-  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+  const first = parts[0] ?? '';
+  if (parts.length === 1) return first.charAt(0).toUpperCase();
+  const last = parts[parts.length - 1] ?? '';
+  return (first.charAt(0) + last.charAt(0)).toUpperCase();
 }
 
 /**

@@ -70,7 +70,9 @@ export function getStepStatus(status: string | undefined): StepsStatus {
  */
 export function getCurrentStep(record: CadastroRecord, etapas: Etapa[]): number {
   for (let i = 0; i < etapas.length; i++) {
-    const status = record[`status_${etapas[i].key}`];
+    const etapa = etapas[i];
+    if (!etapa) continue;
+    const status = record[`status_${etapa.key}`];
     if (status !== 'concluido') {
       return i;
     }

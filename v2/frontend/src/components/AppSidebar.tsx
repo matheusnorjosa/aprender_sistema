@@ -101,8 +101,9 @@ const MENU_KEY_TO_PARENT: Record<string, string> = {
 function useSelectedMenuKey(): string {
   const location = useLocation();
   return useMemo(() => {
-    if (ROUTE_TO_MENU_KEY[location.pathname]) {
-      return ROUTE_TO_MENU_KEY[location.pathname];
+    const exact = ROUTE_TO_MENU_KEY[location.pathname];
+    if (exact) {
+      return exact;
     }
     for (const [route, key] of Object.entries(ROUTE_TO_MENU_KEY)) {
       if (location.pathname.startsWith(route) && route !== '/') {

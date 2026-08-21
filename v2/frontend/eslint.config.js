@@ -32,9 +32,9 @@ export default defineConfig([
   // recommended sem type-checking (sem `project`) — rápido, não exige tsconfig
   // no lint. Escopo src/**: onde vive o app (e os callers de autz do #1281).
   // e2e/ (Playwright) precisa de override próprio (o plugin react-hooks
-  // confunde o `use()` de fixture com hook) — follow-up. Regras estilísticas
-  // ruidosas (no-explicit-any: 63 ocorrências) ficam `warn`; endurecer é
-  // follow-up incremental.
+  // confunde o `use()` de fixture com hook) — follow-up. O sweep de tipagem
+  // (DAT #1806) zerou os `any` de produção, então `no-explicit-any` passou a
+  // `error` (trava regressão). Warnings de HMR/exhaustive-deps seguem `warn`.
   {
     files: ['src/**/*.{ts,tsx}'],
     extends: [
@@ -57,7 +57,7 @@ export default defineConfig([
         'error',
         { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
       ],
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'error',
       // DX de Fast-Refresh (HMR), não correção — arquivos que exportam um
       // componente + util (ex: PerfilPage + maskCpf). Fica `warn`.
       'react-refresh/only-export-components': 'warn',

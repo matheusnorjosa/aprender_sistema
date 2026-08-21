@@ -10,7 +10,7 @@ Aritmética `Decimal` (nunca `float`): `float(Decimal("1.1")) == 1.1000000000000
 faz o `ceil` estourar +1. Ver `REGRA-10-PORCENTO-CODIGOS.md` §6.
 """
 
-# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportOperatorIssue=false, reportCallIssue=false
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportOperatorIssue=false, reportCallIssue=false, reportUnnecessaryComparison=false
 
 from __future__ import annotations
 
@@ -45,6 +45,11 @@ def calcular_nr_codigos(registro: DATRegistro) -> int | None:
     """
     Soma dos códigos das compras do registro (município × projeto, ativas).
 
+    Cohort anual (decisão do dono): quando `registro.ano` está definido, conta SÓ as
+    compras cujo `ano_uso` bate — cada ano tem seu número, sem inflar o total somando
+    2026 + 2027 + sem-ano no mesmo balde. `ano` nulo (transição) mantém o comportamento
+    antigo (soma todos os anos).
+
     `None` quando o projeto_geral não gera códigos (`nao_aplicavel`) ou não existe —
     preserva a semântica de "em branco" da planilha. A regra vem SEMPRE do
     `registro.projeto_geral` (FK NOT NULL), nunca da compra.
@@ -58,6 +63,8 @@ def calcular_nr_codigos(registro: DATRegistro) -> int | None:
     from apps.core.models.dat_compra import DATCompra
 
     compras = DATCompra.objects.filter(municipio_id=registro.municipio_id, projeto_id=registro.projeto_id, ativo=True)
+    if registro.ano is not None:
+        compras = compras.filter(ano_uso=registro.ano)
     return sum(codigos_da_compra(c, pg) for c in compras)
 
 

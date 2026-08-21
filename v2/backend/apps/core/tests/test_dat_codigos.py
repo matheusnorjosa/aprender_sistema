@@ -92,26 +92,41 @@ class CalcularNrCodigosTest(TestCase):
         )
         cls.projeto = ProjetoFactory(nome="NOVO LENDO 1", codigo="NL1", fluxo="NAO_SUPER", projeto_geral=cls.pg_prof)
 
-    def _registro(self, projeto, pg, aluno=None, prof=None):
+    def _registro(self, projeto, pg, aluno=None, prof=None, ano=None):
         return DATRegistro.objects.create(
             municipio=self.municipio,
             projeto_geral=pg,
             projeto=projeto,
             aluno_qtde=aluno,
             professor_qtde=prof,
+            ano=ano,
             created_by=self.user,
         )
 
-    def _compra_db(self, projeto, tipo, qtde, conta=True):
+    def _compra_db(self, projeto, tipo, qtde, conta=True, ano=2026):
         return DATCompra.objects.create(
             municipio=self.municipio,
             projeto=projeto,
             tipo=tipo,
             quantidade=qtde,
             conta_para_codigos=conta,
-            ano_uso=2026,
+            ano_uso=ano,
             created_by=self.user,
         )
+
+    def test_conta_so_o_ano_do_registro(self):
+        """Cohort anual: registro de 2026 conta só as compras ano_uso=2026, não as de 2027."""
+        reg = self._registro(self.projeto, self.pg_prof, prof=20, ano=2026)
+        self._compra_db(self.projeto, "Professor", 20, ano=2026)  # ceil(22.0) = 22
+        self._compra_db(self.projeto, "Professor", 100, ano=2027)  # outro ano → não conta
+        self.assertEqual(calcular_nr_codigos(reg), 22)
+
+    def test_ano_nulo_soma_todos_os_anos(self):
+        """Transição (ano=NULL): mantém o comportamento antigo, somando todos os anos."""
+        reg = self._registro(self.projeto, self.pg_prof, prof=20, ano=None)
+        self._compra_db(self.projeto, "Professor", 20, ano=2026)  # 22
+        self._compra_db(self.projeto, "Professor", 20, ano=2027)  # 22
+        self.assertEqual(calcular_nr_codigos(reg), 44)
 
     def test_soma_arredonda_cada_compra_nao_o_agregado(self):
         """O caso 41+11 do REGRA-10: per-compra = 46+13 = 59 (NÃO ceil(52×1.1)=58)."""

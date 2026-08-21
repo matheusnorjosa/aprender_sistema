@@ -144,6 +144,31 @@ def test_classify_projeto_geral(tmp_path):
     assert r["would_create"] == 1
 
 
+# ───────── classify do master projeto (Onda A) ─────────
+def test_classify_projeto(tmp_path):
+    # Catálogo: uma variante existente (casa por canon-key: & vs E) + um PG para o novo.
+    ProjetoFactory(nome="Vida & Matemática 6", fluxo="NAO_SUPER")
+    ProjetoGeral.objects.create(nome="VIDA E MATEMATICA")
+    # 1 casa a existente (canon) -> skip; 2 novo c/ PG+fluxo -> create;
+    # 3 nome vazio, 4 PG desconhecido, 5 fluxo ausente -> reject (rotulado).
+    csv = (
+        "projeto,projeto_geral,fluxo\n"
+        "VIDA E MATEMATICA 6,VIDA E MATEMATICA,NAO_SUPER\n"
+        "Vida & Matemática 7,VIDA E MATEMATICA,NAO_SUPER\n"
+        ",VIDA E MATEMATICA,NAO_SUPER\n"
+        "Projeto Sem PG 1,PG INEXISTENTE,NAO_SUPER\n"
+        "Projeto Sem Fluxo 1,VIDA E MATEMATICA,\n"
+    )
+    path = _write_export(tmp_path, {"projeto": csv})
+    r = ExportContractImporter(path=path).run()["por_entidade"]["projeto"]
+    assert r["would_skip_same"] == 1  # linha 1 casa a existente
+    assert r["would_create"] == 1  # linha 2
+    assert r["would_reject"] == 3  # linhas 3, 4, 5
+    assert r["reject_reasons"]["nome_vazio"] == 1
+    assert r["reject_reasons"]["pg_desconhecido"] == 1
+    assert r["reject_reasons"]["fluxo_ausente"] == 1
+
+
 # ───────── uso do resolver de Projeto ─────────
 def test_uses_projeto_resolver():
     ProjetoFactory(nome="Vida & Matemática 6", fluxo="NAO_SUPER")

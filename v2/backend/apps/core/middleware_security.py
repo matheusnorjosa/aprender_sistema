@@ -61,11 +61,14 @@ class SecurityHeadersMiddleware:
         is_api_docs = request.path.startswith("/api/docs") or request.path.startswith("/api/redoc")
 
         # - 'self': Permite recursos do mesmo domínio
-        # - 'unsafe-inline': Necessário para Ant Design inline styles
+        # - 'unsafe-inline' (SÓ em style-src): Ant Design injeta estilos inline
         # - data:: Necessário para imagens base64 (ícones, avatars)
         # - blob:: Necessário para download de arquivos
-        # SEC-CSP-01: only allow unsafe-eval in development (React hot reload needs it)
-        script_src = "script-src 'self' 'unsafe-inline'"
+        # SEC-004 (#1462): script-src SEM 'unsafe-inline' — corta a superfície de XSS por
+        # injeção de <script>/handler inline. Nenhum template Django do projeto usa script
+        # inline e o admin 5.2 é CSP-compatível; o SPA React é servido pelo nginx (sem esta
+        # CSP). unsafe-eval fica só em dev (hot reload do React).
+        script_src = "script-src 'self'"
         if settings.ENVIRONMENT != "production":
             script_src += " 'unsafe-eval'"
         style_src = "style-src 'self' 'unsafe-inline'"
@@ -87,7 +90,7 @@ class SecurityHeadersMiddleware:
             style_src,  # Ant Design usa inline styles
             img_src,  # Imagens de qualquer HTTPS
             font_src,  # Fontes locais e data URIs
-            "connect-src 'self' https://api.github.com",  # APIs permitidas
+            "connect-src 'self'",  # APIs permitidas (G8 #1462: api.github.com removido — sem consumidor)
             "frame-ancestors 'none'",  # Previne clickjacking (como X-Frame-Options)
             "base-uri 'self'",  # Previne ataques de base tag
             "form-action 'self'",  # Forms só podem submeter para o mesmo domínio

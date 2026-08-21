@@ -39,11 +39,20 @@ class TestCSPUnsafeEval(TestCase):
         assert "style-src 'self' 'unsafe-inline'" in csp, f"style-src missing unsafe-inline: {csp}"
 
     @override_settings(ENVIRONMENT="production")
-    def test_production_csp_has_unsafe_inline_for_scripts(self):
-        """script-src must still have unsafe-inline (needed for inline scripts)."""
+    def test_production_csp_script_src_has_no_unsafe_inline(self):
+        """SEC-004 (#1462): script-src must NOT contain unsafe-inline."""
         response = self.client.get("/healthz/")
         csp = response.get("Content-Security-Policy", "") or response.get("Content-Security-Policy-Report-Only", "")
-        assert "script-src 'self' 'unsafe-inline'" in csp, f"script-src missing unsafe-inline: {csp}"
+        # Isola a diretiva script-src (style-src legitimamente mantém 'unsafe-inline').
+        script_directive = next((d for d in csp.split(";") if d.strip().startswith("script-src")), "")
+        assert script_directive, f"script-src directive missing: {csp}"
+        assert "unsafe-inline" not in script_directive, f"script-src should not have unsafe-inline: {csp}"
+
+    def test_csp_connect_src_has_no_github(self):
+        """G8 (#1462): connect-src must not allowlist api.github.com (sem consumidor)."""
+        response = self.client.get("/healthz/")
+        csp = response.get("Content-Security-Policy", "") or response.get("Content-Security-Policy-Report-Only", "")
+        assert "api.github.com" not in csp, f"connect-src should not have api.github.com: {csp}"
 
 
 class TestCSPMode(TestCase):

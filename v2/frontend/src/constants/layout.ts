@@ -31,6 +31,3 @@ export const LAYOUT = {
   TABLE_SCROLL_LARGE: 1200,
   TABLE_SCROLL_XLARGE: 1400,
 } as const;
-
-/** Type for LAYOUT keys */
-export type LayoutKey = keyof typeof LAYOUT;

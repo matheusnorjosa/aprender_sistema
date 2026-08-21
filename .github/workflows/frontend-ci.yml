@@ -62,8 +62,8 @@ jobs:
     - name: Build with Vite
       run: npm run build
 
-    - name: Run tests
-      run: npm run test
+    - name: Run tests (gate de cobertura — ratchet no baseline)
+      run: npm run test:coverage
 
     - name: Check bundle sizes
       run: npm run size

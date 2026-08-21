@@ -12,6 +12,7 @@ import json
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
@@ -104,6 +105,7 @@ class DATRegistroModelTests(TestCase):
             projeto_geral=self.projeto_geral_professor,
             projeto=self.projeto,
             professor_qtde=52,
+            ano=2026,
             created_by=self.user,
         )
         self.assertEqual(reg.nr_codigos, 0)  # ainda sem compras
@@ -118,6 +120,45 @@ class DATRegistroModelTests(TestCase):
             )
         reg.save()  # recalcula do zero a partir das compras
         self.assertEqual(reg.nr_codigos, 59)
+
+    def test_nk_permite_um_registro_por_ano(self):
+        """A NK inclui `ano`: dois registros do mesmo (município, projeto) com anos de uso
+        diferentes coexistem (um por ano). Antes, a NK (mun, proj_geral, proj) proibia o 2º."""
+        DATRegistro.objects.create(
+            municipio=self.municipio,
+            projeto_geral=self.projeto_geral_professor,
+            projeto=self.projeto,
+            ano=2026,
+            created_by=self.user,
+        )
+        DATRegistro.objects.create(
+            municipio=self.municipio,
+            projeto_geral=self.projeto_geral_professor,
+            projeto=self.projeto,
+            ano=2027,
+            created_by=self.user,
+        )
+        self.assertEqual(DATRegistro.objects.filter(municipio=self.municipio, projeto=self.projeto).count(), 2)
+
+    def test_nk_pendente_unico_por_par(self):
+        """`nulls_distinct=False`: só UM registro pendente (ano=None) por (município, projeto).
+        Sem isso, o Postgres trataria cada NULL como distinto e deixaria vários pendentes."""
+        DATRegistro.objects.create(
+            municipio=self.municipio,
+            projeto_geral=self.projeto_geral_professor,
+            projeto=self.projeto,
+            ano=None,
+            created_by=self.user,
+        )
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                DATRegistro.objects.create(
+                    municipio=self.municipio,
+                    projeto_geral=self.projeto_geral_professor,
+                    projeto=self.projeto,
+                    ano=None,
+                    created_by=self.user,
+                )
 
     def test_usa_avaliar_synced_from_projeto_geral(self):
         """usa_avaliar should be synced from projeto_geral on save."""

@@ -119,6 +119,24 @@ def test_apply_dat_compra_reads_ano_uso_colecao_v12(tmp_path):
     assert DATCompra.objects.get().ano_uso == 2026
 
 
+def test_apply_dat_compra_stores_nao_classificado_as_null(tmp_path):
+    """fix2: compra com ano_uso_colecao VAZIO (NÃO_CLASSIFICADO) é GRAVADA com ano_uso=NULL
+    (pendente de ano), não descartada. Decisão A do dono: 'guarda como pendente até alguém
+    preencher o ano'. Antes, a guarda `nk[5] is None` a descartava silenciosamente."""
+    actor = _actor()
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
+    row = "Cidade X,CE,Proj X,99,Professor kit,Professor,true,41,,2026-06-08"  # ano_uso_colecao vazio
+    r = ExportContractImporter(
+        path=_write_export(tmp_path, {"dat_compra": f"{COMPRA_HEADER_V12}\n{row}\n"}),
+        apply=True,
+        allow=("dat_compra",),
+        actor=actor,
+    ).run()
+    assert r["applied"]["dat_compra"] == 1
+    assert DATCompra.objects.get().ano_uso is None
+
+
 def test_apply_dat_compra_distinct_by_data_compra(tmp_path):
     """NK inclui data_compra: 2 compras iguais em tudo menos a DATA são distintas (não dedup).
     Regressão real (PACATUBA/Vida & Ciências 9): mesmo kit de professor comprado em 2 datas —

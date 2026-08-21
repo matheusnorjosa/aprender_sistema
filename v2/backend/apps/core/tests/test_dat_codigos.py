@@ -121,16 +121,17 @@ class CalcularNrCodigosTest(TestCase):
         self._compra_db(self.projeto, "Professor", 100, ano=2027)  # outro ano → não conta
         self.assertEqual(calcular_nr_codigos(reg), 22)
 
-    def test_ano_nulo_soma_todos_os_anos(self):
-        """Transição (ano=NULL): mantém o comportamento antigo, somando todos os anos."""
+    def test_ano_nulo_conta_so_nao_classificado(self):
+        """Split per-year: registro com ano=None é o bucket PENDENTE — conta SÓ as compras
+        ano_uso IS NULL (NÃO_CLASSIFICADO), não todos os anos (antes somava tudo)."""
         reg = self._registro(self.projeto, self.pg_prof, prof=20, ano=None)
-        self._compra_db(self.projeto, "Professor", 20, ano=2026)  # 22
-        self._compra_db(self.projeto, "Professor", 20, ano=2027)  # 22
-        self.assertEqual(calcular_nr_codigos(reg), 44)
+        self._compra_db(self.projeto, "Professor", 20, ano=2026)  # ano real → NÃO conta no pendente
+        self._compra_db(self.projeto, "Professor", 20, ano=None)  # NÃO_CLASSIFICADO → conta = 22
+        self.assertEqual(calcular_nr_codigos(reg), 22)
 
     def test_soma_arredonda_cada_compra_nao_o_agregado(self):
         """O caso 41+11 do REGRA-10: per-compra = 46+13 = 59 (NÃO ceil(52×1.1)=58)."""
-        reg = self._registro(self.projeto, self.pg_prof, prof=52)
+        reg = self._registro(self.projeto, self.pg_prof, prof=52, ano=2026)
         self._compra_db(self.projeto, "Professor", 41)
         self._compra_db(self.projeto, "Professor", 11)
         self.assertEqual(calcular_nr_codigos(reg), 59)
@@ -138,13 +139,13 @@ class CalcularNrCodigosTest(TestCase):
 
     def test_conta_para_codigos_false_excluida(self):
         """Compra não-contável não entra na soma (cenário GESTÃO ESCOLAR/MARINGÁ)."""
-        reg = self._registro(self.projeto, self.pg_prof, prof=10)
+        reg = self._registro(self.projeto, self.pg_prof, prof=10, ano=2026)
         self._compra_db(self.projeto, "Professor", 10, conta=True)  # ceil(11.0)=11
         self._compra_db(self.projeto, "Professor", 500, conta=False)  # excluída
         self.assertEqual(calcular_nr_codigos(reg), 11)
 
     def test_registro_sem_compras_da_zero(self):
-        reg = self._registro(self.projeto, self.pg_prof, prof=10)
+        reg = self._registro(self.projeto, self.pg_prof, prof=10, ano=2026)
         self.assertEqual(calcular_nr_codigos(reg), 0)
 
     def test_nao_aplicavel_da_none(self):
@@ -153,7 +154,7 @@ class CalcularNrCodigosTest(TestCase):
         self.assertIsNone(calcular_nr_codigos(reg))
 
     def test_compra_inativa_nao_conta(self):
-        reg = self._registro(self.projeto, self.pg_prof, prof=10)
+        reg = self._registro(self.projeto, self.pg_prof, prof=10, ano=2026)
         c = self._compra_db(self.projeto, "Professor", 10)
         c.ativo = False
         c.save()
@@ -182,6 +183,7 @@ class RecomputeRegistrosTest(TestCase):
             projeto_geral=self.pg,
             projeto=self.projeto,
             professor_qtde=100,
+            ano=2026,
             created_by=self.user,
         )
         self.assertEqual(reg.nr_codigos, 0)

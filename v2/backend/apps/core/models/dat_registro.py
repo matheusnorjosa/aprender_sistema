@@ -37,7 +37,7 @@ class DATRegistro(models.Model):
     - Campos AVALIAR só são relevantes quando usa_avaliar=True
 
     Constraints:
-    - Unique: (municipio, projeto_geral, projeto) - um registro por combinação
+    - Unique: (municipio, projeto_geral, projeto, ano) - um registro por combinação/ano de uso
     - external_hash: para idempotência de importação ETL
 
     Ref: SPEC_DAT_REGISTROS.md seção 2.2
@@ -81,9 +81,9 @@ class DATRegistro(models.Model):
         verbose_name="Projeto Específico",
         help_text="Ex: VIDA E LINGUAGEM 6, ACERTA BRASIL MATEMATICA",
     )
-    # Ano de uso da coleção (cohort anual). nr_codigos conta SÓ as compras deste ano
-    # (DATCompra.ano_uso). Nullable na transição: o backfill preenche pelo ano dominante
-    # das compras; a chave natural passa a incluir `ano` num PR seguinte (split per-year).
+    # Ano de uso da coleção (cohort anual). Faz PARTE da chave natural (um registro por
+    # município × projeto × ano). nr_codigos conta SÓ as compras deste ano (DATCompra.ano_uso).
+    # ano=None é o bucket pendente (NÃO_CLASSIFICADO); nulls_distinct=False → um só por par.
     ano = models.PositiveSmallIntegerField(
         null=True,
         blank=True,
@@ -223,7 +223,9 @@ class DATRegistro(models.Model):
         ]
         constraints = [
             models.UniqueConstraint(
-                fields=["municipio", "projeto_geral", "projeto"], name="unique_dat_registro_municipio_projeto"
+                fields=["municipio", "projeto_geral", "projeto", "ano"],
+                name="unique_dat_registro_municipio_projeto_ano",
+                nulls_distinct=False,
             ),
         ]
 

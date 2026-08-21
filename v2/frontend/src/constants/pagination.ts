@@ -15,6 +15,3 @@ export const PAGE_SIZES = {
 } as const;
 
 export const DEFAULT_PAGE_SIZE: number = PAGE_SIZES.DEFAULT;
-
-/** Type for valid page sizes */
-export type PageSize = (typeof PAGE_SIZES)[keyof typeof PAGE_SIZES];

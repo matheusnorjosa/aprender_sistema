@@ -25,6 +25,8 @@ pytestmark = pytest.mark.django_db
 COMPRA_HEADER = (
     "municipio,uf,projeto,produto_codigo,descricao_produto,tipo,conta_para_codigos,quantidade,ano_uso,data_compra"
 )
+# Contrato v12 renomeou `ano_uso` -> `ano_uso_colecao` (ano de USO da coleção != ano_compra).
+COMPRA_HEADER_V12 = COMPRA_HEADER.replace("ano_uso", "ano_uso_colecao")
 PG_HEADER = (
     "nome,nome_norm,usa_avaliar,tipo_calculo_codigos,divisor_aluno,multiplicador_professor,precisa_config,visto_na_dat"
 )
@@ -97,6 +99,24 @@ def test_apply_dat_compra_creates_and_recomputes(tmp_path):
     assert r["applied"]["dat_compra"] == 2
     reg.refresh_from_db()
     assert reg.nr_codigos == 59  # ceil(41×1.1)+ceil(11×1.1) = 46+13, NÃO ceil(52×1.1)=58
+
+
+def test_apply_dat_compra_reads_ano_uso_colecao_v12(tmp_path):
+    """Regressão de drift: o contrato v12 renomeou a coluna `ano_uso` -> `ano_uso_colecao`.
+    Se o importer lesse só o nome antigo, `ano_uso` viria None e TODA compra seria descartada
+    como 'ano_uso ausente' (applied=0, silencioso). Aqui o header só tem o nome NOVO."""
+    actor = _actor()
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
+    row = "Cidade X,CE,Proj X,99,Professor kit,Professor,true,41,2026,2026-06-08"
+    r = ExportContractImporter(
+        path=_write_export(tmp_path, {"dat_compra": f"{COMPRA_HEADER_V12}\n{row}\n"}),
+        apply=True,
+        allow=("dat_compra",),
+        actor=actor,
+    ).run()
+    assert r["applied"]["dat_compra"] == 1
+    assert DATCompra.objects.get().ano_uso == 2026
 
 
 def test_apply_dat_compra_distinct_by_data_compra(tmp_path):

@@ -85,7 +85,10 @@ class DATCompra(models.Model):
 
     # Período
     ano_uso = models.PositiveSmallIntegerField(
-        verbose_name="Ano de Uso", help_text="Ano em que o material será/foi utilizado"
+        null=True,
+        blank=True,
+        verbose_name="Ano de Uso",
+        help_text="Ano de uso da coleção; NULL = não classificado (pendente de ano).",
     )
     data_compra = models.DateField(null=True, blank=True, verbose_name="Data da Compra")
 

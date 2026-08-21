@@ -236,13 +236,43 @@ def build_monthly_grid(
                 events_by_user_day[(uid, day_num)].append(event)
             current += timedelta(days=1)
 
-        # CH mês/ano por usuário. Calcula uma vez por evento e soma pra
-        # cada participant.
+        # CH mês por usuário (uma vez por evento, somada a cada participant).
+        # CH ano é agregada à parte, sobre a janela do ANO — `events` só
+        # intersecta o mês consultado (M14-03 / #1663).
         ch_month_hours = _calc_hours_in_range(event.inicio, event.fim, month_start, month_end)
-        ch_year_hours = _calc_hours_in_range(event.inicio, event.fim, year_start_dt, year_end_dt)
         for uid in event_users:
             if uid in user_ids_set:
                 ch_month_by_user[uid] += ch_month_hours
+
+    # 5.5. CH Ano por usuário — janela do ANO, independente do mês consultado.
+    # `events` acima só intersecta [month_start, month_end], então somar ch_year
+    # sobre ele contava um único mês (CH Ano ≈ CH Mês, repetindo o CH Mês). Query
+    # própria sobre a janela do ano alimenta ch_year (M14-03 / #1663).
+    year_events_q = Solicitacao.objects.filter(
+        status="aprovado",
+        participations__role=role,
+        participations__usuario_id__in=user_ids,
+        inicio__lt=year_end_dt,
+        fim__gt=year_start_dt,
+    )
+    if sector and sector.strip():
+        year_events_q = year_events_q.filter(projeto__nome__iexact=sector.strip())
+    year_rows = list(year_events_q.values_list("id", "inicio", "fim").distinct())
+
+    year_event_to_users: dict[int, list[int]] = defaultdict(list)
+    year_event_ids = [row[0] for row in year_rows]
+    if year_event_ids:
+        for sol_id, uid in Participation.objects.filter(
+            solicitacao_id__in=year_event_ids,
+            role=role,
+            usuario_id__in=user_ids,
+        ).values_list("solicitacao_id", "usuario_id"):
+            year_event_to_users[sol_id].append(uid)
+
+    for ev_id, ev_inicio, ev_fim in year_rows:
+        ch_year_hours = _calc_hours_in_range(ev_inicio, ev_fim, year_start_dt, year_end_dt)
+        for uid in year_event_to_users.get(ev_id, ()):
+            if uid in user_ids_set:
                 ch_year_by_user[uid] += ch_year_hours
 
     # 6. Distribuir bloqueios por dia/pessoa

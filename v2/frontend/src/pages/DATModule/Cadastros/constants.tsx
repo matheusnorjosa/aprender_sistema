@@ -71,7 +71,7 @@ export const STATUS_OPTIONS: StatusOption[] = [
 ];
 
 // Platform configurations with their workflow steps
-export const PLATAFORMAS: Record<string, PlataformaConfig> = {
+export const PLATAFORMAS: Record<'FORMAR' | 'AVALIAR', PlataformaConfig> = {
   FORMAR: {
     key: 'FORMAR',
     label: 'FORMAR',

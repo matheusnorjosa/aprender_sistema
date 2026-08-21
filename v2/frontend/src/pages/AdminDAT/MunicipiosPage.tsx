@@ -207,6 +207,7 @@ export default function MunicipiosPage(): JSX.Element {
     }
 
     const match = exactMatches[0];
+    if (!match) return;
     if (!(match.ibge_code && match.confidence === 'high')) {
       return;
     }

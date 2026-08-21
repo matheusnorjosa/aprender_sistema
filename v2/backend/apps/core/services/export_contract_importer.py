@@ -471,7 +471,8 @@ class ExportContractImporter:
 
         elif name == "dat_compra":
             # NK existence-based por tupla (idioma dos handlers DAT). Município por (norm, uf);
-            # Projeto via resolver (#1372). FK não-resolvida ou ano_uso ausente → would_reject.
+            # Projeto via resolver (#1372). FK não-resolvida → would_reject; ano_uso vazio
+            # (NÃO_CLASSIFICADO) grava com ano_uso=NULL (pendente de ano — decisão A).
             mun_idx = self._municipio_index()
             existing = set(
                 DATCompra.objects.values_list(
@@ -482,7 +483,7 @@ class ExportContractImporter:
                 mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
                 proj_id = self.resolve_projeto(r.get("projeto") or "")
                 nk = self._dat_compra_nk(r, mun_id, proj_id)
-                if mun_id is None or proj_id is None or nk[5] is None:
+                if mun_id is None or proj_id is None:
                     tally["would_reject"] += 1
                     continue
                 st, _ = diff_and_classify({} if nk in existing else None, {}, protected)
@@ -697,8 +698,8 @@ class ExportContractImporter:
             mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
             proj_id = self.resolve_projeto(r.get("projeto") or "")
             nk = self._dat_compra_nk(r, mun_id, proj_id)
-            if mun_id is None or proj_id is None or nk[5] is None:
-                continue  # FK não-resolvida ou ano_uso ausente
+            if mun_id is None or proj_id is None:
+                continue  # FK não-resolvida (ano_uso vazio grava como pendente, ano_uso=NULL)
             if nk in existing:
                 continue
             DATCompra.objects.create(

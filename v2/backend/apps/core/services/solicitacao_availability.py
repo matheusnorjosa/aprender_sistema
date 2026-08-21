@@ -21,20 +21,13 @@ from django.db import connection
 
 from apps.core.exceptions import ValidationAPIError
 from apps.core.models import Participation, Solicitacao, Usuario
-from apps.core.services.availability_service import Conflict, check_conflicts_uncached
+from apps.core.services.availability_service import ENFORCED_ROLES, Conflict, check_conflicts_uncached
 
 logger = logging.getLogger(__name__)
 
-# Papéis que ocupam a agenda da pessoa e por isso entram na checagem.
-#
-# CONVIDADO fica de fora de propósito: é audiência, não recurso alocado. Checá-lo
-# estouraria a capacidade diária (RD-05) de quem é convidado a vários eventos no mesmo
-# dia — um diretor convidado a 5 eventos bloquearia os 5.
-ENFORCED_ROLES: tuple[str, ...] = (
-    Participation.Role.COORDENADOR,
-    Participation.Role.FORMADOR,
-    Participation.Role.COORD_ACOMPANHA,
-)
+# ENFORCED_ROLES (papéis ocupantes; CONVIDADO fica de fora — é audiência, não recurso
+# alocado) é SSOT do motor: definido em availability_service e importado acima, para o
+# enforcement e a query de eventos existentes usarem o MESMO predicado (M08-07 / #1664).
 
 # Namespace do advisory lock (classid), para não colidir com outros locks da aplicação.
 _LOCK_NAMESPACE = 1452

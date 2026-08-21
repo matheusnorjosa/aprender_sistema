@@ -28,7 +28,7 @@ from apps.core.permissions import HasPerm
     # Onda 2 A3 (β, 2026-04-27): adicionado `manage_admin_registries` para DAT
     # como ator transversal (validar/suportar). Mesma decisão dos demais
     # endpoints metrics — preserva Lote 4.2.b2 (composition OR ad-hoc por
-    # objetos semanticamente diferentes).
+    # objetos semanticamente diferentes). Ver ADR-019 (v2/docs/adr/ADR-019-metrics-composition-or.md).
     [HasPerm("run_daily_operations") | HasPerm("supervise_operations") | HasPerm("manage_admin_registries")]
 )
 @throttle_classes([ScopedRateThrottle])

@@ -33,6 +33,7 @@ from apps.core.permissions import HasPerm
     #   run_daily_operations    → Controle (operar)
     #   supervise_operations    → Diretoria (supervisionar)
     #   manage_admin_registries → DAT (validar/suportar)
+    # Racional completo + guard-rail: ADR-019 (v2/docs/adr/ADR-019-metrics-composition-or.md).
     [HasPerm("run_daily_operations") | HasPerm("supervise_operations") | HasPerm("manage_admin_registries")]
 )
 @throttle_classes([ScopedRateThrottle])
@@ -132,6 +133,7 @@ productivity_metrics.throttle_scope = "metrics"  # type: ignore[attr-defined]
     #   run_daily_operations    → Controle (operar)
     #   supervise_operations    → Diretoria (supervisionar)
     #   manage_admin_registries → DAT (validar/suportar)
+    # Racional completo + guard-rail: ADR-019 (v2/docs/adr/ADR-019-metrics-composition-or.md).
     [HasPerm("run_daily_operations") | HasPerm("supervise_operations") | HasPerm("manage_admin_registries")]
 )
 @throttle_classes([ScopedRateThrottle])

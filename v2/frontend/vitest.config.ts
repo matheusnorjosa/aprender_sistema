@@ -25,7 +25,7 @@ export default defineConfig({
         url: 'https://localhost/',
       },
     },
-    setupFiles: './src/test/setup.js',
+    setupFiles: './src/test/setup.ts',
     include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
     exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],
     pool: 'threads',

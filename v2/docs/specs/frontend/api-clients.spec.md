@@ -31,7 +31,7 @@ related:
 
 ## Proposito
 
-A camada `src/api/` concentra todo o acesso HTTP do frontend ao backend DRF. **A migracao axios -> Fetch API nativa esta concluida**: `axios` nao aparece em `v2/frontend/package.json` (nem em `dependencies` nem em `devDependencies`) e o unico residuo no codigo sao dois comentarios de teste legado (`hooks/__tests__/useGoogleIntegration.test.js:11` e `useSessionMonitor.test.js:3`, Epic #1039). Todos os clientes consomem um wrapper unico (`config.ts`) construido sobre `fetch()`, eliminando risco de supply chain e ~40KB de bundle (ver ADR-013).
+A camada `src/api/` concentra todo o acesso HTTP do frontend ao backend DRF. **A migracao axios -> Fetch API nativa esta concluida**: `axios` nao aparece em `v2/frontend/package.json` (nem em `dependencies` nem em `devDependencies`) e o unico residuo no codigo sao dois comentarios de teste legado (`hooks/__tests__/useGoogleIntegration.test.ts:11` e `useSessionMonitor.test.ts:3`, Epic #1039). Todos os clientes consomem um wrapper unico (`config.ts`) construido sobre `fetch()`, eliminando risco de supply chain e ~40KB de bundle (ver ADR-013).
 
 `src/api/` tem hoje **16 arquivos**: o wrapper `config.ts` + **15 clientes tematicos** (auth, me, lookup, solicitacoes, availability, deslocamentos, ops/Controle, adminDAT, datModule, gcal, dashboard, stats, teamMetrics, systemConfig, acoesNotificacao). Eles expoem funcoes tipadas que retornam `Promise<T>` e delegam o transporte, CSRF e tratamento de erro ao `config.ts`. Nenhum componente de `src/pages/` deve chamar `fetch()` diretamente — isso e travado por um teste sentinela (ver "Testes que cobrem"); a regra de ouro e uma funcao de cliente por endpoint.
 
@@ -92,7 +92,7 @@ Wrapper publico exportado por `config.ts`:
 ## Pontos de atencao / dividas conhecidas
 
 - **Sem instancia central legada**: nao existe `src/api.ts` nem `httpClient.ts`; o plano do ADR-013 foi simplificado para um unico `config.ts`. Citar `config.ts` como wrapper, nao `httpClient.ts`.
-- **Residuo historico de axios**: somente comentarios em `src/hooks/__tests__/useGoogleIntegration.test.js` e `useSessionMonitor.test.js`. Nenhum import real de axios — nao reintroduzir.
+- **Residuo historico de axios**: somente comentarios em `src/hooks/__tests__/useGoogleIntegration.test.ts` e `useSessionMonitor.test.ts`. Nenhum import real de axios — nao reintroduzir.
 - **Retry CSRF detecta por string**: o gatilho do retry e `errorBody.includes('CSRF')`; mudanca na mensagem do Django pode quebrar o retry silenciosamente.
 - **`fetchBlob` engole detalhe do erro**: lanca mensagem generica `HTTP <status>` sem parsear o body — pior UX que `fetchAPI` para exports que falham com 400 detalhado.
 - **CSRF stale residual**: o TTL de 30 min cobre a maioria dos casos, mas o cookie tem prioridade sobre o cache; se o cookie ficar stale (sem HttpOnly) o retry-1x e a unica rede de seguranca.

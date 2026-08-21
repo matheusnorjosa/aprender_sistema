@@ -122,6 +122,18 @@ def _fmt_interval_local(start: datetime, end: datetime) -> str:
     return f"{s:%H:%M %d/%m}–{e:%H:%M %d/%m}"
 
 
+def _clip_minutes(start: datetime, end: datetime, window_start: datetime, window_end: datetime) -> int:
+    """Minutos de [start, end] que caem dentro de [window_start, window_end] (>= 0).
+
+    Usado pela RD-05 para recortar tanto os eventos existentes quanto o novo pela
+    janela de UM dia local — assim um evento que cruza a meia-noite contribui só a
+    fração correta em cada dia (M08-09 / #1664).
+    """
+    lo = max(start, window_start)
+    hi = min(end, window_end)
+    return max(int((hi - lo).total_seconds() // 60), 0)
+
+
 def _check_conflicts_impl(
     *,
     usuario: Usuario,
@@ -289,46 +301,42 @@ def _check_conflicts_impl(
     # ================================================================
     # RD-05: CAPACIDADE DIÁRIA
     # ================================================================
-    # Buscar eventos aprovados no mesmo dia local do início
-    inicio_local: datetime = to_local(inicio)
-    inicio_date = inicio_local.date()
-
-    # Issue #249: Usar range de datetime ao invés de .date() para evitar
-    # problemas de timezone (RD-06). Eventos próximos da meia-noite podem
-    # ter data diferente em UTC vs America/Fortaleza.
+    # M08-09 (#1664): checa CADA dia LOCAL que o novo evento toca. Eventos
+    # existentes E o novo são recortados pela janela do dia (`_clip_minutes`),
+    # então um evento que cruza a meia-noite (ex.: 22h→02h) contribui só a fração
+    # certa em D e em D+1 — antes, o novo evento entrava com a duração CHEIA no dia
+    # do início e o dia seguinte nunca era checado.
+    # Issue #249: ranges de datetime (não `.date()`) por causa de UTC vs local (RD-06).
     tz_name: str = getattr(settings, "TZ_PROJECT", "America/Fortaleza")
     local_tz = ZoneInfo(tz_name)
-
-    # Início e fim do dia no timezone local, convertidos para UTC para query
-    day_start: datetime = datetime.combine(inicio_date, time.min, tzinfo=local_tz)
-    day_end: datetime = datetime.combine(inicio_date, time.max, tzinfo=local_tz)
-
-    # Seleção ampla: eventos que tocam o dia do início (usando ranges UTC)
-    same_day_events = events_qs.filter(inicio__lt=day_end, fim__gt=day_start).distinct()
-
-    # Somar duração dos eventos existentes no dia
-    total_minutes: int = 0
-    for ev in same_day_events:
-        overlap_start = max(ev.inicio, day_start)
-        overlap_end = min(ev.fim, day_end)
-        dur: int = int((overlap_end - overlap_start).total_seconds() // 60)
-        total_minutes += max(dur, 0)
-
-    # Somar duração do novo intervalo
-    new_duration: int = int((fim - inicio).total_seconds() // 60)
-    total_minutes += new_duration
-
-    # Verificar limite diário
     daily_limit_minutes: int = int(daily_limit_h * 60)
-    if total_minutes > daily_limit_minutes:
-        conflicts.append(
-            Conflict(
-                "M",
-                "Capacidade diária excedida",
-                f"Total do dia {inicio_local:%d/%m}: {total_minutes} min > "
-                f"limite {daily_limit_minutes} min ({daily_limit_h}h)",
-            )
-        )
+
+    first_day = to_local(inicio).date()
+    last_day = to_local(fim).date()
+    day = first_day
+    while day <= last_day:
+        day_start: datetime = datetime.combine(day, time.min, tzinfo=local_tz)
+        day_end: datetime = datetime.combine(day, time.max, tzinfo=local_tz)
+
+        # Só checa dias onde o novo evento realmente ocupa tempo (evita falso M num
+        # dia adjacente onde o evento apenas toca a fronteira).
+        new_minutes = _clip_minutes(inicio, fim, day_start, day_end)
+        if new_minutes > 0:
+            total_minutes = new_minutes
+            for ev in events_qs.filter(inicio__lt=day_end, fim__gt=day_start).distinct():
+                total_minutes += _clip_minutes(ev.inicio, ev.fim, day_start, day_end)
+
+            if total_minutes > daily_limit_minutes:
+                conflicts.append(
+                    Conflict(
+                        "M",
+                        "Capacidade diária excedida",
+                        f"Total do dia {day:%d/%m}: {total_minutes} min > "
+                        f"limite {daily_limit_minutes} min ({daily_limit_h}h)",
+                    )
+                )
+
+        day += timedelta(days=1)
 
     # ================================================================
     # RD-07: Retornar todos os conflitos encontrados

@@ -168,6 +168,19 @@ const buildRegistrosParams = (f: DATRegistrosFilters): TableFilterParams => ({
   ...(f.status_formar && { status_formar: f.status_formar }),
 });
 
+/**
+ * Normaliza a resposta dos endpoints de opções para um array.
+ *
+ * `/options/municipios/` e `/options/projetos/` têm `pagination_class = None` e
+ * devolvem array puro, mas `/projetos-gerais/?minimal=true` passa pelo
+ * `ModelViewSet` paginado (StandardPagination) e devolve `{ results: [...] }`.
+ * O tipo do client anota array nos três casos, então tratamos ambas as formas
+ * aqui — sem `any` e sem alterar o comportamento em runtime.
+ */
+function unwrapOptionList<T>(data: T[] | PaginatedResponse<T>): T[] {
+  return Array.isArray(data) ? data : (data.results ?? []);
+}
+
 export default function DATRegistrosPage(): JSX.Element {
   // Options for dropdowns
   const [projetosGerais, setProjetosGerais] = useState<ProjetoGeralOption[]>([]);
@@ -208,9 +221,9 @@ export default function DATRegistrosPage(): JSX.Element {
           getMunicipiosOptions(),
           getProjetosOptions(),
         ]);
-        setProjetosGerais((pgData as any).results || pgData || []);
-        setMunicipios((munData as any).results || munData || []);
-        setProjetos((projData as any).results || projData || []);
+        setProjetosGerais(unwrapOptionList(pgData));
+        setMunicipios(unwrapOptionList(munData));
+        setProjetos(unwrapOptionList(projData));
       } catch (error) {
         message.error(`Erro ao carregar opções: ${(error as Error).message}`);
       }
@@ -222,7 +235,8 @@ export default function DATRegistrosPage(): JSX.Element {
   const handleRegiaoChange = (regiao: string | undefined) => {
     setFilters((prev) => ({ ...prev, regiao, uf: undefined }));
     if (regiao && REGIAO_UFS[regiao]) {
-      setFilteredUFs((UF_OPTIONS as UFOption[]).filter((uf) => (REGIAO_UFS as any)[regiao as string]?.includes(uf.value)));
+      const ufsDaRegiao = REGIAO_UFS[regiao];
+      setFilteredUFs((UF_OPTIONS as UFOption[]).filter((uf) => ufsDaRegiao.includes(uf.value)));
     } else {
       setFilteredUFs(UF_OPTIONS as UFOption[]);
     }
@@ -242,7 +256,7 @@ export default function DATRegistrosPage(): JSX.Element {
   // Export to CSV
   const handleExport = async () => {
     try {
-      const blob = await exportDATRegistros(filters as any);
+      const blob = await exportDATRegistros({ ...filters });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -524,7 +538,7 @@ export default function DATRegistrosPage(): JSX.Element {
         </div>
 
         <Table
-          columns={columns as any}
+          columns={columns}
           dataSource={registros}
           rowKey="id"
           loading={loading}

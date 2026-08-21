@@ -5,6 +5,7 @@
  */
 
 import { fetchAPI, fetchBlob, fetchWithErrorMapping, buildUrl, type QueryParams } from './config';
+import { unwrapList } from './unwrapList';
 import type { ID, PaginatedResponse, MunicipioOption, ProjetoOption, Projeto } from '../types';
 
 // ========== TYPE DEFINITIONS ==========
@@ -135,21 +136,31 @@ export async function deleteProjetoGeral(id: ID): Promise<void> {
 }
 
 export async function getProjetosForProjetoGeral(id: ID): Promise<Projeto[]> {
-  return fetchAPI(`/projetos-gerais/${id}/projetos/`);
+  return unwrapList(
+    await fetchAPI<Projeto[] | PaginatedResponse<Projeto>>(`/projetos-gerais/${id}/projetos/`),
+  );
 }
 
 // ========== OPTIONS (for dropdowns) ==========
 
 export async function getProjetosGeraisOptions(): Promise<ProjetoGeralOption[]> {
-  return fetchAPI(buildUrl('/projetos-gerais/', { minimal: 'true' }));
+  return unwrapList(
+    await fetchAPI<ProjetoGeralOption[] | PaginatedResponse<ProjetoGeralOption>>(
+      buildUrl('/projetos-gerais/', { minimal: 'true' }),
+    ),
+  );
 }
 
 export async function getMunicipiosOptions(): Promise<MunicipioOption[]> {
-  return fetchAPI('/options/municipios/');
+  return unwrapList(
+    await fetchAPI<MunicipioOption[] | PaginatedResponse<MunicipioOption>>('/options/municipios/'),
+  );
 }
 
 export async function getProjetosOptions(): Promise<ProjetoOption[]> {
-  return fetchAPI('/options/projetos/');
+  return unwrapList(
+    await fetchAPI<ProjetoOption[] | PaginatedResponse<ProjetoOption>>('/options/projetos/'),
+  );
 }
 
 // ========== AÇÕES (Ciclo de Vida de Projetos) ==========
@@ -342,7 +353,11 @@ export async function getFormacoesStats(params: FilterParams = {}): Promise<Gene
 }
 
 export async function getFormacoesCalendario(params: FilterParams = {}): Promise<GenericRecord[]> {
-  return fetchAPI(buildUrl('/dat/formacoes/calendario/', params as QueryParams));
+  return unwrapList(
+    await fetchAPI<GenericRecord[] | PaginatedResponse<GenericRecord>>(
+      buildUrl('/dat/formacoes/calendario/', params as QueryParams),
+    ),
+  );
 }
 
 // ========== COORDENADORES ==========
@@ -374,7 +389,11 @@ export async function deleteCoordenadorDAT(id: ID): Promise<void> {
 }
 
 export async function getCoordenadorAlocacoes(id: ID): Promise<GenericRecord[]> {
-  return fetchAPI(`/dat/coordenadores/${id}/alocacoes/`);
+  return unwrapList(
+    await fetchAPI<GenericRecord[] | PaginatedResponse<GenericRecord>>(
+      `/dat/coordenadores/${id}/alocacoes/`,
+    ),
+  );
 }
 
 // ========== PRODUTOS ==========
@@ -408,15 +427,21 @@ export async function listAreasDAT(params: FilterParams = {}): Promise<Paginated
 // ========== COORDENADORES OPTIONS ==========
 
 export async function getCoordenadoresOptions(): Promise<GenericRecord[]> {
-  return fetchAPI('/options/coordenadores/');
+  return unwrapList(
+    await fetchAPI<GenericRecord[] | PaginatedResponse<GenericRecord>>('/options/coordenadores/'),
+  );
 }
 
 export async function getAreasOptions(): Promise<GenericRecord[]> {
-  return fetchAPI('/options/areas/');
+  return unwrapList(
+    await fetchAPI<GenericRecord[] | PaginatedResponse<GenericRecord>>('/options/areas/'),
+  );
 }
 
 export async function getProdutosOptions(): Promise<GenericRecord[]> {
-  return fetchAPI('/options/produtos/');
+  return unwrapList(
+    await fetchAPI<GenericRecord[] | PaginatedResponse<GenericRecord>>('/options/produtos/'),
+  );
 }
 
 // ========== PLANO FORMAÇÕES ==========

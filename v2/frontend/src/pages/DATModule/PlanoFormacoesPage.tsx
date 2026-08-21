@@ -54,6 +54,7 @@ import {
   InfoCircleOutlined,
 } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
+import type { ColumnsType } from 'antd/es/table';
 
 import {
   listPlanoFormacoes,
@@ -258,9 +259,9 @@ export default function PlanoFormacoesPage(): JSX.Element {
           getProjetosOptions(),
           getCoordenadoresOptions(),
         ]);
-        setMunicipios((munData as any).results || munData || []);
-        setProjetos((projData as any).results || projData || []);
-        setCoordenadores((coordData as any).results || coordData || []);
+        setMunicipios(munData);
+        setProjetos(projData);
+        setCoordenadores(coordData as unknown as CoordenadorOption[]);
       } catch (error) {
         message.error(`Erro ao carregar opcoes: ${(error as Error).message}`);
       }
@@ -329,10 +330,10 @@ export default function PlanoFormacoesPage(): JSX.Element {
   const handleSave = async (values: PlanoFormacaoFormValues) => {
     try {
       if (editingPlano) {
-        await updatePlanoFormacoes(editingPlano.id, values as any);
+        await updatePlanoFormacoes(editingPlano.id, values as unknown as Record<string, unknown>);
         message.success('Plano atualizado com sucesso');
       } else {
-        await createPlanoFormacoes(values as any);
+        await createPlanoFormacoes(values as unknown as Record<string, unknown>);
         message.success('Plano criado com sucesso');
       }
       setModalVisible(false);
@@ -461,7 +462,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
   // TABLE COLUMNS (memoized §16 Epic #459)
   // ============================================================
 
-  const columns = useMemo(() => [
+  const columns = useMemo<ColumnsType<PlanoFormacaoRecord>>(() => [
     {
       title: 'Municipio',
       dataIndex: 'municipio_nome',
@@ -757,7 +758,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
       {viewMode === 'table' && (
         <Card>
           <Table
-            columns={columns as any}
+            columns={columns}
             dataSource={planos}
             rowKey="id"
             loading={loading}

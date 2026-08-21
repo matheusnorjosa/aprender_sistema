@@ -63,7 +63,7 @@ import {
   DEFAULT_FILTERS,
   VIEW_MODES,
 } from './Formacoes/constants';
-import { getColumns } from './Formacoes/columns';
+import { getColumns, type FormacaoRecord } from './Formacoes/columns';
 import { renderStatusTag } from './Formacoes/helpers';
 
 const { Title, Text } = Typography;
@@ -72,21 +72,8 @@ const { Title, Text } = Typography;
 // TYPE DEFINITIONS
 // ============================================================
 
-interface FormacaoRecord {
-  id: number;
-  projeto: number;
-  projeto_nome: string;
-  municipio: number;
-  municipio_nome: string;
-  uf: string;
-  coordenador: number | null;
-  coordenador_nome: string | null;
-  data_formacao: string | null;
-  horario_inicio: string | null;
-  horario_fim: string | null;
-  status: string | null;
-  [key: string]: any;
-}
+// Registro de formação (linhas da tabela e itens do calendário) reutiliza a
+// interface de ./Formacoes/columns — fonte única do shape de FormacaoRecord.
 
 interface FormacoesFilters {
   search: string;
@@ -96,8 +83,8 @@ interface FormacoesFilters {
   coordenador: number | undefined;
   status: string | undefined;
   modalidade: string | undefined;
-  data_inicio: any;
-  data_fim: any;
+  data_inicio: Dayjs | undefined;
+  data_fim: Dayjs | undefined;
 }
 
 interface FormacaoFormValues {
@@ -105,7 +92,22 @@ interface FormacaoFormValues {
   projeto: number;
   municipio: number;
   coordenador: number | null;
-  [key: string]: any;
+  data_formacao?: Dayjs | null;
+  horario_inicio?: Dayjs | null;
+  horario_fim?: Dayjs | null;
+  modalidade?: string;
+  local_formacao?: string;
+  endereco?: string;
+  formador_nome?: string;
+  formador_contato?: string;
+  link_online?: string;
+  status?: string;
+  material_preparado?: boolean;
+  material_enviado?: boolean;
+  lista_presenca_enviada?: boolean;
+  relatorio_enviado?: boolean;
+  fotos_enviadas?: boolean;
+  observacoes?: string;
 }
 
 interface FormacoesStats {
@@ -130,16 +132,6 @@ interface CoordenadorOption {
   nome: string;
 }
 
-interface CalendarFormacaoItem {
-  id: number;
-  data_formacao: string;
-  projeto_nome: string;
-  municipio_nome: string;
-  uf: string;
-  status: string | null;
-  [key: string]: any;
-}
-
 
 const buildFormacoesParams = (f: FormacoesFilters): TableFilterParams => ({
   ...(f.search && { search: f.search }),
@@ -155,7 +147,7 @@ const buildFormacoesParams = (f: FormacoesFilters): TableFilterParams => ({
 
 export default function FormacoesPage(): JSX.Element {
   const [viewMode, setViewMode] = useState<string>(VIEW_MODES.TABLE);
-  const [calendarData, setCalendarData] = useState<CalendarFormacaoItem[]>([]);
+  const [calendarData, setCalendarData] = useState<FormacaoRecord[]>([]);
 
   // Options for dropdowns
   const [municipios, setMunicipios] = useState<MunicipioOption[]>([]);
@@ -180,7 +172,7 @@ export default function FormacoesPage(): JSX.Element {
     handleTableChange,
     refresh,
   } = useTableFilters<FormacoesFilters, FormacaoRecord, FormacoesStats>({
-    defaultFilters: DEFAULT_FILTERS as FormacoesFilters,
+    defaultFilters: DEFAULT_FILTERS as unknown as FormacoesFilters,
     listFn: listFormacoes as unknown as (params: TableFilterParams) => Promise<PaginatedResponse<FormacaoRecord>>,
     statsFn: getFormacoesStats as unknown as (params: TableFilterParams) => Promise<FormacoesStats>,
     buildParams: buildFormacoesParams,
@@ -196,7 +188,7 @@ export default function FormacoesPage(): JSX.Element {
       ordering: 'data_formacao',
     };
     getFormacoesCalendario(params)
-      .then((calData) => setCalendarData((calData as any).results || calData || []))
+      .then((calData) => setCalendarData((calData || []) as unknown as FormacaoRecord[]))
       .catch((error) => message.error(`Erro ao carregar calendário: ${(error as Error).message}`));
   }, [viewMode, filters]);
 
@@ -209,9 +201,9 @@ export default function FormacoesPage(): JSX.Element {
           getProjetosOptions(),
           getCoordenadoresOptions(),
         ]);
-        setMunicipios((munData as any).results || munData || []);
-        setProjetos((projData as any).results || projData || []);
-        setCoordenadores((coordData as any).results || coordData || []);
+        setMunicipios(munData || []);
+        setProjetos(projData || []);
+        setCoordenadores((coordData || []) as unknown as CoordenadorOption[]);
       } catch (error) {
         message.error(`Erro ao carregar opções: ${(error as Error).message}`);
       }
@@ -239,7 +231,7 @@ export default function FormacoesPage(): JSX.Element {
 
   const handleSave = async (values: FormacaoFormValues) => {
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         ...values,
         data_formacao: values.data_formacao?.format('YYYY-MM-DD') || null,
         horario_inicio: values.horario_inicio?.format('HH:mm') || null,
@@ -318,7 +310,7 @@ export default function FormacoesPage(): JSX.Element {
 
   // Table columns - using extracted getColumns from ./Formacoes/columns (memoized §16 Epic #459)
   const columns = useMemo(
-    () => getColumns({ onEdit: handleEdit, onDelete: handleDelete } as any),
+    () => getColumns({ onEdit: handleEdit, onDelete: handleDelete }),
     [handleEdit, handleDelete]
   );
 
@@ -503,7 +495,7 @@ export default function FormacoesPage(): JSX.Element {
             <DatePicker.RangePicker
               style={{ width: '100%' }}
               format="DD/MM/YYYY"
-              value={[filters.data_inicio, filters.data_fim]}
+              value={[filters.data_inicio ?? null, filters.data_fim ?? null]}
               onChange={(dates) =>
                 setFilters((prev) => ({
                   ...prev,
@@ -543,7 +535,7 @@ export default function FormacoesPage(): JSX.Element {
           }
         >
           <Table
-            columns={columns as any}
+            columns={columns}
             dataSource={formacoes}
             rowKey="id"
             loading={loading}
@@ -583,7 +575,7 @@ export default function FormacoesPage(): JSX.Element {
                               size="small"
                               onClick={() => {
                                 Modal.destroyAll();
-                                handleEdit(f as any);
+                                handleEdit(f);
                               }}
                             >
                               Editar

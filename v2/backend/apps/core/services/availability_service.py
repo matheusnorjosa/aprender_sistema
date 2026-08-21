@@ -26,10 +26,20 @@ from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 
-from apps.core.models import AvailabilityBlock, Municipio, Solicitacao, Usuario
+from apps.core.models import AvailabilityBlock, Municipio, Participation, Solicitacao, Usuario
 from apps.core.services.config_service import get_cfg
 from apps.core.types import ConflictCode
 from apps.core.utils.cache_utils import cache_availability_check
+
+# SSOT dos papéis OCUPANTES (RD): quem, participando de um evento aprovado, ocupa a
+# agenda para efeito de conflito/capacidade. CONVIDADO não ocupa. Usado tanto no
+# enforcement (solicitacao_availability) quanto na query de eventos existentes aqui —
+# um único predicado, sem lista de papéis duplicada fora deste módulo. (M08-07 / #1664)
+ENFORCED_ROLES: tuple[str, ...] = (
+    Participation.Role.COORDENADOR.value,
+    Participation.Role.FORMADOR.value,
+    Participation.Role.COORD_ACOMPANHA.value,
+)
 
 
 @dataclass
@@ -163,8 +173,11 @@ def _check_conflicts_impl(
     )
 
     conflicts: list[Conflict] = []
+    # M08-07 (#1664): só papéis OCUPANTES (ENFORCED_ROLES) bloqueiam. Antes qualquer
+    # participação casava, então um CONVIDADO bloqueava indevidamente o FORMADOR. O
+    # filtro por role vai na ORIGEM da query (events_qs), não em Python depois.
     events_qs = Solicitacao.objects.filter(status=Solicitacao.Status.APROVADO).filter(
-        Q(usuario=usuario) | Q(participations__usuario=usuario)
+        Q(usuario=usuario) | Q(participations__usuario=usuario, participations__role__in=ENFORCED_ROLES)
     )
     if exclude_solicitacao_id is not None:
         events_qs = events_qs.exclude(pk=exclude_solicitacao_id)

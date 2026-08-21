@@ -319,7 +319,7 @@ export default function GCalDashboardPage(): JSX.Element {
         // Recarregar detalhes após 2 segundos
         setTimeout(() => loadEventDetail(selectedEventId), TIMING.GCAL_DETAIL_LOAD_DELAY_MS);
       } else if (data.errors && data.errors.length > 0) {
-        message.error(`Erro: ${data.errors[0].detail}`);
+        message.error(`Erro: ${data.errors[0]?.detail}`);
       }
     } catch (error) {
       logger.error('Erro ao reapliar:', error);
@@ -343,7 +343,7 @@ export default function GCalDashboardPage(): JSX.Element {
         // Recarregar detalhes após 2 segundos
         setTimeout(() => loadEventDetail(selectedEventId), TIMING.GCAL_DETAIL_LOAD_DELAY_MS);
       } else if (data.errors && data.errors.length > 0) {
-        message.error(`Erro: ${data.errors[0].detail}`);
+        message.error(`Erro: ${data.errors[0]?.detail}`);
       }
     } catch (error) {
       logger.error('Erro ao ressincronizar:', error);

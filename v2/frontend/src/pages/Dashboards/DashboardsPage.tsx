@@ -125,7 +125,7 @@ export default function DashboardsPage(): JSX.Element {
 
   // Calcular max para Progress bars
   const maxFluxo = Math.max(...por_fluxo.map((f) => f.quantidade), 1);
-  const maxCoord = top_coordenadores.length > 0 ? top_coordenadores[0].eventos : 1;
+  const maxCoord = top_coordenadores[0]?.eventos ?? 1;
 
   // Columns for top coordenadores table
   const columns: ColumnsType<DashboardCoordenadorItem> = [

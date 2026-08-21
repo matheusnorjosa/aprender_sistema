@@ -320,7 +320,7 @@ export default function MapaBrasilPage(): JSX.Element {
   // Calcular estilo do estado - estilo SimpleMaps (flat, clean)
   // Hover é controlado apenas por CSS, não por React state
   const getStateStyle = useCallback((sigla: string): PathOptions => {
-    const hasEvents = estadosData[sigla]?.eventos > 0;
+    const hasEvents = (estadosData[sigla]?.eventos ?? 0) > 0;
 
     // Estado selecionado - borda branca mantida, só cor de preenchimento muda
     if (selectedState === sigla) {

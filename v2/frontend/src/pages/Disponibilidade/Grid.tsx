@@ -128,7 +128,7 @@ export default function Grid({
                 </td>
                 {/* Células dos dias */}
                 {days.map((day, dayIdx) => {
-                  const code = cells[rowIdx][dayIdx];
+                  const code = cells[rowIdx]?.[dayIdx];
                   const key = `${rowIdx}:${dayIdx}`;
                   const hasDetails = (detailsIndex[key] as unknown[] | undefined)?.length ?? 0 > 0;
                   const sel = selected?.rowIdx === rowIdx && selected?.dayIdx === dayIdx;

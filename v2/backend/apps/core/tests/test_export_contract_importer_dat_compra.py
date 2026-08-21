@@ -87,7 +87,9 @@ def test_apply_dat_compra_creates_and_recomputes(tmp_path):
         nome="PG X", usa_avaliar=False, tipo_calculo_codigos="por_professor", multiplicador_professor=Decimal("1.1")
     )
     proj = ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER", projeto_geral=pg)
-    reg = DATRegistro.objects.create(municipio=mun, projeto_geral=pg, projeto=proj, professor_qtde=52, created_by=actor)
+    reg = DATRegistro.objects.create(
+        municipio=mun, projeto_geral=pg, projeto=proj, professor_qtde=52, ano=2026, created_by=actor
+    )
     assert reg.nr_codigos == 0
     rows = "\n".join([_compra_row(qtde=41), _compra_row(qtde=11)])  # 41+11 professor
     r = ExportContractImporter(

@@ -16,7 +16,7 @@ sources_of_truth:
   - v2/frontend/src/App.tsx
   - v2/frontend/src/components/AppRoutes.tsx
   - v2/frontend/src/components/AppSidebar.tsx
-  - v2/frontend/src/hooks/__tests__/usePermissions.test.js
+  - v2/frontend/src/hooks/__tests__/usePermissions.test.ts
   - v2/frontend/src/hooks/__tests__/useCanAccess.test.ts
   - v2/frontend/src/hooks/__tests__/useCapabilities.test.ts
   - v2/frontend/src/hooks/__tests__/useIdentity.test.ts
@@ -119,7 +119,7 @@ Guard de rota (componente, nao hook):
 
 ## Testes que cobrem
 
-- [`v2/frontend/src/hooks/__tests__/usePermissions.test.js`](../../../frontend/src/hooks/__tests__/usePermissions.test.js) — `computePermissions` por ator (null, superuser, Coordenador/Apoio, DAT, Controle, Gerente, visibilidade de dashboards, `canDisponibilidade`).
+- [`v2/frontend/src/hooks/__tests__/usePermissions.test.ts`](../../../frontend/src/hooks/__tests__/usePermissions.test.ts) — `computePermissions` por ator (null, superuser, Coordenador/Apoio, DAT, Controle, Gerente, visibilidade de dashboards, `canDisponibilidade`).
 - [`v2/frontend/src/hooks/__tests__/useCanAccess.test.ts`](../../../frontend/src/hooks/__tests__/useCanAccess.test.ts) — `computeAccess` (match exato de policy, fallback legacy, derived flags).
 - [`v2/frontend/src/hooks/__tests__/useCapabilities.test.ts`](../../../frontend/src/hooks/__tests__/useCapabilities.test.ts) — `computeCapabilities` (paridade flag x policy key, completude).
 - [`v2/frontend/src/hooks/__tests__/useIdentity.test.ts`](../../../frontend/src/hooks/__tests__/useIdentity.test.ts) — `computeIdentity` (setor/funcao, `displayName`, prioridade do `badge`).
@@ -131,7 +131,7 @@ Guard de rota (componente, nao hook):
 
 ## Pontos de atencao / dividas conhecidas
 
-- **`useGoogleGuard.tsx` sem teste unitario** — nao ha `useGoogleGuard.test.*` (apenas `useGoogleIntegration.test.js`). O contrato critico de "permitir prosseguir quando `googleStatus === null`" + tratamento de `403 google_not_connected` nao tem cobertura direta. GAP a fechar.
+- **`useGoogleGuard.tsx` sem teste unitario** — nao ha `useGoogleGuard.test.*` (apenas `useGoogleIntegration.test.ts`). O contrato critico de "permitir prosseguir quando `googleStatus === null`" + tratamento de `403 google_not_connected` nao tem cobertura direta. GAP a fechar.
 - **TOCTOU benigno no guard Google**: o status pode estar stale entre `fetchStatus` e a acao; o `handleGoogleError` no `catch` e a rede de seguranca (backend e a autoridade). Por design, mas significa que a UX pode mostrar o modal so apos a tentativa.
 - **Sem invalidacao de RBAC em runtime**: mudanca de setor/funcao/grupo de um usuario logado so reflete apos reload/relogin (nao ha refetch de `/me/policies/`). Aceitavel para o tenant atual; revisitar se surgir admin que altere permissoes em tempo real.
 - **Quatro hooks para o mesmo problema**: `useCapabilities` (destino), `useIdentity` (display), `usePermissions` (`@deprecated`, mas ainda gateia rotas) e `useCanAccess` (ponte). Enquanto `usePermissions` existir, uma mesma decisao pode ser tomada por duas camadas diferentes em pontos diferentes da tela.

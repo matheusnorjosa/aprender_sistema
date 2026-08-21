@@ -81,6 +81,15 @@ class DATRegistro(models.Model):
         verbose_name="Projeto Específico",
         help_text="Ex: VIDA E LINGUAGEM 6, ACERTA BRASIL MATEMATICA",
     )
+    # Ano de uso da coleção (cohort anual). nr_codigos conta SÓ as compras deste ano
+    # (DATCompra.ano_uso). Nullable na transição: o backfill preenche pelo ano dominante
+    # das compras; a chave natural passa a incluir `ano` num PR seguinte (split per-year).
+    ano = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Ano de uso",
+        help_text="Ano de uso da coleção — nr_codigos conta apenas as compras deste ano.",
+    )
     aluno_qtde = models.PositiveIntegerField(
         null=True,
         blank=True,

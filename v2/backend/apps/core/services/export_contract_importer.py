@@ -505,7 +505,9 @@ class ExportContractImporter:
             (r.get("descricao_produto") or "").strip(),
             (r.get("tipo") or "").strip() or None,
             _parse_int(r.get("quantidade")),
-            _parse_int(r.get("ano_uso")),
+            # Contrato v12 renomeou `ano_uso` -> `ano_uso_colecao` (ano de USO da coleção,
+            # distinto de `ano_compra`). Prefere o nome novo; cai no antigo p/ contratos <=v11.
+            _parse_int(r.get("ano_uso_colecao") or r.get("ano_uso")),
             _parse_iso_date(r.get("data_compra")),
         )
 

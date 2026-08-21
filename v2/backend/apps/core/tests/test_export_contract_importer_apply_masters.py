@@ -26,9 +26,9 @@ from django.contrib.auth.models import Group
 
 import pytest
 
-from apps.core.models import TipoEvento, Usuario
+from apps.core.models import Projeto, ProjetoGeral, TipoEvento, Usuario
 from apps.core.services.export_contract_importer import ExportContractImporter
-from apps.core.tests.factories import TipoEventoFactory, UsuarioFactory
+from apps.core.tests.factories import ProjetoFactory, TipoEventoFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -95,6 +95,84 @@ def test_apply_tipo_evento_rejects_empty_nome(tmp_path):
     r = ExportContractImporter(path=path, apply=True, allow=("tipo_evento",)).run()
     assert r["applied"]["tipo_evento"] == 1
     assert not TipoEvento.objects.filter(descricao="sem nome").exists()
+
+
+# ══════════════════════════════ projeto (Onda A) ══════════════════════════════
+def test_apply_projeto_creates_with_projeto_geral(tmp_path):
+    # Núcleo da Onda A: cria a variante COM projeto_geral populado (não órfã).
+    pg = ProjetoGeral.objects.create(nome="ACERTA BRASIL MATEMATICA")
+    csv = "projeto,projeto_geral,fluxo\nACerta Brasil Matemática 3,ACERTA BRASIL MATEMATICA,SUPER\n"
+    path = _write_export(tmp_path, {"projeto": csv})
+    r = ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
+    assert r["applied"]["projeto"] == 1
+    p = Projeto.objects.get(nome="ACerta Brasil Matemática 3")
+    assert p.projeto_geral_id == pg.id  # PG populado — fecha órfã tipo CATOLÉ
+    assert p.fluxo == "SUPER"
+
+
+def test_apply_projeto_idempotent(tmp_path):
+    ProjetoGeral.objects.create(nome="PG IDEM")
+    csv = "projeto,projeto_geral,fluxo\nProjeto Idem 1,PG IDEM,NAO_SUPER\n"
+    path = _write_export(tmp_path, {"projeto": csv})
+    ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
+    r2 = ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
+    assert r2["applied"]["projeto"] == 0
+    assert Projeto.objects.filter(nome="Projeto Idem 1").count() == 1
+
+
+def test_apply_projeto_create_only_skips_existing_by_canon_key(tmp_path):
+    # Já existe sob outra grafia (& vs E) -> create-only não duplica nem atualiza.
+    ProjetoFactory(nome="Vida & Matemática 6", fluxo="NAO_SUPER")
+    ProjetoGeral.objects.create(nome="VIDA E MATEMATICA")
+    csv = "projeto,projeto_geral,fluxo\nVIDA E MATEMATICA 6,VIDA E MATEMATICA,SUPER\n"
+    path = _write_export(tmp_path, {"projeto": csv})
+    r = ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
+    assert r["applied"]["projeto"] == 0
+    assert Projeto.objects.filter(nome__iexact="Vida & Matemática 6").count() == 1
+    assert Projeto.objects.get(nome="Vida & Matemática 6").fluxo == "NAO_SUPER"  # não alterado
+
+
+def test_apply_projeto_rejects_pg_desconhecido(tmp_path):
+    # PG não resolvível -> NÃO cria (nunca projeto_geral=NULL órfão).
+    csv = "projeto,projeto_geral,fluxo\nProjeto Sem PG 2,PG QUE NAO EXISTE,NAO_SUPER\n"
+    path = _write_export(tmp_path, {"projeto": csv})
+    r = ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
+    assert r["applied"]["projeto"] == 0
+    assert not Projeto.objects.filter(nome="Projeto Sem PG 2").exists()
+
+
+def test_apply_projeto_rejects_fluxo_ausente(tmp_path):
+    # fluxo vazio -> NÃO cria (default NAO_SUPER faria SUPER auto-aprovar — PA-01).
+    ProjetoGeral.objects.create(nome="PG FLUXO VAZIO")
+    csv = "projeto,projeto_geral,fluxo\nProjeto Sem Fluxo 2,PG FLUXO VAZIO,\n"
+    path = _write_export(tmp_path, {"projeto": csv})
+    r = ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
+    assert r["applied"]["projeto"] == 0
+    assert not Projeto.objects.filter(nome="Projeto Sem Fluxo 2").exists()
+
+
+def test_apply_projeto_allowlist_blocks(tmp_path):
+    ProjetoGeral.objects.create(nome="PG BLOQ")
+    csv = "projeto,projeto_geral,fluxo\nProjeto Bloq 1,PG BLOQ,NAO_SUPER\n"
+    path = _write_export(tmp_path, {"projeto": csv})
+    before = Projeto.objects.count()
+    r = ExportContractImporter(path=path, apply=True, allow=()).run()
+    assert r["apply_blocked"] is True
+    assert Projeto.objects.count() == before
+
+
+def test_apply_projeto_dedup_intra_csv_same_canon_key(tmp_path):
+    # Duas grafias da MESMA variante canônica na mesma run -> cria 1 (não quebra unique nome).
+    ProjetoGeral.objects.create(nome="PG DEDUP")
+    csv = (
+        "projeto,projeto_geral,fluxo\n"
+        "Vida & Matemática 8,PG DEDUP,NAO_SUPER\n"
+        "VIDA E MATEMATICA 8,PG DEDUP,NAO_SUPER\n"
+    )
+    path = _write_export(tmp_path, {"projeto": csv})
+    r = ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
+    assert r["applied"]["projeto"] == 1
+    assert Projeto.objects.filter(projeto_geral__nome="PG DEDUP").count() == 1
 
 
 # ══════════════════════════ usuario (PR-C, + atribuicao de Group) ══════════════════════════

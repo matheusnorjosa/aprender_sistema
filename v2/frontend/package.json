@@ -8,6 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "build:analyze": "ANALYZE=true vite build",
     "lint": "eslint .",
+    "check:ts-only": "node scripts/check-no-legacy-js.mjs",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "test": "vitest",

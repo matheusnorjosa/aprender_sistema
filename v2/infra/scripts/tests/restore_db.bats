@@ -29,9 +29,17 @@ setup() {
 #!/usr/bin/env bash
 echo "psql $*" >> "$PSQL_LOG"
 cat >/dev/null 2>&1 || true   # dreno do pipe (age|gunzip|psql); EOF imediato nos -c
+# A chamada de RESTORE (Step 4) e' a unica com -q: falha sob STUB_RESTORE_EXIT (M26-02).
+for a in "$@"; do
+  if [ "$a" = "-q" ] && [ -n "$STUB_RESTORE_EXIT" ]; then exit "$STUB_RESTORE_EXIT"; fi
+done
+# Contagens da Step 5 sao ajustaveis por env (default 42) p/ simular tabela vazia/faltando.
 for a in "$@"; do
   case "$a" in
-    *information_schema*|*"count("*|*"COUNT("*) echo 42 ;;
+    *core_usuario*)        echo "${STUB_CORE_USUARIO_ROWS:-42}" ;;
+    *core_solicitacao*)    echo "${STUB_CORE_SOLICITACAO_ROWS:-42}" ;;
+    *information_schema*)   echo "${STUB_TABLE_COUNT:-42}" ;;
+    *"count("*|*"COUNT("*)  echo 42 ;;
   esac
 done
 exit 0
@@ -121,4 +129,24 @@ run_restore() { printf 'yes\n' | bash "$SCRIPT" "$@"; }
   run run_restore --latest
   [ "$status" -eq 0 ]
   [[ "$output" == *"Backup integrity OK"* ]]
+}
+
+# 6) M26-02 (#1645): um erro de SQL no restore (psql sai != 0 sob ON_ERROR_STOP)
+# deve ABORTAR — nada de "Restore completed successfully!" com exit 0.
+@test "restore com erro no meio NAO declara sucesso" {
+  export STUB_RESTORE_EXIT=3
+  run run_restore "$PLAIN_GZ"
+  [ "$status" -ne 0 ]
+  [[ "$output" != *"Restore completed successfully"* ]]
+  [[ "$output" == *"restore falhou"* ]]
+}
+
+# 7) M26-02 (#1645): restore "sucesso" mas tabela-chave vazia -> a verificacao final
+# reprova e NAO imprime o banner verde.
+@test "verificacao final reprova banco com tabela-chave vazia" {
+  export STUB_CORE_USUARIO_ROWS=0
+  run run_restore "$PLAIN_GZ"
+  [ "$status" -ne 0 ]
+  [[ "$output" != *"Restore completed successfully"* ]]
+  [[ "$output" == *"core_usuario"* ]]
 }

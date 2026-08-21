@@ -129,6 +129,24 @@ psql -h $DB_HOST -U postgres -c "
     WHERE datname = '$DB_NAME' AND pid <> pg_backend_pid();
 " 2>/dev/null || true
 
+# Step 2.5: Safety dump do banco atual ANTES do DROP destrutivo (M26-02 / #1645).
+# Se o restore falhar, o estado anterior ainda existe. Best-effort: banco novo ou
+# pg_dump ausente apenas avisa (nao aborta o restore).
+SAFETY_DUMP="$BACKUP_DIR/pre-restore-safety-$(date +%Y%m%d_%H%M%S).sql.gz"
+if command -v pg_dump > /dev/null 2>&1; then
+    echo "[$(date)] Dump de seguranca do banco atual -> $SAFETY_DUMP"
+    if ( set -o pipefail; pg_dump -h $DB_HOST -U postgres -d $DB_NAME 2>/dev/null | gzip > "$SAFETY_DUMP" ); then
+        echo -e "${GREEN}Dump de seguranca salvo.${NC}"
+    else
+        echo -e "${YELLOW}AVISO: dump de seguranca falhou (banco novo?); prosseguindo.${NC}"
+        rm -f "$SAFETY_DUMP"
+        SAFETY_DUMP=""
+    fi
+else
+    echo -e "${YELLOW}AVISO: pg_dump indisponivel; sem dump de seguranca.${NC}"
+    SAFETY_DUMP=""
+fi
+
 # Step 3: Drop and recreate database
 echo "[$(date)] Recreating database..."
 psql -h $DB_HOST -U postgres -c "DROP DATABASE IF EXISTS $DB_NAME;"
@@ -136,21 +154,62 @@ psql -h $DB_HOST -U postgres -c "CREATE DATABASE $DB_NAME OWNER $DB_USER;"
 
 # Step 4: Restore backup
 echo "[$(date)] Restoring backup (this may take a while)..."
+# M26-02 (#1645): `-v ON_ERROR_STOP=1` faz o psql ABORTAR no primeiro erro de SQL —
+# sem isso ele seguia apos falhas e "restaurava" um banco com tabelas faltando, saindo 0.
+# pipefail LOCAL captura falha de age/gunzip (o branch plaintext tambem passa a ter).
+# Capturamos o exit do pipeline; se != 0, abortamos VERMELHO (o banner verde so sai no fim).
 # SEC-017: Support encrypted backups (.age extension)
+RESTORE_OK=0
 if echo "$BACKUP_FILE" | grep -q '\.age$'; then
     BACKUP_AGE_KEY="${BACKUP_AGE_KEY:-/etc/backup-key.txt}"
     echo "[$(date)] Decrypting encrypted backup with age..."
-    # pipefail LOCAL: uma falha do `age` (chave errada, arquivo truncado) deve abortar o
-    # restore — sem isso, o psql receberia stream vazio e "restauraria" um banco incompleto.
-    ( set -o pipefail; age -d -i "$BACKUP_AGE_KEY" "$BACKUP_FILE" | gunzip | psql -h $DB_HOST -U postgres -d $DB_NAME -q )
+    if ( set -o pipefail; age -d -i "$BACKUP_AGE_KEY" "$BACKUP_FILE" | gunzip | psql -v ON_ERROR_STOP=1 -h $DB_HOST -U postgres -d $DB_NAME -q ); then
+        RESTORE_OK=1
+    fi
 else
-    gunzip -c "$BACKUP_FILE" | psql -h $DB_HOST -U postgres -d $DB_NAME -q
+    if ( set -o pipefail; gunzip -c "$BACKUP_FILE" | psql -v ON_ERROR_STOP=1 -h $DB_HOST -U postgres -d $DB_NAME -q ); then
+        RESTORE_OK=1
+    fi
+fi
+if [ "$RESTORE_OK" -ne 1 ]; then
+    echo -e "${RED}ERROR: restore falhou (erro de SQL, decifragem ou descompressao). Banco pode estar incompleto.${NC}"
+    [ -n "$SAFETY_DUMP" ] && echo -e "${RED}Estado anterior preservado em: $SAFETY_DUMP${NC}"
+    exit 1
 fi
 
-# Step 5: Verify restore
+# Step 5: Verify restore — M26-02 (#1645). Exige piso de tabelas E linhas nas
+# tabelas-chave. Um restore que perdeu tabelas ou veio vazio NAO declara sucesso.
 echo "[$(date)] Verifying restore..."
-TABLE_COUNT=$(psql -h $DB_HOST -U postgres -d $DB_NAME -t -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';")
+_count() { psql -h $DB_HOST -U postgres -d $DB_NAME -tAc "$1" 2>/dev/null | tr -d '[:space:]'; }
+TABLE_COUNT=$(_count "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';")
+[[ "$TABLE_COUNT" =~ ^[0-9]+$ ]] || TABLE_COUNT=0
 echo "Tables restored: $TABLE_COUNT"
+
+MIN_TABLES="${RESTORE_MIN_TABLES:-20}"
+VERIFY_FAIL=0
+if [ "$TABLE_COUNT" -lt "$MIN_TABLES" ]; then
+    echo -e "${RED}ERROR: apenas $TABLE_COUNT tabelas (< piso $MIN_TABLES) — restore incompleto.${NC}"
+    VERIFY_FAIL=1
+fi
+for tbl in core_usuario core_solicitacao; do
+    ROWS=$(_count "SELECT count(*) FROM $tbl;")
+    [[ "$ROWS" =~ ^[0-9]+$ ]] || ROWS=0
+    if [ "$ROWS" -eq 0 ]; then
+        echo -e "${RED}ERROR: tabela-chave '$tbl' ausente ou vazia (linhas=$ROWS).${NC}"
+        VERIFY_FAIL=1
+    else
+        echo "  $tbl: $ROWS linhas"
+    fi
+done
+
+if [ "$VERIFY_FAIL" -ne 0 ]; then
+    echo ""
+    echo -e "${RED}========================================${NC}"
+    echo -e "${RED}  Restore FALHOU na verificacao!       ${NC}"
+    echo -e "${RED}========================================${NC}"
+    [ -n "$SAFETY_DUMP" ] && echo -e "${RED}Estado anterior preservado em: $SAFETY_DUMP${NC}"
+    exit 1
+fi
 
 echo ""
 echo -e "${GREEN}========================================${NC}"

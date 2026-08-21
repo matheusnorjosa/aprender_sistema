@@ -9,7 +9,7 @@ from typing import Any
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.db.models.signals import m2m_changed, post_delete, post_save
+from django.db.models.signals import m2m_changed, post_delete, post_save, pre_delete
 from django.dispatch import receiver
 
 from apps.core.models import PermissaoFuncional
@@ -110,3 +110,20 @@ def _invalidate_funcperm_on_group_change(
     group_id = getattr(instance, "id", None)
     if isinstance(group_id, int):
         invalidate_group_functional_permissions_cache([group_id])
+
+
+@receiver(pre_delete, sender=Group)
+def _invalidate_funcperm_on_group_delete_members(
+    sender: type[Group],
+    instance: Group,
+    **kwargs: Any,
+) -> None:
+    # M05-03 (#1667): ao deletar um Group, o cascade que remove as linhas de
+    # User.groups.through NÃO emite m2m_changed, então
+    # _invalidate_funcperm_on_user_groups_change nunca dispara e o cache
+    # POR-USUÁRIO dos ex-membros fica stale até o TTL (300s) — mantendo em cache
+    # capabilities que a exclusão do grupo revogou. Snapshot dos membros ANTES do
+    # cascade (mesmo padrão do pre_clear acima) e invalida o cache por-usuário.
+    member_ids = list(instance.user_set.values_list("id", flat=True))
+    if member_ids:
+        invalidate_users_functional_permissions_cache(member_ids)

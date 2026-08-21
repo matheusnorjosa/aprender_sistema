@@ -95,6 +95,40 @@ def test_cache_invalidated_when_user_groups_change():
     assert permission.has_permission(request, _MockView()) is False
 
 
+def test_cache_invalidated_when_group_deleted():
+    # M05-03 (#1667): deletar o Group deve invalidar o cache POR-USUÁRIO dos
+    # ex-membros. O cascade de User.groups.through NÃO emite m2m_changed, então
+    # sem o receiver pre_delete a autorização revogada persistia em cache (300s).
+    # Grupo descartável (não o DAT semeado, que tem FK protegida).
+    cache.clear()
+    temp_group = GroupFactory(name="temp_group_del_1667")
+    user = UsuarioFactory(
+        username="invalidate_group_delete",
+        email="invalidate_group_delete@test.com",
+        password="test123",
+        cpf="10000000011",
+    )
+    user.groups.add(temp_group)
+
+    custom_perm, _ = PermissaoFuncional.objects.get_or_create(
+        codename="perm_temp_group_del",
+        defaults={
+            "label": "Permissão temporária delete de grupo",
+            "description": "Teste",
+            "category": "test",
+            "is_system": False,
+        },
+    )
+    custom_perm.groups.set([temp_group])
+
+    permission = HasPerm("perm_temp_group_del")()
+    request = _request_with_user(APIRequestFactory(), user)
+    assert permission.has_permission(request, _MockView()) is True
+
+    temp_group.delete()  # cascade em User.groups.through NÃO emite m2m_changed
+    assert permission.has_permission(request, _MockView()) is False
+
+
 def test_cache_invalidated_when_permission_m2m_changes():
     cache.clear()
     dat_group = GroupFactory(name="DAT")

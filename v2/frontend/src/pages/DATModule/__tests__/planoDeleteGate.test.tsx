@@ -48,9 +48,9 @@ vi.mock('../../../api/datModule', () => ({
     ch_total: 20,
   }),
   updateFormacaoInline: vi.fn().mockResolvedValue({}),
-  getMunicipiosOptions: vi.fn().mockResolvedValue({ results: [] }),
-  getProjetosOptions: vi.fn().mockResolvedValue({ results: [] }),
-  getCoordenadoresOptions: vi.fn().mockResolvedValue({ results: [] }),
+  getMunicipiosOptions: vi.fn().mockResolvedValue([]),
+  getProjetosOptions: vi.fn().mockResolvedValue([]),
+  getCoordenadoresOptions: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('../../../api/availability', () => ({ getMe: vi.fn() }));

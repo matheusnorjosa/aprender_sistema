@@ -11,6 +11,7 @@
 import { useState, useEffect, useCallback, useMemo, type JSX } from 'react';
 import { useTableFilters, type TableFilterParams } from '../../hooks/useTableFilters';
 import type { PaginatedResponse } from '../../types';
+import type { ColumnsType } from 'antd/es/table';
 import {
   Table,
   Button,
@@ -60,7 +61,7 @@ import {
   getProjetosOptions,
   getCoordenadoresOptions,
 } from '../../api/datModule';
-import dayjs from 'dayjs';
+import dayjs, { type Dayjs } from 'dayjs';
 import { UF_OPTIONS } from '../../constants';
 
 const { Title, Text } = Typography;
@@ -78,14 +79,35 @@ interface AcaoRecord {
   projeto_nome: string;
   coordenador: number | null;
   coordenador_nome: string | null;
-  [key: string]: any;
+  // Etapas (StatusEtapa: pendente | em_andamento | concluido | cancelado) — sempre presentes na list
+  status_carta: string;
+  status_contato: string;
+  status_reuniao: string;
+  status_entrega: string;
+  // Datas das etapas (DateField null=True) — só vêm no detail, opcionais na list
+  data_carta?: string | null;
+  data_contato?: string | null;
+  data_reuniao?: string | null;
+  data_entrega?: string | null;
+  // Referenciados pela tabela/form mas ausentes do serializer atual (podem vir undefined)
+  area?: string | null;
+  observacoes?: string | null;
 }
 
 interface AcaoFormValues {
   municipio: number;
   projeto: number;
   coordenador: number | null;
-  [key: string]: any;
+  area?: string | null;
+  status_carta?: string;
+  status_contato?: string;
+  status_reuniao?: string;
+  status_entrega?: string;
+  data_carta?: Dayjs | null;
+  data_contato?: Dayjs | null;
+  data_reuniao?: Dayjs | null;
+  data_entrega?: Dayjs | null;
+  observacoes?: string | null;
 }
 
 interface AcoesFilters {
@@ -190,9 +212,10 @@ export default function AcoesPage(): JSX.Element {
           getProjetosOptions(),
           getCoordenadoresOptions(),
         ]);
-        setMunicipios((munData as any).results || munData || []);
-        setProjetos((projData as any).results || projData || []);
-        setCoordenadores((coordData as any).results || coordData || []);
+        // Os três endpoints retornam arrays diretos (não paginados) — vide datModule.ts
+        setMunicipios(munData);
+        setProjetos(projData);
+        setCoordenadores(coordData as unknown as CoordenadorOption[]);
       } catch (error) {
         message.error(`Erro ao carregar opções: ${(error as Error).message}`);
       }
@@ -212,14 +235,14 @@ export default function AcoesPage(): JSX.Element {
   // e o PATCH apagaria as datas em silencio. Buscar o DETAIL antes de abrir o modal.
   const handleEdit = useCallback(async (record: AcaoRecord) => {
     try {
-      const detail = await getAcao(record.id);
+      const detail = (await getAcao(record.id)) as unknown as AcaoRecord;
       form.resetFields(); // evita vazar valores do registro anterior (setFieldsValue faz merge)
       form.setFieldsValue({
         ...detail,
-        data_carta: detail.data_carta ? dayjs(detail.data_carta as string) : null,
-        data_contato: detail.data_contato ? dayjs(detail.data_contato as string) : null,
-        data_reuniao: detail.data_reuniao ? dayjs(detail.data_reuniao as string) : null,
-        data_entrega: detail.data_entrega ? dayjs(detail.data_entrega as string) : null,
+        data_carta: detail.data_carta ? dayjs(detail.data_carta) : null,
+        data_contato: detail.data_contato ? dayjs(detail.data_contato) : null,
+        data_reuniao: detail.data_reuniao ? dayjs(detail.data_reuniao) : null,
+        data_entrega: detail.data_entrega ? dayjs(detail.data_entrega) : null,
       });
       setEditingAcao(record);
       setModalVisible(true);
@@ -302,7 +325,7 @@ export default function AcoesPage(): JSX.Element {
   }, []);
 
   // Table columns - memoized to prevent re-renders (§3 Epic #459)
-  const columns = useMemo(() => [
+  const columns: ColumnsType<AcaoRecord> = useMemo(() => [
     {
       title: 'Município - UF',
       key: 'municipio_uf',
@@ -718,7 +741,7 @@ export default function AcoesPage(): JSX.Element {
         </div>
 
         <Table
-          columns={columns as any}
+          columns={columns}
           dataSource={acoes}
           rowKey="id"
           loading={loading}

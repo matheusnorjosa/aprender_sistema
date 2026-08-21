@@ -63,8 +63,9 @@ import {
   UF_OPTIONS,
   DEFAULT_FILTERS,
 } from './Cadastros/constants';
-import { getColumnsFormar, getColumnsAvaliar } from './Cadastros/columns';
-import dayjs from 'dayjs';
+import { getColumnsFormar, getColumnsAvaliar, type ColumnHandlers } from './Cadastros/columns';
+import type { CadastroRecord } from './Cadastros/types';
+import dayjs, { type Dayjs } from 'dayjs';
 
 const { Title, Text } = Typography;
 
@@ -72,18 +73,8 @@ const { Title, Text } = Typography;
 // TYPE DEFINITIONS
 // ============================================================
 
-interface CadastroRecord {
-  id: number;
-  municipio: number;
-  municipio_nome: string;
-  projeto_geral: number;
-  projeto_geral_nome: string;
-  plataforma: 'FORMAR' | 'AVALIAR';
-  quantidade_alunos: number | null;
-  quantidade_professores: number | null;
-  quantidade_codigos: number | null;
-  [key: string]: any;
-}
+// CadastroRecord vive em ./Cadastros/types (compartilhado com columns.tsx) para
+// evitar divergência de tipos entre a tabela e os handlers desta página.
 
 interface CadastrosFilters {
   search: string;
@@ -97,7 +88,32 @@ interface CadastroFormValues {
   plataforma: 'FORMAR' | 'AVALIAR';
   projeto_geral: number;
   municipio: number;
-  [key: string]: any;
+  // Workflow FORMAR — datas são objetos Dayjs (DatePicker); status são choices.
+  status_criacao_curso?: string;
+  data_criacao_curso?: Dayjs | null;
+  status_chaves?: string;
+  data_chaves?: Dayjs | null;
+  status_instrucoes?: string;
+  data_instrucoes?: Dayjs | null;
+  status_envio?: string;
+  data_envio?: Dayjs | null;
+  // Workflow AVALIAR
+  status_recebidos?: string;
+  quantidade_recebidos?: number;
+  data_recebidos?: Dayjs | null;
+  status_validados?: string;
+  quantidade_validados?: number;
+  data_validados?: Dayjs | null;
+  status_importados?: string;
+  quantidade_importados?: number;
+  data_importados?: Dayjs | null;
+  // Links + observações
+  link_planilha?: string;
+  link_plataforma?: string;
+  observacoes?: string;
+  // O modal é preenchido com o DETAIL (GenericRecord) via setFieldsValue, que
+  // espalha campos dinâmicos; mantém-se o índice para esse preenchimento.
+  [key: string]: unknown;
 }
 
 interface CadastrosStats {
@@ -176,8 +192,9 @@ export default function CadastrosPage(): JSX.Element {
           getMunicipiosOptions(),
           getProjetosGeraisOptions(),
         ]);
-        setMunicipios((munData as any).results || munData || []);
-        setProjetosGerais((pgData as any).results || pgData || []);
+        // getMunicipiosOptions/getProjetosGeraisOptions retornam arrays (não paginado).
+        setMunicipios(munData);
+        setProjetosGerais(pgData);
       } catch (error) {
         message.error(`Erro ao carregar opções: ${(error as Error).message}`);
       }
@@ -208,7 +225,7 @@ export default function CadastrosPage(): JSX.Element {
         data_recebidos: detail.data_recebidos ? dayjs(detail.data_recebidos as string) : null,
         data_validados: detail.data_validados ? dayjs(detail.data_validados as string) : null,
         data_importados: detail.data_importados ? dayjs(detail.data_importados as string) : null,
-      });
+      } as unknown as Parameters<typeof form.setFieldsValue>[0]);
       setEditingCadastro(record);
       setModalVisible(true);
     } catch (error) {
@@ -276,7 +293,7 @@ export default function CadastrosPage(): JSX.Element {
   };
 
   // Issue #303: Column definitions extracted to ./Cadastros/columns.jsx
-  const columnHandlers = {
+  const columnHandlers: ColumnHandlers = {
     onQuickStatusUpdate: handleQuickStatusUpdate,
     onEdit: handleEdit,
     onDelete: handleDelete,
@@ -284,8 +301,8 @@ export default function CadastrosPage(): JSX.Element {
 
   const currentColumns =
     activeTab === 'FORMAR'
-      ? getColumnsFormar(columnHandlers as any)
-      : getColumnsAvaliar(columnHandlers as any);
+      ? getColumnsFormar(columnHandlers)
+      : getColumnsAvaliar(columnHandlers);
   const currentPlataforma = PLATAFORMAS[activeTab];
 
   return (
@@ -513,7 +530,7 @@ export default function CadastrosPage(): JSX.Element {
         }
       >
         <Table
-          columns={currentColumns as any}
+          columns={currentColumns}
           dataSource={cadastros}
           rowKey="id"
           loading={loading}

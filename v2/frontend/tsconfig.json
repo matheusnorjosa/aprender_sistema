@@ -16,6 +16,8 @@
 
     // Type Checking - Full Strict Mode (Issue #477 completed)
     "strict": true,
+    "noImplicitReturns": true,
+    "noImplicitOverride": true,
     "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,

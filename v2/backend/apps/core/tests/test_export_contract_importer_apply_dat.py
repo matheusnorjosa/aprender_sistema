@@ -17,7 +17,7 @@ from typing import Any
 
 import pytest
 
-from apps.core.models import DATCadastro, DATRegistro, ProjetoGeral
+from apps.core.models import DATAcao, DATCadastro, DATRegistro, ProjetoGeral
 from apps.core.services.export_contract_importer import ExportContractImporter
 from apps.core.tests.factories import MunicipioFactory, ProjetoFactory, UsuarioFactory
 
@@ -183,3 +183,108 @@ def test_apply_dat_registro_skips_unresolved_projeto_geral(tmp_path):
     ).run()
     assert r["applied"]["dat_registro"] == 0
     assert DATRegistro.objects.count() == 0
+
+
+# ───────── dat_acao (temporal NK: (municipio, projeto, ano)) ─────────
+ACAO_HEADER = (
+    "municipio,municipio_norm,uf,projeto,projeto_norm,coordenador,coordenador_cpf,"
+    "data_entrega,data_carta,contato_inicial,data_reuniao,observacao"
+)
+
+
+def test_apply_dat_acao_creates_derives_ano_from_reuniao(tmp_path):
+    actor = _actor()
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
+    # ano = data_reuniao.year (2026); status derivado da presença de data; contato_inicial → data_contato.
+    row = "Cidade X,CIDADE X,CE,Proj X,Proj X,Fulano,11144477735,2026-04-10,2026-01-05,2026-02-03,2026-03-01,obs geral"
+    r = ExportContractImporter(
+        path=_write_export(tmp_path, {"dat_acao": f"{ACAO_HEADER}\n{row}\n"}),
+        apply=True,
+        allow=("dat_acao",),
+        actor=actor,
+    ).run()
+    assert r["applied"]["dat_acao"] == 1
+    a = DATAcao.objects.get()
+    assert a.ano == 2026
+    assert a.data_reuniao == date(2026, 3, 1)
+    assert a.data_contato == date(2026, 2, 3)  # contato_inicial (CSV) → data_contato (model)
+    assert a.data_carta == date(2026, 1, 5)
+    assert a.data_entrega == date(2026, 4, 10)
+    assert a.status_reuniao == "concluido"  # tem data → concluido
+    assert a.status_contato == "concluido"
+    assert a.created_by_id == actor.id
+
+
+def test_apply_dat_acao_two_years_same_mun_proj(tmp_path):
+    actor = _actor()
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
+    csv = (
+        f"{ACAO_HEADER}\n"
+        "Cidade X,CIDADE X,CE,Proj X,Proj X,F,11144477735,,,,2026-03-01,\n"
+        "Cidade X,CIDADE X,CE,Proj X,Proj X,F,11144477735,,,,2027-03-01,\n"
+    )
+    r = ExportContractImporter(
+        path=_write_export(tmp_path, {"dat_acao": csv}), apply=True, allow=("dat_acao",), actor=actor
+    ).run()
+    assert r["applied"]["dat_acao"] == 2  # NK temporal: um por ano do mesmo (mun, projeto)
+    assert set(DATAcao.objects.values_list("ano", flat=True)) == {2026, 2027}
+
+
+def test_apply_dat_acao_ano_fallback_to_entrega(tmp_path):
+    actor = _actor()
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
+    # sem reuniao; data_entrega 2025 → ano=2025 (fallback reuniao→entrega→carta→contato)
+    csv = f"{ACAO_HEADER}\nCidade X,CIDADE X,CE,Proj X,Proj X,F,11144477735,2025-11-01,,,,\n"
+    ExportContractImporter(
+        path=_write_export(tmp_path, {"dat_acao": csv}), apply=True, allow=("dat_acao",), actor=actor
+    ).run()
+    assert DATAcao.objects.get().ano == 2025
+
+
+def test_apply_dat_acao_ano_none_when_no_dates(tmp_path):
+    actor = _actor()
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
+    csv = f"{ACAO_HEADER}\nCidade X,CIDADE X,CE,Proj X,Proj X,F,11144477735,,,,,\n"
+    r = ExportContractImporter(
+        path=_write_export(tmp_path, {"dat_acao": csv}), apply=True, allow=("dat_acao",), actor=actor
+    ).run()
+    assert r["applied"]["dat_acao"] == 1
+    assert DATAcao.objects.get().ano is None  # sem datas → bucket pendente (NÃO_CLASSIFICADO)
+
+
+def test_apply_dat_acao_idempotent(tmp_path):
+    actor = _actor()
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
+    csv = f"{ACAO_HEADER}\nCidade X,CIDADE X,CE,Proj X,Proj X,F,11144477735,,,,2026-03-01,\n"
+    path = _write_export(tmp_path, {"dat_acao": csv})
+    ExportContractImporter(path=path, apply=True, allow=("dat_acao",), actor=actor).run()
+    r2 = ExportContractImporter(path=path, apply=True, allow=("dat_acao",), actor=actor).run()
+    assert r2["applied"]["dat_acao"] == 0
+    assert DATAcao.objects.count() == 1
+
+
+def test_apply_dat_acao_requires_actor(tmp_path):
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
+    csv = f"{ACAO_HEADER}\nCidade X,CIDADE X,CE,Proj X,Proj X,F,11144477735,,,,2026-03-01,\n"
+    with pytest.raises(ValueError):
+        ExportContractImporter(
+            path=_write_export(tmp_path, {"dat_acao": csv}), apply=True, allow=("dat_acao",), actor=None
+        ).run()
+
+
+def test_apply_dat_acao_skips_unresolved_projeto(tmp_path):
+    actor = _actor()
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    # Projeto inexistente → resolver None → não cria (nem quebra)
+    csv = f"{ACAO_HEADER}\nCidade X,CIDADE X,CE,Proj Inexistente,Proj Inexistente,F,11144477735,,,,2026-03-01,\n"
+    r = ExportContractImporter(
+        path=_write_export(tmp_path, {"dat_acao": csv}), apply=True, allow=("dat_acao",), actor=actor
+    ).run()
+    assert r["applied"]["dat_acao"] == 0
+    assert DATAcao.objects.count() == 0

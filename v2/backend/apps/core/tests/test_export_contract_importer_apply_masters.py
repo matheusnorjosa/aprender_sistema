@@ -175,6 +175,17 @@ def test_apply_projeto_dedup_intra_csv_same_canon_key(tmp_path):
     assert Projeto.objects.filter(projeto_geral__nome="PG DEDUP").count() == 1
 
 
+def test_apply_projeto_base_empty_pg_derives_from_own_name(tmp_path):
+    # Projeto-base sem projeto_geral (shape v14: coluna `nome`) → liga ao PG homônimo
+    # (não cria órfão NULL nem rejeita como pg_desconhecido).
+    pg = ProjetoGeral.objects.create(nome="A COR DA GENTE")
+    csv = "nome,projeto_geral,fluxo\nA Cor da Gente,,NAO_SUPER\n"
+    path = _write_export(tmp_path, {"projeto": csv})
+    r = ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
+    assert r["applied"]["projeto"] == 1
+    assert Projeto.objects.get(nome="A Cor da Gente").projeto_geral_id == pg.id
+
+
 # ══════════════════════════ usuario (PR-C, + atribuicao de Group) ══════════════════════════
 def test_apply_usuario_creates_username_cpf_unusable_password(tmp_path):
     csv = "nome_completo,cpf,email,cargo\nMaria Silva Souza,11144477735,maria@ex.com,Coordenadores\n"

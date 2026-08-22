@@ -367,8 +367,10 @@ class ExportContractImporter:
                     tally["would_reject"] += 1
                     reasons["ambiguous"] += 1
                     continue
-                # unmatched → candidato a create; exige PG resolvível + fluxo válido
-                if pg_idx.get(_norm(r.get("projeto_geral") or "")) is None:
+                # unmatched → candidato a create; exige PG resolvível + fluxo válido.
+                # projeto_geral vazio (base MATCH_CANONICO) → deriva do próprio nome (PG homônimo).
+                pg_name = (r.get("projeto_geral") or "").strip() or nome
+                if pg_idx.get(_norm(pg_name)) is None:
                     tally["would_reject"] += 1
                     reasons["pg_desconhecido"] += 1
                     continue
@@ -784,7 +786,8 @@ class ExportContractImporter:
                 continue  # matched (já existe) ou ambiguous (decisão humana) → não cria
             if res.canonical_key in seen:
                 continue  # mesma variante canônica repetida na run
-            pg_id = pg_idx.get(_norm(r.get("projeto_geral") or ""))
+            pg_name = (r.get("projeto_geral") or "").strip() or nome  # base sem PG → deriva do nome
+            pg_id = pg_idx.get(_norm(pg_name))
             fluxo = (r.get("fluxo") or "").strip().upper()
             if pg_id is None or fluxo not in _PROJETO_FLUXOS:
                 continue  # PG desconhecido / fluxo ausente → não cria (órfã/PA-01)

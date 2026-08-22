@@ -169,6 +169,17 @@ def test_classify_projeto(tmp_path):
     assert r["reject_reasons"]["fluxo_ausente"] == 1
 
 
+def test_classify_projeto_base_empty_pg_derives_from_own_name(tmp_path):
+    # Projeto-base (MATCH_CANONICO no v14) tem projeto_geral VAZIO; há PG homônimo →
+    # deriva o PG do próprio nome, não rejeita. Usa a coluna `nome` (shape real do v14).
+    ProjetoGeral.objects.create(nome="A COR DA GENTE")
+    csv = "nome,projeto_geral,fluxo\nA Cor da Gente,,NAO_SUPER\n"
+    path = _write_export(tmp_path, {"projeto": csv})
+    r = ExportContractImporter(path=path).run()["por_entidade"]["projeto"]
+    assert r["would_create"] == 1  # deriva PG do próprio nome → não é pg_desconhecido
+    assert r["reject_reasons"]["pg_desconhecido"] == 0
+
+
 # ───────── uso do resolver de Projeto ─────────
 def test_uses_projeto_resolver():
     ProjetoFactory(nome="Vida & Matemática 6", fluxo="NAO_SUPER")

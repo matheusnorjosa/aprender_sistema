@@ -288,3 +288,57 @@ def test_apply_dat_acao_skips_unresolved_projeto(tmp_path):
     ).run()
     assert r["applied"]["dat_acao"] == 0
     assert DATAcao.objects.count() == 0
+
+
+# ───────── dat_cadastro: ano na NK (municipio, projeto_geral, plataforma, ano) ─────────
+def test_apply_dat_cadastro_derives_ano_from_etapa1(tmp_path):
+    actor = _actor()
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    ProjetoGeral.objects.create(nome="PG X", usa_avaliar=True)
+    # etapa1_data 2026 → ano=2026 (âncora = 1ª etapa do ciclo)
+    csv = f"{CAD_HEADER}\nCidade X,CIDADE X,CE,PG X,PG X,FORMAR,concluido,2026-03-01,pendente,,pendente,,pendente,,1\n"
+    r = ExportContractImporter(
+        path=_write_export(tmp_path, {"dat_cadastro": csv}), apply=True, allow=("dat_cadastro",), actor=actor
+    ).run()
+    assert r["applied"]["dat_cadastro"] == 1
+    assert DATCadastro.objects.get().ano == 2026
+
+
+def test_apply_dat_cadastro_two_years_same_key(tmp_path):
+    actor = _actor()
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    ProjetoGeral.objects.create(nome="PG X", usa_avaliar=True)
+    csv = (
+        f"{CAD_HEADER}\n"
+        "Cidade X,CIDADE X,CE,PG X,PG X,FORMAR,concluido,2026-03-01,pendente,,pendente,,pendente,,1\n"
+        "Cidade X,CIDADE X,CE,PG X,PG X,FORMAR,concluido,2027-03-01,pendente,,pendente,,pendente,,1\n"
+    )
+    r = ExportContractImporter(
+        path=_write_export(tmp_path, {"dat_cadastro": csv}), apply=True, allow=("dat_cadastro",), actor=actor
+    ).run()
+    assert r["applied"]["dat_cadastro"] == 2  # mesma (mun, pg, FORMAR) em 2 anos → 2 linhas
+    assert set(DATCadastro.objects.values_list("ano", flat=True)) == {2026, 2027}
+
+
+def test_apply_dat_cadastro_ano_fallback_to_etapa2(tmp_path):
+    actor = _actor()
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    ProjetoGeral.objects.create(nome="PG X", usa_avaliar=True)
+    # etapa1 sem data; etapa2_data 2025 → ano=2025 (fallback pelas etapas seguintes)
+    csv = f"{CAD_HEADER}\nCidade X,CIDADE X,CE,PG X,PG X,FORMAR,pendente,,concluido,2025-06-01,pendente,,pendente,,1\n"
+    ExportContractImporter(
+        path=_write_export(tmp_path, {"dat_cadastro": csv}), apply=True, allow=("dat_cadastro",), actor=actor
+    ).run()
+    assert DATCadastro.objects.get().ano == 2025
+
+
+def test_apply_dat_cadastro_ano_none_when_no_dates(tmp_path):
+    actor = _actor()
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    ProjetoGeral.objects.create(nome="PG X", usa_avaliar=True)
+    csv = f"{CAD_HEADER}\nCidade X,CIDADE X,CE,PG X,PG X,FORMAR,pendente,,pendente,,pendente,,pendente,,1\n"
+    r = ExportContractImporter(
+        path=_write_export(tmp_path, {"dat_cadastro": csv}), apply=True, allow=("dat_cadastro",), actor=actor
+    ).run()
+    assert r["applied"]["dat_cadastro"] == 1
+    assert DATCadastro.objects.get().ano is None  # sem datas → bucket pendente

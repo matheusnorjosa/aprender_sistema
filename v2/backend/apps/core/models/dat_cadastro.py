@@ -53,6 +53,15 @@ class DATCadastro(models.Model):
         "core.ProjetoGeral", on_delete=models.PROTECT, related_name="dat_cadastros", verbose_name="Projeto Geral"
     )
     plataforma = models.CharField(max_length=10, choices=Plataforma.choices, verbose_name="Plataforma")
+    # Ano-cohort do cadastro. Faz parte da chave natural (municipio, projeto_geral, plataforma, ano):
+    # um cadastro por ano de uso. Derivado no import da 1ª etapa com data (início do ciclo); ano=None
+    # é o bucket pendente (NÃO_CLASSIFICADO) — nulls_distinct=False → um só pendente por combinação.
+    ano = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Ano",
+        help_text="Ano-cohort do cadastro (derivado da 1ª etapa com data no import). NULL = não classificado.",
+    )
 
     # === Workflow FORMAR ===
     # Etapa 1: Criação do Curso
@@ -128,7 +137,9 @@ class DATCadastro(models.Model):
         ordering = ["plataforma", "municipio__nome"]
         constraints = [
             models.UniqueConstraint(
-                fields=["municipio", "projeto_geral", "plataforma"], name="unique_dat_cadastro_mun_proj_plat"
+                fields=["municipio", "projeto_geral", "plataforma", "ano"],
+                name="unique_dat_cadastro_mun_proj_plat_ano",
+                nulls_distinct=False,
             ),
         ]
         indexes = [

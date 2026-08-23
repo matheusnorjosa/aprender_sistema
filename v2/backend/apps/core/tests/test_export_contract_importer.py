@@ -417,3 +417,22 @@ def test_classify_dat_cadastro_skip_create_reject(tmp_path):
     assert r["would_create"] == 2
     assert r["would_reject"] == 1
     assert r["would_update"] == 0
+
+
+def test_classify_dat_cadastro_ano_in_nk(tmp_path):
+    # NK temporal (municipio, projeto_geral, plataforma, ano): mesma tripla em anos diferentes = distintos.
+    creator = UsuarioFactory(username="u_dc_ano", password="x", cpf="44455566677")
+    mun = MunicipioFactory(nome="Cidade Cad Ano", uf="CE", ativo=True)
+    pg = ProjetoGeral.objects.create(nome="PG Cad Ano", usa_avaliar=True)
+    DATCadastro.objects.create(municipio=mun, projeto_geral=pg, plataforma="FORMAR", ano=2026, created_by=creator)
+    csv = (
+        "municipio,uf,projeto_geral,plataforma,etapa1_data\n"
+        "Cidade Cad Ano,CE,PG Cad Ano,FORMAR,2026-03-01\n"  # (mun, pg, FORMAR, 2026) já existe → skip
+        "Cidade Cad Ano,CE,PG Cad Ano,FORMAR,2027-03-01\n"  # ano novo → create
+    )
+    r = ExportContractImporter(path=_write_export(tmp_path, {"dat_cadastro": csv})).run()["por_entidade"][
+        "dat_cadastro"
+    ]
+    assert r["would_skip_same"] == 1
+    assert r["would_create"] == 1
+    assert r["would_reject"] == 0

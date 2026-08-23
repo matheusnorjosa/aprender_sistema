@@ -233,6 +233,16 @@ def _dat_acao_ano(r: dict[str, str]) -> int | None:
     return None
 
 
+def _dat_cadastro_ano(r: dict[str, str]) -> int | None:
+    """Ano-cohort do cadastro = ano da 1ª etapa com data (início do ciclo FORMAR/AVALIAR), fallback
+    pelas etapas seguintes. Nenhuma data → None (pendente)."""
+    for col in ("etapa1_data", "etapa2_data", "etapa3_data", "etapa4_data"):
+        d = _parse_iso_date(r.get(col))
+        if d:
+            return d.year
+    return None
+
+
 def diff_and_classify(
     existing: dict[str, Any] | None, export: dict[str, Any], protected: set[str]
 ) -> tuple[str, list[str]]:
@@ -524,7 +534,7 @@ class ExportContractImporter:
             # (FORMAR|AVALIAR); valor fora do domínio → would_reject. Existence-based.
             mun_idx = self._municipio_index()
             pg_idx = self._projeto_geral_index()
-            existing = set(DATCadastro.objects.values_list("municipio_id", "projeto_geral_id", "plataforma"))
+            existing = set(DATCadastro.objects.values_list("municipio_id", "projeto_geral_id", "plataforma", "ano"))
             for r in rows:
                 mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
                 pg_id = pg_idx.get(_norm(r.get("projeto_geral") or ""))
@@ -532,7 +542,8 @@ class ExportContractImporter:
                 if mun_id is None or pg_id is None or plataforma not in ("FORMAR", "AVALIAR"):
                     tally["would_reject"] += 1
                     continue
-                st, _ = diff_and_classify({} if (mun_id, pg_id, plataforma) in existing else None, {}, protected)
+                nk = (mun_id, pg_id, plataforma, _dat_cadastro_ano(r))
+                st, _ = diff_and_classify({} if nk in existing else None, {}, protected)
                 tally[st] += 1
 
         elif name == "dat_compra":
@@ -688,7 +699,10 @@ class ExportContractImporter:
             plataforma = (r.get("plataforma") or "").strip().upper()
             if mun_id is None or pg_id is None or plataforma not in _CAD_ETAPAS:
                 continue
-            if DATCadastro.objects.filter(municipio_id=mun_id, projeto_geral_id=pg_id, plataforma=plataforma).exists():
+            ano = _dat_cadastro_ano(r)
+            if DATCadastro.objects.filter(
+                municipio_id=mun_id, projeto_geral_id=pg_id, plataforma=plataforma, ano=ano
+            ).exists():
                 continue
             campos: dict[str, Any] = {}
             for prefix, status_field, data_field in _CAD_ETAPAS[plataforma]:
@@ -698,6 +712,7 @@ class ExportContractImporter:
                 municipio_id=mun_id,
                 projeto_geral_id=pg_id,
                 plataforma=plataforma,
+                ano=ano,
                 created_by=actor,
                 **campos,
             )

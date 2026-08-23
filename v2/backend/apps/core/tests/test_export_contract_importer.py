@@ -302,6 +302,24 @@ def test_classify_dat_acao_skip_create_reject(tmp_path):
     assert r["would_update"] == 0
 
 
+def test_classify_dat_acao_ano_in_nk(tmp_path):
+    # NK temporal (municipio, projeto, ano): mesmo (mun, proj) com anos diferentes = distintos.
+    creator = UsuarioFactory(username="u_da_ano", password="x", cpf="22255588846")
+    mun = MunicipioFactory(nome="Cidade Ano", uf="CE", ativo=True)
+    proj = ProjetoFactory(nome="Proj Ano Teste", fluxo="NAO_SUPER")
+    DATAcao.objects.create(municipio=mun, projeto=proj, ano=2026, created_by=creator)
+    # linha 1: reuniao 2026 → (mun, proj, 2026) já existe → skip; linha 2: reuniao 2027 → ano novo → create.
+    csv = (
+        "municipio,uf,projeto,data_reuniao\n"
+        "Cidade Ano,CE,Proj Ano Teste,2026-03-01\n"
+        "Cidade Ano,CE,Proj Ano Teste,2027-03-01\n"
+    )
+    r = ExportContractImporter(path=_write_export(tmp_path, {"dat_acao": csv})).run()["por_entidade"]["dat_acao"]
+    assert r["would_skip_same"] == 1  # 2026 já existe
+    assert r["would_create"] == 1  # 2027 novo
+    assert r["would_reject"] == 0
+
+
 def test_classify_plano_formacao_skip_create_reject(tmp_path):
     creator = UsuarioFactory(username="u_pf_creator", password="x", cpf="77788899900")
     mun_a = MunicipioFactory(nome="Cidade Plano Um", uf="CE", ativo=True)

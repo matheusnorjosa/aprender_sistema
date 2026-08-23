@@ -55,6 +55,15 @@ class DATAcao(models.Model):
         related_name="dat_acoes",
         verbose_name="Coordenador Responsável",
     )
+    # Ano-cohort da ação (decisão B = anual). Faz parte da chave natural (municipio, projeto, ano):
+    # um ciclo por ano de uso. Derivado no import da data da reunião (fallback entrega→carta→contato);
+    # ano=None é o bucket pendente (NÃO_CLASSIFICADO) — nulls_distinct=False → um só pendente por par.
+    ano = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Ano",
+        help_text="Ano-cohort da ação (derivado da data da reunião no import). NULL = não classificado.",
+    )
 
     # Etapa 1: Carta
     status_carta = models.CharField(
@@ -111,7 +120,11 @@ class DATAcao(models.Model):
         verbose_name_plural = "Ações DAT"
         ordering = ["-prioridade", "municipio__nome"]
         constraints = [
-            models.UniqueConstraint(fields=["municipio", "projeto"], name="unique_dat_acao_municipio_projeto"),
+            models.UniqueConstraint(
+                fields=["municipio", "projeto", "ano"],
+                name="unique_dat_acao_municipio_projeto_ano",
+                nulls_distinct=False,
+            ),
         ]
         indexes = [
             models.Index(fields=["municipio", "projeto"]),

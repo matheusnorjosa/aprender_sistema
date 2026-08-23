@@ -1,7 +1,7 @@
 ---
 title: Módulo DAT
 status: canonical
-last_verified: 2026-08-22
+last_verified: 2026-08-23
 sources_of_truth:
   - v2/backend/apps/core/services/controle_acoes_import.py
   - v2/backend/apps/core/models/dat_acao.py
@@ -67,7 +67,7 @@ Roteamento: [`urls.py`](../../../backend/apps/core/urls.py). Serviço de import 
 
 - **Unicidade (constraints de BD, não podem ser violadas):**
   - `DATAcao`: único por `(municipio, projeto, ano)` — `unique_dat_acao_municipio_projeto_ano`, `nulls_distinct=False` (migration 0092): um ciclo de ação por **ano** (cohort anual, decisão B). O `ano` é derivado da data da reunião no import (fallback entrega→carta→contato); `ano=NULL` = pendente (um só por par).
-  - `DATCadastro`: único por `(municipio, projeto_geral, plataforma)` — `unique_dat_cadastro_mun_proj_plat`.
+  - `DATCadastro`: único por `(municipio, projeto_geral, plataforma, ano)` — `unique_dat_cadastro_mun_proj_plat_ano`, `nulls_distinct=False` (migration 0093): um cadastro por plataforma/**ano**. O `ano` é derivado da 1ª etapa com data no import (fallback etapa1→4); `ano=NULL` = pendente.
   - `DATRegistro`: único por `(municipio, projeto_geral, projeto, ano)` — `unique_dat_registro_municipio_projeto_ano`, `nulls_distinct=False` (Postgres `NULLS NOT DISTINCT`, migration 0091): um registro por par/**ano de uso**, e **um só pendente** (`ano=NULL`) por par. `external_hash` é unique (idempotência de import).
   - `AcaoDAT` (legacy): `external_hash` unique = `SHA1(municipio_id|projeto_id|tipo_acao|responsavel_id)`.
 - **Campos derivados em `DATRegistro.save()`:** `usa_avaliar` espelha `projeto_geral.usa_avaliar`; se `usa_avaliar=False`, os 3 status AVALIAR viram `nao_aplicavel`. UI/import nunca devem gravar esses campos manualmente.

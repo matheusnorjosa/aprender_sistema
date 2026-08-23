@@ -223,6 +223,16 @@ _CAD_ETAPAS: dict[str, list[tuple[str, str, str]]] = {
 }
 
 
+def _dat_acao_ano(r: dict[str, str]) -> int | None:
+    """Ano-cohort da ação DAT (decisão B) = ano da data da reunião (âncora do ciclo), com fallback
+    reuniao → entrega → carta → contato. CSV usa `contato_inicial` (= data_contato). None = pendente."""
+    for col in ("data_reuniao", "data_entrega", "data_carta", "contato_inicial"):
+        d = _parse_iso_date(r.get(col))
+        if d:
+            return d.year
+    return None
+
+
 def diff_and_classify(
     existing: dict[str, Any] | None, export: dict[str, Any], protected: set[str]
 ) -> tuple[str, list[str]]:
@@ -463,12 +473,11 @@ class ExportContractImporter:
                 st, _ = diff_and_classify({} if existe else None, {}, protected)
                 tally[st] += 1
 
-        elif name in ("dat_acao", "plano_formacao"):
+        elif name == "plano_formacao":
             # NK = (municipio_id, projeto_id). Município por (norm(nome), uf); Projeto via resolver (#1372).
             # FK não-resolvido → would_reject. Existence-based (não compara campos operacionais, não lê coordenador).
-            model_cls = {"dat_acao": DATAcao, "plano_formacao": PlanoFormacoes}[name]
             mun_idx = self._municipio_index()
-            existing = set(model_cls.objects.values_list("municipio_id", "projeto_id"))
+            existing = set(PlanoFormacoes.objects.values_list("municipio_id", "projeto_id"))
             for r in rows:
                 mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
                 proj_id = self.resolve_projeto(r.get("projeto") or "")
@@ -476,6 +485,21 @@ class ExportContractImporter:
                     tally["would_reject"] += 1
                     continue
                 st, _ = diff_and_classify({} if (mun_id, proj_id) in existing else None, {}, protected)
+                tally[st] += 1
+
+        elif name == "dat_acao":
+            # NK = (municipio_id, projeto_id, ano) — decisão B (anual). ano = cohort derivado da data
+            # da reunião (fallback entrega→carta→contato; None = pendente). Existence-based (não lê coordenador).
+            mun_idx = self._municipio_index()
+            existing = set(DATAcao.objects.values_list("municipio_id", "projeto_id", "ano"))
+            for r in rows:
+                mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
+                proj_id = self.resolve_projeto(r.get("projeto") or "")
+                if mun_id is None or proj_id is None:
+                    tally["would_reject"] += 1
+                    continue
+                nk = (mun_id, proj_id, _dat_acao_ano(r))
+                st, _ = diff_and_classify({} if nk in existing else None, {}, protected)
                 tally[st] += 1
 
         elif name == "dat_registro":
@@ -609,6 +633,10 @@ class ExportContractImporter:
                     # Handler dedicado (resolver + PG + fluxo); NÃO o loop genérico (nome__iexact).
                     applied[name] = self._apply_projeto(self._load(name))
                     continue
+                if name == "dat_acao":
+                    # Handler dedicado (NK com ano; CSV sem coluna `nome` → o loop genérico gravaria 0).
+                    applied[name] = self._apply_dat_acao(self._load(name))
+                    continue
                 created = 0
                 for r in self._load(name):
                     nome = (r.get("nome") or "").strip()
@@ -672,6 +700,43 @@ class ExportContractImporter:
                 plataforma=plataforma,
                 created_by=actor,
                 **campos,
+            )
+            created += 1
+        return created
+
+    def _apply_dat_acao(self, rows: list[dict[str, str]]) -> int:
+        """Create-only de DATAcao. NK (municipio, projeto, ano); ano = cohort anual derivado da data
+        da reunião (fallback entrega→carta→contato). CSV `contato_inicial` = data_contato; o status de
+        cada etapa é derivado da presença da data (tem data → concluido, senão pendente)."""
+        actor = self._require_actor("dat_acao")
+        mun_idx = self._municipio_index()
+        created = 0
+        for r in rows:
+            mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
+            proj_id = self.resolve_projeto(r.get("projeto") or "")
+            if mun_id is None or proj_id is None:
+                continue  # FK não-resolvida (municipio/projeto)
+            ano = _dat_acao_ano(r)
+            if DATAcao.objects.filter(municipio_id=mun_id, projeto_id=proj_id, ano=ano).exists():
+                continue
+            dc = _parse_iso_date(r.get("data_carta"))
+            dco = _parse_iso_date(r.get("contato_inicial"))  # CSV `contato_inicial` → model data_contato
+            dr = _parse_iso_date(r.get("data_reuniao"))
+            de = _parse_iso_date(r.get("data_entrega"))
+            DATAcao.objects.create(
+                municipio_id=mun_id,
+                projeto_id=proj_id,
+                ano=ano,
+                created_by=actor,
+                data_carta=dc,
+                status_carta="concluido" if dc else "pendente",
+                data_contato=dco,
+                status_contato="concluido" if dco else "pendente",
+                data_reuniao=dr,
+                status_reuniao="concluido" if dr else "pendente",
+                data_entrega=de,
+                status_entrega="concluido" if de else "pendente",
+                observacao_carta=(r.get("observacao") or "")[:500],
             )
             created += 1
         return created

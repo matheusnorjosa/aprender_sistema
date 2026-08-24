@@ -89,9 +89,22 @@ export default defineConfig([
         'error',
         { checksVoidReturn: { attributes: false, properties: false } },
       ],
+      // Grupo D — require-await: função async sem await = async ocioso (ou await
+      // esquecido). Em PROD trava o smell; nos testes é DESLIGADO abaixo (mocks
+      // `async () => data` são async de propósito p/ o contrato Promise).
+      '@typescript-eslint/require-await': 'error',
       // DX de Fast-Refresh (HMR), não correção — arquivos que exportam um
       // componente + util (ex: PerfilPage + maskCpf). Fica `warn`.
       'react-refresh/only-export-components': 'warn',
+    },
+  },
+  // Testes: `require-await` off — mocks/fakes async sem await são intencionais
+  // (retornam Promise p/ imitar a API real). O parser/plugin type-aware do bloco
+  // src/** acima continua valendo p/ estes arquivos (só sobrescreve a regra).
+  {
+    files: ['src/**/*.{test,spec}.{ts,tsx}', 'src/**/__tests__/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/require-await': 'off',
     },
   },
 ])

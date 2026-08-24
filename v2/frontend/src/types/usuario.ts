@@ -68,19 +68,19 @@ export function isCurrentUserPayload(value: unknown): value is CurrentUser {
     Array.isArray(field) && field.every((item) => typeof item === 'string');
 
   return (
-    typeof payload.id === 'number'
-    && typeof payload.username === 'string'
-    && typeof payload.email === 'string'
-    && typeof payload.first_name === 'string'
-    && typeof payload.last_name === 'string'
-    && typeof payload.name === 'string'
-    && isStringArray(payload.groups)
-    && isStringArray(payload.setores)
-    && isStringArray(payload.funcoes)
-    && typeof payload.is_superuser === 'boolean'
-    && typeof payload.is_superintendencia === 'boolean'
-    && typeof payload.can_approve_super === 'boolean'
-    && isStringArray(payload.permissions)
+    typeof payload['id'] === 'number'
+    && typeof payload['username'] === 'string'
+    && typeof payload['email'] === 'string'
+    && typeof payload['first_name'] === 'string'
+    && typeof payload['last_name'] === 'string'
+    && typeof payload['name'] === 'string'
+    && isStringArray(payload['groups'])
+    && isStringArray(payload['setores'])
+    && isStringArray(payload['funcoes'])
+    && typeof payload['is_superuser'] === 'boolean'
+    && typeof payload['is_superintendencia'] === 'boolean'
+    && typeof payload['can_approve_super'] === 'boolean'
+    && isStringArray(payload['permissions'])
   );
 }
 

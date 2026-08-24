@@ -7,8 +7,8 @@
 
 export const EXTERNAL_URLS = {
   // Formar Platform (Moodle LMS)
-  FORMAR_PLATFORM: (import.meta.env.VITE_FORMAR_URL as string) || 'https://www.aprenderformar.com.br/plataforma/',
+  FORMAR_PLATFORM: (import.meta.env['VITE_FORMAR_URL'] as string) || 'https://www.aprenderformar.com.br/plataforma/',
 
   // Avaliar Platform (Assessment)
-  AVALIAR_PLATFORM: (import.meta.env.VITE_AVALIAR_URL as string) || 'https://aprenderavaliar.com.br/',
+  AVALIAR_PLATFORM: (import.meta.env['VITE_AVALIAR_URL'] as string) || 'https://aprenderavaliar.com.br/',
 };

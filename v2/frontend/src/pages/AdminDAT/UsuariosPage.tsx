@@ -210,18 +210,18 @@ export default function UsuariosPage(): JSX.Element {
 
       // Only add non-empty search
       if (searchText) {
-        apiParams.search = searchText;
+        apiParams['search'] = searchText;
       }
 
       // Add pagination params
-      apiParams.page = params.current || pagination.current;
-      apiParams.page_size = params.pageSize || pagination.pageSize;
+      apiParams['page'] = params.current || pagination.current;
+      apiParams['page_size'] = params.pageSize || pagination.pageSize;
 
       // Add ordering if provided
       if (params.ordering) {
-        apiParams.ordering = params.ordering;
+        apiParams['ordering'] = params['ordering'];
       } else {
-        apiParams.ordering = 'username';
+        apiParams['ordering'] = 'username';
       }
 
       const data = await listUsers(apiParams);

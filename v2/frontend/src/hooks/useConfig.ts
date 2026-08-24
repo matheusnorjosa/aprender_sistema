@@ -105,7 +105,7 @@ export function useConfig(): UseConfigReturn {
 
   // Load config on mount
   useEffect(() => {
-    loadConfig();
+    void loadConfig();
   }, []);
 
   return {

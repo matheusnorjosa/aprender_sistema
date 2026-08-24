@@ -92,7 +92,7 @@ export default function useMonthlyQuery(
   }, [year, month, role, sector, q, gerenciaId]);
 
   useEffect(() => {
-    fetchData();
+    void fetchData();
   }, [fetchData]);
 
   // RT-02: Polling 5s for cross-device sync (#1032)
@@ -105,7 +105,7 @@ export default function useMonthlyQuery(
   // RT-02: BroadcastChannel for instant cross-tab sync
   useEffect(() => {
     const unsub = syncChannel.subscribe('availability', () => {
-      fetchData();
+      void fetchData();
     });
     return unsub;
   }, [fetchData]);

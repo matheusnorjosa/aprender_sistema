@@ -76,7 +76,7 @@ export default function DashboardsPage(): JSX.Element {
   }, []);
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, [loadData]);
 
   const handleExportCSV = () => {

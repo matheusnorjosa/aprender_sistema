@@ -108,7 +108,7 @@ function AppContent(): JSX.Element {
 
   useEffect(() => {
     isMountedRef.current = true;
-    loadUser();
+    void loadUser();
     return () => { isMountedRef.current = false; };
   }, [loadUser]);
 

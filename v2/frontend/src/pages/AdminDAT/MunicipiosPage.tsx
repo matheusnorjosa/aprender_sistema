@@ -132,11 +132,11 @@ export default function MunicipiosPage(): JSX.Element {
   };
 
   useEffect(() => {
-    fetchMunicipios(1, pagination.pageSize || DEFAULT_PAGE_SIZE);
+    void fetchMunicipios(1, pagination.pageSize || DEFAULT_PAGE_SIZE);
   }, [searchText, ufFilter]);
 
   const handleTableChange = (newPagination: TablePaginationConfig): void => {
-    fetchMunicipios(
+    void fetchMunicipios(
       newPagination.current || 1,
       newPagination.pageSize || pagination.pageSize || DEFAULT_PAGE_SIZE,
     );
@@ -255,7 +255,7 @@ export default function MunicipiosPage(): JSX.Element {
       setLookupOptions([]);
       setIbgeLocked(false);
       form.resetFields();
-      fetchMunicipios(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
+      void fetchMunicipios(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
     } catch (error) {
       message.error(`Erro: ${(error as Error).message}`);
     }
@@ -314,7 +314,7 @@ export default function MunicipiosPage(): JSX.Element {
         try {
           await deleteMunicipio(municipio.id);
           message.success('Município excluído com sucesso');
-          fetchMunicipios(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
+          void fetchMunicipios(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
         } catch (error) {
           message.error(`Erro ao excluir: ${(error as Error).message}`);
         }

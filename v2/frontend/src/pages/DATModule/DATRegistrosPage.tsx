@@ -228,7 +228,7 @@ export default function DATRegistrosPage(): JSX.Element {
         message.error(`Erro ao carregar opções: ${(error as Error).message}`);
       }
     };
-    loadOptions();
+    void loadOptions();
   }, []);
 
   // Handle region filter change
@@ -250,7 +250,7 @@ export default function DATRegistrosPage(): JSX.Element {
 
   // Apply filters
   const handleApplyFilters = () => {
-    fetchData(1);
+    void fetchData(1);
   };
 
   // Export to CSV

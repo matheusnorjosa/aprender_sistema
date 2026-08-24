@@ -125,7 +125,7 @@ export default function AdminDATHomePage(): JSX.Element {
               }}
               onClick={() => {
                 if (module.status === 'Disponível') {
-                  navigate(module.path);
+                  void navigate(module.path);
                 }
               }}
             >

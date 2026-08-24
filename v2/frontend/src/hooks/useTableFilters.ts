@@ -178,7 +178,7 @@ export function useTableFilters<F extends object, T, S = unknown>({
 
   const handleTableChange = useCallback(
     (page: number, newPageSize?: number): void => {
-      fetchData(page, newPageSize);
+      void fetchData(page, newPageSize);
     },
     [fetchData],
   );

@@ -73,6 +73,11 @@ export default defineConfig([
       // require-await (22) e no-unsafe-* (96) — entram em PRs dedicados de burn-down.
       '@typescript-eslint/no-unnecessary-type-assertion': 'error',
       '@typescript-eslint/no-redundant-type-constituents': 'error',
+      // Grupo B — promise-safety (a classe de falha silenciosa que motiva o programa).
+      // Promise não-tratada = erro engolido sem UI/log. Convenção do projeto: `void`
+      // para fire-and-forget intencional (o handler/efeito não pode ser async e a fn
+      // chamada já trata o próprio erro), `.catch(...)` quando o erro precisa aflorar.
+      '@typescript-eslint/no-floating-promises': 'error',
       // DX de Fast-Refresh (HMR), não correção — arquivos que exportam um
       // componente + util (ex: PerfilPage + maskCpf). Fica `warn`.
       'react-refresh/only-export-components': 'warn',

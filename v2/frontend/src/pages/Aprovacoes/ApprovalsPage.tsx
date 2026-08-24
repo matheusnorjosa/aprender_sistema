@@ -129,7 +129,7 @@ export default function ApprovalsPage(): JSX.Element {
   }, [statusFilter, searchTerm]);
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, [loadData]);
 
   // RT-02: Polling 5s for cross-device sync (#1032)
@@ -143,8 +143,8 @@ export default function ApprovalsPage(): JSX.Element {
 
   // RT-02: BroadcastChannel for instant cross-tab sync
   useEffect(() => {
-    const unsub1 = syncChannel.subscribe('solicitacoes', () => { loadData(); });
-    const unsub2 = syncChannel.subscribe('aprovacoes', () => { loadData(); });
+    const unsub1 = syncChannel.subscribe('solicitacoes', () => { void loadData(); });
+    const unsub2 = syncChannel.subscribe('aprovacoes', () => { void loadData(); });
     return () => { unsub1(); unsub2(); };
   }, [loadData]);
 
@@ -164,7 +164,7 @@ export default function ApprovalsPage(): JSX.Element {
         setCanApprove(false);
       }
     };
-    loadAccess();
+    void loadAccess();
   }, []);
 
   // Issue #260: Memoizar handlers para evitar re-renderização desnecessária
@@ -189,7 +189,7 @@ export default function ApprovalsPage(): JSX.Element {
         try {
           await approveSolicitacao(id);
           message.success('Solicitação aprovada com sucesso!');
-          loadData();
+          void loadData();
         } catch (error) {
           message.error('Erro ao aprovar: ' + (error as Error).message);
         }
@@ -208,7 +208,7 @@ export default function ApprovalsPage(): JSX.Element {
         try {
           await rejectSolicitacao(id);
           message.success('Solicitação reprovada.');
-          loadData();
+          void loadData();
         } catch (error) {
           message.error('Erro ao reprovar: ' + (error as Error).message);
         }
@@ -237,7 +237,7 @@ export default function ApprovalsPage(): JSX.Element {
           }
 
           setSelectedRowKeys([]);
-          loadData();
+          void loadData();
         } catch (error) {
           message.error('Erro ao aprovar em lote: ' + (error as Error).message);
         } finally {
@@ -267,7 +267,7 @@ export default function ApprovalsPage(): JSX.Element {
           }
 
           setSelectedRowKeys([]);
-          loadData();
+          void loadData();
         } catch (error) {
           message.error('Erro ao reprovar em lote: ' + (error as Error).message);
         } finally {

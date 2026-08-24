@@ -69,7 +69,7 @@ export function SessionExpiryWarning({ showWarning, timeLeft, renewSession }: Se
     const success = await renewSession();
     if (!success) {
       // Se falhar, redirecionar para login
-      navigate('/login');
+      void navigate('/login');
     }
   };
 
@@ -77,7 +77,7 @@ export function SessionExpiryWarning({ showWarning, timeLeft, renewSession }: Se
    * Handler para logout imediato.
    */
   const handleLogout = (): void => {
-    navigate('/logout');
+    void navigate('/logout');
   };
 
   return (

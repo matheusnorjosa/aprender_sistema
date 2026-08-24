@@ -180,7 +180,7 @@ export default function PreAgendaPage(): JSX.Element {
         logger.error('Erro ao carregar usuário:', error);
       }
     };
-    loadUser();
+    void loadUser();
   }, []);
 
   // #1668 (M12-19): controle do ciclo de requisições.
@@ -272,8 +272,8 @@ export default function PreAgendaPage(): JSX.Element {
 
   // RT-02: BroadcastChannel for instant cross-tab sync
   useEffect(() => {
-    const unsub1 = syncChannel.subscribe('preagenda', () => { loadData(); });
-    const unsub2 = syncChannel.subscribe('solicitacoes', () => { loadData(); });
+    const unsub1 = syncChannel.subscribe('preagenda', () => { void loadData(); });
+    const unsub2 = syncChannel.subscribe('solicitacoes', () => { void loadData(); });
     return () => { unsub1(); unsub2(); };
   }, [loadData]);
 
@@ -307,7 +307,7 @@ export default function PreAgendaPage(): JSX.Element {
           message.info(
             'Publicação enfileirada no Google Calendar — o evento aparecerá como publicado em instantes.',
           );
-          loadData();
+          void loadData();
         } catch (error) {
           // Section 4 Epic #459: Use consolidated error handler
           if (handleGoogleError(error)) return;
@@ -339,7 +339,7 @@ export default function PreAgendaPage(): JSX.Element {
         try {
           await resyncSolicitacao(id);
           message.success('Reenvio solicitado! O evento será atualizado em instantes.');
-          loadData();
+          void loadData();
         } catch (error) {
           // Section 4 Epic #459: Use consolidated error handler
           if (handleGoogleError(error)) return;
@@ -368,7 +368,7 @@ export default function PreAgendaPage(): JSX.Element {
         try {
           await cancelSolicitacao(id);
           message.success('Cancelamento solicitado! O evento será removido em instantes.');
-          loadData();
+          void loadData();
         } catch (error) {
           message.error('Erro ao cancelar: ' + (error as Error).message);
         }
@@ -416,7 +416,7 @@ export default function PreAgendaPage(): JSX.Element {
             );
           }
           setSelectedRowKeys([]);
-          loadData();
+          void loadData();
         } catch (error) {
           if (handleGoogleError(error)) return;
           message.error('Erro ao reenviar em massa: ' + (error as Error).message);
@@ -467,7 +467,7 @@ export default function PreAgendaPage(): JSX.Element {
             );
           }
           setSelectedRowKeys([]);
-          loadData();
+          void loadData();
         } catch (error) {
           if (handleGoogleError(error)) return;
           message.error('Erro ao resync em massa: ' + (error as Error).message);
@@ -604,7 +604,7 @@ export default function PreAgendaPage(): JSX.Element {
   // Carregar eventos GCal quando mudar para a aba
   useEffect(() => {
     if (viewMode === 'gcal-events' && googleStatus?.connected) {
-      loadGcalEvents();
+      void loadGcalEvents();
     }
   }, [viewMode, googleStatus?.connected, loadGcalEvents]);
 

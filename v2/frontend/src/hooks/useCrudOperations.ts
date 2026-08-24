@@ -262,7 +262,7 @@ export function useCrudOperations<T extends Record<string, unknown>>({
       current: page,
       pageSize: newPageSize || prev.pageSize,
     }));
-    fetchData({ page, pageSize: newPageSize, ...extraParams });
+    void fetchData({ page, pageSize: newPageSize, ...extraParams });
   }, [fetchData]);
 
   /**

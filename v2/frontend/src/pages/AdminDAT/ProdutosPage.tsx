@@ -80,18 +80,18 @@ export default function ProdutosPage(): JSX.Element {
   };
 
   useEffect(() => {
-    fetchProdutos(1, pagination.pageSize || DEFAULT_PAGE_SIZE);
+    void fetchProdutos(1, pagination.pageSize || DEFAULT_PAGE_SIZE);
   }, [searchText]);
 
   const handleTableChange = (newPagination: TablePaginationConfig): void => {
-    fetchProdutos(
+    void fetchProdutos(
       newPagination.current || 1,
       newPagination.pageSize || pagination.pageSize || DEFAULT_PAGE_SIZE,
     );
   };
 
   useEffect(() => {
-    fetchProjetos();
+    void fetchProjetos();
   }, []);
 
   const handleCreate = (): void => {
@@ -130,7 +130,7 @@ export default function ProdutosPage(): JSX.Element {
       }
       setModalVisible(false);
       form.resetFields();
-      fetchProdutos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
+      void fetchProdutos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
     } catch (error) {
       message.error(`Erro: ${(error as Error).message}`);
     }
@@ -147,7 +147,7 @@ export default function ProdutosPage(): JSX.Element {
         try {
           await deleteProduto(produto.id);
           message.success('Produto excluido com sucesso');
-          fetchProdutos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
+          void fetchProdutos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
         } catch (error) {
           message.error(`Erro ao excluir: ${(error as Error).message}`);
         }

@@ -275,7 +275,7 @@ export default function UsuariosPage(): JSX.Element {
 
   // Load users on mount and search change (reset to page 1)
   useEffect(() => {
-    fetchUsuarios({ current: 1 });
+    void fetchUsuarios({ current: 1 });
   }, [searchText]);
 
   const handleTableChange = (
@@ -294,7 +294,7 @@ export default function UsuariosPage(): JSX.Element {
       params.ordering = `${singleSorter.order === 'descend' ? '-' : ''}${String(singleSorter.field)}`;
     }
 
-    fetchUsuarios(params);
+    void fetchUsuarios(params);
   };
 
   const handleCreate = (): void => {
@@ -350,7 +350,7 @@ export default function UsuariosPage(): JSX.Element {
         try {
           await deleteUser(user.id);
           message.success('Usuário excluído com sucesso');
-          fetchUsuarios();
+          void fetchUsuarios();
         } catch (error) {
           message.error(`Erro ao excluir: ${(error as Error).message}`);
         }
@@ -377,7 +377,7 @@ export default function UsuariosPage(): JSX.Element {
       }
       setModalVisible(false);
       form.resetFields();
-      fetchUsuarios();
+      void fetchUsuarios();
     } catch (error) {
       message.error(`Erro: ${(error as Error).message}`);
     }
@@ -598,7 +598,7 @@ export default function UsuariosPage(): JSX.Element {
             onApply={async (file: File) => {
               const result = await importUsuarios(file, false);
               // Recarregar lista após importação
-              fetchUsuarios();
+              void fetchUsuarios();
               return toApplyResult(result);
             }}
           />)

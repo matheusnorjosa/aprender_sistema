@@ -159,19 +159,19 @@ export default function GCalDashboardPage(): JSX.Element {
   const [topMetric, setTopMetric] = useState<string>('municipios');
 
   useEffect(() => {
-    loadMetrics();
-    loadEvents(1, pagination.pageSize);
-    loadInsights();
+    void loadMetrics();
+    void loadEvents(1, pagination.pageSize);
+    void loadInsights();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateRange]);
 
   useEffect(() => {
-    loadEvents(1, pagination.pageSize);
+    void loadEvents(1, pagination.pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
   useEffect(() => {
-    loadTopInsights();
+    void loadTopInsights();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topMetric, dateRange]);
 
@@ -216,7 +216,7 @@ export default function GCalDashboardPage(): JSX.Element {
   };
 
   const handleTableChange = useCallback((newPagination: TablePaginationConfig) => {
-    loadEvents(newPagination.current || 1, newPagination.pageSize || 20);
+    void loadEvents(newPagination.current || 1, newPagination.pageSize || 20);
   }, []);
 
   // Issue #99: Carregar insights (success rate + top insights)
@@ -259,9 +259,9 @@ export default function GCalDashboardPage(): JSX.Element {
   };
 
   const handleRefresh = () => {
-    loadMetrics();
-    loadEvents(pagination.current, pagination.pageSize);
-    loadInsights();
+    void loadMetrics();
+    void loadEvents(pagination.current, pagination.pageSize);
+    void loadInsights();
   };
 
   const handleExport = (format: string) => {

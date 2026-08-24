@@ -187,7 +187,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
     };
 
     if (id) {
-      fetchSolicitacao();
+      void fetchSolicitacao();
     }
   }, [id, form]);
 
@@ -285,7 +285,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
 
       await updateSolicitacao(Number(id), payload);
       message.success('Solicitação atualizada com sucesso!');
-      navigate('/solicitacoes/minhas');
+      void navigate('/solicitacoes/minhas');
     } catch (err) {
       logger.error('Erro ao atualizar solicitação:', err);
       const apiErr = err as ApiErrorResponse;

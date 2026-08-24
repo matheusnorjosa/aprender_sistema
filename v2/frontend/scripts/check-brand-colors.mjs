@@ -2,11 +2,13 @@
 /**
  * Guard de SSOT de cor de marca (Fase 2 — Robustez do Frontend).
  *
- * As cores de MARCA distintas moram em `BRAND_COLORS` (src/contexts/ThemeContext.tsx)
- * e são aplicadas via `ConfigProvider` do AntD + import direto do token. Este guard
- * TRAVA a regressão: falha o CI se algum componente hardcodar um dos verdes de marca
- * em vez de usar `BRAND_COLORS.*`. Assim a cor da marca tem uma fonte única — trocar
- * o verde no SSOT propaga para todo lugar.
+ * As cores de MARCA distintas moram em DOIS SSOTs paralelos, mantidos em sincronia:
+ *  - TS/AntD: `BRAND_COLORS` (src/contexts/ThemeContext.tsx), via `ConfigProvider` + token.
+ *  - CSS/Tailwind: bloco `:root{ --as-primary/-dark/-light }` (src/index.css); `.css` e o
+ *    `tailwind.config` leem por `var(--as-*)`.
+ * Este guard TRAVA a regressão: falha o CI se qualquer `.ts`/`.tsx`/`.css` hardcodar um dos
+ * verdes de marca em vez de usar `BRAND_COLORS.*` (TS) ou `var(--as-*)` (CSS). Assim a cor
+ * da marca tem fonte única — trocar o verde nos SSOTs propaga para todo lugar.
  *
  * Escopo: só os 3 verdes DISTINTOS da marca (primary/primaryDark/primaryLight). Não
  * mexe em paletas de chart/mapa/status nem em cores genéricas (#fff, status AntD) —
@@ -23,8 +25,10 @@ const SRC = fileURLToPath(new URL('../src', import.meta.url));
 // Verdes de marca (= BRAND_COLORS.primary / primaryDark / primaryLight / sidebarBackground).
 const BRAND_GREENS = /#(006B52|004B3D|E5EDE5)\b/i;
 
-// O SSOT é o único lugar onde esses literais podem existir.
-const SSOT = 'contexts/ThemeContext.tsx';
+// Os SSOTs são os únicos lugares onde esses literais podem existir:
+//  - contexts/ThemeContext.tsx: BRAND_COLORS (TS/AntD)
+//  - index.css: bloco :root{ --as-primary/-dark/-light } (SSOT das CSS vars)
+const SSOT = new Set(['contexts/ThemeContext.tsx', 'index.css']);
 
 /** @param {string} name */
 const isTestFile = (name) => /\.(test|spec)\.[jt]sx?$/.test(name);
@@ -44,8 +48,8 @@ function walk(dir) {
       walk(abs);
       continue;
     }
-    if (!/\.(ts|tsx)$/.test(name)) continue;
-    if (isTestFile(name) || inTestInfra(rel) || rel === SSOT) continue;
+    if (!/\.(ts|tsx|css)$/.test(name)) continue;
+    if (isTestFile(name) || inTestInfra(rel) || SSOT.has(rel)) continue;
 
     const lines = readFileSync(abs, 'utf8').split('\n');
     lines.forEach((text, i) => {
@@ -64,7 +68,8 @@ if (offenders.length > 0) {
     console.error(`   ${o.file}:${o.line}  ${o.text}`);
   }
   console.error(
-    '\nImporte de `contexts/ThemeContext`: BRAND_COLORS.primary / .primaryDark / .primaryLight.',
+    '\nTS/TSX: importe de `contexts/ThemeContext` (BRAND_COLORS.primary / .primaryDark / .primaryLight).' +
+      '\nCSS:    use var(--as-primary) / var(--as-primary-dark) / var(--as-primary-light) (definidas em index.css).',
   );
   process.exit(1);
 }

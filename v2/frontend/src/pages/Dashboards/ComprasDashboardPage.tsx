@@ -204,15 +204,15 @@ export default function ComprasDashboardPage(): JSX.Element {
 
     try {
       const dashboardParams: Record<string, string | number> = {};
-      if (filters.uf) dashboardParams.uf = filters.uf;
-      if (filters.ano_uso) dashboardParams.ano_uso = filters.ano_uso;
-      if (filters.projeto) dashboardParams.projeto_id = filters.projeto;
-      if (filters.produto) dashboardParams.produto_id = filters.produto;
-      if (filters.tipo_compra) dashboardParams.tipo_compra = filters.tipo_compra;
+      if (filters['uf']) dashboardParams['uf'] = filters['uf'];
+      if (filters['ano_uso']) dashboardParams['ano_uso'] = filters['ano_uso'];
+      if (filters.projeto) dashboardParams['projeto_id'] = filters.projeto;
+      if (filters.produto) dashboardParams['produto_id'] = filters.produto;
+      if (filters['tipo_compra']) dashboardParams['tipo_compra'] = filters['tipo_compra'];
 
       const pendenciasParams: Record<string, string | number> = {};
-      if (filters.uf) pendenciasParams.uf = filters.uf;
-      if (filters.projeto) pendenciasParams.projeto_id = filters.projeto;
+      if (filters['uf']) pendenciasParams['uf'] = filters['uf'];
+      if (filters.projeto) pendenciasParams['projeto_id'] = filters.projeto;
 
       const [dashboardResponse, pendenciasResponse] = await Promise.all([
         getComprasDashboard(dashboardParams),
@@ -270,7 +270,7 @@ export default function ComprasDashboardPage(): JSX.Element {
       key: 'municipio',
       render: (value: string, record) => (
         <Space>
-          <Tag color="blue">{String(record.uf || '-')}</Tag>
+          <Tag color="blue">{String(record['uf'] || '-')}</Tag>
           <Text strong>{value}</Text>
         </Space>
       ),
@@ -301,10 +301,10 @@ export default function ComprasDashboardPage(): JSX.Element {
       key: 'comparativo',
       render: (_: unknown, record) => {
         const maxQuantidade = Math.max(
-          ...(data?.top_municipios || []).map((item) => toNumber(item.quantidade)),
+          ...(data?.top_municipios || []).map((item) => toNumber(item['quantidade'])),
           1
         );
-        const percent = Math.round((toNumber(record.quantidade) / maxQuantidade) * 100);
+        const percent = Math.round((toNumber(record['quantidade']) / maxQuantidade) * 100);
 
         return (
           <Progress
@@ -676,7 +676,7 @@ export default function ComprasDashboardPage(): JSX.Element {
               scroll={{ x: "max-content" }}
               dataSource={data.top_municipios}
               columns={topMunicipiosColumns}
-              rowKey={(record) => `${record.municipio}-${record.uf}`}
+              rowKey={(record) => `${record['municipio']}-${record['uf']}`}
               pagination={false}
             />
           </Card>

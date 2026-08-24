@@ -199,10 +199,10 @@ export default function PreAgendaPage(): JSX.Element {
 
       const { searchTerm, sectorFilter, dateRange } = filtersRef.current;
       const filters: Record<string, string> = { status: 'approved' };
-      if (searchTerm) filters.q = searchTerm;
-      if (sectorFilter) filters.sector = sectorFilter;
-      if (dateRange[0]) filters.date_from = dateRange[0].format('YYYY-MM-DD');
-      if (dateRange[1]) filters.date_to = dateRange[1].format('YYYY-MM-DD');
+      if (searchTerm) filters['q'] = searchTerm;
+      if (sectorFilter) filters['sector'] = sectorFilter;
+      if (dateRange[0]) filters['date_from'] = dateRange[0].format('YYYY-MM-DD');
+      if (dateRange[1]) filters['date_to'] = dateRange[1].format('YYYY-MM-DD');
 
       // page_size alto: a pré-agenda é uma lista única (paginação client-side),
       // então carrega o conjunto de aprovados de uma vez, não só a 1ª página.

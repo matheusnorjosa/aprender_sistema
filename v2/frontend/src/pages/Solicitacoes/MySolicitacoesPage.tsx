@@ -95,8 +95,8 @@ export default function MySolicitacoesPage(): JSX.Element {
     try {
       setLoading(true);
       const filters: Record<string, string> = { mine: 'true' };
-      if (statusFilter) filters.status = statusFilter;
-      if (searchTerm) filters.q = searchTerm;
+      if (statusFilter) filters['status'] = statusFilter;
+      if (searchTerm) filters['q'] = searchTerm;
 
       const data = await listSolicitacoes(filters) as PaginatedResponse<SolicitacaoExtended> | SolicitacaoExtended[];
       const results = 'results' in data ? data.results : data;

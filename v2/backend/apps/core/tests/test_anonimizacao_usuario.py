@@ -15,8 +15,12 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AuditLog, Usuario
-from apps.core.services.anonimizacao import CAMPOS_ANONIMIZADOS, anonimizar_usuario
+from apps.core.models import AuditLog, DATCoordenador, Usuario
+from apps.core.services.anonimizacao import (
+    CAMPOS_ANONIMIZADOS,
+    CAMPOS_ANONIMIZADOS_COORD,
+    anonimizar_usuario,
+)
 from apps.core.tests.factories import SolicitacaoFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
@@ -105,6 +109,85 @@ def test_auditoria_registra_o_fato_sem_pii(django_capture_on_commit_callbacks):
     assert _CPF_TITULAR not in blob
     assert _EMAIL_TITULAR not in blob
     assert _TEL_TITULAR not in blob
+
+
+# --------------------- reach ao DATCoordenador por CPF (opção A #1837) ---------------------
+
+
+def _coordenador(cpf, **kw):
+    actor = kw.pop("actor", None) or UsuarioFactory()
+    defaults = dict(
+        nome="Amanda Arruda",
+        email="coordenacao11@example.com",
+        telefone="85911112222",
+        foto_url="https://ex/f.jpg",
+        observacoes="anotação com PII",
+        area="DAT",
+        cpf=cpf,
+        created_by=actor,
+    )
+    defaults.update(kw)
+    return DATCoordenador.objects.create(**defaults)
+
+
+def test_anonimiza_alcanca_coordenador_por_cpf(django_capture_on_commit_callbacks):
+    """O CPF é a chave de join: esquecer o titular scrubba a PII do coordenador casado."""
+    user = _titular()
+    coord = _coordenador(cpf=_CPF_TITULAR)
+
+    with django_capture_on_commit_callbacks(execute=True):
+        anonimizar_usuario(usuario=user, actor=None)
+
+    coord.refresh_from_db()
+    assert coord.cpf is None
+    assert coord.email == ""
+    assert coord.telefone == ""
+    assert coord.foto_url == ""
+    assert coord.observacoes == ""
+    assert coord.nome != "Amanda Arruda"  # tombstone, não vazio (NOT NULL)
+    assert coord.nome != ""
+    assert coord.ativo is False
+
+
+def test_anonimiza_nao_alcanca_coordenador_de_outro_cpf(django_capture_on_commit_callbacks):
+    user = _titular()
+    outro = _coordenador(cpf="22255588846")
+
+    with django_capture_on_commit_callbacks(execute=True):
+        anonimizar_usuario(usuario=user, actor=None)
+
+    outro.refresh_from_db()
+    assert outro.cpf == "22255588846"
+    assert outro.nome == "Amanda Arruda"  # intocado
+
+
+def test_anonimiza_cpf_nao_11_digitos_nao_scrubba_ninguem(django_capture_on_commit_callbacks):
+    """Guard: cpf_original que não normaliza p/ 11 dígitos NÃO pode mass-scrubbar cpf=''/NULL."""
+    user = _titular(cpf="ANON0000009")  # normaliza p/ "0000009" (7 díg)
+    vazio = _coordenador(cpf="")
+
+    with django_capture_on_commit_callbacks(execute=True):
+        anonimizar_usuario(usuario=user, actor=None)
+
+    vazio.refresh_from_db()
+    assert vazio.nome == "Amanda Arruda"  # NÃO foi scrubbado
+
+
+def test_auditoria_conta_coordenadores_sem_pii(django_capture_on_commit_callbacks):
+    actor = UsuarioFactory(superuser=True)
+    user = _titular()
+    _coordenador(cpf=_CPF_TITULAR)
+
+    with django_capture_on_commit_callbacks(execute=True):
+        anonimizar_usuario(usuario=user, actor=actor)
+
+    log = AuditLog.objects.filter(action=AuditLog.Action.USER_ANONYMIZE).latest("created_at")
+    assert log.details["coordenadores_anonimizados"] == 1
+    assert set(log.details["campos_anonimizados_coordenador"]) == set(CAMPOS_ANONIMIZADOS_COORD)
+    blob = str(log.details)
+    assert _CPF_TITULAR not in blob
+    assert "coordenacao11@example.com" not in blob
+    assert "Amanda Arruda" not in blob
 
 
 # ------------------------------- endpoint -------------------------------

@@ -45,7 +45,13 @@ def build_lgpd_export_data(user: Any, *, include_audit: bool = True, include_gca
     `include_audit`: inclui as últimas 100 entradas de AuditLog do usuário.
     `include_gcal`: inclui METADADOS da credencial Google (nunca os tokens).
     """
-    from apps.core.models import AuditLog, AvailabilityBlock, GoogleOAuthCredential, Solicitacao
+    from apps.core.models import (
+        AuditLog,
+        AvailabilityBlock,
+        DATCoordenador,
+        GoogleOAuthCredential,
+        Solicitacao,
+    )
 
     data: dict[str, Any] = {
         "export_info": {
@@ -110,6 +116,16 @@ def build_lgpd_export_data(user: Any, *, include_audit: bool = True, include_gca
             "motivo",
             "created_at",
         )
+    )
+
+    # DATCoordenador casado por CPF (opcao A #1837): paridade acesso<->erasure. Se a
+    # anonimizacao alcanca o coordenador por CPF, o dossie de acesso precisa inclui-lo —
+    # senao o sistema apaga dado que se recusa a divulgar. Match so' com 11 digitos.
+    cpf_digits = "".join(ch for ch in str(user.cpf or "") if ch.isdigit())
+    data["dat_coordenador_records"] = (
+        list(DATCoordenador.objects.filter(cpf=cpf_digits).values("id", "nome", "area", "email", "telefone", "cargo"))
+        if len(cpf_digits) == 11
+        else []
     )
 
     # Aprovacoes feitas pelo titular (do AuditLog).

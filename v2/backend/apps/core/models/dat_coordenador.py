@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from django.core.validators import RegexValidator
 from django.db import models
 from django.utils import timezone
 
@@ -57,6 +58,19 @@ class DATCoordenador(models.Model):
 
     # Dados pessoais
     nome = models.CharField(max_length=200, verbose_name="Nome Completo")
+    # CPF = chave ESTÁVEL de pessoa (o email é chave de CARGO — coordenacao11@ migra de dono).
+    # Raw (consistente com Usuario.cpf), nullable (legados sem CPF), NÃO-unique (um IntegrityError
+    # abortaria o --apply; a unicidade é garantida pelo UNION-NK do importer). RegexValidator é grátis
+    # (não roda em create()/bulk_update) e fecha CRUD futuro. PII: nunca exposto em leitura.
+    cpf = models.CharField(
+        max_length=11,
+        null=True,
+        blank=True,
+        db_index=True,
+        validators=[RegexValidator(r"^\d{11}$", "CPF deve conter exatamente 11 dígitos.")],
+        verbose_name="CPF",
+        help_text="Somente dígitos (11). Chave de identidade para resolução de import por CPF.",
+    )
     email = models.EmailField(blank=True, verbose_name="Email Principal")
     email_alternativo = models.EmailField(blank=True, verbose_name="Email Alternativo")
     telefone = models.CharField(max_length=20, blank=True, verbose_name="Telefone Principal")

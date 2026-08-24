@@ -48,7 +48,7 @@ class SearchIndex {
    * @param data - Array of objects to index
    * @param options - Fuse.js options
    */
-  async index<T extends IndexableRecord>(
+  index<T extends IndexableRecord>(
     key: string,
     data: T[],
     options: IndexOptions = {}
@@ -64,6 +64,9 @@ class SearchIndex {
     };
 
     this.indices[key] = new Fuse(data, fuseOptions) as Fuse<IndexableRecord>;
+    // Indexação é síncrona hoje; mantém o contrato Promise<void> da API de busca
+    // (callers usam await/void) sem `async` ocioso (require-await).
+    return Promise.resolve();
   }
 
   /**

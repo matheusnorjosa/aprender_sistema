@@ -48,16 +48,17 @@ export default defineConfig({
         '**/e2e/**',
         'src/main.tsx',
       ],
-      // Ratchet de cobertura fixado no baseline REAL medido (2026-08), não numa meta
-      // aspiracional. O gate estava DORMENTE — o CI rodava `vitest` sem `--coverage`,
-      // então os 70% nunca eram avaliados e a cobertura real caiu para ~42%. Ligar em
-      // 70% reprovaria o CI na hora; fixar no piso atual TRAVA a regressão (nenhum PR
-      // baixa a cobertura) e sobe por ratchet conforme os testes entram.
+      // Ratchet de cobertura fixado no baseline REAL medido, não numa meta aspiracional.
+      // O gate estava DORMENTE (CI rodava `vitest` sem `--coverage`); ligado em #1800 no
+      // piso de então (~42%). Este ratchet sobe o piso após a leva de testes de clientes
+      // de API (#1815) + hooks (#1816): medido 44.75/34.47/32.92/45.26, fixado ~1pt
+      // abaixo pra travar a regressão sem reprovar por flutuação. Sobe conforme entram
+      // novos testes.
       thresholds: {
-        statements: 40,
-        branches: 31,
-        functions: 29,
-        lines: 41,
+        statements: 44,
+        branches: 34,
+        functions: 32,
+        lines: 44,
       },
     },
   },

@@ -266,12 +266,12 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
   };
 
   useEffect(() => {
-    fetchGrupos();
+    void fetchGrupos();
   }, [searchText, forcedType, rbacMeta]);
 
   useEffect(() => {
-    fetchUsuarios();
-    fetchPermissoesAndMeta();
+    void fetchUsuarios();
+    void fetchPermissoesAndMeta();
     void (async () => {
       try {
         const auth = await checkAuth();

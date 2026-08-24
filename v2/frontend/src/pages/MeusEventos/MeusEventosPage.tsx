@@ -48,7 +48,7 @@ export default function MeusEventosPage(): JSX.Element {
   }, []);
 
   useEffect(() => {
-    loadData(page);
+    void loadData(page);
   }, [loadData, page]);
 
   const handleTableChange = useCallback((pagination: TablePaginationConfig): void => {

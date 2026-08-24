@@ -100,7 +100,7 @@ describe('useCrudOperations', () => {
 
     // Start fetch (non-blocking)
     act(() => {
-      result.current.fetchData()
+      void result.current.fetchData()
     })
 
     // Should be loading

@@ -111,14 +111,14 @@ export default function MySolicitacoesPage(): JSX.Element {
   }, [statusFilter, searchTerm]);
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, [loadData]);
 
   const handleDelete = useCallback(async (id: ID): Promise<void> => {
     try {
       await deleteSolicitacao(id);
       message.success('Solicitação excluída com sucesso!');
-      loadData();
+      void loadData();
     } catch (error) {
       const apiErr = error as ApiErrorResponse;
       if (apiErr.response?.data?.detail) {

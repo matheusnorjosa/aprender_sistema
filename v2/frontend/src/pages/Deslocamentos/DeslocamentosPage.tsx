@@ -118,7 +118,7 @@ export default function DeslocamentosPage(): JSX.Element {
       }
     }
 
-    loadUser();
+    void loadUser();
   }, []);
 
   // M09-06 (#1622): guarda de sequência (latest-wins). O debounce reduz mas não
@@ -162,7 +162,7 @@ export default function DeslocamentosPage(): JSX.Element {
   // Opções de formador carregam UMA vez (não dependem dos filtros).
   useEffect(() => {
     if (canAccess) {
-      loadFormadores();
+      void loadFormadores();
     }
   }, [canAccess, loadFormadores]);
 
@@ -175,7 +175,7 @@ export default function DeslocamentosPage(): JSX.Element {
     }
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      loadDeslocamentos(1, controller.signal);
+      void loadDeslocamentos(1, controller.signal);
     }, 350);
     return () => {
       clearTimeout(timer);
@@ -185,7 +185,7 @@ export default function DeslocamentosPage(): JSX.Element {
 
   // Handle table change (pagination)
   const handleTableChange = (paginationConfig: TablePaginationConfig): void => {
-    loadDeslocamentos(paginationConfig.current);
+    void loadDeslocamentos(paginationConfig.current);
   };
 
   // Handle filter change
@@ -257,7 +257,7 @@ export default function DeslocamentosPage(): JSX.Element {
 
       setModalVisible(false);
       form.resetFields();
-      loadDeslocamentos(pagination.current);
+      void loadDeslocamentos(pagination.current);
     } catch (error) {
       const apiError = error as ApiErrorType;
       if (apiError.end_date) {
@@ -275,7 +275,7 @@ export default function DeslocamentosPage(): JSX.Element {
     try {
       await deleteDeslocamento(id);
       message.success('Deslocamento deletado com sucesso!');
-      loadDeslocamentos(pagination.current);
+      void loadDeslocamentos(pagination.current);
     } catch {
       message.error('Erro ao deletar deslocamento');
     }

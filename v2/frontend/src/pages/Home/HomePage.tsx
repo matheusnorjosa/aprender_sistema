@@ -129,7 +129,7 @@ export default function HomePage(): JSX.Element {
       }
     };
 
-    loadUserAndStats();
+    void loadUserAndStats();
   }, []);
 
   if (loading) {

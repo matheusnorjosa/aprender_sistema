@@ -340,7 +340,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
 
       await createSolicitacao(payload);
       message.success('Solicitação criada com sucesso!');
-      navigate('/solicitacoes/minhas');
+      void navigate('/solicitacoes/minhas');
     } catch (error) {
       logger.error('Erro ao criar solicitação:', error);
 

@@ -271,7 +271,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
         message.error(`Erro ao carregar opcoes: ${(error as Error).message}`);
       }
     };
-    loadOptions();
+    void loadOptions();
   }, []);
 
   // Gate do botao Excluir (#1740): o destroy exige `execute_restricted_operations`
@@ -288,7 +288,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
         setCanDeletePlano(false);
       }
     };
-    loadPermissions();
+    void loadPermissions();
   }, []);
 
   // ============================================================

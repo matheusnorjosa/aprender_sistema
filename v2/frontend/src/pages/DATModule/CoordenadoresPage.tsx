@@ -201,7 +201,7 @@ export default function CoordenadoresPage(): JSX.Element {
         message.error(`Erro ao carregar opções: ${(error as Error).message}`);
       }
     };
-    loadOptions();
+    void loadOptions();
   }, []);
 
   // Load alocações for detail view

@@ -68,11 +68,11 @@ export default function GerenciasPage(): JSX.Element {
   };
 
   useEffect(() => {
-    fetchGerencias(1, pagination.pageSize || DEFAULT_PAGE_SIZE);
+    void fetchGerencias(1, pagination.pageSize || DEFAULT_PAGE_SIZE);
   }, [searchText]);
 
   const handleTableChange = (newPagination: TablePaginationConfig): void => {
-    fetchGerencias(
+    void fetchGerencias(
       newPagination.current || 1,
       newPagination.pageSize || pagination.pageSize || DEFAULT_PAGE_SIZE,
     );
@@ -112,7 +112,7 @@ export default function GerenciasPage(): JSX.Element {
       }
       setModalVisible(false);
       form.resetFields();
-      fetchGerencias(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
+      void fetchGerencias(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
     } catch (error) {
       message.error(`Erro: ${(error as Error).message}`);
     }
@@ -129,7 +129,7 @@ export default function GerenciasPage(): JSX.Element {
         try {
           await deleteGerencia(gerencia.id);
           message.success('Gerencia excluida com sucesso');
-          fetchGerencias(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
+          void fetchGerencias(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
         } catch (error) {
           message.error(`Erro ao excluir: ${(error as Error).message}`);
         }

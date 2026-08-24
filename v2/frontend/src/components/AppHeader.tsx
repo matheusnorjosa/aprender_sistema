@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect, type JSX } from 'react';
 import { Layout, Button, Badge, Popover, List, Tag, Empty, Spin, Typography, message } from 'antd';
 import { Link } from 'react-router';
+import { BRAND_COLORS } from '../contexts/ThemeContext';
 import {
   UserOutlined,
   LogoutOutlined,
@@ -176,7 +177,7 @@ export function AppHeader({
           >
             <span style={{ cursor: 'pointer' }} aria-label="Notificações">
               <Badge count={unreadNotifications} size="small" offset={[2, 0]}>
-                <BellOutlined style={{ fontSize: 18, color: unreadNotifications > 0 ? '#006B52' : undefined }} />
+                <BellOutlined style={{ fontSize: 18, color: unreadNotifications > 0 ? BRAND_COLORS.primary : undefined }} />
               </Badge>
             </span>
           </Popover>

@@ -9,6 +9,7 @@
 
 import { useState, useEffect, ReactNode, JSX } from 'react';
 import { Link } from 'react-router';
+import { BRAND_COLORS } from '../../contexts/ThemeContext';
 import { Row, Col, Card, Typography, Badge, Space, Spin, Statistic } from 'antd';
 import {
   UserOutlined,
@@ -69,7 +70,7 @@ function AccessCard({ icon, title, description, link, badge, disabled = false }:
     >
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
         <div className="flex justify-between items-center">
-          <div style={{ fontSize: '32px', color: '#004B3D' }}>
+          <div style={{ fontSize: '32px', color: BRAND_COLORS.primaryDark }}>
             {icon}
           </div>
           {badge !== undefined && (

@@ -53,7 +53,7 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
     async function fetchData(): Promise<void> {
       try {
         const [gerenciasData, meData] = await Promise.all([
-          getGerencias() as Promise<Gerencia[]>,
+          getGerencias(),
           getMe(),
         ]);
         setAllGerencias(gerenciasData);

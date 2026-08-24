@@ -28,7 +28,7 @@ const { fetchAPIMock, getMeMock, listSolicitacoesMock, getStatusSummaryMock } = 
 // antd: substitui apenas DatePicker.RangePicker por um botão controlável.
 // O restante do antd (Table, Card, Segmented, Empty, Tag, ...) permanece real.
 vi.mock('antd', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+  const actual = (await importOriginal());
   const dayjsLib = (await import('dayjs')).default;
   const MockRangePicker = ({ onChange }: { onChange?: (dates: unknown[]) => void }) => (
     <button
@@ -46,7 +46,7 @@ vi.mock('antd', async (importOriginal) => {
 // config: mantém buildUrl/API_BASE reais (evita quebrar imports transitivos),
 // mas troca fetchAPI pelo mock roteável.
 vi.mock('../../../api/config', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+  const actual = (await importOriginal());
   return { ...actual, fetchAPI: fetchAPIMock };
 });
 

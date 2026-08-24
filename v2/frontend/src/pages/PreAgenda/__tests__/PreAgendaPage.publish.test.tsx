@@ -24,7 +24,7 @@ const { getMeMock, listSolicitacoesMock, getStatusSummaryMock, fetchAPIMock } = 
 }));
 
 vi.mock('../../../api/config', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+  const actual = (await importOriginal());
   return { ...actual, fetchAPI: fetchAPIMock };
 });
 vi.mock('../../../api/availability', () => ({ getMe: getMeMock }));

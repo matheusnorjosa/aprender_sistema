@@ -132,7 +132,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
     const fetchSolicitacao = async (): Promise<void> => {
       try {
         setLoading(true);
-        const data = await getSolicitacao(Number(id)) as Solicitacao;
+        const data = await getSolicitacao(Number(id));
         setSolicitacao(data);
 
         // Extrair formadores das participations
@@ -394,7 +394,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
             rules={[{ required: true, message: 'Por favor selecione um projeto' }]}
           >
             <ComboBox
-              lookupFunction={lookupProjetos as unknown as (query: string) => Promise<Array<{ id: ID; label: string; [key: string]: unknown }>>}
+              lookupFunction={lookupProjetos}
               onChange={(value: ComboBoxValue | null) => setFormData({ ...formData, projeto: value })}
               value={formData.projeto as unknown as { id: ID; label: string; [key: string]: unknown } | null}
               placeholder="Busque ou selecione um projeto"
@@ -406,7 +406,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
             rules={[{ required: true, message: 'Por favor selecione um tipo de evento' }]}
           >
             <ComboBox
-              lookupFunction={lookupTiposEvento as unknown as (query: string) => Promise<Array<{ id: ID; label: string; [key: string]: unknown }>>}
+              lookupFunction={lookupTiposEvento}
               onChange={(value: ComboBoxValue | null) => setFormData({ ...formData, tipoEvento: value })}
               value={formData.tipoEvento as unknown as { id: ID; label: string; [key: string]: unknown } | null}
               placeholder="Busque ou selecione um tipo de evento"
@@ -418,7 +418,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
             rules={[{ required: true, message: 'Por favor selecione um município' }]}
           >
             <ComboBox
-              lookupFunction={lookupMunicipios as unknown as (query: string) => Promise<Array<{ id: ID; label: string; [key: string]: unknown }>>}
+              lookupFunction={lookupMunicipios}
               onChange={(value: ComboBoxValue | null) => setFormData({ ...formData, municipio: value })}
               value={formData.municipio as unknown as { id: ID; label: string; [key: string]: unknown } | null}
               placeholder="Busque ou selecione um município"
@@ -430,7 +430,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
             rules={[{ required: true, message: 'Por favor selecione pelo menos um formador' }]}
           >
             <FormadoresPicker
-              value={formData.formadores as unknown as Array<{ id: ID; email: string; label: string; name?: string }>}
+              value={formData.formadores}
               onChange={(value: FormadorType[]) => setFormData({ ...formData, formadores: value })}
             />
           </Form.Item>

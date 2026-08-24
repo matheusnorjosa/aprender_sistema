@@ -1,0 +1,6 @@
+{
+  "//": "tsconfig SÓ para o lint type-aware (recommendedTypeChecked). O tsconfig.json de build EXCLUI testes, mas o eslint linta src/** inteiro (incl. testes) — o parser type-aware exige que todo arquivo lintado esteja num projeto. Este inclui os testes.",
+  "extends": "./tsconfig.json",
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

@@ -9,7 +9,6 @@
 
 import { useState, useEffect, useMemo, type JSX } from 'react';
 import { useTableFilters, type TableFilterParams } from '../../hooks/useTableFilters';
-import type { PaginatedResponse } from '../../types';
 import {
   Table,
   Button,
@@ -173,7 +172,7 @@ export default function FormacoesPage(): JSX.Element {
     refresh,
   } = useTableFilters<FormacoesFilters, FormacaoRecord, FormacoesStats>({
     defaultFilters: DEFAULT_FILTERS as unknown as FormacoesFilters,
-    listFn: listFormacoes as unknown as (params: TableFilterParams) => Promise<PaginatedResponse<FormacaoRecord>>,
+    listFn: listFormacoes,
     statsFn: getFormacoesStats as unknown as (params: TableFilterParams) => Promise<FormacoesStats>,
     buildParams: buildFormacoesParams,
     defaultOrdering: 'data_formacao',
@@ -184,7 +183,7 @@ export default function FormacoesPage(): JSX.Element {
   useEffect(() => {
     if (viewMode !== VIEW_MODES.CALENDAR) return;
     const params: TableFilterParams = {
-      ...(buildFormacoesParams(filters) as TableFilterParams),
+      ...(buildFormacoesParams(filters)),
       ordering: 'data_formacao',
     };
     getFormacoesCalendario(params)

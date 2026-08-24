@@ -143,7 +143,7 @@ export function useTableFilters<F extends object, T, S = unknown>({
 
         const results =
           (listResp as PaginatedResponse<T>).results ??
-          (Array.isArray(listResp) ? (listResp as T[]) : []);
+          (Array.isArray(listResp) ? (listResp) : []);
         const total = (listResp as PaginatedResponse<T>).count ?? results.length;
 
         setData(results);
@@ -166,7 +166,7 @@ export function useTableFilters<F extends object, T, S = unknown>({
   // Auto-fetch on mount and whenever filters change. Pagination changes are
   // driven by handleTableChange (or manual fetchData calls), not this effect —
   // otherwise changing pageSize would re-fire fetchData via the closure.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   useEffect(() => {
     if (!autoFetch) return;
     void fetchData(1);

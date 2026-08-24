@@ -100,6 +100,24 @@ def test_apply_plano_coordenador_none_when_unresolvable(tmp_path):
     assert PlanoFormacoes.objects.get().coordenador_id is None  # nome não bate → NULL, não chuta
 
 
+def test_apply_plano_ambiguous_email_resolves_none(tmp_path):
+    """Email de CARGO herdado por 2 coordenadores (a caixa trocou de dono) → NULL, não chuta o dono atual."""
+    actor = _actor()
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
+    # mesmo email de função em 2 DATCoordenador (histórico de troca)
+    DATCoordenador.objects.create(nome="Coord Antiga", email="coordenacao11@x.com", area="DAT", created_by=actor)
+    DATCoordenador.objects.create(nome="Coord Nova", email="coordenacao11@x.com", area="DAT", created_by=actor)
+    row = "Cidade X,CIDADE X,CE,Proj X,Proj X,2026,workbook,false,,,coordenacao11@x.com,0,0,0"
+    ExportContractImporter(
+        path=_write_export(tmp_path, {"plano_formacao": f"{PLANO_HEADER}\n{row}\n"}),
+        apply=True,
+        allow=("plano_formacao",),
+        actor=actor,
+    ).run()
+    assert PlanoFormacoes.objects.get().coordenador_id is None  # email ambíguo → NULL (não atrela o errado)
+
+
 def test_apply_plano_idempotent(tmp_path):
     actor = _actor()
     path = _setup(tmp_path, "Cidade X,CIDADE X,CE,Proj X,Proj X,2026,workbook,false,,,,0,0,0")

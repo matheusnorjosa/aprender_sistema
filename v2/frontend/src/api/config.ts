@@ -24,7 +24,7 @@ export type QueryParams = Record<string, string | number | boolean | null | unde
 /**
  * Base API URL (can be overridden by VITE_API_URL env var)
  */
-export const API_BASE: string = import.meta.env['VITE_API_URL'] || '/api';
+export const API_BASE: string = (import.meta.env['VITE_API_URL'] as string | undefined) || '/api';
 
 /**
  * Extrai token CSRF do cookie 'csrftoken'.
@@ -82,7 +82,7 @@ async function fetchFreshCsrfToken(): Promise<string | null> {
     });
 
     if (response.ok) {
-      const data = await response.json();
+      const data = (await response.json()) as { csrfToken?: string };
       const token = data.csrfToken;
 
       if (token) {
@@ -214,7 +214,7 @@ export async function fetchAPI<T = unknown>(url: string, options: FetchOptions =
 
     let error: { detail?: string; message?: string };
     try {
-      error = JSON.parse(errorBody);
+      error = JSON.parse(errorBody) as { detail?: string; message?: string };
     } catch {
       error = { detail: `HTTP ${response.status}: ${response.statusText}` };
     }
@@ -240,7 +240,7 @@ export async function fetchAPI<T = unknown>(url: string, options: FetchOptions =
   if (response.status === 204 || response.headers.get('content-length') === '0') {
     return undefined as T;
   }
-  return response.json();
+  return (await response.json()) as T;
 }
 
 /**

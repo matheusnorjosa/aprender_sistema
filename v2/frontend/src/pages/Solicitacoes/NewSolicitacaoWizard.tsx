@@ -262,7 +262,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
       // sobrescreve `coordenadores: []` por `undefined` e o render do resumo estoura em
       // `.length` (#1452). Só mescla o que realmente tem valor.
       const definidos = Object.fromEntries(
-        Object.entries(values).filter(([, v]) => v !== undefined)
+        Object.entries(values as Record<string, unknown>).filter(([, v]) => v !== undefined)
       );
       setFormData({ ...formData, ...definidos });
       setCurrentStep(currentStep + 1);

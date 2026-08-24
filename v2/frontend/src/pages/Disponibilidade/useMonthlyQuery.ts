@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { getMonthlyAvailability } from '../../api/availability';
+import type { MonthlyGridResponse } from '../../types/availability';
 import { TIMING } from '../../constants/timing';
 import { usePolling } from '../../hooks/usePolling';
 import { syncChannel } from '../../services/syncChannel';
@@ -23,19 +24,16 @@ interface UseMonthlyQueryParams {
 }
 
 /**
- * Monthly grid data returned by the hook
- * Uses generic types to allow flexibility in page implementations
+ * Monthly grid data returned by the hook — a shape real da API de grade mensal
+ * (`getMonthlyAvailability` já retorna `MonthlyGridResponse`).
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type MonthlyGridData = any;
+type MonthlyGridData = MonthlyGridResponse;
 
 /**
  * Return type for the monthly query hook
  */
 interface UseMonthlyQueryResult {
-  // MonthlyGridData é `any` (typing pendente p/ PR de no-unsafe-*); `any` já absorve
-  // null, então `| null` é redundante (no-redundant-type-constituents).
-  data: MonthlyGridData;
+  data: MonthlyGridData | null;
   loading: boolean;
   error: string | null;
   lastUpdated: number | null;
@@ -57,7 +55,7 @@ interface UseMonthlyQueryResult {
 export default function useMonthlyQuery(
   params: UseMonthlyQueryParams
 ): UseMonthlyQueryResult {
-  const [data, setData] = useState<MonthlyGridData>(null);
+  const [data, setData] = useState<MonthlyGridData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);

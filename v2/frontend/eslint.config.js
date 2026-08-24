@@ -93,18 +93,37 @@ export default defineConfig([
       // esquecido). Em PROD trava o smell; nos testes é DESLIGADO abaixo (mocks
       // `async () => data` são async de propósito p/ o contrato Promise).
       '@typescript-eslint/require-await': 'error',
+      // Grupo E — no-unsafe-* (type-safety ponta a ponta): valor `any` fluindo = buraco
+      // de tipo (acesso/atribuição/retorno/argumento/chamada). Fontes externas não-tipadas
+      // (`response.json()`/`JSON.parse`/`import.meta.env`) recebem cast p/ a shape real;
+      // respostas de API ganham interface (ex.: `MonthlyGridData = MonthlyGridResponse`).
+      // DESLIGADO em testes (fixtures/mocks são frouxos por natureza) — override abaixo.
+      '@typescript-eslint/no-unsafe-member-access': 'error',
+      '@typescript-eslint/no-unsafe-assignment': 'error',
+      '@typescript-eslint/no-unsafe-argument': 'error',
+      '@typescript-eslint/no-unsafe-return': 'error',
+      '@typescript-eslint/no-unsafe-call': 'error',
       // DX de Fast-Refresh (HMR), não correção — arquivos que exportam um
       // componente + util (ex: PerfilPage + maskCpf). Fica `warn`.
       'react-refresh/only-export-components': 'warn',
     },
   },
-  // Testes: `require-await` off — mocks/fakes async sem await são intencionais
-  // (retornam Promise p/ imitar a API real). O parser/plugin type-aware do bloco
-  // src/** acima continua valendo p/ estes arquivos (só sobrescreve a regra).
+  // Testes: regras type-aware frouxas — mocks/fakes/fixtures usam `async () => data`
+  // sem await (contrato Promise) e dados `any` de propósito. O parser/plugin type-aware
+  // do bloco src/** acima continua valendo (só sobrescreve as regras). Prod segue ATIVO.
   {
-    files: ['src/**/*.{test,spec}.{ts,tsx}', 'src/**/__tests__/**/*.{ts,tsx}'],
+    files: [
+      'src/**/*.{test,spec}.{ts,tsx}',
+      'src/**/__tests__/**/*.{ts,tsx}',
+      'src/test/**/*.{ts,tsx}',
+    ],
     rules: {
       '@typescript-eslint/require-await': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
     },
   },
 ])

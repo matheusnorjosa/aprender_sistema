@@ -94,7 +94,9 @@ async function postMultipart(url: string, file: File, dryRun: boolean = true): P
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: response.statusText }));
+    const error = (await response
+      .json()
+      .catch(() => ({ detail: response.statusText }))) as { detail?: string };
     throw new Error(error.detail || `HTTP ${response.status}: ${response.statusText}`);
   }
 

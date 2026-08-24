@@ -9,7 +9,7 @@
 
 /* Login - labels legiveis no card claro */
 .login-page .login-card .ant-form-item-label > label {
-  color: #004B3D;
+  color: var(--as-primary-dark);
 }
 
 /* Login - inputs/placeholder coerentes com card claro */
@@ -17,11 +17,11 @@
 .login-page .login-card .ant-input-affix-wrapper {
   background-color: #ffffff;
   border-color: #cdd9cd;
-  color: #004B3D;
+  color: var(--as-primary-dark);
 }
 
 .login-page .login-card .ant-input-affix-wrapper input {
-  color: #004B3D;
+  color: var(--as-primary-dark);
 }
 
 .login-page .login-card .ant-input::placeholder,
@@ -31,12 +31,12 @@
 
 .login-page .login-card .ant-input:hover,
 .login-page .login-card .ant-input-affix-wrapper:hover {
-  border-color: #006B52;
+  border-color: var(--as-primary);
 }
 
 .login-page .login-card .ant-input:focus,
 .login-page .login-card .ant-input-affix-wrapper-focused {
-  border-color: #006B52;
+  border-color: var(--as-primary);
   box-shadow: 0 0 0 2px rgba(0, 107, 82, 0.15);
 }
 
@@ -45,13 +45,13 @@
 }
 
 .login-page .login-card .ant-input-password-icon:hover {
-  color: #004B3D;
+  color: var(--as-primary-dark);
 }
 
 /* Login - botão consistente com a marca (independente do tema) */
 .login-page .login-card .login-submit.ant-btn-primary {
-  background: #006B52 !important;
-  border-color: #006B52 !important;
+  background: var(--as-primary) !important;
+  border-color: var(--as-primary) !important;
   color: #ffffff !important;
 }
 

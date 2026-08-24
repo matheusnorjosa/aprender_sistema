@@ -4,6 +4,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Tokens de cor de marca — fonte única, espelho de BRAND_COLORS
+ * (src/contexts/ThemeContext.tsx). AntD lê BRAND_COLORS via ConfigProvider;
+ * CSS (App.css) e Tailwind (tailwind.config.js) leem estas vars. Trocar o
+ * verde da marca = editar BRAND_COLORS + estas 3 linhas.
+ */
+:root {
+  --as-primary: #006B52;
+  --as-primary-dark: #004B3D;
+  --as-primary-light: #E5EDE5;
+}
+
 /* Clean reset - let Ant Design handle styling */
 * {
   margin: 0;

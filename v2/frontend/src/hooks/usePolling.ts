@@ -56,7 +56,7 @@ export function usePolling(
 
     const doFetch = () => {
       if (mountedRef.current) {
-        fetchRef.current();
+        void fetchRef.current();
       }
     };
 

@@ -199,7 +199,7 @@ export default function CadastrosPage(): JSX.Element {
         message.error(`Erro ao carregar opções: ${(error as Error).message}`);
       }
     };
-    loadOptions();
+    void loadOptions();
   }, []);
 
   // CRUD handlers

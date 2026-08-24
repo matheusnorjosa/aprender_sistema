@@ -82,7 +82,7 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
         setLoading(false);
       }
     }
-    fetchData();
+    void fetchData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /**

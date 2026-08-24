@@ -263,7 +263,7 @@ export async function initCsrfToken(): Promise<void> {
 // Isso garante que o token está disponível assim que o app iniciar
 // Skip em ambiente de teste (Vitest/jsdom não tem servidor real)
 if (typeof import.meta.env?.['VITEST'] === 'undefined') {
-  initCsrfToken();
+  void initCsrfToken();
 }
 
 /**

@@ -69,7 +69,7 @@ export default function ComboBox({
         setLoading(false);
       }
     };
-    loadInitial();
+    void loadInitial();
   }, [lookupFunction]);
 
   // Atualizar searchValue quando value muda

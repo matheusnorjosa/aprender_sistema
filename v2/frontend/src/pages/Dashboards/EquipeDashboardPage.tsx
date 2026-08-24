@@ -87,7 +87,7 @@ export default function EquipeDashboardPage(): JSX.Element {
   }, [days]);
 
   useEffect(() => {
-    loadAllMetrics();
+    void loadAllMetrics();
   }, [loadAllMetrics]);
 
   const handleExportCSV = () => {

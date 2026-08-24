@@ -82,7 +82,7 @@ const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }: GoogleIntegr
   // Carregar calendários quando conectado
   useEffect(() => {
     if (connected && !isExpired) {
-      loadCalendars();
+      void loadCalendars();
     }
   }, [connected, isExpired]);
 

@@ -54,7 +54,7 @@ export default function ControlePage(): JSX.Element {
    * Carrega compras ao montar ou quando filtros mudam.
    */
   useEffect(() => {
-    fetchCompras();
+    void fetchCompras();
   }, [fetchCompras]);
 
   return (

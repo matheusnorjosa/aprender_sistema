@@ -142,7 +142,7 @@ const useGoogleIntegration = (): UseGoogleIntegrationReturn => {
    * Carrega status ao montar o componente.
    */
   useEffect(() => {
-    fetchStatus();
+    void fetchStatus();
   }, [fetchStatus]);
 
   return {

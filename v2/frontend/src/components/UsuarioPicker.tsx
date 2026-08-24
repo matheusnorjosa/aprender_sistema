@@ -131,7 +131,7 @@ export default function UsuarioPicker({
         onFocus={() => {
           // Carregar lista inicial ao focar no campo (se ainda não carregou)
           if (options.length === 0 && !loading) {
-            handleSearch('');
+            void handleSearch('');
           }
         }}
         onSelect={handleAdd}

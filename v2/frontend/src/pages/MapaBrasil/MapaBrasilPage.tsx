@@ -227,12 +227,12 @@ export default function MapaBrasilPage(): JSX.Element {
         logger.error('Erro ao carregar projetos:', err);
       }
     };
-    fetchProjetos();
+    void fetchProjetos();
   }, []);
 
   // Fetch dados do mapa no mount
   useEffect(() => {
-    fetchMapData();
+    void fetchMapData();
   }, []);
 
   const buildCurrentMapParams = (): MapQueryParams => {
@@ -290,21 +290,21 @@ export default function MapaBrasilPage(): JSX.Element {
   // Quando selectedState muda, buscar coordenadores
   useEffect(() => {
     if (selectedState) {
-      fetchCoordinators(selectedState, appliedMapFilters);
+      void fetchCoordinators(selectedState, appliedMapFilters);
     } else {
       setCoordenadoresData([]);
     }
   }, [selectedState, appliedMapFilters]);
 
   const handleApplyFilters = (): void => {
-    fetchMapData();
+    void fetchMapData();
   };
 
   const handleClearFilters = (): void => {
     setSelectedProjeto(null);
     setDateRange(null);
     setSearchTerm('');
-    fetchMapData({});
+    void fetchMapData({});
   };
 
   // Função para resetar a seleção do estado com zoom de volta

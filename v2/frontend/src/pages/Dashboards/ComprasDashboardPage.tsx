@@ -229,7 +229,7 @@ export default function ComprasDashboardPage(): JSX.Element {
   }, [filters]);
 
   useEffect(() => {
-    loadDashboard();
+    void loadDashboard();
   }, [loadDashboard]);
 
   useEffect(() => {
@@ -245,7 +245,7 @@ export default function ComprasDashboardPage(): JSX.Element {
         // Sem opções não bloqueia dashboard
       }
     };
-    loadOptions();
+    void loadOptions();
   }, []);
 
   const anoOptions = useMemo(() => {

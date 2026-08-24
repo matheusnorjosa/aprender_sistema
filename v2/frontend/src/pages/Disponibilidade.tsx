@@ -67,7 +67,7 @@ export default function Disponibilidade(): JSX.Element {
 
   // Carregar bloqueios ao montar componente
   useEffect(() => {
-    fetchBlocks();
+    void fetchBlocks();
   }, []);
 
   return (

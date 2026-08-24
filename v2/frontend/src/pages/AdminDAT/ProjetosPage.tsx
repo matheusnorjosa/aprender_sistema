@@ -82,11 +82,11 @@ export default function ProjetosPage(): JSX.Element {
   };
 
   useEffect(() => {
-    fetchProjetos(1, pagination.pageSize || DEFAULT_PAGE_SIZE);
+    void fetchProjetos(1, pagination.pageSize || DEFAULT_PAGE_SIZE);
   }, [searchText]);
 
   const handleTableChange = (newPagination: TablePaginationConfig): void => {
-    fetchProjetos(
+    void fetchProjetos(
       newPagination.current || 1,
       newPagination.pageSize || pagination.pageSize || DEFAULT_PAGE_SIZE,
     );
@@ -120,7 +120,7 @@ export default function ProjetosPage(): JSX.Element {
       }
       setModalVisible(false);
       form.resetFields();
-      fetchProjetos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
+      void fetchProjetos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
     } catch (error) {
       message.error(`Erro: ${(error as Error).message}`);
     }
@@ -137,7 +137,7 @@ export default function ProjetosPage(): JSX.Element {
         try {
           await deleteProjeto(projeto.id);
           message.success('Projeto excluído com sucesso');
-          fetchProjetos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
+          void fetchProjetos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
         } catch (error) {
           message.error(`Erro ao excluir: ${(error as Error).message}`);
         }

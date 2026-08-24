@@ -50,15 +50,16 @@ export default defineConfig({
       ],
       // Ratchet de cobertura fixado no baseline REAL medido, não numa meta aspiracional.
       // O gate estava DORMENTE (CI rodava `vitest` sem `--coverage`); ligado em #1800 no
-      // piso de então (~42%). Este ratchet sobe o piso após a leva de testes de clientes
-      // de API (#1815) + hooks (#1816): medido 44.75/34.47/32.92/45.26, fixado ~1pt
-      // abaixo pra travar a regressão sem reprovar por flutuação. Sobe conforme entram
-      // novos testes.
+      // piso de então (~42%). Sobe a cada leva de testes: #1815 (clientes de API) + #1816
+      // (hooks) levaram a 44/34/32/44; agora, pós #1825 (4 páginas críticas), o suite mede
+      // 45.33/35.29/33.68/45.85 — fixado ~0.3-0.8pt abaixo pra travar a regressão sem
+      // reprovar por flutuação. Cobertura é determinística num suite verde, então a margem
+      // só protege de teste flaky que perca as retries.
       thresholds: {
-        statements: 44,
-        branches: 34,
-        functions: 32,
-        lines: 44,
+        statements: 45,
+        branches: 35,
+        functions: 33,
+        lines: 45,
       },
     },
   },

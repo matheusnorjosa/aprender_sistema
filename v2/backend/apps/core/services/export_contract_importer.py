@@ -103,6 +103,9 @@ IMPLEMENTED = {
     "dat_cadastro",
     "dat_compra",
 }
+# Escrivíveis = subconjunto de IMPLEMENTED com apply REAL. `produto`/`gerencia` classificam mas não
+# têm handler (silent-0) → `--allow-entity` neles é erro (CR-03), não "applied=0" calado.
+APPLIABLE = IMPLEMENTED - {"produto", "gerencia"}
 
 # Papel canonico (PAPEL_MAPPING) -> nome do Django Group (FUNCAO_GROUPS). Fonte do papel no
 # import de usuario: equipe_gerencia.papel (primaria, por CPF) -> usuario.cargo (fallback).
@@ -481,16 +484,24 @@ class ExportContractImporter:
                 tally[st] += 1
 
         elif name == "dat_coordenador":
-            # DATCoordenador não tem unique no model; matching por email (lower) ∪ norm(nome).
-            # PII: coordenador é pessoa → só conta/resolve, nunca imprime valores.
-            emails = {(e or "").lower() for e in DATCoordenador.objects.values_list("email", flat=True) if e}
+            # Existence-based UNION (cpf ∪ email/alt ∪ norm(nome)) — ESPELHA a NK do apply, senão o
+            # dry-run diverge do apply e fura o gate "dry-run verde". PII: coordenador é pessoa → o
+            # `usuario_cpf` só entra na contagem de existência, nunca no relatório.
+            emails = {(e or "").lower() for e in DATCoordenador.objects.values_list("email", flat=True) if e} | {
+                (e or "").lower() for e in DATCoordenador.objects.values_list("email_alternativo", flat=True) if e
+            }
             nomes = {_norm(n) for n in DATCoordenador.objects.values_list("nome", flat=True) if n}
+            cpfs = {c for c in DATCoordenador.objects.values_list("cpf", flat=True) if c}
             for r in rows:
                 val = (r.get("usuario") or "").strip()
                 if not val:
                     tally["would_reject"] += 1
                     continue
-                existe = ("@" in val and val.lower() in emails) or (_norm(val) in nomes)
+                cpf_raw = r.get("usuario_cpf") or r.get("cpf") or ""
+                cpf = normalize_cpf_digits(cpf_raw) if is_valid_cpf(cpf_raw) else None
+                existe = (
+                    (cpf is not None and cpf in cpfs) or ("@" in val and val.lower() in emails) or (_norm(val) in nomes)
+                )
                 st, _ = diff_and_classify({} if existe else None, {}, protected)
                 tally[st] += 1
 
@@ -640,7 +651,12 @@ class ExportContractImporter:
         """Cria SOMENTE would_create das entidades em allow (create-only). Transacional."""
         applied: dict[str, int] = {}
         with transaction.atomic():
-            for name in self.allow:
+            # Ordena por ENTITY_ORDER (master → operacional): o apply itera `self.allow`, que preserva a
+            # ordem de CLI — sem isto, `--allow-entity plano_formacao dat_coordenador` resolveria planos
+            # ANTES de criar coordenadores (índice vazio → coordenador_id NULL), sem reparo (create-only).
+            for name in sorted(
+                self.allow, key=lambda n: ENTITY_ORDER.index(n) if n in ENTITY_ORDER else len(ENTITY_ORDER)
+            ):
                 if name not in IMPLEMENTED:
                     continue
                 if name == "usuario":
@@ -655,6 +671,11 @@ class ExportContractImporter:
                     continue
                 if name == "dat_compra":
                     applied[name] = self._apply_dat_compra(self._load(name))
+                    continue
+                if name == "dat_coordenador":
+                    # Handler dedicado (fecha silent-gap M18-09: CSV usa `usuario`, não `nome` → o loop
+                    # genérico gravaria 0). Cria com CPF do master (`usuario_cpf`).
+                    applied[name] = self._apply_dat_coordenador(self._load(name))
                     continue
                 if name == "projeto":
                     # Handler dedicado (resolver + PG + fluxo); NÃO o loop genérico (nome__iexact).
@@ -799,6 +820,57 @@ class ExportContractImporter:
                     idx.setdefault(key, next(iter(ids)))
         return idx
 
+    def _dat_coordenador_cpf_index(self) -> dict[str, int]:
+        """cpf(11 díg) → coordenador_id, só ids INEQUÍVOCOS. Guard falsy OBRIGATÓRIO: só `len==11`
+        (senão `cpf==""` mapearia `""→id` e prenderia toda linha de CPF vazio na pessoa errada)."""
+        cpf_ids: dict[str, set[int]] = {}
+        for cid, cpf in DATCoordenador.objects.values_list("id", "cpf"):
+            if cpf and len(cpf) == 11:
+                cpf_ids.setdefault(cpf, set()).add(cid)
+        return {cpf: next(iter(ids)) for cpf, ids in cpf_ids.items() if len(ids) == 1}
+
+    def _apply_dat_coordenador(self, rows: list[dict[str, str]]) -> int:
+        """Create-only de DATCoordenador (fecha o silent-gap M18-09). Master v14 =
+        `usuario`(NOME, sem email), `usuario_cpf`(raw), `area`. NK existence-based **UNION**
+        (cpf OU email OU norm(nome)) — priority-first (cpf) duplicaria a pessoa cuja linha DB
+        nasceu no CRUD sem cpf. `cpf` só se `is_valid_cpf`; linha sem nome é rejeitada (create-only
+        não conserta nome vazio). Índices atualizados in-memory p/ dedupe intra-CSV."""
+        actor = self._require_actor("dat_coordenador")
+        existing_cpfs = {c for c in DATCoordenador.objects.values_list("cpf", flat=True) if c}
+        existing_names = {_norm(n) for n in DATCoordenador.objects.values_list("nome", flat=True) if n}
+        existing_emails = {(e or "").lower() for e in DATCoordenador.objects.values_list("email", flat=True) if e} | {
+            (e or "").lower() for e in DATCoordenador.objects.values_list("email_alternativo", flat=True) if e
+        }
+        created = 0
+        for r in rows:
+            usuario = (r.get("usuario") or "").strip()
+            if not usuario:
+                continue  # sem nome → não cria (row inutilizável sob create-only)
+            cpf_raw = r.get("usuario_cpf") or r.get("cpf") or ""
+            cpf = normalize_cpf_digits(cpf_raw) if is_valid_cpf(cpf_raw) else None
+            is_email = "@" in usuario
+            exists = (
+                (cpf is not None and cpf in existing_cpfs)
+                or (is_email and usuario.lower() in existing_emails)
+                or (_norm(usuario) in existing_names)
+            )
+            if exists:
+                continue
+            DATCoordenador.objects.create(
+                nome=usuario[:200],
+                email=(usuario.lower()[:254] if is_email else ""),
+                area=(r.get("area") or "").strip()[:100],
+                cpf=cpf,
+                created_by=actor,
+            )
+            if cpf is not None:
+                existing_cpfs.add(cpf)
+            existing_names.add(_norm(usuario))
+            if is_email:
+                existing_emails.add(usuario.lower())
+            created += 1
+        return created
+
     def _apply_plano_formacao(self, rows: list[dict[str, str]]) -> int:
         """Create-only de PlanoFormacoes. NK (municipio, projeto, ano); `ano` DECLARADO do workbook.
         `sem_plano` (reserva: TOTAL 0 + sem data) é pulado (não é plano). Coordenador (DATCoordenador)
@@ -809,6 +881,7 @@ class ExportContractImporter:
         actor = self._require_actor("plano_formacao")
         mun_idx = self._municipio_index()
         coord_idx = self._dat_coordenador_index()
+        coord_cpf_idx = self._dat_coordenador_cpf_index()
         created = 0
         for r in rows:
             if _to_bool(r.get("sem_plano")):
@@ -820,11 +893,20 @@ class ExportContractImporter:
             ano = _parse_int(r.get("ano"))
             if PlanoFormacoes.objects.filter(municipio_id=mun_id, projeto_id=proj_id, ano=ano).exists():
                 continue
-            email = (r.get("coordenador_email") or "").strip().lower()
-            coord_id = coord_idx.get(email) if email else None
-            if coord_id is None:
+            # CPF autoritativo (#1837): se a linha tem CPF válido, casa por CPF; se não casar, cai para
+            # NOME (guardado), NUNCA para o email de CARGO (que ligaria ao ocupante atual da caixa —
+            # o bug que a opção A mata). Sem CPF → fallback email→nome do PR3.
+            cpf_raw = r.get("coordenador_cpf") or ""
+            cpf = normalize_cpf_digits(cpf_raw) if is_valid_cpf(cpf_raw) else None
+            if cpf is not None:
                 nome = _norm(r.get("coordenador") or "")
-                coord_id = coord_idx.get(nome) if nome else None
+                coord_id = coord_cpf_idx.get(cpf) or (coord_idx.get(nome) if nome else None)
+            else:
+                email = (r.get("coordenador_email") or "").strip().lower()
+                coord_id = coord_idx.get(email) if email else None
+                if coord_id is None:
+                    nome = _norm(r.get("coordenador") or "")
+                    coord_id = coord_idx.get(nome) if nome else None
             PlanoFormacoes.objects.create(
                 municipio_id=mun_id,
                 projeto_id=proj_id,

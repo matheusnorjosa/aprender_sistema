@@ -190,10 +190,77 @@ def test_classify_plano_ano_in_nk(tmp_path):
 
 
 def test_apply_plano_no_coordenador_pii_in_report(tmp_path):
-    """coordenador é pessoa → nome/email nunca no relatório (dry-run não lê coordenador)."""
+    """coordenador é pessoa → nome/email/CPF nunca no relatório (dry-run não lê coordenador)."""
     MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
     ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
-    row = "Cidade X,CIDADE X,CE,Proj X,Proj X,2026,workbook,false,CoordSecretoZZZ,,secreto@zzz.com,0,0,0"
+    row = "Cidade X,CIDADE X,CE,Proj X,Proj X,2026,workbook,false,CoordSecretoZZZ,22255588846,secreto@zzz.com,0,0,0"
     report = ExportContractImporter(path=_write_export(tmp_path, {"plano_formacao": f"{PLANO_HEADER}\n{row}\n"})).run()
-    assert "CoordSecretoZZZ" not in json.dumps(report)
-    assert "secreto@zzz.com" not in json.dumps(report)
+    blob = json.dumps(report)
+    assert "CoordSecretoZZZ" not in blob
+    assert "secreto@zzz.com" not in blob
+    assert "22255588846" not in blob  # o CPF (novo) também não vaza no report
+
+
+# --------------------- resolução por CPF (opção A #1837 · Wave 2) ---------------------
+
+_CPF_A = "22255588846"
+
+
+def _plano_with(tmp_path, coordenador="", coordenador_cpf="", coordenador_email=""):
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
+    row = (
+        f"Cidade X,CIDADE X,CE,Proj X,Proj X,2026,workbook,false,"
+        f"{coordenador},{coordenador_cpf},{coordenador_email},0,0,0"
+    )
+    return _write_export(tmp_path, {"plano_formacao": f"{PLANO_HEADER}\n{row}\n"})
+
+
+def test_apply_plano_resolves_by_cpf(tmp_path):
+    """CPF casa o coordenador mesmo com nome/email da linha divergentes."""
+    actor = _actor()
+    coord = DATCoordenador.objects.create(
+        nome="Pessoa Real", email="pessoal@x.com", area="DAT", cpf=_CPF_A, created_by=actor
+    )
+    path = _plano_with(tmp_path, coordenador="Outro Nome", coordenador_cpf=_CPF_A, coordenador_email="cargo@x.com")
+    ExportContractImporter(path=path, apply=True, allow=("plano_formacao",), actor=actor).run()
+    assert PlanoFormacoes.objects.get().coordenador_id == coord.id
+
+
+def test_apply_plano_cpf_wins_over_divergent_email(tmp_path):
+    """A linha traz o CPF de A e o email de cargo de B → resolve A (CPF autoritativo)."""
+    actor = _actor()
+    a = DATCoordenador.objects.create(nome="A", email="a@x.com", area="DAT", cpf=_CPF_A, created_by=actor)
+    DATCoordenador.objects.create(nome="B", email="coordenacao11@x.com", area="DAT", created_by=actor)
+    path = _plano_with(tmp_path, coordenador_cpf=_CPF_A, coordenador_email="coordenacao11@x.com")
+    ExportContractImporter(path=path, apply=True, allow=("plano_formacao",), actor=actor).run()
+    assert PlanoFormacoes.objects.get().coordenador_id == a.id
+
+
+def test_apply_plano_cpf_miss_falls_to_name_not_email(tmp_path):
+    """CPF presente mas sem match → cai para NOME (sem match) → NULL. NUNCA para o email de cargo."""
+    actor = _actor()
+    DATCoordenador.objects.create(nome="Cargo Holder", email="coordenacao11@x.com", area="DAT", created_by=actor)
+    path = _plano_with(
+        tmp_path, coordenador="Nome Que Nao Existe", coordenador_cpf=_CPF_A, coordenador_email="coordenacao11@x.com"
+    )
+    ExportContractImporter(path=path, apply=True, allow=("plano_formacao",), actor=actor).run()
+    assert PlanoFormacoes.objects.get().coordenador_id is None  # não usou o email de cargo
+
+
+def test_apply_plano_no_cpf_uses_email(tmp_path):
+    """Sem CPF na linha → mantém o fallback email→nome (status quo PR3)."""
+    actor = _actor()
+    coord = DATCoordenador.objects.create(nome="E", email="e@x.com", area="DAT", created_by=actor)
+    path = _plano_with(tmp_path, coordenador_email="e@x.com")
+    ExportContractImporter(path=path, apply=True, allow=("plano_formacao",), actor=actor).run()
+    assert PlanoFormacoes.objects.get().coordenador_id == coord.id
+
+
+def test_apply_plano_empty_cpf_index_guard(tmp_path):
+    """Guard falsy: um coordenador com cpf='' não pode ser casado por uma linha de cpf vazio."""
+    actor = _actor()
+    DATCoordenador.objects.create(nome="Vazio", email="", area="DAT", cpf="", created_by=actor)
+    path = _plano_with(tmp_path, coordenador="Sem Ninguem", coordenador_cpf="", coordenador_email="")
+    ExportContractImporter(path=path, apply=True, allow=("plano_formacao",), actor=actor).run()
+    assert PlanoFormacoes.objects.get().coordenador_id is None

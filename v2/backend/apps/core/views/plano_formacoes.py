@@ -57,6 +57,7 @@ class PlanoFormacoesFilter(filters.FilterSet):
         fields = [
             "municipio",
             "projeto",
+            "ano",
             "coordenador",
             "ativo",
             "uf",

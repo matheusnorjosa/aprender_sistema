@@ -52,6 +52,13 @@ class PlanoFormacoes(models.Model):
         verbose_name="Coordenador Responsavel",
     )
 
+    ano = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Ano",
+        help_text="Ano do ciclo anual do plano (declarado no import).",
+    )
+
     # Totais de carga horaria (calculados/manuais)
     ch_total = models.DecimalField(
         max_digits=6,
@@ -105,10 +112,17 @@ class PlanoFormacoes(models.Model):
             models.Index(fields=["municipio", "projeto"]),
             models.Index(fields=["coordenador", "ativo"]),
         ]
-        constraints = [models.UniqueConstraint(fields=["municipio", "projeto"], name="unique_plano_municipio_projeto")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["municipio", "projeto", "ano"],
+                name="unique_plano_municipio_projeto_ano",
+                nulls_distinct=False,
+            )
+        ]
 
     def __str__(self) -> str:
-        return f"{self.municipio} - {self.projeto}"
+        base = f"{self.municipio} - {self.projeto}"
+        return f"{base} ({self.ano})" if self.ano else base
 
     def recalcular_ch(self) -> None:
         """Recalcula CH total e anual baseado nas formacoes.

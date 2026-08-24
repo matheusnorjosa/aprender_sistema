@@ -5,7 +5,7 @@ pessoa que substitui o email de cargo na resolução do coordenador. É PII: nun
 exposto em leitura (serializer/CRUD ficam para wave futura).
 """
 
-# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportCallIssue=false
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportCallIssue=false
 
 from __future__ import annotations
 

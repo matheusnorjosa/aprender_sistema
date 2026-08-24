@@ -8,10 +8,12 @@ Type-checked with Pyright (strict mode).
 
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from django.db import models
+from django.utils import timezone
 
 if TYPE_CHECKING:
     from apps.core.models.usuario import Usuario
@@ -278,6 +280,15 @@ class EquipeGerencia(models.Model):
         default=True,
         help_text="Se esta atribuicao esta ativa",
     )
+    valid_from = models.DateField(
+        default=timezone.localdate,
+        help_text="Início da vigência do vínculo (inclusive).",
+    )
+    valid_to = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Fim da vigência (inclusive); NULL = janela aberta / vigente.",
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -297,6 +308,11 @@ class EquipeGerencia(models.Model):
                 name="apoio_requires_supervisor",
                 violation_error_message="Apoio de Coordenacao deve ter um coordenador supervisor",
             ),
+            models.CheckConstraint(
+                condition=(models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=models.F("valid_from"))),
+                name="equipe_gerencia_valid_window",
+                violation_error_message="valid_to deve ser vazio ou >= valid_from",
+            ),
         ]
         indexes = [
             # ASQ-004: hot path do grid mensal filtra por (gerencia, papel, ativo).
@@ -308,6 +324,21 @@ class EquipeGerencia(models.Model):
                 name="idx_equipe_ger_papel_ativo",
             ),
         ]
+
+    @classmethod
+    def vigentes_em(cls, hoje: date | None = None) -> models.QuerySet["EquipeGerencia"]:
+        """Vínculos VIGENTES na data ``hoje`` (default: hoje em Fortaleza, RD-06) — SSOT de vigência.
+
+        Vigente = kill-switch ``ativo`` ligado E a data cai dentro da janela
+        ``[valid_from, valid_to]`` (``valid_to`` NULL = janela aberta). O ``hoje`` é
+        resolvido AQUI (nunca como default de parâmetro) para não congelar no import.
+        Uso: ``EquipeGerencia.vigentes_em().filter(...)``.
+        """
+        if hoje is None:
+            hoje = timezone.localdate()
+        return EquipeGerencia.objects.filter(ativo=True, valid_from__lte=hoje).filter(
+            models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=hoje)
+        )
 
     def __str__(self) -> str:
         papel = self.get_papel_display()  # type: ignore[reportUnknownMemberType,reportAttributeAccessIssue]

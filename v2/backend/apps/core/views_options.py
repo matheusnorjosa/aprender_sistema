@@ -356,7 +356,8 @@ def formadores_do_setor_options(request: Request) -> Response:
     # Superusers veem todos os formadores e coordenadores
     if user.is_superuser:
         user_ids = (
-            EquipeGerencia.objects.filter(papel__in=["FORMADOR", "COORDENADOR"], ativo=True)
+            EquipeGerencia.vigentes_em()
+            .filter(papel__in=["FORMADOR", "COORDENADOR"])
             .values_list("usuario_id", flat=True)
             .distinct()
         )
@@ -367,7 +368,7 @@ def formadores_do_setor_options(request: Request) -> Response:
         return Response(serializer.data)
 
     # Buscar as gerencias do usuário logado
-    user_gerencias = EquipeGerencia.objects.filter(usuario=user, ativo=True).values_list("gerencia_id", flat=True)
+    user_gerencias = EquipeGerencia.vigentes_em().filter(usuario=user).values_list("gerencia_id", flat=True)
 
     if not user_gerencias:
         # Se usuário não tem gerencias, retorna lista vazia
@@ -375,7 +376,8 @@ def formadores_do_setor_options(request: Request) -> Response:
 
     # Buscar formadores das mesmas gerencias
     formador_ids = (
-        EquipeGerencia.objects.filter(gerencia_id__in=user_gerencias, papel="FORMADOR", ativo=True)
+        EquipeGerencia.vigentes_em()
+        .filter(gerencia_id__in=user_gerencias, papel="FORMADOR")
         .values_list("usuario_id", flat=True)
         .distinct()
     )

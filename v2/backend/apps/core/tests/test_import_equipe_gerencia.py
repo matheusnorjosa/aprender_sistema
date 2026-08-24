@@ -14,6 +14,7 @@ Cobertura:
 import tempfile
 from pathlib import Path
 
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -189,3 +190,57 @@ class TestEquipeGerenciaImportView:
         with open(sample_csv, "rb") as f:
             response = api_client.post(IMPORT_EQUIPE_URL, {"file": f}, format="multipart")
         assert response.status_code == status.HTTP_200_OK
+
+
+# =============================================================================
+# VIGÊNCIA (valid_from / valid_to) — writer
+# =============================================================================
+
+
+def _csv_ativo(email: str, ativo: str) -> str:
+    """CSV de 1 linha para o mesmo vínculo (Vidas/FORMADOR) com o flag `ativo` dado."""
+    content = f"setor,papel,usuario_email,ativo\nVidas,FORMADOR,{email},{ativo}\n"
+    temp = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8")
+    temp.write(content)
+    temp.close()
+    return temp.name
+
+
+@pytest.mark.django_db
+class TestEquipeGerenciaVigenciaWriter:
+    """Reimport inativa/reativa a MESMA linha (janela única); valid_from da entrada é preservado."""
+
+    def test_inactivate_sets_valid_to_today(self, usuario_formador):
+        import_equipe_gerencia_from_file(path=_csv_ativo(usuario_formador.email, "true"), dry_run=False)
+        m = EquipeGerencia.objects.get(usuario=usuario_formador)
+        assert m.ativo is True and m.valid_to is None
+        entrada = m.valid_from
+
+        result = import_equipe_gerencia_from_file(path=_csv_ativo(usuario_formador.email, "false"), dry_run=False)
+        assert result["stats"]["updated"] == 1
+        assert EquipeGerencia.objects.filter(usuario=usuario_formador).count() == 1  # mesma linha
+        m.refresh_from_db()
+        assert m.ativo is False
+        assert m.valid_to == timezone.localdate()
+        assert m.valid_from == entrada  # entrada original intocada
+
+    def test_reactivate_clears_valid_to(self, usuario_formador):
+        import_equipe_gerencia_from_file(path=_csv_ativo(usuario_formador.email, "true"), dry_run=False)
+        import_equipe_gerencia_from_file(path=_csv_ativo(usuario_formador.email, "false"), dry_run=False)
+        m = EquipeGerencia.objects.get(usuario=usuario_formador)
+        entrada = m.valid_from
+        assert m.valid_to == timezone.localdate()
+
+        result = import_equipe_gerencia_from_file(path=_csv_ativo(usuario_formador.email, "true"), dry_run=False)
+        assert result["stats"]["updated"] == 1
+        m.refresh_from_db()
+        assert m.ativo is True
+        assert m.valid_to is None  # janela reaberta
+        assert m.valid_from == entrada  # NÃO cria nova entrada
+
+    def test_idempotent_reimport_leaves_window_open(self, usuario_formador):
+        import_equipe_gerencia_from_file(path=_csv_ativo(usuario_formador.email, "true"), dry_run=False)
+        result = import_equipe_gerencia_from_file(path=_csv_ativo(usuario_formador.email, "true"), dry_run=False)
+        assert result["stats"]["unchanged"] == 1
+        m = EquipeGerencia.objects.get(usuario=usuario_formador)
+        assert m.valid_to is None

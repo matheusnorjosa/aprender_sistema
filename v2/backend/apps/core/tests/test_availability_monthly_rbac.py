@@ -327,6 +327,35 @@ class TestCoordenadorScopedAccess:
             f"resolvido em runtime). Got {res.status_code}: {res.content!r}"
         )
 
+    def test_expired_coordenador_with_gerencia_id_returns_403(self):
+        """
+        Coordenador cujo vínculo EXPIROU (valid_to no passado) perde o gate do grid,
+        mesmo passando `gerencia_id` explícito. Fecha o gap de HasSectorAccess:317
+        (que não filtrava vigência → ex-membro ainda entrava no setor).
+        """
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        user = _make_user_with_groups_and_caps("expired_coord", ["Coordenador"], [])
+        gerencia = Gerencia.objects.create(nome="GERENCIA EXPIRED TEST", nome_setor="Vidas Exp")
+        hoje = timezone.localdate()
+        EquipeGerencia.objects.create(
+            gerencia=gerencia,
+            usuario=user,
+            papel="COORDENADOR",
+            ativo=True,  # kill-switch ligado; só a vigência expirou
+            valid_from=hoje - timedelta(days=60),
+            valid_to=hoje - timedelta(days=1),
+        )
+        client = APIClient()
+        client.force_authenticate(user=user)
+        res = client.get(URL + QS + f"&gerencia_id={gerencia.id}")
+        assert res.status_code == 403, (
+            f"Ex-coordenador expirado NÃO pode acessar o setor via gerencia_id. "
+            f"Got {res.status_code}: {res.content!r}"
+        )
+
     def test_coordenador_without_equipe_gerencia_returns_403(self):
         """
         Coordenador SEM EquipeGerencia ativa → 403 (D8).

@@ -106,9 +106,7 @@ class HomeStatsView(APIView):
             "manage_admin_registries",
         )
 
-        user_gerencias = list(
-            EquipeGerencia.objects.vigente_em().filter(usuario=user).values_list("gerencia_id", flat=True)
-        )
+        user_gerencias = list(EquipeGerencia.vigentes_em().filter(usuario=user).values_list("gerencia_id", flat=True))
 
         # === APROVAÇÕES PENDENTES ===
         pending_approvals = None

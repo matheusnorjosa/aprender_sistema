@@ -55,7 +55,7 @@ def user_is_solicitacao_global(user: Any) -> bool:
 
 
 def _user_gerencia_ids(user: Any) -> set[int]:
-    return set(EquipeGerencia.objects.vigente_em().filter(usuario=user).values_list("gerencia_id", flat=True))
+    return set(EquipeGerencia.vigentes_em().filter(usuario=user).values_list("gerencia_id", flat=True))
 
 
 def scope_solicitacoes(qs: QuerySet, user: Any) -> QuerySet:

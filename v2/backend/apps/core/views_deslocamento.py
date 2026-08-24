@@ -123,14 +123,14 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
         # mas antes dos filtros de query params (não filtra duas vezes).
         if not getattr(user, "is_superuser", False) and not user_has_any_perm(user, "view_all_availability"):
             user_gerencia_ids = list(
-                EquipeGerencia.objects.vigente_em().filter(usuario=user).values_list("gerencia_id", flat=True)
+                EquipeGerencia.vigentes_em().filter(usuario=user).values_list("gerencia_id", flat=True)
             )
             # #1454: o próprio dono sempre vê/edita os próprios deslocamentos
             # (self-service), além dos de usuários com vínculo VIGENTE na(s)
             # gerência(s) do solicitante. Exists correlaciona a vigência do
             # membro-alvo — o join reverso `usuario__equipes__` não compõe com o
-            # queryset-helper `.vigente_em()` (e o Exists já dispensa o .distinct()).
-            vinculo_vigente = EquipeGerencia.objects.vigente_em().filter(
+            # helper de vigência `vigentes_em()` (e o Exists já dispensa o .distinct()).
+            vinculo_vigente = EquipeGerencia.vigentes_em().filter(
                 usuario_id=OuterRef("usuario_id"),
                 gerencia_id__in=user_gerencia_ids,
             )

@@ -222,33 +222,6 @@ class Gerencia(models.Model):
         return f"{self.nome} ({self.nome_setor})"
 
 
-class EquipeGerenciaQuerySet(models.QuerySet["EquipeGerencia"]):
-    """Filtros reutilizáveis para vínculos de equipe (SSOT de vigência)."""
-
-    def vigente_em(self, hoje: date | None = None) -> "EquipeGerenciaQuerySet":
-        """Vínculos vigentes na data `hoje` (default: hoje em Fortaleza, RD-06).
-
-        Vigente = kill-switch ``ativo`` ligado E a data cai dentro da janela
-        ``[valid_from, valid_to]`` (``valid_to`` NULL = janela aberta). O ``hoje``
-        é resolvido AQUI (nunca como default de parâmetro) para não congelar no import.
-        """
-        if hoje is None:
-            hoje = timezone.localdate()
-        return self.filter(ativo=True, valid_from__lte=hoje).filter(
-            models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=hoje)
-        )
-
-
-class EquipeGerenciaManager(models.Manager["EquipeGerencia"]):
-    """Expõe ``vigente_em`` no manager para os call-sites (``EquipeGerencia.objects.vigente_em()``)."""
-
-    def get_queryset(self) -> EquipeGerenciaQuerySet:
-        return EquipeGerenciaQuerySet(self.model, using=self._db)
-
-    def vigente_em(self, hoje: date | None = None) -> EquipeGerenciaQuerySet:
-        return self.get_queryset().vigente_em(hoje)
-
-
 class EquipeGerencia(models.Model):
     """
     Hierarquia de equipe dentro de uma gerencia.
@@ -320,8 +293,6 @@ class EquipeGerencia(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    objects = EquipeGerenciaManager()
-
     class Meta:  # type: ignore[misc]
         db_table = "core_equipe_gerencia"
         verbose_name = "Equipe de Gerencia"
@@ -353,6 +324,21 @@ class EquipeGerencia(models.Model):
                 name="idx_equipe_ger_papel_ativo",
             ),
         ]
+
+    @classmethod
+    def vigentes_em(cls, hoje: date | None = None) -> models.QuerySet["EquipeGerencia"]:
+        """Vínculos VIGENTES na data ``hoje`` (default: hoje em Fortaleza, RD-06) — SSOT de vigência.
+
+        Vigente = kill-switch ``ativo`` ligado E a data cai dentro da janela
+        ``[valid_from, valid_to]`` (``valid_to`` NULL = janela aberta). O ``hoje`` é
+        resolvido AQUI (nunca como default de parâmetro) para não congelar no import.
+        Uso: ``EquipeGerencia.vigentes_em().filter(...)``.
+        """
+        if hoje is None:
+            hoje = timezone.localdate()
+        return EquipeGerencia.objects.filter(ativo=True, valid_from__lte=hoje).filter(
+            models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=hoje)
+        )
 
     def __str__(self) -> str:
         papel = self.get_papel_display()  # type: ignore[reportUnknownMemberType,reportAttributeAccessIssue]

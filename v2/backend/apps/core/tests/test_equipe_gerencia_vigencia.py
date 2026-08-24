@@ -5,7 +5,7 @@ Contrato:
 - Toda linha nova nasce vigente hoje (valid_from=hoje, valid_to=NULL) — default do model.
 - "vigente em D" = ativo=True AND valid_from<=D AND (valid_to IS NULL OR valid_to>=D).
 - `ativo` continua kill-switch: ativo=False exclui mesmo com janela aberta.
-- Helper SSOT: EquipeGerencia.objects.vigente_em(hoje=None) — `hoje` = timezone.localdate() (Fortaleza, RD-06).
+- Helper SSOT: EquipeGerencia.vigentes_em(hoje=None) — `hoje` = timezone.localdate() (Fortaleza, RD-06).
 """
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false
@@ -49,32 +49,32 @@ class TestVigenteEmQuerySet:
         m = _membro(_gerencia())  # sem valid_from/valid_to → default
         assert m.valid_from == timezone.localdate()
         assert m.valid_to is None
-        assert EquipeGerencia.objects.vigente_em().filter(pk=m.pk).exists()
+        assert EquipeGerencia.vigentes_em().filter(pk=m.pk).exists()
 
     def test_expired_link_excluded(self):
         hoje = timezone.localdate()  # entrou e saiu no passado (janela fechada)
         m = _membro(_gerencia(), valid_from=hoje - timedelta(days=30), valid_to=hoje - timedelta(days=1))
-        assert not EquipeGerencia.objects.vigente_em().filter(pk=m.pk).exists()
+        assert not EquipeGerencia.vigentes_em().filter(pk=m.pk).exists()
 
     def test_future_start_excluded(self):
         amanha = timezone.localdate() + timedelta(days=1)
         m = _membro(_gerencia(), valid_from=amanha)
-        assert not EquipeGerencia.objects.vigente_em().filter(pk=m.pk).exists()
+        assert not EquipeGerencia.vigentes_em().filter(pk=m.pk).exists()
 
     def test_inactive_overrides_open_window(self):
         m = _membro(_gerencia(), ativo=False)  # janela aberta, mas kill-switch manual
-        assert not EquipeGerencia.objects.vigente_em().filter(pk=m.pk).exists()
+        assert not EquipeGerencia.vigentes_em().filter(pk=m.pk).exists()
 
     def test_valid_to_boundary_is_inclusive(self):
         hoje = timezone.localdate()
         m = _membro(_gerencia(), valid_to=hoje)  # termina hoje → ainda vigente hoje
-        assert EquipeGerencia.objects.vigente_em().filter(pk=m.pk).exists()
+        assert EquipeGerencia.vigentes_em().filter(pk=m.pk).exists()
 
     def test_vigente_em_accepts_explicit_date(self):
         hoje = timezone.localdate()
         m = _membro(_gerencia(), valid_from=hoje - timedelta(days=10), valid_to=hoje - timedelta(days=5))
-        assert EquipeGerencia.objects.vigente_em(hoje - timedelta(days=7)).filter(pk=m.pk).exists()
-        assert not EquipeGerencia.objects.vigente_em().filter(pk=m.pk).exists()
+        assert EquipeGerencia.vigentes_em(hoje - timedelta(days=7)).filter(pk=m.pk).exists()
+        assert not EquipeGerencia.vigentes_em().filter(pk=m.pk).exists()
 
 
 class TestScopeExcludesExpiredMember:

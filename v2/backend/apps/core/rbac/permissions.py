@@ -299,7 +299,7 @@ class HasSectorAccess(permissions.BasePermission):  # type: ignore[misc]
         # é Formador/DAT/Diretoria/sem-vínculo → 403.
         if gerencia_id_raw is None:
             has_any_vinculo = (
-                EquipeGerencia.objects.vigente_em()
+                EquipeGerencia.vigentes_em()
                 .filter(
                     usuario=request.user,
                 )
@@ -318,7 +318,7 @@ class HasSectorAccess(permissions.BasePermission):  # type: ignore[misc]
 
         # Com gerencia_id = verificar se usuário pertence à gerência
         has_access = (
-            EquipeGerencia.objects.vigente_em()
+            EquipeGerencia.vigentes_em()
             .filter(
                 usuario=request.user,
                 gerencia_id=gerencia_id,

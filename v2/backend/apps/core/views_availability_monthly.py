@@ -190,17 +190,18 @@ class MonthlyAvailabilityView(APIView):
                 cache_scope = "wide"
             else:
                 user_gerencia_ids = list(
-                    EquipeGerencia.objects.filter(
+                    EquipeGerencia.objects.vigente_em()
+                    .filter(
                         usuario=request.user,
-                        ativo=True,
-                    ).values_list("gerencia_id", flat=True)
+                    )
+                    .values_list("gerencia_id", flat=True)
                 )
                 if user_gerencia_ids:
                     # PERF-SQL-04: filter nulls at DB level instead of Python
                     allowed_user_ids = list(
-                        EquipeGerencia.objects.filter(
+                        EquipeGerencia.objects.vigente_em()
+                        .filter(
                             gerencia_id__in=user_gerencia_ids,
-                            ativo=True,
                             usuario_id__isnull=False,
                         )
                         .values_list("usuario_id", flat=True)
@@ -218,6 +219,10 @@ class MonthlyAvailabilityView(APIView):
         from apps.core.utils.cache_utils import get_monthly_cache_version
 
         monthly_ver = get_monthly_cache_version(request.user.id)
+        # Vigência (EquipeGerencia) NÃO entra na chave: o TTL curto (_ttl_with_jitter,
+        # ~5min) já limita a defasagem de uma expiração de vínculo exatamente como
+        # já limita o toggle de `ativo` (não há signal EquipeGerencia→cache). Pôr
+        # `localdate()` aqui só criaria um burst diário de cache-miss sem ganho real.
         cache_key = (
             f"monthly:v5:{monthly_ver}:{year}:{month}:{role}:"
             f"{cache_scope}:{sector or '*'}:{(q or '').strip().lower()}"

@@ -777,22 +777,26 @@ class ExportContractImporter:
         return created
 
     def _dat_coordenador_index(self) -> dict[str, int]:
-        """Índice email/nome → coordenador_id (DATCoordenador não tem CPF nem unique). Email (principal
-        e alternativo) resolve direto; nome só resolve se INEQUÍVOCO (2+ ids p/ o mesmo nome não entram →
-        vira NULL em vez de escolher errado)."""
-        idx: dict[str, int] = {}
+        """Índice email/nome → coordenador_id (DATCoordenador não tem CPF nem unique). O email é chave de
+        CARGO, não de pessoa — endereços de função (coordenacao11@…) passam adiante quando alguém troca,
+        então o MESMO email pode apontar p/ 2+ coordenadores no histórico. Só resolvemos chave INEQUÍVOCA:
+        email OU nome que aponte p/ 2+ ids → NÃO entra (vira NULL), em vez de atrelar o plano à pessoa
+        errada. Email tem prioridade sobre nome."""
+        email_ids: dict[str, set[int]] = {}
         name_ids: dict[str, set[int]] = {}
         for cid, email, email_alt, nome in DATCoordenador.objects.values_list(
             "id", "email", "email_alternativo", "nome"
         ):
             for e in (email, email_alt):
                 if e:
-                    idx.setdefault(e.lower(), cid)
+                    email_ids.setdefault(e.lower(), set()).add(cid)
             if nome:
                 name_ids.setdefault(_norm(nome), set()).add(cid)
-        for n, ids in name_ids.items():
-            if len(ids) == 1:
-                idx[n] = next(iter(ids))
+        idx: dict[str, int] = {}
+        for key_map in (email_ids, name_ids):  # email primeiro → tem prioridade
+            for key, ids in key_map.items():
+                if len(ids) == 1:
+                    idx.setdefault(key, next(iter(ids)))
         return idx
 
     def _apply_plano_formacao(self, rows: list[dict[str, str]]) -> int:

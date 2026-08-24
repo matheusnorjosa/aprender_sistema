@@ -317,7 +317,7 @@ export default function GCalDashboardPage(): JSX.Element {
       if (data.queued > 0) {
         message.success(`Evento reenfileirado para publicação (Reapply)`);
         // Recarregar detalhes após 2 segundos
-        setTimeout(() => loadEventDetail(selectedEventId), TIMING.GCAL_DETAIL_LOAD_DELAY_MS);
+        setTimeout(() => { void loadEventDetail(selectedEventId); }, TIMING.GCAL_DETAIL_LOAD_DELAY_MS);
       } else if (data.errors && data.errors.length > 0) {
         message.error(`Erro: ${data.errors[0]?.detail}`);
       }
@@ -341,7 +341,7 @@ export default function GCalDashboardPage(): JSX.Element {
       if (data.queued > 0) {
         message.success(`Evento reenfileirado para ressincronização (Resync)`);
         // Recarregar detalhes após 2 segundos
-        setTimeout(() => loadEventDetail(selectedEventId), TIMING.GCAL_DETAIL_LOAD_DELAY_MS);
+        setTimeout(() => { void loadEventDetail(selectedEventId); }, TIMING.GCAL_DETAIL_LOAD_DELAY_MS);
       } else if (data.errors && data.errors.length > 0) {
         message.error(`Erro: ${data.errors[0]?.detail}`);
       }

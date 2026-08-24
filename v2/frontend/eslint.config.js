@@ -78,6 +78,17 @@ export default defineConfig([
       // para fire-and-forget intencional (o handler/efeito não pode ser async e a fn
       // chamada já trata o próprio erro), `.catch(...)` quando o erro precisa aflorar.
       '@typescript-eslint/no-floating-promises': 'error',
+      // Grupo C — no-misused-promises. `checksVoidReturn.attributes/properties:false`
+      // porque handler async em atributo JSX (onClick={async...}) e em objeto-config de
+      // handlers (ColumnHandlers, getColumns({onEdit,onDelete})) é idioma legítimo do React
+      // — o React/AntD não aguarda o retorno e nossos handlers já tratam o próprio erro
+      // (try/catch + message/logger). As checagens de VALOR seguem ATIVAS: `arguments`
+      // (Promise passada a callback void — ex.: setTimeout(async...)), `conditionals`
+      // (Promise num if/&&) e `spreads`. Os sites de `arguments` foram corrigidos no código.
+      '@typescript-eslint/no-misused-promises': [
+        'error',
+        { checksVoidReturn: { attributes: false, properties: false } },
+      ],
       // DX de Fast-Refresh (HMR), não correção — arquivos que exportam um
       // componente + util (ex: PerfilPage + maskCpf). Fica `warn`.
       'react-refresh/only-export-components': 'warn',

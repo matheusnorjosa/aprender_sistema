@@ -161,7 +161,8 @@ export default function MunicipiosPage(): JSX.Element {
     const requestId = lookupRequestRef.current + 1;
     lookupRequestRef.current = requestId;
 
-    const timerId = window.setTimeout(async () => {
+    const timerId = window.setTimeout(() => {
+      void (async () => {
       setLookupLoading(true);
       try {
         const results = await autocompleteMunicipiosAdmin({ q: nome, uf, limit: 20 });
@@ -177,6 +178,7 @@ export default function MunicipiosPage(): JSX.Element {
           setLookupLoading(false);
         }
       }
+      })();
     }, 250);
 
     return () => {

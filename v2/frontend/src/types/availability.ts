@@ -142,5 +142,7 @@ export interface MonthlyGridResponse {
   legend: Record<string, string>;
   people: MonthlyGridPerson[];
   cells: AvailabilityCode[][];
-  details_index: Record<string, unknown>;
+  // Cada chave (célula) mapeia para uma LISTA de detalhes de evento — a shape real
+  // que o Grid consome (`DetailsIndexType = Record<string, unknown[]>`).
+  details_index: Record<string, unknown[]>;
 }

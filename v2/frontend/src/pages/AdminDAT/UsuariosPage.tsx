@@ -547,7 +547,7 @@ export default function UsuariosPage(): JSX.Element {
           </Title>
           <Radio.Group
             value={viewMode}
-            onChange={(e: RadioChangeEvent) => setViewMode(e.target.value)}
+            onChange={(e: RadioChangeEvent) => setViewMode(e.target.value as ViewMode)}
             buttonStyle="solid"
           >
             <Radio.Button value="lista">Lista</Radio.Button>

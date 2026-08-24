@@ -162,6 +162,17 @@ def _parse_int(v: Any) -> int | None:
         return None
 
 
+def _parse_decimal(v: Any) -> Decimal:
+    """Parseia decimal (carga horária). Vazio/inválido → 0.00."""
+    s = str(v or "").strip()
+    if not s:
+        return Decimal("0.00")
+    try:
+        return Decimal(s)
+    except (ArithmeticError, ValueError):
+        return Decimal("0.00")
+
+
 def _parse_json_list(v: Any) -> list[Any]:
     """Parseia array JSON de datas (ex.: '[\"2026-03-27\"]'). Vazio/inválido → []."""
     s = str(v or "").strip()
@@ -484,17 +495,22 @@ class ExportContractImporter:
                 tally[st] += 1
 
         elif name == "plano_formacao":
-            # NK = (municipio_id, projeto_id). Município por (norm(nome), uf); Projeto via resolver (#1372).
-            # FK não-resolvido → would_reject. Existence-based (não compara campos operacionais, não lê coordenador).
+            # NK = (municipio_id, projeto_id, ano); `ano` DECLARADO do workbook (coluna `ano`, nullable=pendente).
+            # `sem_plano` (TOTAL 0 + sem data) = linha reservada → reject VISÍVEL (não é plano; mantém a
+            # reconciliação, não some calado). FK não-resolvido → would_reject. Não lê coordenador (PII).
             mun_idx = self._municipio_index()
-            existing = set(PlanoFormacoes.objects.values_list("municipio_id", "projeto_id"))
+            existing = set(PlanoFormacoes.objects.values_list("municipio_id", "projeto_id", "ano"))
             for r in rows:
+                if _to_bool(r.get("sem_plano")):
+                    tally["would_reject"] += 1
+                    continue
                 mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
                 proj_id = self.resolve_projeto(r.get("projeto") or "")
                 if mun_id is None or proj_id is None:
                     tally["would_reject"] += 1
                     continue
-                st, _ = diff_and_classify({} if (mun_id, proj_id) in existing else None, {}, protected)
+                nk = (mun_id, proj_id, _parse_int(r.get("ano")))
+                st, _ = diff_and_classify({} if nk in existing else None, {}, protected)
                 tally[st] += 1
 
         elif name == "dat_acao":
@@ -648,6 +664,10 @@ class ExportContractImporter:
                     # Handler dedicado (NK com ano; CSV sem coluna `nome` → o loop genérico gravaria 0).
                     applied[name] = self._apply_dat_acao(self._load(name))
                     continue
+                if name == "plano_formacao":
+                    # Handler dedicado (NK com ano; CSV sem coluna `nome` → o loop genérico gravaria 0 = silent-gap).
+                    applied[name] = self._apply_plano_formacao(self._load(name))
+                    continue
                 created = 0
                 for r in self._load(name):
                     nome = (r.get("nome") or "").strip()
@@ -752,6 +772,64 @@ class ExportContractImporter:
                 data_entrega=de,
                 status_entrega="concluido" if de else "pendente",
                 observacao_carta=(r.get("observacao") or "")[:500],
+            )
+            created += 1
+        return created
+
+    def _dat_coordenador_index(self) -> dict[str, int]:
+        """Índice email/nome → coordenador_id (DATCoordenador não tem CPF nem unique). Email (principal
+        e alternativo) resolve direto; nome só resolve se INEQUÍVOCO (2+ ids p/ o mesmo nome não entram →
+        vira NULL em vez de escolher errado)."""
+        idx: dict[str, int] = {}
+        name_ids: dict[str, set[int]] = {}
+        for cid, email, email_alt, nome in DATCoordenador.objects.values_list(
+            "id", "email", "email_alternativo", "nome"
+        ):
+            for e in (email, email_alt):
+                if e:
+                    idx.setdefault(e.lower(), cid)
+            if nome:
+                name_ids.setdefault(_norm(nome), set()).add(cid)
+        for n, ids in name_ids.items():
+            if len(ids) == 1:
+                idx[n] = next(iter(ids))
+        return idx
+
+    def _apply_plano_formacao(self, rows: list[dict[str, str]]) -> int:
+        """Create-only de PlanoFormacoes. NK (municipio, projeto, ano); `ano` DECLARADO do workbook.
+        `sem_plano` (reserva: TOTAL 0 + sem data) é pulado (não é plano). Coordenador (DATCoordenador)
+        resolvido por email→nome (sem CPF no model; ambíguo/ausente → NULL). `ch_estudo` importado;
+        `ch_total`/`ch_anual` semeados dos totais da planilha (recalcular_ch sobrescreve quando/se as
+        formações-filhas forem importadas). CSV sem coluna `nome` → precisa deste handler (o loop
+        genérico gravaria 0 = silent-gap)."""
+        actor = self._require_actor("plano_formacao")
+        mun_idx = self._municipio_index()
+        coord_idx = self._dat_coordenador_index()
+        created = 0
+        for r in rows:
+            if _to_bool(r.get("sem_plano")):
+                continue  # linha reservada, não é plano
+            mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
+            proj_id = self.resolve_projeto(r.get("projeto") or "")
+            if mun_id is None or proj_id is None:
+                continue  # FK não-resolvida (municipio/projeto)
+            ano = _parse_int(r.get("ano"))
+            if PlanoFormacoes.objects.filter(municipio_id=mun_id, projeto_id=proj_id, ano=ano).exists():
+                continue
+            email = (r.get("coordenador_email") or "").strip().lower()
+            coord_id = coord_idx.get(email) if email else None
+            if coord_id is None:
+                nome = _norm(r.get("coordenador") or "")
+                coord_id = coord_idx.get(nome) if nome else None
+            PlanoFormacoes.objects.create(
+                municipio_id=mun_id,
+                projeto_id=proj_id,
+                ano=ano,
+                coordenador_id=coord_id,
+                ch_estudo=_parse_decimal(r.get("ch_estudo")),
+                ch_total=_parse_decimal(r.get("ch_total_planilha")),
+                ch_anual=_parse_decimal(r.get("ch_anual_planilha")),
+                created_by=actor,
             )
             created += 1
         return created

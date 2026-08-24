@@ -102,7 +102,7 @@ class TestPlanoFormacoesModel:
         assert str(plano) == "Municipio Teste-CE - Projeto Teste"
 
     def test_unique_constraint(self, plano, municipio, projeto, user):
-        """Test unique constraint on municipio + projeto."""
+        """NK (municipio, projeto, ano): dois pendentes (ano=None) colapsam (nulls_distinct=False)."""
         duplicate = PlanoFormacoes(
             municipio=municipio,
             projeto=projeto,
@@ -110,6 +110,24 @@ class TestPlanoFormacoesModel:
         )
         with pytest.raises(ValidationError):
             duplicate.full_clean()
+
+    def test_ano_in_nk_allows_year_coexistence(self, municipio, projeto, user):
+        """Mesmo (municipio, projeto) coexiste em anos diferentes — a razão de ser da NK trina."""
+        PlanoFormacoes.objects.create(municipio=municipio, projeto=projeto, ano=2026, created_by=user)
+        PlanoFormacoes.objects.create(municipio=municipio, projeto=projeto, ano=2027, created_by=user)
+        assert PlanoFormacoes.objects.filter(municipio=municipio, projeto=projeto).count() == 2
+
+    def test_ano_in_nk_same_year_collides(self, municipio, projeto, user):
+        """Mesmo (municipio, projeto, ano) colide."""
+        PlanoFormacoes.objects.create(municipio=municipio, projeto=projeto, ano=2026, created_by=user)
+        dup = PlanoFormacoes(municipio=municipio, projeto=projeto, ano=2026, created_by=user)
+        with pytest.raises(ValidationError):
+            dup.full_clean()
+
+    def test_str_includes_ano_when_present(self, municipio, projeto, user):
+        """__str__ anexa o ano só quando presente (plano pendente sem ano fica inalterado)."""
+        p = PlanoFormacoes.objects.create(municipio=municipio, projeto=projeto, ano=2026, created_by=user)
+        assert str(p) == "Municipio Teste-CE - Projeto Teste (2026)"
 
     def test_recalcular_ch(self, plano):
         """Test recalcular_ch method."""
@@ -421,6 +439,46 @@ class TestPlanoFormacoesAPI:
         assert plano.formacoes.count() == 15
         assert plano.acompanhamentos.count() == 2
         assert plano.provas.count() == 3
+
+    def test_create_plano_defaults_ano_to_current_year(self, client, user):
+        """POST sem `ano` usa o ano vigente (Fortaleza) — evita plano-fantasma ano=NULL."""
+        from django.utils import timezone
+
+        client.force_login(user)
+        mun = MunicipioFactory(nome="Mun Ano Def", uf="CE")
+        proj = ProjetoFactory(nome="Proj Ano Def", fluxo="NAO_SUPER")
+        resp = client.post(
+            "/api/dat/plano-formacoes/",
+            data={"municipio": mun.id, "projeto": proj.id},
+            content_type="application/json",
+        )
+        assert resp.status_code == 201
+        p = PlanoFormacoes.objects.get(id=resp.json()["id"])
+        assert p.ano == timezone.localdate().year
+
+    def test_create_duplicate_plano_returns_400_not_500(self, client, user):
+        """Duplicata (municipio, projeto, ano) → 400 do UniqueTogetherValidator (não 500 de IntegrityError)."""
+        client.force_login(user)
+        mun = MunicipioFactory(nome="Mun Dup", uf="CE")
+        proj = ProjetoFactory(nome="Proj Dup", fluxo="NAO_SUPER")
+        payload = {"municipio": mun.id, "projeto": proj.id, "ano": 2026}
+        r1 = client.post("/api/dat/plano-formacoes/", data=payload, content_type="application/json")
+        assert r1.status_code == 201
+        r2 = client.post("/api/dat/plano-formacoes/", data=payload, content_type="application/json")
+        assert r2.status_code == 400
+
+    def test_filter_by_ano(self, client, user):
+        """FilterSet permite escopar a lista por ano."""
+        client.force_login(user)
+        mun = MunicipioFactory(nome="Mun Filtro", uf="CE")
+        proj = ProjetoFactory(nome="Proj Filtro", fluxo="NAO_SUPER")
+        PlanoFormacoes.objects.create(municipio=mun, projeto=proj, ano=2026, created_by=user)
+        PlanoFormacoes.objects.create(municipio=mun, projeto=proj, ano=2027, created_by=user)
+        resp = client.get("/api/dat/plano-formacoes/?ano=2027")
+        assert resp.status_code == 200
+        results = resp.json().get("results", resp.json())
+        anos = {p.get("ano") for p in results}
+        assert anos == {2027}
 
     def test_stats_endpoint(self, client, user, plano):
         """Test stats endpoint."""

@@ -13,9 +13,16 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
+from django.utils import timezone
 from rest_framework import serializers  # type: ignore[attr-defined]
 
 from apps.core.models import Acompanhamento, Formacao, PlanoFormacoes, Prova
+
+
+def _ano_vigente() -> int:
+    """Ano vigente em America/Fortaleza — default do `ano` na criação manual (evita plano-fantasma NULL)."""
+    return timezone.localdate().year
+
 
 # ============================================================
 # Nested Serializers (for inline display)
@@ -106,6 +113,9 @@ class PlanoFormacoesSerializer(serializers.ModelSerializer["PlanoFormacoes"]):
     # Audit
     created_by_nome = serializers.CharField(source="created_by.get_full_name", read_only=True)
 
+    # Ano do ciclo — default = ano vigente (restaura o UniqueTogetherValidator da NK trina + evita ano=NULL).
+    ano = serializers.IntegerField(required=False, default=_ano_vigente, help_text="Ano do ciclo (default: vigente).")
+
     class Meta:
         model = PlanoFormacoes
         fields = [
@@ -115,6 +125,7 @@ class PlanoFormacoesSerializer(serializers.ModelSerializer["PlanoFormacoes"]):
             "municipio_uf",
             "projeto",
             "projeto_nome",
+            "ano",
             "coordenador",
             "coordenador_nome",
             "ch_total",
@@ -203,6 +214,7 @@ class PlanoFormacoesListSerializer(serializers.ModelSerializer["PlanoFormacoes"]
             "municipio_uf",
             "projeto",
             "projeto_nome",
+            "ano",
             "coordenador",
             "coordenador_nome",
             "ch_total",
@@ -269,7 +281,8 @@ class PlanoFormacoesOptionSerializer(serializers.ModelSerializer["PlanoFormacoes
         fields = ["id", "label"]
 
     def get_label(self, obj: PlanoFormacoes) -> str:
-        return f"{obj.municipio.nome} - {obj.projeto.nome}"
+        base = f"{obj.municipio.nome} - {obj.projeto.nome}"
+        return f"{base} ({obj.ano})" if obj.ano else base
 
 
 # ============================================================

@@ -298,10 +298,13 @@ class HasSectorAccess(permissions.BasePermission):  # type: ignore[misc]
         # `CanViewAllAvailability` na composition; quem cai aqui sem vínculo
         # é Formador/DAT/Diretoria/sem-vínculo → 403.
         if gerencia_id_raw is None:
-            has_any_vinculo = EquipeGerencia.objects.filter(
-                usuario=request.user,
-                ativo=True,
-            ).exists()
+            has_any_vinculo = (
+                EquipeGerencia.vigentes_em()
+                .filter(
+                    usuario=request.user,
+                )
+                .exists()
+            )
             if not has_any_vinculo:
                 self.message = "Você não tem acesso à grade mensal de disponibilidade."
             return has_any_vinculo
@@ -314,10 +317,14 @@ class HasSectorAccess(permissions.BasePermission):  # type: ignore[misc]
             return False
 
         # Com gerencia_id = verificar se usuário pertence à gerência
-        has_access = EquipeGerencia.objects.filter(
-            usuario=request.user,
-            gerencia_id=gerencia_id,
-        ).exists()
+        has_access = (
+            EquipeGerencia.vigentes_em()
+            .filter(
+                usuario=request.user,
+                gerencia_id=gerencia_id,
+            )
+            .exists()
+        )
 
         if not has_access:
             self.message = "Você não tem acesso a este setor."

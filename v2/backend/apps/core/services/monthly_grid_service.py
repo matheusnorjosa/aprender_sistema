@@ -94,10 +94,9 @@ def build_monthly_grid(
         papel_map = {"FORMADOR": "FORMADOR", "COORDENADOR": "COORDENADOR"}
         papel = papel_map.get(role, role)
 
-        equipe_qs = EquipeGerencia.objects.filter(
+        equipe_qs = EquipeGerencia.vigentes_em().filter(
             gerencia_id=gerencia_id,
             papel=papel,
-            ativo=True,
         )
 
         if q and q.strip():

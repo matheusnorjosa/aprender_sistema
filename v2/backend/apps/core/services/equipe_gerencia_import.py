@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from django.db import transaction
+from django.utils import timezone
 
 import pandas as pd
 
@@ -406,6 +407,7 @@ def _process_row(
             return
 
     is_active = bool(row.get("is_active", True))
+    hoje = timezone.localdate()
 
     existing = EquipeGerencia.objects.filter(gerencia=gerencia, usuario=usuario, papel=papel).first()
     if existing:
@@ -419,8 +421,12 @@ def _process_row(
 
         if existing.ativo != is_active:
             existing.ativo = is_active
+            # Vigência (janela única): inativar fecha em `hoje`; reativar reabre
+            # a MESMA linha (valid_to=None). `valid_from` (a entrada) fica intocado.
+            existing.valid_to = None if is_active else hoje
             updated = True
             update_fields.append("ativo")
+            update_fields.append("valid_to")  # senão o save(update_fields=) não grava
 
         if updated:
             existing.save(update_fields=update_fields)
@@ -435,5 +441,7 @@ def _process_row(
         papel=papel,
         coordenador_supervisor=supervisor,
         ativo=is_active,
+        valid_from=hoje,
+        valid_to=None if is_active else hoje,
     )
     stats["created"] += 1

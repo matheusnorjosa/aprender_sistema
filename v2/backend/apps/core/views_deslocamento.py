@@ -33,7 +33,7 @@ Pagination:
 
 from __future__ import annotations
 
-from django.db.models import Q, QuerySet
+from django.db.models import Exists, OuterRef, Q, QuerySet
 from rest_framework import viewsets
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.filters import OrderingFilter
@@ -122,12 +122,19 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
         # Scope filter — aplicar APÓS auth (IsAuthenticated em permission_classes)
         # mas antes dos filtros de query params (não filtra duas vezes).
         if not getattr(user, "is_superuser", False) and not user_has_any_perm(user, "view_all_availability"):
-            user_gerencia_ids = list(EquipeGerencia.objects.filter(usuario=user).values_list("gerencia_id", flat=True))
+            user_gerencia_ids = list(
+                EquipeGerencia.vigentes_em().filter(usuario=user).values_list("gerencia_id", flat=True)
+            )
             # #1454: o próprio dono sempre vê/edita os próprios deslocamentos
-            # (self-service), além dos de usuários na(s) gerência(s) vinculada(s).
-            queryset = queryset.filter(
-                Q(usuario=user) | Q(usuario__equipes__gerencia_id__in=user_gerencia_ids)
-            ).distinct()
+            # (self-service), além dos de usuários com vínculo VIGENTE na(s)
+            # gerência(s) do solicitante. Exists correlaciona a vigência do
+            # membro-alvo — o join reverso `usuario__equipes__` não compõe com o
+            # helper de vigência `vigentes_em()` (e o Exists já dispensa o .distinct()).
+            vinculo_vigente = EquipeGerencia.vigentes_em().filter(
+                usuario_id=OuterRef("usuario_id"),
+                gerencia_id__in=user_gerencia_ids,
+            )
+            queryset = queryset.filter(Q(usuario=user) | Exists(vinculo_vigente))
 
         # Filter by usuario_id
         usuario_id = self.request.query_params.get("usuario_id")

@@ -1,7 +1,7 @@
 ---
 title: RBAC — Controle de Acesso
 status: canonical
-last_verified: 2026-07-24
+last_verified: 2026-08-24
 sources_of_truth:
   - v2/backend/apps/core/rbac/__init__.py
   - v2/backend/apps/core/rbac/permissions.py
@@ -96,7 +96,7 @@ Doc canônico detalhado (não duplicado aqui): convenção de nomes em [`RBAC_NA
 **Classes DRF** (import via `from apps.core.rbac import ...`):
 
 - `HasPerm("codename")` — checa uma capability; aceita prefixo `core.` opcional. Suporta `| & ~`.
-- `HasSectorAccess` — scope dinâmico por `gerencia_id` (query/kwargs); sem `gerencia_id` exige `EquipeGerencia` ativa. Idiomático: `[IsAuthenticated, CanViewAllAvailability | HasSectorAccess]`.
+- `HasSectorAccess` — scope dinâmico por `gerencia_id` (query/kwargs); sem `gerencia_id` exige vínculo **vigente** em `EquipeGerencia`. Vigência = kill-switch `ativo` **E** hoje dentro da janela `[valid_from, valid_to]` (Fortaleza, RD-06), via a SSOT `EquipeGerencia.vigentes_em()` (classmethod → `QuerySet`) — reaplicada nos ~14 read-sites de scope (permissions/availability/options/deslocamento/stats/solicitacao_scope); fecha o gap onde um ex-membro expirado ainda passava o gate (`permissions.py:317`). Idiomático: `[IsAuthenticated, CanViewAllAvailability | HasSectorAccess]`.
 - `IsGerenteSuperintendencia` — composite funcperm `approve_solicitation_batch` + grupo `Gerente`.
 - `IsOwnerOrPrivileged` — object-level: superuser/privilegiado ou `obj.usuario == user`.
 - `IsAssistenteAdministrativoControle` — composite Setor `Controle` + Função `Assistente Administrativo`.
@@ -139,7 +139,7 @@ Doc canônico detalhado (não duplicado aqui): convenção de nomes em [`RBAC_NA
 - **`GUIA_ADMIN_RBAC.md` lista "Gerência" como setor genérico**; o SSOT `SETOR_GROUPS` não contém "Gerência" (são 13 setores nomeados). Guia precisa alinhar.
 - **Cutoff D17 hardcoded** (`D17_LEGACY_MIGRATIONS_MAX = 82`): migrations futuras que precisem backfill legítimo de grupos exigem `# noqa: RBAC-migration-allowed` consciente.
 - **Composition OR em instâncias depende de monkey-patch** (`permissions.OR/AND/NOT.__call__ = lambda self: self`) aplicado em `permissions.py`; `policies.py` força o import por side-effect. Remover o patch quebra silenciosamente todo `permission_classes = [A | B]`.
-- **`HasSectorAccess` é o único ponto com TOCTOU residual** de scope: a checagem de `EquipeGerencia` ativa e a leitura de dados acontecem em requests separados; mudança de vínculo entre eles não é transacional (aceitável para o caso de uso atual).
+- **`HasSectorAccess` é o único ponto com TOCTOU residual** de scope: a checagem de vínculo **vigente** em `EquipeGerencia` (`vigentes_em()`) e a leitura de dados acontecem em requests separados; mudança de vínculo entre eles não é transacional (aceitável para o caso de uso atual).
 - **Schema OpenAPI de `/api/me/policies/`** declara `{policies: [...]}` via `inline_serializer` (`views/me.py:104-107`), mas o código retorna o array bruto (`:132`). Divergência de documentação de schema (não afeta o contrato real consumido pelo frontend).
 - **Escopo ator×alvo é a dívida estrutural do módulo** (épico #1656). O idioma `HasPerm(codename)` responde "esta pessoa pode executar esta ação?", nunca "sobre QUEM ela pode executar". Onde o alvo importa — administração de usuários (`M07-02`), solicitações de outra gerência (`M10-01`), `HasSectorAccess` na Grade Mensal (`M14-01`) — a checagem de alvo precisa ser feita no queryset/serializer da view, e hoje falta em vários pontos. Ao criar uma capability nova, decidir explicitamente se ela precisa de escopo e onde ele é aplicado.
 - **`SuperuserOnly` fora da superfície pública**: não está em `rbac/__init__.py`; importar via `apps.core.permissions`. Se for promovida ao `__init__`, atualizar esta spec e o `__all__` juntos.

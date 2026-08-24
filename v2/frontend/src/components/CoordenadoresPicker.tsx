@@ -1,139 +1,20 @@
 /**
- * CoordenadoresPicker - Seleção de Coordenadores Acompanhantes
+ * CoordenadoresPicker - Seleção de Coordenadores Acompanhantes.
  *
- * Componente específico para o wizard de nova solicitação.
- * Permite selecionar múltiplos coordenadores acompanhantes.
+ * Wrapper fino de UsuarioPicker (implementação compartilhada): papel
+ * 'Coordenador', Tag verde.
  */
 
-import { useState, type JSX } from 'react';
-import { Tag, AutoComplete, Spin } from 'antd';
-import { lookupUsuarios } from '../api/lookup';
-import logger from '../utils/logger';
-import type { ID } from '../types';
+import { type JSX } from 'react';
+import UsuarioPicker, { type UsuarioItem, type UsuarioPickerProps } from './UsuarioPicker';
 
-/**
- * Coordenador item interface
- */
-export interface CoordenadorItem {
-  id: ID;
-  label: string;
-  name?: string;
-}
+/** Coordenador selecionado (mesmo shape de UsuarioItem). */
+export type CoordenadorItem = UsuarioItem;
 
-/**
- * AutoComplete option interface
- */
-interface UserOption {
-  value: string;
-  label: string;
-  data: {
-    id: ID;
-    label: string;
-  };
-}
+export type CoordenadoresPickerProps = Pick<UsuarioPickerProps, 'value' | 'onChange'>;
 
-/**
- * CoordenadoresPicker props interface
- */
-export interface CoordenadoresPickerProps {
-  value?: CoordenadorItem[];
-  onChange?: (value: CoordenadorItem[]) => void;
-}
-
-export default function CoordenadoresPicker({ value = [], onChange }: CoordenadoresPickerProps): JSX.Element {
-  const [options, setOptions] = useState<UserOption[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState('');
-
-  const handleSearch = async (query: string): Promise<void> => {
-    setSearch(query);
-
-    // Permitir busca vazia (mostra lista inicial) ou com 2+ caracteres
-    if (query && query.length > 0 && query.length < 2) {
-      setOptions([]);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const results = await lookupUsuarios(query || '', 'Coordenador');
-      setOptions(
-        results.map(item => ({
-          value: String(item.id),
-          label: item.label,
-          data: item,
-        }))
-      );
-    } catch (error) {
-      logger.error('Erro ao buscar coordenadores:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAdd = (_selectedValue: string, option: UserOption): void => {
-    const newCoordenador: CoordenadorItem = {
-      id: option.data.id,
-      label: option.data.label,
-      name: option.data.label, // Alias para compatibilidade
-    };
-
-    // Verificar se já existe (by ID only — SEC-ENUM-01)
-    const exists = value.some(c => c.id === newCoordenador.id);
-    if (exists) {
-      return;
-    }
-
-    if (onChange) {
-      onChange([...value, newCoordenador]);
-    }
-
-    // Limpar busca mas manter as opções para próxima seleção
-    setSearch('');
-  };
-
-  const handleRemove = (id: ID): void => {
-    if (onChange) {
-      onChange(value.filter((c) => c.id !== id));
-    }
-  };
-
+export default function CoordenadoresPicker(props: CoordenadoresPickerProps): JSX.Element {
   return (
-    <div>
-      {/* Tags dos coordenadores selecionados */}
-      {value.length > 0 && (
-        <ul style={{ display: 'flex', flexWrap: 'wrap', gap: 8, listStyle: 'none', padding: 0, margin: '0 0 8px 0' }} aria-label="Coordenadores selecionados">
-          {value.map((coord) => (
-            <li key={coord.id}>
-              <Tag
-                closable
-                onClose={() => handleRemove(coord.id)}
-                color="green"
-              >
-                {coord.label || coord.name}
-              </Tag>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {/* Autocomplete para adicionar coordenadores */}
-      <AutoComplete
-        value={search}
-        options={options}
-        onSearch={handleSearch}
-        onFocus={() => {
-          // Carregar lista inicial ao focar no campo (se ainda não carregou)
-          if (options.length === 0 && !loading) {
-            handleSearch('');
-          }
-        }}
-        onSelect={handleAdd}
-        onChange={setSearch}
-        placeholder="Clique para ver lista ou digite para buscar..."
-        style={{ width: '100%' }}
-        notFoundContent={loading ? <Spin size="small" /> : null}
-      />
-    </div>
+    <UsuarioPicker {...props} role="Coordenador" tagColor="green" ariaLabel="Coordenadores selecionados" />
   );
 }

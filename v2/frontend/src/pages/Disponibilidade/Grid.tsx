@@ -130,7 +130,7 @@ export default function Grid({
                 {days.map((day, dayIdx) => {
                   const code = cells[rowIdx]?.[dayIdx];
                   const key = `${rowIdx}:${dayIdx}`;
-                  const hasDetails = (detailsIndex[key] as unknown[] | undefined)?.length ?? 0 > 0;
+                  const hasDetails = (detailsIndex[key])?.length ?? 0 > 0;
                   const sel = selected?.rowIdx === rowIdx && selected?.dayIdx === dayIdx;
                   const today = isToday(year, month, day);
                   const conflict = code === 'X';

@@ -2,7 +2,7 @@
  * API Client - Team Metrics Dashboard
  */
 
-import { buildUrl, fetchAPI, type QueryParams } from './config'
+import { buildUrl, fetchAPI } from './config'
 
 /**
  * Productivity response.
@@ -49,7 +49,7 @@ export interface TeamQualityData {
  * Load productivity metrics.
  */
 export async function getTeamProductivity(days: number): Promise<TeamProductivityData> {
-  const url = buildUrl('/metrics/team/productivity/', { days } as QueryParams)
+  const url = buildUrl('/metrics/team/productivity/', { days })
   return fetchAPI(url)
 }
 
@@ -57,7 +57,7 @@ export async function getTeamProductivity(days: number): Promise<TeamProductivit
  * Load formadores metrics.
  */
 export async function getTeamFormadores(days: number): Promise<TeamFormadoresData> {
-  const url = buildUrl('/metrics/team/formadores/', { days } as QueryParams)
+  const url = buildUrl('/metrics/team/formadores/', { days })
   return fetchAPI(url)
 }
 
@@ -65,6 +65,6 @@ export async function getTeamFormadores(days: number): Promise<TeamFormadoresDat
  * Load quality metrics.
  */
 export async function getTeamQuality(days: number): Promise<TeamQualityData> {
-  const url = buildUrl('/metrics/team/quality/', { days } as QueryParams)
+  const url = buildUrl('/metrics/team/quality/', { days })
   return fetchAPI(url)
 }

@@ -56,7 +56,7 @@ export default function ProdutosPage(): JSX.Element {
         page: current,
         page_size: pageSize,
       });
-      setProdutos(data.results as unknown as ProdutoRecord[]);
+      setProdutos(data.results);
       setPagination((prev) => ({
         ...prev,
         current,

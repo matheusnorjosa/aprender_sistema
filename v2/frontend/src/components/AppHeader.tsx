@@ -145,7 +145,7 @@ export function AppHeader({
                           padding: '8px 12px',
                           cursor: item.lida ? 'default' : 'pointer',
                         }}
-                        onClick={() => { if (!item.lida) void handlePopoverMarkRead(item.id as number); }}
+                        onClick={() => { if (!item.lida) void handlePopoverMarkRead(item.id); }}
                       >
                         <List.Item.Meta
                           title={

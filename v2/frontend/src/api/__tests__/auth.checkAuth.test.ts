@@ -21,7 +21,7 @@ describe('#1741 checkAuth: distingue 401/403 de erro transitório', () => {
   beforeEach(() => vi.clearAllMocks());
 
   test('sucesso → authenticated:true + user', async () => {
-    vi.mocked(fetchAPI).mockResolvedValue({ id: 1, is_superuser: true } as never);
+    vi.mocked(fetchAPI).mockResolvedValue({ id: 1, is_superuser: true });
     await expect(checkAuth()).resolves.toEqual({
       authenticated: true,
       user: { id: 1, is_superuser: true },

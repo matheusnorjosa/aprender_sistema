@@ -30,7 +30,7 @@ export default function Disponibilidade(): JSX.Element {
     setLoading(true);
     try {
       const data = await getBlocks({ owner: 'me' });
-      setBlocks(data as AvailabilityBlock[]);
+      setBlocks(data);
     } catch (error) {
       message.error(`Erro ao carregar bloqueios: ${(error as Error).message}`);
     } finally {
@@ -92,7 +92,7 @@ export default function Disponibilidade(): JSX.Element {
           <Col xs={24} lg={12}>
             <article aria-label="Criar novo bloqueio">
               <Card title="Criar Bloqueio" bordered={false}>
-                <BlockForm onSubmit={handleCreate as unknown as (payload: { tipo: string; inicio: string; fim: string }) => Promise<void>} />
+                <BlockForm onSubmit={handleCreate} />
               </Card>
             </article>
           </Col>

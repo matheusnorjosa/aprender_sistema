@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from 'react';
 import { checkAvailabilityMany } from '../api/availability';
 import { TIMING } from '../constants';
 import logger from '../utils/logger';
-import type { BlockedParticipant, ConflictDetail, ID } from '../types';
+import type { BlockedParticipant, ID } from '../types';
 
 export interface PreviewParticipant {
   id: ID;
@@ -103,7 +103,7 @@ export function useAvailabilityPreview(input: AvailabilityPreviewInput): Availab
               return {
                 usuario_id: r.usuario_id,
                 usuario_nome: p?.nome ?? `Participante #${r.usuario_id}`,
-                conflicts: r.conflicts as ConflictDetail[],
+                conflicts: r.conflicts,
               };
             });
           setStored({ key, preview: { status: 'conflito', bloqueados } });

@@ -229,7 +229,7 @@ export default function UsuariosPage(): JSX.Element {
       // DRF pagination response structure
       // Note: API returns AdminUser with Group[], component uses string[]
       // This is acceptable during migration - will be unified in strict mode phase
-      setUsuarios(data.results as unknown as UserRecord[]);
+      setUsuarios(data.results);
       setPagination({
         current: params.current || pagination.current,
         pageSize: params.pageSize || pagination.pageSize,
@@ -250,7 +250,7 @@ export default function UsuariosPage(): JSX.Element {
         listGroups({ ordering: 'name', page_size: PAGE_SIZES.ALL }),
         getRBACMeta(),
       ]);
-      setGrupos(groupsData.results as GroupRecord[]);
+      setGrupos(groupsData.results);
       setRbacMeta(meta);
     } catch (error) {
       logger.error('Erro ao carregar contexto RBAC:', error);
@@ -594,12 +594,12 @@ export default function UsuariosPage(): JSX.Element {
           (<ImportUploader
             label="Importar Usuários de CSV/XLSX"
             description="Colunas obrigatórias: cpf, nome. Opcionais: email, telefone, cargo, grupos (separados por vírgula). O CPF é a chave de idempotência."
-            onDryRun={async (file: File) => toValidationResult(await importUsuarios(file, true) as unknown as ImportResult)}
+            onDryRun={async (file: File) => toValidationResult(await importUsuarios(file, true))}
             onApply={async (file: File) => {
               const result = await importUsuarios(file, false);
               // Recarregar lista após importação
               fetchUsuarios();
-              return toApplyResult(result as unknown as ImportResult);
+              return toApplyResult(result);
             }}
           />)
         )}

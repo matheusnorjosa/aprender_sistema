@@ -104,7 +104,7 @@ export async function getDATRegistroStats(): Promise<DATRegistroStats> {
 }
 
 export async function exportDATRegistros(params: FilterParams = {}): Promise<Blob> {
-  return fetchBlob(buildUrl('/dat/registros/export/', params as QueryParams));
+  return fetchBlob(buildUrl('/dat/registros/export/', params));
 }
 
 // ========== PROJETOS GERAIS ==========

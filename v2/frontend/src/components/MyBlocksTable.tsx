@@ -11,7 +11,7 @@
 import { Table, Button, Popconfirm, Tag, Empty } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import type { ColumnsType, ColumnType } from 'antd/es/table';
+import type { ColumnsType } from 'antd/es/table';
 import type { ID } from '../types';
 import { formatFortaleza } from '../utils/datetime';
 
@@ -158,7 +158,7 @@ export default function MyBlocksTable({ blocks, onDelete, loading }: MyBlocksTab
           </Popconfirm>
         );
       },
-    } as ColumnType<BlockRecord>,
+    },
   ];
 
   /**

@@ -149,7 +149,9 @@ export interface GCalTopInsightsResponse {
     start?: string | null;
     end?: string | null;
   };
-  metric: 'municipios' | 'projetos' | string;
+  // `string & {}` mantém os literais conhecidos (autocomplete/doc) sem que o
+  // `string` os absorva (no-redundant-type-constituents) — aceita qualquer string.
+  metric: 'municipios' | 'projetos' | (string & {});
   limit: number;
 }
 
@@ -157,7 +159,9 @@ export interface GCalTopInsightsResponse {
  * Params for top insights endpoint.
  */
 export interface GCalTopInsightsParams extends GCalDashboardWindowFilters {
-  metric: 'municipios' | 'projetos' | string;
+  // `string & {}` mantém os literais conhecidos (autocomplete/doc) sem que o
+  // `string` os absorva (no-redundant-type-constituents) — aceita qualquer string.
+  metric: 'municipios' | 'projetos' | (string & {});
   limit?: number;
 }
 
@@ -316,6 +320,6 @@ export function buildDashboardEventsExportUrl(params: {
   end?: string;
   status?: string;
 }): string {
-  const relativePath = buildUrl('/gcal/dashboard/events/export/', params as QueryParams);
+  const relativePath = buildUrl('/gcal/dashboard/events/export/', params);
   return `${API_BASE}${relativePath}`;
 }

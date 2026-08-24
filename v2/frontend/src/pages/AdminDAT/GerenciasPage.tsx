@@ -53,7 +53,7 @@ export default function GerenciasPage(): JSX.Element {
         page: current,
         page_size: pageSize,
       });
-      setGerencias(data.results as unknown as GerenciaRecord[]);
+      setGerencias(data.results);
       setPagination((prev) => ({
         ...prev,
         current,

@@ -161,7 +161,7 @@ export default function CadastrosPage(): JSX.Element {
     handleTableChange,
     refresh,
   } = useTableFilters<CadastrosFilters, CadastroRecord, CadastrosStats>({
-    defaultFilters: DEFAULT_FILTERS as CadastrosFilters,
+    defaultFilters: DEFAULT_FILTERS,
     listFn: listCadastros as unknown as (params: TableFilterParams) => Promise<PaginatedResponse<CadastroRecord>>,
     statsFn: getCadastrosStats as unknown as (params: TableFilterParams) => Promise<CadastrosStats>,
     buildParams: (f) => ({

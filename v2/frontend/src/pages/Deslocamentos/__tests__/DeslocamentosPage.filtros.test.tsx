@@ -58,7 +58,7 @@ describe('DeslocamentosPage — filtros (#1622)', () => {
   test('digitar no filtro Origem: input preserva valor, página não desmonta, opções não refetadas', async () => {
     renderPage();
 
-    const origem = (await screen.findByPlaceholderText('Origem', undefined, { timeout: 5000 })) as HTMLInputElement;
+    const origem = (await screen.findByPlaceholderText('Origem', undefined, { timeout: 5000 }));
     await waitFor(() => expect(listFormadoresMock).toHaveBeenCalledTimes(1));
 
     // Digita no filtro (um único change com o valor completo evita corridas de remontagem).
@@ -76,7 +76,7 @@ describe('DeslocamentosPage — filtros (#1622)', () => {
     expect(screen.getByText('Filtros')).toBeInTheDocument();
 
     // O input mantém o valor digitado (controlado).
-    expect((screen.getByPlaceholderText('Origem') as HTMLInputElement).value).toBe('Fortaleza');
+    expect((screen.getByPlaceholderText('Origem')).value).toBe('Fortaleza');
 
     // As opções de formador NÃO são refetadas a cada mudança de filtro.
     expect(listFormadoresMock).toHaveBeenCalledTimes(1);
@@ -101,7 +101,7 @@ describe('DeslocamentosPage — filtros (#1622)', () => {
     });
 
     renderPage();
-    const origem = (await screen.findByPlaceholderText('Origem', undefined, { timeout: 5000 })) as HTMLInputElement;
+    const origem = (await screen.findByPlaceholderText('Origem', undefined, { timeout: 5000 }));
     await waitFor(() => expect(listDeslocamentosMock).toHaveBeenCalled()); // load inicial
 
     // 1º filtro 'A' → request LENTO (resolvido sob controle, mais tarde).

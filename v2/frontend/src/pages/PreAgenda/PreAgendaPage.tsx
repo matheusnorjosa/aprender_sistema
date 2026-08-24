@@ -681,7 +681,7 @@ export default function PreAgendaPage(): JSX.Element {
 
   const handleGoogleDisconnect = async (): Promise<void> => {
     try {
-      const result = await googleDisconnect() as { success: boolean; error?: string };
+      const result = await googleDisconnect();
 
       if (result.success) {
         message.success('Conta Google desconectada com sucesso');

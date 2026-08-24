@@ -100,7 +100,7 @@ export default function MySolicitacoesPage(): JSX.Element {
 
       const data = await listSolicitacoes(filters) as PaginatedResponse<SolicitacaoExtended> | SolicitacaoExtended[];
       const results = 'results' in data ? data.results : data;
-      const count = 'count' in data ? data.count : (data as SolicitacaoExtended[]).length;
+      const count = 'count' in data ? data.count : (data).length;
       setRows(results || []);
       setTotal(count || 0);
     } catch (error) {

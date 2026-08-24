@@ -277,7 +277,7 @@ export default function MapaBrasilPage(): JSX.Element {
 
     setLoadingCoordinators(true);
     try {
-      const data = await fetchAPI<{ coordenadores: CoordenadorDataType[] }>(buildUrl('/metrics/map/coordinators/', { uf, ...filters } as QueryParams));
+      const data = await fetchAPI<{ coordenadores: CoordenadorDataType[] }>(buildUrl('/metrics/map/coordinators/', { uf, ...filters }));
       setCoordenadoresData(data.coordenadores || []);
     } catch (err) {
       logger.error('Erro ao buscar coordenadores:', err);

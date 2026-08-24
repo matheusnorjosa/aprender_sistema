@@ -33,7 +33,9 @@ type MonthlyGridData = any;
  * Return type for the monthly query hook
  */
 interface UseMonthlyQueryResult {
-  data: MonthlyGridData | null;
+  // MonthlyGridData é `any` (typing pendente p/ PR de no-unsafe-*); `any` já absorve
+  // null, então `| null` é redundante (no-redundant-type-constituents).
+  data: MonthlyGridData;
   loading: boolean;
   error: string | null;
   lastUpdated: number | null;
@@ -55,7 +57,7 @@ interface UseMonthlyQueryResult {
 export default function useMonthlyQuery(
   params: UseMonthlyQueryParams
 ): UseMonthlyQueryResult {
-  const [data, setData] = useState<MonthlyGridData | null>(null);
+  const [data, setData] = useState<MonthlyGridData>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);

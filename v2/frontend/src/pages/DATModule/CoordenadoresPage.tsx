@@ -137,7 +137,7 @@ export default function CoordenadoresPage(): JSX.Element {
     handleTableChange,
     refresh,
   } = useTableFilters<CoordenadoresFilters, CoordenadorRecord>({
-    defaultFilters: DEFAULT_FILTERS as CoordenadoresFilters,
+    defaultFilters: DEFAULT_FILTERS,
     listFn: listCoordenadoresDAT as unknown as (params: TableFilterParams) => Promise<PaginatedResponse<CoordenadorRecord>>,
     buildParams: (f) => ({
       ...(f.search && { search: f.search }),
@@ -160,7 +160,7 @@ export default function CoordenadoresPage(): JSX.Element {
       ativos,
       areas: areasUnicas,
       media_projetos: mediaProjetos,
-    } as CoordenadoresStats;
+    };
   }, [coordenadores, pagination.total]);
 
   // Options for dropdowns (projetos/municipios reserved for future use)

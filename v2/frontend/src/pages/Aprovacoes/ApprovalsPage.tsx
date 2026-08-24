@@ -58,7 +58,7 @@ import { usePolling } from '../../hooks/usePolling';
 import { syncChannel } from '../../services/syncChannel';
 import { formatFortaleza, FORTALEZA_TZ } from '../../utils/datetime';
 import logger from '../../utils/logger';
-import type { ID, Solicitacao, SolicitacaoStatus, PaginatedResponse, Participation, BatchOperationResult } from '../../types';
+import type { ID, Solicitacao, SolicitacaoStatus, PaginatedResponse, Participation } from '../../types';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -98,7 +98,7 @@ export default function ApprovalsPage(): JSX.Element {
   const [rows, setRows] = useState<Solicitacao[]>([]);
   const [total, setTotal] = useState<number>(0);
 
-  const [statusFilter, setStatusFilter] = useState<SolicitacaoStatus | string>('pendente');
+  const [statusFilter, setStatusFilter] = useState<SolicitacaoStatus | (string & {})>('pendente');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   const [previewVisible, setPreviewVisible] = useState<boolean>(false);
@@ -118,7 +118,7 @@ export default function ApprovalsPage(): JSX.Element {
 
       const data = await listSolicitacoes(filters as unknown as Record<string, string>) as PaginatedResponse<Solicitacao> | Solicitacao[];
       const results = 'results' in data ? data.results : data;
-      const count = 'count' in data ? data.count : (data as Solicitacao[]).length;
+      const count = 'count' in data ? data.count : (data).length;
       setRows(results || []);
       setTotal(count || 0);
     } catch (error) {
@@ -227,7 +227,7 @@ export default function ApprovalsPage(): JSX.Element {
       onOk: async () => {
         try {
           setBatchLoading(true);
-          const result = await approveSolicitacoesBatch(selectedRowKeys as ID[]) as BatchOperationResult;
+          const result = await approveSolicitacoesBatch(selectedRowKeys as ID[]);
 
           if (result.approved && result.approved > 0) {
             message.success(`${result.approved} solicitação(ões) aprovada(s)!`);
@@ -257,7 +257,7 @@ export default function ApprovalsPage(): JSX.Element {
       onOk: async () => {
         try {
           setBatchLoading(true);
-          const result = await rejectSolicitacoesBatch(selectedRowKeys as ID[]) as BatchOperationResult;
+          const result = await rejectSolicitacoesBatch(selectedRowKeys as ID[]);
 
           if (result.rejected && result.rejected > 0) {
             message.success(`${result.rejected} solicitação(ões) reprovada(s)!`);

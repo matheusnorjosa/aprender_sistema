@@ -238,14 +238,14 @@ export default function DATRegistrosPage(): JSX.Element {
       const ufsDaRegiao = REGIAO_UFS[regiao];
       setFilteredUFs((UF_OPTIONS as UFOption[]).filter((uf) => ufsDaRegiao.includes(uf.value)));
     } else {
-      setFilteredUFs(UF_OPTIONS as UFOption[]);
+      setFilteredUFs(UF_OPTIONS);
     }
   };
 
   // Clear all filters (also resets cascading UF list)
   const handleClearFilters = () => {
     clearFilterState();
-    setFilteredUFs(UF_OPTIONS as UFOption[]);
+    setFilteredUFs(UF_OPTIONS);
   };
 
   // Apply filters

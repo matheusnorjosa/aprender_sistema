@@ -136,20 +136,20 @@ function normalizeImportResponse(raw: unknown): ImportResult {
   };
 
   // Pass-through if response already matches the ImportResult contract
-  if (Array.isArray(r.errors) && typeof r.created !== 'undefined') {
+  if (Array.isArray(r['errors']) && typeof r['created'] !== 'undefined') {
     return {
-      created: toNum(r.created),
-      updated: toNum(r.updated),
-      skipped: toNum(r.skipped),
-      errors: r.errors as Array<{ row: number; message: string }>,
-      warnings: Array.isArray(r.warnings) ? (r.warnings as string[]) : [],
+      created: toNum(r['created']),
+      updated: toNum(r['updated']),
+      skipped: toNum(r['skipped']),
+      errors: r['errors'] as Array<{ row: number; message: string }>,
+      warnings: Array.isArray(r['warnings']) ? (r['warnings'] as string[]) : [],
     };
   }
 
-  const stats = (r.stats ?? {}) as Record<string, unknown>;
+  const stats = (r['stats'] ?? {}) as Record<string, unknown>;
 
   // eventos returns stats.solicitacoes = {created, updated, unchanged}
-  const nested = stats.solicitacoes;
+  const nested = stats['solicitacoes'];
   const baseStats =
     nested && typeof nested === 'object'
       ? (nested as Record<string, unknown>)
@@ -157,7 +157,7 @@ function normalizeImportResponse(raw: unknown): ImportResult {
 
   // stats.skipped may be a number (compras) or an object keyed by skip reason
   let skippedTotal = 0;
-  const sk = stats.skipped;
+  const sk = stats['skipped'];
   if (typeof sk === 'number') {
     skippedTotal = sk;
   } else if (sk && typeof sk === 'object') {
@@ -168,10 +168,10 @@ function normalizeImportResponse(raw: unknown): ImportResult {
   // `unchanged` rows are also "non-mutating" — surface them in the same bucket
   // so the page label "registros não alterados" reflects everything that
   // didn't create or update.
-  skippedTotal += toNum(baseStats.unchanged);
+  skippedTotal += toNum(baseStats['unchanged']);
 
   // Flatten pendencias dict-of-arrays into errors[] / warnings[]
-  const pendencias = (r.pendencias ?? {}) as Record<string, unknown>;
+  const pendencias = (r['pendencias'] ?? {}) as Record<string, unknown>;
   const errors: Array<{ row: number; message: string }> = [];
   const warnings: string[] = [];
   for (const [cat, items] of Object.entries(pendencias)) {
@@ -180,8 +180,8 @@ function normalizeImportResponse(raw: unknown): ImportResult {
     for (const e of items) {
       if (typeof e !== 'object' || e === null) continue;
       const item = e as Record<string, unknown>;
-      const rowNum = toNum(item.linha ?? item.linha_num ?? item.row);
-      const detail = [item.erro, item.nome, item.message]
+      const rowNum = toNum(item['linha'] ?? item['linha_num'] ?? item['row']);
+      const detail = [item['erro'], item['nome'], item['message']]
         .filter((x): x is string => typeof x === 'string' && x.length > 0)
         .join(' — ');
       if (isBlocking) {
@@ -196,8 +196,8 @@ function normalizeImportResponse(raw: unknown): ImportResult {
   }
 
   return {
-    created: toNum(baseStats.created),
-    updated: toNum(baseStats.updated),
+    created: toNum(baseStats['created']),
+    updated: toNum(baseStats['updated']),
     skipped: skippedTotal,
     errors,
     warnings,

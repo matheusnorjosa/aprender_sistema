@@ -53,8 +53,8 @@ export async function listSolicitacoes(filters: SolicitacaoFilters = {}): Promis
   // Mapear status aliases (inglês→português) se necessário
   const normalizedFilters = { ...filters } as Record<string, unknown>;
 
-  if (normalizedFilters.status) {
-    normalizedFilters.status = STATUS_MAP[normalizedFilters.status as string] ?? normalizedFilters.status;
+  if (normalizedFilters['status']) {
+    normalizedFilters['status'] = STATUS_MAP[normalizedFilters['status'] as string] ?? normalizedFilters['status'];
   }
 
   const url = buildUrl('/solicitacoes/', normalizedFilters as QueryParams);

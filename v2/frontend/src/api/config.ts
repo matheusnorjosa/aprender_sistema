@@ -24,7 +24,7 @@ export type QueryParams = Record<string, string | number | boolean | null | unde
 /**
  * Base API URL (can be overridden by VITE_API_URL env var)
  */
-export const API_BASE: string = import.meta.env.VITE_API_URL || '/api';
+export const API_BASE: string = import.meta.env['VITE_API_URL'] || '/api';
 
 /**
  * Extrai token CSRF do cookie 'csrftoken'.
@@ -262,7 +262,7 @@ export async function initCsrfToken(): Promise<void> {
 // Inicializar CSRF token automaticamente quando o módulo carrega
 // Isso garante que o token está disponível assim que o app iniciar
 // Skip em ambiente de teste (Vitest/jsdom não tem servidor real)
-if (typeof import.meta.env?.VITEST === 'undefined') {
+if (typeof import.meta.env?.['VITEST'] === 'undefined') {
   initCsrfToken();
 }
 

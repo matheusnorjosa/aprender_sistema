@@ -8,10 +8,10 @@
 export function getErrorStatus(error: unknown): number | undefined {
   if (typeof error === 'object' && error !== null) {
     const err = error as Record<string, unknown>;
-    if (typeof err.status === 'number') return err.status;
-    if (typeof err.response === 'object' && err.response !== null) {
-      const resp = err.response as Record<string, unknown>;
-      if (typeof resp.status === 'number') return resp.status;
+    if (typeof err['status'] === 'number') return err['status'];
+    if (typeof err['response'] === 'object' && err['response'] !== null) {
+      const resp = err['response'] as Record<string, unknown>;
+      if (typeof resp['status'] === 'number') return resp['status'];
     }
   }
   return undefined;

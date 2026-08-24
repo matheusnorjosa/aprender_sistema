@@ -14,25 +14,25 @@ import type { JSX } from "react";
 const { Title, Text } = Typography;
 
 function toValidationResult(report: Record<string, unknown>): ValidationResult {
-  const stats = (report.stats as Record<string, number | undefined>) || {};
+  const stats = (report['stats'] as Record<string, number | undefined>) || {};
   return {
     stats: {
-      created: stats.created || 0,
-      updated: stats.updated || 0,
-      unchanged: stats.unchanged || 0,
+      created: stats['created'] || 0,
+      updated: stats['updated'] || 0,
+      unchanged: stats['unchanged'] || 0,
     },
     errors: [],
-    pendencias: (report.pendencias as Record<string, unknown>) || {},
+    pendencias: (report['pendencias'] as Record<string, unknown>) || {},
   };
 }
 
 function toApplyResult(report: Record<string, unknown>): ApplyResult {
-  const stats = (report.stats as Record<string, number | undefined>) || {};
+  const stats = (report['stats'] as Record<string, number | undefined>) || {};
   return {
     stats: {
-      created: stats.created || 0,
-      updated: stats.updated || 0,
-      unchanged: stats.unchanged || 0,
+      created: stats['created'] || 0,
+      updated: stats['updated'] || 0,
+      unchanged: stats['unchanged'] || 0,
     },
   };
 }

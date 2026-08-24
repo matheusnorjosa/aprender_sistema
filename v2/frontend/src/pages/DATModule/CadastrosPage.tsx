@@ -218,13 +218,13 @@ export default function CadastrosPage(): JSX.Element {
       form.resetFields(); // evita vazar valores do registro anterior (setFieldsValue faz merge)
       form.setFieldsValue({
         ...detail,
-        data_criacao_curso: detail.data_criacao_curso ? dayjs(detail.data_criacao_curso as string) : null,
-        data_chaves: detail.data_chaves ? dayjs(detail.data_chaves as string) : null,
-        data_instrucoes: detail.data_instrucoes ? dayjs(detail.data_instrucoes as string) : null,
-        data_envio: detail.data_envio ? dayjs(detail.data_envio as string) : null,
-        data_recebidos: detail.data_recebidos ? dayjs(detail.data_recebidos as string) : null,
-        data_validados: detail.data_validados ? dayjs(detail.data_validados as string) : null,
-        data_importados: detail.data_importados ? dayjs(detail.data_importados as string) : null,
+        data_criacao_curso: detail['data_criacao_curso'] ? dayjs(detail['data_criacao_curso'] as string) : null,
+        data_chaves: detail['data_chaves'] ? dayjs(detail['data_chaves'] as string) : null,
+        data_instrucoes: detail['data_instrucoes'] ? dayjs(detail['data_instrucoes'] as string) : null,
+        data_envio: detail['data_envio'] ? dayjs(detail['data_envio'] as string) : null,
+        data_recebidos: detail['data_recebidos'] ? dayjs(detail['data_recebidos'] as string) : null,
+        data_validados: detail['data_validados'] ? dayjs(detail['data_validados'] as string) : null,
+        data_importados: detail['data_importados'] ? dayjs(detail['data_importados'] as string) : null,
       } as unknown as Parameters<typeof form.setFieldsValue>[0]);
       setEditingCadastro(record);
       setModalVisible(true);

@@ -1,7 +1,7 @@
 ---
 title: Módulo DAT
 status: canonical
-last_verified: 2026-08-23
+last_verified: 2026-08-24
 sources_of_truth:
   - v2/backend/apps/core/services/controle_acoes_import.py
   - v2/backend/apps/core/models/dat_acao.py
@@ -129,7 +129,7 @@ Notas: a composition OR do #1220 vale só para Coordenador/Ação/Formação. Em
 - Issue #1220 — Controle edita ações/formações/coordenadores DAT via `run_daily_operations` (composition OR).
 - Issues #1222/#1233 (Epic 4.2.b1) — `pendencias` é operacional; `dashboard` agregado fica restrito (Diretoria); cada action mapeada para Policy nomeada de Compras.
 - PR #1361 — `stats_qs = qs.order_by()` antes de `values_list().annotate(Count())` para evitar fragmentação de GROUP BY (aplicado a todos os `stats` do módulo).
-- Pipeline export-contract — `dat_acao` + `plano_formacao` no importer dedicado (PR #1384, dry-run); ver [export-contract](../../../backend/apps/core/services/export_contract_importer.py).
+- Pipeline export-contract — `dat_acao` + `plano_formacao` no importer com handler de apply dedicado (NK `(municipio, projeto, ano)`; ano DECLARADO no plano_formacao, derivado de data no dat_acao); ver [export-contract](../../../backend/apps/core/services/export_contract_importer.py).
 
 ## Testes que cobrem
 

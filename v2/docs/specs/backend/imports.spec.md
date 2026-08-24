@@ -1,7 +1,7 @@
 ---
 title: Importação de Dados (export-contract)
 status: canonical
-last_verified: 2026-08-22
+last_verified: 2026-08-24
 sources_of_truth:
   - v2/backend/apps/core/imports/__init__.py
   - v2/backend/apps/core/imports/hashing.py
@@ -117,7 +117,7 @@ python manage.py import_export_contract --path <dir> --apply --allow-entity muni
 
 Entidades classificadas no importer (`IMPLEMENTED`): `municipio`, `projeto_geral`, `projeto`, `produto`, `usuario`, `gerencia`, `tipo_evento`, `dat_coordenador`, `dat_area`, `dat_acao`, `plano_formacao`, `dat_registro`, `dat_cadastro`, `dat_compra`. Demais (`solicitacao`, `formacao`, `acompanhamento`, ...) → `not_implemented` (só count reportado).
 
-> ⚠️ `IMPLEMENTED` significa **classificado no dry-run**; nem toda entidade é **gravável no `--apply`**. `_apply_create_only` escreve para: `usuario`, `dat_area`, `municipio`, `projeto_geral` (com config de cálculo v5 + guard de alias ambíguo), `projeto` (Onda A: resolver canon-key #1372, popula o FK `projeto_geral` + `fluxo` autoritativo — PG/fluxo ausente = `would_reject` rotulado, nunca órfã NULL nem SUPER auto-aprovável; sem actor), `tipo_evento`, `dat_acao` (NK `(municipio, projeto, ano)`; `ano` derivado da data da reunião — decisão B; exige actor), `dat_registro`, `dat_cadastro` e `dat_compra` (estes exigem `--as-user`/actor; `dat_compra` carrega `tipo`/`conta_para_codigos` e dispara o recompute de `nr_codigos`). Um `--apply --allow-entity produto` (ou `gerencia`/`dat_coordenador`/`plano_formacao`) retorna `applied={"produto": 0}` **sem erro** — silêncio, não falha (`plano_formacao` segue gap: falta o `ano` no contrato + handler dedicado).
+> ⚠️ `IMPLEMENTED` significa **classificado no dry-run**; nem toda entidade é **gravável no `--apply`**. `_apply_create_only` escreve para: `usuario`, `dat_area`, `municipio`, `projeto_geral` (com config de cálculo v5 + guard de alias ambíguo), `projeto` (Onda A: resolver canon-key #1372, popula o FK `projeto_geral` + `fluxo` autoritativo — PG/fluxo ausente = `would_reject` rotulado, nunca órfã NULL nem SUPER auto-aprovável; sem actor), `tipo_evento`, `dat_acao` (NK `(municipio, projeto, ano)`; `ano` derivado da data da reunião — decisão B; exige actor), `plano_formacao` (NK `(municipio, projeto, ano)`; `ano` DECLARADO do workbook — não derivável de data; `sem_plano`=reserva → reject visível; coordenador por email; exige actor), `dat_registro`, `dat_cadastro` e `dat_compra` (estes exigem `--as-user`/actor; `dat_compra` carrega `tipo`/`conta_para_codigos` e dispara o recompute de `nr_codigos`). Um `--apply --allow-entity produto` (ou `gerencia`/`dat_coordenador`) retorna `applied={"produto": 0}` **sem erro** — silêncio, não falha.
 
 ## Fluxos principais
 

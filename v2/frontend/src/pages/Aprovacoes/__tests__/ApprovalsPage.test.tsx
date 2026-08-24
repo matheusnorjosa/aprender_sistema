@@ -146,14 +146,21 @@ describe('ApprovalsPage', () => {
 
     renderPage();
 
-    // canApprove vem de computeAccess(policies) real → botões de ação aparecem.
-    // O ícone AntD entra no nome acessível (ex.: "check Aprovar"), daí o regex.
-    const approveBtn = await screen.findByRole('button', { name: /Aprovar/i });
-    expect(approveBtn).toBeInTheDocument();
-
+    // Espera a LINHA renderizar (query de texto, rápida) e então os botões de ação
+    // DENTRO da tabela. canApprove vem de computeAccess(policies) real. `findByRole`
+    // por nome acessível numa tabela AntD é lento no CI (recomputa o nome de todos os
+    // botões a cada poll); escopar na tabela + timeout folgado evita estourar o
+    // timeout do teste sob carga (o ícone entra no nome acessível, daí o regex).
+    await screen.findByText('MunicipioTesteAlfa');
     const table = screen.getByRole('table');
+    const approveBtn = await within(table).findByRole(
+      'button',
+      { name: /Aprovar/i },
+      { timeout: 10000 },
+    );
+    expect(approveBtn).toBeInTheDocument();
     expect(
       within(table).getByRole('button', { name: /Reprovar/i }),
     ).toBeInTheDocument();
-  });
+  }, 20000);
 });

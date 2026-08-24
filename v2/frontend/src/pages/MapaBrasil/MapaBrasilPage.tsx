@@ -585,7 +585,7 @@ export default function MapaBrasilPage(): JSX.Element {
           </Title>
           <Text type="secondary">Visualização geográfica do Brasil</Text>
         </div>
-        <Radio.Group value={viewMode} onChange={(e: RadioChangeEvent) => setViewMode(e.target.value)} buttonStyle="solid">
+        <Radio.Group value={viewMode} onChange={(e: RadioChangeEvent) => setViewMode(e.target.value as ViewMode)} buttonStyle="solid">
           <Radio.Button value="map">Mapa</Radio.Button>
           <Radio.Button value="list">Lista</Radio.Button>
         </Radio.Group>

@@ -160,7 +160,7 @@ export default function MonthlyPage(): JSX.Element {
                   month={filters.month}
                   days={formadores.data.days}
                   people={formadores.data.people}
-                  cells={formadores.data.cells as ('' | 'E' | '2' | 'P' | 'T' | 'X' | 'D' | 'D1')[][]}
+                  cells={formadores.data.cells}
                   detailsIndex={formadores.data.details_index || {}}
                   onSelect={onSelectFormador}
                   selected={
@@ -207,7 +207,7 @@ export default function MonthlyPage(): JSX.Element {
                   month={filters.month}
                   days={coordenadores.data.days}
                   people={coordenadores.data.people}
-                  cells={coordenadores.data.cells as ('' | 'E' | '2' | 'P' | 'T' | 'X' | 'D' | 'D1')[][]}
+                  cells={coordenadores.data.cells}
                   detailsIndex={coordenadores.data.details_index || {}}
                   onSelect={onSelectCoordenador}
                   selected={

@@ -14,6 +14,7 @@ import {
   message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import type { Dayjs } from 'dayjs';
 
 import { concluirAcao, listAcoesByCiclo, listCiclosAcoes, registrarAncora } from '../../api/acoesNotificacao';
 import type { AcaoInstancia, CicloAcoes } from '../../types/acoesNotificacao';
@@ -21,6 +22,12 @@ import type { AcaoInstancia, CicloAcoes } from '../../types/acoesNotificacao';
 const { Title, Text } = Typography;
 
 type ModalMode = 'ancora' | 'conclusao';
+
+interface AcaoNotificacaoFormValues {
+  data_ancora: Dayjs;
+  data_realizacao: Dayjs;
+  observacao: string;
+}
 
 export default function AcoesNotificacaoPage(): JSX.Element {
   const [cycles, setCycles] = useState<CicloAcoes[]>([]);
@@ -33,7 +40,7 @@ export default function AcoesNotificacaoPage(): JSX.Element {
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [modalMode, setModalMode] = useState<ModalMode>('ancora');
   const [selectedAction, setSelectedAction] = useState<AcaoInstancia | null>(null);
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<AcaoNotificacaoFormValues>();
 
   const loadCycles = async () => {
     setLoadingCycles(true);

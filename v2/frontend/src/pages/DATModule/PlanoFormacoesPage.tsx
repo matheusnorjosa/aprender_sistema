@@ -951,7 +951,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
                     pagination={false}
                     columns={[
                       { title: '#', dataIndex: 'numero', width: 50 },
-                      { title: 'Data', dataIndex: 'data', render: (d) => d ? dayjs(d).format('DD/MM/YYYY') : '-' },
+                      { title: 'Data', dataIndex: 'data', render: (d: string | null) => d ? dayjs(d).format('DD/MM/YYYY') : '-' },
                       { title: 'CH', dataIndex: 'ch', render: (v) => `${v}h` },
                       { title: 'Modalidade', dataIndex: 'modalidade', render: (m) => m === 'online' ? 'Online' : 'Presencial' },
                       { title: 'Realizada', dataIndex: 'realizada', render: (v) => v ? <CheckCircleOutlined className="text-green-500" /> : '-' },
@@ -971,7 +971,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
                     pagination={false}
                     columns={[
                       { title: 'Tipo', dataIndex: 'tipo', render: (t) => t === 'primeiro' ? '1o Acomp.' : '2o Acomp.' },
-                      { title: 'Data', dataIndex: 'data', render: (d) => d ? dayjs(d).format('DD/MM/YYYY') : '-' },
+                      { title: 'Data', dataIndex: 'data', render: (d: string | null) => d ? dayjs(d).format('DD/MM/YYYY') : '-' },
                       { title: 'Realizado', dataIndex: 'realizado', render: (v) => v ? <CheckCircleOutlined className="text-green-500" /> : '-' },
                     ]}
                   />
@@ -989,7 +989,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
                     pagination={false}
                     columns={[
                       { title: '#', dataIndex: 'numero', width: 50 },
-                      { title: 'Data', dataIndex: 'data', render: (d) => d ? dayjs(d).format('DD/MM/YYYY') : '-' },
+                      { title: 'Data', dataIndex: 'data', render: (d: string | null) => d ? dayjs(d).format('DD/MM/YYYY') : '-' },
                       { title: 'Realizada', dataIndex: 'realizada', render: (v) => v ? <CheckCircleOutlined className="text-green-500" /> : '-' },
                     ]}
                   />

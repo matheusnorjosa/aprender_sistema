@@ -94,6 +94,7 @@ interface PlanoFilters {
   municipio: number | undefined;
   projeto: number | undefined;
   coordenador: number | undefined;
+  ano: number | undefined;
 }
 
 interface AcompanhamentoItem {
@@ -117,6 +118,7 @@ interface PlanoFormacaoRecord {
   municipio_uf: string;
   projeto: number;
   projeto_nome: string;
+  ano: number | null;
   coordenador: number | null;
   coordenador_nome: string | null;
   ch_estudo: number | null;
@@ -130,6 +132,7 @@ interface PlanoFormacaoRecord {
 interface PlanoFormacaoFormValues {
   municipio: number;
   projeto: number;
+  ano: number;
   coordenador: number | null;
   ch_estudo: number | null;
   observacoes: string | null;
@@ -190,6 +193,7 @@ const DEFAULT_PLANO_FILTERS: PlanoFilters = {
   municipio: undefined,
   projeto: undefined,
   coordenador: undefined,
+  ano: undefined,
 };
 
 const buildPlanoParams = (f: PlanoFilters): TableFilterParams => ({
@@ -198,6 +202,7 @@ const buildPlanoParams = (f: PlanoFilters): TableFilterParams => ({
   ...(f.municipio !== undefined && { municipio: f.municipio }),
   ...(f.projeto !== undefined && { projeto: f.projeto }),
   ...(f.coordenador !== undefined && { coordenador: f.coordenador }),
+  ...(f.ano !== undefined && { ano: f.ano }),
 });
 
 export default function PlanoFormacoesPage(): JSX.Element {
@@ -293,6 +298,8 @@ export default function PlanoFormacoesPage(): JSX.Element {
   const handleCreate = () => {
     setEditingPlano(null);
     form.resetFields();
+    // Default = ano vigente (o serializer confirma o default no server, RD-06 Fortaleza).
+    form.setFieldsValue({ ano: dayjs().year() });
     setModalVisible(true);
   };
 
@@ -301,6 +308,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
     form.setFieldsValue({
       municipio: record.municipio,
       projeto: record.projeto,
+      ano: record.ano ?? dayjs().year(),
       coordenador: record.coordenador,
       ch_estudo: record.ch_estudo,
       observacoes: record.observacoes,
@@ -492,6 +500,15 @@ export default function PlanoFormacoesPage(): JSX.Element {
       width: 150,
       fixed: 'left' as const,
       ellipsis: true,
+    },
+    {
+      title: 'Ano',
+      dataIndex: 'ano',
+      key: 'ano',
+      width: 60,
+      fixed: 'left' as const,
+      align: 'center' as const,
+      render: (ano: number | null) => (ano != null ? <Text>{ano}</Text> : <Text type="secondary">-</Text>),
     },
     // 15 formacoes columns
     ...Array.from({ length: 15 }, (_, i) => ({
@@ -743,6 +760,20 @@ export default function PlanoFormacoesPage(): JSX.Element {
               options={coordenadores.map((c) => ({ label: c.nome, value: c.id }))}
             />
           </Col>
+          <Col xs={12} sm={6} md={4} lg={3}>
+            <div className="mb-1">
+              <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>Ano</Text>
+            </div>
+            <InputNumber
+              style={{ width: '100%' }}
+              placeholder="Todos"
+              min={2020}
+              max={2100}
+              controls={false}
+              value={filters.ano}
+              onChange={(val) => setFilters((prev) => ({ ...prev, ano: val ?? undefined }))}
+            />
+          </Col>
         </Row>
         <Divider className="my-4 mb-3" />
         <div className="flex justify-end gap-2">
@@ -834,7 +865,16 @@ export default function PlanoFormacoesPage(): JSX.Element {
             </Col>
           </Row>
           <Row gutter={16}>
-            <Col span={12}>
+            <Col span={8}>
+              <Form.Item
+                name="ano"
+                label="Ano"
+                rules={[{ required: true, message: 'Informe o ano' }]}
+              >
+                <InputNumber style={{ width: '100%' }} min={2020} max={2100} controls={false} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
               <Form.Item name="coordenador" label="Coordenador">
                 <Select
                   placeholder="Selecione..."
@@ -845,7 +885,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
                 />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col span={8}>
               <Form.Item name="ch_estudo" label="CH Estudo (horas)">
                 <InputNumber style={{ width: '100%' }} min={0} step={0.5} />
               </Form.Item>

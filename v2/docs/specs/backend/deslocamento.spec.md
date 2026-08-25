@@ -1,7 +1,7 @@
 ---
 title: Deslocamento
 status: canonical
-last_verified: 2026-07-24
+last_verified: 2026-08-25
 sources_of_truth:
   - v2/backend/apps/core/models/workflow.py
   - v2/backend/apps/core/migrations/0016_create_deslocamento.py
@@ -60,7 +60,7 @@ E um cadastro operacional simples (CRUD + import em massa), sem fluxo de aprovac
 - **Validacao de datas** (serializer): exige `end_date > start_date` (estrito; `end_date <= start_date` -> 400 em `end_date`). Suporta PATCH parcial (usa o valor da instancia para o campo ausente).
 - **Origem != destino** (serializer): comparacao case-insensitive (`.strip().lower()`); igual -> 400 em `destino`.
 - **Idempotencia de import**: `external_hash = SHA1(usuario_id|origem|destino|start_iso|end_iso)` via `stable_import_hash` (byte-equivalente ao formato historico). Re-import do mesmo registro nao duplica; so `observacao` e atualizada quando muda (never-overwrite dos demais campos). `unique=True` no `external_hash` e a barreira de banco.
-- **Dry-run por padrao no import**: `dry_run=true` faz `transaction.set_rollback(True)`; nada e persistido. O endpoint inteiro exige `HasPerm("import_spreadsheet")` (DAT ou superuser), tanto em dry-run quanto em apply. Isolamento savepoint-por-linha (ASQ-016): uma linha ruim nao derruba o lote. ⚠️ **O parse de `dry_run` e fail-OPEN** (achado `M04-05`, issue #1649): `views_import_deslocamentos.py:96-97` faz `dry_run = dry_run_param in {"1","true","t","yes","y"}` — qualquer valor fora dessa allowlist (`sim`, `maybe`, typo, string vazia) vira **apply**. Só a ausencia do parametro cai no default `true`.
+- **Dry-run por padrao no import**: `dry_run=true` faz `transaction.set_rollback(True)`; nada e persistido. O endpoint inteiro exige `HasPerm("import_spreadsheet")` (DAT ou superuser), tanto em dry-run quanto em apply. Isolamento savepoint-por-linha (ASQ-016): uma linha ruim nao derruba o lote. **O parse de `dry_run` e FAIL-CLOSED** (corrigido em [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649); achado historico `M04-05`): `views_import_deslocamentos.py` chama `parse_dry_run(request.query_params.get("dry_run"))` — só um token de apply explícito (`false`/`0`/`no`/…) grava; qualquer valor desconhecido (`sim`, `maybe`, typo, vazio) permanece em dry-run (preview). Antes de #1649 o parse era uma allowlist do valor verdadeiro e o valor desconhecido virava apply silencioso.
 - **Leitura: scope por gerencia + self-service** (`views_deslocamento.py:147-153`):
   - Superuser **ou** capability `view_all_availability` (Controle/Gerente via seed 0078) -> ve todos os deslocamentos.
   - Demais autenticados -> `Q(usuario=user) | Q(usuario__equipes__gerencia_id__in=<gerencias do user>)`. **O proprio dono SEMPRE ve os proprios deslocamentos**, mesmo sem vinculo de `EquipeGerencia` (#1454, comentario em `:149-150`). A regra anterior desta spec ("sem vinculo -> 0 resultados") deixou de valer.

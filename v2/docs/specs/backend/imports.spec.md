@@ -41,7 +41,7 @@ Este módulo importa dados da planilha consolidada externa (`sheets.banco`, mate
 
 A regra de ouro **pretendida** é a segurança contra reimportação cega: todo import valida em **dry-run** antes de qualquer escrita, é **idempotente** por `external_hash`, e nunca sobrescreve campos protegidos ou dispara efeitos colaterais perigosos. O ETL legado `apps.dat_ingest` foi **removido**; não existem mais management commands `etl_*.py`/`import_*.py` históricos — o import real é `import_export_contract` + os endpoints DRF.
 
-> ⚠️ **A regra de ouro vale integralmente para o `import_export_contract`, e NÃO vale para vários dos endpoints DRF síncronos.** A auditoria M00–M28 reconfirmou por execução, contra o SHA de produção, quatro classes de furo: (1) o import de usuários **atribui grupos privilegiados sem checar o ator** (`M03-01`, **P0**, issue #1610); (2) valor desconhecido de `dry_run` é tratado como **APPLY** (`M04-05`, #1649); (3) imports **bypassam invariantes de domínio** que a API impõe (épico #1659); (4) entidades são resolvidas por **rótulo humano** com `.first()`/substring (épico #1658). As seções abaixo descrevem o código como ele é, com os achados marcados. Fila viva: [`ACHADOS_REAIS.md`](../../audits/ACHADOS_REAIS.md).
+> ⚠️ **A regra de ouro vale integralmente para o `import_export_contract`, e NÃO vale para vários dos endpoints DRF síncronos.** A auditoria M00–M28 reconfirmou por execução, contra o SHA de produção, quatro classes de furo: (1) o import de usuários **atribui grupos privilegiados sem checar o ator** (`M03-01`, **P0**, issue #1610); (2) valor desconhecido de `dry_run` **era** tratado como **APPLY** (`M04-05`, **resolvido em #1852** — parse fail-closed); (3) imports **bypassam invariantes de domínio** que a API impõe (épico #1659); (4) entidades são resolvidas por **rótulo humano** com `.first()`/substring (épico #1658). As seções abaixo descrevem o código como ele é, com os achados marcados. Fila viva: [`ACHADOS_REAIS.md`](../../audits/ACHADOS_REAIS.md).
 
 ## Fonte de verdade no código
 
@@ -55,14 +55,15 @@ A regra de ouro **pretendida** é a segurança contra reimportação cega: todo 
 
 ## Contratos e invariantes
 
-- **Dry-run é o default, mas o parse é fail-OPEN** (comportamento real, achado `M04-05`, issue #1649). Endpoints síncronos aceitam `?dry_run=true|false` (ausência do parâmetro → `true`); o importer do export-contract é dry-run salvo `--apply`. Dry-run valida e retorna preview sem persistir (rollback via `transaction.atomic`). ⚠️ O parse é uma **allowlist do valor verdadeiro**, não uma validação:
+- **Dry-run é o default e o parse é FAIL-CLOSED** (corrigido em [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649); achado histórico `M04-05`). Endpoints síncronos aceitam `?dry_run=true|false` (ausência do parâmetro → `true`); o importer do export-contract é dry-run salvo `--apply`. Dry-run valida e retorna preview sem persistir (rollback via `transaction.atomic`). O parse vive num helper canônico compartilhado, `apps.core.imports.request_params.parse_dry_run`:
 
   ```python
-  dry_run_param = str(request.query_params.get("dry_run", "true")).lower()
-  dry_run = dry_run_param in {"1", "true", "t", "yes", "y"}
+  dry_run = parse_dry_run(request.query_params.get("dry_run"))
+  # só um token de apply EXPLÍCITO ({false,0,no,n,f,off}) grava; qualquer valor
+  # desconhecido (typo, lixo, vazio) permanece em dry-run (preview) e é logado.
   ```
 
-  Logo `?dry_run=sim`, `?dry_run=maybe`, `?dry_run=` (vazio) ou qualquer typo → `dry_run=False` → **APPLY silencioso**. Nenhuma view devolve 400 para valor inválido. O padrão se repete em **12 sítios / 11 arquivos**: `views_import_usuarios.py:93-94`, `views_import_municipios.py:81-82`, `views_import_colecoes.py:81-82`, `views_import_equipe_gerencia.py:81-82`, `views_import_produtos.py:96-97`, `views_import_eventos.py:104-105`, `views_import_bloqueios.py:97-98`, `views_import_deslocamentos.py:96-97`, `views_controle_imports.py:105-106`, `views_imports.py:102-103` e `:200-201`, e o helper `views/imports.py:45-49`.
+  Antes de #1649 o parse era uma **allowlist do valor verdadeiro** (`dry_run = valor in {"1","true","t","yes","y"}`), então `?dry_run=sim`/`maybe`/typo/vazio caía em `False` → **APPLY silencioso**. Os **12 sítios / 11 arquivos** (11 views síncronas inline + o helper async `views/imports.py`) agora chamam `parse_dry_run` e falham fechado.
 - **Idempotência via `external_hash` (SHA1, ADR-012)**. `stable_import_hash(*parts)` = `hashlib.sha1("|".join(parts), usedforsecurity=False).hexdigest()`. O algoritmo, encoding (UTF-8) e delimitador (`|`) são **congelados** — alterá-los quebra os hashes históricos gravados em `Compra`, `Solicitacao`, `Deslocamento`, `AcaoControle`, `AcaoDAT`, `Acompanhamento`. `controle_imports.sha1_str` delega a `stable_import_hash`. Reimportar o mesmo arquivo não duplica linhas.
 - **`--apply` sem allowlist é BLOQUEADO** no `import_export_contract`: sem `--allow-entity`, `report["apply_blocked"]` é verdadeiro e nada é escrito. Modo `create-only`: só insere `would_create`, nunca faz update.
 - **Never-overwrite de campos protegidos** (`PROTECTED_FIELDS`): `Solicitacao.status`, `Formacao.data_formacao`, `Acompanhamento.{data_acompanhamento,realizado}`. Linha que diverge num campo protegido vira `protected_diff` e fica para decisão humana — jamais sobrescrita.

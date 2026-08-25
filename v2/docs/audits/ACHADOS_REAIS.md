@@ -243,18 +243,18 @@ Nove desses 31 são só correção de contradição do registro: `M03-03`, `M12-
 - **`M15-10`** — inalterado desde 2026-08-17: só a Fase A (`8f894279`, 2026-08-11, e `e94f15f4`,
   2026-08-12); issue #1637 segue OPEN e a Fase B continua sem desenho.
 
-### Seguem `aberto`: 19 IDs
+### Seguem `aberto`: 18 IDs
 
-Issue OPEN **e** nenhum commit citando o ID ou a issue:
+Issue OPEN **e** nenhum commit citando o ID ou a issue (`M04-05` saiu: **resolvido em #1852**, parse `dry_run` fail-closed, posterior a esta reconciliação):
 
-`M02-09` `M04-01` `M04-05` `M05-07` `M08-12` `M09-05` `M10-05` `M10-06` `M10-07` `M14-05`
+`M02-09` `M04-01` `M05-07` `M08-12` `M09-05` `M10-05` `M10-06` `M10-07` `M14-05`
 `M15-04` `M15-05` `M15-08` `M15-09` `M16-04` `M17-01` `M18-05` `M22-14` `M26-03`
 
 Amostra reverificada no artefato, não só por ausência de commit:
 
-- `M04-05` — `v2/backend/apps/core/views_import_usuarios.py:96-97`: o parse aceita uma allowlist
-  de verdadeiros e manda todo o resto para `False`; valor desconhecido (`dry_run=maybe`) vira
-  **APPLY**. Mecanismo intacto.
+- `M04-05` — ✅ **resolvido em #1852** (posterior a esta reconciliação): o parse migrou para o
+  helper fail-closed `apps.core.imports.request_params.parse_dry_run` nos 12 sítios; valor
+  desconhecido (`dry_run=maybe`) agora permanece em dry-run (preview), não mais APPLY.
 - `M16-04` — nenhum `select_for_update` nas views/serializers DAT; o lost update continua.
 - `M26-03` — `v2/infra/scripts/test_dr.sh` não é tocado desde `ca9c1c37` (#1006) e não menciona
   `.age`. A cobertura de `.age` ficou toda em `v2/infra/scripts/tests/restore_db.bats`, que é
@@ -359,7 +359,7 @@ commit traz a data **de cada commit**, porque eles podem estar a semanas de dist
 | `M01-01` | **P2** | resolvido | seguranca/rede: resolver de IP confia no primeiro X-Forwarded-For, permitindo forjar origem em … | Anonimo na internet (nao requer conta): o caminho /api/ e o unico prox… | #1660 (épico, CLOSED) | `d24da3df` (2026-08-20) |
 | `M03-02` | **P2** | resolvido | auth: login aceita requisição cross-origin e emite sessão (login-CSRF) | — | #1648 (CLOSED) | `9da4674d` (2026-08-20) |
 | `M03-10` | **P2** | resolvido | PII/LGPD: remover CPF integral de `Usuario.__str__` e redigir `username` nos logs de auditoria | DAT e Controle no censo de 2026-07-20 | #1657 (épico, CLOSED) | `6b35fa40` (2026-08-11)+`20c6f48d` (2026-08-18)+`d2f226cc` (2026-08-18) |
-| `M04-05` | **P2** | aberto | imports: valor desconhecido de `dry_run` é tratado como APPLY em 11 views | — | #1649 (OPEN) | — |
+| `M04-05` | **P2** | **resolvido** | imports: valor desconhecido de `dry_run` é tratado como APPLY em 11 views | — | #1649 (OPEN) | #1852 (parse fail-closed `parse_dry_run`, 2026-08-25) |
 | `M05-03` | **P2** | resolvido | RBAC: excluir um Group deixa capabilities dos ex-membros em cache por ate 300s | apenas superuser (1 ativo em prod). DELETE /api/grupos/{id}/ e Superus… | #1667 (épico, CLOSED) | `a545d5f8` (2026-07-18)+`01ddb4cd` (2026-08-21) |
 | `M05-05` | **P2** | resolvido | RBAC: mudança de Grupo×Capability via API não gera AuditLog e o delta pendente é atribuído ao próximo ator | Somente superuser e operações administrativas | #1657 (épico) | `aba033f1` (2026-07-31) |
 | `M05-07` | **P2** | aberto | frontend: HomePage decide criacao de solicitacao por setor/funcao em vez da policy create_solic… | DAT (3 ativos nao-superuser) e Gerente (9 ativos) — ambos existem hoje… | #1655 (épico, OPEN) | — |

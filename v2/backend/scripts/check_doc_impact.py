@@ -46,6 +46,7 @@ Testes: apps/core/tests/test_check_doc_impact.py
 from __future__ import annotations
 
 import argparse
+import os
 import pathlib
 import re
 import subprocess
@@ -139,6 +140,10 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--changed-files-from")
     ap.add_argument("--commit-messages-from")
     ap.add_argument("--pr-body-file")
+    ap.add_argument(
+        "--summary-file",
+        help="destino do resumo em Markdown. Default: $GITHUB_STEP_SUMMARY.",
+    )
     a = ap.parse_args(argv[1:])
 
     raiz = pathlib.Path(a.repo_root).resolve()
@@ -254,6 +259,40 @@ def main(argv: list[str]) -> int:
                             "Encolher a lista faz o drift sumir sem corrigir a doc",
                         )
                     )
+
+    # E.2 — AUDITAR O USO DO CONTORNO. O waiver e necessario (sem saida de
+    # escape o gate vira imposto e e contornado por fora) E e o ponto de erosao.
+    # A contagem vai para o job summary porque, se subir de forma sustentada,
+    # quem esta errado e o GATE, nao a pessoa. Metrica sem lugar onde alguem
+    # olhe e decoracao — foi assim que o aviso de 180 dias morreu.
+    #
+    # So escreve a secao quando ha uso: aviso sem acao e ruido, e ruido treina
+    # a ignorar o gate.
+    destino = a.summary_file or os.environ.get("GITHUB_STEP_SUMMARY")
+    if destino and (waivers or sem_motivo):
+        linhas = [
+            "## Documentacao viva — uso do waiver",
+            "",
+            f"Este PR usou **{len(waivers)}** waiver(s) justificado(s)"
+            + (f" e **{len(sem_motivo)}** sem justificativa." if sem_motivo else "."),
+            "",
+            "Se este numero subir de forma sustentada entre PRs, o gate esta errado —",
+            'nao a pessoa. O contorno existe para a decisao de "nao afeta" ficar',
+            "registrada e revisavel, em vez de tacita.",
+            "",
+            "| doc dispensado | justificativa |",
+            "| --- | --- |",
+        ]
+        for cam, motivo in sorted(waivers.items()):
+            linhas.append(f"| `{cam}` | {motivo} |")
+        for cam in sorted(sem_motivo):
+            linhas.append(f"| `{cam}` | **sem justificativa — nao vale** |")
+        linhas.append("")
+        try:
+            with open(destino, "a", encoding="utf-8") as fh:
+                fh.write(os.linesep.join(linhas) + os.linesep)
+        except OSError:
+            pass
 
     if avisos:
         print("AVISO — specs e docs que o PR provavelmente afeta:")

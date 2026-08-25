@@ -378,3 +378,58 @@ def test_historico_fica_fora(tmp_path, caminho, status):
     assert "viva.spec.md" in r.stdout, f"o relatorio nao rodou:\n{r.stdout}"
     nome = caminho.rsplit("/", 1)[-1]
     assert nome not in r.stdout, f"{caminho} ({status}) nao deveria ser medido:\n{r.stdout}"
+
+
+# --------------------------------------------------------------------------
+# Fase D — bordas que faltavam: renomeacao e fonte que nao resolve
+# --------------------------------------------------------------------------
+def test_fonte_renomeada_ainda_e_medida(tmp_path):
+    """`git log -- <caminho>` mostra o commit que renomeou, mesmo sem `--follow`.
+
+    Isto e o que permite passar varios pathspecs de uma vez. `--follow` aceita um
+    so, e trocar para ele obrigaria uma chamada por arquivo — o plano avisa disso
+    na Fase D. Este teste fixa que nao e necessario: a renomeacao aparece como
+    mudanca no caminho antigo, que e exatamente o sinal de drift desejado.
+    """
+    raiz = _repo(tmp_path)
+    antigo = "v2/backend/apps/core/services/pagamento.py"
+    _escreve(raiz, antigo, "x = 1\n")
+    sha = _commit(raiz, "feat: pagamento")
+    _escreve(raiz, "v2/docs/specs/backend/pagamento.spec.md", _spec(sha, [antigo]))
+    _commit(raiz, "docs: spec")
+
+    _git(raiz, "mv", antigo, "v2/backend/apps/core/services/cobranca.py")
+    _commit(raiz, "refactor(pagamento): renomeia para cobranca")
+
+    r = _run(raiz)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "1 em drift" in r.stdout, f"renomeacao deveria contar como drift do caminho declarado:\n{r.stdout}"
+
+
+def test_fonte_que_nao_resolve_e_reportada(tmp_path):
+    """Entrada de `sources_of_truth` que nao e caminho mede NADA, em silencio.
+
+    Medido no repo em 2026-08-25: 6 de 303 entradas nao resolvem. Tres delas sao
+    frases em prosa dentro da lista do proprio arbitro de defeitos
+    (`reverificacao por execucao contra main d08acfa5`), tres sao caminho com
+    anotacao entre parenteses. Passadas ao `git log` como pathspec, nao casam
+    nada — e a spec aparece «sem drift» por malformacao, nao por estar em dia.
+    """
+    raiz = _repo(tmp_path)
+    fonte = "v2/backend/apps/core/services/pagamento.py"
+    _escreve(raiz, fonte, "x = 1\n")
+    sha = _commit(raiz, "feat: pagamento")
+    _escreve(
+        raiz,
+        "v2/docs/specs/backend/pagamento.spec.md",
+        _spec(sha, [fonte, "reverificacao por execucao contra main d08acfa5"]),
+    )
+    _commit(raiz, "docs: spec com entrada que nao e caminho")
+
+    r = _run(raiz)
+    assert r.returncode == 0, "fonte malformada nao pode derrubar o relatorio"
+    saida = r.stdout.lower()
+    assert (
+        "nao resolve" in saida or "nao existe" in saida
+    ), f"entrada que nao e caminho precisa ser reportada:\n{r.stdout}"
+    assert "reverificacao" in saida, "a saida deve nomear a entrada problematica"

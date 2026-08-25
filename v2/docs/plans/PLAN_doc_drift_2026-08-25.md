@@ -311,14 +311,25 @@ Script mora em `v2/backend/scripts/`, teste em `apps/core/tests/`.
 
 Cada gate precisa, no mínimo:
 
-- [ ] caso **baseline limpo passa** (senão o gate nasce vermelho e é desligado)
-- [ ] caso **drift reprova** — a prova de que morde
-- [ ] borda: spec sem `sources_of_truth`
-- [ ] borda: caminho inexistente · caminho que é diretório
-- [ ] borda: `verified_at_commit` malformado ou ausente
-- [ ] borda: arquivo renomeado (`git log --follow` aceita **um** pathspec só — por arquivo, nunca em lote)
-- [ ] borda: repositório raso
-- [ ] borda: fronteira de hora do dia (o bug de approxidate)
+- [x] caso **baseline limpo passa** — nos 5 gates
+- [x] caso **drift reprova** — a prova de que morde, em cada um
+- [x] borda: spec sem `sources_of_truth`
+- [x] borda: **entrada que não é caminho.** Medido: **6 de 303** entradas não
+      resolvem — três são frases em prosa dentro da lista do próprio árbitro de
+      defeitos (`reverificação por execução contra main d08acfa5`), três são
+      caminho com anotação entre parênteses. Passadas ao `git log` como pathspec
+      não casam nada, e a spec aparecia «sem drift» por malformação. Agora saem
+      numa seção própria do relatório.
+- [x] borda: `verified_at_commit` malformado ou ausente
+- [x] borda: **arquivo renomeado** — a preocupação era infundada, e o teste
+      provou. `git log -- <caminho>` mostra o commit que renomeou mesmo sem
+      `--follow`, então não é preciso uma chamada por arquivo. **Mas** a primeira
+      versão da checagem acima quebrou justamente esse caso: fonte renomeada é
+      onde o caminho declarado some, e a ausência ali *é* o sinal de drift.
+      Resolvido com o mesmo discriminador do gate de instrução — se o git já
+      conheceu o caminho, mede; se nunca viu, não é caminho.
+- [x] borda: repositório raso
+- [x] borda: fronteira de hora do dia (o bug de approxidate)
 
 ---
 
@@ -333,15 +344,23 @@ num cron teria o mesmo fim.
 
 **Ação.** Job summary do PR (item B.3). Aparece onde a pessoa já olha.
 
-- [ ] feito
+- [x] feito — `doc_drift_report.py --format=gh-summary`, no `docs-quality.yml`.
 
 ### E.2 · Auditar o uso do contorno
 
-O `spec-nao-afetada` de C.1 é necessário e é o ponto de erosão. Contagem de uso
+O `doc-nao-afetada` de C.1 é necessário e é o ponto de erosão. Contagem de uso
 por PR entra no mesmo summary. **Se subir de forma sustentada, o gate está
 errado — não a pessoa.**
 
-- [ ] feito
+- [x] feito — tabela no job summary com cada doc dispensado e a justificativa,
+      e os waivers sem justificativa marcados como **não valem**. A seção só
+      aparece quando há uso: aviso sem ação é ruído, e ruído treina a ignorar
+      o gate.
+
+      **Limite medido:** o histórico entre PRs não é derivável do git. O squash
+      grava a mensagem de commit, não o corpo do PR, então a tendência só existe
+      via API. O que este item entrega é a contagem **deste** PR, no lugar onde
+      a pessoa já olha; a leitura da tendência continua manual.
 
 ### E.3 · Gate que verifica quais gates são gates
 
@@ -373,11 +392,31 @@ esteja errada sobre o código.
       recriou a colisão 21 dias depois de a primeira ser documentada**. Não existe
       registro de numeração. São **três** listas `RF01..RF08` incompatíveis, não
       duas, e a nota que avisa da colisão só conhece uma delas.
-- [ ] **F.2 · 35 documentos vivos inalcançáveis** por qualquer índice — inclusive
+- [~] **F.2 · 35 documentos vivos inalcançáveis** por qualquer índice — inclusive
       uma **terceira** árvore (`specs/`) declarada «leitura obrigatória».
-- [ ] **F.3 · `mkdocs --strict` não valida âncora nem cobertura de nav**: 9 âncoras
-      quebradas e 21 páginas fora da navegação passam verdes. Falta a chave
-      `validation` no `mkdocs.yml`.
+      Parcial: os **21 de `docs/`** entraram no nav (18 ADRs + índice + 2 docs de
+      CI) e agora o `mkdocs build --strict` reprova se algum sair. O resto mora em
+      `v2/docs/`, fora do `docs_dir` — continua aberto, e é escopo de conteúdo.
+- [x] **F.3 · `mkdocs --strict` não valida âncora nem cobertura de nav.** Confirmado
+      e corrigido: `--strict` só promove warnings a erro, e essas checagens nem
+      existem sem a chave `validation`. Ela foi adicionada, com todos os níveis
+      **medidos antes** de virarem bloqueantes.
+
+      **Correção do próprio plano:** as «9 âncoras quebradas» **não existem**. Com
+      a validação ligada em `warn`, o único achado em `docs/` eram as 21 omissões
+      de nav — zero âncora, zero link quebrado. A única âncora morta que a
+      varredura de 2026-08-25 encontrou (`VARREDURA_DOCS:30`) mora em `v2/docs/`,
+      que está fora do `docs_dir` e o mkdocs nunca enxerga.
+
+      Prova de que morde, com o baseline limpo antes e depois: página órfã →
+      exit 1; link para arquivo inexistente → exit 1; âncora inexistente em
+      arquivo que existe → exit 1, com a mensagem certa (`does not contain an
+      anchor`). O primeiro teste de âncora que escrevi reprovou pelo motivo
+      errado — link não-encontrado, não âncora — e só valeu depois de refeito.
+
+      **Limite:** `[info] documentation build` não está no ruleset, então isto
+      avisa e não trava merge. É exatamente a divergência que o gate da E.3
+      passou a expor em todo PR; promovê-lo é decisão de admin.
 - [ ] **F.4 · O índice manda ler o documento que a spec canônica declara obsoleto**
       (`INDEX_DOCUMENTACAO` → `IMPLEMENTACAO_PA`).
 - [ ] **F.5 · Referência por caminho em crase não é link** — 11 arquivos SEC ficaram

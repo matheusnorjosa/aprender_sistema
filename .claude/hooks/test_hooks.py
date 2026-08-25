@@ -91,7 +91,7 @@ GUARDRAILS_CASES = [
     ("G5 vite manualChunks", write("v2/frontend/vite.config.ts", "manualChunks: {}"), 2),
     ("G5 vite clean", write("v2/frontend/vite.config.ts", "export default {}"), 0),
     ("G5 MultiEdit manualChunks", {"tool_name": "MultiEdit", "tool_input": {"file_path": "v2/frontend/vite.config.ts", "edits": [{"new_string": "manualChunks: ()=>{}"}]}}, 2),
-    ("edit models.py normal", edit("apps/core/models.py", "x"), 0),
+    ("edit models/solicitacao.py normal", edit("apps/core/models/solicitacao.py", "x"), 0),
 ]
 for name, payload, expected in GUARDRAILS_CASES:
     rc, _ = run_py("guardrails.py", payload)
@@ -102,7 +102,7 @@ for name, payload, expected in GUARDRAILS_CASES:
 # context-injector.py -- output-substring based
 # --------------------------------------------------------------------------
 CONTEXT_CASES = [
-    ("models guidance", edit("v2/backend/apps/core/models.py", "x"), "Model Guidelines", True),
+    ("models guidance", edit("v2/backend/apps/core/models/solicitacao.py", "x"), "Model Guidelines", True),
     ("api guidance", edit("v2/frontend/src/api/foo.ts", "x"), "API Client", True),
     ("W5 rbac in view", edit("v2/backend/apps/core/views_x.py", 'user.groups.filter(name="DAT")'), "RBAC V001", True),
     ("W5 rbac in test (whitelisted)", edit("v2/backend/apps/core/tests/test_x.py", 'user.groups.filter(name="DAT")'), "RBAC V001", False),

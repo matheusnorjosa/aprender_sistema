@@ -6,8 +6,14 @@ Escopo: auditoria dos 11 services `*_import.py` existentes + proposta de contrat
 
 > Esta PR não altera código. Apenas inspeciona o estado atual, identifica inconsistências e propõe um contrato futuro. Implementação fica para PRs subsequentes.
 
-> 🔴 **Como `dry_run` é realmente parseado (auditoria 2026-07-24, achado `M04-05`, issue
-> [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649))**
+> ✅ **RESOLVIDO em [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649) (2026-08-25):**
+> o parse de `dry_run` é agora **fail-closed** — só um token de apply explícito
+> (`false`/`0`/`no`/`n`/`f`/`off`) grava; qualquer valor desconhecido permanece em dry-run
+> (preview) e é logado. A lógica vive num helper canônico compartilhado,
+> `apps.core.imports.request_params.parse_dry_run`, chamado pelos 12 sítios. O bloco abaixo
+> descreve o estado **ANTERIOR** (achado `M04-05`, auditoria 2026-07-24), preservado como histórico.
+>
+> 🔴 **Como `dry_run` era parseado (histórico, pré-#1649):**
 >
 > Onze views repetem literalmente estas duas linhas:
 >
@@ -31,7 +37,9 @@ Escopo: auditoria dos 11 services `*_import.py` existentes + proposta de contrat
 > `apps/core/views/imports.py:92`, que usa o helper `_parse_dry_run` (`:45-49`). Ele **tem `.strip()`**
 > mas herda a mesma semântica de allowlist — `?dry_run=maybe` também vira apply lá.
 >
-> O contrato proposto em §4 deve incluir: **valor não reconhecido ⇒ HTTP 400**, nunca apply.
+> O contrato proposto em §4 sugeria **valor não reconhecido ⇒ HTTP 400**. #1649 implementou a
+> variante **fail-closed → preview** (valor desconhecido = dry-run, nunca apply) — igualmente
+> segura e sem quebrar clientes que enviam só `true`/`false`.
 
 ---
 
@@ -82,7 +90,7 @@ Escopo: auditoria dos 11 services `*_import.py` existentes + proposta de contrat
 
 | Inconsistência | Services afetados | Risco |
 |---|---|---|
-| **`dry_run` desconhecido = APPLY** (`M04-05`, [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649)) | **11 views** — ver bloco no topo deste documento | **Alto e vivo em produção** — `?dry_run=maybe` persiste. O default (parâmetro ausente) é fail-safe; o **valor inválido** não é |
+| ~~**`dry_run` desconhecido = APPLY**~~ ✅ **RESOLVIDO** (`M04-05`, [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649)) | 12 sítios, agora via `parse_dry_run` | **Corrigido (fail-closed)** — `?dry_run=maybe` permanece em dry-run (preview). Só token de apply explícito grava |
 | **`dry_run` default `False`** em vez de `True` | `controle_acoes_import` (`services/controle_acoes_import.py:43`), `dat_cadastros_import` (`services/dat_cadastros_import.py:77`) | **Alto** — chamada interna sem keyword vai persistir. Endpoints externos passam o valor explicitamente, mas chamada Python direta é perigosa. Confirmado ainda vivo em 2026-07-24 |
 | **Nenhum import síncrono grava `AuditLog`** | todos os 10 endpoints síncronos | **Alto** — um apply não deixa rastro de quem rodou nem do que mudou. `AuditLog.Action` (`models/auditoria.py:72-73`) só tem `IMPORT_JOB_COMPLETED`/`IMPORT_JOB_FAILED`, emitidos apenas pelo caminho async em `tasks.py:634,669` (hoje só `bloqueios`) |
 | **Stats com 4 campos vs 4+aninhado** | `controle_imports` (dataclass `{created,updated,skipped,errors}`) vs demais (dict `{created,updated,unchanged,skipped:{...}}`) | Médio — frontend precisa branch lógica |

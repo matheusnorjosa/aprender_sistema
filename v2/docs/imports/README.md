@@ -55,10 +55,10 @@ Comandos que **existem hoje**:
 - `python manage.py import_export_contract` — dry-run por padrão, `--apply` com allowlist
   (`apps/core/management/commands/import_export_contract.py`). É o caminho canônico que substituiu o ETL.
 
-> 🔴 **Atenção — `dry_run` não é fail-closed.** O default (parâmetro ausente) é `true`, mas
-> **qualquer valor desconhecido é tratado como APPLY** em 11 views. `?dry_run=maybe` persiste.
-> Achado `M04-05`, issue [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649) —
-> detalhe em [dry_run_response_contract.md](./dry_run_response_contract.md).
+> ✅ **`dry_run` é fail-closed** (corrigido em [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649),
+> achado `M04-05`). O default (parâmetro ausente) **e** qualquer valor desconhecido permanecem em
+> dry-run (preview); só um token de apply explícito (`false`/`0`/`no`/…) persiste. Detalhe em
+> [dry_run_response_contract.md](./dry_run_response_contract.md).
 
 ### 2.2 Idempotência via `external_hash`
 
@@ -221,7 +221,7 @@ Helpers de reconciliação compartilhados em `apps/core/services/resolvers.py`:
 | `POST /api/controle/import-acoes/` | `ControleImportAcoesView` | `HasPerm("import_spreadsheet")` |
 | `POST /api/dat/import-cadastros/` | `DATImportCadastrosView` | `HasPerm("manage_admin_registries")` |
 
-Todos aceitam `?dry_run=true|false` (default `true`) — mas **valor desconhecido = apply** (§2.1, #1649).
+Todos aceitam `?dry_run=true|false` (default `true`). O parse é **fail-closed** (§2.1, #1649): valor desconhecido permanece em dry-run (preview); só `false`/`0`/`no`/… aplicam.
 
 > ⚠️ **`POST /api/dat/import-cadastros/` grava `AcaoDAT`, que nenhuma tela lê.** O card "Importar
 > CADASTROS DAT" do frontend chama este endpoint (`v2/frontend/src/api/ops.ts:253`), e o service
@@ -317,8 +317,8 @@ Mudanças que quebram contrato (renomear coluna obrigatória, mudar tipo de dado
    planilha de Agenda, já que CPF não aparece lá.
 3. **Import não pode bypassar invariante de domínio** — épico
    [#1659](https://github.com/matheusnorjosa/aprender_sistema/issues/1659) (#1620, #1628, #1634, #1640).
-4. **`dry_run` fail-closed** ([#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649))
-   e **auditoria do apply** (§2.4).
+4. ✅ **`dry_run` fail-closed** ([#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649)) — **feito** (2026-08-25, helper `parse_dry_run`).
+   Resta a **auditoria do apply** (§2.4).
 5. **Mapeamento Cargo → Função RBAC**: `usuarios.md` propõe tabela; **não implementado**. Falta
    confirmar os termos reais da planilha antes de decidir se vale implementar.
 6. **Disponibilidade**: tipo `D` e recorrência continuam sem contrato — ver

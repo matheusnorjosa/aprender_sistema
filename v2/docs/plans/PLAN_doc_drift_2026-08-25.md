@@ -16,6 +16,7 @@ sources_of_truth:
   - v2/backend/scripts/check_doc_impact.py
   - v2/backend/scripts/doc_drift_report.py
   - v2/backend/scripts/doc_frontmatter.py
+  - .claude/citacoes-apagadas-allowlist.txt
   - .claude/hooks/test_hooks.py
 ---
 
@@ -370,6 +371,29 @@ esteja errada sobre o código.
       (`INDEX_DOCUMENTACAO` → `IMPLEMENTACAO_PA`).
 - [ ] **F.5 · Referência por caminho em crase não é link** — 11 arquivos SEC ficaram
       inalcançáveis com o checker verde.
+- [x] **F.6 · A camada de instrução ficou versionada sem gate de drift.** O D3
+      trouxe `.claude/` e `.agents/` para o git, mas versionar não é vigiar:
+      `check_agent_instructions.py` só olhava caminho de máquina e credencial, e
+      `check_doc_impact.py` nem enxerga a árvore (`RAIZES_DOC` não inclui
+      `.claude`). **170 arquivos de instrução citam caminho de código real.**
+      Medido: `apps/core/models.py` foi apagado em `4ae989fe` (#213, há 9 meses),
+      `views.py` em `733e3933` e `serializers.py` em `18eb7148` — e a instrução
+      ainda mandava o agente procurar a regra PA-01 dentro de `Solicitacao.save()`,
+      método que não existe.
+
+      **Detector 3 do `check_agent_instructions.py`: citação a caminho apagado.**
+      O discriminador é o git (`--diff-filter=D`), não heurística de texto — varrer
+      «caminho que não existe» dá 17% de precisão, e filtro por palavra não serve
+      porque *um texto que nega a mentira contém as mesmas palavras*. Perguntar ao
+      git leva a precisão a 83%.
+
+      Limite conhecido, fixado como teste: declaração histórica **correta** sobre
+      arquivo realmente apagado é indistinguível de instrução que ficou para trás
+      (`src/api.ts`, removido no #1045). Saída: allowlist com motivo escrito.
+
+      11 testes em `apps/core/tests/test_citacao_apagada.py`; allowlist em
+      `.claude/citacoes-apagadas-allowlist.txt`, com as 3 entradas temporárias do
+      Lote C marcadas para remoção.
 
 ---
 

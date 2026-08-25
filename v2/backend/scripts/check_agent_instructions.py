@@ -57,8 +57,22 @@ TOKENS = [
     ("Chave privada", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
 ]
 
+# Caminho de codigo citado em prosa de instrucao. Exige extensao e uma barra,
+# para nao casar palavra solta. `tsx` antes de `ts`: a alternancia do `re` e
+# ordenada, e `ts|tsx` truncaria `Componente.tsx` em `Componente.ts` — que nao
+# existe, e o achado nasceria falso. (Aconteceu na medicao que calibrou isto.)
+CITACAO = re.compile(
+    r"(?<![\w/.-])((?:v2/)?(?:backend/|frontend/|infra/)?"
+    r"(?:apps|src|scripts|config)/[\w./-]+\.(?:tsx|ts|py|sh|yml|yaml))"
+)
+
+# Um caminho citado pode estar escrito relativo a raiz ou a um subprojeto.
+PREFIXOS = ("", "v2/", "v2/backend/", "v2/frontend/", "v2/infra/")
+
+ALLOWLIST = "citacoes-apagadas-allowlist.txt"
+
 # Nao varrer: binario, cache, dependencia e worktree (copias).
-DIR_IGNORADOS = {"__pycache__", "node_modules", ".venv", "venv", "worktrees", ".git"}
+DIR_IGNORADOS = {"__pycache__", "node_modules", ".venv", "venv", "worktrees", ".git", "_archive"}
 EXT_IGNORADAS = {
     ".pyc",
     ".pyo",
@@ -117,6 +131,110 @@ def _analisa(p: pathlib.Path) -> list[tuple[int, str, str]]:
     return achados
 
 
+def _git(args: list[str]) -> str | None:
+    """stdout do git, ou None se o git nao estiver disponivel/utilizavel."""
+    import subprocess
+
+    try:
+        r = subprocess.run(
+            ["git", *args],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=120,
+            encoding="utf-8",
+            errors="replace",
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return r.stdout if r.returncode == 0 else None
+
+
+def _apagados() -> set[str] | None:
+    """Caminhos que este repositorio ja teve e apagou.
+
+    ESTE E O DISCRIMINADOR. Varrer "caminho citado que nao existe" produz 12
+    achados no repositorio, dos quais so 2 sao drift — 17% de precisao, e um
+    gate assim e desligado na primeira semana. O resto e texto-exemplo generico
+    (`src/auth/session.py`, `src/path/to.test.tsx`) que o git nunca viu.
+
+    Filtrar por palavra-chave nao serve: um texto que NEGA a mentira contem as
+    mesmas palavras. Perguntar ao git elimina os exemplos genericos e leva a
+    precisao de 17% para 83% (10 de 12 exigem acao).
+
+    O QUE ELE NAO RESOLVE, medido no repo real: `src/api.ts` foi de fato apagado
+    (#1045, remocao do axios), e a skill que o cita esta CERTA — a frase e "There
+    is no `src/api.ts` anymore". Declaracao historica correta sobre um arquivo
+    realmente apagado e indistinguivel, por historico, de instrucao que ficou
+    para tras. Esses 2 casos vao para o allowlist, que existe para isso.
+
+    Uma chamada so, sobre todo o historico. Sem git, devolve None e o detector
+    se cala — nao ha como distinguir drift de exemplo, e acusar tudo seria pior
+    que nao acusar nada.
+    """
+    out = _git(["log", "--all", "--diff-filter=D", "--name-only", "--format="])
+    if out is None:
+        return None
+    return {x.strip() for x in out.split("\n") if x.strip()}
+
+
+def _candidatos(cit: str) -> list[str]:
+    return [pref + cit for pref in PREFIXOS]
+
+
+def _quem_apagou(cit: str) -> str:
+    for cand in _candidatos(cit):
+        out = _git(["log", "--all", "--format=%h %s", "-1", "--diff-filter=D", "--", cand])
+        if out and out.strip():
+            return out.strip().split("\n")[0]
+    return ""
+
+
+def _le_allowlist(alvos: list[pathlib.Path]) -> set[str]:
+    """Arquivos perdoados enquanto a limpeza de conteudo nao acontece.
+
+    «Limpar primeiro, trancar depois com allowlist» e o padrao que este
+    repositorio prova que funciona (`check-no-legacy-js`). Sem isto o gate nasce
+    vermelho por divida preexistente e e desligado antes de pegar o primeiro
+    caso novo — que e o que ele existe para pegar.
+    """
+    perdoados: set[str] = set()
+    vistos: set[pathlib.Path] = set()
+    for alvo in alvos:
+        base = alvo if alvo.is_dir() else alvo.parent
+        f = base / ALLOWLIST
+        if f in vistos or not f.is_file():
+            continue
+        vistos.add(f)
+        try:
+            for linha in f.read_text(encoding="utf-8").splitlines():
+                linha = linha.strip()
+                if linha and not linha.startswith("#"):
+                    perdoados.add(linha.replace("\\", "/"))
+        except OSError:
+            continue
+    return perdoados
+
+
+def _citacoes_apagadas(p: pathlib.Path, apagados: set[str], raiz: pathlib.Path) -> list[tuple[int, str, str]]:
+    try:
+        texto = p.read_text(encoding="utf-8")
+    except (UnicodeDecodeError, OSError):
+        return []
+
+    achados: list[tuple[int, str, str]] = []
+    for n, linha in enumerate(texto.splitlines(), 1):
+        for m in CITACAO.finditer(linha):
+            cit = m.group(1)
+            cands = _candidatos(cit)
+            if any((raiz / c).exists() for c in cands):
+                continue  # vivo
+            if not any(c in apagados for c in cands):
+                continue  # o git nunca viu: e exemplo, nao drift
+            achados.append((n, "citacao a caminho apagado", cit))
+    return achados
+
+
 def _rastreados(alvos: list[pathlib.Path]) -> set[pathlib.Path] | None:
     """Conjunto de arquivos que o git rastreia. None se git nao estiver disponivel."""
     import subprocess
@@ -159,20 +277,53 @@ def main(argv: list[str]) -> int:
             print("ERRO: --tracked-only exige git disponivel e um repositorio.", file=sys.stderr)
             return 2
 
+    # Sem git nao da para separar drift de texto-exemplo; nesse caso `apagados`
+    # vem None e o detector de citacao fica de fora, em vez de acusar tudo.
+    apagados = _apagados()
+    perdoados = _le_allowlist(alvos)
+    cwd = pathlib.Path.cwd()
+
     total = 0
+    citacoes = 0
     varridos = 0
     for alvo in alvos:
-        raiz = alvo if alvo.is_dir() else alvo.parent
         for p in _arquivos(alvo):
             if permitidos is not None and p.resolve() not in permitidos:
                 continue
             varridos += 1
-            for linha, tipo, trecho in _analisa(p):
-                try:
-                    rel = p.relative_to(raiz)
-                except ValueError:
-                    rel = p
-                print(f"{rel}:{linha}: {tipo}: {trecho}")
+
+            achados = list(_analisa(p))
+            # `lstrip("./")` aqui seria bug: lstrip remove um CONJUNTO de
+            # caracteres, entao `.claude/...` viraria `claude/...` e o allowlist
+            # nunca casaria.
+            rel_repo = p.as_posix().replace("\\", "/")
+            if rel_repo.startswith("./"):
+                rel_repo = rel_repo[2:]
+
+            # O proprio allowlist fica fora do detector de citacao: ele explica
+            # cada entrada, e explicar exige nomear o caminho apagado. Sem esta
+            # excecao o gate reprova na propria configuracao — e a saida seria
+            # escrever um allowlist sem motivo, que e a erosao que ele evita.
+            if p.name == ALLOWLIST:
+                for linha, tipo, trecho in _analisa(p):
+                    print(f"{rel_repo}:{linha}: {tipo}: {trecho}")
+                    total += 1
+                continue
+            if apagados is not None and rel_repo not in perdoados:
+                novos = _citacoes_apagadas(p, apagados, cwd)
+                citacoes += len(novos)
+                achados += novos
+
+            for linha, tipo, trecho in achados:
+                # Relativo ao repo, nao ao alvo: `.claude/skills/x/SKILL.md` e
+                # `.agents/skills/x/SKILL.md` sao espelhos e imprimiam identicos
+                # como `skills/x/SKILL.md` — sem dizer em qual arvore agir.
+                rel = rel_repo
+                extra = ""
+                if tipo.startswith("citacao"):
+                    quem = _quem_apagou(trecho)
+                    extra = f"  (apagado em {quem})" if quem else ""
+                print(f"{rel}:{linha}: {tipo}: {trecho}{extra}")
                 total += 1
 
     if total:
@@ -181,9 +332,19 @@ def main(argv: list[str]) -> int:
         print("Caminho de maquina -> use $CLAUDE_PROJECT_DIR ou $HOME.")
         print("Credencial -> use placeholder <usuario>:<senha> e ponha o valor real")
         print("em .claude/settings.local.json, que continua fora do git.")
+        if citacoes:
+            print()
+            print("Citacao a caminho apagado -> aponte para onde o codigo foi. O git")
+            print("sabe quem apagou (mostrado acima). Se a mencao for historica e")
+            print(f"deliberada, liste o arquivo em {ALLOWLIST}, com o motivo.")
         return 1
 
-    print(f"OK {varridos} arquivo(s) varrido(s), nenhum caminho de maquina nem credencial.")
+    checou = "caminho de maquina, credencial"
+    if apagados is not None:
+        checou += ", citacao a caminho apagado"
+    else:
+        checou += " (citacao nao verificada: sem git)"
+    print(f"OK {varridos} arquivo(s) varrido(s) — {checou}.")
     return 0
 
 

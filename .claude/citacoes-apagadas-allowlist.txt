@@ -1,0 +1,45 @@
+# Arquivos de instrucao perdoados pelo detector de "citacao a caminho apagado"
+# (v2/backend/scripts/check_agent_instructions.py).
+#
+# Este arquivo existe porque o gate nasce sobre divida preexistente. O padrao
+# «limpar primeiro, trancar depois com allowlist» e o que este repositorio prova
+# que funciona (check-no-legacy-js); trancar antes de limpar deixa o gate
+# vermelho no dia 1 e ele e desligado antes de pegar o primeiro caso novo.
+#
+# Caminho relativo a raiz do repo, um por linha. Toda entrada precisa de motivo.
+# Entrada sem motivo e o comeco da erosao — o gate volta a nao valer nada.
+#
+# Criado em 2026-08-25.
+
+# ---------------------------------------------------------------------------
+# PERMANENTE — declaracao historica correta, nao instrucao desatualizada.
+#
+# `src/api.ts` foi mesmo apagado (#1045, remocao do axios). A frase que o cita e
+# "There is no `src/api.ts` or `httpClient.ts` — the single wrapper is
+# `config.ts`", ou seja, o texto esta CERTO justamente por falar de um arquivo
+# que nao existe mais. O discriminador de git nao consegue separar isso de
+# instrucao que ficou para tras; esta e a saida prevista para essa classe.
+# ---------------------------------------------------------------------------
+.claude/skills/deprecation-and-migration/SKILL.md
+.agents/skills/deprecation-and-migration/SKILL.md
+
+# ---------------------------------------------------------------------------
+# TEMPORARIO — divida real, em execucao por outra frente (Lote C da varredura de
+# sanitizacao de 2026-08-25). Sao 8 citacoes a tres monolitos ja modularizados:
+#
+#   apps/core/models.py       apagado em 4ae989fe (#213, 2025-12-02)
+#   apps/core/views.py        apagado em 733e3933 (#1463/#1571)
+#   apps/core/serializers.py  apagado em 18eb7148 (#214)
+#
+# O caso de maior dano: approve-flow.md e test-coverage.md mandam procurar a
+# regra PA-01 em `Solicitacao.save()`, metodo que NAO EXISTE — a decisao mora em
+# apps/core/services/solicitacao_create.py:resolve_initial_status(). E o
+# test-coverage.md mede cobertura de `apps.core.views`, que e shim: o codigo real
+# esta em apps/core/views_solicitacao.py.
+#
+# REMOVER ESTAS TRES LINHAS quando o Lote C corrigir o conteudo. Enquanto elas
+# estiverem aqui, o gate nao protege estes tres arquivos.
+# ---------------------------------------------------------------------------
+.claude/commands/approve-flow.md
+.claude/commands/review-enhanced.md
+.claude/commands/test-coverage.md

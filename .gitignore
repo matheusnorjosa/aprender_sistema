@@ -581,6 +581,9 @@ v2/docs/memoria/
 !.claude/hooks/
 !.claude/skills/
 !.claude/songs/
+# Precisa ser versionado: o gate le este arquivo no CI. Fora do git, ele nao
+# existiria no runner e o gate nasceria vermelho por divida ja conhecida.
+!.claude/citacoes-apagadas-allowlist.txt
 
 # Nunca versionar: config de maquina, worktrees, caches e notas historicas.
 # .claude/_archive/ ficou de fora de proposito: sao notas de sessao antigas, sem

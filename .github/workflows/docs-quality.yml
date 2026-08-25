@@ -56,6 +56,15 @@ jobs:
       # caminho de maquina e credencial entrarem por descuido. Este gate impede
       # a reincidencia; `--tracked-only` limita ao que o git rastreia, para nao
       # acusar settings.local.json, que fica fora do git de proposito.
+      #
+      # Terceiro detector (2026-08-25): CITACAO A CAMINHO APAGADO. Versionar nao
+      # e vigiar — o gate so olhava caminho de maquina e credencial, e ninguem
+      # checava se o conteudo e verdade. Medido: `apps/core/models.py` foi
+      # apagado em 4ae989fe (#213, ha 9 meses) e tres arquivos ainda mandavam o
+      # agente procurar a regra PA-01 la dentro. `views.py` e `serializers.py`
+      # idem. O discriminador e o git (`--diff-filter=D`), nao heuristica de
+      # texto: um texto que NEGA a mentira contem as mesmas palavras.
+      # Precisa de historico completo — dai o `fetch-depth: 0` acima.
       - name: Instrucao de agente sem caminho de maquina nem credencial
         run: >
           python v2/backend/scripts/check_agent_instructions.py

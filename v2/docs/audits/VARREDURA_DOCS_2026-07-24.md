@@ -27,7 +27,7 @@ desejado nunca foi escrito como se já existisse.
 
 ## Como ler este documento
 
-A seção mais importante é [**Precisa de decisão humana**](#precisa-de-decisão-humana). Ela
+A seção mais importante é [**Precisa de decisão humana**](#2-precisa-de-decisão-humana). Ela
 lista o que **não** foi corrigido de propósito, e por quê.
 
 ---

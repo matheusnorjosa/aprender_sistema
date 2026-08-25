@@ -17,8 +17,9 @@ contrato em produção tem (ou terá) uma spec versionada, datada e rastreável 
 e as fases estão no [plano SDD](../plans/PLAN_sdd_migration_2026-06-19.md), apoiado na
 [auditoria documental 2026-06-19](../reports/AUDITORIA_DOCUMENTAL_2026-06-19.md).
 
-> Estado: **as 20 specs foram reverificadas contra o código em 2026-07-24** (varredura documental
-> pós-auditoria M00–M28), e todas estão hoje como `canonical`. O modelo SDD está formalizado na
+> Estado: **as 21 specs foram reverificadas contra o código** (varredura documental
+> pós-auditoria M00–M28); **20 `canonical` + 1 `draft`** (`at-rest-encryption`, pendente de verificação
+> de infra). O modelo SDD está formalizado na
 > [ADR-017](../../../docs/architecture/project-decisions/ADR-017-spec-driven-documentation.md).
 >
 > **Leia junto:** [`ACHADOS_REAIS.md`](../audits/ACHADOS_REAIS.md) é a fila viva de defeitos (57

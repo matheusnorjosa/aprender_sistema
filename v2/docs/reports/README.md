@@ -8,7 +8,7 @@ Esta pasta concentra relatorios tecnicos e analises consolidadas.
 - `ESTIMATIVAS_PRAZOS_QUALIDADE_2026-03-06.md`
 - `RELATORIO_TECNICO_ARQUITETURA_2026-03-06.md`
 - `CLASSIFICACAO_PUBLICO_PRIVADO_2026-03-09.md`
-- `relatorio_deploy.md`
+- [`relatorio_deploy.md`](../_archive/reports/relatorio_deploy.md) — arquivado
 
 ## Auditoria documental / SDD
 - Relatorio: `AUDITORIA_DOCUMENTAL_2026-06-19.md`

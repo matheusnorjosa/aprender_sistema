@@ -69,7 +69,7 @@ import {
   // updateAcompanhamentoInline,
   // updateProvaInline,
 } from '../../api/datModule';
-import { getMunicipiosOptions, getProjetosOptions, getCoordenadoresOptions } from '../../api/datModule';
+import { getMunicipiosOptions, getProjetosOptions } from '../../api/datModule';
 import { getMe } from '../../api/availability';
 import { computePermissions } from '../../hooks/usePermissions';
 
@@ -93,7 +93,6 @@ interface PlanoFilters {
   uf: string | undefined;
   municipio: number | undefined;
   projeto: number | undefined;
-  coordenador: number | undefined;
   ano: number | undefined;
 }
 
@@ -133,7 +132,6 @@ interface PlanoFormacaoFormValues {
   municipio: number;
   projeto: number;
   ano: number;
-  coordenador: number | null;
   ch_estudo: number | null;
   observacoes: string | null;
 }
@@ -163,11 +161,6 @@ interface ProjetoOption {
   nome: string;
 }
 
-interface CoordenadorOption {
-  id: number;
-  nome: string;
-}
-
 interface EditingFormacaoState {
   plano: PlanoFormacaoRecord;
   formacao: FormacaoItem;
@@ -192,7 +185,6 @@ const DEFAULT_PLANO_FILTERS: PlanoFilters = {
   uf: undefined,
   municipio: undefined,
   projeto: undefined,
-  coordenador: undefined,
   ano: undefined,
 };
 
@@ -201,7 +193,6 @@ const buildPlanoParams = (f: PlanoFilters): TableFilterParams => ({
   ...(f.uf && { uf: f.uf }),
   ...(f.municipio !== undefined && { municipio: f.municipio }),
   ...(f.projeto !== undefined && { projeto: f.projeto }),
-  ...(f.coordenador !== undefined && { coordenador: f.coordenador }),
   ...(f.ano !== undefined && { ano: f.ano }),
 });
 
@@ -209,7 +200,6 @@ export default function PlanoFormacoesPage(): JSX.Element {
   // Options state
   const [municipios, setMunicipios] = useState<MunicipioOption[]>([]);
   const [projetos, setProjetos] = useState<ProjetoOption[]>([]);
-  const [coordenadores, setCoordenadores] = useState<CoordenadorOption[]>([]);
 
   const {
     data: planos,
@@ -259,14 +249,12 @@ export default function PlanoFormacoesPage(): JSX.Element {
   useEffect(() => {
     const loadOptions = async () => {
       try {
-        const [munData, projData, coordData] = await Promise.all([
+        const [munData, projData] = await Promise.all([
           getMunicipiosOptions(),
           getProjetosOptions(),
-          getCoordenadoresOptions(),
         ]);
         setMunicipios(munData);
         setProjetos(projData);
-        setCoordenadores(coordData as unknown as CoordenadorOption[]);
       } catch (error) {
         message.error(`Erro ao carregar opcoes: ${(error as Error).message}`);
       }
@@ -309,7 +297,6 @@ export default function PlanoFormacoesPage(): JSX.Element {
       municipio: record.municipio,
       projeto: record.projeto,
       ano: record.ano ?? dayjs().year(),
-      coordenador: record.coordenador,
       ch_estudo: record.ch_estudo,
       observacoes: record.observacoes,
     });
@@ -745,21 +732,8 @@ export default function PlanoFormacoesPage(): JSX.Element {
               options={projetos.map((p) => ({ label: p.nome, value: p.id }))}
             />
           </Col>
-          <Col xs={12} sm={6} md={4} lg={3}>
-            <div className="mb-1">
-              <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>Coordenador</Text>
-            </div>
-            <Select
-              style={{ width: '100%' }}
-              placeholder="Todos"
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              value={filters.coordenador}
-              onChange={(val) => setFilters((prev) => ({ ...prev, coordenador: val }))}
-              options={coordenadores.map((c) => ({ label: c.nome, value: c.id }))}
-            />
-          </Col>
+          {/* Filtro de coordenador removido (#1849, opção B): coordenador virou Usuario (import-only);
+              a busca por nome do coordenador é coberta pela busca geral (search_fields). */}
           <Col xs={12} sm={6} md={4} lg={3}>
             <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>Ano</Text>
@@ -874,17 +848,8 @@ export default function PlanoFormacoesPage(): JSX.Element {
                 <InputNumber style={{ width: '100%' }} min={2020} max={2100} controls={false} />
               </Form.Item>
             </Col>
-            <Col span={8}>
-              <Form.Item name="coordenador" label="Coordenador">
-                <Select
-                  placeholder="Selecione..."
-                  showSearch
-                  allowClear
-                  optionFilterProp="label"
-                  options={coordenadores.map((c) => ({ label: c.nome, value: c.id }))}
-                />
-              </Form.Item>
-            </Col>
+            {/* Campo de coordenador removido do form (#1849, opção B): é a pessoa que coordenou,
+                autoritativo do import da Agenda — exibido na tabela, não editável aqui. */}
             <Col span={8}>
               <Form.Item name="ch_estudo" label="CH Estudo (horas)">
                 <InputNumber style={{ width: '100%' }} min={0} step={0.5} />

@@ -103,7 +103,7 @@ class PlanoFormacoesSerializer(serializers.ModelSerializer["PlanoFormacoes"]):
     municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
     municipio_uf = serializers.CharField(source="municipio.uf", read_only=True)
     projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
-    coordenador_nome = serializers.CharField(source="coordenador.nome", read_only=True, allow_null=True)
+    coordenador_nome = serializers.CharField(source="coordenador.get_full_name", read_only=True, allow_null=True)
 
     # Computed
     total_formacoes = serializers.IntegerField(read_only=True)
@@ -155,6 +155,9 @@ class PlanoFormacoesSerializer(serializers.ModelSerializer["PlanoFormacoes"]):
             "municipio_nome",
             "municipio_uf",
             "projeto_nome",
+            # coordenador = a PESSOA que coordenou, autoritativo do import da Agenda (#1849, opção B):
+            # exibido, não editável pela UI. O import seta via ORM (não passa pelo serializer).
+            "coordenador",
             "coordenador_nome",
         ]
 
@@ -192,7 +195,7 @@ class PlanoFormacoesListSerializer(serializers.ModelSerializer["PlanoFormacoes"]
     municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
     municipio_uf = serializers.CharField(source="municipio.uf", read_only=True)
     projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
-    coordenador_nome = serializers.CharField(source="coordenador.nome", read_only=True, allow_null=True)
+    coordenador_nome = serializers.CharField(source="coordenador.get_full_name", read_only=True, allow_null=True)
 
     # Formacoes expandidas para exibicao em tabela (F1-F15)
     formacoes_list = serializers.SerializerMethodField()
@@ -228,6 +231,8 @@ class PlanoFormacoesListSerializer(serializers.ModelSerializer["PlanoFormacoes"]
             "total_formacoes",
             "formacoes_realizadas",
         ]
+        # coordenador é import-only (#1849, opção B) — nunca gravável, nem por PATCH da tabela (M17-02).
+        read_only_fields = ["coordenador", "coordenador_nome"]
 
     def get_formacoes_list(self, obj: PlanoFormacoes) -> list[dict[str, Any]]:
         """Return formacoes as ordered list for table display."""

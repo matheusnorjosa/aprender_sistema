@@ -37,19 +37,15 @@ import sys
 
 # Caminho absoluto que carrega o nome de usuario de quem escreveu.
 # Aceita $CLAUDE_PROJECT_DIR e $HOME — sao a correcao prescrita, nao violacao.
-CAMINHO_MAQUINA = re.compile(
-    r"""(?ix)
+CAMINHO_MAQUINA = re.compile(r"""(?ix)
     (?: [A-Z]:[\\/]{1,2} Users [\\/]{1,2} (?!\<) [A-Za-z0-9._-]+   # C:\Users\nome
       | /home/   (?!\<) [A-Za-z0-9._-]+                            # /home/nome
       | /Users/  (?!\<) [A-Za-z0-9._-]+                            # /Users/nome
     )
-    """
-)
+    """)
 
 # Credencial embutida em URL de conexao. Placeholder <...> e aceito.
-CREDENCIAL_URL = re.compile(
-    r"(?i)\b[a-z][a-z0-9+.-]*://(?!\<)[^\s:/@]+:(?!\<)[^\s:/@]+@"
-)
+CREDENCIAL_URL = re.compile(r"(?i)\b[a-z][a-z0-9+.-]*://(?!\<)[^\s:/@]+:(?!\<)[^\s:/@]+@")
 
 # Tokens de provedores conhecidos.
 TOKENS = [
@@ -64,8 +60,24 @@ TOKENS = [
 # Nao varrer: binario, cache, dependencia e worktree (copias).
 DIR_IGNORADOS = {"__pycache__", "node_modules", ".venv", "venv", "worktrees", ".git"}
 EXT_IGNORADAS = {
-    ".pyc", ".pyo", ".so", ".dll", ".exe", ".bin", ".zip", ".gz", ".png",
-    ".jpg", ".jpeg", ".gif", ".ico", ".pdf", ".woff", ".woff2", ".ttf", ".mp3",
+    ".pyc",
+    ".pyo",
+    ".so",
+    ".dll",
+    ".exe",
+    ".bin",
+    ".zip",
+    ".gz",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".ico",
+    ".pdf",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".mp3",
 }
 
 

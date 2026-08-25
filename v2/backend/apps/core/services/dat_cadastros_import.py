@@ -30,7 +30,12 @@ from apps.core.imports.hashing import stable_import_hash
 from apps.core.imports.row_errors import registrar_erro_import
 from apps.core.models import AcaoDAT, Municipio, Projeto, TipoAcaoDAT, Usuario
 from apps.core.services.normalize import norm_text
-from apps.core.services.resolvers import resolve_municipio, resolve_user_by_email, resolve_user_by_name
+from apps.core.services.resolvers import (
+    resolve_municipio,
+    resolve_projeto,
+    resolve_user_by_email,
+    resolve_user_by_name,
+)
 from apps.core.types import ExternalHash
 
 OUT_DIR: Path = Path(settings.BASE_DIR) / "out_etl"
@@ -260,7 +265,9 @@ def _process_row(
         pendencias["projetos"].append({"linha": idx, "nome": None})
         return "skip"
 
-    projeto: Projeto | None = Projeto.objects.filter(nome__iexact=norm_text(projeto_nome)).first()
+    # #1613/M02-09: usa o resolver canônico (normalização NFKD SIMÉTRICA dos dois
+    # lados — projeto acentuado agora casa — e rejeita ambiguidade em vez de .first()).
+    projeto: Projeto | None = resolve_projeto(projeto_nome)
     if not projeto:
         stats["skipped"]["projeto"] += 1
         pendencias["projetos"].append({"linha": idx, "nome": projeto_nome})

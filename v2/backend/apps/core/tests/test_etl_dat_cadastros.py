@@ -44,6 +44,47 @@ def _create_csv_file(rows, fieldnames):
     return tmp.name
 
 
+def test_import_resolves_accented_project_1613():
+    """#1613/M02-09: import DAT resolve projeto com nome ACENTUADO (norm simétrica).
+
+    Antes do fix, a query inline `nome__iexact=norm_text(projeto)` normalizava o
+    INPUT (tira acento) mas comparava contra o `nome` CRU do DB (accent-sensitive)
+    → projeto acentuado nunca casava e caía em pendência. Agora usa `resolve_projeto`,
+    que compara NFKD dos DOIS lados (e casa o exato acentuado no estágio de nome).
+    """
+    UsuarioFactory(
+        username="resp_ac",
+        email="resp_ac@example.com",
+        password="test123",
+        cpf="22255588846",
+        first_name="R",
+        last_name="A",
+    )
+    MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    ProjetoFactory(nome="Educação Infantil", ativo=True)  # nome ACENTUADO
+
+    csv_file = _create_csv_file(
+        rows=[
+            {
+                "Município": "Fortaleza",
+                "Projeto": "Educação Infantil",
+                "Tipo de Ação": TipoAcaoDAT.CRIACAO_CURSO,
+                "Responsável": "resp_ac@example.com",
+                "Data Registro": "2025-01-15",
+                "Observação": "",
+            }
+        ],
+        fieldnames=["Município", "Projeto", "Tipo de Ação", "Responsável", "Data Registro", "Observação"],
+    )
+
+    report = import_dat_cadastros(csv_file, dry_run=True)
+    Path(csv_file).unlink(missing_ok=True)
+
+    # Projeto acentuado resolveu — NÃO caiu em pendência de projeto.
+    assert report["stats"]["skipped"]["projeto"] == 0
+    assert report["pendencias"]["projetos"] == []
+
+
 def test_import_creates_acao_dat():
     """Importação cria AcaoDAT com todos os campos."""
     responsavel = UsuarioFactory(

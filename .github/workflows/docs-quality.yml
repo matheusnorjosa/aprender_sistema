@@ -48,6 +48,26 @@ jobs:
       - name: Links relativos quebrados (docs vivos)
         run: python scripts/check_doc_links.py
 
+      # E.3 — QUAIS GATES SAO GATES. Medido em 2026-08-25: 19 jobs carregam
+      # `[required]` no nome, o ruleset da main exige 10. Nove estao rotulados
+      # como obrigatorios sem serem — inclusive rbac-lint, pyright, backend tests
+      # e docker parity. Quem le o nome no PR conclui que aquilo trava o merge.
+      #
+      # BLOQUEIA so o inverso: context exigido que nenhum job produz, que deixa o
+      # PR "Expected" para sempre. Hoje sao zero, entao entra sobre baseline
+      # limpo. O rotulo falso so AVISA — consertar e acao de admin no ruleset, e
+      # bloquear PR por algo que o autor nao pode consertar desliga o gate.
+      - name: Quais checks travam merge de verdade
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Unico step deste job com dependencia. Ler workflow com YAML de verdade
+          # nao e luxo: a medicao que originou este gate errou duas vezes por
+          # regex/glob (`*.yml*` nao casa `ci.yaml`, o arquivo com mais jobs).
+          python -m pip install --quiet pyyaml
+          python v2/backend/scripts/check_required_checks.py --branch main
+
       - name: Frontmatter das specs SDD
         run: python scripts/check_doc_frontmatter.py
 

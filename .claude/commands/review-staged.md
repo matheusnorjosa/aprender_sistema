@@ -52,7 +52,7 @@ git diff --cached --name-only
 #### Compliance Check
 - [ ] PA-01 to PA-07 respected (if approval related)
 - [ ] RD-01 to RD-08 respected (if availability related)
-- [ ] CP-01 to CP-06 not violated
+- [ ] CP-01 to CP-08 not violated
 
 #### Docstrings (PEP 257)
 - [ ] Module docstring explains purpose

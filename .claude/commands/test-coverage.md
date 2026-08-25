@@ -16,7 +16,7 @@ Run tests with coverage: ${ARGUMENTS:-all tests}
 - **Critical modules**: aim for 100% coverage (above the 85% gate)
   - `apps/core/services/availability_service.py` (RD-01 to RD-08)
   - `apps/core/services/solicitacao_approval.py` (PA-01 to PA-07)
-  - `apps/core/models.py` (Solicitacao.save logic)
+  - `apps/core/services/solicitacao_create.py` (resolve_initial_status) + `apps/core/views_solicitacao.py` (approve/reject)
 
 ### 2. Run Coverage
 
@@ -45,11 +45,11 @@ docker compose exec web pytest --cov=apps --cov-report=xml --cov-report=term
 ```
 Name                                        Stmts   Miss  Cover   Missing
 ---------------------------------------------------------------------------
-apps/core/models.py                           250      5    98%   145-149
+apps/core/models/solicitacao.py                           250      5    98%   145-149
 apps/core/services/availability_service.py     180      0   100%
 apps/core/services/solicitacao_approval.py     120      0   100%
-apps/core/views.py                             300     30    90%
-apps/core/serializers.py                       150     15    90%
+apps/core/views_solicitacao.py                             300     30    90%
+apps/core/serializers/solicitacao.py                       150     15    90%
 ---------------------------------------------------------------------------
 TOTAL                                         1000     50    95%
 ```
@@ -110,7 +110,7 @@ def test_daily_capacity_exceeded():
 
 **Low coverage in non-critical modules**:
 ```
-apps/core/views.py   85%
+apps/core/views_solicitacao.py   85%
 ```
 
 **Action**: Identify untested edge cases, add tests
@@ -256,8 +256,8 @@ docker compose exec web pytest apps/core/tests/test_availability_service.py \
 **Validation**:
 ```bash
 docker compose exec web pytest apps/core/tests/test_approval_policy_PA.py \
-  --cov=apps.core.models \
-  --cov=apps.core.views \
+  --cov=apps.core.services.solicitacao_create \
+  --cov=apps.core.views_solicitacao \
   --cov-report=term-missing \
   --cov-fail-under=100
 ```
@@ -398,7 +398,7 @@ Status: PASS
 Critical Modules:
 - availability_service.py: 100% ✓
 - solicitacao_approval.py: 100% ✓
-- models.py: 98% ✓
+- models/solicitacao.py: 98% ✓
 
 HTML Report: htmlcov/index.html
 ```
@@ -417,7 +417,7 @@ Status: FAIL
 
 Uncovered modules:
 - views.py: 80% (60 lines uncovered)
-- serializers.py: 85% (23 lines uncovered)
+- serializers/solicitacao.py: 85% (23 lines uncovered)
 
 Action Required:
 1. Review uncovered lines in HTML report (htmlcov/index.html)

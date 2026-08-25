@@ -2,7 +2,7 @@
 
 > índice — full em `.claude/skills/<nome>/SKILL.md`, `.claude/commands/<nome>.md` e CLAUDE.md
 
-Inventário atual do disco: **23 skills · 18 commands · 4 agent types · 8 MCPs**.
+Inventário atual do disco: **25 skills · 18 commands · 4 agent types · 6 MCPs wired**.
 (6 skills são user-invoked — `disable-model-invocation`: create-plan, implement-plan, create-handoff, resume-handoff, continuity-ledger, security-scan.)
 
 **Invocação de skill:** via Skill tool com o **nome direto** (ex.: `test-driven-development`),
@@ -10,7 +10,7 @@ não `/skill <nome>`. Comandos slash (`/<nome>`) são os de `.claude/commands/`.
 
 ---
 
-## Skills (23)
+## Skills (25)
 
 | Skill | Quando usar |
 |-------|-------------|
@@ -36,6 +36,8 @@ não `/skill <nome>`. Comandos slash (`/<nome>`) são os de `.claude/commands/`.
 | `resume-handoff` | Continuar de handoff anterior |
 | `git-worktrees` | Trabalhar em múltiplas branches |
 | `graphify` | Knowledge graph local do codebase |
+| `plan-crosscheck` | Cross-check adversarial de um PLANO contra o código antes de implementar |
+| `ponytail` | Modo "senior dev preguiçoso" — YAGNI, reusar, menor diff que funciona |
 | `etl-guidelines` | **DEPRECATED-OK** — ETL legado removido; usar `import_export_contract` + DRF |
 
 ---
@@ -76,18 +78,18 @@ não `/skill <nome>`. Comandos slash (`/<nome>`) são os de `.claude/commands/`.
 
 ---
 
-## MCP Servers (8)
+## MCP Servers (6 wired)
 
 | MCP | Uso |
 |-----|-----|
-| `postgres` | Queries SQL |
-| `github` | Issues, PRs, CI |
-| `playwright` | Testes E2E |
-| `fetch` | URLs |
-| `context7` | Docs de libs/frameworks atualizadas |
-| `docker` | Operações Docker |
-| `tree-sitter` | Análise de AST |
-| `devdocs` | Documentação de referência |
+| `MCP_DOCKER` | playwright (E2E), fetch (URLs), duckduckgo, dockerhub, sequentialthinking |
+| `context7` | Docs de libs/frameworks atualizadas (`.mcp.json`) |
+| `oraculo-bd` | Banco de dados (conhecimento + auditoria) |
+| `multi-model` | Consultar outros modelos |
+| `vercel` | Deploy/projetos Vercel |
+| Google Calendar | Eventos/calendários |
+
+> **Não wired** (usar CLI): `postgres` → `docker exec … manage.py dbshell` · `github` → `gh` · `tree-sitter` → `graphify` · `devdocs`. As defs antigas em `settings.json` eram **inertes** (Claude Code só lê MCP de `.mcp.json`) e foram removidas.
 
 ---
 

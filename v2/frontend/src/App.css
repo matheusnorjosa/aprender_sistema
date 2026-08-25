@@ -283,14 +283,14 @@ html.dark .ant-input:hover,
 html.dark .ant-input-affix-wrapper:hover,
 html.dark .ant-select-selector:hover,
 html.dark .ant-picker:hover {
-  border-color: #ea2a33;
+  border-color: var(--as-primary-dark-accent);
 }
 
 html.dark .ant-input:focus,
 html.dark .ant-input-affix-wrapper-focused,
 html.dark .ant-select-focused .ant-select-selector,
 html.dark .ant-picker-focused {
-  border-color: #ea2a33;
+  border-color: var(--as-primary-dark-accent);
   box-shadow: 0 0 0 2px rgba(234, 42, 51, 0.2);
 }
 
@@ -366,8 +366,8 @@ html.dark .ant-btn-default {
 }
 
 html.dark .ant-btn-default:hover {
-  border-color: #ea2a33;
-  color: #ea2a33;
+  border-color: var(--as-primary-dark-accent);
+  color: var(--as-primary-dark-accent);
 }
 
 /* Tags no tema escuro */
@@ -388,11 +388,11 @@ html.dark .ant-pagination-item a {
 }
 
 html.dark .ant-pagination-item-active {
-  border-color: #ea2a33;
+  border-color: var(--as-primary-dark-accent);
 }
 
 html.dark .ant-pagination-item-active a {
-  color: #ea2a33;
+  color: var(--as-primary-dark-accent);
 }
 
 /* Scrollbar customizada para tema escuro */

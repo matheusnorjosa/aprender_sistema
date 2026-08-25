@@ -85,9 +85,17 @@ export const BRAND_COLORS: BrandColors = {
   errorBg: '#fff2f0',
 };
 
+// Acento de interação do tema ESCURO (colorPrimary → hover/focus/ativo/selecionado
+// que o AntD deriva). Antes era '#ea2a33' (vermelho): criava conflito semântico
+// (vermelho = erro/danger) e divergia da marca verde. O verde da marca cru (#006B52)
+// REPROVA WCAG no fundo dark (~2.5:1); este é o verde clareado p/ 5.2:1 sobre #1f1f1f
+// — mantém a marca e libera o vermelho só para erro. Espelha a CSS var
+// `--as-primary-dark-accent` em index.css.
+const DARK_ACCENT = '#2FA37D';
+
 // Cores customizadas para o tema escuro (baseado no design de referência)
 const darkThemeTokens = {
-  colorPrimary: '#ea2a33',
+  colorPrimary: DARK_ACCENT,
   colorBgContainer: '#1f1f1f',
   colorBgElevated: '#262626',
   colorBgLayout: '#141414',
@@ -150,7 +158,7 @@ export function ThemeProvider({ children }: ThemeProviderProps): JSX.Element {
       Menu: isDark ? {
         darkItemBg: '#141414',
         darkSubMenuItemBg: '#1f1f1f',
-        darkItemSelectedBg: '#ea2a33',
+        darkItemSelectedBg: DARK_ACCENT,
       } : {
         darkItemBg: '#006B52',
         darkSubMenuItemBg: '#004B3D',

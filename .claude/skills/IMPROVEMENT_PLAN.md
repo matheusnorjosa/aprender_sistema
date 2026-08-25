@@ -1,7 +1,23 @@
 # Plano de Melhoria das Skills — Aprender Sistema v2
 
-> Documento de acompanhamento. Marque `- [x]` conforme concluir.
-> Tudo aqui é em `.claude/skills/` (gitignored → edição **local**, sem PR/CP-07).
+> [!note] HISTÓRICO — encerrado em 2026-06-25. Não é instrução; é registro.
+> Todas as ondas A–E foram concluídas (ver *Log de progresso*). Este arquivo ficou como o
+> **registro de por que as skills têm a forma que têm** — não como plano a executar. Nada aqui
+> descreve o estado de hoje, e checkbox desmarcado abaixo significa "não foi feito naquela onda",
+> não "faça agora".
+>
+> **Duas premissas do texto original deixaram de valer:**
+>
+> - ~~"Tudo aqui é em `.claude/skills/` (gitignored → edição **local**, sem PR/CP-07)"~~ —
+>   **revogado pela decisão D3** (`v2/docs/plans/PLAN_doc_drift_2026-08-25.md`, 2026-08-25):
+>   `.claude/`, `.agents/`, `AGENTS.md` e `CLAUDE.md` passaram a ser **versionados**. Editar skill
+>   agora é branch + PR como qualquer código, e o gate `v2/backend/scripts/check_agent_instructions.py`
+>   proíbe caminho de máquina e credencial nesses arquivos. **Não siga a instrução antiga.**
+> - A onda **E1** entregou a skill `ci-github-actions` descrevendo *"deploy Portainer"*. Aquele
+>   modelo (ADR-010) foi **revogado pelo ADR-018 em 2026-07-10** (jobs `deploy` e
+>   `validate_existing_tag` deletados no #1516). A skill foi corrigida; a linha de E1 abaixo fica
+>   como estava porque descreve o que se decidiu **então**.
+>
 > Rubric de referência: [writing-great-skills (mattpocock)](https://github.com/mattpocock/skills/blob/main/skills/productivity/writing-great-skills/SKILL.md)
 
 ## Baseline (auditoria 2026-06-25)

@@ -28,7 +28,7 @@ Consultado sob demanda pela skill `ci-github-actions`. Nomes (`name:`) e arquivo
 
 - **`staging-gate-audit.yml`** — *Staging Gate Evidence*. `[required]`. Dispara em `v2/backend/apps/`; exige os 3 marcadores literais no corpo do PR (ver SKILL.md). `on: edited` re-roda.
 - **`deploy.yaml`** — *Build, sign and release (main)*. Pós-merge: build/scan/push no Docker Hub, **assina** (cosign keyless + SLSA), cria tag imutável + GitHub Release. **NÃO deploya** — o job `deploy` (PUT ao `:9443` público) foi deletado na Fase 4 do ADR-018 (#1516).
-- **`promote.yml`** — *Promote*. `workflow_dispatch`, gated no Environment `production` (required reviewer). Resolve tag→digest (com retry: o Docker Hub flaka), exige imagens assinadas, assina o `production.json` e publica no branch protegido `deploy-pointer`. O agente `aprender-deployer` (VM01, systemd ~60s) lê, verifica e aplica por digest em `127.0.0.1:9443` — imune ao *false-red* do `:9443`.
+- **`promote.yml`** — *Promote*. `workflow_dispatch`, gated no Environment `production` (required reviewer). Resolve tag→digest (com retry: o Docker Hub flaka), exige imagens assinadas (gate duro em `.github/workflows/promote.yml:139`), assina o `production.json` e publica no branch protegido `deploy-pointer`. Na VM01 (systemd ~60s) o `aprender-deployer` **lê e verifica** o ponteiro; quem **aplica** — o `PUT` por digest em `127.0.0.1:9443` — é o `aprender-applier`, o único que detém o token do Portainer. É separação de privilégio (decisão #4 do ADR-018): o deployer parseia dado vindo da internet e por isso **não** tem o token. A confirmação é feita de dentro da VM, o que a torna imune ao *false-red* do `:9443`.
 
 ## Monitoramento (não bloqueia merge)
 

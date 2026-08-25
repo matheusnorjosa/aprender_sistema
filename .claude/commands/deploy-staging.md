@@ -1,5 +1,5 @@
 ---
-description: Pre-deployment checklist (local staging-full validation + merge-to-main deploy via Portainer)
+description: Pre-flight do release (gate local staging-full) + promoção humana para produção via promote.yml (ADR-018)
 argument-hint: [optional: deployment type - 'full' or 'hotfix']
 ---
 
@@ -9,15 +9,28 @@ Deployment type: ${ARGUMENTS:-full}
 
 ## 🎯 Overview
 
-**There is NO dedicated staging environment** in AS v2. The flow is:
+**There is NO dedicated staging environment** in AS v2, e **merge na `main` NÃO deploya**.
+O fluxo tem dois atos deliberados:
 
-1. **Validate locally** with `make staging-full` (prod-like stack) — must finish **8/8 PASS**.
-2. **Merge (squash) into `main`** → this triggers an **automatic deploy to production via Portainer**.
-3. **Verify version/health** after the deploy lands.
+1. **Validar localmente** com `make staging-full` (stack prod-like) — precisa fechar **8/8 PASS**.
+2. **Merge (squash) na `main`** → dispara `deploy.yaml` (*"Build, sign and release"*): build → scan →
+   push no Docker Hub → **assina** (cosign keyless + provenance SLSA) → cria a tag imutável
+   `vYYYY.MM.DD-<sha7>` + GitHub Release. **Produção não muda aqui.**
+3. **Promover** a tag: `promote.yml` (`workflow_dispatch`), atrás do GitHub Environment `production`
+   com *required reviewer*. A VM01 **puxa** o ponteiro assinado e aplica **por digest**.
+4. **Verificar** `/api/version/` + `/api/readyz/` depois que a VM01 aplicar (~60s de timer).
 
-"Staging" here means the **local prod-like validation gate**, not a remote server.
-**NEVER skip the local gate** — merging to `main` deploys straight to prod (CP-07: never push
-directly to `main`; merge a PR).
+"Staging" aqui significa o **gate local prod-like**, não um servidor remoto.
+**NUNCA pule o gate local** — ele é a única validação pré-produção que existe.
+
+> [!warning] Procedimento revogado — não volte a ele
+> Até o **ADR-018 (2026-07-10)** este comando ensinava: *"merge na `main` → deploy automático em
+> produção via Portainer"*, com rollback por *redeploy da tag anterior no Portainer*. Era o
+> **ADR-010**. Ele foi **superseded**: os jobs `deploy` e `validate_existing_tag` do `deploy.yaml`
+> foram **deletados** no **#1516**, e a `:9443` deixou de ser pública (o `PUT` legítimo é do
+> `aprender-applier`, em `127.0.0.1:9443`). Quem seguir o texto antigo vai procurar um deploy que
+> não acontece, ou tentar mexer no Portainer à mão — que é exatamente o que o modelo novo remove.
+> Registro: `docs/architecture/project-decisions/ADR-018-pull-based-deploy.md`.
 
 ---
 
@@ -57,6 +70,10 @@ directly to `main`; merge a PR).
   docker exec aprender_dev-web-1 python manage.py check
   # Expected: No issues detected
   ```
+  > Em produção as migrations rodam **sozinhas e bloqueantes** (serviço one-shot `migrate`, #1456):
+  > `web`/`worker`/`beat` só sobem com `depends_on: service_completed_successfully`. Uma migration
+  > quebrada **trava o deploy** em vez de servir schema meio-migrado — por isso validar aqui é o
+  > que impede a promoção de morrer no meio.
 
 - [ ] **RBAC lint clean** (bans user.groups.filter(name=...))
   ```bash
@@ -103,65 +120,105 @@ directly to `main`; merge a PR).
   - Staging-gate markers present in body (Phase 2)
   - Conventional commit title (CP-06): `type(scope): message`
 
-### Phase 4: Deploy Execution (merge → Portainer)
+### Phase 4: Merge → Release (NÃO é deploy)
 
 - [ ] **Squash-merge the PR into `main`**
   ```bash
   gh pr merge <PR> --squash
-  # Merge to main = automatic deploy to PRODUCTION via Portainer. There is no manual ssh/deploy step.
+  # Merge dispara build/scan/push + cosign + SLSA + tag imutavel. Producao NAO muda.
   ```
 
-- [ ] **Watch the deploy workflow**
+- [ ] **Acompanhar o build/assinatura**
   ```bash
-  gh run watch          # or: gh run list --workflow=deploy
-  # A burst of merges = N serial deploys; the deploy of HEAD is the one that must succeed.
+  gh run watch          # ou: gh run list --workflow=deploy.yaml --limit 1
+  # O run precisa terminar verde nos jobs: prepare, build_and_push, sign, tag_and_release.
   ```
-  > Transient `curl 28` / HTTP 000 against Portainer (9443) during a merge burst is not an alarm
-  > if the HEAD deploy succeeds and prod returns HTTP 200.
+  > `blob unknown to registry` no `buildx --push` é **flake transitório** do Docker Hub:
+  > `gh run rerun <id> --failed`. Produção intacta — ela nem foi tocada.
 
-### Phase 5: Post-Deployment Validation
+- [ ] **Anotar a tag imutável gerada**
+  ```bash
+  gh release list --limit 3
+  # Formato: vYYYY.MM.DD-<sha7>. E essa string que a promocao recebe.
+  ```
+
+### Phase 5: Promoção para produção (ato humano, gated)
+
+- [ ] **Confirmar que as imagens estão assinadas** — o `promote.yml` **exige** isso e falha se não
+      estiverem (`slsa-provenance.yml`). Não há como promover um artefato não assinado.
+
+- [ ] **Disparar a promoção**
+  ```bash
+  gh workflow run promote.yml -f release=v2026.MM.DD-<sha7>
+  ```
+
+- [ ] **Aprovar no gate** — o job pausa no GitHub Environment `production` esperando o
+      *required reviewer*. Sem a aprovação, nada sai do lugar.
+
+- [ ] **Confirmar o ponteiro publicado**
+  ```bash
+  gh run list --workflow=promote.yml --limit 1
+  # O workflow resolve tag->digest, monta e assina o production.json (sequence monotonica,
+  # expires_at) e publica no branch protegido `deploy-pointer`. Ele TAMBEM nao deploya.
+  ```
+
+- [ ] **Esperar a VM01 puxar** (~60s, systemd timer). `aprender-deployer` lê o ponteiro *tokenless*,
+      verifica a assinatura contra trusted-root pinado offline e os digests das imagens; entrega ao
+      `aprender-applier`, que confere anti-rollback (selo monotônico), drift do compose, exige
+      **backup de DB fresco**, faz o `PUT` em `127.0.0.1:9443` e confirma em `localhost`.
+      Cada degrau é **fail-closed** — um `REFUSE` significa que produção **não** mudou.
+
+### Phase 6: Post-Promotion Validation
 
 - [ ] **Version/health check**
   ```bash
-  curl -s https://<prod-host>/api/health/
-  # Expected: HTTP 200 + {"status": "ok", "version": "v2026.MM.DD-<sha>"}
+  curl -s https://<prod-host>/api/version/   # {"version": "<release>"} -- casa com production.json?
+  curl -s https://<prod-host>/api/readyz/    # 200
   ```
-  > **External health may return HTTP 000** (Kaspersky/KESL on the Golden VMs blocks the probe),
-  > even when the site is up. In that case, fall back to the **Portainer API** to confirm the
-  > container is healthy and serving — accept the deploy as good when Portainer shows the new
-  > image running + an internal 200.
-
-- [ ] **Confirm deployed image tag matches the merged commit**
-  ```bash
-  # via Portainer API: check the running container image tag == v2026.MM.DD-<sha>
-  ```
+  > A verdade do que roda em produção é o **digest verificado no `PUT`**, não a cor de um job de CI.
+  > **Mas o `/api/version/` não devolve digest**: o payload é `{"version": ...}`, com `git_sha` e
+  > `build_date` só para `is_staff` (`v2/backend/apps/core/views_health.py:93-99`). Daqui a
+  > evidência possível é a **tag** — compare com o `release` do `production.json`. O digest fica no
+  > selo que o applier grava dentro da VM.
+  > O applier já confirmou de **dentro** da VM (`/api/readyz/` + `/api/version/` em `localhost`),
+  > o que torna a confirmação imune ao *false-red* do `:9443`. Se o probe **externo** der HTTP 000
+  > (Kaspersky/KESL nas Golden VMs), isso não indica deploy quebrado — confira o selo do applier /
+  > o `/api/version/` interno em vez de concluir pela borda.
 
 - [ ] **Spot-check a critical endpoint** (with auth)
   - Frontend loads (homepage renders)
   - Login works → redirects to dashboard
   - `/api/solicitacoes/` returns data
 
-### Phase 6: Rollback Plan (If Needed)
+### Phase 7: Rollback Plan (If Needed)
 
-**If the deploy is bad**, roll back via Portainer (redeploy the previous image tag):
+**Rollback é uma promoção PARA TRÁS, pelo mesmo gate.** Não existe mais "redeploy da tag anterior
+no Portainer", nem `gh workflow run deploy.yaml -f rollback_tag=...`.
 
-- [ ] **Redeploy previous known-good tag** through Portainer (stack/container update to
-      `v2026.MM.DD-<previous-sha>`).
-- [ ] **If a migration broke prod**, restore from the latest DB backup per
-      `v2/docs/DISASTER_RECOVERY.md` / `BACKUP_OPERATIONS.md`.
-- [ ] **Open a revert PR** if the fix is code-level (do NOT push to `main` directly — CP-07).
-- [ ] **Never `systemctl restart docker`** on the VMs (Kaspersky race brings the site down).
+- [ ] **Promover a tag imutável anterior**
+  ```bash
+  gh workflow run promote.yml -f release=v2026.MM.DD-<sha7-anterior> -f rollback=true
+  # `rollback: true` marca o downgrade como intencional e assinado.
+  # Ainda exige `sequence` maior que o selo -- o anti-rollback nao e desligado.
+  ```
+- [ ] **Aprovar no Environment `production`** (mesmo required reviewer).
+- [ ] **Se uma migration quebrou prod**: **não há auto-rollback** — migrations são *forward-only*.
+      Restaurar do backup conforme `v2/docs/DISASTER_RECOVERY.md` / `BACKUP_OPERATIONS.md`.
+- [ ] **Abrir PR de revert** se o fix é de código (nunca push direto na `main` — CP-07).
+- [ ] **Nunca `systemctl restart docker`** nas VMs (race do Kaspersky derruba o site).
 
 ---
 
 ## 🚨 Critical Checks (NEVER Skip)
 
-1. ✅ **`make staging-full` 8/8 PASS** — merging to main deploys to PROD, so the local gate is the
-   only pre-prod safety net.
+1. ✅ **`make staging-full` 8/8 PASS** — não existe staging remoto; o gate local é a única rede
+   de proteção antes de a tag ficar promovível.
 2. ✅ **All required CI checks green** + staging-gate markers in the PR body.
-3. ✅ **Migrations validated** locally before merge.
-4. ✅ **Post-deploy health** — HTTP 200, or Portainer-API confirmation when external probe = 000.
-5. ✅ **Rollback path known** — previous image tag in Portainer + latest DB backup.
+3. ✅ **Migrations validadas localmente** — em prod elas são bloqueantes e travam o deploy.
+4. ✅ **Promoção aprovada no Environment `production`** — merge não basta, e não é para bastar.
+5. ✅ **Pós-promoção: `/api/version/` mostra o release esperado** — a rota devolve a **tag**, não o
+   digest; compare com o `release` do `production.json`.
+6. ✅ **Rollback path conhecido** — `promote.yml` com `rollback: true` + backup de DB recente.
 
 ---
 
@@ -170,13 +227,15 @@ directly to `main`; merge a PR).
 ### Full Deployment
 
 **Use when**: multiple PRs, major feature, breaking changes, or schema changes.
-**Extra care**: full `make staging-full` run + full smoke of touched flows; confirm image tag post-deploy.
+**Extra care**: full `make staging-full` run + smoke completo dos fluxos tocados; confirmar o
+`release` do `/api/version/` contra o `production.json` depois da promoção (a rota não devolve digest).
 
 ### Hotfix Deployment
 
 **Use when**: critical bug fix, security patch, urgent prod issue.
-**Streamlined**: still run `make staging-full` (the gate is non-negotiable), but smoke-test only the
-fixed area. Merge → Portainer redeploys.
+**Streamlined**: o gate local continua não-negociável (`make staging-full`), mas o smoke cobre só a
+área corrigida. O caminho **não** encurta: merge → tag → `promote.yml` → aprovação. Não existe
+atalho "direto pra prod" — a `:9443` não é mais pública.
 
 **Example**:
 ```bash
@@ -185,7 +244,8 @@ git checkout -b hotfix/critical-bug
 git commit -m "fix(critical): resolve [issue]"
 git push origin hotfix/critical-bug
 # ... PR with staging-gate markers, approved, required checks green ...
-gh pr merge <PR> --squash   # deploys to prod via Portainer
+gh pr merge <PR> --squash                                   # -> build + sign + tag
+gh workflow run promote.yml -f release=v2026.MM.DD-<sha7>   # -> gate `production` -> VM01 puxa
 ```
 
 ---
@@ -194,15 +254,25 @@ gh pr merge <PR> --squash   # deploys to prod via Portainer
 
 - **No remote staging server.** Validation is **local** (`make staging-full`, prod-like Docker stack).
 - **Prod = 3 Golden VMs**: VM01_App (Nginx/Gunicorn/Celery/React), VM02_DB (PostgreSQL 15),
-  VM03_Red (Redis 7). Deploys land via **Portainer**.
+  VM03_Red (Redis 7).
+- **Produção puxa; o CI não empurra** (ADR-018). O `PUT` sai do `aprender-applier` para
+  `127.0.0.1:9443`; o `aprender-deployer`, que faz o parsing do que vem da internet, **não** detém
+  o token do Portainer (separação de privilégio entre dois usuários de sistema).
+- **Migrations**: automáticas e bloqueantes no deploy (serviço one-shot `migrate`, #1456).
+  Rodar `manage.py migrate` a mão em produção está **revogado**.
+- **Compose**: `docker-compose.prod.yml` no repo é a *intenção*; a verdade é o Editor do Portainer,
+  e o que o applier reenvia é o `trust/compose.pinned.yml` da VM. Mudou o compose? atualize no
+  Editor **e** re-capture o pinado, senão `compose_check_drift` **recusa** o próximo deploy
+  (comportamento desejado).
 - **Secrets** live in **Portainer** (Golden VMs); `.env.production` in the repo are dev templates.
-- **External health probe may be HTTP 000** (Kaspersky/KESL) — use the Portainer API as fallback.
+- **External health probe may be HTTP 000** (Kaspersky/KESL) — a confirmação canônica é a do
+  applier, feita de dentro da VM.
 
 ---
 
 ## 🧪 Manual QA Checklist (RF Validation)
 
-Run against the **local prod-like stack** before merge (and spot-check prod after):
+Run against the **local prod-like stack** before merge (and spot-check prod after promoting):
 
 - [ ] RF02: Create solicitação (wizard completes)
 - [ ] RF03: Check conflicts (displays conflicts correctly)
@@ -224,7 +294,11 @@ Run against the **local prod-like stack** before merge (and spot-check prod afte
 
 ## 📚 Reference
 
-- **Deploy flow / checklist**: `v2/docs/DEPLOY_CHECKLIST.md`
+- **SSOT do fluxo**: `v2/docs/specs/infra/deploy.spec.md`
+- **Decisão**: `docs/architecture/project-decisions/ADR-018-pull-based-deploy.md`
+  (supersede o `ADR-010-deploy-portainer-direct-to-prod.md`)
+- **Agente da VM01**: `v2/infra/deployer/README.md`
+- **Checklist operacional**: `v2/docs/DEPLOY_CHECKLIST.md`
 - **Imports spec**: `v2/docs/specs/backend/imports.spec.md`
 - **Backup/DR**: `v2/docs/DISASTER_RECOVERY.md`, `v2/docs/BACKUP_OPERATIONS.md`
 - **Migration command**: `.claude/commands/migrate.md`
@@ -237,15 +311,21 @@ Run against the **local prod-like stack** before merge (and spot-check prod afte
 
 **If all checks pass**:
 ```
-✅ DEPLOY SUCCESSFUL (via Portainer)
+✅ RELEASE PROMOVIDO (ADR-018, pull-based)
 
 Validation: make staging-full → ALL 8 CHECKS PASSED
 CI: all [required] checks green
-Merge: PR #<n> squash-merged to main
+Merge: PR #<n> squash-merged to main → build + sign + release
+Tag: v2026.MM.DD-<sha> (imagens assinadas: cosign + SLSA)
+
+Promocao:
+- promote.yml aprovado no Environment `production` por <reviewer>
+- production.json assinado, sequence <n>, publicado em `deploy-pointer`
+- VM01 aplicou por digest; applier selou a sequence
 
 Prod:
-- Image tag: v2026.MM.DD-<sha> running (confirmed via Portainer)
-- Health: HTTP 200  (or Portainer-API confirmed if external probe = 000)
+- /api/version/  → version = v2026.MM.DD-<sha>, casa com o release do production.json ✓
+- /api/readyz/   → 200 ✓
 - Smoke: RF02 / RF03 / RF04 ✓
 
 Status: Live in production
@@ -253,19 +333,27 @@ Status: Live in production
 
 **If checks fail**:
 ```
-❌ DEPLOY FAILED / ROLLED BACK
+❌ FALHOU — em que degrau?
 
-Failed: <staging-full check N> | <required CI check> | <post-deploy health>
+[ ] gate local (staging-full check N)   → nada foi buildado
+[ ] CI [required]                       → nada foi buildado
+[ ] deploy.yaml (build/sign/release)    → nenhuma tag promovivel; prod INTACTA
+[ ] promote.yml (assinatura/gate)       → ponteiro nao publicado; prod INTACTA
+[ ] applier na VM01 (REFUSE <motivo>)   → fail-closed; prod INTACTA (ver motivo:
+                                          anti-rollback / compose_drift / backup ausente)
+[ ] pos-promocao (/api/version/)        → prod MUDOU e esta ruim → rollback
 
-Action: redeploy previous image tag via Portainer
-- Previous tag restored ✓
-- (DB restored from backup, if a migration broke prod)
-- Revert PR opened (no direct push to main — CP-07)
+Rollback (so no ultimo caso):
+gh workflow run promote.yml -f release=<tag-anterior> -f rollback=true
++ aprovacao no Environment `production`
+(DB: migrations sao forward-only — restaurar backup conforme DISASTER_RECOVERY.md)
+Revert PR se o fix e de codigo (sem push direto na main — CP-07)
 
-Next: fix root cause, re-run make staging-full (8/8), re-merge
+Next: corrigir a causa, re-rodar make staging-full (8/8), re-merge, re-promover
 ```
 
 ---
 
-**Focus**: Local prod-like gate (`make staging-full` 8/8) → squash-merge to `main` → automatic
-Portainer deploy → health verify (HTTP 200 or Portainer-API fallback) → Portainer rollback if bad.
+**Focus**: gate local (`make staging-full` 8/8) → merge = **build/sign/release** → `promote.yml`
+aprovado no Environment `production` → VM01 **puxa** e aplica por digest → verificar `/api/version/`
+→ rollback = promover a tag anterior com `rollback: true`.

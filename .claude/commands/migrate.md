@@ -72,7 +72,12 @@ docker compose exec web python manage.py migrate --plan
 
 ### 5. Backup Database (CRITICAL)
 
-**Before applying migrations in staging/production**:
+> **Em produção você não aplica migration à mão** (ver §11). O backup de produção não é um passo
+> seu: o `aprender-applier` na VM01 **exige backup de DB fresco** antes de fazer o `PUT`, e recusa
+> o deploy (fail-closed) se não houver. O que segue é o backup **local**, antes de aplicar no seu
+> ambiente de dev/prod-like.
+
+**Before applying migrations locally**:
 ```bash
 # Backup PostgreSQL
 docker compose exec db pg_dump -U postgres aprender_v2 > backup_pre_migration_$(date +%Y%m%d_%H%M%S).sql
@@ -265,7 +270,12 @@ docker compose exec web python manage.py migrate
 docker compose exec web pytest -v
 ```
 
-### 10. Rollback Migrations
+### 10. Rollback Migrations (local/dev — **não** em produção)
+
+> Em produção migrations são **forward-only** (ADR-018): não há `migrate <app> <n-1>` manual, e a
+> promoção para trás (`promote.yml -f rollback=true`) troca a **imagem**, não desfaz o schema. Se o
+> schema precisa voltar, o caminho é restaurar backup (`v2/docs/DISASTER_RECOVERY.md`). O que segue
+> vale para o seu ambiente local.
 
 **Revert to specific migration**:
 ```bash
@@ -292,33 +302,66 @@ docker compose exec web python manage.py showmigrations core
 
 ### 11. Production Deployment Pattern
 
-> **Realidade de deploy (AS v2)**: NÃO há ambiente de staging remoto nem `ssh production`.
-> A validação é LOCAL via `make staging-full` (8/8). O merge da PR na `main` dispara o
-> deploy automático via Portainer; as migrations rodam dentro do stack já deployado.
-> Backup/restore seguem o runbook de DR (`v2/docs/DISASTER_RECOVERY.md`).
+> **Realidade de deploy (AS v2, ADR-018 — 2026-07-10)**: não há staging remoto nem
+> `ssh production`. A validação é LOCAL via `make staging-full` (8/8). **Merge na `main` NÃO
+> deploya** — ele builda, assina e libera uma tag imutável. Produção muda por **promoção humana**
+> (`promote.yml`, gated no Environment `production`), e a VM01 **puxa** por digest.
+>
+> **Em produção, migrations são automáticas e BLOQUEANTES (#1456):** o serviço one-shot `migrate`
+> do `docker-compose.prod.yml` roda `python manage.py migrate --noinput`, e `web`/`worker`/`beat`
+> só sobem com `depends_on: service_completed_successfully`. Migration quebrada **trava o deploy**
+> em vez de servir schema meio-migrado.
+
+> [!warning] Procedimento revogado
+> ~~"Rodar `python manage.py migrate` manualmente no container de produção"~~ (instrução do
+> **ADR-010**) está **revogada desde o ADR-018, 2026-07-10**. Não é só desnecessário: aplicar
+> migration por fora do serviço `migrate` desalinha o schema do que o applier acabou de selar.
+> ~~"Merge na `main` → deploy automático via Portainer"~~ também caiu — os jobs `deploy` e
+> `validate_existing_tag` foram **deletados** no **#1516**.
 
 **Safe deployment workflow**:
 
 ```bash
-# Step 1: Validação LOCAL (staging-like) — gate obrigatório antes da PR
+# Step 1: Validacao LOCAL (staging-like) — gate obrigatorio antes da PR
 #   build + up + migrate + test suite + down, tudo em containers locais
 make staging-full          # precisa fechar 8/8 PASS
 
-# Step 2: Abrir/atualizar a PR com a evidência do gate
-#   (sem deploy manual aqui — o merge é o gatilho)
+# Step 2: Abrir/atualizar a PR com a evidencia do gate
+#   (makemigrations --check limpo: migration faltando quebra o servico `migrate` em prod)
 
-# Step 3: Merge na main -> deploy AUTOMÁTICO via Portainer
-#   O workflow reconstrói a imagem e aplica o stack na VM.
-#   As migrations rodam DENTRO do stack deployado (entrypoint/release step).
+# Step 3: Merge na main -> BUILD + ASSINATURA + TAG (nao e deploy)
+#   deploy.yaml = "Build, sign and release": build/scan/push + cosign + SLSA
+#   -> tag imutavel vYYYY.MM.DD-<sha7>. Producao NAO muda aqui.
 
-# Step 4: Validar pós-deploy
-#   Health externo pode dar HTTP 000 (Kaspersky) -> verificar via Portainer API
-#   (estado do container) em vez do curl externo.
+# Step 4: Promover (ato humano, gated)
+gh workflow run promote.yml -f release=v2026.MM.DD-<sha7>
+#   Pausa no GitHub Environment `production` (required reviewer). Assina o
+#   production.json e publica no branch protegido `deploy-pointer`.
 
-# Backup/Restore do banco: seguir o runbook de DR
-#   v2/docs/DISASTER_RECOVERY.md  /  BACKUP_OPERATIONS.md
-#   (secrets de produção vivem no Portainer, não no repo)
+# Step 5: A VM01 puxa (~60s, systemd timer)
+#   aprender-deployer verifica assinatura + digests; aprender-applier confere
+#   anti-rollback, drift do compose, EXIGE backup de DB fresco, faz o PUT em
+#   127.0.0.1:9443. O servico one-shot `migrate` roda AI, antes de web/worker/beat.
+#   Migration que falha = deploy fail-closed; producao segue na versao anterior.
+
+# Step 6: Validar pos-promocao
+#   curl /api/version/  -> {"version":"<release>"} deve casar com o release do production.json.
+#                          A rota NAO devolve digest (views_health.py:93-99); o digest verificado
+#                          no PUT fica no selo do applier, dentro da VM.
+#   curl /api/readyz/   -> 200
+#   Probe externo HTTP 000 (Kaspersky/KESL) nao indica deploy quebrado: a confirmacao
+#   canonica e a que o applier ja fez de DENTRO da VM (localhost).
+
+# Rollback: NAO ha auto-rollback — migrations sao forward-only.
+gh workflow run promote.yml -f release=<tag-anterior> -f rollback=true
+#   Se a migration corrompeu dados, promover para tras NAO desfaz o schema:
+#   restaurar do backup conforme v2/docs/DISASTER_RECOVERY.md / BACKUP_OPERATIONS.md
+#   (secrets de producao vivem no Portainer, nao no repo)
 ```
+
+**Consequência prática para quem escreve a migration**: ela é o degrau que pode derrubar a
+promoção inteira, e não existe janela manual para "consertar em produção". Migration não-reversível
+ou destrutiva precisa do padrão expand/contract (§8) espalhado por releases separados.
 
 ### 12. Squash Migrations (Optional)
 
@@ -383,7 +426,7 @@ ROLLBACK RECOMMENDED
 - ✅ Separate schema and data migrations
 - ✅ Always provide reverse operations
 - ✅ Test migrations on sample data first
-- ✅ Backup before applying in staging/production
+- ✅ Backup before applying locally (em prod o applier exige backup fresco sozinho)
 - ✅ Use `RenameField`/`RenameModel` (not remove+add)
 - ✅ Handle large datasets with batch updates
 - ✅ Document complex migrations
@@ -391,11 +434,12 @@ ROLLBACK RECOMMENDED
 #### DON'T
 - ❌ Edit applied migrations (create new instead)
 - ❌ Commit migration files without testing
-- ❌ Skip backups in production
+- ❌ **Rodar `manage.py migrate` a mão no container de produção** — revogado (ADR-018); o serviço
+  one-shot `migrate` é quem aplica, e aplicar por fora desalinha o schema do que o applier selou
 - ❌ Apply migrations without reviewing SQL
 - ❌ Use `null=True` as workaround (add default instead)
 - ❌ Ignore migration warnings
-- ❌ Apply untested migrations to production
+- ❌ Promover uma tag cuja migration não passou no gate local (ela **bloqueia** o deploy em prod)
 
 ### 15. Common Scenarios
 

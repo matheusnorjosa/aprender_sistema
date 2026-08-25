@@ -125,10 +125,12 @@ Error Budget (horas/mês) = (100 - SLO%) × 720 / 100
 | Google Calendar | 0 | 24 horas | Resync automático |
 
 > ⚠️ **Estes são alvos, não capacidade demonstrada.** Hoje: o WAL archiving da VM02 **não
-> foi verificado** (sem ele o RPO efetivo é ~24h, o intervalo do dump diário), a ferramenta
-> oficial de restore **não funciona** com o formato de backup de produção
-> ([#1611](https://github.com/matheusnorjosa/aprender_sistema/issues/1611)) e **nenhum
-> ensaio de restore foi registrado**. Antes de comprometer RPO/RTO com terceiros, leia
+> foi verificado** (sem ele o RPO efetivo é ~24h, o intervalo do dump diário) e **nenhum
+> ensaio de restore foi registrado**
+> ([#1646](https://github.com/matheusnorjosa/aprender_sistema/issues/1646), aberta).
+> A ferramenta oficial de restore **voltou a funcionar** com o formato de produção
+> `.age` — #1611 corrigido em `8f392636`, #1645 em `3bca74f3` —, mas ferramenta correta
+> não é RTO medido. Antes de comprometer RPO/RTO com terceiros, leia
 > [BACKUP_OPERATIONS.md → Estado real do restore](./BACKUP_OPERATIONS.md#estado-real-do-restore).
 
 ### 6.2 Consistência
@@ -207,6 +209,7 @@ O único mecanismo automático de detecção hoje é o **Sentry**, e ele só est
 |--------|------|----------|
 | 1.0 | 2026-01-12 | Versão inicial |
 | 1.1 | 2026-07-24 | Marcado como **não medido em produção**; corrigidos os nomes de métrica PromQL (não são as séries do `django-prometheus`); alertas reclassificados de "recomendados" para **não implementados**; ressalva de RPO/RTO ligada a #1611 |
+| 1.2 | 2026-08-25 | Ressalva de RPO/RTO **religada a #1646** (ensaio de DR, aberta): #1611 e #1645 foram corrigidos (`8f392636`, `3bca74f3`) e a ferramenta de restore deixou de ser o gargalo |
 
 ---
 

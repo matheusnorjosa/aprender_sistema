@@ -1,6 +1,6 @@
 ---
 name: post-merge-cleanup
-description: Limpeza pós-merge — atualiza main, deleta branches locais/remotas, verifica deploy, prune
+description: Limpeza pós-merge — atualiza main, deleta branches locais/remotas, confere o run de build/sign/release (que NÃO é deploy) e faz prune
 model: haiku
 ---
 
@@ -60,11 +60,27 @@ git branch
 # Esperado: apenas "* main"
 ```
 
-### 6. Verificar deploy (se runtime change)
+### 6. Verificar o artefato de release — o merge **não** deploya
+
+> [!warning] Procedimento revogado — não volte a ele
+> Até o **ADR-018 (2026-07-10, #1516)** este passo se chamava ~~"Verificar deploy (se runtime
+> change)"~~ e lia o ~~"último deploy run"~~ como se ele tivesse mudado produção. Os jobs `deploy`
+> e `validate_existing_tag` do `deploy.yaml` foram **deletados** e a `:9443` deixou de ser pública.
+> Hoje o workflow chama-se *"Build, sign and release"* e **produção não muda com merge**. Levar a
+> prod exige `promote.yml` aprovado no Environment `production` — e quem monitora aquilo é o agente
+> `post-deploy-monitor`, não este.
+
 ```bash
-# Último deploy run
+# O run do deploy.yaml e evidencia de BUILD / ASSINATURA / TAG -- nao de deploy.
 gh run list --workflow=deploy.yaml --limit 1 --json databaseId,status,conclusion,displayTitle
+gh release list --limit 3   # a tag imutavel vYYYY.MM.DD-<sha7> que o merge tornou promovivel
 ```
+
+> A tag existir **não** prova que as imagens foram assinadas: `tag_and_release` tem
+> `needs: [prepare, build_and_push]`, com o `sign` fora do `needs` e fora do `if`
+> (`.github/workflows/deploy.yaml:231-235`). Se a assinatura importa, olhe o job
+> *Sign images (cosign keyless + SLSA)* à parte — o gate duro dela é o `promote.yml`
+> (`.github/workflows/promote.yml:139`), não este run.
 
 ### 7. Verificar issues fechadas
 ```bash
@@ -85,7 +101,8 @@ done
 Main updated: ✅
 Branches deleted: N local, M remote pruned
 Graph: clean (main only)
-Deploy: [status]
+Build/sign/release (deploy.yaml): [status] -- prod NAO foi tocada
+Tag promovivel: [vYYYY.MM.DD-<sha7> | nenhuma]
 Issues closed: #X, #Y, #Z
 
 Done ✅

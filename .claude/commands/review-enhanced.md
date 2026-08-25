@@ -739,13 +739,15 @@ Review code: $ARGUMENTS
 
 ### 11. **Compliance Checks (AS v2 Specific)**
 
-#### Cláusulas Pétreas (CP-01 to CP-06)
+#### Cláusulas Pétreas (CP-01 to CP-08)
 - [ ] **CP-01**: Docker-only (check `/.dockerenv`)
 - [ ] **CP-02**: Manual approval (PA-01 to PA-07) if approval flow
 - [ ] **CP-03**: Availability rules (RD-01 to RD-08) if conflicts
 - [ ] **CP-04**: Workflow followed (Understand → Plan → Implement → Test)
 - [ ] **CP-05**: v1 untouched
 - [ ] **CP-06**: Conventional commits (`feat:`, `fix:`, etc.)
+- [ ] **CP-07**: Nunca push direto na main (branch + PR; enforced por hook)
+- [ ] **CP-08**: `INCLUDE_DEV_TOOLS=false` em produção
 
 #### Regras de Disponibilidade (RD-01 to RD-08)
 If code handles availability/conflicts:
@@ -782,7 +784,7 @@ If code handles approvals:
 
 **Example**:
 ```
-apps/core/views.py:145
+apps/core/views_solicitacao.py:145
 Issue: Missing AuditLog for approval action
 Rule: PA-05 (Política de Aprovação Manual)
 Severity: HIGH (compliance violation)

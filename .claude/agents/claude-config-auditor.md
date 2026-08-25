@@ -27,7 +27,7 @@ Você audita a configuração `.claude/` (skills, commands, agents, hooks, cheat
   Administrativo); 13 setores. Aprovação: superuser OU (Gerente + Superintendência).
 - **Stack**: Python 3.12 / Django 5.2 / DRF / React 18 / Vite 7 / Antd 5. v2 Docker-only (CP-01).
   Frontend migrado p/ TypeScript (`.tsx`, não `.jsx`).
-- **Agent types reais**: Explore, Plan, general-purpose, Workflow (nunca "Bash"). `.claude/` é gitignored.
+- **Agent types reais**: Explore, Plan, general-purpose, Workflow (nunca "Bash"). `.claude/` é **versionado** desde a decisão D3 (`PLAN_doc_drift_2026-08-25.md`; negado em `.gitignore` p/ `agents/`, `commands/`, `hooks/`, `skills/`, `CLAUDE.md`, `settings.json` — exceto `_archive/`, `worktrees/`, `settings.local.json`, caches); o gate `check_agent_instructions.py` roda em todo PR que toca `.claude/**`.
 
 ## Não-bugs (NÃO reportar)
 

@@ -24,7 +24,7 @@ git checkout -b feat/<feature-name>
 
 ### 1. Identify Compliance Requirements
 Check CLAUDE.md for applicable rules:
-- **CP-01 to CP-06**: Cláusulas pétreas (imutáveis)
+- **CP-01 to CP-08**: Cláusulas pétreas (imutáveis)
 - **RD-01 to RD-08**: Regras de disponibilidade
 - **PA-01 to PA-07**: Política de aprovação
 - **RF01 to RF08**: Requisitos funcionais

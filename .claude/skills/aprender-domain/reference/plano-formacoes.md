@@ -15,7 +15,8 @@ Estrutura de formações anuais por Município + Projeto.
 **Campos principais**:
 - `municipio`: FK → Municipio (PROTECT)
 - `projeto`: FK → Projeto (PROTECT)
-- `coordenador`: FK → DATCoordenador (SET_NULL, opcional)
+- `coordenador`: FK → **Usuario** (SET_NULL, opcional) — a PESSOA que coordenou o evento, resolvida por CPF (#1849). NÃO é a lista de governança `DATCoordenador`
+- `ano`: PositiveSmallIntegerField — dimensão temporal por ano (natural key `municipio+projeto+ano`)
 - `ch_total`: DecimalField (soma das CH das formações)
 - `ch_estudo`: DecimalField (CH adicional de estudo)
 - `ch_anual`: DecimalField (ch_total + ch_estudo)

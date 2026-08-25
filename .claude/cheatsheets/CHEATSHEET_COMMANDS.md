@@ -23,7 +23,7 @@ docker compose logs -f db
 
 # Shell no container
 docker compose exec web bash
-docker compose exec db psql -U postgres aprender_db
+docker compose exec db psql -U aprender_user aprender_db
 ```
 
 ---
@@ -179,13 +179,13 @@ cd v2/frontend && npm run format
 
 ```bash
 # Acesso direto PostgreSQL
-docker compose exec db psql -U postgres aprender_db
+docker compose exec db psql -U aprender_user aprender_db
 
 # Dump
-docker compose exec db pg_dump -U postgres aprender_db > backup.sql
+docker compose exec db pg_dump -U aprender_user aprender_db > backup.sql
 
 # Restore
-docker compose exec -T db psql -U postgres aprender_db < backup.sql
+docker compose exec -T db psql -U aprender_user aprender_db < backup.sql
 ```
 
 ---

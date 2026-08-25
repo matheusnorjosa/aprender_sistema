@@ -22,7 +22,7 @@ docker compose exec -T web pytest apps/core/tests/test_availability_service.py::
 docker compose exec -T web pytest apps/core/tests/test_availability_service.py --cov=apps.core.services.availability_service --cov-report=term-missing
 ```
 
-### 2. Expected Results (17 tests)
+### 2. Expected Results (18 tests)
 
 #### TestAvailabilityServiceRules (11 tests)
 - [ ] `test_conflict_overlap_total` — RD-01 (overlap ≥ 1 min)

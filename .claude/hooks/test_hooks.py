@@ -37,14 +37,16 @@ def run_py(hook: str, payload: dict) -> tuple[int, str]:
     return _run([PY, str(HOOKS / hook)], payload)
 
 
-# PowerShell nao existe no runner Linux do CI. Os hooks .ps1 sao de notificacao e
-# formatacao; os guards que sustentam CP-05/CP-07 sao Python e continuam sendo
-# exercitados. Pular o que nao da para rodar e melhor que nao rodar nada — foi a
-# ausencia deste harness no CI que deixou o PR #1847 quebrar os guards em silencio.
+# `powershell` e o nome do binario so no Windows. O ubuntu-latest do GitHub tem
+# PowerShell Core como `pwsh`, entao os 4 casos .ps1 rodam la tambem: medido,
+# 51/51 no runner. O fallback serve para runner sem nenhum dos dois — ai eles sao
+# pulados COM AVISO, e o piso MINIMO no fim do arquivo impede que a ausencia
+# passe por aprovacao. Chamar `powershell` direto foi o que quebrou o CI do #1853.
 POWERSHELL = shutil.which("powershell") or shutil.which("pwsh")
 
 
 def run_ps(hook: str, payload: dict) -> tuple[int, str]:
+    assert POWERSHELL, "run_ps sem PowerShell: o bloco .ps1 deveria ter sido pulado"
     return _run([POWERSHELL, "-ExecutionPolicy", "Bypass", "-File", str(HOOKS / hook)], payload)
 
 
@@ -239,8 +241,10 @@ else:
 # --------------------------------------------------------------------------
 # report
 # --------------------------------------------------------------------------
-# Piso anti-vacuidade: um harness que roda pouco passa por nao testar. O runner
-# Linux do CI nao tem powershell e pula 4 casos; abaixo disso algo sumiu.
+# Piso anti-vacuidade: um harness que roda pouco passa por nao testar sem ninguem
+# perceber. 51 casos com PowerShell presente (Windows e o runner do CI, que tem
+# `pwsh`), 47 sem. Abaixo de 45, algo sumiu — e sumir em silencio e o defeito que
+# este arquivo existe para pegar.
 MINIMO = 45
 
 fails = [r for r in results if not r[1]]

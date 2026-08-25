@@ -62,9 +62,9 @@ jobs:
           --tracked-only .claude .agents AGENTS.md CLAUDE.md
 
       # POR QUE ESTE STEP EXISTE.
-      # .claude/hooks/test_hooks.py tem 51 casos cobrindo os guards (47 aqui: os 4
-      # de hook .ps1 sao pulados, com aviso, porque o runner nao tem powershell) — inclusive
-      # a CP-07 — e NUNCA rodou em CI: mora fora do `testpaths = apps` do pytest.
+      # .claude/hooks/test_hooks.py tem 51 casos cobrindo os guards — inclusive a
+      # CP-07 — e NUNCA rodou em CI: mora fora do `testpaths = apps` do pytest.
+      # Os 51 rodam aqui: o ubuntu-latest traz PowerShell Core como `pwsh`.
       # Consequencia medida: o PR #1847 trocou os caminhos dos hooks para
       # $CLAUDE_PROJECT_DIR, o harness usava os.path.isabs() e passou a reprovar
       # 8 testes de wiring e a PULAR EM SILENCIO os 2 de runtime do guardrails.

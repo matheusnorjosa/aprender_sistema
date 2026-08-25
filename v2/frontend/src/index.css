@@ -14,6 +14,11 @@
   --as-primary: #006B52;
   --as-primary-dark: #004B3D;
   --as-primary-light: #E5EDE5;
+  /* Acento de interação do tema ESCURO (hover/focus/ativo de inputs, botões e
+     paginação). O verde da marca (#006B52) REPROVA WCAG no fundo dark (~2.5:1);
+     este é o mesmo verde clareado p/ contraste (5.2:1 sobre #1f1f1f). Mantém a
+     identidade da marca e libera o vermelho para significar SÓ erro/danger. */
+  --as-primary-dark-accent: #2FA37D;
 }
 
 /* Clean reset - let Ant Design handle styling */

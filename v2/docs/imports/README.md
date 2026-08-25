@@ -135,7 +135,7 @@ Datas de calendário (Solicitação, AvailabilityBlock) **são armazenadas em UT
 | ~~Nunca aprova solicitações~~ | ❌ **falso** | `fluxo == NAO_SUPER` grava `status='aprovado'` **sem o hard gate de disponibilidade** — `M08-12` / [#1620](https://github.com/matheusnorjosa/aprender_sistema/issues/1620). (SUPER continua nascendo `pendente`, isso é verdade.) |
 | ~~Nunca atribui `Gerente`/`Superintendência`~~ | ❌ **falso** | a coluna `grupos` concede qualquer grupo, sem allowlist — `M03-01` / [#1610](https://github.com/matheusnorjosa/aprender_sistema/issues/1610), **P0** |
 | ~~Nunca sobrescreve sem match confirmado~~ | ❌ **falso** | o match **é** o gatilho da sobrescrita: `update_or_create` apaga status, owner e datas e reporta `unchanged` — `M10-07` / [#1628](https://github.com/matheusnorjosa/aprender_sistema/issues/1628) |
-| (não alegado) Nunca resolve pessoa/município errado | ❌ **falso** | resolvers usam fallback por substring e desempatam com `.first()` — `M02-09`/[#1613](https://github.com/matheusnorjosa/aprender_sistema/issues/1613), `M22-14`/[#1643](https://github.com/matheusnorjosa/aprender_sistema/issues/1643), `M15-05`/[#1635](https://github.com/matheusnorjosa/aprender_sistema/issues/1635), `M04-01`/[#1615](https://github.com/matheusnorjosa/aprender_sistema/issues/1615) — épico [#1658](https://github.com/matheusnorjosa/aprender_sistema/issues/1658) |
+| (não alegado) Nunca resolve pessoa/município errado | ⚠️ **parcial** | `M02-09`/[#1613](https://github.com/matheusnorjosa/aprender_sistema/issues/1613) **✅ resolvido**: `resolve_projeto`/`resolve_tipo_evento` rejeitam ambiguidade (não mais `.first()`) + import DAT com norm simétrica. **Seguem abertos**: `M22-14`/[#1643](https://github.com/matheusnorjosa/aprender_sistema/issues/1643) (`resolve_user_by_name` substring de pessoa), `M15-05`/[#1635](https://github.com/matheusnorjosa/aprender_sistema/issues/1635), `M04-01`/[#1615](https://github.com/matheusnorjosa/aprender_sistema/issues/1615) — épico [#1658](https://github.com/matheusnorjosa/aprender_sistema/issues/1658) |
 | (não alegado) Nunca grava linha inválida | ❌ **falso** | compras aceita quantidade vazia/negativa/decimal e data ausente — `M15-04` / [#1634](https://github.com/matheusnorjosa/aprender_sistema/issues/1634) |
 
 Épico de causa raiz para os itens de invariante:
@@ -313,7 +313,7 @@ Mudanças que quebram contrato (renomear coluna obrigatória, mudar tipo de dado
    ([#1610](https://github.com/matheusnorjosa/aprender_sistema/issues/1610)).
 2. **Resolvers devem rejeitar ambiguidade em vez de escolher com `.first()`** — épico
    [#1658](https://github.com/matheusnorjosa/aprender_sistema/issues/1658)
-   (#1613, #1615, #1635, #1643). Inclui a pergunta antiga: qual chave usar para Formador 1..5 na
+   (✅ #1613 feito p/ `resolve_projeto`/`resolve_tipo_evento`; #1615, #1635, #1643 abertos). Inclui a pergunta antiga: qual chave usar para Formador 1..5 na
    planilha de Agenda, já que CPF não aparece lá.
 3. **Import não pode bypassar invariante de domínio** — épico
    [#1659](https://github.com/matheusnorjosa/aprender_sistema/issues/1659) (#1620, #1628, #1634, #1640).

@@ -26,6 +26,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.core.api_schemas import COMMON_ERROR_RESPONSES
+from apps.core.imports.request_params import parse_dry_run
 from apps.core.permissions import HasPerm
 from apps.core.serializers.openapi_critical_contract import (
     ImportFileUploadRequestSerializer,
@@ -78,8 +79,7 @@ class ImportMunicipiosView(APIView):
     )
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         # Parse dry_run query param
-        dry_run_param = str(request.query_params.get("dry_run", "true")).lower()
-        dry_run = dry_run_param in {"1", "true", "t", "yes", "y"}
+        dry_run = parse_dry_run(request.query_params.get("dry_run"))
 
         # Verificar arquivo
         try:

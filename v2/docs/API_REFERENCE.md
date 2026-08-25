@@ -614,8 +614,8 @@ Imports assíncronos (ASQ-005): `POST /api/imports/bloqueios/`
 (`IsAuthenticated` + `CanImportGenericSpreadsheet`), `GET /api/imports/` e
 `GET /api/imports/{id}/` (`IsAuthenticated`, queryset filtrado por dono).
 
-> Achado aberto `M04-05` (P2, issue #1649): valor **desconhecido** de `dry_run`
-> é tratado como APPLY em 11 views. Envie exatamente `true` ou `false`.
+> ✅ Resolvido em #1649 (achado `M04-05`): o parse de `dry_run` é **fail-closed** — valor
+> desconhecido permanece em dry-run (preview); só `false`/`0`/`no`/… disparam APPLY.
 
 ---
 

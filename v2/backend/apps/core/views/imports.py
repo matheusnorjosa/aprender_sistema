@@ -33,6 +33,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.core.api_schemas import COMMON_ERROR_RESPONSES
+from apps.core.imports.request_params import parse_dry_run
 from apps.core.models import ImportJob
 from apps.core.rbac.policies import CanImportGenericSpreadsheet
 from apps.core.serializers.import_job import ImportJobSerializer, ImportJobUploadRequestSerializer
@@ -43,10 +44,12 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_dry_run(raw: str | None, *, default: bool = True) -> bool:
-    """Parse dry_run query-param de forma permissiva (true/false/1/0/yes/no)."""
-    if raw is None:
-        return default
-    return str(raw).strip().lower() in {"1", "true", "t", "yes", "y"}
+    """Parse dry_run query-param FAIL-CLOSED (issue #1649).
+
+    Delega ao helper canônico: só um token de apply explícito ('false', '0', …)
+    liga o APPLY; qualquer valor desconhecido permanece em dry-run (preview).
+    """
+    return parse_dry_run(raw, default=default)
 
 
 class ImportJobBloqueiosUploadView(APIView):

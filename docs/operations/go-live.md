@@ -33,8 +33,11 @@
 - [ ] PostgreSQL 15 configurado
 - [ ] Credenciais seguras
 - [ ] Backup automatizado **funcionando e verificado por restore drill** — ver
-      [Backup](backup.md): hoje o job está morto/silencioso (#1455) e a ferramenta
-      oficial de restore rejeita todo artefato `.age` de produção (#1611)
+      [Backup](backup.md). O job voltou a gravar (#1455 → #1528, bind-mount em
+      `docker-compose.prod.yml:235`) e `restore_db.sh` restaura `.age` (#1611 →
+      `8f392636`; #1645 → `3bca74f3`). **O drill em si continua pendente**
+      ([#1646](https://github.com/matheusnorjosa/aprender_sistema/issues/1646)) — este
+      item só pode ser marcado depois dele
 - [ ] Migrations aplicadas — em prod o serviço one-shot `migrate` roda antes de
       `web`/`worker`/`beat` (`docker-compose.prod.yml`)
 

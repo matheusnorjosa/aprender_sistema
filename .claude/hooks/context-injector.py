@@ -386,6 +386,9 @@ If truly needed: `systemctl restart kesl && sleep 10 && systemctl restart docker
 - Compose in Portainer Editor (NOT docker-compose CLI)
 - ENV vars in Portainer Environment variables (NOT .env files)
 - Real secrets in Portainer on Golden VMs, .env.production in repo are dev templates
+- ADR-018: quem faz o PUT e o aprender-applier em 127.0.0.1:9443, com o
+  trust/compose.pinned.yml da propria VM. Editou o compose no Editor? re-capture o
+  pinado, senao `compose_check_drift` recusa o proximo deploy.
 
 ### Network Segmentation
 - backend-internal: web, redis, worker, beat (driver: bridge, NOT internal)
@@ -401,35 +404,54 @@ If truly needed: `systemctl restart kesl && sleep 10 && systemctl restart docker
 
 
 def deploy_context(command: str) -> str:
-    """Hook 6: Deploy guidelines."""
-    keywords = ["deploy", "portainer", "staging-gate", "make deploy"]
+    """Hook 6: Deploy guidelines (modelo ADR-018, pull-based)."""
+    keywords = ["deploy", "portainer", "promote", "staging-gate", "make deploy"]
     if not any(kw in command for kw in keywords):
         return ""
 
     return """<system-reminder>
-## Deploy Guidelines (auto-injected)
+## Deploy Guidelines (auto-injected)  --  ADR-018 (2026-07-10), pull-based
 
-### Deploy Flow
-Merge to main -> GitHub Actions builds images -> Portainer CE API redeploys stack
+### REVOGADO: "merge na main deploya"
+Era o ADR-010. O ADR-018 o superseded: os jobs `deploy` e `validate_existing_tag`
+do deploy.yaml foram DELETADOS (#1516) e a :9443 deixou de ser publica.
+Se voce leu isso em algum doc, o doc esta velho.
 
-### Pre-Deploy Checklist
-1. All CI checks green (staging gate evidence in PR body)
-2. No breaking changes in compose (test locally first)
-3. DB migrations run automatically on container start
+### Fluxo atual (producao PUXA; o CI nao empurra)
+1. Merge na main -> deploy.yaml ("Build, sign and release"): build/scan/push no
+   Docker Hub + cosign keyless + SLSA + tag imutavel vYYYY.MM.DD-<sha7>. PARA AQUI.
+2. Promocao humana: `gh workflow run promote.yml -f release=<tag>` -- workflow_dispatch
+   atras do GitHub Environment `production` (required reviewer). Resolve tag->digest,
+   exige imagens assinadas, assina o production.json (sequence monotonica) e publica
+   no branch protegido `deploy-pointer`. promote.yml TAMBEM nao deploya.
+3. VM01 (systemd ~60s): aprender-deployer le/verifica o ponteiro; aprender-applier
+   (unico com o token do Portainer) confere anti-rollback + drift do compose, exige
+   backup de DB fresco, faz o PUT em 127.0.0.1:9443 e confirma em localhost.
 
-### Post-Deploy Verification
-- Health: /api/readyz/ must return 200
-- Version: /api/version/ must show new git_sha
-- CI fallback: Portainer API verification if external health check fails (HTTP 000)
+### Rollback
+Promocao PARA TRAS pelo mesmo gate: promote.yml com `rollback: true` na tag anterior
+(ainda exige sequence > selo). NAO existe `gh workflow run deploy.yaml -f rollback_tag=...`.
+Nao ha auto-rollback -- migrations sao forward-only.
 
-### Production VMs
-- VM01_App: Portainer, NPM, containers
-- VM02_DB: PostgreSQL 15 (TLS enabled)
-- IPs/hosts: see v2/docs/specs/infra/deploy.spec.md + v2/docs/DEPLOY_CHECKLIST.md (NOT hardcoded here)
+### Migrations
+Automaticas e BLOQUEANTES (#1456): servico one-shot `migrate` no docker-compose.prod.yml;
+web/worker/beat sobem so com `depends_on: service_completed_successfully`.
+Rodar `manage.py migrate` a mao em producao esta REVOGADO.
 
-### Portainer Manual Updates
-Compose changes require manual update in Portainer Editor -> Update the stack.
-The deploy workflow only updates IMAGE_TAG, not the compose file.
+### Verificacao pos-deploy
+- A verdade e o digest verificado no PUT, nao a cor de um job de CI -- mas esse digest
+  fica no selo do applier, DENTRO da VM. A rota /api/version/ NAO devolve digest: o
+  payload e {"version": ...}, com git_sha/build_date so para is_staff
+  (v2/backend/apps/core/views_health.py:93-99).
+- Conferir /api/version/ (a TAG) contra o release do production.json, e /api/readyz/.
+- O applier confirma de DENTRO da VM -> imune ao false-red do :9443.
+
+### Compose
+Mudanca no compose exige update manual no Portainer Editor E re-captura do
+trust/compose.pinned.yml na VM -- senao `compose_check_drift` RECUSA o proximo deploy.
+
+### Producao / hosts
+IPs e hosts NAO ficam aqui: v2/docs/specs/infra/deploy.spec.md + v2/docs/DEPLOY_CHECKLIST.md
 </system-reminder>"""
 
 
@@ -573,24 +595,37 @@ Se for placeholder/fixture, ignore.
 
 
 def git_merge_cleanup_context(command: str) -> str:
-    """Post-merge cleanup reminder + W7 prod-deploy warning for `gh pr merge`."""
+    """Post-merge cleanup reminder + W7 release warning for `gh pr merge`."""
     if "git merge" not in command and "gh pr merge" not in command:
         return ""
 
     parts = ["<system-reminder>"]
-    # W7: a PR merge to main triggers a prod deploy (merge == deploy via Portainer).
+    # W7: desde o ADR-018 (#1516) o merge na main NAO deploya -- ele so builda,
+    # assina e libera. O aviso existe para nao reintroduzir o modelo revogado
+    # (ADR-010) nem deixar acreditar que o merge ja colocou a versao em prod.
     if "gh pr merge" in command:
-        parts.append("## ATENCAO: merge na main = DEPLOY EM PROD (auto-detected)")
+        parts.append("## Merge na main NAO deploya (ADR-018) -- auto-detected")
         parts.append(
-            "Merge de PR na main dispara build + redeploy via Portainer (sem staging)."
+            "O merge dispara deploy.yaml ('Build, sign and release'): build/scan/push +"
         )
-        parts.append("Confirme: CI verde + evidencia do staging gate no corpo do PR.")
+        parts.append(
+            "cosign + tag imutavel vYYYY.MM.DD-<sha7>. Producao NAO muda com isso."
+        )
+        parts.append(
+            "Para levar a prod: gh workflow run promote.yml -f release=<tag> (gate do"
+        )
+        parts.append(
+            "Environment `production`, required reviewer). A VM01 puxa e aplica por digest."
+        )
+        parts.append("Confirme antes do merge: CI verde + evidencia do staging gate no PR.")
         parts.append("")
     parts.append("## Post-Merge Reminder")
     parts.append(
         "Considere o agente post-merge-cleanup: deleta branches mergeadas, atualiza main,"
     )
-    parts.append("verifica deploy, faz prune de refs obsoletas.")
+    parts.append(
+        "confere o run do deploy.yaml (build/assinatura -- nao e deploy) e faz prune de refs."
+    )
     parts.append("</system-reminder>")
     return "\n".join(parts)
 

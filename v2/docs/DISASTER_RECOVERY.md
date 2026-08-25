@@ -14,25 +14,76 @@ procedimentos do lado PostgreSQL nativo e PITR, ver [GUIDE_DR.md](./GUIDE_DR.md)
 
 ---
 
-## 0. ⛔ A ferramenta oficial de restore está quebrada (#1611)
+## 0. Antes de restaurar: use `restore_db.sh`
 
-**Não use `restore_db.sh` contra um backup de produção.** Ele roda
-`gzip -t "$BACKUP_FILE"` incondicionalmente (`restore_db.sh:91`) **antes** do branch que
-decifra `.age` (`restore_db.sh:113-119`). Produção grava **exclusivamente**
-`backup_full_*.sql.gz.age` (`backup_db.sh:44-55` fail-closed +
-`docker-compose.prod.yml:197`), e um artefato `age` começa com o texto
-`age-encryption.org/v1` — que não é gzip. O script aborta com
+> [!important] O aviso que abria este runbook foi revogado em 2026-08-25.
+> Até essa data a seção 0 dizia **"não use `restore_db.sh` contra um backup de produção"**
+> e mandava o operador para um pipeline manual. Os dois defeitos que justificavam o aviso
+> foram corrigidos:
+>
+> | Defeito | Corrigido em |
+> |---|---|
+> | #1611 / M26-01 — `gzip -t` incondicional rejeitava todo `.age` com `Backup file is corrupted!` (mensagem falsa) | `8f392636`, 2026-08-10 |
+> | #1645 / M26-02 — declarava `Restore completed successfully!` com exit 0 sobre banco vazio | `3bca74f3`, 2026-08-21 |
+>
+> Numa emergência, um aviso obsoleto empurra o operador para o caminho pior — sem safety
+> dump e sem verificação. **Use a ferramenta.**
 
+O `restore_db.sh` hoje, contra um `.age` de produção:
+
+1. Verifica a integridade **antes de destruir qualquer coisa**, decifrando com `age -d` e
+   só então rodando `gzip -t` (`restore_db.sh:101-121`). Falha cedo se o binário `age` não
+   estiver no PATH ou a chave não for legível (`:103-110`).
+2. Tira um **safety dump** do banco atual antes do `DROP DATABASE` (`:132-148`).
+3. Restaura com `psql -v ON_ERROR_STOP=1` sob `pipefail`; qualquer erro de SQL,
+   decifragem ou descompressão aborta em vermelho e informa onde o safety dump ficou
+   (`:162-178`).
+4. **Verifica o resultado**: piso de tabelas (`RESTORE_MIN_TABLES`, default 20) e linhas
+   > 0 em `core_usuario` e `core_solicitacao`. Só então imprime o banner verde
+   (`:180-212`).
+
+> [!caution] Em produção, `DB_HOST` por TCP **não autentica** — `M26-N1`, P1, aberto
+> `restore_db.sh` conecta **sempre** como superusuário `postgres` via `-h $DB_HOST` e
+> **não tem tratamento de senha nenhum**: `grep -i PGPASSWORD v2/infra/scripts/restore_db.sh`
+> retorna zero (para contraste, `backup_db.sh` exporta `PGPASSWORD`).
+>
+> A VM02 escuta em `10.0.0.2`, não em loopback
+> (`v2/infra/configs/vm02/postgresql.conf:8`), e o `pg_hba.conf:18` termina com
+> `host all all 0.0.0.0/0 reject`. A única regra que aceita `postgres` é `local … peer`
+> (`:8`) — socket unix.
+>
+> **Na VM02, use o pipeline manual com peer auth** (`sudo -u postgres`), que é o
+> procedimento canônico e está em [GUIDE_DR.md](./GUIDE_DR.md). O comando abaixo serve
+> para **dev/staging**, onde o banco aceita a conexão.
+>
+> `M26-N1` (P1, confirmado) —
+> `v2/docs/audits/2026-07-17-system-module-audit.md:9438`.
+
+```bash
+# dev/staging — em produção, veja o aviso acima
+BACKUP_DIR=/var/backups/aprender BACKUP_AGE_KEY=/etc/backup-key.txt \
+DB_HOST="$DB_HOST" DB_NAME=aprender_db \
+  /app/infra/scripts/restore_db.sh --latest
 ```
-ERROR: Backup file is corrupted!
-```
 
-**A mensagem é falsa** e atinge os três caminhos de entrada (arquivo explícito, `--latest`,
-interativo). Nada é destruído: a parada é na linha 91, antes do `DROP DATABASE` da linha
-107. Issue [#1611](https://github.com/matheusnorjosa/aprender_sistema/issues/1611).
+Pré-requisitos: a **chave privada `age`** não fica na VM por design — está no gerenciador
+de senhas do mantenedor. O binário `age` existe na imagem de backend **de produção**
+(`v2/infra/Dockerfile.prod:56`) e **não** existe na imagem dev
+(`v2/infra/Dockerfile.dev:19-21`).
 
-**O que funciona hoje** (precisa da chave privada `age`, que **não** fica na VM — está no
-gerenciador de senhas do mantenedor):
+> ⚠️ **O que ainda não foi provado.** O código está correto e o caminho `.age` é
+> exercitado por ele, mas **nenhum drill real** foi executado: `test_dr.sh` não gera
+> `.age` nem chama `age -d`. Issue
+> [#1646](https://github.com/matheusnorjosa/aprender_sistema/issues/1646) (M26-03) segue
+> **ABERTA**. Trate a restaurabilidade como *inferida do código*, não demonstrada.
+
+Passo a passo completo:
+[GUIDE_DR.md → Restore Completo](./GUIDE_DR.md#restore-completo-desastre-total).
+
+<details>
+<summary>Pipeline manual (contorno histórico de #1611 — só para host sem o repositório)</summary>
+
+Não faz safety dump nem verificação pós-restore; foi por isso que #1645 existiu.
 
 ```bash
 age -d -i /etc/backup-key.txt <arquivo>.sql.gz.age | gzip -t   # verificar ANTES
@@ -40,12 +91,10 @@ age -d -i /etc/backup-key.txt <arquivo>.sql.gz.age | gunzip \
   | psql -h "$DB_HOST" -U postgres -d aprender_db -v ON_ERROR_STOP=1
 ```
 
-O binário `age` existe na imagem de backend **de produção**
-(`v2/infra/Dockerfile.prod:56`) e **não** existe na imagem dev
-(`v2/infra/Dockerfile.dev:19-21`). Procedimento passo a passo:
-[GUIDE_DR.md → Restore Completo](./GUIDE_DR.md#restore-completo-desastre-total).
+</details>
 
 ---
+
 
 ## 1. Visão Geral
 
@@ -94,23 +143,23 @@ docker compose -f docker-compose.prod.yml stop web worker beat
 #    NÃO existe "latest.sql.gz".
 ls -lht /var/backups/aprender/backup_full_*.sql.gz.age | head -5
 
-# 3. Verificar integridade ANTES de destruir (precisa da chave privada age)
-age -d -i /etc/backup-key.txt \
-  /var/backups/aprender/backup_full_<DATA>.sql.gz.age | gzip -t && echo "OK"
+# 3. Restaurar com a ferramenta oficial (ver secao 0). Ela verifica a integridade do
+#    .age ANTES de destruir, tira safety dump do banco atual, aborta em erro de SQL
+#    e confere tabelas + linhas antes de declarar sucesso. Pede confirmacao 'yes'.
+BACKUP_DIR=/var/backups/aprender BACKUP_AGE_KEY=/etc/backup-key.txt \
+DB_HOST="$DB_HOST" DB_NAME=aprender_db \
+  /app/infra/scripts/restore_db.sh backup_full_<DATA>.sql.gz.age
 
-# 4. Restaurar — pipeline manual (restore_db.sh está quebrado, ver seção 0 / #1611)
-age -d -i /etc/backup-key.txt \
-  /var/backups/aprender/backup_full_<DATA>.sql.gz.age | gunzip \
-  | psql -h "$DB_HOST" -U postgres -d aprender_db -v ON_ERROR_STOP=1
-
-# 5. Conferir explicitamente o resultado (não confie em exit 0 — ver #1645)
+# 4. Ler a saida. Exit 0 ja significa "tabelas restauradas E tabelas-chave nao-vazias"
+#    (restore_db.sh:180-212); exit 1 imprime onde ficou o safety dump do estado
+#    anterior. Conferencia independente, se quiser:
 psql -h "$DB_HOST" -U postgres -d aprender_db -c "SELECT count(*) FROM core_usuario;"
 psql -h "$DB_HOST" -U postgres -d aprender_db -c "SELECT count(*) FROM core_solicitacao;"
 
-# 6. Reiniciar a stack (o one-shot `migrate` aplica migrations antes de web/worker/beat)
+# 5. Reiniciar a stack (o one-shot `migrate` aplica migrations antes de web/worker/beat)
 docker compose -f docker-compose.prod.yml up -d
 
-# 7. Validar de dentro da VM01
+# 6. Validar de dentro da VM01
 curl -f http://127.0.0.1:8000/api/readyz/
 curl -f http://127.0.0.1:8000/api/version/
 ```
@@ -149,9 +198,11 @@ aws s3 cp s3://<bucket>/backups/backup_full_<DATA>.sql.gz.age ./
 # 4. Subir só o necessário para restaurar
 docker compose -f docker-compose.prod.yml up -d redis
 
-# 5. Restaurar (pipeline manual — ver seção 0)
-age -d -i /etc/backup-key.txt backup_full_<DATA>.sql.gz.age | gunzip \
-  | psql -h "$DB_HOST" -U postgres -d aprender_db -v ON_ERROR_STOP=1
+# 5. Restaurar com restore_db.sh (ver secao 0). Rode a partir de um container da
+#    imagem de backend, que traz `age`, `psql` e o script em /app/infra/scripts.
+BACKUP_DIR=$(pwd) BACKUP_AGE_KEY=/etc/backup-key.txt \
+DB_HOST="$DB_HOST" DB_NAME=aprender_db \
+  /app/infra/scripts/restore_db.sh backup_full_<DATA>.sql.gz.age
 
 # 6. Subir a aplicação (serviços reais: migrate, web, worker, beat, frontend)
 docker compose -f docker-compose.prod.yml up -d
@@ -240,10 +291,12 @@ Scripts canônicos em `v2/infra/scripts/`:
   `backup_full_YYYYMMDD_HHMMSS.sql.gz[.age]` (`backup_db.sh:50-55`). Em produção o
   sufixo é **sempre** `.age`. Retenção no próprio script (`backup_db.sh:103`), com glob
   que cobre `.sql.gz` **e** `.sql.gz.age`. **Não duplicar lógica neste doc.**
-- **`restore_db.sh`** — ⛔ **quebrado para backups de produção** (ver seção 0 / #1611).
-  Além disso, `restore_db.sh:17` hardcoda `BACKUP_DIR=/var/backups/aprender` e ignora a
-  env var, então `--latest` não funciona de dentro do container (onde o diretório é
-  `/backups`). Use o pipeline manual até a correção.
+- **`restore_db.sh`** — **operante para `.age` e plaintext** (ver seção 0). Verificação de
+  integridade ciente do formato (`:101-121`), `BACKUP_DIR` respeitando a env var (`:23`,
+  então `--latest` funciona de dentro do container), safety dump pré-DROP (`:132-148`),
+  `ON_ERROR_STOP=1` + `pipefail` (`:162-178`) e verificação pós-restore de tabelas e
+  linhas (`:180-212`). Corrigido em `8f392636` (#1611) e `3bca74f3` (#1645); o aviso
+  anterior de "quebrado" foi revogado em 2026-08-25.
 - **`verify_backup.sh`** — para `.age`, verifica **presença + tamanho + frescor** e
   **pula a checagem de conteúdo** (`verify_backup.sh:44-48`), porque a chave privada não
   fica na VM. "Verificado" aqui não significa "restaurável".
@@ -271,12 +324,21 @@ Este script:
 **Limites conhecidos — leia antes de tratar um verde como garantia de DR:**
 
 - ❌ **Nunca exercita o formato de produção.** Não gera `.age`, não chama `age -d` e não
-  chama `restore_db.sh`. O bug #1611 passaria despercebido por ele indefinidamente.
-  Issue [#1646](https://github.com/matheusnorjosa/aprender_sistema/issues/1646).
+  chama `restore_db.sh`. Foi essa cegueira que deixou #1611 e #1645 vivos até 2026-08;
+  ambos já foram corrigidos, mas o teste que os teria pego **continua não existindo**.
+  Issue [#1646](https://github.com/matheusnorjosa/aprender_sistema/issues/1646) —
+  **ABERTA**.
 - ❌ Depende de um serviço `db` no compose (`docker compose exec -T db …`), que só existe
   em **dev/staging**. Em produção o PostgreSQL é externo.
-- ❌ Não existe nenhum teste `.bats` para `restore_db.sh` (os únicos bats do repositório
-  cobrem `v2/infra/deployer/`).
+- ✅ **Corrigido.** Existe `v2/infra/scripts/tests/restore_db.bats`, com 7 testes:
+  **criado por `8f392636`** (2026-08-10, #1691 — o fix do #1611) com 5 casos, e
+  **ampliado por `3bca74f3`** (2026-08-21, #1793) com os 2 do #1645. Cobre `.age` válido,
+  corrupção, formato simples, diretório customizado, `--latest`, erro no meio do restore
+  e banco com tabela-chave vazia. Até 2026-08-25 esta linha dizia que a cobertura era zero.
+
+  > O que os `.bats` **não** cobrem — e é a razão de o #1646 seguir aberto: eles exercitam
+  > o script, nunca um artefato `.age` real restaurado num banco real. Cobertura de unidade
+  > não é ensaio de recuperação.
 
 O ensaio que de fato prova o DR está em
 [GUIDE_DR.md → Ensaio de DR](./GUIDE_DR.md#ensaio-de-dr-o-único-teste-que-vale).
@@ -345,6 +407,7 @@ Instrumentar backup em Prometheus continua como item de backlog — ver
 |------|--------|----------|
 | 2026-01-12 | 1.0 | Versão inicial |
 | 2026-07-24 | 1.1 | Revisão contra o código (auditoria M26). Adicionada seção 0 (#1611: `restore_db.sh` rejeita todo backup `.age` de produção). Corrigidos: nomes de arquivo (`latest.sql.gz` → `backup_full_*.sql.gz.age`), serviço `celery` → `worker`, ausência do serviço `db` em produção, `clearsessions` vs sessões no Redis, métricas Prometheus inexistentes, limites reais do `test_dr.sh`. |
+| 2026-08-25 | 1.2 | **Seção 0 revogada**: #1611 corrigido em `8f392636` (2026-08-10) e #1645 em `3bca74f3` (2026-08-21). O runbook voltou a mandar usar `restore_db.sh`; o pipeline manual virou contorno histórico. **#1646 (drill real de DR) permanece ABERTA** e continua sinalizada. |
 
 ---
 

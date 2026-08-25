@@ -5,7 +5,11 @@ description: CI/CD do AS v2 (GitHub Actions). Use ao editar workflows, destravar
 
 # CI/CD — Aprender Sistema v2 (GitHub Actions)
 
-> Merge na `main` = **deploy direto pra prod** via Portainer. CI verde não é burocracia — é o portão de produção.
+> **Merge na `main` NÃO deploya** (ADR-018, 2026-07-10). O merge produz um artefato assinado e
+> *promovível*; produção só muda por promoção humana (`promote.yml` + Environment `production`).
+> CI verde continua não sendo burocracia — é o que decide se existe artefato promovível.
+> ~~"Merge na `main` = deploy direto pra prod via Portainer"~~ era o **ADR-010**, **revogado**: os
+> jobs `deploy` e `validate_existing_tag` foram **deletados** no **#1516**.
 > SSOT do fluxo: [`v2/docs/specs/infra/ci.spec.md`](../../../v2/docs/specs/infra/ci.spec.md). Detalhe por-workflow: [reference/workflows.md](reference/workflows.md).
 
 ## Arquitetura
@@ -40,11 +44,23 @@ description: CI/CD do AS v2 (GitHub Actions). Use ao editar workflows, destravar
 
 Checkboxes precisam estar **marcados** (`- [x]`). Editar o body re-roda o gate (`on: edited`). PR draft pula o gate.
 
+## Procedimento: levar uma versão a produção
+
+1. **Merge na `main`** → `deploy.yaml` builda, escaneia e faz push das imagens, dispara o `sign` (cosign keyless + SLSA) e gera a tag imutável `vYYYY.MM.DD-<sha7>` + GitHub Release. `gh release list --limit 3` mostra a tag. **A tag não prova assinatura:** `tag_and_release` tem `needs: [prepare, build_and_push]` e o `sign` está fora do `needs` **e** fora do `if` (`.github/workflows/deploy.yaml:231-235`) — tag e Release nascem mesmo com o `sign` falhando. O gate **duro** de assinatura é o `promote.yml` (`.github/workflows/promote.yml:139`, *“Gate duro — imagens DEVEM estar assinadas (cosign)”*), e o agente da VM01 recusa digest que não passe no `cosign verify`.
+2. **Promover:** `gh workflow run promote.yml -f release=v2026.MM.DD-<sha7>`.
+3. **Aprovar** no GitHub Environment `production` (*required reviewer*). Enquanto isso o run fica `status: waiting` — não é falha.
+4. **A VM01 puxa** (systemd, ~60s) e aplica **por digest**; o `PUT` é do `aprender-applier` em `127.0.0.1:9443`. Cada degrau é **fail-closed** — `REFUSE` significa que produção não mudou.
+5. **Verificar:** `/api/version/` devolve a **release (tag)**, **não** o digest — payload `{"version": ...}`, com `git_sha`/`build_date` só para `is_staff` (`v2/backend/apps/core/views_health.py:93-99`). Compare com o `release` do `production.json`; mais `/api/readyz/`. A cor do job **não** é evidência.
+
+**Rollback** = promover a tag anterior com `-f rollback=true` (ainda exige `sequence` > selo). Não existe `deploy.yaml -f rollback_tag=...`, e não há auto-rollback — migrations são forward-only.
+
 ## Gotchas recorrentes (já nos morderam)
 
 - **`pytest --no-migrations`** no gate (M4 #1404): seeds RBAC vêm de fixtures (`ensure_base_groups` + `seed_functional_permissions`), não das RunPython. Testes que exercitam data-migrations levam `@pytest.mark.migrations` e rodam no job `backend-migrate-integrity`.
-- **Deploy `blob unknown to registry`** no buildx `--push` = **flake transitório**; `gh run rerun <id> --failed`. Prod intacta.
-- **Rajada de merges** = N deploys seriais; alguns falham `curl 28` no Portainer 9443 (transiente) mas o último vence — não é alarme se o deploy do HEAD = success + prod HTTP 200.
+- **`blob unknown to registry`** no buildx `--push` = **flake transitório** do Docker Hub; `gh run rerun <id> --failed`. Prod intacta (nem foi tocada).
+- **Rajada de merges** = N builds, **não** N deploys. Nenhum deles muda produção; o que interessa é a tag do HEAD existir e estar assinada. ~~"alguns falham `curl 28` no Portainer 9443 mas o último vence"~~ era do job `deploy`, **deletado** (#1516) — o *false-red* do `:9443` deixou de aparecer no CI porque a confirmação passou a ser feita de dentro da VM.
+- **`promote.yml` parado em `waiting`** = gate do Environment `production` esperando reviewer. Não é falha de CI.
+- **`REFUSE compose_drift`** no applier = `docker-compose.prod.yml` mudou sem re-captura do `trust/compose.pinned.yml` na VM. É o comportamento desejado, não um bug.
 - **Gate Trivy travando por CVE de SO** (não da app): cache-bust do `apt/apk upgrade` por `GIT_SHA` no `Dockerfile.prod` (#1407).
 - **Codecov**: upload só roda `if: env.CODECOV_TOKEN != ''` (tokenless é rejeitado) — sem o secret, é pulado; cobertura é enforçada no gate, não no Codecov.
 - **react-doctor**: score depende de telemetria remota → exige `--offline` para ser determinístico.
@@ -54,4 +70,5 @@ Checkboxes precisam estar **marcados** (`- [x]`). Editar o body re-roda o gate (
 
 - Nunca `git push` direto na `main` (CP-07, enforce por hook) — sempre branch + PR.
 - Nunca `systemctl restart docker` na VM01 (Kaspersky/KESL derruba o site) — usar `systemctl restart kesl`.
-- Mudança em `docker-compose.prod.yml` exige update manual no Editor do Portainer (não vai pelo deploy).
+- Mudança em `docker-compose.prod.yml` **não** viaja pelo pipeline: exige update manual no Editor do Portainer **e** re-captura do `trust/compose.pinned.yml` na VM01 (o applier reenvia o pinado, e recusa se o vivo divergir).
+- Nunca tratar merge na `main` como deploy, nem procurar um job `deploy` no `deploy.yaml` — ele não existe desde o #1516.

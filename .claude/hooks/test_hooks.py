@@ -11,6 +11,7 @@ the piece whose absence let two hooks silently die (env-var stdin + exit-1 block
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -20,6 +21,7 @@ HOOKS = Path(__file__).resolve().parent
 PY = sys.executable
 
 results: list[tuple[str, bool, str]] = []
+skipped: list[str] = []
 
 
 def _run(cmd: list[str], payload: dict) -> tuple[int, str]:
@@ -35,8 +37,17 @@ def run_py(hook: str, payload: dict) -> tuple[int, str]:
     return _run([PY, str(HOOKS / hook)], payload)
 
 
+# `powershell` e o nome do binario so no Windows. O ubuntu-latest do GitHub tem
+# PowerShell Core como `pwsh`, entao os 4 casos .ps1 rodam la tambem: medido,
+# 51/51 no runner. O fallback serve para runner sem nenhum dos dois — ai eles sao
+# pulados COM AVISO, e o piso MINIMO no fim do arquivo impede que a ausencia
+# passe por aprovacao. Chamar `powershell` direto foi o que quebrou o CI do #1853.
+POWERSHELL = shutil.which("powershell") or shutil.which("pwsh")
+
+
 def run_ps(hook: str, payload: dict) -> tuple[int, str]:
-    return _run(["powershell", "-ExecutionPolicy", "Bypass", "-File", str(HOOKS / hook)], payload)
+    assert POWERSHELL, "run_ps sem PowerShell: o bloco .ps1 deveria ter sido pulado"
+    return _run([POWERSHELL, "-ExecutionPolicy", "Bypass", "-File", str(HOOKS / hook)], payload)
 
 
 def check(name: str, ok: bool, detail: str = "") -> None:
@@ -97,8 +108,10 @@ CONTEXT_CASES = [
     ("W5 rbac in test (whitelisted)", edit("v2/backend/apps/core/tests/test_x.py", 'user.groups.filter(name="DAT")'), "RBAC V001", False),
     ("W6 pr missing markers", bash('gh pr create --body "## Summary"'), "marcadores do staging", True),
     ("W6 pr with exact markers", bash('gh pr create --body "(8/8 PASS) Evidencia anexada no PR ALL 8 CHECKS PASSED"'), "marcadores do staging", False),
-    ("W7 gh pr merge -> prod", bash("gh pr merge 1 --squash"), "DEPLOY EM PROD", True),
-    ("W7 git merge local", bash("git merge main"), "DEPLOY EM PROD", False),
+    # W7 mudou de sentido no ADR-018 (#1516): o merge NAO deploya mais. O aviso
+    # existe para nao deixar o agente acreditar que a versao ja esta em prod.
+    ("W7 gh pr merge -> release", bash("gh pr merge 1 --squash"), "NAO deploya", True),
+    ("W7 git merge local", bash("git merge main"), "NAO deploya", False),
     ("secret real value", write("x.py", 'password = "S3cretValue99"'), "segredo hardcoded", True),
     ("secret placeholder", write("x.py", 'password = "changeme1"'), "segredo hardcoded", False),
     ("N+1 in view", edit("apps/core/views_y.py", "Foo.objects.filter(a=1)"), "Possivel N+1", True),
@@ -126,17 +139,20 @@ for name, payload, sub, want in INTENT_CASES:
 # --------------------------------------------------------------------------
 # PowerShell hooks -- smoke
 # --------------------------------------------------------------------------
-_, out = run_ps("tools-reminder.ps1", {"prompt": "x"})
-check("tools-reminder: emits reminder", "skill/command/agent" in out)
+if not POWERSHELL:
+    skipped.append("hooks .ps1 (powershell ausente)")
+else:
+    _, out = run_ps("tools-reminder.ps1", {"prompt": "x"})
+    check("tools-reminder: emits reminder", "skill/command/agent" in out)
 
-rc, _ = run_ps("graphify-reminder.ps1", bash("grep foo src/"))
-check("graphify-reminder: runs clean", rc == 0, f"exit={rc}")
+    rc, _ = run_ps("graphify-reminder.ps1", bash("grep foo src/"))
+    check("graphify-reminder: runs clean", rc == 0, f"exit={rc}")
 
-rc, _ = run_ps("auto-format-python.ps1", write("src/foo.ts", "x"))
-check("auto-format: no-op on .ts", rc == 0, f"exit={rc}")
+    rc, _ = run_ps("auto-format-python.ps1", write("src/foo.ts", "x"))
+    check("auto-format: no-op on .ts", rc == 0, f"exit={rc}")
 
-rc, _ = run_ps("graphify-sync.ps1", {"hook_event_name": "Stop"})
-check("graphify-sync: exit 0", rc == 0, f"exit={rc}")
+    rc, _ = run_ps("graphify-sync.ps1", {"hook_event_name": "Stop"})
+    check("graphify-sync: exit 0", rc == 0, f"exit={rc}")
 
 
 # --------------------------------------------------------------------------
@@ -179,19 +195,43 @@ def _script_path(command: str, scriptname: str) -> str | None:
     return m.group(1) if m else None
 
 
-# (1) Estatico (deterministico): todo hook nosso usa path ABSOLUTO. Um path relativo
-#     (.claude/hooks/...) reintroduzido = guardrails false-bloqueia de cwd nao-raiz.
+PROJECT_DIR = str(HOOKS.parent.parent)
+
+
+def _ancorado(p: str | None) -> bool:
+    """O path do hook precisa resolver a partir da RAIZ, nao do cwd.
+
+    Duas formas valem: path absoluto, ou `$CLAUDE_PROJECT_DIR/...`. A segunda passou
+    a ser a forma exigida quando `.claude/` virou versionado (decisao D3, 2026-08-25):
+    `v2/backend/scripts/check_agent_instructions.py` PROIBE caminho de maquina nos
+    arquivos rastreados, entao `os.path.isabs()` sozinho reprovaria justamente a
+    correcao prescrita. O que continua reprovado e o path RELATIVO (.claude/hooks/...),
+    que false-bloqueia quando o cwd nao e a raiz.
+    """
+    return bool(p) and (os.path.isabs(p) or p.startswith("$CLAUDE_PROJECT_DIR"))
+
+
+def _resolve(p: str) -> str:
+    return p.replace("$CLAUDE_PROJECT_DIR", PROJECT_DIR).replace("\\", os.sep)
+
+
+# (1) Estatico (deterministico): todo hook nosso usa path ancorado na raiz.
 for _script in HOOK_SCRIPTS:
     _cmd = _wired_command(_script)
     if _cmd is None:
         continue  # hook nao wired -- ok
     _p = _script_path(_cmd, _script)
-    check(f"wiring: {_script} com path absoluto no settings.json", bool(_p) and os.path.isabs(_p), f"path={_p!r}")
+    check(f"wiring: {_script} ancorado na raiz no settings.json", _ancorado(_p), f"path={_p!r}")
 
 # (2) Runtime: o guardrails resolve + decide de um cwd NAO-RAIZ (via PY, sem ambiguidade de shell).
 _gcmd = _wired_command("guardrails.py")
 _gpath = _script_path(_gcmd, "guardrails.py") if _gcmd else None
-if _gpath and os.path.isabs(_gpath):
+if not (_gpath and _ancorado(_gpath)):
+    # Sem else, estes dois casos sumiam em silencio e o harness ficava verde por
+    # vacuidade -- foi assim que o #1847 quebrou os guards sem ninguem ver.
+    check("wiring: guardrails testavel em runtime", False, f"nao wired/ancorado: path={_gpath!r}")
+else:
+    _gpath = _resolve(_gpath)
     _rc = subprocess.run([PY, _gpath], input=json.dumps(bash("git push origin main")).encode("utf-8"), capture_output=True, cwd=NONROOT).returncode
     check("wiring: guardrails BLOQUEIA de cwd nao-raiz (exit 2)", _rc == 2, f"exit={_rc}")
     _rc = subprocess.run([PY, _gpath], input=json.dumps(bash("git status")).encode("utf-8"), capture_output=True, cwd=NONROOT).returncode
@@ -201,11 +241,24 @@ if _gpath and os.path.isabs(_gpath):
 # --------------------------------------------------------------------------
 # report
 # --------------------------------------------------------------------------
+# Piso anti-vacuidade: um harness que roda pouco passa por nao testar sem ninguem
+# perceber. 51 casos com PowerShell presente (Windows e o runner do CI, que tem
+# `pwsh`), 47 sem. Abaixo de 45, algo sumiu — e sumir em silencio e o defeito que
+# este arquivo existe para pegar.
+MINIMO = 45
+
 fails = [r for r in results if not r[1]]
 for name, ok, detail in results:
     line = f"{'PASS' if ok else 'FAIL'}  {name}"
     if not ok and detail:
         line += f"  [{detail}]"
     print(line)
-print(f"\n{len(results) - len(fails)}/{len(results)} passed")
+for motivo in skipped:
+    print(f"SKIP  {motivo}")
+print()
+print(f"{len(results) - len(fails)}/{len(results)} passed")
+
+if len(results) < MINIMO:
+    print(f"ERRO: so {len(results)} casos rodaram (minimo {MINIMO}). Verde por vacuidade.")
+    sys.exit(1)
 sys.exit(1 if fails else 0)

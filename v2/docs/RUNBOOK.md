@@ -1,12 +1,13 @@
 # 📘 Aprender Sistema v2 — Runbook Operacional
 
-**Versão:** 1.1
-**Projeto Docker:** `aprender_v2`
-**Última atualização:** 2026-07-24
+**Versão:** 1.2
+**Projeto Docker:** `aprender_dev` (SSOT: `v2/Makefile:6`, `PROJECT ?= aprender_dev`)
+**Última atualização:** 2026-08-25
 
 > ⚠️ **Escopo: este runbook é majoritariamente DEV/LOCAL.** Portas `8002`/`5434`/`6380`,
 > serviço `db`, `GCAL_CLIENT=fake`, credenciais de admin e `make` targets são do ambiente
-> local (`infra/docker-compose.yml`, projeto `aprender_v2`).
+> local (`infra/docker-compose.yml` + `infra/docker-compose.override.yml`, projeto
+> `aprender_dev`).
 >
 > **Em produção nada disso vale:** a stack roda sob Portainer na VM01 com
 > `infra/docker-compose.prod.yml` (serviços `migrate`, `web`, `redis`, `worker`, `beat`,
@@ -19,6 +20,7 @@
 
 ## 📋 Índice
 
+0. [Como invocar o compose](#como-invocar-o-compose)
 1. [Recarregar Variáveis de Ambiente (.env)](#recarregar-variáveis-de-ambiente-env)
 2. [Operações Celery (Worker/Beat)](#operações-celery-workerbeat)
 3. [Health Checks e Validações](#health-checks-e-validações)
@@ -26,6 +28,52 @@
 5. [APIs REST: Ações (Controle e DAT)](#apis-rest-ações-controle-e-dat)
 6. [Troubleshooting Comum](#troubleshooting-comum)
 7. [Deploy Workflow (Canônico)](#deploy-workflow-canônico)
+
+---
+
+## 🧭 Como invocar o compose
+
+> [!warning] Até 2026-08-25 este runbook mandava rodar
+> `docker compose -p aprender_v2 -f infra/docker-compose.yml …`.
+> Nenhuma dessas ~20 invocações funcionava. Três motivos, todos verificáveis:
+>
+> | Problema | Realidade | Onde |
+> |---|---|---|
+> | Projeto errado | O stack chama-se **`aprender_dev`**, não `aprender_v2`. `-p aprender_v2` cria/consulta um projeto vazio e o comando não acha container nenhum | `v2/Makefile:6` |
+> | `IMAGE_TAG` faltando | O compose declara `image: …:${IMAGE_TAG:?IMAGE_TAG is required}`; sem a variável o docker aborta antes de subir qualquer coisa | `infra/docker-compose.yml:54, 98, 122, 146` |
+> | `override.yml` omitido | É o override que traz `build:` e o **bind-mount do fonte** (`../backend:/app`). Sem ele você roda a imagem publicada, não o seu código | `infra/docker-compose.override.yml:15-51` |
+
+**Prefira os alvos do Makefile.** Eles já carregam projeto, `IMAGE_TAG` e os dois arquivos
+de compose (`Makefile:11`, a variável `DC`):
+
+```bash
+cd v2
+make up            # sobe a stack (up -d --build)
+make down          # derruba (--remove-orphans)
+make logs          # logs -f web
+make shell         # bash no web
+make migrate       # migrate + collectstatic
+make healthz       # curl /healthz/
+make readyz        # curl /api/readyz/
+make help          # lista todos os alvos
+```
+
+**Quando precisar do compose cru** (não há alvo para `ps`, `exec`, `restart`), exporte a
+mesma invocação que o Makefile usa e reaproveite:
+
+```bash
+cd v2
+export COMPOSE_PROJECT_NAME=aprender_dev
+export IMAGE_TAG=latest
+DC="docker compose -f infra/docker-compose.yml -f infra/docker-compose.override.yml"
+
+$DC ps
+$DC exec -T web python manage.py shell
+```
+
+Todos os `$DC` deste runbook assumem esse bloco. Rodando vários worktrees em paralelo,
+`source infra/scripts/worktree-env.sh <slot>` deriva `PROJECT` e as portas
+(`Makefile:1-6`).
 
 ---
 
@@ -93,7 +141,7 @@ docker compose up -d <serviço>
 
 # Exemplo: Recarregar variáveis no web, worker e beat
 cd v2
-docker compose -p aprender_v2 -f infra/docker-compose.yml up -d web worker beat
+$DC up -d web worker beat
 ```
 
 **Por quê funciona?**
@@ -119,10 +167,10 @@ nano .env  # ou editor de sua preferência
 
 # 2. Recriar serviços afetados
 cd ..
-docker compose -p aprender_v2 -f infra/docker-compose.yml up -d web worker beat
+$DC up -d web worker beat
 
 # 3. Verificar logs
-docker compose -p aprender_v2 -f infra/docker-compose.yml logs -f web worker beat
+$DC logs -f web worker beat
 
 # 4. Validar health
 make healthz && make readyz
@@ -142,8 +190,8 @@ make up-worker
 make up-beat
 
 # OU diretamente com docker compose
-docker compose -p aprender_v2 -f infra/docker-compose.yml up -d worker
-docker compose -p aprender_v2 -f infra/docker-compose.yml up -d beat
+$DC up -d worker
+$DC up -d beat
 ```
 
 ### **Parar Worker e Beat**
@@ -152,10 +200,10 @@ docker compose -p aprender_v2 -f infra/docker-compose.yml up -d beat
 cd v2
 
 # Parar (sem remover)
-docker compose -p aprender_v2 -f infra/docker-compose.yml stop worker beat
+$DC stop worker beat
 
 # Remover containers (dados em volumes são mantidos)
-docker compose -p aprender_v2 -f infra/docker-compose.yml down worker beat
+$DC down worker beat
 ```
 
 ### **Ver Logs em Tempo Real**
@@ -168,8 +216,8 @@ make logs-worker     # Worker (tempo real)
 make logs-beat       # Beat (tempo real)
 
 # OU diretamente
-docker compose -p aprender_v2 -f infra/docker-compose.yml logs -f worker
-docker compose -p aprender_v2 -f infra/docker-compose.yml logs -f beat
+$DC logs -f worker
+$DC logs -f beat
 ```
 
 ### **Ver Últimas 200 Linhas de Logs**
@@ -182,8 +230,8 @@ make logs-worker-last
 make logs-beat-last
 
 # OU diretamente
-docker compose -p aprender_v2 -f infra/docker-compose.yml logs --tail=200 worker
-docker compose -p aprender_v2 -f infra/docker-compose.yml logs --tail=200 beat
+$DC logs --tail=200 worker
+$DC logs --tail=200 beat
 ```
 
 ### **Reiniciar Worker/Beat (após mudanças de código)**
@@ -192,10 +240,10 @@ docker compose -p aprender_v2 -f infra/docker-compose.yml logs --tail=200 beat
 cd v2
 
 # ⚠️ Para recarregar .env: use up -d (não restart!)
-docker compose -p aprender_v2 -f infra/docker-compose.yml up -d worker beat
+$DC up -d worker beat
 
 # ✅ Para apenas reiniciar (sem recarregar .env): use restart
-docker compose -p aprender_v2 -f infra/docker-compose.yml restart worker beat
+$DC restart worker beat
 ```
 
 ### **Verificar Status**
@@ -204,10 +252,10 @@ docker compose -p aprender_v2 -f infra/docker-compose.yml restart worker beat
 cd v2
 
 # Status de todos os serviços
-docker compose -p aprender_v2 -f infra/docker-compose.yml ps
+$DC ps
 
 # Status apenas de worker/beat
-docker compose -p aprender_v2 -f infra/docker-compose.yml ps worker beat
+$DC ps worker beat
 ```
 
 ### **Critérios de Sucesso (Worker)**
@@ -275,7 +323,7 @@ make readyz
 ```bash
 cd v2
 
-docker compose -p aprender_v2 -f infra/docker-compose.yml exec -T web python -c "
+$DC exec -T web python -c "
 from django.conf import settings
 print('BROKER:', settings.CELERY_BROKER_URL)
 print('RESULT_BACKEND:', settings.CELERY_RESULT_BACKEND)
@@ -311,7 +359,7 @@ cd v2/infra
 
 # 2. Recriar containers (NÃO usar restart!)
 cd ..
-docker compose -p aprender_v2 -f infra/docker-compose.yml up -d web worker beat
+$DC up -d web worker beat
 ```
 
 ---
@@ -324,7 +372,7 @@ docker compose -p aprender_v2 -f infra/docker-compose.yml up -d web worker beat
 **Solução:**
 ```bash
 # Usar up -d para recriar
-docker compose -p aprender_v2 -f infra/docker-compose.yml up -d <serviço>
+$DC up -d <serviço>
 ```
 
 ---
@@ -334,18 +382,18 @@ docker compose -p aprender_v2 -f infra/docker-compose.yml up -d <serviço>
 **Verificar:**
 1. Redis está rodando?
    ```bash
-   docker compose -p aprender_v2 ps redis
+   $DC ps redis
    ```
 
 2. REDIS_PORT correto no .env?
    ```bash
-   docker compose exec -T worker printenv | grep REDIS
+   $DC exec -T worker printenv | grep REDIS
    # Deve mostrar: REDIS_PORT=6379 (não 6380!)
    ```
 
 3. Worker foi recriado (não apenas reiniciado)?
    ```bash
-   docker compose -p aprender_v2 up -d worker
+   $DC up -d worker
    ```
 
 ---
@@ -355,7 +403,7 @@ docker compose -p aprender_v2 -f infra/docker-compose.yml up -d <serviço>
 **Verificar:**
 1. Beat está rodando?
    ```bash
-   docker compose -p aprender_v2 ps beat
+   $DC ps beat
    make logs-beat-last
    ```
 
@@ -365,7 +413,7 @@ docker compose -p aprender_v2 -f infra/docker-compose.yml up -d <serviço>
 
 3. Schedule está configurado corretamente?
    ```bash
-   docker compose exec -T beat celery -A config inspect scheduled
+   $DC exec -T beat celery -A config inspect scheduled
    ```
 
 ---
@@ -405,7 +453,8 @@ REDIS_PORT=6379  # ← Não usar 6380!
 
 # Docker
 REQUIRE_DOCKER=1
-COMPOSE_PROJECT_NAME=aprender_v2
+COMPOSE_PROJECT_NAME=aprender_dev   # mesmo default do Makefile (PROJECT ?= aprender_dev)
+IMAGE_TAG=latest                    # exigido pelo compose (${IMAGE_TAG:?…})
 
 # Google Calendar
 GCAL_CLIENT=fake  # Valores: "fake" ou "google"
@@ -424,12 +473,12 @@ Veja `v2/infra/.env.example` para o template completo com comentários.
 # Iniciar Stack
 # ════════════════════════════════════════════════════════════
 cd v2
-docker compose -p aprender_v2 -f infra/docker-compose.yml up -d
+$DC up -d
 
 # ════════════════════════════════════════════════════════════
 # Recarregar .env (após edição)
 # ════════════════════════════════════════════════════════════
-docker compose -p aprender_v2 -f infra/docker-compose.yml up -d web worker beat
+$DC up -d web worker beat
 
 # ════════════════════════════════════════════════════════════
 # Celery - Subir Worker/Beat
@@ -460,19 +509,27 @@ curl http://localhost:8002/api/features/
 # ════════════════════════════════════════════════════════════
 # Parar Stack (sem perder dados)
 # ════════════════════════════════════════════════════════════
-docker compose -p aprender_v2 -f infra/docker-compose.yml down
+$DC down
 
 # ════════════════════════════════════════════════════════════
-# Migrations
+# Migrations — DEV/LOCAL apenas (ver nota abaixo)
 # ════════════════════════════════════════════════════════════
-docker compose -p aprender_v2 exec -T web python manage.py makemigrations
-docker compose -p aprender_v2 exec -T web python manage.py migrate
+$DC exec -T web python manage.py makemigrations
+make migrate      # migrate + collectstatic
 
 # ════════════════════════════════════════════════════════════
 # Django Shell
 # ════════════════════════════════════════════════════════════
-docker compose -p aprender_v2 exec web python manage.py shell
+make shell                                   # bash no web
+$DC exec web python manage.py shell          # shell do Django
 ```
+
+> ⛔ **Não rode `migrate` a mão em produção.** As migrations são aplicadas por um
+> serviço **one-shot `migrate`**, automático e bloqueante: `web`/`worker`/`beat` só
+> sobem depois que ele termina (#1456). Rodar `migrate` manualmente em produção foi
+> **revogado** junto com o cutover pull-based — ver
+> [ADR-018](../../docs/architecture/project-decisions/ADR-018-pull-based-deploy.md) e
+> [Deploy Workflow](#deploy-workflow-canônico).
 
 ---
 
@@ -485,7 +542,7 @@ docker compose -p aprender_v2 exec web python manage.py shell
 ---
 
 **Autor:** Equipe Aprender Sistema
-**Projeto:** `aprender_v2`
+**Projeto:** `aprender_dev`
 **Stack:** Django 5.2.1 LTS + PostgreSQL 15 + Redis 7 + Celery 5.5.3
 
 ---
@@ -509,7 +566,7 @@ Cria grupos e permissões mínimas (idempotente):
 make seed-rbac
 
 # Via Docker diretamente
-docker compose -p aprender_v2 exec -T web python manage.py seed_rbac
+$DC exec -T web python manage.py seed_rbac
 ```
 
 **Grupos criados:** a união de `SETOR_GROUPS` (13) + `FUNCAO_GROUPS` (5), definidos em
@@ -550,7 +607,7 @@ seed são só o piso.
 
 **Consultar logs:**
 ```bash
-docker compose -p aprender_v2 exec -T web python manage.py shell -c "
+$DC exec -T web python manage.py shell -c "
 from apps.core.models import AuditLog
 logs = AuditLog.objects.order_by('-created_at')[:10]
 for log in logs:
@@ -654,10 +711,10 @@ GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account","project_id":"...","priva
 cd v2
 
 # Recriar containers para carregar novas variáveis .env
-docker compose -p aprender_v2 -f infra/docker-compose.yml up -d web worker beat
+$DC up -d web worker beat
 
 # Verificar logs
-docker compose -p aprender_v2 -f infra/docker-compose.yml logs -f web | grep -i google
+$DC logs -f web | grep -i google
 ```
 
 **Logs esperados:**
@@ -732,7 +789,7 @@ curl -X POST http://localhost:8002/api/solicitacoes/1/publish/ \
 #### **4. Logs de Auditoria**
 
 ```bash
-docker compose -p aprender_v2 exec -T web python manage.py shell -c "
+$DC exec -T web python manage.py shell -c "
 from apps.core.models import AuditLog
 logs = AuditLog.objects.filter(action__in=['PREVIEW_GCAL', 'PUBLISH_GCAL']).order_by('-created_at')[:5]
 for log in logs:
@@ -766,10 +823,10 @@ for log in logs:
 **Solução:**
 ```bash
 # Verificar variáveis no container
-docker compose -p aprender_v2 exec -T web printenv | grep GOOGLE
+$DC exec -T web printenv | grep GOOGLE
 
 # Recriar container se necessário
-docker compose -p aprender_v2 -f infra/docker-compose.yml up -d web worker beat
+$DC up -d web worker beat
 ```
 
 #### **Erro: Rate limit exceeded (429)**
@@ -843,64 +900,39 @@ Endpoints RESTful para consulta e criação de ações com **RBAC** (Role-Based 
 
 **Autenticação:** Session-based (Django Auth)
 
+> [!note] As classes `IsControleOrSuper` / `IsDATOrSuper` não existem mais.
+> Este runbook citava as duas como permissão destes endpoints. O `rbac_lint`
+> **bane** qualquer `class Is<Word>(...)` fora da whitelist
+> (`IsGerenteSuperintendencia`, `IsOwnerOrPrivileged`) — regra **V002**,
+> `v2/backend/scripts/rbac_lint.py:37-43`, com job obrigatório no CI
+> (`[required] backend rbac-lint`). O idioma canônico é
+> `HasPerm("<codename>")` ou uma classe `Can*` do Capability Policy Layer; o
+> mapeamento das classes legadas está em `scripts/rbac_codemod.py:36-37`
+> (`IsControleOrSuper → import_spreadsheet`,
+> `IsDATOrSuper → manage_admin_registries`). Convenção completa:
+> [RBAC_NAMING.md](./RBAC_NAMING.md).
+
 ---
 
-### **API 1: Ações de Controle**
+### ~~API 1: Ações de Controle~~ — **rota removida**
 
-**Endpoint:** `GET /api/controle/acoes/`
+> [!warning] `GET /api/controle/acoes/` não existe mais.
+> Este runbook documentou o endpoint até 2026-08-25. A rota foi retirada na **Onda 1 do
+> programa de imports órfãos**, junto com o modelo `AcaoControle` que a alimentava — hoje
+> o import de ações grava em `DATAcao`. Não há `path("controle/acoes/", …)` em
+> `v2/backend/apps/core/urls.py`. As rotas `controle/…` que restaram são
+> `controle/import-acoes/` (`urls.py:211-214`), que é **upload de planilha**, e
+> `controle/compras/` (`urls.py:215-219`) — nenhuma delas lista ações. Registro:
+> `v2/docs/plans/PLANO_IMPORTS_ORFAOS.md` e o cabeçalho de
+> `apps/core/tests/test_controle_dat_api.py:14-16`.
 
-**Permissão:** `IsControleOrSuper` (grupos: Controle ou Superintendência)
+Para onde ir:
 
-**Descrição:** Lista ações do setor Controle com filtros opcionais de data.
-
-#### **Query Parameters**
-
-| Parâmetro | Tipo | Descrição | Exemplo |
-|-----------|------|-----------|---------|
-| `data_inicio` | `YYYY-MM-DD` | Filtra por qualquer data >= data_inicio | `2025-01-01` |
-| `data_fim` | `YYYY-MM-DD` | Filtra por qualquer data <= data_fim | `2025-12-31` |
-
-**Comportamento do filtro:**
-- Considera **todas as datas** do modelo: `data_entrega`, `data_carta`, `contato_inicial`, `data_reuniao`
-- Retorna ação se **pelo menos uma** das datas estiver no intervalo
-- Usa `Q()` do Django para OR lógico
-
-#### **Exemplo de Requisição**
-
-```bash
-# Listar todas as ações
-curl -X GET http://localhost:8002/api/controle/acoes/ \
-  -H "Cookie: sessionid=<seu-session-id>"
-
-# Filtrar por intervalo de datas
-curl -X GET "http://localhost:8002/api/controle/acoes/?data_inicio=2025-01-01&data_fim=2025-03-31" \
-  -H "Cookie: sessionid=<seu-session-id>"
-```
-
-#### **Resposta (200 OK)**
-
-```json
-[
-  {
-    "id": 1,
-    "municipio": "Fortaleza",
-    "projeto": "ACerta",
-    "coordenador": "Maria Silva",
-    "data_entrega": "2025-01-15",
-    "data_carta": "2025-01-10",
-    "contato_inicial": "2025-01-20",
-    "data_reuniao": "2025-02-01",
-    "observacao": "Entrega confirmada",
-    "external_hash": "a1b2c3d4e5f6...",
-    "created_at": "2025-01-01T10:00:00Z",
-    "updated_at": "2025-01-01T10:00:00Z"
-  }
-]
-```
-
-**Notas:**
-- FKs retornados como **strings** via `StringRelatedField` (ex: "Fortaleza", não ID)
-- Ordenação padrão: `-data_reuniao`, `-data_entrega`
+| Se você queria | Use |
+|---|---|
+| Listar ações do ciclo DAT | `GET /api/dat/acoes-ciclo/` (`DATAcaoViewSet`, `urls.py:147`) |
+| Importar ações de planilha | `POST /api/controle/import-acoes/` — `HasPerm("import_spreadsheet")`, `dry_run=true` por padrão (`views_imports.py:48-58`) |
+| Listar cadastros DAT legados | [API 2](#api-2-cadastros-dat-leitura), abaixo |
 
 ---
 
@@ -908,7 +940,7 @@ curl -X GET "http://localhost:8002/api/controle/acoes/?data_inicio=2025-01-01&da
 
 **Endpoint:** `GET /api/dat/acoes/`
 
-**Permissão:** `IsDATOrSuper` (grupos: DAT ou Superintendência/superuser)
+**Permissão:** `HasPerm("manage_admin_registries")` (`views_controle_dat.py:56`)
 
 **Descrição:** Lista cadastros do setor DAT com filtros opcionais.
 
@@ -941,21 +973,31 @@ curl -X GET "http://localhost:8002/api/dat/acoes/?projeto=1&data_inicio=2025-01-
 #### **Resposta (200 OK)**
 
 ```json
-[
-  {
-    "id": 1,
-    "municipio": "Fortaleza",
-    "projeto": "ACerta",
-    "tipo_acao": "Cadastro INEP",
-    "responsavel": "João Silva",
-    "observacao": "Cadastro concluído",
-    "data_registro": "2025-01-20",
-    "external_hash": "x1y2z3a4b5c6...",
-    "created_at": "2025-01-01T12:00:00Z",
-    "updated_at": "2025-01-01T12:00:00Z"
-  }
-]
+{
+  "count": 1,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": 1,
+      "municipio": "Fortaleza",
+      "projeto": "ACerta",
+      "tipo_acao": "Cadastro INEP",
+      "responsavel": "João Silva",
+      "observacao": "Cadastro concluído",
+      "data_registro": "2025-01-20",
+      "external_hash": "x1y2z3a4b5c6...",
+      "created_at": "2025-01-01T12:00:00Z",
+      "updated_at": "2025-01-01T12:00:00Z"
+    }
+  ]
+}
 ```
+
+> A resposta é **paginada**: `StandardPagination` é o
+> `DEFAULT_PAGINATION_CLASS` (`config/settings.py:508-509`), com `page_size=100` e
+> `max_page_size=500`, e honra `?page_size=` (`apps/core/pagination.py:21-23`).
+> Ordenação padrão: `-data_registro`, `municipio_id` (`views_controle_dat.py:57-59`).
 
 ---
 
@@ -963,7 +1005,7 @@ curl -X GET "http://localhost:8002/api/dat/acoes/?projeto=1&data_inicio=2025-01-
 
 **Endpoint:** `POST /api/dat/acoes/`
 
-**Permissão:** `IsDATOrSuper`
+**Permissão:** `HasPerm("manage_admin_registries")` (mesma view)
 
 **Descrição:** Cria nova ação DAT.
 
@@ -1030,27 +1072,28 @@ curl -X POST http://localhost:8002/api/dat/acoes/ \
 
 #### **403 Forbidden**
 
-**Causa:** Usuário sem permissão (grupo incorreto).
+**Causa:** Usuário sem a **capability** exigida pela view.
 
-**Solução:**
+**Solução:** diagnostique pela capability, não pelo nome do grupo — é a permissão que
+a view checa (`HasPerm("manage_admin_registries")`), e o grupo é só um dos caminhos
+para chegar nela.
+
 ```bash
-# Verificar grupos do usuário
 make shell
 python manage.py shell -c "
 from django.contrib.auth import get_user_model
+from apps.core.rbac import user_has_any_perm
 u = get_user_model().objects.get(username='seu_usuario')
-print(u.groups.values_list('name', flat=True))
-"
-
-# Adicionar ao grupo correto
-python manage.py shell -c "
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
-u = get_user_model().objects.get(username='seu_usuario')
-g = Group.objects.get(name='Controle')  # ou 'DAT'
-u.groups.add(g)
+print('grupos:', list(u.groups.values_list('name', flat=True)))
+print('tem a capability:', user_has_any_perm(u, 'manage_admin_registries'))
 "
 ```
+
+Se faltar, atribua o usuário ao grupo que carrega a permissão pelo **Django Admin**
+(`/admin/auth/user/`) ou reaplique o seed em dev (`make seed-rbac`). O mapeamento
+grupo → permissões é `PERMS_BY_GROUP` em
+`apps/dev_tools/management/commands/seed_rbac.py`; a matriz de autorização real está em
+[rbac_authorization_matrix.md](./rbac_authorization_matrix.md).
 
 #### **400 Bad Request (campo obrigatório faltando)**
 

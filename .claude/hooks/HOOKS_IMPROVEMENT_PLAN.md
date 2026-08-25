@@ -1,9 +1,28 @@
 # Plano de Melhoria dos Hooks — Aprender Sistema v2
 
-> Documento de acompanhamento. Marque `- [x]` conforme concluir.
-> Tudo em `.claude/hooks/` + `.claude/settings.json` é **gitignored → edição local**, sem PR/staging-gate/CP-07.
-> Princípio-guia: um hook só ganha o sustento se fizer o que o CLAUDE.md **não** pode —
-> **bloqueio duro**, **automação**, ou **injeção genuinamente contextual**. Onde repete o CLAUDE.md, é ruído.
+> [!note] HISTÓRICO — encerrado em 2026-06-25. Não é instrução; é registro.
+> As ondas 1–5 foram concluídas e o harness fechou 37/37 (ver *Log de progresso*). O valor deste
+> arquivo hoje é explicar **por que** a arquitetura de hooks é guarda/injeção/automação separadas —
+> não dizer o que fazer.
+>
+> **Duas premissas do texto original deixaram de valer:**
+>
+> - ~~"Tudo em `.claude/hooks/` + `.claude/settings.json` é **gitignored → edição local**, sem
+>   PR/staging-gate/CP-07"~~ — **revogado pela decisão D3**
+>   (`v2/docs/plans/PLAN_doc_drift_2026-08-25.md`, 2026-08-25): a camada de instrução de agente
+>   passou a ser **versionada**. Mexer em hook agora é branch + PR, e o gate
+>   `v2/backend/scripts/check_agent_instructions.py` proíbe caminho de máquina e credencial nesses
+>   arquivos. **Não siga a instrução antiga.**
+> - O item **2.6 (W7)** abaixo mandou o `context-injector.py` avisar *"merge na main = deploy pra
+>   prod via Portainer"*. Aquilo era o **ADR-010** e foi **revogado pelo ADR-018 em 2026-07-10**
+>   (jobs `deploy` e `validate_existing_tag` deletados no **#1516**; a `:9443` deixou de ser
+>   pública). O W7 continua existindo no hook, mas hoje avisa o contrário: **o merge não deploya**,
+>   produção muda por `promote.yml` gated. O item fica escrito como estava porque registra a decisão
+>   de 2026-06-25 — corrigi-lo aqui apagaria o motivo de o aviso existir.
+>
+> Princípio-guia (esse continua valendo): um hook só ganha o sustento se fizer o que o CLAUDE.md
+> **não** pode — **bloqueio duro**, **automação**, ou **injeção genuinamente contextual**. Onde
+> repete o CLAUDE.md, é ruído.
 
 ## Baseline (auditoria 2026-06-25)
 

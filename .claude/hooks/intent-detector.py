@@ -51,12 +51,20 @@ def detect_intent(prompt: str) -> str:
         parts.append("</system-reminder>")
 
     # Deploy detection
-    if re.search(r"deploy|producao|production|portainer|staging", prompt_lower):
+    if re.search(r"deploy|promote|producao|production|portainer|staging", prompt_lower):
         parts.append("<system-reminder>")
         parts.append("## Deploy Detected (auto-detected)")
-        parts.append("Use /deploy-staging for pre-deploy checklist.")
+        parts.append("ADR-018 (2026-07-10): merge na main NAO deploya -- deploy.yaml so")
+        parts.append("builda/assina/libera a tag (jobs deploy e validate_existing_tag")
+        parts.append("DELETADOS no #1516). O modelo 'merge = deploy' do ADR-010 esta REVOGADO.")
+        parts.append("Producao muda por promocao humana: gh workflow run promote.yml")
+        parts.append("-f release=<tag>, gated no Environment `production` (required reviewer);")
+        parts.append("a VM01 puxa o ponteiro assinado e aplica por digest em 127.0.0.1:9443.")
+        parts.append("Rollback = promote.yml com rollback: true na tag anterior.")
+        parts.append("Migrations sao automaticas e bloqueantes (#1456) -- nao rode a mao em prod.")
+        parts.append("Use /deploy-staging for the pre-merge gate checklist.")
         parts.append("CRITICAL: NEVER run systemctl restart docker on VM01.")
-        parts.append("Compose changes require manual Portainer Editor update.")
+        parts.append("Compose changes: Portainer Editor + re-captura do trust/compose.pinned.yml.")
         parts.append("</system-reminder>")
 
     # Security detection

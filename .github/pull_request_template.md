@@ -28,6 +28,21 @@
 ALL 8 CHECKS PASSED
 ```
 
+## Documentacao viva
+
+<!-- Auditoria de 2026-08-24: 92,9% dos commits `fix(...)` nao tocam nenhum .md,
+     e 39 issues fechadas seguem descritas como abertas na doc. O job
+     [required] docs quality aponta o que este PR afeta. -->
+
+- [ ] Se o PR resolve uma issue, a doc que a descreve foi atualizada
+- [ ] Se o PR toca arquivo listado em `sources_of_truth` de uma spec, a spec foi
+      revisada (ou o `last_verified` dela renovado)
+
+Quando um documento apontado pelo gate **nao** for afetado, declare aqui — a
+justificativa fica registrada e revisavel, em vez de tacita:
+
+<!-- doc-nao-afetada: caminho/do/doc.md — por que nao afeta -->
+
 ## Validacoes
 
 - [ ] Checks `[required]` verdes (somente gates bloqueantes)

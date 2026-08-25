@@ -80,7 +80,7 @@ docker compose exec web python manage.py migrate --plan
 **Before applying migrations locally**:
 ```bash
 # Backup PostgreSQL
-docker compose exec db pg_dump -U postgres aprender_v2 > backup_pre_migration_$(date +%Y%m%d_%H%M%S).sql
+docker compose exec db pg_dump -U aprender_user aprender_db > backup_pre_migration_$(date +%Y%m%d_%H%M%S).sql
 
 # Verify backup
 ls -lh backup_*.sql
@@ -91,7 +91,7 @@ ls -lh backup_*.sql
 # Restore from backup
 docker compose down
 docker compose up -d db
-docker compose exec -T db psql -U postgres aprender_v2 < backup_pre_migration_20250115.sql
+docker compose exec -T db psql -U aprender_user aprender_db < backup_pre_migration_20250115.sql
 docker compose up -d
 ```
 
@@ -412,7 +412,7 @@ Backup retained: backup_pre_migration_20250115_103000.sql
 Error: [Error message]
 
 ROLLBACK RECOMMENDED
-1. Restore database: docker compose exec -T db psql -U postgres aprender_v2 < backup_pre_migration_20250115.sql
+1. Restore database: docker compose exec -T db psql -U aprender_user aprender_db < backup_pre_migration_20250115.sql
 2. Review migration: apps/core/migrations/0024_*.py
 3. Fix issues in models.py
 4. Recreate migration: rm 0024_*.py && python manage.py makemigrations

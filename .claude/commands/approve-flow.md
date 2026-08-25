@@ -19,7 +19,7 @@ docker compose exec -T web pytest apps/core/tests/test_approval_policy_PA.py -v
 docker compose exec -T web pytest apps/core/tests/test_approval_policy_PA.py::$ARGUMENTS -v
 
 # With coverage
-docker compose exec -T web pytest apps/core/tests/test_approval_policy_PA.py --cov=apps.core.models --cov=apps.core.views --cov-report=term-missing
+docker compose exec -T web pytest apps/core/tests/test_approval_policy_PA.py --cov=apps.core.services.solicitacao_create --cov=apps.core.views_solicitacao --cov-report=term-missing
 ```
 
 ### 2. Expected Results (5 mandatory tests)
@@ -30,7 +30,7 @@ docker compose exec -T web pytest apps/core/tests/test_approval_policy_PA.py --c
 **Validates**:
 - Solicitação with `projeto.fluxo == 'SUPER'` NEVER auto-approves
 - Status remains 'pendente' after save/clean
-- No auto-approval in Solicitacao.save() method
+- No auto-approval — decided in `resolve_initial_status()` (`apps/core/services/solicitacao_create.py`), not a model `save()`
 
 **Note**: NAO_SUPER projects ARE auto-approved (tested in `test_solicitacao_fluxo.py`)
 
@@ -47,7 +47,7 @@ docker compose exec -T web pytest apps/core/tests/test_approval_policy_PA.py --c
 - [ ] `test_calendar_integration_not_called_before_approval`
 
 **Validates**:
-- `task_publish_solicitacao_to_gcal` is NOT called during Solicitacao.save()
+- `task_publish_solicitacao_to_gcal` is NOT called during creation (service-layer flow, post-approval only)
 - External integrations only execute AFTER manual approval
 - Google Calendar integration respects approval flow
 
@@ -207,11 +207,11 @@ curl -X POST "http://localhost:8002/api/solicitacoes/1/reject/" \
 
 | Requisito | Implementação | Teste | Status |
 |-----------|---------------|-------|--------|
-| **PA-01** | `models.py:431-448` (SUPER only) | `test_never_auto_approves_on_clean_or_save` | ✅ |
+| **PA-01** | `services/solicitacao_create.py:resolve_initial_status` (SUPER only) | `test_never_auto_approves_on_clean_or_save` | ✅ |
 | **PA-02** | `rbac/policies.py:CanAccessSolicitationApprovals` | `test_only_superintendencia_can_approve_or_reject` | ✅ |
 | **PA-03** | `views_solicitacao.py:approve()` (no task call) | `test_calendar_integration_not_called_before_approval` | ✅ |
-| **PA-04** | `models.py:120` (`default='pendente'`) | Implicit in PA-01 test | ✅ |
-| **PA-05** | `views_solicitacao.py:614 (approve) / :652 (reject)` | `test_approval_flow_records_audit_log` | ✅ |
+| **PA-04** | `services/solicitacao_create.py` (SUPER → `pendente`) | Implicit in PA-01 test | ✅ |
+| **PA-05** | `views_solicitacao.py` `approve()` / `reject()` actions | `test_approval_flow_records_audit_log` | ✅ |
 | **PA-06** | `ApprovalsPage.tsx` (`canApprove` gate) | Manual UI test | ✅ |
 | **PA-07** | All tests above | Run pytest | ✅ |
 
@@ -242,7 +242,7 @@ Failed tests: N/5
 
 Next steps:
 1. Review failure logs
-2. Check `apps/core/models.py:Solicitacao.save()`
+2. Check `apps/core/services/solicitacao_create.py:resolve_initial_status()`
 3. Check `apps/core/views_solicitacao.py:approve()` and `reject()`
 4. Verify `apps/core/rbac/policies.py:CanAccessSolicitationApprovals` (Policy on approve/reject `@action`)
 5. Check AuditLog creation in approve/reject methods
@@ -265,7 +265,7 @@ Next steps:
 ## Reference
 
 - **Business Rules**: `.claude/skills/aprender-domain/SKILL.md` (PA-01 to PA-07)
-- **Implementation**: `apps/core/views_solicitacao.py`, `apps/core/services/solicitacao_approval.py`, `apps/core/models.py`
+- **Implementation**: `apps/core/views_solicitacao.py`, `apps/core/services/solicitacao_approval.py`, `apps/core/services/solicitacao_create.py`
 - **Tests**: `apps/core/tests/test_approval_policy_PA.py`
 - **Frontend**: `v2/frontend/src/pages/Aprovacoes/ApprovalsPage.tsx`
 

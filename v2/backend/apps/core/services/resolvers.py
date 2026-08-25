@@ -12,9 +12,10 @@ ETL do sistema principal (Issue: decouple-etl).
 
 from __future__ import annotations
 
+import logging
 import re
 import unicodedata
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 from django.contrib.auth import get_user_model
 from django.db.models import Q
@@ -27,6 +28,38 @@ if TYPE_CHECKING:
     from apps.core.models import Usuario
 
 User = get_user_model()
+
+logger = logging.getLogger(__name__)
+
+_M = TypeVar("_M")
+
+
+def _pick_unique(hits: list[_M], *, kind: str, needle: str) -> tuple[str, _M | None]:
+    """Escolhe um único candidato ou REJEITA ambiguidade (M02-09/#1613).
+
+    Nunca escolhe "o primeiro" quando há mais de um alvo distinto: em vez de
+    ``.first()`` (que gravava o alvo errado em silêncio), devolve ``ambiguous``
+    e registra um WARNING com os candidatos, para o chamador tratar como
+    pendência em vez de resolver no chute.
+
+    Returns:
+        ``("matched", obj)`` para exatamente 1 candidato distinto;
+        ``("ambiguous", None)`` para 2+; ``("none", None)`` para 0.
+    """
+    unique = {getattr(h, "pk", id(h)): h for h in hits}
+    if len(unique) == 1:
+        return "matched", next(iter(unique.values()))
+    if len(unique) > 1:
+        candidatos = ", ".join(sorted(str(getattr(h, "nome", h)) for h in unique.values()))
+        logger.warning(
+            "%s ambíguo para %r: %d candidatos (%s) — rejeitado, não escolho no " "chute (M02-09/#1613).",
+            kind,
+            needle,
+            len(unique),
+            candidatos,
+        )
+        return "ambiguous", None
+    return "none", None
 
 
 def resolve_user_by_email(email: str) -> Usuario | None:
@@ -331,40 +364,77 @@ def resolve_projeto(nome: str) -> Projeto | None:
     if not nome_raw:
         return None
 
+    # Cada estágio REJEITA ambiguidade (M02-09/#1613): 2+ alvos distintos → None
+    # + WARNING, em vez de escolher o primeiro no chute.
+
     # 1) Codigo exato
-    projeto = Projeto.objects.filter(codigo__iexact=nome_raw).first()
-    if projeto:
+    status, projeto = _pick_unique(
+        list(Projeto.objects.filter(codigo__iexact=nome_raw)),
+        kind="Projeto (código)",
+        needle=nome_raw,
+    )
+    if status == "matched":
         return projeto
+    if status == "ambiguous":
+        return None
 
     # 2) Nome bruto (exato)
-    projeto = Projeto.objects.filter(nome__iexact=nome_raw).first()
-    if projeto:
+    status, projeto = _pick_unique(
+        list(Projeto.objects.filter(nome__iexact=nome_raw)),
+        kind="Projeto (nome)",
+        needle=nome_raw,
+    )
+    if status == "matched":
         return projeto
+    if status == "ambiguous":
+        return None
 
-    # 2b) Nome bruto (normalizado)
+    # 2b) Nome normalizado (simétrico: NFKD dos DOIS lados)
     nome_raw_norm = norm_text(nome_raw)
     projetos = list(Projeto.objects.all())
-    for p in projetos:
-        if norm_text(p.nome) == nome_raw_norm:
-            return p
+    status, projeto = _pick_unique(
+        [p for p in projetos if norm_text(p.nome) == nome_raw_norm],
+        kind="Projeto (nome normalizado)",
+        needle=nome_raw,
+    )
+    if status == "matched":
+        return projeto
+    if status == "ambiguous":
+        return None
 
     # 3) Alias/canonizacao
     nome_mapped = normalize_projeto_name(nome_raw)
     if nome_mapped == nome_raw:
         return None
 
-    projeto = Projeto.objects.filter(codigo__iexact=nome_mapped).first()
-    if projeto:
+    status, projeto = _pick_unique(
+        list(Projeto.objects.filter(codigo__iexact=nome_mapped)),
+        kind="Projeto (código via alias)",
+        needle=nome_mapped,
+    )
+    if status == "matched":
         return projeto
+    if status == "ambiguous":
+        return None
 
-    projeto = Projeto.objects.filter(nome__iexact=nome_mapped).first()
-    if projeto:
+    status, projeto = _pick_unique(
+        list(Projeto.objects.filter(nome__iexact=nome_mapped)),
+        kind="Projeto (nome via alias)",
+        needle=nome_mapped,
+    )
+    if status == "matched":
         return projeto
+    if status == "ambiguous":
+        return None
 
     nome_mapped_norm = norm_text(nome_mapped)
-    for p in projetos:
-        if norm_text(p.nome) == nome_mapped_norm:
-            return p
+    status, projeto = _pick_unique(
+        [p for p in projetos if norm_text(p.nome) == nome_mapped_norm],
+        kind="Projeto (nome normalizado via alias)",
+        needle=nome_mapped,
+    )
+    if status == "matched":
+        return projeto
 
     return None
 
@@ -384,14 +454,25 @@ def resolve_tipo_evento(nome: str) -> TipoEvento | None:
 
     nome_norm = norm_text(nome)
 
-    try:
-        return TipoEvento.objects.get(nome__iexact=nome)
-    except TipoEvento.DoesNotExist:
-        # Tenta com nome normalizado
-        tipos = TipoEvento.objects.all()
-        for t in tipos:
-            if norm_text(t.nome) == nome_norm:
-                return t
+    # 1) Nome exato (case-insensitive) — REJEITA ambiguidade (M02-09/#1613):
+    # 2+ tipos com o mesmo nome → None, em vez do antigo .first() no chute.
+    status, tipo = _pick_unique(
+        list(TipoEvento.objects.filter(nome__iexact=nome)),
+        kind="TipoEvento (nome)",
+        needle=nome,
+    )
+    if status == "matched":
+        return tipo
+    if status == "ambiguous":
         return None
-    except TipoEvento.MultipleObjectsReturned:
-        return TipoEvento.objects.filter(nome__iexact=nome).first()
+
+    # 2) Nome normalizado (NFKD dos dois lados)
+    status, tipo = _pick_unique(
+        [t for t in TipoEvento.objects.all() if norm_text(t.nome) == nome_norm],
+        kind="TipoEvento (nome normalizado)",
+        needle=nome,
+    )
+    if status == "matched":
+        return tipo
+
+    return None

@@ -349,7 +349,18 @@ errado — não a pessoa.**
 manda copiar. Check que compara os `name:` dos workflows com os contexts do
 ruleset e reporta a divergência.
 
-- [ ] feito · divergência atual: **9 de 19**
+- [x] feito · **9 de 19** confirmado por parse YAML dos workflows contra
+  `GET /repos/:owner/:repo/rules/branches/main` (legível sem admin).
+  `check_required_checks.py` + 9 testes. Calibragem oposta nas duas divergências,
+  pelo critério de **quem consegue consertar**: context exigido sem job que o
+  produza **bloqueia** (trava merge para sempre, conserta-se dentro do PR, hoje
+  zero); rótulo `[required]` sem o ruleset exigir apenas **avisa** (é ação de
+  admin no ruleset — bloquear PR por algo que o autor não pode consertar desliga
+  o gate). Conjunto exigido vazio é lido como falha de medida, não aprovação.
+
+  Os rótulos falsos não são jobs quaisquer: `backend rbac-lint`,
+  `backend typecheck (pyright)`, `backend tests (runner)` e `docker parity`
+  **não travam merge nenhum** hoje.
 
 ---
 

@@ -629,7 +629,7 @@ export default function MapaBrasilPage(): JSX.Element {
                       placeholder="mm/dd/yyyy"
                       format="DD/MM/YYYY"
                       value={dateRange?.[0]}
-                      onChange={(date) => setDateRange([date, dateRange?.[1] || null])}
+                      onChange={(date) => setDateRange([date ?? null, dateRange?.[1] || null])}
                     />
                     <Text type="secondary" style={{ fontSize: 12 }}>Data Final</Text>
                     <DatePicker
@@ -637,7 +637,7 @@ export default function MapaBrasilPage(): JSX.Element {
                       placeholder="mm/dd/yyyy"
                       format="DD/MM/YYYY"
                       value={dateRange?.[1]}
-                      onChange={(date) => setDateRange([dateRange?.[0] || null, date])}
+                      onChange={(date) => setDateRange([dateRange?.[0] || null, date ?? null])}
                     />
                   </Space>
                 </Panel>

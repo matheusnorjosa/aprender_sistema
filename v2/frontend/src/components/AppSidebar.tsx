@@ -157,7 +157,7 @@ function SidebarMenu({ openKeys, onOpenChange, onItemClick, children }: SidebarM
       selectedKeys={[selectedKey]}
       openKeys={openKeys}
       onOpenChange={onOpenChange}
-      onClick={onItemClick}
+      {...(onItemClick !== undefined && { onClick: onItemClick })}
       style={{ borderRight: 0 }}
     >
       {children}

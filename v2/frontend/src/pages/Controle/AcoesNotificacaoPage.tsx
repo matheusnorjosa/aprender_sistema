@@ -211,7 +211,7 @@ export default function AcoesNotificacaoPage(): JSX.Element {
             <Select
               loading={loadingCycles}
               value={selectedCycleId ?? undefined}
-              onChange={(value) => setSelectedCycleId(value)}
+              onChange={(value) => setSelectedCycleId(value ?? null)}
               placeholder="Selecione o ciclo"
               options={cycles.map((cycle) => ({
                 value: cycle.id,
@@ -260,11 +260,9 @@ export default function AcoesNotificacaoPage(): JSX.Element {
           <Form.Item
             name="observacao"
             label="Observação"
-            rules={
-              modalMode === 'conclusao'
-                ? [{ required: true, message: 'Observação é obrigatória para conclusão' }]
-                : undefined
-            }
+            {...(modalMode === 'conclusao' && {
+              rules: [{ required: true, message: 'Observação é obrigatória para conclusão' }],
+            })}
           >
             <Input.TextArea rows={4} />
           </Form.Item>

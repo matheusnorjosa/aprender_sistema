@@ -15,7 +15,7 @@ type LegendCode = 'T' | 'P' | 'D' | 'X' | 'E' | '2' | 'D1';
 type LegendMapType = Record<string, string>;
 
 interface LegendProps {
-  legend?: LegendMapType;
+  legend?: LegendMapType | undefined;
 }
 
 // Mapeamento de códigos para cores (círculos)

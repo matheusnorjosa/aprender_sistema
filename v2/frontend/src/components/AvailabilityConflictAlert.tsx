@@ -36,7 +36,7 @@ export default function AvailabilityConflictAlert({
 
   return (
     <Alert
-      id={id}
+      {...(id !== undefined && { id })}
       type="error"
       showIcon
       role="alert"

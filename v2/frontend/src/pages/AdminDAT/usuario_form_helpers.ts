@@ -17,16 +17,18 @@ import type { ID } from '../../types';
 export interface UsuarioFormValues {
   username: string;
   email: string;
-  first_name?: string;
-  last_name?: string;
-  cpf?: string;
-  telefone?: string;
-  cargo?: string;
+  // exactOptionalPropertyTypes: casam com UserFormValues (hidratado de um AntD Form
+  // cujos campos são T | undefined). buildUsuarioPayload já trata undefined/vazio.
+  first_name?: string | undefined;
+  last_name?: string | undefined;
+  cpf?: string | undefined;
+  telefone?: string | undefined;
+  cargo?: string | undefined;
   is_active: boolean;
   is_superuser: boolean;
   setor_ids: ID[];
   funcao_ids: ID[];
-  password?: string;
+  password?: string | undefined;
 }
 
 export interface BuildPayloadOptions {

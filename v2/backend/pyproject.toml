@@ -72,7 +72,13 @@ root = "."
 pythonVersion = "3.12"
 extraPaths = [
     "apps",
-    "config"
+    "config",
+    # Os gates de documentacao rodam como script solto no runner (`python
+    # v2/backend/scripts/check_doc_impact.py`), entao o proprio diretorio entra no
+    # sys.path e `import doc_frontmatter` resolve em runtime. O pyright nao segue
+    # `sys.path.insert`; declarar aqui e dizer a verdade sobre como eles rodam,
+    # em vez de silenciar o erro com um `# type: ignore`.
+    "scripts"
 ]
 
 # ================================================================

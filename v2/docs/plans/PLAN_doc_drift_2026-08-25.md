@@ -12,6 +12,11 @@ sources_of_truth:
   - v2/docs/audits/ACHADOS_REAIS.md
   - v2/backend/scripts/rbac_lint.py
   - v2/backend/apps/core/tests/test_rbac_lint.py
+  - v2/backend/scripts/check_agent_instructions.py
+  - v2/backend/scripts/check_doc_impact.py
+  - v2/backend/scripts/doc_drift_report.py
+  - v2/backend/scripts/doc_frontmatter.py
+  - .claude/hooks/test_hooks.py
 ---
 
 # Plano — drift documental
@@ -161,7 +166,9 @@ pytest apps/core/tests/test_doc_drift.py::test_commit_no_mesmo_dia_nao_acusa -q
 pytest apps/core/tests/test_doc_drift.py::test_roda_igual_as_08h_e_as_20h -q
 ```
 
-- [ ] feito
+- [x] feito — `verified_at_commit` lido pelo parser novo; sem âncora declarada,
+  âncora **inferida** do último commit da spec, sempre rotulada como tal.
+  17 testes em `apps/core/tests/test_doc_drift.py`.
 
 ### B.2 · O gate morre em repositório raso
 
@@ -180,7 +187,8 @@ grep -A3 'actions/checkout' .github/workflows/docs-quality.yml | grep -q 'fetch-
 git clone --depth 1 . /tmp/raso && (cd /tmp/raso && python ... ; test $? -ne 0)
 ```
 
-- [ ] feito
+- [x] feito — `fetch-depth: 0` (PR #1853) + guard no script.
+  `test_repositorio_raso_aborta` clona com `--depth 1` e exige exit ≠ 0.
 
 ### B.3 · Camada 1 é **relatório**, não bloqueio
 
@@ -199,7 +207,8 @@ specs em drift, quantos commits atrás, delta desde o PR anterior. Nunca falha.
 python v2/backend/scripts/doc_drift_report.py --format=gh-summary
 ```
 
-- [ ] feito · linha de base: **21/21 specs em drift**
+- [x] feito · linha de base medida: **21 em drift, 4 sem drift, 6 não medível**
+  (31 docs SDD). Sai no job summary; a única saída ≠ 0 é repositório raso.
 
 ### B.4 · Detectar `sources_of_truth` encolhendo
 
@@ -216,7 +225,8 @@ isso.
 pytest apps/core/tests/test_doc_drift.py::test_sot_encolhendo_reprova -q
 ```
 
-- [ ] feito
+- [x] feito — detector 3 do `check_doc_impact.py`, reaproveitando o waiver.
+  6 casos, incluindo os que **não** podem bloquear: crescer, reordenar, spec nova.
 
 ---
 
@@ -431,7 +441,15 @@ dele parece versionada e não é.
 
 Item sem linha aqui não está feito, independente da caixa.
 
-> Estado: **em working tree, não commitado.** 166 arquivos alterados/novos.
+> Estado: **Fases A, C e B mergeadas.** PR #1847 (D3 + D2), #1853 (Fase A + gate
+> de doc viva), e a Fase B em revisão. Fases D–G pendentes; decisões D1 e D4 em
+> aberto.
+>
+> Este bloco dizia «em working tree, não commitado — 166 arquivos» até 25/08,
+> quando dois PRs já haviam mergeado. Um plano que mente sobre o próprio estado é
+> o defeito que ele descreve, então fica registrado: **o gate da Fase C não pega
+> este caso** — ele liga *issue resolvida* a *doc que a cita*, e nenhum dos dois
+> PRs citava issue. Lacuna real, candidata à Fase F.
 
 | Data | Item | Comando de verificação | Saída |
 |---|---|---|---|

@@ -10,7 +10,6 @@ Ensures all views are importable from both:
 
 from __future__ import annotations
 
-import pytest
 
 
 class TestViewsBackwardsCompatibility:
@@ -106,35 +105,6 @@ class TestViewsBackwardsCompatibility:
 
         assert AuditLogViewSet is not None
 
-    def test_municipio_option_viewset_importable_from_legacy(self):
-        """MunicipioOptionViewSet should be importable from views (facade)."""
-        from apps.core.views import MunicipioOptionViewSet
-
-        assert MunicipioOptionViewSet is not None
-
-    def test_projeto_option_viewset_importable_from_legacy(self):
-        """ProjetoOptionViewSet should be importable from views (facade)."""
-        from apps.core.views import ProjetoOptionViewSet
-
-        assert ProjetoOptionViewSet is not None
-
-    def test_coordenador_option_viewset_importable_from_legacy(self):
-        """CoordenadorOptionViewSet should be importable from views (facade)."""
-        from apps.core.views import CoordenadorOptionViewSet
-
-        assert CoordenadorOptionViewSet is not None
-
-    def test_formador_option_viewset_importable_from_legacy(self):
-        """FormadorOptionViewSet should be importable from views (facade)."""
-        from apps.core.views import FormadorOptionViewSet
-
-        assert FormadorOptionViewSet is not None
-
-    def test_tipo_evento_option_viewset_importable_from_legacy(self):
-        """TipoEventoOptionViewSet should be importable from views (facade)."""
-        from apps.core.views import TipoEventoOptionViewSet
-
-        assert TipoEventoOptionViewSet is not None
 
 
 class TestViewsPackageDirectImports:
@@ -142,10 +112,9 @@ class TestViewsPackageDirectImports:
 
     def test_utils_module_importable(self):
         """Utils module should be importable."""
-        from apps.core.views.utils import _get_client_ip, api_root
+        from apps.core.views.utils import _get_client_ip
 
         assert callable(_get_client_ip)
-        assert callable(api_root)
 
     def test_solicitacao_module_importable(self):
         """Solicitacao module should be importable."""
@@ -200,21 +169,6 @@ class TestViewsPackageDirectImports:
         assert GroupViewSet is not None
         assert AuditLogViewSet is not None
 
-    def test_options_module_importable(self):
-        """Options module should be importable."""
-        from apps.core.views.options import (
-            CoordenadorOptionViewSet,
-            FormadorOptionViewSet,
-            MunicipioOptionViewSet,
-            ProjetoOptionViewSet,
-            TipoEventoOptionViewSet,
-        )
-
-        assert MunicipioOptionViewSet is not None
-        assert ProjetoOptionViewSet is not None
-        assert CoordenadorOptionViewSet is not None
-        assert FormadorOptionViewSet is not None
-        assert TipoEventoOptionViewSet is not None
 
 
 class TestViewsPackageStructure:

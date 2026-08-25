@@ -1,14 +1,12 @@
 """
 AS v2 — Core Views Utilities
 
-Helper functions and API root endpoint.
+Helper functions.
 """
 
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false
 
 from __future__ import annotations
-
-from django.http import HttpRequest, JsonResponse
 
 from apps.core.utils.net import get_client_ip
 
@@ -18,18 +16,3 @@ from apps.core.utils.net import get_client_ip
 # that honours NUM_PROXIES and ignores forged entries (#1660). Kept under the
 # legacy name so the views facade and views_auth imports keep working.
 _get_client_ip = get_client_ip
-
-
-def api_root(request: HttpRequest) -> JsonResponse:
-    """API root endpoint"""
-    return JsonResponse(
-        {
-            "message": "AS v2 API",
-            "version": "2.0.0",
-            "endpoints": {
-                "admin": "/admin/",
-                "healthz": "/healthz/",
-                "api": "/api/",
-            },
-        }
-    )

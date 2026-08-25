@@ -722,7 +722,11 @@ def main() -> None:
                 results.append(ctx)
 
     if results:
-        print("\n".join(results))
+        # Redige na FRONTEIRA de saida, nao so na leitura: aqui passa tudo que
+        # o hook injeta no transcript, venha de arquivo de memoria, do comando
+        # inspecionado ou de qualquer checker futuro. Sanitizar na origem exige
+        # lembrar de fazer em cada nova fonte; sanitizar na saida, nao.
+        print(_redige("\n".join(results)))
 
 
 if __name__ == "__main__":

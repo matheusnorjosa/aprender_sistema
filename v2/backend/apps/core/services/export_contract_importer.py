@@ -797,37 +797,16 @@ class ExportContractImporter:
             created += 1
         return created
 
-    def _dat_coordenador_index(self) -> dict[str, int]:
-        """Índice email/nome → coordenador_id (DATCoordenador não tem CPF nem unique). O email é chave de
-        CARGO, não de pessoa — endereços de função (coordenacao11@…) passam adiante quando alguém troca,
-        então o MESMO email pode apontar p/ 2+ coordenadores no histórico. Só resolvemos chave INEQUÍVOCA:
-        email OU nome que aponte p/ 2+ ids → NÃO entra (vira NULL), em vez de atrelar o plano à pessoa
-        errada. Email tem prioridade sobre nome."""
-        email_ids: dict[str, set[int]] = {}
-        name_ids: dict[str, set[int]] = {}
-        for cid, email, email_alt, nome in DATCoordenador.objects.values_list(
-            "id", "email", "email_alternativo", "nome"
-        ):
-            for e in (email, email_alt):
-                if e:
-                    email_ids.setdefault(e.lower(), set()).add(cid)
-            if nome:
-                name_ids.setdefault(_norm(nome), set()).add(cid)
+    def _usuario_cpf_index(self) -> dict[str, int]:
+        """cpf(11 díg) → Usuario.id. O coordenador do plano é a PESSOA que coordenou (#1849), e
+        `Usuario.cpf` é unique no banco → chave inequívoca. Guard falsy OBRIGATÓRIO: só `len==11` (senão
+        um cpf vazio/legado mapearia `""→id` e prenderia toda linha de CPF vazio na pessoa errada)."""
         idx: dict[str, int] = {}
-        for key_map in (email_ids, name_ids):  # email primeiro → tem prioridade
-            for key, ids in key_map.items():
-                if len(ids) == 1:
-                    idx.setdefault(key, next(iter(ids)))
+        for uid, cpf in Usuario.objects.values_list("id", "cpf"):
+            digits = normalize_cpf_digits(cpf)
+            if len(digits) == 11:
+                idx[digits] = uid
         return idx
-
-    def _dat_coordenador_cpf_index(self) -> dict[str, int]:
-        """cpf(11 díg) → coordenador_id, só ids INEQUÍVOCOS. Guard falsy OBRIGATÓRIO: só `len==11`
-        (senão `cpf==""` mapearia `""→id` e prenderia toda linha de CPF vazio na pessoa errada)."""
-        cpf_ids: dict[str, set[int]] = {}
-        for cid, cpf in DATCoordenador.objects.values_list("id", "cpf"):
-            if cpf and len(cpf) == 11:
-                cpf_ids.setdefault(cpf, set()).add(cid)
-        return {cpf: next(iter(ids)) for cpf, ids in cpf_ids.items() if len(ids) == 1}
 
     def _apply_dat_coordenador(self, rows: list[dict[str, str]]) -> int:
         """Create-only de DATCoordenador (fecha o silent-gap M18-09). Master v14 =
@@ -873,15 +852,14 @@ class ExportContractImporter:
 
     def _apply_plano_formacao(self, rows: list[dict[str, str]]) -> int:
         """Create-only de PlanoFormacoes. NK (municipio, projeto, ano); `ano` DECLARADO do workbook.
-        `sem_plano` (reserva: TOTAL 0 + sem data) é pulado (não é plano). Coordenador (DATCoordenador)
-        resolvido por email→nome (sem CPF no model; ambíguo/ausente → NULL). `ch_estudo` importado;
-        `ch_total`/`ch_anual` semeados dos totais da planilha (recalcular_ch sobrescreve quando/se as
-        formações-filhas forem importadas). CSV sem coluna `nome` → precisa deste handler (o loop
-        genérico gravaria 0 = silent-gap)."""
+        `sem_plano` (reserva: TOTAL 0 + sem data) é pulado (não é plano). Coordenador = a PESSOA que
+        coordenou (coluna Coordenador da Agenda), resolvido por CPF → `Usuario` (cpf unique no banco);
+        CPF ausente/inválido ou sem match → NULL, sem fallback email/nome (a pessoa é chave de CPF, #1849).
+        `ch_estudo` importado; `ch_total`/`ch_anual` semeados dos totais da planilha (recalcular_ch
+        sobrescreve quando/se as formações-filhas forem importadas)."""
         actor = self._require_actor("plano_formacao")
         mun_idx = self._municipio_index()
-        coord_idx = self._dat_coordenador_index()
-        coord_cpf_idx = self._dat_coordenador_cpf_index()
+        usuario_idx = self._usuario_cpf_index()
         created = 0
         for r in rows:
             if _to_bool(r.get("sem_plano")):
@@ -893,20 +871,11 @@ class ExportContractImporter:
             ano = _parse_int(r.get("ano"))
             if PlanoFormacoes.objects.filter(municipio_id=mun_id, projeto_id=proj_id, ano=ano).exists():
                 continue
-            # CPF autoritativo (#1837): se a linha tem CPF válido, casa por CPF; se não casar, cai para
-            # NOME (guardado), NUNCA para o email de CARGO (que ligaria ao ocupante atual da caixa —
-            # o bug que a opção A mata). Sem CPF → fallback email→nome do PR3.
+            # Coordenador = a PESSOA (Usuario) por CPF (#1849). CPF inválido/ausente/sem match → NULL,
+            # sem chute por email/nome de cargo (a resolução por email atrelaria ao ocupante atual da caixa).
             cpf_raw = r.get("coordenador_cpf") or ""
             cpf = normalize_cpf_digits(cpf_raw) if is_valid_cpf(cpf_raw) else None
-            if cpf is not None:
-                nome = _norm(r.get("coordenador") or "")
-                coord_id = coord_cpf_idx.get(cpf) or (coord_idx.get(nome) if nome else None)
-            else:
-                email = (r.get("coordenador_email") or "").strip().lower()
-                coord_id = coord_idx.get(email) if email else None
-                if coord_id is None:
-                    nome = _norm(r.get("coordenador") or "")
-                    coord_id = coord_idx.get(nome) if nome else None
+            coord_id = usuario_idx.get(cpf) if cpf else None
             PlanoFormacoes.objects.create(
                 municipio_id=mun_id,
                 projeto_id=proj_id,

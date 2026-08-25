@@ -292,6 +292,17 @@ Cada módulo em produção tem uma spec versionada, datada e rastreável ao cód
 
 ---
 
+### 🎨 **Design System (Frontend)**
+
+**Arquivo**: [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md)
+
+- Cadeia SSOT de cor (BRAND_COLORS → CSS vars → AntD/Tailwind/CSS) e os pares-espelho manuais
+- Paleta da marca e tokens de tema claro/escuro
+- Racional WCAG do acento do tema escuro (`#ea2a33` → `#2FA37D`, PR #1846)
+- Checklist para alterar uma cor sem regressão de contraste
+
+---
+
 ### 🔧 **Infraestrutura**
 
 **Arquivos**:

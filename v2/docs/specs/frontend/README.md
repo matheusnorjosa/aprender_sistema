@@ -31,3 +31,8 @@ antiga de "45+ pages" e "6/14 documentadas" não correspondia ao código.
 que a tela oferece e o que o backend aceita (HomePage, Deslocamentos, Pré-agenda, DAT/Compras,
 DAT/Registros, paginação). O rastreamento é do documento vivo
 [`ACHADOS_REAIS.md`](../../audits/ACHADOS_REAIS.md) — as specs linkam, não duplicam.
+
+## Ver também
+
+Sistema de cor e tema (paleta da marca, tokens claro/escuro, cadeia SSOT e racional WCAG do
+acento do tema escuro): [`DESIGN_SYSTEM.md`](../../DESIGN_SYSTEM.md).

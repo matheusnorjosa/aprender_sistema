@@ -1,0 +1,231 @@
+{
+  "env": {
+    "DJANGO_ENV": "development",
+    "DB_HOST": "db",
+    "DB_PORT": "5432"
+  },
+  "includeCoAuthoredBy": false,
+  "permissions": {
+    "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "MultiEdit",
+      "Bash(git status:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git log:*)",
+      "Bash(python manage.py:*)",
+      "Bash(docker compose:*)",
+      "Bash(for:*)",
+      "Bash(gh pr list:*)",
+      "Bash(git merge:*)",
+      "Bash(git diff:*)",
+      "Bash(git branch:*)",
+      "Bash(git checkout:*)",
+      "Bash(sed:*)",
+      "Bash(xargs:*)",
+      "Bash(find:*)",
+      "Bash(wc:*)",
+      "Bash(ls:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(mkdir:*)",
+      "Bash(test:*)",
+      "Bash(cat:*)",
+      "Bash(node:*)",
+      "Bash(npm:*)"
+    ],
+    "deny": [],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(docker build:*)",
+      "Bash(docker tag:*)",
+      "Bash(docker rmi:*)",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "additionalDirectories": [
+      "$CLAUDE_PROJECT_DIR\\v2\\docs\\memoria"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -ExecutionPolicy Bypass -File \"$CLAUDE_PROJECT_DIR\\.claude\\hooks\\tools-reminder.ps1\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "py -3 $CLAUDE_PROJECT_DIR/.claude/hooks/intent-detector.py 2>/dev/null || true",
+            "timeout": 5,
+            "statusMessage": "Detecting intent..."
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/plugins/marketplaces/thedotmack/plugin/scripts/bun-runner.js\" \"$HOME/.claude/plugins/marketplaces/thedotmack/plugin/scripts/worker-service.cjs\" hook claude-code session-init",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "py -3 $CLAUDE_PROJECT_DIR/.claude/hooks/guardrails.py",
+            "timeout": 5,
+            "statusMessage": "Checking guardrails..."
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "py -3 $CLAUDE_PROJECT_DIR/.claude/hooks/context-injector.py 2>/dev/null || true",
+            "timeout": 5,
+            "statusMessage": "Injecting project context..."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -ExecutionPolicy Bypass -File \"$CLAUDE_PROJECT_DIR\\.claude\\hooks\\graphify-reminder.ps1\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -ExecutionPolicy Bypass -File \"$CLAUDE_PROJECT_DIR\\.claude\\hooks\\auto-format-python.ps1\"",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/plugins/marketplaces/thedotmack/plugin/scripts/bun-runner.js\" \"$HOME/.claude/plugins/marketplaces/thedotmack/plugin/scripts/worker-service.cjs\" hook claude-code observation",
+            "timeout": 120
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/plugins/marketplaces/thedotmack/plugin/scripts/bun-runner.js\" \"$HOME/.claude/plugins/marketplaces/thedotmack/plugin/scripts/worker-service.cjs\" hook claude-code summarize",
+            "timeout": 120
+          },
+          {
+            "type": "command",
+            "command": "powershell -ExecutionPolicy Bypass -File \"$CLAUDE_PROJECT_DIR\\.claude\\hooks\\graphify-sync.ps1\"",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -ExecutionPolicy Bypass -File \"$CLAUDE_PROJECT_DIR\\.claude\\songs\\play-notification.ps1\""
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/post-compact-reminder.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "verbose": false,
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest"
+      ]
+    },
+    "github": {
+      "command": "bash",
+      "args": [
+        ".claude/hooks/github-mcp.sh"
+      ]
+    },
+    "postgres": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@bytebase/dbhub@latest"
+      ],
+      "env": {
+        "DSN": "postgresql://<usuario>:<senha>@localhost:5434/aprender_db"
+      }
+    },
+    "fetch": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@anthropic-ai/mcp-fetch@latest"
+      ]
+    },
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@latest"
+      ]
+    },
+    "docker": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@ckreiling/mcp-server-docker@latest"
+      ]
+    },
+    "tree-sitter": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-server-tree-sitter@latest"
+      ]
+    },
+    "devdocs": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "devdocs-mcp-server@latest"
+      ]
+    }
+  }
+}

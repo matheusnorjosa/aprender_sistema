@@ -34,6 +34,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
+        with:
+          # `check_agent_instructions.py --tracked-only` chama `git ls-files`.
+          # Checkout raso (depth=1) faria o gate passar por falta de dado, que e
+          # o modo de falha que este plano existe para eliminar.
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v5
@@ -45,3 +50,13 @@ jobs:
 
       - name: Frontmatter das specs SDD
         run: python scripts/check_doc_frontmatter.py
+
+      # A camada de instrucao de agente (.claude/, .agents/) passou a ser
+      # versionada em 2026-08-25 (D3). Num repo publico isso cria risco de
+      # caminho de maquina e credencial entrarem por descuido. Este gate impede
+      # a reincidencia; `--tracked-only` limita ao que o git rastreia, para nao
+      # acusar settings.local.json, que fica fora do git de proposito.
+      - name: Instrucao de agente sem caminho de maquina nem credencial
+        run: >
+          python v2/backend/scripts/check_agent_instructions.py
+          --tracked-only .claude .agents AGENTS.md CLAUDE.md

@@ -438,3 +438,88 @@ def test_spec_intocada_nao_e_avaliada_por_encolhimento(tmp_path):
 
     r = _run_range(raiz, base)
     assert r.returncode == 0, f"spec nao tocada foi avaliada por encolhimento:\n{r.stdout}"
+
+
+# ==========================================================================
+# E.2 — auditar o uso do contorno
+#
+# O waiver e necessario (sem saida de escape o gate vira imposto e e contornado)
+# E e o ponto de erosao. A contagem por PR entra no job summary porque, se subir
+# de forma sustentada, quem esta errado e o GATE, nao a pessoa. Metrica sem lugar
+# onde alguem olhe e decoracao — foi assim que o aviso de 180 dias morreu.
+# ==========================================================================
+
+
+def test_summary_conta_waivers_deste_pr(tmp_path):
+    destino = tmp_path / "summary.md"
+    _monta(tmp_path, {"v2/docs/specs/backend/pagamento.spec.md": SPEC})
+    r = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--repo-root",
+            str(tmp_path),
+            "--changed-files-from",
+            str(tmp_path / "_a.txt"),
+            "--commit-messages-from",
+            str(tmp_path / "_c.txt"),
+            "--pr-body-file",
+            str(tmp_path / "_b.txt"),
+            "--summary-file",
+            str(destino),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        encoding="utf-8",
+        env=_env_com_arquivos(
+            tmp_path,
+            ["v2/backend/apps/core/services/pagamento.py"],
+            "fix(pagamento): x\n\nCloses #1610",
+            "doc-nao-afetada: v2/docs/specs/backend/pagamento.spec.md — "
+            "o #1610 citado na spec e outro defeito, de nomenclatura",
+        ),
+    )
+    assert r.returncode == 0, r.stdout
+    md = destino.read_text(encoding="utf-8")
+    assert "waiver" in md.lower(), f"o summary deveria contar o uso do contorno:\n{md}"
+    assert "pagamento.spec.md" in md, "e nomear qual doc foi dispensado"
+
+
+def _env_com_arquivos(raiz, alterados, commits, corpo):
+    import os
+
+    (raiz / "_a.txt").write_text("\n".join(alterados), encoding="utf-8")
+    (raiz / "_c.txt").write_text(commits, encoding="utf-8")
+    (raiz / "_b.txt").write_text(corpo, encoding="utf-8")
+    return dict(os.environ)
+
+
+def test_summary_sem_waiver_nao_inventa_secao(tmp_path):
+    """Aviso sem ação é ruído, e ruído treina a ignorar o gate."""
+    destino = tmp_path / "summary.md"
+    _monta(tmp_path, {"v2/docs/specs/backend/pagamento.spec.md": SPEC})
+    r = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--repo-root",
+            str(tmp_path),
+            "--changed-files-from",
+            str(tmp_path / "_a.txt"),
+            "--commit-messages-from",
+            str(tmp_path / "_c.txt"),
+            "--pr-body-file",
+            str(tmp_path / "_b.txt"),
+            "--summary-file",
+            str(destino),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        encoding="utf-8",
+        env=_env_com_arquivos(tmp_path, ["README.md"], "docs: nada", ""),
+    )
+    assert r.returncode == 0, r.stdout
+    md = destino.read_text(encoding="utf-8") if destino.exists() else ""
+    assert "waiver" not in md.lower(), f"sem waiver nao deveria haver secao:\n{md}"

@@ -14,7 +14,7 @@ Segurança:
 - modo `create-only`: só insere would_create; nunca atualiza; nunca sobrescreve campo protegido.
 """
 
-# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUnknownArgumentType=false
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any
 
 from django.core.management.base import BaseCommand, CommandError
 
-from apps.core.services.export_contract_importer import ExportContractImporter
+from apps.core.services.export_contract_importer import APPLIABLE, ExportContractImporter
 
 if TYPE_CHECKING:
     from argparse import ArgumentParser
@@ -75,6 +75,13 @@ class Command(BaseCommand):
         return actor
 
     def handle(self, *args: Any, **opts: Any) -> None:
+        # CR-03: barra --allow-entity que aponta entidade não-escrivível (classifica mas não tem apply)
+        # ANTES de tocar arquivos — senão o apply mentiria "applied=0" em silêncio.
+        bad = sorted(name for name in (opts.get("allow") or []) if name not in APPLIABLE)
+        if bad:
+            raise CommandError(
+                f"--allow-entity não-escrivível: {', '.join(bad)}. " f"Escrivíveis: {', '.join(sorted(APPLIABLE))}."
+            )
         actor = self._resolve_actor(opts.get("as_user"))
         importer = ExportContractImporter(
             path=opts["path"],

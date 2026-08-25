@@ -99,6 +99,59 @@ nav:
     - CI Security Checks: operations/ci-security-checks.md
     - Backup: operations/backup.md
     - Go-Live Checklist: operations/go-live.md
+    - CI · canário xdist: operations/ci-backend-xdist-canary.md
+    - CI · backlog de estabilização xdist: operations/ci-backend-xdist-stabilization-backlog.md
+  # Os 18 ADRs eram alcançáveis só por link a partir do índice — ficavam fora da
+  # navegação e, com `validation.nav.omitted_files: error`, o build passaria a
+  # reprovar. Estão aqui na ordem numérica, que é a ordem em que foram decididos.
+  - Decisões de Arquitetura:
+    - Índice: architecture/project-decisions/README.md
+    - ADR-001 · Deploy só em Docker: architecture/project-decisions/ADR-001-docker-only-deployment.md
+    - ADR-002 · Aprovação manual: architecture/project-decisions/ADR-002-approval-policy-manual.md
+    - ADR-003 · Disponibilidade e timezone: architecture/project-decisions/ADR-003-availability-rules-timezone.md
+    - ADR-004 · Conventional commits e proteção de branch: architecture/project-decisions/ADR-004-conventional-commits-branch-protection.md
+    - ADR-005 · PostgreSQL como SSOT: architecture/project-decisions/ADR-005-ssot-postgresql.md
+    - ADR-006 · Sessão em Redis: architecture/project-decisions/ADR-006-session-storage-redis.md
+    - ADR-007 · Django 5.2 LTS: architecture/project-decisions/ADR-007-django-5.2-lts-upgrade.md
+    - ADR-008 · requestId determinístico no GCal: architecture/project-decisions/ADR-008-gcal-deterministic-requestid.md
+    - ADR-009 · Repositório público e sanitização: architecture/project-decisions/ADR-009-public-repo-sanitization.md
+    - ADR-010 · Deploy via Portainer (superado pelo 018): architecture/project-decisions/ADR-010-deploy-portainer-direct-to-prod.md
+    - ADR-011 · Polling em vez de WebSocket: architecture/project-decisions/ADR-011-polling-over-websocket.md
+    - ADR-012 · Guardrails de dependência: architecture/project-decisions/ADR-012-dependency-guardrails.md
+    - ADR-013 · Migração de axios para fetch: architecture/project-decisions/ADR-013-axios-pinning-fetch-migration.md
+    - ADR-014 · Escala horizontal sem estado: architecture/project-decisions/ADR-014-stateless-horizontal-scaling.md
+    - ADR-015 · Política de testes: architecture/project-decisions/ADR-015-testing-policy.md
+    - ADR-016 · Estratégia de cripto assimétrica: architecture/project-decisions/ADR-016-asymmetric-crypto-strategy.md
+    - ADR-017 · Documentação dirigida por spec: architecture/project-decisions/ADR-017-spec-driven-documentation.md
+    - ADR-018 · Deploy pull-based: architecture/project-decisions/ADR-018-pull-based-deploy.md
+
+# F.3 — `mkdocs build --strict` NÃO valida âncora nem cobertura de navegação por
+# conta própria: essas checagens só existem se a chave `validation` pedir. Sem
+# ela, 21 páginas fora do nav passavam verdes.
+#
+# Todos os níveis abaixo foram MEDIDOS antes de virar `error`: com a validação
+# ligada em `warn`, o único achado eram as 21 omissões de nav — zero âncora
+# quebrada, zero link quebrado. (O plano previa «9 âncoras quebradas»; não há
+# nenhuma em `docs/`. A âncora quebrada que a varredura achou mora em `v2/docs/`,
+# que está fora do `docs_dir` e o mkdocs nunca enxerga.)
+#
+# ATENÇÃO ao ler `warn` aqui como «brando»: estes níveis só aceitam
+# `warn`/`info`/`ignore`, e o CI roda `mkdocs build --strict` (docs.yml:49), que
+# promove todo warning a erro. Ou seja, `warn` abaixo é BLOQUEANTE. Só `info`
+# é de fato informativo.
+#
+# `unrecognized_links` fica em `info` de propósito: as páginas linkam v2/docs por
+# URL absoluta do GitHub, que é o padrão correto aqui (v2/docs está fora do site)
+# e não deve derrubar o build por uma checagem heurística.
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+  links:
+    not_found: warn
+    anchors: warn
+    absolute_links: warn
+    unrecognized_links: info
 
 extra:
   social:

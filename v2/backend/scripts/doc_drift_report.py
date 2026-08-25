@@ -196,6 +196,7 @@ def main(argv: list[str]) -> int:
     em_drift: list[tuple[str, int, list[str], str]] = []
     ok: list[tuple[str, str]] = []
     nao_medivel: list[tuple[str, str]] = []
+    nao_resolvem: list[tuple[str, str]] = []
 
     for caminho, rel in _docs_vivos(raiz):
         try:
@@ -211,6 +212,34 @@ def main(argv: list[str]) -> int:
         if not fontes:
             nao_medivel.append((rel, "sem fontes (`sources_of_truth` ausente ou vazio)"))
             continue
+
+        # Entrada que nao e caminho mede NADA e nao reclama: passada ao `git log`
+        # como pathspec, simplesmente nao casa, e a spec aparece "sem drift" por
+        # malformacao em vez de por estar em dia. Medido em 2026-08-25: 6 de 303
+        # entradas nao resolvem — tres sao frases em prosa dentro da lista do
+        # proprio arbitro de defeitos, tres sao caminho com anotacao entre
+        # parenteses.
+        #
+        # MAS "nao existe no disco" NAO basta como criterio, e o teste de
+        # renomeacao provou isso derrubando a primeira versao desta checagem:
+        # fonte renomeada e exatamente o caso em que o caminho declarado sumiu — e
+        # ai a ausencia E o sinal de drift, nao ruido. O discriminador e o mesmo
+        # do gate da camada de instrucao: se o git ja conheceu o caminho, mede;
+        # se nunca viu, nao e caminho.
+        vivas: list[str] = []
+        for f in fontes:
+            if (raiz / f).exists():
+                vivas.append(f)
+                continue
+            rc_f, out_f = _git(["log", "--all", "-1", "--format=%h", "--", f], raiz)
+            if rc_f == 0 and out_f.strip():
+                vivas.append(f)  # existiu e sumiu: e drift, e o git sabe contar
+            else:
+                nao_resolvem.append((rel, f))
+        if not vivas:
+            nao_medivel.append((rel, f"nenhuma das {len(fontes)} entradas de `sources_of_truth` resolve"))
+            continue
+        fontes = vivas
 
         sha = campos.get("verified_at_commit", "").strip().strip("`\"'")
         proveniencia = "declarada"
@@ -238,19 +267,21 @@ def main(argv: list[str]) -> int:
     em_drift.sort(key=lambda t: (-t[1], t[0]))
     total = len(em_drift) + len(ok) + len(nao_medivel)
 
+    nao_resolvem.sort()
+
     if a.formato == "gh-summary":
         destino = a.summary_file or os.environ.get("GITHUB_STEP_SUMMARY")
-        md = _monta_summary(em_drift, ok, nao_medivel, total)
+        md = _monta_summary(em_drift, ok, nao_medivel, nao_resolvem, total)
         if destino:
             with open(destino, "a", encoding="utf-8") as fh:
                 fh.write(md)
         else:
             print(md)
         # A tabela vai para o summary; o stdout continua sendo o log do job.
-        _imprime_texto(em_drift, ok, nao_medivel, total)
+        _imprime_texto(em_drift, ok, nao_medivel, nao_resolvem, total)
         return 0
 
-    _imprime_texto(em_drift, ok, nao_medivel, total)
+    _imprime_texto(em_drift, ok, nao_medivel, nao_resolvem, total)
     return 0
 
 
@@ -258,6 +289,7 @@ def _imprime_texto(
     em_drift: list[tuple[str, int, list[str], str]],
     ok: list[tuple[str, str]],
     nao_medivel: list[tuple[str, str]],
+    nao_resolvem: list[tuple[str, str]],
     total: int,
 ) -> None:
     if em_drift:
@@ -269,6 +301,15 @@ def _imprime_texto(
                 print(f"        {c}")
             if n > 3:
                 print(f"        ... e mais {n - 3}")
+        print()
+
+    if nao_resolvem:
+        print("FONTE QUE NAO RESOLVE — entrada de sources_of_truth que nao e caminho:")
+        for rel, f in nao_resolvem:
+            print(f"  {rel}")
+            print(f"      {f}")
+        print("  Passada ao git log como pathspec, nao casa nada: a spec mede menos")
+        print("  do que declara, e o silencio parece 'sem drift'.")
         print()
 
     if nao_medivel:
@@ -296,6 +337,7 @@ def _monta_summary(
     em_drift: list[tuple[str, int, list[str], str]],
     ok: list[tuple[str, str]],
     nao_medivel: list[tuple[str, str]],
+    nao_resolvem: list[tuple[str, str]],
     total: int,
 ) -> str:
     linhas = [

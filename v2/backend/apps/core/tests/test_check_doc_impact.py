@@ -7,7 +7,7 @@ HEAD d8e64714: **92,9% dos commits `fix(...)` nao tocam um unico `.md`** (8 de
 deles fixes. A regra ja estava escrita, em negrito, dentro do proprio arbitro — o
 modo de falha nao e ignorancia, e ausencia de gate.
 
-Este gate tem DOIS detectores, com calibragem diferente porque a precisao deles e
+Este gate tem TRES detectores, com calibragem diferente porque a precisao deles e
 diferente:
 
 1. **Issue resolvida -> doc que a cita.** Preciso e raro. BLOQUEIA.
@@ -18,6 +18,12 @@ diferente:
    Toda spec declara `sources_of_truth` com os arquivos que descreve. Se o PR
    toca um deles, aquela spec ficou suspeita por construcao. Medido: dispara em
    60% dos commits, media de 2,6 specs. Bloquear nisso trava o repo.
+
+3. **`sources_of_truth` encolhendo.** Preciso. BLOQUEIA sem justificativa.
+   (Fase B.4.) As 21 specs que declaram fontes estao 21/21 em drift; as unicas
+   verdes eram as que nao declaravam nada. A saida barata, entao, e apagar linhas
+   da lista: o drift some sem que uma linha de doc fique correta. Encolher pode
+   ser legitimo — por isso exige justificativa, nao proibicao.
 
 Por que nao ancorar so na issue: `Closes #N` aparece em apenas **27,7%** dos
 commits de fix, e as citacoes `Mxx-yy` cairam a zero quando a frente de trabalho
@@ -37,6 +43,8 @@ Verifica que:
 11. `status: historical` fora de `_archive/` tambem e poupado.
 12. ID de achado citado em commit que nao e fix nao bloqueia.
 13. Achado nao e rotulado com `#` — issue tem numero, achado tem ID.
+14. `sources_of_truth` que encolhe bloqueia; com justificativa, passa.
+15. Crescer, reordenar ou criar spec nova nao bloqueia (detector 3).
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportMissingTypeStubs=false
@@ -308,3 +316,125 @@ def test_id_de_achado_nao_e_rotulado_como_issue(tmp_path):
     saida = r.stdout + r.stderr
     assert "M26-03" in saida, f"o aviso deveria citar o achado:\n{saida}"
     assert "#M26-03" not in saida, "achado foi rotulado como issue"
+
+
+# ==========================================================================
+# B.4 — sources_of_truth encolhendo
+#
+# O INCENTIVO PERVERSO que a Fase B criaria se ninguem olhasse: as 21 specs que
+# declaram `sources_of_truth` estao 21/21 em drift, e as unicas verdes eram as
+# que nao declaravam nada. A saida barata e apagar linhas da lista — o drift some
+# sem que uma linha de doc fique correta.
+#
+# Estes casos usam repositorio git de verdade porque o detector le a versao
+# anterior da spec com `git show <base>:<caminho>`. Simular isso testaria o mock.
+# ==========================================================================
+
+from apps.core.tests.repo_git import commita, cria_repo, escreve  # noqa: E402
+from apps.core.tests.repo_git import spec as monta_spec  # noqa: E402
+
+FONTES = [
+    "v2/backend/apps/core/services/pagamento.py",
+    "v2/backend/apps/core/models/pagamento.py",
+]
+SPEC_REL = "v2/docs/specs/backend/pagamento.spec.md"
+
+
+def _repo_com_spec(tmp_path, fontes=None):
+    raiz = cria_repo(tmp_path)
+    for f in FONTES:
+        escreve(raiz, f, "x = 1\n")
+    escreve(raiz, SPEC_REL, monta_spec(None, fontes or FONTES))
+    base = commita(raiz, "chore: base")
+    return raiz, base
+
+
+def _run_range(raiz, base, corpo_pr=""):
+    corpo = raiz / "_corpo.txt"
+    corpo.write_text(corpo_pr, encoding="utf-8")
+    return subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--repo-root",
+            str(raiz),
+            "--range",
+            f"{base}...HEAD",
+            "--pr-body-file",
+            str(corpo),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        encoding="utf-8",
+    )
+
+
+def test_sot_encolhendo_reprova(tmp_path):
+    raiz, base = _repo_com_spec(tmp_path)
+    escreve(raiz, SPEC_REL, monta_spec(None, FONTES[:1]))
+    commita(raiz, "docs(pagamento): enxuga spec")
+
+    r = _run_range(raiz, base)
+    assert r.returncode != 0, f"lista encolhida passou sem justificativa:\n{r.stdout}"
+    assert "pagamento.spec.md" in r.stdout
+    assert "models/pagamento.py" in r.stdout, "a saida deve nomear o item que sumiu"
+
+
+def test_sot_encolhendo_com_waiver_passa(tmp_path):
+    raiz, base = _repo_com_spec(tmp_path)
+    escreve(raiz, SPEC_REL, monta_spec(None, FONTES[:1]))
+    commita(raiz, "docs(pagamento): enxuga spec")
+
+    # Sem o waiver tem que bloquear. Sem esta linha o teste passa mesmo com o
+    # detector desligado, e ai nao prova que o waiver faz alguma coisa.
+    assert _run_range(raiz, base).returncode != 0, "o cenario nem estava bloqueando"
+
+    r = _run_range(
+        raiz,
+        base,
+        f"doc-nao-afetada: {SPEC_REL} — models/pagamento.py foi movido para "
+        "apps/financeiro no #1900 e a spec de la passou a declara-lo",
+    )
+    assert r.returncode == 0, f"waiver justificado deveria satisfazer:\n{r.stdout}"
+
+
+def test_sot_crescendo_nao_reprova(tmp_path):
+    """Declarar mais fontes e o comportamento que se quer premiar."""
+    raiz, base = _repo_com_spec(tmp_path, fontes=FONTES[:1])
+    escreve(raiz, SPEC_REL, monta_spec(None, FONTES))
+    commita(raiz, "docs(pagamento): declara mais fontes")
+
+    r = _run_range(raiz, base)
+    assert r.returncode == 0, f"crescer a lista reprovou:\n{r.stdout}"
+
+
+def test_sot_reordenado_nao_reprova(tmp_path):
+    raiz, base = _repo_com_spec(tmp_path)
+    escreve(raiz, SPEC_REL, monta_spec(None, list(reversed(FONTES))))
+    commita(raiz, "docs(pagamento): reordena")
+
+    r = _run_range(raiz, base)
+    assert r.returncode == 0, f"reordenar reprovou; a comparacao e de conjunto:\n{r.stdout}"
+
+
+def test_spec_nova_no_pr_nao_reprova(tmp_path):
+    """Nao ha versao anterior da qual encolher."""
+    raiz = cria_repo(tmp_path)
+    for f in FONTES:
+        escreve(raiz, f, "x = 1\n")
+    base = commita(raiz, "chore: base")
+    escreve(raiz, "v2/docs/specs/backend/nova.spec.md", monta_spec(None, FONTES))
+    commita(raiz, "docs: spec nova")
+
+    r = _run_range(raiz, base)
+    assert r.returncode == 0, f"spec nova reprovou:\n{r.stdout}"
+
+
+def test_spec_intocada_nao_e_avaliada_por_encolhimento(tmp_path):
+    raiz, base = _repo_com_spec(tmp_path)
+    escreve(raiz, FONTES[0], "x = 2\n")
+    commita(raiz, "refactor(pagamento): mexe no codigo")
+
+    r = _run_range(raiz, base)
+    assert r.returncode == 0, f"spec nao tocada foi avaliada por encolhimento:\n{r.stdout}"

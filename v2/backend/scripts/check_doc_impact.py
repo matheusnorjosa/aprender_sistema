@@ -51,6 +51,12 @@ import re
 import subprocess
 import sys
 
+# Roda como script solto no runner, entao o proprio diretorio entra no sys.path.
+# `doc_frontmatter` e o SSOT de como se le uma spec — dois parsers respondendo
+# diferente sobre o mesmo arquivo e o gerador de drift que este gate combate.
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import doc_frontmatter  # noqa: E402
+
 # Verbo que declara resolucao. Sem verbo, a mencao e contexto — avisa, nao bloqueia.
 RESOLVE = re.compile(r"(?i)\b(clos(?:e|es|ed)|fix(?:e[sd])?|resolv(?:e|es|ed))\s+#(\d{2,6})\b")
 MENCAO = re.compile(r"#(\d{2,6})\b")
@@ -102,39 +108,28 @@ def _docs_vivos(raiz: pathlib.Path):
 
 
 def _status(texto: str) -> str:
-    """status do frontmatter. Vazio se nao houver."""
-    linhas = texto.split("\n")
-    if not linhas or linhas[0].strip() != "---":
-        return ""
-    for ln in linhas[1:40]:
-        if ln.strip() == "---":
-            break
-        m = re.match(r"^status\s*:\s*(\S+)", ln)
-        if m:
-            return m.group(1).strip().lower()
-    return ""
+    return doc_frontmatter.status(texto)
 
 
 def _sources_of_truth(texto: str) -> list[str]:
-    """Le a lista do frontmatter. O parser do check_doc_frontmatter nao le listas."""
-    linhas = texto.split("\n")
-    if not linhas or linhas[0].strip() != "---":
-        return []
-    dentro = False
-    itens: list[str] = []
-    for ln in linhas[1:]:
-        if ln.strip() == "---":
-            break
-        if re.match(r"^sources_of_truth\s*:", ln):
-            dentro = True
-            continue
-        if dentro:
-            m = re.match(r"^\s+-\s+(.+?)\s*$", ln)
-            if m:
-                itens.append(m.group(1).strip().strip("`\"'"))
-            elif re.match(r"^\w", ln):
-                break
-    return itens
+    return doc_frontmatter.frontmatter(texto)[1]
+
+
+def _sot_encolheu(raiz: pathlib.Path, base: str, rel: str, texto_atual: str) -> list[str]:
+    """Itens que sumiram do `sources_of_truth` desta spec em relacao a `base`.
+
+    B.4 — O INCENTIVO PERVERSO. As 21 specs que declaram `sources_of_truth` estao
+    21/21 em drift; as unicas verdes eram as que nao declaravam nada. A saida
+    barata, entao, e apagar linhas da lista: o drift some sem que uma linha de
+    doc fique correta. Encolher pode ser legitimo (arquivo removido, escopo
+    dividido) — por isso exige justificativa, nao proibicao.
+    """
+    antes = _git(["show", f"{base}:{rel}"], raiz)
+    if not antes:
+        return []  # spec nova neste PR: nao ha do que encolher
+    _, fontes_antes = doc_frontmatter.frontmatter(antes)
+    _, fontes_agora = doc_frontmatter.frontmatter(texto_atual)
+    return sorted(set(fontes_antes) - set(fontes_agora))
 
 
 def main(argv: list[str]) -> int:
@@ -151,12 +146,16 @@ def main(argv: list[str]) -> int:
         print(f"ERRO: repo-root nao encontrado: {raiz}", file=sys.stderr)
         return 2
 
+    base = ""
     if a.changed_files_from:
         alterados = [x.strip() for x in _le(a.changed_files_from).split("\n") if x.strip()]
         mensagens = _le(a.commit_messages_from)
     elif a.intervalo:
         alterados = [x.strip() for x in _git(["diff", "--name-only", a.intervalo], raiz).split("\n") if x.strip()]
         mensagens = _git(["log", "--format=%B", a.intervalo], raiz)
+        # B.4 compara a lista declarada contra a versao da base. Com `...` a base
+        # e o merge-base, que e o mesmo ponto que o diff acima usa.
+        base = a.intervalo.split("...")[0].split("..")[0].strip()
     else:
         print("ERRO: informe --range ou --changed-files-from.", file=sys.stderr)
         return 2
@@ -235,6 +234,26 @@ def main(argv: list[str]) -> int:
         if atingidos and rel not in tocados:
             amostra = ", ".join(atingidos[:3]) + ("…" if len(atingidos) > 3 else "")
             avisos.append((rel, f"declara em sources_of_truth arquivo que o PR alterou: {amostra}"))
+
+        # detector 3 (B.4) — a lista encolheu: BLOQUEIA sem justificativa.
+        # Apagar linhas do sources_of_truth faz o drift sumir sem corrigir uma
+        # linha de doc. E a saida barata que a Fase B criaria se ninguem olhasse.
+        if base and rel in tocados:
+            sumiram = _sot_encolheu(raiz, base, rel, texto)
+            if sumiram:
+                amostra = ", ".join(sumiram[:3]) + ("…" if len(sumiram) > 3 else "")
+                if rel in waivers:
+                    pass
+                elif rel in sem_motivo:
+                    bloqueios.append((rel, f"waiver sem justificativa para sources_of_truth que encolheu: {amostra}"))
+                else:
+                    bloqueios.append(
+                        (
+                            rel,
+                            f"sources_of_truth perdeu {len(sumiram)} item(ns) — {amostra}. "
+                            "Encolher a lista faz o drift sumir sem corrigir a doc",
+                        )
+                    )
 
     if avisos:
         print("AVISO — specs e docs que o PR provavelmente afeta:")

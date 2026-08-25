@@ -32,10 +32,10 @@ export interface BlockFilters {
 export interface MonthlyAvailabilityParams {
   year: number;
   month: number;
-  role?: 'FORMADOR' | 'COORDENADOR';
-  sector?: string;
-  q?: string;
-  gerencia_id?: number | null;
+  role?: 'FORMADOR' | 'COORDENADOR' | undefined;
+  sector?: string | undefined;
+  q?: string | undefined;
+  gerencia_id?: number | null | undefined;
 }
 
 /**

@@ -35,9 +35,9 @@ import type { ID, PaginatedResponse } from '../types';
  * Query parameters for list operations
  */
 export interface ListParams {
-  page?: number;
-  pageSize?: number;
-  page_size?: number;
+  page?: number | undefined;
+  pageSize?: number | undefined;
+  page_size?: number | undefined;
   [key: string]: unknown;
 }
 

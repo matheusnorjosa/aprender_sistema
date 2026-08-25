@@ -319,7 +319,11 @@ export default function DashboardsPage(): JSX.Element {
                     </div>
                     <Progress
                       percent={item.porcentagem}
-                      strokeColor={GERENCIA_COLORS[idx % GERENCIA_COLORS.length]}
+                      {...(GERENCIA_COLORS[idx % GERENCIA_COLORS.length] !==
+                        undefined && {
+                        strokeColor:
+                          GERENCIA_COLORS[idx % GERENCIA_COLORS.length],
+                      })}
                       size="small"
                     />
                   </div>

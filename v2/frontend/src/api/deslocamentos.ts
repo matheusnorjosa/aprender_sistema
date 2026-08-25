@@ -75,10 +75,15 @@ export interface DeslocamentoPayload {
  */
 export async function listDeslocamentos(
   filters: DeslocamentoFilters = {},
-  options: { signal?: AbortSignal } = {}
+  options: { signal?: AbortSignal | undefined } = {}
 ): Promise<PaginatedResponse<DeslocamentoRecord>> {
   const url = buildUrl('/deslocamentos/', filters as QueryParams);
-  return await fetchAPI<PaginatedResponse<DeslocamentoRecord>>(url, { ...options });
+  // exactOptional: só repassa `signal` se definido (FetchOptions.signal vem de
+  // RequestInit e não aceita undefined EXPLÍCITO); evita spread de undefined.
+  return await fetchAPI<PaginatedResponse<DeslocamentoRecord>>(
+    url,
+    options.signal !== undefined ? { signal: options.signal } : {},
+  );
 }
 
 /**

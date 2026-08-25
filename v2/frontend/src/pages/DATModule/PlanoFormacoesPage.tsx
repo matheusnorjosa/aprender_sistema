@@ -764,13 +764,13 @@ export default function PlanoFormacoesPage(): JSX.Element {
             <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>Ano</Text>
             </div>
-            <InputNumber
+            <InputNumber<number>
               style={{ width: '100%' }}
               placeholder="Todos"
               min={2020}
               max={2100}
               controls={false}
-              value={filters.ano}
+              {...(filters.ano !== undefined && { value: filters.ano })}
               onChange={(val) => setFilters((prev) => ({ ...prev, ano: val ?? undefined }))}
             />
           </Col>

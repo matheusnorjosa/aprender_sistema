@@ -114,11 +114,11 @@ interface GroupRecord {
 interface UserFormValues {
   username: string;
   email: string;
-  first_name?: string;
-  last_name?: string;
+  first_name?: string | undefined;
+  last_name?: string | undefined;
   cpf?: string;
-  telefone?: string;
-  cargo?: string;
+  telefone?: string | undefined;
+  cargo?: string | undefined;
   is_active: boolean;
   is_superuser: boolean;
   setor_ids: ID[];
@@ -139,8 +139,8 @@ interface PaginationState {
  * Fetch params interface
  */
 interface FetchParams {
-  current?: number;
-  pageSize?: number;
+  current?: number | undefined;
+  pageSize?: number | undefined;
   ordering?: string;
 }
 

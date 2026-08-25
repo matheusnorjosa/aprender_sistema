@@ -54,8 +54,8 @@ export default function DatImportsCentralizedBanner({
   return (
     <Alert
       aria-label={DAT_IMPORTS_CENTRALIZED_MESSAGE}
-      className={className}
-      style={style}
+      {...(className !== undefined && { className })}
+      {...(style !== undefined && { style })}
       type="info"
       showIcon
       message={description}

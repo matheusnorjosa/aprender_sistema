@@ -144,7 +144,7 @@ export interface ListParams {
   search?: string;
   is_active?: boolean;
   ativo?: boolean;
-  uf?: string;
+  uf?: string | undefined;
   ordering?: string;
   page?: number;
   page_size?: number;

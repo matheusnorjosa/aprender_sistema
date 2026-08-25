@@ -485,7 +485,7 @@ export default function ApprovalsPage(): JSX.Element {
           {/* Tabela */}
           <section aria-label="Lista de solicitacoes para aprovacao">
             <Table
-              rowSelection={rowSelection}
+              {...(rowSelection !== undefined && { rowSelection })}
               columns={columns}
               dataSource={rows}
               loading={loading}

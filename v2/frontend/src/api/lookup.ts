@@ -54,8 +54,8 @@ export interface ValidateSolicResult {
  */
 export type LookupMunicipiosParams = QueryParams & {
   q?: string;
-  com_compra?: boolean;
-  projeto_id?: ID;
+  com_compra?: boolean | undefined;
+  projeto_id?: ID | undefined;
 };
 
 /**

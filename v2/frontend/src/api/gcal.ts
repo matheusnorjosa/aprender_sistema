@@ -111,7 +111,7 @@ export interface GCalDashboardEventRecord {
 export interface GCalDashboardEventsParams extends GCalDashboardWindowFilters {
   page?: number;
   page_size?: number;
-  status?: string;
+  status?: string | undefined;
 }
 
 /**
@@ -318,7 +318,7 @@ export function buildDashboardEventsExportUrl(params: {
   export_format: 'csv' | 'json';
   start?: string;
   end?: string;
-  status?: string;
+  status?: string | undefined;
 }): string {
   const relativePath = buildUrl('/gcal/dashboard/events/export/', params);
   return `${API_BASE}${relativePath}`;

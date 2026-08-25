@@ -82,32 +82,32 @@ interface DATRegistrosFilters {
 }
 
 interface DATRegistroFormValues {
-  municipio: number;
-  projeto_geral: number;
-  projeto: number;
-  aluno_qtde?: number | null;
-  professor_qtde?: number | null;
+  municipio: number | undefined;
+  projeto_geral: number | undefined;
+  projeto: number | undefined;
+  aluno_qtde?: number | null | undefined;
+  professor_qtde?: number | null | undefined;
   // FORMAR
   reuniao_dat?: Dayjs | null;
-  turma_formar_id?: string | null;
-  turma_formar_status?: string | null;
-  nr_codigos?: number | null;
-  chaves_inscricao_status?: string | null;
+  turma_formar_id?: string | null | undefined;
+  turma_formar_status?: string | null | undefined;
+  nr_codigos?: number | null | undefined;
+  chaves_inscricao_status?: string | null | undefined;
   chaves_inscricao_data?: Dayjs | null;
-  instrucoes_status?: string | null;
+  instrucoes_status?: string | null | undefined;
   instrucoes_data?: Dayjs | null;
-  envio_codigos_status?: string | null;
+  envio_codigos_status?: string | null | undefined;
   envio_codigos_data?: Dayjs | null;
-  obs_formar?: string | null;
+  obs_formar?: string | null | undefined;
   // AVALIAR: multivalorado (JSONField array). O nome do form já é o plural do serializer.
-  usa_avaliar?: boolean;
-  alunos_recebidos_status?: string | null;
+  usa_avaliar?: boolean | undefined;
+  alunos_recebidos_status?: string | null | undefined;
   alunos_recebidos_datas?: Dayjs[] | null;
-  alunos_validados_status?: string | null;
+  alunos_validados_status?: string | null | undefined;
   alunos_validados_datas?: Dayjs[] | null;
-  alunos_importados_status?: string | null;
+  alunos_importados_status?: string | null | undefined;
   alunos_importados_datas?: Dayjs[] | null;
-  obs_avaliar?: string | null;
+  obs_avaliar?: string | null | undefined;
 }
 
 const toISODate = (d?: Dayjs | null): string | null => (d ? d.format('YYYY-MM-DD') : null);

@@ -97,7 +97,7 @@ export default function AcoesTimelinePage(): JSX.Element {
           <Select
             loading={loadingCycles}
             value={selectedCycleId ?? undefined}
-            onChange={(value) => setSelectedCycleId(value)}
+            onChange={(value) => setSelectedCycleId(value ?? null)}
             placeholder="Selecione o ciclo"
             options={cycles.map((cycle) => ({
               value: cycle.id,

@@ -78,6 +78,19 @@ jobs:
         if: ${{ !cancelled() }}
         run: python .claude/hooks/test_hooks.py
 
+      # RELATORIO, NAO PORTAO (Fase B.3 do plano). Medido em 2026-08-24: 21 de 21
+      # specs que declaram `sources_of_truth` estao em drift, e 95% recebem commit
+      # novo em 7 dias. Um gate que barra sobre "existe drift" barra sempre e e
+      # desligado na primeira semana. Drift em repouso e metrica; o portao e o step
+      # seguinte, limitado ao que o PR tocou.
+      #
+      # A unica saida != 0 daqui e nao poder medir: em repo raso o `git log` ve um
+      # punhado de commits e responderia "sem drift" — verde por falta de dado, que
+      # e o defeito que o relatorio existe para medir. Dai o `fetch-depth: 0` acima.
+      - name: Drift das specs vivas (relatorio no job summary)
+        if: ${{ !cancelled() }}
+        run: python v2/backend/scripts/doc_drift_report.py --format=gh-summary
+
       # Mantem a documentacao viva. Dois detectores com calibragem diferente:
       # issue resolvida cujo doc a cita BLOQUEIA (preciso e raro); codigo alterado
       # que uma spec declara em sources_of_truth AVISA (dispara em ~60% dos PRs).

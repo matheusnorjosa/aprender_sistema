@@ -130,15 +130,19 @@ def test_classify_no_pii_in_report(tmp_path):
     assert _CPF_A not in blob
 
 
-def test_allow_order_applies_coordenador_before_plano(tmp_path):
-    """--allow-entity plano ANTES de coordenador: o sort por ENTITY_ORDER garante coordenador 1º →
-    o plano resolve por CPF (senão o índice sairia vazio e o plano ficaria NULL)."""
+def test_allow_order_applies_by_entity_order_not_cli_order(tmp_path):
+    """O apply itera por ENTITY_ORDER, não pela ordem de --allow-entity: dat_coordenador (idx menor) é
+    aplicado mesmo listado DEPOIS de plano_formacao. (Nota #1849: o coordenador do PLANO resolve contra
+    Usuario, não contra este DATCoordenador — que é governança; por isso o plano fica NULL aqui.)"""
     actor = _actor()
     MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
     ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
     coord_csv = f"{COORD_HEADER}\nCoord Y,COORD Y,{_CPF_A},DAT,DAT\n"
     plano_row = f"Cidade X,CIDADE X,CE,Proj X,Proj X,2026,workbook,false,Coord Y,{_CPF_A},,0,0,0"
     path = _write_export(tmp_path, {"dat_coordenador": coord_csv, "plano_formacao": f"{PLANO_HEADER}\n{plano_row}\n"})
-    ExportContractImporter(path=path, apply=True, allow=("plano_formacao", "dat_coordenador"), actor=actor).run()
-    p = PlanoFormacoes.objects.get()
-    assert p.coordenador_id == DATCoordenador.objects.get(nome="Coord Y").id
+    r = ExportContractImporter(path=path, apply=True, allow=("plano_formacao", "dat_coordenador"), actor=actor).run()
+    # dat_coordenador foi aplicado apesar de listado DEPOIS de plano → ordenação por ENTITY_ORDER.
+    assert r["applied"]["dat_coordenador"] == 1
+    assert DATCoordenador.objects.filter(nome="Coord Y").exists()
+    # o coordenador do plano NÃO vem deste DATCoordenador (resolve contra Usuario, ausente aqui) → NULL.
+    assert PlanoFormacoes.objects.get().coordenador_id is None

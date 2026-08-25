@@ -17,7 +17,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from django.db import transaction
-from django.db.models import Count, Sum
+from django.db.models import Count, Sum, Value
+from django.db.models.functions import Concat
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
@@ -54,11 +55,12 @@ class PlanoFormacoesFilter(filters.FilterSet):
 
     class Meta:
         model = PlanoFormacoes
+        # coordenador removido do filtro (#1849, opção B): o campo virou FK→Usuario e o dropdown de
+        # DATCoordenador do front some; a busca por nome do coordenador é coberta por `search_fields`.
         fields = [
             "municipio",
             "projeto",
             "ano",
-            "coordenador",
             "ativo",
             "uf",
         ]
@@ -98,7 +100,7 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = PlanoFormacoesFilter
-    search_fields = ["municipio__nome", "projeto__nome", "coordenador__nome"]
+    search_fields = ["municipio__nome", "projeto__nome", "coordenador__first_name", "coordenador__last_name"]
     ordering_fields = ["municipio__nome", "projeto__nome", "ch_anual", "created_at"]
     ordering = ["municipio__nome", "projeto__nome"]
 
@@ -199,10 +201,12 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
         # Por UF
         por_uf = list(qs.values("municipio__uf").annotate(count=Count("id")).order_by("-count"))
 
-        # Por coordenador (top 10)
+        # Por coordenador (top 10) — coordenador virou Usuario (#1849); nome = first_name + last_name.
+        # A chave do payload passa de `coordenador__nome` para `coordenador_nome`.
         por_coordenador = list(
             qs.exclude(coordenador__isnull=True)
-            .values("coordenador__nome")
+            .annotate(coordenador_nome=Concat("coordenador__first_name", Value(" "), "coordenador__last_name"))
+            .values("coordenador_nome")
             .annotate(count=Count("id"))
             .order_by("-count")[:10]
         )
@@ -296,8 +300,12 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
 
             ch_total = planos_projeto.aggregate(total=Sum("ch_anual"))["total"] or 0
 
+            # coordenador virou Usuario (#1849) → nome = first_name + last_name.
             coordenadores = list(
-                planos_projeto.exclude(coordenador__isnull=True).values_list("coordenador__nome", flat=True).distinct()
+                planos_projeto.exclude(coordenador__isnull=True)
+                .annotate(coordenador_nome=Concat("coordenador__first_name", Value(" "), "coordenador__last_name"))
+                .values_list("coordenador_nome", flat=True)
+                .distinct()
             )
 
             resumo.append(

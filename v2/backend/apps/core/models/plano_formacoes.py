@@ -18,7 +18,6 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 if TYPE_CHECKING:
-    from apps.core.models.dat_coordenador import DATCoordenador
     from apps.core.models.organizacao import Municipio, Projeto
     from apps.core.models.usuario import Usuario
 
@@ -43,12 +42,15 @@ class PlanoFormacoes(models.Model):
     projeto: models.ForeignKey[Projeto] = models.ForeignKey(  # type: ignore[assignment]
         "core.Projeto", on_delete=models.PROTECT, related_name="planos_formacoes", verbose_name="Projeto"
     )
-    coordenador: models.ForeignKey[DATCoordenador | None] = models.ForeignKey(  # type: ignore[assignment]
-        "core.DATCoordenador",
+    # Coordenador = a PESSOA que coordenou (coluna Coordenador da Agenda), resolvido por CPF → Usuario
+    # (#1849). NÃO é a lista de governança DATCoordenador (essa segue em DATAcao/DATFormacao). Read-only
+    # na UI (o dado é autoritativo do import); o import seta via ORM.
+    coordenador: models.ForeignKey[Usuario | None] = models.ForeignKey(  # type: ignore[assignment]
+        "core.Usuario",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="planos_formacoes",
+        related_name="planos_coordenados",
         verbose_name="Coordenador Responsavel",
     )
 

@@ -566,12 +566,37 @@ v2/docs/memoria/
 # Codex local workspace (local only)
 .codex/
 
-# Claude local workspace (local only)
-.claude/
+# Claude local workspace
+# D3 (PLAN_doc_drift_2026-08-25): a camada de instrucao de agente passou a ser
+# VERSIONADA. Motivo: e onde drift desvia um agente em vez de confundir uma
+# pessoa, e instrucao que so existe numa maquina nao tem revisao, diff nem
+# historico. O que fica de fora e o que e de maquina ou volumoso.
+.claude/*
+!.claude/CLAUDE.md
+!.claude/CLAUDE-principles.md
+!.claude/settings.json
+!.claude/agents/
+!.claude/cheatsheets/
+!.claude/commands/
+!.claude/hooks/
+!.claude/skills/
+!.claude/songs/
 
-# Agent instruction files (local only)
-AGENTS.md
-CLAUDE.md
+# Nunca versionar: config de maquina, worktrees, caches e notas historicas.
+# .claude/_archive/ ficou de fora de proposito: sao notas de sessao antigas, sem
+# valor operacional, e carregam caminhos de outras pastas da maquina.
+.claude/_archive/
+.claude/settings.local.json
+.claude/worktrees/
+.claude/**/__pycache__/
+.claude/**/*.pyc
+
+# Agent instruction files — VERSIONADOS desde D3 (ver acima).
+# Antes eram local-only por decisao do ADR-017, cuja premissa era "nenhum
+# comportamento critico depende de .claude/ num clone limpo". A auditoria de
+# 2026-08-24 falsificou a premissa: o enforcement da CP-07 vive em
+# .claude/hooks/guardrails.py e a clausulas-petreas.spec.md o cita como
+# mecanismo. Registro em v2/docs/plans/PLAN_doc_drift_2026-08-25.md (D3).
 v2/docs/AGENTS.md
 
 # Session/handoff notes (local only)
@@ -631,7 +656,8 @@ graphify-out/cost.json
 .rtk/
 
 # Claude Code agent skills cache
-.agents/
+# .agents/ — VERSIONADO desde D3. Ver bloco 'Claude local workspace'.
+.agents/**/__pycache__/
 
 # Staging gate evidence (local artifacts)
 evidence/

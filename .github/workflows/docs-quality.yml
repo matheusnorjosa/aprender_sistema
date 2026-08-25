@@ -60,3 +60,35 @@ jobs:
         run: >
           python v2/backend/scripts/check_agent_instructions.py
           --tracked-only .claude .agents AGENTS.md CLAUDE.md
+
+      # POR QUE ESTE STEP EXISTE.
+      # .claude/hooks/test_hooks.py tem 51 testes cobrindo os guards — inclusive
+      # a CP-07 — e NUNCA rodou em CI: mora fora do `testpaths = apps` do pytest.
+      # Consequencia medida: o PR #1847 trocou os caminhos dos hooks para
+      # $CLAUDE_PROJECT_DIR, o harness usava os.path.isabs() e passou a reprovar
+      # 8 testes de wiring e a PULAR EM SILENCIO os 2 de runtime do guardrails.
+      # Ficou 41/49 e mergeou assim. Um harness que ninguem roda nao protege nada.
+      # Sem dependencia externa: so json + os da stdlib.
+      - name: Harness dos hooks de agente (guards CP-05/CP-07)
+        run: python .claude/hooks/test_hooks.py
+
+      # Mantem a documentacao viva. Dois detectores com calibragem diferente:
+      # issue resolvida cujo doc a cita BLOQUEIA (preciso e raro); codigo alterado
+      # que uma spec declara em sources_of_truth AVISA (dispara em ~60% dos PRs).
+      # Medido contra os 12 ultimos merges: 0 bloqueios, media de 1,7 avisos.
+      # Escopo resolvido DENTRO do job — nunca por path filter, que e o trap
+      # documentado no topo deste arquivo.
+      - name: Documentacao viva (issue resolvida e spec impactada)
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body || '' }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$PR_BODY" > /tmp/pr-body.txt
+          # `...` (merge-base) e nao `..`: com `..` o diff carrega o que entrou na
+          # main depois do branch, e o PR responde por mudanca alheia.
+          python v2/backend/scripts/check_doc_impact.py \
+            --range "${BASE_SHA}...${HEAD_SHA}" \
+            --pr-body-file /tmp/pr-body.txt

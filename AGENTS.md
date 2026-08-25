@@ -20,7 +20,10 @@ Valem **mesmo que nenhum hook dispare**. São o piso de qualidade:
 4. **NUNCA mencione Claude/IA** em commit ou PR ("Generated with Claude Code", "Co-Authored-By: Claude"). Reforça o global.
 5. **NUNCA use Vite `manualChunks`** em `vite.config.*` — quebrou deps do Rollup e **crashou a prod**. Deixe o Rollup fazer o chunking automático.
 6. **v2 roda APENAS em Docker** (CP-01): `cd v2 && make up`. NUNCA `python manage.py` no host — use `docker exec aprender_dev-web-1 python manage.py ...`. **Exceção: o frontend roda no HOST** (`cd v2/frontend && npm ...`), não em Docker.
-7. **Merge na `main` = DEPLOY EM PROD** via Portainer (sem staging). Confirme CI verde + evidência do staging gate antes de promover o PR a Ready.
+7. **Merge na `main` NÃO deploya** (ADR-018, 2026-07-10). O merge só builda, escaneia, assina (cosign + SLSA) e publica a tag imutável `vYYYY.MM.DD-<sha7>` — `deploy.yaml` chama-se hoje *"Build, sign and release"* e diz em caixa alta que não deploya. Produção muda por **promoção humana**: `gh workflow run promote.yml -f release=<tag>`, atrás do GitHub Environment `production` com *required reviewer*; a VM01 **puxa** o ponteiro assinado e aplica por digest. **NUNCA** aplique nada direto no Portainer para "subir uma versão" — o `PUT` legítimo é feito pelo `aprender-applier` em `127.0.0.1:9443`.
+   > ~~Merge na `main` = deploy em prod via Portainer (sem staging).~~ Era o **ADR-010**, **revogado pelo ADR-018 em 2026-07-10**: os jobs `deploy` e `validate_existing_tag` foram **deletados** no #1516 e a `:9443` deixou de ser pública. Guardado aqui porque a instrução antiga circulou por meses.
+
+   Continua valendo: CI verde + evidência do staging gate no corpo do PR antes de promover o PR a Ready — não existe staging remoto, o gate local (`make staging-full`) é a única validação pré-prod.
 
 ## Cláusulas Pétreas (CP) — imutáveis
 - **CP-01** Docker-only (`cd v2 && make up`)
@@ -66,7 +69,21 @@ PR abre como **Draft**; só promove a Ready após `make staging-full` passar. Sq
 - **Tools do Codex**: edição = `apply_patch` (não `Edit`/`Write`); shell = `shell`/`local_shell`. As regras acima são tool-agnósticas.
 
 ## Produção
-3 VMs (App: Nginx/Gunicorn/Celery/React · DB: PostgreSQL 15 · Red: Redis 7). Deploy: merge na `main` → GitHub Actions builda imagem → redeploy via **Portainer CE API** (sem staging). Mudança de compose exige update manual no Portainer Editor.
+3 VMs (App: Nginx/Gunicorn/Celery/React · DB: PostgreSQL 15 · Red: Redis 7).
+
+**Deploy pull-based (ADR-018).** Produção **puxa**; o CI não empurra:
+
+1. Merge na `main` → `deploy.yaml` (*"Build, sign and release"*): build → scan → push no Docker Hub → assina (cosign keyless + provenance SLSA) → tag imutável + GitHub Release. **Para aqui.**
+2. `promote.yml` (`workflow_dispatch`, gated no Environment `production` com *required reviewer*): resolve tag→digest, exige imagens assinadas, monta e assina o `production.json` (release, digests, `sequence` monotônica, `expires_at`) e publica no branch protegido `deploy-pointer`. **Também não deploya** — é a autoridade de assinatura do ponteiro.
+3. VM01, systemd timer ~60s: `aprender-deployer` lê o ponteiro, verifica assinatura + digests; entrega ao `aprender-applier` (único que detém o token do Portainer), que confere anti-rollback, drift do compose contra `trust/compose.pinned.yml`, exige backup de DB fresco, faz o `PUT` em **`127.0.0.1:9443`** e confirma em `localhost` (`/api/readyz/` + `/api/version/`). Cada degrau é fail-closed.
+
+**Migrations são automáticas e bloqueantes** (#1456): serviço one-shot `migrate` no `docker-compose.prod.yml`; `web`/`worker`/`beat` só sobem com `depends_on: service_completed_successfully`. Rodar `migrate` a mão em prod está **revogado** (era instrução do ADR-010).
+
+**Rollback** = promoção para trás pelo mesmo gate: `promote.yml` com `rollback: true` na tag anterior (ainda exige `sequence` maior que o selo). Não há auto-rollback — migrations são forward-only.
+
+Mudança de compose continua exigindo update manual no Portainer Editor **e** re-captura do `trust/compose.pinned.yml` na VM, senão o `compose_check_drift` recusa o próximo deploy.
+
+SSOT: `v2/docs/specs/infra/deploy.spec.md` · ADR: `docs/architecture/project-decisions/ADR-018-pull-based-deploy.md`.
 
 ## Delegação a subagents
 Tarefa que lê muitos arquivos → delegar e ficar só com a conclusão (não com o dump). Contexto principal = síntese e decisão.

@@ -8,41 +8,50 @@ Operações de backup do AS v2.
 
 ## Estado real — leia antes de contar com o DR
 
-Dois defeitos abertos, ambos confirmados por execução contra `main`:
+> [!important] Este bloco listava defeitos que já foram fechados. Situação em 2026-08-25:
+>
+> | Defeito | Estado |
+> |---|---|
+> | #1611 / M26-01 — `restore_db.sh` rejeitava todo backup `.age` de produção com `ERROR: Backup file is corrupted!` | **Corrigido** — `8f392636`, 2026-08-10 |
+> | #1645 / M26-02 — `restore_db.sh` declarava sucesso com exit 0 sobre banco vazio | **Corrigido** — `3bca74f3`, 2026-08-21 |
+> | #1455 — `worker` de produção não montava `/backups`, então o job gravava no vazio | **Corrigido** — #1528; bind-mount `/var/backups/aprender:/backups` em `docker-compose.prod.yml:235` |
+> | [#1646](https://github.com/matheusnorjosa/aprender_sistema/issues/1646) / M26-03 — nenhum drill real de DR com artefato `.age` | **ABERTO** |
 
-**1. O restore oficial rejeita todo backup de produção (P0, issue #1611).**
-`v2/infra/scripts/restore_db.sh:91` roda `gzip -t "$BACKUP_FILE"` **incondicionalmente**,
-antes do branch que sabe decifrar `age` (linhas 113-119). Produção grava
-**exclusivamente** `.age`: `backup_db.sh:44-52` é fail-closed (sem
-`BACKUP_AGE_RECIPIENT` o backup aborta; com recipient o nome vira `.sql.gz.age`) e
-`docker-compose.prod.yml:197` define o recipient. Um artefato `age` começa com o
-cabeçalho de texto `age-encryption.org/v1`, que não é gzip — então o script aborta com
+**O restore oficial funciona.** `restore_db.sh` é ciente do formato: decifra o `.age`
+com `age -d` e só então testa o gzip (`:101-121`), respeita `BACKUP_DIR` via env var
+(`:23`), tira safety dump antes do `DROP DATABASE` (`:132-148`), usa
+`psql -v ON_ERROR_STOP=1` sob `pipefail` (`:162-178`) e verifica o resultado — piso de
+tabelas e linhas > 0 nas tabelas-chave — antes de declarar sucesso (`:180-212`).
 
-```
-ERROR: Backup file is corrupted!
-```
+!!! danger "Em produção, `DB_HOST` por TCP não autentica — `M26-N1`, P1, aberto"
+    `restore_db.sh` conecta sempre como superusuário `postgres` via `-h $DB_HOST` e
+    **não tem tratamento de senha nenhum**:
+    `grep -i PGPASSWORD v2/infra/scripts/restore_db.sh` retorna zero — para contraste,
+    `backup_db.sh` exporta `PGPASSWORD`.
 
-que é **factualmente falso**. Atinge os três caminhos de entrada (arquivo explícito,
-`--latest`, modo interativo). A falha é *fail-closed*: para na linha 91, antes do
-`DROP DATABASE` da linha 107, então não há destruição de dados — o dano é RTO
-estourado sob incidente.
+    A VM02 escuta em `10.0.0.2`, não em loopback
+    (`v2/infra/configs/vm02/postgresql.conf:8`), e o `pg_hba.conf:18` termina com
+    `host all all 0.0.0.0/0 reject`. A única regra que aceita `postgres` é
+    `local … peer` (`:8`) — socket unix.
 
-**Contorno manual enquanto #1611 não é corrigida** (rodar onde o binário `age` exista;
-a imagem `web` não o tem):
+    **Na VM02, use o pipeline manual com peer auth** (`sudo -u postgres`), documentado
+    em `v2/docs/GUIDE_DR.md`. O comando abaixo serve para **dev/staging**.
+
+    `M26-N1` (P1, confirmado) —
+    `v2/docs/audits/2026-07-17-system-module-audit.md:9438`.
 
 ```bash
-age -d -i /etc/backup-key.txt backup_full_<ts>.sql.gz.age | gunzip \
-  | psql -h "$DB_HOST" -U postgres -d "$DB_NAME"
+BACKUP_DIR=/backups BACKUP_AGE_KEY=/etc/backup-key.txt \
+  DB_HOST="$DB_HOST" DB_NAME="$DB_NAME" \
+  /app/infra/scripts/restore_db.sh --latest
 ```
 
-Atenção adicional: `restore_db.sh:17` hardcoda `BACKUP_DIR=/var/backups/aprender` e
-ignora a env var (`backup_db.sh:31` respeita), então `--latest` dentro do container não
-acha nada.
+Rode onde o binário `age` exista: ele está na imagem de **produção**
+(`Dockerfile.prod:56`), não na de dev (`Dockerfile.dev:19-21`).
 
-**2. O job automatizado está silencioso/morto em produção (issue #1455).** `worker` e
-`beat` de prod não montam `/backups`; sem `SENTRY_DSN`, a falha não alerta ninguém.
-
-Consequência: a estratégia documentada nos SSOTs é o **alvo recomendado**, não o estado
-operante. Não existe registro de restore drill bem-sucedido com artefato `.age`
-(`test_dr.sh` não exercita o caminho cifrado — issue #1646). **Se existe backup
-restaurável hoje em produção é uma pergunta em aberto que só um drill real responde.**
+**O que continua em aberto.** Não existe registro de restore drill bem-sucedido com
+artefato `.age` — `test_dr.sh` não gera `.age` nem chama `age -d`, então não exercita o
+caminho cifrado (issue
+[#1646](https://github.com/matheusnorjosa/aprender_sistema/issues/1646)). O código é
+verificável linha a linha; **saber restaurar em produção ainda depende de executar o
+drill.**

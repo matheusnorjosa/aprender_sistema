@@ -26,7 +26,7 @@ não `/skill <nome>`. Comandos slash (`/<nome>`) são os de `.claude/commands/`.
 | `subagent-development` | Orquestrar/paralelizar subagents |
 | `verification-gate` | Verificar antes de afirmar sucesso |
 | `security-scan` | Scan de secrets/deps/code patterns |
-| `ci-github-actions` | CI/CD: workflows, gates [required], 3 marcadores do staging gate, deploy Portainer |
+| `ci-github-actions` | CI/CD: workflows, gates [required], 3 marcadores do staging gate, promoção para prod (ADR-018) |
 | `receiving-code-review` | Processar feedback de review |
 | `create-plan` | Planejar features complexas |
 | `implement-plan` | Executar planos de `thoughts/shared/plans/` |
@@ -57,7 +57,7 @@ não `/skill <nome>`. Comandos slash (`/<nome>`) são os de `.claude/commands/`.
 | `/project_e2e-smoke` | Smoke E2E RF01→…→RF07 (Playwright MCP) |
 | `/project_fix-django-url` | Investigar/corrigir URL reversing |
 | `/project_git-pr` | Commit limpo + descrição de PR |
-| `/deploy-staging` | Checklist de deploy (staging-full + Portainer) |
+| `/deploy-staging` | Checklist do release: gate local `staging-full` → merge (build/sign/tag) → `promote.yml` |
 | `/security-scan` | Scan de segurança automatizado |
 | `/trim` | Reduzir descrição de PR em ~70% |
 | `/etl-dry` | **DEPRECATED-OK** — usar `import_export_contract` (dry-run) |

@@ -1,14 +1,16 @@
 ---
 status: canonical
-last_verified: 2026-08-19
+last_verified: 2026-08-25
 audit_baseline: 90f6a048
 last_runtime_reverification: d08acfa5 (2026-07-20)
 last_v0_revalidation: f6eecd5f (2026-08-19; revalidação por código+git dos 46 itens `aberto`)
+last_code_reconciliation: d8e64714 (2026-08-25; código + git + estado de issue de todo item `aberto`/`parcial`)
 last_confirmed_production_snapshot: 94f27651 (2026-07-20; estado atual não verificado)
 sources_of_truth:
   - v2/docs/audits/2026-07-17-system-module-audit.md
   - reverificação por execução contra main d08acfa5 (2026-07-20)
   - reconciliação parcial por código, testes e histórico Git contra main 6d73ba29 (2026-08-17)
+  - reconciliação por código, histórico Git e estado de issue contra main d8e64714 (2026-08-25)
 ---
 
 # Achados reais — auditoria modular M00–M28
@@ -23,6 +25,11 @@ sources_of_truth:
 > frontend diretamente relacionados. Os outros 46 itens **não foram reexecutados**; seu
 > status `aberto` continua sendo o último veredito de 2026-07-20, não uma nova afirmação
 > sobre a produção atual.
+>
+> **Escopo da atualização de 2026-08-25 (mais recente):** reconciliação por código, histórico
+> Git e estado de issue contra o `HEAD d8e64714`. Ver
+> [Reconciliação de 2026-08-25](#reconciliação-de-2026-08-25-head-d8e64714). Continua **não
+> sendo verificação de deploy**: nada foi promovido a `em prod` nesta passagem.
 
 ## Como este documento nasceu
 
@@ -109,7 +116,13 @@ O workflow ligou PR→achado **mesmo sem auto-close** da issue (M12-19/M23-02) e
 falso-resolvido. Os 5 PRs desta leva (#1758/#1760/#1761/#1762/#1764) mais LGPD/RBAC anteriores
 respondem por esses 7.
 
-### Os 39 que seguem LIVE (mecanismo confirmado no `HEAD`, cada um com issue OPEN)
+### Os 39 que seguiam LIVE em 2026-08-19 (mecanismo no `HEAD f6eecd5f`, issue OPEN naquela data)
+
+> **Veredito de 2026-08-19, superado.** Esta lista é o corte daquela data e fica como registro.
+> A reconciliação de 2026-08-25 mediu que **20 dos 39** mudaram de estado no código desde então
+> (18 `resolvido`, 2 `parcial`). Para o estado corrente, ler
+> [Reconciliação de 2026-08-25](#reconciliação-de-2026-08-25-head-d8e64714) e a coluna `Status`
+> da fila adjudicada — não esta lista.
 
 `M01-01` `M01-07` `M02-09` `M03-02` `M04-01` `M04-05` `M05-07` `M06-04` `M07-01` `M07-02`
 `M08-01` `M08-07` `M08-09` `M08-12` `M09-05` `M10-01` `M10-02` `M10-03` `M10-04` `M10-05`
@@ -124,10 +137,149 @@ respondem por esses 7.
 > conta com senha + [Gerente, Superintendência] = **escalonamento a aprovador**. Mecanismo LIVE
 > (verificado 2026-08-19). A auditoria tratava a escopagem ator×alvo do admin de usuários como
 > **decisão de policy pendente (G2)**, não descuido — daí P1; decidir se vira P0.
+>
+> **Atualização de 2026-08-25 — mecanismo fechado no código.** `a81053cd` (#1769, 2026-08-19)
+> introduziu a policy ator×alvo no admin de usuários; issues #1616 e #1617 estão CLOSED. A
+> pergunta de severidade (P1 → P0) ficou **sem resposta** e perdeu urgência com a correção: não
+> foi decidida nem promovida aqui. Deploy não verificado.
 
-**Total acionável atual (por código, não deploy): 45** (39 LIVE + 6 parciais com residual). Os
-`resolvido` deixam de contar. Épicos-causa-raiz (V2) inalterados. Próxima onda: V1 (encerrar os
-parciais restantes) e V2 (épicos por causa raiz).
+**Total acionável no corte de 2026-08-19 (por código, não deploy): 45** (39 LIVE + 6 parciais
+com residual). Os `resolvido` deixam de contar. Épicos-causa-raiz (V2) inalterados naquele corte.
+
+> ⚠️ **Aritmética inconsistente dentro da própria passagem V0, não corrigida aqui.** A tabela de
+> vereditos soma 39 LIVE + 6 `parcial` + 1 `resolvido` = 46, mas a tabela «Reclassificados nesta
+> passagem» lista **2** `resolvido` (`M12-15`, `M03-03`) e **5** `parcial` — ou seja, 39 + 5 + 2.
+> O total 45 herda a contagem de 6 parciais. Registrado como defeito do registro V0; os números
+> ficam como foram publicados, e o estado corrente vem da seção seguinte, não daqui.
+
+## Reconciliação de 2026-08-25 (`HEAD d8e64714`)
+
+O arquivo não era tocado desde `9631ef60` (2026-08-19). Entre aquele commit e o `HEAD`
+entraram **74 commits, 27 deles `fix(...)`**, e **nenhum** atualizou este documento. Esta
+passagem só reconciliou o registro; não corrigiu código.
+
+**Método, por ID marcado `aberto` ou `parcial`:** (1) estado da issue via
+`gh issue view <N> --json state`; (2) estado do código via `git log --grep="<ID>"` e leitura do
+artefato citado; (3) os dois são registrados separadamente porque **divergem**.
+
+**Limite herdado, mantido:** isto continua sendo reconciliação de código e histórico Git.
+`resolvido` aqui significa *mergeado na `main`* — **não** significa `em prod`. Nenhum item foi
+promovido a `em prod` nesta passagem, e o último snapshot de produção confirmado segue sendo
+`94f27651` (2026-07-20).
+
+### Contradição interna corrigida
+
+Até esta passagem, os **7 IDs reclassificados na passagem V0** continuavam lendo `aberto` na
+coluna `Status` da fila adjudicada: `M12-15` e `M03-03`, que o próprio arquivo declarava
+`resolvido`, e `M12-19`, `M15-02`, `M15-03`, `M23-02`, `M05-03`, declarados `parcial`. Quem lesse
+só a tabela — o modo normal de consumo — recebia `aberto` para dois achados que o mesmo arquivo
+dizia estarem fechados. A coluna `Status` agora reflete o veredito.
+
+### Mudaram de estado: 31 IDs
+
+A coluna **Issue** registra o estado no GitHub; a coluna **Commit** registra o estado do código.
+Onde a issue é um épico que cobre outros IDs, ela pode seguir OPEN com o ID já fechado.
+
+| ID | Sev. | Veredito do árbitro (2026-08-19) | Estado do código (`d8e64714`) | Commit (data) | Issue |
+|---|---|---|---|---|---|
+| `M01-01` | P2 | LIVE | resolvido | `d24da3df` (2026-08-20) | #1660 CLOSED |
+| `M01-07` | P1 | LIVE | resolvido | `aa8bfb5c` (2026-08-20) | #1612 CLOSED |
+| `M03-02` | P2 | LIVE | resolvido | `9da4674d` (2026-08-20) | #1648 CLOSED |
+| `M03-03` | P1 | resolvido (só no texto) | resolvido | `9ae753e6` (2026-08-18) | #1614 CLOSED |
+| `M03-10` | P2 | parcial (2026-08-17) | resolvido | `20c6f48d`+`d2f226cc` (2026-08-18) | #1657 CLOSED |
+| `M05-03` | P2 | parcial | resolvido | `01ddb4cd` (2026-08-21) | #1667 CLOSED |
+| `M06-04` | P2 | LIVE | resolvido | `88626736` (2026-08-19) | #1661 CLOSED |
+| `M07-01` | P1 | LIVE | resolvido | `a81053cd` (2026-08-19) | #1616 CLOSED |
+| `M07-02` | P1 | LIVE | resolvido | `a81053cd` (2026-08-19) | #1617 CLOSED |
+| `M07-03` | P1 | parcial (2026-08-17) | resolvido | `11219a7e` (2026-08-18) | #1618 CLOSED |
+| `M08-01` | P1 | LIVE | resolvido | `af2e8810` (2026-08-19) | #1619 CLOSED |
+| `M08-07` | P2 | LIVE | resolvido | `cd60882a` (2026-08-21) | #1664 OPEN (épico) |
+| `M08-09` | P2 | LIVE | resolvido | `a986a250` (2026-08-21) | #1664 OPEN (épico) |
+| `M09-06` | P1 | parcial (2026-08-17) | resolvido | `659c164f` (2026-08-18) | #1622 CLOSED |
+| `M10-01` | P1 | LIVE | resolvido | `824f777c` (2026-08-20) | #1623 CLOSED |
+| `M10-02` | P1 | LIVE | resolvido | `a1577d41` (2026-08-19) | #1624 CLOSED |
+| `M10-03` | P1 | LIVE | resolvido | `f115dd45` (2026-08-19) | #1625 CLOSED |
+| `M10-04` | P1 | LIVE | **parcial** | `185fab4a` (2026-08-20; só o shape do create) | #1626 CLOSED |
+| `M11-04` | P2 | LIVE | resolvido | `59b001e5` (2026-08-19) | #1650 CLOSED |
+| `M12-15` | P2 | resolvido (só no texto) | resolvido | `9328227f` (2026-08-19) | #1652 CLOSED |
+| `M12-19` | P1 | parcial (residual: publish tratava HTTP 202 como concluído) | resolvido | `3ab590d6` (2026-08-20) | #1629 CLOSED |
+| `M14-01` | P2 | LIVE | **parcial** | `2818a2ad` (2026-08-24) | #1656 OPEN (épico) |
+| `M14-02` | P1 | LIVE | resolvido | `4321d90b` (2026-08-20) | #1630 CLOSED |
+| `M14-03` | P2 | LIVE | resolvido | `4f63caf0` (2026-08-21) | #1663 OPEN (épico) |
+| `M15-02` | P1 | parcial | **parcial** (inalterado) | `5f78a59b` (2026-08-19) | #1632 OPEN |
+| `M15-03` | P1 | parcial | **parcial** (inalterado) | `f6eecd5f` (2026-08-19) | #1633 OPEN |
+| `M16-07` | P1 | parcial (2026-08-17) | resolvido | `1fbcb34b` (2026-08-18) | #1638 CLOSED |
+| `M18-06` | P2 | LIVE | resolvido | `062df0ec` (2026-08-20) | #1653 CLOSED |
+| `M23-02` | P1 | parcial (resíduo teórico) | **parcial** (inalterado) | `20c6f48d`+`d2f226cc` (2026-08-18) | #1644 CLOSED |
+| `M26-02` | P1 | LIVE | resolvido | `3bca74f3` (2026-08-21) | #1645 CLOSED |
+| `M27-24` | P1 | LIVE | resolvido | `88626736` (2026-08-19) | #1647 CLOSED |
+
+Nove desses 31 são só correção de contradição do registro: `M03-03`, `M12-15`, `M15-02`,
+`M15-03` e `M23-02` já tinham veredito na passagem V0 e a tabela contradizia o texto;
+`M03-10`, `M07-03`, `M09-06` e `M16-07` eram parciais de 2026-08-17 nunca reabertos. Os outros
+**22** são mudança real de estado do código depois do corte da V0.
+
+### Residuais que sustentam os `parcial` desta leva
+
+- **`M10-04`** — rebaixado de `resolvido` para `parcial` na revisão de 2026-08-25, porque
+  `185fab4a` (#1778, 2026-08-20) validou o **shape**, nunca o alvo. `_ExtraParticipantsSerializer`
+  (`v2/backend/apps/core/views_solicitacao.py:53-77`) limita cada lista a 200 itens, exige inteiro
+  positivo em `formador_ids`/`coord_acompanha_ids` e e-mail válido nos `*_emails`, e
+  `_create_participants` passou a filtrar `is_active=True` (`views_solicitacao.py:378` e `:384`).
+  Nada verifica **quem** são os ids: qualquer usuário ativo vira `FORMADOR`/`COORD_ACOMPANHA` e
+  qualquer e-mail válido vira `guest_email`, sem policy ator×alvo em lugar nenhum do caminho. O
+  próprio corpo do commit delimita o escopo — "a policy ator×alvo por participante (épico #1656)
+  fica fora". Fechou "sem limite e estoura 500"; **"aceita alvo arbitrário sem policy" segue LIVE**.
+- **`M14-01`** — `2818a2ad` (#1824) fechou só o ramo de vigência: `HasSectorAccess` passou a usar
+  `EquipeGerencia.vigentes_em()` (`v2/backend/apps/core/rbac/permissions.py:300-311` e `:319-327`),
+  então ex-membro expirado perde o gate. O mecanismo titulado **segue LIVE**: sem `gerencia_id`,
+  qualquer papel com vínculo vigente entra — a query não filtra papel (`permissions.py:301-307`).
+- **`M15-02`** / **`M15-03`** — sem mudança desde a V0. Falta, respectivamente, `CHECK`-constraint
+  no banco + datafix, e identidade natural-key + `UniqueConstraint`.
+- **`M23-02`** — issue #1644 está CLOSED e a redação de CPF existe na escrita e na leitura, mas o
+  veredito de 2026-08-19 registrou resíduo teórico (username não-CPF por design). Mantido
+  `parcial` porque **quem baixou o status foi o árbitro**, com a evidência à mão; promover a
+  `resolvido` aqui seria sobrescrever um veredito sem prova nova.
+- **`M15-10`** — inalterado desde 2026-08-17: só a Fase A (`8f894279`, 2026-08-11, e `e94f15f4`,
+  2026-08-12); issue #1637 segue OPEN e a Fase B continua sem desenho.
+
+### Seguem `aberto`: 19 IDs
+
+Issue OPEN **e** nenhum commit citando o ID ou a issue:
+
+`M02-09` `M04-01` `M04-05` `M05-07` `M08-12` `M09-05` `M10-05` `M10-06` `M10-07` `M14-05`
+`M15-04` `M15-05` `M15-08` `M15-09` `M16-04` `M17-01` `M18-05` `M22-14` `M26-03`
+
+Amostra reverificada no artefato, não só por ausência de commit:
+
+- `M04-05` — `v2/backend/apps/core/views_import_usuarios.py:96-97`: o parse aceita uma allowlist
+  de verdadeiros e manda todo o resto para `False`; valor desconhecido (`dry_run=maybe`) vira
+  **APPLY**. Mecanismo intacto.
+- `M16-04` — nenhum `select_for_update` nas views/serializers DAT; o lost update continua.
+- `M26-03` — `v2/infra/scripts/test_dr.sh` não é tocado desde `ca9c1c37` (#1006) e não menciona
+  `.age`. A cobertura de `.age` ficou toda em `v2/infra/scripts/tests/restore_db.bats`, que é
+  outro artefato e não é o round-trip de DR ponta a ponta que o ID pede.
+- `M04-01` — `v2/backend/apps/core/services/equipe_gerencia_import.py` mudou por `2818a2ad`
+  (2026-08-24) e **só** por vigência de vínculo (`valid_from`/`valid_to`); antes dele o arquivo
+  estava parado desde `45c11902` (2026-07-30). `ac418a50` (2026-08-25) resolve coordenador por CPF,
+  mas em `export_contract_importer.py` e `controle_acoes_import.py` — **não toca** este arquivo
+  (`git show --stat --format="" ac418a50`). A duplicação de Gerência não foi tocada por nenhum dos
+  dois. Exemplo de por que "arquivo mudou" não é "achado fechado".
+- `M10-05` — o commit de `M10-04` (`185fab4a`) declara no corpo que a reconciliação de
+  participantes no update fica **fora do escopo**. Ausência de fix confirmada pela própria PR.
+
+**Total acionável por código (não deploy): 25** — 19 `aberto` + 6 `parcial`
+(`M10-04`, `M14-01`, `M15-02`, `M15-03`, `M15-10`, `M23-02`). Era 45 no corte de 2026-08-19.
+
+### Divergência de severidade com a auditoria-mãe — observada, não resolvida
+
+O árbitro já declara que "as severidades daquele relatório não valem: valem as desta tabela", e
+diverge da auditoria de 2026-07-17 na severidade de **27 dos 61 achados**. Esta passagem
+**não mexeu em nenhuma severidade** e não tentou reconciliar as duas escalas. Onde a divergência
+ficou mais visível: o quadro `M07-01`/`M07-02` (P1 com uma pergunta P0 deixada em aberto, agora
+sem urgência porque o mecanismo foi fechado) e os `M26-0x`, que aqui são P1 mas pendem do épico
+#1662, classificado P0. Fica para uma passagem própria, com o critério de severidade explicitado
+antes de qualquer reclassificação.
 
 ## Legenda de status
 
@@ -140,74 +292,97 @@ parciais restantes) e V2 (épicos por causa raiz).
 | `em prod` | correção deployada e verificada em produção |
 | `descartado` | reclassificado ou refutado depois — anote o porquê |
 
-## Fila adjudicada — status reconciliado parcialmente
+## Fila adjudicada — status reconciliado em 2026-08-25 (`HEAD d8e64714`)
+
+A coluna `Status` é o estado **do código na `main`**; nenhuma linha afirma estado de produção.
+A coluna `Issue` traz o número da issue e — **onde o estado foi conferido nesta passagem** — o
+estado dela no GitHub, porque os dois divergem: um épico pode seguir OPEN com o ID já fechado
+(`M08-07`, `M08-09`, `M14-03`), e uma issue pode estar CLOSED com residual registrado aqui
+(`M23-02`).
+
+**Alcance real da conferência, para não prometer mais do que foi feito.** O método desta passagem
+rodou `gh issue view` **apenas** nos IDs marcados `aberto` ou `parcial` e nos reclassificados. As
+**11** linhas que já estavam `resolvido` antes dela não foram reconferidas e por isso trazem só o
+número, sem `(OPEN)`/`(CLOSED)`: `M03-01`, `M26-01`, `M03-11`, `M05-05`, `M10-08`, `M15-11`,
+`M16-08`, `M17-02`, `M19-01`, `M19-02` e `M19-03`. Célula sem estado significa **não conferido
+neste corte** — não "sem issue" e não "issue aberta".
+
+`Resolvido em` cita commit **e** data — linha sem os dois não é `resolvido`. Célula com mais de um
+commit traz a data **de cada commit**, porque eles podem estar a semanas de distância (em `M05-03`,
+`a545d5f8` é de 2026-07-18 e `01ddb4cd` de 2026-08-21).
 
 | ID | Sev. | Status | Título | Ator real | Issue | Resolvido em |
 |---|---|---|---|---|---|---|
 | `M03-01` | **P0** | resolvido | rbac/imports: import de usuários permite auto-escalação a Gerente+Superintendência | DAT (3 contas ativas no censo de 2026-07-20) | #1610 | `ccbe1e05` (2026-07-30) |
 | `M26-01` | **P0** | resolvido | infra/DR: restore_db.sh roda `gzip -t` antes de decifrar e rejeita todo backup .age de produção | Operador/SRE com acesso à VM de banco | #1611 | `8f392636` (2026-08-10) |
-| `M01-07` | **P1** | aberto | rbac/admin: salvar grupo revoga membros alem dos 100 primeiros (paginador global ignora page_si… | Superuser (1 ativo em prod) para a perda de dados no editor de grupos … | #1612 | — |
-| `M02-09` | **P1** | aberto | imports/resolvers: rejeitar ambiguidade em vez de escolher com .first(), e corrigir normalizaçã… | DAT (3 ativos) e Superintendência (1 ativo) + superuser (1). Os endpoi… | #1613 | — |
-| `M03-03` | **P1** | aberto | auth: lockout e throttle de login sao evadiveis por grafia do CPF e por sessao autenticada | Qualquer um dos 148 usuarios ativos autenticados (nenhum grupo necessa… | #1614 | — |
+| `M01-07` | **P1** | resolvido | rbac/admin: salvar grupo revoga membros alem dos 100 primeiros (paginador global ignora page_si… | Superuser (1 ativo em prod) para a perda de dados no editor de grupos … | #1612 (CLOSED) | `aa8bfb5c` (2026-08-20) |
+| `M02-09` | **P1** | aberto | imports/resolvers: rejeitar ambiguidade em vez de escolher com .first(), e corrigir normalizaçã… | DAT (3 ativos) e Superintendência (1 ativo) + superuser (1). Os endpoi… | #1613 (OPEN) | — |
+| `M03-03` | **P1** | resolvido | auth: lockout e throttle de login sao evadiveis por grafia do CPF e por sessao autenticada | Qualquer um dos 148 usuarios ativos autenticados (nenhum grupo necessa… | #1614 (CLOSED) | `9ae753e6` (2026-08-18) |
 | `M03-11` | **P2** | resolvido | frontend/auth: `checkAuth` e o boot (App.tsx) deslogam a sessão em QUALQUER erro (5xx/rede), não só 401/403 — um blip transitório manda um usuário com cookie válido para a tela de login (auditoria dinâmica 2026-08-17, F2). Fix: `checkAuth` relança erro não-auth; App mostra tela de erro com retry; `UsuariosPage` fail-closed | Qualquer usuário autenticado (o boot roda em todo carregamento da app) | #1741 | `fcc074b1` (2026-08-18) |
-| `M04-01` | **P1** | aberto | imports/equipe-gerencia: import cria Gerência duplicada para "Brincando" e "Ed Financeira" e de… | DAT (3 membros ativos nao-superuser) + superuser (1). O endpoint POST … | #1615 | — |
-| `M07-01` | **P1** | aberto | rbac/admin: DAT faz takeover de conta aprovadora (senha, desativação e hard delete) | — | #1616 | — |
-| `M07-02` | **P1** | aberto | RBAC/admin de usuarios: DAT faz takeover de conta aprovadora (senha, e-mail, desativacao e hard… | DAT — 3 membros ativos nao-superuser. Probe confirma que DAT e o UNICO… | #1617 | — |
-| `M07-03` | **P1** | parcial | RBAC/Auditoria: registrar AuditLog em todas as mutações de identidade do UsuarioAdminViewSet | 3 usuários ativos do grupo DAT no censo de 2026-07-20 | #1618 | `aba033f1` (parcial; CRUD cadastral ainda sem cobertura total) |
-| `M08-01` | **P1** | aberto | disponibilidade: PATCH transfere bloqueio aprovado para usuário arbitrário, sem policy nem Audi… | — | #1619 | — |
-| `M08-12` | **P1** | aberto | imports/eventos: import de eventos grava solicitacao aprovada sem hard gate de disponibilidade … | Grupo DAT (3 membros ativos nao-superuser) + 1 superuser ativo. `Permi… | #1620 | — |
-| `M09-05` | **P1** | aberto | Deslocamentos: UI exige delegacao que o backend nega — Coordenador nao consegue registrar nenhu… | Coordenador (42 ativos) e o ator principal: 100% dos creates pela UI f… | #1621 | — |
-| `M09-06` | **P1** | parcial | Deslocamentos: filtros Origem/Destino inutilizáveis — página desmonta a cada tecla e o filtro falha | Coordenador, DAT, Controle, Superintendência e superuser | #1622 | `6d73ba29` (sem cancelamento/latest-wins) |
-| `M10-01` | **P1** | aberto | solicitações: Gerente lê, edita e exclui solicitação de qualquer gerência (sem escopo ator×alvo… | Gerente — 9 usuários ativos não-superuser em produção. Ator real e num… | #1623 | — |
-| `M10-02` | **P1** | aberto | solicitação: troca de projeto para fluxo SUPER mantém status aprovado (lavagem de aprovação, vi… | — | #1624 | — |
-| `M10-03` | **P1** | aberto | solicitacoes: bloquear edicao e exclusao enquanto gcal_status=PENDING (publica conteudo diferen… | Ator real e amplo: o proprio owner da solicitacao. Em prod isso alcanc… | #1625 | — |
-| `M10-04` | **P1** | aberto | solicitacoes: extra_participants aceita alvo arbitrário sem policy, sem limite e estoura 500 | Grande. `create` exige `HasPerm("create_solicitation")` (views_solicit… | #1626 | — |
-| `M10-05` | **P1** | aberto | solicitacoes: edição não reconcilia participantes — convidados e COORD_ACOMPANHA ficam órfãos e… | Existe e é o fluxo comum: 42 Coordenadores ativos + 9 Gerentes + 1 sup… | #1627 | — |
-| `M10-07` | **P1** | aberto | imports/eventos: reimport sobrescreve decisão de aprovação, owner e datas e reporta "unchanged" | DAT (3 membros ativos não-superuser) + superuser (1). `import_spreadsh… | #1628 | — |
+| `M04-01` | **P1** | aberto | imports/equipe-gerencia: import cria Gerência duplicada para "Brincando" e "Ed Financeira" e de… | DAT (3 membros ativos nao-superuser) + superuser (1). O endpoint POST … | #1615 (OPEN) | — |
+| `M07-01` | **P1** | resolvido | rbac/admin: DAT faz takeover de conta aprovadora (senha, desativação e hard delete) | — | #1616 (CLOSED) | `a81053cd` (2026-08-19) |
+| `M07-02` | **P1** | resolvido | RBAC/admin de usuarios: DAT faz takeover de conta aprovadora (senha, e-mail, desativacao e hard… | DAT — 3 membros ativos nao-superuser. Probe confirma que DAT e o UNICO… | #1617 (CLOSED) | `a81053cd` (2026-08-19) |
+| `M07-03` | **P1** | resolvido | RBAC/Auditoria: registrar AuditLog em todas as mutações de identidade do UsuarioAdminViewSet | 3 usuários ativos do grupo DAT no censo de 2026-07-20 | #1618 (CLOSED) | `aba033f1` (2026-07-31)+`11219a7e` (2026-08-18) |
+| `M08-01` | **P1** | resolvido | disponibilidade: PATCH transfere bloqueio aprovado para usuário arbitrário, sem policy nem Audi… | — | #1619 (CLOSED) | `af2e8810` (2026-08-19) |
+| `M08-12` | **P1** | aberto | imports/eventos: import de eventos grava solicitacao aprovada sem hard gate de disponibilidade … | Grupo DAT (3 membros ativos nao-superuser) + 1 superuser ativo. `Permi… | #1620 (OPEN) | — |
+| `M09-05` | **P1** | aberto | Deslocamentos: UI exige delegacao que o backend nega — Coordenador nao consegue registrar nenhu… | Coordenador (42 ativos) e o ator principal: 100% dos creates pela UI f… | #1621 (OPEN) | — |
+| `M09-06` | **P1** | resolvido | Deslocamentos: filtros Origem/Destino inutilizáveis — página desmonta a cada tecla e o filtro falha | Coordenador, DAT, Controle, Superintendência e superuser | #1622 (CLOSED) | `6d73ba29` (2026-08-12)+`659c164f` (2026-08-18) |
+| `M10-01` | **P1** | resolvido | solicitações: Gerente lê, edita e exclui solicitação de qualquer gerência (sem escopo ator×alvo… | Gerente — 9 usuários ativos não-superuser em produção. Ator real e num… | #1623 (CLOSED) | `824f777c` (2026-08-20) |
+| `M10-02` | **P1** | resolvido | solicitação: troca de projeto para fluxo SUPER mantém status aprovado (lavagem de aprovação, vi… | — | #1624 (CLOSED) | `a1577d41` (2026-08-19) |
+| `M10-03` | **P1** | resolvido | solicitacoes: bloquear edicao e exclusao enquanto gcal_status=PENDING (publica conteudo diferen… | Ator real e amplo: o proprio owner da solicitacao. Em prod isso alcanc… | #1625 (CLOSED) | `f115dd45` (2026-08-19) |
+| `M10-04` | **P1** | parcial | solicitacoes: extra_participants aceita alvo arbitrário sem policy, sem limite e estoura 500 | Grande. `create` exige `HasPerm("create_solicitation")` (views_solicit… | #1626 (CLOSED) | `185fab4a` (2026-08-20; só o shape — alvo arbitrário sem policy segue) |
+| `M10-05` | **P1** | aberto | solicitacoes: edição não reconcilia participantes — convidados e COORD_ACOMPANHA ficam órfãos e… | Existe e é o fluxo comum: 42 Coordenadores ativos + 9 Gerentes + 1 sup… | #1627 (OPEN) | — |
+| `M10-07` | **P1** | aberto | imports/eventos: reimport sobrescreve decisão de aprovação, owner e datas e reporta "unchanged" | DAT (3 membros ativos não-superuser) + superuser (1). `import_spreadsh… | #1628 (OPEN) | — |
 | `M10-08` | **P2** | resolvido | solicitações: PATCH (re)atribui município/projeto para par sem Compra — elegibilidade era create-only (auditoria dinâmica 2026-08-17) | Coordenador (42 ativos) e demais criadores editando a própria solicitação | #1738 | `b48aa5f2` (2026-08-18) |
-| `M12-19` | **P1** | aberto | Pré-agenda: polling estoura o throttle do operador e a lista mostra total inalcançável | Sim. Rota `/pre-agenda` e `/controle/pre-agenda` sao gateadas por `Req… | #1629 | — |
-| `M14-02` | **P1** | aberto | Grade mensal: evento com 2+ participantes multiplica CH, codigo e detalhes por participante | Amplo e real. `MonthlyAvailabilityView.permission_classes = [IsAuthent… | #1630 | — |
-| `M14-05` | **P1** | aberto | Disponibilidade/Grade Mensal: unificar a população da grade — visão "Todas" usa coorte históric… | Permanentemente: Controle (1 ativo), DAT (3 ativos), superuser (1) — t… | #1631 | — |
-| `M15-02` | **P1** | aberto | Compras DAT: validar invariantes de DATCompra (sobreuso, valor negativo, item vazio, produto de… | DAT (3 ativos) + Controle (1 ativo). O gate de create/update do DATCom… | #1632 | — |
-| `M15-03` | **P1** | aberto | Compras: definir identidade real de `Compra` — hash sobre campos mutaveis duplica linha na corr… | DAT (3 ativos) e Controle (1 ativo) = 4 atores nao-superuser reais, ma… | #1633 | — |
-| `M15-04` | **P1** | aberto | imports/compras: preview aceita linhas invalidas (quantidade vazia/decimal/negativa, data ausen… | DAT (3 membros ativos nao-superuser) + 1 superuser. O endpoint `POST /… | #1634 | — |
-| `M15-05` | **P1** | aberto | imports/compras: usar UF e código do produto na resolução e gravar Compra.produto | DAT (3 membros ativos nao-superuser) + 1 superuser, via POST /api/cont… | #1635 | — |
-| `M15-09` | **P1** | aberto | Compras (DATCompra): edição reassocia material para outro município/projeto silenciosamente | DAT (3 ativos) + Controle (1) + Assistente Administrativo (1, herda Co… | #1636 | — |
-| `M15-10` | **P1** | parcial | DAT/Compras: formulário de Nova Compra descarta campos, grava valor zero e esconde o erro | DAT e Superintendência | #1637 | `8f894279` + `e94f15f4` (Fase A) |
+| `M12-19` | **P1** | resolvido | Pré-agenda: polling estoura o throttle do operador e a lista mostra total inalcançável | Sim. Rota `/pre-agenda` e `/controle/pre-agenda` sao gateadas por `Req… | #1629 (CLOSED) | `cdbc0d0c` (2026-08-18)+`3ab590d6` (2026-08-20) |
+| `M14-02` | **P1** | resolvido | Grade mensal: evento com 2+ participantes multiplica CH, codigo e detalhes por participante | Amplo e real. `MonthlyAvailabilityView.permission_classes = [IsAuthent… | #1630 (CLOSED) | `4321d90b` (2026-08-20) |
+| `M14-05` | **P1** | aberto | Disponibilidade/Grade Mensal: unificar a população da grade — visão "Todas" usa coorte históric… | Permanentemente: Controle (1 ativo), DAT (3 ativos), superuser (1) — t… | #1631 (OPEN) | — |
+| `M15-02` | **P1** | parcial | Compras DAT: validar invariantes de DATCompra (sobreuso, valor negativo, item vazio, produto de… | DAT (3 ativos) + Controle (1 ativo). O gate de create/update do DATCom… | #1632 (OPEN) | `5f78a59b` (2026-08-19; falta CHECK no banco + datafix) |
+| `M15-03` | **P1** | parcial | Compras: definir identidade real de `Compra` — hash sobre campos mutaveis duplica linha na corr… | DAT (3 ativos) e Controle (1 ativo) = 4 atores nao-superuser reais, ma… | #1633 (OPEN) | `f6eecd5f` (2026-08-19; falta natural-key + UniqueConstraint) |
+| `M15-04` | **P1** | aberto | imports/compras: preview aceita linhas invalidas (quantidade vazia/decimal/negativa, data ausen… | DAT (3 membros ativos nao-superuser) + 1 superuser. O endpoint `POST /… | #1634 (OPEN) | — |
+| `M15-05` | **P1** | aberto | imports/compras: usar UF e código do produto na resolução e gravar Compra.produto | DAT (3 membros ativos nao-superuser) + 1 superuser, via POST /api/cont… | #1635 (OPEN) | — |
+| `M15-09` | **P1** | aberto | Compras (DATCompra): edição reassocia material para outro município/projeto silenciosamente | DAT (3 ativos) + Controle (1) + Assistente Administrativo (1, herda Co… | #1636 (OPEN) | — |
+| `M15-10` | **P1** | parcial | DAT/Compras: formulário de Nova Compra descarta campos, grava valor zero e esconde o erro | DAT e Superintendência | #1637 (OPEN) | `8f894279` (2026-08-11) + `e94f15f4` (2026-08-12) — Fase A |
 | `M15-11` | **P2** | resolvido | hardening de baixo risco consolidado (auditoria dinâmica 2026-08-17): N+1 em `/coordenadores/{id}/alocacoes/` (select_related); índices redundantes de `external_hash` em `core_compra` (3 btrees → 1 + migração); ImportCompras sem magic-bytes (anti-spoofing via `validate_upload`); disconnect Google apaga credencial local mesmo com revoke ≠ 200/400 (preservar p/ retry); aria-label nos botões só-ícone de Deslocamentos; NOTA get_permissions vs @action | DAT/Controle, operador GCal, visitante autenticado | #1742 | `091e6f53`+`99b85952`+`dcecfebf` (2026-08-18) |
-| `M16-07` | **P1** | parcial | DAT Registros: datas do formulário não chegam ao banco | DAT e superuser | #1638 | `3954e208` (arrays multivalorados ainda perdem histórico) |
+| `M16-07` | **P1** | resolvido | DAT Registros: datas do formulário não chegam ao banco | DAT e superuser | #1638 (CLOSED) | `3954e208` (2026-08-11)+`1fbcb34b` (2026-08-18) |
 | `M16-08` | **P1** | resolvido | DAT Registros: opções de status da UI divergem dos choices do backend | DAT e superuser | #1639 | `419fe5fd` (2026-08-11) |
-| `M17-01` | **P1** | aberto | DAT/imports: card "Importar CADASTROS DAT" grava AcaoDAT legacy, que nenhuma tela le | DAT (3 membros ativos nao-superuser) + 1 superuser. O gate do card e d… | #1640 | — |
+| `M17-01` | **P1** | aberto | DAT/imports: card "Importar CADASTROS DAT" grava AcaoDAT legacy, que nenhuma tela le | DAT (3 membros ativos nao-superuser) + 1 superuser. O gate do card e d… | #1640 (OPEN) | — |
 | `M17-02` | **P1** | resolvido | DAT (Ações/Cadastros): editar pelo modal apaga silenciosamente as datas do registro | DAT, Controle e Assistente Administrativo | #1641 | `a0553fd7` (2026-08-11) |
 | `M19-01` | **P1** | resolvido | DAT/PlanoFormacoes: CH total e anual ficam um PATCH atrasadas ao atualizar formação inline | DAT e superuser | #1642 | `f9e40902` (2026-08-11) |
 | `M19-02` | **P2** | resolvido | field-drift form↔serializer: DATFormacao.titulo obrigatório sem Form.Item (400 no create) + Solicitacao.observacoes coage null para allow_null=False (auditoria dinâmica 2026-08-17; instância do épico #1655) | DAT (3 ativos) e Coordenador (42 ativos) criadores | #1739 | `58759ced` (2026-08-18) |
 | `M19-03` | **P2** | resolvido | DAT/PlanoFormacoes: excluir plano faz HARD DELETE em cascata de formações/acompanhamentos/provas — inclusive as concluídas (realizada=True, registro histórico) — sem bloqueio, sem soft-delete e sem auditoria (auditoria dinâmica 2026-08-17). Fix: `perform_destroy` bloqueia (409) quando há concluídas + audita a exclusão permitida; UI gateia o botão | Superintendência (`execute_restricted_operations`) + superuser | #1740 | `92ee82af` (2026-08-18) |
-| `M22-14` | **P1** | aberto | Import de bloqueios: resolucao por nome com fallback substring cria bloqueio auto-aprovado na a… | Grupo DAT (3 membros ativos nao-superuser) + 1 superuser ativo, via `H… | #1643 | — |
-| `M23-02` | **P1** | aberto | auditoria: redigir CPF (`username`) nos AuditLog de LOGIN_FAILED, na escrita e na leitura | DAT (3 ativos), Controle (1), Superintendencia (1), Gerente (9) — 14 n… | #1644 | — |
-| `M26-02` | **P1** | aberto | DR: restore_db.sh declara "Restore completed successfully!" com exit 0 apos um restore que perd… | Operador de DR com SSH na VM02 (na pratica o unico superuser/dono). Na… | #1645 | — |
-| `M26-03` | **P1** | aberto | infra/DR: test_dr.sh nao exercita o backup cifrado — round-trip .age via restore_db.sh nunca fo… | Nao e achado de RBAC — nenhum grupo o alcanca e o censo nao muda a sev… | #1646 | — |
-| `M27-24` | **P1** | aberto | frontend/nginx: restaurar os 7 headers de seguranca descartados pelo add_header aninhado | Qualquer visitante nao autenticado / atacante externo — o defeito esta… | #1647 | — |
-| `M01-01` | **P2** | aberto | seguranca/rede: resolver de IP confia no primeiro X-Forwarded-For, permitindo forjar origem em … | Anonimo na internet (nao requer conta): o caminho /api/ e o unico prox… | #1660 (épico) | — |
-| `M03-02` | **P2** | aberto | auth: login aceita requisição cross-origin e emite sessão (login-CSRF) | — | #1648 | — |
-| `M03-10` | **P2** | parcial | PII/LGPD: remover CPF integral de `Usuario.__str__` e redigir `username` nos logs de auditoria | DAT e Controle no censo de 2026-07-20 | #1657 (épico) | `6b35fa40` (`AuditLog.details.username` ainda persiste) |
-| `M04-05` | **P2** | aberto | imports: valor desconhecido de `dry_run` é tratado como APPLY em 11 views | — | #1649 | — |
-| `M05-03` | **P2** | aberto | RBAC: excluir um Group deixa capabilities dos ex-membros em cache por ate 300s | apenas superuser (1 ativo em prod). DELETE /api/grupos/{id}/ e Superus… | #1667 (épico) | — |
+| `M22-14` | **P1** | aberto | Import de bloqueios: resolucao por nome com fallback substring cria bloqueio auto-aprovado na a… | Grupo DAT (3 membros ativos nao-superuser) + 1 superuser ativo, via `H… | #1643 (OPEN) | — |
+| `M23-02` | **P1** | parcial | auditoria: redigir CPF (`username`) nos AuditLog de LOGIN_FAILED, na escrita e na leitura | DAT (3 ativos), Controle (1), Superintendencia (1), Gerente (9) — 14 n… | #1644 (CLOSED) | `20c6f48d`+`d2f226cc` (2026-08-18; residuo teorico) |
+| `M26-02` | **P1** | resolvido | DR: restore_db.sh declara "Restore completed successfully!" com exit 0 apos um restore que perd… | Operador de DR com SSH na VM02 (na pratica o unico superuser/dono). Na… | #1645 (CLOSED) | `3bca74f3` (2026-08-21) |
+| `M26-03` | **P1** | aberto | infra/DR: test_dr.sh nao exercita o backup cifrado — round-trip .age via restore_db.sh nunca fo… | Nao e achado de RBAC — nenhum grupo o alcanca e o censo nao muda a sev… | #1646 (OPEN) | — |
+| `M27-24` | **P1** | resolvido | frontend/nginx: restaurar os 7 headers de seguranca descartados pelo add_header aninhado | Qualquer visitante nao autenticado / atacante externo — o defeito esta… | #1647 (CLOSED) | `88626736` (2026-08-19) |
+| `M01-01` | **P2** | resolvido | seguranca/rede: resolver de IP confia no primeiro X-Forwarded-For, permitindo forjar origem em … | Anonimo na internet (nao requer conta): o caminho /api/ e o unico prox… | #1660 (épico, CLOSED) | `d24da3df` (2026-08-20) |
+| `M03-02` | **P2** | resolvido | auth: login aceita requisição cross-origin e emite sessão (login-CSRF) | — | #1648 (CLOSED) | `9da4674d` (2026-08-20) |
+| `M03-10` | **P2** | resolvido | PII/LGPD: remover CPF integral de `Usuario.__str__` e redigir `username` nos logs de auditoria | DAT e Controle no censo de 2026-07-20 | #1657 (épico, CLOSED) | `6b35fa40` (2026-08-11)+`20c6f48d` (2026-08-18)+`d2f226cc` (2026-08-18) |
+| `M04-05` | **P2** | aberto | imports: valor desconhecido de `dry_run` é tratado como APPLY em 11 views | — | #1649 (OPEN) | — |
+| `M05-03` | **P2** | resolvido | RBAC: excluir um Group deixa capabilities dos ex-membros em cache por ate 300s | apenas superuser (1 ativo em prod). DELETE /api/grupos/{id}/ e Superus… | #1667 (épico, CLOSED) | `a545d5f8` (2026-07-18)+`01ddb4cd` (2026-08-21) |
 | `M05-05` | **P2** | resolvido | RBAC: mudança de Grupo×Capability via API não gera AuditLog e o delta pendente é atribuído ao próximo ator | Somente superuser e operações administrativas | #1657 (épico) | `aba033f1` (2026-07-31) |
-| `M05-07` | **P2** | aberto | frontend: HomePage decide criacao de solicitacao por setor/funcao em vez da policy create_solic… | DAT (3 ativos nao-superuser) e Gerente (9 ativos) — ambos existem hoje… | #1655 (épico) | — |
-| `M06-04` | **P2** | aberto | frontend/nginx: locations `/`, `/assets/`, imagens e `/health` perdem os 7 headers de segurança | Não é achado de RBAC — o censo de grupos não se aplica. A superfície a… | #1661 (épico) | — |
-| `M08-07` | **P2** | aberto | disponibilidade: filtrar papeis ocupantes tambem na query de eventos existentes (CONVIDADO bloq… | Somente o superuser (1 ativo), via Django admin (`ParticipationAdmin`,… | #1664 (épico) | — |
-| `M08-09` | **P2** | aberto | Disponibilidade (RD-05): capacidade diaria ignora eventos que cruzam a meia-noite | Qualquer usuario autenticado que crie/edite Solicitacao ou consulte /a… | #1664 (épico) | — |
-| `M10-06` | **P2** | aberto | gcal: descrição do evento perde a seção "Equipe" — payload lê formadores/coordenador legados qu… | Qualquer criador de solicitação — Coordenador (42 ativos), Formador (9… | #1666 (épico) | — |
-| `M11-04` | **P2** | aberto | aprovação: `ids` em lote sem validação decompõe string em dígitos e aprova alvo não nomeado | — | #1650 | — |
-| `M12-15` | **P2** | aberto | oauth: vincular state do OAuth Google a sessao que o criou (identidade lida do sufixo mutavel) | Atacante precisa mintar um state via /oauth/google/start, que exige Ca… | #1652 | — |
-| `M14-01` | **P2** | aberto | RBAC/Grade mensal: HasSectorAccess autoriza qualquer papel com vínculo e ignora `ativo` no ramo… | Depende de variável NÃO VERIFICADA. O gate só é alcançável por quem te… | #1656 (épico) | — |
-| `M14-03` | **P2** | aberto | Disponibilidade: CH Ano na grade mensal soma so o mes consultado e repete o CH Mes | ~14 atores nao-superuser: DAT 3 + Controle 1 + Assistente Administrati… | #1663 (épico) | — |
-| `M15-08` | **P2** | aberto | DAT/Compras: PATCH concorrente em DATCompra sobrescreve estoque (lost update) e duplo POST cria… | DAT (3 ativos), Controle (1), Assistente Administrativo lotado em Cont… | #1665 (épico) | — |
-| `M16-04` | **P2** | aberto | DAT: PATCH concorrente perde update (lost update) em ProjetoGeral/DATRegistro | — | #1651 | — |
-| `M18-05` | **P2** | aberto | DAT Coordenadores: edicao apaga data_admissao e vaza observacoes entre registros (detalhe/edica… | DAT (3 ativos) e Controle (1 ativo) + o superuser (1). O endpoint exig… | #1654 (épico) | — |
-| `M18-06` | **P2** | aberto | Paginação: DRF ignora `page_size` e esconde até 77% das linhas nas telas DAT | DAT (3 ativos) e Superintendência (1 ativo) + 1 superuser — a permissã… | #1653 (épico) | — |
+| `M05-07` | **P2** | aberto | frontend: HomePage decide criacao de solicitacao por setor/funcao em vez da policy create_solic… | DAT (3 ativos nao-superuser) e Gerente (9 ativos) — ambos existem hoje… | #1655 (épico, OPEN) | — |
+| `M06-04` | **P2** | resolvido | frontend/nginx: locations `/`, `/assets/`, imagens e `/health` perdem os 7 headers de segurança | Não é achado de RBAC — o censo de grupos não se aplica. A superfície a… | #1661 (épico, CLOSED) | `88626736` (2026-08-19) |
+| `M08-07` | **P2** | resolvido | disponibilidade: filtrar papeis ocupantes tambem na query de eventos existentes (CONVIDADO bloq… | Somente o superuser (1 ativo), via Django admin (`ParticipationAdmin`,… | #1664 (épico, OPEN) | `cd60882a` (2026-08-21) |
+| `M08-09` | **P2** | resolvido | Disponibilidade (RD-05): capacidade diaria ignora eventos que cruzam a meia-noite | Qualquer usuario autenticado que crie/edite Solicitacao ou consulte /a… | #1664 (épico, OPEN) | `a986a250` (2026-08-21) |
+| `M10-06` | **P2** | aberto | gcal: descrição do evento perde a seção "Equipe" — payload lê formadores/coordenador legados qu… | Qualquer criador de solicitação — Coordenador (42 ativos), Formador (9… | #1666 (épico, OPEN) | — |
+| `M11-04` | **P2** | resolvido | aprovação: `ids` em lote sem validação decompõe string em dígitos e aprova alvo não nomeado | — | #1650 (CLOSED) | `59b001e5` (2026-08-19) |
+| `M12-15` | **P2** | resolvido | oauth: vincular state do OAuth Google a sessao que o criou (identidade lida do sufixo mutavel) | Atacante precisa mintar um state via /oauth/google/start, que exige Ca… | #1652 (CLOSED) | `9328227f` (2026-08-19) |
+| `M14-01` | **P2** | parcial | RBAC/Grade mensal: HasSectorAccess autoriza qualquer papel com vínculo e ignora `ativo` no ramo… | Depende de variável NÃO VERIFICADA. O gate só é alcançável por quem te… | #1656 (épico, OPEN) | `2818a2ad` (2026-08-24; so o ramo de vigencia) |
+| `M14-03` | **P2** | resolvido | Disponibilidade: CH Ano na grade mensal soma so o mes consultado e repete o CH Mes | ~14 atores nao-superuser: DAT 3 + Controle 1 + Assistente Administrati… | #1663 (épico, OPEN) | `4f63caf0` (2026-08-21) |
+| `M15-08` | **P2** | aberto | DAT/Compras: PATCH concorrente em DATCompra sobrescreve estoque (lost update) e duplo POST cria… | DAT (3 ativos), Controle (1), Assistente Administrativo lotado em Cont… | #1665 (épico, OPEN) | — |
+| `M16-04` | **P2** | aberto | DAT: PATCH concorrente perde update (lost update) em ProjetoGeral/DATRegistro | — | #1651 (OPEN) | — |
+| `M18-05` | **P2** | aberto | DAT Coordenadores: edicao apaga data_admissao e vaza observacoes entre registros (detalhe/edica… | DAT (3 ativos) e Controle (1 ativo) + o superuser (1). O endpoint exig… | #1654 (épico, OPEN) | — |
+| `M18-06` | **P2** | resolvido | Paginação: DRF ignora `page_size` e esconde até 77% das linhas nas telas DAT | DAT (3 ativos) e Superintendência (1 ativo) + 1 superuser — a permissã… | #1653 (épico, CLOSED) | `062df0ec` (2026-08-20) |
 
-## Correções reconciliadas com o `HEAD`
+## Correções reconciliadas em 2026-08-17, contra o `HEAD 6d73ba29` (commit de 2026-08-12)
+
+> **Snapshot datado, parcialmente superado.** Quatro linhas `parcial` desta tabela foram
+> encerradas depois: `M07-03` (`11219a7e`), `M09-06` (`659c164f`), `M16-07` (`1fbcb34b`) e
+> `M03-10` (`20c6f48d`+`d2f226cc`), todas em 2026-08-18. O residual descrito na coluna à direita
+> é o que existia em 2026-08-17 e é justamente o que aqueles commits fecharam — a coluna fica
+> como registro do que foi medido, não como fila. `M15-10` continua `parcial`.
 
 | ID | Resultado | Evidência atual | Regressão/residual |
 |---|---|---|---|
@@ -231,26 +406,43 @@ o backend permanece Docker-only.
 
 ## Plano de continuidade
 
-### Onda V0 — tornar a fila atual novamente
+### Onda V0 — tornar a fila atual novamente — **executada**
 
-1. Revalidar os 46 itens `aberto` contra `main 6d73ba29`, por módulo, sem herdar o veredito
-   de julho: entry point real → policy/scope → efeito → teste → commit corretivo, se houver.
-2. Para itens dependentes de ambiente, repetir somente consultas read-only em produção e anotar
-   data, SHA e ponto de observação. Código versionado não prova deploy, firewall, env ou dados.
-3. Dar um ID próprio ao residual do import de usuários que ainda altera cadastro/`is_active`
-   de qualquer alvo não-superuser; não reabrir o P0 de autoatribuição de grupos já fechado.
-4. Só então recalcular P0/P1/P2 e o total acionável atual.
+1. ~~Revalidar os 46 itens `aberto` contra `main 6d73ba29`~~ — feito em 2026-08-19 (`f6eecd5f`)
+   e reconciliado de novo em 2026-08-25 contra `d8e64714`.
+2. **Pendente.** Itens dependentes de ambiente (nginx/edge, DR, envs, dados) continuam sem
+   observação read-only em produção. Código versionado não prova deploy, firewall, env ou dados.
+3. **Pendente.** O residual do import de usuários que ainda altera cadastro/`is_active` de
+   qualquer alvo não-superuser segue sem ID próprio; não reabrir o P0 de autoatribuição de
+   grupos já fechado.
+4. ~~Recalcular o total acionável~~ — 25 por código em 2026-08-25 (19 `aberto` + 6 `parcial`).
+   O recorte P0/P1/P2 **não** foi refeito: severidade não foi tocada nesta passagem.
 
-### Onda V1 — encerrar os cinco parciais
+### Onda V1 — encerrar os parciais — **4 de 5 fechados**
 
-1. `M07-03`: tornar AuditLog invariante para create/update/activate/deactivate, na mesma
-   transação e sem senha/PII no payload.
-2. `M09-06`: abortar request anterior ou aplicar latest-wins; teste com respostas fora de ordem.
-3. `M15-10`: concluir a Fase B ratificada para o domínio de Compras, sem reintroduzir campos
-   sem dono ou contrato backend.
-4. `M16-07`: preservar JSONFields multivalorados e provar formulário → API → banco → detalhe.
-5. `M03-10`: redigir `AuditLog.details.username` na escrita e na leitura, com teste de CPF
-   formatado e não formatado.
+1. ~~`M07-03`: AuditLog invariante para create/update/activate/deactivate~~ — `11219a7e` (#1736),
+   2026-08-18. Helper `services/audit.py::auditar_privilege_flags` vira SSOT do before/after e o
+   `save_model` do Django Admin passa a reusá-lo, então os dois caminhos não divergem mais.
+2. ~~`M09-06`: abortar request anterior ou aplicar latest-wins~~ — `659c164f` (#1737), 2026-08-18.
+   `seqRef` + `AbortController` em `DeslocamentosPage.tsx`, com teste de resposta fora de ordem.
+3. **`M15-10` — único remanescente.** Concluir a Fase B ratificada para o domínio de Compras,
+   sem reintroduzir campos sem dono ou contrato backend. Issue #1637 segue OPEN.
+4. ~~`M16-07`: preservar JSONFields multivalorados~~ — `1fbcb34b` (#1744), 2026-08-18.
+   Falta ainda a prova ponta a ponta formulário → API → banco → detalhe.
+5. ~~`M03-10`: redigir `AuditLog.details.username` na escrita e na leitura~~ — `20c6f48d` (#1735),
+   2026-08-18, com teste de CPF cru e formatado; épico #1657 CLOSED por `d2f226cc`.
+
+Entram no lugar dos fechados cinco `parcial`, de duas procedências diferentes — a distinção
+importa porque o veredito V0 não classificou os dois últimos como `parcial`:
+
+- saíram `parcial` do próprio veredito V0 de 2026-08-19: `M15-02`, `M15-03` e `M23-02`. A tabela
+  de reclassificados da V0 lista como `parcial` apenas `M12-19`, `M15-02`, `M15-03`, `M23-02` e
+  `M05-03` — e `M12-19` e `M05-03` já fecharam;
+- estavam entre os **39 LIVE** da V0 e só foram rebaixados a `parcial` na reconciliação de
+  2026-08-25: `M14-01` (`2818a2ad` fechou apenas o ramo de vigência) e `M10-04` (`185fab4a`
+  fechou apenas o shape do create).
+
+Residuais em [Reconciliação de 2026-08-25](#reconciliação-de-2026-08-25-head-d8e64714).
 
 ### Onda V2 — corrigir por causa raiz
 
@@ -365,7 +557,7 @@ Um artefato `age` comeca com o cabecalho de texto `age-encryption.org/v1`, que n
 Agravantes:
 - A mensagem e ativamente enganosa. Sob pressao de incidente, um operador pode concluir que a cadeia inteira de backups esta corrompida e desistir do restore.
 - Atinge os **tres** caminhos de entrada (arquivo explicito, `--latest`, modo interativo) — a selecao ja e ciente de `.age` (`:36,:56,:61`), so a verificacao nao e.
-- Zero cobertura: nao existe `.bats` para `restore_db.sh` (os unicos bats do repo cobrem `v2/infra/deployer/`).
+- Zero cobertura **a epoca do achado**: nao existia `.bats` para `restore_db.sh`. A suite foi **criada por `8f392636`** (2026-08-10, #1691 — o proprio fix de `M26-01`) com 5 casos, e **ampliada por `3bca74f3`** (2026-08-21, #1793) com os 2 de `M26-02`, somando os 7 de hoje. A ausencia de teste foi a causa de o defeito sobreviver — nao um sintoma remanescente. O que segue descoberto e o drill real (`M26-03`, #1646): os bats exercitam o script, nunca um `.age` restaurado num banco real.
 - Bug secundario adjacente: `BACKUP_DIR` esta **hardcoded** em `restore_db.sh:17` (`/var/backups/aprender`) e nao respeita a env var, enquanto `backup_db.sh:31` usa `BACKUP_DIR="${BACKUP_DIR:-/backups}"`. Dentro do container (mount `/var/backups/aprender:/backups`) o `--latest` nao acha nada.
 
 Atenuante: a falha e **fail-closed** — para na linha 91, ANTES do `DROP DATABASE` da linha 107. Nao ha destruicao de dados, e um operador experiente pode contornar manualmente com `age -d -i /etc/backup-key.txt <arq> | gunzip | psql`. O dano e RTO estourado + perda de confianca no DR, nao perda de dados.
@@ -464,8 +656,10 @@ nao era o ambiente sob analise.
 
 #### Verificação restante
 
-- A suíte Bats versionada contém cinco cenários e integra o workflow de staging; não foi
-  reexecutada nesta passagem porque Bats não está instalado no ambiente local.
+- A suíte `v2/infra/scripts/tests/restore_db.bats` integra o workflow de staging e cresceu
+  depois: `3bca74f3` (#1793, 2026-08-21) somou os cenários de `M26-02` aos cinco originais. Não
+  foi reexecutada em 2026-08-19 nem em 2026-08-25 porque Bats não está instalado no ambiente
+  local — a contagem corrente sai do arquivo, não daqui.
 - Ensaio de DR real em staging: `backup_db.sh` com `BACKUP_AGE_RECIPIENT` -> gera `.age` -> `restore_db.sh --latest` -> restaura -> conferir `TABLE_COUNT` e contagem de linhas de tabelas-chave (`core_usuario`, `core_solicitacao`) contra a origem.
 - Registrar a data do ensaio em `v2/docs/DISASTER_RECOVERY.md` / `BACKUP_OPERATIONS.md`.
 
@@ -480,24 +674,28 @@ não há prova de RTO nem de restauração ponta a ponta com a chave e o Postgre
 Achados que compartilham uma causa raiz devem ser corrigidos estruturalmente, não com N
 patches pontuais.
 
-| Causa raiz | Sev. | Achados | Issue | Status |
+Estado no corte de 2026-08-25 (`d8e64714`). `Issue` traz o estado no GitHub; `Status` traz o
+estado **do código**. Os dois divergem de propósito: #1664 segue OPEN com os dois achados
+fechados no código, e #1657 está CLOSED com resíduo teórico registrado em `M23-02`.
+
+| Causa raiz | Sev. | Achados | Issue | Status (código) |
 |---|---|---|---|---|
-| paginacao-global-sem-page-size | P1 | `M01-07`, `M18-06` | #1653 | aberto |
-| list-serializer-como-fonte-de-detalhe | P1 | `M15-09`, `M17-02`, `M18-05` | #1654 | parcial |
-| contrato-fe-be-sem-ssot | P1 | `M15-10`, `M16-07`, `M16-08`, `M09-05`, `M05-07` | #1655 | parcial |
-| escopo-ator-alvo-ausente | P0 | `M22-01` (duplicata histórica de `M03-01`), `M07-02`, `M10-01`, `M10-04`, `M14-01` | #1656 | parcial |
-| auditoria-nao-invariante-e-pii | P1 | `M07-03`, `M05-05`, `M23-02`, `M03-10` | #1657 | parcial |
-| resolvers-por-rotulo-humano | P1 | `M02-09`, `M04-01`, `M22-14`, `M15-05` | #1658 | aberto |
-| import-bypassa-invariantes | P1 | `M08-12`, `M10-07`, `M17-01`, `M15-04` | #1659 | aberto |
-| chave-de-seguranca-nao-canonica | P1 | `M03-03`, `M01-01` | #1660 | aberto |
-| nginx-add-header-heranca | P2 | `M06-04`, `M27-24` | #1661 | aberto |
-| dr-restore-nao-exercitado | P0 | `M26-01`, `M26-02`, `M26-03` | #1662 | parcial |
-| grade-mensal-agregacao-e-populacao | P1 | `M14-02`, `M14-03`, `M14-05` | #1663 | aberto |
-| motor-disponibilidade-sem-ssot-de-regra | P2 | `M08-07`, `M08-09` | #1664 | aberto |
-| compras-sem-invariantes-nem-identidade | P1 | `M15-02`, `M15-03`, `M15-08` | #1665 | aberto |
-| solicitacao-participantes-sem-ssot | P1 | `M10-05`, `M10-06` | #1666 | aberto |
-| estado-derivado-obsoleto-apos-escrita | P2 | `M05-03`, `M19-01` | #1667 | parcial |
-| frontend-ciclo-de-requisicoes | P1 | `M09-06`, `M12-19` | #1668 | parcial |
+| paginacao-global-sem-page-size | P1 | `M01-07`, `M18-06` | #1653 CLOSED | resolvido (`aa8bfb5c`, `062df0ec`; 2026-08-20) |
+| list-serializer-como-fonte-de-detalhe | P1 | `M15-09`, `M17-02`, `M18-05` | #1654 OPEN | parcial (`M15-09` e `M18-05` abertos) |
+| contrato-fe-be-sem-ssot | P1 | `M15-10`, `M16-07`, `M16-08`, `M09-05`, `M05-07` | #1655 OPEN | parcial (`M16-07`/`M16-08` fechados; `M15-10` parcial; `M09-05`/`M05-07` abertos) |
+| escopo-ator-alvo-ausente | P0 | `M22-01` (duplicata histórica de `M03-01`), `M07-02`, `M10-01`, `M10-04`, `M14-01` | #1656 OPEN | parcial (`M10-04` e `M14-01` seguem: `M10-04` sem policy ator×alvo por participante; `M14-01` só no ramo sem `gerencia_id`) |
+| auditoria-nao-invariante-e-pii | P1 | `M07-03`, `M05-05`, `M23-02`, `M03-10` | #1657 CLOSED | parcial (`11219a7e`, `20c6f48d`, `d2f226cc`, todos 2026-08-18, fecham `M07-03`/`M05-05`/`M03-10`; `M23-02` segue `parcial` na fila, com o resíduo teórico) |
+| resolvers-por-rotulo-humano | P1 | `M02-09`, `M04-01`, `M22-14`, `M15-05` | #1658 OPEN | aberto (nenhum dos 4 tem fix) |
+| import-bypassa-invariantes | P1 | `M08-12`, `M10-07`, `M17-01`, `M15-04` | #1659 OPEN | aberto (nenhum dos 4 tem fix) |
+| chave-de-seguranca-nao-canonica | P1 | `M03-03`, `M01-01` | #1660 CLOSED | resolvido (`9ae753e6` 2026-08-18, `d24da3df` 2026-08-20) |
+| nginx-add-header-heranca | P2 | `M06-04`, `M27-24` | #1661 CLOSED | resolvido (`88626736`, 2026-08-19) |
+| dr-restore-nao-exercitado | P0 | `M26-01`, `M26-02`, `M26-03` | #1662 OPEN | parcial (`M26-01`/`M26-02` fechados; `M26-03` aberto e o drill real de DR nunca ocorreu) |
+| grade-mensal-agregacao-e-populacao | P1 | `M14-02`, `M14-03`, `M14-05` | #1663 OPEN | parcial (`4321d90b`, `4f63caf0`; `M14-05` aberto) |
+| motor-disponibilidade-sem-ssot-de-regra | P2 | `M08-07`, `M08-09` | #1664 OPEN | resolvido no código (`cd60882a`, `a986a250`; 2026-08-21) — issue segue OPEN |
+| compras-sem-invariantes-nem-identidade | P1 | `M15-02`, `M15-03`, `M15-08` | #1665 OPEN | parcial (`M15-02`/`M15-03` parciais; `M15-08` aberto) |
+| solicitacao-participantes-sem-ssot | P1 | `M10-05`, `M10-06` | #1666 OPEN | aberto (o fix de `M10-04` declara a reconciliação do update fora de escopo) |
+| estado-derivado-obsoleto-apos-escrita | P2 | `M05-03`, `M19-01` | #1667 CLOSED | resolvido (`f9e40902` 2026-08-11, `01ddb4cd` 2026-08-21) |
+| frontend-ciclo-de-requisicoes | P1 | `M09-06`, `M12-19` | #1668 CLOSED | resolvido (`659c164f` 2026-08-18, `3ab590d6` 2026-08-20) |
 
 ## Já corrigidos — não abrir issue
 
@@ -572,6 +770,11 @@ Consequência: os 13 achados de M12 que dependiam de OAuth ativo têm a premissa
 (state de OAuth de um usuário aceito no callback de outro) e para o uso do
 `GCAL_CALENDAR_ID` global no cancelamento em vez do calendário do operador.
 
+> Nota de 2026-08-25: `M12-15` foi fechado no código por `9328227f` (#1760, 2026-08-19) — o
+> ownership do state passou a viver no cache e o callback ganhou `CanUseGcal`. O snapshot de
+> ambiente acima continua sendo o de 2026-07-20; a premissa (OAuth por usuário, sem service
+> account) não foi remedida.
+
 #### F1 — Porta 8000 ✅ (parcial)
 
 O dono testou por **4G, fora da rede corporativa**: a porta **não responde**. A porta
@@ -580,8 +783,9 @@ está protegida por allowlist de firewall externo (Golden).
 Refuta o achado `M27-05` como "exposição pública" — os probes anteriores rodaram de
 dentro da rede allowlisted e concluíram além do que o ponto de observação sustentava.
 
-O que **permanece** verdadeiro: `docker-compose.prod.yml:100-101` publica em `0.0.0.0`
-sem bind em `127.0.0.1`, então o firewall externo é a **única** camada protegendo um
+O que **permanece** verdadeiro (reconferido em 2026-08-25, `d8e64714`):
+`v2/infra/docker-compose.prod.yml:101` ainda publica `"${BACKEND_HOST_PORT:-8000}:8000"`, sem
+bind em `127.0.0.1`, então o firewall externo é a **única** camada protegendo um
 canal em texto claro que serve a API e o `/admin` do Django, fora do TLS e do `limit_req`.
 Reclassificado P0 → **P2**, defesa em profundidade. Correção que preserva o consumidor
 legítimo (`deployer/apply.sh:73-80` usa `confirm_localhost`):
@@ -591,12 +795,19 @@ legítimo (`deployer/apply.sh:73-80` usa `confirm_localhost`):
 
 - **F5** — conteúdo real dos envs no Portainer, comparado 1-a-1 com o template. 18 achados
   dependem disso, e é o único fato com potencial de **promover** algo a P0 (ex.: `DEBUG=True`).
-- **F7** — o beat roda e existe hoje backup restaurável? O código de `M26-01` foi corrigido,
-  mas sem drill real o risco operacional de DR continua aberto junto de `M26-02`/`M26-03`.
-  Precedente relevante: #1537, backup que nunca rodou.
+- **F7** — o beat roda e existe hoje backup restaurável? O código de `M26-01` e o de `M26-02`
+  foram corrigidos (`8f392636`, `3bca74f3`), mas sem drill real o risco operacional de DR
+  continua aberto junto de `M26-03`, que é justamente o ID do teste que nunca exercitou o
+  round-trip cifrado. Precedente relevante: #1537, backup que nunca rodou.
 - **F1 (resto)** — configuração do edge real. O Nginx Proxy Manager é **externo ao
   repositório** (`docker-compose.prod.yml:329-339`); se ele **anexa** `X-Forwarded-For` em
   vez de sobrescrever, `M01-01` e `M03-03` sobem para P1 (bypass remoto de lockout/throttle).
+  **Atualizado em 2026-08-25:** os dois foram fechados no código — `9ae753e6` canonicaliza a
+  chave de lockout/throttle e `d24da3df` faz `get_client_ip` contar `NUM_PROXIES` saltos a
+  partir da **direita**, ignorando entrada forjada à esquerda. A pergunta sobre o edge deixa
+  de ser condição de severidade e vira verificação de topologia: `NUM_PROXIES=2` assume
+  `NPM → nginx frontend → gunicorn`, e um salto a mais ou a menos no edge real reabre o
+  bypass. Continua **não verificado** em produção.
 - **F6** — homônimos e duplicatas nos dados reais (`M02-09`, `M22-14`): dano atual ou preventivo?
 
 ---

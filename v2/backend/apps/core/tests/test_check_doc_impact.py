@@ -1,10 +1,11 @@
 """
 Self-verification do gate que mantem a documentacao viva (Fase C do plano).
 
-Problema medido na auditoria de 2026-08-24: **92,9% dos commits `fix(...)` nao
-tocam um unico `.md`** (8 de 112 desde junho). O arbitro de defeitos ficou 64
-commits sem atualizacao, 26 deles fixes. A regra ja estava escrita, em negrito,
-dentro do proprio arbitro — o modo de falha nao e ignorancia, e ausencia de gate.
+Problema medido na auditoria de 2026-08-24, reconferido em 2026-08-25 contra o
+HEAD d8e64714: **92,9% dos commits `fix(...)` nao tocam um unico `.md`** (8 de
+113 desde 2026-06-01). O arbitro de defeitos ficou 74 commits sem atualizacao, 27
+deles fixes. A regra ja estava escrita, em negrito, dentro do proprio arbitro — o
+modo de falha nao e ignorancia, e ausencia de gate.
 
 Este gate tem DOIS detectores, com calibragem diferente porque a precisao deles e
 diferente:
@@ -31,6 +32,11 @@ Verifica que:
 6. Referencia a issue sem verbo de resolucao gera aviso, nao bloqueio.
 7. `_archive/` e ignorado (historico nao se corrige).
 8. A saida nomeia o doc e diz por que ele foi apontado.
+9. Waiver escondido em comentario HTML nao vale.
+10. Placeholder nao passa por justificativa.
+11. `status: historical` fora de `_archive/` tambem e poupado.
+12. ID de achado citado em commit que nao e fix nao bloqueia.
+13. Achado nao e rotulado com `#` — issue tem numero, achado tem ID.
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportMissingTypeStubs=false
@@ -67,10 +73,14 @@ def _run(
         [
             sys.executable,
             str(SCRIPT),
-            "--repo-root", str(raiz),
-            "--changed-files-from", str(raiz / "_alterados.txt"),
-            "--commit-messages-from", str(raiz / "_commits.txt"),
-            "--pr-body-file", str(raiz / "_corpo.txt"),
+            "--repo-root",
+            str(raiz),
+            "--changed-files-from",
+            str(raiz / "_alterados.txt"),
+            "--commit-messages-from",
+            str(raiz / "_commits.txt"),
+            "--pr-body-file",
+            str(raiz / "_corpo.txt"),
         ],
         capture_output=True,
         text=True,
@@ -278,3 +288,23 @@ def test_saida_explica_o_porque(tmp_path):
     )
     saida = r.stdout + r.stderr
     assert "doc-nao-afetada" in saida, "a saida deve ensinar como declarar o waiver"
+
+
+def test_id_de_achado_nao_e_rotulado_como_issue(tmp_path):
+    """`#M26-03` nao existe. Achado tem ID proprio; issue tem numero.
+
+    A saida deste gate e lida por gente e colada em PR. Rotular achado com `#`
+    fabrica uma referencia que nao resolve em lugar nenhum.
+    """
+    _monta(
+        tmp_path,
+        {"v2/docs/specs/infra/deploy.spec.md": ("---\nstatus: canonical\n---\nM26-03 segue aberto.\n")},
+    )
+    r = _run(
+        tmp_path,
+        ["v2/backend/apps/core/services/x.py"],
+        commits="refactor(deploy): contexto de M26-03",
+    )
+    saida = r.stdout + r.stderr
+    assert "M26-03" in saida, f"o aviso deveria citar o achado:\n{saida}"
+    assert "#M26-03" not in saida, "achado foi rotulado como issue"

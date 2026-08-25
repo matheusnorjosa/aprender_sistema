@@ -62,14 +62,20 @@ jobs:
           --tracked-only .claude .agents AGENTS.md CLAUDE.md
 
       # POR QUE ESTE STEP EXISTE.
-      # .claude/hooks/test_hooks.py tem 51 testes cobrindo os guards — inclusive
+      # .claude/hooks/test_hooks.py tem 51 casos cobrindo os guards (47 aqui: os 4
+      # de hook .ps1 sao pulados, com aviso, porque o runner nao tem powershell) — inclusive
       # a CP-07 — e NUNCA rodou em CI: mora fora do `testpaths = apps` do pytest.
       # Consequencia medida: o PR #1847 trocou os caminhos dos hooks para
       # $CLAUDE_PROJECT_DIR, o harness usava os.path.isabs() e passou a reprovar
       # 8 testes de wiring e a PULAR EM SILENCIO os 2 de runtime do guardrails.
       # Ficou 41/49 e mergeou assim. Um harness que ninguem roda nao protege nada.
       # Sem dependencia externa: so json + os da stdlib.
+      #
+      # `!cancelled()`: sem isto, a falha deste step PULA o gate de doc viva abaixo
+      # e o diagnostico chega pela metade -- foi o que aconteceu na primeira
+      # execucao deste workflow. Cada gate reporta por si.
       - name: Harness dos hooks de agente (guards CP-05/CP-07)
+        if: ${{ !cancelled() }}
         run: python .claude/hooks/test_hooks.py
 
       # Mantem a documentacao viva. Dois detectores com calibragem diferente:
@@ -79,7 +85,7 @@ jobs:
       # Escopo resolvido DENTRO do job — nunca por path filter, que e o trap
       # documentado no topo deste arquivo.
       - name: Documentacao viva (issue resolvida e spec impactada)
-        if: github.event_name == 'pull_request'
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         env:
           PR_BODY: ${{ github.event.pull_request.body || '' }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}

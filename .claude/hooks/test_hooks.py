@@ -11,6 +11,7 @@ the piece whose absence let two hooks silently die (env-var stdin + exit-1 block
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -20,6 +21,7 @@ HOOKS = Path(__file__).resolve().parent
 PY = sys.executable
 
 results: list[tuple[str, bool, str]] = []
+skipped: list[str] = []
 
 
 def _run(cmd: list[str], payload: dict) -> tuple[int, str]:
@@ -35,8 +37,15 @@ def run_py(hook: str, payload: dict) -> tuple[int, str]:
     return _run([PY, str(HOOKS / hook)], payload)
 
 
+# PowerShell nao existe no runner Linux do CI. Os hooks .ps1 sao de notificacao e
+# formatacao; os guards que sustentam CP-05/CP-07 sao Python e continuam sendo
+# exercitados. Pular o que nao da para rodar e melhor que nao rodar nada — foi a
+# ausencia deste harness no CI que deixou o PR #1847 quebrar os guards em silencio.
+POWERSHELL = shutil.which("powershell") or shutil.which("pwsh")
+
+
 def run_ps(hook: str, payload: dict) -> tuple[int, str]:
-    return _run(["powershell", "-ExecutionPolicy", "Bypass", "-File", str(HOOKS / hook)], payload)
+    return _run([POWERSHELL, "-ExecutionPolicy", "Bypass", "-File", str(HOOKS / hook)], payload)
 
 
 def check(name: str, ok: bool, detail: str = "") -> None:
@@ -128,17 +137,20 @@ for name, payload, sub, want in INTENT_CASES:
 # --------------------------------------------------------------------------
 # PowerShell hooks -- smoke
 # --------------------------------------------------------------------------
-_, out = run_ps("tools-reminder.ps1", {"prompt": "x"})
-check("tools-reminder: emits reminder", "skill/command/agent" in out)
+if not POWERSHELL:
+    skipped.append("hooks .ps1 (powershell ausente)")
+else:
+    _, out = run_ps("tools-reminder.ps1", {"prompt": "x"})
+    check("tools-reminder: emits reminder", "skill/command/agent" in out)
 
-rc, _ = run_ps("graphify-reminder.ps1", bash("grep foo src/"))
-check("graphify-reminder: runs clean", rc == 0, f"exit={rc}")
+    rc, _ = run_ps("graphify-reminder.ps1", bash("grep foo src/"))
+    check("graphify-reminder: runs clean", rc == 0, f"exit={rc}")
 
-rc, _ = run_ps("auto-format-python.ps1", write("src/foo.ts", "x"))
-check("auto-format: no-op on .ts", rc == 0, f"exit={rc}")
+    rc, _ = run_ps("auto-format-python.ps1", write("src/foo.ts", "x"))
+    check("auto-format: no-op on .ts", rc == 0, f"exit={rc}")
 
-rc, _ = run_ps("graphify-sync.ps1", {"hook_event_name": "Stop"})
-check("graphify-sync: exit 0", rc == 0, f"exit={rc}")
+    rc, _ = run_ps("graphify-sync.ps1", {"hook_event_name": "Stop"})
+    check("graphify-sync: exit 0", rc == 0, f"exit={rc}")
 
 
 # --------------------------------------------------------------------------
@@ -212,7 +224,11 @@ for _script in HOOK_SCRIPTS:
 # (2) Runtime: o guardrails resolve + decide de um cwd NAO-RAIZ (via PY, sem ambiguidade de shell).
 _gcmd = _wired_command("guardrails.py")
 _gpath = _script_path(_gcmd, "guardrails.py") if _gcmd else None
-if _gpath and _ancorado(_gpath):
+if not (_gpath and _ancorado(_gpath)):
+    # Sem else, estes dois casos sumiam em silencio e o harness ficava verde por
+    # vacuidade -- foi assim que o #1847 quebrou os guards sem ninguem ver.
+    check("wiring: guardrails testavel em runtime", False, f"nao wired/ancorado: path={_gpath!r}")
+else:
     _gpath = _resolve(_gpath)
     _rc = subprocess.run([PY, _gpath], input=json.dumps(bash("git push origin main")).encode("utf-8"), capture_output=True, cwd=NONROOT).returncode
     check("wiring: guardrails BLOQUEIA de cwd nao-raiz (exit 2)", _rc == 2, f"exit={_rc}")
@@ -223,11 +239,22 @@ if _gpath and _ancorado(_gpath):
 # --------------------------------------------------------------------------
 # report
 # --------------------------------------------------------------------------
+# Piso anti-vacuidade: um harness que roda pouco passa por nao testar. O runner
+# Linux do CI nao tem powershell e pula 4 casos; abaixo disso algo sumiu.
+MINIMO = 45
+
 fails = [r for r in results if not r[1]]
 for name, ok, detail in results:
     line = f"{'PASS' if ok else 'FAIL'}  {name}"
     if not ok and detail:
         line += f"  [{detail}]"
     print(line)
-print(f"\n{len(results) - len(fails)}/{len(results)} passed")
+for motivo in skipped:
+    print(f"SKIP  {motivo}")
+print()
+print(f"{len(results) - len(fails)}/{len(results)} passed")
+
+if len(results) < MINIMO:
+    print(f"ERRO: so {len(results)} casos rodaram (minimo {MINIMO}). Verde por vacuidade.")
+    sys.exit(1)
 sys.exit(1 if fails else 0)

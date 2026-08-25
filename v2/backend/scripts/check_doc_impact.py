@@ -63,6 +63,15 @@ IGNORA_DOC = ("_archive", "worktrees", "node_modules")
 WAIVER = re.compile(r"(?im)^\s*doc[- ]nao[- ]afetada\s*:\s*(?P<caminho>\S+)\s*(?:[—–-]{1,2}\s*(?P<motivo>.+))?$")
 
 
+def _rotula(ids: list[str]) -> str:
+    """Issue leva `#`; achado nao.
+
+    Esta saida e lida por gente e colada em PR. `#M26-03` fabrica uma referencia
+    que nao resolve em lugar nenhum — o GitHub nem linka.
+    """
+    return ", ".join("#" + i if i.isdigit() else i for i in ids)
+
+
 def _le(p: str | None) -> str:
     if not p:
         return ""
@@ -206,22 +215,19 @@ def main(argv: list[str]) -> int:
         refs_doc = set(MENCAO.findall(texto)) | set(ACHADO.findall(texto))
 
         # detector 1 — issue resolvida citada pelo doc
-        casadas = sorted((resolvidas | achados) & refs_doc)
-        casadas = [c for c in casadas if c in resolvidas or c in achados]
-        duras = [c for c in casadas if c in resolvidas or c in achados]
+        duras = sorted((resolvidas | achados) & refs_doc)
         if duras and rel not in tocados:
             if rel in waivers:
                 pass
             elif rel in sem_motivo:
-                bloqueios.append((rel, f"waiver sem justificativa (>=10 caracteres) para {', '.join(duras)}"))
+                bloqueios.append((rel, f"waiver sem justificativa (>=10 caracteres) para {_rotula(duras)}"))
             else:
-                ids = ", ".join("#" + c if c.isdigit() else c for c in duras)
-                bloqueios.append((rel, f"o PR resolve {ids} e este doc cita, mas nao foi atualizado"))
+                bloqueios.append((rel, f"o PR resolve {_rotula(duras)} e este doc cita, mas nao foi atualizado"))
 
         # detector 1b — mencao sem verbo de resolucao: so avisa
         brandas = sorted((mencionadas | achados_mencionados) & refs_doc)
         if brandas and rel not in tocados and not duras:
-            avisos.append((rel, f"cita #{', #'.join(brandas)}, mencionado no PR sem verbo de resolucao"))
+            avisos.append((rel, f"cita {_rotula(brandas)}, mencionado no PR sem verbo de resolucao"))
 
         # detector 2 — indice reverso: so avisa
         sot = _sources_of_truth(texto)

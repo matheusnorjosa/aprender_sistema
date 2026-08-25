@@ -26,24 +26,62 @@ DOCS_DIR = PROJECT_ROOT / "v2" / "docs"
 CLAUDE_DIR = PROJECT_ROOT / ".claude"
 # Diretorio de memoria do Claude Code para ESTE projeto.
 # Derivado do caminho do repo, nao fixo: funciona em qualquer maquina/clone.
-_slug = str(Path(__file__).resolve().parents[2]).replace(":", "-").replace("\\", "-").replace("/", "-").lstrip("-")
+_slug = (
+    str(Path(__file__).resolve().parents[2])
+    .replace(":", "-")
+    .replace("\\", "-")
+    .replace("/", "-")
+    .lstrip("-")
+)
 MEMORY_DIR = Path(os.path.expanduser("~")) / ".claude" / "projects" / _slug / "memory"
 
 
+# Tudo que este modulo le do disco acaba impresso no stdout, que vira contexto
+# de sessao e transcript. Arquivos de memoria sao escritos por agente e podem
+# conter qualquer coisa, inclusive segredo colado por engano.
+# CodeQL py/clear-text-logging-sensitive-data (high) apontou exatamente isso
+# quando .claude/ passou a ser versionado e entrou no escopo de analise.
+_SEGREDOS = [
+    re.compile(r"\bghp_[A-Za-z0-9]{30,}"),
+    re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}"),
+    re.compile(r"\bsk-[A-Za-z0-9]{24,}"),
+    re.compile(r"\bAIza[0-9A-Za-z_-]{30,}"),
+    re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}"),
+    re.compile(
+        r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----"
+    ),
+    # credencial embutida em URL de conexao: preserva o esquema e o host
+    re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://)[^\s:/@]+:[^\s:/@]+@"),
+    # atribuicao explicita de segredo
+    re.compile(
+        r"(?i)\b([A-Z_]*(?:TOKEN|SECRET|PASSWORD|PASSWD|API_?KEY)[A-Z_]*\s*[=:]\s*)\S+"
+    ),
+]
+
+
+def _redige(texto: str) -> str:
+    """Mascara segredo antes de qualquer coisa ir para o stdout."""
+    for rx in _SEGREDOS:
+        texto = rx.sub(
+            lambda m: (m.group(1) if m.groups() else "") + "<redigido>", texto
+        )
+    return texto
+
+
 def read_file(path: Path, max_lines: int = 80) -> str:
-    """Read a file, truncated to max_lines."""
+    """Read a file, truncated to max_lines. Secrets are redacted."""
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
         content = "\n".join(lines[:max_lines])
         if len(lines) > max_lines:
             content += f"\n\n... ({len(lines) - max_lines} lines truncated)"
-        return content
+        return _redige(content)
     except Exception:
         return ""
 
 
 def read_section(path: Path, start_marker: str, end_marker: str = "") -> str:
-    """Read a section of a file between markers."""
+    """Read a section of a file between markers. Secrets are redacted."""
     try:
         text = path.read_text(encoding="utf-8")
         start = text.find(start_marker)
@@ -51,8 +89,8 @@ def read_section(path: Path, start_marker: str, end_marker: str = "") -> str:
             return ""
         if end_marker:
             end = text.find(end_marker, start + len(start_marker))
-            return text[start : end if end != -1 else start + 2000]
-        return text[start : start + 2000]
+            return _redige(text[start : end if end != -1 else start + 2000])
+        return _redige(text[start : start + 2000])
     except Exception:
         return ""
 
@@ -60,6 +98,7 @@ def read_section(path: Path, start_marker: str, end_marker: str = "") -> str:
 # ============================================================================
 # RULE DEFINITIONS
 # ============================================================================
+
 
 def python_code_context(tool_input: dict) -> str:
     """Hook 1: Python code guidelines when editing .py files in apps/."""
@@ -77,10 +116,14 @@ def python_code_context(tool_input: dict) -> str:
     # Core patterns based on file type
     if "models" in file_path or "model" in file_path:
         parts.append("### Model Guidelines")
-        parts.append("- Use CheckConstraint with `condition=` (Django 5.2+, not `check=`)")
+        parts.append(
+            "- Use CheckConstraint with `condition=` (Django 5.2+, not `check=`)"
+        )
         parts.append("- Always define `__str__`, `Meta.ordering`, `Meta.verbose_name`")
         parts.append("- Use `UniqueConstraint` over `unique_together`")
-        parts.append("- Pyright strict mode  -- all fields need type annotations (PEP 695)")
+        parts.append(
+            "- Pyright strict mode  -- all fields need type annotations (PEP 695)"
+        )
         parts.append("- Timezone: always store UTC, display America/Fortaleza")
 
     elif "serializer" in file_path:
@@ -94,13 +137,19 @@ def python_code_context(tool_input: dict) -> str:
         parts.append("### View Guidelines")
         parts.append("- Always set `permission_classes` explicitly")
         parts.append("- Use `select_related`/`prefetch_related` in `get_queryset()`")
-        parts.append("- Return proper HTTP status codes (201 for create, 204 for delete)")
-        parts.append('- RBAC: permission_classes = [HasPerm("codename")] from apps.core.rbac (compose with HasPerm("a") | HasPerm("b"))')
+        parts.append(
+            "- Return proper HTTP status codes (201 for create, 204 for delete)"
+        )
+        parts.append(
+            '- RBAC: permission_classes = [HasPerm("codename")] from apps.core.rbac (compose with HasPerm("a") | HasPerm("b"))'
+        )
 
     elif "test" in file_path:
         parts.append("### Test Guidelines")
         parts.append("- Use `default_test_user` fixture from conftest.py")
-        parts.append("- factory_boy factories (UsuarioFactory, etc.) with `factory.Sequence` for unique cpf/email (deterministic, xdist-safe; NEVER hash()%N) [#1404]")
+        parts.append(
+            "- factory_boy factories (UsuarioFactory, etc.) with `factory.Sequence` for unique cpf/email (deterministic, xdist-safe; NEVER hash()%N) [#1404]"
+        )
         parts.append("- Coverage target: 85%+ backend")
         parts.append("- Mark slow tests with `@pytest.mark.slow`")
 
@@ -112,10 +161,18 @@ def python_code_context(tool_input: dict) -> str:
 
     elif "permission" in file_path:
         parts.append("### Permission/RBAC Guidelines")
-        parts.append('- Canonical idiom: permission_classes = [HasPerm("codename")] from apps.core.rbac (compose with HasPerm("a") | HasPerm("b"))')
-        parts.append("- Helpers in apps/core/rbac/; NEVER user.groups.filter(name=...) (banned by scripts/rbac_lint.py, CI required job)")
-        parts.append("- 13 Setores: Superintendencia, Vidas, Fluir, ACerta, Brincando, Sou da Paz, DAT, Controle, Diretoria, Comercial, Relacionamento, Logistica Viagens, Logistica Galpao")
-        parts.append("- 5 Funcoes: Formador, Coordenador, Apoio de Coordenacao, Gerente, Assistente Administrativo")
+        parts.append(
+            '- Canonical idiom: permission_classes = [HasPerm("codename")] from apps.core.rbac (compose with HasPerm("a") | HasPerm("b"))'
+        )
+        parts.append(
+            "- Helpers in apps/core/rbac/; NEVER user.groups.filter(name=...) (banned by scripts/rbac_lint.py, CI required job)"
+        )
+        parts.append(
+            "- 13 Setores: Superintendencia, Vidas, Fluir, ACerta, Brincando, Sou da Paz, DAT, Controle, Diretoria, Comercial, Relacionamento, Logistica Viagens, Logistica Galpao"
+        )
+        parts.append(
+            "- 5 Funcoes: Formador, Coordenador, Apoio de Coordenacao, Gerente, Assistente Administrativo"
+        )
         parts.append("- Approval: superuser OR (Gerente + Superintendencia)")
         parts.append("- All authorization MUST be server-side (never trust client)")
         parts.append("- Check /approve-flow and /check-conflicts commands")
@@ -166,12 +223,16 @@ def typescript_code_context(tool_input: dict) -> str:
         parts.append("### API Client Guidelines")
         parts.append("- Use `fetchAPI()` from api/config.ts (NOT axios)")
         parts.append("- CSRF token handled automatically by fetchAPI")
-        parts.append("- Auth errors (401/403) are silenced in console  -- don't re-add logging")
+        parts.append(
+            "- Auth errors (401/403) are silenced in console  -- don't re-add logging"
+        )
 
     elif "components/" in file_path:
         parts.append("### Component Guidelines")
         parts.append("- Ant Design v5 components with ConfigProvider theme")
-        parts.append("- Brand colors via ConfigProvider theme tokens (not a custom hook)")
+        parts.append(
+            "- Brand colors via ConfigProvider theme tokens (not a custom hook)"
+        )
 
     elif "hooks/" in file_path:
         parts.append("### Hook Guidelines")
@@ -183,7 +244,9 @@ def typescript_code_context(tool_input: dict) -> str:
     parts.append("")
     parts.append("### Gotchas (nao-obvios)")
     parts.append("- React 18 (NOT 19)  -- use lowercase `fetchpriority`, not camelCase")
-    parts.append("- Vite `manualChunks` e bloqueado (crashou prod)  -- deixe o Rollup auto-chunkar")
+    parts.append(
+        "- Vite `manualChunks` e bloqueado (crashou prod)  -- deixe o Rollup auto-chunkar"
+    )
     parts.append("</system-reminder>")
 
     return "\n".join(parts)
@@ -198,7 +261,9 @@ def git_commit_context(command: str) -> str:
     match = re.search(r'-m\s+["\']([^"\']+)["\']', command)
     if match:
         msg = match.group(1)
-        valid_pattern = r"^(feat|fix|refactor|test|docs|style|perf|ci|chore)\([^)]+\):\s.+"
+        valid_pattern = (
+            r"^(feat|fix|refactor|test|docs|style|perf|ci|chore)\([^)]+\):\s.+"
+        )
         if not re.match(valid_pattern, msg):
             return """<system-reminder>
 WARNING: CP-06 VIOLATION -- Invalid commit message format.
@@ -247,8 +312,12 @@ def github_pr_context(command: str) -> str:
         missing = [m for m in markers if m not in command]
         if missing:
             parts.append("<system-reminder>")
-            parts.append("## WARNING: marcadores do staging gate ausentes (auto-detected)")
-            parts.append("O corpo do PR precisa dos 3 marcadores EXATOS (sem acento em 'Evidencia'):")
+            parts.append(
+                "## WARNING: marcadores do staging gate ausentes (auto-detected)"
+            )
+            parts.append(
+                "O corpo do PR precisa dos 3 marcadores EXATOS (sem acento em 'Evidencia'):"
+            )
             parts.append("  - [x] make staging-full executado com sucesso (8/8 PASS)")
             parts.append("  - [x] Evidencia anexada no PR")
             parts.append("  ALL 8 CHECKS PASSED")
@@ -291,7 +360,13 @@ ALL 8 CHECKS PASSED
 
 def docker_stack_context(command: str) -> str:
     """Hook 5: Docker/Stack guidelines."""
-    keywords = ["docker compose", "make up", "make down", "docker-compose", "docker build"]
+    keywords = [
+        "docker compose",
+        "make up",
+        "make down",
+        "docker-compose",
+        "docker build",
+    ]
     if not any(kw in command for kw in keywords):
         return ""
 
@@ -372,11 +447,19 @@ def test_context(command: str) -> str:
     if "pytest" in command or "make test" in command:
         parts.append("### Backend (pytest)")
         parts.append("- Fixture: `default_test_user` auto-injected via pre_save signal")
-        parts.append("- factory_boy + `factory.Sequence` for unique fields (deterministic, xdist-safe) [#1404]")
+        parts.append(
+            "- factory_boy + `factory.Sequence` for unique fields (deterministic, xdist-safe) [#1404]"
+        )
         parts.append("- Coverage target: 85%+ (path to 90%)")
-        parts.append("- `--reuse-db` local; CI gate uses `--no-migrations` (schema from models, #1404)")
-        parts.append("- Markers: `@pytest.mark.slow`, `@pytest.mark.performance`, `@pytest.mark.migrations`")
-        parts.append("- Run: `docker exec aprender_dev-web-1 pytest apps/core/tests/ -v`")
+        parts.append(
+            "- `--reuse-db` local; CI gate uses `--no-migrations` (schema from models, #1404)"
+        )
+        parts.append(
+            "- Markers: `@pytest.mark.slow`, `@pytest.mark.performance`, `@pytest.mark.migrations`"
+        )
+        parts.append(
+            "- Run: `docker exec aprender_dev-web-1 pytest apps/core/tests/ -v`"
+        )
 
     if "vitest" in command:
         parts.append("### Frontend (vitest)")
@@ -413,6 +496,7 @@ O ETL legado (`apps.dat_ingest`, comandos `etl_*`) foi **REMOVIDO** (#967/#971) 
 # ============================================================================
 # PRIORITY 2 HOOKS
 # ============================================================================
+
 
 def cp01_docker_only_context(command: str) -> str:
     """CP-01: Block python manage.py outside Docker."""
@@ -497,11 +581,15 @@ def git_merge_cleanup_context(command: str) -> str:
     # W7: a PR merge to main triggers a prod deploy (merge == deploy via Portainer).
     if "gh pr merge" in command:
         parts.append("## ATENCAO: merge na main = DEPLOY EM PROD (auto-detected)")
-        parts.append("Merge de PR na main dispara build + redeploy via Portainer (sem staging).")
+        parts.append(
+            "Merge de PR na main dispara build + redeploy via Portainer (sem staging)."
+        )
         parts.append("Confirme: CI verde + evidencia do staging gate no corpo do PR.")
         parts.append("")
     parts.append("## Post-Merge Reminder")
-    parts.append("Considere o agente post-merge-cleanup: deleta branches mergeadas, atualiza main,")
+    parts.append(
+        "Considere o agente post-merge-cleanup: deleta branches mergeadas, atualiza main,"
+    )
     parts.append("verifica deploy, faz prune de refs obsoletas.")
     parts.append("</system-reminder>")
     return "\n".join(parts)
@@ -544,14 +632,24 @@ def rbac_groups_filter_warning_context(tool_input: dict) -> str:
     whitelisted = any(
         s in norm
         for s in (
-            "/tests/", "/migrations/", "/fixtures/", "/apps/core/rbac/",
-            "/apps/dev_tools/", "/constants.py", "/permissions.py",
-            "/rbac_helpers.py", "/scripts/rbac_lint.py", "/scripts/rbac_codemod.py",
+            "/tests/",
+            "/migrations/",
+            "/fixtures/",
+            "/apps/core/rbac/",
+            "/apps/dev_tools/",
+            "/constants.py",
+            "/permissions.py",
+            "/rbac_helpers.py",
+            "/scripts/rbac_lint.py",
+            "/scripts/rbac_codemod.py",
         )
     )
     if whitelisted:
         return ""
-    if re.search(r"\.groups\.(filter|exclude)\(\s*name", content) or "groups__name=" in content:
+    if (
+        re.search(r"\.groups\.(filter|exclude)\(\s*name", content)
+        or "groups__name=" in content
+    ):
         return """<system-reminder>
 ## WARNING: RBAC V001 (auto-detected)
 `user.groups.filter(name=...)` e banido pelo rbac_lint ([required] backend rbac-lint) fora da whitelist.
@@ -564,6 +662,7 @@ Uso legitimo (composite/block/data-scope)? Adicione `# noqa: RBAC-<tipo>-allowed
 # ============================================================================
 # DISPATCHER
 # ============================================================================
+
 
 def main() -> None:
     """Main dispatcher  -- reads stdin, matches rules, outputs context."""

@@ -226,8 +226,15 @@ def _resolve_dat_coordenador(value: str) -> DATCoordenador | None:
     if not v:
         return None
     if "@" in v:
-        return DATCoordenador.objects.filter(Q(email__iexact=v) | Q(email_alternativo__iexact=v)).order_by("id").first()
-    return DATCoordenador.objects.filter(nome__iexact=v).order_by("id").first()
+        qs = DATCoordenador.objects.filter(Q(email__iexact=v) | Q(email_alternativo__iexact=v))
+    else:
+        qs = DATCoordenador.objects.filter(nome__iexact=v)
+    # Guard de ambiguidade (#1837): email de coordenador é chave de CARGO (migra de dono); `.first()`
+    # atrelaria a ação ao ocupante ATUAL da caixa. 1 match inequívoco → resolve; 0 ou 2+ → None.
+    ids = list(qs.values_list("id", flat=True)[:2])
+    if len(ids) == 1:
+        return DATCoordenador.objects.get(pk=ids[0])
+    return None
 
 
 def _derive_status(data_etapa: date | None) -> str:

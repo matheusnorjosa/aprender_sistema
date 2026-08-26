@@ -68,6 +68,18 @@ jobs:
           python -m pip install --quiet pyyaml
           python v2/backend/scripts/check_required_checks.py --branch main
 
+      # F.1 pela raiz. As duas arvores de ADR compartilham UM espaco de
+      # numeracao e nao ha registro central: ha dois ADR-012 desde 2026-05-18, e
+      # o ADR-019 recriou a colisao 21 dias depois de a primeira ser documentada
+      # num README. Nota nao impede reincidencia; check impede.
+      #
+      # Nao renumera nada — o 012 esta no allowlist, com motivo. O que ele
+      # bloqueia e a PROXIMA: docs/ vai ate 018, v2/docs/adr ja tem 019, entao o
+      # proximo ADR escrito em docs/ colidiria em silencio.
+      - name: Numeracao de ADR unica nas duas arvores
+        if: ${{ !cancelled() }}
+        run: python v2/backend/scripts/check_adr_numbers.py
+
       - name: Frontmatter das specs SDD
         run: python scripts/check_doc_frontmatter.py
 

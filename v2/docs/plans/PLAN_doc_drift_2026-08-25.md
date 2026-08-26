@@ -613,15 +613,39 @@ dele parece versionada e não é.
 
 Item sem linha aqui não está feito, independente da caixa.
 
-> Estado: **Fases A, C e B mergeadas.** PR #1847 (D3 + D2), #1853 (Fase A + gate
-> de doc viva), e a Fase B em revisão. Fases D–G pendentes; decisões D1 e D4 em
-> aberto.
+> **Estado em 2026-08-26 — a frente de gates está fechada.**
+>
+> | fase | estado |
+> |---|---|
+> | A · limpar antes de trancar | ✅ A.1 (ratchet) · A.2 feito |
+> | B · medir drift por âncora de commit | ✅ B.1–B.4 |
+> | C · fechar o loop por PR | ✅ C.1/C.2/C.4 · C.3 **parcial**, e o limite é de projeto |
+> | D · testes dos próprios gates | ✅ |
+> | E · observabilidade | ✅ E.1/E.2/E.3 |
+> | F · consistência doc-a-doc | ✅ F.1/F.3/F.5/F.6 · F.2 parcial · **F.4 aberta** (conteúdo) |
+> | G · achados de engenharia | ⬜ **aberta** — é código, outra frente |
+> | H · evasão dos próprios gates | ✅ H.1/H.2 |
+>
+> **Nove gates rodam em todo PR:** `check_doc_links` (+F.5), `check_doc_frontmatter`,
+> `check_doc_impact` (4 detectores), `check_agent_instructions` (3 detectores),
+> `check_adr_numbers`, `check_required_checks`, `check_issue_drift` (ratchet),
+> `doc_drift_report`, e o harness dos hooks (51 casos).
+>
+> **O que sobra não é de gate:**
+> - **conteúdo** — as suspeitas restantes do ratchet, arquivar (E), F.4, as três
+>   listas `RF01..RF08` incompatíveis, renumerar o ADR-012
+> - **código** — Fase G inteira
+> - **decisão** — D1, D4, e promover no ruleset os 9 jobs que dizem `[required]`
+>   sem travar merge
 >
 > Este bloco dizia «em working tree, não commitado — 166 arquivos» até 25/08,
 > quando dois PRs já haviam mergeado. Um plano que mente sobre o próprio estado é
-> o defeito que ele descreve, então fica registrado: **o gate da Fase C não pega
-> este caso** — ele liga *issue resolvida* a *doc que a cita*, e nenhum dos dois
-> PRs citava issue. Lacuna real, candidata à Fase F.
+> o defeito que ele descreve — e o gate da Fase C **não pega este caso**, porque
+> liga *issue resolvida* a *doc que a cita*, e nenhum dos PRs citava issue.
+> Lacuna real, ainda aberta.
+>
+> **A metodologia foi destilada em `.claude/skills/gate-calibration/`** — cada
+> regra de calibragem com o número medido que a decidiu.
 
 | Data | Item | Comando de verificação | Saída |
 |---|---|---|---|

@@ -33,17 +33,10 @@ from apps.core.views.dat_module import (
 )
 from apps.core.views.imports import ImportJobBloqueiosUploadView, ImportJobDetailView, ImportJobListView
 from apps.core.views.me import MeEventsListView
-from apps.core.views.options import (
-    CoordenadorOptionViewSet,
-    FormadorOptionViewSet,
-    MunicipioOptionViewSet,
-    ProjetoOptionViewSet,
-    TipoEventoOptionViewSet,
-)
 from apps.core.views.plano_formacoes import PlanoFormacoesViewSet
 from apps.core.views.solicitacao import SolicitacaoViewSet
 from apps.core.views.stats import HomeStatsView
-from apps.core.views.utils import _get_client_ip, api_root
+from apps.core.views.utils import _get_client_ip
 from apps.core.views_basic import CurrentUserView
 
 __all__ = [
@@ -53,7 +46,6 @@ __all__ = [
     "NotificacaoInternaViewSet",
     # Utils
     "_get_client_ip",
-    "api_root",
     # Solicitacao
     "SolicitacaoViewSet",
     # Availability
@@ -85,12 +77,6 @@ __all__ = [
     "DATFormacaoViewSet",
     # Plano Formacoes
     "PlanoFormacoesViewSet",
-    # Options
-    "MunicipioOptionViewSet",
-    "ProjetoOptionViewSet",
-    "CoordenadorOptionViewSet",
-    "FormadorOptionViewSet",
-    "TipoEventoOptionViewSet",
     # Stats
     "HomeStatsView",
     # Imports (ASQ-005)

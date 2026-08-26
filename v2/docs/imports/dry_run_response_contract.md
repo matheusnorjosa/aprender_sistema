@@ -157,9 +157,10 @@ Unificar resposta entre os 11 services + `ImportJob.stats` + `ImportJob.pendenci
 
 ### 4.2 Princípios
 
-0. **`dry_run` fail-closed**: valor não reconhecido ⇒ **HTTP 400**, nunca apply. Hoje 11 views
-   fazem o oposto (`M04-05` / [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649)).
-   Isto vem antes de qualquer padronização de shape.
+0. **`dry_run` fail-closed** — ✅ **implementado em [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649)** (`M04-05`):
+   valor não reconhecido permanece em dry-run (preview), nunca apply. É a variante fail-closed
+   do que esta seção propunha (`HTTP 400`) — igualmente segura. Antes de #1649 as 11 views faziam
+   o oposto. Base para qualquer padronização de shape.
 1. **Compatibilidade gradual**: adicionar campos novos sem remover os antigos por 1 release. Migrar service-by-service.
 2. **Códigos estáveis** em vez de chaves descritivas: `INVALID_CPF` em vez de `cpf_invalid`. Permite i18n no frontend.
 3. **`row_number` obrigatório** em cada erro/warning: ancora ao CSV original.
@@ -275,7 +276,7 @@ Critérios: complexidade, models afetados, dry_run real, idempotência, uso em p
 |---|---|
 | `municipios_import.py` | Cadastro mestre. Sem FK para nada crítico. Sem GCal. Cache de options para invalidar é simples. |
 | `colecoes_import.py` | Cadastro mestre. FK apenas `Projeto`. Sem GCal. |
-| `usuarios_import.py` | ⚠️ **Reclassificado em 2026-07-24: NÃO é baixo risco.** A coluna `grupos` concede **qualquer** grupo, sem allowlist e sem política ator×alvo (`services/usuarios_import.py:374-382`) — achado `M03-01`/**P0**, issue [#1610](https://github.com/matheusnorjosa/aprender_sistema/issues/1610). Padronizar o shape de retorno é seguro; **mexer neste service sem corrigir #1610 antes não é**. Ver [usuarios.md](./usuarios.md) §10. |
+| `usuarios_import.py` | Cadastro mestre (FK `Group` M2M). ✅ **P0 #1610 resolvido (`ccbe1e05`):** a coluna `grupos` passou a exigir gate de superuser — para não-superusuário os grupos pedidos entram em `grupos_ignorados` em vez de serem concedidos (`services/usuarios_import.py:273-283/362/495-496`), e o `export_contract_importer` aplica allowlist (`export_contract_importer.py:1077-1082`). Achado histórico `M03-01`. Residual acompanhado em [#1656](https://github.com/matheusnorjosa/aprender_sistema/issues/1656). Padronizar o shape de retorno segue seguro. Ver [usuarios.md](./usuarios.md) §10. |
 | `produtos_import.py` | Cadastro mestre. FK apenas `Projeto`. |
 | `equipe_gerencia_import.py` | Cadastro de vínculo. Tem extras `gerencias_created/existing` no stats — bom caso de teste para extensibilidade do contrato. |
 
@@ -351,7 +352,7 @@ Quem ler este documento consegue responder:
 | Quais retornam stats? | Todos os 11. Mas com shape diferente (4-campos vs 4+aninhado). Ver §3. |
 | Quais retornam pendências? | Todos os 11. Mas com chaves de categoria diferentes por service. Ver §2.3. |
 | Quais retornam erro por linha? | **Nenhum nativamente** — alguns colocam `linha`/`row` dentro do dict de pendência; nenhum tem array `rows[*]` com `row_number` estruturado. **Lacuna real para padronizar.** |
-| Quais têm dry_run real? | Todos os 11. **Mas o parsing não é fail-safe**: valor desconhecido vira apply em 11 views (`M04-05` / [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649) — ver bloco no topo). Além disso 2 services têm default `False` (`controle_acoes_import:43`, `dat_cadastros_import:77`) — risco se chamado via Python direto. |
+| Quais têm dry_run real? | Todos os 11. **O parsing é fail-closed** desde [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649) (`M04-05`): valor desconhecido permanece em dry-run (preview), nunca apply — via `parse_dry_run` nos 12 sítios (ver bloco no topo). Além disso 2 services têm default `False` (`controle_acoes_import:43`, `dat_cadastros_import:77`) — risco se chamado via Python direto. |
 | O apply fica auditado? | **Não.** Nenhum endpoint síncrono grava `AuditLog` — ver §2.3. Só o caminho async (`ImportJob` → `tasks.py:634,669`, hoje só `bloqueios`) registra. |
 | Quais têm idempotência? | **Todos** — 4 via SHA1 explícito (compras, ações controle, DAT cadastros, eventos), 3 via campo unique (usuarios=cpf, produtos=codigo, municipios=nome+uf), 4 via tupla natural sem hash visível (bloqueios, colecoes, equipe_gerencia, deslocamentos). |
 | Quais podem ser migrados para `ImportJob` async? | **Todos os 11**, conforme comentário em `apps/core/models/import_job.py:41-44`. Hoje só `bloqueios` está async (piloto ASQ-005 Fase 1). |
@@ -370,7 +371,7 @@ Quem ler este documento consegue responder:
 | `_process_row` de `colecoes_import.py`, `municipios_import.py`, `produtos_import.py`, `equipe_gerencia_import.py`, `deslocamentos_import.py` | Confirmar exatamente quais campos vão para `pendencias.outros` vs categorias específicas. |
 | ~~Endpoint sync de **`deslocamentos`**~~ | ✅ **Resolvido 2026-07-24**: rota `deslocamentos/import/` → `ImportDeslocamentosView` (`apps/core/urls.py:76,235-236`). |
 | Default `dry_run=False` em `controle_acoes_import` e `dat_cadastros_import` | **Ainda aberto em 2026-07-24** (`controle_acoes_import.py:43`, `dat_cadastros_import.py:77`). Decidir se é bug a corrigir ou intencional (Makefile chama com `?dry_run=true\|false` explícito). |
-| Parsing de `dry_run` nas 11 views | **Aberto — `M04-05` / [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649).** Valor desconhecido ⇒ apply. Ver bloco no topo. |
+| ~~Parsing de `dry_run` nas 11 views~~ | ✅ **Resolvido — `M04-05` / [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649) (2026-08-25).** `parse_dry_run` fail-closed (valor desconhecido permanece em dry-run/preview), wired em 12 views via `apps.core.imports.request_params.parse_dry_run`. Ver bloco no topo. |
 
 ---
 

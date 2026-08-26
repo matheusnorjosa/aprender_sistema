@@ -1,7 +1,7 @@
 ---
 title: Backup & Disaster Recovery
 status: canonical
-last_verified: 2026-07-24
+last_verified: 2026-08-26
 sources_of_truth:
   - v2/backend/apps/core/tasks_backup.py
   - v2/backend/config/celery.py
@@ -34,10 +34,10 @@ Garantir que o estado do AS v2 (banco PostgreSQL, fonte de verdade de ~82k formu
 
 Esta spec e o **indice canonico** do tema. Os parametros e procedimentos detalhados vivem em [`BACKUP_OPERATIONS.md`](../../BACKUP_OPERATIONS.md) (SSOT de operacoes/parametros) e [`DISASTER_RECOVERY.md`](../../DISASTER_RECOVERY.md) (cenarios de recovery em Docker); para VM de producao, [`GUIDE_DR.md`](../../GUIDE_DR.md). Aqui ficam o **contrato** e os **invariantes** — nao se duplica o passo-a-passo dos guias.
 
-> **AVISO DE REALIDADE (revisto em 2026-07-24).** Duas coisas diferentes:
+> **AVISO DE REALIDADE (revisto em 2026-08-26).** Duas coisas diferentes:
 >
 > 1. **Backup (escrita)** — as tres causas de codigo do #1455 **ja estao corrigidas** e presentes tanto na `main` (`d08acfa5`) quanto no SHA de producao (`94f27651`): registro da task (`config/celery.py:73`, segundo `autodiscover_tasks(related_name="tasks_backup")`), mount gravavel de `/backups` no `worker` (`docker-compose.prod.yml:234-235`) e glob do health check ciente de `.age` (`tasks_backup.py:202-205`). Ver §Pontos de atencao para o detalhe do que era falso na versao anterior desta spec.
-> 2. **Restore (leitura)** — **quebrado**. `v2/infra/scripts/restore_db.sh:91` roda `gzip -t` incondicionalmente e rejeita **todo** backup `.age` — que e o unico formato que producao grava. Achado `M26-01` (**P0**, issue #1611), epico #1662. Detalhe abaixo.
+> 2. **Restore (leitura)** — **corrigido no codigo**. `M26-01` (P0, #1611, `8f392636`) e `M26-02` (P1, #1645, `3bca74f3`/#1793) estao **fechados**: `restore_db.sh` agora e ciente do formato (decifra `.age` com `age -d` **antes** do `gzip -t`), roda o restore com `psql -v ON_ERROR_STOP=1` + piso de contagem de tabelas, faz dump de seguranca antes do `DROP` e honra `BACKUP_DIR`. Cobertura `.bats` criada (`restore_db.bats`, 7 casos). O que **continua aberto** e o drill real de ponta-a-ponta (`M26-03`, #1646, epico #1662): os testes exercitam o script, mas nenhum `.age` foi restaurado num banco real. Detalhe abaixo.
 >
 > O que continua **NAO verificado** e nao pode ser afirmado por leitura de codigo: se o beat realmente executa em producao e se existe hoje um artefato restauravel. E o item **F7** de `v2/docs/audits/ACHADOS_REAIS.md` — depende de verificacao humana na VM. Precedente: #1537, backup que nunca rodou.
 
@@ -50,7 +50,7 @@ Esta spec e o **indice canonico** do tema. Os parametros e procedimentos detalha
   - `daily-database-backup` — `crontab(hour=2, minute=0)`, args `("full",)`, `expires=3600`.
   - `weekly-backup-health-check` — `crontab(hour=3, minute=0, day_of_week=0)` (domingos).
 - **Script de backup** — [`v2/infra/scripts/backup_db.sh`](../../../infra/scripts/backup_db.sh) — `set -euo pipefail` (`:23`), `pg_dump | gzip [| age]`, nomenclatura `backup_full_YYYYMMDD_HHMMSS.sql.gz[.age]` (`:51-55`), `BACKUP_DIR="${BACKUP_DIR:-/backups}"` (`:31`), retencao que cobre **os dois sufixos** (`:103`), upload S3 opcional. Mesmo script para Docker e VM (muda so a chamada e os defaults das env vars).
-- **Script de restore** — [`v2/infra/scripts/restore_db.sh`](../../../infra/scripts/restore_db.sh) — interativo (exige `yes`, `:80-84`), verifica integridade com `gzip -t` (`:91`), termina conexoes (`:99`), drop+create do DB (`:107-108`), restaura com branch `.age` (`:113-119`), imprime contagem de tabelas (`:123`). **⚠️ Ver §Pontos de atencao: a ordem esta invertida e o script rejeita o formato de producao.**
+- **Script de restore** — [`v2/infra/scripts/restore_db.sh`](../../../infra/scripts/restore_db.sh) — interativo (exige `yes`), verificacao de integridade **ciente do formato** (`.age` -> `age -d | gzip -t` com pipefail local, `:100-113`; branch plaintext usa `gzip -t` direto), dump de seguranca antes do `DROP` (`SAFETY_DUMP`, `:135`), termina conexoes, drop+create do DB, restaura com `psql -v ON_ERROR_STOP=1` (`:166`/`:170`) e **valida piso de contagem de tabelas** (`:184-191`). Honra `BACKUP_DIR` (`:21-23`).
 - **Onde os scripts vivem no container** — [`v2/infra/Dockerfile.prod:67-68`](../../../infra/Dockerfile.prod): `COPY infra/scripts /app/infra/scripts` + `chmod +x`. Sao **assados na imagem**, nao montados. Por isso `Path("/app/infra/scripts/backup_db.sh").exists()` (`tasks_backup.py:57,62`) e verdadeiro em producao sem mount algum.
 - **Scripts auxiliares** — [`verify_backup.sh`](../../../infra/scripts/verify_backup.sh) (health check da VM; sabe distinguir `.age` **antes** de chamar `gzip -t`, `:44-71`, e pula a inspecao de conteudo cifrado por design, `:45-48`), [`test_dr.sh`](../../../infra/scripts/test_dr.sh) (drill).
 - **WAL archiving (RPO)** — [`v2/infra/configs/vm02/postgresql.conf`](../../../infra/configs/vm02/postgresql.conf): `archive_mode=on`, `archive_timeout=300`, `archive_command` para `/var/lib/postgresql/wal_archive/`.
@@ -86,11 +86,11 @@ docker compose exec web /app/infra/scripts/backup_db.sh full
 # via Celery
 docker compose exec web python manage.py shell -c \
   "from apps.core.tasks_backup import perform_database_backup; perform_database_backup.delay('full')"
-# restore (DESTRUTIVO) — ver AVISO: hoje ABORTA em artefato .age (M26-01/#1611)
+# restore (DESTRUTIVO) — ciente do formato desde #1611/#1645 (decifra .age antes do gzip -t)
 docker compose exec web /app/infra/scripts/restore_db.sh /backups/backup_full_<ts>.sql.gz.age
 ```
 
-**Contorno manual enquanto `M26-01` estiver aberto** (o unico caminho que funciona hoje para um artefato de producao):
+**Restore manual direto** (alternativa ao script — util para inspecao ou pipe custom; o `restore_db.sh` ja cobre o `.age` de producao):
 
 ```bash
 age -d -i /etc/backup-key.txt backup_full_<ts>.sql.gz.age | gunzip | psql -h <host> -U postgres -d <db>
@@ -106,14 +106,14 @@ age -d -i /etc/backup-key.txt backup_full_<ts>.sql.gz.age | gunzip | psql -h <ho
 
 **Restore (cenario 1 — corrupcao de DB), contrato-alvo:** parar `web/worker/beat` -> listar backups -> `restore_db.sh <file>` (verifica integridade, termina conexoes, drop/create, restaura, valida contagem) -> reiniciar -> validar `/healthz/detailed/`. Cenarios completos (perda total do servidor, credenciais comprometidas, GCal indisponivel) em [`DISASTER_RECOVERY.md` §2](../../DISASTER_RECOVERY.md).
 
-**Restore — o que o script FAZ hoje** (`M26-01`, P0, issue #1611):
+**Restore — comportamento atual** (`M26-01`/#1611 e `M26-02`/#1645 corrigidos):
 
-1. A selecao ja e ciente de `.age` nos tres caminhos de entrada — arquivo explicito (`:42-50`), `--latest` (`:36`) e interativo (`:56,:61`).
-2. **Step 1 nao e**: `if ! gzip -t "$BACKUP_FILE"` roda **incondicionalmente** em `:91`. Um artefato `age` comeca com o cabecalho de texto `age-encryption.org/v1`, que nao e gzip -> `gzip -t` retorna 1.
-3. O script aborta em `:92-93` com a mensagem literal **`ERROR: Backup file is corrupted!`** — factualmente falsa e ativamente enganosa sob pressao de incidente.
-4. O branch que sabe decifrar (`:113-119`) fica **inalcancavel** para o unico formato que producao grava.
+1. A selecao e ciente de `.age` nos tres caminhos de entrada — arquivo explicito (`:42-50`), `--latest` e interativo (`:56,:67`).
+2. **Verificacao de integridade ciente do formato**: para `.age`, `age -d -i $BACKUP_AGE_KEY | gzip -t` num subshell com `set -o pipefail` (`:100-113`); para `.sql.gz` legitimo, `gzip -t` direto. Falha de decifragem ou gzip **aborta antes de qualquer escrita**.
+3. **Dump de seguranca antes do `DROP`** (`SAFETY_DUMP`, `:135`), depois drop+create.
+4. **Restore com `psql -v ON_ERROR_STOP=1`** (`:166` `.age` / `:170` plaintext) — um erro de SQL aborta em vez de mascarar; o **piso de contagem de tabelas** (`:184-191`) rejeita restore incompleto em vez de declarar sucesso falso.
 
-Atenuante: a falha e **fail-closed** — para em `:91`, antes do `DROP DATABASE` de `:107`. Nao ha destruicao de dados; o dano e RTO estourado e perda de confianca no DR. Use o contorno manual da secao anterior.
+O unico gap restante e o **drill real** (`M26-03`, #1646): a suite `.bats` exercita o script, mas nenhum `.age` foi restaurado ponta-a-ponta num banco real.
 
 ## Decisoes relacionadas (ADRs)
 
@@ -128,13 +128,13 @@ Atenuante: a falha e **fail-closed** — para em `:91`, antes do `DROP DATABASE`
   - `TestVerifyBackupHealth` (`:22`) — degraded sem backups; healthy com backup recente; warning com backup > 25h; warning com dir inexistente; **prefixo `backup_full_` e obrigatorio** (nome divergente = invisivel, `:113-142`); **`backup_full_*.sql.gz.age` conta como healthy** (`:144-166`, sentinela do #1455).
   - `TestPerformDatabaseBackupScriptPath` (`:169`) — task registrada com nome `backup.perform_database_backup`; `max_retries=3`, `default_retry_delay=300`.
 - `apps/core/tests/test_celery_beat_registration.py` — sentinela do registro da task num interpretador novo (um `import` direto de `tasks_backup` no pytest mascararia o `NotRegistered` do #1455; ver comentario em `config/celery.py:60-71`).
-- **Restore tem cobertura ZERO** (`M26-03`, issue #1646). Nao existe `.bats` para `restore_db.sh` — os 5 arquivos `.bats` do repo vivem em `v2/infra/deployer/tests/` e nenhum menciona restore. E [`test_dr.sh`](../../../infra/scripts/test_dr.sh) **nao exercita o caminho cifrado nem chama `restore_db.sh`**: ele gera o dump em texto claro (`:76`) e restaura a mao com `gunzip -c | psql` (`:103`). E exatamente por isso que `M26-01` sobreviveu. (O comentario de `verify_backup.sh:43`, que afirma que a verificacao de conteudo cifrado "e exercitada no test_dr.sh", esta errado.)
+- **Restore agora tem cobertura `.bats`** ([`v2/infra/scripts/tests/restore_db.bats`](../../../infra/scripts/tests/restore_db.bats), 7 casos: `.age` valido, corrupcao, formato simples, diretorio customizado, `--latest`, e os 2 do piso de tabelas). Criada por `8f392636` (#1691, o fix do `M26-01`) e ampliada por `3bca74f3` (#1793, `M26-02`). **O que continua faltando e o drill real** (`M26-03`, issue #1646): os `.bats` exercitam o script, mas [`test_dr.sh`](../../../infra/scripts/test_dr.sh) ainda gera o dump em texto claro (`:76`) e restaura a mao com `gunzip -c | psql` (`:103`) — nunca um `.age` restaurado num banco real. (O comentario de `verify_backup.sh:43`, que afirma que a verificacao de conteudo cifrado "e exercitada no test_dr.sh", segue errado.)
 
 ## Pontos de atencao / dividas conhecidas
 
-- **P0 ABERTO — o restore oficial rejeita todo backup de producao** (`M26-01`, issue #1611, epico #1662). Ver §Fluxos. Correcao: espelhar na Step 1 o branch `.age` que ja existe na Step 4, e adicionar `set -o pipefail` (hoje so `set -e` em `:15`) para que uma falha do `age` no pipe de `:116` nao seja mascarada pelo exit 0 do proximo estagio — mesma classe de bug ja corrigida em `backup_db.sh` pelo #1543. Corrigir junto o `BACKUP_DIR` hardcoded (`:17`). Nota operacional: o binario `age` precisa existir no host/imagem onde o restore roda — verificar antes do incidente, nao durante.
-- **P1 ABERTO — "Restore completed successfully!" com exit 0 apos restore parcial** (`M26-02`, issue #1645). `restore_db.sh:123-124` calcula `TABLE_COUNT` e **so imprime** — nao compara com piso algum (contraste: `test_dr.sh:116-119` tem `-lt 10 -> exit 1`). E o `psql` de restore (`:116`/`:118`) roda **sem `-v ON_ERROR_STOP=1`**, entao erros de SQL individuais nao mudam o exit code: `set -e` nao dispara e `:128` declara sucesso.
-- **P1 ABERTO — DR nunca exercitado no formato real** (`M26-03`, issue #1646). Ver §Testes.
+- **CORRIGIDO — `M26-01` (P0, #1611), fechado por `8f392636`.** `restore_db.sh` espelhou na verificacao de integridade o branch `.age` que ja existia no restore (decifra antes do `gzip -t`) e adicionou `set -o pipefail` **local** nos pipes do `age` (o global e so `set -e` por design — ver comentario `:14-19` sobre `ls A B | head`). `BACKUP_DIR` deixou de ser hardcoded (`:21-23`). Nota operacional (ainda valida): o binario `age` precisa existir no host/imagem onde o restore roda, e a chave privada (`BACKUP_AGE_KEY`) precisa ser provisionada — verificar antes do incidente, nao durante (`M26-N2`).
+- **CORRIGIDO — `M26-02` (P1, #1645), fechado por `3bca74f3` (#1793).** `restore_db.sh` agora roda o `psql` de restore com `-v ON_ERROR_STOP=1` (`:166`/`:170`), compara `TABLE_COUNT` com um piso e aborta se `< MIN_TABLES` (`:184-191`), alem do dump de seguranca antes do `DROP`. O "Restore completed successfully!" (`:216`) so e impresso apos passar o piso.
+- **P1 ABERTO — DR nunca exercitado no formato real** (`M26-03`, issue #1646, epico #1662). Os `.bats` exercitam o script, mas nenhum round-trip real de um `.age` num banco de verdade ocorreu. Ver §Testes.
 - **CORRIGIDO (nao repetir o diagnostico antigo do #1455).** Versoes anteriores desta spec afirmavam que `worker`/`beat` de producao nao montavam `/backups` nem `/app/infra/scripts`, e que `script_path.exists()` falhava com `FileNotFoundError`. Isso **nao corresponde ao codigo atual**: o `worker` monta `/var/backups/aprender:/backups` (`docker-compose.prod.yml:234-235`, com comentario `#1455 / ADR-018 B2`) e os scripts vem assados na imagem (`Dockerfile.prod:67-68`), logo nao dependem de mount. A causa raiz real era outra: `autodiscover_tasks()` importa apenas o modulo `tasks` de cada app, e as tasks de backup vivem em `tasks_backup.py` — o beat despachava e o worker respondia `NotRegistered` em silencio. Fechado por `config/celery.py:73` (`app.autodiscover_tasks(related_name="tasks_backup")`). O `beat` continua sem mount de `/backups`, e isso e correto: quem executa o script e o `worker`.
 - **Sem alerta de "backup ausente"**: o health check semanal so emite warning ao Sentry; se `SENTRY_DSN` nao estiver configurado, `degraded` nao chega a ninguem. Se o Sentry esta ou nao ativo em producao **depende de verificacao humana** (conteudo do env no Portainer — item F5 de `ACHADOS_REAIS.md`).
 - **RPO 5 min depende do WAL na VM02**, nao do `pg_dump` (diario). Em ambiente Docker sem `archive_mode`, o RPO efetivo regride para ~24h (ultimo dump).

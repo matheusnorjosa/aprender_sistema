@@ -142,6 +142,12 @@ pytest apps/core/tests/test_check_issue_drift.py -q
       A heurística é assumida, não disfarçada: a saída chama de **suspeita**, e
       o que o ratchet trava é o número de suspeitas, não de mentiras provadas.
 
+      **Primeiro giro do ratchet, 2026-08-26:** o #1869 corrigiu o #1611 nas três
+      specs, e a contagem caiu **59 → 54** (`v2/docs/specs: 27 → 22`). O piso foi
+      apertado no mesmo dia — se não fosse, o gate ficaria com **5 vagas de folga**
+      e daria para reintroduzir 5 mentiras sem que nada reclamasse. Um piso frouxo
+      não quebra nada visivelmente, que é justamente por que é o pior desfecho.
+
 ### A.2 · Correções de dano alto
 
 | # | Alvo | O quê | Rastreado no git? |
@@ -420,35 +426,29 @@ ruleset e reporta a divergência.
 Classe inteira que a v1 ignorava: doc que contradiz **outra doc**, sem que nenhuma
 esteja errada sobre o código.
 
-- [ ] **F.1 · Colisão de identificador.** Dois `ADR-012` diferentes — e **`ADR-019`
-      recriou a colisão 21 dias depois de a primeira ser documentada**. Não existe
-      registro de numeração. São **três** listas `RF01..RF08` incompatíveis, não
-      duas, e a nota que avisa da colisão só conhece uma delas.
-- [~] **F.2 · 35 documentos vivos inalcançáveis** por qualquer índice — inclusive
-      uma **terceira** árvore (`specs/`) declarada «leitura obrigatória».
-      Parcial: os **21 de `docs/`** entraram no nav (18 ADRs + índice + 2 docs de
-      CI) e agora o `mkdocs build --strict` reprova se algum sair. O resto mora em
-      `v2/docs/`, fora do `docs_dir` — continua aberto, e é escopo de conteúdo.
-- [x] **F.3 · `mkdocs --strict` não valida âncora nem cobertura de nav.** Confirmado
-      e corrigido: `--strict` só promove warnings a erro, e essas checagens nem
-      existem sem a chave `validation`. Ela foi adicionada, com todos os níveis
-      **medidos antes** de virarem bloqueantes.
+- [x] **F.1 · Colisão de identificador — resolvida pela raiz, não pela renumeração.**
+      Dois `ADR-012` desde 2026-05-18, e **o `ADR-019` recriou a colisão 21 dias
+      depois de a primeira ser documentada** num README. Isso é a evidência de
+      que nota não impede reincidência.
 
-      **Correção do próprio plano:** as «9 âncoras quebradas» **não existem**. Com
-      a validação ligada em `warn`, o único achado em `docs/` eram as 21 omissões
-      de nav — zero âncora, zero link quebrado. A única âncora morta que a
-      varredura de 2026-08-25 encontrou (`VARREDURA_DOCS:30`) mora em `v2/docs/`,
-      que está fora do `docs_dir` e o mkdocs nunca enxerga.
+      **Não renumerei** — é churn em duas árvores por ganho cosmético, e obriga a
+      atualizar as citações em prosa dos dois lados. O 012 entrou no allowlist,
+      com motivo escrito.
 
-      Prova de que morde, com o baseline limpo antes e depois: página órfã →
-      exit 1; link para arquivo inexistente → exit 1; âncora inexistente em
-      arquivo que existe → exit 1, com a mensagem certa (`does not contain an
-      anchor`). O primeiro teste de âncora que escrevi reprovou pelo motivo
-      errado — link não-encontrado, não âncora — e só valeu depois de refeito.
+      O que o `check_adr_numbers.py` impede é a **próxima**: medido em 2026-08-26,
+      `docs/architecture/project-decisions/` vai até **ADR-018** e `v2/docs/adr/`
+      já tem **ADR-019** — o próximo ADR escrito na primeira árvore colidiria em
+      silêncio. Provado: criar `docs/.../ADR-019-*.md` reprova com exit 1 e a
+      saída nomeia os dois arquivos e sugere o próximo número livre (ADR-020).
 
-      **Limite:** `[info] documentation build` não está no ruleset, então isto
-      avisa e não trava merge. É exatamente a divergência que o gate da E.3
-      passou a expor em todo PR; promovê-lo é decisão de admin.
+      O dano não é teórico: `docs/guides/etl.md:5` cita «ADR-012» querendo dizer o
+      de SHA1 (árvore v2), e dentro do mkdocs resolve para o de guardrails.
+
+      10 testes · allowlist em `project-decisions/adr-numeros-allowlist.txt`.
+
+      > Segue aberta a decisão de **renumerar** o 012 — de time, não de gate.
+      > As três listas `RF01..RF08` incompatíveis também seguem, e são conteúdo.
+
 - [ ] **F.4 · O índice manda ler o documento que a spec canônica declara obsoleto**
       (`INDEX_DOCUMENTACAO` → `IMPLEMENTACAO_PA`).
 - [x] **F.5 · Referência por caminho em crase não é link** — 11 arquivos SEC ficaram

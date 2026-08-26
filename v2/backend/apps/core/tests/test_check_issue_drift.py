@@ -16,10 +16,10 @@ O NUMERO, MEDIDO COM CUIDADO. 146 issues fechadas sao citadas em doc viva, em 30
 lugares. **Nao sao 146 mentiras**: "corrigido em #1611" e referencia historica
 correta, e contar palavra-chave aqui e a armadilha de sempre — um texto que
 descreve a correcao cita a mesma issue. Filtrando para citacao com marcador de
-ABERTO (`P0`, `quebrado`, `pendente`, `⛔`) e SEM marcador de corrigido: **71**,
-sendo 30 nas specs canonicas.
+ABERTO (`P0`, `quebrado`, `pendente`, `⛔`) e SEM marcador de corrigido: **59**,
+sendo 27 nas specs canonicas.
 
-POR QUE RATCHET, E NAO BLOQUEIO NEM AVISO. Bloquear com 71 pendentes reprova todo
+POR QUE RATCHET, E NAO BLOQUEIO NEM AVISO. Bloquear com 59 pendentes reprova todo
 PR no dia 1. Avisar e o que fez o limiar de 180 dias virar decoracao — aviso sem
 acao associada e ruido. O ratchet sobre piso medido e o terceiro caminho, e e
 padrao provado neste repositorio (cobertura vitest, subida 3x em 4 dias): a
@@ -48,6 +48,7 @@ Verifica que:
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -63,7 +64,18 @@ def _monta(raiz: pathlib.Path, arquivos: dict[str, str]) -> None:
         p.write_text(conteudo, encoding="utf-8")
 
 
-def _run(raiz: pathlib.Path, fechadas: list[int] | None, piso: dict | None = None):
+def _run(
+    raiz: pathlib.Path,
+    fechadas: list[int] | None,
+    piso: dict[str, int] | None = None,
+    sem_gh: bool = False,
+):
+    """`sem_gh` remove o `gh` do PATH em vez de torcer para ele nao existir.
+
+    O teste do caminho sem-API passou no CI por acaso: se o runner tivesse `gh`
+    autenticado — e tem — ele consultaria as issues de verdade e o teste viraria
+    flake. Um teste que depende do ambiente nao testa o que diz testar.
+    """
     args = [sys.executable, str(SCRIPT), "--repo-root", str(raiz)]
     if fechadas is not None:
         f = raiz / "_fechadas.json"
@@ -73,7 +85,10 @@ def _run(raiz: pathlib.Path, fechadas: list[int] | None, piso: dict | None = Non
         f = raiz / "_piso.json"
         f.write_text(json.dumps(piso), encoding="utf-8")
         args += ["--baseline", str(f)]
-    return subprocess.run(args, capture_output=True, text=True, check=False, encoding="utf-8")
+    env = dict(os.environ)
+    if sem_gh:
+        env["PATH"] = str(raiz)  # diretorio sem `gh` dentro
+    return subprocess.run(args, capture_output=True, text=True, check=False, encoding="utf-8", env=env)
 
 
 SPEC_ABERTA = """---
@@ -165,7 +180,7 @@ def test_historico_e_archive_ficam_fora(tmp_path):
 def test_sem_api_avisa_e_sai_zero(tmp_path):
     """CI nao pode depender da API do GitHub — mas tambem nao pode aprovar cego."""
     _monta(tmp_path, {"v2/docs/specs/backup.spec.md": SPEC_ABERTA})
-    r = _run(tmp_path, fechadas=None, piso={})
+    r = _run(tmp_path, fechadas=None, piso={}, sem_gh=True)
     assert r.returncode == 0, f"falta de API derrubou o build:\n{r.stdout}\n{r.stderr}"
     saida = r.stdout + r.stderr
     assert "AVISO" in saida, "o skip precisa ser barulhento"

@@ -79,3 +79,21 @@ $ cd v2/backend && pyright apps/core config
 
 Testes passam e type check OK.
 ```
+
+## Quatro modos de falsa verificação (medidos em 2026-08)
+
+Rodar o comando não basta se a leitura da saída estiver errada. Estes quatro
+produzem evidência que **parece** boa:
+
+1. **`exit != 0` sem ler o motivo.** Um teste de âncora quebrada reprovou — por
+   *link não-encontrado*, não por âncora. Não exercitava o que dizia.
+2. **Asserção negativa satisfeita por saída vazia.** Cinco testes passaram antes
+   de a implementação existir. Prove que a coisa foi medida antes de afirmar que
+   ela não apareceu.
+3. **Contar palavra-chave em vez de ler a afirmação.** `"EM DRIFT" not in saida`
+   reprovava com a saída correta, porque o resumo diz `0 em drift`. E um texto
+   que NEGA a mentira contém as mesmas palavras — cometido três vezes.
+4. **Passar por acidente do ambiente.** Um teste do caminho «sem API» assumia que
+   `gh` não existe; no runner existe. Force a condição, não torça por ela.
+
+Detalhe e casos: `gate-calibration/reference/medicao.md`.

@@ -72,3 +72,17 @@ Checkboxes precisam estar **marcados** (`- [x]`). Editar o body re-roda o gate (
 - Nunca `systemctl restart docker` na VM01 (Kaspersky/KESL derruba o site) — usar `systemctl restart kesl`.
 - Mudança em `docker-compose.prod.yml` **não** viaja pelo pipeline: exige update manual no Editor do Portainer **e** re-captura do `trust/compose.pinned.yml` na VM01 (o applier reenvia o pinado, e recusa se o vivo divergir).
 - Nunca tratar merge na `main` como deploy, nem procurar um job `deploy` no `deploy.yaml` — ele não existe desde o #1516.
+
+## Projetar um check novo
+
+Esta skill cobre **operar** o CI. Para decidir se um check novo bloqueia, avisa
+ou usa ratchet — e para provar que ele não pode ser contornado — use
+`gate-calibration`.
+
+Dois fatos deste repo que a calibragem precisa saber:
+
+- **`[required]` no nome não é enforcement.** Medido em 2026-08-26: 19 jobs
+  declaram, o ruleset da `main` exige 10. `check_required_checks.py` expõe a
+  divergência em todo PR; promover é ação de admin.
+- **Cron não é visto.** `ci-runtime-telemetry` falhou 26 execuções seguidas sem
+  ninguém notar — é `schedule`-only e não aparece em PR nenhum.

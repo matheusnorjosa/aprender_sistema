@@ -6,7 +6,7 @@
 
 import { fetchAPI, fetchBlob, fetchWithErrorMapping, buildUrl, type QueryParams } from './config';
 import { unwrapList } from './unwrapList';
-import type { ID, PaginatedResponse, MunicipioOption, ProjetoOption, Projeto } from '../types';
+import type { ID, PaginatedResponse, MunicipioOption, ProjetoOption } from '../types';
 
 // ========== TYPE DEFINITIONS ==========
 
@@ -23,24 +23,6 @@ export interface DATRegistro {
   status_formar: string;
   created_at: string;
   updated_at: string;
-}
-
-export interface DATRegistroStats {
-  total: number;
-  completos_formar: number;
-  completos_avaliar: number;
-  usa_avaliar: number;
-  por_uf: Record<string, number>;
-}
-
-export interface ProjetoGeral {
-  id: ID;
-  nome: string;
-  usa_avaliar: boolean;
-  tipo_calculo_codigos: string;
-  divisor_aluno?: number;
-  multiplicador_professor?: number;
-  ativo: boolean;
 }
 
 export interface ProjetoGeralOption {
@@ -77,10 +59,6 @@ export async function listDATRegistros(params: FilterParams = {}): Promise<Pagin
   return fetchWithErrorMapping(buildUrl('/dat/registros/', params as QueryParams), {}, DAT_ERROR_MAP);
 }
 
-export async function getDATRegistro(id: ID): Promise<DATRegistro> {
-  return fetchWithErrorMapping(`/dat/registros/${id}/`, {}, DAT_ERROR_MAP);
-}
-
 export async function createDATRegistro(data: Partial<DATRegistro>): Promise<DATRegistro> {
   return fetchWithErrorMapping('/dat/registros/', {
     method: 'POST',
@@ -99,46 +77,8 @@ export async function deleteDATRegistro(id: ID): Promise<void> {
   await fetchWithErrorMapping(`/dat/registros/${id}/`, { method: 'DELETE' }, DAT_ERROR_MAP);
 }
 
-export async function getDATRegistroStats(): Promise<DATRegistroStats> {
-  return fetchAPI('/dat/registros/stats/');
-}
-
 export async function exportDATRegistros(params: FilterParams = {}): Promise<Blob> {
   return fetchBlob(buildUrl('/dat/registros/export/', params));
-}
-
-// ========== PROJETOS GERAIS ==========
-
-export async function listProjetosGerais(params: FilterParams = {}): Promise<PaginatedResponse<ProjetoGeral>> {
-  return fetchWithErrorMapping(buildUrl('/projetos-gerais/', params as QueryParams), {}, DAT_ERROR_MAP);
-}
-
-export async function getProjetoGeral(id: ID): Promise<ProjetoGeral> {
-  return fetchWithErrorMapping(`/projetos-gerais/${id}/`, {}, DAT_ERROR_MAP);
-}
-
-export async function createProjetoGeral(data: Partial<ProjetoGeral>): Promise<ProjetoGeral> {
-  return fetchWithErrorMapping('/projetos-gerais/', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }, DAT_ERROR_MAP);
-}
-
-export async function updateProjetoGeral(id: ID, data: Partial<ProjetoGeral>): Promise<ProjetoGeral> {
-  return fetchWithErrorMapping(`/projetos-gerais/${id}/`, {
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  }, DAT_ERROR_MAP);
-}
-
-export async function deleteProjetoGeral(id: ID): Promise<void> {
-  await fetchWithErrorMapping(`/projetos-gerais/${id}/`, { method: 'DELETE' }, DAT_ERROR_MAP);
-}
-
-export async function getProjetosForProjetoGeral(id: ID): Promise<Projeto[]> {
-  return unwrapList(
-    await fetchAPI<Projeto[] | PaginatedResponse<Projeto>>(`/projetos-gerais/${id}/projetos/`),
-  );
 }
 
 // ========== OPTIONS (for dropdowns) ==========
@@ -201,10 +141,6 @@ export async function listCompras(params: FilterParams = {}): Promise<PaginatedR
   return fetchWithErrorMapping(buildUrl('/dat/compras-materiais/', params as QueryParams), {}, DAT_ERROR_MAP);
 }
 
-export async function getCompra(id: ID): Promise<GenericRecord> {
-  return fetchWithErrorMapping(`/dat/compras-materiais/${id}/`, {}, DAT_ERROR_MAP);
-}
-
 export async function createCompra(data: Record<string, unknown>): Promise<GenericRecord> {
   return fetchWithErrorMapping('/dat/compras-materiais/', {
     method: 'POST',
@@ -221,10 +157,6 @@ export async function updateCompra(id: ID, data: Record<string, unknown>): Promi
 
 export async function deleteCompra(id: ID): Promise<void> {
   await fetchWithErrorMapping(`/dat/compras-materiais/${id}/`, { method: 'DELETE' }, DAT_ERROR_MAP);
-}
-
-export async function getComprasStats(params: FilterParams = {}): Promise<GenericStats> {
-  return fetchAPI(buildUrl('/dat/compras-materiais/stats/', params as QueryParams));
 }
 
 // Dashboard de Compras
@@ -326,10 +258,6 @@ export async function listFormacoes(params: FilterParams = {}): Promise<Paginate
   return fetchWithErrorMapping(buildUrl('/dat/formacoes/', params as QueryParams), {}, DAT_ERROR_MAP);
 }
 
-export async function getFormacao(id: ID): Promise<GenericRecord> {
-  return fetchWithErrorMapping(`/dat/formacoes/${id}/`, {}, DAT_ERROR_MAP);
-}
-
 export async function createFormacao(data: Record<string, unknown>): Promise<GenericRecord> {
   return fetchWithErrorMapping('/dat/formacoes/', {
     method: 'POST',
@@ -366,10 +294,6 @@ export async function listCoordenadoresDAT(params: FilterParams = {}): Promise<P
   return fetchWithErrorMapping(buildUrl('/dat/coordenadores/', params as QueryParams), {}, DAT_ERROR_MAP);
 }
 
-export async function getCoordenadorDAT(id: ID): Promise<GenericRecord> {
-  return fetchWithErrorMapping(`/dat/coordenadores/${id}/`, {}, DAT_ERROR_MAP);
-}
-
 export async function createCoordenadorDAT(data: Record<string, unknown>): Promise<GenericRecord> {
   return fetchWithErrorMapping('/dat/coordenadores/', {
     method: 'POST',
@@ -396,12 +320,6 @@ export async function getCoordenadorAlocacoes(id: ID): Promise<GenericRecord[]> 
   );
 }
 
-// ========== ÁREAS ==========
-
-export async function listAreasDAT(params: FilterParams = {}): Promise<PaginatedResponse<GenericRecord>> {
-  return fetchAPI(buildUrl('/dat/areas/', params as QueryParams));
-}
-
 // ========== COORDENADORES OPTIONS ==========
 
 export async function getCoordenadoresOptions(): Promise<GenericRecord[]> {
@@ -426,10 +344,6 @@ export async function getProdutosOptions(): Promise<GenericRecord[]> {
 
 export async function listPlanoFormacoes(params: FilterParams = {}): Promise<PaginatedResponse<GenericRecord>> {
   return fetchWithErrorMapping(buildUrl('/dat/plano-formacoes/', params as QueryParams), {}, DAT_ERROR_MAP);
-}
-
-export async function getPlanoFormacoes(id: ID): Promise<GenericRecord> {
-  return fetchWithErrorMapping(`/dat/plano-formacoes/${id}/`, {}, DAT_ERROR_MAP);
 }
 
 export async function createPlanoFormacoes(data: Record<string, unknown>): Promise<GenericRecord> {

@@ -142,6 +142,12 @@ pytest apps/core/tests/test_check_issue_drift.py -q
       A heurística é assumida, não disfarçada: a saída chama de **suspeita**, e
       o que o ratchet trava é o número de suspeitas, não de mentiras provadas.
 
+      **Primeiro giro do ratchet, 2026-08-26:** o #1869 corrigiu o #1611 nas três
+      specs, e a contagem caiu **59 → 54** (`v2/docs/specs: 27 → 22`). O piso foi
+      apertado no mesmo dia — se não fosse, o gate ficaria com **5 vagas de folga**
+      e daria para reintroduzir 5 mentiras sem que nada reclamasse. Um piso frouxo
+      não quebra nada visivelmente, que é justamente por que é o pior desfecho.
+
 ### A.2 · Correções de dano alto
 
 | # | Alvo | O quê | Rastreado no git? |

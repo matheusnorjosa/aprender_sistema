@@ -229,10 +229,14 @@ Sim. Por exemplo, alguém pode ser Coordenador e Gerente ao mesmo tempo.
 ### Como remover um grupo de um usuário?
 Na edição do usuário (como superusuário), desmarque o grupo desejado e salve.
 
-⚠️ **O import de usuários NÃO remove grupos — só adiciona, e sem allowlist.**
-`POST /api/usuarios/import/` com a coluna `grupos` concede **qualquer** grupo, inclusive
-`Gerente` e `Superintendência`, sem verificar quem é o ator. Achado **P0**, issue
-[#1610](https://github.com/matheusnorjosa/aprender_sistema/issues/1610) —
+⚠️ **O import de usuários NÃO remove grupos — só adiciona.** A concessão de grupos por
+`POST /api/usuarios/import/` (coluna `grupos`) **passou a exigir superusuário** — era drift
+(issue [#1610](https://github.com/matheusnorjosa/aprender_sistema/issues/1610)), **corrigido**
+em `ccbe1e05`: `_actor_pode_atribuir_grupos` (`usuarios_import.py:273-283`, aplicado em `:362`
+e `:495-496`) faz um ator não-superusuário ter os grupos ignorados (`grupos_ignorados`), e o
+importer dedicado impõe allowlist (`export_contract_importer.py:1077-1082`). Resta o residual
+de escopo ator × alvo abrangente, endereçado pelo épico
+[#1656](https://github.com/matheusnorjosa/aprender_sistema/issues/1656) —
 ver [imports/usuarios.md](./imports/usuarios.md).
 
 ### Os grupos são case-sensitive?

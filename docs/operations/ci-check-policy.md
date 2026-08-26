@@ -44,23 +44,25 @@ sozinho **não** diz como o check bloqueia o merge — há três mecanismos (col
 | `[required] Secret Detection` | `security-scan.yml` | ruleset (direto) |
 | `[required] docs quality (links + frontmatter)` | `docs-quality.yml` | ruleset (direto) |
 | `[required] staging gate evidence` | `staging-gate-audit.yml` | ruleset (direto) |
-| `[required] architecture dependency guardrails` | `architecture-guardrails.yml` | path-filtered — exceção (não no ruleset) |
+| `[required] architecture dependency guardrails` | `architecture-guardrails.yml` | ruleset (direto) |
 | `[required] rbac matrix doc drift` | `rbac-doc-drift.yml` | path-filtered — exceção (não no ruleset) |
 
-Os 13 marcados **ruleset (direto)** compõem exatamente os `required_status_checks` de
-`Protect main` (verificado 2026-08-26).
+Os **14** marcados **ruleset (direto)** devem compor os `required_status_checks` de
+`Protect main`. Em 2026-08-26 o ruleset tinha os 13 primeiros; o `architecture dependency
+guardrails` teve o path filter do `pull_request` removido (passa a sempre reportar) e é
+**adicionado ao ruleset logo após o merge deste PR** — fechando o único `[required]` de
+backend/frontend que ainda não travava o merge.
 
 > **A composição efetiva do ruleset é uma configuração do GitHub, não um arquivo do
 > repositório.** A coluna **Enforcement** é o inventário do que *deveria* valer; conferir com
-> `gh api /repos/<owner>/<repo>/rulesets` antes de assumir que os 13 diretos continuam ligados.
+> `gh api /repos/<owner>/<repo>/rulesets` antes de assumir que os diretos continuam ligados.
 
-> **Exceções conhecidas (path-filtered) — `[required] architecture dependency guardrails` e
-> `[required] rbac matrix doc drift`.** Ambos usam `paths` no gatilho de `pull_request`
-> (`architecture-guardrails.yml`; `rbac-doc-drift.yml:32-37`), então **não reportam** em PR
-> fora dos paths e **não estão no ruleset**. Ligá-los sem antes remover o `paths` travaria
-> todo PR que não toque esses paths (check eternamente *pending*/"Expected"). Para promovê-los
-> ao gate: remover o `paths` do `pull_request` (como `frontend-ci.yml` fez) ou renomeá-los
-> para `[info]`.
+> **Exceção conhecida (path-filtered) — `[required] rbac matrix doc drift`.** Usa `paths` no
+> gatilho de `pull_request` (`rbac-doc-drift.yml:32-37`), então **não reporta** em PR fora dos
+> paths e **não está no ruleset**. Ligá-lo sem antes remover o `paths` travaria todo PR que não
+> toque `matrix.py`/`rbac_authorization_matrix.md` (check eternamente *pending*/"Expected").
+> Para promovê-lo ao gate: remover o `paths` do `pull_request` (como `architecture-guardrails.yml`
+> fez neste ciclo) ou renomeá-lo para `[info]`.
 
 ## Checks informativos
 

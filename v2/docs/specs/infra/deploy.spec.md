@@ -120,15 +120,14 @@ criado com dono/permissão corretos (0755, UID do `appuser`), pré-requisito doc
 próprio compose. Precedente: **#1537**, backup que nunca rodou. Para confirmar seria preciso
 SSH na VM01 e `ls -la /var/backups/aprender` + `journalctl`/logs do worker.
 
-**Aberto e grave — o restore não funciona (P0, #1611).** `v2/infra/scripts/restore_db.sh:91`
-executa `gzip -t "$BACKUP_FILE"` **incondicionalmente**, antes do branch que trata artefatos
-`age` (linhas 113-119). Como produção grava **exclusivamente** `.age` (fail-closed em
-`backup_db.sh:44-52` + recipient no compose), a ferramenta oficial de restore rejeita todo
-backup de produção com a mensagem falsa `ERROR: Backup file is corrupted!` — nos três
-caminhos de entrada (arquivo explícito, `--latest`, interativo). É **fail-closed** (para
-antes do `DROP DATABASE` da linha 107), então não há destruição de dados; o dano é RTO
-estourado. Achados `M26-01` (#1611), `M26-02` (#1645, sucesso falso com exit 0) e `M26-03`
-(#1646, `test_dr.sh` nunca exercita o round-trip cifrado), agrupados no épico **#1662**.
+**Restore corrigido; falta o drill real (#1646).** `M26-01` (#1611, `8f392636`) e `M26-02`
+(#1645, `3bca74f3`/#1793) estão **fechados**: `restore_db.sh` agora é ciente do formato
+(decifra `.age` com `age -d` **antes** do `gzip -t`, com `set -o pipefail` local), roda o
+restore com `psql -v ON_ERROR_STOP=1` + piso de contagem de tabelas, e faz dump de segurança
+antes do `DROP`. Cobertura `.bats` criada (`restore_db.bats`, 7 casos). O que **permanece
+aberto** no épico **#1662** é `M26-03` (#1646): a suite exercita o script, mas nenhum
+round-trip cifrado real (`.age` restaurado num banco de verdade) ocorreu — detalhe em
+[`backup-dr.spec.md`](../backend/backup-dr.spec.md).
 
 **Complementar, fora desta stack:** o cron na **VM02** (#376, WAL archiving) — não
 verificável pelo Portainer/repo (exige SSH na VM02).
@@ -188,7 +187,7 @@ gravável no `worker` graças ao bind-mount do #1455), `INCLUDE_DEV_TOOLS`/`INCL
   Resta o **gating**: o job `backend-migrate-integrity` é `[info]` e não entra no `needs` do `[required] tests`,
   então model-drift é detectado mas **não bloqueia merge**. Ver [`ci.spec.md`](./ci.spec.md).
 - **#1457** — guard de `REDIS_PASSWORD` obrigatório (em prod está setado; falta o fail-fast preventivo).
-- **#1611 / épico #1662 (P0)** — `restore_db.sh` rejeita todo backup `.age` de produção. Ver a seção de backup acima.
+- **#1611 / #1645 fechados; épico #1662 aberto por #1646** — `restore_db.sh` já restaura o `.age` de produção (fix `8f392636` / `3bca74f3`); resta o drill real de DR (#1646). Ver a seção de backup acima.
 - **#1660 (P2)** — `docker-compose.prod.yml:100-101` publica a porta do backend em `0.0.0.0` sem bind em
   `127.0.0.1`. O dono confirmou por teste externo (4G) que a porta **não responde** da internet: há allowlist de
   firewall externo (Golden). Não é exposição pública — mas o firewall externo é a **única** camada protegendo um

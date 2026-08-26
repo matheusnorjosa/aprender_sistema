@@ -78,7 +78,7 @@ related: []                   # links a specs/ADRs relacionados
 | [solicitacao-approval.spec.md](./backend/solicitacao-approval.spec.md) | fluxo de aprovação (PA/RF04) | canonical |
 | [gcal.spec.md](./backend/gcal.spec.md) | Google Calendar + Meet (RF05/06) | canonical |
 | [imports.spec.md](./backend/imports.spec.md) | pipeline export-contract | canonical |
-| [backup-dr.spec.md](./backend/backup-dr.spec.md) | backup & disaster recovery (#1455 fechado; **restore quebrado, #1611 P0**) | canonical |
+| [backup-dr.spec.md](./backend/backup-dr.spec.md) | backup & disaster recovery (#1455/#1611/#1645 fechados; drill real #1646 aberto) | canonical |
 | [dat.spec.md](./backend/dat.spec.md) | módulo DAT (ações/cadastros/registros) | canonical |
 | [notificacoes.spec.md](./backend/notificacoes.spec.md) | sistema 32 Passos | canonical |
 | [deslocamento.spec.md](./backend/deslocamento.spec.md) | deslocamento (gate owner-or-delegate, #1454) | canonical |

@@ -1,7 +1,7 @@
 ---
 title: Specs de Backend
 status: active
-last_verified: 2026-07-24
+last_verified: 2026-08-26
 owner: backend
 related:
   - ../INDEX_SDD.md
@@ -12,6 +12,26 @@ related:
 
 Backend real = **apenas** `apps/core` (42 models concretos em `apps/core/models/`) + `apps/dev_tools`.
 Voltar ao [índice SDD](../INDEX_SDD.md).
+
+## Monólito modular — não fatiar em apps Django
+
+AS v2 é um **monólito modular** em `apps.core`: a modularidade vem de **fronteiras de import**
+e **writers canônicos** (services/serializers), não de novos apps Django.
+`INSTALLED_APPS = apps.core` (+ `dev_tools` condicional) — **não expandir**. Um segundo app
+Django só se justifica por **D3** (abaixo); microserviços estão fora (já há SPA + Django +
+Celery). Registro completo:
+[`PLAN_monolito_modular_solo_2026-08-26.md`](../../plans/PLAN_monolito_modular_solo_2026-08-26.md).
+
+**Critério D3 — quando extrair um segundo app Django** (só com **um** destes, isolado do resto):
+
+1. **Ciclo de release próprio** — deploya em cadência diferente do core.
+2. **Dono distinto** — outro maintainer/equipe responsável.
+3. **Carga isolada** — SLO/escala que exige recurso separado (improvável neste hardware: 1
+   compose, ~148 usuários).
+
+Sem um destes, a resposta é **fronteira de import dentro de `apps.core`**, não pasta nova.
+Candidatos tardios (não agendados): notificações 32 Passos, GCal — e ainda assim como app
+Django no mesmo compose.
 
 ## As 10 specs e o código que cada uma descreve
 

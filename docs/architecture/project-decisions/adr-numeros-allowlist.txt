@@ -1,0 +1,33 @@
+# Numeros de ADR perdoados pelo check de unicidade
+# (v2/backend/scripts/check_adr_numbers.py).
+#
+# As duas arvores de ADR — docs/architecture/project-decisions/ e v2/docs/adr/ —
+# compartilham UM espaco de numeracao, ainda que vivam separadas. Numero repetido
+# faz a citacao em prosa apontar para o documento errado.
+#
+# Formato: `NNN — motivo`. Numero nu nao vale: allowlist que aceita entrada sem
+# motivo vira lugar de esconder colisao, e o gate deixa de valer.
+#
+# Criado em 2026-08-26.
+
+# ---------------------------------------------------------------------------
+# A colisao que este check NAO existe para consertar.
+#
+# ADR-012 aparece duas vezes desde 2026-05-18:
+#   docs/architecture/project-decisions/ADR-012-dependency-guardrails.md  (2026-01-15)
+#   v2/docs/adr/ADR-012-sha1-idempotency-hashes.md                        (2026-05-18)
+#
+# Ja esta documentada em project-decisions/README.md:30 como "pendente de
+# renumeracao", e renumerar hoje e churn em duas arvores por ganho cosmetico —
+# obriga a atualizar as citacoes em prosa dos dois lados.
+#
+# O que este check existe para impedir e a PROXIMA colisao. Medido em 2026-08-26:
+# docs/architecture/project-decisions/ vai ate ADR-018 e v2/docs/adr/ ja tem
+# ADR-019 — o proximo ADR escrito na primeira arvore colide. Nota em README nao
+# impediu reincidencia antes: o proprio plano registra que o ADR-019 recriou a
+# colisao 21 dias depois de a primeira ser documentada.
+#
+# REMOVER ESTA LINHA se a renumeracao for feita. Enquanto ela estiver aqui, o 012
+# nao esta protegido — so o resto do espaco de numeracao esta.
+# ---------------------------------------------------------------------------
+012 — colisao historica entre as duas arvores, registrada em project-decisions/README.md:30; renumeracao pendente por decisao de time

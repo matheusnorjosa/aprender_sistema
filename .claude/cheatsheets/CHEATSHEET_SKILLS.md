@@ -2,7 +2,7 @@
 
 > índice — full em `.claude/skills/<nome>/SKILL.md`, `.claude/commands/<nome>.md` e CLAUDE.md
 
-Inventário atual do disco: **27 skills · 18 commands · 4 agent types · 6 MCPs wired**.
+Inventário atual do disco: **28 skills · 18 commands · 4 agent types · 6 MCPs wired**.
 (6 skills são user-invoked — `disable-model-invocation`: create-plan, implement-plan, create-handoff, resume-handoff, continuity-ledger, security-scan.)
 
 **Invocação de skill:** via Skill tool com o **nome direto** (ex.: `test-driven-development`),
@@ -10,7 +10,7 @@ não `/skill <nome>`. Comandos slash (`/<nome>`) são os de `.claude/commands/`.
 
 ---
 
-## Skills (27)
+## Skills (28)
 
 | Skill | Quando usar |
 |-------|-------------|
@@ -22,6 +22,7 @@ não `/skill <nome>`. Comandos slash (`/<nome>`) são os de `.claude/commands/`.
 | `writing-standards` | Docs, docstrings (PEP 257), commits |
 | `test-driven-development` | **Antes** de implementar feature/bugfix |
 | `gate-calibration` | **Antes** de criar ou recalibrar um check de CI — decide bloqueia/avisa/ratchet |
+| `findings-crosscheck` | **Antes** de agir sobre achado relatado por agente — verifica no código |
 | `debugging-and-error-recovery` | Debug root-cause (testes/builds/runtime) |
 | `deprecation-and-migration` | Remover deps, substituir serviços, migrar |
 | `subagent-development` | Orquestrar/paralelizar subagents |

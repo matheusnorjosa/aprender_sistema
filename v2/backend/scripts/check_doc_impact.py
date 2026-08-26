@@ -11,7 +11,8 @@ PROBLEMA MEDIDO (auditoria de 2026-08-24, 450 arquivos; contagens conferidas em
   - A regra ja estava escrita, em negrito, dentro do proprio arbitro. O modo de
     falha nao e ignorancia — e ausencia de enforcement.
 
-DOIS DETECTORES, calibrados pela precisao de cada um:
+QUATRO DETECTORES, calibrados pela precisao de cada um. Os dois ultimos nao
+procuram drift: procuram EVASAO dos dois primeiros.
 
   1. ISSUE RESOLVIDA -> DOC QUE A CITA          [BLOQUEIA]
      Um commit com `Closes #N` resolve algo. Se um doc vivo descreve #N como
@@ -21,6 +22,16 @@ DOIS DETECTORES, calibrados pela precisao de cada um:
      Toda spec declara `sources_of_truth`. Se o PR toca um desses arquivos, a
      spec ficou suspeita por construcao. Medido: dispara em 60% dos commits,
      media de 2,6 specs. Bloquear nisso trava o repositorio e o gate e revertido.
+
+  3. `sources_of_truth` ENCOLHENDO                [BLOQUEIA sem justificativa]
+     As unicas specs verdes eram as que nao declaravam nada, entao a saida
+     barata e apagar linhas da lista: o drift some sem corrigir uma linha de doc.
+
+  4. STATUS REBAIXADO PARA "ESCONDE"              [BLOQUEIA sem justificativa]
+     Tres gates pulam docs com status historical/stale/superseded/deprecated.
+     Trocar UMA palavra faz a spec sumir dos tres — e no ratchet a contagem CAI,
+     entao a evasao e lida como progresso. Achado tentando explorar o proprio
+     gate em 2026-08-26.
 
 POR QUE NAO ANCORAR SO NA ISSUE: `Closes #N` aparece em apenas 27,7% dos commits
 de fix, e as citacoes `Mxx-yy` cairam a zero quando a frente virou frontend. Um
@@ -67,6 +78,12 @@ ACHADO = re.compile(r"\bM\d{2}-\d{2}\b")
 RAIZES_DOC = ["v2/docs", "docs", "specs"]
 IGNORA_DOC = ("_archive", "worktrees", "node_modules")
 
+# Status que fazem um doc sumir dos gates de drift. Vem do SSOT para nao divergir
+# do doc_frontmatter — divergir aqui reabriria o buraco que o detector 4 fecha.
+# O detector 1 historicamente so olhava {historical, stale}; alinhar com o SSOT
+# tambem fecha `superseded` e `deprecated`.
+STATUS_ESCONDE = doc_frontmatter.STATUS_FORA
+
 WAIVER = re.compile(r"(?im)^\s*doc[- ]nao[- ]afetada\s*:\s*(?P<caminho>\S+)\s*(?:[—–-]{1,2}\s*(?P<motivo>.+))?$")
 
 
@@ -89,9 +106,31 @@ def _le(p: str | None) -> str:
 
 
 def _git(args: list[str], cwd: pathlib.Path) -> str:
+    """stdout do git, ou "" — NUNCA None.
+
+    `text=True` sem `encoding` usa o default da plataforma: cp1252 no Windows.
+    `git show` de uma spec com acento estourava UnicodeDecodeError DENTRO da
+    thread leitora do subprocess, e `r.stdout` voltava None. Como todo chamador
+    faz `if not antes`, None e falsy e o detector desligava EM SILENCIO — com o
+    gate reportando OK.
+
+    Descoberto em 2026-08-26 tentando explorar o proprio gate: o exploit passou
+    localmente com os testes verdes, porque o container de teste e Linux (UTF-8).
+    Ou seja, o detector 3 (B.4) esteve cego no Windows desde que subiu, e so o CI
+    o exercitava. Os outros dois scripts ja tinham `encoding`; este ficou para tras.
+    """
     try:
-        r = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=False, timeout=120)
-        return r.stdout if r.returncode == 0 else ""
+        r = subprocess.run(
+            ["git", *args],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=120,
+            encoding="utf-8",
+            errors="replace",
+        )
+        return (r.stdout or "") if r.returncode == 0 else ""
     except (OSError, subprocess.SubprocessError):
         return ""
 
@@ -210,10 +249,42 @@ def main(argv: list[str]) -> int:
         except OSError:
             continue
 
+        # detector 4 — REBAIXAMENTO DE STATUS. Roda ANTES do skip abaixo, porque
+        # e justamente o skip que ele protege.
+        #
+        # Tres gates pulam um doc quando o status esta em STATUS_ESCONDE:
+        # doc_drift_report, check_issue_drift e o detector 1 logo abaixo. Trocar
+        # UMA palavra faz a spec sumir dos tres. Medido em 2026-08-26 com
+        # rbac.spec.md: o achado do check_issue_drift some (54 -> 53), e o ratchet
+        # responde OK e ainda SUGERE APERTAR O PISO — evasao lida como progresso.
+        # E pior que encolher `sources_of_truth`: la a contagem ficava igual,
+        # aqui ela melhora.
+        #
+        # Zero rebaixamentos nos ultimos 60 commits da main: raro, preciso, e
+        # conserta-se dentro do PR. Bloqueia sobre baseline limpo, sem allowlist.
+        # Rebaixar pode ser legitimo — exige justificativa, nao proibicao.
+        st_agora = _status(texto)
+        if base and rel in tocados and st_agora in STATUS_ESCONDE:
+            st_antes = _status(_git(["show", f"{base}:{rel}"], raiz))
+            if st_antes and st_antes not in STATUS_ESCONDE:
+                if rel in waivers:
+                    pass
+                elif rel in sem_motivo:
+                    bloqueios.append((rel, f"waiver sem justificativa para rebaixar `{st_antes}` -> `{st_agora}`"))
+                else:
+                    bloqueios.append(
+                        (
+                            rel,
+                            f"status rebaixado de `{st_antes}` para `{st_agora}` — isso esconde "
+                            "o doc de todos os gates de drift, e a contagem cai como se fosse "
+                            "melhoria",
+                        )
+                    )
+
         # Doc que se declara historico nao se corrige (ADR-017 item 5). Vale
         # tambem fora de _archive: a auditoria de 2026-07-17 mora em audits/ e
         # abre com "Registro historico — nao e a fila de trabalho".
-        if _status(texto) in {"historical", "stale"}:
+        if st_agora in STATUS_ESCONDE:
             continue
 
         refs_doc = set(MENCAO.findall(texto)) | set(ACHADO.findall(texto))

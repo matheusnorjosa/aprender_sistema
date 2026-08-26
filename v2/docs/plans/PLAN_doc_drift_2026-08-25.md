@@ -493,6 +493,46 @@ esteja errada sobre o código.
 
 ---
 
+## Fase H — Evasão dos próprios gates
+
+Classe que nenhuma fase anterior cobria: não é doc que mente, é **doc que se
+esconde do gate**. Achada em 2026-08-26 tentando explorar os gates em vez de
+testá-los.
+
+- [x] **H.1 · Rebaixamento de status.** Três gates pulam um doc quando o `status`
+      está em `{historical, stale, superseded, deprecated}` — `doc_drift_report`,
+      `check_issue_drift` e o detector 1 do `check_doc_impact`. **Trocar uma
+      palavra faz a spec sumir dos três.**
+
+      Medido com `rbac.spec.md`: o achado do `check_issue_drift` some (54 → 53),
+      o relatório para de vê-la, e o ratchet responde `OK` e ainda **sugere
+      apertar o piso**. Evasão lida como progresso — pior que encolher
+      `sources_of_truth`, porque lá a contagem ficava igual e aqui ela melhora.
+
+      Detector 4 do `check_doc_impact.py`. Zero rebaixamentos nos últimos 60
+      commits da main, então **bloqueia sobre baseline limpo**, sem allowlist.
+      Rebaixar pode ser legítimo — exige justificativa, não proibição.
+
+- [x] **H.2 · O detector 3 estava cego no Windows.** Descoberto no mesmo teste:
+      o exploit passou localmente **com os testes verdes**. `_git()` do
+      `check_doc_impact.py` usava `text=True` sem `encoding`; no Windows o default
+      é cp1252, e `git show` de spec com acento estourava `UnicodeDecodeError`
+      dentro da thread leitora do subprocess. `r.stdout` voltava `None`, e como
+      todo chamador faz `if not antes`, o detector **desligava em silêncio** com
+      o gate reportando OK.
+
+      Ou seja: a B.4 esteve cega no Windows desde que subiu — só o CI a
+      exercitava. Os outros dois scripts já tinham `encoding`; esse ficou para
+      trás. Fixado, com teste que rebaixa uma spec **com acento**.
+
+> **A lição, e ela é sobre método.** Provar que um gate morde não prova que ele
+> não pode ser contornado. Foram duas coisas, e nenhuma apareceu em teste
+> unitário: uma evasão de uma palavra, e um detector cego por plataforma que
+> passava verde nos dois. Testar contra o repositório real, na máquina real, é o
+> que separou as duas.
+
+---
+
 ## Fase G — Achados de engenharia
 
 Não são documentação. Apareceram na auditoria e não têm dono.

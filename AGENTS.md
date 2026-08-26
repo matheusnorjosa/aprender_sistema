@@ -90,10 +90,17 @@ Tarefa que lê muitos arquivos → delegar e ficar só com a conclusão (não co
 
 ## graphify
 
-This project has a graphify knowledge graph at graphify-out/.
+Existe um grafo de conhecimento gerado em `graphify-out/` — **ferramenta sob demanda,
+não fonte canônica** (raiz `CLAUDE.md` D2). A verdade de arquitetura são as **specs vivas**
+em `v2/docs/specs/` (índice `INDEX_SDD.md`); para estado de defeito,
+`v2/docs/audits/ACHADOS_REAIS.md`.
 
-Rules:
-- Before answering architecture or codebase questions, read graphify-out/GRAPH_REPORT.md for god nodes and community structure
-- If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
-- For cross-module "how does X relate to Y" questions, prefer `graphify query "<question>"`, `graphify path "<A>" "<B>"`, or `graphify explain "<concept>"` over grep - these traverse the graph's EXTRACTED + INFERRED edges instead of scanning files
-- After modifying code files in this session, run `graphify update .` to keep the graph current (AST-only, no API cost)
+Regras:
+- **Nunca é leitura obrigatória.** Não é preciso ler o grafo (nem `GRAPH_REPORT.md`) antes de
+  responder pergunta de arquitetura — vá às specs vivas.
+- O grafo **não está no git** (`.gitignore`) e a saída pode estar velha. Regenere antes de
+  confiar: `graphify update .` (AST-only, sem custo de API).
+- Como exploração opcional: `graphify query "<pergunta>"` / `path "<A>" "<B>"` /
+  `explain "<conceito>"` ajudam a navegar relações — ciente de que podem estar desatualizadas.
+- A instrução antiga ("ler `GRAPH_REPORT.md` antes de responder") foi removida: raiz
+  `CLAUDE.md`, decisão D2.

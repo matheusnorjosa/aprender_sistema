@@ -18,7 +18,7 @@ services:
 ### PostgreSQL
 
 - **Imagem**: postgres:15
-- **Porta**: 5433 (externa), 5432 (interna)
+- **Porta**: 5434 (externa), 5432 (interna)
 - **Volume**: `pgdata` para persistência
 
 ### Redis

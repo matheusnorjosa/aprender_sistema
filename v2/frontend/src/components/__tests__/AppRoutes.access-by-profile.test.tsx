@@ -61,6 +61,9 @@ vi.mock('../../api/availability', () => ({
     cells: [],
     details_index: {},
   }),
+  // FiltersBar chama getGerencias ao montar a página mensal; sem este stub a
+  // chamada vira unhandled rejection que derruba o processo do vitest (exit 1).
+  getGerencias: vi.fn().mockResolvedValue([]),
 }));
 vi.mock('../../api/stats', () => ({
   getHomeStats: vi.fn().mockResolvedValue({}),

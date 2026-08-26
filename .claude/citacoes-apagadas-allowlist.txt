@@ -22,3 +22,17 @@
 # ---------------------------------------------------------------------------
 .claude/skills/deprecation-and-migration/SKILL.md
 .agents/skills/deprecation-and-migration/SKILL.md
+
+# ---------------------------------------------------------------------------
+# PERMANENTE — o documento que EXPLICA o falso positivo dispara o falso positivo.
+#
+# `gate-calibration/reference/evasao.md` descreve, como limite conhecido do
+# discriminador, o caso do `src/api.ts`: apagado de verdade (#1045) e citado
+# corretamente por uma skill que diz "There is no src/api.ts anymore". Para
+# ensinar isso, o texto precisa nomear o caminho — e cai na propria regra.
+#
+# Mesma natureza da excecao que este arquivo tem para si mesmo: explicar exige
+# nomear. Nao ha discriminador que separe as duas.
+# ---------------------------------------------------------------------------
+.claude/skills/gate-calibration/reference/evasao.md
+

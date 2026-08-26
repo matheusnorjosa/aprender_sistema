@@ -145,8 +145,40 @@ else:
     _, out = run_ps("tools-reminder.ps1", {"prompt": "x"})
     check("tools-reminder: emits reminder", "skill/command/agent" in out)
 
-    rc, _ = run_ps("graphify-reminder.ps1", bash("grep foo src/"))
-    check("graphify-reminder: runs clean", rc == 0, f"exit={rc}")
+    # 1.B: graphify-reminder deve SEMPRE emitir JSON valido + exit 0 (nunca stdout
+    # vazio, que o Cursor le como "invalid JSON" e BLOQUEIA a tool). Quatro casos:
+    # stdin vazio, comando nao-search (ls), rg SEM e COM graphify-out/graph.json.
+    _gr = str(HOOKS / "graphify-reminder.ps1")
+
+    def _ps_out(payload: dict, cwd: str) -> tuple[int, str]:
+        assert POWERSHELL, "_ps_out sem PowerShell: bloco .ps1 deveria ter sido pulado"
+        proc = subprocess.run(
+            [POWERSHELL, "-ExecutionPolicy", "Bypass", "-File", _gr],
+            input=json.dumps(payload).encode("utf-8"), capture_output=True, cwd=cwd,
+        )
+        return proc.returncode, proc.stdout.decode("utf-8", "replace").strip()
+
+    def _is_json(s: str) -> bool:
+        try:
+            json.loads(s)
+            return True
+        except Exception:
+            return False
+
+    with tempfile.TemporaryDirectory() as _gd:
+        for _cn, _pl in [
+            ("stdin vazio", {}),
+            ("comando ls (nao-search)", bash("ls -la")),
+            ("rg SEM graph.json", bash("rg foo src/")),
+        ]:
+            _rc, _o = _ps_out(_pl, _gd)
+            check(f"graphify-reminder: {_cn} -> JSON valido + exit 0",
+                  _rc == 0 and _is_json(_o), f"exit={_rc} out={_o[:50]!r}")
+        os.makedirs(os.path.join(_gd, "graphify-out"), exist_ok=True)
+        Path(os.path.join(_gd, "graphify-out", "graph.json")).write_text("{}", encoding="utf-8")
+        _rc, _o = _ps_out(bash("rg foo src/"), _gd)
+        check("graphify-reminder: rg COM graph.json -> JSON valido + exit 0",
+              _rc == 0 and _is_json(_o), f"exit={_rc} out={_o[:50]!r}")
 
     rc, _ = run_ps("auto-format-python.ps1", write("src/foo.ts", "x"))
     check("auto-format: no-op on .ts", rc == 0, f"exit={rc}")
@@ -242,7 +274,7 @@ else:
 # report
 # --------------------------------------------------------------------------
 # Piso anti-vacuidade: um harness que roda pouco passa por nao testar sem ninguem
-# perceber. 51 casos com PowerShell presente (Windows e o runner do CI, que tem
+# perceber. 54 casos com PowerShell presente (Windows e o runner do CI, que tem
 # `pwsh`), 47 sem. Abaixo de 45, algo sumiu — e sumir em silencio e o defeito que
 # este arquivo existe para pegar.
 MINIMO = 45

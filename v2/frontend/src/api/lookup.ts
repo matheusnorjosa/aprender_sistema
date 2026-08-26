@@ -24,47 +24,12 @@ export interface LookupItem {
 export type UserLookupItem = LookupItem;
 
 /**
- * Validation payload for solicitacao
- */
-export interface ValidateSolicPayload {
-  municipio?: string | { id: ID };
-  projeto?: string | { id: ID };
-  tipo_evento?: string | { id: ID };
-  date?: string;
-  start?: string;
-  end?: string;
-  participants?: {
-    coordenador?: ID;
-    formadores?: ID[];
-    coord_acompanha?: ID[];
-  };
-}
-
-/**
- * Validation result
- */
-export interface ValidateSolicResult {
-  ok: boolean;
-  errors: Array<{ field: string; message: string }>;
-  canonical: Record<string, unknown>;
-}
-
-/**
  * Filtros opcionais para lookup de municípios.
  */
 export type LookupMunicipiosParams = QueryParams & {
   q?: string;
   com_compra?: boolean | undefined;
   projeto_id?: ID | undefined;
-};
-
-/**
- * Filtros opcionais para lookup de projetos.
- */
-export type LookupProjetosParams = QueryParams & {
-  q?: string;
-  com_compra?: boolean;
-  municipio_id?: ID;
 };
 
 /**
@@ -116,14 +81,4 @@ export async function lookupTiposEvento(q: string = ''): Promise<LookupItem[]> {
 export async function lookupUsuarios(q: string = '', role: string = ''): Promise<UserLookupItem[]> {
   const url = buildUrl('/lookup/usuarios/', { q, role });
   return await fetchAPI(url);
-}
-
-/**
- * Validar dados de solicitação antes do submit
- */
-export async function validateSolic(payload: ValidateSolicPayload): Promise<ValidateSolicResult> {
-  return await fetchAPI('/solicitacoes/validate/', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
 }

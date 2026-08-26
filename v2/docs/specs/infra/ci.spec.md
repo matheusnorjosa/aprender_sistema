@@ -1,7 +1,7 @@
 ---
 title: CI/CD (GitHub Actions)
 status: canonical
-last_verified: 2026-07-24
+last_verified: 2026-08-26
 sources_of_truth:
   - .github/workflows/ci.yaml
   - .github/workflows/promote.yml
@@ -54,6 +54,7 @@ A nomenclatura dos checks é o contrato de governança: `[required]` bloqueia me
 - **Cobertura backend ≥ 85%** — `coverage combine` dos dois jobs (core + dev_tools) com `coverage report --fail-under=85`. Falha abaixo do limiar bloqueia o gate.
 - **Paralelização xdist no gate (M3, #1402/#1403)** — gate usa `pytest -n auto --dist loadscope` (~15min→~5min). `loadscope` mantém testes da mesma classe/módulo no mesmo worker. Habilitado **só** após a suíte estabilizar (causa raiz: `transaction=True` truncava o seed RBAC; fix de re-seed pós-truncate). O canary cobre a matriz `workers×dist` mas **nunca** bloqueia (`fail_on_test_error=false`).
 - **Backend impact detector (fail-safe)** — eventos não-PR (push/dispatch) forçam `backend_changed=true` (modo full seguro); PR sem base/head SHA também. O agregador `[required] tests` exige que os jobs backend ou tenham passado (impacto) ou tenham `skipped` (sem impacto) — nunca silenciosamente verde por engano.
+- **Integridade de migrations bloqueia o merge** — `backend-migrate-integrity` roda `makemigrations --check --dry-run` (model-drift), aplica a cadeia RunPython em DB limpo e roda os testes `-m migrations`; está no `needs` + assert do agregador `[required] tests`. Logo, **model alterado sem a migration correspondente — ou cadeia RunPython quebrada — reprova o gate** (a saída de escape é `manage.py makemigrations` + commit da migration). Como todo job backend, fica `skipped` (não bloqueante) em PR sem impacto de backend. O check `check_migrations` veio do #1456; este ajuste ligou o job ao agregador required (antes era `[info]`, só reportava).
 - **Docker parity (#1401 carve-out)** — `docker-parity-backend` NÃO consome o reusable: usa topologia de container (`host.docker.internal`, `REQUIRE_DOCKER=1`, migrate in-container, build via buildx). Versões de postgres/redis aqui devem ser sincronizadas manualmente com o `services` do reusable (SSOT das versões: `postgres:15.13`, `redis:7.4`).
 - **Gate de staging (evidência)** — para PRs com impacto em runtime (`v2/backend/apps|config|requirements.txt`, `v2/frontend/src|public|Dockerfile.prod`, `v2/infra/...`), o corpo do PR precisa de 3 marcadores literais (sem acento, crase normalizada): checkbox `make staging-full ... (8/8 PASS)`, checkbox `Evidencia anexada no PR`, e o texto `ALL 8 CHECKS PASSED`. PRs em draft ou sem impacto em runtime são pulados.
 - **Guard rails de lint** — Black/isort/Flake8 + ban de `/api/v1/` fora da allowlist (#796); RBAC lint AST bane `user.groups.filter(name=...)` e classes `Is<Role>` fora da whitelist (idioma canônico: `permission_classes=[HasPerm("codename")]`).
@@ -112,7 +113,6 @@ A CI é infra-as-code; sua "prova" são os próprios checks de gate e o canary, 
 ## Pontos de atenção / dívidas conhecidas
 
 - **Drift de versões postgres/redis** — `docker-parity-backend` é carve-out do reusable; bump no reusable não propaga sozinho (sincronizar manualmente). Apps = `core` + `dev_tools` apenas.
-- **`makemigrations --check` roda, mas não bloqueia merge** — o check existe (`_backend-test.yml:155-163`, `python manage.py makemigrations --check --dry-run`) e é acionado por `ci.yaml:283` (`check_migrations: true`) no job `backend-migrate-integrity`. Só que esse job é **`[info]`** (`ci.yaml:271`) e **não está no `needs` do agregador `[required] tests`** (`ci.yaml:562-566`), que só assere `backend-tests`, `backend-typecheck` e `docker-parity-backend`. Resultado: model-drift sem migration é **detectado e reportado, mas não impede o merge**. O comentário em `ci.yaml:268-270` afirma que o job "é gated pelo required `backend-tests` (needs + assert)" — isso **não** corresponde ao `needs:` declarado. Rastreado em **#1456**; a lacuna de gating está registrada na varredura documental de 2026-07-24. (O **deploy**, esse sim, aplica migrations automaticamente via serviço one-shot `migrate` — ver [`deploy.spec.md`](./deploy.spec.md).)
 - **Canary só mostra top-5** — o report da issue #677 lista os 5 piores; a magnitude total de falhas pode ficar subdimensionada no comentário (vide M3: a issue citava 6 testes, eram 537).
 - **`pull_request` sem path filters em checks `[required]`** — necessário para o ruleset, mas faz `frontend-ci` rodar mesmo em PRs sem mudança de frontend (custo aceito por governança).
 - **react-doctor exige `--offline`** — o score depende de telemetria remota; sem `--offline` o gate é não-determinístico (memória `react-doctor-offline-determinism`).

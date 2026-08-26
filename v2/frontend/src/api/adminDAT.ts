@@ -162,10 +162,6 @@ export async function listUsers(params: ListParams = {}): Promise<PaginatedRespo
   return fetchWithErrorMapping(buildUrl('/usuarios-admin/', params as QueryParams), {}, ADMIN_ERROR_MAP);
 }
 
-export async function getUser(id: ID): Promise<AdminUser> {
-  return fetchWithErrorMapping(`/usuarios-admin/${id}/`, {}, ADMIN_ERROR_MAP);
-}
-
 export async function createUser(data: UserPayload): Promise<AdminUser> {
   const result = await fetchWithErrorMapping<AdminUser>(
     '/usuarios-admin/',
@@ -272,10 +268,6 @@ export async function listMunicipios(params: ListParams = {}): Promise<Paginated
   return fetchWithErrorMapping(buildUrl('/municipios/', params as QueryParams), {}, ADMIN_ERROR_MAP);
 }
 
-export async function getMunicipio(id: ID): Promise<Municipio> {
-  return fetchWithErrorMapping(`/municipios/${id}/`, {}, ADMIN_ERROR_MAP);
-}
-
 export async function createMunicipio(data: MunicipioPayload): Promise<Municipio> {
   return fetchWithErrorMapping('/municipios/', {
     method: 'POST',
@@ -307,10 +299,6 @@ export async function autocompleteMunicipiosAdmin(
 
 export async function listProjetos(params: ListParams = {}): Promise<PaginatedResponse<Projeto>> {
   return fetchWithErrorMapping(buildUrl('/projetos/', params as QueryParams), {}, ADMIN_ERROR_MAP);
-}
-
-export async function getProjeto(id: ID): Promise<Projeto> {
-  return fetchWithErrorMapping(`/projetos/${id}/`, {}, ADMIN_ERROR_MAP);
 }
 
 export async function createProjeto(data: ProjetoPayload): Promise<Projeto> {

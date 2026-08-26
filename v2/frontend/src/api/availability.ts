@@ -39,16 +39,6 @@ export interface MonthlyAvailabilityParams {
 }
 
 /**
- * Feature flags response
- */
-export interface FeatureFlags {
-  apply_blocked: boolean;
-  GCAL_CLIENT: boolean;
-  PREVIEW_ONLY: boolean;
-  [key: string]: unknown;
-}
-
-/**
  * Busca informações do usuário atual.
  */
 export async function getMe(): Promise<CurrentUser> {
@@ -124,13 +114,6 @@ export async function checkAvailabilityMany(
 export async function getMonthlyAvailability(params: MonthlyAvailabilityParams): Promise<MonthlyGridResponse> {
   const url = buildUrl('/availability/monthly/', params as unknown as QueryParams);
   return await fetchAPI(url);
-}
-
-/**
- * Busca feature flags do sistema.
- */
-export async function getFeatures(): Promise<FeatureFlags> {
-  return await fetchAPI('/features/');
 }
 
 /**

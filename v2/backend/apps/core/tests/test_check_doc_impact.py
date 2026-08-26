@@ -607,3 +607,131 @@ def test_spec_atualizada_no_mesmo_pr_dispensa_o_checkbox(tmp_path):
         corpo_pr="",
     )
     assert r.returncode == 0, f"spec tocada no PR deveria dispensar o checkbox:\n{r.stdout}"
+
+
+# ==========================================================================
+# DETECTOR 4 — REBAIXAMENTO DE STATUS (evasao, nao drift)
+#
+# O MESMO INCENTIVO PERVERSO DA B.4, num campo que ela nao cobria. Tres gates
+# pulam um doc quando o `status` esta em {historical, stale, superseded,
+# deprecated}: doc_drift_report, check_issue_drift e o detector 1. Trocar UMA
+# palavra faz a spec sumir dos tres.
+#
+# Medido em 2026-08-26 com rbac.spec.md: o achado do check_issue_drift some
+# (54 -> 53), o doc_drift_report para de ve-la, e o ratchet responde OK e ainda
+# SUGERE APERTAR O PISO. Evasao total, lida como progresso — pior que encolher
+# `sources_of_truth`, porque la a contagem ficava igual e aqui ela melhora.
+#
+# CALIBRAGEM: BLOQUEIA sobre baseline limpo. Zero rebaixamentos nos ultimos 60
+# commits da main, entao sem allowlist. Rebaixar pode ser legitimo — exige
+# justificativa, nao proibicao.
+# ==========================================================================
+
+
+def _spec_status(status: str) -> str:
+    return monta_spec(None, FONTES).replace("status: canonical", f"status: {status}", 1)
+
+
+def test_rebaixar_status_para_historical_bloqueia(tmp_path):
+    raiz, base = _repo_com_spec(tmp_path)
+    escreve(raiz, SPEC_REL, _spec_status("historical"))
+    commita(raiz, "docs(pagamento): marca spec como historica")
+
+    r = _run_range(raiz, base)
+    assert r.returncode != 0, f"rebaixamento de status passou:\n{r.stdout}"
+    assert "pagamento.spec.md" in r.stdout
+    assert "canonical" in r.stdout and "historical" in r.stdout, f"a saida deve mostrar o antes e o depois:\n{r.stdout}"
+
+
+@pytest.mark.parametrize("destino", ["stale", "superseded", "deprecated"])
+def test_todos_os_status_que_escondem_bloqueiam(tmp_path, destino):
+    raiz, base = _repo_com_spec(tmp_path)
+    escreve(raiz, SPEC_REL, _spec_status(destino))
+    commita(raiz, f"docs: marca como {destino}")
+
+    r = _run_range(raiz, base)
+    assert r.returncode != 0, f"rebaixamento para {destino} passou:\n{r.stdout}"
+
+
+def test_rebaixamento_com_waiver_passa(tmp_path):
+    raiz, base = _repo_com_spec(tmp_path)
+    escreve(raiz, SPEC_REL, _spec_status("historical"))
+    commita(raiz, "docs(pagamento): marca spec como historica")
+
+    assert _run_range(raiz, base).returncode != 0, "o cenario nem estava bloqueando"
+
+    r = _run_range(
+        raiz,
+        base,
+        f"doc-nao-afetada: {SPEC_REL} — o modulo de pagamento foi removido no "
+        "#1900 e a spec vira registro historico, nao contrato vigente",
+    )
+    assert r.returncode == 0, f"waiver justificado deveria satisfazer:\n{r.stdout}"
+
+
+def test_promover_status_nao_bloqueia(tmp_path):
+    """historical -> canonical e o movimento que se quer premiar."""
+    raiz = cria_repo(tmp_path)
+    for f in FONTES:
+        escreve(raiz, f, "x = 1\n")
+    escreve(raiz, SPEC_REL, _spec_status("historical"))
+    base = commita(raiz, "chore: base historica")
+    escreve(raiz, SPEC_REL, monta_spec(None, FONTES))
+    commita(raiz, "docs(pagamento): spec volta a ser canonica")
+
+    r = _run_range(raiz, base)
+    assert r.returncode == 0, f"promocao de status reprovou:\n{r.stdout}"
+
+
+def test_spec_que_ja_nasce_historica_nao_bloqueia(tmp_path):
+    """Nao ha rebaixamento: nao existia versao anterior."""
+    raiz = cria_repo(tmp_path)
+    for f in FONTES:
+        escreve(raiz, f, "x = 1\n")
+    base = commita(raiz, "chore: base")
+    escreve(raiz, "v2/docs/specs/backend/nova.spec.md", _spec_status("historical"))
+    commita(raiz, "docs: registro historico novo")
+
+    r = _run_range(raiz, base)
+    assert r.returncode == 0, f"doc que nasce historico reprovou:\n{r.stdout}"
+
+
+def test_troca_entre_status_vivos_nao_bloqueia(tmp_path):
+    """canonical -> draft continua visivel aos gates; nao e evasao."""
+    raiz, base = _repo_com_spec(tmp_path)
+    escreve(raiz, SPEC_REL, _spec_status("draft"))
+    commita(raiz, "docs(pagamento): rebaixa para draft enquanto revisa")
+
+    r = _run_range(raiz, base)
+    assert r.returncode == 0, f"troca entre status vivos reprovou:\n{r.stdout}"
+
+
+def test_editar_doc_ja_historico_nao_bloqueia(tmp_path):
+    raiz = cria_repo(tmp_path)
+    for f in FONTES:
+        escreve(raiz, f, "x = 1\n")
+    escreve(raiz, SPEC_REL, _spec_status("historical"))
+    base = commita(raiz, "chore: base")
+    escreve(raiz, SPEC_REL, _spec_status("historical").replace("Conteudo.", "Outro texto."))
+    commita(raiz, "docs: edita doc historico")
+
+    r = _run_range(raiz, base)
+    assert r.returncode == 0, f"editar doc ja historico reprovou:\n{r.stdout}"
+
+
+def test_acento_no_doc_nao_cega_os_detectores(tmp_path):
+    """`_git` sem `encoding` devolvia None no Windows e o detector calava.
+
+    O `git show` de um doc com acento estourava UnicodeDecodeError na thread
+    leitora; `r.stdout` virava None, e como todo chamador faz `if not antes`, o
+    detector desligava EM SILENCIO com o gate reportando OK. O detector 3 (B.4)
+    esteve cego assim desde que subiu — o CI (Linux/UTF-8) o exercitava, a
+    maquina de quem escreve, nao.
+    """
+    raiz, base = _repo_com_spec(tmp_path)
+    com_acento = _spec_status("historical").replace("Conteudo.", "Conteúdo com acentuação, çedilha e travessão —.")
+    escreve(raiz, SPEC_REL, com_acento)
+    commita(raiz, "docs: rebaixa spec com acento")
+
+    r = _run_range(raiz, base)
+    assert r.returncode != 0, f"acento no doc cegou o detector:\n{r.stdout}\n{r.stderr}"

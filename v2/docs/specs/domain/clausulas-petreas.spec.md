@@ -1,7 +1,7 @@
 ---
 title: Cláusulas Pétreas (CP-01..CP-08)
 status: canonical
-last_verified: 2026-07-24
+last_verified: 2026-08-26
 sources_of_truth:
   - docs/business-rules/clausulas-petreas.md
   - v2/backend/config/settings.py
@@ -48,7 +48,7 @@ Esta spec é o **índice canônico** das CPs: lista cada cláusula com seu **enf
 ## Contratos e invariantes
 
 - **CP-01 — REQUIRE_DOCKER**: v2 roda **apenas em Docker**. Quando `REQUIRE_DOCKER=1` e o processo **não** vê `/.dockerenv`, `settings.py` aborta com `sys.exit(1)`. Em dev a variável fica desligada (`"0"`); o job de integração da CI exporta `REQUIRE_DOCKER=1` e migra/roda dentro do container.
-- **CP-02 — Aprovação manual SUPER**: nenhum fluxo SUPER auto-aprova (nem evento passado, fix #1370); aprovam superuser OU (Gerente + Superintendência) OU (Assistente Administrativo + Controle); integrações (GCal) só disparam **após** aprovação. Contrato detalhado em PA-01..PA-07. ⚠️ A **imutabilidade** desta autoridade não é cumprida hoje — ver §Divergências (`M03-01`).
+- **CP-02 — Aprovação manual SUPER**: nenhum fluxo SUPER auto-aprova (nem evento passado, fix #1370); aprovam superuser OU (Gerente + Superintendência) OU (Assistente Administrativo + Controle); integrações (GCal) só disparam **após** aprovação. Contrato detalhado em PA-01..PA-07. A **imutabilidade** desta autoridade tinha um furo via import de usuários (`M03-01`), **corrigido** por #1610 (`ccbe1e05`) — ver §Divergências.
 - **CP-03 — Disponibilidade**: não-sobreposição, bloqueios T/P, buffer de deslocamento (D) e capacidade diária (M), timezone `America/Fortaleza` (storage UTC). Contrato detalhado em RD-01..RD-08.
 - **CP-04 — Workflow**: agentes autônomos seguem a ordem **Entender → Planejar → Implementar → Testar** (Infra/ETL/UI como fases subsequentes). É disciplina de processo, **não** verificada por CI.
 - **CP-05 — v1 congelado**: v1 só muda por branch `fix/v1-*` + PR para `main-v1`, com aprovação. Não há script que bloqueie edição de v1 — o backstop é a separação de branches + revisão.
@@ -87,21 +87,18 @@ As CPs não expõem endpoints próprios; são invariantes atravessando o sistema
 
 ## Divergências entre a cláusula e o código
 
-> Reconfirmadas por execução contra `main d08acfa5` e **vivas em produção**. Fonte:
+> Estado reconfirmado por execução; o status vivo de cada achado está em
 > [`ACHADOS_REAIS.md`](../../audits/ACHADOS_REAIS.md).
 
-### `M03-01` — CP-02: a autoridade de aprovação é auto-concedível
+### `M03-01` — CP-02: a autoridade de aprovação era auto-concedível (RESOLVIDO)
 
-**Severidade P0 · aberto · issue #1610 · vivo em produção.**
+**Severidade P0 · RESOLVIDO · issue #1610 (CLOSED) · corrigido em `ccbe1e05`.**
 
-CP-02 declara a autoridade de aprovação imutável. O import de usuários a torna concedível por quem já tem `manage_admin_registries` (grupo **DAT** — 3 contas ativas não-superuser em produção):
+CP-02 declara a autoridade de aprovação imutável. Até o #1610, o import de usuários a tornava concedível por quem já tinha `manage_admin_registries` (grupo **DAT** — contas ativas não-superuser em produção): `_assign_groups` fazia `usuario.groups.add(grupo)` para **qualquer** grupo resolvido por nome, sem allowlist e sem comparar ator × alvo. `POST /api/usuarios/import/?dry_run=false` com o próprio CPF e `grupos="Gerente,Superintendencia"` devolvia **HTTP 200** e concedia os dois grupos — exatamente o composite exigido por `_user_has_solicitation_approvals` ([`policies.py:415-418`](../../../backend/apps/core/rbac/policies.py)).
 
-- Gate: `permission_classes = [IsAuthenticated, HasPerm("manage_admin_registries")]` ([`views_import_usuarios.py:66`](../../../backend/apps/core/views_import_usuarios.py)).
-- `_assign_groups` ([`usuarios_import.py:374-382`](../../../backend/apps/core/services/usuarios_import.py)) faz `usuario.groups.add(grupo)` para **qualquer** grupo resolvido por nome, sem allowlist e sem comparar ator × alvo.
+**Correção (#1610, `ccbe1e05`)**: a concessão de grupos passou a ser **gated por superuser**. `_actor_pode_atribuir_grupos` ([`usuarios_import.py:273-283`](../../../backend/apps/core/services/usuarios_import.py)) só retorna `True` para `actor.is_superuser`; a decisão (`:362`) e a primitiva `_assign_groups` (`:495-496`) aplicam o gate, e um ator não-superuser recebe `grupos_ignorados` em vez da concessão. O importer export-contract concede apenas a allowlist `ALLOWED_USER_GROUPS` ([`export_contract_importer.py:1077-1082`](../../../backend/apps/core/services/export_contract_importer.py)). Um ator não-superuser não consegue mais escalar a própria autoridade de aprovação — CP-02 volta a valer como invariante para o vetor de import.
 
-`POST /api/usuarios/import/?dry_run=false` com o próprio CPF e `grupos="Gerente,Superintendencia"` devolve **HTTP 200** e concede os dois grupos — exatamente o composite exigido por `_user_has_solicitation_approvals` ([`policies.py:415-418`](../../../backend/apps/core/rbac/policies.py)).
-
-Efeito sobre a cláusula: CP-02 continua correta como *regra pretendida* e correta no *ponto de decisão* (o gate de `approve` de fato exige o composite), mas **falsa como invariante** — o conjunto de quem pode aprovar não é fixo. Detalhe do fluxo em [`politica-aprovacao.spec.md`](./politica-aprovacao.spec.md) §Divergências.
+**Residual (não é o M03-01)**: falta escopo ator × alvo abrangente em outros writers — um superuser ainda pode conceder grupos a qualquer alvo. Rastreado no épico **#1656** (M07-02; o M07-01 já foi resolvido no #1616). Detalhe do fluxo em [`politica-aprovacao.spec.md`](./politica-aprovacao.spec.md) §Divergências.
 
 CP-03 também tem divergências vivas (`M08-07`, `M08-09`, épico #1664) — ver [`regras-disponibilidade.spec.md`](./regras-disponibilidade.spec.md) §Divergencias.
 

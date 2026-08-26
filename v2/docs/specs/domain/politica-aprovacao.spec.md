@@ -54,7 +54,7 @@ A política distingue dois fluxos de projeto: `SUPER` (requer aprovação manual
 - **PA-06 — UI/UX**: botões de aprovar/reprovar ocultos para perfis sem a policy (frontend consome `access_solicitation_approvals` via `/api/me/policies/`; o legado `can_approve_super` em `/api/me/` **não** é fonte de decisão).
 - **PA-07 — Testes obrigatórios**: os 5 testes nomeados existem e passam (ver §Testes).
 - **Idempotência / concorrência**: transição só ocorre se `status == "pendente"` sob `select_for_update()` (single) e `select_for_update(skip_locked=True)` (lote) dentro de `transaction.atomic()`; reentrada em solicitação já `aprovado`/`reprovado` retorna `ValidationAPIError` (`already_approved` / `already_rejected` / `invalid_status`), não duplica AuditLog.
-- **Limites**: lote máximo de **100** ids por chamada (`batch_limit_exceeded`); `ids` vazio → `ids_required`. ⚠️ `ids` **não é validado como lista de inteiros** — ver `M11-04` em §Divergências.
+- **Limites**: lote máximo de **100** ids por chamada (`batch_limit_exceeded`); `ids` vazio → `ids_required`; `ids` é **validado como lista de inteiros** por `_BatchIdsSerializer` (#1650) antes do service — ver `M11-04` em §Divergências.
 - **Aprovação REVALIDA conflitos (#1452)**: `approve_solicitacao` chama `enforce_solicitacao_availability(solicitacao, action="approve")` ([`solicitacao_approval.py:136`](../../../backend/apps/core/services/solicitacao_approval.py)) dentro do mesmo `transaction.atomic()` do `select_for_update`; `batch_approve_solicitacoes` faz o mesmo por item (`:305`). Conflito em qualquer participante → **400 `availability_conflict`** e a aprovação não acontece. Em lote, o item conflitante entra em `errors[]` e o resto do lote segue. Como o lote aprova em sequência dentro da mesma transação, a checagem do item N já enxerga os N-1 anteriores como aprovados — é isso que impede um lote de aprovar dois eventos conflitantes do mesmo formador de uma vez. Detalhe do guard em [`regras-disponibilidade.spec.md`](./regras-disponibilidade.spec.md).
 - **CP-02** é a cláusula pétrea que ancora toda esta política; ver [`clausulas-petreas.spec.md`](./clausulas-petreas.spec.md).
 
@@ -109,40 +109,31 @@ Corpo de `approve`/`reject` aceita `{"justificativa": "..."}` (opcional). Lote a
 
 ## Divergências entre a política escrita e o código
 
-> Reconfirmadas por execução contra `main d08acfa5` e **vivas em produção**. Fonte:
-> [`ACHADOS_REAIS.md`](../../audits/ACHADOS_REAIS.md). Uma cláusula pétrea que o código não
-> cumpre é um fato do contrato — está registrada aqui, não corrigida no papel.
+> Estas três divergências foram **fechadas e corrigidas** (verificado no código +
+> [`ACHADOS_REAIS.md`](../../audits/ACHADOS_REAIS.md)). Ficam registradas com o que **eram** e
+> como foram fechadas — uma cláusula pétrea violada é um fato do contrato, e a correção também.
+> Residuais adjacentes seguem apontados para as issues que os rastreiam.
 
-### `M03-01` — a autoridade de aprovação (PA-02 / CP-02) é auto-concedível
+### `M03-01` — a autoridade de aprovação (PA-02 / CP-02) era auto-concedível — **RESOLVIDO (#1610)**
 
-**Severidade P0 · aberto · issue #1610 · vivo em produção.**
+PA-02 e CP-02 tratam "quem aprova" como invariante. O import de usuários **furava** isso; corrigido em `ccbe1e05` (2026-07-30).
 
-PA-02 e CP-02 tratam "quem aprova" como invariante. O import de usuários fura isso:
+- O gate do endpoint segue sendo a capability do grupo **DAT** ([`views_import_usuarios.py`](../../../backend/apps/core/views_import_usuarios.py)), mas a concessão de grupos passou a ser **gated por superuser**: `_actor_pode_atribuir_grupos` ([`usuarios_import.py:273-283`](../../../backend/apps/core/services/usuarios_import.py)) só retorna `True` para `actor.is_superuser`, e tanto a decisão (`:362`) quanto a primitiva `_assign_groups` (`:495-496`) aplicam o gate; um ator não-superuser recebe `grupos_ignorados`, não a escalação. O importer de export-contract só concede grupo do allowlist `ALLOWED_USER_GROUPS` ([`export_contract_importer.py:1077-1082`](../../../backend/apps/core/services/export_contract_importer.py)).
+- Cadeia antiga (um usuário DAT importava o próprio CPF com `grupos="Gerente,Superintendencia"` → HTTP 200 → passava a auto-aprovar) está **fechada**: hoje esses grupos só são concedidos por superuser.
 
-- Gate do endpoint: `permission_classes = [IsAuthenticated, HasPerm("manage_admin_registries")]` ([`views_import_usuarios.py:66`](../../../backend/apps/core/views_import_usuarios.py)) — capability do grupo **DAT** (3 contas ativas não-superuser em produção).
-- `_assign_groups` ([`usuarios_import.py:374-382`](../../../backend/apps/core/services/usuarios_import.py)) resolve o grupo por nome (`Group.objects.filter(name__iexact=...)`) e faz `usuario.groups.add(grupo)`. **Não há allowlist de grupos concedíveis nem comparação ator × alvo** — a única proteção é `superuser_protected`, que cobre o alvo superuser, não a escalação de privilégio do próprio ator.
+Residual: a política **ator × alvo** abrangente — outros writers que mutam contas de terceiros — não é encerrada por M03-01; segue no épico **#1656** (`M07-02` = takeover de conta aprovadora pelo DAT; `M07-01` já resolvido em #1616). O gate de auto-escalação **via import** está fechado.
 
-Cadeia: um usuário só do grupo DAT faz `POST /api/usuarios/import/?dry_run=false` com um CSV contendo o próprio CPF e `grupos="Gerente,Superintendencia"` → **HTTP 200**, zero pendências, zero skips. Os dois grupos concedidos são exatamente os que `_user_has_solicitation_approvals` exige ([`policies.py:415-418`](../../../backend/apps/core/rbac/policies.py)), então o ator passa a aprovar as próprias solicitações.
+### `M10-02` — trocar o projeto para fluxo SUPER preservava `status=aprovado` (lavagem de aprovação) — **RESOLVIDO (#1624)**
 
-Consequência para esta spec: **PA-02 descreve corretamente o gate, mas o gate não é uma fronteira de confiança.** Enquanto #1610 estiver aberto, "só Gerente da Superintendência aprova" é uma afirmação sobre a matriz RBAC, não sobre quem de fato consegue aprovar.
+PA-04 diz que solicitação de projeto `SUPER` nasce `pendente` e só vira `aprovado` pelos endpoints de aprovação. O `perform_update` **preservava** `aprovado` ao trocar o projeto; corrigido em #1775: [`views_solicitacao.py:478-487`](../../../backend/apps/core/views_solicitacao.py) — se o `projeto_id` mudou, a solicitação estava `aprovado` e o novo projeto resolve para `pendente` (`resolve_initial_status(projeto=instance.projeto).status == "pendente"`), o status é **rebaixado para `pendente`** (`instance.save(update_fields=["status"])`), re-exigindo aprovação.
 
-### `M10-02` — trocar o projeto para fluxo SUPER preserva `status=aprovado` (lavagem de aprovação)
+Cadeia antiga (criar em `NAO_SUPER` → nasce `aprovado` → `PATCH` trocando para projeto `SUPER` → ficava `SUPER` **e** `aprovado` sem `AuditLog` de `APPROVE`, elegível a `publish` que só checa `status == "aprovado"`) está **fechada**: trocar para um fluxo que exige aprovação rebaixa o status.
 
-**Severidade P1 · aberto · issue #1624 · vivo em produção.**
+### `M11-04` — `ids` em lote sem validação decompunha string em dígitos — **RESOLVIDO (#1650)**
 
-PA-04 diz que solicitação de projeto `SUPER` nasce `pendente` e só vira `aprovado` pelos endpoints de aprovação. `perform_update` ([`views_solicitacao.py:401-497`](../../../backend/apps/core/views_solicitacao.py)) trata `projeto_id` como campo editável comum: ele é lido em `old_data` (`:428`) e `new_data` (`:464`) apenas para o AuditLog, e **`resolve_initial_status` não é reavaliado** — não há nenhum reset de `status` no caminho de update.
+`batch_approve`/`batch_reject` **não coagiam o tipo** de `ids`: uma string `"123"` chegava ao service e `Solicitacao.objects.filter(id__in="123")` iterava a string, alvejando as solicitações **1, 2 e 3**. Corrigido em #1773: [`views_solicitacao.py:80-96`](../../../backend/apps/core/views_solicitacao.py) define `_BatchIdsSerializer` (`ids = ListField(child=IntegerField(min_value=1))`), aplicado com `is_valid(raise_exception=True)` em `batch_approve` (`:912-914`) e `batch_reject` (`:954`) — um `ids` que não seja lista de inteiros falha com **400** antes de chegar ao service.
 
-Cadeia: criar solicitação em projeto `NAO_SUPER` → nasce `aprovado` sem passar por ninguém (`resolve_initial_status`, [`solicitacao_create.py:33-38`](../../../backend/apps/core/services/solicitacao_create.py)) → `PATCH` trocando `projeto` para um de fluxo `SUPER` → o registro fica `SUPER` **e** `aprovado`, sem nunca ter tido `AuditLog` de `APPROVE`.
-
-Resultado: o evento entra na Pré-Agenda e fica elegível a `publish` (que só checa `status == "aprovado"`, [`solicitacao_publish.py:197`](../../../backend/apps/core/services/solicitacao_publish.py)). PA-01 é respeitada na letra (nada promoveu `pendente → aprovado`) e violada no efeito.
-
-### `M11-04` — `ids` em lote sem validação decompõe string em dígitos
-
-**Severidade P2 · aberto · issue #1650 · vivo em produção.**
-
-`ids = request.data.get("ids", [])` ([`views_solicitacao.py:857`](../../../backend/apps/core/views_solicitacao.py), e `:894` para `batch_reject`) vai direto ao service sem coerção de tipo. Em [`solicitacao_approval.py:272-291`](../../../backend/apps/core/services/solicitacao_approval.py) as duas guardas são `if not ids` e `if len(ids) > 100` — ambas passam para uma **string**, cujo `len` é a contagem de caracteres. `Solicitacao.objects.filter(id__in="123")` faz o Django iterar a string, e o lote alveja as solicitações **1, 2 e 3**.
-
-O aprovador precisa da policy `access_solicitation_approvals`, então não é escalação de privilégio; o defeito é de **integridade da decisão**: aprova alvo que não foi nomeado, e cada item aprovado grava `AuditLog` com `batch: True` como se tivesse sido pedido. O `select_for_update(skip_locked=True)` e o guard de disponibilidade continuam valendo — o dano é aprovar o item errado, não corromper o estado.
+As guardas de vazio/limite em [`solicitacao_approval.py`](../../../backend/apps/core/services/solicitacao_approval.py), o `select_for_update(skip_locked=True)` e o guard de disponibilidade seguem por design. O defeito era de **integridade da decisão** (aprovar alvo não-nomeado, gravando `AuditLog` `batch: True`) — fechado pela validação de tipo.
 
 ## Pontos de atenção / dívidas conhecidas
 

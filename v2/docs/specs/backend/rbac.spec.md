@@ -1,7 +1,7 @@
 ---
 title: RBAC — Controle de Acesso
 status: canonical
-last_verified: 2026-08-24
+last_verified: 2026-08-26
 sources_of_truth:
   - v2/backend/apps/core/rbac/__init__.py
   - v2/backend/apps/core/rbac/permissions.py
@@ -42,13 +42,23 @@ related:
 > - **Escalada via `GroupViewSet`** (antigo P0-1) — #1567. `get_permissions` devolve `SuperuserOnly` para tudo que não
 >   seja `list`/`retrieve` (`views/admin.py:494-500`). Registrado como `M05-01`/`M05-02` em `ACHADOS_REAIS.md`
 >   (§"Já corrigidos").
+> - **Auto-escalação via import de usuários** (antigo `M03-01`, **P0**) — `ccbe1e05` / #1610. A concessão de grupos
+>   no import passou a ser **gated por superuser**: `_actor_pode_atribuir_grupos` (`services/usuarios_import.py:273-283`)
+>   só é `True` p/ `actor.is_superuser`; a decisão (`:362`) e `_assign_groups` (`:495-496`) aplicam o gate, e um ator
+>   não-superuser recebe `grupos_ignorados`. O importer export-contract concede só a allowlist `ALLOWED_USER_GROUPS`
+>   (`services/export_contract_importer.py:1077-1082`). O residual ator×alvo em **outros** writers segue no épico #1656
+>   (`M07-02`). Ver [imports.spec](./imports.spec.md).
+> - **Auditoria de Grupo×Capability não-invariante + PII** (antigo `M05-05`, épico #1657) — #1672. O buffer de módulo
+>   `_PENDING_GROUP_CAP_DELTAS` / `flush_group_capability_audit` **não existe mais**; a escrita via REST audita em
+>   `serializers/usuario.py:514` (create) e `:532` (update) via `auditar_group_capabilities_set`, o Admin em
+>   `admin.py:438`, e o signal (`signals.py:182-192`) só faz cache-bust. PII redigida em `serializers/auditoria.py:25`
+>   e `:61-65` (`redact_cpf`).
 >
 > **Ainda abertos e reconfirmados vivos** (ver a tabela de `ACHADOS_REAIS.md` para severidade e issue):
 > escopo ator×alvo ausente em vários writers (épico #1656, inclui `M10-01` solicitações cross-gerência,
-> `M07-02` takeover de conta aprovadora pelo DAT e `M14-01` `HasSectorAccess`); auditoria não-invariante
-> (épico #1657, inclui `M05-05`); cache de revogação (`M05-03`, épico #1667); e a auto-escalação via import de
-> usuários (`M03-01`, **P0**, #1610 — ver [imports.spec](./imports.spec.md)). As seções abaixo descrevem o código
-> **como ele é**; onde a intenção diverge do real, isso está marcado explicitamente.
+> `M07-02` takeover de conta aprovadora pelo DAT e `M14-01` `HasSectorAccess`); e cache de revogação
+> (`M05-03`, épico #1667). As seções abaixo descrevem o código **como ele é**; onde a intenção diverge do
+> real, isso está marcado explicitamente.
 >
 > **Bus factor de 1.** Há **1 superuser ativo** em produção (censo de 2026-07-20, `ACHADOS_REAIS.md` §F3), e o #1567
 > tornou a administração de Grupo×Capability superuser-only. Se essa conta cair, ninguém administra RBAC. A decisão
@@ -72,7 +82,7 @@ Existem três conceitos ortogonais: **capability** (autorização binária por f
 - [`v2/backend/apps/core/services/rbac_permissions.py`](../../../backend/apps/core/services/rbac_permissions.py) — `get_user_functional_permissions` (resolução cache-aware das capabilities do usuário) + helpers de invalidação por usuário/grupo.
 - [`v2/backend/apps/core/services/functional_permissions_seed.py`](../../../backend/apps/core/services/functional_permissions_seed.py) — `FUNCTIONAL_PERMISSIONS_SEED`: SSOT dos codenames, labels, categorias e grupos default de cada capability.
 - [`v2/backend/apps/core/views/me.py`](../../../backend/apps/core/views/me.py) — `MePoliciesView` (`GET /api/me/policies/`).
-- [`v2/backend/apps/core/signals.py`](../../../backend/apps/core/signals.py) — signal `m2m_changed` em `PermissaoFuncional.groups` (`:201-264`): invalida cache (`:250`) e **acumula** o delta num buffer de módulo `_PENDING_GROUP_CAP_DELTAS` (`:47`). O `AuditLog GROUP_CAPABILITY_CHANGED` só é persistido por `flush_group_capability_audit()` (`:267-329`, `AuditLog.objects.create` em `:315`) — ver a ressalva de D17 abaixo.
+- [`v2/backend/apps/core/signals.py`](../../../backend/apps/core/signals.py) — signal `m2m_changed` em `PermissaoFuncional.groups` (`:182-192`): faz **cache-bust** dos usuários afetados. A auditoria de Grupo×Capability **não** passa mais por este signal — o buffer de módulo `_PENDING_GROUP_CAP_DELTAS` / `flush_group_capability_audit` foi removido no #1672 e o `AuditLog GROUP_CAPABILITY_CHANGED` agora é gravado no ponto de escrita — ver D17 abaixo.
 - [`v2/backend/scripts/rbac_lint.py`](../../../backend/scripts/rbac_lint.py) — lint AST (V001/V002/V003) que enforça a convenção em CI.
 
 Doc canônico detalhado (não duplicado aqui): convenção de nomes em [`RBAC_NAMING.md`](../../RBAC_NAMING.md), matriz declarativa ator × recurso em [`rbac_authorization_matrix.md`](../../rbac_authorization_matrix.md), e operação via Admin em [`GUIA_ADMIN_RBAC.md`](../../GUIA_ADMIN_RBAC.md).
@@ -85,7 +95,7 @@ Doc canônico detalhado (não duplicado aqui): convenção de nomes em [`RBAC_NA
 - **Superuser sempre bypassa**: toda classe e helper retorna `True` para `is_superuser` antes de qualquer checagem.
 - **Fail-secure**: usuário anônimo/`None` → `False`; policy key ausente da matriz → `False`; capability sem grupos no seed → só superuser passa (feature em incubação).
 - **D17 — Admin-driven Group × Capability**: a atribuição grupo↔capability migra para o Django Admin superuser-only (`PermissaoFuncionalAdmin`). Codename/label/category/existência da capability são read-only (SSOT no seed); só `groups` é editável. Toda edição invalida cache (signal `m2m_changed`).
-  - ⚠️ **O AuditLog só sai pelo Django Admin** (comportamento real, achado `M05-05`, épico #1657). O único chamador de produção de `flush_group_capability_audit()` é `PermissaoFuncionalAdmin.save_related()` (`apps/core/admin.py:416-419`). **Nenhuma view DRF chama o flush.** Como `GroupSerializer.permissao_funcional_ids` é gravável (`serializers/usuario.py:356-363`), um `PATCH /api/grupos/{id}/` altera a matriz Grupo×Capability, dispara o signal, invalida o cache — e o delta fica no buffer **sem nunca ser drenado**: zero AuditLog. Agravante: `_PENDING_GROUP_CAP_DELTAS` (`signals.py:47`) é um `dict` de módulo, **não** um thread-local (apesar do comentário em `:44`), então o lixo acumulado por uma mudança via API é drenado pelo **próximo** `save_related` no Admin e **atribuído ao ator errado**.
+  - ✅ **Auditoria de Grupo×Capability invariante — RESOLVIDO no #1672** (antigo achado `M05-05`, épico #1657, CLOSED). Antes do #1672, o único chamador de `flush_group_capability_audit()` era `PermissaoFuncionalAdmin.save_related()` (`admin.py:416-419`): **nenhuma view DRF drenava o buffer**, então um `PATCH /api/grupos/{id}/` alterava a matriz Grupo×Capability, disparava o signal e invalidava o cache, mas o delta ficava no buffer de módulo `_PENDING_GROUP_CAP_DELTAS` (`signals.py:47`) **sem nunca ser gravado** (zero AuditLog) — e, por ser um `dict` de módulo e não um thread-local, o lixo era drenado pelo **próximo** `save_related` do Admin e **atribuído ao ator errado**. O #1672 removeu o buffer e o flush: a auditoria agora é gravada **no ponto de escrita** — Admin em `admin.py:438`, REST em `serializers/usuario.py:514` (create) / `:532` (update) via `auditar_group_capabilities_set` — com PII redigida em `serializers/auditoria.py:25` / `:61-65` (`redact_cpf`). Ambos os caminhos auditam.
 - **Policy key = contrato externo estável** (uma vez em `PUBLIC_POLICY_KEYS`): adicionar key é compatível; renomear/remover é breaking (deprecation de 2 releases); mudar capabilities elegíveis (`ACCESS_POLICIES[k]`) é compatível (frontend não depende). O endpoint nunca vaza capability codenames.
 - **SSOT da semântica de policy**: `user_has_policy(user, key)` é a fonte única; `_PolicyPermission.has_permission`, os testes e `resolve_public_policies` delegam para ele. Mudar avaliação = mudar num só lugar.
 - **Revogação NÃO é imediata quando o Group é excluído** (comportamento real, achado `M05-03`, épico #1667). O cache funcional tem TTL de **300 s** (`services/rbac_permissions.py:15`). O `post_delete` em `Group` (`rbac_signals.py:102-112`) chama `invalidate_group_functional_permissions_cache`, que resolve os usuários impactados **consultando o M2M** (`rbac_permissions.py:63`). Em `post_delete` as linhas de `auth_user_groups` já foram removidas em cascata → a query volta vazia → nenhuma chave é apagada. Não há `pre_delete` com snapshot dos membros (contraste: o `pre_clear` de `rbac_signals.py:51-56` faz o snapshot de propósito). Consequência: após `DELETE /api/grupos/{id}/` os ex-membros mantêm as capabilities revogadas por até 5 minutos.
@@ -113,7 +123,7 @@ Doc canônico detalhado (não duplicado aqui): convenção de nomes em [`RBAC_NA
 
 1. **Checagem em request DRF**: DRF instancia a classe → `has_permission` rejeita não-autenticado, libera superuser, e consulta `get_user_functional_permissions(user)` (cache Redis, TTL) testando `codename in perms`. Composition `A | B` é resolvida pelas classes `OR/AND/NOT` do DRF (habilitadas em instâncias pelo monkey-patch).
 2. **Resolução de policy**: `user_has_policy(user, key)` → anônimo `False` → superuser `True` → composite key delega a helper dedicado (ex: `_user_has_solicitation_approvals`) → caso geral `user_has_any_perm(user, *ACCESS_POLICIES[key])`.
-3. **Mudança de atribuição (admin)**: superuser edita `PermissaoFuncional.groups` no Admin → signal `m2m_changed` consolida as 6 disparadas (pre/post × add/remove/clear) → invalida cache funcional dos usuários afetados (sem restart) → `save_related` chama `flush_group_capability_audit` → grava `AuditLog GROUP_CAPABILITY_CHANGED` (added/removed/groups_after). **Pelo caminho DRF (`PATCH /api/grupos/{id}/`) os dois primeiros passos acontecem e o AuditLog não** — ver a ressalva de D17.
+3. **Mudança de atribuição**: editar `PermissaoFuncional.groups` → signal `m2m_changed` consolida as 6 disparadas (pre/post × add/remove/clear) → invalida cache funcional dos usuários afetados (sem restart). A auditoria `GROUP_CAPABILITY_CHANGED` (added/removed/groups_after) é gravada **no ponto de escrita**, não pelo signal: via Admin em `admin.py:438`, via REST (`PATCH /api/grupos/{id}/`) em `serializers/usuario.py:514` (create) e `:532` (update), ambos chamando `auditar_group_capabilities_set` (#1672). Os dois caminhos auditam — o gap antigo (AuditLog só pelo Admin) foi fechado.
 4. **Erros relevantes**: capability sem grupo no seed → 403 a todos exceto superuser; `gerencia_id` não-inteiro em `HasSectorAccess` → 403 com a mensagem `"gerencia_id deve ser um número inteiro."` (`permissions.py:307`); Controle puro tentando aprovar (sem Função `Assistente Administrativo`) → 403.
 
 ## Decisões relacionadas (ADRs)

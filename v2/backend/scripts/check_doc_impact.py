@@ -260,6 +260,33 @@ def main(argv: list[str]) -> int:
                         )
                     )
 
+    # C.3 — CHECKBOX VERIFICADO POR MAQUINA. O template tinha 13 checkboxes e a
+    # palavra "doc" nao aparecia uma vez. O unico checkbox verificado por maquina
+    # neste repositorio tem 100% de adesao em 25 de 25 PRs, com o gate fora do
+    # ruleset: aqui, formato pega mais que bloqueio.
+    #
+    # ONDE ENCAIXA: o detector 2 AVISA em ~60% dos PRs, e aviso sem acao
+    # associada e como o limiar de 180 dias virou decoracao. O checkbox e a acao
+    # — custa um clique e converte o aviso em decisao registrada.
+    #
+    # CONDICIONAL de proposito: so exigido quando ha aviso. Pedir "revisei a
+    # spec" em PR que nao toca spec e atrito sem informacao, e atrito sem
+    # informacao treina a marcar sem ler.
+    #
+    # Lido do corpo VISIVEL: escondido em <!-- --> nao e revisavel, mesma
+    # disciplina do waiver — e impede que o texto do template valha por si.
+    # NAO BLOQUEIA, e a razao e um erro de projeto que os testes antigos pegaram:
+    # a primeira versao exigia o checkbox sempre que o detector 2 avisasse. Isso
+    # converte o detector 2 de AVISO em BLOQUEIO em ~60% dos PRs — precisamente o
+    # que a analise do plano rejeitou ("bloquear nisso trava o repositorio e o
+    # gate e revertido"). Um checkbox verificado nao pode contrabandear a
+    # calibragem que o detector abaixo dele recusou.
+    #
+    # Fica como nudge no job summary, junto do resto (E.1/E.2): onde a pessoa ja
+    # olha, sem transformar aviso em portao pela porta dos fundos.
+    CHECKBOX_SPEC = re.compile(r"(?im)^\s*-\s*\[x\]\s*.*sources_of_truth")
+    checkbox_marcado = bool(CHECKBOX_SPEC.search(corpo_visivel))
+
     # E.2 — AUDITAR O USO DO CONTORNO. O waiver e necessario (sem saida de
     # escape o gate vira imposto e e contornado por fora) E e o ponto de erosao.
     # A contagem vai para o job summary porque, se subir de forma sustentada,
@@ -269,6 +296,24 @@ def main(argv: list[str]) -> int:
     # So escreve a secao quando ha uso: aviso sem acao e ruido, e ruido treina
     # a ignorar o gate.
     destino = a.summary_file or os.environ.get("GITHUB_STEP_SUMMARY")
+    if destino and avisos and not checkbox_marcado:
+        quais = sorted({rel for rel, _ in avisos})
+        nudge = [
+            "## Documentacao viva — checkbox de revisao de spec",
+            "",
+            f"O gate apontou **{len(quais)}** spec(s) que este PR provavelmente afeta, e o",
+            "checkbox de revisao nao esta marcado no corpo do PR. Marcar custa um clique",
+            "e deixa a decisao registrada; nao marcar nao bloqueia nada.",
+            "",
+            *[f"- `{q}`" for q in quais[:10]],
+            "",
+        ]
+        try:
+            with open(destino, "a", encoding="utf-8") as fh:
+                fh.write(os.linesep.join(nudge) + os.linesep)
+        except OSError:
+            pass
+
     if destino and (waivers or sem_motivo):
         linhas = [
             "## Documentacao viva — uso do waiver",

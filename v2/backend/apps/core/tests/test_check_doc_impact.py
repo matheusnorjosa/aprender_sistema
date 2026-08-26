@@ -523,3 +523,87 @@ def test_summary_sem_waiver_nao_inventa_secao(tmp_path):
     assert r.returncode == 0, r.stdout
     md = destino.read_text(encoding="utf-8") if destino.exists() else ""
     assert "waiver" not in md.lower(), f"sem waiver nao deveria haver secao:\n{md}"
+
+
+# ==========================================================================
+# C.3 — CHECKBOX VERIFICADO POR MAQUINA
+#
+# O `pull_request_template.md` tinha 13 checkboxes e a palavra «doc» nao
+# aparecia uma vez. O unico checkbox verificado por maquina neste repositorio tem
+# 100% de adesao em 25 de 25 PRs — com o gate fora do ruleset. Formato, nao
+# bloqueio, e o que faz um gate pegar aqui.
+#
+# ONDE ELE ENCAIXA: o detector 2 AVISA em ~60% dos PRs, e aviso sem acao
+# associada e exatamente como o limiar de 180 dias virou decoracao. O checkbox e
+# a acao — custa um clique, e converte o aviso em decisao registrada.
+#
+# Por isso a exigencia e CONDICIONAL: so vale quando o detector 2 aponta algo.
+# Exigir em todo PR seria pedir que se marque «revisei a spec» em PR que nao toca
+# spec nenhuma — atrito sem informacao, que treina a marcar sem ler.
+# ==========================================================================
+
+CHECK_SPEC = "- [x] Se o PR toca arquivo listado em `sources_of_truth` de uma spec, a spec foi"
+
+
+def test_aviso_sem_checkbox_NAO_bloqueia(tmp_path):
+    """A primeira versao disto BLOQUEAVA, e os testes antigos pegaram o erro.
+
+    Exigir o checkbox sempre que o detector 2 avisa converte o detector de AVISO
+    em BLOQUEIO em ~60% dos PRs — exatamente o que a analise do plano rejeitou.
+    Um checkbox verificado nao pode contrabandear a calibragem que o detector
+    abaixo dele recusou. Vira nudge no job summary.
+    """
+    _monta(tmp_path, {"v2/docs/specs/backend/pagamento.spec.md": SPEC})
+    r = _run(
+        tmp_path,
+        ["v2/backend/apps/core/models/pagamento.py"],
+        commits="refactor(pagamento): extrai helper",
+        corpo_pr="- [ ] Se o PR toca arquivo listado em `sources_of_truth` de uma spec, a spec foi",
+    )
+    assert r.returncode == 0, f"checkbox nao pode virar bloqueio disfarcado:\n{r.stdout}"
+    assert "pagamento.spec.md" in r.stdout, "o aviso do detector 2 continua saindo"
+
+
+def test_aviso_do_detector_2_com_checkbox_passa(tmp_path):
+    _monta(tmp_path, {"v2/docs/specs/backend/pagamento.spec.md": SPEC})
+    r = _run(
+        tmp_path,
+        ["v2/backend/apps/core/models/pagamento.py"],
+        commits="refactor(pagamento): extrai helper",
+        corpo_pr=CHECK_SPEC,
+    )
+    assert r.returncode == 0, f"checkbox marcado deveria satisfazer:\n{r.stdout}"
+
+
+def test_sem_aviso_o_checkbox_nao_e_exigido(tmp_path):
+    """Exigir em PR que nao toca spec e atrito sem informacao — treina a marcar sem ler."""
+    _monta(tmp_path, {"v2/docs/specs/backend/pagamento.spec.md": SPEC})
+    r = _run(tmp_path, ["README.md"], commits="docs: ajusta readme", corpo_pr="")
+    assert r.returncode == 0, f"PR sem aviso nao deveria exigir checkbox:\n{r.stdout}"
+
+
+def test_checkbox_dentro_de_comentario_html_nao_conta(tmp_path):
+    """Mesma disciplina do waiver: escondido nao e revisavel."""
+    _monta(tmp_path, {"v2/docs/specs/backend/pagamento.spec.md": SPEC})
+    r = _run(
+        tmp_path,
+        ["v2/backend/apps/core/models/pagamento.py"],
+        commits="refactor(pagamento): extrai helper",
+        corpo_pr=f"<!-- {CHECK_SPEC} -->",
+    )
+    assert r.returncode == 0, "nao bloqueia — o checkbox e nudge, nao portao"
+
+
+def test_spec_atualizada_no_mesmo_pr_dispensa_o_checkbox(tmp_path):
+    """Quem ja atualizou a spec nao precisa declarar que a revisou."""
+    _monta(tmp_path, {"v2/docs/specs/backend/pagamento.spec.md": SPEC})
+    r = _run(
+        tmp_path,
+        [
+            "v2/backend/apps/core/models/pagamento.py",
+            "v2/docs/specs/backend/pagamento.spec.md",
+        ],
+        commits="refactor(pagamento): extrai helper",
+        corpo_pr="",
+    )
+    assert r.returncode == 0, f"spec tocada no PR deveria dispensar o checkbox:\n{r.stdout}"

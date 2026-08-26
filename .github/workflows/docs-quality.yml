@@ -107,6 +107,23 @@ jobs:
         if: ${{ !cancelled() }}
         run: python .claude/hooks/test_hooks.py
 
+      # A.1 — RECONCILIACAO DE ISSUE, EM RATCHET. Os outros gates sao por PR e
+      # impedem drift NOVO; nenhum limpa o que ja estava la. Caso verificado:
+      # a issue #1611 esta CLOSED e a spec CANONICA de DR diz "restore quebrado,
+      # P0" — quem le conclui que o restore de producao nao funciona.
+      #
+      # Nem bloqueio (59 pendentes reprovariam todo PR no dia 1) nem aviso (aviso
+      # sem acao virou decoracao no limiar de 180 dias): ratchet sobre piso
+      # medido, que e padrao provado aqui. A contagem por raiz nao pode CRESCER;
+      # a reducao e trabalho de conteudo.
+      - name: Reconciliacao de issue (ratchet sobre piso medido)
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          python v2/backend/scripts/check_issue_drift.py
+          --baseline v2/docs/.issue-drift-baseline.json
+
       # RELATORIO, NAO PORTAO (Fase B.3 do plano). Medido em 2026-08-24: 21 de 21
       # specs que declaram `sources_of_truth` estao em drift, e 95% recebem commit
       # novo em 7 dias. Um gate que barra sobre "existe drift" barra sempre e e

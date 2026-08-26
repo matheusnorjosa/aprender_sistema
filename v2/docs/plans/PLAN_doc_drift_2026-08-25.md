@@ -17,6 +17,7 @@ sources_of_truth:
   - v2/backend/scripts/doc_drift_report.py
   - v2/backend/scripts/doc_frontmatter.py
   - .claude/citacoes-apagadas-allowlist.txt
+  - v2/docs/.issue-drift-baseline.json
   - .claude/hooks/test_hooks.py
 ---
 
@@ -120,7 +121,26 @@ python v2/backend/scripts/check_issue_drift.py --root v2/docs/audits   # espera 
 pytest apps/core/tests/test_check_issue_drift.py -q
 ```
 
-- [ ] feito · 30 linhas · 27 severidades divergentes
+- [x] feito — `check_issue_drift.py` + 11 testes, em **ratchet sobre piso medido**.
+
+      **Caso verificado ponta a ponta:** a issue **#1611 está `CLOSED`** e
+      `specs/backend/backup-dr.spec.md:40,109` + `INDEX_SDD.md:81` descrevem o
+      restore como quebrado, P0. Quem abre a spec canônica de DR conclui que o
+      restore de produção não funciona. O gate da Fase C bloquearia — mas o fix
+      mergeou antes dele existir, e **gate por PR não alcança o passado**.
+
+      **O número, medido com cuidado:** 146 issues fechadas são citadas em doc
+      viva, em 305 lugares — e *não são 146 mentiras*: «corrigido em #1611» é
+      referência histórica correta. Filtrando para citação com marcador de aberto
+      e sem marcador de corrigido: **59 suspeitas**, 27 nas specs canônicas.
+
+      **Por que ratchet:** bloquear com 59 pendentes reprova todo PR no dia 1;
+      avisar é o que fez o limiar de 180 dias virar decoração. A contagem por
+      raiz não pode crescer — provado injetando uma citação nova numa spec:
+      `v2/docs/specs: 28 > 27`, exit 1. A redução é trabalho de conteúdo.
+
+      A heurística é assumida, não disfarçada: a saída chama de **suspeita**, e
+      o que o ratchet trava é o número de suspeitas, não de mentiras provadas.
 
 ### A.2 · Correções de dano alto
 
@@ -281,7 +301,19 @@ não aparece uma vez**. E o único checkbox verificado por máquina no projeto t
 `staging-gate-audit.yml` faz — que é hoje o único workflow que lê
 `pull_request.body`.
 
-- [ ] feito
+- [~] parcial, **e o limite é de projeto, não de esforço.** Os dois checkboxes
+      entraram no template (#1853) e o corpo do PR passou a ser lido.
+
+      A verificação por máquina foi implementada como **bloqueio** e **revertida
+      no mesmo PR**: os testes antigos pegaram o erro. Exigir o checkbox sempre
+      que o detector 2 avisa converte o detector de *aviso* em *bloqueio em ~60%
+      dos PRs* — precisamente o que a análise deste plano rejeitou («bloquear
+      nisso trava o repositório e o gate é revertido»). Um checkbox verificado
+      não pode contrabandear a calibragem que o detector abaixo dele recusou.
+
+      Ficou como **nudge no job summary**, junto de E.1/E.2. A adesão de 100%
+      que o formato tem no `staging-gate-audit.yml` vem de um sinal preciso;
+      aqui o sinal é amplo, e o formato não conserta isso.
 
 ### C.4 · Módulo novo sem spec — aviso
 

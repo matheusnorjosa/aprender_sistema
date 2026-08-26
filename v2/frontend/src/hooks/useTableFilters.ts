@@ -25,7 +25,15 @@
 import { useState, useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
 import { message } from 'antd';
 import type { PaginatedResponse } from '../types';
-import type { PaginationState } from './useCrudOperations';
+
+/**
+ * Pagination state (current page, page size, total rows).
+ */
+export interface PaginationState {
+  current: number;
+  pageSize: number;
+  total: number;
+}
 
 /**
  * Query params produced by the hook for the list/stats endpoints.

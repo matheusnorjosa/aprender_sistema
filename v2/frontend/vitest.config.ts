@@ -55,11 +55,15 @@ export default defineConfig({
       // 45.33/35.29/33.68/45.85 — fixado ~0.3-0.8pt abaixo pra travar a regressão sem
       // reprovar por flutuação. Cobertura é determinística num suite verde, então a margem
       // só protege de teste flaky que perca as retries.
+      // #1867: statements/lines 45→44 — a remoção do hook morto `useCrudOperations`
+      // (~300 ln, coberto ~100% pelo próprio teste, também removido) tirou um bloco de
+      // ALTA cobertura da média, baixando statements 45.33→44.83. Não é regressão de
+      // código VIVO — é artefato do denominador ao remover dead code + seu teste.
       thresholds: {
-        statements: 45,
+        statements: 44,
         branches: 35,
         functions: 33,
-        lines: 45,
+        lines: 44,
       },
     },
   },

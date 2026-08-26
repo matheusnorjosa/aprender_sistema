@@ -265,11 +265,13 @@ jobs:
   # a cadeia real de migrations no deploy. Este job preenche essa lacuna:
   # run_migrations=true aplica as 24 RunPython em DB limpo (falha aqui = migration
   # quebrada, pega ANTES do deploy) e roda os testes `-m migrations` contra o DB
-  # migrado. E gated pelo required `backend-tests` (needs + assert), sem mexer no
-  # ruleset de branch protection.
+  # migrado. Gateia o merge via `needs` + assert do agregador required `tests`
+  # (abaixo), sem criar check novo no ruleset de branch protection: model-drift
+  # sem migration (check_migrations) e cadeia RunPython quebrada passam a
+  # bloquear o PR, nao so a reportar.
   # ----------------------------------------------------------------
   backend-migrate-integrity:
-    name: "[info] backend migrate-integrity"
+    name: "[required] backend migrate-integrity"
     needs:
       - backend-impact
     if: needs.backend-impact.outputs.backend_changed == 'true'
@@ -564,6 +566,7 @@ jobs:
       - backend-tests
       - backend-typecheck
       - docker-parity-backend
+      - backend-migrate-integrity
     if: always()
     timeout-minutes: 5
     steps:
@@ -590,6 +593,11 @@ jobs:
             echo "docker-parity-backend failed with result=${{ needs.docker-parity-backend.result }}" >&2
             exit 1
           fi
+          if [ "${{ needs.backend-migrate-integrity.result }}" != "success" ]; then
+            echo "backend-migrate-integrity failed with result=${{ needs.backend-migrate-integrity.result }}" >&2
+            echo "Model-drift sem migration (makemigrations --check) ou cadeia RunPython quebrada. Rode 'manage.py makemigrations' e commite a migration." >&2
+            exit 1
+          fi
           echo "Backend impact detected: required backend jobs passed."
           exit 0
         fi
@@ -604,6 +612,10 @@ jobs:
         fi
         if [ "${{ needs.docker-parity-backend.result }}" != "skipped" ]; then
           echo "Expected docker-parity-backend=skipped when backend_changed=false, got result=${{ needs.docker-parity-backend.result }}" >&2
+          exit 1
+        fi
+        if [ "${{ needs.backend-migrate-integrity.result }}" != "skipped" ]; then
+          echo "Expected backend-migrate-integrity=skipped when backend_changed=false, got result=${{ needs.backend-migrate-integrity.result }}" >&2
           exit 1
         fi
         echo "No backend impact detected: backend-heavy jobs skipped as expected."

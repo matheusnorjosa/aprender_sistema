@@ -419,8 +419,22 @@ esteja errada sobre o código.
       passou a expor em todo PR; promovê-lo é decisão de admin.
 - [ ] **F.4 · O índice manda ler o documento que a spec canônica declara obsoleto**
       (`INDEX_DOCUMENTACAO` → `IMPLEMENTACAO_PA`).
-- [ ] **F.5 · Referência por caminho em crase não é link** — 11 arquivos SEC ficaram
-      inalcançáveis com o checker verde.
+- [x] **F.5 · Referência por caminho em crase não é link** — 11 arquivos SEC ficaram
+      inalcançáveis com o checker verde. `check_doc_links.py` passou a **avisar**
+      sobre caminho em crase que não resolve, com 7 testes (o script era step
+      `[required]` desde sempre e não tinha teste nenhum).
+
+      **Avisa, não bloqueia**, e a medição é o motivo: 211 referências com forma
+      de caminho em doc vivo, **22 não resolvem, ~11 exigem ação**. O resto são
+      relatórios datados (candidatos a `_archive/`) e declarações históricas
+      **corretas** — inclusive uma neste próprio plano, que afirma com razão que
+      `graphify-out/wiki/index.md` não existe. 50% de precisão fica abaixo da
+      barra que os outros detectores usam para bloquear, e bloquear reprovaria
+      PR alheio por dívida de outra frente.
+
+      Só conta o que tem forma de caminho (exige `/`): incluir nome solto em
+      crase — «ver `ACHADOS_REAIS.md`» — levava a 164 achados de 610, ruído que
+      treina a ignorar o gate.
 - [x] **F.6 · A camada de instrução ficou versionada sem gate de drift.** O D3
       trouxe `.claude/` e `.agents/` para o git, mas versionar não é vigiar:
       `check_agent_instructions.py` só olhava caminho de máquina e credencial, e
@@ -462,6 +476,18 @@ Não são documentação. Apareceram na auditoria e não têm dono.
 | G.7 | 5 ViewSets de opções **sem rota nenhuma**, com testes verdes que só atestam import | médio |
 
 - [ ] G.1 · [ ] G.2 · [ ] G.3 · [ ] G.4 · [ ] G.5 · [ ] G.6 · [ ] G.7
+
+> **Escopo:** a Fase G é correção de código, não de documentação, e por isso saiu
+> da frente de gates. O **G.7** já está no Lote A da varredura de sanitização de
+> 2026-08-25, com prova independente: `grep OptionViewSet v2/backend/apps/core/urls.py`
+> retorna zero — os 5 ViewSets nunca foram roteados, e as rotas `/api/options/*`
+> vivas usam as function-based views de `views_options.py`.
+>
+> **G.1 confirmado por execução** em 2026-08-25: `aprender_dev_s1-web-1` monta
+> `.claude/worktrees/system-mapping-technical-analysis-348949/v2/backend → /app`.
+> Rodar `docker exec … pytest` ali testa outro worktree, não o diretório de
+> trabalho — foi o que aconteceu ao tentar rodar os testes deste plano no
+> container: `collected 0 items`, verde por não ter encontrado os arquivos.
 
 ---
 

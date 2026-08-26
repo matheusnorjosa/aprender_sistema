@@ -5,16 +5,18 @@ Consolidar o programa de hardening de cyberseguranca 2026-03-09, garantindo fech
 - Documento consolidado: `v2/docs/plans/PLAN_cybersecurity_hardening_2026-03-09.md`
 
 ## Trilhas vinculadas
-- [ ] #799 SEC-001 Watchtower sem exposicao externa
-- [ ] #800 SEC-002 Redis/Celery com auth/TLS uniforme
-- [ ] #801 SEC-003 Respostas de erro sem leak tecnico
-- [ ] #802 SEC-004 CSP estrita sem unsafe-inline/unsafe-eval
-- [ ] #803 SEC-005 Endpoints docs/schema/metrics restritos
-- [ ] #804 SEC-006 Runtime de containers hardening completo
-- [ ] #805 SEC-007 Mitigacao de CSV Injection
-- [ ] #806 SEC-008 Swagger sem persistencia de auth em prod
-- [ ] #807 SEC-009 CORS/CSRF minimizado em producao
-- [ ] #808 SEC-010 Blindagem contra tampering client-side/localStorage
+> **Épico concluído** (#809) — todas as 10 trilhas (#799–#808) estão CLOSED. Checklist marcada em 2026-08. O "Marco de fases" abaixo é o cronograma histórico de planejamento (prazos relativos), preservado como registro.
+
+- [x] #799 SEC-001 Watchtower sem exposicao externa
+- [x] #800 SEC-002 Redis/Celery com auth/TLS uniforme
+- [x] #801 SEC-003 Respostas de erro sem leak tecnico
+- [x] #802 SEC-004 CSP estrita sem unsafe-inline/unsafe-eval
+- [x] #803 SEC-005 Endpoints docs/schema/metrics restritos
+- [x] #804 SEC-006 Runtime de containers hardening completo
+- [x] #805 SEC-007 Mitigacao de CSV Injection
+- [x] #806 SEC-008 Swagger sem persistencia de auth em prod
+- [x] #807 SEC-009 CORS/CSRF minimizado em producao
+- [x] #808 SEC-010 Blindagem contra tampering client-side/localStorage
 
 ## Marco de fases
 1. P0 (0-7 dias): #799 #800 #801

@@ -141,8 +141,10 @@ Cada seta indica dependência de FK ou de validação de domínio.
   planilha **cria uma linha nova** em vez de atualizar
   ([#1633](https://github.com/matheusnorjosa/aprender_sistema/issues/1633)).
 - **Bloqueios** — reimport atualiza `motivo`.
-- **Usuários** — reimport **adiciona** os grupos da coluna `grupos`, sem allowlist
-  ([#1610](https://github.com/matheusnorjosa/aprender_sistema/issues/1610), P0).
+- **Usuários** — reimport reconcilia por CPF; a concessão dos grupos da coluna `grupos` **era**
+  irrestrita a cada reimport (auto-escalação), **corrigida** por
+  [#1610](https://github.com/matheusnorjosa/aprender_sistema/issues/1610) (`ccbe1e05`): agora só o
+  ator superuser concede grupos — não-superuser recebe `grupos_ignorados`.
 
 **Antes de reimportar em produção**: rodar dry-run e ler a resposta HTTP — ela é a **única**
 evidência que existe. `AuditLog` filtrado por `action LIKE 'IMPORT_%'` **não devolve nada**: as
@@ -158,7 +160,7 @@ evidência que existe. `AuditLog` filtrado por `action LIKE 'IMPORT_%'` **não d
 - Em quais cenários **Cadastros base** (passo 2) precisam ser refeitos pós-deploy? Sentinela D17 deveria bloquear?
 - Disponibilidade deve preceder Agenda no fluxo real ou as duas chegam juntas? *(Nota 2026-07-24:
   hoje a ordem não protege nada — o import de eventos não consulta disponibilidade, #1620.)*
-- 🔴 **Antes do próximo reimport em massa**: fechar #1610 (auto-escalação), #1628 (sobrescrita
-  silenciosa de aprovação) e #1633 (duplicação de `Compra`). Sem isso, "re-rodar o arquivo
-  corrigido" é uma operação destrutiva sem rastro. Ver
-  [../audits/ACHADOS_REAIS.md](../audits/ACHADOS_REAIS.md).
+- 🔴 **Antes do próximo reimport em massa**: fechar #1628 (sobrescrita silenciosa de aprovação) e
+  #1633 (duplicação de `Compra`). Sem isso, "re-rodar o arquivo corrigido" é uma operação destrutiva
+  sem rastro. (A auto-escalação de grupos de #1610 já foi **corrigida** em `ccbe1e05` — concessão
+  gated por superuser.) Ver [../audits/ACHADOS_REAIS.md](../audits/ACHADOS_REAIS.md).

@@ -488,7 +488,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
             # Processa extra_participants se presente
             extra_participants = self.request.data.get("extra_participants", {})
-            if extra_participants and "formador_ids" in extra_participants:
+            if isinstance(extra_participants, dict) and (
+                "formador_ids" in extra_participants or "coord_acompanha_ids" in extra_participants
+            ):
                 self._update_formadores(instance, extra_participants)
 
             enforce_solicitacao_availability(instance, action="update")
@@ -552,44 +554,47 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         from .models import Participation, Usuario
         from .utils.cache_utils import invalidate_availability_cache
 
-        new_formador_ids = set(extra.get("formador_ids", []))
-
-        # Formadores atuais
-        current_participations = Participation.objects.filter(solicitacao=solicitacao, role="FORMADOR")
-        current_ids = set(p.usuario_id for p in current_participations if p.usuario_id)
-
-        # Calcular diferenças
-        to_remove = current_ids - new_formador_ids
-        to_add = new_formador_ids - current_ids
-
         changed = False
+        touched: set[int] = set()
 
-        # Remover formadores
-        if to_remove:
-            Participation.objects.filter(solicitacao=solicitacao, role="FORMADOR", usuario_id__in=to_remove).delete()
-            changed = True
+        # Reconcilia FORMADOR e COORD_ACOMPANHA por id (diff-set), espelhando o create.
+        for role, key in (("FORMADOR", "formador_ids"), ("COORD_ACOMPANHA", "coord_acompanha_ids")):
+            if key not in extra:
+                continue  # campo ausente = não mexer neste papel
+            new_ids = {i for i in extra.get(key, []) if i}
 
-        # Adicionar formadores com batch fetch (#406 - Query Optimization)
-        if to_add:
-            # Batch fetch: 1 query para todos os usuários em vez de N queries
-            usuarios_map = {u.id: u for u in Usuario.objects.filter(id__in=to_add)}
+            current_ids = set(
+                Participation.objects.filter(solicitacao=solicitacao, role=role, usuario_id__isnull=False).values_list(
+                    "usuario_id", flat=True
+                )
+            )
 
-            # Bulk create participations
-            participations_to_create = [
-                Participation(solicitacao=solicitacao, usuario=usuarios_map[formador_id], role="FORMADOR")
-                for formador_id in to_add
-                if formador_id and formador_id in usuarios_map
-            ]
+            to_remove = current_ids - new_ids
+            to_add = new_ids - current_ids
 
-            if participations_to_create:
-                Participation.objects.bulk_create(participations_to_create, ignore_conflicts=True)
+            if to_remove:
+                Participation.objects.filter(solicitacao=solicitacao, role=role, usuario_id__in=to_remove).delete()
                 changed = True
+                touched |= to_remove
+
+            # #1656/D6: só usuários ATIVOS entram por id (o create já filtra; o update
+            # não filtrava → pessoa desligada marcada ativa voltava a ser anexada).
+            # Batch fetch: 1 query para todos (#406).
+            if to_add:
+                usuarios = {u.id: u for u in Usuario.objects.filter(id__in=to_add, is_active=True)}
+                added = [uid for uid in to_add if uid in usuarios]
+                if added:
+                    Participation.objects.bulk_create(
+                        [Participation(solicitacao=solicitacao, usuario=usuarios[uid], role=role) for uid in added],
+                        ignore_conflicts=True,
+                    )
+                    changed = True
+                    touched |= set(added)
 
         # #1556: bulk_create não dispara post_save (o receiver de Participation é inerte
         # para os adds). Invalida o cache de disponibilidade explicitamente para
-        # adicionados E removidos — não depende de o QuerySet.delete() acima disparar
-        # post_delete (mais robusto a refactors futuros de fast-delete).
-        for usuario_id in to_add | to_remove:
+        # adicionados E removidos — mais robusto a refactors futuros de fast-delete.
+        for usuario_id in touched:
             invalidate_availability_cache(usuario_id=usuario_id)
 
         return changed

@@ -31,10 +31,32 @@ onda com impacto de dado fecha com uma checagem de **página/tela**, não só de
 Autoridade e detalhe: `ESPELHO_SISTEMA_PLANILHA.md` (o que o sistema faz, em `v2/docs/`) +
 `REFERENCIA-DOMINIO.md` (o que a planilha contém, no `sheets.banco`).
 
-> **Caminho crítico:** o `sheets.banco` emite a **v15** (com `setor_canonico`, `segmento_norm`,
-> `external_event_id`, correções §9.2). As migrations/import de verdade dependem dela.
-> **RF01 imutável:** não importar dado real até um dry-run do `--apply` passar verde +
+> **Caminho crítico:** a **v15 foi ENTREGUE** (2026-08-27, snapshot 2026-08-21, 32 arquivos, com
+> `setor_canonico`, `segmento_norm`, `usuario.status`, correções). As migrations/import de verdade
+> podem começar. **RF01 imutável:** não importar dado real até um dry-run do `--apply` passar verde +
 > autorização do dono.
+
+## Verificação crosscheck v15 (2026-08-27) — o que o código REALMENTE tem
+
+Rodei um workflow de 8 agentes cruzando cada afirmação do **lado-sistema** da v15 contra o código
+(file:line). O relay veio enviesado "mais pronto do que é" (2 claims cravaram, 6 corrigidos):
+
+| claim do relay | veredicto | realidade no código | issue |
+|---|---|---|---|
+| `projeto.setor` × `gerencia.setor_canonico` (gate D6) | 🔶 reclass | **nenhum dos 2 campos existe**; setor é `projeto.gerencia.nome_setor`; `projeto.gerencia` **124/125 vazio** | #1893 #1898 |
+| `EquipeGerencia.vigentes_em()` + setor | 🟡 parcial | esqueleto **roda em prod**; `Gerencia.setor_canonico` é NOVO (só em Gerencia, não em EquipeGerencia) | #1893 |
+| `external_event_id` importável | 🔶 reclass ⚠️ | campo é **cache determinístico** (`asv2-{id}`); **NÃO importável** (landmine `tipo_compra`≠`tipo`) | #1899 |
+| Colecao tem import próprio | ✅ ok | `POST /api/colecoes/import/` existe; remover `colecao.csv` é inócuo | — |
+| não apagar model `Prova` | ✅ ok | model **vivo** (PATCH `update_prova`, serializers, prefetch); "0 provas" = dado vazio | — |
+| `usuario.status`/`desativado_localmente` | 🔴 refutado ⚠️ | **não existem** (só `is_active`); `usuarios_import.py:425-428` **reativa desligado** (bomba) | #1891 #1894 |
+| 14 entidades "implementadas" | 🟡 parcial | **12 escrevem**; `equipe_gerencia`/`solicitacao` sem handler; `gerencia` só classifica | #1895 #1896 |
+| `segmento_norm`; projeto_geral→nr_codigos | 🟡 parcial | `segmento_norm` **não é coluna**; nr_codigos usa `DATRegistro.projeto_geral`, **não** `Projeto.projeto_geral` | #1896 #1897 |
+
+**Rastreamento: milestone #22 — Import v15 → dev correto** (issues #1891–#1900). Ordem sugerida:
+**#1891** (bomba usuarios_import, urgente) → **#1892** (merge VIDA `--apply`) → **#1893/#1894** (campos) →
+**#1895/#1896/#1897** (import) → **#1898** (gates D6/D7) → **#1899** (relay external_event_id) → **#1900**
+(validação de dev). As duas landmines (external_event_id, bomba de reativação) foram evitadas por verificar
+antes de construir.
 
 ## Decisões travadas (não relitigar sem o dono)
 
@@ -154,7 +176,7 @@ Onda 0 ✅ ──> Onda A (agora, independente)
 
 | risco | mitigação |
 |---|---|
-| import reativa desligado (Elienai) | `desativado_localmente` (B.5) vence a fonte; import nunca reativa |
+| import reativa desligado (Elienai) — **bomba viva** | `usuarios_import.py:425-428` sobrescreve `is_active` incondicional (default True se coluna ausente). Fix: guarda never-reactivate + campo `desativado_localmente` (#1891/#1894). `desativado_localmente` **ainda não existe** |
 | comparar setor por igualdade barra 46% | usar `setor_canonico` dos dois lados (B.1) |
 | transferência duplica evento no GCal | eventId determinístico → UPDATE; editar solicitação existente, não criar nova |
 | import cego sobrescreve data-fix manual | dry-run verde + autorização (RF01); create-only + never-overwrite |
@@ -163,10 +185,11 @@ Onda 0 ✅ ──> Onda A (agora, independente)
 
 ## Requests ao `sheets.banco`
 
-**Emitir na v15:** `equipe_gerencia.setor_canonico` (de-para aplicado) · `projeto→projeto_geral`
-o mais completo possível (regra de códigos) · `segmento_norm` + `external_event_id` (identidade
-de evento, evita colisão de hash) · corrigir `prova.csv` (0 linhas) · decisão sobre `colecao` ·
-dropar os 6 artefatos internos.
+**v15 ENTREGUE** (setor_canonico · projeto_geral 107/117 · segmento_norm · usuario.status das 3 abas ·
+prova.csv com log explícito de origem-vazia · colecao.csv removido · 3 projetos de catálogo). Item que
+**volta** ao sheets.banco (#1899): **`external_event_id` reclassificar** — o sistema deriva a identidade
+(`asv2-{id}`) e não ingere id externo; **não é campo importável**. Conferir se a coluna não é, na verdade,
+outra coisa (link/observação).
 
 **Dados/respostas:** lista dos 34 eventos futuros do Elienai (município/data/status publicação) —
 p/ desenhar a transferência (F.1) · quem atende os 21 projetos órfãos (A COR DA GENTE, ED

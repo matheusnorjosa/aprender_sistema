@@ -1,7 +1,7 @@
 ---
 title: Plano — Import da planilha + features derivadas
 status: draft
-last_verified: 2026-08-26
+last_verified: 2026-08-27
 owner: backend
 related:
   - ../specs/backend/imports.spec.md
@@ -19,6 +19,14 @@ setores, vínculos, compras, eventos) já existe do lado do `sheets.banco` (cont
 snapshot 2026-08-21) e entra por **import** — não por raspagem (os scripts de raspagem
 estão aposentados, DECIDIDO 25/08). Este plano cobre tudo que o **lado-sistema** precisa
 fazer para consumir esse contrato e as features que saem dele.
+
+**Objetivo de dev (a régua de "pronto").** O ambiente de dev é o **ponto de validação**: o
+sistema inteiro deve funcionar corretamente aqui — as **páginas exibindo os dados certos**,
+os fluxos operando — antes de qualquer coisa ir para produção. **Exceção:** a **criação de
+eventos no Google Agenda não precisa funcionar em dev** (já funciona em prod; dev usa o GCal
+*fake client*). Ou seja, o import + os data-fixes (ex.: as duplicatas de projeto) + os gates
+não existem só para pôr dado no banco — existem para deixar dev **correto e navegável**. Cada
+onda com impacto de dado fecha com uma checagem de **página/tela**, não só de linha de tabela.
 
 Autoridade e detalhe: `ESPELHO_SISTEMA_PLANILHA.md` (o que o sistema faz, em `v2/docs/`) +
 `REFERENCIA-DOMINIO.md` (o que a planilha contém, no `sheets.banco`).
@@ -42,6 +50,7 @@ Autoridade e detalhe: `ESPELHO_SISTEMA_PLANILHA.md` (o que o sistema faz, em `v2
 | — | o import **não pode reativar** quem foi desativado no sistema | derivado |
 | — | co-titularidade de plano modelada para **N** (não 2) | dono 25/08 |
 | — | troca de coordenador = **transferência de carteira com data de corte** (evento de negócio), não edição em massa | dono 25/08 |
+| — | **dev deve funcionar 100% correto** (páginas + dados) como validação pré-prod; exceção: criação de eventos GCal (já ok em prod) | dono 27/08 |
 | — | setor comparado por **setor canônico** (não igualdade de gerência) | sheets.banco (medido: igualdade barra 46%) |
 
 ## Ondas (wave-based, CP-04)
@@ -110,6 +119,19 @@ Autoridade e detalhe: `ESPELHO_SISTEMA_PLANILHA.md` (o que o sistema faz, em `v2
 - [ ] **G.1** `nome_curto` (recorte de 2 palavras) armazenado — fallback de casamento por nome.
 - [ ] **G.2** `Colecao`: decidir "edição anual do material" (dado real) ou parar de exportar.
 
+### Onda H — Validação de dev (transversal — a régua de "pronto")
+
+Não é uma onda no fim: é a checagem que **fecha cada onda com impacto de dado**. Dev tem de ficar
+**correto e navegável** (ver Contexto).
+
+- [ ] **H.1** Após reconcile/merge de projeto: contagem por projeto correta **nas telas** (Compras,
+      DAT, Planos, Disponibilidade) — não só na tabela.
+- [ ] **H.2** Após o import (C): as páginas de `AppRoutes.tsx` exibem os dados reais sem erro
+      (setores, projetos, pessoas, vínculos, compras, eventos).
+- [ ] **H.3** Fluxos ponta-a-ponta em dev: criar solicitação → aprovar → grade → planos.
+      **Exceção:** a publicação real no Google Agenda **não** é exercida em dev (GCal *fake client*;
+      já funciona em prod).
+
 ## O que preciso do `sheets.banco` (para desbloquear B/C/E/F)
 
 Ver a lista consolidada em [§ Requests](#requests-ao-sheetsbanco) abaixo.
@@ -123,6 +145,9 @@ Onda 0 ✅ ──> Onda A (agora, independente)
                                         │  └────> Onda E (códigos)
                                         └───────> Onda F (features)
                                                   Onda G (follow-ups)
+
+   Onda H (validação de dev) — transversal: fecha CADA onda de dado com
+   checagem de página/tela, não só de tabela. Régua de "pronto" pré-prod.
 ```
 
 ## Riscos / o que NÃO fazer

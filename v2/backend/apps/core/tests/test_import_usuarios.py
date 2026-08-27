@@ -714,3 +714,45 @@ class TestUsuariosImportCpfMod11:
 
         assert result["stats"]["created"] == 1
         assert User.objects.filter(cpf="10000000019").exists()
+
+
+@pytest.mark.django_db
+class TestNeverReactivate:
+    """#1891 — o import NAO reativa quem foi desativado localmente.
+
+    Desativacao e decisao do sistema; a planilha (fonte) nao e corrigida e marca
+    a pessoa como ativa (caso Elienai). Sem esta guarda, um CSV SEM coluna de
+    status (default is_active=True) reativa em massa quem estava inativo. A
+    planilha ainda pode DESATIVAR (True->False); so a reativacao (False->True)
+    via import e proibida — reativar e acao humana.
+    """
+
+    def test_inactive_user_not_reactivated_when_sheet_says_active(self, tmp_path):
+        UsuarioFactory(username="desligado_1891", cpf="10000005673", is_active=False)
+        path = _write_csv(tmp_path, "cpf,nome,email,ativo\n10000005673,Fulano De Tal,x@test.com,sim\n")
+
+        result = import_usuarios_from_file(path=path, dry_run=False)
+
+        assert (
+            User.objects.get(cpf="10000005673").is_active is False
+        ), "import NAO pode reativar quem foi desativado localmente"
+        assert result["stats"]["reativacao_bloqueada"] == 1
+        assert result["pendencias"]["reativacao_bloqueada"], "o bloqueio precisa aparecer no relatorio"
+
+    def test_no_status_column_does_not_reactivate(self, tmp_path):
+        # A bomba: CSV sem coluna de status -> normalize defaulta is_active=True.
+        UsuarioFactory(username="desligado_1891b", cpf="10000005673", is_active=False)
+        path = _write_csv(tmp_path, "cpf,nome,email\n10000005673,Fulano De Tal,y@test.com\n")
+
+        import_usuarios_from_file(path=path, dry_run=False)
+
+        assert User.objects.get(cpf="10000005673").is_active is False
+
+    def test_import_can_still_deactivate(self, tmp_path):
+        # Nao-regressao: True->False (a planilha DESATIVA) segue funcionando.
+        UsuarioFactory(username="ativo_1891", cpf="10000005673", is_active=True)
+        path = _write_csv(tmp_path, "cpf,nome,email,ativo\n10000005673,Fulano De Tal,z@test.com,nao\n")
+
+        import_usuarios_from_file(path=path, dry_run=False)
+
+        assert User.objects.get(cpf="10000005673").is_active is False, "planilha ainda pode DESATIVAR"

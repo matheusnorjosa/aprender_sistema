@@ -244,6 +244,7 @@ export default function ComprasPage(): JSX.Element {
 
   const handleEdit = (record: CompraRecord) => {
     setEditingCompra(record);
+    form.resetFields();
     form.setFieldsValue({
       ...record,
       data_compra: record.data_compra ? dayjs(record.data_compra) : null,

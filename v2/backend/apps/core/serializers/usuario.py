@@ -334,6 +334,17 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
 
         user = super().update(instance, validated_data)
 
+        # #1894: desativação decidida NO SISTEMA (admin) é LOCAL -> marca `desativado_localmente`
+        # para o import never-reactivate (o import nunca liga False->True com a flag). Reativar
+        # (ação humana) limpa a flag. Reage só à TRANSIÇÃO real de is_active.
+        was_active = before_flags["is_active"]
+        if was_active and not user.is_active and not user.desativado_localmente:
+            user.desativado_localmente = True
+            user.save(update_fields=["desativado_localmente"])
+        elif not was_active and user.is_active and user.desativado_localmente:
+            user.desativado_localmente = False
+            user.save(update_fields=["desativado_localmente"])
+
         # M07-03: flip de privilegio via REST (activate/deactivate/promote) audita igual ao Admin.
         auditar_privilege_flags(actor=actor, target_user=user, before=before_flags, via="rest_api")
         # M07-03: alteracao cadastral — so os NOMES dos campos escritos (nunca valores/PII).

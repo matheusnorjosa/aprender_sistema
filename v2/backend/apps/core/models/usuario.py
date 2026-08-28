@@ -31,6 +31,15 @@ class Usuario(AbstractUser):
     )
     telefone = models.CharField(max_length=20, blank=True)
     cargo = models.CharField(max_length=100, blank=True)
+    desativado_localmente = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text=(
+            "Marca desativação decidida NO SISTEMA (admin/anonimização), não pela planilha. "
+            "O import nunca reativa (False->True) um usuário com esta flag — reativar é ação humana "
+            "(#1894). A planilha pode reativar quem ela mesma desativou (flag False)."
+        ),
+    )
 
     class Meta:  # type: ignore[misc]
         db_table = "core_usuario"

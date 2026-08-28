@@ -728,7 +728,7 @@ class TestNeverReactivate:
     """
 
     def test_inactive_user_not_reactivated_when_sheet_says_active(self, tmp_path):
-        UsuarioFactory(username="desligado_1891", cpf="10000005673", is_active=False)
+        UsuarioFactory(username="desligado_1891", cpf="10000005673", is_active=False, desativado_localmente=True)
         path = _write_csv(tmp_path, "cpf,nome,email,ativo\n10000005673,Fulano De Tal,x@test.com,sim\n")
 
         result = import_usuarios_from_file(path=path, dry_run=False)
@@ -741,7 +741,7 @@ class TestNeverReactivate:
 
     def test_no_status_column_does_not_reactivate(self, tmp_path):
         # A bomba: CSV sem coluna de status -> normalize defaulta is_active=True.
-        UsuarioFactory(username="desligado_1891b", cpf="10000005673", is_active=False)
+        UsuarioFactory(username="desligado_1891b", cpf="10000005673", is_active=False, desativado_localmente=True)
         path = _write_csv(tmp_path, "cpf,nome,email\n10000005673,Fulano De Tal,y@test.com\n")
 
         import_usuarios_from_file(path=path, dry_run=False)

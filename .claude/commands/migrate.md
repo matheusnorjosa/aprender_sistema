@@ -21,16 +21,16 @@ Before creating migrations:
 
 ```bash
 # All apps (default)
-docker compose exec web python manage.py makemigrations
+docker exec aprender_dev-web-1 python manage.py makemigrations
 
 # Specific app
-docker compose exec web python manage.py makemigrations $ARGUMENTS
+docker exec aprender_dev-web-1 python manage.py makemigrations $ARGUMENTS
 
 # Dry-run (see what would be created)
-docker compose exec web python manage.py makemigrations --dry-run
+docker exec aprender_dev-web-1 python manage.py makemigrations --dry-run
 
 # With custom name
-docker compose exec web python manage.py makemigrations --name add_prioridade_field
+docker exec aprender_dev-web-1 python manage.py makemigrations --name add_prioridade_field
 ```
 
 ### 3. Inspect Generated Migrations
@@ -38,10 +38,10 @@ docker compose exec web python manage.py makemigrations --name add_prioridade_fi
 **Check migration file**:
 ```bash
 # List migrations
-docker compose exec web python manage.py showmigrations
+docker exec aprender_dev-web-1 python manage.py showmigrations
 
 # View SQL (before applying)
-docker compose exec web python manage.py sqlmigrate core 0024
+docker exec aprender_dev-web-1 python manage.py sqlmigrate core 0024
 ```
 
 **Review checklist**:
@@ -55,13 +55,13 @@ docker compose exec web python manage.py sqlmigrate core 0024
 
 ```bash
 # Check for issues
-docker compose exec web python manage.py check
+docker exec aprender_dev-web-1 python manage.py check
 
 # Detect conflicts
-docker compose exec web python manage.py makemigrations --check
+docker exec aprender_dev-web-1 python manage.py makemigrations --check
 
 # Run migrations (dry-run equivalent)
-docker compose exec web python manage.py migrate --plan
+docker exec aprender_dev-web-1 python manage.py migrate --plan
 ```
 
 **Common issues**:
@@ -80,7 +80,7 @@ docker compose exec web python manage.py migrate --plan
 **Before applying migrations locally**:
 ```bash
 # Backup PostgreSQL
-docker compose exec db pg_dump -U aprender_user aprender_db > backup_pre_migration_$(date +%Y%m%d_%H%M%S).sql
+docker exec aprender_dev-db-1 pg_dump -U aprender_user aprender_db > backup_pre_migration_$(date +%Y%m%d_%H%M%S).sql
 
 # Verify backup
 ls -lh backup_*.sql
@@ -91,7 +91,7 @@ ls -lh backup_*.sql
 # Restore from backup
 docker compose down
 docker compose up -d db
-docker compose exec -T db psql -U aprender_user aprender_db < backup_pre_migration_20250115.sql
+docker exec -i aprender_dev-db-1 psql -U aprender_user aprender_db < backup_pre_migration_20250115.sql
 docker compose up -d
 ```
 
@@ -99,16 +99,16 @@ docker compose up -d
 
 ```bash
 # Development (local)
-docker compose exec web python manage.py migrate
+docker exec aprender_dev-web-1 python manage.py migrate
 
 # Specific app
-docker compose exec web python manage.py migrate core
+docker exec aprender_dev-web-1 python manage.py migrate core
 
 # Specific migration
-docker compose exec web python manage.py migrate core 0024
+docker exec aprender_dev-web-1 python manage.py migrate core 0024
 
 # With verbosity
-docker compose exec web python manage.py migrate --verbosity 2
+docker exec aprender_dev-web-1 python manage.py migrate --verbosity 2
 ```
 
 **Watch for**:
@@ -120,13 +120,13 @@ docker compose exec web python manage.py migrate --verbosity 2
 
 ```bash
 # Run checks
-docker compose exec web python manage.py check
+docker exec aprender_dev-web-1 python manage.py check
 
 # Run tests (critical)
-docker compose exec web pytest apps/core/tests/ -v
+docker exec aprender_dev-web-1 pytest apps/core/tests/ -v
 
 # Verify data integrity
-docker compose exec web python manage.py shell
+docker exec aprender_dev-web-1 python manage.py shell
 
 >>> from apps.core.models import Solicitacao
 >>> Solicitacao.objects.count()  # Should match pre-migration
@@ -247,7 +247,7 @@ migrations.AddField(...),
 
 **Detection**:
 ```bash
-docker compose exec web python manage.py makemigrations --check
+docker exec aprender_dev-web-1 python manage.py makemigrations --check
 # Error: Conflicting migrations detected
 ```
 
@@ -263,11 +263,11 @@ git rebase main
 
 # Step 3: Recreate migration
 rm apps/core/migrations/0024_*.py  # Remove conflicting
-docker compose exec web python manage.py makemigrations
+docker exec aprender_dev-web-1 python manage.py makemigrations
 
 # Step 4: Test
-docker compose exec web python manage.py migrate
-docker compose exec web pytest -v
+docker exec aprender_dev-web-1 python manage.py migrate
+docker exec aprender_dev-web-1 pytest -v
 ```
 
 ### 10. Rollback Migrations (local/dev — **não** em produção)
@@ -280,13 +280,13 @@ docker compose exec web pytest -v
 **Revert to specific migration**:
 ```bash
 # Rollback last migration
-docker compose exec web python manage.py migrate core 0023
+docker exec aprender_dev-web-1 python manage.py migrate core 0023
 
 # Rollback all migrations for app
-docker compose exec web python manage.py migrate core zero
+docker exec aprender_dev-web-1 python manage.py migrate core zero
 
 # See migration history
-docker compose exec web python manage.py showmigrations core
+docker exec aprender_dev-web-1 python manage.py showmigrations core
 ```
 
 **When to rollback**:
@@ -373,10 +373,10 @@ ou destrutiva precisa do padrão expand/contract (§8) espalhado por releases se
 **How to squash**:
 ```bash
 # Squash migrations 0010-0025 into single migration
-docker compose exec web python manage.py squashmigrations core 0010 0025
+docker exec aprender_dev-web-1 python manage.py squashmigrations core 0010 0025
 
 # Test squashed migration
-docker compose exec web python manage.py migrate
+docker exec aprender_dev-web-1 python manage.py migrate
 
 # After testing, delete old migrations (keep squashed)
 ```
@@ -412,7 +412,7 @@ Backup retained: backup_pre_migration_20250115_103000.sql
 Error: [Error message]
 
 ROLLBACK RECOMMENDED
-1. Restore database: docker compose exec -T db psql -U aprender_user aprender_db < backup_pre_migration_20250115.sql
+1. Restore database: docker exec -i aprender_dev-db-1 psql -U aprender_user aprender_db < backup_pre_migration_20250115.sql
 2. Review migration: apps/core/migrations/0024_*.py
 3. Fix issues in models.py
 4. Recreate migration: rm 0024_*.py && python manage.py makemigrations
@@ -448,25 +448,25 @@ ROLLBACK RECOMMENDED
 # Edit model
 # Add: prioridade = models.IntegerField(default=3)
 
-docker compose exec web python manage.py makemigrations
-docker compose exec web python manage.py migrate
+docker exec aprender_dev-web-1 python manage.py makemigrations
+docker exec aprender_dev-web-1 python manage.py migrate
 ```
 
 #### Add Non-Nullable Field (Existing Data)
 ```bash
 # Step 1: Add nullable with default
 # prioridade = models.IntegerField(default=3, null=True)
-docker compose exec web python manage.py makemigrations
-docker compose exec web python manage.py migrate
+docker exec aprender_dev-web-1 python manage.py makemigrations
+docker exec aprender_dev-web-1 python manage.py migrate
 
 # Step 2: Populate (data migration)
 # Create 0025_populate_prioridade.py
-docker compose exec web python manage.py migrate
+docker exec aprender_dev-web-1 python manage.py migrate
 
 # Step 3: Remove null
 # prioridade = models.IntegerField(default=3)
-docker compose exec web python manage.py makemigrations
-docker compose exec web python manage.py migrate
+docker exec aprender_dev-web-1 python manage.py makemigrations
+docker exec aprender_dev-web-1 python manage.py migrate
 ```
 
 #### Rename Model
@@ -477,22 +477,22 @@ docker compose exec web python manage.py migrate
 # Migration will be:
 # migrations.RenameModel(old_name='Solicitacao', new_name='Pedido')
 
-docker compose exec web python manage.py makemigrations
-docker compose exec web python manage.py migrate
+docker exec aprender_dev-web-1 python manage.py makemigrations
+docker exec aprender_dev-web-1 python manage.py migrate
 ```
 
 #### Add Unique Constraint (Existing Data)
 ```bash
 # Step 1: Check for duplicates
-docker compose exec web python manage.py shell
+docker exec aprender_dev-web-1 python manage.py shell
 >>> Solicitacao.objects.values('projeto', 'inicio').annotate(count=Count('id')).filter(count__gt=1)
 
 # Step 2: Handle duplicates (data migration)
 
 # Step 3: Add constraint
 # Meta: constraints = [models.UniqueConstraint(fields=['projeto', 'inicio'], name='...')]
-docker compose exec web python manage.py makemigrations
-docker compose exec web python manage.py migrate
+docker exec aprender_dev-web-1 python manage.py makemigrations
+docker exec aprender_dev-web-1 python manage.py migrate
 ```
 
 ## Reference

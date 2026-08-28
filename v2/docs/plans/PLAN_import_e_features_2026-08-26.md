@@ -49,7 +49,7 @@ Rodei um workflow de 8 agentes cruzando cada afirmação do **lado-sistema** da 
 | Colecao tem import próprio | ✅ ok | `POST /api/colecoes/import/` existe; remover `colecao.csv` é inócuo | — |
 | não apagar model `Prova` | ✅ ok | model **vivo** (PATCH `update_prova`, serializers, prefetch); "0 provas" = dado vazio | — |
 | `usuario.status`/`desativado_localmente` | 🔴 refutado ⚠️ | **não existem** (só `is_active`); a bomba foi **corrigida** (never-reactivate) e o campo persistente `desativado_localmente` **existe** (#1894) | #1891 ✅ · #1894 ✅ |
-| 14 entidades "implementadas" | 🟡 parcial | **12 escrevem**; `equipe_gerencia`/`solicitacao` sem handler; `gerencia` só classifica | #1895 #1896 |
+| 14 entidades "implementadas" | 🟡 parcial | **13 escrevem** (`equipe_gerencia` ganhou handler classify+apply+guardrail no #1895); `solicitacao` sem handler; `gerencia` só classifica | #1895 ✅ · #1896 |
 | `segmento_norm`; projeto_geral→nr_codigos | 🟡 parcial | `segmento_norm` **não é coluna**; nr_codigos usa `DATRegistro.projeto_geral`, **não** `Projeto.projeto_geral` | #1896 #1897 |
 
 **Rastreamento: milestone #22 — Import v15 → dev correto** (issues #1891–#1900). Ordem sugerida:

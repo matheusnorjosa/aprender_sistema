@@ -69,6 +69,7 @@ def import_usuarios_from_file(*, path: str, dry_run: bool = True, actor: Any = N
         "unchanged": 0,
         "grupos_ignorados": 0,
         "grupos_desconhecidos": 0,
+        "reativacao_bloqueada": 0,
         "skipped": {"cpf_invalid": 0, "nome_missing": 0, "superuser_protected": 0, "other": 0},
     }
     pendencias: dict[str, list[dict[str, Any]]] = {
@@ -77,6 +78,7 @@ def import_usuarios_from_file(*, path: str, dry_run: bool = True, actor: Any = N
         "superuser_protected": [],
         "grupos_ignorados": [],
         "grupos_desconhecidos": [],
+        "reativacao_bloqueada": [],
         "outros": [],
     }
 
@@ -423,9 +425,25 @@ def _process_row(
             update_fields.append("last_name")
 
         if existing.is_active != is_active:
-            existing.is_active = is_active
-            updated = True
-            update_fields.append("is_active")
+            # #1891 never-reactivate: desativacao e decisao LOCAL do sistema; a
+            # planilha (fonte) nao e corrigida e marca a pessoa como ativa (caso
+            # Elienai). Sem esta guarda, um CSV SEM coluna de status (normalize
+            # defaulta is_active=True) reativa em massa quem foi desligado. A
+            # planilha ainda pode DESATIVAR (True->False); so a reativacao
+            # (False->True) via import e proibida — reativar e acao humana.
+            if existing.is_active is False and is_active is True:
+                stats["reativacao_bloqueada"] += 1
+                pendencias["reativacao_bloqueada"].append(
+                    {
+                        "linha": linha_num,
+                        "cpf": cpf,
+                        "erro": "Usuario inativo NAO reativado por importacao (reativar e acao humana).",
+                    }
+                )
+            else:
+                existing.is_active = is_active
+                updated = True
+                update_fields.append("is_active")
 
         if updated:
             if not dry_run:

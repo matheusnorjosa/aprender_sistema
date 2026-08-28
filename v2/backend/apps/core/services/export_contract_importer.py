@@ -30,6 +30,7 @@ from typing import Any
 
 from django.contrib.auth.models import Group
 from django.db import transaction
+from django.utils import timezone
 
 from apps.core.constants import ALLOWED_USER_GROUPS
 from apps.core.imports.normalization import normalize_cpf_digits
@@ -40,6 +41,7 @@ from apps.core.models import (
     DATCompra,
     DATCoordenador,
     DATRegistro,
+    EquipeGerencia,
     Gerencia,
     Municipio,
     PlanoFormacoes,
@@ -50,7 +52,13 @@ from apps.core.models import (
     Usuario,
 )
 from apps.core.services.dat_codigos import recompute_all
-from apps.core.services.equipe_gerencia_import import PAPEL_MAPPING
+from apps.core.services.equipe_gerencia_import import (
+    PAPEL_MAPPING,
+    SETOR_MAPPING,
+    _generate_gerencia_nome,
+    _get_or_create_gerencia,
+    _resolve_usuario,
+)
 from apps.core.services.export_contract_projeto_resolver import build_projeto_index, resolve_projeto_export
 from apps.core.validators import CPF_ABSENT, CPF_INVALID, classify_cpf, is_valid_cpf
 
@@ -96,6 +104,7 @@ IMPLEMENTED = {
     "usuario",
     "tipo_evento",
     "gerencia",
+    "equipe_gerencia",
     "dat_coordenador",
     "dat_acao",
     "plano_formacao",
@@ -116,6 +125,8 @@ _PAPEL_TO_GROUP: dict[str, str] = {
     "APOIO": "Apoio de Coordenação",
     "FORMADOR": "Formador",
 }
+# Papéis canônicos válidos de EquipeGerencia (NK inclui o papel; fora disto = would_reject).
+_EQUIPE_PAPEIS = frozenset(_PAPEL_TO_GROUP)
 
 
 def _resolve_papel(raw: str | None) -> str:
@@ -593,8 +604,42 @@ class ExportContractImporter:
                 st, _ = diff_and_classify({} if nk in existing else None, {}, protected)
                 tally[st] += 1
 
+        elif name == "equipe_gerencia":
+            # NK = (gerencia, usuario, papel). Papel fora do domínio ou usuário não-resolvido →
+            # would_reject. Gerência resolvida read-only (o apply cria se faltar via
+            # _get_or_create_gerencia). PII: usuário (CPF) só entra na contagem de existência.
+            existing = set(EquipeGerencia.objects.values_list("gerencia_id", "usuario_id", "papel"))
+            for r in rows:
+                setor = (r.get("gerencia") or r.get("setor") or "").strip()
+                papel = _resolve_papel(r.get("papel"))
+                if not setor or papel not in _EQUIPE_PAPEIS:
+                    tally["would_reject"] += 1
+                    continue
+                usuario = _resolve_usuario(
+                    r.get("usuario_cpf") or r.get("cpf") or "",
+                    r.get("usuario_email") or r.get("email") or "",
+                    r.get("usuario_nome") or r.get("nome") or "",
+                )
+                if usuario is None:
+                    tally["would_reject"] += 1
+                    continue
+                ger = self._resolve_gerencia_readonly(setor)
+                exists = ger is not None and (ger.id, usuario.id, papel) in existing
+                st, _ = diff_and_classify({} if exists else None, {}, protected)
+                tally[st] += 1
+
         tally["export_rows"] = len(rows)
         return tally
+
+    def _resolve_gerencia_readonly(self, setor_raw: str) -> Gerencia | None:
+        """Resolve Gerencia por setor SEM criar (espelha a precedência de _get_or_create_gerencia,
+        p/ o classify dry-run): nome_setor → nome → nome canônico gerado."""
+        setor = SETOR_MAPPING.get(setor_raw, setor_raw)
+        return (
+            Gerencia.objects.filter(nome_setor__iexact=setor).first()
+            or Gerencia.objects.filter(nome__iexact=setor).first()
+            or Gerencia.objects.filter(nome__iexact=_generate_gerencia_nome(setor)).first()
+        )
 
     @staticmethod
     def _dat_compra_nk(r: dict[str, str], mun_id: int | None, proj_id: int | None) -> tuple[Any, ...]:
@@ -663,6 +708,11 @@ class ExportContractImporter:
                     # NK = CPF (nao `nome`); atribui Group -> handler dedicado.
                     applied[name] = self._apply_usuario(self._load(name))
                     continue
+                if name == "equipe_gerencia":
+                    # NK = (gerencia, usuario, papel); CSV usa `usuario_cpf`/`gerencia` (setor), não
+                    # `nome` → handler dedicado (o loop genérico gravaria 0 = silent-gap).
+                    applied[name] = self._apply_equipe_gerencia(self._load(name))
+                    continue
                 if name == "dat_cadastro":
                     applied[name] = self._apply_dat_cadastro(self._load(name))
                     continue
@@ -726,6 +776,48 @@ class ExportContractImporter:
         if self.actor is None:
             raise ValueError(f"apply de {entity} exige um ator (created_by): rode com --as-user <cpf>.")
         return self.actor
+
+    def _apply_equipe_gerencia(self, rows: list[dict[str, str]]) -> int:
+        """Create-only de EquipeGerencia. NK (gerencia, usuario, papel); vigência aberta
+        (valid_from=hoje, valid_to=None). Reusa os resolvers do serviço de upload
+        (_get_or_create_gerencia / _resolve_usuario). Popula Gerencia.setor_canonico do row
+        (vocabulário de produto, de-para) — o fio de leitura do #1893. EquipeGerencia não audita
+        (sem created_by) → NÃO exige actor. CPF por string (não valida dígito: a linha de dígito
+        inválido casa por igualdade); papel/usuário não-resolvido → pula (nunca o substring do #1643)."""
+        hoje = timezone.localdate()
+        ger_stats: dict[str, Any] = {"gerencias_created": 0, "gerencias_existing": 0}
+        created = 0
+        for r in rows:
+            setor_raw = (r.get("gerencia") or r.get("setor") or "").strip()
+            papel = _resolve_papel(r.get("papel"))
+            if not setor_raw or papel not in _EQUIPE_PAPEIS:
+                continue
+            usuario = _resolve_usuario(
+                r.get("usuario_cpf") or r.get("cpf") or "",
+                r.get("usuario_email") or r.get("email") or "",
+                r.get("usuario_nome") or r.get("nome") or "",
+            )
+            if usuario is None:
+                continue
+            gerencia = _get_or_create_gerencia(setor_raw, ger_stats)
+            if gerencia is None:
+                continue
+            setor_canon = (r.get("setor_canonico") or "").strip()
+            if setor_canon and gerencia.setor_canonico != setor_canon:
+                gerencia.setor_canonico = setor_canon
+                gerencia.save(update_fields=["setor_canonico"])
+            if EquipeGerencia.objects.filter(gerencia=gerencia, usuario=usuario, papel=papel).exists():
+                continue
+            EquipeGerencia.objects.create(
+                gerencia=gerencia,
+                usuario=usuario,
+                papel=papel,
+                ativo=True,
+                valid_from=hoje,
+                valid_to=None,
+            )
+            created += 1
+        return created
 
     def _apply_dat_cadastro(self, rows: list[dict[str, str]]) -> int:
         """Create-only de DATCadastro. NK (municipio, projeto_geral, plataforma).

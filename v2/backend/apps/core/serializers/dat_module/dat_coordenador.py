@@ -77,6 +77,7 @@ class DATCoordenadorListSerializer(serializers.ModelSerializer["DATCoordenador"]
             "telefone",
             "area",
             "cargo",
+            "data_admissao",
             "ativo",
             "foto_url",
             "total_municipios",

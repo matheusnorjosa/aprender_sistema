@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(git add:*), Bash(git commit:*), Bash(python manage.py:*)
+allowed-tools: Bash(git add:*), Bash(git commit:*), Bash(docker exec aprender_dev-web-1 python manage.py:*)
 description: Investigate and fix Django URL reversing issues
 ---
 

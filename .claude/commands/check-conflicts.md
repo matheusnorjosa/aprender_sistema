@@ -13,13 +13,13 @@ Test availability rules: ${ARGUMENTS:-all}
 
 ```bash
 # All RF03 tests (RD-01 to RD-08)
-docker compose exec -T web pytest apps/core/tests/test_availability_service.py -v
+docker exec aprender_dev-web-1 pytest apps/core/tests/test_availability_service.py -v
 
 # Specific test
-docker compose exec -T web pytest apps/core/tests/test_availability_service.py::$ARGUMENTS -v
+docker exec aprender_dev-web-1 pytest apps/core/tests/test_availability_service.py::$ARGUMENTS -v
 
 # With coverage
-docker compose exec -T web pytest apps/core/tests/test_availability_service.py --cov=apps.core.services.availability_service --cov-report=term-missing
+docker exec aprender_dev-web-1 pytest apps/core/tests/test_availability_service.py --cov=apps.core.services.availability_service --cov-report=term-missing
 ```
 
 ### 2. Expected Results (18 tests)

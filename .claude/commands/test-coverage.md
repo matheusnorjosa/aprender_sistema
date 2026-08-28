@@ -22,21 +22,21 @@ Run tests with coverage: ${ARGUMENTS:-all tests}
 
 ```bash
 # All tests with coverage
-docker compose exec web pytest --cov=apps --cov-report=term-missing --cov-report=html
+docker exec aprender_dev-web-1 pytest --cov=apps --cov-report=term-missing --cov-report=html
 
 # Specific app
-docker compose exec web pytest apps/core/tests/ --cov=apps.core --cov-report=term-missing
+docker exec aprender_dev-web-1 pytest apps/core/tests/ --cov=apps.core --cov-report=term-missing
 
 # Specific module
-docker compose exec web pytest apps/core/tests/test_availability_service.py \
+docker exec aprender_dev-web-1 pytest apps/core/tests/test_availability_service.py \
   --cov=apps.core.services.availability_service \
   --cov-report=term-missing
 
 # With minimum threshold (fail if below the 85% gate)
-docker compose exec web pytest --cov=apps --cov-fail-under=85
+docker exec aprender_dev-web-1 pytest --cov=apps --cov-fail-under=85
 
 # Generate XML report (for CI)
-docker compose exec web pytest --cov=apps --cov-report=xml --cov-report=term
+docker exec aprender_dev-web-1 pytest --cov=apps --cov-report=xml --cov-report=term
 ```
 
 ### 3. Interpret Coverage Report
@@ -64,7 +64,7 @@ TOTAL                                         1000     50    95%
 
 ```bash
 # Generate HTML report
-docker compose exec web pytest --cov=apps --cov-report=html
+docker exec aprender_dev-web-1 pytest --cov=apps --cov-report=html
 
 # View report (opens in browser)
 # File: htmlcov/index.html
@@ -236,7 +236,7 @@ def test_process_batch_multiple_items():
 
 **Validation**:
 ```bash
-docker compose exec web pytest apps/core/tests/test_availability_service.py \
+docker exec aprender_dev-web-1 pytest apps/core/tests/test_availability_service.py \
   --cov=apps.core.services.availability_service \
   --cov-report=term-missing \
   --cov-fail-under=100
@@ -255,7 +255,7 @@ docker compose exec web pytest apps/core/tests/test_availability_service.py \
 
 **Validation**:
 ```bash
-docker compose exec web pytest apps/core/tests/test_approval_policy_PA.py \
+docker exec aprender_dev-web-1 pytest apps/core/tests/test_approval_policy_PA.py \
   --cov=apps.core.services.solicitacao_create \
   --cov=apps.core.views_solicitacao \
   --cov-report=term-missing \
@@ -264,11 +264,11 @@ docker compose exec web pytest apps/core/tests/test_approval_policy_PA.py \
 
 ### 8. Exclude Unnecessary Code
 
-**Coverage configuration** (`.coveragerc` or `pyproject.toml`):
+**Coverage configuration** — já centralizada em `v2/backend/pytest.ini` (seções `[coverage:run]` / `[coverage:report]`). **Não** crie um `.coveragerc`/`pyproject.toml` separado (vira config duplicada/conflitante). Conteúdo atual:
 
 ```ini
-# .coveragerc
-[run]
+# v2/backend/pytest.ini
+[coverage:run]
 source = apps
 omit =
     */migrations/*
@@ -279,7 +279,7 @@ omit =
     */settings.py
     */manage.py
 
-[report]
+[coverage:report]
 exclude_lines =
     pragma: no cover
     def __repr__
@@ -307,23 +307,23 @@ the pipeline in an ad-hoc workflow — reference the reusable workflow instead.
 
 ### 10. Coverage by Component
 
-**Run coverage for specific components**:
+**Run coverage for specific components** (os nomes de arquivo abaixo são **ilustrativos** — os testes reais têm nomes específicos, ex.: `test_models_constraints.py`, `test_views_auth.py`; ajuste ao arquivo real ou aponte para o diretório `apps/core/tests/`):
 
 ```bash
 # Models
-docker compose exec web pytest apps/core/tests/test_models.py \
+docker exec aprender_dev-web-1 pytest apps/core/tests/test_models.py \
   --cov=apps.core.models --cov-report=term-missing
 
 # Serializers
-docker compose exec web pytest apps/core/tests/test_serializers.py \
+docker exec aprender_dev-web-1 pytest apps/core/tests/test_serializers.py \
   --cov=apps.core.serializers --cov-report=term-missing
 
 # Views
-docker compose exec web pytest apps/core/tests/test_views.py \
+docker exec aprender_dev-web-1 pytest apps/core/tests/test_views.py \
   --cov=apps.core.views --cov-report=term-missing
 
 # Services
-docker compose exec web pytest apps/core/tests/test_availability_service.py \
+docker exec aprender_dev-web-1 pytest apps/core/tests/test_availability_service.py \
   --cov=apps.core.services --cov-report=term-missing
 ```
 
@@ -332,10 +332,10 @@ docker compose exec web pytest apps/core/tests/test_availability_service.py \
 **Generate summary report**:
 ```bash
 # Terminal summary
-docker compose exec web pytest --cov=apps --cov-report=term
+docker exec aprender_dev-web-1 pytest --cov=apps --cov-report=term
 
 # Generate badge (for README)
-docker compose exec web pytest --cov=apps --cov-report=term | grep TOTAL
+docker exec aprender_dev-web-1 pytest --cov=apps --cov-report=term | grep TOTAL
 ```
 
 **Example output**:
@@ -361,7 +361,7 @@ TOTAL    1000     50    95%
 **Example**:
 ```bash
 # Step 1: Run coverage
-docker compose exec web pytest --cov=apps.core.services.availability_service \
+docker exec aprender_dev-web-1 pytest --cov=apps.core.services.availability_service \
   --cov-report=term-missing
 
 # Output shows:
@@ -374,7 +374,7 @@ docker compose exec web pytest --cov=apps.core.services.availability_service \
 # (Create test_daily_capacity_exceeded)
 
 # Step 4: Re-run coverage
-docker compose exec web pytest --cov=apps.core.services.availability_service \
+docker exec aprender_dev-web-1 pytest --cov=apps.core.services.availability_service \
   --cov-report=term-missing
 
 # Output shows:

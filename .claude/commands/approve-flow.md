@@ -13,13 +13,13 @@ Test approval policy: ${ARGUMENTS:-all}
 
 ```bash
 # All PA-01 to PA-07 tests
-docker compose exec -T web pytest apps/core/tests/test_approval_policy_PA.py -v
+docker exec aprender_dev-web-1 pytest apps/core/tests/test_approval_policy_PA.py -v
 
 # Specific test
-docker compose exec -T web pytest apps/core/tests/test_approval_policy_PA.py::$ARGUMENTS -v
+docker exec aprender_dev-web-1 pytest apps/core/tests/test_approval_policy_PA.py::$ARGUMENTS -v
 
 # With coverage
-docker compose exec -T web pytest apps/core/tests/test_approval_policy_PA.py --cov=apps.core.services.solicitacao_create --cov=apps.core.views_solicitacao --cov-report=term-missing
+docker exec aprender_dev-web-1 pytest apps/core/tests/test_approval_policy_PA.py --cov=apps.core.services.solicitacao_create --cov=apps.core.views_solicitacao --cov-report=term-missing
 ```
 
 ### 2. Expected Results (5 mandatory tests)

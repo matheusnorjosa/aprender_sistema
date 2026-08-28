@@ -74,3 +74,25 @@ class TestEquipeGerenciaApply:
         ExportContractImporter(path=path, apply=True, allow=("equipe_gerencia",)).run()
 
         assert EquipeGerencia.objects.filter(papel="COORDENADOR").count() == 1, "2ª run não duplica"
+
+
+class TestEquipeGerenciaGuardrail:
+    """Guardrail (sugestão do sheets.banco): o classify reporta os campos do CSV que o importer
+    NÃO consome, pra que nenhum dado do contrato caia calado (o header real traz gerencia_norm,
+    setor_canonico_confianca, coordenador_supervisor — nenhum consumido hoje)."""
+
+    def test_classify_reports_ignored_csv_fields(self, tmp_path):
+        Gerencia.objects.create(nome="GERENCIA 2", nome_setor="Vidas")
+        UsuarioFactory(cpf="10000005673")
+        csv = (
+            "gerencia,gerencia_norm,usuario_cpf,papel,setor_canonico,coordenador_supervisor\n"
+            "Vidas,VIDAS,10000005673,COORDENADOR,GESTÃO ESCOLAR,\n"
+        )
+        path = _write_export(tmp_path, {"equipe_gerencia": csv})
+
+        pe = ExportContractImporter(path=path).run()["por_entidade"]["equipe_gerencia"]
+
+        assert "gerencia_norm" in pe["ignored_fields"], "campo não-consumido deve ser reportado"
+        assert "coordenador_supervisor" in pe["ignored_fields"]
+        for consumed in ("gerencia", "usuario_cpf", "papel", "setor_canonico"):
+            assert consumed not in pe["ignored_fields"], f"{consumed} é consumido, não pode aparecer"

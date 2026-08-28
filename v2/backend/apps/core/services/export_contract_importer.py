@@ -128,6 +128,26 @@ _PAPEL_TO_GROUP: dict[str, str] = {
 # Papéis canônicos válidos de EquipeGerencia (NK inclui o papel; fora disto = would_reject).
 _EQUIPE_PAPEIS = frozenset(_PAPEL_TO_GROUP)
 
+# Guardrail: colunas do CSV que cada handler DE FATO consome. O classify reporta em `ignored_fields`
+# o que chega no contrato mas não é lido — pra nenhum dado cair calado (sugestão do sheets.banco).
+# Inclui os aliases aceitos na leitura. Entidade sem entrada aqui não reporta ignorados (ainda).
+_CONSUMED_FIELDS: dict[str, frozenset[str]] = {
+    "equipe_gerencia": frozenset(
+        {
+            "gerencia",
+            "setor",
+            "usuario_cpf",
+            "cpf",
+            "usuario_email",
+            "email",
+            "usuario_nome",
+            "nome",
+            "papel",
+            "setor_canonico",
+        }
+    ),
+}
+
 
 def _resolve_papel(raw: str | None) -> str:
     """Nome de papel bruto -> canonico (GERENTE/COORDENADOR/APOIO/FORMADOR) via PAPEL_MAPPING."""
@@ -627,6 +647,10 @@ class ExportContractImporter:
                 exists = ger is not None and (ger.id, usuario.id, papel) in existing
                 st, _ = diff_and_classify({} if exists else None, {}, protected)
                 tally[st] += 1
+
+        if name in _CONSUMED_FIELDS and rows:
+            # Guardrail: colunas presentes no CSV que o handler não lê (aliases já contam como consumidos).
+            tally["ignored_fields"] = sorted(set(rows[0].keys()) - _CONSUMED_FIELDS[name])
 
         tally["export_rows"] = len(rows)
         return tally

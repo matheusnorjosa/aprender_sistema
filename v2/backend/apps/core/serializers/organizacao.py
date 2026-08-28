@@ -5,7 +5,7 @@ Serializers para Municipio, ProjetoGeral, Projeto, Gerencia, TipoEvento, Produto
 Type-checked with Pyright (strict mode).
 """
 
-# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false, reportReturnType=false
 
 from __future__ import annotations
 
@@ -93,8 +93,9 @@ class ProjetoSerializer(serializers.ModelSerializer):
     fluxo = serializers.ChoiceField(choices=Projeto.FLUXO_CHOICES, required=True)
 
     def get_setor(self, obj: Projeto) -> str:
-        """Retorna nome do setor (derivado de gerencia)."""
-        return obj.gerencia.nome_setor if obj.gerencia else ""
+        """Setor do projeto: campo canônico do model (`Projeto.setor`, do de-para v15) quando
+        preenchido; senão deriva de `gerencia.nome_setor` (fallback sem regressão). #1893."""
+        return obj.setor or (obj.gerencia.nome_setor if obj.gerencia else "")
 
     class Meta:
         model = Projeto

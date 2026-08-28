@@ -48,12 +48,12 @@ Rodei um workflow de 8 agentes cruzando cada afirmação do **lado-sistema** da 
 | `external_event_id` importável | 🔶 reclass ⚠️ | campo é **cache determinístico** (`asv2-{id}`); **NÃO importável** (landmine `tipo_compra`≠`tipo`) | #1899 |
 | Colecao tem import próprio | ✅ ok | `POST /api/colecoes/import/` existe; remover `colecao.csv` é inócuo | — |
 | não apagar model `Prova` | ✅ ok | model **vivo** (PATCH `update_prova`, serializers, prefetch); "0 provas" = dado vazio | — |
-| `usuario.status`/`desativado_localmente` | 🔴 refutado ⚠️ | **não existem** (só `is_active`); `usuarios_import.py:425-428` **reativa desligado** (bomba) | #1891 #1894 |
+| `usuario.status`/`desativado_localmente` | 🔴 refutado ⚠️ | **não existem** (só `is_active`); a bomba de reativação (`usuarios_import.py:425-428`) foi **corrigida** (guarda never-reactivate); campo persistente = #1894 | #1891 ✅ (#1902) · #1894 |
 | 14 entidades "implementadas" | 🟡 parcial | **12 escrevem**; `equipe_gerencia`/`solicitacao` sem handler; `gerencia` só classifica | #1895 #1896 |
 | `segmento_norm`; projeto_geral→nr_codigos | 🟡 parcial | `segmento_norm` **não é coluna**; nr_codigos usa `DATRegistro.projeto_geral`, **não** `Projeto.projeto_geral` | #1896 #1897 |
 
 **Rastreamento: milestone #22 — Import v15 → dev correto** (issues #1891–#1900). Ordem sugerida:
-**#1891** (bomba usuarios_import, urgente) → **#1892** (merge VIDA `--apply`) → **#1893/#1894** (campos) →
+**#1891 ✅** (bomba usuarios_import — corrigida no #1902) → **#1892** (merge VIDA `--apply` — aplicado no dev) → **#1893/#1894** (campos) →
 **#1895/#1896/#1897** (import) → **#1898** (gates D6/D7) → **#1899** (relay external_event_id) → **#1900**
 (validação de dev). As duas landmines (external_event_id, bomba de reativação) foram evitadas por verificar
 antes de construir.
@@ -176,7 +176,7 @@ Onda 0 ✅ ──> Onda A (agora, independente)
 
 | risco | mitigação |
 |---|---|
-| import reativa desligado (Elienai) — **bomba viva** | `usuarios_import.py:425-428` sobrescreve `is_active` incondicional (default True se coluna ausente). Fix: guarda never-reactivate + campo `desativado_localmente` (#1891/#1894). `desativado_localmente` **ainda não existe** |
+| import reativa desligado (Elienai) | **corrigido** no #1902 (#1891): guarda never-reactivate bloqueia `False→True` via import. Campo persistente `desativado_localmente` = #1894 (ainda não existe) |
 | comparar setor por igualdade barra 46% | usar `setor_canonico` dos dois lados (B.1) |
 | transferência duplica evento no GCal | eventId determinístico → UPDATE; editar solicitação existente, não criar nova |
 | import cego sobrescreve data-fix manual | dry-run verde + autorização (RF01); create-only + never-overwrite |

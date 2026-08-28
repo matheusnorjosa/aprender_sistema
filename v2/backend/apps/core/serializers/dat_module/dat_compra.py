@@ -129,6 +129,9 @@ class DATCompraListSerializer(serializers.ModelSerializer["DATCompra"]):
         model = DATCompra
         fields = [
             "id",
+            "municipio",
+            "projeto",
+            "produto",
             "municipio_nome",
             "municipio_uf",
             "projeto_nome",

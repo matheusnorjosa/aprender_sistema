@@ -29,6 +29,15 @@ class TestNewFields:
         p = ProjetoFactory(nome="P-1893", codigo="P1893", fluxo="NAO_SUPER", ativo=True)
         assert p.setor == ""
 
+    def test_accepts_product_setor_vocabulary_not_in_rbac_groups(self):
+        # RELAY 28: setor_canonico fala o vocabulário de setor-de-PRODUTO (11), NÃO os 13 grupos
+        # RBAC (SETOR_GROUPS). "GESTÃO ESCOLAR" vem do de-para mas não é grupo — deve ser aceito
+        # (sem choices=SETOR_GROUPS, que barraria 5 dos 11 valores reais).
+        p = ProjetoFactory(nome="P-1893d", codigo="P1893d", fluxo="NAO_SUPER", ativo=True, setor="GESTÃO ESCOLAR")
+        assert ProjetoSerializer(p).data["setor"] == "GESTÃO ESCOLAR"
+        g = Gerencia.objects.create(nome="G-1893d", nome_setor="x", setor_canonico="GESTÃO ESCOLAR")
+        assert g.setor_canonico == "GESTÃO ESCOLAR"
+
 
 class TestGetSetorPrefersModelField:
     def test_uses_projeto_setor_when_set(self):

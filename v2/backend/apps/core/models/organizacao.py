@@ -15,14 +15,8 @@ from typing import TYPE_CHECKING
 from django.db import models
 from django.utils import timezone
 
-from apps.core.constants import SETOR_GROUPS
-
 if TYPE_CHECKING:
     from apps.core.models.usuario import Usuario
-
-# Vocabulário canônico de setor (SSOT: apps.core.constants.SETOR_GROUPS) usado pelo
-# de-para do sheets.banco e pelo gate de setor (#1893/#1898).
-_SETOR_CHOICES = [(s, s) for s in SETOR_GROUPS]
 
 
 class ProjetoGeral(models.Model):
@@ -209,11 +203,11 @@ class Gerencia(models.Model):
         blank=True,
         default="",
         db_index=True,
-        choices=_SETOR_CHOICES,
         help_text=(
-            "Setor canônico (vocabulário SETOR_GROUPS), do de-para do sheets.banco. Eixo do gate de "
-            "participação/grade por setor (#1893/#1898). Comparar por igualdade de nome_setor barra "
-            "~46%; este campo canoniza os dois lados."
+            "Setor canônico da PESSOA, no vocabulário de setor-de-PRODUTO (do de-para do sheets.banco, "
+            "ex.: Vidas, Fluir, Superativar, GESTÃO ESCOLAR) — NÃO os 13 grupos RBAC (SETOR_GROUPS). "
+            "Compara por igualdade com Projeto.setor no gate de participação/grade (#1893/#1898); "
+            "igualdade de nome_setor barrava ~46%, este campo canoniza os dois lados."
         ),
     )
     gerente = models.ForeignKey(  # type: ignore[misc]
@@ -394,11 +388,11 @@ class Projeto(models.Model):
         blank=True,
         default="",
         db_index=True,
-        choices=_SETOR_CHOICES,
         help_text=(
-            "Setor canônico do projeto (vocabulário SETOR_GROUPS), do de-para do sheets.banco. Eixo "
-            "de autorização por setor (#1893/#1898). Autoritativo; enquanto vazio, o serializer deriva "
-            "de gerencia.nome_setor (fallback, sem regressão)."
+            "Setor do projeto, no vocabulário de setor-de-PRODUTO (do de-para do sheets.banco, ex.: "
+            "Vidas, Fluir, Superativar, GESTÃO ESCOLAR) — NÃO os 13 grupos RBAC. Eixo de autorização "
+            "por setor (#1893/#1898); compara por igualdade com Gerencia.setor_canonico. Autoritativo; "
+            "enquanto vazio, o serializer deriva de gerencia.nome_setor (fallback, sem regressão)."
         ),
     )
 

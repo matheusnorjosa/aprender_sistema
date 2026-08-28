@@ -425,13 +425,13 @@ def _process_row(
             update_fields.append("last_name")
 
         if existing.is_active != is_active:
-            # #1891 never-reactivate: desativacao e decisao LOCAL do sistema; a
-            # planilha (fonte) nao e corrigida e marca a pessoa como ativa (caso
-            # Elienai). Sem esta guarda, um CSV SEM coluna de status (normalize
-            # defaulta is_active=True) reativa em massa quem foi desligado. A
-            # planilha ainda pode DESATIVAR (True->False); so a reativacao
-            # (False->True) via import e proibida — reativar e acao humana.
-            if existing.is_active is False and is_active is True:
+            # #1891/#1894 never-reactivate: desativacao decidida NO SISTEMA (admin) e LOCAL e
+            # marca `desativado_localmente`; a planilha (fonte) nao e corrigida e marca a pessoa
+            # como ativa (caso Elienai). O import NUNCA reativa (False->True) quem tem a flag —
+            # reativar e acao humana. A planilha AINDA pode DESATIVAR (True->False), e PODE reativar
+            # quem ela mesma desativou (flag False). #1894 refina o #1891 (que bloqueava toda
+            # reativacao) usando a flag; sem coluna de status o normalize defaulta is_active=True.
+            if existing.is_active is False and is_active is True and existing.desativado_localmente:
                 stats["reativacao_bloqueada"] += 1
                 pendencias["reativacao_bloqueada"].append(
                     {

@@ -43,8 +43,8 @@ Rodei um workflow de 8 agentes cruzando cada afirmação do **lado-sistema** da 
 
 | claim do relay | veredicto | realidade no código | issue |
 |---|---|---|---|
-| `projeto.setor` × `gerencia.setor_canonico` (gate D6) | 🔶 reclass | **nenhum dos 2 campos existe**; setor é `projeto.gerencia.nome_setor`; `projeto.gerencia` **124/125 vazio** | #1893 #1898 |
-| `EquipeGerencia.vigentes_em()` + setor | 🟡 parcial | esqueleto **roda em prod**; `Gerencia.setor_canonico` é NOVO (só em Gerencia, não em EquipeGerencia) | #1893 |
+| `projeto.setor` × `gerencia.setor_canonico` (gate D6) | 🔶 reclass | **campos criados** (#1893 ✅ — `get_setor` prefere o model, fallback derivado); falta **popular** via import (#1897); `projeto.gerencia` 124/125 vazio | #1893 ✅ · #1898 |
+| `EquipeGerencia.vigentes_em()` + setor | 🟡 parcial | esqueleto **roda em prod**; `Gerencia.setor_canonico` **criado** (#1893 ✅, só em Gerencia) | #1893 ✅ |
 | `external_event_id` importável | 🔶 reclass ⚠️ | campo é **cache determinístico** (`asv2-{id}`); **NÃO importável** (landmine `tipo_compra`≠`tipo`) | #1899 |
 | Colecao tem import próprio | ✅ ok | `POST /api/colecoes/import/` existe; remover `colecao.csv` é inócuo | — |
 | não apagar model `Prova` | ✅ ok | model **vivo** (PATCH `update_prova`, serializers, prefetch); "0 provas" = dado vazio | — |
@@ -53,7 +53,7 @@ Rodei um workflow de 8 agentes cruzando cada afirmação do **lado-sistema** da 
 | `segmento_norm`; projeto_geral→nr_codigos | 🟡 parcial | `segmento_norm` **não é coluna**; nr_codigos usa `DATRegistro.projeto_geral`, **não** `Projeto.projeto_geral` | #1896 #1897 |
 
 **Rastreamento: milestone #22 — Import v15 → dev correto** (issues #1891–#1900). Ordem sugerida:
-**#1891 ✅** (bomba usuarios_import — corrigida no #1902) → **#1892** (merge VIDA `--apply` — aplicado no dev) → **#1893** (setor) / **#1894 ✅** (desativado_localmente) →
+**#1891 ✅** (bomba usuarios_import — corrigida no #1902) → **#1892** (merge VIDA `--apply` — aplicado no dev) → **#1893 ✅** (campos setor) / **#1894 ✅** (desativado_localmente) →
 **#1895/#1896/#1897** (import) → **#1898** (gates D6/D7) → **#1899** (relay external_event_id) → **#1900**
 (validação de dev). As duas landmines (external_event_id, bomba de reativação) foram evitadas por verificar
 antes de construir.
@@ -93,9 +93,10 @@ antes de construir.
 
 ### Onda B — Modelo + migrations (depende da v15)
 
-- [ ] **B.1** `Gerencia.setor_canonico` (CharField) — recebe o de-para do sheets.banco.
-- [ ] **B.2** Setor do projeto: popular `projeto.gerencia` via import (hoje 124/125 vazio). Decidir
-      se `projeto.setor` vira campo próprio ou fica derivado de `gerencia__setor_canonico`.
+- [x] **B.1** `Gerencia.setor_canonico` (CharField) ✅ #1893 — recebe o de-para do sheets.banco.
+- [x] **B.2** Setor do projeto: **`Projeto.setor` criado** (#1893 ✅ — decisão: campo próprio +
+      fallback derivado de `gerencia.nome_setor` no `get_setor`, sem regressão). Falta **popular**
+      via import (#1897).
 - [ ] **B.3** `projeto.projeto_geral` (hoje 125/125 vazio) — a regra de códigos mora na família.
 - [ ] **B.4** Papel `SUPORTE`/`OPERACIONAL` no enum de `EquipeGerencia.papel` (ou mapeamento
       explícito) — sem promover a APOIO.

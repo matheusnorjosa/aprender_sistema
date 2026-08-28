@@ -1,6 +1,6 @@
 ---
 status: canonical
-last_verified: 2026-08-25
+last_verified: 2026-08-28
 audit_baseline: 90f6a048
 last_runtime_reverification: d08acfa5 (2026-07-20)
 last_v0_revalidation: f6eecd5f (2026-08-19; revalidação por código+git dos 46 itens `aberto`)
@@ -151,6 +151,38 @@ com residual). Os `resolvido` deixam de contar. Épicos-causa-raiz (V2) inaltera
 > passagem» lista **2** `resolvido` (`M12-15`, `M03-03`) e **5** `parcial` — ou seja, 39 + 5 + 2.
 > O total 45 herda a contagem de 6 parciais. Registrado como defeito do registro V0; os números
 > ficam como foram publicados, e o estado corrente vem da seção seguinte, não daqui.
+
+## Reconciliação de 2026-08-28 (round-trip / entrada-direta)
+
+Duas auditorias por fan-out sobre o `HEAD d4beda07`: **cobertura** (página×dado×endpoint, as 46
+rotas de `AppRoutes.tsx`) e **round-trip** (`form → write-serializer → model → read/List-serializer
+→ tela`, ~20 entidades). Motivadas pela meta "todos os dados aparecendo nos campos certos, por
+import E por entrada direta". Método: cada achado é hipótese com file:line; os graves (🔴 de perda
+ativa) foram **re-verificados adversarialmente** antes de virar issue, e **cruzados contra os
+M-codes existentes** — o crosscheck evitou ~8 issues duplicadas (a maioria dos ~15 achados de
+round-trip já eram M-codes abertos). `resolvido` = mergeado; nada promovido a `em prod`.
+
+**Re-confirmados VIVOS (M-codes existentes; evidência fresca 2026-08-28):**
+
+| ID | Achado | Evidência 2026-08-28 (file:line) | Issue |
+|---|---|---|---|
+| `M18-05` | DATCoordenador `data_admissao` zerada a CADA edição (**perda ativa**) | List omite (`serializers/dat_module/dat_coordenador.py:64-85`) → `CoordenadoresPage.tsx:234` seta null → `handleSave:249` PATCH `null` | épico #1654 |
+| `M15-09` | DATCompra editar vaza FK entre registros | List omite ids (`dat_module/dat_compra.py:128-150`) + `ComprasPage.tsx:245` sem `resetFields` | #1636 |
+| `M10-05` | Solicitacao: COORD_ACOMPANHA/guest não editável | `EditSolicitacaoPage:139-281` só FORMADOR; `MySolicitacoesPage:181` filtra guest | #1627 |
+| `M15-10`/FE↔BE | dangling form fields (form≠serializer): DATAcao `area`/`observacoes`, DATCadastro `link_*` | `AcoesPage.tsx:875,988`; `CadastrosPage.tsx:760,765` | épico #1655 |
+| SSOT-part. | `Solicitacao.coordenador` FK nunca capturado + M2M `formadores` morto | `serializers/solicitacao.py:144,170` | épico #1666 |
+
+**Novos (confirmados por reprodução; issue criada; milestone #22):**
+
+| Achado | Verificação | Issue |
+|---|---|---|
+| `_compute_external_hash` OMITE segmento → 156 eventos colapsam; **MATERIALIZADO no golden (controle positivo 6/6)** | `eventos_import.py:358-365`; medido no golden (RELAY 45-48) | **#1915** (P1, bloqueante do import real) |
+| `ano` fora de form/serializer → UI-create cai em `ano=NULL` → 2º create colide (400) | DATRegistro/Cadastro/Acao | #1912 |
+| edição inline de Acompanhamento/Prova morta (backend pronto, front não liga `onClick`) | `PlanoFormacoesPage.tsx:69-70` | #1913 |
+| `setor_canonico`/`Projeto.setor`/`ProjetoGeral` sem entrada-direta (`setor_canonico` gateia navegação) | `serializers/organizacao.py`; `usePermissions.ts:86` | #1914 |
+
+O achado do hash (#1915) atualiza a memória `hash-dedup-key-must-cover-natural-key` de **latente**
+para **materializado no golden**. Segue **não sendo verificação de deploy**.
 
 ## Reconciliação de 2026-08-25 (`HEAD d8e64714`)
 

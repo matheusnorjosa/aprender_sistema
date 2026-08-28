@@ -871,11 +871,6 @@ export default function AcoesPage(): JSX.Element {
                   />
                 </Form.Item>
               </Col>
-              <Col xs={24} sm={12}>
-                <Form.Item name="area" label="Área">
-                  <Input placeholder="Ex: DAT, Pedagógico..." />
-                </Form.Item>
-              </Col>
             </Row>
           </Card>
 
@@ -984,10 +979,6 @@ export default function AcoesPage(): JSX.Element {
             </Row>
           </Card>
 
-          {/* Observações */}
-          <Form.Item name="observacoes" label="Observações">
-            <Input.TextArea rows={3} placeholder="Observações sobre a ação..." />
-          </Form.Item>
         </Form>
       </Modal>
     </section>

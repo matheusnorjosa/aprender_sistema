@@ -14,6 +14,7 @@ Contrato:
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import pytest
 
@@ -29,7 +30,7 @@ _CSV = "gerencia,usuario_cpf,papel,setor_canonico\nVidas,10000005673,COORDENADOR
 def _write_export(tmp_path, files: dict[str, str]) -> str:
     d = tmp_path / "export"
     d.mkdir()
-    manifest: dict = {"generated_at": "x", "snapshot_date": "y", "entities": {}}
+    manifest: dict[str, Any] = {"generated_at": "x", "snapshot_date": "y", "entities": {}}
     for name, content in files.items():
         (d / f"{name}.csv").write_text(content, encoding="utf-8")
         manifest["entities"][name] = {"file_csv": f"{name}.csv"}

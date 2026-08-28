@@ -15,7 +15,7 @@ Demais entidades → `not_implemented` (contagem reportada, sem processamento).
 NÃO importa dados reais por padrão. Sem PII no relatório (só counts/nomes de entidade).
 """
 
-# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportPrivateUsage=false
 
 from __future__ import annotations
 

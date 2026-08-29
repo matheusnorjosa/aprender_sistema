@@ -48,6 +48,7 @@ const NotificacoesInternasPage = lazy(() => import('../pages/Controle/Notificaco
 const AcoesTimelinePage = lazy(() => import('../pages/Controle/AcoesTimelinePage'));
 const GerenciasPage = lazy(() => import('../pages/AdminDAT/GerenciasPage'));
 const ProdutosPage = lazy(() => import('../pages/AdminDAT/ProdutosPage'));
+const ProjetosGeraisPage = lazy(() => import('../pages/AdminDAT/ProjetosGeraisPage'));
 
 function PageLoader(): JSX.Element {
   return (
@@ -141,6 +142,7 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
         <Route path="/dat/admin/funcoes" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><FuncoesPage /></RequirePolicy>} />
         <Route path="/dat/admin/gerencias" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><GerenciasPage /></RequirePolicy>} />
         <Route path="/dat/admin/produtos" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><ProdutosPage /></RequirePolicy>} />
+        <Route path="/dat/admin/projetos-gerais" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><ProjetosGeraisPage /></RequirePolicy>} />
         <Route path="/dat/admin/configuracoes" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><ConfiguracoesPage /></RequirePolicy>} />
         <Route path="/dat/admin/colecoes" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><ColecoesImportPage /></RequirePolicy>} />
         <Route path="/dat/admin/equipe-gerencia" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><EquipeGerenciaImportPage /></RequirePolicy>} />

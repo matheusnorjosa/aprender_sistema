@@ -148,9 +148,26 @@ export default function CoordenadoresPage(): JSX.Element {
     entityName: 'coordenadores',
   });
 
-  // Stats derived from current page (no API for stats on this entity).
+  // KPIs GLOBAIS, não da página. A lista é paginada (pageSize 15), então derivar
+  // áreas/média/ativos de `coordenadores` (só a página) dava números inconsistentes com o
+  // total global — e um % de ativos quebrado (numerador da página / denominador global).
+  // Coordenador é entidade pequena: busca-se a lista completa (respeitando os filtros) só
+  // para os cards de resumo. `total` continua vindo do count autoritativo da paginação.
+  const [statsSource, setStatsSource] = useState<CoordenadorRecord[]>([]);
+  useEffect(() => {
+    const params: TableFilterParams = {
+      ...(filters.search && { search: filters.search }),
+      ...(filters.area && { area: filters.area }),
+      ...(filters.ativo !== undefined && { ativo: filters.ativo }),
+      page_size: 500,
+    };
+    (listCoordenadoresDAT as unknown as (p: TableFilterParams) => Promise<PaginatedResponse<CoordenadorRecord>>)(params)
+      .then((r) => setStatsSource(r.results ?? []))
+      .catch(() => setStatsSource([]));
+  }, [filters.search, filters.area, filters.ativo]);
+
   const stats = useMemo<CoordenadoresStats>(() => {
-    const results = coordenadores;
+    const results = statsSource;
     const ativos = results.filter((c) => c.ativo !== false).length;
     const areasUnicas = [...new Set(results.map((c) => c.area))].filter(Boolean).length;
     const totalProjetos = results.reduce((sum, c) => sum + (c.total_projetos || 0), 0);
@@ -161,7 +178,7 @@ export default function CoordenadoresPage(): JSX.Element {
       areas: areasUnicas,
       media_projetos: mediaProjetos,
     };
-  }, [coordenadores, pagination.total]);
+  }, [statsSource, pagination.total]);
 
   // Options for dropdowns (projetos/municipios reserved for future use)
   const [areas, setAreas] = useState<(AreaOption | string)[]>([]);

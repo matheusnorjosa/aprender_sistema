@@ -107,9 +107,6 @@ interface CadastroFormValues {
   status_importados?: string;
   quantidade_importados?: number;
   data_importados?: Dayjs | null;
-  // Links + observações
-  link_planilha?: string;
-  link_plataforma?: string;
   observacoes?: string;
   // O modal é preenchido com o DETAIL (GenericRecord) via setFieldsValue, que
   // espalha campos dinâmicos; mantém-se o índice para esse preenchimento.
@@ -752,22 +749,6 @@ export default function CadastrosPage(): JSX.Element {
               </Row>
             </Card>
           )}
-
-          {/* Links */}
-          <Card size="small" title="Links" className="mb-4">
-            <Row gutter={16}>
-              <Col xs={24} sm={12}>
-                <Form.Item name="link_planilha" label="Link da Planilha">
-                  <Input placeholder="https://docs.google.com/spreadsheets/..." />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={12}>
-                <Form.Item name="link_plataforma" label="Link da Plataforma">
-                  <Input placeholder="https://..." />
-                </Form.Item>
-              </Col>
-            </Row>
-          </Card>
 
           {/* Observações */}
           <Form.Item name="observacoes" label="Observações">

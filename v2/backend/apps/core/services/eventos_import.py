@@ -349,11 +349,21 @@ def _compute_external_hash(
     data_evento: date,
     hora_inicio: time,
     hora_fim: time,
+    segmento: str,
 ) -> str:
     """
     Gera external_hash SHA1 para idempotencia.
 
-    Hash: SHA1(municipio_id|projeto_id|tipo_id|data|hora_inicio|hora_fim)
+    Hash: SHA1(municipio_id|projeto_id|tipo_id|data|hora_inicio|hora_fim|segmento)
+
+    O `segmento` faz parte da CHAVE NATURAL do evento (#1915): duas turmas no mesmo
+    slot (municipio/projeto/tipo/data/hora) diferindo so no segmento sao eventos
+    DISTINTOS; sem o segmento na chave o hash colidia e o `update_or_create` sobrescrevia
+    o primeiro em silencio. Usa o segmento BRUTO (so `.strip()`, feito no chamador) — mais
+    discriminacao e o lado seguro para um bug de sub-discriminacao. ADR-012 congela o
+    ALGORITMO (SHA-1/encoding), nao a composicao de campos; por isso a migracao 0101
+    re-chaveia as linhas ja persistidas. Limite inerente: eventos com segmento vazio
+    permanecem indistinguiveis e ainda podem colapsar (nao ha campo que os separe).
     """
     parts = [
         str(municipio_id),
@@ -362,6 +372,7 @@ def _compute_external_hash(
         data_evento.isoformat(),
         hora_inicio.strftime("%H:%M"),
         hora_fim.strftime("%H:%M"),
+        segmento,
     ]
     return stable_import_hash(*parts)
 
@@ -518,6 +529,7 @@ def _process_row(
         data_evento,
         hora_inicio,
         hora_fim,
+        segmento,
     )
 
     # Upsert Solicitacao

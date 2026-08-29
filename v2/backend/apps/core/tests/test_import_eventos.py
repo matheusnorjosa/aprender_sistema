@@ -149,6 +149,22 @@ def sample_csv(coordenador_user, municipio, projeto_super, tipo_evento):
 
 
 @pytest.fixture
+def sample_csv_same_slot_diff_segmento(coordenador_user, municipio, projeto_super, tipo_evento):
+    """#1915: dois eventos no MESMO slot (municipio/projeto/tipo/data/hora), diferindo
+    SO no segmento. Sao eventos DISTINTOS (turmas diferentes) e devem virar 2 Solicitacoes."""
+    d1 = (date.today() + timedelta(days=45)).isoformat()
+    content = f"""municipio,projeto,tipo_evento,data,hora_inicio,hora_fim,coordenador,segmento
+{municipio.nome},{projeto_super.nome},{tipo_evento.nome},{d1},08:00,12:00,{coordenador_user.email},Fundamental I
+{municipio.nome},{projeto_super.nome},{tipo_evento.nome},{d1},08:00,12:00,{coordenador_user.email},Fundamental II
+"""
+    temp = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8")
+    temp.write(content)
+    temp.close()
+    yield temp.name
+    Path(temp.name).unlink(missing_ok=True)
+
+
+@pytest.fixture
 def sample_csv_with_formadores(coordenador_user, formador1_user, municipio, projeto_super, tipo_evento):
     """CSV com formadores."""
     d1 = (date.today() + timedelta(days=35)).isoformat()
@@ -252,6 +268,22 @@ class TestEventosImportService:
 
         # Total no banco
         assert Solicitacao.objects.count() == 2
+
+    def test_same_slot_different_segmento_creates_two(
+        self, sample_csv_same_slot_diff_segmento, coordenador_user, municipio, projeto_super, tipo_evento
+    ):
+        """#1915: dois eventos no mesmo slot que so diferem no segmento NAO podem colapsar.
+
+        Antes do fix o external_hash omitia o segmento -> hash identico -> update_or_create
+        sobrescrevia o primeiro (perda silenciosa, contada como 'unchanged'). Cada segmento e
+        uma turma distinta: devem coexistir como 2 Solicitacoes.
+        """
+        result = import_eventos_from_file(path=sample_csv_same_slot_diff_segmento, dry_run=False)
+
+        assert result["stats"]["solicitacoes"]["created"] == 2
+        assert Solicitacao.objects.count() == 2
+        segmentos = set(Solicitacao.objects.values_list("segmento", flat=True))
+        assert segmentos == {"Fundamental I", "Fundamental II"}
 
     def test_creates_participations(
         self, sample_csv_with_formadores, coordenador_user, formador1_user, municipio, projeto_super, tipo_evento
@@ -432,3 +464,41 @@ class TestImportEventosView:
 
         # Pode ser 401 ou 403 dependendo da configuracao
         assert response.status_code in [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN]
+
+
+# =============================================================================
+# MIGRACAO 0101 — re-hash com segmento (#1915)
+# =============================================================================
+
+
+@pytest.mark.django_db
+class TestRehashMigration0101:
+    """#1915: a migracao 0101 recomputa o external_hash das linhas ja persistidas para
+    incluir o segmento. O ponto critico e o TIMEZONE TRAP: o hash usa data/hora LOCAIS de
+    Fortaleza, mas o banco guarda inicio/fim em UTC — a migracao precisa converter de volta.
+    """
+
+    def test_rehash_reproduces_importer_hash(self, sample_csv_same_slot_diff_segmento):
+        """Apos o re-hash, cada linha volta a ter EXATAMENTE o hash que o importer gera.
+
+        Se a migracao extraisse a hora em UTC (em vez de Fortaleza), o hash recomputado
+        divergiria do que um import futuro produz -> duplicacao. Este assert pega isso.
+        """
+        import importlib
+
+        from django.apps import apps as global_apps
+
+        import_eventos_from_file(path=sample_csv_same_slot_diff_segmento, dry_run=False)
+        expected = {s.id: s.external_hash for s in Solicitacao.objects.all()}
+        assert len(expected) == 2
+
+        # Simula linhas pre-migracao: external_hash obsoleto (placeholder distinto, 64 chars).
+        for i, sol in enumerate(Solicitacao.objects.all().order_by("id")):
+            sol.external_hash = f"stale{i:059d}"
+            sol.save(update_fields=["external_hash"])
+
+        mig = importlib.import_module("apps.core.migrations.0101_rehash_eventos_external_hash_with_segmento")
+        mig._rehash_forward(global_apps, None)
+
+        got = {s.id: s.external_hash for s in Solicitacao.objects.all()}
+        assert got == expected

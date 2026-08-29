@@ -114,14 +114,16 @@ class TestDeslocamentoExternalHashEquivalence:
 class TestEventosExternalHashEquivalence:
     """
     Snapshot test pinning the exact digest produced by
-    ``eventos_import._compute_external_hash`` so the migration to
-    ``stable_import_hash`` cannot silently change ``Solicitacao.external_hash``.
+    ``eventos_import._compute_external_hash`` so the ALGORITHM (SHA-1/encoding/
+    delimiter, ADR-012) stays byte-equivalent to a raw ``hashlib.sha1``.
 
-    Replicates the legacy call:
+    #1915: the recipe now includes ``segmento`` as the 7th field (part of the
+    event's natural key). ADR-012 freezes the algorithm, NOT the field
+    composition, so this snapshot tracks the current 7-field recipe:
 
         parts = [str(municipio_id), str(projeto_id), str(tipo_evento_id),
                  data_evento.isoformat(), hora_inicio.strftime("%H:%M"),
-                 hora_fim.strftime("%H:%M")]
+                 hora_fim.strftime("%H:%M"), segmento]
         content = "|".join(parts)
         return hashlib.sha1(content.encode("utf-8"), usedforsecurity=False).hexdigest()
     """
@@ -140,9 +142,10 @@ class TestEventosExternalHashEquivalence:
             date(2026, 5, 16),  # data_evento -> "2026-05-16"
             time(8, 0),  # hora_inicio -> "08:00"
             time(12, 30),  # hora_fim -> "12:30"
+            "Fundamental I",  # segmento (#1915)
         )
 
-        legacy = _legacy_sha1("|".join(["7", "3", "5", "2026-05-16", "08:00", "12:30"]))
+        legacy = _legacy_sha1("|".join(["7", "3", "5", "2026-05-16", "08:00", "12:30", "Fundamental I"]))
 
         assert digest == legacy
 

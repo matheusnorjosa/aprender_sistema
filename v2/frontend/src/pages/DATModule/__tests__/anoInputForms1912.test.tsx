@@ -53,9 +53,9 @@ import AcoesPage from '../AcoesPage';
 const CURRENT_YEAR = new Date().getFullYear();
 
 const CASES: Array<[string, ComponentType, RegExp]> = [
-  ['DATRegistros', DATRegistrosPage as unknown as ComponentType, /novo registro/i],
-  ['Cadastros', CadastrosPage as unknown as ComponentType, /novo cadastro/i],
-  ['Acoes', AcoesPage as unknown as ComponentType, /nova ação/i],
+  ['DATRegistros', DATRegistrosPage, /novo registro/i],
+  ['Cadastros', CadastrosPage, /novo cadastro/i],
+  ['Acoes', AcoesPage, /nova ação/i],
 ];
 
 describe('#1912-FE: form de criação tem input "Ano" (default = ano corrente)', () => {

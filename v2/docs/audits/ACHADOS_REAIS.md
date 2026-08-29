@@ -177,7 +177,7 @@ round-trip já eram M-codes abertos). `resolvido` = mergeado; nada promovido a `
 | Achado | Verificação | Issue |
 |---|---|---|
 | `_compute_external_hash` OMITE segmento → 156 eventos colapsam; **MATERIALIZADO no golden (controle positivo 6/6)** | `eventos_import.py:358-365`; medido no golden (RELAY 45-48) | **#1915** (P1, bloqueante do import real) |
-| `ano` fora de form/serializer → UI-create cai em `ano=NULL` → 2º create colide (400) | DATRegistro/Cadastro/Acao | #1912 |
+| ~~`ano` fora de form/serializer → UI-create cai em `ano=NULL` → 2º create colide (400)~~ → **resolvido** por #1925 (BE: `ano` gravável nos write-serializers) + #1927 (FE: input Ano nos forms de create) | DATRegistro/Cadastro/Acao | #1912 |
 | edição inline de Acompanhamento/Prova morta (backend pronto, front não liga `onClick`) | `PlanoFormacoesPage.tsx:69-70` | #1913 |
 | `setor_canonico`/`Projeto.setor`/`ProjetoGeral` sem entrada-direta (`setor_canonico` gateia navegação) | `serializers/organizacao.py`; `usePermissions.ts:86` | #1914 |
 

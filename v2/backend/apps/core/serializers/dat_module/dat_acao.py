@@ -40,6 +40,7 @@ class DATAcaoSerializer(serializers.ModelSerializer["DATAcao"]):
             "projeto_nome",
             "coordenador",
             "coordenador_nome",
+            "ano",
             # Etapa Carta
             "status_carta",
             "data_carta",

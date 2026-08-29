@@ -39,6 +39,7 @@ class DATCadastroSerializer(serializers.ModelSerializer["DATCadastro"]):
             "projeto_geral",
             "projeto_geral_nome",
             "plataforma",
+            "ano",
             # FORMAR workflow
             "status_criacao_curso",
             "data_criacao_curso",

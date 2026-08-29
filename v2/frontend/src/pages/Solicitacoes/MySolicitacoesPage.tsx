@@ -50,28 +50,6 @@ const STATUS_LABELS: Record<SolicitacaoStatus, string> = {
   reprovado: 'Reprovado',
 };
 
-/** Municipio nested type */
-interface MunicipioNested {
-  nome?: string;
-}
-
-/** Projeto nested type */
-interface ProjetoNested {
-  nome?: string;
-}
-
-/** TipoEvento nested type */
-interface TipoEventoNested {
-  nome?: string;
-}
-
-/** Extended solicitacao with nested objects */
-interface SolicitacaoExtended extends Omit<Solicitacao, 'municipio' | 'projeto' | 'tipo_evento'> {
-  municipio?: MunicipioNested | number | null;
-  projeto?: ProjetoNested | number | null;
-  tipo_evento?: TipoEventoNested | number | null;
-}
-
 /** API error response type */
 interface ApiErrorResponse {
   response?: {
@@ -85,7 +63,7 @@ interface ApiErrorResponse {
 export default function MySolicitacoesPage(): JSX.Element {
   const navigate = useNavigate();
   const [loading, setLoading] = useState<boolean>(false);
-  const [rows, setRows] = useState<SolicitacaoExtended[]>([]);
+  const [rows, setRows] = useState<Solicitacao[]>([]);
   const [total, setTotal] = useState<number>(0);
 
   const [statusFilter, setStatusFilter] = useState<SolicitacaoStatus | ''>(''); // '' = Todas
@@ -98,7 +76,7 @@ export default function MySolicitacoesPage(): JSX.Element {
       if (statusFilter) filters['status'] = statusFilter;
       if (searchTerm) filters['q'] = searchTerm;
 
-      const data = await listSolicitacoes(filters) as PaginatedResponse<SolicitacaoExtended> | SolicitacaoExtended[];
+      const data = await listSolicitacoes(filters) as PaginatedResponse<Solicitacao> | Solicitacao[];
       const results = 'results' in data ? data.results : data;
       const count = 'count' in data ? data.count : (data).length;
       setRows(results || []);
@@ -130,7 +108,7 @@ export default function MySolicitacoesPage(): JSX.Element {
   }, [loadData]);
 
   // Colunas memoizadas (Issue #427)
-  const columns: ColumnsType<SolicitacaoExtended> = useMemo(() => [
+  const columns: ColumnsType<Solicitacao> = useMemo(() => [
     {
       title: 'Data/Hora',
       dataIndex: 'inicio',
@@ -140,36 +118,21 @@ export default function MySolicitacoesPage(): JSX.Element {
     },
     {
       title: 'Município',
-      dataIndex: 'municipio',
+      dataIndex: 'municipio_nome',
       key: 'municipio',
-      render: (municipio: MunicipioNested | ID | null) => {
-        if (municipio && typeof municipio === 'object' && 'nome' in municipio) {
-          return municipio.nome || '-';
-        }
-        return '-';
-      },
+      render: (nome: string | null) => nome || '-',
     },
     {
       title: 'Projeto',
-      dataIndex: 'projeto',
+      dataIndex: 'projeto_nome',
       key: 'projeto',
-      render: (projeto: ProjetoNested | ID | null) => {
-        if (projeto && typeof projeto === 'object' && 'nome' in projeto) {
-          return projeto.nome || '-';
-        }
-        return '-';
-      },
+      render: (nome: string | null) => nome || '-',
     },
     {
       title: 'Tipo',
-      dataIndex: 'tipo_evento',
+      dataIndex: 'tipo_evento_nome',
       key: 'tipo_evento',
-      render: (tipo: TipoEventoNested | ID | null) => {
-        if (tipo && typeof tipo === 'object' && 'nome' in tipo) {
-          return tipo.nome || '-';
-        }
-        return '-';
-      },
+      render: (nome: string | null) => nome || '-',
     },
     {
       title: 'Formadores',

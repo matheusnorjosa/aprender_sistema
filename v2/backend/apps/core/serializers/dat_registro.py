@@ -104,6 +104,7 @@ class DATRegistroCreateSerializer(serializers.ModelSerializer["DATRegistro"]):
             "municipio",
             "projeto_geral",
             "projeto",
+            "ano",
             "aluno_qtde",
             "professor_qtde",
             # FORMAR (optional on create)
@@ -176,6 +177,7 @@ class DATRegistroUpdateSerializer(serializers.ModelSerializer["DATRegistro"]):
         model = DATRegistro
         fields = [
             # Dados Básicos (editable)
+            "ano",
             "aluno_qtde",
             "professor_qtde",
             # FORMAR

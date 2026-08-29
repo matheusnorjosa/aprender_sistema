@@ -41,8 +41,10 @@ describe('ProjetosGeraisPage (#1914 — CRUD admin)', () => {
     renderPage();
     expect(await screen.findByText('PROJETO AMMA', {}, { timeout: 15000 })).toBeInTheDocument();
     expect(await screen.findByText('PROJETO VIDAS')).toBeInTheDocument();
-  });
+  }, 20000);
 
+  // Timeout folgado: render da página inteira (Table + modal + form) em jsdom passa dos 5s
+  // default do vitest sob carga do CI. O comportamento testado é rápido; o render é o lento.
   test('o botão "Novo" abre o modal e cria via createProjetoGeral', async () => {
     const user = userEvent.setup();
     renderPage();
@@ -54,5 +56,5 @@ describe('ProjetosGeraisPage (#1914 — CRUD admin)', () => {
       () => expect(createProjetoGeral).toHaveBeenCalledWith(expect.objectContaining({ nome: 'PROJETO NOVO' })),
       { timeout: 10000 },
     );
-  });
+  }, 30000);
 });

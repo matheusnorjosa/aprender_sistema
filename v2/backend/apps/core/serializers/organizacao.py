@@ -143,6 +143,7 @@ class GerenciaSerializer(serializers.ModelSerializer["Gerencia"]):
             "id",
             "nome",
             "nome_setor",
+            "setor_canonico",
             "gerente",
             "gerente_nome",
             "ativo",

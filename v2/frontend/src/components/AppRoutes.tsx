@@ -1,9 +1,10 @@
 import { lazy, Suspense, type JSX } from 'react';
-import { Routes, Route, Navigate } from 'react-router';
+import { Routes, Route, Navigate, useLocation } from 'react-router';
 import { Spin } from 'antd';
 import type { Permissions } from '../hooks/usePermissions';
 import { useCanAccess } from '../hooks/useCanAccess';
 import { RequirePolicy } from './access/RequirePolicy';
+import { ErrorBoundary } from './ErrorBoundary';
 import type { CurrentUser } from '../types';
 
 // Lazy-loaded pages (code-splitting)
@@ -76,7 +77,13 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
     canBloqueios: canControle || canCoordenador || isFormador,
   });
 
+  // H.2: um crash de página (throw no render OU falha ao baixar o chunk lazy) fica isolado
+  // no conteúdo — a casca (sidebar/header, fora deste boundary) sobrevive. `resetKeys` pela
+  // rota faz o boundary sair do erro ao navegar, sem exigir full reload.
+  const location = useLocation();
+
   return (
+    <ErrorBoundary resetKeys={[location.pathname]}>
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/" element={<HomePage />} />
@@ -157,5 +164,6 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
         <Route path="/dat/registros" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><DATRegistrosPage /></RequirePolicy>} />
       </Routes>
     </Suspense>
+    </ErrorBoundary>
   );
 }

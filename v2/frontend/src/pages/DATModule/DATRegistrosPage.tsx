@@ -85,6 +85,7 @@ interface DATRegistroFormValues {
   municipio: number | undefined;
   projeto_geral: number | undefined;
   projeto: number | undefined;
+  ano?: number | null | undefined;
   aluno_qtde?: number | null | undefined;
   professor_qtde?: number | null | undefined;
   // FORMAR
@@ -273,6 +274,9 @@ export default function DATRegistrosPage(): JSX.Element {
   const handleCreate = () => {
     setEditingRegistro(null);
     form.resetFields();
+    // #1912: `ano` entra na UniqueConstraint (nulls_distinct=False); sem valor, o 2o create
+    // do mesmo municipio+projeto colide em ano=NULL. Default = ano corrente.
+    form.setFieldsValue({ ano: new Date().getFullYear() });
     setModalVisible(true);
   };
 
@@ -288,6 +292,7 @@ export default function DATRegistrosPage(): JSX.Element {
       municipio: record.municipio,
       projeto_geral: record.projeto_geral,
       projeto: record.projeto,
+      ano: r['ano'] as number | undefined,
       aluno_qtde: record.aluno_qtde,
       professor_qtde: record.professor_qtde,
       reuniao_dat: asDate(record.reuniao_dat),
@@ -677,6 +682,15 @@ export default function DATRegistrosPage(): JSX.Element {
                     optionFilterProp="label"
                     options={projetos.map((p) => ({ label: `${p.nome} (${p.codigo})`, value: p.id }))}
                   />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12} md={8}>
+                <Form.Item
+                  name="ano"
+                  label="Ano"
+                  rules={[{ required: true, message: 'Informe o ano' }]}
+                >
+                  <InputNumber min={2020} max={2100} style={{ width: '100%' }} placeholder="Ex: 2026" />
                 </Form.Item>
               </Col>
             </Row>

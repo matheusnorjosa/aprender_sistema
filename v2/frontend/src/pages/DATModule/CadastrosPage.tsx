@@ -88,6 +88,7 @@ interface CadastroFormValues {
   plataforma: 'FORMAR' | 'AVALIAR';
   projeto_geral: number;
   municipio: number;
+  ano?: number | null;
   // Workflow FORMAR — datas são objetos Dayjs (DatePicker); status são choices.
   status_criacao_curso?: string;
   data_criacao_curso?: Dayjs | null;
@@ -203,7 +204,8 @@ export default function CadastrosPage(): JSX.Element {
   const handleCreate = () => {
     setEditingCadastro(null);
     form.resetFields();
-    form.setFieldsValue({ plataforma: activeTab });
+    // #1912: `ano` entra na UniqueConstraint (nulls_distinct=False); default = ano corrente.
+    form.setFieldsValue({ plataforma: activeTab, ano: new Date().getFullYear() });
     setModalVisible(true);
   };
 
@@ -646,6 +648,15 @@ export default function CadastrosPage(): JSX.Element {
                     optionFilterProp="label"
                     options={municipios.map((m) => ({ label: `${m.nome} - ${m.uf}`, value: m.id }))}
                   />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item
+                  name="ano"
+                  label="Ano"
+                  rules={[{ required: true, message: 'Informe o ano' }]}
+                >
+                  <InputNumber min={2020} max={2100} style={{ width: '100%' }} placeholder="Ex: 2026" />
                 </Form.Item>
               </Col>
             </Row>

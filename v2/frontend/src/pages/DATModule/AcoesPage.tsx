@@ -24,6 +24,7 @@ import {
   Select,
   Modal,
   Form,
+  InputNumber,
   DatePicker,
   Tooltip,
   Divider,
@@ -98,6 +99,7 @@ interface AcaoFormValues {
   municipio: number;
   projeto: number;
   coordenador: number | null;
+  ano?: number | null;
   area?: string | null;
   status_carta?: string;
   status_contato?: string;
@@ -227,6 +229,8 @@ export default function AcoesPage(): JSX.Element {
   const handleCreate = () => {
     setEditingAcao(null);
     form.resetFields();
+    // #1912: `ano` entra na UniqueConstraint (nulls_distinct=False); default = ano corrente.
+    form.setFieldsValue({ ano: new Date().getFullYear() });
     setModalVisible(true);
   };
 
@@ -856,6 +860,15 @@ export default function AcoesPage(): JSX.Element {
                     optionFilterProp="label"
                     options={projetos.map((p) => ({ label: p.nome, value: p.id }))}
                   />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item
+                  name="ano"
+                  label="Ano"
+                  rules={[{ required: true, message: 'Informe o ano' }]}
+                >
+                  <InputNumber min={2020} max={2100} style={{ width: '100%' }} placeholder="Ex: 2026" />
                 </Form.Item>
               </Col>
             </Row>

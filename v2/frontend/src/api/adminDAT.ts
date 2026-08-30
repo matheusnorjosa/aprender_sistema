@@ -407,3 +407,52 @@ export async function updateProduto(id: ID, data: ProdutoPayload): Promise<Produ
 export async function deleteProduto(id: ID): Promise<void> {
   await fetchWithErrorMapping(`/produtos/${id}/`, { method: 'DELETE' }, ADMIN_ERROR_MAP);
 }
+
+// ========== PROJETOS GERAIS ==========
+
+export interface ProjetoGeralRecord {
+  id: ID;
+  nome: string;
+  usa_avaliar: boolean;
+  tipo_calculo_codigos: 'por_aluno' | 'por_professor' | 'nao_aplicavel';
+  divisor_aluno: number;
+  // DecimalField no backend → serializado como string ("1.10").
+  multiplicador_professor: string;
+  ativo: boolean;
+  descricao: string;
+  projetos_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjetoGeralPayload {
+  nome?: string;
+  usa_avaliar?: boolean;
+  tipo_calculo_codigos?: 'por_aluno' | 'por_professor' | 'nao_aplicavel';
+  divisor_aluno?: number;
+  multiplicador_professor?: string;
+  ativo?: boolean;
+  descricao?: string;
+}
+
+export async function listProjetosGerais(params: ListParams = {}): Promise<PaginatedResponse<ProjetoGeralRecord>> {
+  return fetchWithErrorMapping(buildUrl('/projetos-gerais/', params as QueryParams), {}, ADMIN_ERROR_MAP);
+}
+
+export async function createProjetoGeral(data: ProjetoGeralPayload): Promise<ProjetoGeralRecord> {
+  return fetchWithErrorMapping('/projetos-gerais/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }, ADMIN_ERROR_MAP);
+}
+
+export async function updateProjetoGeral(id: ID, data: ProjetoGeralPayload): Promise<ProjetoGeralRecord> {
+  return fetchWithErrorMapping(`/projetos-gerais/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }, ADMIN_ERROR_MAP);
+}
+
+export async function deleteProjetoGeral(id: ID): Promise<void> {
+  await fetchWithErrorMapping(`/projetos-gerais/${id}/`, { method: 'DELETE' }, ADMIN_ERROR_MAP);
+}

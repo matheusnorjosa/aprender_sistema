@@ -91,6 +91,14 @@ export default function AdminDATHomePage(): JSX.Element {
       status: 'Disponível',
     },
     {
+      key: 'projetos-gerais',
+      title: 'Projetos Gerais',
+      description: 'CRUD de projetos gerais (famílias): AVALIAR e cálculo de códigos',
+      icon: <ProjectOutlined className="text-5xl text-teal-600" />,
+      path: '/dat/admin/projetos-gerais',
+      status: 'Disponível',
+    },
+    {
       key: 'configuracoes',
       title: 'Configurações',
       description: 'Configurações do sistema (disponibilidade, GCal, sessões, features)',

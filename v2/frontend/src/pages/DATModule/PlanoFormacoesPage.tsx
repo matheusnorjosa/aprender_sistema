@@ -63,11 +63,11 @@ import {
   deletePlanoFormacoes,
   getPlanoFormacoesStats,
   updateFormacaoInline,
+  updateAcompanhamentoInline,
+  updateProvaInline,
   // TODO: Implementar views de Calendario e Resumo por Projeto
   // getPlanoFormacoesCalendario,
   // getPlanoFormacoesResumoProjeto,
-  // updateAcompanhamentoInline,
-  // updateProvaInline,
 } from '../../api/datModule';
 import { getMunicipiosOptions, getProjetosOptions } from '../../api/datModule';
 import { getMe } from '../../api/availability';
@@ -143,6 +143,16 @@ interface FormacaoInlineFormValues {
   realizada: boolean;
 }
 
+interface AcompanhamentoInlineFormValues {
+  data: Dayjs | null;
+  realizado: boolean;
+}
+
+interface ProvaInlineFormValues {
+  data: Dayjs | null;
+  realizada: boolean;
+}
+
 interface PlanoFormacoesStats {
   total_planos: number;
   total_formacoes: number;
@@ -164,6 +174,16 @@ interface ProjetoOption {
 interface EditingFormacaoState {
   plano: PlanoFormacaoRecord;
   formacao: FormacaoItem;
+}
+
+interface EditingAcompanhamentoState {
+  plano: PlanoFormacaoRecord;
+  acomp: AcompanhamentoItem;
+}
+
+interface EditingProvaState {
+  plano: PlanoFormacaoRecord;
+  prova: ProvaItem;
 }
 
 
@@ -233,6 +253,12 @@ export default function PlanoFormacoesPage(): JSX.Element {
   const [formacaoModalVisible, setFormacaoModalVisible] = useState<boolean>(false);
   const [editingFormacao, setEditingFormacao] = useState<EditingFormacaoState | null>(null);
   const [formacaoForm] = Form.useForm<FormacaoInlineFormValues>();
+  const [acompModalVisible, setAcompModalVisible] = useState<boolean>(false);
+  const [editingAcomp, setEditingAcomp] = useState<EditingAcompanhamentoState | null>(null);
+  const [acompForm] = Form.useForm<AcompanhamentoInlineFormValues>();
+  const [provaModalVisible, setProvaModalVisible] = useState<boolean>(false);
+  const [editingProva, setEditingProva] = useState<EditingProvaState | null>(null);
+  const [provaForm] = Form.useForm<ProvaInlineFormValues>();
 
   // Detail modal
   const [detailModalVisible, setDetailModalVisible] = useState<boolean>(false);
@@ -372,6 +398,62 @@ export default function PlanoFormacoesPage(): JSX.Element {
     }
   };
 
+  // Acompanhamento cell click (edicao inline — #1913)
+  const handleAcompanhamentoClick = (plano: PlanoFormacaoRecord, acomp: AcompanhamentoItem) => {
+    setEditingAcomp({ plano, acomp });
+    acompForm.setFieldsValue({
+      data: acomp.data ? dayjs(acomp.data) : null,
+      realizado: acomp.realizado,
+    });
+    setAcompModalVisible(true);
+  };
+
+  const handleAcompanhamentoSave = async (values: AcompanhamentoInlineFormValues) => {
+    if (!editingAcomp) return;
+    try {
+      const payload = {
+        data: values.data?.format('YYYY-MM-DD') || null,
+        realizado: values.realizado,
+      };
+      await updateAcompanhamentoInline(
+        editingAcomp.plano.id,
+        editingAcomp.acomp.tipo as 'primeiro' | 'segundo',
+        payload,
+      );
+      message.success('Acompanhamento atualizado');
+      setAcompModalVisible(false);
+      void refresh();
+    } catch (error) {
+      message.error(`Erro: ${(error as Error).message}`);
+    }
+  };
+
+  // Prova cell click (edicao inline — #1913)
+  const handleProvaClick = (plano: PlanoFormacaoRecord, prova: ProvaItem) => {
+    setEditingProva({ plano, prova });
+    provaForm.setFieldsValue({
+      data: prova.data ? dayjs(prova.data) : null,
+      realizada: prova.realizada,
+    });
+    setProvaModalVisible(true);
+  };
+
+  const handleProvaSave = async (values: ProvaInlineFormValues) => {
+    if (!editingProva) return;
+    try {
+      const payload = {
+        data: values.data?.format('YYYY-MM-DD') || null,
+        realizada: values.realizada,
+      };
+      await updateProvaInline(editingProva.plano.id, editingProva.prova.numero, payload);
+      message.success('Prova atualizada');
+      setProvaModalVisible(false);
+      void refresh();
+    } catch (error) {
+      message.error(`Erro: ${(error as Error).message}`);
+    }
+  };
+
   // ============================================================
   // RENDER HELPERS
   // ============================================================
@@ -422,7 +504,19 @@ export default function PlanoFormacoesPage(): JSX.Element {
     if (!acomp) return <Text type="secondary">-</Text>;
 
     return (
-      <div style={{ textAlign: 'center' }}>
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label={`Editar acompanhamento ${acomp.tipo}`}
+        style={{ textAlign: 'center', cursor: 'pointer', padding: 4 }}
+        onClick={() => handleAcompanhamentoClick(plano, acomp)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleAcompanhamentoClick(plano, acomp);
+          }
+        }}
+      >
         {acomp.realizado ? (
           <CheckCircleOutlined className="text-green-500" />
         ) : (
@@ -440,7 +534,19 @@ export default function PlanoFormacoesPage(): JSX.Element {
     if (!prova) return <Text type="secondary">-</Text>;
 
     return (
-      <div style={{ textAlign: 'center' }}>
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label={`Editar prova ${prova.numero}`}
+        style={{ textAlign: 'center', cursor: 'pointer', padding: 4 }}
+        onClick={() => handleProvaClick(plano, prova)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleProvaClick(plano, prova);
+          }
+        }}
+      >
         {prova.realizada ? (
           <CheckCircleOutlined className="text-green-500" />
         ) : (
@@ -886,6 +992,52 @@ export default function PlanoFormacoesPage(): JSX.Element {
             <Select
               options={MODALIDADE_OPTIONS.map((m) => ({ label: m.label, value: m.value }))}
             />
+          </Form.Item>
+          <Form.Item name="realizada" valuePropName="checked">
+            <Checkbox>Realizada</Checkbox>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Acompanhamento Edit Modal (#1913) */}
+      <Modal
+        title={`Editar Acompanhamento ${editingAcomp?.acomp?.tipo || ''}`}
+        open={acompModalVisible}
+        onCancel={() => setAcompModalVisible(false)}
+        footer={
+          <Space>
+            <Button onClick={() => setAcompModalVisible(false)}>Cancelar</Button>
+            <Button type="primary" onClick={() => acompForm.submit()}>Salvar</Button>
+          </Space>
+        }
+        width={400}
+      >
+        <Form form={acompForm} layout="vertical" autoComplete="off" onFinish={handleAcompanhamentoSave}>
+          <Form.Item name="data" label="Data">
+            <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+          </Form.Item>
+          <Form.Item name="realizado" valuePropName="checked">
+            <Checkbox>Realizado</Checkbox>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Prova Edit Modal (#1913) */}
+      <Modal
+        title={`Editar Prova ${editingProva?.prova?.numero || ''}`}
+        open={provaModalVisible}
+        onCancel={() => setProvaModalVisible(false)}
+        footer={
+          <Space>
+            <Button onClick={() => setProvaModalVisible(false)}>Cancelar</Button>
+            <Button type="primary" onClick={() => provaForm.submit()}>Salvar</Button>
+          </Space>
+        }
+        width={400}
+      >
+        <Form form={provaForm} layout="vertical" autoComplete="off" onFinish={handleProvaSave}>
+          <Form.Item name="data" label="Data">
+            <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
           </Form.Item>
           <Form.Item name="realizada" valuePropName="checked">
             <Checkbox>Realizada</Checkbox>

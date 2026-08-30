@@ -176,9 +176,9 @@ round-trip já eram M-codes abertos). `resolvido` = mergeado; nada promovido a `
 
 | Achado | Verificação | Issue |
 |---|---|---|
-| `_compute_external_hash` OMITE segmento → 156 eventos colapsam; **MATERIALIZADO no golden (controle positivo 6/6)** | `eventos_import.py:358-365`; medido no golden (RELAY 45-48) | **#1915** (P1, bloqueante do import real) |
+| `_compute_external_hash` OMITE segmento → 156 eventos colapsam; **MATERIALIZADO no golden (controle positivo 6/6)** | `eventos_import.py:345` (recipe); medido no golden (RELAY 45-48) | **#1915** — **fix**: `segmento` na chave natural + migração `0101` (re-hash UTC→Fortaleza); **recuperação** dos 156 via re-import segue gated (autorização + dry-run verde) |
 | ~~`ano` fora de form/serializer → UI-create cai em `ano=NULL` → 2º create colide (400)~~ → **resolvido** por #1925 (BE: `ano` gravável nos write-serializers) + #1927 (FE: input Ano nos forms de create) | DATRegistro/Cadastro/Acao | #1912 |
-| edição inline de Acompanhamento/Prova morta (backend pronto, front não liga `onClick`) | `PlanoFormacoesPage.tsx:69-70` | #1913 |
+| edição inline de Acompanhamento/Prova morta (backend pronto, front não liga `onClick`) | `PlanoFormacoesPage.tsx:69-70` | **#1913** — **fix** (front liga o `onClick` de Acompanhamento/Prova; célula clicável com label): PR #1922 |
 | `setor_canonico`/`Projeto.setor`/`ProjetoGeral` sem entrada-direta (`setor_canonico` gateia navegação) | `serializers/organizacao.py`; `usePermissions.ts:86` | #1914 |
 
 O achado do hash (#1915) atualiza a memória `hash-dedup-key-must-cover-natural-key` de **latente**
@@ -373,7 +373,7 @@ commit traz a data **de cada commit**, porque eles podem estar a semanas de dist
 | `M15-03` | **P1** | parcial | Compras: definir identidade real de `Compra` — hash sobre campos mutaveis duplica linha na corr… | DAT (3 ativos) e Controle (1 ativo) = 4 atores nao-superuser reais, ma… | #1633 (OPEN) | `f6eecd5f` (2026-08-19; falta natural-key + UniqueConstraint) |
 | `M15-04` | **P1** | aberto | imports/compras: preview aceita linhas invalidas (quantidade vazia/decimal/negativa, data ausen… | DAT (3 membros ativos nao-superuser) + 1 superuser. O endpoint `POST /… | #1634 (OPEN) | — |
 | `M15-05` | **P1** | aberto | imports/compras: usar UF e código do produto na resolução e gravar Compra.produto | DAT (3 membros ativos nao-superuser) + 1 superuser, via POST /api/cont… | #1635 (OPEN) | — |
-| `M15-09` | **P1** | aberto | Compras (DATCompra): edição reassocia material para outro município/projeto silenciosamente | DAT (3 ativos) + Controle (1) + Assistente Administrativo (1, herda Co… | #1636 (OPEN) | — |
+| `M15-09` | **P1** | resolvido | Compras (DATCompra): edição reassocia material para outro município/projeto silenciosamente | DAT (3 ativos) + Controle (1) + Assistente Administrativo (1, herda Co… | #1636 (CLOSED) | `#1917` (List expõe FK ids) + `#1919` (resetFields no handleEdit) |
 | `M15-10` | **P1** | parcial | DAT/Compras: formulário de Nova Compra descarta campos, grava valor zero e esconde o erro | DAT e Superintendência | #1637 (OPEN) | `8f894279` (2026-08-11) + `e94f15f4` (2026-08-12) — Fase A |
 | `M15-11` | **P2** | resolvido | hardening de baixo risco consolidado (auditoria dinâmica 2026-08-17): N+1 em `/coordenadores/{id}/alocacoes/` (select_related); índices redundantes de `external_hash` em `core_compra` (3 btrees → 1 + migração); ImportCompras sem magic-bytes (anti-spoofing via `validate_upload`); disconnect Google apaga credencial local mesmo com revoke ≠ 200/400 (preservar p/ retry); aria-label nos botões só-ícone de Deslocamentos; NOTA get_permissions vs @action | DAT/Controle, operador GCal, visitante autenticado | #1742 | `091e6f53`+`99b85952`+`dcecfebf` (2026-08-18) |
 | `M16-07` | **P1** | resolvido | DAT Registros: datas do formulário não chegam ao banco | DAT e superuser | #1638 (CLOSED) | `3954e208` (2026-08-11)+`1fbcb34b` (2026-08-18) |

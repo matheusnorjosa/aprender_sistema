@@ -72,6 +72,8 @@ describe('Cinto M17 (#1636): editar compra reseta o form (sem carry-over)', () =
       const obsB = await screen.findByLabelText('Observações', {}, { timeout: 10000 });
       expect(obsB).toHaveValue(''); // RED sem resetFields (retém OBS_DA_COMPRA_A)
     },
-    30000,
+    // Render da ComprasPage inteira 2x (edita A → cancela → edita B) é pesado; sob a carga
+    // da suíte no CI passa dos 30s. 60s dá folga sem mascarar hang (local roda em ~2s).
+    60000,
   );
 });

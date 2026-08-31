@@ -93,7 +93,9 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
     """
 
     queryset = (
-        PlanoFormacoes.objects.select_related("municipio", "projeto", "coordenador", "created_by", "updated_by")
+        PlanoFormacoes.objects.select_related(
+            "municipio", "projeto", "projeto__projeto_geral", "coordenador", "created_by", "updated_by"
+        )
         .prefetch_related("formacoes", "acompanhamentos", "provas")
         .order_by("municipio__nome", "projeto__nome")
     )

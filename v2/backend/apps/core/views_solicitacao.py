@@ -179,7 +179,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     PR 8/N: Apenas Coordenador ou DAT podem criar solicitações.
     """
 
-    queryset = Solicitacao.objects.select_related("usuario", "municipio", "tipo_evento", "projeto", "coordenador")
+    queryset = Solicitacao.objects.select_related(
+        "usuario", "municipio", "tipo_evento", "projeto", "projeto__projeto_geral", "coordenador"
+    )
     serializer_class = SolicitacaoSerializer
     permission_classes = [IsAuthenticated]
 
@@ -225,7 +227,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             # Forçar filtro por usuário atual
             qs = (
                 Solicitacao.objects.filter(usuario=self.request.user)
-                .select_related("usuario", "municipio", "tipo_evento", "projeto", "coordenador")
+                .select_related(
+                    "usuario", "municipio", "tipo_evento", "projeto", "projeto__projeto_geral", "coordenador"
+                )
                 .prefetch_related("participations__usuario")
             )
         # M10-01 (#1623): escopo ator×gerência (SSOT `scope_solicitacoes`).

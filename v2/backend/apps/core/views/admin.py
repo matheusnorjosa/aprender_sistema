@@ -22,7 +22,7 @@ from rest_framework.views import APIView
 
 from django_filters.rest_framework import DjangoFilterBackend
 
-from apps.core.constants import FUNCAO_GROUPS, RESERVED_GROUPS, SETOR_GROUPS
+from apps.core.constants import FUNCAO_GROUPS, RESERVED_GROUPS, SETOR_GROUPS, SETORES_PRODUTO
 from apps.core.models import (
     AuditLog,
     Compra,
@@ -707,6 +707,9 @@ class RBACMetaView(APIView):
             {
                 "setor_groups": sorted(set(SETOR_GROUPS) | dynamic_setor_groups),
                 "funcao_groups": sorted(set(FUNCAO_GROUPS) | dynamic_funcao_groups),
+                # #1914: vocabulário canônico de setor-de-produto (Gerencia.setor_canonico) —
+                # DISTINTO dos setor_groups (RBAC). O FE monta um Select FECHADO na conferência.
+                "setores_produto": sorted(SETORES_PRODUTO),
                 "categories": categories,
             },
             status=status.HTTP_200_OK,

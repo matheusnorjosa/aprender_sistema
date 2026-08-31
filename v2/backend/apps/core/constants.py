@@ -51,6 +51,29 @@ ALLOWED_USER_GROUPS: set[str] = set(SETOR_GROUPS) | set(FUNCAO_GROUPS)
 RESERVED_GROUPS: frozenset[str] = frozenset(SETOR_GROUPS) | frozenset(FUNCAO_GROUPS)
 
 
+# === SETORES-DE-PRODUTO (12) — vocabulário canônico de `Gerencia.setor_canonico` ===
+# DISTINTO dos 13 SETOR_GROUPS acima (grupos RBAC). Este é o vocabulário "setor-de-produto"
+# do de-para v15 (RELAY 28/#1906): o valor gravado em `Gerencia.setor_canonico`, que gateia
+# navegação. SSOT desta lista; o `SETOR_MAPPING` (services/equipe_gerencia_import) mapeia os
+# aliases PARA estes valores — um teste garante que todo destino do de-para é membro daqui.
+# Exposto pelo `RBACMetaView` (`/api/rbac/meta/`) para o FE montar um Select FECHADO na tela
+# de conferência (texto-livre traria o drift que o campo combate).
+SETORES_PRODUTO: tuple[str, ...] = (
+    "A Cor da Gente",
+    "ACerta",
+    "Avançando Juntos",
+    "Brincando e Aprendendo",
+    "Educação Financeira",
+    "Fluir",
+    "IDEB10",
+    "Ler, Ouvir e Contar",
+    "My Companion",
+    "Sou da Paz",
+    "Superintendência",
+    "Vidas",
+)
+
+
 # =======================================================================
 # Data scope constants (Epic 3 RBAC Refactor, 2026-04-23)
 #

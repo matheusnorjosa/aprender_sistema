@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, type JSX } from 'react';
-import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, Form, Checkbox } from 'antd';
+import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, Form, Checkbox, Select } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { TablePaginationConfig } from 'antd/es/table';
 import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
@@ -17,12 +17,31 @@ import { DEFAULT_PAGE_SIZE } from '../../constants';
 const { Title } = Typography;
 const { Search } = Input;
 
+// Vocabulário setor-de-produto (12 valores; SSOT = range do SETOR_MAPPING no backend).
+// TEMPORÁRIO: hardcode até o backend expor o endpoint de options (#1914-BE, em curso) —
+// trocar por um fetch a esse endpoint quando o terminal avisar.
+const SETORES_PRODUTO = [
+  'A Cor da Gente',
+  'ACerta',
+  'Avançando Juntos',
+  'Brincando e Aprendendo',
+  'Educação Financeira',
+  'Fluir',
+  'IDEB10',
+  'Ler Ouvir e Contar',
+  'My Companion',
+  'Sou da Paz',
+  'Superintendência',
+  'Vidas',
+];
+
 /**
  * Gerencia form values interface
  */
 interface GerenciaFormValues {
   nome: string;
   nome_setor: string;
+  setor_canonico?: string;
   descricao: string;
   ativo: boolean;
 }
@@ -89,6 +108,7 @@ export default function GerenciasPage(): JSX.Element {
     form.setFieldsValue({
       nome: gerencia.nome,
       nome_setor: gerencia.nome_setor,
+      setor_canonico: gerencia.setor_canonico,
       descricao: gerencia.descricao,
       ativo: gerencia.ativo,
     });
@@ -102,6 +122,8 @@ export default function GerenciasPage(): JSX.Element {
         nome_setor: values.nome_setor,
         descricao: values.descricao,
         ativo: values.ativo,
+        // setor_canonico é opcional (CharField allow_blank); envia string vazia se limpo.
+        setor_canonico: values.setor_canonico ?? '',
       };
       if (editingGerencia) {
         await updateGerencia(editingGerencia.id, payload);
@@ -141,6 +163,13 @@ export default function GerenciasPage(): JSX.Element {
     { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
     { title: 'Nome', dataIndex: 'nome', key: 'nome', width: 200 },
     { title: 'Nome Setor', dataIndex: 'nome_setor', key: 'nome_setor', width: 150 },
+    {
+      title: 'Setor canônico',
+      dataIndex: 'setor_canonico',
+      key: 'setor_canonico',
+      width: 170,
+      render: (v: string) => (v ? <Tag color="geekblue">{v}</Tag> : <Tag>não definido</Tag>),
+    },
     { title: 'Gerente', dataIndex: 'gerente_nome', key: 'gerente_nome', width: 150 },
     {
       title: 'Projetos',
@@ -262,6 +291,18 @@ export default function GerenciasPage(): JSX.Element {
             rules={[{ required: true, message: 'Nome do setor e obrigatorio' }]}
           >
             <Input placeholder="Ex: Superintendencia" />
+          </Form.Item>
+
+          <Form.Item
+            name="setor_canonico"
+            label="Setor canônico (vocabulário de setor-de-produto)"
+          >
+            <Select
+              allowClear
+              showSearch
+              placeholder="Selecione o setor canônico..."
+              options={SETORES_PRODUTO.map((s) => ({ label: s, value: s }))}
+            />
           </Form.Item>
 
           <Form.Item

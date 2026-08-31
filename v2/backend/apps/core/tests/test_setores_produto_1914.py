@@ -6,7 +6,7 @@ o campo combate. Os valores canônicos já existem como range do `SETOR_MAPPING`
 fixa como SSOT em `constants` e o `RBACMetaView` os expõe pro FE montar o Select.
 """
 
-# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportOperatorIssue=false, reportIndexIssue=false
 
 from __future__ import annotations
 

@@ -18,7 +18,6 @@ import unicodedata
 from typing import TYPE_CHECKING, TypeVar
 
 from django.contrib.auth import get_user_model
-from django.db.models import Q
 
 from apps.core.models import Municipio, Projeto, TipoEvento
 
@@ -88,45 +87,58 @@ def resolve_user_by_email(email: str) -> Usuario | None:
 
 def resolve_user_by_name(name: str) -> Usuario | None:
     """
-    Resolve usuário por nome completo (match simples).
+    Resolve usuário por nome EXIGINDO candidato único em cada degrau (#1643).
 
-    Tenta match exato em first_name + last_name (normalizado).
-    Se não encontrar, tenta por partes do nome.
+    Escada determinística (reusa ``_pick_unique`` do #1613), comparando por
+    ``norm_text`` dos DOIS lados (remove acento/caixa; simétrico, como
+    ``resolve_projeto`` — ``icontains`` cru erraria nomes acentuados):
+
+      1. nome completo exato (``get_full_name`` normalizado);
+      2. todos os tokens do nome presentes nos tokens do usuário (subconjunto).
+
+    Ambiguidade (2+ candidatos distintos) NUNCA vira chute: devolve ``None`` e
+    loga WARNING (o chamador trata como pendência). Substitui as antigas
+    Tentativas 2/3 (``icontains`` + ``.first()`` sem unicidade = match único
+    errado silencioso).
 
     Args:
-        name: Nome completo do usuário
+        name: Nome completo do usuário.
 
     Returns:
-        Usuario ou None se não encontrado
+        Usuario para exatamente 1 candidato distinto; None para 0 ou ambiguidade.
     """
     if not name:
         return None
 
     name_norm = norm_text(name)
+    tokens = set(name_norm.split())
+    if not tokens:
+        return None
 
-    # Tentativa 1: Match exato em first_name ou last_name
-    user = User.objects.filter(Q(first_name__iexact=name_norm) | Q(last_name__iexact=name_norm)).first()
+    # Candidatos = usuários com nome preenchido. norm_text nos DOIS lados torna a
+    # comparação acento/caixa-insensível. Tabela de usuários é pequena (interno),
+    # mesmo padrão de resolve_projeto/resolve_tipo_evento.
+    usuarios = [u for u in User.objects.all() if u.get_full_name().strip()]
 
-    if user:
+    # Degrau 1: nome completo exato, único.
+    status, user = _pick_unique(
+        [u for u in usuarios if norm_text(u.get_full_name()) == name_norm],
+        kind="Usuario (nome completo exato)",
+        needle=name,
+    )
+    if status == "matched":
         return user
+    if status == "ambiguous":
+        return None
 
-    # Tentativa 2: Match por partes do nome (heurística)
-    parts = name_norm.split()
-    if len(parts) >= 2:
-        first_part = parts[0]
-        last_part = parts[-1]
-
-        # Tenta primeiro nome + último nome
-        user = User.objects.filter(first_name__icontains=first_part, last_name__icontains=last_part).first()
-
-        if user:
-            return user
-
-        # Tentativa 3: Match mais relaxado (qualquer parte em qualquer nome)
-        user = User.objects.filter(Q(first_name__icontains=first_part) | Q(last_name__icontains=last_part)).first()
-
-        if user:
-            return user
+    # Degrau 2: todos os tokens do nome presentes nos tokens do usuário, único.
+    status, user = _pick_unique(
+        [u for u in usuarios if tokens <= set(norm_text(u.get_full_name()).split())],
+        kind="Usuario (todos os tokens)",
+        needle=name,
+    )
+    if status == "matched":
+        return user
 
     return None
 

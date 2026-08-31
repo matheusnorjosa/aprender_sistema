@@ -57,7 +57,9 @@ describe('Cinto M17 (#1636): editar compra reseta o form (sem carry-over)', () =
       await user.click(editBtns[0]); // edita A
 
       const obs = await screen.findByLabelText('Observações', {}, { timeout: 10000 });
-      await user.type(obs, 'OBS_DA_COMPRA_A');
+      // delay:null digita de uma vez (sem re-render por char) — evita timeout de 30s no CI
+      // sob carga da suíte inteira (o render pesado do AntD + type char-a-char estourava).
+      await user.type(obs, 'OBS_DA_COMPRA_A', { delay: null });
       expect(obs).toHaveValue('OBS_DA_COMPRA_A');
 
       // cancela — o onCancel só esconde o modal, sem limpar o form
@@ -70,6 +72,8 @@ describe('Cinto M17 (#1636): editar compra reseta o form (sem carry-over)', () =
       const obsB = await screen.findByLabelText('Observações', {}, { timeout: 10000 });
       expect(obsB).toHaveValue(''); // RED sem resetFields (retém OBS_DA_COMPRA_A)
     },
-    30000,
+    // Render da ComprasPage inteira 2x (edita A → cancela → edita B) é pesado; sob a carga
+    // da suíte no CI passa dos 30s. 60s dá folga sem mascarar hang (local roda em ~2s).
+    60000,
   );
 });

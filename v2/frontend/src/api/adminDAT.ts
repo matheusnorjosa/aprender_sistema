@@ -325,6 +325,7 @@ export interface GerenciaRecord {
   id: ID;
   nome: string;
   nome_setor: string;
+  setor_canonico: string;
   gerente: ID | null;
   gerente_nome: string;
   ativo: boolean;
@@ -337,6 +338,7 @@ export interface GerenciaRecord {
 export interface GerenciaPayload {
   nome?: string;
   nome_setor?: string;
+  setor_canonico?: string;
   gerente?: ID | null;
   ativo?: boolean;
   descricao?: string;

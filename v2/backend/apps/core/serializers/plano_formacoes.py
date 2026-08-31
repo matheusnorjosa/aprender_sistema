@@ -103,6 +103,7 @@ class PlanoFormacoesSerializer(serializers.ModelSerializer["PlanoFormacoes"]):
     municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
     municipio_uf = serializers.CharField(source="municipio.uf", read_only=True)
     projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
+    projeto_geral_nome = serializers.CharField(source="projeto.projeto_geral.nome", read_only=True, allow_null=True)
     coordenador_nome = serializers.CharField(source="coordenador.get_full_name", read_only=True, allow_null=True)
 
     # Computed
@@ -125,6 +126,7 @@ class PlanoFormacoesSerializer(serializers.ModelSerializer["PlanoFormacoes"]):
             "municipio_uf",
             "projeto",
             "projeto_nome",
+            "projeto_geral_nome",
             "ano",
             "coordenador",
             "coordenador_nome",
@@ -195,6 +197,7 @@ class PlanoFormacoesListSerializer(serializers.ModelSerializer["PlanoFormacoes"]
     municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
     municipio_uf = serializers.CharField(source="municipio.uf", read_only=True)
     projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
+    projeto_geral_nome = serializers.CharField(source="projeto.projeto_geral.nome", read_only=True, allow_null=True)
     coordenador_nome = serializers.CharField(source="coordenador.get_full_name", read_only=True, allow_null=True)
 
     # Formacoes expandidas para exibicao em tabela (F1-F15)
@@ -217,6 +220,7 @@ class PlanoFormacoesListSerializer(serializers.ModelSerializer["PlanoFormacoes"]
             "municipio_uf",
             "projeto",
             "projeto_nome",
+            "projeto_geral_nome",
             "ano",
             "coordenador",
             "coordenador_nome",

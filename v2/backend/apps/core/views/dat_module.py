@@ -237,9 +237,9 @@ class DATAcaoViewSet(viewsets.ModelViewSet):
         - destroy: apenas Superintendência
     """
 
-    queryset = DATAcao.objects.select_related("municipio", "projeto", "coordenador", "created_by").order_by(
-        "-prioridade", "municipio__nome"
-    )
+    queryset = DATAcao.objects.select_related(
+        "municipio", "projeto", "projeto__projeto_geral", "coordenador", "created_by"
+    ).order_by("-prioridade", "municipio__nome")
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = DATAcaoFilter
@@ -377,9 +377,9 @@ class DATCompraViewSet(viewsets.ModelViewSet):
         - destroy: apenas Superintendência
     """
 
-    queryset = DATCompra.objects.select_related("municipio", "projeto", "produto", "created_by").order_by(
-        "-ano_uso", "municipio__nome"
-    )
+    queryset = DATCompra.objects.select_related(
+        "municipio", "projeto", "projeto__projeto_geral", "produto", "created_by"
+    ).order_by("-ano_uso", "municipio__nome")
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = DATCompraFilter

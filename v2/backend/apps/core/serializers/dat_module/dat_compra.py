@@ -23,6 +23,7 @@ class DATCompraSerializer(serializers.ModelSerializer["DATCompra"]):
     municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
     municipio_uf = serializers.CharField(source="municipio.uf", read_only=True)
     projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
+    projeto_geral_nome = serializers.CharField(source="projeto.projeto_geral.nome", read_only=True, allow_null=True)
     produto_nome = serializers.CharField(source="produto.nome", read_only=True, allow_null=True)
     # #1637: codigo e' do Produto (SSOT), nao por-compra. Espelho read-only.
     codigo_produto = serializers.CharField(source="produto.codigo", read_only=True, allow_null=True)
@@ -44,6 +45,7 @@ class DATCompraSerializer(serializers.ModelSerializer["DATCompra"]):
             "municipio_uf",
             "projeto",
             "projeto_nome",
+            "projeto_geral_nome",
             "produto",
             "produto_nome",
             "codigo_produto",
@@ -120,6 +122,7 @@ class DATCompraListSerializer(serializers.ModelSerializer["DATCompra"]):
     municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
     municipio_uf = serializers.CharField(source="municipio.uf", read_only=True)
     projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
+    projeto_geral_nome = serializers.CharField(source="projeto.projeto_geral.nome", read_only=True, allow_null=True)
     produto_nome = serializers.CharField(source="produto.nome", read_only=True, allow_null=True)
     codigo_produto = serializers.CharField(source="produto.codigo", read_only=True, allow_null=True)
     disponivel = serializers.IntegerField(read_only=True)
@@ -135,6 +138,7 @@ class DATCompraListSerializer(serializers.ModelSerializer["DATCompra"]):
             "municipio_nome",
             "municipio_uf",
             "projeto_nome",
+            "projeto_geral_nome",
             "produto_nome",
             "codigo_produto",
             "descricao_produto",

@@ -40,7 +40,7 @@ class PreAgendaListView(generics.ListAPIView):
         """Retorna apenas solicitações aprovadas, com filtros opcionais."""
         queryset: QuerySet[Solicitacao] = (
             Solicitacao.objects.filter(status="aprovado")
-            .select_related("usuario", "municipio", "projeto", "tipo_evento", "coordenador")
+            .select_related("usuario", "municipio", "projeto", "projeto__projeto_geral", "tipo_evento", "coordenador")
             .prefetch_related("participations__usuario")
         )
 

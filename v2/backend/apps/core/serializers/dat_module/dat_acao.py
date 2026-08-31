@@ -20,6 +20,7 @@ class DATAcaoSerializer(serializers.ModelSerializer["DATAcao"]):
     # FK names
     municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
     projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
+    projeto_geral_nome = serializers.CharField(source="projeto.projeto_geral.nome", read_only=True, allow_null=True)
     coordenador_nome = serializers.CharField(source="coordenador.nome", read_only=True, allow_null=True)
 
     # Computed
@@ -38,6 +39,7 @@ class DATAcaoSerializer(serializers.ModelSerializer["DATAcao"]):
             "municipio_nome",
             "projeto",
             "projeto_nome",
+            "projeto_geral_nome",
             "coordenador",
             "coordenador_nome",
             "ano",
@@ -77,6 +79,7 @@ class DATAcaoListSerializer(serializers.ModelSerializer["DATAcao"]):
 
     municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
     projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
+    projeto_geral_nome = serializers.CharField(source="projeto.projeto_geral.nome", read_only=True, allow_null=True)
     coordenador_nome = serializers.CharField(source="coordenador.nome", read_only=True, allow_null=True)
     progresso = serializers.IntegerField(read_only=True)
     etapa_atual = serializers.CharField(read_only=True)
@@ -89,6 +92,7 @@ class DATAcaoListSerializer(serializers.ModelSerializer["DATAcao"]):
             "municipio_nome",
             "projeto",
             "projeto_nome",
+            "projeto_geral_nome",
             "coordenador",
             "coordenador_nome",
             "status_carta",

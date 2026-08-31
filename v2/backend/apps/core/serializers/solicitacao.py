@@ -54,6 +54,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
     coordenador_nome = serializers.SerializerMethodField()
     municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
     projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
+    projeto_geral_nome = serializers.CharField(source="projeto.projeto_geral.nome", read_only=True, allow_null=True)
     tipo_evento_nome = serializers.CharField(source="tipo_evento.nome", read_only=True)
 
     class Meta:
@@ -66,6 +67,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "municipio_nome",
             "projeto",
             "projeto_nome",
+            "projeto_geral_nome",
             "tipo_evento",
             "tipo_evento_nome",
             "tipo",

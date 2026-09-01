@@ -10,30 +10,12 @@ import type { ColumnsType } from 'antd/es/table';
 import type { TablePaginationConfig } from 'antd/es/table';
 import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Link } from 'react-router';
-import { listGerencias, createGerencia, updateGerencia, deleteGerencia } from '../../api/adminDAT';
+import { listGerencias, createGerencia, updateGerencia, deleteGerencia, getRBACMeta } from '../../api/adminDAT';
 import type { GerenciaRecord, GerenciaPayload } from '../../api/adminDAT';
 import { DEFAULT_PAGE_SIZE } from '../../constants';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 const { Search } = Input;
-
-// Vocabulário setor-de-produto (12 valores; SSOT = range do SETOR_MAPPING no backend).
-// TEMPORÁRIO: hardcode até o backend expor o endpoint de options (#1914-BE, em curso) —
-// trocar por um fetch a esse endpoint quando o terminal avisar.
-const SETORES_PRODUTO = [
-  'A Cor da Gente',
-  'ACerta',
-  'Avançando Juntos',
-  'Brincando e Aprendendo',
-  'Educação Financeira',
-  'Fluir',
-  'IDEB10',
-  'Ler Ouvir e Contar',
-  'My Companion',
-  'Sou da Paz',
-  'Superintendência',
-  'Vidas',
-];
 
 /**
  * Gerencia form values interface
@@ -57,6 +39,9 @@ export default function GerenciasPage(): JSX.Element {
     pageSize: DEFAULT_PAGE_SIZE,
     total: 0,
   });
+  // Vocabulário setor-de-produto (SSOT = SETORES_PRODUTO no backend), buscado do endpoint de
+  // options (/rbac/meta/) — Select FECHADO da conferência, sem hardcode (evita drift do vocabulário).
+  const [setoresProduto, setSetoresProduto] = useState<string[]>([]);
 
   const [form] = Form.useForm<GerenciaFormValues>();
 
@@ -89,6 +74,18 @@ export default function GerenciasPage(): JSX.Element {
   useEffect(() => {
     void fetchGerencias(1, pagination.pageSize || DEFAULT_PAGE_SIZE);
   }, [searchText]);
+
+  // Carrega o vocabulário de setor-de-produto uma vez (Select fechado da conferência).
+  useEffect(() => {
+    void (async () => {
+      try {
+        const meta = await getRBACMeta();
+        setSetoresProduto(meta.setores_produto);
+      } catch {
+        // meta indisponível: o Select fica sem options até um reload; não bloqueia a listagem.
+      }
+    })();
+  }, []);
 
   const handleTableChange = (newPagination: TablePaginationConfig): void => {
     void fetchGerencias(
@@ -169,6 +166,15 @@ export default function GerenciasPage(): JSX.Element {
       key: 'setor_canonico',
       width: 170,
       render: (v: string) => (v ? <Tag color="geekblue">{v}</Tag> : <Tag>não definido</Tag>),
+    },
+    {
+      // Sinal de qualidade do de-para v15 (read-only) — ajuda a priorizar a conferência de
+      // baixa confiança. Valor exibido cru (vocabulário definido pelo importer, RELAY 50).
+      title: 'Confiança',
+      dataIndex: 'setor_canonico_confianca',
+      key: 'setor_canonico_confianca',
+      width: 110,
+      render: (v: string) => (v ? <Tag>{v}</Tag> : <Text type="secondary">—</Text>),
     },
     { title: 'Gerente', dataIndex: 'gerente_nome', key: 'gerente_nome', width: 150 },
     {
@@ -301,7 +307,7 @@ export default function GerenciasPage(): JSX.Element {
               allowClear
               showSearch
               placeholder="Selecione o setor canônico..."
-              options={SETORES_PRODUTO.map((s) => ({ label: s, value: s }))}
+              options={setoresProduto.map((s) => ({ label: s, value: s }))}
             />
           </Form.Item>
 

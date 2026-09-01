@@ -117,6 +117,8 @@ interface PlanoFormacaoRecord {
   municipio_uf: string;
   projeto: number;
   projeto_nome: string;
+  // Família do projeto (read-only do serializer) — coluna ao lado da variante. H.1/#1897.
+  projeto_geral_nome?: string;
   ano: number | null;
   coordenador: number | null;
   coordenador_nome: string | null;
@@ -593,6 +595,18 @@ export default function PlanoFormacoesPage(): JSX.Element {
       width: 150,
       fixed: 'left' as const,
       ellipsis: true,
+    },
+    {
+      // Família (projeto_geral_nome) ao lado da variante. ⚠️ sorter CLIENT-SIDE (só a página carregada).
+      title: 'Família',
+      dataIndex: 'projeto_geral_nome',
+      key: 'projeto_geral',
+      width: 150,
+      fixed: 'left' as const,
+      ellipsis: true,
+      sorter: (a: PlanoFormacaoRecord, b: PlanoFormacaoRecord) =>
+        (a.projeto_geral_nome ?? '').localeCompare(b.projeto_geral_nome ?? ''),
+      render: (nome: string | undefined) => (nome ? <Tag color="geekblue">{nome}</Tag> : <Text type="secondary">—</Text>),
     },
     {
       title: 'Ano',

@@ -43,6 +43,9 @@ export type ParticipantRole = 'FORMADOR' | 'COORDENADOR' | 'PARTICIPANTE' | 'CON
 export interface Participation {
   usuario: UserSlim | null;
   guest_email: string | null;
+  // Nome preservado de convidado sem FK (ex.: pessoa importada "que saiu") — RELAY/import v15.
+  // Cadeia de exibição: usuario → guest_nome → guest_email.
+  guest_nome: string | null;
   email: string | null;
   role: ParticipantRole;
   ch_horas: number | null;

@@ -173,8 +173,21 @@ export default function GerenciasPage(): JSX.Element {
       title: 'Confiança',
       dataIndex: 'setor_canonico_confianca',
       key: 'setor_canonico_confianca',
-      width: 110,
-      render: (v: string) => (v ? <Tag>{v}</Tag> : <Text type="secondary">—</Text>),
+      width: 130,
+      // Realça baixa qualidade p/ priorizar a conferência: `na` (não-aplicável, prioridade
+      // máxima) vermelho; `media` laranja; `alta` verde/neutro. Vocabulário do de-para v15.
+      render: (v: string) => {
+        if (!v) return <Text type="secondary">—</Text>;
+        const color = v === 'na' ? 'red' : v === 'media' ? 'orange' : 'green';
+        return <Tag color={color}>{v}</Tag>;
+      },
+      // Filtro client-side (a lista de gerências cabe em poucas páginas) p/ isolar baixa confiança.
+      filters: [
+        { text: 'na (conferir!)', value: 'na' },
+        { text: 'media', value: 'media' },
+        { text: 'alta', value: 'alta' },
+      ],
+      onFilter: (value, record) => record.setor_canonico_confianca === value,
     },
     { title: 'Gerente', dataIndex: 'gerente_nome', key: 'gerente_nome', width: 150 },
     {

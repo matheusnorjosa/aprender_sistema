@@ -210,6 +210,17 @@ class Gerencia(models.Model):
             "igualdade de nome_setor barrava ~46%, este campo canoniza os dois lados."
         ),
     )
+    setor_canonico_confianca = models.CharField(
+        max_length=30,
+        blank=True,
+        default="",
+        help_text=(
+            "Confiança do de-para v15 que atribuiu `setor_canonico` (RELAY 50, item 8) — ÚNICO "
+            "sinal de qualidade, populado por IMPORT, SEM entrada-direta. Exibido na conferência "
+            "para o humano priorizar as atribuições de baixa confiança; o usuário não digita este "
+            "campo (read-only na API)."
+        ),
+    )
     gerente = models.ForeignKey(  # type: ignore[misc]
         "core.Usuario",
         on_delete=models.SET_NULL,

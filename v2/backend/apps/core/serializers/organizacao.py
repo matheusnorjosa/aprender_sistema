@@ -85,16 +85,20 @@ class ProjetoSerializer(serializers.ModelSerializer):
     """
 
     gerencia_nome = serializers.CharField(source="gerencia.nome_setor", read_only=True, allow_null=True)
-    setor = serializers.SerializerMethodField()
+    # `setor` NÃO é declarado aqui: o ModelSerializer o gera do campo model `Projeto.setor`
+    # (CharField gravável, read devolve o valor ARMAZENADO). A derivação vai para `setor_efetivo`
+    # (read-only) — assim o modal de edição liga no raw sem contaminá-lo (guarda anti-M17).
+    setor_efetivo = serializers.SerializerMethodField()
     projeto_geral_nome = serializers.CharField(source="projeto_geral.nome", read_only=True, allow_null=True)
 
     # PR 7 (2026-04-30): explícito + required=True (não consome default do
     # model). DRF respeita choices e devolve 400 com mensagem padrão.
     fluxo = serializers.ChoiceField(choices=Projeto.FLUXO_CHOICES, required=True)
 
-    def get_setor(self, obj: Projeto) -> str:
-        """Setor do projeto: campo canônico do model (`Projeto.setor`, do de-para v15) quando
-        preenchido; senão deriva de `gerencia.nome_setor` (fallback sem regressão). #1893."""
+    def get_setor_efetivo(self, obj: Projeto) -> str:
+        """Setor EFETIVO para EXIBIÇÃO: campo canônico do model (`Projeto.setor`, do de-para v15)
+        quando preenchido; senão deriva de `gerencia.nome_setor` (fallback sem regressão #1893).
+        Read-only: a grade exibe este; o form de conferência grava no raw `setor`."""
         return obj.setor or (obj.gerencia.nome_setor if obj.gerencia else "")
 
     class Meta:
@@ -110,6 +114,7 @@ class ProjetoSerializer(serializers.ModelSerializer):
             "projeto_geral",
             "projeto_geral_nome",
             "setor",
+            "setor_efetivo",
             "is_test",
         ]
         read_only_fields = ["id"]
@@ -144,6 +149,7 @@ class GerenciaSerializer(serializers.ModelSerializer["Gerencia"]):
             "nome",
             "nome_setor",
             "setor_canonico",
+            "setor_canonico_confianca",
             "gerente",
             "gerente_nome",
             "ativo",
@@ -152,7 +158,9 @@ class GerenciaSerializer(serializers.ModelSerializer["Gerencia"]):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["created_at", "updated_at"]
+        # setor_canonico_confianca: sinal importado do de-para (RELAY 50, item 8), exibido na
+        # conferência mas SEM entrada-direta → read-only (o usuário confere `setor_canonico`, não a confiança).
+        read_only_fields = ["created_at", "updated_at", "setor_canonico_confianca"]
 
 
 class TipoEventoOptionSerializer(serializers.ModelSerializer):

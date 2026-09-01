@@ -169,11 +169,14 @@ _CONSUMED_FIELDS: dict[str, frozenset[str]] = {
             "coordenador",
             "coordenador_cpf",
             "is_online",
+            "evento_id",
+            "evento_id_origem",
             "evento_hash_natural",
         }
     ),
     "participation": frozenset(
         {
+            "evento_id",
             "evento_hash_natural",
             "usuario",
             "usuario_cpf",
@@ -444,8 +447,8 @@ class ExportContractImporter:
         Retorna (mun_id, proj_id, tipo_id, data, hora_ini, hora_fim, segmento, coord_id, ext_hash) ou
         None se algum essencial não resolve (would_reject: FK ausente, hora inválida, ou solicitante/
         coordenador — `usuario` NOT NULL — não resolvido por CPF). Identidade (external_hash) = o
-        `evento_hash_natural` do CSV; fallback `_compute_external_hash` (ADR-012) quando ausente.
-        Solicitante = coordenador (D3), por CPF."""
+        `evento_id` estável do CSV; fallback `evento_hash_natural` (join intra-entrega) e
+        `_compute_external_hash` (ADR-012) quando ausentes. Solicitante = coordenador (D3), por CPF."""
         mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
         proj_id = self.resolve_projeto(r.get("projeto") or "")
         tipo_id = tipo_idx.get(_norm(r.get("tipo_evento") or ""))
@@ -459,14 +462,15 @@ class ExportContractImporter:
         if data_ev is None or hora_ini is None or hora_fim is None:
             return None
         segmento = (r.get("segmento") or "").strip()
-        # Identidade = o `evento_hash_natural` que o sheets.banco emite (chave natural canônica). O
-        # Django NÃO recomputa para o valor armazenado: `_compute_external_hash` usa IDs do banco, que
-        # o sheets não conhece → nunca bateriam, e a participation (que só liga por `evento_hash_natural`)
-        # orfanizaria. Fallback ao recompute só quando a coluna está ausente (fixtures / CSV antigo).
-        # O sheets garante (contrato v16): mesmo valor em solicitacao.csv e participation.csv, cobrindo
-        # segmento (lição #1915), estável. `_compute_external_hash` continua como o ALGORITMO de referência.
-        ext_hash = (r.get("evento_hash_natural") or "").strip() or _compute_external_hash(
-            mun_id, proj_id, tipo_id, data_ev, hora_ini, hora_fim, segmento
+        # Identidade ESTÁVEL = `evento_id` (ledger do sheets.banco, sobrevive a edição da linha). RELAY 52
+        # mediu que o `evento_hash_natural` (hash de CONTEÚDO) deriva ~2%/10 dias (44/3.322 mudam de hash),
+        # logo NÃO serve de identidade ao longo do tempo — armazená-lo recria o problema do RELAY 50 item 2
+        # (a cada carga ~44 eventos viram "novo" + ~44 órfãos). O hash vira fallback (join dentro de UMA
+        # entrega) e `_compute_external_hash` (ADR-012) o último fallback (fixtures / CSV sem as colunas).
+        ext_hash = (
+            (r.get("evento_id") or "").strip()
+            or (r.get("evento_hash_natural") or "").strip()
+            or _compute_external_hash(mun_id, proj_id, tipo_id, data_ev, hora_ini, hora_fim, segmento)
         )
         return (mun_id, proj_id, tipo_id, data_ev, hora_ini, hora_fim, segmento, coord_id, ext_hash)
 
@@ -760,7 +764,7 @@ class ExportContractImporter:
                 tally[st] += 1
 
         elif name == "solicitacao":
-            # NK = external_hash (= evento_hash_natural do CSV; fallback _compute_external_hash). FK/hora/coordenador não resolvidos →
+            # NK = external_hash (= evento_id estável do CSV; fallback hash/recompute). FK/hora/coordenador não resolvidos →
             # would_reject. Existence-based (status/participations ficam para o apply).
             mun_idx = self._municipio_index()
             tipo_idx = self._tipo_evento_index()
@@ -777,14 +781,14 @@ class ExportContractImporter:
                 tally[st] += 1
 
         elif name == "participation":
-            # Liga por evento_hash_natural → solicitacao.external_hash. Papel do CSV (posição), não cargo.
+            # Liga por evento_id (fallback evento_hash_natural) → solicitacao.external_hash. Papel do CSV (posição), não cargo.
             # No dry-run a solicitacao pode ainda não existir no DB → would_reject inflado (esperado; o apply
             # ordenado cria a solicitacao antes). Resolução de usuário/existência fica para o apply.
             sol_hashes = set(
                 Solicitacao.objects.exclude(external_hash__isnull=True).values_list("external_hash", flat=True)
             )
             for r in rows:
-                ehash = (r.get("evento_hash_natural") or "").strip()
+                ehash = (r.get("evento_id") or r.get("evento_hash_natural") or "").strip()
                 role = _map_participation_role(r.get("role"))
                 if not ehash or ehash not in sol_hashes or role is None:
                     tally["would_reject"] += 1
@@ -1157,8 +1161,8 @@ class ExportContractImporter:
         return created
 
     def _apply_solicitacao(self, rows: list[dict[str, str]]) -> int:
-        """Create-only de Solicitacao. NK = external_hash = `evento_hash_natural` do CSV (fallback
-        `_compute_external_hash`/ADR-012 quando ausente — ver `_resolve_solicitacao_key`). Solicitante =
+        """Create-only de Solicitacao. NK = external_hash = `evento_id` estável do CSV (fallback
+        `evento_hash_natural`, depois `_compute_external_hash`/ADR-012 — ver `_resolve_solicitacao_key`). Solicitante =
         coordenador (D3), resolvido por CPF; grava a FK `coordenador` E uma Participation(COORDENADOR)
         (decisão a — a tela lê a FK). Status via `resolve_initial_status` (PA-01: SUPER/desconhecido →
         pendente). `coord_acompanha` (Sim/Não) → BooleanField `coordenador_acompanha` (RELAY 50: visual,
@@ -1224,7 +1228,8 @@ class ExportContractImporter:
         return None
 
     def _apply_participation(self, rows: list[dict[str, str]]) -> int:
-        """Create-only de Participation. Liga por `evento_hash_natural` → `solicitacao.external_hash`.
+        """Create-only de Participation. Liga por `evento_id` (fallback `evento_hash_natural`) →
+        `solicitacao.external_hash`.
         Papel vem do CSV (POSIÇÃO), NUNCA do cargo. Usuário resolvido EMAIL-first → CPF → nome; sem match
         mas com nome → `guest_nome` (preserva quem saiu, MARCA não descarta). Sem solicitacao ou papel
         inválido → pula. Dedup existence-based (por-usuário e nome-only), índices atualizados in-memory."""
@@ -1238,7 +1243,7 @@ class ExportContractImporter:
         )
         created = 0
         for r in rows:
-            ehash = (r.get("evento_hash_natural") or "").strip()
+            ehash = (r.get("evento_id") or r.get("evento_hash_natural") or "").strip()
             sol_id = sol_idx.get(ehash)
             role = _map_participation_role(r.get("role"))
             if sol_id is None or role is None:

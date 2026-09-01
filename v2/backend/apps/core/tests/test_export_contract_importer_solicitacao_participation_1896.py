@@ -160,9 +160,8 @@ def test_solicitacao_participation_classify_not_marked_not_implemented(tmp_path)
 
 
 def test_apply_solicitacao_uses_csv_evento_hash_natural_not_recompute(tmp_path):
-    """O sheets.banco calcula `evento_hash_natural` do seu jeito (não conhece os IDs do Django).
-    O import DEVE armazenar esse valor como identidade (senão a participação — que só liga por
-    `evento_hash_natural` — orfaniza). Este é o guard do bug de 'primeira execução real'."""
+    """FALLBACK (CSV sem evento_id): armazena o `evento_hash_natural` do CSV, não recomputa (o recompute
+    usa IDs do Django que o sheets não conhece → participação orfanizaria). Guard de 'primeira execução'."""
     mun, proj, tipo, _coord = _masters()
     formador = UsuarioFactory(username="f9", cpf="52998224725", email="f9@x.com", first_name="F", last_name="Nove")
     # hash arbitrário do sheets.banco — NÃO é o _compute_external_hash (IDs do Django)
@@ -172,7 +171,29 @@ def test_apply_solicitacao_uses_csv_evento_hash_natural_not_recompute(tmp_path):
     path = _write_export(tmp_path, {"solicitacao": _sol_row(ehash=sheets_hash), "participation": part})
     ExportContractImporter(path=path, apply=True, allow=("solicitacao", "participation")).run()
     sol = Solicitacao.objects.get()
-    assert sol.external_hash == sheets_hash, "deve armazenar o evento_hash_natural do CSV, não recomputar"
+    assert sol.external_hash == sheets_hash, "fallback: armazena o evento_hash_natural do CSV, não recomputa"
     assert Participation.objects.filter(
         solicitacao=sol, usuario=formador, role="FORMADOR"
     ).exists(), "participação liga por evento_hash_natural → external_hash armazenado"
+
+
+def test_apply_solicitacao_prefers_stable_evento_id_over_hash(tmp_path):
+    """RELAY 52: identidade = `evento_id` (ledger estável), NÃO o `evento_hash_natural` (conteúdo, deriva
+    ~2%/10 dias). Com ambos presentes e DIFERENTES, o import armazena o evento_id e a participation liga
+    por ele — senão a cada carga ~44 eventos virariam 'novo' + órfão (RELAY 50 item 2)."""
+    _masters()  # cria Municipio/Projeto/TipoEvento/coordenador (resolvidos pelos nomes hardcoded)
+    formador = UsuarioFactory(username="f10", cpf="52998224725", email="f10@x.com", first_name="F", last_name="Dez")
+    evento_id = "EVT-000123"
+    hash_val = "hash_que_deriva_9999"  # diferente do evento_id de propósito
+    sol_csv = (
+        f"{SOL_HEADER},evento_id\n"
+        f"Cidade X,CE,Projeto X,Formacao,2026-05-10,09:00,12:00,Fund I,Sim,Coord Um,11144477735,Nao,{hash_val},{evento_id}\n"
+    )
+    part = f"{PART_HEADER},evento_id\n{hash_val},F Dez,F DEZ,52998224725,f10@x.com,FORMADOR,{evento_id}\n"
+    path = _write_export(tmp_path, {"solicitacao": sol_csv, "participation": part})
+    ExportContractImporter(path=path, apply=True, allow=("solicitacao", "participation")).run()
+    sol = Solicitacao.objects.get()
+    assert sol.external_hash == evento_id, "identidade = evento_id estável, não o hash de conteúdo"
+    assert Participation.objects.filter(
+        solicitacao=sol, usuario=formador, role="FORMADOR"
+    ).exists(), "participation liga por evento_id → external_hash"

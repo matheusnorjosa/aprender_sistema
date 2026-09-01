@@ -167,6 +167,15 @@ class Solicitacao(models.Model):
         related_name="eventos_coordenados",
         help_text="Coordenador responsavel pelo evento",
     )
+    solicitante_procedencia = models.CharField(
+        max_length=30,
+        blank=True,
+        default="",
+        help_text=(
+            "Import (v16.4): como o solicitante/coordenador do evento foi resolvido — coluna_n, "
+            "coluna_n_escada (fato), constante_da_aba, cargo_unico (inferencia). Vazio = entrada direta."
+        ),
+    )
     formadores = models.ManyToManyField(  # type: ignore[misc]
         "core.Usuario",
         blank=True,

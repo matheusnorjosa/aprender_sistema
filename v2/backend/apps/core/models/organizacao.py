@@ -327,11 +327,6 @@ class EquipeGerencia(models.Model):
                 name="unique_equipe_gerencia_usuario_papel",
             ),
             models.CheckConstraint(
-                condition=(~models.Q(papel="APOIO") | models.Q(coordenador_supervisor__isnull=False)),
-                name="apoio_requires_supervisor",
-                violation_error_message="Apoio de Coordenacao deve ter um coordenador supervisor",
-            ),
-            models.CheckConstraint(
                 condition=(models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=models.F("valid_from"))),
                 name="equipe_gerencia_valid_window",
                 violation_error_message="valid_to deve ser vazio ou >= valid_from",

@@ -166,8 +166,8 @@ round-trip já eram M-codes abertos). `resolvido` = mergeado; nada promovido a `
 
 | ID | Achado | Evidência 2026-08-28 (file:line) | Issue |
 |---|---|---|---|
-| `M18-05` | DATCoordenador `data_admissao` zerada a CADA edição (**perda ativa**) | List omite (`serializers/dat_module/dat_coordenador.py:64-85`) → `CoordenadoresPage.tsx:234` seta null → `handleSave:249` PATCH `null` | épico #1654 |
-| `M15-09` | DATCompra editar vaza FK entre registros | List omite ids (`dat_module/dat_compra.py:128-150`) + `ComprasPage.tsx:245` sem `resetFields` | #1636 |
+| `M18-05` | DATCoordenador `data_admissao` ~~zerada a CADA edição~~ → **resolvido #1917** (List expõe `data_admissao`) | List omitia (`serializers/dat_module/dat_coordenador.py:64-85`) → `CoordenadoresPage.tsx:234` setava null | #1654 (épico) · #1917 ✅ |
+| `M15-09` | DATCompra ~~editar vaza FK entre registros~~ → **resolvido #1917/#1919** (List expõe ids) | List omitia ids (`dat_module/dat_compra.py:128-150`) | #1636 ✅ (fechado) |
 | `M10-05` | Solicitacao: COORD_ACOMPANHA/guest não editável | `EditSolicitacaoPage:139-281` só FORMADOR; `MySolicitacoesPage:181` filtra guest | #1627 |
 | `M15-10`/FE↔BE | dangling form fields (form≠serializer): DATAcao `area`/`observacoes`, DATCadastro `link_*` | `AcoesPage.tsx:875,988`; `CadastrosPage.tsx:760,765` | épico #1655 |
 | SSOT-part. | `Solicitacao.coordenador` FK nunca capturado + M2M `formadores` morto | `serializers/solicitacao.py:144,170` | épico #1666 |
@@ -179,7 +179,7 @@ round-trip já eram M-codes abertos). `resolvido` = mergeado; nada promovido a `
 | `_compute_external_hash` OMITE segmento → 156 eventos colapsam; **MATERIALIZADO no golden (controle positivo 6/6)** | `eventos_import.py:345` (recipe); medido no golden (RELAY 45-48) | **#1915** — **fix**: `segmento` na chave natural + migração `0101` (re-hash UTC→Fortaleza); **recuperação** dos 156 via re-import segue gated (autorização + dry-run verde) |
 | ~~`ano` fora de form/serializer → UI-create cai em `ano=NULL` → 2º create colide (400)~~ → **resolvido** por #1925 (BE: `ano` gravável nos write-serializers) + #1927 (FE: input Ano nos forms de create) | DATRegistro/Cadastro/Acao | #1912 |
 | edição inline de Acompanhamento/Prova morta (backend pronto, front não liga `onClick`) | `PlanoFormacoesPage.tsx:69-70` | **#1913** — **fix** (front liga o `onClick` de Acompanhamento/Prova; célula clicável com label): PR #1922 |
-| `setor_canonico`/`Projeto.setor`/`ProjetoGeral` sem entrada-direta (`setor_canonico` gateia navegação) | `serializers/organizacao.py`; `usePermissions.ts:86` | #1914 |
+| ~~`setor_canonico`/`Projeto.setor`/`ProjetoGeral` sem entrada-direta~~ → **resolvido**: conferência de `setor_canonico` (#1930) + `setor_canonico_confianca` read-only + `Projeto.setor` gravável (split anti-M17, #1934) + CRUD de Projetos Gerais (#1928) | `serializers/organizacao.py`; migração 0102 | #1914 ✅ |
 
 O achado do hash (#1915) atualiza a memória `hash-dedup-key-must-cover-natural-key` de **latente**
 para **materializado no golden**. Segue **não sendo verificação de deploy**.
@@ -405,7 +405,7 @@ commit traz a data **de cada commit**, porque eles podem estar a semanas de dist
 | `M14-03` | **P2** | resolvido | Disponibilidade: CH Ano na grade mensal soma so o mes consultado e repete o CH Mes | ~14 atores nao-superuser: DAT 3 + Controle 1 + Assistente Administrati… | #1663 (épico, OPEN) | `4f63caf0` (2026-08-21) |
 | `M15-08` | **P2** | aberto | DAT/Compras: PATCH concorrente em DATCompra sobrescreve estoque (lost update) e duplo POST cria… | DAT (3 ativos), Controle (1), Assistente Administrativo lotado em Cont… | #1665 (épico, OPEN) | — |
 | `M16-04` | **P2** | aberto | DAT: PATCH concorrente perde update (lost update) em ProjetoGeral/DATRegistro | — | #1651 (OPEN) | — |
-| `M18-05` | **P2** | aberto | DAT Coordenadores: edicao apaga data_admissao e vaza observacoes entre registros (detalhe/edica… | DAT (3 ativos) e Controle (1 ativo) + o superuser (1). O endpoint exig… | #1654 (épico, OPEN) | — |
+| `M18-05` | **P2** | parcial | DAT Coordenadores: ~~edicao apaga data_admissao~~ (resolvido #1917) e vaza observacoes entre registros (detalhe/edica… | DAT (3 ativos) e Controle (1 ativo) + o superuser (1). O endpoint exig… | #1654 (épico, OPEN) | — |
 | `M18-06` | **P2** | resolvido | Paginação: DRF ignora `page_size` e esconde até 77% das linhas nas telas DAT | DAT (3 ativos) e Superintendência (1 ativo) + 1 superuser — a permissã… | #1653 (épico, CLOSED) | `062df0ec` (2026-08-20) |
 
 ## Correções reconciliadas em 2026-08-17, contra o `HEAD 6d73ba29` (commit de 2026-08-12)
@@ -713,7 +713,7 @@ fechados no código, e #1657 está CLOSED com resíduo teórico registrado em `M
 | Causa raiz | Sev. | Achados | Issue | Status (código) |
 |---|---|---|---|---|
 | paginacao-global-sem-page-size | P1 | `M01-07`, `M18-06` | #1653 CLOSED | resolvido (`aa8bfb5c`, `062df0ec`; 2026-08-20) |
-| list-serializer-como-fonte-de-detalhe | P1 | `M15-09`, `M17-02`, `M18-05` | #1654 OPEN | parcial (`M15-09` e `M18-05` abertos) |
+| list-serializer-como-fonte-de-detalhe | P1 | `M15-09`, `M17-02`, `M18-05` | #1654 OPEN (épico) | **resolvido**: List serializers expõem os campos omitidos — `M15-09` (#1917/#1919), `M18-05` data_admissao (#1917), `M17-02` já resolvido |
 | contrato-fe-be-sem-ssot | P1 | `M15-10`, `M16-07`, `M16-08`, `M09-05`, `M05-07` | #1655 OPEN | parcial (`M16-07`/`M16-08` fechados; `M15-10` parcial; `M09-05`/`M05-07` abertos) |
 | escopo-ator-alvo-ausente | P0 | `M22-01` (duplicata histórica de `M03-01`), `M07-02`, `M10-01`, `M10-04`, `M14-01` | #1656 OPEN | parcial (`M10-04` e `M14-01` seguem: `M10-04` sem policy ator×alvo por participante; `M14-01` só no ramo sem `gerencia_id`) |
 | auditoria-nao-invariante-e-pii | P1 | `M07-03`, `M05-05`, `M23-02`, `M03-10` | #1657 CLOSED | parcial (`11219a7e`, `20c6f48d`, `d2f226cc`, todos 2026-08-18, fecham `M07-03`/`M05-05`/`M03-10`; `M23-02` segue `parcial` na fila, com o resíduo teórico) |

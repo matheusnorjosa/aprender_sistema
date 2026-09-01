@@ -6,12 +6,12 @@
  */
 
 import { useState, useEffect, type JSX } from 'react';
-import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, Form, Radio, Checkbox } from 'antd';
+import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, Form, Radio, Checkbox, Select } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { TablePaginationConfig } from 'antd/es/table';
 import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Link } from 'react-router';
-import { listProjetos, createProjeto, updateProjeto, deleteProjeto } from '../../api/adminDAT';
+import { listProjetos, createProjeto, updateProjeto, deleteProjeto, getRBACMeta } from '../../api/adminDAT';
 import { DEFAULT_PAGE_SIZE } from '../../constants';
 import type { ID } from '../../types';
 
@@ -27,6 +27,9 @@ interface ProjetoRecord {
   codigo: string;
   fluxo: 'SUPER' | 'NAO_SUPER';
   ativo: boolean;
+  // Conferência #1914: setor = raw gravável; setor_efetivo = derivado (setor || gerencia.nome_setor), read-only.
+  setor: string;
+  setor_efetivo: string;
 }
 
 /**
@@ -37,6 +40,7 @@ interface ProjetoFormValues {
   codigo: string;
   fluxo: 'SUPER' | 'NAO_SUPER';
   ativo: boolean;
+  setor?: string;
 }
 
 export default function ProjetosPage(): JSX.Element {
@@ -50,6 +54,10 @@ export default function ProjetosPage(): JSX.Element {
     pageSize: DEFAULT_PAGE_SIZE,
     total: 0,
   });
+
+  // Vocabulário setor-de-produto (SSOT no backend), buscado do endpoint de options (/rbac/meta/) —
+  // Select FECHADO da conferência, sem hardcode (evita drift do vocabulário). Mesmo padrão da GerenciasPage.
+  const [setoresProduto, setSetoresProduto] = useState<string[]>([]);
 
   const [form] = Form.useForm<ProjetoFormValues>();
 
@@ -85,6 +93,18 @@ export default function ProjetosPage(): JSX.Element {
     void fetchProjetos(1, pagination.pageSize || DEFAULT_PAGE_SIZE);
   }, [searchText]);
 
+  // Carrega o vocabulário de setor-de-produto uma vez (Select fechado da conferência).
+  useEffect(() => {
+    void (async () => {
+      try {
+        const meta = await getRBACMeta();
+        setSetoresProduto(meta.setores_produto);
+      } catch {
+        // meta indisponível: o Select fica sem options até um reload; não bloqueia a listagem.
+      }
+    })();
+  }, []);
+
   const handleTableChange = (newPagination: TablePaginationConfig): void => {
     void fetchProjetos(
       newPagination.current || 1,
@@ -105,6 +125,9 @@ export default function ProjetosPage(): JSX.Element {
       codigo: projeto.codigo,
       fluxo: projeto.fluxo,
       ativo: projeto.ativo,
+      // Semeia o RAW `setor` (não o derivado `setor_efetivo`): editar o derivado e salvar
+      // gravaria a derivação no raw, contaminando-o (guarda anti-M17).
+      setor: projeto.setor,
     });
     setModalVisible(true);
   };
@@ -149,6 +172,14 @@ export default function ProjetosPage(): JSX.Element {
     { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
     { title: 'Nome', dataIndex: 'nome', key: 'nome', width: 300 },
     { title: 'Código', dataIndex: 'codigo', key: 'codigo', width: 120 },
+    {
+      // Setor EFETIVO (derivado, read-only): a grade exibe este; o form de conferência grava no raw.
+      title: 'Setor',
+      dataIndex: 'setor_efetivo',
+      key: 'setor_efetivo',
+      width: 160,
+      render: (v: string) => (v ? <Tag color="geekblue">{v}</Tag> : <Tag>não definido</Tag>),
+    },
     {
       title: 'Fluxo',
       dataIndex: 'fluxo',
@@ -273,6 +304,18 @@ export default function ProjetosPage(): JSX.Element {
             rules={[{ required: true, message: 'Código é obrigatório' }]}
           >
             <Input placeholder="Ex: AMMA" />
+          </Form.Item>
+
+          <Form.Item
+            name="setor"
+            label="Setor canônico (vocabulário de setor-de-produto)"
+          >
+            <Select
+              allowClear
+              showSearch
+              placeholder="Selecione o setor..."
+              options={setoresProduto.map((s) => ({ label: s, value: s }))}
+            />
           </Form.Item>
 
           <Form.Item

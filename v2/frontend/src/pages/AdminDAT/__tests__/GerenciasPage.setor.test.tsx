@@ -20,13 +20,15 @@ const { GERENCIAS, RBAC_META } = vi.hoisted(() => ({
   GERENCIAS: [
     { id: 1, nome: 'Gerência A', nome_setor: 'Comercial', setor_canonico: 'ACerta', setor_canonico_confianca: 'alta', gerente: null, gerente_nome: '', ativo: true, descricao: '', projetos_count: 2, created_at: '', updated_at: '' },
     { id: 2, nome: 'Gerência B', nome_setor: 'Operações', setor_canonico: '', setor_canonico_confianca: '', gerente: null, gerente_nome: '', ativo: true, descricao: '', projetos_count: 0, created_at: '', updated_at: '' },
+    { id: 3, nome: 'Gerência C', nome_setor: 'Vidas', setor_canonico: 'Fluir', setor_canonico_confianca: 'na', gerente: null, gerente_nome: '', ativo: true, descricao: '', projetos_count: 1, created_at: '', updated_at: '' },
+    { id: 4, nome: 'Gerência D', nome_setor: 'DAT', setor_canonico: 'Vidas', setor_canonico_confianca: 'media', gerente: null, gerente_nome: '', ativo: true, descricao: '', projetos_count: 1, created_at: '', updated_at: '' },
   ],
   // valor canônico com VÍRGULAS: só pode vir do endpoint (a constante antiga não tinha vírgulas).
   RBAC_META: { setor_groups: [], funcao_groups: [], categories: [], setores_produto: ['ACerta', 'Ler, Ouvir e Contar', 'Vidas'] },
 }));
 
 vi.mock('../../../api/adminDAT', () => ({
-  listGerencias: vi.fn().mockResolvedValue({ results: GERENCIAS, count: 2, next: null, previous: null }),
+  listGerencias: vi.fn().mockResolvedValue({ results: GERENCIAS, count: 4, next: null, previous: null }),
   createGerencia: vi.fn().mockResolvedValue({}),
   updateGerencia: vi.fn().mockResolvedValue({}),
   deleteGerencia: vi.fn().mockResolvedValue({}),
@@ -62,6 +64,17 @@ describe('GerenciasPage — conferência de setor_canonico (#1914)', () => {
     // gerência 1 tem confianca "alta" (sinal do de-para, célula única); gerência 2 não tem → em-dash
     expect(await screen.findByText('alta')).toBeInTheDocument();
     expect(await screen.findByText('—')).toBeInTheDocument();
+  }, 20000);
+
+  test('Confiança realça baixa qualidade: "na" vermelho (máx prioridade) e "media" laranja', async () => {
+    renderPage();
+    const na = await screen.findByText('na', {}, { timeout: 15000 });
+    expect(na.closest('.ant-tag')?.className).toContain('ant-tag-red');
+    const media = await screen.findByText('media');
+    expect(media.closest('.ant-tag')?.className).toContain('ant-tag-orange');
+    // "alta" fica neutro (não é vermelho nem laranja)
+    const alta = await screen.findByText('alta');
+    expect(alta.closest('.ant-tag')?.className).not.toContain('ant-tag-red');
   }, 20000);
 
   test('Select de setor_canonico é alimentado pelo endpoint de options (canônico com vírgulas)', async () => {

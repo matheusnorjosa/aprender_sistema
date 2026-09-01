@@ -443,8 +443,9 @@ class ExportContractImporter:
         """Resolve os campos-chave de uma linha de solicitacao (FKs + hora + coordenador-solicitante).
         Retorna (mun_id, proj_id, tipo_id, data, hora_ini, hora_fim, segmento, coord_id, ext_hash) ou
         None se algum essencial não resolve (would_reject: FK ausente, hora inválida, ou solicitante/
-        coordenador — `usuario` NOT NULL — não resolvido por CPF). NK = `_compute_external_hash` (ADR-012,
-        inclui segmento bruto). Solicitante = coordenador (D3), por CPF."""
+        coordenador — `usuario` NOT NULL — não resolvido por CPF). Identidade (external_hash) = o
+        `evento_hash_natural` do CSV; fallback `_compute_external_hash` (ADR-012) quando ausente.
+        Solicitante = coordenador (D3), por CPF."""
         mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
         proj_id = self.resolve_projeto(r.get("projeto") or "")
         tipo_id = tipo_idx.get(_norm(r.get("tipo_evento") or ""))
@@ -458,7 +459,15 @@ class ExportContractImporter:
         if data_ev is None or hora_ini is None or hora_fim is None:
             return None
         segmento = (r.get("segmento") or "").strip()
-        ext_hash = _compute_external_hash(mun_id, proj_id, tipo_id, data_ev, hora_ini, hora_fim, segmento)
+        # Identidade = o `evento_hash_natural` que o sheets.banco emite (chave natural canônica). O
+        # Django NÃO recomputa para o valor armazenado: `_compute_external_hash` usa IDs do banco, que
+        # o sheets não conhece → nunca bateriam, e a participation (que só liga por `evento_hash_natural`)
+        # orfanizaria. Fallback ao recompute só quando a coluna está ausente (fixtures / CSV antigo).
+        # O sheets garante (contrato v16): mesmo valor em solicitacao.csv e participation.csv, cobrindo
+        # segmento (lição #1915), estável. `_compute_external_hash` continua como o ALGORITMO de referência.
+        ext_hash = (r.get("evento_hash_natural") or "").strip() or _compute_external_hash(
+            mun_id, proj_id, tipo_id, data_ev, hora_ini, hora_fim, segmento
+        )
         return (mun_id, proj_id, tipo_id, data_ev, hora_ini, hora_fim, segmento, coord_id, ext_hash)
 
     # ── handlers da fatia implementada ──
@@ -751,7 +760,7 @@ class ExportContractImporter:
                 tally[st] += 1
 
         elif name == "solicitacao":
-            # NK = external_hash (_compute_external_hash; ADR-012). FK/hora/coordenador não resolvidos →
+            # NK = external_hash (= evento_hash_natural do CSV; fallback _compute_external_hash). FK/hora/coordenador não resolvidos →
             # would_reject. Existence-based (status/participations ficam para o apply).
             mun_idx = self._municipio_index()
             tipo_idx = self._tipo_evento_index()
@@ -1148,7 +1157,8 @@ class ExportContractImporter:
         return created
 
     def _apply_solicitacao(self, rows: list[dict[str, str]]) -> int:
-        """Create-only de Solicitacao. NK = external_hash (`_compute_external_hash`, ADR-012). Solicitante =
+        """Create-only de Solicitacao. NK = external_hash = `evento_hash_natural` do CSV (fallback
+        `_compute_external_hash`/ADR-012 quando ausente — ver `_resolve_solicitacao_key`). Solicitante =
         coordenador (D3), resolvido por CPF; grava a FK `coordenador` E uma Participation(COORDENADOR)
         (decisão a — a tela lê a FK). Status via `resolve_initial_status` (PA-01: SUPER/desconhecido →
         pendente). `coord_acompanha` (Sim/Não) → BooleanField `coordenador_acompanha` (RELAY 50: visual,

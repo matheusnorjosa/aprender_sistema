@@ -157,3 +157,22 @@ def test_solicitacao_participation_classify_not_marked_not_implemented(tmp_path)
     r = ExportContractImporter(path=path, apply=False).run()
     assert "would_create" in r["por_entidade"]["solicitacao"], "solicitacao deve classificar (não not_implemented)"
     assert "would_create" in r["por_entidade"]["participation"]
+
+
+def test_apply_solicitacao_uses_csv_evento_hash_natural_not_recompute(tmp_path):
+    """O sheets.banco calcula `evento_hash_natural` do seu jeito (não conhece os IDs do Django).
+    O import DEVE armazenar esse valor como identidade (senão a participação — que só liga por
+    `evento_hash_natural` — orfaniza). Este é o guard do bug de 'primeira execução real'."""
+    mun, proj, tipo, _coord = _masters()
+    formador = UsuarioFactory(username="f9", cpf="52998224725", email="f9@x.com", first_name="F", last_name="Nove")
+    # hash arbitrário do sheets.banco — NÃO é o _compute_external_hash (IDs do Django)
+    sheets_hash = "sheetsbanco0001abcdef"
+    assert sheets_hash != _hash(mun, proj, tipo), "fixture: o hash do sheets tem que diferir do recompute"
+    part = f"{PART_HEADER}\n{sheets_hash},F Nove,F NOVE,52998224725,f9@x.com,FORMADOR\n"
+    path = _write_export(tmp_path, {"solicitacao": _sol_row(ehash=sheets_hash), "participation": part})
+    ExportContractImporter(path=path, apply=True, allow=("solicitacao", "participation")).run()
+    sol = Solicitacao.objects.get()
+    assert sol.external_hash == sheets_hash, "deve armazenar o evento_hash_natural do CSV, não recomputar"
+    assert Participation.objects.filter(
+        solicitacao=sol, usuario=formador, role="FORMADOR"
+    ).exists(), "participação liga por evento_hash_natural → external_hash armazenado"

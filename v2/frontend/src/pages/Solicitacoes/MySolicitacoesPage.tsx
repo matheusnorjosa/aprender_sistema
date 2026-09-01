@@ -32,6 +32,7 @@ import DeleteOutlined from '@ant-design/icons/DeleteOutlined';
 import { listSolicitacoes, deleteSolicitacao } from '../../api/solicitacoes';
 import { MeetLink } from '../../components/MeetLink';
 import type { ID, Solicitacao, SolicitacaoStatus, FluxoType, GCalStatus, Participation, PaginatedResponse } from '../../types';
+import { formadoresLabel } from '../../utils/participants';
 import { formatFortaleza } from '../../utils/datetime';
 
 const { Title } = Typography;
@@ -138,13 +139,8 @@ export default function MySolicitacoesPage(): JSX.Element {
       title: 'Formadores',
       dataIndex: 'participations',
       key: 'formadores',
-      render: (participations: Participation[] | undefined) => {
-        if (!participations || !Array.isArray(participations)) return '-';
-        const formadores = participations
-          .filter(p => p.role === 'FORMADOR' && p.usuario)
-          .map(p => p.usuario!.first_name || p.usuario!.username);
-        return formadores.length > 0 ? formadores.join(', ') : '-';
-      },
+      // Nome do formador (inclui convidados "que saíram" via guest_nome — sem FK). Ver utils/participants.
+      render: (participations: Participation[] | undefined) => formadoresLabel(participations) || '-',
       ellipsis: true,
     },
     {

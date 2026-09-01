@@ -26,6 +26,8 @@ export interface FormacaoRecord {
   horario_inicio?: string;
   horario_fim?: string;
   projeto_nome?: string;
+  // Família do projeto (read-only do serializer) — coluna ao lado da variante. H.1/#1897.
+  projeto_geral_nome?: string;
   municipio_nome?: string;
   uf?: string;
   coordenador_nome?: string;
@@ -81,6 +83,16 @@ export function getColumns({ onEdit, onDelete }: ColumnHandlers): ColumnsType<Fo
       key: 'projeto',
       width: 120,
       render: (nome: string | undefined) => <Tag color="blue">{nome}</Tag>,
+    },
+    {
+      // Família (projeto_geral_nome) ao lado da variante. ⚠️ sorter CLIENT-SIDE (só a página carregada).
+      title: 'Família',
+      dataIndex: 'projeto_geral_nome',
+      key: 'projeto_geral',
+      width: 140,
+      sorter: (a: FormacaoRecord, b: FormacaoRecord) =>
+        (a.projeto_geral_nome ?? '').localeCompare(b.projeto_geral_nome ?? ''),
+      render: (nome: string | undefined) => (nome ? <Tag color="geekblue">{nome}</Tag> : <Text type="secondary">—</Text>),
     },
     {
       title: 'Município - UF',

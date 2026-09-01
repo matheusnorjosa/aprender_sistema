@@ -65,6 +65,8 @@ interface CompraRecord {
   id: number;
   projeto: number;
   projeto_nome: string;
+  // Família do projeto (read-only do serializer) — coluna ao lado da variante. H.1/#1897.
+  projeto_geral_nome?: string;
   produto: number;
   produto_nome: string;
   codigo_produto: string | null;
@@ -341,6 +343,18 @@ export default function ComprasPage(): JSX.Element {
       width: 120,
       fixed: 'left' as const,
       render: (nome: string) => <Tag color="blue">{nome}</Tag>,
+    },
+    {
+      // Família (projeto_geral_nome) ao lado da variante — reagrupar por família via ordenar.
+      // ⚠️ sorter CLIENT-SIDE: ordena só a página carregada (ordering server-side não é wired aqui).
+      title: 'Família',
+      dataIndex: 'projeto_geral_nome',
+      key: 'projeto_geral',
+      width: 140,
+      fixed: 'left' as const,
+      sorter: (a: CompraRecord, b: CompraRecord) =>
+        (a.projeto_geral_nome ?? '').localeCompare(b.projeto_geral_nome ?? ''),
+      render: (nome: string | undefined) => (nome ? <Tag color="geekblue">{nome}</Tag> : '—'),
     },
     {
       title: 'Produto',
@@ -689,7 +703,7 @@ export default function ComprasPage(): JSX.Element {
             return (
               <Table.Summary fixed>
                 <Table.Summary.Row className="bg-gray-50 font-bold">
-                  <Table.Summary.Cell index={0} colSpan={4}>
+                  <Table.Summary.Cell index={0} colSpan={5}>
                     Total da Página
                   </Table.Summary.Cell>
                   <Table.Summary.Cell index={4} align="right">

@@ -78,6 +78,8 @@ interface AcaoRecord {
   municipio_uf: string;
   projeto: number;
   projeto_nome: string;
+  // Família do projeto (read-only do serializer) — coluna ao lado da variante. H.1/#1897.
+  projeto_geral_nome?: string;
   coordenador: number | null;
   coordenador_nome: string | null;
   // Etapas (StatusEtapa: pendente | em_andamento | concluido | cancelado) — sempre presentes na list
@@ -347,6 +349,16 @@ export default function AcoesPage(): JSX.Element {
       key: 'projeto',
       width: 150,
       render: (nome: string) => <Tag color="blue">{nome}</Tag>,
+    },
+    {
+      // Família (projeto_geral_nome) ao lado da variante. ⚠️ sorter CLIENT-SIDE (só a página carregada).
+      title: 'Família',
+      dataIndex: 'projeto_geral_nome',
+      key: 'projeto_geral',
+      width: 140,
+      sorter: (a: AcaoRecord, b: AcaoRecord) =>
+        (a.projeto_geral_nome ?? '').localeCompare(b.projeto_geral_nome ?? ''),
+      render: (nome: string | undefined) => (nome ? <Tag color="geekblue">{nome}</Tag> : '—'),
     },
     {
       title: 'Coordenador',
@@ -717,7 +729,8 @@ export default function AcoesPage(): JSX.Element {
         >
           <div
             style={{
-              flex: '0 0 480px',
+              // 620 = Município-UF(180) + Projeto(150) + Família(140) + Coordenador(150).
+              flex: '0 0 620px',
               padding: '8px 16px',
               borderRight: '1px solid #f0f0f0',
             }}

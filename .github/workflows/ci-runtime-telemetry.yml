@@ -2,7 +2,9 @@ name: CI Runtime Telemetry
 
 on:
   schedule:
-    - cron: "0 9 * * *"
+    # Reduzido diário→semanal (segunda) — baseline de duração não precisa de granularidade
+    # diária. Corte de custo de Actions (2026-09).
+    - cron: "0 9 * * 1"
   workflow_dispatch:
   push:
     branches: [ main ]

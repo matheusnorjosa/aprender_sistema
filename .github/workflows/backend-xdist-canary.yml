@@ -5,7 +5,9 @@ on:
     # Semanal (segunda 10:20 UTC); antes era diario. A estabilizacao xdist ja esta
     # consolidada ha semanas; o trigger `push` cobre o caso importante (codigo novo
     # introduzindo flakiness), e o cron semanal cobre o de fundo (flaky por tempo).
-    - cron: "20 10 * * 1"
+    # Reduzido semanal→mensal (dia 1) — estabilização xdist consolidada há semanas; o
+    # trigger push cobre regressão nova. Corte de custo de Actions (2026-09).
+    - cron: "20 10 1 * *"
   workflow_dispatch:
     inputs:
       extra_pytest_args:

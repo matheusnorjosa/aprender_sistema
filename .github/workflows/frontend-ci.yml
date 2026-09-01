@@ -25,6 +25,32 @@ env:
   NPM_CONFIG_FUND: 'false'
 
 jobs:
+  # Detecta se o PR toca o frontend. Os jobs [info] caros (e2e ~30min, lighthouse) passam a
+  # gatear nisso → PR backend-puro não os paga. Corte de custo de Actions (2026-09).
+  # Os jobs [required] (react-doctor/build-lint/checklist) NÃO dependem deste — se ele falhar,
+  # eles rodam normalmente; o gating só afeta os [info] (não-bloqueantes).
+  changes:
+    name: detect frontend changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
+        with:
+          fetch-depth: 0
+      - id: filter
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            # push na main já é path-filtrado (paths: v2/frontend/**) → sempre relevante.
+            echo "frontend=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "${{ github.event.pull_request.base.sha }}" HEAD -- v2/frontend/ | grep -q .; then
+            echo "frontend=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "frontend=false" >> "$GITHUB_OUTPUT"
+          fi
+
   react-doctor:
     name: "[required] react doctor quality gate"
     runs-on: ubuntu-latest
@@ -206,6 +232,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     continue-on-error: true
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     env:
       # Dev env: throttle relaxado + FreezeTimeMiddleware habilitado.
       ENVIRONMENT: 'development'
@@ -330,8 +358,8 @@ jobs:
   lighthouse-ci:
     name: "[info] lighthouse CI"
     runs-on: ubuntu-latest
-    needs: build-lint-frontend
-    if: github.event_name == 'pull_request'
+    needs: [build-lint-frontend, changes]
+    if: github.event_name == 'pull_request' && needs.changes.outputs.frontend == 'true'
     timeout-minutes: 12
 
     defaults:

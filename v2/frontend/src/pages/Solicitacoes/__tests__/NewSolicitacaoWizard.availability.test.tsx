@@ -34,6 +34,8 @@ vi.mock('../../../api/lookup', () => ({
   lookupMunicipiosWithFilters: lookupMunicipiosWithFiltersMock,
   lookupProjetos: lookupProjetosMock,
   lookupTiposEvento: lookupTiposEventoMock,
+  // #1666: o wizard agora busca coordenadores (ComboBox "Coordenador responsável" no Step 2).
+  lookupUsuarios: vi.fn().mockResolvedValue([]),
 }));
 
 // Stubs que EMITEM onChange (o real dispara ao selecionar). Sem isso o gatilho

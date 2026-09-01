@@ -95,6 +95,9 @@ export interface RBACMetaPayload {
   setor_groups: string[];
   funcao_groups: string[];
   categories: string[];
+  // #1914: vocabulário canônico de setor-de-produto (Gerencia.setor_canonico / Projeto.setor),
+  // DISTINTO dos setor_groups (13 grupos RBAC). Alimenta o Select FECHADO das telas de conferência.
+  setores_produto: string[];
 }
 
 /**
@@ -326,6 +329,9 @@ export interface GerenciaRecord {
   nome: string;
   nome_setor: string;
   setor_canonico: string;
+  // Confiança do de-para v15 que atribuiu setor_canonico (RELAY 50) — read-only, só-import,
+  // exibido na conferência para priorizar baixa confiança. Sem entrada-direta.
+  setor_canonico_confianca: string;
   gerente: ID | null;
   gerente_nome: string;
   ativo: boolean;

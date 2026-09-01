@@ -29,7 +29,7 @@ class ParticipationNestedSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Participation
-        fields = ("usuario", "guest_email", "email", "role", "ch_horas", "observacao")
+        fields = ("usuario", "guest_email", "guest_nome", "email", "role", "ch_horas", "observacao")
 
     def get_email(self, obj: Participation) -> str | None:
         user_email = getattr(getattr(obj, "usuario", None), "email", None)

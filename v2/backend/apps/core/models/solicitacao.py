@@ -346,6 +346,9 @@ class Participation(models.Model):
     )
     # Convidado externo identificado por e-mail quando nao ha usuario cadastrado
     guest_email = models.EmailField(null=True, blank=True, verbose_name="E-mail do convidado")
+    # Nome livre quando NEM usuario NEM guest_email resolvem (import v15: pessoa que saiu /
+    # sem e-mail — o nome e PRESERVADO, nao descartado; RELAY 50). Ultima identidade possivel.
+    guest_nome = models.CharField(max_length=200, blank=True, default="", verbose_name="Nome do convidado")
     role = models.CharField(
         max_length=20,
         choices=Role.choices,
@@ -363,10 +366,12 @@ class Participation(models.Model):
         verbose_name_plural = "Participacoes"
         ordering = ["solicitacao_id", "role", "usuario_id"]
         constraints = [
-            # Pelo menos um entre usuario ou guest_email deve estar preenchido
+            # Pelo menos uma identidade: usuario OU guest_email OU guest_nome (D1, #1896).
             models.CheckConstraint(
                 name="core_participation_user_or_email",
-                condition=(models.Q(usuario__isnull=False) | models.Q(guest_email__isnull=False)),
+                condition=(
+                    models.Q(usuario__isnull=False) | models.Q(guest_email__isnull=False) | ~models.Q(guest_nome="")
+                ),
             ),
             # Unicidade por usuario (quando usuario existe)
             models.UniqueConstraint(
@@ -379,6 +384,14 @@ class Participation(models.Model):
                 fields=["solicitacao", "guest_email", "role"],
                 name="core_participation_unique_guest",
                 condition=models.Q(guest_email__isnull=False),
+            ),
+            # Unicidade por nome livre (nome-only: sem usuario nem email) — idempotencia do import
+            models.UniqueConstraint(
+                fields=["solicitacao", "guest_nome", "role"],
+                name="core_participation_unique_nome",
+                condition=(
+                    models.Q(usuario__isnull=True) & models.Q(guest_email__isnull=True) & ~models.Q(guest_nome="")
+                ),
             ),
         ]
         indexes = [

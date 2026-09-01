@@ -33,10 +33,12 @@ def test_dat_ingest_module_removed() -> None:
 # get_or_create ENTRA na lista: todo create de Participation (canonico e ofensor)
 # usa get_or_create; sem ele a banned-list fica desdentada (medido na Onda 2).
 #
-# Estado medido na main (2026-08-26): VERDE. Unico writer fora do caminho canonico
-# = services/eventos_import.py (import de eventos, superficie viva ImportEventosView),
-# registrado como divida conhecida #1884 (alvo do D8/Onda 4). Este teste bloqueia
-# NOVOS ofensores; a divida so encolhe.
+# Writers fora do caminho canonico, registrados como divida conhecida:
+# - services/eventos_import.py (import de eventos, superficie viva ImportEventosView) -- #1884
+#   (alvo do D8/Onda 4).
+# - services/export_contract_importer.py (import export-contract; bypass DELIBERADO de RD --
+#   importa historico, nao booking: decisao D2/#1620, epico invariantes #1659) -- #1896.
+# Este teste bloqueia NOVOS ofensores nao registrados; a lista so muda por decisao consciente.
 # --------------------------------------------------------------------------
 _WRITE_RE = re.compile(
     r"\b(?:Solicitacao|Participation)\.objects\.(?:create|update|update_or_create|bulk_create|get_or_create)\b"
@@ -45,9 +47,12 @@ _WRITE_RE = re.compile(
 # Caminho canonico da API: persistir esses models aqui e legitimo.
 _CANONICAL = {"views_solicitacao.py"}
 
-# Divida conhecida (rastreada por issue, a rotear pelo service da API). So encolhe:
-# quando o D8 rotear eventos_import pelo serializer/service, remover daqui.
-_KNOWN_DEBT = {"services/eventos_import.py"}  # #1884
+# Divida conhecida (rastreada por issue). Muda por decisao consciente (adicionar exige comentario
+# + issue; remover quando o writer for roteado pelo service, ou quando o bypass deixar de existir).
+_KNOWN_DEBT = {
+    "services/eventos_import.py",  # #1884 (alvo do D8/Onda 4)
+    "services/export_contract_importer.py",  # #1896 (import export-contract; bypass RD deliberado, D2/#1659)
+}
 
 # Dirs que nao sao codigo de app -- escrita sempre permitida.
 _ALLOWLIST_DIRS = ("tests", "migrations")

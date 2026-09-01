@@ -191,9 +191,10 @@ def test_uses_projeto_resolver():
 
 # ───────── entidades não implementadas ─────────
 def test_not_implemented_entities_marked(tmp_path):
-    path = _write_export(tmp_path, {"solicitacao": "municipio,projeto\nX,Y\n"})
+    # `solicitacao`/`participation` agora são IMPLEMENTED (#1896) — usa `deslocamento` (ainda não).
+    path = _write_export(tmp_path, {"deslocamento": "origem,destino\nX,Y\n"})
     r = ExportContractImporter(path=path).run()["por_entidade"]
-    assert r["solicitacao"]["status"] == "not_implemented"
+    assert r["deslocamento"]["status"] == "not_implemented"
 
 
 # ───────── sem PII no relatório ─────────

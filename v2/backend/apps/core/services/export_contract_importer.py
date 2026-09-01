@@ -24,9 +24,10 @@ import json
 import os
 import re
 import unicodedata
-from datetime import date
+from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from django.contrib.auth.models import Group
 from django.db import transaction
@@ -44,10 +45,12 @@ from apps.core.models import (
     EquipeGerencia,
     Gerencia,
     Municipio,
+    Participation,
     PlanoFormacoes,
     Produto,
     Projeto,
     ProjetoGeral,
+    Solicitacao,
     TipoEvento,
     Usuario,
 )
@@ -59,7 +62,10 @@ from apps.core.services.equipe_gerencia_import import (
     _get_or_create_gerencia,
     _resolve_usuario,
 )
+from apps.core.services.eventos_import import _compute_external_hash
 from apps.core.services.export_contract_projeto_resolver import build_projeto_index, resolve_projeto_export
+from apps.core.services.resolvers import resolve_user_by_email, resolve_user_by_name
+from apps.core.services.solicitacao_create import resolve_initial_status
 from apps.core.validators import CPF_ABSENT, CPF_INVALID, classify_cpf, is_valid_cpf
 
 # Campos protegidos por entidade — NUNCA sobrescrever em update (decisão humana).
@@ -111,6 +117,8 @@ IMPLEMENTED = {
     "dat_registro",
     "dat_cadastro",
     "dat_compra",
+    "solicitacao",
+    "participation",
 }
 # Escrivíveis = subconjunto de IMPLEMENTED com apply REAL. `produto`/`gerencia` classificam mas não
 # têm handler (silent-0) → `--allow-entity` neles é erro (CR-03), não "applied=0" calado.
@@ -144,6 +152,35 @@ _CONSUMED_FIELDS: dict[str, frozenset[str]] = {
             "nome",
             "papel",
             "setor_canonico",
+        }
+    ),
+    "solicitacao": frozenset(
+        {
+            "municipio",
+            "uf",
+            "projeto",
+            "tipo_evento",
+            "data",
+            "hora_inicio",
+            "hora_fim",
+            "segmento",
+            "encontro",
+            "coord_acompanha",
+            "coordenador",
+            "coordenador_cpf",
+            "is_online",
+            "evento_hash_natural",
+        }
+    ),
+    "participation": frozenset(
+        {
+            "evento_hash_natural",
+            "usuario",
+            "usuario_cpf",
+            "usuario_email",
+            "email",
+            "convidados_emails",
+            "role",
         }
     ),
 }
@@ -183,6 +220,39 @@ def _parse_iso_date(v: Any) -> date | None:
         return date.fromisoformat(s)
     except ValueError:
         return None
+
+
+_FORTALEZA_TZ = ZoneInfo("America/Fortaleza")
+
+
+def _parse_hora(v: Any) -> time | None:
+    """Parseia hora HH:MM (ou HH:MM:SS) do export-contract. Vazio/inválido → None."""
+    s = str(v or "").strip()
+    if not s:
+        return None
+    for fmt in ("%H:%M", "%H:%M:%S"):
+        try:
+            return datetime.strptime(s, fmt).time()
+        except ValueError:
+            continue
+    return None
+
+
+def _map_participation_role(raw: Any) -> str | None:
+    """Papel do participante vindo do CSV (derivado de POSIÇÃO pela planilha), NUNCA do cargo do
+    usuário. Tolera rótulos de posição ('Formador 1'..'Formador 5' → FORMADOR). Fora do domínio → None."""
+    s = str(raw or "").strip().upper()
+    if not s:
+        return None
+    if s.startswith("COORD") and "ACOMPANH" in s:
+        return Participation.Role.COORD_ACOMPANHA
+    if s.startswith("COORDENADOR"):
+        return Participation.Role.COORDENADOR
+    if s.startswith("FORMADOR"):
+        return Participation.Role.FORMADOR
+    if s.startswith("CONVIDADO"):
+        return Participation.Role.CONVIDADO
+    return None
 
 
 def _parse_int(v: Any) -> int | None:
@@ -358,6 +428,38 @@ class ExportContractImporter:
     def _projeto_geral_index(self) -> dict[str, int]:
         """Índice norm(nome) → projeto_geral_id (ProjetoGeral.nome é unique)."""
         return {_norm(n): pid for pid, n in ProjetoGeral.objects.values_list("id", "nome")}
+
+    def _tipo_evento_index(self) -> dict[str, int]:
+        """Índice norm(nome) → tipo_evento_id (resolver FK de solicitacao por nome do tipo)."""
+        return {_norm(n): tid for tid, n in TipoEvento.objects.values_list("id", "nome")}
+
+    def _resolve_solicitacao_key(
+        self,
+        r: dict[str, str],
+        mun_idx: dict[tuple[str, str], int],
+        tipo_idx: dict[str, int],
+        cpf_idx: dict[str, int],
+    ) -> tuple[int, int, int, date, time, time, str, int, str] | None:
+        """Resolve os campos-chave de uma linha de solicitacao (FKs + hora + coordenador-solicitante).
+        Retorna (mun_id, proj_id, tipo_id, data, hora_ini, hora_fim, segmento, coord_id, ext_hash) ou
+        None se algum essencial não resolve (would_reject: FK ausente, hora inválida, ou solicitante/
+        coordenador — `usuario` NOT NULL — não resolvido por CPF). NK = `_compute_external_hash` (ADR-012,
+        inclui segmento bruto). Solicitante = coordenador (D3), por CPF."""
+        mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
+        proj_id = self.resolve_projeto(r.get("projeto") or "")
+        tipo_id = tipo_idx.get(_norm(r.get("tipo_evento") or ""))
+        data_ev = _parse_iso_date(r.get("data"))
+        hora_ini = _parse_hora(r.get("hora_inicio"))
+        hora_fim = _parse_hora(r.get("hora_fim"))
+        coord_cpf = normalize_cpf_digits(r.get("coordenador_cpf") or "")
+        coord_id = cpf_idx.get(coord_cpf) if len(coord_cpf) == 11 else None
+        if mun_id is None or proj_id is None or tipo_id is None or coord_id is None:
+            return None
+        if data_ev is None or hora_ini is None or hora_fim is None:
+            return None
+        segmento = (r.get("segmento") or "").strip()
+        ext_hash = _compute_external_hash(mun_id, proj_id, tipo_id, data_ev, hora_ini, hora_fim, segmento)
+        return (mun_id, proj_id, tipo_id, data_ev, hora_ini, hora_fim, segmento, coord_id, ext_hash)
 
     # ── handlers da fatia implementada ──
     def _classify_master(self, name: str) -> dict[str, Any]:
@@ -648,6 +750,39 @@ class ExportContractImporter:
                 st, _ = diff_and_classify({} if exists else None, {}, protected)
                 tally[st] += 1
 
+        elif name == "solicitacao":
+            # NK = external_hash (_compute_external_hash; ADR-012). FK/hora/coordenador não resolvidos →
+            # would_reject. Existence-based (status/participations ficam para o apply).
+            mun_idx = self._municipio_index()
+            tipo_idx = self._tipo_evento_index()
+            cpf_idx = self._usuario_cpf_index()
+            existing = set(
+                Solicitacao.objects.exclude(external_hash__isnull=True).values_list("external_hash", flat=True)
+            )
+            for r in rows:
+                key = self._resolve_solicitacao_key(r, mun_idx, tipo_idx, cpf_idx)
+                if key is None:
+                    tally["would_reject"] += 1
+                    continue
+                st, _ = diff_and_classify({} if key[-1] in existing else None, {}, protected)
+                tally[st] += 1
+
+        elif name == "participation":
+            # Liga por evento_hash_natural → solicitacao.external_hash. Papel do CSV (posição), não cargo.
+            # No dry-run a solicitacao pode ainda não existir no DB → would_reject inflado (esperado; o apply
+            # ordenado cria a solicitacao antes). Resolução de usuário/existência fica para o apply.
+            sol_hashes = set(
+                Solicitacao.objects.exclude(external_hash__isnull=True).values_list("external_hash", flat=True)
+            )
+            for r in rows:
+                ehash = (r.get("evento_hash_natural") or "").strip()
+                role = _map_participation_role(r.get("role"))
+                if not ehash or ehash not in sol_hashes or role is None:
+                    tally["would_reject"] += 1
+                    continue
+                st, _ = diff_and_classify(None, {}, protected)  # would_create (dedup por-usuário no apply)
+                tally[st] += 1
+
         if name in _CONSUMED_FIELDS and rows:
             # Guardrail: colunas presentes no CSV que o handler não lê (aliases já contam como consumidos).
             tally["ignored_fields"] = sorted(set(rows[0].keys()) - _CONSUMED_FIELDS[name])
@@ -762,6 +897,13 @@ class ExportContractImporter:
                 if name == "plano_formacao":
                     # Handler dedicado (NK com ano; CSV sem coluna `nome` → o loop genérico gravaria 0 = silent-gap).
                     applied[name] = self._apply_plano_formacao(self._load(name))
+                    continue
+                if name == "solicitacao":
+                    applied[name] = self._apply_solicitacao(self._load(name))
+                    continue
+                if name == "participation":
+                    # DEPOIS de solicitacao (ENTITY_ORDER garante): liga por external_hash já criado.
+                    applied[name] = self._apply_participation(self._load(name))
                     continue
                 created = 0
                 for r in self._load(name):
@@ -1002,6 +1144,112 @@ class ExportContractImporter:
                 ch_anual=_parse_decimal(r.get("ch_anual_planilha")),
                 created_by=actor,
             )
+            created += 1
+        return created
+
+    def _apply_solicitacao(self, rows: list[dict[str, str]]) -> int:
+        """Create-only de Solicitacao. NK = external_hash (`_compute_external_hash`, ADR-012). Solicitante =
+        coordenador (D3), resolvido por CPF; grava a FK `coordenador` E uma Participation(COORDENADOR)
+        (decisão a — a tela lê a FK). Status via `resolve_initial_status` (PA-01: SUPER/desconhecido →
+        pendente). `coord_acompanha` (Sim/Não) → BooleanField `coordenador_acompanha` (RELAY 50: visual,
+        vazio→False). inicio/fim montados de data+hora LOCAL (America/Fortaleza), armazenados em UTC. Sem
+        `created_by` no model → não exige actor."""
+        mun_idx = self._municipio_index()
+        tipo_idx = self._tipo_evento_index()
+        cpf_idx = self._usuario_cpf_index()
+        proj_by_id = {p.id: p for p in Projeto.objects.all()}
+        existing = set(Solicitacao.objects.exclude(external_hash__isnull=True).values_list("external_hash", flat=True))
+        created = 0
+        for r in rows:
+            key = self._resolve_solicitacao_key(r, mun_idx, tipo_idx, cpf_idx)
+            if key is None:
+                continue  # would_reject (FK/hora/coordenador não resolvido)
+            mun_id, proj_id, tipo_id, data_ev, hora_ini, hora_fim, segmento, coord_id, ext_hash = key
+            if ext_hash in existing:
+                continue
+            inicio = timezone.make_aware(datetime.combine(data_ev, hora_ini), _FORTALEZA_TZ)
+            fim = timezone.make_aware(datetime.combine(data_ev, hora_fim), _FORTALEZA_TZ)
+            if fim <= inicio:
+                continue  # constraint solicitacao_fim_gt_inicio: linha inconsistente
+            status = resolve_initial_status(projeto=proj_by_id.get(proj_id)).status
+            sol = Solicitacao.objects.create(
+                usuario_id=coord_id,  # solicitante = coordenador (D3)
+                municipio_id=mun_id,
+                projeto_id=proj_id,
+                tipo_evento_id=tipo_id,
+                coordenador_id=coord_id,  # grava nos DOIS (decisão a)
+                inicio=inicio,
+                fim=fim,
+                segmento=segmento,
+                encontro=(r.get("encontro") or "").strip() or None,
+                coordenador_acompanha=_to_bool(r.get("coord_acompanha")),
+                is_online=_to_bool(r.get("is_online")),
+                status=status,
+                external_hash=ext_hash,
+            )
+            Participation.objects.get_or_create(
+                solicitacao=sol, usuario_id=coord_id, role=Participation.Role.COORDENADOR
+            )
+            existing.add(ext_hash)
+            created += 1
+        return created
+
+    def _resolve_participante(self, r: dict[str, str], cpf_idx: dict[str, int]) -> Usuario | None:
+        """EMAIL-first (`resolve_user_by_email`, exato, sem filtro is_active — inclui inativos, RELAY 50)
+        → CPF (`usuario_cpf`) → nome (escada determinística #1643). Papel/cargo NUNCA gateiam a resolução."""
+        email = (r.get("usuario_email") or r.get("email") or r.get("convidados_emails") or "").strip()
+        if email:
+            first = email.replace(";", ",").split(",")[0].strip()
+            u = resolve_user_by_email(first)
+            if u is not None:
+                return u
+        cpf = normalize_cpf_digits(r.get("usuario_cpf") or "")
+        if len(cpf) == 11:
+            uid = cpf_idx.get(cpf)
+            if uid is not None:
+                return Usuario.objects.filter(id=uid).first()
+        nome = (r.get("usuario") or "").strip()
+        if nome and "@" not in nome:
+            return resolve_user_by_name(nome)
+        return None
+
+    def _apply_participation(self, rows: list[dict[str, str]]) -> int:
+        """Create-only de Participation. Liga por `evento_hash_natural` → `solicitacao.external_hash`.
+        Papel vem do CSV (POSIÇÃO), NUNCA do cargo. Usuário resolvido EMAIL-first → CPF → nome; sem match
+        mas com nome → `guest_nome` (preserva quem saiu, MARCA não descarta). Sem solicitacao ou papel
+        inválido → pula. Dedup existence-based (por-usuário e nome-only), índices atualizados in-memory."""
+        sol_idx = dict(Solicitacao.objects.exclude(external_hash__isnull=True).values_list("external_hash", "id"))
+        cpf_idx = self._usuario_cpf_index()
+        existing_user = set(
+            Participation.objects.exclude(usuario__isnull=True).values_list("solicitacao_id", "usuario_id", "role")
+        )
+        existing_nome = set(
+            Participation.objects.exclude(guest_nome="").values_list("solicitacao_id", "guest_nome", "role")
+        )
+        created = 0
+        for r in rows:
+            ehash = (r.get("evento_hash_natural") or "").strip()
+            sol_id = sol_idx.get(ehash)
+            role = _map_participation_role(r.get("role"))
+            if sol_id is None or role is None:
+                continue  # solicitacao inexistente (órfã) ou papel fora do domínio
+            usuario = self._resolve_participante(r, cpf_idx)
+            if usuario is not None:
+                ukey = (sol_id, usuario.id, role)
+                if ukey in existing_user:
+                    continue
+                Participation.objects.create(solicitacao_id=sol_id, usuario=usuario, role=role)
+                existing_user.add(ukey)
+                created += 1
+                continue
+            nome = (r.get("usuario") or "").strip()[:200]
+            if not nome:
+                continue  # sem identidade alguma (nem usuário nem nome) → não cria
+            nkey = (sol_id, nome, role)
+            if nkey in existing_nome:
+                continue
+            Participation.objects.create(solicitacao_id=sol_id, guest_nome=nome, role=role)
+            existing_nome.add(nkey)
             created += 1
         return created
 

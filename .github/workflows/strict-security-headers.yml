@@ -9,7 +9,9 @@ on:
         type: string
   schedule:
     # Run daily at 03:00 UTC
-    - cron: '0 3 * * *'
+    # Reduzido diário→semanal (segunda) — headers de segurança mudam raramente. Corte de
+    # custo de Actions (2026-09). Pula se STRICT_SECURITY_HEADERS_BASE_URL ausente.
+    - cron: '0 3 * * 1'
 
 permissions:
   contents: read

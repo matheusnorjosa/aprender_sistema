@@ -1,7 +1,7 @@
 # Composite action: Setup Node.js with cached node_modules
 # Follows Sentry pattern — caches node_modules directly to skip npm ci on hit.
 # Used by: frontend-ci.yml, security-scan.yml, architecture-guardrails.yml,
-#          agent-browser-smoke.yml, dependency-review-scorecard.yml
+#          dependency-review-scorecard.yml
 name: 'Setup Node.js with cached dependencies'
 description: 'Install Node.js and npm dependencies with node_modules caching'
 

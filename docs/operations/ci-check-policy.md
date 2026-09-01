@@ -70,11 +70,10 @@ Estes checks não bloqueiam merge:
 
 - `[info] backend tests core (runner)` (`ci.yaml`)
 - `[info] backend tests dev_tools (runner)` (`ci.yaml`)
-- `[info] e2e journeys` (`frontend-ci.yml`)
-- `[info] lighthouse CI` (`frontend-ci.yml`)
-- `[info] openssf scorecard` (`dependency-review-scorecard.yml`)
-- `[info] backend xdist canary (w=...,dist=...)` (`backend-xdist-canary.yml`)
-- `[info] agent-browser smoke` (`agent-browser-smoke.yml`)
+- `[info] e2e journeys` (`frontend-ci.yml`) — só roda quando o PR toca `v2/frontend/**` (corte de custo, 2026-09)
+- `[info] lighthouse CI` (`frontend-ci.yml`) — idem, path-gated ao frontend (2026-09)
+- `[info] openssf scorecard` (`dependency-review-scorecard.yml`) — movido p/ schedule semanal, não roda por PR (2026-09)
+- `[info] backend xdist canary (w=...,dist=...)` (`backend-xdist-canary.yml`) — schedule reduzido p/ mensal (2026-09)
 - `[info] documentation build` (`docs.yml`)
 - `[info] backend test` (`_backend-test.yml`, workflow reutilizável — o nome efetivo
   vem do job que o chama)

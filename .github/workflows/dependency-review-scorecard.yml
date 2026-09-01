@@ -4,6 +4,11 @@ on:
   pull_request:
     branches:
       - main
+  # Scorecard movido p/ schedule semanal — é [info], sinal baixo em repo privado, não paga
+  # por PR. O dependency-review segue no PR (é [required]). Corte de custo de Actions (2026-09).
+  schedule:
+    - cron: "30 6 * * 1"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -16,6 +21,9 @@ jobs:
   dependency-review:
     name: "[required] dependency review"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Só em PR — no schedule/dispatch roda só o scorecard.
+    if: github.event_name == 'pull_request'
     permissions:
       contents: read
       pull-requests: read
@@ -123,14 +131,16 @@ jobs:
   scorecard:
     name: "[info] openssf scorecard"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     continue-on-error: true
     permissions:
       # publish_results:false + so upload-artifact (sem upload-sarif) -> os escopos
       # security-events:write e id-token:write ficavam ociosos. Removidos. #1397.
       contents: read
       actions: read
-    # Fork PRs can have restricted token permissions for Scorecard internals.
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    # Movido p/ schedule/dispatch (não paga por PR) — o antigo guard de fork-PR fica moot
+    # sem eventos de PR. Corte de custo de Actions (2026-09).
+    if: github.event_name != 'pull_request'
     steps:
       - name: Checkout code
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4

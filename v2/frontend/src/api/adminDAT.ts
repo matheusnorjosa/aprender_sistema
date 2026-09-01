@@ -138,6 +138,8 @@ export interface ProjetoPayload {
   codigo?: string;
   fluxo?: 'SUPER' | 'NAO_SUPER';
   ativo?: boolean;
+  // Setor canônico do projeto (raw, gravável) — conferência #1914. setor_efetivo (derivado) é read-only.
+  setor?: string;
 }
 
 /**

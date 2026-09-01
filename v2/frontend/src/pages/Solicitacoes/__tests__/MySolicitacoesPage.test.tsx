@@ -109,4 +109,25 @@ describe('MySolicitacoesPage', () => {
     expect(await screen.findByText('Vidas')).toBeInTheDocument();
     expect(await screen.findByText('Formação')).toBeInTheDocument();
   });
+
+  // Seam 3 (import v15): a coluna Formadores mostra o NOME, e inclui convidados "que saíram"
+  // (sem FK, nome em guest_nome). Antes o filtro `&& p.usuario` descartava esse convidado.
+  test('coluna Formadores inclui convidado por guest_nome (antes descartado por não ter FK)', async () => {
+    listSolicitacoesMock.mockResolvedValueOnce({
+      count: 1,
+      next: null,
+      previous: null,
+      results: [
+        makeSolic({
+          id: 11,
+          participations: [
+            { usuario: { id: 1, username: 'jsilva', first_name: 'João', last_name: 'Silva', email: 'j@x.com' }, guest_email: null, guest_nome: null, email: 'j@x.com', role: 'FORMADOR', ch_horas: null, observacao: null },
+            { usuario: null, guest_email: 'maria@x.com', guest_nome: 'Maria Ex', email: 'maria@x.com', role: 'FORMADOR', ch_horas: null, observacao: null },
+          ],
+        }),
+      ],
+    });
+    renderPage();
+    expect(await screen.findByText(/João Silva, Maria Ex/)).toBeInTheDocument();
+  });
 });

@@ -59,6 +59,7 @@ import { syncChannel } from '../../services/syncChannel';
 import { formatFortaleza, FORTALEZA_TZ } from '../../utils/datetime';
 import logger from '../../utils/logger';
 import type { ID, Solicitacao, SolicitacaoStatus, PaginatedResponse, Participation } from '../../types';
+import { formadoresLabel } from '../../utils/participants';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -347,15 +348,8 @@ export default function ApprovalsPage(): JSX.Element {
       title: 'Formadores',
       dataIndex: 'participations',
       key: 'formadores',
-      render: (participations: Participation[] | undefined) => {
-        if (!participations || participations.length === 0) return '-';
-        const formadores = participations
-          .filter((p: Participation) => p.role === 'FORMADOR')
-          .map((p: Participation) => p.usuario?.first_name || p.usuario?.last_name || p.email || 'N/A')
-          .filter((name: string) => name !== 'N/A')
-          .join(', ');
-        return formadores || '-';
-      },
+      // Nome do formador (inclui convidados "que saíram" via guest_nome — sem FK). Ver utils/participants.
+      render: (participations: Participation[] | undefined) => formadoresLabel(participations) || '-',
       width: 150,
       ellipsis: true,
     },

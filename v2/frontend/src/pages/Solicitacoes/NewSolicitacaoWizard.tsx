@@ -41,6 +41,7 @@ import {
   lookupMunicipiosWithFilters,
   lookupProjetos,
   lookupTiposEvento,
+  lookupUsuarios,
 } from '../../api/lookup';
 import { getMe } from '../../api/availability';
 import { computePermissions } from '../../hooks/usePermissions';
@@ -60,6 +61,9 @@ dayjs.tz.setDefault('America/Fortaleza');
 const { TextArea } = Input;
 const { Title, Text } = Typography;
 const { Step } = Steps;
+
+/** Lookup de coordenadores (papel fixo) p/ o ComboBox single-select "Coordenador responsável" (#1666). */
+const lookupCoordenadores = (q: string): Promise<Array<{ id: ID; label: string }>> => lookupUsuarios(q, 'Coordenador');
 
 const RANGE_TIMEZONE = 'America/Fortaleza';
 
@@ -89,6 +93,9 @@ interface FormDataType {
   // Passo 2
   formadores: ParticipantType[];
   coordenadores: ParticipantType[];
+  // #1666: coordenador RESPONSÁVEL (FK dono da solicitação), distinto dos acompanhantes (M2M).
+  // O wizard não capturava este campo → backend caía no default (o criador).
+  coordenadorResponsavel: ComboBoxValue | null;
   // Passo 3
   tipo: string;
   encontro: string;
@@ -111,6 +118,52 @@ interface StepType {
   title: string;
   icon: ReactNode;
   content: ReactNode;
+}
+
+/** Entrada achatada p/ montar o payload de criação de solicitação (validada em handleSubmit). */
+export interface SolicitacaoWizardPayloadInput {
+  municipioId: ID;
+  projetoId: ID;
+  tipoEventoId: ID;
+  inicio: string;
+  fim: string;
+  tipo: string;
+  encontro: string;
+  segmento: string;
+  observacoes: string;
+  local: string;
+  isOnline: boolean;
+  formadorIds: ID[];
+  coordAcompanhaIds: ID[];
+  /** #1666: FK do coordenador RESPONSÁVEL (dono da solicitação). null → backend usa o default. */
+  coordenadorResponsavelId: ID | null;
+}
+
+/**
+ * Monta o payload de criação de solicitação (co-locado + exportado p/ teste, como buildCompraPayload).
+ * Distingue o coordenador RESPONSÁVEL (FK `coordenador`) dos ACOMPANHANTES (M2M em extra_participants).
+ */
+export function buildSolicitacaoPayload(input: SolicitacaoWizardPayloadInput): Record<string, unknown> {
+  return {
+    municipio: input.municipioId,
+    projeto: input.projetoId,
+    tipo_evento: input.tipoEventoId,
+    inicio: dayjs(input.inicio).utc().format(),
+    fim: dayjs(input.fim).utc().format(),
+    tipo: input.tipo || null,
+    encontro: input.encontro || null,
+    segmento: input.segmento || null,
+    observacoes: optionalText(input.observacoes),
+    local: input.local || '',
+    is_online: input.isOnline,
+    // #1666: FK do coordenador RESPONSÁVEL (dono). Antes ausente → backend usava o criador.
+    coordenador: input.coordenadorResponsavelId,
+    coordenador_acompanha: input.coordAcompanhaIds.length > 0,
+    extra_participants: {
+      formador_ids: input.formadorIds,
+      coord_acompanha_ids: input.coordAcompanhaIds,
+    },
+  };
 }
 
 export default function NewSolicitacaoWizard(): JSX.Element {
@@ -138,6 +191,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
     // Passo 2
     formadores: [],
     coordenadores: [],
+    coordenadorResponsavel: null,
     // Passo 3
     tipo: '',
     encontro: '',
@@ -317,26 +371,24 @@ export default function NewSolicitacaoWizard(): JSX.Element {
         return;
       }
 
-      const payload = {
-        municipio: formData.municipio.id,
-        projeto: formData.projeto.id,
-        tipo_evento: formData.tipoEvento.id,
-        inicio: dayjs(formData.inicio).utc().format(),
-        fim: dayjs(formData.fim).utc().format(),
-        tipo: formData.tipo || null,
-        encontro: formData.encontro || null,
-        segmento: formData.segmento || null,
-        observacoes: optionalText(formData.observacoes),
-        local: formData.local || '',
-        // PR19: incluir modalidade no payload
-        is_online: !!formData.is_online,
-        coordenador_acompanha: coordenadores.length > 0,
-        // Backend espera participantes dentro de extra_participants
-        extra_participants: {
-          formador_ids: formadores.map(f => f.id),
-          coord_acompanha_ids: coordenadores.map(c => c.id),
-        },
-      };
+      const payload = buildSolicitacaoPayload({
+        municipioId: formData.municipio.id,
+        projetoId: formData.projeto.id,
+        tipoEventoId: formData.tipoEvento.id,
+        inicio: formData.inicio,
+        fim: formData.fim,
+        tipo: formData.tipo,
+        encontro: formData.encontro,
+        segmento: formData.segmento,
+        observacoes: formData.observacoes,
+        local: formData.local,
+        // PR19: modalidade online/presencial
+        isOnline: !!formData.is_online,
+        formadorIds: formadores.map(f => f.id),
+        coordAcompanhaIds: coordenadores.map(c => c.id),
+        // #1666: FK do coordenador responsável escolhido no wizard (null → default do backend).
+        coordenadorResponsavelId: formData.coordenadorResponsavel?.id ?? null,
+      });
 
       await createSolicitacao(payload);
       message.success('Solicitação criada com sucesso!');
@@ -529,6 +581,19 @@ export default function NewSolicitacaoWizard(): JSX.Element {
             <FormadoresPicker
               value={formData.formadores as unknown as Array<{ id: ID; email: string; label: string; name?: string }>}
               onChange={(value: ParticipantType[]) => setFormData({ ...formData, formadores: value })}
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="Coordenador responsável"
+            name="coordenadorResponsavel"
+            tooltip="Dono da solicitação (FK). Distinto dos acompanhantes. Se vazio, o backend assume o criador."
+          >
+            <ComboBox
+              lookupFunction={lookupCoordenadores}
+              onChange={(value: ComboBoxValue | null) => setFormData({ ...formData, coordenadorResponsavel: value })}
+              value={formData.coordenadorResponsavel as unknown as { id: ID; label: string; [key: string]: unknown } | null}
+              placeholder="Busque o coordenador responsável (opcional)"
             />
           </Form.Item>
 

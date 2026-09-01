@@ -76,7 +76,8 @@ import { usePolling } from '../../hooks/usePolling';
 import { syncChannel } from '../../services/syncChannel';
 import { formatFortaleza } from '../../utils/datetime';
 import logger from '../../utils/logger';
-import type { ID, Solicitacao, GCalStatus, CurrentUser, PaginatedResponse } from '../../types';
+import type { ID, Solicitacao, GCalStatus, CurrentUser, PaginatedResponse, Participation } from '../../types';
+import { formadoresLabel } from '../../utils/participants';
 
 // #1668 (M12-19): orçamento de requisições da Pré-agenda.
 /** Carrega a pré-agenda inteira como lista única (paginação client-side). */
@@ -504,6 +505,15 @@ export default function PreAgendaPage(): JSX.Element {
       dataIndex: 'tipo',
       key: 'tipo',
       render: (tipo: string | null) => tipo || '-',
+    },
+    {
+      // Nome do formador (inclui convidados "que saíram" via guest_nome — sem FK). Ver utils/participants.
+      title: 'Formadores',
+      dataIndex: 'participations',
+      key: 'formadores',
+      render: (participations: Participation[] | undefined) => formadoresLabel(participations) || '-',
+      ellipsis: true,
+      width: 160,
     },
     {
       title: 'GCal Status',

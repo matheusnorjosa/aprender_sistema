@@ -228,6 +228,48 @@ class TestAPIAvailabilityBlocks:
         assert block.status == "aprovado", "Status deve ser 'aprovado' (auto-aprovação de bloqueios)"
         assert response.data["status"] == "aprovado", "Resposta deve retornar status='aprovado'"
 
+    def test_block_serializer_exposes_usuario_nome(self, user_test):
+        """Serializer expõe o NOME do dono do bloqueio (o FE já consome `usuario_nome`;
+        antes o serializer só devolvia `usuario` como id → a tela não mostrava de quem é)."""
+        user_test.first_name = "Maria"
+        user_test.last_name = "Silva"
+        user_test.save()
+        now = timezone.now()
+        block = AvailabilityBlock.objects.create(
+            usuario=user_test, inicio=now + timedelta(hours=24), fim=now + timedelta(hours=26), tipo="T"
+        )
+        client = APIClient()
+        client.force_authenticate(user=user_test)
+        resp = client.get(f"/api/availability-blocks/{block.id}/")
+        assert resp.status_code == http_status.HTTP_200_OK, f"{resp.status_code}: {resp.data}"
+        assert resp.data["usuario_nome"] == "Maria Silva"
+
+    def test_owner_me_filters_to_requester(self, user_test, another_user):
+        """?owner=me (MyBlocks) restringe aos bloqueios do próprio requester — mesmo para quem
+        vê todos (Controle/privilegiado). Antes o get_queryset ignorava `owner` → MyBlocks
+        mostrava tudo."""
+        now = timezone.now()
+        mine = AvailabilityBlock.objects.create(
+            usuario=user_test, inicio=now + timedelta(hours=24), fim=now + timedelta(hours=26), tipo="T"
+        )
+        other = AvailabilityBlock.objects.create(
+            usuario=another_user, inicio=now + timedelta(hours=24), fim=now + timedelta(hours=26), tipo="T"
+        )
+        client = APIClient()
+        client.force_authenticate(user=user_test)
+
+        def ids(resp):
+            d = resp.data
+            items = d["results"] if isinstance(d, dict) and "results" in d else d
+            return {b["id"] for b in items}
+
+        # sem owner: privilegiado (Controle) vê ambos
+        assert ids(client.get("/api/availability-blocks/")) >= {mine.id, other.id}
+        # com owner=me: só os do requester
+        me_ids = ids(client.get("/api/availability-blocks/?owner=me"))
+        assert mine.id in me_ids
+        assert other.id not in me_ids
+
     def test_unauthenticated_cannot_create_block(self):
         """
         Test: Usuário não autenticado não pode criar bloqueio.

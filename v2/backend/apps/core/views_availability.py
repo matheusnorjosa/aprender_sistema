@@ -114,26 +114,32 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
     def get_queryset(self) -> QuerySet:
         user = self.request.user
 
-        # Privilegiados (superuser, Superintendência, Controle) veem todos
+        # Escopo por papel (segurança C-03: nunca AFROUXA; owner=me abaixo só NARROWS).
         if is_privileged_user(user):
-            return AvailabilityBlock.objects.select_related("usuario").all()
+            # Privilegiados (superuser, Superintendência, Controle) veem todos
+            qs = AvailabilityBlock.objects.select_related("usuario").all()
+        elif self.action in {"update", "partial_update", "destroy"}:
+            # update/delete: usuários comuns só veem seus próprios bloqueios
+            qs = AvailabilityBlock.objects.select_related("usuario").filter(usuario=user)
+        else:
+            gerencias_ids = get_user_gerencias_ids(user)
+            if not gerencias_ids:
+                # Sem gerência, vê apenas os próprios
+                qs = AvailabilityBlock.objects.select_related("usuario").filter(usuario=user)
+            else:
+                # Bloqueios de usuários das suas gerências
+                usuarios_na_gerencia = (
+                    EquipeGerencia.vigentes_em()
+                    .filter(gerencia_id__in=gerencias_ids)
+                    .values_list("usuario_id", flat=True)
+                )
+                qs = AvailabilityBlock.objects.select_related("usuario").filter(usuario_id__in=usuarios_na_gerencia)
 
-        # Segurança (C-03): para update/delete, usuários comuns só veem seus próprios bloqueios
-        if self.action in {"update", "partial_update", "destroy"}:
-            return AvailabilityBlock.objects.select_related("usuario").filter(usuario=user)
+        # ?owner=me (MyBlocks): restringe aos do próprio requester, mesmo para quem vê todos.
+        if self.request.query_params.get("owner") == "me":
+            qs = qs.filter(usuario=user)
 
-        # Outros: bloqueios de usuários das suas gerências
-        gerencias_ids = get_user_gerencias_ids(user)
-        if not gerencias_ids:
-            # Sem gerência, vê apenas os próprios
-            return AvailabilityBlock.objects.select_related("usuario").filter(usuario=user)
-
-        # Usuários na mesma gerência
-        usuarios_na_gerencia = (
-            EquipeGerencia.vigentes_em().filter(gerencia_id__in=gerencias_ids).values_list("usuario_id", flat=True)
-        )
-
-        return AvailabilityBlock.objects.select_related("usuario").filter(usuario_id__in=usuarios_na_gerencia)
+        return qs
 
     def perform_create(self, serializer):
         """

@@ -34,6 +34,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.core.constants import ALLOWED_USER_GROUPS
+from apps.core.imports.hashing import stable_import_hash
 from apps.core.imports.normalization import normalize_cpf_digits
 from apps.core.models import (
     Acompanhamento,
@@ -44,6 +45,7 @@ from apps.core.models import (
     DATCompra,
     DATCoordenador,
     DATRegistro,
+    Deslocamento,
     EquipeGerencia,
     Formacao,
     Gerencia,
@@ -127,6 +129,7 @@ IMPLEMENTED = {
     "acompanhamento",
     "prova",
     "availability_block",
+    "deslocamento",
 }
 # Escrivíveis = subconjunto de IMPLEMENTED com apply REAL. `produto`/`gerencia` classificam mas não
 # têm handler (silent-0) → `--allow-entity` neles é erro (CR-03), não "applied=0" calado.
@@ -208,6 +211,7 @@ _CONSUMED_FIELDS: dict[str, frozenset[str]] = {
     "acompanhamento": frozenset({"municipio", "uf", "projeto", "ano", "tipo", "data_acompanhamento"}),
     "prova": frozenset({"municipio", "uf", "projeto", "ano", "numero_prova", "data_prova", "marcado"}),
     "availability_block": frozenset({"usuario_cpf", "inicio", "fim", "tipo", "motivo"}),
+    "deslocamento": frozenset({"usuario_cpf", "origem", "destino", "start_date", "end_date", "observacao"}),
 }
 
 
@@ -945,6 +949,23 @@ class ExportContractImporter:
                 st, _ = diff_and_classify({} if (usr_id, inicio, fim, tipo) in existing else None, {}, protected)
                 tally[st] += 1
 
+        elif name == "deslocamento":
+            # Deslocamento de formador (origem/destino TEXTO, não FK). usuario por CPF (PROTECT NOT
+            # NULL → sem match = reject); start/end obrigatórios. NK = external_hash (SHA1 ADR-012)
+            # sobre (usuario, start, end, origem, destino, observacao) — observacao ENTRA (RELAY 31:
+            # senão ida/volta colapsam). Existence-based por hash.
+            cpf_idx = self._usuario_cpf_index()
+            existing = set(
+                Deslocamento.objects.exclude(external_hash__isnull=True).values_list("external_hash", flat=True)
+            )
+            for r in rows:
+                fields = self._deslocamento_fields(r, cpf_idx)
+                if fields is None:
+                    tally["would_reject"] += 1
+                    continue
+                st, _ = diff_and_classify({} if fields[-1] in existing else None, {}, protected)
+                tally[st] += 1
+
         if name in _CONSUMED_FIELDS and rows:
             # Guardrail: colunas presentes no CSV que o handler não lê (aliases já contam como consumidos).
             tally["ignored_fields"] = sorted(set(rows[0].keys()) - _CONSUMED_FIELDS[name])
@@ -979,6 +1000,23 @@ class ExportContractImporter:
                 return matched
         ids = list(qs.values_list("id", flat=True)[:2])
         return ids[0] if len(ids) == 1 else None
+
+    def _deslocamento_fields(
+        self, r: dict[str, str], cpf_idx: dict[str, int]
+    ) -> tuple[int, str, str, date, date, str, str] | None:
+        """Resolve os campos de um deslocamento + o external_hash (ponto único, classify e apply).
+        None se usuario (por CPF) ou datas (start/end) não resolvem. origem/destino são texto (não
+        FK); observacao ENTRA no hash (RELAY 31: senão ida/volta colapsam)."""
+        usr_id = cpf_idx.get(normalize_cpf_digits(r.get("usuario_cpf") or ""))
+        start = _parse_iso_date(r.get("start_date"))
+        end = _parse_iso_date(r.get("end_date"))
+        if usr_id is None or start is None or end is None:
+            return None
+        origem = (r.get("origem") or "").strip()[:200]
+        destino = (r.get("destino") or "").strip()[:200]
+        obs = (r.get("observacao") or "").strip()
+        h = stable_import_hash(str(usr_id), start.isoformat(), end.isoformat(), origem, destino, obs)
+        return (usr_id, origem, destino, start, end, obs, h)
 
     def _resolve_gerencia_readonly(self, setor_raw: str) -> Gerencia | None:
         """Resolve Gerencia por setor SEM criar (espelha a precedência de _get_or_create_gerencia,
@@ -1107,6 +1145,9 @@ class ExportContractImporter:
                     continue
                 if name == "availability_block":
                     applied[name] = self._apply_availability_block(self._load(name))
+                    continue
+                if name == "deslocamento":
+                    applied[name] = self._apply_deslocamento(self._load(name))
                     continue
                 created = 0
                 for r in self._load(name):
@@ -1578,6 +1619,34 @@ class ExportContractImporter:
                 created_by=actor,
             )
             existing.add(nk)
+            created += 1
+        return created
+
+    def _apply_deslocamento(self, rows: list[dict[str, str]]) -> int:
+        """Create-only de Deslocamento (formador entre municípios, origem/destino TEXTO). usuario por
+        CPF (FK PROTECT NOT NULL → sem match = skip); start/end obrigatórios. Idempotência por
+        `external_hash` (SHA1 ADR-012) sobre (usuario, start, end, origem, destino, observacao) —
+        observacao ENTRA (RELAY 31). Sem created_by no model → não exige actor."""
+        cpf_idx = self._usuario_cpf_index()
+        existing = set(Deslocamento.objects.exclude(external_hash__isnull=True).values_list("external_hash", flat=True))
+        created = 0
+        for r in rows:
+            fields = self._deslocamento_fields(r, cpf_idx)
+            if fields is None:
+                continue
+            usr_id, origem, destino, start, end, obs, h = fields
+            if h in existing:
+                continue
+            Deslocamento.objects.create(
+                usuario_id=usr_id,
+                origem=origem,
+                destino=destino,
+                start_date=start,
+                end_date=end,
+                observacao=obs,
+                external_hash=h,
+            )
+            existing.add(h)
             created += 1
         return created
 

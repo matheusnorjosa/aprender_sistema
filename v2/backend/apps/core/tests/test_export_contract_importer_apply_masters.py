@@ -186,6 +186,47 @@ def test_apply_projeto_base_empty_pg_derives_from_own_name(tmp_path):
     assert Projeto.objects.get(nome="A Cor da Gente").projeto_geral_id == pg.id
 
 
+# ── #1897: projeto rótulo com projeto_geral NULL (família-vazia intencional) ──
+def test_apply_projeto_empty_pg_no_dat_use_creates_null_1897(tmp_path):
+    # projeto_geral vazio + SEM homônimo + SEM uso DAT → cria como RÓTULO (projeto_geral NULL).
+    csv = "projeto,projeto_geral,fluxo\nVida - Esquenta Saeb,,NAO_SUPER\n"
+    path = _write_export(tmp_path, {"projeto": csv})
+    r = ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
+    assert r["applied"]["projeto"] == 1
+    p = Projeto.objects.get(nome="Vida - Esquenta Saeb")
+    assert p.projeto_geral_id is None, "rótulo família-vazia = projeto_geral NULL"
+    assert p.fluxo == "NAO_SUPER"
+
+
+def test_apply_projeto_empty_pg_with_dat_compra_rejected_1897(tmp_path):
+    # Condição do dono: família vazia MAS com dat_compra → precisa de família (nr_codigos) → NÃO cria.
+    csv_proj = "projeto,projeto_geral,fluxo\nRotulo Com Compra,,NAO_SUPER\n"
+    csv_compra = "municipio,projeto,ano_uso\nCidade Y,Rotulo Com Compra,2026\n"
+    path = _write_export(tmp_path, {"projeto": csv_proj, "dat_compra": csv_compra})
+    r = ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
+    assert r["applied"]["projeto"] == 0
+    assert not Projeto.objects.filter(nome="Rotulo Com Compra").exists()
+
+
+def test_apply_projeto_empty_pg_with_dat_registro_rejected_1897(tmp_path):
+    csv_proj = "projeto,projeto_geral,fluxo\nRotulo Com Registro,,NAO_SUPER\n"
+    csv_reg = "municipio,projeto,projeto_geral\nCidade Y,Rotulo Com Registro,\n"
+    path = _write_export(tmp_path, {"projeto": csv_proj, "dat_registro": csv_reg})
+    r = ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
+    assert r["applied"]["projeto"] == 0
+    assert not Projeto.objects.filter(nome="Rotulo Com Registro").exists()
+
+
+def test_classify_projeto_empty_pg_no_dat_use_would_create_1897(tmp_path):
+    # dry-run: família-vazia sem uso DAT classifica como would_create (não would_reject).
+    csv = "projeto,projeto_geral,fluxo\nRotulo Label,,NAO_SUPER\n"
+    path = _write_export(tmp_path, {"projeto": csv})
+    r = ExportContractImporter(path=path, apply=False).run()
+    pe = r["por_entidade"]["projeto"]
+    assert pe["would_create"] == 1
+    assert pe["would_reject"] == 0
+
+
 # ══════════════════════════ usuario (PR-C, + atribuicao de Group) ══════════════════════════
 def test_apply_usuario_creates_username_cpf_unusable_password(tmp_path):
     csv = "nome_completo,cpf,email,cargo\nMaria Silva Souza,11144477735,maria@ex.com,Coordenadores\n"

@@ -14,6 +14,7 @@
 import { useState, type JSX } from 'react';
 import { Form, DatePicker, Select, Input, Button } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
+import { fortalezaWallClockToISO } from '../utils/datetime';
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -56,8 +57,10 @@ export default function BlockForm({ onSubmit }: BlockFormProps): JSX.Element {
     setLoading(true);
     try {
       const payload: BlockPayload = {
-        inicio: values.inicio.toISOString(),
-        fim: values.fim.toISOString(),
+        // RD-06: o wall-clock escolhido no DatePicker é interpretado COMO America/Fortaleza
+        // (não o fuso do navegador) antes de serializar em UTC. Ver utils/datetime.
+        inicio: fortalezaWallClockToISO(values.inicio),
+        fim: fortalezaWallClockToISO(values.fim),
         tipo: values.tipo,
         motivo: values.motivo || '',
       };

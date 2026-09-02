@@ -21,7 +21,8 @@ import message from 'antd/es/message';
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
 
 import { formatFortaleza } from '../../utils/datetime';
-import { getMyEvents, type MeEvent } from '../../api/me';
+import { getMyEvents, type MeEvent, type MeEventParticipante } from '../../api/me';
+import { formadoresNomes } from '../../utils/participants';
 import { MeetLink } from '../../components/MeetLink';
 
 const { Title, Text } = Typography;
@@ -104,10 +105,12 @@ export default function MeusEventosPage(): JSX.Element {
     },
     {
       title: 'Formadores',
-      dataIndex: 'formadores',
+      dataIndex: 'participantes',
       key: 'formadores',
-      render: (formadores: string[]) =>
-        formadores.length > 0 ? formadores.join(', ') : <Text type="secondary">—</Text>,
+      // #1945: usa `participantes` (inclui quem saiu, via guest_nome) filtrando FORMADOR — no lugar
+      // do `formadores` legado (só usuário). Mesmo padrão das outras telas. Ver utils/participants.
+      render: (participantes: MeEventParticipante[]) =>
+        formadoresNomes(participantes) || <Text type="secondary">—</Text>,
       ellipsis: true,
     },
     {

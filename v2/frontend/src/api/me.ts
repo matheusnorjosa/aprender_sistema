@@ -15,6 +15,12 @@ import type { CurrentUser } from '../types/usuario';
  * Espelha `MeEventSerializer` em `apps/core/serializers/me.py`.
  * Campos derivados (`*_nome`, `formadores`) são read-only.
  */
+/** Participante na visão do MeEventSerializer: `nome` já resolvido (usuario → guest_nome → guest_email). */
+export interface MeEventParticipante {
+  role: string;
+  nome: string;
+}
+
 export interface MeEvent {
   id: ID;
   inicio: string; // ISO 8601 datetime
@@ -24,6 +30,9 @@ export interface MeEvent {
   tipo_evento_nome: string | null;
   local: string;
   formadores: string[];
+  // #1945: TODAS as participations [{role, nome}] — inclui quem saiu (guest_nome), ao contrário
+  // de `formadores` (só usuario). O FE filtra o papel (ex.: FORMADOR).
+  participantes: MeEventParticipante[];
   is_online: boolean;
   meet_link: string | null;
   status: 'aprovado' | 'pendente' | 'reprovado';

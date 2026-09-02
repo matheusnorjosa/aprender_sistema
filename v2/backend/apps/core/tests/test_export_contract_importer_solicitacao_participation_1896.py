@@ -197,3 +197,79 @@ def test_apply_solicitacao_prefers_stable_evento_id_over_hash(tmp_path):
     assert Participation.objects.filter(
         solicitacao=sol, usuario=formador, role="FORMADOR"
     ).exists(), "participation liga por evento_id → external_hash"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v16.4 (RELAY 57): o dono do evento vem RESOLVIDO em `solicitante_cpf`/`solicitante_email`
+# (cascata coluna_n + escada-2-tokens + inferência), com `solicitante_procedencia` carimbando
+# o degrau. `linha_completa=false` = fora de escopo (sem hora/dados) — não importa.
+# ─────────────────────────────────────────────────────────────────────────────
+
+SOL_HEADER_V16 = (
+    "municipio,uf,projeto,tipo_evento,data,hora_inicio,hora_fim,segmento,"
+    "coord_acompanha,is_online,linha_completa,solicitante_cpf,solicitante_email,"
+    "solicitante_procedencia,coordenador_cpf,evento_id"
+)
+
+
+def _sol_row_v16(
+    *,
+    solicitante_cpf="",
+    solicitante_email="",
+    procedencia="coluna_n",
+    linha_completa="true",
+    coordenador_cpf="",
+    evento_id="EVT-1",
+):
+    return (
+        f"{SOL_HEADER_V16}\n"
+        f"Cidade X,CE,Projeto X,Formacao,2026-05-10,09:00,12:00,Fund I,"
+        f"Sim,Nao,{linha_completa},{solicitante_cpf},{solicitante_email},"
+        f"{procedencia},{coordenador_cpf},{evento_id}\n"
+    )
+
+
+def test_apply_solicitacao_prefers_solicitante_cpf_over_coordenador_cpf(tmp_path):
+    """v16.4: `solicitante_cpf` (dono já resolvido) tem prioridade sobre a coluna N crua
+    (`coordenador_cpf`), que nos 130 casos-fila está errada/vazia."""
+    _masters()  # semeia Municipio/Projeto/TipoEvento/coord (cpf 11144477735)
+    outro = UsuarioFactory(
+        username="outro", cpf="52998224725", email="outro@x.com", first_name="Outro", last_name="Pessoa"
+    )
+    csv = _sol_row_v16(solicitante_cpf="52998224725", coordenador_cpf="11144477735", evento_id="EVT-A")
+    path = _write_export(tmp_path, {"solicitacao": csv})
+    ExportContractImporter(path=path, apply=True, allow=("solicitacao",)).run()
+    sol = Solicitacao.objects.get()
+    assert sol.usuario_id == outro.id, "solicitante_cpf (v16.4) vence coordenador_cpf"
+    assert sol.coordenador_id == outro.id, "grava a pessoa resolvida nos DOIS FKs"
+
+
+def test_apply_solicitacao_falls_back_to_solicitante_email(tmp_path):
+    """Quando `solicitante_cpf` não resolve (ausente no seed), cai para `solicitante_email`."""
+    _mun, _proj, _tipo, coord = _masters()  # coord email coord1@x.com
+    csv = _sol_row_v16(solicitante_cpf="", solicitante_email="coord1@x.com", evento_id="EVT-B")
+    path = _write_export(tmp_path, {"solicitacao": csv})
+    ExportContractImporter(path=path, apply=True, allow=("solicitacao",)).run()
+    assert Solicitacao.objects.get().usuario_id == coord.id, "resolve por solicitante_email"
+
+
+def test_apply_solicitacao_stamps_solicitante_procedencia(tmp_path):
+    """`solicitante_procedencia` é carimbada no registro (auditoria: fato vs inferência)."""
+    _masters()
+    csv = _sol_row_v16(solicitante_cpf="11144477735", procedencia="cargo_unico", evento_id="EVT-C")
+    path = _write_export(tmp_path, {"solicitacao": csv})
+    ExportContractImporter(path=path, apply=True, allow=("solicitacao",)).run()
+    assert Solicitacao.objects.get().solicitante_procedencia == "cargo_unico"
+
+
+def test_apply_solicitacao_rejects_incomplete_line(tmp_path):
+    """`linha_completa=false` não importa, mesmo com solicitante e hora resolvidos (v16.2)."""
+    _masters()
+    # resolvível pelos DOIS caminhos (solicitante_cpf E coordenador_cpf) — isola linha_completa
+    csv = _sol_row_v16(
+        solicitante_cpf="11144477735", coordenador_cpf="11144477735", linha_completa="false", evento_id="EVT-D"
+    )
+    path = _write_export(tmp_path, {"solicitacao": csv})
+    r = ExportContractImporter(path=path, apply=True, allow=("solicitacao",)).run()
+    assert r["applied"]["solicitacao"] == 0, "linha_completa=false → fora de escopo"
+    assert Solicitacao.objects.count() == 0

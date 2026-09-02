@@ -168,6 +168,10 @@ _CONSUMED_FIELDS: dict[str, frozenset[str]] = {
             "coord_acompanha",
             "coordenador",
             "coordenador_cpf",
+            "solicitante_cpf",
+            "solicitante_email",
+            "solicitante_procedencia",
+            "linha_completa",
             "is_online",
             "evento_id",
             "evento_id_origem",
@@ -436,6 +440,26 @@ class ExportContractImporter:
         """Índice norm(nome) → tipo_evento_id (resolver FK de solicitacao por nome do tipo)."""
         return {_norm(n): tid for tid, n in TipoEvento.objects.values_list("id", "nome")}
 
+    def _resolve_solicitante(self, r: dict[str, str], cpf_idx: dict[str, int]) -> int | None:
+        """Pessoa dona do evento (v16.4, RELAY 57), já resolvida pelo sheets em `solicitante_cpf` (cascata
+        coluna_n + escada-2-tokens + inferência). Fallback: `solicitante_email` (mesma pessoa) e, por fim,
+        `coordenador_cpf` cru (fixtures/legado). Retorna o Usuario.id ou None. É gravada em `usuario` E
+        `coordenador` (decisão a). NÃO gateia por cargo/papel."""
+        cpf = normalize_cpf_digits(r.get("solicitante_cpf") or "")
+        if len(cpf) == 11:
+            uid = cpf_idx.get(cpf)
+            if uid is not None:
+                return uid
+        email = (r.get("solicitante_email") or "").strip()
+        if email:
+            u = resolve_user_by_email(email)
+            if u is not None:
+                return u.id
+        fb = normalize_cpf_digits(r.get("coordenador_cpf") or "")
+        if len(fb) == 11:
+            return cpf_idx.get(fb)
+        return None
+
     def _resolve_solicitacao_key(
         self,
         r: dict[str, str],
@@ -443,20 +467,25 @@ class ExportContractImporter:
         tipo_idx: dict[str, int],
         cpf_idx: dict[str, int],
     ) -> tuple[int, int, int, date, time, time, str, int, str] | None:
-        """Resolve os campos-chave de uma linha de solicitacao (FKs + hora + coordenador-solicitante).
+        """Resolve os campos-chave de uma linha de solicitacao (FKs + hora + solicitante).
         Retorna (mun_id, proj_id, tipo_id, data, hora_ini, hora_fim, segmento, coord_id, ext_hash) ou
-        None se algum essencial não resolve (would_reject: FK ausente, hora inválida, ou solicitante/
-        coordenador — `usuario` NOT NULL — não resolvido por CPF). Identidade (external_hash) = o
+        None se algum essencial não resolve (would_reject: `linha_completa=false`, FK ausente, hora
+        inválida, ou solicitante — `usuario` NOT NULL — não resolvido). Identidade (external_hash) = o
         `evento_id` estável do CSV; fallback `evento_hash_natural` (join intra-entrega) e
-        `_compute_external_hash` (ADR-012) quando ausentes. Solicitante = coordenador (D3), por CPF."""
+        `_compute_external_hash` (ADR-012) quando ausentes. Solicitante (dono) via `_resolve_solicitante`
+        (`solicitante_cpf`→`solicitante_email`→`coordenador_cpf`)."""
+        # v16.2: linha incompleta (sem hora/dados essenciais, `linha_completa=false`) = fora de escopo do
+        # import — NÃO inventa hora (RELAY 54). Coluna ausente (fixtures/CSV antigo) → trata como completa.
+        lc = r.get("linha_completa")
+        if lc is not None and not _to_bool(lc):
+            return None
         mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
         proj_id = self.resolve_projeto(r.get("projeto") or "")
         tipo_id = tipo_idx.get(_norm(r.get("tipo_evento") or ""))
         data_ev = _parse_iso_date(r.get("data"))
         hora_ini = _parse_hora(r.get("hora_inicio"))
         hora_fim = _parse_hora(r.get("hora_fim"))
-        coord_cpf = normalize_cpf_digits(r.get("coordenador_cpf") or "")
-        coord_id = cpf_idx.get(coord_cpf) if len(coord_cpf) == 11 else None
+        coord_id = self._resolve_solicitante(r, cpf_idx)
         if mun_id is None or proj_id is None or tipo_id is None or coord_id is None:
             return None
         if data_ev is None or hora_ini is None or hora_fim is None:
@@ -1162,9 +1191,10 @@ class ExportContractImporter:
 
     def _apply_solicitacao(self, rows: list[dict[str, str]]) -> int:
         """Create-only de Solicitacao. NK = external_hash = `evento_id` estável do CSV (fallback
-        `evento_hash_natural`, depois `_compute_external_hash`/ADR-012 — ver `_resolve_solicitacao_key`). Solicitante =
-        coordenador (D3), resolvido por CPF; grava a FK `coordenador` E uma Participation(COORDENADOR)
-        (decisão a — a tela lê a FK). Status via `resolve_initial_status` (PA-01: SUPER/desconhecido →
+        `evento_hash_natural`, depois `_compute_external_hash`/ADR-012 — ver `_resolve_solicitacao_key`). Solicitante
+        (dono) via `_resolve_solicitante` (solicitante_cpf→email→coordenador_cpf, v16.4); grava `usuario` E a FK
+        `coordenador` (decisão a — a tela lê a FK) + uma Participation(COORDENADOR) e carimba
+        `solicitante_procedencia`. Status via `resolve_initial_status` (PA-01: SUPER/desconhecido →
         pendente). `coord_acompanha` (Sim/Não) → BooleanField `coordenador_acompanha` (RELAY 50: visual,
         vazio→False). inicio/fim montados de data+hora LOCAL (America/Fortaleza), armazenados em UTC. Sem
         `created_by` no model → não exige actor."""
@@ -1200,6 +1230,7 @@ class ExportContractImporter:
                 is_online=_to_bool(r.get("is_online")),
                 status=status,
                 external_hash=ext_hash,
+                solicitante_procedencia=(r.get("solicitante_procedencia") or "").strip()[:30],
             )
             Participation.objects.get_or_create(
                 solicitacao=sol, usuario_id=coord_id, role=Participation.Role.COORDENADOR

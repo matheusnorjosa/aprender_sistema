@@ -407,6 +407,21 @@ class ExportContractImporter:
         self.allow = tuple(allow)
         self.actor = actor  # created_by no apply de entidades com auditoria (dat_cadastro/dat_registro)
         self._pidx = None
+        self._dat_uso_projetos: set[str] | None = None
+
+    def _projetos_com_dat_uso(self) -> set[str]:
+        """norm(nome) dos projetos que aparecem em dat_registro.csv/dat_compra.csv (coluna `projeto`).
+        Guard do #1897: um rótulo família-vazia (projeto_geral NULL) é OK, MAS se tem uso DAT a família
+        importa para `nr_codigos` → não pode ficar sem — o import barra a criação (would_reject)."""
+        if self._dat_uso_projetos is None:
+            s: set[str] = set()
+            for ent in ("dat_registro", "dat_compra"):
+                for r in self._load(ent):
+                    nome = (r.get("projeto") or "").strip()
+                    if nome:
+                        s.add(_norm(nome))
+            self._dat_uso_projetos = s
+        return self._dat_uso_projetos
 
     # ── resolver de Projeto (delegação ao módulo mergeado na #1372) ──
     def resolve_projeto(self, raw_name: str) -> int | None:
@@ -557,12 +572,19 @@ class ExportContractImporter:
         elif name == "projeto":
             # Master do catálogo de variantes (Onda A). Matching via resolver #1372 (canon-key,
             # detecta ambiguidade); NUNCA nome__iexact (o resolver canoniza & vs E / hífen /
-            # prefixo PROJETO). Criar exige PG resolvível (coluna projeto_geral) + fluxo
-            # autoritativo (PA-01) → PG/fluxo ausente = would_reject rotulado, nunca órfã NULL.
+            # prefixo PROJETO). Criar exige fluxo autoritativo (PA-01). projeto_geral resolvível OU,
+            # se vazio, rótulo família-vazia sem uso DAT (#1897) → cria NULL; PG declarado-desconhecido
+            # ou família-vazia-com-dat = would_reject rotulado.
             if self._pidx is None:
                 self._pidx = build_projeto_index()
             pg_idx = self._projeto_geral_index()
-            reasons = {"nome_vazio": 0, "ambiguous": 0, "pg_desconhecido": 0, "fluxo_ausente": 0}
+            reasons = {
+                "nome_vazio": 0,
+                "ambiguous": 0,
+                "pg_desconhecido": 0,
+                "fluxo_ausente": 0,
+                "familia_vazia_com_dat": 0,
+            }
             for r in rows:
                 nome = (r.get("projeto") or r.get("nome") or "").strip()
                 if not nome:
@@ -577,13 +599,18 @@ class ExportContractImporter:
                     tally["would_reject"] += 1
                     reasons["ambiguous"] += 1
                     continue
-                # unmatched → candidato a create; exige PG resolvível + fluxo válido.
-                # projeto_geral vazio (base MATCH_CANONICO) → deriva do próprio nome (PG homônimo).
-                pg_name = (r.get("projeto_geral") or "").strip() or nome
-                if pg_idx.get(_norm(pg_name)) is None:
-                    tally["would_reject"] += 1
-                    reasons["pg_desconhecido"] += 1
-                    continue
+                # unmatched → candidato a create.
+                pg_raw = (r.get("projeto_geral") or "").strip()
+                if pg_idx.get(_norm(pg_raw or nome)) is None:  # nem declarado nem homônimo resolve
+                    if pg_raw:
+                        tally["would_reject"] += 1  # PG DECLARADO mas desconhecido
+                        reasons["pg_desconhecido"] += 1
+                        continue
+                    if _norm(nome) in self._projetos_com_dat_uso():  # #1897: família vazia + uso DAT
+                        tally["would_reject"] += 1
+                        reasons["familia_vazia_com_dat"] += 1
+                        continue
+                    # else: rótulo família-vazia sem uso DAT → OK criar NULL
                 if (r.get("fluxo") or "").strip().upper() not in _PROJETO_FLUXOS:
                     tally["would_reject"] += 1
                     reasons["fluxo_ausente"] += 1
@@ -1419,11 +1446,19 @@ class ExportContractImporter:
                 continue  # matched (já existe) ou ambiguous (decisão humana) → não cria
             if res.canonical_key in seen:
                 continue  # mesma variante canônica repetida na run
-            pg_name = (r.get("projeto_geral") or "").strip() or nome  # base sem PG → deriva do nome
-            pg_id = pg_idx.get(_norm(pg_name))
             fluxo = (r.get("fluxo") or "").strip().upper()
-            if pg_id is None or fluxo not in _PROJETO_FLUXOS:
-                continue  # PG desconhecido / fluxo ausente → não cria (órfã/PA-01)
+            if fluxo not in _PROJETO_FLUXOS:
+                continue  # fluxo ausente → não cria (PA-01: default NAO_SUPER faria SUPER auto-aprovar)
+            pg_raw = (r.get("projeto_geral") or "").strip()
+            pg_id = pg_idx.get(_norm(pg_raw or nome))  # declarado, ou homônimo se vazio
+            if pg_id is None:
+                if pg_raw:
+                    continue  # PG DECLARADO mas desconhecido → não cria (nunca família errada)
+                # #1897: projeto_geral vazio = rótulo família-vazia intencional → cria NULL, SALVO se
+                # o projeto tem dat_registro/dat_compra (aí a família importa p/ nr_codigos → barra).
+                if _norm(nome) in self._projetos_com_dat_uso():
+                    continue  # would_reject (familia_vazia_com_dat)
+                # pg_id fica None → Projeto.projeto_geral NULL (rótulo)
             codigo = (r.get("codigo") or "").strip()[:50]
             if codigo and codigo in seen_codigos:
                 codigo = ""  # codigo repetido na run quebraria o unique parcial → grava vazio

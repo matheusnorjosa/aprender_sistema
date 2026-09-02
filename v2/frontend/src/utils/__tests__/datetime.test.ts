@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import dayjs from 'dayjs';
 
-import { formatFortaleza } from '../datetime';
+import { formatFortaleza, fortalezaWallClockToISO } from '../datetime';
 
 /**
  * RD-06 / CP-03: eventos são armazenados em UTC e DEVEM ser exibidos em
@@ -30,5 +31,21 @@ describe('formatFortaleza (RD-06: exibe em America/Fortaleza)', () => {
     expect(formatFortaleza(null)).toBe('');
     expect(formatFortaleza(undefined)).toBe('');
     expect(formatFortaleza('')).toBe('');
+  });
+});
+
+describe('fortalezaWallClockToISO (RD-06: escreve interpretando o wall-clock como Fortaleza)', () => {
+  it('trata o horário escolhido como America/Fortaleza (UTC−3) e serializa em UTC', () => {
+    // usuário escolhe 08:00 (pensando em Fortaleza) → 11:00Z, independente do fuso do runner
+    expect(fortalezaWallClockToISO(dayjs('2026-05-10 08:00'))).toBe('2026-05-10T11:00:00.000Z');
+  });
+
+  it('meia-noite em Fortaleza vira 03:00Z do mesmo dia', () => {
+    expect(fortalezaWallClockToISO(dayjs('2026-05-10 00:00'))).toBe('2026-05-10T03:00:00.000Z');
+  });
+
+  it('não quebra com valor nulo/inválido', () => {
+    expect(fortalezaWallClockToISO(null)).toBe('');
+    expect(fortalezaWallClockToISO('')).toBe('');
   });
 });

@@ -1,7 +1,7 @@
 ---
 title: Plano — Import da planilha + features derivadas
 status: draft
-last_verified: 2026-08-27
+last_verified: 2026-09-02
 owner: backend
 related:
   - ../specs/backend/imports.spec.md
@@ -11,6 +11,31 @@ related:
 ---
 
 # Plano — Import da planilha → sistema + features derivadas
+
+## ⏩ Status 2026-09-02 — IMPORT REAL FEITO, golden dev = só-v16
+
+`main = 7beb36cc`, 0 PRs. O dono AUTORIZOU o import real (RF01) e pediu "montar tudo localmente pra
+testar". **PRs mergeados** (v16.4→lookup): #1943 (solicitacao: `solicitante_cpf/email` + procedência +
+filtro `linha_completa` + afrouxa `apoio_requires_supervisor`) · #1944 (participation: guarda
+`match_procedencia` vazio→`guest_nome`) · #1945/#1947 (MeEventSerializer.`participantes` + coluna
+MeusEventos do Desktop) · #1946 (projeto rótulo `projeto_geral` NULL + guard família-vazia+dat,
+Refs #1897) · #1948 (lookup dropdown projeto+município: nome-limpo, esconde kits numerados / hubs
+UF-vazia, `include_kits`/`include_hubs`, teto 200).
+
+**Import real aplicado** (create-only, backup antes) da fatia appliable → golden só-v16: Solicitacao
+**3.085** · Participation **12.093** · DATCompra **2.214** · DATRegistro/Cadastro/Acao · PlanoFormacoes
+**380** · Municipio ativos **108** · Projeto ativos **116**. Depois: **purga do legado**
+(`created_at<hoje` — o golden tinha snapshot de maio misturado) + **limpeza de catálogo** (projeto:
+kits/dups/cruft; município: dup-acento/truncado/geo-errado + **cruzamento IBGE 5.571**). Regra do dono:
+**IBGE é SINAL, não exclusão** (AMIGOS DO BEM/APRENDER são necessidade operacional).
+
+**Falta a última fatia** (o "todos os dados"): **5 handlers NOT_IMPLEMENTED** no importer — `formacao`
+(1.229) · `acompanhamento` (111) · `prova` (51) · `availability_block` (53) · `deslocamento` (1.505).
+No golden só-v16 essas telas ficam vazias até serem codadas (TDD, poucos PRs). Também: fonte corrige
+**Capivari-PR→SP** (#129, typo real) → re-import; mesclar `Miudezas`(forma curta)→`PROJETO MIUDEZAS E
+DESCOBERTAS`. Playbook + aprendizados: memória `reference-golden-datafix-and-ibge-cleanup-2026-09-02`,
+`feedback-gunicorn-dev-sighup-reload`, `feedback-ibge-municipio-validation-signal`,
+`feedback-multi-claude-relay-verify-system-side` (RELAY 60/63: correção bidirecional, DictReader≠posição).
 
 ## Contexto (por quê)
 

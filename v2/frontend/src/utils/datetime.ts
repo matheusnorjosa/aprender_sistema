@@ -29,3 +29,19 @@ export function formatFortaleza(value: dayjs.ConfigType, format = 'DD/MM/YYYY HH
   const d = dayjs(value);
   return d.isValid() ? d.tz(FORTALEZA_TZ).format(format) : '';
 }
+
+/**
+ * Inverso de `formatFortaleza` no lado da ESCRITA (RD-06). Um DatePicker devolve um `Dayjs`
+ * cujo wall-clock (dia+hora que o usuário viu/digitou) está ancorado no fuso do NAVEGADOR.
+ * Este util reinterpreta esse mesmo wall-clock COMO America/Fortaleza e serializa em UTC ISO —
+ * assim "08:00" digitado é sempre 08:00 em Fortaleza, não no fuso local de quem preencheu.
+ *
+ * @returns ISO UTC (ex.: `2026-05-10T11:00:00.000Z`); `''` para valor inválido/nulo.
+ */
+export function fortalezaWallClockToISO(value: dayjs.ConfigType): string {
+  if (value === null || value === undefined || value === '') return '';
+  const d = dayjs(value);
+  if (!d.isValid()) return '';
+  // Extrai o wall-clock como o usuário o viu e o reancora em Fortaleza (não no fuso do navegador).
+  return dayjs.tz(d.format('YYYY-MM-DDTHH:mm:ss'), FORTALEZA_TZ).toISOString();
+}

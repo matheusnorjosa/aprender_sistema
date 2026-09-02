@@ -187,6 +187,7 @@ _CONSUMED_FIELDS: dict[str, frozenset[str]] = {
             "usuario_email",
             "email",
             "convidados_emails",
+            "match_procedencia",
             "role",
         }
     ),
@@ -1241,7 +1242,13 @@ class ExportContractImporter:
 
     def _resolve_participante(self, r: dict[str, str], cpf_idx: dict[str, int]) -> Usuario | None:
         """EMAIL-first (`resolve_user_by_email`, exato, sem filtro is_active — inclui inativos, RELAY 50)
-        → CPF (`usuario_cpf`) → nome (escada determinística #1643). Papel/cargo NUNCA gateiam a resolução."""
+        → CPF (`usuario_cpf`) → nome (escada determinística #1643). Papel/cargo NUNCA gateiam a resolução.
+
+        Guarda de relay (v16.4/RELAY 57): se o sheets emite `match_procedencia` e ele vem VAZIO, a fonte
+        JÁ tentou CPF/e-mail + escada-2-tokens e se absteve — o resolver-por-nome (Degrau 2, token-subset)
+        é sinal mais fraco e casaria a pessoa que SAIU a um homônimo de nome mais longo. Então NÃO resolve
+        por nome nesse caso → vira `guest_nome` (preserva quem saiu). Coluna ausente (fixtures/CSV antigo) =
+        sem sinal → mantém o fallback por nome."""
         email = (r.get("usuario_email") or r.get("email") or r.get("convidados_emails") or "").strip()
         if email:
             first = email.replace(";", ",").split(",")[0].strip()
@@ -1253,6 +1260,9 @@ class ExportContractImporter:
             uid = cpf_idx.get(cpf)
             if uid is not None:
                 return Usuario.objects.filter(id=uid).first()
+        match_proc = r.get("match_procedencia")
+        if match_proc is not None and not match_proc.strip():
+            return None  # fonte abstém-se → não fuzzy-match por nome → guest_nome
         nome = (r.get("usuario") or "").strip()
         if nome and "@" not in nome:
             return resolve_user_by_name(nome)

@@ -219,6 +219,49 @@ class TestProjetoLookup:
         assert p1.id in returned_ids
         assert p2.id not in returned_ids
 
+    def test_lookup_label_sem_prefixo_de_codigo(self, api_client, authenticated_user):
+        """Label = nome (sem 'codigo - '): os codigos-slug (Á->_) poluíam a lista com 'A_COR_DA_GENTE -'."""
+        p = ProjetoFactory(nome="A COR DA GENTE", codigo="A_COR_DA_GENTE", ativo=True, fluxo="NAO_SUPER")
+        api_client.force_authenticate(user=authenticated_user)
+        data = api_client.get("/api/lookup/projetos/?q=GENTE").json()
+        item = next(d for d in data if d["id"] == p.id)
+        assert item["label"] == "A COR DA GENTE", "label = nome, sem prefixo de codigo-slug"
+
+    def test_lookup_esconde_variantes_kit_numeradas(self, api_client, authenticated_user):
+        """Kits numerados (nome termina em número) não entram no dropdown de evento (decisão do dono:
+        os eventos usam o nome-família, ex.: 'A COR DA GENTE'; '... 1..9' são os kits das coleções)."""
+        fam = ProjetoFactory(nome="A COR DA GENTE", codigo="A_COR_DA_GENTE", ativo=True, fluxo="NAO_SUPER")
+        kit = ProjetoFactory(nome="A COR DA GENTE 3", codigo="", ativo=True, fluxo="NAO_SUPER")
+        api_client.force_authenticate(user=authenticated_user)
+        ids = {d["id"] for d in api_client.get("/api/lookup/projetos/?q=GENTE").json()}
+        assert fam.id in ids, "família (projeto-evento) aparece"
+        assert kit.id not in ids, "kit numerado escondido"
+
+    def test_lookup_include_kits_traz_numeradas(self, api_client, authenticated_user):
+        """include_kits=true reexpõe os numerados (escape hatch p/ eventual consumidor de kit)."""
+        kit = ProjetoFactory(nome="A COR DA GENTE 3", codigo="", ativo=True, fluxo="NAO_SUPER")
+        api_client.force_authenticate(user=authenticated_user)
+        ids = {d["id"] for d in api_client.get("/api/lookup/projetos/?q=GENTE&include_kits=true").json()}
+        assert kit.id in ids
+
+    def test_lookup_municipios_exclui_hub_uf_vazia(self, api_client, authenticated_user):
+        """Hub de viagem (UF vazia) não é local de EVENTO → fora do dropdown de solicitação por padrão."""
+        real = MunicipioFactory(nome="Sobral", uf="CE", ativo=True)
+        hub = MunicipioFactory(nome="Fortaleza", uf="", ativo=True)  # hub de viagem, UF vazia
+        api_client.force_authenticate(user=authenticated_user)
+        ids = {d["id"] for d in api_client.get("/api/lookup/municipios/?q=").json()}
+        assert real.id in ids
+        assert hub.id not in ids, "hub UF-vazia escondido do dropdown de evento"
+
+    def test_lookup_municipios_include_hubs_traz_uf_vazia(self, api_client, authenticated_user):
+        """include_hubs=true reexpõe os hubs (p/ o fluxo de deslocamento)."""
+        hub = MunicipioFactory(nome="Salvador", uf="", ativo=True)
+        api_client.force_authenticate(user=authenticated_user)
+        data = api_client.get("/api/lookup/municipios/?q=&include_hubs=true").json()
+        by = {d["id"]: d["label"] for d in data}
+        assert hub.id in by
+        assert by[hub.id] == "Salvador", "label sem traço sobrando quando UF é vazia"
+
 
 @pytest.mark.django_db
 class TestTipoEventoLookup:

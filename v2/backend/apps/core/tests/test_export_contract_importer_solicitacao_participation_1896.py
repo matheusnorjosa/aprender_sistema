@@ -273,3 +273,46 @@ def test_apply_solicitacao_rejects_incomplete_line(tmp_path):
     r = ExportContractImporter(path=path, apply=True, allow=("solicitacao",)).run()
     assert r["applied"]["solicitacao"] == 0, "linha_completa=false → fora de escopo"
     assert Solicitacao.objects.count() == 0
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v16.4 participation (RELAY 57): `match_procedencia` vazio = o sheets tentou CPF/e-mail +
+# escada-2-tokens e ABSTEVE-SE. O importer NÃO pode cair no resolver-por-nome (Degrau 2 casa
+# quem SAIU a um homônimo de nome mais longo) — preserva como guest_nome. Guarda de relay.
+# ─────────────────────────────────────────────────────────────────────────────
+
+PART_HEADER_V16 = "evento_id,evento_hash_natural,usuario,usuario_norm,usuario_cpf,usuario_email,match_procedencia,role"
+
+
+def test_apply_participation_empty_match_procedencia_becomes_guest_nome(tmp_path):
+    """match_procedencia vazio → não resolve por nome (evita casar a pessoa que saiu ao homônimo
+    que ficou, via Degrau 2 token-subconjunto) → guest_nome."""
+    mun, proj, tipo, _coord = _masters()
+    # usuário que FICOU, nome mais longo: 'Manuela Fonseca' ⊆ tokens de 'Manuela Fonseca Silva'
+    ficou = UsuarioFactory(
+        username="mfs", cpf="52998224725", email="mfs@x.com", first_name="Manuela Fonseca", last_name="Silva"
+    )
+    eh = _hash(mun, proj, tipo)
+    # match_procedencia vazio, sem cpf/email — a pessoa que saiu
+    part = f"{PART_HEADER_V16}\n{eh},{eh},Manuela Fonseca,MANUELA FONSECA,,,,FORMADOR\n"
+    path = _write_export(tmp_path, {"solicitacao": _sol_row(ehash=eh), "participation": part})
+    ExportContractImporter(path=path, apply=True, allow=("solicitacao", "participation")).run()
+    assert not Participation.objects.filter(
+        solicitacao__external_hash=eh, usuario=ficou
+    ).exists(), "match vazio não pode casar por nome ao homônimo que ficou"
+    p = Participation.objects.get(solicitacao__external_hash=eh, role="FORMADOR", usuario__isnull=True)
+    assert p.guest_nome == "Manuela Fonseca", "preserva quem saiu como guest_nome"
+
+
+def test_apply_participation_nonempty_match_still_resolves_by_name(tmp_path):
+    """Guarda só age no match VAZIO: com match preenchido (ou coluna ausente, fixtures), o resolver
+    por nome segue valendo — não quebra o caminho legítimo."""
+    mun, proj, tipo, _coord = _masters()
+    pessoa = UsuarioFactory(username="p3", cpf="52998224725", email="p3@x.com", first_name="Pessoa", last_name="Tres")
+    eh = _hash(mun, proj, tipo)
+    part = f"{PART_HEADER_V16}\n{eh},{eh},Pessoa Tres,PESSOA TRES,,,escada_2tokens,FORMADOR\n"
+    path = _write_export(tmp_path, {"solicitacao": _sol_row(ehash=eh), "participation": part})
+    ExportContractImporter(path=path, apply=True, allow=("solicitacao", "participation")).run()
+    assert Participation.objects.filter(
+        solicitacao__external_hash=eh, usuario=pessoa, role="FORMADOR"
+    ).exists(), "match não-vazio → resolve por nome normalmente"

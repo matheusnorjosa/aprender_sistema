@@ -4,7 +4,7 @@
  * Cadeia: usuario (nome) → guest_nome → guest_email → email.
  */
 import { describe, it, expect } from 'vitest';
-import { participantLabel, formadoresLabel } from '../participants';
+import { participantLabel, formadoresLabel, formadoresNomes } from '../participants';
 import type { Participation } from '../../types/solicitacao';
 
 const base: Participation = {
@@ -61,5 +61,25 @@ describe('formadoresLabel', () => {
   it('lista vazia/undefined → string vazia', () => {
     expect(formadoresLabel(undefined)).toBe('');
     expect(formadoresLabel([])).toBe('');
+  });
+});
+
+// #1945: MeusEventos consome o shape pré-resolvido [{role, nome}] do MeEventSerializer.
+describe('formadoresNomes (MeusEventos — shape pré-resolvido [{role, nome}])', () => {
+  it('inclui só FORMADOR, incluindo quem saiu (nome já resolvido); descarta outros papéis', () => {
+    const participantes = [
+      { role: 'FORMADOR', nome: 'João Silva' }, // formador com usuário
+      { role: 'FORMADOR', nome: 'Maria Ex' }, // formador que saiu (guest_nome, sem FK)
+      { role: 'COORDENADOR', nome: 'Ana Coord' }, // não-formador → fora
+      { role: 'COORD_ACOMPANHA', nome: 'Beto Acomp' }, // não-formador → fora
+      { role: 'CONVIDADO', nome: 'Caio Convidado' }, // não-formador → fora
+    ];
+    expect(formadoresNomes(participantes)).toBe('João Silva, Maria Ex');
+  });
+
+  it('descarta nomes vazios e trata lista vazia/undefined', () => {
+    expect(formadoresNomes([{ role: 'FORMADOR', nome: '' }])).toBe('');
+    expect(formadoresNomes(undefined)).toBe('');
+    expect(formadoresNomes([])).toBe('');
   });
 });

@@ -37,6 +37,11 @@ function makeEvent(overrides: Partial<MeEvent> = {}): MeEvent {
     tipo_evento_nome: 'Formação',
     local: 'Escola Municipal X',
     formadores: ['Ana Vidas', 'Bruno Fluir'],
+    // #1945: a coluna passou a ler `participantes` (inclui quem saiu por guest_nome).
+    participantes: [
+      { role: 'FORMADOR', nome: 'Ana Vidas' },
+      { role: 'FORMADOR', nome: 'Bruno Fluir' },
+    ],
     is_online: false,
     meet_link: null,
     status: 'aprovado',
@@ -74,6 +79,27 @@ describe('MeusEventosPage', () => {
     expect(await screen.findByText('Fluir')).toBeInTheDocument();
     // formadores juntados por vírgula
     expect(await screen.findAllByText('Ana Vidas, Bruno Fluir')).toHaveLength(2);
+  });
+
+  // #1945: a coluna Formadores usa `participantes` (não o `formadores` legado) → inclui quem
+  // saiu (guest_nome, sem FK) e filtra o papel FORMADOR (coordenadores não entram).
+  test('coluna Formadores inclui quem saiu (guest_nome) e ignora não-formadores', async () => {
+    getMyEventsMock.mockResolvedValueOnce(
+      makePage([
+        makeEvent({
+          id: 50,
+          participantes: [
+            { role: 'FORMADOR', nome: 'Carla Ativa' },
+            { role: 'FORMADOR', nome: 'Diego Saiu' }, // convidado que saiu, preservado por nome
+            { role: 'COORDENADOR', nome: 'Elis Coord' }, // não-formador → fora
+          ],
+        }),
+      ])
+    );
+    renderPage();
+
+    expect(await screen.findByText('Carla Ativa, Diego Saiu')).toBeInTheDocument();
+    expect(screen.queryByText(/Elis Coord/)).not.toBeInTheDocument();
   });
 
   test('mostra empty state quando não há eventos', async () => {

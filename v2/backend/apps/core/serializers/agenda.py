@@ -34,12 +34,17 @@ class AvailabilityBlockSerializer(serializers.ModelSerializer):
     # validação de permissão — vazaria enumeração de IDs por 400 vs 403.
     usuario_id = serializers.IntegerField(required=False, write_only=True)
 
+    # Nome do dono do bloqueio (read-only): `usuario` sai como id, então a tela
+    # precisa deste campo para exibir DE QUEM é o bloqueio (o FE já o consome).
+    usuario_nome = serializers.SerializerMethodField()
+
     class Meta:
         model = AvailabilityBlock
         fields = [
             "id",
             "usuario",
             "usuario_id",
+            "usuario_nome",
             "inicio",
             "fim",
             "tipo",
@@ -49,6 +54,12 @@ class AvailabilityBlockSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "usuario", "status", "created_at", "updated_at"]
+
+    def get_usuario_nome(self, obj: AvailabilityBlock) -> str:
+        u = getattr(obj, "usuario", None)
+        if u is None:
+            return ""
+        return u.get_full_name() or u.username
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         """

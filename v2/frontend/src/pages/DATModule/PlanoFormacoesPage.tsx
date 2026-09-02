@@ -414,7 +414,9 @@ export default function PlanoFormacoesPage(): JSX.Element {
     if (!editingAcomp) return;
     try {
       const payload = {
-        data: values.data?.format('YYYY-MM-DD') || null,
+        // Campo gravável do AcompanhamentoSerializer é `data_acompanhamento` (não `data`):
+        // com partial=True o DRF descartava a chave desconhecida → a data nunca persistia.
+        data_acompanhamento: values.data?.format('YYYY-MM-DD') || null,
         realizado: values.realizado,
       };
       await updateAcompanhamentoInline(
@@ -444,7 +446,8 @@ export default function PlanoFormacoesPage(): JSX.Element {
     if (!editingProva) return;
     try {
       const payload = {
-        data: values.data?.format('YYYY-MM-DD') || null,
+        // Campo gravável do ProvaSerializer é `data_prova` (não `data`) — mesmo bug do dangling.
+        data_prova: values.data?.format('YYYY-MM-DD') || null,
         realizada: values.realizada,
       };
       await updateProvaInline(editingProva.plano.id, editingProva.prova.numero, payload);

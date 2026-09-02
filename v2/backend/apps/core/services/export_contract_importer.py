@@ -36,6 +36,7 @@ from django.utils import timezone
 from apps.core.constants import ALLOWED_USER_GROUPS
 from apps.core.imports.normalization import normalize_cpf_digits
 from apps.core.models import (
+    Acompanhamento,
     DATAcao,
     DATArea,
     DATCadastro,
@@ -43,6 +44,7 @@ from apps.core.models import (
     DATCoordenador,
     DATRegistro,
     EquipeGerencia,
+    Formacao,
     Gerencia,
     Municipio,
     Participation,
@@ -50,6 +52,7 @@ from apps.core.models import (
     Produto,
     Projeto,
     ProjetoGeral,
+    Prova,
     Solicitacao,
     TipoEvento,
     Usuario,
@@ -119,6 +122,9 @@ IMPLEMENTED = {
     "dat_compra",
     "solicitacao",
     "participation",
+    "formacao",
+    "acompanhamento",
+    "prova",
 }
 # Escrivíveis = subconjunto de IMPLEMENTED com apply REAL. `produto`/`gerencia` classificam mas não
 # têm handler (silent-0) → `--allow-entity` neles é erro (CR-03), não "applied=0" calado.
@@ -135,6 +141,9 @@ _PAPEL_TO_GROUP: dict[str, str] = {
 }
 # Papéis canônicos válidos de EquipeGerencia (NK inclui o papel; fora disto = would_reject).
 _EQUIPE_PAPEIS = frozenset(_PAPEL_TO_GROUP)
+
+# Tipos válidos de Acompanhamento (choices do model, sem CheckConstraint no BD → guard no importer).
+_ACOMPANHAMENTO_TIPOS = frozenset({"primeiro", "segundo"})
 
 # Guardrail: colunas do CSV que cada handler DE FATO consome. O classify reporta em `ignored_fields`
 # o que chega no contrato mas não é lido — pra nenhum dado cair calado (sugestão do sheets.banco).
@@ -191,6 +200,11 @@ _CONSUMED_FIELDS: dict[str, frozenset[str]] = {
             "role",
         }
     ),
+    "formacao": frozenset(
+        {"municipio", "uf", "projeto", "ano", "numero_formacao", "data_formacao", "carga_horaria", "modalidade"}
+    ),
+    "acompanhamento": frozenset({"municipio", "uf", "projeto", "ano", "tipo", "data_acompanhamento"}),
+    "prova": frozenset({"municipio", "uf", "projeto", "ano", "numero_prova", "data_prova", "marcado"}),
 }
 
 
@@ -853,12 +867,83 @@ class ExportContractImporter:
                 st, _ = diff_and_classify(None, {}, protected)  # would_create (dedup por-usuário no apply)
                 tally[st] += 1
 
+        elif name == "formacao":
+            # Filha de PlanoFormacoes. NK (plano_id, numero_formacao); plano pai resolvido por
+            # (municipio, projeto[, ano derivado de data_formacao.year]). Plano/FK ausente ou numero
+            # fora de 1..15 (CheckConstraint) → would_reject. Existence-based.
+            mun_idx = self._municipio_index()
+            existing = set(Formacao.objects.values_list("plano_id", "numero_formacao"))
+            for r in rows:
+                plano_id = self._resolve_plano_id(r, mun_idx, "data_formacao")
+                numero = _parse_int(r.get("numero_formacao"))
+                if plano_id is None or numero is None or not (1 <= numero <= 15):
+                    tally["would_reject"] += 1
+                    continue
+                st, _ = diff_and_classify({} if (plano_id, numero) in existing else None, {}, protected)
+                tally[st] += 1
+
+        elif name == "acompanhamento":
+            # Filha de PlanoFormacoes. NK (plano_id, tipo); tipo ∈ {primeiro, segundo} (choices, sem
+            # CheckConstraint no BD → guard aqui p/ não gravar valor fora do domínio). Existence-based.
+            mun_idx = self._municipio_index()
+            existing = set(Acompanhamento.objects.values_list("plano_id", "tipo"))
+            for r in rows:
+                plano_id = self._resolve_plano_id(r, mun_idx, "data_acompanhamento")
+                tipo = (r.get("tipo") or "").strip().lower()
+                if plano_id is None or tipo not in _ACOMPANHAMENTO_TIPOS:
+                    tally["would_reject"] += 1
+                    continue
+                st, _ = diff_and_classify({} if (plano_id, tipo) in existing else None, {}, protected)
+                tally[st] += 1
+
+        elif name == "prova":
+            # Filha de PlanoFormacoes. NK (plano_id, numero_prova); numero ∈ 1..3 (CheckConstraint).
+            # Existence-based.
+            mun_idx = self._municipio_index()
+            existing = set(Prova.objects.values_list("plano_id", "numero_prova"))
+            for r in rows:
+                plano_id = self._resolve_plano_id(r, mun_idx, "data_prova")
+                numero = _parse_int(r.get("numero_prova"))
+                if plano_id is None or numero is None or not (1 <= numero <= 3):
+                    tally["would_reject"] += 1
+                    continue
+                st, _ = diff_and_classify({} if (plano_id, numero) in existing else None, {}, protected)
+                tally[st] += 1
+
         if name in _CONSUMED_FIELDS and rows:
             # Guardrail: colunas presentes no CSV que o handler não lê (aliases já contam como consumidos).
             tally["ignored_fields"] = sorted(set(rows[0].keys()) - _CONSUMED_FIELDS[name])
 
         tally["export_rows"] = len(rows)
         return tally
+
+    def _resolve_plano_id(self, r: dict[str, str], mun_idx: dict[tuple[str, str], int], date_field: str) -> int | None:
+        """Resolve o PlanoFormacoes pai de uma filha (formacao/acompanhamento/prova) por
+        (municipio, projeto, ano).
+
+        `ano` vem da coluna `ano` do CSV da filha — o MESMO dado do pai (contrato v16.7/RELAY 31),
+        não derivado. Fallback p/ contratos antigos/fixtures: ano derivado de `date_field.year` (as
+        datas da fonte vêm DD/MM sem ano → derivação NÃO é confiável para planos de outros anos, por
+        isso a coluna explícita); depois o ÚNICO plano do par (golden 1:1).
+
+        Fail-safe: par (mun, proj) com planos em anos distintos e `ano` desconhecido → ambíguo →
+        None (rejeita a filha, não chuta um plano arbitrário). Co-coordenação no MESMO (mun, proj,
+        ano) é barrada pela UniqueConstraint do model — decisão #134, não deste handler."""
+        mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
+        proj_id = self.resolve_projeto(r.get("projeto") or "")
+        if mun_id is None or proj_id is None:
+            return None
+        qs = PlanoFormacoes.objects.filter(municipio_id=mun_id, projeto_id=proj_id)
+        ano = _parse_int(r.get("ano"))
+        if ano is None:
+            d = _parse_iso_date(r.get(date_field))
+            ano = d.year if d is not None else None
+        if ano is not None:
+            matched = qs.filter(ano=ano).values_list("id", flat=True).first()  # UniqueConstraint → ≤1
+            if matched is not None:
+                return matched
+        ids = list(qs.values_list("id", flat=True)[:2])
+        return ids[0] if len(ids) == 1 else None
 
     def _resolve_gerencia_readonly(self, setor_raw: str) -> Gerencia | None:
         """Resolve Gerencia por setor SEM criar (espelha a precedência de _get_or_create_gerencia,
@@ -974,6 +1059,16 @@ class ExportContractImporter:
                 if name == "participation":
                     # DEPOIS de solicitacao (ENTITY_ORDER garante): liga por external_hash já criado.
                     applied[name] = self._apply_participation(self._load(name))
+                    continue
+                if name == "formacao":
+                    # Filha de PlanoFormacoes (DEPOIS de plano_formacao por ENTITY_ORDER). CSV sem `nome`.
+                    applied[name] = self._apply_formacao(self._load(name))
+                    continue
+                if name == "acompanhamento":
+                    applied[name] = self._apply_acompanhamento(self._load(name))
+                    continue
+                if name == "prova":
+                    applied[name] = self._apply_prova(self._load(name))
                     continue
                 created = 0
                 for r in self._load(name):
@@ -1333,6 +1428,86 @@ class ExportContractImporter:
                 continue
             Participation.objects.create(solicitacao_id=sol_id, guest_nome=nome, role=role)
             existing_nome.add(nkey)
+            created += 1
+        return created
+
+    def _apply_formacao(self, rows: list[dict[str, str]]) -> int:
+        """Create-only de Formacao (filha de PlanoFormacoes). Plano pai via `_resolve_plano_id`
+        (municipio, projeto[, ano de data_formacao]). NK (plano_id, numero_formacao); numero fora de
+        1..15 (CheckConstraint) → skip (não estoura IntegrityError na transação). modalidade fora do
+        domínio → default presencial; carga_horaria vazia → default do model. Sem created_by no
+        model → não exige actor."""
+        mun_idx = self._municipio_index()
+        existing = set(Formacao.objects.values_list("plano_id", "numero_formacao"))
+        created = 0
+        for r in rows:
+            plano_id = self._resolve_plano_id(r, mun_idx, "data_formacao")
+            numero = _parse_int(r.get("numero_formacao"))
+            if plano_id is None or numero is None or not (1 <= numero <= 15):
+                continue
+            if (plano_id, numero) in existing:
+                continue
+            modalidade = (r.get("modalidade") or "").strip().lower()
+            if modalidade not in ("presencial", "online"):
+                modalidade = "presencial"
+            ch = _parse_decimal(r.get("carga_horaria"))
+            Formacao.objects.create(
+                plano_id=plano_id,
+                numero_formacao=numero,
+                data_formacao=_parse_iso_date(r.get("data_formacao")),
+                carga_horaria=ch if ch is not None else Decimal("4.00"),
+                modalidade=modalidade,
+            )
+            existing.add((plano_id, numero))
+            created += 1
+        return created
+
+    def _apply_acompanhamento(self, rows: list[dict[str, str]]) -> int:
+        """Create-only de Acompanhamento (filha de PlanoFormacoes). Plano pai via `_resolve_plano_id`
+        (municipio, projeto[, ano de data_acompanhamento]). NK (plano_id, tipo); tipo fora de
+        {primeiro, segundo} → skip (choices, sem CheckConstraint no BD). `realizado` = default False
+        (o contrato não traz sinal de realizado). Sem created_by no model → não exige actor."""
+        mun_idx = self._municipio_index()
+        existing = set(Acompanhamento.objects.values_list("plano_id", "tipo"))
+        created = 0
+        for r in rows:
+            plano_id = self._resolve_plano_id(r, mun_idx, "data_acompanhamento")
+            tipo = (r.get("tipo") or "").strip().lower()
+            if plano_id is None or tipo not in _ACOMPANHAMENTO_TIPOS:
+                continue
+            if (plano_id, tipo) in existing:
+                continue
+            Acompanhamento.objects.create(
+                plano_id=plano_id,
+                tipo=tipo,
+                data_acompanhamento=_parse_iso_date(r.get("data_acompanhamento")),
+            )
+            existing.add((plano_id, tipo))
+            created += 1
+        return created
+
+    def _apply_prova(self, rows: list[dict[str, str]]) -> int:
+        """Create-only de Prova (filha de PlanoFormacoes). Plano pai via `_resolve_plano_id`
+        (municipio, projeto[, ano de data_prova]). NK (plano_id, numero_prova); numero fora de 1..3
+        (CheckConstraint) → skip. `marcado` (sempre 'true' na fonte) → `realizada`. data_prova vazia
+        é comum (nullable). Sem created_by no model → não exige actor."""
+        mun_idx = self._municipio_index()
+        existing = set(Prova.objects.values_list("plano_id", "numero_prova"))
+        created = 0
+        for r in rows:
+            plano_id = self._resolve_plano_id(r, mun_idx, "data_prova")
+            numero = _parse_int(r.get("numero_prova"))
+            if plano_id is None or numero is None or not (1 <= numero <= 3):
+                continue
+            if (plano_id, numero) in existing:
+                continue
+            Prova.objects.create(
+                plano_id=plano_id,
+                numero_prova=numero,
+                data_prova=_parse_iso_date(r.get("data_prova")),
+                realizada=_to_bool(r.get("marcado")),
+            )
+            existing.add((plano_id, numero))
             created += 1
         return created
 

@@ -37,6 +37,7 @@ from apps.core.constants import ALLOWED_USER_GROUPS
 from apps.core.imports.normalization import normalize_cpf_digits
 from apps.core.models import (
     Acompanhamento,
+    AvailabilityBlock,
     DATAcao,
     DATArea,
     DATCadastro,
@@ -125,6 +126,7 @@ IMPLEMENTED = {
     "formacao",
     "acompanhamento",
     "prova",
+    "availability_block",
 }
 # Escrivíveis = subconjunto de IMPLEMENTED com apply REAL. `produto`/`gerencia` classificam mas não
 # têm handler (silent-0) → `--allow-entity` neles é erro (CR-03), não "applied=0" calado.
@@ -205,6 +207,7 @@ _CONSUMED_FIELDS: dict[str, frozenset[str]] = {
     ),
     "acompanhamento": frozenset({"municipio", "uf", "projeto", "ano", "tipo", "data_acompanhamento"}),
     "prova": frozenset({"municipio", "uf", "projeto", "ano", "numero_prova", "data_prova", "marcado"}),
+    "availability_block": frozenset({"usuario_cpf", "inicio", "fim", "tipo", "motivo"}),
 }
 
 
@@ -245,6 +248,21 @@ def _parse_iso_date(v: Any) -> date | None:
 
 
 _FORTALEZA_TZ = ZoneInfo("America/Fortaleza")
+
+
+def _parse_local_datetime(v: Any) -> datetime | None:
+    """Parseia datetime ISO (YYYY-MM-DDTHH:MM:SS) LOCAL de Fortaleza → aware em UTC (RD-06).
+    Vazio/inválido → None. Ignora offset já embutido (a fonte emite naive + timezone=Fortaleza)."""
+    s = str(v or "").strip()
+    if not s:
+        return None
+    try:
+        dt = datetime.fromisoformat(s)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = timezone.make_aware(dt, _FORTALEZA_TZ)
+    return dt
 
 
 def _parse_hora(v: Any) -> time | None:
@@ -910,6 +928,23 @@ class ExportContractImporter:
                 st, _ = diff_and_classify({} if (plano_id, numero) in existing else None, {}, protected)
                 tally[st] += 1
 
+        elif name == "availability_block":
+            # Bloco de disponibilidade de formador. usuario por CPF (FK PROTECT NOT NULL → sem match
+            # = reject). tipo ∈ {T, P} (CheckConstraint). inicio/fim datetime local → UTC; fim ≤ inicio
+            # viola a constraint → reject. NK (usuario, inicio, fim, tipo). Existence-based.
+            cpf_idx = self._usuario_cpf_index()
+            existing = set(AvailabilityBlock.objects.values_list("usuario_id", "inicio", "fim", "tipo"))
+            for r in rows:
+                usr_id = cpf_idx.get(normalize_cpf_digits(r.get("usuario_cpf") or ""))
+                tipo = (r.get("tipo") or "").strip().upper()
+                inicio = _parse_local_datetime(r.get("inicio"))
+                fim = _parse_local_datetime(r.get("fim"))
+                if usr_id is None or tipo not in ("T", "P") or inicio is None or fim is None or fim <= inicio:
+                    tally["would_reject"] += 1
+                    continue
+                st, _ = diff_and_classify({} if (usr_id, inicio, fim, tipo) in existing else None, {}, protected)
+                tally[st] += 1
+
         if name in _CONSUMED_FIELDS and rows:
             # Guardrail: colunas presentes no CSV que o handler não lê (aliases já contam como consumidos).
             tally["ignored_fields"] = sorted(set(rows[0].keys()) - _CONSUMED_FIELDS[name])
@@ -1069,6 +1104,9 @@ class ExportContractImporter:
                     continue
                 if name == "prova":
                     applied[name] = self._apply_prova(self._load(name))
+                    continue
+                if name == "availability_block":
+                    applied[name] = self._apply_availability_block(self._load(name))
                     continue
                 created = 0
                 for r in self._load(name):
@@ -1508,6 +1546,38 @@ class ExportContractImporter:
                 realizada=_to_bool(r.get("marcado")),
             )
             existing.add((plano_id, numero))
+            created += 1
+        return created
+
+    def _apply_availability_block(self, rows: list[dict[str, str]]) -> int:
+        """Create-only de AvailabilityBlock (bloco de disponibilidade de formador). usuario por CPF
+        (FK PROTECT NOT NULL → sem match = skip). inicio/fim datetime LOCAL Fortaleza → UTC (RD-06);
+        fim ≤ inicio viola a CheckConstraint → skip. tipo ∈ {T, P} → skip fora disso. `motivo` sem
+        origem na planilha → ''. status default 'aprovado' (save auto-aprova). created_by = actor.
+        NK existence-based (usuario, inicio, fim, tipo)."""
+        actor = self._require_actor("availability_block")
+        cpf_idx = self._usuario_cpf_index()
+        existing = set(AvailabilityBlock.objects.values_list("usuario_id", "inicio", "fim", "tipo"))
+        created = 0
+        for r in rows:
+            usr_id = cpf_idx.get(normalize_cpf_digits(r.get("usuario_cpf") or ""))
+            tipo = (r.get("tipo") or "").strip().upper()
+            inicio = _parse_local_datetime(r.get("inicio"))
+            fim = _parse_local_datetime(r.get("fim"))
+            if usr_id is None or tipo not in ("T", "P") or inicio is None or fim is None or fim <= inicio:
+                continue
+            nk = (usr_id, inicio, fim, tipo)
+            if nk in existing:
+                continue
+            AvailabilityBlock.objects.create(
+                usuario_id=usr_id,
+                inicio=inicio,
+                fim=fim,
+                tipo=tipo,
+                motivo=(r.get("motivo") or "").strip()[:255],
+                created_by=actor,
+            )
+            existing.add(nk)
             created += 1
         return created
 

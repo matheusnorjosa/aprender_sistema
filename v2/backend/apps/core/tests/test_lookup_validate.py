@@ -244,6 +244,24 @@ class TestProjetoLookup:
         ids = {d["id"] for d in api_client.get("/api/lookup/projetos/?q=GENTE&include_kits=true").json()}
         assert kit.id in ids
 
+    def test_lookup_municipios_exclui_hub_uf_vazia(self, api_client, authenticated_user):
+        """Hub de viagem (UF vazia) não é local de EVENTO → fora do dropdown de solicitação por padrão."""
+        real = MunicipioFactory(nome="Sobral", uf="CE", ativo=True)
+        hub = MunicipioFactory(nome="Fortaleza", uf="", ativo=True)  # hub de viagem, UF vazia
+        api_client.force_authenticate(user=authenticated_user)
+        ids = {d["id"] for d in api_client.get("/api/lookup/municipios/?q=").json()}
+        assert real.id in ids
+        assert hub.id not in ids, "hub UF-vazia escondido do dropdown de evento"
+
+    def test_lookup_municipios_include_hubs_traz_uf_vazia(self, api_client, authenticated_user):
+        """include_hubs=true reexpõe os hubs (p/ o fluxo de deslocamento)."""
+        hub = MunicipioFactory(nome="Salvador", uf="", ativo=True)
+        api_client.force_authenticate(user=authenticated_user)
+        data = api_client.get("/api/lookup/municipios/?q=&include_hubs=true").json()
+        by = {d["id"]: d["label"] for d in data}
+        assert hub.id in by
+        assert by[hub.id] == "Salvador", "label sem traço sobrando quando UF é vazia"
+
 
 @pytest.mark.django_db
 class TestTipoEventoLookup:

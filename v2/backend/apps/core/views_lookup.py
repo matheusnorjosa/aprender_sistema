@@ -56,6 +56,7 @@ class MunicipioLookup(APIView):
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         q = request.GET.get("q", "").strip()
         com_compra = request.GET.get("com_compra", "false").lower() in {"1", "true", "t", "yes", "y"}
+        include_hubs = request.GET.get("include_hubs", "false").lower() in {"1", "true", "t", "yes", "y"}
         projeto_id_raw = request.GET.get("projeto_id", "").strip()
 
         projeto_id: int | None = None
@@ -66,6 +67,10 @@ class MunicipioLookup(APIView):
             projeto_id = None
 
         qs: QuerySet[Municipio] = Municipio.objects.filter(ativo=True)
+        # Hubs de viagem têm UF vazia (origem/destino de deslocamento, não local de evento). Fora do
+        # dropdown de solicitação por padrão; `include_hubs=true` reexpõe (fluxo de deslocamento).
+        if not include_hubs:
+            qs = qs.exclude(uf="")
         if com_compra or projeto_id is not None:
             qs = qs.filter(compras__isnull=False)
         if projeto_id is not None:
@@ -84,10 +89,12 @@ class MunicipioLookup(APIView):
 
         results = []
         for mun in qs:
+            # Sem traço sobrando quando a UF é vazia (hub de viagem): "Fortaleza", não "Fortaleza-".
+            label = f"{mun.nome}-{mun.uf}" if mun.uf else mun.nome
             results.append(
                 {
                     "id": mun.id,
-                    "label": f"{mun.nome}-{mun.uf}",
+                    "label": label,
                     "kind": "municipio",
                 }
             )

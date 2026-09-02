@@ -191,6 +191,7 @@ def test_serializer_exposes_expected_fields(make_user, make_solicitacao):
         "tipo_evento_nome",
         "local",
         "formadores",
+        "participantes",
         "is_online",
         "meet_link",
         "status",

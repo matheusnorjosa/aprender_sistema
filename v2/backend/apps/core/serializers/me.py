@@ -33,6 +33,7 @@ class MeEventSerializer(serializers.ModelSerializer):
     projeto_nome = serializers.CharField(source="projeto.nome", read_only=True, default=None)
     tipo_evento_nome = serializers.CharField(source="tipo_evento.nome", read_only=True, default=None)
     formadores = serializers.SerializerMethodField()
+    participantes = serializers.SerializerMethodField()
 
     class Meta:
         model = Solicitacao
@@ -45,6 +46,7 @@ class MeEventSerializer(serializers.ModelSerializer):
             "tipo_evento_nome",
             "local",
             "formadores",
+            "participantes",
             "is_online",
             "meet_link",
             "status",
@@ -61,3 +63,19 @@ class MeEventSerializer(serializers.ModelSerializer):
             .order_by("usuario__first_name", "usuario__last_name")
         )
         return [f"{p.usuario.first_name} {p.usuario.last_name}".strip() for p in formadores]
+
+    def get_participantes(self, obj: Solicitacao) -> list[dict[str, str]]:
+        """[{role, nome}] de TODAS as participations (todos os papéis). `nome` na cascata
+        usuario → guest_nome → guest_email (não deixa quem saiu virar nome em branco). O FE filtra
+        o papel que quiser (ex.: FORMADOR), reaproveitando o padrão das outras telas."""
+        parts = obj.participations.select_related("usuario").order_by(
+            "role", "usuario__first_name", "usuario__last_name", "guest_nome", "guest_email", "id"
+        )
+        result: list[dict[str, str]] = []
+        for p in parts:
+            if p.usuario_id:
+                nome = f"{p.usuario.first_name} {p.usuario.last_name}".strip() or p.usuario.username
+            else:
+                nome = (p.guest_nome or "").strip() or (p.guest_email or "").strip()
+            result.append({"role": p.role, "nome": nome})
+        return result

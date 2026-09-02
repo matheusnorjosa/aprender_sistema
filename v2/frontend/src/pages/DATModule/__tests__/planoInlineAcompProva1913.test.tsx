@@ -70,8 +70,14 @@ describe('#1913: edição inline de Acompanhamento e Prova', () => {
       await user.click(cell);
       const dialog = await screen.findByRole('dialog', {}, { timeout: 10000 });
       await user.click(within(dialog).getByRole('button', { name: /salvar/i }));
+      // payload EXATO: a chave gravável é `data_acompanhamento` (não `data`), senão a data é
+      // descartada silenciosamente pelo DRF (partial=True). Contrato do AcompanhamentoSerializer.
       await waitFor(
-        () => expect(updateAcompanhamentoInline).toHaveBeenCalledWith(7, 'primeiro', expect.any(Object)),
+        () =>
+          expect(updateAcompanhamentoInline).toHaveBeenCalledWith(7, 'primeiro', {
+            data_acompanhamento: '2026-03-10',
+            realizado: false,
+          }),
         { timeout: 10000 },
       );
     },
@@ -87,8 +93,13 @@ describe('#1913: edição inline de Acompanhamento e Prova', () => {
       await user.click(cell);
       const dialog = await screen.findByRole('dialog', {}, { timeout: 10000 });
       await user.click(within(dialog).getByRole('button', { name: /salvar/i }));
+      // payload EXATO: a chave gravável é `data_prova` (não `data`). Contrato do ProvaSerializer.
       await waitFor(
-        () => expect(updateProvaInline).toHaveBeenCalledWith(7, 1, expect.any(Object)),
+        () =>
+          expect(updateProvaInline).toHaveBeenCalledWith(7, 1, {
+            data_prova: '2026-04-10',
+            realizada: false,
+          }),
         { timeout: 10000 },
       );
     },

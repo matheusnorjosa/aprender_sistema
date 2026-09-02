@@ -201,10 +201,10 @@ _CONSUMED_FIELDS: dict[str, frozenset[str]] = {
         }
     ),
     "formacao": frozenset(
-        {"municipio", "uf", "projeto", "numero_formacao", "data_formacao", "carga_horaria", "modalidade"}
+        {"municipio", "uf", "projeto", "ano", "numero_formacao", "data_formacao", "carga_horaria", "modalidade"}
     ),
-    "acompanhamento": frozenset({"municipio", "uf", "projeto", "tipo", "data_acompanhamento"}),
-    "prova": frozenset({"municipio", "uf", "projeto", "numero_prova", "data_prova", "marcado"}),
+    "acompanhamento": frozenset({"municipio", "uf", "projeto", "ano", "tipo", "data_acompanhamento"}),
+    "prova": frozenset({"municipio", "uf", "projeto", "ano", "numero_prova", "data_prova", "marcado"}),
 }
 
 
@@ -919,20 +919,30 @@ class ExportContractImporter:
 
     def _resolve_plano_id(self, r: dict[str, str], mun_idx: dict[tuple[str, str], int], date_field: str) -> int | None:
         """Resolve o PlanoFormacoes pai de uma filha (formacao/acompanhamento/prova) por
-        (municipio, projeto). O CSV da filha não traz `ano` → prefere o plano cujo `ano` bate com o
-        ano da data da própria filha (`date_field`); sem data ou sem match, usa o ÚNICO plano do par
-        (o golden é 1:1). Par sem plano OU ambíguo (>1 sem ano-match) → None (não cria filha órfã)."""
+        (municipio, projeto, ano).
+
+        `ano` vem da coluna `ano` do CSV da filha — o MESMO dado do pai (contrato v16.7/RELAY 31),
+        não derivado. Fallback p/ contratos antigos/fixtures: ano derivado de `date_field.year` (as
+        datas da fonte vêm DD/MM sem ano → derivação NÃO é confiável para planos de outros anos, por
+        isso a coluna explícita); depois o ÚNICO plano do par (golden 1:1).
+
+        Fail-safe: par (mun, proj) com planos em anos distintos e `ano` desconhecido → ambíguo →
+        None (rejeita a filha, não chuta um plano arbitrário). Co-coordenação no MESMO (mun, proj,
+        ano) é barrada pela UniqueConstraint do model — decisão #134, não deste handler."""
         mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
         proj_id = self.resolve_projeto(r.get("projeto") or "")
         if mun_id is None or proj_id is None:
             return None
         qs = PlanoFormacoes.objects.filter(municipio_id=mun_id, projeto_id=proj_id)
-        d = _parse_iso_date(r.get(date_field))
-        if d is not None:
-            matched = qs.filter(ano=d.year).values_list("id", flat=True).first()
+        ano = _parse_int(r.get("ano"))
+        if ano is None:
+            d = _parse_iso_date(r.get(date_field))
+            ano = d.year if d is not None else None
+        if ano is not None:
+            matched = qs.filter(ano=ano).values_list("id", flat=True).first()  # UniqueConstraint → ≤1
             if matched is not None:
                 return matched
-        ids = list(qs.values_list("id", flat=True))
+        ids = list(qs.values_list("id", flat=True)[:2])
         return ids[0] if len(ids) == 1 else None
 
     def _resolve_gerencia_readonly(self, setor_raw: str) -> Gerencia | None:

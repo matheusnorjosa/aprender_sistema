@@ -137,6 +137,38 @@ def test_classify_formacao_create_vs_skip(tmp_path):
     assert r["would_reject"] == 0
 
 
+def test_apply_formacao_explicit_ano_wins_over_date_year(tmp_path):
+    """Contrato v16.7/RELAY 31: a coluna `ano` (dado do pai) tem precedência sobre o ano derivado da
+    data — as datas DD/MM da fonte completam 2026 fixo, então um plano 2027 só casa pelo `ano`."""
+    actor = UsuarioFactory(cpf="11144477735")
+    mun = MunicipioFactory(nome="Belo Jardim", uf="PE", ativo=True)
+    proj = ProjetoFactory(nome="Proj BJ", fluxo="NAO_SUPER")
+    PlanoFormacoes.objects.create(municipio=mun, projeto=proj, ano=2026, created_by=actor)
+    p2027 = PlanoFormacoes.objects.create(municipio=mun, projeto=proj, ano=2027, created_by=actor)
+    header = FORMACAO_HEADER + ",ano"
+    row = "Belo Jardim,BELO JARDIM,PE,Proj BJ,Proj BJ,1,2026-03-15,4,presencial,2027"  # data=2026, ano=2027
+    path = _write_export(tmp_path, {"formacao": f"{header}\n{row}\n"})
+    r = ExportContractImporter(path=path, apply=True, allow=("formacao",)).run()
+    assert r["applied"]["formacao"] == 1
+    assert Formacao.objects.get().plano_id == p2027.id  # ano explícito venceu a data derivada
+
+
+def test_apply_formacao_multi_year_unknown_ano_rejects(tmp_path):
+    """Par (mun, proj) com planos em 2 anos e a filha sem `ano` nem data que desambigue → ambíguo →
+    NÃO chuta um arbitrário (fail-safe do par-único; co-coordenação no MESMO ano é barrada pela
+    UniqueConstraint(mun, proj, ano) do model, decisão #134)."""
+    actor = UsuarioFactory(cpf="11144477735")
+    mun = MunicipioFactory(nome="Belo Jardim", uf="PE", ativo=True)
+    proj = ProjetoFactory(nome="Proj BJ", fluxo="NAO_SUPER")
+    PlanoFormacoes.objects.create(municipio=mun, projeto=proj, ano=2026, created_by=actor)
+    PlanoFormacoes.objects.create(municipio=mun, projeto=proj, ano=2027, created_by=actor)
+    row = "Belo Jardim,BELO JARDIM,PE,Proj BJ,Proj BJ,1,,4,presencial"  # sem ano, sem data → não desambigua
+    path = _write_export(tmp_path, {"formacao": f"{FORMACAO_HEADER}\n{row}\n"})
+    r = ExportContractImporter(path=path, apply=True, allow=("formacao",)).run()
+    assert r["applied"]["formacao"] == 0  # 2 planos, ano desconhecido → rejeita, não escolhe arbitrário
+    assert Formacao.objects.count() == 0
+
+
 # ─────────────────────────── acompanhamento ───────────────────────────
 
 

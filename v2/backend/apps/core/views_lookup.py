@@ -111,6 +111,7 @@ class ProjetoLookup(APIView):
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         q = request.GET.get("q", "").strip()
         com_compra = request.GET.get("com_compra", "false").lower() in {"1", "true", "t", "yes", "y"}
+        include_kits = request.GET.get("include_kits", "false").lower() in {"1", "true", "t", "yes", "y"}
         municipio_id_raw = request.GET.get("municipio_id", "").strip()
 
         municipio_id: int | None = None
@@ -125,24 +126,30 @@ class ProjetoLookup(APIView):
             qs = qs.filter(compras__isnull=False)
         if municipio_id is not None:
             qs = qs.filter(compras__municipio_id=municipio_id)
+        # Os EVENTOS usam o nome-família (ex.: "A COR DA GENTE"); as variantes numeradas ("A COR DA
+        # GENTE 3") são os kits das coleções e NÃO entram no dropdown de solicitação por padrão
+        # (decisão do dono). Heurística de nome (termina em número) enquanto não há flag kit/evento —
+        # relacionado à população de projeto_geral (#1897/#1898). `include_kits=true` reexpõe.
+        if not include_kits:
+            qs = qs.exclude(nome__regex=r"[0-9]+$")
         qs = qs.distinct()
 
+        # Teto amplo: com os kits fora, o catálogo de projetos-evento cabe na lista (a busca `q`
+        # ainda filtra ao digitar). Antes era 50 → cortava projetos alfabeticamente ao fim.
         if not q:
-            qs = qs.order_by("nome")[:50]
+            qs = qs.order_by("nome")[:200]
         else:
             _q_norm = norm_text(q)  # noqa: F841 - reserved for future normalized search
-            qs = qs.filter(Q(nome__icontains=q) | Q(codigo__icontains=q)).order_by("nome")[:50]
+            qs = qs.filter(Q(nome__icontains=q) | Q(codigo__icontains=q)).order_by("nome")[:200]
 
         results = []
         for proj in qs:
-            label = proj.nome
-            if proj.codigo:
-                label = f"{proj.codigo} - {proj.nome}"
-
+            # Label = nome puro. O `codigo` do catálogo é um slug do próprio nome (Á/ç/ê→"_"), então
+            # "A_COR_DA_GENTE - A COR DA GENTE" era ruído redundante — não desambigua nada.
             results.append(
                 {
                     "id": proj.id,
-                    "label": label,
+                    "label": proj.nome,
                     "kind": "projeto",
                     "fluxo": proj.fluxo,
                 }

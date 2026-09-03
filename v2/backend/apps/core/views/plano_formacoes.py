@@ -94,15 +94,16 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
 
     queryset = (
         PlanoFormacoes.objects.select_related(
-            "municipio", "projeto", "projeto__projeto_geral", "coordenador", "created_by", "updated_by"
+            "municipio", "projeto", "projeto__projeto_geral", "created_by", "updated_by"
         )
-        .prefetch_related("formacoes", "acompanhamentos", "provas")
+        .prefetch_related("formacoes", "acompanhamentos", "provas", "coordenadores")
         .order_by("municipio__nome", "projeto__nome")
+        .distinct()  # coordenadores virou M2M (#1957): a busca por nome faz JOIN e duplicaria a linha
     )
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = PlanoFormacoesFilter
-    search_fields = ["municipio__nome", "projeto__nome", "coordenador__first_name", "coordenador__last_name"]
+    search_fields = ["municipio__nome", "projeto__nome", "coordenadores__first_name", "coordenadores__last_name"]
     ordering_fields = ["municipio__nome", "projeto__nome", "ch_anual", "created_at"]
     ordering = ["municipio__nome", "projeto__nome"]
 
@@ -203,13 +204,15 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
         # Por UF
         por_uf = list(qs.values("municipio__uf").annotate(count=Count("id")).order_by("-count"))
 
-        # Por coordenador (top 10) — coordenador virou Usuario (#1849); nome = first_name + last_name.
-        # A chave do payload passa de `coordenador__nome` para `coordenador_nome`.
+        # Por coordenador (top 10) — coordenadores virou M2M (#1957): nome = first_name + last_name.
+        # Co-liderança faz um plano contar 1x por coordenador → a SOMA das contagens > total de planos
+        # (leitura certa; ninguém deve somar esta coluna esperando o total). `distinct=True` no Count evita
+        # que uma linha se multiplique pela própria junção.
         por_coordenador = list(
-            qs.exclude(coordenador__isnull=True)
-            .annotate(coordenador_nome=Concat("coordenador__first_name", Value(" "), "coordenador__last_name"))
+            qs.exclude(coordenadores__isnull=True)
+            .annotate(coordenador_nome=Concat("coordenadores__first_name", Value(" "), "coordenadores__last_name"))
             .values("coordenador_nome")
-            .annotate(count=Count("id"))
+            .annotate(count=Count("id", distinct=True))
             .order_by("-count")[:10]
         )
 
@@ -302,10 +305,10 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
 
             ch_total = planos_projeto.aggregate(total=Sum("ch_anual"))["total"] or 0
 
-            # coordenador virou Usuario (#1849) → nome = first_name + last_name.
+            # coordenadores virou M2M (#1957) → nome = first_name + last_name; distinct() já dedupe a junção.
             coordenadores = list(
-                planos_projeto.exclude(coordenador__isnull=True)
-                .annotate(coordenador_nome=Concat("coordenador__first_name", Value(" "), "coordenador__last_name"))
+                planos_projeto.exclude(coordenadores__isnull=True)
+                .annotate(coordenador_nome=Concat("coordenadores__first_name", Value(" "), "coordenadores__last_name"))
                 .values_list("coordenador_nome", flat=True)
                 .distinct()
             )

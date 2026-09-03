@@ -983,8 +983,9 @@ class ExportContractImporter:
         isso a coluna explícita); depois o ÚNICO plano do par (golden 1:1).
 
         Fail-safe: par (mun, proj) com planos em anos distintos e `ano` desconhecido → ambíguo →
-        None (rejeita a filha, não chuta um plano arbitrário). Co-coordenação no MESMO (mun, proj,
-        ano) é barrada pela UniqueConstraint do model — decisão #134, não deste handler."""
+        None (rejeita a filha, não chuta um plano arbitrário). Co-liderança no MESMO (mun, proj,
+        ano) = 1 plano com N coordenadores (M2M, #1957): a UniqueConstraint garante 1 plano por
+        (mun, proj, ano), então o resolver casa esse plano único e as filhas co-lideradas anexam a ele."""
         mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
         proj_id = self.resolve_projeto(r.get("projeto") or "")
         if mun_id is None or proj_id is None:
@@ -1352,13 +1353,31 @@ class ExportContractImporter:
             created += 1
         return created
 
+    def _resolve_coordenador_ids(self, r: dict[str, str], usuario_idx: dict[str, int]) -> list[int]:
+        """CPFs dos coordenadores → ids de `Usuario`, em ordem e sem duplicar. Co-liderança N:N (RELAY
+        32/34): prefere o array `coordenadores_cpf`; cai para a coluna única `coordenador_cpf` (CSV
+        antigo). CPF inválido (mod-11), ausente ou sem match no cadastro é descartado — sem fallback por
+        email/nome de cargo (isso atrelaria ao ocupante atual da caixa; a pessoa é chave de CPF, #1849)."""
+        raw = _parse_json_list(r.get("coordenadores_cpf"))
+        if not raw:
+            single = r.get("coordenador_cpf") or ""
+            raw = [single] if single else []
+        ids: list[int] = []
+        for item in raw:
+            s = str(item or "")
+            cpf = normalize_cpf_digits(s) if is_valid_cpf(s) else None
+            uid = usuario_idx.get(cpf) if cpf else None
+            if uid is not None and uid not in ids:
+                ids.append(uid)
+        return ids
+
     def _apply_plano_formacao(self, rows: list[dict[str, str]]) -> int:
         """Create-only de PlanoFormacoes. NK (municipio, projeto, ano); `ano` DECLARADO do workbook.
-        `sem_plano` (reserva: TOTAL 0 + sem data) é pulado (não é plano). Coordenador = a PESSOA que
-        coordenou (coluna Coordenador da Agenda), resolvido por CPF → `Usuario` (cpf unique no banco);
-        CPF ausente/inválido ou sem match → NULL, sem fallback email/nome (a pessoa é chave de CPF, #1849).
-        `ch_estudo` importado; `ch_total`/`ch_anual` semeados dos totais da planilha (recalcular_ch
-        sobrescreve quando/se as formações-filhas forem importadas)."""
+        `sem_plano` (reserva: TOTAL 0 + sem data) é pulado (não é plano). Coordenadores = as PESSOAS que
+        coordenaram (coluna Coordenador da Agenda), N:N por co-liderança (RELAY 32/34): `coordenadores_cpf`
+        (array) com fallback `coordenador_cpf`, cada CPF → `Usuario` (sem fallback email/nome; ausente/
+        inválido/sem match é descartado, #1849). `ch_estudo` importado; `ch_total`/`ch_anual` semeados dos
+        totais da planilha (recalcular_ch sobrescreve quando/se as formações-filhas forem importadas)."""
         actor = self._require_actor("plano_formacao")
         mun_idx = self._municipio_index()
         usuario_idx = self._usuario_cpf_index()
@@ -1373,21 +1392,18 @@ class ExportContractImporter:
             ano = _parse_int(r.get("ano"))
             if PlanoFormacoes.objects.filter(municipio_id=mun_id, projeto_id=proj_id, ano=ano).exists():
                 continue
-            # Coordenador = a PESSOA (Usuario) por CPF (#1849). CPF inválido/ausente/sem match → NULL,
-            # sem chute por email/nome de cargo (a resolução por email atrelaria ao ocupante atual da caixa).
-            cpf_raw = r.get("coordenador_cpf") or ""
-            cpf = normalize_cpf_digits(cpf_raw) if is_valid_cpf(cpf_raw) else None
-            coord_id = usuario_idx.get(cpf) if cpf else None
-            PlanoFormacoes.objects.create(
+            coord_ids = self._resolve_coordenador_ids(r, usuario_idx)
+            plano = PlanoFormacoes.objects.create(
                 municipio_id=mun_id,
                 projeto_id=proj_id,
                 ano=ano,
-                coordenador_id=coord_id,
                 ch_estudo=_parse_decimal(r.get("ch_estudo")),
                 ch_total=_parse_decimal(r.get("ch_total_planilha")),
                 ch_anual=_parse_decimal(r.get("ch_anual_planilha")),
                 created_by=actor,
             )
+            if coord_ids:
+                plano.coordenadores.set(coord_ids)
             created += 1
         return created
 

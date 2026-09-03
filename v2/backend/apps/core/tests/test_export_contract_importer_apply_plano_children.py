@@ -234,7 +234,7 @@ def test_classify_acompanhamento_create_and_reject(tmp_path):
 
 def test_apply_prova_creates_child_of_plano(tmp_path):
     plano = _plano()
-    row = "Cidade X,CIDADE X,CE,Proj X,Proj X,1,,true,x"  # data_prova vazia (comum), marcado→realizada
+    row = "Cidade X,CIDADE X,CE,Proj X,Proj X,1,,true,x"  # data_prova vazia (comum); marcado='X'=não-se-aplica
     path = _write_export(tmp_path, {"prova": f"{PROVA_HEADER}\n{row}\n"})
     r = ExportContractImporter(path=path, apply=True, allow=("prova",)).run()
     assert r["applied"]["prova"] == 1
@@ -242,7 +242,9 @@ def test_apply_prova_creates_child_of_plano(tmp_path):
     assert p.plano_id == plano.id
     assert p.numero_prova == 1
     assert p.data_prova is None
-    assert p.realizada is True  # marcado=true → realizada
+    assert (
+        p.realizada is False
+    )  # marcado='X' = "não se aplica" (RELAY 33), NÃO realizado — sem sinal de realizado na fonte
 
 
 def test_apply_prova_idempotent(tmp_path):

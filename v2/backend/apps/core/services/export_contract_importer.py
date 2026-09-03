@@ -1584,8 +1584,10 @@ class ExportContractImporter:
     def _apply_prova(self, rows: list[dict[str, str]]) -> int:
         """Create-only de Prova (filha de PlanoFormacoes). Plano pai via `_resolve_plano_id`
         (municipio, projeto[, ano de data_prova]). NK (plano_id, numero_prova); numero fora de 1..3
-        (CheckConstraint) → skip. `marcado` (sempre 'true' na fonte) → `realizada`. data_prova vazia
-        é comum (nullable). Sem created_by no model → não exige actor."""
+        (CheckConstraint) → skip. `realizada` fica no default False: o `marcado` (X na célula) significa
+        **não se aplica** (o projeto não faz prova — RELAY 33), NÃO realizado; a fonte não tem coluna de
+        "aconteceu" em nenhuma aba, então `marcado` é lido e deliberadamente descartado (mesmo padrão do
+        `motivo` no availability_block). data_prova vazia é comum (nullable). Sem created_by → sem actor."""
         mun_idx = self._municipio_index()
         existing = set(Prova.objects.values_list("plano_id", "numero_prova"))
         created = 0
@@ -1600,7 +1602,6 @@ class ExportContractImporter:
                 plano_id=plano_id,
                 numero_prova=numero,
                 data_prova=_parse_iso_date(r.get("data_prova")),
-                realizada=_to_bool(r.get("marcado")),
             )
             existing.add((plano_id, numero))
             created += 1

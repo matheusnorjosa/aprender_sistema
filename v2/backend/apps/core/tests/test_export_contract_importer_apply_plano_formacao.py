@@ -308,9 +308,116 @@ def test_apply_plano_array_takes_precedence_over_single(tmp_path):
     """Havendo o array (não-vazio), ele manda; a coluna única `coordenador_cpf` é ignorada."""
     actor = _actor()
     a = UsuarioFactory(cpf=_CPF_A)
-    b = UsuarioFactory(cpf=_CPF_B)
+    UsuarioFactory(cpf=_CPF_B)  # B existe no cadastro — mas o array [A] deve vencer mesmo assim
     json_arr = f'[""{_CPF_A}""]'  # array só com A
     path = _plano_m2m(tmp_path, json_arr, coordenador_cpf=_CPF_B)  # single = B, deve ser ignorado
     ExportContractImporter(path=path, apply=True, allow=("plano_formacao",), actor=actor).run()
     assert _coord_ids(PlanoFormacoes.objects.get()) == [a.id]
-    assert b.id not in _coord_ids(PlanoFormacoes.objects.get())
+
+
+# --------------- reconcile do M2M coordenadores em plano EXISTENTE (#1957 follow-up, v18) ---------------
+# O importer é create-only para o PLANO, mas mantém `coordenadores` (autoritativo do import, read-only na
+# UI) em sincronia num plano JÁ existente — REPORTADO sob `plano_formacao__coordenadores_reconciled`, nunca
+# silencioso (#1628/#1738), e NUNCA esvazia (array vazio = ausência de sinal, não sinal de remoção).
+# Necessário porque o backfill do #1958 deu 1 coordenador aos planos co-liderados; o array v18 traz os 2.
+
+
+def _write_plano_arr(base, arr_json, ch_estudo="0"):
+    """Escreve um export mínimo de plano_formacao com um array de coordenadores, num subdir próprio."""
+    base.mkdir(parents=True, exist_ok=True)
+    row = f'Cidade X,CIDADE X,CE,Proj X,Proj X,2026,workbook,false,Dupla,,,{ch_estudo},0,0,"{arr_json}"'
+    (base / "plano_formacao.csv").write_text(f"{PLANO_HEADER_M2M}\n{row}\n", encoding="utf-8")
+    (base / "manifest.json").write_text(
+        json.dumps(
+            {
+                "generated_at": "x",
+                "snapshot_date": "x",
+                "entities": {"plano_formacao": {"file_csv": "plano_formacao.csv", "rows": 1}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    return str(base)
+
+
+def test_apply_plano_reconciles_coordenadores_on_existing(tmp_path):
+    """Plano já existente com 1 coordenador + array v18 com 2 → reconcilia p/ os 2 (reportado)."""
+    actor = _actor()
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
+    a = UsuarioFactory(cpf=_CPF_A)
+    b = UsuarioFactory(cpf=_CPF_B)
+    ExportContractImporter(
+        path=_write_plano_arr(tmp_path / "v1", f'[""{_CPF_A}""]'),
+        apply=True,
+        allow=("plano_formacao",),
+        actor=actor,
+    ).run()
+    assert _coord_ids(PlanoFormacoes.objects.get()) == [a.id]
+    r = ExportContractImporter(
+        path=_write_plano_arr(tmp_path / "v2", f'[""{_CPF_A}"",""{_CPF_B}""]'),
+        apply=True,
+        allow=("plano_formacao",),
+        actor=actor,
+    ).run()
+    assert r["applied"]["plano_formacao"] == 0  # nenhum plano NOVO
+    assert r["applied"]["plano_formacao__coordenadores_reconciled"] == 1
+    assert set(_coord_ids(PlanoFormacoes.objects.get())) == {a.id, b.id}
+
+
+def test_apply_plano_reconcile_idempotent(tmp_path):
+    """Reconciliar com o mesmo array de novo → 0 (sem chave reconciled, sem re-escrever o M2M)."""
+    actor = _actor()
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
+    UsuarioFactory(cpf=_CPF_A)
+    UsuarioFactory(cpf=_CPF_B)
+    arr = f'[""{_CPF_A}"",""{_CPF_B}""]'
+    ExportContractImporter(
+        path=_write_plano_arr(tmp_path / "v1", arr), apply=True, allow=("plano_formacao",), actor=actor
+    ).run()
+    r = ExportContractImporter(
+        path=_write_plano_arr(tmp_path / "v2", arr), apply=True, allow=("plano_formacao",), actor=actor
+    ).run()
+    assert r["applied"]["plano_formacao"] == 0
+    assert "plano_formacao__coordenadores_reconciled" not in r["applied"]
+
+
+def test_apply_plano_reconcile_scoped_to_coordenadores(tmp_path):
+    """Reconcile toca SÓ coordenadores; ch_estudo do plano existente NÃO muda (create-only anti-silent-update)."""
+    actor = _actor()
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
+    a = UsuarioFactory(cpf=_CPF_A)
+    b = UsuarioFactory(cpf=_CPF_B)
+    ExportContractImporter(
+        path=_write_plano_arr(tmp_path / "v1", f'[""{_CPF_A}""]', ch_estudo="10"),
+        apply=True,
+        allow=("plano_formacao",),
+        actor=actor,
+    ).run()
+    ExportContractImporter(
+        path=_write_plano_arr(tmp_path / "v2", f'[""{_CPF_A}"",""{_CPF_B}""]', ch_estudo="99"),
+        apply=True,
+        allow=("plano_formacao",),
+        actor=actor,
+    ).run()
+    p = PlanoFormacoes.objects.get()
+    assert set(_coord_ids(p)) == {a.id, b.id}
+    assert p.ch_estudo == Decimal("10.00")  # o resto NÃO é sobrescrito
+
+
+def test_apply_plano_reconcile_empty_array_does_not_wipe(tmp_path):
+    """Array vazio numa reentrega = ausência de sinal → NÃO esvazia os coordenadores existentes."""
+    actor = _actor()
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
+    a = UsuarioFactory(cpf=_CPF_A)
+    ExportContractImporter(
+        path=_write_plano_arr(tmp_path / "v1", f'[""{_CPF_A}""]'), apply=True, allow=("plano_formacao",), actor=actor
+    ).run()
+    r = ExportContractImporter(
+        path=_write_plano_arr(tmp_path / "v2", "[]"), apply=True, allow=("plano_formacao",), actor=actor
+    ).run()
+    assert _coord_ids(PlanoFormacoes.objects.get()) == [a.id]  # preservado
+    assert "plano_formacao__coordenadores_reconciled" not in r["applied"]

@@ -47,7 +47,7 @@ context-injector.py (PreToolUse Edit|Write|Bash, exit 0)            ← só inje
 intent-detector.py  (UserPromptSubmit, exit 0)                      ← nudge de skill/command (mantém)
 graphify-reminder   (PreToolUse Bash, exit 0)                       ← mantém (já lê stdin certo)
 graphify-sync.ps1   (Stop, automação)                              ← graphify update se código mudou
-tools/post-compact/github-mcp                                       ← mantêm
+tools-reminder/post-compact                                         ← mantêm (github-mcp.sh REMOVIDO 2026-09-02: morto)
 + test_hooks.py     (harness, rodar manual: py -3 .claude/hooks/test_hooks.py)
 ```
 
@@ -72,7 +72,7 @@ Fail-open: erro interno do guardrails → `exit 0` (nunca travar o agente por bu
 
 ## Onda 2 — Enxugar `context-injector.py` (A.2 + A.3) + warns (B.5/6/7)
 
-- [x] **2.1** Cortar duplicação com CLAUDE.md: remover rodapés "General Rules" genéricos (Pyright/Black/isort/CP-04 já no contexto). **Manter** os gotchas não-óbvios (fetchpriority minúsculo).
+- [x] **2.1** Cortar duplicação com CLAUDE.md: remover rodapés "General Rules" genéricos (Pyright/Black/isort/CP-04 já no contexto). **Manter** os gotchas não-óbvios (fetchPriority camelCase, React 19 — corrigido de 18→19 em 2026-09-02).
 - [x] **2.2** Heurística de secrets honesta: parar de pular cego em "test"/"mock"; só pular se o **valor** for placeholder óbvio (changeme/xxx/your-key/example). Continua warn.
 - [x] **2.3** N+1 → aviso honesto ("possível N+1, confira select_related/prefetch_related") em vez de afirmação.
 - [x] **2.4** **W5** warn RBAC: editar `.py` fora da whitelist do rbac_lint com `.groups.filter(name`/`.groups.exclude(name`/`groups__name=` → lembrar do `[required]` rbac-lint + escape `# noqa: RBAC-<tipo>-allowed`.
@@ -119,4 +119,4 @@ Fail-open: erro interno do guardrails → `exit 0` (nunca travar o agente por bu
   - **Onda 3** ✅ — `graphify-sync.ps1` (Stop) + wire; gate por `.py/.ts/.tsx` no `git status`; no-op verificado (186ms quando só `.md` muda).
   - **Onda 4** ✅ — `test_hooks.py` harness cobrindo os 7 hooks; **37/37**, exit 0. Regression-gate dos hooks.
   - **Onda 5** ✅ — memória `project_hooks_system.md` atualizada (arquitetura nova + cp1252 gotcha).
-  - **Estado final dos hooks:** guardrails.py · context-injector.py · intent-detector.py · graphify-reminder.ps1 · graphify-sync.ps1 · tools-reminder.ps1 · post-compact-reminder.sh · auto-format-python.ps1 · github-mcp.sh + test_hooks.py.
+  - **Estado final dos hooks:** guardrails.py · context-injector.py · intent-detector.py · graphify-reminder.ps1 · graphify-sync.ps1 · tools-reminder.ps1 · post-compact-reminder.sh · auto-format-python.ps1 + test_hooks.py. *(github-mcp.sh removido 2026-09-02 — código morto, não-wired.)*

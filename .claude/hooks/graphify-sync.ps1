@@ -1,8 +1,9 @@
 # Hook: graphify-sync -- keep the knowledge graph fresh after code changes.
 # Event: Stop. Best-effort, NEVER blocks (always exit 0). AST-only (no API cost).
 # Runs `graphify update .` only when the git working tree has changed .py/.ts/.tsx
-# files AND a graph already exists. CLAUDE.md asks for this after modifying code;
-# this automates it. To disable, remove the Stop entry in settings.json.
+# files AND a graph already exists. graphify e opcional (CLAUDE.md D2); este hook
+# so mantem o grafo menos velho quando ja existe -- best-effort. Para desligar,
+# remova a entrada Stop em settings.json.
 
 # Drain the Stop payload from stdin so the pipe doesn't break (content unused).
 $null = [Console]::In.ReadToEnd()

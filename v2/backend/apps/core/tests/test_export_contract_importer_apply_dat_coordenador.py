@@ -132,8 +132,9 @@ def test_classify_no_pii_in_report(tmp_path):
 
 def test_allow_order_applies_by_entity_order_not_cli_order(tmp_path):
     """O apply itera por ENTITY_ORDER, não pela ordem de --allow-entity: dat_coordenador (idx menor) é
-    aplicado mesmo listado DEPOIS de plano_formacao. (Nota #1849: o coordenador do PLANO resolve contra
-    Usuario, não contra este DATCoordenador — que é governança; por isso o plano fica NULL aqui.)"""
+    aplicado mesmo listado DEPOIS de plano_formacao. (Nota #1849/#1957: os coordenadores do PLANO resolvem
+    contra Usuario (M2M), não contra este DATCoordenador — que é governança; por isso o plano fica sem
+    coordenadores aqui.)"""
     actor = _actor()
     MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
     ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
@@ -144,5 +145,5 @@ def test_allow_order_applies_by_entity_order_not_cli_order(tmp_path):
     # dat_coordenador foi aplicado apesar de listado DEPOIS de plano → ordenação por ENTITY_ORDER.
     assert r["applied"]["dat_coordenador"] == 1
     assert DATCoordenador.objects.filter(nome="Coord Y").exists()
-    # o coordenador do plano NÃO vem deste DATCoordenador (resolve contra Usuario, ausente aqui) → NULL.
-    assert PlanoFormacoes.objects.get().coordenador_id is None
+    # os coordenadores do plano NÃO vêm deste DATCoordenador (resolve contra Usuario, ausente aqui) → vazio.
+    assert PlanoFormacoes.objects.get().coordenadores.count() == 0

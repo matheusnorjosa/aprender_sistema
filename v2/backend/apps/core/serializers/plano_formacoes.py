@@ -24,6 +24,14 @@ def _ano_vigente() -> int:
     return timezone.localdate().year
 
 
+def _coordenadores_nomes(obj: PlanoFormacoes) -> str | None:
+    """Nomes dos coordenadores juntados com ' & ' (convenção da fonte para co-liderança). Vazio → None.
+    Mantém a chave `coordenador_nome` que a tabela do front já consome, agora agregando o M2M."""
+    nomes = [u.get_full_name() or u.username for u in obj.coordenadores.all()]
+    nomes = [n for n in nomes if n]
+    return " & ".join(nomes) if nomes else None
+
+
 # ============================================================
 # Nested Serializers (for inline display)
 # ============================================================
@@ -104,12 +112,16 @@ class PlanoFormacoesSerializer(serializers.ModelSerializer["PlanoFormacoes"]):
     municipio_uf = serializers.CharField(source="municipio.uf", read_only=True)
     projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
     projeto_geral_nome = serializers.CharField(source="projeto.projeto_geral.nome", read_only=True, allow_null=True)
-    coordenador_nome = serializers.CharField(source="coordenador.get_full_name", read_only=True, allow_null=True)
+    # Co-liderança N:N (#1957): nomes agregados dos coordenadores (a tabela do front lê `coordenador_nome`).
+    coordenador_nome = serializers.SerializerMethodField()
 
     # Computed
     total_formacoes = serializers.IntegerField(read_only=True)
     formacoes_realizadas = serializers.IntegerField(read_only=True)
     taxa_realizacao = serializers.FloatField(read_only=True)
+
+    def get_coordenador_nome(self, obj: PlanoFormacoes) -> str | None:
+        return _coordenadores_nomes(obj)
 
     # Audit
     created_by_nome = serializers.CharField(source="created_by.get_full_name", read_only=True)
@@ -128,7 +140,7 @@ class PlanoFormacoesSerializer(serializers.ModelSerializer["PlanoFormacoes"]):
             "projeto_nome",
             "projeto_geral_nome",
             "ano",
-            "coordenador",
+            "coordenadores",
             "coordenador_nome",
             "ch_total",
             "ch_estudo",
@@ -157,9 +169,9 @@ class PlanoFormacoesSerializer(serializers.ModelSerializer["PlanoFormacoes"]):
             "municipio_nome",
             "municipio_uf",
             "projeto_nome",
-            # coordenador = a PESSOA que coordenou, autoritativo do import da Agenda (#1849, opção B):
-            # exibido, não editável pela UI. O import seta via ORM (não passa pelo serializer).
-            "coordenador",
+            # coordenadores = as PESSOAS que coordenaram, autoritativo do import da Agenda (#1849/#1957,
+            # opção B): exibido, não editável pela UI. O import seta o M2M via ORM (não passa pelo serializer).
+            "coordenadores",
             "coordenador_nome",
         ]
 
@@ -198,7 +210,8 @@ class PlanoFormacoesListSerializer(serializers.ModelSerializer["PlanoFormacoes"]
     municipio_uf = serializers.CharField(source="municipio.uf", read_only=True)
     projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
     projeto_geral_nome = serializers.CharField(source="projeto.projeto_geral.nome", read_only=True, allow_null=True)
-    coordenador_nome = serializers.CharField(source="coordenador.get_full_name", read_only=True, allow_null=True)
+    # Co-liderança N:N (#1957): nomes agregados dos coordenadores (a tabela do front lê `coordenador_nome`).
+    coordenador_nome = serializers.SerializerMethodField()
 
     # Formacoes expandidas para exibicao em tabela (F1-F15)
     formacoes_list = serializers.SerializerMethodField()
@@ -211,6 +224,9 @@ class PlanoFormacoesListSerializer(serializers.ModelSerializer["PlanoFormacoes"]
     total_formacoes = serializers.IntegerField(read_only=True)
     formacoes_realizadas = serializers.IntegerField(read_only=True)
 
+    def get_coordenador_nome(self, obj: PlanoFormacoes) -> str | None:
+        return _coordenadores_nomes(obj)
+
     class Meta:
         model = PlanoFormacoes
         fields = [
@@ -222,7 +238,7 @@ class PlanoFormacoesListSerializer(serializers.ModelSerializer["PlanoFormacoes"]
             "projeto_nome",
             "projeto_geral_nome",
             "ano",
-            "coordenador",
+            "coordenadores",
             "coordenador_nome",
             "ch_total",
             "ch_anual",
@@ -235,8 +251,8 @@ class PlanoFormacoesListSerializer(serializers.ModelSerializer["PlanoFormacoes"]
             "total_formacoes",
             "formacoes_realizadas",
         ]
-        # coordenador é import-only (#1849, opção B) — nunca gravável, nem por PATCH da tabela (M17-02).
-        read_only_fields = ["coordenador", "coordenador_nome"]
+        # coordenadores é import-only (#1849/#1957, opção B) — nunca gravável, nem por PATCH da tabela (M17-02).
+        read_only_fields = ["coordenadores", "coordenador_nome"]
 
     def get_formacoes_list(self, obj: PlanoFormacoes) -> list[dict[str, Any]]:
         """Return formacoes as ordered list for table display."""

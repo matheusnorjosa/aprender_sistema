@@ -42,16 +42,17 @@ class PlanoFormacoes(models.Model):
     projeto: models.ForeignKey[Projeto] = models.ForeignKey(  # type: ignore[assignment]
         "core.Projeto", on_delete=models.PROTECT, related_name="planos_formacoes", verbose_name="Projeto"
     )
-    # Coordenador = a PESSOA que coordenou (coluna Coordenador da Agenda), resolvido por CPF → Usuario
-    # (#1849). NÃO é a lista de governança DATCoordenador (essa segue em DATAcao/DATFormacao). Read-only
-    # na UI (o dado é autoritativo do import); o import seta via ORM.
-    coordenador: models.ForeignKey[Usuario | None] = models.ForeignKey(  # type: ignore[assignment]
+    # Coordenadores = as PESSOAS que coordenaram (coluna Coordenador da Agenda), resolvidas por CPF →
+    # Usuario (#1849). Co-liderança: um plano pode ter N coordenadores conduzindo o MESMO ciclo — a chave
+    # natural (municipio, projeto, ano) continua identificando UM plano; o coordenador é N:N (ex.: os 2
+    # grupos de UNIÃO DOS PALMARES e os 33 de VIDA E MATEMÁTICA / "Elienai & Silvio"). NÃO é a lista de
+    # governança DATCoordenador (essa segue em DATAcao/DATFormacao). Read-only na UI (o dado é autoritativo
+    # do import; o import seta via ORM).
+    coordenadores = models.ManyToManyField(  # type: ignore[misc]
         "core.Usuario",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
         related_name="planos_coordenados",
-        verbose_name="Coordenador Responsavel",
+        blank=True,
+        verbose_name="Coordenadores",
     )
 
     ano = models.PositiveSmallIntegerField(
@@ -112,7 +113,6 @@ class PlanoFormacoes(models.Model):
         ordering = ["municipio__nome", "projeto__nome"]
         indexes = [
             models.Index(fields=["municipio", "projeto"]),
-            models.Index(fields=["coordenador", "ativo"]),
         ]
         constraints = [
             models.UniqueConstraint(

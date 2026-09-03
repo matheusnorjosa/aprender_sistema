@@ -1,7 +1,7 @@
 # Hook: graphify-reminder -- PreToolUse (Bash). Sugere o grafo como ferramenta
 # SOB DEMANDA (CLAUDE.md D2): nunca obriga a le-lo, nunca falha fechado.
 # REGRA CRITICA: SEMPRE emitir JSON valido em stdout + exit 0. Um stdout vazio
-# e lido como "invalid JSON" pelo Cursor -> a tool e BLOQUEADA. Por isso o ramo
+# e lido como "invalid JSON" pelo Claude Code -> a tool e BLOQUEADA. Por isso o ramo
 # else devolve '{}' em vez de nada.
 
 $inputJson = [Console]::In.ReadToEnd()

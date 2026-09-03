@@ -146,7 +146,7 @@ else:
     check("tools-reminder: emits reminder", "skill/command/agent" in out)
 
     # 1.B: graphify-reminder deve SEMPRE emitir JSON valido + exit 0 (nunca stdout
-    # vazio, que o Cursor le como "invalid JSON" e BLOQUEIA a tool). Quatro casos:
+    # vazio, que o Claude Code le como "invalid JSON" e BLOQUEIA a tool). Quatro casos:
     # stdin vazio, comando nao-search (ls), rg SEM e COM graphify-out/graph.json.
     _gr = str(HOOKS / "graphify-reminder.ps1")
 

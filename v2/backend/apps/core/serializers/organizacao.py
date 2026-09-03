@@ -115,9 +115,11 @@ class ProjetoSerializer(serializers.ModelSerializer):
             "projeto_geral_nome",
             "setor",
             "setor_efetivo",
+            "sem_operacao",
             "is_test",
         ]
-        read_only_fields = ["id"]
+        # sem_operacao: autoritativo do import (#1897), sem entrada-direta → read-only.
+        read_only_fields = ["id", "sem_operacao"]
 
 
 class ProjetoOptionSerializer(serializers.ModelSerializer):

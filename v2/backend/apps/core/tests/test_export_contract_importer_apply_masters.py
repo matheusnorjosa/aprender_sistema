@@ -336,3 +336,64 @@ def test_apply_usuario_no_pii_in_report(tmp_path):
     assert "12398712399" not in blob
     assert "fulano.secreto@ex.com" not in blob
     assert "Fulano Secreto" not in blob
+
+
+# ═══════════════════════ projeto: setor + sem_operacao (#1897) ═══════════════════════
+PROJ_SN_HEADER = "projeto,projeto_geral,fluxo,setor,sem_operacao"
+
+
+def test_apply_projeto_creates_with_setor_and_sem_operacao(tmp_path):
+    """Novo projeto (unmatched) é criado já com setor + sem_operacao da CSV."""
+    ProjetoGeral.objects.create(nome="PG SETOR")
+    csv = f"{PROJ_SN_HEADER}\nProjeto Setor Novo 1,PG SETOR,NAO_SUPER,Vidas,true\n"
+    path = _write_export(tmp_path, {"projeto": csv})
+    r = ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
+    assert r["applied"]["projeto"] == 1
+    p = Projeto.objects.get(nome="Projeto Setor Novo 1")
+    assert p.setor == "Vidas"
+    assert p.sem_operacao is True
+
+
+def test_reconcile_projeto_setor_seeds_when_empty(tmp_path):
+    """Projeto existente com setor vazio → import SEMEIA o setor (reportado à parte)."""
+    ProjetoFactory(nome="Projeto Semear 1", fluxo="NAO_SUPER", setor="")
+    csv = f"{PROJ_SN_HEADER}\nProjeto Semear 1,,,Fluir,\n"
+    path = _write_export(tmp_path, {"projeto": csv})
+    r = ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
+    assert r["applied"]["projeto"] == 0, "existente não recria"
+    assert r["applied"]["projeto__reconciled"] == 1
+    assert Projeto.objects.get(nome="Projeto Semear 1").setor == "Fluir"
+
+
+def test_reconcile_projeto_setor_never_clobbers_human_value(tmp_path):
+    """setor é editável na UI (#1934) → import NUNCA sobrescreve valor humano; só semeia vazio."""
+    ProjetoFactory(nome="Projeto Fixo 1", fluxo="NAO_SUPER", setor="Fluir")
+    csv = f"{PROJ_SN_HEADER}\nProjeto Fixo 1,,,Vidas,\n"
+    path = _write_export(tmp_path, {"projeto": csv})
+    r = ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
+    assert r["applied"].get("projeto__reconciled", 0) == 0
+    assert Projeto.objects.get(nome="Projeto Fixo 1").setor == "Fluir", "não clobber"
+
+
+def test_reconcile_projeto_sem_operacao_if_differ(tmp_path):
+    """sem_operacao é autoritativo do import (sem UI) → reconcilia quando difere."""
+    ProjetoFactory(nome="Projeto Op 1", fluxo="NAO_SUPER", sem_operacao=False)
+    csv = f"{PROJ_SN_HEADER}\nProjeto Op 1,,,,true\n"
+    path = _write_export(tmp_path, {"projeto": csv})
+    r = ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
+    assert r["applied"]["projeto__reconciled"] == 1
+    assert Projeto.objects.get(nome="Projeto Op 1").sem_operacao is True
+
+
+def test_reconcile_projeto_scoped_and_idempotent(tmp_path):
+    """Reconcile toca só setor/sem_operacao — nunca fluxo/codigo; 2ª run = 0."""
+    p = ProjetoFactory(nome="Projeto Escopo 1", fluxo="NAO_SUPER", setor="", codigo="ESC1")
+    csv = f"{PROJ_SN_HEADER}\nProjeto Escopo 1,,SUPER,Vidas,\n"  # fluxo SUPER na CSV NÃO muda o existente
+    path = _write_export(tmp_path, {"projeto": csv})
+    ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
+    p.refresh_from_db()
+    assert p.setor == "Vidas"
+    assert p.fluxo == "NAO_SUPER", "reconcile não toca fluxo"
+    assert p.codigo == "ESC1", "codigo intacto"
+    r2 = ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
+    assert r2["applied"].get("projeto__reconciled", 0) == 0, "2ª run: nada muda"

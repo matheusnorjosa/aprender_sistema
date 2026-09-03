@@ -68,7 +68,7 @@ Rodei um workflow de 8 agentes cruzando cada afirmação do **lado-sistema** da 
 
 | claim do relay | veredicto | realidade no código | issue |
 |---|---|---|---|
-| `projeto.setor` × `gerencia.setor_canonico` (gate D6) | 🔶 reclass | **campos criados** (#1893 ✅ — `get_setor` prefere o model, fallback derivado); falta **popular** via import (#1897); `projeto.gerencia` 124/125 vazio | #1893 ✅ · #1898 |
+| `projeto.setor` × `gerencia.setor_canonico` (gate D6) | 🔶 reclass | **campos criados** (#1893 ✅ — `get_setor` prefere o model, fallback derivado); **populado via import (#1897 ✅ — setor seed-if-empty + sem_operacao)**; `projeto.gerencia` 124/125 vazio | #1893 ✅ · #1897 ✅ · #1898 |
 | `EquipeGerencia.vigentes_em()` + setor | 🟡 parcial | esqueleto **roda em prod**; `Gerencia.setor_canonico` **criado** (#1893 ✅, só em Gerencia) | #1893 ✅ |
 | `external_event_id` importável | 🔶 reclass ⚠️ | campo é **cache determinístico** (`asv2-{id}`); **NÃO importável** (landmine `tipo_compra`≠`tipo`) | #1899 |
 | Colecao tem import próprio | ✅ ok | `POST /api/colecoes/import/` existe; remover `colecao.csv` é inócuo | — |
@@ -120,8 +120,9 @@ antes de construir.
 
 - [x] **B.1** `Gerencia.setor_canonico` (CharField) ✅ #1893 — recebe o de-para do sheets.banco.
 - [x] **B.2** Setor do projeto: **`Projeto.setor` criado** (#1893 ✅ — decisão: campo próprio +
-      fallback derivado de `gerencia.nome_setor` no `get_setor`, sem regressão). Falta **popular**
-      via import (#1897).
+      fallback derivado de `gerencia.nome_setor` no `get_setor`, sem regressão). **Populado via import
+      (#1897 ✅)**: `setor` (seed-if-empty, nunca clobber conferência) + `sem_operacao` (if-differ),
+      create + reconcile.
 - [ ] **B.3** `projeto.projeto_geral` (hoje 125/125 vazio) — a regra de códigos mora na família.
 - [ ] **B.4** Papel `SUPORTE`/`OPERACIONAL` no enum de `EquipeGerencia.papel` (ou mapeamento
       explícito) — sem promover a APOIO.

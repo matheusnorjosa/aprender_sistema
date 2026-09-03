@@ -155,6 +155,26 @@ class Solicitacao(models.Model):
         blank=True,
         help_text="Segmento educacional (ex: Fundamental I, Fundamental II)",
     )
+    segmento_norm = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text=(
+            "Segmento canônico (de-para do sheets.banco: v15 mapeia 275 grafias → 57 valores). "
+            "Populado por IMPORT a partir da coluna `segmento_norm` do contrato; o `segmento` cru fica "
+            "intacto. Autoritativo do import (sem entrada-direta), espelhando `Gerencia.setor_canonico`."
+        ),
+    )
+    segmento_norm_confianca = models.CharField(
+        max_length=30,
+        blank=True,
+        default="",
+        help_text=(
+            "Confiança do de-para que atribuiu `segmento_norm` — sinal de qualidade populado por IMPORT, "
+            "SEM entrada-direta (read-only na API), espelhando `Gerencia.setor_canonico_confianca`."
+        ),
+    )
     coordenador_acompanha = models.BooleanField(
         default=False,
         help_text="Indica se o coordenador acompanha o evento",

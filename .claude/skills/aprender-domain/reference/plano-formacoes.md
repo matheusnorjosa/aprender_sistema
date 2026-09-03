@@ -15,7 +15,7 @@ Estrutura de formações anuais por Município + Projeto.
 **Campos principais**:
 - `municipio`: FK → Municipio (PROTECT)
 - `projeto`: FK → Projeto (PROTECT)
-- `coordenador`: FK → **Usuario** (SET_NULL, opcional) — a PESSOA que coordenou o evento, resolvida por CPF (#1849). NÃO é a lista de governança `DATCoordenador`
+- `coordenadores`: **M2M → Usuario** (co-liderança, #1958/#1960) — as PESSOAS que coordenaram, resolvidas por CPF (#1849/#1957). Um plano pode ter N coordenadores conduzindo o mesmo ciclo; a chave natural `(municipio, projeto, ano)` segue identificando 1 plano. Autoritativo do import (read-only na UI; o serializer agrega os nomes em `coordenador_nome` = "A & B"). NÃO é a lista de governança `DATCoordenador`
 - `ano`: PositiveSmallIntegerField — dimensão temporal por ano (natural key `municipio+projeto+ano`)
 - `ch_total`: DecimalField (soma das CH das formações)
 - `ch_estudo`: DecimalField (CH adicional de estudo)

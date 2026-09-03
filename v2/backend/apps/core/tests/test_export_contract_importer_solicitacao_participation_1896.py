@@ -316,3 +316,105 @@ def test_apply_participation_nonempty_match_still_resolves_by_name(tmp_path):
     assert Participation.objects.filter(
         solicitacao__external_hash=eh, usuario=pessoa, role="FORMADOR"
     ).exists(), "match não-vazio → resolve por nome normalmente"
+
+
+# ── #1896: segmento_norm (canônico, autoritativo do import) — create + reconcile ──
+
+SOL_HEADER_SN = SOL_HEADER + ",segmento_norm,segmento_norm_confianca"
+
+
+def _mk(base, name):
+    d = base / name
+    d.mkdir(exist_ok=True)
+    return d
+
+
+def _sol_row_sn(coord_cpf="11144477735", ehash="", seg="Fund I", seg_norm="", seg_conf="", coord_ac="Sim"):
+    return (
+        f"{SOL_HEADER_SN}\n"
+        f"Cidade X,CE,Projeto X,Formacao,2026-05-10,09:00,12:00,{seg},"
+        f"{coord_ac},Coord Um,{coord_cpf},Nao,{ehash},{seg_norm},{seg_conf}\n"
+    )
+
+
+def test_apply_solicitacao_sets_segmento_norm_on_create(tmp_path):
+    """Cria populando segmento_norm + confianca a partir da CSV; o `segmento` cru fica intacto."""
+    mun, proj, tipo, _coord = _masters()
+    eh = _hash(mun, proj, tipo)
+    path = _write_export(
+        tmp_path,
+        {"solicitacao": _sol_row_sn(ehash=eh, seg="Fund I", seg_norm="Fundamental I", seg_conf="alta")},
+    )
+    ExportContractImporter(path=path, apply=True, allow=("solicitacao",)).run()
+    sol = Solicitacao.objects.get()
+    assert sol.segmento == "Fund I", "segmento cru intacto"
+    assert sol.segmento_norm == "Fundamental I", "segmento_norm vem da CSV"
+    assert sol.segmento_norm_confianca == "alta"
+
+
+def test_reconcile_segmento_norm_on_existing(tmp_path):
+    """Create-only pula o existente por external_hash, mas RECONCILIA segmento_norm (autoritativo do
+    import), reportado à parte em applied['solicitacao__segmento_norm_reconciled']."""
+    mun, proj, tipo, _coord = _masters()
+    eh = _hash(mun, proj, tipo)
+    # 1ª carga: sem segmento_norm → cria com norm vazio
+    p1 = _write_export(_mk(tmp_path, "a"), {"solicitacao": _sol_row_sn(ehash=eh)})
+    ExportContractImporter(path=p1, apply=True, allow=("solicitacao",)).run()
+    assert Solicitacao.objects.get().segmento_norm == ""
+    # 2ª carga: mesma NK, agora com segmento_norm → reconcilia
+    p2 = _write_export(
+        _mk(tmp_path, "b"), {"solicitacao": _sol_row_sn(ehash=eh, seg_norm="Fundamental I", seg_conf="media")}
+    )
+    r = ExportContractImporter(path=p2, apply=True, allow=("solicitacao",)).run()
+    assert r["applied"]["solicitacao"] == 0, "não recria"
+    assert r["applied"]["solicitacao__segmento_norm_reconciled"] == 1
+    sol = Solicitacao.objects.get()
+    assert sol.segmento_norm == "Fundamental I"
+    assert sol.segmento_norm_confianca == "media"
+
+
+def test_reconcile_segmento_norm_never_empties(tmp_path):
+    """segmento_norm vazio na fonte = ausência de sinal, NÃO comando de apagar → nunca esvazia."""
+    mun, proj, tipo, _coord = _masters()
+    eh = _hash(mun, proj, tipo)
+    p1 = _write_export(
+        _mk(tmp_path, "a"), {"solicitacao": _sol_row_sn(ehash=eh, seg_norm="Fundamental I", seg_conf="alta")}
+    )
+    ExportContractImporter(path=p1, apply=True, allow=("solicitacao",)).run()
+    p2 = _write_export(_mk(tmp_path, "b"), {"solicitacao": _sol_row_sn(ehash=eh, seg_norm="", seg_conf="")})
+    r = ExportContractImporter(path=p2, apply=True, allow=("solicitacao",)).run()
+    assert r["applied"].get("solicitacao__segmento_norm_reconciled", 0) == 0
+    sol = Solicitacao.objects.get()
+    assert sol.segmento_norm == "Fundamental I", "não apaga o valor com fonte vazia"
+    assert sol.segmento_norm_confianca == "alta"
+
+
+def test_reconcile_segmento_norm_idempotent(tmp_path):
+    """2ª run com o mesmo valor → 0 reconciliado."""
+    mun, proj, tipo, _coord = _masters()
+    eh = _hash(mun, proj, tipo)
+    files = {"solicitacao": _sol_row_sn(ehash=eh, seg_norm="Fundamental I", seg_conf="alta")}
+    p1 = _write_export(_mk(tmp_path, "a"), files)
+    ExportContractImporter(path=p1, apply=True, allow=("solicitacao",)).run()
+    p2 = _write_export(_mk(tmp_path, "b"), files)
+    r = ExportContractImporter(path=p2, apply=True, allow=("solicitacao",)).run()
+    assert r["applied"].get("solicitacao__segmento_norm_reconciled", 0) == 0, "sem mudança → 0"
+
+
+def test_reconcile_segmento_norm_scoped(tmp_path):
+    """Reconcilia SÓ segmento_norm/confianca — não toca segmento cru nem status."""
+    mun, proj, tipo, _coord = _masters()
+    eh = _hash(mun, proj, tipo)
+    p1 = _write_export(_mk(tmp_path, "a"), {"solicitacao": _sol_row_sn(ehash=eh, seg="Fund I")})
+    ExportContractImporter(path=p1, apply=True, allow=("solicitacao",)).run()
+    status_antes = Solicitacao.objects.get().status
+    # fonte muda segmento cru E norm; só norm/confianca podem mudar no existente
+    p2 = _write_export(
+        _mk(tmp_path, "b"),
+        {"solicitacao": _sol_row_sn(ehash=eh, seg="OUTRO CRU", seg_norm="Fundamental I", seg_conf="alta")},
+    )
+    ExportContractImporter(path=p2, apply=True, allow=("solicitacao",)).run()
+    sol = Solicitacao.objects.get()
+    assert sol.segmento == "Fund I", "segmento cru do existente NÃO muda (create-only fora do norm)"
+    assert sol.status == status_antes, "status intocado"
+    assert sol.segmento_norm == "Fundamental I"

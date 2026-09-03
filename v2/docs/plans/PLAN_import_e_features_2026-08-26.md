@@ -75,7 +75,7 @@ Rodei um workflow de 8 agentes cruzando cada afirmação do **lado-sistema** da 
 | não apagar model `Prova` | ✅ ok | model **vivo** (PATCH `update_prova`, serializers, prefetch); "0 provas" = dado vazio | — |
 | `usuario.status`/`desativado_localmente` | 🔴 refutado ⚠️ | **não existem** (só `is_active`); a bomba foi **corrigida** (never-reactivate) e o campo persistente `desativado_localmente` **existe** (#1894) | #1891 ✅ · #1894 ✅ |
 | 14 entidades "implementadas" | ✅ ok | `solicitacao`+`participation` ganharam handler classify+apply no **#1935** (`guest_nome`/D1, email-first, papel-por-posição); `equipe_gerencia` #1895; `gerencia` só classifica (by design) | #1895 ✅ · #1896 ✅ |
-| `segmento_norm`; projeto_geral→nr_codigos | 🟡 parcial | `segmento_norm` **não é coluna**; nr_codigos usa `DATRegistro.projeto_geral`, **não** `Projeto.projeto_geral` | #1896 #1897 |
+| `segmento_norm`; projeto_geral→nr_codigos | 🟡 parcial | `segmento_norm` **agora é campo** (`Solicitacao.segmento_norm`/`_confianca`, importado do de-para + reconcile, #1896 ✅); nr_codigos ainda usa `DATRegistro.projeto_geral`, **não** `Projeto.projeto_geral` | #1896 ✅ #1897 |
 
 **Rastreamento: milestone #22 — Import v15 → dev correto** (issues #1891–#1900). Ordem sugerida:
 **#1891 ✅** (bomba usuarios_import — corrigida no #1902) → **#1892** (merge VIDA `--apply` — aplicado no dev) → **#1893 ✅** (campos setor) / **#1894 ✅** (desativado_localmente) →

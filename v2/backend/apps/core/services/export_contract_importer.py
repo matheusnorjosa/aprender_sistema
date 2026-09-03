@@ -1125,7 +1125,11 @@ class ExportContractImporter:
                     continue
                 if name == "plano_formacao":
                     # Handler dedicado (NK com ano; CSV sem coluna `nome` → o loop genérico gravaria 0 = silent-gap).
-                    applied[name] = self._apply_plano_formacao(self._load(name))
+                    # Create-only do plano + reconcile do M2M coordenadores em plano existente (reportado à parte).
+                    created_pf, reconciled_pf = self._apply_plano_formacao(self._load(name))
+                    applied[name] = created_pf
+                    if reconciled_pf:
+                        applied["plano_formacao__coordenadores_reconciled"] = reconciled_pf
                     continue
                 if name == "solicitacao":
                     applied[name] = self._apply_solicitacao(self._load(name))
@@ -1371,17 +1375,23 @@ class ExportContractImporter:
                 ids.append(uid)
         return ids
 
-    def _apply_plano_formacao(self, rows: list[dict[str, str]]) -> int:
-        """Create-only de PlanoFormacoes. NK (municipio, projeto, ano); `ano` DECLARADO do workbook.
-        `sem_plano` (reserva: TOTAL 0 + sem data) é pulado (não é plano). Coordenadores = as PESSOAS que
-        coordenaram (coluna Coordenador da Agenda), N:N por co-liderança (RELAY 32/34): `coordenadores_cpf`
+    def _apply_plano_formacao(self, rows: list[dict[str, str]]) -> tuple[int, int]:
+        """Create-only do PLANO + reconcile do M2M `coordenadores` em plano JÁ existente.
+
+        NK (municipio, projeto, ano); `ano` DECLARADO do workbook; `sem_plano` (reserva) é pulado.
+        Coordenadores = as PESSOAS que coordenaram, N:N por co-liderança (RELAY 32/34): `coordenadores_cpf`
         (array) com fallback `coordenador_cpf`, cada CPF → `Usuario` (sem fallback email/nome; ausente/
-        inválido/sem match é descartado, #1849). `ch_estudo` importado; `ch_total`/`ch_anual` semeados dos
-        totais da planilha (recalcular_ch sobrescreve quando/se as formações-filhas forem importadas)."""
+        inválido/sem match é descartado, #1849). `ch_estudo`/`ch_total`/`ch_anual` semeados na criação.
+
+        Plano já existente → reconcilia **só** `coordenadores` (dado AUTORITATIVO do import, read-only na UI:
+        não é decisão humana, então mantê-lo em sincronia é seguro), **nunca** outros campos (create-only p/
+        o resto — anti-silent-update #1628/#1738). Só reconcilia se o conjunto resolvido for **não-vazio e
+        diferente** (array vazio = ausência de sinal → não esvazia). Retorna `(created, reconciled)`."""
         actor = self._require_actor("plano_formacao")
         mun_idx = self._municipio_index()
         usuario_idx = self._usuario_cpf_index()
         created = 0
+        reconciled = 0
         for r in rows:
             if _to_bool(r.get("sem_plano")):
                 continue  # linha reservada, não é plano
@@ -1390,9 +1400,14 @@ class ExportContractImporter:
             if mun_id is None or proj_id is None:
                 continue  # FK não-resolvida (municipio/projeto)
             ano = _parse_int(r.get("ano"))
-            if PlanoFormacoes.objects.filter(municipio_id=mun_id, projeto_id=proj_id, ano=ano).exists():
-                continue
             coord_ids = self._resolve_coordenador_ids(r, usuario_idx)
+            existing = PlanoFormacoes.objects.filter(municipio_id=mun_id, projeto_id=proj_id, ano=ano).first()
+            if existing is not None:
+                # reconcile SÓ coordenadores; nunca esvazia (vazio = sem sinal); nunca toca outros campos.
+                if coord_ids and set(existing.coordenadores.values_list("id", flat=True)) != set(coord_ids):
+                    existing.coordenadores.set(coord_ids)
+                    reconciled += 1
+                continue
             plano = PlanoFormacoes.objects.create(
                 municipio_id=mun_id,
                 projeto_id=proj_id,
@@ -1405,7 +1420,7 @@ class ExportContractImporter:
             if coord_ids:
                 plano.coordenadores.set(coord_ids)
             created += 1
-        return created
+        return created, reconciled
 
     def _apply_solicitacao(self, rows: list[dict[str, str]]) -> int:
         """Create-only de Solicitacao. NK = external_hash = `evento_id` estável do CSV (fallback

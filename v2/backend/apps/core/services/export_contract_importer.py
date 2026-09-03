@@ -178,6 +178,8 @@ _CONSUMED_FIELDS: dict[str, frozenset[str]] = {
             "hora_inicio",
             "hora_fim",
             "segmento",
+            "segmento_norm",
+            "segmento_norm_confianca",
             "encontro",
             "coord_acompanha",
             "coordenador",
@@ -1132,7 +1134,12 @@ class ExportContractImporter:
                         applied["plano_formacao__coordenadores_reconciled"] = reconciled_pf
                     continue
                 if name == "solicitacao":
-                    applied[name] = self._apply_solicitacao(self._load(name))
+                    # Create-only da Solicitacao + reconcile de segmento_norm (autoritativo do import,
+                    # reportado à parte — #1896). Mesmo shape do plano_formacao/coordenadores.
+                    created_sol, reconciled_sol = self._apply_solicitacao(self._load(name))
+                    applied[name] = created_sol
+                    if reconciled_sol:
+                        applied["solicitacao__segmento_norm_reconciled"] = reconciled_sol
                     continue
                 if name == "participation":
                     # DEPOIS de solicitacao (ENTITY_ORDER garante): liga por external_hash já criado.
@@ -1422,27 +1429,45 @@ class ExportContractImporter:
             created += 1
         return created, reconciled
 
-    def _apply_solicitacao(self, rows: list[dict[str, str]]) -> int:
-        """Create-only de Solicitacao. NK = external_hash = `evento_id` estável do CSV (fallback
-        `evento_hash_natural`, depois `_compute_external_hash`/ADR-012 — ver `_resolve_solicitacao_key`). Solicitante
-        (dono) via `_resolve_solicitante` (solicitante_cpf→email→coordenador_cpf, v16.4); grava `usuario` E a FK
-        `coordenador` (decisão a — a tela lê a FK) + uma Participation(COORDENADOR) e carimba
-        `solicitante_procedencia`. Status via `resolve_initial_status` (PA-01: SUPER/desconhecido →
-        pendente). `coord_acompanha` (Sim/Não) → BooleanField `coordenador_acompanha` (RELAY 50: visual,
-        vazio→False). inicio/fim montados de data+hora LOCAL (America/Fortaleza), armazenados em UTC. Sem
-        `created_by` no model → não exige actor."""
+    def _apply_solicitacao(self, rows: list[dict[str, str]]) -> tuple[int, int]:
+        """Create-only de Solicitacao + reconcile de `segmento_norm`. NK = external_hash = `evento_id`
+        estável do CSV (fallback `evento_hash_natural`, depois `_compute_external_hash`/ADR-012 — ver
+        `_resolve_solicitacao_key`). Solicitante (dono) via `_resolve_solicitante`
+        (solicitante_cpf→email→coordenador_cpf, v16.4); grava `usuario` E a FK `coordenador` (decisão a —
+        a tela lê a FK) + uma Participation(COORDENADOR) e carimba `solicitante_procedencia`. Status via
+        `resolve_initial_status` (PA-01: SUPER/desconhecido → pendente). `coord_acompanha` (Sim/Não) →
+        BooleanField `coordenador_acompanha` (RELAY 50: visual, vazio→False). inicio/fim montados de
+        data+hora LOCAL (America/Fortaleza), armazenados em UTC. Sem `created_by` no model → não exige actor.
+
+        Retorna `(created, reconciled)`. `segmento_norm`/`segmento_norm_confianca` são autoritativos do
+        import (de-para do sheets, sem entrada-direta — #1896): create-only pula o registro existente por
+        external_hash, mas RECONCILIA esse campo — escopado (só norm/confianca), reportado à parte,
+        idempotente (só grava se difere), NUNCA esvazia (fonte vazia = ausência de sinal, não remoção)."""
         mun_idx = self._municipio_index()
         tipo_idx = self._tipo_evento_index()
         cpf_idx = self._usuario_cpf_index()
         proj_by_id = {p.id: p for p in Projeto.objects.all()}
-        existing = set(Solicitacao.objects.exclude(external_hash__isnull=True).values_list("external_hash", flat=True))
+        existing: dict[str, tuple[int, str]] = {
+            h: (sid, sn)
+            for h, sid, sn in Solicitacao.objects.exclude(external_hash__isnull=True).values_list(
+                "external_hash", "id", "segmento_norm"
+            )
+        }
         created = 0
+        reconciled = 0
         for r in rows:
             key = self._resolve_solicitacao_key(r, mun_idx, tipo_idx, cpf_idx)
             if key is None:
                 continue  # would_reject (FK/hora/coordenador não resolvido)
             mun_id, proj_id, tipo_id, data_ev, hora_ini, hora_fim, segmento, coord_id, ext_hash = key
+            seg_norm = (r.get("segmento_norm") or "").strip()[:100]
+            seg_conf = (r.get("segmento_norm_confianca") or "").strip()[:30]
             if ext_hash in existing:
+                sid, cur_sn = existing[ext_hash]
+                if seg_norm and seg_norm != cur_sn:
+                    Solicitacao.objects.filter(id=sid).update(segmento_norm=seg_norm, segmento_norm_confianca=seg_conf)
+                    existing[ext_hash] = (sid, seg_norm)
+                    reconciled += 1
                 continue
             inicio = timezone.make_aware(datetime.combine(data_ev, hora_ini), _FORTALEZA_TZ)
             fim = timezone.make_aware(datetime.combine(data_ev, hora_fim), _FORTALEZA_TZ)
@@ -1458,6 +1483,8 @@ class ExportContractImporter:
                 inicio=inicio,
                 fim=fim,
                 segmento=segmento,
+                segmento_norm=seg_norm,
+                segmento_norm_confianca=seg_conf,
                 encontro=(r.get("encontro") or "").strip() or None,
                 coordenador_acompanha=_to_bool(r.get("coord_acompanha")),
                 is_online=_to_bool(r.get("is_online")),
@@ -1468,9 +1495,9 @@ class ExportContractImporter:
             Participation.objects.get_or_create(
                 solicitacao=sol, usuario_id=coord_id, role=Participation.Role.COORDENADOR
             )
-            existing.add(ext_hash)
+            existing[ext_hash] = (sol.id, seg_norm)
             created += 1
-        return created
+        return created, reconciled
 
     def _resolve_participante(self, r: dict[str, str], cpf_idx: dict[str, int]) -> Usuario | None:
         """EMAIL-first (`resolve_user_by_email`, exato, sem filtro is_active — inclui inativos, RELAY 50)

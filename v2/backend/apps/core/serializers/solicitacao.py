@@ -73,6 +73,8 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "tipo",
             "encontro",
             "segmento",
+            "segmento_norm",
+            "segmento_norm_confianca",
             "coordenador_acompanha",
             "coordenador",
             "coordenador_username",
@@ -104,6 +106,9 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "external_event_id",
             "created_at",
             "updated_at",
+            # #1896: segmento_norm/confianca vêm do de-para do import (sem entrada-direta) → read-only
+            "segmento_norm",
+            "segmento_norm_confianca",
             # PR14: Campos GCal são gerenciados pelo sistema
             "gcal_status",
             "gcal_last_sync_at",

@@ -168,6 +168,9 @@ _CONSUMED_FIELDS: dict[str, frozenset[str]] = {
             "setor_canonico",
         }
     ),
+    "projeto": frozenset(
+        {"projeto", "nome", "projeto_geral", "fluxo", "codigo", "descricao", "ativo", "setor", "sem_operacao"}
+    ),
     "solicitacao": frozenset(
         {
             "municipio",
@@ -1119,7 +1122,12 @@ class ExportContractImporter:
                     continue
                 if name == "projeto":
                     # Handler dedicado (resolver + PG + fluxo); NÃO o loop genérico (nome__iexact).
-                    applied[name] = self._apply_projeto(self._load(name))
+                    # Create-only + reconcile de setor/sem_operacao em projeto existente (#1897,
+                    # reportado à parte — mesmo shape do solicitacao/plano_formacao).
+                    created_pr, reconciled_pr = self._apply_projeto(self._load(name))
+                    applied[name] = created_pr
+                    if reconciled_pr:
+                        applied["projeto__reconciled"] = reconciled_pr
                     continue
                 if name == "dat_acao":
                     # Handler dedicado (NK com ano; CSV sem coluna `nome` → o loop genérico gravaria 0).
@@ -1797,13 +1805,15 @@ class ExportContractImporter:
             created += 1
         return created
 
-    def _apply_projeto(self, rows: list[dict[str, str]]) -> int:
-        """Create-only do master `projeto` (catálogo de variantes — Onda A). Matching via
-        resolver #1372 (canon-key): cria SÓ unmatched, COM projeto_geral resolvível + fluxo
-        válido (PA-01). NÃO usa actor (Projeto não tem created_by). PG/fluxo ausente → pula
-        (would_reject no dry-run). Dedup intra-CSV por canon-key: o índice do resolver é cacheado
-        antes do loop, então sem dedup 2 grafias da mesma variante quebrariam o unique de `nome`.
-        Invalida o índice ao fim para que resolves posteriores (na mesma instância) vejam os novos."""
+    def _apply_projeto(self, rows: list[dict[str, str]]) -> tuple[int, int]:
+        """Create-only do master `projeto` (catálogo de variantes — Onda A) + reconcile de
+        setor/sem_operacao (#1897). Matching via resolver #1372 (canon-key): cria SÓ unmatched, COM
+        projeto_geral resolvível + fluxo válido (PA-01), já com setor + sem_operacao. NÃO usa actor
+        (Projeto não tem created_by). PG/fluxo ausente → pula (would_reject no dry-run). Dedup intra-CSV
+        por canon-key: o índice do resolver é cacheado antes do loop, então sem dedup 2 grafias da mesma
+        variante quebrariam o unique de `nome`. Invalida o índice ao fim para que resolves posteriores
+        (na mesma instância) vejam os novos. Retorna `(created, reconciled)` — ver
+        `_reconcile_projeto_fields`."""
         if self._pidx is None:
             self._pidx = build_projeto_index()
         pg_idx = self._projeto_geral_index()
@@ -1842,6 +1852,8 @@ class ExportContractImporter:
                 descricao=(r.get("descricao") or ""),
                 ativo=(_to_bool(r.get("ativo")) if (r.get("ativo") or "").strip() else True),
                 projeto_geral_id=pg_id,
+                setor=(r.get("setor") or "").strip()[:100],  # #1897: setor de-para v15
+                sem_operacao=_to_bool(r.get("sem_operacao")),
             )
             seen.add(res.canonical_key)
             if codigo:
@@ -1849,7 +1861,40 @@ class ExportContractImporter:
             created += 1
         if created:
             self._pidx = None  # invalida cache: resolves posteriores veem os recém-criados
-        return created
+        reconciled = self._reconcile_projeto_fields(rows)
+        return created, reconciled
+
+    def _reconcile_projeto_fields(self, rows: list[dict[str, str]]) -> int:
+        """Reconcilia `setor` e `sem_operacao` (#1897) em projetos JÁ existentes — o create-only pula
+        o matched, então sem isto o import seria no-op no catálogo já povoado. Guard-rails do #1960:
+        - `setor`: SEED-if-empty (é editável na UI/conferência #1934 → NUNCA clobber decisão humana);
+        - `sem_operacao`: if-differ (autoritativo do import, sem entrada-direta);
+        - escopado (só esses 2 campos), idempotente (só grava se muda), nunca esvazia o setor.
+        Conta 1 por projeto efetivamente atualizado (re-consulta a cada linha → grafias repetidas da
+        mesma variante não recontam)."""
+        reconciled = 0
+        for r in rows:
+            nome = (r.get("projeto") or r.get("nome") or "").strip()
+            if not nome:
+                continue
+            pid = self.resolve_projeto(nome)
+            if pid is None:
+                continue  # unmatched (já criado acima) ou ambíguo (decisão humana) → não reconcilia
+            cur = Projeto.objects.filter(id=pid).values("setor", "sem_operacao").first()
+            if cur is None:
+                continue
+            updates: dict[str, Any] = {}
+            setor = (r.get("setor") or "").strip()[:100]
+            if setor and not cur["setor"]:  # seed-if-empty: nunca sobrescreve valor humano
+                updates["setor"] = setor
+            if (r.get("sem_operacao") or "").strip():  # coluna presente = sinal do import
+                sem_op = _to_bool(r.get("sem_operacao"))
+                if cur["sem_operacao"] != sem_op:
+                    updates["sem_operacao"] = sem_op
+            if updates:
+                Projeto.objects.filter(id=pid).update(**updates)
+                reconciled += 1
+        return reconciled
 
     def _papel_index_from_equipe(self) -> dict[str, str]:
         """Mapa cpf(11 dig) -> papel canonico, de equipe_gerencia.csv (fonte primaria do papel)."""

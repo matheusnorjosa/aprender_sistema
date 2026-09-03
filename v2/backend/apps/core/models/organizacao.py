@@ -401,6 +401,14 @@ class Projeto(models.Model):
             "enquanto vazio, o serializer deriva de gerencia.nome_setor (fallback, sem regressão)."
         ),
     )
+    sem_operacao = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text=(
+            "Marcador v15 (do de-para do sheets.banco, #1897) de projeto SEM operação — variante de "
+            "catálogo que não gera eventos/operação. Autoritativo do import, SEM entrada-direta."
+        ),
+    )
 
     # Issue #145: Hierarquia organizacional
     gerencia = models.ForeignKey(  # type: ignore[misc]

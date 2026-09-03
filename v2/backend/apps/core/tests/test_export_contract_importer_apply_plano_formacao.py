@@ -2,9 +2,10 @@
 Tests do APPLY (create-only) da fatia plano_formacao do export-contract.
 
 Contrato (travado com o pipeline sheets.banco): `ano` declarado do workbook (coluna `ano`);
-`sem_plano`=reserva (não é plano → não cria); coordenador = a PESSOA que coordenou, resolvido por
-CPF → `Usuario` (cpf unique; sem fallback email/nome; ausente/inválido/sem match → NULL, #1849).
-NK (municipio, projeto, ano).
+`sem_plano`=reserva (não é plano → não cria); coordenadores = as PESSOAS que coordenaram, N:N por
+co-liderança (#1957): array `coordenadores_cpf` com fallback `coordenador_cpf` único, cada CPF → `Usuario`
+(cpf unique; sem fallback email/nome; ausente/inválido/sem match → descartado, #1849). NK (municipio,
+projeto, ano).
 
 Segurança: apply exige allowlist + actor (--as-user); create-only; idempotente. Fixtures sintéticos.
 """
@@ -29,6 +30,8 @@ PLANO_HEADER = (
     "municipio,municipio_norm,uf,projeto,projeto_norm,ano,ano_origem,sem_plano,"
     "coordenador,coordenador_cpf,coordenador_email,ch_estudo,ch_total_planilha,ch_anual_planilha"
 )
+# Header com a coluna N:N (co-liderança, #1957). CSV antigo (sem ela) cai no fallback coordenador_cpf.
+PLANO_HEADER_M2M = PLANO_HEADER + ",coordenadores_cpf"
 
 
 def _write_export(tmp_path, files: dict[str, str]) -> str:
@@ -44,6 +47,11 @@ def _write_export(tmp_path, files: dict[str, str]) -> str:
 
 def _actor():
     return UsuarioFactory(username="u_apply_plano", password="x", cpf="11144477735")
+
+
+def _coord_ids(p: PlanoFormacoes) -> list[int]:
+    """Ids dos coordenadores (M2M), em ordem de id — o dado importado."""
+    return list(p.coordenadores.values_list("id", flat=True).order_by("id"))
 
 
 def _setup(tmp_path, row: str):
@@ -63,7 +71,7 @@ def test_apply_plano_creates_with_ano_coordenador_and_ch(tmp_path):
     assert r["applied"]["plano_formacao"] == 1
     p = PlanoFormacoes.objects.get()
     assert p.ano == 2026
-    assert p.coordenador_id == coord.id  # resolvido por CPF → Usuario
+    assert _coord_ids(p) == [coord.id]  # resolvido por CPF → Usuario (fallback da coluna única)
     assert p.ch_estudo == Decimal("10.00")
     assert p.ch_total == Decimal("40.00")  # semeado de ch_total_planilha
     assert p.ch_anual == Decimal("50.00")  # semeado de ch_anual_planilha
@@ -98,11 +106,11 @@ def test_apply_plano_coordenador_none_when_unresolvable(tmp_path):
     actor = _actor()
     row = "Cidade X,CIDADE X,CE,Proj X,Proj X,2026,workbook,false,Fulano Inexistente,,,0,0,0"
     ExportContractImporter(path=_setup(tmp_path, row), apply=True, allow=("plano_formacao",), actor=actor).run()
-    assert PlanoFormacoes.objects.get().coordenador_id is None  # nome não bate → NULL, não chuta
+    assert _coord_ids(PlanoFormacoes.objects.get()) == []  # nome não bate → sem coordenador, não chuta
 
 
 def test_apply_plano_ambiguous_email_resolves_none(tmp_path):
-    """Email de CARGO herdado por 2 coordenadores (a caixa trocou de dono) → NULL, não chuta o dono atual."""
+    """Email de CARGO herdado por 2 coordenadores (a caixa trocou de dono) → sem coordenador (só resolve por CPF)."""
     actor = _actor()
     MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
     ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
@@ -116,7 +124,7 @@ def test_apply_plano_ambiguous_email_resolves_none(tmp_path):
         allow=("plano_formacao",),
         actor=actor,
     ).run()
-    assert PlanoFormacoes.objects.get().coordenador_id is None  # email ambíguo → NULL (não atrela o errado)
+    assert _coord_ids(PlanoFormacoes.objects.get()) == []  # email ambíguo → sem coordenador (não atrela o errado)
 
 
 def test_apply_plano_idempotent(tmp_path):
@@ -202,9 +210,10 @@ def test_apply_plano_no_coordenador_pii_in_report(tmp_path):
     assert "22255588846" not in blob  # o CPF (novo) também não vaza no report
 
 
-# --------------------- resolução do coordenador = PESSOA (Usuario) por CPF (definitivo #1849) ---------------------
-# O coordenador do plano vem da coluna Coordenador da Agenda = quem tocou o evento (uma PESSOA).
-# Resolve 100% contra Usuario por CPF (unique no banco). SEM fallback email/nome (a pessoa é chave de CPF).
+# --------------------- resolução dos coordenadores = PESSOAS (Usuario) por CPF, N:N (#1849/#1957) ---------------------
+# Os coordenadores do plano vêm da coluna Coordenador da Agenda = quem tocou o evento (PESSOAS).
+# Co-liderança (RELAY 32/34): array `coordenadores_cpf`, fallback `coordenador_cpf` único. Resolve 100%
+# contra Usuario por CPF (unique). SEM fallback email/nome (a pessoa é chave de CPF).
 
 _CPF_A = "22255588846"
 _CPF_B = "33366699957"
@@ -226,30 +235,82 @@ def test_apply_plano_resolves_coordenador_to_usuario_by_cpf(tmp_path):
     pessoa = UsuarioFactory(cpf=_CPF_A)
     path = _plano_with(tmp_path, coordenador="Outro Nome", coordenador_cpf=_CPF_A, coordenador_email="cargo@x.com")
     ExportContractImporter(path=path, apply=True, allow=("plano_formacao",), actor=actor).run()
-    assert PlanoFormacoes.objects.get().coordenador_id == pessoa.id
+    assert _coord_ids(PlanoFormacoes.objects.get()) == [pessoa.id]
 
 
 def test_apply_plano_cpf_miss_is_null(tmp_path):
-    """CPF presente mas nenhum Usuario tem → NULL (sem fallback email/nome)."""
+    """CPF presente mas nenhum Usuario tem → sem coordenador (sem fallback email/nome)."""
     actor = _actor()
     UsuarioFactory(cpf=_CPF_B)  # outra pessoa, cpf diferente
     path = _plano_with(tmp_path, coordenador="Nome Qualquer", coordenador_cpf=_CPF_A, coordenador_email="cargo@x.com")
     ExportContractImporter(path=path, apply=True, allow=("plano_formacao",), actor=actor).run()
-    assert PlanoFormacoes.objects.get().coordenador_id is None
+    assert _coord_ids(PlanoFormacoes.objects.get()) == []
 
 
 def test_apply_plano_no_cpf_is_null(tmp_path):
-    """Sem CPF na linha → NULL (sem fallback por email/nome de cargo)."""
+    """Sem CPF na linha → sem coordenador (sem fallback por email/nome de cargo)."""
     actor = _actor()
     UsuarioFactory(cpf=_CPF_A)
     path = _plano_with(tmp_path, coordenador="Alguem", coordenador_cpf="", coordenador_email="e@x.com")
     ExportContractImporter(path=path, apply=True, allow=("plano_formacao",), actor=actor).run()
-    assert PlanoFormacoes.objects.get().coordenador_id is None
+    assert _coord_ids(PlanoFormacoes.objects.get()) == []
 
 
 def test_apply_plano_invalid_cpf_is_null(tmp_path):
-    """CPF estruturalmente inválido (mod-11) → NULL, sem chute."""
+    """CPF estruturalmente inválido (mod-11) → sem coordenador, sem chute."""
     actor = _actor()
     path = _plano_with(tmp_path, coordenador_cpf="12345678900")
     ExportContractImporter(path=path, apply=True, allow=("plano_formacao",), actor=actor).run()
-    assert PlanoFormacoes.objects.get().coordenador_id is None
+    assert _coord_ids(PlanoFormacoes.objects.get()) == []
+
+
+# --------------------- co-liderança N:N: array coordenadores_cpf (#1957) ---------------------
+
+
+def _plano_m2m(tmp_path, coordenadores_cpf_json: str, coordenador_cpf: str = ""):
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
+    # coordenadores_cpf é array JSON → vem entre aspas no CSV (contém vírgulas).
+    row = (
+        f"Cidade X,CIDADE X,CE,Proj X,Proj X,2026,workbook,false,Dupla,{coordenador_cpf},,0,0,0,"
+        f'"{coordenadores_cpf_json}"'
+    )
+    return _write_export(tmp_path, {"plano_formacao": f"{PLANO_HEADER_M2M}\n{row}\n"})
+
+
+def test_apply_plano_multiple_coordenadores_from_json_array(tmp_path):
+    """Co-liderança (#1957): array coordenadores_cpf → M2M com os N coordenadores resolvidos por CPF.
+
+    Reproduz UNIÃO DOS PALMARES / 'Elienai & Silvio': 1 plano (NK mun/proj/ano), 2 coordenadores.
+    """
+    actor = _actor()
+    a = UsuarioFactory(cpf=_CPF_A)
+    b = UsuarioFactory(cpf=_CPF_B)
+    json_arr = f'[""{_CPF_A}"",""{_CPF_B}""]'  # aspas duplicadas = escape CSV
+    path = _plano_m2m(tmp_path, json_arr)
+    r = ExportContractImporter(path=path, apply=True, allow=("plano_formacao",), actor=actor).run()
+    assert r["applied"]["plano_formacao"] == 1  # 1 plano, não 2
+    assert set(_coord_ids(PlanoFormacoes.objects.get())) == {a.id, b.id}
+
+
+def test_apply_plano_coordenadores_array_skips_unresolvable(tmp_path):
+    """Array com um CPF válido + um sem match no cadastro → só o que resolve entra no M2M (sem chute)."""
+    actor = _actor()
+    a = UsuarioFactory(cpf=_CPF_A)  # existe
+    # _CPF_B não tem Usuario cadastrado
+    json_arr = f'[""{_CPF_A}"",""{_CPF_B}""]'
+    path = _plano_m2m(tmp_path, json_arr)
+    ExportContractImporter(path=path, apply=True, allow=("plano_formacao",), actor=actor).run()
+    assert _coord_ids(PlanoFormacoes.objects.get()) == [a.id]
+
+
+def test_apply_plano_array_takes_precedence_over_single(tmp_path):
+    """Havendo o array (não-vazio), ele manda; a coluna única `coordenador_cpf` é ignorada."""
+    actor = _actor()
+    a = UsuarioFactory(cpf=_CPF_A)
+    b = UsuarioFactory(cpf=_CPF_B)
+    json_arr = f'[""{_CPF_A}""]'  # array só com A
+    path = _plano_m2m(tmp_path, json_arr, coordenador_cpf=_CPF_B)  # single = B, deve ser ignorado
+    ExportContractImporter(path=path, apply=True, allow=("plano_formacao",), actor=actor).run()
+    assert _coord_ids(PlanoFormacoes.objects.get()) == [a.id]
+    assert b.id not in _coord_ids(PlanoFormacoes.objects.get())

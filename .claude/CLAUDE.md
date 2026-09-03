@@ -5,7 +5,7 @@
 ## Stack
 
 - **Backend**: Python 3.12, Django 5.2, DRF, PostgreSQL 15, Redis 7, Docker
-- **Frontend**: React 18, Vite 7, Ant Design 5, Tailwind CSS
+- **Frontend**: React 19, Vite 7, Ant Design 5, Tailwind CSS
 - **Timezone**: `America/Fortaleza` (UTC storage)
 - **Type Checking**: Pyright strict mode (PEP 695)
 - **Objetivo**: Substituir 82.389 fórmulas Excel por plataforma web

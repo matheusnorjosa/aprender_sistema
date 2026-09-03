@@ -243,7 +243,7 @@ def typescript_code_context(tool_input: dict) -> str:
     # Only the non-obvious gotchas (the rest is generic / in CLAUDE.md).
     parts.append("")
     parts.append("### Gotchas (nao-obvios)")
-    parts.append("- React 18 (NOT 19)  -- use lowercase `fetchpriority`, not camelCase")
+    parts.append("- React 19 (migrado de 18, #1675/#1687)  -- `fetchPriority` e prop camelCase; lowercase quebra sob React 19")
     parts.append(
         "- Vite `manualChunks` e bloqueado (crashou prod)  -- deixe o Rollup auto-chunkar"
     )
@@ -485,7 +485,7 @@ def test_context(command: str) -> str:
 
     if "vitest" in command:
         parts.append("### Frontend (vitest)")
-        parts.append("- Coverage target: 70%+")
+        parts.append("- Coverage: ratchet no baseline (statements 44 / branches 35 / functions 33 / lines 44) -- nao baixar")
         parts.append("- Pool: single-thread (race condition protection)")
         parts.append("- Environment: jsdom")
         parts.append("- Run: `cd v2/frontend && npx vitest`")

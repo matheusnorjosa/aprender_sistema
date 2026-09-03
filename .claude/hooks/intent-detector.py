@@ -73,7 +73,7 @@ def detect_intent(prompt: str) -> str:
         parts.append("## Security Context Detected (auto-detected)")
         parts.append("Use /security-scan for automated security scanning.")
         parts.append("Use django-security skill for OWASP/IDOR/RBAC guidance.")
-        parts.append("SEC Group A (infra) and B (code) are complete.")
+        parts.append("SEC-001..012 fechados (2026-04); hardening segue continuo (LGPD, pos-V1, authz).")
         parts.append("</system-reminder>")
 
     # Feature implementation detection

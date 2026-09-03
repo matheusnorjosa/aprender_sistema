@@ -1,7 +1,7 @@
 ---
 title: Espelho Sistema × Planilha
 status: living
-last_verified: 2026-08-26
+last_verified: 2026-09-03
 owner: backend
 sources_of_truth:
   - v2/backend/apps/core/models/organizacao.py
@@ -87,7 +87,7 @@ Contrato em [`solicitacao-approval.spec.md`](./specs/backend/solicitacao-approva
 
 - **DAT** transforma compra em acesso funcionando (trilhas FORMAR/AVALIAR). Ver
   [`dat.spec.md`](./specs/backend/dat.spec.md).
-- **Plano** `PlanoFormacoes(municipio, projeto, coordenador→Usuario)` → `Formacao` →
+- **Plano** `PlanoFormacoes(municipio, projeto, coordenadores→Usuario M2M)` → `Formacao` →
   `Acompanhamento`/`Prova`.
 - **Disponibilidade** cruza `AvailabilityBlock` + `Deslocamento` (RD-01..08). Ver
   [`availability.spec.md`](./specs/backend/availability.spec.md).
@@ -182,13 +182,15 @@ Granularidade por pessoa (opcionalmente filtrada por projeto/setor); trilha de *
 transferiu, quando, e qual a data de corte**. É recorrente. **Planejar antes de
 implementar (CP-04)** — depende do import (precisa do dado).
 
-### 4.3 Co-titularidade de plano — modelar para **N**
+### 4.3 Co-titularidade de plano — modelar para **N** — ✅ FEITO (2026-09-03)
 
-**DECIDIDO (dono, 25/08):** dois coordenadores respondem **igualmente** por um par
-município×projeto (`VIDA E MATEMÁTICA`), e o caso é recorrente. **MEDIDO no sistema:**
-`PlanoFormacoes.coordenador` é **FK única** → aceita um só. Modelar para **N** (não dois);
-sem pressa (não há caso vivo hoje — o co-titular foi desligado). Não partir o plano em dois
-(duplicaria o cronograma de encontros).
+**DECIDIDO (dono, 25/08)** e **IMPLEMENTADO:** dois coordenadores respondem **igualmente** por um par
+município×projeto (`VIDA E MATEMÁTICA`, `UNIÃO DOS PALMARES`), caso recorrente. `PlanoFormacoes.coordenador`
+(FK única) virou `coordenadores` (**M2M**, #1958 + reconcile #1960): a chave natural `(municipio, projeto, ano)`
+segue identificando **1 plano** — não se parte o cronograma. A medição do sheets.banco (RELAY 32/34) confirmou
+**co-liderança da mesma formação** (não turmas separadas) e que pôr o coordenador na chave inflaria a CH do
+município. Golden: **32 planos co-liderados** (display "A & B"); deployado em prod `v2026.09.03-f9521ba`.
+Dados de co-coordenação em prod = re-import futuro à parte.
 
 ### 4.4 Papel SUPORTE/OPERACIONAL
 

@@ -109,7 +109,9 @@ def projetos_options(request: Request) -> Response:
     """
     # CP3: Cache manual (não usar decorator com DRF views)
     include_test = request.query_params.get("include_test", "false").lower() == "true"
-    cache_key = f"static_endpoint:projetos_options:include_test={include_test}"
+    # #1976: exclui variantes-por-série (só famílias) — evento/plano apontam família.
+    exclude_kits = request.query_params.get("exclude_kits", "false").lower() == "true"
+    cache_key = f"static_endpoint:projetos_options:include_test={include_test}:exclude_kits={exclude_kits}"
     cached_data = cache.get(cache_key)
     if cached_data is not None:
         return Response(cached_data)
@@ -121,6 +123,11 @@ def projetos_options(request: Request) -> Response:
     # Issue #153: Filter out test projects by default
     if not include_test:
         projetos = projetos.filter(is_test=False)
+
+    # #1976: exclui variantes-por-série (nomes terminados em número) — mesma heurística do
+    # ProjetoLookup (views_lookup.py). Default off (Compras/DAT precisam das variantes).
+    if exclude_kits:
+        projetos = projetos.exclude(nome__regex=r"[0-9]+$")
 
     projetos = projetos.order_by("nome")
 

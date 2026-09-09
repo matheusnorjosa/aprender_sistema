@@ -251,42 +251,6 @@ export async function getCadastrosStats(params: FilterParams = {}): Promise<Gene
   return fetchAPI(buildUrl('/dat/cadastros/stats/', params as QueryParams));
 }
 
-// ========== FORMAÇÕES (Calendário de Treinamentos) ==========
-
-export async function listFormacoes(params: FilterParams = {}): Promise<PaginatedResponse<GenericRecord>> {
-  return fetchWithErrorMapping(buildUrl('/dat/formacoes/', params as QueryParams), {}, DAT_ERROR_MAP);
-}
-
-export async function createFormacao(data: Record<string, unknown>): Promise<GenericRecord> {
-  return fetchWithErrorMapping('/dat/formacoes/', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }, DAT_ERROR_MAP);
-}
-
-export async function updateFormacao(id: ID, data: Record<string, unknown>): Promise<GenericRecord> {
-  return fetchWithErrorMapping(`/dat/formacoes/${id}/`, {
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  }, DAT_ERROR_MAP);
-}
-
-export async function deleteFormacao(id: ID): Promise<void> {
-  await fetchWithErrorMapping(`/dat/formacoes/${id}/`, { method: 'DELETE' }, DAT_ERROR_MAP);
-}
-
-export async function getFormacoesStats(params: FilterParams = {}): Promise<GenericStats> {
-  return fetchAPI(buildUrl('/dat/formacoes/stats/', params as QueryParams));
-}
-
-export async function getFormacoesCalendario(params: FilterParams = {}): Promise<GenericRecord[]> {
-  return unwrapList(
-    await fetchAPI<GenericRecord[] | PaginatedResponse<GenericRecord>>(
-      buildUrl('/dat/formacoes/calendario/', params as QueryParams),
-    ),
-  );
-}
-
 // ========== COORDENADORES ==========
 
 export async function listCoordenadoresDAT(params: FilterParams = {}): Promise<PaginatedResponse<GenericRecord>> {

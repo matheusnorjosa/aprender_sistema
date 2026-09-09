@@ -279,7 +279,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
       try {
         const [munData, projData] = await Promise.all([
           getMunicipiosOptions(),
-          getProjetosOptions(),
+          getProjetosOptions({ excludeKits: true }), // #1976: plano aponta família, não variante-por-série
         ]);
         setMunicipios(munData);
         setProjetos(projData);

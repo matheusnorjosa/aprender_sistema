@@ -441,7 +441,7 @@ class TestProjetosOptionsCache:
         assert response1.status_code == 200
 
         # Verify cache is set (Python boolean is capitalized: False not false)
-        cached = cache.get("static_endpoint:projetos_options:include_test=False")
+        cached = cache.get("static_endpoint:projetos_options:include_test=False:exclude_kits=False")
         assert cached is not None
 
         # Second request - should use cache
@@ -471,8 +471,8 @@ class TestProjetosOptionsCache:
         assert "Test Project" in nomes2
 
         # Verify separate cache keys (Python boolean capitalized: True/False)
-        cached_without = cache.get("static_endpoint:projetos_options:include_test=False")
-        cached_with = cache.get("static_endpoint:projetos_options:include_test=True")
+        cached_without = cache.get("static_endpoint:projetos_options:include_test=False:exclude_kits=False")
+        cached_with = cache.get("static_endpoint:projetos_options:include_test=True:exclude_kits=False")
         assert cached_without is not None
         assert cached_with is not None
         assert len(cached_with) > len(cached_without)

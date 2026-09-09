@@ -97,9 +97,11 @@ export async function getMunicipiosOptions(): Promise<MunicipioOption[]> {
   );
 }
 
-export async function getProjetosOptions(): Promise<ProjetoOption[]> {
+export async function getProjetosOptions(opts?: { excludeKits?: boolean }): Promise<ProjetoOption[]> {
+  // #1976: excludeKits=true traz só famílias (evento/plano apontam família); default traz tudo (Compras/DAT).
+  const url = opts?.excludeKits ? '/options/projetos/?exclude_kits=true' : '/options/projetos/';
   return unwrapList(
-    await fetchAPI<ProjetoOption[] | PaginatedResponse<ProjetoOption>>('/options/projetos/'),
+    await fetchAPI<ProjetoOption[] | PaginatedResponse<ProjetoOption>>(url),
   );
 }
 

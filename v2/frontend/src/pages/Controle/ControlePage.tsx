@@ -1,181 +1,134 @@
 /**
- * Página de Controle - Gestão de COMPRAS e AÇÕES
+ * Painel de Controle — hub da seção Controle (#1984).
  *
- * Features:
- * - Listagem de COMPRAS com filtros
- * - Aviso de centralização de importações em DAT > Importações
- * - Campos corretos: Data, Município, UF, Projeto, Código, Quant., Uso
+ * Substitui a antiga lista de compras (que era redundante com /controle/compras e
+ * lia o modelo legado core.Compra): agora é uma landing com KPIs de contagem REAIS
+ * (sem valor financeiro) + atalhos de navegação para as sub-páginas.
  */
 
-import { useState, useEffect, useCallback, ChangeEvent, type JSX } from 'react';
-import { listCompras } from '../../api/ops';
-import type { Compra, ComprasFilters } from '../../api/ops';
-import DatImportsCentralizedBanner from '../../components/DatImportsCentralizedBanner';
+import { useEffect, useState, type JSX } from 'react';
+import { Link } from 'react-router';
+import { Alert, Card, Col, Row, Spin, Statistic, Typography } from 'antd';
+import {
+  CalendarOutlined,
+  ProjectOutlined,
+  ScheduleOutlined,
+  ShoppingCartOutlined,
+  TeamOutlined,
+} from '@ant-design/icons';
+import {
+  getAcoesStats,
+  getComprasStats,
+  getPlanoFormacoesStats,
+  listCoordenadoresDAT,
+} from '../../api/datModule';
+
+const { Title, Text } = Typography;
+
+const toNum = (v: unknown): number => (typeof v === 'number' ? v : Number(v) || 0);
+
+interface Kpis {
+  acoes: number;
+  compras: number;
+  planos: number;
+  coordenadores: number;
+}
+
+const NAV_TILES = [
+  { to: '/controle/acoes', label: 'Ações', icon: <ProjectOutlined /> },
+  { to: '/controle/compras', label: 'Compras', icon: <ShoppingCartOutlined /> },
+  { to: '/controle/coordenadores', label: 'Coordenadores', icon: <TeamOutlined /> },
+  { to: '/controle/plano-formacoes', label: 'Plano Anual', icon: <CalendarOutlined /> },
+  { to: '/controle/pre-agenda', label: 'Pré-agenda', icon: <ScheduleOutlined /> },
+] as const;
 
 export default function ControlePage(): JSX.Element {
-  const [compras, setCompras] = useState<Compra[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [kpis, setKpis] = useState<Kpis | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [filters, setFilters] = useState<ComprasFilters>({
-    municipio: '',
-    projeto: '',
-    uf: '',
-    from: '',
-    to: '',
-    q: '',
-  });
-
-  /**
-   * Carrega lista de compras.
-   */
-  const fetchCompras = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const data = await listCompras(filters);
-      setCompras(data);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  }, [filters]);
-
-  /**
-   * Handler de mudança de filtros.
-   */
-  const handleFilterChange = (key: keyof ComprasFilters, value: string) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
-  };
-
-  /**
-   * Carrega compras ao montar ou quando filtros mudam.
-   */
   useEffect(() => {
-    void fetchCompras();
-  }, [fetchCompras]);
+    let active = true;
+    const load = async (): Promise<void> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [acoes, compras, planos, coord] = await Promise.all([
+          getAcoesStats(),
+          getComprasStats(),
+          getPlanoFormacoesStats(),
+          listCoordenadoresDAT({ page: 1 }),
+        ]);
+        if (!active) return;
+        setKpis({
+          acoes: toNum(acoes['total']),
+          compras: toNum(compras['total']),
+          planos: toNum(planos['total_planos']),
+          coordenadores: toNum(coord.count),
+        });
+      } catch (err) {
+        if (active) setError((err as Error).message || 'Erro ao carregar indicadores');
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    void load();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const cards: Array<{ title: string; value: number; icon: JSX.Element }> = [
+    { title: 'Ações', value: kpis?.acoes ?? 0, icon: <ProjectOutlined /> },
+    { title: 'Compras', value: kpis?.compras ?? 0, icon: <ShoppingCartOutlined /> },
+    { title: 'Planos de formação', value: kpis?.planos ?? 0, icon: <CalendarOutlined /> },
+    { title: 'Coordenadores', value: kpis?.coordenadores ?? 0, icon: <TeamOutlined /> },
+  ];
 
   return (
-    <main className="p-6 space-y-6 bg-gray-50 min-h-screen" aria-labelledby="controle-title">
-      {/* Título */}
-      <header>
-        <h1 id="controle-title" className="text-3xl font-bold text-gray-900">Controle</h1>
-        <p className="text-sm text-gray-600 mt-1">
-          Gestão de compras e ações de controle
-        </p>
+    <main className="p-6" aria-labelledby="controle-title">
+      <header className="mb-6">
+        <Title level={3} id="controle-title" className="!mb-1">Painel de Controle</Title>
+        <Text type="secondary">
+          Visão geral da seção Controle — ações, compras, planos de formação e coordenadores.
+        </Text>
       </header>
 
-      <DatImportsCentralizedBanner />
+      {error && (
+        <Alert
+          type="error"
+          showIcon
+          className="mb-4"
+          message="Erro ao carregar indicadores"
+          description={error}
+        />
+      )}
 
-      {/* Filtros de COMPRAS */}
-      <section aria-label="Filtros de compras" className="bg-white rounded-lg shadow p-4">
-        <h2 className="text-lg font-semibold text-gray-900 mb-3">
-          Filtros de COMPRAS
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <input
-            type="text"
-            placeholder="Município"
-            value={filters.municipio}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFilterChange('municipio', e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="text"
-            placeholder="Projeto"
-            value={filters.projeto}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFilterChange('projeto', e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="text"
-            placeholder="UF"
-            value={filters.uf}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFilterChange('uf', e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="date"
-            placeholder="De"
-            value={filters.from}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFilterChange('from', e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="date"
-            placeholder="Até"
-            value={filters.to}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFilterChange('to', e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="text"
-            placeholder="Buscar uso/código"
-            value={filters.q}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => handleFilterChange('q', e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-      </section>
+      <Spin spinning={loading}>
+        <Row gutter={[16, 16]} className="mb-8">
+          {cards.map((c) => (
+            <Col xs={12} md={6} key={c.title}>
+              <Card variant="borderless">
+                <Statistic title={c.title} value={c.value} prefix={c.icon} groupSeparator="." />
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      </Spin>
 
-      {/* Tabela de COMPRAS */}
-      <section aria-label="Tabela de compras" className="bg-white rounded-lg shadow overflow-hidden">
-        <header className="px-4 py-3 border-b">
-          <h2 className="text-lg font-semibold text-gray-900">
-            COMPRAS ({compras.length})
-          </h2>
-        </header>
-
-        {error && (
-          <div className="p-4 bg-red-50 border-b border-red-200">
-            <p className="text-sm text-red-800">Erro: {error}</p>
-            <p className="text-xs text-red-600 mt-1">
-              Verifique se o backend está rodando e se você está autenticado.
-            </p>
-          </div>
-        )}
-
-        {loading ? (
-          <div className="p-8 text-center">
-            <p className="text-gray-500">Carregando...</p>
-          </div>
-        ) : compras.length === 0 ? (
-          <div className="p-8 text-center">
-            <p className="text-gray-500">Nenhuma compra encontrada.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left font-medium text-gray-700">Data</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-700">Município</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-700">UF</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-700">Projeto</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-700">Código</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-700">Quantidade</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-700">Uso</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {compras.map((r) => (
-                  <tr key={r.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">{r.data}</td>
-                    <td className="px-4 py-3">{r.municipio}</td>
-                    <td className="px-4 py-3">{r.uf}</td>
-                    <td className="px-4 py-3">{r.projeto}</td>
-                    <td className="px-4 py-3">{r.codigo}</td>
-                    <td className="px-4 py-3">{r.quantidade}</td>
-                    <td className="px-4 py-3">{r.uso}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      <Title level={5} className="!mb-3">Atalhos</Title>
+      <Row gutter={[16, 16]}>
+        {NAV_TILES.map((t) => (
+          <Col xs={12} sm={8} md={6} lg={4} key={t.to}>
+            <Link to={t.to}>
+              <Card hoverable variant="borderless" className="text-center">
+                <div className="text-2xl mb-2" aria-hidden="true">{t.icon}</div>
+                <Text strong>{t.label}</Text>
+              </Card>
+            </Link>
+          </Col>
+        ))}
+      </Row>
     </main>
   );
 }

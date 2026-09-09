@@ -13,6 +13,12 @@ vi.mock('../../../api/datModule', () => ({
   listCoordenadoresDAT: vi.fn().mockResolvedValue({ count: 12, results: [], next: null, previous: null }),
 }));
 
+// Banner faz getMe() no mount; mockamos como noop pra manter o teste focado nos KPIs/atalhos.
+vi.mock('../../../components/DatImportsCentralizedBanner', () => ({
+  default: () => null,
+  DAT_IMPORTS_CENTRALIZED_MESSAGE: 'Importações foram centralizadas em DAT > Importações.',
+}));
+
 import ControlePage from '../ControlePage';
 
 const renderPage = () =>

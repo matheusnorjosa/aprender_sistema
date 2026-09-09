@@ -22,6 +22,7 @@ import {
   getPlanoFormacoesStats,
   listCoordenadoresDAT,
 } from '../../api/datModule';
+import DatImportsCentralizedBanner from '../../components/DatImportsCentralizedBanner';
 
 const { Title, Text } = Typography;
 
@@ -93,6 +94,8 @@ export default function ControlePage(): JSX.Element {
           Visão geral da seção Controle — ações, compras, planos de formação e coordenadores.
         </Text>
       </header>
+
+      <DatImportsCentralizedBanner className="mb-6" />
 
       {error && (
         <Alert

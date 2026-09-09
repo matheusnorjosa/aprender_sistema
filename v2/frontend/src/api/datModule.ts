@@ -214,6 +214,10 @@ export async function getComprasPendencias(params: FilterParams = {}): Promise<C
   return fetchAPI(buildUrl('/dat/compras-materiais/pendencias/', params as QueryParams));
 }
 
+export async function getComprasStats(params: FilterParams = {}): Promise<GenericStats> {
+  return fetchAPI(buildUrl('/dat/compras-materiais/stats/', params as QueryParams));
+}
+
 // ========== CADASTROS (Workflow FORMAR/AVALIAR) ==========
 
 export async function listCadastros(params: FilterParams = {}): Promise<PaginatedResponse<GenericRecord>> {

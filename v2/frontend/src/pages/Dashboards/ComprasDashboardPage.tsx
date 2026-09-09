@@ -26,7 +26,6 @@ import {
   BookOutlined,
   CheckCircleOutlined,
   DownloadOutlined,
-  DollarOutlined,
   EnvironmentOutlined,
   InboxOutlined,
   ReloadOutlined,
@@ -71,9 +70,6 @@ const toNumber = (value: unknown): number => {
 
 const formatNumber = (value: unknown): string =>
   toNumber(value).toLocaleString('pt-BR');
-
-const formatCurrency = (value: unknown): string =>
-  `R$ ${toNumber(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
 const formatDate = (value: string | null): string => {
   if (!value) return '-';
@@ -571,17 +567,6 @@ export default function ComprasDashboardPage(): JSX.Element {
                 <div className="kpi-value">{formatNumber(data.kpis.colecoes_diferentes)}</div>
               </div>
               <AppstoreOutlined className="kpi-icon" />
-            </div>
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={8} lg={4}>
-          <Card className="kpi-card kpi-6" bordered={false}>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="kpi-title">Valor total</div>
-                <div className="kpi-value">{formatCurrency(data.kpis.valor_total)}</div>
-              </div>
-              <DollarOutlined className="kpi-icon" />
             </div>
           </Card>
         </Col>

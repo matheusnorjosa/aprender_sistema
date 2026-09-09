@@ -113,10 +113,11 @@ Inventário por domínio (rota → componente → guard **como o código aplica 
 | `/controle/acoes` | `DATModule/AcoesPage` | policy `access_controle_section` (`:118`) |
 | `/controle/compras`, `/compras-materiais` | `DATModule/ComprasPage` | `allow={canControle \|\| canDAT}` (`:119`, `:121`) |
 | `/controle/coordenadores` | `DATModule/CoordenadoresPage` | policy `access_controle_section` (`:120`) |
-| `/controle/formacoes` | `DATModule/FormacoesPage` | policy `access_controle_section` (`:123`) |
 | `/controle/plano-formacoes` | `DATModule/PlanoFormacoesPage` | policy `access_controle_section` (`:124`) |
 | `/controle/pre-agenda`, `/pre-agenda` | `PreAgenda/PreAgendaPage` | policy `access_controle_section` (`:125-126`) |
 | `/acoes-notificacao`, `/acoes-notificacao/timeline`, `/notificacoes-internas` | `Controle/AcoesNotificacaoPage` / `AcoesTimelinePage` / `NotificacoesInternasPage` | policy `manage_internal_actions` (`:129-131`) |
+
+> `/controle/formacoes` (lia `DATFormacao`, tabela vazia — não existe formação avulsa: toda formação é encontro de plano) foi **removida** em #1978. As formações reais vivem em `/controle/plano-formacoes` (children de `PlanoFormacoes`, matriz F1..F15). O model/endpoint `DATFormacao` segue no backend como dead-code (deprecação separada).
 
 ### DAT / AdminDAT
 

@@ -41,7 +41,6 @@ const DATRegistrosPage = lazy(() => import('../pages/DATModule/DATRegistrosPage'
 const AcoesPage = lazy(() => import('../pages/DATModule/AcoesPage'));
 const DATComprasPage = lazy(() => import('../pages/DATModule/ComprasPage'));
 const CadastrosPage = lazy(() => import('../pages/DATModule/CadastrosPage'));
-const FormacoesPage = lazy(() => import('../pages/DATModule/FormacoesPage'));
 const PlanoFormacoesPage = lazy(() => import('../pages/DATModule/PlanoFormacoesPage'));
 const CoordenadoresPage = lazy(() => import('../pages/DATModule/CoordenadoresPage'));
 const AcoesNotificacaoPage = lazy(() => import('../pages/Controle/AcoesNotificacaoPage'));
@@ -130,7 +129,6 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
         <Route path="/controle/coordenadores" element={<RequirePolicy policy="access_controle_section" policies={policies}><CoordenadoresPage /></RequirePolicy>} />
         <Route path="/compras-materiais" element={<RequirePolicy allow={canControle || canDAT}><DATComprasPage /></RequirePolicy>} />
         {/* /deslocamentos movido para /solicitacoes/deslocamentos (Epic 3, Issue #1227 — redirect já registrado acima) */}
-        <Route path="/controle/formacoes" element={<RequirePolicy policy="access_controle_section" policies={policies}><FormacoesPage /></RequirePolicy>} />
         <Route path="/controle/plano-formacoes" element={<RequirePolicy policy="access_controle_section" policies={policies}><PlanoFormacoesPage /></RequirePolicy>} />
         <Route path="/controle/pre-agenda" element={<RequirePolicy policy="access_controle_section" policies={policies}><PreAgendaPage /></RequirePolicy>} />
         <Route path="/pre-agenda" element={<RequirePolicy policy="access_controle_section" policies={policies}><PreAgendaPage /></RequirePolicy>} />

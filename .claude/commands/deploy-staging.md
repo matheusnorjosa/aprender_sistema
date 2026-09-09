@@ -91,12 +91,15 @@ O fluxo tem dois atos deliberados:
   > On GnuWin32/Windows, `$(MAKE)` recursion can break — run the staging-precheck/build/up/test/down
   > steps individually if `make staging-full` fails on the make-recursion (not on a real check).
 
-- [ ] **Attach evidence + staging-gate markers to the PR body** (exact literals, no accents)
-  - `make staging-full ... (8/8 PASS)`
-  - `Evidencia anexada no PR`
+- [ ] **Attach evidence + staging-gate markers to the PR body** (checkbox format, literais exatos, sem acento)
+  - `- [x] make staging-full executado com sucesso (8/8 PASS)`
+  - `- [x] Evidencia anexada no PR`
   - `ALL 8 CHECKS PASSED`
-  > The staging gate matches these literal strings (regex `Evidencia` — no accent). A `Evidência`
-  > body fails the gate; fix via `gh pr edit --body`. Draft PRs skip the gate.
+  > O gate casa DOIS **checkboxes marcados** (`- [x]`) com o texto EXATO acima — via regex, e
+  > `Evidencia` **sem acento** — MAIS a substring `ALL 8 CHECKS PASSED` em qualquer lugar do corpo
+  > (ex.: no bloco de saída do smoke). **Prosa não conta**: precisa ser checkbox `- [x]`; um
+  > `make staging-full ... (8/8 PASS)` solto (sem `- [x]` e sem `executado com sucesso`) NÃO
+  > satisfaz. Uma `Evidência` com acento falha. Corrija via `gh pr edit --body`. Draft PRs pulam o gate.
 
 ### Phase 3: Version Control & PR
 

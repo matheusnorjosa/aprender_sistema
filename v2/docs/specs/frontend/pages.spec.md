@@ -119,6 +119,8 @@ Inventário por domínio (rota → componente → guard **como o código aplica 
 
 > `/controle/formacoes` (lia `DATFormacao`, tabela vazia — não existe formação avulsa: toda formação é encontro de plano) foi **removida** em #1978. As formações reais vivem em `/controle/plano-formacoes` (children de `PlanoFormacoes`, matriz F1..F15). O model/endpoint `DATFormacao` segue no backend como dead-code (deprecação separada).
 
+> **#1976 (níveis de catálogo Projeto):** o catálogo tem 2 níveis — **família** (`A COR DA GENTE`) ← evento/**plano** apontam aqui; **variante-por-série** (`A COR DA GENTE 1..9`) ← DAT/compra. O dropdown de projeto do **plano de formação** passou a listar **só famílias** (`getProjetosOptions({ excludeKits: true })` → `/options/projetos/?exclude_kits=true`, mesma heurística do `ProjetoLookup` que a NOVA solicitação já usa). Compras/DAT seguem com todas as variantes (default `exclude_kits=false`).
+
 ### DAT / AdminDAT
 
 | Rota | Página | Guard (`AppRoutes.tsx`) |

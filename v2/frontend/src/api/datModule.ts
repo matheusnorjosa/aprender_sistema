@@ -169,7 +169,6 @@ export interface ComprasDashboardKpis {
   total_disponivel: number;
   produtos_diferentes: number;
   colecoes_diferentes: number;
-  valor_total: number;
 }
 
 export interface ComprasDashboardItem {

@@ -44,7 +44,6 @@ const ROUTE_TO_MENU_KEY: Record<string, string> = {
   '/controle/acoes': 'controle-acoes',
   '/controle/compras': 'controle-compras',
   '/controle/coordenadores': 'controle-coordenadores',
-  '/controle/formacoes': 'controle-formacoes',
   '/controle/plano-formacoes': 'controle-plano-formacoes',
   '/controle/pre-agenda': 'controle-pre-agenda',
   '/compras-materiais': 'controle-compras',
@@ -75,7 +74,6 @@ const MENU_KEY_TO_PARENT: Record<string, string> = {
   'controle-acoes': 'controle-submenu',
   'controle-compras': 'controle-submenu',
   'controle-coordenadores': 'controle-submenu',
-  'controle-formacoes': 'controle-submenu',
   'controle-plano-formacoes': 'controle-submenu',
   'controle-pre-agenda': 'controle-submenu',
   'acoes-notificacao-ciclo': 'acoes-notificacao-submenu',
@@ -298,7 +296,6 @@ export function AppSidebar({
                 <Menu.Item key="controle-acoes"><Link to="/controle/acoes">Ações</Link></Menu.Item>
                 <Menu.Item key="controle-compras"><Link to="/controle/compras">Compras</Link></Menu.Item>
                 <Menu.Item key="controle-coordenadores"><Link to="/controle/coordenadores">Coordenadores</Link></Menu.Item>
-                <Menu.Item key="controle-formacoes"><Link to="/controle/formacoes">Formações</Link></Menu.Item>
                 <Menu.Item key="controle-ops"><Link to="/controle">Painel de Controle</Link></Menu.Item>
                 <Menu.Item key="controle-plano-formacoes"><Link to="/controle/plano-formacoes">Plano Anual</Link></Menu.Item>
                 <Menu.Item key="controle-pre-agenda"><Link to="/controle/pre-agenda">Pré-agenda</Link></Menu.Item>

@@ -180,6 +180,25 @@ class ExportContractV20Reconciler:
         return self._cpf_cache[digits]
 
     @staticmethod
+    def _usuario_by_email(email_raw: str | None) -> Any:
+        """Resolve Usuario por e-mail (case-insensitive). Guarda 'nunca chuta': só resolve se
+        EXATAMENTE 1 casar (e-mail compartilhado/posto → None → cai no CPF via `_resolve_para`)."""
+        email = (email_raw or "").strip()
+        if not email:
+            return None
+        qs = Usuario.objects.filter(email__iexact=email)
+        return qs.first() if qs.count() == 1 else None
+
+    def _resolve_para(self, r: dict[str, str]) -> Any:
+        """Resolve o `para` (alvo do reassign) pela chave que casa com o prod (v25). O prod indexa
+        coordenador por E-MAIL (CPF vazio/errado), então e-mail é a chave estável — EXCETO quando
+        `email_desambigua == NAO_mesma_caixa` (o e-mail é um posto em sucessão, ex.: coordenacao21@
+        Elienai→Diogo): aí o e-mail é ambíguo e usa-se o `para_cpf`. Fallback pro CPF sempre."""
+        if (r.get("email_desambigua") or "").strip().upper() == "NAO_MESMA_CAIXA":
+            return self._usuario_by_cpf(self._get(r, "para_cpf", "para"))
+        return self._usuario_by_email(r.get("para_email")) or self._usuario_by_cpf(self._get(r, "para_cpf", "para"))
+
+    @staticmethod
     def _map_role(papel: str | None) -> str | None:
         """Mapeia o `papel` do reconcile para Participation.Role (mesmo domínio do importer)."""
         p = (papel or "").strip().upper()
@@ -278,7 +297,7 @@ class ExportContractV20Reconciler:
         classe = TROCA_DE_TITULAR
         sol = self._sol_by_event(r)
         role = self._map_role(r.get("papel"))
-        para_user = self._usuario_by_cpf(self._get(r, "para_cpf", "para"))
+        para_user = self._resolve_para(r)
         if sol is None or role is None or para_user is None:
             return self._rec("skipped_not_found", classe)
         # idempotência: se a participation do `para` já existe, nada a fazer.
@@ -339,7 +358,7 @@ class ExportContractV20Reconciler:
             return self._rec("applied", classe)
 
         # "assumiu a coordenação" [+ saiu de formador] → reatribui de→para.
-        para_user = self._usuario_by_cpf(self._get(r, "para_cpf", "para"))
+        para_user = self._resolve_para(r)
         if para_user is None:
             return self._rec("skipped_not_found", classe)
         if Participation.objects.filter(solicitacao=p.solicitacao, usuario=para_user, role=role).exists():

@@ -37,6 +37,7 @@ export interface DATRegistrosFilters {
   projeto_geral: number | undefined;
   usa_avaliar: boolean | undefined;
   status_formar: string | undefined;
+  ano: number | undefined;
 }
 
 // Opções de status. Espelham os choices do backend (M16-08):
@@ -95,4 +96,5 @@ export const DEFAULT_FILTERS: DATRegistrosFilters = {
   projeto_geral: undefined,
   usa_avaliar: undefined,
   status_formar: undefined,
+  ano: undefined,
 };

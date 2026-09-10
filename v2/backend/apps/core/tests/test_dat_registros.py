@@ -649,3 +649,89 @@ class DATRegistroFilterRegiaoTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         ufs = {r["municipio_uf"] for r in response.data["results"] if r.get("municipio_uf")}
         self.assertTrue(ufs.issubset({"AL", "BA", "CE", "MA", "PB", "PE", "PI", "RN", "SE"}))
+
+
+class DATRegistroListagemPorAnoTests(APITestCase):
+    """
+    A listagem precisa refletir o modelo POR ANO (o split fan-out cria uma linha por
+    ano de uso; o modelo tem UniqueConstraint(municipio, projeto, ano)).
+
+    Regressão real (2026-09-10): a List serializer não expunha `ano` (linhas por-ano
+    apareciam como duplicatas) e a ordenação `-created_at` jogava as linhas novas
+    (anos secundários, sem alunos) pro topo.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        import uuid
+
+        suffix = str(uuid.uuid4())[:8]
+        cls.dat_group = GroupFactory(name="DAT")
+        cls.user = UsuarioFactory(username=f"ano_test_{suffix}", password="t123", cpf=f"555{suffix[:8]}")
+        cls.user.groups.add(cls.dat_group)
+        cls.pg = ProjetoGeral.objects.create(nome=f"PG Ano {suffix}", usa_avaliar=False)
+        cls.projeto = ProjetoFactory(
+            nome=f"Projeto Ano {suffix}",
+            codigo=f"ANO{suffix}",
+            fluxo="NAO_SUPER",
+            projeto_geral=cls.pg,
+        )
+        # Dois municípios fora de ordem alfabética para provar a ordenação.
+        cls.mun_alfa = MunicipioFactory(nome=f"Alfa {suffix}", uf="BA")
+        cls.mun_zeta = MunicipioFactory(nome=f"Zeta {suffix}", uf="BA")
+
+        # Alfa tem 2026 e 2027 (linha primária + secundária); Zeta só 2026.
+        cls.reg_alfa_2026 = DATRegistro.objects.create(
+            municipio=cls.mun_alfa,
+            projeto_geral=cls.pg,
+            projeto=cls.projeto,
+            ano=2026,
+            aluno_qtde=100,
+            created_by=cls.user,
+        )
+        cls.reg_zeta_2026 = DATRegistro.objects.create(
+            municipio=cls.mun_zeta,
+            projeto_geral=cls.pg,
+            projeto=cls.projeto,
+            ano=2026,
+            aluno_qtde=50,
+            created_by=cls.user,
+        )
+        # Criada por ÚLTIMO de propósito: com -created_at iria pro topo (o bug).
+        cls.reg_alfa_2027 = DATRegistro.objects.create(
+            municipio=cls.mun_alfa,
+            projeto_geral=cls.pg,
+            projeto=cls.projeto,
+            ano=2027,
+            aluno_qtde=None,
+            created_by=cls.user,
+        )
+
+    def _results(self, query=""):
+        self.client.force_authenticate(user=self.user)
+        resp = self.client.get(f"/api/dat/registros/{query}")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        return resp.data["results"]
+
+    def test_list_serializer_expoe_ano(self):
+        """A List serializer DEVE expor `ano` (a tabela e o modal de edição dependem dele)."""
+        rows = {r["id"]: r for r in self._results()}
+        self.assertIn("ano", rows[self.reg_alfa_2026.id])
+        self.assertEqual(rows[self.reg_alfa_2026.id]["ano"], 2026)
+        self.assertEqual(rows[self.reg_alfa_2027.id]["ano"], 2027)
+
+    def test_ordena_por_municipio_projeto_ano(self):
+        """Ordenação default estável: município → projeto → ano (não -created_at)."""
+        ids = [r["id"] for r in self._results()]
+        # Filtra só os 3 desta suíte, preservando a ordem devolvida.
+        meus = [i for i in ids if i in {self.reg_alfa_2026.id, self.reg_alfa_2027.id, self.reg_zeta_2026.id}]
+        self.assertEqual(meus, [self.reg_alfa_2026.id, self.reg_alfa_2027.id, self.reg_zeta_2026.id])
+
+    def test_filtra_por_ano(self):
+        """`?ano=2027` traz só as linhas de 2027."""
+        rows = self._results("?ano=2027")
+        anos = {r["ano"] for r in rows}
+        self.assertEqual(anos, {2027})
+        ids = {r["id"] for r in rows}
+        self.assertIn(self.reg_alfa_2027.id, ids)
+        self.assertNotIn(self.reg_alfa_2026.id, ids)

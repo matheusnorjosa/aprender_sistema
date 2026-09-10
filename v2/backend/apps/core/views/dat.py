@@ -97,6 +97,7 @@ class DATRegistroFilter(filters.FilterSet):
             "municipio",
             "projeto_geral",
             "projeto",
+            "ano",
             "usa_avaliar",
             "uf",
             "turma_formar_status",
@@ -157,9 +158,14 @@ class DATRegistroViewSet(viewsets.ModelViewSet):
         "created_at",
         "municipio__nome",
         "projeto_geral__nome",
+        "projeto__nome",
+        "ano",
         "aluno_qtde",
     ]
-    ordering = ["-created_at"]
+    # Default estável e legível: agrupa as linhas por-ano do mesmo (municipio, projeto)
+    # em sequência (municipio -> projeto -> ano), em vez de -created_at, que jogava as
+    # linhas novas do split (anos secundarios, sem alunos) pro topo.
+    ordering = ["municipio__nome", "projeto__nome", "ano"]
 
     def get_serializer_class(self):
         """Return appropriate serializer based on action."""

@@ -47,6 +47,10 @@ RECONCILE_HEADER = [
     "de_cpf",
     "para_cpf",
     "de_usuario_origem",
+    # colunas v25 (RELAY-45/46): chave por e-mail + desambiguação de posto-em-sucessão.
+    "para_email",
+    "de_email",
+    "email_desambigua",
 ]
 
 
@@ -326,6 +330,34 @@ class TestTrocaDeTitular:
         assert p.guest_email in (None, "")
         assert rep["applied"]["TROCA_DE_TITULAR"] == 1
 
+    def test_v25_para_por_cpf_quando_nao_mesma_caixa(self, tmp_path):
+        """v25: email_desambigua=NAO_mesma_caixa (posto em sucessão, ex.: coordenacao21@ Elienai→Diogo)
+        → resolve `para` por `para_cpf`, NUNCA por e-mail (o e-mail resolveria o posto = pessoa errada)."""
+        de = UsuarioFactory(username="11111111111")
+        diogo = UsuarioFactory(username="22222222222", email="")
+        UsuarioFactory(username="99999999999", email="coordenacao21@x.org")  # decoy: o posto/e-mail
+        sol = SolicitacaoFactory(external_hash="EV0999")
+        p = Participation.objects.create(solicitacao=sol, usuario=de, role=Participation.Role.CONVIDADO)
+
+        row = {
+            "classe": "TROCA_DE_TITULAR",
+            "entidade": "participation",
+            "evento_id": "EV0999",
+            "papel": "CONVIDADO",
+            "de": "Elienai",
+            "para": "Diogo",
+            "de_cpf": "11111111111",
+            "para_cpf": "22222222222",
+            "para_email": "coordenacao21@x.org",
+            "email_desambigua": "NAO_mesma_caixa",
+        }
+        path = _write_reconcile(tmp_path / "r", [row])
+        rep = ExportContractV20Reconciler(path=path, apply=True, allow=("TROCA_DE_TITULAR",)).run()
+
+        p.refresh_from_db()
+        assert p.usuario_id == diogo.id  # via para_cpf, NÃO o decoy do e-mail
+        assert rep["applied"]["TROCA_DE_TITULAR"] == 1
+
 
 @pytest.mark.django_db
 class TestTrocaDePessoa:
@@ -433,3 +465,51 @@ class TestTrocaDePessoa:
         assert pb.usuario_id == de.id  # o outro (mesmo município+data) ficou intacto
         assert rep["applied"]["TROCA_DE_PESSOA"] == 1
         assert rep["skipped_ambiguous"]["TROCA_DE_PESSOA"] == 0
+
+    def test_v25_para_por_email_quando_sim(self, tmp_path):
+        """v25: email_desambigua=sim → resolve `para` por para_email (o prod indexa coordenador por
+        e-mail; o para_cpf 'correto' pode não bater com o username/cpf do prod). de por de_cpf."""
+        de = UsuarioFactory(username="11111111111")
+        para = UsuarioFactory(username="00000000000", email="novo.coord@x.org")  # username != para_cpf
+        mun = MunicipioFactory(nome="TAMANDARÉ", uf="PE")
+        sol = SolicitacaoFactory(municipio=mun, inicio=_inicio(2026, 9, 10), external_hash="EVP01")
+        p = Participation.objects.create(solicitacao=sol, usuario=de, role=Participation.Role.COORDENADOR)
+
+        row = self._row(
+            evento_id="EVP01",
+            de_cpf="11111111111",
+            para_cpf="22222222222",  # NÃO resolve (ninguém com esse cpf/username)
+            para_email="novo.coord@x.org",
+            email_desambigua="sim",
+        )
+        path = _write_reconcile(tmp_path / "r", [row])
+        rep = ExportContractV20Reconciler(path=path, apply=True, allow=("TROCA_DE_PESSOA",)).run()
+
+        p.refresh_from_db()
+        assert p.usuario_id == para.id  # resolvido por e-mail, não por cpf
+        assert rep["applied"]["TROCA_DE_PESSOA"] == 1
+
+    def test_v25_email_compartilhado_cai_no_cpf(self, tmp_path):
+        """v25 guard: e-mail que resolve >1 Usuario (posto compartilhado) → _usuario_by_email=None
+        (nunca chuta) → cai no para_cpf."""
+        de = UsuarioFactory(username="11111111111")
+        para = UsuarioFactory(username="22222222222", email="")
+        UsuarioFactory(username="33333333333", email="posto@x.org")
+        UsuarioFactory(username="44444444444", email="posto@x.org")  # 2 no mesmo e-mail
+        mun = MunicipioFactory(nome="TAMANDARÉ", uf="PE")
+        sol = SolicitacaoFactory(municipio=mun, inicio=_inicio(2026, 9, 10), external_hash="EVP02")
+        p = Participation.objects.create(solicitacao=sol, usuario=de, role=Participation.Role.COORDENADOR)
+
+        row = self._row(
+            evento_id="EVP02",
+            de_cpf="11111111111",
+            para_cpf="22222222222",
+            para_email="posto@x.org",
+            email_desambigua="sim",
+        )
+        path = _write_reconcile(tmp_path / "r", [row])
+        rep = ExportContractV20Reconciler(path=path, apply=True, allow=("TROCA_DE_PESSOA",)).run()
+
+        p.refresh_from_db()
+        assert p.usuario_id == para.id  # e-mail ambíguo → guard → para_cpf
+        assert rep["applied"]["TROCA_DE_PESSOA"] == 1

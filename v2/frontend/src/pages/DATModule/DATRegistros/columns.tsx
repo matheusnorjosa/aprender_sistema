@@ -25,6 +25,7 @@ export interface DATRegistroRecord {
   projeto_geral_nome?: string;
   projeto?: number;
   projeto_nome?: string;
+  ano?: number;
   aluno_qtde?: number;
   professor_qtde?: number;
   reuniao_dat?: string;
@@ -79,6 +80,18 @@ export function getColumns({ onEdit, onDelete }: ColumnHandlers): ColumnsType<DA
       dataIndex: 'projeto_nome',
       key: 'projeto',
       width: 150,
+    },
+    {
+      // A listagem é POR ANO (split fan-out). Sem esta coluna as linhas por-ano
+      // do mesmo município+projeto pareciam duplicatas. `ano` nulo = bucket de
+      // compras ainda não classificadas por ano (mostra "Pendente").
+      title: 'Ano',
+      dataIndex: 'ano',
+      key: 'ano',
+      width: 80,
+      align: 'center',
+      render: (val: number | undefined) =>
+        val ? <Text strong>{val}</Text> : <Text type="secondary">Pendente</Text>,
     },
     {
       title: 'Alunos',

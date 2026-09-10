@@ -45,6 +45,7 @@ class DATRegistroListSerializer(serializers.ModelSerializer["DATRegistro"]):
             "projeto_geral_nome",
             "projeto",
             "projeto_nome",
+            "ano",
             "aluno_qtde",
             "professor_qtde",
             # FORMAR

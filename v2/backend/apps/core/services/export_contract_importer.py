@@ -61,6 +61,7 @@ from apps.core.models import (
     Usuario,
 )
 from apps.core.services.dat_codigos import recompute_all
+from apps.core.services.dat_registro_split import split_dat_registros
 from apps.core.services.equipe_gerencia_import import (
     PAPEL_MAPPING,
     SETOR_MAPPING,
@@ -1198,6 +1199,13 @@ class ExportContractImporter:
                         created += 1
                 applied[name] = created
             if {"dat_compra", "dat_registro"} & set(self.allow):
+                # Split per-year: cada (municipio, projeto) flat vira UM registro por ano de uso
+                # das compras. Sem este passo os registros ficam flat (ano=None) e o cálculo de
+                # nr_codigos conta o cohort errado (só compras ano_uso=None) — foi o que deixou os
+                # códigos zerados em prod. Idempotente + no-op quando não há compras.
+                # (o ignore abaixo: @transaction.atomic confunde o pyright sem django-stubs, que
+                # acha que a chamada é do decorator; a assinatura real de split não exige args.)
+                split_dat_registros()  # pyright: ignore[reportCallIssue]
                 # nr_codigos vem das compras: recomputa após aplicar (ordem-independente).
                 recompute_all()
         return applied

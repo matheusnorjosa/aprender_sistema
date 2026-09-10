@@ -79,6 +79,7 @@ interface DATRegistrosFilters {
   projeto_geral: number | undefined;
   usa_avaliar: string | undefined;
   status_formar: string | undefined;
+  ano: number | undefined;
 }
 
 interface DATRegistroFormValues {
@@ -167,6 +168,7 @@ const buildRegistrosParams = (f: DATRegistrosFilters): TableFilterParams => ({
   ...(f.projeto_geral !== undefined && { projeto_geral: f.projeto_geral }),
   ...(f.usa_avaliar !== undefined && { usa_avaliar: f.usa_avaliar }),
   ...(f.status_formar && { status_formar: f.status_formar }),
+  ...(f.ano !== undefined && { ano: f.ano }),
 });
 
 /**
@@ -209,7 +211,9 @@ export default function DATRegistrosPage(): JSX.Element {
     defaultFilters: DEFAULT_FILTERS as unknown as DATRegistrosFilters,
     listFn: listDATRegistros as unknown as (params: TableFilterParams) => Promise<PaginatedResponse<DATRegistroRecord>>,
     buildParams: buildRegistrosParams,
-    defaultOrdering: '-created_at',
+    // Ordena por município → projeto → ano (estável e legível para linhas por-ano),
+    // não por -created_at (que jogava as linhas novas do split, sem alunos, pro topo).
+    defaultOrdering: 'municipio__nome,projeto__nome,ano',
     entityName: 'registros',
   });
 
@@ -489,6 +493,22 @@ export default function DATRegistrosPage(): JSX.Element {
               ]}
             />
           </Col>
+          <Col xs={24} sm={12} md={8} lg={3}>
+            <div className="mb-1">
+              <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
+                Ano
+              </Text>
+            </div>
+            <InputNumber<number>
+              style={{ width: '100%' }}
+              placeholder="Todos"
+              min={2020}
+              max={2100}
+              controls={false}
+              value={filters.ano ?? null}
+              onChange={(val) => setFilters((prev) => ({ ...prev, ano: val ?? undefined }))}
+            />
+          </Col>
         </Row>
         <Divider className="my-4 mb-3" />
         <div className="flex justify-end gap-2">
@@ -524,7 +544,7 @@ export default function DATRegistrosPage(): JSX.Element {
         >
           <div
             className="flex items-center gap-1.5"
-            style={{ flex: '0 0 640px', padding: '8px 16px', borderRight: '1px solid #f0f0f0' }}
+            style={{ flex: '0 0 720px', padding: '8px 16px', borderRight: '1px solid #f0f0f0' }}
           >
             <DatabaseOutlined /> Dados Básicos
           </div>

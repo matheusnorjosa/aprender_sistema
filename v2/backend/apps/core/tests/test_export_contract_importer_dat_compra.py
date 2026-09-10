@@ -103,6 +103,33 @@ def test_apply_dat_compra_creates_and_recomputes(tmp_path):
     assert reg.nr_codigos == 59  # ceil(41×1.1)+ceil(11×1.1) = 46+13, NÃO ceil(52×1.1)=58
 
 
+def test_apply_final_pass_runs_split_por_ano(tmp_path):
+    """O passo final do importer roda o split por-ano automaticamente: um DATRegistro flat
+    (ano=None) com compras em 2 anos vira UM registro por ano. Sem isso, os registros ficam
+    flat e `nr_codigos` conta o cohort errado (ano_uso=None) — o bug que quebrou /dat/registros
+    em prod (2026-09). O split roda no MESMO bloco final que já recomputa nr_codigos."""
+    actor = _actor()
+    mun = MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    pg = ProjetoGeral.objects.create(
+        nome="PG X", usa_avaliar=False, tipo_calculo_codigos="por_professor", multiplicador_professor=Decimal("1.1")
+    )
+    proj = ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER", projeto_geral=pg)
+    # registro flat, como o import de dat_registro cria ANTES das compras (ano só se conhece depois).
+    DATRegistro.objects.create(municipio=mun, projeto_geral=pg, projeto=proj, professor_qtde=40, created_by=actor)
+    rows = "\n".join([_compra_row(qtde=40, ano=2026), _compra_row(qtde=20, ano=2027)])
+    ExportContractImporter(
+        path=_write_export(tmp_path, {"dat_compra": f"{COMPRA_HEADER}\n{rows}\n"}),
+        apply=True,
+        allow=("dat_compra",),
+        actor=actor,
+    ).run()
+    anos = sorted(DATRegistro.objects.filter(municipio=mun, projeto=proj).values_list("ano", flat=True))
+    assert anos == [2026, 2027]  # fan-out por ano de uso das compras
+    # e nr_codigos é POR ANO: 2026 = ceil(40×1.1)=44; 2027 = ceil(20×1.1)=22
+    assert DATRegistro.objects.get(municipio=mun, projeto=proj, ano=2026).nr_codigos == 44
+    assert DATRegistro.objects.get(municipio=mun, projeto=proj, ano=2027).nr_codigos == 22
+
+
 def test_apply_dat_compra_reads_ano_uso_colecao_v12(tmp_path):
     """Regressão de drift: o contrato v12 renomeou a coluna `ano_uso` -> `ano_uso_colecao`.
     Se o importer lesse só o nome antigo, `ano_uso` viria None e TODA compra seria descartada

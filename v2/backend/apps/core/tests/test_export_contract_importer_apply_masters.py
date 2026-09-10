@@ -151,6 +151,20 @@ def test_apply_projeto_rejects_fluxo_ausente(tmp_path):
     assert not Projeto.objects.filter(nome="Projeto Sem Fluxo 2").exists()
 
 
+def test_apply_projeto_guard_nome_existente_unmatched_1993(tmp_path):
+    # #1993: alias aponta pra alvo AUSENTE no catálogo -> resolve=unmatched, mas o `nome` cru
+    # JÁ existe. Sem o guard, o create quebraria core_projeto_nome_key (IntegrityError, aborta a
+    # transação). Com o guard, create-only pula (não duplica, não crasha).
+    pg = ProjetoGeral.objects.create(nome="SUPERATIVAR LINGUAGENS")
+    Projeto.objects.create(nome="SUPERATIVAR PORTUGUES 3", fluxo="SUPER", projeto_geral=pg)
+    # alias "SUPERATIVAR PORTUGUES 3" -> "SUPERATIVAR LINGUAGENS 3" (alvo NÃO criado) => unmatched
+    csv = "projeto,projeto_geral,fluxo\nSUPERATIVAR PORTUGUES 3,SUPERATIVAR LINGUAGENS,SUPER\n"
+    path = _write_export(tmp_path, {"projeto": csv})
+    r = ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
+    assert r["applied"]["projeto"] == 0  # pulou pelo guard
+    assert Projeto.objects.filter(nome="SUPERATIVAR PORTUGUES 3").count() == 1  # não duplicou
+
+
 def test_apply_projeto_allowlist_blocks(tmp_path):
     ProjetoGeral.objects.create(nome="PG BLOQ")
     csv = "projeto,projeto_geral,fluxo\nProjeto Bloq 1,PG BLOQ,NAO_SUPER\n"

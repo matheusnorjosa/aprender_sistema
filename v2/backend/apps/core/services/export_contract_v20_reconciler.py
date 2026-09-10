@@ -24,6 +24,7 @@ LINHA_NAO_EMITIDA entram em incrementos seguintes (registrados como `pending` at
 from __future__ import annotations
 
 import csv
+import re
 from collections import defaultdict
 from datetime import date
 from pathlib import Path
@@ -104,10 +105,38 @@ class ExportContractV20Reconciler:
         self._mun_idx: dict[tuple[str, str], int] | None = None
 
     # ── infra ────────────────────────────────────────────────────────────────
+    def _reconcile_path(self) -> Path:
+        """Acha o reconcile CSV de maior versão em `path` (reconcile__v16_para_vNN.csv).
+        Assim o mesmo comando serve v20 (nome/CPF) e v24 (evento_id/de_cpf/…) sem flag."""
+        cands = list(self.path.glob("reconcile__v16_para_v*.csv"))
+        if not cands:
+            return self.path / _RECONCILE_FILE
+
+        def _ver(p: Path) -> int:
+            m = re.search(r"_v(\d+)\.csv$", p.name)
+            return int(m.group(1)) if m else -1
+
+        return max(cands, key=_ver)
+
     def _load(self) -> list[dict[str, str]]:
-        fp = self.path / _RECONCILE_FILE
-        with open(fp, encoding="utf-8", newline="") as f:
+        with open(self._reconcile_path(), encoding="utf-8", newline="") as f:
             return list(csv.DictReader(f))
+
+    @staticmethod
+    def _get(r: dict[str, str], *keys: str) -> str:
+        """Primeiro valor não-vazio entre `keys` (prefere coluna nova, cai na antiga)."""
+        for k in keys:
+            v = (r.get(k) or "").strip()
+            if v:
+                return v
+        return ""
+
+    def _sol_by_event(self, r: dict[str, str]) -> Any:
+        """Solicitacao por evento_id (external_hash; fallback `chave`). None se ausente/sem match."""
+        ehash = self._get(r, "evento_id", "chave")
+        if not ehash:
+            return None
+        return Solicitacao.objects.filter(external_hash=ehash).first()
 
     def _rec(self, status: str, classe: str) -> None:
         self._report[status][classe] += 1
@@ -216,51 +245,85 @@ class ExportContractV20Reconciler:
         self._pg_index = None  # invalida o cache após deletar
         self._rec("applied", classe)
 
+    def _find_de_participation(self, sol: Any, role: str, r: dict[str, str]) -> Any:
+        """Acha a participação do `de` no titular. A identidade gravada em prod pode ser
+        o usuário (CPF), a caixa (e-mail em `de_usuario_origem`, como usuario OU guest_email),
+        ou o nome livre (`de` = guest_nome). Tenta nessa ordem; None se nada casar."""
+        de_user = self._usuario_by_cpf(self._get(r, "de_cpf", "de"))
+        if de_user is not None:
+            p = Participation.objects.filter(solicitacao=sol, usuario=de_user, role=role).first()
+            if p is not None:
+                return p
+        email = (r.get("de_usuario_origem") or "").strip()
+        if email:
+            u = Usuario.objects.filter(email__iexact=email).first()
+            if u is not None:
+                p = Participation.objects.filter(solicitacao=sol, usuario=u, role=role).first()
+                if p is not None:
+                    return p
+            p = Participation.objects.filter(solicitacao=sol, guest_email__iexact=email, role=role).first()
+            if p is not None:
+                return p
+        nome = (r.get("de") or "").strip()
+        if nome and not nome.replace(".", "").replace("-", "").isdigit():
+            p = Participation.objects.filter(solicitacao=sol, guest_nome=nome, role=role).first()
+            if p is not None:
+                return p
+        return None
+
     def _h_troca_de_titular(self, r: dict[str, str]) -> None:
-        """Reatribui a Participation (caixa de coordenação) de `de`→`para`. Lookup determinístico:
-        Solicitacao por external_hash (`chave`) + Participation por (solicitacao, usuario=de, role)."""
+        """Reatribui a Participation (caixa de coordenação) de `de`→`para`. Lookup por evento_id
+        (external_hash; fallback `chave`) + identidade do `de` por CPF/e-mail-da-caixa/nome
+        (`_find_de_participation`); `para` por `para_cpf` (fallback `para`)."""
         classe = TROCA_DE_TITULAR
-        sol = Solicitacao.objects.filter(external_hash=(r.get("chave") or "").strip()).first()
+        sol = self._sol_by_event(r)
         role = self._map_role(r.get("papel"))
-        para_user = self._usuario_by_cpf(r.get("para"))
+        para_user = self._usuario_by_cpf(self._get(r, "para_cpf", "para"))
         if sol is None or role is None or para_user is None:
             return self._rec("skipped_not_found", classe)
         # idempotência: se a participation do `para` já existe, nada a fazer.
         if Participation.objects.filter(solicitacao=sol, usuario=para_user, role=role).exists():
             return self._rec("noop", classe)
-        de_user = self._usuario_by_cpf(r.get("de"))
-        if de_user is None:
-            return self._rec("skipped_not_found", classe)
-        p = Participation.objects.filter(solicitacao=sol, usuario=de_user, role=role).first()
+        p = self._find_de_participation(sol, role, r)
         if p is None:
             return self._rec("skipped_not_found", classe)
         if not self._should_write(classe):
             return self._rec("would_apply", classe)
         p.usuario = para_user
-        p.save(update_fields=["usuario"])
+        p.guest_email = None
+        p.guest_nome = ""
+        p.save(update_fields=["usuario", "guest_email", "guest_nome"])
         self._rec("applied", classe)
 
     def _h_troca_de_pessoa(self, r: dict[str, str]) -> None:
-        """Troca de pessoa num evento. Lookup por (município nome+UF, data Fortaleza, papel, de-CPF)
-        com **guarda estrita**: só age se casar EXATAMENTE 1 Participation; senão skip+report (nunca chuta).
-        Sub-ações (o_que_fazer): 'assumiu a coordenação' → reatribui de→para; 'vaga de formador esvaziada'
-        → remove; '+ saiu da vaga de formador' → reatribui + remove a de-formador do `para` no evento."""
+        """Troca de pessoa num evento. Lookup PRIMÁRIO por evento_id (external_hash) →
+        participação exata (sol, de, papel); FALLBACK v20 por (município nome+UF, data
+        Fortaleza, papel, de-CPF) com **guarda estrita** (exatamente-1; senão skip+report,
+        nunca chuta). Sub-ações (o_que_fazer): 'assumiu a coordenação' → reatribui de→para;
+        'vaga de formador esvaziada' → remove; '+ saiu da vaga de formador' → reatribui +
+        remove a de-formador do `para` no evento."""
         classe = TROCA_DE_PESSOA
         role = self._map_role(r.get("papel"))
-        de_user = self._usuario_by_cpf(r.get("de"))
-        mun_id = self._municipio_id(r.get("municipio"))
-        data = _parse_iso_date(r.get("data"))
-        if role is None or de_user is None or mun_id is None or data is None:
+        de_user = self._usuario_by_cpf(self._get(r, "de_cpf", "de"))
+        if role is None or de_user is None:
             return self._rec("skipped_not_found", classe)
 
-        parts = list(
-            Participation.objects.filter(
-                solicitacao__municipio_id=mun_id,
-                solicitacao__inicio__date=data,
-                usuario=de_user,
-                role=role,
+        sol = self._sol_by_event(r)
+        if sol is not None:
+            parts = list(Participation.objects.filter(solicitacao=sol, usuario=de_user, role=role))
+        else:
+            mun_id = self._municipio_id(r.get("municipio"))
+            data = _parse_iso_date(r.get("data"))
+            if mun_id is None or data is None:
+                return self._rec("skipped_not_found", classe)
+            parts = list(
+                Participation.objects.filter(
+                    solicitacao__municipio_id=mun_id,
+                    solicitacao__inicio__date=data,
+                    usuario=de_user,
+                    role=role,
+                )
             )
-        )
         if len(parts) == 0:
             return self._rec("skipped_not_found", classe)
         if len(parts) > 1:
@@ -276,7 +339,7 @@ class ExportContractV20Reconciler:
             return self._rec("applied", classe)
 
         # "assumiu a coordenação" [+ saiu de formador] → reatribui de→para.
-        para_user = self._usuario_by_cpf(r.get("para"))
+        para_user = self._usuario_by_cpf(self._get(r, "para_cpf", "para"))
         if para_user is None:
             return self._rec("skipped_not_found", classe)
         if Participation.objects.filter(solicitacao=p.solicitacao, usuario=para_user, role=role).exists():

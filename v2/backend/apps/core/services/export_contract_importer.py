@@ -1827,6 +1827,10 @@ class ExportContractImporter:
             res = resolve_projeto_export(nome, index=self._pidx)
             if res.status != "unmatched":
                 continue  # matched (já existe) ou ambiguous (decisão humana) → não cria
+            if Projeto.objects.filter(nome=nome).exists():
+                # #1993: create-only — o `nome` cru já existe (o resolver não casou por família,
+                # ex.: projeto_geral virou NULL). INSERT quebraria core_projeto_nome_key → pula.
+                continue
             if res.canonical_key in seen:
                 continue  # mesma variante canônica repetida na run
             fluxo = (r.get("fluxo") or "").strip().upper()

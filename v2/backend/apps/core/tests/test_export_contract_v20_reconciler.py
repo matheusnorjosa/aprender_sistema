@@ -32,7 +32,22 @@ def _inicio(y: int, m: int, d: int) -> datetime:
     return datetime(y, m, d, 12, 0, tzinfo=_FORTALEZA)
 
 
-RECONCILE_HEADER = ["classe", "entidade", "chave", "data", "municipio", "papel", "de", "para", "o_que_fazer"]
+RECONCILE_HEADER = [
+    "classe",
+    "entidade",
+    "chave",
+    "data",
+    "municipio",
+    "papel",
+    "de",
+    "para",
+    "o_que_fazer",
+    # colunas v24 (RELAY-43): identidade determinística. Vazias nas linhas v20 → fallback.
+    "evento_id",
+    "de_cpf",
+    "para_cpf",
+    "de_usuario_origem",
+]
 
 
 def _write_reconcile(base: Path, rows: list[dict[str, str]]) -> str:
@@ -261,6 +276,56 @@ class TestTrocaDeTitular:
         assert p.usuario_id == de.id
         assert rep["would_apply"]["TROCA_DE_TITULAR"] == 1
 
+    def test_v24_reassign_por_evento_id_e_cpf(self, tmp_path):
+        """v24: casa por evento_id (external_hash) + de_cpf/para_cpf (não `chave`/`de`/`para`)."""
+        de = UsuarioFactory(username="11111111111")
+        para = UsuarioFactory(username="22222222222")
+        sol = SolicitacaoFactory(external_hash="EV0777")
+        p = Participation.objects.create(solicitacao=sol, usuario=de, role=Participation.Role.CONVIDADO)
+
+        row = {
+            "classe": "TROCA_DE_TITULAR",
+            "entidade": "participation",
+            "evento_id": "EV0777",
+            "papel": "CONVIDADO",
+            "de": "Fulano De Tal",
+            "para": "Beltrano De Tal",
+            "de_cpf": "11111111111",
+            "para_cpf": "22222222222",
+        }
+        path = _write_reconcile(tmp_path / "r", [row])
+        rep = ExportContractV20Reconciler(path=path, apply=True, allow=("TROCA_DE_TITULAR",)).run()
+
+        p.refresh_from_db()
+        assert p.usuario_id == para.id
+        assert rep["applied"]["TROCA_DE_TITULAR"] == 1
+
+    def test_v24_caixa_por_guest_email(self, tmp_path):
+        """v24: a caixa está gravada como guest_email; `de_usuario_origem` a localiza; vira usuario=para."""
+        para = UsuarioFactory(username="22222222222")
+        sol = SolicitacaoFactory(external_hash="EV0888")
+        p = Participation.objects.create(
+            solicitacao=sol, guest_email="coordenacao21@x.org", role=Participation.Role.CONVIDADO
+        )
+
+        row = {
+            "classe": "TROCA_DE_TITULAR",
+            "entidade": "participation",
+            "evento_id": "EV0888",
+            "papel": "CONVIDADO",
+            "de": "Caixa Coordenacao",
+            "para": "Beltrano De Tal",
+            "para_cpf": "22222222222",
+            "de_usuario_origem": "coordenacao21@x.org",
+        }
+        path = _write_reconcile(tmp_path / "r", [row])
+        rep = ExportContractV20Reconciler(path=path, apply=True, allow=("TROCA_DE_TITULAR",)).run()
+
+        p.refresh_from_db()
+        assert p.usuario_id == para.id
+        assert p.guest_email in (None, "")
+        assert rep["applied"]["TROCA_DE_TITULAR"] == 1
+
 
 @pytest.mark.django_db
 class TestTrocaDePessoa:
@@ -346,3 +411,25 @@ class TestTrocaDePessoa:
         p.refresh_from_db()
         assert p.usuario_id == de.id
         assert rep["would_apply"]["TROCA_DE_PESSOA"] == 1
+
+    def test_v24_evento_id_desambigua(self, tmp_path):
+        """v24: 2 eventos no MESMO município+data (ambíguo no lookup v20) — evento_id resolve
+        exatamente-1, então aplica na participação certa e deixa a outra intacta."""
+        de = UsuarioFactory(username="11111111111")
+        para = UsuarioFactory(username="22222222222")
+        mun = MunicipioFactory(nome="TAMANDARÉ", uf="PE")
+        sol_a = SolicitacaoFactory(municipio=mun, inicio=_inicio(2026, 9, 10), external_hash="EV-A")
+        sol_b = SolicitacaoFactory(municipio=mun, inicio=_inicio(2026, 9, 10), external_hash="EV-B")
+        pa = Participation.objects.create(solicitacao=sol_a, usuario=de, role=Participation.Role.COORDENADOR)
+        pb = Participation.objects.create(solicitacao=sol_b, usuario=de, role=Participation.Role.COORDENADOR)
+
+        row = self._row(evento_id="EV-A", de_cpf="11111111111", para_cpf="22222222222")
+        path = _write_reconcile(tmp_path / "r", [row])
+        rep = ExportContractV20Reconciler(path=path, apply=True, allow=("TROCA_DE_PESSOA",)).run()
+
+        pa.refresh_from_db()
+        pb.refresh_from_db()
+        assert pa.usuario_id == para.id  # o evento apontado foi reatribuído
+        assert pb.usuario_id == de.id  # o outro (mesmo município+data) ficou intacto
+        assert rep["applied"]["TROCA_DE_PESSOA"] == 1
+        assert rep["skipped_ambiguous"]["TROCA_DE_PESSOA"] == 0

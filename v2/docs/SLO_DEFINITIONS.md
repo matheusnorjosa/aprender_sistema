@@ -1,3 +1,15 @@
+---
+title: Service Level Objectives (SLOs)
+status: active
+last_verified: 2026-09-11
+verified_at_commit: d0d43890c58b6620a9c6dabca2c940a4e9589911
+sources_of_truth:
+  - v2/backend/apps/core/services/db_retry.py
+  - v2/backend/config/settings.py
+  - v2/backend/apps/core/tasks_backup.py
+  - v2/backend/requirements.txt
+---
+
 # Service Level Objectives (SLOs)
 
 **Data**: 2026-07-24 (revisão contra o código)

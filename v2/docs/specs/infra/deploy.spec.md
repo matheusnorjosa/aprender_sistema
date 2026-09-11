@@ -91,13 +91,13 @@ pelo pipeline canônico (ver `DEPLOY_CHECKLIST.md` §7).
 
 | Componente | Produção | Local/dev |
 |---|---|---|
-| Stack | **6 serviços**: `migrate` (one-shot), `web`, `redis`, `worker`, `beat`, `frontend` (docker-compose.prod.yml:47,84,135,171,240,289) | idem + override de dev |
+| Stack | **6 serviços**: `migrate` (one-shot), `web`, `redis`, `worker`, `beat`, `frontend` (serviços no `docker-compose.prod.yml`) | idem + override de dev |
 | Observabilidade (Prometheus/Grafana) | **NÃO roda** | opcional via `make up-obs` (compose gitignored) |
 | `/metrics` (django-prometheus) | exposto, **gated** (staff/IP interno, SEC-RECON-02) | exposto |
 | Sentry | **DESLIGADO** — `SENTRY_DSN` ausente no stack.env | off (salvo se setar DSN) |
 | Backup Celery | mount `/backups` **corrigido no compose** (#1455); **execução real em prod NÃO verificada** — ver abaixo | grava em `backup_data:/backups` (base) |
 | Redis auth | **ATIVO** — `REDIS_PASSWORD` preenchido; isolado em `backend-internal` sem porta no host | conforme `.env` |
-| Migrations | **automáticas no deploy** — serviço one-shot `migrate` roda `python manage.py migrate --noinput`; web/worker/beat aguardam via `depends_on: service_completed_successfully` (docker-compose.prod.yml:47-50,106-107,202-203,261-262; add. #1495 2026-07-02; corrigido nesta spec 2026-07-17) | via `make up` |
+| Migrations | **automáticas no deploy** — serviço one-shot `migrate` roda `python manage.py migrate --noinput`; web/worker/beat aguardam via `depends_on: service_completed_successfully` (serviço `migrate` + `depends_on` de web/worker/beat no `docker-compose.prod.yml`; add. #1495 2026-07-02; corrigido nesta spec 2026-07-17) | via `make up` |
 | Guards de prod | **OK** — `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `SECRET_KEY`, `SECURE_SSL_REDIRECT`, `DB_SSLMODE` setados | guards não se aplicam |
 | GCal | **configurado** (`GCAL_*` completos) | conforme `.env` |
 | dev_tools (CP-08) | **off** — `INCLUDE_DEV_TOOLS` ausente → default `false` | on em dev |
@@ -105,12 +105,12 @@ pelo pipeline canônico (ver `DEPLOY_CHECKLIST.md` §7).
 ### Backup: o que foi corrigido e o que continua em aberto
 
 **Corrigido no compose (#1455).** O serviço `worker` tem hoje o bind-mount gravável
-`- /var/backups/aprender:/backups` (docker-compose.prod.yml:234-235), apesar do
+`- /var/backups/aprender:/backups` (serviço `worker` no `docker-compose.prod.yml`), apesar do
 `read_only: true` do root FS. A task Celery `backup.perform_database_backup` roda **no
 `worker`** (não no `beat`, que só a agenda) e chama `backup_db.sh`, que grava
 `backup_full_*.sql.gz.age` em `/backups`. `BACKUP_AGE_RECIPIENT` está fixado no
-`environment:` do worker (docker-compose.prod.yml:197), e não na `stack.env`, para sobreviver
-à recriação da stack. O `beat` **não** tem volume algum (docker-compose.prod.yml:279-287) —
+`environment:` do worker (no `docker-compose.prod.yml`), e não na `stack.env`, para sobreviver
+à recriação da stack. O `beat` **não** tem volume algum (serviço `beat` no `docker-compose.prod.yml`) —
 correto, pois não escreve dumps.
 
 **Não verificado — exige olhar produção.** Que o mount exista no compose **não prova** que o
@@ -144,8 +144,8 @@ re-login + perda de tasks Celery em voo) é irrelevante pré-go-live e aceitáve
 **Rejeitado:** Redis grátis externo (latência por-request + rate-limit de free tier para sessão/cache/broker).
 VM03 dedicada só se **HA** virar requisito.
 
-**Docs a reconciliar (Fase 2 — hoje afirmam VM03, divergindo do compose):** `v2/infra/ENVIRONMENTS.md:19/74`
-("Redis externo VM03"), `v2/infra/README.md:170` (tabela "VM03_Redis"), `.claude/CLAUDE.md` (tabela prod).
+**Docs a reconciliar (Fase 2 — hoje afirmam VM03, divergindo do compose):** `v2/infra/ENVIRONMENTS.md`
+("Redis externo VM03"), `v2/infra/README.md` (tabela "VM03_Redis"), `.claude/CLAUDE.md` (tabela prod).
 Vestigiais (não montados pelo container, que usa `--requirepass` inline): `v2/infra/configs/vm03/redis.conf`,
 `v2/infra/redis/redis.conf`. **VM03 provavelmente está ociosa** (nota de inventário/custo).
 
@@ -188,8 +188,8 @@ gravável no `worker` graças ao bind-mount do #1455), `INCLUDE_DEV_TOOLS`/`INCL
   então model-drift é detectado mas **não bloqueia merge**. Ver [`ci.spec.md`](./ci.spec.md).
 - **#1457** — guard de `REDIS_PASSWORD` obrigatório (em prod está setado; falta o fail-fast preventivo).
 - **#1611 / #1645 fechados; épico #1662 aberto por #1646** — `restore_db.sh` já restaura o `.age` de produção (fix `8f392636` / `3bca74f3`); resta o drill real de DR (#1646). Ver a seção de backup acima.
-- **#1660 (P2)** — `docker-compose.prod.yml:100-101` publica a porta do backend em `0.0.0.0` sem bind em
+- **#1660 (P2)** — o `ports:` do serviço `web` (`docker-compose.prod.yml`) publica a porta do backend em `0.0.0.0` sem bind em
   `127.0.0.1`. O dono confirmou por teste externo (4G) que a porta **não responde** da internet: há allowlist de
   firewall externo (Golden). Não é exposição pública — mas o firewall externo é a **única** camada protegendo um
   canal em texto claro que serve a API e o `/admin`, fora do TLS e do `limit_req`. Correção que preserva o
-  consumidor legítimo (`deployer/apply.sh:73-80` usa `confirm_localhost`): `127.0.0.1:${BACKEND_HOST_PORT}:8000`.
+  consumidor legítimo (`deployer/apply.sh` usa `confirm_localhost`): `127.0.0.1:${BACKEND_HOST_PORT}:8000`.

@@ -45,7 +45,7 @@ O app é **condicional**: só entra em `INSTALLED_APPS` quando `INCLUDE_DEV_TOOL
 
 ## Fonte de verdade no código
 
-- Gate de inclusão (CP-08): [`v2/backend/config/settings.py`](../../../backend/config/settings.py) — `INCLUDE_DEV_TOOLS = os.getenv("INCLUDE_DEV_TOOLS", "true").lower() == "true"` (`:126`); **guard rígido de produção em `:137-143`** (`if ENVIRONMENT == "production": ... INCLUDE_DEV_TOOLS = False`, com warning no stderr quando alguém pede `true` explicitamente); o app só é anexado via `if INCLUDE_DEV_TOOLS: INSTALLED_APPS.append("apps.dev_tools")` (`:170-171`).
+- Gate de inclusão (CP-08): [`v2/backend/config/settings.py`](../../../backend/config/settings.py) — `INCLUDE_DEV_TOOLS = os.getenv("INCLUDE_DEV_TOOLS", "true").lower() == "true"`; **guard rígido de produção** (`if ENVIRONMENT == "production": ... INCLUDE_DEV_TOOLS = False`, com warning no stderr quando alguém pede `true` explicitamente); o app só é anexado via `if INCLUDE_DEV_TOOLS: INSTALLED_APPS.append("apps.dev_tools")`.
 - AppConfig: [`v2/backend/apps/dev_tools/apps.py`](../../../backend/apps/dev_tools/apps.py) (`DevToolsConfig`, sem lógica de gate — o gate vive em `settings.py`).
 - Pacote: [`v2/backend/apps/dev_tools/__init__.py`](../../../backend/apps/dev_tools/__init__.py).
 - Management commands: `v2/backend/apps/dev_tools/management/commands/*.py` — **15 comandos** (16 arquivos `.py` no total, incluindo `__init__.py`). Os 15 estão na tabela abaixo, 1:1 com os arquivos.
@@ -55,8 +55,8 @@ O app é **condicional**: só entra em `INSTALLED_APPS` quando `INCLUDE_DEV_TOOL
 
 | Comando | O que semeia / faz |
 |---------|--------------------|
-| `seed_rbac` | Grupos e permissões mínimas. `GROUPS = SETOR_GROUPS + FUNCAO_GROUPS` (`seed_rbac.py:30`) = **13 setores + 5 funções = 18**; o loop de `PERMS_BY_GROUP` (`:127-128`) cria ainda o grupo legado `"Gerência"` (`:89`), fora de `GROUPS`. Idempotente; é a base do RBAC. ⚠️ O docstring do próprio comando (`:3`) ainda diz "FUNCAO_GROUPS (4)" — desatualizado: `apps/core/constants.py:36-45` tem **5** funções desde a inclusão de `Assistente Administrativo`. |
-| `seed_e2e_users` | **13** usuários (`coord_e2e`, `super_e2e`, `controle_e2e`, `formador_e2e`, `coord_vidas`, `coord_fluir`, `coord_acerta`, `gerente_vidas`, `dat_e2e`, `super_geral`, `approver_03`, `formador_vidas`, `formador_fluir`) + grupos, **2** municípios (Salvador/BA e Fortaleza/CE, para cobrir RD-04), **2** projetos (`TESTE E2E` fluxo SUPER e `TESTE E2E NAO_SUPER` fluxo NAO_SUPER), além de `TipoEvento` e `Compra`. Idempotente. ⚠️ O docstring do comando (`seed_e2e_users.py:14-17`) ainda anuncia "4 usuários / 1 município / 1 projeto" — desatualizado. |
+| `seed_rbac` | Grupos e permissões mínimas. `GROUPS = SETOR_GROUPS + FUNCAO_GROUPS` (`seed_rbac.py`) = **13 setores + 5 funções = 18**; o loop de `PERMS_BY_GROUP` cria ainda o grupo legado `"Gerência"`, fora de `GROUPS`. Idempotente; é a base do RBAC. ⚠️ O docstring do próprio comando ainda diz "FUNCAO_GROUPS (4)" — desatualizado: `apps/core/constants.py` (`FUNCAO_GROUPS`) tem **5** funções desde a inclusão de `Assistente Administrativo`. |
+| `seed_e2e_users` | **13** usuários (`coord_e2e`, `super_e2e`, `controle_e2e`, `formador_e2e`, `coord_vidas`, `coord_fluir`, `coord_acerta`, `gerente_vidas`, `dat_e2e`, `super_geral`, `approver_03`, `formador_vidas`, `formador_fluir`) + grupos, **2** municípios (Salvador/BA e Fortaleza/CE, para cobrir RD-04), **2** projetos (`TESTE E2E` fluxo SUPER e `TESTE E2E NAO_SUPER` fluxo NAO_SUPER), além de `TipoEvento` e `Compra`. Idempotente. ⚠️ O docstring do comando (`seed_e2e_users.py`) ainda anuncia "4 usuários / 1 município / 1 projeto" — desatualizado. |
 | `seed_frontend_contract_data` | Dados determinísticos da matriz funcional crítica frontend↔backend (checklist Playwright): usuários, municípios, projetos, compras, solicitações. |
 | `seed_gerencias` | Seed inicial de gerências (7 registros). |
 | `seed_gerentes` | Vincula gerentes ao grupo função Gerente + `EquipeGerencia.papel=GERENTE`. |
@@ -67,16 +67,16 @@ O app é **condicional**: só entra em `INSTALLED_APPS` quando `INCLUDE_DEV_TOOL
 | `link_projetos_gerencias` | Vincula projetos existentes às gerências. |
 | `fix_projetos_gerencia` | Corrige vinculação de projetos a gerências. Idempotente (fixup). |
 | `migrate_rbac_groups` | Migra usuários para a estrutura RBAC atual (Setor + Função). Backfill. |
-| `backfill_is_online` | Backfill a partir da coluna G da planilha original; grava **três** campos de `Solicitacao` num só `update`: `tipo`, `is_online` e `tipo_evento` (`backfill_is_online.py:83`). |
+| `backfill_is_online` | Backfill a partir da coluna G da planilha original; grava **três** campos de `Solicitacao` num só `update`: `tipo`, `is_online` e `tipo_evento` (`backfill_is_online.py`). |
 | `populate_municipio_coords` | Popula latitude/longitude de `Municipio` a partir de CSV. |
 | `cleanup_e2e_data` | Remove os dados E2E criados por `seed_e2e_users` (Playwright). |
 
 ## Contratos e invariantes
 
-- **CP-08 (imutável)**: produção roda com `INCLUDE_DEV_TOOLS=false`. Sem o app, **nenhum** comando de seed/backfill/fix/cleanup fica disponível e `FreezeTimeMiddleware` não é instalado. Texto canônico em `docs/business-rules/clausulas-petreas.md:62-66`.
-- **Guard por `ENVIRONMENT` EXISTE** (`settings.py:137-143`, #1466): quando `ENVIRONMENT == "production"`, `INCLUDE_DEV_TOOLS` é **forçado a `False`** independentemente da env var, e um `WARNING` vai ao stderr se alguém tiver pedido `true` explicitamente. Optou-se por forçar o valor em vez de `sys.exit(1)` de propósito — como a stack de produção não define a variável, abortar o boot converteria o footgun em indisponibilidade. Sentinela: `apps/core/tests/test_prod_guard_rails.py:248-263`.
+- **CP-08 (imutável)**: produção roda com `INCLUDE_DEV_TOOLS=false`. Sem o app, **nenhum** comando de seed/backfill/fix/cleanup fica disponível e `FreezeTimeMiddleware` não é instalado. Texto canônico em `docs/business-rules/clausulas-petreas.md`.
+- **Guard por `ENVIRONMENT` EXISTE** (`settings.py`, `INCLUDE_DEV_TOOLS`, #1466): quando `ENVIRONMENT == "production"`, `INCLUDE_DEV_TOOLS` é **forçado a `False`** independentemente da env var, e um `WARNING` vai ao stderr se alguém tiver pedido `true` explicitamente. Optou-se por forçar o valor em vez de `sys.exit(1)` de propósito — como a stack de produção não define a variável, abortar o boot converteria o footgun em indisponibilidade. Sentinela: `apps/core/tests/test_prod_guard_rails.py` (`DevToolsProductionGuardTests`).
   - O default `true` continua valendo para **qualquer outro `ENVIRONMENT`** (dev, CI, staging), e é lá que mora o risco residual: um ambiente com dados sensíveis rotulado como algo diferente de `production` carrega o app de seeds.
-  - ⚠️ O bullet de alerta de `docs/business-rules/clausulas-petreas.md:66` ("não há guard por `ENVIRONMENT`") está **desatualizado**. Esta spec é a referência correta enquanto o doc de CP não for reconciliado.
+  - ⚠️ O bullet de alerta de `docs/business-rules/clausulas-petreas.md` ("não há guard por `ENVIRONMENT`") está **desatualizado**. Esta spec é a referência correta enquanto o doc de CP não for reconciliado.
 - **Idempotência**: seeds usam `get_or_create` / lógica idempotente — rodar N vezes não duplica dados. É invariante esperada de todo `seed_*` (validada nos testes).
 - **Separação de domínio**: `apps.core` (produção) NÃO depende de `apps.dev_tools`. Toda lógica de produção precisa viver fora deste app, pois ele desaparece em prod.
 - **RBAC**: seeds criam grupos por nome, mas a autorização em runtime continua via `permission_classes=[HasPerm("codename")]` — grupos diretos (`user.groups.filter(name=...)`) são banidos por `scripts/rbac_lint.py` fora do código de seed. Ver [RBAC_NAMING.md](../../RBAC_NAMING.md).
@@ -118,8 +118,8 @@ Em CI o E2E roda com `INCLUDE_DEV_TOOLS=true` + `DEBUG_E2E=true` (ver `.github/w
 
 ## Pontos de atenção / dívidas conhecidas
 
-- **Risco residual do default `true`**: o failsafe por `ENVIRONMENT=production` **já existe** (#1466, `settings.py:137-143`) — a versão anterior desta spec dizia que faltava. O que sobra é o default `true` para qualquer outro rótulo de ambiente: um staging com dados reais e `ENVIRONMENT=staging` carrega `apps.dev_tools`. Auditar via [deploy.spec.md](../infra/deploy.spec.md).
-- **Docstrings de comando são fonte não-confiável**: `seed_rbac.py:3` e `seed_e2e_users.py:14-17` descrevem números que o código já não produz (4 funções, 4 usuários). Ao atualizar um seed, atualizar o docstring **e** esta tabela.
+- **Risco residual do default `true`**: o failsafe por `ENVIRONMENT=production` **já existe** (#1466, `settings.py`, `INCLUDE_DEV_TOOLS`) — a versão anterior desta spec dizia que faltava. O que sobra é o default `true` para qualquer outro rótulo de ambiente: um staging com dados reais e `ENVIRONMENT=staging` carrega `apps.dev_tools`. Auditar via [deploy.spec.md](../infra/deploy.spec.md).
+- **Docstrings de comando são fonte não-confiável**: `seed_rbac.py` e `seed_e2e_users.py` descrevem números que o código já não produz (4 funções, 4 usuários). Ao atualizar um seed, atualizar o docstring **e** esta tabela.
 - **Gate fora do app**: o gate vive em `config/settings.py`, não em `apps/dev_tools/apps.py` — quem audita o app precisa olhar settings. (Esta spec corrige a expectativa de que o gate estaria em `apps.py`.)
 - **Comandos não-seed na mesma pasta**: `backfill_*`, `fix_*`, `migrate_rbac_groups` e `populate_municipio_coords` são one-shot/legados; alguns dependem de planilhas/CSV externos (ex.: `backfill_is_online` lê coluna G da planilha original) e podem estar obsoletos após os data-fixes manuais do golden dataset. Confirmar relevância antes de rodar.
 - **`seed_rbac` é pré-requisito**: várias suítes e seeds assumem grupos/permissões já criados; rodar seeds dependentes antes de `seed_rbac` falha. A sequência canônica está documentada na memória de seed order do projeto.

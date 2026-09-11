@@ -36,14 +36,14 @@ O calculo e a SSOT da logica de conflito, e hoje ele tem **dois consumidores com
 | **Consultiva** | `check_conflicts` | 300s | So informa. Telas de disponibilidade, Grade Mensal, feedback no wizard. |
 | **Enforcement** | `check_conflicts_uncached` via `solicitacao_availability.enforce_solicitacao_availability` | nenhum | **Bloqueia** create/update/approve/batch_approve com HTTP 400 `availability_conflict`. |
 
-A afirmacao "RD e apenas consultivo" era verdadeira ate o #1452 e **nao vale mais**: conflito e bloqueio duro, sem override, inclusive no fluxo `NAO_SUPER` ([`solicitacao_availability.py:196-225`](../../../backend/apps/core/services/solicitacao_availability.py)). A decisao humana da Superintendencia continua sendo o gate de *aprovacao* (PA), mas ela nao consegue mais aprovar por cima de um conflito.
+A afirmacao "RD e apenas consultivo" era verdadeira ate o #1452 e **nao vale mais**: conflito e bloqueio duro, sem override, inclusive no fluxo `NAO_SUPER` ([`solicitacao_availability.py`](../../../backend/apps/core/services/solicitacao_availability.py)). A decisao humana da Superintendencia continua sendo o gate de *aprovacao* (PA), mas ela nao consegue mais aprovar por cima de um conflito.
 
 ## Fonte de verdade no codigo
 
-- [`v2/backend/apps/core/services/availability_service.py`](../../../backend/apps/core/services/availability_service.py) — `_check_conflicts_impl` (`:115`) e o calculo RD-01..RD-08; dataclasses `Conflict` e `CheckResult`; helpers `to_local`, `same_day_local`, `_fmt_interval_local`. Duas entradas publicas:
-  - `check_conflicts` (`:327`) — consultiva, decorada com `@cache_availability_check(timeout=300)`. A assinatura **nao** expoe `exclude_solicitacao_id` de proposito: a chave de cache vem de uma whitelist fixa de campos, entao um argumento extra mudaria o resultado sem mudar a chave (envenenamento de cache).
-  - `check_conflicts_uncached` (`:353`) — enforcement, sempre le do banco, aceita `exclude_solicitacao_id` para o evento nao conflitar consigo mesmo ao ser revalidado.
-- [`v2/backend/apps/core/services/solicitacao_availability.py`](../../../backend/apps/core/services/solicitacao_availability.py) — guard por participante (#1452). `collect_participants` (`:74`) le a tabela `Participation` ja gravada (nunca o payload) filtrando `role__in=ENFORCED_ROLES`; `lock_participants` (`:114`) toma `pg_advisory_xact_lock` por `usuario_id` em ordem ASC; `enforce_solicitacao_availability` (`:228`) e o ponto de entrada de create/update/approve. Antes do #1452 a checagem rodava **so no criador** da solicitacao — como o coordenador que cria tipicamente nao e o formador que atende, as regras rodavam na pessoa errada.
+- [`v2/backend/apps/core/services/availability_service.py`](../../../backend/apps/core/services/availability_service.py) — `_check_conflicts_impl` e o calculo RD-01..RD-08; dataclasses `Conflict` e `CheckResult`; helpers `to_local`, `same_day_local`, `_fmt_interval_local`. Duas entradas publicas:
+  - `check_conflicts` — consultiva, decorada com `@cache_availability_check(timeout=300)`. A assinatura **nao** expoe `exclude_solicitacao_id` de proposito: a chave de cache vem de uma whitelist fixa de campos, entao um argumento extra mudaria o resultado sem mudar a chave (envenenamento de cache).
+  - `check_conflicts_uncached` — enforcement, sempre le do banco, aceita `exclude_solicitacao_id` para o evento nao conflitar consigo mesmo ao ser revalidado.
+- [`v2/backend/apps/core/services/solicitacao_availability.py`](../../../backend/apps/core/services/solicitacao_availability.py) — guard por participante (#1452). `collect_participants` le a tabela `Participation` ja gravada (nunca o payload) filtrando `role__in=ENFORCED_ROLES`; `lock_participants` toma `pg_advisory_xact_lock` por `usuario_id` em ordem ASC; `enforce_solicitacao_availability` e o ponto de entrada de create/update/approve. Antes do #1452 a checagem rodava **so no criador** da solicitacao — como o coordenador que cria tipicamente nao e o formador que atende, as regras rodavam na pessoa errada.
 - [`v2/backend/apps/core/types.py`](../../../backend/apps/core/types.py) — `ConflictCode: TypeAlias = Literal["X", "T", "P", "D", "M", "E"]`.
 - [`v2/backend/apps/core/views_availability.py`](../../../backend/apps/core/views_availability.py) — `AvailabilityCheckView`, `AvailabilityCheckManyView`, `AvailabilityBlockViewSet`, helpers `is_privileged_user` / `can_check_availability_for_others`.
 - [`v2/backend/apps/core/views_availability_monthly.py`](../../../backend/apps/core/views_availability_monthly.py) — `MonthlyAvailabilityView` (grade mensal, codigos de celula).
@@ -75,7 +75,7 @@ Invariantes (NAO podem ser violados):
 - **RD-08**: cada `Conflict` carrega `code`, `title`, `detail` (com intervalo formatado `HH:MM dd/mm`) e `ref_id` opcional.
 - **Pureza do calculo**: o calculo so le; considera apenas `Solicitacao.status == APROVADO` e `AvailabilityBlock.status == APROVADO`. Validacao basica: `fim <= inicio` → `ok=False` com conflito `X` "Intervalo invalido". Solicitacao `pendente` e **invisivel** para a checagem — e por isso que o guard precisa do advisory lock (duas transacoes concorrentes leriam a outra como inexistente).
 - **Cache**: so na camada consultiva (`check_conflicts`, 300s via `@cache_availability_check`); TTL curto porque dados mudam com frequencia. O caminho de enforcement **nunca** le do cache.
-- **Quem e checado (enforcement)**: todos os participantes gravados com `role` em `ENFORCED_ROLES` = `COORDENADOR`, `FORMADOR`, `COORD_ACOMPANHA` ([`solicitacao_availability.py:33-37`](../../../backend/apps/core/services/solicitacao_availability.py)), mais o criador (`solicitacao.usuario`), deduplicados por id. `CONVIDADO` fica de fora **de proposito** — e audiencia, nao recurso alocado; checa-lo estouraria o RD-05 de quem e convidado a varios eventos no mesmo dia. Convidado externo sem cadastro (`usuario=NULL` + `guest_email`) e fisicamente nao-checavel e volta em `skipped_guests`, sempre logado como `availability_guest_check_skipped` — nunca ignorado em silencio.
+- **Quem e checado (enforcement)**: todos os participantes gravados com `role` em `ENFORCED_ROLES` = `COORDENADOR`, `FORMADOR`, `COORD_ACOMPANHA` ([`solicitacao_availability.py`](../../../backend/apps/core/services/solicitacao_availability.py)), mais o criador (`solicitacao.usuario`), deduplicados por id. `CONVIDADO` fica de fora **de proposito** — e audiencia, nao recurso alocado; checa-lo estouraria o RD-05 de quem e convidado a varios eventos no mesmo dia. Convidado externo sem cadastro (`usuario=NULL` + `guest_email`) e fisicamente nao-checavel e volta em `skipped_guests`, sempre logado como `availability_guest_check_skipped` — nunca ignorado em silencio.
 - **Exclusao mutua (enforcement)**: `pg_advisory_xact_lock(1452, usuario_id)` em ordem ASC de id antes de ler. `select_for_update` sozinho tranca so a linha da propria solicitacao; duas solicitacoes distintas do mesmo formador trancam linhas disjuntas e ambas commitariam.
 
 > Nota: `ConflictCode` inclui `E`, mas o servico **nao emite `E`** — `E`/`D1`/`2` sao codigos de celula da legenda da Grade Mensal (`GUIDE_AVAILABILITY.md`), nao saidas de `check_conflicts`.
@@ -114,7 +114,7 @@ Caminho de enforcement (`enforce_solicitacao_availability`, dentro de `transacti
 4. `skipped_guests` nao vazio → `logger.warning("availability_guest_check_skipped")` (nao bloqueia).
 5. Qualquer bloqueado → `ValidationAPIError` **400 `availability_conflict`**, com `conflicts` achatado (contrato legado) e `blocked_participants` por pessoa. A transacao inteira e desfeita — no `update`, a edicao nao persiste.
 
-Call-sites: `perform_create` ([`views_solicitacao.py:308`](../../../backend/apps/core/views_solicitacao.py)), `perform_update` (`:452`), `approve_solicitacao` ([`solicitacao_approval.py:136`](../../../backend/apps/core/services/solicitacao_approval.py)) e `batch_approve_solicitacoes` (`:305`).
+Call-sites: `perform_create` e `perform_update` ([`views_solicitacao.py`](../../../backend/apps/core/views_solicitacao.py)); `approve_solicitacao` e `batch_approve_solicitacoes` ([`solicitacao_approval.py`](../../../backend/apps/core/services/solicitacao_approval.py)).
 
 Caminhos de erro do endpoint `check/`: `usuario_id` ausente/invalido → 400; usuario inexistente → 404; consultar outro sem permissao → 403; `municipio_id` invalido → 400; `inicio`/`fim` ausentes ou nao-ISO → 400; `fim <= inicio` → 400; nao autenticado → 401/403. Datetimes naive sao convertidos para UTC antes do servico (RD-06).
 
@@ -143,11 +143,11 @@ Caminhos de erro do endpoint `check/`: `usuario_id` ausente/invalido → 400; us
 
 O que a regra diz: nenhum usuario acumula mais de `AVAILABILITY_DAILY_LIMIT_HOURS` por dia local.
 
-O que o codigo faz ([`availability_service.py:280-306`](../../../backend/apps/core/services/availability_service.py)):
+O que o codigo faz (em [`availability_service.py`](../../../backend/apps/core/services/availability_service.py)):
 
-1. Deriva `inicio_date` **apenas** do dia local de `inicio` (`:280-281`). Nenhum outro dia e avaliado.
-2. Os eventos **ja existentes** sao recortados ao dia (`overlap_start`/`overlap_end`, `:299-301`).
-3. O **novo** intervalo entra inteiro, sem recorte (`new_duration = int((fim - inicio) ...)`, `:305`).
+1. Deriva `inicio_date` **apenas** do dia local de `inicio`. Nenhum outro dia e avaliado.
+2. Os eventos **ja existentes** sao recortados ao dia (`overlap_start`/`overlap_end`).
+3. O **novo** intervalo entra inteiro, sem recorte (`new_duration = int((fim - inicio) ...)`).
 
 Consequencia: um evento das 22:00 as 06:00 debita 480 min no dia 1 (onde so 120 min sao reais) e
 **nao debita nada no dia 2** — a carga ja agendada do dia 2 nunca e somada. A regra falha nos dois
@@ -161,7 +161,7 @@ de `.date()` cru); ele nao cobre o novo intervalo nem a avaliacao multi-dia.
 **Severidade P2 · aberto · epico #1664.**
 
 `ENFORCED_ROLES` exclui `CONVIDADO` ao decidir **quem** e checado, mas `events_qs`
-([`availability_service.py:166-168`](../../../backend/apps/core/services/availability_service.py))
+([`availability_service.py`](../../../backend/apps/core/services/availability_service.py))
 monta os eventos ja existentes com `Q(usuario=usuario) | Q(participations__usuario=usuario)`,
 **sem** `role__in`. As duas pontas discordam:
 

@@ -1,0 +1,21 @@
+# Ancoras de linha perdoadas pelo check de referencia por simbolo
+# (v2/backend/scripts/check_doc_line_anchors.py).
+#
+# A regra: em spec SDD, ancora de codigo e por SIMBOLO (`PROTECTED_FIELDS`,
+# `_assign_groups`), nao por `arquivo.ext:NNN`. O nome do simbolo e estavel a
+# movimento de codigo; a linha drifta a cada commit que mexe no arquivo.
+#
+# O gate hard-bane so a forma INEQUIVOCA `arquivo.ext:NNN` (extensao de codigo). A
+# forma bare `` `:NNN` `` fica FORA do gate: e sintaticamente identica a uma PORTA de
+# rede (`:9443`, `:5173`), e reprovar porta desligaria o gate (gate-calibration). As
+# bare foram varridas uma vez no mesmo PR; regressao delas e caso do doc-drift-auditor.
+#
+# Formato: `<spec> <ancora> — motivo`. Ex.:
+#   v2/docs/specs/backend/rbac.spec.md admin.py:371-384 — range exato de auditoria de seguranca
+# Ancora nua (sem motivo, ou motivo com menos de 10 chars) NAO vale: allowlist que
+# aceita entrada sem motivo vira lugar de esconder drift, e o gate deixa de valer.
+#
+# Criado em 2026-09-11. Comeca VAZIO: a divida existente (~212 ancoras `arquivo.ext:NNN`
+# em 17 specs + a forma bare em 20) foi varrida no mesmo PR (limpar primeiro, trancar
+# depois). So adicione linha aqui quando a ancora `arquivo.ext:NNN` for deliberada e nao
+# houver simbolo estavel que a substitua.

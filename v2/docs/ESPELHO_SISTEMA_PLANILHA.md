@@ -104,9 +104,9 @@ do import real:
 |---|---|---|
 | `Projeto.gerencia` (setor) | **NULL em 124/125** | sem setor, o gate D6 não roda |
 | `Projeto.projeto_geral` (família) | **NULL em 125/125** | a regra de códigos mora na família → **nenhum** cálculo funciona |
-| `Gerencia.setor_canonico` | **campo não existe** | o de-para do sheets.banco (v15) não tem onde pousar |
+| `Gerencia.setor_canonico` | **existe** (mig 0099), gravado pelo importer | o de-para v15 já pousa; D6 segue bloqueado pelo predicado (§6.3) + `projeto.gerencia` vazio |
 | `papel` SUPORTE/OPERACIONAL | **não existem no enum** (só APOIO) | 9 vínculos DAT sem casa (§4) |
-| `desativado_localmente` | **campo não existe** | o import reativaria quem foi desligado (§4) |
+| `desativado_localmente` | **existe** (mig 0098), guarda implementada em `usuarios_import` (§4.1) | o import não reativa mais quem foi desligado localmente |
 | SKU cadastrado como projeto | resíduo ETL | diferença 125 (sistema) × 114 (planilha) |
 
 > **Nada disso é re-derivável no Django.** DECIDIDO (dono, 25/08): os scripts de raspagem
@@ -165,8 +165,10 @@ manteria ativa.
 > efeito de sync.** Quando a pessoa some da fonte: **desativar, nunca apagar** (o histórico
 > de quem conduziu formação é registro).
 
-O PR #1886 (`is_active` no update) é o **primeiro degrau**; `desativado_localmente` é o
-segundo (garante que a desativação cola entre syncs).
+O PR #1886 (`is_active` no update) foi o **primeiro degrau**; `desativado_localmente`
+(migration 0098, #1894) é o segundo e **já está implementado** — a guarda vive em
+`usuarios_import` (não reativa quem tem a flag) e tem teste dedicado
+(`test_desativado_localmente_1894.py`).
 
 ### 4.2 Troca de coordenador em lote — **evento de negócio**, não edição em massa
 
@@ -225,13 +227,12 @@ O predicado do gate D6 recomendado pelo sheets.banco compara **setor canônico**
 lados (não igualdade de gerência — igualdade barraria 46% da operação). No sistema isso
 exige:
 
-1. `Gerencia.setor_canonico` (campo novo, migration) — recebe o de-para que o sheets.banco
-   emite na v15;
+1. `Gerencia.setor_canonico` — **já existe** (migration 0099) e é populado pelo import;
 2. o setor do `Projeto` populado via import (`projeto.gerencia`, hoje 124/125 vazio);
-3. o predicado `EquipeGerencia.vigentes_em().filter(usuario=user, gerencia__setor_canonico=<setor do projeto>)`.
+3. o predicado `EquipeGerencia.vigentes_em().filter(usuario=user, gerencia__setor_canonico=<setor do projeto>)` — **ainda não reescrito** (0 usos de `setor_canonico` em `solicitacao_scope.py`/`rbac`).
 
-Enquanto (1) e (2) não existem, **o gate D6 fica bloqueado** — é dependência de import,
-não de código de autorização.
+Com (1) já feito, **o gate D6 segue bloqueado** enquanto (2) e (3) não existirem — é
+dependência de import **e** de código de autorização.
 
 ---
 
@@ -241,7 +242,7 @@ não de código de autorização.
 |---|---|---|
 | 1 | `_update_formadores` (`is_active` + COORD_ACOMPANHA) | ✅ **PR #1886** (gate 8/8) |
 | 2 | remover os 6 scripts de raspagem | pronto (§3.3: seguro) |
-| 3 | migrations: `setor_canonico`, `projeto_geral`, papel, `desativado_localmente` | **depois da v15** |
+| 3 | migrations: `setor_canonico` ✅ (0099), `desativado_localmente` ✅ (0098); falta `projeto_geral`, papel | parcial |
 | 4 | import real (dry-run → apply, autorização) | depois de 3 |
 | 5 | gates D6/D7 + cálculo de códigos | depois de 4 |
 | 6 | feature de transferência de carteira (§4.2) | planejar (CP-04), depois de 4 |

@@ -113,9 +113,9 @@ Legenda dos status codes (matriz executável):
 
 ---
 
-## 4. Capability ↔ grupo (estado canônico pós migration 0078)
+## 4. Capability ↔ grupo (estado canônico pós migration 0080)
 
-Estado autoritativo após `0078_scope_view_all_availability` (2026-04-27). Mudanças exigem migration data-only nova + atualização desta tabela.
+Estado autoritativo após `0080_redistribute_view_all_availability` (2026-04-28, que substituiu a 0078). Mudanças exigem migration data-only nova + atualização desta tabela.
 
 | Capability | Grupos atribuídos | Justificativa |
 |------------|-------------------|---------------|
@@ -130,7 +130,7 @@ Estado autoritativo após `0078_scope_view_all_availability` (2026-04-27). Mudan
 | `operate_preagenda` | Controle | Operação diária do calendário |
 | `run_daily_operations` | Controle | Imports operacionais e workflow diário |
 | `supervise_operations` | Diretoria | Visão executiva consolidada |
-| **`view_all_availability`** | **Controle, Gerente** *(NÃO inclui Coord/Apoio — caem em scope)* | **Visão transversal sem restrição** (decisão pós Bug 1) |
+| **`view_all_availability`** | **Controle, DAT** *(Gerente perdeu a cap global na 0080 e cai em scope via EquipeGerencia; Coord/Apoio idem — D9)* | **Visão transversal sem restrição** (decisão D9, pós migration 0080) |
 | `view_compras_dashboard` | Diretoria | Decisão executiva de compras |
 | `view_map_metrics` | Diretoria | Métricas geográficas executivas |
 | `view_overview_dashboard` | Diretoria | Painel executivo geral |
@@ -206,24 +206,25 @@ permission_classes = [IsAdminUser]                    # ❌ DRF built-in fora da
 | # | Recurso | Problema | Fix |
 |---|---------|----------|-----|
 | C1 | Dashboards sidebar | `usePermissions.canDashboardEquipe`/`canMapaBrasil`/`canDashboardGcal` hardcoded inclui Controle, contra D7 | Restringir a Diretoria/DAT/superuser |
-| C2 | Deslocamentos sidebar | UI mostra para Coord/DAT, backend exige `view_all_availability` (Controle/Gerente only após D6) | Alinhar gate (esconder pra Coord/DAT) ou alargar backend (decisão pendente) |
-| C3 | Ações Internas | `[IsAdminUser]` bypassa Capability Policy Layer (D1 violado) | Substituir por `[CanManageAdminRegistries]` ou nova policy específica |
+| C2 | Deslocamentos sidebar | UI mostra para Coord/DAT, backend exige `view_all_availability` (Controle/DAT após 0080) | Alinhar gate (esconder pra Coord) ou alargar backend (decisão pendente) |
 
 ### Onda 2 — Altos
 
 | # | Recurso | Problema | Fix |
 |---|---------|----------|-----|
-| A1 | `SolicitacaoViewSet.create` | Aceita qualquer authenticated, sem `HasPerm("create_solicitation")` explícito | Adicionar permission class |
 | A2 | `usePermissions.canDashboardCompras` | Hardcoded em vez de consumir policy `view_compras_dashboard` (que está em PUBLIC_POLICY_KEYS) | Migrar para `useCanAccess` derived flag |
 | A3 | 4 viewsets com `[IsAuthenticated]` apenas | Confiando 100% em queryset filter; sem capability check explícito | Adicionar `CanAccessBlocks` ou similar |
 
-### Onda 3 — Matriz Viva (governance)
+### Concluído (entregue — antes rastreado aqui como pendência)
 
-Implementar testes parametrizados que **falham CI** se um (ator × recurso) ganha/perde acesso inesperado. Estrutura proposta:
-
-- `apps/core/tests/test_rbac_matrix_living.py` — backend pytest parametrize sobre `(actor_groups, resource_url, method) → expected_status`
-- `v2/frontend/src/__tests__/rbac_matrix.test.ts` — vitest parametrize sobre `(policies, menu_key) → visibility`
-- `apps/core/rbac/matrix.py` (NEW) — SSOT lido pelos 2 tests, espelha esta tabela canônica em formato Python
+- **C3 — Ações Internas**: `[IsAdminUser]` substituído pela capability `manage_internal_actions`
+  (migration `0079_add_manage_internal_actions`); `CicloAcoesViewSet`/`AcaoInstanciaViewSet` usam
+  `HasPerm("manage_internal_actions")`.
+- **A1 — `SolicitacaoViewSet.create`**: a action `create` já exige `HasPerm("create_solicitation")`.
+- **Onda 3 — Matriz Viva**: entregue — `apps/core/rbac/matrix.py` é o SSOT lido pelos testes
+  sentinela (`test_rbac_matrix_living.py`, `test_rbac_matrix_contract.py`,
+  `test_rbac_matrix_endpoint_coverage.py`, `test_rbac_matrix_scope.py`); o bloco AUTOGEN desta
+  página é gerado dele.
 
 Ver memória `project_rbac_access_policy_realignment.md` para detalhes do escopo das ondas.
 

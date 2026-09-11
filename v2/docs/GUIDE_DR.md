@@ -1,3 +1,19 @@
+---
+title: Backup e Recovery — PostgreSQL nativo (VM02)
+status: active
+last_verified: 2026-09-11
+verified_at_commit: d0d43890c58b6620a9c6dabca2c940a4e9589911
+sources_of_truth:
+  - v2/infra/configs/vm02/pg_hba.conf
+  - v2/infra/configs/vm02/postgresql.conf
+  - v2/infra/scripts/restore_db.sh
+  - v2/infra/scripts/verify_backup.sh
+  - v2/infra/scripts/setup_vm02.sh
+  - v2/infra/cron/aprender-backup
+  - v2/backend/apps/core/tasks_backup.py
+  - v2/backend/config/celery.py
+---
+
 # Backup e Recovery — PostgreSQL nativo (VM02) + PITR
 
 **Ambiente**: **VM02_Banco** — PostgreSQL nativo, operado por `systemd`/`cron` do próprio

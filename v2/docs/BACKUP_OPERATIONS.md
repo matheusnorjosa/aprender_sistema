@@ -1,3 +1,19 @@
+---
+title: Backup Operations Guide
+status: active
+last_verified: 2026-09-11
+verified_at_commit: d0d43890c58b6620a9c6dabca2c940a4e9589911
+sources_of_truth:
+  - v2/infra/scripts/backup_db.sh
+  - v2/infra/scripts/restore_db.sh
+  - v2/infra/scripts/verify_backup.sh
+  - v2/backend/apps/core/tasks_backup.py
+  - v2/backend/config/celery.py
+  - v2/infra/docker-compose.prod.yml
+  - v2/infra/scripts/tests/restore_db.bats
+  - v2/infra/Dockerfile.prod
+---
+
 # Backup Operations Guide — AS v2
 
 **Status**: Backup grava e `restore_db.sh` restaura `.age` — **M26-01 (#1611) e M26-02

@@ -1,3 +1,19 @@
+---
+title: Disaster Recovery Runbook
+status: active
+last_verified: 2026-09-11
+verified_at_commit: d0d43890c58b6620a9c6dabca2c940a4e9589911
+sources_of_truth:
+  - v2/infra/docker-compose.prod.yml
+  - v2/infra/scripts/restore_db.sh
+  - v2/infra/scripts/backup_db.sh
+  - v2/infra/scripts/test_dr.sh
+  - v2/backend/config/settings.py
+  - v2/backend/config/urls.py
+  - v2/backend/apps/core/urls.py
+  - v2/infra/deployer/hooks/check_backup.sh
+---
+
 # Disaster Recovery Runbook
 
 **Data**: 2026-07-24 (revisão contra o código)
@@ -224,7 +240,7 @@ curl -f http://127.0.0.1:8000/api/version/
 ```bash
 # 1. Revogar todas as sessões
 #    ATENÇÃO: as sessões vivem no Redis, não no banco
-#    (settings.py:328-329 — SESSION_ENGINE=cache, SESSION_CACHE_ALIAS=default).
+#    (SESSION_ENGINE=cache, SESSION_CACHE_ALIAS=default em config/settings.py).
 #    `manage.py clearsessions` opera sobre a tabela de sessões do Django e NÃO
 #    derruba ninguém neste setup. O que derruba é limpar o cache:
 docker compose exec -T web python -c "from django.core.cache import cache; cache.clear()"
@@ -257,11 +273,11 @@ docker compose exec web python manage.py compliance_audit --days=7
 
 ```bash
 # 1. Verificar status do circuit breaker
-#    /healthz/detailed/ é GATEADO (superuser ou IP interno — config/urls.py:46-54):
+#    /healthz/detailed/ é GATEADO (superuser ou IP interno, gate em config/urls.py):
 #    de fora da rede responde 403. Rode de dentro da VM.
 curl http://127.0.0.1:8000/healthz/detailed/
 # Esperado: "gcal_circuit": "open"
-#    Alternativa autenticada: GET /api/gcal/circuit-breaker/ (apps/core/urls.py:315)
+#    Alternativa autenticada: GET /api/gcal/circuit-breaker/ (rota gcal_circuit_breaker_state em apps/core/urls.py)
 
 # 2. Verificar status do Google
 # https://www.google.com/appsstatus/dashboard/

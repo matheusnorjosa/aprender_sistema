@@ -146,8 +146,6 @@ Doc canônico detalhado (não duplicado aqui): convenção de nomes em [`RBAC_NA
 
 ## Pontos de atenção / dívidas conhecidas
 
-- **Divergência doc × código (V003)**: `RBAC_NAMING.md §7` afirma "V003 (import de Group) foi descartado", mas `scripts/rbac_lint.py` **implementa** V003 com sentido diferente (proíbe mutação de `PermissaoFuncional.groups`/`Group.permissions` em migrations de `apps/core/` acima do cutoff D17=82). O texto do §7 está desatualizado; a fonte de verdade é o lint. Corrigir o §7.
-- **`GUIA_ADMIN_RBAC.md` lista "Gerência" como setor genérico**; o SSOT `SETOR_GROUPS` não contém "Gerência" (são 13 setores nomeados). Guia precisa alinhar.
 - **Cutoff D17 hardcoded** (`D17_LEGACY_MIGRATIONS_MAX = 82`): migrations futuras que precisem backfill legítimo de grupos exigem `# noqa: RBAC-migration-allowed` consciente.
 - **Composition OR em instâncias depende de monkey-patch** (`permissions.OR/AND/NOT.__call__ = lambda self: self`) aplicado em `permissions.py`; `policies.py` força o import por side-effect. Remover o patch quebra silenciosamente todo `permission_classes = [A | B]`.
 - **`HasSectorAccess` é o único ponto com TOCTOU residual** de scope: a checagem de vínculo **vigente** em `EquipeGerencia` (`vigentes_em()`) e a leitura de dados acontecem em requests separados; mudança de vínculo entre eles não é transacional (aceitável para o caso de uso atual).

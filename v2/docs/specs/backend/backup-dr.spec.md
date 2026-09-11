@@ -1,7 +1,8 @@
 ---
 title: Backup & Disaster Recovery
 status: canonical
-last_verified: 2026-08-26
+last_verified: 2026-09-11
+verified_at_commit: 0dd1dcb630fdc1cf9b2b488121553e89488dde3c
 sources_of_truth:
   - v2/backend/apps/core/tasks_backup.py
   - v2/backend/config/celery.py
@@ -96,7 +97,7 @@ docker compose exec web /app/infra/scripts/restore_db.sh /backups/backup_full_<t
 age -d -i /etc/backup-key.txt backup_full_<ts>.sql.gz.age | gunzip | psql -h <host> -U postgres -d <db>
 ```
 
-**Env vars (contrato `tasks_backup.py`, `perform_database_backup` -> `backup_db.sh`):** `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME`, `BACKUP_DIR` (default `/backups`), `BACKUP_RETENTION_DAYS` (7), `S3_BUCKET` (opcional; a task exporta `settings.BACKUP_S3_BUCKET` com o **nome `S3_BUCKET`**), `BACKUP_AGE_RECIPIENT`, `SENTRY_DSN`. ⚠️ `restore_db.sh` **nao** honra `BACKUP_DIR`: o valor esta hardcoded (`/var/backups/aprender`), enquanto `backup_db.sh` usa `${BACKUP_DIR:-/backups}` — dentro do container (mount `/var/backups/aprender:/backups`) o `--latest` do restore procura no diretorio errado. Tabela completa de variaveis e setup S3 em [`BACKUP_OPERATIONS.md`](../../BACKUP_OPERATIONS.md#configuration).
+**Env vars (contrato `tasks_backup.py`, `perform_database_backup` -> `backup_db.sh`):** `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME`, `BACKUP_DIR` (default `/backups`), `BACKUP_RETENTION_DAYS` (7), `S3_BUCKET` (opcional; a task exporta `settings.BACKUP_S3_BUCKET` com o **nome `S3_BUCKET`**), `BACKUP_AGE_RECIPIENT`, `SENTRY_DSN`. `restore_db.sh` **honra** `BACKUP_DIR` (`BACKUP_DIR="${BACKUP_DIR:-/var/backups/aprender}"`, corrigido em #1611 — o default so e fallback), assim como `backup_db.sh` usa `${BACKUP_DIR:-/backups}`; dentro do container o mount aponta o diretorio certo e o `--latest` do restore procura no lugar configurado. Tabela completa de variaveis e setup S3 em [`BACKUP_OPERATIONS.md`](../../BACKUP_OPERATIONS.md#configuration).
 
 ## Fluxos principais
 

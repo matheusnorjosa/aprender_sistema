@@ -1,7 +1,8 @@
 ---
 title: Deploy & Produção (spec)
 status: canonical
-last_verified: 2026-07-24
+last_verified: 2026-09-11
+verified_at_commit: 0dd1dcb630fdc1cf9b2b488121553e89488dde3c
 sources_of_truth:
   - v2/infra/docker-compose.prod.yml
   - v2/infra/Dockerfile.prod
@@ -144,8 +145,9 @@ re-login + perda de tasks Celery em voo) é irrelevante pré-go-live e aceitáve
 **Rejeitado:** Redis grátis externo (latência por-request + rate-limit de free tier para sessão/cache/broker).
 VM03 dedicada só se **HA** virar requisito.
 
-**Docs a reconciliar (Fase 2 — hoje afirmam VM03, divergindo do compose):** `v2/infra/ENVIRONMENTS.md`
-("Redis externo VM03"), `v2/infra/README.md` (tabela "VM03_Redis"), `.claude/CLAUDE.md` (tabela prod).
+**Docs de topologia reconciliados (Fase 2 concluída):** `v2/infra/ENVIRONMENTS.md`, `v2/infra/README.md` e
+`.claude/CLAUDE.md` (tabela prod) descrevem o Redis como **container interno na VM01** (serviço `redis`),
+alinhados ao compose — não mais como "VM03_Red" dedicada.
 Vestigiais (não montados pelo container, que usa `--requirepass` inline): `v2/infra/configs/vm03/redis.conf`,
 `v2/infra/redis/redis.conf`. **VM03 provavelmente está ociosa** (nota de inventário/custo).
 

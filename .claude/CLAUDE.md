@@ -90,13 +90,14 @@ v2/frontend/src/
 - **Lint guard**: `scripts/rbac_lint.py` bane `user.groups.filter(name=...)`
   fora de whitelist. CI job: `[required] backend rbac-lint`.
 
-## Produção (3 VMs)
+## Produção (2 VMs)
 
-| VM         | Specs              | Serviços                       |
-|------------|--------------------|--------------------------------|
-| VM01\_App  | 4vCPU/16GB/60GB    | Nginx, Gunicorn, Celery, React |
-| VM02\_DB   | 4vCPU/16GB/300GB   | PostgreSQL 15                  |
-| VM03\_Red  | 2vCPU/4GB/20GB     | Redis 7 (cache/sessions/broker)|
+| VM         | Specs              | Serviços                                                              |
+|------------|--------------------|----------------------------------------------------------------------|
+| VM01\_App  | 4vCPU/16GB/60GB    | Nginx, Gunicorn, Celery, React, Redis 7 (container `redis`, rede interna) |
+| VM02\_DB   | 4vCPU/16GB/300GB   | PostgreSQL 15                                                         |
+
+Redis 7 (cache/sessions/broker) roda como **container na stack da VM01** (serviço `redis`, rede `backend-internal`, sem porta no host) — não é mais VM dedicada. SSOT: `v2/infra/README.md`, `v2/infra/ENVIRONMENTS.md`.
 
 ## Planos em Andamento
 

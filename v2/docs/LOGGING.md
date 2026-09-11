@@ -44,12 +44,17 @@ logger.error("Erros que precisam atenção")
 
 ### Configuração
 
-A configuração está em `config/settings.py:632-690` (bloco `LOGGING`):
+A configuração está em `config/settings.py`, no bloco `LOGGING`:
 
 - **Development**: formatter `verbose`, legível no console
 - **Staging/Production**: formatter `json` (`pythonjsonlogger`) em stdout, com os filtros
   `RequestIDFilter` e `ContextFilter` (`apps/core/logging_filters.py`) injetando
   `request_id`, `environment` e `service`
+- **Redação de PII** (todos os ambientes): o filtro `PIIRedactionFilter`
+  (`apps/core/logging_filters.py`) está ligado em **todos** os handlers e mascara, antes da
+  formatação, e-mail (preservando o domínio) e CPF de 11 dígitos crus — backstop automático
+  de LGPD (art. 46, #1698). ⚠️ **Não** cobre CPF formatado (`123.456.789-00`): é defesa em
+  profundidade, não substitui a disciplina de não logar PII (ver a seção **Dados Sensíveis**)
 - `SERVICE_NAME` (`web`/`worker`/`beat`) vem do compose e é o que permite distinguir a
   origem da linha
 
@@ -143,6 +148,11 @@ async function badFetch() {
 - IDs de usuário (OK para debugging)
 - Emails (mascarar em produção: `j***@example.com`)
 - IPs (considerar LGPD)
+
+> **Backstop automático**: o `PIIRedactionFilter` (ver a seção **Configuração**) mascara
+> e-mail e CPF cru em toda linha antes da formatação. Ele reduz o dano de um vazamento
+> acidental, mas cobre só CPF cru — não o formatado (`123.456.789-00`) —, então as regras
+> acima seguem obrigatórias.
 
 ---
 

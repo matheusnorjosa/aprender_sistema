@@ -189,9 +189,12 @@ A tabela abaixo é o **backlog** de alertas desejados, não o que está ativo:
 | HighErrorRate | 5xx > 1% por 5min | Critical | ❌ não implementado |
 | LowAvailability | Uptime < 99% em 1h | Critical | ❌ não implementado |
 
-O único mecanismo automático de detecção hoje é o **Sentry**, e ele só está ativo se
-`SENTRY_DSN` estiver configurado — ausente em produção na última verificação
-([OBSERVABILITY.md](./OBSERVABILITY.md)).
+Para violação de SLO (latência/erro/disponibilidade), o único mecanismo automático de
+detecção hoje é o **Sentry**, e ele só está ativo se `SENTRY_DSN` estiver configurado —
+ausente em produção na última verificação ([OBSERVABILITY.md](./OBSERVABILITY.md)). Fora
+do escopo de SLO, há um *dead-man* diário de frescor de backup
+(`backup.check_backup_freshness`, Celery beat às 6:00) que loga `ERROR` mesmo sem
+`SENTRY_DSN` (#1733).
 
 ---
 

@@ -162,8 +162,8 @@ curl -s "http://localhost:8000/api/solicitacoes/?q=fortaleza" \
 curl -s "http://localhost:8000/api/solicitacoes/?date_from=2026-01-01&date_to=2026-01-31&flow=SUPER" \
   -b cookies.txt | jq
 
-# Paginacao: page_size e IGNORADO nesta rota (paginador global sem
-# page_size_query_param, settings.py:485-486). Pagina fixa em 100.
+# Paginacao: ?page_size e honrado (ate 500) pelo paginador global
+# StandardPagination (#1653); default 100 itens. ?page= tambem funciona.
 curl -s "http://localhost:8000/api/solicitacoes/?page=2" \
   -b cookies.txt | jq
 ```

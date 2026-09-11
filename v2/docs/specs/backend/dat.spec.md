@@ -1,7 +1,7 @@
 ---
 title: Módulo DAT
 status: canonical
-last_verified: 2026-08-24
+last_verified: 2026-09-11
 sources_of_truth:
   - v2/backend/apps/core/services/controle_acoes_import.py
   - v2/backend/apps/core/models/dat_acao.py
@@ -38,7 +38,7 @@ O módulo DAT (Departamento de Apoio Técnico/Tecnologia) gerencia o ciclo opera
 No código convivem **dois conjuntos de models** com a mesma origem de dados (planilha DAT), mas finalidades diferentes — o que segue a distinção legacy×operacional do projeto:
 
 - **Operacional (UI/CRUD via DRF):** `DATAcao`, `DATCadastro`, `DATCompra`, `DATFormacao`, `DATCoordenador`/`DATArea`, `DATRegistro` (tabelas `core_dat_*`). É o que esta spec governa.
-- **Legacy (histórico de import ETL):** `AcaoDAT` em [`workflow.py:135`](../../../backend/apps/core/models/workflow.py) (tabela `core_acao_dat`), com o enum de choices `TipoAcaoDAT` (`workflow.py:124`, `models.TextChoices` — **não é model**). Alimentado por importação por `external_hash`; não é o caminho de edição da UI nova. **`AcaoControle` foi REMOVIDO na Onda 1** (o import de ações — `POST /api/controle/import-acoes/` — grava em `DATAcao`): a tabela `core_acao_controle`, o endpoint legacy `/controle/acoes/`, o serializer e o admin foram apagados (ver [`docs/plans/PLANO_IMPORTS_ORFAOS.md`](../../plans/PLANO_IMPORTS_ORFAOS.md)).
+- **Legacy (histórico de import ETL):** `AcaoDAT` em [`workflow.py`](../../../backend/apps/core/models/workflow.py) (tabela `core_acao_dat`), com o enum de choices `TipoAcaoDAT` (`workflow.py`, `models.TextChoices` — **não é model**). Alimentado por importação por `external_hash`; não é o caminho de edição da UI nova. **`AcaoControle` foi REMOVIDO na Onda 1** (o import de ações — `POST /api/controle/import-acoes/` — grava em `DATAcao`): a tabela `core_acao_controle`, o endpoint legacy `/controle/acoes/`, o serializer e o admin foram apagados (ver [`docs/plans/PLANO_IMPORTS_ORFAOS.md`](../../plans/PLANO_IMPORTS_ORFAOS.md)).
 
 ## Fonte de verdade no código
 
@@ -53,7 +53,7 @@ Models operacionais (um arquivo por entidade):
 
 Model legacy:
 
-- [`models/workflow.py`](../../../backend/apps/core/models/workflow.py) — `AcaoDAT` (`:135`) + o enum `TipoAcaoDAT` (`:124`).
+- [`models/workflow.py`](../../../backend/apps/core/models/workflow.py) — `AcaoDAT` + o enum `TipoAcaoDAT`.
 
 ViewSets / Views:
 
@@ -73,10 +73,11 @@ Roteamento: [`urls.py`](../../../backend/apps/core/urls.py). Serviço de import 
 - **Campos derivados em `DATRegistro.save()`:** `usa_avaliar` espelha `projeto_geral.usa_avaliar`; se `usa_avaliar=False`, os 3 status AVALIAR viram `nao_aplicavel`. UI/import nunca devem gravar esses campos manualmente.
 - **`nr_codigos` = SOMA por linha de compra, por ano de uso (cohort anual)** (contrato v5, `services/dat_codigos.py`): das `DATCompra` do par `(municipio, projeto)` com `conta_para_codigos=True` **e `ano_uso = registro.ano`** — cada ano tem seu número (não soma 2026 + 2027 + sem-ano no mesmo balde); `registro.ano=None` é o **bucket pendente**, conta só as compras `ano_uso IS NULL` (NÃO_CLASSIFICADO). `ceil` **por compra** em Decimal, por kit (`tipo=Aluno` → `ceil(qtde/divisor_aluno)`, `tipo=Professor` → `ceil(qtde*multiplicador)`); `nao_aplicavel`/sem PG → `None`. Difere do agregado quando uma variante tem 2+ compras de professor (~29 códigos, by-design). Recalculado no `save()` do registro, nos `perform_*` do `DATCompraViewSet`, na passada final do importer (`recompute_all`) e pelo command `recalcular_nr_codigos_dat`. `nr_codigos_planilha` guarda o valor cru da planilha para reconciliação (não é autoridade). `DATCompra.tipo`/`conta_para_codigos` (migration 0087) são a base do cálculo, resolvidos pelo Tipo do SKU no export-contract; `DATCompra.ano_uso` (nullable, migration 0090) é o ano de uso da coleção — `NULL` grava como pendente/NÃO_CLASSIFICADO.
 - **Fatiamento por ano** (`services/dat_registro_split.py`, command `split_dat_registros_por_ano`): converte um `DATRegistro` "plano" (herdado do domínio pré-`ano`) nas linhas por ano das compras do par — reatribui o registro-âncora ao ano primário (2026 se houver, senão o maior ano real), cria os anos secundários e o pendente (`ano=NULL`). Idempotente; reporta `compras_sem_registro` (par de compra sem registro correspondente — nunca inventa registro).
-- **Auto-status em `DATCompra.save()`** (`dat_compra.py:145-153`): `status_uso` é derivado das quantidades (`quantidade_utilizada >= quantidade` → `esgotado`; `> 0` → `em_uso`; senão `disponivel`) — sobrescrito **a cada save**, então o choice `DEVOLVIDO` (`:41`) nunca é produzido por este caminho. `disponivel` **não é campo**: é `@property` (`:135-138`, `max(0, quantidade - quantidade_utilizada)`) e portanto não é filtrável/ordenável no ORM.
+- **Auto-status em `DATCompra.save()`** (`dat_compra.py`): `status_uso` é derivado das quantidades (`quantidade_utilizada >= quantidade` → `esgotado`; `> 0` → `em_uso`; senão `disponivel`) — sobrescrito **a cada save**, então o choice `DEVOLVIDO` (`StatusUso.DEVOLVIDO`) nunca é produzido por este caminho. `disponivel` **não é campo**: é a `@property` `DATCompra.disponivel` (`max(0, quantidade - quantidade_utilizada)`) e portanto não é filtrável/ordenável no ORM.
 - **Workflow de 4 etapas (`DATAcao`):** Carta → Contato → Reunião → Entrega. Cada etapa tem status `pendente|em_andamento|concluido|cancelado`. `progresso` e `etapa_atual` são derivados (primeira não concluída).
 - **Auditoria obrigatória:** todos os models gravam `created_by` (PROTECT) e `updated_by` via `perform_create`/`perform_update`; FKs para `Municipio`/`Projeto`/`ProjetoGeral` são `PROTECT` (não deletar mestre com dependentes).
-- **SEC-007:** export CSV de `DATRegistro` passa por `sanitize_csv_value` (anti CSV-injection) — `views/dat.py:202,237-252`. Não remover. (Esta cláusula **não** é a CP-08: CP-08 é `INCLUDE_DEV_TOOLS=false` em produção — ver `docs/business-rules/clausulas-petreas.md:62-66` e [dev-tools.spec](./dev-tools.spec.md).)
+- **`projeto_geral_nome` (read-only) nos serializers de `DATAcao` e `DATCompra`** (#1932): campo derivado via `source="projeto.projeto_geral.nome"` (presente tanto no List quanto no Full — `serializers/dat_module/dat_acao.py`, `.../dat_compra.py`), para exibir o Projeto Geral na UI sem lookup extra.
+- **SEC-007:** export CSV de `DATRegistro` passa por `sanitize_csv_value` (anti CSV-injection) — no `@action export` de `DATRegistroViewSet` (`views/dat.py`). Não remover. (Esta cláusula **não** é a CP-08: CP-08 é `INCLUDE_DEV_TOOLS=false` em produção — ver `docs/business-rules/clausulas-petreas.md` e [dev-tools.spec](./dev-tools.spec.md).)
 - **Disciplina de import (CP / memória do projeto):** o caminho de import real é via `import_export_contract` (dry-run por padrão; `--apply` exige allowlist). Re-import cego sobrescreveria data-fixes manuais — **não importar dados reais sem dry-run verde + autorização**.
 
 ## API / Interface
@@ -91,7 +92,7 @@ Rotas DRF (prefixo `/api/`, registradas em [`urls.py`](../../../backend/apps/cor
 | Compras/materiais | `dat/compras-materiais/` | `DATCompraViewSet` | `@action stats / dashboard / pendencias` |
 | Cadastros FORMAR/AVALIAR | `dat/cadastros/` | `DATCadastroViewSet` | `@action stats / etapa` |
 | Formações | `dat/formacoes/` | `DATFormacaoViewSet` | `@action stats / calendario` |
-| Registros (turmas) | `dat/registros/` | `DATRegistroViewSet` | `@action export(CSV) / stats` |
+| Registros (turmas) | `dat/registros/` | `DATRegistroViewSet` | `@action export(CSV) / stats`; filtro por `ano` + ordenação por `ano`/`municipio__nome`/`projeto__nome` (default `["municipio__nome","projeto__nome","ano"]`, #1996) |
 | Projetos Gerais | `projetos-gerais/` | `ProjetoGeralViewSet` | `@action projetos` |
 | Ações DAT (legacy) | `dat/acoes/` | `DATAcoesListCreateView` | model `AcaoDAT` |
 
@@ -101,14 +102,14 @@ Rotas DRF (prefixo `/api/`, registradas em [`urls.py`](../../../backend/apps/cor
 
 | ViewSet | Gate padrão | `destroy` | Prova |
 |---|---|---|---|
-| `DATAreaViewSet` (ReadOnly) | `IsAuthenticated` — **sem capability** | — | `dat_module.py:84` |
-| `DATCoordenadorViewSet` | `manage_admin_registries \| run_daily_operations` | `execute_restricted_operations` | `dat_module.py:142-151` |
-| `DATAcaoViewSet` | idem | idem | `dat_module.py:249-257` |
-| `DATFormacaoViewSet` | idem | idem | `dat_module.py:930-938` |
-| `DATCompraViewSet` | **`CanViewComprasStats`** para tudo (list/retrieve/create/update/stats); `dashboard` → `CanViewComprasDashboard`; `pendencias` → `CanViewComprasPendencias` | `execute_restricted_operations` | `dat_module.py:387-400` |
-| `DATCadastroViewSet` | só `manage_admin_registries` | `execute_restricted_operations` | `dat_module.py:756-760` |
-| `DATRegistroViewSet` | só `manage_admin_registries` | `execute_restricted_operations` | `dat.py:174-185` |
-| `ProjetoGeralViewSet` | `list`/`retrieve`/`projetos` → `IsAuthenticated`; resto → `manage_admin_registries` | `execute_restricted_operations` | `dat.py:351-362` |
+| `DATAreaViewSet` (ReadOnly) | `IsAuthenticated` — **sem capability** | — | `DATAreaViewSet.permission_classes` (`dat_module.py`) |
+| `DATCoordenadorViewSet` | `manage_admin_registries \| run_daily_operations` | `execute_restricted_operations` | `DATCoordenadorViewSet.get_permissions` (`dat_module.py`) |
+| `DATAcaoViewSet` | idem | idem | `DATAcaoViewSet.get_permissions` (`dat_module.py`) |
+| `DATFormacaoViewSet` | idem | idem | `DATFormacaoViewSet.get_permissions` (`dat_module.py`) |
+| `DATCompraViewSet` | **`CanViewComprasStats`** para tudo (list/retrieve/create/update/stats); `dashboard` → `CanViewComprasDashboard`; `pendencias` → `CanViewComprasPendencias` | `execute_restricted_operations` | `DATCompraViewSet.get_permissions` (`dat_module.py`) |
+| `DATCadastroViewSet` | só `manage_admin_registries` | `execute_restricted_operations` | `DATCadastroViewSet.get_permissions` (`dat_module.py`) |
+| `DATRegistroViewSet` | só `manage_admin_registries` | `execute_restricted_operations` | `DATRegistroViewSet.get_permissions` (`dat.py`) |
+| `ProjetoGeralViewSet` | `list`/`retrieve`/`projetos` → `IsAuthenticated`; resto → `manage_admin_registries` | `execute_restricted_operations` | `ProjetoGeralViewSet.get_permissions` (`dat.py`) |
 
 Notas: a composition OR do #1220 vale só para Coordenador/Ação/Formação. Em Compras, a Policy `CanViewComprasStats` (#1233) governa o **CRUD inteiro**, não apenas a action `stats` — mantém paridade de capabilities com a OR anterior, mas o nome sugere escopo menor do que o real. Ver [`rbac/policies.py`](../../../backend/apps/core/rbac/policies.py) e [`rbac/matrix.py`](../../../backend/apps/core/rbac/matrix.py).
 
@@ -145,13 +146,13 @@ Notas: a composition OR do #1220 vale só para Coordenador/Ação/Formação. Em
 > ⚠️ **Drift FE↔BE reconfirmado vivo em produção** (`ACHADOS_REAIS.md`, épicos #1655 e #1654). Os quatro itens abaixo descrevem o comportamento **real**, não o pretendido.
 
 - **Datas do formulário de Registros não chegam ao banco** (`M16-07`, issue #1638). Duas falhas distintas:
-  - *FORMAR* — `handleSave` (`v2/frontend/src/pages/DATModule/DATRegistrosPage.tsx:223-228`) formata **apenas** `reuniao_dat`; `chaves_inscricao_data` (`:662`), `instrucoes_data` (`:677`) e `envio_codigos_data` (`:692`) são `DatePicker` que caem no spread `...values` como objeto Dayjs e viram datetime ISO completo no JSON. O `DateField` do DRF (`models/dat_registro.py:119,124,129`) só aceita `YYYY-MM-DD` → **400**.
-  - *AVALIAR* — o form usa os nomes **no singular** `alunos_recebidos_data` (`:738`), `alunos_validados_data` (`:758`), `alunos_importados_data` (`:778`), enquanto model e serializer têm `alunos_recebidos_datas` / `alunos_validados_datas` / `alunos_importados_datas` (`JSONField` de lista, `models/dat_registro.py:145,155,160`). Chave desconhecida → DRF **descarta em silêncio**, sem erro e sem gravar.
-  - O serializer **não** é a causa: os 7 campos estão declarados corretamente em `serializers/dat_registro.py` (List `:51-70`, Create `:111-126`, Update `:183-198`).
-- **Choices de status divergem entre UI e backend** (`M16-08`, issue #1639). Backend: `STATUS_CHOICES` tem 5 valores (`concluido, pendente, em_andamento, nao_aplicavel, erro` — `models/dat_registro.py:47-53`) e `TURMA_STATUS_CHOICES` tem 3 (`criada, pendente, erro` — `:55-59`). Frontend: `STATUS_OPTIONS` oferece 3 (`pendente, em_andamento, concluido` — `DATRegistros/constants.tsx:43-47`). Consequências: (a) `nao_aplicavel` e `erro` aparecem na legenda mas não são selecionáveis; (b) o campo `turma_formar_status` usa `STATUS_OPTIONS` (`DATRegistrosPage.tsx:630`) em vez das choices de turma — escolher "Em Andamento"/"Concluído" viola os choices do model e retorna **400**.
-- **Editar pelo modal apaga as datas** (`M17-02`, issue #1641; causa raiz "list-serializer como fonte de detalhe", épico #1654). Os serializers de LIST de `DATCadastro` e `DATAcao` **não incluem** os campos `data_*` (`serializers/dat_module/dat_cadastro.py`, `.../dat_acao.py`), e `get_serializer_class` só devolve o Full fora do `list` (`views/dat_module.py:750-754` e `:243-247`). O modal é populado a partir do registro da LIST (`CadastrosPage.tsx:195-208`, `AcoesPage.tsx:210-220`), então as datas chegam `undefined` — e o `handleSave` envia **`null` explícito** para cada uma (`CadastrosPage.tsx:212-221`, `AcoesPage.tsx:224-230`). É PATCH (`api/datModule.ts:290-293`, `:172-175`), mas com `null` explícito o backend grava NULL. Resultado: uma edição de status zera as 7 datas do cadastro / 4 datas da ação.
-- **O card "Importar CADASTROS DAT" alimenta o model legacy** (`M17-01`, issue #1640). `POST /api/dat/import-cadastros/` (`urls.py:225-228`, view em `views_imports.py:148`) chama `services/dat_cadastros_import.py`, que grava `AcaoDAT` (`:303,329` → tabela `core_acao_dat`), **não** `DATCadastro`. Quem lê `AcaoDAT` é apenas `GET /api/dat/acoes/` (`views_controle_dat.py:100-144`), exposto no front por `api/ops.ts:388` — função sem nenhuma página consumidora. A tela operacional "Cadastros" usa `/dat/cadastros/` (`DATCadastro`). Ou seja: o import não alimenta a tela que o operador espera.
-- **Dois `DATAcao`/`AcaoDAT` coexistentes:** operacional (`core_dat_acao`, `dat/acoes-ciclo/`) vs legacy (`core_acao_dat`, `dat/acoes/`). Não confundir ao escrever queries/migrações; ver memória "Legacy vs Operational models". Docstrings dos ViewSets ainda citam as rotas antigas `/api/dat/acoes/` e `/api/dat/compras/` (`views/dat_module.py:9-10,219-225,353-358`) — as reais são `acoes-ciclo/` e `compras-materiais/`.
+  - *FORMAR* — `handleSave` (`v2/frontend/src/pages/DATModule/DATRegistrosPage.tsx`) formata **apenas** `reuniao_dat`; `chaves_inscricao_data`, `instrucoes_data` e `envio_codigos_data` são `DatePicker` que caem no spread `...values` como objeto Dayjs e viram datetime ISO completo no JSON. O `DateField` do DRF (`models/dat_registro.py`) só aceita `YYYY-MM-DD` → **400**.
+  - *AVALIAR* — o form usa os nomes **no singular** `alunos_recebidos_data`, `alunos_validados_data`, `alunos_importados_data`, enquanto model e serializer têm `alunos_recebidos_datas` / `alunos_validados_datas` / `alunos_importados_datas` (`JSONField` de lista, `models/dat_registro.py`). Chave desconhecida → DRF **descarta em silêncio**, sem erro e sem gravar.
+  - O serializer **não** é a causa: os 7 campos estão declarados corretamente em `serializers/dat_registro.py` (`DATRegistroListSerializer`, `DATRegistroCreateSerializer`, `DATRegistroUpdateSerializer`).
+- **Choices de status divergem entre UI e backend** (`M16-08`, issue #1639). Backend: `STATUS_CHOICES` tem 5 valores (`concluido, pendente, em_andamento, nao_aplicavel, erro` — `models/dat_registro.py`) e `TURMA_STATUS_CHOICES` tem 3 (`criada, pendente, erro`). Frontend: `STATUS_OPTIONS` oferece 3 (`pendente, em_andamento, concluido` — `DATRegistros/constants.tsx`). Consequências: (a) `nao_aplicavel` e `erro` aparecem na legenda mas não são selecionáveis; (b) o campo `turma_formar_status` usa `STATUS_OPTIONS` (`DATRegistrosPage.tsx`) em vez das choices de turma — escolher "Em Andamento"/"Concluído" viola os choices do model e retorna **400**.
+- **Editar pelo modal apaga as datas** (`M17-02`, issue #1641; causa raiz "list-serializer como fonte de detalhe", épico #1654). Os serializers de LIST de `DATCadastro` e `DATAcao` **não incluem** os campos `data_*` (`serializers/dat_module/dat_cadastro.py`, `.../dat_acao.py`), e `get_serializer_class` só devolve o Full fora do `list` (`DATCadastroViewSet.get_serializer_class` e `DATAcaoViewSet.get_serializer_class` em `views/dat_module.py`). O modal é populado a partir do registro da LIST (`handleEdit` em `CadastrosPage.tsx`/`AcoesPage.tsx`), então as datas chegam `undefined` — e o `handleSave` envia **`null` explícito** para cada uma (`CadastrosPage.tsx`, `AcoesPage.tsx`). É PATCH (`updateCadastro`/`updateAcao` em `api/datModule.ts`), mas com `null` explícito o backend grava NULL. Resultado: uma edição de status zera as 7 datas do cadastro / 4 datas da ação.
+- **O card "Importar CADASTROS DAT" alimenta o model legacy** (`M17-01`, issue #1640). `POST /api/dat/import-cadastros/` (`urls.py`, view `DATImportCadastrosView` em `views_imports.py`) chama `services/dat_cadastros_import.py`, que grava `AcaoDAT` (em `_process_row` → tabela `core_acao_dat`), **não** `DATCadastro`. Quem lê `AcaoDAT` é apenas `GET /api/dat/acoes/` (`DATAcoesListCreateView` em `views_controle_dat.py`), exposto no front por `api/ops.ts` — função sem nenhuma página consumidora. A tela operacional "Cadastros" usa `/dat/cadastros/` (`DATCadastro`). Ou seja: o import não alimenta a tela que o operador espera.
+- **Dois `DATAcao`/`AcaoDAT` coexistentes:** operacional (`core_dat_acao`, `dat/acoes-ciclo/`) vs legacy (`core_acao_dat`, `dat/acoes/`). Não confundir ao escrever queries/migrações; ver memória "Legacy vs Operational models". Docstrings dos ViewSets ainda citam as rotas antigas `/api/dat/acoes/` e `/api/dat/compras/` (docstring do módulo e das classes `DATAcaoViewSet`/`DATCompraViewSet` em `views/dat_module.py`) — as reais são `acoes-ciclo/` e `compras-materiais/`.
 - **`DATCoordenador.area` é `CharField` livre**, não FK para `DATArea` (a tabela de referência existe mas não é amarrada). Divergência de grafia silenciosa é possível.
 - **REGIAO_UFS duplicado:** o mapa em [`views/dat.py`](../../../backend/apps/core/views/dat.py) deve casar com `REGIAO_UFS` do frontend (`DATModule/DATRegistros/constants.tsx`); divergência quebra o filtro `regiao`.
 - **Doc detalhado arquivado:** `SPEC_DAT_REGISTROS.md` está em `v2/docs/_archive/` (não atualizado com o estado atual); esta spec passa a ser o índice canônico do módulo, mas o detalhe de Registros ainda referencia o arquivo arquivado.

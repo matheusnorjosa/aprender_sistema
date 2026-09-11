@@ -83,6 +83,23 @@ jobs:
       - name: Frontmatter das specs SDD
         run: python scripts/check_doc_frontmatter.py
 
+      # Ancora de codigo em spec e por SIMBOLO, nao por `arquivo.py:NNN`. O
+      # doc-drift-auditor (PR #1998) achou, na 1a rodada real, ancoras obsoletas no
+      # imports.spec.md: o importer cresceu ~500->1900 linhas e a spec mandava o
+      # leitor para a linha errada -- quem clica cai em codigo nao relacionado.
+      # Medido em 2026-09-11: 212 ancoras-de-linha em 17 specs, contra ~575
+      # referencias a nivel de arquivo/simbolo (~92%). A ancora-com-linha e a
+      # minoria de ~8% que drifta a cada commit que mexe no arquivo.
+      #
+      # CALIBRAGEM: BLOQUEIA. Preciso (regex de `arquivo.ext:NNN`), com a divida
+      # existente VARRIDA no mesmo PR (limpar primeiro, trancar depois) e
+      # conserta-se DENTRO do PR -- troca-se a ancora pelo nome do simbolo, estavel
+      # a movimento de codigo. Excecao deliberada entra no allowlist COM MOTIVO,
+      # mesmo contrato do `adr-numeros-allowlist.txt`.
+      - name: Ancoras de linha em specs (use simbolo, nao linha)
+        if: ${{ !cancelled() }}
+        run: python v2/backend/scripts/check_doc_line_anchors.py
+
       # A camada de instrucao de agente (.claude/, .agents/) passou a ser
       # versionada em 2026-08-25 (D3). Num repo publico isso cria risco de
       # caminho de maquina e credencial entrarem por descuido. Este gate impede

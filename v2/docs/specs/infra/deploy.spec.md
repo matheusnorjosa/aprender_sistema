@@ -148,8 +148,9 @@ VM03 dedicada só se **HA** virar requisito.
 **Docs de topologia reconciliados (Fase 2 concluída):** `v2/infra/ENVIRONMENTS.md`, `v2/infra/README.md` e
 `.claude/CLAUDE.md` (tabela prod) descrevem o Redis como **container interno na VM01** (serviço `redis`),
 alinhados ao compose — não mais como "VM03_Red" dedicada.
-Vestigiais (não montados pelo container, que usa `--requirepass` inline): `v2/infra/configs/vm03/redis.conf`,
-`v2/infra/redis/redis.conf`. **VM03 provavelmente está ociosa** (nota de inventário/custo).
+Vestigial restante (não montado; o container usa `--requirepass` inline): `v2/infra/redis/redis.conf`.
+O script `setup_vm03.sh` + a config `configs/vm03/redis.conf` da topologia VM03 morta foram **removidos**
+(auditoria de guias, Fase 2b). **VM03 provavelmente está ociosa** (nota de inventário/custo).
 
 ## Variáveis de ambiente em produção (stack.env)
 

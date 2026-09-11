@@ -52,7 +52,7 @@ Registrado explicitamente porque outros runbooks já assumiram o contrário:
 | **Uptime/synthetic monitoring** | ❌ não configurado no repositório | "Disponibilidade" não é medida; os SLOs são alvos |
 
 A única métrica customizada do projeto é **`as_db_transaction_retries_total`**
-(`apps/core/services/db_retry.py:64`). Todo o resto em `/metrics` vem do `django-prometheus`
+(`apps/core/services/db_retry.py`). Todo o resto em `/metrics` vem do `django-prometheus`
 (prefixo `django_*`) — confira os nomes reais em `/metrics` antes de escrever query.
 
 ## Versões da stack (DEV-only)

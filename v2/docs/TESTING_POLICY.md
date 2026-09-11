@@ -96,7 +96,7 @@ que **não existe** — nem o arquivo, nem o diretório `apps/core/data/`.)*
 4. **Fixtures idempotentes**: usar `get_or_create()` para evitar cross-poluição
 5. **Security-first**: validar permissões antes de parâmetros (403 → 400 → 200)
 6. **xdist-safe** (ADR-015): a suite roda em paralelo
-   (`v2/backend/pytest.ini:14` — `django_db_suffix = _{worker_id}`). Portanto:
+   (`v2/backend/pytest.ini` — `django_db_suffix = _{worker_id}`). Portanto:
    sufixar CPFs/usernames com UUID, **nunca** usar `AuditLog.objects.all().delete()`, e
    contar sempre com queryset filtrado — nunca `.count()` global.
 
@@ -104,8 +104,8 @@ que **não existe** — nem o arquivo, nem o diretório `apps/core/data/`.)*
 
 | Lado | Threshold configurado | Enforçado no CI? |
 |---|---|---|
-| Backend | **85%** — `v2/backend/pytest.ini:40` (`fail_under = 85`) | ✅ sim — `.github/workflows/ci.yaml:353` (`coverage report --fail-under=85`) |
-| Frontend | **70%** (statements/branches/functions/lines) — `v2/frontend/vitest.config.ts:44-49` | ❌ **não** — `.github/workflows/frontend-ci.yml:66` roda `npm run test` (= `vitest`), não `test:coverage` |
+| Backend | **85%** — `v2/backend/pytest.ini` (`fail_under = 85`) | ✅ sim — `.github/workflows/ci.yaml` (`coverage report --fail-under=85`) |
+| Frontend | **70%** (statements/branches/functions/lines) — `coverage.thresholds` em `v2/frontend/vitest.config.ts` | ❌ **não** — `.github/workflows/frontend-ci.yml` roda `npm run test` (= `vitest`), não `test:coverage` |
 
 Política e histórico do gate de 85%: [analysis/COVERAGE_POLICY.md](./analysis/COVERAGE_POLICY.md).
 O alvo de 90% (Fase 2) segue como meta, não como gate.

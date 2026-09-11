@@ -67,7 +67,7 @@ Rótulos, como na `REFERENCIA-DOMINIO.md`: **MEDIDO** (contado no código/banco,
   `EquipeGerencia.vigentes_em()` (`models/organizacao.py`, é o SSOT de vigência, RD-06).
 
 **MEDIDO:** `EquipeGerencia.PAPEL_CHOICES` = `GERENTE, COORDENADOR, APOIO, FORMADOR`
-(`models/organizacao.py:247-252`). Escopo de autorização deve sair do **vínculo**
+(`models/organizacao.py`). Escopo de autorização deve sair do **vínculo**
 (`EquipeGerencia` + setor canônico), não do **grupo** — grupo serve para *capability*,
 vínculo serve para *escopo*.
 
@@ -133,8 +133,8 @@ Registro durável da verificação adversarial de 2026-08-26 (11 afirmações de
 
 | item | verdade que sobra | o que a auditoria errou |
 |---|---|---|
-| **`DATCoordenador`** | cadastro paralelo: 12 campos de conteúdo, **sem FK de identidade** para `Usuario`. Refatorar p/ `(usuario_fk, area)` resolvendo por CPF (épico #1833) | "o importer preenche todos" — **falso**; grava 4 (`export_contract_importer.py:838-844`) |
-| `AcaoDAT` | endpoint `/dat/acoes/` é candidato a deprecação (nenhuma tela React lê) | comentário "LEGACY" está **certo**; o model **é escrito** pelo import (`dat_cadastros_import.py:337`); são 2 serializers, não 1 |
+| **`DATCoordenador`** | cadastro paralelo: 12 campos de conteúdo, **sem FK de identidade** para `Usuario`. Refatorar p/ `(usuario_fk, area)` resolvendo por CPF (épico #1833) | "o importer preenche todos" — **falso**; grava 4 (`_apply_dat_coordenador` em `export_contract_importer.py`) |
+| `AcaoDAT` | endpoint `/dat/acoes/` é candidato a deprecação (nenhuma tela React lê) | comentário "LEGACY" está **certo**; o model **é escrito** pelo import (`_process_row` em `dat_cadastros_import.py`); são 2 serializers, não 1 |
 | `DATCompra` | só `valor_unitario`/`qtd_utilizada` são digitação manual | `quantidade` **é importada e load-bearing** no cálculo de códigos. Manter |
 | `DATFormacao` | só "sem importador em lote" | 29 campos (não 24); CRUD vivo; domínio distinto. Manter |
 | pares status/data (`dat_registro.py`) | **manter os 7** | conflacionou `DATRegistro` (emite 7) com `DATCadastro` (4 colunas) |
@@ -143,11 +143,11 @@ Registro durável da verificação adversarial de 2026-08-26 (11 afirmações de
 
 | afirmação | por que caiu (evidência) |
 |---|---|
-| "~20 classes RBAC mortas" | **load-bearing.** `test_rbac_policies.py:119 test_every_matrix_key_has_policy_class` obriga uma classe `Can*` por key de `ACCESS_POLICIES`; `GET /api/me/policies/` (`views/me.py:11-12`, `urls.py:165`) é **contrato público do frontend**. Apagar quebra o teste **e** o contrato |
+| "~20 classes RBAC mortas" | **load-bearing.** `test_every_matrix_key_has_policy_class` (`test_rbac_policies.py`) obriga uma classe `Can*` por key de `ACCESS_POLICIES`; `GET /api/me/policies/` (`MePoliciesView` em `views/me.py`, rota `me-policies` em `urls.py`) é **contrato público do frontend**. Apagar quebra o teste **e** o contrato |
 | "`RegistroConclusaoAcao`/`RegistroAncora` mortos" | **vivos** — persistência de dois endpoints; a view chama o **método** do model (`.registrar_ancora()`, `.concluir()`), não o nome da classe |
 | "`Colecao` nunca exposto" | **vivo** — `POST /api/colecoes/import/` + FK `Produto.colecao` + dashboard DAT |
-| "`FeriadoLocal` nunca usado" | **vivo** — query em runtime (`business_calendar_service.py:97`), admin, Celery de notificações |
-| "varrer os 6 scripts atrás de de-para hardcoded antes de apagar" | **não há** `SETOR_DO_PROJETO`; o único alias (`IDEB`→Gestão Escolar) já vive em `resolvers.py:314-319`. Os 6 scripts são **seguros de remover** |
+| "`FeriadoLocal` nunca usado" | **vivo** — query em runtime (`get_holidays` em `business_calendar_service.py`), admin, Celery de notificações |
+| "varrer os 6 scripts atrás de de-para hardcoded antes de apagar" | **não há** `SETOR_DO_PROJETO`; o único alias (`IDEB`→Gestão Escolar) já vive em `normalize_projeto_name` (`resolvers.py`). Os 6 scripts são **seguros de remover** |
 
 ---
 
@@ -209,8 +209,8 @@ DAT (`view_all_availability`), não via papel.
 **duplica**?
 
 **MEDIDO — ATUALIZA, não duplica.** O `eventId` é **determinístico por Solicitação**
-(`services/gcal/validation.py:59 _event_id_for` → `{PREFIX}-{id}`), e o sync decide
-(`services/gcal/sync.py:157-161`): aprovado + evento existe (ou adota) → **UPDATE**;
+(`_event_id_for` em `services/gcal/validation.py` → `{PREFIX}-{id}`), e o sync decide
+(`upsert_one` em `services/gcal/sync.py`): aprovado + evento existe (ou adota) → **UPDATE**;
 não existe → CREATE; não-aprovado com id → DELETE.
 
 **Consequência:** a parte 3 da transferência (§4.2) é **viável com a máquina que já

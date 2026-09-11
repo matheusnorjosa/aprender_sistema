@@ -20,15 +20,15 @@
 | Pergunta | Resposta honesta |
 |---|---|
 | O backup é gerado? | O wiring existe e é *fail-closed*: task Celery no `worker` às 02:00, bind-mount `/backups`, recipient `age` fixo no compose. **Se está rodando hoje em prod, não foi verificado neste documento.** |
-| O backup é cifrado? | Sim, sempre. `backup_db.sh:44-48` **aborta** sem `BACKUP_AGE_RECIPIENT`. Produção grava só `.sql.gz.age`. |
-| `restore_db.sh` aceita `.age`? | **Sim**, desde `8f392636` (2026-08-10, #1611 / M26-01). A verificação de integridade é ciente do formato: `restore_db.sh:101-121` decifra com `age -d` e **só então** roda `gzip -t`; o `gzip -t` cru ficou no branch plaintext (`:117`). |
+| O backup é cifrado? | Sim, sempre. O guard fail-closed de `backup_db.sh` **aborta** sem `BACKUP_AGE_RECIPIENT`. Produção grava só `.sql.gz.age`. |
+| `restore_db.sh` aceita `.age`? | **Sim**, desde `8f392636` (2026-08-10, #1611 / M26-01). A verificação de integridade é ciente do formato: o Step 1 (`restore_db.sh`) decifra com `age -d` e **só então** roda `gzip -t`; o `gzip -t` cru ficou no branch plaintext do mesmo Step 1. |
 | Ele declara sucesso indevido? | **Não mais**, desde `3bca74f3` (2026-08-21, #1645 / M26-02). Ver [O que mudou](#o-que-mudou-nos-fixes-1611--1645). |
 | O backup é restaurável em produção? | **Ainda não demonstrado.** O código está correto, mas **nenhum drill real** contra um artefato `.age` de produção foi executado — issue [#1646](https://github.com/matheusnorjosa/aprender_sistema/issues/1646) (M26-03) segue **ABERTA**. Ver [Último ensaio de restore](#último-ensaio-de-restore). |
 
 ### Procedimento — use a ferramenta
 
 O `restore_db.sh` precisa da **chave privada `age`**, que por design **não fica na VM**
-(`verify_backup.sh:40-43`) — ela vive no gerenciador de senhas do mantenedor. Traga a
+(o branch `*.age` de `verify_backup.sh`) — ela vive no gerenciador de senhas do mantenedor. Traga a
 chave para o host onde o restore vai rodar, aponte `BACKUP_AGE_KEY` para ela e chame o
 script:
 
@@ -46,12 +46,12 @@ resultado. Se falhar, diz onde o estado anterior ficou preservado.
 
 | Antes (o que este doc descrevia) | Hoje | Onde |
 |---|---|---|
-| `gzip -t` incondicional abortava todo `.age` com `Backup file is corrupted!` (falso) | Branch por formato: `.age` é decifrado com `age -d` e só então testado com `gzip -t`; plaintext vai direto no `gzip -t` | `restore_db.sh:101-121` |
-| `BACKUP_DIR` hardcoded — `--latest` não achava nada de dentro do container | `BACKUP_DIR="${BACKUP_DIR:-/var/backups/aprender}"` respeita a env var | `restore_db.sh:23` |
-| Seleção de backup só olhava o glob `*.sql.gz` | Globs cobrem `*.sql.gz` **e** `*.sql.gz.age` | `restore_db.sh:42, 62, 67` |
-| `psql` sem `ON_ERROR_STOP` seguia após erro de SQL e saía 0 | `-v ON_ERROR_STOP=1` nos dois branches + `pipefail` local; exit != 0 aborta em vermelho | `restore_db.sh:162-178` |
-| DROP destrutivo sem rede de segurança | Safety dump do banco atual antes do DROP; o caminho de erro imprime onde ele ficou | `restore_db.sh:132-148, 176, 210` |
-| `Restore completed successfully!` com banco vazio | Verificação pós-restore: piso de tabelas (`RESTORE_MIN_TABLES`, default 20) **e** linhas > 0 em `core_usuario` e `core_solicitacao`; qualquer falha → exit 1 | `restore_db.sh:180-212` |
+| `gzip -t` incondicional abortava todo `.age` com `Backup file is corrupted!` (falso) | Branch por formato: `.age` é decifrado com `age -d` e só então testado com `gzip -t`; plaintext vai direto no `gzip -t` | Step 1 (`restore_db.sh`) |
+| `BACKUP_DIR` hardcoded — `--latest` não achava nada de dentro do container | `BACKUP_DIR="${BACKUP_DIR:-/var/backups/aprender}"` respeita a env var | default de `BACKUP_DIR` (`restore_db.sh`) |
+| Seleção de backup só olhava o glob `*.sql.gz` | Globs cobrem `*.sql.gz` **e** `*.sql.gz.age` | seleção de backup, `--latest` e interativa (`restore_db.sh`) |
+| `psql` sem `ON_ERROR_STOP` seguia após erro de SQL e saía 0 | `-v ON_ERROR_STOP=1` nos dois branches + `pipefail` local; exit != 0 aborta em vermelho | Step 4 (`restore_db.sh`) |
+| DROP destrutivo sem rede de segurança | Safety dump do banco atual antes do DROP; o caminho de erro imprime onde ele ficou | Step 2.5 e caminhos de erro (`restore_db.sh`) |
+| `Restore completed successfully!` com banco vazio | Verificação pós-restore: piso de tabelas (`RESTORE_MIN_TABLES`, default 20) **e** linhas > 0 em `core_usuario` e `core_solicitacao`; qualquer falha → exit 1 | Step 5 (`restore_db.sh`) |
 
 <details>
 <summary>Pipeline manual (contorno histórico — não é mais o caminho recomendado)</summary>
@@ -95,8 +95,8 @@ The AS v2 backup system provides automated PostgreSQL backups with:
 - **Daily full backups** (parâmetros acima)
 - **age encryption at rest** (SEC-017) — **obrigatória na prática**: sem
   `BACKUP_AGE_RECIPIENT` e sem `BACKUP_ALLOW_PLAINTEXT=1` o script **recusa gerar o dump**
-  (`backup_db.sh:44-48`, fail-closed). Produção define o recipient em
-  `docker-compose.prod.yml:197`.
+  (guard fail-closed de `backup_db.sh`). Produção define o recipient em
+  `docker-compose.prod.yml` (env `BACKUP_AGE_RECIPIENT` do serviço `worker`).
 - **S3/MinIO upload** (opt-in via `S3_BUCKET`) — ⚠️ **indisponível nas imagens atuais**:
   nenhum Dockerfile do projeto instala o `aws` CLI (`Dockerfile.prod:56`,
   `Dockerfile.dev:19-21`).
@@ -112,8 +112,8 @@ The AS v2 backup system provides automated PostgreSQL backups with:
 
 | Contexto | Quem dispara | Storage | Doc complementar |
 |---|---|---|---|
-| **Produção (VM01, Docker/Portainer)** | Celery Beat 2:00 AM → task no serviço **`worker`** (`config/celery.py:38-40`, `tasks_backup.py:57`) | bind-mount **`/var/backups/aprender:/backups`** no `worker` (`docker-compose.prod.yml:235`) | `DISASTER_RECOVERY.md` (cenários de recovery) |
-| **Dev/staging (Docker Compose)** | Celery Beat 2:00 AM | volume `backup_data` → `/backups` (`docker-compose.yml:16`) | `DISASTER_RECOVERY.md` |
+| **Produção (VM01, Docker/Portainer)** | Celery Beat 2:00 AM → task no serviço **`worker`** (schedule `daily-database-backup` em `config/celery.py`, task `perform_database_backup` em `tasks_backup.py`) | bind-mount **`/var/backups/aprender:/backups`** no `worker` (serviço `worker` em `docker-compose.prod.yml`) | `DISASTER_RECOVERY.md` (cenários de recovery) |
+| **Dev/staging (Docker Compose)** | Celery Beat 2:00 AM | volume `backup_data` → `/backups` (âncora `x-backend-volumes` em `docker-compose.yml`) | `DISASTER_RECOVERY.md` |
 | **VM02 (PostgreSQL nativo)** | Cron 3:00 AM (`/etc/cron.d/aprender-backup`) — **instalação não verificada** | `/var/backups/aprender` | `GUIDE_DR.md` (PITR via WAL) |
 
 Em todos os contextos o script `v2/infra/scripts/backup_db.sh` é o **mesmo**; muda a
@@ -130,27 +130,27 @@ vs `/var/backups/aprender` na VM).
 ### Components
 
 1. **Backup Script** (`v2/infra/scripts/backup_db.sh`)
-   - `pg_dump | gzip | age -r $BACKUP_AGE_RECIPIENT` (`:69-72`) — **cifrado**, não só
+   - `pg_dump | gzip | age -r $BACKUP_AGE_RECIPIENT` (bloco de cifragem) — **cifrado**, não só
      comprimido
-   - `set -euo pipefail` (`:23`): falha do `pg_dump` no meio do pipe **aborta** em vez de
+   - `set -euo pipefail`: falha do `pg_dump` no meio do pipe **aborta** em vez de
      gravar um dump truncado que se disfarça de sucesso (audit #1541)
-   - Fail-closed sem recipient (`:44-48`)
+   - Fail-closed sem recipient (guard fail-closed)
    - S3 upload (opt-in via `S3_BUCKET`; hoje sem `aws` CLI na imagem)
-   - Retention com glob que cobre `.sql.gz` **e** `.sql.gz.age` (`:103`)
+   - Retention com glob que cobre `.sql.gz` **e** `.sql.gz.age` (bloco de retenção)
    - Log em stdout (capturado pelo Docker; sem arquivo `.log` em Docker)
 
 2. **Restore Script** (`v2/infra/scripts/restore_db.sh`) — operante para `.age` e plaintext
    - Restauração interativa com confirmação explícita (`yes`)
-   - Verificação de integridade **ciente do formato** (`:101-121`): `.age` é decifrado com
+   - Verificação de integridade **ciente do formato** (Step 1): `.age` é decifrado com
      `age -d` e só então testado com `gzip -t`; plaintext vai direto no `gzip -t`
      ([#1611](https://github.com/matheusnorjosa/aprender_sistema/issues/1611), `8f392636`)
-   - `BACKUP_DIR` respeita a env var (`:23`) — `--latest` funciona de dentro do container
-   - Seleção (`--latest` e interativa) cobre `*.sql.gz` **e** `*.sql.gz.age` (`:42, 62, 67`)
-   - Safety dump do banco atual antes do DROP (`:132-148`); em caso de falha o caminho de
-     erro imprime onde ele ficou (`:176, 210`)
-   - `psql -v ON_ERROR_STOP=1` + `pipefail` local nos dois branches (`:162-178`) — erro de
+   - `BACKUP_DIR` respeita a env var — `--latest` funciona de dentro do container
+   - Seleção (`--latest` e interativa) cobre `*.sql.gz` **e** `*.sql.gz.age`
+   - Safety dump do banco atual antes do DROP (Step 2.5); em caso de falha o caminho de
+     erro imprime onde ele ficou
+   - `psql -v ON_ERROR_STOP=1` + `pipefail` local nos dois branches (Step 4) — erro de
      SQL, decifragem ou descompressão aborta em vermelho
-   - Verificação pós-restore (`:180-212`): piso de tabelas (`RESTORE_MIN_TABLES`, default
+   - Verificação pós-restore (Step 5): piso de tabelas (`RESTORE_MIN_TABLES`, default
      20) **e** linhas > 0 em `core_usuario`/`core_solicitacao`
      ([#1645](https://github.com/matheusnorjosa/aprender_sistema/issues/1645), `3bca74f3`)
    - Cobertura: **`v2/infra/scripts/tests/restore_db.bats`** — 7 casos (`.age` válido,
@@ -158,9 +158,9 @@ vs `/var/backups/aprender` na VM).
      `--latest` respeitando `BACKUP_DIR`, diretório só com `.age`, erro no meio do restore
      e tabela-chave vazia). Criado em `8f392636` e ampliado em `3bca74f3` — **os mesmos
      commits** que fecharam #1611 e #1645. Roda no CI em
-     `.github/workflows/staging-gate-bats.yml:52-54` (`bats tests/` a partir de
+     `.github/workflows/staging-gate-bats.yml` (step `bats tests/` do job `bats`, a partir de
      `v2/infra/scripts`), disparado por mudança em `restore_db.sh` ou em `tests/**`
-     (`:18-19, 28-29`); **não é `[required]`** no ruleset da main (`:7-8`)
+     (filtros de `paths` do workflow); **não é `[required]`** no ruleset da main (nota no cabeçalho do workflow)
    - O que a suíte **não** cobre: os stubs substituem `age` e `psql` no `PATH`, então ela
      valida o **fluxo de controle**, não um round-trip real. O drill com artefato `.age` e
      chave de verdade continua sendo
@@ -231,7 +231,7 @@ SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
 
 ### Docker Volumes
 
-**Dev/staging** (`v2/infra/docker-compose.yml:16-17`) — volume nomeado, montado nos
+**Dev/staging** (âncora `x-backend-volumes` em `v2/infra/docker-compose.yml`) — volume nomeado, montado nos
 serviços que compartilham o bloco comum:
 
 ```yaml
@@ -242,7 +242,7 @@ volumes:
   backup_data:
 ```
 
-**Produção** (`v2/infra/docker-compose.prod.yml:235`) — bind-mount do host, **só no
+**Produção** (bind-mount `/backups` do serviço `worker` em `v2/infra/docker-compose.prod.yml`) — bind-mount do host, **só no
 `worker`**, porque o root filesystem dos containers é `read_only`:
 
 ```yaml
@@ -258,12 +258,12 @@ Sem esse mount, o job falha em silêncio — foi a causa raiz do
 
 ### S3/MinIO Setup (opt-in, hoje não funcional)
 
-`backup_db.sh:87-89` só tenta o upload se a env var **`S3_BUCKET`** estiver preenchida (a
+O bloco de upload S3 de `backup_db.sh` só tenta o upload se a env var **`S3_BUCKET`** estiver preenchida (a
 task Celery mapeia a setting Django `BACKUP_S3_BUCKET` → `S3_BUCKET` em
-`tasks_backup.py:78`). **Mas nenhuma imagem do projeto instala o `aws` CLI** — conferido em
+`tasks_backup.py`, na task `perform_database_backup`). **Mas nenhuma imagem do projeto instala o `aws` CLI** — conferido em
 `Dockerfile.prod:56` e `Dockerfile.dev:19-21`. Com `S3_BUCKET` preenchido hoje, o upload
 falha e o script emite `WARNING: S3 upload FAILED (offsite copy missing)` no stderr
-(`backup_db.sh:90-94`) sem abortar o backup local.
+(o aviso de falha de S3 em `backup_db.sh`) sem abortar o backup local.
 
 Para habilitar de verdade seria preciso, além do abaixo, **adicionar o `aws` CLI à imagem**:
 
@@ -295,10 +295,10 @@ docker compose exec -T worker ls -lh /backups/
 ```
 
 > O script **não aceita argumentos**: `backup_db.sh` nunca lê `$1`. O `full` que a task
-> Celery passa (`tasks_backup.py:85`) é inerte — o dump é sempre completo.
+> Celery passa (task `perform_database_backup` em `tasks_backup.py`) é inerte — o dump é sempre completo.
 > Em dev, sem `BACKUP_AGE_RECIPIENT`, o script **aborta** (fail-closed); para um dump em
 > texto claro local, use `BACKUP_ALLOW_PLAINTEXT=1` explicitamente
-> (`backup_db.sh:43-48`).
+> (guard fail-closed de `backup_db.sh`).
 
 ### Restore
 
@@ -319,11 +319,11 @@ docker compose exec -T worker sh -c \
 ```
 
 Exit 0 do script já significa "tabelas restauradas **e** tabelas-chave não vazias"
-(`restore_db.sh:180-212`) — a conferência manual que este documento exigia virou parte do
+(Step 5 de `restore_db.sh`) — a conferência manual que este documento exigia virou parte do
 script. O que continua **não** provado é o caminho completo em produção: #1646.
 
 **Pré-requisitos**:
-- Chave privada `age` — **não fica na VM por design** (`verify_backup.sh:40-43`); está no
+- Chave privada `age` — **não fica na VM por design** (o branch `*.age` de `verify_backup.sh`); está no
   gerenciador de senhas do mantenedor. Copie para `/etc/backup-key.txt` com `chmod 600` e
   **apague ao final**.
 - Binário `age` — presente na imagem de **produção** (`Dockerfile.prod:56`),
@@ -345,7 +345,7 @@ script *dentro* do `worker`. Escolha um dos dois veículos:
 > **Na VM02, use o pipeline manual com peer auth** (`sudo -u postgres`), documentado em
 > [GUIDE_DR.md](./GUIDE_DR.md). As invocações abaixo servem para **dev/staging**.
 >
-> `M26-N1` (P1, confirmado) — `v2/docs/audits/2026-07-17-system-module-audit.md:9438`.
+> `M26-N1` (P1, confirmado) — auditoria de módulos M26 (`v2/docs/audits/2026-07-17-system-module-audit.md`).
 
 - **Do host da VM** — precisa de `age` e `postgresql-client` instalados lá; o dump está em
   `/var/backups/aprender`. É o caminho descrito em
@@ -353,7 +353,7 @@ script *dentro* do `worker`. Escolha um dos dois veículos:
 - **Container efêmero** da mesma imagem de backend (tem `age`, `psql` e o próprio script
   em `/app/infra/scripts/`), com os serviços da stack parados. Monte `/backups` como
   leitura-e-escrita: é lá que o script grava o safety dump do banco atual
-  (`restore_db.sh:135`).
+  (Step 2.5 — safety dump — de `restore_db.sh`).
   ```bash
   docker run --rm -i \
     -v /var/backups/aprender:/backups \
@@ -401,9 +401,9 @@ Configured in `v2/backend/config/celery.py`:
 
 ### Verify Schedule
 
-A SSOT do schedule é `v2/backend/config/celery.py:35-56` (`daily-database-backup` às 02:00,
+A SSOT do schedule é o `CELERY_BEAT_SCHEDULE` de `v2/backend/config/celery.py` (`daily-database-backup` às 02:00,
 `weekly-backup-health-check` domingos 03:00). Em produção o beat roda com o **scheduler
-padrão** (`docker-compose.prod.yml:243`:
+padrão** (o `command` do serviço `beat` em `docker-compose.prod.yml`:
 `celery -A config beat -l info --schedule /tmp/celerybeat-schedule`), que é quem lê esse
 schedule do código — e **não** o `DatabaseScheduler` do `django_celery_beat`.
 
@@ -434,7 +434,7 @@ Results are logged and sent to Sentry **se `SENTRY_DSN` estiver configurado** �
 era o caso em produção na última verificação.
 
 > ⚠️ **O que esses checks NÃO provam.** Nem esta task nem o `verify_backup.sh` abrem um
-> artefato `.age`: `verify_backup.sh:44-48` pula explicitamente a checagem de conteúdo
+> artefato `.age`: o branch `*.age` de `verify_backup.sh` pula explicitamente a checagem de conteúdo
 > porque a chave privada não vive na VM. O mesmo vale para o gate de deploy
 > `v2/infra/deployer/hooks/check_backup.sh`, que só faz `stat` (idade ≤ 28h, tamanho ≥
 > 1024B). Ou seja: **"health check verde" significa "existe, é recente e não é minúsculo"**,
@@ -483,12 +483,12 @@ Failures are sent to Sentry when `SENTRY_DSN` is configured:
 
 | Issue | Cause | Solution |
 |-------|-------|----------|
-| `ERROR: BACKUP_AGE_RECIPIENT ausente...` | Recipient sumiu do environment do `worker` | Fail-closed proposital (`backup_db.sh:44-48`). Repor o valor em `docker-compose.prod.yml:197` **e** no Portainer. Em dev, `BACKUP_ALLOW_PLAINTEXT=1` |
+| `ERROR: BACKUP_AGE_RECIPIENT ausente...` | Recipient sumiu do environment do `worker` | Fail-closed proposital (guard fail-closed de `backup_db.sh`). Repor o valor em `docker-compose.prod.yml` (env `BACKUP_AGE_RECIPIENT` do `worker`) **e** no Portainer. Em dev, `BACKUP_ALLOW_PLAINTEXT=1` |
 | `pg_dump: connection failed` | Banco inalcançável | Conferir `DB_HOST`/`DB_PORT`. **Em produção não existe serviço `db`** — o PostgreSQL é externo (VM02) |
 | `Permission denied: /backups` | Bind-mount ausente ou dono errado | Criar `/var/backups/aprender` no host (0755, dono = UID do `appuser`); o root FS do container é `read_only`, só o mount é gravável |
-| Nada em `/backups` e nenhum erro | `docker compose exec` no serviço errado | O `/backups` só existe no **`worker`** (`docker-compose.prod.yml:235`) |
-| `S3 upload FAILED (offsite copy missing)` | `aws` CLI **não existe na imagem** | Ver [S3/MinIO Setup](#s3minio-setup-opt-in-hoje-não-funcional). O backup **local** segue válido — o script não re-roda o `pg_dump` (`backup_db.sh:90-94`) |
-| `Backup timed out` | Banco grande (>1h) | Aumentar o `timeout` de `subprocess.run` em `tasks_backup.py:90` |
+| Nada em `/backups` e nenhum erro | `docker compose exec` no serviço errado | O `/backups` só existe no **`worker`** (bind-mount do serviço `worker` em `docker-compose.prod.yml`) |
+| `S3 upload FAILED (offsite copy missing)` | `aws` CLI **não existe na imagem** | Ver [S3/MinIO Setup](#s3minio-setup-opt-in-hoje-não-funcional). O backup **local** segue válido — o script não re-roda o `pg_dump` (bloco de upload S3 de `backup_db.sh`) |
+| `Backup timed out` | Banco grande (>1h) | Aumentar o `timeout` de `subprocess.run` em `tasks_backup.py` (task `perform_database_backup`) |
 
 ## Disaster Recovery
 
@@ -597,7 +597,7 @@ Roteiro do ensaio:
 Cobertura de teste automatizado do `restore_db.sh`: **existe** —
 `v2/infra/scripts/tests/restore_db.bats`, 7 casos, criado em `8f392636` e ampliado em
 `3bca74f3` (os mesmos commits dos fixes), executado no CI por
-`.github/workflows/staging-gate-bats.yml:52-54`. Ela é **hermética**: stuba `age` e `psql`
+`.github/workflows/staging-gate-bats.yml` (step `bats tests/`). Ela é **hermética**: stuba `age` e `psql`
 no `PATH` e afirma o fluxo de controle do script.
 
 Isso **não** substitui o drill. O que continua aberto é `M26-03` /
@@ -649,8 +649,8 @@ backup_failure_total = Counter('backup_failure_total', 'Failed backups')
 ### Data Encryption
 
 - **Backup files**: **cifrados com `age`** (SEC-017). O dump é
-  `pg_dump | gzip | age -r $BACKUP_AGE_RECIPIENT` (`backup_db.sh:69-72`). O recipient é a
-  chave **pública** (só cifra) e está fixo em `docker-compose.prod.yml:197`; a chave
+  `pg_dump | gzip | age -r $BACKUP_AGE_RECIPIENT` (bloco de cifragem de `backup_db.sh`). O recipient é a
+  chave **pública** (só cifra) e está fixo em `docker-compose.prod.yml` (env `BACKUP_AGE_RECIPIENT` do `worker`); a chave
   **privada** nunca entra no repositório nem na VM — fica no gerenciador de senhas do
   mantenedor.
 - **Consequência operacional**: quem tem acesso ao disco de backup **não** consegue ler PII;
@@ -682,7 +682,7 @@ aws s3api put-bucket-encryption \
 
 Default: 7 days (configurable via `BACKUP_RETENTION_DAYS`)
 
-**Policy logic** — literal de `backup_db.sh:103`:
+**Policy logic** — literal do bloco de retenção de `backup_db.sh`:
 ```bash
 find "$BACKUP_DIR" \
   \( -name "backup_full_*.sql.gz" -o -name "backup_full_*.sql.gz.age" \) \
@@ -821,9 +821,9 @@ docker compose exec -T worker env | grep AWS
 
 Esse era o sintoma do **#1611**, corrigido em `8f392636` (2026-08-10): o script rodava
 `gzip -t` no `.age` sem decifrar. **Hoje essa mensagem só sai no branch plaintext**
-(`restore_db.sh:117`) — num `.sql.gz` de verdade corrompido. Para um `.age` inválido a
+(branch plaintext do Step 1 de `restore_db.sh`) — num `.sql.gz` de verdade corrompido. Para um `.age` inválido a
 mensagem é outra: `ERROR: backup cifrado invalido (falha ao decifrar ou gzip corrompido)!`
-(`:113`).
+(branch `.age` do Step 1).
 
 **Diagnosis**:
 ```bash
@@ -895,8 +895,8 @@ See: [PostgreSQL WAL Archiving](https://www.postgresql.org/docs/current/continuo
 
 > **Nota de realidade (2026-07-24):** o wiring que faltava no #1455 **existe hoje no
 > compose** — bind-mount gravável `/var/backups/aprender:/backups` no `worker`
-> (`docker-compose.prod.yml:227-235`), recipient `age` fixo (`:197`), script fail-closed
-> (`backup_db.sh:44-48`) e gate de frescor no deploy (`deployer/hooks/check_backup.sh`).
+> (bind-mount `/backups` do serviço `worker` em `docker-compose.prod.yml`), recipient `age` fixo (env `BACKUP_AGE_RECIPIENT` do `worker`), script fail-closed
+> (guard fail-closed de `backup_db.sh`) e gate de frescor no deploy (`deployer/hooks/check_backup.sh`).
 > **O que continua NÃO verificado** é se o beat/worker estão de fato produzindo dumps em
 > produção hoje, e se algum deles já foi restaurado com sucesso. Trate o 3-2-1 abaixo como
 > **alvo**, não como estado.
@@ -972,10 +972,10 @@ Em ordem de risco.
 
 - ~~**Corrigir `restore_db.sh` (#1611)**~~ — **feito** em `8f392636`, 2026-08-10: Step 1
   ciente do formato `.age`, `pipefail` local nos pipes do `age`, `BACKUP_DIR` respeitando
-  a env var (`:23`), e falha cedo se `age` não estiver no PATH (`:103-110`).
+  a env var, e falha cedo se `age` não estiver no PATH (Step 1).
 - ~~**`ON_ERROR_STOP=1` + verificação real de sucesso (#1645)**~~ — **feito** em
   `3bca74f3`, 2026-08-21: `ON_ERROR_STOP=1` nos dois branches, safety dump pré-DROP e
-  verificação pós-restore de tabelas + linhas (`:180-212`).
+  verificação pós-restore de tabelas + linhas (Step 5).
 
 **Abertos:**
 

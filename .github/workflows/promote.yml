@@ -7,8 +7,8 @@ name: Promote (assina o ponteiro de release)
 # workflow em refs/heads/main) e publica no branch protegido `deploy-pointer`.
 # O agente aprender-deployer (v2/infra/deployer) le e verifica esse ponteiro.
 #
-# NAO faz deploy. Na Fase 2 (dual-write) o deploy de prod segue pelo push-PUT
-# legado do deploy.yaml; o push-PUT so e removido no cutover (Fase 3).
+# NAO faz deploy. O push-PUT legado do deploy.yaml foi REMOVIDO no #1516 (Fase 4,
+# ADR-018): a promocao de prod hoje e SO por este ponteiro assinado (pull-based).
 
 on:
   workflow_dispatch:

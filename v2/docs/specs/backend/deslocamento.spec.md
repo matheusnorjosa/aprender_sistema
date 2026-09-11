@@ -1,7 +1,8 @@
 ---
 title: Deslocamento
 status: canonical
-last_verified: 2026-08-25
+last_verified: 2026-09-11
+verified_at_commit: 0dd1dcb630fdc1cf9b2b488121553e89488dde3c
 sources_of_truth:
   - v2/backend/apps/core/models/workflow.py
   - v2/backend/apps/core/migrations/0016_create_deslocamento.py
@@ -116,7 +117,7 @@ Schema detalhado/exemplos: ver `API_REFERENCE` quando disponivel.
 ## Pontos de atencao / dividas conhecidas
 
 - **Contrato FE↔BE quebrado no create** (`M09-05`, issue #1621): ver §Contratos. A decisao pendente e de produto — ou o backend passa a aceitar auto-registro de Coordenador, ou a UI para de exigir "Formador" e passa a permitir o proprio usuario. Nao "consertar" so um lado.
-- **Filtros Origem/Destino inutilizaveis na UI** (`M09-06`, issue #1622, épico #1668): o defeito e de frontend e o mecanismo e o early-return `if (loading) return <div>Carregando...</div>` em `DeslocamentosPage.tsx`. Cada tecla -> `handleFilterChange` -> `filters` muda -> `loadDeslocamentos` recriado (`useCallback([filters])`) -> `setLoading(true)` -> **a arvore inteira, filtros inclusive, desmonta**. Os `<Input>` sao nao-controlados, entao remontam vazios e sem foco. Nao ha debounce: 1 request por tecla. (Nao e "componente redefinido no render".)
+- **Filtros Origem/Destino inutilizaveis na UI** (`M09-06`, issue #1622, épico #1668) — **RESOLVIDO (#1622)** (PRs #1731/#1737/#1753). O defeito era de frontend: o early-return `if (loading) return <div>Carregando...</div>` em `DeslocamentosPage` remontava a arvore inteira (filtros inclusive) a cada tecla, os `<Input>` eram nao-controlados (voltavam vazios e sem foco) e nao havia debounce (1 request por tecla). Hoje os inputs sao **controlados** (`value={filters.origem ?? ''}` / `value={filters.destino ?? ''}`), o fetch tem **debounce de 350 ms**, o loading foi separado em `pageLoading` (pagina, cobre so a carga inicial no early-return) e `tableLoading` (so a tabela), e as respostas obsoletas sao descartadas por `seqRef` (latest-wins) + `AbortController`.
 - **Paginacao**: o backend respeita `?page_size` (`views_deslocamento.py`, `DeslocamentoPagination`); a `DeslocamentosPage` fixa `pageSize: 50` e nunca envia o parametro, sem `showSizeChanger`. O achado `M18-06` (épico #1653) e de frontend neste modulo.
 - **GAP de documentacao (resolvido)**: este modulo nao tinha spec/doc canonico ate 2026-06-19. Confirmar dono de produto da regra de negocio de viagem.
 - **RD-04 vs Deslocamento**: facil confundir. RD-04 (buffer entre municipios) le municipios de *eventos*, **nao** o modelo `Deslocamento`. Nao assumir que cadastrar um deslocamento gera buffer no motor de conflitos — hoje **nao gera**. Avaliar se essa desconexao e intencional ou divida.

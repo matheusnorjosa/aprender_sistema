@@ -1,7 +1,8 @@
 ---
 title: RBAC — Controle de Acesso
 status: canonical
-last_verified: 2026-08-26
+last_verified: 2026-09-11
+verified_at_commit: 0dd1dcb630fdc1cf9b2b488121553e89488dde3c
 sources_of_truth:
   - v2/backend/apps/core/rbac/__init__.py
   - v2/backend/apps/core/rbac/permissions.py
@@ -56,9 +57,9 @@ related:
 >
 > **Ainda abertos e reconfirmados vivos** (ver a tabela de `ACHADOS_REAIS.md` para severidade e issue):
 > escopo ator×alvo ausente em vários writers (épico #1656, inclui `M10-01` solicitações cross-gerência,
-> `M07-02` takeover de conta aprovadora pelo DAT e `M14-01` `HasSectorAccess`); e cache de revogação
-> (`M05-03`, épico #1667). As seções abaixo descrevem o código **como ele é**; onde a intenção diverge do
-> real, isso está marcado explicitamente.
+> `M07-02` takeover de conta aprovadora pelo DAT e `M14-01` `HasSectorAccess`). O cache de revogação ao
+> excluir um Group (`M05-03`, épico #1667) foi **RESOLVIDO no #1791** — ver §Contratos abaixo. As seções
+> abaixo descrevem o código **como ele é**; onde a intenção diverge do real, isso está marcado explicitamente.
 >
 > **Bus factor de 1.** Há **1 superuser ativo** em produção (censo de 2026-07-20, `ACHADOS_REAIS.md` §F3), e o #1567
 > tornou a administração de Grupo×Capability superuser-only. Se essa conta cair, ninguém administra RBAC. A decisão
@@ -98,7 +99,7 @@ Doc canônico detalhado (não duplicado aqui): convenção de nomes em [`RBAC_NA
   - ✅ **Auditoria de Grupo×Capability invariante — RESOLVIDO no #1672** (antigo achado `M05-05`, épico #1657, CLOSED). Antes do #1672, o único chamador de `flush_group_capability_audit()` era `PermissaoFuncionalAdmin.save_related()` (em `admin.py`): **nenhuma view DRF drenava o buffer**, então um `PATCH /api/grupos/{id}/` alterava a matriz Grupo×Capability, disparava o signal e invalidava o cache, mas o delta ficava no buffer de módulo `_PENDING_GROUP_CAP_DELTAS` (então em `signals.py`) **sem nunca ser gravado** (zero AuditLog) — e, por ser um `dict` de módulo e não um thread-local, o lixo era drenado pelo **próximo** `save_related` do Admin e **atribuído ao ator errado**. O #1672 removeu o buffer e o flush: a auditoria agora é gravada **no ponto de escrita** — Admin em `PermissaoFuncionalAdmin.save_related` (`admin.py`), REST em `GroupSerializer.create` / `GroupSerializer.update` (`serializers/usuario.py`) via `auditar_group_capabilities_set` — com PII redigida em `_PII_KEYS_TO_MASK` / `_redact_details` (`redact_cpf`) em `serializers/auditoria.py`. Ambos os caminhos auditam.
 - **Policy key = contrato externo estável** (uma vez em `PUBLIC_POLICY_KEYS`): adicionar key é compatível; renomear/remover é breaking (deprecation de 2 releases); mudar capabilities elegíveis (`ACCESS_POLICIES[k]`) é compatível (frontend não depende). O endpoint nunca vaza capability codenames.
 - **SSOT da semântica de policy**: `user_has_policy(user, key)` é a fonte única; `_PolicyPermission.has_permission`, os testes e `resolve_public_policies` delegam para ele. Mudar avaliação = mudar num só lugar.
-- **Revogação NÃO é imediata quando o Group é excluído** (comportamento real, achado `M05-03`, épico #1667). O cache funcional tem TTL de **300 s** (`CACHE_TTL_SECONDS` em `services/rbac_permissions.py`). O `post_delete` em `Group` (`_invalidate_funcperm_on_group_change` em `rbac_signals.py`) chama `invalidate_group_functional_permissions_cache`, que resolve os usuários impactados **consultando o M2M** (`rbac_permissions.py`). Em `post_delete` as linhas de `auth_user_groups` já foram removidas em cascata → a query volta vazia → nenhuma chave é apagada. Não há `pre_delete` com snapshot dos membros (contraste: o `pre_clear` de `_invalidate_funcperm_on_user_groups_change` em `rbac_signals.py` faz o snapshot de propósito). Consequência: após `DELETE /api/grupos/{id}/` os ex-membros mantêm as capabilities revogadas por até 5 minutos.
+- ✅ **Revogação imediata ao excluir um Group — RESOLVIDO no #1791** (antigo achado `M05-03`, épico #1667, CLOSED). Antes do #1791, o cache funcional (TTL de **300 s**, `CACHE_TTL_SECONDS` em `services/rbac_permissions.py`) mantinha as capabilities revogadas por até 5 minutos após `DELETE /api/grupos/{id}/`: o único invalidador era o `post_delete` em `Group` (`_invalidate_funcperm_on_group_change` em `rbac_signals.py`), que resolve os usuários impactados **consultando o M2M** — mas em `post_delete` as linhas de `auth_user_groups` já foram removidas em cascata, a query volta vazia e nenhuma chave por-usuário é apagada. O #1791 (`01ddb4cd`) adicionou `_invalidate_funcperm_on_group_delete_members` (`@receiver(pre_delete, sender=Group)` em `rbac_signals.py`), que faz o **snapshot dos membros ANTES do cascade** (mesmo padrão do `pre_clear` de `_invalidate_funcperm_on_user_groups_change`) e invalida o cache por-usuário de forma **síncrona** via `invalidate_users_functional_permissions_cache` — os ex-membros perdem as capabilities revogadas na hora, sem esperar o TTL. Prova comportamental em `test_cache_invalidated_when_group_deleted` (`test_rbac_functional_permissions.py`).
 - **Aprovação de solicitações (CP-02, PA-02)**: gate composite `CanAccessSolicitationApprovals` = Gerente da Superintendência (Setor `Superintendência` + Função `Gerente`) **OU** Assistente Administrativo do Controle (Setor `Controle` + Função `Assistente Administrativo`) **OU** superuser (`_user_has_solicitation_approvals` em `policies.py`). Detalhe em [`solicitacao-approval.spec.md`](./solicitacao-approval.spec.md).
 
 ## API / Interface
@@ -150,6 +151,6 @@ Doc canônico detalhado (não duplicado aqui): convenção de nomes em [`RBAC_NA
 - **Cutoff D17 hardcoded** (`D17_LEGACY_MIGRATIONS_MAX = 82`): migrations futuras que precisem backfill legítimo de grupos exigem `# noqa: RBAC-migration-allowed` consciente.
 - **Composition OR em instâncias depende de monkey-patch** (`permissions.OR/AND/NOT.__call__ = lambda self: self`) aplicado em `permissions.py`; `policies.py` força o import por side-effect. Remover o patch quebra silenciosamente todo `permission_classes = [A | B]`.
 - **`HasSectorAccess` é o único ponto com TOCTOU residual** de scope: a checagem de vínculo **vigente** em `EquipeGerencia` (`vigentes_em()`) e a leitura de dados acontecem em requests separados; mudança de vínculo entre eles não é transacional (aceitável para o caso de uso atual).
-- **Schema OpenAPI de `/api/me/policies/`** declara `{policies: [...]}` via `inline_serializer` (`views/me.py`), mas o código retorna o array bruto (`MePoliciesView.get`). Divergência de documentação de schema (não afeta o contrato real consumido pelo frontend).
+- ✅ **Schema OpenAPI de `/api/me/policies/` — RESOLVIDO no #1463**. A `MePoliciesView` (`views/me.py`) declara `responses={200: ListSerializer(child=CharField())}` — um array de strings — que bate com o retorno real (`MePoliciesView.get` devolve o array bruto via `resolve_public_policies`). A divergência antiga de schema (declarava `{policies: [...]}` via `inline_serializer` mas retornava array bruto) foi fechada.
 - **Escopo ator×alvo é a dívida estrutural do módulo** (épico #1656). O idioma `HasPerm(codename)` responde "esta pessoa pode executar esta ação?", nunca "sobre QUEM ela pode executar". Onde o alvo importa — administração de usuários (`M07-02`), solicitações de outra gerência (`M10-01`), `HasSectorAccess` na Grade Mensal (`M14-01`) — a checagem de alvo precisa ser feita no queryset/serializer da view, e hoje falta em vários pontos. Ao criar uma capability nova, decidir explicitamente se ela precisa de escopo e onde ele é aplicado.
 - **`SuperuserOnly` fora da superfície pública**: não está em `rbac/__init__.py`; importar via `apps.core.permissions`. Se for promovida ao `__init__`, atualizar esta spec e o `__all__` juntos.

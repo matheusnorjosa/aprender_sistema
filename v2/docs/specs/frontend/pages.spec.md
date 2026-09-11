@@ -1,7 +1,8 @@
 ---
 title: Páginas (React)
 status: canonical
-last_verified: 2026-07-24
+last_verified: 2026-09-11
+verified_at_commit: 0dd1dcb630fdc1cf9b2b488121553e89488dde3c
 sources_of_truth:
   - v2/frontend/src/App.tsx
   - v2/frontend/src/components/AppRoutes.tsx
@@ -174,18 +175,19 @@ Inventário por domínio (rota → componente → guard **como o código aplica 
 ## Divergências conhecidas entre página e backend
 
 Reconfirmadas por execução na auditoria modular M00–M28 e rastreadas no documento vivo
-[`ACHADOS_REAIS.md`](../../audits/ACHADOS_REAIS.md). **Estão vivas em produção** — esta seção
-existe para que a spec descreva o que as páginas fazem, não o que deveriam fazer.
+[`ACHADOS_REAIS.md`](../../audits/ACHADOS_REAIS.md). **Algumas já foram RESOLVIDAS** (marcador por
+linha na coluna à direita); as demais seguem **vivas em produção** — esta seção descreve o que as
+páginas fazem, não o que deveriam fazer.
 
 | Achado | Página | O que o código faz hoje |
 |---|---|---|
 | `M05-07` (#1655) | `Home/HomePage` | Os cards "Enviar Solicitação"/"Minhas Solicitações" são gateados por `perms.canCoordenador` (`HomePage.tsx`, `isCoordenador`), isto é, por setor/função — **não** pela policy `create_solicitation` que gateia as rotas de destino (`AppRoutes.tsx`, rotas `/solicitacoes/{minhas,nova}`). Quem tem a policy sem ser Coordenador/DAT não vê o atalho; quem é DAT vê um atalho para uma rota que a policy pode negar. |
 | `M09-05` (#1621) | `Deslocamentos/DeslocamentosPage` | O campo "Formador" do modal é `required` (`Form.Item name="usuario"`) e só oferece terceiros; o POST sempre manda `usuario` (`handleModalSubmit`). O backend exige delegação (`views_deslocamento.py`, `DeslocamentoViewSet.perform_create`) satisfeita apenas por `operate_preagenda`/`view_all_availability` (`rbac/policies.py`, `user_can_delegate_deslocamento`) — capabilities que Coordenador não tem. Resultado: Coordenador acessa a página e falha em 100% dos creates. |
-| `M09-06` (#1622) | `Deslocamentos/DeslocamentosPage` | Filtros Origem/Destino são `<Input>` não-controlados sem debounce; cada tecla muda `filters`, refaz o `useEffect` e liga `loading`, e o early-return `if (loading) return …` desmonta a árvore inteira — o input perde foco e o caractere digitado. |
-| `M12-19` (#1629) | `PreAgenda/PreAgendaPage` | `usePolling` a cada 5 s (`constants/timing.ts`, `TIMING.SYNC_POLL_INTERVAL_MS`) dispara 3 requisições por ciclo (`loadData`) contra o throttle `user: 1000/hour` (`config/settings.py`, `REST_FRAMEWORK` → `DEFAULT_THROTTLE_RATES`). A tabela anuncia `total = superCount + naoCount` mas só carrega a primeira página de cada lista, e pagina no cliente sem handler — as páginas além do que foi buscado ficam vazias. |
-| `M15-10` (#1637) | `DATModule/ComprasPage` | O payload é um spread cru do form; `codigo_produto`, `uf`, `data_entrega`, `numero_nota_fiscal` e `fornecedor` não existem no serializer (`serializers/dat_module/dat_compra.py`, `DATCompraSerializer.Meta.fields`) e são descartados em silêncio. Não há campo de preço no modal, então `valor_unitario` fica no default `0.00` (`models/dat_compra.py`, `DATCompra.valor_unitario`) e o `valor_total` saía zerado no dashboard — o card **Valor total** foi removido em #1983 por ser enganoso (R$0 sempre); o campo de preço no modal continua ausente (causa-raiz de M15-10). |
-| `M16-08` (#1639) | `DATModule/DATRegistrosPage` | Um único `STATUS_OPTIONS` de 3 valores (`DATRegistros/constants.tsx`) é reusado para dois conjuntos de choices diferentes do backend (`models/dat_registro.py`, `DATRegistro.STATUS_CHOICES`/`TURMA_STATUS_CHOICES`). Para `turma_formar_status`, `em_andamento` e `concluido` são inválidos → 400 no save. |
-| `M18-06` (#1653) | telas DAT com `useTableFilters` | O FE envia `page_size` (`hooks/useTableFilters.ts`, `fetchData`; default 15 no param `pageSize`), mas o DRF usa a `PageNumberPagination` de estoque (`config/settings.py`, `REST_FRAMEWORK` → `DEFAULT_PAGINATION_CLASS`), cujo `page_size_query_param` é `None` — o parâmetro é ignorado e a API devolve 100 linhas. A `<Table>` do antd exibe 15 delas, escondendo o resto. |
+| `M09-06` (#1622) | `Deslocamentos/DeslocamentosPage` | **RESOLVIDO (#1622)** (PRs #1731/#1737/#1753). Era: filtros Origem/Destino como `<Input>` não-controlados, sem debounce, e o early-return `if (loading) return …` desmontava a árvore inteira a cada tecla (o input perdia foco e o caractere). Hoje: inputs **controlados** (`value={filters.origem ?? ''}`), **debounce de 350 ms**, `pageLoading`/`tableLoading` separados (o early-return cobre só a carga inicial) e `seqRef` (latest-wins) + `AbortController` descartando respostas obsoletas. |
+| `M12-19` (#1629) | `PreAgenda/PreAgendaPage` | **RESOLVIDO (#1629)** (#1750). Era: a tabela anunciava `total = superCount + naoCount` mas só carregava a primeira página de cada lista e paginava no cliente sem handler — as páginas além do buscado ficavam vazias, e o polling pressionava o throttle `user: 1000/hour`. Hoje: carrega as duas listas de uma vez, `total = loadedRows.length` (contador honesto), guarda latest-wins e **backoff após 429** no polling. |
+| `M15-10` (#1637) | `DATModule/ComprasPage` | **Fase A resolvida (#1714/#1716); resta Fase B (#1637 OPEN)** — o achado NÃO fechou por inteiro. Fase A: `buildCompraPayload` faz strip **explícito** dos campos extras (não é mais spread cru) e o save reporta erro por-campo; `codigo_produto` **existe** no serializer como mirror read-only (`source="produto.codigo"`); `valor_unitario` e `ano_uso` viraram **obrigatórios** no modal (o `valor_total` R$0 sumiu — card removido em #1983). Fase B (aberta): persistir `fornecedor`, `numero_nota_fiscal` e `data_entrega` no lado do Controle — hoje `buildCompraPayload` ainda os remove por não terem destino no serializer. |
+| `M16-08` (#1639) | `DATModule/DATRegistrosPage` | **RESOLVIDO (#1712).** Era: um único `STATUS_OPTIONS` de 3 valores reusado para dois conjuntos de choices diferentes do backend (`DATRegistro.STATUS_CHOICES`/`TURMA_STATUS_CHOICES`), tornando `em_andamento`/`concluido` inválidos em `turma_formar_status` → 400. Hoje partido em `TURMA_STATUS_OPTIONS` (3, casa `TURMA_STATUS_CHOICES`) e `ETAPA_STATUS_OPTIONS` (5, casa `STATUS_CHOICES`) em `DATRegistros/constants.tsx`; `turma_formar_status` usa `TURMA_STATUS_OPTIONS`; contrato travado por `statusOptionsContract.test.ts`. |
+| `M18-06` (#1653) | telas DAT com `useTableFilters` | **RESOLVIDO (#1653)** (commit `062df0ec`). Era: o FE enviava `page_size` mas o DRF usava `PageNumberPagination` de estoque como `DEFAULT_PAGINATION_CLASS`, com `page_size_query_param` = `None` — o parâmetro era ignorado e a API devolvia 100 linhas. Hoje o default é `StandardPagination(PageNumberPagination)` com `page_size_query_param="page_size"` e `max_page_size=500`, honrando `?page_size` (coberto por teste). |
 
 ## Pontos de atenção / dívidas conhecidas
 

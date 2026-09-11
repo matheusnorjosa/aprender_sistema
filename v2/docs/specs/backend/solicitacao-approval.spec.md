@@ -1,7 +1,8 @@
 ---
 title: Aprovação de Solicitações
 status: canonical
-last_verified: 2026-08-26
+last_verified: 2026-09-11
+verified_at_commit: 0dd1dcb630fdc1cf9b2b488121553e89488dde3c
 sources_of_truth:
   - v2/backend/apps/core/services/solicitacao_approval.py
   - v2/backend/apps/core/models/solicitacao.py
@@ -116,4 +117,4 @@ Interface de serviço (chamável internamente): `approve_solicitacao(solicitacao
 - **Service confia na view para autorização**: chamadas diretas ao service (Celery, management commands, futuros callers) NÃO re-checam `CanAccessSolicitationApprovals`. Qualquer novo caller fora da view deve validar a policy antes (ou expor a regra via `user_has_policy("access_solicitation_approvals")`).
 - **Sem efeito colateral de publicação na aprovação**: aprovar apenas muda `status`; a publicação no GCal (RF05/RF06) é um passo separado via actions `publish`/`resync-gcal` (gate `CanUseGcal`). PA-03 (integração externa só após aprovação) é garantido pelo próprio `publish_to_gcal`, que exige `status == "aprovado"` (`services/solicitacao_publish.py`) — não por um trigger acoplado a este módulo.
 - **Lavagem de aprovação por troca de projeto** (era drift M10-02 / issue #1624, **corrigido** por #1775): antes, o `update`/`partial_update` de `Solicitacao` — gateado por `IsOwnerOrPrivileged`, não por `CanAccessSolicitationApprovals` — deixava o dono de uma solicitação criada em projeto `NAO_SUPER` (que nasce `aprovado`) trocá-la para um projeto `SUPER` e ficar com um evento de fluxo SUPER já aprovado sem nunca ter passado pela policy de aprovação, porque o serializer grava `projeto` mas mantém `status` read-only (não o resetava). Hoje `perform_update` (`views_solicitacao.py`) detecta a troca de `projeto_id`: se a solicitação estava `aprovado` e o novo projeto resolve para `pendente` (fluxo SUPER), o status é **rebaixado para `pendente`**, re-exigindo a aprovação. A lavagem está fechada.
-- **Sem bloqueio de edição/exclusão com `gcal_status=PENDING`** (achado M10-03 / issue #1625): `destroy` só barra `PUBLISHED` (`perform_destroy`) e `perform_update` não consulta `gcal_status`. Entre o `mark_gcal(PENDING)` e a execução da task de publicação existe janela para editar/excluir o registro que será publicado.
+- **Edição/exclusão bloqueadas com `gcal_status=PENDING`** (era achado M10-03 / issue #1625, **RESOLVIDO em #1777**, commit `f115dd45`; issue CLOSED): antes `perform_destroy` só barrava `PUBLISHED` e existia, entre o `mark_gcal(PENDING)` e a execução da task de publicação, uma janela para editar/excluir o registro que seria publicado. Hoje `perform_destroy` barra `PUBLISHED` **e** `PENDING`, e a **edição** durante `PENDING` é bloqueada em `SolicitacaoSerializer.validate()` — **não** em `perform_update`, já que o DRF chama `validate()` via `is_valid()` antes do `perform_update`. A janela está fechada.

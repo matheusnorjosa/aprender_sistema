@@ -7,7 +7,7 @@ Este guia explica como gerenciar permissões de usuários no Aprender Sistema v2
 as listas de Setor (9 → **13**) e Função (4 → **5**), o terceiro caminho de aprovação SUPER
 (Assistente Administrativo do Controle) e o fato de que **editar grupos virou superuser-only**.
 
-SSOT das listas: `v2/backend/apps/core/constants.py:16-45`.
+SSOT das listas: `SETOR_GROUPS`/`FUNCAO_GROUPS` (`v2/backend/apps/core/constants.py`).
 
 ---
 
@@ -24,7 +24,7 @@ Cada usuário pode ter **um ou mais setores** e **uma ou mais funções**.
 
 ## Grupos de SETOR
 
-São **13** (`apps/core/constants.py:16-33`). A lista abaixo estava com 9 até 2026-07-24 e ainda
+São **13** (`SETOR_GROUPS`, `apps/core/constants.py`). A lista abaixo estava com 9 até 2026-07-24 e ainda
 incluía um grupo **"Gerência"** que não existe.
 
 | Setor | Descrição | Fluxo |
@@ -50,7 +50,7 @@ incluía um grupo **"Gerência"** que não existe.
 
 ## Grupos de FUNÇÃO
 
-São **5** (`apps/core/constants.py:36-45`).
+São **5** (`FUNCAO_GROUPS`, `apps/core/constants.py`).
 
 | Função | O que pode fazer |
 |--------|------------------|
@@ -64,15 +64,15 @@ São **5** (`apps/core/constants.py:36-45`).
 
 ## Quem Pode Aprovar Solicitações SUPER?
 
-São **três** caminhos (`apps/core/rbac/policies.py:395-421`, espelhado em
-`apps/core/views_basic.py:107-109`). A versão anterior deste guia listava só os dois primeiros.
+São **três** caminhos (`_user_has_solicitation_approvals` em `apps/core/rbac/policies.py`, espelhado por
+`can_approve_super` em `apps/core/views_basic.py`). A versão anterior deste guia listava só os dois primeiros.
 
-✅ Ser **superusuário** (`policies.py:411-412`)
+✅ Ser **superusuário** (`_user_has_solicitation_approvals`)
 
-**OU** ter **ambos** (`policies.py:415-418`):
+**OU** ter **ambos** (`_user_has_solicitation_approvals`):
 - Função **Gerente** + Setor **Superintendência**
 
-**OU** ter **ambos** (`policies.py:421`):
+**OU** ter **ambos** (`_user_has_solicitation_approvals`, via `user_is_assistente_administrativo_controle`):
 - Função **Assistente Administrativo** + Setor **Controle**
 
 ### Exemplos
@@ -96,9 +96,9 @@ São **três** caminhos (`apps/core/rbac/policies.py:395-421`, espelhado em
 
 1. Faça login
 2. No menu lateral, abra **DAT** → **Administração** (`/dat/admin`)
-   — `v2/frontend/src/components/AppSidebar.tsx:354-355`
+   — `v2/frontend/src/components/AppSidebar.tsx`
 3. A tela de usuários fica em `/dat/admin/usuarios`
-   (`v2/frontend/src/components/AppRoutes.tsx:134`); não há item de menu direto para ela
+   (`v2/frontend/src/components/AppRoutes.tsx`); não há item de menu direto para ela
 
 *(Corrigido em 2026-07-24: não existe item "Admin DAT" no menu lateral.)*
 
@@ -108,11 +108,10 @@ São **três** caminhos (`apps/core/rbac/policies.py:395-421`, espelhado em
 > operação de "administrador"**: é restrita ao superusuário.
 >
 > - **Frontend**: os selects `setor_ids` e `funcao_ids` são renderizados com
->   `disabled={!currentIsSuperuser}` (`v2/frontend/src/pages/AdminDAT/UsuariosPage.tsx:699,709` e
->   `:718,728`), e o payload de salvamento **não envia `group_ids`** para não-superuser
->   (comentário `:696-698`).
+>   `disabled={!currentIsSuperuser}` (`v2/frontend/src/pages/AdminDAT/UsuariosPage.tsx`), e o
+>   payload de salvamento **não envia `group_ids`** para não-superuser.
 > - **Backend**: a action `assign_groups` é `permission_classes=[SuperuserOnly]`
->   (`apps/core/views/admin.py:399`).
+>   (`apps/core/views/admin.py`).
 >
 > Em produção há **1 superusuário ativo**. Consequência operacional: se essa conta ficar
 > indisponível, **ninguém** consegue atribuir Setor/Função. Isso é um bus factor conhecido —
@@ -221,7 +220,7 @@ O outro caminho é Assistente Administrativo **do Controle**.
 
 ### Por que os campos de Setor/Função aparecem desabilitados para mim?
 Porque desde o hardening Tier-0 essa edição é **somente superusuário**
-(`apps/core/views/admin.py:399`; UI em `UsuariosPage.tsx:699,709`). Não é bug.
+(`assign_groups`, `apps/core/views/admin.py`; UI em `UsuariosPage.tsx`). Não é bug.
 
 ### Posso dar múltiplas funções a um usuário?
 Sim. Por exemplo, alguém pode ser Coordenador e Gerente ao mesmo tempo.
@@ -232,9 +231,9 @@ Na edição do usuário (como superusuário), desmarque o grupo desejado e salve
 ⚠️ **O import de usuários NÃO remove grupos — só adiciona.** A concessão de grupos por
 `POST /api/usuarios/import/` (coluna `grupos`) **passou a exigir superusuário** — era drift
 (issue [#1610](https://github.com/matheusnorjosa/aprender_sistema/issues/1610)), **corrigido**
-em `ccbe1e05`: `_actor_pode_atribuir_grupos` (`usuarios_import.py:273-283`, aplicado em `:362`
-e `:495-496`) faz um ator não-superusuário ter os grupos ignorados (`grupos_ignorados`), e o
-importer dedicado impõe allowlist (`export_contract_importer.py:1077-1082`). Resta o residual
+em `ccbe1e05`: `_actor_pode_atribuir_grupos` (`usuarios_import.py`) faz um ator não-superusuário
+ter os grupos ignorados (`grupos_ignorados`), e o importer dedicado impõe allowlist (`run` de
+`ExportContractImporter`, `export_contract_importer.py`). Resta o residual
 de escopo ator × alvo abrangente, endereçado pelo épico
 [#1656](https://github.com/matheusnorjosa/aprender_sistema/issues/1656) —
 ver [imports/usuarios.md](./imports/usuarios.md).
@@ -248,11 +247,11 @@ para não usá-lo como via de administração.)*
 
 ## Referências Técnicas
 
-- **SSOT das listas**: `apps/core/constants.py:16` (`SETOR_GROUPS`) e `:36` (`FUNCAO_GROUPS`).
-  `apps/core/views_basic.py:21` apenas as importa; em runtime a classificação prefere o model
-  `GroupClassificacao` (`views_basic.py:81-97`), com as constantes como fallback (`:94-97`).
-- **Policies de aprovação**: `apps/core/rbac/policies.py:395-421`
-- **Gate de edição de grupos**: `apps/core/views/admin.py:399` (`SuperuserOnly`)
+- **SSOT das listas**: `SETOR_GROUPS` e `FUNCAO_GROUPS` (`apps/core/constants.py`).
+  `apps/core/views_basic.py` apenas as importa; em runtime a classificação prefere o model
+  `GroupClassificacao` (em `CurrentUserView.get`, `views_basic.py`), com as constantes como fallback.
+- **Policies de aprovação**: `_user_has_solicitation_approvals` (`apps/core/rbac/policies.py`)
+- **Gate de edição de grupos**: `assign_groups` (`apps/core/views/admin.py`, `SuperuserOnly`)
 - **Testes**: `apps/core/tests/test_rbac_permissions.py` (21 testes)
 - **Frontend**: `v2/frontend/src/pages/AdminDAT/UsuariosPage.tsx`
 - **Convenção RBAC**: [RBAC_NAMING.md](./RBAC_NAMING.md)
@@ -265,8 +264,8 @@ para não usá-lo como via de administração.)*
 
 ## Telas administrativas existentes (não cobertas por este guia)
 
-Rotas em `v2/frontend/src/components/AppRoutes.tsx:134-142`:
+Rotas em `v2/frontend/src/components/AppRoutes.tsx`:
 `/dat/admin/usuarios`, `/grupos`, `/setores`, `/funcoes`, `/gerencias`, `/produtos`, `/configuracoes`.
 
 A administração de **Grupo × Capability** não fica no frontend: é o Django Admin
-(`/admin/core/permissaofuncional/`, `apps/core/admin.py:348`), **superuser-only** desde o #1567.
+(`/admin/core/permissaofuncional/`, `PermissaoFuncionalAdmin` em `apps/core/admin.py`), **superuser-only** desde o #1567.

@@ -32,15 +32,15 @@ procedimentos do lado PostgreSQL nativo e PITR, ver [GUIDE_DR.md](./GUIDE_DR.md)
 O `restore_db.sh` hoje, contra um `.age` de produção:
 
 1. Verifica a integridade **antes de destruir qualquer coisa**, decifrando com `age -d` e
-   só então rodando `gzip -t` (`restore_db.sh:101-121`). Falha cedo se o binário `age` não
-   estiver no PATH ou a chave não for legível (`:103-110`).
-2. Tira um **safety dump** do banco atual antes do `DROP DATABASE` (`:132-148`).
+   só então rodando `gzip -t` (Step 1 de `restore_db.sh`). Falha cedo se o binário `age` não
+   estiver no PATH ou a chave não for legível.
+2. Tira um **safety dump** do banco atual antes do `DROP DATABASE` (Step 2.5).
 3. Restaura com `psql -v ON_ERROR_STOP=1` sob `pipefail`; qualquer erro de SQL,
    decifragem ou descompressão aborta em vermelho e informa onde o safety dump ficou
-   (`:162-178`).
+   (Step 4).
 4. **Verifica o resultado**: piso de tabelas (`RESTORE_MIN_TABLES`, default 20) e linhas
    > 0 em `core_usuario` e `core_solicitacao`. Só então imprime o banner verde
-   (`:180-212`).
+   (Step 5).
 
 > [!caution] Em produção, `DB_HOST` por TCP **não autentica** — `M26-N1`, P1, aberto
 > `restore_db.sh` conecta **sempre** como superusuário `postgres` via `-h $DB_HOST` e
@@ -57,7 +57,7 @@ O `restore_db.sh` hoje, contra um `.age` de produção:
 > para **dev/staging**, onde o banco aceita a conexão.
 >
 > `M26-N1` (P1, confirmado) —
-> `v2/docs/audits/2026-07-17-system-module-audit.md:9438`.
+> auditoria de módulos M26 (`v2/docs/audits/2026-07-17-system-module-audit.md`).
 
 ```bash
 # dev/staging — em produção, veja o aviso acima
@@ -114,7 +114,7 @@ agendamento, criptografia, S3), consulte o SSOT
 
 | Tipo | Frequência | Retenção | Storage |
 |------|------------|----------|---------|
-| Full dump (cifrado `.age`) | Diário 2:00 AM, task Celery no serviço **`worker`** | 7 dias (`BACKUP_RETENTION_DAYS`) | **prod**: bind-mount `/var/backups/aprender:/backups` (`docker-compose.prod.yml:235`); **dev**: volume `backup_data` |
+| Full dump (cifrado `.age`) | Diário 2:00 AM, task Celery no serviço **`worker`** | 7 dias (`BACKUP_RETENTION_DAYS`) | **prod**: bind-mount `/var/backups/aprender:/backups` (serviço `worker` em `docker-compose.prod.yml`); **dev**: volume `backup_data` |
 | WAL archiving | Contínuo (`archive_timeout=300`) — **não verificado em prod** | 7 dias | `/var/lib/postgresql/wal_archive/` na VM02 |
 | Redis (AOF + RDB) | AOF contínuo (`--appendfsync everysec`) + RDB (`--save 60 1`) | conforme retenção do volume | volume nomeado `redis_data` (SEC-013) |
 
@@ -178,7 +178,7 @@ curl -f http://127.0.0.1:8000/api/version/
 **Procedimento**:
 
 > **Cópia offsite não existe hoje.** O upload para S3 é opt-in via `S3_BUCKET`
-> (`backup_db.sh:34,87-89`) e **nenhuma imagem do projeto instala o `aws` CLI**
+> (o bloco de upload S3 de `backup_db.sh`) e **nenhuma imagem do projeto instala o `aws` CLI**
 > (`Dockerfile.prod:56`, `Dockerfile.dev:19-21`). Se o host que guarda
 > `/var/backups/aprender` for perdido junto com a VM, **não há de onde restaurar**.
 > Ver [BACKUP_OPERATIONS.md → Estratégia 3-2-1](./BACKUP_OPERATIONS.md#estratégia-3-2-1-recomendada--alvo).
@@ -288,17 +288,17 @@ Scripts canônicos em `v2/infra/scripts/`:
 - **`backup_db.sh`** — script unificado Docker+VM. Configurável via env vars
   (`DB_HOST/DB_PORT/DB_USER/DB_NAME/DB_PASSWORD`, `BACKUP_DIR`,
   `BACKUP_RETENTION_DAYS`, `S3_BUCKET`, `BACKUP_AGE_RECIPIENT`). Nomenclatura
-  `backup_full_YYYYMMDD_HHMMSS.sql.gz[.age]` (`backup_db.sh:50-55`). Em produção o
-  sufixo é **sempre** `.age`. Retenção no próprio script (`backup_db.sh:103`), com glob
+  `backup_full_YYYYMMDD_HHMMSS.sql.gz[.age]` (bloco de nomenclatura de `backup_db.sh`). Em produção o
+  sufixo é **sempre** `.age`. Retenção no próprio script (bloco de retenção de `backup_db.sh`), com glob
   que cobre `.sql.gz` **e** `.sql.gz.age`. **Não duplicar lógica neste doc.**
 - **`restore_db.sh`** — **operante para `.age` e plaintext** (ver seção 0). Verificação de
-  integridade ciente do formato (`:101-121`), `BACKUP_DIR` respeitando a env var (`:23`,
-  então `--latest` funciona de dentro do container), safety dump pré-DROP (`:132-148`),
-  `ON_ERROR_STOP=1` + `pipefail` (`:162-178`) e verificação pós-restore de tabelas e
-  linhas (`:180-212`). Corrigido em `8f392636` (#1611) e `3bca74f3` (#1645); o aviso
+  integridade ciente do formato (Step 1), `BACKUP_DIR` respeitando a env var (
+  então `--latest` funciona de dentro do container), safety dump pré-DROP (Step 2.5),
+  `ON_ERROR_STOP=1` + `pipefail` (Step 4) e verificação pós-restore de tabelas e
+  linhas (Step 5). Corrigido em `8f392636` (#1611) e `3bca74f3` (#1645); o aviso
   anterior de "quebrado" foi revogado em 2026-08-25.
 - **`verify_backup.sh`** — para `.age`, verifica **presença + tamanho + frescor** e
-  **pula a checagem de conteúdo** (`verify_backup.sh:44-48`), porque a chave privada não
+  **pula a checagem de conteúdo** (o branch `*.age` de `verify_backup.sh`), porque a chave privada não
   fica na VM. "Verificado" aqui não significa "restaurável".
 
 Para detalhes completos (variáveis, S3 setup, criptografia age — SEC-017),
@@ -316,8 +316,8 @@ operacionais nas seções 2.1-2.4 acima referenciam esses scripts.
 ```
 
 Este script:
-1. Cria um dump com `pg_dump | gzip` **em texto claro** (`test_dr.sh:76`)
-2. Restaura em database separado com `gunzip -c | psql` (`test_dr.sh:103`)
+1. Cria um dump com `pg_dump | gzip` **em texto claro** (Step 1 de `test_dr.sh`)
+2. Restaura em database separado com `gunzip -c | psql` (Step 3 de `test_dr.sh`)
 3. Valida contagem de tabelas e presença das tabelas-chave
 4. Limpa o database de teste
 
@@ -381,7 +381,7 @@ O ensaio que de fato prova o DR está em
 > `as_gcal_circuit_breaker_state` NÃO existem** — não há nenhuma definição delas no
 > backend. Não escreva alerta nem painel em cima delas. A única métrica customizada com
 > prefixo `as_` que existe hoje é `as_db_transaction_retries_total`
-> (`apps/core/services/db_retry.py:64`), usada em
+> (definida em `apps/core/services/db_retry.py`), usada em
 > [RUNBOOK_concurrency.md](./RUNBOOK_concurrency.md). As demais métricas disponíveis são as
 > geradas por `django-prometheus` em `/metrics`.
 

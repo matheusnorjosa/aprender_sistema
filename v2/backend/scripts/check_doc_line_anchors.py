@@ -20,10 +20,11 @@ PR — troca-se a ancora pelo nome do simbolo. A excecao deliberada (ex.: prosa 
 auditoria de seguranca que cita um range exato) entra no allowlist COM MOTIVO,
 mesmo contrato do `adr-numeros-allowlist.txt`: entrada nua e o comeco da erosao.
 
-Escopo: `v2/docs/specs/**/*.md` (specs SDD). Ignora bloco de codigo cercado (```),
-o frontmatter (onde `sources_of_truth` e caminho puro) e specs fora de escopo
-(status historical/stale/superseded/deprecated — historico nao se corrige,
-ADR-017 item 5).
+Escopo: specs SDD (`v2/docs/specs/**/*.md`) + guias de topo (`v2/docs/*.md`, NAO
+recursivo — plans/audits/adr/imports citam linha exata de proposito e ficam fora).
+Ignora bloco de codigo cercado (```), o frontmatter (onde `sources_of_truth` e
+caminho puro) e docs fora de escopo (status historical/stale/superseded/deprecated
+— historico nao se corrige, ADR-017 item 5).
 
 Uso:
     python v2/backend/scripts/check_doc_line_anchors.py [--repo-root DIR] [--allowlist PATH]
@@ -52,9 +53,11 @@ for _fluxo in (sys.stdout, sys.stderr):
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import doc_frontmatter  # noqa: E402
 
-# Escopo apertado (hard-ban): so as specs SDD, onde referenciar por simbolo ja e a
-# convencao dominante. Planos/auditorias citam linha exata de proposito — fora daqui.
+# Escopo do hard-ban: specs SDD (rglob) + guias de topo v2/docs/*.md (NAO recursivo).
+# Planos/auditorias/adr/imports citam linha exata de proposito e ficam FORA — subdirs
+# nao entram no glob nao-recursivo dos guias; as specs entram pela sua propria raiz.
 SPECS_ROOT = "v2/docs/specs"
+GUIAS_ROOT = "v2/docs"
 IGNORA = ("_archive", "worktrees", "node_modules")
 
 ALLOWLIST = "v2/docs/.doc-line-anchors-allowlist.txt"
@@ -150,6 +153,25 @@ def _specs_vivas(raiz: pathlib.Path):
         yield rel, texto
 
 
+def _guias_vivos(raiz: pathlib.Path):
+    """Guias de topo `v2/docs/*.md` — NAO recursivo, entao plans/audits/adr/imports
+    (que citam linha de proposito) e as proprias specs (raiz separada) ficam fora."""
+    d = raiz / GUIAS_ROOT
+    if not d.is_dir():
+        return
+    for p in sorted(d.glob("*.md")):
+        rel = p.relative_to(raiz).as_posix()
+        if any(x in rel for x in IGNORA):
+            continue
+        try:
+            texto = p.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if doc_frontmatter.fora_de_escopo(texto):
+            continue
+        yield rel, texto
+
+
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(add_help=True)
     ap.add_argument("--repo-root", default=".")
@@ -173,7 +195,7 @@ def main(argv: list[str]) -> int:
         return 1
 
     achados: list[str] = []
-    for rel, texto in _specs_vivas(raiz):
+    for rel, texto in list(_specs_vivas(raiz)) + list(_guias_vivos(raiz)):
         for linha, ancora in _ancoras_de(texto):
             if (rel, ancora) in perdoados:
                 continue
@@ -190,7 +212,7 @@ def main(argv: list[str]) -> int:
         print("no formato `<spec> <ancora> — motivo`.")
         return 1
 
-    print(f"OK nenhuma ancora de linha em {SPECS_ROOT}/**.")
+    print(f"OK nenhuma ancora de linha em {SPECS_ROOT}/** e {GUIAS_ROOT}/*.md.")
     return 0
 
 

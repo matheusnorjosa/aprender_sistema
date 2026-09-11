@@ -53,6 +53,13 @@ def _spec(raiz: pathlib.Path, rel: str, corpo: str, status: str = "canonical") -
     p.write_text(fm + corpo, encoding="utf-8")
 
 
+def _guia(raiz: pathlib.Path, rel: str, corpo: str) -> None:
+    """Escreve um guia de topo `v2/docs/*.md` — caso real: SEM frontmatter."""
+    p = raiz / rel
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(corpo, encoding="utf-8")
+
+
 def _allowlist(raiz: pathlib.Path, conteudo: str) -> None:
     p = raiz / ALLOWLIST
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -232,3 +239,28 @@ def test_saida_ensina_a_correcao(tmp_path):
     r = _run(tmp_path)
     assert r.returncode == 1
     assert "simbolo" in r.stdout.lower() or "símbolo" in r.stdout.lower()
+
+
+def test_guia_de_topo_sem_frontmatter_bloqueia(tmp_path):
+    """Fase 2: guia `v2/docs/*.md` (sem frontmatter) tambem esta no escopo do hard-ban."""
+    _guia(tmp_path, "v2/docs/GUIA_X.md", "O beat roda em `docker-compose.prod.yml:44`.\n")
+    r = _run(tmp_path)
+    assert r.returncode == 1, f"ancora em guia de topo passou:\n{r.stdout}"
+    assert "GUIA_X.md" in r.stdout
+    assert "docker-compose.prod.yml:44" in r.stdout
+
+
+def test_subdir_de_docs_fica_fora(tmp_path):
+    """plans/audits/adr/imports citam linha de proposito — glob nao-recursivo os deixa fora."""
+    _guia(tmp_path, "v2/docs/plans/PLANO.md", "Ver `foo.py:50`.\n")
+    _guia(tmp_path, "v2/docs/audits/AUD.md", "Ver `bar.py:99`.\n")
+    _guia(tmp_path, "v2/docs/imports/IMP.md", "Ver `baz.py:12`.\n")
+    r = _run(tmp_path)
+    assert r.returncode == 0, f"subdir de docs (plans/audits/imports) entrou no escopo:\n{r.stdout}"
+
+
+def test_guia_de_topo_limpo_passa(tmp_path):
+    """Guia so com referencia a simbolo (sem :NNN) passa — nao nasce vermelho."""
+    _guia(tmp_path, "v2/docs/GUIA_OK.md", "O `perform_create` vive em `views_solicitacao.py`.\n")
+    r = _run(tmp_path)
+    assert r.returncode == 0, f"guia limpo reprovou:\n{r.stdout}"

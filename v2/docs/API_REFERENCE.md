@@ -740,22 +740,22 @@ Para decisão nova, consuma `GET /api/me/policies/` e leia
 
 ## 📄 Paginação
 
-O padrão global é `rest_framework.pagination.PageNumberPagination` com
-`PAGE_SIZE: 100` (`v2/backend/config/settings.py:485-486`). Essa classe **não
-define `page_size_query_param`**, então **`?page_size=` é ignorado** na maioria
-das listagens — a página vem sempre com 100 itens. Só `?page=` funciona.
+O padrão global é `apps.core.pagination.StandardPagination` (`apps/core/pagination.py`),
+ligada via `REST_FRAMEWORK["DEFAULT_PAGINATION_CLASS"]` em `config/settings.py`. Default
+`page_size=100` e **honra `?page_size=` até 500** em toda listagem que não sobrescreve
+`pagination_class` (#1653). `?page=` também funciona.
 
-`StandardPagination` (`apps/core/pagination.py:12`), que aceitaria `page_size`,
-existe mas **não está ligada a nenhuma view** — nenhum
-`pagination_class = StandardPagination` no backend.
+> Antes de 2026-08-20 o padrão era `PageNumberPagination` cru (ignorava `?page_size` e
+> capava em 100). O #1653 trocou o default global — a descrição antiga é texto legado.
 
-Exceções que **aceitam** `?page_size=`, por terem paginador próprio:
+Endpoints com paginador próprio (default/teto diferentes do global):
 
 | Endpoint | Classe | Default | Máx. |
 |---|---|---:|---:|
 | `/api/deslocamentos/` | `DeslocamentoPagination` (`views_deslocamento.py:75-80`) | 50 | 100 |
 | `/api/gcal/list/` | `LargePagination` (`pagination.py:26-39`) | 200 | 1000 |
 | `/api/gcal/dashboard/events/` | `DashboardEventsPagination` (`views_gcal/helpers.py:149-154`) | 20 | 100 |
+| `/api/usuarios-admin/` | `LargePagination` (`pagination.py:26-39`) | 200 | 1000 |
 
 Endpoints de `/api/options/*` não são paginados (`pagination_class = None`).
 

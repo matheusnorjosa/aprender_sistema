@@ -48,7 +48,7 @@ Registrado explicitamente porque outros runbooks já assumiram o contrário:
 |---|---|---|
 | **Loki / agregador de logs** | ❌ não existe (nenhuma referência no repositório) | Logs = `docker compose logs` no stdout dos containers, driver `json-file`, `max-size 50m` / `max-file 10`. **Colete antes de reiniciar.** Ver [LOGGING.md](./LOGGING.md) |
 | **Regras de alerta Prometheus** | ❌ nenhuma versionada | Nada dispara sozinho por latência/erro. Ver [SLO_DEFINITIONS.md](./SLO_DEFINITIONS.md) |
-| **Métricas de backup** (`as_backup_*`) | ❌ não implementadas | O único gate automático de backup é `deployer/hooks/check_backup.sh` (idade + tamanho). Ver [BACKUP_OPERATIONS.md](./BACKUP_OPERATIONS.md) |
+| **Métricas de backup** (`as_backup_*`) | ❌ não implementadas | Há **dois** gates automáticos de backup: o externo `deployer/hooks/check_backup.sh` (idade + tamanho, bloqueia deploy) e o *dead-man* diário interno `backup.check_backup_freshness` (Celery beat, alerta se o backup passar de 24h — #1733). Ver [BACKUP_OPERATIONS.md](./BACKUP_OPERATIONS.md) |
 | **Uptime/synthetic monitoring** | ❌ não configurado no repositório | "Disponibilidade" não é medida; os SLOs são alvos |
 
 A única métrica customizada do projeto é **`as_db_transaction_retries_total`**

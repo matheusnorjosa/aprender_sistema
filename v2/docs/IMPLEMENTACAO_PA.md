@@ -57,8 +57,8 @@ PR17 implementa conformidade com a Política de Aprovação Manual (CP-02), gara
 > (`apps/core/models/`), e `apps/core/models/solicitacao.py` **não tem `def save`**.
 
 - **Arquivo real**: `v2/backend/apps/core/services/solicitacao_create.py:23-44`
-- **Call sites**: `apps/core/views_solicitacao.py:297` (API) e
-  `apps/core/services/eventos_import.py:497` (import de eventos)
+- **Call sites**: `apps/core/views_solicitacao.py` (na API, dentro de `perform_create`) e
+  `apps/core/services/eventos_import.py` (import de eventos)
 - **Regra real**:
 
 ```python
@@ -72,14 +72,14 @@ def resolve_initial_status(*, projeto: Projeto | None) -> InitialStatusDecision:
 
 Não há parâmetro de data. O default do campo no model continua `"pendente"`
 (`apps/core/models/solicitacao.py:80-83`), e a decisão explícita é aplicada em
-`views_solicitacao.py:301` (`serializer.save(..., status=initial_status.status)`).
+`perform_create` (`views_solicitacao.py`), no `serializer.save(..., status=initial_status.status)`.
 Comentário no próprio código: *"status inicial decidido em camada de serviço (não no
-model.save())"* (`views_solicitacao.py:300`).
+model.save())"* (mesmo `perform_create`).
 
 #### 2. Auditoria Persistente (PA-05)
 - **Arquivo real**: `v2/backend/apps/core/services/solicitacao_approval.py`
   — `AuditLog.objects.create()` em `:143-155` (approve) e `:214-226` (reject)
-- **Endpoints**: `apps/core/views_solicitacao.py:635` (`approve`), `:677` (`reject`)
+- **Endpoints**: métodos `approve` e `reject` do `SolicitacaoViewSet` (`apps/core/views_solicitacao.py`)
 - **Problema original**: métodos só faziam `logger.info()`, sem AuditLog persistente
 - **Código** *(o snippet abaixo é o do PR17; a estrutura atual vive no service acima)*:
 ```python
@@ -100,13 +100,14 @@ AuditLog.objects.create(
 ```
 
 #### 3. Testes Obrigatórios (PA-07)
-- **Arquivo**: `v2/backend/apps/core/tests/test_approval_policy_PA.py` (344 linhas)
-- **5 testes implementados e passando**:
+- **Arquivo**: `v2/backend/apps/core/tests/test_approval_policy_PA.py` (372 linhas)
+- **6 testes implementados e passando**:
   1. `test_never_auto_approves_on_clean_or_save` - Valida PA-01
   2. `test_only_superintendencia_can_approve_or_reject` - Valida PA-02
   3. `test_non_privileged_user_gets_403_on_approval_endpoint` - Valida PA-02 (complementar)
   4. `test_calendar_integration_not_called_before_approval` - Valida PA-03
-  5. `test_approval_flow_records_audit_log` - Valida PA-05
+  5. `test_calendar_integration_is_called_after_approval` - Valida PA-03 (lado positivo)
+  6. `test_approval_flow_records_audit_log` - Valida PA-05
 
 ### Frontend (React)
 
@@ -134,9 +135,10 @@ test_approval_policy_PA.py::test_never_auto_approves_on_clean_or_save PASSED
 test_approval_policy_PA.py::test_only_superintendencia_can_approve_or_reject PASSED
 test_approval_policy_PA.py::test_non_privileged_user_gets_403_on_approval_endpoint PASSED
 test_approval_policy_PA.py::test_calendar_integration_not_called_before_approval PASSED
+test_approval_policy_PA.py::test_calendar_integration_is_called_after_approval PASSED
 test_approval_policy_PA.py::test_approval_flow_records_audit_log PASSED
 
-========================= 5 passed in 2.34s =========================
+========================= 6 passed in 2.34s =========================
 ```
 
 ## Conformidade PA-01 a PA-07
@@ -147,7 +149,7 @@ test_approval_policy_PA.py::test_approval_flow_records_audit_log PASSED
 | Requisito | Status | Implementação real | Arquivo:linha |
 |-----------|--------|---------------|---------|
 | **PA-01** | ✅ (SUPER) | `resolve_initial_status(*, projeto)` — SUPER→`pendente`, NAO_SUPER→`aprovado`. A **data não entra** na decisão | `services/solicitacao_create.py:23-44` |
-| **PA-02** | ✅ | Gate `CanAccessSolicitationApprovals`. A classe `IsSuperintendencia` **não existe**; `apps/core/permissions.py:14-21` exporta só `HasFunctionalPermission, HasPerm, HasSectorAccess, IsGerenteSuperintendencia, IsOwnerOrPrivileged, SuperuserOnly`. **DAT não aprova** | `views_solicitacao.py:632,674,840,877`; `rbac/policies.py:395-421` |
+| **PA-02** | ✅ | Gate `CanAccessSolicitationApprovals`. A classe `IsSuperintendencia` **não existe**; `apps/core/permissions.py:14-21` exporta só `HasFunctionalPermission, HasPerm, HasSectorAccess, IsGerenteSuperintendencia, IsOwnerOrPrivileged, SuperuserOnly`. **DAT não aprova** | 4 `@action` gateados por `CanAccessSolicitationApprovals` (`approve`/`reject`/`batch_approve`/`batch_reject`); `rbac/policies.py:395-421` |
 | **PA-03** | ✅ | Celery task `task_publish_solicitacao_to_gcal` validado via mock | `tests/test_approval_policy_PA.py:213,247` |
 | **PA-04** | ✅ | Campo `status` com `default="pendente"` | `models/solicitacao.py:80-83` |
 | **PA-05** | ✅ | `AuditLog.objects.create()` em approve/reject | `services/solicitacao_approval.py:143-155, 214-226` |

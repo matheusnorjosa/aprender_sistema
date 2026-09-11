@@ -650,10 +650,10 @@ docker compose exec -T web pytest apps/core/tests/test_gcal_cancel_resync.py -v
 
 **Cancel é idempotente**: Se o evento já foi deletado do Calendar (404), a operação é tratada como sucesso. Isso permite múltiplas tentativas sem erro.
 
-**Implementação** (`apps/core/services/gcal/sync.py:416`):
+**Implementação** (`apps/core/services/gcal/sync.py`, função `cancel_solicitacao`):
 ```python
 try:
-    _retry_with_backoff(
+    _retry_with_circuit_breaker(
         lambda: client.delete(calendar_id, event_id),
         operation_name=f"GCal CANCEL #{s.id}",
     )
@@ -663,9 +663,14 @@ except Exception as e:
         raise
 ```
 
+> **Circuit breaker** (`apps/core/services/gcal/circuit_breaker.py`, `gcal_breaker`): as chamadas
+> ao Google Calendar (create/update/cancel) passam por `_retry_with_circuit_breaker`, que **falha
+> rápido** enquanto o circuito está aberto (após uma sequência de falhas), evitando martelar a API.
+> O retry/backoff (`_retry_with_backoff`) roda por dentro do breaker.
+
 ## 5. Comandos Úteis
 
-### Preview (GET /preview-gcal/)
+### Preview (POST /preview-gcal/)
 
 ```bash
 # Preview sempre funciona, independente de GCAL_CLIENT

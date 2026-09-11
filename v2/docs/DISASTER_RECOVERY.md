@@ -116,7 +116,7 @@ agendamento, criptografia, S3), consulte o SSOT
 |------|------------|----------|---------|
 | Full dump (cifrado `.age`) | Diário 2:00 AM, task Celery no serviço **`worker`** | 7 dias (`BACKUP_RETENTION_DAYS`) | **prod**: bind-mount `/var/backups/aprender:/backups` (`docker-compose.prod.yml:235`); **dev**: volume `backup_data` |
 | WAL archiving | Contínuo (`archive_timeout=300`) — **não verificado em prod** | 7 dias | `/var/lib/postgresql/wal_archive/` na VM02 |
-| Redis snapshot | Não persistido | - | Memory only |
+| Redis (AOF + RDB) | AOF contínuo (`--appendfsync everysec`) + RDB (`--save 60 1`) | conforme retenção do volume | volume nomeado `redis_data` (SEC-013) |
 
 > O bind-mount `/backups` existe **apenas no serviço `worker`**. `web`, `beat` e
 > `frontend` não enxergam o diretório — comandos do tipo

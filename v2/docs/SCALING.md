@@ -28,9 +28,9 @@ a arquitetura stateless e como escalar a aplicação **quando for preciso**.
 | Componente | State | Storage | Estado real |
 |------------|-------|---------|---|
 | Django App | Stateless | - | ✅ |
-| Sessions | Redis | `SESSION_ENGINE=cache` (`settings.py:328-329`) | ✅ em uso |
+| Sessions | Redis | `SESSION_ENGINE=cache` (`settings.py`) | ✅ em uso |
 | Cache | Redis | `django_redis.cache.RedisCache` | ✅ em uso |
-| Media Files | S3 (opcional) | `django-storages` **só se `AWS_STORAGE_BUCKET_NAME` estiver setado** (`settings.py:385-386`) | ⚠️ **não configurado**; cai em `MEDIA_ROOT = BASE_DIR/"media"` (disco local, `settings.py:379`). Hoje nenhum model usa `FileField`/`ImageField`, então isso não bloqueia réplicas — **passaria a bloquear** no primeiro upload persistente |
+| Media Files | S3 (opcional) | `django-storages` **só se `AWS_STORAGE_BUCKET_NAME` estiver setado** (`settings.py`) | ⚠️ **não configurado**; cai em `MEDIA_ROOT = BASE_DIR/"media"` (disco local, `settings.py`). Hoje nenhum model usa `FileField`/`ImageField`, então isso não bloqueia réplicas — **passaria a bloquear** no primeiro upload persistente |
 | Task Queue | Redis | Celery broker | ✅ em uso |
 | Database | PostgreSQL | Externo (VM02) | ✅ |
 
@@ -55,7 +55,7 @@ grep -nE "SESSION_ENGINE|SESSION_CACHE_ALIAS|AWS_STORAGE_BUCKET_NAME" config/set
 > **Exemplos ilustrativos.** Nenhum dos blocos desta seção reflete o compose real. O
 > compose de produção não declara `deploy.replicas`, não tem serviço `db` (Postgres é
 > externo) e trata migrations com um serviço one-shot `migrate` +
-> `depends_on: service_completed_successfully` (`docker-compose.prod.yml:47-51`) — não com
+> `depends_on: service_completed_successfully` (`docker-compose.prod.yml`) — não com
 > `RUN_MIGRATIONS`.
 
 ### 3.1 Docker Compose (exemplo)
@@ -99,7 +99,7 @@ services:
 
 > Em produção o roteamento é feito pelo **Nginx Proxy Manager**, que é **externo ao
 > repositório**: o compose apenas se conecta à rede `shared_proxy`, declarada
-> `external: true` (`docker-compose.prod.yml:322-323,341-342`). A configuração do NPM
+> `external: true` (`docker-compose.prod.yml`). A configuração do NPM
 > (rotas, TLS, headers, tratamento de `X-Forwarded-For`) **não está versionada aqui** e
 > precisa ser inspecionada no próprio NPM. O `nginx.conf` versionado é o do container
 > `frontend` (SPA + proxy `/api/`), não um balanceador.
@@ -207,7 +207,7 @@ spec:
 **Problema**: Múltiplas instâncias não podem rodar migrations simultaneamente.
 
 **Como o projeto já resolve isso (produção, hoje)**: um serviço **one-shot `migrate`**
-(`docker-compose.prod.yml:47-51`) espera o Postgres da VM02 responder, roda
+(`docker-compose.prod.yml`) espera o Postgres da VM02 responder, roda
 `manage.py migrate --noinput` e sai. `web`, `worker` e `beat` só sobem depois que ele
 termina com **êxito** (`depends_on: condition: service_completed_successfully`, #1456).
 Uma migration quebrada **bloqueia o deploy** em vez de servir um schema meio-migrado.
@@ -232,7 +232,7 @@ celery -A config worker -l info --concurrency=4
 
 ### 4.3 Database Pool
 
-Configuração real, em `v2/backend/config/settings.py:247-276`:
+Configuração real, em `DATABASES` (`v2/backend/config/settings.py`):
 
 ```python
 DATABASES = {
@@ -264,7 +264,7 @@ max_connections (PostgreSQL) >= (web_replicas * gunicorn_workers * gunicorn_thre
 ```
 
 O gunicorn roda `worker_class = "gthread"` com `workers = GUNICORN_WORKERS` (default =
-nº de CPUs) e `threads = GUNICORN_THREADS` (default 2) — `v2/infra/gunicorn.conf.py:16-18`.
+nº de CPUs) e `threads = GUNICORN_THREADS` (default 2) — `v2/infra/gunicorn.conf.py`.
 São esses dois, e não um "pool", que multiplicam as conexões. Confira o limite real do
 servidor antes de escalar:
 
@@ -288,13 +288,13 @@ SELECT count(*), state FROM pg_stat_activity GROUP BY state;
 | Endpoint | Propósito | Checks | Acesso |
 |----------|-----------|--------|--------|
 | `/healthz/` | Liveness | Básico (app running) | aberto |
-| `/api/readyz/` | Readiness | DB + Redis — é o que o healthcheck do container `web` usa (`docker-compose.prod.yml:109`) e o que o applier confirma no deploy | aberto |
-| `/healthz/detailed/` | Monitoring | DB + Redis + circuit breaker do GCal | ⚠️ **gated**: superuser **ou** IP interno (`config/urls.py:46-54`); de fora responde **403** |
+| `/api/readyz/` | Readiness | DB + Redis — é o que o healthcheck do container `web` usa (`docker-compose.prod.yml`) e o que o applier confirma no deploy | aberto |
+| `/healthz/detailed/` | Monitoring | DB + Redis + circuit breaker do GCal | ⚠️ **gated**: superuser **ou** IP interno (`healthz_detailed`, `config/urls.py`); de fora responde **403** |
 | `/api/version/` | Identificar a release aplicada | SHA/tag em execução | aberto |
 
 ### 5.2 Implementação
 
-A implementação real é `healthz_detailed` em **`v2/backend/config/urls.py:40-95`** (não em
+A implementação real é `healthz_detailed` em **`v2/backend/config/urls.py`** (não em
 `apps/core/views.py`). Ela devolve `{"status": ..., "checks": {"database", "redis",
 "gcal_circuit"}}`, e o `status` global considera apenas `database` e `redis` como *core
 checks* — um `gcal_circuit` aberto **não** derruba o health.

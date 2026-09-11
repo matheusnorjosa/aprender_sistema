@@ -1,10 +1,10 @@
 # 🐍 Type Hints — Guia do Desenvolvedor
 
 **Projeto**: Aprender Sistema v2
-**Python**: 3.12 (`v2/backend/pyproject.toml:11`) — PEP 695 é suportado pelo runtime, mas **o
+**Python**: 3.12 (`pythonVersion` em `v2/backend/pyproject.toml`) — PEP 695 é suportado pelo runtime, mas **o
 projeto não o usa**: os aliases são declarados com `TypeAlias` em `apps/core/types.py`
-**Type Checker**: Pyright strict, **gate bloqueante no CI** (`v2/backend/pyproject.toml:8`;
-`.github/workflows/ci.yaml:380,393-396`)
+**Type Checker**: Pyright strict, **gate bloqueante no CI** (`typeCheckingMode` em `v2/backend/pyproject.toml`;
+`.github/workflows/ci.yaml`, job `backend-typecheck` / step `Type check with Pyright`)
 **Última Atualização**: 24 de julho de 2026 — revisão contra o código real
 
 ---
@@ -253,7 +253,7 @@ def check_conflicts(
     ...
 ```
 
-> ⚠️ Existe também `check_conflicts_uncached` (`availability_service.py:353`), usado no caminho de
+> ⚠️ Existe também `check_conflicts_uncached` (`availability_service.py`), usado no caminho de
 > **enforcement** (aprovação/criação de solicitação) justamente para não ler cache de 5 min.
 > Não use a versão cacheada para decidir escrita.
 
@@ -262,7 +262,7 @@ def check_conflicts(
 > ⚠️ **Padrão aspiracional, ainda não adotado.** Em 2026-07-24 não há **nenhum** uso de `TypedDict`
 > ou `NotRequired` em `v2/backend/apps/`, e a classe `GCalEventPayload` abaixo não existe.
 > O payload real do GCal é montado por `build_event_payload`
-> (`apps/core/services/gcal/payload.py:274`) devolvendo `dict[str, Any]`.
+> (`apps/core/services/gcal/payload.py`) devolvendo `dict[str, Any]`.
 > O exemplo permanece como referência de estilo para código novo.
 
 ```python
@@ -302,7 +302,7 @@ def build_gcal_payload(
 > 🔴 **Corrigido em 2026-07-24.** Este bloco marcava a sintaxe PEP 695 (`type X = ...`) como
 > "✅ Agora", dando a entender que era o padrão do projeto. **Não é**: não existe um único
 > `type X = ...` em `v2/backend`. O SSOT de aliases (`apps/core/types.py`) declara explicitamente
-> "usando TypeAlias (Python 3.10+)" (`types.py:4`) e importa `TypeAlias` (`types.py:20`).
+> "usando TypeAlias (Python 3.10+)" (`types.py`) e importa `TypeAlias` (`types.py`).
 
 ```python
 # ✅ Padrão do projeto — apps/core/types.py
@@ -459,7 +459,7 @@ def processar(dados: Any) -> Any:
 ### "Preciso tipar tudo?"
 
 **Não!** Foque no que o pyright já analisa — `apps/core`, `apps/dev_tools` e `config`
-(`v2/backend/pyproject.toml:21-25`), com prioridade para:
+(`include` em `v2/backend/pyproject.toml`), com prioridade para:
 - ✅ Services (lógica de negócio)
 - ✅ Models (métodos personalizados)
 - ✅ Serializers (validate)

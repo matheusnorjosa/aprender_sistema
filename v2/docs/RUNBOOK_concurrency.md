@@ -15,14 +15,14 @@ Companion to [`ACID_POLICY.md`](ACID_POLICY.md). Tracks how to diagnose and resp
 
 | Signal | Where (prod) | What it means |
 |---|---|---|
-| **Prometheus counter** `as_db_transaction_retries_total` (`apps/core/services/db_retry.py:64`) | `/metrics` do serviço `web` (gated). Sem scraper externo configurado, só dá para ler pontualmente | A retry fired. A low, bursty rate is normal; a sustained non-zero rate means a hotspot. |
+| **Prometheus counter** `as_db_transaction_retries_total` (`apps/core/services/db_retry.py`) | `/metrics` do serviço `web` (gated). Sem scraper externo configurado, só dá para ler pontualmente | A retry fired. A low, bursty rate is normal; a sustained non-zero rate means a hotspot. |
 | **Log event** `db_retry_exhausted` | `docker compose logs worker web \| grep db_retry_exhausted` | A user actually hit the ceiling on `max_attempts`. A single burst after a deploy can be noise; sustained events are a bug. |
 | **Log event** `solicitacao_batch_approved` over **10 s** | `docker compose logs web \| grep solicitacao_batch_approved` | Batch approvals normally complete in < 1 s. Slowness usually means `skip_locked` is hitting contention somewhere upstream. |
-| **Circuit breaker `state=open`** | `GET /api/gcal/circuit-breaker/` (`apps/core/urls.py:315`) — autenticado | Google Calendar is rejecting us. Not strictly a concurrency issue, but related: approvals no longer publish, so the retry task **`apps.core.tasks.queue_gcal_sync_retry`** (`apps/core/tasks.py:690-696`) deve estar re-agendando (`max_retries=10`, `default_retry_delay=300`). Ela é **enfileirada por evento**, não pelo beat — não há entrada dela em `config/celery.py`. |
+| **Circuit breaker `state=open`** | `GET /api/gcal/circuit-breaker/` (`apps/core/urls.py`) — autenticado | Google Calendar is rejecting us. Not strictly a concurrency issue, but related: approvals no longer publish, so the retry task **`apps.core.tasks.queue_gcal_sync_retry`** (`apps/core/tasks.py`) deve estar re-agendando (`max_retries=10`, `default_retry_delay=300`). Ela é **enfileirada por evento**, não pelo beat — não há entrada dela em `config/celery.py`. |
 
 ## Triage — "deadlock_detected in production"
 
-1. **Grab the event** (`db_retry_scheduled` é emitido em `services/db_retry.py:173`):
+1. **Grab the event** (`db_retry_scheduled` é emitido em `retry_on_deadlock`, `services/db_retry.py`):
    ```bash
    # Produção (sem Loki): stdout dos containers
    docker compose logs --tail=2000 web worker | grep db_retry_scheduled | grep 40P01

@@ -39,7 +39,7 @@ curl -X POST http://localhost:8000/api/auth/login/ \
 
 O `username` do sistema e o **CPF** (somente digitos).
 
-**Resposta (`views_auth.py:302-316`):**
+**Resposta (`login`, `views_auth.py`):**
 ```json
 {
   "id": 1,
@@ -69,14 +69,14 @@ curl -s http://localhost:8000/api/me/ \
 
 ## Solicitacoes
 
-O modelo `Solicitacao` **nao tem campo `titulo`** (`models/solicitacao.py:22-97`).
+O modelo `Solicitacao` **nao tem campo `titulo`** (`models/solicitacao.py`).
 Um `titulo` enviado no corpo e descartado em silencio pelo `ModelSerializer`.
 Campos gravaveis: `municipio`, `projeto`, `tipo_evento`, `tipo`, `encontro`,
 `segmento`, `coordenador`, `coordenador_acompanha`, `inicio`, `fim`,
-`observacoes`, `local`, `is_online` (`serializers/solicitacao.py:59-112`).
+`observacoes`, `local`, `is_online` (`SolicitacaoSerializer`, `serializers/solicitacao.py`).
 `usuario` e `status` sao read-only — o backend os define.
 
-Criar exige a capability `create_solicitation` (`views_solicitacao.py:179-180`).
+Criar exige a capability `create_solicitation` (`SolicitacaoViewSet.get_permissions`, `views_solicitacao.py`).
 
 ### Criar Solicitacao Presencial
 
@@ -124,7 +124,7 @@ espelhado, nao como objetos aninhados:
 
 > **`status` inicial depende do projeto**: `projeto.fluxo == "NAO_SUPER"` nasce
 > `"aprovado"`; qualquer outro caso nasce `"pendente"`
-> (`services/solicitacao_create.py:27-44`). Nao assuma `"pendente"`.
+> (`resolve_initial_status`, `services/solicitacao_create.py`). Nao assuma `"pendente"`.
 
 ### Criar Solicitacao Online
 
@@ -170,7 +170,7 @@ curl -s "http://localhost:8000/api/solicitacoes/?page=2" \
 
 ### Aprovar Solicitacao (PA-02)
 
-O metodo e **PATCH**, nao POST (`views_solicitacao.py:629-634`). POST retorna 405.
+O metodo e **PATCH**, nao POST (`SolicitacaoViewSet.approve`, `views_solicitacao.py`). POST retorna 405.
 
 ```bash
 curl -X PATCH http://localhost:8000/api/solicitacoes/123/approve/ \
@@ -190,7 +190,7 @@ curl -X PATCH http://localhost:8000/api/solicitacoes/123/approve/ \
 
 ### Reprovar Solicitacao
 
-Tambem **PATCH** (`views_solicitacao.py:671-676`). A justificativa vai em
+Tambem **PATCH** (`SolicitacaoViewSet.reject`, `views_solicitacao.py`). A justificativa vai em
 `reason` (alias aceito: `justificativa`) — **nao** em `motivo`.
 
 ```bash
@@ -216,7 +216,7 @@ curl -X POST http://localhost:8000/api/solicitacoes/batch-approve/ \
 ```
 
 **Resposta (200)** — a chave de cada erro e `detail`, nao `error`
-(`services/solicitacao_approval.py:96-98`, `:307`):
+(`_build_batch_status_errors` e `batch_approve_solicitacoes`, `services/solicitacao_approval.py`):
 ```json
 {
   "approved": 3,
@@ -239,7 +239,7 @@ curl -X POST http://localhost:8000/api/solicitacoes/batch-approve/ \
 ### Verificar Disponibilidade (individual)
 
 E **GET com query params**, nao POST com corpo. O parametro e `usuario_id`
-(nao `formador_id`) — `views_availability.py:263-278`.
+(nao `formador_id`) — `AvailabilityCheckView` (`views_availability.py`).
 
 ```bash
 curl -s -G http://localhost:8000/api/availability/check/ \
@@ -251,7 +251,7 @@ curl -s -G http://localhost:8000/api/availability/check/ \
 ```
 
 **Resposta (disponivel)** — objeto plano, chave `ok` (nao `available`), sem
-envelope `data`/`meta` (`views_availability.py:341-347`):
+envelope `data`/`meta` (`AvailabilityCheckView.get`, `views_availability.py`):
 ```json
 {
   "ok": true,
@@ -260,7 +260,7 @@ envelope `data`/`meta` (`views_availability.py:341-347`):
 ```
 
 **Resposta (com conflitos)** — cada conflito tem `code`/`title`/`detail`/`ref_id`
-(`services/availability_service.py:35-49`):
+(`Conflict`, `services/availability_service.py`):
 ```json
 {
   "ok": false,
@@ -290,12 +290,12 @@ curl -X POST http://localhost:8000/api/availability/check-many/ \
   }'
 ```
 
-A chave e `usuarios_ids` (`views_availability.py:382`). Lista vazia => 400.
+A chave e `usuarios_ids` (`AvailabilityCheckManyView`, `views_availability.py`). Lista vazia => 400.
 
 ### Grade Mensal
 
 `role` e **obrigatorio** (`FORMADOR` ou `COORDENADOR`); sem ele a resposta e 400
-(`views_availability_monthly.py:153-158`). Nao existe `formador_id` nesta rota —
+(`MonthlyAvailabilityView.get`, `views_availability_monthly.py`). Nao existe `formador_id` nesta rota —
 o recorte por pessoa e feito por `gerencia_id`/`sector`/`q`.
 
 ```bash
@@ -319,7 +319,7 @@ Todas as rotas abaixo exigem a policy `use_gcal` (`CanUseGcal`).
 
 ### Preview antes de Publicar
 
-E **POST**, nao GET (`views_solicitacao.py:698-704`).
+E **POST**, nao GET (`SolicitacaoViewSet.preview_gcal`, `views_solicitacao.py`).
 
 ```bash
 curl -X POST http://localhost:8000/api/solicitacoes/123/preview-gcal/ \
@@ -351,7 +351,7 @@ Relacionadas, mesmo contrato 202:
 
 A chave e **`solicitacao_ids`**, nao `ids` — `ids` resulta em
 `400 {"detail": "solicitacao_ids deve ser um array nao-vazio de IDs"}`
-(`views_gcal/batch.py:82-90`). Limite: 500 por requisicao.
+(`GCalPublishBatchView`, `views_gcal/batch.py`). Limite: 500 por requisicao.
 
 ```bash
 curl -X POST http://localhost:8000/api/gcal/publish-batch/ \
@@ -401,7 +401,7 @@ curl -s http://localhost:8000/api/options/tipos-evento/ \
 
 O `custom_exception_handler` devolve um objeto **plano** com `detail` + `code`
 (+ `errors` quando ha erro de campo). Nao existe envelope `error`, nem
-`message`, nem `request_id` na resposta — `apps/core/exceptions.py:162-281`.
+`message`, nem `request_id` na resposta — `apps/core/exceptions.py`.
 
 ```json
 {
@@ -415,7 +415,7 @@ O `custom_exception_handler` devolve um objeto **plano** com `detail` + `code`
 
 ### Codigos de Erro Comuns
 
-`code` vem de `_get_error_code` (`exceptions.py:284-305`): para excecoes do DRF e
+`code` vem de `_get_error_code` (`exceptions.py`): para excecoes do DRF e
 o `default_code` em MAIUSCULAS (por isso o `ValidationError` do serializer vira
 `INVALID`, nao `VALIDATION_ERROR`).
 

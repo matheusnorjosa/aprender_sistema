@@ -2,7 +2,7 @@
 
 **Última Atualização**: 2026-07-24 (varredura de veracidade contra o código)
 **Base canônica**: `/api`
-**ViewSets registrados no router**: 24 (`v2/backend/apps/core/urls.py:118-156`)
+**ViewSets registrados no router**: 24 (bloco `router.register(...)`, `v2/backend/apps/core/urls.py`)
 **Contagem total de endpoints**: não re-derivada nesta varredura — a fonte
 executável é o schema OpenAPI em `/api/schema/`.
 
@@ -75,7 +75,7 @@ Regras:
 | Monitoramento | 2026-04-15 a 2026-06-14 | Observar se há tráfego residual em `/api/v1/` |
 | Remoção do alias | Após 2026-06-14 | Remover `path("api/v1/", ...)` de `config/urls.py` |
 
-**Estado em 2026-07-24**: o alias **ainda existe** — `v2/backend/config/urls.py:110`
+**Estado em 2026-07-24**: o alias **ainda existe** — a rota `api/v1/` (namespace `core-v1`) em `v2/backend/config/urls.py`
 mantém `path("api/v1/", include("apps.core.urls", namespace="core-v1"))`. A última
 linha do plano acima está pendente.
 
@@ -130,12 +130,12 @@ Cookie: sessionid=<session_id>
 | DELETE | `/api/solicitacoes/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Excluir solicitação | `IsOwnerOrPrivileged` |
 | POST | `/api/solicitacoes/validate/` | ![Stable](https://img.shields.io/badge/-stable-green) | Validar payload antes de criar | IsAuthenticated |
 
-Gates em `views_solicitacao.py:164-183`. `IsOwnerOrPrivileged` é object-level:
+Gates em `SolicitacaoViewSet.get_permissions` (`views_solicitacao.py`). `IsOwnerOrPrivileged` é object-level:
 libera o dono do registro **ou** quem tem `edit_solicitation_as_owner_or_privileged`.
 
 > **PA-01 / fluxo**: o status inicial **não é sempre `pendente`**. `perform_create`
 > delega a `resolve_initial_status(projeto=...)`: projeto com `fluxo=SUPER` nasce
-> `pendente`; `fluxo=NAO_SUPER` nasce `aprovado` (`views_solicitacao.py:296-301`).
+> `pendente`; `fluxo=NAO_SUPER` nasce `aprovado` (`SolicitacaoViewSet.perform_create`, `views_solicitacao.py`).
 
 ### Ações de Aprovação (PA-01 a PA-07)
 
@@ -146,8 +146,8 @@ libera o dono do registro **ou** quem tem `edit_solicitation_as_owner_or_privile
 | POST | `/api/solicitacoes/batch-approve/` | ![Stable](https://img.shields.io/badge/-stable-green) | Aprovar em lote (máx. 100 `ids`) | `CanAccessSolicitationApprovals` |
 | POST | `/api/solicitacoes/batch-reject/` | ![Stable](https://img.shields.io/badge/-stable-green) | Reprovar em lote (máx. 100 `ids`) | `CanAccessSolicitationApprovals` |
 
-`approve`/`reject` são **PATCH**, não POST (`views_solicitacao.py:629-634` e
-`:671-676`). POST nessas rotas retorna `405 Method Not Allowed`.
+`approve`/`reject` são **PATCH**, não POST (actions `SolicitacaoViewSet.approve` e
+`SolicitacaoViewSet.reject`, `views_solicitacao.py`). POST nessas rotas retorna `405 Method Not Allowed`.
 
 Corpo opcional de `approve`/`reject`: `{"reason": "..."}` (aceita também
 `justificativa` como alias). Resposta 200:
@@ -156,7 +156,7 @@ Corpo opcional de `approve`/`reject`: `{"reason": "..."}` (aceita também
 ### Filtros Disponíveis
 
 `filterset_fields` está **vazio** — os filtros são tratados manualmente em
-`get_queryset` (`views_solicitacao.py:153`, `:185-278`). Só existem estes:
+`get_queryset` (`filterset_fields` e `SolicitacaoViewSet.get_queryset`, `views_solicitacao.py`). Só existem estes:
 
 ```
 ?mine=true                       # força escopo ao próprio usuário
@@ -186,9 +186,9 @@ Não existem `?projeto=`, `?municipio=`, `?usuario=`, `?data_inicio__gte=`,
 | POST | `/api/availability/check-many/` | ![Stable](https://img.shields.io/badge/-stable-green) | Verificar conflitos em lote | idem acima |
 | GET | `/api/availability/monthly/` | ![Stable](https://img.shields.io/badge/-stable-green) | Grade mensal de disponibilidade | `IsAuthenticated` + (`CanViewAllAvailability` \| `HasSectorAccess`) |
 
-Gates: `views_availability.py:233-235` e `:376-378`; `views_availability_monthly.py:80`.
+Gates: `AvailabilityCheckView` e `AvailabilityCheckManyView` (`views_availability.py`); `MonthlyAvailabilityView` (`views_availability_monthly.py`).
 Além do gate de entrada, `check/` e `check-many/` aplicam filtro em runtime: consultar
-outro usuário exige `can_check_availability_for_others` (`views_availability.py:291`, `:392`).
+outro usuário exige `can_check_availability_for_others` (`AvailabilityCheckView.get` e `AvailabilityCheckManyView.post`, `views_availability.py`).
 
 ### Parâmetros de Check (GET `/api/availability/check/`)
 
@@ -203,15 +203,15 @@ Não existe `exclude_id` (nenhuma ocorrência no backend).
 
 Corpo de `POST /api/availability/check-many/`:
 `{"usuarios_ids": [1, 2], "inicio": "...", "fim": "...", "municipio_id": 1}`
-— a chave é `usuarios_ids` (`views_availability.py:382`).
+— a chave é `usuarios_ids` (`AvailabilityCheckManyView.post`, `views_availability.py`).
 
-Parâmetros da grade mensal (`views_availability_monthly.py:133-174`):
+Parâmetros da grade mensal (`MonthlyAvailabilityView.get`, `views_availability_monthly.py`):
 `year` (obrigatório), `month` (obrigatório), `role` (**obrigatório**:
 `FORMADOR` ou `COORDENADOR`), `gerencia_id`, `sector`, `q` (opcionais).
 
 ### Resposta de Conflito
 
-A chave é `ok`, não `available` (`views_availability.py:341-347`):
+A chave é `ok`, não `available` (`AvailabilityCheckView.get`, `views_availability.py`):
 
 ```json
 {
@@ -240,7 +240,7 @@ A chave é `ok`, não `available` (`views_availability.py:341-347`):
 ### Bloqueios de Disponibilidade
 
 A rota é `/api/availability-blocks/` (registrada no router como
-`availability-blocks`, `v2/backend/apps/core/urls.py:119-123`). **Não** existe
+`availability-blocks`, `v2/backend/apps/core/urls.py`; basename `availability-block`). **Não** existe
 `/api/availability/blocks/`.
 
 | Método | Endpoint | Status | Descrição | Permissão |
@@ -252,13 +252,13 @@ A rota é `/api/availability-blocks/` (registrada no router como
 | DELETE | `/api/availability-blocks/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Remover bloqueio | IsAuthenticated |
 
 É um `ModelViewSet` completo com `permission_classes = [IsAuthenticated]`
-(`views_availability.py:91`, `:112`). A restrição real é de **dado**, no
+(`AvailabilityBlockViewSet`, `views_availability.py`). A restrição real é de **dado**, no
 `get_queryset`: privilegiados veem todos; usuários comuns só os próprios ou os
-da mesma gerência (`:114-136`).
+da mesma gerência (`AvailabilityBlockViewSet.get_queryset`, `views_availability.py`).
 
 Delegação: enviar `usuario_id` diferente do próprio no POST exige
 `user_can_delegate_availability_block` e o alvo precisa ser Formador ativo —
-caso contrário 403/400 (`views_availability.py:162-183`).
+caso contrário 403/400 (`AvailabilityBlockViewSet.perform_create`, `views_availability.py`).
 
 ---
 
@@ -268,7 +268,7 @@ caso contrário 403/400 (`views_availability.py:162-183`).
 
 As transições por solicitação são **actions do `SolicitacaoViewSet`**, não rotas
 sob `/api/gcal/`. Todas exigem `CanUseGcal` (policy `use_gcal` =
-`operate_preagenda` OU `approve_solicitation`) — `views_solicitacao.py:698-836`.
+`operate_preagenda` OU `approve_solicitation`) — actions `preview_gcal`/`publish`/`resync_gcal`/`cancel_gcal` do `SolicitacaoViewSet` (`views_solicitacao.py`).
 
 | Método | Endpoint | Status | Descrição | Permissão |
 |--------|----------|--------|-----------|-----------|
@@ -279,7 +279,7 @@ sob `/api/gcal/`. Todas exigem `CanUseGcal` (policy `use_gcal` =
 | POST | `/api/gcal/publish-batch/` | ![Stable](https://img.shields.io/badge/-stable-green) | Publicar múltiplas solicitações (202) | `IsAuthenticated` + `CanUseGcal` |
 
 `POST /api/gcal/publish-batch/` espera **`solicitacao_ids`** (não `ids`), máx. 500;
-opcionais `dry_run` e `apply_blocked` (`views_gcal/batch.py:80-94`).
+opcionais `dry_run` e `apply_blocked` (`GCalPublishBatchView.post`, `views_gcal/batch.py`).
 Resposta 202: `{"queued": N, "errors": [...], "dry_run": bool, "apply_blocked": bool}`.
 
 Não existem `/api/gcal/preview/`, `/api/gcal/publish/`, `/api/gcal/resync/{id}/`
@@ -317,7 +317,7 @@ Não existem `/api/gcal/dashboard/summary/`, `/pending/`, `/errors/` nem `/insig
 ### OAuth (por usuário)
 
 As rotas OAuth ficam sob `/api/oauth/google/` e `/api/integrations/google/` —
-**não** sob `/api/gcal/oauth/` (`v2/backend/apps/core/urls.py:176-182`).
+**não** sob `/api/gcal/oauth/` (paths `google-oauth-*`, `v2/backend/apps/core/urls.py`).
 
 | Método | Endpoint | Status | Descrição | Permissão |
 |--------|----------|--------|-----------|-----------|
@@ -337,7 +337,7 @@ As rotas OAuth ficam sob `/api/oauth/google/` e `/api/integrations/google/` —
 
 `UsuarioAdminViewSet` é `ModelViewSet` com
 `permission_classes = [HasPerm("manage_admin_registries")]` para **todas** as
-actions, inclusive leitura (`views/admin.py:363`).
+actions, inclusive leitura (`UsuarioAdminViewSet`, `views/admin.py`).
 
 | Método | Endpoint | Status | Descrição | Permissão |
 |--------|----------|--------|-----------|-----------|
@@ -350,7 +350,7 @@ actions, inclusive leitura (`views/admin.py:363`).
 ### Municípios
 
 `MunicipioViewSet.permission_classes = [HasPerm("manage_admin_registries")]`
-sem `get_permissions()` — o gate vale também para leitura (`views/admin.py:69`).
+sem `get_permissions()` — o gate vale também para leitura (`MunicipioViewSet`, `views/admin.py`).
 Consumidores que só precisam popular selects devem usar `/api/options/municipios/`.
 
 | Método | Endpoint | Status | Descrição | Permissão |
@@ -363,7 +363,7 @@ Consumidores que só precisam popular selects devem usar `/api/options/municipio
 ### Projetos
 
 Mesma regra dos municípios: `permission_classes = [HasPerm("manage_admin_registries")]`
-para todas as actions (`views/admin.py:199`). Selects usam `/api/options/projetos/`.
+para todas as actions (`ProjetoViewSet`, `views/admin.py`). Selects usam `/api/options/projetos/`.
 
 | Método | Endpoint | Status | Descrição | Permissão |
 |--------|----------|--------|-----------|-----------|
@@ -379,11 +379,11 @@ para todas as actions (`views/admin.py:199`). Selects usam `/api/options/projeto
 | GET | `/api/produtos/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar produtos | `manage_admin_registries` \| `manage_purchases_and_materials` \| `run_daily_operations` |
 | POST/PUT/PATCH/DELETE | `/api/produtos/` | ![Stable](https://img.shields.io/badge/-stable-green) | Escrita de produto | `IsAuthenticated` + `manage_purchases_and_materials` |
 
-Gate em `views/admin.py:250-272` (D11). Selects abertos ficam em `/api/options/produtos/`.
+Gate em `ProdutoViewSet.get_permissions` (`views/admin.py`, D11). Selects abertos ficam em `/api/options/produtos/`.
 
 ### Grupos (RBAC)
 
-`GroupViewSet.get_permissions()` (`views/admin.py:494-500`): `list`/`retrieve`
+`GroupViewSet.get_permissions()` (`views/admin.py`): `list`/`retrieve`
 exigem `manage_purchases_and_materials`; **toda** outra action é `SuperuserOnly`.
 
 | Método | Endpoint | Status | Descrição | Permissão |
@@ -398,7 +398,7 @@ Relacionados: `GET /api/permissoes-funcionais/` (read-only,
 ### Tipos de Evento
 
 **Não existe** ViewSet `/api/tipos-evento/` — não há registro no router
-(`v2/backend/apps/core/urls.py:118-156`). Tipos de evento são expostos apenas
+(bloco `router.register(...)`, `v2/backend/apps/core/urls.py`). Tipos de evento são expostos apenas
 como lookup de leitura:
 
 | Método | Endpoint | Status | Descrição | Permissão |
@@ -416,7 +416,7 @@ CRUD de `TipoEvento` só pelo Django Admin (superuser).
 | GET | `/api/gerencias/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Detalhes da gerência | IsAuthenticated |
 | POST/PUT/PATCH/DELETE | `/api/gerencias/` | ![Stable](https://img.shields.io/badge/-stable-green) | Escrita de gerência | `IsAuthenticated` + `manage_purchases_and_materials` |
 
-Gate em `views/admin.py:302-306`.
+Gate em `GerenciaViewSet.get_permissions` (`views/admin.py`).
 
 ### Auditoria
 
@@ -440,11 +440,11 @@ Gate em `views/admin.py:302-306`.
 | GET | `/api/dat/registros/export/` | ![Stable](https://img.shields.io/badge/-stable-green) | Exportar registros | `manage_admin_registries` |
 | GET | `/api/dat/registros/stats/` | ![Stable](https://img.shields.io/badge/-stable-green) | Estatísticas | `manage_admin_registries` |
 
-Gate em `views/dat.py:174-185`.
+Gate em `DATRegistroViewSet.get_permissions` (`views/dat.py`).
 
 ### Ações
 
-`/api/dat/acoes/` é uma `ListCreateAPIView` (`views_controle_dat.py:100`), não um
+`/api/dat/acoes/` é uma `ListCreateAPIView` (`DATAcoesListCreateView`, `views_controle_dat.py`), não um
 ViewSet: só existem **GET** e **POST** na rota de coleção. **Não** existe
 `/api/dat/acoes/{id}/` — logo, não há `PATCH` nesse caminho.
 
@@ -463,13 +463,13 @@ ViewSet: só existem **GET** e **POST** na rota de coleção. **Não** existe
 | DELETE | `/api/dat/acoes-ciclo/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Excluir ciclo | `execute_restricted_operations` |
 | GET | `/api/dat/acoes-ciclo/stats/` | ![Stable](https://img.shields.io/badge/-stable-green) | Estatísticas | `manage_admin_registries` \| `run_daily_operations` |
 
-Gate em `views/dat_module.py:249-257`.
+Gate em `DATAcaoViewSet.get_permissions` (`views/dat_module.py`).
 
 > **Atenção ao ler o código do módulo DAT**: vários `@action(...)` declaram
 > `permission_classes=[...]` no decorator, mas os ViewSets sobrescrevem
 > `get_permissions()` — e o override **vence**. Quem decide é o `get_permissions()`
 > da classe, não o decorator (o próprio código anota isso em
-> `views/dat_module.py:413-415`, `:460-462`, `:608-610`).
+> `DATCompraViewSet.stats`, `DATCompraViewSet.dashboard` e `DATCompraViewSet.pendencias`, `views/dat_module.py`).
 
 ### Cadastros
 
@@ -480,11 +480,11 @@ Gate em `views/dat_module.py:249-257`.
 | PUT/PATCH | `/api/dat/cadastros/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Atualizar cadastro | `manage_admin_registries` |
 | DELETE | `/api/dat/cadastros/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Excluir cadastro | `execute_restricted_operations` |
 
-Gate em `views/dat_module.py:756-760`.
+Gate em `DATCadastroViewSet.get_permissions` (`views/dat_module.py`).
 
 ### Compras DAT
 
-A rota é `/api/dat/compras-materiais/` (`v2/backend/apps/core/urls.py:148`).
+A rota é `/api/dat/compras-materiais/` (basename `dat-compra-material`, `v2/backend/apps/core/urls.py`).
 **Não** existe `/api/dat/compras/`. O CRUD genérico de `Compra` (outro modelo)
 fica em `/api/compras/`.
 
@@ -497,9 +497,9 @@ fica em `/api/compras/`.
 | GET | `/api/dat/compras-materiais/dashboard/` | ![Stable](https://img.shields.io/badge/-stable-green) | Dashboard de compras | `CanViewComprasDashboard` |
 | GET | `/api/dat/compras-materiais/pendencias/` | ![Stable](https://img.shields.io/badge/-stable-green) | Painel de pendências | `CanViewComprasPendencias` |
 
-Gate em `views/dat_module.py:387-399`. `CanViewComprasStats` =
+Gate em `DATCompraViewSet.get_permissions` (`views/dat_module.py`). `CanViewComprasStats` =
 `manage_admin_registries` \| `manage_purchases_and_materials` \| `run_daily_operations`
-(`rbac/policies.py:113-119`) — ou seja, **escrita de compra também é liberada a
+(`rbac/policies.py`) — ou seja, **escrita de compra também é liberada a
 Controle**, não só a DAT.
 
 ### Coordenadores DAT
@@ -512,7 +512,7 @@ Controle**, não só a DAT.
 | DELETE | `/api/dat/coordenadores/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Excluir coordenador | `execute_restricted_operations` |
 | GET | `/api/dat/coordenadores/{id}/alocacoes/` | ![Stable](https://img.shields.io/badge/-stable-green) | Alocações do coordenador | `manage_admin_registries` \| `run_daily_operations` |
 
-Gate em `views/dat_module.py:142-151`.
+Gate em `DATCoordenadorViewSet.get_permissions` (`views/dat_module.py`).
 
 ### Formações DAT
 
@@ -524,11 +524,11 @@ Gate em `views/dat_module.py:142-151`.
 | GET | `/api/dat/formacoes/stats/` | ![Stable](https://img.shields.io/badge/-stable-green) | Estatísticas | `manage_admin_registries` \| `run_daily_operations` |
 | GET | `/api/dat/formacoes/calendario/` | ![Stable](https://img.shields.io/badge/-stable-green) | Dados para calendário | `manage_admin_registries` \| `run_daily_operations` |
 
-Gate em `views/dat_module.py:930-938`.
+Gate em `DATFormacaoViewSet.get_permissions` (`views/dat_module.py`).
 
 ### Áreas DAT — READ-ONLY
 
-`DATAreaViewSet` é `viewsets.ReadOnlyModelViewSet` (`views/dat_module.py:72`):
+`DATAreaViewSet` é `viewsets.ReadOnlyModelViewSet` (`views/dat_module.py`):
 **só existem GET de lista e de detalhe**. `POST`, `PUT`, `PATCH` e `DELETE`
 retornam `405 Method Not Allowed` — a doc anterior anunciava um `POST` que a rota
 nunca aceitou. Cadastro de área é feito pelo Django Admin.
@@ -538,7 +538,7 @@ nunca aceitou. Cadastro de área é feito pelo Django Admin.
 | GET | `/api/dat/areas/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar áreas (`?minimal=true` p/ select) | IsAuthenticated |
 | GET | `/api/dat/areas/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Detalhe da área | IsAuthenticated |
 
-`permission_classes = [IsAuthenticated]` (`views/dat_module.py:84`) — não exige
+`permission_classes = [IsAuthenticated]` (`DATAreaViewSet`, `views/dat_module.py`) — não exige
 capability de DAT. A lista já vem filtrada por `ativo=True`.
 
 ---
@@ -552,7 +552,7 @@ capability de DAT. A lista já vem filtrada por `ativo=True`.
 | GET | `/api/metrics/map/` | ![Stable](https://img.shields.io/badge/-stable-green) | Dados para mapa | `HasPerm("view_map_metrics")` |
 | GET | `/api/metrics/map/coordinators/` | ![Stable](https://img.shields.io/badge/-stable-green) | Mapa por coordenador | `HasPerm("view_map_metrics")` |
 
-Gate em `views/metrics/map_metrics.py:179-181` e `:373-375`. **Não** existe
+Gate em `metrics_map` e `metrics_map_coordinators` (`views/metrics/map_metrics.py`). **Não** existe
 `/api/metrics/map/summary/`, nem `/api/metrics/coordinators/`, nem
 `/api/metrics/coordinators/{id}/`.
 
@@ -560,8 +560,8 @@ Gate em `views/metrics/map_metrics.py:179-181` e `:373-375`. **Não** existe
 
 Todas sob `/api/metrics/team/`, com a mesma composition
 `run_daily_operations | supervise_operations | manage_admin_registries`
-(`views/metrics/dashboard_metrics.py:26-38`, `:125-137`;
-`views/metrics/formador_metrics.py:26-34`).
+(`productivity_metrics` e `quality_metrics`, `views/metrics/dashboard_metrics.py`;
+`formadores_metrics`, `views/metrics/formador_metrics.py`).
 
 | Método | Endpoint | Status | Descrição | Permissão |
 |--------|----------|--------|-----------|-----------|
@@ -585,7 +585,7 @@ Todas sob `/api/metrics/team/`, com a mesma composition
 | GET | `/api/pre-agenda/` | ![Stable](https://img.shields.io/badge/-stable-green) | Fila da pré-agenda (list-only) | `HasPerm("operate_preagenda")` |
 
 `CanViewReports` = `operate_preagenda` \| `approve_solicitation` \|
-`manage_admin_registries` (`rbac/policies.py:126`).
+`manage_admin_registries` (`rbac/policies.py`).
 
 ---
 
@@ -594,7 +594,7 @@ Todas sob `/api/metrics/team/`, com a mesma composition
 Todos são `POST` `multipart/form-data` com o arquivo no campo **`file`**, e todos
 usam o throttle scope `import` (30/min). O modo de execução vem no query param
 **`dry_run`** — o default é `true` (preview); `?dry_run=false` aplica
-(`views_import_usuarios.py:93-94`).
+(`ImportUsuariosView.post`, `views_import_usuarios.py`).
 
 | Endpoint | Permissão |
 |----------|-----------|
@@ -634,7 +634,7 @@ Endpoints para popular dropdowns e selects no frontend.
 | GET | `/api/options/produtos/` | ![Stable](https://img.shields.io/badge/-stable-green) | Produtos para select | IsAuthenticated |
 | GET | `/api/options/areas/` | ![Stable](https://img.shields.io/badge/-stable-green) | Áreas DAT para select | IsAuthenticated |
 
-Registro das rotas em `v2/backend/apps/core/urls.py:328-335`. **Não** existem
+Registro das rotas em `v2/backend/apps/core/urls.py` (paths `options-*`). **Não** existem
 `/api/options/formadores/` (o nome é `formadores-do-setor`) nem
 `/api/options/gerencias/` — para gerências use `GET /api/gerencias/`
 (IsAuthenticated na leitura).
@@ -648,7 +648,7 @@ Registro das rotas em `v2/backend/apps/core/urls.py:328-335`. **Não** existem
 | GET | `/api/lookup/tipos-evento/` | ![Stable](https://img.shields.io/badge/-stable-green) | Autocomplete de tipos de evento | IsAuthenticated |
 | GET | `/api/lookup/usuarios/` | ![Stable](https://img.shields.io/badge/-stable-green) | Autocomplete de usuários | `create_solicitation` \| `manage_admin_registries` |
 
-`UsuarioLookup` é o único com gate de capability (`views_lookup.py:209`, D12).
+`UsuarioLookup` é o único com gate de capability (`views_lookup.py`, D12).
 
 ---
 
@@ -663,11 +663,11 @@ Registro das rotas em `v2/backend/apps/core/urls.py:328-335`. **Não** existem
 | GET | `/api/features/` | ![Stable](https://img.shields.io/badge/-stable-green) | Feature flags ativas | **IsAuthenticated** |
 | GET/PUT | `/api/config/` | ![Stable](https://img.shields.io/badge/-stable-green) | Configurações operacionais (leitura **e escrita**) | `manage_purchases_and_materials` \| `approve_solicitation` |
 
-Provas: `/healthz/` e `/healthz/detailed/` estão em `v2/backend/config/urls.py:103-104`
-(fora do `include("apps.core.urls")` da linha 108) — `/api/healthz/` **não existe**.
-`/api/features/` usa `@permission_classes([IsAuthenticated])` (`views_health.py:99-101`),
+Provas: `/healthz/` e `/healthz/detailed/` estão em `v2/backend/config/urls.py`
+(fora do `include("apps.core.urls")` do path `api/`) — `/api/healthz/` **não existe**.
+`/api/features/` usa `@permission_classes([IsAuthenticated])` (view `features`, `views_health.py`),
 não `AllowAny`. `/api/config/` aceita `GET` e `PUT` e é gateado por capability
-(`views_config.py:62-63`), não por `IsAuthenticated`.
+(`config_view`, `views_config.py`), não por `IsAuthenticated`.
 
 ---
 
@@ -677,7 +677,7 @@ não `AllowAny`. `/api/config/` aceita `GET` e `PUT` e é gateado por capability
 
 As classes `IsSuperintendencia`, `IsControleOrSuper`, `IsDATOrSuper` e `IsDAT`
 **não existem no código** — o padrão "permission class por nome de grupo" é
-banido pelo `rbac_lint` (`v2/backend/apps/core/rbac/__init__.py:24-27`;
+banido pelo `rbac_lint` (`v2/backend/apps/core/rbac/__init__.py`, docstring "Nunca fazer";
 `apps/core/tests/test_rbac_lint.py`). Autorização é por **capability**, não por
 grupo. O que existe:
 
@@ -685,11 +685,11 @@ grupo. O que existe:
 |--------|------|-----------|
 | `AllowAny` | DRF | Acesso público |
 | `IsAuthenticated` | DRF | Usuário logado |
-| `HasPerm("<codename>")` | `rbac/permissions.py:39` | Exige a capability; suporta OR (`HasPerm("a") \| HasPerm("b")`) |
-| `SuperuserOnly` | `rbac/permissions.py:128` | Só superuser |
-| `IsOwnerOrPrivileged` | `rbac/permissions.py:212` | Object-level: dono do registro ou `edit_solicitation_as_owner_or_privileged` |
-| `HasSectorAccess` | `rbac/permissions.py:240` | Escopo por gerência (`EquipeGerencia`) para a grade mensal |
-| `Can*` (Policy) | `rbac/policies.py:78-162` | Policy nomeada = OR de capabilities com semântica única |
+| `HasPerm("<codename>")` | `rbac/permissions.py` | Exige a capability; suporta OR (`HasPerm("a") \| HasPerm("b")`) |
+| `SuperuserOnly` | `rbac/permissions.py` | Só superuser |
+| `IsOwnerOrPrivileged` | `rbac/permissions.py` | Object-level: dono do registro ou `edit_solicitation_as_owner_or_privileged` |
+| `HasSectorAccess` | `rbac/permissions.py` | Escopo por gerência (`EquipeGerencia`) para a grade mensal |
+| `Can*` (Policy) | `rbac/policies.py` | Policy nomeada = OR de capabilities com semântica única |
 
 Policies usadas nesta referência (`rbac/policies.py`):
 
@@ -727,14 +727,14 @@ access_solicitation_approvals = is_superuser OR (
 
 # [legacy] mantido em /api/me/ por compat externa; não usar para decisão nova.
 # Desde o PR 3 (#1308) o flag foi alinhado à policy — inclui também o
-# Assistente Administrativo do Controle. Prova: views_basic.py:107-109.
+# Assistente Administrativo do Controle. Prova: cálculo de `can_approve_super` em `views_basic.py`.
 can_approve_super = is_superuser
     OR ("Gerente" IN funcoes AND "Superintendência" IN setores)
     OR ("Assistente Administrativo" IN funcoes AND "Controle" IN setores)
 ```
 
 Para decisão nova, consuma `GET /api/me/policies/` e leia
-`access_solicitation_approvals` (`rbac/policies.py:333-337`).
+`access_solicitation_approvals` (`rbac/policies.py`).
 
 ---
 
@@ -752,10 +752,10 @@ Endpoints com paginador próprio (default/teto diferentes do global):
 
 | Endpoint | Classe | Default | Máx. |
 |---|---|---:|---:|
-| `/api/deslocamentos/` | `DeslocamentoPagination` (`views_deslocamento.py:75-80`) | 50 | 100 |
-| `/api/gcal/list/` | `LargePagination` (`pagination.py:26-39`) | 200 | 1000 |
-| `/api/gcal/dashboard/events/` | `DashboardEventsPagination` (`views_gcal/helpers.py:149-154`) | 20 | 100 |
-| `/api/usuarios-admin/` | `LargePagination` (`pagination.py:26-39`) | 200 | 1000 |
+| `/api/deslocamentos/` | `DeslocamentoPagination` (`views_deslocamento.py`) | 50 | 100 |
+| `/api/gcal/list/` | `LargePagination` (`pagination.py`) | 200 | 1000 |
+| `/api/gcal/dashboard/events/` | `DashboardEventsPagination` (`views_gcal/helpers.py`) | 20 | 100 |
+| `/api/usuarios-admin/` | `LargePagination` (`pagination.py`) | 200 | 1000 |
 
 Endpoints de `/api/options/*` não são paginados (`pagination_class = None`).
 
@@ -799,8 +799,8 @@ GET /api/solicitacoes/?page=2
 
 `custom_exception_handler` normaliza **toda** resposta de erro para um objeto
 plano com `detail` + `code` (+ `errors` quando há erro de campo) —
-`apps/core/exceptions.py:162-281`. `code` vem em **MAIÚSCULAS**
-(`_get_error_code`, `:284-296`).
+`apps/core/exceptions.py`. `code` vem em **MAIÚSCULAS**
+(`_get_error_code`, `apps/core/exceptions.py`).
 
 ```json
 {
@@ -812,9 +812,9 @@ plano com `detail` + `code` (+ `errors` quando há erro de campo) —
 ### Erros de Validação
 
 Os erros de campo **não** ficam na raiz: são agrupados sob `errors`
-(`exceptions.py:272-279`). Para o `ValidationError` do DRF (o caso comum de
+(`_standardize_error_response`, `exceptions.py`). Para o `ValidationError` do DRF (o caso comum de
 serializer), `code` é `INVALID` — vem do `default_code` da exceção, não do mapa
-de nomes (`exceptions.py:287-288`).
+de nomes (`_get_error_code`, `exceptions.py`).
 
 ```json
 {
@@ -831,7 +831,7 @@ de nomes (`exceptions.py:287-288`).
 
 ## 🚀 Rate Limiting
 
-Valores de produção — `v2/backend/config/settings.py:495-516`.
+Valores de produção — `REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]` (`v2/backend/config/settings.py`).
 
 | Escopo | Limite | Descrição |
 |--------|--------|-----------|
@@ -847,7 +847,7 @@ Valores de produção — `v2/backend/config/settings.py:495-516`.
 | `change_password` | 20/min | Troca de senha self-service |
 | `oauth` | 10/hour | `/api/oauth/google/start/` |
 
-**Nota**: fora de produção os limites são relaxados (`settings.py:572-587`) —
+**Nota**: fora de produção os limites são relaxados (override em `ENVIRONMENT == "development"` de `REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]`, `settings.py`) —
 não são exatamente "10x" para todos os escopos (`login` vai a `1000/minute`).
 
 ---

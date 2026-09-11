@@ -2,7 +2,7 @@
 
 **Projeto**: Aprender Sistema v2
 **Type Checker**: Pyright 1.1.382 (`v2/backend/requirements-dev.txt:42`)
-**Python**: 3.12 (`v2/backend/pyproject.toml:11`; CI em `.github/actions/setup-python-deps/action.yml:12`)
+**Python**: 3.12 (`pythonVersion` em `v2/backend/pyproject.toml`; CI em `python-version` de `.github/actions/setup-python-deps/action.yml`)
 **Última Atualização**: 24 de julho de 2026 — revisão contra a config real
 
 ---
@@ -67,12 +67,12 @@ stubPath = "typings"                                     # pyproject.toml:37
 > ETL legado. `v2/backend/apps/` contém apenas `core/` e `dev_tools/`. Toda referência a
 > `dat_ingest` neste documento foi substituída.
 >
-> ⚠️ **`**/tests` NÃO está em `exclude`** (`pyproject.toml:28-34`). Os testes não são analisados
+> ⚠️ **`**/tests` NÃO está em `exclude`** (`pyproject.toml`). Os testes não são analisados
 > porque também não estão em `include` — não porque estejam explicitamente excluídos.
 
 ### Type Stubs Customizados
 
-Type stubs em `v2/backend/typings/` (`stubPath`, `pyproject.toml:37`):
+Type stubs em `v2/backend/typings/` (`stubPath`, `pyproject.toml`):
 
 ```
 typings/
@@ -126,8 +126,8 @@ O CI roda automaticamente em cada push/PR:
 ```
 
 > ✅ **Atualizado em 2026-07-24**: pyright é hoje um **gate obrigatório e bloqueante**.
-> O step em `.github/workflows/ci.yaml:393-396` **não tem** `continue-on-error`, e o job se chama
-> `[required] backend typecheck (pyright)` (`ci.yaml:380`). O marco "PR #8" já foi entregue.
+> O step `Type check with Pyright` em `.github/workflows/ci.yaml` **não tem** `continue-on-error`, e o job se chama
+> `[required] backend typecheck (pyright)` (job `backend-typecheck` em `ci.yaml`). O marco "PR #8" já foi entregue.
 
 ---
 
@@ -326,7 +326,7 @@ pyright --outputjson > pyright-baseline.json
 ```
 
 **Estado em 2026-07-24**: gate **bloqueante**. Não há `continue-on-error` no step
-(`.github/workflows/ci.yaml:393-396`) — pyright reprovando reprova o PR.
+(step `Type check with Pyright` em `.github/workflows/ci.yaml`) — pyright reprovando reprova o PR.
 
 ### Pre-commit Hook (Futuro)
 

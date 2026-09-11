@@ -66,14 +66,14 @@ O sistema original funcionava integralmente sobre planilhas Google/Excel, que ac
 ### 2.3 Modelos do Sistema
 
 > 🔴 **Corrigido em 2026-07-24.** O título dizia "28 modelos", a tabela abaixo lista 29 e o código
-> exporta **43 nomes** em `apps/core/models/__init__.py:84-142`. Não confie na contagem daqui:
+> exporta **43 nomes** em `__all__` de `apps/core/models/__init__.py`. Não confie na contagem daqui:
 > o **SSOT é `apps/core/models/__init__.py`**.
 >
 > Ausentes da tabela abaixo: `Colecao`, `MunicipioReferencia`, `ImportJob`, `PermissaoFuncional`,
 > `GroupClassificacao` e os 8 modelos de ações/notificações (`AcaoTemplate`,
 > `AcaoTemplateExecutor`, `CicloAcoes`, `AcaoInstancia`, `RegistroAncora`,
 > `RegistroConclusaoAcao`, `FeriadoLocal`, `NotificacaoInterna`) —
-> `models/__init__.py:41-50, 64, 66-77`.
+> importados em `apps/core/models/__init__.py`.
 
 #### Usuários e Organização
 | Modelo | Descrição |

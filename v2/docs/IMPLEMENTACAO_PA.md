@@ -8,20 +8,20 @@
 > de 2025 e envelheceu. O que mudou desde então:
 >
 > 1. **PA-01 não é "nenhuma solicitação é auto-aprovada".** O código decide o status inicial em
->    `resolve_initial_status` (`apps/core/services/solicitacao_create.py:23-44`):
+>    `resolve_initial_status` (`apps/core/services/solicitacao_create.py`):
 >    `fluxo == "NAO_SUPER"` → **`"aprovado"`** (`:33-38`); qualquer outro caso (SUPER, fluxo
 >    desconhecido, `projeto is None`) → `"pendente"` (`:40-44`). A garantia real é: **fluxo SUPER
 >    nunca auto-aprova.**
 > 2. **A data do evento não influencia o status.** `resolve_initial_status` **não recebe data
 >    nenhuma** — a assinatura é `(*, projeto: Projeto | None)`. SUPER nasce `pendente` no passado e
 >    no futuro; NAO_SUPER nasce `aprovado` nos dois. Confirmado pelo teste
->    `apps/core/tests/test_import_eventos.py:289`. Qualquer doc que diga "SUPER + data futura →
+>    `test_projeto_super_passado_status_pendente` (`apps/core/tests/test_import_eventos.py`). Qualquer doc que diga "SUPER + data futura →
 >    pendente" está errado.
 > 3. **A aprovação manual passou a revalidar conflitos** (#1452, 2026-07-16). A §"Limitações
 >    Conhecidas" no fim deste documento dizia o contrário e está corrigida lá.
 >
 > A decisão de status vive na **camada de serviço**, não em `Solicitacao.save()` — ver comentário
-> em `apps/core/views_solicitacao.py:300`.
+> em `perform_create` (`apps/core/views_solicitacao.py`).
 
 ## Resumo da Implementação
 
@@ -56,7 +56,7 @@ PR17 implementa conformidade com a Política de Aprovação Manual (CP-02), gara
 > override `Solicitacao.save()`. **Nenhum dos dois existe**: `apps/core/models.py` é um *pacote*
 > (`apps/core/models/`), e `apps/core/models/solicitacao.py` **não tem `def save`**.
 
-- **Arquivo real**: `v2/backend/apps/core/services/solicitacao_create.py:23-44`
+- **Arquivo real**: `v2/backend/apps/core/services/solicitacao_create.py`
 - **Call sites**: `apps/core/views_solicitacao.py` (na API, dentro de `perform_create`) e
   `apps/core/services/eventos_import.py` (import de eventos)
 - **Regra real**:
@@ -71,7 +71,7 @@ def resolve_initial_status(*, projeto: Projeto | None) -> InitialStatusDecision:
 ```
 
 Não há parâmetro de data. O default do campo no model continua `"pendente"`
-(`apps/core/models/solicitacao.py:80-83`), e a decisão explícita é aplicada em
+(`Solicitacao.status`, `apps/core/models/solicitacao.py`), e a decisão explícita é aplicada em
 `perform_create` (`views_solicitacao.py`), no `serializer.save(..., status=initial_status.status)`.
 Comentário no próprio código: *"status inicial decidido em camada de serviço (não no
 model.save())"* (mesmo `perform_create`).
@@ -148,28 +148,28 @@ test_approval_policy_PA.py::test_approval_flow_records_audit_log PASSED
 
 | Requisito | Status | Implementação real | Arquivo:linha |
 |-----------|--------|---------------|---------|
-| **PA-01** | ✅ (SUPER) | `resolve_initial_status(*, projeto)` — SUPER→`pendente`, NAO_SUPER→`aprovado`. A **data não entra** na decisão | `services/solicitacao_create.py:23-44` |
-| **PA-02** | ✅ | Gate `CanAccessSolicitationApprovals`. A classe `IsSuperintendencia` **não existe**; `apps/core/permissions.py:14-21` exporta só `HasFunctionalPermission, HasPerm, HasSectorAccess, IsGerenteSuperintendencia, IsOwnerOrPrivileged, SuperuserOnly`. **DAT não aprova** | 4 `@action` gateados por `CanAccessSolicitationApprovals` (`approve`/`reject`/`batch_approve`/`batch_reject`); `rbac/policies.py:395-421` |
-| **PA-03** | ✅ | Celery task `task_publish_solicitacao_to_gcal` validado via mock | `tests/test_approval_policy_PA.py:213,247` |
-| **PA-04** | ✅ | Campo `status` com `default="pendente"` | `models/solicitacao.py:80-83` |
-| **PA-05** | ✅ | `AuditLog.objects.create()` em approve/reject | `services/solicitacao_approval.py:143-155, 214-226` |
-| **PA-06** | ✅ | Botões gateados por policy `access_solicitation_approvals` | `ApprovalsPage.tsx:107,158-159,384` |
-| **PA-07** | ✅ | **6** funções de teste (372 linhas) | `tests/test_approval_policy_PA.py:94,127,178,213,247,313` |
+| **PA-01** | ✅ (SUPER) | `resolve_initial_status(*, projeto)` — SUPER→`pendente`, NAO_SUPER→`aprovado`. A **data não entra** na decisão | `services/solicitacao_create.py` |
+| **PA-02** | ✅ | Gate `CanAccessSolicitationApprovals`. A classe `IsSuperintendencia` **não existe**; `apps/core/permissions.py` exporta só `HasFunctionalPermission, HasPerm, HasSectorAccess, IsGerenteSuperintendencia, IsOwnerOrPrivileged, SuperuserOnly`. **DAT não aprova** | 4 `@action` gateados por `CanAccessSolicitationApprovals` (`approve`/`reject`/`batch_approve`/`batch_reject`); `_user_has_solicitation_approvals` (`rbac/policies.py`) |
+| **PA-03** | ✅ | Celery task `task_publish_solicitacao_to_gcal` validado via mock | `test_calendar_integration_not_called_before_approval` / `test_calendar_integration_is_called_after_approval` (`tests/test_approval_policy_PA.py`) |
+| **PA-04** | ✅ | Campo `status` com `default="pendente"` | `Solicitacao.status` (`models/solicitacao.py`) |
+| **PA-05** | ✅ | `AuditLog.objects.create()` em approve/reject | `approve_solicitacao`/`reject_solicitacao` (`services/solicitacao_approval.py`) |
+| **PA-06** | ✅ | Botões gateados por policy `access_solicitation_approvals` | `ApprovalsPage.tsx` |
+| **PA-07** | ✅ | **6** funções de teste (372 linhas) | as funções de teste em `tests/test_approval_policy_PA.py` |
 
 ## ✅ Atualização #1452 (2026-07-16): a aprovação manual **revalida** conflitos
 
 > 🔴 **Esta seção dizia o contrário até 2026-07-24.** O texto anterior ("Aprovação Manual NÃO
 > Revalida Conflitos — comportamento intencional") descrevia o estado anterior ao #1452 e não
-> vale mais. Além disso, apontava `views_solicitacao.py:268-323`, que é `perform_create`,
+> vale mais. Além disso, apontava `perform_create` (`views_solicitacao.py`),
 > não `approve()`.
 
 `aprovar_solicitacao` chama `enforce_solicitacao_availability(solicitacao, action="approve")`
-**dentro da transação** (`apps/core/services/solicitacao_approval.py:136`, justificativa em
-`:132-135`). Isso executa `check_conflicts_uncached` por participante
-(`apps/core/services/solicitacao_availability.py:164-170`) e levanta **`400 availability_conflict`**
-em caso de choque (`:210-225`).
+**dentro da transação** (`approve_solicitacao`, `apps/core/services/solicitacao_approval.py`). Isso
+executa `check_conflicts_uncached` por participante (em `check_solicitacao_availability`,
+`apps/core/services/solicitacao_availability.py`) e levanta **`400 availability_conflict`**
+em caso de choque (`raise_if_blocked`).
 
-Comentário do código (`solicitacao_availability.py:201-203`):
+Comentário do código (docstring de `raise_if_blocked`, `solicitacao_availability.py`):
 *"Conflito é bloqueio duro, sem override: vale para todos os fluxos, inclusive NAO_SUPER
 (decisão de negócio, 2026-07-16)."*
 

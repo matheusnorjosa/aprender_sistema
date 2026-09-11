@@ -22,7 +22,7 @@ Este guia documenta a configuração e uso da integração do **Aprender Sistema
 > - O caminho de produção é a **§2 (OAuth)**.
 > - O bloco "Exemplo para Produção" da §3 aponta para Service Account e **está errado para o
 >   ambiente atual** — há um aviso no local.
-> - `service_account` continua sendo o default **no código** (`config/settings.py:728`), o que
+> - `service_account` continua sendo o default **no código** (`GCAL_AUTH_MODE` em `config/settings.py`), o que
 >   torna fácil configurar um ambiente novo no modo errado. Sempre defina `GCAL_AUTH_MODE`
 >   explicitamente.
 >
@@ -76,16 +76,16 @@ O sistema suporta dois modos de autenticação com o Google Calendar, selecionad
 | Modo | Variável | Credenciais | Uso |
 |------|----------|-------------|-----|
 | **OAuth** — ✅ **produção** | `GCAL_AUTH_MODE=oauth` | Credenciais OAuth 2.0 por usuário, cifradas em `GoogleOAuthCredential` | Cada usuário conecta sua conta Google |
-| Service Account — legado | `GCAL_AUTH_MODE=service_account` (**default do código**, `config/settings.py:728`) | `GOOGLE_SERVICE_ACCOUNT_JSON` | Autenticação servidor-a-servidor |
+| Service Account — legado | `GCAL_AUTH_MODE=service_account` (**default do código**, `config/settings.py`) | `GOOGLE_SERVICE_ACCOUNT_JSON` | Autenticação servidor-a-servidor |
 
 > ⚠️ `service_account` ser o **default do código** não significa que seja o modo em uso.
 > Em produção `GCAL_AUTH_MODE=oauth` está definido explicitamente e
 > `GCAL_SERVICE_ACCOUNT_JSON` não existe. **Sempre defina `GCAL_AUTH_MODE` explicitamente**
 > em ambientes novos, ou eles cairão no caminho errado em silêncio.
 >
-> ⚠️ Apenas `GOOGLE_SERVICE_ACCOUNT_JSON` é lido por `config/settings.py:717`.
+> ⚠️ Apenas `GOOGLE_SERVICE_ACCOUNT_JSON` é lido por `config/settings.py`.
 > `GOOGLE_SERVICE_ACCOUNT_FILE` **não** passa pelo settings — é lido direto via `os.getenv`
-> em `apps/core/services/gcal_google_client.py:67`.
+> em `apps/core/services/gcal_google_client.py`.
 
 > Em ambos os modos, `GCAL_CLIENT=google` é obrigatório para chamar a API real. A variável de modo é `GCAL_AUTH_MODE` (**não** `GCAL_CLIENT_MODE`).
 
@@ -380,7 +380,7 @@ is_online = models.BooleanField(
 
 ### UI: Checkbox no Wizard
 
-**Localização**: `v2/frontend/src/pages/Solicitacoes/NewSolicitacaoWizard.tsx:629` (`<Form.Item name="is_online">`)
+**Localização**: `v2/frontend/src/pages/Solicitacoes/NewSolicitacaoWizard.tsx` (`<Form.Item name="is_online">`)
 
 ```jsx
 <Form.Item name="is_online" valuePropName="checked">
@@ -406,7 +406,7 @@ is_online = models.BooleanField(
 
 ### Comportamento no Backend
 
-**Payload Building** — implementação real em `apps/core/services/gcal/payload.py:274`.
+**Payload Building** — implementação real em `build_event_payload` (`apps/core/services/gcal/payload.py`).
 
 > ⚠️ Corrigido em 2026-07-24. Dois pontos: (a) `apps/core/services/gcal_sync_service.py` é hoje
 > apenas uma **fachada de re-export** (`:1-60`) — o código vive no pacote
@@ -464,7 +464,7 @@ A **Fase 4** implementa funcionalidades para **reenviar (resync)** e **cancelar*
 **Descrição**: Republicar solicitação no Google Calendar (força UPDATE)
 
 **Permissão**: `CanUseGcal` (policy `use_gcal` = `{operate_preagenda, approve_solicitation}`,
-`apps/core/rbac/policies.py:129`). *(Corrigido em 2026-07-24: a classe `IsControleOrSuper`
+entrada `use_gcal` de `ACCESS_POLICIES` em `apps/core/rbac/policies.py`). *(Corrigido em 2026-07-24: a classe `IsControleOrSuper`
 não existe no codebase.)*
 
 **Fluxo**:
@@ -497,7 +497,7 @@ curl -X POST http://localhost:8002/api/solicitacoes/123/resync-gcal/ \
 **Descrição**: Cancelar evento no Google Calendar e limpar campos
 
 **Permissão**: `CanUseGcal` (policy `use_gcal` = `{operate_preagenda, approve_solicitation}`,
-`apps/core/rbac/policies.py:129`). *(Corrigido em 2026-07-24: a classe `IsControleOrSuper`
+entrada `use_gcal` de `ACCESS_POLICIES` em `apps/core/rbac/policies.py`). *(Corrigido em 2026-07-24: a classe `IsControleOrSuper`
 não existe no codebase.)*
 
 **Fluxo**:
@@ -754,7 +754,7 @@ export GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}'
 - ✅ `conferenceDataVersion=1` está sendo passado? (ver `gcal_google_client.py`)
 - ✅ Payload inclui `conferenceData`? (ver `_build_payload` com `enable_meet=True`)
 - ✅ Response do Google inclui `hangoutLink`? (verificar logs)
-- ✅ `s.meet_link` está sendo persistido? (ver `upsert_one` em `apps/core/services/gcal/sync.py:143`; a gravação está em `sync.py:292` e `:346`)
+- ✅ `s.meet_link` está sendo persistido? (ver `upsert_one` em `apps/core/services/gcal/sync.py`; a gravação de `s.meet_link` fica nos branches INSERT e UPDATE de `upsert_one`)
 
 **Debug:**
 ```python

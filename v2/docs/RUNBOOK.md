@@ -40,8 +40,8 @@
 > | Problema | Realidade | Onde |
 > |---|---|---|
 > | Projeto errado | O stack chama-se **`aprender_dev`**, não `aprender_v2`. `-p aprender_v2` cria/consulta um projeto vazio e o comando não acha container nenhum | `v2/Makefile:6` |
-> | `IMAGE_TAG` faltando | O compose declara `image: …:${IMAGE_TAG:?IMAGE_TAG is required}`; sem a variável o docker aborta antes de subir qualquer coisa | `infra/docker-compose.yml:54, 98, 122, 146` |
-> | `override.yml` omitido | É o override que traz `build:` e o **bind-mount do fonte** (`../backend:/app`). Sem ele você roda a imagem publicada, não o seu código | `infra/docker-compose.override.yml:15-51` |
+> | `IMAGE_TAG` faltando | O compose declara `image: …:${IMAGE_TAG:?IMAGE_TAG is required}`; sem a variável o docker aborta antes de subir qualquer coisa | `infra/docker-compose.yml` (chave `image:` de web/worker/beat/frontend) |
+> | `override.yml` omitido | É o override que traz `build:` e o **bind-mount do fonte** (`../backend:/app`). Sem ele você roda a imagem publicada, não o seu código | `infra/docker-compose.override.yml` (chaves `build:`/`volumes:`) |
 
 **Prefira os alvos do Makefile.** Eles já carregam projeto, `IMAGE_TAG` e os dois arquivos
 de compose (`Makefile:11`, a variável `DC`):
@@ -279,12 +279,12 @@ $DC ps worker beat
 Notas operacionais:
 - Em **produção** (Docker/Portainer na VM01, **não** systemd) o beat roda com o **scheduler padrão** do
   Celery: `celery -A config beat -l info --schedule /tmp/celerybeat-schedule`
-  (`v2/infra/docker-compose.prod.yml:243`; o `--schedule` aponta para tmpfs porque o root FS é `read_only`).
-  É esse scheduler que respeita o schedule definido em código, em `config/celery.py:35-56`.
+  (`v2/infra/docker-compose.prod.yml`; o `--schedule` aponta para tmpfs porque o root FS é `read_only`).
+  É esse scheduler que respeita o schedule definido em código, em `CELERY_BEAT_SCHEDULE` (`config/celery.py`).
 - Só usar `django_celery_beat.schedulers:DatabaseScheduler` se as `PeriodicTask` estiverem cadastradas no banco.
 - **O beat só agenda; quem executa é o `worker`.** Ao investigar um job que não rodou (ex.: o backup diário
   das 02:00), olhe os **dois**: `logs beat` para o disparo, `logs worker` para a execução. Só o `worker` tem o
-  bind-mount `/backups` (`docker-compose.prod.yml:235`) — ver [BACKUP_OPERATIONS.md](./BACKUP_OPERATIONS.md).
+  bind-mount `/backups` (`docker-compose.prod.yml`) — ver [BACKUP_OPERATIONS.md](./BACKUP_OPERATIONS.md).
 
 ---
 
@@ -553,7 +553,7 @@ $DC exec web python manage.py shell          # shell do Django
 
 > ⛔ **DEV/STAGING APENAS — o comando não existe em produção.** `seed_rbac` vive em
 > `apps/dev_tools` (`v2/backend/apps/dev_tools/management/commands/seed_rbac.py`), e
-> `config/settings.py:137-143` **força `INCLUDE_DEV_TOOLS=False` quando
+> `config/settings.py` **força `INCLUDE_DEV_TOOLS=False` quando
 > `ENVIRONMENT == "production"`**, independentemente da env var (CP-08 / #1466). O app não
 > entra em `INSTALLED_APPS`, então `manage.py seed_rbac` responde *Unknown command* em prod.
 > `docker-compose.prod.yml` ainda fixa `INCLUDE_DEV_TOOLS: "false"` como defesa em
@@ -570,7 +570,7 @@ $DC exec -T web python manage.py seed_rbac
 ```
 
 **Grupos criados:** a união de `SETOR_GROUPS` (13) + `FUNCAO_GROUPS` (5), definidos em
-`v2/backend/apps/core/constants.py:16-45` — essa é a SSOT, não esta lista.
+`v2/backend/apps/core/constants.py` — essa é a SSOT, não esta lista.
 
 - **Setores (13):** Superintendência, Vidas, Fluir, ACerta, Brincando, Sou da Paz, DAT,
   Controle, Diretoria, Comercial, Relacionamento, Logística Viagens, Logística Galpão
@@ -579,10 +579,10 @@ $DC exec -T web python manage.py seed_rbac
 
 > O grupo **"Gerência"** foi **descontinuado** em favor da função **"Gerente"** (#1222). Ele
 > ainda aparece em `PERMS_BY_GROUP` do seed por compatibilidade com testes legados
-> (`seed_rbac.py:89,124-126`), mas **não** está em `ALLOWED_USER_GROUPS` — não atribua
+> (`seed_rbac.py`), mas **não** está em `ALLOWED_USER_GROUPS` — não atribua
 > usuários a ele.
 
-**Permissões atribuídas:** ver `PERMS_BY_GROUP` em `seed_rbac.py:32-92`. A matriz de
+**Permissões atribuídas:** ver `PERMS_BY_GROUP` em `seed_rbac.py`. A matriz de
 autorização real (capabilities/policies) está em
 [rbac_authorization_matrix.md](./rbac_authorization_matrix.md) — as Django permissions do
 seed são só o piso.
@@ -904,10 +904,10 @@ Endpoints RESTful para consulta e criação de ações com **RBAC** (Role-Based 
 > Este runbook citava as duas como permissão destes endpoints. O `rbac_lint`
 > **bane** qualquer `class Is<Word>(...)` fora da whitelist
 > (`IsGerenteSuperintendencia`, `IsOwnerOrPrivileged`) — regra **V002**,
-> `v2/backend/scripts/rbac_lint.py:37-43`, com job obrigatório no CI
+> `v2/backend/scripts/rbac_lint.py`, com job obrigatório no CI
 > (`[required] backend rbac-lint`). O idioma canônico é
 > `HasPerm("<codename>")` ou uma classe `Can*` do Capability Policy Layer; o
-> mapeamento das classes legadas está em `scripts/rbac_codemod.py:36-37`
+> mapeamento das classes legadas está em `CLASS_TO_CODENAME` (`scripts/rbac_codemod.py`)
 > (`IsControleOrSuper → import_spreadsheet`,
 > `IsDATOrSuper → manage_admin_registries`). Convenção completa:
 > [RBAC_NAMING.md](./RBAC_NAMING.md).
@@ -921,17 +921,17 @@ Endpoints RESTful para consulta e criação de ações com **RBAC** (Role-Based 
 > programa de imports órfãos**, junto com o modelo `AcaoControle` que a alimentava — hoje
 > o import de ações grava em `DATAcao`. Não há `path("controle/acoes/", …)` em
 > `v2/backend/apps/core/urls.py`. As rotas `controle/…` que restaram são
-> `controle/import-acoes/` (`urls.py:211-214`), que é **upload de planilha**, e
-> `controle/compras/` (`urls.py:215-219`) — nenhuma delas lista ações. Registro:
+> `controle/import-acoes/` (`urls.py`), que é **upload de planilha**, e
+> `controle/compras/` (`urls.py`) — nenhuma delas lista ações. Registro:
 > `v2/docs/plans/PLANO_IMPORTS_ORFAOS.md` e o cabeçalho de
-> `apps/core/tests/test_controle_dat_api.py:14-16`.
+> `apps/core/tests/test_controle_dat_api.py`.
 
 Para onde ir:
 
 | Se você queria | Use |
 |---|---|
-| Listar ações do ciclo DAT | `GET /api/dat/acoes-ciclo/` (`DATAcaoViewSet`, `urls.py:147`) |
-| Importar ações de planilha | `POST /api/controle/import-acoes/` — `HasPerm("import_spreadsheet")`, `dry_run=true` por padrão (`views_imports.py:48-58`) |
+| Listar ações do ciclo DAT | `GET /api/dat/acoes-ciclo/` (`DATAcaoViewSet`, `urls.py`) |
+| Importar ações de planilha | `POST /api/controle/import-acoes/` — `HasPerm("import_spreadsheet")`, `dry_run=true` por padrão (`ControleImportAcoesView`, `views_imports.py`) |
 | Listar cadastros DAT legados | [API 2](#api-2-cadastros-dat-leitura), abaixo |
 
 ---
@@ -940,7 +940,7 @@ Para onde ir:
 
 **Endpoint:** `GET /api/dat/acoes/`
 
-**Permissão:** `HasPerm("manage_admin_registries")` (`views_controle_dat.py:56`)
+**Permissão:** `HasPerm("manage_admin_registries")` (`DATAcoesListCreateView`, `views_controle_dat.py`)
 
 **Descrição:** Lista cadastros do setor DAT com filtros opcionais.
 
@@ -995,9 +995,9 @@ curl -X GET "http://localhost:8002/api/dat/acoes/?projeto=1&data_inicio=2025-01-
 ```
 
 > A resposta é **paginada**: `StandardPagination` é o
-> `DEFAULT_PAGINATION_CLASS` (`config/settings.py:508-509`), com `page_size=100` e
-> `max_page_size=500`, e honra `?page_size=` (`apps/core/pagination.py:21-23`).
-> Ordenação padrão: `-data_registro`, `municipio_id` (`views_controle_dat.py:57-59`).
+> `DEFAULT_PAGINATION_CLASS` (`config/settings.py`), com `page_size=100` e
+> `max_page_size=500`, e honra `?page_size=` (`apps/core/pagination.py`).
+> Ordenação padrão: `-data_registro`, `municipio_id` (`DATAcoesListCreateView.queryset`, `views_controle_dat.py`).
 
 ---
 

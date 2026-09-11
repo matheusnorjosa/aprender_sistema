@@ -134,7 +134,7 @@
 - Validação de senha e status do usuário (`user_can_authenticate`)
 - Implementação reversível, sem migrations
 - Arquivo: `v2/backend/apps/core/auth_backends.py`
-- Configuração: `AUTHENTICATION_BACKENDS` em `config/settings.py:183-186` (linha atual;
+- Configuração: `AUTHENTICATION_BACKENDS` em `config/settings.py` (linha atual;
   o doc citava 95-101, de 2025)
 
 **Frontend: Placeholder/Label Atualizado**

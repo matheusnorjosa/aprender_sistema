@@ -133,12 +133,12 @@ props. Those are not HTTP — they are plain JS contracts. Keep using
    (`NewSolicitacaoWizard.test.tsx` e `NewSolicitacaoWizard.availability.test.tsx` ainda
    usam `vi.mock` em módulos de API). These produce the biggest fidelity gain.
 4. **Phase 4** — Flip `onUnhandledRequest` from `'bypass'` to `'error'`
-   (`v2/frontend/src/test/setup.js:18`) once the long tail is covered, and remove the two
-   remaining `vi.mock('../config')` callsites: `src/api/__tests__/teamMetrics.test.ts:8`
-   e `src/api/__tests__/dashboard.test.ts:7`.
+   (`v2/frontend/src/test/setup.ts`) once the long tail is covered, and remove the two
+   remaining `vi.mock('../config')` callsites: `src/api/__tests__/teamMetrics.test.ts`
+   e `src/api/__tests__/dashboard.test.ts`.
 
-> ⚠️ Drift no código, não neste doc: o comentário em `v2/frontend/src/test/mocks/server.ts:5`
-> afirma `onUnhandledRequest: 'error'`, mas o valor real em `src/test/setup.js:18` é `'bypass'`.
+> ⚠️ Drift no código, não neste doc: o comentário em `v2/frontend/src/test/mocks/server.ts`
+> afirma `onUnhandledRequest: 'error'`, mas o valor real em `src/test/setup.ts` é `'bypass'`.
 > Corrigir o comentário junto com a Phase 4.
 
 ## Related

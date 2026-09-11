@@ -337,7 +337,7 @@ docker compose exec web python manage.py migrate core 0038
 
 **Views Modificadas** *(caminhos corrigidos em 2026-07-24 — `apps/core/views.py` não existe;
 `apps/core/views/` é um pacote)*:
-- `v2/backend/apps/core/views/admin.py:182` (`ProjetoViewSet`), `get_queryset()` em `:207`
+- `v2/backend/apps/core/views/admin.py` (`ProjetoViewSet`), `get_queryset()` em `:207`
 - `v2/backend/apps/core/views_options.py` (`projetos_options()` function)
 
 **Testes**:

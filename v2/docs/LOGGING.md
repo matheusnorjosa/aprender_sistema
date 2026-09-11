@@ -111,7 +111,7 @@ Fonte: `v2/frontend/src/utils/logger.ts`. Os cinco métodos (`log`, `debug`, `wa
 `error`, `api`) são **todos** condicionados a `import.meta.env.DEV`.
 
 > ⚠️ **Consequência operacional: em produção o frontend não emite nada — nem erros.**
-> `logger.error` também é suprimido (`logger.ts:49-55`), e o envio para Sentry está apenas
+> `logger.error` também é suprimido (`logger.ts`), e o envio para Sentry está apenas
 > comentado como intenção futura. Ao depurar um problema de frontend em produção, **não
 > espere achar rastro no console do navegador**: use a aba Network, os logs do `web` no
 > backend (correlacionados por `request_id`) e reprodução local com `DEV=true`.
@@ -170,7 +170,7 @@ async function badFetch() {
 
 ## Correlation ID (Backend)
 
-O middleware `RequestIDMiddleware` (`config/settings.py:193`) adiciona correlation ID a
+O middleware `RequestIDMiddleware` (`config/settings.py`) adiciona correlation ID a
 todos os logs. Formato real emitido em staging/produção:
 
 ```json
@@ -189,7 +189,7 @@ Usar `request_id` para rastrear um mesmo request entre `web` e `worker`; usar `s
 para saber de qual container a linha veio.
 
 > **Nota de incidente (2026-07-06):** o formatter exclui explicitamente os atributos
-> `request` e `taskName` do LogRecord (`settings.py:646`). Sem isso, cada resposta 4xx/5xx
+> `request` e `taskName` do LogRecord (`reserved_attrs` em `settings.py`). Sem isso, cada resposta 4xx/5xx
 > serializava o objeto `WSGIRequest` inteiro na linha de log — inundação de disco e
 > vazamento de PII. Não remova esse `reserved_attrs`.
 

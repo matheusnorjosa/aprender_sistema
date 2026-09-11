@@ -27,8 +27,8 @@ Formal transactional policy for the critical flows. Tracks issue [#866](https://
 | **Approve (batch)** | `services/solicitacao_approval.py :: batch_approve_solicitacoes` | Function body | `select_for_update(skip_locked=True).order_by('id')` so concurrent batches never deadlock | `skip_locked` drops already-locked rows; concurrent duplicate batches approve 0 | ✅ `@retry_on_deadlock("solicitacao.batch_approve")` |
 | **Reject (batch)** | `services/solicitacao_approval.py :: batch_reject_solicitacoes` | Same | Same | Same | ✅ `@retry_on_deadlock("solicitacao.batch_reject")` |
 | **OAuth refresh** | `services/oauth/token_manager.py :: refresh_access_token_safe` | Function body | `GoogleOAuthCredential.objects.select_for_update().get(id=...)` + double-check `token_expiry` after lock | Second caller short-circuits if token is still valid | ✅ `@retry_on_deadlock("oauth.refresh_access_token")` |
-| **GCal publish (entry point)** | `services/gcal/sync.py :: apply_one_solicitacao` | ⚠️ **NONE — see "Known gaps" below.** The function has no `transaction.atomic()`; each `s.mark_gcal` / `s.save` commits on its own. HTTP call to Google happens outside any tx | Caller (Celery task / management command) is responsible for `select_for_update` on the batch | Deterministic event id + payload hash on `Solicitacao`; duplicate dispatches collapse via `client.get(...)` existence check | ⚠️ Decorator applied (`sync.py:30`) but **ineffective** — see gaps |
-| **GCal low-level upsert** | `services/gcal/sync.py :: upsert_one` (`sync.py:143`) | Each `s.save(update_fields=...)` is atomic on its own; HTTP call happens between saves | Caller contract: wrap in `transaction.atomic()` + `select_for_update` for batch sync | Same — event id + hash | Circuit breaker at HTTP layer (`services/gcal/circuit_breaker.py`, #779) |
+| **GCal publish (entry point)** | `services/gcal/sync.py :: apply_one_solicitacao` | ⚠️ **NONE — see "Known gaps" below.** The function has no `transaction.atomic()`; each `s.mark_gcal` / `s.save` commits on its own. HTTP call to Google happens outside any tx | Caller (Celery task / management command) is responsible for `select_for_update` on the batch | Deterministic event id + payload hash on `Solicitacao`; duplicate dispatches collapse via `client.get(...)` existence check | ⚠️ Decorator applied (`@retry_on_deadlock` em `apply_one_solicitacao`) but **ineffective** — see gaps |
+| **GCal low-level upsert** | `services/gcal/sync.py :: upsert_one` | Each `s.save(update_fields=...)` is atomic on its own; HTTP call happens between saves | Caller contract: wrap in `transaction.atomic()` + `select_for_update` for batch sync | Same — event id + hash | Circuit breaker at HTTP layer (`services/gcal/circuit_breaker.py`, #779) |
 | **GCal publish (DRF entry point)** | `services/solicitacao_publish.py :: publish_to_gcal` (`:168`) | ⚠️ **NONE.** `mark_gcal` (`:229`) e `AuditLog.objects.create` (`:253`) são escritas independentes | — | — | ❌ **Ausente** — zero ocorrências de `transaction.atomic` ou `retry_on_deadlock` no arquivo |
 | **Imports** — 10 services de planilha | `services/*_import.py` (`bloqueios`, `colecoes`, `controle_acoes`, `dat_cadastros`, `deslocamentos`, `equipe_gerencia`, `eventos`, `municipios`, `produtos`, `usuarios`) | Outer `transaction.atomic` for dry-run rollback + **savepoint-per-row** via nested `transaction.atomic` | No explicit row locks — idempotency via unique constraints + `external_hash` | One bad row only aborts itself (savepoint); dry-run still discards the whole batch | ❌ Not yet — imports run offline. |
 | **Import canônico** (`import_export_contract`) | `services/export_contract_importer.py` | ⚠️ Um único `transaction.atomic()` grosso (`:355`) — **sem savepoint-per-row** | Sem locks | `external_hash` / chaves naturais | ❌ Não |
@@ -70,9 +70,9 @@ and are **open gaps**, not documentation errors to be re-closed silently:
 
 1. **`apply_one_solicitacao` viola a regra "non-negotiable" acima.**
    O decorator `@retry_on_deadlock(operation="gcal.apply_one_solicitacao")` está aplicado
-   (`services/gcal/sync.py:30`), mas o corpo da função (`:30-140`) **não abre
+   (em `apply_one_solicitacao`, `services/gcal/sync.py`), mas o corpo da função (`:30-140`) **não abre
    `transaction.atomic()`**. A única ocorrência da string `transaction.atomic` no arquivo inteiro é
-   um **comentário** (`sync.py:184`). Consequência: em caso de `40001`/`40P01`, o retry re-executa
+   um **comentário** em `upsert_one` (`services/gcal/sync.py`). Consequência: em caso de `40001`/`40P01`, o retry re-executa
    a função a partir do zero — inclusive a chamada HTTP ao Google — sem rollback de escritas já
    commitadas. Ou seja, o retry existe no papel e não dá a garantia que o contrato promete.
 
@@ -83,7 +83,7 @@ and are **open gaps**, not documentation errors to be re-closed silently:
    as duas deixa o estado do GCal marcado **sem** o registro de auditoria correspondente.
 
 3. **O importador canônico não tem savepoint-per-row.**
-   `services/export_contract_importer.py:355` usa um único `transaction.atomic()` para o lote
+   O método `run()` de `services/export_contract_importer.py` usa um único `transaction.atomic()` para o lote
    inteiro. Uma linha ruim aborta o lote — comportamento diferente dos 10 services de planilha,
    que seguem o padrão ASQ-016. Como `import_export_contract` é hoje o caminho canônico de import,
    vale decidir se ele deve adotar o mesmo padrão.

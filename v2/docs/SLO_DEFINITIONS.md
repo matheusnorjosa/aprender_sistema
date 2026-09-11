@@ -159,7 +159,7 @@ Error Budget (horas/mês) = (100 - SLO%) × 720 / 100
 > curl -s http://127.0.0.1:8000/metrics | grep -E '^# (HELP|TYPE) django_http' | head -40
 > ```
 > A única métrica customizada do projeto é `as_db_transaction_retries_total`
-> (`apps/core/services/db_retry.py:64`) — ver
+> (`apps/core/services/db_retry.py`) — ver
 > [RUNBOOK_concurrency.md](./RUNBOOK_concurrency.md).
 
 Forma das queries (substituindo pelos nomes reais lidos acima):

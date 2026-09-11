@@ -163,8 +163,8 @@ test_approval_policy_PA.py::test_approval_flow_records_audit_log PASSED
 > vale mais. Além disso, apontava `perform_create` (`views_solicitacao.py`),
 > não `approve()`.
 
-`aprovar_solicitacao` chama `enforce_solicitacao_availability(solicitacao, action="approve")`
-**dentro da transação** (`approve_solicitacao`, `apps/core/services/solicitacao_approval.py`). Isso
+`approve_solicitacao` (`apps/core/services/solicitacao_approval.py`) chama
+`enforce_solicitacao_availability(solicitacao, action="approve")` **dentro da transação**. Isso
 executa `check_conflicts_uncached` por participante (em `check_solicitacao_availability`,
 `apps/core/services/solicitacao_availability.py`) e levanta **`400 availability_conflict`**
 em caso de choque (`raise_if_blocked`).
@@ -210,8 +210,6 @@ direto para `NAO_SUPER` sem chamar `check_conflicts` (`M08-12`, issue
 
 - [#1620](https://github.com/matheusnorjosa/aprender_sistema/issues/1620) — import de eventos grava
   `aprovado` sem o hard gate de disponibilidade do #1452.
-- [#1624](https://github.com/matheusnorjosa/aprender_sistema/issues/1624) — troca de projeto para
-  fluxo SUPER mantém status aprovado (lavagem de aprovação).
 - [#1628](https://github.com/matheusnorjosa/aprender_sistema/issues/1628) — reimport sobrescreve a
   decisão de aprovação e reporta "unchanged".
 

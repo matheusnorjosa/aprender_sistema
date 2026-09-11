@@ -457,6 +457,11 @@ A **Fase 4** implementa funcionalidades para **reenviar (resync)** e **cancelar*
 - **Resync**: Corrigir dados de um evento já publicado (ex: horário alterado, descrição atualizada)
 - **Cancel**: Remover permanentemente um evento do Calendar quando cancelado/reprovado
 
+**Guard de ciclo de vida (M10-03, #1625):** enquanto a sincronização está em andamento
+(`gcal_status == "PENDING"`, entre o enfileiramento da task e sua conclusão), **excluir a
+solicitação é bloqueado** — `perform_destroy` (`views_solicitacao.py`) retorna `400`, senão a
+task Celery operaria sobre um registro já removido. Aguarde a conclusão da sincronização.
+
 ### Endpoints
 
 #### POST /api/solicitacoes/{id}/resync-gcal/

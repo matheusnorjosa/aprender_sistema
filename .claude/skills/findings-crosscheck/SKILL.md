@@ -57,6 +57,15 @@ looks good can hide the *wrong target* — re-measure against the alternative (7
 an FK's target). In this project's history: *"57 fields don't arrive"* → **4**; *"4 import defects"* →
 **0**; *"76 fields to build"* → **31 already had a home**.
 
+**4b. When the alarming number is a command's OWN opaque status** (`skipped_not_found: 43`,
+`would_apply: 0`, `noop: N`), reproduce it by **replaying that command's own service methods per row**
+and tallying *where each row stops* — instantiate the real service and call its own lookups, never
+reimplement them (a reimplementation measures itself, not the system). One opaque count becomes an
+actionable breakdown that localizes the real blocker and often flips the fix: in the v25 reconcile
+(2026-09-11) `skipped_not_found: 43` replayed into `para_nao_resolveu: 38 / sol_nao_encontrada: 5` —
+the 38 were a **missing user in prod**, not a code bug, so the fix was to onboard that person (by CPF,
+the stable key), not to change the reconciler. Output aggregates/booleans only, never PII.
+
 **5. Apply the blind-instrument test.** Ask: *what would I see if my scan were blind?* If the answer is
 "exactly this number", it measured nothing — the empty came from the instrument, not the system.
 Known blind spots that all read as false absence: filter-by-filename (code lives in packages),

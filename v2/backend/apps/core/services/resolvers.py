@@ -248,27 +248,39 @@ def resolve_municipio(nome: str) -> Municipio | None:
 
     qs = Municipio.objects.all()
 
-    # 2) Se UF veio, tentar match direto por (UF + nome case-insensitive)
+    # 2) Se UF veio, tentar match direto por (UF + nome case-insensitive).
     if uf:
-        hit = qs.filter(uf=uf).filter(nome__iexact=cidade).first()
-        if hit:
+        status, hit = _pick_unique(
+            list(qs.filter(uf=uf).filter(nome__iexact=cidade)),
+            kind="Municipio (UF + nome)",
+            needle=nome,
+        )
+        if status == "matched":
             return hit
+        if status == "ambiguous":
+            return None
 
-    # 3) Fallback: match por nome exato (case-insensitive), sem UF
-    hit = qs.filter(nome__iexact=cidade).first()
-    if hit:
+    # 3) Fallback: match por nome exato (case-insensitive), sem UF. Homônimos
+    #    entre UFs ("Bonito" em MS/PA/PE/BA) → ambíguo → None (pendência), nunca
+    #    `.first()` silencioso (#2003, mesmo padrão de _pick_unique/M02-09/#1613).
+    status, hit = _pick_unique(
+        list(qs.filter(nome__iexact=cidade)),
+        kind="Municipio (nome)",
+        needle=nome,
+    )
+    if status == "matched":
+        return hit
+    if status == "ambiguous":
+        return None
+
+    # 4) Fallback: compara NFKD casefold em Python (para acentos), respeitando a
+    #    UF se veio. Também rejeita ambiguidade em vez de pegar o primeiro.
+    nfkd_hits = [m for m in qs if _nfkd(m.nome) == cidade_nfkd and not (uf and m.uf != uf)]
+    status, hit = _pick_unique(nfkd_hits, kind="Municipio (NFKD)", needle=nome)
+    if status == "matched":
         return hit
 
-    # 4) Fallback: compare NFKD casefold em Python (para acentos)
-    for m in qs:
-        m_nfkd = _nfkd(m.nome)
-        if m_nfkd == cidade_nfkd:
-            # Se UF foi especificada, validar
-            if uf and m.uf != uf:
-                continue
-            return m
-
-    # Não encontrado
+    # Não encontrado (ou ambíguo)
     return None
 
 

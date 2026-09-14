@@ -233,6 +233,14 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", s).upper()
 
 
+def _norm_codigo(code: str) -> str:
+    """SKU comparável p/ casar `produto_codigo` (planilha) com `produto.codigo` (catálogo):
+    strip + upper + remove ZERO À ESQUERDA. Normaliza OS DOIS LADOS (#1635): '0402002' e '402002'
+    são o mesmo SKU do Protheus; comparar cru×cru perde quem difere só no zero (medido: 99,4%→99,9%).
+    Vazio permanece vazio (não linka)."""
+    return (code or "").strip().upper().lstrip("0")
+
+
 def _cmp(v: Any) -> str:
     """Forma comparável canônica (bool/None/str) para detectar diferença de campo."""
     if isinstance(v, bool):
@@ -1782,7 +1790,19 @@ class ExportContractImporter:
         codigo (opcional; fallback descricao_produto). status_uso é derivado no save()."""
         actor = self._require_actor("dat_compra")
         mun_idx = self._municipio_index()
-        prod_idx = {(c or "").strip().upper(): pid for pid, c in Produto.objects.values_list("id", "codigo")}
+        # #1635: índice por codigo normalizado (zero à esquerda) nos DOIS lados. Colisão de chave
+        # normalizada entre 2 produtos distintos = ambígua → não linka (fail-closed, sem chute).
+        prod_idx: dict[str, int] = {}
+        _ambiguous_codes: set[str] = set()
+        for pid, c in Produto.objects.values_list("id", "codigo"):
+            key = _norm_codigo(c)
+            if not key:
+                continue
+            if key in prod_idx and prod_idx[key] != pid:
+                _ambiguous_codes.add(key)
+            prod_idx.setdefault(key, pid)
+        for key in _ambiguous_codes:
+            prod_idx.pop(key, None)
         existing = set(
             DATCompra.objects.values_list(
                 "municipio_id", "projeto_id", "descricao_produto", "tipo", "quantidade", "ano_uso", "data_compra"
@@ -1800,7 +1820,7 @@ class ExportContractImporter:
             DATCompra.objects.create(
                 municipio_id=mun_id,
                 projeto_id=proj_id,
-                produto_id=prod_idx.get((r.get("produto_codigo") or "").strip().upper()),
+                produto_id=prod_idx.get(_norm_codigo(r.get("produto_codigo") or "")),
                 descricao_produto=nk[2],
                 tipo=nk[3],
                 conta_para_codigos=_to_bool(r.get("conta_para_codigos")),

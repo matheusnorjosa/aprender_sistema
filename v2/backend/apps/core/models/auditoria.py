@@ -82,6 +82,8 @@ class AuditLog(models.Model):
 
         # Bloqueios delegados
         DELEGATE_BLOCK_CREATE = "DELEGATE_BLOCK_CREATE", "Criar bloqueio delegado"
+        DELEGATE_BLOCK_UPDATE = "DELEGATE_BLOCK_UPDATE", "Editar bloqueio delegado"
+        DELEGATE_BLOCK_DELETE = "DELEGATE_BLOCK_DELETE", "Apagar bloqueio delegado"
 
         # Notificacoes
         CICLO_ACOES_CREATE = "CICLO_ACOES_CREATE", "Criar ciclo de acoes"

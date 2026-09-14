@@ -1,14 +1,7 @@
 name: Documentation
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'docs/**'
-      - 'mkdocs.yml'
-      - 'requirements-docs.txt'
-      - '.github/workflows/docs.yml'
+  # Gatilho push removido em 2026-09-14 (dedupe pos-merge) -- ver nota em ci.yaml.
   pull_request:
     branches:
       - main

@@ -1,12 +1,7 @@
 name: frontend-ci
 
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - 'v2/frontend/**'
-      - '.github/workflows/frontend-ci.yml'
-      - '.github/actions/setup-node-deps/**'
+  # Gatilho push removido em 2026-09-14 (dedupe pos-merge) -- ver nota em ci.yaml.
   pull_request:
     branches: [ main ]
     # Removed path filters for pull_request to ensure required check always runs

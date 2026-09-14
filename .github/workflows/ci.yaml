@@ -1,8 +1,16 @@
 name: CI – Continuous Integration
 
 on:
-  push:
-    branches: [ main ]
+  # Só pull_request (e não push na main): o GitHub testa o COMMIT DE MERGE no
+  # evento pull_request, então quando o merge acontece o veredito já existe — a
+  # antiga execução em push só reconfirmava o confirmado (ganho é relógio e ruído,
+  # não custo: repo público tem runner grátis). Gatilho push removido em 9 workflows
+  # de verificação em 2026-09-14.
+  #
+  # ⚠️ O QUE SE PERDE (leia antes de reativar o push): não existe mais execução que
+  # prove a main DEPOIS do merge, e push direto na main deixa de ser conferido. O
+  # portão passou a ser EXCLUSIVAMENTE o PR (ruleset "Protect main": PR obrigatório
+  # + 14 checks required). Os outros 8 workflows dedupados referenciam esta nota.
   pull_request:
     branches: [ main ]
 

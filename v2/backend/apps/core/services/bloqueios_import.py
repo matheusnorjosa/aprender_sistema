@@ -31,6 +31,17 @@ from apps.core.services.resolvers import resolve_user_by_name
 
 TZ = ZoneInfo("America/Fortaleza")
 
+# Decisão do dono (2026-09-14): o alvo do bloqueio é validado pela DATA do bloqueio
+# (campo `inicio`). ANTES desta data → qualquer usuário (dados históricos). A PARTIR
+# dela → só Formador ATIVO (senão pendência). O cutoff é a data do BLOQUEIO, não a do
+# import. Complementa #2011 (created_by + AuditLog).
+_FORMADOR_CUTOFF = date(2026, 7, 31)
+
+
+def _is_active_formador(usuario: Any) -> bool:
+    """A partir de `_FORMADOR_CUTOFF`, o alvo precisa ser Formador ativo."""
+    return bool(usuario.is_active and usuario.groups.filter(name="Formador").exists())  # noqa: RBAC-composite-allowed
+
 
 def import_bloqueios_from_file(*, path: str, dry_run: bool = True, actor: Any = None) -> dict[str, Any]:
     """
@@ -278,6 +289,19 @@ def _process_row(
                 "inicio": str(inicio),
                 "fim": str(fim),
                 "erro": "fim <= inicio",
+            }
+        )
+        return
+
+    # Alvo por DATA do bloqueio (decisão do dono 2026-09-14): a partir do cutoff,
+    # só Formador ativo; antes é histórico e aceita qualquer usuário.
+    if inicio.date() >= _FORMADOR_CUTOFF and not _is_active_formador(usuario):
+        stats["skipped"]["usuario"] += 1
+        pendencias["usuarios"].append(
+            {
+                "linha": linha_num,
+                "nome": nome,
+                "motivo": "A partir de 31/07/2026, bloqueio só para Formador ativo.",
             }
         )
         return

@@ -185,7 +185,7 @@ As colunas `cancelar` e `atualizar` **não são lidas pelo service**: `_normaliz
 | Sim | **Ignorar** (idempotente) | 🔴 **`update_or_create` sobrescreve** `usuario`, `coordenador`, `municipio`, `projeto`, `tipo_evento`, `inicio`, `fim`, `status`, `observacoes`, `local`, `encontro`, `segmento` |
 | Sim, com `cancelar=true` | Não cancelar; relatar | Coluna ignorada; a linha é aplicada como qualquer outra |
 | Sim, com `atualizar=true` | Não atualizar; relatar | Coluna ignorada; **atualiza de qualquer jeito** |
-| Sim, e algo mudou | Contar como `updated` | 🔴 Conta como **`unchanged`** — `changed` é calculado após o save (#1628) |
+| Sim, e algo mudou | Contar como `updated` | ✅ **#2021**: conta `updated` (diff real, comparado ANTES da escrita) (#1628) |
 
 ---
 
@@ -199,7 +199,7 @@ As colunas `cancelar` e `atualizar` **não são lidas pelo service**: `_normaliz
 | Model `Municipio`, `Projeto`, `TipoEvento` | `apps/core/models/organizacao.py` | FKs | ✅ existe |
 | **Service de import** | `apps/core/services/eventos_import.py` | `import_eventos_from_file(*, path: str, dry_run: bool = True) -> dict`. Status inicial vem de `resolve_initial_status(projeto=projeto)` (`:497`) — **só o `fluxo` decide, a data não** (`:23`). Cria 1 `Participation(role='COORDENADOR')` + até 5 `Participation(role='FORMADOR')`. Idempotência por `external_hash` SHA-1. Timezone `America/Fortaleza` (`:55`). | ✅ **já implementado** |
 | Resolvers usados | `apps/core/services/resolvers.py` | `resolve_municipio`, `resolve_projeto`, `resolve_tipo_evento`, `resolve_user_by_email`, `resolve_user_by_name` | ✅ existe |
-| Service availability | `apps/core/services/availability_service.py:check_conflicts()` | RD-01..08 — 🔴 **não é chamado pelo import.** Nem `availability_service` nem `solicitacao_availability` aparecem nos imports de `eventos_import.py:38-53`. Uma linha `NAO_SUPER` vira solicitação **aprovada** sem passar pelo hard gate — `M08-12` / [#1620](https://github.com/matheusnorjosa/aprender_sistema/issues/1620) | ✅ existe, ❌ não usado aqui |
+| Service availability | `solicitacao_availability.check_solicitacao_availability()` | RD-01..08 — ✅ **#2021**: chamado pelo import p/ evento **FUTURO** (conflito → pendência `availability`, não grava); histórico entra sem checar (decisão do dono) — `M08-12` / [#1620](https://github.com/matheusnorjosa/aprender_sistema/issues/1620) | ✅ existe e usado (futuro) |
 | **Endpoint síncrono** | `POST /api/solicitacoes/import/` (`ImportEventosView` em `apps/core/views_import_eventos.py`) | dry_run via query param; multipart `file=` no body | ✅ **já funciona** |
 | Endpoint async | (não implementado para eventos) | ASQ-005 Fase 2 migrará | ⏳ Fase 2 do `ImportJob` |
 | Gate RBAC efetivo | `IsAuthenticated + HasPerm("import_spreadsheet")` (DAT) | NÃO `manage_admin_registries` — eventos é operacional, não cadastro | ✅ aplicado em prod |
@@ -265,9 +265,9 @@ import percebe. Achado `M10-07` / [#1628](https://github.com/matheusnorjosa/apre
 |---|---|---|
 | Publicar no Google Calendar | PA-03: integrações pós-aprovação manual | ✅ sim — nenhum client GCal é importado pelo service |
 | Aprovar Solicitacao de fluxo SUPER | PA-01: SUPER nunca auto-aprova | ✅ sim — `resolve_initial_status` devolve `pendente` |
-| Aprovar sem checar disponibilidade | RD-01..08 é invariante de domínio | ❌ **não** — `NAO_SUPER` entra `aprovado` sem `check_conflicts` (#1620) |
+| Aprovar sem checar disponibilidade | RD-01..08 é invariante de domínio | ✅ **#2021** p/ evento futuro — conflito → pendência `availability`; histórico entra sem checar (#1620) |
 | Cancelar Solicitacao mesmo com `cancelar=true` | Cancel envolve policy + AuditLog | ✅ na prática — a coluna nem é lida (`:159-256`) |
-| Atualizar Solicitacao mesmo com `atualizar=true` | Update precisa passar por RD-01..08 | ❌ **não** — atualiza sempre que o hash bate, independente da coluna (#1628) |
+| Atualizar Solicitacao mesmo com `atualizar=true` | Update precisa passar por RD-01..08 | ✅ **#2021** — reimport protege status/owner/local (divergência → pendência `protected`) (#1628) |
 | Criar Usuario novo (Coordenador/Formador inexistente) | Usuários vêm do import #1; agenda só reconcilia | ✅ sim — não resolvido vira `pendencias.usuarios` |
 | Criar Municipio/Projeto novo | Cadastros mestres vêm dos passos 3-4 da ordem | ✅ sim — não resolvido vira pendência e a linha é pulada |
 | Reconciliar formador para a pessoa errada | Homônimo entra na agenda de terceiro | ❌ **não** — `resolve_user_by_name` usa substring + `.first()` (#1643) |
@@ -287,7 +287,7 @@ emitidos exclusivamente pelo caminho assíncrono (`apps/core/tasks.py:634,669`),
 `bloqueios`. Nenhuma view nem service de import síncrono grava `AuditLog`.
 
 Combinado com o sobrescrito silencioso de §9, isto significa: **um reimport pode apagar uma
-decisão de aprovação sem deixar rastro nenhum**. É a razão de #1628 ser P1 e não cosmético.
+decisão de aprovação sem deixar rastro nenhum** — era a razão de #1628 ser P1. **Resolvido no #2021**: o reimport não sobrescreve mais campo protegido (status/owner/local → pendência).
 
 ### Drift check
 - Comparar `Solicitacao.objects.filter(created_at__date=<dia>).count()` com `linhas_criadas`.
@@ -311,8 +311,8 @@ Gerar lista de:
 |---|---|---|
 | **Publicação automática em GCal** | Crítica | ✅ Mitigado — o service não importa nenhum client GCal |
 | **Aprovação automática de fluxo SUPER** | Crítica | ✅ Mitigado — `resolve_initial_status` devolve `pendente` (`:497`) |
-| **Aprovação de `NAO_SUPER` sem hard gate de disponibilidade** | **P1 vivo** | ❌ **Nenhuma** — [#1620](https://github.com/matheusnorjosa/aprender_sistema/issues/1620) |
-| **Update automático sobrescrevendo decisões, owner e datas** | **P1 vivo** | ❌ **Nenhuma** — e ainda reporta `unchanged` ([#1628](https://github.com/matheusnorjosa/aprender_sistema/issues/1628)) |
+| **Aprovação de `NAO_SUPER` sem hard gate de disponibilidade** | ✅ Resolvido | **#2021** — gate RD-01..08 p/ evento FUTURO (conflito → pendência `availability`); histórico entra sem checar — [#1620](https://github.com/matheusnorjosa/aprender_sistema/issues/1620) |
+| **Update automático sobrescrevendo decisões, owner e datas** | ✅ Resolvido | **#2021** — reimport protege status/owner/local (→ pendência `protected`) + diff real ([#1628](https://github.com/matheusnorjosa/aprender_sistema/issues/1628)) |
 | **Match errado de Formador/Coordenador por nome (homônimos)** | **P1 vivo** | ❌ **Nenhuma** — substring + `.first()` (`resolvers.py:89-131`), [#1643](https://github.com/matheusnorjosa/aprender_sistema/issues/1643) |
 | Colisão de hash entre turmas simultâneas | Alta | ❌ Nenhuma — a chave não inclui formador nem coordenador (§7) |
 | Cancel automático destruindo dados | Alta | ✅ Na prática — a coluna `cancelar` não é lida |

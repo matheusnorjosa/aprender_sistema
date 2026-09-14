@@ -14,9 +14,7 @@ on:
   pull_request:
     branches:
       - main
-  push:
-    branches:
-      - main
+  # Gatilho push removido em 2026-09-14 (dedupe pos-merge) -- ver nota em ci.yaml.
   workflow_dispatch:
 
 permissions:

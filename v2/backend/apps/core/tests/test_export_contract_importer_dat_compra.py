@@ -16,7 +16,7 @@ from typing import Any
 
 import pytest
 
-from apps.core.models import DATCompra, DATRegistro, ProjetoGeral
+from apps.core.models import DATCompra, DATRegistro, Produto, ProjetoGeral
 from apps.core.services.export_contract_importer import ExportContractImporter
 from apps.core.tests.factories import MunicipioFactory, ProjetoFactory, UsuarioFactory
 
@@ -226,3 +226,38 @@ def test_projeto_geral_alias_ambiguo_rejeitado(tmp_path):
     r = ExportContractImporter(path=path, apply=True, allow=("projeto_geral",), actor=actor).run()
     assert r["por_entidade"]["projeto_geral"]["would_reject"] == 1
     assert not ProjetoGeral.objects.filter(nome__icontains="ESCREVER COMUNICAR").exists()
+
+
+def test_apply_dat_compra_liga_produto_por_codigo_normalizando_zero(tmp_path):
+    """#1635: liga DATCompra.produto por `produto_codigo` == `produto.codigo` normalizando o
+    ZERO À ESQUERDA nos DOIS lados. SKU ausente do catálogo fica sem ligação (contado, não inventado).
+
+    RED no código antigo: `_apply_dat_compra` indexava/consultava só com `.strip().upper()`, então
+    '0402002' (catálogo) × '402002' (planilha) não casavam → produto NULL.
+    """
+    actor = _actor()
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    proj = ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
+    p_zero = Produto.objects.create(codigo="0402002", nome="Produto Com Zero", projeto=proj)
+    p_semzero = Produto.objects.create(codigo="507", nome="Produto Sem Zero", projeto=proj)
+    rows = "\n".join(
+        [
+            # catálogo TEM zero, planilha SEM zero
+            "Cidade X,CE,Proj X,402002,desc A,Professor,true,10,2026,2026-06-08",
+            # catálogo SEM zero, planilha COM zeros
+            "Cidade X,CE,Proj X,0000507,desc B,Professor,true,20,2026,2026-06-08",
+            # SKU ausente do catálogo -> NULL (contado, não inventado)
+            "Cidade X,CE,Proj X,999999,desc C,Professor,true,30,2026,2026-06-08",
+        ]
+    )
+    r = ExportContractImporter(
+        path=_write_export(tmp_path, {"dat_compra": f"{COMPRA_HEADER}\n{rows}\n"}),
+        apply=True,
+        allow=("dat_compra",),
+        actor=actor,
+    ).run()
+    assert r["applied"]["dat_compra"] == 3
+    by_desc = {c.descricao_produto: c for c in DATCompra.objects.all()}
+    assert by_desc["desc A"].produto_id == p_zero.id  # 402002 -> 0402002 (RED: NULL hoje)
+    assert by_desc["desc B"].produto_id == p_semzero.id  # 0000507 -> 507 (RED: NULL hoje)
+    assert by_desc["desc C"].produto_id is None  # SKU ausente do catálogo

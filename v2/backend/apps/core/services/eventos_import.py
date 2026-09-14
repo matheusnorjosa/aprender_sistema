@@ -720,7 +720,7 @@ def _sync_participations(
                 "linha": linha_num,
                 "solicitacao_id": solicitacao.pk,
                 "usuario_id": p.usuario_id,
-                "nome": (str(p.usuario.get_full_name() or p.usuario.username) if p.usuario_id else None),
+                "nome": (str(p.usuario.get_full_name() or p.usuario.username) if p.usuario else None),
                 "role": p.role,
             }
         )

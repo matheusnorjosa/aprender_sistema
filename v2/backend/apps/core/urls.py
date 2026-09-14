@@ -98,6 +98,7 @@ from .views_oauth import (
 )
 from .views_options import (
     areas_options,
+    colecoes_options,
     coordenadores_options,
     formadores_do_setor_options,
     municipios_options,
@@ -324,6 +325,7 @@ urlpatterns = [
     path("options/tipos-evento/", tipos_evento_options, name="options-tipos-evento"),
     path("options/usuarios/", usuarios_options, name="options-usuarios"),
     path("options/produtos/", produtos_options, name="options-produtos"),
+    path("options/colecoes/", colecoes_options, name="options-colecoes"),
     path("options/coordenadores/", coordenadores_options, name="options-coordenadores"),
     path("options/areas/", areas_options, name="options-areas"),
     path("options/formadores-do-setor/", formadores_do_setor_options, name="options-formadores-do-setor"),

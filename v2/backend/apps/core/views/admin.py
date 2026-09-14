@@ -244,7 +244,7 @@ class ProdutoViewSet(viewsets.ModelViewSet):  # type: ignore[misc]
         - codigo (icontains via search)
     """
 
-    queryset = Produto.objects.select_related("projeto").order_by("codigo")
+    queryset = Produto.objects.select_related("projeto", "colecao").order_by("codigo")
     serializer_class = ProdutoSerializer
     # PR 4 hardening RBAC (2026-04-30, #1258): list/retrieve/CRUD são
     # operações admin/operacionais — não devem ficar abertas a qualquer

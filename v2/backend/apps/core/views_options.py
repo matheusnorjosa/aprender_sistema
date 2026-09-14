@@ -19,8 +19,9 @@ from rest_framework.response import Response
 
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
-from .models import DATArea, DATCoordenador, Municipio, Produto, Projeto, TipoEvento, Usuario
+from .models import Colecao, DATArea, DATCoordenador, Municipio, Produto, Projeto, TipoEvento, Usuario
 from .serializers import (
+    ColecaoOptionSerializer,
     MunicipioOptionSerializer,
     ProdutoOptionSerializer,
     ProjetoOptionSerializer,
@@ -251,6 +252,43 @@ def produtos_options(request: Request) -> Response:
 
     produtos = Produto.objects.filter(ativo=True).order_by("nome")
     serializer = ProdutoOptionSerializer(produtos, many=True)
+    data = serializer.data
+
+    cache.set(cache_key, data, timeout=settings.CACHE_DEFAULT_TIMEOUT)
+    return Response(data)
+
+
+@extend_schema(
+    methods=["GET"],
+    summary="Listar coleções para opções",
+    parameters=[
+        OpenApiParameter("projeto", int, description="Filtra coleções de um projeto/família (opcional)"),
+    ],
+    responses=ColecaoOptionSerializer(many=True),
+    tags=["options"],
+)
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def colecoes_options(request: Request) -> Response:
+    """
+    GET /api/options/colecoes/
+
+    Retorna coleções para o dropdown do cadastro de Produto (Produto.colecao).
+    `?projeto=<id>` (opcional) restringe às coleções da família selecionada.
+
+    Permissions: IsAuthenticated
+    Cache: 5 minutos (por projeto)
+    """
+    projeto_id = request.query_params.get("projeto")
+    cache_key = f"static_endpoint:colecoes_options:projeto={projeto_id or 'all'}"
+    cached_data = cache.get(cache_key)
+    if cached_data is not None:
+        return Response(cached_data)
+
+    colecoes = Colecao.objects.all().order_by("nome")
+    if projeto_id:
+        colecoes = colecoes.filter(projeto_id=projeto_id)
+    serializer = ColecaoOptionSerializer(colecoes, many=True)
     data = serializer.data
 
     cache.set(cache_key, data, timeout=settings.CACHE_DEFAULT_TIMEOUT)

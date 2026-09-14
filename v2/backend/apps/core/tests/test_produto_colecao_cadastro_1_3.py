@@ -10,7 +10,7 @@ de cadastro direto forward-looking.) Aqui a coleção passa a ser cadastrável
 diretamente (write) e exibível (`colecao_nome`).
 """
 
-# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportOptionalSubscript=false
 
 from __future__ import annotations
 

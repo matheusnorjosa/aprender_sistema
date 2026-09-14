@@ -72,6 +72,13 @@ def api_client():
 
 
 @pytest.fixture
+def gerencia_vidas(db):
+    """Catálogo semeado: o import RESOLVE contra ele, não cria (#1615). `resolve_gerencia`
+    casa por `nome_setor__iexact='Vidas'`."""
+    return Gerencia.objects.create(nome="GERENCIA VIDAS", nome_setor="Vidas", ativo=True)
+
+
+@pytest.fixture
 def usuario_formador(db):
     return UsuarioFactory(
         username="formador1",
@@ -138,7 +145,7 @@ Vidas,APOIO,{usuario_formador.email}
 
 @pytest.mark.django_db
 class TestEquipeGerenciaImportService:
-    def test_dry_run_does_not_persist(self, sample_csv):
+    def test_dry_run_does_not_persist(self, sample_csv, gerencia_vidas):
         initial_count = EquipeGerencia.objects.count()
         result = import_equipe_gerencia_from_file(path=sample_csv, dry_run=True)
 
@@ -146,18 +153,34 @@ class TestEquipeGerenciaImportService:
         assert result["stats"]["created"] == 1
         assert EquipeGerencia.objects.count() == initial_count
 
-    def test_apply_creates_equipes(self, sample_csv):
+    def test_apply_creates_equipes(self, sample_csv, gerencia_vidas):
         result = import_equipe_gerencia_from_file(path=sample_csv, dry_run=False)
         assert result["stats"]["created"] == 1
         assert EquipeGerencia.objects.count() == 1
-        assert Gerencia.objects.filter(nome_setor__iexact="Vidas").exists()
+        # #1615: o import RESOLVE contra o catálogo semeado; não duplica a Gerencia.
+        assert Gerencia.objects.filter(nome_setor__iexact="Vidas").count() == 1
 
-    def test_apoio_requires_supervisor(self, sample_csv_apoio_missing_supervisor):
+    def test_unmatched_setor_goes_to_pendencia_not_created(self, sample_csv):
+        """#1615: setor sem Gerencia no catálogo → pendência, NÃO cria unidade nova.
+
+        Sem `gerencia_vidas` semeada, "Vidas" não resolve → pendência `setor_missing`; nenhuma
+        Gerencia nem EquipeGerencia é criada. RED no código antigo (get_or_create criava a unidade).
+        """
+        assert Gerencia.objects.count() == 0
+        result = import_equipe_gerencia_from_file(path=sample_csv, dry_run=False)
+
+        assert result["stats"]["created"] == 0
+        assert result["stats"]["skipped"]["setor_missing"] == 1
+        assert len(result["pendencias"]["setor_missing"]) == 1
+        assert Gerencia.objects.count() == 0  # RED: hoje cria "GERENCIA VIDAS"
+        assert EquipeGerencia.objects.count() == 0
+
+    def test_apoio_requires_supervisor(self, sample_csv_apoio_missing_supervisor, gerencia_vidas):
         result = import_equipe_gerencia_from_file(path=sample_csv_apoio_missing_supervisor, dry_run=False)
         assert result["stats"]["skipped"]["apoio_supervisor_missing"] == 1
         assert EquipeGerencia.objects.count() == 0
 
-    def test_apoio_with_supervisor(self, sample_csv_apoio):
+    def test_apoio_with_supervisor(self, sample_csv_apoio, gerencia_vidas):
         result = import_equipe_gerencia_from_file(path=sample_csv_apoio, dry_run=False)
         assert result["stats"]["created"] == 1
         equipe = EquipeGerencia.objects.first()
@@ -210,7 +233,7 @@ def _csv_ativo(email: str, ativo: str) -> str:
 class TestEquipeGerenciaVigenciaWriter:
     """Reimport inativa/reativa a MESMA linha (janela única); valid_from da entrada é preservado."""
 
-    def test_inactivate_sets_valid_to_today(self, usuario_formador):
+    def test_inactivate_sets_valid_to_today(self, usuario_formador, gerencia_vidas):
         import_equipe_gerencia_from_file(path=_csv_ativo(usuario_formador.email, "true"), dry_run=False)
         m = EquipeGerencia.objects.get(usuario=usuario_formador)
         assert m.ativo is True and m.valid_to is None
@@ -224,7 +247,7 @@ class TestEquipeGerenciaVigenciaWriter:
         assert m.valid_to == timezone.localdate()
         assert m.valid_from == entrada  # entrada original intocada
 
-    def test_reactivate_clears_valid_to(self, usuario_formador):
+    def test_reactivate_clears_valid_to(self, usuario_formador, gerencia_vidas):
         import_equipe_gerencia_from_file(path=_csv_ativo(usuario_formador.email, "true"), dry_run=False)
         import_equipe_gerencia_from_file(path=_csv_ativo(usuario_formador.email, "false"), dry_run=False)
         m = EquipeGerencia.objects.get(usuario=usuario_formador)
@@ -238,7 +261,7 @@ class TestEquipeGerenciaVigenciaWriter:
         assert m.valid_to is None  # janela reaberta
         assert m.valid_from == entrada  # NÃO cria nova entrada
 
-    def test_idempotent_reimport_leaves_window_open(self, usuario_formador):
+    def test_idempotent_reimport_leaves_window_open(self, usuario_formador, gerencia_vidas):
         import_equipe_gerencia_from_file(path=_csv_ativo(usuario_formador.email, "true"), dry_run=False)
         result = import_equipe_gerencia_from_file(path=_csv_ativo(usuario_formador.email, "true"), dry_run=False)
         assert result["stats"]["unchanged"] == 1

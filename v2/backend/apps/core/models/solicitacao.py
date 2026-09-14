@@ -422,6 +422,14 @@ class Participation(models.Model):
                     models.Q(usuario__isnull=True) & models.Q(guest_email__isnull=True) & ~models.Q(guest_nome="")
                 ),
             ),
+            # role dentro de Role.choices — CHECK no banco (integridade, auditoria #4): o import
+            # grava por ORM direto sem full_clean, e `choices` so valida no Python. Espelha os 5
+            # enums ja protegidos na migration 0032. Lista literal (como a 0032) — se Role mudar,
+            # makemigrations exige nova migration.
+            models.CheckConstraint(
+                name="core_participation_role_valid",
+                condition=models.Q(role__in=["COORDENADOR", "FORMADOR", "COORD_ACOMPANHA", "CONVIDADO"]),
+            ),
         ]
         indexes = [
             models.Index(fields=["solicitacao", "role"]),

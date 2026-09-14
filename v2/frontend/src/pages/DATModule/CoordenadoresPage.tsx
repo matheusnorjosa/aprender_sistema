@@ -56,6 +56,7 @@ import {
 import {
   listCoordenadoresDAT,
   createCoordenadorDAT,
+  getCoordenadorDAT,
   updateCoordenadorDAT,
   deleteCoordenadorDAT,
   getCoordenadorAlocacoes,
@@ -244,13 +245,25 @@ export default function CoordenadoresPage(): JSX.Element {
   };
 
   // Memoized handlers (§2 Epic #459)
-  const handleEdit = useCallback((record: CoordenadorRecord) => {
+  // M18-05 (#1654): o form de edição NÃO pode ser populado pela linha da lista — o list
+  // serializer não traz observacoes/email_alternativo/telefone_alternativo, e setFieldsValue
+  // é aditivo (campos ausentes vazam do registro anterior e o PATCH os sobrescreve). Busca o
+  // DETAIL e reseta o form antes. Espelha AcoesPage/CadastrosPage (M17-02) e ComprasPage (#1636).
+  const handleEdit = useCallback(async (record: CoordenadorRecord) => {
+    form.resetFields();
     setEditingCoordenador(record);
-    form.setFieldsValue({
-      ...record,
-      data_admissao: record.data_admissao ? dayjs(record.data_admissao) : null,
-    });
     setModalVisible(true);
+    try {
+      const detail = (await getCoordenadorDAT(record.id)) as unknown as CoordenadorRecord;
+      setEditingCoordenador(detail);
+      form.setFieldsValue({
+        ...detail,
+        data_admissao: detail.data_admissao ? dayjs(detail.data_admissao) : null,
+      });
+    } catch (error) {
+      message.error(`Erro ao carregar coordenador: ${(error as Error).message}`);
+      setModalVisible(false);
+    }
   }, [form]);
 
   const handleView = useCallback(async (record: CoordenadorRecord) => {
@@ -852,7 +865,7 @@ export default function CoordenadoresPage(): JSX.Element {
               onClick={() => {
                 setDetailModalVisible(false);
                 if (viewingCoordenador) {
-                  handleEdit(viewingCoordenador);
+                  void handleEdit(viewingCoordenador);
                 }
               }}
             >

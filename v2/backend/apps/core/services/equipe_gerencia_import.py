@@ -247,32 +247,38 @@ def _generate_gerencia_nome(nome_setor: str) -> str:
     return mapping.get(nome_setor, f"GERENCIA {nome_setor.upper()}")
 
 
-def _get_or_create_gerencia(nome_setor: str, stats: dict[str, Any]) -> Gerencia | None:
-    """Obtém ou cria uma Gerencia pelo nome do setor."""
+def _resolve_gerencia(nome_setor: str) -> Gerencia | None:
+    """Resolve uma Gerencia EXISTENTE pelo setor/nome. NÃO cria (fail-closed, #1615).
+
+    Ordem de match: nome_setor canônico → nome == setor → nome == nome-gerado. Miss = None,
+    para o chamador tratar como pendência — o catálogo de gerências é SSOT semeado; a planilha
+    resolve contra ele, não provisiona unidade nova por rótulo (evita duplicata por grafia).
+    """
     nome_setor = SETOR_MAPPING.get(nome_setor, nome_setor)
     nome_gerencia = _generate_gerencia_nome(nome_setor)
+    return (
+        Gerencia.objects.filter(nome_setor__iexact=nome_setor).first()
+        or Gerencia.objects.filter(nome__iexact=nome_setor).first()
+        or Gerencia.objects.filter(nome__iexact=nome_gerencia).first()
+    )
 
-    gerencia = Gerencia.objects.filter(nome_setor__iexact=nome_setor).first()
+
+def _get_or_create_gerencia(nome_setor: str, stats: dict[str, Any]) -> Gerencia | None:
+    """Resolve ou CRIA a Gerencia — caminho do export_contract `--apply` autorizado.
+
+    Diferente do import de equipe (#1615, resolve-only via `_resolve_gerencia`): o import mestre
+    pode provisionar a unidade quando não existe. Mantém o comportamento de criar no miss.
+    """
+    gerencia = _resolve_gerencia(nome_setor)
     if gerencia:
         stats["gerencias_existing"] += 1
         return gerencia
 
-    gerencia = Gerencia.objects.filter(nome__iexact=nome_setor).first()
-    if gerencia:
-        stats["gerencias_existing"] += 1
-        return gerencia
-
-    gerencia = Gerencia.objects.filter(nome__iexact=nome_gerencia).first()
-    if gerencia:
-        stats["gerencias_existing"] += 1
-        return gerencia
-
+    nome_setor_c = SETOR_MAPPING.get(nome_setor, nome_setor)
+    nome_gerencia = _generate_gerencia_nome(nome_setor_c)
     gerencia, created = Gerencia.objects.get_or_create(
         nome=nome_gerencia,
-        defaults={
-            "nome_setor": nome_setor,
-            "ativo": True,
-        },
+        defaults={"nome_setor": nome_setor_c, "ativo": True},
     )
     if created:
         stats["gerencias_created"] += 1
@@ -365,11 +371,16 @@ def _process_row(
         )
         return
 
-    gerencia = _get_or_create_gerencia(setor, stats)
+    # #1615: resolve-only. O import NÃO cria Gerencia por rótulo (catálogo é SSOT semeado);
+    # miss → pendência para decisão humana (cadastrar a unidade OU corrigir a grafia da planilha).
+    gerencia = _resolve_gerencia(setor)
     if not gerencia:
         stats["skipped"]["setor_missing"] += 1
-        pendencias["setor_missing"].append({"linha": linha_num, "erro": "Gerencia nao encontrada", "setor": setor})
+        pendencias["setor_missing"].append(
+            {"linha": linha_num, "erro": "Gerencia nao encontrada no catalogo (nao criada por rotulo)", "setor": setor}
+        )
         return
+    stats["gerencias_existing"] += 1
 
     usuario = _resolve_usuario(
         row.get("usuario_cpf", "").strip(),

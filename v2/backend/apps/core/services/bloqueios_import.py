@@ -327,8 +327,8 @@ def _process_row(
                 action=AuditLog.Action.DELEGATE_BLOCK_CREATE,
                 model_name="AvailabilityBlock",
                 details={
-                    "target_user_id": usuario.id,
-                    "block_id": block.id,
+                    "target_user_id": usuario.pk,
+                    "block_id": block.pk,
                     "inicio": inicio.isoformat(),
                     "fim": fim.isoformat(),
                     "origem": "import",

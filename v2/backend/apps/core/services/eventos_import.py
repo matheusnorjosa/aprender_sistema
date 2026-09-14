@@ -20,9 +20,17 @@ Regras de negocio (PA-01/PA-04):
 - Status inicial decidido por resolve_initial_status (mesma regra da API):
   - projeto.fluxo == 'SUPER'      -> 'pendente' (PA-01: SUPER NUNCA auto-aprova)
   - projeto.fluxo == 'NAO_SUPER'  -> 'aprovado'
-  - A data do evento NAO influencia o status (passado/futuro irrelevante).
+  - A data do evento NAO influencia o STATUS (passado/futuro irrelevante).
 - Criar Participation para coordenador (role='COORDENADOR')
 - Criar Participation para cada formador1-5 (role='FORMADOR')
+
+Disponibilidade e reimport (#1620/M08-12 e #1628/M10-07):
+- Gate RD-01..08 (check_solicitacao_availability): so p/ evento FUTURO. Evento futuro em
+  conflito NAO e gravado -> pendencia `availability`. Historico (data passada) entra sem checar.
+- Reimport NUNCA sobrescreve decisao humana: se um campo protegido (status/usuario/
+  coordenador/local) divergir da linha existente -> pendencia `protected`, sem escrita.
+  Sem divergencia, atualiza so observacoes/encontro (diff real em `updated`/`unchanged`).
+- Participante ocupante que sumiu da planilha no reimport e REPORTADO em `orfaos`, nunca removido.
 """
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false
@@ -44,6 +52,7 @@ from apps.core.imports.hashing import stable_import_hash
 from apps.core.imports.normalization import normalize_blank
 from apps.core.imports.row_errors import registrar_erro_import
 from apps.core.models import Participation, Solicitacao
+from apps.core.services.availability_service import ENFORCED_ROLES
 from apps.core.services.resolvers import (
     resolve_municipio,
     resolve_projeto,
@@ -51,9 +60,29 @@ from apps.core.services.resolvers import (
     resolve_user_by_email,
     resolve_user_by_name,
 )
+from apps.core.services.solicitacao_availability import check_solicitacao_availability
 from apps.core.services.solicitacao_create import resolve_initial_status
 
 TZ = ZoneInfo("America/Fortaleza")
+
+# Campos que carregam DECISAO ou EDICAO humana: o reimport NUNCA os sobrescreve (#1628/M10-07).
+# `inicio`/`fim`/`segmento` nao entram porque fazem parte do external_hash (mesma chave => mesmos
+# valores), logo nunca divergem para a mesma linha.
+_PROTECTED_FIELDS: tuple[str, ...] = ("status", "usuario_id", "coordenador_id", "local")
+
+
+class _AvailabilityConflict(Exception):
+    """Evento FUTURO importado conflita com a disponibilidade (RD-01..08) de um participante.
+
+    Levantada DENTRO do savepoint-per-row, DEPOIS de a Solicitacao+Participation terem sido
+    gravadas (o gate le os participantes ja persistidos) e ANTES de qualquer contagem em `stats`
+    (increment de dict nao volta no rollback). O laco principal a converte na pendencia
+    `availability`. So se aplica a evento futuro — historico entra sem checar (#1620/M08-12).
+    """
+
+    def __init__(self, detail: dict[str, Any]) -> None:
+        super().__init__("availability_conflict")
+        self.detail = detail
 
 
 def import_eventos_from_file(*, path: str, dry_run: bool = True) -> dict[str, Any]:
@@ -89,6 +118,8 @@ def import_eventos_from_file(*, path: str, dry_run: bool = True) -> dict[str, An
             "tipo_evento": 0,
             "coordenador": 0,
             "dates": 0,
+            "availability": 0,
+            "protected": 0,
             "other": 0,
         },
     }
@@ -98,6 +129,9 @@ def import_eventos_from_file(*, path: str, dry_run: bool = True) -> dict[str, An
         "tipos_evento": [],
         "usuarios": [],
         "dates": [],
+        "availability": [],
+        "protected": [],
+        "orfaos": [],
         "outros": [],
     }
 
@@ -112,6 +146,11 @@ def import_eventos_from_file(*, path: str, dry_run: bool = True) -> dict[str, An
             try:
                 with transaction.atomic():  # savepoint
                     _process_row(row, idx, stats, pendencias)
+            except _AvailabilityConflict as exc:
+                # Evento futuro em conflito: o savepoint ja desfez a Solicitacao/Participation.
+                # `stats` ainda nao foi tocado (contagem so acontece apos o gate passar).
+                stats["skipped"]["availability"] += 1
+                pendencias["availability"].append(exc.detail)
             except Exception:
                 stats["skipped"]["other"] += 1
                 pendencias["outros"].append(
@@ -532,67 +571,125 @@ def _process_row(
         segmento,
     )
 
-    # Upsert Solicitacao
-    solicitacao, created = Solicitacao.objects.update_or_create(
+    # Idempotencia + protecao (#1628/M10-07): buscar a linha existente COM lock. select_for_update
+    # fecha o lost-update (leitura->escrita concorrente) e serializa reimports da mesma linha.
+    existing = Solicitacao.objects.select_for_update().filter(external_hash=external_hash).first()
+
+    if existing is not None:
+        _reimport_existing(
+            existing, coordenador, status, local, observacoes, encontro, row, stats, pendencias, linha_num
+        )
+        return
+
+    # Linha NOVA: cria, popula participacoes e (so p/ evento futuro) checa disponibilidade
+    # ANTES de contabilizar. As contagens ficam para o fim porque increment de dict nao volta
+    # no rollback do savepoint disparado por _AvailabilityConflict.
+    solicitacao = Solicitacao.objects.create(
         external_hash=external_hash,
-        defaults={
-            "usuario": coordenador,
-            "coordenador": coordenador,
-            "municipio": municipio,
-            "projeto": projeto,
-            "tipo_evento": tipo_evento,
-            "inicio": inicio,
-            "fim": fim,
-            "status": status,
-            "observacoes": observacoes,
-            "local": local,
-            "encontro": encontro,
-            "segmento": segmento,
-        },
+        usuario=coordenador,
+        coordenador=coordenador,
+        municipio=municipio,
+        projeto=projeto,
+        tipo_evento=tipo_evento,
+        inicio=inicio,
+        fim=fim,
+        status=status,
+        observacoes=observacoes,
+        local=local,
+        encontro=encontro,
+        segmento=segmento,
     )
+    part = _sync_participations(solicitacao, coordenador, row, linha_num)
 
-    if created:
-        stats["solicitacoes"]["created"] += 1
-    else:
-        # Verificar se houve mudanca
-        changed = False
-        if solicitacao.status != status:
-            changed = True
-        if solicitacao.inicio != inicio or solicitacao.fim != fim:
-            changed = True
-        if solicitacao.local != local:
-            changed = True
+    # #1620/M08-12: gate RD-01..08 so p/ evento FUTURO. Historico (data passada) entra sem
+    # checar — ja aconteceu; bloquear reescreveria o passado. Futuro em conflito NAO grava.
+    if inicio > timezone.now():
+        guard = check_solicitacao_availability(solicitacao)
+        if not guard.ok:
+            raise _AvailabilityConflict(
+                {
+                    "linha": linha_num,
+                    "motivo": "conflito de disponibilidade (evento futuro)",
+                    "participantes": [{"usuario_id": p.usuario_id, "nome": p.usuario_nome} for p in guard.blocked],
+                }
+            )
 
-        if changed:
-            stats["solicitacoes"]["updated"] += 1
-        else:
-            stats["solicitacoes"]["unchanged"] += 1
-
-    # Criar Participations
-    _process_participations(solicitacao, coordenador, row, stats, pendencias, linha_num)
+    # Passou (ou historico): agora contabiliza (o savepoint desta linha vai commitar).
+    stats["solicitacoes"]["created"] += 1
+    _apply_participation_result(part, stats, pendencias)
 
 
-def _process_participations(
-    solicitacao: Any,
+def _reimport_existing(
+    existing: Any,
     coordenador: Any,
+    status: str,
+    local: str,
+    observacoes: str,
+    encontro: str,
     row: dict[str, Any],
     stats: dict[str, Any],
     pendencias: dict[str, list[dict[str, Any]]],
     linha_num: int,
 ) -> None:
-    """Cria Participations para coordenador e formadores."""
-    # Participation para coordenador
+    """Reimport de linha existente: protege decisao humana, atualiza so o descritivo (#1628).
+
+    Se um campo PROTEGIDO divergir (status decidido por humano, reatribuicao de dono, ou edicao
+    manual de local), a linha NAO e sobrescrita — vira pendencia `protected` p/ decisao humana.
+    Sem divergencia protegida, atualiza apenas observacoes/encontro e reporta o diff REAL (o
+    `updated` deixa de ser codigo morto: antes comparava a instancia JA mutada pelo upsert).
+    """
+    would_be: dict[str, Any] = {
+        "status": status,
+        "usuario_id": coordenador.pk,
+        "coordenador_id": coordenador.pk,
+        "local": local,
+    }
+    divergences = [f for f in _PROTECTED_FIELDS if getattr(existing, f) != would_be[f]]
+    if divergences:
+        stats["skipped"]["protected"] += 1
+        pendencias["protected"].append({"linha": linha_num, "solicitacao_id": existing.pk, "campos": divergences})
+        return
+
+    changed_fields: list[str] = []
+    if existing.observacoes != observacoes:
+        existing.observacoes = observacoes
+        changed_fields.append("observacoes")
+    if existing.encontro != encontro:
+        existing.encontro = encontro
+        changed_fields.append("encontro")
+
+    if changed_fields:
+        existing.save(update_fields=changed_fields)
+        stats["solicitacoes"]["updated"] += 1
+    else:
+        stats["solicitacoes"]["unchanged"] += 1
+
+    _apply_participation_result(_sync_participations(existing, coordenador, row, linha_num), stats, pendencias)
+
+
+def _sync_participations(
+    solicitacao: Any,
+    coordenador: Any,
+    row: dict[str, Any],
+    linha_num: int,
+) -> dict[str, Any]:
+    """Grava as Participations (coordenador + formadores) e detecta orfaos, SEM tocar `stats`.
+
+    Devolve contagens/pendencias para o chamador aplicar: no caminho de evento novo a
+    contabilizacao so pode acontecer DEPOIS do gate de disponibilidade (senao um evento
+    revertido no rollback contaria). Orfao — participante ocupante que sumiu da planilha — e
+    REPORTADO, nunca removido (decisao do dono 2026-09-14, #1628 item 4).
+    """
+    result: dict[str, Any] = {"created": 0, "updated": 0, "orfaos": [], "unresolved": []}
+    sheet_usuario_ids: set[int] = {coordenador.pk}
+
     _, created = Participation.objects.get_or_create(
         solicitacao=solicitacao,
         usuario=coordenador,
         role=Participation.Role.COORDENADOR,
     )
-    if created:
-        stats["participations"]["created"] += 1
-    else:
-        stats["participations"]["updated"] += 1
+    result["created" if created else "updated"] += 1
 
-    # Participations para formadores (1-5)
     for i in range(1, 6):
         formador_id = row.get(f"formador{i}", "").strip()
         if not formador_id:
@@ -600,13 +697,7 @@ def _process_participations(
 
         formador = _resolve_user(formador_id)
         if not formador:
-            pendencias["usuarios"].append(
-                {
-                    "linha": linha_num,
-                    "identificador": formador_id,
-                    "role": f"FORMADOR{i}",
-                }
-            )
+            result["unresolved"].append({"linha": linha_num, "identificador": formador_id, "role": f"FORMADOR{i}"})
             continue
 
         _, created = Participation.objects.get_or_create(
@@ -614,7 +705,36 @@ def _process_participations(
             usuario=formador,
             role=Participation.Role.FORMADOR,
         )
-        if created:
-            stats["participations"]["created"] += 1
-        else:
-            stats["participations"]["updated"] += 1
+        sheet_usuario_ids.add(formador.pk)
+        result["created" if created else "updated"] += 1
+
+    # Orfao: participante ocupante (ENFORCED_ROLES) que nao consta mais da planilha.
+    orfaos = (
+        Participation.objects.filter(solicitacao=solicitacao, role__in=ENFORCED_ROLES)
+        .exclude(usuario_id__in=sheet_usuario_ids)
+        .select_related("usuario")
+    )
+    for p in orfaos:
+        result["orfaos"].append(
+            {
+                "linha": linha_num,
+                "solicitacao_id": solicitacao.pk,
+                "usuario_id": p.usuario_id,
+                "nome": (str(p.usuario.get_full_name() or p.usuario.username) if p.usuario_id else None),
+                "role": p.role,
+            }
+        )
+
+    return result
+
+
+def _apply_participation_result(
+    result: dict[str, Any],
+    stats: dict[str, Any],
+    pendencias: dict[str, list[dict[str, Any]]],
+) -> None:
+    """Aplica a `stats`/`pendencias` o resultado de _sync_participations (apos o gate passar)."""
+    stats["participations"]["created"] += result["created"]
+    stats["participations"]["updated"] += result["updated"]
+    pendencias["usuarios"].extend(result["unresolved"])
+    pendencias["orfaos"].extend(result["orfaos"])

@@ -130,7 +130,11 @@ def bloqueio_outro_usuario(db, outro_usuario):
         "bloqueio próprio' deixou de existir. Agora qualquer user sem "
         "view_all_availability é 403 GLOBAL no endpoint. IDOR scope original "
         "(C-03 issue #560) virou data-scope dentro de privileged users — "
-        "ver test_multi_sector_permissions para cenários ainda relevantes."
+        "ver test_multi_sector_permissions para cenários ainda relevantes. "
+        "⚑ GAP-1 (2026-09-14): a regra C-03 'Controle/Super gerenciam qualquer "
+        "bloqueio' foi SUPERADA — update/destroy de bloqueio de terceiro agora "
+        "exige o gate de delegação (só superuser/Assistente Admin Controle/DAT); "
+        "sentinela em test_availability_block_gap1_mutation_gate.py."
     )
 )
 @pytest.mark.django_db

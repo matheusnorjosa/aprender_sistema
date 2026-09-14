@@ -21,7 +21,7 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
 
 from .api_schemas import AVAILABILITY_CONFLICT_EXAMPLE, AVAILABILITY_OK_EXAMPLE, COMMON_ERROR_RESPONSES
-from .models import AvailabilityBlock, EquipeGerencia, Municipio, Usuario
+from .models import AuditLog, AvailabilityBlock, EquipeGerencia, Municipio, Usuario
 from .permissions import HasPerm
 from .serializers import AvailabilityBlockSerializer
 from .services.availability_service import check_conflicts, check_conflicts_uncached
@@ -205,6 +205,49 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
             },
         )
 
+    def _assert_can_mutate(self, instance) -> bool:
+        """
+        GAP-1 (auditoria object-level authz #1, 2026-09-14): mutar bloqueio de
+        TERCEIRO exige o MESMO gate estreito do create delegado
+        (`user_can_delegate_availability_block`).
+
+        Antes, `get_queryset` dava `.all()` a quem tem `view_all_availability`
+        (LEITURA; ex.: Controle puro) e `perform_update`/`perform_destroy` não
+        checavam o alvo — então um privilegiado de leitura editava/apagava bloqueio
+        alheio, assimétrico com o create (PR 13). Decisão do dono: quem não pode
+        CRIAR bloqueio de terceiro também não EDITA nem APAGA.
+
+        Retorna True quando é mutação de bloqueio de terceiro (autorizada, para
+        auditar); False quando é o próprio. Levanta 403 se for de terceiro e o ator
+        não for delegante. Own-block segue livre para todos.
+        """
+        from rest_framework.exceptions import PermissionDenied
+
+        from apps.core.rbac.policies import user_can_delegate_availability_block
+
+        user = self.request.user
+        if instance.usuario_id == user.pk:
+            return False
+        if not user_can_delegate_availability_block(user):
+            raise PermissionDenied("Você não tem permissão para editar ou apagar bloqueio de outro usuário.")
+        return True
+
+    def _audit_block_mutation(self, block, action) -> None:
+        """Trilha de auditoria da mutação delegada de bloqueio de terceiro (GAP-1)."""
+        AuditLog.objects.create(
+            usuario=self.request.user,
+            action=action,
+            model_name="AvailabilityBlock",
+            details={
+                "delegate_user_id": self.request.user.pk,
+                "target_user_id": block.usuario_id,
+                "block_id": block.pk,
+                "inicio": block.inicio.isoformat(),
+                "fim": block.fim.isoformat(),
+                "origem": "delegated",
+            },
+        )
+
     def perform_update(self, serializer):
         """
         M08-01 (#1619): a titularidade de um bloqueio é IMUTÁVEL na edição.
@@ -218,14 +261,32 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
 
         Aqui `usuario_id` é retirado do payload (não reatribui) e uma tentativa
         de mudar o dono para outro usuário é rejeitada com 403.
+
+        GAP-1: editar bloqueio de terceiro exige o gate de delegação (403 caso
+        contrário); a edição delegada gera AuditLog `DELEGATE_BLOCK_UPDATE`.
         """
         from rest_framework.exceptions import PermissionDenied
 
         instance = serializer.instance
+        is_delegated = self._assert_can_mutate(instance)
         target_id = serializer.validated_data.pop("usuario_id", None)
         if target_id is not None and target_id != instance.usuario_id:
             raise PermissionDenied("Não é possível transferir a titularidade de um bloqueio pela edição.")
         serializer.save()
+        if is_delegated:
+            self._audit_block_mutation(instance, AuditLog.Action.DELEGATE_BLOCK_UPDATE)
+
+    def perform_destroy(self, instance):
+        """
+        GAP-1: apagar bloqueio de terceiro exige o gate de delegação (403 caso
+        contrário); a exclusão delegada gera AuditLog `DELEGATE_BLOCK_DELETE`.
+        Apagar bloqueio alheio "libera" o formador → fura RD-02/RD-03, por isso
+        o gate é o mesmo do create/edit delegado.
+        """
+        is_delegated = self._assert_can_mutate(instance)
+        if is_delegated:
+            self._audit_block_mutation(instance, AuditLog.Action.DELEGATE_BLOCK_DELETE)
+        instance.delete()
 
 
 class AvailabilityCheckView(APIView):

@@ -17,12 +17,33 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.core.exceptions import ValidationAPIError
-from apps.core.models import AuditLog, Solicitacao, Usuario
+from apps.core.models import AuditLog, Participation, Solicitacao, Usuario
 from apps.core.services.db_retry import retry_on_deadlock
 from apps.core.services.solicitacao_availability import enforce_solicitacao_availability
+from apps.core.utils.cache_utils import invalidate_availability_cache
 from apps.core.utils.net import get_client_ip
 
 logger = logging.getLogger(__name__)
+
+
+def _invalidate_participants_availability_cache(solicitacao: Solicitacao) -> None:
+    """
+    Decisão do dono (2026-09-14): ao APROVAR, o evento passa a OCUPAR a agenda dos
+    participantes (`check_conflicts` conta evento aprovado via Participation com role
+    ocupante — RD-07). O signal de Solicitacao só bumpa o cache do CRIADOR
+    (`instance.usuario_id`); os demais participantes ficariam com `avail_ver`/
+    `monthly_ver` obsoletos — um preview cacheado diria "livre" para quem acabou de
+    ser alocado. Bump explícito aqui (o #1556 só cobre a MUDANÇA de Participation,
+    não a mudança de status). Convidados externos (`usuario_id=None`) não têm
+    disponibilidade — são naturalmente excluídos pelo filtro.
+    """
+    participantes_ids = (
+        Participation.objects.filter(solicitacao=solicitacao, usuario_id__isnull=False)
+        .values_list("usuario_id", flat=True)
+        .distinct()
+    )
+    for usuario_id in participantes_ids:
+        invalidate_availability_cache(usuario_id=usuario_id)
 
 
 @dataclass
@@ -128,6 +149,10 @@ def approve_solicitacao(
         prev_status = solicitacao.status
         solicitacao.status = "aprovado"
         solicitacao.save()
+
+        # #GAP-5: aprovar torna o evento ocupante — invalida o cache consultivo dos
+        # participantes (o signal de Solicitacao só bumpa o criador).
+        _invalidate_participants_availability_cache(solicitacao)
 
         # Persist AuditLog
         AuditLog.objects.create(
@@ -300,6 +325,9 @@ def batch_approve_solicitacoes(
             prev_status = sol.status
             sol.status = "aprovado"
             sol.save()
+
+            # #GAP-5: idem approve single — invalida cache consultivo dos participantes.
+            _invalidate_participants_availability_cache(sol)
 
             # PA-05: Individual AuditLog with batch=true
             AuditLog.objects.create(

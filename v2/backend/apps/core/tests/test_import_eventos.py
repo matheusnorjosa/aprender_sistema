@@ -15,9 +15,11 @@ Cobertura:
 
 import io
 import tempfile
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -28,9 +30,26 @@ from apps.core.services.eventos_import import import_eventos_from_file
 from apps.core.tests.factories import (
     MunicipioFactory,
     ProjetoFactory,
+    SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
 )
+
+_TZ_FORTALEZA = ZoneInfo("America/Fortaleza")
+
+
+def _aware_fortaleza(d: date, hh: int, mm: int = 0) -> datetime:
+    """datetime timezone-aware em Fortaleza (mesmo fuso que o importer usa)."""
+    return timezone.make_aware(datetime.combine(d, time(hh, mm)), _TZ_FORTALEZA)
+
+
+def _write_csv(content: str) -> str:
+    """Escreve um CSV temporario e devolve o caminho (cleanup no proprio teste/gc)."""
+    temp = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8")
+    temp.write(content)
+    temp.close()
+    return temp.name
+
 
 # URL direta (evita problemas de cache de rotas no container)
 IMPORT_EVENTOS_URL = "/api/solicitacoes/import/"
@@ -502,3 +521,158 @@ class TestRehashMigration0101:
 
         got = {s.id: s.external_hash for s in Solicitacao.objects.all()}
         assert got == expected
+
+
+# =============================================================================
+# #1620 (gate de disponibilidade so p/ evento FUTURO) + #1628 (reimport nao reverte decisao)
+# =============================================================================
+
+
+@pytest.mark.django_db
+class TestEventosImportAvailabilityAndReimport:
+    """#1620/M08-12 (enforcement RD-01..08 no import, so p/ FUTURO) e #1628/M10-07
+    (reimport nao sobrescreve decisao humana; relatorio real; orfao reportado)."""
+
+    def _approved_event(self, *, municipio, projeto, tipo_evento, formador, inicio, fim):
+        """Cria um evento APROVADO com o formador como participante (recurso alocado)."""
+        sol = SolicitacaoFactory(
+            municipio=municipio,
+            projeto=projeto,
+            tipo_evento=tipo_evento,
+            inicio=inicio,
+            fim=fim,
+            status=Solicitacao.Status.APROVADO,
+        )
+        Participation.objects.create(solicitacao=sol, usuario=formador, role=Participation.Role.FORMADOR)
+        return sol
+
+    def test_future_conflict_goes_to_pendencia_not_created(
+        self, coordenador_user, formador1_user, municipio, projeto_super, tipo_evento
+    ):
+        """#1620: evento FUTURO que conflita com evento aprovado do mesmo formador NAO e gravado."""
+        d = date.today() + timedelta(days=60)
+        self._approved_event(
+            municipio=municipio,
+            projeto=projeto_super,
+            tipo_evento=tipo_evento,
+            formador=formador1_user,
+            inicio=_aware_fortaleza(d, 8),
+            fim=_aware_fortaleza(d, 12),
+        )
+        csv = _write_csv(
+            "municipio,projeto,tipo_evento,data,hora_inicio,hora_fim,coordenador,formador1\n"
+            f"{municipio.nome},{projeto_super.nome},{tipo_evento.nome},{d.isoformat()},"
+            f"10:00,14:00,{coordenador_user.email},{formador1_user.email}\n"
+        )
+        result = import_eventos_from_file(path=csv, dry_run=False)
+        Path(csv).unlink(missing_ok=True)
+
+        # comportamento (RED no codigo antigo: o evento em conflito era gravado aprovado)
+        assert result["stats"]["solicitacoes"]["created"] == 0
+        assert Solicitacao.objects.count() == 1  # so o aprovado pre-existente
+        # e reportado como pendencia de disponibilidade
+        assert result["stats"]["skipped"]["availability"] == 1
+        assert len(result["pendencias"]["availability"]) == 1
+
+    def test_past_conflict_is_created_historical(
+        self, coordenador_user, formador1_user, municipio, projeto_super, tipo_evento
+    ):
+        """#1620: evento PASSADO (historico) entra mesmo em conflito — nao passa pelo gate."""
+        d = date.today() - timedelta(days=60)
+        self._approved_event(
+            municipio=municipio,
+            projeto=projeto_super,
+            tipo_evento=tipo_evento,
+            formador=formador1_user,
+            inicio=_aware_fortaleza(d, 8),
+            fim=_aware_fortaleza(d, 12),
+        )
+        csv = _write_csv(
+            "municipio,projeto,tipo_evento,data,hora_inicio,hora_fim,coordenador,formador1\n"
+            f"{municipio.nome},{projeto_super.nome},{tipo_evento.nome},{d.isoformat()},"
+            f"10:00,14:00,{coordenador_user.email},{formador1_user.email}\n"
+        )
+        result = import_eventos_from_file(path=csv, dry_run=False)
+        Path(csv).unlink(missing_ok=True)
+
+        assert result["stats"]["solicitacoes"]["created"] == 1  # historico entra
+        assert Solicitacao.objects.count() == 2
+
+    def test_reimport_preserves_human_approved_status(self, coordenador_user, municipio, projeto_super, tipo_evento):
+        """#1628: reimport NAO reverte a decisao humana (aprovado nao volta a pendente)."""
+        d = date.today() + timedelta(days=70)
+        content = (
+            "municipio,projeto,tipo_evento,data,hora_inicio,hora_fim,coordenador\n"
+            f"{municipio.nome},{projeto_super.nome},{tipo_evento.nome},{d.isoformat()},"
+            f"08:00,12:00,{coordenador_user.email}\n"
+        )
+        csv = _write_csv(content)
+        import_eventos_from_file(path=csv, dry_run=False)
+        sol = Solicitacao.objects.get()
+        assert sol.status == "pendente"  # SUPER nasce pendente
+
+        # decisao humana: aprova
+        sol.status = Solicitacao.Status.APROVADO
+        sol.save(update_fields=["status"])
+
+        # reimport da MESMA linha
+        result = import_eventos_from_file(path=csv, dry_run=False)
+        Path(csv).unlink(missing_ok=True)
+
+        sol.refresh_from_db()
+        assert sol.status == "aprovado"  # RED: hoje o reimport reverte p/ pendente
+        assert result["stats"]["skipped"]["protected"] == 1
+        assert len(result["pendencias"]["protected"]) == 1
+
+    def test_reimport_changed_nonprotected_field_counts_as_updated(
+        self, coordenador_user, municipio, projeto_nao_super, tipo_evento
+    ):
+        """#1628 item 3: mudanca real (encontro) e contada como 'updated', nao 'unchanged'."""
+        d = date.today() + timedelta(days=80)
+        base = (
+            "municipio,projeto,tipo_evento,data,hora_inicio,hora_fim,coordenador,encontro\n"
+            f"{municipio.nome},{projeto_nao_super.nome},{tipo_evento.nome},{d.isoformat()},"
+            "08:00,12:00,{coord},{enc}\n"
+        )
+        csv1 = _write_csv(base.format(coord=coordenador_user.email, enc="EF1"))
+        import_eventos_from_file(path=csv1, dry_run=False)
+        Path(csv1).unlink(missing_ok=True)
+
+        csv2 = _write_csv(base.format(coord=coordenador_user.email, enc="EF9"))
+        result = import_eventos_from_file(path=csv2, dry_run=False)
+        Path(csv2).unlink(missing_ok=True)
+
+        assert result["stats"]["solicitacoes"]["updated"] == 1  # RED: hoje conta 'unchanged'
+        assert result["stats"]["solicitacoes"]["unchanged"] == 0
+        sol = Solicitacao.objects.get()
+        assert sol.encontro == "EF9"
+
+    def test_reimport_orphan_formador_reported_not_removed(
+        self, coordenador_user, formador1_user, municipio, projeto_nao_super, tipo_evento
+    ):
+        """#1628 item 4: formador retirado da planilha no reimport e REPORTADO, nao removido."""
+        d = date.today() + timedelta(days=90)
+        with_form = (
+            "municipio,projeto,tipo_evento,data,hora_inicio,hora_fim,coordenador,formador1\n"
+            f"{municipio.nome},{projeto_nao_super.nome},{tipo_evento.nome},{d.isoformat()},"
+            f"08:00,12:00,{coordenador_user.email},{formador1_user.email}\n"
+        )
+        csv1 = _write_csv(with_form)
+        import_eventos_from_file(path=csv1, dry_run=False)
+        Path(csv1).unlink(missing_ok=True)
+        sol = Solicitacao.objects.get()
+        assert Participation.objects.filter(solicitacao=sol, usuario=formador1_user).exists()
+
+        # reimport SEM o formador1 (mesma chave natural = mesmo external_hash)
+        without_form = (
+            "municipio,projeto,tipo_evento,data,hora_inicio,hora_fim,coordenador\n"
+            f"{municipio.nome},{projeto_nao_super.nome},{tipo_evento.nome},{d.isoformat()},"
+            f"08:00,12:00,{coordenador_user.email}\n"
+        )
+        csv2 = _write_csv(without_form)
+        result = import_eventos_from_file(path=csv2, dry_run=False)
+        Path(csv2).unlink(missing_ok=True)
+
+        # NAO removido, apenas reportado
+        assert Participation.objects.filter(solicitacao=sol, usuario=formador1_user).exists()
+        assert len(result["pendencias"]["orfaos"]) == 1

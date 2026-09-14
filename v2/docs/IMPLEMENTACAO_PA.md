@@ -176,9 +176,10 @@ Comentário do código (docstring de `raise_if_blocked`, `solicitacao_availabili
 Ou seja: **não há mais override por contexto humano na aprovação.** A grade em `/disponibilidade`
 continua sendo a ferramenta de consulta, mas deixou de ser a única barreira.
 
-⚠️ **Exceção conhecida**: o **import de eventos** não passa por esse gate — grava `aprovado`
-direto para `NAO_SUPER` sem chamar `check_conflicts` (`M08-12`, issue
-[#1620](https://github.com/matheusnorjosa/aprender_sistema/issues/1620)). Ver
+✅ **Resolvido (#2021)**: o **import de eventos** passa pelo gate `check_solicitacao_availability`
+(RD-01..08) para evento **FUTURO** — conflito vira pendência `availability` sem gravar; evento
+**histórico** (data passada) entra sem checar (decisão do dono). `M08-12`, issue
+[#1620](https://github.com/matheusnorjosa/aprender_sistema/issues/1620). Ver
 [imports/agenda_solicitacoes.md](./imports/agenda_solicitacoes.md).
 
 ## Arquivos Modificados (registro do PR17 — paths de 2025)
@@ -208,9 +209,9 @@ direto para `NAO_SUPER` sem chamar `check_conflicts` (`M08-12`, issue
 
 ### Backlog atual relacionado a PA (2026-07-24)
 
-- [#1620](https://github.com/matheusnorjosa/aprender_sistema/issues/1620) — import de eventos grava
-  `aprovado` sem o hard gate de disponibilidade do #1452.
-- [#1628](https://github.com/matheusnorjosa/aprender_sistema/issues/1628) — reimport sobrescreve a
-  decisão de aprovação e reporta "unchanged".
+- ✅ [#1620](https://github.com/matheusnorjosa/aprender_sistema/issues/1620) — **resolvido no #2021**:
+  import de eventos aplica o hard gate de disponibilidade a evento futuro (histórico entra sem checar).
+- ✅ [#1628](https://github.com/matheusnorjosa/aprender_sistema/issues/1628) — **resolvido no #2021**
+  (itens 2/3/4): reimport não sobrescreve mais decisão humana e reporta diff real. Item 1 (hash) pendente.
 
 Documento vivo: [audits/ACHADOS_REAIS.md](./audits/ACHADOS_REAIS.md).

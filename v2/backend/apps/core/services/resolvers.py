@@ -81,8 +81,17 @@ def resolve_user_by_email(email: str) -> Usuario | None:
     except User.DoesNotExist:
         return None
     except User.MultipleObjectsReturned:
-        # Se houver duplicatas, retorna o primeiro
-        return User.objects.filter(email__iexact=email_norm).first()
+        # Email duplicado (o `email` do AbstractUser não é único): NÃO escolhe no
+        # chute. Mesma disciplina de `_pick_unique`/#1613 e `resolve_municipio`/#2003:
+        # rejeita a ambiguidade → None + WARNING, para o chamador tratar como
+        # pendência, em vez do `.first()` que ligava à pessoa errada em silêncio.
+        n = User.objects.filter(email__iexact=email_norm).count()
+        logger.warning(
+            "Usuario ambíguo por email %r: %d candidatos — rejeitado, não escolho no chute (#1658).",
+            email_norm,
+            n,
+        )
+        return None
 
 
 def resolve_user_by_name(name: str) -> Usuario | None:

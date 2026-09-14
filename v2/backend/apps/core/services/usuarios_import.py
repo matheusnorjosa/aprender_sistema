@@ -22,6 +22,7 @@ Colunas esperadas:
 
 from __future__ import annotations
 
+import logging
 import re
 import secrets
 import string
@@ -38,6 +39,8 @@ from apps.core.imports.row_errors import registrar_erro_import
 from apps.core.models import AuditLog, Usuario
 from apps.core.services.audit import registrar_auditoria
 from apps.core.validators import CPF_ABSENT, CPF_VALID, classify_cpf
+
+logger = logging.getLogger(__name__)
 
 
 def import_usuarios_from_file(*, path: str, dry_run: bool = True, actor: Any = None) -> dict[str, Any]:
@@ -514,5 +517,20 @@ def _assign_groups(usuario: Usuario, grupos: list[Group], *, actor: Any = None) 
         return
 
     if grupos:
+        # #1658 (defesa-em-profundidade): so grupos da allowlist (setores+funcoes,
+        # ALLOWED_USER_GROUPS). Bane atribuir grupo admin/reservado/Tier-0 via CSV
+        # mesmo por superuser (typo / blast-radius de credencial); espelha o
+        # export_contract_importer. Fora-da-allowlist e recusado + logado.
+        from apps.core.constants import ALLOWED_USER_GROUPS
+
+        permitidos = [g for g in grupos if str(g.name) in ALLOWED_USER_GROUPS]
+        recusados = [str(g.name) for g in grupos if str(g.name) not in ALLOWED_USER_GROUPS]
+        if recusados:
+            logger.warning(
+                "usuarios_import: grupo(s) fora da allowlist recusado(s) para %s: %s",
+                getattr(usuario, "username", usuario),
+                ", ".join(recusados),
+            )
         # `add` e idempotente para M2M — nao precisa checar pertinencia antes.
-        usuario.groups.add(*grupos)
+        if permitidos:
+            usuario.groups.add(*permitidos)

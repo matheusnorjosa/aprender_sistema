@@ -383,6 +383,8 @@ export interface ProdutoRecord {
   descricao: string;
   projeto: ID;
   projeto_nome: string;
+  colecao: ID | null;
+  colecao_nome: string | null;
   ativo: boolean;
   created_at: string;
   updated_at: string;
@@ -393,11 +395,25 @@ export interface ProdutoPayload {
   nome?: string;
   descricao?: string;
   projeto?: ID;
+  colecao?: ID | null;
   ativo?: boolean;
+}
+
+export interface ColecaoOption {
+  id: ID;
+  nome: string;
+  projeto: ID;
 }
 
 export async function listProdutos(params: ListParams = {}): Promise<PaginatedResponse<ProdutoRecord>> {
   return fetchWithErrorMapping(buildUrl('/produtos/', params as QueryParams), {}, ADMIN_ERROR_MAP);
+}
+
+/** Opções de Coleção para o dropdown do cadastro de Produto (Produto.colecao).
+ * `projeto` (opcional) restringe às coleções da família selecionada. */
+export async function listColecoesOptions(projeto?: ID): Promise<ColecaoOption[]> {
+  const params: QueryParams = projeto != null ? { projeto } : {};
+  return fetchWithErrorMapping(buildUrl('/options/colecoes/', params), {}, ADMIN_ERROR_MAP);
 }
 
 export async function createProduto(data: ProdutoPayload): Promise<ProdutoRecord> {

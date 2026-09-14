@@ -10,8 +10,15 @@ import type { ColumnsType } from 'antd/es/table';
 import type { TablePaginationConfig } from 'antd/es/table';
 import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Link } from 'react-router';
-import { listProdutos, createProduto, updateProduto, deleteProduto, listProjetos } from '../../api/adminDAT';
-import type { ProdutoRecord, ProdutoPayload } from '../../api/adminDAT';
+import {
+  listProdutos,
+  createProduto,
+  updateProduto,
+  deleteProduto,
+  listProjetos,
+  listColecoesOptions,
+} from '../../api/adminDAT';
+import type { ProdutoRecord, ProdutoPayload, ColecaoOption } from '../../api/adminDAT';
 import { DEFAULT_PAGE_SIZE } from '../../constants';
 import type { ID, Projeto } from '../../types';
 
@@ -26,12 +33,14 @@ interface ProdutoFormValues {
   nome: string;
   descricao: string;
   projeto: ID;
+  colecao?: ID | null;
   ativo: boolean;
 }
 
 export default function ProdutosPage(): JSX.Element {
   const [produtos, setProdutos] = useState<ProdutoRecord[]>([]);
   const [projetos, setProjetos] = useState<Projeto[]>([]);
+  const [colecoes, setColecoes] = useState<ColecaoOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
@@ -43,6 +52,8 @@ export default function ProdutosPage(): JSX.Element {
   });
 
   const [form] = Form.useForm<ProdutoFormValues>();
+  const selectedProjeto = Form.useWatch('projeto', form);
+  const colecoesDoProjeto = colecoes.filter((c) => selectedProjeto == null || c.projeto === selectedProjeto);
 
   const fetchProdutos = async (
     current = pagination.current || 1,
@@ -79,6 +90,14 @@ export default function ProdutosPage(): JSX.Element {
     }
   };
 
+  const fetchColecoes = async (): Promise<void> => {
+    try {
+      setColecoes(await listColecoesOptions());
+    } catch (error) {
+      message.error(`Erro ao carregar coleções: ${(error as Error).message}`);
+    }
+  };
+
   useEffect(() => {
     void fetchProdutos(1, pagination.pageSize || DEFAULT_PAGE_SIZE);
   }, [searchText]);
@@ -92,6 +111,7 @@ export default function ProdutosPage(): JSX.Element {
 
   useEffect(() => {
     void fetchProjetos();
+    void fetchColecoes();
   }, []);
 
   const handleCreate = (): void => {
@@ -107,6 +127,7 @@ export default function ProdutosPage(): JSX.Element {
       nome: produto.nome,
       descricao: produto.descricao,
       projeto: produto.projeto,
+      colecao: produto.colecao,
       ativo: produto.ativo,
     });
     setModalVisible(true);
@@ -119,6 +140,7 @@ export default function ProdutosPage(): JSX.Element {
         nome: values.nome,
         descricao: values.descricao,
         projeto: values.projeto,
+        colecao: values.colecao ?? null,
         ativo: values.ativo,
       };
       if (editingProduto) {
@@ -169,6 +191,14 @@ export default function ProdutosPage(): JSX.Element {
         descricao && descricao.trim() ? descricao : <span style={{ color: '#bfbfbf' }}>—</span>,
     },
     { title: 'Projeto', dataIndex: 'projeto_nome', key: 'projeto_nome', width: 150 },
+    {
+      title: 'Coleção',
+      dataIndex: 'colecao_nome',
+      key: 'colecao_nome',
+      width: 150,
+      render: (nome: string | null | undefined) =>
+        nome && nome.trim() ? nome : <span style={{ color: '#bfbfbf' }}>—</span>,
+    },
     {
       title: 'Ativo',
       dataIndex: 'ativo',
@@ -307,6 +337,28 @@ export default function ProdutosPage(): JSX.Element {
               {projetos.map((p) => (
                 <Select.Option key={p.id} value={p.id}>
                   {p.nome}
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="colecao"
+            label="Coleção"
+            help={selectedProjeto == null ? 'Selecione um projeto para listar as coleções' : undefined}
+          >
+            <Select
+              placeholder="Selecione uma coleção (opcional)"
+              allowClear
+              showSearch
+              optionFilterProp="children"
+              filterOption={(input, option) =>
+                (option?.children as unknown as string)?.toLowerCase().includes(input.toLowerCase()) ?? false
+              }
+            >
+              {colecoesDoProjeto.map((c) => (
+                <Select.Option key={c.id} value={c.id}>
+                  {c.nome}
                 </Select.Option>
               ))}
             </Select>

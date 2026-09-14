@@ -40,6 +40,7 @@ from apps.core.serializers.dat_registro import (
     DATRegistroUpdateSerializer,
 )
 from apps.core.serializers.organizacao import (
+    ColecaoOptionSerializer,
     GerenciaSerializer,
     MunicipioOptionSerializer,
     MunicipioSerializer,
@@ -109,6 +110,7 @@ __all__ = [
     "TipoEventoOptionSerializer",
     "ProdutoSerializer",
     "ProdutoOptionSerializer",
+    "ColecaoOptionSerializer",
     # Solicitacao
     "ParticipationNestedSerializer",
     "SolicitacaoSerializer",

@@ -275,11 +275,11 @@ Nove desses 31 são só correção de contradição do registro: `M03-03`, `M12-
 - **`M15-10`** — inalterado desde 2026-08-17: só a Fase A (`8f894279`, 2026-08-11, e `e94f15f4`,
   2026-08-12); issue #1637 segue OPEN e a Fase B continua sem desenho.
 
-### Seguem `aberto`: 16 IDs
+### Seguem `aberto`: 14 IDs
 
 Issue OPEN **e** nenhum commit citando o ID ou a issue (`M04-05` saiu: **resolvido em #1852**, parse `dry_run` fail-closed; `M02-09` saiu: **resolvido** (issue #1613 — resolvers rejeitam ambiguidade + norm simétrica no import DAT); ambos posteriores a esta reconciliação):
 
-`M04-01` `M05-07` `M08-12` `M09-05` `M10-05` `M10-06` `M10-07` `M14-05`
+`M04-01` `M05-07` `M09-05` `M10-05` `M10-06` `M14-05` (`M08-12`/`M10-07` saíram: resolvidos em #2021, posteriores a esta reconciliação)
 `M15-04` `M15-05` `M15-08` `M15-09` `M16-04` `M17-01` `M22-14` `M26-03` (`M18-05` saiu: resolvido em #2020, posterior a esta reconciliação)
 
 Amostra reverificada no artefato, não só por ausência de commit:
@@ -356,7 +356,7 @@ commit traz a data **de cada commit**, porque eles podem estar a semanas de dist
 | `M07-02` | **P1** | resolvido | RBAC/admin de usuarios: DAT faz takeover de conta aprovadora (senha, e-mail, desativacao e hard… | DAT — 3 membros ativos nao-superuser. Probe confirma que DAT e o UNICO… | #1617 (CLOSED) | `a81053cd` (2026-08-19) |
 | `M07-03` | **P1** | resolvido | RBAC/Auditoria: registrar AuditLog em todas as mutações de identidade do UsuarioAdminViewSet | 3 usuários ativos do grupo DAT no censo de 2026-07-20 | #1618 (CLOSED) | `aba033f1` (2026-07-31)+`11219a7e` (2026-08-18) |
 | `M08-01` | **P1** | resolvido | disponibilidade: PATCH transfere bloqueio aprovado para usuário arbitrário, sem policy nem Audi… | — | #1619 (CLOSED) | `af2e8810` (2026-08-19) |
-| `M08-12` | **P1** | aberto | imports/eventos: import de eventos grava solicitacao aprovada sem hard gate de disponibilidade … | Grupo DAT (3 membros ativos nao-superuser) + 1 superuser ativo. `Permi… | #1620 (OPEN) | — |
+| `M08-12` | **P1** | resolvido | imports/eventos: ~~grava aprovada sem gate de disponibilidade~~ → gate RD-01..08 (+advisory lock) p/ evento FUTURO; histórico entra sem checar (decisão do dono) | Grupo DAT (3 membros ativos nao-superuser) + 1 superuser ativo. `Permi… | #1620 | #2021 (2026-09-14) |
 | `M09-05` | **P1** | aberto | Deslocamentos: UI exige delegacao que o backend nega — Coordenador nao consegue registrar nenhu… | Coordenador (42 ativos) e o ator principal: 100% dos creates pela UI f… | #1621 (OPEN) | — |
 | `M09-06` | **P1** | resolvido | Deslocamentos: filtros Origem/Destino inutilizáveis — página desmonta a cada tecla e o filtro falha | Coordenador, DAT, Controle, Superintendência e superuser | #1622 (CLOSED) | `6d73ba29` (2026-08-12)+`659c164f` (2026-08-18) |
 | `M10-01` | **P1** | resolvido | solicitações: Gerente lê, edita e exclui solicitação de qualquer gerência (sem escopo ator×alvo… | Gerente — 9 usuários ativos não-superuser em produção. Ator real e num… | #1623 (CLOSED) | `824f777c` (2026-08-20) |
@@ -364,7 +364,7 @@ commit traz a data **de cada commit**, porque eles podem estar a semanas de dist
 | `M10-03` | **P1** | resolvido | solicitacoes: bloquear edicao e exclusao enquanto gcal_status=PENDING (publica conteudo diferen… | Ator real e amplo: o proprio owner da solicitacao. Em prod isso alcanc… | #1625 (CLOSED) | `f115dd45` (2026-08-19) |
 | `M10-04` | **P1** | parcial | solicitacoes: extra_participants aceita alvo arbitrário sem policy, sem limite e estoura 500 | Grande. `create` exige `HasPerm("create_solicitation")` (views_solicit… | #1626 (CLOSED) | `185fab4a` (2026-08-20; só o shape — alvo arbitrário sem policy segue) |
 | `M10-05` | **P1** | aberto | solicitacoes: edição não reconcilia participantes — convidados e COORD_ACOMPANHA ficam órfãos e… | Existe e é o fluxo comum: 42 Coordenadores ativos + 9 Gerentes + 1 sup… | #1627 (OPEN) | — |
-| `M10-07` | **P1** | aberto | imports/eventos: reimport sobrescreve decisão de aprovação, owner e datas e reporta "unchanged" | DAT (3 membros ativos não-superuser) + superuser (1). `import_spreadsh… | #1628 (OPEN) | — |
+| `M10-07` | **P1** | resolvido | imports/eventos: ~~reimport sobrescreve decisão/owner/datas e reporta "unchanged"~~ → protege campos (status/usuario/coord/local), diff real, órfão reportado, select_for_update | DAT (3 membros ativos não-superuser) + superuser (1). `import_spreadsh… | #1628 (item 1 hash pend.) | #2021 (2026-09-14) |
 | `M10-08` | **P2** | resolvido | solicitações: PATCH (re)atribui município/projeto para par sem Compra — elegibilidade era create-only (auditoria dinâmica 2026-08-17) | Coordenador (42 ativos) e demais criadores editando a própria solicitação | #1738 | `b48aa5f2` (2026-08-18) |
 | `M12-19` | **P1** | resolvido | Pré-agenda: polling estoura o throttle do operador e a lista mostra total inalcançável | Sim. Rota `/pre-agenda` e `/controle/pre-agenda` sao gateadas por `Req… | #1629 (CLOSED) | `cdbc0d0c` (2026-08-18)+`3ab590d6` (2026-08-20) |
 | `M14-02` | **P1** | resolvido | Grade mensal: evento com 2+ participantes multiplica CH, codigo e detalhes por participante | Amplo e real. `MonthlyAvailabilityView.permission_classes = [IsAuthent… | #1630 (CLOSED) | `4321d90b` (2026-08-20) |
@@ -718,7 +718,7 @@ fechados no código, e #1657 está CLOSED com resíduo teórico registrado em `M
 | escopo-ator-alvo-ausente | P0 | `M22-01` (duplicata histórica de `M03-01`), `M07-02`, `M10-01`, `M10-04`, `M14-01` | #1656 OPEN | parcial (`M10-04` e `M14-01` seguem: `M10-04` sem policy ator×alvo por participante; `M14-01` só no ramo sem `gerencia_id`) |
 | auditoria-nao-invariante-e-pii | P1 | `M07-03`, `M05-05`, `M23-02`, `M03-10` | #1657 CLOSED | parcial (`11219a7e`, `20c6f48d`, `d2f226cc`, todos 2026-08-18, fecham `M07-03`/`M05-05`/`M03-10`; `M23-02` segue `parcial` na fila, com o resíduo teórico) |
 | resolvers-por-rotulo-humano | P1 | `M02-09`, `M04-01`, `M22-14`, `M15-05` | #1658 OPEN | parcial (`M02-09`/#1613 resolvido: `resolve_projeto`/`resolve_tipo_evento` rejeitam ambiguidade + norm simétrica no import DAT; `M04-01`/`M22-14`/`M15-05` seguem abertos) |
-| import-bypassa-invariantes | P1 | `M08-12`, `M10-07`, `M17-01`, `M15-04` | #1659 OPEN | aberto (nenhum dos 4 tem fix) |
+| import-bypassa-invariantes | P1 | `M08-12`, `M10-07`, `M17-01`, `M15-04` | #1659 OPEN | parcial: `M08-12` (#2021 gate futuro) + `M10-07` (#2021 protege reimport) resolvidos; `M17-01` (cadastros DAT) e `M15-04` (compras) abertos |
 | chave-de-seguranca-nao-canonica | P1 | `M03-03`, `M01-01` | #1660 CLOSED | resolvido (`9ae753e6` 2026-08-18, `d24da3df` 2026-08-20) |
 | nginx-add-header-heranca | P2 | `M06-04`, `M27-24` | #1661 CLOSED | resolvido (`88626736`, 2026-08-19) |
 | dr-restore-nao-exercitado | P0 | `M26-01`, `M26-02`, `M26-03` | #1662 OPEN | parcial (`M26-01`/`M26-02` fechados; `M26-03` aberto e o drill real de DR nunca ocorreu) |

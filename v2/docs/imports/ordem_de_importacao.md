@@ -77,10 +77,10 @@ A ordem abaixo respeita as dependências de chave estrangeira e regras de domín
   `SUPER` → `pendente`, `NAO_SUPER` → `aprovado`. 🔴 **A data do evento não influencia nada**
   (docstring `eventos_import.py:23`); a v0.2 dizia "SUPER + data futura", o que era falso.
 - **GCal**: ✅ **nunca é tocado** pelo import.
-- 🔴 **Cuidado**: linhas `NAO_SUPER` entram **aprovadas sem passar pelo hard gate de
-  disponibilidade** — `check_conflicts` não é chamado pelo import
-  ([#1620](https://github.com/matheusnorjosa/aprender_sistema/issues/1620)). Rodar o passo 7
-  (Disponibilidade) **antes** do passo 8 não impede o conflito; apenas facilita detectá-lo depois.
+- ✅ **Resolvido (#2021)**: linhas `NAO_SUPER` entram `aprovadas`, mas o import aplica o hard gate de
+  disponibilidade a evento **FUTURO** — `check_solicitacao_availability` é chamado; conflito futuro →
+  pendência `availability`, **não grava** ([#1620](https://github.com/matheusnorjosa/aprender_sistema/issues/1620)).
+  Evento **histórico** (data passada) entra sem checar (decisão do dono). O passo 7 antes do 8 segue útil.
 
 ### 9. Google Calendar — somente após validação manual
 
@@ -158,9 +158,9 @@ evidência que existe. `AuditLog` filtrado por `action LIKE 'IMPORT_%'` **não d
 - Existe pipeline automatizado entre `sheets.banco` e o sistema (ex: cron + API) ou todo import é manual via UI/CLI?
 - Municípios e Projetos têm uma fonte de cadastro contínua na planilha ou ficam congelados após o seed inicial?
 - Em quais cenários **Cadastros base** (passo 2) precisam ser refeitos pós-deploy? Sentinela D17 deveria bloquear?
-- Disponibilidade deve preceder Agenda no fluxo real ou as duas chegam juntas? *(Nota 2026-07-24:
-  hoje a ordem não protege nada — o import de eventos não consulta disponibilidade, #1620.)*
-- 🔴 **Antes do próximo reimport em massa**: fechar #1628 (sobrescrita silenciosa de aprovação) e
-  #1633 (duplicação de `Compra`). Sem isso, "re-rodar o arquivo corrigido" é uma operação destrutiva
+- Disponibilidade deve preceder Agenda no fluxo real ou as duas chegam juntas? *(Atualizado #2021:
+  o import agora consulta disponibilidade para evento FUTURO (#1620); histórico entra sem checar.)*
+- 🟡 **Antes do próximo reimport em massa**: #1628 (sobrescrita silenciosa de aprovação) **resolvido no #2021**
+  (reimport protege decisão humana); resta #1633 (duplicação de `Compra`). "Re-rodar o arquivo corrigido"
   sem rastro. (A auto-escalação de grupos de #1610 já foi **corrigida** em `ccbe1e05` — concessão
   gated por superuser.) Ver [../audits/ACHADOS_REAIS.md](../audits/ACHADOS_REAIS.md).

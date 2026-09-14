@@ -12,12 +12,14 @@ Template: [templates/agenda_solicitacoes.template.csv](./templates/agenda_solici
 >    O service chama `resolve_initial_status(projeto=projeto)` (`eventos_import.py:497`) — só o
 >    `projeto.fluxo` decide. A própria docstring diz: *"A data do evento NAO influencia o status
 >    (passado/futuro irrelevante)"* (`eventos_import.py:23`).
-> 2. **O import grava solicitação `aprovado` sem o hard gate de disponibilidade.** Para
->    `fluxo == 'NAO_SUPER'` a linha entra direto como aprovada e `check_conflicts` **nunca é
->    chamado** — `eventos_import.py` não importa `availability_service` nem
->    `solicitacao_availability`. Achado `M08-12`, issue
+> 2. **[RESOLVIDO #2021] O import aplica o hard gate de disponibilidade a evento FUTURO.** Para
+>    `fluxo == 'NAO_SUPER'` a linha ainda entra `aprovada`, mas evento **futuro** passa por
+>    `check_solicitacao_availability` (RD-01..08 + advisory lock); conflito → pendência
+>    `availability`, **não grava**. Evento **histórico** (data passada) entra sem checar (decisão
+>    do dono 2026-09-14). Achado `M08-12`, issue
 >    [#1620](https://github.com/matheusnorjosa/aprender_sistema/issues/1620) (épico
->    [#1659](https://github.com/matheusnorjosa/aprender_sistema/issues/1659)).
+>    [#1659](https://github.com/matheusnorjosa/aprender_sistema/issues/1659)). As linhas de análise
+>    abaixo descrevem o estado ANTERIOR ao #2021.
 > 3. **Reimport SOBRESCREVE decisão de aprovação, owner e datas — e reporta "unchanged".**
 >    A v0.2 afirmava "linhas com hash existente são ignoradas". Falso: é
 >    `Solicitacao.objects.update_or_create(external_hash=..., defaults={...})`

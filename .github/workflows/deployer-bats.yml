@@ -15,12 +15,7 @@ on:
     paths:
       - "v2/infra/deployer/**"
       - ".github/workflows/deployer-bats.yml"
-  push:
-    branches:
-      - main
-    paths:
-      - "v2/infra/deployer/**"
-      - ".github/workflows/deployer-bats.yml"
+  # Gatilho push removido em 2026-09-14 (dedupe pos-merge) -- ver nota em ci.yaml.
   workflow_dispatch:
 
 permissions:

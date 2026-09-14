@@ -247,6 +247,9 @@ def test_bloqueios_import_uses_savepoint_per_row(tmp_path, usuario):
     Three rows: row 1 valid, row 2 bad (unknown user), row 3 valid. After
     import the bad row is counted as skipped but rows 1 and 3 are persisted.
     """
+    # #2016: as datas são pós-cutoff (2099) → o alvo precisa ser Formador ativo
+    # (regra por data do bloqueio). Isolamento de savepoint é ortogonal a isso.
+    usuario.groups.add(GroupFactory(name="Formador"))
     csv_path = tmp_path / "bloqueios_asq016.csv"
     # Valid datetimes (the service parses ISO/BR formats).
     d1_start = datetime(2099, 1, 10, 9, 0, tzinfo=dt_timezone.utc).isoformat()

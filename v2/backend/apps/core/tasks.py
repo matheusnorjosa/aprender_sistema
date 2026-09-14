@@ -701,7 +701,7 @@ def task_run_import_job(self: Any, import_job_id: int) -> dict[str, Any]:
         file_path = job.file.path
 
         if job.import_type == ImportJob.ImportType.BLOQUEIOS:
-            report = import_bloqueios_from_file(path=file_path, dry_run=job.dry_run)
+            report = import_bloqueios_from_file(path=file_path, dry_run=job.dry_run, actor=job.user)
         else:
             # Fase 2 adicionara: usuarios, compras, etc.
             raise NotImplementedError(f"import_type={job.import_type} nao suportado nesta fase")

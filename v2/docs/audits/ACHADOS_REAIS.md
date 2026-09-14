@@ -275,12 +275,12 @@ Nove desses 31 são só correção de contradição do registro: `M03-03`, `M12-
 - **`M15-10`** — inalterado desde 2026-08-17: só a Fase A (`8f894279`, 2026-08-11, e `e94f15f4`,
   2026-08-12); issue #1637 segue OPEN e a Fase B continua sem desenho.
 
-### Seguem `aberto`: 17 IDs
+### Seguem `aberto`: 16 IDs
 
 Issue OPEN **e** nenhum commit citando o ID ou a issue (`M04-05` saiu: **resolvido em #1852**, parse `dry_run` fail-closed; `M02-09` saiu: **resolvido** (issue #1613 — resolvers rejeitam ambiguidade + norm simétrica no import DAT); ambos posteriores a esta reconciliação):
 
 `M04-01` `M05-07` `M08-12` `M09-05` `M10-05` `M10-06` `M10-07` `M14-05`
-`M15-04` `M15-05` `M15-08` `M15-09` `M16-04` `M17-01` `M18-05` `M22-14` `M26-03`
+`M15-04` `M15-05` `M15-08` `M15-09` `M16-04` `M17-01` `M22-14` `M26-03` (`M18-05` saiu: resolvido em #2020, posterior a esta reconciliação)
 
 Amostra reverificada no artefato, não só por ausência de commit:
 
@@ -405,7 +405,7 @@ commit traz a data **de cada commit**, porque eles podem estar a semanas de dist
 | `M14-03` | **P2** | resolvido | Disponibilidade: CH Ano na grade mensal soma so o mes consultado e repete o CH Mes | ~14 atores nao-superuser: DAT 3 + Controle 1 + Assistente Administrati… | #1663 (épico, OPEN) | `4f63caf0` (2026-08-21) |
 | `M15-08` | **P2** | aberto | DAT/Compras: PATCH concorrente em DATCompra sobrescreve estoque (lost update) e duplo POST cria… | DAT (3 ativos), Controle (1), Assistente Administrativo lotado em Cont… | #1665 (épico, OPEN) | — |
 | `M16-04` | **P2** | aberto | DAT: PATCH concorrente perde update (lost update) em ProjetoGeral/DATRegistro | — | #1651 (OPEN) | — |
-| `M18-05` | **P2** | parcial | DAT Coordenadores: ~~edicao apaga data_admissao~~ (resolvido #1917) e vaza observacoes entre registros (detalhe/edica… | DAT (3 ativos) e Controle (1 ativo) + o superuser (1). O endpoint exig… | #1654 (épico, OPEN) | — |
+| `M18-05` | **P2** | resolvido | DAT Coordenadores: ~~edicao apaga data_admissao~~ (resolvido #1917) e ~~vaza observacoes entre registros~~ (resolvido #2020: handleEdit busca detail + resetFields) | DAT (3 ativos) e Controle (1 ativo) + o superuser (1). O endpoint exig… | #1654 (épico, OPEN) | #2020 (2026-09-14) |
 | `M18-06` | **P2** | resolvido | Paginação: DRF ignora `page_size` e esconde até 77% das linhas nas telas DAT | DAT (3 ativos) e Superintendência (1 ativo) + 1 superuser — a permissã… | #1653 (épico, CLOSED) | `062df0ec` (2026-08-20) |
 
 ## Correções reconciliadas em 2026-08-17, contra o `HEAD 6d73ba29` (commit de 2026-08-12)
@@ -713,7 +713,7 @@ fechados no código, e #1657 está CLOSED com resíduo teórico registrado em `M
 | Causa raiz | Sev. | Achados | Issue | Status (código) |
 |---|---|---|---|---|
 | paginacao-global-sem-page-size | P1 | `M01-07`, `M18-06` | #1653 CLOSED | resolvido (`aa8bfb5c`, `062df0ec`; 2026-08-20) |
-| list-serializer-como-fonte-de-detalhe | P1 | `M15-09`, `M17-02`, `M18-05` | #1654 OPEN (épico) | **resolvido**: List serializers expõem os campos omitidos — `M15-09` (#1917/#1919), `M18-05` data_admissao (#1917), `M17-02` já resolvido |
+| list-serializer-como-fonte-de-detalhe | P1 | `M15-09`, `M17-02`, `M18-05` | #1654 OPEN (épico) | **resolvido** (as 3 fatias): `M15-09` (#1917/#1919 List expõe ids), `M17-02` (editFetchesDetail — getAcao/getCadastro), `M18-05` data_admissao (#1917) + vaza observacoes (#2020: handleEdit busca detail + resetFields). Épico #1654 segue OPEN pelos itens estruturais (adapter dirtyFields, hook useEditModal, lint) |
 | contrato-fe-be-sem-ssot | P1 | `M15-10`, `M16-07`, `M16-08`, `M09-05`, `M05-07` | #1655 OPEN | parcial (`M16-07`/`M16-08` fechados; `M15-10` parcial; `M09-05`/`M05-07` abertos) |
 | escopo-ator-alvo-ausente | P0 | `M22-01` (duplicata histórica de `M03-01`), `M07-02`, `M10-01`, `M10-04`, `M14-01` | #1656 OPEN | parcial (`M10-04` e `M14-01` seguem: `M10-04` sem policy ator×alvo por participante; `M14-01` só no ramo sem `gerencia_id`) |
 | auditoria-nao-invariante-e-pii | P1 | `M07-03`, `M05-05`, `M23-02`, `M03-10` | #1657 CLOSED | parcial (`11219a7e`, `20c6f48d`, `d2f226cc`, todos 2026-08-18, fecham `M07-03`/`M05-05`/`M03-10`; `M23-02` segue `parcial` na fila, com o resíduo teórico) |

@@ -270,6 +270,10 @@ export async function createCoordenadorDAT(data: Record<string, unknown>): Promi
   }, DAT_ERROR_MAP);
 }
 
+export async function getCoordenadorDAT(id: ID): Promise<GenericRecord> {
+  return fetchWithErrorMapping(`/dat/coordenadores/${id}/`, {}, DAT_ERROR_MAP);
+}
+
 export async function updateCoordenadorDAT(id: ID, data: Record<string, unknown>): Promise<GenericRecord> {
   return fetchWithErrorMapping(`/dat/coordenadores/${id}/`, {
     method: 'PATCH',

@@ -7,7 +7,6 @@ Testa models, serializers e ViewSets para:
 - DATAcao
 - DATCompra
 - DATCadastro
-- DATFormacao
 
 Ref: .claude/plans/linear-scribbling-boole.md
 """
@@ -16,7 +15,7 @@ Ref: .claude/plans/linear-scribbling-boole.md
 
 from __future__ import annotations
 
-from datetime import date, time, timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
@@ -33,7 +32,6 @@ from apps.core.models import (
     DATCadastro,
     DATCompra,
     DATCoordenador,
-    DATFormacao,
     ProjetoGeral,
 )
 from apps.core.tests.factories import (
@@ -100,7 +98,6 @@ class DATCoordenadorModelTests(TestCase):
         # Initially no relations
         self.assertEqual(coord.total_municipios, 0)
         self.assertEqual(coord.total_projetos, 0)
-        self.assertEqual(coord.total_formacoes, 0)
 
 
 class DATAcaoModelTests(TestCase):
@@ -325,90 +322,6 @@ class DATCadastroModelTests(TestCase):
             duplicate.full_clean()
 
 
-class DATFormacaoModelTests(TestCase):
-    """Tests for DATFormacao model."""
-
-    @classmethod
-    def setUpTestData(cls):
-        import uuid
-
-        uid = uuid.uuid4().hex[:5]
-        cls.user = UsuarioFactory(
-            username=f"testuser_formacao_{uid}", password="test123", cpf=f"555{uid}555"  # 11 chars
-        )
-        cls.municipio = MunicipioFactory(nome=f"Fortaleza_formacao_{uid}", uf="CE")
-        cls.projeto = ProjetoFactory(nome=f"Projeto Teste_formacao_{uid}", codigo=f"PF{uid[:4]}", fluxo="NAO_SUPER")
-
-    def test_create_formacao(self):
-        """DATFormacao should be created with correct fields."""
-        formacao = DATFormacao.objects.create(
-            municipio=self.municipio,
-            projeto=self.projeto,
-            titulo="Formação de Professores",
-            data_formacao=date.today(),
-            horario_inicio=time(9, 0),
-            horario_fim=time(12, 0),
-            modalidade="presencial",
-            quantidade_prevista=50,
-            created_by=self.user,
-        )
-        self.assertEqual(formacao.status, "agendada")
-        self.assertEqual(formacao.modalidade, "presencial")
-
-    def test_duracao_horas_property(self):
-        """DATFormacao duracao_horas should calculate correctly."""
-        formacao = DATFormacao.objects.create(
-            municipio=self.municipio,
-            projeto=self.projeto,
-            titulo="Formação",
-            data_formacao=date.today(),
-            horario_inicio=time(9, 0),
-            horario_fim=time(12, 0),
-            created_by=self.user,
-        )
-        self.assertEqual(formacao.duracao_horas, 3.0)
-
-    def test_taxa_presenca_property(self):
-        """DATFormacao taxa_presenca should calculate correctly."""
-        formacao = DATFormacao.objects.create(
-            municipio=self.municipio,
-            projeto=self.projeto,
-            titulo="Formação",
-            data_formacao=date.today(),
-            horario_inicio=time(9, 0),
-            horario_fim=time(12, 0),
-            quantidade_prevista=100,
-            quantidade_presente=75,
-            created_by=self.user,
-        )
-        self.assertEqual(formacao.taxa_presenca, 75.0)
-
-    def test_documentacao_completa_property(self):
-        """DATFormacao documentacao_completa should check all flags."""
-        formacao = DATFormacao.objects.create(
-            municipio=self.municipio,
-            projeto=self.projeto,
-            titulo="Formação",
-            data_formacao=date.today(),
-            horario_inicio=time(9, 0),
-            horario_fim=time(12, 0),
-            created_by=self.user,
-        )
-        self.assertFalse(formacao.documentacao_completa)
-
-        formacao.material_preparado = True
-        formacao.lista_presenca_enviada = True
-        formacao.relatorio_enviado = True
-        formacao.fotos_enviadas = True
-        formacao.save()
-        self.assertTrue(formacao.documentacao_completa)
-
-
-# ============================================================
-# API Tests
-# ============================================================
-
-
 class DATModuleAPITestCase(APITestCase):
     """Base test case with common setup for DAT Module API tests."""
 
@@ -529,7 +442,7 @@ class DATCoordenadorAPITests(DATModuleAPITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("acoes", response.data)
-        self.assertIn("formacoes", response.data)
+        self.assertIn("total_acoes", response.data)
 
 
 class DATAcaoAPITests(DATModuleAPITestCase):
@@ -873,129 +786,6 @@ class DATCadastroAPITests(DATModuleAPITestCase):
         )
 
 
-class DATFormacaoAPITests(DATModuleAPITestCase):
-    """Tests for DATFormacao API endpoints."""
-
-    def test_create_formacao(self):
-        """DAT user should create formacao."""
-        self.client.force_authenticate(user=self.dat_user)
-        url = reverse("core:dat-formacao-list")
-        data = {
-            "municipio": self.municipio.id,
-            "projeto": self.projeto.id,
-            "titulo": "Formação de Professores",
-            "data_formacao": "2025-02-15",
-            "horario_inicio": "09:00",
-            "horario_fim": "12:00",
-            "modalidade": "presencial",
-            "quantidade_prevista": 50,
-        }
-        response = self.client.post(url, data)
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-
-    def test_calendario_action(self):
-        """Calendario action should return events for date range."""
-        self.client.force_authenticate(user=self.dat_user)
-        today = date.today()
-        DATFormacao.objects.create(
-            municipio=self.municipio,
-            projeto=self.projeto,
-            titulo="Formação",
-            data_formacao=today,
-            horario_inicio=time(9, 0),
-            horario_fim=time(12, 0),
-            created_by=self.dat_user,
-        )
-        url = reverse("core:dat-formacao-calendario")
-        response = self.client.get(
-            url,
-            {
-                "data_inicio": (today - timedelta(days=1)).isoformat(),
-                "data_fim": (today + timedelta(days=1)).isoformat(),
-            },
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-
-    def test_calendario_action_missing_params(self):
-        """Calendario action should require date params."""
-        self.client.force_authenticate(user=self.dat_user)
-        url = reverse("core:dat-formacao-calendario")
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_stats_action(self):
-        """Stats action should return aggregated data."""
-        self.client.force_authenticate(user=self.dat_user)
-        DATFormacao.objects.create(
-            municipio=self.municipio,
-            projeto=self.projeto,
-            titulo="Formação",
-            data_formacao=date.today(),
-            horario_inicio=time(9, 0),
-            horario_fim=time(12, 0),
-            quantidade_prevista=50,
-            quantidade_presente=40,
-            created_by=self.dat_user,
-        )
-        url = reverse("core:dat-formacao-stats")
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn("total", response.data)
-        self.assertIn("participantes_previstos", response.data)
-        self.assertEqual(response.data["participantes_previstos"], 50)
-
-    def test_stats_aggregations_not_fragmented_by_listing_ordering(self):
-        """Regression: same bug as DATAcao stats (PR #1361).
-
-        DATFormacao base queryset is ordered by ("-data_formacao", "horario_inicio").
-        Without `.order_by()` before `.values_list().annotate(Count())`, Django
-        injects those columns into GROUP BY → por_status fragmented.
-        """
-        import uuid
-
-        self.client.force_authenticate(user=self.dat_user)
-
-        uid = uuid.uuid4().hex[:6]
-        # 6 formações com status="agendada" mas datas/horários distintos →
-        # would fragment without the fix.
-        today = date.today()
-        for i in range(6):
-            DATFormacao.objects.create(
-                municipio=self.municipio,
-                projeto=self.projeto,
-                titulo=f"Formação {uid}_{i}",
-                data_formacao=today + timedelta(days=i),  # varied date
-                horario_inicio=time(8 + i, 0),  # varied hour
-                horario_fim=time(12, 0),
-                status="agendada",
-                modalidade="presencial",
-                created_by=self.dat_user,
-            )
-
-        url = reverse("core:dat-formacao-stats")
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        total = response.data["total"]
-        self.assertEqual(total, 6)
-
-        sum_status = sum(response.data["por_status"].values())
-        self.assertEqual(
-            sum_status,
-            total,
-            f"por_status should sum to total ({total}); got {sum_status}. "
-            f"Regression of ORDER BY → GROUP BY. por_status={response.data['por_status']!r}",
-        )
-
-        sum_modalidade = sum(response.data["por_modalidade"].values())
-        self.assertEqual(sum_modalidade, total)
-
-
-# ============================================================
-# Permission Tests
-# ============================================================
-
-
 class DATModulePermissionTests(DATModuleAPITestCase):
     """Tests for DAT Module permissions."""
 
@@ -1008,7 +798,6 @@ class DATModulePermissionTests(DATModuleAPITestCase):
             reverse("core:dat-acao-ciclo-list"),
             reverse("core:dat-compra-material-list"),
             reverse("core:dat-cadastro-list"),
-            reverse("core:dat-formacao-list"),
         ]
 
         for url in endpoints:
@@ -1024,7 +813,6 @@ class DATModulePermissionTests(DATModuleAPITestCase):
             reverse("core:dat-acao-ciclo-list"),
             reverse("core:dat-compra-material-list"),
             reverse("core:dat-cadastro-list"),
-            reverse("core:dat-formacao-list"),
         ]
 
         for url in endpoints:
@@ -1048,15 +836,6 @@ class DATModulePermissionTests(DATModuleAPITestCase):
         cadastro = DATCadastro.objects.create(
             municipio=self.municipio, projeto_geral=self.projeto_geral, plataforma="FORMAR", created_by=self.dat_user
         )
-        formacao = DATFormacao.objects.create(
-            municipio=self.municipio,
-            projeto=self.projeto,
-            titulo="Test",
-            data_formacao=date.today(),
-            horario_inicio=time(9, 0),
-            horario_fim=time(12, 0),
-            created_by=self.dat_user,
-        )
 
         # Delete all
         self.assertEqual(
@@ -1069,10 +848,6 @@ class DATModulePermissionTests(DATModuleAPITestCase):
         )
         self.assertEqual(
             self.client.delete(reverse("core:dat-cadastro-detail", args=[cadastro.id])).status_code,
-            status.HTTP_204_NO_CONTENT,
-        )
-        self.assertEqual(
-            self.client.delete(reverse("core:dat-formacao-detail", args=[formacao.id])).status_code,
             status.HTTP_204_NO_CONTENT,
         )
 

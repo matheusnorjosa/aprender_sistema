@@ -14,11 +14,6 @@ from apps.core.serializers.dat_module.dat_coordenador import (
     DATCoordenadorOptionSerializer,
     DATCoordenadorSerializer,
 )
-from apps.core.serializers.dat_module.dat_formacao import (
-    DATFormacaoCalendarioSerializer,
-    DATFormacaoListSerializer,
-    DATFormacaoSerializer,
-)
 
 __all__ = [
     # DATArea
@@ -37,8 +32,4 @@ __all__ = [
     # DATCadastro
     "DATCadastroSerializer",
     "DATCadastroListSerializer",
-    # DATFormacao
-    "DATFormacaoSerializer",
-    "DATFormacaoListSerializer",
-    "DATFormacaoCalendarioSerializer",
 ]

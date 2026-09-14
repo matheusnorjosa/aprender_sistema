@@ -29,7 +29,6 @@ from .views import (  # ASQ-005: async imports; DAT Module ViewSets; Plano Forma
     DATCadastroViewSet,
     DATCompraViewSet,
     DATCoordenadorViewSet,
-    DATFormacaoViewSet,
     ImportJobBloqueiosUploadView,
     ImportJobDetailView,
     ImportJobListView,
@@ -147,7 +146,6 @@ router.register(r"dat/coordenadores", DATCoordenadorViewSet, basename="dat-coord
 router.register(r"dat/acoes-ciclo", DATAcaoViewSet, basename="dat-acao-ciclo")
 router.register(r"dat/compras-materiais", DATCompraViewSet, basename="dat-compra-material")
 router.register(r"dat/cadastros", DATCadastroViewSet, basename="dat-cadastro")
-router.register(r"dat/formacoes", DATFormacaoViewSet, basename="dat-formacao")
 # Plano Formacoes (novo modelo estruturado)
 router.register(r"dat/plano-formacoes", PlanoFormacoesViewSet, basename="plano-formacoes")
 # Acoes/Notificacoes internas (Issue #872)

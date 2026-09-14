@@ -46,7 +46,7 @@ class PlanoFormacoes(models.Model):
     # Usuario (#1849). Co-liderança: um plano pode ter N coordenadores conduzindo o MESMO ciclo — a chave
     # natural (municipio, projeto, ano) continua identificando UM plano; o coordenador é N:N (ex.: os 2
     # grupos de UNIÃO DOS PALMARES e os 33 de VIDA E MATEMÁTICA / "Elienai & Silvio"). NÃO é a lista de
-    # governança DATCoordenador (essa segue em DATAcao/DATFormacao). Read-only na UI (o dado é autoritativo
+    # governança DATCoordenador (essa segue em DATAcao). Read-only na UI (o dado é autoritativo
     # do import; o import seta via ORM).
     coordenadores = models.ManyToManyField(  # type: ignore[misc]
         "core.Usuario",

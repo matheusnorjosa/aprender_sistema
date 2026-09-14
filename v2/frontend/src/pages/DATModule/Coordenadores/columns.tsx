@@ -35,7 +35,6 @@ export interface CoordenadorRecord {
   data_admissao?: string | null;
   total_municipios?: number;
   total_projetos?: number;
-  total_formacoes?: number;
   ativo?: boolean;
   observacoes?: string | null;
   [key: string]: unknown;

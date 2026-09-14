@@ -29,7 +29,6 @@ from apps.core.views.dat_module import (
     DATCadastroViewSet,
     DATCompraViewSet,
     DATCoordenadorViewSet,
-    DATFormacaoViewSet,
 )
 from apps.core.views.imports import ImportJobBloqueiosUploadView, ImportJobDetailView, ImportJobListView
 from apps.core.views.me import MeEventsListView
@@ -74,7 +73,6 @@ __all__ = [
     "DATAcaoViewSet",
     "DATCompraViewSet",
     "DATCadastroViewSet",
-    "DATFormacaoViewSet",
     # Plano Formacoes
     "PlanoFormacoesViewSet",
     # Stats

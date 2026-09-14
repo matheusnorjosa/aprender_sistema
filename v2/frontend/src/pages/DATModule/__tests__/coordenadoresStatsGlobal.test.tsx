@@ -14,11 +14,11 @@ import { MemoryRouter } from 'react-router';
 
 const { ALL } = vi.hoisted(() => ({
   ALL: [
-    { id: 1, nome: 'Ana', email: 'a@x.com', telefone: '', area: 'DAT', cargo: '', ativo: true, foto_url: null, total_municipios: 1, total_projetos: 4, total_formacoes: 0 },
-    { id: 2, nome: 'Bruno', email: 'b@x.com', telefone: '', area: 'DAT', cargo: '', ativo: true, foto_url: null, total_municipios: 1, total_projetos: 4, total_formacoes: 0 },
-    { id: 3, nome: 'Carla', email: 'c@x.com', telefone: '', area: 'Pedagógico', cargo: '', ativo: true, foto_url: null, total_municipios: 1, total_projetos: 2, total_formacoes: 0 },
-    { id: 4, nome: 'Davi', email: 'd@x.com', telefone: '', area: 'Logística', cargo: '', ativo: false, foto_url: null, total_municipios: 0, total_projetos: 0, total_formacoes: 0 },
-    { id: 5, nome: 'Eva', email: 'e@x.com', telefone: '', area: null, cargo: '', ativo: false, foto_url: null, total_municipios: 0, total_projetos: 0, total_formacoes: 0 },
+    { id: 1, nome: 'Ana', email: 'a@x.com', telefone: '', area: 'DAT', cargo: '', ativo: true, foto_url: null, total_municipios: 1, total_projetos: 4 },
+    { id: 2, nome: 'Bruno', email: 'b@x.com', telefone: '', area: 'DAT', cargo: '', ativo: true, foto_url: null, total_municipios: 1, total_projetos: 4 },
+    { id: 3, nome: 'Carla', email: 'c@x.com', telefone: '', area: 'Pedagógico', cargo: '', ativo: true, foto_url: null, total_municipios: 1, total_projetos: 2 },
+    { id: 4, nome: 'Davi', email: 'd@x.com', telefone: '', area: 'Logística', cargo: '', ativo: false, foto_url: null, total_municipios: 0, total_projetos: 0 },
+    { id: 5, nome: 'Eva', email: 'e@x.com', telefone: '', area: null, cargo: '', ativo: false, foto_url: null, total_municipios: 0, total_projetos: 0 },
   ],
 }));
 

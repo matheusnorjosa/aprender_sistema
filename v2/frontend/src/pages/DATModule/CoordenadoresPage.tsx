@@ -912,7 +912,7 @@ export default function CoordenadoresPage(): JSX.Element {
 
             {/* Stats */}
             <Row gutter={16} className="mb-6">
-              <Col span={8}>
+              <Col span={12}>
                 <Card size="small">
                   <Statistic
                     title="Projetos"
@@ -921,21 +921,12 @@ export default function CoordenadoresPage(): JSX.Element {
                   />
                 </Card>
               </Col>
-              <Col span={8}>
+              <Col span={12}>
                 <Card size="small">
                   <Statistic
                     title="Municípios"
                     value={viewingCoordenador.total_municipios || 0}
                     prefix={<EnvironmentOutlined />}
-                  />
-                </Card>
-              </Col>
-              <Col span={8}>
-                <Card size="small">
-                  <Statistic
-                    title="Formações"
-                    value={viewingCoordenador.total_formacoes || 0}
-                    prefix={<TeamOutlined />}
                   />
                 </Card>
               </Col>

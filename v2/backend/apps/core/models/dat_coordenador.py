@@ -51,7 +51,7 @@ class DATCoordenador(models.Model):
     Gestao de coordenadores do DAT.
 
     Registra informacoes de contato, area de atuacao e status.
-    Rastreia carga de trabalho via relacionamentos com DATAcao e DATFormacao.
+    Rastreia carga de trabalho via relacionamentos com DATAcao.
 
     Ref: CoordenadoresPage.jsx (29 registros)
     """
@@ -127,8 +127,3 @@ class DATCoordenador(models.Model):
     def total_projetos(self) -> int:
         """Conta projetos unicos das acoes atribuidas."""
         return self.dat_acoes.values("projeto").distinct().count()
-
-    @property
-    def total_formacoes(self) -> int:
-        """Conta formacoes atribuidas."""
-        return self.dat_formacoes.count()

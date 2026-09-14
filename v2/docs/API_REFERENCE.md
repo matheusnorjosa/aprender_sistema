@@ -514,18 +514,6 @@ Controle**, não só a DAT.
 
 Gate em `DATCoordenadorViewSet.get_permissions` (`views/dat_module.py`).
 
-### Formações DAT
-
-| Método | Endpoint | Status | Descrição | Permissão |
-|--------|----------|--------|-----------|-----------|
-| GET/POST | `/api/dat/formacoes/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar / criar formação | `manage_admin_registries` \| `run_daily_operations` |
-| GET/PUT/PATCH | `/api/dat/formacoes/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Detalhe / atualizar formação | `manage_admin_registries` \| `run_daily_operations` |
-| DELETE | `/api/dat/formacoes/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Excluir formação | `execute_restricted_operations` |
-| GET | `/api/dat/formacoes/stats/` | ![Stable](https://img.shields.io/badge/-stable-green) | Estatísticas | `manage_admin_registries` \| `run_daily_operations` |
-| GET | `/api/dat/formacoes/calendario/` | ![Stable](https://img.shields.io/badge/-stable-green) | Dados para calendário | `manage_admin_registries` \| `run_daily_operations` |
-
-Gate em `DATFormacaoViewSet.get_permissions` (`views/dat_module.py`).
-
 ### Áreas DAT — READ-ONLY
 
 `DATAreaViewSet` é `viewsets.ReadOnlyModelViewSet` (`views/dat_module.py`):

@@ -1,7 +1,7 @@
 ---
 title: Módulo DAT
 status: canonical
-last_verified: 2026-09-11
+last_verified: 2026-09-14
 verified_at_commit: 0dd1dcb630fdc1cf9b2b488121553e89488dde3c
 sources_of_truth:
   - v2/backend/apps/core/services/controle_acoes_import.py
@@ -9,7 +9,6 @@ sources_of_truth:
   - v2/backend/apps/core/models/dat_cadastro.py
   - v2/backend/apps/core/models/dat_compra.py
   - v2/backend/apps/core/models/dat_coordenador.py
-  - v2/backend/apps/core/models/dat_formacao.py
   - v2/backend/apps/core/models/dat_registro.py
   - v2/backend/apps/core/models/workflow.py
   - v2/backend/apps/core/views/dat_module.py
@@ -38,7 +37,7 @@ O módulo DAT (Departamento de Apoio Técnico/Tecnologia) gerencia o ciclo opera
 
 No código convivem **dois conjuntos de models** com a mesma origem de dados (planilha DAT), mas finalidades diferentes — o que segue a distinção legacy×operacional do projeto:
 
-- **Operacional (UI/CRUD via DRF):** `DATAcao`, `DATCadastro`, `DATCompra`, `DATFormacao`, `DATCoordenador`/`DATArea`, `DATRegistro` (tabelas `core_dat_*`). É o que esta spec governa.
+- **Operacional (UI/CRUD via DRF):** `DATAcao`, `DATCadastro`, `DATCompra`, `DATCoordenador`/`DATArea`, `DATRegistro` (tabelas `core_dat_*`). É o que esta spec governa. (`DATFormacao` foi REMOVIDO — dead-code, ver #1978/deleção 2026-09-14; formação real vive em `PlanoFormacoes`.)
 - **Legacy (histórico de import ETL):** `AcaoDAT` em [`workflow.py`](../../../backend/apps/core/models/workflow.py) (tabela `core_acao_dat`), com o enum de choices `TipoAcaoDAT` (`workflow.py`, `models.TextChoices` — **não é model**). Alimentado por importação por `external_hash`; não é o caminho de edição da UI nova. **`AcaoControle` foi REMOVIDO na Onda 1** (o import de ações — `POST /api/controle/import-acoes/` — grava em `DATAcao`): a tabela `core_acao_controle`, o endpoint legacy `/controle/acoes/`, o serializer e o admin foram apagados (ver [`docs/plans/PLANO_IMPORTS_ORFAOS.md`](../../plans/PLANO_IMPORTS_ORFAOS.md)).
 
 ## Fonte de verdade no código
@@ -48,7 +47,6 @@ Models operacionais (um arquivo por entidade):
 - [`models/dat_acao.py`](../../../backend/apps/core/models/dat_acao.py) — `DATAcao` (ciclo de 4 etapas).
 - [`models/dat_cadastro.py`](../../../backend/apps/core/models/dat_cadastro.py) — `DATCadastro` (FORMAR/AVALIAR).
 - [`models/dat_compra.py`](../../../backend/apps/core/models/dat_compra.py) — `DATCompra` (materiais/estoque).
-- [`models/dat_formacao.py`](../../../backend/apps/core/models/dat_formacao.py) — `DATFormacao` (formações/calendário).
 - [`models/dat_coordenador.py`](../../../backend/apps/core/models/dat_coordenador.py) — `DATArea` (referência) + `DATCoordenador`.
 - [`models/dat_registro.py`](../../../backend/apps/core/models/dat_registro.py) — `DATRegistro` (acompanhamento de turmas FORMAR/AVALIAR; depende de `ProjetoGeral`).
 
@@ -58,7 +56,7 @@ Model legacy:
 
 ViewSets / Views:
 
-- [`views/dat_module.py`](../../../backend/apps/core/views/dat_module.py) — `DATArea/DATCoordenador/DATAcao/DATCompra/DATCadastro/DATFormacao` ViewSets.
+- [`views/dat_module.py`](../../../backend/apps/core/views/dat_module.py) — `DATArea/DATCoordenador/DATAcao/DATCompra/DATCadastro` ViewSets.
 - [`views/dat.py`](../../../backend/apps/core/views/dat.py) — `DATRegistroViewSet` + `ProjetoGeralViewSet`.
 - [`views_controle_dat.py`](../../../backend/apps/core/views_controle_dat.py) — `DATAcoesListCreateView` (legacy `AcaoDAT`).
 
@@ -92,7 +90,6 @@ Rotas DRF (prefixo `/api/`, registradas em [`urls.py`](../../../backend/apps/cor
 | Ações (ciclo) | `dat/acoes-ciclo/` | `DATAcaoViewSet` | `@action stats` |
 | Compras/materiais | `dat/compras-materiais/` | `DATCompraViewSet` | `@action stats / dashboard / pendencias` |
 | Cadastros FORMAR/AVALIAR | `dat/cadastros/` | `DATCadastroViewSet` | `@action stats / etapa` |
-| Formações | `dat/formacoes/` | `DATFormacaoViewSet` | `@action stats / calendario` |
 | Registros (turmas) | `dat/registros/` | `DATRegistroViewSet` | `@action export(CSV) / stats`; filtro por `ano` + ordenação por `ano`/`municipio__nome`/`projeto__nome` (default `["municipio__nome","projeto__nome","ano"]`, #1996) |
 | Projetos Gerais | `projetos-gerais/` | `ProjetoGeralViewSet` | `@action projetos` |
 | Ações DAT (legacy) | `dat/acoes/` | `DATAcoesListCreateView` | model `AcaoDAT` |
@@ -106,13 +103,12 @@ Rotas DRF (prefixo `/api/`, registradas em [`urls.py`](../../../backend/apps/cor
 | `DATAreaViewSet` (ReadOnly) | `IsAuthenticated` — **sem capability** | — | `DATAreaViewSet.permission_classes` (`dat_module.py`) |
 | `DATCoordenadorViewSet` | `manage_admin_registries \| run_daily_operations` | `execute_restricted_operations` | `DATCoordenadorViewSet.get_permissions` (`dat_module.py`) |
 | `DATAcaoViewSet` | idem | idem | `DATAcaoViewSet.get_permissions` (`dat_module.py`) |
-| `DATFormacaoViewSet` | idem | idem | `DATFormacaoViewSet.get_permissions` (`dat_module.py`) |
 | `DATCompraViewSet` | **`CanViewComprasStats`** para tudo (list/retrieve/create/update/stats); `dashboard` → `CanViewComprasDashboard`; `pendencias` → `CanViewComprasPendencias` | `execute_restricted_operations` | `DATCompraViewSet.get_permissions` (`dat_module.py`) |
 | `DATCadastroViewSet` | só `manage_admin_registries` | `execute_restricted_operations` | `DATCadastroViewSet.get_permissions` (`dat_module.py`) |
 | `DATRegistroViewSet` | só `manage_admin_registries` | `execute_restricted_operations` | `DATRegistroViewSet.get_permissions` (`dat.py`) |
 | `ProjetoGeralViewSet` | `list`/`retrieve`/`projetos` → `IsAuthenticated`; resto → `manage_admin_registries` | `execute_restricted_operations` | `ProjetoGeralViewSet.get_permissions` (`dat.py`) |
 
-Notas: a composition OR do #1220 vale só para Coordenador/Ação/Formação. Em Compras, a Policy `CanViewComprasStats` (#1233) governa o **CRUD inteiro**, não apenas a action `stats` — mantém paridade de capabilities com a OR anterior, mas o nome sugere escopo menor do que o real. Ver [`rbac/policies.py`](../../../backend/apps/core/rbac/policies.py) e [`rbac/matrix.py`](../../../backend/apps/core/rbac/matrix.py).
+Notas: a composition OR do #1220 vale só para Coordenador/Ação. Em Compras, a Policy `CanViewComprasStats` (#1233) governa o **CRUD inteiro**, não apenas a action `stats` — mantém paridade de capabilities com a OR anterior, mas o nome sugere escopo menor do que o real. Ver [`rbac/policies.py`](../../../backend/apps/core/rbac/policies.py) e [`rbac/matrix.py`](../../../backend/apps/core/rbac/matrix.py).
 
 ## Fluxos principais
 
@@ -121,8 +117,6 @@ Notas: a composition OR do #1220 vale só para Coordenador/Ação/Formação. Em
 **Cadastro de plataforma:** cria-se `DATCadastro` para `(municipio, projeto_geral, plataforma)` → workflow FORMAR (Criação Curso → Chaves → Instruções → Envio) ou AVALIAR (Recebimento → Validação → Importação) → `POST {id}/etapa/` atualiza uma etapa específica (`etapa` inválida → **400**) → `progresso` por plataforma.
 
 **Registro de turma:** cria-se `DATRegistro` → `save()` deriva `usa_avaliar`/`nr_codigos` → seções FORMAR e (condicionalmente) AVALIAR → `status_geral` = `completo | pendente_formar | pendente_avaliar` → `export/` gera CSV sanitizado.
-
-**Formação:** cria-se `DATFormacao` (data/horário/modalidade/participantes/docs) → `calendario/` exige `data_inicio`+`data_fim` (faltando → **400**) → `taxa_presenca`/`documentacao_completa` derivados.
 
 **Erros relevantes:** sem permissão → **403**; etapa/parâmetro inválido → **400**; violação de unicidade → **IntegrityError** (400/409).
 

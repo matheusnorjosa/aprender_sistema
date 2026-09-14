@@ -1,7 +1,7 @@
 """
 AS v2 — DAT Module ViewSets
 
-ViewSets para DATArea, DATCoordenador, DATAcao, DATCompra, DATCadastro, DATFormacao.
+ViewSets para DATArea, DATCoordenador, DATAcao, DATCompra, DATCadastro.
 
 Endpoints:
     - /api/dat/areas/ (ReadOnly)
@@ -9,7 +9,6 @@ Endpoints:
     - /api/dat/acoes/ (CRUD + stats)
     - /api/dat/compras/ (CRUD + stats)
     - /api/dat/cadastros/ (CRUD + stats + etapa)
-    - /api/dat/formacoes/ (CRUD + stats + calendario)
 
 Type-checked with Pyright (strict mode).
 """
@@ -38,7 +37,6 @@ from apps.core.models import (
     DATCadastro,
     DATCompra,
     DATCoordenador,
-    DATFormacao,
     MunicipioReferencia,
     Solicitacao,
 )
@@ -56,9 +54,6 @@ from apps.core.serializers import (
     DATCoordenadorListSerializer,
     DATCoordenadorOptionSerializer,
     DATCoordenadorSerializer,
-    DATFormacaoCalendarioSerializer,
-    DATFormacaoListSerializer,
-    DATFormacaoSerializer,
 )
 from apps.core.services.dat_codigos import recompute_registros
 
@@ -166,11 +161,11 @@ class DATCoordenadorViewSet(viewsets.ModelViewSet):
     )
     def alocacoes(self, request: Request, pk: int | None = None) -> Response:
         """
-        Lista alocações (ações e formações) do coordenador.
+        Lista alocações (ações) do coordenador.
 
         GET /api/dat/coordenadores/{id}/alocacoes/
 
-        Returns: {acoes: [...], formacoes: [...]}
+        Returns: {acoes: [...], total_acoes: N}
         """
         coordenador = self.get_object()
 
@@ -179,17 +174,10 @@ class DATCoordenadorViewSet(viewsets.ModelViewSet):
             many=True,
         ).data
 
-        formacoes = DATFormacaoListSerializer(
-            coordenador.dat_formacoes.filter(ativo=True).select_related("municipio", "projeto", "created_by")[:10],
-            many=True,
-        ).data
-
         return Response(
             {
                 "acoes": acoes,
-                "formacoes": formacoes,
                 "total_acoes": coordenador.dat_acoes.filter(ativo=True).count(),
-                "total_formacoes": coordenador.dat_formacoes.filter(ativo=True).count(),
             }
         )
 
@@ -896,168 +884,3 @@ class DATCadastroViewSet(viewsets.ModelViewSet):
         cadastro.save()
 
         return Response(DATCadastroSerializer(cadastro).data)
-
-
-# ============================================================
-# DATFormacao ViewSet
-# ============================================================
-
-
-class DATFormacaoFilter(filters.FilterSet):
-    """FilterSet para DATFormacao."""
-
-    uf = filters.CharFilter(field_name="municipio__uf", lookup_expr="iexact")
-    data_inicio = filters.DateFilter(field_name="data_formacao", lookup_expr="gte")
-    data_fim = filters.DateFilter(field_name="data_formacao", lookup_expr="lte")
-
-    class Meta:
-        model = DATFormacao
-        fields = [
-            "municipio",
-            "projeto",
-            "coordenador",
-            "modalidade",
-            "status",
-            "ativo",
-            "uf",
-        ]
-
-
-class DATFormacaoViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet para CRUD de Formações DAT.
-
-    Endpoints:
-        - GET /api/dat/formacoes/ - Listar
-        - POST /api/dat/formacoes/ - Criar
-        - GET /api/dat/formacoes/{id}/ - Detalhe
-        - PATCH /api/dat/formacoes/{id}/ - Atualizar
-        - DELETE /api/dat/formacoes/{id}/ - Excluir (Superintendência only)
-        - GET /api/dat/formacoes/stats/ - Estatísticas
-        - GET /api/dat/formacoes/calendario/ - Dados para calendário
-
-    Permissões:
-        - list, retrieve, stats, calendario: DAT ou Superintendência
-        - create, update: DAT ou Superintendência
-        - destroy: apenas Superintendência
-    """
-
-    queryset = DATFormacao.objects.select_related("municipio", "projeto", "coordenador", "created_by").order_by(
-        "-data_formacao", "horario_inicio"
-    )
-
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_class = DATFormacaoFilter
-    search_fields = ["titulo", "municipio__nome", "projeto__nome", "coordenador__nome"]
-    ordering_fields = ["data_formacao", "titulo", "municipio__nome", "created_at"]
-    ordering = ["-data_formacao", "horario_inicio"]
-
-    def get_serializer_class(self):
-        """Return appropriate serializer based on action."""
-        if self.action == "list":
-            return DATFormacaoListSerializer
-        elif self.action == "calendario":
-            return DATFormacaoCalendarioSerializer
-        return DATFormacaoSerializer
-
-    def get_permissions(self):
-        """Permissões baseadas na ação.
-
-        Issue #1220 (Epic 1): setor Controle também edita formações via
-        `run_daily_operations` — não apenas DAT. Composition OR cobre ambos.
-        """
-        if self.action == "destroy":
-            return [HasPerm("execute_restricted_operations")()]
-        return [(HasPerm("manage_admin_registries") | HasPerm("run_daily_operations"))()]
-
-    def perform_create(self, serializer: Any) -> None:
-        """Set created_by on create."""
-        serializer.save(created_by=self.request.user)
-
-    def perform_update(self, serializer: Any) -> None:
-        """Set updated_by on update."""
-        serializer.save(updated_by=self.request.user)
-
-    @action(detail=False, methods=["get"], permission_classes=[HasPerm("manage_admin_registries")])
-    def stats(self, request: Request) -> Response:
-        """
-        Estatísticas agregadas das formações.
-
-        GET /api/dat/formacoes/stats/
-
-        Returns: {
-            total, por_status, por_modalidade, por_projeto, por_coordenador
-        }
-        """
-        qs = self.filter_queryset(self.get_queryset())
-
-        total = qs.count()
-
-        # Same fix as DATAcao stats (PR #1361): clear listing ordering before
-        # aggregation. Base queryset orders by ("-data_formacao", "horario_inicio"),
-        # which Django would otherwise inject into the GROUP BY.
-        stats_qs = qs.order_by()
-
-        # Por status
-        por_status = dict(stats_qs.values_list("status").annotate(c=Count("id")))
-
-        # Por modalidade
-        por_modalidade = dict(stats_qs.values_list("modalidade").annotate(c=Count("id")))
-
-        # Por projeto (top 10)
-        por_projeto = list(stats_qs.values("projeto__nome").annotate(count=Count("id")).order_by("-count")[:10])
-
-        # Por coordenador (top 10)
-        por_coordenador = list(
-            stats_qs.filter(coordenador__isnull=False)
-            .values("coordenador__nome")
-            .annotate(count=Count("id"))
-            .order_by("-count")[:10]
-        )
-
-        # Participantes totais (Sum em qs ordenada não sofre o bug; mantemos qs
-        # original mas usar stats_qs também é seguro)
-        participantes = stats_qs.aggregate(
-            previstos=Sum("quantidade_prevista"),
-            presentes=Sum("quantidade_presente"),
-        )
-
-        return Response(
-            {
-                "total": total,
-                "por_status": por_status,
-                "por_modalidade": por_modalidade,
-                "por_projeto": por_projeto,
-                "por_coordenador": por_coordenador,
-                "participantes_previstos": participantes["previstos"] or 0,
-                "participantes_presentes": participantes["presentes"] or 0,
-            }
-        )
-
-    @action(detail=False, methods=["get"], permission_classes=[HasPerm("manage_admin_registries")])
-    def calendario(self, request: Request) -> Response:
-        """
-        Dados otimizados para visualização em calendário.
-
-        GET /api/dat/formacoes/calendario/
-        Query params: data_inicio, data_fim (obrigatórios)
-
-        Returns: Lista de eventos para calendário
-        """
-        data_inicio = request.query_params.get("data_inicio")
-        data_fim = request.query_params.get("data_fim")
-
-        if not data_inicio or not data_fim:
-            return Response(
-                {"error": "Parâmetros data_inicio e data_fim são obrigatórios"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        qs = self.get_queryset().filter(
-            data_formacao__gte=data_inicio,
-            data_formacao__lte=data_fim,
-            ativo=True,
-        )
-
-        serializer = DATFormacaoCalendarioSerializer(qs, many=True)
-        return Response(serializer.data)

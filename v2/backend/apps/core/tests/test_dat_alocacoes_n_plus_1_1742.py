@@ -2,16 +2,15 @@
 Teste de query-count (N+1) para GET /api/dat/coordenadores/{id}/alocacoes/ (#1742).
 
 Fix sob teste (apps/core/views/dat_module.py — DATCoordenadorViewSet.alocacoes):
-as querysets `coordenador.dat_acoes` e `coordenador.dat_formacoes` agora aplicam
+a queryset `coordenador.dat_acoes` aplica
 `.select_related("municipio", "projeto", "created_by")`.
 
 Prova do RED (por que falharia SEM o fix):
-    DATAcaoListSerializer / DATFormacaoListSerializer acessam `obj.municipio.nome`
-    e `obj.projeto.nome`. Sem `select_related`, cada linha serializada dispara 2
-    queries extra (municipio + projeto), logo o total de queries CRESCE
-    linearmente com o nº de linhas. A asserção `q_large == q_small` (contagem
-    idêntica com 1 e com 7 linhas) só é verdadeira COM o select_related — sem ele,
-    q_large ≈ q_small + 6*2 (ações) + 6*2 (formações).
+    DATAcaoListSerializer acessa `obj.municipio.nome` e `obj.projeto.nome`. Sem
+    `select_related`, cada linha serializada dispara 2 queries extra (municipio +
+    projeto), logo o total de queries CRESCE linearmente com o nº de linhas. A
+    asserção `q_large == q_small` (contagem idêntica com 1 e com 7 linhas) só é
+    verdadeira COM o select_related — sem ele, q_large ≈ q_small + 6*2 (ações).
 
 Nota: `obj.coordenador.nome` também é acessado, mas o manager de FK reverso
 (`coordenador.dat_acoes`) injeta a instância do coordenador via
@@ -23,15 +22,13 @@ select_related.
 
 from __future__ import annotations
 
-from datetime import date, time
-
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.core.models import DATAcao, DATCoordenador, DATFormacao
+from apps.core.models import DATAcao, DATCoordenador
 from apps.core.tests.factories import (
     GroupFactory,
     MunicipioFactory,
@@ -57,9 +54,9 @@ class DATAlocacoesNPlusOneTests(APITestCase):
         )
 
     def _add_alocacoes(self, n: int) -> None:
-        """Cria n ações + n formações ligadas ao coordenador, cada uma com
-        município/projeto DISTINTOS (obriga uma query por FK sem select_related e
-        respeita o UniqueConstraint (municipio, projeto) de DATAcao)."""
+        """Cria n ações ligadas ao coordenador, cada uma com município/projeto
+        DISTINTOS (obriga uma query por FK sem select_related e respeita o
+        UniqueConstraint (municipio, projeto) de DATAcao)."""
         for _ in range(n):
             municipio = MunicipioFactory()
             projeto = ProjetoFactory()
@@ -68,16 +65,6 @@ class DATAlocacoesNPlusOneTests(APITestCase):
                 projeto=projeto,
                 coordenador=self.coordenador,
                 created_by=self.dat_user,
-            )
-            DATFormacao.objects.create(
-                municipio=municipio,
-                projeto=projeto,
-                coordenador=self.coordenador,
-                created_by=self.dat_user,
-                titulo="Formação N+1 1742",
-                data_formacao=date(2026, 1, 1),
-                horario_inicio=time(9, 0),
-                horario_fim=time(12, 0),
             )
 
     def test_alocacoes_query_count_is_independent_of_row_count(self):
@@ -105,9 +92,7 @@ class DATAlocacoesNPlusOneTests(APITestCase):
 
         # Sanidade: as 7 linhas realmente foram serializadas.
         self.assertEqual(len(resp_large.data["acoes"]), 7)
-        self.assertEqual(len(resp_large.data["formacoes"]), 7)
         self.assertEqual(resp_large.data["total_acoes"], 7)
-        self.assertEqual(resp_large.data["total_formacoes"], 7)
 
         # Núcleo do teste: com select_related a contagem é constante.
         # Sem o fix, q_large ≈ q_small + 24 (municipio+projeto por linha extra).

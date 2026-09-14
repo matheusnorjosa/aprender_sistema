@@ -26,19 +26,23 @@ import pandas as pd
 
 from apps.core.imports.normalization import normalize_blank
 from apps.core.imports.row_errors import registrar_erro_import
-from apps.core.models import AvailabilityBlock
+from apps.core.models import AuditLog, AvailabilityBlock
 from apps.core.services.resolvers import resolve_user_by_name
 
 TZ = ZoneInfo("America/Fortaleza")
 
 
-def import_bloqueios_from_file(*, path: str, dry_run: bool = True) -> dict[str, Any]:
+def import_bloqueios_from_file(*, path: str, dry_run: bool = True, actor: Any = None) -> dict[str, Any]:
     """
     Importa bloqueios de CSV/XLSX.
 
     Args:
         path: Caminho do arquivo CSV/XLSX
         dry_run: Se True, nao persiste (rollback)
+        actor: Usuario que dispara o import (#1643) — grava `created_by` no
+            bloqueio e um AuditLog `DELEGATE_BLOCK_CREATE` (origem=import) para
+            atribuir/auditar. A view passa `request.user`; o task passa `job.user`.
+            None (chamada legada) = comportamento antigo (created_by nulo, sem audit).
 
     Returns:
         {
@@ -71,7 +75,7 @@ def import_bloqueios_from_file(*, path: str, dry_run: bool = True) -> dict[str, 
         for idx, row in enumerate(rows, start=1):
             try:
                 with transaction.atomic():  # savepoint
-                    _process_row(row, idx, stats, pendencias)
+                    _process_row(row, idx, stats, pendencias, actor)
             except Exception:
                 stats["skipped"]["other"] += 1
                 pendencias["outros"].append(
@@ -225,6 +229,7 @@ def _process_row(
     linha_num: int,
     stats: dict[str, Any],
     pendencias: dict[str, list[dict[str, Any]]],
+    actor: Any = None,
 ) -> None:
     """Processa uma linha do arquivo."""
     # Resolver usuario
@@ -304,12 +309,28 @@ def _process_row(
         else:
             stats["unchanged"] += 1
     else:
-        AvailabilityBlock.objects.create(
+        block = AvailabilityBlock.objects.create(
             usuario=usuario,
             inicio=inicio,
             fim=fim,
             tipo=tipo,
             motivo=motivo,
             status="aprovado",  # Auto-aprovado
+            created_by=actor,  # #1643: atribuicao (ator do import; None em chamada legada)
         )
         stats["created"] += 1
+        # #1643: auditoria do bloqueio criado por import (nao e' declaracao propria do
+        # formador; afeta RD-02/RD-03). So quando ha ator identificado.
+        if actor is not None:
+            AuditLog.objects.create(
+                usuario=actor,
+                action=AuditLog.Action.DELEGATE_BLOCK_CREATE,
+                model_name="AvailabilityBlock",
+                details={
+                    "target_user_id": usuario.pk,
+                    "block_id": block.pk,
+                    "inicio": inicio.isoformat(),
+                    "fim": fim.isoformat(),
+                    "origem": "import",
+                },
+            )

@@ -124,7 +124,7 @@ class ImportBloqueiosView(APIView):
             temp_file.close()
 
             # Executar import
-            report = import_bloqueios_from_file(path=temp_file.name, dry_run=dry_run)
+            report = import_bloqueios_from_file(path=temp_file.name, dry_run=dry_run, actor=request.user)
 
             return Response(report, status=status.HTTP_200_OK)
 

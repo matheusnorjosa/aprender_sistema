@@ -241,7 +241,9 @@ class PlanoFormacoesListSerializer(serializers.ModelSerializer["PlanoFormacoes"]
             "coordenadores",
             "coordenador_nome",
             "ch_total",
+            "ch_estudo",
             "ch_anual",
+            "observacoes",
             "ativo",
             # Expanded arrays
             "formacoes_list",

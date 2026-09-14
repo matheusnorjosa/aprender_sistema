@@ -275,11 +275,11 @@ Nove desses 31 são só correção de contradição do registro: `M03-03`, `M12-
 - **`M15-10`** — inalterado desde 2026-08-17: só a Fase A (`8f894279`, 2026-08-11, e `e94f15f4`,
   2026-08-12); issue #1637 segue OPEN e a Fase B continua sem desenho.
 
-### Seguem `aberto`: 14 IDs
+### Seguem `aberto`: 13 IDs
 
 Issue OPEN **e** nenhum commit citando o ID ou a issue (`M04-05` saiu: **resolvido em #1852**, parse `dry_run` fail-closed; `M02-09` saiu: **resolvido** (issue #1613 — resolvers rejeitam ambiguidade + norm simétrica no import DAT); ambos posteriores a esta reconciliação):
 
-`M04-01` `M05-07` `M09-05` `M10-05` `M10-06` `M14-05` (`M08-12`/`M10-07` saíram: resolvidos em #2021, posteriores a esta reconciliação)
+`M05-07` `M09-05` `M10-05` `M10-06` `M14-05` (`M08-12`/`M10-07` #2021 · `M04-01` #2022 saíram: resolvidos, posteriores a esta reconciliação)
 `M15-04` `M15-05` `M15-08` `M15-09` `M16-04` `M17-01` `M22-14` `M26-03` (`M18-05` saiu: resolvido em #2020, posterior a esta reconciliação)
 
 Amostra reverificada no artefato, não só por ausência de commit:
@@ -351,7 +351,7 @@ commit traz a data **de cada commit**, porque eles podem estar a semanas de dist
 | `M02-09` | **P1** | **resolvido** | imports/resolvers: rejeitar ambiguidade em vez de escolher com .first(), e corrigir normalizaçã… | DAT (3 ativos) e Superintendência (1 ativo) + superuser (1). Os endpoi… | #1613 | `resolve_projeto`/`resolve_tipo_evento` rejeitam ambiguidade (`_pick_unique`) + import DAT usa `resolve_projeto` (norm simétrica). Substring de PESSOA (`resolve_user_by_name`) segue em `M22-14`/#1643 |
 | `M03-03` | **P1** | resolvido | auth: lockout e throttle de login sao evadiveis por grafia do CPF e por sessao autenticada | Qualquer um dos 148 usuarios ativos autenticados (nenhum grupo necessa… | #1614 (CLOSED) | `9ae753e6` (2026-08-18) |
 | `M03-11` | **P2** | resolvido | frontend/auth: `checkAuth` e o boot (App.tsx) deslogam a sessão em QUALQUER erro (5xx/rede), não só 401/403 — um blip transitório manda um usuário com cookie válido para a tela de login (auditoria dinâmica 2026-08-17, F2). Fix: `checkAuth` relança erro não-auth; App mostra tela de erro com retry; `UsuariosPage` fail-closed | Qualquer usuário autenticado (o boot roda em todo carregamento da app) | #1741 | `fcc074b1` (2026-08-18) |
-| `M04-01` | **P1** | aberto | imports/equipe-gerencia: import cria Gerência duplicada para "Brincando" e "Ed Financeira" e de… | DAT (3 membros ativos nao-superuser) + superuser (1). O endpoint POST … | #1615 (OPEN) | — |
+| `M04-01` | **P1** | resolvido | imports/equipe-gerencia: ~~import cria Gerência duplicada por rótulo~~ → `_resolve_gerencia` resolve-only, miss → pendência (catálogo é SSOT); create ficou só no export_contract --apply | DAT (3 membros ativos nao-superuser) + superuser (1). O endpoint POST … | #1615 | #2022 (2026-09-14) |
 | `M07-01` | **P1** | resolvido | rbac/admin: DAT faz takeover de conta aprovadora (senha, desativação e hard delete) | — | #1616 (CLOSED) | `a81053cd` (2026-08-19) |
 | `M07-02` | **P1** | resolvido | RBAC/admin de usuarios: DAT faz takeover de conta aprovadora (senha, e-mail, desativacao e hard… | DAT — 3 membros ativos nao-superuser. Probe confirma que DAT e o UNICO… | #1617 (CLOSED) | `a81053cd` (2026-08-19) |
 | `M07-03` | **P1** | resolvido | RBAC/Auditoria: registrar AuditLog em todas as mutações de identidade do UsuarioAdminViewSet | 3 usuários ativos do grupo DAT no censo de 2026-07-20 | #1618 (CLOSED) | `aba033f1` (2026-07-31)+`11219a7e` (2026-08-18) |
@@ -717,7 +717,7 @@ fechados no código, e #1657 está CLOSED com resíduo teórico registrado em `M
 | contrato-fe-be-sem-ssot | P1 | `M15-10`, `M16-07`, `M16-08`, `M09-05`, `M05-07` | #1655 OPEN | parcial (`M16-07`/`M16-08` fechados; `M15-10` parcial; `M09-05`/`M05-07` abertos) |
 | escopo-ator-alvo-ausente | P0 | `M22-01` (duplicata histórica de `M03-01`), `M07-02`, `M10-01`, `M10-04`, `M14-01` | #1656 OPEN | parcial (`M10-04` e `M14-01` seguem: `M10-04` sem policy ator×alvo por participante; `M14-01` só no ramo sem `gerencia_id`) |
 | auditoria-nao-invariante-e-pii | P1 | `M07-03`, `M05-05`, `M23-02`, `M03-10` | #1657 CLOSED | parcial (`11219a7e`, `20c6f48d`, `d2f226cc`, todos 2026-08-18, fecham `M07-03`/`M05-05`/`M03-10`; `M23-02` segue `parcial` na fila, com o resíduo teórico) |
-| resolvers-por-rotulo-humano | P1 | `M02-09`, `M04-01`, `M22-14`, `M15-05` | #1658 OPEN | parcial (`M02-09`/#1613 resolvido: `resolve_projeto`/`resolve_tipo_evento` rejeitam ambiguidade + norm simétrica no import DAT; `M04-01`/`M22-14`/`M15-05` seguem abertos) |
+| resolvers-por-rotulo-humano | P1 | `M02-09`, `M04-01`, `M22-14`, `M15-05` | #1658 OPEN | parcial (`M02-09`/#1613 e `M04-01`/#2022 resolvidos: `resolve_projeto`/`resolve_tipo_evento` rejeitam ambiguidade; equipe_gerencia resolve-only via `_resolve_gerencia`. `M22-14`/`M15-05` seguem abertos) |
 | import-bypassa-invariantes | P1 | `M08-12`, `M10-07`, `M17-01`, `M15-04` | #1659 OPEN | parcial: `M08-12` (#2021 gate futuro) + `M10-07` (#2021 protege reimport) resolvidos; `M17-01` (cadastros DAT) e `M15-04` (compras) abertos |
 | chave-de-seguranca-nao-canonica | P1 | `M03-03`, `M01-01` | #1660 CLOSED | resolvido (`9ae753e6` 2026-08-18, `d24da3df` 2026-08-20) |
 | nginx-add-header-heranca | P2 | `M06-04`, `M27-24` | #1661 CLOSED | resolvido (`88626736`, 2026-08-19) |

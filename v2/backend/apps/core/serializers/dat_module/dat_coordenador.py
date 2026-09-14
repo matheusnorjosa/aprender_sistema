@@ -20,7 +20,6 @@ class DATCoordenadorSerializer(serializers.ModelSerializer["DATCoordenador"]):
     # Computed fields
     total_municipios = serializers.IntegerField(read_only=True)
     total_projetos = serializers.IntegerField(read_only=True)
-    total_formacoes = serializers.IntegerField(read_only=True)
 
     # Audit names
     created_by_nome = serializers.CharField(source="created_by.get_full_name", read_only=True)
@@ -43,7 +42,6 @@ class DATCoordenadorSerializer(serializers.ModelSerializer["DATCoordenador"]):
             # Computed
             "total_municipios",
             "total_projetos",
-            "total_formacoes",
             # Audit
             "created_by",
             "created_by_nome",
@@ -66,7 +64,6 @@ class DATCoordenadorListSerializer(serializers.ModelSerializer["DATCoordenador"]
 
     total_municipios = serializers.IntegerField(read_only=True)
     total_projetos = serializers.IntegerField(read_only=True)
-    total_formacoes = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = DATCoordenador
@@ -82,5 +79,4 @@ class DATCoordenadorListSerializer(serializers.ModelSerializer["DATCoordenador"]
             "foto_url",
             "total_municipios",
             "total_projetos",
-            "total_formacoes",
         ]

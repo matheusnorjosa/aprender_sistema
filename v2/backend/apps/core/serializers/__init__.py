@@ -32,9 +32,6 @@ from apps.core.serializers.dat_module import (
     DATCoordenadorListSerializer,
     DATCoordenadorOptionSerializer,
     DATCoordenadorSerializer,
-    DATFormacaoCalendarioSerializer,
-    DATFormacaoListSerializer,
-    DATFormacaoSerializer,
 )
 from apps.core.serializers.dat_registro import (
     DATRegistroCreateSerializer,
@@ -142,9 +139,6 @@ __all__ = [
     "DATCompraListSerializer",
     "DATCadastroSerializer",
     "DATCadastroListSerializer",
-    "DATFormacaoSerializer",
-    "DATFormacaoListSerializer",
-    "DATFormacaoCalendarioSerializer",
     # Plano Formacoes (novo modelo estruturado)
     "PlanoFormacoesSerializer",
     "PlanoFormacoesListSerializer",

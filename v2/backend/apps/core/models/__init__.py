@@ -24,7 +24,6 @@ Estrutura:
     ├── dat_acao.py          # DATAcao
     ├── dat_compra.py        # DATCompra
     ├── dat_cadastro.py      # DATCadastro
-    ├── dat_formacao.py      # DATFormacao
     ├── plano_formacoes.py   # PlanoFormacoes
     ├── permissao_funcional.py # PermissaoFuncional
     ├── group_classificacao.py # GroupClassificacao
@@ -57,7 +56,6 @@ from apps.core.models.dat_acao import DATAcao
 from apps.core.models.dat_cadastro import DATCadastro
 from apps.core.models.dat_compra import DATCompra
 from apps.core.models.dat_coordenador import DATArea, DATCoordenador
-from apps.core.models.dat_formacao import DATFormacao
 from apps.core.models.dat_registro import DATRegistro
 from apps.core.models.formacao import Formacao
 from apps.core.models.group_classificacao import GroupClassificacao
@@ -113,7 +111,6 @@ __all__ = [
     "DATAcao",
     "DATCompra",
     "DATCadastro",
-    "DATFormacao",
     # Plano Formacoes (novo modelo estruturado)
     "PlanoFormacoes",
     "PermissaoFuncional",

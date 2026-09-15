@@ -297,7 +297,9 @@ Amostra reverificada no artefato, não só por ausência de commit:
 - `M04-05` — ✅ **resolvido em #1852** (posterior a esta reconciliação): o parse migrou para o
   helper fail-closed `apps.core.imports.request_params.parse_dry_run` nos 12 sítios; valor
   desconhecido (`dry_run=maybe`) agora permanece em dry-run (preview), não mais APPLY.
-- `M16-04` — nenhum `select_for_update` nas views/serializers DAT; o lost update continua.
+- `M16-04` — **RESOLVIDO**: `LockOnWriteMixin` (`apps/core/views/mixins.py`) aplica `select_for_update(of=("self",))`
+  em métodos de escrita + `atomic()` no `update`/`destroy`; ligado em DATCompra, DATRegistro e ProjetoGeral.
+  O lost update por PATCH concorrente deixou de ocorrer nesses viewsets.
 - `M26-03` — `v2/infra/scripts/test_dr.sh` não é tocado desde `ca9c1c37` (#1006) e não menciona
   `.age`. A cobertura de `.age` ficou toda em `v2/infra/scripts/tests/restore_db.bats`, que é
   outro artefato e não é o round-trip de DR ponta a ponta que o ID pede.
@@ -413,8 +415,8 @@ commit traz a data **de cada commit**, porque eles podem estar a semanas de dist
 | `M12-15` | **P2** | resolvido | oauth: vincular state do OAuth Google a sessao que o criou (identidade lida do sufixo mutavel) | Atacante precisa mintar um state via /oauth/google/start, que exige Ca… | #1652 (CLOSED) | `9328227f` (2026-08-19) |
 | `M14-01` | **P2** | parcial | RBAC/Grade mensal: HasSectorAccess autoriza qualquer papel com vínculo e ignora `ativo` no ramo… | Depende de variável NÃO VERIFICADA. O gate só é alcançável por quem te… | #1656 (épico, OPEN) | `2818a2ad` (2026-08-24; so o ramo de vigencia) |
 | `M14-03` | **P2** | resolvido | Disponibilidade: CH Ano na grade mensal soma so o mes consultado e repete o CH Mes | ~14 atores nao-superuser: DAT 3 + Controle 1 + Assistente Administrati… | #1663 (épico, OPEN) | `4f63caf0` (2026-08-21) |
-| `M15-08` | **P2** | aberto | DAT/Compras: PATCH concorrente em DATCompra sobrescreve estoque (lost update) e duplo POST cria… | DAT (3 ativos), Controle (1), Assistente Administrativo lotado em Cont… | #1665 (épico, OPEN) | — |
-| `M16-04` | **P2** | aberto | DAT: PATCH concorrente perde update (lost update) em ProjetoGeral/DATRegistro | — | #1651 (OPEN) | — |
+| `M15-08` | **P2** | **parcial** | DAT/Compras: PATCH concorrente em DATCompra sobrescreve estoque (lost update) e duplo POST cria… | DAT (3 ativos), Controle (1), Assistente Administrativo lotado em Cont… | #1665 (épico, OPEN) | lost-update via `LockOnWriteMixin`; "duplo POST/duplicata" = NK descartada por medição (§M15-02) |
+| `M16-04` | **P2** | **resolvido** | DAT: PATCH concorrente perde update (lost update) em ProjetoGeral/DATRegistro | — | #1651 (fechado por este PR) | `LockOnWriteMixin` (select_for_update + atomic) em ProjetoGeral/DATRegistro |
 | `M18-05` | **P2** | resolvido | DAT Coordenadores: ~~edicao apaga data_admissao~~ (resolvido #1917) e ~~vaza observacoes entre registros~~ (resolvido #2020: handleEdit busca detail + resetFields) | DAT (3 ativos) e Controle (1 ativo) + o superuser (1). O endpoint exig… | #1654 (épico, OPEN) | #2020 (2026-09-14) |
 | `M18-06` | **P2** | resolvido | Paginação: DRF ignora `page_size` e esconde até 77% das linhas nas telas DAT | DAT (3 ativos) e Superintendência (1 ativo) + 1 superuser — a permissã… | #1653 (épico, CLOSED) | `062df0ec` (2026-08-20) |
 

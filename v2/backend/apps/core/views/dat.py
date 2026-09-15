@@ -32,6 +32,7 @@ from apps.core.serializers import (
     ProjetoGeralOptionSerializer,
     ProjetoGeralSerializer,
 )
+from apps.core.views.mixins import LockOnWriteMixin
 
 if TYPE_CHECKING:
     from rest_framework.request import Request
@@ -107,7 +108,7 @@ class DATRegistroFilter(filters.FilterSet):
         ]
 
 
-class DATRegistroViewSet(viewsets.ModelViewSet):
+class DATRegistroViewSet(LockOnWriteMixin, viewsets.ModelViewSet):
     """
     ViewSet para CRUD de Registros DAT.
 
@@ -317,7 +318,7 @@ class DATRegistroViewSet(viewsets.ModelViewSet):
         )
 
 
-class ProjetoGeralViewSet(viewsets.ModelViewSet):
+class ProjetoGeralViewSet(LockOnWriteMixin, viewsets.ModelViewSet):
     """
     ViewSet para CRUD de Projetos Gerais.
 

@@ -57,6 +57,7 @@ from apps.core.serializers import (
     DATCoordenadorSerializer,
 )
 from apps.core.services.dat_codigos import recompute_registros
+from apps.core.views.mixins import LockOnWriteMixin
 
 if TYPE_CHECKING:
     from rest_framework.request import Request
@@ -348,7 +349,7 @@ class DATCompraFilter(filters.FilterSet):
         ]
 
 
-class DATCompraViewSet(viewsets.ModelViewSet):
+class DATCompraViewSet(LockOnWriteMixin, viewsets.ModelViewSet):
     """
     ViewSet para CRUD de Compras DAT.
 

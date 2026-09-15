@@ -258,10 +258,14 @@ Nove desses 31 são só correção de contradição do registro: `M03-03`, `M12-
   (`v2/backend/apps/core/views_solicitacao.py:53-77`) limita cada lista a 200 itens, exige inteiro
   positivo em `formador_ids`/`coord_acompanha_ids` e e-mail válido nos `*_emails`, e
   `_create_participants` passou a filtrar `is_active=True` (`views_solicitacao.py:378` e `:384`).
+  O caminho de **UPDATE** (`_update_formadores`) foi blindado em duas etapas: `is_active` no PATCH
+  (#1656/D6) e, na Wave 4 (2026-09-15), a validação de shape pelo mesmo `_ExtraParticipantsSerializer`
+  do create — antes disso `{"formador_ids": "abc"}` era iterado cru e estourava 500 no `id__in`, sem
+  `max_length`. Com isso o "sem limite e estoura 500" está fechado no create **e** no update.
   Nada verifica **quem** são os ids: qualquer usuário ativo vira `FORMADOR`/`COORD_ACOMPANHA` e
   qualquer e-mail válido vira `guest_email`, sem policy ator×alvo em lugar nenhum do caminho. O
   próprio corpo do commit delimita o escopo — "a policy ator×alvo por participante (épico #1656)
-  fica fora". Fechou "sem limite e estoura 500"; **"aceita alvo arbitrário sem policy" segue LIVE**.
+  fica fora". **"aceita alvo arbitrário sem policy" (create e update) segue LIVE** (épico #1656).
 - **`M14-01`** — `2818a2ad` (#1824) fechou só o ramo de vigência: `HasSectorAccess` passou a usar
   `EquipeGerencia.vigentes_em()` (`v2/backend/apps/core/rbac/permissions.py:300-311` e `:319-327`),
   então ex-membro expirado perde o gate. O mecanismo titulado **segue LIVE**: sem `gerencia_id`,

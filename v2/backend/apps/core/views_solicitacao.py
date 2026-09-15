@@ -491,11 +491,21 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                     instance.save(update_fields=["status"])
 
             # Processa extra_participants se presente
+            # M10-04 (#1626): valida o shape ANTES de reconciliar (espelha o create) —
+            # sem isto, `{"formador_ids": "abc"}`/`{...}` era iterado cru em
+            # `_update_formadores` e estourava ValueError no `id__in` (500), e listas
+            # não tinham limite de tamanho. Preserva a semântica "campo ausente = não
+            # mexer neste papel": o serializer preenche `default=list` nas chaves
+            # ausentes, então só repassamos as que vieram no payload (senão um PATCH
+            # só com formador_ids apagaria os COORD_ACOMPANHA, e vice-versa).
             extra_participants = self.request.data.get("extra_participants", {})
             if isinstance(extra_participants, dict) and (
                 "formador_ids" in extra_participants or "coord_acompanha_ids" in extra_participants
             ):
-                self._update_formadores(instance, extra_participants)
+                extra_serializer = _ExtraParticipantsSerializer(data=extra_participants)
+                extra_serializer.is_valid(raise_exception=True)
+                validated = {k: v for k, v in extra_serializer.validated_data.items() if k in extra_participants}
+                self._update_formadores(instance, validated)
 
             enforce_solicitacao_availability(instance, action="update")
 

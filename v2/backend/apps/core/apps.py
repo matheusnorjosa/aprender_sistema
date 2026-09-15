@@ -24,5 +24,6 @@ class CoreConfig(AppConfig):
         - Registro explícito de modelos essenciais (Usuario, Projeto, Municipio, etc.)
         """
         import apps.core.admin  # noqa: F401
+        import apps.core.rbac.checks  # noqa: F401  # pyright: ignore[reportUnusedImport]  # registra system check de drift dos composites (H2)
         import apps.core.rbac_signals  # noqa: F401  # pyright: ignore[reportUnusedImport]
         import apps.core.signals  # noqa: F401  # pyright: ignore[reportUnusedImport]

@@ -446,3 +446,42 @@ def test_date_parsing_formats():
 
     acao_br = AcaoDAT.objects.get(tipo_acao=TipoAcaoDAT.REUNIAO_DAT)
     assert acao_br.data_registro == date(2025, 1, 20)
+
+
+def test_default_dry_run_e_preview_seguro():
+    """Defense-in-depth: `import_dat_cadastros` sem `dry_run` explícito NÃO aplica (default=True),
+    alinhado aos outros importers (produtos/controle/equipe = default True). O endpoint HTTP já
+    passa `dry_run` explícito; o risco era um caller não-HTTP omitir e gravar sem querer.
+
+    RED no código antigo (default=False): a linha válida seria APLICADA e AcaoDAT criada.
+    """
+    UsuarioFactory(
+        username="resp_dd",
+        email="resp_dd@example.com",
+        password="test123",
+        cpf="22255588123",
+        first_name="R",
+        last_name="D",
+    )
+    MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
+    ProjetoFactory(nome="Projeto DD", ativo=True)
+    csv_file = _create_csv_file(
+        rows=[
+            {
+                "Município": "Fortaleza",
+                "Projeto": "Projeto DD",
+                "Tipo de Ação": TipoAcaoDAT.CRIACAO_CURSO,
+                "Responsável": "resp_dd@example.com",
+                "Data Registro": "2025-01-15",
+                "Observação": "",
+            }
+        ],
+        fieldnames=["Município", "Projeto", "Tipo de Ação", "Responsável", "Data Registro", "Observação"],
+    )
+    try:
+        report = import_dat_cadastros(csv_file)  # SEM dry_run → deve defaultar a preview
+    finally:
+        Path(csv_file).unlink(missing_ok=True)
+
+    assert report["dry_run"] is True
+    assert AcaoDAT.objects.count() == 0  # RED: default=False aplicaria e criaria

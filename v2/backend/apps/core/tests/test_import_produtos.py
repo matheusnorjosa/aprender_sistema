@@ -435,3 +435,38 @@ class TestImportProdutosView:
             )
 
         assert response.status_code in [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN]
+
+
+@pytest.mark.django_db
+class TestProdutoCacheCollisionFailClosed:
+    """Cache de projeto (`_build_projeto_cache`): chave normalizada que colide entre projetos
+    DISTINTOS (nome de um == codigo de outro, ou homônimos) era last-write-wins → produto ligava
+    ao projeto ERRADO em silêncio. Fix fail-closed: colisão → chave removida → resolve None →
+    pendência `projeto_not_found` (mesma disciplina do `_pick_unique`)."""
+
+    def test_colisao_nome_x_codigo_vira_pendencia_nao_liga_errado(self):
+        # p1.codigo == p2.nome == "BETACOLL" (projetos distintos) → chave ambígua
+        p1 = ProjetoFactory(nome="Alfa Coll", codigo="BETACOLL", fluxo="NAO_SUPER", ativo=True)
+        ProjetoFactory(nome="BETACOLL", codigo="Gama Coll", fluxo="NAO_SUPER", ativo=True)
+
+        content = (
+            "codigo,nome,projeto,descricao\n"
+            "PROD-COLL,Produto Colisao,BETACOLL,desc colisao\n"  # projeto ambíguo → pendência
+            "PROD-OK,Produto OK,Alfa Coll,desc ok\n"  # chave única → liga em p1
+        )
+        temp = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8")
+        temp.write(content)
+        temp.close()
+        try:
+            result = import_produtos_from_file(path=temp.name, dry_run=False)
+        finally:
+            Path(temp.name).unlink(missing_ok=True)
+
+        # RED hoje: "BETACOLL" resolvia (last-write-wins) → PROD-COLL criado ligado ao projeto errado.
+        assert any(p.get("projeto") == "BETACOLL" for p in result["pendencias"]["projeto_not_found"])
+        assert not Produto.objects.filter(codigo="PROD-COLL").exists()
+
+        # controle: chave NÃO-ambígua ("Alfa Coll") continua ligando corretamente em p1
+        ok = Produto.objects.filter(codigo="PROD-OK").first()
+        assert ok is not None
+        assert ok.projeto_id == p1.id

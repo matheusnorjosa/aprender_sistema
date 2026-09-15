@@ -122,20 +122,31 @@ def _build_projeto_cache() -> dict[str, Projeto]:
     Constroi cache de projetos por nome e codigo normalizados.
 
     Permite resolver projeto por nome fuzzy ou codigo exato.
+
+    Fail-closed: se uma chave normalizada colide entre projetos DISTINTOS (homonimos, ou o codigo
+    de um == o nome de outro), a chave e AMBIGUA e sai do cache -> `_resolve_projeto` devolve None
+    -> pendencia `projeto_not_found`, em vez do last-write-wins que ligava o produto ao projeto
+    errado em silencio. Mesma disciplina do `_pick_unique` dos resolvers compartilhados.
     """
     cache: dict[str, Projeto] = {}
+    ambiguas: set[str] = set()
+
+    def _registrar(key: str, projeto: Projeto) -> None:
+        if not key:
+            return
+        anterior = cache.get(key)
+        if anterior is not None and anterior.pk != projeto.pk:
+            ambiguas.add(key)  # colisao entre projetos distintos
+        else:
+            cache.setdefault(key, projeto)
 
     for projeto in Projeto.objects.filter(ativo=True):
-        # Por nome normalizado
-        nome_norm = _nfkd(projeto.nome)
-        if nome_norm:
-            cache[nome_norm] = projeto
-
-        # Por codigo normalizado (se tiver)
+        _registrar(_nfkd(projeto.nome), projeto)
         if projeto.codigo:
-            codigo_norm = _nfkd(projeto.codigo)
-            if codigo_norm:
-                cache[codigo_norm] = projeto
+            _registrar(_nfkd(projeto.codigo), projeto)
+
+    for key in ambiguas:
+        cache.pop(key, None)
 
     return cache
 

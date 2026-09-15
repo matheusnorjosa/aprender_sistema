@@ -623,6 +623,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         Registra exclusão no AuditLog antes de deletar.
         """
+        from django.db import transaction
         from rest_framework.exceptions import ValidationError
 
         # Bloquear exclusão de solicitações publicadas (ambos os fluxos)
@@ -669,20 +670,24 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         client_ip = get_client_ip(self.request)
 
-        # Registrar exclusão no AuditLog ANTES de deletar
-        AuditLog.objects.create(
-            usuario=self.request.user,
-            action=AuditLog.Action.DELETE,
-            model_name="Solicitacao",
-            details={
-                "solicitacao_data": solicitacao_data,
-                "ip_address": client_ip,
-                "user_agent": self.request.META.get("HTTP_USER_AGENT", "")[:200],
-            },
-        )
+        # AuditLog + delete no MESMO atomic(): se o delete falhar, o AuditLog(DELETE)
+        # é desfeito junto (senão sobra trilha "excluído" para um registro que
+        # continua existindo — ATOMIC_REQUESTS=False → a request não é atômica por si).
+        with transaction.atomic():
+            # Registrar exclusão no AuditLog ANTES de deletar
+            AuditLog.objects.create(
+                usuario=self.request.user,
+                action=AuditLog.Action.DELETE,
+                model_name="Solicitacao",
+                details={
+                    "solicitacao_data": solicitacao_data,
+                    "ip_address": client_ip,
+                    "user_agent": self.request.META.get("HTTP_USER_AGENT", "")[:200],
+                },
+            )
 
-        # Executar exclusão
-        instance.delete()
+            # Executar exclusão
+            instance.delete()
 
     @extend_schema(
         summary="Aprovar solicitação",

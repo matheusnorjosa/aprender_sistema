@@ -33,6 +33,7 @@ Pagination:
 
 from __future__ import annotations
 
+from django.db import transaction
 from django.db.models import Exists, OuterRef, Q, QuerySet
 from rest_framework import viewsets
 from rest_framework.exceptions import PermissionDenied
@@ -301,23 +302,28 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
         # #1454 (audit 2026-07-10): só o dono (ou delegado) remove a viagem.
         self._ensure_owner_or_delegate(instance)
 
-        # Create AuditLog before deletion
-        AuditLog.objects.create(
-            usuario=self.request.user,
-            action=AuditLog.Action.DELETE_DESLOCAMENTO,
-            model_name="Deslocamento",
-            details={
-                "deslocamento_id": instance.id,
-                "usuario_id": instance.usuario_id,
-                "origem": instance.origem,
-                "destino": instance.destino,
-                "start_date": instance.start_date.isoformat(),
-                "end_date": instance.end_date.isoformat(),
-                "observacao": instance.observacao or "",
-                "ip_address": get_client_ip(self.request),
-                "user_agent": self.request.META.get("HTTP_USER_AGENT", "")[:200],
-            },
-        )
+        # AuditLog + delete no MESMO atomic(): se o delete falhar, o AuditLog
+        # (DELETE_DESLOCAMENTO) é desfeito junto (senão sobra trilha "excluído" para
+        # um registro que continua existindo — ATOMIC_REQUESTS=False → a request não
+        # é atômica por si).
+        with transaction.atomic():
+            # Create AuditLog before deletion
+            AuditLog.objects.create(
+                usuario=self.request.user,
+                action=AuditLog.Action.DELETE_DESLOCAMENTO,
+                model_name="Deslocamento",
+                details={
+                    "deslocamento_id": instance.id,
+                    "usuario_id": instance.usuario_id,
+                    "origem": instance.origem,
+                    "destino": instance.destino,
+                    "start_date": instance.start_date.isoformat(),
+                    "end_date": instance.end_date.isoformat(),
+                    "observacao": instance.observacao or "",
+                    "ip_address": get_client_ip(self.request),
+                    "user_agent": self.request.META.get("HTTP_USER_AGENT", "")[:200],
+                },
+            )
 
-        # Delete instance
-        instance.delete()
+            # Delete instance
+            instance.delete()

@@ -93,10 +93,11 @@ class DATCompraInvariantesAPITests(DATModuleAPITestCase):
         assert r.status_code == status.HTTP_201_CREATED, f"rejeitou válido: {r.data}"
 
     def test_dashboard_disponivel_igual_soma_das_linhas(self):
-        """O KPI total_disponivel deve bater com a soma das .disponivel (clamp por linha).
+        """O KPI total_disponivel deve bater com a soma das .disponivel.
 
-        Linhas com sobreuso são criadas via ORM (import/shell bypassa o serializer), como
-        acontece em prod. RED: a agregação SEM clamp diverge da soma clamped.
+        Cobre uma linha esgotada (utilizada == quantidade → disponível 0) além da normal.
+        Sobreuso (utilizada > quantidade) deixou de ser representável: a CheckConstraint
+        `dat_compra_utilizada_lte_quantidade` (M15-02/#1632) o barra no banco.
         """
         # Linha normal: disponível = 10 - 3 = 7
         DATCompra.objects.create(
@@ -109,13 +110,13 @@ class DATCompraInvariantesAPITests(DATModuleAPITestCase):
             ano_uso=2026,
             created_by=self.dat_user,
         )
-        # Linha com sobreuso: disponível clampado = max(0, 10 - 999) = 0
+        # Linha esgotada: disponível = max(0, 10 - 10) = 0 (utilizada == quantidade)
         DATCompra.objects.create(
             municipio=self.municipio,
             projeto=self.projeto,
             produto=self.produto,
             quantidade=10,
-            quantidade_utilizada=999,
+            quantidade_utilizada=10,
             valor_unitario=Decimal("1.00"),
             ano_uso=2026,
             created_by=self.dat_user,

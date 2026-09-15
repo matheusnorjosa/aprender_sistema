@@ -106,7 +106,7 @@ dependentes de nginx/DR/dados de prod seguem precisando de observação read-onl
 | `M12-15` | P2 | aberto | **resolvido** | #1760 (`9328227f`) | — (issue CLOSED; ownership do state pelo cache) |
 | `M03-03` | P1 | aberto | **resolvido** | #1758 (`9ae753e6`) | sub-ponto de IP no edge herda de `M01-01`/#1660 (não é código deste ID) |
 | `M12-19` | P1 | aberto | **parcial** | #1750 (`cdbc0d0c`) | paginação/total/dedup/backoff OK; residual: publish trata HTTP 202 como concluído |
-| `M15-02` | P1 | aberto | **parcial** | #1762 (`2f36b303`) | serializer + clamp do dashboard OK; falta CHECK-constraint no banco + datafix |
+| `M15-02` | P1 | aberto | **parcial** | #1762 (`2f36b303`) · migração `0110` | serializer + clamp OK; CHECK numérico no banco (utilizada≤quantidade, valor≥0) ✅ migração 0110; ≥0 já vinha do PositiveIntegerField; falta DB-enforcement de item-vazio/produto-de-outro-projeto (só serializer; produto-de-outro-projeto não é CHECK simples) |
 | `M15-03` | P1 | aberto | **parcial** | #1764 | `external_hash` imutável no PATCH + `quantidade>0`; falta identidade natural-key + UniqueConstraint |
 | `M23-02` | P1 | aberto | **parcial** | #1735 (`20c6f48d`) | redação de CPF na escrita+leitura OK; resíduo teórico (username não-CPF por design) |
 | `M05-03` | P2 | aberto | **parcial** | #1572 (`a545d5f8`) | metade reverse-m2m corrigida; sintoma titulado (delete de Group deixa ex-membros stale) segue LIVE |
@@ -270,8 +270,14 @@ Nove desses 31 são só correção de contradição do registro: `M03-03`, `M12-
   `EquipeGerencia.vigentes_em()` (`v2/backend/apps/core/rbac/permissions.py:300-311` e `:319-327`),
   então ex-membro expirado perde o gate. O mecanismo titulado **segue LIVE**: sem `gerencia_id`,
   qualquer papel com vínculo vigente entra — a query não filtra papel (`permissions.py:301-307`).
-- **`M15-02`** / **`M15-03`** — sem mudança desde a V0. Falta, respectivamente, `CHECK`-constraint
-  no banco + datafix, e identidade natural-key + `UniqueConstraint`.
+- **`M15-02`** — `CHECK`-constraint numérico no banco (utilizada≤quantidade, valor≥0) aplicado na
+  migração `0110` (dev: 0 violações; ≥0 já vinha do `PositiveIntegerField`). Resta o DB-enforcement de
+  item-vazio/produto-de-outro-projeto (hoje só no serializer; produto-de-outro-projeto não é expressável
+  como `CHECK` simples). A **NK/`UniqueConstraint`** foi **descartada por medição**: dev tem 196 grupos
+  com mesma (município, projeto, produto, ano) — compra inicial vs adicional 1/2/3 são linhas legítimas
+  e o histórico importado do sheets.banco não tinha id de compra/nota → não há chave natural a impor.
+- **`M15-03`** — sem mudança desde a V0. Falta identidade natural-key + `UniqueConstraint` (mesma
+  ressalva de NK acima: o dado não sustenta uma chave natural única em DATCompra).
 - **`M23-02`** — issue #1644 está CLOSED e a redação de CPF existe na escrita e na leitura, mas o
   veredito de 2026-08-19 registrou resíduo teórico (username não-CPF por design). Mantido
   `parcial` porque **quem baixou o status foi o árbitro**, com a evidência à mão; promover a

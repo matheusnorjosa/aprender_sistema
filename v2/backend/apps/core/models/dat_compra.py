@@ -148,6 +148,22 @@ class DATCompra(models.Model):
             models.Index(fields=["ano_uso", "status_uso"]),
             models.Index(fields=["produto"]),
         ]
+        # M15-02 (#1632): invariantes de estoque/valor no BANCO (respaldam o
+        # DATCompraSerializer.validate contra import/`.update()`/shell). `quantidade`
+        # e `quantidade_utilizada` >= 0 JÁ vêm do CHECK que o PositiveIntegerField
+        # emite no PG — aqui só as 2 regras que faltavam. A UniqueConstraint de NK
+        # da #1632 foi descartada: não há chave natural (histórico importado sem id
+        # de compra/nota; compra inicial vs adicional 1/2/3 são linhas legítimas).
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(quantidade_utilizada__lte=models.F("quantidade")),
+                name="dat_compra_utilizada_lte_quantidade",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(valor_unitario__gte=0),
+                name="dat_compra_valor_unitario_gte_0",
+            ),
+        ]
 
     def __str__(self) -> str:
         produto_nome = self.produto.nome if self.produto else self.descricao_produto

@@ -25,6 +25,7 @@ from rest_framework.views import APIView
 from apps.core.permissions import HasPerm
 from apps.core.rbac.helpers import user_has_any_perm
 from apps.core.services.normalize import norm_text
+from apps.core.services.solicitacao_scope import scope_usuarios_by_setor
 
 from .models import Municipio, Projeto, TipoEvento, Usuario
 
@@ -255,6 +256,11 @@ class UsuarioLookup(APIView):
         # Filtrar por role/group ANTES do slice
         if role:
             qs = qs.filter(groups__name__iexact=role)
+
+        # M10-04/#1656 Wave 1: o coordenador regular só enxerga usuários do PRÓPRIO
+        # setor (o picker do wizard consome este lookup → FE já filtrado, sem 400).
+        # Global/privilegiado (superuser, Superintendência, Controle, DAT) é isento.
+        qs = scope_usuarios_by_setor(qs, request.user)
 
         # Aplicar ordenação e limite
         qs = qs.order_by("-id")[: 50 if q else 20]

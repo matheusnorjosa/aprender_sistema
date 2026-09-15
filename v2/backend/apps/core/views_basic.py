@@ -21,6 +21,7 @@ from drf_spectacular.utils import extend_schema
 from .api_schemas import COMMON_ERROR_RESPONSES
 from .constants import FUNCAO_GROUPS, SETOR_GROUPS
 from .models import AuditLog, GroupClassificacao
+from .rbac.policies import user_has_policy
 from .serializers import CurrentUserSerializer, MeContactUpdateSerializer
 from .services.audit import registrar_auditoria
 from .services.rbac_permissions import get_user_functional_permissions
@@ -106,9 +107,10 @@ class CurrentUserView(APIView):
         # `access_solicitation_approvals`. Frontend deve consumir a policy
         # via `/api/me/policies/`; este flag fica como **legado** durante a
         # transição (sem ser mais fonte de verdade). DAT removido.
-        is_gerente_super = ("Superintendência" in setores) and ("Gerente" in funcoes)
-        is_asst_admin_controle = ("Controle" in setores) and ("Assistente Administrativo" in funcoes)
-        can_approve_super = user.is_superuser or is_gerente_super or is_asst_admin_controle
+        # Roteado pela SSOT `access_solicitation_approvals` (composite Setor×Função),
+        # não mais re-implementado por string aqui — evita drift silencioso com
+        # policies/helpers. `user_has_policy` já faz bypass de superuser.
+        can_approve_super = user_has_policy(user, "access_solicitation_approvals")
 
         # Compute display name
         name: str = f"{user.first_name or ''} {user.last_name or ''}".strip()

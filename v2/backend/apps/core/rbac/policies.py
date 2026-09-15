@@ -45,7 +45,11 @@ from rest_framework.views import APIView
 # em `permission_classes`). Não usamos HasPerm aqui, mas precisamos que o
 # patch esteja ativo antes do primeiro uso de composition.
 from apps.core.rbac import permissions as _rbac_permissions  # noqa: F401
-from apps.core.rbac.helpers import user_has_any_perm, user_is_assistente_administrativo_controle
+from apps.core.rbac.helpers import (
+    user_has_any_perm,
+    user_is_assistente_administrativo_controle,
+    user_matches_any_approver_composite,
+)
 
 # ============================================================================
 # SSOT: matriz declarativa Policy → capabilities elegíveis (OR semantics)
@@ -411,14 +415,9 @@ def _user_has_solicitation_approvals(user: AbstractBaseUser | AnonymousUser | No
         return False
     if getattr(user, "is_superuser", False):
         return True
-    groups = user.groups  # type: ignore[attr-defined]
-    is_gerente_super = (
-        groups.filter(name="Gerente").exists()  # noqa: RBAC-composite-allowed
-        and groups.filter(name="Superintendência").exists()  # noqa: RBAC-composite-allowed
-    )
-    if is_gerente_super:
-        return True
-    return user_is_assistente_administrativo_controle(user)
+    # Composites vêm da SSOT `APPROVER_COMPOSITES` (Gerente da Superintendência OU
+    # Assistente Administrativo do Controle) — não mais nomes literais aqui.
+    return user_matches_any_approver_composite(user)
 
 
 def user_can_delegate_availability_block(user: AbstractBaseUser | AnonymousUser | None) -> bool:

@@ -16,9 +16,55 @@ Ver v2/docs/RBAC_NAMING.md §4 e master-plan §4.
 
 from __future__ import annotations
 
+from typing import Final
+
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
 
 from apps.core.services.rbac_permissions import get_user_functional_permissions
+
+# SSOT dos composites Setor×Função que conferem autoridade de APROVAÇÃO de
+# solicitações (H2 / refactor rename-robusto, 2026-09-15). Cada dupla é
+# (nome do grupo de SETOR, nome do grupo de FUNÇÃO); "aprovador" = estar em AMBOS.
+# Único lugar onde esses nomes vivem — consumido por
+# `policies._user_has_solicitation_approvals`, `user_is_assistente_administrativo_controle`
+# (abaixo) e `views_basic` (/api/me/). Uma capability não expressa isto (é por-grupo,
+# o composite é AND de 2 grupos), por isso a robustez a rename vem da guarda de drift
+# (system check + teste-sentinela) que valida estes nomes contra SETOR_GROUPS/FUNCAO_GROUPS.
+APPROVER_COMPOSITES: Final[tuple[tuple[str, str], ...]] = (
+    ("Superintendência", "Gerente"),
+    ("Controle", "Assistente Administrativo"),
+)
+
+
+def user_in_composite(
+    user: AbstractBaseUser | AnonymousUser | None,
+    setor: str,
+    funcao: str,
+) -> bool:
+    """True se o usuário está em AMBOS os grupos (Setor E Função) do composite.
+
+    NÃO faz bypass de superuser (quem chama decide) — espelha
+    `user_is_assistente_administrativo_controle`.
+    """
+    if not user or not user.is_authenticated:
+        return False
+    return bool(
+        user.groups.filter(name=setor).exists()  # noqa: RBAC-composite-allowed
+        and user.groups.filter(name=funcao).exists()  # noqa: RBAC-composite-allowed
+    )
+
+
+def user_matches_any_approver_composite(
+    user: AbstractBaseUser | AnonymousUser | None,
+) -> bool:
+    """True se o usuário casa QUALQUER composite aprovador de `APPROVER_COMPOSITES`.
+
+    Sem bypass de superuser (quem chama decide — `_user_has_solicitation_approvals`
+    trata superuser antes).
+    """
+    if not user or not user.is_authenticated:
+        return False
+    return any(user_in_composite(user, setor, funcao) for setor, funcao in APPROVER_COMPOSITES)
 
 
 def user_has_any_perm(
@@ -62,13 +108,10 @@ def user_is_assistente_administrativo_controle(
     - user None ou anônimo → False
     - is_superuser → False (bypass é decidido por quem chama)
     - caso geral → exige AMBOS os grupos
+
+    Nomes do composite vêm da SSOT `APPROVER_COMPOSITES` (não mais literais aqui).
     """
-    if not user or not user.is_authenticated:
-        return False
-    return bool(
-        user.groups.filter(name="Controle").exists()  # noqa: RBAC-composite-allowed
-        and user.groups.filter(name="Assistente Administrativo").exists()  # noqa: RBAC-composite-allowed
-    )
+    return user_in_composite(user, "Controle", "Assistente Administrativo")
 
 
 def user_has_all_perms(

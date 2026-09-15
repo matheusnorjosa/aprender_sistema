@@ -353,11 +353,14 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
 
         serializer = FormacaoSerializer(formacao, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
 
-        # Recalcular CH do plano
-        plano.recalcular_ch()
-        plano.save()
+        # Mutação + recompute (CH do plano) no mesmo atomic(): se recalcular_ch/save
+        # falhar, a formacao não fica alterada sem a CH recalculada
+        # (ATOMIC_REQUESTS=False → a request não é atômica por si).
+        with transaction.atomic():
+            serializer.save()
+            plano.recalcular_ch()
+            plano.save()
 
         return Response(serializer.data)
 

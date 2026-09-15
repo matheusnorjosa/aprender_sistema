@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from django.db import transaction
 from django.db.models import Count, Exists, F, Max, OuterRef, Q, Sum, Value
 from django.db.models.functions import Coalesce, Greatest
 from rest_framework import status, viewsets
@@ -402,25 +403,33 @@ class DATCompraViewSet(viewsets.ModelViewSet):
         return [CanViewComprasStats()]
 
     def perform_create(self, serializer: Any) -> None:
-        """Set created_by e recalcula nr_codigos do par (município, projeto)."""
-        serializer.save(created_by=self.request.user)
-        c = serializer.instance
-        recompute_registros(c.municipio_id, c.projeto_id)
+        """Set created_by e recalcula nr_codigos do par (município, projeto).
+
+        Mutação + recompute no mesmo `atomic()`: se o recompute do valor derivado
+        (`DATRegistro.nr_codigos`) falhar, a Compra não fica persistida sem o
+        recompute (ATOMIC_REQUESTS=False → a request não é atômica por si).
+        """
+        with transaction.atomic():
+            serializer.save(created_by=self.request.user)
+            c = serializer.instance
+            recompute_registros(c.municipio_id, c.projeto_id)
 
     def perform_update(self, serializer: Any) -> None:
         """Set updated_by e recalcula nr_codigos (par novo e, se mudou, o antigo)."""
-        old_pair = (serializer.instance.municipio_id, serializer.instance.projeto_id)
-        serializer.save(updated_by=self.request.user)
-        c = serializer.instance
-        recompute_registros(c.municipio_id, c.projeto_id)
-        if (c.municipio_id, c.projeto_id) != old_pair:
-            recompute_registros(*old_pair)
+        with transaction.atomic():
+            old_pair = (serializer.instance.municipio_id, serializer.instance.projeto_id)
+            serializer.save(updated_by=self.request.user)
+            c = serializer.instance
+            recompute_registros(c.municipio_id, c.projeto_id)
+            if (c.municipio_id, c.projeto_id) != old_pair:
+                recompute_registros(*old_pair)
 
     def perform_destroy(self, instance: Any) -> None:
         """Deleta e recalcula nr_codigos do par afetado."""
-        municipio_id, projeto_id = instance.municipio_id, instance.projeto_id
-        instance.delete()
-        recompute_registros(municipio_id, projeto_id)
+        with transaction.atomic():
+            municipio_id, projeto_id = instance.municipio_id, instance.projeto_id
+            instance.delete()
+            recompute_registros(municipio_id, projeto_id)
 
     @action(
         detail=False,

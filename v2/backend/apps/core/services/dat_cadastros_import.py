@@ -80,7 +80,7 @@ def _normalize_tipo_acao_dat(value: str | None) -> str | None:
     return TIPO_ACAO_MAP.get(key)
 
 
-def import_dat_cadastros(file_path: str, dry_run: bool = False) -> dict[str, Any]:
+def import_dat_cadastros(file_path: str, dry_run: bool = True) -> dict[str, Any]:
     """
     Importa cadastros DAT de CSV/XLSX.
 

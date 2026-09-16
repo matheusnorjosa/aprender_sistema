@@ -44,7 +44,7 @@ from .services.solicitacao_create import resolve_initial_status
 from .services.solicitacao_publish import cancel_from_gcal
 from .services.solicitacao_publish import preview_gcal as preview_gcal_service
 from .services.solicitacao_publish import publish_to_gcal, resync_to_gcal
-from .services.solicitacao_scope import scope_solicitacoes
+from .services.solicitacao_scope import participants_out_of_setor, scope_solicitacoes
 from .utils.net import get_client_ip
 
 logger = logging.getLogger(__name__)
@@ -352,6 +352,26 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             },
         )
 
+    _SETOR_SCOPE_MSG = "Você só pode adicionar formadores/coordenadores do seu setor."
+
+    def _assert_participants_in_setor_scope(self, users):
+        """M10-04/#1656 Wave 1: barra participante de outro SETOR com 400.
+
+        O coordenador regular só adiciona formador/coord do próprio setor
+        (`Gerencia.setor_canonico` via EquipeGerencia vigente). Global/privilegiado
+        é isento e criador sem setor é fail-open — regra em `participants_out_of_setor`.
+        O FE já filtra as opções por setor; este é o gate de servidor (não confiar no FE).
+        Sem `request` (chamada interna direta, ex.: testes/serviços) → criador None →
+        fail-open em `participants_out_of_setor` (contexto de ator ausente não escopa).
+        """
+        creator = getattr(getattr(self, "request", None), "user", None)
+        offending = participants_out_of_setor(creator, users)
+        if offending:
+            ids = ", ".join(sorted(str(u.id) for u in offending))
+            raise serializers.ValidationError(
+                {"extra_participants": [f"{self._SETOR_SCOPE_MSG} Fora do escopo (ids): {ids}."]}
+            )
+
     def _create_participants(self, solicitacao, extra):
         """
         PR15: Cria Participation entries baseado em extra_participants.
@@ -371,9 +391,6 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         """
         from .models import Participation, Usuario
 
-        # Sempre criar participação do coordenador (request.user)
-        Participation.objects.get_or_create(solicitacao=solicitacao, usuario=self.request.user, role="COORDENADOR")
-
         # PERF-SQL-02: Batch fetch all referenced users in 2 queries instead of N
         all_ids = set()
         all_ids.update(fid for fid in extra.get("formador_ids", []) if fid)
@@ -389,6 +406,15 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             if all_emails
             else {}
         )
+
+        # M10-04/#1656 Wave 1: escopo por SETOR do criador ANTES de materializar
+        # qualquer Participation (perform_create é atômico → 400 desfaz tudo).
+        self._assert_participants_in_setor_scope(
+            list({u.id: u for u in (*usuarios_by_id.values(), *usuarios_by_email.values())}.values())
+        )
+
+        # Sempre criar participação do coordenador (request.user)
+        Participation.objects.get_or_create(solicitacao=solicitacao, usuario=self.request.user, role="COORDENADOR")
 
         # Formadores por ID
         for formador_id in extra.get("formador_ids", []):
@@ -596,6 +622,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             # Batch fetch: 1 query para todos (#406).
             if to_add:
                 usuarios = {u.id: u for u in Usuario.objects.filter(id__in=to_add, is_active=True)}
+                # M10-04/#1656 Wave 1: barra ADIÇÃO cross-setor (só as novas; manter
+                # quem já está não reprova). perform_update é atômico → 400 desfaz tudo.
+                self._assert_participants_in_setor_scope(list(usuarios.values()))
                 added = [uid for uid in to_add if uid in usuarios]
                 if added:
                     Participation.objects.bulk_create(

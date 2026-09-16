@@ -44,7 +44,7 @@ from .services.solicitacao_create import resolve_initial_status
 from .services.solicitacao_publish import cancel_from_gcal
 from .services.solicitacao_publish import preview_gcal as preview_gcal_service
 from .services.solicitacao_publish import publish_to_gcal, resync_to_gcal
-from .services.solicitacao_scope import participants_out_of_setor, scope_solicitacoes
+from .services.solicitacao_scope import participants_out_of_setor, projeto_out_of_setor, scope_solicitacoes
 from .utils.net import get_client_ip
 
 logger = logging.getLogger(__name__)
@@ -321,6 +321,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         from .services.solicitacao_availability import enforce_solicitacao_availability
 
         projeto = serializer.validated_data.get("projeto")
+        # M10-04/#1656 Wave 1 (S2): o projeto tem que ser do setor do criador.
+        self._assert_projeto_in_setor_scope(projeto)
         initial_status = resolve_initial_status(projeto=projeto)
 
         with transaction.atomic():
@@ -371,6 +373,18 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             raise serializers.ValidationError(
                 {"extra_participants": [f"{self._SETOR_SCOPE_MSG} Fora do escopo (ids): {ids}."]}
             )
+
+    _SETOR_SCOPE_MSG_PROJETO = "Você só pode criar/editar solicitação de projeto do seu setor."
+
+    def _assert_projeto_in_setor_scope(self, projeto):
+        """M10-04/#1656 Wave 1 (S2): barra projeto de outro SETOR com 400.
+
+        Mesma isenção/fail-open de `projeto_out_of_setor` (global/privilegiado, criador
+        sem setor, projeto sem setor → passa). Sem `request` → criador None → fail-open.
+        """
+        creator = getattr(getattr(self, "request", None), "user", None)
+        if projeto_out_of_setor(creator, projeto):
+            raise serializers.ValidationError({"projeto": [self._SETOR_SCOPE_MSG_PROJETO]})
 
     def _create_participants(self, solicitacao, extra):
         """
@@ -477,6 +491,11 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         from .services.solicitacao_availability import enforce_solicitacao_availability
 
         instance = serializer.instance
+
+        # M10-04/#1656 Wave 1 (S2): se o PATCH troca o projeto, ele tem que ser do
+        # setor do editor (perform_update é atômico → 400 desfaz tudo).
+        if "projeto" in serializer.validated_data:
+            self._assert_projeto_in_setor_scope(serializer.validated_data["projeto"])
 
         # Captura formadores atuais antes do update
         old_formador_ids = set(

@@ -165,3 +165,40 @@ def scope_usuarios_by_setor(qs: QuerySet, user: Any) -> QuerySet:
         EquipeGerencia.vigentes_em().filter(gerencia__setor_canonico__in=setores).values_list("usuario_id", flat=True)
     )
     return qs.filter(id__in=vigentes)
+
+
+def scope_projetos_by_setor(qs: QuerySet, user: Any) -> QuerySet:
+    """Restringe um queryset de `Projeto` aos do SETOR do `user` (S2, épico #1656).
+
+    Mesma regra do participante, eixo projeto: alimenta o `/lookup/projetos/` para o
+    wizard só oferecer projetos do setor do coordenador. `Projeto.setor` casa com
+    `Gerencia.setor_canonico` por igualdade (o mesmo de-para v15).
+    - Global/privilegiado (`user_is_solicitacao_global`) → sem filtro.
+    - `user` sem setor → sem filtro (fail-open).
+    - Projeto SEM setor → incluído (fail-open; `Projeto.setor` é gap conhecido).
+    """
+    if user_is_solicitacao_global(user):
+        return qs
+    setores = user_setores(user)
+    if not setores:
+        return qs
+    return qs.filter(Q(setor__in=[*setores, ""]) | Q(setor__isnull=True))
+
+
+def projeto_out_of_setor(creator: Any, projeto: Any) -> bool:
+    """True sse `projeto` é de um SETOR ao qual o `creator` regular não pertence.
+
+    Write-path do S2 (create/update de Solicitacao). Fail-open (False) quando:
+    criador global/privilegiado, criador sem setor, `projeto` None, ou projeto sem
+    setor (gap de dado). Só barra quando o criador TEM setor e o projeto tem um
+    setor diferente.
+    """
+    if projeto is None or user_is_solicitacao_global(creator):
+        return False
+    creator_setores = user_setores(creator)
+    if not creator_setores:
+        return False
+    proj_setor = getattr(projeto, "setor", "") or ""
+    if not proj_setor:
+        return False
+    return proj_setor not in creator_setores

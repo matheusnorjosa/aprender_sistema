@@ -25,7 +25,7 @@ from rest_framework.views import APIView
 from apps.core.permissions import HasPerm
 from apps.core.rbac.helpers import user_has_any_perm
 from apps.core.services.normalize import norm_text
-from apps.core.services.solicitacao_scope import scope_usuarios_by_setor
+from apps.core.services.solicitacao_scope import scope_projetos_by_setor, scope_usuarios_by_setor
 
 from .models import Municipio, Projeto, TipoEvento, Usuario
 
@@ -140,6 +140,9 @@ class ProjetoLookup(APIView):
         # relacionado à população de projeto_geral (#1897/#1898). `include_kits=true` reexpõe.
         if not include_kits:
             qs = qs.exclude(nome__regex=r"[0-9]+$")
+        # M10-04/#1656 Wave 1 (S2): coordenador regular só vê projetos do PRÓPRIO
+        # setor (+ projetos sem setor, fail-open). Global/privilegiado isento.
+        qs = scope_projetos_by_setor(qs, request.user)
         qs = qs.distinct()
 
         # Teto amplo: com os kits fora, o catálogo de projetos-evento cabe na lista (a busca `q`

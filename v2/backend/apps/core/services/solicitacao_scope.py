@@ -25,6 +25,8 @@ fora do escopo → 404, não distinguível de inexistente).
 
 from __future__ import annotations
 
+from collections import defaultdict
+from collections.abc import Sequence
 from typing import Any
 
 from django.db.models import Q, QuerySet
@@ -80,3 +82,86 @@ def user_can_access_solicitacao(user: Any, obj: Any) -> bool:
         gerencia_id = getattr(getattr(obj, "projeto", None), "gerencia_id", None)
         return gerencia_id is not None and gerencia_id in _user_gerencia_ids(user)
     return False
+
+
+def user_setores(user: Any) -> set[str]:
+    """Setores (`Gerencia.setor_canonico`) das gerências vigentes do `user`.
+
+    SSOT do "setor do ator" para o escopo de participantes (M10-04/#1656 Wave 1).
+    ⚑ Setor ≠ Gerencia: o modelo `Gerencia` é fino (Vidas L/M/C são registros
+    distintos) e colapsa em um SETOR por `setor_canonico`. Usa a mesma vigência
+    (`vigentes_em()`) do resto do módulo e descarta `setor_canonico` vazio/nulo
+    (gerência sem setor não define escopo).
+    """
+    return set(
+        EquipeGerencia.vigentes_em()
+        .filter(usuario=user)
+        .exclude(gerencia__setor_canonico="")
+        .exclude(gerencia__setor_canonico__isnull=True)
+        .values_list("gerencia__setor_canonico", flat=True)
+    )
+
+
+def _setores_por_usuario(user_ids: list[int]) -> dict[int, set[str]]:
+    """Mapa user_id → setores (1 query) para checar vários participantes de uma vez."""
+    out: dict[int, set[str]] = defaultdict(set)
+    if not user_ids:
+        return out
+    rows = (
+        EquipeGerencia.vigentes_em()
+        .filter(usuario_id__in=user_ids)
+        .exclude(gerencia__setor_canonico="")
+        .exclude(gerencia__setor_canonico__isnull=True)
+        .values_list("usuario_id", "gerencia__setor_canonico")
+    )
+    for uid, setor in rows:
+        out[uid].add(setor)
+    return out
+
+
+def participants_out_of_setor(creator: Any, users: Sequence[Any]) -> list[Any]:
+    """Retorna os `users` cujo SETOR é disjunto do setor do `creator`.
+
+    M10-04/#1656 Wave 1: o coordenador regular só adiciona formador/coord do próprio
+    setor. Medido em prod (2026-09-15): 0 cross-setor para coordenador regular; os 3
+    cross-setor reais são todos da Superintendência (isenta abaixo).
+
+    - Criador GLOBAL/privilegiado (`user_is_solicitacao_global`: superuser,
+      Superintendência, Controle, DAT) → isento → lista vazia.
+    - Criador SEM setor → fail-open (não dá p/ escopar; 0 em prod) → lista vazia.
+    - Caso contrário: participante sem setor OU de setor disjunto = fora do escopo
+      (fail-closed para o participante).
+    """
+    if not users:
+        return []
+    if user_is_solicitacao_global(creator):
+        return []
+    creator_setores = user_setores(creator)
+    if not creator_setores:
+        return []
+    smap = _setores_por_usuario([u.id for u in users])
+    return [u for u in users if not (smap.get(u.id, set()) & creator_setores)]
+
+
+def scope_usuarios_by_setor(qs: QuerySet, user: Any) -> QuerySet:
+    """Restringe um queryset de `Usuario` aos que compartilham SETOR com `user`.
+
+    Espelho de LEITURA do `participants_out_of_setor` (write-path): alimenta o
+    `/lookup/usuarios/` para o picker do wizard já oferecer só o setor do
+    coordenador (M10-04/#1656 Wave 1) — assim o FE nunca mostra opção que o
+    backend recusaria (contrato FE-first satisfeito pela fonte de dados).
+
+    - Global/privilegiado (`user_is_solicitacao_global`: superuser, Superintendência,
+      Controle, DAT) → sem filtro.
+    - `user` sem setor → sem filtro (fail-open; espelha o write-path).
+    - Caso contrário: só usuários com vínculo vigente em algum desses setores.
+    """
+    if user_is_solicitacao_global(user):
+        return qs
+    setores = user_setores(user)
+    if not setores:
+        return qs
+    vigentes = (
+        EquipeGerencia.vigentes_em().filter(gerencia__setor_canonico__in=setores).values_list("usuario_id", flat=True)
+    )
+    return qs.filter(id__in=vigentes)

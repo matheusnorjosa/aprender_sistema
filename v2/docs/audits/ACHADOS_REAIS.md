@@ -231,7 +231,7 @@ Onde a issue é um épico que cobre outros IDs, ela pode seguir OPEN com o ID j�
 | `M10-01` | P1 | LIVE | resolvido | `824f777c` (2026-08-20) | #1623 CLOSED |
 | `M10-02` | P1 | LIVE | resolvido | `a1577d41` (2026-08-19) | #1624 CLOSED |
 | `M10-03` | P1 | LIVE | resolvido | `f115dd45` (2026-08-19) | #1625 CLOSED |
-| `M10-04` | P1 | LIVE | **parcial** | `185fab4a` (2026-08-20; só o shape do create) | #1626 CLOSED |
+| `M10-04` | P1 | LIVE | **resolvido** | `185fab4a` (shape) + `#2033` (2026-09-15; escopo do alvo por SETOR: participante) | #1626 CLOSED |
 | `M11-04` | P2 | LIVE | resolvido | `59b001e5` (2026-08-19) | #1650 CLOSED |
 | `M12-15` | P2 | resolvido (só no texto) | resolvido | `9328227f` (2026-08-19) | #1652 CLOSED |
 | `M12-19` | P1 | parcial (residual: publish tratava HTTP 202 como concluído) | resolvido | `3ab590d6` (2026-08-20) | #1629 CLOSED |
@@ -262,10 +262,17 @@ Nove desses 31 são só correção de contradição do registro: `M03-03`, `M12-
   (#1656/D6) e, na Wave 4 (2026-09-15), a validação de shape pelo mesmo `_ExtraParticipantsSerializer`
   do create — antes disso `{"formador_ids": "abc"}` era iterado cru e estourava 500 no `id__in`, sem
   `max_length`. Com isso o "sem limite e estoura 500" está fechado no create **e** no update.
-  Nada verifica **quem** são os ids: qualquer usuário ativo vira `FORMADOR`/`COORD_ACOMPANHA` e
-  qualquer e-mail válido vira `guest_email`, sem policy ator×alvo em lugar nenhum do caminho. O
-  próprio corpo do commit delimita o escopo — "a policy ator×alvo por participante (épico #1656)
-  fica fora". **"aceita alvo arbitrário sem policy" (create e update) segue LIVE** (épico #1656).
+  O escopo do alvo por participante foi fechado em **#2033** (2026-09-15): `participants_out_of_setor`
+  (`services/solicitacao_scope.py`) barra formador/coord de outro **setor** (`Gerencia.setor_canonico`
+  via `EquipeGerencia.vigentes_em()`), ligado no create (`_create_participants`), no update
+  (`_update_formadores`) e no lookup (`/lookup/usuarios/`, FE já filtrado — sem tocar FE). Regra medida
+  em prod (agregado, sem PII): cross-setor = 3/4.873 (0,1%), todos da Superintendência (isenta via
+  `user_is_solicitacao_global`); coordenador regular = 0 casos. Global/privilegiado isento; criador sem
+  setor = fail-open. Guests por e-mail (externos) seguem fora do escopo por design. ⚑A regra ancora no
+  **setor do criador**, não na "gerência do projeto": a medição mostrou `Projeto.gerencia` VAZIO em prod
+  (só `dev_tools` seta, CP-08). **M10-04 resolvido no código**; a completude do enforcement em prod
+  depende do backfill dos vínculos `EquipeGerencia` faltantes (S0). O escopo de **projeto** e o
+  `can_act_on` central seguem no épico #1656.
 - **`M14-01`** — `2818a2ad` (#1824) fechou só o ramo de vigência: `HasSectorAccess` passou a usar
   `EquipeGerencia.vigentes_em()` (`v2/backend/apps/core/rbac/permissions.py:300-311` e `:319-327`),
   então ex-membro expirado perde o gate. O mecanismo titulado **segue LIVE**: sem `gerencia_id`,
@@ -374,7 +381,7 @@ commit traz a data **de cada commit**, porque eles podem estar a semanas de dist
 | `M10-01` | **P1** | resolvido | solicitações: Gerente lê, edita e exclui solicitação de qualquer gerência (sem escopo ator×alvo… | Gerente — 9 usuários ativos não-superuser em produção. Ator real e num… | #1623 (CLOSED) | `824f777c` (2026-08-20) |
 | `M10-02` | **P1** | resolvido | solicitação: troca de projeto para fluxo SUPER mantém status aprovado (lavagem de aprovação, vi… | — | #1624 (CLOSED) | `a1577d41` (2026-08-19) |
 | `M10-03` | **P1** | resolvido | solicitacoes: bloquear edicao e exclusao enquanto gcal_status=PENDING (publica conteudo diferen… | Ator real e amplo: o proprio owner da solicitacao. Em prod isso alcanc… | #1625 (CLOSED) | `f115dd45` (2026-08-19) |
-| `M10-04` | **P1** | parcial | solicitacoes: extra_participants aceita alvo arbitrário sem policy, sem limite e estoura 500 | Grande. `create` exige `HasPerm("create_solicitation")` (views_solicit… | #1626 (CLOSED) | `185fab4a` (2026-08-20; só o shape — alvo arbitrário sem policy segue) |
+| `M10-04` | **P1** | resolvido | solicitacoes: extra_participants aceita alvo arbitrário sem policy, sem limite e estoura 500 | Grande. `create` exige `HasPerm("create_solicitation")` (views_solicit… | #1626 (CLOSED) | `185fab4a` (shape) + `#2033` (2026-09-15; alvo por SETOR: participante — create/update/lookup) |
 | `M10-05` | **P1** | aberto | solicitacoes: edição não reconcilia participantes — convidados e COORD_ACOMPANHA ficam órfãos e… | Existe e é o fluxo comum: 42 Coordenadores ativos + 9 Gerentes + 1 sup… | #1627 (OPEN) | — |
 | `M10-07` | **P1** | resolvido | imports/eventos: ~~reimport sobrescreve decisão/owner/datas e reporta "unchanged"~~ → protege campos (status/usuario/coord/local), diff real, órfão reportado, select_for_update | DAT (3 membros ativos não-superuser) + superuser (1). `import_spreadsh… | #1628 (item 1 hash pend.) | #2021 (2026-09-14) |
 | `M10-08` | **P2** | resolvido | solicitações: PATCH (re)atribui município/projeto para par sem Compra — elegibilidade era create-only (auditoria dinâmica 2026-08-17) | Coordenador (42 ativos) e demais criadores editando a própria solicitação | #1738 | `b48aa5f2` (2026-08-18) |
@@ -727,7 +734,7 @@ fechados no código, e #1657 está CLOSED com resíduo teórico registrado em `M
 | paginacao-global-sem-page-size | P1 | `M01-07`, `M18-06` | #1653 CLOSED | resolvido (`aa8bfb5c`, `062df0ec`; 2026-08-20) |
 | list-serializer-como-fonte-de-detalhe | P1 | `M15-09`, `M17-02`, `M18-05` | #1654 OPEN (épico) | **resolvido** (as 3 fatias): `M15-09` (#1917/#1919 List expõe ids), `M17-02` (editFetchesDetail — getAcao/getCadastro), `M18-05` data_admissao (#1917) + vaza observacoes (#2020: handleEdit busca detail + resetFields). Épico #1654 segue OPEN pelos itens estruturais (adapter dirtyFields, hook useEditModal, lint) |
 | contrato-fe-be-sem-ssot | P1 | `M15-10`, `M16-07`, `M16-08`, `M09-05`, `M05-07` | #1655 OPEN | parcial (`M16-07`/`M16-08` fechados; `M15-10` parcial; `M09-05`/`M05-07` abertos) |
-| escopo-ator-alvo-ausente | P0 | `M22-01` (duplicata histórica de `M03-01`), `M07-02`, `M10-01`, `M10-04`, `M14-01` | #1656 OPEN | parcial (`M10-04` e `M14-01` seguem: `M10-04` sem policy ator×alvo por participante; `M14-01` só no ramo sem `gerencia_id`) |
+| escopo-ator-alvo-ausente | P0 | `M22-01` (duplicata histórica de `M03-01`), `M07-02`, `M10-01`, `M10-04`, `M14-01` | #1656 OPEN | parcial (`M10-04` fechado por #2033 — participante escopado por setor no create/update/lookup; `M14-01` segue só no ramo sem `gerencia_id`; #1656 segue pelo escopo de **projeto** + `can_act_on` central) |
 | auditoria-nao-invariante-e-pii | P1 | `M07-03`, `M05-05`, `M23-02`, `M03-10` | #1657 CLOSED | parcial (`11219a7e`, `20c6f48d`, `d2f226cc`, todos 2026-08-18, fecham `M07-03`/`M05-05`/`M03-10`; `M23-02` segue `parcial` na fila, com o resíduo teórico) |
 | resolvers-por-rotulo-humano | P1 | `M02-09`, `M04-01`, `M22-14`, `M15-05` | #1658 OPEN | parcial (`M02-09`/#1613 e `M04-01`/#2022 resolvidos: `resolve_projeto`/`resolve_tipo_evento` rejeitam ambiguidade; equipe_gerencia resolve-only via `_resolve_gerencia`. `M22-14`/`M15-05` seguem abertos) |
 | import-bypassa-invariantes | P1 | `M08-12`, `M10-07`, `M17-01`, `M15-04` | #1659 OPEN | parcial: `M08-12` (#2021 gate futuro) + `M10-07` (#2021 protege reimport) resolvidos; `M17-01` (cadastros DAT) e `M15-04` (compras) abertos |

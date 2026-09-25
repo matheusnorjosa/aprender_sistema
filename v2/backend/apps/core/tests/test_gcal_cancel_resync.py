@@ -218,6 +218,26 @@ class TestCancelHelper:
         assert outcome.solicitation_id == solicitacao_publicada.id
         assert outcome.external_event_id is None
 
+    @patch("apps.core.services.gcal.sync._retry_with_circuit_breaker")
+    def test_cancel_oauth_uses_credential_calendar_not_primary(self, mock_retry, solicitacao_publicada):
+        """OAuth mode (client fornecido): cancel deleta no calendário da CREDENCIAL
+        (client.get_default_calendar_id()), não em 'primary'/GCAL_CALENDAR_ID.
+
+        Espelha o publish (apply_one_solicitacao): sem isso, o cancel some no
+        calendário errado, o Google devolve 404 (tratado como sucesso idempotente)
+        e o evento sobrevive no calendário real ("Formações")."""
+        # side_effect executa a lambda (chama client.delete) sem o circuit breaker real
+        mock_retry.side_effect = lambda func, operation_name=None: func()
+        client = MagicMock()
+        client.get_default_calendar_id.return_value = "formacoes@group.calendar.google.com"
+
+        cancel_solicitacao(solicitacao_publicada, client=client)
+
+        client.delete.assert_called_once()
+        called_calendar_id = client.delete.call_args[0][0]
+        assert called_calendar_id == "formacoes@group.calendar.google.com"
+        assert called_calendar_id != "primary"
+
 
 # ============================================================================
 # TESTES: TASK CELERY (2 testes)

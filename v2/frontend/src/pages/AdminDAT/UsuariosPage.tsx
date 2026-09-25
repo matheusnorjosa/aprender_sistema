@@ -32,9 +32,9 @@ import type { RadioChangeEvent } from 'antd/es/radio';
 import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined, KeyOutlined } from '@ant-design/icons';
 import { Link } from 'react-router';
 import { checkAuth } from '../../api/auth';
-import { listUsers, createUser, updateUser, deleteUser, resetUserPassword, listGroups, getRBACMeta } from '../../api/adminDAT';
+import { listUsers, createUser, updateUser, deleteUser, resetUserPassword, listGroups, getRBACMeta, listGerencias } from '../../api/adminDAT';
 import { buildUsuarioPayload } from './usuario_form_helpers';
-import type { PermissaoFuncional, RBACMetaPayload } from '../../api/adminDAT';
+import type { PermissaoFuncional, RBACMetaPayload, GerenciaRecord } from '../../api/adminDAT';
 import { importUsuarios } from '../../api/ops';
 import type { ImportResult } from '../../api/ops';
 import ImportUploader from '../../components/ImportUploader';
@@ -96,6 +96,8 @@ interface UserRecord {
   is_superuser: boolean;
   groups?: string[];
   group_ids_display?: ID[];
+  // Lotação vigente (EquipeGerencia) — hidrata a gerência no EDIT. null se não há vínculo.
+  gerencia_atual?: { gerencia_id: number; nome_setor: string; setor_canonico: string; papel: string } | null;
 }
 
 /**
@@ -121,7 +123,7 @@ interface UserFormValues {
   cargo?: string | undefined;
   is_active: boolean;
   is_superuser: boolean;
-  setor_ids: ID[];
+  gerencia_id?: ID | null | undefined;
   funcao_ids: ID[];
   password?: string;
 }
@@ -166,13 +168,14 @@ export default function UsuariosPage(): JSX.Element {
   // para liberar nova entrada. Submit omite `cpf` do payload se locked.
   const [cpfEditUnlocked, setCpfEditUnlocked] = useState(false);
   const [grupos, setGrupos] = useState<GroupRecord[]>([]);
+  const [gerencias, setGerencias] = useState<GerenciaRecord[]>([]);
   const [rbacMeta, setRbacMeta] = useState<RBACMetaPayload | null>(null);
   const [currentIsSuperuser, setCurrentIsSuperuser] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('lista');
 
   const [form] = Form.useForm<UserFormValues>();
   const [resetForm] = Form.useForm<{ nova_senha: string; confirmar_nova_senha: string }>();
-  const selectedSetorIds = Form.useWatch('setor_ids', form) || [];
+  const selectedGerenciaId = Form.useWatch('gerencia_id', form);
   const selectedFuncaoIds = Form.useWatch('funcao_ids', form) || [];
 
   const setorGroupsSet = useMemo(
@@ -184,12 +187,15 @@ export default function UsuariosPage(): JSX.Element {
     [rbacMeta]
   );
 
-  const setorOptions = useMemo(
-    () => grupos
-      .filter((g) => setorGroupsSet.has(g.name))
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map((g) => ({ label: g.name, value: g.id })),
-    [grupos, setorGroupsSet]
+  // Gerência específica (single-select). Label = nome_setor (fallback nome);
+  // setor_canonico vira hint no resumo. Só gerências ATIVAS entram (carregadas
+  // no fetch de contexto já filtradas por `ativo: true`).
+  const gerenciaOptions = useMemo(
+    () => gerencias
+      .slice()
+      .sort((a, b) => (a.nome_setor || a.nome).localeCompare(b.nome_setor || b.nome))
+      .map((g) => ({ label: g.nome_setor || g.nome, value: g.id })),
+    [gerencias]
   );
 
   const funcaoOptions = useMemo(
@@ -246,12 +252,14 @@ export default function UsuariosPage(): JSX.Element {
   // Fetch RBAC metadata and groups for dynamic classification
   const fetchRbacContext = async (): Promise<void> => {
     try {
-      const [groupsData, meta] = await Promise.all([
+      const [groupsData, meta, gerenciasData] = await Promise.all([
         listGroups({ ordering: 'name', page_size: PAGE_SIZES.ALL }),
         getRBACMeta(),
+        listGerencias({ ativo: true, page_size: 1000 }),
       ]);
       setGrupos(groupsData.results);
       setRbacMeta(meta);
+      setGerencias(gerenciasData.results);
     } catch (error) {
       logger.error('Erro ao carregar contexto RBAC:', error);
       message.error('Erro ao carregar metadados RBAC');
@@ -304,7 +312,7 @@ export default function UsuariosPage(): JSX.Element {
     form.setFieldsValue({
       is_active: true,
       is_superuser: false,
-      setor_ids: [],
+      gerencia_id: undefined,
       funcao_ids: [],
     });
     setModalVisible(true);
@@ -313,11 +321,8 @@ export default function UsuariosPage(): JSX.Element {
   const handleEdit = (user: UserRecord): void => {
     setEditingUser(user);
     setCpfEditUnlocked(false);  // Edit: CPF locked até user clicar "Alterar"
-    // Separar IDs de grupos por tipo
+    // Separar IDs de grupos por tipo (só FUNÇÕES agora; o setor vem via Gerência)
     const userGroupIds = user.group_ids_display || [];
-    const setorIds = grupos
-      .filter((g) => setorGroupsSet.has(g.name) && userGroupIds.includes(g.id))
-      .map(g => g.id);
     const funcaoIds = grupos
       .filter((g) => funcaoGroupsSet.has(g.name) && userGroupIds.includes(g.id))
       .map(g => g.id);
@@ -333,7 +338,7 @@ export default function UsuariosPage(): JSX.Element {
       cargo: user.cargo,
       is_active: user.is_active,
       is_superuser: user.is_superuser,
-      setor_ids: setorIds,
+      gerencia_id: user.gerencia_atual?.gerencia_id ?? undefined,
       funcao_ids: funcaoIds,
     });
     setModalVisible(true);
@@ -730,26 +735,24 @@ export default function UsuariosPage(): JSX.Element {
             showIcon
             className="mb-4"
             message="Como configurar"
-            description="Setor define onde a pessoa atua. Função define o que a pessoa pode fazer no sistema."
+            description="Gerência define onde a pessoa atua (o setor é atribuído automaticamente). Função define o que a pessoa pode fazer no sistema."
           />
 
           <Form.Item
-            name="setor_ids"
-            label="Setor (onde trabalha)"
-            tooltip="Unidade/área de atuação da pessoa"
-            // P0-1 Tier-0 (D-1=2a): membership é superuser-only. Não-superuser vê
-            // o valor atual, mas não edita (e o helper não envia group_ids). Relaxa
+            name="gerencia_id"
+            label="Gerência (onde trabalha)"
+            tooltip="Gerência específica de lotação da pessoa. O setor é derivado da gerência."
+            // P0-1 Tier-0 (D-1=2a): lotação é superuser-only. Não-superuser vê o
+            // valor atual, mas não edita (e o helper não envia gerencia_id). Relaxa
             // o required p/ não travar o submit de conta comum com o Select disabled.
-            rules={currentIsSuperuser ? [{ required: true, message: 'Selecione pelo menos um setor' }] : []}
+            rules={currentIsSuperuser ? [{ required: true, message: 'Selecione uma gerência' }] : []}
           >
             <Select
-              mode="multiple"
               allowClear
               showSearch
               optionFilterProp="label"
-              maxTagCount="responsive"
-              placeholder="Selecione um ou mais setores"
-              options={setorOptions}
+              placeholder="Selecione uma gerência"
+              options={gerenciaOptions}
               disabled={!currentIsSuperuser}
             />
           </Form.Item>
@@ -758,7 +761,7 @@ export default function UsuariosPage(): JSX.Element {
             name="funcao_ids"
             label="Função (o que pode fazer)"
             tooltip="Papel da pessoa no processo"
-            // P0-1 Tier-0 (D-1=2a): membership é superuser-only (ver setor_ids acima).
+            // P0-1 Tier-0 (D-1=2a): membership é superuser-only (ver gerencia_id acima).
             rules={currentIsSuperuser ? [{ required: true, message: 'Selecione pelo menos uma função' }] : []}
           >
             <Select
@@ -776,16 +779,21 @@ export default function UsuariosPage(): JSX.Element {
           <Card size="small" title="Resumo do perfil de acesso" className="mb-4">
             <Space direction="vertical" size={8} style={{ width: '100%' }}>
               <div>
-                <Text strong>Setores selecionados: </Text>
-                {selectedSetorIds.length > 0 ? (
-                  grupos
-                    .filter((group) => selectedSetorIds.includes(group.id))
-                    .map((group) => (
-                      <Tag key={group.id} color="green">{group.name}</Tag>
-                    ))
-                ) : (
-                  <Text type="secondary">nenhum setor selecionado</Text>
-                )}
+                <Text strong>Gerência selecionada: </Text>
+                {(() => {
+                  const gerencia = gerencias.find((ger) => ger.id === selectedGerenciaId);
+                  if (!gerencia) {
+                    return <Text type="secondary">nenhuma gerência selecionada</Text>;
+                  }
+                  return (
+                    <>
+                      <Tag color="green">{gerencia.nome_setor || gerencia.nome}</Tag>
+                      {gerencia.setor_canonico ? (
+                        <Text type="secondary">setor: {gerencia.setor_canonico}</Text>
+                      ) : null}
+                    </>
+                  );
+                })()}
               </div>
               <div>
                 <Text strong>Funções selecionadas: </Text>
@@ -802,9 +810,14 @@ export default function UsuariosPage(): JSX.Element {
               <div>
                 <Text strong>Permissões efetivas: </Text>
                 {(() => {
-                  const selectedGroups = grupos.filter((group) =>
-                    [...selectedSetorIds, ...selectedFuncaoIds].includes(group.id)
-                  );
+                  // Setor é derivado da Gerência (grupo cujo nome == setor_canonico,
+                  // quando existe — espelha o setor_group_for do backend) + Funções.
+                  const selectedGerencia = gerencias.find((ger) => ger.id === selectedGerenciaId);
+                  const setorGroup = selectedGerencia
+                    ? grupos.find((group) => group.name === selectedGerencia.setor_canonico)
+                    : undefined;
+                  const funcaoGroups = grupos.filter((group) => selectedFuncaoIds.includes(group.id));
+                  const selectedGroups = setorGroup ? [setorGroup, ...funcaoGroups] : funcaoGroups;
                   const labels = new Set<string>();
                   selectedGroups.forEach((group) => {
                     (group.permissoes_funcionais || []).forEach((permissao) => labels.add(permissao.label));

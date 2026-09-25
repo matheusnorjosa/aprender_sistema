@@ -63,7 +63,7 @@ class TestGCalSyncIdempotency:
     def test_create_idempotent(self, usuario_test, tipo_evento_test, municipio_test, fake_client):
         """
         create_idempotent: Primeira rodada CREATE, segunda rodada UPDATE (idempotente).
-        Solicitação aprovada sem external_event_id cria evento asv2-{id}.
+        Solicitação aprovada sem external_event_id cria evento asv2{id}.
         Segunda rodada deve fazer UPDATE (ou SKIP se payload igual).
         """
         now = timezone.now().replace(hour=10, minute=0, second=0, microsecond=0)
@@ -91,16 +91,16 @@ class TestGCalSyncIdempotency:
 
         assert outcome1.action == "CREATE", "Primeira execução deve criar evento"
         assert outcome1.solicitation_id == sol.id
-        assert outcome1.external_event_id == f"asv2-{sol.id}"
+        assert outcome1.external_event_id == f"asv2{sol.id}"
 
         # Verificar que evento foi criado no Calendar
         events = fake_client.list_events(calendar_id)
         assert len(events) == 1, "Deve ter 1 evento no Calendar"
-        assert events[0]["id"] == f"asv2-{sol.id}"
+        assert events[0]["id"] == f"asv2{sol.id}"
 
         # Verificar que DB foi atualizado
         sol.refresh_from_db()
-        assert sol.external_event_id == f"asv2-{sol.id}", "DB deve ter external_event_id"
+        assert sol.external_event_id == f"asv2{sol.id}", "DB deve ter external_event_id"
 
         # Segunda execução → UPDATE (idempotente)
         outcome2 = upsert_one(
@@ -113,7 +113,7 @@ class TestGCalSyncIdempotency:
 
         assert outcome2.action == "UPDATE", "Segunda execução deve atualizar"
         assert outcome2.solicitation_id == sol.id
-        assert outcome2.external_event_id == f"asv2-{sol.id}"
+        assert outcome2.external_event_id == f"asv2{sol.id}"
 
         # Verificar que ainda tem apenas 1 evento
         events = fake_client.list_events(calendar_id)
@@ -138,7 +138,7 @@ class TestGCalSyncIdempotency:
         )
 
         calendar_id = "test-calendar"
-        event_id = f"asv2-{sol.id}"
+        event_id = f"asv2{sol.id}"
 
         # Simular que evento já existe no Calendar (criado manualmente)
         fake_client.insert(
@@ -201,7 +201,7 @@ class TestGCalSyncIdempotency:
         assert outcome1.action == "CREATE"
 
         # Obter evento inicial
-        event_id = f"asv2-{sol.id}"
+        event_id = f"asv2{sol.id}"
         event_before = fake_client.get(calendar_id, event_id)
         start_before = event_before["start"]["dateTime"]
 
@@ -254,7 +254,7 @@ class TestGCalSyncIdempotency:
             no_delete=False,
         )
         assert outcome1.action == "CREATE"
-        assert sol.external_event_id == f"asv2-{sol.id}"
+        assert sol.external_event_id == f"asv2{sol.id}"
 
         # Verificar que evento existe
         events = fake_client.list_events(calendar_id)
@@ -543,7 +543,7 @@ class TestGCalSyncFilters:
 
         # Verificar IDs corretos
         event_ids = {e["id"] for e in events}
-        assert event_ids == {f"asv2-{sol1.id}", f"asv2-{sol3.id}"}
+        assert event_ids == {f"asv2{sol1.id}", f"asv2{sol3.id}"}
 
 
 @pytest.mark.django_db
@@ -611,7 +611,7 @@ class TestGCalSyncEdgeCases:
         assert outcome.action == "CREATE"
 
         # Obter evento criado
-        event = fake_client.get(calendar_id, f"asv2-{sol.id}")
+        event = fake_client.get(calendar_id, f"asv2{sol.id}")
 
         # Verificar campos obrigatórios
         assert "summary" in event, "Deve ter summary"

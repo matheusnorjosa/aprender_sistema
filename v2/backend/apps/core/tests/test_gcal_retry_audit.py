@@ -103,7 +103,7 @@ class TestRetryBackoff:
             call_count += 1
             if call_count < 3:
                 raise create_http_error(429, "Rate Limit Exceeded")
-            return {"id": f"asv2-{solicitacao_aprovada.id}", "summary": "Test"}
+            return {"id": f"asv2{solicitacao_aprovada.id}", "summary": "Test"}
 
         mock_client.insert.side_effect = side_effect_insert
         mock_client.get.return_value = None  # Evento não existe ainda
@@ -114,7 +114,7 @@ class TestRetryBackoff:
         # Verificar que tentou 3 vezes (2 falhas + 1 sucesso)
         assert call_count == 3
         assert outcome.action == "CREATE"
-        assert outcome.external_event_id == f"asv2-{solicitacao_aprovada.id}"
+        assert outcome.external_event_id == f"asv2{solicitacao_aprovada.id}"
 
     @patch("apps.core.services.gcal_google_client.GoogleCalendarClient._retry_with_backoff")
     @patch("apps.core.services.gcal_client_factory.get_gcal_client_and_calendar_id")
@@ -136,7 +136,7 @@ class TestRetryBackoff:
             call_count += 1
             if call_count < 2:
                 raise create_http_error(503, "Service Unavailable")
-            return {"id": f"asv2-{solicitacao_aprovada.id}", "summary": "Test"}
+            return {"id": f"asv2{solicitacao_aprovada.id}", "summary": "Test"}
 
         mock_client.insert.side_effect = side_effect_insert
         mock_client.get.return_value = None
@@ -160,7 +160,7 @@ class TestRetryBackoff:
         # get() retorna None (404)
         mock_client.get.return_value = None
         # insert() sucede normalmente
-        mock_client.insert.return_value = {"id": f"asv2-{solicitacao_aprovada.id}", "summary": "Test"}
+        mock_client.insert.return_value = {"id": f"asv2{solicitacao_aprovada.id}", "summary": "Test"}
 
         outcome = apply_one_solicitacao(solicitacao_aprovada, dry_run=False, apply_blocked=True)
 
@@ -213,7 +213,7 @@ class TestErrorPersistence:
         mock_client = MagicMock()
         mock_factory.return_value = (mock_client, "test-calendar-id")
         mock_client.get.return_value = None
-        mock_client.insert.return_value = {"id": f"asv2-{solicitacao_aprovada.id}", "summary": "Test"}
+        mock_client.insert.return_value = {"id": f"asv2{solicitacao_aprovada.id}", "summary": "Test"}
 
         # Aplicar com sucesso
         outcome = apply_one_solicitacao(solicitacao_aprovada, dry_run=False, apply_blocked=True)
@@ -273,7 +273,7 @@ class TestAuditLog:
         mock_client = MagicMock()
         mock_factory.return_value = (mock_client, "test-calendar-id")
         mock_client.get.return_value = None
-        mock_client.insert.return_value = {"id": f"asv2-{solicitacao_aprovada.id}", "summary": "Test"}
+        mock_client.insert.return_value = {"id": f"asv2{solicitacao_aprovada.id}", "summary": "Test"}
 
         # Executar task (síncrona para teste)
         result = task_publish_solicitacao_to_gcal(solicitacao_aprovada.id, dry_run=False, apply_blocked=True)

@@ -26,9 +26,11 @@ def _validate_event_id(event_id: EventId) -> bool:
     """
     Valida eventId conforme especificação Google Calendar API.
 
-    Regras:
+    Regras (base32hex, conforme a API rejeita ids fora dela com HTTP 400
+    "Invalid resource id value"):
     - Comprimento: 5-1024 caracteres
-    - Caracteres permitidos: a-z, 0-9, - (hífen), _ (underscore)
+    - Caracteres permitidos: a-v (letras) e 0-9 (dígitos) — SEM hífen, SEM
+      underscore
     - Deve ser lowercase
 
     Args:
@@ -49,9 +51,9 @@ def _validate_event_id(event_id: EventId) -> bool:
     if len(event_id) > 1024:
         raise ValueError(f"eventId muito longo: {len(event_id)} chars (máximo: 1024)")
 
-    # Verificar caracteres permitidos (a-z, 0-9, -, _)
-    if not re.match(r"^[a-z0-9_-]+$", event_id):
-        raise ValueError(f"eventId contém caracteres inválidos: {event_id}. " "Permitido: a-z, 0-9, -, _")
+    # Verificar caracteres permitidos (base32hex: a-v, 0-9)
+    if not re.match(r"^[a-v0-9]+$", event_id):
+        raise ValueError(f"eventId contém caracteres inválidos: {event_id}. " "Permitido: a-v, 0-9")
 
     return True
 
@@ -60,18 +62,20 @@ def _event_id_for(s: Solicitacao) -> EventId:
     """
     Gera eventId determinístico para uma Solicitacao.
 
-    Format: ``{GCAL_EVENT_ID_PREFIX}-{id}`` (ex: ``asv2-123``)
+    Format: ``{GCAL_EVENT_ID_PREFIX}{id}`` (ex: ``asv2123``)
+
+    Sem hífen: o Google Calendar só aceita base32hex (a-v, 0-9) no eventId.
 
     Args:
         s: Solicitacao
 
     Returns:
-        str: Event ID determinístico (ex: asv2-123)
+        str: Event ID determinístico (ex: asv2123)
 
     Raises:
         ValueError: Se ID gerado for inválido
     """
-    event_id = f"{GCAL_EVENT_ID_PREFIX}-{s.id}"
+    event_id = f"{GCAL_EVENT_ID_PREFIX}{s.id}"
 
     # Validar antes de retornar
     _validate_event_id(event_id)

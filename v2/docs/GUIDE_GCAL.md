@@ -554,7 +554,7 @@ from apps.core.services.gcal_sync_service import resync_solicitacao
 # Republicar solicitação aprovada
 outcome = resync_solicitacao(solicitacao, apply_blocked=False)
 # outcome.action == "UPDATE"
-# outcome.external_event_id == "asv2-123"
+# outcome.external_event_id == "asv2123"
 ```
 
 **Comportamento**:

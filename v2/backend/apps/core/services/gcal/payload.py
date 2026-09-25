@@ -311,8 +311,8 @@ def build_preview_for_solicitacao(s: Solicitacao) -> JsonDict:
     # Gerar meet_link fake para preview (não persiste) apenas quando online
     meet_link_preview = None
     if enable_meet:
-        # Extrai número do event_id (formato: {GCAL_EVENT_ID_PREFIX}-{id})
-        event_num = event_id.split("-")[-1] if "-" in event_id else event_id
+        # Extrai sufixo do event_id (formato: {GCAL_EVENT_ID_PREFIX}{id})
+        event_num = event_id[len(GCAL_EVENT_ID_PREFIX) :] if event_id.startswith(GCAL_EVENT_ID_PREFIX) else event_id
         meet_link_preview = f"https://meet.google.com/fake-{event_num}"
 
     return {

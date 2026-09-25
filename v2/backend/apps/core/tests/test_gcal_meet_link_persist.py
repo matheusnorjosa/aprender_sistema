@@ -136,7 +136,7 @@ class TestMeetLinkPersistence:
         """
         # Mock do preview incluindo meet_link
         mock_build_preview.return_value = {
-            "event_id": "asv2-test",
+            "event_id": "asv2test",
             "payload": {
                 "summary": "Teste",
                 "start": {},

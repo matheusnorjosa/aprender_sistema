@@ -4,7 +4,7 @@ Testes Sprint 3 - Event Publishing (Create/Update) com idempotência e estados
 Cobertura:
 - Publish: dry_run, apply, apply_blocked (409)
 - Resync: create vs update, força UPDATE, dry_run
-- Idempotência: eventId asv2-{id}, sendUpdates='none'
+- Idempotência: eventId asv2{id}, sendUpdates='none'
 - Estados: PENDING → PUBLISHED/ERROR
 
 100% fake/mocked (GCAL_CLIENT=fake), sem rede real.
@@ -94,7 +94,7 @@ def solicitacao_published(usuario_controle):
         fim=now + timedelta(days=2, hours=3),
         status="aprovado",
         gcal_status=Solicitacao.GCalStatus.PUBLISHED,
-        external_event_id="asv2-999",
+        external_event_id="asv2999",
     )
 
 
@@ -118,7 +118,7 @@ class TestPublishEndpoint:
         mock_apply.return_value = SyncOutcome(
             action="DRY_RUN",
             solicitation_id=solicitacao_aprovada.id,
-            external_event_id=f"asv2-{solicitacao_aprovada.id}",
+            external_event_id=f"asv2{solicitacao_aprovada.id}",
             summary="Test Event",
         )
 
@@ -323,12 +323,12 @@ class TestResyncEndpoint:
 
 @pytest.mark.django_db
 class TestIdempotence:
-    """Testes de idempotência: eventId asv2-{id}, sendUpdates='none'"""
+    """Testes de idempotência: eventId asv2{id}, sendUpdates='none'"""
 
     @patch("django.conf.settings.GCAL_CLIENT", "fake")
     def test_event_id_format_is_asv2_id(self, solicitacao_aprovada):
         """
-        Validar que eventId segue padrão asv2-{id}
+        Validar que eventId segue padrão asv2{id}
         """
         from apps.core.services.gcal_sync_service import apply_one_solicitacao
 
@@ -336,7 +336,7 @@ class TestIdempotence:
         outcome = apply_one_solicitacao(solicitacao_aprovada, dry_run=False, apply_blocked=True)
 
         # Verificar eventId
-        assert outcome.external_event_id == f"asv2-{solicitacao_aprovada.id}"
+        assert outcome.external_event_id == f"asv2{solicitacao_aprovada.id}"
 
     @patch("django.conf.settings.GCAL_CLIENT", "fake")
     def test_send_updates_is_none(self, solicitacao_aprovada):

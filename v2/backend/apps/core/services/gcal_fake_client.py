@@ -9,6 +9,7 @@ Usado nos testes para simular Google Calendar API.
 
 from __future__ import annotations
 
+from apps.core.services.gcal.validation import GCAL_EVENT_ID_PREFIX
 from apps.core.services.gcal_sync_service import CalendarClientAdapter
 from apps.core.types import CalendarId, EventId, JsonDict
 
@@ -54,8 +55,10 @@ class FakeCalendarClient(CalendarClientAdapter):
 
         # RF06/PR19: Gerar hangoutLink fake se conferenceData presente
         if payload.get("conferenceData"):
-            # Extrair event_id numérico do formato asv2-{id}
-            event_num: str = event_id.split("-")[-1] if "-" in event_id else event_id
+            # Extrair sufixo do event_id no formato asv2{id}
+            event_num: str = (
+                event_id[len(GCAL_EVENT_ID_PREFIX) :] if event_id.startswith(GCAL_EVENT_ID_PREFIX) else event_id
+            )
             event["hangoutLink"] = f"https://meet.google.com/fake-{event_num}"
 
         self._store[self._key(calendar_id, event_id)] = event
@@ -77,8 +80,10 @@ class FakeCalendarClient(CalendarClientAdapter):
 
         # RF06/PR19: Gerar hangoutLink fake se conferenceData presente
         if payload.get("conferenceData"):
-            # Extrair event_id numérico do formato asv2-{id}
-            event_num: str = event_id.split("-")[-1] if "-" in event_id else event_id
+            # Extrair sufixo do event_id no formato asv2{id}
+            event_num: str = (
+                event_id[len(GCAL_EVENT_ID_PREFIX) :] if event_id.startswith(GCAL_EVENT_ID_PREFIX) else event_id
+            )
             event["hangoutLink"] = f"https://meet.google.com/fake-{event_num}"
 
         self._store[self._key(calendar_id, event_id)] = event

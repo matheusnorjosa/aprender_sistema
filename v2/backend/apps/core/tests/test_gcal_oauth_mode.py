@@ -219,7 +219,7 @@ def test_resync_oauth_mode_sem_credencial_retorna_403(mock_task, solicitacao_apr
     """
     # Marcar como PUBLISHED para permitir resync
     solicitacao_aprovada.gcal_status = Solicitacao.GCalStatus.PUBLISHED
-    solicitacao_aprovada.external_event_id = "asv2-123"
+    solicitacao_aprovada.external_event_id = "asv2123"
     solicitacao_aprovada.save()
 
     client = APIClient()
@@ -253,7 +253,7 @@ def test_resync_oauth_mode_com_credencial_retorna_202(
     """
     # Marcar como PUBLISHED para permitir resync
     solicitacao_aprovada.gcal_status = Solicitacao.GCalStatus.PUBLISHED
-    solicitacao_aprovada.external_event_id = "asv2-123"
+    solicitacao_aprovada.external_event_id = "asv2123"
     solicitacao_aprovada.save()
 
     # Mock task result
@@ -292,7 +292,7 @@ def test_cancel_oauth_mode_sem_credencial_retorna_403(mock_task, solicitacao_apr
     """
     # Marcar como PUBLISHED para permitir cancel
     solicitacao_aprovada.gcal_status = Solicitacao.GCalStatus.PUBLISHED
-    solicitacao_aprovada.external_event_id = "asv2-cancel-test"
+    solicitacao_aprovada.external_event_id = "asv2canceltest"
     solicitacao_aprovada.save()
 
     client = APIClient()
@@ -320,7 +320,7 @@ def test_cancel_oauth_mode_com_credencial_retorna_202(
     """
     # Marcar como PUBLISHED para permitir cancel
     solicitacao_aprovada.gcal_status = Solicitacao.GCalStatus.PUBLISHED
-    solicitacao_aprovada.external_event_id = "asv2-cancel-test"
+    solicitacao_aprovada.external_event_id = "asv2canceltest"
     solicitacao_aprovada.save()
 
     mock_task.return_value.id = "fake-cancel-task-789"

@@ -86,7 +86,7 @@ class TestGCalExport(TestCase):
             usuario=self.user_controle,
             coordenador=self.user_coordenador,
             gcal_status=Solicitacao.GCalStatus.PUBLISHED,
-            external_event_id="asv2-123",
+            external_event_id="asv2123",
             meet_link="https://meet.google.com/abc-def-ghi",
         )
 
@@ -209,7 +209,7 @@ class TestGCalExport(TestCase):
         self.assertEqual(sol_pub_row[7], "coordenador_user")  # coordenador
         self.assertEqual(sol_pub_row[8], "SUPER")  # fluxo
         self.assertEqual(sol_pub_row[9], "PUBLISHED")  # gcal_status
-        self.assertEqual(sol_pub_row[10], "asv2-123")  # external_event_id
+        self.assertEqual(sol_pub_row[10], "asv2123")  # external_event_id
         self.assertIn("meet.google.com", sol_pub_row[13])  # meet_link
 
     def test_export_json_structure(self):

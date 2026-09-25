@@ -64,7 +64,7 @@ def solicitacao_com_meet_link(usuario_controle):
 
     # Simular que já foi publicado e recebeu meet_link
     sol.meet_link = "https://meet.google.com/abc-defg-hij"
-    sol.external_event_id = "asv2-12345"
+    sol.external_event_id = "asv212345"
     sol.save()
 
     return sol

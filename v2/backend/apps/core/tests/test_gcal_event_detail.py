@@ -96,7 +96,7 @@ def solicitacao_aprovada(usuario_controle, municipio, projeto, tipo_evento):
         fim=fim,
         status="aprovado",
         gcal_status=Solicitacao.GCalStatus.PUBLISHED,
-        external_event_id="asv2-test-123",
+        external_event_id="asv2test123",
         meet_link="https://meet.google.com/test-meet",
         gcal_payload_hash="abc123hash",
     )
@@ -146,7 +146,7 @@ class TestEventDetail:
 
         # Campos GCal
         assert data["gcal_status"] == "PUBLISHED"
-        assert data["external_event_id"] == "asv2-test-123"
+        assert data["external_event_id"] == "asv2test123"
         assert data["meet_link"] == "https://meet.google.com/test-meet"
         # Note: gcal_payload_hash removed from serializer (internal implementation detail)
         assert data["gcal_last_error"] is None  # Campo é nullable, retorna None quando vazio

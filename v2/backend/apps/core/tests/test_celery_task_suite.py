@@ -57,7 +57,7 @@ def task_solicitacao(db):
         fim=now + timedelta(days=1, hours=2),
         status="aprovado",
         gcal_status=Solicitacao.GCalStatus.PUBLISHED,
-        external_event_id=f"asv2-task-{uid}",
+        external_event_id=f"asv2task{uid}",
     )
     return sol
 
@@ -80,7 +80,7 @@ class TestPublishTask:
             mock_apply.return_value = SyncOutcome(
                 action="CREATE",
                 solicitation_id=task_solicitacao.id,
-                external_event_id=f"asv2-{task_solicitacao.id}",
+                external_event_id=f"asv2{task_solicitacao.id}",
                 summary=f"Solicitação #{task_solicitacao.id}",
             )
 
@@ -122,7 +122,7 @@ class TestPublishTask:
             mock_apply.return_value = SyncOutcome(
                 action="CREATE",
                 solicitation_id=task_solicitacao.id,
-                external_event_id=f"asv2-{task_solicitacao.id}",
+                external_event_id=f"asv2{task_solicitacao.id}",
                 summary=f"Solicitação #{task_solicitacao.id}",
             )
             result = task_publish_solicitacao_to_gcal(task_solicitacao.id, dry_run=True)

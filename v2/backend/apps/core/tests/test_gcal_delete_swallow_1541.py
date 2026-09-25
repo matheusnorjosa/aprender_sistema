@@ -58,7 +58,7 @@ class TestUpsertDeleteSwallow:
 
         Antes do fix retornava action="DELETE" com o ponteiro descartado (órfão).
         """
-        s = SolicitacaoFactory(status="reprovado", external_event_id="asv2-orphan-1")
+        s = SolicitacaoFactory(status="reprovado", external_event_id="asv2orphan1")
         client = _FakeClient(delete_exc=RuntimeError("500 Internal Server Error"))
 
         with patch(_PASSTHROUGH, side_effect=_passthrough):
@@ -66,11 +66,11 @@ class TestUpsertDeleteSwallow:
                 upsert_one(client=client, calendar_id="primary", s=s)
 
         s.refresh_from_db()
-        assert s.external_event_id == "asv2-orphan-1", "ponteiro deve ser preservado na falha"
+        assert s.external_event_id == "asv2orphan1", "ponteiro deve ser preservado na falha"
 
     def test_delete_404_is_success_and_clears_pointer(self):
         """404 = evento já removido no Google → sucesso idempotente, zera o ponteiro."""
-        s = SolicitacaoFactory(status="reprovado", external_event_id="asv2-gone-1")
+        s = SolicitacaoFactory(status="reprovado", external_event_id="asv2gone1")
         client = _FakeClient(delete_exc=Exception("404 Not Found"))
 
         with patch(_PASSTHROUGH, side_effect=_passthrough):
@@ -82,7 +82,7 @@ class TestUpsertDeleteSwallow:
 
     def test_delete_success_clears_pointer(self):
         """DELETE bem-sucedido zera o ponteiro e reporta action=DELETE."""
-        s = SolicitacaoFactory(status="reprovado", external_event_id="asv2-ok-1")
+        s = SolicitacaoFactory(status="reprovado", external_event_id="asv2ok1")
         client = _FakeClient(delete_exc=None)
 
         with patch(_PASSTHROUGH, side_effect=_passthrough):

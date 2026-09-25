@@ -230,7 +230,7 @@ test.describe('Fluxo Solicitação → Google Calendar (Fake)', () => {
 
     // Asserts críticos
     expect(solicitacao.external_event_id).toBeTruthy();
-    expect(solicitacao.external_event_id).toMatch(/^asv2-\d+/); // Padrão fake client
+    expect(solicitacao.external_event_id).toMatch(/^asv2\d+/); // Padrão fake client
     // gcal_payload_hash pode não ser exposto no serializer
 
     // meet_link depende de is_online=true (se implementado)

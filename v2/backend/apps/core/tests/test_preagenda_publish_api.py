@@ -182,7 +182,7 @@ def test_build_preview_for_solicitacao(setup_solicitacao):
     assert "payload" in preview
 
     # Validar event_id determinístico
-    assert preview["event_id"] == f"asv2-{sol.id}"
+    assert preview["event_id"] == f"asv2{sol.id}"
 
     # Validar payload
     payload = preview["payload"]
@@ -208,7 +208,7 @@ def test_apply_one_solicitacao_with_client(mock_client_class, setup_solicitacao)
     # Mock do cliente
     mock_client = MagicMock()
     mock_client.get.return_value = None  # Evento não existe
-    mock_client.insert.return_value = {"id": f"asv2-{sol.id}"}
+    mock_client.insert.return_value = {"id": f"asv2{sol.id}"}
     mock_client_class.return_value = mock_client
 
     # Aplicar (com apply_blocked=True para forçar execução)
@@ -217,7 +217,7 @@ def test_apply_one_solicitacao_with_client(mock_client_class, setup_solicitacao)
     # Validar outcome
     assert outcome.action == "CREATE"
     assert outcome.solicitation_id == sol.id
-    assert outcome.external_event_id == f"asv2-{sol.id}"
+    assert outcome.external_event_id == f"asv2{sol.id}"
 
     # Verificar que insert foi chamado
     mock_client.insert.assert_called_once()
@@ -269,7 +269,7 @@ def test_preview_gcal_api_success(api_client, user_super, setup_solicitacao):
     assert "preview" in data
 
     preview = data["preview"]
-    assert preview["event_id"] == f"asv2-{sol.id}"
+    assert preview["event_id"] == f"asv2{sol.id}"
     assert "payload" in preview
 
     # PR14: Validar que payload_hash está presente

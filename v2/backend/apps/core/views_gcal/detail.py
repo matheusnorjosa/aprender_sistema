@@ -236,7 +236,7 @@ class GCalDriftView(APIView):
                 "projeto": "Gestão Escolar",
                 "stored_hash": "abc123...",
                 "current_hash": "def456...",
-                "external_event_id": "asv2-123"
+                "external_event_id": "asv2123"
             },
             ...
         ]

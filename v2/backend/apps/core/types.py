@@ -95,7 +95,7 @@ Códigos:
 # ==============================================================================
 
 EventId: TypeAlias = str
-"""ID de evento no Google Calendar (ex: 'asv2-123')."""
+"""ID de evento no Google Calendar (ex: 'asv2123')."""
 
 CalendarId: TypeAlias = str
 """ID de calendário Google (ex: 'primary' ou 'user@group.calendar.google.com')."""

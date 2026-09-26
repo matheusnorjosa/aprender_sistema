@@ -67,6 +67,19 @@ def scope_solicitacoes(qs: QuerySet, user: Any) -> QuerySet:
     if user_has_any_perm(user, *_MANAGER_CAPS):
         gerencia_ids = _user_gerencia_ids(user)
         return qs.filter(Q(usuario=user) | Q(projeto__gerencia_id__in=gerencia_ids))
+    # #1656 Feature 2: Apoio de Coordenação com `publish_setor_solicitacao` enxerga
+    # (para publicar/preview/resync/cancel) as solicitações APROVADAS do PRÓPRIO setor,
+    # além das suas (estas em qualquer status, pois é dona). O ramo do setor filtra
+    # `status="aprovado"` para não expor PII de eventos pendentes/reprovados de
+    # terceiros (a feature promete só APROVADOS do setor). É tier de LEITURA/escopo
+    # apenas — a edição segue barrada porque `user_can_access_solicitacao` (usado por
+    # IsOwnerOrPrivileged) NÃO muda. A publicabilidade por-objeto (setor-match) é
+    # reforçada por `can_publish_solicitacao` nas 4 @actions GCal.
+    if user_has_any_perm(user, "publish_setor_solicitacao"):
+        setores = user_setores(user)
+        if setores:
+            return qs.filter(Q(usuario=user) | Q(projeto__gerencia__setor_canonico__in=setores, status="aprovado"))
+        return qs.filter(usuario=user)
     return qs.filter(usuario=user)
 
 
@@ -81,6 +94,32 @@ def user_can_access_solicitacao(user: Any, obj: Any) -> bool:
     if user_has_any_perm(user, *_MANAGER_CAPS):
         gerencia_id = getattr(getattr(obj, "projeto", None), "gerencia_id", None)
         return gerencia_id is not None and gerencia_id in _user_gerencia_ids(user)
+    return False
+
+
+def can_publish_solicitacao(user: Any, obj: Any) -> bool:
+    """True sse `user` pode publicar/prever/resincronizar/cancelar o evento GCal `obj`.
+
+    Guarda de OBJETO das 4 @actions GCal (#1656 Feature 2). Separa "publicabilidade"
+    de "visibilidade": o `scope_solicitacoes` deixa a Apoio VER as próprias (qualquer
+    status) + as APROVADAS do setor; mas PUBLICAR exige que o evento seja do PRÓPRIO
+    setor da Apoio — fecha o caso-limite de uma Apoio sem vínculo vigente (setor vazio)
+    publicar um evento próprio que caiu em outro setor (via fail-open do create).
+
+    - Global (`use_gcal`: superuser / Controle / Superintendência) → qualquer evento.
+    - `publish_setor_solicitacao` (Apoio) → só evento cujo `projeto.gerencia.setor_canonico`
+      ∈ `user_setores(user)`. Sem setor vigente → False (fail-closed).
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if user_is_solicitacao_global(user):
+        return True
+    if user_has_any_perm(user, "publish_setor_solicitacao"):
+        setores = user_setores(user)
+        if not setores:
+            return False
+        setor = getattr(getattr(getattr(obj, "projeto", None), "gerencia", None), "setor_canonico", None)
+        return bool(setor) and setor in setores
     return False
 
 

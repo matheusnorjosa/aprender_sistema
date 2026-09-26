@@ -131,6 +131,12 @@ ACCESS_POLICIES: Final[dict[str, frozenset[str]]] = {
     # --- GCal ---
     # Endpoints GCal (preview, lista, dashboards de erro): operar + aprovar.
     "use_gcal": frozenset({"operate_preagenda", "approve_solicitation"}),
+    # Publish/preview/resync/cancel GCal ESCOPADO por setor (#1656 Feature 2) —
+    # Apoio de Coordenação. Cap dedicada de propósito: NÃO estende `use_gcal`
+    # (que porteia views_gcal/* batch, sem escopo por id). O alcance de objeto
+    # vem do tier aditivo em `scope_solicitacoes`; a edição continua barrada por
+    # `user_can_access_solicitacao` (inalterado).
+    "publish_setor_solicitacao": frozenset({"publish_setor_solicitacao"}),
     # --- Availability ---
     # Visualização ampla de disponibilidades — Controle/Gerente/Coord/Apoio.
     "view_all_availability": frozenset({"view_all_availability"}),
@@ -275,6 +281,10 @@ class CanUseGcal(_PolicyPermission):
     policy = "use_gcal"
 
 
+class CanPublishSetorSolicitacao(_PolicyPermission):
+    policy = "publish_setor_solicitacao"
+
+
 class CanViewAllAvailability(_PolicyPermission):
     policy = "view_all_availability"
 
@@ -377,6 +387,7 @@ PUBLIC_POLICY_KEYS: Final[frozenset[str]] = frozenset(
         "view_map_metrics",
         "view_reports",
         "use_gcal",
+        "publish_setor_solicitacao",
         "view_all_availability",
         "import_availability_blocks",
         "import_compras",
@@ -567,6 +578,7 @@ __all__ = [
     "CanViewMapMetrics",
     "CanViewReports",
     "CanUseGcal",
+    "CanPublishSetorSolicitacao",
     "CanViewAllAvailability",
     "CanImportAvailabilityBlocks",
     "CanImportCompras",

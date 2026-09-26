@@ -32,7 +32,7 @@ from .api_schemas import (
 )
 from .models import AuditLog, Solicitacao
 from .permissions import HasPerm, IsOwnerOrPrivileged
-from .rbac.policies import CanAccessSolicitationApprovals, CanUseGcal
+from .rbac.policies import CanAccessSolicitationApprovals, CanPublishSetorSolicitacao, CanUseGcal
 from .serializers import SolicitacaoSerializer
 from .services.solicitacao_approval import (
     approve_solicitacao,
@@ -44,7 +44,12 @@ from .services.solicitacao_create import resolve_initial_status
 from .services.solicitacao_publish import cancel_from_gcal
 from .services.solicitacao_publish import preview_gcal as preview_gcal_service
 from .services.solicitacao_publish import publish_to_gcal, resync_to_gcal
-from .services.solicitacao_scope import participants_out_of_setor, projeto_out_of_setor, scope_solicitacoes
+from .services.solicitacao_scope import (
+    can_publish_solicitacao,
+    participants_out_of_setor,
+    projeto_out_of_setor,
+    scope_solicitacoes,
+)
 from .utils.net import get_client_ip
 
 logger = logging.getLogger(__name__)
@@ -820,18 +825,33 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    def _get_publishable_solicitacao(self):
+        """`get_object()` + guarda de OBJETO por setor (#1656 Feature 2).
+
+        Global (`use_gcal`: Controle/Super) publica qualquer evento; Apoio só evento
+        do PRÓPRIO setor. Fecha o caso-limite de publicar evento próprio caído em
+        outro setor (Apoio sem vínculo vigente). Fora do escopo → 404 (indistinguível
+        de inexistente, alinhado ao get_object).
+        """
+        solicitacao = self.get_object()
+        if not can_publish_solicitacao(self.request.user, solicitacao):
+            from rest_framework.exceptions import NotFound
+
+            raise NotFound()
+        return solicitacao
+
     @action(
         detail=True,
         methods=["post"],
         # Issue #1233 (Epic 4.2.a): operações GCal usam Policy `use_gcal`
-        # (Controle + Super). Antes Epic 1.6 já havia composto `operate_preagenda
-        # | approve_solicitation` aqui — agora encapsulado em CanUseGcal.
-        permission_classes=[CanUseGcal],
+        # (Controle + Super). #1656 Feature 2: OU `publish_setor_solicitacao`
+        # (Apoio de Coordenação), escopado por setor via `scope_solicitacoes`.
+        permission_classes=[CanUseGcal | CanPublishSetorSolicitacao],
         url_path="preview-gcal",
     )
     def preview_gcal(self, request, pk=None):
         """Preview do payload GCal sem publicar (Controle ou Superintendência)."""
-        solicitacao = self.get_object()
+        solicitacao = self._get_publishable_solicitacao()
 
         # §1 Epic #459: Delegate to service layer
         result = preview_gcal_service(
@@ -852,14 +872,14 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         detail=True,
         methods=["post"],
         # Issue #1233 (Epic 4.2.a): operações GCal usam Policy `use_gcal`
-        # (Controle + Super). Antes Epic 1.6 já havia composto `operate_preagenda
-        # | approve_solicitation` aqui — agora encapsulado em CanUseGcal.
-        permission_classes=[CanUseGcal],
+        # (Controle + Super). #1656 Feature 2: OU `publish_setor_solicitacao`
+        # (Apoio de Coordenação), escopado por setor via `scope_solicitacoes`.
+        permission_classes=[CanUseGcal | CanPublishSetorSolicitacao],
         url_path="publish",
     )
     def publish(self, request, pk=None):
         """Publica solicitação no Google Calendar via Celery (Controle ou Superintendência)."""
-        solicitacao = self.get_object()
+        solicitacao = self._get_publishable_solicitacao()
         dry_run = request.data.get("dry_run", False)
         apply_blocked = request.data.get("apply_blocked", False)
 
@@ -885,9 +905,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         detail=True,
         methods=["post"],
         # Issue #1233 (Epic 4.2.a): operações GCal usam Policy `use_gcal`
-        # (Controle + Super). Antes Epic 1.6 já havia composto `operate_preagenda
-        # | approve_solicitation` aqui — agora encapsulado em CanUseGcal.
-        permission_classes=[CanUseGcal],
+        # (Controle + Super). #1656 Feature 2: OU `publish_setor_solicitacao`
+        # (Apoio de Coordenação), escopado por setor via `scope_solicitacoes`.
+        permission_classes=[CanUseGcal | CanPublishSetorSolicitacao],
         url_path="resync-gcal",
     )
     def resync_gcal(self, request, pk=None):
@@ -897,7 +917,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         Permissão: Controle ou Superintendência
         Returns: 202 Accepted (processamento assíncrono)
         """
-        solicitacao = self.get_object()
+        solicitacao = self._get_publishable_solicitacao()
 
         # §1 Epic #459: Delegate to service layer
         result = resync_to_gcal(
@@ -919,9 +939,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         detail=True,
         methods=["post"],
         # Issue #1233 (Epic 4.2.a): operações GCal usam Policy `use_gcal`
-        # (Controle + Super). Antes Epic 1.6 já havia composto `operate_preagenda
-        # | approve_solicitation` aqui — agora encapsulado em CanUseGcal.
-        permission_classes=[CanUseGcal],
+        # (Controle + Super). #1656 Feature 2: OU `publish_setor_solicitacao`
+        # (Apoio de Coordenação), escopado por setor via `scope_solicitacoes`.
+        permission_classes=[CanUseGcal | CanPublishSetorSolicitacao],
         url_path="cancel-gcal",
     )
     def cancel_gcal(self, request, pk=None):
@@ -931,7 +951,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         Permissão: Controle ou Superintendência
         Returns: 202 Accepted (processamento assíncrono)
         """
-        solicitacao = self.get_object()
+        solicitacao = self._get_publishable_solicitacao()
 
         # §1 Epic #459: Delegate to service layer
         result = cancel_from_gcal(

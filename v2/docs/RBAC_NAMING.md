@@ -422,6 +422,7 @@ Limitar prefixos de Policy keys ao vocabulário:
 
 - `access_X` — acesso de leitura ao módulo (ex: `access_audit_logs`)
 - `create_X` — criação de recurso (ex: `create_solicitation`)
+- `publish_X` — publicação/exposição de recurso (ex: `publish_setor_solicitacao`)
 - `use_X` — operação ativa (ex: `use_gcal_endpoints`)
 - `import_X` — importação de dados
 - `manage_X` — CRUD administrativo
@@ -473,7 +474,7 @@ PUBLIC_POLICY_KEYS: Final[frozenset[str]] = frozenset({
     "access_audit_logs",
     "use_gcal",
     "view_compras_dashboard",
-    # ... 18 outras — total 21 (apps/core/rbac/policies.py:363-387)
+    # ... 19 outras — total 22 (apps/core/rbac/policies.py:363-387)
 })
 ```
 

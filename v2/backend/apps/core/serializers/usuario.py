@@ -18,7 +18,7 @@ from django.core.exceptions import ValidationError
 from rest_framework import serializers  # type: ignore[attr-defined]
 
 from apps.core.constants import FUNCAO_GROUPS, RESERVED_GROUPS, SETOR_GROUPS
-from apps.core.models import AuditLog, GroupClassificacao, PermissaoFuncional
+from apps.core.models import AuditLog, EquipeGerencia, Gerencia, GroupClassificacao, PermissaoFuncional
 from apps.core.rbac import can_admin_mutate_target
 from apps.core.services.audit import (
     auditar_assign_groups,
@@ -27,7 +27,11 @@ from apps.core.services.audit import (
     auditar_reset_senha,
     registrar_auditoria,
 )
+from apps.core.services.equipe_gerencia import papeis_de_grupos, setor_group_for, sync_user_lotacao
 from apps.core.services.rbac_service import get_assignable_group_names
+
+# Sentinela: distingue "campo não enviado" de "enviado como null" no PATCH parcial.
+_UNSET: Any = object()
 
 
 class UserSlimSerializer(serializers.ModelSerializer):
@@ -125,12 +129,31 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
 
     password = serializers.CharField(write_only=True, required=False)
 
+    # Lotação (EquipeGerencia): gerencia_id (write) cria/atualiza o vínculo de gerência
+    # a partir da Gerência + Função; gerencia_atual (read) hidrata o form no EDIT.
+    gerencia_id = serializers.PrimaryKeyRelatedField(
+        queryset=Gerencia.objects.all(), required=False, allow_null=True, write_only=True
+    )
+    gerencia_atual = serializers.SerializerMethodField()
+
     # CPF mascarado para list views (LGPD compliance)
     cpf_masked = serializers.SerializerMethodField()
 
     def get_group_ids_display(self, obj: Any) -> list[int]:
         """Return group IDs for frontend editing."""
         return [g.id for g in obj.groups.all()]
+
+    def get_gerencia_atual(self, obj: Any) -> dict[str, Any] | None:
+        """Gerência vigente do usuário (para hidratar o form no EDIT). None se não há vínculo."""
+        v = EquipeGerencia.vigentes_em().filter(usuario=obj).select_related("gerencia").order_by("id").first()
+        if v is None:
+            return None
+        return {
+            "gerencia_id": v.gerencia_id,
+            "nome_setor": v.gerencia.nome_setor,
+            "setor_canonico": v.gerencia.setor_canonico,
+            "papel": v.papel,
+        }
 
     def get_cpf_masked(self, obj: Any) -> str | None:
         """
@@ -163,6 +186,8 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             "groups",  # Read-only (nomes)
             "group_ids",  # Write-only (IDs para criar/editar)
             "group_ids_display",  # Read-only (IDs para popular form de edição)
+            "gerencia_id",  # Write-only (cria/atualiza vínculo EquipeGerencia)
+            "gerencia_atual",  # Read-only (hidrata a gerência atual no EDIT)
             "date_joined",
             "last_login",
         ]
@@ -281,9 +306,41 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
     def _actor(self) -> Any:
         return getattr(self.context.get("request"), "user", None)
 
+    def _apply_lotacao(self, user: Any, groups: Any, gerencia: Any, actor: Any, before_group_ids: Any) -> None:
+        """Aplica grupos + vínculo de gerência (chamado por create/update; superuser-only).
+
+        - Auto-atribui o grupo de setor por nome (== `Gerencia.setor_canonico`) quando existir.
+        - Deriva os papéis das FUNÇÕES e sincroniza a lotação `EquipeGerencia` (form = SSOT).
+        - `groups=None` = não mexer em membership; `gerencia` ausente/`_UNSET`/None = não mexer no vínculo.
+        """
+        has_gerencia = gerencia is not None and gerencia is not _UNSET
+        final_groups = list(groups) if groups is not None else None
+        if has_gerencia:
+            setor_group = setor_group_for(gerencia)
+            if setor_group is not None:
+                if final_groups is not None:
+                    if setor_group not in final_groups:
+                        final_groups.append(setor_group)
+                else:
+                    user.groups.add(setor_group)
+        if final_groups is not None:
+            user.groups.set(final_groups)
+            # #1672: atribuicao de grupos (privilegio) auditada.
+            auditar_assign_groups(
+                actor=actor,
+                target_user=user,
+                before_group_ids=before_group_ids,
+                after_group_ids=list(user.groups.values_list("pk", flat=True)),
+            )
+        if has_gerencia:
+            papeis = papeis_de_grupos(user.groups.all())
+            if papeis:
+                sync_user_lotacao(user, gerencia, papeis)
+
     def create(self, validated_data: dict[str, Any]) -> Any:
-        """Create user with hashed password and groups."""
-        groups = validated_data.pop("groups", [])
+        """Create user with hashed password, groups e vínculo de gerência."""
+        groups = validated_data.pop("groups", None)
+        gerencia = validated_data.pop("gerencia_id", None)
         password = validated_data.pop("password", None)
 
         user = super().create(validated_data)
@@ -305,25 +362,19 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             # #1672: senha definida por um admin para outro usuario -> trilha.
             auditar_reset_senha(actor=actor, target_user=user, contexto="create")
 
-        # P0-1 Tier-0 (D-1=2a): membership é superuser-only. group_ids de
-        # não-superuser é ignorado (o frontend já não envia — aqui é a
-        # fronteira real). DAT cria a conta comum; o vínculo a grupo fica a
-        # cargo do superuser.
-        if groups and self._actor_is_superuser():
-            user.groups.set(groups)
-            # #1672: atribuicao de grupos (privilegio) auditada.
-            auditar_assign_groups(
-                actor=actor,
-                target_user=user,
-                before_group_ids=[],
-                after_group_ids=list(user.groups.values_list("pk", flat=True)),
-            )
+        # P0-1 Tier-0 (D-1=2a): membership + lotação são superuser-only. group_ids /
+        # gerencia_id de não-superuser são ignorados (o frontend já não envia — aqui é a
+        # fronteira real). DAT cria a conta comum; grupo/vínculo ficam a cargo do superuser.
+        if self._actor_is_superuser():
+            self._apply_lotacao(user, groups, gerencia, actor, before_group_ids=[])
 
         return user
 
     def update(self, instance: Any, validated_data: dict[str, Any]) -> Any:
-        """Update user and hash password if provided."""
+        """Update user, hash password e sincroniza lotação de gerência."""
         groups = validated_data.pop("groups", None)
+        # _UNSET distingue "não enviado" (não mexe no vínculo) de enviado (PATCH parcial).
+        gerencia = validated_data.pop("gerencia_id", _UNSET)
         password = validated_data.pop("password", None)
         actor = self._actor()
         before_group_ids = set(instance.groups.values_list("pk", flat=True))
@@ -362,17 +413,10 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             # #1672: senha redefinida por um admin para outro usuario -> trilha.
             auditar_reset_senha(actor=actor, target_user=user, contexto="update")
 
-        # P0-1 Tier-0 (D-1=2a): membership é superuser-only (ver create()).
-        # group_ids de não-superuser é ignorado.
-        if groups is not None and self._actor_is_superuser():
-            user.groups.set(groups)
-            # #1672: mudanca de membership (privilegio) auditada.
-            auditar_assign_groups(
-                actor=actor,
-                target_user=user,
-                before_group_ids=before_group_ids,
-                after_group_ids=set(user.groups.values_list("pk", flat=True)),
-            )
+        # P0-1 Tier-0 (D-1=2a): membership + lotação são superuser-only (ver create()).
+        # group_ids / gerencia_id de não-superuser são ignorados.
+        if self._actor_is_superuser():
+            self._apply_lotacao(user, groups, gerencia, actor, before_group_ids=before_group_ids)
 
         return user
 

@@ -451,9 +451,16 @@ def cancel_solicitacao(
 
         client, calendar_id = get_gcal_client_and_calendar_id()
     else:
-        from django.conf import settings
+        # Cliente fornecido externamente (OAuth mode): usar o calendário PREFERIDO da
+        # credencial, igual ao publish (apply_one_solicitacao). Sem isso o cancel caía
+        # em GCAL_CALENDAR_ID/"primary" (calendário errado) -> 404 tratado como sucesso
+        # e o evento sobrevivia no calendário real ("Formações").
+        if hasattr(client, "get_default_calendar_id"):
+            calendar_id = client.get_default_calendar_id()
+        else:
+            from django.conf import settings
 
-        calendar_id = getattr(settings, "GCAL_CALENDAR_ID", "primary")
+            calendar_id = getattr(settings, "GCAL_CALENDAR_ID", None) or "primary"
 
     # Usar external_event_id ou gerar determinístico
     event_id = s.external_event_id or _event_id_for(s)

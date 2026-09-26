@@ -33,12 +33,13 @@ test_approval_policy_PA.py e afins. Aqui é meta: qual CLASSE gateia cada action
 
 from __future__ import annotations
 
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import OR, IsAuthenticated
 
 import pytest
 
 from apps.core.rbac import (
     CanAccessSolicitationApprovals,
+    CanPublishSetorSolicitacao,
     CanUseGcal,
     IsOwnerOrPrivileged,
 )
@@ -54,6 +55,7 @@ _STANDARD_ACTIONS = ("create", "update", "partial_update", "destroy", "list", "r
 # Valor: (kind, spec)
 #   ("class", Cls)          -> get_permissions() retorna instância de Cls
 #   ("has_perm", codename)  -> retorna HasPerm com self.codename == codename
+#   ("or", (ClsA, ClsB))    -> retorna DRF OR de instâncias de ClsA e ClsB
 EXPECTED_PERMISSIONS: dict[str, tuple[str, object]] = {
     # override-path (get_permissions retorna a instância diretamente)
     "create": ("has_perm", "create_solicitation"),
@@ -67,10 +69,12 @@ EXPECTED_PERMISSIONS: dict[str, tuple[str, object]] = {
     "reject": ("class", CanAccessSolicitationApprovals),
     "batch_approve": ("class", CanAccessSolicitationApprovals),
     "batch_reject": ("class", CanAccessSolicitationApprovals),
-    "preview_gcal": ("class", CanUseGcal),
-    "publish": ("class", CanUseGcal),
-    "resync_gcal": ("class", CanUseGcal),
-    "cancel_gcal": ("class", CanUseGcal),
+    # #1656 Feature 2: GCal actions compõem `CanUseGcal | CanPublishSetorSolicitacao`
+    # (Apoio de Coordenação publica escopado por setor) → resolvem para DRF OR.
+    "preview_gcal": ("or", (CanUseGcal, CanPublishSetorSolicitacao)),
+    "publish": ("or", (CanUseGcal, CanPublishSetorSolicitacao)),
+    "resync_gcal": ("or", (CanUseGcal, CanPublishSetorSolicitacao)),
+    "cancel_gcal": ("or", (CanUseGcal, CanPublishSetorSolicitacao)),
 }
 
 
@@ -106,6 +110,19 @@ class TestSolicitacaoActionPermissionSentinel:
                 "Se for @action custom resolvendo IsAuthenticated, a action provavelmente "
                 "não está na lista de delegação de get_permissions() — buraco de segurança."
             )
+        elif kind == "or":
+            assert isinstance(spec, tuple)  # narrow p/ pyright
+            cls_a, cls_b = spec
+            assert isinstance(perm, OR), (
+                f"action '{action}' deveria ser um DRF OR de "
+                f"{cls_a.__name__}|{cls_b.__name__}, mas resolveu {type(perm).__name__}."
+            )
+            assert isinstance(
+                perm.op1, cls_a
+            ), f"action '{action}' op1 esperado {cls_a.__name__}, got {type(perm.op1).__name__}"
+            assert isinstance(
+                perm.op2, cls_b
+            ), f"action '{action}' op2 esperado {cls_b.__name__}, got {type(perm.op2).__name__}"
         else:  # has_perm
             assert (
                 type(perm).__name__ == "HasPerm"

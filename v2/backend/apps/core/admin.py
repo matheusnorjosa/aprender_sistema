@@ -372,7 +372,7 @@ class PermissaoFuncionalAdmin(admin.ModelAdmin):
     Guardas estritos:
     - `has_add_permission` / `has_delete_permission` desabilitados.
       Capability codenames são SSOT em
-      `apps/core/services/functional_permissions_seed.py` (16 itens
+      `apps/core/services/functional_permissions_seed.py` (17 itens
       validados em `_validate_seed`). Adicionar via Admin violaria essa
       contagem; remover quebraria policies hardcoded.
     - Todos os campos descritivos read-only — admin só edita `groups`.
@@ -413,7 +413,7 @@ class PermissaoFuncionalAdmin(admin.ModelAdmin):
         return obj.groups.count()
 
     def has_add_permission(self, request: HttpRequest) -> bool:
-        # SSOT é o seed (16 itens). Add via Admin violaria `_validate_seed`.
+        # SSOT é o seed (17 itens). Add via Admin violaria `_validate_seed`.
         return False
 
     def has_delete_permission(self, request: HttpRequest, obj: PermissaoFuncional | None = None) -> bool:

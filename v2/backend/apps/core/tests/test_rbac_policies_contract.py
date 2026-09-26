@@ -60,6 +60,7 @@ EXPECTED_PUBLIC_POLICY_KEYS_SORTED: list[str] = [
     "manage_internal_actions",
     "manage_purchases_and_materials",
     "manage_solicitacao_status",
+    "publish_setor_solicitacao",
     "use_gcal",
     "view_all_availability",
     "view_compras_dashboard",

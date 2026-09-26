@@ -182,6 +182,19 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
         category="operacao",
         group_names=("Controle", "DAT"),
     ),
+    FunctionalPermissionSeed(
+        codename="publish_setor_solicitacao",
+        label="Publicar eventos do setor na agenda",
+        description=(
+            "Publicar/prever/resincronizar/cancelar no Google Calendar os eventos "
+            "APROVADOS do próprio setor (qualquer criador), escopado por vínculo "
+            "EquipeGerencia. NÃO concede edição/exclusão de eventos de terceiros "
+            "(a checagem de objeto continua em `user_can_access_solicitacao`) nem "
+            "acesso aos endpoints GCal em lote (`use_gcal`). #1656 Feature 2."
+        ),
+        category="solicitacao",
+        group_names=("Apoio de Coordenação",),
+    ),
 )
 
 
@@ -189,8 +202,10 @@ def _validate_seed() -> None:
     # Epic 4.3 (2026-04-24): dual-write terminado, apenas os 15 `verb_noun`.
     # Onda 1 C3 (2026-04-27): +1 capability `manage_internal_actions` (zero
     # grupos atribuídos por seed; só superuser bypassa). Total: 16.
-    if len(FUNCTIONAL_PERMISSIONS_SEED) != 16:
-        raise ValueError("Seed de permissoes funcionais deve conter exatamente 16 itens.")
+    # #1656 Feature 2: +1 capability `publish_setor_solicitacao` (Apoio de
+    # Coordenação). Total: 17.
+    if len(FUNCTIONAL_PERMISSIONS_SEED) != 17:
+        raise ValueError("Seed de permissoes funcionais deve conter exatamente 17 itens.")
 
     seen: set[str] = set()
     for item in FUNCTIONAL_PERMISSIONS_SEED:

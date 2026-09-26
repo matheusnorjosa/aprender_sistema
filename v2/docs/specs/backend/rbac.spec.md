@@ -1,7 +1,7 @@
 ---
 title: RBAC — Controle de Acesso
 status: canonical
-last_verified: 2026-09-11
+last_verified: 2026-09-25
 verified_at_commit: 0dd1dcb630fdc1cf9b2b488121553e89488dde3c
 sources_of_truth:
   - v2/backend/apps/core/rbac/__init__.py
@@ -75,7 +75,7 @@ Existem três conceitos ortogonais: **capability** (autorização binária por f
 
 - [`v2/backend/apps/core/rbac/__init__.py`](../../../backend/apps/core/rbac/__init__.py) — superfície pública do módulo (re-exporta classes, helpers e a matriz de policies).
 - [`v2/backend/apps/core/rbac/permissions.py`](../../../backend/apps/core/rbac/permissions.py) — **7 classes DRF**: `HasPerm` (paramétrica), `HasFunctionalPermission` (base), `SuperuserOnly` e as 4 não-reduzíveis/composite `IsGerenteSuperintendencia`, `IsAssistenteAdministrativoControle`, `IsOwnerOrPrivileged`, `HasSectorAccess`. Aplica o monkey-patch de `permissions.OR/AND/NOT.__call__` que habilita composition em instâncias. **`SuperuserOnly` é a classe Tier-0** que sustenta o gate de escrita do `GroupViewSet` e do `assign_groups` (#1567/#1558) — ela **não** é re-exportada por `rbac/__init__.py`; as views a importam pelo shim `apps/core/permissions.py`.
-- [`v2/backend/apps/core/rbac/policies.py`](../../../backend/apps/core/rbac/policies.py) — Capability Policy Layer: matriz `ACCESS_POLICIES` (policy key → frozenset de capabilities elegíveis, semântica OR), **21 classes `Can*`**, `PUBLIC_POLICY_KEYS`, e os SSOT `user_has_policy` / `resolve_public_policies`. Também hospeda os helpers de delegação `user_can_delegate_availability_block` e `user_can_delegate_deslocamento`.
+- [`v2/backend/apps/core/rbac/policies.py`](../../../backend/apps/core/rbac/policies.py) — Capability Policy Layer: matriz `ACCESS_POLICIES` (policy key → frozenset de capabilities elegíveis, semântica OR), **22 classes `Can*`**, `PUBLIC_POLICY_KEYS`, e os SSOT `user_has_policy` / `resolve_public_policies`. Também hospeda os helpers de delegação `user_can_delegate_availability_block` e `user_can_delegate_deslocamento`.
 - [`v2/backend/apps/core/rbac/matrix.py`](../../../backend/apps/core/rbac/matrix.py) — Matriz Viva `ACCESS_MATRIX` (10 atores × recursos discriminantes → status HTTP esperado) para testes parametrizados.
 - [`v2/backend/apps/core/rbac/helpers.py`](../../../backend/apps/core/rbac/helpers.py) — `user_has_any_perm`, `user_is_assistente_administrativo_controle`, `user_has_all_perms`. Os helpers de **delegação** vivem em `policies.py`, não aqui.
 - [`v2/backend/apps/core/rbac/constants.py`](../../../backend/apps/core/rbac/constants.py) — constantes de **data scope** (`COORDENADOR_ROLE_GROUPS`, `FORMADOR_ROLE_GROUPS`) — usadas para filtrar queryset, não para autorizar.
@@ -112,7 +112,7 @@ Doc canônico detalhado (não duplicado aqui): convenção de nomes em [`RBAC_NA
 - `IsOwnerOrPrivileged` — object-level: superuser/privilegiado ou `obj.usuario == user`.
 - `IsAssistenteAdministrativoControle` — composite Setor `Controle` + Função `Assistente Administrativo`.
 - `SuperuserOnly` — só `is_superuser`. Gate de escrita do `GroupViewSet` e do `assign_groups`.
-- 21 classes `Can*` (`CanAccessAuditLogs`, `CanViewComprasDashboard`, `CanViewAllAvailability`, `CanAccessSolicitationApprovals`, `CanUseGcal`, `CanManageInternalActions`, ...) mapeadas em `ACCESS_POLICIES` — lista completa em `policies.py` (de `CanAccessAuditLogs` a `CanAccessSolicitationApprovals`).
+- 22 classes `Can*` (`CanAccessAuditLogs`, `CanViewComprasDashboard`, `CanViewAllAvailability`, `CanAccessSolicitationApprovals`, `CanUseGcal`, `CanManageInternalActions`, ...) mapeadas em `ACCESS_POLICIES` — lista completa em `policies.py` (de `CanAccessAuditLogs` a `CanAccessSolicitationApprovals`).
 
 **Helpers** (não-DRF): `user_has_any_perm(user, *codenames)`, `user_has_all_perms(...)`, `user_has_policy(user, key)`, `user_is_assistente_administrativo_controle(user)`, `user_can_delegate_availability_block(user)`.
 

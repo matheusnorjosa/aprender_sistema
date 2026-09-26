@@ -27,7 +27,7 @@ function makeValues(overrides: Partial<UsuarioFormValues> = {}): UsuarioFormValu
     cargo: 'Apoio de Coordenação',
     is_active: true,
     is_superuser: false,
-    setor_ids: [1],
+    gerencia_id: 5,
     funcao_ids: [2],
     ...overrides,
   };
@@ -45,7 +45,9 @@ describe('buildUsuarioPayload — CPF write-only LGPD (Bug 3 fix)', () => {
       });
       expect(payload.cpf).toBe('12345678901');
       expect(payload.username).toBe('fabiana.veras');
-      expect(payload.group_ids).toEqual([1, 2]);
+      // group_ids agora só as FUNÇÕES; o grupo de setor é auto-atribuído pelo backend via gerencia_id.
+      expect(payload.group_ids).toEqual([2]);
+      expect(payload.gerencia_id).toBe(5);
     });
 
     test('cpf vazio → não enviado (defesa em profundidade — schema já marca required)', () => {
@@ -130,17 +132,37 @@ describe('buildUsuarioPayload — CPF write-only LGPD (Bug 3 fix)', () => {
     });
   });
 
-  describe('group_ids consolida setor_ids + funcao_ids', () => {
-    test('setor_ids + funcao_ids agregados em group_ids', () => {
-      const values = makeValues({ setor_ids: [10, 20], funcao_ids: [30] });
+  describe('group_ids = só FUNÇÕES; setor via gerencia_id', () => {
+    test('group_ids leva apenas funcao_ids (setor auto-atribuído no backend)', () => {
+      const values = makeValues({ gerencia_id: 7, funcao_ids: [30, 40] });
       const payload = buildUsuarioPayload(values, {
         isEditing: false,
         cpfEditUnlocked: true,
         currentIsSuperuser: true,
       });
-      expect(payload.group_ids).toEqual([10, 20, 30]);
-      expect(payload).not.toHaveProperty('setor_ids');
+      expect(payload.group_ids).toEqual([30, 40]);
       expect(payload).not.toHaveProperty('funcao_ids');
+    });
+
+    test('create inclui gerencia_id no payload (mesmo gate superuser)', () => {
+      const values = makeValues({ gerencia_id: 7, funcao_ids: [30] });
+      const payload = buildUsuarioPayload(values, {
+        isEditing: false,
+        cpfEditUnlocked: true,
+        currentIsSuperuser: true,
+      });
+      expect(payload.gerencia_id).toBe(7);
+      expect(payload).not.toHaveProperty('gerencia_id_display');
+    });
+
+    test('gerencia_id ausente → payload envia null (backend não altera vínculo)', () => {
+      const values = makeValues({ gerencia_id: undefined, funcao_ids: [30] });
+      const payload = buildUsuarioPayload(values, {
+        isEditing: true,
+        cpfEditUnlocked: false,
+        currentIsSuperuser: true,
+      });
+      expect(payload.gerencia_id).toBeNull();
     });
   });
 });
@@ -149,28 +171,29 @@ describe('buildUsuarioPayload — group_ids gated por superuser (P0-1 Tier-0)', 
   // Memberships (User→Group) viram superuser-only (D-1=2a). O frontend NAO
   // envia group_ids para editor nao-superuser (co-deploy: para de enviar ANTES
   // do backend rejeitar). DAT segue editando conta comum (cadastral/senha).
-  test('currentIsSuperuser=false → group_ids OMITIDO', () => {
-    const values = makeValues({ setor_ids: [1], funcao_ids: [2] });
+  test('currentIsSuperuser=false → group_ids E gerencia_id OMITIDOS', () => {
+    const values = makeValues({ gerencia_id: 1, funcao_ids: [2] });
     const payload = buildUsuarioPayload(values, {
       isEditing: true,
       cpfEditUnlocked: false,
       currentIsSuperuser: false,
     });
     expect(payload).not.toHaveProperty('group_ids');
+    expect(payload).not.toHaveProperty('gerencia_id');
   });
 
-  test('currentIsSuperuser=true → group_ids presente (superuser mantem gestao)', () => {
-    const values = makeValues({ setor_ids: [1], funcao_ids: [2] });
+  test('currentIsSuperuser=true → group_ids (só funções) presente (superuser mantem gestao)', () => {
+    const values = makeValues({ gerencia_id: 1, funcao_ids: [2] });
     const payload = buildUsuarioPayload(values, {
       isEditing: false,
       cpfEditUnlocked: true,
       currentIsSuperuser: true,
     });
-    expect(payload.group_ids).toEqual([1, 2]);
+    expect(payload.group_ids).toEqual([2]);
   });
 
-  test('nao-superuser: campos comuns preservados (so group_ids sai)', () => {
-    const values = makeValues({ setor_ids: [1], funcao_ids: [2] });
+  test('nao-superuser: campos comuns preservados (so group_ids/gerencia_id saem)', () => {
+    const values = makeValues({ gerencia_id: 1, funcao_ids: [2] });
     const payload = buildUsuarioPayload(values, {
       isEditing: true,
       cpfEditUnlocked: false,

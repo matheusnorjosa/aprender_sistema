@@ -26,7 +26,9 @@ export interface UsuarioFormValues {
   cargo?: string | undefined;
   is_active: boolean;
   is_superuser: boolean;
-  setor_ids: ID[];
+  // Gerência específica (single-select). O backend deriva o papel da FUNÇÃO e
+  // auto-atribui o grupo de setor — o FE só envia a Gerência + as Funções.
+  gerencia_id?: ID | null | undefined;
   funcao_ids: ID[];
   password?: string | undefined;
 }
@@ -53,7 +55,7 @@ export function buildUsuarioPayload(
   values: UsuarioFormValues,
   options: BuildPayloadOptions,
 ): Record<string, unknown> {
-  const { setor_ids = [], funcao_ids = [], is_superuser, cpf, ...rest } = values;
+  const { funcao_ids = [], gerencia_id, is_superuser, cpf, ...rest } = values;
   const { isEditing, cpfEditUnlocked, currentIsSuperuser } = options;
 
   // CPF: incluir se create OU se edit+unlocked com valor preenchido
@@ -66,13 +68,19 @@ export function buildUsuarioPayload(
   // group_ids (memberships): P0-1 Tier-0 (D-1=2a) — gestão de grupo é
   // superuser-only. Editor não-superuser NÃO envia group_ids (co-deploy: para
   // de enviar antes de o backend rejeitar). DAT segue editando conta comum
-  // (cadastral/senha/ativo) sem tocar em memberships.
-  const groupsPayload = currentIsSuperuser ? { group_ids: [...setor_ids, ...funcao_ids] } : {};
+  // (cadastral/senha/ativo) sem tocar em memberships. Agora só as FUNÇÕES — o
+  // grupo de setor é auto-atribuído pelo backend a partir da Gerência.
+  const groupsPayload = currentIsSuperuser ? { group_ids: [...funcao_ids] } : {};
+
+  // gerencia_id (lotação): mesmo gate superuser-only. O backend cria/sincroniza
+  // o vínculo EquipeGerencia; null = não altera o vínculo existente.
+  const gerenciaPayload = currentIsSuperuser ? { gerencia_id: gerencia_id ?? null } : {};
 
   return {
     ...rest,
     ...cpfPayload,
     ...superuserPayload,
     ...groupsPayload,
+    ...gerenciaPayload,
   };
 }

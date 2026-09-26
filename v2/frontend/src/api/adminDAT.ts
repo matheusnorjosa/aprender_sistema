@@ -26,6 +26,8 @@ export interface AdminUser {
   is_superuser: boolean;
   groups: string[];
   group_ids_display?: ID[];
+  // Lotação vigente (EquipeGerencia) para hidratar o form no EDIT. null se não há vínculo.
+  gerencia_atual?: { gerencia_id: number; nome_setor: string; setor_canonico: string; papel: string } | null;
   date_joined: string;
   last_login: string | null;
 }
@@ -46,6 +48,9 @@ export interface UserPayload {
   is_staff?: boolean;
   is_superuser?: boolean;
   group_ids?: ID[];
+  // Gerência (Lotação): backend cria/sincroniza o vínculo EquipeGerencia e auto-atribui
+  // o grupo de setor. null = não altera o vínculo existente.
+  gerencia_id?: ID | null;
 }
 
 /**

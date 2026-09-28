@@ -744,6 +744,20 @@ export GOOGLE_SERVICE_ACCOUNT_FILE=/app/secrets/key.json
 export GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}'
 ```
 
+### Erro: "Sua conexão com o Google expirou ou foi removida"
+
+**Sintoma:** o status Google do evento fica *Erro* com essa mensagem (antes ele ficava preso em PENDING).
+
+**Causa:** a credencial Google de quem publicou/cancelou não existe mais ou foi revogada — por exemplo, refresh token emitido com o app OAuth em modo Teste, que vence em 7 dias.
+
+**Solução:** a pessoa desconecta e conecta a conta Google de novo e repete a ação. O erro cru fica no `AuditLog` (`PUBLISH_GCAL_ERROR`, `details.error`).
+
+### Erro: "O Google recusou o acesso ao calendário da organização"
+
+**Causa:** a conta Google de quem agiu recebeu 403/404 no calendário (sem permissão de edição, ou calendário não compartilhado com ela).
+
+**Solução:** compartilhar o calendário da organização com a conta (ou com o Grupo Google dela) com a permissão "Fazer alterações nos eventos" e repetir a ação.
+
 ### Erro: "403 Forbidden" na Google Calendar API
 
 **Causa:** Service Account não tem permissão no calendário

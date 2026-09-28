@@ -222,7 +222,7 @@ def refresh_access_token_safe(credential: GoogleOAuthCredential) -> GoogleOAuthC
                     )
 
                     raise ValueError(
-                        "Sua conexão com o Google foi revogada. " "Reconecte sua conta em Pré-agenda > Integrações."
+                        "Sua conexão com o Google foi revogada. Desconecte e conecte sua conta Google de novo."
                     )
 
             logger.error(f"❌ Erro ao refresh access token: {e}")

@@ -275,6 +275,21 @@ async function main() {
     printCategorySummary(results);
 
     const assertions = evaluateAssertions(results);
+
+    // Resumo legível por máquina para o relatório no PR (scripts/pr-report.mjs).
+    // Gravado antes do veredito: sai também quando as asserções reprovam.
+    const categoryIds = ['performance', 'accessibility', 'best-practices', 'seo'];
+    const metricIds = ['largest-contentful-paint', 'total-blocking-time', 'cumulative-layout-shift'];
+    const summary = {
+      runs: results.length,
+      categories: Object.fromEntries(categoryIds.map((id) => [id, average(getCategoryScores(results, id))])),
+      metrics: Object.fromEntries(metricIds.map((id) => [id, average(getAuditNumericValues(results, id))])),
+      checks: CHECKS,
+      failures: assertions.failures,
+      warnings: assertions.warnings,
+    };
+    await fs.writeFile(path.join(OUTPUT_DIR, 'summary.json'), JSON.stringify(summary, null, 2), 'utf8');
+
     if (assertions.warnings.length) {
       console.log('\nWarning assertions:');
       for (const warning of assertions.warnings) {

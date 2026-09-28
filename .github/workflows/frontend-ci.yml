@@ -87,6 +87,7 @@ jobs:
       run: npm run lint
 
     - name: Build with Vite
+      id: build
       run: npm run build
 
     - name: Run tests (gate de cobertura — ratchet no baseline)
@@ -105,6 +106,25 @@ jobs:
     - name: Guard — ratchet de cast inseguro (as unknown / as never)
       if: ${{ !cancelled() }}
       run: npm run check:unknown-casts
+
+    # Tamanhos em JSON para o relatório no PR (job pr-report). Só observa: o gate
+    # é o "Check bundle sizes" acima, e `continue-on-error` garante que um bug do
+    # relatório nunca deixe este job [required] vermelho. `npx`, não `npm run`:
+    # o banner do npm iria para o stdout e corromperia o JSON.
+    - name: Relatório — tamanhos do bundle em JSON
+      if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+      continue-on-error: true
+      run: npx size-limit --json > "$RUNNER_TEMP/size-limit.json"
+
+    - name: Relatório — upload dos tamanhos
+      if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+      continue-on-error: true
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4
+      with:
+        name: size-limit-report
+        path: ${{ runner.temp }}/size-limit.json
+        if-no-files-found: ignore
+        retention-days: 7
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4
@@ -406,3 +426,74 @@ jobs:
         if-no-files-found: ignore
         include-hidden-files: true
         retention-days: 7
+
+  # Um comentário por PR com size-limit e Lighthouse, atualizado a cada push
+  # (acha o próprio comentário pelo MARKER). Antes os dois só existiam no log e
+  # no artefato — o Lighthouse reprovava calado sob `continue-on-error`.
+  # `!cancelled()`: sai mesmo se build ou Lighthouse falharem; o que faltar vira
+  # "Indisponível" no relatório. Dados do evento só via `env:`.
+  pr-report:
+    name: "[info] frontend PR report"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [changes, build-lint-frontend, lighthouse-ci]
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.changes.outputs.frontend == 'true' }}
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      # Igual à 1ª linha que v2/frontend/scripts/pr-report.mjs imprime.
+      MARKER: '<!-- as-frontend-report -->'
+
+    steps:
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
+      with:
+        sparse-checkout: v2/frontend/scripts
+        persist-credentials: false
+
+    - name: Download size-limit report
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      continue-on-error: true
+      with:
+        name: size-limit-report
+        path: ${{ runner.temp }}/size
+
+    - name: Download Lighthouse results
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      continue-on-error: true
+      with:
+        name: lighthouse-results
+        path: ${{ runner.temp }}/lighthouse
+
+    - name: Montar relatório
+      env:
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      run: |
+        node v2/frontend/scripts/pr-report.mjs \
+          "$RUNNER_TEMP/size/size-limit.json" \
+          "$RUNNER_TEMP/lighthouse/summary.json" > report.md
+        cat report.md >> "$GITHUB_STEP_SUMMARY"
+
+    # PR de fork e do Dependabot recebem token só-leitura: o comentário falharia.
+    # Sem continue-on-error: se comentar quebrar, o job mostra.
+    - name: Comentar no PR (cria ou atualiza)
+      if: github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        PR: ${{ github.event.pull_request.number }}
+      run: |
+        ids="$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR/comments?per_page=100" \
+          --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | contains(env.MARKER))) | .id')"
+        id="$(printf '%s\n' "$ids" | head -n 1)"
+        if [ -n "$id" ]; then
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@report.md > /dev/null
+          echo "Comentário $id atualizado."
+        else
+          gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -F body=@report.md > /dev/null
+          echo "Comentário criado."
+        fi
+
+    - name: Auto-teste do relatório
+      if: ${{ !cancelled() }}
+      run: node --test v2/frontend/scripts/pr-report.test.mjs

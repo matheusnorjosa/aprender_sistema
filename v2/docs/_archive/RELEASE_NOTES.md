@@ -16,11 +16,11 @@
 > **Onde olhar em vez disto:**
 > - versão em produção: `GET /api/version/`
 > - histórico real: `git tag --list 'v2026*' | sort -V` e `git log --oneline`
-> - estado conhecido do sistema: [audits/ACHADOS_REAIS.md](./audits/ACHADOS_REAIS.md)
+> - estado conhecido do sistema: [audits/ACHADOS_REAIS.md](../audits/ACHADOS_REAIS.md)
 >
-> **Decisão pendente (humana)**: este arquivo deve ser (a) arquivado em `_archive/` como
-> registro histórico do PR #52, ou (b) reconstruído a partir das tags com um processo que o
-> mantenha atualizado a cada release? Enquanto isso não for decidido, ele fica com este aviso.
+> **Arquivado em 2026-09-28.** As notas de release passaram a viver na GitHub Release que
+> vai para produção: a cada promoção, `.github/workflows/release-notes-producao.yml`
+> escreve nela o que entrou desde a promoção anterior e a marca como *Latest*.
 >
 > O conteúdo abaixo é preservado **como registro histórico de 2025-10-29**. Os caminhos de
 > arquivo e comandos citados não devem ser executados.

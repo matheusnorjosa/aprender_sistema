@@ -204,7 +204,7 @@ Cada módulo em produção tem uma spec versionada, datada e rastreável ao cód
 - [DEPLOY_CHECKLIST.md](./DEPLOY_CHECKLIST.md) - Checklist completo (inclui go-live local, §4.5)
 - [SCALING.md](./SCALING.md) - Escalabilidade
 - [RUNBOOK.md](./RUNBOOK.md) - Runbook operacional · [RUNBOOK_concurrency.md](./RUNBOOK_concurrency.md)
-- [RELEASE_NOTES.md](./RELEASE_NOTES.md) - Notas de release
+- Notas de release: na GitHub Release promovida (a marcada _Latest_ = produção) · [_archive/RELEASE_NOTES.md](./_archive/RELEASE_NOTES.md) - **Histórico**: parou no PR #52 (2025-10-29)
 - Specs: [infra/deploy](./specs/infra/deploy.spec.md) · [infra/environments](./specs/infra/environments.spec.md) · [infra/ci](./specs/infra/ci.spec.md)
 - [_archive/GO_LIVE_CHECKLIST.md](./_archive/GO_LIVE_CHECKLIST.md) - **Histórico**: consolidado em `DEPLOY_CHECKLIST.md` §4.5
 

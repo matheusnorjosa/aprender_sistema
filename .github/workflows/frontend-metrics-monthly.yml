@@ -2,13 +2,18 @@ name: frontend-metrics-monthly
 
 # Decisão do dono (28/09): o Lighthouse do CI NÃO bloqueia merge, mas os números
 # são acompanhados a cada 30 dias. Este workflow mede a `main` (size-limit +
-# Lighthouse) e deixa um comentário NOVO por mês na issue de acompanhamento —
-# a issue é a série histórica. O relatório sai de v2/frontend/scripts/pr-report.mjs
+# Lighthouse) e deixa um comentário NOVO por execução na issue de acompanhamento
+# — a issue é a série histórica. O relatório sai de v2/frontend/scripts/pr-report.mjs
 # (o mesmo do `[info] frontend PR report`), em modo `--mensal`.
+#
+# Dois jobs, como o `pr-report` do frontend-ci.yml: `medir` roda npm, build,
+# size-limit, Chrome e Lighthouse (código de dependência) só com `contents: read`;
+# `publicar` tem `issues: write` e não instala nem roda nada do npm.
 on:
   schedule:
-    # Dia 1º, 12:00 UTC = 09:00 America/Fortaleza.
-    - cron: '0 12 1 * *'
+    # Dia 1º, 12:17 UTC = 09:17 America/Fortaleza. Fora da hora cheia, quando
+    # runs agendados atrasam ou são descartados.
+    - cron: '17 12 1 * *'
   workflow_dispatch:
 
 permissions:
@@ -24,35 +29,32 @@ env:
   NPM_CONFIG_FUND: 'false'
 
 jobs:
-  metrics:
-    name: "[ops] frontend monthly metrics"
+  medir:
+    name: "[ops] frontend monthly metrics (medir)"
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
-      issues: write
-    env:
-      TRACKING_ISSUE: '2066'
-      # Igual à 1ª linha que pr-report.mjs imprime com `--mensal`.
-      MARKER: '<!-- as-frontend-monthly -->'
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
 
     defaults:
       run:
         working-directory: v2/frontend
 
     steps:
-    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       with:
         ref: main
         persist-credentials: false
 
-    - uses: ./.github/actions/setup-node-deps
+    # O SHA do checkout, não `github.sha`: num dispatch de outra branch os dois
+    # diferem, e o medido é a `main`.
+    - name: Commit medido
+      id: commit
+      run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-    - name: Setup Chrome
-      id: setup-chrome
-      uses: browser-actions/setup-chrome@c785b87e244131f27c9f19c1a33e2ead956ab7ce # v1
-      with:
-        chrome-version: stable
+    - uses: ./.github/actions/setup-node-deps
 
     - name: Build with Vite
       id: build
@@ -67,55 +69,103 @@ jobs:
         mkdir -p "$RUNNER_TEMP/metricas"
         npx size-limit --json > "$RUNNER_TEMP/metricas/size-limit.json"
 
-    # Hoje reprova (performance 0,69, LCP ~3 s): é o que se acompanha, não um gate.
+    # Depois do size-limit: se o Chrome falhar, o número de JS já está medido.
+    - name: Setup Chrome
+      id: setup-chrome
+      if: steps.build.outcome == 'success'
+      uses: browser-actions/setup-chrome@c785b87e244131f27c9f19c1a33e2ead956ab7ce # v1.7.3
+      with:
+        chrome-version: stable
+
+    # Hoje reprova (performance 0,69, LCP ~3 s): é o que se acompanha, não um
+    # gate. Timeout próprio para nunca consumir o job inteiro.
     - name: Lighthouse
       if: steps.build.outcome == 'success'
       continue-on-error: true
+      timeout-minutes: 12
       run: npm run lighthouse:ci
       env:
         CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
 
-    # Sai mesmo com o build quebrado: o que faltar vira "Indisponível" no
-    # comentário, e o mês não some da série. A comparação lê os números do
-    # último comentário mensal do bot (bloco oculto gravado pelo próprio script).
-    # HEAD_SHA do checkout, não `github.sha`: num dispatch de outra branch os dois
-    # diferem, e o medido é a `main`.
-    - name: Montar relatório
-      id: relatorio
+    - name: Juntar medições
       if: ${{ !cancelled() }}
-      shell: bash
-      env:
-        GH_TOKEN: ${{ github.token }}
       run: |
-        HEAD_SHA="$(git rev-parse HEAD)"
-        export HEAD_SHA
         mkdir -p "$RUNNER_TEMP/metricas"
         cp .lighthouseci/summary.json "$RUNNER_TEMP/metricas/" 2>/dev/null || echo "Sem summary.json do Lighthouse."
-        id="$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$TRACKING_ISSUE/comments?per_page=100" \
-          --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | contains(env.MARKER))) | .id' | tail -n 1)"
-        : > "$RUNNER_TEMP/anterior.md"
-        if [ -n "$id" ]; then
-          gh api "repos/$GITHUB_REPOSITORY/issues/comments/$id" --jq .body > "$RUNNER_TEMP/anterior.md"
-          echo "Comparando com o comentário $id."
-        fi
-        node scripts/pr-report.mjs --mensal --anterior "$RUNNER_TEMP/anterior.md" \
-          "$RUNNER_TEMP/metricas/size-limit.json" "$RUNNER_TEMP/metricas/summary.json" \
-          > "$RUNNER_TEMP/metricas/report.md"
-        cat "$RUNNER_TEMP/metricas/report.md" >> "$GITHUB_STEP_SUMMARY"
 
-    # Comentário novo a cada execução (nunca edita o anterior): é o histórico.
-    - name: Comentar na issue de acompanhamento
-      if: ${{ !cancelled() && steps.relatorio.outcome == 'success' }}
-      run: gh issue comment "$TRACKING_ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/metricas/report.md"
-      env:
-        GH_TOKEN: ${{ github.token }}
-
+    # `overwrite`: num re-run, o `publicar` tem de ler a medição nova, não a da
+    # tentativa anterior.
     - name: Upload das medições
       if: ${{ !cancelled() }}
       continue-on-error: true
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: frontend-metrics-monthly
         path: ${{ runner.temp }}/metricas
         if-no-files-found: warn
+        overwrite: true
         retention-days: 90
+
+  # Sai mesmo com `medir` vermelho: o que faltar vira "Indisponível" no
+  # comentário, e o mês não some da série. Sem npm e sem node_modules: o
+  # pr-report.mjs não tem dependências e roda no Node do runner.
+  publicar:
+    name: "[ops] frontend monthly metrics (publicar)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: medir
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+      issues: write
+    env:
+      TRACKING_ISSUE: '2066'
+      # Igual à 1ª linha que pr-report.mjs imprime com `--mensal` (o auto-teste
+      # do script confere).
+      MARKER: '<!-- as-frontend-monthly -->'
+
+    steps:
+    # Script do mesmo commit deste workflow: a CLI é contrato entre os dois.
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      with:
+        sparse-checkout: v2/frontend/scripts
+        persist-credentials: false
+
+    - name: Download das medições
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      continue-on-error: true
+      with:
+        name: frontend-metrics-monthly
+        path: ${{ runner.temp }}/metricas
+
+    # A base da comparação são todos os comentários mensais anteriores do bot
+    # (o script usa, por métrica, o valor não nulo mais recente). Se a leitura
+    # falhar (5xx, rate limit), o relatório sai "sem medição anterior" e é
+    # postado mesmo assim: perder a comparação é melhor que perder o mês.
+    - name: Medições anteriores na issue
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        if ! gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$TRACKING_ISSUE/comments?per_page=100" \
+          --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | contains(env.MARKER))) | {created_at, body}' \
+          > "$RUNNER_TEMP/anteriores.jsonl"; then
+          echo "::warning::Não deu para ler os comentários anteriores da #$TRACKING_ISSUE; o relatório sai sem medição anterior."
+          : > "$RUNNER_TEMP/anteriores.jsonl"
+        fi
+        echo "Comentários mensais anteriores: $(wc -l < "$RUNNER_TEMP/anteriores.jsonl")."
+
+    - name: Montar relatório
+      env:
+        HEAD_SHA: ${{ needs.medir.outputs.sha }}
+      run: |
+        node v2/frontend/scripts/pr-report.mjs --mensal --anteriores "$RUNNER_TEMP/anteriores.jsonl" \
+          "$RUNNER_TEMP/metricas/size-limit.json" "$RUNNER_TEMP/metricas/summary.json" \
+          > "$RUNNER_TEMP/report.md"
+        cat "$RUNNER_TEMP/report.md" >> "$GITHUB_STEP_SUMMARY"
+
+    # Comentário novo a cada execução (nunca edita o anterior): é o histórico.
+    # Sem continue-on-error: se postar falhar, o job fica vermelho.
+    - name: Comentar na issue de acompanhamento
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: gh issue comment "$TRACKING_ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/report.md"

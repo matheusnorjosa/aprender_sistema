@@ -4,23 +4,25 @@
  * (frontend-metrics-monthly.yml). Sem dependências: roda num checkout esparso
  * de scripts/.
  *
- * Uso: node scripts/pr-report.mjs [--mensal [--anterior <comentario.md>]]
+ * Uso: node scripts/pr-report.mjs [--mensal [--anteriores <comentarios.jsonl>]]
  *        <size-limit.json> <lighthouse-summary.json>
  *   - size-limit.json: saída de `npx size-limit --json` (lista de
  *     { name, passed, size, sizeLimit }, tamanhos em bytes).
  *   - lighthouse-summary.json: `.lighthouseci/summary.json`, gravado por
  *     scripts/lighthouse-ci.mjs.
- *   - --mensal: título de acompanhamento mensal, linha de comparação com o mês
- *     anterior no topo e, no fim, os números num comentário HTML oculto (é dele
- *     que o mês seguinte lê a comparação).
- *   - --anterior: corpo do último comentário mensal. Vazio, ausente ou sem o
- *     bloco de números vira "sem mês anterior".
+ *   - --mensal: título de acompanhamento mensal, linha de comparação com a
+ *     medição anterior no topo e, no fim, os números num comentário HTML oculto
+ *     (é dele que as medições seguintes leem a comparação).
+ *   - --anteriores: os comentários mensais anteriores, um JSON
+ *     `{ created_at, body }` por linha (o que o workflow tira da API). Por
+ *     métrica, a base é o valor não nulo mais recente. Vazio, ausente ou sem
+ *     nenhum bloco de números vira "sem medição anterior".
  *
  * Imprime markdown no stdout. Arquivo ausente ou ilegível vira a seção
  * "Indisponível" com o motivo — o relatório sai mesmo assim.
  *
  * A 1ª linha é o marcador com que o workflow acha o próprio comentário; se
- * mudar aqui, mude o `MARKER` do workflow junto.
+ * mudar aqui, mude o `MARKER` do workflow junto (o auto-teste confere).
  *
  * Env (opcional): HEAD_SHA; GITHUB_SERVER_URL, GITHUB_REPOSITORY e
  * GITHUB_RUN_ID (link do run — o runner já define).
@@ -48,13 +50,15 @@ const MODOS = {
 };
 
 // Números que o modo mensal grava e compara. `js` é a entrada do
-// .size-limit.json cujo nome começa com JS_ENTRADA (JS inicial, sem chunks lazy).
+// .size-limit.json cujo nome começa com JS_ENTRADA: soma gzip de todos os
+// `dist/assets/*.js`, chunks lazy das páginas inclusive; só o GeoJSON
+// `brazil-states-*` fica de fora. `valor` converte como as tabelas abaixo.
 const DADOS = 'as-frontend-monthly-dados';
 const JS_ENTRADA = 'JS Bundle';
 const COMPARADOS = [
-  { chave: 'performance', rotulo: 'performance', escala: 100, digitos: 1, unidade: '' },
-  { chave: 'lcp', rotulo: 'LCP', escala: 1, digitos: 0, unidade: ' ms' },
-  { chave: 'js', rotulo: 'JS', escala: 1 / 1000, digitos: 1, unidade: ' kB' },
+  { chave: 'performance', rotulo: 'performance', valor: (nota) => nota * 100, digitos: 1, unidade: '' },
+  { chave: 'lcp', rotulo: 'LCP', valor: (ms) => ms, digitos: 0, unidade: ' ms' },
+  { chave: 'js', rotulo: 'JS', valor: (bytes) => bytes / 1000, digitos: 1, unidade: ' kB' },
 ];
 
 const METRIC_LABELS = {
@@ -196,41 +200,68 @@ function numeros(sizeFile, lighthouseFile) {
   };
 }
 
-/** Números gravados no comentário do mês anterior, ou `null`. */
-function numerosAnteriores(file) {
-  if (!file) {
-    return null;
-  }
+/**
+ * Medições gravadas nos comentários mensais anteriores, da mais recente para a
+ * mais antiga: `{ em, numeros }`. Linha ilegível, sem data ou sem o bloco de
+ * números fica de fora.
+ */
+function medicoesAnteriores(file) {
+  let texto = '';
   try {
-    const achado = readFileSync(file, 'utf8').match(new RegExp(`<!-- ${DADOS} (\\{.*?\\}) -->`));
-    return achado ? JSON.parse(achado[1]) : null;
+    texto = file ? readFileSync(file, 'utf8') : '';
   } catch {
-    return null;
+    // Sem o arquivo, sem base: o relatório sai com "sem medição anterior".
   }
+  const medicoes = [];
+  for (const linha of texto.split('\n')) {
+    try {
+      const { created_at: criado, body } = JSON.parse(linha);
+      const em = Date.parse(criado);
+      const achado = String(body).match(new RegExp(`<!-- ${DADOS} (\\{.*?\\}) -->`));
+      if (achado && !Number.isNaN(em)) {
+        medicoes.push({ em, numeros: JSON.parse(achado[1]) });
+      }
+    } catch {
+      // Linha vazia, JSON quebrado ou bloco editado à mão: não serve de base.
+    }
+  }
+  return medicoes.sort((a, b) => b.em - a.em);
 }
 
-function comparacao(atual, anterior) {
-  const titulo = '**Contra o mês anterior:**';
-  if (!anterior) {
-    return `${titulo} sem mês anterior.`;
+function dia(em) {
+  return new Date(em).toLocaleDateString('pt-BR', { timeZone: 'America/Fortaleza' });
+}
+
+/**
+ * A variação sai dos valores já arredondados que a linha mostra, para ela
+ * nunca se contradizer. A data do título é a da medição anterior; métrica que
+ * faltou nela compara com a última medição que a tem, e leva a própria data.
+ */
+function comparacao(atual, anteriores) {
+  if (!anteriores.length) {
+    return '**Contra a medição anterior:** sem medição anterior.';
   }
-  const partes = COMPARADOS.map(({ chave, rotulo, escala, digitos, unidade }) => {
-    const [antes, agora] = [anterior[chave], atual[chave]];
-    if (typeof antes !== 'number' || typeof agora !== 'number') {
+  const partes = COMPARADOS.map(({ chave, rotulo, valor, digitos, unidade }) => {
+    const base = anteriores.find((medicao) => typeof medicao.numeros[chave] === 'number');
+    if (!base || typeof atual[chave] !== 'number') {
       return `${rotulo} n/d`;
     }
-    const delta = ((agora - antes) * escala).toLocaleString('pt-BR', {
+    const arredonda = (numero) => Number(numero.toFixed(digitos));
+    const antes = arredonda(valor(base.numeros[chave]));
+    const agora = arredonda(valor(atual[chave]));
+    const delta = arredonda(agora - antes).toLocaleString('pt-BR', {
       maximumFractionDigits: digitos,
       signDisplay: 'exceptZero',
     });
-    return `${rotulo} ${fmt(antes * escala, digitos)} → ${fmt(agora * escala, digitos)}${unidade} (${delta}${unidade})`;
+    const de = base === anteriores[0] ? '' : ` (${dia(base.em)})`;
+    return `${rotulo} ${fmt(antes, digitos)}${de} → ${fmt(agora, digitos)}${unidade} (${delta}${unidade})`;
   });
-  return `${titulo} ${partes.join(' · ')}.`;
+  return `**Contra a medição anterior (${dia(anteriores[0].em)}):** ${partes.join(' · ')}.`;
 }
 
 const { values: opcoes, positionals } = parseArgs({
   allowPositionals: true,
-  options: { mensal: { type: 'boolean' }, anterior: { type: 'string' } },
+  options: { mensal: { type: 'boolean' }, anteriores: { type: 'string' } },
 });
 const [sizeFile, lighthouseFile] = positionals;
 const modo = opcoes.mensal ? MODOS.mensal : MODOS.pr;
@@ -238,7 +269,7 @@ const modo = opcoes.mensal ? MODOS.mensal : MODOS.pr;
 const topo = header(modo);
 const atual = opcoes.mensal ? numeros(sizeFile, lighthouseFile) : null;
 if (atual) {
-  topo.push('', comparacao(atual, numerosAnteriores(opcoes.anterior)));
+  topo.push('', comparacao(atual, medicoesAnteriores(opcoes.anteriores)));
 }
 const report = [
   ...topo,

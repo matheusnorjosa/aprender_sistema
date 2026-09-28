@@ -442,13 +442,17 @@ jobs:
       contents: read
       pull-requests: write
     env:
-      # Igual à 1ª linha que v2/frontend/scripts/pr-report.mjs imprime.
+      # Igual à 1ª linha que v2/frontend/scripts/pr-report.mjs imprime (o
+      # auto-teste do script confere).
       MARKER: '<!-- as-frontend-report -->'
 
     steps:
     - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
       with:
-        sparse-checkout: v2/frontend/scripts
+        # .github/workflows: o auto-teste confere o MARKER dos workflows contra o script.
+        sparse-checkout: |
+          v2/frontend/scripts
+          .github/workflows
         persist-credentials: false
 
     - name: Download size-limit report

@@ -65,6 +65,11 @@ class GCalPublishBatchView(APIView):
     - Se GCAL_CLIENT != "google" e dry_run=false e apply_blocked=false → erro
     - Válidas: marca gcal_status=PENDING e enfileira task Celery
     - Inválidas: retorna em 'errors' com motivo
+
+    OAuth Mode (#2039, igual a reapply/resync):
+    - Se GCAL_AUTH_MODE=='oauth', requer GoogleOAuthCredential
+    - Sem credencial → 403 {code: 'google_not_connected'} (nada é alterado)
+    - Com credencial → passa operator_user_id para task
     """
 
     permission_classes = [IsAuthenticated, CanUseGcal]
@@ -75,9 +80,27 @@ class GCalPublishBatchView(APIView):
         responses={
             202: BatchActionResponseSerializer,
             400: DetailMessageSerializer,
+            403: DetailMessageSerializer,
         }
     )
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        from apps.core.models import GoogleOAuthCredential
+        from apps.core.tasks import task_publish_solicitacao_to_gcal
+
+        # OAuth: verificar credencial Google ANTES de mexer em qualquer linha (#2039)
+        auth_mode = getattr(settings, "GCAL_AUTH_MODE", "service_account")
+        operator_user_id = None
+
+        if auth_mode == "oauth":
+            try:
+                GoogleOAuthCredential.objects.get(user=request.user)
+                operator_user_id = request.user.pk
+            except GoogleOAuthCredential.DoesNotExist:
+                return Response(
+                    {"detail": "Conecte sua conta Google para realizar ações em massa", "code": "google_not_connected"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
         # Parse request body
         solicitacao_ids = request.data.get("solicitacao_ids", [])
         dry_run = request.data.get("dry_run", False)
@@ -132,13 +155,15 @@ class GCalPublishBatchView(APIView):
                 sol.gcal_status = Solicitacao.GCalStatus.PENDING
                 sol.save(update_fields=["gcal_status", "updated_at"])
 
-                # Importar e enfileirar task Celery
+                # Id POSICIONAL: a task recebe `solicitation_id`. O antigo kwarg
+                # `solicitacao_id=` estourava TypeError no despacho e nada rodava (M24-01).
                 try:
-                    from apps.core.tasks import task_publish_solicitacao_to_gcal
-
-                    task_publish_solicitacao_to_gcal.delay(
-                        solicitacao_id=sol.id, dry_run=dry_run, apply_blocked=apply_blocked
-                    )
+                    if auth_mode == "oauth":
+                        task_publish_solicitacao_to_gcal.delay(
+                            sol.id, dry_run=dry_run, apply_blocked=apply_blocked, operator_user_id=operator_user_id
+                        )
+                    else:
+                        task_publish_solicitacao_to_gcal.delay(sol.id, dry_run=dry_run, apply_blocked=apply_blocked)
                     queued.append(sol.id)
                     logger.info(f"Batch publish queued: solicitacao_id={sol.id}, dry_run={dry_run}")
                 except Exception as e:

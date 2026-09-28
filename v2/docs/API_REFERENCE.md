@@ -281,6 +281,8 @@ sob `/api/gcal/`. Todas exigem `CanUseGcal` (policy `use_gcal` =
 `POST /api/gcal/publish-batch/` espera **`solicitacao_ids`** (não `ids`), máx. 500;
 opcionais `dry_run` e `apply_blocked` (`GCalPublishBatchView.post`, `views_gcal/batch.py`).
 Resposta 202: `{"queued": N, "errors": [...], "dry_run": bool, "apply_blocked": bool}`.
+Em modo OAuth (`GCAL_AUTH_MODE=oauth`), igual a reapply/resync: exige a credencial Google de quem chama
+(senão 403 `{"code": "google_not_connected"}`, sem alterar nenhuma linha) e passa `operator_user_id` à task.
 
 Não existem `/api/gcal/preview/`, `/api/gcal/publish/`, `/api/gcal/resync/{id}/`
 nem `/api/gcal/cancel/{id}/`.

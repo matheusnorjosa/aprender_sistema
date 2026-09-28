@@ -375,7 +375,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
         <Title level={2} className="mb-2">Editar Solicitação #{id}</Title>
         <Text type="secondary">
           Status: <strong>{solicitacao?.status}</strong>
-          {solicitacao?.gcal_status && solicitacao.gcal_status !== ('NOT_SYNCED' as GCalStatus) && (
+          {solicitacao?.gcal_status && solicitacao.gcal_status !== ('NONE' as GCalStatus) && (
             <> | GCal: <strong>{solicitacao.gcal_status}</strong></>
           )}
         </Text>

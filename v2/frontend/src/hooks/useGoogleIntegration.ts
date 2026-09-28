@@ -33,7 +33,8 @@ export type { GoogleIntegrationStatus } from '../types/gcal';
  * Estado de domínio para o estado inicial / reset (desconectado).
  *
  * Defaults defensivos: qualquer campo ausente/nulo no payload cai para um
- * valor seguro. `connected` e `isExpired` defaultam para `false`; os demais
+ * valor seguro. `connected`, `isExpired` e `publishReady` defaultam para
+ * `false` (ações de publicação desabilitadas até o status chegar); os demais
  * para `null`.
  */
 const EMPTY_STATUS: GoogleIntegrationStatus = {
@@ -43,6 +44,8 @@ const EMPTY_STATUS: GoogleIntegrationStatus = {
   expiresInDays: null,
   isExpired: false,
   defaultCalendarId: null,
+  publishReady: false,
+  publishBlockReason: null,
 };
 
 /**
@@ -67,6 +70,8 @@ export function normalizeGoogleStatus(
     expiresInDays: raw.expires_in_days ?? null,
     isExpired: raw.is_expired ?? false,
     defaultCalendarId: raw.default_calendar_id ?? null,
+    publishReady: raw.publish_ready ?? false,
+    publishBlockReason: raw.publish_block_reason ?? null,
   };
 }
 

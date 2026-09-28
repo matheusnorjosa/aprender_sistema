@@ -13,6 +13,15 @@ import type { ID, ISODateTime } from './common';
 export type GoogleConnectionStatus = 'connected' | 'disconnected' | 'expired';
 
 /**
+ * Por que o usuário ainda não pode publicar no Google Agenda (#1656).
+ *
+ * - `no_setor_scope`: não é global nem tem setor vigente (nada que publicar).
+ * - `google_not_connected`: falta conectar a própria conta Google.
+ * - `google_calendar_not_configured`: o calendário da organização não foi configurado.
+ */
+export type PublishBlockReason = 'no_setor_scope' | 'google_not_connected' | 'google_calendar_not_configured';
+
+/**
  * Google integration status — payload RAW do backend (snake_case).
  *
  * SSOT do contrato: `apps/core/views_oauth.py` `google_oauth_status`
@@ -26,6 +35,9 @@ export interface GoogleIntegrationStatusRaw {
   expires_in_days: number | null;
   is_expired: boolean;
   default_calendar_id: string | null;
+  /** `true` quando o usuário já pode publicar (#1656). Ausente em payloads antigos. */
+  publish_ready: boolean;
+  publish_block_reason: PublishBlockReason | null;
 }
 
 /**
@@ -41,6 +53,8 @@ export interface GoogleIntegrationStatus {
   expiresInDays: number | null;
   isExpired: boolean;
   defaultCalendarId: string | null;
+  publishReady: boolean;
+  publishBlockReason: PublishBlockReason | null;
 }
 
 /**

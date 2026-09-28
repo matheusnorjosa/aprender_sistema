@@ -34,6 +34,7 @@ const ROUTE_TO_MENU_KEY: Record<string, string> = {
   '/solicitacoes/meus-eventos': 'meus-eventos',
   '/solicitacoes/minhas': 'minhas-solicitacoes',
   '/solicitacoes/nova': 'nova-solicitacao',
+  '/solicitacoes/publicacao': 'publicacao-setor',
   // Backward-compat: rotas legadas redirecionam, mas o menu key segue válido para deep-links cacheados
   '/aprovacoes': 'aprovacoes',
   '/bloqueios': 'bloqueios',
@@ -90,6 +91,7 @@ const MENU_KEY_TO_PARENT: Record<string, string> = {
   'dat-registros': 'dat-submenu',
   'minhas-solicitacoes': 'solicitacoes-submenu',
   'nova-solicitacao': 'solicitacoes-submenu',
+  'publicacao-setor': 'solicitacoes-submenu',
 };
 
 // ============================================================================
@@ -365,10 +367,19 @@ export function AppSidebar({
               </Menu.Item>
             )}
 
-            {caps.canCreateSolicitation && (
+            {/* #1656: cada item pelo próprio gate; "Publicar na agenda" é da Apoio de
+                Coordenação (publish_setor_solicitacao), não de quem cria solicitação. */}
+            {(caps.canCreateSolicitation || caps.canPublishSetorSolicitacao) && (
               <SubMenu key="solicitacoes-submenu" icon={<FileTextOutlined />} title="Solicitações">
-                <Menu.Item key="minhas-solicitacoes"><Link to="/solicitacoes/minhas">Minhas Solicitações</Link></Menu.Item>
-                <Menu.Item key="nova-solicitacao"><Link to="/solicitacoes/nova">Nova Solicitação</Link></Menu.Item>
+                {caps.canCreateSolicitation && (
+                  <Menu.Item key="minhas-solicitacoes"><Link to="/solicitacoes/minhas">Minhas Solicitações</Link></Menu.Item>
+                )}
+                {caps.canCreateSolicitation && (
+                  <Menu.Item key="nova-solicitacao"><Link to="/solicitacoes/nova">Nova Solicitação</Link></Menu.Item>
+                )}
+                {caps.canPublishSetorSolicitacao && (
+                  <Menu.Item key="publicacao-setor"><Link to="/solicitacoes/publicacao">Publicar na agenda</Link></Menu.Item>
+                )}
               </SubMenu>
             )}
           </SidebarMenu>

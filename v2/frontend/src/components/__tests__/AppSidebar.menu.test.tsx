@@ -655,6 +655,60 @@ describe('AppSidebar — Aprovações é policy-only (PR 10 hardening RBAC)', ()
   });
 });
 
+// ============================================================================
+// Solicitações → "Publicar na agenda" (#1656, policy publish_setor_solicitacao)
+// ============================================================================
+
+const SOLICITACOES_CHILDREN = ['Minhas Solicitações', 'Nova Solicitação', 'Publicar na agenda'];
+
+function getSolicitacoesChildren(): string[] {
+  if (!openSubmenuByTitle('Solicitações')) return [];
+  return SOLICITACOES_CHILDREN.filter(
+    (label) => screen.queryByRole('link', { name: new RegExp(`^${label}$`, 'i') }) !== null,
+  );
+}
+
+describe('AppSidebar — "Publicar na agenda" (#1656)', () => {
+  // usePermissions trata Apoio igual a Coordenador; a diferença está na policy.
+  const APOIO_PERMISSIONS: Permissions = {
+    ...EMPTY_PERMISSIONS,
+    isCoordenador: true,
+    canCoordenador: true,
+    canAcoesInternas: true,
+    canDisponibilidade: true,
+  };
+  const APOIO_POLICIES = ['create_solicitation', 'publish_setor_solicitacao'];
+
+  test('Apoio de Coordenação vê Minhas, Nova e Publicar na agenda (→ /solicitacoes/publicacao)', () => {
+    renderSidebar(APOIO_PERMISSIONS, APOIO_POLICIES);
+    expect(getSolicitacoesChildren()).toEqual(SOLICITACOES_CHILDREN);
+    expect(
+      screen.getByRole('link', { name: /^Publicar na agenda$/i }).getAttribute('href'),
+    ).toBe('/solicitacoes/publicacao');
+  });
+
+  test('Coordenador (só create_solicitation) continua com Minhas e Nova', () => {
+    renderSidebar(APOIO_PERMISSIONS, ['create_solicitation']);
+    expect(getSolicitacoesChildren()).toEqual(['Minhas Solicitações', 'Nova Solicitação']);
+  });
+
+  test('só publish_setor_solicitacao: o submenu aparece, só com Publicar na agenda', () => {
+    renderSidebar(EMPTY_PERMISSIONS, ['publish_setor_solicitacao']);
+    expect(isTopLevelVisible('Solicitações')).toBe(true);
+    expect(getSolicitacoesChildren()).toEqual(['Publicar na agenda']);
+  });
+
+  test('deep-link em /solicitacoes/publicacao abre o submenu e seleciona o item', () => {
+    render(
+      <MemoryRouter initialEntries={['/solicitacoes/publicacao']}>
+        <AppSidebar permissions={APOIO_PERMISSIONS} policies={APOIO_POLICIES} {...SIDEBAR_PROPS} />
+      </MemoryRouter>,
+    );
+    const link = screen.getByRole('link', { name: /^Publicar na agenda$/i });
+    expect(link.closest('li')?.className).toContain('ant-menu-item-selected');
+  });
+});
+
 describe('AppSidebar — Ações Internas é policy-only (Issue #1263)', () => {
   test('legacy canAcoesInternas=true sem policy → Ações Internas ESCONDIDA', () => {
     // Bug #1263: a flag legacy por grupo mostrava o menu para DAT/Coordenador/

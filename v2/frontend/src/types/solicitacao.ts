@@ -23,9 +23,10 @@ export type SolicitacaoStatus = 'pendente' | 'aprovado' | 'reprovado';
 export type FluxoType = 'SUPER' | 'NAO_SUPER';
 
 /**
- * Google Calendar sync status
+ * Google Calendar sync status — espelha `Solicitacao.GCalStatus` do backend
+ * (`models/solicitacao.py`): NONE | PENDING | PUBLISHED | ERROR.
  */
-export type GCalStatus = 'NOT_SYNCED' | 'PENDING' | 'PUBLISHED' | 'ERROR' | 'CANCELLED';
+export type GCalStatus = 'NONE' | 'PENDING' | 'PUBLISHED' | 'ERROR';
 
 /**
  * Event type (from TipoEvento)
@@ -129,6 +130,11 @@ export interface SolicitacaoFilters {
   date_from?: string;
   date_to?: string;
   page?: number;
+  page_size?: number;
+  /** Campo de ordenação do DRF (`inicio`, `-inicio`, `fim`, `id`). */
+  ordering?: string;
+  /** #1656: só as solicitações que o usuário pode publicar no Google Agenda. */
+  publishable?: 'true';
   search?: string;
 }
 

@@ -59,9 +59,20 @@ export interface GoogleIntegrationCardProps {
   status: GoogleIntegrationStatus | null;
   onConnect: () => void;
   onDisconnect: () => void;
+  /**
+   * Destino de publicação fixado pelo servidor (calendário oficial da organização, #1656):
+   * sem seletor de calendário (nem chamada a `/calendars/`) e sem a UI de expiração —
+   * o `isExpired` do status é o access token de 1h, renovado sozinho pelo refresh token.
+   */
+  fixedCalendar?: boolean;
 }
 
-const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }: GoogleIntegrationCardProps): JSX.Element | null => {
+const GoogleIntegrationCard = ({
+  status,
+  onConnect,
+  onDisconnect,
+  fixedCalendar = false,
+}: GoogleIntegrationCardProps): JSX.Element | null => {
   const [calendars, setCalendars] = useState<CalendarItem[]>([]);
   const [loadingCalendars, setLoadingCalendars] = useState(false);
   const [selectedCalendar, setSelectedCalendar] = useState<string | null>(null);
@@ -69,7 +80,7 @@ const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }: GoogleIntegr
   // Extrair valores de status (ou usar defaults se status for null). `status`
   // pode ser null antes do fetch inicial; a renderização real só ocorre após o
   // early return abaixo, mas os hooks precisam rodar incondicionalmente.
-  const { connected, googleEmail, tokenExpiry, expiresInDays, isExpired, defaultCalendarId } =
+  const { connected, googleEmail, tokenExpiry, expiresInDays, isExpired: tokenExpired, defaultCalendarId } =
     status ?? {
       connected: false,
       googleEmail: null,
@@ -78,13 +89,16 @@ const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }: GoogleIntegr
       isExpired: false,
       defaultCalendarId: null,
     };
+  // No modo fixo a expiração do access token não é mostrada: "Expirado"/"Reconectar"
+  // só empurraria reconexões inúteis (o refresh token renova o acesso sozinho).
+  const isExpired = !fixedCalendar && tokenExpired;
 
-  // Carregar calendários quando conectado
+  // Carregar calendários quando conectado (no modo fixo não há o que escolher)
   useEffect(() => {
-    if (connected && !isExpired) {
+    if (connected && !isExpired && !fixedCalendar) {
       void loadCalendars();
     }
-  }, [connected, isExpired]);
+  }, [connected, isExpired, fixedCalendar]);
 
   // Atualizar calendário selecionado quando defaultCalendarId mudar.
   // Sem defaultCalendarId salvo, cair para o calendário principal ('primary'),
@@ -170,7 +184,8 @@ const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }: GoogleIntegr
   }
 
   // Estado: CONECTADO
-  const isExpiringSoon = expiresInDays !== null && expiresInDays !== undefined && expiresInDays <= 7;
+  const isExpiringSoon =
+    !fixedCalendar && expiresInDays !== null && expiresInDays !== undefined && expiresInDays <= 7;
   const cardColor = isExpired
     ? '#ff4d4f' // vermelho
     : isExpiringSoon
@@ -218,7 +233,7 @@ const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }: GoogleIntegr
           <Text>
             <strong>Conta conectada:</strong> {googleEmail}
           </Text>
-          {tokenExpiry && (
+          {tokenExpiry && !fixedCalendar && (
             <Text type="secondary">
               <strong>Token expira em:</strong>{' '}
               {new Date(tokenExpiry).toLocaleDateString('pt-BR', {
@@ -231,35 +246,41 @@ const GoogleIntegrationCard = ({ status, onConnect, onDisconnect }: GoogleIntegr
             </Text>
           )}
 
-          {/* Seletor de calendário */}
-          <div className="mt-2">
-            <Text strong className="block mb-2">
-              <CalendarOutlined /> Calendário para eventos:
+          {/* Seletor de calendário (no modo fixo, só o destino oficial) */}
+          {fixedCalendar ? (
+            <Text>
+              <CalendarOutlined /> Os eventos são publicados no calendário oficial da organização.
             </Text>
-            <Select
-              style={{ width: '100%' }}
-              placeholder="Selecione um calendário"
-              value={selectedCalendar}
-              onChange={handleCalendarChange}
-              loading={loadingCalendars || savingCalendar}
-              disabled={isExpired}
-              options={calendars.map((cal) => ({
-                value: cal.id,
-                label: (
-                  <span>
-                    {cal.summary}
-                    {cal.primary && <Tag color="blue" className="ml-2">Principal</Tag>}
-                  </span>
-                ),
-              }))}
-              notFoundContent={loadingCalendars ? 'Carregando...' : 'Nenhum calendário encontrado'}
-            />
-            {!defaultCalendarId && (
-              <Text type="secondary" className="block mt-1" style={{ fontSize: '12px' }}>
-                Usando calendário principal por padrão
+          ) : (
+            <div className="mt-2">
+              <Text strong className="block mb-2">
+                <CalendarOutlined /> Calendário para eventos:
               </Text>
-            )}
-          </div>
+              <Select
+                style={{ width: '100%' }}
+                placeholder="Selecione um calendário"
+                value={selectedCalendar}
+                onChange={handleCalendarChange}
+                loading={loadingCalendars || savingCalendar}
+                disabled={isExpired}
+                options={calendars.map((cal) => ({
+                  value: cal.id,
+                  label: (
+                    <span>
+                      {cal.summary}
+                      {cal.primary && <Tag color="blue" className="ml-2">Principal</Tag>}
+                    </span>
+                  ),
+                }))}
+                notFoundContent={loadingCalendars ? 'Carregando...' : 'Nenhum calendário encontrado'}
+              />
+              {!defaultCalendarId && (
+                <Text type="secondary" className="block mt-1" style={{ fontSize: '12px' }}>
+                  Usando calendário principal por padrão
+                </Text>
+              )}
+            </div>
+          )}
         </Space>
 
         <Space>

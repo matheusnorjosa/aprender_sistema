@@ -637,6 +637,19 @@ outcome = cancel_solicitacao(solicitacao)
 )}
 ```
 
+### UI: Publicar na agenda (Apoio de Coordenação, #1656)
+
+**Arquivo**: `v2/frontend/src/pages/Solicitacoes/PublicacaoSetorPage.tsx`, rota `/solicitacoes/publicacao`. O gate é a policy `publish_setor_solicitacao`, a mesma da API; `use_gcal` não abre esta página, e a Apoio continua sem acesso à Pré-agenda.
+
+Fluxo da Apoio de Coordenação:
+
+1. **Menu**: *Solicitações → Publicar na agenda*. O item só aparece para quem tem `publish_setor_solicitacao`.
+2. **Conectar uma vez**: no card "Integração Google Calendar", *Conectar conta Google* abre o OAuth com `return_to=/solicitacoes/publicacao`. A conexão é da **própria** conta corporativa dela. Na volta, a página mostra o resultado (`?google=connected` ou `?google=error&reason=…`), limpa a URL e relê o status. O card não oferece escolha de calendário, porque os eventos vão para o calendário oficial da organização, e não mostra a expiração do access token (o refresh token o renova sozinho).
+3. **Publicar**: a tabela lista os eventos **aprovados do setor dela, a partir de hoje** (data de Fortaleza), 20 por página: `GET /api/solicitacoes/?status=aprovado&publishable=true&date_from=…&ordering=inicio`. Cada ação pede confirmação antes de chamar a API: *Publicar* (status NONE) e *Tentar de novo* (ERROR sem evento no Google) chamam `/publish/`; *Atualizar no Google* chama `/resync-gcal/`; *Remover do Google* chama `/cancel-gcal/`. Uma linha PENDING não tem ação.
+4. **Acompanhar**: a coluna *Google Agenda* mostra Não publicado, Publicando…, Publicado ou Erro, com a mensagem do erro visível na linha. Enquanto alguma linha está PENDING, a página recarrega a lista a cada 5 s; sem PENDING, não há polling.
+
+Os bloqueios vêm de `publish_ready` e `publish_block_reason` em `GET /api/integrations/google/status/`. Sem setor vigente, a página mostra um alerta para pedir o vínculo de gerência à DAT e não oferece conexão. Sem conta conectada, as ações ficam desabilitadas até ela conectar. Com a agenda da organização ainda não configurada, um alerta pede para avisar o Controle.
+
 ### Testes
 
 **Cobertura** (`v2/backend/apps/core/tests/test_gcal_cancel_resync.py`):

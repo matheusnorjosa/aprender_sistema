@@ -25,7 +25,7 @@ Refs:
 from __future__ import annotations
 
 from datetime import timedelta
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 from django.test import override_settings
 from django.utils import timezone
@@ -592,3 +592,87 @@ def test_batch_publish_valida_limite_500_ids(api_client, usuario_controle):
 
     assert response.status_code == http_status.HTTP_400_BAD_REQUEST
     assert "Limite de 500 IDs" in response.data["detail"]
+
+
+# ============================================================================
+# TESTES - PUBLISH-BATCH: despacho da task (M24-01) + operator_user_id (#2039)
+# ============================================================================
+
+
+@pytest.mark.django_db
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="oauth")
+@patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
+def test_batch_publish_oauth_mode_com_credencial_passa_operator_user_id(
+    mock_task, api_client, usuario_controle, setup_solicitacoes, google_oauth_credential
+):
+    """#2039: em modo OAuth, cada id vai POSICIONAL + operator_user_id (espelha reapply/resync).
+
+    Antes ia `delay(solicitacao_id=...)` — kwarg que a task não tem (ela recebe
+    `solicitation_id`) — e sem operator, então a task nunca rodava (M24-01).
+    """
+    api_client.force_authenticate(user=usuario_controle)
+    ids = [sol.id for sol in setup_solicitacoes]
+
+    response = api_client.post(
+        "/api/gcal/publish-batch/",
+        {"solicitacao_ids": ids, "dry_run": False, "apply_blocked": False},
+        format="json",
+    )
+
+    assert response.status_code == http_status.HTTP_202_ACCEPTED
+    assert response.data["queued"] == 3
+    assert response.data["errors"] == []
+    assert mock_task.call_args_list == [
+        call(sid, dry_run=False, apply_blocked=False, operator_user_id=usuario_controle.pk) for sid in ids
+    ]
+
+
+@pytest.mark.django_db
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="oauth")
+@patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
+def test_batch_publish_oauth_mode_sem_credencial_retorna_403(
+    mock_task, api_client, usuario_controle, setup_solicitacoes
+):
+    """#2039: sem credencial Google em modo OAuth → 403 e nenhuma linha fica presa em PENDING."""
+    api_client.force_authenticate(user=usuario_controle)
+    ids = [sol.id for sol in setup_solicitacoes]
+
+    response = api_client.post(
+        "/api/gcal/publish-batch/",
+        {"solicitacao_ids": ids, "dry_run": False, "apply_blocked": False},
+        format="json",
+    )
+
+    assert response.status_code == http_status.HTTP_403_FORBIDDEN
+    assert response.data["code"] == "google_not_connected"
+    mock_task.assert_not_called()
+    assert set(Solicitacao.objects.filter(id__in=ids).values_list("gcal_status", flat=True)) == {
+        Solicitacao.GCalStatus.NONE
+    }
+
+
+@pytest.mark.django_db
+@override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")
+@patch("celery.app.base.Celery.send_task")
+def test_batch_publish_despacho_respeita_assinatura_da_task(
+    mock_send_task, api_client, usuario_controle, setup_solicitacoes
+):
+    """M24-01: sem mockar o `.delay`, o Celery confere os argumentos contra a assinatura real.
+
+    Mockar só o `.delay` aceita qualquer kwarg — foi assim que `solicitacao_id=` passou:
+    o `TypeError` era engolido e a resposta dizia 202 com `queued=0`. Aqui só o envio ao
+    broker é mockado.
+    """
+    api_client.force_authenticate(user=usuario_controle)
+    ids = [sol.id for sol in setup_solicitacoes]
+
+    response = api_client.post(
+        "/api/gcal/publish-batch/",
+        {"solicitacao_ids": ids, "dry_run": False, "apply_blocked": False},
+        format="json",
+    )
+
+    assert response.status_code == http_status.HTTP_202_ACCEPTED
+    assert response.data["errors"] == []
+    assert response.data["queued"] == 3
+    assert mock_send_task.call_count == 3

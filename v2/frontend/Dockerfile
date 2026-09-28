@@ -5,8 +5,9 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-# Instalar dependências primeiro (cache layer)
-COPY package*.json ./
+# Instalar dependências primeiro (cache layer). O .npmrc vem junto para o
+# `npm ci` já ver o ignore-scripts=true.
+COPY package*.json .npmrc ./
 RUN npm ci
 
 # Copiar código fonte

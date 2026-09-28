@@ -55,6 +55,11 @@ def _is_safe_url(url: str) -> bool:
     if not url:
         return False
 
+    # 0. Barra invertida e caracteres de controle nunca: o navegador normaliza "/\evil.com"
+    #    para "//evil.com" (outro host), e CR/LF/NUL não têm uso legítimo num destino.
+    if "\\" in url or any(ord(ch) < 32 for ch in url):
+        return False
+
     # 1. Permitir caminhos relativos (começam com "/" mas não "//")
     if url.startswith("/") and not url.startswith("//"):
         return True

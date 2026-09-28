@@ -40,8 +40,13 @@ SEM_THROTTLE = (
 
 
 def _cred(default_calendar_id=""):
+    # Operador com `use_gcal` (superuser dispensa banco): sem pino, a seleção dele vale.
+    operador = SimpleNamespace(is_authenticated=True, is_superuser=True)
     return SimpleNamespace(
-        default_calendar_id=default_calendar_id, google_email="operador@aprendereditora.com.br", user_id=1
+        default_calendar_id=default_calendar_id,
+        google_email="operador@aprendereditora.com.br",
+        user_id=1,
+        user=operador,
     )
 
 

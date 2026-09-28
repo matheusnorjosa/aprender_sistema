@@ -767,8 +767,9 @@ class TestOAuthSecurity:
         assert not AuditLog.objects.filter(usuario=usuario_super, action="GOOGLE_CONNECT").exists()
 
     def test_callback_exige_can_use_gcal(self, usuario_formador):
-        """M12-15 (item 4): o callback deve reaplicar CanUseGcal. Um usuário autenticado SEM a
-        policy (Formador) não pode receber credencial GCal → 403.
+        """M12-15 (item 4): o callback reaplica a permissão de publicar (`CanUseGcal |
+        CanPublishSetorSolicitacao`, #1656). Um usuário autenticado sem nenhuma das duas
+        (Formador) não pode receber credencial GCal → 403.
 
         RED: hoje o callback só exige IsAuthenticated (sem @permission_classes([CanUseGcal])).
         """

@@ -89,7 +89,14 @@ describe('computeCapabilities — flags nomeadas por ator', () => {
     expect(c.canManageInternalActions).toBe(false);
   });
 
-  test('cada uma das 21 flags reflete exatamente sua policy', () => {
+  test('Apoio de Coordenação → canPublishSetorSolicitacao, sem canUseGcal', () => {
+    // Publica os eventos aprovados do PRÓPRIO setor (#1656); não opera a Pré-agenda.
+    const caps = computeCapabilities(['create_solicitation', 'publish_setor_solicitacao']);
+    expect(caps.canPublishSetorSolicitacao).toBe(true);
+    expect(caps.canUseGcal).toBe(false);
+  });
+
+  test('cada uma das 22 flags reflete exatamente sua policy', () => {
     const CASES: ReadonlyArray<readonly [keyof ReturnType<typeof computeCapabilities>, string]> = [
       ['canAccessAuditLogs', 'access_audit_logs'],
       ['canAccessApprovals', 'access_solicitation_approvals'],
@@ -112,6 +119,7 @@ describe('computeCapabilities — flags nomeadas por ator', () => {
       ['canAccessControleSection', 'access_controle_section'],
       ['canViewTeamDashboard', 'view_team_dashboard'],
       ['canViewGcalDashboard', 'view_gcal_dashboard'],
+      ['canPublishSetorSolicitacao', 'publish_setor_solicitacao'],
     ];
     for (const [flag, policy] of CASES) {
       const caps = computeCapabilities([policy]);

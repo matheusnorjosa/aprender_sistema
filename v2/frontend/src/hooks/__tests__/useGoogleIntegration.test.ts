@@ -51,6 +51,8 @@ describe('normalizeGoogleStatus (função pura)', () => {
       expiresInDays: 45,
       isExpired: false,
       defaultCalendarId: null,
+      publishReady: false,
+      publishBlockReason: null,
     });
   });
 
@@ -62,6 +64,8 @@ describe('normalizeGoogleStatus (função pura)', () => {
       expiresInDays: null,
       isExpired: false,
       defaultCalendarId: null,
+      publishReady: false,
+      publishBlockReason: null,
     });
   });
 
@@ -74,6 +78,8 @@ describe('normalizeGoogleStatus (função pura)', () => {
       expiresInDays: null,
       isExpired: false,
       defaultCalendarId: null,
+      publishReady: false,
+      publishBlockReason: null,
     });
     expect(normalizeGoogleStatus(null)).toEqual({
       connected: false,
@@ -82,7 +88,38 @@ describe('normalizeGoogleStatus (função pura)', () => {
       expiresInDays: null,
       isExpired: false,
       defaultCalendarId: null,
+      publishReady: false,
+      publishBlockReason: null,
     });
+  });
+
+  // #1656: o status passa a dizer se o usuário JÁ pode publicar e, se não, por quê.
+  test('mapeia publish_ready/publish_block_reason → publishReady/publishBlockReason', () => {
+    expect(
+      normalizeGoogleStatus({ ...RAW_CONNECTED, publish_ready: true, publish_block_reason: null }),
+    ).toMatchObject({ publishReady: true, publishBlockReason: null });
+    expect(
+      normalizeGoogleStatus({
+        ...RAW_DISCONNECTED,
+        publish_ready: false,
+        publish_block_reason: 'google_not_connected',
+      }),
+    ).toMatchObject({ publishReady: false, publishBlockReason: 'google_not_connected' });
+    expect(
+      normalizeGoogleStatus({
+        ...RAW_CONNECTED,
+        publish_ready: false,
+        publish_block_reason: 'google_calendar_not_configured',
+      }).publishBlockReason,
+    ).toBe('google_calendar_not_configured');
+  });
+
+  test('payload antigo (sem os campos de publicação) → publishReady=false e motivo null', () => {
+    // Backend anterior ao #1656 não manda publish_*: as ações ficam desabilitadas
+    // (nunca "pronto" por omissão).
+    const status = normalizeGoogleStatus(RAW_CONNECTED);
+    expect(status.publishReady).toBe(false);
+    expect(status.publishBlockReason).toBeNull();
   });
 
   test('preserva default_calendar_id salvo (regressão de contrato)', () => {

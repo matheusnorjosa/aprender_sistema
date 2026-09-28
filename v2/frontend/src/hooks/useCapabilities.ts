@@ -44,6 +44,9 @@ export interface Capabilities {
   canAccessControleSection: boolean;
   canViewTeamDashboard: boolean;
   canViewGcalDashboard: boolean;
+  // Apoio de Coordenação publica no Google Agenda os eventos aprovados do PRÓPRIO
+  // setor (#1656) — distinto de `canUseGcal` (operação global da Pré-agenda).
+  canPublishSetorSolicitacao: boolean;
 }
 
 /** Versão pura (sem React) — usada em tests e call sites sem render. */
@@ -75,6 +78,7 @@ export function computeCapabilities(policies: readonly string[]): Capabilities {
     canAccessControleSection: can('access_controle_section'),
     canViewTeamDashboard: can('view_team_dashboard'),
     canViewGcalDashboard: can('view_gcal_dashboard'),
+    canPublishSetorSolicitacao: can('publish_setor_solicitacao'),
   };
 }
 

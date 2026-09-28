@@ -14,7 +14,8 @@
  */
 
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, test, expect, vi } from 'vitest';
+import { beforeEach, describe, test, expect, vi } from 'vitest';
+import { fetchAPI } from '../../../api/config';
 import GoogleIntegrationCard, { type GoogleIntegrationStatus } from '../GoogleIntegrationCard';
 
 // Quando `connected`, o componente dispara loadCalendars() ->
@@ -377,5 +378,73 @@ describe('GoogleIntegrationCard', () => {
 
     // Sem defaultCalendarId ausente → não exibe o texto de fallback.
     expect(screen.queryByText('Usando calendário principal por padrão')).not.toBeInTheDocument();
+  });
+});
+
+// ============================================================================
+// fixedCalendar — publicação no calendário oficial da organização (#1656)
+// ============================================================================
+// A Apoio de Coordenação publica num calendário fixado pelo servidor: ela não
+// escolhe calendário (o /calendars/ nem é aberto para ela) e o `isExpired` do
+// status é o access token de 1h, que o refresh token renova sozinho.
+
+describe('GoogleIntegrationCard — fixedCalendar', () => {
+  const CONECTADA: GoogleIntegrationStatus = {
+    connected: true,
+    googleEmail: 'apoio@aprendereditora.com.br',
+    tokenExpiry: '2026-09-28T13:00:00Z',
+    expiresInDays: 0,
+    isExpired: false,
+    defaultCalendarId: null,
+    publishReady: true,
+    publishBlockReason: null,
+  };
+
+  beforeEach(() => {
+    vi.mocked(fetchAPI).mockClear();
+  });
+
+  test('não busca /calendars/, não mostra o seletor e informa o destino fixo', () => {
+    render(
+      <GoogleIntegrationCard status={CONECTADA} fixedCalendar onConnect={() => {}} onDisconnect={() => {}} />
+    );
+
+    expect(
+      screen.getByText('Os eventos são publicados no calendário oficial da organização.')
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(fetchAPI).not.toHaveBeenCalledWith('/integrations/google/calendars/');
+  });
+
+  test('isExpired=true não vira "Expirado", "Reconectar" nem data de expiração do token', () => {
+    const onConnect = vi.fn();
+    render(
+      <GoogleIntegrationCard
+        status={{ ...CONECTADA, isExpired: true }}
+        fixedCalendar
+        onConnect={onConnect}
+        onDisconnect={() => {}}
+      />
+    );
+
+    expect(screen.getByText('Conectado')).toBeInTheDocument();
+    expect(screen.queryByText(/Expirado/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Expira em/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Token expira em:/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Reconectar conta')).not.toBeInTheDocument();
+    // Desconectar continua disponível (ela revoga a própria conta).
+    expect(screen.getByText('Desconectar')).toBeInTheDocument();
+  });
+
+  test('sem a prop (Pré-agenda) o comportamento não muda: busca /calendars/ e mostra o seletor', () => {
+    render(
+      <GoogleIntegrationCard status={CONECTADA} onConnect={() => {}} onDisconnect={() => {}} />
+    );
+
+    expect(fetchAPI).toHaveBeenCalledWith('/integrations/google/calendars/');
+    expect(screen.getByText(/Calendário para eventos:/)).toBeInTheDocument();
+    expect(
+      screen.queryByText('Os eventos são publicados no calendário oficial da organização.')
+    ).not.toBeInTheDocument();
   });
 });

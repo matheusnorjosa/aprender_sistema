@@ -132,6 +132,7 @@ O cancel também confere, antes de apagar, se a conta enxerga o calendário (`ca
 - **Pré-requisito**: quem publica conecta a PRÓPRIA conta Google via `GET /api/oauth/google/start/` (callback em `/api/oauth/google/callback/`): Controle e Superintendência (`use_gcal`) e a Apoio de Coordenação com setor vigente (`publish_setor_solicitacao`, #1656). A Apoio não escolhe calendário: publica no da organização (`GCAL_OAUTH_CALENDAR_ID`), então a conta conectada precisa do compartilhamento «Fazer alterações nos eventos» nesse calendário.
 - **Fluxo de publicação**: ao publicar/resync na Pré-agenda, o sistema verifica a conexão. Sem conexão retorna **403 Forbidden** (UI mostra card/modal "Conectar conta Google"); com conexão enfileira a task Celery com `operator_user_id` e retorna **202 Accepted**.
 - **Governança**: `apply_blocked` continua dependendo de `GCAL_CLIENT='google'`.
+- **Verificação diária das contas** (#2039): às 05:00 o job `probe_google_credentials` força o refresh de cada credencial. Conta que o Google recusa (`invalid_grant`) é removida e a pessoa vê o aviso de reconectar; o Controle vê a lista no resumo de alertas do GCal. Erro de rede ou 5xx não remove nada. Ver §6, "Conta Google desconectada pelo sistema".
 
 Tokens OAuth são criptografados em repouso (ver seção 8 — SEC-011, `GCAL_ENCRYPTION_KEY`).
 
@@ -637,6 +638,19 @@ outcome = cancel_solicitacao(solicitacao)
 )}
 ```
 
+### UI: Publicar na agenda (Apoio de Coordenação, #1656)
+
+**Arquivo**: `v2/frontend/src/pages/Solicitacoes/PublicacaoSetorPage.tsx`, rota `/solicitacoes/publicacao`. O gate é a policy `publish_setor_solicitacao`, a mesma da API; `use_gcal` não abre esta página, e a Apoio continua sem acesso à Pré-agenda.
+
+Fluxo da Apoio de Coordenação:
+
+1. **Menu**: *Solicitações → Publicar na agenda*. O item só aparece para quem tem `publish_setor_solicitacao`.
+2. **Conectar uma vez**: no card "Integração Google Calendar", *Conectar conta Google* abre o OAuth com `return_to=/solicitacoes/publicacao`. A conexão é da **própria** conta corporativa dela. Na volta, a página mostra o resultado (`?google=connected` ou `?google=error&reason=…`), limpa a URL e relê o status. O card não oferece escolha de calendário, porque os eventos vão para o calendário oficial da organização, e não mostra a expiração do access token (o refresh token o renova sozinho).
+3. **Publicar**: a tabela lista os eventos **aprovados do setor dela, a partir de hoje** (data de Fortaleza), 20 por página: `GET /api/solicitacoes/?status=aprovado&publishable=true&date_from=…&ordering=inicio`. Cada ação pede confirmação antes de chamar a API: *Publicar* (status NONE) e *Tentar de novo* (ERROR sem evento no Google) chamam `/publish/`; *Atualizar no Google* chama `/resync-gcal/`; *Remover do Google* chama `/cancel-gcal/`. Uma linha PENDING não tem ação.
+4. **Acompanhar**: a coluna *Google Agenda* mostra Não publicado, Publicando…, Publicado ou Erro, com a mensagem do erro visível na linha. Enquanto alguma linha está PENDING, a página recarrega a lista a cada 5 s; sem PENDING, não há polling.
+
+Os bloqueios vêm de `publish_ready` e `publish_block_reason` em `GET /api/integrations/google/status/`. Sem setor vigente, a página mostra um alerta para pedir o vínculo de gerência à DAT e não oferece conexão. Sem conta conectada, as ações ficam desabilitadas até ela conectar. Com a agenda da organização ainda não configurada, um alerta pede para avisar o Controle.
+
 ### Testes
 
 **Cobertura** (`v2/backend/apps/core/tests/test_gcal_cancel_resync.py`):
@@ -768,6 +782,18 @@ export GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}'
 **Causa:** a credencial Google de quem publicou/cancelou não existe mais ou foi revogada — por exemplo, refresh token emitido com o app OAuth em modo Teste, que vence em 7 dias.
 
 **Solução:** a pessoa desconecta e conecta a conta Google de novo e repete a ação. O erro cru fica no `AuditLog` (`PUBLISH_GCAL_ERROR`, `details.error`).
+
+### Aviso: conta Google desconectada pelo sistema (`reconnect_required`)
+
+**Sintoma:** `GET /api/integrations/google/status/` responde `connected=false` e `reconnect_required=true`; o Controle vê a pessoa em `google_reconnect.users` no `GET /api/gcal/dashboard/alerts/summary/`.
+
+**Na tela:** na Pré-agenda e na página "Publicar na agenda", o card do Google mostra acima de "Conectar conta Google" o aviso "O Google revogou o acesso da sua conta ao sistema, então ela foi desconectada. Conecte de novo para voltar a publicar."; o Controle recebe um toast (o polling de alertas do GCal liga para o Controle) com os nomes (até 3 e "e mais N"), repetido só quando a lista de pessoas muda. O card não alarma mais pela validade do access token de 1h ("Expirado"/"Expira em N dias"): o refresh token o renova sozinho.
+
+**Causa:** o Google recusou o refresh token (`invalid_grant`): acesso revogado na conta Google, app OAuth em modo Teste (token vence em 7 dias), token sem uso por 6 meses ou conta suspensa. O sistema apagou a credencial e gravou `AuditLog` `GOOGLE_DISCONNECT` com `details.status="auto_removed"`. Quem detecta é o job diário `probe_google_credentials` (05:00) ou o próprio publish/cancel.
+
+**Solução:** a pessoa conecta a conta Google de novo. Não precisa "Desconectar" antes, porque não há credencial. O aviso some no próximo status: o `GOOGLE_CONNECT` do callback passa a ser o último evento. Para investigar, procure o `GOOGLE_DISCONNECT` com `details.status="auto_removed"` da pessoa no `AuditLog`.
+
+Erro de rede ou 5xx do Google no job **não** remove a credencial. Aparece só no log do worker, sem e-mail: `probe_google_credentials: credencial #N (usuario #M) mantida; refresh falhou (<TipoDoErro>)`. O resumo da execução (`{"ok", "removed", "errors"}`) sai em WARNING quando há remoção ou erro. Se o aviso nunca aparece para ninguém, confira se o beat e o worker estão de pé: com eles parados o job não roda.
 
 ### Erro: "O Google recusou o acesso ao calendário da organização"
 

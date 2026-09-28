@@ -17,6 +17,7 @@ const PoliticaPrivacidadePage = lazy(() => import('../pages/Politica/PoliticaPri
 const NewSolicitacaoWizard = lazy(() => import('../pages/Solicitacoes/NewSolicitacaoWizard'));
 const EditSolicitacaoPage = lazy(() => import('../pages/Solicitacoes/EditSolicitacaoPage'));
 const MySolicitacoesPage = lazy(() => import('../pages/Solicitacoes/MySolicitacoesPage'));
+const PublicacaoSetorPage = lazy(() => import('../pages/Solicitacoes/PublicacaoSetorPage'));
 const MeusEventosPage = lazy(() => import('../pages/MeusEventos/MeusEventosPage'));
 const ApprovalsPage = lazy(() => import('../pages/Aprovacoes/ApprovalsPage'));
 const PreAgendaPage = lazy(() => import('../pages/PreAgenda/PreAgendaPage'));
@@ -100,6 +101,9 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
         {/* Páginas pré-existentes mantidas */}
         <Route path="/solicitacoes/minhas" element={<RequirePolicy policy="create_solicitation" policies={policies}><MySolicitacoesPage /></RequirePolicy>} />
         <Route path="/solicitacoes/nova" element={<RequirePolicy policy="create_solicitation" policies={policies}><NewSolicitacaoWizard /></RequirePolicy>} />
+        {/* #1656: Apoio de Coordenação publica no Google Agenda os aprovados do próprio setor
+            (mesma policy da API; use_gcal/Pré-agenda não dão acesso). */}
+        <Route path="/solicitacoes/publicacao" element={<RequirePolicy policy="publish_setor_solicitacao" policies={policies}><PublicacaoSetorPage /></RequirePolicy>} />
         {/* :id/editar — composite (#1169): owner plausível OU privilegiado, sem policy única. */}
         <Route path="/solicitacoes/:id/editar" element={<RequirePolicy allow={canCoordenador || canApproveSuper}><EditSolicitacaoPage /></RequirePolicy>} />
 

@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "check:ts-only": "node scripts/check-no-legacy-js.mjs",
     "check:brand-colors": "node scripts/check-brand-colors.mjs",
+    "check:unknown-casts": "node scripts/check-unknown-casts.mjs",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "test": "vitest",

@@ -25,7 +25,21 @@ runs:
       id: npm-cache
       with:
         path: ${{ inputs.working-directory }}/node_modules
-        key: ${{ runner.os }}-node-modules-${{ hashFiles(format('{0}/package-lock.json', inputs.working-directory)) }}
+        # O .npmrc entra na chave porque muda o que o `npm ci` instala
+        # (ignore-scripts); só com o lockfile, mexer nele reusaria o cache antigo.
+        key: ${{ runner.os }}-node-modules-${{ hashFiles(format('{0}/package-lock.json', inputs.working-directory), format('{0}/.npmrc', inputs.working-directory)) }}
+
+    # Antes do `npm ci` e também no cache hit: sem o .npmrc a chave volta a ser a
+    # antiga e restauraria um node_modules instalado com scripts. Todos os
+    # callers usam o default v2/frontend, que tem o .npmrc.
+    - name: Guard — ignore-scripts ativo
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        if [ "$(npm config get ignore-scripts)" != true ]; then
+          echo "::error::ignore-scripts desligado (falta ${{ inputs.working-directory }}/.npmrc?)"
+          exit 1
+        fi
 
     - name: Install dependencies
       if: steps.npm-cache.outputs.cache-hit != 'true'

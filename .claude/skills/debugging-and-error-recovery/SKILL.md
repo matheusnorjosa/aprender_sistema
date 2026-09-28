@@ -50,6 +50,11 @@ Non-reproducible in local:
 └── Random? → Add defensive logging, monitor, revisit when recurs
 ```
 
+**Done when** you can name ONE command, already run (show it and its output), that
+goes red on the user's exact symptom — not "runs without erroring" — same verdict
+every run, in seconds. No such command → no theories yet: reading code to build a
+hypothesis before this exists is the failure this step prevents.
+
 ### Step 2: Localize
 
 Which layer is failing?
@@ -92,6 +97,17 @@ class MinimalRepro(TestCase):
         result = the_function_that_breaks(sol)
         self.assertEqual(result.status, 'expected')
 ```
+
+### Step 4b: Hypothesise, then Instrument
+
+List **3–5 ranked hypotheses** before testing any. Each states its prediction:
+"If X is the cause, changing Y makes the bug disappear." No prediction = discard it.
+Show the list to the user before testing — they often re-rank it instantly
+("we deployed a change to #3"); don't block if they're away.
+
+Each probe maps to one prediction; change one variable at a time. Tag every
+temporary log with a unique prefix (`logger.warning("[DEBUG-a4f2] ...")`) so
+cleanup is a single `grep -rn "DEBUG-a4f2"`.
 
 ### Step 5: Fix Root Cause (not Symptom)
 
@@ -188,6 +204,8 @@ After fixing a bug:
 - [ ] Build succeeds (`npm run build`, `pyright`)
 - [ ] Original bug scenario verified end-to-end
 - [ ] No new `console.error` or `logger.warn` left in (unless permanent)
+- [ ] `grep` for the `[DEBUG-xxxx]` prefix returns nothing
+- [ ] The hypothesis that proved correct is stated in the commit/PR
 
 ## References
 

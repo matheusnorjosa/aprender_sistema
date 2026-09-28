@@ -51,6 +51,9 @@ describe('normalizeGoogleStatus (função pura)', () => {
       expiresInDays: 45,
       isExpired: false,
       defaultCalendarId: null,
+      publishReady: false,
+      publishBlockReason: null,
+      reconnectRequired: false,
     });
   });
 
@@ -62,6 +65,9 @@ describe('normalizeGoogleStatus (função pura)', () => {
       expiresInDays: null,
       isExpired: false,
       defaultCalendarId: null,
+      publishReady: false,
+      publishBlockReason: null,
+      reconnectRequired: false,
     });
   });
 
@@ -74,6 +80,9 @@ describe('normalizeGoogleStatus (função pura)', () => {
       expiresInDays: null,
       isExpired: false,
       defaultCalendarId: null,
+      publishReady: false,
+      publishBlockReason: null,
+      reconnectRequired: false,
     });
     expect(normalizeGoogleStatus(null)).toEqual({
       connected: false,
@@ -82,7 +91,59 @@ describe('normalizeGoogleStatus (função pura)', () => {
       expiresInDays: null,
       isExpired: false,
       defaultCalendarId: null,
+      publishReady: false,
+      publishBlockReason: null,
+      reconnectRequired: false,
     });
+  });
+
+  // #1656: o status passa a dizer se o usuário JÁ pode publicar e, se não, por quê.
+  test('mapeia publish_ready/publish_block_reason → publishReady/publishBlockReason', () => {
+    expect(
+      normalizeGoogleStatus({ ...RAW_CONNECTED, publish_ready: true, publish_block_reason: null }),
+    ).toMatchObject({ publishReady: true, publishBlockReason: null });
+    expect(
+      normalizeGoogleStatus({
+        ...RAW_DISCONNECTED,
+        publish_ready: false,
+        publish_block_reason: 'google_not_connected',
+      }),
+    ).toMatchObject({ publishReady: false, publishBlockReason: 'google_not_connected' });
+    expect(
+      normalizeGoogleStatus({
+        ...RAW_CONNECTED,
+        publish_ready: false,
+        publish_block_reason: 'google_calendar_not_configured',
+      }).publishBlockReason,
+    ).toBe('google_calendar_not_configured');
+  });
+
+  test('payload antigo (sem os campos de publicação) → publishReady=false e motivo null', () => {
+    // Backend anterior ao #1656 não manda publish_*: as ações ficam desabilitadas
+    // (nunca "pronto" por omissão).
+    const status = normalizeGoogleStatus(RAW_CONNECTED);
+    expect(status.publishReady).toBe(false);
+    expect(status.publishBlockReason).toBeNull();
+  });
+
+  // #2039: o sistema removeu a conexão porque o Google revogou o acesso (invalid_grant).
+  test('mapeia reconnect_required → reconnectRequired', () => {
+    expect(
+      normalizeGoogleStatus({
+        ...RAW_DISCONNECTED,
+        publish_ready: false,
+        publish_block_reason: 'google_not_connected',
+        reconnect_required: true,
+      }).reconnectRequired,
+    ).toBe(true);
+    expect(
+      normalizeGoogleStatus({ ...RAW_DISCONNECTED, reconnect_required: false }).reconnectRequired,
+    ).toBe(false);
+  });
+
+  test('payload antigo (sem reconnect_required) → reconnectRequired=false', () => {
+    // Backend anterior ao #2039 não manda o campo: sem aviso de reconexão.
+    expect(normalizeGoogleStatus(RAW_DISCONNECTED).reconnectRequired).toBe(false);
   });
 
   test('preserva default_calendar_id salvo (regressão de contrato)', () => {

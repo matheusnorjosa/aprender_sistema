@@ -99,12 +99,12 @@ def outro_usuario():
 
 @pytest.fixture
 def projeto_fluir(gerencia_fluir):
-    return ProjetoFactory(nome="Projeto Fluir PSS", gerencia=gerencia_fluir)
+    return ProjetoFactory(nome="Projeto Fluir PSS", setor="Fluir", gerencia=gerencia_fluir)
 
 
 @pytest.fixture
 def projeto_vidas(gerencia_vidas):
-    return ProjetoFactory(nome="Projeto Vidas PSS", gerencia=gerencia_vidas)
+    return ProjetoFactory(nome="Projeto Vidas PSS", setor="Vidas", gerencia=gerencia_vidas)
 
 
 @pytest.fixture
@@ -457,3 +457,79 @@ class TestSetorSomenteAprovados:
 
         propria_vidas = _aprovada(apoio_fluir, projeto_vidas)
         assert can_publish_solicitacao(apoio_fluir, propria_vidas) is False
+
+
+# ---------------------------------------------------------------------------
+# I. Forma de PROD — o setor do EVENTO vem de `Projeto.setor`
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def projeto_fluir_prod():
+    """Forma de prod (2026-09-28): `Projeto.setor` preenchido (109/109) e `gerencia` NULL (109/109)."""
+    return ProjetoFactory(nome="Fluir das Emocoes PSS", setor="Fluir", gerencia=None)
+
+
+class TestSetorVemDoProjetoSetor:
+    """#2043 ficou inerte em prod: lia `projeto.gerencia.setor_canonico`, e `Projeto.gerencia`
+    está vazio em prod (o backfill é outra fase). O setor do evento vem de `Projeto.setor`, o
+    mesmo SSOT do escopo de projeto do S2 (`scope_projetos_by_setor`/`projeto_out_of_setor`)."""
+
+    def test_scope_inclui_aprovada_do_setor_sem_gerencia_no_projeto(
+        self, apoio_fluir, outro_usuario, projeto_fluir_prod
+    ):
+        sol = _aprovada(outro_usuario, projeto_fluir_prod)
+        ids = set(scope_solicitacoes(Solicitacao.objects.all(), apoio_fluir).values_list("id", flat=True))
+        assert sol.id in ids
+
+    @patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
+    @patch("django.conf.settings.GCAL_CLIENT", "fake")
+    @patch("rest_framework.throttling.AnonRateThrottle.allow_request", return_value=True)
+    @patch("rest_framework.throttling.UserRateThrottle.allow_request", return_value=True)
+    def test_apoio_publica_a_propria_sem_gerencia_no_projeto(
+        self, _t1, _t2, mock_task, apoio_fluir, projeto_fluir_prod
+    ):
+        """O caso real da Taís: ela mesma cria o evento do Fluir e publica."""
+        mock_task.return_value = _mock_task_result()
+        propria = _aprovada(apoio_fluir, projeto_fluir_prod)
+        client = APIClient()
+        client.force_authenticate(apoio_fluir)
+
+        resp = _publish(client, propria.id)
+
+        assert resp.status_code == status.HTTP_202_ACCEPTED
+
+    @patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
+    @patch("django.conf.settings.GCAL_CLIENT", "fake")
+    @patch("rest_framework.throttling.AnonRateThrottle.allow_request", return_value=True)
+    @patch("rest_framework.throttling.UserRateThrottle.allow_request", return_value=True)
+    def test_apoio_publica_do_setor_de_terceiro_sem_gerencia_no_projeto(
+        self, _t1, _t2, mock_task, apoio_fluir, outro_usuario, projeto_fluir_prod
+    ):
+        mock_task.return_value = _mock_task_result()
+        sol = _aprovada(outro_usuario, projeto_fluir_prod)
+        client = APIClient()
+        client.force_authenticate(apoio_fluir)
+
+        resp = _publish(client, sol.id)
+
+        assert resp.status_code == status.HTTP_202_ACCEPTED
+
+    def test_setor_vem_do_projeto_e_nao_da_gerencia(self, apoio_fluir, outro_usuario, gerencia_fluir):
+        """Projeto rotulado Vidas mas pendurado na gerência do Fluir: vale `Projeto.setor`."""
+        from apps.core.services.solicitacao_scope import can_publish_solicitacao
+
+        projeto = ProjetoFactory(nome="Vidas com gerencia Fluir PSS", setor="Vidas", gerencia=gerencia_fluir)
+        sol = _aprovada(outro_usuario, projeto)
+
+        ids = set(scope_solicitacoes(Solicitacao.objects.all(), apoio_fluir).values_list("id", flat=True))
+        assert sol.id not in ids
+        assert can_publish_solicitacao(apoio_fluir, sol) is False
+
+    def test_projeto_sem_setor_nao_publica(self, apoio_fluir):
+        """Guarda (fail-closed): evento próprio num projeto SEM setor não é publicável."""
+        from apps.core.services.solicitacao_scope import can_publish_solicitacao
+
+        projeto = ProjetoFactory(nome="Sem setor PSS", setor="", gerencia=None)
+        propria = _aprovada(apoio_fluir, projeto)
+        assert can_publish_solicitacao(apoio_fluir, propria) is False

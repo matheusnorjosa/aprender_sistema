@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Ratchet de cast inseguro (`as unknown as` e `as never`) no frontend de produção.
+ * Ratchet de cast inseguro (`as unknown` e `as never`) no frontend de produção.
  *
  * `x as unknown as T` desliga o type-checker naquele ponto: o compilador aceita
  * qualquer T. Medido em 2026-09-28: 55 ocorrências em 21 arquivos de produção.
@@ -11,13 +11,19 @@
  * Teto POR ARQUIVO, e não total: com total, tipar um cast em A "paga" um cast
  * novo em B e o número fica igual — a dívida só muda de lugar.
  *
- * Conta `as never` porque ele compila no lugar de `as unknown as T` (never é
- * atribuível a tudo). Sem contá-lo, a burla faria a contagem CAIR e o gate
- * sugeriria apertar o teto: premiaria quem o contorna.
+ * Conta QUALQUER `as unknown`, não só a sequência `as unknown as`: toda dupla
+ * conversão passa por `as unknown`, e a sequência literal deixava escapar
+ * `(x as unknown) as T` (ou um comentário entre `unknown` e `as`). Sem isso, a
+ * burla faria a contagem CAIR e o gate sugeriria apertar o teto: premiaria quem
+ * o contorna. Custo: `x as unknown` isolado (só alarga o tipo) também conta —
+ * anote `const v: unknown = x` no lugar. Em 2026-09-28 havia 0 casos isolados.
+ *
+ * Conta `as never` pelo mesmo motivo: ele compila no lugar de `as unknown as T`
+ * (never é atribuível a tudo).
  *
  * Escopo: .ts/.tsx em src/, fora testes (*.test.*, *.spec.*, __tests__/, src/test/)
  * — os mesmos predicados de check-brand-colors.mjs. O regex roda no conteúdo
- * inteiro, então `as unknown` + quebra de linha (LF ou CRLF) + `as` também conta.
+ * inteiro, então quebra de linha (LF ou CRLF) entre `as` e `unknown` também conta.
  * Heurística textual: o padrão dentro de comentário ou string conta igual.
  * Limites conhecidos (não contados): cast em ângulo (`<unknown>x`, só em .ts) e
  * helper genérico do tipo `cast<T>(x: unknown): T`.
@@ -40,7 +46,7 @@ import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
-const CAST = /\bas\s+unknown\s+as\b|\bas\s+never\b/g;
+const CAST = /\bas\s+unknown\b|\bas\s+never\b/g;
 
 /** @param {string} name */
 const isTestFile = (name) => /\.(test|spec)\.[jt]sx?$/.test(name);
@@ -171,7 +177,7 @@ if (caiu.length > 0) {
 
 if (acima.length > 0) {
   console.error(`\u274c Cast inseguro acima do teto de ${BASELINE_ROTULO}`);
-  console.error('   (conta `as unknown as` e `as never` — os dois desligam o type-checker):\n');
+  console.error('   (conta `as unknown` e `as never` — toda dupla conversão passa por um deles):\n');
   for (const f of acima) {
     console.error(`  ${f}: ${contagemDe(f)} > teto ${tetoDe(f)}`);
     for (const o of achados.get(f) ?? []) console.error(`    ${f}:${o.linha}  ${o.trecho}`);

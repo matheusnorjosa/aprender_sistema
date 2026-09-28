@@ -108,13 +108,13 @@ test('arquivo renomeado: reprova no caminho novo, aponta o antigo, e não sugere
   assert.doesNotMatch(r.out, /--write/);
 });
 
-test('`as unknown` + quebra de linha + `as` conta (LF e CRLF), na linha onde começa', (t) => {
+test('quebra de linha entre `as` e `unknown` conta (LF e CRLF), na linha onde começa', (t) => {
   const r = roda(
     cenario(
       t,
       {
-        'lf.ts': 'const a = 1;\nconst b = a as unknown\n  as string;\n',
-        'crlf.ts': 'const a = 1;\r\nconst b = a as unknown\r\n  as string;\r\n',
+        'lf.ts': 'const a = 1;\nconst b = a as\n  unknown as string;\n',
+        'crlf.ts': 'const a = 1;\r\nconst b = a as\r\n  unknown as string;\r\n',
       },
       {},
     ),
@@ -124,6 +124,22 @@ test('`as unknown` + quebra de linha + `as` conta (LF e CRLF), na linha onde com
   assert.match(r.out, /src\/lf\.ts:2 /);
   assert.match(r.out, /src\/crlf\.ts: 1 > teto 0/);
   assert.match(r.out, /src\/crlf\.ts:2 /);
+});
+
+test('`(x as unknown) as T` conta — parêntese não tira o cast duplo da contagem', (t) => {
+  const r = roda(
+    cenario(t, { 'a.ts': 'const x = 1;\nconst y = (x as unknown) as string;\n' }, { 'src/a.ts': 0 }),
+  );
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /src\/a\.ts: 1 > teto 0/);
+  assert.match(r.out, /src\/a\.ts:2 {2}const y = \(x as unknown\) as string;/);
+});
+
+test('`x as unknown` isolado conta', (t) => {
+  const r = roda(cenario(t, { 'a.ts': 'const x = 1;\nconst y = x as unknown;\n' }, { 'src/a.ts': 0 }));
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /src\/a\.ts: 1 > teto 0/);
+  assert.match(r.out, /src\/a\.ts:2 {2}const y = x as unknown;/);
 });
 
 test('`as never` conta — trocar o cast duplo por ele não derruba a contagem', (t) => {

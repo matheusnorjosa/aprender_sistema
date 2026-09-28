@@ -216,6 +216,11 @@ export interface GCalAlertsSummaryResponse {
     start?: string | null;
     end?: string | null;
   };
+  /** Contas Google removidas pelo sistema (Google revogou o acesso) e não reconectadas (#2039). */
+  google_reconnect?: {
+    count: number;
+    users: { id: number; nome: string }[];
+  };
 }
 
 /**

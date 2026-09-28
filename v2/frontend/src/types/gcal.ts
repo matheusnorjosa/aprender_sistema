@@ -38,6 +38,11 @@ export interface GoogleIntegrationStatusRaw {
   /** `true` quando o usuário já pode publicar (#1656). Ausente em payloads antigos. */
   publish_ready: boolean;
   publish_block_reason: PublishBlockReason | null;
+  /**
+   * `true` quando o SISTEMA removeu a conexão porque o Google revogou o acesso
+   * (`invalid_grant`) e a pessoa não reconectou (#2039). Ausente em payloads antigos.
+   */
+  reconnect_required?: boolean;
 }
 
 /**
@@ -55,6 +60,8 @@ export interface GoogleIntegrationStatus {
   defaultCalendarId: string | null;
   publishReady: boolean;
   publishBlockReason: PublishBlockReason | null;
+  /** O sistema desconectou a conta (Google revogou o acesso); pedir para conectar de novo. */
+  reconnectRequired: boolean;
 }
 
 /**

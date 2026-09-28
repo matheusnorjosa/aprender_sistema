@@ -9,9 +9,12 @@ description: Review and harden security in the AS v2 Django/DRF backend. Use whe
 
 Run in order; the audit is DONE only when every step passes.
 
-1. **Lint passes** — run `python scripts/rbac_lint.py apps/` (cwd `v2/backend`).
+1. **Lint passes** — deterministic pre-pass:
+   `cd v2/backend && python scripts/rbac_lint.py apps/` (exit 1 = finding).
    It bans `user.groups.filter(name=...)` and `Is<Role>` classes outside the
-   whitelist. Same job as CI `[required] backend rbac-lint`.
+   whitelist. Same job as CI `[required] backend rbac-lint`. It is this skill's
+   only scanner: IDOR and CSV injection were measured as scanners and failed
+   (0% precision); prove what the lint cannot decide with a test.
 2. **Every ViewSet has explicit `permission_classes`** — enumerate the ViewSets
    touched; each must declare `HasPerm("codename")` (or a composition), never
    rely on the DRF default alone. If `get_permissions()` is overridden, confirm
@@ -19,8 +22,18 @@ Run in order; the audit is DONE only when every step passes.
 3. **`get_queryset()` enforces data-scope** — non-privileged users see only their
    own rows (`filter(usuario=request.user)`); the full queryset is gated behind a
    capability check via `user_has_any_perm(...)`. No `objects.all()` leak.
+   The IDOR bug lives in the scope's content (branch order, gerência filter,
+   writable owner field). Prove the scope with a test in two halves; a bare 403
+   proves nothing, since the capability gate returns it whatever the queryset does:
+   - **Positive control** — user A, holding the capability, hits an object in
+     A's own scope with the same verb → 2xx (200; 204 on DELETE).
+   - **Out of scope** — the same user A does GET/PATCH/DELETE on user B's object
+     → 404 (the scope lives in the queryset, so B's object does not exist for A).
+     Expect 403 only where the design is "exists but you may not act on it".
 4. **Secrets/config** — no hardcoded keys; production flags set (see A05);
-   `.gitignore` blocks the secret files (see Secrets Management).
+   `.gitignore` blocks the secret files (see Secrets Management). Leave secret
+   scanning to CI `[required] Secret Detection` (gitleaks + TruffleHog) and
+   GitHub push protection; no local secret scanner run.
 
 DONE = steps 1–4 all pass for the code under review.
 
@@ -73,8 +86,12 @@ writer.writerow([solicitacao.observacoes])
 
 # SAFE — SEC-007 helper prefixes formula chars (= + - @ TAB CR LF) with a single quote
 from apps.core.utils.csv_sanitize import sanitize_csv_value
-writer.writerow([sanitize_csv_value(v) for v in row])
+writer.writerow([sanitize_csv_value(r.municipio.nome), r.aluno_qtde])
 ```
+
+Sanitize free text only: the helper turns numbers into text (`-5` → `'-5`).
+A new export = helper + an injection test on the endpoint (model:
+`v2/backend/apps/core/tests/test_csv_export_injection.py`).
 
 ### A04: Insecure Design
 

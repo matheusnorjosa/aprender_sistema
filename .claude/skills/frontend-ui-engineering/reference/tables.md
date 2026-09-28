@@ -32,11 +32,19 @@ or `municipio_id` before wiring the query param.
 
 ## Empty / loading / error states
 
-Always handle all three — never a blank screen:
+Always handle all three — never a blank screen. Keep the `Table` mounted while it loads:
+`loading` overlays the current rows, so the page doesn't collapse to a spinner and jump back
+(layout shift). The empty state goes in `locale.emptyText`, not in an early return, which
+would also replace the table during the first load:
 
 ```tsx
-if (loading) return <Spin size="large" />;
 if (error) return <Alert type="error" message={error} showIcon />;
-if (data.length === 0) return <Empty description="Nenhuma solicitação encontrada" />;
-return <Table dataSource={data} columns={columns} />;
+return (
+  <Table
+    dataSource={data}
+    columns={columns}
+    loading={loading}
+    locale={{ emptyText: <Empty description="Nenhuma solicitação encontrada" /> }}
+  />
+);
 ```

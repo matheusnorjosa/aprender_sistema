@@ -1,0 +1,113 @@
+name: Notas de producao (Release promovida)
+
+# Depois de cada promocao bem-sucedida, escreve na Release promovida O QUE entrou em
+# producao desde a promocao anterior e a marca como "Latest". Com o deploy.yaml
+# criando Releases com --latest=false, o selo "Latest" do GitHub passa a significar
+# "o que esta em producao", nao "o ultimo build".
+#
+# Por que workflow_run e nao `on: push` no deploy-pointer: o promote.yml publica o
+# ponteiro com o GITHUB_TOKEN, e push feito com GITHUB_TOKEN nao dispara workflow.
+# `workflows:` casa com o `name:` do promote.yml (nao com o nome do arquivo).
+#
+# Cosmetico por desenho: nao participa do deploy. Falhar aqui nao muda producao;
+# re-rodar o run falho refaz a edicao (idempotente, ver marcadores abaixo).
+
+on:
+  workflow_run:
+    workflows: ["Promote (assina o ponteiro de release)"]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  notas:
+    name: "[ops] notas de producao na Release"
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write   # gh release edit + releases/generate-notes
+    steps:
+      - name: Checkout do deploy-pointer (HEAD = promocao, HEAD~1 = anterior)
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
+        with:
+          ref: deploy-pointer
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Escrever notas e marcar Latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PROMOTE_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+
+          novo="$(git show HEAD:production.json)"
+
+          # Duas promocoes em sequencia rapida: quando este run comeca, o ponteiro ja
+          # pode estar na seguinte. Editar a Release errada (e roubar o Latest dela)
+          # seria pior que pular: o run da promocao seguinte escreve as notas dela.
+          run_url="$(jq -r '.run_url' <<<"$novo")"
+          if [ "${run_url##*/}" != "$PROMOTE_RUN_ID" ]; then
+            echo "::notice::deploy-pointer ja avancou (HEAD veio de ${run_url}); este run nao edita nada."
+            exit 0
+          fi
+
+          new="$(jq -e -r '.release' <<<"$novo")"
+          seq="$(jq -e -r '.sequence' <<<"$novo")"
+          issued="$(jq -e -r '.issued_at' <<<"$novo")"
+          rollback="$(jq -r '.rollback' <<<"$novo")"
+          tag_re='^v[0-9]{4}\.[0-9]{2}\.[0-9]{2}-[0-9A-Za-z._-]+$'
+          grep -Eq "$tag_re" <<<"$new" || { echo "release invalida: $new" >&2; exit 1; }
+
+          prev=""
+          if git rev-parse -q --verify HEAD~1 >/dev/null; then
+            prev="$(git show HEAD~1:production.json | jq -e -r '.release')"
+            grep -Eq "$tag_re" <<<"$prev" || { echo "release anterior invalida: $prev" >&2; exit 1; }
+          fi
+
+          # generate-notes so devolve texto, nao grava nada. Num rollback a faixa e
+          # invertida: lista o que SAIU de producao (o que havia em prev e nao em new).
+          if [ -z "$prev" ]; then
+            cabecalho="**Promovida para produção** em ${issued} (seq ${seq}; primeira promoção)."
+            gerado=""
+          elif [ "$rollback" = "true" ]; then
+            cabecalho="**Rollback** — promovida para produção em ${issued} (seq ${seq}; anterior ${prev}). O que saiu de produção:"
+            gerado="$(gh api -X POST "repos/${GH_REPO}/releases/generate-notes" \
+              -f tag_name="$prev" -f previous_tag_name="$new" --jq .body)"
+          else
+            cabecalho="**Promovida para produção** em ${issued} (seq ${seq}; anterior ${prev})."
+            gerado="$(gh api -X POST "repos/${GH_REPO}/releases/generate-notes" \
+              -f tag_name="$new" -f previous_tag_name="$prev" --jq .body)"
+          fi
+
+          # Preserva o corpo atual (imagens, comandos de pull). O bloco entre os
+          # marcadores e substituido, nao empilhado: re-run e re-promocao nao duplicam.
+          # `tr -d '\r'`: corpo editado pela web volta com CRLF e o marcador nao casaria.
+          # Sem o marcador de fim (edicao manual), nao corta nada: melhor duplicar o
+          # bloco que apagar o resto do corpo.
+          corpo="$(gh release view "$new" --json body --jq .body | tr -d '\r')"
+          if grep -qx '<!-- producao:fim -->' <<<"$corpo"; then
+            corpo="$(awk '/^<!-- producao:inicio -->$/{p=1} !p{print} /^<!-- producao:fim -->$/{p=0}' <<<"$corpo" \
+              | sed '/./,$!d')"
+          fi
+
+          {
+            echo "<!-- producao:inicio -->"
+            echo "$cabecalho"
+            if [ -n "$gerado" ]; then echo; printf '%s\n' "$gerado"; fi
+            echo
+            echo "---"
+            echo "<!-- producao:fim -->"
+            echo
+            printf '%s\n' "$corpo"
+          } > "${RUNNER_TEMP}/notas.md"
+
+          gh release edit "$new" --notes-file "${RUNNER_TEMP}/notas.md" --latest
+          {
+            echo "# Notas de producao"
+            echo
+            echo "- release: \`${new}\` (seq ${seq}; anterior \`${prev:-nenhuma}\`; rollback=${rollback})"
+            echo "- marcada como Latest"
+          } >> "$GITHUB_STEP_SUMMARY"

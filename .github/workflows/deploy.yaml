@@ -285,6 +285,10 @@ jobs:
             echo '```'
           } > release_notes.md
 
+          # --latest=false: build nao e producao. Quem marca "Latest" e o
+          # release-notes-producao.yml, depois de cada promocao. O `edit` nao leva o
+          # flag: omitido, o GitHub nao mexe no selo; `false` num re-run da Release
+          # que esta em producao poderia tira-lo dela.
           if gh release view "${RELEASE_VERSION}" >/dev/null 2>&1; then
             gh release edit "${RELEASE_VERSION}" \
               --title "Release ${RELEASE_VERSION}" \
@@ -292,6 +296,7 @@ jobs:
           else
             gh release create "${RELEASE_VERSION}" \
               --title "Release ${RELEASE_VERSION}" \
-              --notes-file release_notes.md
+              --notes-file release_notes.md \
+              --latest=false
           fi
 

@@ -52,8 +52,10 @@ const LIGHTHOUSE = {
  * @param {import('node:test').TestContext} t
  * @param {object | string | undefined} size
  * @param {object | string | undefined} lighthouse
+ * @param {{ mensal?: boolean, anterior?: string }} [opcoes] `anterior`: corpo
+ *   do comentário do mês anterior, gravado e passado em `--anterior`.
  */
-function roda(t, size, lighthouse) {
+function roda(t, size, lighthouse, { mensal = false, anterior } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'pr-report-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const arquivos = [
@@ -65,7 +67,12 @@ function roda(t, size, lighthouse) {
       writeFileSync(arquivo, typeof conteudo === 'string' ? conteudo : JSON.stringify(conteudo));
     }
   }
-  const r = spawnSync(process.execPath, [SCRIPT, ...arquivos.map(([arquivo]) => arquivo)], {
+  const flags = mensal ? ['--mensal'] : [];
+  if (anterior !== undefined) {
+    writeFileSync(join(dir, 'anterior.md'), anterior);
+    flags.push('--anterior', join(dir, 'anterior.md'));
+  }
+  const r = spawnSync(process.execPath, [SCRIPT, ...flags, ...arquivos.map(([arquivo]) => arquivo)], {
     encoding: 'utf8',
     env: {
       ...process.env,
@@ -120,4 +127,54 @@ test('JSON ilegível ou de formato errado também vira "Indisponível", sem derr
   const out = roda(t, '{ quebrado', { error: 'Error: sem arquivos' });
   assert.match(out, /\*\*Indisponível:\*\* arquivo ilegível \(`size-limit\.json`\): /);
   assert.match(out, /\*\*Indisponível:\*\* formato inesperado/);
+});
+
+test('modo PR não ganha comparação nem bloco de números', (t) => {
+  const out = roda(t, SIZE, LIGHTHOUSE);
+  assert.doesNotMatch(out, /mês anterior|as-frontend-monthly/);
+});
+
+// Mês seguinte: performance e JS sobem, LCP cai.
+const SIZE_OUTUBRO = [{ ...SIZE[0], size: 740000 }, SIZE[1]];
+const LIGHTHOUSE_OUTUBRO = {
+  ...LIGHTHOUSE,
+  categories: { ...LIGHTHOUSE.categories, performance: 0.72 },
+  metrics: { ...LIGHTHOUSE.metrics, 'largest-contentful-paint': 2800 },
+};
+
+test('mensal, 1ª execução (anterior vazio): marcador e título próprios, "sem mês anterior" e o bloco de números', (t) => {
+  const out = roda(t, SIZE, LIGHTHOUSE, { mensal: true, anterior: '' });
+  const linhas = out.split('\n');
+  assert.equal(linhas[0], '<!-- as-frontend-monthly -->');
+  assert.equal(linhas[1], '## Acompanhamento mensal do frontend');
+  assert.match(out, /Commit `0123456` · \[run do CI\]\(.+\) · medição agendada da `main`; não bloqueia merge\./);
+  assert.match(out, /\n\n\*\*Contra o mês anterior:\*\* sem mês anterior\.\n\n### Tamanho do bundle/);
+  assert.equal(
+    linhas.at(-2),
+    '<!-- as-frontend-monthly-dados {"performance":0.69,"lcp":3006.4,"js":727500} -->',
+  );
+  assert.doesNotMatch(out, /as-frontend-report|atualizado a cada push/);
+});
+
+test('mensal: compara com os números que o próprio relatório do mês anterior gravou', (t) => {
+  const setembro = roda(t, SIZE, LIGHTHOUSE, { mensal: true, anterior: '' });
+  const out = roda(t, SIZE_OUTUBRO, LIGHTHOUSE_OUTUBRO, { mensal: true, anterior: setembro });
+  assert.match(
+    out,
+    /\*\*Contra o mês anterior:\*\* performance 69 → 72 \(\+3\) · LCP 3\.006 → 2\.800 ms \(-206 ms\) · JS 727,5 → 740 kB \(\+12,5 kB\)\./,
+  );
+});
+
+test('mensal: número que faltou num dos meses vira "n/d" só nele', (t) => {
+  const semLighthouse = roda(t, SIZE, undefined, { mensal: true, anterior: '' });
+  assert.match(semLighthouse, /as-frontend-monthly-dados \{"performance":null,"lcp":null,"js":727500\}/);
+  const out = roda(t, SIZE_OUTUBRO, LIGHTHOUSE_OUTUBRO, { mensal: true, anterior: semLighthouse });
+  assert.match(out, /\*\*Contra o mês anterior:\*\* performance n\/d · LCP n\/d · JS 727,5 → 740 kB \(\+12,5 kB\)\./);
+});
+
+test('mensal: comentário anterior sem bloco de números (ou editado à mão) vira "sem mês anterior"', (t) => {
+  for (const anterior of ['<!-- as-frontend-monthly -->\nqualquer texto', '<!-- as-frontend-monthly-dados {quebrado} -->']) {
+    const out = roda(t, SIZE, LIGHTHOUSE, { mensal: true, anterior });
+    assert.match(out, /\*\*Contra o mês anterior:\*\* sem mês anterior\./);
+  }
 });

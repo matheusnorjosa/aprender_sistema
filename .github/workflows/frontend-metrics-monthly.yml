@@ -1,0 +1,121 @@
+name: frontend-metrics-monthly
+
+# Decisão do dono (28/09): o Lighthouse do CI NÃO bloqueia merge, mas os números
+# são acompanhados a cada 30 dias. Este workflow mede a `main` (size-limit +
+# Lighthouse) e deixa um comentário NOVO por mês na issue de acompanhamento —
+# a issue é a série histórica. O relatório sai de v2/frontend/scripts/pr-report.mjs
+# (o mesmo do `[info] frontend PR report`), em modo `--mensal`.
+on:
+  schedule:
+    # Dia 1º, 12:00 UTC = 09:00 America/Fortaleza.
+    - cron: '0 12 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+env:
+  NPM_CONFIG_PREFER_OFFLINE: 'true'
+  NPM_CONFIG_AUDIT: 'false'
+  NPM_CONFIG_FUND: 'false'
+
+jobs:
+  metrics:
+    name: "[ops] frontend monthly metrics"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write
+    env:
+      TRACKING_ISSUE: '2066'
+      # Igual à 1ª linha que pr-report.mjs imprime com `--mensal`.
+      MARKER: '<!-- as-frontend-monthly -->'
+
+    defaults:
+      run:
+        working-directory: v2/frontend
+
+    steps:
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
+      with:
+        ref: main
+        persist-credentials: false
+
+    - uses: ./.github/actions/setup-node-deps
+
+    - name: Setup Chrome
+      id: setup-chrome
+      uses: browser-actions/setup-chrome@c785b87e244131f27c9f19c1a33e2ead956ab7ce # v1
+      with:
+        chrome-version: stable
+
+    - name: Build with Vite
+      id: build
+      run: npm run build
+
+    # Estouro de limite sai != 0 mas o JSON sai igual: não pode impedir o
+    # relatório. `npx`, não `npm run`: o banner do npm corromperia o JSON.
+    - name: Tamanhos do bundle em JSON
+      if: steps.build.outcome == 'success'
+      continue-on-error: true
+      run: |
+        mkdir -p "$RUNNER_TEMP/metricas"
+        npx size-limit --json > "$RUNNER_TEMP/metricas/size-limit.json"
+
+    # Hoje reprova (performance 0,69, LCP ~3 s): é o que se acompanha, não um gate.
+    - name: Lighthouse
+      if: steps.build.outcome == 'success'
+      continue-on-error: true
+      run: npm run lighthouse:ci
+      env:
+        CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
+
+    # Sai mesmo com o build quebrado: o que faltar vira "Indisponível" no
+    # comentário, e o mês não some da série. A comparação lê os números do
+    # último comentário mensal do bot (bloco oculto gravado pelo próprio script).
+    # HEAD_SHA do checkout, não `github.sha`: num dispatch de outra branch os dois
+    # diferem, e o medido é a `main`.
+    - name: Montar relatório
+      id: relatorio
+      if: ${{ !cancelled() }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        HEAD_SHA="$(git rev-parse HEAD)"
+        export HEAD_SHA
+        mkdir -p "$RUNNER_TEMP/metricas"
+        cp .lighthouseci/summary.json "$RUNNER_TEMP/metricas/" 2>/dev/null || echo "Sem summary.json do Lighthouse."
+        id="$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$TRACKING_ISSUE/comments?per_page=100" \
+          --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | contains(env.MARKER))) | .id' | tail -n 1)"
+        : > "$RUNNER_TEMP/anterior.md"
+        if [ -n "$id" ]; then
+          gh api "repos/$GITHUB_REPOSITORY/issues/comments/$id" --jq .body > "$RUNNER_TEMP/anterior.md"
+          echo "Comparando com o comentário $id."
+        fi
+        node scripts/pr-report.mjs --mensal --anterior "$RUNNER_TEMP/anterior.md" \
+          "$RUNNER_TEMP/metricas/size-limit.json" "$RUNNER_TEMP/metricas/summary.json" \
+          > "$RUNNER_TEMP/metricas/report.md"
+        cat "$RUNNER_TEMP/metricas/report.md" >> "$GITHUB_STEP_SUMMARY"
+
+    # Comentário novo a cada execução (nunca edita o anterior): é o histórico.
+    - name: Comentar na issue de acompanhamento
+      if: ${{ !cancelled() && steps.relatorio.outcome == 'success' }}
+      run: gh issue comment "$TRACKING_ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/metricas/report.md"
+      env:
+        GH_TOKEN: ${{ github.token }}
+
+    - name: Upload das medições
+      if: ${{ !cancelled() }}
+      continue-on-error: true
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4
+      with:
+        name: frontend-metrics-monthly
+        path: ${{ runner.temp }}/metricas
+        if-no-files-found: warn
+        retention-days: 90

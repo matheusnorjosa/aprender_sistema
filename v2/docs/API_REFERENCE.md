@@ -160,7 +160,7 @@ Corpo opcional de `approve`/`reject`: `{"reason": "..."}` (aceita também
 
 ```
 ?mine=true                       # força escopo ao próprio usuário
-?publishable=true                # só o que o usuário pode publicar no Google Agenda (#1656)
+?publishable=true                # só o que o usuário pode publicar no Google Agenda (#1656); use com status=aprovado
 ?status=pendente|aprovado|reprovado
 ?status=pending|approved|rejected # aliases em inglês (mapeados)
 ?flow=SUPER|NAO_SUPER            # fluxo do projeto

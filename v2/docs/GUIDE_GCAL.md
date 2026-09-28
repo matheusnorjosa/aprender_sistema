@@ -118,7 +118,7 @@ GCAL_CALENDAR_ID=primary
 Toda escrita OAuth — publicar, resincronizar e cancelar, por qualquer operador — vai para **um** calendário, resolvido no servidor (`resolve_publish_calendar_id`):
 
 1. `GCAL_OAUTH_CALENDAR_ID` (o pino da organização), se definido;
-2. senão, o calendário **escolhido** na credencial de quem age (`default_calendar_id`);
+2. senão, o calendário **escolhido** na credencial de quem age (`default_calendar_id`) — só para quem tem `use_gcal`; a Apoio de Coordenação publica apenas no pino (#1656);
 3. senão, **nada**: o request responde `409 {"code": "google_calendar_not_configured"}` antes de marcar PENDING — nunca o calendário pessoal da conta.
 
 Por que o pino vale para todos: sem ele, o calendário era re-derivado de quem age, e um resync feito por outro operador criava um evento duplicado no calendário dele, enquanto o cancel "dava certo" (404 = sucesso) e deixava o evento órfão no calendário da organização. Com o pino, todos miram o mesmo calendário do evento.

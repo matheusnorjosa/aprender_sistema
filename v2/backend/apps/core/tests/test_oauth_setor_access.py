@@ -165,6 +165,21 @@ def test_apoio_callback_state_invalido_volta_para_pagina_de_publicacao(_mock_val
     assert "invalid_state" in resp.url
 
 
+@patch("apps.core.views_oauth.exchange_code_for_tokens", return_value=TOKENS)
+@patch("apps.core.services.google_oauth.validate_oauth_state")
+def test_apoio_sem_setor_callback_nao_grava_credencial(mock_validate, mock_exchange):
+    """M12-15: o vínculo pode vencer entre o start e o callback (o state vive 10 min) — sem setor, sem token."""
+    apoio = _apoio(None)
+    mock_validate.return_value = {"valid": True, "return_to": PAGINA_PUBLICACAO, "user_id": apoio.pk}
+
+    resp = _cliente(apoio).get("/api/oauth/google/callback/", {"code": "c", "state": "s"})
+
+    assert resp.status_code == status.HTTP_302_FOUND
+    assert "reason=no_setor_scope" in resp.url
+    mock_exchange.assert_not_called()
+    assert not GoogleOAuthCredential.objects.filter(user=apoio).exists()
+
+
 @patch("apps.core.views_oauth.exchange_code_for_tokens")
 def test_controle_callback_erro_continua_em_pre_agenda(_mock_exchange):
     resp = _cliente(_controle()).get("/api/oauth/google/callback/", {"error": "access_denied"})
@@ -194,6 +209,19 @@ def test_apoio_status_e_disconnect_200(_mock_google_revoke, apoio_fluir, setting
     desconectar = client.post("/api/integrations/google/disconnect/")
     assert desconectar.status_code == status.HTTP_200_OK
     assert not GoogleOAuthCredential.objects.filter(user=apoio_fluir).exists()
+
+
+def test_apoio_sem_pino_nao_usa_calendario_herdado_da_credencial(apoio_fluir, settings):
+    """Sem pino, só quem tem use_gcal usa a própria seleção. A Apoio publica só no calendário da
+    organização — nunca num calendário herdado de outro papel (credencial criada quando era Controle)."""
+    settings.GCAL_AUTH_MODE = "oauth"
+    settings.GCAL_OAUTH_CALENDAR_ID = ""
+    _conectar(apoio_fluir, default_calendar_id="calendario-antigo@group.calendar.google.com")
+
+    resp = _cliente(apoio_fluir).get("/api/integrations/google/status/")
+
+    assert resp.data["publish_block_reason"] == "google_calendar_not_configured"
+    assert resp.data["publish_ready"] is False
 
 
 @pytest.mark.parametrize(
@@ -278,7 +306,10 @@ def test_formador_start_callback_status_disconnect_403(metodo, url):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("url", ["/\\evil.com", "/solicitacoes/publicacao\r\nSet-Cookie: x=1", "/pre-agenda\x00"])
+@pytest.mark.parametrize(
+    "url",
+    ["/\\evil.com", "\\/evil.com", "/\t/evil.com", "/solicitacoes/publicacao\r\nSet-Cookie: x=1", "/pre-agenda\x00"],
+)
 def test_is_safe_url_rejeita_barra_invertida_e_controle(url):
     """O navegador normaliza '/\\' para '//' (outro host). Controle CR/LF/NUL também sai."""
     assert _is_safe_url(url) is False

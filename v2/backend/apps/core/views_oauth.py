@@ -399,6 +399,12 @@ def google_oauth_callback(request: Request) -> Response:
     # State válido - usar return_to validado
     return_to = validation["return_to"]
 
+    # M12-15: o vínculo pode vencer entre o start e o callback (o state vive 10 min).
+    # Quem não pode publicar nada não recebe token Google.
+    if not has_publish_scope(request.user):
+        redirect_path = _merge_query_params(return_to, google="error", reason="no_setor_scope")
+        return redirect(_build_frontend_redirect_url(redirect_path))
+
     try:
         # Trocar code por tokens
         tokens = exchange_code_for_tokens(code)

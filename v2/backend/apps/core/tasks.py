@@ -202,9 +202,14 @@ def _mark_gcal_error(
     publish/resync/cancel marcam PENDING antes de enfileirar; se a task sai sem marcar, a linha
     fica PENDING para sempre (publicar some da tela e a edição fica bloqueada). `mark_gcal` não
     toca em `external_event_id`, então a linha segue re-tentável.
+
+    No dry-run não grava nada: a prévia não marca PENDING, e ERROR (ou AuditLog) numa linha que
+    pode estar publicada seria efeito colateral de uma simulação. O erro volta só no resultado.
     """
     from apps.core.models import AuditLog, Solicitacao
 
+    if dry_run:
+        return
     try:
         s = Solicitacao.objects.get(id=solicitation_id)
     except Solicitacao.DoesNotExist:
@@ -213,19 +218,18 @@ def _mark_gcal_error(
         s.mark_gcal(status=Solicitacao.GCalStatus.ERROR, payload_hash=None, error=message)
     except Exception:
         logger.exception("Falha ao marcar ERROR na Solicitacao #%s", solicitation_id)
-    if not dry_run:
-        AuditLog.objects.create(
-            usuario=operator,
-            action=AuditLog.Action.PUBLISH_GCAL_ERROR,
-            model_name="Solicitacao",
-            details={
-                "solicitacao_id": s.id,
-                "operation": operation,
-                "error": raw_error[:500],
-                "dry_run": dry_run,
-                "apply_blocked": apply_blocked,
-            },
-        )
+    AuditLog.objects.create(
+        usuario=operator,
+        action=AuditLog.Action.PUBLISH_GCAL_ERROR,
+        model_name="Solicitacao",
+        details={
+            "solicitacao_id": s.id,
+            "operation": operation,
+            "error": raw_error[:500],
+            "dry_run": dry_run,
+            "apply_blocked": apply_blocked,
+        },
+    )
 
 
 @shared_task(name="apps.core.tasks.task_publish_solicitacao_to_gcal")
@@ -266,13 +270,16 @@ def task_publish_solicitacao_to_gcal(
     operator = None
     google_email = None
 
-    if auth_mode == "oauth" and not dry_run:
-        # OAuth mode requer operator_user_id. Toda saída cedo marca ERROR (nunca PENDING eterno).
+    if auth_mode == "oauth":
+        # OAuth mode requer operator_user_id — também no dry-run, que só não ESCREVE: sem o cliente
+        # do operador ele caía na service account, que não existe em prod. Toda saída cedo marca
+        # ERROR (nunca PENDING eterno), exceto no dry-run (ver _mark_gcal_error).
         if operator_user_id is None:
             _mark_gcal_error(
                 solicitation_id,
                 "Publicação sem operador identificado. Publique de novo pela tela.",
                 raw_error="missing_operator_user_id",
+                dry_run=dry_run,
                 apply_blocked=apply_blocked,
             )
             return {
@@ -298,6 +305,7 @@ def task_publish_solicitacao_to_gcal(
                 solicitation_id,
                 f"Usuário operador #{operator_user_id} não encontrado.",
                 raw_error="operator_not_found",
+                dry_run=dry_run,
                 apply_blocked=apply_blocked,
             )
             return {
@@ -314,6 +322,7 @@ def task_publish_solicitacao_to_gcal(
                 _MSG_CREDENCIAL_GOOGLE,
                 raw_error=str(e),
                 operator=operator,
+                dry_run=dry_run,
                 apply_blocked=apply_blocked,
             )
             return {
@@ -330,6 +339,7 @@ def task_publish_solicitacao_to_gcal(
                 _friendly_gcal_error(e),
                 raw_error=str(e),
                 operator=operator,
+                dry_run=dry_run,
                 apply_blocked=apply_blocked,
             )
             return {
@@ -407,7 +417,7 @@ def task_publish_solicitacao_to_gcal(
             )
 
         # Marca ERROR com texto acionável (403/404 do Google = sem acesso ao calendário);
-        # o erro cru vai para o AuditLog (só fora do dry-run).
+        # o erro cru vai para o AuditLog. No dry-run, nenhum dos dois.
         _mark_gcal_error(
             solicitation_id,
             _friendly_gcal_error(e),

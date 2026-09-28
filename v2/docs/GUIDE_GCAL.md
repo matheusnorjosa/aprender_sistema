@@ -230,6 +230,7 @@ O `GoogleCalendarClient` (`apps/core/services/gcal_google_client.py`) lê `setti
 - **dry_run**: Modo simulação:
   - Se `true`: Executa lógica mas NÃO persiste no DB nem no Calendar
   - Se `false`: Executa e persiste (publicação real)
+  - No modo OAuth, o dry-run usa o cliente OAuth do operador, como a publicação real: lê o Google e não escreve. Se falhar (sem operador, sem credencial, sem calendário), o erro volta só no resultado da task; o evento não vira *Erro* e nada vai para o `AuditLog`.
 
 ### Matriz de Comportamento
 
@@ -774,6 +775,16 @@ export GOOGLE_SERVICE_ACCOUNT_FILE=/app/secrets/key.json
 # Opção 2: JSON inline
 export GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}'
 ```
+
+**No modo OAuth (produção) não configure a service account.** Esse erro indica que algum caminho ignorou o cliente do operador. Até a correção de 2026-09-28, o dry-run (`{"dry_run": true}` no `/publish/`) fazia isso. Hoje ele usa o cliente OAuth do operador. O auto-retry depois do circuit breaker (`queue_gcal_sync_retry`) ainda usa a service account (ver a spec, "Pontos de atenção").
+
+### Evento *Publicado* no sistema, mas invisível no Google
+
+**Sintoma:** o evento foi publicado, removido ("Cancelar") e publicado de novo. O sistema mostra *Publicado*, mas o evento não aparece no calendário. Pela API, `events.get` do id `asv2{id}` devolve `"status": "cancelled"`.
+
+**Causa:** o "Cancelar" apaga o evento no Google, e o Google faz soft-delete: o evento fica `cancelled` com o mesmo id. A publicação seguinte encontra esse id, adota o evento e faz `patch`. Até a correção de 2026-09-28 o payload não mandava `status`, e o `patch` deixava o evento cancelado.
+
+**Solução:** hoje o payload sempre manda `"status": "confirmed"`, e publicar de novo volta a mostrar o evento. Para um evento que ficou oculto antes da correção, use "Reenviar" (resync): o hash do payload mudou (agora inclui `status`), então a publicação faz `UPDATE` e o evento volta a `confirmed`.
 
 ### Erro: "Sua conexão com o Google expirou ou foi removida"
 

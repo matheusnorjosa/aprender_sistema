@@ -242,6 +242,10 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> JsonDict:
 
     # Construir payload
     payload = {
+        # O DELETE do Google é soft-delete (o evento fica `cancelled` e o GET pelo id
+        # determinístico ainda o acha). Republicar depois de remover adota o evento e faz
+        # PATCH, que só troca os campos enviados: sem `status` aqui ele seguia oculto.
+        "status": "confirmed",
         "summary": summary_trimmed,
         "description": description_trimmed,
         "start": {"dateTime": start_iso, "timeZone": "UTC"},

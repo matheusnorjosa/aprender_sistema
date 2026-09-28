@@ -9,12 +9,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const SCRIPT = fileURLToPath(new URL('./pr-report.mjs', import.meta.url));
+// Raiz do repo a partir deste arquivo (v2/frontend/scripts), não do cwd: o job
+// pr-report roda o teste da raiz, e o `npm`/dev, de v2/frontend.
+const WORKFLOWS = new URL('../../../.github/workflows/', import.meta.url);
 
 const SIZE = [
   { name: 'JS Bundle', passed: true, size: 727500, sizeLimit: 750000 },
@@ -52,8 +55,11 @@ const LIGHTHOUSE = {
  * @param {import('node:test').TestContext} t
  * @param {object | string | undefined} size
  * @param {object | string | undefined} lighthouse
+ * @param {{ mensal?: boolean, anteriores?: Array<object | string> }} [opcoes]
+ *   `anteriores`: comentários mensais anteriores (`{ created_at, body }`, ou
+ *   uma linha crua), gravados em JSON Lines e passados em `--anteriores`.
  */
-function roda(t, size, lighthouse) {
+function roda(t, size, lighthouse, { mensal = false, anteriores } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'pr-report-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const arquivos = [
@@ -65,7 +71,13 @@ function roda(t, size, lighthouse) {
       writeFileSync(arquivo, typeof conteudo === 'string' ? conteudo : JSON.stringify(conteudo));
     }
   }
-  const r = spawnSync(process.execPath, [SCRIPT, ...arquivos.map(([arquivo]) => arquivo)], {
+  const flags = mensal ? ['--mensal'] : [];
+  if (anteriores !== undefined) {
+    const linhas = anteriores.map((c) => (typeof c === 'string' ? c : JSON.stringify(c)));
+    writeFileSync(join(dir, 'anteriores.jsonl'), linhas.map((linha) => `${linha}\n`).join(''));
+    flags.push('--anteriores', join(dir, 'anteriores.jsonl'));
+  }
+  const r = spawnSync(process.execPath, [SCRIPT, ...flags, ...arquivos.map(([arquivo]) => arquivo)], {
     encoding: 'utf8',
     env: {
       ...process.env,
@@ -120,4 +132,120 @@ test('JSON ilegível ou de formato errado também vira "Indisponível", sem derr
   const out = roda(t, '{ quebrado', { error: 'Error: sem arquivos' });
   assert.match(out, /\*\*Indisponível:\*\* arquivo ilegível \(`size-limit\.json`\): /);
   assert.match(out, /\*\*Indisponível:\*\* formato inesperado/);
+});
+
+test('modo PR não ganha comparação nem bloco de números', (t) => {
+  const out = roda(t, SIZE, LIGHTHOUSE);
+  assert.doesNotMatch(out, /medição anterior|as-frontend-monthly/);
+});
+
+// Mês seguinte: performance e JS sobem, LCP cai.
+const SIZE_OUTUBRO = [{ ...SIZE[0], size: 740000 }, SIZE[1]];
+const LIGHTHOUSE_OUTUBRO = {
+  ...LIGHTHOUSE,
+  categories: { ...LIGHTHOUSE.categories, performance: 0.72 },
+  metrics: { ...LIGHTHOUSE.metrics, 'largest-contentful-paint': 2800 },
+};
+
+/** Comentário mensal anterior como a API devolve, só com o bloco de números. */
+function comentario(createdAt, numeros) {
+  return {
+    created_at: createdAt,
+    body: `<!-- as-frontend-monthly -->\n## Acompanhamento mensal do frontend\n\n<!-- as-frontend-monthly-dados ${JSON.stringify(numeros)} -->\n`,
+  };
+}
+
+test('mensal, 1ª execução (sem anteriores): marcador e título próprios, "sem medição anterior" e o bloco de números', (t) => {
+  const out = roda(t, SIZE, LIGHTHOUSE, { mensal: true, anteriores: [] });
+  const linhas = out.split('\n');
+  assert.equal(linhas[0], '<!-- as-frontend-monthly -->');
+  assert.equal(linhas[1], '## Acompanhamento mensal do frontend');
+  assert.match(out, /Commit `0123456` · \[run do CI\]\(.+\) · medição agendada da `main`; não bloqueia merge\./);
+  assert.match(out, /\n\n\*\*Contra a medição anterior:\*\* sem medição anterior\.\n\n### Tamanho do bundle/);
+  assert.equal(
+    linhas.at(-2),
+    '<!-- as-frontend-monthly-dados {"performance":0.69,"lcp":3006.4,"js":727500} -->',
+  );
+  assert.doesNotMatch(out, /as-frontend-report|atualizado a cada push/);
+});
+
+test('mensal: compara com os números que o próprio relatório anterior gravou, com a data dele', (t) => {
+  const setembro = roda(t, SIZE, LIGHTHOUSE, { mensal: true, anteriores: [] });
+  const out = roda(t, SIZE_OUTUBRO, LIGHTHOUSE_OUTUBRO, {
+    mensal: true,
+    anteriores: [{ created_at: '2026-09-01T12:17:40Z', body: setembro }],
+  });
+  assert.match(
+    out,
+    /\*\*Contra a medição anterior \(01\/09\/2026\):\*\* performance 69 → 72 \(\+3\) · LCP 3\.006 → 2\.800 ms \(-206 ms\) · JS 727,5 → 740 kB \(\+12,5 kB\)\./,
+  );
+});
+
+test('mensal: execução manual não passa por "mês anterior" — a data é a do comentário, em Fortaleza', (t) => {
+  // 02:00 UTC de 01/10 = 23:00 de 30/09 em Fortaleza.
+  const manual = comentario('2026-10-01T02:00:00Z', { performance: 0.69, lcp: 3006.4, js: 727500 });
+  const out = roda(t, SIZE_OUTUBRO, LIGHTHOUSE_OUTUBRO, { mensal: true, anteriores: [manual] });
+  assert.match(out, /\*\*Contra a medição anterior \(30\/09\/2026\):\*\* performance 69 → 72/);
+  assert.doesNotMatch(out, /mês anterior/);
+});
+
+test('mensal: métrica que faltou na medição anterior compara com a última que a tem, e leva a data dela', (t) => {
+  const agosto = comentario('2026-08-01T12:17:00Z', { performance: 0.66, lcp: 3211, js: 725000 });
+  const setembroQuebrado = comentario('2026-09-01T12:17:00Z', { performance: null, lcp: null, js: 727500 });
+  // A ordem do arquivo não importa: vale a created_at.
+  for (const anteriores of [[agosto, setembroQuebrado], [setembroQuebrado, agosto]]) {
+    const out = roda(t, SIZE_OUTUBRO, LIGHTHOUSE_OUTUBRO, { mensal: true, anteriores });
+    assert.match(
+      out,
+      /\*\*Contra a medição anterior \(01\/09\/2026\):\*\* performance 66 \(01\/08\/2026\) → 72 \(\+6\) · LCP 3\.211 \(01\/08\/2026\) → 2\.800 ms \(-411 ms\) · JS 727,5 → 740 kB \(\+12,5 kB\)\./,
+    );
+  }
+});
+
+test('mensal: número sem base em medição nenhuma, ou que falta agora, vira "n/d" só nele', (t) => {
+  const semLighthouse = roda(t, SIZE, undefined, { mensal: true, anteriores: [] });
+  assert.match(semLighthouse, /as-frontend-monthly-dados \{"performance":null,"lcp":null,"js":727500\}/);
+  const anteriores = [{ created_at: '2026-09-01T12:17:40Z', body: semLighthouse }];
+  const out = roda(t, SIZE_OUTUBRO, LIGHTHOUSE_OUTUBRO, { mensal: true, anteriores });
+  assert.match(out, /\*\*Contra a medição anterior \(01\/09\/2026\):\*\* performance n\/d · LCP n\/d · JS 727,5 → 740 kB \(\+12,5 kB\)\./);
+
+  const semLighthouseAgora = roda(t, SIZE_OUTUBRO, undefined, { mensal: true, anteriores });
+  assert.match(semLighthouseAgora, /performance n\/d · LCP n\/d · JS 727,5 → 740 kB/);
+});
+
+test('mensal: a variação sai dos valores arredondados que a linha mostra (68,7 → 69,3 é +0,6)', (t) => {
+  const anterior = comentario('2026-09-01T12:17:00Z', { performance: 0.68666, lcp: 3006.4, js: 727500 });
+  const lighthouse = { ...LIGHTHOUSE, categories: { ...LIGHTHOUSE.categories, performance: 0.69333 } };
+  const out = roda(t, SIZE, lighthouse, { mensal: true, anteriores: [anterior] });
+  assert.match(out, /performance 68,7 → 69,3 \(\+0,6\) · LCP 3\.006 → 3\.006 ms \(0 ms\)/);
+});
+
+test('mensal: anteriores sem bloco de números, quebrados ou sem data viram "sem medição anterior"', (t) => {
+  const anteriores = [
+    { created_at: '2026-09-01T12:17:00Z', body: '<!-- as-frontend-monthly -->\nqualquer texto' },
+    { created_at: '2026-09-02T12:17:00Z', body: '<!-- as-frontend-monthly-dados {quebrado} -->' },
+    { body: comentario('', { performance: 0.7 }).body },
+    'linha que não é JSON',
+    '',
+  ];
+  const out = roda(t, SIZE, LIGHTHOUSE, { mensal: true, anteriores });
+  assert.match(out, /\*\*Contra a medição anterior:\*\* sem medição anterior\./);
+});
+
+// O workflow acha o próprio comentário pelo MARKER do `env:`; se ele e a 1ª
+// linha do script divergirem, cada execução vira um comentário "sem anterior"
+// (mensal) ou um comentário novo por push (PR), sem erro nenhum.
+function marcadorDoWorkflow(arquivo) {
+  const yml = readFileSync(new URL(arquivo, WORKFLOWS), 'utf8');
+  const marcadores = [...yml.matchAll(/^\s*MARKER:\s*'([^']*)'\s*$/gm)].map((achado) => achado[1]);
+  assert.equal(marcadores.length, 1, `esperava um MARKER em ${arquivo}`);
+  return marcadores[0];
+}
+
+test('o MARKER de cada workflow é a 1ª linha que o script imprime no modo dele', (t) => {
+  assert.equal(marcadorDoWorkflow('frontend-ci.yml'), roda(t, SIZE, LIGHTHOUSE).split('\n')[0]);
+  assert.equal(
+    marcadorDoWorkflow('frontend-metrics-monthly.yml'),
+    roda(t, SIZE, LIGHTHOUSE, { mensal: true }).split('\n')[0],
+  );
 });

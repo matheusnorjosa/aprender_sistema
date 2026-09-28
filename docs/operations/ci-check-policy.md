@@ -87,6 +87,7 @@ Executados por `schedule` ou `workflow_dispatch`:
 
 - `[ops] strict security headers (staging/prod)`
 - `[ops] backend xdist canary summary`
+- `[ops] frontend monthly metrics (medir)` e `(publicar)` (`frontend-metrics-monthly.yml`) — dia 1º, ~09:17 de Fortaleza: mede a `main` (size-limit + Lighthouse, sem bloquear nada) e deixa um comentário novo por execução na issue #2066, com a variação contra a medição anterior
 - `[ops] slsa provenance + cosign`
 - `[ops] promote (assina ponteiro)` (`promote.yml`, gated no Environment `production`)
 

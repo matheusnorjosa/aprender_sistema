@@ -171,8 +171,14 @@ DEPLOY\_CHECKLIST, SLO\_DEFINITIONS, DISASTER\_RECOVERY. Specs vivas em `v2/docs
 
 Instalado em `~/.local/bin/rtk.exe` + hook global em `settings.json`.
 Comandos Bash passam automaticamente por `rtk hook claude` (transparente).
+`ls`, `git`, `grep`, `gh`, `head` e `tail` rodam sem RTK (exclude_commands global).
+Saída que parecer resumida demais? Usar `rtk proxy <cmd>`.
 
 **Filtros locais do projeto:** `.rtk/filters.toml` (pytest, vite, pyright, docker logs).
+Versionado, mas só vale depois de `rtk trust` na raiz e só para rtk rodado da raiz.
+Na 0.50 só `pyright`, `vite build` e `yarn build` chegam a ele: `docker …` e `npm …`
+vão para o módulo nativo do rtk. Editou o arquivo? O trust cai;
+`RTK_TRUST_PROJECT_FILTERS=1 CI=1 rtk verify` roda os `[[tests.*]]` sem refazer o trust.
 
 **Comandos diretos úteis:**
 

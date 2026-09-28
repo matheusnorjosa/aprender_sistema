@@ -655,8 +655,10 @@ graphify-out/cost.json
 # GSD-2 state (local orchestration)
 .gsd/
 
-# RTK (Rust Token Killer) local filters
-.rtk/
+# RTK (Rust Token Killer): os filtros do projeto sao versionados; o resto de
+# .rtk/ fica local. Filtro versionado so vale depois de `rtk trust` do dono.
+.rtk/*
+!.rtk/filters.toml
 
 # Claude Code agent skills cache
 # .agents/ — VERSIONADO desde D3. Ver bloco 'Claude local workspace'.

@@ -1,0 +1,176 @@
+# Aprender Sistema - RTK project-local filters
+# These take precedence over ~/.config/rtk/filters.toml
+# Docs: https://github.com/rtk-ai/rtk#custom-filters
+#
+# rtk >= 0.50 ignores a filter if any top-level branch of match_command does
+# not start with '^'. Any edit here revokes `rtk trust`: the owner reviews the
+# file and runs `rtk trust` again at the repo root. `rtk verify` runs the
+# [[tests.*]] cases below.
+#
+# rtk reads this file from the current directory only (repo root), and in 0.50
+# it sends `docker ...` and `npm ...` to its native modules before any TOML
+# lookup, so the docker-* filters and the `npm run build` branch never fire.
+
+schema_version = 1
+
+# ============================================================
+# Docker exec patterns (our primary dev workflow)
+# ============================================================
+
+[filters.docker-exec-pytest]
+description = "Strip pytest verbose output from docker exec"
+match_command = "^docker exec .* pytest"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",                          # empty lines
+    "^platform .*Python.*pytest",      # pytest header
+    "^cachedir:",                      # cache info
+    "^rootdir:",                       # root info
+    "^plugins:",                       # plugin list
+    "^collecting \\.\\.\\.",            # collection progress
+    "^\\s+\\d+ passed",                # individual pass lines when verbose
+]
+
+[[tests.docker-exec-pytest]]
+name = "strips header noise, keeps results, failures and summary"
+input = """
+============================= test session starts ==============================
+platform linux -- Python 3.12.11, pytest-8.4.2, pluggy-1.6.0 -- /usr/local/bin/python
+cachedir: .pytest_cache
+django: version: 5.2.6, settings: config.settings.test (from ini)
+rootdir: /app
+configfile: pytest.ini
+plugins: django-4.11.1, xdist-3.8.0, cov-7.0.0
+collecting ... collected 2 items
+
+apps/core/tests/test_x.py::test_a PASSED                                 [ 50%]
+apps/core/tests/test_x.py::test_b FAILED                                 [100%]
+
+=========================== short test summary info ============================
+FAILED apps/core/tests/test_x.py::test_b - AssertionError: assert 1 == 2
+========================= 1 failed, 1 passed in 0.42s ==========================
+"""
+expected = """
+============================= test session starts ==============================
+django: version: 5.2.6, settings: config.settings.test (from ini)
+configfile: pytest.ini
+apps/core/tests/test_x.py::test_a PASSED                                 [ 50%]
+apps/core/tests/test_x.py::test_b FAILED                                 [100%]
+=========================== short test summary info ============================
+FAILED apps/core/tests/test_x.py::test_b - AssertionError: assert 1 == 2
+========================= 1 failed, 1 passed in 0.42s ==========================
+"""
+
+[filters.docker-exec-migrate]
+description = "Compact Django migrate output"
+match_command = "^docker exec .* (migrate|makemigrations|showmigrations)"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",
+    "^\\s+Applying ",  # will show only summary
+]
+
+[[tests.docker-exec-migrate]]
+name = "drops per-migration Applying lines, keeps the plan header"
+input = """
+Operations to perform:
+  Apply all migrations: admin, auth, contenttypes, core, sessions
+Running migrations:
+  Applying core.0101_exemplo... OK
+  Applying core.0102_exemplo... OK
+
+"""
+expected = """
+Operations to perform:
+  Apply all migrations: admin, auth, contenttypes, core, sessions
+Running migrations:
+"""
+
+[filters.docker-logs]
+description = "Dedupe gunicorn/celery worker repetitive logs"
+match_command = "^docker logs\\b"
+strip_ansi = true
+max_lines = 50
+
+[[tests.docker-logs]]
+name = "strips ANSI colors, keeps every line under the cap"
+input = """
+\u001b[32m[2026-09-28 10:00:00 -0300] [1] [INFO] Starting gunicorn 23.0.0\u001b[0m
+[2026-09-28 10:00:01 -0300] [7] [INFO] Booting worker with pid: 7
+"""
+expected = """
+[2026-09-28 10:00:00 -0300] [1] [INFO] Starting gunicorn 23.0.0
+[2026-09-28 10:00:01 -0300] [7] [INFO] Booting worker with pid: 7
+"""
+
+# ============================================================
+# Frontend build (Vite is verbose)
+# ============================================================
+
+[filters.vite-build]
+description = "Strip Vite build boilerplate"
+match_command = "^(npm run build|vite build|yarn build)\\b"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",
+    "^vite v[0-9]",
+    "^\\s*transforming",
+    "^\\s*computing gzip size",
+]
+
+[[tests.vite-build]]
+name = "keeps the chunk table and the final built-in line"
+input = """
+vite v7.1.5 building for production...
+transforming...
+✓ 3120 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.62 kB │ gzip:   0.38 kB
+dist/assets/index-Bx1a.css       45.10 kB │ gzip:   8.71 kB
+dist/assets/index-C9d2.js       412.33 kB │ gzip: 131.02 kB
+
+✓ built in 5.18s
+"""
+expected = """
+✓ 3120 modules transformed.
+rendering chunks...
+dist/index.html                   0.62 kB │ gzip:   0.38 kB
+dist/assets/index-Bx1a.css       45.10 kB │ gzip:   8.71 kB
+dist/assets/index-C9d2.js       412.33 kB │ gzip: 131.02 kB
+✓ built in 5.18s
+"""
+
+# ============================================================
+# Python tooling (inside container)
+# ============================================================
+
+[filters.pyright-strict]
+description = "Keep only pyright errors and summary"
+match_command = "^pyright\\b"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",
+    "^\\s+\\(reportUnknownMemberType\\)",
+    "^\\s+\\(reportUnknownVariableType\\)",
+]
+
+[[tests.pyright-strict]]
+name = "keeps the indented Type lines that explain the error"
+input = """
+/app/apps/core/exemplo.py
+  /app/apps/core/exemplo.py:13:9 - error: Argument of type "(x: int) -> None" cannot be assigned to parameter "cb" of type "(str) -> None" in function "aplicar"
+    Type "(x: int) -> None" is not assignable to type "(str) -> None"
+      Parameter 1: type "str" is incompatible with type "int"
+        "str" is not assignable to "int" (reportArgumentType)
+
+1 error, 0 warnings, 0 informations
+"""
+expected = """
+/app/apps/core/exemplo.py
+  /app/apps/core/exemplo.py:13:9 - error: Argument of type "(x: int) -> None" cannot be assigned to parameter "cb" of type "(str) -> None" in function "aplicar"
+    Type "(x: int) -> None" is not assignable to type "(str) -> None"
+      Parameter 1: type "str" is incompatible with type "int"
+        "str" is not assignable to "int" (reportArgumentType)
+1 error, 0 warnings, 0 informations
+"""

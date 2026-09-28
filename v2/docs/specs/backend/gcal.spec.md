@@ -71,13 +71,13 @@ O módulo isola o acesso à Google Calendar API atrás de um adaptador único (`
 - **Persistência de `meet_link` apenas em APPLY real**: preview, `dry_run=true` e o caminho bloqueado (409) **não** persistem `meet_link`/`external_event_id`/`gcal_payload_hash`.
 - **`GCAL_SEND_UPDATES`** ∈ `{none, all, externalOnly}` (default `none`) é validado *fail-fast* no boot (`sys.exit(1)` em valor inválido) e repassado como `sendUpdates` em insert/update/delete.
 - **Tokens OAuth criptografados em repouso** (Fernet, AES-128-CBC + HMAC-SHA256) via `GCAL_ENCRYPTION_KEY`. Em produção a chave é **obrigatória** (ausência → `ValueError`); em dev/staging há fallback derivado de `SECRET_KEY` com warning. Refresh é thread-safe (`select_for_update` + double-check). `invalid_grant` no refresh remove a credencial e exige reconexão.
-- **RBAC**: as 4 ações GCal sobre `Solicitacao` usam `permission_classes=[CanUseGcal]` (`preview_gcal`, `publish`, `resync_gcal`, `cancel_gcal`; preservadas de `get_permissions` pela allowlist `actions_with_custom_permissions`). Policy `use_gcal` = `operate_preagenda | approve_solicitation` (`policies.py`), ou seja Controle + Superintendência. Nenhum acesso a grupo direto (banido por `scripts/rbac_lint.py`).
+- **RBAC**: as 4 ações GCal sobre `Solicitacao` usam `permission_classes=[CanUseGcal | CanPublishSetorSolicitacao]` + a guarda de objeto `can_publish_solicitacao` (`preview_gcal`, `publish`, `resync_gcal`, `cancel_gcal`; preservadas de `get_permissions` pela allowlist `actions_with_custom_permissions`). Policy `use_gcal` = `operate_preagenda | approve_solicitation` (`policies.py`), ou seja Controle + Superintendência. A policy `publish_setor_solicitacao` (grupo Apoio de Coordenação, #2043) libera as mesmas 4 ações só para evento **aprovado do próprio setor**: setor do evento = `Projeto.setor`, setor da pessoa = `user_setores` (vínculo vigente); o "global" do publish é `use_gcal`, não o global de visibilidade (que inclui a DAT). Nenhum acesso a grupo direto (banido por `scripts/rbac_lint.py`).
 - **Endpoints OAuth — gate uniforme**: `start`, `status`, `disconnect`, `calendars`, `select-calendar`, `events` e o `callback` são todos `[CanUseGcal]`. O `callback` passou a declarar `@permission_classes([CanUseGcal])` (`google_oauth_callback`) — em vez de cair no default `IsAuthenticated` — de modo que quem não pode usar GCal não recebe credencial GCal (era parte do achado `M12-15` / issue #1652, **RESOLVIDO em #1760**, commit `9328227f`). Rate limit `OAuthThrottle` (scope `oauth` = `10/hour` em prod, `settings.py`) existe **apenas no `start`** (`google_oauth_start`); os demais só têm os throttles anon/user default.
 - **Auditoria obrigatória (PA-05)**: cada operação grava `AuditLog` — ações `PREVIEW_GCAL`, `PUBLISH_GCAL_REQUESTED`/`PUBLISH_GCAL`/`PUBLISH_GCAL_ERROR`, `RESYNC_GCAL_REQUESTED`, `CANCEL_GCAL_REQUESTED`/`CANCEL_GCAL`, `GCAL_ENCRYPTION_KEY_ROTATION`, `GOOGLE_CONNECT`/`GOOGLE_DISCONNECT`/`GOOGLE_REFRESH_TOKEN`.
 
 ## API / Interface
 
-Ações sobre `Solicitacao` (DRF `@action`, todas `CanUseGcal`):
+Ações sobre `Solicitacao` (DRF `@action`, todas `CanUseGcal | CanPublishSetorSolicitacao`; ver RBAC acima):
 
 - `POST /api/solicitacoes/{id}/preview-gcal/` → payload simulado, sem persistir (200).
 - `POST /api/solicitacoes/{id}/publish/` — corpo `{dry_run?, apply_blocked?}` → enfileira `task_publish_solicitacao_to_gcal` (202 `task_id`); 409 se bloqueado; 403 se OAuth sem conexão.
@@ -112,6 +112,7 @@ Beat automático: `preview_then_apply_gcal`, chave `gcal-sync-every-5-minutes`, 
 - SEC-011 — criptografia de tokens OAuth (Fernet + `GCAL_ENCRYPTION_KEY`, rotação zero-downtime). Detalhes na seção 8 de [`GUIDE_GCAL.md`](../../GUIDE_GCAL.md).
 - Epic #459 (§1/§7) — extração da camada de serviço de publicação e modularização OAuth (`oauth/oauth_flow.py`, `oauth/token_manager.py`).
 - Issue #1233 (Epic 4.2.a) — operações GCal encapsuladas na Policy `use_gcal` (`CanUseGcal`); ver [`rbac.spec`](rbac.spec.md).
+- #2043 (épico #1656) — publicação escopada por setor para a Apoio de Coordenação (`CanPublishSetorSolicitacao`); o setor do evento é `Projeto.setor` (#2045).
 
 ## Testes que cobrem
 

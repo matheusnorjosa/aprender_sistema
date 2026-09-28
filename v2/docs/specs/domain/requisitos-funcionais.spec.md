@@ -71,7 +71,7 @@ Rotas registradas em [`urls.py`](../../../backend/apps/core/urls.py) (prefixo `/
 - **RF02**: `SolicitacaoViewSet` (router `solicitacoes`); `POST /api/solicitacoes/validate/`.
 - **RF03**: `GET /api/availability/check/` (individual) · `POST /api/availability/check-many/` (lote).
 - **RF04**: `PATCH /api/solicitacoes/{id}/approve/` · `PATCH /api/solicitacoes/{id}/reject/` (+ ações de lote no viewset).
-- **RF05/RF06**: `POST /api/solicitacoes/{id}/preview-gcal/` · `POST /api/solicitacoes/{id}/publish/` (202 Accepted, Celery) · `POST /api/solicitacoes/{id}/resync-gcal/` · `POST /api/gcal/publish-batch/`. Permissão `CanUseGcal` (Controle + Superintendência).
+- **RF05/RF06**: `POST /api/solicitacoes/{id}/preview-gcal/` · `POST /api/solicitacoes/{id}/publish/` (202 Accepted, Celery) · `POST /api/solicitacoes/{id}/resync-gcal/` · `POST /api/gcal/publish-batch/`. Permissão `CanUseGcal` (Controle + Superintendência); as ações por solicitação também aceitam `CanPublishSetorSolicitacao` (Apoio de Coordenação, só evento aprovado do próprio setor). O lote segue só `CanUseGcal`.
 - **RF08**: `GET /api/availability/monthly/?year=&month=&role=§or=&q=`.
 - **RF01**: comando `python manage.py import_export_contract --path ... [--apply --allow-entity <entidade>] [--json]`; importers DRF sob `/api/.../import/`.
 

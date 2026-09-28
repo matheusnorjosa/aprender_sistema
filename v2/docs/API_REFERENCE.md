@@ -267,15 +267,16 @@ caso contrário 403/400 (`AvailabilityBlockViewSet.perform_create`, `views_avail
 ### Preview e Publicação
 
 As transições por solicitação são **actions do `SolicitacaoViewSet`**, não rotas
-sob `/api/gcal/`. Todas exigem `CanUseGcal` (policy `use_gcal` =
-`operate_preagenda` OU `approve_solicitation`) — actions `preview_gcal`/`publish`/`resync_gcal`/`cancel_gcal` do `SolicitacaoViewSet` (`views_solicitacao.py`).
+sob `/api/gcal/`. Exigem `CanUseGcal` (policy `use_gcal` =
+`operate_preagenda` OU `approve_solicitation`) **ou** `CanPublishSetorSolicitacao` — actions `preview_gcal`/`publish`/`resync_gcal`/`cancel_gcal` do `SolicitacaoViewSet` (`views_solicitacao.py`).
+Com `CanPublishSetorSolicitacao` (Apoio de Coordenação) só vale evento **aprovado do próprio setor**: `Projeto.setor` do evento ∈ setores do vínculo vigente da pessoa (`can_publish_solicitacao`); fora disso, 404.
 
 | Método | Endpoint | Status | Descrição | Permissão |
 |--------|----------|--------|-----------|-----------|
-| POST | `/api/solicitacoes/{id}/preview-gcal/` | ![Stable](https://img.shields.io/badge/-stable-green) | Preview do payload (não publica) | `CanUseGcal` |
-| POST | `/api/solicitacoes/{id}/publish/` | ![Stable](https://img.shields.io/badge/-stable-green) | Publicar no Google Calendar (202) | `CanUseGcal` |
-| POST | `/api/solicitacoes/{id}/resync-gcal/` | ![Beta](https://img.shields.io/badge/-beta-yellow) | Resincronizar evento (202) | `CanUseGcal` |
-| POST | `/api/solicitacoes/{id}/cancel-gcal/` | ![Stable](https://img.shields.io/badge/-stable-green) | Cancelar evento no GCal (202) | `CanUseGcal` |
+| POST | `/api/solicitacoes/{id}/preview-gcal/` | ![Stable](https://img.shields.io/badge/-stable-green) | Preview do payload (não publica) | `CanUseGcal` ou `CanPublishSetorSolicitacao` |
+| POST | `/api/solicitacoes/{id}/publish/` | ![Stable](https://img.shields.io/badge/-stable-green) | Publicar no Google Calendar (202) | `CanUseGcal` ou `CanPublishSetorSolicitacao` |
+| POST | `/api/solicitacoes/{id}/resync-gcal/` | ![Beta](https://img.shields.io/badge/-beta-yellow) | Resincronizar evento (202) | `CanUseGcal` ou `CanPublishSetorSolicitacao` |
+| POST | `/api/solicitacoes/{id}/cancel-gcal/` | ![Stable](https://img.shields.io/badge/-stable-green) | Cancelar evento no GCal (202) | `CanUseGcal` ou `CanPublishSetorSolicitacao` |
 | POST | `/api/gcal/publish-batch/` | ![Stable](https://img.shields.io/badge/-stable-green) | Publicar múltiplas solicitações (202) | `IsAuthenticated` + `CanUseGcal` |
 
 `POST /api/gcal/publish-batch/` espera **`solicitacao_ids`** (não `ids`), máx. 500;

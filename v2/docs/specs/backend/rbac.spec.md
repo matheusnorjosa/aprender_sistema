@@ -112,7 +112,7 @@ Doc canônico detalhado (não duplicado aqui): convenção de nomes em [`RBAC_NA
 - `IsOwnerOrPrivileged` — object-level: superuser/privilegiado ou `obj.usuario == user`.
 - `IsAssistenteAdministrativoControle` — composite Setor `Controle` + Função `Assistente Administrativo`.
 - `SuperuserOnly` — só `is_superuser`. Gate de escrita do `GroupViewSet` e do `assign_groups`.
-- 22 classes `Can*` (`CanAccessAuditLogs`, `CanViewComprasDashboard`, `CanViewAllAvailability`, `CanAccessSolicitationApprovals`, `CanUseGcal`, `CanManageInternalActions`, ...) mapeadas em `ACCESS_POLICIES` — lista completa em `policies.py` (de `CanAccessAuditLogs` a `CanAccessSolicitationApprovals`).
+- 22 classes `Can*` (`CanAccessAuditLogs`, `CanViewComprasDashboard`, `CanViewAllAvailability`, `CanAccessSolicitationApprovals`, `CanUseGcal`, `CanManageInternalActions`, ...) mapeadas em `ACCESS_POLICIES` — lista completa em `policies.py` (de `CanAccessAuditLogs` a `CanAccessSolicitationApprovals`). `CanPublishSetorSolicitacao` (policy `publish_setor_solicitacao`, grupo Apoio de Coordenação, #2043) entra em OR com `CanUseGcal` nas 4 ações GCal por solicitação; o recorte real é por objeto em `can_publish_solicitacao` (`services/solicitacao_scope.py`): global = `use_gcal`, senão `Projeto.setor` ∈ `user_setores`.
 
 **Helpers** (não-DRF): `user_has_any_perm(user, *codenames)`, `user_has_all_perms(...)`, `user_has_policy(user, key)`, `user_is_assistente_administrativo_controle(user)`, `user_can_delegate_availability_block(user)`.
 

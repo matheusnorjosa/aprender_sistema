@@ -41,7 +41,7 @@ A política distingue dois fluxos de projeto: `SUPER` (requer aprovação manual
 - **Resolução do estado inicial por fluxo**: [`v2/backend/apps/core/services/solicitacao_create.py`](../../../backend/apps/core/services/solicitacao_create.py) — `resolve_initial_status(projeto=...)` retorna `aprovado` sse `projeto.fluxo == "NAO_SUPER"`, senão `pendente`. Aplicado em `SolicitacaoViewSet.perform_create` ([`views_solicitacao.py`](../../../backend/apps/core/views_solicitacao.py)).
 - **Perfil exigido (PA-02)**: [`v2/backend/apps/core/rbac/policies.py`](../../../backend/apps/core/rbac/policies.py) — Policy composite `CanAccessSolicitationApprovals` (key `access_solicitation_approvals`) delegando para o helper SSOT `_user_has_solicitation_approvals`.
 - **Transições + auditoria + idempotência (PA-05)**: [`v2/backend/apps/core/services/solicitacao_approval.py`](../../../backend/apps/core/services/solicitacao_approval.py) — `approve_solicitacao`, `reject_solicitacao`, `batch_approve_solicitacoes`, `batch_reject_solicitacoes`.
-- **Endpoints (PA-02, PA-03)**: [`v2/backend/apps/core/views_solicitacao.py`](../../../backend/apps/core/views_solicitacao.py) — actions `approve`/`reject`/`batch_approve`/`batch_reject` (gate `CanAccessSolicitationApprovals`) e `publish`/`resync_gcal`/`cancel_gcal` (gate `CanUseGcal`, só pós-aprovação).
+- **Endpoints (PA-02, PA-03)**: [`v2/backend/apps/core/views_solicitacao.py`](../../../backend/apps/core/views_solicitacao.py) — actions `approve`/`reject`/`batch_approve`/`batch_reject` (gate `CanAccessSolicitationApprovals`) e `publish`/`resync_gcal`/`cancel_gcal` (gate `CanUseGcal`, ou `CanPublishSetorSolicitacao` para a Apoio de Coordenação do setor do evento; só pós-aprovação).
 - **Detalhe canônico das regras**: [`docs/business-rules/politica-aprovacao.md`](../../../../docs/business-rules/politica-aprovacao.md) e [ADR-002](../../../../docs/architecture/project-decisions/ADR-002-approval-policy-manual.md). Matriz de quem aprova: [`v2/docs/rbac_authorization_matrix.md`](../../rbac_authorization_matrix.md).
 
 ## Contratos e invariantes
@@ -69,7 +69,7 @@ Endpoints DRF do `SolicitacaoViewSet` (prefixo `/api/solicitacoes/`):
 | Reprovar | PATCH | `/api/solicitacoes/{id}/reject/` | `CanAccessSolicitationApprovals` | 200 |
 | Aprovar em lote | POST | `/api/solicitacoes/batch_approve/` | `CanAccessSolicitationApprovals` | 200 |
 | Reprovar em lote | POST | `/api/solicitacoes/batch_reject/` | `CanAccessSolicitationApprovals` | 200 |
-| Publicar (GCal) | POST | `/api/solicitacoes/{id}/publish/` | `CanUseGcal` | 202 (só se `aprovado`; senão 400) |
+| Publicar (GCal) | POST | `/api/solicitacoes/{id}/publish/` | `CanUseGcal` ou `CanPublishSetorSolicitacao` | 202 (só se `aprovado`; senão 400) |
 | Policies do usuário | GET | `/api/me/policies/` | `IsAuthenticated` | lista com `access_solicitation_approvals` quando elegível |
 
 Corpo de `approve`/`reject` aceita `{"justificativa": "..."}` (opcional). Lote aceita `{"ids": [...]}` e retorna `approved_count`/`rejected_count` + `errors[]` por id não processado.
@@ -81,7 +81,7 @@ Corpo de `approve`/`reject` aceita `{"justificativa": "..."}` (opcional). Lote a
 1. Coordenador cria solicitação para projeto `fluxo == "SUPER"` → `perform_create` valida disponibilidade (`check_conflicts`) e grava `status="pendente"` (`resolve_initial_status`).
 2. Gerente da Superintendência (ou Assistente Administrativo do Controle) chama `approve`/`reject`.
 3. Service trava a linha (`select_for_update`), exige `status == "pendente"`, **revalida a disponibilidade de todos os participantes** (`enforce_solicitacao_availability`, #1452), grava novo status e cria `AuditLog`. `reject` não revalida — reprovar não aloca agenda.
-4. Aprovada → entra na Pré-Agenda; Controle/Super publica no GCal via `publish` (PA-03).
+4. Aprovada → entra na Pré-Agenda; Controle/Super (ou a Apoio de Coordenação do setor do evento) publica no GCal via `publish` (PA-03).
 
 **Fluxo NAO_SUPER (auto-aprovado):**
 

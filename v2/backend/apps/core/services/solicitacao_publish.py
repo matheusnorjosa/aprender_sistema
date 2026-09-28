@@ -53,30 +53,55 @@ class PreviewResult:
     message: str
 
 
+def oauth_publish_block_reason(user: Usuario) -> str | None:
+    """Por que `user` não pode escrever no GCal agora (modo OAuth), ou None se pode.
+
+    - `google_not_connected`: sem credencial Google;
+    - `google_calendar_not_configured`: sem calendário de publicação (sem o pino da organização
+      `GCAL_OAUTH_CALENDAR_ID` e sem escolha na credencial) — nunca cair no calendário pessoal.
+    Fora do modo OAuth → None (o service account resolve o calendário por conta própria).
+    """
+    if getattr(settings, "GCAL_AUTH_MODE", "service_account") != "oauth":
+        return None
+    try:
+        credential = GoogleOAuthCredential.objects.get(user=user)
+    except GoogleOAuthCredential.DoesNotExist:
+        return "google_not_connected"
+    from apps.core.services.gcal_oauth_client import resolve_publish_calendar_id
+
+    if not resolve_publish_calendar_id(credential):
+        return "google_calendar_not_configured"
+    return None
+
+
 def _check_google_oauth(user: Usuario) -> int | None:
     """
-    Check if user has Google OAuth credentials in OAuth mode.
+    Check if user can write to Google Calendar in OAuth mode (roda ANTES de marcar PENDING).
 
     Returns:
-        operator_user_id if OAuth mode and credentials exist, None otherwise
+        operator_user_id if OAuth mode and the user can write, None outside OAuth mode
 
     Raises:
-        ValidationAPIError: If OAuth mode and no credentials found
+        APIError 403 `google_not_connected`: OAuth mode and no credentials found
+        APIError 409 `google_calendar_not_configured`: no organization calendar to write to
     """
-    auth_mode = getattr(settings, "GCAL_AUTH_MODE", "service_account")
-
-    if auth_mode != "oauth":
+    if getattr(settings, "GCAL_AUTH_MODE", "service_account") != "oauth":
         return None
 
-    try:
-        GoogleOAuthCredential.objects.get(user=user)
-        return user.id
-    except GoogleOAuthCredential.DoesNotExist:
+    reason = oauth_publish_block_reason(user)
+    if reason == "google_not_connected":
         raise APIError(
             code="google_not_connected",
             message="Conecte sua conta Google",
             status_code=403,
         )
+    if reason == "google_calendar_not_configured":
+        raise APIError(
+            code="google_calendar_not_configured",
+            message="A agenda da organização ainda não foi configurada no sistema. Avise o Controle.",
+            status_code=409,
+        )
+    return user.pk
 
 
 def preview_gcal(

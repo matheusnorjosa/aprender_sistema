@@ -465,6 +465,15 @@ def cancel_solicitacao(
     # Usar external_event_id ou gerar determinístico
     event_id = s.external_event_id or _event_id_for(s)
 
+    # O Google devolve 404 no delete tanto para "já removido" quanto para "esta conta não vê o
+    # calendário", e o 404 abaixo é tratado como sucesso. Sem acesso confirmado, NÃO apaga às cegas:
+    # levanta, a task marca ERROR e mantém external_event_id (re-tentável após o compartilhamento).
+    if hasattr(client, "calendar_accessible") and not client.calendar_accessible(calendar_id):
+        raise ValueError(
+            "Sua conta Google não tem acesso ao calendário da organização; o evento continua no Google. "
+            "Peça o compartilhamento e tente de novo."
+        )
+
     try:
         # Tentar deletar com retry/backoff
         _retry_with_circuit_breaker(

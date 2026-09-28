@@ -115,6 +115,42 @@ def purge_old_audit_logs() -> dict[str, Any]:
     return {"deleted": deleted, "retention_days": days}
 
 
+@shared_task(name="apps.core.tasks.probe_google_credentials")
+def probe_google_credentials() -> dict[str, int]:
+    """Verificação DIÁRIA das credenciais Google (#2039): força o refresh de cada uma.
+
+    Credencial morta (refresh token revogado/vencido) só aparecia quando um publish falhava — em
+    prod, 2 de 3 estavam mortas havia meses. Aqui: sucesso → mantém; `invalid_grant` → o refresh
+    remove a credencial e audita (`GOOGLE_DISCONNECT`, `status=auto_removed`), e a pessoa passa a
+    ver `reconnect_required` no status; rede/5xx → só loga, mantém (não prova que morreu).
+    Registrada no beat (config/celery.py, 05:00).
+    """
+    from apps.core.models import GoogleOAuthCredential
+    from apps.core.services.oauth.token_manager import refresh_access_token_safe
+
+    resumo = {"ok": 0, "removed": 0, "errors": 0}
+    for cred in GoogleOAuthCredential.objects.all():
+        try:
+            refresh_access_token_safe(cred, force=True)
+            resumo["ok"] += 1
+        except Exception as exc:
+            if GoogleOAuthCredential.objects.filter(pk=cred.pk).exists():
+                resumo["errors"] += 1
+                # Sem e-mail nem token no log: só ids e o tipo do erro.
+                logger.warning(
+                    "probe_google_credentials: credencial #%s (usuario #%s) mantida; refresh falhou (%s)",
+                    cred.pk,
+                    cred.user_id,
+                    type(exc).__name__,
+                )
+            else:
+                resumo["removed"] += 1
+
+    nivel = logging.WARNING if resumo["removed"] or resumo["errors"] else logging.INFO
+    logger.log(nivel, "probe_google_credentials: %s", resumo)
+    return resumo
+
+
 @shared_task
 def gcal_sync_task() -> None:
     """

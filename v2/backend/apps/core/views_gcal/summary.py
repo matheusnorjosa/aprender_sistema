@@ -31,6 +31,7 @@ from apps.core.serializers.gcal_dashboard_contract import (
     GCalStatusSummaryResponseSerializer,
     PaginatedSolicitacaoResponseSerializer,
 )
+from apps.core.services.oauth.token_manager import usuarios_para_reconectar
 from apps.core.views_gcal.helpers import _apply_common_filters, _filter_events_queryset
 
 
@@ -256,6 +257,10 @@ class AlertsSummaryView(APIView):
         "window": {
             "start": "YYYY-MM-DD" | null,
             "end": "YYYY-MM-DD" | null
+        },
+        "google_reconnect": {  # #2039: conexão Google removida pelo sistema, sem reconexão
+            "count": int,      # (não depende da janela)
+            "users": [{"id": int, "nome": str}]
         }
     }
 
@@ -282,6 +287,11 @@ class AlertsSummaryView(APIView):
         start_param = request.query_params.get("start")
         end_param = request.query_params.get("end")
 
+        # Só id + nome (sem e-mail/CPF): `str(usuario)` é o nome ou "Usuario #id".
+        reconectar = [
+            {"id": u.pk, "nome": str(u)} for u in usuarios_para_reconectar().order_by("first_name", "last_name", "pk")
+        ]
+
         return Response(
             {
                 "errors": counts["errors"],
@@ -289,6 +299,7 @@ class AlertsSummaryView(APIView):
                 "published": counts["published"],
                 "none": counts["none"],
                 "window": {"start": start_param if start_param else None, "end": end_param if end_param else None},
+                "google_reconnect": {"count": len(reconectar), "users": reconectar},
             },
             status=status.HTTP_200_OK,
         )

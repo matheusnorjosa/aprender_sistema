@@ -22,6 +22,7 @@ from typing import Any
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import OuterRef, QuerySet, Subquery
 from django.utils import timezone
 
 import requests
@@ -31,6 +32,10 @@ from apps.core.models import AuditLog, GoogleOAuthCredential, Usuario
 from apps.core.services.db_retry import retry_on_deadlock
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+# `details.status` do AuditLog GOOGLE_DISCONNECT quando o SISTEMA removeu a credencial
+# (invalid_grant). O "Desconectar" da pessoa grava `status="success"`.
+AUTO_REMOVED = "auto_removed"
 
 
 # ============================================================================
@@ -118,7 +123,7 @@ _decrypt_token = decrypt_token
 
 
 @retry_on_deadlock(operation="oauth.refresh_access_token")
-def refresh_access_token_safe(credential: GoogleOAuthCredential) -> GoogleOAuthCredential:
+def refresh_access_token_safe(credential: GoogleOAuthCredential, *, force: bool = False) -> GoogleOAuthCredential:
     """
     Atualiza access_token usando refresh_token (thread-safe).
 
@@ -129,6 +134,8 @@ def refresh_access_token_safe(credential: GoogleOAuthCredential) -> GoogleOAuthC
 
     Args:
         credential: Instância de GoogleOAuthCredential a ser atualizada
+        force: pula o double-check e chama o Google mesmo com token válido — é o que prova que
+            o refresh_token ainda vive (job diário `probe_google_credentials`, #2039)
 
     Returns:
         GoogleOAuthCredential: Credencial atualizada (re-fetched do DB)
@@ -148,7 +155,7 @@ def refresh_access_token_safe(credential: GoogleOAuthCredential) -> GoogleOAuthC
         cred: GoogleOAuthCredential = GoogleOAuthCredential.objects.select_for_update().get(id=credential.id)
 
         # Double-check: outro thread já refrescou?
-        if cred.token_expiry > timezone.now() + timedelta(minutes=5):
+        if not force and cred.token_expiry > timezone.now() + timedelta(minutes=5):
             logger.info(f"✅ Token já válido (outro thread refrescou). " f"Expira em: {cred.token_expiry}")
             return cred
 
@@ -201,32 +208,55 @@ def refresh_access_token_safe(credential: GoogleOAuthCredential) -> GoogleOAuthC
 
         except requests.exceptions.HTTPError as e:
             # invalid_grant: refresh_token revogado pelo usuário
-            if e.response.status_code == 400:
-                error_data: dict[str, Any] = e.response.json()
-                if error_data.get("error") == "invalid_grant":
-                    logger.error(f"❌ Refresh token inválido (revogado pelo usuário): {cred.google_email}")
+            if e.response.status_code == 400 and e.response.json().get("error") == "invalid_grant":
+                # Sem e-mail no log (LGPD): o id basta para achar a credencial no AuditLog.
+                logger.error("❌ Refresh token inválido (revogado): credencial #%s removida", cred.pk)
 
-                    # Remover credencial (usuário precisa reconectar)
-                    cred.delete()
+                # Remover credencial (usuário precisa reconectar)
+                cred.delete()
 
-                    # Auditoria (PA-05)
-                    AuditLog.objects.create(
-                        usuario=cred.user,
-                        action=AuditLog.Action.GOOGLE_DISCONNECT,
-                        model_name="GoogleOAuthCredential",
-                        details={
-                            "google_email": cred.google_email,
-                            "reason": "invalid_grant (refresh token revogado pelo usuário)",
-                            "status": "auto_removed",
-                        },
-                    )
+                # Auditoria (PA-05)
+                AuditLog.objects.create(
+                    usuario=cred.user,
+                    action=AuditLog.Action.GOOGLE_DISCONNECT,
+                    model_name="GoogleOAuthCredential",
+                    details={
+                        "google_email": cred.google_email,
+                        "reason": "invalid_grant (refresh token revogado pelo usuário)",
+                        "status": AUTO_REMOVED,
+                    },
+                )
+            else:
+                logger.error(f"❌ Erro ao refresh access token: {e}")
+                raise Exception(f"Falha ao atualizar token Google: {str(e)}")
 
-                    raise ValueError(
-                        "Sua conexão com o Google foi revogada. Desconecte e conecte sua conta Google de novo."
-                    )
+    # M12-10: o erro sai FORA do atomic. Levantado dentro, o rollback desfazia o delete e o
+    # audit acima — a credencial revogada nunca sumia e ninguém ficava sabendo.
+    raise ValueError("Sua conexão com o Google foi revogada. Desconecte e conecte sua conta Google de novo.")
 
-            logger.error(f"❌ Erro ao refresh access token: {e}")
-            raise Exception(f"Falha ao atualizar token Google: {str(e)}")
+
+def usuarios_para_reconectar() -> QuerySet[Usuario]:
+    """Pessoas ativas cuja conexão Google o SISTEMA removeu (invalid_grant) e que não reconectaram.
+
+    Regra: sem credencial E o último evento de conexão da pessoa no AuditLog (`GOOGLE_CONNECT` /
+    `GOOGLE_DISCONNECT`) é uma remoção automática. O "Desconectar" manual não conta (#2039).
+    """
+    ultimo_evento = (
+        AuditLog.objects.filter(
+            usuario=OuterRef("pk"),
+            action__in=[AuditLog.Action.GOOGLE_CONNECT, AuditLog.Action.GOOGLE_DISCONNECT],
+        )
+        .order_by("-created_at", "-pk")
+        .values("pk")[:1]
+    )
+    remocoes_automaticas = AuditLog.objects.filter(
+        action=AuditLog.Action.GOOGLE_DISCONNECT, details__status=AUTO_REMOVED
+    ).values("pk")
+    return (
+        Usuario.objects.filter(is_active=True, google_oauth__isnull=True)
+        .annotate(ultimo_evento_google=Subquery(ultimo_evento))
+        .filter(ultimo_evento_google__in=remocoes_automaticas)
+    )
 
 
 def revoke_token(credential: GoogleOAuthCredential) -> bool:

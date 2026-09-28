@@ -250,7 +250,8 @@ export default function PublicacaoSetorPage(): JSX.Element {
 
   const ready = status.publishReady;
   const reason = status.publishBlockReason;
-  const blocked = blockedMessage(ready, reason, statusError);
+  // Conexão removida pelo sistema: o card já explica a revogação e oferece Conectar — não repetir.
+  const blocked = status.reconnectRequired ? null : blockedMessage(ready, reason, statusError);
   const blockedIsWarning =
     reason === 'no_setor_scope' || reason === 'google_calendar_not_configured' || (!reason && !!statusError);
 

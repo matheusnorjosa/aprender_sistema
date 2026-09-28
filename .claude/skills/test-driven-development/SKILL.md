@@ -46,6 +46,13 @@ Implement fresh from tests. Period.
 
 ## Red-Green-Refactor
 
+### Agree the seams first
+
+Before the first test, write down the **seams** — the public boundaries you will
+test at (endpoint URL, service function, model method) — and confirm them with the
+user. No test at an unconfirmed seam: this is how effort lands on critical paths
+instead of every edge case.
+
 ### RED - Write Failing Test
 
 Write one minimal test showing what should happen. Use `APITestCase` for
@@ -77,6 +84,10 @@ Vague name, pokes a mocked view internal instead of the real request/RBAC path.
 - One behavior
 - Clear name
 - Real code through the URL/ORM (no mocks unless unavoidable)
+- Expected value from an independent source (a literal, a worked example, the
+  spec). An assertion that recomputes it the way the code does
+  (`assertEqual(total(a, b), a + b)`) is **tautological**: it passes by
+  construction and can never catch a bug.
 
 ### Verify RED - Watch It Fail
 

@@ -72,6 +72,9 @@ Estes checks não bloqueiam merge:
 - `[info] backend tests dev_tools (runner)` (`ci.yaml`)
 - `[info] e2e journeys` (`frontend-ci.yml`) — só roda quando o PR toca `v2/frontend/**` (corte de custo, 2026-09)
 - `[info] lighthouse CI` (`frontend-ci.yml`) — idem, path-gated ao frontend (2026-09)
+- `[info] frontend PR report` (`frontend-ci.yml`) — idem; mantém **um** comentário no PR
+  (marcador `<!-- as-frontend-report -->`, atualizado a cada push) com o size-limit e o
+  Lighthouse contra os limites. Não comenta em PR de fork nem do Dependabot (token só-leitura)
 - `[info] openssf scorecard` (`dependency-review-scorecard.yml`) — movido p/ schedule semanal, não roda por PR (2026-09)
 - `[info] backend xdist canary (w=...,dist=...)` (`backend-xdist-canary.yml`) — schedule reduzido p/ mensal (2026-09)
 - `[info] documentation build` (`docs.yml`)

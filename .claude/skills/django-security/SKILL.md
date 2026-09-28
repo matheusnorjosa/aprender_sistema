@@ -23,8 +23,13 @@ Run in order; the audit is DONE only when every step passes.
    own rows (`filter(usuario=request.user)`); the full queryset is gated behind a
    capability check via `user_has_any_perm(...)`. No `objects.all()` leak.
    The IDOR bug lives in the scope's content (branch order, gerência filter,
-   writable owner field). Prove it with user A doing GET/PATCH/DELETE on user
-   B's object → 403/404.
+   writable owner field). Prove the scope with a test in two halves; a bare 403
+   proves nothing, since the capability gate returns it whatever the queryset does:
+   - **Positive control** — user A, holding the capability, hits an object in
+     A's own scope with the same verb → 2xx (200; 204 on DELETE).
+   - **Out of scope** — the same user A does GET/PATCH/DELETE on user B's object
+     → 404 (the scope lives in the queryset, so B's object does not exist for A).
+     Expect 403 only where the design is "exists but you may not act on it".
 4. **Secrets/config** — no hardcoded keys; production flags set (see A05);
    `.gitignore` blocks the secret files (see Secrets Management). Leave secret
    scanning to CI `[required] Secret Detection` (gitleaks + TruffleHog) and

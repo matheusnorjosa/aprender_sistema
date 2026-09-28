@@ -3,7 +3,8 @@
  *
  * Cobertura:
  * - Renderização condicional (null, desconectado, conectado)
- * - Estados visuais (conectado, expirando, expirado)
+ * - Estados visuais (conectado; desconectado com aviso de reconexão — #2039)
+ * - Sem alarme de expiração do access token (renovado sozinho pelo refresh token)
  * - Callbacks (onConnect, onDisconnect)
  * - Popconfirm de disconnect
  * - Formatação de datas
@@ -84,6 +85,39 @@ describe('GoogleIntegrationCard', () => {
     // Testar callback
     fireEvent.click(connectButton);
     expect(onConnect).toHaveBeenCalledTimes(1);
+
+    // Desconexão comum (nunca conectou / "Desconectar" manual): sem aviso de revogação.
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  // #2039: o sistema removeu a conexão porque o Google revogou o acesso.
+  test('desconectado com reconnectRequired: aviso de revogação acima do "Conectar conta Google"', () => {
+    const status: GoogleIntegrationStatus = {
+      connected: false,
+      googleEmail: null,
+      tokenExpiry: null,
+      expiresInDays: null,
+      isExpired: false,
+      defaultCalendarId: null,
+      publishReady: false,
+      publishBlockReason: 'google_not_connected',
+      reconnectRequired: true,
+    };
+    const onConnect = vi.fn();
+
+    render(<GoogleIntegrationCard status={status} onConnect={onConnect} onDisconnect={() => {}} />);
+
+    const aviso = screen.getByRole('alert');
+    expect(aviso).toHaveTextContent(
+      'O Google revogou o acesso da sua conta ao sistema, então ela foi desconectada. ' +
+        'Conecte de novo para voltar a publicar.'
+    );
+
+    // O aviso vem antes do botão de conectar, que continua funcionando.
+    const connectButton = screen.getByRole('button', { name: /Conectar conta Google/i });
+    expect(aviso.compareDocumentPosition(connectButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(connectButton);
+    expect(onConnect).toHaveBeenCalledTimes(1);
   });
 
   // ============================================================================
@@ -111,8 +145,8 @@ describe('GoogleIntegrationCard', () => {
     const emailElements = screen.getAllByText('controle@aprendereditora.com.br');
     expect(emailElements.length).toBeGreaterThanOrEqual(1);
 
-    // Validar data de expiração
-    expect(screen.getByText(/Token expira em:/)).toBeInTheDocument();
+    // Sem data de expiração: o access token dura 1h e o refresh token o renova sozinho.
+    expect(screen.queryByText(/Token expira em:/)).not.toBeInTheDocument();
 
     // Botão "Desconectar" deve estar presente
     expect(screen.getByRole('button', { name: /Desconectar/i })).toBeInTheDocument();
@@ -121,7 +155,7 @@ describe('GoogleIntegrationCard', () => {
     expect(screen.queryByRole('button', { name: /Reconectar/i })).not.toBeInTheDocument();
   });
 
-  test('deve renderizar card amarelo quando expirando (≤7 dias)', () => {
+  test('expiresInDays ≤ 7 não vira alerta "Expira em N dias"', () => {
     const status: GoogleIntegrationStatus = {
       connected: true,
       googleEmail: 'controle@aprendereditora.com.br',
@@ -134,8 +168,9 @@ describe('GoogleIntegrationCard', () => {
       <GoogleIntegrationCard status={status} onConnect={() => {}} onDisconnect={() => {}} />
     );
 
-    // Validar tag "Expira em X dias" (amarelo)
-    expect(screen.getByText('Expira em 5 dias')).toBeInTheDocument();
+    // Continua "Conectado": a validade do access token não é assunto de quem usa.
+    expect(screen.getByText('Conectado')).toBeInTheDocument();
+    expect(screen.queryByText(/Expira em/)).not.toBeInTheDocument();
 
     // Email e desconectar devem estar presentes (email pode aparecer em múltiplos lugares)
     const emailElements = screen.getAllByText('controle@aprendereditora.com.br');
@@ -146,7 +181,10 @@ describe('GoogleIntegrationCard', () => {
     expect(screen.queryByRole('button', { name: /Reconectar/i })).not.toBeInTheDocument();
   });
 
-  test('deve renderizar card vermelho quando expirado', () => {
+  // O `isExpired` do status é o access token de 1h, que o refresh token renova sozinho:
+  // "Expirado"/"Reconectar conta" só empurrava reconexões inúteis (#2039).
+  test('isExpired=true não vira "Expirado" nem "Reconectar conta"; seletor segue ativo', async () => {
+    vi.mocked(fetchAPI).mockClear();
     const status: GoogleIntegrationStatus = {
       connected: true,
       googleEmail: 'controle@aprendereditora.com.br',
@@ -154,49 +192,23 @@ describe('GoogleIntegrationCard', () => {
       expiresInDays: 0,
       isExpired: true,
       defaultCalendarId: null,
-    };
-
-    const onConnect = vi.fn();
-
-    render(
-      <GoogleIntegrationCard status={status} onConnect={onConnect} onDisconnect={() => {}} />
-    );
-
-    // Validar tag "Expirado (reconecte sua conta)" (vermelho)
-    expect(screen.getByText('Expirado (reconecte sua conta)')).toBeInTheDocument();
-
-    // Validar botão "Reconectar conta" (danger)
-    const reconnectButton = screen.getByRole('button', { name: /Reconectar conta/i });
-    expect(reconnectButton).toBeInTheDocument();
-
-    // Testar callback
-    fireEvent.click(reconnectButton);
-    expect(onConnect).toHaveBeenCalledTimes(1);
-
-    // Botão "Desconectar" também deve estar presente
-    expect(screen.getByRole('button', { name: /Desconectar/i })).toBeInTheDocument();
-  });
-
-  test('deve renderizar sem data de expiração se tokenExpiry for null', () => {
-    const status: GoogleIntegrationStatus = {
-      connected: true,
-      googleEmail: 'controle@aprendereditora.com.br',
-      tokenExpiry: null,
-      expiresInDays: null,
-      isExpired: false,
-      defaultCalendarId: null,
+      publishReady: true,
+      publishBlockReason: null,
+      reconnectRequired: false,
     };
 
     render(
       <GoogleIntegrationCard status={status} onConnect={() => {}} onDisconnect={() => {}} />
     );
 
-    // Email deve estar presente (pode aparecer em múltiplos lugares)
-    const emailElements = screen.getAllByText('controle@aprendereditora.com.br');
-    expect(emailElements.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Conectado')).toBeInTheDocument();
+    expect(screen.queryByText(/Expirado/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Reconectar/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Desconectar/i })).toBeInTheDocument();
 
-    // Texto "Token expira em:" NÃO deve estar presente
-    expect(screen.queryByText(/Token expira em:/)).not.toBeInTheDocument();
+    // O seletor de calendário não fica travado por causa do access token.
+    await waitFor(() => expect(fetchAPI).toHaveBeenCalledWith('/integrations/google/calendars/'));
+    expect(screen.getByRole('combobox')).not.toBeDisabled();
   });
 
   // ============================================================================
@@ -304,31 +316,6 @@ describe('GoogleIntegrationCard', () => {
   });
 
   // ============================================================================
-  // TESTES DE FORMATAÇÃO
-  // ============================================================================
-
-  test('deve formatar data de expiração em pt-BR', () => {
-    const status: GoogleIntegrationStatus = {
-      connected: true,
-      googleEmail: 'controle@aprendereditora.com.br',
-      tokenExpiry: '2025-12-31T23:59:59Z',
-      expiresInDays: 45,
-      isExpired: false,
-    };
-
-    render(
-      <GoogleIntegrationCard status={status} onConnect={() => {}} onDisconnect={() => {}} />
-    );
-
-    // Validar que alguma data aparece (formato depende do locale do sistema)
-    expect(screen.getByText(/Token expira em:/)).toBeInTheDocument();
-
-    // Regex para validar formato de data (tolerante a variações de locale)
-    const dateText = screen.getByText(/\d{2}\/\d{2}\/\d{4}/);
-    expect(dateText).toBeInTheDocument();
-  });
-
-  // ============================================================================
   // TESTES DE SELEÇÃO DE CALENDÁRIO (defaultCalendarId) — #1291
   // ============================================================================
 
@@ -398,6 +385,7 @@ describe('GoogleIntegrationCard — fixedCalendar', () => {
     defaultCalendarId: null,
     publishReady: true,
     publishBlockReason: null,
+    reconnectRequired: false,
   };
 
   beforeEach(() => {

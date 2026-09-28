@@ -787,6 +787,8 @@ export GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}'
 
 **Sintoma:** `GET /api/integrations/google/status/` responde `connected=false` e `reconnect_required=true`; o Controle vê a pessoa em `google_reconnect.users` no `GET /api/gcal/dashboard/alerts/summary/`.
 
+**Na tela:** na Pré-agenda e na página "Publicar na agenda", o card do Google mostra acima de "Conectar conta Google" o aviso "O Google revogou o acesso da sua conta ao sistema, então ela foi desconectada. Conecte de novo para voltar a publicar."; quem tem `use_gcal` (Controle/Superintendência) recebe um toast com os nomes (até 3 e "e mais N"), repetido só quando a lista de pessoas muda. O card não alarma mais pela validade do access token de 1h ("Expirado"/"Expira em N dias"): o refresh token o renova sozinho.
+
 **Causa:** o Google recusou o refresh token (`invalid_grant`): acesso revogado na conta Google, app OAuth em modo Teste (token vence em 7 dias), token sem uso por 6 meses ou conta suspensa. O sistema apagou a credencial e gravou `AuditLog` `GOOGLE_DISCONNECT` com `details.status="auto_removed"`. Quem detecta é o job diário `probe_google_credentials` (05:00) ou o próprio publish/cancel.
 
 **Solução:** a pessoa conecta a conta Google de novo. Não precisa "Desconectar" antes, porque não há credencial. O aviso some no próximo status: o `GOOGLE_CONNECT` do callback passa a ser o último evento. Para investigar, procure o `GOOGLE_DISCONNECT` com `details.status="auto_removed"` da pessoa no `AuditLog`.

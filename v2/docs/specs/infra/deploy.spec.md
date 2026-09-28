@@ -9,6 +9,7 @@ sources_of_truth:
   - v2/frontend/Dockerfile.prod
   - .github/workflows/deploy.yaml
   - .github/workflows/promote.yml
+  - .github/workflows/release-notes-producao.yml
   - v2/infra/deployer/README.md
   - v2/infra/scripts/restore_db.sh
   - v2/infra/Makefile
@@ -52,14 +53,16 @@ auto-load), `docker-compose.staging-gate.yml` (gate), `docker-compose.observabil
 
 **Merge na `main` NÃO deploya.** Ele dispara `deploy.yaml` (hoje *"Build, sign and release"*), que faz
 build → scan → push no Docker Hub → **assina** as imagens (cosign keyless + provenance SLSA) → cria a tag
-imutável `vYYYY.MM.DD-<sha7>` e o GitHub Release. Fim.
+imutável `vYYYY.MM.DD-<sha7>` e o GitHub Release (criado com `--latest=false`: build não é produção). Fim.
 
 Produção muda em **dois passos deliberados**:
 
 1. **`promote.yml`** (`workflow_dispatch`, gated no GitHub Environment `production` com *required reviewer*):
    resolve tag→digest, **exige** que as imagens estejam assinadas, monta o `production.json` (release, digests,
    `sequence` monotônica, `expires_at`) e o **assina** (`cosign sign-blob`, identidade OIDC do próprio workflow).
-   Publica no branch protegido **`deploy-pointer`**.
+   Publica no branch protegido **`deploy-pointer`**. Em seguida, `release-notes-producao.yml` (`workflow_run`)
+   escreve na Release promovida o que entrou desde a promoção anterior e a marca **Latest** — o selo
+   *Latest* do GitHub é a release promovida mais recente (não confirma que o agente já aplicou).
 2. **Agente `aprender-deployer` na VM01** (systemd, ~60s): lê o ponteiro *tokenless* por `raw.githubusercontent.com`,
    verifica a assinatura contra um trusted-root **pinado offline**, verifica as duas imagens **por digest**
    (`cosign verify`), e entrega ao `aprender-applier` (o único que detém o token do Portainer). O applier

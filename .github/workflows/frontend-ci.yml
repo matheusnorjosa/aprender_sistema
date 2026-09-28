@@ -95,6 +95,17 @@ jobs:
     - name: Check bundle sizes
       run: npm run size
 
+    # Ratchet de `as unknown` / `as never` (teto por arquivo em
+    # scripts/unknown-casts-baseline.json). `!cancelled()`: cada gate reporta por
+    # si, mesmo se um passo anterior falhou.
+    - name: Guard — auto-teste do ratchet de cast inseguro
+      if: ${{ !cancelled() }}
+      run: node --test scripts/check-unknown-casts.test.mjs
+
+    - name: Guard — ratchet de cast inseguro (as unknown / as never)
+      if: ${{ !cancelled() }}
+      run: npm run check:unknown-casts
+
     - name: Upload build artifacts
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4
       continue-on-error: true

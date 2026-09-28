@@ -74,13 +74,26 @@ def test_invalid_grant_remove_credencial_grava_audit_e_levanta_erro():
     cred = _conectar(usuario)
 
     with patch.object(token_manager.requests, "post", return_value=_resposta(400, INVALID_GRANT)):
-        with pytest.raises(ValueError, match="Desconecte e conecte sua conta Google de novo"):
+        # Depois da remoção o card só oferece "Conectar": a mensagem não manda "Desconectar".
+        with pytest.raises(ValueError, match=r"revogada\. Conecte sua conta Google de novo"):
             token_manager.refresh_access_token_safe(cred)
 
     assert not GoogleOAuthCredential.objects.filter(pk=cred.pk).exists()
     audit = AuditLog.objects.get(usuario=usuario, action=AuditLog.Action.GOOGLE_DISCONNECT)
     assert audit.details["status"] == "auto_removed"
     assert "invalid_grant" in audit.details["reason"]
+
+
+def test_refresh_de_credencial_ja_removida_da_erro_de_reconexao_e_nao_de_orm():
+    """Corrida: outra task removeu a credencial enquanto esta esperava o lock. A pessoa deve ver a
+    mensagem de reconexão, não "GoogleOAuthCredential matching query does not exist."."""
+    cred = _conectar(UsuarioFactory())
+    GoogleOAuthCredential.objects.filter(pk=cred.pk).delete()
+
+    with patch.object(token_manager.requests, "post") as post:
+        with pytest.raises(ValueError, match="Conecte sua conta Google de novo"):
+            token_manager.refresh_access_token_safe(cred, force=True)
+    post.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -97,7 +110,40 @@ def _google_por_refresh_token(url, data, timeout):
         return _resposta(400, INVALID_GRANT)
     if refresh_token == "rt-google-fora":
         return _resposta(503, {"error": "backend_error"})
+    if refresh_token == "rt-400-outro-erro":
+        return _resposta(400, {"error": "invalid_request"})
+    if refresh_token == "rt-cliente-invalido":
+        return _resposta(401, {"error": "invalid_client"})
     raise requests.exceptions.ConnectionError("rede caiu")
+
+
+def test_probe_so_remove_com_invalid_grant():
+    """400 que não é invalid_grant e 401 (config do cliente OAuth) não provam que a credencial
+    morreu: ficam, e contam como erro."""
+    from apps.core.tasks import probe_google_credentials
+
+    em_uma_hora = timedelta(hours=1)
+    outro_400 = _conectar(UsuarioFactory(), "rt-400-outro-erro", expira_em=em_uma_hora)
+    cliente_invalido = _conectar(UsuarioFactory(), "rt-cliente-invalido", expira_em=em_uma_hora)
+
+    with patch.object(token_manager.requests, "post", side_effect=_google_por_refresh_token):
+        resumo = probe_google_credentials()
+
+    assert resumo == {"ok": 0, "removed": 0, "errors": 2}
+    assert GoogleOAuthCredential.objects.filter(pk__in=[outro_400.pk, cliente_invalido.pk]).count() == 2
+
+
+def test_probe_ignora_credencial_de_usuario_inativo():
+    """Pessoa desligada: o refresh diário manteria o token vivo à toa (e ela nunca entra no aviso)."""
+    from apps.core.tasks import probe_google_credentials
+
+    _conectar(UsuarioFactory(is_active=False), "rt-ok", expira_em=timedelta(hours=1))
+
+    with patch.object(token_manager.requests, "post", side_effect=_google_por_refresh_token) as post:
+        resumo = probe_google_credentials()
+
+    post.assert_not_called()
+    assert resumo == {"ok": 0, "removed": 0, "errors": 0}
 
 
 def test_probe_forca_refresh_remove_so_a_revogada_e_resume():
@@ -195,6 +241,19 @@ def _reconectou(user):
     assert "google=connected" in resp.url
 
 
+def _removida_de_novo(user):
+    """A credencial nova (do callback) também é revogada."""
+    cred = GoogleOAuthCredential.objects.get(user=user)
+    with patch.object(token_manager.requests, "post", return_value=_resposta(400, INVALID_GRANT)):
+        with pytest.raises(ValueError):
+            token_manager.refresh_access_token_safe(cred, force=True)
+
+
+def _desconectou_a_credencial_atual(user):
+    with patch.object(token_manager.requests, "post", return_value=_resposta(200, {})):  # /revoke do Google
+        assert _cliente(user).post("/api/integrations/google/disconnect/").status_code == status.HTTP_200_OK
+
+
 @pytest.mark.parametrize(
     "historia, esperado",
     [
@@ -202,6 +261,9 @@ def _reconectou(user):
         ("desconectou_manual", False),
         ("removida_pelo_sistema", True),
         ("removida_e_reconectou", False),
+        # Só o ÚLTIMO evento decide: uma remoção antiga não conta depois de reconectar e desconectar.
+        ("removida_reconectou_desconectou", False),
+        ("removida_reconectou_removida_de_novo", True),
     ],
 )
 def test_status_reconnect_required(historia, esperado):
@@ -210,9 +272,13 @@ def test_status_reconnect_required(historia, esperado):
         _desconectou_manual(user)
     elif historia == "removida_pelo_sistema":
         _removida_pelo_sistema(user)
-    elif historia == "removida_e_reconectou":
+    elif historia.startswith("removida_"):
         _removida_pelo_sistema(user)
         _reconectou(user)
+        if historia == "removida_reconectou_desconectou":
+            _desconectou_a_credencial_atual(user)
+        elif historia == "removida_reconectou_removida_de_novo":
+            _removida_de_novo(user)
 
     assert _status(user)["reconnect_required"] is esperado
 

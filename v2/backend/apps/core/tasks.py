@@ -129,7 +129,8 @@ def probe_google_credentials() -> dict[str, int]:
     from apps.core.services.oauth.token_manager import refresh_access_token_safe
 
     resumo = {"ok": 0, "removed": 0, "errors": 0}
-    for cred in GoogleOAuthCredential.objects.all():
+    # Pessoa desligada: o refresh diário só manteria vivo um token sem uso (e ela não entra no aviso).
+    for cred in GoogleOAuthCredential.objects.filter(user__is_active=True):
         try:
             refresh_access_token_safe(cred, force=True)
             resumo["ok"] += 1
@@ -171,9 +172,7 @@ def gcal_sync_task() -> None:
 
 
 # Mensagens de erro GCal gravadas na Solicitacao (a pessoa lê na tela): dizem COMO resolver.
-_MSG_CREDENCIAL_GOOGLE = (
-    "Sua conexão com o Google expirou ou foi removida. Desconecte e conecte sua conta Google de novo."
-)
+_MSG_CREDENCIAL_GOOGLE = "Sua conexão com o Google expirou ou foi removida. Conecte sua conta Google de novo."
 _MSG_SEM_ACESSO_CALENDARIO = (
     "O Google recusou o acesso ao calendário da organização (sem permissão de edição ou calendário "
     "não compartilhado com sua conta). Peça ao Controle o compartilhamento com «Fazer alterações nos eventos»."

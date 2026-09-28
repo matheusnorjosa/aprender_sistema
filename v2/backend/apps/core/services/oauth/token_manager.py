@@ -152,7 +152,12 @@ def refresh_access_token_safe(credential: GoogleOAuthCredential, *, force: bool 
     """
     with transaction.atomic():
         # Row-level lock (GAP-1: Concorrência)
-        cred: GoogleOAuthCredential = GoogleOAuthCredential.objects.select_for_update().get(id=credential.id)
+        try:
+            cred: GoogleOAuthCredential = GoogleOAuthCredential.objects.select_for_update().get(id=credential.id)
+        except GoogleOAuthCredential.DoesNotExist:
+            # Corrida: outra task removeu a credencial enquanto esta esperava o lock. A pessoa vê a
+            # orientação de reconectar, não o erro cru do ORM.
+            raise ValueError("Sua conta Google foi desconectada. Conecte sua conta Google de novo.") from None
 
         # Double-check: outro thread já refrescou?
         if not force and cred.token_expiry > timezone.now() + timedelta(minutes=5):
@@ -176,7 +181,7 @@ def refresh_access_token_safe(credential: GoogleOAuthCredential, *, force: bool 
             "grant_type": "refresh_token",
         }
 
-        logger.info(f"🔄 Refreshing access token para {cred.google_email}")
+        logger.info("🔄 Refreshing access token: credencial #%s", cred.pk)  # sem e-mail no log (LGPD)
 
         try:
             response: requests.Response = requests.post(
@@ -232,7 +237,7 @@ def refresh_access_token_safe(credential: GoogleOAuthCredential, *, force: bool 
 
     # M12-10: o erro sai FORA do atomic. Levantado dentro, o rollback desfazia o delete e o
     # audit acima — a credencial revogada nunca sumia e ninguém ficava sabendo.
-    raise ValueError("Sua conexão com o Google foi revogada. Desconecte e conecte sua conta Google de novo.")
+    raise ValueError("Sua conexão com o Google foi revogada. Conecte sua conta Google de novo.")
 
 
 def usuarios_para_reconectar() -> QuerySet[Usuario]:

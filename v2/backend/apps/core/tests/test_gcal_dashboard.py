@@ -376,8 +376,8 @@ class TestGCalBulkReapply:
         Requer FEATURE_AUTO_APPLY_ENABLED=True para enfileirar tasks Celery
         (caso contrário, retorna queued=0 e não aplica).
 
-        Mock do task: Produção chama task.delay(solicitacao_id=...), mas
-        assinatura real é task.delay(s.id). Mock aceita ambos os formatos.
+        Mock do task: a view despacha task.delay(s.id, ...) com id posicional
+        (M24-01 — o antigo kwarg `solicitacao_id=` não existe na task).
         """
         # Mock task.delay para aceitar qualquer parâmetro
         mock_delay = MagicMock()
@@ -404,8 +404,13 @@ class TestGCalBulkReapply:
         # Verificar que task foi enfileirado
         assert mock_delay.called
 
-    def test_reapply_marks_pending_when_not_dry_run(self, api_client, usuario_controle, setup_solicitacoes):
-        """Marca como PENDING quando dry_run=False."""
+    @patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
+    def test_reapply_marks_pending_when_not_dry_run(self, mock_delay, api_client, usuario_controle, setup_solicitacoes):
+        """Marca como PENDING quando dry_run=False.
+
+        `.delay` mockado: com o despacho corrigido (M24-01) a task chegaria de verdade
+        ao broker — antes o TypeError a impedia e este teste passava por causa do bug.
+        """
         sol1 = setup_solicitacoes["sol1"]
 
         api_client.force_authenticate(user=usuario_controle)
@@ -416,6 +421,7 @@ class TestGCalBulkReapply:
         )
 
         assert response.status_code == 202
+        mock_delay.assert_called_once_with(sol1.id, dry_run=False, apply_blocked=True)
 
         # Verificar que status mudou para PENDING
         sol1.refresh_from_db()

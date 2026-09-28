@@ -1,0 +1,82 @@
+# Aprender Sistema - RTK project-local filters
+# These take precedence over ~/.config/rtk/filters.toml
+# Docs: https://github.com/rtk-ai/rtk#custom-filters
+
+schema_version = 1
+
+# ============================================================
+# Docker exec patterns (our primary dev workflow)
+# ============================================================
+
+[filters.docker-exec-pytest]
+description = "Strip pytest verbose output from docker exec"
+match_command = "docker exec .* pytest"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",                          # empty lines
+    "^platform .*Python.*pytest",      # pytest header
+    "^cachedir:",                      # cache info
+    "^rootdir:",                       # root info
+    "^plugins:",                       # plugin list
+    "^collecting \\.\\.\\.",            # collection progress
+    "^\\s+\\d+ passed",                # individual pass lines when verbose
+]
+
+[filters.docker-exec-migrate]
+description = "Compact Django migrate output"
+match_command = "docker exec .* (migrate|makemigrations|showmigrations)"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",
+    "^\\s+Applying ",  # will show only summary
+]
+
+[filters.docker-logs]
+description = "Dedupe gunicorn/celery worker repetitive logs"
+match_command = "docker logs"
+strip_ansi = true
+max_lines = 50
+
+# ============================================================
+# Frontend build (Vite is verbose)
+# ============================================================
+
+[filters.vite-build]
+description = "Strip Vite build boilerplate"
+match_command = "(npm run build|vite build|yarn build)"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",
+    "^vite v[0-9]",
+    "^✓ built in",                     # keep final summary line pre-this
+    "^\\s*transforming",
+    "^\\s*computing gzip size",
+]
+
+# ============================================================
+# Python tooling (inside container)
+# ============================================================
+
+[filters.pyright-strict]
+description = "Keep only pyright errors and summary"
+match_command = "pyright"
+strip_ansi = true
+strip_lines_matching = [
+    "^\\s*$",
+    "^\\s+Type \"",                    # type info lines
+    "^\\s+\\(reportUnknownMemberType\\)",
+    "^\\s+\\(reportUnknownVariableType\\)",
+]
+
+# ============================================================
+# Database queries (psql, django-extensions shell_plus)
+# ============================================================
+
+[filters.psql-compact]
+description = "Strip psql table borders"
+match_command = "psql|docker exec .* psql"
+strip_ansi = true
+strip_lines_matching = [
+    "^-+\\+-+",                        # table separators
+    "^\\s*$",
+]

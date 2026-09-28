@@ -134,6 +134,65 @@ def gcal_sync_task() -> None:
     pass
 
 
+# Mensagens de erro GCal gravadas na Solicitacao (a pessoa lê na tela): dizem COMO resolver.
+_MSG_CREDENCIAL_GOOGLE = (
+    "Sua conexão com o Google expirou ou foi removida. Desconecte e conecte sua conta Google de novo."
+)
+_MSG_SEM_ACESSO_CALENDARIO = (
+    "O Google recusou o acesso ao calendário da organização (sem permissão de edição ou calendário "
+    "não compartilhado com sua conta). Peça ao Controle o compartilhamento com «Fazer alterações nos eventos»."
+)
+
+
+def _friendly_gcal_error(error: BaseException) -> str:
+    """Texto acionável para `gcal_last_error`; o erro cru vai para o AuditLog."""
+    status = getattr(getattr(error, "resp", None), "status", None)
+    if str(status) in ("403", "404"):
+        return _MSG_SEM_ACESSO_CALENDARIO
+    return str(error)[:500]
+
+
+def _mark_gcal_error(
+    solicitation_id: int,
+    message: str,
+    *,
+    raw_error: str,
+    operator: Any = None,
+    operation: str = "publish",
+    dry_run: bool = False,
+    apply_blocked: bool = False,
+) -> None:
+    """Tira a linha de PENDING: marca ERROR com `message` e audita o erro cru.
+
+    publish/resync/cancel marcam PENDING antes de enfileirar; se a task sai sem marcar, a linha
+    fica PENDING para sempre (publicar some da tela e a edição fica bloqueada). `mark_gcal` não
+    toca em `external_event_id`, então a linha segue re-tentável.
+    """
+    from apps.core.models import AuditLog, Solicitacao
+
+    try:
+        s = Solicitacao.objects.get(id=solicitation_id)
+    except Solicitacao.DoesNotExist:
+        return
+    try:
+        s.mark_gcal(status=Solicitacao.GCalStatus.ERROR, payload_hash=None, error=message)
+    except Exception:
+        logger.exception("Falha ao marcar ERROR na Solicitacao #%s", solicitation_id)
+    if not dry_run:
+        AuditLog.objects.create(
+            usuario=operator,
+            action=AuditLog.Action.PUBLISH_GCAL_ERROR,
+            model_name="Solicitacao",
+            details={
+                "solicitacao_id": s.id,
+                "operation": operation,
+                "error": raw_error[:500],
+                "dry_run": dry_run,
+                "apply_blocked": apply_blocked,
+            },
+        )
+
+
 @shared_task(name="apps.core.tasks.task_publish_solicitacao_to_gcal")
 def task_publish_solicitacao_to_gcal(
     solicitation_id: int,
@@ -173,8 +232,14 @@ def task_publish_solicitacao_to_gcal(
     google_email = None
 
     if auth_mode == "oauth" and not dry_run:
-        # OAuth mode requer operator_user_id
+        # OAuth mode requer operator_user_id. Toda saída cedo marca ERROR (nunca PENDING eterno).
         if operator_user_id is None:
+            _mark_gcal_error(
+                solicitation_id,
+                "Publicação sem operador identificado. Publique de novo pela tela.",
+                raw_error="missing_operator_user_id",
+                apply_blocked=apply_blocked,
+            )
             return {
                 "action": "ERROR",
                 "solicitation_id": solicitation_id,
@@ -194,6 +259,12 @@ def task_publish_solicitacao_to_gcal(
             google_email = client.credential.google_email
 
         except Usuario.DoesNotExist:
+            _mark_gcal_error(
+                solicitation_id,
+                f"Usuário operador #{operator_user_id} não encontrado.",
+                raw_error="operator_not_found",
+                apply_blocked=apply_blocked,
+            )
             return {
                 "action": "ERROR",
                 "solicitation_id": solicitation_id,
@@ -202,13 +273,36 @@ def task_publish_solicitacao_to_gcal(
                 "error": "operator_not_found",
             }
         except ValueError as e:
-            # get_oauth_client_for_user pode lançar ValueError se não há credencial
+            # Sem credencial, ou refresh token revogado (invalid_grant)
+            _mark_gcal_error(
+                solicitation_id,
+                _MSG_CREDENCIAL_GOOGLE,
+                raw_error=str(e),
+                operator=operator,
+                apply_blocked=apply_blocked,
+            )
             return {
                 "action": "ERROR",
                 "solicitation_id": solicitation_id,
                 "external_event_id": None,
                 "summary": str(e),
                 "error": "oauth_credential_missing",
+            }
+        except Exception as e:
+            # O refresh levanta Exception genérica em erro de rede (token_manager)
+            _mark_gcal_error(
+                solicitation_id,
+                _friendly_gcal_error(e),
+                raw_error=str(e),
+                operator=operator,
+                apply_blocked=apply_blocked,
+            )
+            return {
+                "action": "ERROR",
+                "solicitation_id": solicitation_id,
+                "external_event_id": None,
+                "summary": str(e),
+                "error": "oauth_client_error",
             }
 
     try:
@@ -277,34 +371,16 @@ def task_publish_solicitacao_to_gcal(
                 countdown=60,
             )
 
-        # Tentar registrar erro e estado se a solicitação existir
-        try:
-            s = Solicitacao.objects.get(id=solicitation_id)
-            # Marcar status de erro
-            try:
-                s.mark_gcal(
-                    status=Solicitacao.GCalStatus.ERROR,
-                    payload_hash=None,
-                    error=str(e)[:500],
-                )
-            except Exception:
-                pass  # Falha ao marcar não deve bloquear o retorno
-
-            # Registrar AuditLog somente quando não for dry-run
-            if not dry_run:
-                AuditLog.objects.create(
-                    usuario=None,  # Task assíncrona
-                    action=AuditLog.Action.PUBLISH_GCAL_ERROR,
-                    model_name="Solicitacao",
-                    details={
-                        "solicitacao_id": s.id,
-                        "error": str(e)[:500],
-                        "dry_run": dry_run,
-                        "apply_blocked": apply_blocked,
-                    },
-                )
-        except Solicitacao.DoesNotExist:
-            pass  # Solicitação não existe, não há o que marcar
+        # Marca ERROR com texto acionável (403/404 do Google = sem acesso ao calendário);
+        # o erro cru vai para o AuditLog (só fora do dry-run).
+        _mark_gcal_error(
+            solicitation_id,
+            _friendly_gcal_error(e),
+            raw_error=str(e),
+            operator=operator,
+            dry_run=dry_run,
+            apply_blocked=apply_blocked,
+        )
 
         return {
             "action": "ERROR",
@@ -347,6 +423,7 @@ def task_cancel_solicitacao_from_gcal(
     # OAuth: create OAuth client if needed (fix #572)
     auth_mode = getattr(settings, "GCAL_AUTH_MODE", "service_account")
     client = None
+    operator = None
 
     if auth_mode == "oauth" and operator_user_id is not None:
         try:
@@ -354,7 +431,16 @@ def task_cancel_solicitacao_from_gcal(
             from apps.core.services.gcal_client_factory import get_oauth_client_for_user
 
             client, _ = get_oauth_client_for_user(operator)
-        except (Usuario.DoesNotExist, ValueError) as e:
+        except Exception as e:
+            # Sem credencial / token revogado / operador inexistente / rede: marca ERROR e
+            # MANTÉM external_event_id — o evento continua no Google e o cancel é re-tentável.
+            if isinstance(e, Usuario.DoesNotExist):
+                mensagem = f"Usuário operador #{operator_user_id} não encontrado."
+            elif isinstance(e, ValueError):
+                mensagem = _MSG_CREDENCIAL_GOOGLE
+            else:
+                mensagem = _friendly_gcal_error(e)
+            _mark_gcal_error(solicitation_id, mensagem, raw_error=str(e), operator=operator, operation="cancel")
             return {
                 "action": "ERROR",
                 "solicitation_id": solicitation_id,
@@ -405,6 +491,10 @@ def task_cancel_solicitacao_from_gcal(
             "error": "DoesNotExist",
         }
     except Exception as e:
+        # Tira a linha de PENDING; external_event_id fica (o evento segue no Google).
+        _mark_gcal_error(
+            solicitation_id, _friendly_gcal_error(e), raw_error=str(e), operator=operator, operation="cancel"
+        )
         return {
             "action": "ERROR",
             "solicitation_id": solicitation_id,

@@ -30,12 +30,14 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 
-from apps.core.exceptions import ServiceUnavailableError
+from apps.core.exceptions import APIError, ServiceUnavailableError
 from apps.core.models import AuditLog, GoogleOAuthCredential
-from apps.core.rbac.policies import CanUseGcal
+from apps.core.rbac.policies import CanPublishSetorSolicitacao, CanUseGcal, user_has_policy
 from apps.core.services.google_oauth import build_authorization_url, exchange_code_for_tokens, revoke_token
 from apps.core.services.oauth.oauth_flow import _is_safe_url as is_safe_url  # noqa: PLC2701
 from apps.core.services.oauth.token_manager import encrypt_token
+from apps.core.services.solicitacao_publish import oauth_publish_block_reason
+from apps.core.services.solicitacao_scope import has_publish_scope
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +106,21 @@ def _safe_return_to(value: str | None, default: str = "/pre-agenda") -> str:
         logger.warning("OAuth return_to rejeitado (open redirect prevention): len=%d", len(value))
         return default
     return value
+
+
+def _default_return_to(user) -> str:
+    """Retorno padrão do OAuth: /pre-agenda para quem opera o GCal; senão a página de publicação.
+
+    A Apoio de Coordenação (`publish_setor_solicitacao`, #1656) não abre /pre-agenda.
+    """
+    return "/pre-agenda" if user_has_policy(user, "use_gcal") else "/solicitacoes/publicacao"
+
+
+def _publish_block_reason(user) -> str | None:
+    """Por que `user` ainda não pode publicar no Google, ou None se pode (sem chamar o Google)."""
+    if not has_publish_scope(user):
+        return "no_setor_scope"
+    return oauth_publish_block_reason(user)
 
 
 def _safe_oauth_error_reason(value: str | None) -> str:
@@ -237,17 +254,19 @@ class OAuthThrottle(UserRateThrottle):
 
 
 @api_view(["GET"])
-@permission_classes([CanUseGcal])
+@permission_classes([CanUseGcal | CanPublishSetorSolicitacao])
 @throttle_classes([OAuthThrottle])
 def google_oauth_start(request: Request) -> Response:
     """
     Inicia fluxo OAuth 2.0 com Google.
 
-    **Permissão**: HasPerm("import_spreadsheet") (apenas grupo Controle ou Superintendência)
+    **Permissão**: `use_gcal` ou `publish_setor_solicitacao` (Apoio de Coordenação com setor vigente;
+    sem setor → 403 `no_setor_scope`)
     **Throttling**: 10 requests/hour por usuário (GAP-3)
 
     Query Params:
-        return_to (str, opcional): URL de retorno após callback (default: /pre-agenda)
+        return_to (str, opcional): URL de retorno após callback (default: /pre-agenda para quem tem
+            `use_gcal`; senão /solicitacoes/publicacao)
 
     Returns:
         302 Redirect: Redireciona para Google OAuth Consent Screen
@@ -257,9 +276,17 @@ def google_oauth_start(request: Request) -> Response:
 
         → Redirects to: https://accounts.google.com/o/oauth2/v2/auth?...
     """
+    # M12-15: quem não pode publicar nada (Apoio sem setor vigente) não recebe token Google.
+    if not has_publish_scope(request.user):
+        raise APIError(
+            code="no_setor_scope",
+            message="Seu cadastro não tem setor vigente. Peça à DAT para cadastrar seu vínculo de gerência.",
+            status_code=403,
+        )
+
     # Security: ``return_to`` é user-controlled — validar contra allowlist
     # antes de injetar no fluxo OAuth (CodeQL py/url-redirection).
-    return_to = _safe_return_to(request.GET.get("return_to"))
+    return_to = _safe_return_to(request.GET.get("return_to"), default=_default_return_to(request.user))
 
     try:
         # Gerar URL de autorização
@@ -289,7 +316,8 @@ def google_oauth_start(request: Request) -> Response:
 
 
 @api_view(["GET"])
-@permission_classes([CanUseGcal])  # M12-15 (#1652): quem não pode usar GCal não recebe credencial GCal
+# M12-15 (#1652): só quem pode publicar recebe credencial GCal — `use_gcal` ou a Apoio do setor (#1656).
+@permission_classes([CanUseGcal | CanPublishSetorSolicitacao])
 def google_oauth_callback(request: Request) -> Response:
     """
     Callback OAuth 2.0 após autorização do usuário no Google.
@@ -334,7 +362,7 @@ def google_oauth_callback(request: Request) -> Response:
     if request.GET.get("error"):
         safe_reason = _safe_oauth_error_reason(request.GET.get("error"))
         logger.warning("⚠️ OAuth callback: Google retornou error param (sanitized)")
-        redirect_path = _merge_query_params("/pre-agenda", google="error", reason=safe_reason)
+        redirect_path = _merge_query_params(_default_return_to(request.user), google="error", reason=safe_reason)
         redirect_url = _build_frontend_redirect_url(redirect_path)
         return redirect(redirect_url)
 
@@ -344,7 +372,8 @@ def google_oauth_callback(request: Request) -> Response:
 
     if not code or not state:
         logger.error("❌ OAuth callback: code ou state ausente")
-        redirect_url = _build_frontend_redirect_url("/pre-agenda?google=error&reason=missing_params")
+        redirect_path = _merge_query_params(_default_return_to(request.user), google="error", reason="missing_params")
+        redirect_url = _build_frontend_redirect_url(redirect_path)
         return redirect(redirect_url)
 
     # Verificar autenticação
@@ -363,11 +392,18 @@ def google_oauth_callback(request: Request) -> Response:
         # ou do refresh token. Não logar o valor — quem precisar de detalhes
         # usa AuditLog dedicado (CodeQL py/clear-text-logging-sensitive-data).
         logger.error("❌ OAuth callback: state validation failed (details not logged)")
-        redirect_url = _build_frontend_redirect_url("/pre-agenda?google=error&reason=invalid_state")
+        redirect_path = _merge_query_params(_default_return_to(request.user), google="error", reason="invalid_state")
+        redirect_url = _build_frontend_redirect_url(redirect_path)
         return redirect(redirect_url)
 
     # State válido - usar return_to validado
     return_to = validation["return_to"]
+
+    # M12-15: o vínculo pode vencer entre o start e o callback (o state vive 10 min).
+    # Quem não pode publicar nada não recebe token Google.
+    if not has_publish_scope(request.user):
+        redirect_path = _merge_query_params(return_to, google="error", reason="no_setor_scope")
+        return redirect(_build_frontend_redirect_url(redirect_path))
 
     try:
         # Trocar code por tokens
@@ -422,12 +458,12 @@ def google_oauth_callback(request: Request) -> Response:
 
 
 @api_view(["GET"])
-@permission_classes([CanUseGcal])
+@permission_classes([CanUseGcal | CanPublishSetorSolicitacao])
 def google_oauth_status(request: Request) -> Response:
     """
     Retorna status da conexão OAuth do usuário.
 
-    **Permissão**: HasPerm("import_spreadsheet")
+    **Permissão**: `use_gcal` ou `publish_setor_solicitacao` (a própria credencial)
 
     Returns:
         200 OK: {
@@ -435,7 +471,10 @@ def google_oauth_status(request: Request) -> Response:
             "google_email": str | null,
             "token_expiry": str (ISO 8601) | null,
             "expires_in_days": int | null,
-            "is_expired": bool
+            "is_expired": bool,
+            "publish_ready": bool,
+            "publish_block_reason": "no_setor_scope" | "google_not_connected"
+                | "google_calendar_not_configured" | null
         }
 
     Example:
@@ -459,6 +498,7 @@ def google_oauth_status(request: Request) -> Response:
             "is_expired": false
         }
     """
+    reason = _publish_block_reason(request.user)
     try:
         credential = GoogleOAuthCredential.objects.get(user=request.user)
 
@@ -470,6 +510,8 @@ def google_oauth_status(request: Request) -> Response:
                 "expires_in_days": credential.days_until_expiry(),
                 "is_expired": credential.is_expired(),
                 "default_calendar_id": credential.default_calendar_id or None,
+                "publish_ready": reason is None,
+                "publish_block_reason": reason,
             }
         )
 
@@ -482,17 +524,19 @@ def google_oauth_status(request: Request) -> Response:
                 "expires_in_days": None,
                 "is_expired": False,
                 "default_calendar_id": None,
+                "publish_ready": reason is None,
+                "publish_block_reason": reason,
             }
         )
 
 
 @api_view(["POST"])
-@permission_classes([CanUseGcal])
+@permission_classes([CanUseGcal | CanPublishSetorSolicitacao])
 def google_oauth_disconnect(request: Request) -> Response:
     """
     Desconecta conta Google (revoga refresh_token).
 
-    **Permissão**: HasPerm("import_spreadsheet")
+    **Permissão**: `use_gcal` ou `publish_setor_solicitacao` (a própria credencial)
 
     Returns:
         200 OK: {"message": "Conta Google desconectada com sucesso"}
@@ -534,12 +578,13 @@ def google_oauth_disconnect(request: Request) -> Response:
 
 
 @api_view(["GET"])
+# NÃO abrir para publish_setor_solicitacao: lê QUALQUER calendar_id da query string (#1656).
 @permission_classes([CanUseGcal])
 def google_oauth_list_events(request: Request) -> Response:
     """
     Lista eventos de um calendário Google do usuário.
 
-    **Permissão**: HasPerm("import_spreadsheet")
+    **Permissão**: `use_gcal` (a Apoio de Coordenação não acessa)
 
     Query Params:
         calendar_id (str, opcional): ID do calendário (default: default_calendar_id ou "primary")
@@ -594,12 +639,13 @@ def google_oauth_list_events(request: Request) -> Response:
 
 
 @api_view(["GET"])
+# NÃO abrir para publish_setor_solicitacao: o calendário de publicação é o da organização (#1656).
 @permission_classes([CanUseGcal])
 def google_oauth_list_calendars(request: Request) -> Response:
     """
     Lista calendários disponíveis do usuário OAuth.
 
-    **Permissão**: HasPerm("import_spreadsheet")
+    **Permissão**: `use_gcal` (a Apoio de Coordenação não acessa)
 
     Returns:
         200 OK: Lista de calendários
@@ -655,12 +701,13 @@ def google_oauth_list_calendars(request: Request) -> Response:
 
 
 @api_view(["POST"])
+# NÃO abrir para publish_setor_solicitacao: o calendário de publicação é o da organização (#1656).
 @permission_classes([CanUseGcal])
 def google_oauth_select_calendar(request: Request) -> Response:
     """
     Salva calendário selecionado pelo usuário.
 
-    **Permissão**: HasPerm("import_spreadsheet")
+    **Permissão**: `use_gcal` (a Apoio de Coordenação não acessa)
 
     Request Body:
         {

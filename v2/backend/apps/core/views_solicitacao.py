@@ -48,6 +48,7 @@ from .services.solicitacao_scope import (
     can_publish_solicitacao,
     participants_out_of_setor,
     projeto_out_of_setor,
+    scope_publishable_solicitacoes,
     scope_solicitacoes,
 )
 from .utils.net import get_client_ip
@@ -114,6 +115,11 @@ class _BatchIdsSerializer(serializers.Serializer):
             ),
             OpenApiParameter(
                 "search", OpenApiTypes.STR, description="Busca textual em usuário, município, observações"
+            ),
+            OpenApiParameter(
+                "publishable",
+                OpenApiTypes.BOOL,
+                description="Se true, retorna só as solicitações que o usuário pode publicar no Google Agenda",
             ),
         ],
         responses={200: SolicitacaoSerializer(many=True), **COMMON_ERROR_RESPONSES},
@@ -249,6 +255,11 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 "usuario", "municipio", "tipo_evento", "projeto", "coordenador"
             ).prefetch_related("participations__usuario")
             qs = scope_solicitacoes(base, self.request.user)
+
+        # #1656: `?publishable=true` = só o que a pessoa pode publicar no Google (mesma
+        # regra da guarda de objeto das 4 ações GCal — a lista nunca oferece o que elas recusam).
+        if self.request.query_params.get("publishable") == "true":
+            qs = scope_publishable_solicitacoes(qs, self.request.user)
 
         # PR15: Filtros adicionais via query params
         sector = self.request.query_params.get("sector")
@@ -850,7 +861,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         url_path="preview-gcal",
     )
     def preview_gcal(self, request, pk=None):
-        """Preview do payload GCal sem publicar (Controle ou Superintendência)."""
+        """Preview do payload GCal sem publicar (`use_gcal`, ou Apoio do setor do evento)."""
         solicitacao = self._get_publishable_solicitacao()
 
         # §1 Epic #459: Delegate to service layer
@@ -878,7 +889,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         url_path="publish",
     )
     def publish(self, request, pk=None):
-        """Publica solicitação no Google Calendar via Celery (Controle ou Superintendência)."""
+        """Publica solicitação no Google Calendar via Celery (`use_gcal`, ou Apoio do setor do evento)."""
         solicitacao = self._get_publishable_solicitacao()
         dry_run = request.data.get("dry_run", False)
         apply_blocked = request.data.get("apply_blocked", False)
@@ -914,7 +925,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         """
         Republicar solicitação no Google Calendar (força UPDATE) - Fase 4.
 
-        Permissão: Controle ou Superintendência
+        Permissão: `use_gcal` (global) ou `publish_setor_solicitacao` (setor do evento)
         Returns: 202 Accepted (processamento assíncrono)
         """
         solicitacao = self._get_publishable_solicitacao()
@@ -948,7 +959,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         """
         Cancelar evento no Google Calendar e limpar campos - Fase 4.
 
-        Permissão: Controle ou Superintendência
+        Permissão: `use_gcal` (global) ou `publish_setor_solicitacao` (setor do evento)
         Returns: 202 Accepted (processamento assíncrono)
         """
         solicitacao = self._get_publishable_solicitacao()

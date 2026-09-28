@@ -175,7 +175,8 @@ class OAuthCalendarClient(CalendarClientAdapter):
         """
         # Se for o email principal do usuário OAuth, usar "primary"
         if calendar_id == self.credential.google_email:
-            logger.debug(f"📧 Resolved {calendar_id} → 'primary' for OAuth user")
+            # Não logar o valor: aqui ele é o e-mail da conta (PII) — CodeQL py/clear-text-logging.
+            logger.debug("📧 Calendário principal da conta OAuth resolvido para 'primary'")
             return "primary"
         # Caso contrário, usar o calendar_id original
         return calendar_id

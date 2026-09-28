@@ -106,12 +106,14 @@ def can_publish_solicitacao(user: Any, obj: Any) -> bool:
     publicar um evento próprio que caiu em outro setor (via fail-open do create).
 
     - Global (`use_gcal`: superuser / Controle / Superintendência) → qualquer evento.
+      ⚑ É o `use_gcal`, NÃO `user_is_solicitacao_global`: este inclui a DAT para VER tudo,
+      e uma pessoa da DAT que também fosse Apoio publicaria evento de qualquer setor.
     - `publish_setor_solicitacao` (Apoio) → só evento cujo `Projeto.setor` ∈
       `user_setores(user)`. Sem setor vigente, ou projeto sem setor → False (fail-closed).
     """
     if not user or not getattr(user, "is_authenticated", False):
         return False
-    if user_is_solicitacao_global(user):
+    if user_has_policy(user, "use_gcal"):
         return True
     if user_has_any_perm(user, "publish_setor_solicitacao"):
         setores = user_setores(user)

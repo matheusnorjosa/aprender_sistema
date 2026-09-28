@@ -533,3 +533,44 @@ class TestSetorVemDoProjetoSetor:
         projeto = ProjetoFactory(nome="Sem setor PSS", setor="", gerencia=None)
         propria = _aprovada(apoio_fluir, projeto)
         assert can_publish_solicitacao(apoio_fluir, propria) is False
+
+    def test_setor_casa_mesmo_com_gerencia_divergente(self, apoio_fluir, outro_usuario, gerencia_vidas):
+        """Guarda: projeto rotulado Fluir mas pendurado na gerência do Vidas → vale `Projeto.setor`.
+        Um backfill futuro de `Projeto.gerencia` não muda o que a Apoio publica."""
+        from apps.core.services.solicitacao_scope import can_publish_solicitacao
+
+        projeto = ProjetoFactory(nome="Fluir com gerencia Vidas PSS", setor="Fluir", gerencia=gerencia_vidas)
+        sol = _aprovada(outro_usuario, projeto)
+
+        ids = set(scope_solicitacoes(Solicitacao.objects.all(), apoio_fluir).values_list("id", flat=True))
+        assert sol.id in ids
+        assert can_publish_solicitacao(apoio_fluir, sol) is True
+
+
+class TestPublishGlobalSoComUseGcal:
+    """O "global" do PUBLISH é `use_gcal`, não o "global" de VISIBILIDADE.
+
+    `user_is_solicitacao_global` inclui a DAT (`manage_admin_registries`) para VER tudo. Se
+    ele também valesse para publicar, uma pessoa da DAT que fosse Apoio passaria a classe
+    pela cap da Apoio e publicaria/cancelaria evento de QUALQUER setor sem ter `use_gcal`.
+    """
+
+    @patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
+    @patch("django.conf.settings.GCAL_CLIENT", "fake")
+    @patch("rest_framework.throttling.AnonRateThrottle.allow_request", return_value=True)
+    @patch("rest_framework.throttling.UserRateThrottle.allow_request", return_value=True)
+    def test_dat_que_tambem_e_apoio_nao_publica_evento_de_outro_setor(
+        self, _t1, _t2, mock_task, gerencia_fluir, sol_vidas_terceiro
+    ):
+        mock_task.return_value = _mock_task_result()
+        user = UsuarioFactory(username="dat_apoio_pss", cpf="63000000009")
+        user.groups.add(GroupFactory(name="DAT"), GroupFactory(name="Apoio de Coordenação"))
+        EquipeGerencia.objects.create(usuario=user, gerencia=gerencia_fluir, papel="APOIO")
+        assert user_is_solicitacao_global(user) is True  # premissa: a DAT VÊ tudo
+        client = APIClient()
+        client.force_authenticate(user)
+
+        resp = _publish(client, sol_vidas_terceiro.id)
+
+        assert resp.status_code == status.HTTP_404_NOT_FOUND
+        mock_task.assert_not_called()

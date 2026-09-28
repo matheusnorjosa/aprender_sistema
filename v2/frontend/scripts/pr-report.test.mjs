@@ -102,6 +102,13 @@ test('limite estourado aparece como "estourou", com o uso acima de 100%', (t) =>
   assert.match(out, /\| CSS Bundle \| 55 kB \| 50 kB \| 110% \| estourou \|/);
 });
 
+test('Lighthouse sem falhas nem avisos: "passou", com a concordância certa', (t) => {
+  const out = roda(t, SIZE, { ...LIGHTHOUSE, failures: [], warnings: [] });
+  assert.match(out, /\*\*Resultado:\*\* passou — 0 falha\(s\), 0 aviso\(s\)/);
+  assert.match(out, /Falhas \(reprovam o Lighthouse\): nenhuma\./);
+  assert.match(out, /Avisos: nenhum\./);
+});
+
 test('os dois arquivos ausentes: as duas seções "Indisponível" com o motivo, e o marcador segue na 1ª linha', (t) => {
   const out = roda(t, undefined, undefined);
   assert.equal(out.split('\n')[0], '<!-- as-frontend-report -->');

@@ -79,9 +79,9 @@ function sizeSection(file) {
   return lines;
 }
 
-function assertionList(title, items) {
+function assertionList(title, items, none) {
   if (!items.length) {
-    return [`${title}: nenhuma.`];
+    return [`${title}: ${none}.`];
   }
   return [`${title}:`, ...items.map((item) => `- \`${item.label}\`: ${item.observed}`)];
 }
@@ -137,8 +137,8 @@ function lighthouseSection(file) {
     lines.push(`| ${METRIC_LABELS[id] ?? id} | ${shown} | ${limit} | ${status} |`);
   }
 
-  lines.push('', ...assertionList('Falhas (reprovam o Lighthouse)', failures));
-  lines.push('', ...assertionList('Avisos', warnings));
+  lines.push('', ...assertionList('Falhas (reprovam o Lighthouse)', failures, 'nenhuma'));
+  lines.push('', ...assertionList('Avisos', warnings, 'nenhum'));
   return lines;
 }
 

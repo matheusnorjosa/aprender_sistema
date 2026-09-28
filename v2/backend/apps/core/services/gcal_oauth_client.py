@@ -39,8 +39,19 @@ def resolve_publish_calendar_id(credential: Any) -> str:
     Nunca o calendário pessoal da conta (e-mail → 'primary'): devolve '' quando não há pino nem
     escolha, e quem chama falha fechado. O pino (`GCAL_OAUTH_CALENDAR_ID`) vale para TODO operador,
     então resync/cancel de outra pessoa miram o mesmo calendário do evento (#1656, F4).
+
+    Sem pino, a escolha da credencial só vale para quem opera o GCal (`use_gcal`). A Apoio de
+    Coordenação publica só no calendário da organização — nunca num calendário que ela não pode
+    escolher (p.ex. herdado de quando tinha outro papel).
     """
-    return str(getattr(settings, "GCAL_OAUTH_CALENDAR_ID", "") or credential.default_calendar_id or "")
+    pino = str(getattr(settings, "GCAL_OAUTH_CALENDAR_ID", "") or "")
+    if pino:
+        return pino
+    from apps.core.rbac.policies import user_has_policy
+
+    if not user_has_policy(getattr(credential, "user", None), "use_gcal"):
+        return ""
+    return str(credential.default_calendar_id or "")
 
 
 class OAuthCalendarClient(CalendarClientAdapter):

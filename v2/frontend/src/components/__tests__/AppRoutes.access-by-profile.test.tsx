@@ -73,6 +73,10 @@ vi.mock('../../api/stats', () => ({
 vi.mock('../../pages/Solicitacoes/EditSolicitacaoPage', () => ({
   default: () => 'EDIT_PAGE',
 }));
+// #1656: idem para /solicitacoes/publicacao — o teste cobre o gate, não a página.
+vi.mock('../../pages/Solicitacoes/PublicacaoSetorPage', () => ({
+  default: () => 'PUBLICACAO_PAGE',
+}));
 
 // ============================================================================
 // Setup
@@ -660,5 +664,51 @@ describe('AppRoutes — gate de /solicitacoes/:id/editar (Issue #1169)', () => {
   test('canApproveSuper → carrega a edição (não Forbidden)', async () => {
     renderRoute(EDITAR, BASE_USER, { ...EMPTY_PERMISSIONS, canApproveSuper: true }, []);
     expect(await screen.findByText('EDIT_PAGE')).toBeInTheDocument();
+  });
+});
+
+// ============================================================================
+// Gate de /solicitacoes/publicacao (#1656) — policy publish_setor_solicitacao
+// ============================================================================
+// A Apoio de Coordenação publica no Google Agenda os eventos aprovados do próprio
+// setor. A rota exige a MESMA policy da API; `use_gcal` (Controle) não basta, e a
+// Apoio continua fora da Pré-agenda (access_controle_section).
+describe('AppRoutes — gate de /solicitacoes/publicacao (#1656)', () => {
+  const PUBLICACAO = '/solicitacoes/publicacao';
+  const APOIO_PERMISSIONS: Permissions = {
+    ...EMPTY_PERMISSIONS,
+    isCoordenador: true,
+    canCoordenador: true,
+    canAcoesInternas: true,
+    canDisponibilidade: true,
+  };
+  const APOIO_POLICIES = ['create_solicitation', 'publish_setor_solicitacao'];
+
+  test('Apoio de Coordenação (publish_setor_solicitacao) → carrega a página', async () => {
+    renderRoute(PUBLICACAO, BASE_USER, APOIO_PERMISSIONS, APOIO_POLICIES);
+    expect(await screen.findByText('PUBLICACAO_PAGE')).toBeInTheDocument();
+    expect(screen.queryByText(FORBIDDEN_TEXT)).not.toBeInTheDocument();
+  });
+
+  test('Coordenador (só create_solicitation) → Forbidden', async () => {
+    renderRoute(PUBLICACAO, BASE_USER, APOIO_PERMISSIONS, ['create_solicitation']);
+    expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
+    expect(screen.queryByText('PUBLICACAO_PAGE')).not.toBeInTheDocument();
+  });
+
+  test('Controle (use_gcal, sem publish_setor_solicitacao) → Forbidden', async () => {
+    renderRoute(
+      PUBLICACAO,
+      BASE_USER,
+      { ...EMPTY_PERMISSIONS, inControle: true, canControle: true },
+      ['access_controle_section', 'manage_solicitacao_status', 'use_gcal', 'view_gcal_dashboard'],
+    );
+    expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
+    expect(screen.queryByText('PUBLICACAO_PAGE')).not.toBeInTheDocument();
+  });
+
+  test('Apoio continua bloqueada na /pre-agenda', async () => {
+    renderRoute('/pre-agenda', BASE_USER, APOIO_PERMISSIONS, APOIO_POLICIES);
+    expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
   });
 });

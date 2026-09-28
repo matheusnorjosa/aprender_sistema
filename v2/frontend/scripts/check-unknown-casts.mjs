@@ -163,7 +163,10 @@ if (caiu.length > 0) {
     if (agora === 0) console.log(`  remova "${f}"   (era ${tetoDe(f)}, zerou)`);
     else console.log(`  "${f}": ${agora},   (era ${tetoDe(f)})`);
   }
-  console.log('  (ou regenere: node scripts/check-unknown-casts.mjs --write)\n');
+  // Com arquivo acima do teto, `--write` também gravaria a subida: só sugere
+  // regenerar quando regenerar é apertar.
+  if (acima.length === 0) console.log('  (ou regenere: node scripts/check-unknown-casts.mjs --write)');
+  console.log('');
 }
 
 if (acima.length > 0) {

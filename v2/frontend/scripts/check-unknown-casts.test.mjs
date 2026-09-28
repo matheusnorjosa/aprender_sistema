@@ -95,6 +95,17 @@ test('cair abaixo do teto passa e imprime as linhas novas para apertar', (t) => 
   assert.match(r.out, /aperte/);
   assert.match(r.out, /"src\/a\.ts": 2,/);
   assert.match(r.out, /remova "src\/b\.ts"/);
+  assert.match(r.out, /--write/);
+});
+
+test('arquivo renomeado: reprova no caminho novo, aponta o antigo, e não sugere --write', (t) => {
+  const r = roda(cenario(t, { 'novo.ts': DOIS_CASTS }, { 'src/velho.ts': 2 }));
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /src\/novo\.ts: 2 > teto 0/);
+  assert.match(r.out, /remova "src\/velho\.ts"/);
+  assert.match(r.out, /mova a entrada/);
+  // Com arquivo acima do teto, --write gravaria a subida junto: não é conselho aqui.
+  assert.doesNotMatch(r.out, /--write/);
 });
 
 test('`as unknown` + quebra de linha + `as` conta (LF e CRLF), na linha onde começa', (t) => {

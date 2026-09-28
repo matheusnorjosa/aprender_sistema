@@ -312,6 +312,23 @@ describe('PublicacaoSetorPage — conexão e prontidão', () => {
     );
   });
 
+  test('(b2) conexão removida pelo sistema: só o aviso do card, sem repetir o da página', async () => {
+    googleHook.status = { ...NOT_CONNECTED, reconnectRequired: true };
+    listResponse = pageOf([makeSolic()]);
+    renderPage();
+
+    expect(await screen.findByLabelText(/^Publicar: Vidas Em Rede/)).toBeDisabled();
+    expect(screen.getByText(/O Google revogou o acesso da sua conta/)).toBeInTheDocument();
+    expect(screen.queryByText('Conecte sua conta Google para publicar os eventos.')).not.toBeInTheDocument();
+  });
+
+  test('(b3) conexão removida pelo sistema E sem setor: o alerta da DAT continua (o card não aparece)', async () => {
+    googleHook.status = { ...NOT_CONNECTED, publishBlockReason: 'no_setor_scope', reconnectRequired: true };
+    renderPage();
+
+    expect(await screen.findByText(/não tem setor vigente/)).toBeInTheDocument();
+  });
+
   test('(f) sem setor vigente: alerta da DAT e nenhum botão de conectar', async () => {
     googleHook.status = { ...NOT_CONNECTED, publishBlockReason: 'no_setor_scope' };
     renderPage();

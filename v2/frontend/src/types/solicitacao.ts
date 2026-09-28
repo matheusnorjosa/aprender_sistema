@@ -23,9 +23,10 @@ export type SolicitacaoStatus = 'pendente' | 'aprovado' | 'reprovado';
 export type FluxoType = 'SUPER' | 'NAO_SUPER';
 
 /**
- * Google Calendar sync status
+ * Google Calendar sync status — espelha `Solicitacao.GCalStatus` do backend
+ * (`models/solicitacao.py`): NONE | PENDING | PUBLISHED | ERROR.
  */
-export type GCalStatus = 'NOT_SYNCED' | 'PENDING' | 'PUBLISHED' | 'ERROR' | 'CANCELLED';
+export type GCalStatus = 'NONE' | 'PENDING' | 'PUBLISHED' | 'ERROR';
 
 /**
  * Event type (from TipoEvento)

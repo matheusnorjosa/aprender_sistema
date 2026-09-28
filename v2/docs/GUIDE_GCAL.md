@@ -104,11 +104,28 @@ GCAL_OAUTH_REDIRECT_URI=https://seu-dominio.com/api/oauth/google/callback/
 # Chave Fernet para criptografar tokens OAuth (ver seção 8 — SEC-011)
 GCAL_ENCRYPTION_KEY=<fernet-key-base64>
 
-# Calendar primário do usuário
+# Calendário da ORGANIZAÇÃO onde toda escrita OAuth acontece (id do "Formações", c_…@group.calendar.google.com)
+GCAL_OAUTH_CALENDAR_ID=<id-do-calendario-da-organizacao>
+
+# Service account / comando preagenda_to_gcal / auto-apply (não vale para o modo OAuth)
 GCAL_CALENDAR_ID=primary
 ```
 
-> Esses vars OAuth são lidos via `os.getenv` em `apps/core/services/oauth/oauth_flow.py`, `services/oauth/token_manager.py` e `services/gcal_oauth_client.py` (não ficam em `settings.py`). Ausência de `GCAL_OAUTH_CLIENT_ID`/`GCAL_OAUTH_REDIRECT_URI` levanta `ValueError`.
+> Esses vars OAuth são lidos via `os.getenv` em `apps/core/services/oauth/oauth_flow.py`, `services/oauth/token_manager.py` e `services/gcal_oauth_client.py` (não ficam em `settings.py`). Ausência de `GCAL_OAUTH_CLIENT_ID`/`GCAL_OAUTH_REDIRECT_URI` levanta `ValueError`. Exceção: `GCAL_OAUTH_CALENDAR_ID` fica em `settings.py`.
+
+#### Calendário de publicação (OAuth)
+
+Toda escrita OAuth — publicar, resincronizar e cancelar, por qualquer operador — vai para **um** calendário, resolvido no servidor (`resolve_publish_calendar_id`):
+
+1. `GCAL_OAUTH_CALENDAR_ID` (o pino da organização), se definido;
+2. senão, o calendário **escolhido** na credencial de quem age (`default_calendar_id`);
+3. senão, **nada**: o request responde `409 {"code": "google_calendar_not_configured"}` antes de marcar PENDING — nunca o calendário pessoal da conta.
+
+Por que o pino vale para todos: sem ele, o calendário era re-derivado de quem age, e um resync feito por outro operador criava um evento duplicado no calendário dele, enquanto o cancel "dava certo" (404 = sucesso) e deixava o evento órfão no calendário da organização. Com o pino, todos miram o mesmo calendário do evento.
+
+O cancel também confere, antes de apagar, se a conta enxerga o calendário (`calendar_accessible`). Sem acesso, ele não apaga às cegas: a linha vira ERROR, mantém `external_event_id` e pode ser repetida depois que o calendário for compartilhado.
+
+> ⚠️ **Não troque o pino com eventos PUBLISHED.** Resync e cancel desses eventos passariam a mirar o calendário novo (duplicados e órfãos). Para trocar: cancele os eventos publicados, troque `GCAL_OAUTH_CALENDAR_ID` e publique de novo.
 
 #### Comportamento do modo OAuth
 

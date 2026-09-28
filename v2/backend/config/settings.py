@@ -761,6 +761,12 @@ LOGGING = {
 # ================================================================
 GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "")
 GCAL_CALENDAR_ID = os.getenv("GCAL_CALENDAR_ID", "")
+# Calendário da ORGANIZAÇÃO para toda escrita em GCAL_AUTH_MODE=oauth (#1656). Tem precedência
+# sobre o calendário escolhido em cada credencial, então publish/resync/cancel de qualquer operador
+# miram o mesmo calendário do evento. Vazio → vale só a escolha explícita da credencial, NUNCA o
+# calendário pessoal (fail-closed). Distinto de GCAL_CALENDAR_ID acima (service account, comando
+# preagenda_to_gcal e auto-apply), que em prod é 'primary' — relativo a quem age.
+GCAL_OAUTH_CALENDAR_ID = os.getenv("GCAL_OAUTH_CALENDAR_ID", "").strip()
 
 # Calendar client type: 'fake' (in-memory, safe) or 'google' (real API)
 # Default: 'fake' para evitar publicações acidentais até implementar GoogleCalendarClient

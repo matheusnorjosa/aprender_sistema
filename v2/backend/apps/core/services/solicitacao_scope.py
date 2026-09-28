@@ -111,17 +111,47 @@ def can_publish_solicitacao(user: Any, obj: Any) -> bool:
     - `publish_setor_solicitacao` (Apoio) → só evento cujo `Projeto.setor` ∈
       `user_setores(user)`. Sem setor vigente, ou projeto sem setor → False (fail-closed).
     """
-    if not user or not getattr(user, "is_authenticated", False):
-        return False
-    if user_has_policy(user, "use_gcal"):
+    is_global, setores = _publish_tier(user)
+    if is_global:
         return True
+    setor = str(getattr(getattr(obj, "projeto", None), "setor", "") or "")
+    return bool(setor) and setor in setores
+
+
+def _publish_tier(user: Any) -> tuple[bool, frozenset[str]]:
+    """(global?, setores) de quem publica no GCal — SSOT da guarda de objeto e da lista.
+
+    `can_publish_solicitacao` (objeto) e `scope_publishable_solicitacoes` (lista) leem
+    daqui, então a lista nunca mostra evento que as 4 ações recusariam.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False, frozenset()
+    if user_has_policy(user, "use_gcal"):
+        return True, frozenset()
     if user_has_any_perm(user, "publish_setor_solicitacao"):
-        setores = user_setores(user)
-        if not setores:
-            return False
-        setor = str(getattr(getattr(obj, "projeto", None), "setor", "") or "")
-        return bool(setor) and setor in setores
-    return False
+        return False, frozenset(user_setores(user))
+    return False, frozenset()
+
+
+def scope_publishable_solicitacoes(qs: QuerySet, user: Any) -> QuerySet:
+    """Restringe `qs` ao que `user` pode publicar no GCal (`?publishable=true`, #1656).
+
+    Global → tudo; Apoio → eventos cujo `Projeto.setor` está entre os setores vigentes
+    do usuário; sem setor, ou sem nenhuma das duas permissões → vazio. Mesma regra da
+    guarda de objeto.
+    """
+    is_global, setores = _publish_tier(user)
+    if is_global:
+        return qs
+    if not setores:
+        return qs.none()
+    return qs.filter(projeto__setor__in=setores)
+
+
+def has_publish_scope(user: Any) -> bool:
+    """True sse `user` pode publicar ALGUM evento (global, ou Apoio com setor vigente)."""
+    is_global, setores = _publish_tier(user)
+    return is_global or bool(setores)
 
 
 def user_setores(user: Any) -> set[str]:

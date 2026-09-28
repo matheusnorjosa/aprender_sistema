@@ -160,6 +160,7 @@ Corpo opcional de `approve`/`reject`: `{"reason": "..."}` (aceita também
 
 ```
 ?mine=true                       # força escopo ao próprio usuário
+?publishable=true                # só o que o usuário pode publicar no Google Agenda (#1656)
 ?status=pendente|aprovado|reprovado
 ?status=pending|approved|rejected # aliases em inglês (mapeados)
 ?flow=SUPER|NAO_SUPER            # fluxo do projeto
@@ -325,13 +326,19 @@ As rotas OAuth ficam sob `/api/oauth/google/` e `/api/integrations/google/` —
 
 | Método | Endpoint | Status | Descrição | Permissão |
 |--------|----------|--------|-----------|-----------|
-| GET | `/api/oauth/google/start/` | ![Stable](https://img.shields.io/badge/-stable-green) | Iniciar fluxo OAuth (redirect) | `CanUseGcal` + throttle `oauth` |
-| GET | `/api/oauth/google/callback/` | ![Stable](https://img.shields.io/badge/-stable-green) | Callback do Google (redirect p/ frontend) | sem `permission_classes` (usa o default do DRF) |
-| GET | `/api/integrations/google/status/` | ![Stable](https://img.shields.io/badge/-stable-green) | Status da conexão OAuth | `CanUseGcal` |
-| POST | `/api/integrations/google/disconnect/` | ![Stable](https://img.shields.io/badge/-stable-green) | Revogar/desconectar credenciais | `CanUseGcal` |
+| GET | `/api/oauth/google/start/` | ![Stable](https://img.shields.io/badge/-stable-green) | Iniciar fluxo OAuth (redirect) | `CanUseGcal \| CanPublishSetorSolicitacao` + throttle `oauth`; sem setor vigente → 403 `no_setor_scope` |
+| GET | `/api/oauth/google/callback/` | ![Stable](https://img.shields.io/badge/-stable-green) | Callback do Google (redirect p/ frontend) | `CanUseGcal \| CanPublishSetorSolicitacao` |
+| GET | `/api/integrations/google/status/` | ![Stable](https://img.shields.io/badge/-stable-green) | Status da conexão OAuth + `publish_ready`/`publish_block_reason` | `CanUseGcal \| CanPublishSetorSolicitacao` |
+| POST | `/api/integrations/google/disconnect/` | ![Stable](https://img.shields.io/badge/-stable-green) | Revogar/desconectar credenciais | `CanUseGcal \| CanPublishSetorSolicitacao` |
 | GET | `/api/integrations/google/calendars/` | ![Stable](https://img.shields.io/badge/-stable-green) | Calendários da conta conectada | `CanUseGcal` |
 | POST | `/api/integrations/google/select-calendar/` | ![Stable](https://img.shields.io/badge/-stable-green) | Escolher calendário de trabalho | `CanUseGcal` |
 | GET | `/api/integrations/google/events/` | ![Stable](https://img.shields.io/badge/-stable-green) | Eventos da conta conectada | `CanUseGcal` |
+
+A Apoio de Coordenação (`CanPublishSetorSolicitacao`, #1656) conecta a própria conta, mas não escolhe
+calendário nem lista eventos: publica sempre no calendário da organização. `return_to` padrão:
+`/pre-agenda` para quem tem `use_gcal`; `/solicitacoes/publicacao` para os demais (vale também para os
+redirects de erro do callback). `publish_block_reason` do `status`: `no_setor_scope` (sem setor vigente),
+`google_not_connected`, `google_calendar_not_configured` ou `null` (pode publicar; `publish_ready=true`).
 
 ---
 

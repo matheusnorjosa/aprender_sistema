@@ -129,7 +129,7 @@ O cancel também confere, antes de apagar, se a conta enxerga o calendário (`ca
 
 #### Comportamento do modo OAuth
 
-- **Pré-requisito**: usuário do grupo Controle ou Superintendência conecta a conta Google via `GET /api/oauth/google/start/` (callback em `/api/oauth/google/callback/`).
+- **Pré-requisito**: quem publica conecta a PRÓPRIA conta Google via `GET /api/oauth/google/start/` (callback em `/api/oauth/google/callback/`): Controle e Superintendência (`use_gcal`) e a Apoio de Coordenação com setor vigente (`publish_setor_solicitacao`, #1656). A Apoio não escolhe calendário: publica no da organização (`GCAL_OAUTH_CALENDAR_ID`), então a conta conectada precisa do compartilhamento «Fazer alterações nos eventos» nesse calendário.
 - **Fluxo de publicação**: ao publicar/resync na Pré-agenda, o sistema verifica a conexão. Sem conexão retorna **403 Forbidden** (UI mostra card/modal "Conectar conta Google"); com conexão enfileira a task Celery com `operator_user_id` e retorna **202 Accepted**.
 - **Governança**: `apply_blocked` continua dependendo de `GCAL_CLIENT='google'`.
 

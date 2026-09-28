@@ -33,6 +33,16 @@ if TYPE_CHECKING:
 logger: logging.Logger = logging.getLogger(__name__)
 
 
+def resolve_publish_calendar_id(credential: Any) -> str:
+    """Calendário onde as escritas OAuth acontecem: o pino da organização, senão a escolha da credencial.
+
+    Nunca o calendário pessoal da conta (e-mail → 'primary'): devolve '' quando não há pino nem
+    escolha, e quem chama falha fechado. O pino (`GCAL_OAUTH_CALENDAR_ID`) vale para TODO operador,
+    então resync/cancel de outra pessoa miram o mesmo calendário do evento (#1656, F4).
+    """
+    return str(getattr(settings, "GCAL_OAUTH_CALENDAR_ID", "") or credential.default_calendar_id or "")
+
+
 class OAuthCalendarClient(CalendarClientAdapter):
     """
     Cliente OAuth de Google Calendar API.
@@ -118,25 +128,37 @@ class OAuthCalendarClient(CalendarClientAdapter):
 
     def get_default_calendar_id(self) -> str:
         """
-        Retorna calendar_id preferido do usuário OAuth.
+        Calendário onde este cliente escreve: o pino da organização, senão a escolha da credencial.
 
-        Ordem de preferência:
-        1. default_calendar_id configurado pelo usuário
-        2. google_email (calendário principal)
+        Nunca o calendário pessoal (o antigo fallback e-mail → 'primary' foi removido: uma conta
+        recém-conectada publicaria no calendário dela). Ver `resolve_publish_calendar_id`.
 
-        Returns:
-            ID do calendário a ser usado
+        Raises:
+            ValueError: sem pino e sem escolha — a escrita falha fechada (a task marca ERROR).
         """
-        # Preferir calendário selecionado pelo usuário
-        if self.credential.default_calendar_id:
-            calendar_id = self.credential.default_calendar_id
-            logger.debug(f"📅 Using user-selected calendar: {calendar_id}")
-            return calendar_id
-
-        # Fallback: usar calendário principal (email)
-        calendar_id = self.credential.google_email
-        logger.debug(f"📧 Using primary calendar (no selection): {calendar_id}")
+        calendar_id = resolve_publish_calendar_id(self.credential)
+        if not calendar_id:
+            raise ValueError("Calendário de publicação da organização não configurado")
         return calendar_id
+
+    def calendar_accessible(self, calendar_id: str) -> bool:
+        """
+        True se esta conta enxerga o calendário (`calendars.get` 200); False em 403/404.
+
+        No `delete`, o Google devolve 404 tanto para "evento já removido" quanto para "esta conta
+        não vê o calendário" — e o cancel trata 404 como sucesso. Conferir o acesso antes separa os
+        dois casos e evita limpar os campos deixando o evento órfão. Outros erros propagam.
+        """
+        try:
+            self._retry_with_backoff(
+                lambda: self.service.calendars().get(calendarId=self._resolve_calendar_id(calendar_id)).execute(),
+                max_retries=settings.GCAL_REQUEST_MAX_RETRIES,
+            )
+            return True
+        except HttpError as e:
+            if e.resp.status in (403, 404):
+                return False
+            raise
 
     def _resolve_calendar_id(self, calendar_id: str) -> str:
         """

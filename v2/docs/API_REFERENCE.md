@@ -270,6 +270,7 @@ As transições por solicitação são **actions do `SolicitacaoViewSet`**, não
 sob `/api/gcal/`. Exigem `CanUseGcal` (policy `use_gcal` =
 `operate_preagenda` OU `approve_solicitation`) **ou** `CanPublishSetorSolicitacao` — actions `preview_gcal`/`publish`/`resync_gcal`/`cancel_gcal` do `SolicitacaoViewSet` (`views_solicitacao.py`).
 Com `CanPublishSetorSolicitacao` (Apoio de Coordenação) só vale evento **aprovado do próprio setor**: `Projeto.setor` do evento ∈ setores do vínculo vigente da pessoa (`can_publish_solicitacao`); fora disso, 404.
+Em modo OAuth, publish/resync/cancel recusam **antes** de marcar PENDING: 403 `google_not_connected` (sem credencial Google) e 409 `google_calendar_not_configured` (sem calendário de publicação — nem o pino `GCAL_OAUTH_CALENDAR_ID`, nem escolha na credencial; ver `GUIDE_GCAL.md`).
 
 | Método | Endpoint | Status | Descrição | Permissão |
 |--------|----------|--------|-----------|-----------|

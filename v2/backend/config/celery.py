@@ -57,6 +57,14 @@ existing_schedule.update(
             "schedule": crontab(hour=6, minute=0),
             "options": {"expires": 3600},
         },
+        # #2039: credencial Google morta so aparecia quando um publish falhava (em prod, 2 de 3
+        # mortas desde abril). Forca o refresh de cada uma as 05:00 (baixa, depois do backup) e
+        # remove as revogadas; quem precisa reconectar ve o aviso ao abrir o sistema.
+        "daily-google-credentials-probe": {
+            "task": "apps.core.tasks.probe_google_credentials",
+            "schedule": crontab(hour=5, minute=0),
+            "options": {"expires": 3600},
+        },
         # #871: Daily notifications/escalation processing at 08:00 (America/Fortaleza)
         "acoes-notificacoes-diarias": {
             "task": "apps.core.tasks.processar_notificacoes_acoes_diarias",

@@ -44,12 +44,23 @@ class DashboardMetricsResponseSerializer(serializers.Serializer):
     window = DashboardWindowSerializer()
 
 
+class GoogleReconnectUserSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    nome = serializers.CharField()
+
+
+class GoogleReconnectSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    users = GoogleReconnectUserSerializer(many=True)
+
+
 class AlertsSummaryResponseSerializer(serializers.Serializer):
     errors = serializers.IntegerField()
     pending = serializers.IntegerField()
     published = serializers.IntegerField()
     none = serializers.IntegerField()
     window = DashboardWindowSerializer()
+    google_reconnect = GoogleReconnectSerializer()
 
 
 class SuccessRateResponseSerializer(serializers.Serializer):

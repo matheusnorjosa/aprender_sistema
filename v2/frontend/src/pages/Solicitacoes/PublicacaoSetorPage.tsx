@@ -250,7 +250,10 @@ export default function PublicacaoSetorPage(): JSX.Element {
 
   const ready = status.publishReady;
   const reason = status.publishBlockReason;
-  const blocked = blockedMessage(ready, reason, statusError);
+  // Conexão removida pelo sistema: o card já explica a revogação e oferece Conectar — não repetir.
+  // Só nesse motivo: sem setor, o card nem aparece e o alerta da DAT é a única explicação.
+  const cardExplica = status.reconnectRequired && reason === 'google_not_connected';
+  const blocked = cardExplica ? null : blockedMessage(ready, reason, statusError);
   const blockedIsWarning =
     reason === 'no_setor_scope' || reason === 'google_calendar_not_configured' || (!reason && !!statusError);
 

@@ -64,7 +64,7 @@ def test_publish_sem_credencial_marca_error_e_nao_fica_pending():
     assert resultado["action"] == "ERROR"
     sol.refresh_from_db()
     assert sol.gcal_status == Solicitacao.GCalStatus.ERROR
-    assert "conecte sua conta Google" in sol.gcal_last_error
+    assert "Conecte sua conta Google de novo" in sol.gcal_last_error
     assert _ultimo_erro(sol).usuario_id == operador.pk
 
 
@@ -78,7 +78,7 @@ def test_publish_invalid_grant_marca_error_com_mensagem_de_reconexao():
 
     sol.refresh_from_db()
     assert sol.gcal_status == Solicitacao.GCalStatus.ERROR
-    assert "conecte sua conta Google" in sol.gcal_last_error
+    assert "Conecte sua conta Google de novo" in sol.gcal_last_error
     assert "invalid_grant" in _ultimo_erro(sol).details["error"]  # erro cru preservado
 
 
@@ -139,7 +139,7 @@ def test_cancel_sem_credencial_marca_error_e_mantem_external_event_id():
     sol.refresh_from_db()
     assert sol.gcal_status == Solicitacao.GCalStatus.ERROR
     assert sol.external_event_id == "asv2x1"
-    assert "conecte sua conta Google" in sol.gcal_last_error
+    assert "Conecte sua conta Google de novo" in sol.gcal_last_error
 
 
 @OAUTH
@@ -185,4 +185,4 @@ def test_mensagem_invalid_grant_nao_cita_pre_agenda():
             token_manager.refresh_access_token_safe(cred)
 
     assert "Pré-agenda" not in str(erro.value)
-    assert "conecte sua conta Google" in str(erro.value)
+    assert "Conecte sua conta Google de novo" in str(erro.value)

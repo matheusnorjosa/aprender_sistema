@@ -303,13 +303,28 @@ Todas com `permission_classes = [IsAuthenticated, CanUseGcal]`.
 | GET | `/api/gcal/dashboard/events/` | ![Stable](https://img.shields.io/badge/-stable-green) | Eventos (paginado, filtros) | `CanUseGcal` |
 | GET | `/api/gcal/dashboard/events/{id}/detail/` | ![Stable](https://img.shields.io/badge/-stable-green) | Detalhe + timeline do evento | `CanUseGcal` |
 | GET | `/api/gcal/dashboard/events/export/` | ![Stable](https://img.shields.io/badge/-stable-green) | Export CSV/JSON | `CanUseGcal` |
-| GET | `/api/gcal/dashboard/alerts/summary/` | ![Stable](https://img.shields.io/badge/-stable-green) | Resumo de alertas (badge/toast) | `CanUseGcal` |
+| GET | `/api/gcal/dashboard/alerts/summary/` | ![Stable](https://img.shields.io/badge/-stable-green) | Resumo de alertas (badge/toast) + `google_reconnect` | `CanUseGcal` |
 | GET | `/api/gcal/dashboard/insights/success-rate/` | ![Beta](https://img.shields.io/badge/-beta-yellow) | Taxa de sucesso | `CanUseGcal` |
 | GET | `/api/gcal/dashboard/insights/top/` | ![Beta](https://img.shields.io/badge/-beta-yellow) | Top 5 insights | `CanUseGcal` |
 | POST | `/api/gcal/dashboard/batch/reapply/` | ![Beta](https://img.shields.io/badge/-beta-yellow) | Reaplicar em lote | `CanUseGcal` |
 | POST | `/api/gcal/dashboard/batch/resync/` | ![Beta](https://img.shields.io/badge/-beta-yellow) | Resincronizar em lote | `CanUseGcal` |
 
 Não existem `/api/gcal/dashboard/summary/`, `/pending/`, `/errors/` nem `/insights/`.
+
+`alerts/summary` (#2039) traz, além das contagens por `gcal_status` (que respeitam `start`/`end`),
+quem precisa reconectar a conta Google, sem depender da janela:
+
+```json
+{
+  "errors": 2, "pending": 0, "published": 40, "none": 3,
+  "window": {"start": null, "end": null},
+  "google_reconnect": {"count": 1, "users": [{"id": 12, "nome": "Ana Souza"}]}
+}
+```
+
+`users`: pessoas ativas cuja conexão o sistema removeu (`invalid_grant`, no job diário ou num
+publish) e que não reconectaram depois. O "Desconectar" manual não entra. Ordenado por nome; só `id`
+e `nome` (o nome, ou `Usuario #<id>` sem nome), sem e-mail nem CPF.
 
 ### Calendários e saúde
 
@@ -328,7 +343,7 @@ As rotas OAuth ficam sob `/api/oauth/google/` e `/api/integrations/google/` —
 |--------|----------|--------|-----------|-----------|
 | GET | `/api/oauth/google/start/` | ![Stable](https://img.shields.io/badge/-stable-green) | Iniciar fluxo OAuth (redirect) | `CanUseGcal \| CanPublishSetorSolicitacao` + throttle `oauth`; sem setor vigente → 403 `no_setor_scope` |
 | GET | `/api/oauth/google/callback/` | ![Stable](https://img.shields.io/badge/-stable-green) | Callback do Google (redirect p/ frontend) | `CanUseGcal \| CanPublishSetorSolicitacao` |
-| GET | `/api/integrations/google/status/` | ![Stable](https://img.shields.io/badge/-stable-green) | Status da conexão OAuth + `publish_ready`/`publish_block_reason` | `CanUseGcal \| CanPublishSetorSolicitacao` |
+| GET | `/api/integrations/google/status/` | ![Stable](https://img.shields.io/badge/-stable-green) | Status da conexão OAuth + `publish_ready`/`publish_block_reason`/`reconnect_required` | `CanUseGcal \| CanPublishSetorSolicitacao` |
 | POST | `/api/integrations/google/disconnect/` | ![Stable](https://img.shields.io/badge/-stable-green) | Revogar/desconectar credenciais | `CanUseGcal \| CanPublishSetorSolicitacao` |
 | GET | `/api/integrations/google/calendars/` | ![Stable](https://img.shields.io/badge/-stable-green) | Calendários da conta conectada | `CanUseGcal` |
 | POST | `/api/integrations/google/select-calendar/` | ![Stable](https://img.shields.io/badge/-stable-green) | Escolher calendário de trabalho | `CanUseGcal` |
@@ -339,6 +354,21 @@ calendário nem lista eventos: publica sempre no calendário da organização. `
 `/pre-agenda` para quem tem `use_gcal`; `/solicitacoes/publicacao` para os demais (vale também para os
 redirects de erro do callback). `publish_block_reason` do `status`: `no_setor_scope` (sem setor vigente),
 `google_not_connected`, `google_calendar_not_configured` ou `null` (pode publicar; `publish_ready=true`).
+
+`reconnect_required` do `status` (#2039): `true` quando não há credencial **e** o último evento de
+conexão da pessoa foi uma remoção feita pelo sistema (o Google recusou o refresh token com
+`invalid_grant`), sem reconexão depois. Nunca conectou ou clicou em "Desconectar": `false`. Com
+credencial: sempre `false`. A remoção vem do job diário `probe_google_credentials` (05:00) ou de um
+publish/cancel. Exemplo de conta removida pelo sistema:
+
+```json
+{
+  "connected": false, "google_email": null, "token_expiry": null, "expires_in_days": null,
+  "is_expired": false, "default_calendar_id": null,
+  "publish_ready": false, "publish_block_reason": "google_not_connected",
+  "reconnect_required": true
+}
+```
 
 ---
 

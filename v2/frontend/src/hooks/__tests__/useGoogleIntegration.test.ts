@@ -53,6 +53,7 @@ describe('normalizeGoogleStatus (função pura)', () => {
       defaultCalendarId: null,
       publishReady: false,
       publishBlockReason: null,
+      reconnectRequired: false,
     });
   });
 
@@ -66,6 +67,7 @@ describe('normalizeGoogleStatus (função pura)', () => {
       defaultCalendarId: null,
       publishReady: false,
       publishBlockReason: null,
+      reconnectRequired: false,
     });
   });
 
@@ -80,6 +82,7 @@ describe('normalizeGoogleStatus (função pura)', () => {
       defaultCalendarId: null,
       publishReady: false,
       publishBlockReason: null,
+      reconnectRequired: false,
     });
     expect(normalizeGoogleStatus(null)).toEqual({
       connected: false,
@@ -90,6 +93,7 @@ describe('normalizeGoogleStatus (função pura)', () => {
       defaultCalendarId: null,
       publishReady: false,
       publishBlockReason: null,
+      reconnectRequired: false,
     });
   });
 
@@ -120,6 +124,26 @@ describe('normalizeGoogleStatus (função pura)', () => {
     const status = normalizeGoogleStatus(RAW_CONNECTED);
     expect(status.publishReady).toBe(false);
     expect(status.publishBlockReason).toBeNull();
+  });
+
+  // #2039: o sistema removeu a conexão porque o Google revogou o acesso (invalid_grant).
+  test('mapeia reconnect_required → reconnectRequired', () => {
+    expect(
+      normalizeGoogleStatus({
+        ...RAW_DISCONNECTED,
+        publish_ready: false,
+        publish_block_reason: 'google_not_connected',
+        reconnect_required: true,
+      }).reconnectRequired,
+    ).toBe(true);
+    expect(
+      normalizeGoogleStatus({ ...RAW_DISCONNECTED, reconnect_required: false }).reconnectRequired,
+    ).toBe(false);
+  });
+
+  test('payload antigo (sem reconnect_required) → reconnectRequired=false', () => {
+    // Backend anterior ao #2039 não manda o campo: sem aviso de reconexão.
+    expect(normalizeGoogleStatus(RAW_DISCONNECTED).reconnectRequired).toBe(false);
   });
 
   test('preserva default_calendar_id salvo (regressão de contrato)', () => {

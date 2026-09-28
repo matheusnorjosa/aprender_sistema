@@ -4,11 +4,14 @@
  * Componente para exibir status da integração OAuth Google Calendar.
  *
  * Estados:
- * - DESCONECTADO: Card vermelho com botão "Conectar conta Google"
- * - CONECTADO: Card verde com email, data, botão "Gerenciar"
+ * - DESCONECTADO: Card vermelho com botão "Conectar conta Google"; se o sistema
+ *   removeu a conexão (`reconnectRequired`, Google revogou o acesso — #2039),
+ *   mostra antes um aviso de revogação.
+ * - CONECTADO: Card verde com email, seletor de calendário e "Desconectar".
+ *   Sem alarme de expiração: o access token dura 1h e o refresh token o renova sozinho.
  *
  * Props:
- * - status: { connected, googleEmail, tokenExpiry, expiresInDays, isExpired }
+ * - status: { connected, googleEmail, defaultCalendarId, reconnectRequired, ... }
  * - onConnect: Função chamada ao clicar "Conectar"
  * - onDisconnect: Função chamada ao clicar "Desconectar"
  *
@@ -18,11 +21,10 @@
  */
 
 import { useState, useEffect, type JSX } from 'react';
-import { Card, Button, Space, Tag, Typography, Popconfirm, Select, message } from 'antd';
+import { Alert, Card, Button, Space, Tag, Typography, Popconfirm, Select, message } from 'antd';
 import {
   GoogleOutlined,
   CheckCircleOutlined,
-  WarningOutlined,
   DisconnectOutlined,
   CalendarOutlined,
 } from '@ant-design/icons';
@@ -61,8 +63,7 @@ export interface GoogleIntegrationCardProps {
   onDisconnect: () => void;
   /**
    * Destino de publicação fixado pelo servidor (calendário oficial da organização, #1656):
-   * sem seletor de calendário (nem chamada a `/calendars/`) e sem a UI de expiração —
-   * o `isExpired` do status é o access token de 1h, renovado sozinho pelo refresh token.
+   * sem seletor de calendário (nem chamada a `/calendars/`).
    */
   fixedCalendar?: boolean;
 }
@@ -80,25 +81,22 @@ const GoogleIntegrationCard = ({
   // Extrair valores de status (ou usar defaults se status for null). `status`
   // pode ser null antes do fetch inicial; a renderização real só ocorre após o
   // early return abaixo, mas os hooks precisam rodar incondicionalmente.
-  const { connected, googleEmail, tokenExpiry, expiresInDays, isExpired: tokenExpired, defaultCalendarId } =
-    status ?? {
-      connected: false,
-      googleEmail: null,
-      tokenExpiry: null,
-      expiresInDays: null,
-      isExpired: false,
-      defaultCalendarId: null,
-    };
-  // No modo fixo a expiração do access token não é mostrada: "Expirado"/"Reconectar"
-  // só empurraria reconexões inúteis (o refresh token renova o acesso sozinho).
-  const isExpired = !fixedCalendar && tokenExpired;
+  // `isExpired`/`expiresInDays`/`tokenExpiry` do status NÃO são usados: descrevem o
+  // access token de 1h, que o refresh token renova sozinho — mostrá-los só empurrava
+  // reconexões inúteis. Conta morta de verdade chega como `reconnectRequired` (#2039).
+  const { connected, googleEmail, defaultCalendarId, reconnectRequired } = status ?? {
+    connected: false,
+    googleEmail: null,
+    defaultCalendarId: null,
+    reconnectRequired: false,
+  };
 
   // Carregar calendários quando conectado (no modo fixo não há o que escolher)
   useEffect(() => {
-    if (connected && !isExpired && !fixedCalendar) {
+    if (connected && !fixedCalendar) {
       void loadCalendars();
     }
-  }, [connected, isExpired, fixedCalendar]);
+  }, [connected, fixedCalendar]);
 
   // Atualizar calendário selecionado quando defaultCalendarId mudar.
   // Sem defaultCalendarId salvo, cair para o calendário principal ('primary'),
@@ -166,6 +164,14 @@ const GoogleIntegrationCard = ({
             </Title>
           </Space>
 
+          {reconnectRequired && (
+            <Alert
+              type="warning"
+              showIcon
+              message="O Google revogou o acesso da sua conta ao sistema, então ela foi desconectada. Conecte de novo para voltar a publicar."
+            />
+          )}
+
           <Text type="secondary">
             Para publicar eventos no Google Calendar, conecte sua conta corporativa do Google.
           </Text>
@@ -184,38 +190,14 @@ const GoogleIntegrationCard = ({
   }
 
   // Estado: CONECTADO
-  const isExpiringSoon =
-    !fixedCalendar && expiresInDays !== null && expiresInDays !== undefined && expiresInDays <= 7;
-  const cardColor = isExpired
-    ? '#ff4d4f' // vermelho
-    : isExpiringSoon
-    ? '#faad14' // amarelo
-    : '#52c41a'; // verde
-
-  const backgroundColor = isExpired
-    ? '#fff2f0' // vermelho claro
-    : isExpiringSoon
-    ? '#fffbe6' // amarelo claro
-    : '#f6ffed'; // verde claro
-
-  const statusText = isExpired
-    ? 'Expirado (reconecte sua conta)'
-    : isExpiringSoon
-    ? `Expira em ${expiresInDays} dias`
-    : 'Conectado';
-
-  const statusIcon = isExpired ? (
-    <WarningOutlined style={{ color: cardColor }} />
-  ) : (
-    <CheckCircleOutlined style={{ color: cardColor }} />
-  );
+  const cardColor = '#52c41a'; // verde
 
   return (
     <Card
       className="mb-4"
       style={{
         borderColor: cardColor,
-        backgroundColor: backgroundColor,
+        backgroundColor: '#f6ffed', // verde claro
       }}
     >
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
@@ -224,8 +206,8 @@ const GoogleIntegrationCard = ({
           <Title level={5} className="m-0">
             Integração Google Calendar
           </Title>
-          <Tag color={isExpired ? 'error' : isExpiringSoon ? 'warning' : 'success'} icon={statusIcon}>
-            {statusText}
+          <Tag color="success" icon={<CheckCircleOutlined style={{ color: cardColor }} />}>
+            Conectado
           </Tag>
         </Space>
 
@@ -233,18 +215,6 @@ const GoogleIntegrationCard = ({
           <Text>
             <strong>Conta conectada:</strong> {googleEmail}
           </Text>
-          {tokenExpiry && !fixedCalendar && (
-            <Text type="secondary">
-              <strong>Token expira em:</strong>{' '}
-              {new Date(tokenExpiry).toLocaleDateString('pt-BR', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </Text>
-          )}
 
           {/* Seletor de calendário (no modo fixo, só o destino oficial) */}
           {fixedCalendar ? (
@@ -262,7 +232,6 @@ const GoogleIntegrationCard = ({
                 value={selectedCalendar}
                 onChange={handleCalendarChange}
                 loading={loadingCalendars || savingCalendar}
-                disabled={isExpired}
                 options={calendars.map((cal) => ({
                   value: cal.id,
                   label: (
@@ -284,17 +253,6 @@ const GoogleIntegrationCard = ({
         </Space>
 
         <Space>
-          {isExpired && (
-            <Button
-              type="primary"
-              icon={<GoogleOutlined />}
-              onClick={onConnect}
-              danger
-            >
-              Reconectar conta
-            </Button>
-          )}
-
           <Popconfirm
             title="Desconectar conta Google?"
             description="Você não poderá publicar eventos até reconectar."

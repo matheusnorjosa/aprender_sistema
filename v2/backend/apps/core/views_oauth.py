@@ -35,7 +35,7 @@ from apps.core.models import AuditLog, GoogleOAuthCredential
 from apps.core.rbac.policies import CanPublishSetorSolicitacao, CanUseGcal, user_has_policy
 from apps.core.services.google_oauth import build_authorization_url, exchange_code_for_tokens, revoke_token
 from apps.core.services.oauth.oauth_flow import _is_safe_url as is_safe_url  # noqa: PLC2701
-from apps.core.services.oauth.token_manager import encrypt_token
+from apps.core.services.oauth.token_manager import encrypt_token, usuarios_para_reconectar
 from apps.core.services.solicitacao_publish import oauth_publish_block_reason
 from apps.core.services.solicitacao_scope import has_publish_scope
 
@@ -474,7 +474,9 @@ def google_oauth_status(request: Request) -> Response:
             "is_expired": bool,
             "publish_ready": bool,
             "publish_block_reason": "no_setor_scope" | "google_not_connected"
-                | "google_calendar_not_configured" | null
+                | "google_calendar_not_configured" | null,
+            "reconnect_required": bool  # o SISTEMA removeu a conexão (invalid_grant) e a
+                                        # pessoa não reconectou; o "Desconectar" manual não conta
         }
 
     Example:
@@ -512,6 +514,7 @@ def google_oauth_status(request: Request) -> Response:
                 "default_calendar_id": credential.default_calendar_id or None,
                 "publish_ready": reason is None,
                 "publish_block_reason": reason,
+                "reconnect_required": False,
             }
         )
 
@@ -526,6 +529,7 @@ def google_oauth_status(request: Request) -> Response:
                 "default_calendar_id": None,
                 "publish_ready": reason is None,
                 "publish_block_reason": reason,
+                "reconnect_required": usuarios_para_reconectar().filter(pk=request.user.pk).exists(),
             }
         )
 

@@ -15,13 +15,19 @@ import { PENDENTES } from '../../../e2e/checklist/sem-rolagem-horizontal.rotas';
 
 type ListaPendentes = Readonly<Record<string, readonly number[]>>;
 
-/** Medida em 2026-09-29 (main a56d9027). Não edite para acomodar tela nova: conserte a tela. */
+/**
+ * Medida em 2026-09-29 (main acd04afd). 112 combinações da 1ª medição, mais 14 que vieram de
+ * critério e vistas novos, não de regressão: o corte sem reticências em Coordenadores (4) e as
+ * vistas Coordenadores "Lista" (4) e "Por área" (2) e Mapa "Lista" (4). Não edite para acomodar
+ * tela nova: conserte a tela.
+ */
 const LINHA_DE_BASE: ListaPendentes = {
   '/dashboards': [360, 768, 1024],
   '/dashboards/compras': [360, 768, 1024, 1280],
   '/dashboards/equipe': [360, 768, 1024, 1280],
   '/dashboards/gcal': [360, 768, 1024],
   '/mapa-brasil': [360, 768, 1024, 1280],
+  '/mapa-brasil#lista': [360, 768, 1024, 1280],
   '/solicitacoes/minhas': [360, 768, 1024, 1280],
   '/solicitacoes/publicacao': [360, 768, 1024, 1280],
   '/solicitacoes/:id/editar': [360, 768],
@@ -32,6 +38,9 @@ const LINHA_DE_BASE: ListaPendentes = {
   '/solicitacoes/meus-eventos': [360, 768, 1024, 1280],
   '/controle/acoes': [360, 768, 1024, 1280],
   '/controle/compras': [360, 768, 1024, 1280],
+  '/controle/coordenadores': [360, 768, 1024, 1280],
+  '/controle/coordenadores#lista': [360, 768, 1024, 1280],
+  '/controle/coordenadores#area': [360, 768],
   '/controle/plano-formacoes': [360, 768, 1024, 1280],
   '/controle/pre-agenda': [360, 768, 1024, 1280],
   '/acoes-notificacao': [360, 768, 1024, 1280],
@@ -50,7 +59,7 @@ const LINHA_DE_BASE: ListaPendentes = {
 };
 
 /** Tamanho atual de PENDENTES. Só desce. */
-const TETO_PENDENTES = 112;
+const TETO_PENDENTES = 126;
 
 function combinacoes(lista: ListaPendentes): string[] {
   return Object.entries(lista).flatMap(([chave, larguras]) => larguras.map((l) => `${chave} @ ${l}px`));

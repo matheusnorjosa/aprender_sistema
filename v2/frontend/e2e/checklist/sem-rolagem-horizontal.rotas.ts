@@ -1,5 +1,6 @@
 /**
- * Rotas medidas pelo spec `sem-rolagem-horizontal.spec.ts` (Programa C, C0).
+ * Rotas medidas pelos specs `sem-rolagem-horizontal.spec.ts` (360 e 768 px) e
+ * `sem-rolagem-horizontal.desktop.spec.ts` (1024 e 1280 px) (Programa C, C0).
  *
  * Dados puros, sem import do Playwright: o teste de cobertura do Vitest
  * (`src/components/__tests__/AppRoutes.semRolagemHorizontal.test.ts`) importa
@@ -28,6 +29,41 @@ export const PERFIS = {
 export type Perfil = keyof typeof PERFIS;
 export const SENHA_PERFIS = 'testpass123';
 
+/**
+ * Textos semeados por `seed_frontend_contract_data` (backend) que as telas têm de mostrar.
+ * O Vitest confere que cada um existe no seed, para a medição não depender de um texto
+ * que o backend deixou de criar.
+ */
+export const TEXTOS_DO_SEED = {
+  municipio: 'Aaa São Sebastião dos Campos Gerais',
+  pessoa: 'Aaa Maria Aparecida da Conceição',
+  projeto: 'Aaa Alfabetização e Letramento',
+  projetoGeral: 'Aaa Alfabetização na Idade Certa',
+  produto: 'Aaa Kit Pedagógico de Alfabetização',
+  gerencia: 'Aaa Gerência de Formação Continuada',
+  grupo: 'Aaa Grupo de Teste de Largura',
+  coordenadorDat: 'Aaa Coordenadora Regional Josefa',
+  acao: 'Aaa Enviar à secretaria municipal',
+  notificacao: 'Prazo da ação se aproxima',
+  motivoBloqueio: 'Participação no seminário estadual',
+} as const;
+const T = TEXTOS_DO_SEED;
+
+/** Prova de que a tela carregou dados: `texto` visível dentro de `em` (seletor CSS em `main`). */
+export interface DadosDaTela {
+  em: string;
+  texto: string;
+}
+
+/** Vista alternativa da mesma rota (outra aba, modo lista...), medida com chave própria. */
+export interface EstadoDaTela {
+  /** Chave em PENDENTES: `${path}#${nome}`. */
+  nome: string;
+  /** Seletor Playwright do controle que troca a vista. */
+  clicar: string;
+  dados: DadosDaTela;
+}
+
 export interface RotaMedida {
   /** O `path` exatamente como está em AppRoutes.tsx. */
   path: string;
@@ -35,52 +71,135 @@ export interface RotaMedida {
   perfil: Perfil;
   /** Rota com parâmetro: o spec descobre o id pela API antes de navegar. */
   parametro?: 'solicitacaoEditavel';
+  /** Título próprio da tela (h1-h5, heading ou título de Card dentro de `main`). */
+  marco: string;
+  /** Nas telas com tabela ou lista: a linha com o texto do seed. */
+  dados?: DadosDaTela;
+  estados?: readonly EstadoDaTela[];
 }
 
+const LINHA = '.ant-table-row';
+
 export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
-  { path: '/', perfil: 'controle' },
-  { path: '/dashboards', perfil: 'superusuario' },
-  { path: '/dashboards/compras', perfil: 'dat' },
-  { path: '/dashboards/equipe', perfil: 'dat' },
-  { path: '/dashboards/gcal', perfil: 'controle' },
-  { path: '/mapa-brasil', perfil: 'superusuario' },
-  { path: '/solicitacoes/minhas', perfil: 'coordenador' },
-  { path: '/solicitacoes/nova', perfil: 'coordenador' },
-  { path: '/solicitacoes/publicacao', perfil: 'superusuario' },
-  { path: '/solicitacoes/:id/editar', perfil: 'coordenador', parametro: 'solicitacaoEditavel' },
-  { path: '/solicitacoes/aprovacoes', perfil: 'aprovador' },
-  { path: '/solicitacoes/disponibilidade', perfil: 'controle' },
-  { path: '/solicitacoes/bloqueios', perfil: 'coordenador' },
-  { path: '/solicitacoes/deslocamentos', perfil: 'controle' },
-  { path: '/solicitacoes/meus-eventos', perfil: 'coordenador' },
-  { path: '/perfil', perfil: 'coordenador' },
-  { path: '/politica-privacidade', perfil: 'coordenador' },
-  { path: '/controle', perfil: 'controle' },
-  { path: '/controle/acoes', perfil: 'controle' },
-  { path: '/controle/compras', perfil: 'controle' },
-  { path: '/controle/coordenadores', perfil: 'controle' },
-  { path: '/controle/plano-formacoes', perfil: 'controle' },
-  { path: '/controle/pre-agenda', perfil: 'controle' },
-  { path: '/acoes-notificacao', perfil: 'superusuario' },
-  { path: '/acoes-notificacao/timeline', perfil: 'superusuario' },
-  { path: '/notificacoes-internas', perfil: 'superusuario' },
-  { path: '/dat/admin', perfil: 'dat' },
-  { path: '/dat/admin/usuarios', perfil: 'dat' },
-  { path: '/dat/admin/municipios', perfil: 'dat' },
-  { path: '/dat/admin/projetos', perfil: 'dat' },
-  { path: '/dat/admin/grupos', perfil: 'dat' },
-  { path: '/dat/admin/setores', perfil: 'dat' },
-  { path: '/dat/admin/funcoes', perfil: 'dat' },
-  { path: '/dat/admin/gerencias', perfil: 'dat' },
-  { path: '/dat/admin/produtos', perfil: 'dat' },
-  { path: '/dat/admin/projetos-gerais', perfil: 'dat' },
-  { path: '/dat/admin/configuracoes', perfil: 'dat' },
-  { path: '/dat/admin/colecoes', perfil: 'dat' },
-  { path: '/dat/admin/equipe-gerencia', perfil: 'dat' },
-  { path: '/dat/cadastros', perfil: 'dat' },
-  { path: '/dat/importacoes', perfil: 'dat' },
-  { path: '/dat/registros', perfil: 'dat' },
+  { path: '/', perfil: 'controle', marco: 'Página Inicial' },
+  { path: '/dashboards', perfil: 'superusuario', marco: 'Dashboards e Analises', dados: { em: LINHA, texto: T.pessoa } },
+  { path: '/dashboards/compras', perfil: 'dat', marco: 'Dashboard de Compras', dados: { em: LINHA, texto: T.municipio } },
+  { path: '/dashboards/equipe', perfil: 'dat', marco: 'Dashboard da Equipe', dados: { em: LINHA, texto: T.pessoa } },
+  { path: '/dashboards/gcal', perfil: 'controle', marco: 'Dashboard Google Calendar', dados: { em: LINHA, texto: T.municipio } },
+  {
+    path: '/mapa-brasil',
+    perfil: 'superusuario',
+    marco: 'Mapa de Eventos',
+    dados: { em: LINHA, texto: 'BA' },
+    estados: [
+      { nome: 'lista', clicar: 'label.ant-radio-button-wrapper:has-text("Lista")', dados: { em: '.ant-list-item', texto: T.municipio } },
+    ],
+  },
+  { path: '/solicitacoes/minhas', perfil: 'coordenador', marco: 'Minhas Solicitações', dados: { em: LINHA, texto: T.municipio } },
+  { path: '/solicitacoes/nova', perfil: 'coordenador', marco: 'Nova Solicitação' },
+  {
+    path: '/solicitacoes/publicacao',
+    perfil: 'superusuario',
+    marco: 'Publicar na agenda do Google',
+    dados: { em: LINHA, texto: T.municipio },
+  },
+  {
+    path: '/solicitacoes/:id/editar',
+    perfil: 'coordenador',
+    parametro: 'solicitacaoEditavel',
+    marco: 'Editar Solicitação',
+    dados: { em: 'form', texto: T.pessoa },
+  },
+  { path: '/solicitacoes/aprovacoes', perfil: 'aprovador', marco: 'Aprovações', dados: { em: LINHA, texto: T.municipio } },
+  {
+    path: '/solicitacoes/disponibilidade',
+    perfil: 'controle',
+    marco: 'Grade Mensal de Disponibilidade',
+    dados: { em: 'tr', texto: T.pessoa },
+  },
+  {
+    path: '/solicitacoes/bloqueios',
+    perfil: 'coordenador',
+    marco: 'Gerenciar Disponibilidade',
+    dados: { em: LINHA, texto: T.motivoBloqueio },
+  },
+  { path: '/solicitacoes/deslocamentos', perfil: 'controle', marco: 'Deslocamentos', dados: { em: LINHA, texto: T.municipio } },
+  { path: '/solicitacoes/meus-eventos', perfil: 'coordenador', marco: 'Meus Eventos', dados: { em: LINHA, texto: T.municipio } },
+  { path: '/perfil', perfil: 'coordenador', marco: 'Meu perfil' },
+  { path: '/politica-privacidade', perfil: 'coordenador', marco: 'Política de Privacidade' },
+  { path: '/controle', perfil: 'controle', marco: 'Painel de Controle' },
+  { path: '/controle/acoes', perfil: 'controle', marco: 'Gestão de Ações', dados: { em: LINHA, texto: T.coordenadorDat } },
+  { path: '/controle/compras', perfil: 'controle', marco: 'Gestão de Compras/Materiais', dados: { em: LINHA, texto: T.produto } },
+  {
+    path: '/controle/coordenadores',
+    perfil: 'controle',
+    marco: 'Gestão de Coordenadores',
+    dados: { em: '.ant-card', texto: T.coordenadorDat },
+    estados: [
+      { nome: 'lista', clicar: 'button[aria-label="Visualizar como lista"]', dados: { em: LINHA, texto: T.coordenadorDat } },
+      {
+        nome: 'area',
+        clicar: 'button[aria-label="Visualizar por área"]',
+        dados: { em: 'section[aria-label="Lista de coordenadores"]', texto: T.coordenadorDat },
+      },
+    ],
+  },
+  { path: '/controle/plano-formacoes', perfil: 'controle', marco: 'Plano de Formacoes', dados: { em: LINHA, texto: T.municipio } },
+  { path: '/controle/pre-agenda', perfil: 'controle', marco: 'Pré-agenda', dados: { em: LINHA, texto: T.municipio } },
+  { path: '/acoes-notificacao', perfil: 'superusuario', marco: 'Ações Internas', dados: { em: LINHA, texto: T.acao } },
+  {
+    path: '/acoes-notificacao/timeline',
+    perfil: 'superusuario',
+    marco: 'Timeline das Ações',
+    dados: { em: '.ant-timeline-item', texto: T.acao },
+  },
+  { path: '/notificacoes-internas', perfil: 'superusuario', marco: 'Notificações Internas', dados: { em: LINHA, texto: T.notificacao } },
+  { path: '/dat/admin', perfil: 'dat', marco: 'Admin DAT' },
+  { path: '/dat/admin/usuarios', perfil: 'dat', marco: 'Usuários', dados: { em: LINHA, texto: T.pessoa } },
+  { path: '/dat/admin/municipios', perfil: 'dat', marco: 'Municípios', dados: { em: LINHA, texto: T.municipio } },
+  { path: '/dat/admin/projetos', perfil: 'dat', marco: 'Projetos', dados: { em: LINHA, texto: T.projeto } },
+  { path: '/dat/admin/grupos', perfil: 'dat', marco: 'Grupos RBAC', dados: { em: LINHA, texto: T.grupo } },
+  // Setores e funções listam só os grupos classificados (seed_rbac): não há texto longo a semear.
+  { path: '/dat/admin/setores', perfil: 'dat', marco: 'Setores', dados: { em: LINHA, texto: 'Vidas' } },
+  { path: '/dat/admin/funcoes', perfil: 'dat', marco: 'Funções', dados: { em: LINHA, texto: 'Coordenador' } },
+  { path: '/dat/admin/gerencias', perfil: 'dat', marco: 'Gerencias', dados: { em: LINHA, texto: T.gerencia } },
+  { path: '/dat/admin/produtos', perfil: 'dat', marco: 'Produtos', dados: { em: LINHA, texto: T.produto } },
+  { path: '/dat/admin/projetos-gerais', perfil: 'dat', marco: 'Projetos Gerais', dados: { em: LINHA, texto: T.projetoGeral } },
+  { path: '/dat/admin/configuracoes', perfil: 'dat', marco: 'Configurações do Sistema' },
+  { path: '/dat/admin/colecoes', perfil: 'dat', marco: 'Importação de Coleções' },
+  { path: '/dat/admin/equipe-gerencia', perfil: 'dat', marco: 'Importação de Vínculos' },
+  {
+    path: '/dat/cadastros',
+    perfil: 'dat',
+    marco: 'Gestão de Cadastros em Plataformas',
+    dados: { em: LINHA, texto: T.municipio },
+  },
+  { path: '/dat/importacoes', perfil: 'dat', marco: 'DAT > Importações' },
+  { path: '/dat/registros', perfil: 'dat', marco: 'Listagem de Registros DAT', dados: { em: LINHA, texto: T.municipio } },
 ];
+
+/** Chave de uma medição em PENDENTES: o path, ou `path#estado` para uma vista alternativa. */
+export function chaveDe(rota: RotaMedida, estado?: EstadoDaTela): string {
+  return estado ? `${rota.path}#${estado.nome}` : rota.path;
+}
+
+/**
+ * Telas e estados que o spec NÃO mede, com o motivo. É documentação da lacuna: cada item
+ * sai daqui quando passar a ser medido (de preferência no PR do Programa C que mexe na tela).
+ */
+export const NAO_MEDIDOS: Readonly<Record<string, string>> = {
+  'Home com outros perfis': 'os cartões da Home mudam por perfil; a rota é medida só com Controle',
+  '/controle/plano-formacoes (Calendário e Resumo)': 'placeholders "em desenvolvimento", sem conteúdo',
+  '/controle/pre-agenda (modo Google)': 'a tabela de eventos do Google exige OAuth',
+  '/solicitacoes/disponibilidade (detalhe do dia)':
+    'o drawer abre ao clicar num evento do mês corrente, e o seed não garante evento no mês (C4)',
+  '/solicitacoes/nova (passos 2 em diante)': 'exige preencher o formulário do wizard (C3)',
+  '/mapa-brasil (municípios do estado clicado)': 'exige clicar numa região do mapa',
+  '/dat/cadastros (aba AVALIAR)': 'o seed só tem cadastro FORMAR',
+  'ImportUploader depois da validação':
+    'exige upload de planilha e validação no backend (importações, coleções, vínculos, municípios)',
+  'Modais e drawers de edição': 'o AntD limita a largura do modal; o plano não muda modais',
+};
 
 /**
  * Paths do AppRoutes que NÃO são medidos, com o destino que cobre cada um.
@@ -115,8 +234,11 @@ export const TELA_LOGIN = 'login';
  * passa a falhar com "Expected to fail, but passed" e obriga a tirar a
  * combinação daqui. A lista só encolhe; o C7 a zera.
  *
- * Medida em 2026-09-29 (main a56d9027, seed com textos longos): 112 combinações
- * em 30 rotas (das 42 medidas). A 1280 px ainda rolam 23; as outras 7 só abaixo disso.
+ * Medida em 2026-09-29 (main acd04afd, seed com textos longos): 126 combinações em 34
+ * chaves (31 das 42 rotas; 3 são vistas alternativas). Rola a página, rola por dentro ou
+ * corta sem reticências. A 1280 px (com a barra de rolagem de 15 px) ainda falham 26 chaves.
+ * O ratchet do Vitest (semRolagemHorizontal.pendentes.test.ts) trava a lista: nada novo
+ * entra e o tamanho só desce.
  */
 export const PENDENTES: Readonly<Record<string, readonly Largura[]>> = {
   '/dashboards': [360, 768, 1024],
@@ -124,6 +246,7 @@ export const PENDENTES: Readonly<Record<string, readonly Largura[]>> = {
   '/dashboards/equipe': [360, 768, 1024, 1280],
   '/dashboards/gcal': [360, 768, 1024],
   '/mapa-brasil': [360, 768, 1024, 1280],
+  '/mapa-brasil#lista': [360, 768, 1024, 1280],
   '/solicitacoes/minhas': [360, 768, 1024, 1280],
   '/solicitacoes/publicacao': [360, 768, 1024, 1280],
   '/solicitacoes/:id/editar': [360, 768],
@@ -134,6 +257,9 @@ export const PENDENTES: Readonly<Record<string, readonly Largura[]>> = {
   '/solicitacoes/meus-eventos': [360, 768, 1024, 1280],
   '/controle/acoes': [360, 768, 1024, 1280],
   '/controle/compras': [360, 768, 1024, 1280],
+  '/controle/coordenadores': [360, 768, 1024, 1280],
+  '/controle/coordenadores#lista': [360, 768, 1024, 1280],
+  '/controle/coordenadores#area': [360, 768],
   '/controle/plano-formacoes': [360, 768, 1024, 1280],
   '/controle/pre-agenda': [360, 768, 1024, 1280],
   '/acoes-notificacao': [360, 768, 1024, 1280],

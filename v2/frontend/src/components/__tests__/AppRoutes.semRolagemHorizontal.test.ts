@@ -19,9 +19,16 @@ import {
   ROTAS_MEDIDAS,
   ROTAS_NAO_MEDIDAS,
   TELA_LOGIN,
+  TEXTOS_DO_SEED,
+  chaveDe,
 } from '../../../e2e/checklist/sem-rolagem-horizontal.rotas';
 
-const APP_ROUTES = resolve(dirname(fileURLToPath(import.meta.url)), '../AppRoutes.tsx');
+const AQUI = dirname(fileURLToPath(import.meta.url));
+const APP_ROUTES = resolve(AQUI, '../AppRoutes.tsx');
+const SEED_DO_BACKEND = resolve(
+  AQUI,
+  '../../../../backend/apps/dev_tools/management/commands/seed_frontend_contract_data.py'
+);
 
 interface RotaDeclarada {
   path: string;
@@ -168,11 +175,30 @@ describe('spec sem-rolagem-horizontal cobre todas as rotas do AppRoutes', () => 
     expect(erros).toEqual([]);
   });
 
-  test('PENDENTES só cita rota medida (ou a tela de login) e larguras medidas', () => {
+  test('PENDENTES só cita chave medida (rota, rota#estado ou a tela de login) e larguras medidas', () => {
+    const chaves = new Set([TELA_LOGIN, ...ROTAS_MEDIDAS.flatMap((r) => [chaveDe(r), ...(r.estados ?? []).map((e) => chaveDe(r, e))])]);
     const invalidas = Object.entries(PENDENTES).flatMap(([chave, larguras]) => [
-      ...(chave === TELA_LOGIN || pathsMedidos.includes(chave) ? [] : [`${chave}: não é rota medida`]),
+      ...(chaves.has(chave) ? [] : [`${chave}: não é chave medida`]),
       ...larguras.filter((l) => !LARGURAS.includes(l)).map((l) => `${chave}: largura ${l} não é medida`),
     ]);
     expect(invalidas).toEqual([]);
+  });
+
+  test('estados de uma rota têm nomes distintos', () => {
+    const repetidos = ROTAS_MEDIDAS.flatMap((r) => {
+      const nomes = (r.estados ?? []).map((e) => e.nome);
+      return nomes.filter((n, i) => nomes.indexOf(n) !== i).map((n) => `${r.path}#${n}`);
+    });
+    expect(repetidos).toEqual([]);
+  });
+
+  test('todo texto que o spec procura na tela existe no seed do backend', () => {
+    // Se o seed deixar de criar o texto, a pré-condição "dados" reprovaria no Playwright;
+    // aqui o aviso chega antes, sem backend.
+    const seed = readFileSync(SEED_DO_BACKEND, 'utf8');
+    const ausentes = Object.entries(TEXTOS_DO_SEED)
+      .filter(([, texto]) => !seed.includes(texto))
+      .map(([nome, texto]) => `${nome}: "${texto}"`);
+    expect(ausentes).toEqual([]);
   });
 });

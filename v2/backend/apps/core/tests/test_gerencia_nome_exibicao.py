@@ -140,6 +140,30 @@ class TestUsuarioAdminLotacao:
         assert "gerencia_id" in resp.data["errors"]
         assert not EquipeGerencia.objects.filter(usuario=user, gerencia=outra_inativa).exists()
 
+    def test_lotacao_exibida_prefere_a_gerencia_ativa(self):
+        """Vínculo antigo em gerência desativada + vínculo na ativa: o form mostra (e reenvia) a ativa, senão
+        mudar a função moveria a pessoa para a gerência desativada e encerraria a lotação que vale."""
+        inativa, ativa = _gerencia(nome_exibicao="Antiga NE"), _gerencia(nome_exibicao="Atual NE")
+        coord, apoio = GroupFactory(name="Coordenador"), GroupFactory(name="Apoio de Coordenação")
+        user = UsuarioFactory()
+        user.groups.add(coord)
+        EquipeGerencia.objects.create(usuario=user, gerencia=inativa, papel="COORDENADOR")
+        EquipeGerencia.objects.create(usuario=user, gerencia=ativa, papel="COORDENADOR")
+        inativa.ativo = False
+        inativa.save(update_fields=["ativo"])
+        client = _root_client()
+
+        assert client.get(f"/api/usuarios-admin/{user.id}/").data["gerencia_atual"]["rotulo"] == "Atual NE"
+
+        resp = client.patch(
+            f"/api/usuarios-admin/{user.id}/",
+            {"group_ids": [coord.id, apoio.id], "gerencia_id": ativa.id},
+            format="json",
+        )
+        assert resp.status_code == 200, resp.data
+        vigentes = set(EquipeGerencia.vigentes_em().filter(usuario=user).values_list("gerencia_id", "papel"))
+        assert vigentes == {(ativa.id, "COORDENADOR"), (ativa.id, "APOIO")}
+
     def test_gerencia_atual_traz_rotulo_e_mantem_nome_setor(self):
         g = _gerencia(nome_setor="ACerta", nome_exibicao="Superativar")
         user = UsuarioFactory()

@@ -15,11 +15,14 @@
 
 import { MemoryRouter } from 'react-router';
 import { render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { AppRoutes } from '../AppRoutes';
 import type { CurrentUser } from '../../types';
 import type { Permissions } from '../../hooks/usePermissions';
+import { computePermissions } from '../../hooks/usePermissions';
+import { getMe } from '../../api/availability';
+import { listDeslocamentos } from '../../api/deslocamentos';
 
 // ============================================================================
 // Mocks de APIs internas das páginas (evita fetch real durante render)
@@ -65,6 +68,13 @@ vi.mock('../../api/availability', () => ({
   // chamada vira unhandled rejection que derruba o processo do vitest (exit 1).
   getGerencias: vi.fn().mockResolvedValue([]),
 }));
+vi.mock('../../api/deslocamentos', () => ({
+  listDeslocamentos: vi.fn().mockResolvedValue({ count: 0, next: null, previous: null, results: [] }),
+  listFormadoresDoSetor: vi.fn().mockResolvedValue([]),
+  createDeslocamento: vi.fn(),
+  updateDeslocamento: vi.fn(),
+  deleteDeslocamento: vi.fn(),
+}));
 vi.mock('../../api/stats', () => ({
   getHomeStats: vi.fn().mockResolvedValue({}),
 }));
@@ -92,6 +102,7 @@ const BASE_USER: CurrentUser = {
   groups: [],
   setores: [],
   funcoes: [],
+  gerencias: [],
   is_superuser: false,
   is_superintendencia: false,
   can_approve_super: false,
@@ -120,6 +131,7 @@ const EMPTY_PERMISSIONS: Permissions = {
   canMapaBrasil: false,
   canDashboardsMenu: false,
   canDisponibilidade: false,
+  isGestorPorVinculo: false,
   canSeeAllSectors: false,
 };
 
@@ -711,4 +723,56 @@ describe('AppRoutes — gate de /solicitacoes/publicacao (#1656)', () => {
     renderRoute('/pre-agenda', BASE_USER, APOIO_PERMISSIONS, APOIO_POLICIES);
     expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
   });
+});
+
+// ============================================================================
+// PR A (condicional medido em prod, 29/09): gestão só por VÍNCULO (sem grupo de FUNÇÃO)
+// ============================================================================
+// O backend já autoriza Grade, Bloqueios e Deslocamentos por vínculo EquipeGerencia
+// (HasSectorAccess / querysets escopados). A rota não pode barrar quem tem vínculo
+// GERENTE/COORDENADOR/APOIO; Formador por vínculo continua fora da Grade.
+describe('AppRoutes — gestor só por vínculo (PR A)', () => {
+  // Usuário e flags derivados do payload real de /me (não montados à mão): prova a cadeia
+  // me.gerencias → computePermissions → gate da rota → gate local da página.
+  const comVinculo = (papel: string): CurrentUser => ({
+    ...BASE_USER,
+    gerencias: [{ id: 4, rotulo: 'Superativar', papeis: [papel] }],
+  });
+
+  afterEach(() => {
+    vi.mocked(getMe).mockResolvedValue({} as CurrentUser);
+  });
+
+  for (const route of ['/solicitacoes/disponibilidade', '/solicitacoes/bloqueios', '/solicitacoes/deslocamentos']) {
+    test(`COORDENADOR por vínculo: ${route} → NÃO renderiza Forbidden`, async () => {
+      const user = comVinculo('COORDENADOR');
+      vi.mocked(getMe).mockResolvedValue(user);
+      renderRoute(route, user, computePermissions(user), []);
+      await waitFor(() => {
+        expect(screen.queryByText(FORBIDDEN_TEXT)).not.toBeInTheDocument();
+      });
+    });
+  }
+
+  test('COORDENADOR por vínculo: Deslocamentos abre de fato (sem "Sem permissão") e lista', async () => {
+    const user = comVinculo('COORDENADOR');
+    vi.mocked(getMe).mockResolvedValue(user);
+    renderRoute('/solicitacoes/deslocamentos', user, computePermissions(user), []);
+    await waitFor(() => expect(listDeslocamentos).toHaveBeenCalled(), { timeout: 3000 });
+    expect(screen.queryByText('Sem permissão')).not.toBeInTheDocument();
+  });
+
+  test('COORDENADOR por vínculo: /solicitacoes/aprovacoes continua negada (vínculo não é policy)', async () => {
+    const user = comVinculo('COORDENADOR');
+    renderRoute('/solicitacoes/aprovacoes', user, computePermissions(user), []);
+    expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
+  });
+
+  for (const route of ['/solicitacoes/disponibilidade', '/solicitacoes/deslocamentos']) {
+    test(`FORMADOR por vínculo: ${route} → Forbidden`, async () => {
+      const user = comVinculo('FORMADOR');
+      renderRoute(route, user, computePermissions(user), []);
+      expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
+    });
+  }
 });

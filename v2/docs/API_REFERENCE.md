@@ -1,6 +1,6 @@
 # 📡 API Reference — Aprender Sistema v2
 
-**Última Atualização**: 2026-07-24 (varredura de veracidade contra o código)
+**Última Atualização**: 2026-09-29 (PR A: `/me/.gerencias`, nomes da gerência, `gerencia_id`; última varredura de veracidade 2026-07-24)
 **Base canônica**: `/api`
 **ViewSets registrados no router**: 24 (bloco `router.register(...)`, `v2/backend/apps/core/urls.py`)
 **Contagem total de endpoints**: não re-derivada nesta varredura — a fonte
@@ -106,6 +106,12 @@ correspondentes).
 | GET | `/me/events/` | ![Stable](https://img.shields.io/badge/-stable-green) | Eventos em que o usuário participa | IsAuthenticated |
 | POST | `/me/change-password/` | ![Stable](https://img.shields.io/badge/-stable-green) | Troca de senha self-service | IsAuthenticated |
 
+`GET /me/` inclui `gerencias: [{id, rotulo, papeis[]}]` (PR A, 2026-09-29): vínculos
+`EquipeGerencia` vigentes (`vigentes_em()`) em gerência ativa, um item por gerência,
+ordenados pelo `rotulo`. É por ele que a Grade Mensal escolhe a gerência de quem não tem
+`view_all_availability`. `setores`, `is_superintendencia` e `can_approve_super` não mudaram
+(continuam vindo dos grupos). Construído em `views_basic.py` (`_gerencias_do_vinculo`).
+
 ### Headers Obrigatórios
 
 ```http
@@ -164,7 +170,8 @@ Corpo opcional de `approve`/`reject`: `{"reason": "..."}` (aceita também
 ?status=pendente|aprovado|reprovado
 ?status=pending|approved|rejected # aliases em inglês (mapeados)
 ?flow=SUPER|NAO_SUPER            # fluxo do projeto
-?sector=Vidas                    # projeto.gerencia.nome_setor (iexact)
+?sector=Vidas                    # projeto.gerencia.nome_setor (iexact) — legado, ainda aceito
+?gerencia_id=4                   # projeto.gerencia_id (PR A; o mesmo do /gcal/status-summary/); não numérico é ignorado
 ?date_from=2026-01-01            # inicio__date__gte
 ?date_to=2026-12-31              # inicio__date__lte
 ?q=texto                         # municipio/projeto/tipo_evento/observacoes/usuário
@@ -296,7 +303,7 @@ Todas com `permission_classes = [IsAuthenticated, CanUseGcal]`.
 
 | Método | Endpoint | Status | Descrição | Permissão |
 |--------|----------|--------|-----------|-----------|
-| GET | `/api/gcal/status-summary/` | ![Stable](https://img.shields.io/badge/-stable-green) | Resumo por `gcal_status` | `CanUseGcal` |
+| GET | `/api/gcal/status-summary/` | ![Stable](https://img.shields.io/badge/-stable-green) | Resumo por `gcal_status` (só aprovados). Filtros `date_from`, `date_to`, `sector` (`projeto__nome__icontains`), `gerencia_id` (`projeto__gerencia_id`, PR A), `q`, `status` (= `gcal_status`, não o status da solicitação) | `CanUseGcal` |
 | GET | `/api/gcal/list/` | ![Stable](https://img.shields.io/badge/-stable-green) | Lista de eventos sincronizados | `CanUseGcal` |
 | GET | `/api/gcal/drift/` | ![Beta](https://img.shields.io/badge/-beta-yellow) | Divergências entre AS e GCal | `CanUseGcal` |
 | GET | `/api/gcal/dashboard/metrics/` | ![Stable](https://img.shields.io/badge/-stable-green) | Métricas de publicação | `CanUseGcal` |
@@ -458,6 +465,26 @@ CRUD de `TipoEvento` só pelo Django Admin (superuser).
 | POST/PUT/PATCH/DELETE | `/api/gerencias/` | ![Stable](https://img.shields.io/badge/-stable-green) | Escrita de gerência | `IsAuthenticated` + `manage_purchases_and_materials` |
 
 Gate em `GerenciaViewSet.get_permissions` (`views/admin.py`).
+
+Filtros: `?ativo=true|false`, `?search=` (`nome`, `nome_setor`, `nome_exibicao`),
+`?ordering=nome|nome_setor|rotulo_ordem` (default `nome_setor`). Sem `ativo` a lista traz
+as inativas (a tela de Gerências reativa); as listas de escolha pedem `?ativo=true`.
+
+Os quatro nomes de uma gerência (PR A, 2026-09-29 — um papel por campo):
+
+| Campo | Papel | Quem altera |
+|---|---|---|
+| `nome` | código interno (seed; aprovação do PR B usa `SUPERINTENDENCIA`) | ninguém, pela tela |
+| `nome_setor` | rótulo nas planilhas (chave do import) | import ou admin |
+| `setor_canonico` | gate de escopo (Wave 1) | import ou admin |
+| `nome_exibicao` | nome que a tela mostra (vazio = usa `nome_setor`) | admin (GerenciasPage) |
+
+`rotulo` (somente leitura) = `nome_exibicao or nome_setor` — nunca cai para `nome`. O
+`ProjetoSerializer.gerencia_nome` e o `gerencia_atual.rotulo` de `/api/usuarios-admin/`
+usam o mesmo rótulo. No form de usuário (`/api/usuarios-admin/`), `gerencia_id` inativa dá 400,
+exceto quando é a lotação atual exibida (`gerencia_atual`), que o form reenvia a cada edição.
+Carga inicial dos 13 nomes de prod: comando
+`definir_nome_exibicao_gerencias` (dry-run por padrão; `--apply` grava).
 
 ### Auditoria
 

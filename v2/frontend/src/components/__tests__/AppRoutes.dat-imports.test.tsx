@@ -39,6 +39,7 @@ const DAT_USER: CurrentUser = {
   groups: ['DAT'],
   setores: ['DAT'],
   funcoes: [],
+  gerencias: [],
   is_superuser: false,
   is_superintendencia: false,
   can_approve_super: false,
@@ -67,6 +68,7 @@ const DAT_PERMISSIONS: Permissions = {
   canMapaBrasil: false,
   canDashboardsMenu: false,
   canDisponibilidade: true,
+  isGestorPorVinculo: false,
   canSeeAllSectors: false,
 };
 

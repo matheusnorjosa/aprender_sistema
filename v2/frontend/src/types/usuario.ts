@@ -32,6 +32,16 @@ export interface UsuarioOption {
 }
 
 /**
+ * Gerência em que o usuário tem vínculo EquipeGerencia vigente (`/api/me/.gerencias`).
+ * Só gerências ativas; dois papéis na mesma gerência viram um item.
+ */
+export interface GerenciaVinculo {
+  id: ID;
+  rotulo: string;
+  papeis: string[];
+}
+
+/**
  * Full user data from /api/me/ endpoint
  */
 export interface CurrentUser {
@@ -48,6 +58,8 @@ export interface CurrentUser {
   groups: string[];
   setores: string[];
   funcoes: string[];
+  /** Vínculos vigentes (EquipeGerencia). Fora do guard: payload antigo sem o campo não derruba o login. */
+  gerencias: GerenciaVinculo[];
   is_superuser: boolean;
   is_superintendencia: boolean;
   can_approve_super: boolean;

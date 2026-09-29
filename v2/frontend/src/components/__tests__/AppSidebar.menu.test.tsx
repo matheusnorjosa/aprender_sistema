@@ -64,6 +64,7 @@ const EMPTY_PERMISSIONS: Permissions = {
   canMapaBrasil: false,
   canDashboardsMenu: false,
   canDisponibilidade: false,
+  isGestorPorVinculo: false,
   canSeeAllSectors: false,
 };
 
@@ -724,5 +725,16 @@ describe('AppSidebar — Ações Internas é policy-only (Issue #1263)', () => {
   test('policy manage_internal_actions sem flag legacy → Ações Internas VISÍVEL', () => {
     renderSidebar(EMPTY_PERMISSIONS, ['manage_internal_actions']);
     expect(isTopLevelVisible('Ações Internas')).toBe(true);
+  });
+});
+
+describe('AppSidebar — gestor só por vínculo (PR A)', () => {
+  test('vínculo de gestão sem grupo → Grade Mensal, Bloqueios e Deslocamentos visíveis', () => {
+    // Espelha as rotas (AppRoutes): o backend escopa por vínculo EquipeGerencia.
+    renderSidebar({ ...EMPTY_PERMISSIONS, isGestorPorVinculo: true, canDisponibilidade: true }, []);
+    expect(isTopLevelVisible('Grade Mensal')).toBe(true);
+    expect(isTopLevelVisible('Bloqueios')).toBe(true);
+    expect(isTopLevelVisible('Deslocamentos')).toBe(true);
+    expect(isTopLevelVisible('Aprovações')).toBe(false);
   });
 });

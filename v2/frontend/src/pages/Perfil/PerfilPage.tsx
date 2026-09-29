@@ -1,7 +1,7 @@
 /**
  * Página de Perfil do usuário autenticado (`/perfil`).
  *
- * MVP: exibe os dados da conta (nome, CPF mascarado, e-mail, setores/funções) e
+ * MVP: exibe os dados da conta (nome, CPF mascarado, e-mail, setores do vínculo/funções) e
  * permite **trocar a própria senha** (self-service). Resolve a dívida de segurança
  * do go-live (usuários importados com senha padrão só podiam trocar via admin).
  *
@@ -124,8 +124,12 @@ export default function PerfilPage({ user }: { user: CurrentUser }) {
             <Descriptions.Item label="E-mail">{user.email || '—'}</Descriptions.Item>
             <Descriptions.Item label="Telefone">{telefone || '—'}</Descriptions.Item>
             <Descriptions.Item label="Cargo">{user.cargo || '—'}</Descriptions.Item>
+            {/* PR A: setor = gerência do vínculo vigente (nome de tela). Sem vínculo (Controle,
+                DAT, Diretoria operam por grupo), cai para os grupos de setor. */}
             <Descriptions.Item label="Setores">
-              <TagList items={user.setores} />
+              <TagList
+                items={user.gerencias?.length ? user.gerencias.map((g) => g.rotulo) : user.setores}
+              />
             </Descriptions.Item>
             <Descriptions.Item label="Funções">
               <TagList items={user.funcoes} />

@@ -67,14 +67,15 @@ interface AppRoutesProps {
 
 export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.Element {
   const {
-    canCoordenador, canControle, canDAT, canApproveSuper, canDisponibilidade, isFormador,
+    canCoordenador, canControle, canDAT, canApproveSuper, canDisponibilidade, isFormador, isGestorPorVinculo,
   } = permissions;
 
   // #1271: rotas gateadas por <RequirePolicy> (policy= direto p/ policies públicas, allow=
   // p/ composites/auth). `access` (useCanAccess) permanece só para os composites de
   // disponibilidade/bloqueios (view_all_availability OU escopo próprio, sem policy única).
+  // PR A: vínculo de gestão (me.gerencias) entra em Bloqueios/Deslocamentos — o backend escopa.
   const access = useCanAccess(policies, {
-    canBloqueios: canControle || canCoordenador || isFormador,
+    canBloqueios: canControle || canCoordenador || isFormador || isGestorPorVinculo,
   });
 
   // H.2: um crash de página (throw no render OU falha ao baixar o chunk lazy) fica isolado
@@ -113,7 +114,7 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
             OU acesso scoped/próprio (Coordenador/Formador) sem policy pública. */}
         <Route path="/solicitacoes/disponibilidade" element={<RequirePolicy allow={access.can('view_all_availability') || canDisponibilidade}><MonthlyPage /></RequirePolicy>} />
         <Route path="/solicitacoes/bloqueios" element={<RequirePolicy allow={access.canAccessBlocks}><DisponibilidadeBlocks /></RequirePolicy>} />
-        <Route path="/solicitacoes/deslocamentos" element={<RequirePolicy allow={access.can('view_all_availability') || canControle || canCoordenador || canDAT}><DeslocamentosPage /></RequirePolicy>} />
+        <Route path="/solicitacoes/deslocamentos" element={<RequirePolicy allow={access.can('view_all_availability') || canControle || canCoordenador || canDAT || isGestorPorVinculo}><DeslocamentosPage /></RequirePolicy>} />
         <Route path="/solicitacoes/meus-eventos" element={<RequirePolicy allow={!!user}><MeusEventosPage /></RequirePolicy>} />
         <Route path="/perfil" element={<RequirePolicy allow={!!user}><PerfilPage user={user} /></RequirePolicy>} />
         <Route path="/politica-privacidade" element={<RequirePolicy allow={!!user}><PoliticaPrivacidadePage /></RequirePolicy>} />

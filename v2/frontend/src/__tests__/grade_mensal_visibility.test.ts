@@ -34,6 +34,7 @@ function makeUser(overrides = {}) {
     groups: [],
     setores: [],
     funcoes: [],
+    gerencias: [] as { id: number; rotulo: string; papeis: string[] }[],
     is_superuser: false,
     is_superintendencia: false,
     can_approve_super: false,
@@ -97,6 +98,14 @@ describe('Grade Mensal visibility (D8 + D9 — 2026-04-28)', () => {
         shouldShowGradeMensal(makeUser({ funcoes: ['Apoio de Coordenação'], setores: ['Vidas'] }), []),
       ).toBe(true);
     });
+
+    // PR A (condicional medido em prod, 29/09): quem tem só o VÍNCULO de gestão (sem
+    // grupo de função) já passa no backend (HasSectorAccess) — a tela não pode barrar.
+    test.each(['COORDENADOR', 'GERENTE', 'APOIO'])('vínculo %s sem grupo (me.gerencias)', (papel) => {
+      expect(
+        shouldShowGradeMensal(makeUser({ gerencias: [{ id: 4, rotulo: 'Superativar', papeis: [papel] }] }), []),
+      ).toBe(true);
+    });
   });
 
   describe('DENY', () => {
@@ -114,6 +123,12 @@ describe('Grade Mensal visibility (D8 + D9 — 2026-04-28)', () => {
 
     test('Usuário só com setor "Vidas" sem função', () => {
       expect(shouldShowGradeMensal(makeUser({ setores: ['Vidas'] }), [])).toBe(false);
+    });
+
+    test('vínculo FORMADOR sem grupo continua negado (PR A)', () => {
+      expect(
+        shouldShowGradeMensal(makeUser({ gerencias: [{ id: 4, rotulo: 'Superativar', papeis: ['FORMADOR'] }] }), []),
+      ).toBe(false);
     });
   });
 });

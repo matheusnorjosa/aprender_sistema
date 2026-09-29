@@ -1,7 +1,7 @@
 ---
 title: Clientes de API (Fetch)
 status: canonical
-last_verified: 2026-07-24
+last_verified: 2026-09-29
 sources_of_truth:
   - v2/frontend/src/api/config.ts
   - v2/frontend/src/api/auth.ts
@@ -68,6 +68,8 @@ Wrapper publico exportado por `config.ts`:
 | `ensureCsrfToken(forceRefresh?)` / `getCsrfToken()` / `clearCsrfCache()` / `initCsrfToken()` | Ciclo de vida do token CSRF. |
 
 `API_BASE` e configuravel por `VITE_API_URL` (default `/api`). Os endpoints concretos consumidos por cada cliente estao em [`v2/docs/API_REFERENCE.md`](../../API_REFERENCE.md). `initCsrfToken()` roda automaticamente no import do modulo, exceto sob Vitest.
+
+- **`getGerencias({ ativo? })`** (`availability.ts`, PR A de 2026-09-29): `{ ativo: true }` pede `/gerencias/?ativo=true` — e o que as listas de escolha usam (Grade Mensal, PreAgenda), para gerencia inativa nao aparecer. Sem filtro traz todas: a tela de Gerencias (`adminDAT.listGerencias`) precisa das inativas para reativar. O rotulo exibido e `rotulo` (`nome_exibicao` ou `nome_setor`), nunca `nome`.
 
 ## Fluxos principais
 

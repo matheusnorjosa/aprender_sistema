@@ -127,6 +127,8 @@ export interface SolicitacaoFilters {
   flow?: FluxoType;
   q?: string;
   sector?: string;
+  /** PR A: filtra por `projeto.gerencia_id` (o mesmo filtro do resumo GCal). */
+  gerencia_id?: string;
   date_from?: string;
   date_to?: string;
   page?: number;

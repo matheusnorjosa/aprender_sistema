@@ -15,7 +15,7 @@ import { listProjetos, createProjeto, updateProjeto, deleteProjeto, getRBACMeta 
 import { DEFAULT_PAGE_SIZE } from '../../constants';
 import type { ID } from '../../types';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 const { Search } = Input;
 
 /**
@@ -30,6 +30,8 @@ interface ProjetoRecord {
   // Conferência #1914: setor = raw gravável; setor_efetivo = derivado (setor || gerencia.nome_setor), read-only.
   setor: string;
   setor_efetivo: string;
+  // PR A: rótulo (nome de tela) da gerência do projeto; null sem gerência.
+  gerencia_nome: string | null;
 }
 
 /**
@@ -173,12 +175,20 @@ export default function ProjetosPage(): JSX.Element {
     { title: 'Nome', dataIndex: 'nome', key: 'nome', width: 300 },
     { title: 'Código', dataIndex: 'codigo', key: 'codigo', width: 120 },
     {
-      // Setor EFETIVO (derivado, read-only): a grade exibe este; o form de conferência grava no raw.
+      // PR A: "Setor" = rótulo da gerência (nome de tela). O setor do catálogo (`setor_efetivo`,
+      // derivado, read-only; o form de conferência grava no raw) fica na mesma célula quando
+      // difere — sem coluna nova, para não alargar a tabela (regra: sem rolagem horizontal).
       title: 'Setor',
-      dataIndex: 'setor_efetivo',
-      key: 'setor_efetivo',
+      key: 'setor',
       width: 160,
-      render: (v: string) => (v ? <Tag color="geekblue">{v}</Tag> : <Tag>não definido</Tag>),
+      render: (_, record) => (
+        <>
+          {record.gerencia_nome ? <Tag color="geekblue">{record.gerencia_nome}</Tag> : <Tag>não definido</Tag>}
+          {record.setor_efetivo && record.setor_efetivo !== record.gerencia_nome ? (
+            <div><Text type="secondary">catálogo: {record.setor_efetivo}</Text></div>
+          ) : null}
+        </>
+      ),
     },
     {
       title: 'Fluxo',

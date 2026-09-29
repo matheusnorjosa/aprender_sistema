@@ -23,6 +23,7 @@ const { Search } = Input;
 interface GerenciaFormValues {
   nome: string;
   nome_setor: string;
+  nome_exibicao?: string;
   setor_canonico?: string;
   descricao: string;
   ativo: boolean;
@@ -53,7 +54,8 @@ export default function GerenciasPage(): JSX.Element {
     try {
       const data = await listGerencias({
         search: searchText,
-        ordering: 'nome',
+        // PR A: ordena pelo nome de tela (nome_exibicao || nome_setor), anotado no backend.
+        ordering: 'rotulo_ordem',
         page: current,
         page_size: pageSize,
       });
@@ -105,6 +107,7 @@ export default function GerenciasPage(): JSX.Element {
     form.setFieldsValue({
       nome: gerencia.nome,
       nome_setor: gerencia.nome_setor,
+      nome_exibicao: gerencia.nome_exibicao,
       setor_canonico: gerencia.setor_canonico,
       descricao: gerencia.descricao,
       ativo: gerencia.ativo,
@@ -115,13 +118,15 @@ export default function GerenciasPage(): JSX.Element {
   const handleSave = async (values: GerenciaFormValues): Promise<void> => {
     try {
       const payload: GerenciaPayload = {
-        nome: values.nome,
         nome_setor: values.nome_setor,
+        nome_exibicao: values.nome_exibicao ?? '',
         descricao: values.descricao,
         ativo: values.ativo,
         // setor_canonico é opcional (CharField allow_blank); envia string vazia se limpo.
         setor_canonico: values.setor_canonico ?? '',
       };
+      // `nome` (código interno) só é definido na criação: é chave técnica (seed/aprovação).
+      if (!editingGerencia) payload.nome = values.nome;
       if (editingGerencia) {
         await updateGerencia(editingGerencia.id, payload);
         message.success('Gerencia atualizada com sucesso');
@@ -140,7 +145,7 @@ export default function GerenciasPage(): JSX.Element {
   const handleDelete = (gerencia: GerenciaRecord): void => {
     Modal.confirm({
       title: 'Confirmar exclusao',
-      content: `Tem certeza que deseja excluir a gerencia "${gerencia.nome}"?`,
+      content: `Tem certeza que deseja excluir a gerencia "${gerencia.rotulo}"?`,
       okText: 'Sim, excluir',
       okType: 'danger',
       cancelText: 'Cancelar',
@@ -158,8 +163,9 @@ export default function GerenciasPage(): JSX.Element {
 
   const columns: ColumnsType<GerenciaRecord> = [
     { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-    { title: 'Nome', dataIndex: 'nome', key: 'nome', width: 200 },
-    { title: 'Nome Setor', dataIndex: 'nome_setor', key: 'nome_setor', width: 150 },
+    // PR A: o setor aparece pelo nome de tela; o código interno (`nome`) fica só no formulário.
+    { title: 'Setor', dataIndex: 'rotulo', key: 'rotulo', width: 200 },
+    { title: 'Rótulo nas planilhas', dataIndex: 'nome_setor', key: 'nome_setor', width: 150 },
     {
       title: 'Setor canônico',
       dataIndex: 'setor_canonico',
@@ -297,19 +303,30 @@ export default function GerenciasPage(): JSX.Element {
           onFinish={handleSave}
         >
           <Form.Item
-            name="nome"
-            label="Nome da Gerencia"
-            rules={[{ required: true, message: 'Nome e obrigatorio' }]}
+            name="nome_exibicao"
+            label="Nome na tela"
+            extra="Nome do setor que aparece nas telas. Vazio: usa o rótulo nas planilhas."
+            rules={[{ max: 100, message: 'Máximo de 100 caracteres' }]}
           >
-            <Input placeholder="Ex: Gerencia de Projetos" />
+            <Input placeholder="Ex: Superativar" />
+          </Form.Item>
+
+          <Form.Item
+            name="nome"
+            label="Código interno"
+            extra={editingGerencia ? 'Chave técnica do sistema; não é alterada pela tela.' : undefined}
+            rules={[{ required: true, message: 'Código interno e obrigatorio' }]}
+          >
+            <Input placeholder="Ex: GERENCIA 4" disabled={!!editingGerencia} />
           </Form.Item>
 
           <Form.Item
             name="nome_setor"
-            label="Nome do Setor"
-            rules={[{ required: true, message: 'Nome do setor e obrigatorio' }]}
+            label="Rótulo nas planilhas"
+            extra="Como o setor aparece nas planilhas importadas (usado para casar a importação)."
+            rules={[{ required: true, message: 'Rótulo nas planilhas e obrigatorio' }]}
           >
-            <Input placeholder="Ex: Superintendencia" />
+            <Input placeholder="Ex: ACerta" />
           </Form.Item>
 
           <Form.Item

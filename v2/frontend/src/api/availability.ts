@@ -117,10 +117,13 @@ export async function getMonthlyAvailability(params: MonthlyAvailabilityParams):
 }
 
 /**
- * Busca lista de gerências disponíveis.
+ * Busca lista de gerências. `{ ativo: true }` traz só as ativas (listas de escolha);
+ * sem filtro traz todas (a tela de Gerências precisa das inativas para reativar).
  */
-export async function getGerencias(): Promise<Gerencia[]> {
-  const data = await fetchAPI<{ results?: Gerencia[] } | Gerencia[]>('/gerencias/');
+export async function getGerencias(params: { ativo?: boolean } = {}): Promise<Gerencia[]> {
+  const data = await fetchAPI<{ results?: Gerencia[] } | Gerencia[]>(
+    buildUrl('/gerencias/', params),
+  );
   // DRF retorna { results: [...], count: N } quando paginado
   return (data as { results: Gerencia[] }).results || (data as Gerencia[]);
 }

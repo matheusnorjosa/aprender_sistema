@@ -108,10 +108,11 @@ def dashboard_overview(request: Request) -> Response:
         for item in por_fluxo_raw
     ]
 
-    # Por Gerência (últimos 30 dias)
+    # Por Gerência (últimos 30 dias). PR A: agrupa pela gerência (id, não funde rótulos
+    # iguais) e mostra o rótulo (`nome_exibicao or nome_setor`), nunca o `nome` técnico.
     por_gerencia_raw = (
         qs_30d.exclude(projeto__gerencia__isnull=True)
-        .values("projeto__gerencia__nome")
+        .values("projeto__gerencia_id", "projeto__gerencia__nome_exibicao", "projeto__gerencia__nome_setor")
         .annotate(quantidade=Count("id"))
         .order_by("-quantidade")
     )
@@ -120,7 +121,9 @@ def dashboard_overview(request: Request) -> Response:
 
     por_gerencia = [
         {
-            "gerencia": item["projeto__gerencia__nome"] or "Sem Gerência",
+            "gerencia": item["projeto__gerencia__nome_exibicao"]
+            or item["projeto__gerencia__nome_setor"]
+            or "Sem Gerência",
             "quantidade": item["quantidade"],
             "porcentagem": round((item["quantidade"] / total_gerencia * 100) if total_gerencia > 0 else 0, 1),
         }

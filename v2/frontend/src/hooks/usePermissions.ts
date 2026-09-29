@@ -45,14 +45,18 @@ export interface Permissions {
   canDashboardsMenu: boolean;
   canDisponibilidade: boolean;
   /**
-   * "Vê todas as gerências/setores" — semântica unificada para auto-seleção
-   * de filtros e widgets cross-setor (FiltersBar, GerenciaSelector, etc.).
+   * Vínculo EquipeGerencia vigente como GERENTE, COORDENADOR ou APOIO (`me.gerencias`),
+   * mesmo sem grupo de FUNÇÃO. O backend já autoriza Grade/Bloqueios/Deslocamentos por
+   * vínculo; a tela acompanha (PR A). FORMADOR não conta. Não vira `canCoordenador`.
+   */
+  isGestorPorVinculo: boolean;
+  /**
+   * "Vê todas as gerências/setores" por GRUPO (superuser ou Superintendência) — widgets
+   * cross-setor (PreAgenda, Solicitações, Aprovações).
    *
-   * Inclui: superuser, Superintendência (campo `is_superintendencia` do
-   * backend OU presença em `setores`).
-   *
-   * Substitui hardcodes do tipo `is_superuser || is_superintendencia ||
-   * groups.includes('Superintendência')` espalhados em páginas (Epic 3.3).
+   * NÃO decide a Grade Mensal: a FiltersBar usa a policy `view_all_availability`
+   * (mesma SSOT do `CanViewAllAvailability` do backend) e o vínculo `me.gerencias`
+   * (PR A). Quem só tinha o grupo levava 403 ao escolher gerência sem vínculo.
    */
   canSeeAllSectors: boolean;
 }
@@ -79,8 +83,12 @@ const EMPTY_PERMISSIONS: Permissions = {
   canMapaBrasil: false,
   canDashboardsMenu: false,
   canDisponibilidade: false,
+  isGestorPorVinculo: false,
   canSeeAllSectors: false,
 };
+
+/** Papéis de vínculo que dão acesso escopado à Grade/Bloqueios/Deslocamentos. */
+const PAPEIS_GESTAO = new Set(['GERENTE', 'COORDENADOR', 'APOIO']);
 
 function computePermissionsInternal(user: CurrentUser): Permissions {
   const setores = user.setores || [];
@@ -131,8 +139,12 @@ function computePermissionsInternal(user: CurrentUser): Permissions {
   // D9 (PR atual): Gerente pedagógico/Sup perde cap global e cai em scope
   // via EquipeGerencia (Gerente Vidas vê só Vidas; Gerente Sup vê só Sup).
   // DAT recebe cap global (ator transversal admin).
+  //
+  // PR A: o vínculo de gestão (me.gerencias) também libera, mesmo sem grupo de FUNÇÃO —
+  // o backend escopa por vínculo. `?? []` protege payload antigo sem o campo.
+  const isGestorPorVinculo = (user.gerencias ?? []).some((g) => g.papeis.some((p) => PAPEIS_GESTAO.has(p)));
   const canDisponibilidade =
-    user.is_superuser || inControle || inDAT || isGerente || isCoordenador;
+    user.is_superuser || inControle || inDAT || isGerente || isCoordenador || isGestorPorVinculo;
   // Epic 3.3: derived flag unificada para "vê todos os setores/gerências".
   // Substitui hardcodes is_superuser || is_superintendencia || groups.includes('Superintendência')
   // em FiltersBar, PreAgendaPage, Solicitacoes, ApprovalsPage.
@@ -161,6 +173,7 @@ function computePermissionsInternal(user: CurrentUser): Permissions {
     canMapaBrasil,
     canDashboardsMenu,
     canDisponibilidade,
+    isGestorPorVinculo,
     canSeeAllSectors,
   };
 }

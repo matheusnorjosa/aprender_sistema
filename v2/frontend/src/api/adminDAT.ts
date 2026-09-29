@@ -27,7 +27,7 @@ export interface AdminUser {
   groups: string[];
   group_ids_display?: ID[];
   // Lotação vigente (EquipeGerencia) para hidratar o form no EDIT. null se não há vínculo.
-  gerencia_atual?: { gerencia_id: number; nome_setor: string; setor_canonico: string; papel: string } | null;
+  gerencia_atual?: { gerencia_id: number; rotulo: string; nome_setor: string; setor_canonico: string; papel: string } | null;
   date_joined: string;
   last_login: string | null;
 }
@@ -333,8 +333,14 @@ export async function deleteProjeto(id: ID): Promise<void> {
 
 export interface GerenciaRecord {
   id: ID;
+  /** Código interno (chave técnica); não exibir como nome do setor. */
   nome: string;
+  /** Rótulo nas planilhas (chave do import). */
   nome_setor: string;
+  /** Nome de tela escolhido pelo admin; vazio = usa nome_setor. */
+  nome_exibicao: string;
+  /** Read-only: nome que a tela mostra (nome_exibicao || nome_setor). */
+  rotulo: string;
   setor_canonico: string;
   // Confiança do de-para v15 que atribuiu setor_canonico (RELAY 50) — read-only, só-import,
   // exibido na conferência para priorizar baixa confiança. Sem entrada-direta.
@@ -351,6 +357,7 @@ export interface GerenciaRecord {
 export interface GerenciaPayload {
   nome?: string;
   nome_setor?: string;
+  nome_exibicao?: string;
   setor_canonico?: string;
   gerente?: ID | null;
   ativo?: boolean;

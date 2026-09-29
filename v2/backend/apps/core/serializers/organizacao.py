@@ -87,7 +87,7 @@ class ProjetoSerializer(serializers.ModelSerializer):
     direto), mas a API/Admin não dependem mais dele.
     """
 
-    gerencia_nome = serializers.CharField(source="gerencia.nome_setor", read_only=True, allow_null=True)
+    gerencia_nome = serializers.CharField(source="gerencia.rotulo", read_only=True, allow_null=True)
     # `setor` NÃO é declarado aqui: o ModelSerializer o gera do campo model `Projeto.setor`
     # (CharField gravável, read devolve o valor ARMAZENADO). A derivação vai para `setor_efetivo`
     # (read-only) — assim o modal de edição liga no raw sem contaminá-lo (guarda anti-M17).
@@ -140,12 +140,14 @@ class GerenciaSerializer(serializers.ModelSerializer["Gerencia"]):
     Serializer para modelo Gerencia.
 
     Fields:
-        - id, nome, nome_setor, gerente (nested), ativo
+        - id, nome, nome_setor, nome_exibicao, gerente (nested), ativo
+        - rotulo (read-only): nome que a tela mostra (`nome_exibicao or nome_setor`)
         - projetos_count (annotated, read-only)
     """
 
     gerente_nome = serializers.CharField(source="gerente.get_full_name", read_only=True, allow_null=True)
     projetos_count = serializers.IntegerField(read_only=True, required=False)
+    rotulo = serializers.CharField(read_only=True)
 
     class Meta:  # type: ignore[misc]
         model = Gerencia
@@ -153,6 +155,8 @@ class GerenciaSerializer(serializers.ModelSerializer["Gerencia"]):
             "id",
             "nome",
             "nome_setor",
+            "nome_exibicao",
+            "rotulo",
             "setor_canonico",
             "setor_canonico_confianca",
             "gerente",
@@ -172,7 +176,7 @@ class GerenciaSerializer(serializers.ModelSerializer["Gerencia"]):
 
         GERENTE vigente em `GERENCIA_APROVADORA_NOME` aprova solicitações. Renomear g1
         desligaria as aprovações; dar esse nome a outra gerência ligaria o poder de aprovar
-        para os GERENTEs dela. Rótulo de tela é `nome_setor` (editável).
+        para os GERENTEs dela. Rótulo de tela é `nome_exibicao` (editável; `rotulo`).
         """
         instance: Any = self.instance
         atual = getattr(instance, "nome", None)

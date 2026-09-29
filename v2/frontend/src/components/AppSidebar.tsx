@@ -201,7 +201,7 @@ export function AppSidebar({
   // Bloqueios/Deslocamentos e o acesso scoped da Grade Mensal (`canDisponibilidade`).
   // Todas são flags can*/is* (não `in*`).
   const {
-    canCoordenador, canControle, canDAT, isFormador, canDisponibilidade,
+    canCoordenador, canControle, canDAT, isFormador, canDisponibilidade, isGestorPorVinculo,
   } = permissions;
 
   const caps = useCapabilities(policies);
@@ -287,7 +287,7 @@ export function AppSidebar({
 
             {/* Bloqueios: policy view_all_availability + escopo próprio de Formador/Coordenador
                 (sem policy pública) e Controle (access_controle_section). */}
-            {(caps.canViewAllAvailability || canControle || canCoordenador || isFormador) && (
+            {(caps.canViewAllAvailability || canControle || canCoordenador || isFormador || isGestorPorVinculo) && (
               <Menu.Item key="bloqueios" icon={<CalendarOutlined />} onClick={closeAllSubmenus}>
                 <Link to="/solicitacoes/bloqueios">Bloqueios</Link>
               </Menu.Item>
@@ -316,7 +316,7 @@ export function AppSidebar({
               </SubMenu>
             )}
 
-            {(caps.canViewAllAvailability || canControle || canCoordenador || canDAT) && (
+            {(caps.canViewAllAvailability || canControle || canCoordenador || canDAT || isGestorPorVinculo) && (
               <Menu.Item key="deslocamentos" icon={<CalendarOutlined />} onClick={closeAllSubmenus}>
                 <Link to="/solicitacoes/deslocamentos">Deslocamentos</Link>
               </Menu.Item>

@@ -291,6 +291,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         # PR15: Filtros adicionais via query params
         sector = self.request.query_params.get("sector")
+        gerencia_id = self.request.query_params.get("gerencia_id")
         date_from = self.request.query_params.get("date_from")
         date_to = self.request.query_params.get("date_to")
         q = self.request.query_params.get("q")
@@ -314,6 +315,11 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             # substring no nome do projeto — que fazia um projeto Fluir chamado
             # "Vidas ..." aparecer indevidamente em ?sector=Vidas.
             qs = qs.filter(projeto__gerencia__nome_setor__iexact=sector)
+
+        # PR A: filtro por gerência (id) — o mesmo do resumo GCal da PreAgenda
+        # (`_apply_common_filters`), para lista e KPIs contarem o mesmo conjunto.
+        if gerencia_id and gerencia_id.isdecimal():  # isdigit() aceita "²", que int() rejeita
+            qs = qs.filter(projeto__gerencia_id=int(gerencia_id))
 
         if date_from:
             try:

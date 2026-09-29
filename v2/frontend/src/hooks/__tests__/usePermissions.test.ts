@@ -29,6 +29,7 @@ function makeUser(overrides = {}) {
     groups: [],
     setores: [],
     funcoes: [],
+    gerencias: [] as { id: number; rotulo: string; papeis: string[] }[],
     is_superuser: false,
     is_superintendencia: false,
     can_approve_super: false,
@@ -284,6 +285,36 @@ describe('computePermissions', () => {
     test('Usuário só com setor "Vidas" (sem função) → DENY', () => {
       const perms = computePermissions(makeUser({ setores: ['Vidas'] }))
       expect(perms.canDisponibilidade).toBe(false)
+    })
+  })
+
+  // PR A (condicional medido em prod, 29/09): vínculo EquipeGerencia de gestão sem grupo
+  // de FUNÇÃO. O backend já autoriza por vínculo (Grade, Bloqueios, Deslocamentos).
+  describe('isGestorPorVinculo (me.gerencias)', () => {
+    const vinculo = (papel: string) => ({ gerencias: [{ id: 4, rotulo: 'Superativar', papeis: [papel] }] })
+
+    test.each(['GERENTE', 'COORDENADOR', 'APOIO'])('vínculo %s → gestor e Grade liberada', (papel) => {
+      const perms = computePermissions(makeUser(vinculo(papel)))
+      expect(perms.isGestorPorVinculo).toBe(true)
+      expect(perms.canDisponibilidade).toBe(true)
+    })
+
+    test('vínculo FORMADOR → continua negado', () => {
+      const perms = computePermissions(makeUser(vinculo('FORMADOR')))
+      expect(perms.isGestorPorVinculo).toBe(false)
+      expect(perms.canDisponibilidade).toBe(false)
+    })
+
+    test('vínculo não vira capability de Coordenador (criar/editar solicitação)', () => {
+      const perms = computePermissions(makeUser(vinculo('COORDENADOR')))
+      expect(perms.isCoordenador).toBe(false)
+      expect(perms.canCoordenador).toBe(false)
+    })
+
+    test('payload antigo sem `gerencias` não quebra', () => {
+      const { gerencias: _omit, ...semGerencias } = makeUser()
+      const perms = computePermissions(semGerencias as unknown as Parameters<typeof computePermissions>[0])
+      expect(perms.isGestorPorVinculo).toBe(false)
     })
   })
 

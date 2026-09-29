@@ -109,7 +109,10 @@ export default function DeslocamentosPage(): JSX.Element {
       try {
         const userData = await getMe();
         const perms = computePermissions(userData);
-        setCanAccess(perms.canControle || perms.canCoordenador || perms.canDAT || perms.inSuperintendencia);
+        // PR A: vínculo de gestão (me.gerencias) também entra — mesma regra da rota/menu.
+        setCanAccess(
+          perms.canControle || perms.canCoordenador || perms.canDAT || perms.inSuperintendencia || perms.isGestorPorVinculo,
+        );
       } catch (error) {
         logger.error('Erro ao carregar usuário:', error);
         setCanAccess(false);

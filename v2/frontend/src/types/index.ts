@@ -24,6 +24,7 @@ export type {
   UserSlim,
   UsuarioOption,
   CurrentUser,
+  GerenciaVinculo,
   AuthCheckResponse,
   LoginRequest,
   LoginResponse,

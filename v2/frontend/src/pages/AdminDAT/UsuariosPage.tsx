@@ -33,7 +33,13 @@ import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined, KeyOutlined
 import { Link } from 'react-router';
 import { checkAuth } from '../../api/auth';
 import { listUsers, createUser, updateUser, deleteUser, resetUserPassword, listGroups, getRBACMeta, listGerencias } from '../../api/adminDAT';
-import { buildUsuarioPayload } from './usuario_form_helpers';
+import {
+  buildUsuarioPayload,
+  funcoesProntasParaSalvar,
+  gruposAposSalvar,
+  lotacaoObrigatoria,
+  mensagemDoErro,
+} from './usuario_form_helpers';
 import type { PermissaoFuncional, RBACMetaPayload, GerenciaRecord } from '../../api/adminDAT';
 import { importUsuarios } from '../../api/ops';
 import type { ImportResult } from '../../api/ops';
@@ -157,6 +163,8 @@ export default function UsuariosPage(): JSX.Element {
   });
   const [modalVisible, setModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
+  // #2071: as funções estavam carregadas quando o Editar abriu (e hidratou o form)?
+  const [hidratouComFuncoes, setHidratouComFuncoes] = useState(false);
   // #1675 follow-up: redefinição de senha de OUTRO usuário (ação de admin).
   // Modal dedicado, separado do form de edição — intenção explícita e a
   // auditoria RESET_PASSWORD (#1672) dispara só aqui.
@@ -176,6 +184,11 @@ export default function UsuariosPage(): JSX.Element {
   const [form] = Form.useForm<UserFormValues>();
   const [resetForm] = Form.useForm<{ nova_senha: string; confirmar_nova_senha: string }>();
   const selectedGerenciaId = Form.useWatch('gerencia_id', form);
+  const obrigatorio = lotacaoObrigatoria({
+    currentIsSuperuser,
+    isEditing: !!editingUser,
+    temLotacao: !!editingUser?.gerencia_atual,
+  });
   const selectedFuncaoIds = Form.useWatch('funcao_ids', form) || [];
 
   const setorGroupsSet = useMemo(
@@ -326,6 +339,7 @@ export default function UsuariosPage(): JSX.Element {
     const funcaoIds = grupos
       .filter((g) => funcaoGroupsSet.has(g.name) && userGroupIds.includes(g.id))
       .map(g => g.id);
+    setHidratouComFuncoes(funcaoGroupsSet.size > 0 && grupos.length > 0);
 
     form.setFieldsValue({
       username: user.username,
@@ -371,6 +385,12 @@ export default function UsuariosPage(): JSX.Element {
         isEditing: !!editingUser,
         cpfEditUnlocked,
         currentIsSuperuser,
+        funcoesCarregadas: funcoesProntasParaSalvar({
+          isEditing: !!editingUser,
+          hidratouComFuncoes,
+          funcoesTocadas: form.isFieldTouched('funcao_ids'),
+          carregadasAgora: funcaoGroupsSet.size > 0 && grupos.length > 0,
+        }),
       });
 
       if (editingUser) {
@@ -384,7 +404,7 @@ export default function UsuariosPage(): JSX.Element {
       form.resetFields();
       void fetchUsuarios();
     } catch (error) {
-      message.error(`Erro: ${(error as Error).message}`);
+      message.error(`Erro: ${mensagemDoErro(error)}`);
     }
   };
 
@@ -402,7 +422,7 @@ export default function UsuariosPage(): JSX.Element {
       setResetPasswordUser(null);
       resetForm.resetFields();
     } catch (error) {
-      message.error(`Erro ao redefinir senha: ${(error as Error).message}`);
+      message.error(`Erro ao redefinir senha: ${mensagemDoErro(error)}`);
     } finally {
       setResetSaving(false);
     }
@@ -745,7 +765,10 @@ export default function UsuariosPage(): JSX.Element {
             // P0-1 Tier-0 (D-1=2a): lotação é superuser-only. Não-superuser vê o
             // valor atual, mas não edita (e o helper não envia gerencia_id). Relaxa
             // o required p/ não travar o submit de conta comum com o Select disabled.
-            rules={currentIsSuperuser ? [{ required: true, message: 'Selecione uma gerência' }] : []}
+            // #2071: obrigatória ao criar e para quem já tem lotação (o Controle não tem).
+            rules={
+              obrigatorio.gerencia ? [{ required: true, message: 'Selecione uma gerência' }] : []
+            }
           >
             <Select
               allowClear
@@ -762,7 +785,8 @@ export default function UsuariosPage(): JSX.Element {
             label="Função (o que pode fazer)"
             tooltip="Papel da pessoa no processo"
             // P0-1 Tier-0 (D-1=2a): membership é superuser-only (ver gerencia_id acima).
-            rules={currentIsSuperuser ? [{ required: true, message: 'Selecione pelo menos uma função' }] : []}
+            // #2071: obrigatória só ao criar (na edição, o DAT não tem função).
+            rules={obrigatorio.funcao ? [{ required: true, message: 'Selecione pelo menos uma função' }] : []}
           >
             <Select
               mode="multiple"
@@ -810,14 +834,16 @@ export default function UsuariosPage(): JSX.Element {
               <div>
                 <Text strong>Permissões efetivas: </Text>
                 {(() => {
-                  // Setor é derivado da Gerência (grupo cujo nome == setor_canonico,
-                  // quando existe — espelha o setor_group_for do backend) + Funções.
-                  const selectedGerencia = gerencias.find((ger) => ger.id === selectedGerenciaId);
-                  const setorGroup = selectedGerencia
-                    ? grupos.find((group) => group.name === selectedGerencia.setor_canonico)
-                    : undefined;
-                  const funcaoGroups = grupos.filter((group) => selectedFuncaoIds.includes(group.id));
-                  const selectedGroups = setorGroup ? [setorGroup, ...funcaoGroups] : funcaoGroups;
+                  // #2071: espelha o Salvar do backend (grupos que ficam + funções + setor
+                  // da gerência só quando ela muda).
+                  const selectedGroups = gruposAposSalvar({
+                    grupos,
+                    idsAtuais: editingUser?.group_ids_display || [],
+                    funcoes: funcaoGroupsSet,
+                    funcaoIds: selectedFuncaoIds,
+                    gerencia: gerencias.find((ger) => ger.id === selectedGerenciaId),
+                    gerenciaAnterior: gerencias.find((ger) => ger.id === editingUser?.gerencia_atual?.gerencia_id),
+                  });
                   const labels = new Set<string>();
                   selectedGroups.forEach((group) => {
                     (group.permissoes_funcionais || []).forEach((permissao) => labels.add(permissao.label));

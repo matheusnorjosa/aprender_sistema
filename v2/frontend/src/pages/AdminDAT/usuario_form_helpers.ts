@@ -40,6 +40,11 @@ export interface BuildPayloadOptions {
   cpfEditUnlocked: boolean;
   /** Se o user logado é superuser (controla visibilidade de is_superuser no payload) */
   currentIsSuperuser: boolean;
+  /**
+   * #2071: se a lista de funções (RBAC meta + grupos) carregou. Sem ela, o form hidrata as funções
+   * vazias; mandar `group_ids` tiraria todas as funções (e a aprovação) por falha de carga.
+   */
+  funcoesCarregadas?: boolean;
 }
 
 /**
@@ -56,7 +61,8 @@ export function buildUsuarioPayload(
   options: BuildPayloadOptions,
 ): Record<string, unknown> {
   const { funcao_ids = [], gerencia_id, is_superuser, cpf, ...rest } = values;
-  const { isEditing, cpfEditUnlocked, currentIsSuperuser } = options;
+  const { isEditing, cpfEditUnlocked, currentIsSuperuser, funcoesCarregadas = true } = options;
+  const editaLotacao = currentIsSuperuser && funcoesCarregadas;
 
   // CPF: incluir se create OU se edit+unlocked com valor preenchido
   const includeCpf = !isEditing || cpfEditUnlocked;
@@ -70,11 +76,11 @@ export function buildUsuarioPayload(
   // de enviar antes de o backend rejeitar). DAT segue editando conta comum
   // (cadastral/senha/ativo) sem tocar em memberships. Agora só as FUNÇÕES — o
   // grupo de setor é auto-atribuído pelo backend a partir da Gerência.
-  const groupsPayload = currentIsSuperuser ? { group_ids: [...funcao_ids] } : {};
+  const groupsPayload = editaLotacao ? { group_ids: [...funcao_ids] } : {};
 
   // gerencia_id (lotação): mesmo gate superuser-only. O backend cria/sincroniza
   // o vínculo EquipeGerencia; null = não altera o vínculo existente.
-  const gerenciaPayload = currentIsSuperuser ? { gerencia_id: gerencia_id ?? null } : {};
+  const gerenciaPayload = editaLotacao ? { gerencia_id: gerencia_id ?? null } : {};
 
   return {
     ...rest,
@@ -83,4 +89,96 @@ export function buildUsuarioPayload(
     ...groupsPayload,
     ...gerenciaPayload,
   };
+}
+
+/** Setores que compõem um par aprovador; espelha `APPROVER_COMPOSITES` (`apps/core/rbac/helpers.py`). */
+const SETORES_DE_PAR_APROVADOR = new Set(['Superintendência', 'Controle']);
+
+interface GrupoLike {
+  id: ID;
+  name: string;
+}
+
+interface GerenciaLike {
+  id: ID;
+  nome: string;
+  setor_canonico?: string | null | undefined;
+}
+
+/**
+ * #2071: o que é obrigatório no form (só para superuser, o único que edita lotação). Ao criar,
+ * gerência e função. Na edição, a função é opcional (o DAT não tem) e a gerência só é obrigatória
+ * para quem já tem lotação: o Controle não tem, e limpar a gerência não pode ser um jeito de salvar
+ * uma aprovadora sem revogar.
+ */
+export function lotacaoObrigatoria(opts: {
+  currentIsSuperuser: boolean;
+  isEditing: boolean;
+  temLotacao: boolean;
+}): { gerencia: boolean; funcao: boolean } {
+  const { currentIsSuperuser, isEditing, temLotacao } = opts;
+  return {
+    gerencia: currentIsSuperuser && (!isEditing || temLotacao),
+    funcao: currentIsSuperuser && !isEditing,
+  };
+}
+
+function setorDaGerencia<G extends GrupoLike>(grupos: G[], gerencia: GerenciaLike | undefined): G | undefined {
+  const setor = (gerencia?.setor_canonico ?? '').trim();
+  if (!setor || SETORES_DE_PAR_APROVADOR.has(setor)) return undefined;
+  return grupos.find((g) => g.name === setor);
+}
+
+/**
+ * #2071: grupos da pessoa depois do Salvar, espelhando `_apply_lotacao` do backend. Os grupos
+ * atuais que não são FUNÇÃO ficam; as funções vêm do form; o grupo de setor da gerência entra e
+ * sai só quando a gerência muda; setor de par aprovador (Superintendência, Controle) não vira grupo.
+ */
+export function gruposAposSalvar<G extends GrupoLike>(args: {
+  grupos: G[];
+  idsAtuais: ID[];
+  funcoes: Set<string>;
+  funcaoIds: ID[];
+  gerencia: GerenciaLike | undefined;
+  gerenciaAnterior: GerenciaLike | undefined;
+}): G[] {
+  const { grupos, idsAtuais, funcoes, funcaoIds, gerencia, gerenciaAnterior } = args;
+  let final = grupos.filter((g) => idsAtuais.includes(g.id) && !funcoes.has(g.name));
+  final.push(...grupos.filter((g) => funcaoIds.includes(g.id) && !final.includes(g)));
+  if (gerencia && gerencia.id !== gerenciaAnterior?.id) {
+    const antigo = setorDaGerencia(grupos, gerenciaAnterior);
+    const novo = setorDaGerencia(grupos, gerencia);
+    if (antigo && antigo !== novo) final = final.filter((g) => g !== antigo);
+    if (novo && !final.includes(novo)) final.push(novo);
+  }
+  return final;
+}
+
+/**
+ * #2071: se o salvar pode mandar funções e gerência. Na edição, só se as funções estavam carregadas
+ * quando o Editar abriu (senão o form foi preenchido com funções vazias) ou se a pessoa mexeu nelas
+ * depois. Ao criar, basta estarem carregadas agora.
+ */
+export function funcoesProntasParaSalvar(opts: {
+  isEditing: boolean;
+  hidratouComFuncoes: boolean;
+  funcoesTocadas: boolean;
+  carregadasAgora: boolean;
+}): boolean {
+  if (!opts.isEditing) return opts.carregadasAgora;
+  return opts.hidratouComFuncoes || opts.funcoesTocadas;
+}
+
+/**
+ * #2071: texto do erro de API para o usuário. A validação do backend chega como
+ * `{detail: "Erro de validação.", errors: {campo: [...]}}`; o motivo está em `errors`.
+ */
+export function mensagemDoErro(error: unknown): string {
+  const err = error as Error & { response?: { data?: { errors?: Record<string, unknown> } } };
+  const errors = err.response?.data?.errors;
+  if (errors && typeof errors === 'object') {
+    const textos = Object.values(errors).flatMap((v) => (Array.isArray(v) ? v.map(String) : [String(v)]));
+    if (textos.length > 0) return textos.join(' ');
+  }
+  return err.message;
 }

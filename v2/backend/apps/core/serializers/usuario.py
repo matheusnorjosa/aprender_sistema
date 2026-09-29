@@ -15,6 +15,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from rest_framework import serializers  # type: ignore[attr-defined]
 
 from apps.core.constants import FUNCAO_GROUPS, RESERVED_GROUPS, SETOR_GROUPS
@@ -28,11 +29,27 @@ from apps.core.services.audit import (
     auditar_reset_senha,
     registrar_auditoria,
 )
-from apps.core.services.equipe_gerencia import papeis_de_grupos, setor_group_for, sync_user_lotacao
-from apps.core.services.rbac_service import get_assignable_group_names
+from apps.core.services.equipe_gerencia import (
+    encerrar_gerente_aprovador,
+    encerrar_lotacao,
+    papeis_de_grupos,
+    setor_group_for,
+    sync_user_lotacao,
+)
+from apps.core.services.rbac_service import get_assignable_group_names, nomes_grupos_funcao
 
 # Sentinela: distingue "campo não enviado" de "enviado como null" no PATCH parcial.
 _UNSET: Any = object()
+
+
+# #2071: par do composite LEGADO de aprovação (espelha `APPROVER_COMPOSITES`; sai no B2). O par
+# Controle + Assistente Administrativo é base legítima e fica fora da trava.
+_PAR_LEGADO: tuple[str, str] = ("Superintendência", "Gerente")
+
+
+def _vinculo_exibido(user: Any) -> Any:
+    """O vínculo vigente que o form de Usuários mostra (e reenvia no save): o primeiro por id."""
+    return EquipeGerencia.vigentes_em().filter(usuario=user).select_related("gerencia").order_by("id").first()
 
 
 class UserSlimSerializer(serializers.ModelSerializer):
@@ -146,7 +163,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
 
     def get_gerencia_atual(self, obj: Any) -> dict[str, Any] | None:
         """Gerência vigente do usuário (para hidratar o form no EDIT). None se não há vínculo."""
-        v = EquipeGerencia.vigentes_em().filter(usuario=obj).select_related("gerencia").order_by("id").first()
+        v = _vinculo_exibido(obj)
         if v is None:
             return None
         return {
@@ -310,37 +327,78 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
     def _apply_lotacao(self, user: Any, groups: Any, gerencia: Any, actor: Any, before_group_ids: Any) -> None:
         """Aplica grupos + vínculo de gerência (chamado por create/update; superuser-only).
 
-        - Auto-atribui o grupo de setor por nome (== `Gerencia.setor_canonico`) quando existir.
-        - Deriva os papéis das FUNÇÕES e sincroniza a lotação `EquipeGerencia` (form = SSOT).
-        - `groups=None` = não mexer em membership; `gerencia` ausente/`_UNSET`/None = não mexer no vínculo.
+        #2071 — o salvar mexe só no que o form mudou (o form mostra as FUNÇÕES e UMA gerência):
+        - `group_ids` substitui só os grupos de FUNÇÃO; os demais (setor, permissão funcional) ficam.
+        - O grupo de setor derivado da gerência (`setor_group_for`, nome == `setor_canonico`) entra e
+          sai só quando a gerência muda (ou na primeira lotação); a gerência aprovadora não deriva grupo.
+        - A lotação `EquipeGerencia` só é re-sincronizada quando a gerência ou os PAPÉIS mudam. Aí o form
+          é a fonte: encerra os outros vínculos; sem papel nenhum, encerra todos (revoga a aprovação).
+        - `groups=None` = não mexer nas funções; `gerencia` ausente/`_UNSET`/None = não mexer na lotação.
         - PR B1: audita a concessão/revogação do poder de aprovar solicitações (vínculo GERENTE
           na gerência aprovadora ou composite de grupos) — antes/depois de grupos + vínculo.
         """
-        aprovava = solicitation_approval_basis(user) is not None
+        base_antes = solicitation_approval_basis(user)
+        aprovava = base_antes is not None
         has_gerencia = gerencia is not None and gerencia is not _UNSET
-        final_groups = list(groups) if groups is not None else None
-        if has_gerencia:
-            setor_group = setor_group_for(gerencia)
-            if setor_group is not None:
-                if final_groups is not None:
-                    if setor_group not in final_groups:
-                        final_groups.append(setor_group)
-                else:
-                    user.groups.add(setor_group)
-        if final_groups is not None:
-            user.groups.set(final_groups)
-            # #1672: atribuicao de grupos (privilegio) auditada.
-            auditar_assign_groups(
-                actor=actor,
-                target_user=user,
-                before_group_ids=before_group_ids,
-                after_group_ids=list(user.groups.values_list("pk", flat=True)),
+        funcoes = nomes_grupos_funcao()
+        antes = list(user.groups.all())
+        exibido = _vinculo_exibido(user)
+        anterior = exibido.gerencia if exibido is not None else None
+        nova_lotacao = has_gerencia and (anterior is None or anterior.pk != gerencia.pk)
+
+        final = [g for g in antes if groups is None or g.name not in funcoes]
+        if groups is not None:
+            final += [g for g in groups if g not in final]
+        if nova_lotacao:
+            setor_antigo = setor_group_for(anterior) if anterior is not None else None
+            setor_novo = setor_group_for(gerencia)
+            if (
+                setor_antigo is not None
+                and setor_antigo != setor_novo
+                and (groups is None or setor_antigo not in groups)
+            ):
+                final = [g for g in final if g != setor_antigo]
+            if setor_novo is not None and setor_novo not in final:
+                final.append(setor_novo)
+        if {g.pk for g in final} != {g.pk for g in antes}:
+            user.groups.set(final)
+        # #1672: atribuicao de grupos (privilegio) auditada (no-op sem delta).
+        auditar_assign_groups(
+            actor=actor,
+            target_user=user,
+            before_group_ids=before_group_ids,
+            after_group_ids=[g.pk for g in final],
+        )
+        papeis = papeis_de_grupos(final)
+        papeis_antes = papeis_de_grupos(antes)
+        # O vínculo GERENTE na gerência aprovadora exige a função Gerente (tirada aqui ou na tela de Grupos).
+        # Encerrá-lo conta como mudança de papel: a lotação exibida é refeita com os papéis que ficaram.
+        encerrou_gerente = (
+            groups is not None and "Gerente" not in {g.name for g in final} and encerrar_gerente_aprovador(user)
+        )
+        if papeis_antes and not papeis:
+            # Tirou todas as funções com papel (com ou sem gerência): encerra a lotação e, com ela,
+            # o poder de aprovar de quem era GERENTE na gerência aprovadora.
+            encerrar_lotacao(user)
+        elif has_gerencia and papeis and (nova_lotacao or papeis != papeis_antes or encerrou_gerente):
+            sync_user_lotacao(user, gerencia, papeis)
+        base = solicitation_approval_basis(user)
+        setor, funcao = _PAR_LEGADO
+        pedido = groups is not None and setor in {g.name for g in groups}
+        par_novo = {setor, funcao} <= {g.name for g in final} and not {setor, funcao} <= {g.name for g in antes}
+        if not pedido and (par_novo or (base == "grupo_superintendencia_gerente" and base != base_antes)):
+            # O form não mostra o grupo de setor e o preserva; ele não pode virar poder de aprovar pelo
+            # par legado sem ninguém pedir (a transação do update() desfaz tudo).
+            raise serializers.ValidationError(
+                {
+                    "group_ids": (
+                        f'Esta pessoa tem o grupo "{setor}", que o formulário não mostra. Com a função {funcao}, ela '
+                        f"passaria a aprovar solicitações por esse grupo (regra antiga, que vai sair). Tire o grupo "
+                        f'"{setor}" dela na tela de Grupos antes de salvar.'
+                    )
+                }
             )
-        if has_gerencia:
-            papeis = papeis_de_grupos(user.groups.all())
-            if papeis:
-                sync_user_lotacao(user, gerencia, papeis)
-        aprova = solicitation_approval_basis(user) is not None
+        aprova = base is not None
         if aprova != aprovava:
             registrar_auditoria(
                 actor=actor,
@@ -385,8 +443,9 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
 
         return user
 
+    @transaction.atomic
     def update(self, instance: Any, validated_data: dict[str, Any]) -> Any:
-        """Update user, hash password e sincroniza lotação de gerência."""
+        """Update user, hash password e sincroniza lotação de gerência (atômico: #2071 pode recusar)."""
         groups = validated_data.pop("groups", None)
         # _UNSET distingue "não enviado" (não mexe no vínculo) de enviado (PATCH parcial).
         gerencia = validated_data.pop("gerencia_id", _UNSET)

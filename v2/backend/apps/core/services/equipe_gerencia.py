@@ -23,6 +23,7 @@ from django.contrib.auth.models import Group
 from django.utils import timezone
 
 from apps.core.models import EquipeGerencia
+from apps.core.rbac.helpers import APPROVER_COMPOSITES, GERENCIA_APROVADORA_NOME
 
 # Função (grupo RBAC) -> papel na EquipeGerencia. "Assistente Administrativo" e
 # demais funções não têm papel de gerência (não viram vínculo).
@@ -45,9 +46,13 @@ def setor_group_for(gerencia: Any) -> Group | None:
     Os 13 grupos de setor são um vocabulário fixo; nem todo `setor_canonico` tem
     grupo correspondente (A Cor da Gente, ED Financeira, Superativar…). Nesses
     casos retorna None (a realidade atual — não inventa grupo).
+
+    #2071: setor que compõe um par aprovador (`APPROVER_COMPOSITES`: Superintendência, Controle)
+    também retorna None. O grupo "Superintendência" abre todos os setores e, com Gerente, aprova pelo
+    composite legado; quem é lotado na gerência aprovadora aprova pelo vínculo (PR B1), não pelo grupo.
     """
     setor = (getattr(gerencia, "setor_canonico", "") or "").strip()
-    if not setor:
+    if not setor or setor in {s for s, _ in APPROVER_COMPOSITES}:
         return None
     return Group.objects.filter(name=setor).first()
 
@@ -98,3 +103,35 @@ def sync_user_lotacao(usuario: Any, gerencia: Any, papeis: Iterable[str], *, sup
         v.ativo = False
         v.valid_to = hoje
         v.save(update_fields=["ativo", "valid_to"])
+
+
+def encerrar_lotacao(usuario: Any) -> None:
+    """Encerra (ativo=False, valid_to=hoje) todos os vínculos ATIVOS do usuário.
+
+    #2071: o form tirou todas as funções que davam papel. Sem isso, tirar a função Gerente de uma
+    aprovadora deixava o vínculo GERENTE na Superintendência, e com ele o poder de aprovar.
+    """
+    hoje = timezone.localdate()
+    for v in EquipeGerencia.objects.filter(usuario=usuario, ativo=True):
+        v.ativo = False
+        v.valid_to = hoje
+        v.save(update_fields=["ativo", "valid_to"])
+
+
+def encerrar_gerente_aprovador(usuario: Any) -> bool:
+    """Encerra o vínculo ATIVO de papel GERENTE na gerência aprovadora (o que dá o poder de aprovar).
+
+    #2071: esse vínculo exige a função Gerente. Se ela saiu (pelo form ou pela tela de Grupos), o
+    salvar do form encerra o vínculo em vez de deixar a aprovação sem a função que a explica.
+    Retorna True se encerrou algum.
+    """
+    hoje = timezone.localdate()
+    encerrou = False
+    for v in EquipeGerencia.objects.filter(
+        usuario=usuario, ativo=True, papel="GERENTE", gerencia__nome=GERENCIA_APROVADORA_NOME
+    ):
+        v.ativo = False
+        v.valid_to = hoje
+        v.save(update_fields=["ativo", "valid_to"])
+        encerrou = True
+    return encerrou

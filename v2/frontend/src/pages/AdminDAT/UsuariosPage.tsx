@@ -33,7 +33,13 @@ import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined, KeyOutlined
 import { Link } from 'react-router';
 import { checkAuth } from '../../api/auth';
 import { listUsers, createUser, updateUser, deleteUser, resetUserPassword, listGroups, getRBACMeta, listGerencias } from '../../api/adminDAT';
-import { buildUsuarioPayload, gruposAposSalvar, lotacaoObrigatoria, mensagemDoErro } from './usuario_form_helpers';
+import {
+  buildUsuarioPayload,
+  funcoesProntasParaSalvar,
+  gruposAposSalvar,
+  lotacaoObrigatoria,
+  mensagemDoErro,
+} from './usuario_form_helpers';
 import type { PermissaoFuncional, RBACMetaPayload, GerenciaRecord } from '../../api/adminDAT';
 import { importUsuarios } from '../../api/ops';
 import type { ImportResult } from '../../api/ops';
@@ -157,6 +163,8 @@ export default function UsuariosPage(): JSX.Element {
   });
   const [modalVisible, setModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
+  // #2071: as funções estavam carregadas quando o Editar abriu (e hidratou o form)?
+  const [hidratouComFuncoes, setHidratouComFuncoes] = useState(false);
   // #1675 follow-up: redefinição de senha de OUTRO usuário (ação de admin).
   // Modal dedicado, separado do form de edição — intenção explícita e a
   // auditoria RESET_PASSWORD (#1672) dispara só aqui.
@@ -331,6 +339,7 @@ export default function UsuariosPage(): JSX.Element {
     const funcaoIds = grupos
       .filter((g) => funcaoGroupsSet.has(g.name) && userGroupIds.includes(g.id))
       .map(g => g.id);
+    setHidratouComFuncoes(funcaoGroupsSet.size > 0 && grupos.length > 0);
 
     form.setFieldsValue({
       username: user.username,
@@ -376,7 +385,12 @@ export default function UsuariosPage(): JSX.Element {
         isEditing: !!editingUser,
         cpfEditUnlocked,
         currentIsSuperuser,
-        funcoesCarregadas: funcaoGroupsSet.size > 0 && grupos.length > 0,
+        funcoesCarregadas: funcoesProntasParaSalvar({
+          isEditing: !!editingUser,
+          hidratouComFuncoes,
+          funcoesTocadas: form.isFieldTouched('funcao_ids'),
+          carregadasAgora: funcaoGroupsSet.size > 0 && grupos.length > 0,
+        }),
       });
 
       if (editingUser) {
@@ -408,7 +422,7 @@ export default function UsuariosPage(): JSX.Element {
       setResetPasswordUser(null);
       resetForm.resetFields();
     } catch (error) {
-      message.error(`Erro ao redefinir senha: ${(error as Error).message}`);
+      message.error(`Erro ao redefinir senha: ${mensagemDoErro(error)}`);
     } finally {
       setResetSaving(false);
     }

@@ -118,16 +118,20 @@ def encerrar_lotacao(usuario: Any) -> None:
         v.save(update_fields=["ativo", "valid_to"])
 
 
-def encerrar_gerente_aprovador(usuario: Any) -> None:
+def encerrar_gerente_aprovador(usuario: Any) -> bool:
     """Encerra o vínculo ATIVO de papel GERENTE na gerência aprovadora (o que dá o poder de aprovar).
 
     #2071: esse vínculo exige a função Gerente. Se ela saiu (pelo form ou pela tela de Grupos), o
     salvar do form encerra o vínculo em vez de deixar a aprovação sem a função que a explica.
+    Retorna True se encerrou algum.
     """
     hoje = timezone.localdate()
+    encerrou = False
     for v in EquipeGerencia.objects.filter(
         usuario=usuario, ativo=True, papel="GERENTE", gerencia__nome=GERENCIA_APROVADORA_NOME
     ):
         v.ativo = False
         v.valid_to = hoje
         v.save(update_fields=["ativo", "valid_to"])
+        encerrou = True
+    return encerrou

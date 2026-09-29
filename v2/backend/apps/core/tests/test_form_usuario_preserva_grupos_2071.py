@@ -369,3 +369,16 @@ class TestSemAprovacaoPorGrupoPeloFormulario:
         assert _ativos(alvo) == set()
         assert solicitation_approval_basis(alvo) is None
         assert _logs_autoridade(alvo) == ["revogada"]
+
+    def test_gerente_trocado_por_coordenador_na_tela_de_grupos_mantem_a_lotacao(self, root, g1):
+        """A tela de Grupos trocou Gerente por Coordenador: salvar revoga e a pessoa segue lotada em g1."""
+        coord = GroupFactory(name="Coordenador")
+        alvo = UsuarioFactory(username="troca_grupos_2071", cpf="92071000023")
+        alvo.groups.add(coord)
+        EquipeGerencia.objects.create(gerencia=g1, usuario=alvo, papel="GERENTE", ativo=True)
+
+        _salvar(root, alvo, {"group_ids": [coord.id], "gerencia_id": g1.id})
+
+        cache.clear()
+        assert _ativos(alvo) == {(g1.id, "COORDENADOR")}
+        assert solicitation_approval_basis(alvo) is None

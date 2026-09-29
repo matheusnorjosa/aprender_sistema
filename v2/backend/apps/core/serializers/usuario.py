@@ -371,15 +371,17 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         )
         papeis = papeis_de_grupos(final)
         papeis_antes = papeis_de_grupos(antes)
+        # O vínculo GERENTE na gerência aprovadora exige a função Gerente (tirada aqui ou na tela de Grupos).
+        # Encerrá-lo conta como mudança de papel: a lotação exibida é refeita com os papéis que ficaram.
+        encerrou_gerente = (
+            groups is not None and "Gerente" not in {g.name for g in final} and encerrar_gerente_aprovador(user)
+        )
         if papeis_antes and not papeis:
             # Tirou todas as funções com papel (com ou sem gerência): encerra a lotação e, com ela,
             # o poder de aprovar de quem era GERENTE na gerência aprovadora.
             encerrar_lotacao(user)
-        elif has_gerencia and papeis and (nova_lotacao or papeis != papeis_antes):
+        elif has_gerencia and papeis and (nova_lotacao or papeis != papeis_antes or encerrou_gerente):
             sync_user_lotacao(user, gerencia, papeis)
-        if groups is not None and "Gerente" not in {g.name for g in final}:
-            # O vínculo GERENTE na gerência aprovadora exige a função Gerente (tirada aqui ou na tela de Grupos).
-            encerrar_gerente_aprovador(user)
         base = solicitation_approval_basis(user)
         setor, funcao = _PAR_LEGADO
         pedido = groups is not None and setor in {g.name for g in groups}

@@ -110,7 +110,7 @@ que as aprovadoras são cadastradas: no formulário de Usuários, gerência Supe
 > 🔴 **Mudou com o hardening Tier-0 (P0-1).** Editar Setor/Função de um usuário **não é mais
 > operação de "administrador"**: é restrita ao superusuário.
 >
-> - **Frontend**: os selects `setor_ids` e `funcao_ids` são renderizados com
+> - **Frontend**: os selects de Gerência (`gerencia_id`) e Função (`funcao_ids`) são renderizados com
 >   `disabled={!currentIsSuperuser}` (`v2/frontend/src/pages/AdminDAT/UsuariosPage.tsx`), e o
 >   payload de salvamento **não envia `group_ids`** para não-superuser.
 > - **Backend**: a action `assign_groups` é `permission_classes=[SuperuserOnly]`
@@ -131,7 +131,8 @@ Passos (como superusuário):
 O Salvar mexe só no que você mudou no formulário (#2071):
 
 - Grupos que o formulário não mostra (como Controle, DAT ou grupos de permissão) continuam.
-- Se a gerência e as funções não mudaram, a lotação não é alterada.
+- Se a gerência e as funções não mudaram, a lotação não é alterada. Exceção: quem é Gerente na
+  Superintendência sem ter a função Gerente (tirada na tela de Grupos) deixa de aprovar.
 - Ao criar, gerência e função são obrigatórias. Na edição, a função pode ficar vazia, e a gerência só pode
   ficar vazia para quem não tem lotação (como o Controle).
 - Lotar alguém na Superintendência não dá o grupo "Superintendência": quem é Gerente ali aprova pelo vínculo.
@@ -169,9 +170,10 @@ Se os campos aparecerem **desabilitados**, é porque sua conta não é superusu�
 - Gerência: DAT
 - Função: Coordenador ou Gerente (dependendo das responsabilidades)
 
-### Usuário que trabalha em múltiplos setores
-- Setores: Vidas, Fluir (múltiplos)
-- Função: Coordenador
+### Usuário que trabalha em mais de uma gerência
+O formulário mostra uma gerência só. Quem atua em mais de uma (ex.: coordena uma e é formadora em outra)
+tem um vínculo em cada, vindo do import de equipe. Salvar sem mudar gerência nem funções mantém todos; mudar
+a gerência ou a função encerra os das outras gerências.
 
 ---
 
@@ -244,7 +246,8 @@ Porque desde o hardening Tier-0 essa edição é **somente superusuário**
 Sim. Por exemplo, alguém pode ser Coordenador e Gerente ao mesmo tempo.
 
 ### Como remover um grupo de um usuário?
-Na edição do usuário (como superusuário), desmarque o grupo desejado e salve.
+Função: na edição do usuário (como superusuário), desmarque a função e salve. Grupos que o formulário não
+mostra (setor, permissões): na tela de Grupos.
 
 ⚠️ **O import de usuários NÃO remove grupos — só adiciona.** A concessão de grupos por
 `POST /api/usuarios/import/` (coluna `grupos`) **passou a exigir superusuário** — era drift

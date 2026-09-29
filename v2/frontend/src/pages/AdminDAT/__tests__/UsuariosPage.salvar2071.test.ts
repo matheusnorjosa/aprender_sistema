@@ -12,7 +12,13 @@
 
 import { describe, expect, test } from 'vitest';
 
-import { buildUsuarioPayload, gruposAposSalvar, lotacaoObrigatoria, mensagemDoErro } from '../usuario_form_helpers';
+import {
+  buildUsuarioPayload,
+  funcoesProntasParaSalvar,
+  gruposAposSalvar,
+  lotacaoObrigatoria,
+  mensagemDoErro,
+} from '../usuario_form_helpers';
 
 const G = {
   formador: { id: 1, name: 'Formador' },
@@ -146,5 +152,34 @@ describe('buildUsuarioPayload sem as funções carregadas (#2071)', () => {
     );
     expect(payload.group_ids).toEqual([2]);
     expect(payload.gerencia_id).toBe(1);
+  });
+});
+
+describe('funcoesProntasParaSalvar (#2071)', () => {
+  test('editar aberto antes de as funções carregarem: não manda, mesmo que tenham carregado depois', () => {
+    expect(
+      funcoesProntasParaSalvar({ isEditing: true, hidratouComFuncoes: false, funcoesTocadas: false, carregadasAgora: true }),
+    ).toBe(false);
+  });
+
+  test('editar aberto antes da carga, mas a pessoa escolheu funções depois: manda', () => {
+    expect(
+      funcoesProntasParaSalvar({ isEditing: true, hidratouComFuncoes: false, funcoesTocadas: true, carregadasAgora: true }),
+    ).toBe(true);
+  });
+
+  test('editar aberto com as funções carregadas: manda', () => {
+    expect(
+      funcoesProntasParaSalvar({ isEditing: true, hidratouComFuncoes: true, funcoesTocadas: false, carregadasAgora: true }),
+    ).toBe(true);
+  });
+
+  test('criar: depende só de as funções estarem carregadas agora', () => {
+    expect(
+      funcoesProntasParaSalvar({ isEditing: false, hidratouComFuncoes: false, funcoesTocadas: false, carregadasAgora: true }),
+    ).toBe(true);
+    expect(
+      funcoesProntasParaSalvar({ isEditing: false, hidratouComFuncoes: false, funcoesTocadas: false, carregadasAgora: false }),
+    ).toBe(false);
   });
 });

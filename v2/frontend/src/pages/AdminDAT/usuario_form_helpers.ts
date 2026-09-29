@@ -155,6 +155,21 @@ export function gruposAposSalvar<G extends GrupoLike>(args: {
 }
 
 /**
+ * #2071: se o salvar pode mandar funções e gerência. Na edição, só se as funções estavam carregadas
+ * quando o Editar abriu (senão o form foi preenchido com funções vazias) ou se a pessoa mexeu nelas
+ * depois. Ao criar, basta estarem carregadas agora.
+ */
+export function funcoesProntasParaSalvar(opts: {
+  isEditing: boolean;
+  hidratouComFuncoes: boolean;
+  funcoesTocadas: boolean;
+  carregadasAgora: boolean;
+}): boolean {
+  if (!opts.isEditing) return opts.carregadasAgora;
+  return opts.hidratouComFuncoes || opts.funcoesTocadas;
+}
+
+/**
  * #2071: texto do erro de API para o usuário. A validação do backend chega como
  * `{detail: "Erro de validação.", errors: {campo: [...]}}`; o motivo está em `errors`.
  */

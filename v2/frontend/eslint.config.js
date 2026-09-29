@@ -5,12 +5,17 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 import { fileURLToPath } from 'node:url'
-import { TABELA_ANTD_ALLOWLIST } from './eslint.tabela-antd-allowlist.js'
+import { TABELA_ANTD_ALLOWLIST, TABELA_ANTD_PADRAO } from './eslint.tabela-antd-allowlist.js'
 
 const MENSAGEM_TABELA_ANTD =
   'Tabela nova usa components/ResponsiveTable (Programa C): sem scroll.x, colunas por prioridade ' +
   'e o que não cabe na linha expandida. Regra: nenhuma rolagem horizontal em 360/768/1024/1280 px ' +
   '(v2/docs/specs/frontend/pages.spec.md, "Padrão responsivo").'
+const MENSAGEM_IMPORT_DINAMICO_ANTD =
+  'Import dinâmico ou require de antd/rc-table escapa da checagem de Table: use import estático. ' +
+  MENSAGEM_TABELA_ANTD
+// Módulos que entregam antd/rc-table por import dinâmico ou require.
+const MODULO_ANTD = '/^(antd|rc-table)([/]|$)/'
 
 export default defineConfig([
   globalIgnores(['dist', 'lighthouserc.cjs']),
@@ -132,38 +137,53 @@ export default defineConfig([
       '@typescript-eslint/no-unsafe-call': 'off',
     },
   },
-  // Programa C (C0): `Table` do AntD só entra por components/ResponsiveTable. Os
-  // arquivos que já importavam Table ficam na allowlist (eslint.tabela-antd-allowlist.js),
-  // que só encolhe: cada PR C1..C7 tira os seus. Teste da trava:
-  // src/test/lint/tabelaAntdRestrita.test.ts. Tipos (`ColumnsType`) continuam livres.
-  // Se outro bloco ligar `no-restricted-imports`, as opções se SUBSTITUEM: junte aqui.
+  // Programa C (C0): `Table` do AntD só entra por components/ResponsiveTable (TABELA_ANTD_PADRAO,
+  // isento para sempre). Os arquivos que já importavam Table ficam na allowlist
+  // (eslint.tabela-antd-allowlist.js), que só encolhe: cada PR C1..C7 tira os seus. Teste da
+  // trava, com um controle por forma de contorno e o ratchet por identidade (que ignora
+  // eslint-disable): src/test/lint/tabelaAntdRestrita.test.ts. Tipos (`ColumnsType`) continuam livres.
+  // Se outro bloco ligar `no-restricted-imports` ou `no-restricted-syntax`, as opções se
+  // SUBSTITUEM: junte aqui.
   {
     files: ['src/**/*.{ts,tsx}'],
-    ignores: Object.keys(TABELA_ANTD_ALLOWLIST),
+    ignores: [...Object.keys(TABELA_ANTD_ALLOWLIST), TABELA_ANTD_PADRAO],
     rules: {
       'no-restricted-imports': [
         'error',
         {
-          paths: [
-            { name: 'antd', importNames: ['Table'], message: MENSAGEM_TABELA_ANTD },
-            { name: 'antd/es/table', importNames: ['default'], message: MENSAGEM_TABELA_ANTD },
-            { name: 'antd/lib/table', importNames: ['default'], message: MENSAGEM_TABELA_ANTD },
-          ],
-          // Portas laterais: o componente por caminho profundo e o rc-table cru.
-          // `antd/es/table/interface` (só tipos) continua livre.
           patterns: [
+            // Barris: antd, antd/es, antd/lib (também com /index e .js) e o bundle UMD.
             {
-              group: [
-                'antd/*/table/Table',
-                'antd/*/table/InternalTable',
-                'antd/*/table/RcTable',
-                'antd/*/table/RcTable/*',
-                'rc-table',
-                'rc-table/*',
-              ],
+              regex: '^antd(/(es|lib))?(/index)?(\\.js)?$|^antd/dist/',
+              importNames: ['Table'],
+              message: MENSAGEM_TABELA_ANTD,
+            },
+            // O default de antd/{es,lib}/table (também com /index e .js). Tipos seguem livres.
+            {
+              regex: '^antd/(es|lib)/table(/index)?(\\.js)?$',
+              importNames: ['default'],
+              message: MENSAGEM_TABELA_ANTD,
+            },
+            // Qualquer outro caminho profundo da tabela (Table, Column, RcTable...), menos a
+            // `interface` (só tipos), e o rc-table cru.
+            {
+              regex: '^antd/(es|lib)/table/(?!index(\\.js)?$|interface(\\.js)?$).+|^rc-table([/]|$)',
               message: MENSAGEM_TABELA_ANTD,
             },
           ],
+        },
+      ],
+      // O no-restricted-imports não vê import() nem require.
+      'no-restricted-syntax': [
+        'error',
+        { selector: `ImportExpression[source.value=${MODULO_ANTD}]`, message: MENSAGEM_IMPORT_DINAMICO_ANTD },
+        {
+          selector: `ImportExpression[source.quasis.0.value.raw=${MODULO_ANTD}]`,
+          message: MENSAGEM_IMPORT_DINAMICO_ANTD,
+        },
+        {
+          selector: `CallExpression[callee.name='require'][arguments.0.value=${MODULO_ANTD}]`,
+          message: MENSAGEM_IMPORT_DINAMICO_ANTD,
         },
       ],
     },

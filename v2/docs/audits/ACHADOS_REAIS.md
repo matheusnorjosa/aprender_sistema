@@ -152,6 +152,23 @@ com residual). Os `resolvido` deixam de contar. Épicos-causa-raiz (V2) inaltera
 > O total 45 herda a contagem de 6 parciais. Registrado como defeito do registro V0; os números
 > ficam como foram publicados, e o estado corrente vem da seção seguinte, não daqui.
 
+## PR B1 — aprovação pela gerência e segregação (2026-09-29)
+
+Três achados P1 da auditoria-mãe (`2026-07-17-system-module-audit.md`) que não estavam na fila
+adjudicada abaixo, fechados pelo PR B1 (branch `feat/aprovacao-pela-gerencia`, base `40271c76`).
+Status `em andamento` pela legenda: **passam a `resolvido` no merge**, com o commit e a data.
+
+| ID | Sev. | Status | Achado | O que fecha |
+|---|---|---|---|---|
+| `M11-06` | P1 | em andamento (PR B1) | Autoaprovação permitida, coberta positivamente por teste de AuditLog e denunciada como PA-01 pelo `compliance_audit`; spec sem regra de segregação | Adendo de segregação da PA-02 ([`politica-aprovacao.spec.md`](../specs/domain/politica-aprovacao.spec.md)): o service recusa decidir a própria (403 `self_approval_forbidden`; lote → `errors[]`), superuser marcado `details.autoaprovacao`. `test_auditlog_approve_reject.py` usa dono ≠ aprovador; `test_autoaprovacao_bloqueada.py` |
+| `M11-16` | P1 | em andamento (PR B1) | `pending_approvals` da Home usava capabilities diferentes do gate real (contava para Superintendência sem Gerente e DAT; `null` para Assistente + Controle) | `views/stats.py` usa a policy `access_solicitation_approvals`, conta só pendentes SUPER e exclui as próprias do não-superuser; `test_home_stats_rbac.py` (paridade reescrita) |
+| `M11-17` | P1 | em andamento (PR B1) — **parcial** | `compliance_audit` chamava autoaprovação de PA-01 e só olhava APPROVE em fluxo SUPER | A checagem virou `PA-02 (segregação)`: conta APPROVE **e** REJECT com ator = dono, ignora `details.autoaprovacao`; `test_compliance_audit_command.py`. **Residual fora do B1**: `invalid_approvers=0` fixo, PA-04 reduzida a enum válido, RD-02 só no dono e AUDIT-01 exigindo AuditLog CREATE que o fluxo não produz |
+
+Ligado a `M03-01`: a autoridade de aprovar passou a vir do **vínculo** `EquipeGerencia`, e o PR
+fecha no mesmo corte o caminho de escalada por import (os importers de equipe recusam criar ou
+reativar GERENTE na `SUPERINTENDENCIA`, pendência `vinculo_aprovador_bloqueado`) e por rename da
+gerência (`GerenciaSerializer.validate_nome`).
+
 ## Reconciliação de 2026-08-28 (round-trip / entrada-direta)
 
 Duas auditorias por fan-out sobre o `HEAD d4beda07`: **cobertura** (página×dado×endpoint, as 46

@@ -60,7 +60,7 @@ class CurrentUserView(APIView):
             "funcoes": list[str],       # Grupos de FUNÇÃO (o que pode fazer)
             "is_superuser": bool,
             "is_superintendencia": bool,
-            "can_approve_super": bool,  # Pode aprovar/reprovar (Superintendência/DAT)
+            "can_approve_super": bool,  # Legado: = policy access_solicitation_approvals (DAT não aprova)
             "permissions": list[str]    # Permissões funcionais efetivas (codenames)
         }
     """
@@ -107,9 +107,9 @@ class CurrentUserView(APIView):
         # `access_solicitation_approvals`. Frontend deve consumir a policy
         # via `/api/me/policies/`; este flag fica como **legado** durante a
         # transição (sem ser mais fonte de verdade). DAT removido.
-        # Roteado pela SSOT `access_solicitation_approvals` (composite Setor×Função),
-        # não mais re-implementado por string aqui — evita drift silencioso com
-        # policies/helpers. `user_has_policy` já faz bypass de superuser.
+        # Roteado pela SSOT `access_solicitation_approvals` (`solicitation_approval_basis`:
+        # vínculo GERENTE na gerência aprovadora, composites ou superuser), não mais
+        # re-implementado por string aqui — evita drift silencioso com policies/helpers.
         can_approve_super = user_has_policy(user, "access_solicitation_approvals")
 
         # Compute display name

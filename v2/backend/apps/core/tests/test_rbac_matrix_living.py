@@ -79,11 +79,14 @@ def _make_user_for_actor(actor: str) -> Usuario:
     if actor in (COORDENADOR, APOIO, GERENTE, GERENTE_SUPER):
         # Setor da gerência segue o ator (Vidas para pedagógico, Sup para
         # GERENTE_SUPER) — diferenciação importante para tests de scope.
-        nome_setor = "Superintendência" if actor == GERENTE_SUPER else "Vidas"
-        gerencia, _ = Gerencia.objects.get_or_create(
-            nome=f"GERENCIA MATRIX {_USER_COUNTER['i']:06d}",
-            defaults={"nome_setor": nome_setor},
-        )
+        # PR B1: GERENTE_SUPER é vinculado à gerência aprovadora real (SUPERINTENDENCIA).
+        if actor == GERENTE_SUPER:
+            gerencia, _ = Gerencia.objects.get_or_create(nome="SUPERINTENDENCIA", defaults={"nome_setor": "Super"})
+        else:
+            gerencia, _ = Gerencia.objects.get_or_create(
+                nome=f"GERENCIA MATRIX {_USER_COUNTER['i']:06d}",
+                defaults={"nome_setor": "Vidas"},
+            )
         if actor == COORDENADOR:
             # Coordenador: papel direto, sem supervisor.
             EquipeGerencia.objects.create(

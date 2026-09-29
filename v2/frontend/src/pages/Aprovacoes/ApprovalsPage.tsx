@@ -8,8 +8,11 @@
  * - Confirmação simples para reprovação (sem justificativa obrigatória)
  *
  * PA-06 (Política de Aprovação Manual):
- * - Botões de aprovar/reprovar aparecem para: Superintendência, DAT, e Superusuários
- * - Verifica: is_superuser || is_superintendencia || groups.includes('Superintendência') || groups.includes('DAT')
+ * - Botões de aprovar/reprovar aparecem para quem tem a policy `access_solicitation_approvals`:
+ *   gerência da Superintendência, Assistente Administrativo do Controle e superusuários
+ *   (DAT não aprova).
+ * - PA-02 (segregação): a própria solicitação sai sem checkbox e sem Aprovar/Reprovar,
+ *   com a Tag "Sua solicitação" — outra pessoa aprovadora decide (superusuário pode).
  * - Conformidade ISO 9241-110: Controle explícito (usuário vê apenas ações permitidas)
  */
 
@@ -29,6 +32,7 @@ import {
   Divider,
   List,
   Avatar,
+  Tooltip,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { TableRowSelection } from 'antd/es/table/interface';
@@ -52,13 +56,14 @@ import {
   rejectSolicitacoesBatch,
 } from '../../api/solicitacoes';
 import { getMyPolicies } from '../../api/me';
+import { getMe } from '../../api/availability';
 import { computeAccess } from '../../hooks/useCanAccess';
 import { TIMING } from '../../constants/timing';
 import { usePolling } from '../../hooks/usePolling';
 import { syncChannel } from '../../services/syncChannel';
 import { formatFortaleza, FORTALEZA_TZ } from '../../utils/datetime';
 import logger from '../../utils/logger';
-import type { ID, Solicitacao, SolicitacaoStatus, PaginatedResponse, Participation } from '../../types';
+import type { CurrentUser, ID, Solicitacao, SolicitacaoStatus, PaginatedResponse, Participation } from '../../types';
 import { formadoresLabel } from '../../utils/participants';
 
 const { Title, Paragraph, Text } = Typography;
@@ -105,8 +110,10 @@ export default function ApprovalsPage(): JSX.Element {
   const [previewVisible, setPreviewVisible] = useState<boolean>(false);
   const [previewData, setPreviewData] = useState<PreviewDataType | null>(null);
 
-  // PA-06: Estado para verificar permissão do usuário (Superintendência, DAT, Superusuários)
+  // PA-06: permissão de aprovar (policy `access_solicitation_approvals`)
   const [canApprove, setCanApprove] = useState<boolean>(false);
+  // PA-02 (segregação): usuário logado, para reconhecer a própria solicitação
+  const [me, setMe] = useState<CurrentUser | null>(null);
 
   // Estados para seleção em lote
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([]);
@@ -154,12 +161,17 @@ export default function ApprovalsPage(): JSX.Element {
   // `access_solicitation_approvals` (Gerente da Superintendência OU
   // Assistente Administrativo do Controle). Legacy `can_approve_super`
   // deixou de ser consultado pelo frontend.
+  // PR B1: `getMe()` em paralelo, para a regra de segregação (PA-02) na tabela.
   useEffect(() => {
     const loadAccess = async (): Promise<void> => {
       try {
-        const policies = await getMyPolicies().catch(() => [] as string[]);
+        const [policies, currentUser] = await Promise.all([
+          getMyPolicies().catch(() => [] as string[]),
+          getMe().catch(() => null),
+        ]);
         const access = computeAccess(policies);
         setCanApprove(access.canAccessApprovals);
+        setMe(currentUser);
       } catch (error) {
         logger.error('Erro ao carregar policies:', error);
         setCanApprove(false);
@@ -167,6 +179,12 @@ export default function ApprovalsPage(): JSX.Element {
     };
     void loadAccess();
   }, []);
+
+  // PA-02 (segregação): quem criou não decide a própria; superusuário pode (fica no AuditLog).
+  const isPropria = useCallback(
+    (record: Solicitacao): boolean => me !== null && !me.is_superuser && record.usuario === me.id,
+    [me],
+  );
 
   // Issue #260: Memoizar handlers para evitar re-renderização desnecessária
   const handlePreview = useCallback(async (id: ID): Promise<void> => {
@@ -283,8 +301,11 @@ export default function ApprovalsPage(): JSX.Element {
     selectedRowKeys,
     onChange: (keys: Key[]) => setSelectedRowKeys(keys),
     getCheckboxProps: (record: Solicitacao) => ({
-      disabled: record.status !== 'pendente', // Só permite selecionar pendentes
+      // Só pendentes; a própria nunca entra no lote (PA-02 segregação)
+      disabled: record.status !== 'pendente' || isPropria(record),
     }),
+    // A própria sai sem checkbox (não só desabilitado): não há ação possível nela.
+    renderCell: (_checked, record, _index, originNode) => (isPropria(record) ? null : originNode),
     selections: [
       Table.SELECTION_ALL,
       Table.SELECTION_INVERT,
@@ -375,8 +396,13 @@ export default function ApprovalsPage(): JSX.Element {
             onClick={() => handlePreview(record.id)}
             aria-label="Visualizar preview do evento"
           />
-          {/* PA-06: Botões de aprovar/reprovar para Superintendência, DAT e Superusuários */}
-          {record.status === 'pendente' && canApprove ? (
+          {/* PA-06: Aprovar/Reprovar para quem tem a policy; PA-02: nunca na própria */}
+          {record.status === 'pendente' && canApprove && isPropria(record) ? (
+            <Tooltip title="Outra pessoa aprovadora precisa decidir">
+              <Tag color="blue">Sua solicitação</Tag>
+            </Tooltip>
+          ) : null}
+          {record.status === 'pendente' && canApprove && !isPropria(record) ? (
             <>
               <Button
                 size="small"
@@ -399,7 +425,7 @@ export default function ApprovalsPage(): JSX.Element {
         </Space>
       ),
     },
-  ], [handlePreview, handleApprove, handleReject, canApprove]);
+  ], [handlePreview, handleApprove, handleReject, canApprove, isPropria]);
 
   return (
     <section className="p-6" aria-labelledby="aprovacoes-title">

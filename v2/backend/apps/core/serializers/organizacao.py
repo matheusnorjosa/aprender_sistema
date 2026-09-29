@@ -9,9 +9,12 @@ Type-checked with Pyright (strict mode).
 
 from __future__ import annotations
 
+from typing import Any
+
 from rest_framework import serializers  # type: ignore[attr-defined]
 
 from apps.core.models import Colecao, Gerencia, Municipio, Produto, Projeto, ProjetoGeral, TipoEvento
+from apps.core.rbac.helpers import GERENCIA_APROVADORA_NOME
 
 
 class MunicipioSerializer(serializers.ModelSerializer):
@@ -163,6 +166,25 @@ class GerenciaSerializer(serializers.ModelSerializer["Gerencia"]):
         # setor_canonico_confianca: sinal importado do de-para (RELAY 50, item 8), exibido na
         # conferência mas SEM entrada-direta → read-only (o usuário confere `setor_canonico`, não a confiança).
         read_only_fields = ["created_at", "updated_at", "setor_canonico_confianca"]
+
+    def validate_nome(self, value: str) -> str:
+        """PR B1 (anti-escalada): `nome` da gerência aprovadora é chave de autorização.
+
+        GERENTE vigente em `GERENCIA_APROVADORA_NOME` aprova solicitações. Renomear g1
+        desligaria as aprovações; dar esse nome a outra gerência ligaria o poder de aprovar
+        para os GERENTEs dela. Rótulo de tela é `nome_setor` (editável).
+        """
+        instance: Any = self.instance
+        atual = getattr(instance, "nome", None)
+        if atual == GERENCIA_APROVADORA_NOME and value != atual:
+            raise serializers.ValidationError(
+                "O nome desta gerência não pode ser alterado: ele define quem aprova solicitações."
+            )
+        if value == GERENCIA_APROVADORA_NOME and atual != GERENCIA_APROVADORA_NOME:
+            raise serializers.ValidationError(
+                f"O nome '{GERENCIA_APROVADORA_NOME}' é reservado à gerência que aprova solicitações."
+            )
+        return value
 
 
 class TipoEventoOptionSerializer(serializers.ModelSerializer):

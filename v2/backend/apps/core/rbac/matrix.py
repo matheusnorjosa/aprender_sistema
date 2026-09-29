@@ -50,7 +50,9 @@ FORMADOR: Final = "Formador"
 
 # PR 8 hardening RBAC (2026-04-30): atores compostos para distinguir
 # regras endurecidas em PRs 3-6 (Aprovações + Audit Logs).
-GERENTE_SUPER: Final = "Gerente da Superintendência"  # Setor Sup + Função Gerente
+# PR B1: aprova pelo vínculo GERENTE na gerência SUPERINTENDENCIA (a fixture cria); os
+# grupos Setor Sup + Função Gerente seguem como composite legado até o B2.
+GERENTE_SUPER: Final = "Gerente da Superintendência"
 ASST_ADMIN_CONTROLE: Final = "Assistente Administrativo do Controle"  # Setor Controle + Função Asst Admin
 
 ACTORS: Final[tuple[str, ...]] = (
@@ -74,7 +76,7 @@ ACTOR_GROUPS: Final[dict[str, list[str]]] = {
     CONTROLE: ["Controle"],
     DIRETORIA: ["Diretoria"],
     GERENTE: ["Gerente"],
-    GERENTE_SUPER: ["Superintendência", "Gerente"],
+    GERENTE_SUPER: ["Superintendência", "Gerente"],  # + vínculo GERENTE em SUPERINTENDENCIA (fixture)
     ASST_ADMIN_CONTROLE: ["Controle", "Assistente Administrativo"],
     COORDENADOR: ["Coordenador"],
     APOIO: ["Apoio de Coordenação"],

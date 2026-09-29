@@ -32,7 +32,12 @@ from .api_schemas import (
 )
 from .models import AuditLog, Solicitacao
 from .permissions import HasPerm, IsOwnerOrPrivileged
-from .rbac.policies import CanAccessSolicitationApprovals, CanPublishSetorSolicitacao, CanUseGcal
+from .rbac.policies import (
+    CanAccessSolicitationApprovals,
+    CanPublishSetorSolicitacao,
+    CanUseGcal,
+    user_has_policy,
+)
 from .serializers import SolicitacaoSerializer
 from .services.solicitacao_approval import (
     approve_solicitacao,
@@ -81,6 +86,28 @@ class _ExtraParticipantsSerializer(serializers.Serializer):
     coord_acompanha_emails = serializers.ListField(
         child=serializers.EmailField(), required=False, default=list, max_length=_MAX
     )
+
+
+def _batch_response_schema(contador: str) -> dict[str, Any]:
+    """Schema OpenAPI da resposta dos lotes: contador + errors[{id, detail, code?}] (PR B1)."""
+    return {
+        "type": "object",
+        "properties": {
+            contador: {"type": "integer"},
+            "errors": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "detail": {"type": "string"},
+                        "code": {"type": "string", "enum": ["self_approval_forbidden"]},
+                    },
+                    "required": ["id", "detail"],
+                },
+            },
+        },
+    }
 
 
 class _BatchIdsSerializer(serializers.Serializer):
@@ -184,9 +211,10 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
     PA-01: Status sempre começa pendente.
     PA-02 (Adaptada): aprovar/reprovar exige a policy `access_solicitation_approvals`
-    (CanAccessSolicitationApprovals) — Gerente da Superintendência OU Assistente
-    Administrativo do Controle OU superuser. (Doc antiga dizia "Superintendência, DAT
-    e Superusuários"; corrigido em #1378 — regra real em rbac/policies.py.)
+    (CanAccessSolicitationApprovals) — GERENTE vigente na gerência SUPERINTENDENCIA
+    (vínculo), Assistente Administrativo do Controle ou superuser (SSOT
+    `solicitation_approval_basis`). Segregação (PR B1): ninguém decide a própria
+    solicitação; superuser pode, marcado no AuditLog.
     PR 8/N: Apenas Coordenador ou DAT podem criar solicitações.
     """
 
@@ -757,7 +785,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         summary="Aprovar solicitação",
         description=(
             "Aprova uma solicitação pendente. Requer a policy access_solicitation_approvals "
-            "(PA-02): Gerente da Superintendência, Assistente Administrativo do Controle ou superuser."
+            "(PA-02): gerência da Superintendência, Assistente Administrativo do Controle ou superuser. "
+            "Quem criou a solicitação não a aprova: 403 com code=self_approval_forbidden "
+            "(superuser pode; o AuditLog marca autoaprovacao=true)."
         ),
         request=None,
         responses={
@@ -774,7 +804,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         url_path="approve",
     )
     def approve(self, request, pk=None):
-        """Aprovar solicitação (PA-02: Gerente da Superintendência, Assistente Administrativo do Controle ou superuser)."""
+        """Aprovar solicitação (PA-02; a própria → 403 `self_approval_forbidden`, salvo superuser)."""
         solicitacao = self.get_object()
         justificativa = request.data.get("reason") or request.data.get("justificativa", "")
 
@@ -798,8 +828,10 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         summary="Reprovar solicitação",
         description=(
             "Reprova uma solicitação pendente. Requer justificativa e a policy "
-            "access_solicitation_approvals (PA-02): Gerente da Superintendência, "
-            "Assistente Administrativo do Controle ou superuser."
+            "access_solicitation_approvals (PA-02): gerência da Superintendência, "
+            "Assistente Administrativo do Controle ou superuser. Quem criou a solicitação "
+            "não a reprova: 403 com code=self_approval_forbidden (superuser pode; o AuditLog "
+            "marca autoaprovacao=true)."
         ),
         request=None,
         responses={
@@ -816,7 +848,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         url_path="reject",
     )
     def reject(self, request, pk=None):
-        """Reprovar solicitação (PA-02: Gerente da Superintendência, Assistente Administrativo do Controle ou superuser)."""
+        """Reprovar solicitação (PA-02; a própria → 403 `self_approval_forbidden`, salvo superuser)."""
         solicitacao = self.get_object()
         justificativa = request.data.get("reason") or request.data.get("justificativa", "")
 
@@ -857,12 +889,19 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         # Issue #1233 (Epic 4.2.a): operações GCal usam Policy `use_gcal`
         # (Controle + Super). #1656 Feature 2: OU `publish_setor_solicitacao`
         # (Apoio de Coordenação), escopado por setor via `scope_solicitacoes`.
-        permission_classes=[CanUseGcal | CanPublishSetorSolicitacao],
+        # PR B1 (decisão 5): OU a policy de aprovação — a prévia é leitura e a tela de
+        # Aprovações a oferece; publicar continua exigindo `use_gcal` ou o setor.
+        permission_classes=[CanUseGcal | CanPublishSetorSolicitacao | CanAccessSolicitationApprovals],
         url_path="preview-gcal",
     )
     def preview_gcal(self, request, pk=None):
-        """Preview do payload GCal sem publicar (`use_gcal`, ou Apoio do setor do evento)."""
-        solicitacao = self._get_publishable_solicitacao()
+        """Preview do payload GCal sem publicar (`use_gcal`, Apoio do setor do evento, ou aprovadora)."""
+        # A aprovadora enxerga toda solicitação (visão global da policy); a guarda de
+        # publicabilidade por setor só vale para quem chega pelas vias de publicação.
+        if user_has_policy(request.user, "access_solicitation_approvals"):
+            solicitacao = self.get_object()
+        else:
+            solicitacao = self._get_publishable_solicitacao()
 
         # §1 Epic #459: Delegate to service layer
         result = preview_gcal_service(
@@ -982,11 +1021,13 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
     @extend_schema(
         summary="Aprovar em lote",
-        description="Aprova múltiplas solicitações em lote (PA-05). Máx 100 por requisição.",
+        description=(
+            "Aprova múltiplas solicitações em lote (PA-05). Máx 100 por requisição. "
+            "Item que não pode ser aprovado vai para errors[] e o resto segue; a solicitação "
+            "do próprio aprovador sai com errors[].code=self_approval_forbidden."
+        ),
         request={"type": "object", "properties": {"ids": {"type": "array", "items": {"type": "integer"}}}},
-        responses={
-            200: {"type": "object", "properties": {"approved": {"type": "integer"}, "errors": {"type": "array"}}}
-        },
+        responses={200: _batch_response_schema("approved")},
         examples=[SOLICITACAO_BATCH_APPROVE_REQUEST, SOLICITACAO_BATCH_APPROVE_RESPONSE],
         tags=["solicitacoes"],
     )
@@ -1004,8 +1045,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         Body: { "ids": [1, 2, 3] }
 
         Response 200: { "approved": 2, "errors": [{"id": 3, "detail": "..."}] }
+        (a própria solicitação: {"id": 4, "code": "self_approval_forbidden", "detail": "..."})
 
-        Permissão: policy access_solicitation_approvals (PA-02) — Gerente da
+        Permissão: policy access_solicitation_approvals (PA-02) — gerência da
         Superintendência, Assistente Administrativo do Controle ou superuser.
         PA-05: Cada solicitação gera um AuditLog individual com batch=true.
         Limite: máximo 100 solicitações por requisição.
@@ -1031,6 +1073,17 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @extend_schema(
+        summary="Reprovar em lote",
+        description=(
+            "Reprova múltiplas solicitações em lote (PA-05). Máx 100 por requisição. "
+            "Item que não pode ser reprovado vai para errors[] e o resto segue; a solicitação "
+            "do próprio aprovador sai com errors[].code=self_approval_forbidden."
+        ),
+        request=_BatchIdsSerializer,
+        responses={200: _batch_response_schema("rejected")},
+        tags=["solicitacoes"],
+    )
     @action(
         detail=False,
         methods=["post"],
@@ -1045,8 +1098,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         Body: { "ids": [1, 2, 3] }
 
         Response 200: { "rejected": 2, "errors": [{"id": 3, "detail": "..."}] }
+        (a própria solicitação: {"id": 4, "code": "self_approval_forbidden", "detail": "..."})
 
-        Permissão: policy access_solicitation_approvals (PA-02) — Gerente da
+        Permissão: policy access_solicitation_approvals (PA-02) — gerência da
         Superintendência, Assistente Administrativo do Controle ou superuser.
         PA-05: Cada solicitação gera um AuditLog individual com batch=true.
         Limite: máximo 100 solicitações por requisição.

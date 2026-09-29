@@ -247,3 +247,72 @@ class TestAprovadoraPeloFormulario:
         assert _ativos(alvo) == {(vidas.id, "FORMADOR")}
         assert solicitation_approval_basis(alvo) is None
         assert _logs_autoridade(alvo) == ["revogada"]
+
+
+class TestSemAprovacaoPorGrupoPeloFormulario:
+    """O composite legado (grupo de setor + função) ainda aprova até o B2. O form preserva grupos que
+    não mostra, então não pode deixar essa preservação virar poder de aprovar que ninguém pediu."""
+
+    def test_grupo_superintendencia_orfao_mais_gerente_e_recusado(self, root, django_capture_on_commit_callbacks):
+        coord, gerente = GroupFactory(name="Coordenador"), GroupFactory(name="Gerente")
+        alvo = UsuarioFactory(username="orfao_sup_2071", cpf="92071000016")
+        alvo.groups.add(coord, GroupFactory(name="Superintendência"))
+
+        client = APIClient()
+        client.force_authenticate(root)
+        with django_capture_on_commit_callbacks(execute=True):
+            resp = client.patch(
+                f"/api/usuarios-admin/{alvo.id}/",
+                {"first_name": "Novo", "group_ids": [coord.id, gerente.id], "gerencia_id": None},
+                format="json",
+            )
+
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST, resp.data
+        assert "Superintendência" in str(resp.data)
+        assert _grupos(alvo) == {"Coordenador", "Superintendência"}
+        alvo.refresh_from_db()
+        assert alvo.first_name != "Novo"
+        assert solicitation_approval_basis(alvo) is None
+        assert _logs_autoridade(alvo) == []
+
+    def test_sair_de_g1_com_o_grupo_superintendencia_e_recusado(self, root, g1):
+        gerente = GroupFactory(name="Gerente")
+        vidas = Gerencia.objects.create(nome="G VIDAS SUP 2071", nome_setor="Vidas", setor_canonico="", ativo=True)
+        alvo = UsuarioFactory(username="aprov_sup_2071", cpf="92071000017")
+        alvo.groups.add(gerente, GroupFactory(name="Superintendência"))
+        EquipeGerencia.objects.create(gerencia=g1, usuario=alvo, papel="GERENTE", ativo=True)
+
+        client = APIClient()
+        client.force_authenticate(root)
+        resp = client.patch(
+            f"/api/usuarios-admin/{alvo.id}/", {"group_ids": [gerente.id], "gerencia_id": vidas.id}, format="json"
+        )
+
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST, resp.data
+        assert _ativos(alvo) == {(g1.id, "GERENTE")}
+
+    @pytest.mark.parametrize("setor", ["Superintendência", "Controle"])
+    def test_gerencia_com_setor_de_par_aprovador_nao_da_o_grupo(self, root, setor):
+        asst, formador = GroupFactory(name="Assistente Administrativo"), GroupFactory(name="Formador")
+        GroupFactory(name=setor)
+        ger = Gerencia.objects.create(
+            nome=f"G {setor.upper()} 2071", nome_setor=setor, setor_canonico=setor, ativo=True
+        )
+        alvo = UsuarioFactory(username=f"par_{len(setor)}_2071", cpf=f"920710000{len(setor) + 70}")
+
+        _salvar(root, alvo, {"group_ids": [asst.id, formador.id], "gerencia_id": ger.id})
+
+        assert _grupos(alvo) == {"Assistente Administrativo", "Formador"}
+
+    def test_limpar_a_gerencia_e_tirar_gerente_revoga(self, root, g1, django_capture_on_commit_callbacks):
+        gerente = GroupFactory(name="Gerente")
+        alvo = UsuarioFactory(username="aprov_null_2071", cpf="92071000018")
+        alvo.groups.add(gerente)
+        EquipeGerencia.objects.create(gerencia=g1, usuario=alvo, papel="GERENTE", ativo=True)
+
+        _salvar(root, alvo, {"group_ids": [], "gerencia_id": None}, django_capture_on_commit_callbacks)
+
+        cache.clear()
+        assert _ativos(alvo) == set()
+        assert solicitation_approval_basis(alvo) is None
+        assert _logs_autoridade(alvo) == ["revogada"]

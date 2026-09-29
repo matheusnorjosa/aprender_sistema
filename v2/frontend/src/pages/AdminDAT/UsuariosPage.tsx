@@ -176,6 +176,11 @@ export default function UsuariosPage(): JSX.Element {
   const [form] = Form.useForm<UserFormValues>();
   const [resetForm] = Form.useForm<{ nova_senha: string; confirmar_nova_senha: string }>();
   const selectedGerenciaId = Form.useWatch('gerencia_id', form);
+  const obrigatorio = lotacaoObrigatoria({
+    currentIsSuperuser,
+    isEditing: !!editingUser,
+    temLotacao: !!editingUser?.gerencia_atual,
+  });
   const selectedFuncaoIds = Form.useWatch('funcao_ids', form) || [];
 
   const setorGroupsSet = useMemo(
@@ -745,11 +750,9 @@ export default function UsuariosPage(): JSX.Element {
             // P0-1 Tier-0 (D-1=2a): lotação é superuser-only. Não-superuser vê o
             // valor atual, mas não edita (e o helper não envia gerencia_id). Relaxa
             // o required p/ não travar o submit de conta comum com o Select disabled.
-            // #2071: obrigatória só ao criar (na edição, o Controle não tem gerência).
+            // #2071: obrigatória ao criar e para quem já tem lotação (o Controle não tem).
             rules={
-              lotacaoObrigatoria({ currentIsSuperuser, isEditing: !!editingUser })
-                ? [{ required: true, message: 'Selecione uma gerência' }]
-                : []
+              obrigatorio.gerencia ? [{ required: true, message: 'Selecione uma gerência' }] : []
             }
           >
             <Select
@@ -768,11 +771,7 @@ export default function UsuariosPage(): JSX.Element {
             tooltip="Papel da pessoa no processo"
             // P0-1 Tier-0 (D-1=2a): membership é superuser-only (ver gerencia_id acima).
             // #2071: obrigatória só ao criar (na edição, o DAT não tem função).
-            rules={
-              lotacaoObrigatoria({ currentIsSuperuser, isEditing: !!editingUser })
-                ? [{ required: true, message: 'Selecione pelo menos uma função' }]
-                : []
-            }
+            rules={obrigatorio.funcao ? [{ required: true, message: 'Selecione pelo menos uma função' }] : []}
           >
             <Select
               mode="multiple"

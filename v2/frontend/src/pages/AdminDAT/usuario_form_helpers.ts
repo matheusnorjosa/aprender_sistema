@@ -85,8 +85,8 @@ export function buildUsuarioPayload(
   };
 }
 
-/** Chave técnica da gerência aprovadora; espelha `GERENCIA_APROVADORA_NOME` (`apps/core/rbac/helpers.py`). */
-export const GERENCIA_APROVADORA_NOME = 'SUPERINTENDENCIA';
+/** Setores que compõem um par aprovador; espelha `APPROVER_COMPOSITES` (`apps/core/rbac/helpers.py`). */
+const SETORES_DE_PAR_APROVADOR = new Set(['Superintendência', 'Controle']);
 
 interface GrupoLike {
   id: ID;
@@ -100,23 +100,33 @@ interface GerenciaLike {
 }
 
 /**
- * #2071: gerência e função são obrigatórias só ao CRIAR (e só para superuser, o único que edita
- * lotação). Na edição, a pessoa pode não ter gerência (Controle) nem função (DAT).
+ * #2071: o que é obrigatório no form (só para superuser, o único que edita lotação). Ao criar,
+ * gerência e função. Na edição, a função é opcional (o DAT não tem) e a gerência só é obrigatória
+ * para quem já tem lotação: o Controle não tem, e limpar a gerência não pode ser um jeito de salvar
+ * uma aprovadora sem revogar.
  */
-export function lotacaoObrigatoria(opts: { currentIsSuperuser: boolean; isEditing: boolean }): boolean {
-  return opts.currentIsSuperuser && !opts.isEditing;
+export function lotacaoObrigatoria(opts: {
+  currentIsSuperuser: boolean;
+  isEditing: boolean;
+  temLotacao: boolean;
+}): { gerencia: boolean; funcao: boolean } {
+  const { currentIsSuperuser, isEditing, temLotacao } = opts;
+  return {
+    gerencia: currentIsSuperuser && (!isEditing || temLotacao),
+    funcao: currentIsSuperuser && !isEditing,
+  };
 }
 
 function setorDaGerencia<G extends GrupoLike>(grupos: G[], gerencia: GerenciaLike | undefined): G | undefined {
-  if (!gerencia || gerencia.nome === GERENCIA_APROVADORA_NOME) return undefined;
-  const setor = (gerencia.setor_canonico ?? '').trim();
-  return setor ? grupos.find((g) => g.name === setor) : undefined;
+  const setor = (gerencia?.setor_canonico ?? '').trim();
+  if (!setor || SETORES_DE_PAR_APROVADOR.has(setor)) return undefined;
+  return grupos.find((g) => g.name === setor);
 }
 
 /**
  * #2071: grupos da pessoa depois do Salvar, espelhando `_apply_lotacao` do backend. Os grupos
  * atuais que não são FUNÇÃO ficam; as funções vêm do form; o grupo de setor da gerência entra e
- * sai só quando a gerência muda; a gerência aprovadora não dá grupo de setor.
+ * sai só quando a gerência muda; setor de par aprovador (Superintendência, Controle) não vira grupo.
  */
 export function gruposAposSalvar<G extends GrupoLike>(args: {
   grupos: G[];

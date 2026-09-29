@@ -129,8 +129,11 @@ O Salvar mexe só no que você mudou no formulário (#2071):
 
 - Grupos que o formulário não mostra (como Controle, DAT ou grupos de permissão) continuam.
 - Se a gerência e as funções não mudaram, a lotação não é alterada.
-- Gerência e função são obrigatórias só ao criar; na edição podem ficar vazias.
+- Ao criar, gerência e função são obrigatórias. Na edição, a função pode ficar vazia, e a gerência só pode
+  ficar vazia para quem não tem lotação (como o Controle).
 - Lotar alguém na Superintendência não dá o grupo "Superintendência": quem é Gerente ali aprova pelo vínculo.
+- Se a pessoa já tem o grupo "Superintendência" ou "Controle" e o salvar a faria aprovar por esse grupo, o
+  sistema recusa e pede para tirar o grupo na tela de Grupos antes.
 - Tirar a função Gerente de uma aprovadora encerra o vínculo e ela deixa de aprovar.
 - Atenção: mudar a gerência ou a função encerra os vínculos da pessoa em outras gerências (o formulário
   mostra uma só).

@@ -15,6 +15,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from rest_framework import serializers  # type: ignore[attr-defined]
 
 from apps.core.constants import FUNCAO_GROUPS, RESERVED_GROUPS, SETOR_GROUPS
@@ -38,6 +39,13 @@ from apps.core.services.rbac_service import get_assignable_group_names, nomes_gr
 
 # Sentinela: distingue "campo não enviado" de "enviado como null" no PATCH parcial.
 _UNSET: Any = object()
+
+
+# #2071: bases de aprovação que vêm de GRUPO (composite legado, sai no B2) -> o grupo de setor do par.
+_BASES_POR_GRUPO: dict[str, str] = {
+    "grupo_superintendencia_gerente": "Superintendência",
+    "asst_admin_controle": "Controle",
+}
 
 
 def _vinculo_exibido(user: Any) -> Any:
@@ -330,7 +338,8 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         - PR B1: audita a concessão/revogação do poder de aprovar solicitações (vínculo GERENTE
           na gerência aprovadora ou composite de grupos) — antes/depois de grupos + vínculo.
         """
-        aprovava = solicitation_approval_basis(user) is not None
+        base_antes = solicitation_approval_basis(user)
+        aprovava = base_antes is not None
         has_gerencia = gerencia is not None and gerencia is not _UNSET
         funcoes = nomes_grupos_funcao()
         antes = list(user.groups.all())
@@ -361,15 +370,28 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             before_group_ids=before_group_ids,
             after_group_ids=[g.pk for g in final],
         )
-        if has_gerencia:
-            papeis = papeis_de_grupos(final)
-            papeis_antes = papeis_de_grupos(antes)
-            if nova_lotacao or papeis != papeis_antes:
-                if papeis:
-                    sync_user_lotacao(user, gerencia, papeis)
-                elif papeis_antes:
-                    encerrar_lotacao(user)
-        aprova = solicitation_approval_basis(user) is not None
+        papeis = papeis_de_grupos(final)
+        papeis_antes = papeis_de_grupos(antes)
+        if papeis_antes and not papeis:
+            # Tirou todas as funções com papel (com ou sem gerência): encerra a lotação e, com ela,
+            # o poder de aprovar de quem era GERENTE na gerência aprovadora.
+            encerrar_lotacao(user)
+        elif has_gerencia and papeis and (nova_lotacao or papeis != papeis_antes):
+            sync_user_lotacao(user, gerencia, papeis)
+        base = solicitation_approval_basis(user)
+        grupo = _BASES_POR_GRUPO.get(base or "")
+        if base != base_antes and grupo is not None and (groups is None or grupo not in {g.name for g in groups}):
+            # O form não mostra grupos de setor e os preserva; eles não podem virar poder de aprovar
+            # pelo composite legado sem ninguém pedir (a transação do update() desfaz tudo).
+            raise serializers.ValidationError(
+                {
+                    "group_ids": (
+                        f'Salvar daria a esta pessoa o poder de aprovar solicitações pelo grupo "{grupo}" (regra '
+                        f'antiga). Tire o grupo "{grupo}" dela na tela de Grupos antes de salvar.'
+                    )
+                }
+            )
+        aprova = base is not None
         if aprova != aprovava:
             registrar_auditoria(
                 actor=actor,
@@ -414,8 +436,9 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
 
         return user
 
+    @transaction.atomic
     def update(self, instance: Any, validated_data: dict[str, Any]) -> Any:
-        """Update user, hash password e sincroniza lotação de gerência."""
+        """Update user, hash password e sincroniza lotação de gerência (atômico: #2071 pode recusar)."""
         groups = validated_data.pop("groups", None)
         # _UNSET distingue "não enviado" (não mexe no vínculo) de enviado (PATCH parcial).
         gerencia = validated_data.pop("gerencia_id", _UNSET)

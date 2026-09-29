@@ -23,7 +23,7 @@ from django.contrib.auth.models import Group
 from django.utils import timezone
 
 from apps.core.models import EquipeGerencia
-from apps.core.rbac.helpers import GERENCIA_APROVADORA_NOME
+from apps.core.rbac.helpers import APPROVER_COMPOSITES
 
 # Função (grupo RBAC) -> papel na EquipeGerencia. "Assistente Administrativo" e
 # demais funções não têm papel de gerência (não viram vínculo).
@@ -47,14 +47,12 @@ def setor_group_for(gerencia: Any) -> Group | None:
     grupo correspondente (A Cor da Gente, ED Financeira, Superativar…). Nesses
     casos retorna None (a realidade atual — não inventa grupo).
 
-    #2071: a gerência aprovadora também retorna None. O grupo "Superintendência" abre todos os
-    setores e, com Gerente, forma o composite legado de aprovação; a autoridade de quem é lotado
-    ali vem do vínculo (PR B1), não do grupo.
+    #2071: setor que compõe um par aprovador (`APPROVER_COMPOSITES`: Superintendência, Controle)
+    também retorna None. O grupo "Superintendência" abre todos os setores e, com Gerente, aprova pelo
+    composite legado; quem é lotado na gerência aprovadora aprova pelo vínculo (PR B1), não pelo grupo.
     """
-    if getattr(gerencia, "nome", None) == GERENCIA_APROVADORA_NOME:
-        return None
     setor = (getattr(gerencia, "setor_canonico", "") or "").strip()
-    if not setor:
+    if not setor or setor in {s for s, _ in APPROVER_COMPOSITES}:
         return None
     return Group.objects.filter(name=setor).first()
 

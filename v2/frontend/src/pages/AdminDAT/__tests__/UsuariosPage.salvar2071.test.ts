@@ -1,16 +1,18 @@
 /**
  * #2071: o Salvar do formulário de Usuários mexe só no que o formulário mudou.
  *
- * - Gerência e função são obrigatórias só ao CRIAR: na edição, a pessoa pode não ter
- *   gerência (Controle) nem função (DAT).
+ * - Ao CRIAR, gerência e função são obrigatórias. Na edição, a função é opcional (o DAT não
+ *   tem) e a gerência só é obrigatória para quem já tem lotação (o Controle não tem; e limpar
+ *   a gerência de uma aprovadora não pode ser um jeito de salvar sem revogar).
  * - A prévia "Permissões efetivas" espelha o backend (`_apply_lotacao`): os grupos atuais
  *   que não são FUNÇÃO ficam; as funções vêm do form; o grupo de setor da gerência só
- *   entra/sai quando a gerência muda; a gerência aprovadora não dá grupo de setor.
+ *   entra/sai quando a gerência muda; setor de par aprovador (Superintendência, Controle)
+ *   não vira grupo.
  */
 
 import { describe, expect, test } from 'vitest';
 
-import { GERENCIA_APROVADORA_NOME, gruposAposSalvar, lotacaoObrigatoria } from '../usuario_form_helpers';
+import { gruposAposSalvar, lotacaoObrigatoria } from '../usuario_form_helpers';
 
 const G = {
   formador: { id: 1, name: 'Formador' },
@@ -26,23 +28,40 @@ const grupos = Object.values(G);
 const funcoes = new Set(['Formador', 'Coordenador', 'Gerente', 'Apoio de Coordenação', 'Assistente Administrativo']);
 const vidas = { id: 2, nome: 'GERENCIA 2', setor_canonico: 'Vidas' };
 const fluir = { id: 3, nome: 'GERENCIA 3', setor_canonico: 'Fluir' };
-const g1 = { id: 1, nome: GERENCIA_APROVADORA_NOME, setor_canonico: 'Superintendência' };
+const g1 = { id: 1, nome: 'SUPERINTENDENCIA', setor_canonico: 'Superintendência' };
+const gControle = { id: 9, nome: 'G CONTROLE', setor_canonico: 'Controle' };
 
 function nomes(args: Parameters<typeof gruposAposSalvar>[0]): string[] {
   return gruposAposSalvar(args).map((g) => g.name).sort();
 }
 
 describe('lotacaoObrigatoria (#2071)', () => {
-  test('superuser criando: obrigatória', () => {
-    expect(lotacaoObrigatoria({ currentIsSuperuser: true, isEditing: false })).toBe(true);
+  test('superuser criando: gerência e função obrigatórias', () => {
+    expect(lotacaoObrigatoria({ currentIsSuperuser: true, isEditing: false, temLotacao: false })).toEqual({
+      gerencia: true,
+      funcao: true,
+    });
   });
 
-  test('superuser editando: opcional (Controle não tem gerência; DAT não tem função)', () => {
-    expect(lotacaoObrigatoria({ currentIsSuperuser: true, isEditing: true })).toBe(false);
+  test('superuser editando quem não tem lotação (Controle, DAT): nada obrigatório', () => {
+    expect(lotacaoObrigatoria({ currentIsSuperuser: true, isEditing: true, temLotacao: false })).toEqual({
+      gerencia: false,
+      funcao: false,
+    });
   });
 
-  test('quem não é superuser: nunca (o campo fica desabilitado)', () => {
-    expect(lotacaoObrigatoria({ currentIsSuperuser: false, isEditing: false })).toBe(false);
+  test('superuser editando quem tem lotação: a gerência não pode ser limpa', () => {
+    expect(lotacaoObrigatoria({ currentIsSuperuser: true, isEditing: true, temLotacao: true })).toEqual({
+      gerencia: true,
+      funcao: false,
+    });
+  });
+
+  test('quem não é superuser: nunca (os campos ficam desabilitados)', () => {
+    expect(lotacaoObrigatoria({ currentIsSuperuser: false, isEditing: false, temLotacao: true })).toEqual({
+      gerencia: false,
+      funcao: false,
+    });
   });
 });
 
@@ -81,5 +100,11 @@ describe('gruposAposSalvar (#2071)', () => {
     expect(nomes({ grupos, idsAtuais: [], funcoes, funcaoIds: [2], gerencia: g1, gerenciaAnterior: undefined })).toEqual([
       'Gerente',
     ]);
+  });
+
+  test('gerência com setor Controle não dá o grupo Controle', () => {
+    expect(
+      nomes({ grupos, idsAtuais: [], funcoes, funcaoIds: [4], gerencia: gControle, gerenciaAnterior: undefined }),
+    ).toEqual(['Assistente Administrativo']);
   });
 });

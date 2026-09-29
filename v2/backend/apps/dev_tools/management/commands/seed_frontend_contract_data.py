@@ -228,7 +228,12 @@ class Command(BaseCommand):
             defaults={"nome_setor": GERENCIA_SETOR_LONGO, "ativo": False, "descricao": TEXTO_OBSERVACAO_LONGO},
         )
 
-        municipio, _ = Municipio.objects.get_or_create(nome=MUNICIPIO_LONGO, uf="BA", defaults={"ativo": True})
+        # Com coordenadas: o Mapa (vista Lista) só mostra município com latitude e longitude.
+        municipio, _ = Municipio.objects.update_or_create(
+            nome=MUNICIPIO_LONGO,
+            uf="BA",
+            defaults={"ativo": True, "latitude": Decimal("-12.971400"), "longitude": Decimal("-38.501400")},
+        )
         projeto, _ = Projeto.objects.update_or_create(
             codigo="E2E_LARGURA",
             defaults={"nome": PROJETO_LONGO, "fluxo": "SUPER", "ativo": True, "descricao": TEXTO_OBSERVACAO_LONGO},

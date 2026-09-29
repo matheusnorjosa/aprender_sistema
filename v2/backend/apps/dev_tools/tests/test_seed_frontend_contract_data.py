@@ -226,6 +226,12 @@ class TestSeedFrontendContractDataTextosLongos:
         hoje = timezone.localdate()
         assert Solicitacao.objects.filter(status="aprovado", inicio__date__gte=hoje).exists()
 
+    def test_municipio_longo_tem_coordenadas_para_a_lista_do_mapa(self):
+        """O Mapa (vista Lista) só mostra município com latitude e longitude."""
+        municipio = Municipio.objects.get(nome__startswith="Aaa ", uf="BA")
+        assert municipio.latitude is not None
+        assert municipio.longitude is not None
+
     def test_matrizopolis_segue_pendente_no_dashboard(self):
         """O contrato funcional espera Matrizopolis nas pendências (sem solicitação ativa)."""
         assert not Solicitacao.objects.filter(

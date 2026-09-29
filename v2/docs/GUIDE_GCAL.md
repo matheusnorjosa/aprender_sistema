@@ -230,6 +230,9 @@ O `GoogleCalendarClient` (`apps/core/services/gcal_google_client.py`) lê `setti
 - **dry_run**: Modo simulação:
   - Se `true`: Executa lógica mas NÃO persiste no DB nem no Calendar
   - Se `false`: Executa e persiste (publicação real)
+  - No modo OAuth, a task do dry-run usa o cliente OAuth do operador, como a publicação real: lê o Google e não escreve eventos. Também não mexe na `Solicitacao`: não trava a linha, não a marca *Erro* e não grava `PUBLISH_GCAL` nem `PUBLISH_GCAL_ERROR`. Antes de ler os eventos, confere se a conta do operador enxerga o calendário da organização; se não enxerga, a prévia termina em erro em vez de verde. A checagem não prova permissão de edição: com o calendário compartilhado só para leitura, a prévia passa e a publicação real recebe 403.
+  - Onde ver o resultado: o endpoint responde sempre 202 e grava `PUBLISH_GCAL_REQUESTED` (com `dry_run: true`). O veredito da prévia, inclusive o erro, fica só no resultado da task (`TaskResult`, backend `django-db`) e no log do worker; nenhuma tela o mostra.
+  - Como na publicação real, montar o cliente pode renovar o token do operador (`GOOGLE_REFRESH_TOKEN`) e, com o token revogado, apagar a credencial (`GOOGLE_DISCONNECT`).
 
 ### Matriz de Comportamento
 
@@ -774,6 +777,16 @@ export GOOGLE_SERVICE_ACCOUNT_FILE=/app/secrets/key.json
 # Opção 2: JSON inline
 export GOOGLE_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}'
 ```
+
+**No modo OAuth (produção) não configure a service account.** Esse erro indica que algum caminho ignorou o cliente do operador. Até a correção de 2026-09-28, o dry-run (`{"dry_run": true}` no `/publish/`) fazia isso. Hoje ele usa o cliente OAuth do operador. O auto-retry depois do circuit breaker (`queue_gcal_sync_retry`) ainda usa a service account (ver a spec, "Pontos de atenção").
+
+### Evento *Publicado* no sistema, mas invisível no Google
+
+**Sintoma:** o evento foi publicado, removido ("Cancelar") e publicado de novo. O sistema mostra *Publicado*, mas o evento não aparece no calendário. Pela API, `events.get` do id `asv2{id}` devolve `"status": "cancelled"`.
+
+**Causa:** o "Cancelar" apaga o evento no Google, e o Google faz soft-delete: o evento fica `cancelled` com o mesmo id. A publicação seguinte encontra esse id, adota o evento e faz `patch`. Até a correção de 2026-09-28 o payload não mandava `status`, e o `patch` deixava o evento cancelado.
+
+**Solução:** hoje o payload sempre manda `"status": "confirmed"`, e publicar de novo volta a mostrar o evento. Isso vale também quando a consulta ao Google falha na republicação (cota, 5xx, rede): o `insert` recebe 409, porque o id já existe, e a publicação faz `patch` em seguida. Para um evento que ficou oculto antes da correção, use "Reenviar" (resync): o resync zera o hash do payload e força um `UPDATE`, que manda o `status` e traz o evento de volta a `confirmed`.
 
 ### Erro: "Sua conexão com o Google expirou ou foi removida"
 

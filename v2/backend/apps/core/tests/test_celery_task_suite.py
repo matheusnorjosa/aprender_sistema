@@ -125,7 +125,9 @@ class TestPublishTask:
                 external_event_id=f"asv2{task_solicitacao.id}",
                 summary=f"Solicitação #{task_solicitacao.id}",
             )
-            result = task_publish_solicitacao_to_gcal(task_solicitacao.id, dry_run=True)
+            # Publicação real: é ela que persiste. A prévia não trava a linha (#2068,
+            # test_so_a_publicacao_real_trava_a_linha_da_solicitacao cobre os dois lados).
+            result = task_publish_solicitacao_to_gcal(task_solicitacao.id, dry_run=False)
 
         assert result["error"] is None
         spy_lock.assert_called()  # a task travou a linha antes de operar

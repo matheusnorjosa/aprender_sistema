@@ -9,7 +9,7 @@ Core synchronization operations for Google Calendar.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 from django.conf import settings
 from django.utils import timezone
@@ -102,6 +102,14 @@ def apply_one_solicitacao(
             calendar_id = getattr(settings, "GCAL_CALENDAR_ID", None) or os.getenv("GCAL_CALENDAR_ID") or "primary"
 
     try:
+        # A prévia só LÊ o Google, e o upsert_one engole erro de GET: sem esta checagem, uma conta
+        # sem acesso ao calendário receberia "CREATE, sem erro" onde a publicação real dá 403.
+        if dry_run and hasattr(client, "calendar_accessible") and not client.calendar_accessible(calendar_id):
+            raise ValueError(
+                "Sua conta Google não tem acesso ao calendário da organização. "
+                "Peça o compartilhamento e tente de novo."
+            )
+
         # Chamar upsert_one com payload pré-calculado (PR14)
         outcome = upsert_one(
             client=client,
@@ -280,10 +288,30 @@ def upsert_one(
                         f"attendees={len(payload.get('attendees', []))}, online={'conferenceData' in payload}"
                     )
                     # RF05: Retry com backoff exponencial (PR19)
-                    created = _retry_with_circuit_breaker(
-                        lambda: client.insert(calendar_id, deterministic_eid, payload),
-                        operation_name=f"GCal INSERT #{s.id}",
+                    # 409/412 voltam None (idempotência em utils._retry_with_backoff), apesar do tipo.
+                    created = cast(
+                        "JsonDict | None",
+                        _retry_with_circuit_breaker(
+                            lambda: client.insert(calendar_id, deterministic_eid, payload),
+                            operation_name=f"GCal INSERT #{s.id}",
+                        ),
                     )
+                    if created is None:
+                        # 409/412 (tratado como sucesso): o id determinístico já existe no Google,
+                        # talvez cancelado (o delete é soft-delete) e o GET acima falhou sem ser 404.
+                        # O insert não aplicou nada; só o PATCH grava o payload e o status confirmed.
+                        # Mesmo SKIP por hash do ramo UPDATE (#1722): payload igual não gera PATCH.
+                        if (
+                            s.external_event_id
+                            and s.gcal_payload_hash
+                            and s.gcal_payload_hash == _payload_hash(payload)
+                        ):
+                            return SyncOutcome("SKIP", s.id, s.external_event_id, payload["summary"])
+                        action = "UPDATE" if s.external_event_id else "ADOPT"
+                        created = _retry_with_circuit_breaker(
+                            lambda: client.update(calendar_id, deterministic_eid, payload),
+                            operation_name=f"GCal UPDATE #{s.id} (id já existia)",
+                        )
                     s.external_event_id = created.get("id") or deterministic_eid if created else deterministic_eid
 
                     # RF06: Extrair hangoutLink se disponível

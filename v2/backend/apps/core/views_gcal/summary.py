@@ -40,7 +40,7 @@ class GCalStatusSummaryView(APIView):
     GET /api/gcal/status-summary/
 
     Retorna resumo de contadores por gcal_status.
-    Suporta filtros: date_from, date_to, sector, q, status.
+    Suporta filtros: date_from, date_to, sector, gerencia_id, q, status.
 
     Response:
     {
@@ -83,7 +83,7 @@ class GCalListView(APIView):
     GET /api/gcal/list/
 
     Lista solicitações aprovadas com campos GCal expostos.
-    Suporta filtros: date_from, date_to, sector, q, status.
+    Suporta filtros: date_from, date_to, sector, gerencia_id, q, status.
     Suporta paginação: page, page_size (max 1000).
 
     Response (paginada):

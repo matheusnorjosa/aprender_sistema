@@ -52,6 +52,8 @@ vi.mock('../../../api/config', async (importOriginal) => {
 
 vi.mock('../../../api/availability', () => ({
   getMe: getMeMock,
+  // PR A: o filtro de gerência carrega as gerências ativas no mount.
+  getGerencias: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('../../../api/solicitacoes', () => ({

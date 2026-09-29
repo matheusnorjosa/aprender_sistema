@@ -1,17 +1,19 @@
 /**
  * Barra de filtros compartilhados.
  *
- * Filtros: ano, mês, gerência, setor, busca (q).
+ * Filtros: ano, mês, gerência, projeto, busca (q).
  * Sem "role" (controlado pela página principal).
  *
- * RBAC: Filtra gerências baseado nos setores do usuário.
- * - Superintendência vê todas as gerências
- * - Demais usuários veem apenas sua(s) gerência(s)
+ * Gerência (PR A — mesma regra do backend, `CanViewAllAvailability | HasSectorAccess`):
+ * - Policy `view_all_availability`: "Participantes de projetos SUPER" + gerências ativas.
+ * - Demais: só as gerências do vínculo EquipeGerencia (`me.gerencias`); a primeira é
+ *   selecionada sozinha. Grupo de setor NÃO conta (o backend autoriza por vínculo).
+ * - Sem vínculo e sem policy: select desabilitado ("Sem gerência vinculada").
  */
 
 import { useState, useEffect, useMemo, ChangeEvent, JSX } from 'react';
 import { getGerencias, getMe } from '../../api/availability';
-import { computePermissions } from '../../hooks/usePermissions';
+import { getMyPolicies } from '../../api/me';
 import type { ID, CurrentUser, Gerencia } from '../../types';
 import logger from '../../utils/logger';
 
@@ -33,48 +35,38 @@ interface FiltersBarProps {
   onChange: (partial: FiltersChangeType) => void;
 }
 
-/**
- * Mapeamento de grupo RBAC para nome_setor da gerência.
- * Necessário porque alguns grupos têm nomes diferentes.
- * Ex: Grupo "Superintendência" -> nome_setor "Super"
- */
-const GROUP_TO_NOME_SETOR: Record<string, string> = {
-  'Superintendência': 'Super',
-  // Os demais têm nomes idênticos (Vidas, Fluir, ACerta, etc.)
-};
+/** Opções do select de gerência (id + rótulo de tela). */
+interface GerenciaOpcao {
+  id: ID;
+  rotulo: string;
+}
+
+const porRotulo = (a: GerenciaOpcao, b: GerenciaOpcao): number => a.rotulo.localeCompare(b.rotulo, 'pt-BR');
 
 export default function FiltersBar({ year, month, gerenciaId, sector, q, onChange }: FiltersBarProps): JSX.Element {
   const [allGerencias, setAllGerencias] = useState<Gerencia[]>([]);
   const [userInfo, setUserInfo] = useState<CurrentUser | null>(null);
+  const [canSeeAll, setCanSeeAll] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Carrega lista de gerências e info do usuário ao montar
+  // Carrega gerências ativas, usuário e policies ao montar
   useEffect(() => {
     async function fetchData(): Promise<void> {
       try {
-        const [gerenciasData, meData] = await Promise.all([
-          getGerencias(),
+        const [gerenciasData, meData, policies] = await Promise.all([
+          getGerencias({ ativo: true }),
           getMe(),
+          getMyPolicies().catch(() => [] as string[]),
         ]);
         setAllGerencias(gerenciasData);
         setUserInfo(meData);
+        const veTodas = policies.includes('view_all_availability');
+        setCanSeeAll(veTodas);
 
-        // Auto-seleciona gerência se usuário não vê todos os setores e tem setor próprio.
-        // Epic 3.3 cleanup: substitui `!is_superintendencia` por flag derivada (SSOT).
-        const meDataPerms = computePermissions(meData);
-        if (!meDataPerms.canSeeAllSectors && meData.setores?.length > 0) {
-          const userSetores = meData.setores;
-          // Converte grupos RBAC para nome_setor
-          const userNomeSetores = userSetores.map(
-            (setor) => GROUP_TO_NOME_SETOR[setor] || setor
-          );
-          // Encontra a primeira gerência que corresponde aos setores do usuário
-          const matchingGerencia = gerenciasData.find((g: Gerencia) =>
-            userNomeSetores.includes(g.nome_setor)
-          );
-          if (matchingGerencia && !gerenciaId) {
-            onChange({ gerenciaId: matchingGerencia.id });
-          }
+        // Sem a policy, a Grade só abre na gerência do vínculo: seleciona a primeira.
+        const primeira = [...(meData.gerencias ?? [])].sort(porRotulo)[0];
+        if (!veTodas && primeira && !gerenciaId) {
+          onChange({ gerenciaId: primeira.id });
         }
       } catch (err) {
         logger.error('Erro ao carregar dados:', err);
@@ -85,37 +77,14 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
     void fetchData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /**
-   * Filtra gerências baseado nos setores do usuário.
-   * Superintendência vê todas. Demais veem apenas suas.
-   */
-  const gerencias = useMemo((): Gerencia[] => {
-    if (!userInfo || !allGerencias.length) return [];
+  /** Com a policy: todas as ativas. Sem ela: só as do vínculo (`me.gerencias`). */
+  const gerencias = useMemo((): GerenciaOpcao[] => {
+    if (!userInfo) return [];
+    const opcoes: GerenciaOpcao[] = canSeeAll ? allGerencias : (userInfo.gerencias ?? []);
+    return [...opcoes].sort(porRotulo);
+  }, [allGerencias, userInfo, canSeeAll]);
 
-    const perms = computePermissions(userInfo);
-
-    // Vê todas as gerências (canSeeAllSectors: superuser/Superintendência/etc.)
-    if (perms.canSeeAllSectors) {
-      return allGerencias;
-    }
-
-    // Converte grupos RBAC para nome_setor
-    const userSetores = userInfo.setores || [];
-    const userNomeSetores = userSetores.map(
-      (setor) => GROUP_TO_NOME_SETOR[setor] || setor
-    );
-
-    // Filtra gerências que correspondem aos setores do usuário
-    return allGerencias.filter((g) =>
-      userNomeSetores.includes(g.nome_setor)
-    );
-  }, [allGerencias, userInfo]);
-
-  /**
-   * Verifica se pode ver todas as gerências (opção "Todas").
-   * Epic 3.3 cleanup: usa flag derivada (SSOT em usePermissions).
-   */
-  const canSeeAll = userInfo ? computePermissions(userInfo).canSeeAllSectors : false;
+  const semOpcoes = !loading && !canSeeAll && gerencias.length === 0;
 
   /**
    * Incrementa/decrementa mês.
@@ -158,30 +127,32 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
           id="filtersbar-gerencia"
           value={gerenciaId || ''}
           onChange={(e: ChangeEvent<HTMLSelectElement>) => onChange({ gerenciaId: e.target.value ? Number(e.target.value) : null })}
-          disabled={loading}
+          disabled={loading || semOpcoes}
           className="w-52 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
         >
-          {/* Opção "Todas" apenas para Superintendência */}
-          {canSeeAll && <option value="">Todas</option>}
+          {/* Sem gerência escolhida a grade mostra os participantes de projetos SUPER
+              (monthly_grid_service) — decisão 3 do dono: o rótulo diz isso. */}
+          {canSeeAll && <option value="">Participantes de projetos SUPER</option>}
+          {semOpcoes && <option value="">Sem gerência vinculada</option>}
           {gerencias.map((g) => (
             <option key={g.id} value={g.id}>
-              {g.nome_setor}
+              {g.rotulo}
             </option>
           ))}
         </select>
       </div>
 
-      {/* Filtro de setor (texto) */}
+      {/* Filtro por nome do projeto (texto) — o backend filtra `projeto__nome` */}
       <div>
         <label htmlFor="filtersbar-setor" className="block text-xs font-medium text-gray-700 mb-1">
-          Setor
+          Projeto
         </label>
         <input
           id="filtersbar-setor"
           type="text"
           value={sector}
           onChange={(e: ChangeEvent<HTMLInputElement>) => onChange({ sector: e.target.value })}
-          placeholder="Filtrar por setor"
+          placeholder="Filtrar por projeto"
           className="w-40 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>

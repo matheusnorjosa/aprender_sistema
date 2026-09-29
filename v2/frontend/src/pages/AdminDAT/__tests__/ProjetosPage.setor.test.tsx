@@ -14,10 +14,10 @@ import { MemoryRouter } from 'react-router';
 
 const { PROJETOS, RBAC_META } = vi.hoisted(() => ({
   PROJETOS: [
-    // raw preenchido; efetivo == raw
-    { id: 1, nome: 'Projeto Raw', codigo: 'PR', fluxo: 'NAO_SUPER', ativo: true, setor: 'Fluir', setor_efetivo: 'Fluir' },
+    // raw preenchido; efetivo == raw; gerência com nome de tela diferente do catálogo (PR A)
+    { id: 1, nome: 'Projeto Raw', codigo: 'PR', fluxo: 'NAO_SUPER', ativo: true, setor: 'Fluir', setor_efetivo: 'Fluir', gerencia_nome: 'Superativar' },
     // raw VAZIO, efetivo DERIVADO da gerência ('Vidas') → caso anti-M17
-    { id: 2, nome: 'Projeto Derivado', codigo: 'PD', fluxo: 'NAO_SUPER', ativo: true, setor: '', setor_efetivo: 'Vidas' },
+    { id: 2, nome: 'Projeto Derivado', codigo: 'PD', fluxo: 'NAO_SUPER', ativo: true, setor: '', setor_efetivo: 'Vidas', gerencia_nome: 'Vidas' },
   ],
   RBAC_META: { setor_groups: [], funcao_groups: [], categories: [], setores_produto: ['Fluir', 'Sou da Paz', 'Vidas'] },
 }));
@@ -44,10 +44,14 @@ function renderPage() {
 describe('ProjetosPage — conferência de Projeto.setor (#1914)', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  test('a grade exibe o setor_efetivo (derivado), não o raw', async () => {
+  test('PR A: "Setor" mostra o rótulo da gerência; o setor do catálogo aparece só quando difere', async () => {
     renderPage();
-    // Projeto 2 tem raw setor='' mas setor_efetivo='Vidas' → só aparece se a grade lê o derivado
-    expect(await screen.findByText('Vidas', {}, { timeout: 15000 })).toBeInTheDocument();
+    // Projeto 1: gerência "Superativar", catálogo "Fluir" → os dois, sem coluna nova (sem rolagem)
+    expect(await screen.findByText('Superativar', {}, { timeout: 15000 })).toBeInTheDocument();
+    expect(screen.getByText('catálogo: Fluir')).toBeInTheDocument();
+    // Projeto 2: gerência == catálogo derivado ("Vidas") → só a tag
+    expect(screen.getByText('Vidas')).toBeInTheDocument();
+    expect(screen.queryByText('catálogo: Vidas')).not.toBeInTheDocument();
   }, 20000);
 
   test('anti-M17: editar+salvar mantém o RAW setor (não grava o derivado)', async () => {

@@ -180,9 +180,12 @@ class Gerencia(models.Model):
         - SUPERINTENDENCIA -> Setor "Super" (projetos SUPER que requerem aprovacao)
         - GERENCIA INDIVIDUAL -> Setor "Individual" (projetos com gerencia individual)
 
-    Attributes:
-        nome (str): Nome da gerencia (ex: GERENCIA 2, SUPERINTENDENCIA)
-        nome_setor (str): Nome comercial/operacional do setor (ex: Vidas, ACerta, Fluir)
+    Attributes (um papel por campo — PLANOS_LIBERACAO_2026-09-29 §0):
+        nome (str): código interno (seed e aprovação do PR B); ninguém altera pela tela
+        nome_setor (str): rótulo nas planilhas (chave do import); import ou admin
+        setor_canonico (str): gate de escopo (Wave 1); import ou admin
+        nome_exibicao (str): nome que a tela mostra; admin (GerenciasPage)
+        rotulo (property): `nome_exibicao or nome_setor` — nunca cai para `nome`
         gerente (FK Usuario): Gerente responsavel pela gerencia (nullable)
         ativo (bool): Se a gerencia esta ativa
         descricao (str): Descricao adicional
@@ -192,11 +195,26 @@ class Gerencia(models.Model):
         max_length=50,
         unique=True,
         db_index=True,
-        help_text="Nome da gerencia (ex: GERENCIA 2, SUPERINTENDENCIA)",
+        help_text=(
+            "Código interno da gerência (ex: GERENCIA 2, SUPERINTENDENCIA). Chave técnica do seed e da "
+            "aprovação (PR B); não é alterado pela tela nem exibido como nome do setor."
+        ),
     )
     nome_setor = models.CharField(
         max_length=100,
-        help_text="Nome comercial/operacional do setor (ex: Vidas, ACerta, Fluir)",
+        help_text=(
+            "Rótulo do setor nas planilhas (ex: Vidas, ACerta, Fluir). Chave de casamento do import "
+            "(export-contract, equipe de gerência); alterado pelo import ou pelo admin."
+        ),
+    )
+    nome_exibicao = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text=(
+            "Nome do setor que a tela mostra (ex: Superativar). Vazio = usa `nome_setor`. "
+            "Alterado pelo admin (Gerências); nenhum import grava este campo."
+        ),
     )
     setor_canonico = models.CharField(
         max_length=100,
@@ -243,6 +261,11 @@ class Gerencia(models.Model):
 
     def __str__(self) -> str:
         return f"{self.nome} ({self.nome_setor})"
+
+    @property
+    def rotulo(self) -> str:
+        """Nome do setor na tela: `nome_exibicao` ou, vazio, `nome_setor`. Nunca cai para `nome`."""
+        return self.nome_exibicao or self.nome_setor
 
 
 class EquipeGerencia(models.Model):

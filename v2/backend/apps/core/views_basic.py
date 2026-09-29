@@ -20,7 +20,7 @@ from drf_spectacular.utils import extend_schema
 
 from .api_schemas import COMMON_ERROR_RESPONSES
 from .constants import FUNCAO_GROUPS, SETOR_GROUPS
-from .models import AuditLog, GroupClassificacao
+from .models import AuditLog, EquipeGerencia, GroupClassificacao
 from .rbac.policies import user_has_policy
 from .serializers import CurrentUserSerializer, MeContactUpdateSerializer
 from .services.audit import registrar_auditoria
@@ -42,6 +42,22 @@ def api_root(request: HttpRequest) -> JsonResponse:
     )
 
 
+def _gerencias_do_vinculo(user: Any) -> list[dict[str, Any]]:
+    """`[{id, rotulo, papeis}]` dos vínculos vigentes do usuário em gerências ativas.
+
+    Agrupa por gerência (dois papéis na mesma gerência viram um item) e ordena pelo
+    rótulo. Uma query só (`select_related` da gerência).
+    """
+    vinculos = EquipeGerencia.vigentes_em().filter(usuario=user, gerencia__ativo=True).select_related("gerencia")
+    por_gerencia: dict[int, dict[str, Any]] = {}
+    for v in vinculos:
+        item = por_gerencia.setdefault(v.gerencia_id, {"id": v.gerencia_id, "rotulo": v.gerencia.rotulo, "papeis": []})
+        item["papeis"].append(v.papel)
+    for item in por_gerencia.values():
+        item["papeis"].sort()
+    return sorted(por_gerencia.values(), key=lambda g: g["rotulo"].casefold())
+
+
 class CurrentUserView(APIView):
     """
     Endpoint que retorna informações do usuário autenticado.
@@ -58,6 +74,9 @@ class CurrentUserView(APIView):
             "groups": list[str],        # Todos os grupos (compatibilidade)
             "setores": list[str],       # Grupos de SETOR (onde trabalha)
             "funcoes": list[str],       # Grupos de FUNÇÃO (o que pode fazer)
+            "gerencias": [              # Vínculos EquipeGerencia vigentes em gerência ativa
+                {"id": int, "rotulo": str, "papeis": list[str]}
+            ],
             "is_superuser": bool,
             "is_superintendencia": bool,
             "can_approve_super": bool,  # Legado: = policy access_solicitation_approvals (DAT não aprova)
@@ -112,6 +131,11 @@ class CurrentUserView(APIView):
         # re-implementado por string aqui — evita drift silencioso com policies/helpers.
         can_approve_super = user_has_policy(user, "access_solicitation_approvals")
 
+        # PR A: gerências do vínculo vigente (EquipeGerencia), em gerência ativa — uma query.
+        # É por aqui (não pelos grupos de setor) que a Grade escolhe a gerência: o backend
+        # autoriza por vínculo (`HasSectorAccess`).
+        gerencias = _gerencias_do_vinculo(user)
+
         # Compute display name
         name: str = f"{user.first_name or ''} {user.last_name or ''}".strip()
         if not name:
@@ -132,6 +156,7 @@ class CurrentUserView(APIView):
                 "groups": groups,
                 "setores": setores,
                 "funcoes": funcoes,
+                "gerencias": gerencias,
                 "is_superuser": user.is_superuser,
                 "is_superintendencia": is_superintendencia,
                 "can_approve_super": can_approve_super,

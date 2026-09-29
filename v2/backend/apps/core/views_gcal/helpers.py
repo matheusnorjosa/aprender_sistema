@@ -100,6 +100,7 @@ def _apply_common_filters(qs: QuerySet[Solicitacao], request: Request) -> QueryS
     - date_from (YYYY-MM-DD): início >= date_from
     - date_to (YYYY-MM-DD): início <= date_to
     - sector: projeto__nome__icontains
+    - gerencia_id: projeto__gerencia_id (o mesmo filtro da lista `/solicitacoes/`)
     - q: busca em múltiplos campos
     - status: filtra por gcal_status (NONE/PENDING/PUBLISHED/ERROR)
     """
@@ -124,6 +125,11 @@ def _apply_common_filters(qs: QuerySet[Solicitacao], request: Request) -> QueryS
     sector = request.query_params.get("sector")
     if sector:
         qs = qs.filter(projeto__nome__icontains=sector)
+
+    # PR A: filtro por gerência (id), igual ao da lista da PreAgenda.
+    gerencia_id = request.query_params.get("gerencia_id")
+    if gerencia_id and gerencia_id.isdecimal():  # isdigit() aceita "²", que int() rejeita
+        qs = qs.filter(projeto__gerencia_id=int(gerencia_id))
 
     # Filtro por gcal_status
     gcal_status_filter = request.query_params.get("status")

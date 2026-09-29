@@ -169,6 +169,17 @@ fecha no mesmo corte o caminho de escalada por import (os importers de equipe re
 reativar GERENTE na `SUPERINTENDENCIA`, pendência `vinculo_aprovador_bloqueado`) e por rename da
 gerência (`GerenciaSerializer.validate_nome`).
 
+## PR A — setor = gerência na tela (2026-09-29)
+
+Achados medidos durante o PR A (branch `feat/gerencia-nome-exibicao-pr-a`, base `a56d9027`), fora
+da fila adjudicada. IDs `PRA-*` locais a esta seção. Status pela legenda: `em andamento (PR A)`
+passa a `resolvido` no merge, com o commit e a data.
+
+| ID | Sev. | Status | Achado | Evidência / o que fecha |
+|---|---|---|---|---|
+| `PRA-01` | P2 | em andamento (PR A) | PreAgenda: lista e KPIs contavam conjuntos diferentes. A lista mandava `sector` e casava `projeto.gerencia.nome_setor` (`views_solicitacao.py`, `get_queryset`); o resumo casava `projeto__nome__icontains` (`views_gcal/helpers.py`, `_apply_common_filters`). E o resumo recebia o `status=approved` da lista, que lá é `gcal_status`: os KPIs ficavam em 0 (medido: `status-summary?status=approved` → `total=0` com 1 aprovada; sem o parâmetro → `1`) | `gerencia_id` (`projeto__gerencia_id`) nos dois endpoints; a PreAgenda manda o mesmo `gerencia_id` e não manda mais `status` ao resumo. `sector` segue aceito. Testes: `test_filtro_gerencia_id_preagenda.py`, `PreAgendaPage.gerencia.test.tsx` |
+| `PRA-02` | P2 | aberto | `GET /api/options/formadores-do-setor/` devolve `[]` para quem não é superuser e não tem vínculo `EquipeGerencia` vigente — caso típico de Controle e DAT, que operam por grupo/policy e não por vínculo (`views_options.py`, `formadores_do_setor_options`: sem `user_gerencias` retorna lista vazia) | Não tratado no PR A. Decidir se Controle/DAT devem ver todos (policy `view_all_availability`, como a Grade) ou se a tela que consome não é deles |
+
 ## Reconciliação de 2026-08-28 (round-trip / entrada-direta)
 
 Duas auditorias por fan-out sobre o `HEAD d4beda07`: **cobertura** (página×dado×endpoint, as 46

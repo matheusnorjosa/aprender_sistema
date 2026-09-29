@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, test } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/mocks/server';
 import { apiUrl } from '../../test/mocks/handlers';
-import { getMe } from '../availability';
+import { getGerencias, getMe } from '../availability';
 
 const validCurrentUserPayload = {
   id: 1,
@@ -58,5 +58,24 @@ describe('availability API — getMe (MSW)', () => {
     );
 
     await expect(getMe()).rejects.toThrow('Invalid /api/me payload shape');
+  });
+});
+
+describe('availability API — getGerencias (MSW)', () => {
+  test('{ ativo: true } pede só as ativas: /gerencias/?ativo=true (PR A)', async () => {
+    const urls: string[] = [];
+    server.use(
+      http.get(apiUrl('/gerencias/'), ({ request }) => {
+        urls.push(request.url);
+        return HttpResponse.json({ results: [], count: 0 });
+      }),
+    );
+
+    await getGerencias({ ativo: true });
+
+    expect(urls).toHaveLength(1);
+    const u = new URL(urls[0]!);
+    expect(u.pathname).toBe('/api/gerencias/');
+    expect(u.searchParams.get('ativo')).toBe('true');
   });
 });

@@ -10,7 +10,8 @@ from __future__ import annotations
 
 from django.contrib.auth.models import Group
 from django.db import transaction
-from django.db.models import Count, Q, QuerySet
+from django.db.models import Count, Q, QuerySet, Value
+from django.db.models.functions import Coalesce, NullIf
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -292,18 +293,21 @@ class GerenciaViewSet(viewsets.ModelViewSet):  # type: ignore[misc]
 
     Filtros:
         - ativo (bool)
-        - nome_setor (search)
+        - nome, nome_setor, nome_exibicao (search)
+        - ordering=rotulo_ordem: pelo nome de tela (`nome_exibicao` ou, vazio, `nome_setor`)
     """
 
-    queryset = Gerencia.objects.annotate(projetos_count=Count("projetos", filter=Q(projetos__ativo=True))).order_by(
-        "nome_setor"
-    )
+    queryset = Gerencia.objects.annotate(
+        projetos_count=Count("projetos", filter=Q(projetos__ativo=True)),
+        # PR A: mesmo fallback da property `Gerencia.rotulo`, para ordenar no banco.
+        rotulo_ordem=Coalesce(NullIf("nome_exibicao", Value("")), "nome_setor"),
+    ).order_by("nome_setor")
     serializer_class = GerenciaSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["ativo"]
-    search_fields = ["nome", "nome_setor"]
-    ordering_fields = ["nome", "nome_setor"]
+    search_fields = ["nome", "nome_setor", "nome_exibicao"]
+    ordering_fields = ["nome", "nome_setor", "rotulo_ordem"]
     ordering = ["nome_setor"]
 
     def get_permissions(self) -> list:  # type: ignore[type-arg]

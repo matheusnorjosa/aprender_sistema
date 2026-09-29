@@ -33,7 +33,7 @@ import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined, KeyOutlined
 import { Link } from 'react-router';
 import { checkAuth } from '../../api/auth';
 import { listUsers, createUser, updateUser, deleteUser, resetUserPassword, listGroups, getRBACMeta, listGerencias } from '../../api/adminDAT';
-import { buildUsuarioPayload } from './usuario_form_helpers';
+import { buildUsuarioPayload, gruposAposSalvar, lotacaoObrigatoria } from './usuario_form_helpers';
 import type { PermissaoFuncional, RBACMetaPayload, GerenciaRecord } from '../../api/adminDAT';
 import { importUsuarios } from '../../api/ops';
 import type { ImportResult } from '../../api/ops';
@@ -745,7 +745,12 @@ export default function UsuariosPage(): JSX.Element {
             // P0-1 Tier-0 (D-1=2a): lotação é superuser-only. Não-superuser vê o
             // valor atual, mas não edita (e o helper não envia gerencia_id). Relaxa
             // o required p/ não travar o submit de conta comum com o Select disabled.
-            rules={currentIsSuperuser ? [{ required: true, message: 'Selecione uma gerência' }] : []}
+            // #2071: obrigatória só ao criar (na edição, o Controle não tem gerência).
+            rules={
+              lotacaoObrigatoria({ currentIsSuperuser, isEditing: !!editingUser })
+                ? [{ required: true, message: 'Selecione uma gerência' }]
+                : []
+            }
           >
             <Select
               allowClear
@@ -762,7 +767,12 @@ export default function UsuariosPage(): JSX.Element {
             label="Função (o que pode fazer)"
             tooltip="Papel da pessoa no processo"
             // P0-1 Tier-0 (D-1=2a): membership é superuser-only (ver gerencia_id acima).
-            rules={currentIsSuperuser ? [{ required: true, message: 'Selecione pelo menos uma função' }] : []}
+            // #2071: obrigatória só ao criar (na edição, o DAT não tem função).
+            rules={
+              lotacaoObrigatoria({ currentIsSuperuser, isEditing: !!editingUser })
+                ? [{ required: true, message: 'Selecione pelo menos uma função' }]
+                : []
+            }
           >
             <Select
               mode="multiple"
@@ -810,14 +820,16 @@ export default function UsuariosPage(): JSX.Element {
               <div>
                 <Text strong>Permissões efetivas: </Text>
                 {(() => {
-                  // Setor é derivado da Gerência (grupo cujo nome == setor_canonico,
-                  // quando existe — espelha o setor_group_for do backend) + Funções.
-                  const selectedGerencia = gerencias.find((ger) => ger.id === selectedGerenciaId);
-                  const setorGroup = selectedGerencia
-                    ? grupos.find((group) => group.name === selectedGerencia.setor_canonico)
-                    : undefined;
-                  const funcaoGroups = grupos.filter((group) => selectedFuncaoIds.includes(group.id));
-                  const selectedGroups = setorGroup ? [setorGroup, ...funcaoGroups] : funcaoGroups;
+                  // #2071: espelha o Salvar do backend (grupos que ficam + funções + setor
+                  // da gerência só quando ela muda).
+                  const selectedGroups = gruposAposSalvar({
+                    grupos,
+                    idsAtuais: editingUser?.group_ids_display || [],
+                    funcoes: funcaoGroupsSet,
+                    funcaoIds: selectedFuncaoIds,
+                    gerencia: gerencias.find((ger) => ger.id === selectedGerenciaId),
+                    gerenciaAnterior: gerencias.find((ger) => ger.id === editingUser?.gerencia_atual?.gerencia_id),
+                  });
                   const labels = new Set<string>();
                   selectedGroups.forEach((group) => {
                     (group.permissoes_funcionais || []).forEach((permissao) => labels.add(permissao.label));

@@ -23,6 +23,7 @@ from django.contrib.auth.models import Group
 from django.utils import timezone
 
 from apps.core.models import EquipeGerencia
+from apps.core.rbac.helpers import GERENCIA_APROVADORA_NOME
 
 # Função (grupo RBAC) -> papel na EquipeGerencia. "Assistente Administrativo" e
 # demais funções não têm papel de gerência (não viram vínculo).
@@ -45,7 +46,13 @@ def setor_group_for(gerencia: Any) -> Group | None:
     Os 13 grupos de setor são um vocabulário fixo; nem todo `setor_canonico` tem
     grupo correspondente (A Cor da Gente, ED Financeira, Superativar…). Nesses
     casos retorna None (a realidade atual — não inventa grupo).
+
+    #2071: a gerência aprovadora também retorna None. O grupo "Superintendência" abre todos os
+    setores e, com Gerente, forma o composite legado de aprovação; a autoridade de quem é lotado
+    ali vem do vínculo (PR B1), não do grupo.
     """
+    if getattr(gerencia, "nome", None) == GERENCIA_APROVADORA_NOME:
+        return None
     setor = (getattr(gerencia, "setor_canonico", "") or "").strip()
     if not setor:
         return None
@@ -79,16 +86,12 @@ def upsert_vinculo(gerencia: Any, usuario: Any, papel: str, *, ativo: bool = Tru
     )
 
 
-def sync_user_lotacao(
-    usuario: Any, gerencia: Any, papeis: Iterable[str], *, supervisor: Any = None, gerencia_anterior: Any = None
-) -> None:
+def sync_user_lotacao(usuario: Any, gerencia: Any, papeis: Iterable[str], *, supervisor: Any = None) -> None:
     """Torna (gerencia, papeis) a lotação ATIVA do usuário (form = SSOT da lotação).
 
     - Garante vínculo ativo para cada (gerencia, papel).
-    - Encerra (ativo=False, valid_to=hoje) os outros vínculos ATIVOS do usuário na gerência alvo e
-      na `gerencia_anterior` (a que o form mostrou): troca de gerência / de papel.
-    - #2071: vínculos em outras gerências ficam — o form mostra uma só, e a pessoa pode ter mais
-      de uma lotação (ex.: coordena um setor e é formadora em outro).
+    - Encerra (ativo=False, valid_to=hoje) qualquer outro vínculo ATIVO do usuário
+      que não seja o alvo (troca de gerência / de papel).
     - Sem papel derivável (papeis vazio): NÃO mexe (evita apagar lotação por engano).
     """
     papeis = set(papeis)
@@ -97,11 +100,21 @@ def sync_user_lotacao(
     for papel in papeis:
         upsert_vinculo(gerencia, usuario, papel, ativo=True, supervisor=supervisor)
     hoje = timezone.localdate()
-    escopo = [g for g in (gerencia, gerencia_anterior) if g is not None]
-    outros = EquipeGerencia.objects.filter(usuario=usuario, ativo=True, gerencia__in=escopo).exclude(
-        gerencia=gerencia, papel__in=papeis
-    )
+    outros = EquipeGerencia.objects.filter(usuario=usuario, ativo=True).exclude(gerencia=gerencia, papel__in=papeis)
     for v in outros:
+        v.ativo = False
+        v.valid_to = hoje
+        v.save(update_fields=["ativo", "valid_to"])
+
+
+def encerrar_lotacao(usuario: Any) -> None:
+    """Encerra (ativo=False, valid_to=hoje) todos os vínculos ATIVOS do usuário.
+
+    #2071: o form tirou todas as funções que davam papel. Sem isso, tirar a função Gerente de uma
+    aprovadora deixava o vínculo GERENTE na Superintendência, e com ele o poder de aprovar.
+    """
+    hoje = timezone.localdate()
+    for v in EquipeGerencia.objects.filter(usuario=usuario, ativo=True):
         v.ativo = False
         v.valid_to = hoje
         v.save(update_fields=["ativo", "valid_to"])

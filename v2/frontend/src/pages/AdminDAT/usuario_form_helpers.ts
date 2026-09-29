@@ -84,3 +84,56 @@ export function buildUsuarioPayload(
     ...gerenciaPayload,
   };
 }
+
+/** Chave técnica da gerência aprovadora; espelha `GERENCIA_APROVADORA_NOME` (`apps/core/rbac/helpers.py`). */
+export const GERENCIA_APROVADORA_NOME = 'SUPERINTENDENCIA';
+
+interface GrupoLike {
+  id: ID;
+  name: string;
+}
+
+interface GerenciaLike {
+  id: ID;
+  nome: string;
+  setor_canonico?: string | null | undefined;
+}
+
+/**
+ * #2071: gerência e função são obrigatórias só ao CRIAR (e só para superuser, o único que edita
+ * lotação). Na edição, a pessoa pode não ter gerência (Controle) nem função (DAT).
+ */
+export function lotacaoObrigatoria(opts: { currentIsSuperuser: boolean; isEditing: boolean }): boolean {
+  return opts.currentIsSuperuser && !opts.isEditing;
+}
+
+function setorDaGerencia<G extends GrupoLike>(grupos: G[], gerencia: GerenciaLike | undefined): G | undefined {
+  if (!gerencia || gerencia.nome === GERENCIA_APROVADORA_NOME) return undefined;
+  const setor = (gerencia.setor_canonico ?? '').trim();
+  return setor ? grupos.find((g) => g.name === setor) : undefined;
+}
+
+/**
+ * #2071: grupos da pessoa depois do Salvar, espelhando `_apply_lotacao` do backend. Os grupos
+ * atuais que não são FUNÇÃO ficam; as funções vêm do form; o grupo de setor da gerência entra e
+ * sai só quando a gerência muda; a gerência aprovadora não dá grupo de setor.
+ */
+export function gruposAposSalvar<G extends GrupoLike>(args: {
+  grupos: G[];
+  idsAtuais: ID[];
+  funcoes: Set<string>;
+  funcaoIds: ID[];
+  gerencia: GerenciaLike | undefined;
+  gerenciaAnterior: GerenciaLike | undefined;
+}): G[] {
+  const { grupos, idsAtuais, funcoes, funcaoIds, gerencia, gerenciaAnterior } = args;
+  let final = grupos.filter((g) => idsAtuais.includes(g.id) && !funcoes.has(g.name));
+  final.push(...grupos.filter((g) => funcaoIds.includes(g.id) && !final.includes(g)));
+  if (gerencia && gerencia.id !== gerenciaAnterior?.id) {
+    const antigo = setorDaGerencia(grupos, gerenciaAnterior);
+    const novo = setorDaGerencia(grupos, gerencia);
+    if (antigo && antigo !== novo) final = final.filter((g) => g !== antigo);
+    if (novo && !final.includes(novo)) final.push(novo);
+  }
+  return final;
+}

@@ -125,9 +125,15 @@ Passos (como superusuário):
    - **Função (o que pode fazer)**: selecione uma ou mais funções
 3. Clique em **Salvar**
 
-O Salvar troca só as funções e a gerência mostradas no formulário (#2071). Grupos que o formulário não
-mostra (como Controle, DAT ou grupos de permissão) e vínculos da pessoa em outras gerências continuam como
-estavam. Se nada mudou na gerência nem nas funções, o vínculo não é alterado.
+O Salvar mexe só no que você mudou no formulário (#2071):
+
+- Grupos que o formulário não mostra (como Controle, DAT ou grupos de permissão) continuam.
+- Se a gerência e as funções não mudaram, a lotação não é alterada.
+- Gerência e função são obrigatórias só ao criar; na edição podem ficar vazias.
+- Lotar alguém na Superintendência não dá o grupo "Superintendência": quem é Gerente ali aprova pelo vínculo.
+- Tirar a função Gerente de uma aprovadora encerra o vínculo e ela deixa de aprovar.
+- Atenção: mudar a gerência ou a função encerra os vínculos da pessoa em outras gerências (o formulário
+  mostra uma só).
 
 Se os campos aparecerem **desabilitados**, é porque sua conta não é superusuário — não é bug.
 

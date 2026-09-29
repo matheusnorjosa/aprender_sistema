@@ -194,7 +194,7 @@ def _mark_gcal_error(
     raw_error: str,
     operator: Any = None,
     operation: str = "publish",
-    dry_run: bool = False,
+    dry_run: bool,
     apply_blocked: bool = False,
 ) -> None:
     """Tira a linha de PENDING: marca ERROR com `message` e audita o erro cru.
@@ -205,6 +205,7 @@ def _mark_gcal_error(
 
     No dry-run não grava nada: a prévia não marca PENDING, e ERROR (ou AuditLog) numa linha que
     pode estar publicada seria efeito colateral de uma simulação. O erro volta só no resultado.
+    `dry_run` é obrigatório: esquecê-lo numa saída nova vira TypeError, não uma escrita silenciosa.
     """
     from apps.core.models import AuditLog, Solicitacao
 
@@ -357,8 +358,10 @@ def task_publish_solicitacao_to_gcal(
         # do mesmo evento (o corpo re-lê a Solicitacao e persiste os campos de sync). O
         # `except` de erro fica FORA deste bloco, para marcar ERROR mesmo após rollback.
         with transaction.atomic():
-            # Buscar solicitação (com lock de linha)
-            s = Solicitacao.objects.select_for_update().get(id=solicitation_id)
+            # Buscar solicitação (com lock de linha). A prévia não escreve na linha: sem lock, ela
+            # não segura publish/cancel/edição reais enquanto espera o Google.
+            qs = Solicitacao.objects.all() if dry_run else Solicitacao.objects.select_for_update()
+            s = qs.get(id=solicitation_id)
 
             # Aplicar publicação (com cliente OAuth se disponível)
             outcome = apply_one_solicitacao(s, dry_run=dry_run, apply_blocked=apply_blocked, client=client)
@@ -485,7 +488,9 @@ def task_cancel_solicitacao_from_gcal(
                 mensagem = _MSG_CREDENCIAL_GOOGLE
             else:
                 mensagem = _friendly_gcal_error(e)
-            _mark_gcal_error(solicitation_id, mensagem, raw_error=str(e), operator=operator, operation="cancel")
+            _mark_gcal_error(
+                solicitation_id, mensagem, raw_error=str(e), operator=operator, operation="cancel", dry_run=False
+            )
             return {
                 "action": "ERROR",
                 "solicitation_id": solicitation_id,
@@ -538,7 +543,12 @@ def task_cancel_solicitacao_from_gcal(
     except Exception as e:
         # Tira a linha de PENDING; external_event_id fica (o evento segue no Google).
         _mark_gcal_error(
-            solicitation_id, _friendly_gcal_error(e), raw_error=str(e), operator=operator, operation="cancel"
+            solicitation_id,
+            _friendly_gcal_error(e),
+            raw_error=str(e),
+            operator=operator,
+            operation="cancel",
+            dry_run=False,
         )
         return {
             "action": "ERROR",

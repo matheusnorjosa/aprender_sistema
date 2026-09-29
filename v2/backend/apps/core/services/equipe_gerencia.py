@@ -23,7 +23,7 @@ from django.contrib.auth.models import Group
 from django.utils import timezone
 
 from apps.core.models import EquipeGerencia
-from apps.core.rbac.helpers import APPROVER_COMPOSITES
+from apps.core.rbac.helpers import APPROVER_COMPOSITES, GERENCIA_APROVADORA_NOME
 
 # Função (grupo RBAC) -> papel na EquipeGerencia. "Assistente Administrativo" e
 # demais funções não têm papel de gerência (não viram vínculo).
@@ -113,6 +113,21 @@ def encerrar_lotacao(usuario: Any) -> None:
     """
     hoje = timezone.localdate()
     for v in EquipeGerencia.objects.filter(usuario=usuario, ativo=True):
+        v.ativo = False
+        v.valid_to = hoje
+        v.save(update_fields=["ativo", "valid_to"])
+
+
+def encerrar_gerente_aprovador(usuario: Any) -> None:
+    """Encerra o vínculo ATIVO de papel GERENTE na gerência aprovadora (o que dá o poder de aprovar).
+
+    #2071: esse vínculo exige a função Gerente. Se ela saiu (pelo form ou pela tela de Grupos), o
+    salvar do form encerra o vínculo em vez de deixar a aprovação sem a função que a explica.
+    """
+    hoje = timezone.localdate()
+    for v in EquipeGerencia.objects.filter(
+        usuario=usuario, ativo=True, papel="GERENTE", gerencia__nome=GERENCIA_APROVADORA_NOME
+    ):
         v.ativo = False
         v.valid_to = hoje
         v.save(update_fields=["ativo", "valid_to"])

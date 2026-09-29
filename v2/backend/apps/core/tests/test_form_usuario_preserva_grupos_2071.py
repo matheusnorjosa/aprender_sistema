@@ -316,3 +316,56 @@ class TestSemAprovacaoPorGrupoPeloFormulario:
         assert _ativos(alvo) == set()
         assert solicitation_approval_basis(alvo) is None
         assert _logs_autoridade(alvo) == ["revogada"]
+
+    def test_par_legado_escondido_sob_o_vinculo_e_recusado(self, root, g1):
+        """Superintendência órfão + Gerente em g1: a base efetiva é o vínculo, mas o par legado nasceria
+        escondido e seguiria aprovando se o vínculo fosse encerrado fora do form."""
+        coord, gerente = GroupFactory(name="Coordenador"), GroupFactory(name="Gerente")
+        alvo = UsuarioFactory(username="par_oculto_2071", cpf="92071000019")
+        alvo.groups.add(coord, GroupFactory(name="Superintendência"))
+
+        client = APIClient()
+        client.force_authenticate(root)
+        resp = client.patch(
+            f"/api/usuarios-admin/{alvo.id}/", {"group_ids": [gerente.id], "gerencia_id": g1.id}, format="json"
+        )
+
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST, resp.data
+        assert _ativos(alvo) == set()
+
+    def test_grupo_superintendencia_pedido_explicitamente_passa(self, root):
+        """A trava é para o grupo que o form não mostra; quem manda o grupo no pedido (API) decide."""
+        sup, gerente = GroupFactory(name="Superintendência"), GroupFactory(name="Gerente")
+        alvo = UsuarioFactory(username="explicito_2071", cpf="92071000020")
+
+        _salvar(root, alvo, {"group_ids": [sup.id, gerente.id], "gerencia_id": None})
+
+        assert solicitation_approval_basis(alvo) == "grupo_superintendencia_gerente"
+
+    def test_aprovadora_do_controle_pode_perder_a_funcao_gerente(self, root, g1):
+        """Controle + Assistente Administrativo é base legítima (não é a regra antiga): tirar Gerente passa."""
+        asst, gerente = GroupFactory(name="Assistente Administrativo"), GroupFactory(name="Gerente")
+        alvo = UsuarioFactory(username="controle_ger_2071", cpf="92071000021")
+        alvo.groups.add(GroupFactory(name="Controle"), asst, gerente)
+        EquipeGerencia.objects.create(gerencia=g1, usuario=alvo, papel="GERENTE", ativo=True)
+
+        _salvar(root, alvo, {"group_ids": [asst.id], "gerencia_id": g1.id})
+
+        cache.clear()
+        assert _ativos(alvo) == set()
+        assert solicitation_approval_basis(alvo) == "asst_admin_controle"
+
+    def test_gerente_tirado_pela_tela_de_grupos_e_revogado_no_proximo_salvar(
+        self, root, g1, django_capture_on_commit_callbacks
+    ):
+        """Depois que a tela de Grupos tira o Gerente, o form hidrata sem funções; salvar assim revoga."""
+        alvo = UsuarioFactory(username="sem_grupo_gerente_2071", cpf="92071000022")
+        EquipeGerencia.objects.create(gerencia=g1, usuario=alvo, papel="GERENTE", ativo=True)
+        assert solicitation_approval_basis(alvo) == "gerente_superintendencia"
+
+        _salvar(root, alvo, {"group_ids": [], "gerencia_id": g1.id}, django_capture_on_commit_callbacks)
+
+        cache.clear()
+        assert _ativos(alvo) == set()
+        assert solicitation_approval_basis(alvo) is None
+        assert _logs_autoridade(alvo) == ["revogada"]

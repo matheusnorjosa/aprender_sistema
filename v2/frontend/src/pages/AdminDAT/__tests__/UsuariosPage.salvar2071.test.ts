@@ -12,7 +12,7 @@
 
 import { describe, expect, test } from 'vitest';
 
-import { gruposAposSalvar, lotacaoObrigatoria } from '../usuario_form_helpers';
+import { buildUsuarioPayload, gruposAposSalvar, lotacaoObrigatoria, mensagemDoErro } from '../usuario_form_helpers';
 
 const G = {
   formador: { id: 1, name: 'Formador' },
@@ -106,5 +106,45 @@ describe('gruposAposSalvar (#2071)', () => {
     expect(
       nomes({ grupos, idsAtuais: [], funcoes, funcaoIds: [4], gerencia: gControle, gerenciaAnterior: undefined }),
     ).toEqual(['Assistente Administrativo']);
+  });
+});
+
+describe('mensagemDoErro (#2071)', () => {
+  test('mostra o texto de validação do backend, não só "Erro de validação."', () => {
+    const err = Object.assign(new Error('Erro de validação.'), {
+      response: { status: 400, data: { detail: 'Erro de validação.', errors: { group_ids: 'Tire o grupo X.' } } },
+    });
+    expect(mensagemDoErro(err)).toBe('Tire o grupo X.');
+  });
+
+  test('lista de mensagens por campo vira um texto só', () => {
+    const err = Object.assign(new Error('Erro de validação.'), {
+      response: { status: 400, data: { errors: { email: ['Inválido.'], cpf: ['Já existe.'] } } },
+    });
+    expect(mensagemDoErro(err)).toBe('Inválido. Já existe.');
+  });
+
+  test('sem detalhes por campo, usa a mensagem do erro', () => {
+    expect(mensagemDoErro(new Error('HTTP 500'))).toBe('HTTP 500');
+  });
+});
+
+describe('buildUsuarioPayload sem as funções carregadas (#2071)', () => {
+  test('não manda funções nem gerência: salvar não pode tirar tudo por falha de carga', () => {
+    const payload = buildUsuarioPayload(
+      { username: 'x', email: 'x@example.com', is_active: true, is_superuser: false, gerencia_id: 1, funcao_ids: [] },
+      { isEditing: true, cpfEditUnlocked: false, currentIsSuperuser: true, funcoesCarregadas: false },
+    );
+    expect(payload).not.toHaveProperty('group_ids');
+    expect(payload).not.toHaveProperty('gerencia_id');
+  });
+
+  test('com as funções carregadas, manda as duas coisas (como antes)', () => {
+    const payload = buildUsuarioPayload(
+      { username: 'x', email: 'x@example.com', is_active: true, is_superuser: false, gerencia_id: 1, funcao_ids: [2] },
+      { isEditing: true, cpfEditUnlocked: false, currentIsSuperuser: true, funcoesCarregadas: true },
+    );
+    expect(payload.group_ids).toEqual([2]);
+    expect(payload.gerencia_id).toBe(1);
   });
 });

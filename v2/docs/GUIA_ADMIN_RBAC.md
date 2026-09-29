@@ -57,19 +57,22 @@ São **5** (`FUNCAO_GROUPS`, `apps/core/constants.py`).
 | **Formador** | Visualiza grade mensal, gerencia bloqueios pessoais |
 | **Coordenador** | Cria solicitações de eventos para sua equipe |
 | **Apoio de Coordenação** | Auxilia coordenação, visualiza solicitações |
-| **Gerente** | Aprova/reprova solicitações (quando no Setor Superintendência), acessa dashboards |
+| **Gerente** | Aprova/reprova solicitações (quando lotado como Gerente na gerência Superintendência), acessa dashboards |
 | **Assistente Administrativo** | Combinada com o Setor **Controle**, aprova solicitações (composite, PR 3 / #1308) |
 
 ---
 
 ## Quem Pode Aprovar Solicitações SUPER?
 
-São **três** caminhos (`_user_has_solicitation_approvals` em `apps/core/rbac/policies.py`, espelhado por
-`can_approve_super` em `apps/core/views_basic.py`). A versão anterior deste guia listava só os dois primeiros.
+A regra fica em `solicitation_approval_basis` (`apps/core/rbac/policies.py`), espelhada por
+`can_approve_super` em `apps/core/views_basic.py`. Desde o PR B1 (#2070, 29/09/2026) são estes caminhos:
 
-✅ Ser **superusuário** (`_user_has_solicitation_approvals`)
+✅ Ser **superusuário**
 
-**OU** ter **ambos** (`_user_has_solicitation_approvals`):
+**OU** estar **lotado como Gerente na gerência Superintendência** (vínculo vigente, sem depender de grupo). É assim
+que as aprovadoras são cadastradas: no formulário de Usuários, gerência Superintendência + função Gerente.
+
+**OU** ter **ambos** os grupos (regra antiga, sai no B2; o formulário recusa formar esse par sem querer):
 - Função **Gerente** + Setor **Superintendência**
 
 **OU** ter **ambos** (`_user_has_solicitation_approvals`, via `user_is_assistente_administrativo_controle`):
@@ -79,7 +82,7 @@ São **três** caminhos (`_user_has_solicitation_approvals` em `apps/core/rbac/p
 
 | Usuário | Setor | Função | Pode Aprovar? |
 |---------|-------|--------|---------------|
-| Maria | Superintendência | Gerente | ✅ **Sim** |
+| Maria | Superintendência (lotação) | Gerente | ✅ **Sim** (vínculo) |
 | Beatriz | Controle | Assistente Administrativo | ✅ **Sim** (composite #1308) |
 | João | DAT | Gerente | ❌ Não (não é Superintendência) |
 | Pedro | Superintendência | Formador | ❌ Não (não é Gerente) |
@@ -132,9 +135,10 @@ O Salvar mexe só no que você mudou no formulário (#2071):
 - Ao criar, gerência e função são obrigatórias. Na edição, a função pode ficar vazia, e a gerência só pode
   ficar vazia para quem não tem lotação (como o Controle).
 - Lotar alguém na Superintendência não dá o grupo "Superintendência": quem é Gerente ali aprova pelo vínculo.
-- Se a pessoa já tem o grupo "Superintendência" ou "Controle" e o salvar a faria aprovar por esse grupo, o
-  sistema recusa e pede para tirar o grupo na tela de Grupos antes.
-- Tirar a função Gerente de uma aprovadora encerra o vínculo e ela deixa de aprovar.
+- Se a pessoa já tem o grupo "Superintendência" (que o formulário não mostra) e o salvar a faria aprovar por
+  esse grupo junto com Gerente, o sistema recusa e pede para tirar o grupo na tela de Grupos antes.
+- Tirar a função Gerente de uma aprovadora encerra o vínculo e ela deixa de aprovar. Para revogar, use este
+  formulário: tirar o Gerente pela tela de Grupos só vale depois do próximo Salvar aqui.
 - Atenção: mudar a gerência ou a função encerra os vínculos da pessoa em outras gerências (o formulário
   mostra uma só).
 
@@ -150,19 +154,19 @@ Se os campos aparecerem **desabilitados**, é porque sua conta não é superusu�
 ## Cenários Comuns
 
 ### Novo Formador da Superintendência
-- Setor: Superintendência
+- Gerência: Superintendência
 - Função: Formador
 
 ### Novo Coordenador do projeto Vidas
-- Setor: Vidas
+- Gerência: Vidas
 - Função: Coordenador
 
 ### Gerente que pode aprovar SUPER
-- Setor: Superintendência
+- Gerência: Superintendência
 - Função: Gerente
 
 ### Usuário do DAT que gerencia eventos
-- Setor: DAT
+- Gerência: DAT
 - Função: Coordenador ou Gerente (dependendo das responsabilidades)
 
 ### Usuário que trabalha em múltiplos setores
@@ -228,7 +232,8 @@ GET /api/me/policies/
 ## Dúvidas Frequentes
 
 ### Por que um Gerente não consegue aprovar?
-Verifique se ele está no setor **Superintendência**. Gerente em outro setor não aprova.
+Verifique se ele está **lotado como Gerente na gerência Superintendência** (formulário de Usuários). Gerente
+lotado em outra gerência não aprova.
 O outro caminho é Assistente Administrativo **do Controle**.
 
 ### Por que os campos de Setor/Função aparecem desabilitados para mim?

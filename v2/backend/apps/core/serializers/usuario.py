@@ -30,6 +30,7 @@ from apps.core.services.audit import (
     registrar_auditoria,
 )
 from apps.core.services.equipe_gerencia import (
+    encerrar_gerente_aprovador,
     encerrar_lotacao,
     papeis_de_grupos,
     setor_group_for,
@@ -41,11 +42,9 @@ from apps.core.services.rbac_service import get_assignable_group_names, nomes_gr
 _UNSET: Any = object()
 
 
-# #2071: bases de aprovação que vêm de GRUPO (composite legado, sai no B2) -> o grupo de setor do par.
-_BASES_POR_GRUPO: dict[str, str] = {
-    "grupo_superintendencia_gerente": "Superintendência",
-    "asst_admin_controle": "Controle",
-}
+# #2071: par do composite LEGADO de aprovação (espelha `APPROVER_COMPOSITES`; sai no B2). O par
+# Controle + Assistente Administrativo é base legítima e fica fora da trava.
+_PAR_LEGADO: tuple[str, str] = ("Superintendência", "Gerente")
 
 
 def _vinculo_exibido(user: Any) -> Any:
@@ -378,16 +377,22 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             encerrar_lotacao(user)
         elif has_gerencia and papeis and (nova_lotacao or papeis != papeis_antes):
             sync_user_lotacao(user, gerencia, papeis)
+        if groups is not None and "Gerente" not in {g.name for g in final}:
+            # O vínculo GERENTE na gerência aprovadora exige a função Gerente (tirada aqui ou na tela de Grupos).
+            encerrar_gerente_aprovador(user)
         base = solicitation_approval_basis(user)
-        grupo = _BASES_POR_GRUPO.get(base or "")
-        if base != base_antes and grupo is not None and (groups is None or grupo not in {g.name for g in groups}):
-            # O form não mostra grupos de setor e os preserva; eles não podem virar poder de aprovar
-            # pelo composite legado sem ninguém pedir (a transação do update() desfaz tudo).
+        setor, funcao = _PAR_LEGADO
+        pedido = groups is not None and setor in {g.name for g in groups}
+        par_novo = {setor, funcao} <= {g.name for g in final} and not {setor, funcao} <= {g.name for g in antes}
+        if not pedido and (par_novo or (base == "grupo_superintendencia_gerente" and base != base_antes)):
+            # O form não mostra o grupo de setor e o preserva; ele não pode virar poder de aprovar pelo
+            # par legado sem ninguém pedir (a transação do update() desfaz tudo).
             raise serializers.ValidationError(
                 {
                     "group_ids": (
-                        f'Salvar daria a esta pessoa o poder de aprovar solicitações pelo grupo "{grupo}" (regra '
-                        f'antiga). Tire o grupo "{grupo}" dela na tela de Grupos antes de salvar.'
+                        f'Esta pessoa tem o grupo "{setor}", que o formulário não mostra. Com a função {funcao}, ela '
+                        f"passaria a aprovar solicitações por esse grupo (regra antiga, que vai sair). Tire o grupo "
+                        f'"{setor}" dela na tela de Grupos antes de salvar.'
                     )
                 }
             )

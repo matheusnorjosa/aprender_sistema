@@ -12,7 +12,7 @@ from django.contrib.auth.models import Group
 from django.core.cache import cache
 from django.db.models import Q
 
-from apps.core.constants import ALLOWED_USER_GROUPS
+from apps.core.constants import ALLOWED_USER_GROUPS, FUNCAO_GROUPS
 from apps.core.models.group_classificacao import GroupClassificacao
 
 ASSIGNABLE_GROUPS_CACHE_KEY = "as2:rbac:assignable-groups:v1"
@@ -55,6 +55,15 @@ def get_assignable_group_names() -> set[str]:
         ASSIGNABLE_GROUPS_CACHE_TTL_SECONDS,
     )
     return resolved
+
+
+def nomes_grupos_funcao() -> set[str]:
+    """Grupos de FUNÇÃO: os estáticos (`FUNCAO_GROUPS`) + os classificados como função na tela de
+    Grupos. É a lista que o formulário de Usuários edita (`/api/rbac/meta/` `funcao_groups`)."""
+    dinamicos = GroupClassificacao.objects.filter(tipo=GroupClassificacao.Tipo.FUNCAO).values_list(
+        "group__name", flat=True
+    )
+    return set(FUNCAO_GROUPS) | set(dinamicos)
 
 
 def get_disallowed_group_names(groups: Iterable[Group]) -> set[str]:

@@ -57,19 +57,22 @@ São **5** (`FUNCAO_GROUPS`, `apps/core/constants.py`).
 | **Formador** | Visualiza grade mensal, gerencia bloqueios pessoais |
 | **Coordenador** | Cria solicitações de eventos para sua equipe |
 | **Apoio de Coordenação** | Auxilia coordenação, visualiza solicitações |
-| **Gerente** | Aprova/reprova solicitações (quando no Setor Superintendência), acessa dashboards |
+| **Gerente** | Aprova/reprova solicitações (quando lotado como Gerente na gerência Superintendência), acessa dashboards |
 | **Assistente Administrativo** | Combinada com o Setor **Controle**, aprova solicitações (composite, PR 3 / #1308) |
 
 ---
 
 ## Quem Pode Aprovar Solicitações SUPER?
 
-São **três** caminhos (`_user_has_solicitation_approvals` em `apps/core/rbac/policies.py`, espelhado por
-`can_approve_super` em `apps/core/views_basic.py`). A versão anterior deste guia listava só os dois primeiros.
+A regra fica em `solicitation_approval_basis` (`apps/core/rbac/policies.py`), espelhada por
+`can_approve_super` em `apps/core/views_basic.py`. Desde o PR B1 (#2070, 29/09/2026) são estes caminhos:
 
-✅ Ser **superusuário** (`_user_has_solicitation_approvals`)
+✅ Ser **superusuário**
 
-**OU** ter **ambos** (`_user_has_solicitation_approvals`):
+**OU** estar **lotado como Gerente na gerência Superintendência** (vínculo vigente, sem depender de grupo). É assim
+que as aprovadoras são cadastradas: no formulário de Usuários, gerência Superintendência + função Gerente.
+
+**OU** ter **ambos** os grupos (regra antiga, sai no B2; o formulário recusa formar esse par sem querer):
 - Função **Gerente** + Setor **Superintendência**
 
 **OU** ter **ambos** (`_user_has_solicitation_approvals`, via `user_is_assistente_administrativo_controle`):
@@ -79,7 +82,7 @@ São **três** caminhos (`_user_has_solicitation_approvals` em `apps/core/rbac/p
 
 | Usuário | Setor | Função | Pode Aprovar? |
 |---------|-------|--------|---------------|
-| Maria | Superintendência | Gerente | ✅ **Sim** |
+| Maria | Superintendência (lotação) | Gerente | ✅ **Sim** (vínculo) |
 | Beatriz | Controle | Assistente Administrativo | ✅ **Sim** (composite #1308) |
 | João | DAT | Gerente | ❌ Não (não é Superintendência) |
 | Pedro | Superintendência | Formador | ❌ Não (não é Gerente) |
@@ -107,7 +110,7 @@ São **três** caminhos (`_user_has_solicitation_approvals` em `apps/core/rbac/p
 > 🔴 **Mudou com o hardening Tier-0 (P0-1).** Editar Setor/Função de um usuário **não é mais
 > operação de "administrador"**: é restrita ao superusuário.
 >
-> - **Frontend**: os selects `setor_ids` e `funcao_ids` são renderizados com
+> - **Frontend**: os selects de Gerência (`gerencia_id`) e Função (`funcao_ids`) são renderizados com
 >   `disabled={!currentIsSuperuser}` (`v2/frontend/src/pages/AdminDAT/UsuariosPage.tsx`), e o
 >   payload de salvamento **não envia `group_ids`** para não-superuser.
 > - **Backend**: a action `assign_groups` é `permission_classes=[SuperuserOnly]`
@@ -121,9 +124,24 @@ Passos (como superusuário):
 
 1. Na lista de usuários, clique no botão **Editar** (ícone de lápis)
 2. No modal, você verá:
-   - **Setor (onde trabalha)**: selecione um ou mais setores
+   - **Gerência (onde trabalha)**: selecione a gerência; o setor vem dela
    - **Função (o que pode fazer)**: selecione uma ou mais funções
 3. Clique em **Salvar**
+
+O Salvar mexe só no que você mudou no formulário (#2071):
+
+- Grupos que o formulário não mostra (como Controle, DAT ou grupos de permissão) continuam.
+- Se a gerência e as funções não mudaram, a lotação não é alterada. Exceção: quem é Gerente na
+  Superintendência sem ter a função Gerente (tirada na tela de Grupos) deixa de aprovar.
+- Ao criar, gerência e função são obrigatórias. Na edição, a função pode ficar vazia, e a gerência só pode
+  ficar vazia para quem não tem lotação (como o Controle).
+- Lotar alguém na Superintendência não dá o grupo "Superintendência": quem é Gerente ali aprova pelo vínculo.
+- Se a pessoa já tem o grupo "Superintendência" (que o formulário não mostra) e o salvar a faria aprovar por
+  esse grupo junto com Gerente, o sistema recusa e pede para tirar o grupo na tela de Grupos antes.
+- Tirar a função Gerente de uma aprovadora encerra o vínculo e ela deixa de aprovar. Para revogar, use este
+  formulário: tirar o Gerente pela tela de Grupos só vale depois do próximo Salvar aqui.
+- Atenção: mudar a gerência ou a função encerra os vínculos da pessoa em outras gerências (o formulário
+  mostra uma só).
 
 Se os campos aparecerem **desabilitados**, é porque sua conta não é superusuário — não é bug.
 
@@ -137,24 +155,25 @@ Se os campos aparecerem **desabilitados**, é porque sua conta não é superusu�
 ## Cenários Comuns
 
 ### Novo Formador da Superintendência
-- Setor: Superintendência
+- Gerência: Superintendência
 - Função: Formador
 
 ### Novo Coordenador do projeto Vidas
-- Setor: Vidas
+- Gerência: Vidas
 - Função: Coordenador
 
 ### Gerente que pode aprovar SUPER
-- Setor: Superintendência
+- Gerência: Superintendência
 - Função: Gerente
 
 ### Usuário do DAT que gerencia eventos
-- Setor: DAT
+- Gerência: DAT
 - Função: Coordenador ou Gerente (dependendo das responsabilidades)
 
-### Usuário que trabalha em múltiplos setores
-- Setores: Vidas, Fluir (múltiplos)
-- Função: Coordenador
+### Usuário que trabalha em mais de uma gerência
+O formulário mostra uma gerência só. Quem atua em mais de uma (ex.: coordena uma e é formadora em outra)
+tem um vínculo em cada, vindo do import de equipe. Salvar sem mudar gerência nem funções mantém todos; mudar
+a gerência ou a função encerra os das outras gerências.
 
 ---
 
@@ -215,7 +234,8 @@ GET /api/me/policies/
 ## Dúvidas Frequentes
 
 ### Por que um Gerente não consegue aprovar?
-Verifique se ele está no setor **Superintendência**. Gerente em outro setor não aprova.
+Verifique se ele está **lotado como Gerente na gerência Superintendência** (formulário de Usuários). Gerente
+lotado em outra gerência não aprova.
 O outro caminho é Assistente Administrativo **do Controle**.
 
 ### Por que os campos de Setor/Função aparecem desabilitados para mim?
@@ -226,7 +246,8 @@ Porque desde o hardening Tier-0 essa edição é **somente superusuário**
 Sim. Por exemplo, alguém pode ser Coordenador e Gerente ao mesmo tempo.
 
 ### Como remover um grupo de um usuário?
-Na edição do usuário (como superusuário), desmarque o grupo desejado e salve.
+Função: na edição do usuário (como superusuário), desmarque a função e salve. Grupos que o formulário não
+mostra (setor, permissões): na tela de Grupos.
 
 ⚠️ **O import de usuários NÃO remove grupos — só adiciona.** A concessão de grupos por
 `POST /api/usuarios/import/` (coluna `grupos`) **passou a exigir superusuário** — era drift

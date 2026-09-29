@@ -30,7 +30,7 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandParser
 from django.db import transaction
 
-from apps.core.models import Municipio, Participation, Projeto, Solicitacao
+from apps.core.models import EquipeGerencia, Municipio, Participation, Projeto, Solicitacao
 
 User = get_user_model()
 
@@ -118,6 +118,8 @@ class Command(BaseCommand):
         if not dry_run:
             participations.delete()
             solicitacoes.delete()
+            # EquipeGerencia.usuario é PROTECT (super_e2e tem vínculo GERENTE desde o PR B1).
+            EquipeGerencia.objects.filter(usuario__in=users).delete()
             users.delete()
 
         for username in e2e_usernames:

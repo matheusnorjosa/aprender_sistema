@@ -143,7 +143,6 @@ def preview_gcal(
         extra={
             "event": "preview_gcal",
             "user_id": user.id,
-            "username": user.username,
             "solicitacao_id": solicitacao.id,
             "event_id": preview["event_id"],
             "ip_address": client_ip,

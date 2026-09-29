@@ -1,6 +1,6 @@
 """Tests for seed_e2e_users idempotency and resilience."""
 
-# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false, reportPrivateUsage=false
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from django.core.management import call_command
 
 import pytest
 
-from apps.core.models import Compra, Municipio, Projeto, Usuario
+from apps.core.models import Compra, EquipeGerencia, Municipio, Projeto, Usuario
 
 SEED_USERNAMES = [
     "coord_e2e@test.com",
@@ -33,6 +33,8 @@ def _clean_seed_entities() -> None:
     Compra.objects.filter(
         projeto__nome__in=SEED_PROJETOS,
     ).delete()
+    # EquipeGerencia.usuario é PROTECT: o vínculo GERENTE de super_e2e (PR B1) sai antes.
+    EquipeGerencia.objects.filter(usuario__username__in=SEED_USERNAMES).delete()
     Usuario.objects.filter(username__in=SEED_USERNAMES).delete()
     Projeto.objects.filter(nome__in=SEED_PROJETOS).delete()
     for nome, uf in SEED_MUNICIPIOS:
@@ -110,3 +112,28 @@ class TestSeedE2EUsersCommand:
         assert Usuario.objects.filter(username__in=SEED_USERNAMES).count() == 4
         assert Projeto.objects.filter(nome="TESTE E2E").exists()
         assert "SEED E2E concluído com sucesso" in output
+
+    def test_personas_aprovadoras_tem_vinculo_gerente_na_superintendencia(self, clean_seed_e2e_state):
+        """PR B1: aprovar passa pelo vínculo GERENTE vigente na SUPERINTENDENCIA — as
+        personas aprovadoras dos E2E (j01/j04/j08/j10) precisam dele."""
+        _run_seed_command()
+
+        vinculados = set(
+            EquipeGerencia.vigentes_em()
+            .filter(papel="GERENTE", gerencia__nome="SUPERINTENDENCIA")
+            .values_list("usuario__username", flat=True)
+        )
+        assert {"super_e2e@test.com", "super_geral@test.com", "approver_03@test.com"} <= vinculados
+
+    def test_cleanup_remove_persona_com_vinculo(self, clean_seed_e2e_state):
+        """`cleanup_e2e_data` apaga super_e2e mesmo com o vínculo GERENTE (FK PROTECT).
+
+        Chama só o passo de usuários: o passo de município do comando já falha por outro
+        motivo, anterior ao PR B1 (Compra.municipio PROTECT), fora deste escopo."""
+        from apps.dev_tools.management.commands.cleanup_e2e_data import Command as Cleanup
+
+        _run_seed_command()
+
+        Cleanup(stdout=StringIO())._delete_users(dry_run=False)
+
+        assert not Usuario.objects.filter(username="super_e2e@test.com").exists()

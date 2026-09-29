@@ -348,55 +348,90 @@ class TestResponseShape:
 # ============================================================================
 
 
+def _pendentes_nao_super_e_super(world, dono: Usuario) -> None:
+    """1 pendente NAO_SUPER + 1 pendente SUPER, ambas de `dono`."""
+    _make_solicitacao(
+        usuario=dono,
+        projeto=world["p1"],  # NAO_SUPER
+        municipio=world["municipio"],
+        tipo_evento=world["tipo_evento"],
+        status="pendente",
+    )
+    p_super = Projeto.objects.filter(nome="Projeto SUPER").first() or _make_projeto(
+        "Projeto SUPER", world["g1"], fluxo="SUPER"
+    )
+    _make_solicitacao(
+        usuario=dono,
+        projeto=p_super,
+        municipio=world["municipio"],
+        tipo_evento=world["tipo_evento"],
+        status="pendente",
+    )
+
+
+def _make_aprovadora() -> Usuario:
+    """PR B1: GERENTE vigente na SUPERINTENDENCIA, sem grupos."""
+    g1 = Gerencia.objects.filter(nome="SUPERINTENDENCIA").first() or _make_gerencia("SUPERINTENDENCIA", "Super")
+    user = _make_user("aprovadora", [])
+    _link_to_gerencia(user, g1, "GERENTE")
+    return user
+
+
 class TestParityWithLegacyBehavior:
-    def test_super_pode_aprovar_apenas_fluxo_super(self, world):
-        """Super (não-DAT) só conta aprovações pendentes em projetos SUPER."""
-        super_user = _make_user("super_pa", ["Superintendência"])
+    """M11-16 (PR B1): `pending_approvals` segue a policy real de aprovação
+    (`access_solicitation_approvals`), conta só pendentes SUPER e, para quem não é
+    superuser, exclui as próprias (que ela não pode decidir)."""
 
-        # 1 pendente em projeto NAO_SUPER (mundo já tem aprovados; criar pendente)
-        _make_solicitacao(
-            usuario=world["autor"],
-            projeto=world["p1"],  # NAO_SUPER
-            municipio=world["municipio"],
-            tipo_evento=world["tipo_evento"],
-            status="pendente",
-        )
-        # 1 pendente em projeto SUPER
-        p_super = _make_projeto("Projeto SUPER", world["g1"], fluxo="SUPER")
-        _make_solicitacao(
-            usuario=world["autor"],
-            projeto=p_super,
-            municipio=world["municipio"],
-            tipo_evento=world["tipo_evento"],
-            status="pendente",
-        )
+    def test_aprovadora_conta_apenas_pendentes_super(self, world):
+        """Aprovadora (vínculo GERENTE em g1) conta só as pendentes SUPER."""
+        _pendentes_nao_super_e_super(world, world["autor"])
 
-        response = _get_home_stats(super_user)
+        response = _get_home_stats(_make_aprovadora())
         assert response.status_code == 200
-        # Super conta apenas SUPER pendente = 1
         assert response.json()["pending_approvals"] == 1
 
-    def test_dat_pode_aprovar_todos_fluxos(self, world):
-        """DAT conta aprovações pendentes de todos os fluxos."""
+    def test_dat_nao_aprova_e_recebe_null(self, world):
+        """DAT não tem a policy de aprovação → null (antes contava todos os fluxos)."""
         dat_user = _make_user("dat_pa", ["DAT"])
-
-        _make_solicitacao(
-            usuario=world["autor"],
-            projeto=world["p1"],  # NAO_SUPER
-            municipio=world["municipio"],
-            tipo_evento=world["tipo_evento"],
-            status="pendente",
-        )
-        p_super = _make_projeto("Projeto SUPER", world["g1"], fluxo="SUPER")
-        _make_solicitacao(
-            usuario=world["autor"],
-            projeto=p_super,
-            municipio=world["municipio"],
-            tipo_evento=world["tipo_evento"],
-            status="pendente",
-        )
+        _pendentes_nao_super_e_super(world, world["autor"])
 
         response = _get_home_stats(dat_user)
+        assert response.status_code == 200
+        assert response.json()["pending_approvals"] is None
+
+    def test_superintendencia_sem_autoridade_recebe_null(self, world):
+        """Setor Superintendência sem vínculo GERENTE nem composite não aprova → null."""
+        _pendentes_nao_super_e_super(world, world["autor"])
+
+        response = _get_home_stats(_make_user("super_pa", ["Superintendência"]))
+        assert response.status_code == 200
+        assert response.json()["pending_approvals"] is None
+
+    def test_asst_admin_controle_conta_pendentes_super(self, world):
+        """Controle + Assistente Administrativo aprova → conta (antes recebia null)."""
+        _pendentes_nao_super_e_super(world, world["autor"])
+
+        response = _get_home_stats(_make_user("asst_ctrl", ["Controle", "Assistente Administrativo"]))
+        assert response.status_code == 200
+        assert response.json()["pending_approvals"] == 1
+
+    def test_aprovadora_nao_conta_as_proprias(self, world):
+        """As pendentes que a aprovadora criou não entram: ela não pode decidi-las."""
+        aprovadora = _make_aprovadora()
+        _pendentes_nao_super_e_super(world, world["autor"])
+        _pendentes_nao_super_e_super(world, aprovadora)
+
+        response = _get_home_stats(aprovadora)
+        assert response.status_code == 200
+        assert response.json()["pending_approvals"] == 1
+
+    def test_superuser_conta_inclusive_as_proprias(self, world):
+        """Superuser pode decidir a própria (marcada no AuditLog) → conta todas as SUPER."""
+        superuser = _make_user("su_pa", [], is_superuser=True)
+        _pendentes_nao_super_e_super(world, world["autor"])
+        _pendentes_nao_super_e_super(world, superuser)
+
+        response = _get_home_stats(superuser)
         assert response.status_code == 200
         assert response.json()["pending_approvals"] == 2
 

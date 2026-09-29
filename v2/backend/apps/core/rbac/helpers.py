@@ -20,6 +20,7 @@ from typing import Final
 
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
 
+from apps.core.models import EquipeGerencia
 from apps.core.services.rbac_permissions import get_user_functional_permissions
 
 # SSOT dos composites Setor×Função que conferem autoridade de APROVAÇÃO de
@@ -34,6 +35,12 @@ APPROVER_COMPOSITES: Final[tuple[tuple[str, str], ...]] = (
     ("Superintendência", "Gerente"),
     ("Controle", "Assistente Administrativo"),
 )
+
+# PR B1 (2026-09-29): chave TÉCNICA da gerência cujos GERENTEs vigentes aprovam
+# solicitações (g1, `seed_gerencias.GERENCIAS`). É `Gerencia.nome`, não `nome_setor`
+# nem `nome_exibicao` (rótulos editáveis), nem `setor_canonico` (reescrito pelo import),
+# nem id (muda entre ambientes). Renomear g1 é bloqueado em `GerenciaSerializer.validate_nome`.
+GERENCIA_APROVADORA_NOME: Final = "SUPERINTENDENCIA"
 
 
 def user_in_composite(
@@ -112,6 +119,28 @@ def user_is_assistente_administrativo_controle(
     Nomes do composite vêm da SSOT `APPROVER_COMPOSITES` (não mais literais aqui).
     """
     return user_in_composite(user, "Controle", "Assistente Administrativo")
+
+
+def user_is_gerente_superintendencia(
+    user: AbstractBaseUser | AnonymousUser | None,
+) -> bool:
+    """
+    True se o usuário tem vínculo `EquipeGerencia` VIGENTE com papel GERENTE na
+    gerência `GERENCIA_APROVADORA_NOME` (PR B1, 2026-09-29).
+
+    - user None ou anônimo → False
+    - is_superuser → False (bypass é decidido por quem chama)
+    - vigência = SSOT `EquipeGerencia.vigentes_em()` (ativo + janela de datas)
+    - `Gerencia.ativo` NÃO é checado: DAT/Controle alteram esse campo, e desligar g1
+      pararia as aprovações; o vínculo tem o próprio desligamento.
+    """
+    if not user or not user.is_authenticated:
+        return False
+    return (
+        EquipeGerencia.vigentes_em()
+        .filter(usuario=user, papel="GERENTE", gerencia__nome=GERENCIA_APROVADORA_NOME)
+        .exists()
+    )
 
 
 def user_has_all_perms(

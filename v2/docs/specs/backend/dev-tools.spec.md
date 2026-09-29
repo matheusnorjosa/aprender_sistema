@@ -56,7 +56,7 @@ O app é **condicional**: só entra em `INSTALLED_APPS` quando `INCLUDE_DEV_TOOL
 | Comando | O que semeia / faz |
 |---------|--------------------|
 | `seed_rbac` | Grupos e permissões mínimas. `GROUPS = SETOR_GROUPS + FUNCAO_GROUPS` (`seed_rbac.py`) = **13 setores + 5 funções = 18**; o loop de `PERMS_BY_GROUP` cria ainda o grupo legado `"Gerência"`, fora de `GROUPS`. Idempotente; é a base do RBAC. ⚠️ O docstring do próprio comando ainda diz "FUNCAO_GROUPS (4)" — desatualizado: `apps/core/constants.py` (`FUNCAO_GROUPS`) tem **5** funções desde a inclusão de `Assistente Administrativo`. |
-| `seed_e2e_users` | **13** usuários (`coord_e2e`, `super_e2e`, `controle_e2e`, `formador_e2e`, `coord_vidas`, `coord_fluir`, `coord_acerta`, `gerente_vidas`, `dat_e2e`, `super_geral`, `approver_03`, `formador_vidas`, `formador_fluir`) + grupos, **2** municípios (Salvador/BA e Fortaleza/CE, para cobrir RD-04), **2** projetos (`TESTE E2E` fluxo SUPER e `TESTE E2E NAO_SUPER` fluxo NAO_SUPER), além de `TipoEvento` e `Compra`. Idempotente. ⚠️ O docstring do comando (`seed_e2e_users.py`) ainda anuncia "4 usuários / 1 município / 1 projeto" — desatualizado. |
+| `seed_e2e_users` | **13** usuários (`coord_e2e`, `super_e2e`, `controle_e2e`, `formador_e2e`, `coord_vidas`, `coord_fluir`, `coord_acerta`, `gerente_vidas`, `dat_e2e`, `super_geral`, `approver_03`, `formador_vidas`, `formador_fluir`) + grupos, **2** municípios (Salvador/BA e Fortaleza/CE, para cobrir RD-04), **2** projetos (`TESTE E2E` fluxo SUPER e `TESTE E2E NAO_SUPER` fluxo NAO_SUPER), além de `TipoEvento` e `Compra`. Vínculos `EquipeGerencia`: os coords/formadores de setor e, desde o PR B1, `super_e2e`, `super_geral` e `approver_03` como GERENTE na gerência `Super` (`SUPERINTENDENCIA`) — é o vínculo que dá o poder de aprovar. Idempotente. ⚠️ O docstring do comando (`seed_e2e_users.py`) ainda anuncia "4 usuários / 1 município / 1 projeto" — desatualizado. |
 | `seed_frontend_contract_data` | Dados determinísticos da matriz funcional crítica frontend↔backend (checklist Playwright): usuários, municípios, projetos, compras, solicitações. |
 | `seed_gerencias` | Seed inicial de gerências (7 registros). |
 | `seed_gerentes` | Vincula gerentes ao grupo função Gerente + `EquipeGerencia.papel=GERENTE`. |
@@ -69,7 +69,7 @@ O app é **condicional**: só entra em `INSTALLED_APPS` quando `INCLUDE_DEV_TOOL
 | `migrate_rbac_groups` | Migra usuários para a estrutura RBAC atual (Setor + Função). Backfill. |
 | `backfill_is_online` | Backfill a partir da coluna G da planilha original; grava **três** campos de `Solicitacao` num só `update`: `tipo`, `is_online` e `tipo_evento` (`backfill_is_online.py`). |
 | `populate_municipio_coords` | Popula latitude/longitude de `Municipio` a partir de CSV. |
-| `cleanup_e2e_data` | Remove os dados E2E criados por `seed_e2e_users` (Playwright). |
+| `cleanup_e2e_data` | Remove os dados E2E criados por `seed_e2e_users` (Playwright). Apaga os vínculos `EquipeGerencia` dos usuários E2E antes deles (FK PROTECT; `super_e2e` tem vínculo desde o PR B1). ⚠️ O passo do município falha quando o seed criou `Compra` (FK PROTECT) — defeito anterior ao PR B1, não corrigido. |
 
 ## Contratos e invariantes
 

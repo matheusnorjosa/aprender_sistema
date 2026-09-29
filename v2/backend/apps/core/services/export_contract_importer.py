@@ -68,6 +68,7 @@ from apps.core.services.equipe_gerencia_import import (
     _generate_gerencia_nome,
     _get_or_create_gerencia,
     _resolve_usuario,
+    is_vinculo_aprovador,
 )
 from apps.core.services.eventos_import import _compute_external_hash
 from apps.core.services.export_contract_projeto_resolver import build_projeto_index, resolve_projeto_export
@@ -851,6 +852,7 @@ class ExportContractImporter:
             # would_reject. Gerência resolvida read-only (o apply cria se faltar via
             # _get_or_create_gerencia). PII: usuário (CPF) só entra na contagem de existência.
             existing = set(EquipeGerencia.objects.values_list("gerencia_id", "usuario_id", "papel"))
+            reasons = {"vinculo_aprovador_bloqueado": 0}
             for r in rows:
                 setor = (r.get("gerencia") or r.get("setor") or "").strip()
                 papel = _resolve_papel(r.get("papel"))
@@ -867,8 +869,14 @@ class ExportContractImporter:
                     continue
                 ger = self._resolve_gerencia_readonly(setor)
                 exists = ger is not None and (ger.id, usuario.id, papel) in existing
+                # PR B1 (anti-escalada): o import nunca cria vínculo que dá poder de aprovar.
+                if not exists and ger is not None and is_vinculo_aprovador(ger, papel):
+                    tally["would_reject"] += 1
+                    reasons["vinculo_aprovador_bloqueado"] += 1
+                    continue
                 st, _ = diff_and_classify({} if exists else None, {}, protected)
                 tally[st] += 1
+            tally["reject_reasons"] = reasons
 
         elif name == "solicitacao":
             # NK = external_hash (= evento_id estável do CSV; fallback hash/recompute). FK/hora/coordenador não resolvidos →
@@ -1248,11 +1256,17 @@ class ExportContractImporter:
             gerencia = _get_or_create_gerencia(setor_raw, ger_stats)
             if gerencia is None:
                 continue
+            exists = EquipeGerencia.objects.filter(gerencia=gerencia, usuario=usuario, papel=papel).exists()
+            # PR B1 (anti-escalada): vínculo aprovador não nasce por import — a linha não grava
+            # nada (classify reporta `reject_reasons.vinculo_aprovador_bloqueado`); concessão =
+            # cadastro de usuário (superuser, auditado).
+            if not exists and is_vinculo_aprovador(gerencia, papel):
+                continue
             setor_canon = (r.get("setor_canonico") or "").strip()
             if setor_canon and gerencia.setor_canonico != setor_canon:
                 gerencia.setor_canonico = setor_canon
                 gerencia.save(update_fields=["setor_canonico"])
-            if EquipeGerencia.objects.filter(gerencia=gerencia, usuario=usuario, papel=papel).exists():
+            if exists:
                 continue
             EquipeGerencia.objects.create(
                 gerencia=gerencia,

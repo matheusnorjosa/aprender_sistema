@@ -6,9 +6,11 @@
  * - Estado vazio: tabela renderiza sem linhas de ação de aprovar.
  * - Sem permissão (policies = []): botão "Aprovar" ausente mesmo com pendente.
  * - Com permissão (`access_solicitation_approvals`): botão "Aprovar" presente.
+ * - PR B1 (PA-02 segregação): a linha da PRÓPRIA solicitação sai sem checkbox e sem
+ *   Aprovar/Reprovar, com a Tag "Sua solicitação" (a de outra pessoa segue normal).
  *
  * GOTCHA: todo cliente de API que a página dispara no useEffect de mount é
- * mockado (listSolicitacoes, getMyPolicies) resolvendo com dados vazios/mínimos.
+ * mockado (listSolicitacoes, getMyPolicies, getMe) resolvendo com dados vazios/mínimos.
  * Sem isso, o fetch rejeita no jsdom e loga async no teardown do worker →
  * EnvironmentTeardownError, reprovando o CI mesmo com asserts verdes.
  * `usePolling` também é mockado (no-op) para não disparar polling real.
@@ -19,7 +21,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MemoryRouter } from 'react-router';
-import type { PaginatedResponse, Solicitacao } from '../../../types';
+import type { CurrentUser, PaginatedResponse, Solicitacao } from '../../../types';
 
 vi.mock('../../../api/solicitacoes', () => ({
   listSolicitacoes: vi.fn(),
@@ -34,6 +36,10 @@ vi.mock('../../../api/me', () => ({
   getMyPolicies: vi.fn(),
 }));
 
+vi.mock('../../../api/availability', () => ({
+  getMe: vi.fn(),
+}));
+
 vi.mock('../../../hooks/usePolling', () => ({
   usePolling: vi.fn(),
 }));
@@ -41,6 +47,7 @@ vi.mock('../../../hooks/usePolling', () => ({
 import ApprovalsPage from '../ApprovalsPage';
 import { listSolicitacoes } from '../../../api/solicitacoes';
 import { getMyPolicies } from '../../../api/me';
+import { getMe } from '../../../api/availability';
 import { usePolling } from '../../../hooks/usePolling';
 
 /** Página vazia (nenhuma solicitação). */
@@ -66,6 +73,26 @@ function pendingRow(overrides: Partial<Solicitacao> = {}): Solicitacao {
   } as unknown as Solicitacao;
 }
 
+/** Usuário logado mínimo (`/api/me/`). */
+function meUser(overrides: Partial<CurrentUser> = {}): CurrentUser {
+  return {
+    id: 99,
+    username: 'aprovadora',
+    email: '',
+    first_name: 'Aprovadora',
+    last_name: 'Teste',
+    name: 'Aprovadora Teste',
+    groups: [],
+    setores: [],
+    funcoes: [],
+    is_superuser: false,
+    is_superintendencia: false,
+    can_approve_super: true,
+    permissions: [],
+    ...overrides,
+  };
+}
+
 function renderPage(): ReturnType<typeof render> {
   return render(
     <MemoryRouter>
@@ -78,6 +105,7 @@ describe('ApprovalsPage', () => {
   beforeEach(() => {
     vi.mocked(listSolicitacoes).mockResolvedValue(emptyPage());
     vi.mocked(getMyPolicies).mockResolvedValue([]);
+    vi.mocked(getMe).mockResolvedValue(meUser());
   });
 
   afterEach(() => {
@@ -162,5 +190,36 @@ describe('ApprovalsPage', () => {
     expect(
       within(table).getByRole('button', { name: /Reprovar/i }),
     ).toBeInTheDocument();
+  }, 20000);
+
+  test('linha própria: sem checkbox e sem Aprovar/Reprovar, com a Tag "Sua solicitação"', async () => {
+    vi.mocked(listSolicitacoes).mockResolvedValue({
+      count: 2,
+      next: null,
+      previous: null,
+      results: [
+        pendingRow({ id: 1, usuario: 99, municipio_nome: 'MunicipioProprio' }),
+        pendingRow({ id: 2, usuario: 5, municipio_nome: 'MunicipioAlheio' }),
+      ],
+    });
+    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
+    vi.mocked(getMe).mockResolvedValue(meUser({ id: 99 }));
+
+    renderPage();
+
+    const propria = (await screen.findByText('MunicipioProprio')).closest('tr');
+    const alheia = screen.getByText('MunicipioAlheio').closest('tr');
+    expect(propria).not.toBeNull();
+    expect(alheia).not.toBeNull();
+
+    // A alheia segue com checkbox e ações (espera o canApprove chegar).
+    await within(alheia as HTMLElement).findByRole('button', { name: /Aprovar/i }, { timeout: 10000 });
+    expect(within(alheia as HTMLElement).getByRole('checkbox')).toBeInTheDocument();
+
+    const linha = within(propria as HTMLElement);
+    expect(linha.getByText('Sua solicitação')).toBeInTheDocument();
+    expect(linha.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(linha.queryByRole('button', { name: /Aprovar/i })).not.toBeInTheDocument();
+    expect(linha.queryByRole('button', { name: /Reprovar/i })).not.toBeInTheDocument();
   }, 20000);
 });

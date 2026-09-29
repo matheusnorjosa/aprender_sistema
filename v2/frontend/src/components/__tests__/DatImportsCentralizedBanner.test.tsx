@@ -22,6 +22,7 @@ const baseUser: CurrentUser = {
   groups: [],
   setores: [],
   funcoes: [],
+  gerencias: [],
   is_superuser: false,
   is_superintendencia: false,
   can_approve_super: false,

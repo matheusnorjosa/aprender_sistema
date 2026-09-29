@@ -29,6 +29,7 @@ function makeUser(overrides: Partial<CurrentUser> = {}): CurrentUser {
     groups: ['Coordenador'],
     setores: ['Vidas'],
     funcoes: ['Coordenador'],
+    gerencias: [],
     is_superuser: false,
     is_superintendencia: false,
     can_approve_super: false,
@@ -81,6 +82,19 @@ describe('PerfilPage', () => {
     // CPF mascarado (LGPD): 3 primeiros + 2 últimos.
     expect(screen.getByText('049.***.***-05')).toBeInTheDocument();
     expect(screen.getByText('coord@aprendereditora.com.br')).toBeInTheDocument();
+  });
+
+  test('PR A: o setor vem do vínculo (me.gerencias, nome de tela), não do grupo', async () => {
+    renderPage(
+      makeUser({ setores: ['Vidas'], gerencias: [{ id: 4, rotulo: 'Superativar', papeis: ['COORDENADOR'] }] })
+    );
+    expect(await screen.findByText('Superativar')).toBeInTheDocument();
+    expect(screen.queryByText('Vidas')).not.toBeInTheDocument();
+  });
+
+  test('PR A: sem vínculo (Controle opera por grupo), o setor cai para os grupos de setor', async () => {
+    renderPage(makeUser({ setores: ['Controle'], gerencias: [] }));
+    expect(await screen.findByText('Controle')).toBeInTheDocument();
   });
 
   test('mascara o CPF do campo cpf (não do username) e mostra telefone/cargo', async () => {

@@ -105,7 +105,9 @@ Inventário por domínio (rota → componente → guard **como o código aplica 
 |---|---|---|
 | `/solicitacoes/disponibilidade` | `Disponibilidade/MonthlyPage` | `allow={can('view_all_availability') \|\| canDisponibilidade}` |
 | `/solicitacoes/bloqueios` | `pages/Disponibilidade.tsx` (arquivo raiz) | `allow={access.canAccessBlocks}` — inclui Formador, escopo próprio |
-| `/solicitacoes/deslocamentos` | `Deslocamentos/DeslocamentosPage` | `allow={can('view_all_availability') \|\| canControle \|\| canCoordenador \|\| canDAT}` |
+| `/solicitacoes/deslocamentos` | `Deslocamentos/DeslocamentosPage` | `allow={can('view_all_availability') \|\| canControle \|\| canCoordenador \|\| canDAT \|\| isGestorPorVinculo}` |
+
+> **PR A (2026-09-29):** `canDisponibilidade`, `canBloqueios` (→ `canAccessBlocks`) e o gate de Deslocamentos também aceitam `isGestorPorVinculo` — vínculo GERENTE/COORDENADOR/APOIO em `/api/me/.gerencias`, mesmo sem grupo de FUNÇÃO (o backend já escopa por vínculo). O menu (`AppSidebar`) e o gate local da `DeslocamentosPage` seguem as mesmas flags. Na Grade, a `FiltersBar` escolhe a gerência pela policy `view_all_availability` + `me.gerencias` (ver [`hooks-rbac.spec.md`](./hooks-rbac.spec.md)); a opção sem gerência se chama "Participantes de projetos SUPER". Na PreAgenda, o filtro de gerência é um Select das gerências ativas que manda `gerencia_id` para a lista e para o resumo (KPIs); o resumo não recebe mais o `status` da lista (lá `status` é o `gcal_status`, e `approved` zerava os KPIs). Nas telas de admin, setor = `rotulo` da gerência: coluna Setor de Usuários pela lotação vigente (sem vínculo — Controle, DAT, Diretoria —, os grupos de setor, como no Perfil), o Select de lotação inclui a gerência atual mesmo inativa, 1ª coluna de Gerências, e em Projetos a tag da gerência com o setor do catálogo embaixo quando difere (sem coluna nova).
 
 ### Controle
 

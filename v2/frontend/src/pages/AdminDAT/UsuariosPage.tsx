@@ -103,7 +103,7 @@ interface UserRecord {
   groups?: string[];
   group_ids_display?: ID[];
   // Lotação vigente (EquipeGerencia) — hidrata a gerência no EDIT. null se não há vínculo.
-  gerencia_atual?: { gerencia_id: number; nome_setor: string; setor_canonico: string; papel: string } | null;
+  gerencia_atual?: { gerencia_id: number; rotulo: string; nome_setor: string; setor_canonico: string; papel: string } | null;
 }
 
 /**
@@ -200,16 +200,21 @@ export default function UsuariosPage(): JSX.Element {
     [rbacMeta]
   );
 
-  // Gerência específica (single-select). Label = nome_setor (fallback nome);
-  // setor_canonico vira hint no resumo. Só gerências ATIVAS entram (carregadas
-  // no fetch de contexto já filtradas por `ativo: true`).
-  const gerenciaOptions = useMemo(
-    () => gerencias
+  // Gerência específica (single-select). Label = rotulo (nome de tela, PR A). Só
+  // gerências ATIVAS entram (carregadas no fetch de contexto já filtradas por `ativo: true`),
+  // mais a lotação atual de quem está em edição quando ela foi desativada — o form a
+  // reenvia e o backend aceita (sem ela o Select mostraria o id cru).
+  const gerenciaOptions = useMemo(() => {
+    const options = gerencias
       .slice()
-      .sort((a, b) => (a.nome_setor || a.nome).localeCompare(b.nome_setor || b.nome))
-      .map((g) => ({ label: g.nome_setor || g.nome, value: g.id })),
-    [gerencias]
-  );
+      .sort((a, b) => a.rotulo.localeCompare(b.rotulo, 'pt-BR'))
+      .map((g) => ({ label: g.rotulo, value: g.id }));
+    const atual = editingUser?.gerencia_atual;
+    if (atual && !options.some((o) => o.value === atual.gerencia_id)) {
+      options.push({ label: atual.rotulo, value: atual.gerencia_id });
+    }
+    return options;
+  }, [gerencias, editingUser]);
 
   const funcaoOptions = useMemo(
     () => grupos
@@ -478,14 +483,16 @@ export default function UsuariosPage(): JSX.Element {
       render: (cargo: string | undefined) => cargo || <Text type="secondary">-</Text>,
     },
     {
+      // PR A: setor = gerência da lotação vigente (EquipeGerencia), pelo nome de tela.
+      // Sem vínculo (Controle, DAT, Diretoria operam por grupo), cai para os grupos de setor.
       title: 'Setor',
       key: 'setor',
       render: (_, record) => {
-        const setores = (record.groups || []).filter((g) => setorGroupsSet.has(g));
+        const setores = record.gerencia_atual
+          ? [record.gerencia_atual.rotulo]
+          : (record.groups || []).filter((g) => setorGroupsSet.has(g));
         return setores.length > 0 ? (
-          setores.map((g) => (
-            <Tag key={g} color="purple">{g}</Tag>
-          ))
+          setores.map((s) => <Tag key={s} color="purple">{s}</Tag>)
         ) : (
           <Text type="secondary">-</Text>
         );
@@ -805,18 +812,12 @@ export default function UsuariosPage(): JSX.Element {
               <div>
                 <Text strong>Gerência selecionada: </Text>
                 {(() => {
-                  const gerencia = gerencias.find((ger) => ger.id === selectedGerenciaId);
+                  // Mesmas opções do Select (inclui a lotação atual inativa).
+                  const gerencia = gerenciaOptions.find((opt) => opt.value === selectedGerenciaId);
                   if (!gerencia) {
                     return <Text type="secondary">nenhuma gerência selecionada</Text>;
                   }
-                  return (
-                    <>
-                      <Tag color="green">{gerencia.nome_setor || gerencia.nome}</Tag>
-                      {gerencia.setor_canonico ? (
-                        <Text type="secondary">setor: {gerencia.setor_canonico}</Text>
-                      ) : null}
-                    </>
-                  );
+                  return <Tag color="green">{gerencia.label}</Tag>;
                 })()}
               </div>
               <div>

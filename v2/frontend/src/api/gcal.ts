@@ -34,8 +34,11 @@ export interface GCalFilters {
   date_from?: string;
   date_to?: string;
   sector?: string;
+  /** PR A: filtra por `projeto.gerencia_id` (o mesmo filtro da lista `/solicitacoes/`). */
+  gerencia_id?: string;
   gcal_status?: string;
   q?: string;
+  /** Aqui é o `gcal_status` (NONE/PENDING/PUBLISHED/ERROR), não o status da solicitação. */
   status?: string;
 }
 

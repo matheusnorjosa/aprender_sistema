@@ -48,8 +48,15 @@ _PAR_LEGADO: tuple[str, str] = ("Superintendência", "Gerente")
 
 
 def _vinculo_exibido(user: Any) -> Any:
-    """O vínculo vigente que o form de Usuários mostra (e reenvia no save): o primeiro por id."""
-    return EquipeGerencia.vigentes_em().filter(usuario=user).select_related("gerencia").order_by("id").first()
+    """O vínculo vigente que o form de Usuários mostra (e reenvia no save): o primeiro por id, preferindo
+    gerência ativa (senão um vínculo antigo em gerência desativada viraria a lotação editada)."""
+    return (
+        EquipeGerencia.vigentes_em()
+        .filter(usuario=user)
+        .select_related("gerencia")
+        .order_by("-gerencia__ativo", "id")
+        .first()
+    )
 
 
 class UserSlimSerializer(serializers.ModelSerializer):
@@ -61,6 +68,14 @@ class UserSlimSerializer(serializers.ModelSerializer):
     class Meta:
         model = get_user_model()
         fields = ("id", "first_name", "last_name", "email")
+
+
+class GerenciaVinculoSerializer(serializers.Serializer):  # type: ignore[misc]
+    """Gerência em que o usuário tem vínculo vigente (item de `/api/me/.gerencias`)."""
+
+    id = serializers.IntegerField()
+    rotulo = serializers.CharField()
+    papeis = serializers.ListField(child=serializers.CharField())
 
 
 class CurrentUserSerializer(serializers.Serializer):  # type: ignore[misc]
@@ -81,6 +96,8 @@ class CurrentUserSerializer(serializers.Serializer):  # type: ignore[misc]
     groups = serializers.ListField(child=serializers.CharField())
     setores = serializers.ListField(child=serializers.CharField())
     funcoes = serializers.ListField(child=serializers.CharField())
+    # PR A: vínculos EquipeGerencia vigentes em gerência ativa (escolha de gerência na Grade).
+    gerencias = GerenciaVinculoSerializer(many=True)
     is_superuser = serializers.BooleanField()
     is_superintendencia = serializers.BooleanField()
     can_approve_super = serializers.BooleanField()
@@ -154,6 +171,19 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
     )
     gerencia_atual = serializers.SerializerMethodField()
 
+    def validate_gerencia_id(self, value: Any) -> Any:
+        """PR A: gerência inativa não vira lotação nova; reenviar a lotação exibida é permitido.
+
+        O form reenvia a gerência atual em toda edição — desativar a gerência não pode
+        travar a edição de quem está lotado nela. "Atual" = a mesma de `get_gerencia_atual`.
+        """
+        if value is None or value.ativo:
+            return value
+        atual = self.get_gerencia_atual(self.instance) if self.instance is not None else None
+        if atual is not None and atual["gerencia_id"] == value.pk:
+            return value
+        raise serializers.ValidationError("Gerência inativa: escolha uma gerência ativa.")
+
     # CPF mascarado para list views (LGPD compliance)
     cpf_masked = serializers.SerializerMethodField()
 
@@ -168,6 +198,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             return None
         return {
             "gerencia_id": v.gerencia_id,
+            "rotulo": v.gerencia.rotulo,
             "nome_setor": v.gerencia.nome_setor,
             "setor_canonico": v.gerencia.setor_canonico,
             "papel": v.papel,

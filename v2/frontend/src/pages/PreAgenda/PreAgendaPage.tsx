@@ -3,7 +3,7 @@
  *
  * Features:
  * - Lista solicitações aprovadas de ambos os fluxos (SUPER + NAO_SUPER)
- * - Filtros por data, setor, busca textual
+ * - Filtros por data, gerência (mesmo `gerencia_id` na lista e nos KPIs), busca textual
  * - Exibe resumo de status GCal no topo
  * - Botões para preview e publish
  * - Operações em lote (Reapply/Resync) via seleção múltipla
@@ -33,6 +33,7 @@ import {
   Segmented,
   Empty,
   Spin,
+  Select,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { TableRowSelection } from 'antd/es/table/interface';
@@ -66,7 +67,7 @@ import {
 } from '../../api/solicitacoes';
 import { getStatusSummary, reapplyBatch, resyncBatch, type GCalStatusSummary } from '../../api/gcal';
 import { MeetLink } from '../../components/MeetLink';
-import { getMe } from '../../api/availability';
+import { getGerencias, getMe } from '../../api/availability';
 import { computePermissions } from '../../hooks/usePermissions';
 import useGoogleIntegration from '../../hooks/useGoogleIntegration';
 import useGoogleGuard from '../../hooks/useGoogleGuard';
@@ -76,7 +77,7 @@ import { usePolling } from '../../hooks/usePolling';
 import { syncChannel } from '../../services/syncChannel';
 import { formatFortaleza } from '../../utils/datetime';
 import logger from '../../utils/logger';
-import type { ID, Solicitacao, GCalStatus, CurrentUser, PaginatedResponse, Participation } from '../../types';
+import type { ID, Solicitacao, GCalStatus, CurrentUser, Gerencia, PaginatedResponse, Participation } from '../../types';
 import { formadoresLabel } from '../../utils/participants';
 
 // #1668 (M12-19): orçamento de requisições da Pré-agenda.
@@ -139,7 +140,9 @@ export default function PreAgendaPage(): JSX.Element {
   });
 
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [sectorFilter, setSectorFilter] = useState<string>('');
+  // PR A: filtro por gerência (id) — o mesmo na lista e nos KPIs. Só gerências ativas.
+  const [gerenciaFilter, setGerenciaFilter] = useState<ID | null>(null);
+  const [gerencias, setGerencias] = useState<Gerencia[]>([]);
   const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null]>([null, null]);
 
   const [previewVisible, setPreviewVisible] = useState<boolean>(false);
@@ -182,6 +185,9 @@ export default function PreAgendaPage(): JSX.Element {
       }
     };
     void loadUser();
+    getGerencias({ ativo: true })
+      .then((data) => setGerencias([...data].sort((a, b) => a.rotulo.localeCompare(b.rotulo, 'pt-BR'))))
+      .catch((error: unknown) => logger.error('Erro ao carregar gerências:', error));
   }, []);
 
   // #1668 (M12-19): controle do ciclo de requisições.
@@ -190,24 +196,26 @@ export default function PreAgendaPage(): JSX.Element {
   // - filtersRef: mantém loadData estável (não recria a cada tecla).
   const seqRef = useRef(0);
   const pollBackoffRef = useRef(0);
-  const filtersRef = useRef({ searchTerm, sectorFilter, dateRange });
-  filtersRef.current = { searchTerm, sectorFilter, dateRange };
+  const filtersRef = useRef({ searchTerm, gerenciaFilter, dateRange });
+  filtersRef.current = { searchTerm, gerenciaFilter, dateRange };
 
   const loadData = useCallback(async (): Promise<void> => {
     const seq = ++seqRef.current;
     try {
       setLoading(true);
 
-      const { searchTerm, sectorFilter, dateRange } = filtersRef.current;
-      const filters: Record<string, string> = { status: 'approved' };
+      const { searchTerm, gerenciaFilter, dateRange } = filtersRef.current;
+      const filters: Record<string, string> = {};
       if (searchTerm) filters['q'] = searchTerm;
-      if (sectorFilter) filters['sector'] = sectorFilter;
+      if (gerenciaFilter) filters['gerencia_id'] = String(gerenciaFilter);
       if (dateRange[0]) filters['date_from'] = dateRange[0].format('YYYY-MM-DD');
       if (dateRange[1]) filters['date_to'] = dateRange[1].format('YYYY-MM-DD');
 
       // page_size alto: a pré-agenda é uma lista única (paginação client-side),
       // então carrega o conjunto de aprovados de uma vez, não só a 1ª página.
-      const listParams = { ...filters, page_size: PREAGENDA_PAGE_SIZE };
+      // `status` vai SÓ na lista: no resumo GCal, `status` é o gcal_status (o resumo já
+      // conta só aprovados) — mandar `approved` lá zerava os KPIs.
+      const listParams = { ...filters, status: 'approved' as const, page_size: PREAGENDA_PAGE_SIZE };
       const [superData, naoSuperData, summaryData] = await Promise.all([
         listSolicitacoes({ ...listParams, flow: 'SUPER' }) as Promise<PaginatedResponse<Solicitacao> | Solicitacao[]>,
         listSolicitacoes({ ...listParams, flow: 'NAO_SUPER' }) as Promise<PaginatedResponse<Solicitacao> | Solicitacao[]>,
@@ -253,7 +261,7 @@ export default function PreAgendaPage(): JSX.Element {
       void loadData();
     }, TIMING.DEBOUNCE_SEARCH_MS);
     return () => clearTimeout(timer);
-  }, [searchTerm, sectorFilter, dateRange, loadData]);
+  }, [searchTerm, gerenciaFilter, dateRange, loadData]);
 
   // RT-02: Polling 5s para sync cross-device (#1032). immediate:false → a carga
   // inicial é do efeito de filtro (sem carga dupla). O tick honra o backoff de 429.
@@ -781,7 +789,8 @@ export default function PreAgendaPage(): JSX.Element {
             {/* Filtros */}
             <Card size="small">
               <Space direction="vertical" style={{ width: '100%' }}>
-                <Space>
+                {/* wrap: em tela estreita os filtros quebram linha (sem rolagem horizontal). */}
+                <Space wrap>
                   <Input.Search
                     placeholder="Buscar por município, projeto..."
                     value={searchTerm}
@@ -790,12 +799,15 @@ export default function PreAgendaPage(): JSX.Element {
                     style={{ width: '100%', maxWidth: 300 }}
                     allowClear
                   />
-                  <Input
-                    placeholder="Filtrar por setor/projeto"
-                    value={sectorFilter}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) => setSectorFilter(e.target.value)}
-                    onPressEnter={loadData}
-                    style={{ width: '100%', maxWidth: 200 }}
+                  <Select
+                    aria-label="Filtrar por gerência"
+                    placeholder="Filtrar por gerência"
+                    value={gerenciaFilter ?? undefined}
+                    onChange={(value?: ID) => setGerenciaFilter(value ?? null)}
+                    options={gerencias.map((g) => ({ label: g.rotulo, value: g.id }))}
+                    showSearch
+                    optionFilterProp="label"
+                    className="w-full sm:w-[200px]"
                     allowClear
                   />
                   <RangePicker

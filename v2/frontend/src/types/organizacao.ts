@@ -79,11 +79,17 @@ export interface TipoEventoOption {
 
 /**
  * Gerencia (management unit)
+ *
+ * `rotulo` é o nome que a tela mostra (`nome_exibicao` ou, vazio, `nome_setor`).
+ * `nome` é código interno (ex.: "GERENCIA 4") e não deve ser exibido como setor.
  */
 export interface Gerencia {
   id: ID;
+  nome: string;
   nome_setor: string;
-  is_super: boolean;
+  nome_exibicao: string;
+  rotulo: string;
+  ativo: boolean;
 }
 
 /**

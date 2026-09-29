@@ -27,7 +27,7 @@ vi.mock('../../../api/config', async (importOriginal) => {
   const actual = (await importOriginal());
   return { ...actual, fetchAPI: fetchAPIMock };
 });
-vi.mock('../../../api/availability', () => ({ getMe: getMeMock }));
+vi.mock('../../../api/availability', () => ({ getMe: getMeMock, getGerencias: vi.fn().mockResolvedValue([]) }));
 vi.mock('../../../api/solicitacoes', () => ({
   listSolicitacoes: listSolicitacoesMock,
   previewSolicitacao: vi.fn(),

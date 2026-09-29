@@ -9,14 +9,19 @@
  * - Estado com dados após o fetch mockado resolver
  *
  * GOTCHA: no mount a página dispara getMonthlyAvailability (via useMonthlyQuery,
- * 2x) e getGerencias/getMe (via FiltersBar), todos de '../../api/availability'.
- * Sem mock, esses fetch REJEITAM no jsdom e logam async DEPOIS do teste
- * -> EnvironmentTeardownError, reprovando o CI mesmo com asserts passando.
- * Mockar o módulo inteiro resolvendo com dados vazios elimina o fetch pendente.
+ * 2x) e getGerencias/getMe (via FiltersBar), todos de '../../api/availability',
+ * e getMyPolicies (FiltersBar, '../../api/me'). Sem mock, esses fetch REJEITAM no
+ * jsdom e logam async DEPOIS do teste -> EnvironmentTeardownError, reprovando o CI
+ * mesmo com asserts passando. Mockar os módulos resolvendo com dados vazios
+ * elimina o fetch pendente.
  */
 
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, test, expect, vi, afterEach } from 'vitest';
+
+vi.mock('../../../api/me', () => ({
+  getMyPolicies: vi.fn().mockResolvedValue([]),
+}));
 
 vi.mock('../../../api/availability', () => ({
   getMonthlyAvailability: vi.fn().mockResolvedValue({
@@ -35,6 +40,7 @@ vi.mock('../../../api/availability', () => ({
     can_approve_super: false,
     setores: [],
     funcoes: [],
+    gerencias: [{ id: 4, rotulo: 'Superativar', papeis: ['COORDENADOR'] }],
   }),
 }));
 
@@ -74,7 +80,7 @@ describe('MonthlyPage — grade mensal', () => {
       screen.getByRole('navigation', { name: /Filtros da grade/i }),
     ).toBeInTheDocument();
     expect(screen.getByLabelText('Gerência')).toBeInTheDocument();
-    expect(screen.getByLabelText('Setor')).toBeInTheDocument();
+    expect(screen.getByLabelText('Projeto')).toBeInTheDocument();
     expect(screen.getByLabelText('Buscar')).toBeInTheDocument();
   });
 

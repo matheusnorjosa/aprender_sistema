@@ -53,6 +53,7 @@ const fakeUser: CurrentUser = {
   groups: [],
   setores: [],
   funcoes: [],
+  gerencias: [],
   is_superuser: true,
   is_superintendencia: false,
   can_approve_super: true,

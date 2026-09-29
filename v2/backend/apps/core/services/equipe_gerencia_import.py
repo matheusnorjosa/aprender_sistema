@@ -11,6 +11,11 @@ Colunas esperadas (flexiveis):
 - usuario_nome / nome (opcional)
 - coordenador_supervisor (opcional, obrigatorio apenas para papel APOIO)
 - ativo (opcional): se a atribuicao esta ativa (default: True)
+
+Anti-escalada (PR B1): GERENTE vigente na gerencia `GERENCIA_APROVADORA_NOME` aprova
+solicitacoes. O import NUNCA cria nem reativa esse vinculo (pendencia
+`vinculo_aprovador_bloqueado`); desativar continua permitido. Conceder = formulario de
+usuario (superuser, auditado).
 """
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false
@@ -28,6 +33,7 @@ import pandas as pd
 from apps.core.imports.normalization import normalize_active_flag, normalize_blank, normalize_cpf_digits
 from apps.core.imports.row_errors import registrar_erro_import
 from apps.core.models import EquipeGerencia, Gerencia, Usuario
+from apps.core.rbac.helpers import GERENCIA_APROVADORA_NOME
 from apps.core.services.resolvers import resolve_user_by_email, resolve_user_by_name
 
 # Mapeamento de nomes de setor -> nome_setor canonico
@@ -96,6 +102,7 @@ def import_equipe_gerencia_from_file(*, path: str, dry_run: bool = True) -> dict
             "papel_missing": 0,
             "usuario_not_found": 0,
             "apoio_supervisor_missing": 0,
+            "vinculo_aprovador_bloqueado": 0,
             "other": 0,
         },
         "gerencias_created": 0,
@@ -106,6 +113,7 @@ def import_equipe_gerencia_from_file(*, path: str, dry_run: bool = True) -> dict
         "papel_missing": [],
         "usuario_not_found": [],
         "apoio_supervisor_missing": [],
+        "vinculo_aprovador_bloqueado": [],
         "outros": [],
     }
 
@@ -287,6 +295,11 @@ def _get_or_create_gerencia(nome_setor: str, stats: dict[str, Any]) -> Gerencia 
     return gerencia
 
 
+def is_vinculo_aprovador(gerencia: Gerencia, papel: str) -> bool:
+    """True se (gerencia, papel) confere poder de aprovar solicitacoes (PR B1)."""
+    return papel == "GERENTE" and gerencia.nome == GERENCIA_APROVADORA_NOME
+
+
 def _resolve_usuario(cpf: str, email: str, nome: str) -> Usuario | None:
     """Resolve usuario por CPF > email > nome."""
     cpf_norm = normalize_cpf_digits(cpf)
@@ -421,6 +434,20 @@ def _process_row(
     hoje = timezone.localdate()
 
     existing = EquipeGerencia.objects.filter(gerencia=gerencia, usuario=usuario, papel=papel).first()
+
+    # PR B1 (anti-escalada): criar ou reativar vinculo aprovador fica fora do import.
+    if is_active and is_vinculo_aprovador(gerencia, papel) and not (existing and existing.ativo):
+        stats["skipped"]["vinculo_aprovador_bloqueado"] += 1
+        pendencias["vinculo_aprovador_bloqueado"].append(
+            {
+                "linha": linha_num,
+                "setor": setor,
+                "papel": papel,
+                "erro": "Vinculo que da poder de aprovar so e concedido pelo cadastro de usuario (superuser).",
+            }
+        )
+        return
+
     if existing:
         updated = False
         update_fields = []

@@ -20,6 +20,7 @@ from rest_framework import serializers  # type: ignore[attr-defined]
 from apps.core.constants import FUNCAO_GROUPS, RESERVED_GROUPS, SETOR_GROUPS
 from apps.core.models import AuditLog, EquipeGerencia, Gerencia, GroupClassificacao, PermissaoFuncional
 from apps.core.rbac import can_admin_mutate_target
+from apps.core.rbac.policies import solicitation_approval_basis
 from apps.core.services.audit import (
     auditar_assign_groups,
     auditar_group_capabilities_set,
@@ -312,7 +313,10 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         - Auto-atribui o grupo de setor por nome (== `Gerencia.setor_canonico`) quando existir.
         - Deriva os papéis das FUNÇÕES e sincroniza a lotação `EquipeGerencia` (form = SSOT).
         - `groups=None` = não mexer em membership; `gerencia` ausente/`_UNSET`/None = não mexer no vínculo.
+        - PR B1: audita a concessão/revogação do poder de aprovar solicitações (vínculo GERENTE
+          na gerência aprovadora ou composite de grupos) — antes/depois de grupos + vínculo.
         """
+        aprovava = solicitation_approval_basis(user) is not None
         has_gerencia = gerencia is not None and gerencia is not _UNSET
         final_groups = list(groups) if groups is not None else None
         if has_gerencia:
@@ -336,6 +340,17 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             papeis = papeis_de_grupos(user.groups.all())
             if papeis:
                 sync_user_lotacao(user, gerencia, papeis)
+        aprova = solicitation_approval_basis(user) is not None
+        if aprova != aprovava:
+            registrar_auditoria(
+                actor=actor,
+                action=AuditLog.Action.USER_PRIVILEGE_CHANGED,
+                model_name="Usuario",
+                details={
+                    "target_user_id": user.pk,
+                    "autoridade_aprovacao": "concedida" if aprova else "revogada",
+                },
+            )
 
     def create(self, validated_data: dict[str, Any]) -> Any:
         """Create user with hashed password, groups e vínculo de gerência."""

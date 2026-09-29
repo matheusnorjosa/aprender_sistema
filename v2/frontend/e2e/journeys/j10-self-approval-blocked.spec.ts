@@ -12,12 +12,14 @@
  * superuser`. Coord (sem essas funções) bate direto na permission class e
  * recebe 403, independente de ser dono ou não.
  *
- * Três camadas:
+ * Quatro camadas:
  *
  * 1. **Canônica**: coord_vidas cria → tenta aprovar → 403 (permission).
  * 2. **Borda**: outro coord (fluir, setor diferente) também recebe 403.
  * 3. **Operação**: após tentativa bloqueada, status permanece pendente.
  *    Super_geral então aprova com sucesso.
+ * 4. **Segregação (PR B1, PA-02)**: aprovadora AUTORIZADA (super_geral) cria uma SUPER
+ *    própria → 403 `self_approval_forbidden` no service; continua pendente.
  */
 import { test, expect, createApiContext, seedSolicitacao, ROLE_CREDENTIALS } from '../fixtures';
 
@@ -89,6 +91,27 @@ test.describe(
       const check2 = await superApi.get(`/api/solicitacoes/${solicitacao.id}/`);
       const body2 = (await check2.json()) as { status: string };
       expect(body2.status).toBe('aprovado');
+    });
+
+    test('segregação: super_geral (aprovadora) cria SUPER própria → 403 e continua pendente', async ({
+      baseURL,
+    }) => {
+      const superApi = await createApiContext({
+        baseURL: baseURL!,
+        username: ROLE_CREDENTIALS.super_geral.username,
+        password: ROLE_CREDENTIALS.super_geral.password,
+      });
+      const solicitacao = await seedSolicitacao(superApi, { fluxo: 'SUPER' });
+      expect(solicitacao.status).toBe('pendente');
+
+      const res = await superApi.patch(`/api/solicitacoes/${solicitacao.id}/approve/`, { data: {} });
+      expect(res.status()).toBe(403);
+      const body = (await res.json()) as { code: string };
+      expect(body.code).toBe('self_approval_forbidden');
+
+      const check = await superApi.get(`/api/solicitacoes/${solicitacao.id}/`);
+      const after = (await check.json()) as { status: string };
+      expect(after.status).toBe('pendente');
     });
   }
 );

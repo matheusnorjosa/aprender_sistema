@@ -33,7 +33,7 @@ Ver `v2/docs/RBAC_NAMING.md §9` (Policy Resolution Rules).
 
 from __future__ import annotations
 
-from typing import Final
+from typing import Final, Literal
 
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
 from rest_framework import permissions
@@ -48,6 +48,7 @@ from apps.core.rbac import permissions as _rbac_permissions  # noqa: F401
 from apps.core.rbac.helpers import (
     user_has_any_perm,
     user_is_assistente_administrativo_controle,
+    user_is_gerente_superintendencia,
     user_matches_any_approver_composite,
 )
 
@@ -331,12 +332,14 @@ class CanManageInternalActions(_PolicyPermission):
 
 class CanAccessSolicitationApprovals(_PolicyPermission):
     """
-    Policy composta de aprovação de solicitações (PR 3, 2026-04-29).
+    Policy composta de aprovação de solicitações (PR 3, 2026-04-29; PR B1, 2026-09-29).
 
-    Habilitada para:
-    - Gerente da Superintendência (Setor `Superintendência` + Função `Gerente`)
+    Habilitada para (SSOT `solicitation_approval_basis`):
+    - Gerente da Superintendência por VÍNCULO: EquipeGerencia vigente com papel
+      GERENTE na gerência `GERENCIA_APROVADORA_NOME` (sem depender de grupo)
     - Assistente Administrativo do Controle (Setor `Controle` + Função
       `Assistente Administrativo`)
+    - Legado até o B2: composite Setor `Superintendência` + Função `Gerente`
 
     Implementação composite (não OR de capabilities): a semântica vive em
     `_user_has_solicitation_approvals` e é compartilhada com
@@ -345,7 +348,10 @@ class CanAccessSolicitationApprovals(_PolicyPermission):
     """
 
     policy = "access_solicitation_approvals"
-    message = "Apenas Gerentes da Superintendência ou Assistente Administrativo do Controle podem aprovar solicitações."
+    message = (
+        "Apenas a gerência da Superintendência ou o Assistente Administrativo do Controle "
+        "podem aprovar solicitações."
+    )
 
     def has_permission(self, request: Request, view: APIView) -> bool:
         return _user_has_solicitation_approvals(request.user)
@@ -407,28 +413,53 @@ PUBLIC_POLICY_KEYS: Final[frozenset[str]] = frozenset(
 # ============================================================================
 
 
+SolicitationApprovalBasis = Literal[
+    "superuser",
+    "gerente_superintendencia",
+    "asst_admin_controle",
+    "grupo_superintendencia_gerente",
+]
+
+
+def solicitation_approval_basis(
+    user: AbstractBaseUser | AnonymousUser | None,
+) -> SolicitationApprovalBasis | None:
+    """
+    SSOT de QUEM aprova/reprova solicitações e POR QUÊ (PR B1, 2026-09-29).
+
+    Retorna a base da autoridade (gravada em `AuditLog.details.autoridade`) ou
+    None quando o usuário não aprova. Ordem de precedência:
+
+    1. `superuser`
+    2. `gerente_superintendencia` — vínculo EquipeGerencia VIGENTE com papel GERENTE
+       na gerência `GERENCIA_APROVADORA_NOME` (sem depender de grupo Django)
+    3. `asst_admin_controle` — composite Setor "Controle" + Função "Assistente
+       Administrativo"
+    4. `grupo_superintendencia_gerente` — composite Setor "Superintendência" + Função
+       "Gerente" (legado; sai no B2)
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return None
+    if getattr(user, "is_superuser", False):
+        return "superuser"
+    if user_is_gerente_superintendencia(user):
+        return "gerente_superintendencia"
+    if user_is_assistente_administrativo_controle(user):
+        return "asst_admin_controle"
+    if user_matches_any_approver_composite(user):
+        return "grupo_superintendencia_gerente"
+    return None
+
+
 def _user_has_solicitation_approvals(user: AbstractBaseUser | AnonymousUser | None) -> bool:
     """
-    Composite check (PR 3 hardening RBAC, 2026-04-29):
-    - Gerente da Superintendência (Setor "Superintendência" + Função "Gerente")
-    - Assistente Administrativo do Controle (Setor "Controle" + Função
-      "Assistente Administrativo")
+    Tem autoridade de aprovação? (`solicitation_approval_basis(user) is not None`).
 
     SSOT chamado tanto pela Policy class `CanAccessSolicitationApprovals`
     quanto por `user_has_policy("access_solicitation_approvals")`. Mudar
-    a regra = mudar aqui e atualizar tests da matriz.
-
-    PR 13 (2026-05-04): a checagem do composite Asst Admin Controle migrou
-    para `helpers.user_is_assistente_administrativo_controle` (SSOT
-    compartilhado com o gate de delegação de bloqueios).
+    a regra = mudar `solicitation_approval_basis` e atualizar tests da matriz.
     """
-    if not user or not getattr(user, "is_authenticated", False):
-        return False
-    if getattr(user, "is_superuser", False):
-        return True
-    # Composites vêm da SSOT `APPROVER_COMPOSITES` (Gerente da Superintendência OU
-    # Assistente Administrativo do Controle) — não mais nomes literais aqui.
-    return user_matches_any_approver_composite(user)
+    return solicitation_approval_basis(user) is not None
 
 
 def user_can_delegate_availability_block(user: AbstractBaseUser | AnonymousUser | None) -> bool:
@@ -565,6 +596,7 @@ __all__ = [
     "PUBLIC_POLICY_KEYS",
     "_PolicyPermission",
     "can_admin_mutate_target",
+    "solicitation_approval_basis",
     "user_can_delegate_availability_block",
     "user_has_policy",
     "resolve_public_policies",

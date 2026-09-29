@@ -70,35 +70,35 @@ class Command(BaseCommand):
         }
 
         # ================================================================
-        # PA-01: No self-approval for SUPER
+        # PA-02 (segregação): ninguém aprova nem reprova a própria solicitação
         # ================================================================
-        # Check AuditLog for APROVAR actions where user approved their own
-        approval_logs = AuditLog.objects.filter(
+        # PR B1 (M11-17): era rotulado PA-01 e só olhava APPROVE em fluxo SUPER. A trava
+        # vive no service para approve/reject; superuser pode decidir a própria como
+        # break-glass, marcado com `details.autoaprovacao` — esses logs não contam.
+        # Só contam decisões registradas depois da regra: toda decisão do B1 grava
+        # `details.autoridade`; log sem ela é anterior à trava e não é violação.
+        decision_logs = AuditLog.objects.filter(
             created_at__gte=since,
-            action__in=["APROVAR", "APPROVE", "aprovar"],
+            action__in=["APROVAR", "APPROVE", "aprovar", "REJECT"],
+            details__has_key="autoridade",
         )
-        self_approvals = 0
-        for log in approval_logs:
+        self_decisions = 0
+        for log in decision_logs:
             details = log.details or {}
             sol_id = details.get("solicitacao_id")
-            if sol_id and log.usuario_id:
-                try:
-                    sol = Solicitacao.objects.select_related("projeto").get(id=sol_id)
-                    # Verificar se o usuário aprovou sua própria solicitação em fluxo SUPER
-                    is_owner = sol.usuario_id == log.usuario_id
-                    is_super = sol.projeto and sol.projeto.fluxo == "SUPER"
-                    if is_owner and is_super:
-                        self_approvals += 1
-                except Solicitacao.DoesNotExist:
-                    pass
+            if not sol_id or not log.usuario_id or details.get("autoaprovacao"):
+                continue
+            owner_id = Solicitacao.objects.filter(id=sol_id).values_list("usuario_id", flat=True).first()
+            if owner_id == log.usuario_id:
+                self_decisions += 1
 
         report["checks"].append(
             {
-                "rule": "PA-01",
-                "description": "No self-approval for SUPER solicitations",
-                "status": "PASS" if self_approvals == 0 else "FAIL",
-                "violations": self_approvals,
-                "details": f"Found {self_approvals} self-approvals in SUPER flow",
+                "rule": "PA-02 (segregação)",
+                "description": "No one approves or rejects their own solicitation (superuser break-glass is flagged)",
+                "status": "PASS" if self_decisions == 0 else "FAIL",
+                "violations": self_decisions,
+                "details": f"Found {self_decisions} self-decisions without autoaprovacao flag",
             }
         )
 

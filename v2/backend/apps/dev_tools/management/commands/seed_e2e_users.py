@@ -111,6 +111,10 @@ class Command(BaseCommand):
             ("gerente_vidas@test.com", "Vidas", "GERENTE"),
             ("formador_vidas@test.com", "Vidas", "FORMADOR"),
             ("formador_fluir@test.com", "Fluir", "FORMADOR"),
+            # PR B1: aprovar = vínculo GERENTE vigente na SUPERINTENDENCIA (nome_setor "Super").
+            ("super_e2e@test.com", "Super", "GERENTE"),
+            ("super_geral@test.com", "Super", "GERENTE"),
+            ("approver_03@test.com", "Super", "GERENTE"),
         ]
         by_username = {u.username: u for u in usuarios}
         for username, nome_setor, papel in vinculos:

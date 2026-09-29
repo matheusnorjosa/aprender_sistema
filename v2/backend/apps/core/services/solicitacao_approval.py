@@ -16,8 +16,9 @@ from typing import Any
 from django.db import transaction
 from django.utils import timezone
 
-from apps.core.exceptions import ValidationAPIError
+from apps.core.exceptions import APIError, ValidationAPIError
 from apps.core.models import AuditLog, Participation, Solicitacao, Usuario
+from apps.core.rbac.policies import solicitation_approval_basis
 from apps.core.services.db_retry import retry_on_deadlock
 from apps.core.services.solicitacao_availability import enforce_solicitacao_availability
 from apps.core.utils.cache_utils import invalidate_availability_cache
@@ -64,6 +65,50 @@ class BatchApprovalResult:
     approved_count: int
     rejected_count: int
     errors: list[dict[str, Any]]
+
+
+SELF_APPROVAL_CODE = "self_approval_forbidden"
+
+
+def _mensagem_decisao_propria(acao: str) -> str:
+    return f"Você não pode {acao} a própria solicitação. Outra pessoa aprovadora precisa decidir."
+
+
+def _decisao_propria_bloqueada(solicitacao: Solicitacao, user: Usuario) -> bool:
+    """PA-02 (segregação, PR B1): quem criou (`Solicitacao.usuario`) não decide a própria.
+
+    Superuser pode (break-glass) — a decisão fica marcada com `details.autoaprovacao`.
+    Loga o bloqueio sem username (username é o CPF em produção).
+    """
+    if solicitacao.usuario_id != user.pk or user.is_superuser:
+        return False
+    logger.warning(
+        "solicitacao_self_decision_blocked",
+        extra={
+            "event": "solicitacao_self_decision_blocked",
+            "user_id": user.pk,
+            "solicitacao_id": solicitacao.pk,
+        },
+    )
+    return True
+
+
+def _bloquear_decisao_propria(solicitacao: Solicitacao, user: Usuario, acao: str) -> None:
+    """Decisão individual: levanta 403 `self_approval_forbidden` se a solicitação é do ator."""
+    if _decisao_propria_bloqueada(solicitacao, user):
+        raise APIError(
+            code=SELF_APPROVAL_CODE,
+            message=_mensagem_decisao_propria(acao),
+            status_code=403,
+        )
+
+
+def _decision_details(solicitacao: Solicitacao, user: Usuario, autoridade: str | None) -> dict[str, Any]:
+    """Autoria comum a todo AuditLog de decisão (PR B1): base da autoridade + autoaprovação."""
+    details: dict[str, Any] = {"autoridade": autoridade}
+    if solicitacao.usuario_id == user.pk:
+        details["autoaprovacao"] = True
+    return details
 
 
 def _raise_invalid_status_error(solicitacao: Solicitacao) -> None:
@@ -137,6 +182,7 @@ def approve_solicitacao(
     client_ip = get_client_ip(request)
     with transaction.atomic():
         solicitacao = Solicitacao.objects.select_for_update().get(pk=solicitacao.pk)
+        _bloquear_decisao_propria(solicitacao, user, "aprovar")
         if solicitacao.status != "pendente":
             _raise_invalid_status_error(solicitacao)
 
@@ -166,6 +212,7 @@ def approve_solicitacao(
                 "justificativa": justificativa,
                 "ip_address": client_ip,
                 "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
+                **_decision_details(solicitacao, user, solicitation_approval_basis(user)),
             },
         )
 
@@ -174,7 +221,6 @@ def approve_solicitacao(
             extra={
                 "event": "solicitacao_approved",
                 "user_id": user.id,
-                "username": user.username,
                 "solicitation_id": solicitacao.id,
                 "action": "approve",
                 "ip_address": client_ip,
@@ -218,6 +264,7 @@ def reject_solicitacao(
     client_ip = get_client_ip(request)
     with transaction.atomic():
         solicitacao = Solicitacao.objects.select_for_update().get(pk=solicitacao.pk)
+        _bloquear_decisao_propria(solicitacao, user, "reprovar")
         if solicitacao.status != "pendente":
             _raise_invalid_status_error(solicitacao)
 
@@ -237,6 +284,7 @@ def reject_solicitacao(
                 "justificativa": justificativa,
                 "ip_address": client_ip,
                 "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
+                **_decision_details(solicitacao, user, solicitation_approval_basis(user)),
             },
         )
 
@@ -245,7 +293,6 @@ def reject_solicitacao(
             extra={
                 "event": "solicitacao_rejected",
                 "user_id": user.id,
-                "username": user.username,
                 "solicitation_id": solicitacao.id,
                 "action": "reject",
                 "ip_address": client_ip,
@@ -299,6 +346,7 @@ def batch_approve_solicitacoes(
     approved = 0
     errors: list[dict[str, Any]] = []
     client_ip = get_client_ip(request)
+    autoridade = solicitation_approval_basis(user)
 
     with transaction.atomic():
         # Fetch and lock pending solicitacoes to avoid double-approval races
@@ -311,6 +359,13 @@ def batch_approve_solicitacoes(
 
         # Approve in batch
         for sol in solicitacoes:
+            # PA-02 (segregação, PR B1): item próprio vai para errors[]; o resto do lote segue.
+            if _decisao_propria_bloqueada(sol, user):
+                errors.append(
+                    {"id": sol.id, "code": SELF_APPROVAL_CODE, "detail": _mensagem_decisao_propria("aprovar")}
+                )
+                continue
+
             # #1452: cada solicitação é revalidada imediatamente antes de ser aprovada.
             # Como aprovamos em sequência dentro da mesma transação, a checagem da
             # próxima já enxerga as anteriores como aprovadas — é isso que impede um
@@ -341,6 +396,7 @@ def batch_approve_solicitacoes(
                     "batch": True,
                     "ip_address": client_ip,
                     "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
+                    **_decision_details(sol, user, autoridade),
                 },
             )
 
@@ -349,7 +405,6 @@ def batch_approve_solicitacoes(
                 extra={
                     "event": "solicitacao_batch_approved",
                     "user_id": user.id,
-                    "username": user.username,
                     "solicitacao_id": sol.id,
                     "batch": True,
                     "ip_address": client_ip,
@@ -401,6 +456,7 @@ def batch_reject_solicitacoes(
     rejected = 0
     errors: list[dict[str, Any]] = []
     client_ip = get_client_ip(request)
+    autoridade = solicitation_approval_basis(user)
 
     with transaction.atomic():
         # Fetch and lock pending solicitacoes to avoid double-reject races
@@ -413,6 +469,13 @@ def batch_reject_solicitacoes(
 
         # Reject in batch
         for sol in solicitacoes:
+            # PA-02 (segregação, PR B1): item próprio vai para errors[]; o resto do lote segue.
+            if _decisao_propria_bloqueada(sol, user):
+                errors.append(
+                    {"id": sol.id, "code": SELF_APPROVAL_CODE, "detail": _mensagem_decisao_propria("reprovar")}
+                )
+                continue
+
             prev_status = sol.status
             sol.status = "reprovado"
             sol.save()
@@ -429,6 +492,7 @@ def batch_reject_solicitacoes(
                     "batch": True,
                     "ip_address": client_ip,
                     "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
+                    **_decision_details(sol, user, autoridade),
                 },
             )
 
@@ -437,7 +501,6 @@ def batch_reject_solicitacoes(
                 extra={
                     "event": "solicitacao_batch_rejected",
                     "user_id": user.id,
-                    "username": user.username,
                     "solicitacao_id": sol.id,
                     "batch": True,
                     "ip_address": client_ip,

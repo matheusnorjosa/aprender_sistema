@@ -49,7 +49,7 @@ def super_user():
 
 
 @pytest.fixture
-def solicitacao_pendente(super_user):
+def solicitacao_pendente():
     """
     Cria solicitação pendente para testes de AuditLog.
 
@@ -75,8 +75,9 @@ def solicitacao_pendente(super_user):
     )
 
     now = timezone.now()
+    # PR B1 (PA-02 segregação): o dono é OUTRA pessoa — o aprovador não decide a própria.
     sol = SolicitacaoFactory(
-        usuario=super_user,
+        usuario=UsuarioFactory(),
         municipio=municipio,
         projeto=projeto,
         tipo_evento=tipo_evento,

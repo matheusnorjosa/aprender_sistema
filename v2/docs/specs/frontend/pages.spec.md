@@ -16,6 +16,10 @@ sources_of_truth:
   - v2/frontend/src/components/__tests__/AppRoutes.dat-imports.test.tsx
   - v2/frontend/src/components/access/__tests__/RequirePolicy.test.tsx
   - v2/frontend/src/pages/__tests__/DatImportsLegacyRemoval.test.tsx
+  - v2/frontend/e2e/checklist/sem-rolagem-horizontal.spec.ts
+  - v2/frontend/e2e/checklist/sem-rolagem-horizontal.rotas.ts
+  - v2/frontend/src/components/__tests__/AppRoutes.semRolagemHorizontal.test.ts
+  - v2/frontend/eslint.tabela-antd-allowlist.js
 owner: frontend
 supersedes: []
 related:
@@ -60,6 +64,16 @@ Esta spec é o **índice canônico do inventário de páginas**: domínio, rota 
 - **`is_superuser` é escape hatch.** As flags `canControle`/`canDAT`/`canDashboard*` já embutem `is_superuser` e o backend devolve todas as `PUBLIC_POLICY_KEYS` ao superuser; superuser passa em tudo. Páginas não devem ramificar por `is_superuser` para regra de negócio — só para widgets admin/debug.
 - **Aprovações = policy exclusiva.** `/solicitacoes/aprovacoes` depende **somente** da policy pública `access_solicitation_approvals` (`AppRoutes.tsx`). O legacy `can_approve_super` foi removido do contrato do FE (PR 10 hardening RBAC). A página carrega `getMe()` em paralelo com as policies para a segregação (PA-02, PR B1): a linha da **própria** solicitação (não-superuser) sai sem checkbox e sem Aprovar/Reprovar, com a Tag "Sua solicitação" e o Tooltip "Outra pessoa aprovadora precisa decidir" — o backend recusa com 403 `self_approval_forbidden` de qualquer forma.
 - **Redirects preservam deep-links.** As 6 URLs legadas (`/aprovacoes`, `/disponibilidade`, `/bloqueios`, `/deslocamentos`, `/meus-eventos`, `/dat/importacao`) redirecionam com `<Navigate replace>` para a rota canônica sob `/solicitacoes/*` ou `/dat/importacoes`.
+
+## Padrão responsivo
+
+**A regra (dono, 29/09/2026):** nenhuma tela rola na horizontal, nem a página nem dentro de tabela, grade ou card, em **360, 768, 1024 e 1280 px**. A largura de 1024 é a de um notebook de 1366 px com escala de 125% no Windows. Reflow sem rolagem também é critério da WCAG 2.1 (1.4.10). Esta seção é a SSOT do padrão.
+
+- **Como se mede.** A página não rola (`documentElement.scrollWidth - clientWidth ≤ 0`) **e** nenhum elemento com `overflow-x` auto ou scroll tem `scrollWidth - clientWidth > 1`. Só o primeiro critério não enxerga a tabela do AntD, que rola dentro de `.ant-table-content`.
+- **Trava 1, Playwright.** [`sem-rolagem-horizontal.spec.ts`](../../../frontend/e2e/checklist/sem-rolagem-horizontal.spec.ts) abre cada rota de `AppRoutes` com um perfil que a acessa, nas 4 larguras, mais a tela de login. Os dados vêm de `seed_frontend_contract_data`, com textos de 80+ caracteres em todo campo de tabela, porque tabela vazia nunca estoura. Rotas, perfis e aliases ficam em [`sem-rolagem-horizontal.rotas.ts`](../../../frontend/e2e/checklist/sem-rolagem-horizontal.rotas.ts); [`AppRoutes.semRolagemHorizontal.test.ts`](../../../frontend/src/components/__tests__/AppRoutes.semRolagemHorizontal.test.ts) reprova rota nova sem entrada lá.
+- **Trava 2, lint.** `Table` de `antd` (também `antd/es/table`, `antd/lib/table`, os caminhos profundos e o `rc-table`) só entra por `components/ResponsiveTable`, que o C1 cria. Os 27 arquivos que já importavam `Table` estão em [`eslint.tabela-antd-allowlist.js`](../../../frontend/eslint.tabela-antd-allowlist.js), cada um com o PR do Programa C que o tira. A trava é provada por [`tabelaAntdRestrita.test.ts`](../../../frontend/src/test/lint/tabelaAntdRestrita.test.ts).
+- **Dívida medida (`PENDENTES`).** Em 29/09/2026, 112 combinações rota × largura rolavam, em 30 das 42 rotas medidas; 23 rotas rolam até a 1280 px. Cada combinação roda com `test.fail`: quando a tela é consertada, o teste passa a falhar e a combinação tem de sair da lista. A lista e a allowlist só encolhem, e o Programa C (C1 a C7) zera as duas.
+- **Tela nova ou alterada.** Nada de `scroll={{ x }}` nem de largura fixa maior que a tela. Colunas secundárias somem por breakpoint (`responsive`), texto longo usa `ellipsis`, ações vão para um menu, e o que some aparece na linha expandida.
 
 ## API / Interface
 
@@ -173,6 +187,7 @@ Inventário por domínio (rota → componente → guard **como o código aplica 
 - [`v2/frontend/src/components/__tests__/AppRoutes.dat-imports.test.tsx`](../../../frontend/src/components/__tests__/AppRoutes.dat-imports.test.tsx) — gate e redirect das rotas DAT (`/dat/importacao` → `/dat/importacoes`).
 - [`v2/frontend/src/pages/__tests__/DatImportsLegacyRemoval.test.tsx`](../../../frontend/src/pages/__tests__/DatImportsLegacyRemoval.test.tsx) — remoção das rotas/imports legados de DAT.
 - [`v2/frontend/src/components/__tests__/AppSidebar.menu.test.tsx`](../../../frontend/src/components/__tests__/AppSidebar.menu.test.tsx) — itens de menu por ator (paridade com os gates de rota).
+- [`v2/frontend/e2e/checklist/sem-rolagem-horizontal.spec.ts`](../../../frontend/e2e/checklist/sem-rolagem-horizontal.spec.ts) e [`AppRoutes.semRolagemHorizontal.test.ts`](../../../frontend/src/components/__tests__/AppRoutes.semRolagemHorizontal.test.ts) — padrão responsivo (seção acima).
 - Testes de página individuais: `NewSolicitacaoWizard.test.tsx`, `MeusEventosPage.test.tsx`, `ImportacoesPage.test.tsx`, `UsuariosPage.cpf.test.tsx`, `GruposPage.readonly.test.tsx`, `PreAgendaPage.gcal.test.tsx`, `PerfilPage.test.tsx`, `PublicacaoSetorPage.test.tsx`.
 
 ## Divergências conhecidas entre página e backend

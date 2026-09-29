@@ -121,9 +121,13 @@ Passos (como superusuário):
 
 1. Na lista de usuários, clique no botão **Editar** (ícone de lápis)
 2. No modal, você verá:
-   - **Setor (onde trabalha)**: selecione um ou mais setores
+   - **Gerência (onde trabalha)**: selecione a gerência; o setor vem dela
    - **Função (o que pode fazer)**: selecione uma ou mais funções
 3. Clique em **Salvar**
+
+O Salvar troca só as funções e a gerência mostradas no formulário (#2071). Grupos que o formulário não
+mostra (como Controle, DAT ou grupos de permissão) e vínculos da pessoa em outras gerências continuam como
+estavam. Se nada mudou na gerência nem nas funções, o vínculo não é alterado.
 
 Se os campos aparecerem **desabilitados**, é porque sua conta não é superusuário — não é bug.
 

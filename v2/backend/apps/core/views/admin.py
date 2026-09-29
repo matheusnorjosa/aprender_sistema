@@ -22,7 +22,7 @@ from rest_framework.views import APIView
 
 from django_filters.rest_framework import DjangoFilterBackend
 
-from apps.core.constants import FUNCAO_GROUPS, RESERVED_GROUPS, SETOR_GROUPS, SETORES_PRODUTO
+from apps.core.constants import RESERVED_GROUPS, SETOR_GROUPS, SETORES_PRODUTO
 from apps.core.models import (
     AuditLog,
     Compra,
@@ -56,7 +56,7 @@ from apps.core.services.audit import (
     registrar_auditoria,
 )
 from apps.core.services.options_cache import invalidate_municipios_options_cache
-from apps.core.services.rbac_service import get_assignable_group_names
+from apps.core.services.rbac_service import get_assignable_group_names, nomes_grupos_funcao
 
 
 class MunicipioViewSet(viewsets.ModelViewSet):
@@ -698,15 +698,13 @@ class RBACMetaView(APIView):
         dynamic_setor_groups = {
             group_name for group_name, tipo in classificacoes if tipo == GroupClassificacao.Tipo.SETOR
         }
-        dynamic_funcao_groups = {
-            group_name for group_name, tipo in classificacoes if tipo == GroupClassificacao.Tipo.FUNCAO
-        }
 
         categories = list(PermissaoFuncional.objects.values_list("category", flat=True).distinct().order_by("category"))
         return Response(
             {
                 "setor_groups": sorted(set(SETOR_GROUPS) | dynamic_setor_groups),
-                "funcao_groups": sorted(set(FUNCAO_GROUPS) | dynamic_funcao_groups),
+                # #2071: mesma lista que o save do formulário de Usuários substitui.
+                "funcao_groups": sorted(nomes_grupos_funcao()),
                 # #1914: vocabulário canônico de setor-de-produto (Gerencia.setor_canonico) —
                 # DISTINTO dos setor_groups (RBAC). O FE monta um Select FECHADO na conferência.
                 "setores_produto": sorted(SETORES_PRODUTO),

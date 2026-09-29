@@ -29,10 +29,15 @@ from apps.core.services.audit import (
     registrar_auditoria,
 )
 from apps.core.services.equipe_gerencia import papeis_de_grupos, setor_group_for, sync_user_lotacao
-from apps.core.services.rbac_service import get_assignable_group_names
+from apps.core.services.rbac_service import get_assignable_group_names, nomes_grupos_funcao
 
 # Sentinela: distingue "campo não enviado" de "enviado como null" no PATCH parcial.
 _UNSET: Any = object()
+
+
+def _vinculo_exibido(user: Any) -> Any:
+    """O vínculo vigente que o form de Usuários mostra (e reenvia no save): o primeiro por id."""
+    return EquipeGerencia.vigentes_em().filter(usuario=user).select_related("gerencia").order_by("id").first()
 
 
 class UserSlimSerializer(serializers.ModelSerializer):
@@ -146,7 +151,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
 
     def get_gerencia_atual(self, obj: Any) -> dict[str, Any] | None:
         """Gerência vigente do usuário (para hidratar o form no EDIT). None se não há vínculo."""
-        v = EquipeGerencia.vigentes_em().filter(usuario=obj).select_related("gerencia").order_by("id").first()
+        v = _vinculo_exibido(obj)
         if v is None:
             return None
         return {
@@ -315,10 +320,34 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         - `groups=None` = não mexer em membership; `gerencia` ausente/`_UNSET`/None = não mexer no vínculo.
         - PR B1: audita a concessão/revogação do poder de aprovar solicitações (vínculo GERENTE
           na gerência aprovadora ou composite de grupos) — antes/depois de grupos + vínculo.
+        - #2071: o form só edita as FUNÇÕES e a gerência exibida. `group_ids` substitui só os grupos de
+          FUNÇÃO; os demais (setor, permissão funcional) ficam. Trocar a gerência troca o grupo de setor
+          derivado dela. Sem mudança de gerência nem de funções, o vínculo não é tocado.
         """
         aprovava = solicitation_approval_basis(user) is not None
         has_gerencia = gerencia is not None and gerencia is not _UNSET
-        final_groups = list(groups) if groups is not None else None
+        funcoes = nomes_grupos_funcao()
+        antes = list(user.groups.all())
+        exibido = _vinculo_exibido(user)
+        anterior = exibido.gerencia if exibido is not None else None
+        troca = has_gerencia and anterior is not None and anterior.pk != gerencia.pk
+        final_groups = None
+        if groups is not None:
+            final_groups = [g for g in antes if g.name not in funcoes]
+            final_groups += [g for g in groups if g not in final_groups]
+        setor_antigo = setor_group_for(anterior) if troca and anterior is not None else None
+        if setor_antigo is not None and (groups is None or setor_antigo not in groups):
+            # Sai o setor da gerência deixada, salvo se outro vínculo ativo ainda o justifica.
+            ainda_lotado = (
+                EquipeGerencia.objects.filter(usuario=user, ativo=True, gerencia__setor_canonico=setor_antigo.name)
+                .exclude(gerencia=anterior)
+                .exists()
+            )
+            if not ainda_lotado:
+                if final_groups is not None:
+                    final_groups = [g for g in final_groups if g != setor_antigo]
+                else:
+                    user.groups.remove(setor_antigo)
         if has_gerencia:
             setor_group = setor_group_for(gerencia)
             if setor_group is not None:
@@ -337,9 +366,13 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
                 after_group_ids=list(user.groups.values_list("pk", flat=True)),
             )
         if has_gerencia:
-            papeis = papeis_de_grupos(user.groups.all())
-            if papeis:
-                sync_user_lotacao(user, gerencia, papeis)
+            depois = list(user.groups.all())
+            mudou_funcoes = {g.name for g in antes if g.name in funcoes} != {
+                g.name for g in depois if g.name in funcoes
+            }
+            papeis = papeis_de_grupos(depois)
+            if papeis and (anterior is None or troca or mudou_funcoes):
+                sync_user_lotacao(user, gerencia, papeis, gerencia_anterior=anterior)
         aprova = solicitation_approval_basis(user) is not None
         if aprova != aprovava:
             registrar_auditoria(

@@ -79,12 +79,16 @@ def upsert_vinculo(gerencia: Any, usuario: Any, papel: str, *, ativo: bool = Tru
     )
 
 
-def sync_user_lotacao(usuario: Any, gerencia: Any, papeis: Iterable[str], *, supervisor: Any = None) -> None:
+def sync_user_lotacao(
+    usuario: Any, gerencia: Any, papeis: Iterable[str], *, supervisor: Any = None, gerencia_anterior: Any = None
+) -> None:
     """Torna (gerencia, papeis) a lotação ATIVA do usuário (form = SSOT da lotação).
 
     - Garante vínculo ativo para cada (gerencia, papel).
-    - Encerra (ativo=False, valid_to=hoje) qualquer outro vínculo ATIVO do usuário
-      que não seja o alvo (troca de gerência / de papel).
+    - Encerra (ativo=False, valid_to=hoje) os outros vínculos ATIVOS do usuário na gerência alvo e
+      na `gerencia_anterior` (a que o form mostrou): troca de gerência / de papel.
+    - #2071: vínculos em outras gerências ficam — o form mostra uma só, e a pessoa pode ter mais
+      de uma lotação (ex.: coordena um setor e é formadora em outro).
     - Sem papel derivável (papeis vazio): NÃO mexe (evita apagar lotação por engano).
     """
     papeis = set(papeis)
@@ -93,7 +97,10 @@ def sync_user_lotacao(usuario: Any, gerencia: Any, papeis: Iterable[str], *, sup
     for papel in papeis:
         upsert_vinculo(gerencia, usuario, papel, ativo=True, supervisor=supervisor)
     hoje = timezone.localdate()
-    outros = EquipeGerencia.objects.filter(usuario=usuario, ativo=True).exclude(gerencia=gerencia, papel__in=papeis)
+    escopo = [g for g in (gerencia, gerencia_anterior) if g is not None]
+    outros = EquipeGerencia.objects.filter(usuario=usuario, ativo=True, gerencia__in=escopo).exclude(
+        gerencia=gerencia, papel__in=papeis
+    )
     for v in outros:
         v.ativo = False
         v.valid_to = hoje

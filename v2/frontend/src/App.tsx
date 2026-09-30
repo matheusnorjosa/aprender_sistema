@@ -29,7 +29,7 @@ import { AppHeader } from './components/AppHeader';
 import { AppRoutes } from './components/AppRoutes';
 import { usePermissions } from './hooks/usePermissions';
 import { useCanAccess } from './hooks/useCanAccess';
-import { useResponsive } from './hooks/useResponsive';
+import { useResponsive, sidebarSobrepondo } from './hooks/useResponsive';
 import { useGCalAlertsPolling } from './hooks/useGCalAlertsPolling';
 import { useUnreadNotificationsPolling } from './hooks/useUnreadNotificationsPolling';
 import useSessionMonitor from './hooks/useSessionMonitor';
@@ -63,6 +63,8 @@ function AppContent(): JSX.Element {
   const margemDoConteudo = modo === 'sobreposta'
     ? 0
     : modo === 'aberta' && !sidebarCollapsed ? LAYOUT.SIDEBAR_WIDTH : LAYOUT.SIDEBAR_COLLAPSED_WIDTH;
+  // Sidebar aberta por cima: cabeçalho e conteúdo atrás do fundo saem do Tab e do leitor de tela.
+  const conteudoInerte = sidebarSobrepondo(modo, sidebarCollapsed);
 
   // ── Permissions (single source of truth) ──
   const permissions = usePermissions(user);
@@ -238,7 +240,7 @@ function AppContent(): JSX.Element {
             toggleSidebar={toggleSidebar}
             colors={{ sidebarBackground: colors.sidebarBackground, borderLight: colors.borderLight }}
           />
-          <Layout style={{
+          <Layout inert={conteudoInerte} style={{
             marginLeft: margemDoConteudo,
             minHeight: '100vh',
             background: colors.pageBackground,

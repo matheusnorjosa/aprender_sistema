@@ -363,7 +363,8 @@ class UsuarioAdminViewSet(viewsets.ModelViewSet):
     - is_active: booleano
     - is_staff: booleano
     - search: busca em username, email, first_name, last_name, cpf
-    - ordering: username, email, date_joined, id
+    - ordering: username, email, date_joined, id, first_name, last_name (a tela de Usuários
+      ordena pelo nome: em prod o username é o CPF)
 
     GAP-001 (resolvido): Endpoint reativado em Fase 1 Iteração 2.
     """
@@ -382,7 +383,7 @@ class UsuarioAdminViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["is_active", "is_staff", "is_superuser"]
     search_fields = ["username", "email", "first_name", "last_name", "cpf"]
-    ordering_fields = ["username", "email", "date_joined", "id"]
+    ordering_fields = ["username", "email", "date_joined", "id", "first_name", "last_name"]
     ordering = ["username"]
 
     def get_queryset(self) -> QuerySet[Usuario]:

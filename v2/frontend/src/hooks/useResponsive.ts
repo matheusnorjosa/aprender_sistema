@@ -11,6 +11,17 @@ import { LAYOUT } from '../constants';
  */
 export type ModoSidebar = 'sobreposta' | 'recolhida' | 'aberta';
 
+/** Id da navegação principal (o Sider): o ☰ do cabeçalho aponta para ele (`aria-controls`). */
+export const ID_NAVEGACAO_PRINCIPAL = 'navegacao-principal';
+
+/**
+ * Abaixo de 1280 px, a sidebar aberta pelo ☰ fica POR CIMA do conteúdo e funciona como
+ * diálogo: foco no menu, Esc fecha, cabeçalho e conteúdo inertes.
+ */
+export function sidebarSobrepondo(modo: ModoSidebar, sidebarCollapsed: boolean): boolean {
+  return modo !== 'aberta' && !sidebarCollapsed;
+}
+
 function modoAtual(): ModoSidebar {
   const largura = typeof window !== 'undefined' ? window.innerWidth : LAYOUT.DESKTOP_BREAKPOINT;
   if (largura < LAYOUT.TABLET_BREAKPOINT) return 'sobreposta';

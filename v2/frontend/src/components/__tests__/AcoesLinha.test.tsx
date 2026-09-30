@@ -5,7 +5,7 @@
  * - até 3 ícones; do 4º em diante, o menu "Mais ações";
  * - `compacto` (celular): todas as ações no menu, um botão só.
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DeleteOutlined, EditOutlined, EyeOutlined, KeyOutlined } from '@ant-design/icons';
 import { describe, expect, test, vi } from 'vitest';
@@ -62,6 +62,74 @@ describe('AcoesLinha', () => {
 
     await user.hover(screen.getByRole('button', { name: 'Editar: Maria Aparecida' }));
     await waitFor(() => expect(screen.getByRole('tooltip')).toHaveTextContent('Editar'));
+  });
+
+  test('o Tooltip também abre no foco por teclado (ícone e "Mais ações")', async () => {
+    const user = userEvent.setup();
+    render(<AcoesLinha acoes={quatroAcoes()} alvo="Maria Aparecida" />);
+
+    await user.tab(); // Ver detalhes
+    await user.tab(); // Editar
+    expect(screen.getByRole('button', { name: 'Editar: Maria Aparecida' })).toHaveFocus();
+    await waitFor(() => expect(screen.getByRole('tooltip')).toHaveTextContent('Editar'));
+
+    await user.tab(); // Redefinir senha
+    await user.tab(); // Mais ações
+    expect(screen.getByRole('button', { name: 'Mais ações: Maria Aparecida' })).toHaveFocus();
+    await waitFor(() =>
+      expect(screen.getAllByRole('tooltip').some((dica) => dica.textContent === 'Mais ações')).toBe(true),
+    );
+  });
+
+  test('Esc fecha o Tooltip aberto pelo foco, sem tirar o foco do ícone (WCAG 1.4.13)', async () => {
+    const user = userEvent.setup();
+    render(<AcoesLinha acoes={quatroAcoes()} alvo="Maria Aparecida" />);
+    const editar = screen.getByRole('button', { name: 'Editar: Maria Aparecida' });
+
+    act(() => editar.focus()); // como um modal que, ao fechar, devolve o foco ao ícone
+    await waitFor(() => expect(screen.getByRole('tooltip')).toHaveTextContent('Editar'));
+    await user.keyboard('{Escape}');
+
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+    expect(editar).toHaveFocus();
+  });
+
+  test('escolher uma ação no menu devolve o foco ao "Mais ações" (e o modal que ela abre o devolve ali)', async () => {
+    const acoes = quatroAcoes();
+    const user = userEvent.setup();
+    render(<AcoesLinha acoes={acoes} alvo="Maria Aparecida" compacto />);
+    const botao = screen.getByRole('button', { name: 'Mais ações: Maria Aparecida' });
+
+    await user.click(botao);
+    await user.click(await screen.findByRole('menuitem', { name: /Editar/ }));
+
+    expect(acoes[1]!.onClick).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(botao).toHaveFocus());
+    expect(botao).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('"Mais ações" anuncia o menu, leva o foco a ele e o Esc devolve o foco ao botão', async () => {
+    const user = userEvent.setup();
+    render(<AcoesLinha acoes={quatroAcoes()} alvo="Maria Aparecida" compacto />);
+    const botao = screen.getByRole('button', { name: 'Mais ações: Maria Aparecida' });
+
+    expect(botao).toHaveAttribute('aria-haspopup', 'menu');
+    expect(botao).toHaveAttribute('aria-expanded', 'false');
+
+    await user.tab();
+    expect(botao).toHaveFocus();
+    await user.keyboard('{Enter}');
+
+    expect(botao).toHaveAttribute('aria-expanded', 'true');
+    const menu = await screen.findByRole('menu');
+    await waitFor(() => expect(menu).toContainElement(document.activeElement as HTMLElement));
+    expect(document.activeElement).toHaveAttribute('role', 'menuitem');
+
+    // O rc-dropdown lê `keyCode` (o navegador manda 27); o user-event v14 manda 0.
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Escape', code: 'Escape', keyCode: 27, which: 27 });
+
+    await waitFor(() => expect(botao).toHaveFocus());
+    expect(botao).toHaveAttribute('aria-expanded', 'false');
   });
 
   test('compacto (celular): um botão só, com todas as ações no menu', async () => {

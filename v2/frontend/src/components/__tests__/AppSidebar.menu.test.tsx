@@ -20,12 +20,14 @@
  * `rbac_matrix.test.ts` em paralelo.
  */
 
+import { useState } from 'react';
 import { MemoryRouter } from 'react-router';
 import { render, screen, within, fireEvent } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 
 import { AppSidebar } from '../AppSidebar';
 import type { Permissions } from '../../hooks/usePermissions';
+import type { ModoSidebar } from '../../hooks/useResponsive';
 
 // ============================================================================
 // Setup
@@ -740,6 +742,21 @@ describe('AppSidebar — gestor só por vínculo (PR A)', () => {
 });
 
 describe('AppSidebar — modo pela largura (Programa C, C1)', () => {
+  /** Com estado de verdade: `toggleSidebar` muda `sidebarCollapsed`, como o `useResponsive` no App. */
+  function SidebarComEstado({ modo, recolhidaInicial }: { modo: ModoSidebar; recolhidaInicial: boolean }) {
+    const [recolhida, setRecolhida] = useState(recolhidaInicial);
+    return (
+      <AppSidebar
+        permissions={EMPTY_PERMISSIONS}
+        policies={['manage_admin_registries']}
+        {...SIDEBAR_PROPS}
+        modo={modo}
+        sidebarCollapsed={recolhida}
+        toggleSidebar={() => setRecolhida((r) => !r)}
+      />
+    );
+  }
+
   function renderModo(modo: 'sobreposta' | 'recolhida' | 'aberta', sidebarCollapsed: boolean, toggleSidebar = () => {}) {
     render(
       <MemoryRouter initialEntries={['/dat/admin/usuarios']}>
@@ -781,11 +798,78 @@ describe('AppSidebar — modo pela largura (Programa C, C1)', () => {
     expect(screen.queryByText('AS')).not.toBeInTheDocument();
   });
 
-  test('sobreposta e aberta: escolher um item fecha a sidebar', () => {
-    const toggle = vi.fn();
-    renderModo('sobreposta', false, toggle);
+  test('sobreposta e aberta: escolher um item fecha a sidebar (uma vez só, mesmo mudando de rota)', () => {
+    // Com estado de verdade: um espião contaria também o fechamento pela troca de rota,
+    // que no App não acontece porque a sidebar já fechou pelo clique.
+    render(
+      <MemoryRouter initialEntries={['/dat/admin/usuarios']}>
+        <SidebarComEstado modo="sobreposta" recolhidaInicial={false} />
+      </MemoryRouter>,
+    );
     fireEvent.click(screen.getByRole('link', { name: 'Página Inicial' }));
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(document.querySelector('.mobile-sidebar-overlay')).toBeNull();
+  });
+
+  test('sobreposta e aberta: o clique (mouse) no item fecha uma vez; o Enter (keydown) não chama o toggle', () => {
+    // Na rota do próprio item a troca de rota não fecha: só o onItemClick pode fechar.
+    const toggle = vi.fn();
+    render(
+      <MemoryRouter initialEntries={['/home']}>
+        <AppSidebar
+          permissions={EMPTY_PERMISSIONS}
+          policies={['manage_admin_registries']}
+          {...SIDEBAR_PROPS}
+          modo="sobreposta"
+          sidebarCollapsed={false}
+          toggleSidebar={toggle}
+        />
+      </MemoryRouter>,
+    );
+    const inicio = screen.getByRole('link', { name: 'Página Inicial' });
+
+    // O rc-menu chama o onClick do Menu já no keydown do Enter; fechar ali tiraria o foco do
+    // <a> antes da ação padrão (o link não navegaria). Quem fecha é o clique que o <a> gera.
+    fireEvent.keyDown(inicio, { key: 'Enter', code: 'Enter', keyCode: 13, which: 13 });
+    expect(toggle).not.toHaveBeenCalled();
+
+    fireEvent.click(inicio);
     expect(toggle).toHaveBeenCalledTimes(1);
+  });
+
+  test('recolhida → expandida: abre o submenu da página atual', () => {
+    const props = { permissions: EMPTY_PERMISSIONS, policies: ['manage_admin_registries'], ...SIDEBAR_PROPS };
+    const { rerender } = render(
+      <MemoryRouter initialEntries={['/dat/admin/usuarios']}>
+        <AppSidebar {...props} modo="recolhida" sidebarCollapsed />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByRole('link', { name: 'Administração' })).not.toBeInTheDocument();
+
+    rerender(
+      <MemoryRouter initialEntries={['/dat/admin/usuarios']}>
+        <AppSidebar {...props} modo="recolhida" sidebarCollapsed={false} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('link', { name: 'Administração' })).toBeInTheDocument();
+  });
+
+  test('cada item de topo tem ícone próprio (na recolhida, só o ícone distingue os itens)', () => {
+    const superuser = ACTORS.find((a) => a.actor === 'Superuser')!;
+    renderSidebar(superuser.permissions, superuser.policies);
+    const nav = screen.getByRole('navigation', { name: 'Navegacao principal' });
+    const raiz = within(nav).getAllByRole('menu')[0]!;
+    const iconePorItem = Array.from(raiz.children)
+      .filter((li) => li.matches('.ant-menu-item, .ant-menu-submenu'))
+      .map((li) => {
+        const icone = Array.from(li.querySelector('.anticon')?.classList ?? []).find((c) => c.startsWith('anticon-'));
+        return `${(li.textContent ?? '').trim()}: ${icone ?? 'sem ícone'}`;
+      });
+    expect(iconePorItem).toHaveLength(TOP_LEVEL_ITEMS.length);
+    const icones = iconePorItem.map((par) => par.split(': ')[1]);
+    const repetidos = iconePorItem.filter((_, i) => icones.indexOf(icones[i]) !== i || icones.lastIndexOf(icones[i]) !== i);
+    expect(repetidos).toEqual([]);
   });
 
   test('aberta (>= 1280 px): nome inteiro, sem fundo escuro, e escolher item não fecha', () => {

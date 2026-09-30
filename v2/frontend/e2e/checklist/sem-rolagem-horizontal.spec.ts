@@ -90,6 +90,9 @@ test.describe('Sem rolagem horizontal: controles do verificador', () => {
     const soLeitor = alvos((await medirRolagemHorizontal(page)).cortados);
     expect(soLeitor).not.toContain('span#leitor.sr-only');
     expect(soLeitor).toContain('span#quase');
+    // Sem CORTE_PERMITIDO, #leitor é corte: prova que a classe .sr-only existe no CSS do app e
+    // que a isenção acima é da lista, não de o span nem chegar a ser candidato.
+    expect(alvos((await medirRolagemHorizontal(page, [])).cortados)).toContain('span#leitor.sr-only');
 
     await injetar('<div style="width:3000px;height:10px"></div>', 'body');
     expect((await medirRolagemHorizontal(page)).pagina).toBeGreaterThan(0);

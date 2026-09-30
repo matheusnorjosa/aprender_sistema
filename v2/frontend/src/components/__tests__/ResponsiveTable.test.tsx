@@ -36,6 +36,14 @@ const PESSOAS: Pessoa[] = [
     funcao: 'Coordenadora',
     ativo: true,
   },
+  {
+    id: 2,
+    nome: 'José Ribamar',
+    email: 'jose@example.invalid',
+    setor: 'Gerência de Logística',
+    funcao: 'Formador',
+    ativo: false,
+  },
 ];
 
 const COLUNAS: ColunaResponsiva<Pessoa>[] = [
@@ -62,25 +70,33 @@ const COLUNAS: ColunaResponsiva<Pessoa>[] = [
   },
 ];
 
-/** Com o locale do app (App.tsx): o botão de expandir se chama "Expandir linha". */
+/** Com o locale do app (App.tsx), como no uso real. */
 function renderTabela() {
   return render(
     <ConfigProvider locale={ptBR}>
-      <ResponsiveTable<Pessoa> columns={COLUNAS} dataSource={PESSOAS} rowKey="id" pagination={false} />
+      <ResponsiveTable<Pessoa>
+        columns={COLUNAS}
+        dataSource={PESSOAS}
+        rowKey="id"
+        pagination={false}
+        nomeDaLinha={(pessoa) => pessoa.nome}
+      />
     </ConfigProvider>,
   );
 }
 
-/** Títulos das colunas visíveis (a coluna do botão de expandir não tem título). */
+/** Títulos das colunas de dados (sem a do botão de expandir, cujo título é só para leitor de tela). */
 function cabecalhos(): string[] {
   return screen
     .getAllByRole('columnheader')
+    .filter((th) => !th.classList.contains('ant-table-row-expand-icon-cell'))
     .map((th) => th.textContent?.trim() ?? '')
     .filter(Boolean);
 }
 
-function botaoExpandir(): HTMLElement | null {
-  return screen.queryByRole('button', { name: /expandir linha/i });
+function botaoExpandir(nome = 'Maria Aparecida'): HTMLElement | null {
+  // "Expandir linha", e não "detalhes": na mesma linha, o nome abre "Ver detalhes de ..." (Usuários).
+  return screen.queryByRole('button', { name: `Expandir linha de ${nome}` });
 }
 
 describe('ResponsiveTable', () => {
@@ -136,6 +152,28 @@ describe('ResponsiveTable', () => {
 
     expect(cabecalhos()).toEqual(['Nome', 'Situação', 'Ações']);
     expect(botaoExpandir()).toBeInTheDocument();
+  });
+
+  test('o botão de expandir diz de que linha é, e a coluna dele tem título para leitor de tela', async () => {
+    definirLarguraTela(360);
+    const user = userEvent.setup();
+    renderTabela();
+
+    const maria = botaoExpandir('Maria Aparecida')!;
+    const jose = botaoExpandir('José Ribamar')!;
+    expect(maria).toBeInTheDocument();
+    expect(jose).toBeInTheDocument();
+    // a classe do AntD fica: é ela que desenha o +/- e que o Playwright procura
+    expect(maria).toHaveClass('ant-table-row-expand-icon');
+    expect(maria).toHaveAttribute('aria-expanded', 'false');
+
+    await user.click(maria);
+    expect(maria).toHaveAttribute('aria-expanded', 'true');
+    expect(jose).toHaveAttribute('aria-expanded', 'false');
+
+    const cabecalho = document.querySelector<HTMLElement>('th.ant-table-row-expand-icon-cell');
+    expect(cabecalho).toHaveTextContent('Detalhes');
+    expect(within(cabecalho!).getByText('Detalhes')).toHaveClass('sr-only');
   });
 
   test('layout fixo: as colunas cabem na largura da tabela', () => {

@@ -7,7 +7,8 @@
  * - toda combinação de PENDENTES está na LINHA_DE_BASE medida (nada novo entra), e toda
  *   combinação de PENDENTES_SO_LINUX (diferença de fonte na CI) na LINHA_DE_BASE_SO_LINUX;
  * - o tamanho das duas listas somadas é exatamente TETO_PENDENTES, que só desce: consertou
- *   uma tela e tirou a combinação? Baixe o teto junto.
+ *   uma tela e tirou a combinação? Baixe o teto e tire-a da linha de base junto;
+ * - a linha de base não tem folga: é exatamente PENDENTES (e a só-Linux, PENDENTES_SO_LINUX).
  * Mexer na linha de base ou subir o teto é decisão explícita, visível no diff deste arquivo.
  */
 import { describe, expect, test } from 'vitest';
@@ -23,21 +24,23 @@ interface Pendencias {
 }
 
 /**
- * Medida em 2026-09-29 (main acd04afd). 112 combinações da 1ª medição, mais 14 que vieram de
- * critério e vistas novos, não de regressão: o corte sem reticências em Coordenadores (4) e as
- * vistas Coordenadores "Lista" (4) e "Por área" (2) e Mapa "Lista" (4). Não edite para acomodar
- * tela nova: conserte a tela.
+ * Medida em 2026-09-29 (main acd04afd), menos o que o Programa C consertou. 112 combinações da
+ * 1ª medição, mais 14 que vieram de critério e vistas novos, não de regressão: o corte sem
+ * reticências em Coordenadores (4) e as vistas Coordenadores "Lista" (4) e "Por área" (2) e Mapa
+ * "Lista" (4). O C1 tirou 9 (as mesmas que saíram de PENDENTES). Consertou uma tela? Tire as
+ * combinações daqui também (o ratchet reprova folga: o que ficasse aqui poderia voltar a
+ * PENDENTES sem ele ver). Não edite para acomodar tela nova: conserte a tela.
  */
 const LINHA_DE_BASE: ListaPendentes = {
   '/dashboards': [360, 768, 1024],
   '/dashboards/compras': [360, 768, 1024, 1280],
   '/dashboards/equipe': [360, 768, 1024, 1280],
   '/dashboards/gcal': [360, 768, 1024],
-  '/mapa-brasil': [360, 768, 1024, 1280],
-  '/mapa-brasil#lista': [360, 768, 1024, 1280],
+  '/mapa-brasil': [360, 1024, 1280],
+  '/mapa-brasil#lista': [360, 1024, 1280],
   '/solicitacoes/minhas': [360, 768, 1024, 1280],
   '/solicitacoes/publicacao': [360, 768, 1024, 1280],
-  '/solicitacoes/:id/editar': [360, 768],
+  '/solicitacoes/:id/editar': [360],
   '/solicitacoes/aprovacoes': [360, 768, 1024, 1280],
   '/solicitacoes/disponibilidade': [360, 768, 1024],
   '/solicitacoes/bloqueios': [360, 768, 1024, 1280],
@@ -47,12 +50,11 @@ const LINHA_DE_BASE: ListaPendentes = {
   '/controle/compras': [360, 768, 1024, 1280],
   '/controle/coordenadores': [360, 768, 1024, 1280],
   '/controle/coordenadores#lista': [360, 768, 1024, 1280],
-  '/controle/coordenadores#area': [360, 768],
+  '/controle/coordenadores#area': [360],
   '/controle/plano-formacoes': [360, 768, 1024, 1280],
   '/controle/pre-agenda': [360, 768, 1024, 1280],
   '/acoes-notificacao': [360, 768, 1024, 1280],
-  '/notificacoes-internas': [360, 768, 1024],
-  '/dat/admin/usuarios': [360, 768, 1024, 1280],
+  '/notificacoes-internas': [360, 768],
   '/dat/admin/municipios': [360, 768, 1024, 1280],
   '/dat/admin/projetos': [360, 768, 1024],
   '/dat/admin/grupos': [360, 768, 1024, 1280],
@@ -104,8 +106,21 @@ function conferirRatchet(pendentes: Pendencias, base: Pendencias, teto: number):
   ];
   if (problemas.length > 0) return problemas;
   if (atuais.length > teto) return [`PENDENTES tem ${atuais.length} combinações e o teto é ${teto}: o teto só desce`];
-  if (atuais.length < teto) return [`PENDENTES encolheu para ${atuais.length}: baixe TETO_PENDENTES de ${teto} para ${atuais.length}`];
-  return [];
+  if (atuais.length < teto) {
+    return [
+      `PENDENTES encolheu para ${atuais.length}: baixe TETO_PENDENTES de ${teto} para ${atuais.length} ` +
+        'e tire da LINHA_DE_BASE o que foi consertado',
+    ];
+  }
+  // Sem folga: a base é exatamente PENDENTES. O que sobrasse nela poderia voltar sem o ratchet ver.
+  const pendentesAgora = new Set(atuais);
+  return [...naBase]
+    .filter((c) => !pendentesAgora.has(c))
+    .map(
+      (c) =>
+        `folga na linha de base: ${c} não está em PENDENTES. Consertou a tela? Tire a combinação da ` +
+        'LINHA_DE_BASE (a só-Linux, da LINHA_DE_BASE_SO_LINUX)'
+    );
 }
 
 describe('ratchet de PENDENTES: controles', () => {
@@ -147,15 +162,37 @@ describe('ratchet de PENDENTES: controles', () => {
     expect(conferirRatchet(BASE, BASE, 3)).toEqual(['PENDENTES tem 4 combinações e o teto é 3: o teto só desce']);
   });
 
-  test('lista menor que o teto pede para baixar o teto', () => {
+  test('lista menor que o teto pede para baixar o teto e limpar a linha de base', () => {
     expect(conferirRatchet(so({ '/a': [360] }), BASE, 4)).toEqual([
-      'PENDENTES encolheu para 2: baixe TETO_PENDENTES de 4 para 2',
+      'PENDENTES encolheu para 2: baixe TETO_PENDENTES de 4 para 2 e tire da LINHA_DE_BASE o que foi consertado',
     ]);
+  });
+
+  test('combinação consertada que volta a PENDENTES reprova', () => {
+    // '/b @ 360' foi consertada e saiu da base; voltar com ela, mesmo com o teto folgado, reprova.
+    const semB: Pendencias = { todas: { '/a': [360, 768] }, soLinux: { '/c': [1280] } };
+    expect(conferirRatchet(BASE, semB, 4)).toEqual(['combinação fora da linha de base: /b @ 360px']);
   });
 
   test('combinação repetida reprova', () => {
     expect(conferirRatchet(so({ '/a': [360, 360, 768], '/b': [360] }), BASE, 5)).toEqual([
       'combinação repetida: /a @ 360px',
+    ]);
+  });
+
+  test('folga na linha de base reprova: consertou, baixou o teto e esqueceu a base', () => {
+    // '/a @ 768' saiu de PENDENTES e o teto desceu, mas a combinação ficou na base: ela
+    // poderia voltar a PENDENTES (com o teto de volta a 4) sem o ratchet ver.
+    expect(conferirRatchet(so({ '/a': [360], '/b': [360] }), BASE, 3)).toEqual([
+      'folga na linha de base: /a @ 768px não está em PENDENTES. Consertou a tela? Tire a combinação da ' +
+        'LINHA_DE_BASE (a só-Linux, da LINHA_DE_BASE_SO_LINUX)',
+    ]);
+  });
+
+  test('folga na linha de base só Linux também reprova', () => {
+    expect(conferirRatchet(so(BASE.todas, {}), BASE, 3)).toEqual([
+      'folga na linha de base: /c @ 1280px (só Linux) não está em PENDENTES. Consertou a tela? Tire a ' +
+        'combinação da LINHA_DE_BASE (a só-Linux, da LINHA_DE_BASE_SO_LINUX)',
     ]);
   });
 
@@ -173,5 +210,28 @@ describe('ratchet de PENDENTES: lista real', () => {
         TETO_PENDENTES
       )
     ).toEqual([]);
+  });
+
+  // O que o C1 consertou (30/09/2026) saiu da linha de base: voltar a rolar e voltar a
+  // PENDENTES reprova, mesmo baixando o teto de menos ("troca 1 por 1" com a lista real).
+  test.each([
+    ['/dat/admin/usuarios', 360],
+    ['/dat/admin/usuarios', 768],
+    ['/dat/admin/usuarios', 1024],
+    ['/dat/admin/usuarios', 1280],
+    ['/mapa-brasil', 768],
+    ['/mapa-brasil#lista', 768],
+    ['/solicitacoes/:id/editar', 768],
+    ['/controle/coordenadores#area', 768],
+    ['/notificacoes-internas', 1024],
+  ] as const)('%s @ %ipx, consertada no C1, não volta a PENDENTES', (chave, largura) => {
+    const devolta = { ...PENDENTES, [chave]: [...(PENDENTES[chave] ?? []), largura] };
+    expect(
+      conferirRatchet(
+        { todas: devolta, soLinux: PENDENTES_SO_LINUX },
+        { todas: LINHA_DE_BASE, soLinux: LINHA_DE_BASE_SO_LINUX },
+        TETO_PENDENTES + 1
+      )
+    ).toEqual([`combinação fora da linha de base: ${chave} @ ${largura}px`]);
   });
 });

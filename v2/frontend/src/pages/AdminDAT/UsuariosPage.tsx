@@ -13,7 +13,7 @@
  * GAP-001 (resolvido): Endpoint /api/usuarios-admin/ reativado
  */
 
-import { useEffect, useMemo, useState, type JSX } from 'react';
+import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import {
   Button,
   Input,
@@ -35,7 +35,7 @@ import {
   theme,
 } from 'antd';
 import type { TablePaginationConfig } from 'antd/es/table';
-import type { FilterValue, SorterResult } from 'antd/es/table/interface';
+import type { FilterValue, SorterResult, SortOrder, TableCurrentDataSource } from 'antd/es/table/interface';
 import type { RadioChangeEvent } from 'antd/es/radio';
 import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined, LockOutlined } from '@ant-design/icons';
 import { Link } from 'react-router';
@@ -124,6 +124,44 @@ function nomeDe(user: UserRecord): string {
   return `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email || 'Sem nome';
 }
 
+/**
+ * Login de tela: em produção o username é o CPF. CPF (só dígitos ou 000.000.000-00) sai com a
+ * regra do `cpf_masked` do backend (UsuarioAdminSerializer: só os 6 últimos dígitos), para login
+ * e CPF mascarados não se completarem; username que não é CPF aparece como está.
+ */
+function loginDeTela(username: string): string {
+  return /^\d{3}\.?\d{3}\.?\d{3}-?\d{2}$/.test(username)
+    ? `***.***.${username.replace(/\D/g, '').slice(-6)}`
+    : username;
+}
+
+/**
+ * Ordem da lista no servidor (decisão 5 do dono): pelo nome, com o id desempatando, e não pelo
+ * username (o CPF). Por coluna com `sorter`: os campos da ordem crescente (o id desempata, para
+ * a paginação não repetir nem pular ninguém). A ordem é controlada: a seta e o `aria-sort`
+ * mostram a que a lista tem, e ela vale na busca, na paginação, no Atualizar, no salvar e no
+ * excluir. Limpar a ordenação volta ao padrão.
+ */
+const ORDEM_DA_COLUNA = {
+  nome: ['first_name', 'last_name', 'id'],
+  email: ['email', 'id'],
+} as const;
+type ColunaOrdenavel = keyof typeof ORDEM_DA_COLUNA;
+interface Ordem {
+  coluna: ColunaOrdenavel;
+  sentido: NonNullable<SortOrder>;
+}
+const ORDEM_PADRAO: Ordem = { coluna: 'nome', sentido: 'ascend' };
+
+function colunaOrdenavel(chave: unknown): chave is ColunaOrdenavel {
+  return typeof chave === 'string' && chave in ORDEM_DA_COLUNA;
+}
+
+/** Parâmetro `ordering` da API: '-' em cada campo na decrescente. */
+function ordering({ coluna, sentido }: Ordem): string {
+  return ORDEM_DA_COLUNA[coluna].map((campo) => (sentido === 'descend' ? `-${campo}` : campo)).join(',');
+}
+
 /** Papel no vínculo EquipeGerencia (PAPEL_CHOICES do backend). */
 const PAPEL: Record<string, string> = {
   GERENTE: 'Gerente',
@@ -132,13 +170,30 @@ const PAPEL: Record<string, string> = {
   FORMADOR: 'Formador',
 };
 
+/**
+ * Cor do texto das tags com contraste AA (4,5:1). O AntD pinta o preset com a cor 7 sobre a
+ * cor 1, e green, gold e orange reprovam (3,37, 2,76 e 3,34:1); red, blue e purple passam.
+ * Molde do Programa C: quando a 2ª página precisar, mover para um módulo comum.
+ */
+const TEXTO_DA_TAG: Partial<Record<string, string>> = {
+  green: '#237804', // green-8: 5,44:1
+  orange: '#ad4e00', // orange-8: 5,09:1
+  gold: '#874d00', // gold-9: 6,53:1 (o gold-8 dá 4,25:1)
+};
+
 /** Tags que quebram linha e cortam com reticências em vez de estourar a coluna. */
 function Etiquetas({ nomes, cor }: { nomes: string[]; cor: (nome: string) => string }): JSX.Element {
   if (nomes.length === 0) return <Text type="secondary">-</Text>;
   return (
     <div className="flex min-w-0 flex-wrap gap-1">
       {nomes.map((nome) => (
-        <Tag key={nome} color={cor(nome)} title={nome} className="truncate" style={{ marginInlineEnd: 0, maxWidth: '100%' }}>
+        <Tag
+          key={nome}
+          color={cor(nome)}
+          title={nome}
+          className="truncate"
+          style={{ marginInlineEnd: 0, maxWidth: '100%', color: TEXTO_DA_TAG[cor(nome)] }}
+        >
           {nome}
         </Tag>
       ))}
@@ -147,8 +202,9 @@ function Etiquetas({ nomes, cor }: { nomes: string[]; cor: (nome: string) => str
 }
 
 function Situacao({ ativo }: { ativo: boolean }): JSX.Element {
+  const cor = ativo ? 'green' : 'red';
   return (
-    <Tag color={ativo ? 'green' : 'red'} style={{ marginInlineEnd: 0 }}>
+    <Tag color={cor} style={{ marginInlineEnd: 0, color: TEXTO_DA_TAG[cor] }}>
       {ativo ? 'Ativo' : 'Inativo'}
     </Tag>
   );
@@ -169,19 +225,27 @@ function DetalheUsuario({ usuario, setores, funcoes }: DetalheUsuarioProps): JSX
   return (
     <div className="flex flex-col gap-6">
       <Descriptions
-        title="Dados pessoais"
+        title={<h3>Dados pessoais</h3>}
         size="small"
         column={1}
         items={[
           { key: 'nome', label: 'Nome', children: nomeDe(usuario) },
           { key: 'email', label: 'E-mail', children: usuario.email || '-' },
-          { key: 'cpf', label: 'CPF', children: usuario.cpf_masked || <Tag color="orange">Sem CPF</Tag> },
+          {
+            key: 'cpf',
+            label: 'CPF',
+            children: usuario.cpf_masked || (
+              <Tag color="orange" style={{ color: TEXTO_DA_TAG['orange'] }}>
+                Sem CPF
+              </Tag>
+            ),
+          },
           { key: 'telefone', label: 'Telefone', children: usuario.telefone || '-' },
           { key: 'cargo', label: 'Cargo', children: usuario.cargo || '-' },
         ]}
       />
       <Descriptions
-        title="Lotação"
+        title={<h3>Lotação</h3>}
         size="small"
         column={1}
         items={
@@ -194,11 +258,11 @@ function DetalheUsuario({ usuario, setores, funcoes }: DetalheUsuarioProps): JSX
         }
       />
       <Descriptions
-        title="Acesso"
+        title={<h3>Acesso</h3>}
         size="small"
         column={1}
         items={[
-          { key: 'login', label: 'Usuário (login)', children: usuario.username },
+          { key: 'login', label: 'Usuário (login)', children: loginDeTela(usuario.username) },
           { key: 'situacao', label: 'Situação', children: <Situacao ativo={usuario.is_active} /> },
           { key: 'superusuario', label: 'Superusuário', children: usuario.is_superuser ? 'Sim' : 'Não' },
           { key: 'funcoes', label: 'Funções', children: <Etiquetas nomes={funcoes} cor={corDaFuncao} /> },
@@ -261,7 +325,7 @@ interface PaginationState {
 interface FetchParams {
   current?: number | undefined;
   pageSize?: number | undefined;
-  ordering?: string;
+  ordem?: Ordem;
 }
 
 export default function UsuariosPage(): JSX.Element {
@@ -273,6 +337,7 @@ export default function UsuariosPage(): JSX.Element {
     pageSize: PAGE_SIZES.SMALL,
     total: 0,
   });
+  const [ordem, setOrdem] = useState<Ordem>(ORDEM_PADRAO);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
   // #2071: as funções estavam carregadas quando o Editar abriu (e hidratou o form)?
@@ -290,6 +355,10 @@ export default function UsuariosPage(): JSX.Element {
     setDetalheUser(user);
     setDetalheAberto(true);
   };
+  // Editar pelo detalhe: o modal só abre quando o Drawer acaba de fechar. Aí o Drawer já
+  // devolveu o foco ao nome da linha, e é para lá que o modal o devolve ao fechar. Abrindo
+  // junto, o modal guardava o Editar do Drawer (escondido) e o foco caía no <body>.
+  const editarAoFecharDetalhe = useRef(false);
   // Celular (< 576 px): as ações da linha vão todas para o menu "Mais ações".
   const acoesCompactas = !Grid.useBreakpoint().sm;
   // Nome como link na cor da marca: o azul padrão do link do AntD dá 4,1:1 no branco (WCAG
@@ -366,12 +435,8 @@ export default function UsuariosPage(): JSX.Element {
       apiParams['page'] = params.current || pagination.current;
       apiParams['page_size'] = params.pageSize || pagination.pageSize;
 
-      // Add ordering if provided
-      if (params.ordering) {
-        apiParams['ordering'] = params['ordering'];
-      } else {
-        apiParams['ordering'] = 'username';
-      }
+      // A ordem escolhida na tabela (a nova vem em params: o estado só muda no próximo render)
+      apiParams['ordering'] = ordering(params.ordem ?? ordem);
 
       const data = await listUsers(apiParams);
 
@@ -432,17 +497,24 @@ export default function UsuariosPage(): JSX.Element {
   const handleTableChange = (
     newPagination: TablePaginationConfig,
     _filters: Record<string, FilterValue | null>,
-    sorter: SorterResult<UserRecord> | SorterResult<UserRecord>[]
+    sorter: SorterResult<UserRecord> | SorterResult<UserRecord>[],
+    extra: TableCurrentDataSource<UserRecord>
   ): void => {
     const params: FetchParams = {
       current: newPagination.current,
       pageSize: newPagination.pageSize,
     };
 
-    // Handle single sorter
-    const singleSorter = Array.isArray(sorter) ? sorter[0] : sorter;
-    if (singleSorter && singleSorter.field) {
-      params.ordering = `${singleSorter.order === 'descend' ? '-' : ''}${String(singleSorter.field)}`;
+    // Só o clique no cabeçalho muda a ordem; a paginação segue a atual (o E-mail some da
+    // tabela abaixo de md, e aí o sorter da paginação viria sem ele).
+    if (extra.action === 'sort') {
+      const singleSorter = Array.isArray(sorter) ? sorter[0] : sorter;
+      const nova =
+        singleSorter?.order && colunaOrdenavel(singleSorter.columnKey)
+          ? { coluna: singleSorter.columnKey, sentido: singleSorter.order }
+          : ORDEM_PADRAO;
+      setOrdem(nova);
+      params.ordem = nova;
     }
 
     void fetchUsuarios(params);
@@ -491,10 +563,12 @@ export default function UsuariosPage(): JSX.Element {
   const handleDelete = (user: UserRecord): void => {
     Modal.confirm({
       title: 'Confirmar exclusão',
-      content: `Tem certeza que deseja excluir o usuário "${user.username}"? Esta ação não pode ser desfeita.`,
+      content: `Tem certeza que deseja excluir o usuário "${nomeDe(user)}"? Esta ação não pode ser desfeita.`,
       okText: 'Excluir',
       okType: 'danger',
       cancelText: 'Cancelar',
+      // Ação destrutiva: o foco começa no Cancelar (senão um Enter repetido exclui sem confirmar).
+      autoFocusButton: 'cancel',
       onOk: async () => {
         try {
           await deleteUser(user.id);
@@ -548,7 +622,7 @@ export default function UsuariosPage(): JSX.Element {
     setResetSaving(true);
     try {
       await resetUserPassword(resetPasswordUser.id, values.nova_senha);
-      message.success(`Senha de "${resetPasswordUser.username}" redefinida com sucesso`);
+      message.success(`Senha de "${nomeDe(resetPasswordUser)}" redefinida com sucesso`);
       setResetPasswordUser(null);
       resetForm.resetFields();
     } catch (error) {
@@ -571,6 +645,8 @@ export default function UsuariosPage(): JSX.Element {
       title: 'Nome',
       key: 'nome',
       ellipsis: true,
+      sorter: true,
+      sortOrder: ordem.coluna === 'nome' ? ordem.sentido : null,
       render: (_, record) => (
         <Button
           type="link"
@@ -589,6 +665,7 @@ export default function UsuariosPage(): JSX.Element {
       key: 'email',
       ellipsis: true,
       sorter: true,
+      sortOrder: ordem.coluna === 'email' ? ordem.sentido : null,
       responsive: VISIVEL_A_PARTIR.md,
     },
     {
@@ -693,6 +770,7 @@ export default function UsuariosPage(): JSX.Element {
             columns={columns}
             dataSource={usuarios}
             rowKey="id"
+            nomeDaLinha={nomeDe}
             loading={loading}
             pagination={{
               ...pagination,
@@ -722,6 +800,12 @@ export default function UsuariosPage(): JSX.Element {
         title={detalheUser ? nomeDe(detalheUser) : 'Usuário'}
         open={detalheAberto}
         onClose={() => setDetalheAberto(false)}
+        afterOpenChange={(aberto) => {
+          if (!aberto && editarAoFecharDetalhe.current && detalheUser) {
+            editarAoFecharDetalhe.current = false;
+            handleEdit(detalheUser);
+          }
+        }}
         width={480}
         extra={
           detalheUser ? (
@@ -729,8 +813,8 @@ export default function UsuariosPage(): JSX.Element {
               type="primary"
               icon={<EditOutlined />}
               onClick={() => {
+                editarAoFecharDetalhe.current = true;
                 setDetalheAberto(false);
-                handleEdit(detalheUser);
               }}
             >
               Editar
@@ -763,6 +847,9 @@ export default function UsuariosPage(): JSX.Element {
             name="username"
             label="Username"
             rules={[{ required: true, message: 'Username é obrigatório' }]}
+            // Na edição (campo travado) o login, que é o CPF, aparece mascarado; o form guarda
+            // o valor real, e o Salvar manda o que sempre mandou.
+            getValueProps={(valor?: string) => ({ value: editingUser && valor ? loginDeTela(valor) : valor })}
           >
             <Input placeholder="Ex: joao.silva" disabled={!!editingUser} />
           </Form.Item>
@@ -923,7 +1010,11 @@ export default function UsuariosPage(): JSX.Element {
                   if (!gerencia) {
                     return <Text type="secondary">nenhuma gerência selecionada</Text>;
                   }
-                  return <Tag color="green">{gerencia.label}</Tag>;
+                  return (
+                    <Tag color="green" style={{ color: TEXTO_DA_TAG['green'] }}>
+                      {gerencia.label}
+                    </Tag>
+                  );
                 })()}
               </div>
               <div>
@@ -987,7 +1078,7 @@ export default function UsuariosPage(): JSX.Element {
       {/* #1675: Modal dedicado de redefinição de senha (admin -> outro usuário).
           O backend audita como RESET_PASSWORD (#1672); a senha nunca é exibida. */}
       <Modal
-        title={resetPasswordUser ? `Redefinir senha — ${resetPasswordUser.username}` : 'Redefinir senha'}
+        title={resetPasswordUser ? `Redefinir senha — ${nomeDe(resetPasswordUser)}` : 'Redefinir senha'}
         open={resetPasswordUser !== null}
         onCancel={() => { setResetPasswordUser(null); resetForm.resetFields(); }}
         onOk={() => resetForm.submit()}

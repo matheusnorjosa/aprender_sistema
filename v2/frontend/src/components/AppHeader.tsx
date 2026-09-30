@@ -11,7 +11,7 @@ import {
 } from '@ant-design/icons';
 import { listNotificacoesInternas, marcarNotificacaoLida } from '../api/acoesNotificacao';
 import type { NotificacaoInterna } from '../types/acoesNotificacao';
-import type { ModoSidebar } from '../hooks/useResponsive';
+import { ID_NAVEGACAO_PRINCIPAL, sidebarSobrepondo, type ModoSidebar } from '../hooks/useResponsive';
 
 const { Header } = Layout;
 const { Text } = Typography;
@@ -50,6 +50,16 @@ export function AppHeader({
     return () => { isMountedRef.current = false; };
   }, []);
 
+  // Fechou a sidebar que estava por cima do conteúdo (Esc, fundo, item, troca de rota):
+  // o foco volta ao ☰, em vez de cair no <body>.
+  const botaoMenuRef = useRef<HTMLButtonElement>(null);
+  const sobrepondo = sidebarSobrepondo(modo, sidebarCollapsed);
+  const sobrepondoAntesRef = useRef(sobrepondo);
+  useEffect(() => {
+    if (sobrepondoAntesRef.current && !sobrepondo) botaoMenuRef.current?.focus();
+    sobrepondoAntesRef.current = sobrepondo;
+  }, [sobrepondo]);
+
   const handlePopoverOpenChange = useCallback(async (open: boolean) => {
     setPopoverOpen(open);
     if (open) {
@@ -86,11 +96,14 @@ export function AppHeader({
       }}
     >
       <Button
+        ref={botaoMenuRef}
         type="text"
         icon={sidebarCollapsed ? <MenuOutlined /> : <CloseOutlined />}
         onClick={toggleSidebar}
-        aria-label={sidebarCollapsed ? 'Abrir menu' : 'Fechar menu'}
+        // Rótulo estável: o estado vai no aria-expanded.
+        aria-label="Menu principal"
         aria-expanded={!sidebarCollapsed}
+        aria-controls={ID_NAVEGACAO_PRINCIPAL}
         className="mobile-menu-toggle"
         style={{
           fontSize: '18px',

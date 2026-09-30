@@ -1,21 +1,24 @@
-import { useState, useEffect, useMemo, useCallback, type JSX } from 'react';
-import { Layout, Menu, Badge } from 'antd';
+import { useState, useEffect, useMemo, useCallback, useRef, type JSX } from 'react';
+import { Layout, Menu, Badge, Button, type MenuProps } from 'antd';
 import { Link, useLocation } from 'react-router';
 import {
   CalendarOutlined,
+  CarOutlined,
   CheckCircleOutlined,
+  CloseOutlined,
   FileTextOutlined,
   SafetyOutlined,
   BarChartOutlined,
   HomeOutlined,
   SolutionOutlined,
+  StopOutlined,
   BellOutlined,
   TableOutlined,
 } from '@ant-design/icons';
 import type { Permissions } from '../hooks/usePermissions';
 import { useCapabilities } from '../hooks/useCapabilities';
 import { LAYOUT } from '../constants';
-import type { ModoSidebar } from '../hooks/useResponsive';
+import { ID_NAVEGACAO_PRINCIPAL, sidebarSobrepondo, type ModoSidebar } from '../hooks/useResponsive';
 
 const { Sider } = Layout;
 const { SubMenu } = Menu;
@@ -139,19 +142,20 @@ interface SidebarMenuProps {
   recolhido: boolean;
   openKeys: string[];
   onOpenChange: (keys: string[]) => void;
-  onItemClick?: () => void;
+  onItemClick?: MenuProps['onClick'];
   children: React.ReactNode;
 }
 
 function SidebarMenu({ recolhido, openKeys, onOpenChange, onItemClick, children }: SidebarMenuProps): JSX.Element {
   const selectedKey = useSelectedMenuKey();
 
+  // Abre o submenu pai da página atual também ao expandir (sair de recolhido): recolher fecha todos.
   useEffect(() => {
     const parentKey = MENU_KEY_TO_PARENT[selectedKey];
     if (parentKey && !recolhido && !openKeys.includes(parentKey)) {
       onOpenChange([parentKey]);
     }
-  }, [selectedKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedKey, recolhido]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <Menu
@@ -198,7 +202,33 @@ export function AppSidebar({
 }: AppSidebarProps): JSX.Element {
   const { openKeys, onOpenChange, closeAllSubmenus } = useMenuOpenKeys();
   // Abaixo de 1280 px a sidebar aberta fica POR CIMA do conteúdo (fundo escuro fecha).
-  const sobrepondo = modo !== 'aberta' && !sidebarCollapsed;
+  const sobrepondo = sidebarSobrepondo(modo, sidebarCollapsed);
+  const navRef = useRef<HTMLDivElement>(null);
+  const { pathname } = useLocation();
+  const rotaRef = useRef(pathname);
+
+  // Por cima do conteúdo, a sidebar é um diálogo: o foco vai para o 1º item e Esc fecha.
+  // O ☰ recebe o foco de volta (AppHeader); cabeçalho e conteúdo ficam inertes (App).
+  useEffect(() => {
+    if (sobrepondo) navRef.current?.querySelector<HTMLElement>('.ant-menu a[href]')?.focus();
+  }, [sobrepondo]);
+
+  useEffect(() => {
+    if (!sobrepondo) return undefined;
+    const fecharComEsc = (evento: KeyboardEvent): void => {
+      if (evento.key === 'Escape') toggleSidebar();
+    };
+    document.addEventListener('keydown', fecharComEsc);
+    return () => document.removeEventListener('keydown', fecharComEsc);
+  }, [sobrepondo, toggleSidebar]);
+
+  // Rota mudou por fora do menu (voltar do navegador, link no conteúdo): fecha. Pelo menu,
+  // o clique no item já fechou (onItemClick) e aqui `sobrepondo` chega false.
+  useEffect(() => {
+    if (rotaRef.current === pathname) return;
+    rotaRef.current = pathname;
+    if (sobrepondo) toggleSidebar();
+  }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // #1270 (RBAC 3.2): os itens de menu derivam de `useCapabilities` (policy pura,
   // fonte de verdade do backend). As flags legacy de organograma permanecem SÓ onde
@@ -231,6 +261,10 @@ export function AppSidebar({
         />
       )}
       <Sider
+        ref={navRef}
+        id={ID_NAVEGACAO_PRINCIPAL}
+        // Sobreposta fechada: escondida (largura 0), fora do Tab e do leitor de tela.
+        inert={modo === 'sobreposta' && sidebarCollapsed}
         width={LAYOUT.SIDEBAR_WIDTH}
         collapsedWidth={modo === 'sobreposta' ? 0 : LAYOUT.SIDEBAR_COLLAPSED_WIDTH}
         collapsed={sidebarCollapsed}
@@ -253,12 +287,13 @@ export function AppSidebar({
       >
         <header
           role="banner"
-          className="flex items-center justify-center font-bold"
+          className={`flex items-center font-bold ${sobrepondo ? 'justify-between' : 'justify-center'}`}
           style={{
             height: '64px',
             color: 'white',
             fontSize: '22px',
             borderBottom: `1px solid ${colors.borderLight}`,
+            ...(sobrepondo && { paddingInline: 12 }),
           }}
         >
           {sidebarCollapsed && modo === 'recolhida' ? (
@@ -269,6 +304,18 @@ export function AppSidebar({
           ) : (
             'Aprender Sistema'
           )}
+          {/* Por cima do conteúdo o ☰ fica inerte e o fundo, aria-hidden: sem Esc (leitor de
+              tela no toque), é este botão que fecha. O foco volta ao ☰ (AppHeader). */}
+          {sobrepondo && (
+            <Button
+              type="text"
+              className="sidebar-fechar-menu"
+              icon={<CloseOutlined />}
+              aria-label="Fechar menu"
+              onClick={toggleSidebar}
+              style={{ color: 'white' }}
+            />
+          )}
         </header>
 
         {!(modo === 'sobreposta' && sidebarCollapsed) && (
@@ -276,7 +323,11 @@ export function AppSidebar({
             recolhido={sidebarCollapsed}
             openKeys={openKeys}
             onOpenChange={onOpenChange}
-            onItemClick={() => {
+            onItemClick={(info) => {
+              // Enter: o rc-menu chama o onClick já no keydown. Fechar ali levaria o foco ao ☰
+              // antes da ação padrão do <a> (o link não navegaria e o keypress reabriria o
+              // menu). O Enter segue para o <a>, e o clique que ele gera fecha por aqui.
+              if (info.domEvent.type === 'keydown') return;
               if (sobrepondo) {
                 toggleSidebar();
                 closeAllSubmenus();
@@ -301,7 +352,7 @@ export function AppSidebar({
             {/* Bloqueios: policy view_all_availability + escopo próprio de Formador/Coordenador
                 (sem policy pública) e Controle (access_controle_section). */}
             {(caps.canViewAllAvailability || canControle || canCoordenador || isFormador || isGestorPorVinculo) && (
-              <Menu.Item key="bloqueios" icon={<CalendarOutlined />} onClick={closeAllSubmenus}>
+              <Menu.Item key="bloqueios" icon={<StopOutlined />} onClick={closeAllSubmenus}>
                 <Link to="/solicitacoes/bloqueios">Bloqueios</Link>
               </Menu.Item>
             )}
@@ -330,7 +381,7 @@ export function AppSidebar({
             )}
 
             {(caps.canViewAllAvailability || canControle || canCoordenador || canDAT || isGestorPorVinculo) && (
-              <Menu.Item key="deslocamentos" icon={<CalendarOutlined />} onClick={closeAllSubmenus}>
+              <Menu.Item key="deslocamentos" icon={<CarOutlined />} onClick={closeAllSubmenus}>
                 <Link to="/solicitacoes/deslocamentos">Deslocamentos</Link>
               </Menu.Item>
             )}

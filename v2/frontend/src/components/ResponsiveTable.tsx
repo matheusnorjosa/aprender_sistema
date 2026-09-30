@@ -7,6 +7,7 @@
  *   VISIVEL_A_PARTIR); sem `responsive`, aparece sempre (identidade, estado e ações);
  * - o que está escondido na largura atual aparece na linha expandida, como
  *   `<Descriptions column={1}>`, com o `title` e o `render` da própria coluna: nada some;
+ *   o botão que a abre leva o nome da linha (`nomeDaLinha`), "Expandir linha de Maria";
  * - `tableLayout="fixed"`: `width` só nas colunas estreitas e `ellipsis` nas de texto.
  * Densidade: `middle` por padrão e `small` no celular (abaixo de `md`), para caber mais
  * colunas na linha antes de mandá-las para o detalhe.
@@ -41,6 +42,8 @@ export interface ColunaResponsiva<T> extends Omit<ColumnType<T>, 'fixed' | 'resp
 export interface ResponsiveTableProps<T extends AnyObject>
   extends Omit<TableProps<T>, 'columns' | 'scroll' | 'tableLayout' | 'expandable'> {
   columns: ColunaResponsiva<T>[];
+  /** Quem a linha representa (ex.: o nome): nomeia o botão de expandir, "Expandir linha de Maria". */
+  nomeDaLinha(registro: T): string;
 }
 
 type Telas = Partial<Record<Breakpoint, boolean>>;
@@ -69,6 +72,7 @@ function conteudo<T>(coluna: ColunaResponsiva<T>, registro: T, indice: number): 
 export default function ResponsiveTable<T extends AnyObject>({
   columns,
   size,
+  nomeDaLinha,
   ...props
 }: ResponsiveTableProps<T>): JSX.Element {
   const telas = Grid.useBreakpoint();
@@ -84,6 +88,21 @@ export default function ResponsiveTable<T extends AnyObject>({
       {...(escondidas.length > 0 && {
         expandable: {
           columnWidth: 40,
+          columnTitle: <span className="sr-only">Detalhes</span>,
+          // O botão do AntD, com as classes dele (o +/-), mas com o nome da linha: o padrão
+          // ("Expandir linha") é o mesmo em todas e não diz de quem é o detalhe.
+          expandIcon: ({ prefixCls, expanded, record, onExpand }) => (
+            <button
+              type="button"
+              className={`${prefixCls}-row-expand-icon ${prefixCls}-row-expand-icon-${expanded ? 'expanded' : 'collapsed'}`}
+              aria-label={`Expandir linha de ${nomeDaLinha(record)}`}
+              aria-expanded={expanded}
+              onClick={(evento) => {
+                onExpand(record, evento);
+                evento.stopPropagation();
+              }}
+            />
+          ),
           expandedRowRender: (registro: T, indice: number) => (
             <Descriptions
               size="small"

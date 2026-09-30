@@ -58,9 +58,12 @@ export const CORTE_PERMITIDO = [
  * 3. corte: `overflow-x` hidden/clip, `scrollWidth - clientWidth > 1` e sem
  *    `text-overflow: ellipsis`. Ficam de fora campos de formulário (o valor rola dentro
  *    do campo), caixas sem largura ou invisíveis, `aria-hidden` e CORTE_PERMITIDO.
- * A folga de 1 px cobre arredondamento de subpixel.
+ * A folga de 1 px cobre arredondamento de subpixel. `permitido` só muda nos controles.
  */
-export async function medirRolagemHorizontal(page: Page): Promise<Medicao> {
+export async function medirRolagemHorizontal(
+  page: Page,
+  permitido: readonly string[] = CORTE_PERMITIDO
+): Promise<Medicao> {
   return page.evaluate((permitido) => {
     const descrever = (el: Element): string => {
       const id = el.id ? `#${el.id}` : '';
@@ -81,12 +84,12 @@ export async function medirRolagemHorizontal(page: Page): Promise<Medicao> {
       if (estilo.overflowX !== 'hidden' && estilo.overflowX !== 'clip') continue;
       if (estilo.textOverflow === 'ellipsis' || estilo.visibility === 'hidden' || el.clientWidth < 1) continue;
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) continue;
-      if (el.closest('[aria-hidden="true"]') || el.matches(seletorPermitido)) continue;
+      if (el.closest('[aria-hidden="true"]') || (seletorPermitido && el.matches(seletorPermitido))) continue;
       cortados.push({ alvo: descrever(el), excesso });
     }
     const de = document.documentElement;
     return { pagina: de.scrollWidth - de.clientWidth, internos, cortados };
-  }, CORTE_PERMITIDO);
+  }, permitido);
 }
 
 export function temProblema(medicao: Medicao): boolean {
@@ -155,7 +158,8 @@ const ERRO_NA_TELA = '.ant-result-error, .ant-result-warning, .ant-alert-error';
  * - casca autenticada: o header com o botão "Sair" (a tela de login também tem `main`);
  * - nenhum erro em `main`: Result de erro ou aviso, Alert de erro, "Algo deu errado"
  *   (ErrorBoundary) e "Recurso indisponível" (RequirePolicy);
- * - dados: o texto do seed dentro da linha de tabela ou do contêiner declarado;
+ * - dados: o texto do seed dentro da linha de tabela ou do contêiner declarado (em `main`, ou
+ *   na página com `foraDeMain`);
  * - rede: nenhuma requisição da mesma origem com falha, fora as esperadas.
  */
 export async function verificarTela(
@@ -186,7 +190,8 @@ export async function verificarTela(
     if ((await main.getByText(texto).count()) > 0) problemas.push(`erro na tela: "${texto}"`);
   }
   if (alvo.dados) {
-    const linha = main.locator(alvo.dados.em).filter({ hasText: alvo.dados.texto }).first();
+    const onde = alvo.dados.foraDeMain ? page.locator('body') : main;
+    const linha = onde.locator(alvo.dados.em).filter({ hasText: alvo.dados.texto }).first();
     try {
       await linha.waitFor({ state: 'visible', timeout: Math.min(espera, 5_000) });
     } catch {
@@ -289,7 +294,7 @@ export function registrarMatriz(larguras: readonly Largura[]): void {
           await garantirTela(page, rota, rede);
           await afirmarSemRolagem(page, chaveDe(rota), largura, rede);
         });
-        for (const estado of rota.estados ?? []) {
+        for (const estado of (rota.estados ?? []).filter((e) => !e.larguras || e.larguras.includes(largura))) {
           test(`${chaveDe(rota, estado)} @ ${largura}px (${rota.perfil})`, async ({ page, baseURL }) => {
             const rede = vigiarRede(page, baseURL);
             await entrar(page, rota.perfil, largura);

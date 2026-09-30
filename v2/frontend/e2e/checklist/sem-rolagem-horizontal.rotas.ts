@@ -53,6 +53,8 @@ const T = TEXTOS_DO_SEED;
 export interface DadosDaTela {
   em: string;
   texto: string;
+  /** Procura `em` na página inteira: o Drawer e o Modal do AntD vão por portal para fora de `main`. */
+  foraDeMain?: boolean;
 }
 
 /** Vista alternativa da mesma rota (outra aba, modo lista...), medida com chave própria. */
@@ -62,6 +64,8 @@ export interface EstadoDaTela {
   /** Seletor Playwright do controle que troca a vista. */
   clicar: string;
   dados: DadosDaTela;
+  /** Só nestas larguras (a vista não existe nas outras). Sem ele, em todas. */
+  larguras?: readonly Largura[];
 }
 
 export interface RotaMedida {
@@ -155,7 +159,27 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
   },
   { path: '/notificacoes-internas', perfil: 'superusuario', marco: 'Notificações Internas', dados: { em: LINHA, texto: T.notificacao } },
   { path: '/dat/admin', perfil: 'dat', marco: 'Admin DAT' },
-  { path: '/dat/admin/usuarios', perfil: 'dat', marco: 'Usuários', dados: { em: LINHA, texto: T.pessoa } },
+  {
+    path: '/dat/admin/usuarios',
+    perfil: 'dat',
+    marco: 'Usuários',
+    dados: { em: LINHA, texto: T.pessoa },
+    estados: [
+      // O que some da linha (E-mail < 768, Setor < 992, Função < 1200) vai para a linha expandida.
+      {
+        nome: 'expandida',
+        clicar: `${LINHA}:has-text("${T.pessoa}") .ant-table-row-expand-icon`,
+        dados: { em: '.ant-table-expanded-row', texto: 'Função' },
+        larguras: [360, 768, 1024],
+      },
+      // O Drawer de detalhe vai por portal para fora de main.
+      {
+        nome: 'detalhe',
+        clicar: `${LINHA}:has-text("${T.pessoa}") button[aria-label^="Ver detalhes de"]`,
+        dados: { em: '.ant-drawer-body', texto: T.pessoa, foraDeMain: true },
+      },
+    ],
+  },
   { path: '/dat/admin/municipios', perfil: 'dat', marco: 'Municípios', dados: { em: LINHA, texto: T.municipio } },
   { path: '/dat/admin/projetos', perfil: 'dat', marco: 'Projetos', dados: { em: LINHA, texto: T.projeto } },
   { path: '/dat/admin/grupos', perfil: 'dat', marco: 'Grupos RBAC', dados: { em: LINHA, texto: T.grupo } },
@@ -198,7 +222,10 @@ export const NAO_MEDIDOS: Readonly<Record<string, string>> = {
   '/dat/cadastros (aba AVALIAR)': 'o seed só tem cadastro FORMAR',
   'ImportUploader depois da validação':
     'exige upload de planilha e validação no backend (importações, coleções, vínculos, municípios)',
-  'Modais e drawers de edição': 'o AntD limita a largura do modal; o plano não muda modais',
+  'Modais e drawers de edição':
+    'exigem abrir o formulário de cada tela; o AntD limita modal e drawer à largura da tela. O Drawer de ' +
+    'detalhe de Usuários (C1) é medido (/dat/admin/usuarios#detalhe); cada PR do Programa C que criar um ' +
+    'drawer de detalhe declara a vista dele',
 };
 
 /**
@@ -238,6 +265,11 @@ export const TELA_LOGIN = 'login';
  * chaves (31 das 42 rotas; 3 são vistas alternativas). Rola a página, rola por dentro ou
  * corta sem reticências. A 1280 px (com a barra de rolagem de 15 px) ainda falham 26 chaves.
  * Diferenças só do Linux da CI (fonte) ficam em PENDENTES_SO_LINUX, no fim do arquivo.
+ * C1 (30/09/2026): saíram 9 — as 4 de /dat/admin/usuarios (o piloto) e 5 que a sidebar nova
+ * liberou (sobreposta abaixo de 992 px dá 250 px a mais a 768; recolhida dá 170 px a mais a
+ * 1024): Mapa e Mapa "Lista" a 768, edição de solicitação a 768, Coordenadores "Por área" a
+ * 768 e Notificações Internas a 1024. Ficam 117. As vistas novas de Usuários, "expandida"
+ * (360 a 1024) e "detalhe" (o Drawer), são medidas e não rolam.
  * O ratchet do Vitest (semRolagemHorizontal.pendentes.test.ts) trava a lista: nada novo
  * entra e o tamanho só desce.
  */
@@ -246,11 +278,11 @@ export const PENDENTES: Readonly<Record<string, readonly Largura[]>> = {
   '/dashboards/compras': [360, 768, 1024, 1280],
   '/dashboards/equipe': [360, 768, 1024, 1280],
   '/dashboards/gcal': [360, 768, 1024],
-  '/mapa-brasil': [360, 768, 1024, 1280],
-  '/mapa-brasil#lista': [360, 768, 1024, 1280],
+  '/mapa-brasil': [360, 1024, 1280],
+  '/mapa-brasil#lista': [360, 1024, 1280],
   '/solicitacoes/minhas': [360, 768, 1024, 1280],
   '/solicitacoes/publicacao': [360, 768, 1024, 1280],
-  '/solicitacoes/:id/editar': [360, 768],
+  '/solicitacoes/:id/editar': [360],
   '/solicitacoes/aprovacoes': [360, 768, 1024, 1280],
   '/solicitacoes/disponibilidade': [360, 768, 1024],
   '/solicitacoes/bloqueios': [360, 768, 1024, 1280],
@@ -260,12 +292,11 @@ export const PENDENTES: Readonly<Record<string, readonly Largura[]>> = {
   '/controle/compras': [360, 768, 1024, 1280],
   '/controle/coordenadores': [360, 768, 1024, 1280],
   '/controle/coordenadores#lista': [360, 768, 1024, 1280],
-  '/controle/coordenadores#area': [360, 768],
+  '/controle/coordenadores#area': [360],
   '/controle/plano-formacoes': [360, 768, 1024, 1280],
   '/controle/pre-agenda': [360, 768, 1024, 1280],
   '/acoes-notificacao': [360, 768, 1024, 1280],
-  '/notificacoes-internas': [360, 768, 1024],
-  '/dat/admin/usuarios': [360, 768, 1024, 1280],
+  '/notificacoes-internas': [360, 768],
   '/dat/admin/municipios': [360, 768, 1024, 1280],
   '/dat/admin/projetos': [360, 768, 1024],
   '/dat/admin/grupos': [360, 768, 1024, 1280],

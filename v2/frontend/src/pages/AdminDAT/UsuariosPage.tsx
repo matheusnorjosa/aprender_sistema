@@ -4,13 +4,17 @@
  * Gestão de usuários: listagem, busca, criação/edição e atribuição de CPF.
  * Substitui uso cotidiano do Django Admin para usuários.
  *
+ * Piloto do padrão responsivo (Programa C, C1): lista enxuta no ResponsiveTable (nome,
+ * e-mail, setor, função, situação e ações, por prioridade de largura) e detalhe por
+ * assunto num Drawer aberto pelo nome. Nunca na grade: ID, CPF, username (em produção
+ * é o CPF), telefone e cargo.
+ *
  * Fase 1 Iteração 2 - Plano DAT/GCal 2025-10-29
  * GAP-001 (resolvido): Endpoint /api/usuarios-admin/ reativado
  */
 
-import { useEffect, useMemo, useState, type JSX } from 'react';
+import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import {
-  Table,
   Button,
   Input,
   Space,
@@ -25,11 +29,15 @@ import {
   Radio,
   Checkbox,
   Alert,
+  Descriptions,
+  Drawer,
+  Grid,
+  theme,
 } from 'antd';
-import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
-import type { FilterValue, SorterResult } from 'antd/es/table/interface';
+import type { TablePaginationConfig } from 'antd/es/table';
+import type { FilterValue, SorterResult, SortOrder, TableCurrentDataSource } from 'antd/es/table/interface';
 import type { RadioChangeEvent } from 'antd/es/radio';
-import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined, KeyOutlined } from '@ant-design/icons';
+import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined, LockOutlined } from '@ant-design/icons';
 import { Link } from 'react-router';
 import { checkAuth } from '../../api/auth';
 import { listUsers, createUser, updateUser, deleteUser, resetUserPassword, listGroups, getRBACMeta, listGerencias } from '../../api/adminDAT';
@@ -44,6 +52,9 @@ import type { PermissaoFuncional, RBACMetaPayload, GerenciaRecord } from '../../
 import { importUsuarios } from '../../api/ops';
 import type { ImportResult } from '../../api/ops';
 import ImportUploader from '../../components/ImportUploader';
+import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
+import { AcoesLinha, larguraAcoesLinha } from '../../components/AcoesLinha';
+import { formatFortaleza } from '../../utils/datetime';
 import type { ValidationResult, ApplyResult } from '../../components/ImportUploader';
 import logger from '../../utils/logger';
 import { PAGE_SIZES } from '../../constants';
@@ -104,6 +115,171 @@ interface UserRecord {
   group_ids_display?: ID[];
   // Lotação vigente (EquipeGerencia) — hidrata a gerência no EDIT. null se não há vínculo.
   gerencia_atual?: { gerencia_id: number; rotulo: string; nome_setor: string; setor_canonico: string; papel: string } | null;
+  date_joined?: string;
+  last_login?: string | null;
+}
+
+/** Nome de tela da pessoa; sem nome cadastrado, o e-mail (nunca o username, que é o CPF). */
+function nomeDe(user: UserRecord): string {
+  return `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email || 'Sem nome';
+}
+
+/**
+ * Login de tela: em produção o username é o CPF. CPF (só dígitos ou 000.000.000-00) sai com a
+ * regra do `cpf_masked` do backend (UsuarioAdminSerializer: só os 6 últimos dígitos), para login
+ * e CPF mascarados não se completarem; username que não é CPF aparece como está.
+ */
+function loginDeTela(username: string): string {
+  return /^\d{3}\.?\d{3}\.?\d{3}-?\d{2}$/.test(username)
+    ? `***.***.${username.replace(/\D/g, '').slice(-6)}`
+    : username;
+}
+
+/**
+ * Ordem da lista no servidor (decisão 5 do dono): pelo nome, com o id desempatando, e não pelo
+ * username (o CPF). Por coluna com `sorter`: os campos da ordem crescente (o id desempata, para
+ * a paginação não repetir nem pular ninguém). A ordem é controlada: a seta e o `aria-sort`
+ * mostram a que a lista tem, e ela vale na busca, na paginação, no Atualizar, no salvar e no
+ * excluir. Limpar a ordenação volta ao padrão.
+ */
+const ORDEM_DA_COLUNA = {
+  nome: ['first_name', 'last_name', 'id'],
+  email: ['email', 'id'],
+} as const;
+type ColunaOrdenavel = keyof typeof ORDEM_DA_COLUNA;
+interface Ordem {
+  coluna: ColunaOrdenavel;
+  sentido: NonNullable<SortOrder>;
+}
+const ORDEM_PADRAO: Ordem = { coluna: 'nome', sentido: 'ascend' };
+
+function colunaOrdenavel(chave: unknown): chave is ColunaOrdenavel {
+  return typeof chave === 'string' && chave in ORDEM_DA_COLUNA;
+}
+
+/** Parâmetro `ordering` da API: '-' em cada campo na decrescente. */
+function ordering({ coluna, sentido }: Ordem): string {
+  return ORDEM_DA_COLUNA[coluna].map((campo) => (sentido === 'descend' ? `-${campo}` : campo)).join(',');
+}
+
+/** Papel no vínculo EquipeGerencia (PAPEL_CHOICES do backend). */
+const PAPEL: Record<string, string> = {
+  GERENTE: 'Gerente',
+  COORDENADOR: 'Coordenador',
+  APOIO: 'Apoio de Coordenação',
+  FORMADOR: 'Formador',
+};
+
+/**
+ * Cor do texto das tags com contraste AA (4,5:1). O AntD pinta o preset com a cor 7 sobre a
+ * cor 1, e green, gold e orange reprovam (3,37, 2,76 e 3,34:1); red, blue e purple passam.
+ * Molde do Programa C: quando a 2ª página precisar, mover para um módulo comum.
+ */
+const TEXTO_DA_TAG: Partial<Record<string, string>> = {
+  green: '#237804', // green-8: 5,44:1
+  orange: '#ad4e00', // orange-8: 5,09:1
+  gold: '#874d00', // gold-9: 6,53:1 (o gold-8 dá 4,25:1)
+};
+
+/** Tags que quebram linha e cortam com reticências em vez de estourar a coluna. */
+function Etiquetas({ nomes, cor }: { nomes: string[]; cor: (nome: string) => string }): JSX.Element {
+  if (nomes.length === 0) return <Text type="secondary">-</Text>;
+  return (
+    <div className="flex min-w-0 flex-wrap gap-1">
+      {nomes.map((nome) => (
+        <Tag
+          key={nome}
+          color={cor(nome)}
+          title={nome}
+          className="truncate"
+          style={{ marginInlineEnd: 0, maxWidth: '100%', color: TEXTO_DA_TAG[cor(nome)] }}
+        >
+          {nome}
+        </Tag>
+      ))}
+    </div>
+  );
+}
+
+function Situacao({ ativo }: { ativo: boolean }): JSX.Element {
+  const cor = ativo ? 'green' : 'red';
+  return (
+    <Tag color={cor} style={{ marginInlineEnd: 0, color: TEXTO_DA_TAG[cor] }}>
+      {ativo ? 'Ativo' : 'Inativo'}
+    </Tag>
+  );
+}
+
+const corDoSetor = (): string => 'purple';
+const corDaFuncao = (nome: string): string => (nome === 'Superusuário' || nome === 'Gerente' ? 'gold' : 'blue');
+
+interface DetalheUsuarioProps {
+  usuario: UserRecord;
+  setores: string[];
+  funcoes: string[];
+}
+
+/** Detalhe por assunto (Drawer): o que não cabe na grade, inteiro e sem corte. */
+function DetalheUsuario({ usuario, setores, funcoes }: DetalheUsuarioProps): JSX.Element {
+  const lotacao = usuario.gerencia_atual;
+  return (
+    <div className="flex flex-col gap-6">
+      <Descriptions
+        title={<h3>Dados pessoais</h3>}
+        size="small"
+        column={1}
+        items={[
+          { key: 'nome', label: 'Nome', children: nomeDe(usuario) },
+          { key: 'email', label: 'E-mail', children: usuario.email || '-' },
+          {
+            key: 'cpf',
+            label: 'CPF',
+            children: usuario.cpf_masked || (
+              <Tag color="orange" style={{ color: TEXTO_DA_TAG['orange'] }}>
+                Sem CPF
+              </Tag>
+            ),
+          },
+          { key: 'telefone', label: 'Telefone', children: usuario.telefone || '-' },
+          { key: 'cargo', label: 'Cargo', children: usuario.cargo || '-' },
+        ]}
+      />
+      <Descriptions
+        title={<h3>Lotação</h3>}
+        size="small"
+        column={1}
+        items={
+          lotacao
+            ? [
+                { key: 'setor', label: 'Setor', children: lotacao.rotulo },
+                { key: 'papel', label: 'Papel', children: PAPEL[lotacao.papel] ?? lotacao.papel },
+              ]
+            : [{ key: 'setor', label: 'Setor', children: <Etiquetas nomes={setores} cor={corDoSetor} /> }]
+        }
+      />
+      <Descriptions
+        title={<h3>Acesso</h3>}
+        size="small"
+        column={1}
+        items={[
+          { key: 'login', label: 'Usuário (login)', children: loginDeTela(usuario.username) },
+          { key: 'situacao', label: 'Situação', children: <Situacao ativo={usuario.is_active} /> },
+          { key: 'superusuario', label: 'Superusuário', children: usuario.is_superuser ? 'Sim' : 'Não' },
+          { key: 'funcoes', label: 'Funções', children: <Etiquetas nomes={funcoes} cor={corDaFuncao} /> },
+          {
+            key: 'ultimo-acesso',
+            label: 'Último acesso',
+            children: usuario.last_login ? formatFortaleza(usuario.last_login) : 'Nunca',
+          },
+          {
+            key: 'cadastro',
+            label: 'Cadastrado em',
+            children: usuario.date_joined ? formatFortaleza(usuario.date_joined, 'DD/MM/YYYY') : '-',
+          },
+        ]}
+      />
+    </div>
+  );
 }
 
 /**
@@ -149,7 +325,7 @@ interface PaginationState {
 interface FetchParams {
   current?: number | undefined;
   pageSize?: number | undefined;
-  ordering?: string;
+  ordem?: Ordem;
 }
 
 export default function UsuariosPage(): JSX.Element {
@@ -161,6 +337,7 @@ export default function UsuariosPage(): JSX.Element {
     pageSize: PAGE_SIZES.SMALL,
     total: 0,
   });
+  const [ordem, setOrdem] = useState<Ordem>(ORDEM_PADRAO);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
   // #2071: as funções estavam carregadas quando o Editar abriu (e hidratou o form)?
@@ -170,6 +347,23 @@ export default function UsuariosPage(): JSX.Element {
   // auditoria RESET_PASSWORD (#1672) dispara só aqui.
   const [resetPasswordUser, setResetPasswordUser] = useState<UserRecord | null>(null);
   const [resetSaving, setResetSaving] = useState(false);
+  // C1: detalhe por assunto (Drawer), aberto pelo nome na lista. O usuário fica no estado
+  // depois de fechar, para o conteúdo não sumir durante a animação de saída.
+  const [detalheUser, setDetalheUser] = useState<UserRecord | null>(null);
+  const [detalheAberto, setDetalheAberto] = useState(false);
+  const abrirDetalhe = (user: UserRecord): void => {
+    setDetalheUser(user);
+    setDetalheAberto(true);
+  };
+  // Editar pelo detalhe: o modal só abre quando o Drawer acaba de fechar. Aí o Drawer já
+  // devolveu o foco ao nome da linha, e é para lá que o modal o devolve ao fechar. Abrindo
+  // junto, o modal guardava o Editar do Drawer (escondido) e o foco caía no <body>.
+  const editarAoFecharDetalhe = useRef(false);
+  // Celular (< 576 px): as ações da linha vão todas para o menu "Mais ações".
+  const acoesCompactas = !Grid.useBreakpoint().sm;
+  // Nome como link na cor da marca: o azul padrão do link do AntD dá 4,1:1 no branco (WCAG
+  // pede 4,5:1); colorPrimary troca sozinho para o verde claro no tema escuro.
+  const { token } = theme.useToken();
   // Bug 3 fix (2026-04-27): CPF é write-only por LGPD (serializer), então API
   // nunca retorna o CPF raw — apenas `cpf_masked`. No modo edit, manter o
   // campo disabled mostrando o mascarado, e exigir clique em "Alterar CPF"
@@ -241,12 +435,8 @@ export default function UsuariosPage(): JSX.Element {
       apiParams['page'] = params.current || pagination.current;
       apiParams['page_size'] = params.pageSize || pagination.pageSize;
 
-      // Add ordering if provided
-      if (params.ordering) {
-        apiParams['ordering'] = params['ordering'];
-      } else {
-        apiParams['ordering'] = 'username';
-      }
+      // A ordem escolhida na tabela (a nova vem em params: o estado só muda no próximo render)
+      apiParams['ordering'] = ordering(params.ordem ?? ordem);
 
       const data = await listUsers(apiParams);
 
@@ -307,17 +497,24 @@ export default function UsuariosPage(): JSX.Element {
   const handleTableChange = (
     newPagination: TablePaginationConfig,
     _filters: Record<string, FilterValue | null>,
-    sorter: SorterResult<UserRecord> | SorterResult<UserRecord>[]
+    sorter: SorterResult<UserRecord> | SorterResult<UserRecord>[],
+    extra: TableCurrentDataSource<UserRecord>
   ): void => {
     const params: FetchParams = {
       current: newPagination.current,
       pageSize: newPagination.pageSize,
     };
 
-    // Handle single sorter
-    const singleSorter = Array.isArray(sorter) ? sorter[0] : sorter;
-    if (singleSorter && singleSorter.field) {
-      params.ordering = `${singleSorter.order === 'descend' ? '-' : ''}${String(singleSorter.field)}`;
+    // Só o clique no cabeçalho muda a ordem; a paginação segue a atual (o E-mail some da
+    // tabela abaixo de md, e aí o sorter da paginação viria sem ele).
+    if (extra.action === 'sort') {
+      const singleSorter = Array.isArray(sorter) ? sorter[0] : sorter;
+      const nova =
+        singleSorter?.order && colunaOrdenavel(singleSorter.columnKey)
+          ? { coluna: singleSorter.columnKey, sentido: singleSorter.order }
+          : ORDEM_PADRAO;
+      setOrdem(nova);
+      params.ordem = nova;
     }
 
     void fetchUsuarios(params);
@@ -366,10 +563,12 @@ export default function UsuariosPage(): JSX.Element {
   const handleDelete = (user: UserRecord): void => {
     Modal.confirm({
       title: 'Confirmar exclusão',
-      content: `Tem certeza que deseja excluir o usuário "${user.username}"? Esta ação não pode ser desfeita.`,
+      content: `Tem certeza que deseja excluir o usuário "${nomeDe(user)}"? Esta ação não pode ser desfeita.`,
       okText: 'Excluir',
       okType: 'danger',
       cancelText: 'Cancelar',
+      // Ação destrutiva: o foco começa no Cancelar (senão um Enter repetido exclui sem confirmar).
+      autoFocusButton: 'cancel',
       onOk: async () => {
         try {
           await deleteUser(user.id);
@@ -423,7 +622,7 @@ export default function UsuariosPage(): JSX.Element {
     setResetSaving(true);
     try {
       await resetUserPassword(resetPasswordUser.id, values.nova_senha);
-      message.success(`Senha de "${resetPasswordUser.username}" redefinida com sucesso`);
+      message.success(`Senha de "${nomeDe(resetPasswordUser)}" redefinida com sucesso`);
       setResetPasswordUser(null);
       resetForm.resetFields();
     } catch (error) {
@@ -433,132 +632,90 @@ export default function UsuariosPage(): JSX.Element {
     }
   };
 
-  const columns: ColumnsType<UserRecord> = [
-    {
-      title: 'ID',
-      dataIndex: 'id',
-      key: 'id',
-      width: 60,
-      sorter: true,
-    },
-    {
-      title: 'Username',
-      dataIndex: 'username',
-      key: 'username',
-      width: 150,
-      sorter: true,
-    },
+  const setoresDe = (record: UserRecord): string[] =>
+    record.gerencia_atual
+      ? [record.gerencia_atual.rotulo]
+      : (record.groups || []).filter((g) => setorGroupsSet.has(g));
+  const funcoesDe = (record: UserRecord): string[] => (record.groups || []).filter((g) => funcaoGroupsSet.has(g));
+
+  // C1: lista enxuta, por prioridade de largura (VISIVEL_A_PARTIR). O que some da linha vai
+  // para a linha expandida (ResponsiveTable) e tudo está no detalhe, aberto pelo nome.
+  const columns: ColunaResponsiva<UserRecord>[] = [
     {
       title: 'Nome',
       key: 'nome',
-      render: (_, record) => `${record.first_name || ''} ${record.last_name || ''}`.trim() || '-',
-      width: 200,
+      ellipsis: true,
+      sorter: true,
+      sortOrder: ordem.coluna === 'nome' ? ordem.sentido : null,
+      render: (_, record) => (
+        <Button
+          type="link"
+          onClick={() => abrirDetalhe(record)}
+          aria-label={`Ver detalhes de ${nomeDe(record)}`}
+          title={nomeDe(record)}
+          style={{ padding: 0, height: 'auto', maxWidth: '100%', color: token.colorPrimary }}
+        >
+          <span className="min-w-0 truncate hover:underline">{nomeDe(record)}</span>
+        </Button>
+      ),
     },
     {
-      title: 'Email',
+      title: 'E-mail',
       dataIndex: 'email',
       key: 'email',
-      width: 250,
+      ellipsis: true,
       sorter: true,
-    },
-    {
-      title: 'CPF',
-      dataIndex: 'cpf_masked',
-      key: 'cpf',
-      width: 150,
-      render: (cpfMasked: string | undefined) => cpfMasked || <Tag color="orange">Sem CPF</Tag>,
-    },
-    {
-      title: 'Telefone',
-      dataIndex: 'telefone',
-      key: 'telefone',
-      width: 150,
-      render: (telefone: string | undefined) => telefone || <Text type="secondary">-</Text>,
-    },
-    {
-      title: 'Cargo',
-      dataIndex: 'cargo',
-      key: 'cargo',
-      width: 180,
-      render: (cargo: string | undefined) => cargo || <Text type="secondary">-</Text>,
+      sortOrder: ordem.coluna === 'email' ? ordem.sentido : null,
+      responsive: VISIVEL_A_PARTIR.md,
     },
     {
       // PR A: setor = gerência da lotação vigente (EquipeGerencia), pelo nome de tela.
       // Sem vínculo (Controle, DAT, Diretoria operam por grupo), cai para os grupos de setor.
       title: 'Setor',
       key: 'setor',
-      render: (_, record) => {
-        const setores = record.gerencia_atual
-          ? [record.gerencia_atual.rotulo]
-          : (record.groups || []).filter((g) => setorGroupsSet.has(g));
-        return setores.length > 0 ? (
-          setores.map((s) => <Tag key={s} color="purple">{s}</Tag>)
-        ) : (
-          <Text type="secondary">-</Text>
-        );
-      },
-      width: 150,
+      responsive: VISIVEL_A_PARTIR.lg,
+      render: (_, record) => <Etiquetas nomes={setoresDe(record)} cor={corDoSetor} />,
     },
     {
       title: 'Função',
       key: 'funcao',
-      render: (_, record) => {
-        const funcoes = (record.groups || []).filter((g) => funcaoGroupsSet.has(g));
-        return funcoes.length > 0 ? (
-          funcoes.map((g) => (
-            <Tag key={g} color={g === 'Gerente' ? 'gold' : 'blue'}>{g}</Tag>
-          ))
-        ) : (
-          <Text type="secondary">-</Text>
-        );
-      },
-      width: 180,
+      responsive: VISIVEL_A_PARTIR.xl,
+      render: (_, record) => (
+        <Etiquetas nomes={[...(record.is_superuser ? ['Superusuário'] : []), ...funcoesDe(record)]} cor={corDaFuncao} />
+      ),
     },
     {
-      title: 'Status',
+      title: 'Situação',
       dataIndex: 'is_active',
       key: 'is_active',
-      width: 180,
-      render: (is_active: boolean, record: UserRecord) => (
-        <Space>
-          <Tag color={is_active ? 'green' : 'red'}>{is_active ? 'Ativo' : 'Inativo'}</Tag>
-          {record.is_superuser ? <Tag color="gold">Superuser</Tag> : null}
-        </Space>
-      ),
+      width: 88,
+      render: (_, record) => <Situacao ativo={record.is_active} />,
     },
     {
       title: 'Ações',
       key: 'acoes',
-      width: 280,
+      width: larguraAcoesLinha(3, acoesCompactas),
       render: (_, record) => (
-        <Space size="small">
-          <Button
-            type="link"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-          >
-            Editar
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            icon={<KeyOutlined />}
-            onClick={() => handleOpenResetPassword(record)}
-            aria-label={`Redefinir senha de ${record.username}`}
-          >
-            Senha
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleDelete(record)}
-          >
-            Excluir
-          </Button>
-        </Space>
+        <AcoesLinha
+          compacto={acoesCompactas}
+          alvo={nomeDe(record)}
+          acoes={[
+            { chave: 'editar', rotulo: 'Editar', icone: <EditOutlined />, onClick: () => handleEdit(record) },
+            {
+              chave: 'senha',
+              rotulo: 'Redefinir senha',
+              icone: <LockOutlined />,
+              onClick: () => handleOpenResetPassword(record),
+            },
+            {
+              chave: 'excluir',
+              rotulo: 'Excluir',
+              icone: <DeleteOutlined />,
+              onClick: () => handleDelete(record),
+              perigo: true,
+            },
+          ]}
+        />
       ),
     },
   ];
@@ -571,7 +728,7 @@ export default function UsuariosPage(): JSX.Element {
       </nav>
 
       <Card>
-        <header className="flex justify-between items-center mb-4">
+        <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <Title level={3} className="m-0" id="usuarios-title">
             {viewMode === 'lista'
               ? `Usuários (${pagination.total})`
@@ -586,11 +743,12 @@ export default function UsuariosPage(): JSX.Element {
             <Radio.Button value="importar">Importar</Radio.Button>
           </Radio.Group>
           {viewMode === 'lista' && (
-            <Space>
+            <div className="flex flex-wrap items-center gap-2">
               <Search
-                placeholder="Buscar por username, email, nome, CPF"
+                placeholder="Buscar por nome, e-mail ou CPF"
+                aria-label="Buscar usuários por nome, e-mail ou CPF"
                 allowClear
-                style={{ width: '100%', maxWidth: 300 }}
+                style={{ width: 300, maxWidth: '100%' }}
                 onSearch={(value) => setSearchText(value)}
                 onChange={(e) => {
                   if (!e.target.value) setSearchText('');
@@ -602,16 +760,17 @@ export default function UsuariosPage(): JSX.Element {
               <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
                 Novo Usuário
               </Button>
-            </Space>
+            </div>
           )}
         </header>
 
         {viewMode === 'lista' ? (
           /* Tabela */
-          (<Table
+          (<ResponsiveTable<UserRecord>
             columns={columns}
             dataSource={usuarios}
             rowKey="id"
+            nomeDaLinha={nomeDe}
             loading={loading}
             pagination={{
               ...pagination,
@@ -619,7 +778,6 @@ export default function UsuariosPage(): JSX.Element {
               showTotal: (total) => `Total: ${total} usuários`,
             }}
             onChange={handleTableChange}
-            scroll={{ x: 1200 }}
           />)
         ) : (
           /* Importação */
@@ -636,6 +794,38 @@ export default function UsuariosPage(): JSX.Element {
           />)
         )}
       </Card>
+
+      {/* C1: detalhe por assunto. A edição continua no modal de sempre. */}
+      <Drawer
+        title={detalheUser ? nomeDe(detalheUser) : 'Usuário'}
+        open={detalheAberto}
+        onClose={() => setDetalheAberto(false)}
+        afterOpenChange={(aberto) => {
+          if (!aberto && editarAoFecharDetalhe.current && detalheUser) {
+            editarAoFecharDetalhe.current = false;
+            handleEdit(detalheUser);
+          }
+        }}
+        width={480}
+        extra={
+          detalheUser ? (
+            <Button
+              type="primary"
+              icon={<EditOutlined />}
+              onClick={() => {
+                editarAoFecharDetalhe.current = true;
+                setDetalheAberto(false);
+              }}
+            >
+              Editar
+            </Button>
+          ) : null
+        }
+      >
+        {detalheUser ? (
+          <DetalheUsuario usuario={detalheUser} setores={setoresDe(detalheUser)} funcoes={funcoesDe(detalheUser)} />
+        ) : null}
+      </Drawer>
 
       {/* Modal Criar/Editar Usuário */}
       <Modal
@@ -657,6 +847,9 @@ export default function UsuariosPage(): JSX.Element {
             name="username"
             label="Username"
             rules={[{ required: true, message: 'Username é obrigatório' }]}
+            // Na edição (campo travado) o login, que é o CPF, aparece mascarado; o form guarda
+            // o valor real, e o Salvar manda o que sempre mandou.
+            getValueProps={(valor?: string) => ({ value: editingUser && valor ? loginDeTela(valor) : valor })}
           >
             <Input placeholder="Ex: joao.silva" disabled={!!editingUser} />
           </Form.Item>
@@ -817,7 +1010,11 @@ export default function UsuariosPage(): JSX.Element {
                   if (!gerencia) {
                     return <Text type="secondary">nenhuma gerência selecionada</Text>;
                   }
-                  return <Tag color="green">{gerencia.label}</Tag>;
+                  return (
+                    <Tag color="green" style={{ color: TEXTO_DA_TAG['green'] }}>
+                      {gerencia.label}
+                    </Tag>
+                  );
                 })()}
               </div>
               <div>
@@ -881,7 +1078,7 @@ export default function UsuariosPage(): JSX.Element {
       {/* #1675: Modal dedicado de redefinição de senha (admin -> outro usuário).
           O backend audita como RESET_PASSWORD (#1672); a senha nunca é exibida. */}
       <Modal
-        title={resetPasswordUser ? `Redefinir senha — ${resetPasswordUser.username}` : 'Redefinir senha'}
+        title={resetPasswordUser ? `Redefinir senha — ${nomeDe(resetPasswordUser)}` : 'Redefinir senha'}
         open={resetPasswordUser !== null}
         onCancel={() => { setResetPasswordUser(null); resetForm.resetFields(); }}
         onOk={() => resetForm.submit()}

@@ -16,6 +16,7 @@
  *    igual à allowlist. Arquivo novo que escapa por comentário, e entrada velha
  *    que já não importa, reprovam;
  * 3. controles provam que a medição enxerga cada forma de escape por comentário.
+ * E a allowlist tem exatamente TETO_ALLOWLIST arquivos, teto que só desce.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -72,6 +73,19 @@ function quemImportaTable(regras: Linter.RulesRecord, arquivos: readonly (readon
     .filter(([arquivo, codigo]) => verificar(regras, arquivo, codigo, false).length > 0)
     .map(([arquivo]) => arquivo)
     .sort();
+}
+
+/**
+ * Tamanho atual da allowlist: 27 em 2026-09-29, 26 depois do C1 (Usuários). Só desce: voltar a
+ * pôr um arquivo na allowlist (e fazê-lo importar Table de novo) reprova aqui, no diff deste teste.
+ */
+const TETO_ALLOWLIST = 26;
+
+function conferirTeto(allowlist: Readonly<Record<string, string>>, teto: number): string[] {
+  const tamanho = Object.keys(allowlist).length;
+  if (tamanho > teto) return [`a allowlist tem ${tamanho} arquivos e o teto é ${teto}: o teto só desce`];
+  if (tamanho < teto) return [`a allowlist encolheu para ${tamanho}: baixe TETO_ALLOWLIST de ${teto} para ${tamanho}`];
+  return [];
 }
 
 function compararComAllowlist(medidos: readonly string[], allowlist: Readonly<Record<string, string>>) {
@@ -165,6 +179,22 @@ describe('ratchet da allowlist por identidade', () => {
     expect(compararComAllowlist(medidos, { 'src/pages/Ja/Consertada.tsx': 'C2 — teste' }).semImportar).toEqual([
       'src/pages/Ja/Consertada.tsx',
     ]);
+  });
+
+  test.each([
+    ['maior que o teto reprova', { 'a.tsx': 'C2', 'b.tsx': 'C2', 'c.tsx': 'C3' }, [
+      'a allowlist tem 3 arquivos e o teto é 2: o teto só desce',
+    ]],
+    ['menor que o teto pede para baixar o teto', { 'a.tsx': 'C2' }, [
+      'a allowlist encolheu para 1: baixe TETO_ALLOWLIST de 2 para 1',
+    ]],
+    ['igual ao teto passa', { 'a.tsx': 'C2', 'b.tsx': 'C2' }, []],
+  ])('teto da allowlist: %s', (_caso, allowlist, esperado) => {
+    expect(conferirTeto(allowlist, 2)).toEqual(esperado);
+  });
+
+  test('a allowlist tem o tamanho do teto (só desce)', () => {
+    expect(conferirTeto(TABELA_ANTD_ALLOWLIST, TETO_ALLOWLIST)).toEqual([]);
   });
 
   test('o conjunto de src/ que importa Table é exatamente a allowlist', async () => {

@@ -14,7 +14,11 @@ from typing import Any
 from rest_framework import serializers  # type: ignore[attr-defined]
 
 from apps.core.models import Colecao, Gerencia, Municipio, Produto, Projeto, ProjetoGeral, TipoEvento
-from apps.core.rbac.helpers import GERENCIA_APROVADORA_NOME
+from apps.core.rbac.helpers import (
+    GERENCIA_APROVADORA_NOME,
+    MSG_FLUXO_SUPER_SO_NA_SUPERINTENDENCIA,
+    fluxo_super_fora_da_superintendencia,
+)
 
 
 class MunicipioSerializer(serializers.ModelSerializer):
@@ -123,6 +127,21 @@ class ProjetoSerializer(serializers.ModelSerializer):
         ]
         # sem_operacao: autoritativo do import (#1897), sem entrada-direta → read-only.
         read_only_fields = ["id", "sem_operacao"]
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        """Regra do dono (30/09): fluxo SUPER só em projeto da gerência Superintendência (g1).
+
+        Vale quando o payload grava `fluxo` ou `gerencia` (estado final = payload + instância); um
+        PATCH só de outros campos não é barrado por dado antigo. Erro sem campo → vira o `detail`
+        da resposta, que a ProjetosPage mostra.
+        """
+        if "fluxo" in attrs or "gerencia" in attrs:
+            instance = getattr(self, "instance", None)
+            fluxo = attrs.get("fluxo", getattr(instance, "fluxo", None))
+            gerencia = attrs.get("gerencia", getattr(instance, "gerencia", None))
+            if fluxo_super_fora_da_superintendencia(fluxo, gerencia):
+                raise serializers.ValidationError(MSG_FLUXO_SUPER_SO_NA_SUPERINTENDENCIA)
+        return attrs
 
 
 class ProjetoOptionSerializer(serializers.ModelSerializer):

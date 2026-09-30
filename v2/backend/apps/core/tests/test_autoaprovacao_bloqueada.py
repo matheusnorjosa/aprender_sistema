@@ -45,20 +45,25 @@ def _clear_rbac_cache(db):
     cache.clear()
 
 
+def _g1() -> Gerencia:
+    g1, _ = Gerencia.objects.get_or_create(nome="SUPERINTENDENCIA", defaults={"nome_setor": "Super"})
+    return g1
+
+
 @pytest.fixture
 def aprovadora() -> Usuario:
     """GERENTE vigente na SUPERINTENDENCIA, sem grupos."""
-    g1, _ = Gerencia.objects.get_or_create(nome="SUPERINTENDENCIA", defaults={"nome_setor": "Super"})
     user = UsuarioFactory()
-    EquipeGerencia.objects.create(usuario=user, gerencia=g1, papel="GERENTE")
+    EquipeGerencia.objects.create(usuario=user, gerencia=_g1(), papel="GERENTE")
     return user
 
 
 def _pendente(dono: Usuario) -> Solicitacao:
+    """SUPER da SUPERINTENDENCIA: no escopo da aprovadora (regra do dono, 30/09)."""
     inicio = timezone.now() + timedelta(days=5)
     return SolicitacaoFactory(
         usuario=dono,
-        projeto=ProjetoFactory(fluxo="SUPER"),
+        projeto=ProjetoFactory(fluxo="SUPER", gerencia=_g1()),
         municipio=MunicipioFactory(),
         tipo_evento=TipoEventoFactory(nome="Formação B1 auto"),
         inicio=inicio,

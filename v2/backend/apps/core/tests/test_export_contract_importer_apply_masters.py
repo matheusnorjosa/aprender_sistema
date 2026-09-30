@@ -99,15 +99,16 @@ def test_apply_tipo_evento_rejects_empty_nome(tmp_path):
 
 # ══════════════════════════════ projeto (Onda A) ══════════════════════════════
 def test_apply_projeto_creates_with_projeto_geral(tmp_path):
-    # Núcleo da Onda A: cria a variante COM projeto_geral populado (não órfã).
+    # Núcleo da Onda A: cria a variante COM projeto_geral populado (não órfã). NAO_SUPER: o import não
+    # cria SUPER (o CSV não traz gerência; regra do dono 30/09, test_projeto_fluxo_super_so_superintendencia).
     pg = ProjetoGeral.objects.create(nome="ACERTA BRASIL MATEMATICA")
-    csv = "projeto,projeto_geral,fluxo\nACerta Brasil Matemática 3,ACERTA BRASIL MATEMATICA,SUPER\n"
+    csv = "projeto,projeto_geral,fluxo\nACerta Brasil Matemática 3,ACERTA BRASIL MATEMATICA,NAO_SUPER\n"
     path = _write_export(tmp_path, {"projeto": csv})
     r = ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
     assert r["applied"]["projeto"] == 1
     p = Projeto.objects.get(nome="ACerta Brasil Matemática 3")
     assert p.projeto_geral_id == pg.id  # PG populado — fecha órfã tipo CATOLÉ
-    assert p.fluxo == "SUPER"
+    assert p.fluxo == "NAO_SUPER"
 
 
 def test_apply_projeto_idempotent(tmp_path):

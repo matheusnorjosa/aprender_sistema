@@ -18,7 +18,11 @@ from django.utils import timezone
 
 from apps.core.exceptions import APIError, ValidationAPIError
 from apps.core.models import AuditLog, Participation, Solicitacao, Usuario
-from apps.core.rbac.policies import solicitation_approval_basis
+from apps.core.rbac.policies import (
+    ESCOPO_SUPERINTENDENCIA_Q,
+    solicitation_approval_basis,
+    solicitation_approval_basis_for,
+)
 from apps.core.services.db_retry import retry_on_deadlock
 from apps.core.services.solicitacao_availability import enforce_solicitacao_availability
 from apps.core.utils.cache_utils import invalidate_availability_cache
@@ -103,6 +107,54 @@ def _bloquear_decisao_propria(solicitacao: Solicitacao, user: Usuario, acao: str
         )
 
 
+OUT_OF_SCOPE_CODE = "out_of_approval_scope"
+
+
+def _mensagem_fora_do_escopo(acao: str) -> str:
+    return f"Você só pode {acao} solicitações do fluxo SUPER da Superintendência."
+
+
+def _log_fora_do_escopo(solicitacao: Solicitacao, user: Usuario) -> None:
+    """Loga o bloqueio de escopo sem username (username é o CPF em produção)."""
+    logger.warning(
+        "solicitacao_out_of_scope_blocked",
+        extra={
+            "event": "solicitacao_out_of_scope_blocked",
+            "user_id": user.pk,
+            "solicitacao_id": solicitacao.pk,
+        },
+    )
+
+
+def _autoridade_no_escopo(solicitacao: Solicitacao, user: Usuario, acao: str) -> str | None:
+    """Regra do dono (30/09): base da autoridade para ESTA solicitação; fora do escopo → 403.
+
+    A aprovadora por vínculo (GERENTE em g1) só decide projeto do fluxo SUPER da Superintendência.
+    Quem chama sem base nenhuma (serviço interno, sem ator aprovador) continua confiando na view.
+    """
+    autoridade = solicitation_approval_basis_for(user, solicitacao)
+    if autoridade is None and solicitation_approval_basis(user) is not None:
+        _log_fora_do_escopo(solicitacao, user)
+        raise APIError(code=OUT_OF_SCOPE_CODE, message=_mensagem_fora_do_escopo(acao), status_code=403)
+    return autoridade
+
+
+def _autoridades_do_lote(user: Usuario, ids: set[int]) -> tuple[str | None, str | None, set[int]]:
+    """Lote: (autoridade no escopo, autoridade fora do escopo, ids no escopo) sem query por item.
+
+    Só a aprovadora por vínculo tem as duas autoridades diferentes; para ela, 1 query separa os ids
+    do escopo (sem `select_related` no `select_for_update`: FK nula dá NotSupportedError no Postgres).
+    """
+    autoridade = solicitation_approval_basis(user)
+    if autoridade != "gerente_superintendencia":
+        return autoridade, autoridade, set()
+    fora = solicitation_approval_basis_for(user, None)
+    no_escopo = set(
+        Solicitacao.objects.filter(id__in=ids).filter(ESCOPO_SUPERINTENDENCIA_Q).values_list("id", flat=True)
+    )
+    return autoridade, fora, no_escopo
+
+
 def _decision_details(solicitacao: Solicitacao, user: Usuario, autoridade: str | None) -> dict[str, Any]:
     """Autoria comum a todo AuditLog de decisão (PR B1): base da autoridade + autoaprovação."""
     details: dict[str, Any] = {"autoridade": autoridade}
@@ -183,6 +235,7 @@ def approve_solicitacao(
     with transaction.atomic():
         solicitacao = Solicitacao.objects.select_for_update().get(pk=solicitacao.pk)
         _bloquear_decisao_propria(solicitacao, user, "aprovar")
+        autoridade = _autoridade_no_escopo(solicitacao, user, "aprovar")
         if solicitacao.status != "pendente":
             _raise_invalid_status_error(solicitacao)
 
@@ -212,7 +265,7 @@ def approve_solicitacao(
                 "justificativa": justificativa,
                 "ip_address": client_ip,
                 "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
-                **_decision_details(solicitacao, user, solicitation_approval_basis(user)),
+                **_decision_details(solicitacao, user, autoridade),
             },
         )
 
@@ -265,6 +318,7 @@ def reject_solicitacao(
     with transaction.atomic():
         solicitacao = Solicitacao.objects.select_for_update().get(pk=solicitacao.pk)
         _bloquear_decisao_propria(solicitacao, user, "reprovar")
+        autoridade = _autoridade_no_escopo(solicitacao, user, "reprovar")
         if solicitacao.status != "pendente":
             _raise_invalid_status_error(solicitacao)
 
@@ -284,7 +338,7 @@ def reject_solicitacao(
                 "justificativa": justificativa,
                 "ip_address": client_ip,
                 "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
-                **_decision_details(solicitacao, user, solicitation_approval_basis(user)),
+                **_decision_details(solicitacao, user, autoridade),
             },
         )
 
@@ -346,7 +400,6 @@ def batch_approve_solicitacoes(
     approved = 0
     errors: list[dict[str, Any]] = []
     client_ip = get_client_ip(request)
-    autoridade = solicitation_approval_basis(user)
 
     with transaction.atomic():
         # Fetch and lock pending solicitacoes to avoid double-approval races
@@ -354,6 +407,7 @@ def batch_approve_solicitacoes(
             Solicitacao.objects.filter(id__in=ids, status="pendente").select_for_update(skip_locked=True).order_by("id")
         )
         found_ids = {sol.id for sol in solicitacoes}
+        autoridade_global, autoridade_fora, no_escopo = _autoridades_do_lote(user, found_ids)
 
         errors.extend(_build_batch_status_errors(ids, found_ids))
 
@@ -364,6 +418,13 @@ def batch_approve_solicitacoes(
                 errors.append(
                     {"id": sol.id, "code": SELF_APPROVAL_CODE, "detail": _mensagem_decisao_propria("aprovar")}
                 )
+                continue
+
+            # Regra do dono (30/09): fora do escopo da aprovadora por vínculo vai para errors[].
+            autoridade = autoridade_global if sol.id in no_escopo else autoridade_fora
+            if autoridade is None and autoridade_global is not None:
+                _log_fora_do_escopo(sol, user)
+                errors.append({"id": sol.id, "code": OUT_OF_SCOPE_CODE, "detail": _mensagem_fora_do_escopo("aprovar")})
                 continue
 
             # #1452: cada solicitação é revalidada imediatamente antes de ser aprovada.
@@ -456,7 +517,6 @@ def batch_reject_solicitacoes(
     rejected = 0
     errors: list[dict[str, Any]] = []
     client_ip = get_client_ip(request)
-    autoridade = solicitation_approval_basis(user)
 
     with transaction.atomic():
         # Fetch and lock pending solicitacoes to avoid double-reject races
@@ -464,6 +524,7 @@ def batch_reject_solicitacoes(
             Solicitacao.objects.filter(id__in=ids, status="pendente").select_for_update(skip_locked=True).order_by("id")
         )
         found_ids = {sol.id for sol in solicitacoes}
+        autoridade_global, autoridade_fora, no_escopo = _autoridades_do_lote(user, found_ids)
 
         errors.extend(_build_batch_status_errors(ids, found_ids))
 
@@ -474,6 +535,13 @@ def batch_reject_solicitacoes(
                 errors.append(
                     {"id": sol.id, "code": SELF_APPROVAL_CODE, "detail": _mensagem_decisao_propria("reprovar")}
                 )
+                continue
+
+            # Regra do dono (30/09): fora do escopo da aprovadora por vínculo vai para errors[].
+            autoridade = autoridade_global if sol.id in no_escopo else autoridade_fora
+            if autoridade is None and autoridade_global is not None:
+                _log_fora_do_escopo(sol, user)
+                errors.append({"id": sol.id, "code": OUT_OF_SCOPE_CODE, "detail": _mensagem_fora_do_escopo("reprovar")})
                 continue
 
             prev_status = sol.status

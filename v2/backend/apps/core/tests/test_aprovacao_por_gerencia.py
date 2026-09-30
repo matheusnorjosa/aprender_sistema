@@ -94,14 +94,22 @@ def _approve(user: Usuario, sol: Solicitacao):
     return _client(user).patch(f"/api/solicitacoes/{sol.id}/approve/", format="json")
 
 
+def _negado_pela_base(resp) -> bool:
+    """403 por falta de base. Os negativos usam pendente SUPER de g1 (DENTRO do escopo da regra de
+    30/09): assim o 403 de escopo (`out_of_approval_scope`) não mascara uma base frouxa."""
+    return resp.status_code == 403 and resp.json().get("code") != "out_of_approval_scope"
+
+
 # =============================================================================
 # Quem aprova
 # =============================================================================
 
 
-def test_gerente_vigente_em_g1_sem_grupos_aprova(g1, outra_gerencia):
+def test_gerente_vigente_em_g1_sem_grupos_aprova(g1):
+    """Fora do escopo (SUPER de outra gerência) a regra do dono de 30/09 dá 403: ver
+    test_escopo_aprovadora_superintendencia.py."""
     aprovadora = _aprovadora(g1)
-    sol = _pendente_super(outra_gerencia)
+    sol = _pendente_super(g1)
 
     resp = _approve(aprovadora, sol)
 
@@ -126,17 +134,17 @@ def test_aprovadora_aparece_com_a_policy_em_me_e_me_policies(g1):
 def test_outros_papeis_em_g1_nao_aprovam(g1, papel):
     user = UsuarioFactory()
     _vincular(user, g1, papel)
-    sol = _pendente_super()
+    sol = _pendente_super(g1)
 
-    assert _approve(user, sol).status_code == 403
+    assert _negado_pela_base(_approve(user, sol))
 
 
-def test_gerente_de_outra_gerencia_nao_aprova(outra_gerencia):
+def test_gerente_de_outra_gerencia_nao_aprova(g1, outra_gerencia):
     user = UsuarioFactory()
     _vincular(user, outra_gerencia, "GERENTE")
-    sol = _pendente_super()
+    sol = _pendente_super(g1)
 
-    assert _approve(user, sol).status_code == 403
+    assert _negado_pela_base(_approve(user, sol))
 
 
 @pytest.mark.parametrize(
@@ -156,9 +164,9 @@ def test_gerente_de_outra_gerencia_nao_aprova(outra_gerencia):
 def test_vinculo_nao_vigente_em_g1_nao_aprova(g1, vinculo_kwargs):
     user = UsuarioFactory()
     _vincular(user, g1, "GERENTE", **vinculo_kwargs)
-    sol = _pendente_super()
+    sol = _pendente_super(g1)
 
-    assert _approve(user, sol).status_code == 403
+    assert _negado_pela_base(_approve(user, sol))
 
 
 @pytest.mark.parametrize(
@@ -269,24 +277,24 @@ def test_patch_em_outros_campos_de_g1_continua_permitido(g1):
     ["Superintendencia", "SUPERINTENDENCIA 2", "SUPERINTENDÊNCIA"],
     ids=["caixa", "sufixo", "acento"],
 )
-def test_chave_e_o_nome_exato_da_gerencia(nome, outra_gerencia):
+def test_chave_e_o_nome_exato_da_gerencia(nome, g1):
     """Só `nome == "SUPERINTENDENCIA"` aprova. Rótulo (`nome_setor`) e setor iguais aos de g1 não
     dão poder de aprovar: esses campos são editáveis e não são a chave."""
     parecida = Gerencia.objects.create(nome=nome, nome_setor="Super", setor_canonico="Superintendência", ativo=True)
     gerente = UsuarioFactory()
     _vincular(gerente, parecida, "GERENTE")
 
-    assert _approve(gerente, _pendente_super(outra_gerencia)).status_code == 403
+    assert _negado_pela_base(_approve(gerente, _pendente_super(g1)))
 
 
-def test_g1_desativada_continua_aprovando(g1, outra_gerencia):
+def test_g1_desativada_continua_aprovando(g1):
     """`Gerencia.ativo` não entra na regra: DAT/Controle editam esse campo e desligar g1 pararia
     todas as aprovações. O desligamento é pelo vínculo (ativo/vigência)."""
     aprovadora = _aprovadora(g1)
     g1.ativo = False
     g1.save(update_fields=["ativo"])
 
-    assert _approve(aprovadora, _pendente_super(outra_gerencia)).status_code == 200
+    assert _approve(aprovadora, _pendente_super(g1)).status_code == 200
 
 
 def test_criar_gerencia_com_o_nome_aprovador_devolve_400():

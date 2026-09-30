@@ -19,6 +19,11 @@ Regra:
 Consumido tanto pelo `get_queryset` do `SolicitacaoViewSet` quanto pelo
 `IsOwnerOrPrivileged.has_object_permission` (mesma semântica em list e em objeto;
 fora do escopo → 404, não distinguível de inexistente).
+
+Exceção (regra do dono, 30/09): a aprovadora por vínculo (GERENTE em g1) é global para VER, mas só
+escreve no alcance dela (`projeto_fora_do_alcance_da_restrita`): fluxo SUPER da Superintendência +
+gerências de outro vínculo de GERENTE dela. Cria e move só para projeto desse alcance; edita e exclui
+nele e nas próprias. Fora disso o objeto aparece e a escrita dá 403/400.
 """
 
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingTypeArgument=false
@@ -32,11 +37,24 @@ from typing import Any
 from django.db.models import Q, QuerySet
 
 from apps.core.models import EquipeGerencia
-from apps.core.rbac.policies import user_has_policy
+from apps.core.rbac.helpers import GERENCIA_APROVADORA_NOME
+from apps.core.rbac.policies import (
+    ESCOPO_SUPERINTENDENCIA_PROJETO_Q,
+    aprovadora_restrita_a_superintendencia,
+    projeto_no_escopo_da_superintendencia,
+    user_has_policy,
+)
 from apps.core.rbac_helpers import user_has_any_perm
 
 # Caps que hoje concediam alcance nacional de solicitação (vazam para todo Gerente).
 _MANAGER_CAPS = ("approve_solicitation", "approve_solicitation_batch")
+
+# `approve_solicitation` é EXCLUSIVA do setor Superintendência (o órgão de
+# oversight/aprovação) — visão global legítima. NÃO incluir
+# `approve_solicitation_batch` aqui: essa é concedida ao grupo FUNÇÃO "Gerente"
+# inteiro e é justamente o que vazava alcance nacional p/ Gerente pedagógico
+# (por isso o escopo abaixo). `operate_preagenda`=Controle, `manage_admin_registries`=DAT.
+_GLOBAL_CAPS = ("operate_preagenda", "manage_admin_registries", "approve_solicitation")
 
 
 def user_is_solicitacao_global(user: Any) -> bool:
@@ -45,12 +63,7 @@ def user_is_solicitacao_global(user: Any) -> bool:
         return False
     if getattr(user, "is_superuser", False):
         return True
-    # `approve_solicitation` é EXCLUSIVA do setor Superintendência (o órgão de
-    # oversight/aprovação) — visão global legítima. NÃO incluir
-    # `approve_solicitation_batch` aqui: essa é concedida ao grupo FUNÇÃO "Gerente"
-    # inteiro e é justamente o que vazava alcance nacional p/ Gerente pedagógico
-    # (por isso o escopo abaixo). `operate_preagenda`=Controle, `manage_admin_registries`=DAT.
-    if user_has_any_perm(user, "operate_preagenda", "manage_admin_registries", "approve_solicitation"):
+    if user_has_any_perm(user, *_GLOBAL_CAPS):
         return True
     # Aprovador composto (Gerente-da-Superintendência OU Asst-Admin-Controle).
     return user_has_policy(user, "access_solicitation_approvals")
@@ -82,14 +95,58 @@ def scope_solicitacoes(qs: QuerySet, user: Any) -> QuerySet:
     return qs.filter(usuario=user)
 
 
+def restrita_ao_escopo_da_superintendencia(user: Any) -> bool:
+    """Regra do dono (30/09): cria, edita e exclui solicitação só no escopo da Superintendência?
+
+    É a aprovadora por vínculo (`aprovadora_restrita_a_superintendencia`) cujo alcance global vem
+    SÓ da policy de aprovação. Global por outra base (Controle, DAT, `approve_solicitation`) segue
+    global: o vínculo em g1 não tira o que outra base dá.
+    """
+    return aprovadora_restrita_a_superintendencia(user) and not user_has_any_perm(user, *_GLOBAL_CAPS)
+
+
+# Papéis que dão o tier do 2º vínculo da restrita: só GERENTE. Coordenadora ou apoio comum não mexe
+# em solicitação alheia da gerência; as próprias dela seguem pelo caminho de dona.
+_PAPEIS_DE_GESTAO = ("GERENTE",)
+
+
+def _gerencias_de_gestor_sem_g1(user: Any) -> set[int]:
+    """Tier de gestor da restrita: gerências dos OUTROS vínculos de GERENTE dela (`_PAPEIS_DE_GESTAO`;
+    g1 fora, senão o NAO_SUPER de g1 voltaria ao alcance). Vazio sem as caps de gestor."""
+    if not user_has_any_perm(user, *_MANAGER_CAPS):
+        return set()
+    return set(
+        EquipeGerencia.vigentes_em()
+        .filter(usuario=user, papel__in=_PAPEIS_DE_GESTAO)
+        .exclude(gerencia__nome=GERENCIA_APROVADORA_NOME)
+        .values_list("gerencia_id", flat=True)
+    )
+
+
+def projeto_fora_do_alcance_da_restrita(user: Any, projeto: Any) -> bool:
+    """True sse `user` é restrita ao escopo da Superintendência e `projeto` está fora do alcance dela.
+
+    Alcance = projeto do fluxo SUPER de g1, ou projeto de outra gerência onde ela tem vínculo de
+    GERENTE (COORDENADOR, APOIO e FORMADOR não contam). Projeto None → fora (fail-closed). Usado para
+    editar/excluir (objeto) e para criar ou mover solicitação (write-path).
+    """
+    if not restrita_ao_escopo_da_superintendencia(user):
+        return False
+    if projeto_no_escopo_da_superintendencia(projeto):
+        return False
+    gerencia_id = getattr(projeto, "gerencia_id", None)
+    return gerencia_id is None or gerencia_id not in _gerencias_de_gestor_sem_g1(user)
+
+
 def user_can_access_solicitacao(user: Any, obj: Any) -> bool:
-    """True sse `user` pode acessar a Solicitacao `obj` (mesma regra do queryset)."""
+    """True sse `user` pode editar/excluir a Solicitacao `obj` (mesma regra do queryset, salvo a
+    aprovadora restrita: vê tudo, mas só escreve nas próprias e no alcance dela)."""
     if not user or not getattr(user, "is_authenticated", False):
         return False
-    if user_is_solicitacao_global(user):
-        return True
     if getattr(obj, "usuario_id", None) == getattr(user, "id", None):
         return True
+    if user_is_solicitacao_global(user):
+        return not projeto_fora_do_alcance_da_restrita(user, getattr(obj, "projeto", None))
     if user_has_any_perm(user, *_MANAGER_CAPS):
         gerencia_id = getattr(getattr(obj, "projeto", None), "gerencia_id", None)
         return gerencia_id is not None and gerencia_id in _user_gerencia_ids(user)
@@ -243,11 +300,14 @@ def scope_projetos_by_setor(qs: QuerySet, user: Any) -> QuerySet:
     Mesma regra do participante, eixo projeto: alimenta o `/lookup/projetos/` para o
     wizard só oferecer projetos do setor do coordenador. `Projeto.setor` casa com
     `Gerencia.setor_canonico` por igualdade (o mesmo de-para v15).
-    - Global/privilegiado (`user_is_solicitacao_global`) → sem filtro.
+    - Global/privilegiado (`user_is_solicitacao_global`) → sem filtro, salvo a aprovadora restrita
+      (regra do dono, 30/09): só o alcance dela, o mesmo de `projeto_fora_do_alcance_da_restrita`.
     - `user` sem setor → sem filtro (fail-open).
     - Projeto SEM setor → incluído (fail-open; `Projeto.setor` é gap conhecido).
     """
     if user_is_solicitacao_global(user):
+        if restrita_ao_escopo_da_superintendencia(user):
+            return qs.filter(ESCOPO_SUPERINTENDENCIA_PROJETO_Q | Q(gerencia_id__in=_gerencias_de_gestor_sem_g1(user)))
         return qs
     setores = user_setores(user)
     if not setores:

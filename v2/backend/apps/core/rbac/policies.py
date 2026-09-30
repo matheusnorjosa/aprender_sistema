@@ -33,9 +33,10 @@ Ver `v2/docs/RBAC_NAMING.md §9` (Policy Resolution Rules).
 
 from __future__ import annotations
 
-from typing import Final, Literal
+from typing import Any, Final, Literal
 
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
+from django.db.models import Q
 from rest_framework import permissions
 from rest_framework.request import Request
 from rest_framework.views import APIView
@@ -46,6 +47,8 @@ from rest_framework.views import APIView
 # patch esteja ativo antes do primeiro uso de composition.
 from apps.core.rbac import permissions as _rbac_permissions  # noqa: F401
 from apps.core.rbac.helpers import (
+    GERENCIA_APROVADORA_NOME,
+    fluxo_super_fora_da_superintendencia,
     user_has_any_perm,
     user_is_assistente_administrativo_controle,
     user_is_gerente_superintendencia,
@@ -444,11 +447,69 @@ def solicitation_approval_basis(
         return "superuser"
     if user_is_gerente_superintendencia(user):
         return "gerente_superintendencia"
+    return _base_de_aprovacao_por_grupos(user)
+
+
+def _base_de_aprovacao_por_grupos(
+    user: AbstractBaseUser | AnonymousUser | None,
+) -> SolicitationApprovalBasis | None:
+    """Bases 3 e 4 de `solicitation_approval_basis` (pares de grupos), sem superuser nem vínculo."""
     if user_is_assistente_administrativo_controle(user):
         return "asst_admin_controle"
     if user_matches_any_approver_composite(user):
         return "grupo_superintendencia_gerente"
     return None
+
+
+# ----------------------------------------------------------------------------
+# Regra do dono (30/09): escopo da aprovadora por vínculo
+# ----------------------------------------------------------------------------
+# A base `gerente_superintendencia` só aprova/reprova, edita, exclui e cria solicitação de projeto
+# do fluxo SUPER da gerência Superintendência (g1). Ver não muda. As bases por grupo e o superuser
+# não têm escopo. O predicado é um só (`projeto_no_escopo_da_superintendencia`); os Q abaixo são a
+# mesma regra em SQL, para o lote e a Home (paridade coberta por teste).
+
+ESCOPO_SUPERINTENDENCIA_PROJETO_Q: Final = Q(fluxo="SUPER", gerencia__nome=GERENCIA_APROVADORA_NOME)
+ESCOPO_SUPERINTENDENCIA_Q: Final = Q(projeto__fluxo="SUPER", projeto__gerencia__nome=GERENCIA_APROVADORA_NOME)
+
+
+def projeto_no_escopo_da_superintendencia(projeto: Any) -> bool:
+    """SSOT: projeto do fluxo SUPER da gerência Superintendência (g1)?
+
+    Fail-closed: projeto None, fluxo ≠ SUPER, sem gerência ou gerência de nome parecido → False.
+    `Gerencia.ativo` NÃO entra, pela mesma razão do vínculo (`user_is_gerente_superintendencia`).
+    """
+    fluxo = getattr(projeto, "fluxo", None)
+    return fluxo == "SUPER" and not fluxo_super_fora_da_superintendencia(fluxo, getattr(projeto, "gerencia", None))
+
+
+def aprovadora_restrita_a_superintendencia(user: AbstractBaseUser | AnonymousUser | None) -> bool:
+    """A única base de aprovação do usuário é o vínculo GERENTE em g1?
+
+    Então ela só decide solicitação no escopo (`projeto_no_escopo_da_superintendencia`). Superuser,
+    o par Controle + Assistente Administrativo e o par legado não são restringidos.
+    """
+    if not user or not getattr(user, "is_authenticated", False) or getattr(user, "is_superuser", False):
+        return False
+    return user_is_gerente_superintendencia(user) and _base_de_aprovacao_por_grupos(user) is None
+
+
+def solicitation_approval_basis_for(
+    user: AbstractBaseUser | AnonymousUser | None,
+    solicitacao: Any,
+) -> SolicitationApprovalBasis | None:
+    """Base de aprovação do usuário para ESTA solicitação (vai para `AuditLog.details.autoridade`).
+
+    Mesma precedência de `solicitation_approval_basis`, mas o vínculo GERENTE em g1 só vale no escopo
+    da Superintendência. Fora dele vale a próxima base (par Controle, par legado) ou None, e None com
+    base global não nula = fora do escopo. `solicitacao=None` responde pelo "fora do escopo".
+    """
+    basis = solicitation_approval_basis(user)
+    if basis != "gerente_superintendencia":
+        return basis
+    if projeto_no_escopo_da_superintendencia(getattr(solicitacao, "projeto", None)):
+        return basis
+    return _base_de_aprovacao_por_grupos(user)
 
 
 def _user_has_solicitation_approvals(user: AbstractBaseUser | AnonymousUser | None) -> bool:
@@ -593,10 +654,15 @@ def can_admin_mutate_target(
 
 __all__ = [
     "ACCESS_POLICIES",
+    "ESCOPO_SUPERINTENDENCIA_PROJETO_Q",
+    "ESCOPO_SUPERINTENDENCIA_Q",
     "PUBLIC_POLICY_KEYS",
     "_PolicyPermission",
+    "aprovadora_restrita_a_superintendencia",
     "can_admin_mutate_target",
+    "projeto_no_escopo_da_superintendencia",
     "solicitation_approval_basis",
+    "solicitation_approval_basis_for",
     "user_can_delegate_availability_block",
     "user_has_policy",
     "resolve_public_policies",

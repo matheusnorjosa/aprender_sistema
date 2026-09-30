@@ -28,6 +28,7 @@ vi.mock('../../../api/adminDAT', () => ({
   updateProjeto: vi.fn().mockResolvedValue({}),
   deleteProjeto: vi.fn().mockResolvedValue({}),
   getRBACMeta: vi.fn().mockResolvedValue(RBAC_META),
+  listGerencias: vi.fn().mockResolvedValue({ results: [], count: 0, next: null, previous: null }),
 }));
 
 import ProjetosPage from '../ProjetosPage';
@@ -77,7 +78,7 @@ describe('ProjetosPage — conferência de Projeto.setor (#1914)', () => {
     const editBtns = await screen.findAllByRole('button', { name: /editar/i }, { timeout: 15000 });
     await user.click(editBtns[0]);
     const dialog = await screen.findByRole('dialog', {}, { timeout: 10000 });
-    await user.click(within(dialog).getByRole('combobox'));
+    await user.click(within(dialog).getByRole('combobox', { name: /setor canônico/i }));
     // 'Sou da Paz' só existe no endpoint (não é setor de nenhuma linha) → prova consumo do endpoint
     expect((await screen.findAllByText('Sou da Paz', {}, { timeout: 10000 })).length).toBeGreaterThan(0);
   }, 30000);

@@ -2,7 +2,9 @@
 
 Lista curada pelo dono do dado (a partir da planilha canonica de produtos, agrupada por
 projeto). fluxo: SUPER = projetos da Superintendencia (exigem aprovacao PA-01); os demais
-NAO_SUPER (auto-aprovado).
+NAO_SUPER (auto-aprovado). Regra do dono (30/09): SUPER so existe na gerencia Superintendencia
+(`GERENCIA_APROVADORA_NOME`), entao o SUPER nasce nela; sem essa gerencia no banco, o SUPER e
+rejeitado (o NAO_SUPER segue sem gerencia, como antes).
 
 create-only + idempotente (get_or_create por nome; NUNCA sobrescreve o fluxo de um projeto
 que ja existe). Fica em `apps.core` (nao em dev_tools) para sobreviver ao CP-08
@@ -17,7 +19,8 @@ from typing import Any
 
 from django.core.management.base import BaseCommand
 
-from apps.core.models import Projeto
+from apps.core.models import Gerencia, Projeto
+from apps.core.rbac.helpers import GERENCIA_APROVADORA_NOME, fluxo_super_fora_da_superintendencia
 
 _FLUXOS = {"SUPER", "NAO_SUPER"}
 
@@ -80,6 +83,7 @@ def seed_projetos_canonicos(projetos: list[tuple[str, str]]) -> dict[str, int]:
 
     stats = {"created": 0, "existing": 0, "ambiguous": 0, "rejected": 0}
     index = build_projeto_index()
+    g1 = Gerencia.objects.filter(nome=GERENCIA_APROVADORA_NOME).first()
     for nome_raw, fluxo_raw in projetos:
         nome = (nome_raw or "").strip()
         fluxo = (fluxo_raw or "").strip().upper()
@@ -94,7 +98,11 @@ def seed_projetos_canonicos(projetos: list[tuple[str, str]]) -> dict[str, int]:
             # Ja ha >1 projeto com essa canon-key: criar pioraria. Decisao humana.
             stats["ambiguous"] += 1
             continue
-        Projeto.objects.get_or_create(nome=nome, defaults={"fluxo": fluxo})
+        gerencia = g1 if fluxo == "SUPER" else None
+        if fluxo_super_fora_da_superintendencia(fluxo, gerencia):
+            stats["rejected"] += 1  # SUPER sem a gerencia Superintendencia no banco
+            continue
+        Projeto.objects.get_or_create(nome=nome, defaults={"fluxo": fluxo, "gerencia": gerencia})
         index = build_projeto_index()  # inclui o recem-criado nas proximas resolucoes (n pequeno)
         stats["created"] += 1
     return stats

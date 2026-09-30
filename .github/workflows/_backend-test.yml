@@ -260,8 +260,8 @@ jobs:
           } >> "${GITHUB_STEP_SUMMARY}"
 
           # core/devtools sao gates reais (falham quando o pytest falha). O canary e
-          # non-blocking (fail_on_test_error=false): o exit real vive no metadata/report
-          # da issue #677 e o job segue verde, preservando o contrato original.
+          # non-blocking nas celulas (fail_on_test_error=false): o exit real vai no metadata,
+          # e o job canary-report e quem fica vermelho e entrega o alerta na issue do canary.
           if [ "${FAIL_ON_TEST_ERROR}" = "true" ]; then
             exit "${TEST_EXIT}"
           fi

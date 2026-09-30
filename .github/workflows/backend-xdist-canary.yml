@@ -2,11 +2,10 @@ name: Backend xdist Canary (non-blocking)
 
 on:
   schedule:
-    # Semanal (segunda 10:20 UTC); antes era diario. A estabilizacao xdist ja esta
-    # consolidada ha semanas; o trigger `push` cobre o caso importante (codigo novo
-    # introduzindo flakiness), e o cron semanal cobre o de fundo (flaky por tempo).
-    # Reduzido semanal→mensal (dia 1) — estabilização xdist consolidada há semanas; o
-    # trigger push cobre regressão nova. Corte de custo de Actions (2026-09).
+    # Mensal (dia 1, 10:20 UTC); era diario, depois semanal. Corte de custo de Actions (2026-09).
+    # O que ele mede de fato: `pytest apps` inteiro num banco MIGRADO (o gate do PR roda
+    # --no-migrations). O `push` abaixo so dispara quando os arquivos do proprio canary mudam;
+    # codigo novo que quebra na suite migrada so aparece aqui, no run mensal.
     - cron: "20 10 1 * *"
   workflow_dispatch:
     inputs:
@@ -30,7 +29,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # Run filtrado (extra_pytest_args) tem grupo proprio: conferir um conserto com `-k` nao cancela o run oficial.
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.extra_pytest_args || 'oficial' }}
   cancel-in-progress: true
 
 jobs:
@@ -52,7 +52,8 @@ jobs:
         --junitxml=xdist-canary-junit.xml ${{ github.event.inputs.extra_pytest_args || '' }}
       summary_title: xdist canary run
       capture_log_file: xdist-canary-pytest.log
-      # non-blocking: falhas xdist vivem no report/issue #677, job segue verde (#1401).
+      # non-blocking na celula: o exit real vai para o metadata, e quem fica vermelho e o
+      # canary-report (issue do canary, marcador as-xdist-canary). #1401.
       fail_on_test_error: false
       emit_canary_metadata: true
       matrix_workers: ${{ matrix.workers }}
@@ -69,7 +70,7 @@ jobs:
     name: "[ops] backend xdist canary summary"
     runs-on: ubuntu-latest
     permissions:
-      # Unico job que comenta na issue 677 — issues:write vive aqui. #1397.
+      # Unico job que mexe na issue do canary — issues:write vive aqui. #1397.
       contents: read
       issues: write
     needs:
@@ -87,16 +88,29 @@ jobs:
       - name: Download xdist canary artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          pattern: xdist-canary-*
+          # So as celulas (xdist-canary-<w>w-<dist>). `xdist-canary-*` tambem casaria o
+          # xdist-canary-report de uma tentativa anterior, e ele contaria como 5a celula.
+          pattern: xdist-canary-*w-*
           path: xdist-canary-artifacts
           digest-mismatch: warn
 
+      # O script decide o alerta (estado/acao no JSON) e tem teste:
+      # v2/backend/apps/core/tests/test_xdist_canary_report.py.
+      # --expected-cells = celulas da matriz acima (2 workers x 2 dist). Mudou a matriz? Mude
+      # aqui; se esquecer, o run vira "nao mediu" (vermelho), nunca "limpo".
       - name: Build consolidated canary report
+        if: ${{ !cancelled() }}
+        env:
+          CANARY_REF: ${{ github.ref }}
+          EXTRA_PYTEST_ARGS: ${{ github.event.inputs.extra_pytest_args || '' }}
         run: |
           python v2/scripts/xdist_canary_report.py \
             --artifacts-dir xdist-canary-artifacts \
             --output-json xdist-canary-report.json \
-            --output-md xdist-canary-report.md
+            --output-md xdist-canary-report.md \
+            --ref="$CANARY_REF" \
+            --extra-pytest-args="$EXTRA_PYTEST_ARGS" \
+            --expected-cells=4
 
       - name: Upload consolidated report artifact
         if: always()
@@ -117,68 +131,76 @@ jobs:
             echo "xdist-canary-report.md not found." >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Publish evidence snapshot to issue #677 (somente em falha)
-        if: always()
-        continue-on-error: true
+      # Destino do alerta: UMA issue ABERTA, criada pelo github-actions[bot], com o marcador
+      # abaixo. Antes ia para a #677, fechada desde 2026-04-23: 16 runs vermelhos seguidos
+      # (02/07 a 28/09) comentaram la e ninguem viu. Issue aberta = canary vermelho.
+      # Acao (decidida pelo script, ver acima):
+      #   fechar             -> run COMPLETO E LIMPO da main sem filtro: comenta e fecha
+      #   abrir_ou_comentar  -> falha ou "nao mediu" num run oficial (main, sem filtro)
+      #   so_resumo          -> run nao oficial (outro ref ou extra_pytest_args): so o summary;
+      #                         nunca toca na issue da main (verde se limpo, vermelho se nao)
+      # Filtro por autor: o repo e publico e qualquer um abre issue com o marcador.
+      # Sem continue-on-error, e todo estado diferente de "limpo" sai vermelho: o GitHub
+      # manda o e-mail de falha, e alerta nao entregue nao passa em silencio.
+      - name: Entregar alerta na issue do canary
+        if: ${{ !cancelled() }}
         env:
           GH_TOKEN: ${{ github.token }}
+          MARKER: "<!-- as-xdist-canary -->"
         run: |
+          set -euo pipefail
           if [ ! -f xdist-canary-report.json ]; then
-            echo "xdist-canary-report.json not found; skipping issue comment."
-            exit 0
+            echo "::error::xdist-canary-report.json ausente: o relatorio nao foi gerado, entao este run nao mediu nada."
+            exit 1
           fi
+          ESTADO=$(jq -r '.alerta.estado' xdist-canary-report.json)
+          ACAO=$(jq -r '.alerta.acao' xdist-canary-report.json)
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          ISSUE=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues?state=open&per_page=100" \
+            --jq '.[] | select(.pull_request == null and .user.login == "github-actions[bot]" and ((.body // "") | contains(env.MARKER))) | .number' \
+            | sort -n | sed -n '1p')
+          { echo "Run: ${RUN_URL}"; echo; cat xdist-canary-report.md; } > "$RUNNER_TEMP/alerta.md"
 
-          # Alerta so quando importa: comenta no #677 SO se houve falha xdist. Run limpo
-          # (0 falhas) nao comenta -> evita fadiga de alerta (email diario de "0 failures").
-          # A evidencia limpa continua no step summary + artifact (retencao 30d); o #677 vira
-          # um log de FLAKY REAL, com significado.
-          FAILS=$(python -c "import json; print(json.load(open('xdist-canary-report.json')).get('runs_with_failures', 0))")
-          if [ "$FAILS" = "0" ]; then
-            echo "xdist canary: 0 runs com falha -> nao comenta no #677 (evidencia limpa fica no summary/artifact)."
-            exit 0
+          case "$ACAO" in
+            fechar)
+              if [ -n "$ISSUE" ]; then
+                gh issue close "$ISSUE" --repo "$GITHUB_REPOSITORY" \
+                  --comment "Run completo e limpo (main, sem filtro, todas as celulas): ${RUN_URL}. Fechando; a proxima falha abre outra."
+                echo "Canary limpo; #${ISSUE} fechada." >> "$GITHUB_STEP_SUMMARY"
+              else
+                echo "Canary limpo; nenhuma issue aberta." >> "$GITHUB_STEP_SUMMARY"
+              fi
+              ;;
+            so_resumo)
+              echo "Run nao oficial (${ESTADO}): resultado so neste summary; a issue da main nao e tocada." >> "$GITHUB_STEP_SUMMARY"
+              cat xdist-canary-report.md >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            abrir_ou_comentar)
+              if [ -n "$ISSUE" ]; then
+                gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/alerta.md"
+                echo "Alerta (${ESTADO}) entregue na #${ISSUE}." >> "$GITHUB_STEP_SUMMARY"
+              else
+                {
+                  echo "$MARKER"
+                  echo "Aberta pelo backend-xdist-canary.yml. O canary roda pytest apps inteiro num banco MIGRADO;"
+                  echo "o gate do PR roda --no-migrations, entao uma falha aqui pode nao aparecer em PR nenhum."
+                  echo "Cada run oficial com falha (ou que nao mediu) comenta aqui; o primeiro run completo e limpo da main fecha a issue."
+                  echo
+                  cat "$RUNNER_TEMP/alerta.md"
+                } > "$RUNNER_TEMP/issue.md"
+                URL=$(gh issue create --repo "$GITHUB_REPOSITORY" \
+                  --title "Canary do backend vermelho: suite inteira em banco migrado" \
+                  --label ci --label tests --body-file "$RUNNER_TEMP/issue.md")
+                echo "Alerta (${ESTADO}) entregue em ${URL} (issue nova)." >> "$GITHUB_STEP_SUMMARY"
+              fi
+              ;;
+            *)
+              echo "::error::acao desconhecida no relatorio: '${ACAO}'."
+              exit 1
+              ;;
+          esac
+
+          if [ "$ESTADO" != "limpo" ]; then
+            echo "::error::Canary ${ESTADO}: ver o summary e a issue do canary (marcador as-xdist-canary)."
+            exit 1
           fi
-
-          python - <<'PY' > /tmp/xdist_issue_677_comment.md
-          import json
-          import os
-          from datetime import datetime, timezone
-
-          run_id = os.environ.get("GITHUB_RUN_ID", "")
-          repo = os.environ.get("GITHUB_REPOSITORY", "")
-          run_url = f"https://github.com/{repo}/actions/runs/{run_id}" if repo and run_id else ""
-          now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-
-          with open("xdist-canary-report.json", "r", encoding="utf-8") as f:
-              report = json.load(f)
-
-          def _top(items, key, limit=5):
-              result = []
-              for item in items[:limit]:
-                  label = item.get(key, "unknown")
-                  count = item.get("count", 0)
-                  result.append(f"- `{label}`: {count} run(s)")
-              if not result:
-                  result.append("- none")
-              return result
-
-          lines = []
-          lines.append("### xdist canary evidence snapshot")
-          lines.append("")
-          lines.append(f"- Timestamp: `{now_utc}`")
-          if run_url:
-              lines.append(f"- Workflow run: {run_url}")
-          lines.append(f"- Matrix runs: `{report.get('runs_total', 0)}`")
-          lines.append(f"- Runs with failures: `{report.get('runs_with_failures', 0)}`")
-          lines.append(f"- Runs without failures: `{report.get('runs_without_failures', 0)}`")
-          lines.append("- Backlog tracking: `docs/operations/ci-backend-xdist-stabilization-backlog.md`")
-          lines.append("")
-          lines.append("Top recurrent failed tests:")
-          lines.extend(_top(report.get("recurrent_failed_tests", []), "test_id"))
-          lines.append("")
-          lines.append("Top failure signatures:")
-          lines.extend(_top(report.get("recurrent_failure_signatures", []), "signature"))
-
-          print("\n".join(lines))
-          PY
-
-          gh issue comment 677 --repo "${GITHUB_REPOSITORY}" --body-file /tmp/xdist_issue_677_comment.md

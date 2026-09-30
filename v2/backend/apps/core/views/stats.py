@@ -3,7 +3,8 @@ Stats API — Estatísticas para HomePage.
 
 GET /api/stats/home/ retorna métricas personalizadas por perfil:
 - pending_approvals: para quem tem a policy de aprovação (`access_solicitation_approvals`);
-  conta só pendentes SUPER e, para não-superuser, exclui as próprias (PR B1 / M11-16)
+  conta só pendentes SUPER e, para não-superuser, exclui as próprias (PR B1 / M11-16); a
+  aprovadora por vínculo conta só o escopo da Superintendência (regra do dono, 30/09)
 - upcoming_events: scope explícito por capability + ownership + EquipeGerencia (fail-safe)
 - my_requests: solicitações do próprio usuário (owner-based)
 
@@ -42,7 +43,11 @@ from drf_spectacular.utils import extend_schema
 from apps.core.models import EquipeGerencia, Solicitacao
 from apps.core.rbac.constants import FORMADOR_ROLE_GROUPS
 from apps.core.rbac.helpers import user_has_any_perm
-from apps.core.rbac.policies import user_has_policy
+from apps.core.rbac.policies import (
+    ESCOPO_SUPERINTENDENCIA_Q,
+    aprovadora_restrita_a_superintendencia,
+    user_has_policy,
+)
 from apps.core.serializers.openapi_critical_contract import HomeStatsResponseSerializer
 
 
@@ -110,6 +115,9 @@ class HomeStatsView(APIView):
             pending_qs = Solicitacao.objects.filter(status="pendente", projeto__fluxo="SUPER")
             if not user.is_superuser:
                 pending_qs = pending_qs.exclude(usuario=user)
+            # Regra do dono (30/09): conta só o que ela decide (não restringe o que ela vê).
+            if aprovadora_restrita_a_superintendencia(user):
+                pending_qs = pending_qs.filter(ESCOPO_SUPERINTENDENCIA_Q)
             pending_approvals = pending_qs.count()
 
         # === EVENTOS FUTUROS (com fail-safe explícito — fix #1284) ===

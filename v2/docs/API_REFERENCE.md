@@ -137,7 +137,11 @@ Cookie: sessionid=<session_id>
 | POST | `/api/solicitacoes/validate/` | ![Stable](https://img.shields.io/badge/-stable-green) | Validar payload antes de criar | IsAuthenticated |
 
 Gates em `SolicitacaoViewSet.get_permissions` (`views_solicitacao.py`). `IsOwnerOrPrivileged` é object-level:
-libera o dono do registro **ou** quem tem `edit_solicitation_as_owner_or_privileged`.
+libera o dono do registro **ou** quem tem `edit_solicitation_as_owner_or_privileged` **dentro do escopo**
+(`user_can_access_solicitacao`). A gerência da Superintendência por vínculo vê tudo, mas só edita/exclui
+as próprias e as do alcance dela, que é o fluxo SUPER da Superintendência mais as gerências de um 2º
+vínculo de GERENTE dela (fora: 403), e só cria ou move para projeto desse alcance (fora: 400 em
+`projeto`) — regra do dono, 2026-09-30.
 
 > **PA-01 / fluxo**: o status inicial **não é sempre `pendente`**. `perform_create`
 > delega a `resolve_initial_status(projeto=...)`: projeto com `fluxo=SUPER` nasce
@@ -158,6 +162,10 @@ libera o dono do registro **ou** quem tem `edit_solicitation_as_owner_or_privile
 Corpo opcional de `approve`/`reject`: `{"reason": "..."}` (aceita também
 `justificativa` como alias). Resposta 200:
 `{"detail": "...", "solicitacao": { ...SolicitacaoSerializer... }}`.
+
+Erros de quem decide: a própria solicitação → 403 `self_approval_forbidden`; para a gerência da
+Superintendência por vínculo, solicitação que não é do fluxo SUPER da Superintendência → 403
+`out_of_approval_scope`. Nos lotes, os dois viram `errors[]` com `{id, code, detail}` e o resto segue.
 
 ### Filtros Disponíveis
 
@@ -416,9 +424,9 @@ para todas as actions (`ProjetoViewSet`, `views/admin.py`). Selects usam `/api/o
 | Método | Endpoint | Status | Descrição | Permissão |
 |--------|----------|--------|-----------|-----------|
 | GET | `/api/projetos/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar projetos | `manage_admin_registries` |
-| POST | `/api/projetos/` | ![Stable](https://img.shields.io/badge/-stable-green) | Criar projeto (`fluxo` obrigatório, D14) | `manage_admin_registries` |
+| POST | `/api/projetos/` | ![Stable](https://img.shields.io/badge/-stable-green) | Criar projeto (`fluxo` obrigatório, D14; `SUPER` só com `gerencia` = Superintendência, senão 400 — D19) | `manage_admin_registries` |
 | GET | `/api/projetos/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Detalhes do projeto | `manage_admin_registries` |
-| PUT/PATCH | `/api/projetos/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Atualizar projeto | `manage_admin_registries` |
+| PUT/PATCH | `/api/projetos/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Atualizar projeto (gravar `fluxo`/`gerencia` que deixe um `SUPER` fora da Superintendência → 400 — D19) | `manage_admin_registries` |
 
 ### Produtos
 
@@ -743,7 +751,7 @@ grupo. O que existe:
 | `IsAuthenticated` | DRF | Usuário logado |
 | `HasPerm("<codename>")` | `rbac/permissions.py` | Exige a capability; suporta OR (`HasPerm("a") \| HasPerm("b")`) |
 | `SuperuserOnly` | `rbac/permissions.py` | Só superuser |
-| `IsOwnerOrPrivileged` | `rbac/permissions.py` | Object-level: dono do registro ou `edit_solicitation_as_owner_or_privileged` |
+| `IsOwnerOrPrivileged` | `rbac/permissions.py` | Object-level: dono do registro ou `edit_solicitation_as_owner_or_privileged` dentro do escopo (`user_can_access_solicitacao`) |
 | `HasSectorAccess` | `rbac/permissions.py` | Escopo por gerência (`EquipeGerencia`) para a grade mensal |
 | `Can*` (Policy) | `rbac/policies.py` | Policy nomeada = OR de capabilities com semântica única |
 

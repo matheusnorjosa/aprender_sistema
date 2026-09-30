@@ -164,7 +164,9 @@ export interface EventDetail extends Omit<Solicitacao, 'usuario' | 'municipio' |
 export interface BatchOperationResult {
   approved?: number;
   rejected?: number;
-  errors: Array<{ id: ID; error: string }>;
+  // Mesmo formato do backend (`_batch_response_schema`): `code` = self_approval_forbidden ou
+  // out_of_approval_scope quando há; "não encontrada"/"Status já é" vêm só com `detail`.
+  errors: Array<{ id: ID; detail: string; code?: string }>;
 }
 
 /**

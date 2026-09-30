@@ -35,6 +35,7 @@ from .models import (
     TipoEvento,
     Usuario,
 )
+from .rbac.helpers import MSG_FLUXO_SUPER_SO_NA_SUPERINTENDENCIA, fluxo_super_fora_da_superintendencia
 from .utils.csv_sanitize import sanitize_csv_value
 
 # pyright: reportMissingTypeArgument=false, reportAttributeAccessIssue=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false
@@ -183,6 +184,13 @@ class ProjetoAdminForm(forms.ModelForm):  # type: ignore[type-arg]
     class Meta:  # type: ignore[misc]
         model = Projeto
         fields = "__all__"
+
+    def clean(self) -> dict[str, Any]:
+        """Regra do dono (30/09): fluxo SUPER só em projeto da gerência Superintendência."""
+        cleaned: dict[str, Any] = super().clean() or {}
+        if fluxo_super_fora_da_superintendencia(cleaned.get("fluxo"), cleaned.get("gerencia")):
+            self.add_error("fluxo", MSG_FLUXO_SUPER_SO_NA_SUPERINTENDENCIA)
+        return cleaned
 
 
 class ProjetoAdmin(admin.ModelAdmin):

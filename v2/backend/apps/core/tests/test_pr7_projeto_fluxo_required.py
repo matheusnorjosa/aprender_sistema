@@ -28,6 +28,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
+from apps.core.models import Gerencia
 from apps.core.serializers.organizacao import ProjetoSerializer
 from apps.core.tests.factories import ProjetoFactory, UsuarioFactory
 
@@ -35,6 +36,15 @@ pytestmark = pytest.mark.django_db
 
 
 _CPF_COUNTER = itertools.count(30000000000)
+
+
+def _gerencia_para(fluxo: str) -> int | None:
+    """SUPER só em projeto da gerência Superintendência (regra do dono, 30/09):
+    test_projeto_fluxo_super_so_superintendencia.py."""
+    if fluxo != "SUPER":
+        return None
+    g1, _ = Gerencia.objects.get_or_create(nome="SUPERINTENDENCIA", defaults={"nome_setor": "Super"})
+    return g1.id
 
 
 def _dat_user():
@@ -71,7 +81,9 @@ def test_serializer_create_with_invalid_fluxo_returns_validation_error():
 @pytest.mark.parametrize("fluxo", ["SUPER", "NAO_SUPER"])
 def test_serializer_create_with_valid_fluxo_passes(fluxo):
     """SUPER/NAO_SUPER explícitos → válidos."""
-    serializer = ProjetoSerializer(data={"nome": f"Projeto {fluxo}", "fluxo": fluxo, "ativo": True})
+    serializer = ProjetoSerializer(
+        data={"nome": f"Projeto {fluxo}", "fluxo": fluxo, "ativo": True, "gerencia": _gerencia_para(fluxo)}
+    )
     assert serializer.is_valid(), f"Serializer deveria aceitar fluxo={fluxo}, erros={serializer.errors}"
 
 
@@ -120,7 +132,7 @@ def test_api_post_with_valid_fluxo_creates(fluxo):
 
     response = client.post(
         "/api/projetos/",
-        {"nome": f"API com {fluxo}", "fluxo": fluxo, "ativo": True},
+        {"nome": f"API com {fluxo}", "fluxo": fluxo, "ativo": True, "gerencia": _gerencia_para(fluxo)},
         format="json",
     )
     assert response.status_code == 201, response.data
@@ -193,6 +205,7 @@ def test_admin_form_with_valid_fluxo_is_valid(fluxo):
             "ativo": True,
             "is_test": False,
             "descricao": "",
+            "gerencia": _gerencia_para(fluxo) or "",
         }
     )
     assert form.is_valid(), f"Admin form deveria aceitar fluxo={fluxo}; erros={form.errors}"

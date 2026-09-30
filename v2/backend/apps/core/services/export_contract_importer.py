@@ -60,6 +60,7 @@ from apps.core.models import (
     TipoEvento,
     Usuario,
 )
+from apps.core.rbac.helpers import fluxo_super_fora_da_superintendencia
 from apps.core.services.dat_codigos import recompute_all
 from apps.core.services.dat_registro_split import split_dat_registros
 from apps.core.services.equipe_gerencia_import import (
@@ -635,6 +636,7 @@ class ExportContractImporter:
                 "pg_desconhecido": 0,
                 "fluxo_ausente": 0,
                 "familia_vazia_com_dat": 0,
+                "fluxo_super_sem_superintendencia": 0,
             }
             for r in rows:
                 nome = (r.get("projeto") or r.get("nome") or "").strip()
@@ -662,9 +664,16 @@ class ExportContractImporter:
                         reasons["familia_vazia_com_dat"] += 1
                         continue
                     # else: rótulo família-vazia sem uso DAT → OK criar NULL
-                if (r.get("fluxo") or "").strip().upper() not in _PROJETO_FLUXOS:
+                fluxo = (r.get("fluxo") or "").strip().upper()
+                if fluxo not in _PROJETO_FLUXOS:
                     tally["would_reject"] += 1
                     reasons["fluxo_ausente"] += 1
+                    continue
+                # Regra do dono (30/09): SUPER só na gerência Superintendência. O CSV não traz
+                # gerência → o projeto nasceria SUPER sem gerência → não cria (cadastro manual em g1).
+                if fluxo_super_fora_da_superintendencia(fluxo, None):
+                    tally["would_reject"] += 1
+                    reasons["fluxo_super_sem_superintendencia"] += 1
                     continue
                 tally["would_create"] += 1
             tally["reject_reasons"] = reasons
@@ -1878,6 +1887,8 @@ class ExportContractImporter:
             fluxo = (r.get("fluxo") or "").strip().upper()
             if fluxo not in _PROJETO_FLUXOS:
                 continue  # fluxo ausente → não cria (PA-01: default NAO_SUPER faria SUPER auto-aprovar)
+            if fluxo_super_fora_da_superintendencia(fluxo, None):
+                continue  # regra do dono (30/09): SUPER só em g1, e o CSV não traz gerência → não cria
             pg_raw = (r.get("projeto_geral") or "").strip()
             pg_id = pg_idx.get(_norm(pg_raw or nome))  # declarado, ou homônimo se vazio
             if pg_id is None:

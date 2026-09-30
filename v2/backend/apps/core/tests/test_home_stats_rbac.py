@@ -348,8 +348,15 @@ class TestResponseShape:
 # ============================================================================
 
 
+def _g1_superintendencia() -> Gerencia:
+    return Gerencia.objects.filter(nome="SUPERINTENDENCIA").first() or _make_gerencia("SUPERINTENDENCIA", "Super")
+
+
 def _pendentes_nao_super_e_super(world, dono: Usuario) -> None:
-    """1 pendente NAO_SUPER + 1 pendente SUPER, ambas de `dono`."""
+    """1 pendente NAO_SUPER + 1 pendente SUPER, ambas de `dono`.
+
+    O SUPER é da SUPERINTENDENCIA: projeto SUPER só existe lá (regra do dono, 30/09), e é o
+    escopo em que a aprovadora por vínculo decide."""
     _make_solicitacao(
         usuario=dono,
         projeto=world["p1"],  # NAO_SUPER
@@ -358,7 +365,7 @@ def _pendentes_nao_super_e_super(world, dono: Usuario) -> None:
         status="pendente",
     )
     p_super = Projeto.objects.filter(nome="Projeto SUPER").first() or _make_projeto(
-        "Projeto SUPER", world["g1"], fluxo="SUPER"
+        "Projeto SUPER", _g1_superintendencia(), fluxo="SUPER"
     )
     _make_solicitacao(
         usuario=dono,
@@ -371,9 +378,8 @@ def _pendentes_nao_super_e_super(world, dono: Usuario) -> None:
 
 def _make_aprovadora() -> Usuario:
     """PR B1: GERENTE vigente na SUPERINTENDENCIA, sem grupos."""
-    g1 = Gerencia.objects.filter(nome="SUPERINTENDENCIA").first() or _make_gerencia("SUPERINTENDENCIA", "Super")
     user = _make_user("aprovadora", [])
-    _link_to_gerencia(user, g1, "GERENTE")
+    _link_to_gerencia(user, _g1_superintendencia(), "GERENTE")
     return user
 
 

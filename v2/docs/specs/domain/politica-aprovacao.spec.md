@@ -1,15 +1,18 @@
 ---
 title: Política de Aprovação (PA-01..PA-07)
 status: canonical
-last_verified: 2026-09-29
+last_verified: 2026-09-30
 sources_of_truth:
   - v2/backend/apps/core/models/solicitacao.py
   - v2/backend/apps/core/services/solicitacao_create.py
   - v2/backend/apps/core/services/solicitacao_approval.py
   - v2/backend/apps/core/services/solicitacao_availability.py
+  - v2/backend/apps/core/services/solicitacao_scope.py
   - v2/backend/apps/core/services/usuarios_import.py
   - v2/backend/apps/core/rbac/policies.py
   - v2/backend/apps/core/rbac/helpers.py
+  - v2/backend/apps/core/rbac/permissions.py
+  - v2/backend/apps/core/serializers/organizacao.py
   - v2/backend/apps/core/views_solicitacao.py
   - v2/backend/apps/core/tests/test_approval_policy_PA.py
   - v2/backend/apps/core/tests/test_solicitacao_fluxo.py
@@ -17,6 +20,8 @@ sources_of_truth:
   - v2/backend/apps/core/tests/test_auditlog_approve_reject.py
   - v2/backend/apps/core/tests/test_aprovacao_por_gerencia.py
   - v2/backend/apps/core/tests/test_autoaprovacao_bloqueada.py
+  - v2/backend/apps/core/tests/test_escopo_aprovadora_superintendencia.py
+  - v2/backend/apps/core/tests/test_projeto_fluxo_super_so_superintendencia.py
 owner: domain
 supersedes:
   - docs/business-rules/politica-aprovacao.md
@@ -57,11 +62,18 @@ A política distingue dois fluxos de projeto: `SUPER` (requer aprovação manual
   3. **Assistente Administrativo do Controle** (`asst_admin_controle`): Setor `Controle` + Função `Assistente Administrativo`;
   4. **legado até o B2** (`grupo_superintendencia_gerente`): composite Setor `Superintendência` + Função `Gerente`.
 
-  DAT, Controle puro, Gerente pedagógico e COORDENADOR/APOIO/FORMADOR da Superintendência **não** aprovam. Sem gerência `SUPERINTENDENCIA` no banco, a regra por vínculo **falha fechada** (ninguém novo aprova). A aprovadora tem visão global das solicitações (a policy entra em `user_is_solicitacao_global`) e vê a prévia do Google (`preview-gcal`), mas publicar continua exigindo `use_gcal`. Idioma RBAC: `permission_classes = [CanAccessSolicitationApprovals]` (grupos diretos via `user.groups.filter(name=...)` são banidos por `scripts/rbac_lint.py`, salvo a whitelist `# noqa: RBAC-composite-allowed` no helper composite).
+  DAT, Controle puro, Gerente pedagógico e COORDENADOR/APOIO/FORMADOR da Superintendência **não** aprovam. Sem gerência `SUPERINTENDENCIA` no banco, a regra por vínculo **falha fechada** (ninguém novo aprova). A aprovadora **vê** todas as solicitações (a policy entra em `user_is_solicitacao_global`) e a prévia do Google (`preview-gcal`), mas decide, edita, exclui e cria só no escopo (bullet "Escopo da aprovadora por vínculo" abaixo); publicar continua exigindo `use_gcal`. Idioma RBAC: `permission_classes = [CanAccessSolicitationApprovals]` (grupos diretos via `user.groups.filter(name=...)` são banidos por `scripts/rbac_lint.py`, salvo a whitelist `# noqa: RBAC-composite-allowed` no helper composite).
 - **PA-02 — Adendo de segregação** (PR B1): quem criou a solicitação (`Solicitacao.usuario`) **não aprova nem reprova a própria**. A trava é do service, sob o `select_for_update` e antes do check de status (logo, sem corrida): individual → **403 `self_approval_forbidden`**, nada muda e nenhum AuditLog é gravado; lote → o item próprio entra em `errors[]` com `code: "self_approval_forbidden"` e o resto segue. **Superuser pode** (break-glass): a decisão passa e o AuditLog marca `details.autoaprovacao = true`. Toda decisão grava `details.autoridade` (a base acima). Não se cria PA-08: a CP-02 enumera PA-01..PA-07, e segregação é parte de "quem decide".
 - **PA-02 — Anti-escalada** (PR B1): o vínculo que dá o poder de aprovar só nasce pelo formulário de usuário (superuser-only; a concessão e a revogação ficam no AuditLog, `details.autoridade_aprovacao`). Os importers de equipe **recusam criar ou reativar** GERENTE na `SUPERINTENDENCIA` (pendência `vinculo_aprovador_bloqueado`; desativar segue permitido), e `GerenciaSerializer.validate_nome` impede renomear essa gerência ou dar esse nome a outra. Ver [`imports.spec.md`](../backend/imports.spec.md).
+- **PA-02 — Escopo da aprovadora por vínculo** (regra do dono, 2026-09-30): a base `gerente_superintendencia` aprova/reprova (individual e lote), edita, exclui e cria **só** solicitação de projeto do fluxo `SUPER` da gerência `SUPERINTENDENCIA`. Predicado único e fail-closed `projeto_no_escopo_da_superintendencia` em [`policies.py`](../../../backend/apps/core/rbac/policies.py): sem projeto, `NAO_SUPER`, sem gerência ou gerência de nome parecido ficam fora; `Gerencia.ativo` não entra. Fora do escopo:
+  - decidir → **403 `out_of_approval_scope`** ("Você só pode aprovar/reprovar solicitações do fluxo SUPER da Superintendência."), checado no service depois da autoaprovação; no lote o item vai para `errors[]` com o código e o resto segue;
+  - editar/excluir → **403** ("A gerência da Superintendência só edita ou exclui solicitações do fluxo SUPER da Superintendência.", `IsOwnerOrPrivileged` + `user_can_access_solicitacao` em [`solicitacao_scope.py`](../../../backend/apps/core/services/solicitacao_scope.py));
+  - criar, ou mover a solicitação para projeto fora (inclusive `projeto: null`) → **400** em `projeto`.
+
+  **Ver não muda**: lista, detalhe e prévia seguem globais. As **próprias** continuam editáveis e excluíveis como para qualquer coordenador; mover a própria para projeto fora do escopo dá 400, como criar. Não são restringidos: superuser, par Controle + Assistente Administrativo, par legado e, para editar/excluir/criar, quem é global por capability (`operate_preagenda`, `manage_admin_registries`, `approve_solicitation`). Exceção do tier de gestor: um 2º vínculo vigente de **`GERENTE`** dela em outra gerência dá criar, editar, excluir e mover solicitação de qualquer fluxo **naquela gerência**, e o lookup oferece os projetos dela. Vínculo `COORDENADOR`, `APOIO` ou `FORMADOR` não dá esse alcance: coordenadora ou apoio comum não mexe em solicitação alheia da gerência, e as próprias dela já seguem pelo caminho de dona. Decidir continua só no escopo. O AuditLog grava a base que valeu para aquela solicitação (`solicitation_approval_basis_for`), e o card "Aprovações pendentes" da Home conta só o escopo dela. O `/lookup/projetos/` do wizard e da edição só oferece o alcance dela.
 - **PA-03 — Gatilhos pós-aprovação**: integrações externas (GCal/Meet) só rodam com `status == "aprovado"`. `publish` rejeita solicitação pendente e **não** enfileira a task Celery.
 - **PA-04 — Estado inicial**: toda solicitação nasce `pendente`, exceto fluxo `NAO_SUPER` (nasce `aprovado`). Garantido por `default="pendente"` + `resolve_initial_status`.
+- **PA-04 — Adendo: projeto SUPER só na Superintendência** (trava de cadastro, regra do dono, 2026-09-30): `fluxo = SUPER` só em projeto da gerência `SUPERINTENDENCIA` (`fluxo_super_fora_da_superintendencia` em [`helpers.py`](../../../backend/apps/core/rbac/helpers.py); SUPER sem gerência também viola). `ProjetoSerializer` → 400 com a mensagem no `detail` (a ProjetosPage tem o campo Gerência, obrigatório ao criar, e mostra a mensagem junto dele); admin Django → erro no campo `fluxo`; import do export-contract → não cria SUPER (o CSV não traz gerência; reject `fluxo_super_sem_superintendencia`); seed do catálogo canônico → SUPER nasce na `SUPERINTENDENCIA` (sem ela, rejeita). PATCH que não grava `fluxo` nem `gerencia` não é barrado por dado antigo — isso vale **só para a API**: pela tela, todo salvar da ProjetosPage manda `fluxo` (e `gerencia`, sempre que o campo tem valor; na edição ele vem preenchido com a atual), então um SUPER antigo fora da `SUPERINTENDENCIA` só salva escolhendo essa gerência ou mudando o fluxo (o 400 aparece junto do campo Gerência). Com isso, toda pendente SUPER fica no escopo da aprovadora.
 - **PA-05 — Auditoria**: toda aprovação/reprovação grava `AuditLog` (`APPROVE`/`REJECT`) com `solicitacao_id`, `prev_status`, `new_status`, `justificativa`, `ip_address`, `user_agent`; em lote, `details["batch"] = True` por item.
 - **PA-06 — UI/UX**: botões de aprovar/reprovar ocultos para perfis sem a policy (frontend consome `access_solicitation_approvals` via `/api/me/policies/`; o legado `can_approve_super` em `/api/me/` **não** é fonte de decisão).
 - **PA-07 — Testes obrigatórios**: os 5 testes nomeados existem e passam (ver §Testes).
@@ -92,7 +104,7 @@ Corpo de `approve`/`reject` aceita `{"justificativa": "..."}` (opcional). Lote a
 
 1. Coordenador cria solicitação para projeto `fluxo == "SUPER"` → `perform_create` valida disponibilidade (`check_conflicts`) e grava `status="pendente"` (`resolve_initial_status`).
 2. A gerência da Superintendência (ou o Assistente Administrativo do Controle) chama `approve`/`reject` — nunca na própria solicitação (segregação).
-3. Service trava a linha (`select_for_update`), recusa a decisão própria (403 `self_approval_forbidden`, salvo superuser), exige `status == "pendente"`, **revalida a disponibilidade de todos os participantes** (`enforce_solicitacao_availability`, #1452), grava novo status e cria `AuditLog`. `reject` não revalida — reprovar não aloca agenda.
+3. Service trava a linha (`select_for_update`), recusa a decisão própria (403 `self_approval_forbidden`, salvo superuser), recusa o que está fora do escopo da aprovadora por vínculo (403 `out_of_approval_scope`), exige `status == "pendente"`, **revalida a disponibilidade de todos os participantes** (`enforce_solicitacao_availability`, #1452), grava novo status e cria `AuditLog`. `reject` não revalida — reprovar não aloca agenda.
 4. Aprovada → entra na Pré-Agenda; Controle/Super (ou a Apoio de Coordenação do setor do evento) publica no GCal via `publish` (PA-03).
 
 **Fluxo NAO_SUPER (auto-aprovado):**
@@ -103,6 +115,8 @@ Corpo de `approve`/`reject` aceita `{"justificativa": "..."}` (opcional). Lote a
 
 - Perfil não autorizado em `approve`/`reject` → **403** (mensagem cita "permissão"/"Superintendência").
 - Decidir a própria solicitação → **403** `self_approval_forbidden` ("Você não pode aprovar/reprovar a própria solicitação. Outra pessoa aprovadora precisa decidir."). Em lote, entrada em `errors[]` com o código.
+- Aprovadora por vínculo fora do escopo (projeto que não é SUPER da `SUPERINTENDENCIA`) → **403** `out_of_approval_scope` ao decidir (em lote, `errors[]`), **403** ao editar/excluir e **400** em `projeto` ao criar ou mover.
+- Projeto `SUPER` fora da `SUPERINTENDENCIA` (criar, marcar SUPER ou trocar a gerência) → **400** "Fluxo SUPER só é permitido em projeto da gerência Superintendência.".
 - `publish` em solicitação `pendente` → **400** e task Celery não enfileirada.
 - Reaprovar item já decidido → **400** (`already_approved`/`already_rejected`).
 - Lote > 100 ou `ids` vazio → **400** (`batch_limit_exceeded`/`ids_required`).
@@ -121,6 +135,8 @@ Corpo de `approve`/`reject` aceita `{"justificativa": "..."}` (opcional). Lote a
 - [`v2/backend/apps/core/tests/test_auditlog_approve_reject.py`](../../../backend/apps/core/tests/test_auditlog_approve_reject.py) — auditoria de approve/reject (PA-05).
 - [`v2/backend/apps/core/tests/test_aprovacao_por_gerencia.py`](../../../backend/apps/core/tests/test_aprovacao_por_gerencia.py) — PA-02 por vínculo: GERENTE vigente na SUPERINTENDENCIA aprova sem grupo; outros papéis, outra gerência e vínculo não vigente → 403; sentinela do seed; `validate_nome`; prévia do Google.
 - [`v2/backend/apps/core/tests/test_autoaprovacao_bloqueada.py`](../../../backend/apps/core/tests/test_autoaprovacao_bloqueada.py) — adendo de segregação (individual, lote, superuser marcado, `details.autoridade`).
+- [`v2/backend/apps/core/tests/test_escopo_aprovadora_superintendencia.py`](../../../backend/apps/core/tests/test_escopo_aprovadora_superintendencia.py) — escopo da aprovadora por vínculo: predicado e paridade com o SQL, decidir/editar/excluir/criar/mover fora → 403/400, lote com `errors[]` e sem query por item, próprias preservadas, bases amplas sem restrição, ver sem mudança, Home e `/lookup/projetos/`.
+- [`v2/backend/apps/core/tests/test_projeto_fluxo_super_so_superintendencia.py`](../../../backend/apps/core/tests/test_projeto_fluxo_super_so_superintendencia.py) — trava de cadastro: API, admin Django, import do export-contract e seed do catálogo.
 
 ## Divergências entre a política escrita e o código
 
@@ -163,4 +179,5 @@ As guardas de vazio/limite em [`solicitacao_approval.py`](../../../backend/apps/
 - **`can_approve_super` (legado)**: permanece no payload de `/api/me/` apenas como contrato legado; consumidores novos devem usar `access_solicitation_approvals`. Remover após período de depreciação.
 - **Whitelist de lint**: o composite usa `groups.filter(name="Gerente"/"Superintendência")` com `# noqa: RBAC-composite-allowed` — qualquer novo caller que precise do composite deve reusar `solicitation_approval_basis`/`user_has_policy`, não replicar o `groups.filter`.
 - **B2 pendente**: o composite de grupos (Superintendência + Gerente) segue valendo em paralelo ao vínculo. Removê-lo (B2) só depois do B1 em produção e da conferência nome a nome da lista (`manage.py relatorio_aprovadores`, somente leitura).
+- **Gargalo do escopo** (regra do dono, 2026-09-30): pendente fora do escopo da aprovadora por vínculo (SUPER sem gerência ou de outra gerência — dado antigo —, NAO_SUPER pendente, sem projeto) só sai com o par Controle + Assistente Administrativo ou com superuser. Em produção era 0 de 1.717 pendentes (30/09), e a trava de cadastro (adendo da PA-04) impede criar SUPER fora da `SUPERINTENDENCIA` daqui em diante. A tela de Aprovações não esconde os botões nessas linhas: o clique recebe o 403 com a mensagem. O par legado de grupos segue sem escopo até o B2.
 - **Gargalo da segregação**: uma pendente criada por uma das poucas aprovadoras só sai com outra aprovadora ou com superuser. As pendentes próprias não entram no card da Home (`pending_approvals` exclui as do próprio usuário não-superuser), mas aparecem na lista de Aprovações com a Tag "Sua solicitação".

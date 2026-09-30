@@ -5,7 +5,7 @@
  * - 🔴 X-Content-Type-Options: nosniff
  * - 🔴 X-Frame-Options: DENY ou SAMEORIGIN
  * - 🟡 Content-Security-Policy
- * - 🟡 X-XSS-Protection: 1; mode=block
+ * - 🟡 X-XSS-Protection: 0 (recomendado) ou 1; mode=block
  * - 🟢 Referrer-Policy
  * - 🟡 Strict-Transport-Security (HSTS)
  *
@@ -75,10 +75,11 @@ test.describe('Checklist: Security Headers', () => {
       const response = await request.get('/');
       const header = response.headers()['x-xss-protection'];
 
-      // X-XSS-Protection está sendo descontinuado em favor de CSP
-      // mas ainda é recomendado para browsers antigos
+      // "0" é o recomendado hoje (OWASP Secure Headers): desliga o XSS auditor legado,
+      // e é o que a borda de produção envia (v2/frontend/security-headers.conf).
+      // "1..." (ex.: "1; mode=block") continua aceito, como antes.
       if (header) {
-        expect(header).toMatch(/^1/); // Deve começar com "1"
+        expect(header).toMatch(/^(0$|1)/);
       }
     });
 
@@ -155,11 +156,21 @@ test.describe('Checklist: HTTPS', () => {
 
 test.describe('Checklist: Cookies Security', () => {
   test.beforeEach(async ({ page }) => {
-    await mockChecklistAuthBootstrap(page);
+    // Em modo estrito o alvo é real: mockar /api/csrf/ impediria o Set-Cookie verdadeiro.
+    await mockChecklistAuthBootstrap(page, { mockCsrf: !STRICT_MODE });
   });
 
   test('🔴 cookies de sessão devem ter flags de segurança', async ({ page }) => {
-    await page.goto('/');
+    if (STRICT_MODE) {
+      // O cookie de CSRF vem da chamada REAL a /api/csrf/, que a SPA faz depois do load:
+      // ler os cookies logo após o goto perde o Set-Cookie.
+      await Promise.all([
+        page.waitForResponse(/\/api\/csrf\/?(\?.*)?$/),
+        page.goto('/'),
+      ]);
+    } else {
+      await page.goto('/');
+    }
 
     const cookies = await page.context().cookies();
     const sessionCookies = cookies.filter(

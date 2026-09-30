@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       base_url:
-        description: 'URL alvo (opcional). Se vazio, usa vars/secrets STRICT_SECURITY_HEADERS_BASE_URL.'
+        description: 'URL alvo (opcional). Vazio = producao (DEFAULT_BASE_URL deste arquivo).'
         required: false
         type: string
   schedule:
     # Run daily at 03:00 UTC
     # Reduzido diário→semanal (segunda) — headers de segurança mudam raramente. Corte de
-    # custo de Actions (2026-09). Pula se STRICT_SECURITY_HEADERS_BASE_URL ausente.
+    # custo de Actions (2026-09). Mede a PRODUCAO; sem alvo, falha (nao pula).
     - cron: '0 3 * * 1'
 
 permissions:
@@ -25,6 +25,11 @@ jobs:
     name: "[ops] strict security headers (staging/prod)"
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      # Producao, escrita aqui de proposito (e nao em vars/secrets): a variavel de repo
+      # nunca existiu e o agendamento pulava verde. A URL e publica (o mesmo host esta em
+      # v2/backend/config/settings.py, _CORS_PROD_DEFAULTS). Mudou o dominio? Mude aqui.
+      DEFAULT_BASE_URL: https://aprendersistema.com.br
 
     defaults:
       run:
@@ -36,38 +41,24 @@ jobs:
     - name: Resolve target URL
       id: target
       env:
-        EVENT_NAME: ${{ github.event_name }}
         INPUT_BASE_URL: ${{ github.event.inputs.base_url || '' }}
-        VAR_BASE_URL: ${{ vars.STRICT_SECURITY_HEADERS_BASE_URL || '' }}
-        SECRET_BASE_URL: ${{ secrets.STRICT_SECURITY_HEADERS_BASE_URL || '' }}
       run: |
         set -euo pipefail
-        SKIP_RUN="0"
-        TARGET_URL="$INPUT_BASE_URL"
+        TARGET_URL="${INPUT_BASE_URL:-$DEFAULT_BASE_URL}"
+        # Nao poder medir nao e aprovar. Antes, sem vars/secrets, o agendamento pulava e saia
+        # verde: 8 semanas de "success" sem medir nada, enquanto a producao estava sem
+        # headers de seguranca (M27-24). Sem alvo agora e erro, em qualquer evento.
         if [ -z "$TARGET_URL" ]; then
-          TARGET_URL="$VAR_BASE_URL"
+          echo "::error::Sem URL alvo: DEFAULT_BASE_URL vazio e nenhum input base_url."
+          exit 1
         fi
-        if [ -z "$TARGET_URL" ]; then
-          TARGET_URL="$SECRET_BASE_URL"
-        fi
-        if [ -z "$TARGET_URL" ]; then
-          if [ "$EVENT_NAME" = "schedule" ]; then
-            SKIP_RUN="1"
-            echo "Scheduled run skipped: STRICT_SECURITY_HEADERS_BASE_URL is not configured." >> "$GITHUB_STEP_SUMMARY"
-            echo "::warning::Skipping strict security headers: missing STRICT_SECURITY_HEADERS_BASE_URL for scheduled run."
-          else
-            echo "Missing target URL. Set workflow_dispatch input 'base_url' or configure STRICT_SECURITY_HEADERS_BASE_URL (vars/secrets)." >&2
-            exit 1
-          fi
-        fi
-        if [ "$SKIP_RUN" = "0" ]; then
-          echo "::add-mask::$TARGET_URL"
-        fi
+        ORIGEM="default do workflow"
+        if [ -n "$INPUT_BASE_URL" ]; then ORIGEM="input do dispatch"; fi
+        # Sem add-mask: a URL e publica, e mascara-la so impedia o summary de dizer o que mediu.
+        echo "Alvo: ${TARGET_URL} (${ORIGEM})" >> "$GITHUB_STEP_SUMMARY"
         echo "target_url=$TARGET_URL" >> "$GITHUB_OUTPUT"
-        echo "skip_run=$SKIP_RUN" >> "$GITHUB_OUTPUT"
 
     - name: Setup Node.js 22.x
-      if: steps.target.outputs.skip_run != '1'
       uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v4
       with:
         node-version: '22.x'
@@ -75,15 +66,14 @@ jobs:
         cache-dependency-path: 'v2/frontend/package-lock.json'
 
     - name: Install dependencies
-      if: steps.target.outputs.skip_run != '1'
       run: npm ci
 
+    # Sem --with-deps, como no frontend-ci: o ubuntu-latest ja tem as libs, e o apt do
+    # mirror era fonte de flake.
     - name: Install Playwright browsers
-      if: steps.target.outputs.skip_run != '1'
-      run: npx playwright install chromium --with-deps
+      run: npx playwright install chromium
 
     - name: Run strict security headers spec
-      if: steps.target.outputs.skip_run != '1'
       run: npx playwright test e2e/checklist/security-headers.spec.ts --project=checklist
       env:
         SKIP_WEBSERVER: '1'
@@ -93,7 +83,7 @@ jobs:
 
     - name: Upload strict security headers artifacts
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4
-      if: always() && steps.target.outputs.skip_run != '1'
+      if: always()
       with:
         name: strict-security-headers-results
         path: |

@@ -41,14 +41,15 @@ test.describe('Sem rolagem horizontal (desktop): controles', () => {
     expect(barra, 'sem a barra, 1024 e 1280 medem ~15 px a mais do que o usuário tem').toBeGreaterThanOrEqual(12);
   });
 
-  test('controle positivo: /dat/admin/usuarios a 1024 rola DENTRO da tabela, não na página', async ({ page, baseURL }) => {
-    // Enquanto a tela estiver em PENDENTES, prova o caso real do AntD. Quando o C1 consertar
-    // Usuários, este controle muda de alvo (outra tela ainda pendente) ou sai; o controle
-    // sintético de sem-rolagem-horizontal.spec.ts continua valendo.
+  test('controle positivo: /dashboards/equipe a 1024 rola DENTRO da tabela, não na página', async ({ page, baseURL }) => {
+    // Prova o caso real do AntD numa tela que ainda está em PENDENTES. Até o C1 o alvo era
+    // /dat/admin/usuarios, que o C1 consertou; o Dashboard da Equipe é do C7, o último PR do
+    // Programa C. Quando ele sair de PENDENTES, este controle sai junto; o controle sintético
+    // de sem-rolagem-horizontal.spec.ts continua valendo.
     const rede = vigiarRede(page, baseURL);
     await entrar(page, 'dat', 1024);
-    await page.goto('/dat/admin/usuarios');
-    expect(await verificarTela(page, rota('/dat/admin/usuarios'), rede)).toEqual([]);
+    await page.goto('/dashboards/equipe');
+    expect(await verificarTela(page, rota('/dashboards/equipe'), rede)).toEqual([]);
     const medicao = await medirAssentada(page);
     expect(medicao.pagina, 'o critério da página sozinho não enxerga esta rolagem').toBe(0);
     expect(

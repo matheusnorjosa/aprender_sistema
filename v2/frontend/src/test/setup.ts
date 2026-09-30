@@ -7,7 +7,8 @@
  * - MSW server for intercepting HTTP traffic (see src/test/mocks/)
  */
 import '@testing-library/jest-dom'
-import { afterAll, afterEach, beforeAll, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest'
+import { LARGURA_PADRAO, definirLarguraTela, matchMediaDeTeste } from './larguraTela'
 import { server } from './mocks/server'
 
 // --- MSW lifecycle --------------------------------------------------------
@@ -19,20 +20,12 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }))
 afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
-// Mock matchMedia for Ant Design components
-// This must be defined before any Ant Design components are imported
-const mockMatchMedia = vi.fn().mockImplementation((query) => ({
-  matches: false,
-  media: query,
-  onchange: null,
-  addListener: vi.fn(),
-  removeListener: vi.fn(),
-  addEventListener: vi.fn(),
-  removeEventListener: vi.fn(),
-  dispatchEvent: vi.fn(),
-}))
-
-vi.stubGlobal('matchMedia', mockMatchMedia)
+// matchMedia por largura (Programa C, C1): avalia min-width/max-width contra 1280 px por
+// padrão; `definirLarguraTela(px)` (src/test/larguraTela.ts) muda a largura no teste.
+// Definido antes de qualquer componente do AntD ser importado.
+vi.stubGlobal('matchMedia', matchMediaDeTeste)
+definirLarguraTela(LARGURA_PADRAO)
+beforeEach(() => definirLarguraTela(LARGURA_PADRAO))
 
 // Mock scrollTo for components that use it
 Object.defineProperty(window, 'scrollTo', {

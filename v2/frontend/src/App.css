@@ -159,6 +159,35 @@ html:not(.dark) .ant-menu-dark .ant-menu-submenu-open > .ant-menu-submenu-title 
   color: #000000 !important;
 }
 
+/* Submenu da página atual, mesmo fechado: na sidebar recolhida (só ícones) é a única
+   marca de onde a pessoa está. Vence as regras que forçam branco por ter uma classe a mais. */
+html:not(.dark) .ant-menu-dark .ant-menu-submenu-selected > .ant-menu-submenu-title {
+  background-color: #C6E6C3 !important;
+  color: #000000 !important;
+}
+
+html:not(.dark) .ant-menu-dark .ant-menu-submenu-selected > .ant-menu-submenu-title .anticon,
+html:not(.dark) .ant-menu-dark .ant-menu-submenu-selected > .ant-menu-submenu-title .ant-menu-submenu-arrow {
+  color: #000000 !important;
+}
+
+/* Foco no menu lateral: o reset do AntD tira o outline do <a>, e o anel do título de submenu
+   (verde sobre verde) dá 1,7:1. Anel de duas cores, branco por fora e preto por dentro: em
+   qualquer fundo do menu, nos dois temas (verde, verde-escuro do submenu, verde-claro do
+   selecionado), uma delas dá 3:1. Por dentro do item: o Sider tem overflow e cortaria um anel
+   por fora. !important: o anel do AntD no título tem uma classe a mais. O mesmo anel no botão
+   "Fechar menu" e no <ul> raiz do menu (parada de Tab), onde o do AntD também dá 1,73:1. */
+.ant-menu-dark .ant-menu-item:has(a:focus-visible),
+.ant-menu-dark .ant-menu-submenu-title:focus-visible,
+.sidebar-fechar-menu:focus-visible,
+.ant-menu-dark.ant-menu-root:focus-visible {
+  outline-width: 2px !important;
+  outline-style: solid !important;
+  outline-color: #ffffff !important;
+  outline-offset: -2px !important;
+  box-shadow: inset 0 0 0 4px #000000 !important;
+}
+
 /* Remover transições de cor para resposta instantânea */
 .ant-menu-dark .ant-menu-item,
 .ant-menu-dark .ant-menu-item a,

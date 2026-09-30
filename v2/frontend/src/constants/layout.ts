@@ -9,9 +9,9 @@ export const LAYOUT = {
   SIDEBAR_WIDTH: 250,
   SIDEBAR_COLLAPSED_WIDTH: 80,
 
-  // Responsive breakpoints (aligned with Tailwind defaults)
-  MOBILE_BREAKPOINT: 768,
-  TABLET_BREAKPOINT: 1024,
+  // Modo da sidebar (useResponsive, Programa C): sobreposta abaixo do TABLET (992 = `lg` do
+  // AntD e do Tailwind), recolhida em 80 px até o DESKTOP, aberta a partir dele.
+  TABLET_BREAKPOINT: 992,
   DESKTOP_BREAKPOINT: 1280,
 
   // Input widths

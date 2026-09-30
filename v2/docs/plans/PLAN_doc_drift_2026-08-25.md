@@ -540,7 +540,7 @@ Não são documentação. Apareceram na auditoria e não têm dono.
 | # | Achado | Sev. |
 |---|---|---|
 | G.1 | **Container de dev montado em outro worktree**: `c/tmp/aprender-wt-onda1/v2/backend → /app`. O comando de verificação do `CLAUDE.md` **valida código alheio** | alto |
-| G.2 | `django-db-connection-pool` é o **único pin exclusivo de produção**, está morto, e é o único que **nunca passa por gate de CVE** (`pip-audit` só lê `requirements.txt`) | alto |
+| G.2 | `django-db-connection-pool` é o **único pin exclusivo de produção**, está morto, e é o único que **nunca passa por gate de CVE** (`pip-audit` só lê `requirements.txt`). *Atualização 2026-09-30: o `security-scan.yml` passou a rodar o pip-audit também no `requirements-prod.txt`; o pacote segue morto na imagem.* | alto |
 | G.3 | **Três eixos de papel sem árbitro**, e dois endpoints divergem por **precedência vs união** — escrita não auditada derruba aprovação | alto |
 | G.4 | `GroupClassificacao` é **gravável por API, altera autorização e não é auditada** — na mesma função onde a escrita vizinha é | alto |
 | G.5 | Índice GIN revertido por migration automática — e, **como estava escrito, nunca teria funcionado** | médio |

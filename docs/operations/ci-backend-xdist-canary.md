@@ -14,7 +14,7 @@ Este fluxo cria uma trilha de experimento para `pytest-xdist` sem alterar os gat
 Arquivo: `.github/workflows/backend-xdist-canary.yml`
 
 Gatilhos:
-- `schedule` **semanal** (segunda, 10:20 UTC) — era diario ate a estabilizacao consolidar
+- `schedule` **mensal** (dia 1, 10:20 UTC) — era diario, depois semanal (corte de custo, 2026-09)
 - `workflow_dispatch` (manual)
 - `push` em `main` para mudancas no proprio workflow/script/doc da trilha
 
@@ -40,14 +40,33 @@ Artifact consolidado:
 - Conteudo: `xdist-canary-report.json` e `xdist-canary-report.md`
 
 O relatorio consolidado inclui:
-- testes que falharam
+- testes que falharam (cada teste uma vez: o id do log e normalizado para o do junit)
 - assinaturas de erro
 - frequencia de reincidencia por teste/assinatura
+- a decisao do alerta (campo `alerta`: estado e acao)
+
+## Alerta (issue do canary)
+
+O canary roda `pytest apps` inteiro num banco **migrado**; o gate do PR roda `--no-migrations`.
+Uma falha aqui pode nao aparecer em PR nenhum, entao o alerta tem destino proprio:
+
+- uma issue aberta pelo `github-actions[bot]` com o marcador `<!-- as-xdist-canary -->` (a busca
+  filtra por autor: o repo e publico e o marcador pode ser copiado);
+- run oficial (`main`, sem `extra_pytest_args`) com falha, ou que nao mediu: comenta na issue ou abre uma;
+- run nao oficial (outro ref ou suite filtrada): nunca toca na issue; o resultado fica so no summary do run, e ele
+  tem grupo de concorrencia proprio (conferir um conserto com `-k` nao cancela o run oficial);
+- so fecha com run **completo e limpo**: `main`, sem filtro, as 4 celulas com artefato e metadata, zero falhas;
+- todo estado diferente de "limpo" deixa o job `[ops] backend xdist canary summary` vermelho.
+
+A decisao sai de `v2/scripts/xdist_canary_report.py`, com teste em
+`v2/backend/apps/core/tests/test_xdist_canary_report.py`. Ate 2026-09 o alerta era um comentario
+na `#677`, fechada desde 2026-04-23: 16 runs vermelhos seguidos (02/07 a 28/09) passaram sem ninguem ver.
 
 ## Backlog de estabilizacao
 
 Regra de triagem:
-- teste/assinatura com reincidencia em `2+` execucoes precisa ter issue de estabilizacao vinculada ao epic da fase (`#677`).
+- teste/assinatura com reincidencia em `2+` execucoes precisa ter issue de estabilizacao citada na issue do canary
+  (marcador `<!-- as-xdist-canary -->`; o epic `#677` esta fechado desde 2026-04-23).
 - backlog com owner/status: [CI Backend xdist Stabilization Backlog](ci-backend-xdist-stabilization-backlog.md)
 
 ## Trilha de evidencia (14 dias) — historico
@@ -60,7 +79,7 @@ Regra de triagem:
 - O job `[ops] backend xdist canary summary` publica:
   - artifact consolidado (`xdist-canary-report`)
   - resumo no `GITHUB_STEP_SUMMARY`
-  - snapshot em comentario na issue `#677`
+  - o alerta na issue do canary (secao "Alerta" acima; ate 2026-09, comentario na `#677`)
 - Esses snapshots formam a trilha objetiva para o criterio de 14 dias antes de qualquer promocao para gate obrigatorio.
 
 ## Criterio formal para promocao ao caminho obrigatorio — historico

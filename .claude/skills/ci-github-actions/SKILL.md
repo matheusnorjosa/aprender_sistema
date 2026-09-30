@@ -18,7 +18,7 @@ description: CI/CD do AS v2 (GitHub Actions). Use ao editar workflows, destravar
 - **`frontend-ci.yml`**: build/lint, react-doctor (exige `--offline`), checklist (meta/a11y/security), `[info] e2e journeys`.
 - Segurança/infra: `security-scan.yml`, `dependency-review-scorecard.yml`, `strict-security-headers.yml`, `architecture-guardrails.yml`, `docs-quality.yml`, `staging-gate-audit.yml`.
 - **`deploy.yaml`** (*Build, sign and release*): pós-merge, **não deploya** — build/scan/push + cosign + tag/release. Prod muda por `promote.yml` (gate `production`) + agente pull-based na VM01 (ADR-018).
-- Monitoramento agendado (não bloqueia): `ci-runtime-telemetry.yml`, `backend-xdist-canary.yml`.
+- Monitoramento agendado (não bloqueia): `backend-xdist-canary.yml`.
 
 ## Checks `[required]` (precisam estar verdes p/ merge)
 
@@ -64,7 +64,7 @@ Checkboxes precisam estar **marcados** (`- [x]`). Editar o body re-roda o gate (
 - **Gate Trivy travando por CVE de SO** (não da app): cache-bust do `apt/apk upgrade` por `GIT_SHA` no `Dockerfile.prod` (#1407).
 - **Codecov**: upload só roda `if: env.CODECOV_TOKEN != ''` (tokenless é rejeitado) — sem o secret, é pulado; cobertura é enforçada no gate, não no Codecov.
 - **react-doctor**: score depende de telemetria remota → exige `--offline` para ser determinístico.
-- **Telemetria de runtime** (`ci-runtime-telemetry.yml`): cron que falha se p95 regride >35% vs `v2/docs/analysis/ci-runtime-baseline.json`. Não bloqueia PR; re-baseline = promover o report fresco ao JSON.
+- **Duração de job**: medir sob demanda (`gh run list --workflow <arquivo> --event pull_request` + `gh run view <id> --json jobs`). A telemetria agendada foi removida: 38 execuções vermelhas seguidas sem ação, e a janela congelou quando o gatilho `push` saiu.
 
 ## NÃO fazer
 
@@ -84,5 +84,5 @@ Dois fatos deste repo que a calibragem precisa saber:
 - **`[required]` no nome não é enforcement.** Medido em 2026-08-26: 19 jobs
   declaram, o ruleset da `main` exige 10. `check_required_checks.py` expõe a
   divergência em todo PR; promover é ação de admin.
-- **Cron não é visto.** `ci-runtime-telemetry` falhou 26 execuções seguidas sem
+- **Cron não é visto.** `ci-runtime-telemetry` (já removido) falhou 26 execuções seguidas sem
   ninguém notar — é `schedule`-only e não aparece em PR nenhum.

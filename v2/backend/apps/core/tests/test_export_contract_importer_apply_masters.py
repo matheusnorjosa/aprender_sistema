@@ -193,7 +193,7 @@ def test_apply_projeto_dedup_intra_csv_same_canon_key(tmp_path):
 def test_apply_projeto_base_empty_pg_derives_from_own_name(tmp_path):
     # Projeto-base sem projeto_geral (shape v14: coluna `nome`) → liga ao PG homônimo
     # (não cria órfão NULL nem rejeita como pg_desconhecido).
-    pg = ProjetoGeral.objects.create(nome="A COR DA GENTE")
+    pg, _ = ProjetoGeral.objects.get_or_create(nome="A COR DA GENTE")  # a migration 0045 já semeia
     csv = "nome,projeto_geral,fluxo\nA Cor da Gente,,NAO_SUPER\n"
     path = _write_export(tmp_path, {"projeto": csv})
     r = ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
@@ -292,10 +292,11 @@ def test_apply_usuario_no_papel_creates_without_group(tmp_path):
 
 
 def test_apply_usuario_group_missing_creates_without_group(tmp_path):
-    # Simula prod ANTES do seed_rbac: o grupo alvo nao existe. (Nos testes, uma fixture
-    # autouse semeia os grupos RBAC, entao deletamos explicitamente para reproduzir o caso.)
-    Group.objects.filter(name__iexact="Coordenador").delete()
-    csv = "nome_completo,cpf,email,cargo\nSemGrupo,11144477735,,Coordenadores\n"
+    # Ramo defensivo: o grupo alvo nao existe. Em prod as migrations 0060/0067 criam os grupos
+    # de funcao, e Coordenador nem pode ser apagado (PROTECT de AcaoTemplateExecutor, 0063).
+    # Formador nao tem FK PROTECT: reproduz o caso com e sem migrations.
+    Group.objects.filter(name__iexact="Formador").delete()
+    csv = "nome_completo,cpf,email,cargo\nSemGrupo,11144477735,,Formadores\n"
     path = _write_export(tmp_path, {"usuario": csv})
     r = ExportContractImporter(path=path, apply=True, allow=("usuario",)).run()
     assert r["applied"]["usuario"] == 1  # usuario e criado mesmo sem o grupo (nao quebra)

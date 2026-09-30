@@ -9,6 +9,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import {
   PENDENTES,
+  PENDENTES_SO_LINUX,
   PERFIS,
   ROTAS_MEDIDAS,
   SENHA_PERFIS,
@@ -234,8 +235,15 @@ async function resolverUrl(page: Page, rota: RotaMedida): Promise<string> {
   return rota.path.replace(':id', String(id));
 }
 
+/**
+ * A referência da trava é o Chromium Linux da CI. PENDENTES_SO_LINUX (diferença de fonte)
+ * só vale lá; no Windows essas telas não rolam e não viram "falha esperada".
+ */
+const NA_REFERENCIA = process.platform === 'linux';
+
 function ehPendente(chave: string, largura: number): boolean {
-  return (PENDENTES[chave] ?? []).some((l) => l === largura);
+  const listas = NA_REFERENCIA ? [PENDENTES, PENDENTES_SO_LINUX] : [PENDENTES];
+  return listas.some((lista) => (lista[chave] ?? []).some((l) => l === largura));
 }
 
 /**

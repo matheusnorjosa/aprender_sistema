@@ -16,6 +16,7 @@ import { describe, expect, test } from 'vitest';
 import {
   LARGURAS,
   PENDENTES,
+  PENDENTES_SO_LINUX,
   ROTAS_MEDIDAS,
   ROTAS_NAO_MEDIDAS,
   TELA_LOGIN,
@@ -175,9 +176,9 @@ describe('spec sem-rolagem-horizontal cobre todas as rotas do AppRoutes', () => 
     expect(erros).toEqual([]);
   });
 
-  test('PENDENTES só cita chave medida (rota, rota#estado ou a tela de login) e larguras medidas', () => {
+  test('PENDENTES e PENDENTES_SO_LINUX só citam chave medida (rota, rota#estado ou login) e larguras medidas', () => {
     const chaves = new Set([TELA_LOGIN, ...ROTAS_MEDIDAS.flatMap((r) => [chaveDe(r), ...(r.estados ?? []).map((e) => chaveDe(r, e))])]);
-    const invalidas = Object.entries(PENDENTES).flatMap(([chave, larguras]) => [
+    const invalidas = [...Object.entries(PENDENTES), ...Object.entries(PENDENTES_SO_LINUX)].flatMap(([chave, larguras]) => [
       ...(chaves.has(chave) ? [] : [`${chave}: não é chave medida`]),
       ...larguras.filter((l) => !LARGURAS.includes(l)).map((l) => `${chave}: largura ${l} não é medida`),
     ]);

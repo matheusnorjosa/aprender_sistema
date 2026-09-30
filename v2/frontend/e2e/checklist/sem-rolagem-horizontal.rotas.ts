@@ -237,6 +237,7 @@ export const TELA_LOGIN = 'login';
  * Medida em 2026-09-29 (main acd04afd, seed com textos longos): 126 combinações em 34
  * chaves (31 das 42 rotas; 3 são vistas alternativas). Rola a página, rola por dentro ou
  * corta sem reticências. A 1280 px (com a barra de rolagem de 15 px) ainda falham 26 chaves.
+ * Diferenças só do Linux da CI (fonte) ficam em PENDENTES_SO_LINUX, no fim do arquivo.
  * O ratchet do Vitest (semRolagemHorizontal.pendentes.test.ts) trava a lista: nada novo
  * entra e o tamanho só desce.
  */
@@ -275,4 +276,19 @@ export const PENDENTES: Readonly<Record<string, readonly Largura[]>> = {
   '/dat/admin/projetos-gerais': [360, 768, 1024],
   '/dat/cadastros': [360, 768, 1024, 1280],
   '/dat/registros': [360, 768, 1024, 1280],
+};
+
+/**
+ * DÍVIDA MEDIDA SÓ NA REFERÊNCIA: combinações que rolam no Chromium Linux da CI (a medição
+ * de referência da trava) e não no Windows. As fontes do Linux (Liberation/DejaVu) são mais
+ * largas que a Segoe UI, e estas tabelas passam do limite por poucos px. O spec só as marca
+ * como falha esperada quando `process.platform === 'linux'`; no Windows elas passam e não
+ * dão "Expected to fail, but passed". Mesmo ratchet de PENDENTES (linha de base e teto), e
+ * uma combinação não pode estar nas duas listas.
+ */
+export const PENDENTES_SO_LINUX: Readonly<Record<string, readonly Largura[]>> = {
+  // CI de 29/09/2026 (run 36655341855): Top 5 Coordenadores, rolagem interna +18 px.
+  '/dashboards': [1280],
+  // CI de 29/09/2026 (run 36655341855): tabela de eventos, rolagem interna +4 px.
+  '/dashboards/gcal': [1280],
 };

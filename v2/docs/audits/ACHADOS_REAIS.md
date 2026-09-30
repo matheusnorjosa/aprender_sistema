@@ -176,11 +176,11 @@ O B1 pôs a policy de aprovação em `user_is_solicitacao_global`, e com ela a a
 decidir solicitação de **qualquer** gerência — o `M10-01` voltou para essas 5 desde 29/09 16:49Z.
 Medição de 30/09 (somente leitura, `relatorios/aprovadoras_escopo_2026-09-30.txt`): 0 ações
 auditadas delas fora do escopo e 0 de 1.717 pendentes fora do escopo.
-Branch `fix/aprovadora-escopo-superintendencia` (base `ef39d0ac`), em andamento até o merge.
+Fechado pelo PR #2077 (branch `fix/aprovadora-escopo-superintendencia`), 2026-09-30.
 
 | ID | Sev. | Status | Achado | O que fecha |
 |---|---|---|---|---|
-| `M10-01` (volta no B1) | P1 | em andamento (branch acima) | A aprovadora por vínculo herdou edição, exclusão e decisão globais; o lote não tinha escopo de queryset | Predicado único `projeto_no_escopo_da_superintendencia` (`policies.py`): decidir fora → 403 `out_of_approval_scope` (lote → `errors[]`); editar/excluir fora → 403 (`user_can_access_solicitacao`); criar/mover para fora → 400 (tier do 2º vínculo só com papel GERENTE). Ver, próprias e bases amplas sem mudança. Trava de cadastro: projeto SUPER só na `SUPERINTENDENCIA`, com o campo Gerência na ProjetosPage. `test_escopo_aprovadora_superintendencia.py`, `test_projeto_fluxo_super_so_superintendencia.py`, `ProjetosPage.gerencia.test.tsx`; [`politica-aprovacao.spec.md`](../specs/domain/politica-aprovacao.spec.md) |
+| `M10-01` (volta no B1) | P1 | resolvido (PR #2077, 2026-09-30) | A aprovadora por vínculo herdou edição, exclusão e decisão globais; o lote não tinha escopo de queryset | Predicado único `projeto_no_escopo_da_superintendencia` (`policies.py`): decidir fora → 403 `out_of_approval_scope` (lote → `errors[]`); editar/excluir fora → 403 (`user_can_access_solicitacao`); criar/mover para fora → 400 (tier do 2º vínculo só com papel GERENTE). Ver, próprias e bases amplas sem mudança. Trava de cadastro: projeto SUPER só na `SUPERINTENDENCIA`, com o campo Gerência na ProjetosPage. `test_escopo_aprovadora_superintendencia.py`, `test_projeto_fluxo_super_so_superintendencia.py`, `ProjetosPage.gerencia.test.tsx`; [`politica-aprovacao.spec.md`](../specs/domain/politica-aprovacao.spec.md) |
 
 ## PR A — setor = gerência na tela (2026-09-29)
 

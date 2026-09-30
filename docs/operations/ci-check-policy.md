@@ -95,7 +95,7 @@ Executados por `schedule` ou `workflow_dispatch`:
 
 - Documento operacional: [CI Backend xdist Canary](ci-backend-xdist-canary.md)
 - Backlog de estabilizacao: [CI Backend xdist Stabilization Backlog](ci-backend-xdist-stabilization-backlog.md)
-- Finalidade: experimentação de paralelismo (`pytest-xdist`) sem alterar o gate obrigatório.
+- Finalidade: rodar a suíte inteira num banco **migrado** (o gate roda `--no-migrations`), na matriz de paralelismo (`pytest-xdist`), sem alterar o gate obrigatório. O alerta vai para a issue do canary (marcador `<!-- as-xdist-canary -->`), descrita no documento operacional.
 - Regra: findings recorrentes da trilha canary viram issues de estabilização antes de qualquer promoção para o caminho obrigatório.
 
 ## Regras de governança
@@ -115,5 +115,6 @@ Executados por `schedule` ou `workflow_dispatch`:
 
 - Revisão operacional mensal via API de billing:
   - `gh api /repos/<owner>/<repo>/actions/billing/usage`
-- Correlacionar custo com a telemetria de duração:
-  - workflow `[monitoring] ci runtime baseline (median/p95)` em `.github/workflows/ci-runtime-telemetry.yml`.
+- Duração por job: medir sob demanda, com `gh run list --workflow <arquivo> --event pull_request`
+  e `gh run view <id> --json jobs`. A telemetria agendada (`ci-runtime-telemetry.yml`) foi
+  removida: ficou 38 execuções vermelhas sem ação, e a janela congelou quando o gatilho `push` saiu.

@@ -132,8 +132,22 @@ jobs:
           cache: 'pip'
           cache-dependency-path: v2/backend/requirements*.txt
 
+      # Versoes de black/isort/flake8: SO em v2/backend/requirements-dev.txt, o mesmo arquivo que
+      # o container de dev e os jobs de teste instalam. Sem pin, o gate usava o que o PyPI tivesse
+      # no dia (30/09: isort 9.0.2 e flake8 7.4.1, contra 8.0.1 e 7.3.0 no dev). O flake8 do dev
+      # subiu para o 7.4.1 do CI; o isort fica no 8.0.1 porque o pylint 4.0.5 do dev exige
+      # isort<9. A main passa nas duas combinacoes (0 apontamentos, medido em 30/09).
+      # `-c requirements-dev.txt` nao serve: o `-r requirements-prod.txt` de dentro dele vira
+      # requisito e o pip instala a producao inteira (medido: 92 pacotes).
       - name: Install lint dependencies
-        run: pip install black isort flake8
+        run: |
+          set -euo pipefail
+          grep -E '^(black|isort|flake8)==' v2/backend/requirements-dev.txt > "$RUNNER_TEMP/lint-requirements.txt"
+          if [ "$(wc -l < "$RUNNER_TEMP/lint-requirements.txt")" -ne 3 ]; then
+            echo "::error file=v2/backend/requirements-dev.txt::black, isort e flake8 precisam estar fixados com == (uma linha cada) neste arquivo."
+            exit 1
+          fi
+          pip install -r "$RUNNER_TEMP/lint-requirements.txt"
 
       - name: Lint with Black
         run: |

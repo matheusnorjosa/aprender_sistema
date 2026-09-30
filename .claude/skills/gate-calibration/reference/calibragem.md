@@ -39,7 +39,7 @@ caso o gate nasce vermelho e é desligado antes de pegar o primeiro caso novo.
 
 - **`[required]` no nome sem estar no ruleset** — 9 de 19 jobs. O nome informa
   errado sobre a própria proteção, e ninguém tinha como saber sem abrir a config.
-- **Cron** — `ci-runtime-telemetry` falhou 26 execuções consecutivas e ninguém
+- **Cron** — `ci-runtime-telemetry` (já removido) falhou 26 execuções consecutivas e ninguém
   viu, porque é `schedule`-only e não aparece em PR nenhum.
 - **Path filter em check `[required]`** — deixa o check «Expected» eterno e trava
   merge. Escopo se resolve **dentro** do job.

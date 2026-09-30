@@ -172,7 +172,7 @@ def test_classify_projeto(tmp_path):
 def test_classify_projeto_base_empty_pg_derives_from_own_name(tmp_path):
     # Projeto-base (MATCH_CANONICO no v14) tem projeto_geral VAZIO; há PG homônimo →
     # deriva o PG do próprio nome, não rejeita. Usa a coluna `nome` (shape real do v14).
-    ProjetoGeral.objects.create(nome="A COR DA GENTE")
+    ProjetoGeral.objects.get_or_create(nome="A COR DA GENTE")  # a migration 0045 já semeia em DB migrado
     csv = "nome,projeto_geral,fluxo\nA Cor da Gente,,NAO_SUPER\n"
     path = _write_export(tmp_path, {"projeto": csv})
     r = ExportContractImporter(path=path).run()["por_entidade"]["projeto"]

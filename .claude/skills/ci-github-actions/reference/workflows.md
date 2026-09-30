@@ -15,7 +15,7 @@ Consultado sob demanda pela skill `ci-github-actions`. Nomes (`name:`) e arquivo
 
 - **`security-scan.yml`** — *Security Scan*. `Container Scan` (Trivy), `Secret Detection` (Gitleaks), Bandit. CVE de SO no Trivy → cache-bust `apt/apk upgrade` por `GIT_SHA` no `Dockerfile.prod`.
 - **`dependency-review-scorecard.yml`** — *Dependency Review & Scorecard*. `dependency review` + OpenSSF Scorecard (`[info]`).
-- **`strict-security-headers.yml`** — *Strict Security Headers*. Valida headers de segurança (CSP/HSTS/etc.).
+- **`strict-security-headers.yml`** — *Strict Security Headers*. Valida headers de segurança (CSP/HSTS/etc.) da produção, semanal; o alvo padrão está no próprio YAML e, sem alvo, falha (não pula).
 - **`slsa-provenance.yml`** — *SLSA Provenance and Signing*. Proveniência/assinatura de artefatos.
 
 ## Docs / arquitetura
@@ -32,8 +32,7 @@ Consultado sob demanda pela skill `ci-github-actions`. Nomes (`name:`) e arquivo
 
 ## Monitoramento (não bloqueia merge)
 
-- **`ci-runtime-telemetry.yml`** — *CI Runtime Telemetry*. Cron diário; falha se p95 regride >35% vs `v2/docs/analysis/ci-runtime-baseline.json`. Re-baseline = promover report fresco ao JSON.
-- **`backend-xdist-canary.yml`** — *Backend xdist Canary (non-blocking)*. 4 matrix runs; posta evidência de estabilidade (issue de tracking #677).
+- **`backend-xdist-canary.yml`** — *Backend xdist Canary (non-blocking)*. 4 matrix runs de `pytest apps` num banco **migrado** (o gate roda `--no-migrations`). O alerta vai para uma issue aberta pelo `github-actions[bot]` com o marcador `<!-- as-xdist-canary -->`: run com falha abre ou comenta; só run completo e limpo da `main`, sem `extra_pytest_args`, fecha.
 - **`agent-browser-smoke.yml`** — *agent-browser-smoke*. Smoke de browser via agente.
 
 ## Composite actions (`.github/actions/`)

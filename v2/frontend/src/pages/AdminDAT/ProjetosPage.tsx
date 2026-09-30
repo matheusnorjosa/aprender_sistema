@@ -5,13 +5,21 @@
  * Fase 1 Iteração 2 - Plano DAT/GCal 2025-10-29
  */
 
-import { useState, useEffect, type JSX } from 'react';
-import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, Form, Radio, Checkbox, Select } from 'antd';
+import { useState, useEffect, useMemo, type JSX } from 'react';
+import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, Form, Radio, Checkbox, Select, Alert } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { TablePaginationConfig } from 'antd/es/table';
 import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Link } from 'react-router';
-import { listProjetos, createProjeto, updateProjeto, deleteProjeto, getRBACMeta } from '../../api/adminDAT';
+import {
+  listProjetos,
+  createProjeto,
+  updateProjeto,
+  deleteProjeto,
+  getRBACMeta,
+  listGerencias,
+  type GerenciaRecord,
+} from '../../api/adminDAT';
 import { DEFAULT_PAGE_SIZE } from '../../constants';
 import type { ID } from '../../types';
 
@@ -30,6 +38,8 @@ interface ProjetoRecord {
   // Conferência #1914: setor = raw gravável; setor_efetivo = derivado (setor || gerencia.nome_setor), read-only.
   setor: string;
   setor_efetivo: string;
+  // Gerência do projeto (id); null sem gerência. Pré-preenche o campo Gerência na edição.
+  gerencia: ID | null;
   // PR A: rótulo (nome de tela) da gerência do projeto; null sem gerência.
   gerencia_nome: string | null;
 }
@@ -43,6 +53,7 @@ interface ProjetoFormValues {
   fluxo: 'SUPER' | 'NAO_SUPER';
   ativo: boolean;
   setor?: string;
+  gerencia?: ID | undefined;
 }
 
 export default function ProjetosPage(): JSX.Element {
@@ -60,6 +71,9 @@ export default function ProjetosPage(): JSX.Element {
   // Vocabulário setor-de-produto (SSOT no backend), buscado do endpoint de options (/rbac/meta/) —
   // Select FECHADO da conferência, sem hardcode (evita drift do vocabulário). Mesmo padrão da GerenciasPage.
   const [setoresProduto, setSetoresProduto] = useState<string[]>([]);
+  const [gerencias, setGerencias] = useState<GerenciaRecord[]>([]);
+  // Motivo da falha ao carregar as gerências (null = carregou). Sem a lista não dá para criar projeto.
+  const [erroGerencias, setErroGerencias] = useState<string | null>(null);
 
   const [form] = Form.useForm<ProjetoFormValues>();
 
@@ -107,6 +121,34 @@ export default function ProjetosPage(): JSX.Element {
     })();
   }, []);
 
+  // Regra do dono (30/09): fluxo SUPER só em projeto da gerência Superintendência — a tela precisa
+  // escolher a gerência. Só as ATIVAS, pelo rótulo de tela (PR A).
+  useEffect(() => {
+    void (async () => {
+      try {
+        const data = await listGerencias({ ativo: true, page_size: 1000 });
+        setGerencias(data.results);
+      } catch (error) {
+        // Sem a lista, o campo obrigatório trava o criar sem chamar a API: o modal mostra o motivo.
+        setErroGerencias((error as Error).message);
+      }
+    })();
+  }, []);
+
+  // Mais a gerência atual do projeto em edição quando ela foi desativada (sem ela o Select
+  // mostraria o id cru) — mesmo padrão da UsuariosPage.
+  const gerenciaOptions = useMemo(() => {
+    const options = gerencias
+      .slice()
+      .sort((a, b) => a.rotulo.localeCompare(b.rotulo, 'pt-BR'))
+      .map((g) => ({ label: g.rotulo, value: g.id }));
+    const atual = editingProjeto?.gerencia;
+    if (atual != null && !options.some((o) => o.value === atual)) {
+      options.push({ label: editingProjeto?.gerencia_nome ?? String(atual), value: atual });
+    }
+    return options;
+  }, [gerencias, editingProjeto]);
+
   const handleTableChange = (newPagination: TablePaginationConfig): void => {
     void fetchProjetos(
       newPagination.current || 1,
@@ -122,6 +164,8 @@ export default function ProjetosPage(): JSX.Element {
 
   const handleEdit = (projeto: ProjetoRecord): void => {
     setEditingProjeto(projeto);
+    // Limpa o erro do último salvar: o setFieldsValue só limpa o de campo cujo valor muda.
+    form.resetFields();
     form.setFieldsValue({
       nome: projeto.nome,
       codigo: projeto.codigo,
@@ -130,6 +174,7 @@ export default function ProjetosPage(): JSX.Element {
       // Semeia o RAW `setor` (não o derivado `setor_efetivo`): editar o derivado e salvar
       // gravaria a derivação no raw, contaminando-o (guarda anti-M17).
       setor: projeto.setor,
+      gerencia: projeto.gerencia ?? undefined,
     });
     setModalVisible(true);
   };
@@ -147,6 +192,14 @@ export default function ProjetosPage(): JSX.Element {
       form.resetFields();
       void fetchProjetos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
     } catch (error) {
+      // A trava "SUPER só na Superintendência" volta como erro sem campo (400): mostra junto do
+      // campo Gerência, onde se corrige.
+      const semCampo = (error as { response?: { data?: { errors?: { non_field_errors?: string[] } } } }).response
+        ?.data?.errors?.non_field_errors;
+      if (semCampo?.length) {
+        form.setFields([{ name: 'gerencia', errors: semCampo }]);
+        return;
+      }
       message.error(`Erro: ${(error as Error).message}`);
     }
   };
@@ -300,6 +353,15 @@ export default function ProjetosPage(): JSX.Element {
           autoComplete="off"
           onFinish={handleSave}
         >
+          {erroGerencias ? (
+            <Alert
+              type="error"
+              showIcon
+              className="mb-4"
+              message="Não foi possível carregar as gerências"
+              description={`${erroGerencias} Sem essa lista não dá para criar projeto nem trocar a gerência; recarregue a página.`}
+            />
+          ) : null}
           <Form.Item
             name="nome"
             label="Nome do Projeto"
@@ -314,6 +376,19 @@ export default function ProjetosPage(): JSX.Element {
             rules={[{ required: true, message: 'Código é obrigatório' }]}
           >
             <Input placeholder="Ex: AMMA" />
+          </Form.Item>
+
+          <Form.Item
+            name="gerencia"
+            label="Gerência"
+            rules={editingProjeto ? [] : [{ required: true, message: 'Gerência é obrigatória' }]}
+          >
+            <Select
+              showSearch
+              optionFilterProp="label"
+              placeholder="Selecione a gerência..."
+              options={gerenciaOptions}
+            />
           </Form.Item>
 
           <Form.Item

@@ -42,6 +42,17 @@ APPROVER_COMPOSITES: Final[tuple[tuple[str, str], ...]] = (
 # nem id (muda entre ambientes). Renomear g1 é bloqueado em `GerenciaSerializer.validate_nome`.
 GERENCIA_APROVADORA_NOME: Final = "SUPERINTENDENCIA"
 
+# Regra do dono (30/09): trava no cadastro de projeto — mensagem única para API, admin e testes.
+MSG_FLUXO_SUPER_SO_NA_SUPERINTENDENCIA: Final = "Fluxo SUPER só é permitido em projeto da gerência Superintendência."
+
+
+def fluxo_super_fora_da_superintendencia(fluxo: str | None, gerencia: object | None) -> bool:
+    """True se a combinação viola a regra do dono (30/09): fluxo SUPER fora da gerência g1.
+
+    Fail-closed: SUPER sem gerência também viola. Chave = `Gerencia.nome` (a mesma da aprovação).
+    """
+    return fluxo == "SUPER" and getattr(gerencia, "nome", None) != GERENCIA_APROVADORA_NOME
+
 
 def user_in_composite(
     user: AbstractBaseUser | AnonymousUser | None,

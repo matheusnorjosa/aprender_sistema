@@ -52,6 +52,7 @@ from .services.solicitacao_publish import publish_to_gcal, resync_to_gcal
 from .services.solicitacao_scope import (
     can_publish_solicitacao,
     participants_out_of_setor,
+    projeto_fora_do_alcance_da_restrita,
     projeto_out_of_setor,
     scope_publishable_solicitacoes,
     scope_solicitacoes,
@@ -101,7 +102,7 @@ def _batch_response_schema(contador: str) -> dict[str, Any]:
                     "properties": {
                         "id": {"type": "integer"},
                         "detail": {"type": "string"},
-                        "code": {"type": "string", "enum": ["self_approval_forbidden"]},
+                        "code": {"type": "string", "enum": ["self_approval_forbidden", "out_of_approval_scope"]},
                     },
                     "required": ["id", "detail"],
                 },
@@ -373,6 +374,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         projeto = serializer.validated_data.get("projeto")
         # M10-04/#1656 Wave 1 (S2): o projeto tem que ser do setor do criador.
         self._assert_projeto_in_setor_scope(projeto)
+        self._assert_projeto_no_alcance_da_aprovadora(projeto)
         initial_status = resolve_initial_status(projeto=projeto)
 
         with transaction.atomic():
@@ -435,6 +437,18 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         creator = getattr(getattr(self, "request", None), "user", None)
         if projeto_out_of_setor(creator, projeto):
             raise serializers.ValidationError({"projeto": [self._SETOR_SCOPE_MSG_PROJETO]})
+
+    _ESCOPO_APROVADORA_MSG_PROJETO = (
+        "Você só pode criar ou mover solicitação para projeto do fluxo SUPER da Superintendência."
+    )
+
+    def _assert_projeto_no_alcance_da_aprovadora(self, projeto):
+        """Regra do dono (30/09): a aprovadora por vínculo só cria ou move solicitação para projeto
+        do alcance dela (`projeto_fora_do_alcance_da_restrita`; projeto None → 400). Sem `request` →
+        ator None → não restringe (como `_assert_projeto_in_setor_scope`)."""
+        user = getattr(getattr(self, "request", None), "user", None)
+        if projeto_fora_do_alcance_da_restrita(user, projeto):
+            raise serializers.ValidationError({"projeto": [self._ESCOPO_APROVADORA_MSG_PROJETO]})
 
     def _create_participants(self, solicitacao, extra):
         """
@@ -545,7 +559,12 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         # M10-04/#1656 Wave 1 (S2): se o PATCH troca o projeto, ele tem que ser do
         # setor do editor (perform_update é atômico → 400 desfaz tudo).
         if "projeto" in serializer.validated_data:
-            self._assert_projeto_in_setor_scope(serializer.validated_data["projeto"])
+            novo_projeto = serializer.validated_data["projeto"]
+            self._assert_projeto_in_setor_scope(novo_projeto)
+            # Regra do dono (30/09): mover (inclusive a própria) só para o alcance da aprovadora.
+            # O EditSolicitacaoPage manda `projeto` em todo save: o mesmo projeto não é mover.
+            if getattr(novo_projeto, "pk", None) != instance.projeto_id:
+                self._assert_projeto_no_alcance_da_aprovadora(novo_projeto)
 
         # Captura formadores atuais antes do update
         old_formador_ids = set(
@@ -793,7 +812,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             "Aprova uma solicitação pendente. Requer a policy access_solicitation_approvals "
             "(PA-02): gerência da Superintendência, Assistente Administrativo do Controle ou superuser. "
             "Quem criou a solicitação não a aprova: 403 com code=self_approval_forbidden "
-            "(superuser pode; o AuditLog marca autoaprovacao=true)."
+            "(superuser pode; o AuditLog marca autoaprovacao=true). A gerência da Superintendência "
+            "(vínculo) só decide projeto do fluxo SUPER da Superintendência: fora disso, 403 com "
+            "code=out_of_approval_scope."
         ),
         request=None,
         responses={
@@ -837,7 +858,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             "access_solicitation_approvals (PA-02): gerência da Superintendência, "
             "Assistente Administrativo do Controle ou superuser. Quem criou a solicitação "
             "não a reprova: 403 com code=self_approval_forbidden (superuser pode; o AuditLog "
-            "marca autoaprovacao=true)."
+            "marca autoaprovacao=true). A gerência da Superintendência (vínculo) só decide projeto "
+            "do fluxo SUPER da Superintendência: fora disso, 403 com code=out_of_approval_scope."
         ),
         request=None,
         responses={
@@ -1030,7 +1052,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         description=(
             "Aprova múltiplas solicitações em lote (PA-05). Máx 100 por requisição. "
             "Item que não pode ser aprovado vai para errors[] e o resto segue; a solicitação "
-            "do próprio aprovador sai com errors[].code=self_approval_forbidden."
+            "do próprio aprovador sai com errors[].code=self_approval_forbidden e, para a gerência "
+            "da Superintendência (vínculo), a que não é do fluxo SUPER da Superintendência sai com "
+            "errors[].code=out_of_approval_scope."
         ),
         request={"type": "object", "properties": {"ids": {"type": "array", "items": {"type": "integer"}}}},
         responses={200: _batch_response_schema("approved")},
@@ -1084,7 +1108,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         description=(
             "Reprova múltiplas solicitações em lote (PA-05). Máx 100 por requisição. "
             "Item que não pode ser reprovado vai para errors[] e o resto segue; a solicitação "
-            "do próprio aprovador sai com errors[].code=self_approval_forbidden."
+            "do próprio aprovador sai com errors[].code=self_approval_forbidden e, para a gerência "
+            "da Superintendência (vínculo), a que não é do fluxo SUPER da Superintendência sai com "
+            "errors[].code=out_of_approval_scope."
         ),
         request=_BatchIdsSerializer,
         responses={200: _batch_response_schema("rejected")},

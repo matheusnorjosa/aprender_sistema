@@ -97,6 +97,8 @@ interface ApiErrorResponse {
     status?: number;
     data?: {
       non_field_errors?: string[];
+      detail?: string;
+      errors?: Record<string, unknown>;
     };
   };
 }
@@ -290,11 +292,18 @@ export default function EditSolicitacaoPage(): JSX.Element {
       logger.error('Erro ao atualizar solicitação:', err);
       const apiErr = err as ApiErrorResponse;
 
-      // Tratar erros específicos do backend
-      if (apiErr.response?.data?.non_field_errors) {
-        message.error(apiErr.response.data.non_field_errors[0]);
+      // Tratar erros específicos do backend. O motivo vem no `detail` (403) ou no campo (400,
+      // ex.: `errors.projeto` ao mover para fora do escopo da aprovadora — regra do dono, 30/09).
+      const data = apiErr.response?.data;
+      const motivoDoCampo = Object.values(data?.errors ?? {})
+        .flat()
+        .find((texto): texto is string => typeof texto === 'string');
+      if (data?.non_field_errors) {
+        message.error(data.non_field_errors[0]);
       } else if (apiErr.response?.status === 403) {
-        message.error('Você não tem permissão para editar esta solicitação.');
+        message.error(data?.detail || 'Você não tem permissão para editar esta solicitação.');
+      } else if (apiErr.response?.status === 400 && motivoDoCampo) {
+        message.error(motivoDoCampo);
       } else {
         message.error('Erro ao atualizar solicitação. Verifique os dados e tente novamente.');
       }

@@ -214,12 +214,17 @@ class IsOwnerOrPrivileged(HasFunctionalPermission):  # type: ignore[misc]
     Permissão para edição de solicitações.
 
     - superuser: acesso total
-    - usuário com permissão funcional privilegiada: acesso total
+    - usuário com permissão funcional privilegiada: acesso no escopo dele (`user_can_access_solicitacao`);
+      a aprovadora por vínculo (GERENTE em g1) só no fluxo SUPER da Superintendência e nas gerências de um
+      2º vínculo de GERENTE dela (regra do dono, 30/09)
     - owner do objeto: acesso ao próprio objeto
     """
 
     functional_codename = "edit_solicitation_as_owner_or_privileged"
     message = "Você só pode editar suas próprias solicitações ou possuir privilégio de gestão."
+    message_escopo_superintendencia = (
+        "A gerência da Superintendência só edita ou exclui solicitações do fluxo SUPER da Superintendência."
+    )
 
     def has_permission(self, request: Request, view: APIView) -> bool:
         return bool(request.user and request.user.is_authenticated)
@@ -234,10 +239,16 @@ class IsOwnerOrPrivileged(HasFunctionalPermission):  # type: ignore[misc]
             # M10-01 (#1623): o privilégio de edição de solicitação só vale DENTRO
             # do escopo do ator (global OU própria gerência OU dono) — não mais
             # nacional. SSOT: `user_can_access_solicitacao`.
-            from apps.core.services.solicitacao_scope import user_can_access_solicitacao
+            from apps.core.services.solicitacao_scope import (
+                restrita_ao_escopo_da_superintendencia,
+                user_can_access_solicitacao,
+            )
 
             if user_can_access_solicitacao(user, obj):
                 return True
+            # Regra do dono (30/09): o 403 diz por que a aprovadora (que VÊ a solicitação) não edita.
+            if restrita_ao_escopo_da_superintendencia(user):
+                self.message = self.message_escopo_superintendencia
 
         obj_usuario = getattr(obj, "usuario", None)
         return obj_usuario == user

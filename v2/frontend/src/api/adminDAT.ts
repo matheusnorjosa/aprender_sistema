@@ -145,6 +145,8 @@ export interface ProjetoPayload {
   ativo?: boolean;
   // Setor canônico do projeto (raw, gravável) — conferência #1914. setor_efetivo (derivado) é read-only.
   setor?: string;
+  // Gerência do projeto (id). Regra do dono (30/09): fluxo SUPER só na gerência Superintendência.
+  gerencia?: ID | undefined;
 }
 
 /**

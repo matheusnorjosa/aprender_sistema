@@ -169,6 +169,19 @@ fecha no mesmo corte o caminho de escalada por import (os importers de equipe re
 reativar GERENTE na `SUPERINTENDENCIA`, pendência `vinculo_aprovador_bloqueado`) e por rename da
 gerência (`GerenciaSerializer.validate_nome`).
 
+## Escopo da aprovadora por vínculo — regra do dono (2026-09-30)
+
+O B1 pôs a policy de aprovação em `user_is_solicitacao_global`, e com ela a aprovadora por vínculo
+(GERENTE em `SUPERINTENDENCIA`, 5 pessoas em produção, só o grupo Gerente) passou a editar, excluir e
+decidir solicitação de **qualquer** gerência — o `M10-01` voltou para essas 5 desde 29/09 16:49Z.
+Medição de 30/09 (somente leitura, `relatorios/aprovadoras_escopo_2026-09-30.txt`): 0 ações
+auditadas delas fora do escopo e 0 de 1.717 pendentes fora do escopo.
+Fechado pelo PR #2077 (branch `fix/aprovadora-escopo-superintendencia`), 2026-09-30.
+
+| ID | Sev. | Status | Achado | O que fecha |
+|---|---|---|---|---|
+| `M10-01` (volta no B1) | P1 | resolvido (PR #2077, 2026-09-30) | A aprovadora por vínculo herdou edição, exclusão e decisão globais; o lote não tinha escopo de queryset | Predicado único `projeto_no_escopo_da_superintendencia` (`policies.py`): decidir fora → 403 `out_of_approval_scope` (lote → `errors[]`); editar/excluir fora → 403 (`user_can_access_solicitacao`); criar/mover para fora → 400 (tier do 2º vínculo só com papel GERENTE). Ver, próprias e bases amplas sem mudança. Trava de cadastro: projeto SUPER só na `SUPERINTENDENCIA`, com o campo Gerência na ProjetosPage. `test_escopo_aprovadora_superintendencia.py`, `test_projeto_fluxo_super_so_superintendencia.py`, `ProjetosPage.gerencia.test.tsx`; [`politica-aprovacao.spec.md`](../specs/domain/politica-aprovacao.spec.md) |
+
 ## PR A — setor = gerência na tela (2026-09-29)
 
 Achados medidos durante o PR A (branch `feat/gerencia-nome-exibicao-pr-a`, base `a56d9027`), fora
@@ -256,7 +269,7 @@ Onde a issue é um épico que cobre outros IDs, ela pode seguir OPEN com o ID j�
 | `M08-07` | P2 | LIVE | resolvido | `cd60882a` (2026-08-21) | #1664 OPEN (épico) |
 | `M08-09` | P2 | LIVE | resolvido | `a986a250` (2026-08-21) | #1664 OPEN (épico) |
 | `M09-06` | P1 | parcial (2026-08-17) | resolvido | `659c164f` (2026-08-18) | #1622 CLOSED |
-| `M10-01` | P1 | LIVE | resolvido | `824f777c` (2026-08-20) | #1623 CLOSED |
+| `M10-01` | P1 | LIVE | resolvido (voltou para a aprovadora por vínculo no B1: §Escopo da aprovadora por vínculo) | `824f777c` (2026-08-20) | #1623 CLOSED |
 | `M10-02` | P1 | LIVE | resolvido | `a1577d41` (2026-08-19) | #1624 CLOSED |
 | `M10-03` | P1 | LIVE | resolvido | `f115dd45` (2026-08-19) | #1625 CLOSED |
 | `M10-04` | P1 | LIVE | **resolvido** | `185fab4a` (shape) + `#2033` (2026-09-15; escopo do alvo por SETOR: participante) | #1626 CLOSED |
@@ -406,7 +419,7 @@ commit traz a data **de cada commit**, porque eles podem estar a semanas de dist
 | `M08-12` | **P1** | resolvido | imports/eventos: ~~grava aprovada sem gate de disponibilidade~~ → gate RD-01..08 (+advisory lock) p/ evento FUTURO; histórico entra sem checar (decisão do dono) | Grupo DAT (3 membros ativos nao-superuser) + 1 superuser ativo. `Permi… | #1620 | #2021 (2026-09-14) |
 | `M09-05` | **P1** | aberto | Deslocamentos: UI exige delegacao que o backend nega — Coordenador nao consegue registrar nenhu… | Coordenador (42 ativos) e o ator principal: 100% dos creates pela UI f… | #1621 (OPEN) | — |
 | `M09-06` | **P1** | resolvido | Deslocamentos: filtros Origem/Destino inutilizáveis — página desmonta a cada tecla e o filtro falha | Coordenador, DAT, Controle, Superintendência e superuser | #1622 (CLOSED) | `6d73ba29` (2026-08-12)+`659c164f` (2026-08-18) |
-| `M10-01` | **P1** | resolvido | solicitações: Gerente lê, edita e exclui solicitação de qualquer gerência (sem escopo ator×alvo… | Gerente — 9 usuários ativos não-superuser em produção. Ator real e num… | #1623 (CLOSED) | `824f777c` (2026-08-20) |
+| `M10-01` | **P1** | resolvido (voltou no B1 para a aprovadora por vínculo: §Escopo da aprovadora por vínculo) | solicitações: Gerente lê, edita e exclui solicitação de qualquer gerência (sem escopo ator×alvo… | Gerente — 9 usuários ativos não-superuser em produção. Ator real e num… | #1623 (CLOSED) | `824f777c` (2026-08-20) |
 | `M10-02` | **P1** | resolvido | solicitação: troca de projeto para fluxo SUPER mantém status aprovado (lavagem de aprovação, vi… | — | #1624 (CLOSED) | `a1577d41` (2026-08-19) |
 | `M10-03` | **P1** | resolvido | solicitacoes: bloquear edicao e exclusao enquanto gcal_status=PENDING (publica conteudo diferen… | Ator real e amplo: o proprio owner da solicitacao. Em prod isso alcanc… | #1625 (CLOSED) | `f115dd45` (2026-08-19) |
 | `M10-04` | **P1** | resolvido | solicitacoes: extra_participants aceita alvo arbitrário sem policy, sem limite e estoura 500 | Grande. `create` exige `HasPerm("create_solicitation")` (views_solicit… | #1626 (CLOSED) | `185fab4a` (shape) + `#2033` (2026-09-15; alvo por SETOR: participante — create/update/lookup) |
@@ -762,7 +775,7 @@ fechados no código, e #1657 está CLOSED com resíduo teórico registrado em `M
 | paginacao-global-sem-page-size | P1 | `M01-07`, `M18-06` | #1653 CLOSED | resolvido (`aa8bfb5c`, `062df0ec`; 2026-08-20) |
 | list-serializer-como-fonte-de-detalhe | P1 | `M15-09`, `M17-02`, `M18-05` | #1654 OPEN (épico) | **resolvido** (as 3 fatias): `M15-09` (#1917/#1919 List expõe ids), `M17-02` (editFetchesDetail — getAcao/getCadastro), `M18-05` data_admissao (#1917) + vaza observacoes (#2020: handleEdit busca detail + resetFields). Épico #1654 segue OPEN pelos itens estruturais (adapter dirtyFields, hook useEditModal, lint) |
 | contrato-fe-be-sem-ssot | P1 | `M15-10`, `M16-07`, `M16-08`, `M09-05`, `M05-07` | #1655 OPEN | parcial (`M16-07`/`M16-08` fechados; `M15-10` parcial; `M09-05`/`M05-07` abertos) |
-| escopo-ator-alvo-ausente | P0 | `M22-01` (duplicata histórica de `M03-01`), `M07-02`, `M10-01`, `M10-04`, `M14-01` | #1656 OPEN | parcial (`M10-04` fechado por #2033 — participante escopado por setor no create/update/lookup; `M14-01` segue só no ramo sem `gerencia_id`; #1656 segue pelo escopo de **projeto** + `can_act_on` central) |
+| escopo-ator-alvo-ausente | P0 | `M22-01` (duplicata histórica de `M03-01`), `M07-02`, `M10-01`, `M10-04`, `M14-01` | #1656 OPEN | parcial (`M10-01` voltou no B1 para a aprovadora por vínculo e é fechado de novo pela regra do dono de 30/09 — §Escopo da aprovadora por vínculo; `M10-04` fechado por #2033 — participante escopado por setor no create/update/lookup; `M14-01` segue só no ramo sem `gerencia_id`; #1656 segue pelo escopo de **projeto** + `can_act_on` central) |
 | auditoria-nao-invariante-e-pii | P1 | `M07-03`, `M05-05`, `M23-02`, `M03-10` | #1657 CLOSED | parcial (`11219a7e`, `20c6f48d`, `d2f226cc`, todos 2026-08-18, fecham `M07-03`/`M05-05`/`M03-10`; `M23-02` segue `parcial` na fila, com o resíduo teórico) |
 | resolvers-por-rotulo-humano | P1 | `M02-09`, `M04-01`, `M22-14`, `M15-05` | #1658 OPEN | parcial (`M02-09`/#1613 e `M04-01`/#2022 resolvidos: `resolve_projeto`/`resolve_tipo_evento` rejeitam ambiguidade; equipe_gerencia resolve-only via `_resolve_gerencia`. `M22-14`/`M15-05` seguem abertos) |
 | import-bypassa-invariantes | P1 | `M08-12`, `M10-07`, `M17-01`, `M15-04` | #1659 OPEN | parcial: `M08-12` (#2021 gate futuro) + `M10-07` (#2021 protege reimport) resolvidos; `M17-01` (cadastros DAT) e `M15-04` (compras) abertos |

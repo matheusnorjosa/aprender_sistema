@@ -91,8 +91,12 @@ def _sol(
     dono: Usuario | None = None,
     status: str = "pendente",
 ) -> Solicitacao:
-    """`fluxo=None` → solicitação SEM projeto. Horários distintos: nada conflita na agenda."""
-    inicio = timezone.now() + timedelta(days=4, hours=3 * next(_HASH))
+    """`fluxo=None` → solicitação SEM projeto. Um dia entre eventos: nada conflita na agenda.
+
+    Com 3 h de espaço, dois eventos do mesmo dono em municípios diferentes ficavam a 1 h um do outro e o
+    PATCH esbarrava no buffer de deslocamento (RD-04, 120 min) — falhou na CI.
+    """
+    inicio = timezone.now() + timedelta(days=4 + next(_HASH))
     return SolicitacaoFactory(
         usuario=dono or UsuarioFactory(groups=["Coordenador"]),
         projeto=_projeto(fluxo, gerencia) if fluxo else None,

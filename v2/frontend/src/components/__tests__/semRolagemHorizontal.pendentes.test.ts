@@ -74,8 +74,11 @@ const LINHA_DE_BASE_SO_LINUX: ListaPendentes = {
   '/dashboards/gcal': [1280],
 };
 
-/** Tamanho atual de PENDENTES mais PENDENTES_SO_LINUX (126 + 2). Só desce. */
-const TETO_PENDENTES = 128;
+/**
+ * Tamanho atual de PENDENTES mais PENDENTES_SO_LINUX (117 + 2). Só desce. C0: 126 + 2; o C1
+ * tirou 9 (as 4 de Usuários e 5 que a sidebar nova liberou a 768 e 1024).
+ */
+const TETO_PENDENTES = 119;
 
 const SO_LINUX = ' (só Linux)';
 

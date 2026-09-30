@@ -22,7 +22,7 @@
 
 import { MemoryRouter } from 'react-router';
 import { render, screen, within, fireEvent } from '@testing-library/react';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
 import { AppSidebar } from '../AppSidebar';
 import type { Permissions } from '../../hooks/usePermissions';
@@ -36,7 +36,7 @@ const COLORS = { sidebarBackground: '#001529', borderLight: '#303030' };
 const SIDEBAR_PROPS = {
   gcalErrorCount: 0,
   unreadNotifications: 0,
-  isMobile: false,
+  modo: 'aberta' as const,
   sidebarCollapsed: false,
   toggleSidebar: () => {},
   colors: COLORS,
@@ -736,5 +736,64 @@ describe('AppSidebar — gestor só por vínculo (PR A)', () => {
     expect(isTopLevelVisible('Bloqueios')).toBe(true);
     expect(isTopLevelVisible('Deslocamentos')).toBe(true);
     expect(isTopLevelVisible('Aprovações')).toBe(false);
+  });
+});
+
+describe('AppSidebar — modo pela largura (Programa C, C1)', () => {
+  function renderModo(modo: 'sobreposta' | 'recolhida' | 'aberta', sidebarCollapsed: boolean, toggleSidebar = () => {}) {
+    render(
+      <MemoryRouter initialEntries={['/dat/admin/usuarios']}>
+        <AppSidebar
+          permissions={EMPTY_PERMISSIONS}
+          policies={['manage_admin_registries']}
+          {...SIDEBAR_PROPS}
+          modo={modo}
+          sidebarCollapsed={sidebarCollapsed}
+          toggleSidebar={toggleSidebar}
+        />
+      </MemoryRouter>,
+    );
+  }
+
+  test('recolhida (992–1279 px): só ícones, marca curta, e o submenu do item atual não abre sozinho', () => {
+    renderModo('recolhida', true);
+    const nav = screen.getByRole('navigation', { name: 'Navegacao principal' });
+    expect(within(nav).getByText('AS')).toHaveAttribute('aria-hidden', 'true');
+    expect(within(nav).getByText('Aprender Sistema')).toHaveClass('sr-only');
+    expect(within(nav).getByRole('menu')).toHaveClass('ant-menu-inline-collapsed');
+    // aberto, o flyout de "DAT" cobriria o conteúdo ao carregar a página
+    expect(screen.queryByRole('link', { name: 'Administração' })).not.toBeInTheDocument();
+    expect(document.querySelector('.mobile-sidebar-overlay')).toBeNull();
+  });
+
+  test('recolhida e aberta pelo botão: fica por cima do conteúdo, com fundo que fecha', () => {
+    const toggle = vi.fn();
+    renderModo('recolhida', false, toggle);
+    const fundo = document.querySelector<HTMLElement>('.mobile-sidebar-overlay');
+    expect(fundo).not.toBeNull();
+    fireEvent.click(fundo!);
+    expect(toggle).toHaveBeenCalledTimes(1);
+  });
+
+  test('sobreposta e fechada (< 992 px): nenhum item de menu na tela', () => {
+    renderModo('sobreposta', true);
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(screen.queryByText('AS')).not.toBeInTheDocument();
+  });
+
+  test('sobreposta e aberta: escolher um item fecha a sidebar', () => {
+    const toggle = vi.fn();
+    renderModo('sobreposta', false, toggle);
+    fireEvent.click(screen.getByRole('link', { name: 'Página Inicial' }));
+    expect(toggle).toHaveBeenCalledTimes(1);
+  });
+
+  test('aberta (>= 1280 px): nome inteiro, sem fundo escuro, e escolher item não fecha', () => {
+    const toggle = vi.fn();
+    renderModo('aberta', false, toggle);
+    expect(screen.getByText('Aprender Sistema')).not.toHaveClass('sr-only');
+    expect(document.querySelector('.mobile-sidebar-overlay')).toBeNull();
+    fireEvent.click(screen.getByRole('link', { name: 'Página Inicial' }));
+    expect(toggle).not.toHaveBeenCalled();
   });
 });

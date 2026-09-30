@@ -57,7 +57,12 @@ function AppContent(): JSX.Element {
   const isMountedRef = useRef(true);
 
   // ── Mobile responsiveness ──
-  const { isMobile, sidebarCollapsed, toggleSidebar } = useResponsive();
+  const { modo, sidebarCollapsed, toggleSidebar } = useResponsive();
+  // Sobreposta: o conteúdo ocupa a largura toda. Recolhida: a sidebar aberta fica POR CIMA
+  // do conteúdo (margem de 80 px sempre). Aberta: a sidebar empurra o conteúdo.
+  const margemDoConteudo = modo === 'sobreposta'
+    ? 0
+    : modo === 'aberta' && !sidebarCollapsed ? LAYOUT.SIDEBAR_WIDTH : LAYOUT.SIDEBAR_COLLAPSED_WIDTH;
 
   // ── Permissions (single source of truth) ──
   const permissions = usePermissions(user);
@@ -228,13 +233,13 @@ function AppContent(): JSX.Element {
             policies={policies}
             gcalErrorCount={alerts.errors}
             unreadNotifications={unreadNotifications}
-            isMobile={isMobile}
+            modo={modo}
             sidebarCollapsed={sidebarCollapsed}
             toggleSidebar={toggleSidebar}
             colors={{ sidebarBackground: colors.sidebarBackground, borderLight: colors.borderLight }}
           />
           <Layout style={{
-            marginLeft: isMobile ? 0 : (sidebarCollapsed ? LAYOUT.SIDEBAR_COLLAPSED_WIDTH : LAYOUT.SIDEBAR_WIDTH),
+            marginLeft: margemDoConteudo,
             minHeight: '100vh',
             background: colors.pageBackground,
             transition: 'margin-left 0.2s ease',
@@ -243,7 +248,7 @@ function AppContent(): JSX.Element {
               user={user}
               canManageInternalActions={access.canManageInternalActions}
               unreadNotifications={unreadNotifications}
-              isMobile={isMobile}
+              modo={modo}
               sidebarCollapsed={sidebarCollapsed}
               toggleSidebar={toggleSidebar}
               onLogout={handleLogout}

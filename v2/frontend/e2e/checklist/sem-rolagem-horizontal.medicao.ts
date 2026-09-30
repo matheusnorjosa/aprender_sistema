@@ -33,7 +33,10 @@ export interface Medicao {
 /**
  * Internos do AntD e do Leaflet que escondem conteúdo de propósito (medidos em 29/09/2026):
  * setas do InputNumber, rótulos do Switch, preenchimento do Progress, linha conectora do
- * Steps, abas com menu "mais" e os tiles do mapa. Lista curta: entrada nova precisa de motivo.
+ * Steps, abas com menu "mais" e os tiles do mapa. Desde o C1 (30/09/2026): os itens da
+ * sidebar recolhida (992 a 1279 px, só ícones; o rótulo aparece no Tooltip e no flyout) e o
+ * texto só para leitor de tela (`sr-only`, cortado por definição). Lista curta: entrada nova
+ * precisa de motivo.
  */
 export const CORTE_PERMITIDO = [
   '.ant-input-number-handler',
@@ -42,6 +45,9 @@ export const CORTE_PERMITIDO = [
   '.ant-steps-item',
   '.ant-tabs-nav-wrap',
   '.leaflet-container',
+  '.ant-menu-inline-collapsed .ant-menu-item',
+  '.ant-menu-inline-collapsed .ant-menu-submenu-title',
+  '.sr-only',
 ] as const;
 
 /**

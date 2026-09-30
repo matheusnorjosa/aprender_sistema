@@ -11,6 +11,7 @@ import {
 } from '@ant-design/icons';
 import { listNotificacoesInternas, marcarNotificacaoLida } from '../api/acoesNotificacao';
 import type { NotificacaoInterna } from '../types/acoesNotificacao';
+import type { ModoSidebar } from '../hooks/useResponsive';
 
 const { Header } = Layout;
 const { Text } = Typography;
@@ -19,7 +20,7 @@ interface AppHeaderProps {
   user: { name?: string; username?: string };
   canManageInternalActions: boolean;
   unreadNotifications: number;
-  isMobile: boolean;
+  modo: ModoSidebar;
   sidebarCollapsed: boolean;
   toggleSidebar: () => void;
   onLogout: () => void;
@@ -33,7 +34,7 @@ export function AppHeader({
   user,
   canManageInternalActions,
   unreadNotifications,
-  isMobile,
+  modo,
   sidebarCollapsed,
   toggleSidebar,
   onLogout,
@@ -89,10 +90,12 @@ export function AppHeader({
         icon={sidebarCollapsed ? <MenuOutlined /> : <CloseOutlined />}
         onClick={toggleSidebar}
         aria-label={sidebarCollapsed ? 'Abrir menu' : 'Fechar menu'}
+        aria-expanded={!sidebarCollapsed}
         className="mobile-menu-toggle"
         style={{
           fontSize: '18px',
-          display: isMobile ? 'flex' : 'none',
+          // A partir de 1280 px a sidebar fica sempre aberta; abaixo, este botão a abre por cima.
+          display: modo !== 'aberta' ? 'flex' : 'none',
           alignItems: 'center',
           justifyContent: 'center',
         }}

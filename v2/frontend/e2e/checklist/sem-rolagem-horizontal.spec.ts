@@ -79,6 +79,18 @@ test.describe('Sem rolagem horizontal: controles do verificador', () => {
     );
     expect(alvos((await medirRolagemHorizontal(page)).cortados)).not.toContain('div#reticencias');
 
+    // CORTE_PERMITIDO: texto só para leitor de tela é cortado de propósito; a mesma caixa sem a
+    // classe continua sendo corte.
+    await injetar(
+      '<span id="leitor" class="sr-only">' + 'texto longo '.repeat(50) + '</span>' +
+        '<span id="quase" style="position:absolute;width:1px;height:1px;overflow:hidden;white-space:nowrap">' +
+        'texto longo '.repeat(50) +
+        '</span>'
+    );
+    const soLeitor = alvos((await medirRolagemHorizontal(page)).cortados);
+    expect(soLeitor).not.toContain('span#leitor.sr-only');
+    expect(soLeitor).toContain('span#quase');
+
     await injetar('<div style="width:3000px;height:10px"></div>', 'body');
     expect((await medirRolagemHorizontal(page)).pagina).toBeGreaterThan(0);
   });

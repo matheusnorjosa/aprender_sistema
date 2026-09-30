@@ -1,35 +1,45 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { LAYOUT } from '../constants';
 
-const getIsMobile = () =>
-  typeof window !== 'undefined' && window.innerWidth < LAYOUT.MOBILE_BREAKPOINT;
+/**
+ * Modo da sidebar pela largura da janela (Programa C, sem rolagem horizontal):
+ * - 'sobreposta' (< 992 px): fechada; abre por cima do conteúdo, que ocupa a largura toda;
+ * - 'recolhida' (992 a 1279 px): só ícones, 80 px; também abre por cima do conteúdo;
+ * - 'aberta' (>= 1280 px): 250 px, empurrando o conteúdo.
+ * Os breakpoints do AntD medem a janela, não o contêiner: por isso a sidebar só ocupa
+ * 250 px quando sobra largura para as colunas que a tela mostra a partir de `xl`.
+ */
+export type ModoSidebar = 'sobreposta' | 'recolhida' | 'aberta';
+
+function modoAtual(): ModoSidebar {
+  const largura = typeof window !== 'undefined' ? window.innerWidth : LAYOUT.DESKTOP_BREAKPOINT;
+  if (largura < LAYOUT.TABLET_BREAKPOINT) return 'sobreposta';
+  if (largura < LAYOUT.DESKTOP_BREAKPOINT) return 'recolhida';
+  return 'aberta';
+}
 
 interface UseResponsiveReturn {
-  isMobile: boolean;
+  modo: ModoSidebar;
   sidebarCollapsed: boolean;
   toggleSidebar: () => void;
 }
 
 /**
- * Responsive layout hook that tracks mobile breakpoint
- * without overriding the user's manual sidebar preference.
- *
- * Only auto-collapses/expands on actual mobile↔desktop transitions.
+ * Só recolhe/abre sozinho quando o modo muda; dentro do mesmo modo, a preferência
+ * manual do usuário (toggleSidebar) fica.
  */
 export function useResponsive(): UseResponsiveReturn {
-  const [isMobile, setIsMobile] = useState(getIsMobile);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(getIsMobile);
-  const prevMobileRef = useRef(isMobile);
+  const [modo, setModo] = useState(modoAtual);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => modoAtual() !== 'aberta');
+  const modoAnteriorRef = useRef(modo);
 
   useEffect(() => {
     const handleResize = () => {
-      const mobile = getIsMobile();
-      setIsMobile(mobile);
-
-      // Only auto-toggle sidebar on actual mobile↔desktop transition
-      if (mobile !== prevMobileRef.current) {
-        setSidebarCollapsed(mobile);
-        prevMobileRef.current = mobile;
+      const novo = modoAtual();
+      setModo(novo);
+      if (novo !== modoAnteriorRef.current) {
+        setSidebarCollapsed(novo !== 'aberta');
+        modoAnteriorRef.current = novo;
       }
     };
     window.addEventListener('resize', handleResize);
@@ -40,5 +50,5 @@ export function useResponsive(): UseResponsiveReturn {
     setSidebarCollapsed(prev => !prev);
   }, []);
 
-  return { isMobile, sidebarCollapsed, toggleSidebar };
+  return { modo, sidebarCollapsed, toggleSidebar };
 }

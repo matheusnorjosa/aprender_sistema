@@ -15,6 +15,7 @@ import {
 import type { Permissions } from '../hooks/usePermissions';
 import { useCapabilities } from '../hooks/useCapabilities';
 import { LAYOUT } from '../constants';
+import type { ModoSidebar } from '../hooks/useResponsive';
 
 const { Sider } = Layout;
 const { SubMenu } = Menu;
@@ -134,18 +135,20 @@ function useMenuOpenKeys() {
 // ============================================================================
 
 interface SidebarMenuProps {
+  /** Só ícones: os submenus abrem como flyout, sem abrir o do item atual sozinho. */
+  recolhido: boolean;
   openKeys: string[];
   onOpenChange: (keys: string[]) => void;
   onItemClick?: () => void;
   children: React.ReactNode;
 }
 
-function SidebarMenu({ openKeys, onOpenChange, onItemClick, children }: SidebarMenuProps): JSX.Element {
+function SidebarMenu({ recolhido, openKeys, onOpenChange, onItemClick, children }: SidebarMenuProps): JSX.Element {
   const selectedKey = useSelectedMenuKey();
 
   useEffect(() => {
     const parentKey = MENU_KEY_TO_PARENT[selectedKey];
-    if (parentKey && !openKeys.includes(parentKey)) {
+    if (parentKey && !recolhido && !openKeys.includes(parentKey)) {
       onOpenChange([parentKey]);
     }
   }, [selectedKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -174,7 +177,7 @@ interface AppSidebarProps {
   policies: readonly string[];
   gcalErrorCount: number;
   unreadNotifications: number;
-  isMobile: boolean;
+  modo: ModoSidebar;
   sidebarCollapsed: boolean;
   toggleSidebar: () => void;
   colors: {
@@ -188,12 +191,14 @@ export function AppSidebar({
   policies,
   gcalErrorCount,
   unreadNotifications,
-  isMobile,
+  modo,
   sidebarCollapsed,
   toggleSidebar,
   colors,
 }: AppSidebarProps): JSX.Element {
   const { openKeys, onOpenChange, closeAllSubmenus } = useMenuOpenKeys();
+  // Abaixo de 1280 px a sidebar aberta fica POR CIMA do conteúdo (fundo escuro fecha).
+  const sobrepondo = modo !== 'aberta' && !sidebarCollapsed;
 
   // #1270 (RBAC 3.2): os itens de menu derivam de `useCapabilities` (policy pura,
   // fonte de verdade do backend). As flags legacy de organograma permanecem SÓ onde
@@ -208,8 +213,8 @@ export function AppSidebar({
 
   return (
     <>
-      {/* Overlay para fechar sidebar em mobile */}
-      {isMobile && !sidebarCollapsed && (
+      {/* Fundo escuro que fecha a sidebar aberta por cima do conteúdo */}
+      {sobrepondo && (
         <div
           className="mobile-sidebar-overlay"
           onClick={toggleSidebar}
@@ -227,13 +232,13 @@ export function AppSidebar({
       )}
       <Sider
         width={LAYOUT.SIDEBAR_WIDTH}
-        collapsedWidth={isMobile ? 0 : LAYOUT.SIDEBAR_COLLAPSED_WIDTH}
+        collapsedWidth={modo === 'sobreposta' ? 0 : LAYOUT.SIDEBAR_COLLAPSED_WIDTH}
         collapsed={sidebarCollapsed}
         collapsible
         trigger={null}
         role="navigation"
         aria-label="Navegacao principal"
-        className={isMobile && !sidebarCollapsed ? 'mobile-sidebar-open' : ''}
+        className={sobrepondo ? 'mobile-sidebar-open' : ''}
         style={{
           overflow: 'auto',
           height: '100vh',
@@ -242,7 +247,7 @@ export function AppSidebar({
           top: 0,
           bottom: 0,
           background: colors.sidebarBackground,
-          zIndex: isMobile ? 1000 : 1,
+          zIndex: sobrepondo ? 1000 : 1,
           transition: 'all 0.2s ease',
         }}
       >
@@ -256,15 +261,23 @@ export function AppSidebar({
             borderBottom: `1px solid ${colors.borderLight}`,
           }}
         >
-          Aprender Sistema
+          {sidebarCollapsed && modo === 'recolhida' ? (
+            <>
+              <span aria-hidden="true">AS</span>
+              <span className="sr-only">Aprender Sistema</span>
+            </>
+          ) : (
+            'Aprender Sistema'
+          )}
         </header>
 
-        {!(isMobile && sidebarCollapsed) && (
+        {!(modo === 'sobreposta' && sidebarCollapsed) && (
           <SidebarMenu
+            recolhido={sidebarCollapsed}
             openKeys={openKeys}
             onOpenChange={onOpenChange}
             onItemClick={() => {
-              if (isMobile) {
+              if (sobrepondo) {
                 toggleSidebar();
                 closeAllSubmenus();
               }

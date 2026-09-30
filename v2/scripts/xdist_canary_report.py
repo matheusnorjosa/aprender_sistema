@@ -15,6 +15,7 @@ from typing import Dict, List, Set
 from xml.etree import ElementTree
 
 FAILED_LINE_RE = re.compile(r"^FAILED\s+(?P<test>\S+)")
+MAIN_REF = "refs/heads/main"
 SIGNATURE_PATTERNS = [
     re.compile(r"SessionInterrupted:[^\n]*"),
     re.compile(r"INTERNALERROR[^\n]*"),
@@ -41,6 +42,7 @@ class CanaryRun:
     duration_seconds: int
     failure_events: List[FailureEvent]
     runtime_signatures: List[str]
+    has_metadata: bool
 
 
 def parse_args() -> argparse.Namespace:
@@ -52,6 +54,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--output-json", required=True, help="Path to output JSON report")
     parser.add_argument("--output-md", required=True, help="Path to output Markdown report")
+    # Decisao do alerta (issue do canary). Passe como --opcao=valor: extra_pytest_args
+    # costuma comecar com "-" (ex.: "-k teste") e o argparse o leria como outra opcao.
+    parser.add_argument("--ref", required=True, help="github.ref do run (so refs/heads/main conta)")
+    parser.add_argument("--extra-pytest-args", default="", help="Input extra_pytest_args do dispatch")
+    parser.add_argument(
+        "--expected-cells", type=int, required=True, help="Numero de celulas da matriz do workflow"
+    )
     return parser.parse_args()
 
 
@@ -69,6 +78,22 @@ def safe_read_text(path: Path) -> str:
     if not path.exists():
         return ""
     return path.read_text(encoding="utf-8", errors="replace")
+
+
+def junit_id_from_log(test_id: str) -> str:
+    """Converte o nodeid do log (`apps/x/test_a.py::Classe::teste[p]`) para o id do junit.
+
+    Espelha o `mangle_test_address` do pytest: `apps.x.test_a.Classe::teste[p]`. Sem isso
+    as duas formas nunca coincidiam e cada falha era contada duas vezes.
+    """
+    path, sep, rest = test_id.partition("::")
+    if not sep or not path.endswith(".py"):
+        return test_id
+    base, bracket, params = rest.partition("[")
+    names = base.split("::")
+    module = path[: -len(".py")].replace("/", ".")
+    classname = ".".join([module, *names[:-1]])
+    return f"{classname}::{names[-1]}{bracket}{params}"
 
 
 def parse_junit(path: Path) -> List[FailureEvent]:
@@ -137,6 +162,9 @@ def collect_runs(artifacts_dir: Path) -> List[CanaryRun]:
 
     for artifact_path in sorted([item for item in artifacts_dir.iterdir() if item.is_dir()]):
         metadata = load_metadata(artifact_path / "xdist-canary-metadata.json")
+        # Sem metadata o exit_code e desconhecido: o 0 abaixo e so para a tabela; a
+        # celula conta como "nao mediu" em classify_alert.
+        has_metadata = "exit_code" in metadata
         workers = str(metadata.get("workers", "unknown"))
         dist = str(metadata.get("dist", "unknown"))
         exit_code = int(metadata.get("exit_code", 0))
@@ -146,7 +174,7 @@ def collect_runs(artifacts_dir: Path) -> List[CanaryRun]:
         log_failed_tests, log_signatures = parse_log(artifact_path / "xdist-canary-pytest.log")
 
         merged_events: Dict[str, FailureEvent] = {event.test_id: event for event in junit_events}
-        for test_id in sorted(log_failed_tests):
+        for test_id in sorted(junit_id_from_log(item) for item in log_failed_tests):
             merged_events.setdefault(
                 test_id,
                 FailureEvent(
@@ -172,6 +200,7 @@ def collect_runs(artifacts_dir: Path) -> List[CanaryRun]:
                 duration_seconds=duration_seconds,
                 failure_events=sorted(merged_events.values(), key=lambda item: item.test_id),
                 runtime_signatures=sorted(runtime_signatures),
+                has_metadata=has_metadata,
             )
         )
 
@@ -247,6 +276,43 @@ def build_payload(runs: List[CanaryRun]) -> dict:
     }
 
 
+def classify_alert(
+    runs: List[CanaryRun], runs_with_failures: int, *, ref: str, extra_pytest_args: str, expected_cells: int
+) -> dict:
+    """Decide o que o workflow faz com a issue do canary (marcador as-xdist-canary).
+
+    Nao poder medir nao e aprovar: so um run COMPLETO E LIMPO fecha a issue. Run nao
+    oficial (outro ref ou suite filtrada) nunca toca na issue da main: o resultado fica so
+    no summary (verde se limpo, vermelho se falhou ou nao mediu).
+    """
+    nao_oficial: List[str] = []
+    if ref != MAIN_REF:
+        nao_oficial.append(f"ref `{ref or '(vazio)'}`: so `{MAIN_REF}` conta")
+    if extra_pytest_args.strip():
+        nao_oficial.append(f"extra_pytest_args `{extra_pytest_args.strip()}`: suite filtrada")
+    medicao: List[str] = []
+    if len(runs) != expected_cells:
+        medicao.append(f"{len(runs)} de {expected_cells} celulas com artefato")
+    sem_metadata = [run.artifact_name for run in runs if not run.has_metadata]
+    if sem_metadata:
+        medicao.append(f"celulas sem metadata (exit desconhecido): {', '.join(sem_metadata)}")
+
+    if runs_with_failures:
+        estado = "falha"
+    elif medicao:
+        estado = "nao_mediu"
+    else:
+        estado = "limpo"
+
+    if nao_oficial:
+        acao = "so_resumo"
+    elif estado == "limpo":
+        acao = "fechar"
+    else:
+        acao = "abrir_ou_comentar"
+    return {"estado": estado, "acao": acao, "motivos": nao_oficial + medicao, "celulas_esperadas": expected_cells}
+
+
 def write_json(path: Path, payload: dict) -> None:
     if path.parent:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -266,6 +332,14 @@ def write_markdown(path: Path, payload: dict) -> None:
     lines.append(f"- Matrix runs: `{payload['runs_total']}`")
     lines.append(f"- Runs with failures: `{payload['runs_with_failures']}`")
     lines.append(f"- Runs without failures: `{payload['runs_without_failures']}`")
+    lines.append("")
+
+    alerta = payload["alerta"]
+    lines.append("## Alerta")
+    lines.append("")
+    lines.append(f"- Estado: `{alerta['estado']}` (acao na issue: `{alerta['acao']}`)")
+    for motivo in alerta["motivos"]:
+        lines.append(f"- Nao conta como run completo e limpo: {motivo}")
     lines.append("")
 
     lines.append("## Matrix results")
@@ -322,6 +396,13 @@ def main() -> int:
 
     runs = collect_runs(artifacts_dir)
     payload = build_payload(runs)
+    payload["alerta"] = classify_alert(
+        runs,
+        payload["runs_with_failures"],
+        ref=args.ref,
+        extra_pytest_args=args.extra_pytest_args,
+        expected_cells=args.expected_cells,
+    )
 
     write_json(output_json, payload)
     write_markdown(output_md, payload)

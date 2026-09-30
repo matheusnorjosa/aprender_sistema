@@ -70,7 +70,7 @@ class TestFamiliaCorrigida:
     """FAMILIA_CORRIGIDA: seta Projeto.projeto_geral para a família declarada (`para`)."""
 
     def test_apply_repoints_projeto_geral(self, tmp_path):
-        pg_certo = ProjetoGeral.objects.create(nome="ED FINANCEIRA")
+        pg_certo, _ = ProjetoGeral.objects.get_or_create(nome="ED FINANCEIRA")  # a 0045 já semeia
         pg_fantasma = ProjetoGeral.objects.create(nome="EDUCAÇÃO FINANCEIRA")
         proj = Projeto.objects.create(nome="EDUCAÇÃO FINANCEIRA LIVRO 1", projeto_geral=pg_fantasma)
 
@@ -95,7 +95,7 @@ class TestFamiliaCorrigida:
         assert rep["applied"]["FAMILIA_CORRIGIDA"] == 1
 
     def test_dry_run_does_not_write(self, tmp_path):
-        pg_certo = ProjetoGeral.objects.create(nome="ED FINANCEIRA")
+        pg_certo, _ = ProjetoGeral.objects.get_or_create(nome="ED FINANCEIRA")  # a 0045 já semeia
         pg_fantasma = ProjetoGeral.objects.create(nome="EDUCAÇÃO FINANCEIRA")
         proj = Projeto.objects.create(nome="EDUCAÇÃO FINANCEIRA LIVRO 1", projeto_geral=pg_fantasma)
 
@@ -140,7 +140,7 @@ class TestFamiliaCorrigida:
         assert proj.projeto_geral_id is None
 
     def test_idempotente_noop_se_ja_certo(self, tmp_path):
-        pg_certo = ProjetoGeral.objects.create(nome="ED FINANCEIRA")
+        pg_certo, _ = ProjetoGeral.objects.get_or_create(nome="ED FINANCEIRA")  # a 0045 já semeia
         Projeto.objects.create(nome="EDUCAÇÃO FINANCEIRA LIVRO 1", projeto_geral=pg_certo)
 
         path = _write_reconcile(
@@ -160,7 +160,7 @@ class TestFamiliaCorrigida:
         assert rep["noop"]["FAMILIA_CORRIGIDA"] == 1
 
     def test_allowlist_gate_bloqueia_sem_permissao(self, tmp_path):
-        pg_certo = ProjetoGeral.objects.create(nome="ED FINANCEIRA")
+        pg_certo, _ = ProjetoGeral.objects.get_or_create(nome="ED FINANCEIRA")  # a 0045 já semeia
         pg_fantasma = ProjetoGeral.objects.create(nome="EDUCAÇÃO FINANCEIRA")
         proj = Projeto.objects.create(nome="EDUCAÇÃO FINANCEIRA LIVRO 1", projeto_geral=pg_fantasma)
 

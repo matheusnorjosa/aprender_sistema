@@ -10,7 +10,28 @@ from django.core.management import call_command
 
 import pytest
 
-from apps.core.models import Compra, DATCompra, Municipio, PermissaoFuncional, Projeto, Usuario
+from apps.core.models import (
+    AcaoInstancia,
+    AvailabilityBlock,
+    Compra,
+    DATAcao,
+    DATCadastro,
+    DATCompra,
+    DATRegistro,
+    Deslocamento,
+    Gerencia,
+    Municipio,
+    NotificacaoInterna,
+    Participation,
+    PermissaoFuncional,
+    PlanoFormacoes,
+    Produto,
+    Projeto,
+    ProjetoGeral,
+    Solicitacao,
+    TipoEvento,
+    Usuario,
+)
 
 SEED_EXTERNAL_HASH = "9" * 64
 SEED_COMPRA_CODE = "MATRIX-PEND-001"
@@ -92,3 +113,127 @@ class TestSeedFrontendContractDataCommand:
         assert PermissaoFuncional.objects.get(codename="view_compras_dashboard").groups.filter(name="DAT").exists()
 
         assert Usuario.objects.filter(username=SEED_CONTROLE_USERNAME).exists()
+
+
+# Programa C (C0): a medição "sem rolagem horizontal" precisa de linhas com texto longo
+# em toda tabela — tabela vazia nunca estoura largura e daria falso verde.
+TEXTO_LONGO_MIN = 80
+
+
+def _maior_texto(valores) -> int:
+    return max((len(v or "") for v in valores), default=0)
+
+
+@pytest.mark.django_db
+class TestSeedFrontendContractDataTextosLongos:
+    """Cada campo que aparece em tabela tem uma linha com 80+ caracteres, visível ao perfil que mede a tela."""
+
+    @pytest.fixture(autouse=True)
+    def _seed(self, clean_contract_seed_state):
+        _run_seed_command()
+
+    def test_superusuario_das_rotas_sem_grupo_existe(self):
+        admin = Usuario.objects.get(username="admin_matrix@test.com")
+        assert admin.is_superuser
+        assert admin.check_password("testpass123")
+
+    @pytest.mark.parametrize(
+        ("rotulo", "valores"),
+        [
+            ("Municipio.nome", lambda: Municipio.objects.values_list("nome", flat=True)),
+            ("Projeto.nome", lambda: Projeto.objects.values_list("nome", flat=True)),
+            ("ProjetoGeral.nome", lambda: ProjetoGeral.objects.values_list("nome", flat=True)),
+            ("Produto.nome", lambda: Produto.objects.values_list("nome", flat=True)),
+            ("TipoEvento.nome", lambda: TipoEvento.objects.values_list("nome", flat=True)),
+            ("Gerencia.nome_setor", lambda: Gerencia.objects.values_list("nome_setor", flat=True)),
+            (
+                "Usuario nome completo",
+                lambda: [f"{u.first_name} {u.last_name}" for u in Usuario.objects.filter(is_superuser=False)],
+            ),
+            ("Usuario.cargo", lambda: Usuario.objects.values_list("cargo", flat=True)),
+            (
+                "Compra pendente (município)",
+                lambda: Compra.objects.values_list("municipio__nome", flat=True),
+            ),
+            (
+                "DATCompra com Produto (coluna Produto)",
+                lambda: DATCompra.objects.filter(produto__isnull=False).values_list("produto__nome", flat=True),
+            ),
+            (
+                "Solicitação pendente SUPER de coord_vidas (Minhas, Aprovações, Editar)",
+                lambda: Solicitacao.objects.filter(
+                    usuario__username="coord_vidas@test.com", status="pendente", projeto__fluxo="SUPER"
+                ).values_list("encontro", flat=True),
+            ),
+            (
+                "Solicitação aprovada com coord_vidas participando (Meus eventos)",
+                lambda: Solicitacao.objects.filter(
+                    status="aprovado", participations__usuario__username="coord_vidas@test.com"
+                ).values_list("local", flat=True),
+            ),
+            (
+                "Formador com usuário numa aprovada (Grade, Equipe)",
+                lambda: [
+                    f"{p.usuario.first_name} {p.usuario.last_name}"
+                    for p in Participation.objects.filter(
+                        role="FORMADOR", usuario__isnull=False, solicitacao__status="aprovado"
+                    ).select_related("usuario")
+                ],
+            ),
+            (
+                "Bloqueio de coord_vidas (motivo)",
+                lambda: AvailabilityBlock.objects.filter(usuario__username="coord_vidas@test.com").values_list(
+                    "motivo", flat=True
+                ),
+            ),
+            ("Deslocamento.origem", lambda: Deslocamento.objects.values_list("origem", flat=True)),
+            (
+                "DATAcao com coordenador",
+                lambda: DATAcao.objects.filter(coordenador__isnull=False).values_list("coordenador__nome", flat=True),
+            ),
+            (
+                "PlanoFormacoes com coordenador",
+                lambda: [
+                    f"{u.first_name} {u.last_name}"
+                    for plano in PlanoFormacoes.objects.all()
+                    for u in plano.coordenadores.all()
+                ],
+            ),
+            (
+                "DATCadastro FORMAR (aba padrão)",
+                lambda: DATCadastro.objects.filter(plataforma="FORMAR").values_list("municipio__nome", flat=True),
+            ),
+            ("DATRegistro.obs_formar", lambda: DATRegistro.objects.values_list("obs_formar", flat=True)),
+            (
+                "Ação do ciclo (template)",
+                lambda: AcaoInstancia.objects.values_list("template__nome", flat=True),
+            ),
+            (
+                "Notificação interna do superusuário",
+                lambda: NotificacaoInterna.objects.filter(destinatario__username="admin_matrix@test.com").values_list(
+                    "titulo", flat=True
+                ),
+            ),
+        ],
+    )
+    def test_campo_de_tabela_tem_texto_longo(self, rotulo, valores):
+        assert _maior_texto(valores()) >= TEXTO_LONGO_MIN, f"{rotulo}: nenhuma linha com {TEXTO_LONGO_MIN}+ caracteres"
+
+    def test_aprovada_futura_para_publicacao_e_dashboards(self):
+        """Publicação lista aprovadas com início >= hoje; dashboards olham hoje±30."""
+        from django.utils import timezone
+
+        hoje = timezone.localdate()
+        assert Solicitacao.objects.filter(status="aprovado", inicio__date__gte=hoje).exists()
+
+    def test_municipio_longo_tem_coordenadas_para_a_lista_do_mapa(self):
+        """O Mapa (vista Lista) só mostra município com latitude e longitude."""
+        municipio = Municipio.objects.get(nome__startswith="Aaa ", uf="BA")
+        assert municipio.latitude is not None
+        assert municipio.longitude is not None
+
+    def test_matrizopolis_segue_pendente_no_dashboard(self):
+        """O contrato funcional espera Matrizopolis nas pendências (sem solicitação ativa)."""
+        assert not Solicitacao.objects.filter(
+            municipio__nome="Matrizopolis", status__in=["pendente", "aprovado"]
+        ).exists()

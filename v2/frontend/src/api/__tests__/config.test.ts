@@ -11,7 +11,14 @@ import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { server } from '../../test/mocks/server'
 import { apiUrl } from '../../test/mocks/handlers'
-import { fetchAPI, getCsrfToken, clearCsrfCache, buildUrl } from '../config'
+import {
+  fetchAPI,
+  fetchBlob,
+  getCsrfToken,
+  clearCsrfCache,
+  buildUrl,
+  SERVIDOR_RESPONDEU,
+} from '../config'
 
 // Helper para limpar cookies
 function clearAllCookies() {
@@ -162,6 +169,43 @@ describe('API Config', () => {
       dispatchSpy.mockRestore()
     })
 
+    // Auditoria UX 30/09, rodada 2: SessionAuthentication não manda WWW-Authenticate, então
+    // o DRF responde 403 (não 401) sem sessão. O `code` NOT_AUTHENTICATED distingue esse 403
+    // do de falta de permissão (PERMISSION_DENIED), que não é sessão expirada.
+    test('emite "auth:expired" em 403 com code NOT_AUTHENTICATED (DRF sem sessão)', async () => {
+      const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
+      server.use(
+        http.get(apiUrl('/sem-sessao/'), () =>
+          HttpResponse.json(
+            { code: 'NOT_AUTHENTICATED', detail: 'As credenciais de autenticação não foram fornecidas.' },
+            { status: 403 },
+          ),
+        ),
+      )
+
+      await expect(fetchAPI('/sem-sessao/')).rejects.toThrow('As credenciais de autenticação não foram fornecidas.')
+
+      expect(authExpiredFired(dispatchSpy)).toBe(true)
+      dispatchSpy.mockRestore()
+    })
+
+    test('NÃO emite "auth:expired" em 403 com code PERMISSION_DENIED', async () => {
+      const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
+      server.use(
+        http.get(apiUrl('/sem-permissao/'), () =>
+          HttpResponse.json(
+            { code: 'PERMISSION_DENIED', detail: 'Você não tem permissão para executar essa ação.' },
+            { status: 403 },
+          ),
+        ),
+      )
+
+      await expect(fetchAPI('/sem-permissao/')).rejects.toThrow()
+
+      expect(authExpiredFired(dispatchSpy)).toBe(false)
+      dispatchSpy.mockRestore()
+    })
+
     test('NÃO emite "auth:expired" em resposta 200 de sucesso', async () => {
       const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
       server.use(
@@ -172,6 +216,131 @@ describe('API Config', () => {
 
       expect(authExpiredFired(dispatchSpy)).toBe(false)
       dispatchSpy.mockRestore()
+    })
+  })
+
+  // ============================================================================
+  // SERVIDOR_RESPONDEU: o monitor de sessão conta a inatividade da última resposta do servidor
+  // (o Django renova a sessão em todo request que atende). Rodada 5: a resposta que diz que não
+  // há sessão não renovou nada e não conta; antes, o 403 da pergunta de uma aba recomeçava o
+  // relógio das outras, que só iam ao login 2 h depois.
+  // ============================================================================
+
+  describe('fetchAPI — SERVIDOR_RESPONDEU', () => {
+    function respondeu(spy: { mock: { calls: Array<[Event]> } }): boolean {
+      return spy.mock.calls.some(([event]) => event.type === SERVIDOR_RESPONDEU)
+    }
+
+    test.each([
+      ['200', () => HttpResponse.json({ ok: true })],
+      ['400 de validação', () => HttpResponse.json({ campo: ['Obrigatório.'] }, { status: 400 })],
+      ['403 PERMISSION_DENIED (a sessão existe)', () => HttpResponse.json({ code: 'PERMISSION_DENIED' }, { status: 403 })],
+    ])('resposta %s: avisa', async (_nome, resposta) => {
+      const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
+      server.use(http.get(apiUrl('/avisa/'), resposta))
+
+      await fetchAPI('/avisa/').catch(() => undefined)
+
+      expect(respondeu(dispatchSpy)).toBe(true)
+      dispatchSpy.mockRestore()
+    })
+
+    test.each([
+      ['401', () => new HttpResponse(null, { status: 401 })],
+      ['403 NOT_AUTHENTICATED', () => HttpResponse.json({ code: 'NOT_AUTHENTICATED', detail: 'Sem sessão.' }, { status: 403 })],
+    ])('resposta %s (sem sessão): não avisa', async (_nome, resposta) => {
+      const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
+      server.use(http.get(apiUrl('/sem-sessao/'), resposta))
+
+      await expect(fetchAPI('/sem-sessao/')).rejects.toThrow()
+
+      expect(respondeu(dispatchSpy)).toBe(false)
+      dispatchSpy.mockRestore()
+    })
+  })
+
+  // ============================================================================
+  // Falha de rede (auditoria UX 30/09, rodada 3): sem rede, "Continuar logado" dizia
+  // "CSRF token ausente. Faça login novamente." e os avisos de carga, "Failed to fetch".
+  // ============================================================================
+
+  describe('fetchAPI — sem conexão', () => {
+    /** Resposta que o service worker (public/sw.js) devolve no lugar do fetch que falhou. */
+    const offlineDoServiceWorker = () =>
+      HttpResponse.json(
+        { error: { code: 'OFFLINE', message: 'Voce esta offline. Verifique sua conexao.' } },
+        { status: 503 },
+      )
+
+    beforeEach(() => {
+      clearCsrfCache()
+    })
+
+    test('POST sem rede ao buscar o token CSRF: "Sem conexão com o servidor.", não erro de CSRF', async () => {
+      server.use(http.get(apiUrl('/csrf/'), () => HttpResponse.error()))
+
+      await expect(fetchAPI('/auth/ping/', { method: 'POST' })).rejects.toThrow('Sem conexão com o servidor.')
+    })
+
+    test('POST com o /csrf/ respondido pelo service worker offline: "Sem conexão com o servidor."', async () => {
+      server.use(http.get(apiUrl('/csrf/'), offlineDoServiceWorker))
+
+      await expect(fetchAPI('/auth/ping/', { method: 'POST' })).rejects.toThrow('Sem conexão com o servidor.')
+    })
+
+    test('GET sem rede: TypeError em português (não "Failed to fetch")', async () => {
+      server.use(http.get(apiUrl('/config/'), () => HttpResponse.error()))
+
+      const erro: unknown = await fetchAPI('/config/').catch((e: unknown) => e)
+
+      expect(erro).toBeInstanceOf(TypeError)
+      expect((erro as Error).message).toBe('Sem conexão com o servidor.')
+    })
+
+    test('GET respondido pelo service worker offline: "Sem conexão com o servidor." (não "Erro 503")', async () => {
+      server.use(http.get(apiUrl('/config/'), offlineDoServiceWorker))
+
+      await expect(fetchAPI('/config/')).rejects.toThrow('Sem conexão com o servidor.')
+    })
+
+    test('503 do servidor (não do service worker) mantém a mensagem do servidor', async () => {
+      server.use(
+        http.get(apiUrl('/config/'), () => HttpResponse.json({ detail: 'Manutenção.' }, { status: 503 })),
+      )
+
+      await expect(fetchAPI('/config/')).rejects.toThrow('Manutenção.')
+    })
+
+    // Rodada 4 (BAIXA): o download dos exports (fetchBlob) usava o fetch cru e dizia
+    // "Failed to fetch" ou "Export failed: HTTP 503".
+    test('fetchBlob, controle: com rede, devolve o arquivo', async () => {
+      server.use(http.get(apiUrl('/dat/compras/export/'), () => new HttpResponse('a;b', { status: 200 })))
+
+      const blob = await fetchBlob('/dat/compras/export/')
+
+      expect(blob.size).toBe(3)
+    })
+
+    test('fetchBlob sem rede: "Sem conexão com o servidor."', async () => {
+      server.use(http.get(apiUrl('/dat/compras/export/'), () => HttpResponse.error()))
+
+      await expect(fetchBlob('/dat/compras/export/')).rejects.toThrow('Sem conexão com o servidor.')
+    })
+
+    test('fetchBlob com a resposta OFFLINE do service worker: "Sem conexão com o servidor."', async () => {
+      server.use(http.get(apiUrl('/dat/compras/export/'), offlineDoServiceWorker))
+
+      await expect(fetchBlob('/dat/compras/export/')).rejects.toThrow('Sem conexão com o servidor.')
+    })
+
+    test('request cancelado (AbortError) passa como veio, sem virar "sem conexão"', async () => {
+      server.use(http.get(apiUrl('/config/'), () => HttpResponse.json({ ok: true })))
+      const controle = new AbortController()
+      controle.abort()
+
+      const erro: unknown = await fetchAPI('/config/', { signal: controle.signal }).catch((e: unknown) => e)
+
+      expect((erro as Error).name).toBe('AbortError')
     })
   })
 

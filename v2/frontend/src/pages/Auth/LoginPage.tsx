@@ -7,12 +7,13 @@
  * - Campos minimalistas
  */
 
-import { useState, type JSX } from 'react';
-import { Form, Input, Button, message } from 'antd';
+import { useEffect, useState, type JSX } from 'react';
+import { Form, Input, Button, message, Alert } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { login } from '../../api/auth';
 import logoLogin from '../../assets/logo-login.webp';
 import logger from '../../utils/logger';
+import { apagarAvisoDoLogin, lerAvisoDoLogin } from '../../utils/storage';
 import { BRAND_COLORS } from '../../contexts/ThemeContext';
 // Aviso LGPD ocultado temporariamente ate o juridico preencher a base legal e o Encarregado (DPO)
 // em AvisoTransparenciaLGPD (placeholders [A PREENCHER]). Reativar: descomentar este import e o uso abaixo.
@@ -35,6 +36,12 @@ export interface LoginPageProps {
 
 export default function LoginPage({ onLoginSuccess }: LoginPageProps): JSX.Element {
   const [loading, setLoading] = useState(false);
+  // Motivo guardado pelo App antes do reload (ex.: "Sua sessão expirou por inatividade").
+  // Lido uma vez e apagado, para não reaparecer no próximo login.
+  const [aviso] = useState(lerAvisoDoLogin);
+  useEffect(() => {
+    apagarAvisoDoLogin();
+  }, []);
 
   const handleSubmit = async (values: LoginFormValues): Promise<void> => {
     setLoading(true);
@@ -96,6 +103,8 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps): JSX.Eleme
         }}>
           Login
         </h1>
+
+        {aviso && <Alert type="warning" showIcon message={aviso} style={{ marginBottom: '24px' }} />}
 
         <Form
           name="login"

@@ -7,8 +7,9 @@
  * - Aparece automaticamente quando timeLeft < 300s
  * - Mostra countdown em tempo real
  * - Botões:
- *   - "Continuar logado": Renova sessão via /api/auth/ping/
- *   - "Sair agora": Logout imediato
+ *   - "Continuar logado": Renova sessão via /api/auth/ping/ (loading enquanto renova; se
+ *     falhar por rede/5xx, o aviso continua e mostra o motivo — renewError)
+ *   - "Sair agora": Logout imediato pelo mesmo caminho do "Sair" do cabeçalho (onLogout)
  *
  * Uso:
  * ```tsx
@@ -16,11 +17,11 @@
  * import SessionExpiryWarning from '../components/SessionExpiryWarning';
  *
  * function App() {
- *   const session = useSessionMonitor();
+ *   const session = useSessionMonitor(handleLogout);
  *
  *   return (
  *     <>
- *       <SessionExpiryWarning {...session} />
+ *       <SessionExpiryWarning {...session} onLogout={handleLogout} />
  *       {/ * resto da aplicação * /}
  *     </>
  *   );
@@ -33,11 +34,9 @@
  * - PA-06: Controle explícito (ISO 9241-110)
  */
 
-import { Modal, Button, Space, Typography } from 'antd';
+import { useState, type JSX } from 'react';
+import { Modal, Button, Space, Typography, Alert } from 'antd';
 import { ClockCircleOutlined, LogoutOutlined, CheckCircleOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router';
-
-import type { JSX } from "react";
 
 const { Text, Title } = Typography;
 
@@ -48,10 +47,14 @@ export interface SessionExpiryWarningProps {
   showWarning: boolean;
   timeLeft: number;
   renewSession: () => Promise<boolean>;
+  /** Motivo da última falha ao renovar (rede/5xx); null quando não há. */
+  renewError: string | null;
+  /** Logout real do App (API de logout + limpa caches + tela de login). */
+  onLogout: () => void;
 }
 
-export function SessionExpiryWarning({ showWarning, timeLeft, renewSession }: SessionExpiryWarningProps): JSX.Element {
-  const navigate = useNavigate();
+export function SessionExpiryWarning({ showWarning, timeLeft, renewSession, renewError, onLogout }: SessionExpiryWarningProps): JSX.Element {
+  const [renovando, setRenovando] = useState(false);
 
   /**
    * Formata tempo restante em MM:SS.
@@ -63,21 +66,16 @@ export function SessionExpiryWarning({ showWarning, timeLeft, renewSession }: Se
   };
 
   /**
-   * Handler para renovar sessão.
+   * Handler para renovar sessão. Sessão já encerrada no servidor (401/403) é tratada pelo
+   * useSessionMonitor (o App leva ao login); rede/5xx volta em renewError.
    */
   const handleRenew = async (): Promise<void> => {
-    const success = await renewSession();
-    if (!success) {
-      // Se falhar, redirecionar para login
-      void navigate('/login');
+    setRenovando(true);
+    try {
+      await renewSession();
+    } finally {
+      setRenovando(false);
     }
-  };
-
-  /**
-   * Handler para logout imediato.
-   */
-  const handleLogout = (): void => {
-    void navigate('/logout');
   };
 
   return (
@@ -122,11 +120,21 @@ export function SessionExpiryWarning({ showWarning, timeLeft, renewSession }: Se
           </Text>
         </div>
 
+        {renewError && (
+          <Alert
+            type="error"
+            showIcon
+            message="Não foi possível renovar a sessão"
+            description={renewError}
+          />
+        )}
+
         <Space direction="vertical" size="small" style={{ width: '100%' }}>
           <Button
             type="primary"
             icon={<CheckCircleOutlined />}
             onClick={handleRenew}
+            loading={renovando}
             block
             size="large"
           >
@@ -136,7 +144,7 @@ export function SessionExpiryWarning({ showWarning, timeLeft, renewSession }: Se
           <Button
             danger
             icon={<LogoutOutlined />}
-            onClick={handleLogout}
+            onClick={onLogout}
             block
           >
             Sair agora

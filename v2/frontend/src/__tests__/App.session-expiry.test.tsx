@@ -9,18 +9,24 @@
  *
  * Estratégia: os filhos pesados (sidebar/header/rotas/login) são stubados para
  * isolar a máquina de estados de auth do App e o novo listener `auth:expired`.
+ *
+ * Auditoria UX 30/09, rodada 2: o backend responde 403 (não 401) sem sessão, e 403 também
+ * é falta de permissão. Antes de tirar alguém do sistema, o App pergunta ao servidor
+ * (`GET /api/me/`): sem sessão → login com o motivo, sem POST de logout; sessão viva →
+ * fica onde está.
  */
 
 import { render, screen, waitFor, act } from '@testing-library/react';
-import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { CurrentUser } from '../types';
+import { apagarAvisoDoLogin, lerAvisoDoLogin } from '../utils/storage';
 
-const getMeMock = vi.hoisted(() => vi.fn());
+const { getMeMock, apiLogoutMock } = vi.hoisted(() => ({ getMeMock: vi.fn(), apiLogoutMock: vi.fn() }));
 
 // Camada de dados
 vi.mock('../api/availability', () => ({ getMe: getMeMock }));
 vi.mock('../api/me', () => ({ getMyPolicies: vi.fn().mockResolvedValue([]) }));
-vi.mock('../api/auth', () => ({ logout: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('../api/auth', () => ({ logout: apiLogoutMock }));
 
 // Filhos pesados → stubs
 vi.mock('../components/AppSidebar', () => ({ AppSidebar: () => <div>SIDEBAR</div> }));
@@ -66,13 +72,27 @@ const fakeUser: CurrentUser = {
   permissions: [],
 };
 
+const locationOriginal = window.location;
+const reloadMock = vi.fn();
+
 describe('App — sessão expirada global (Issue #1376)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...locationOriginal, reload: reloadMock },
+    });
   });
 
-  test('usuário logado volta ao login quando auth:expired dispara (401 global)', async () => {
-    getMeMock.mockResolvedValue(fakeUser);
+  afterEach(() => {
+    Object.defineProperty(window, 'location', { configurable: true, value: locationOriginal });
+    apagarAvisoDoLogin();
+  });
+
+  test('auth:expired e o servidor confirma que não há sessão: login com o motivo, sem POST de logout', async () => {
+    getMeMock
+      .mockResolvedValueOnce(fakeUser)
+      .mockRejectedValue({ status: 403, response: { status: 403, data: { code: 'NOT_AUTHENTICATED' } } });
 
     render(<App />);
 
@@ -93,9 +113,28 @@ describe('App — sessão expirada global (Issue #1376)', () => {
       window.dispatchEvent(new Event('auth:expired'));
     });
 
-    // Tratamento global: sessão limpa → tela de login.
-    await screen.findByText('LOGIN_PAGE');
-    expect(screen.queryByTestId('app-routes')).not.toBeInTheDocument();
+    // Pergunta ao servidor (GET /api/me/) e, sem sessão, recarrega para o login com o motivo.
+    await waitFor(() => expect(reloadMock).toHaveBeenCalledTimes(1));
+    expect(getMeMock).toHaveBeenCalledTimes(2);
+    expect(apiLogoutMock).not.toHaveBeenCalled();
+    expect(lerAvisoDoLogin()).toBe('Sua sessão expirou. Entre de novo.');
+  });
+
+  test('auth:expired com a sessão viva no servidor não tira a pessoa do sistema', async () => {
+    getMeMock.mockResolvedValue(fakeUser);
+
+    render(<App />);
+    await screen.findByTestId('app-routes');
+    await act(async () => {});
+
+    await act(async () => {
+      window.dispatchEvent(new Event('auth:expired'));
+    });
+
+    await waitFor(() => expect(getMeMock).toHaveBeenCalledTimes(2));
+    expect(screen.getByTestId('app-routes')).toBeInTheDocument();
+    expect(screen.queryByText('LOGIN_PAGE')).not.toBeInTheDocument();
+    expect(reloadMock).not.toHaveBeenCalled();
   });
 
   test('auth:expired antes do login NÃO causa loop (sem usuário → permanece no login)', async () => {

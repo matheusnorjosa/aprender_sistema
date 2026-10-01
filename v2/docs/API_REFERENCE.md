@@ -725,7 +725,7 @@ Registro das rotas em `v2/backend/apps/core/urls.py` (paths `options-*`). **Não
 | GET | `/api/readyz/` | ![Stable](https://img.shields.io/badge/-stable-green) | Readiness (DB + Redis) | AllowAny |
 | GET | `/api/version/` | ![Stable](https://img.shields.io/badge/-stable-green) | SHA/tag da build em execução | AllowAny |
 | GET | `/api/features/` | ![Stable](https://img.shields.io/badge/-stable-green) | Feature flags ativas | **IsAuthenticated** |
-| GET/PUT | `/api/config/` | ![Stable](https://img.shields.io/badge/-stable-green) | Configurações operacionais (leitura **e escrita**) | `manage_purchases_and_materials` \| `approve_solicitation` |
+| GET/PUT | `/api/config/` | ![Stable](https://img.shields.io/badge/-stable-green) | Configurações operacionais (leitura **e escrita**; o PUT grava só as chaves enviadas: chave ausente mantém o valor atual e chaves que o serializer não conhece ficam no JSON) | `manage_purchases_and_materials` \| `approve_solicitation` |
 
 Provas: `/healthz/` e `/healthz/detailed/` estão em `v2/backend/config/urls.py`
 (fora do `include("apps.core.urls")` do path `api/`) — `/api/healthz/` **não existe**.

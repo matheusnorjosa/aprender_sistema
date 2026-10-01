@@ -9,24 +9,20 @@
 
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, test, expect, vi, beforeEach } from 'vitest'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, useLocation } from 'react-router'
 import SessionExpiryWarning from '../SessionExpiryWarning'
 
-// Mock useNavigate
-const mockNavigate = vi.fn()
-vi.mock('react-router', async () => {
-  const actual = await vi.importActual('react-router')
-  return {
-    ...actual,
-    useNavigate: () => mockNavigate,
-  }
-})
+function OndeEstou() {
+  return <span data-testid="rota">{useLocation().pathname}</span>
+}
 
 describe('SessionExpiryWarning', () => {
   const defaultProps = {
     showWarning: true,
     timeLeft: 180, // 3 minutos
     renewSession: vi.fn(),
+    renewError: null,
+    onLogout: vi.fn(),
   }
 
   beforeEach(() => {
@@ -91,34 +87,71 @@ describe('SessionExpiryWarning', () => {
     })
   })
 
-  test('deve navegar para /login se renewSession falhar', async () => {
+  // Auditoria UX 30/09 (ALTA): /login e /logout não são rotas — a tela ficava em branco
+  // e a sessão continuava aberta. Sessão expirada é tratada pelo useSessionMonitor
+  // (logout real do App); o aviso não navega para rota nenhuma.
+  test('renewSession falho não navega para rota inexistente', async () => {
     const mockRenewSession = vi.fn().mockResolvedValue(false)
 
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={['/dat/registros']}>
         <SessionExpiryWarning {...defaultProps} renewSession={mockRenewSession} />
+        <OndeEstou />
       </MemoryRouter>
     )
 
-    const renewButton = screen.getByRole('button', { name: /Continuar logado/i })
-    fireEvent.click(renewButton)
+    fireEvent.click(screen.getByRole('button', { name: /Continuar logado/i }))
 
-    await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/login')
-    })
+    await waitFor(() => expect(mockRenewSession).toHaveBeenCalledTimes(1))
+    expect(screen.getByTestId('rota')).toHaveTextContent('/dat/registros')
   })
 
-  test('deve navegar para /logout ao clicar "Sair agora"', () => {
+  // Auditoria UX 30/09, rodada 2 (MÉDIA): "Continuar logado" com erro de rede ou 5xx era
+  // clique mudo. O botão fica em loading enquanto renova e o motivo aparece no aviso.
+  test('"Continuar logado" fica em loading enquanto renova', async () => {
+    let terminar: (ok: boolean) => void = () => {}
+    const renewSession = vi.fn(() => new Promise<boolean>((resolve) => { terminar = resolve }))
+
     render(
       <MemoryRouter>
-        <SessionExpiryWarning {...defaultProps} />
+        <SessionExpiryWarning {...defaultProps} renewSession={renewSession} />
       </MemoryRouter>
     )
 
-    const logoutButton = screen.getByRole('button', { name: /Sair agora/i })
-    fireEvent.click(logoutButton)
+    const botao = screen.getByRole('button', { name: /Continuar logado/i })
+    fireEvent.click(botao)
 
-    expect(mockNavigate).toHaveBeenCalledWith('/logout')
+    await waitFor(() => expect(botao).toHaveClass('ant-btn-loading'))
+    terminar(false)
+    await waitFor(() => expect(botao).not.toHaveClass('ant-btn-loading'))
+  })
+
+  test('renovação que falhou mostra o motivo e o aviso continua aberto', () => {
+    render(
+      <MemoryRouter>
+        <SessionExpiryWarning {...defaultProps} renewError="Sem conexão com o servidor." />
+      </MemoryRouter>
+    )
+
+    const erro = screen.getByRole('alert')
+    expect(erro).toHaveTextContent('Não foi possível renovar a sessão')
+    expect(erro).toHaveTextContent('Sem conexão com o servidor.')
+    expect(screen.getByRole('button', { name: /Continuar logado/i })).toBeInTheDocument()
+  })
+
+  test('"Sair agora" usa o logout real do App (onLogout), sem navegar para /logout', () => {
+    const onLogout = vi.fn()
+    render(
+      <MemoryRouter initialEntries={['/dat/registros']}>
+        <SessionExpiryWarning {...defaultProps} onLogout={onLogout} />
+        <OndeEstou />
+      </MemoryRouter>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Sair agora/i }))
+
+    expect(onLogout).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('rota')).toHaveTextContent('/dat/registros')
   })
 
   // ============================================================================

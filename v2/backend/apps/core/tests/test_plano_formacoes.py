@@ -645,3 +645,83 @@ class TestPlanoFormacoesDeleteProtection:
             model_name="PlanoFormacoes",
             details__plano_id=plano_id,
         ).exists()
+
+
+@pytest.mark.django_db
+class TestPlanoFormacoesAcessoControle:
+    """Decisão do dono (30/09): o Controle edita o Plano Anual (/controle/plano-formacoes).
+
+    O Controle chega por `run_daily_operations` (#1220), que o `get_permissions` do
+    ViewSet aceita em TODAS as ações menos o destroy — inclusive stats, calendário,
+    resumo e as edições inline de formação, acompanhamento e prova. A auditoria UX de
+    30/09 leu o `permission_classes` dos `@action` (só `manage_admin_registries`) e
+    concluiu que o stats barrava o Controle; esse decorator não era consultado. Estes
+    testes travam o acesso real, e que quem não o tinha continua sem.
+    """
+
+    @pytest.fixture
+    def controle(self, db):
+        return UsuarioFactory(username="controle_plano", cpf="52998224725", groups=["Controle"])
+
+    @pytest.fixture
+    def plano_com_filhos(self, client, controle):
+        client.force_login(controle)
+        mun = MunicipioFactory(nome="Mun Controle", uf="CE")
+        proj = ProjetoFactory(nome="Proj Controle", fluxo="NAO_SUPER")
+        resp = client.post(
+            "/api/dat/plano-formacoes/",
+            data={"municipio": mun.id, "projeto": proj.id, "ano": 2026},
+            content_type="application/json",
+        )
+        assert resp.status_code == 201, resp.content
+        return PlanoFormacoes.objects.get(id=resp.json()["id"])
+
+    @pytest.mark.parametrize(
+        "caminho",
+        ["", "{id}/", "stats/", "calendario/", "resumo-projeto/"],
+        ids=["list", "retrieve", "stats", "calendario", "resumo-projeto"],
+    )
+    def test_controle_le(self, client, controle, plano_com_filhos, caminho):
+        client.force_login(controle)
+        url = "/api/dat/plano-formacoes/" + caminho.format(id=plano_com_filhos.id)
+        assert client.get(url).status_code == 200
+
+    @pytest.mark.parametrize(
+        ("caminho", "corpo"),
+        [
+            ("", {"observacoes": "Controle alimentando"}),
+            ("formacao/1/", {"data_formacao": "2026-03-12", "carga_horaria": "4.00"}),
+            ("acompanhamento/primeiro/", {"data_acompanhamento": "2026-04-02", "realizado": True}),
+            ("prova/1/", {"data_prova": "2026-05-20"}),
+        ],
+        ids=["plano", "formacao", "acompanhamento", "prova"],
+    )
+    def test_controle_edita(self, client, controle, plano_com_filhos, caminho, corpo):
+        client.force_login(controle)
+        url = f"/api/dat/plano-formacoes/{plano_com_filhos.id}/{caminho}"
+        resp = client.patch(url, data=corpo, content_type="application/json")
+        assert resp.status_code == 200, resp.content
+
+    def test_controle_nao_exclui(self, client, controle, plano_com_filhos):
+        client.force_login(controle)
+        resp = client.delete(f"/api/dat/plano-formacoes/{plano_com_filhos.id}/")
+        assert resp.status_code == 403
+        assert PlanoFormacoes.objects.filter(id=plano_com_filhos.id).exists()
+
+    @pytest.mark.parametrize(
+        "grupos",
+        [["Coordenador"], ["Formador"], ["Gerente"], ["Superintendência"], ["Diretoria"], ["Vidas", "Coordenador"]],
+        ids=lambda g: "+".join(g),
+    )
+    def test_quem_nao_tinha_continua_sem(self, client, plano_com_filhos, grupos):
+        outro = UsuarioFactory(username="sem_plano", cpf="39053344705", groups=grupos)
+        client.force_login(outro)
+        base = "/api/dat/plano-formacoes/"
+        assert client.get(base).status_code == 403
+        assert client.get(base + "stats/").status_code == 403
+        resp = client.patch(
+            f"{base}{plano_com_filhos.id}/formacao/1/",
+            data={"data_formacao": "2026-03-12"},
+            content_type="application/json",
+        )
+        assert resp.status_code == 403

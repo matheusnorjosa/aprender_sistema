@@ -15,6 +15,8 @@ from typing import Any, Callable, TypeVar, cast
 
 from django.core.cache import cache
 
+from apps.core.services.config_service import parametros_disponibilidade
+
 F = TypeVar("F", bound=Callable[..., Any])
 
 # Base TTL with jitter to prevent cache stampede
@@ -40,8 +42,11 @@ def cache_availability_check(timeout: int | None = None) -> Callable[[F], F]:
     Cache key includes a per-user version counter. When user's data changes,
     the version increments and all old entries become cache misses naturally.
 
-    A chave é montada a partir destes 4 argumentos e mais nada. Por isso o wrapper
-    aceita SÓ eles: um kwarg extra mudaria o resultado sem mudar a chave, e a próxima
+    A chave é montada a partir destes 4 argumentos e dos parâmetros vigentes (Buffer de
+    deslocamento e limite diário, os mesmos que o motor aplica), e mais nada. Salvar esses
+    parâmetros em Configurações muda a chave: a consulta seguinte já usa o valor novo, sem
+    esperar o cache vencer (auditoria UX 30/09, rodada 4). Por isso também o wrapper aceita
+    SÓ os 4 argumentos: um kwarg extra mudaria o resultado sem mudar a chave, e a próxima
     chamada com a chave antiga receberia a resposta errada. Quem precisa de argumentos
     extras (ex.: `exclude_solicitacao_id`) chama a versão sem cache.
 
@@ -61,6 +66,7 @@ def cache_availability_check(timeout: int | None = None) -> Callable[[F], F]:
                 "inicio": inicio.isoformat(),
                 "fim": fim.isoformat(),
                 "municipio_id": municipio.id if municipio else None,
+                "parametros": parametros_disponibilidade(),
             }
             key_str = json.dumps(key_data, sort_keys=True)
             key_hash = hashlib.md5(key_str.encode(), usedforsecurity=False).hexdigest()

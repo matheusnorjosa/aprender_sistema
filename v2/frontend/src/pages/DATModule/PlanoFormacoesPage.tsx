@@ -36,6 +36,7 @@ import {
   Divider,
   Checkbox,
   Tabs,
+  Alert,
 } from 'antd';
 import {
   PlusOutlined,
@@ -226,6 +227,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
   const {
     data: planos,
     stats,
+    statsError,
     loading,
     filters,
     setFilters,
@@ -241,6 +243,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
     buildParams: buildPlanoParams,
     defaultOrdering: 'municipio__nome,projeto__nome',
     entityName: 'planos',
+    showsStatsError: true, // aviso com o motivo e "Tentar de novo" acima dos cards
   });
 
   // View mode
@@ -758,7 +761,21 @@ export default function PlanoFormacoesPage(): JSX.Element {
         </Space>
       </header>
 
-      {/* Stats Cards */}
+      {/* Stats Cards — erro nelas não derruba a lista: aviso com o motivo */}
+      {statsError && (
+        <Alert
+          type="warning"
+          showIcon
+          className="mb-4"
+          message="Não foi possível carregar as estatísticas"
+          description={statsError}
+          action={
+            <Button size="small" onClick={() => void refresh()} loading={loading}>
+              Tentar de novo
+            </Button>
+          }
+        />
+      )}
       {stats && (
         <Row gutter={16} className="mb-4">
           <Col xs={24} sm={12} md={6}>

@@ -190,6 +190,82 @@ describe('useTableFilters', () => {
     expect(result.current.stats).toEqual({ total: 50 });
   });
 
+  // Auditoria UX 30/09 (ALTA): lista e estatísticas saíam juntas (Promise.all) — o erro
+  // das estatísticas derrubava a lista. Agora a lista segue e o motivo fica em statsError.
+  test('erro das estatísticas não derruba a lista e expõe o motivo', async () => {
+    mockStatsFn.mockRejectedValueOnce(new Error('Você não tem permissão para executar essa ação.'));
+
+    const { result } = renderHook(() =>
+      useTableFilters<MockFilters, MockRecord, MockStats>({
+        defaultFilters,
+        listFn: mockListFn,
+        statsFn: mockStatsFn,
+        entityName: 'planos',
+        showsStatsError: true,
+      }),
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.data).toEqual(mockData);
+    expect(result.current.pagination.total).toBe(50);
+    expect(result.current.stats).toBeNull();
+    expect(result.current.statsError).toBe('Você não tem permissão para executar essa ação.');
+    expect(message.error).not.toHaveBeenCalled();
+  });
+
+  // Rodada 2 (BAIXA): Ações e Cadastros não desenham statsError — o erro das estatísticas
+  // passou de toast a silêncio. Sem `showsStatsError`, o hook continua avisando por toast.
+  test('sem showsStatsError, o erro das estatísticas vira toast com o motivo', async () => {
+    mockStatsFn.mockRejectedValueOnce(new Error('HTTP 500'));
+
+    const { result } = renderHook(() =>
+      useTableFilters<MockFilters, MockRecord, MockStats>({
+        defaultFilters,
+        listFn: mockListFn,
+        statsFn: mockStatsFn,
+        entityName: 'ações',
+      }),
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.data).toEqual(mockData);
+    expect(message.error).toHaveBeenCalledWith('Erro ao carregar as estatísticas de ações: HTTP 500');
+  });
+
+  test('motivo que não é Error também aparece em statsError', async () => {
+    mockStatsFn.mockRejectedValueOnce('Tempo esgotado');
+
+    const { result } = renderHook(() =>
+      useTableFilters<MockFilters, MockRecord, MockStats>({
+        defaultFilters,
+        listFn: mockListFn,
+        statsFn: mockStatsFn,
+        showsStatsError: true,
+      }),
+    );
+
+    await waitFor(() => expect(result.current.statsError).toBe('Tempo esgotado'));
+  });
+
+  test('statsError some quando as estatísticas voltam a carregar', async () => {
+    mockStatsFn.mockRejectedValueOnce(new Error('HTTP 500'));
+
+    const { result } = renderHook(() =>
+      useTableFilters<MockFilters, MockRecord, MockStats>({
+        defaultFilters,
+        listFn: mockListFn,
+        statsFn: mockStatsFn,
+      }),
+    );
+
+    await waitFor(() => expect(result.current.statsError).toBe('HTTP 500'));
+    await act(async () => {
+      await result.current.refresh();
+    });
+    expect(result.current.statsError).toBeNull();
+    expect(result.current.stats).toEqual({ total: 50 });
+  });
+
   test('statsFn not called when not provided', async () => {
     renderHook(() =>
       useTableFilters<MockFilters, MockRecord, MockStats>({

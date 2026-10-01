@@ -38,6 +38,8 @@ import {
 export interface UseConfigReturn {
   config: SystemConfig | null;
   loading: boolean;
+  /** Motivo da falha ao carregar; null quando carregou. */
+  loadError: string | null;
   saveConfig: (values: SystemConfig) => Promise<boolean>;
   reload: () => Promise<void>;
 }
@@ -48,6 +50,7 @@ export interface UseConfigReturn {
 export function useConfig(): UseConfigReturn {
   const [config, setConfig] = useState<SystemConfig | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   type ApiClientError = Error & {
     response?: {
@@ -64,9 +67,11 @@ export function useConfig(): UseConfigReturn {
     try {
       const data = await getSystemConfig();
       setConfig(data);
+      setLoadError(null);
     } catch (error) {
       message.error('Erro ao carregar configurações');
       logger.error('useConfig loadConfig error:', error);
+      setLoadError(error instanceof Error && error.message ? error.message : 'Erro inesperado do servidor.');
     } finally {
       setLoading(false);
     }
@@ -89,15 +94,18 @@ export function useConfig(): UseConfigReturn {
       const validationData = apiError.response?.data;
       logger.error('useConfig saveConfig error:', error);
 
-      // Display backend validation errors when available.
-      if (validationData && typeof validationData === 'object' && !Array.isArray(validationData)) {
+      // Erros por campo só no 400 (o PUT devolve serializer.errors). O resto mostra o motivo
+      // real: sem rede, permissão, 5xx (auditoria UX 30/09, rodada 4; antes o corpo
+      // `{code, detail}` virava "Erro de validação" e a falha de rede não dizia nada).
+      if (apiError.response?.status === 400 && validationData && typeof validationData === 'object' && !Array.isArray(validationData)) {
         const errors = validationData as ConfigValidationErrors;
         const errorMessages = Object.entries(errors)
             .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`)
             .join('\n');
         message.error(`Erro de validação:\n${errorMessages}`, 5);
       } else {
-        message.error('Erro ao salvar configurações');
+        const motivo = error instanceof Error && error.message ? error.message : 'Erro inesperado do servidor.';
+        message.error(`Não foi possível salvar: ${motivo}`);
       }
       return false;
     }
@@ -111,6 +119,7 @@ export function useConfig(): UseConfigReturn {
   return {
     config,
     loading,
+    loadError,
     saveConfig,
     reload: loadConfig
   };

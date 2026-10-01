@@ -3,17 +3,16 @@ Config Service — Cache layer para Config model (5min TTL)
 
 Funções:
 - get_cfg(key, default): Busca config com cache (5min TTL)
+- parametros_disponibilidade(): Buffer (RD-04) e limite diário (RD-05) vigentes
 - bust_cfg(key): Invalida cache para key específica
 
 Uso:
-    from apps.core.services.config_service import get_cfg
+    from apps.core.services.config_service import parametros_disponibilidade
 
-    # Obter buffer de deslocamento (RD-04)
-    cfg = get_cfg("availability", {})
-    buffer_min = cfg.get("TRAVEL_BUFFER_MINUTES", 120)
-
-    # Obter limite diário (RD-05)
-    daily_limit_h = cfg.get("AVAILABILITY_DAILY_LIMIT_HOURS", 8)
+    # Buffer de deslocamento (RD-04) e limite diário (RD-05): Config gravado ou settings
+    parametros = parametros_disponibilidade()
+    buffer_min = parametros["TRAVEL_BUFFER_MINUTES"]
+    daily_limit_h = parametros["AVAILABILITY_DAILY_LIMIT_HOURS"]
 
 Invalidação automática:
     - Via signal post_save em apps/core/signals.py
@@ -26,6 +25,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.conf import settings
 from django.core.cache import cache
 
 _PREFIX: str = "cfg:v1:"
@@ -70,6 +70,24 @@ def get_cfg(key: str, default: Any = None) -> Any:
     cache.set(ck, val, _TTL)
 
     return val
+
+
+def parametros_disponibilidade() -> dict[str, Any]:
+    """
+    Buffer de deslocamento (RD-04) e limite diário (RD-05) vigentes.
+
+    Fonte única da tela de Configurações (GET /api/config/) e do motor de disponibilidade
+    (auditoria UX 30/09): vale o Config gravado; sem a chave, o settings (env). Antes a tela
+    completava com 120/8 fixos enquanto o motor caía no settings. `is None`, e não `or`:
+    Buffer 0 gravado é valor válido.
+    """
+    cfg: dict[str, Any] = get_cfg("availability", {}) or {}
+    buffer_min = cfg.get("TRAVEL_BUFFER_MINUTES")
+    limite_h = cfg.get("AVAILABILITY_DAILY_LIMIT_HOURS")
+    return {
+        "TRAVEL_BUFFER_MINUTES": settings.TRAVEL_BUFFER_MINUTES if buffer_min is None else buffer_min,
+        "AVAILABILITY_DAILY_LIMIT_HOURS": settings.AVAILABILITY_DAILY_LIMIT_HOURS if limite_h is None else limite_h,
+    }
 
 
 def bust_cfg(key: str) -> None:

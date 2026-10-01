@@ -47,6 +47,60 @@ export function getCsrfToken(): string | null {
   return cookieValue;
 }
 
+/** Falha de rede, em português (auditoria UX 30/09): nunca "Failed to fetch" nem erro de CSRF. */
+export const SEM_CONEXAO = 'Sem conexão com o servidor.';
+
+/** A resposta que o service worker (public/sw.js) devolve no lugar de um fetch que falhou. */
+async function ehRespostaOfflineDoServiceWorker(response: Response): Promise<boolean> {
+  if (response.status !== 503) return false;
+  try {
+    const corpo = (await response.clone().json()) as { error?: { code?: string } };
+    return corpo.error?.code === 'OFFLINE';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Evento de `window` a cada resposta do servidor com status < 500. O Django renova a sessão em
+ * todo request que atende (SESSION_SAVE_EVERY_REQUEST; o 5xx não renova) e a vence 2 h depois
+ * do último: o monitor de sessão conta a inatividade a partir daqui (auditoria UX 30/09, rodada 4).
+ * A resposta que diz que não há sessão não renovou nada e não dispara (rodada 5).
+ */
+export const SERVIDOR_RESPONDEU = 'sessao:servidor-respondeu';
+
+/** 401, ou o 403 do DRF com code NOT_AUTHENTICATED: o servidor disse que não há sessão. */
+async function ehRespostaSemSessao(response: Response): Promise<boolean> {
+  if (response.status === 401) return true;
+  if (response.status !== 403) return false;
+  try {
+    const corpo = (await response.clone().json()) as { code?: string };
+    return corpo.code === 'NOT_AUTHENTICATED';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * `fetch` que dá nome à falha de rede: o fetch rejeitado (TypeError) e a resposta OFFLINE do
+ * service worker viram `TypeError(SEM_CONEXAO)`. O resto (ex.: AbortError) passa como veio.
+ * Toda chamada de rede do app passa por aqui (fetchAPI, CSRF, upload e download).
+ */
+export async function fetchNaRede(input: string, init: RequestInit): Promise<Response> {
+  let response: Response;
+  try {
+    response = await fetch(input, init);
+  } catch (error) {
+    if (error instanceof TypeError) throw new TypeError(SEM_CONEXAO, { cause: error });
+    throw error;
+  }
+  if (await ehRespostaOfflineDoServiceWorker(response)) throw new TypeError(SEM_CONEXAO);
+  if (response.status < 500 && typeof window !== 'undefined' && !(await ehRespostaSemSessao(response))) {
+    window.dispatchEvent(new Event(SERVIDOR_RESPONDEU));
+  }
+  return response;
+}
+
 // Cache de token CSRF em memória (Issue #135 - suporte a HttpOnly)
 // Issue #258: Adiciona TTL para evitar token stale
 let cachedCsrfToken: string | null = null;
@@ -72,15 +126,15 @@ function isCsrfTokenValid(): boolean {
 }
 
 /**
- * Busca um token CSRF fresco do servidor.
+ * Busca um token CSRF fresco do servidor. Sem rede, lança `TypeError(SEM_CONEXAO)`: a falha
+ * de rede não vira "CSRF token ausente" (auditoria UX 30/09).
  */
 async function fetchFreshCsrfToken(): Promise<string | null> {
+  const response = await fetchNaRede(`${API_BASE}/csrf/`, {
+    method: 'GET',
+    credentials: 'include',
+  });
   try {
-    const response = await fetch(`${API_BASE}/csrf/`, {
-      method: 'GET',
-      credentials: 'include',
-    });
-
     if (response.ok) {
       const data = (await response.json()) as { csrfToken?: string };
       const token = data.csrfToken;
@@ -142,6 +196,7 @@ export async function ensureCsrfToken(forceRefresh: boolean = false): Promise<st
  * @param options - Opções do fetch (method, body, headers, etc.)
  * @param isRetry - Flag interna para evitar loop infinito de retry
  * @throws Error Se request falhar ou CSRF estiver ausente
+ * @throws TypeError(SEM_CONEXAO) Sem rede (inclusive a resposta OFFLINE do service worker)
  */
 export async function fetchAPI<T = unknown>(url: string, options: FetchOptions = {}, isRetry: boolean = false): Promise<T> {
   const fullUrl = url.startsWith('http') ? url : `${API_BASE}${url}`;
@@ -173,7 +228,7 @@ export async function fetchAPI<T = unknown>(url: string, options: FetchOptions =
     logger.debug('Body:', options.body);
   }
 
-  const response = await fetch(fullUrl, {
+  const response = await fetchNaRede(fullUrl, {
     ...options,
     headers,
     credentials: 'include', // Sempre incluir cookies de sessão
@@ -189,18 +244,6 @@ export async function fetchAPI<T = unknown>(url: string, options: FetchOptions =
       return fetchAPI(url, options, true); // Retry com flag
     }
 
-    // Issue #258: Invalidar cache em 401 (sessão expirada)
-    // Issue #1376: emitir evento global `auth:expired` para tratamento único no
-    // App (limpar sessão + voltar ao login), em vez de cada tela lidar com o 401
-    // isoladamente. fetchAPI não sabe se havia usuário logado — o guard vive no
-    // App (só age se havia sessão), evitando loop no load inicial / rotas públicas.
-    if (response.status === 401) {
-      clearCsrfCache();
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new Event('auth:expired'));
-      }
-    }
-
     const isAuthError = response.status === 401 || response.status === 403;
 
     // Auth errors (401/403) are expected during initial load (not authenticated).
@@ -212,11 +255,26 @@ export async function fetchAPI<T = unknown>(url: string, options: FetchOptions =
       logger.error('Response body:', errorBody);
     }
 
-    let error: { detail?: string; message?: string };
+    let error: { detail?: string; message?: string; code?: string };
     try {
-      error = JSON.parse(errorBody) as { detail?: string; message?: string };
+      error = JSON.parse(errorBody) as { detail?: string; message?: string; code?: string };
     } catch {
       error = { detail: `HTTP ${response.status}: ${response.statusText}` };
+    }
+
+    // Issue #258: Invalidar cache quando o servidor diz que não há sessão.
+    // Issue #1376: emitir evento global `auth:expired` para tratamento único no
+    // App (confere com o servidor e volta ao login), em vez de cada tela lidar com isso
+    // isoladamente. fetchAPI não sabe se havia usuário logado — o guard vive no
+    // App (só age se havia sessão), evitando loop no load inicial / rotas públicas.
+    // Sem sessão, o DRF responde 403 com code NOT_AUTHENTICATED (SessionAuthentication
+    // não manda WWW-Authenticate); o 403 de falta de permissão (PERMISSION_DENIED) não é
+    // sessão expirada (auditoria UX 30/09, rodada 2).
+    if (response.status === 401 || (response.status === 403 && error.code === 'NOT_AUTHENTICATED')) {
+      clearCsrfCache();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('auth:expired'));
+      }
     }
 
     const err = new Error(error.detail || error.message || `Erro ${response.status}`) as Error & {
@@ -275,6 +333,7 @@ if (typeof import.meta.env?.['VITEST'] === 'undefined') {
  * @param url - API path (relative or absolute)
  * @param options - Fetch options
  * @returns Blob with file content
+ * @throws TypeError(SEM_CONEXAO) Sem rede (inclusive a resposta OFFLINE do service worker)
  *
  * @example
  * const blob = await fetchBlob('/dat/compras/export/');
@@ -290,7 +349,7 @@ export async function fetchBlob(url: string, options: FetchOptions = {}): Promis
     if (csrfToken) headers['X-CSRFToken'] = csrfToken;
   }
 
-  const response = await fetch(fullUrl, {
+  const response = await fetchNaRede(fullUrl, {
     ...options,
     headers,
     credentials: 'include',

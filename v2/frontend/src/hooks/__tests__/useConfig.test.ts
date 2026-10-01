@@ -83,6 +83,16 @@ describe('useConfig', () => {
     expect(result.current.config).toBeNull()
   })
 
+  // Auditoria UX 30/09, rodada 2: a tela mostra o motivo e desabilita o Salvar.
+  test('erro de carregamento expõe o motivo em loadError', async () => {
+    getSystemConfigMock.mockRejectedValueOnce(new Error('HTTP 500: Internal Server Error'))
+
+    const { result } = renderHook(() => useConfig())
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.loadError).toBe('HTTP 500: Internal Server Error')
+  })
+
   test('deve lidar com erro de rede', async () => {
     getSystemConfigMock.mockRejectedValueOnce(new Error('Network error'))
 

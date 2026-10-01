@@ -9,7 +9,7 @@
  * Issue #135: Usa ensureCsrfToken() para suportar CSRF_COOKIE_HTTPONLY=True
  */
 
-import { API_BASE, ensureCsrfToken, fetchAPI, buildUrl } from './config';
+import { API_BASE, ensureCsrfToken, fetchAPI, fetchNaRede, buildUrl } from './config';
 import logger from '../utils/logger';
 
 /**
@@ -89,7 +89,8 @@ async function postMultipart(url: string, file: File, dryRun: boolean = true): P
     throw new Error('CSRF token ausente. Faça login novamente.');
   }
 
-  const response = await fetch(`${fullUrl}${queryParam}`, {
+  // fetchNaRede: sem rede, "Sem conexão com o servidor." (não "Failed to fetch" nem "HTTP 503: ").
+  const response = await fetchNaRede(`${fullUrl}${queryParam}`, {
     method: 'POST',
     headers: headers,
     body: formData,

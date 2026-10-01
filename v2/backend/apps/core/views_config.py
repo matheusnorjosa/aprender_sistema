@@ -32,7 +32,52 @@ from apps.core.api_schemas import COMMON_ERROR_RESPONSES
 from apps.core.models import AuditLog, Config
 from apps.core.permissions import HasPerm
 from apps.core.serializers import ConfigSerializer
-from apps.core.services.config_service import bust_cfg, get_cfg
+from apps.core.services.config_service import bust_cfg, get_cfg, parametros_disponibilidade
+
+# Chaves do serializer por registro de Config. O JSON de cada registro pode ter outras
+# chaves (ex.: `features` guarda overrides lidos por /api/features/), que o PUT preserva.
+_CAMPOS_POR_CHAVE: dict[str, tuple[str, ...]] = {
+    "availability": (
+        "TRAVEL_BUFFER_MINUTES",
+        "AVAILABILITY_DAILY_LIMIT_HOURS",
+        "ALLOW_ADJACENT_EVENTS",
+        "BLOCK_AUTO_APPROVE",
+    ),
+    "gcal_sync": ("BATCH_SIZE", "LOCK_TTL_SECONDS", "AUTO_RETRY_ON_ERROR", "MAX_RETRIES", "SEND_UPDATES"),
+    "session_settings": ("SESSION_COOKIE_AGE", "SESSION_WARNING_THRESHOLD", "AUTOCOMPLETE_DEBOUNCE_MS"),
+    "features": ("ENABLE_MULTI_CALENDAR", "ENABLE_BATCH_ACTIONS", "ENABLE_ADVANCED_FILTERS"),
+}
+
+
+def _config_atual() -> dict[str, Any]:
+    """Configurações vigentes em formato flat (lidas do Config model via get_cfg, com cache)."""
+    availability = get_cfg("availability", {})
+    disponibilidade = parametros_disponibilidade()  # a mesma fonte que o motor (RD-04/RD-05) aplica
+    gcal_sync = get_cfg("gcal_sync", {})
+    session_settings = get_cfg("session_settings", {})
+    features = get_cfg("features", {})
+
+    return {
+        # Availability
+        "TRAVEL_BUFFER_MINUTES": disponibilidade["TRAVEL_BUFFER_MINUTES"],
+        "AVAILABILITY_DAILY_LIMIT_HOURS": disponibilidade["AVAILABILITY_DAILY_LIMIT_HOURS"],
+        "ALLOW_ADJACENT_EVENTS": availability.get("ALLOW_ADJACENT_EVENTS", True),
+        "BLOCK_AUTO_APPROVE": availability.get("BLOCK_AUTO_APPROVE", True),
+        # GCal
+        "BATCH_SIZE": gcal_sync.get("BATCH_SIZE", 200),
+        "LOCK_TTL_SECONDS": gcal_sync.get("LOCK_TTL_SECONDS", 300),
+        "AUTO_RETRY_ON_ERROR": gcal_sync.get("AUTO_RETRY_ON_ERROR", True),
+        "MAX_RETRIES": gcal_sync.get("MAX_RETRIES", 3),
+        "SEND_UPDATES": gcal_sync.get("SEND_UPDATES", "none"),
+        # Session
+        "SESSION_COOKIE_AGE": session_settings.get("SESSION_COOKIE_AGE", 1800),
+        "SESSION_WARNING_THRESHOLD": session_settings.get("SESSION_WARNING_THRESHOLD", 300),
+        "AUTOCOMPLETE_DEBOUNCE_MS": session_settings.get("AUTOCOMPLETE_DEBOUNCE_MS", 300),
+        # Features
+        "ENABLE_MULTI_CALENDAR": features.get("ENABLE_MULTI_CALENDAR", False),
+        "ENABLE_BATCH_ACTIONS": features.get("ENABLE_BATCH_ACTIONS", False),
+        "ENABLE_ADVANCED_FILTERS": features.get("ENABLE_ADVANCED_FILTERS", False),
+    }
 
 
 @extend_schema(
@@ -49,7 +94,10 @@ from apps.core.services.config_service import bust_cfg, get_cfg
 @extend_schema(
     methods=["PUT"],
     summary="Atualizar configurações do sistema",
-    description="Valida e persiste configurações consolidadas, registrando AuditLog.",
+    description=(
+        "Valida e persiste as chaves enviadas, registrando AuditLog. "
+        "Chave ausente mantém o valor atual (não volta ao padrão)."
+    ),
     request=ConfigSerializer,
     responses={
         200: ConfigSerializer,
@@ -64,7 +112,7 @@ from apps.core.services.config_service import bust_cfg, get_cfg
 def config_view(request: Request) -> Response:
     """
     GET: Lê configurações consolidadas do Config model.
-    PUT: Atualiza configurações + cria AuditLog.
+    PUT: Atualiza as chaves enviadas + cria AuditLog. Chave ausente mantém o valor atual.
 
     Permissions: HasPerm("manage_purchases_and_materials") | HasPerm("approve_solicitation")
 
@@ -97,96 +145,32 @@ def config_view(request: Request) -> Response:
     """
 
     if request.method == "GET":
-        # Ler de cada chave do Config model via get_cfg (cache-enabled)
-        availability = get_cfg("availability", {})
-        gcal_sync = get_cfg("gcal_sync", {})
-        session_settings = get_cfg("session_settings", {})
-        features = get_cfg("features", {})
-
-        # Consolidar em um dict flat
-        data = {
-            # Availability
-            "TRAVEL_BUFFER_MINUTES": availability.get("TRAVEL_BUFFER_MINUTES", 120),
-            "AVAILABILITY_DAILY_LIMIT_HOURS": availability.get("AVAILABILITY_DAILY_LIMIT_HOURS", 8),
-            "ALLOW_ADJACENT_EVENTS": availability.get("ALLOW_ADJACENT_EVENTS", True),
-            "BLOCK_AUTO_APPROVE": availability.get("BLOCK_AUTO_APPROVE", True),
-            # GCal
-            "BATCH_SIZE": gcal_sync.get("BATCH_SIZE", 200),
-            "LOCK_TTL_SECONDS": gcal_sync.get("LOCK_TTL_SECONDS", 300),
-            "AUTO_RETRY_ON_ERROR": gcal_sync.get("AUTO_RETRY_ON_ERROR", True),
-            "MAX_RETRIES": gcal_sync.get("MAX_RETRIES", 3),
-            "SEND_UPDATES": gcal_sync.get("SEND_UPDATES", "none"),
-            # Session
-            "SESSION_COOKIE_AGE": session_settings.get("SESSION_COOKIE_AGE", 1800),
-            "SESSION_WARNING_THRESHOLD": session_settings.get("SESSION_WARNING_THRESHOLD", 300),
-            "AUTOCOMPLETE_DEBOUNCE_MS": session_settings.get("AUTOCOMPLETE_DEBOUNCE_MS", 300),
-            # Features
-            "ENABLE_MULTI_CALENDAR": features.get("ENABLE_MULTI_CALENDAR", False),
-            "ENABLE_BATCH_ACTIONS": features.get("ENABLE_BATCH_ACTIONS", False),
-            "ENABLE_ADVANCED_FILTERS": features.get("ENABLE_ADVANCED_FILTERS", False),
-        }
-
-        serializer = ConfigSerializer(data)
-        return Response(serializer.data)
+        return Response(ConfigSerializer(_config_atual()).data)
 
     elif request.method == "PUT":
-        serializer = ConfigSerializer(data=request.data)
+        # Campo ausente mantém o valor atual (auditoria UX 30/09): sem `partial`, o
+        # serializer completava o que não veio com `default=` e o save zerava o resto.
+        serializer = ConfigSerializer(data=request.data, partial=True)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        vd: dict[str, Any] = serializer.validated_data
+        enviados: dict[str, Any] = dict(serializer.validated_data)
+        vd: dict[str, Any] = {**_config_atual(), **enviados}
 
-        # Separar por categoria e salvar no Config model
-        Config.objects.update_or_create(
-            key="availability",
-            defaults={
-                "value": {
-                    "TRAVEL_BUFFER_MINUTES": vd["TRAVEL_BUFFER_MINUTES"],
-                    "AVAILABILITY_DAILY_LIMIT_HOURS": vd["AVAILABILITY_DAILY_LIMIT_HOURS"],
-                    "ALLOW_ADJACENT_EVENTS": vd["ALLOW_ADJACENT_EVENTS"],
-                    "BLOCK_AUTO_APPROVE": vd["BLOCK_AUTO_APPROVE"],
-                },
-                "effective_at": timezone.now(),
-            },
-        )
-
-        Config.objects.update_or_create(
-            key="gcal_sync",
-            defaults={
-                "value": {
-                    "BATCH_SIZE": vd["BATCH_SIZE"],
-                    "LOCK_TTL_SECONDS": vd["LOCK_TTL_SECONDS"],
-                    "AUTO_RETRY_ON_ERROR": vd["AUTO_RETRY_ON_ERROR"],
-                    "MAX_RETRIES": vd["MAX_RETRIES"],
-                    "SEND_UPDATES": vd["SEND_UPDATES"],
-                },
-                "effective_at": timezone.now(),
-            },
-        )
-
-        Config.objects.update_or_create(
-            key="session_settings",
-            defaults={
-                "value": {
-                    "SESSION_COOKIE_AGE": vd["SESSION_COOKIE_AGE"],
-                    "SESSION_WARNING_THRESHOLD": vd["SESSION_WARNING_THRESHOLD"],
-                    "AUTOCOMPLETE_DEBOUNCE_MS": vd["AUTOCOMPLETE_DEBOUNCE_MS"],
-                },
-                "effective_at": timezone.now(),
-            },
-        )
-
-        Config.objects.update_or_create(
-            key="features",
-            defaults={
-                "value": {
-                    "ENABLE_MULTI_CALENDAR": vd["ENABLE_MULTI_CALENDAR"],
-                    "ENABLE_BATCH_ACTIONS": vd["ENABLE_BATCH_ACTIONS"],
-                    "ENABLE_ADVANCED_FILTERS": vd["ENABLE_ADVANCED_FILTERS"],
-                },
-                "effective_at": timezone.now(),
-            },
-        )
+        # Grava só as chaves enviadas, por cima do JSON guardado (auditoria UX 30/09, rodada
+        # 2): regravar o resto com o valor lido no começo desfazia a edição de outra pessoa
+        # feita no meio do caminho, e apagava as chaves que o serializer não conhece. Lido do
+        # banco, não do cache, para pegar também o que foi gravado sem passar pelo signal.
+        for chave, campos in _CAMPOS_POR_CHAVE.items():
+            mudou = {campo: enviados[campo] for campo in campos if campo in enviados}
+            if not mudou:
+                continue
+            registro = Config.objects.filter(key=chave).first()
+            guardado = registro.value if registro and isinstance(registro.value, dict) else {}
+            Config.objects.update_or_create(
+                key=chave,
+                defaults={"value": {**guardado, **mudou}, "effective_at": timezone.now()},
+            )
 
         # AuditLog (Issue #187 requirement)
         AuditLog.objects.create(
@@ -194,7 +178,7 @@ def config_view(request: Request) -> Response:
             action=AuditLog.Action.UPDATE_CONFIG,
             model_name="Config",
             details={
-                "changed_fields": list(vd.keys()),
+                "changed_fields": list(enviados.keys()),
                 "ip_address": request.META.get("REMOTE_ADDR", "unknown"),
                 "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
             },
@@ -204,7 +188,7 @@ def config_view(request: Request) -> Response:
         for key in ["availability", "gcal_sync", "session_settings", "features"]:
             bust_cfg(key)
 
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(ConfigSerializer(vd).data, status=status.HTTP_200_OK)
 
     # Should never reach here due to @api_view decorator
     return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)

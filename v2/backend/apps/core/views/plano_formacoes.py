@@ -86,10 +86,11 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
         - GET /api/dat/plano-formacoes/resumo-projeto/ - Resumo por projeto
         - PATCH /api/dat/plano-formacoes/{id}/formacao/{numero}/ - Atualizar formacao inline
 
-    Permissoes:
-        - list, retrieve: DAT ou Superintendencia
-        - create, update: DAT ou Superintendencia
-        - destroy: apenas Superintendencia
+    Permissoes (decididas SO em `get_permissions`; os `@action` nao declaram as suas):
+        - destroy: `execute_restricted_operations` (Superintendencia)
+        - todo o resto (list, retrieve, create, update, stats, calendario,
+          resumo-projeto e edicoes inline): `manage_admin_registries` (DAT)
+          ou `run_daily_operations` (Controle)
     """
 
     queryset = (
@@ -116,10 +117,13 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
         return PlanoFormacoesSerializer
 
     def get_permissions(self):
-        """Permissoes baseadas na acao.
+        """Permissoes baseadas na acao — vale para TODAS as actions, inclusive os `@action`.
 
         Issue #1220 (Epic 1): setor Controle também edita planos de formação
         via `run_daily_operations` — não apenas DAT. Composition OR cobre ambos.
+        Como este método é sobrescrito, um `permission_classes` no `@action` seria
+        ignorado: os decorators não o declaram para não enganar quem lê (a auditoria
+        UX de 30/09 concluiu, por eles, que o stats barrava o Controle).
         """
         if self.action == "destroy":
             return [HasPerm("execute_restricted_operations")()]
@@ -173,7 +177,7 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
             )
             super().perform_destroy(instance)
 
-    @action(detail=False, methods=["get"], permission_classes=[HasPerm("manage_admin_registries")])
+    @action(detail=False, methods=["get"])
     def stats(self, request: Request) -> Response:
         """
         Estatisticas agregadas dos planos de formacoes.
@@ -233,7 +237,7 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
             }
         )
 
-    @action(detail=False, methods=["get"], permission_classes=[HasPerm("manage_admin_registries")])
+    @action(detail=False, methods=["get"])
     def calendario(self, request: Request) -> Response:
         """
         Dados para visualizacao de calendario.
@@ -279,7 +283,6 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
     @action(
         detail=False,
         methods=["get"],
-        permission_classes=[HasPerm("manage_admin_registries")],
         url_path="resumo-projeto",
     )
     def resumo_projeto(self, request: Request) -> Response:
@@ -334,7 +337,6 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
         detail=True,
         methods=["patch"],
         url_path=r"formacao/(?P<numero>\d+)",
-        permission_classes=[HasPerm("manage_admin_registries")],
     )
     def update_formacao(self, request: Request, pk: int | None = None, numero: str | None = None) -> Response:
         """
@@ -368,7 +370,6 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
         detail=True,
         methods=["patch"],
         url_path=r"acompanhamento/(?P<tipo>\w+)",
-        permission_classes=[HasPerm("manage_admin_registries")],
     )
     def update_acompanhamento(self, request: Request, pk: int | None = None, tipo: str | None = None) -> Response:
         """
@@ -396,7 +397,6 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
         detail=True,
         methods=["patch"],
         url_path=r"prova/(?P<numero>\d+)",
-        permission_classes=[HasPerm("manage_admin_registries")],
     )
     def update_prova(self, request: Request, pk: int | None = None, numero: str | None = None) -> Response:
         """

@@ -6,8 +6,7 @@
  */
 
 import { useEffect, useRef, useState, type JSX } from 'react';
-import { Table, Button, Input, Space, Tag, Typography, Card, message, Select, Modal, Form, Checkbox, AutoComplete } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import { Button, Input, Tag, Typography, Card, message, Select, Modal, Form, Checkbox, AutoComplete, Grid, Space } from 'antd';
 import type { TablePaginationConfig } from 'antd/es/table';
 import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Link } from 'react-router';
@@ -21,11 +20,15 @@ import {
 import type { MunicipioAutocompleteItem } from '../../api/adminDAT';
 import { importMunicipios } from '../../api/ops';
 import ImportUploader from '../../components/ImportUploader';
-import type { ValidationResult, ApplyResult } from '../../components/ImportUploader';
+import { aplicacaoDoImport, validacaoDoImport } from '../../components/resultadoDoImport';
+import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
+import { AcoesLinha, larguraAcoesLinha } from '../../components/AcoesLinha';
+import { TEXTO_DA_TAG } from '../../components/textoDaTag';
 import { DEFAULT_PAGE_SIZE, UF_NORDESTE_OPTIONS } from '../../constants';
 import type { ID } from '../../types';
+import { errosDosCampos, mensagemDoErro } from './usuario_form_helpers';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 const { Search } = Input;
 
 /**
@@ -49,6 +52,11 @@ interface MunicipioFormValues {
   ativo: boolean;
 }
 
+/** Nome de tela do município: com a UF, porque há municípios de mesmo nome em UFs diferentes. */
+function nomeDoMunicipio(municipio: MunicipioRecord): string {
+  return `${municipio.nome} - ${municipio.uf}`;
+}
+
 function normalizeMunicipioName(value: string): string {
   return value
     .normalize('NFD')
@@ -56,30 +64,6 @@ function normalizeMunicipioName(value: string): string {
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
-}
-
-function toValidationResult(report: Record<string, unknown>): ValidationResult {
-  const stats = (report['stats'] as Record<string, number | undefined>) || {};
-  return {
-    stats: {
-      created: stats['created'] || 0,
-      updated: stats['updated'] || 0,
-      unchanged: stats['unchanged'] || 0,
-    },
-    errors: [],
-    pendencias: (report['pendencias'] as Record<string, unknown>) || {},
-  };
-}
-
-function toApplyResult(report: Record<string, unknown>): ApplyResult {
-  const stats = (report['stats'] as Record<string, number | undefined>) || {};
-  return {
-    stats: {
-      created: stats['created'] || 0,
-      updated: stats['updated'] || 0,
-      unchanged: stats['unchanged'] || 0,
-    },
-  };
 }
 
 export default function MunicipiosPage(): JSX.Element {
@@ -97,6 +81,11 @@ export default function MunicipiosPage(): JSX.Element {
     pageSize: DEFAULT_PAGE_SIZE,
     total: 0,
   });
+  const [salvando, setSalvando] = useState(false);
+  const [erroLista, setErroLista] = useState<string | null>(null);
+  // Celular (< 576 px): as ações da linha vão todas para o menu "Mais ações", e a UF sai da
+  // grade (fica junto do nome: há municípios de mesmo nome em UFs diferentes).
+  const acoesCompactas = !Grid.useBreakpoint().sm;
 
   const [form] = Form.useForm<MunicipioFormValues>();
   const watchedNome = Form.useWatch('nome', form);
@@ -118,6 +107,7 @@ export default function MunicipiosPage(): JSX.Element {
         page_size: pageSize,
       });
       setMunicipios(data.results as MunicipioRecord[]);
+      setErroLista(null);
       setPagination((prev) => ({
         ...prev,
         current,
@@ -125,7 +115,7 @@ export default function MunicipiosPage(): JSX.Element {
         total: data.count,
       }));
     } catch (error) {
-      message.error(`Erro ao carregar municípios: ${(error as Error).message}`);
+      setErroLista(mensagemDoErro(error));
     } finally {
       setLoading(false);
     }
@@ -228,6 +218,8 @@ export default function MunicipiosPage(): JSX.Element {
     setLookupOptions([]);
     setIbgeLocked(false);
     form.resetFields();
+    // Quem filtrou por UF está cadastrando naquela UF: o nome já fica liberado.
+    if (ufFilter) form.setFieldsValue({ uf: ufFilter });
     setModalVisible(true);
   };
 
@@ -245,6 +237,7 @@ export default function MunicipiosPage(): JSX.Element {
   };
 
   const handleSave = async (values: MunicipioFormValues): Promise<void> => {
+    setSalvando(true);
     try {
       if (editingMunicipio) {
         await updateMunicipio(editingMunicipio.id, values);
@@ -259,7 +252,10 @@ export default function MunicipiosPage(): JSX.Element {
       form.resetFields();
       void fetchMunicipios(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
     } catch (error) {
-      message.error(`Erro: ${(error as Error).message}`);
+      form.setFields(errosDosCampos(error));
+      message.error(`Erro: ${mensagemDoErro(error)}`);
+    } finally {
+      setSalvando(false);
     }
   };
 
@@ -308,58 +304,103 @@ export default function MunicipiosPage(): JSX.Element {
   const handleDelete = (municipio: MunicipioRecord): void => {
     Modal.confirm({
       title: 'Confirmar exclusão',
-      content: `Tem certeza que deseja excluir o município "${municipio.nome}"?`,
+      content: `Tem certeza que deseja excluir o município "${nomeDoMunicipio(municipio)}"?`,
       okText: 'Sim, excluir',
       okType: 'danger',
       cancelText: 'Cancelar',
+      // Ação destrutiva: o foco começa no Cancelar (senão um Enter repetido exclui sem confirmar).
+      autoFocusButton: 'cancel',
       onOk: async () => {
         try {
           await deleteMunicipio(municipio.id);
           message.success('Município excluído com sucesso');
           void fetchMunicipios(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
         } catch (error) {
-          message.error(`Erro ao excluir: ${(error as Error).message}`);
+          message.error(`Erro ao excluir: ${mensagemDoErro(error)}`);
         }
       },
     });
   };
 
-  const columns: ColumnsType<MunicipioRecord> = [
-    { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-    { title: 'Nome', dataIndex: 'nome', key: 'nome', width: 300 },
-    { title: 'UF', dataIndex: 'uf', key: 'uf', width: 80, render: (uf: string) => <Tag color="blue">{uf}</Tag> },
-    { title: 'IBGE', dataIndex: 'ibge_code', key: 'ibge_code', width: 120, render: (ibgeCode: string | null) => ibgeCode || '-' },
+  // Vazio que diz o que fazer: o filtro de UF (com o jeito de limpá-lo), a busca, ou cadastrar.
+  const vazio = ufFilter ? (
+    <Space direction="vertical" size={4}>
+      <span>Nenhum município para a UF {ufFilter}.</span>
+      <Button size="small" onClick={() => setUfFilter(undefined)}>
+        Limpar filtro de UF
+      </Button>
+    </Space>
+  ) : searchText ? (
+    `Nenhum município encontrado para "${searchText}".`
+  ) : (
+    'Nenhum município cadastrado. Use "Novo Município" ou importe uma planilha abaixo.'
+  );
+
+  // C2: lista enxuta, por prioridade de largura (VISIVEL_A_PARTIR). O que some da linha vai
+  // para a linha expandida (ResponsiveTable). O ID interno não vai para a grade.
+  const columns: ColunaResponsiva<MunicipioRecord>[] = [
     {
-      title: 'Ativo',
+      title: 'Nome',
+      dataIndex: 'nome',
+      key: 'nome',
+      // Sem detalhe que mostre o nome inteiro, ele quebra linha em vez de cortar. No celular, a
+      // UF (fora da grade) vai junto: há municípios de mesmo nome em UFs diferentes.
+      render: (_, record) => (
+        <Text className="min-w-0 max-w-full break-words">
+          {record.nome}
+          {acoesCompactas ? <Text type="secondary"> - {record.uf}</Text> : null}
+        </Text>
+      ),
+    },
+    {
+      title: 'UF',
+      dataIndex: 'uf',
+      key: 'uf',
+      width: 64,
+      responsive: VISIVEL_A_PARTIR.sm,
+      render: (_, record) => <Tag color="blue" style={{ marginInlineEnd: 0 }}>{record.uf}</Tag>,
+    },
+    {
+      title: 'IBGE',
+      dataIndex: 'ibge_code',
+      key: 'ibge_code',
+      width: 104,
+      responsive: VISIVEL_A_PARTIR.md,
+      render: (_, record) => record.ibge_code || '-',
+    },
+    {
+      title: 'Situação',
       dataIndex: 'ativo',
       key: 'ativo',
-      width: 100,
-      render: (ativo: boolean) => <Tag color={ativo ? 'green' : 'red'}>{ativo ? 'Sim' : 'Não'}</Tag>,
+      width: 88,
+      render: (_, record) => {
+        const cor = record.ativo ? 'green' : 'red';
+        return (
+          <Tag color={cor} style={{ marginInlineEnd: 0, color: TEXTO_DA_TAG[cor] }}>
+            {record.ativo ? 'Ativo' : 'Inativo'}
+          </Tag>
+        );
+      },
     },
     {
       title: 'Ações',
       key: 'acoes',
-      width: 150,
+      width: larguraAcoesLinha(2, acoesCompactas),
       render: (_, record) => (
-        <Space size="small">
-          <Button
-            type="link"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-          >
-            Editar
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleDelete(record)}
-          >
-            Excluir
-          </Button>
-        </Space>
+        <AcoesLinha
+          compacto={acoesCompactas}
+          alvo={nomeDoMunicipio(record)}
+          acoes={[
+            { chave: 'editar', rotulo: 'Editar', icone: <EditOutlined />, onClick: () => handleEdit(record) },
+            {
+              chave: 'excluir',
+              rotulo: 'Excluir',
+              icone: <DeleteOutlined />,
+              onClick: () => handleDelete(record),
+              perigo: true,
+            },
+          ]}
+        />
       ),
     },
   ];
@@ -371,22 +412,26 @@ export default function MunicipiosPage(): JSX.Element {
       </nav>
 
       <Card>
-        <header className="flex justify-between items-center mb-4">
+        <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <Title level={3} className="m-0" id="municipios-title">
-            Municípios ({pagination.total || 0})
+            {/* Lista que falhou não tem total: "(0)" diria que não há município. */}
+            Municípios{erroLista ? '' : ` (${pagination.total || 0})`}
           </Title>
-          <Space>
+          <div className="flex flex-wrap items-center gap-2">
             <Search
               placeholder="Buscar por nome ou IBGE"
+              aria-label="Buscar municípios por nome ou IBGE"
               allowClear
-              style={{ width: '100%', maxWidth: 250 }}
+              style={{ width: 250, maxWidth: '100%' }}
               onSearch={setSearchText}
               onChange={(e) => !e.target.value && setSearchText('')}
             />
             <Select
               placeholder="Filtrar por UF"
+              aria-label="Filtrar por UF"
               allowClear
-              style={{ width: '100%', maxWidth: 100 }}
+              style={{ width: 140 }}
+              value={ufFilter}
               onChange={setUfFilter}
               options={UF_NORDESTE_OPTIONS}
             />
@@ -400,14 +445,18 @@ export default function MunicipiosPage(): JSX.Element {
             <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
               Novo Município
             </Button>
-          </Space>
+          </div>
         </header>
 
-        <Table
+        <ResponsiveTable<MunicipioRecord>
           columns={columns}
           dataSource={municipios}
           rowKey="id"
+          nomeDaLinha={nomeDoMunicipio}
           loading={loading}
+          erro={erroLista}
+          onTentarDeNovo={() => void fetchMunicipios(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE)}
+          locale={{ emptyText: vazio }}
           onChange={handleTableChange}
           pagination={{
             ...pagination,
@@ -415,7 +464,6 @@ export default function MunicipiosPage(): JSX.Element {
             pageSizeOptions: ['15', '30', '50', '100'],
             showTotal: (total) => `Total: ${total}`,
           }}
-          scroll={{ x: 1000 }}
         />
       </Card>
 
@@ -426,8 +474,8 @@ export default function MunicipiosPage(): JSX.Element {
         <ImportUploader
           label="Importar Municípios"
           description="CSV/XLSX com colunas: nome, uf (obrigatórios), ibge_code e ativo (opcionais)"
-          onDryRun={async (file: File) => toValidationResult(await importMunicipios(file, true) as unknown as Record<string, unknown>)}
-          onApply={async (file: File) => toApplyResult(await importMunicipios(file, false) as unknown as Record<string, unknown>)}
+          onDryRun={async (file: File) => validacaoDoImport(await importMunicipios(file, true))}
+          onApply={async (file: File) => aplicacaoDoImport(await importMunicipios(file, false))}
         />
       </Card>
 
@@ -443,6 +491,7 @@ export default function MunicipiosPage(): JSX.Element {
         onOk={() => form.submit()}
         okText="Salvar"
         cancelText="Cancelar"
+        confirmLoading={salvando}
         width={600}
       >
         <Form
@@ -451,6 +500,23 @@ export default function MunicipiosPage(): JSX.Element {
           autoComplete="off"
           onFinish={handleSave}
         >
+          {/* A UF vem primeiro: o nome só libera (e o autocomplete só busca) com a UF escolhida. */}
+          <Form.Item
+            name="uf"
+            label="UF"
+            rules={[{ required: true, message: 'UF é obrigatória' }]}
+          >
+            <Select
+              placeholder="Selecione a UF"
+              options={UF_NORDESTE_OPTIONS}
+              onChange={() => {
+                setLookupOptions([]);
+                setIbgeLocked(false);
+                form.setFieldValue('ibge_code', '');
+              }}
+            />
+          </Form.Item>
+
           <Form.Item
             name="nome"
             label="Nome do Município"
@@ -469,22 +535,6 @@ export default function MunicipiosPage(): JSX.Element {
             >
               <Input placeholder={watchedUf ? 'Digite ao menos 2 letras (autocomplete)' : 'Selecione a UF primeiro'} />
             </AutoComplete>
-          </Form.Item>
-
-          <Form.Item
-            name="uf"
-            label="UF"
-            rules={[{ required: true, message: 'UF é obrigatória' }]}
-          >
-            <Select
-              placeholder="Selecione a UF"
-              options={UF_NORDESTE_OPTIONS}
-              onChange={() => {
-                setLookupOptions([]);
-                setIbgeLocked(false);
-                form.setFieldValue('ibge_code', '');
-              }}
-            />
           </Form.Item>
 
           <Form.Item

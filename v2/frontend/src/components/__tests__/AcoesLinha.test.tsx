@@ -142,6 +142,16 @@ describe('AcoesLinha', () => {
     expect(itens.map((i) => i.textContent)).toEqual(['Ver detalhes', 'Editar', 'Redefinir senha', 'Excluir']);
   });
 
+  test('o item do menu tem só o rótulo como nome, sem o nome do ícone em inglês ("delete Excluir")', async () => {
+    const user = userEvent.setup();
+    render(<AcoesLinha acoes={quatroAcoes()} alvo="Maria Aparecida" compacto />);
+
+    await user.click(screen.getByRole('button', { name: 'Mais ações: Maria Aparecida' }));
+
+    expect(await screen.findByRole('menuitem', { name: 'Excluir' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Editar' })).toBeInTheDocument();
+  });
+
   test('larguraAcoesLinha cobre os botões que aparecem', () => {
     expect(larguraAcoesLinha(1)).toBeLessThan(larguraAcoesLinha(3));
     expect(larguraAcoesLinha(4)).toBeGreaterThan(larguraAcoesLinha(3));

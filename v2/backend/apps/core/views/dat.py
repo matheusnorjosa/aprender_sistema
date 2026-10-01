@@ -339,15 +339,21 @@ class ProjetoGeralViewSet(LockOnWriteMixin, viewsets.ModelViewSet):
     Ref: SPEC_DAT_REGISTROS.md seção 4.1
     """
 
-    queryset = ProjetoGeral.objects.annotate(
-        projetos_count=Count("projetos_especificos", filter=Q(projetos_especificos__ativo=True))
-    ).order_by("nome")
+    queryset = ProjetoGeral.objects.order_by("nome")
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ["usa_avaliar", "ativo", "tipo_calculo_codigos"]
     search_fields = ["nome", "descricao"]
     ordering_fields = ["nome", "created_at"]
     ordering = ["nome"]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        # A escrita trava a linha (FOR UPDATE, LockOnWriteMixin), e o PostgreSQL recusa FOR UPDATE
+        # com GROUP BY: a contagem de projetos só entra na leitura (a resposta da escrita vem sem ela).
+        if qs.query.select_for_update:
+            return qs
+        return qs.annotate(projetos_count=Count("projetos_especificos", filter=Q(projetos_especificos__ativo=True)))
 
     def get_serializer_class(self):
         """Return appropriate serializer."""

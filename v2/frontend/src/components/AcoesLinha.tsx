@@ -95,7 +95,8 @@ export function AcoesLinha({ acoes, alvo, compacto = false }: AcoesLinhaProps): 
               items: noMenu.map((acao) => ({
                 key: acao.chave,
                 label: acao.rotulo,
-                icon: acao.icone,
+                // Sem o aria-hidden, o nome do ícone (em inglês) entra no do item: "delete Excluir".
+                icon: <span aria-hidden="true">{acao.icone}</span>,
                 danger: Boolean(acao.perigo),
                 onClick: ({ domEvent }) => {
                   // Enter: o rc-menu chama isto já no keydown, e o foco volta ao botão ali mesmo.

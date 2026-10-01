@@ -855,7 +855,7 @@ GET /api/solicitacoes/?page=2
 | 401 | Não autenticado |
 | 403 | Sem permissão |
 | 404 | Não encontrado |
-| 409 | Conflito (ex: evento já publicado) |
+| 409 | Conflito (ex: evento já publicado; excluir registro em uso: o `ProtectedError` vira 409 `CONFLICT` com os tipos de registro vinculados no `detail`, nunca os registros) |
 | 429 | Rate limit excedido |
 | 500 | Erro interno |
 

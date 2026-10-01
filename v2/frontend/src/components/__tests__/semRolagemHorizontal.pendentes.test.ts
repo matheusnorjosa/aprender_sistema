@@ -27,7 +27,7 @@ interface Pendencias {
  * Medida em 2026-09-29 (main acd04afd), menos o que o Programa C consertou. 112 combinações da
  * 1ª medição, mais 14 que vieram de critério e vistas novos, não de regressão: o corte sem
  * reticências em Coordenadores (4) e as vistas Coordenadores "Lista" (4) e "Por área" (2) e Mapa
- * "Lista" (4). O C1 tirou 9 (as mesmas que saíram de PENDENTES). Consertou uma tela? Tire as
+ * "Lista" (4). O C1 tirou 9 e o C2 tirou 27 (as mesmas que saíram de PENDENTES). Consertou uma tela? Tire as
  * combinações daqui também (o ratchet reprova folga: o que ficasse aqui poderia voltar a
  * PENDENTES sem ele ver). Não edite para acomodar tela nova: conserte a tela.
  */
@@ -55,14 +55,7 @@ const LINHA_DE_BASE: ListaPendentes = {
   '/controle/pre-agenda': [360, 768, 1024, 1280],
   '/acoes-notificacao': [360, 768, 1024, 1280],
   '/notificacoes-internas': [360, 768],
-  '/dat/admin/municipios': [360, 768, 1024, 1280],
   '/dat/admin/projetos': [360, 768, 1024],
-  '/dat/admin/grupos': [360, 768, 1024, 1280],
-  '/dat/admin/setores': [360, 768, 1024, 1280],
-  '/dat/admin/funcoes': [360, 768, 1024, 1280],
-  '/dat/admin/gerencias': [360, 768, 1024, 1280],
-  '/dat/admin/produtos': [360, 768, 1024, 1280],
-  '/dat/admin/projetos-gerais': [360, 768, 1024],
   '/dat/cadastros': [360, 768, 1024, 1280],
   '/dat/registros': [360, 768, 1024, 1280],
 };
@@ -77,10 +70,11 @@ const LINHA_DE_BASE_SO_LINUX: ListaPendentes = {
 };
 
 /**
- * Tamanho atual de PENDENTES mais PENDENTES_SO_LINUX (117 + 2). Só desce. C0: 126 + 2; o C1
- * tirou 9 (as 4 de Usuários e 5 que a sidebar nova liberou a 768 e 1024).
+ * Tamanho atual de PENDENTES mais PENDENTES_SO_LINUX (90 + 2). Só desce. C0: 126 + 2; o C1
+ * tirou 9 (as 4 de Usuários e 5 que a sidebar nova liberou a 768 e 1024); o C2 tirou 27 (Admin
+ * DAT: grupos, setores, funções, gerências, municípios, produtos e projetos gerais).
  */
-const TETO_PENDENTES = 119;
+const TETO_PENDENTES = 92;
 
 const SO_LINUX = ' (só Linux)';
 
@@ -201,6 +195,16 @@ describe('ratchet de PENDENTES: controles', () => {
   });
 });
 
+/** Devolve `chave @ largura` a PENDENTES, com o teto folgado em 1, e confere o ratchet real. */
+function devolverAPendentes(chave: string, largura: number): string[] {
+  const devolta = { ...PENDENTES, [chave]: [...(PENDENTES[chave] ?? []), largura] };
+  return conferirRatchet(
+    { todas: devolta, soLinux: PENDENTES_SO_LINUX },
+    { todas: LINHA_DE_BASE, soLinux: LINHA_DE_BASE_SO_LINUX },
+    TETO_PENDENTES + 1
+  );
+}
+
 describe('ratchet de PENDENTES: lista real', () => {
   test('PENDENTES está dentro da linha de base e no teto', () => {
     expect(
@@ -225,13 +229,23 @@ describe('ratchet de PENDENTES: lista real', () => {
     ['/controle/coordenadores#area', 768],
     ['/notificacoes-internas', 1024],
   ] as const)('%s @ %ipx, consertada no C1, não volta a PENDENTES', (chave, largura) => {
-    const devolta = { ...PENDENTES, [chave]: [...(PENDENTES[chave] ?? []), largura] };
-    expect(
-      conferirRatchet(
-        { todas: devolta, soLinux: PENDENTES_SO_LINUX },
-        { todas: LINHA_DE_BASE, soLinux: LINHA_DE_BASE_SO_LINUX },
-        TETO_PENDENTES + 1
-      )
-    ).toEqual([`combinação fora da linha de base: ${chave} @ ${largura}px`]);
+    expect(devolverAPendentes(chave, largura)).toEqual([`combinação fora da linha de base: ${chave} @ ${largura}px`]);
   });
+
+  // O que o C2 consertou (30/09/2026, Admin DAT) também saiu da linha de base.
+  const CONSERTADAS_NO_C2: ListaPendentes = {
+    '/dat/admin/grupos': [360, 768, 1024, 1280],
+    '/dat/admin/setores': [360, 768, 1024, 1280],
+    '/dat/admin/funcoes': [360, 768, 1024, 1280],
+    '/dat/admin/gerencias': [360, 768, 1024, 1280],
+    '/dat/admin/municipios': [360, 768, 1024, 1280],
+    '/dat/admin/produtos': [360, 768, 1024, 1280],
+    '/dat/admin/projetos-gerais': [360, 768, 1024],
+  };
+  test.each(Object.entries(CONSERTADAS_NO_C2).flatMap(([chave, larguras]) => larguras.map((l) => [chave, l] as const)))(
+    '%s @ %ipx, consertada no C2, não volta a PENDENTES',
+    (chave, largura) => {
+      expect(devolverAPendentes(chave, largura)).toEqual([`combinação fora da linha de base: ${chave} @ ${largura}px`]);
+    }
+  );
 });

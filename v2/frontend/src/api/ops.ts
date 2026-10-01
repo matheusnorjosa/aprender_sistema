@@ -28,7 +28,10 @@ const NON_BLOCKING_PENDENCIA_CATEGORIES = new Set(['grupos_ignorados', 'grupos_d
 export interface ImportResult {
   created: number;
   updated: number;
+  /** Tudo o que não criou nem atualizou: inalteradas E rejeitadas. */
   skipped: number;
+  /** Só as inalteradas, quando o backend as conta (`stats.unchanged`); as rejeitadas estão em `errors`. */
+  unchanged?: number;
   errors: Array<{ row: number; message: string }>;
   warnings: string[];
 }
@@ -183,7 +186,7 @@ function normalizeImportResponse(raw: unknown): ImportResult {
       if (typeof e !== 'object' || e === null) continue;
       const item = e as Record<string, unknown>;
       const rowNum = toNum(item['linha'] ?? item['linha_num'] ?? item['row']);
-      const detail = [item['erro'], item['nome'], item['message']]
+      const detail = [item['erro'], item['nome'], item['municipio'], item['message']]
         .filter((x): x is string => typeof x === 'string' && x.length > 0)
         .join(' — ');
       if (isBlocking) {
@@ -201,6 +204,7 @@ function normalizeImportResponse(raw: unknown): ImportResult {
     created: toNum(baseStats['created']),
     updated: toNum(baseStats['updated']),
     skipped: skippedTotal,
+    ...(baseStats['unchanged'] !== undefined && { unchanged: toNum(baseStats['unchanged']) }),
     errors,
     warnings,
   };

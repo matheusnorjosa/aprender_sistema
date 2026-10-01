@@ -3,25 +3,29 @@
  *
  * CRUD de grupos Django com gestão de membros e permissões funcionais.
  * Fase 4a - RBAC funcional (Issue #830)
+ *
+ * Padrão responsivo (Programa C, C2): lista enxuta no ResponsiveTable (nome e ações sempre;
+ * Tipo, Usuários e Permissões sobem por largura), ações no AcoesLinha. O ID não vai para a
+ * grade. Padrão: v2/docs/specs/frontend/pages.spec.md, "Padrão responsivo".
  */
 
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import {
+  Alert,
   Button,
   Card,
   Checkbox,
   Empty,
   Form,
+  Grid,
   Input,
   Modal,
   Select,
   Space,
-  Table,
   Tag,
   Typography,
   message,
 } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
 import {
   DeleteOutlined,
   EditOutlined,
@@ -44,6 +48,10 @@ import {
 } from '../../api/adminDAT';
 import type { PermissaoFuncional, RBACMetaPayload } from '../../api/adminDAT';
 import { checkAuth } from '../../api/auth';
+import { errosDosCampos, mensagemDoErro, nomeDe } from './usuario_form_helpers';
+import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
+import { AcoesLinha, larguraAcoesLinha } from '../../components/AcoesLinha';
+import { TEXTO_DA_TAG } from '../../components/textoDaTag';
 import { PAGE_SIZES } from '../../constants';
 import type { ID } from '../../types';
 
@@ -63,6 +71,8 @@ interface UserRecord {
   id: ID;
   username: string;
   email: string;
+  first_name?: string;
+  last_name?: string;
   groups?: string[];
   group_ids_display?: ID[];
 }
@@ -108,9 +118,10 @@ const CATEGORY_LABELS: Record<string, { title: string; help: string }> = {
   },
 };
 
-const TYPE_UI: Record<'setor' | 'funcao', { title: string; create: string; singular: string }> = {
-  setor: { title: 'Setores', create: 'Novo Setor', singular: 'Setor' },
-  funcao: { title: 'Funções', create: 'Nova Função', singular: 'Função' },
+// `feminino`: a concordância das frases ("Nenhuma função", "esta função", "Nome da Função").
+const TYPE_UI: Record<'setor' | 'funcao', { title: string; create: string; singular: string; feminino: boolean }> = {
+  setor: { title: 'Setores', create: 'Novo Setor', singular: 'Setor', feminino: false },
+  funcao: { title: 'Funções', create: 'Nova Função', singular: 'Função', feminino: true },
 };
 
 function humanizeCategory(category: string): string {
@@ -126,13 +137,21 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
   const [modalVisible, setModalVisible] = useState(false);
   const [editingGroup, setEditingGroup] = useState<GroupRecord | null>(null);
   const [savingGroup, setSavingGroup] = useState(false);
-  const [deletingGroupId, setDeletingGroupId] = useState<ID | null>(null);
+  // Celular (< 576 px): as ações da linha vão todas para o menu "Mais ações".
+  const acoesCompactas = !Grid.useBreakpoint().sm;
   // P0-1 Tier-0 (D-1=2a): gestão de grupo/matriz/membership é superuser-only.
   // Não-superuser vê a lista, mas sem ações de escrita (co-deploy: UI para de
   // oferecer escrita antes de o backend rejeitar).
   const [currentIsSuperuser, setCurrentIsSuperuser] = useState(false);
 
   const [usuarios, setUsuarios] = useState<UserRecord[]>([]);
+  // Os membros do modal saem desta lista e o Salvar os grava por full-replace: sem ela
+  // carregada inteira, o Salvar não mexe nos membros (senão mandaria `user_ids: []`).
+  const [usuariosProntos, setUsuariosProntos] = useState(false);
+  const [erroUsuarios, setErroUsuarios] = useState<string | null>(null);
+  const [erroLista, setErroLista] = useState<string | null>(null);
+  // O toast do AntD não é região viva: o aviso do grupo reservado vai também para o leitor de tela.
+  const [avisoLeitor, setAvisoLeitor] = useState('');
 
   const [permissoesDisponiveis, setPermissoesDisponiveis] = useState<PermissaoFuncional[]>([]);
   const [rbacMeta, setRbacMeta] = useState<RBACMetaPayload | null>(null);
@@ -186,6 +205,24 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
 
   const isReservedGroup = (groupName: string): boolean => reservedGroupNames.has(groupName);
 
+  // Membros pelo nome, com o e-mail para distinguir homônimos; nunca o username (é o CPF).
+  const opcoesDeMembros = usuarios
+    .map((usuario) => {
+      const nome = nomeDe(usuario);
+      return { label: nome === usuario.email ? nome : `${nome} (${usuario.email})`, value: usuario.id };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+
+  // Vazio que diz o que fazer: a busca, ou o "Novo" de quem pode criar.
+  const rotuloDoTipo = pageTypeMeta ? pageTypeMeta.singular.toLowerCase() : 'grupo';
+  const feminino = pageTypeMeta?.feminino ?? false;
+  const artigo = feminino ? 'a' : 'o';
+  const nenhum = feminino ? 'Nenhuma' : 'Nenhum';
+  const vazio = searchText
+    ? `${nenhum} ${rotuloDoTipo} encontrad${artigo} para "${searchText}".`
+    : `${nenhum} ${rotuloDoTipo} cadastrad${artigo}.` +
+      (currentIsSuperuser ? ` Use "${pageTypeMeta ? pageTypeMeta.create : 'Novo Grupo'}" para criar.` : '');
+
   const inferGroupType = (group: GroupRecord): 'setor' | 'funcao' | undefined => {
     if (group.group_type === 'setor' || group.group_type === 'funcao') {
       return group.group_type;
@@ -208,6 +245,7 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
         page_size: PAGE_SIZES.ALL,
       });
       const loaded = data.results as GroupRecord[];
+      setErroLista(null);
       if (!forcedType) {
         setGrupos(loaded);
         return;
@@ -224,13 +262,15 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
       });
       setGrupos(filtered);
     } catch (error) {
-      message.error(`Erro ao carregar grupos: ${(error as Error).message}`);
+      setErroLista(mensagemDoErro(error));
     } finally {
       setLoading(false);
     }
   };
 
   const fetchUsuarios = async (): Promise<void> => {
+    setUsuariosProntos(false);
+    setErroUsuarios(null);
     try {
       // M01-07 (#1612): a membership do grupo é DERIVADA desta lista e salva por
       // full-replace (sync-members). Carregar só a 1ª página revogava membros além
@@ -247,8 +287,9 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
         page += 1;
       }
       setUsuarios(all);
+      setUsuariosProntos(true);
     } catch (error) {
-      message.error(`Erro ao carregar usuários: ${(error as Error).message}`);
+      setErroUsuarios(mensagemDoErro(error));
     }
   };
 
@@ -268,6 +309,14 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
   useEffect(() => {
     void fetchGrupos();
   }, [searchText, forcedType, rbacMeta]);
+
+  // Usuários que carregam com o Editar já aberto ("Tentar de novo", ou a recarga depois de
+  // salvar): os membros atuais entram no campo, que ficou desabilitado enquanto a lista não vinha.
+  useEffect(() => {
+    if (editingGroup && usuariosProntos && !form.isFieldTouched('member_ids')) {
+      form.setFieldValue('member_ids', currentMemberIds);
+    }
+  }, [currentMemberIds, usuariosProntos, editingGroup, form]);
 
   useEffect(() => {
     void fetchUsuarios();
@@ -306,8 +355,11 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
         name: groupDetail.name,
         group_type_input: groupType || 'setor',
         permissao_funcional_ids: (groupDetail.permissoes_funcionais || []).map((permissao) => permissao.id),
-        member_ids: memberIds,
       });
+      // Não tocado: o setFieldsValue marca o campo como tocado quando o valor muda (o modal não é
+      // destruído, e o valor anterior é o do Editar ou do Novo de antes), e aí o efeito acima não
+      // punha a lista que chega depois. O Salvar mandava o campo vazio ou velho por full-replace.
+      form.setFields([{ name: 'member_ids', value: memberIds, touched: false }]);
       setModalVisible(true);
     } catch (error) {
       message.error(`Erro ao carregar grupo para edição: ${(error as Error).message}`);
@@ -331,19 +383,30 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
         groupId = createdGroup.id;
       }
 
-      const syncResult = await syncGroupMembers(groupId, { user_ids: member_ids });
-      if (editingGroup) {
-        message.success(
-          `Grupo atualizado com sucesso (+${syncResult.added}/-${syncResult.removed} membros)`
+      if (!usuariosProntos) {
+        // Salvamento parcial não é sucesso pleno: aviso, com o motivo certo (carregando × falhou).
+        const motivo = erroUsuarios ? 'a lista de usuários não carregou' : 'a lista de usuários ainda estava carregando';
+        message.warning(
+          editingGroup
+            ? `Grupo atualizado, mas os membros não foram alterados: ${motivo}.`
+            : `Grupo criado sem membros: ${motivo}.`
         );
       } else {
-        message.success(`Grupo criado com sucesso (${syncResult.members_count} membros vinculados)`);
+        const syncResult = await syncGroupMembers(groupId, { user_ids: member_ids });
+        if (editingGroup) {
+          message.success(
+            `Grupo atualizado com sucesso (+${syncResult.added}/-${syncResult.removed} membros)`
+          );
+        } else {
+          message.success(`Grupo criado com sucesso (${syncResult.members_count} membros vinculados)`);
+        }
       }
       setModalVisible(false);
       form.resetFields();
       await Promise.all([fetchGrupos(), fetchUsuarios()]);
     } catch (error) {
-      message.error(`Erro ao salvar grupo: ${(error as Error).message}`);
+      form.setFields(errosDosCampos(error));
+      message.error(`Erro ao salvar grupo: ${mensagemDoErro(error)}`);
     } finally {
       setSavingGroup(false);
     }
@@ -368,78 +431,88 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
 
   const handleDelete = (group: GroupRecord): void => {
     if (isReservedGroup(group.name)) {
-      message.warning('Grupo reservado: exclusão bloqueada na interface.');
+      const aviso = 'Grupo reservado: exclusão bloqueada na interface.';
+      message.warning(aviso);
+      setAvisoLeitor(aviso);
       return;
     }
 
+    const quantos = group.user_count ?? 0;
     Modal.confirm({
       title: 'Confirmar exclusão',
-      content: `Tem certeza que deseja excluir o grupo "${group.name}"?`,
+      content:
+        `Tem certeza que deseja excluir o grupo "${group.name}"?` +
+        (quantos > 0 ? ` ${quantos} usuário(s) deixarão de ter ${feminino ? 'esta' : 'este'} ${rotuloDoTipo}.` : ''),
       okText: 'Excluir',
       okType: 'danger',
       cancelText: 'Cancelar',
+      // Ação destrutiva: o foco começa no Cancelar (senão um Enter repetido exclui sem confirmar).
+      autoFocusButton: 'cancel',
       onOk: async () => {
-        setDeletingGroupId(group.id);
         try {
           await deleteGroup(group.id);
           message.success('Grupo excluído com sucesso');
           await fetchGrupos();
         } catch (error) {
-          message.error(`Erro ao excluir grupo: ${(error as Error).message}`);
-        } finally {
-          setDeletingGroupId(null);
+          message.error(`Erro ao excluir grupo: ${mensagemDoErro(error)}`);
         }
       },
     });
   };
 
-  const columns: ColumnsType<GroupRecord> = [
-    { title: 'ID', dataIndex: 'id', key: 'id', width: 70 },
+  // C2: lista enxuta, por prioridade de largura (VISIVEL_A_PARTIR). O que some da linha vai
+  // para a linha expandida (ResponsiveTable). O ID não vai para a grade.
+  const columns: ColunaResponsiva<GroupRecord>[] = [
     {
       title: 'Nome',
-      dataIndex: 'name',
       key: 'name',
-      width: 260,
-      render: (name: string) => (
-        <Space size={8}>
-          <Text>{name}</Text>
-          {isReservedGroup(name) ? (
-            <Tag color="gold" icon={<LockOutlined />} style={{ marginInlineEnd: 0 }}>
+      // Sem detalhe para mostrar o nome inteiro, ele quebra linha em vez de cortar.
+      render: (_, record) => (
+        <div className="flex min-w-0 flex-wrap items-center gap-1">
+          <Text className="min-w-0 max-w-full break-words">{record.name}</Text>
+          {isReservedGroup(record.name) ? (
+            <Tag
+              color="gold"
+              icon={<LockOutlined />}
+              style={{ marginInlineEnd: 0, color: TEXTO_DA_TAG['gold'] }}
+            >
               Reservado
             </Tag>
           ) : null}
-        </Space>
+        </div>
       ),
     },
     {
       title: 'Tipo',
-      dataIndex: 'group_type',
       key: 'group_type',
-      width: 120,
-      render: (_: GroupRecord['group_type'], record: GroupRecord) => {
+      width: 96,
+      responsive: VISIVEL_A_PARTIR.sm,
+      render: (_, record) => {
         const type = inferGroupType(record);
         if (type === 'funcao') {
-          return <Tag color="geekblue">Função</Tag>;
+          return <Tag color="geekblue" style={{ marginInlineEnd: 0 }}>Função</Tag>;
         }
         if (type === 'setor') {
-          return <Tag color="green">Setor</Tag>;
+          return <Tag color="green" style={{ marginInlineEnd: 0, color: TEXTO_DA_TAG['green'] }}>Setor</Tag>;
         }
         return <Text type="secondary">-</Text>;
       },
     },
     {
       title: 'Usuários',
-      dataIndex: 'user_count',
       key: 'user_count',
-      width: 120,
-      render: (count: number | undefined) => <Tag color="blue">{count || 0} usuário(s)</Tag>,
+      width: 128,
+      responsive: VISIVEL_A_PARTIR.md,
+      render: (_, record) => (
+        <Tag color="blue" style={{ marginInlineEnd: 0 }}>{record.user_count || 0} usuário(s)</Tag>
+      ),
     },
     {
       title: 'Permissões funcionais',
-      dataIndex: 'permissoes_funcionais',
       key: 'permissoes_funcionais',
-      width: 420,
-      render: (permissoes: PermissaoFuncional[] | undefined) => {
+      responsive: VISIVEL_A_PARTIR.lg,
+      render: (_, record) => {
+        const permissoes = record.permissoes_funcionais;
         if (!permissoes || permissoes.length === 0) {
           return <Text type="secondary">Sem permissões funcionais</Text>;
         }
@@ -447,47 +520,57 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
         const displayed = permissoes.slice(0, 3);
         const remaining = permissoes.length - displayed.length;
 
+        // Tags que quebram linha e cortam com reticências em vez de estourar a coluna.
         return (
-          <Space size={[4, 4]} wrap>
+          <div className="flex min-w-0 flex-wrap gap-1">
             {displayed.map((permissao) => (
-              <Tag key={permissao.id} color="purple">
+              <Tag
+                key={permissao.id}
+                color="purple"
+                title={permissao.label}
+                className="truncate"
+                style={{ marginInlineEnd: 0, maxWidth: '100%' }}
+              >
                 {permissao.label}
               </Tag>
             ))}
-            {remaining > 0 ? <Tag>+{remaining}</Tag> : null}
-          </Space>
+            {remaining > 0 ? <Tag style={{ marginInlineEnd: 0 }}>+{remaining}</Tag> : null}
+          </div>
         );
       },
     },
-    {
-      title: 'Ações',
-      key: 'acoes',
-      width: 220,
-      render: (_, record) => {
-        const reserved = isReservedGroup(record.name);
-        if (!currentIsSuperuser) {
-          return <Text type="secondary">Somente superusuário</Text>;
-        }
-        return (
-          <Space>
-            <Button type="link" size="small" icon={<EditOutlined />} onClick={() => void handleEdit(record)}>
-              Editar
-            </Button>
-            <Button
-              type="link"
-              danger
-              size="small"
-              icon={reserved ? <LockOutlined /> : <DeleteOutlined />}
-              disabled={reserved}
-              loading={deletingGroupId === record.id}
-              onClick={() => handleDelete(record)}
-            >
-              Excluir
-            </Button>
-          </Space>
-        );
-      },
-    },
+    // P0-1 Tier-0: sem escrita para não-superuser, a coluna nem aparece (o aviso fica no topo).
+    ...(currentIsSuperuser
+      ? [
+          {
+            title: 'Ações',
+            key: 'acoes',
+            width: larguraAcoesLinha(2, acoesCompactas),
+            render: (_: unknown, record: GroupRecord) => {
+              const reserved = isReservedGroup(record.name);
+              return (
+                <AcoesLinha
+                  compacto={acoesCompactas}
+                  alvo={record.name}
+                  acoes={[
+                    { chave: 'editar', rotulo: 'Editar', icone: <EditOutlined />, onClick: () => void handleEdit(record) },
+                    // Reservado: o Excluir só avisa que a exclusão está bloqueada (handleDelete).
+                    reserved
+                      ? { chave: 'excluir', rotulo: 'Excluir (reservado)', icone: <LockOutlined />, onClick: () => handleDelete(record) }
+                      : {
+                          chave: 'excluir',
+                          rotulo: 'Excluir',
+                          icone: <DeleteOutlined />,
+                          onClick: () => handleDelete(record),
+                          perigo: true,
+                        },
+                  ]}
+                />
+              );
+            },
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -501,15 +584,18 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
       </nav>
 
       <Card>
-        <header className="flex justify-between items-center mb-4">
+        <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <Title level={3} className="m-0" id="grupos-title">
-            <TeamOutlined aria-hidden="true" /> {pageTypeMeta ? pageTypeMeta.title : 'Grupos RBAC'} ({grupos.length})
+            {/* Lista que falhou não tem total: "(0)" diria que não há grupo. */}
+            <TeamOutlined aria-hidden="true" /> {pageTypeMeta ? pageTypeMeta.title : 'Grupos RBAC'}
+            {erroLista ? '' : ` (${grupos.length})`}
           </Title>
-          <Space>
+          <div className="flex flex-wrap items-center gap-2">
             <Search
               placeholder={pageTypeMeta ? `Buscar ${pageTypeMeta.singular.toLowerCase()} por nome` : 'Buscar por nome'}
+              aria-label={`Buscar ${pageTypeMeta ? pageTypeMeta.title.toLowerCase() : 'grupos'} por nome`}
               allowClear
-              style={{ width: '100%', maxWidth: 250 }}
+              style={{ width: 250, maxWidth: '100%' }}
               onSearch={setSearchText}
               onChange={(event) => !event.target.value && setSearchText('')}
             />
@@ -521,16 +607,27 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
                 {pageTypeMeta ? pageTypeMeta.create : 'Novo Grupo'}
               </Button>
             ) : null}
-          </Space>
+          </div>
         </header>
 
-        <Table
+        {!currentIsSuperuser ? (
+          <Text type="secondary" className="mb-4 block">
+            <LockOutlined aria-hidden="true" /> Somente superusuário cria, edita ou exclui.
+          </Text>
+        ) : null}
+
+        <span role="status" className="sr-only">{avisoLeitor}</span>
+
+        <ResponsiveTable<GroupRecord>
           columns={columns}
           dataSource={grupos}
           rowKey="id"
+          nomeDaLinha={(grupo) => grupo.name}
           loading={loading}
+          erro={erroLista}
+          onTentarDeNovo={() => void fetchGrupos()}
+          locale={{ emptyText: vazio }}
           pagination={{ pageSize: 15, showTotal: (total) => `Total: ${total}` }}
-          scroll={{ x: 1200 }}
         />
       </Card>
 
@@ -551,10 +648,10 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
         <Form form={form} layout="vertical" autoComplete="off" onFinish={(values) => void handleSave(values)}>
           <Form.Item
             name="name"
-            label={`Nome do ${pageTypeMeta ? pageTypeMeta.singular : 'Grupo'}`}
+            label={`Nome d${artigo} ${pageTypeMeta ? pageTypeMeta.singular : 'Grupo'}`}
             rules={[{ required: true, message: 'Nome é obrigatório' }]}
           >
-            <Input placeholder={pageTypeMeta ? `Ex: ${pageTypeMeta.singular} Pedagógico` : 'Ex: DAT, Superintendência, Coordenador'} />
+            <Input placeholder={pageTypeMeta ? `Ex: ${pageTypeMeta.singular} Pedagógic${artigo}` : 'Ex: DAT, Superintendência, Coordenador'} />
           </Form.Item>
 
           {!forcedType ? (
@@ -617,6 +714,28 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
             )}
           </Form.Item>
 
+          {!usuariosProntos ? (
+            <Alert
+              className="mb-4"
+              type={erroUsuarios ? 'error' : 'info'}
+              showIcon
+              message={erroUsuarios ? 'Não foi possível carregar os usuários.' : 'Carregando os usuários…'}
+              description={
+                (erroUsuarios ? `${erroUsuarios} ` : '') +
+                (editingGroup
+                  ? 'Os membros deste grupo não serão alterados ao salvar.'
+                  : 'O grupo será criado sem membros.')
+              }
+              action={
+                erroUsuarios ? (
+                  <Button size="small" onClick={() => void fetchUsuarios()}>
+                    Tentar de novo
+                  </Button>
+                ) : undefined
+              }
+            />
+          ) : null}
+
           <Form.Item
             name="member_ids"
             label="Membros do grupo"
@@ -626,12 +745,10 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
               mode="multiple"
               allowClear
               showSearch
+              disabled={!usuariosProntos}
               placeholder="Selecione os membros"
               optionFilterProp="label"
-              options={usuarios.map((usuario) => ({
-                label: `${usuario.username} (${usuario.email})`,
-                value: usuario.id,
-              }))}
+              options={opcoesDeMembros}
             />
           </Form.Item>
 
@@ -640,10 +757,21 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
               <Text>
                 Permissões selecionadas: <Tag color="purple">{selectedPermissionIds.length}</Tag>
               </Text>
-              <Text>
-                Membros selecionados: <Tag color="blue">{selectedMemberIds.length}</Tag>
-              </Text>
-              {editingGroup ? (
+              {/* Sem a lista, a contagem seria 0 (o campo está vazio): mostra o estado da lista, não um número. */}
+              {usuariosProntos ? (
+                <Text>
+                  Membros selecionados: <Tag color="blue">{selectedMemberIds.length}</Tag>
+                </Text>
+              ) : null}
+              {!usuariosProntos ? (
+                <Text type="secondary">
+                  {!erroUsuarios
+                    ? 'Membros: aguardando a lista de usuários…'
+                    : editingGroup
+                      ? 'Membros: não serão alterados (a lista de usuários não carregou).'
+                      : 'Membros: nenhum (a lista de usuários não carregou).'}
+                </Text>
+              ) : editingGroup ? (
                 <Text type="secondary">
                   Alterações de membros: +{membershipDelta.added} / -{membershipDelta.removed}
                 </Text>

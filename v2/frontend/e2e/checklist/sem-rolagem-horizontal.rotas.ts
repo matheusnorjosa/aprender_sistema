@@ -84,6 +84,19 @@ export interface RotaMedida {
 
 const LINHA = '.ant-table-row';
 
+/**
+ * Vista "expandida" do ResponsiveTable: abre a linha com `textoDaLinha` e espera o rótulo de
+ * uma coluna escondida (`rotulo`) na linha expandida. `larguras`: onde há coluna escondida.
+ */
+function expandida(textoDaLinha: string, rotulo: string, larguras?: readonly Largura[]): EstadoDaTela {
+  return {
+    nome: 'expandida',
+    clicar: `${LINHA}:has-text("${textoDaLinha}") .ant-table-row-expand-icon`,
+    dados: { em: '.ant-table-expanded-row', texto: rotulo },
+    ...(larguras && { larguras }),
+  };
+}
+
 export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
   { path: '/', perfil: 'controle', marco: 'Página Inicial' },
   { path: '/dashboards', perfil: 'superusuario', marco: 'Dashboards e Analises', dados: { em: LINHA, texto: T.pessoa } },
@@ -180,15 +193,64 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
       },
     ],
   },
-  { path: '/dat/admin/municipios', perfil: 'dat', marco: 'Municípios', dados: { em: LINHA, texto: T.municipio } },
+  {
+    path: '/dat/admin/municipios',
+    perfil: 'dat',
+    marco: 'Municípios',
+    dados: { em: LINHA, texto: T.municipio },
+    // C2: UF (< 576) e IBGE (< 768) vão para a linha expandida.
+    estados: [expandida(T.municipio, 'IBGE', [360])],
+  },
   { path: '/dat/admin/projetos', perfil: 'dat', marco: 'Projetos', dados: { em: LINHA, texto: T.projeto } },
-  { path: '/dat/admin/grupos', perfil: 'dat', marco: 'Grupos RBAC', dados: { em: LINHA, texto: T.grupo } },
+  {
+    path: '/dat/admin/grupos',
+    // Superusuário: só ele vê a coluna Ações (P0-1). Setores e funções, o mesmo componente,
+    // são medidos com o DAT, sem a coluna e com o aviso "Somente superusuário".
+    perfil: 'superusuario',
+    marco: 'Grupos RBAC',
+    dados: { em: LINHA, texto: T.grupo },
+    // C2: Tipo (< 576), Usuários (< 768) e Permissões funcionais (< 992) vão para a linha expandida.
+    estados: [expandida(T.grupo, 'Permissões funcionais', [360, 768])],
+  },
   // Setores e funções listam só os grupos classificados (seed_rbac): não há texto longo a semear.
-  { path: '/dat/admin/setores', perfil: 'dat', marco: 'Setores', dados: { em: LINHA, texto: 'Vidas' } },
-  { path: '/dat/admin/funcoes', perfil: 'dat', marco: 'Funções', dados: { em: LINHA, texto: 'Coordenador' } },
-  { path: '/dat/admin/gerencias', perfil: 'dat', marco: 'Gerencias', dados: { em: LINHA, texto: T.gerencia } },
-  { path: '/dat/admin/produtos', perfil: 'dat', marco: 'Produtos', dados: { em: LINHA, texto: T.produto } },
-  { path: '/dat/admin/projetos-gerais', perfil: 'dat', marco: 'Projetos Gerais', dados: { em: LINHA, texto: T.projetoGeral } },
+  {
+    path: '/dat/admin/setores',
+    perfil: 'dat',
+    marco: 'Setores',
+    dados: { em: LINHA, texto: 'Vidas' },
+    estados: [expandida('Vidas', 'Permissões funcionais', [360, 768])],
+  },
+  {
+    path: '/dat/admin/funcoes',
+    perfil: 'dat',
+    marco: 'Funções',
+    dados: { em: LINHA, texto: 'Coordenador' },
+    estados: [expandida('Coordenador', 'Permissões funcionais', [360, 768])],
+  },
+  {
+    path: '/dat/admin/gerencias',
+    perfil: 'dat',
+    marco: 'Gerencias',
+    dados: { em: LINHA, texto: T.gerencia },
+    // C2: Rótulo nas planilhas só entra na linha a partir de 1600 px: há linha expandida em toda largura.
+    estados: [expandida(T.gerencia, 'Rótulo nas planilhas')],
+  },
+  {
+    path: '/dat/admin/produtos',
+    perfil: 'dat',
+    marco: 'Produtos',
+    dados: { em: LINHA, texto: T.produto },
+    // C2: a Descrição só entra na linha a partir de 1600 px: há linha expandida em toda largura.
+    estados: [expandida(T.produto, 'Descrição')],
+  },
+  {
+    path: '/dat/admin/projetos-gerais',
+    perfil: 'dat',
+    marco: 'Projetos Gerais',
+    dados: { em: LINHA, texto: T.projetoGeral },
+    // C2: Usa AVALIAR e Projetos (< 992) e Cálculo de códigos (< 768) vão para a linha expandida.
+    estados: [expandida(T.projetoGeral, 'Usa AVALIAR', [360, 768])],
+  },
   { path: '/dat/admin/configuracoes', perfil: 'dat', marco: 'Configurações do Sistema' },
   { path: '/dat/admin/colecoes', perfil: 'dat', marco: 'Importação de Coleções' },
   { path: '/dat/admin/equipe-gerencia', perfil: 'dat', marco: 'Importação de Vínculos' },
@@ -270,6 +332,9 @@ export const TELA_LOGIN = 'login';
  * 1024): Mapa e Mapa "Lista" a 768, edição de solicitação a 768, Coordenadores "Por área" a
  * 768 e Notificações Internas a 1024. Ficam 117. As vistas novas de Usuários, "expandida"
  * (360 a 1024) e "detalhe" (o Drawer), são medidas e não rolam.
+ * C2 (30/09/2026): saíram 27, todas as combinações de /dat/admin/grupos, /setores, /funcoes,
+ * /gerencias, /municipios e /produtos (4 cada) e de /dat/admin/projetos-gerais (3). Ficam 90.
+ * A vista "expandida" de cada uma é medida e não rola. /dat/admin/projetos fica para outro PR.
  * O ratchet do Vitest (semRolagemHorizontal.pendentes.test.ts) trava a lista: nada novo
  * entra e o tamanho só desce.
  */
@@ -297,14 +362,7 @@ export const PENDENTES: Readonly<Record<string, readonly Largura[]>> = {
   '/controle/pre-agenda': [360, 768, 1024, 1280],
   '/acoes-notificacao': [360, 768, 1024, 1280],
   '/notificacoes-internas': [360, 768],
-  '/dat/admin/municipios': [360, 768, 1024, 1280],
   '/dat/admin/projetos': [360, 768, 1024],
-  '/dat/admin/grupos': [360, 768, 1024, 1280],
-  '/dat/admin/setores': [360, 768, 1024, 1280],
-  '/dat/admin/funcoes': [360, 768, 1024, 1280],
-  '/dat/admin/gerencias': [360, 768, 1024, 1280],
-  '/dat/admin/produtos': [360, 768, 1024, 1280],
-  '/dat/admin/projetos-gerais': [360, 768, 1024],
   '/dat/cadastros': [360, 768, 1024, 1280],
   '/dat/registros': [360, 768, 1024, 1280],
 };

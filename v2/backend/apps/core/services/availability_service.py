@@ -27,7 +27,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from apps.core.models import AvailabilityBlock, Municipio, Participation, Solicitacao, Usuario
-from apps.core.services.config_service import get_cfg
+from apps.core.services.config_service import parametros_disponibilidade
 from apps.core.types import ConflictCode
 from apps.core.utils.cache_utils import cache_availability_check
 
@@ -177,12 +177,10 @@ def _check_conflicts_impl(
             conflicts=[Conflict("X", "Intervalo inválido", "fim deve ser > início")],
         )
 
-    # Carregar configurações (RD-04, RD-05) com fallback para settings
-    cfg: dict[str, str] = get_cfg("availability", {})
-    buffer_min: int = int(cfg.get("TRAVEL_BUFFER_MINUTES") or getattr(settings, "TRAVEL_BUFFER_MINUTES", 120))
-    daily_limit_h: float = float(
-        cfg.get("AVAILABILITY_DAILY_LIMIT_HOURS") or getattr(settings, "AVAILABILITY_DAILY_LIMIT_HOURS", 8)
-    )
+    # Configurações (RD-04, RD-05): a mesma fonte que a tela de Configurações mostra
+    parametros = parametros_disponibilidade()
+    buffer_min: int = int(parametros["TRAVEL_BUFFER_MINUTES"])
+    daily_limit_h: float = float(parametros["AVAILABILITY_DAILY_LIMIT_HOURS"])
 
     conflicts: list[Conflict] = []
     # M08-07 (#1664): só papéis OCUPANTES (ENFORCED_ROLES) bloqueiam. Antes qualquer

@@ -63,12 +63,19 @@ export interface UseTableFiltersConfig<F extends object, T, S = unknown> {
   entityName?: string;
   /** Auto-fetch on mount and whenever filters change. Defaults to true. */
   autoFetch?: boolean;
+  /**
+   * A tela mostra `statsError` (ex.: Alert com "Tentar de novo"). Sem isso (padrão), o
+   * hook avisa o erro das estatísticas por toast — a lista carrega de qualquer jeito.
+   */
+  showsStatsError?: boolean;
 }
 
 export interface UseTableFiltersReturn<F, T, S> {
   data: T[];
   setData: Dispatch<SetStateAction<T[]>>;
   stats: S | null;
+  /** Motivo do erro das estatísticas (a lista carrega mesmo assim); null se carregaram. */
+  statsError: string | null;
   loading: boolean;
   filters: F;
   setFilters: Dispatch<SetStateAction<F>>;
@@ -100,9 +107,11 @@ export function useTableFilters<F extends object, T, S = unknown>({
   pageSize = 15,
   entityName = 'dados',
   autoFetch = true,
+  showsStatsError = false,
 }: UseTableFiltersConfig<F, T, S>): UseTableFiltersReturn<F, T, S> {
   const [data, setData] = useState<T[]>([]);
   const [stats, setStats] = useState<S | null>(null);
+  const [statsError, setStatsError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [filters, setFilters] = useState<F>(defaultFilters);
   const [pagination, setPagination] = useState<PaginationState>({
@@ -142,12 +151,16 @@ export function useTableFilters<F extends object, T, S = unknown>({
           ...mapped,
         };
 
-        const [listResp, statsResp] = await Promise.all([
+        // Lista e estatísticas independentes (auditoria UX 30/09): o erro das
+        // estatísticas não derruba a lista — vira `statsError`, com o motivo.
+        const [listResult, statsResult] = await Promise.allSettled([
           listFn(params),
           statsFn ? statsFn(params) : Promise.resolve(undefined),
         ]);
 
         if (seq !== seqRef.current) return; // resposta obsoleta: uma busca mais nova venceu
+        if (listResult.status === 'rejected') throw listResult.reason;
+        const listResp = listResult.value;
 
         const results =
           (listResp as PaginatedResponse<T>).results ??
@@ -158,7 +171,16 @@ export function useTableFilters<F extends object, T, S = unknown>({
         setPagination((prev) => ({ ...prev, current: page, pageSize: requestPageSize, total }));
 
         if (statsFn) {
-          setStats((statsResp as S) ?? null);
+          if (statsResult.status === 'fulfilled') {
+            setStats((statsResult.value as S) ?? null);
+            setStatsError(null);
+          } else {
+            const reason: unknown = statsResult.reason;
+            const motivo = reason instanceof Error ? reason.message : String(reason);
+            setStats(null);
+            setStatsError(motivo);
+            if (!showsStatsError) message.error(`Erro ao carregar as estatísticas de ${entityName}: ${motivo}`);
+          }
         }
       } catch (error) {
         if (seq !== seqRef.current) return; // erro de busca obsoleta: não polui a UI atual
@@ -168,7 +190,7 @@ export function useTableFilters<F extends object, T, S = unknown>({
         if (seq === seqRef.current) setLoading(false);
       }
     },
-    [buildParams, filters, listFn, statsFn, defaultOrdering, entityName, pagination.pageSize],
+    [buildParams, filters, listFn, statsFn, defaultOrdering, entityName, showsStatsError, pagination.pageSize],
   );
 
   // Auto-fetch on mount and whenever filters change. Pagination changes are
@@ -199,6 +221,7 @@ export function useTableFilters<F extends object, T, S = unknown>({
     data,
     setData,
     stats,
+    statsError,
     loading,
     filters,
     setFilters,

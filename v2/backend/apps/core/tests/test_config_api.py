@@ -16,15 +16,18 @@ Test coverage:
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Any
 
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
 from apps.core.models import AuditLog, Config
-from apps.core.tests.factories import GroupFactory, UsuarioFactory
+from apps.core.services.availability_service import check_conflicts_uncached
+from apps.core.tests.factories import GroupFactory, MunicipioFactory, SolicitacaoFactory, UsuarioFactory
 
 
 @pytest.fixture
@@ -61,7 +64,7 @@ def coordenador_user(db: Any) -> Any:
 
 
 @pytest.mark.django_db
-def test_config_get_endpoint(client: APIClient, dat_user: Any) -> None:
+def test_config_get_endpoint(client: APIClient, dat_user: Any, settings: Any) -> None:
     """
     Test 1: GET /api/config/ returns defaults correctly.
 
@@ -85,8 +88,9 @@ def test_config_get_endpoint(client: APIClient, dat_user: Any) -> None:
     data = response.json()
 
     # Check default values (from ConfigSerializer)
-    assert data["TRAVEL_BUFFER_MINUTES"] == 120
-    assert data["AVAILABILITY_DAILY_LIMIT_HOURS"] == 8
+    # Buffer e limite diário: sem Config, o settings (env) — o mesmo que o motor aplica.
+    assert data["TRAVEL_BUFFER_MINUTES"] == settings.TRAVEL_BUFFER_MINUTES
+    assert data["AVAILABILITY_DAILY_LIMIT_HOURS"] == settings.AVAILABILITY_DAILY_LIMIT_HOURS
     assert data["ALLOW_ADJACENT_EVENTS"] is True
     assert data["BLOCK_AUTO_APPROVE"] is True
     assert data["BATCH_SIZE"] == 200
@@ -327,3 +331,191 @@ def test_config_audit_log(client: APIClient, dat_user: Any) -> None:
     assert "TRAVEL_BUFFER_MINUTES" in audit_log.details["changed_fields"]
     assert "ip_address" in audit_log.details
     assert "user_agent" in audit_log.details
+
+
+@pytest.mark.django_db
+def test_config_put_parcial_mantem_o_que_nao_veio(client: APIClient, dat_user: Any) -> None:
+    """Auditoria UX 30/09 (ALTA): campo ausente no PUT mantém o valor atual, não volta ao padrão.
+
+    A tela de Configurações só mandava os campos das abas abertas; o serializer
+    completava o resto com `default=` e o save zerava Google Calendar, Sessões e
+    flags experimentais, respondendo 200.
+    """
+    from apps.core.services.config_service import bust_cfg
+
+    Config.objects.all().delete()
+    for key in ("availability", "gcal_sync", "session_settings", "features"):
+        bust_cfg(key)
+    client.force_authenticate(user=dat_user)
+    url = reverse("core:config")
+
+    completo = {
+        "TRAVEL_BUFFER_MINUTES": 90,
+        "AVAILABILITY_DAILY_LIMIT_HOURS": 10,
+        "ALLOW_ADJACENT_EVENTS": False,
+        "BLOCK_AUTO_APPROVE": False,
+        "BATCH_SIZE": 150,
+        "LOCK_TTL_SECONDS": 200,
+        "AUTO_RETRY_ON_ERROR": False,
+        "MAX_RETRIES": 2,
+        "SEND_UPDATES": "all",
+        "SESSION_COOKIE_AGE": 3600,
+        "SESSION_WARNING_THRESHOLD": 600,
+        "AUTOCOMPLETE_DEBOUNCE_MS": 500,
+        "ENABLE_MULTI_CALENDAR": True,
+        "ENABLE_BATCH_ACTIONS": True,
+        "ENABLE_ADVANCED_FILTERS": True,
+    }
+    assert client.put(url, data=completo, format="json").status_code == 200
+
+    # Só a aba 1 (Disponibilidade), com o Buffer alterado.
+    parcial = {
+        "TRAVEL_BUFFER_MINUTES": 45,
+        "AVAILABILITY_DAILY_LIMIT_HOURS": 10,
+        "ALLOW_ADJACENT_EVENTS": False,
+        "BLOCK_AUTO_APPROVE": False,
+    }
+    response = client.put(url, data=parcial, format="json")
+    assert response.status_code == 200
+
+    esperado = {**completo, "TRAVEL_BUFFER_MINUTES": 45}
+    assert response.json() == esperado
+    assert client.get(url).json() == esperado
+
+    audit = AuditLog.objects.filter(action="UPDATE_CONFIG").order_by("-id").first()
+    assert audit is not None
+    assert sorted(audit.details["changed_fields"]) == sorted(parcial)
+
+
+def _limpar_config() -> None:
+    from apps.core.services.config_service import bust_cfg
+
+    Config.objects.all().delete()
+    for key in ("availability", "gcal_sync", "session_settings", "features"):
+        bust_cfg(key)
+
+
+@pytest.mark.django_db
+def test_config_put_preserva_chaves_que_o_serializer_nao_conhece(client: APIClient, dat_user: Any) -> None:
+    """Auditoria UX 30/09, rodada 2: o JSON de `features` também guarda overrides lidos por
+    /api/features/ (PREVIEW_ONLY, auto_apply_enabled...). O PUT regravava só as 3 chaves do
+    serializer e apagava o resto, sem rastro."""
+    _limpar_config()
+    Config.objects.create(
+        key="features",
+        value={"ENABLE_MULTI_CALENDAR": False, "PREVIEW_ONLY": True, "auto_apply_enabled": True},
+    )
+    client.force_authenticate(user=dat_user)
+
+    response = client.put(reverse("core:config"), data={"ENABLE_BATCH_ACTIONS": True}, format="json")
+
+    assert response.status_code == 200
+    features = Config.objects.get(key="features").value
+    assert features["PREVIEW_ONLY"] is True
+    assert features["auto_apply_enabled"] is True
+    assert features["ENABLE_BATCH_ACTIONS"] is True
+    assert features["ENABLE_MULTI_CALENDAR"] is False
+
+
+@pytest.mark.django_db
+def test_config_put_so_regrava_a_categoria_enviada(client: APIClient, dat_user: Any) -> None:
+    """Rodada 2: a tela manda só o que mudou. Regravar as outras categorias com o valor lido
+    no começo do PUT desfazia a edição de outra pessoa feita no meio do caminho."""
+    _limpar_config()
+    client.force_authenticate(user=dat_user)
+
+    response = client.put(reverse("core:config"), data={"SEND_UPDATES": "all"}, format="json")
+
+    assert response.status_code == 200
+    assert response.json()["SEND_UPDATES"] == "all"
+    assert sorted(Config.objects.values_list("key", flat=True)) == ["gcal_sync"]
+    audit = AuditLog.objects.filter(action="UPDATE_CONFIG").order_by("-id").first()
+    assert audit is not None
+    assert audit.details["changed_fields"] == ["SEND_UPDATES"]
+
+
+def _codigos(usuario: Any, inicio: Any, minutos: int, municipio: Any = None) -> set[str]:
+    """Conflitos que o motor de disponibilidade (o mesmo de check_conflicts) aplica."""
+    resultado = check_conflicts_uncached(
+        usuario=usuario, inicio=inicio, fim=inicio + timedelta(minutes=minutos), municipio=municipio
+    )
+    return {c.code for c in resultado.conflicts}
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "gravado",
+    [None, {"TRAVEL_BUFFER_MINUTES": 0}, {"TRAVEL_BUFFER_MINUTES": 45}, {"AVAILABILITY_DAILY_LIMIT_HOURS": 10}],
+    ids=["sem-config", "buffer-0-gravado", "buffer-45-gravado", "registro-sem-buffer"],
+)
+def test_config_buffer_exibido_e_o_aplicado_no_rd04(
+    client: APIClient, dat_user: Any, settings: Any, gravado: dict[str, int] | None
+) -> None:
+    """Auditoria UX 30/09 (MÉDIA): a tela completava o Buffer com 120 fixo, e o motor (RD-04)
+    caía no settings (env); um Buffer 0 gravado também virava o settings (`0 or ...`)."""
+    _limpar_config()
+    settings.TRAVEL_BUFFER_MINUTES = 60  # env diferente do 120 que a tela mostrava
+    if gravado is not None:
+        Config.objects.create(key="availability", value=gravado)
+    client.force_authenticate(user=dat_user)
+
+    exibido = client.get(reverse("core:config")).json()["TRAVEL_BUFFER_MINUTES"]
+
+    fim_anterior = timezone.now().replace(hour=8, minute=0, second=0, microsecond=0)
+    SolicitacaoFactory(
+        usuario=dat_user,
+        inicio=fim_anterior - timedelta(hours=1),
+        fim=fim_anterior,
+        status="aprovado",
+    )
+    outra_cidade = MunicipioFactory()
+    assert "D" not in _codigos(dat_user, fim_anterior + timedelta(minutes=exibido), 30, outra_cidade)
+    if exibido > 0:
+        assert "D" in _codigos(dat_user, fim_anterior + timedelta(minutes=exibido - 1), 30, outra_cidade)
+
+
+@pytest.mark.django_db
+def test_config_limite_diario_exibido_e_o_aplicado_no_rd05(client: APIClient, dat_user: Any, settings: Any) -> None:
+    """Mesma divergência no limite diário: a tela completava com 8 fixo e o motor (RD-05) usava o settings."""
+    _limpar_config()
+    settings.AVAILABILITY_DAILY_LIMIT_HOURS = 6
+    client.force_authenticate(user=dat_user)
+
+    exibido = client.get(reverse("core:config")).json()["AVAILABILITY_DAILY_LIMIT_HOURS"]
+
+    inicio = timezone.now().replace(hour=12, minute=0, second=0, microsecond=0)  # 09:00 em Fortaleza
+    assert "M" not in _codigos(dat_user, inicio, exibido * 60)
+    assert "M" in _codigos(dat_user, inicio, exibido * 60 + 1)
+
+
+@pytest.mark.django_db
+def test_config_buffer_salvo_vale_ja_na_checagem_consultiva_com_cache(client: APIClient, dat_user: Any) -> None:
+    """Auditoria UX 30/09, rodada 4 (BAIXA): a checagem consultiva (`check_conflicts`, cache de
+    5 min) não dependia do Config. Depois de salvar o Buffer em Configurações, a tela e o
+    enforcement já aplicavam o novo valor, mas a consultiva respondia com o velho por até 5 min.
+    """
+    _limpar_config()
+    Config.objects.create(key="availability", value={"TRAVEL_BUFFER_MINUTES": 120})
+    client.force_authenticate(user=dat_user)
+
+    fim_anterior = timezone.now().replace(hour=8, minute=0, second=0, microsecond=0) + timedelta(days=7)
+    SolicitacaoFactory(usuario=dat_user, inicio=fim_anterior - timedelta(hours=1), fim=fim_anterior, status="aprovado")
+    inicio = fim_anterior + timedelta(minutes=90)  # 90 min depois, em outra cidade
+    consulta = {
+        "usuario_id": dat_user.id,
+        "inicio": inicio.isoformat(),
+        "fim": (inicio + timedelta(minutes=30)).isoformat(),
+        "municipio_id": MunicipioFactory().id,
+    }
+
+    def codigos() -> set[str]:
+        resposta = client.get(reverse("core:availability-check"), consulta)
+        assert resposta.status_code == 200, resposta.content
+        return {c["code"] for c in resposta.json()["conflicts"]}
+
+    assert "D" in codigos()  # buffer 120 > 90: conflito (e o resultado fica no cache)
+
+    resposta = client.put(reverse("core:config"), data={"TRAVEL_BUFFER_MINUTES": 60}, format="json")
+    assert resposta.status_code == 200
+
+    assert "D" not in codigos()  # buffer 60 < 90: já sem conflito, sem esperar o cache vencer

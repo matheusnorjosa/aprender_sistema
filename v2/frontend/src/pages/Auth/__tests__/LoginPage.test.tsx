@@ -23,10 +23,28 @@ vi.mock('../../../api/auth', () => ({
 }));
 
 import LoginPage from '../LoginPage';
+import { guardarAvisoDoLogin, lerAvisoDoLogin, apagarAvisoDoLogin } from '../../../utils/storage';
 
 describe('LoginPage', () => {
   afterEach(() => {
     vi.clearAllMocks();
+    apagarAvisoDoLogin();
+  });
+
+  // Auditoria UX 30/09, rodada 2 (MÉDIA): a sessão expirada caía no login sem dizer por quê
+  // (o "Logout realizado com sucesso" sumia no reload). O App guarda o motivo; o login mostra.
+  test('mostra o motivo guardado (sessão expirada) e o consome', () => {
+    guardarAvisoDoLogin('Sua sessão expirou por inatividade. Entre de novo.');
+
+    render(<LoginPage />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Sua sessão expirou por inatividade. Entre de novo.');
+    expect(lerAvisoDoLogin()).toBeNull();
+  });
+
+  test('sem motivo guardado, não mostra aviso', () => {
+    render(<LoginPage />);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   test('renderiza o heading "Login"', () => {

@@ -47,7 +47,7 @@ A afirmacao "RD e apenas consultivo" era verdadeira ate o #1452 e **nao vale mai
 - [`v2/backend/apps/core/types.py`](../../../backend/apps/core/types.py) — `ConflictCode: TypeAlias = Literal["X", "T", "P", "D", "M", "E"]`.
 - [`v2/backend/apps/core/views_availability.py`](../../../backend/apps/core/views_availability.py) — `AvailabilityCheckView`, `AvailabilityCheckManyView`, `AvailabilityBlockViewSet`, helpers `is_privileged_user` / `can_check_availability_for_others`.
 - [`v2/backend/apps/core/views_availability_monthly.py`](../../../backend/apps/core/views_availability_monthly.py) — `MonthlyAvailabilityView` (grade mensal, codigos de celula).
-- [`v2/backend/apps/core/services/config_service.py`](../../../backend/apps/core/services/config_service.py) — `get_cfg("availability", {})` (overrides em runtime de buffer/limite).
+- [`v2/backend/apps/core/services/config_service.py`](../../../backend/apps/core/services/config_service.py) — `parametros_disponibilidade()` (overrides em runtime de buffer/limite, via `get_cfg("availability", {})`; a mesma função alimenta a tela de Configurações).
 - [`v2/backend/config/settings.py`](../../../backend/config/settings.py) — `TIME_ZONE = TZ_PROJECT = "America/Fortaleza"`; `TRAVEL_BUFFER_MINUTES` (default 120); `AVAILABILITY_DAILY_LIMIT_HOURS` (default 8).
 
 Doc detalhado da API/permissoes da grade: [`v2/docs/GUIDE_AVAILABILITY.md`](../../GUIDE_AVAILABILITY.md). Decisao arquitetural: [`ADR-003`](../../../../docs/architecture/project-decisions/ADR-003-availability-rules-timezone.md).
@@ -98,7 +98,7 @@ RBAC dos endpoints de check: `permission_classes = [HasPerm("view_all_availabili
 Caminho feliz / deteccao (`check_conflicts`):
 
 1. Valida `fim > inicio` (senao retorna `X` "Intervalo invalido").
-2. Carrega `buffer_min` e `daily_limit_h` de `get_cfg("availability", {})` com fallback para settings (120 min / 8 h).
+2. Carrega `buffer_min` e `daily_limit_h` por `parametros_disponibilidade()`: a chave gravada no Config `availability` vale (inclusive Buffer 0); sem ela, o settings (env; default 120 min / 8 h). É a mesma fonte do `GET /api/config/`, então o valor que a tela mostra é o aplicado (auditoria UX 30/09).
 3. Monta `events_qs` = `Solicitacao` APROVADO onde o usuario e dono **ou** participante (`participations__usuario`).
 4. RD-02/RD-03: itera blocos aprovados que intersectam → emite `T` ou `P`.
 5. RD-01: itera eventos aprovados que intersectam → emite `X`.

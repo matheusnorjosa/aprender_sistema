@@ -11,7 +11,7 @@ import { useState, useEffect, useRef, useCallback, lazy, Suspense, type JSX } fr
 import { BrowserRouter as Router } from 'react-router';
 import { ConfigProvider, Layout, message, Result, Button } from 'antd';
 import logger from './utils/logger';
-import { isAuthError } from './utils/errors';
+import { getErrorStatus, isAuthError } from './utils/errors';
 import { ThemeProvider, useTheme, useBrandColors } from './contexts/ThemeContext';
 import ptBR from 'antd/locale/pt_BR';
 import { getMe } from './api/availability';
@@ -21,6 +21,7 @@ import { Toaster } from 'react-hot-toast';
 import { LAYOUT } from './constants';
 import { preloadSearchData } from './services/preloadSearchData';
 import { clearApiCaches } from './services/swCache';
+import { apagarAvisoDoLogin, avisarSaidaAsOutrasAbas, guardarAvisoDoLogin, storageKeys } from './utils/storage';
 import OfflineBanner from './components/OfflineBanner';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FullscreenLoader } from './components/FullscreenLoader';
@@ -40,6 +41,30 @@ import './App.css';
 const LoginPage = lazy(() => import('./pages/Auth/LoginPage'));
 
 const { Content } = Layout;
+
+const AVISO_INATIVIDADE = 'Sua sessão expirou por inatividade. Entre de novo.';
+const AVISO_SESSAO_EXPIRADA = 'Sua sessão expirou. Entre de novo.';
+const AVISO_SAIU_EM_OUTRA_ABA = 'Você saiu do sistema em outra aba. Entre de novo.';
+
+/**
+ * Monitor e aviso de sessão: só existem com usuário logado (na tela de login não há sessão
+ * para vigiar, e o monitor ali chegava a fazer POST de logout — auditoria UX 30/09).
+ */
+function MonitorDeSessao({ onExpirada, onSair }: {
+  onExpirada: () => Promise<void>;
+  onSair: () => Promise<void>;
+}): JSX.Element {
+  const monitor = useSessionMonitor(onExpirada);
+  return (
+    <SessionExpiryWarning
+      showWarning={monitor.showWarning}
+      timeLeft={monitor.timeLeft}
+      renewSession={monitor.renewSession}
+      renewError={monitor.renewError}
+      onLogout={onSair}
+    />
+  );
+}
 
 function AppContent(): JSX.Element {
   const { antThemeConfig } = useTheme();
@@ -84,6 +109,8 @@ function AppContent(): JSX.Element {
       const userData = await getMe();
       if (!isMountedRef.current) return;
       setUser(userData);
+      // Sessão viva: um motivo guardado para o login (ex.: expiração dada por engano) não vale mais.
+      apagarAvisoDoLogin();
 
       // Só busca policies se user autenticado (evita 403 espúrio pre-login).
       try {
@@ -138,52 +165,101 @@ function AppContent(): JSX.Element {
     userId: user?.id,
   });
 
-  // ── Monitor proativo de sessão (Issue #164, religado em #1376) ──
-  // Aviso de expiração iminente + renovação via /api/auth/ping/. Até então era
-  // dead code (nunca montado). A UI (SessionExpiryWarning) é renderizada dentro
-  // do <Router> no fluxo autenticado (usa useNavigate).
-  const sessionMonitor = useSessionMonitor();
-
-  // ── Tratamento global de sessão expirada no 401 (Issue #1376) ──
-  // `fetchAPI` dispara `auth:expired` em qualquer 401. Se havia usuário logado,
-  // limpamos o estado de sessão → App re-renderiza a LoginPage (redirect global
-  // para o login, sem cada tela tratar o 401). O guard `userRef.current` evita
-  // loop no load inicial e em rotas públicas: um 401 sem sessão prévia é ignorado.
-  const userRef = useRef<CurrentUser | null>(null);
-  useEffect(() => {
-    userRef.current = user;
-  }, [user]);
-
-  useEffect(() => {
-    const handleAuthExpired = (): void => {
-      if (!userRef.current || !isMountedRef.current) return;
-      message.warning('Sua sessão expirou. Faça login novamente.');
-      setUser(null);
-      setPolicies([]);
-    };
-    window.addEventListener('auth:expired', handleAuthExpired);
-    return () => window.removeEventListener('auth:expired', handleAuthExpired);
-  }, []);
-
   // ── Logout ──
   // TODO(tech-debt): replace window.location.reload() with state-driven
   // cleanup once a centralized auth store is in place (#927)
+  // Só para a ação explícita: "Sair" do cabeçalho e "Sair agora" do aviso. '/login' e
+  // '/logout' não são rotas — o login aparece quando não há sessão.
   const handleLogout = useCallback(async () => {
     try {
       await apiLogout();
       message.success('Logout realizado com sucesso');
     } catch (error) {
-      logger.error('Erro no logout:', error);
-      message.warning('Sessão encerrada localmente');
-    } finally {
-      // Remove os caches de identidade do SW antes do reload (Issue #1461):
-      // impede servir /api/me/* de um usuário anterior offline. Roda mesmo se o
-      // POST de logout falhar (está no finally) e nunca lança (no-op seguro).
-      await clearApiCaches();
-      setUser(null);
-      window.location.reload();
+      // A sessão já acabou no servidor (401, ou 403 com code NOT_AUTHENTICATED, como no
+      // fetchAPI): segue para o login. Outro 403 (ex.: CSRF Failed) é com a sessão viva.
+      const status = getErrorStatus(error);
+      const codigo = (error as { response?: { data?: { code?: string } } }).response?.data?.code;
+      if (!(status === 401 || (status === 403 && codigo === 'NOT_AUTHENTICATED'))) {
+        // Sem rede, 5xx ou 403 de CSRF, a sessão continua aberta no servidor: recarregar
+        // mostraria uma tela quebrada (o JSON offline do service worker) ou a mesma conta
+        // logada, sem aviso. Fica na tela e pede para tentar de novo (auditoria UX 30/09,
+        // rodadas 3 e 4).
+        logger.error('Erro no logout:', error);
+        message.error(error instanceof TypeError
+          ? 'Não foi possível sair: sem conexão. Tente de novo.'
+          : 'Não foi possível sair: erro no servidor. Tente de novo.');
+        return;
+      }
     }
+    // As outras abas vão ao login na hora: sem isto, contavam das respostas deste logout e
+    // seguiam com cara de logadas por mais 2 h (auditoria UX 30/09, rodada 6).
+    avisarSaidaAsOutrasAbas();
+    // Remove os caches de identidade do SW antes do reload (Issue #1461):
+    // impede servir /api/me/* de um usuário anterior offline. Nunca lança (no-op seguro).
+    await clearApiCaches();
+    setUser(null);
+    window.location.reload();
   }, []);
+
+  // ── Sessão encerrada pelo servidor (expirou, ou caiu em outra aba) ──
+  // SEM POST de logout: não há sessão para encerrar, e o POST de uma aba ociosa derrubava
+  // a sessão das outras (o cookie é do navegador). Limpa os caches de identidade do SW,
+  // guarda o motivo para o login e recarrega (o reload zera o estado em memória, como no
+  // logout) — auditoria UX 30/09, rodada 2.
+  const encerradaRef = useRef(false);
+  const handleSessaoEncerrada = useCallback(async (aviso: string): Promise<void> => {
+    if (encerradaRef.current) return;
+    encerradaRef.current = true;
+    guardarAvisoDoLogin(aviso);
+    await clearApiCaches();
+    window.location.reload();
+  }, []);
+  const handleInatividade = useCallback(
+    () => handleSessaoEncerrada(AVISO_INATIVIDADE),
+    [handleSessaoEncerrada],
+  );
+
+  // ── Tratamento global de sessão expirada (Issue #1376) ──
+  // `fetchAPI` dispara `auth:expired` em 401 e no 403 do DRF sem sessão (code
+  // NOT_AUTHENTICATED; SessionAuthentication não manda WWW-Authenticate, então o DRF
+  // responde 403). Antes de tirar alguém do sistema, pergunta ao servidor (GET /api/me/):
+  // sem sessão → login com o motivo; sessão viva → fica (a tela já mostrou o erro dela).
+  // O guard `userRef.current` evita loop no load inicial e na tela de login.
+  // O "Sair" em outra aba apaga o horário comum às abas (handleLogout): o evento 'storage', que
+  // o navegador entrega só às outras abas, faz a mesma pergunta, com o motivo certo (rodada 6).
+  const userRef = useRef<CurrentUser | null>(null);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
+  const conferindoRef = useRef(false);
+  useEffect(() => {
+    const conferirSessao = async (aviso: string): Promise<void> => {
+      if (!userRef.current || !isMountedRef.current || conferindoRef.current) return;
+      conferindoRef.current = true;
+      try {
+        await getMe();
+      } catch (err) {
+        if (isAuthError(err)) await handleSessaoEncerrada(aviso);
+      } finally {
+        conferindoRef.current = false;
+      }
+    };
+    const ouvinte = (): void => {
+      void conferirSessao(AVISO_SESSAO_EXPIRADA);
+    };
+    const saiuEmOutraAba = (e: StorageEvent): void => {
+      if (e.key === storageKeys.sessaoUltimaResposta && e.newValue === null) {
+        void conferirSessao(AVISO_SAIU_EM_OUTRA_ABA);
+      }
+    };
+    window.addEventListener('auth:expired', ouvinte);
+    window.addEventListener('storage', saiuEmOutraAba);
+    return () => {
+      window.removeEventListener('auth:expired', ouvinte);
+      window.removeEventListener('storage', saiuEmOutraAba);
+    };
+  }, [handleSessaoEncerrada]);
 
   // ── Render ──
   if (loading) {
@@ -224,11 +300,7 @@ function AppContent(): JSX.Element {
       <Toaster position="top-right" toastOptions={{ duration: 5000 }} />
       <Router>
         <OfflineBanner />
-        <SessionExpiryWarning
-          showWarning={sessionMonitor.showWarning}
-          timeLeft={sessionMonitor.timeLeft}
-          renewSession={sessionMonitor.renewSession}
-        />
+        <MonitorDeSessao onExpirada={handleInatividade} onSair={handleLogout} />
         <Layout style={{ minHeight: '100vh', background: colors.pageBackground }}>
           <AppSidebar
             permissions={permissions}

@@ -32,6 +32,10 @@ Use Antd components for everything that has one; Tailwind for spacing/layout onl
 
 ## Reference (read the file for the task at hand)
 
+- **UX principles (owner's rule, read first):** `v2/docs/specs/frontend/ux-principios.spec.md` — clarity, flow,
+  a11y as baseline, feedback; no paternalism/dark patterns/useless polish; hard limits (WCAG AA, CWV); PR checklist.
+  Screen pattern: `pages.spec.md` → "Padrão responsivo".
+
 - Forms, data fetching (`fetchAPI`), polling, state management → `reference/forms.md`
 - Tables (`useTableFilters`), empty/loading/error states → `reference/tables.md`
 - Accessibility (WCAG), keyboard, ARIA, responsive → `reference/a11y.md`

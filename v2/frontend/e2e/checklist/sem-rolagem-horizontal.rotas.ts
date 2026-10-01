@@ -80,9 +80,32 @@ export interface RotaMedida {
   /** Nas telas com tabela ou lista: a linha com o texto do seed. */
   dados?: DadosDaTela;
   estados?: readonly EstadoDaTela[];
+  /**
+   * Relógio do navegador fixo nesta data e hora (ISO 8601), para tela que desenha "o mês de hoje":
+   * sem ele, a medição muda com o dia em que a CI roda. Travado no ratchet do Vitest.
+   */
+  relogio?: string;
+  /**
+   * Larguras em que a rota (e as vistas dela) NÃO é medida. O motivo fica em NAO_MEDIDOS, com a
+   * chave `${path} @ ${largura}px`. Travado no ratchet do Vitest: não é atalho para tirar tela da medição.
+   */
+  naoMedirEm?: readonly Largura[];
 }
 
 const LINHA = '.ant-table-row';
+
+/**
+ * Vista "expandida" do ResponsiveTable: abre a linha com `textoDaLinha` e espera o rótulo de
+ * uma coluna escondida (`rotulo`) na linha expandida. `larguras`: onde há coluna escondida.
+ */
+function expandida(textoDaLinha: string, rotulo: string, larguras?: readonly Largura[]): EstadoDaTela {
+  return {
+    nome: 'expandida',
+    clicar: `${LINHA}:has-text("${textoDaLinha}") .ant-table-row-expand-icon`,
+    dados: { em: '.ant-table-expanded-row', texto: rotulo },
+    ...(larguras && { larguras }),
+  };
+}
 
 export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
   { path: '/', perfil: 'controle', marco: 'Página Inicial' },
@@ -120,6 +143,15 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
     perfil: 'controle',
     marco: 'Grade Mensal de Disponibilidade',
     dados: { em: 'tr', texto: T.pessoa },
+    // A Grade desenha o mês de hoje do navegador, 1 coluna por dia, e o dia com evento (49 px) é
+    // mais largo que o vazio (18 a 25 px). O seed põe evento em hoje+3 a hoje+20, que cai ou não no
+    // mês corrente: a largura mudava com o dia da CI (run 36845410982, 01/10/2026: passou a rolar a
+    // 1280, +76/+25 px; no Windows, um fevereiro sem evento no mês deixaria de rolar a 1024). Janeiro
+    // de 2026 tem 31 dias, o máximo de colunas, e nenhum evento do seed, que só cria datas a partir
+    // do dia em que roda. Sem evento é a Grade mais estreita: por isso ela não sai de PENDENTES por
+    // esta medição (ver NAO_MEDIDOS e o ratchet do Vitest).
+    relogio: '2026-01-15T12:00:00-03:00',
+    naoMedirEm: [1280],
   },
   {
     path: '/solicitacoes/bloqueios',
@@ -180,15 +212,64 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
       },
     ],
   },
-  { path: '/dat/admin/municipios', perfil: 'dat', marco: 'Municípios', dados: { em: LINHA, texto: T.municipio } },
+  {
+    path: '/dat/admin/municipios',
+    perfil: 'dat',
+    marco: 'Municípios',
+    dados: { em: LINHA, texto: T.municipio },
+    // C2: UF (< 576) e IBGE (< 768) vão para a linha expandida.
+    estados: [expandida(T.municipio, 'IBGE', [360])],
+  },
   { path: '/dat/admin/projetos', perfil: 'dat', marco: 'Projetos', dados: { em: LINHA, texto: T.projeto } },
-  { path: '/dat/admin/grupos', perfil: 'dat', marco: 'Grupos RBAC', dados: { em: LINHA, texto: T.grupo } },
+  {
+    path: '/dat/admin/grupos',
+    // Superusuário: só ele vê a coluna Ações (P0-1). Setores e funções, o mesmo componente,
+    // são medidos com o DAT, sem a coluna e com o aviso "Somente superusuário".
+    perfil: 'superusuario',
+    marco: 'Grupos RBAC',
+    dados: { em: LINHA, texto: T.grupo },
+    // C2: Tipo (< 576), Usuários (< 768) e Permissões funcionais (< 992) vão para a linha expandida.
+    estados: [expandida(T.grupo, 'Permissões funcionais', [360, 768])],
+  },
   // Setores e funções listam só os grupos classificados (seed_rbac): não há texto longo a semear.
-  { path: '/dat/admin/setores', perfil: 'dat', marco: 'Setores', dados: { em: LINHA, texto: 'Vidas' } },
-  { path: '/dat/admin/funcoes', perfil: 'dat', marco: 'Funções', dados: { em: LINHA, texto: 'Coordenador' } },
-  { path: '/dat/admin/gerencias', perfil: 'dat', marco: 'Gerencias', dados: { em: LINHA, texto: T.gerencia } },
-  { path: '/dat/admin/produtos', perfil: 'dat', marco: 'Produtos', dados: { em: LINHA, texto: T.produto } },
-  { path: '/dat/admin/projetos-gerais', perfil: 'dat', marco: 'Projetos Gerais', dados: { em: LINHA, texto: T.projetoGeral } },
+  {
+    path: '/dat/admin/setores',
+    perfil: 'dat',
+    marco: 'Setores',
+    dados: { em: LINHA, texto: 'Vidas' },
+    estados: [expandida('Vidas', 'Permissões funcionais', [360, 768])],
+  },
+  {
+    path: '/dat/admin/funcoes',
+    perfil: 'dat',
+    marco: 'Funções',
+    dados: { em: LINHA, texto: 'Coordenador' },
+    estados: [expandida('Coordenador', 'Permissões funcionais', [360, 768])],
+  },
+  {
+    path: '/dat/admin/gerencias',
+    perfil: 'dat',
+    marco: 'Gerencias',
+    dados: { em: LINHA, texto: T.gerencia },
+    // C2: Rótulo nas planilhas só entra na linha a partir de 1600 px: há linha expandida em toda largura.
+    estados: [expandida(T.gerencia, 'Rótulo nas planilhas')],
+  },
+  {
+    path: '/dat/admin/produtos',
+    perfil: 'dat',
+    marco: 'Produtos',
+    dados: { em: LINHA, texto: T.produto },
+    // C2: a Descrição só entra na linha a partir de 1600 px: há linha expandida em toda largura.
+    estados: [expandida(T.produto, 'Descrição')],
+  },
+  {
+    path: '/dat/admin/projetos-gerais',
+    perfil: 'dat',
+    marco: 'Projetos Gerais',
+    dados: { em: LINHA, texto: T.projetoGeral },
+    // C2: Usa AVALIAR e Projetos (< 992) e Cálculo de códigos (< 768) vão para a linha expandida.
+    estados: [expandida(T.projetoGeral, 'Usa AVALIAR', [360, 768])],
+  },
   { path: '/dat/admin/configuracoes', perfil: 'dat', marco: 'Configurações do Sistema' },
   { path: '/dat/admin/colecoes', perfil: 'dat', marco: 'Importação de Coleções' },
   { path: '/dat/admin/equipe-gerencia', perfil: 'dat', marco: 'Importação de Vínculos' },
@@ -216,7 +297,16 @@ export const NAO_MEDIDOS: Readonly<Record<string, string>> = {
   '/controle/plano-formacoes (Calendário e Resumo)': 'placeholders "em desenvolvimento", sem conteúdo',
   '/controle/pre-agenda (modo Google)': 'a tabela de eventos do Google exige OAuth',
   '/solicitacoes/disponibilidade (detalhe do dia)':
-    'o drawer abre ao clicar num evento do mês corrente, e o seed não garante evento no mês (C4)',
+    'o drawer abre ao clicar num evento, e o mês medido (relógio fixo em janeiro de 2026) não tem evento do seed (C4)',
+  '/solicitacoes/disponibilidade @ 1280px':
+    'no mês fixo, sem evento, a Grade cabe a 1280 (sobram 40 px no Windows; no Linux da CI, estimado a ' +
+    'partir do run 36845410982, uns 15 a 30 px) e o ' +
+    'teste passaria; com dados reais (evento quase todo dia útil, coluna de 49 px) ela rola a 1280 em ' +
+    'qualquer mês. Medir de verdade exige mês com evento em dias fixos, e o seed não fixa isso. O C4 ' +
+    'redesenha a Grade (semana com ‹ › abaixo de 1280) e volta a medir com data fixa',
+  '/solicitacoes/disponibilidade (Grade com evento, 360 a 1024)':
+    'o mês fixo não tem evento do seed, e sem evento é a Grade mais estreita: ela segue em PENDENTES a 360, ' +
+    '768 e 1024 até o C4 medir com evento em data fixa (o ratchet do Vitest impede que saia por esta medição)',
   '/solicitacoes/nova (passos 2 em diante)': 'exige preencher o formulário do wizard (C3)',
   '/mapa-brasil (municípios do estado clicado)': 'exige clicar numa região do mapa',
   '/dat/cadastros (aba AVALIAR)': 'o seed só tem cadastro FORMAR',
@@ -270,6 +360,9 @@ export const TELA_LOGIN = 'login';
  * 1024): Mapa e Mapa "Lista" a 768, edição de solicitação a 768, Coordenadores "Por área" a
  * 768 e Notificações Internas a 1024. Ficam 117. As vistas novas de Usuários, "expandida"
  * (360 a 1024) e "detalhe" (o Drawer), são medidas e não rolam.
+ * C2 (30/09/2026): saíram 27, todas as combinações de /dat/admin/grupos, /setores, /funcoes,
+ * /gerencias, /municipios e /produtos (4 cada) e de /dat/admin/projetos-gerais (3). Ficam 90.
+ * A vista "expandida" de cada uma é medida e não rola. /dat/admin/projetos fica para outro PR.
  * O ratchet do Vitest (semRolagemHorizontal.pendentes.test.ts) trava a lista: nada novo
  * entra e o tamanho só desce.
  */
@@ -297,14 +390,7 @@ export const PENDENTES: Readonly<Record<string, readonly Largura[]>> = {
   '/controle/pre-agenda': [360, 768, 1024, 1280],
   '/acoes-notificacao': [360, 768, 1024, 1280],
   '/notificacoes-internas': [360, 768],
-  '/dat/admin/municipios': [360, 768, 1024, 1280],
   '/dat/admin/projetos': [360, 768, 1024],
-  '/dat/admin/grupos': [360, 768, 1024, 1280],
-  '/dat/admin/setores': [360, 768, 1024, 1280],
-  '/dat/admin/funcoes': [360, 768, 1024, 1280],
-  '/dat/admin/gerencias': [360, 768, 1024, 1280],
-  '/dat/admin/produtos': [360, 768, 1024, 1280],
-  '/dat/admin/projetos-gerais': [360, 768, 1024],
   '/dat/cadastros': [360, 768, 1024, 1280],
   '/dat/registros': [360, 768, 1024, 1280],
 };

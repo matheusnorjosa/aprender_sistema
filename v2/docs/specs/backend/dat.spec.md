@@ -91,7 +91,7 @@ Rotas DRF (prefixo `/api/`, registradas em [`urls.py`](../../../backend/apps/cor
 | Compras/materiais | `dat/compras-materiais/` | `DATCompraViewSet` | `@action stats / dashboard / pendencias` |
 | Cadastros FORMAR/AVALIAR | `dat/cadastros/` | `DATCadastroViewSet` | `@action stats / etapa` |
 | Registros (turmas) | `dat/registros/` | `DATRegistroViewSet` | `@action export(CSV) / stats`; filtro por `ano` + ordenação por `ano`/`municipio__nome`/`projeto__nome` (default `["municipio__nome","projeto__nome","ano"]`, #1996) |
-| Projetos Gerais | `projetos-gerais/` | `ProjetoGeralViewSet` | `@action projetos` |
+| Projetos Gerais | `projetos-gerais/` | `ProjetoGeralViewSet` | `@action projetos`; `projetos_count` (ativos) só na leitura: a escrita trava a linha (`LockOnWriteMixin`) e o PostgreSQL recusa FOR UPDATE com GROUP BY |
 | Ações DAT (legacy) | `dat/acoes/` | `DATAcoesListCreateView` | model `AcaoDAT` |
 
 **RBAC (idioma `permission_classes=[HasPerm("codename")]`; ver [rbac.spec](rbac.spec.md)):**

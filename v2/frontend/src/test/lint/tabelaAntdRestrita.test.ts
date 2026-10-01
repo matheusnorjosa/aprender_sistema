@@ -76,10 +76,11 @@ function quemImportaTable(regras: Linter.RulesRecord, arquivos: readonly (readon
 }
 
 /**
- * Tamanho atual da allowlist: 27 em 2026-09-29, 26 depois do C1 (Usuários). Só desce: voltar a
+ * Tamanho atual da allowlist: 27 em 2026-09-29, 26 depois do C1 (Usuários) e 21 depois do C2
+ * (Admin DAT: grupos, gerências, municípios, produtos e projetos gerais). Só desce: voltar a
  * pôr um arquivo na allowlist (e fazê-lo importar Table de novo) reprova aqui, no diff deste teste.
  */
-const TETO_ALLOWLIST = 26;
+const TETO_ALLOWLIST = 21;
 
 function conferirTeto(allowlist: Readonly<Record<string, string>>, teto: number): string[] {
   const tamanho = Object.keys(allowlist).length;

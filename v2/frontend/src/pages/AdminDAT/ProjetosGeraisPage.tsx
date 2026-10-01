@@ -7,24 +7,14 @@
  *
  * Fora de escopo (costura backend #1914-BE): a conferência de `setor_canonico` — esse campo
  * é do model Gerencia/Projeto e não é serializado, então não entra aqui.
+ *
+ * Padrão responsivo (Programa C, C2): lista enxuta no ResponsiveTable. Sempre na linha o
+ * nome, Situação e as ações; as demais colunas sobem por largura e o que some vai para a linha
+ * expandida. Nunca na grade: ID e descrição (no formulário).
  */
 import { useState, useEffect, type JSX } from 'react';
-import {
-  Table,
-  Button,
-  Input,
-  Space,
-  Tag,
-  Typography,
-  Card,
-  message,
-  Modal,
-  Form,
-  Select,
-  Checkbox,
-  InputNumber,
-} from 'antd';
-import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
+import { Button, Input, Tag, Typography, Card, message, Modal, Form, Select, Checkbox, InputNumber, Grid } from 'antd';
+import type { TablePaginationConfig } from 'antd/es/table';
 import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Link } from 'react-router';
 import {
@@ -35,15 +25,29 @@ import {
   type ProjetoGeralRecord,
   type ProjetoGeralPayload,
 } from '../../api/adminDAT';
+import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
+import { AcoesLinha, larguraAcoesLinha } from '../../components/AcoesLinha';
+import { TEXTO_DA_TAG } from '../../components/textoDaTag';
 import { DEFAULT_PAGE_SIZE } from '../../constants';
+import { errosDosCampos, mensagemDoErro } from './usuario_form_helpers';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 const { Search } = Input;
 
+function SimNao({ valor, corDoNao }: { valor: boolean; corDoNao: string }): JSX.Element {
+  const cor = valor ? 'green' : corDoNao;
+  return (
+    <Tag color={cor} style={{ marginInlineEnd: 0, color: TEXTO_DA_TAG[cor] }}>
+      {valor ? 'Sim' : 'Não'}
+    </Tag>
+  );
+}
+
+/** Rótulo curto no Select (com a fórmula, cortava a 360 px); a fórmula vai abaixo do campo e na coluna. */
 const TIPO_CALCULO_OPTIONS = [
-  { label: 'Por Aluno (qtde_alunos / divisor)', value: 'por_aluno' },
-  { label: 'Por Professor (qtde_professores * multiplicador)', value: 'por_professor' },
-  { label: 'Não Aplicável (não gera códigos)', value: 'nao_aplicavel' },
+  { label: 'Por aluno', value: 'por_aluno', formula: 'alunos ÷ divisor' },
+  { label: 'Por professor', value: 'por_professor', formula: 'professores × multiplicador' },
+  { label: 'Não se aplica', value: 'nao_aplicavel', formula: 'não gera códigos' },
 ];
 
 interface ProjetoGeralFormValues {
@@ -68,6 +72,13 @@ export default function ProjetosGeraisPage(): JSX.Element {
     total: 0,
   });
   const [form] = Form.useForm<ProjetoGeralFormValues>();
+  // Só o parâmetro do cálculo escolhido aparece (o outro continua no formulário, escondido).
+  const tipoCalculo = Form.useWatch('tipo_calculo_codigos', form);
+  const formulaDoCalculo = TIPO_CALCULO_OPTIONS.find((o) => o.value === tipoCalculo)?.formula;
+  const [salvando, setSalvando] = useState(false);
+  const [erroLista, setErroLista] = useState<string | null>(null);
+  // Celular (< 576 px): as ações da linha vão todas para o menu "Mais ações".
+  const acoesCompactas = !Grid.useBreakpoint().sm;
 
   const fetchProjetos = async (page = 1, pageSize = DEFAULT_PAGE_SIZE): Promise<void> => {
     try {
@@ -79,9 +90,10 @@ export default function ProjetosGeraisPage(): JSX.Element {
         page_size: pageSize,
       });
       setProjetos(data.results ?? []);
+      setErroLista(null);
       setPagination((prev) => ({ ...prev, current: page, pageSize, total: data.count ?? 0 }));
     } catch (error) {
-      message.error(`Erro ao carregar projetos gerais: ${(error as Error).message}`);
+      setErroLista(mensagemDoErro(error));
     } finally {
       setLoading(false);
     }
@@ -117,6 +129,7 @@ export default function ProjetosGeraisPage(): JSX.Element {
   };
 
   const handleSave = async (values: ProjetoGeralFormValues): Promise<void> => {
+    setSalvando(true);
     try {
       // Monta o payload só com campos definidos (exactOptionalPropertyTypes) e converte
       // multiplicador_professor para string (DecimalField no backend).
@@ -141,67 +154,110 @@ export default function ProjetosGeraisPage(): JSX.Element {
       setModalVisible(false);
       void fetchProjetos(pagination.current ?? 1, pagination.pageSize ?? DEFAULT_PAGE_SIZE);
     } catch (error) {
-      message.error(`Erro ao salvar: ${(error as Error).message}`);
+      form.setFields(errosDosCampos(error));
+      message.error(`Erro ao salvar: ${mensagemDoErro(error)}`);
+    } finally {
+      setSalvando(false);
     }
   };
 
   const handleDelete = (record: ProjetoGeralRecord): void => {
+    const projetos = record.projetos_count ?? 0;
     Modal.confirm({
       title: 'Excluir projeto geral',
-      content: `Tem certeza que deseja excluir "${record.nome}"?`,
+      // Os projetos da família não somem: ficam sem projeto geral (SET_NULL no backend), inclusive os
+      // inativos, que a contagem (só de ativos) não inclui.
+      content:
+        `Tem certeza que deseja excluir "${record.nome}"?` +
+        (projetos > 0
+          ? ` Os projetos desta família (${projetos} ativo(s) e os inativos) ficarão sem projeto geral.`
+          : ' Não há projetos ativos nesta família; os inativos, se houver, ficarão sem projeto geral.'),
       okText: 'Sim, excluir',
       cancelText: 'Cancelar',
       okButtonProps: { danger: true },
+      // Ação destrutiva: o foco começa no Cancelar (senão um Enter repetido exclui sem confirmar).
+      autoFocusButton: 'cancel',
       onOk: async () => {
         try {
           await deleteProjetoGeral(record.id);
           message.success('Projeto geral excluído');
           void fetchProjetos(pagination.current ?? 1, pagination.pageSize ?? DEFAULT_PAGE_SIZE);
         } catch (error) {
-          message.error(`Erro ao excluir: ${(error as Error).message}`);
+          message.error(`Erro ao excluir: ${mensagemDoErro(error)}`);
         }
       },
     });
   };
 
-  const columns: ColumnsType<ProjetoGeralRecord> = [
-    { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-    { title: 'Nome', dataIndex: 'nome', key: 'nome', width: 260 },
+  // C2: lista enxuta, por prioridade de largura (VISIVEL_A_PARTIR). O que some da linha vai
+  // para a linha expandida (ResponsiveTable).
+  const columns: ColunaResponsiva<ProjetoGeralRecord>[] = [
+    {
+      title: 'Nome',
+      dataIndex: 'nome',
+      key: 'nome',
+      // Sem detalhe que mostre o nome inteiro, ele quebra linha em vez de cortar.
+      render: (_, p) => <Text className="min-w-0 max-w-full break-words">{p.nome}</Text>,
+    },
     {
       title: 'Usa AVALIAR',
       dataIndex: 'usa_avaliar',
       key: 'usa_avaliar',
-      width: 120,
-      render: (v: boolean) => <Tag color={v ? 'green' : 'default'}>{v ? 'Sim' : 'Não'}</Tag>,
+      width: 112,
+      responsive: VISIVEL_A_PARTIR.lg,
+      render: (_, p) => <SimNao valor={p.usa_avaliar} corDoNao="default" />,
     },
     {
       title: 'Cálculo de códigos',
       dataIndex: 'tipo_calculo_codigos',
       key: 'tipo_calculo_codigos',
-      width: 200,
-      render: (v: string) => TIPO_CALCULO_OPTIONS.find((o) => o.value === v)?.label ?? v,
+      ellipsis: true,
+      responsive: VISIVEL_A_PARTIR.md,
+      render: (_, p) => {
+        const tipo = TIPO_CALCULO_OPTIONS.find((o) => o.value === p.tipo_calculo_codigos);
+        return tipo ? `${tipo.label} (${tipo.formula})` : p.tipo_calculo_codigos;
+      },
     },
-    { title: 'Projetos', dataIndex: 'projetos_count', key: 'projetos_count', width: 100 },
     {
-      title: 'Ativo',
+      title: 'Projetos',
+      dataIndex: 'projetos_count',
+      key: 'projetos_count',
+      width: 88,
+      responsive: VISIVEL_A_PARTIR.lg,
+    },
+    {
+      title: 'Situação',
       dataIndex: 'ativo',
       key: 'ativo',
-      width: 90,
-      render: (v: boolean) => <Tag color={v ? 'green' : 'red'}>{v ? 'Sim' : 'Não'}</Tag>,
+      width: 88,
+      render: (_, p) => {
+        const cor = p.ativo ? 'green' : 'red';
+        return (
+          <Tag color={cor} style={{ marginInlineEnd: 0, color: TEXTO_DA_TAG[cor] }}>
+            {p.ativo ? 'Ativo' : 'Inativo'}
+          </Tag>
+        );
+      },
     },
     {
       title: 'Ações',
       key: 'acoes',
-      width: 150,
+      width: larguraAcoesLinha(2, acoesCompactas),
       render: (_, record) => (
-        <Space size="small">
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
-            Editar
-          </Button>
-          <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => handleDelete(record)}>
-            Excluir
-          </Button>
-        </Space>
+        <AcoesLinha
+          compacto={acoesCompactas}
+          alvo={record.nome}
+          acoes={[
+            { chave: 'editar', rotulo: 'Editar', icone: <EditOutlined />, onClick: () => handleEdit(record) },
+            {
+              chave: 'excluir',
+              rotulo: 'Excluir',
+              icone: <DeleteOutlined />,
+              onClick: () => handleDelete(record),
+              perigo: true,
+            },
+          ]}
+        />
       ),
     },
   ];
@@ -216,16 +272,17 @@ export default function ProjetosGeraisPage(): JSX.Element {
         <Link to="/dat/admin">← Voltar para Admin DAT</Link>
       </nav>
       <Card style={{ marginTop: 16 }}>
-        <header className="flex justify-between items-center mb-4">
+        <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <Title level={2} id="projetos-gerais-title" className="m-0">
             Projetos Gerais
           </Title>
-          <Space>
+          <div className="flex flex-wrap items-center gap-2">
             <Search
               placeholder="Buscar por nome..."
+              aria-label="Buscar projetos gerais por nome"
               allowClear
               onSearch={(v) => setSearchText(v)}
-              style={{ width: 240 }}
+              style={{ width: 240, maxWidth: '100%' }}
             />
             <Button
               icon={<ReloadOutlined />}
@@ -237,16 +294,18 @@ export default function ProjetosGeraisPage(): JSX.Element {
             <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
               Novo Projeto Geral
             </Button>
-          </Space>
+          </div>
         </header>
-        <Table
+        <ResponsiveTable<ProjetoGeralRecord>
           columns={columns}
           dataSource={projetos}
           rowKey="id"
+          nomeDaLinha={(p) => p.nome}
           loading={loading}
+          erro={erroLista}
+          onTentarDeNovo={() => void fetchProjetos(pagination.current ?? 1, pagination.pageSize ?? DEFAULT_PAGE_SIZE)}
           onChange={handleTableChange}
           pagination={pagination}
-          scroll={{ x: 900 }}
         />
       </Card>
 
@@ -257,19 +316,35 @@ export default function ProjetosGeraisPage(): JSX.Element {
         onOk={() => form.submit()}
         okText="Salvar"
         cancelText="Cancelar"
+        confirmLoading={salvando}
         width={600}
       >
         <Form form={form} layout="vertical" autoComplete="off" onFinish={handleSave}>
           <Form.Item name="nome" label="Nome" rules={[{ required: true, message: 'Nome é obrigatório' }]}>
             <Input placeholder="Ex: PROJETO AMMA" />
           </Form.Item>
-          <Form.Item name="tipo_calculo_codigos" label="Cálculo de códigos" initialValue="por_professor">
-            <Select options={TIPO_CALCULO_OPTIONS} />
+          <Form.Item
+            name="tipo_calculo_codigos"
+            label="Cálculo de códigos"
+            initialValue="por_professor"
+            extra={formulaDoCalculo ? `Cálculo: ${formulaDoCalculo}.` : undefined}
+          >
+            <Select options={TIPO_CALCULO_OPTIONS.map(({ label, value }) => ({ label, value }))} />
           </Form.Item>
-          <Form.Item name="divisor_aluno" label="Divisor (por aluno)" initialValue={20}>
+          <Form.Item
+            name="divisor_aluno"
+            label="Divisor (por aluno)"
+            initialValue={20}
+            hidden={tipoCalculo !== 'por_aluno'}
+          >
             <InputNumber min={1} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="multiplicador_professor" label="Multiplicador (por professor)" initialValue={1.1}>
+          <Form.Item
+            name="multiplicador_professor"
+            label="Multiplicador (por professor)"
+            initialValue={1.1}
+            hidden={tipoCalculo !== 'por_professor'}
+          >
             <InputNumber min={0} step={0.1} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="usa_avaliar" valuePropName="checked" initialValue={false}>

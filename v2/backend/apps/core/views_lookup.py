@@ -134,12 +134,12 @@ class ProjetoLookup(APIView):
             qs = qs.filter(compras__isnull=False)
         if municipio_id is not None:
             qs = qs.filter(compras__municipio_id=municipio_id)
-        # Os EVENTOS usam o nome-família (ex.: "A COR DA GENTE"); as variantes numeradas ("A COR DA
-        # GENTE 3") são os kits das coleções e NÃO entram no dropdown de solicitação por padrão
-        # (decisão do dono). Heurística de nome (termina em número) enquanto não há flag kit/evento —
-        # relacionado à população de projeto_geral (#1897/#1898). `include_kits=true` reexpõe.
+        # Os EVENTOS usam o nome-família (ex.: "A COR DA GENTE"); as séries ("A COR DA GENTE 3") são
+        # os kits das coleções e NÃO entram no dropdown de solicitação por padrão (decisão do dono).
+        # Quem diz o que é série é a marca `Projeto.eh_serie` (editável na tela Projetos), não o
+        # nome. `include_kits=true` reexpõe.
         if not include_kits:
-            qs = qs.exclude(nome__regex=r"[0-9]+$")
+            qs = qs.exclude(eh_serie=True)
         # M10-04/#1656 Wave 1 (S2): coordenador regular só vê projetos do PRÓPRIO
         # setor (+ projetos sem setor, fail-open). Global/privilegiado isento.
         qs = scope_projetos_by_setor(qs, request.user)

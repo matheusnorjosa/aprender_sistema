@@ -1971,6 +1971,10 @@ class ExportContractImporter:
                 descricao=(r.get("descricao") or ""),
                 ativo=(_to_bool(r.get("ativo")) if (r.get("ativo") or "").strip() else True),
                 projeto_geral_id=pg_id,
+                # Série no nascimento: família DECLARADA, existente, e nome diferente do dela. Nome
+                # igual ao da família (ou sem família) = projeto-família/rótulo. Só no create: em
+                # projeto existente vale a marca, editável na tela (o reconcile não a toca).
+                eh_serie=bool(pg_raw) and pg_id is not None and _norm(nome) != _norm(pg_raw),
                 setor=(r.get("setor") or "").strip()[:100],  # #1897: setor de-para v15
                 sem_operacao=_to_bool(r.get("sem_operacao")),
             )

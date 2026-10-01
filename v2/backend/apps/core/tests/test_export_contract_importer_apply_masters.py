@@ -133,6 +133,27 @@ def test_apply_projeto_create_only_skips_existing_by_canon_key(tmp_path):
     assert Projeto.objects.get(nome="Vida & Matemática 6").fluxo == "NAO_SUPER"  # não alterado
 
 
+@pytest.mark.parametrize(
+    ("no_catalogo", "da_planilha"),
+    [
+        ("Fluir das Emoções (Antigo)", "FLUIR DAS EMOÇÕES"),
+        ("ACerta Matemática", "ACERTA BRASIL MATEMATICA"),
+        ("ACerta Português", "ACERTA BRASIL PORTUGUES"),
+    ],
+)
+def test_apply_projeto_nao_recria_projeto_renomeado_ou_juntado(tmp_path, no_catalogo, da_planilha):
+    # Decisões do dono (02/10): o script de dados renomeia "Fluir das Emoções" e junta "ACerta Brasil"
+    # em "ACerta"; a planilha continua mandando o nome antigo. O master `projeto` não pode recriá-lo,
+    # e a agenda/compras (mesmo resolver, `resolve_projeto`) têm de cair no projeto que ficou.
+    existente = ProjetoFactory(nome=no_catalogo, fluxo="NAO_SUPER")
+    path = _write_export(tmp_path, {"projeto": f"projeto,projeto_geral,fluxo\n{da_planilha},,NAO_SUPER\n"})
+    importer = ExportContractImporter(path=path, apply=True, allow=("projeto",))
+    r = importer.run()
+    assert r["applied"]["projeto"] == 0
+    assert not Projeto.objects.filter(nome__iexact=da_planilha).exists()
+    assert importer.resolve_projeto(da_planilha) == existente.id
+
+
 def test_apply_projeto_rejects_pg_desconhecido(tmp_path):
     # PG não resolvível -> NÃO cria (nunca projeto_geral=NULL órfão).
     csv = "projeto,projeto_geral,fluxo\nProjeto Sem PG 2,PG QUE NAO EXISTE,NAO_SUPER\n"
@@ -199,6 +220,62 @@ def test_apply_projeto_base_empty_pg_derives_from_own_name(tmp_path):
     r = ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
     assert r["applied"]["projeto"] == 1
     assert Projeto.objects.get(nome="A Cor da Gente").projeto_geral_id == pg.id
+
+
+# ── marca de série no nascimento (`Projeto.eh_serie`) ──
+def test_apply_projeto_variante_de_familia_nasce_serie(tmp_path):
+    # Família declarada, existente, e nome diferente do dela → série (fora da Nova Solicitação e do
+    # Plano Anual). Sem isto, as séries novas do catálogo nasceriam visíveis nos dois.
+    ProjetoGeral.objects.create(nome="GESTÃO ESCOLAR SERIE")
+    csv = "projeto,projeto_geral,fluxo\nGESTÃO ESCOLAR SERIE 3,GESTÃO ESCOLAR SERIE,NAO_SUPER\n"
+    path = _write_export(tmp_path, {"projeto": csv})
+    r = ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
+    assert r["applied"]["projeto"] == 1
+    assert Projeto.objects.get(nome="GESTÃO ESCOLAR SERIE 3").eh_serie is True
+
+
+def test_apply_projeto_com_nome_da_familia_nao_nasce_serie(tmp_path):
+    # Mesmo nome da família (ignorando caixa e acento), declarada ou homônima: é o projeto-família.
+    ProjetoGeral.objects.create(nome="CIRANDAR SERIE")
+    ProjetoGeral.objects.create(nome="GIRASSOL SERIE")
+    csv = (
+        "projeto,projeto_geral,fluxo\n"
+        "Cirandar Serie,,NAO_SUPER\n"  # família vazia → homônimo
+        "Girassol Série,GIRASSOL SERIE,NAO_SUPER\n"  # família declarada, mesmo nome
+    )
+    path = _write_export(tmp_path, {"projeto": csv})
+    r = ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
+    assert r["applied"]["projeto"] == 2
+    assert Projeto.objects.get(nome="Cirandar Serie").eh_serie is False
+    assert Projeto.objects.get(nome="Girassol Série").eh_serie is False
+
+
+def test_apply_projeto_rotulo_sem_familia_nao_nasce_serie(tmp_path):
+    # Número no nome não marca: sem família, é rótulo.
+    csv = "projeto,projeto_geral,fluxo\nRotulo Sem Familia 2,,NAO_SUPER\n"
+    path = _write_export(tmp_path, {"projeto": csv})
+    r = ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
+    assert r["applied"]["projeto"] == 1
+    assert Projeto.objects.get(nome="Rotulo Sem Familia 2").eh_serie is False
+
+
+def test_apply_projeto_existente_nao_muda_a_marca(tmp_path):
+    # Depois de criado, quem manda é a marca (editável na tela): a reimportação não a altera,
+    # nem para ligar nem para desligar.
+    pg = ProjetoGeral.objects.create(nome="MARCA MANUAL")
+    ProjetoFactory(nome="MARCA MANUAL 1", projeto_geral=pg, eh_serie=False)  # exceção: numerado, não é série
+    ProjetoFactory(nome="MARCA MANUAL", projeto_geral=pg, eh_serie=True)  # marcado à mão
+    csv = (
+        "projeto,projeto_geral,fluxo,setor\n"
+        "MARCA MANUAL 1,MARCA MANUAL,NAO_SUPER,Vidas\n"
+        "MARCA MANUAL,MARCA MANUAL,NAO_SUPER,Vidas\n"
+    )
+    path = _write_export(tmp_path, {"projeto": csv})
+    r = ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
+    assert r["applied"]["projeto"] == 0
+    assert r["applied"]["projeto__reconciled"] == 2  # o reconcile roda (setor) e não toca na marca
+    assert Projeto.objects.get(nome="MARCA MANUAL 1").eh_serie is False
+    assert Projeto.objects.get(nome="MARCA MANUAL").eh_serie is True
 
 
 # ── #1897: projeto rótulo com projeto_geral NULL (família-vazia intencional) ──

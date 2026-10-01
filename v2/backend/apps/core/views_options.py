@@ -12,6 +12,7 @@ from typing import Any
 
 from django.conf import settings
 from django.core.cache import cache
+from django.db.models import Exists, OuterRef, Q
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
@@ -19,7 +20,17 @@ from rest_framework.response import Response
 
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
-from .models import Colecao, DATArea, DATCoordenador, Municipio, Produto, Projeto, TipoEvento, Usuario
+from .models import (
+    Colecao,
+    DATArea,
+    DATCoordenador,
+    Municipio,
+    PlanoFormacoes,
+    Produto,
+    Projeto,
+    TipoEvento,
+    Usuario,
+)
 from .serializers import (
     ColecaoOptionSerializer,
     MunicipioOptionSerializer,
@@ -110,7 +121,7 @@ def projetos_options(request: Request) -> Response:
     """
     # CP3: Cache manual (não usar decorator com DRF views)
     include_test = request.query_params.get("include_test", "false").lower() == "true"
-    # #1976: exclui variantes-por-série (só famílias) — evento/plano apontam família.
+    # #1976: exclui variantes-por-série (famílias + série que já tem plano) — Plano Anual.
     exclude_kits = request.query_params.get("exclude_kits", "false").lower() == "true"
     cache_key = f"static_endpoint:projetos_options:include_test={include_test}:exclude_kits={exclude_kits}"
     cached_data = cache.get(cache_key)
@@ -125,10 +136,13 @@ def projetos_options(request: Request) -> Response:
     if not include_test:
         projetos = projetos.filter(is_test=False)
 
-    # #1976: exclui variantes-por-série (nomes terminados em número) — mesma heurística do
-    # ProjetoLookup (views_lookup.py). Default off (Compras/DAT precisam das variantes).
+    # #1976: exclui as séries (marca `Projeto.eh_serie`). Default off (Compras/DAT precisam das
+    # variantes). Quem usa `exclude_kits=true` é o Plano Anual, então a série que JÁ TEM plano fica
+    # (decisão do dono, 02/10/2026: "Projeto Catavento 2/3" seguem série e os planos deles não
+    # podem sumir do filtro). O ProjetoLookup (Nova Solicitação) não tem essa exceção.
     if exclude_kits:
-        projetos = projetos.exclude(nome__regex=r"[0-9]+$")
+        tem_plano = Exists(PlanoFormacoes.objects.filter(projeto=OuterRef("pk")))
+        projetos = projetos.filter(Q(eh_serie=False) | tem_plano)
 
     projetos = projetos.order_by("nome")
 

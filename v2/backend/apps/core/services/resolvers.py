@@ -375,6 +375,14 @@ def normalize_projeto_name(nome: str) -> str:
     return nome
 
 
+# Projeto renomeado no catálogo por script de dados enquanto a planilha continua mandando o nome
+# antigo (decisão do dono, 02/10/2026). Chave = norm_text do nome antigo (sem prefixo de ano).
+# Só é consultado quando o nome antigo NÃO resolve: antes do rename nada muda.
+_PROJETOS_RENOMEADOS: dict[str, str] = {
+    "fluir das emocoes": "Fluir das Emoções (Antigo)",
+}
+
+
 def resolve_projeto(nome: str) -> Projeto | None:
     """
     Resolve projeto por nome ou codigo.
@@ -383,6 +391,24 @@ def resolve_projeto(nome: str) -> Projeto | None:
     1. Tenta codigo exato (case-insensitive).
     2. Tenta nome bruto informado (exato e normalizado).
     3. Aplica aliases (IDEB -> GESTAO ESCOLAR, etc.) e tenta novamente.
+    4. Nada casou: tenta o nome novo de um projeto renomeado (`_PROJETOS_RENOMEADOS`).
+
+    Args:
+        nome: Nome/codigo do projeto
+
+    Returns:
+        Projeto ou None se não encontrado
+    """
+    projeto = _resolve_projeto_no_catalogo(nome)
+    if projeto is not None or not nome:
+        return projeto
+    renomeado = _PROJETOS_RENOMEADOS.get(norm_text(normalize_projeto_name(nome.strip())))
+    return _resolve_projeto_no_catalogo(renomeado) if renomeado else None
+
+
+def _resolve_projeto_no_catalogo(nome: str) -> Projeto | None:
+    """
+    Passos 1 a 3 de `resolve_projeto`.
 
     Args:
         nome: Nome/codigo do projeto

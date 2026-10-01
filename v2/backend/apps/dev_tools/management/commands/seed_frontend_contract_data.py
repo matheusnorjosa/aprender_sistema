@@ -234,11 +234,18 @@ class Command(BaseCommand):
             uf="BA",
             defaults={"ativo": True, "latitude": Decimal("-12.971400"), "longitude": Decimal("-38.501400")},
         )
+        projeto_geral, _ = ProjetoGeral.objects.get_or_create(nome=PROJETO_GERAL_LONGO)
+        # Com a família: a coluna "Família" da tela Projetos é medida com texto longo.
         projeto, _ = Projeto.objects.update_or_create(
             codigo="E2E_LARGURA",
-            defaults={"nome": PROJETO_LONGO, "fluxo": "SUPER", "ativo": True, "descricao": TEXTO_OBSERVACAO_LONGO},
+            defaults={
+                "nome": PROJETO_LONGO,
+                "fluxo": "SUPER",
+                "ativo": True,
+                "descricao": TEXTO_OBSERVACAO_LONGO,
+                "projeto_geral": projeto_geral,
+            },
         )
-        projeto_geral, _ = ProjetoGeral.objects.get_or_create(nome=PROJETO_GERAL_LONGO)
         tipo_evento, _ = TipoEvento.objects.get_or_create(nome=TIPO_EVENTO_LONGO, defaults={"cor": "#1890ff"})
 
         # Pendências do dashboard de compras: Compra sem solicitação ativa no par (município, projeto).

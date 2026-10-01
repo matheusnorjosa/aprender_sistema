@@ -8,7 +8,8 @@ export const TABELA_ANTD_PADRAO = 'src/components/ResponsiveTable.tsx';
  * Allowlist da regra "Table do AntD só via components/ResponsiveTable" (Programa C, C0).
  *
  * Medida em 2026-09-29 pela própria regra, sem allowlist: 27 arquivos importavam
- * `Table` de `antd`; 26 depois do C1 (Usuários, o piloto) e 21 depois do C2 (Admin DAT).
+ * `Table` de `antd`; 26 depois do C1 (Usuários, o piloto), 21 depois do C2 (Admin DAT)
+ * e 20 depois de Projetos (01/10/2026).
  * SÓ ENCOLHE. Cada PR do Programa C tira os arquivos que migra (o valor diz qual PR). src/test/lint/tabelaAntdRestrita.test.ts mede quem importa
  * Table em src/ e exige que o conjunto seja exatamente esta lista: arquivo novo
  * reprova (use ResponsiveTable) e entrada que já não importa também (tire-a daqui).
@@ -19,7 +20,6 @@ export const TABELA_ANTD_PADRAO = 'src/components/ResponsiveTable.tsx';
  * @type {Readonly<Record<string, string>>}
  */
 export const TABELA_ANTD_ALLOWLIST = {
-  'src/pages/AdminDAT/ProjetosPage.tsx': 'C2 — Admin DAT',
   'src/components/MyBlocksTable.tsx': 'C3 — Bloqueios',
   'src/pages/Aprovacoes/ApprovalsPage.tsx': 'C3 — Aprovações',
   'src/pages/Deslocamentos/DeslocamentosPage.tsx': 'C3 — Deslocamentos',

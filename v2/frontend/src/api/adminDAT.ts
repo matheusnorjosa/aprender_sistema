@@ -157,6 +157,8 @@ export interface ListParams {
   is_active?: boolean;
   ativo?: boolean;
   uf?: string | undefined;
+  /** Produtos: filtro por projeto (filterset do ProdutoViewSet). */
+  projeto?: ID | undefined;
   ordering?: string;
   page?: number;
   page_size?: number;

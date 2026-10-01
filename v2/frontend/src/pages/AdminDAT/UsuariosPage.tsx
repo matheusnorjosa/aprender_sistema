@@ -47,6 +47,7 @@ import {
   gruposAposSalvar,
   lotacaoObrigatoria,
   mensagemDoErro,
+  nomeDe,
 } from './usuario_form_helpers';
 import type { PermissaoFuncional, RBACMetaPayload, GerenciaRecord } from '../../api/adminDAT';
 import { importUsuarios } from '../../api/ops';
@@ -54,6 +55,7 @@ import type { ImportResult } from '../../api/ops';
 import ImportUploader from '../../components/ImportUploader';
 import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
 import { AcoesLinha, larguraAcoesLinha } from '../../components/AcoesLinha';
+import { TEXTO_DA_TAG } from '../../components/textoDaTag';
 import { formatFortaleza } from '../../utils/datetime';
 import type { ValidationResult, ApplyResult } from '../../components/ImportUploader';
 import logger from '../../utils/logger';
@@ -119,11 +121,6 @@ interface UserRecord {
   last_login?: string | null;
 }
 
-/** Nome de tela da pessoa; sem nome cadastrado, o e-mail (nunca o username, que é o CPF). */
-function nomeDe(user: UserRecord): string {
-  return `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email || 'Sem nome';
-}
-
 /**
  * Login de tela: em produção o username é o CPF. CPF (só dígitos ou 000.000.000-00) sai com a
  * regra do `cpf_masked` do backend (UsuarioAdminSerializer: só os 6 últimos dígitos), para login
@@ -168,17 +165,6 @@ const PAPEL: Record<string, string> = {
   COORDENADOR: 'Coordenador',
   APOIO: 'Apoio de Coordenação',
   FORMADOR: 'Formador',
-};
-
-/**
- * Cor do texto das tags com contraste AA (4,5:1). O AntD pinta o preset com a cor 7 sobre a
- * cor 1, e green, gold e orange reprovam (3,37, 2,76 e 3,34:1); red, blue e purple passam.
- * Molde do Programa C: quando a 2ª página precisar, mover para um módulo comum.
- */
-const TEXTO_DA_TAG: Partial<Record<string, string>> = {
-  green: '#237804', // green-8: 5,44:1
-  orange: '#ad4e00', // orange-8: 5,09:1
-  gold: '#874d00', // gold-9: 6,53:1 (o gold-8 dá 4,25:1)
 };
 
 /** Tags que quebram linha e cortam com reticências em vez de estourar a coluna. */

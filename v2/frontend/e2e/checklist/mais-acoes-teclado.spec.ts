@@ -41,7 +41,8 @@ for (const { acao, setas, dialogo } of [
     await expect(menu).toBeVisible();
     await expect(maisAcoes(page)).toHaveAttribute('aria-expanded', 'true');
     for (let i = 0; i < setas; i++) await page.keyboard.press('ArrowDown');
-    await expect(menu.getByRole('menuitem', { name: acao })).toBeFocused();
+    // exact: o nome do item é só o rótulo, sem o do ícone em inglês ("delete Excluir").
+    await expect(menu.getByRole('menuitem', { name: acao, exact: true })).toBeFocused();
     await page.keyboard.press('Enter');
 
     await expect(page.getByRole('dialog').filter({ hasText: dialogo })).toBeVisible();

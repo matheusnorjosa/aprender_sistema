@@ -80,15 +80,16 @@ describe('GerenciasPage — nome de tela (PR A)', () => {
     expect(updateGerencia).not.toHaveBeenCalledWith(4, expect.objectContaining({ nome: expect.anything() }));
   }, 30000);
 
-  test('a confirmação de exclusão cita o rótulo', async () => {
-    // Modal.confirm (API estática do antd v5) não monta de forma confiável sob React 19 no
+  test('o diálogo de exclusão cita o rótulo', async () => {
+    // Modal.info (API estática do antd v5) não monta de forma confiável sob React 19 no
     // jsdom (ver PreAgendaPage.publish.test.tsx) — espia a chamada em vez de renderizar.
-    const confirmSpy = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }));
+    // Com projetos ativos (3), excluir só avisa que não pode (C2); a confirmação está em GerenciasPage.salvar.test.tsx.
+    const infoSpy = vi.spyOn(Modal, 'info').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }));
     const user = userEvent.setup();
     renderPage();
     const delBtns = await screen.findAllByRole('button', { name: /excluir/i }, { timeout: 15000 });
     await user.click(delBtns[0]!);
-    expect(confirmSpy).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining('"Superativar"') }));
-    confirmSpy.mockRestore();
+    expect(infoSpy).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining('"Superativar"') }));
+    infoSpy.mockRestore();
   }, 30000);
 });

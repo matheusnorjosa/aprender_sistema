@@ -12,6 +12,7 @@
  * Esta lógica é extraída em função pura para ser testável sem render do form.
  */
 
+import type { FormInstance } from 'antd';
 import type { ID } from '../../types';
 
 export interface UsuarioFormValues {
@@ -181,4 +182,23 @@ export function mensagemDoErro(error: unknown): string {
     if (textos.length > 0) return textos.join(' ');
   }
   return err.message;
+}
+
+/**
+ * C2: os erros de validação do backend (`errors: {campo: [...]}`) no formato do `form.setFields`,
+ * para a mensagem aparecer no campo a corrigir (ex.: código repetido), e não só num toast.
+ */
+export function errosDosCampos<Valores>(error: unknown): Parameters<FormInstance<Valores>['setFields']>[0] {
+  const errors = (error as { response?: { data?: { errors?: unknown } } }).response?.data?.errors;
+  if (!errors || typeof errors !== 'object') return [];
+  // O nome vem do backend: um campo que o formulário não tem só não aparece.
+  return Object.entries(errors).map(([name, v]) => ({
+    name: name as Parameters<FormInstance<Valores>['setFields']>[0][number]['name'],
+    errors: Array.isArray(v) ? v.map(String) : [String(v)],
+  }));
+}
+
+/** Nome de tela da pessoa; sem nome cadastrado, o e-mail (nunca o username, que é o CPF). */
+export function nomeDe(user: { first_name?: string; last_name?: string; email?: string }): string {
+  return `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email || 'Sem nome';
 }

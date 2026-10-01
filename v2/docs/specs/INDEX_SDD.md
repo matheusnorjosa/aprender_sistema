@@ -89,6 +89,7 @@ related: []                   # links a specs/ADRs relacionados
 | Spec | Cobre | Status |
 |---|---|---|
 | [pages.spec.md](./frontend/pages.spec.md) | páginas React (rotas + guards) | canonical |
+| [ux-principios.spec.md](./frontend/ux-principios.spec.md) | princípios de UX, limites duros (WCAG AA, CWV) e como provar melhora | canonical |
 | [hooks-rbac.spec.md](./frontend/hooks-rbac.spec.md) | hooks de RBAC/guards (GAP preenchido) | canonical |
 | [api-clients.spec.md](./frontend/api-clients.spec.md) | clientes axios/fetch | canonical |
 

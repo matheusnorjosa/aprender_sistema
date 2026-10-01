@@ -6,6 +6,9 @@
  * pare de OFERECER escrita antes de o backend (PR-B) passar a rejeitar — senão
  * um DAT clica em Salvar e leva 403 (+ risco de escrita parcial: grupo criado,
  * membros barrados).
+ *
+ * C2 (Programa C): sem ações, a coluna Ações sai da tabela e o aviso "Somente
+ * superusuário" aparece uma vez, acima dela (antes repetia em cada linha e tomava largura).
  */
 
 import { describe, expect, test, vi, beforeEach } from 'vitest';
@@ -43,25 +46,26 @@ describe('GruposPage — read-only para não-superuser (P0-1 Tier-0)', () => {
     vi.clearAllMocks();
   });
 
-  test('não-superuser: sem botão "Novo Grupo" e ações = "Somente superusuário"', async () => {
+  test('não-superuser: sem "Novo Grupo" nem ações; o aviso "Somente superusuário" aparece uma vez', async () => {
     vi.mocked(checkAuth).mockResolvedValue({ user: { is_superuser: false } } as never);
     renderPage();
 
     await waitFor(() => expect(screen.getByText(/Grupos RBAC/)).toBeInTheDocument());
-    await waitFor(() => expect(screen.getByText('Somente superusuário')).toBeInTheDocument());
+    await screen.findByText('DAT', {}, { timeout: 10000 });
+    await waitFor(() => expect(screen.getAllByText(/Somente superusuário/)).toHaveLength(1));
 
-    expect(screen.queryByText('Novo Grupo')).toBeNull();
-    expect(screen.queryByText('Editar')).toBeNull();
-    expect(screen.queryByText('Excluir')).toBeNull();
-  });
+    expect(screen.queryByRole('button', { name: /Novo Grupo/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^(Editar|Excluir|Mais ações)/ })).toBeNull();
+    expect(screen.queryByRole('columnheader', { name: 'Ações' })).toBeNull();
+  }, 20000);
 
   test('superuser: botão "Novo Grupo" e ações Editar/Excluir presentes', async () => {
     vi.mocked(checkAuth).mockResolvedValue({ user: { is_superuser: true } } as never);
     renderPage();
 
-    await waitFor(() => expect(screen.getByText('Novo Grupo')).toBeInTheDocument());
-    await waitFor(() => expect(screen.getByText('Editar')).toBeInTheDocument());
+    await screen.findByRole('button', { name: /Novo Grupo/ }, { timeout: 10000 });
+    await screen.findByRole('button', { name: 'Editar: DAT' }, { timeout: 10000 });
 
-    expect(screen.queryByText('Somente superusuário')).toBeNull();
-  });
+    expect(screen.queryByText(/Somente superusuário/)).toBeNull();
+  }, 20000);
 });

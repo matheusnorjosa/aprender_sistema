@@ -9,11 +9,12 @@
  *   conferidos por `npx tsc --noEmit -p tsconfig.eslint.json` (o tsconfig do build exclui
  *   os testes): se o tipo passar a aceitar `scroll`, a diretiva fica sem uso e o tsc reprova.
  */
+import { useState, type JSX } from 'react';
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConfigProvider, Tag } from 'antd';
 import ptBR from 'antd/locale/pt_BR';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
 import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../ResponsiveTable';
 import { definirLarguraTela } from '../../test/larguraTela';
@@ -174,6 +175,117 @@ describe('ResponsiveTable', () => {
     const cabecalho = document.querySelector<HTMLElement>('th.ant-table-row-expand-icon-cell');
     expect(cabecalho).toHaveTextContent('Detalhes');
     expect(within(cabecalho!).getByText('Detalhes')).toHaveClass('sr-only');
+  });
+
+  test('falha ao carregar: o motivo e "Tentar de novo" no lugar das linhas, nunca "Não há dados"', async () => {
+    const tentarDeNovo = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <ConfigProvider locale={ptBR}>
+        <ResponsiveTable<Pessoa>
+          columns={COLUNAS}
+          dataSource={PESSOAS}
+          rowKey="id"
+          pagination={false}
+          nomeDaLinha={(pessoa) => pessoa.nome}
+          erro="Você não tem permissão para realizar esta ação."
+          onTentarDeNovo={tentarDeNovo}
+        />
+      </ConfigProvider>,
+    );
+
+    const alerta = screen.getByRole('alert');
+    expect(alerta).toHaveTextContent('Não foi possível carregar a lista.');
+    expect(alerta).toHaveTextContent('Você não tem permissão para realizar esta ação.');
+    expect(screen.queryByText('Não há dados')).not.toBeInTheDocument();
+    // as linhas antigas não ficam na tela como se fossem o resultado
+    expect(screen.queryByText('Maria Aparecida')).not.toBeInTheDocument();
+
+    await user.click(within(alerta).getByRole('button', { name: 'Tentar de novo' }));
+    expect(tentarDeNovo).toHaveBeenCalledTimes(1);
+  });
+
+  describe('"Tentar de novo" da lista: para onde vai o foco', () => {
+    let responder: () => void = () => undefined;
+
+    /** A lista falhou; o "Tentar de novo" recarrega e a resposta chega quando o teste mandar. */
+    function ListaQueFalhou({ campoAoLado = false }: { campoAoLado?: boolean }): JSX.Element {
+      const [erro, setErro] = useState<string | null>('Falha de rede');
+      return (
+        <ConfigProvider locale={ptBR}>
+          {campoAoLado ? <input aria-label="Buscar" /> : null}
+          <ResponsiveTable<Pessoa>
+            columns={COLUNAS}
+            dataSource={PESSOAS}
+            rowKey="id"
+            pagination={false}
+            nomeDaLinha={(pessoa) => pessoa.nome}
+            erro={erro}
+            onTentarDeNovo={() => {
+              responder = () => setErro(null);
+            }}
+          />
+        </ConfigProvider>
+      );
+    }
+
+    test('carregou: o foco vai para a tabela, não para o body (o Tab recomeçaria do topo)', async () => {
+      const user = userEvent.setup();
+      render(<ListaQueFalhou />);
+
+      within(screen.getByRole('alert')).getByRole('button', { name: 'Tentar de novo' }).focus();
+      await user.keyboard('{Enter}');
+      act(() => responder());
+
+      expect(screen.getByText('Maria Aparecida')).toBeInTheDocument();
+      expect(document.activeElement).not.toBe(document.body);
+      expect(document.activeElement).toContainElement(screen.getByRole('table'));
+      // Alvo focável só por programa: não entra no Tab.
+      expect(document.activeElement).toHaveAttribute('tabindex', '-1');
+      // Ao sair dele, deixa de ser focável (senão um clique na tabela o focaria e o Tab voltaria ao topo dela).
+      act(() => (document.activeElement as HTMLElement).blur());
+      expect(screen.getByRole('table').closest('[tabindex]')).toBeNull();
+    });
+
+    test('sem "Tentar de novo", o contêiner da tabela não é focável (clique na tabela não muda a ordem do Tab)', () => {
+      render(
+        <ConfigProvider locale={ptBR}>
+          <ResponsiveTable<Pessoa> columns={COLUNAS} dataSource={PESSOAS} rowKey="id" nomeDaLinha={(p) => p.nome} />
+        </ConfigProvider>
+      );
+      expect(screen.getByRole('table').closest('[tabindex]')).toBeNull();
+    });
+
+    test('carregou depois que a pessoa foi para outro campo: o foco fica onde ela está', async () => {
+      const user = userEvent.setup();
+      render(<ListaQueFalhou campoAoLado />);
+
+      within(screen.getByRole('alert')).getByRole('button', { name: 'Tentar de novo' }).focus();
+      await user.keyboard('{Enter}');
+      await user.click(screen.getByRole('textbox', { name: 'Buscar' }));
+      act(() => responder());
+
+      expect(screen.getByText('Maria Aparecida')).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'Buscar' })).toHaveFocus();
+    });
+  });
+
+  test('falha ao carregar: sem paginação, que diria o total da carga anterior', () => {
+    render(
+      <ConfigProvider locale={ptBR}>
+        <ResponsiveTable<Pessoa>
+          columns={COLUNAS}
+          dataSource={PESSOAS}
+          rowKey="id"
+          pagination={{ current: 1, pageSize: 15, total: 42, showTotal: (total) => `Total: ${total}` }}
+          nomeDaLinha={(pessoa) => pessoa.nome}
+          erro="Falha de rede"
+        />
+      </ConfigProvider>,
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Falha de rede');
+    expect(screen.queryByText('Total: 42')).not.toBeInTheDocument();
   });
 
   test('layout fixo: as colunas cabem na largura da tabela', () => {

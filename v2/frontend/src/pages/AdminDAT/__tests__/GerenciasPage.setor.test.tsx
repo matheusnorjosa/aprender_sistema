@@ -62,18 +62,19 @@ describe('GerenciasPage — conferência de setor_canonico (#1914)', () => {
     // header da coluna (AntD duplica o header quando a Table tem scroll → getAllByText)
     expect((await screen.findAllByText('Confiança', {}, { timeout: 15000 })).length).toBeGreaterThan(0);
     // gerência 1 tem confianca "alta" (sinal do de-para, célula única); gerência 2 não tem → em-dash
-    expect(await screen.findByText('alta')).toBeInTheDocument();
+    // C2: o valor aparece com rótulo de tela (alta → Alta).
+    expect(await screen.findByText('Alta')).toBeInTheDocument();
     expect(await screen.findByText('—')).toBeInTheDocument();
   }, 20000);
 
-  test('Confiança realça baixa qualidade: "na" vermelho (máx prioridade) e "media" laranja', async () => {
+  test('Confiança realça baixa qualidade: "na" (Conferir) vermelho e "media" (Média) laranja', async () => {
     renderPage();
-    const na = await screen.findByText('na', {}, { timeout: 15000 });
+    const na = await screen.findByText('Conferir', {}, { timeout: 15000 });
     expect(na.closest('.ant-tag')?.className).toContain('ant-tag-red');
-    const media = await screen.findByText('media');
+    const media = await screen.findByText('Média');
     expect(media.closest('.ant-tag')?.className).toContain('ant-tag-orange');
     // "alta" fica neutro (não é vermelho nem laranja)
-    const alta = await screen.findByText('alta');
+    const alta = await screen.findByText('Alta');
     expect(alta.closest('.ant-tag')?.className).not.toContain('ant-tag-red');
   }, 20000);
 

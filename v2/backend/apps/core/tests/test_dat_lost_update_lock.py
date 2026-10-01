@@ -74,3 +74,16 @@ class TestPatchStillWorks:
         assert resp.status_code == 200, resp.data
         compra.refresh_from_db()
         assert compra.quantidade == 20
+
+    def test_patch_projeto_geral_ok_com_lock(self):
+        """Integração: PATCH real → 200. A contagem de projetos (GROUP BY) não pode ir junto do FOR UPDATE."""
+        from apps.core.models import ProjetoGeral
+
+        projeto_geral = ProjetoGeral.objects.create(nome="PROJETO LU")
+        ProjetoFactory(projeto_geral=projeto_geral)
+        client = APIClient(raise_request_exception=False)
+        client.force_authenticate(UsuarioFactory(superuser=True))
+        resp = client.patch(f"/api/projetos-gerais/{projeto_geral.id}/", {"descricao": "nova"}, format="json")
+        assert resp.status_code == 200, f"status {resp.status_code}"
+        projeto_geral.refresh_from_db()
+        assert projeto_geral.descricao == "nova"

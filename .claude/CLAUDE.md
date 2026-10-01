@@ -141,7 +141,7 @@ Para domínio, arquitetura ou contrato de módulo, ler as **specs vivas** em `v2
 
 - `specs/domain/` — CP / RD / PA / RF (contratos imutáveis)
 - `specs/backend/` — rbac, gcal, availability, solicitacao-approval, imports, backup-dr, dat, notificacoes, deslocamento, dev-tools
-- `specs/frontend/` — pages, hooks-rbac, api-clients
+- `specs/frontend/` — pages, hooks-rbac, api-clients, **ux-principios** (ler antes de mexer em qualquer tela)
 - `specs/infra/` — deploy, environments, ci
 
 Gate de docs no CI: `scripts/check_doc_links.py` (links vivos) + `scripts/check_doc_frontmatter.py`.

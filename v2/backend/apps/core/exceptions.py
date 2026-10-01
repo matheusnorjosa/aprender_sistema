@@ -22,6 +22,7 @@ from typing import Any
 
 from django.core.exceptions import PermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db.models import ProtectedError
 from django.http import Http404
 from rest_framework import status
 from rest_framework.exceptions import APIException
@@ -170,6 +171,10 @@ def custom_exception_handler(exc: Exception, context: dict[str, Any]) -> Respons
         "errors": dict  # Optional field-level errors (validation only)
     }
     """
+    # Excluir registro em uso (FK PROTECT): 409 com o que impede, não 500.
+    if isinstance(exc, ProtectedError):
+        exc = ConflictError(message=_mensagem_em_uso(exc))
+
     # Handle our custom APIError exceptions first
     if isinstance(exc, APIError):
         data: dict[str, Any] = {
@@ -219,6 +224,12 @@ def custom_exception_handler(exc: Exception, context: dict[str, Any]) -> Respons
         response.data = _standardize_error_response(exc, response.data)
 
     return response
+
+
+def _mensagem_em_uso(exc: ProtectedError) -> str:
+    """Só os TIPOS de registro vinculados; nunca os registros em si (podem ser de outro setor)."""
+    tipos = sorted({str(obj._meta.verbose_name_plural) for obj in exc.protected_objects})
+    return f"Este registro não pode ser excluído porque está em uso ({', '.join(tipos)})."
 
 
 def _standardize_error_response(exc: Exception, data: dict[str, Any] | list[Any] | str) -> dict[str, Any]:

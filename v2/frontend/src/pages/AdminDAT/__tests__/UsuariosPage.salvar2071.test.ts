@@ -14,10 +14,12 @@ import { describe, expect, test } from 'vitest';
 
 import {
   buildUsuarioPayload,
+  errosDosCampos,
   funcoesProntasParaSalvar,
   gruposAposSalvar,
   lotacaoObrigatoria,
   mensagemDoErro,
+  nomeDe,
 } from '../usuario_form_helpers';
 
 const G = {
@@ -132,6 +134,32 @@ describe('mensagemDoErro (#2071)', () => {
 
   test('sem detalhes por campo, usa a mensagem do erro', () => {
     expect(mensagemDoErro(new Error('HTTP 500'))).toBe('HTTP 500');
+  });
+});
+
+describe('errosDosCampos (C2): o erro de validação vai para o campo do formulário', () => {
+  test('cada campo com as mensagens dele, no formato do form.setFields', () => {
+    const err = Object.assign(new Error('Erro de validação.'), {
+      response: {
+        status: 400,
+        data: { detail: 'Erro de validação.', errors: { codigo: ['produto com este código já existe.'], nome: 'Curto.' } },
+      },
+    });
+    expect(errosDosCampos(err)).toEqual([
+      { name: 'codigo', errors: ['produto com este código já existe.'] },
+      { name: 'nome', errors: ['Curto.'] },
+    ]);
+  });
+
+  test('sem erros por campo (ex.: 500), nada para marcar', () => {
+    expect(errosDosCampos(new Error('HTTP 500'))).toEqual([]);
+  });
+});
+
+describe('nomeDe: a pessoa pelo nome, nunca pelo username (CPF)', () => {
+  test('nome completo; sem nome, o e-mail', () => {
+    expect(nomeDe({ first_name: 'Maria', last_name: 'Aparecida', email: 'maria@example.invalid' })).toBe('Maria Aparecida');
+    expect(nomeDe({ first_name: '', last_name: '', email: 'maria@example.invalid' })).toBe('maria@example.invalid');
   });
 });
 

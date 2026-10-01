@@ -4,9 +4,10 @@
  * CRUD de produtos por projeto com codigo e status ativo.
  */
 
-import { useState, useEffect, type JSX } from 'react';
-import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, Form, Checkbox, Select } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import { useState, useEffect, useRef, type JSX } from 'react';
+import { flushSync } from 'react-dom';
+import { Button, Input, Tag, Typography, Card, message, Modal, Form, Checkbox, Select, Grid, Space } from 'antd';
+import type { InputRef, RefSelectProps } from 'antd';
 import type { TablePaginationConfig } from 'antd/es/table';
 import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Link } from 'react-router';
@@ -19,11 +20,19 @@ import {
   listColecoesOptions,
 } from '../../api/adminDAT';
 import type { ProdutoRecord, ProdutoPayload, ColecaoOption } from '../../api/adminDAT';
+import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
+import { AcoesLinha, larguraAcoesLinha } from '../../components/AcoesLinha';
+import { FalhaAoCarregar } from '../../components/FalhaAoCarregar';
+import { TEXTO_DA_TAG } from '../../components/textoDaTag';
 import { DEFAULT_PAGE_SIZE } from '../../constants';
 import type { ID, Projeto } from '../../types';
+import { errosDosCampos, mensagemDoErro } from './usuario_form_helpers';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 const { Search } = Input;
+
+/** Texto opcional: vazio vira '-' (o cinza #bfbfbf de antes dava 1,9:1 no branco). */
+const ouTraco = (texto: string | null | undefined): string => (texto && texto.trim() ? texto : '-');
 
 /**
  * Produto form values interface
@@ -43,6 +52,9 @@ export default function ProdutosPage(): JSX.Element {
   const [colecoes, setColecoes] = useState<ColecaoOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
+  // O texto no campo de busca (a busca só vale no Enter): controlado para o "Limpar" do vazio o apagar.
+  const [busca, setBusca] = useState('');
+  const buscaRef = useRef<InputRef>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingProduto, setEditingProduto] = useState<ProdutoRecord | null>(null);
   const [pagination, setPagination] = useState<TablePaginationConfig>({
@@ -50,6 +62,20 @@ export default function ProdutosPage(): JSX.Element {
     pageSize: DEFAULT_PAGE_SIZE,
     total: 0,
   });
+
+  const [projetoFiltro, setProjetoFiltro] = useState<ID | undefined>(undefined);
+  const [erroLista, setErroLista] = useState<string | null>(null);
+  const [erroProjetos, setErroProjetos] = useState<string | null>(null);
+  const [erroColecoes, setErroColecoes] = useState<string | null>(null);
+  // O "Tentar de novo" que carregou põe o foco no campo que ele recarregou.
+  const filtroProjetoRef = useRef<RefSelectProps>(null);
+  const projetoRef = useRef<RefSelectProps>(null);
+  const colecaoRef = useRef<RefSelectProps>(null);
+  const [salvando, setSalvando] = useState(false);
+
+  // Celular (< 576 px): as ações da linha vão todas para o menu "Mais ações", e o Código sai
+  // da grade (fica junto do nome: o nome pode repetir, o código não).
+  const acoesCompactas = !Grid.useBreakpoint().sm;
 
   const [form] = Form.useForm<ProdutoFormValues>();
   const selectedProjeto = Form.useWatch('projeto', form);
@@ -63,11 +89,13 @@ export default function ProdutosPage(): JSX.Element {
     try {
       const data = await listProdutos({
         search: searchText,
+        projeto: projetoFiltro,
         ordering: 'nome',
         page: current,
         page_size: pageSize,
       });
       setProdutos(data.results);
+      setErroLista(null);
       setPagination((prev) => ({
         ...prev,
         current,
@@ -75,32 +103,46 @@ export default function ProdutosPage(): JSX.Element {
         total: data.count,
       }));
     } catch (error) {
-      message.error(`Erro ao carregar produtos: ${(error as Error).message}`);
+      setErroLista(mensagemDoErro(error));
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchProjetos = async (): Promise<void> => {
+  // Opções: o erro fica até a resposta (o "Tentar de novo" não some com o foco nele) e, no
+  // sucesso, a tela atualiza na hora (flushSync), para o Select já estar habilitado quando recebe
+  // o foco. Devolvem se carregou.
+  const fetchProjetos = async (): Promise<boolean> => {
     try {
       const data = await listProjetos({ page_size: 200 });
-      setProjetos(data.results);
+      flushSync(() => {
+        setProjetos(data.results);
+        setErroProjetos(null);
+      });
+      return true;
     } catch (error) {
-      message.error(`Erro ao carregar projetos: ${(error as Error).message}`);
+      setErroProjetos(mensagemDoErro(error));
+      return false;
     }
   };
 
-  const fetchColecoes = async (): Promise<void> => {
+  const fetchColecoes = async (): Promise<boolean> => {
     try {
-      setColecoes(await listColecoesOptions());
+      const data = await listColecoesOptions();
+      flushSync(() => {
+        setColecoes(data);
+        setErroColecoes(null);
+      });
+      return true;
     } catch (error) {
-      message.error(`Erro ao carregar coleções: ${(error as Error).message}`);
+      setErroColecoes(mensagemDoErro(error));
+      return false;
     }
   };
 
   useEffect(() => {
     void fetchProdutos(1, pagination.pageSize || DEFAULT_PAGE_SIZE);
-  }, [searchText]);
+  }, [searchText, projetoFiltro]);
 
   const handleTableChange = (newPagination: TablePaginationConfig): void => {
     void fetchProdutos(
@@ -134,6 +176,7 @@ export default function ProdutosPage(): JSX.Element {
   };
 
   const handleSave = async (values: ProdutoFormValues): Promise<void> => {
+    setSalvando(true);
     try {
       const payload: ProdutoPayload = {
         codigo: values.codigo,
@@ -154,82 +197,133 @@ export default function ProdutosPage(): JSX.Element {
       form.resetFields();
       void fetchProdutos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
     } catch (error) {
-      message.error(`Erro: ${(error as Error).message}`);
+      form.setFields(errosDosCampos(error));
+      message.error(`Erro: ${mensagemDoErro(error)}`);
+    } finally {
+      setSalvando(false);
     }
   };
 
   const handleDelete = (produto: ProdutoRecord): void => {
     Modal.confirm({
-      title: 'Confirmar exclusao',
-      content: `Tem certeza que deseja excluir o produto "${produto.nome}"?`,
+      title: 'Confirmar exclusão',
+      // O nome pode repetir; o código, não.
+      content: `Tem certeza que deseja excluir o produto "${produto.nome}" (código ${produto.codigo})?`,
       okText: 'Sim, excluir',
       okType: 'danger',
       cancelText: 'Cancelar',
+      // Ação destrutiva: o foco começa no Cancelar (senão um Enter repetido exclui sem confirmar).
+      autoFocusButton: 'cancel',
       onOk: async () => {
         try {
           await deleteProduto(produto.id);
           message.success('Produto excluido com sucesso');
           void fetchProdutos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
         } catch (error) {
-          message.error(`Erro ao excluir: ${(error as Error).message}`);
+          message.error(`Erro ao excluir: ${mensagemDoErro(error)}`);
         }
       },
     });
   };
 
-  const columns: ColumnsType<ProdutoRecord> = [
-    { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-    { title: 'Codigo', dataIndex: 'codigo', key: 'codigo', width: 120 },
-    { title: 'Nome', dataIndex: 'nome', key: 'nome', width: 250 },
+  // Vazio que diz o que fazer: com o filtro de projeto, o jeito de limpá-lo (como a UF em Municípios).
+  // Com a busca também, cita as duas e limpa as duas: o projeto pode ter produtos que só não batem
+  // com a busca.
+  const nomeDoProjetoFiltro = projetos.find((p) => p.id === projetoFiltro)?.nome ?? projetoFiltro;
+  const vazio = projetoFiltro ? (
+    <Space direction="vertical" size={4}>
+      <span>
+        {searchText
+          ? `Nenhum produto para "${searchText}" no projeto ${nomeDoProjetoFiltro}.`
+          : `Nenhum produto para o projeto ${nomeDoProjetoFiltro}.`}
+      </span>
+      <Button
+        size="small"
+        onClick={() => {
+          setProjetoFiltro(undefined);
+          setSearchText('');
+          setBusca('');
+          // O botão some com o clique (o vazio sai): o foco vai para a busca, não para o body.
+          buscaRef.current?.focus();
+        }}
+      >
+        {searchText ? 'Limpar busca e filtro de projeto' : 'Limpar filtro de projeto'}
+      </Button>
+    </Space>
+  ) : null;
+
+  // C2: lista enxuta, por prioridade de largura (VISIVEL_A_PARTIR). O que some da linha vai
+  // para a linha expandida (ResponsiveTable). O ID interno não vai para a grade, e a
+  // Descrição (texto longo) só entra nela a partir de xxl (1600 px).
+  const columns: ColunaResponsiva<ProdutoRecord>[] = [
     {
-      title: 'Descrição',
-      dataIndex: 'descricao',
-      key: 'descricao',
-      width: 280,
-      ellipsis: true,
-      render: (descricao: string | null | undefined) =>
-        descricao && descricao.trim() ? descricao : <span style={{ color: '#bfbfbf' }}>—</span>,
+      title: 'Nome',
+      dataIndex: 'nome',
+      key: 'nome',
+      // Sem detalhe que mostre o nome inteiro, ele quebra linha em vez de cortar. No celular, o
+      // código (fora da grade) vai junto: é a chave única, o nome pode repetir.
+      render: (_, record) => (
+        <div className="min-w-0">
+          <Text className="max-w-full break-words">{record.nome}</Text>
+          {acoesCompactas ? (
+            <Text type="secondary" className="block max-w-full break-words">
+              {record.codigo}
+            </Text>
+          ) : null}
+        </div>
+      ),
     },
-    { title: 'Projeto', dataIndex: 'projeto_nome', key: 'projeto_nome', width: 150 },
+    { title: 'Código', dataIndex: 'codigo', key: 'codigo', width: 136, ellipsis: true, responsive: VISIVEL_A_PARTIR.sm },
+    { title: 'Projeto', dataIndex: 'projeto_nome', key: 'projeto_nome', ellipsis: true, responsive: VISIVEL_A_PARTIR.md },
     {
       title: 'Coleção',
       dataIndex: 'colecao_nome',
       key: 'colecao_nome',
-      width: 150,
-      render: (nome: string | null | undefined) =>
-        nome && nome.trim() ? nome : <span style={{ color: '#bfbfbf' }}>—</span>,
+      ellipsis: true,
+      responsive: VISIVEL_A_PARTIR.lg,
+      render: (_, record) => ouTraco(record.colecao_nome),
     },
     {
-      title: 'Ativo',
+      title: 'Descrição',
+      dataIndex: 'descricao',
+      key: 'descricao',
+      ellipsis: true,
+      responsive: VISIVEL_A_PARTIR.xxl,
+      render: (_, record) => ouTraco(record.descricao),
+    },
+    {
+      title: 'Situação',
       dataIndex: 'ativo',
       key: 'ativo',
-      width: 80,
-      render: (ativo: boolean) => <Tag color={ativo ? 'green' : 'red'}>{ativo ? 'Sim' : 'Nao'}</Tag>,
+      width: 88,
+      render: (_, record) => {
+        const cor = record.ativo ? 'green' : 'red';
+        return (
+          <Tag color={cor} style={{ marginInlineEnd: 0, color: TEXTO_DA_TAG[cor] }}>
+            {record.ativo ? 'Ativo' : 'Inativo'}
+          </Tag>
+        );
+      },
     },
     {
-      title: 'Acoes',
+      title: 'Ações',
       key: 'acoes',
-      width: 150,
+      width: larguraAcoesLinha(2, acoesCompactas),
       render: (_, record) => (
-        <Space size="small">
-          <Button
-            type="link"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-          >
-            Editar
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleDelete(record)}
-          >
-            Excluir
-          </Button>
-        </Space>
+        <AcoesLinha
+          compacto={acoesCompactas}
+          alvo={record.nome}
+          acoes={[
+            { chave: 'editar', rotulo: 'Editar', icone: <EditOutlined />, onClick: () => handleEdit(record) },
+            {
+              chave: 'excluir',
+              rotulo: 'Excluir',
+              icone: <DeleteOutlined />,
+              onClick: () => handleDelete(record),
+              perigo: true,
+            },
+          ]}
+        />
       ),
     },
   ];
@@ -241,17 +335,37 @@ export default function ProdutosPage(): JSX.Element {
       </nav>
 
       <Card>
-        <header className="flex justify-between items-center mb-4">
+        <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <Title level={3} className="m-0" id="produtos-title">
-            Produtos ({pagination.total || 0})
+            {/* Lista que falhou não tem total: "(0)" diria que não há produto. */}
+            Produtos{erroLista ? '' : ` (${pagination.total || 0})`}
           </Title>
-          <Space>
+          <div className="flex flex-wrap items-center gap-2">
             <Search
+              ref={buscaRef}
               placeholder="Buscar por nome ou codigo..."
+              aria-label="Buscar produtos por nome ou código"
               allowClear
-              style={{ width: '100%', maxWidth: 250 }}
+              style={{ width: 250, maxWidth: '100%' }}
+              value={busca}
               onSearch={setSearchText}
-              onChange={(e) => !e.target.value && setSearchText('')}
+              onChange={(e) => {
+                setBusca(e.target.value);
+                if (!e.target.value) setSearchText('');
+              }}
+            />
+            <Select
+              ref={filtroProjetoRef}
+              placeholder="Filtrar por projeto"
+              aria-label="Filtrar por projeto"
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              style={{ width: 220, maxWidth: '100%' }}
+              disabled={!!erroProjetos && projetos.length === 0}
+              value={projetoFiltro}
+              onChange={setProjetoFiltro}
+              options={projetos.map((p) => ({ value: p.id, label: p.nome }))}
             />
             <Button
               icon={<ReloadOutlined />}
@@ -263,14 +377,29 @@ export default function ProdutosPage(): JSX.Element {
             <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
               Novo Produto
             </Button>
-          </Space>
+          </div>
         </header>
 
-        <Table
+        {/* Projetos que não carregaram: o filtro fica desabilitado e o motivo aparece aqui, não "Não há dados". */}
+        {erroProjetos ? (
+          <FalhaAoCarregar
+            oque="os projetos"
+            erro={erroProjetos}
+            onTentarDeNovo={fetchProjetos}
+            campo={filtroProjetoRef}
+            className="mb-4"
+          />
+        ) : null}
+
+        <ResponsiveTable<ProdutoRecord>
           columns={columns}
           dataSource={produtos}
           rowKey="id"
+          nomeDaLinha={(produto) => produto.nome}
           loading={loading}
+          erro={erroLista}
+          onTentarDeNovo={() => void fetchProdutos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE)}
+          {...(vazio && { locale: { emptyText: vazio } })}
           onChange={handleTableChange}
           pagination={{
             ...pagination,
@@ -278,7 +407,6 @@ export default function ProdutosPage(): JSX.Element {
             pageSizeOptions: ['15', '30', '50', '100'],
             showTotal: (total) => `Total: ${total}`,
           }}
-          scroll={{ x: 1180 }}
         />
       </Card>
 
@@ -290,6 +418,7 @@ export default function ProdutosPage(): JSX.Element {
         onOk={() => form.submit()}
         okText="Salvar"
         cancelText="Cancelar"
+        confirmLoading={salvando}
         width={600}
       >
         <Form
@@ -325,14 +454,23 @@ export default function ProdutosPage(): JSX.Element {
             name="projeto"
             label="Projeto"
             rules={[{ required: true, message: 'Projeto e obrigatorio' }]}
+            extra={
+              erroProjetos ? (
+                <FalhaAoCarregar oque="os projetos" erro={erroProjetos} onTentarDeNovo={fetchProjetos} campo={projetoRef} />
+              ) : undefined
+            }
           >
             <Select
+              ref={projetoRef}
               placeholder="Selecione um projeto"
               showSearch
+              disabled={!!erroProjetos && projetos.length === 0}
               optionFilterProp="children"
               filterOption={(input, option) =>
                 (option?.children as unknown as string)?.toLowerCase().includes(input.toLowerCase()) ?? false
               }
+              // A coleção é do projeto: trocar o projeto a limpa (senão gravava a de outro projeto).
+              onChange={() => form.setFieldValue('colecao', undefined)}
             >
               {projetos.map((p) => (
                 <Select.Option key={p.id} value={p.id}>
@@ -346,11 +484,18 @@ export default function ProdutosPage(): JSX.Element {
             name="colecao"
             label="Coleção"
             help={selectedProjeto == null ? 'Selecione um projeto para listar as coleções' : undefined}
+            extra={
+              erroColecoes ? (
+                <FalhaAoCarregar oque="as coleções" erro={erroColecoes} onTentarDeNovo={fetchColecoes} campo={colecaoRef} />
+              ) : undefined
+            }
           >
             <Select
+              ref={colecaoRef}
               placeholder="Selecione uma coleção (opcional)"
               allowClear
               showSearch
+              disabled={!!erroColecoes && colecoes.length === 0}
               optionFilterProp="children"
               filterOption={(input, option) =>
                 (option?.children as unknown as string)?.toLowerCase().includes(input.toLowerCase()) ?? false

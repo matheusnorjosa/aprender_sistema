@@ -8,6 +8,7 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 import {
+  NAO_MEDIDOS,
   PENDENTES,
   PENDENTES_SO_LINUX,
   PERFIS,
@@ -246,6 +247,12 @@ async function resolverUrl(page: Page, rota: RotaMedida): Promise<string> {
   return rota.path.replace(':id', String(id));
 }
 
+/** Abre a rota, com o relógio do navegador fixo antes da navegação quando a rota declara `relogio`. */
+async function abrir(page: Page, rota: RotaMedida): Promise<void> {
+  if (rota.relogio) await page.clock.setFixedTime(new Date(rota.relogio));
+  await page.goto(await resolverUrl(page, rota));
+}
+
 /**
  * A referência da trava é o Chromium Linux da CI. PENDENTES_SO_LINUX (diferença de fonte)
  * só vale lá; no Windows essas telas não rolam e não viram "falha esperada".
@@ -287,10 +294,17 @@ export function registrarMatriz(larguras: readonly Largura[]): void {
   test.describe(`Sem rolagem horizontal: rota × largura (${larguras.join(' e ')} px)`, () => {
     for (const rota of ROTAS_MEDIDAS) {
       for (const largura of larguras) {
+        if (rota.naoMedirEm?.includes(largura)) {
+          // Aparece no relatório como pulado, com o motivo de NAO_MEDIDOS (o Vitest exige que exista).
+          test(`${rota.path} @ ${largura}px (${rota.perfil})`, () => {
+            test.skip(true, `NÃO MEDIDO: ${NAO_MEDIDOS[`${rota.path} @ ${largura}px`]}`);
+          });
+          continue;
+        }
         test(`${rota.path} @ ${largura}px (${rota.perfil})`, async ({ page, baseURL }) => {
           const rede = vigiarRede(page, baseURL);
           await entrar(page, rota.perfil, largura);
-          await page.goto(await resolverUrl(page, rota));
+          await abrir(page, rota);
           await garantirTela(page, rota, rede);
           await afirmarSemRolagem(page, chaveDe(rota), largura, rede);
         });
@@ -298,7 +312,7 @@ export function registrarMatriz(larguras: readonly Largura[]): void {
           test(`${chaveDe(rota, estado)} @ ${largura}px (${rota.perfil})`, async ({ page, baseURL }) => {
             const rede = vigiarRede(page, baseURL);
             await entrar(page, rota.perfil, largura);
-            await page.goto(await resolverUrl(page, rota));
+            await abrir(page, rota);
             await garantirTela(page, rota, rede);
             await page.locator(estado.clicar).first().click();
             await garantirTela(page, { marco: rota.marco, dados: estado.dados }, rede);

@@ -87,6 +87,37 @@ def test_brincando_professor_vira_brincando(catalogo):
     _assert_matches("BRINCANDO E APRENDENDO PROFESSOR", "Brincando e Aprendendo")
 
 
+# ---------- nome exato vence apelido (RELAY-53, defeito B) ----------
+@pytest.fixture
+def catalogo_prod_acerta():
+    """Catálogo ACerta como está em prod (2026-10-01): existe 'ACERTA BRASIL PORTUGUES' (id 45) e
+    NÃO existe 'ACerta Brasil Língua Portuguesa', o alvo do apelido escopado."""
+    nomes = ["ACERTA BRASIL PORTUGUES", "ACERTA BRASIL MATEMATICA", "ACerta Português", "ACerta Matemática"]
+    return {n: ProjetoFactory(nome=n, fluxo="NAO_SUPER") for n in nomes}
+
+
+def test_nome_exato_resolve_quando_alvo_do_apelido_nao_existe(catalogo_prod_acerta):
+    # Antes: o apelido apontava para um nome ausente do catálogo e devolvia `unmatched`,
+    # sombreando o projeto de nome idêntico — 31 compras (11.049 unidades, 12 municípios) e
+    # 12 linhas de dat_registro ficaram de fora em prod.
+    _assert_matches("ACERTA BRASIL PORTUGUES", "ACERTA BRASIL PORTUGUES")
+
+
+def test_apelido_com_alvo_ausente_nao_sombreia_regra_canonica(catalogo_prod_acerta):
+    # Com hífen não há match exato; o apelido (chave canônica) aponta para nome ausente e
+    # não pode encerrar a busca — a regra determinística ainda casa o projeto existente.
+    _assert_matches("ACERTA BRASIL - PORTUGUES", "ACERTA BRASIL PORTUGUES")
+
+
+def test_nome_exato_vence_apelido_mesmo_com_alvo_existente(db):
+    exato = ProjetoFactory(nome="Brincando e Aprendendo Professor", fluxo="NAO_SUPER")
+    ProjetoFactory(nome="Brincando e Aprendendo", fluxo="NAO_SUPER")
+    res = resolve_projeto_export("BRINCANDO E APRENDENDO PROFESSOR")
+    assert res.status == "matched"
+    assert res.projeto == exato
+    assert res.matched_via == "norm"
+
+
 # ---------- NÃO mapear (sem regra global Português) ----------
 def test_acerta_portugues_nao_vira_brasil_lingua_portuguesa(catalogo):
     res = resolve_projeto_export("ACERTA PORTUGUES")

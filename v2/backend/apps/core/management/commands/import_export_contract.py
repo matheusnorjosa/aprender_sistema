@@ -110,5 +110,10 @@ class Command(BaseCommand):
                     + f" protected_diff={v['protected_diff']} reject={v['would_reject']}"
                 )
                 self.stdout.write(linha)
+                motivos = {k: n for k, n in (v.get("reject_reasons") or {}).items() if n}
+                if motivos:
+                    self.stdout.write(f"    reject_reasons={motivos}")
+                if v.get("projetos_nao_resolvidos"):
+                    self.stdout.write(f"    projetos_nao_resolvidos={v['projetos_nao_resolvidos']}")
         if report["applied"]:
             self.stdout.write(self.style.SUCCESS(f"  applied(create-only)={report['applied']}"))

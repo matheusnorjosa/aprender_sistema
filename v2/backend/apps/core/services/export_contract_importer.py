@@ -315,11 +315,21 @@ def _map_participation_role(raw: Any) -> str | None:
     return None
 
 
+_MILHAR_PT_BR = re.compile(r"\d{1,3}(?:\.\d{3})+")
+
+
 def _parse_int(v: Any) -> int | None:
-    """Parseia inteiro de string (o v3 emite quantidades como string). Vazio/inválido → None."""
+    """Parseia inteiro de string (o v3 emite quantidades como string). Vazio/inválido → None.
+
+    Milhar pt-BR ("1.000", "4.619") vale mil, não 1,0: a planilha formata quantidade grande com
+    ponto e o CSV traz o texto formatado (RELAY-53: prod gravou 1 e 4). Formatos medidos nas 13
+    versões do contrato: inteiro puro e milhar com ponto. O caminho por float fica para não mudar
+    o sentido de "100.0" para quem já o mandava."""
     s = str(v or "").strip()
     if not s:
         return None
+    if _MILHAR_PT_BR.fullmatch(s):
+        return int(s.replace(".", ""))
     try:
         return int(float(s))
     except ValueError:
@@ -406,6 +416,13 @@ def _dat_acao_ano(r: dict[str, str]) -> int | None:
         if d:
             return d.year
     return None
+
+
+def _dat_compra_ano_uso(r: dict[str, str]) -> int | None:
+    """Ano de USO da coleção (distinto de `ano_compra`). Contrato v12 renomeou `ano_uso` ->
+    `ano_uso_colecao`: prefere o nome novo; cai no antigo p/ contratos <=v11. Vazio = None
+    (NÃO_CLASSIFICADO, gravado como pendente — decisão A)."""
+    return _parse_int(r.get("ano_uso_colecao") or r.get("ano_uso"))
 
 
 def _dat_cadastro_ano(r: dict[str, str]) -> int | None:
@@ -837,24 +854,61 @@ class ExportContractImporter:
                 tally[st] += 1
 
         elif name == "dat_compra":
-            # NK existence-based por tupla (idioma dos handlers DAT). Município por (norm, uf);
-            # Projeto via resolver (#1372). FK não-resolvida → would_reject; ano_uso vazio
-            # (NÃO_CLASSIFICADO) grava com ano_uso=NULL (pendente de ano — decisão A).
+            # NK existence-based por tupla (idioma dos handlers DAT), SEM ano_uso (ver `_dat_compra_nk`).
+            # Município por (norm, uf); Projeto via resolver (#1372). FK não-resolvida → would_reject com
+            # motivo em `reject_reasons` e o nome bruto em `projetos_nao_resolvidos` (RELAY-53: sumiam
+            # calados). Compra existente com outro ano_uso → would_update (o apply create-only não
+            # sobrescreve). Espelha o apply, que grava só a 1ª linha de cada NK do arquivo: a repetição
+            # vira would_reject(compra_repetida_no_arquivo), e would_create = compras que o apply cria.
+            # ano_uso vazio (NÃO_CLASSIFICADO) grava com ano_uso=NULL (pendente de ano — decisão A).
             mun_idx = self._municipio_index()
-            existing = set(
-                DATCompra.objects.values_list(
-                    "municipio_id", "projeto_id", "descricao_produto", "tipo", "quantidade", "ano_uso", "data_compra"
-                )
-            )
+            if self._pidx is None:
+                self._pidx = build_projeto_index()
+            anos_por_nk: dict[tuple[Any, ...], set[int | None]] = {}
+            for *nk_db, ano_db in DATCompra.objects.values_list(
+                "municipio_id", "projeto_id", "descricao_produto", "tipo", "quantidade", "data_compra", "ano_uso"
+            ):
+                anos_por_nk.setdefault(tuple(nk_db), set()).add(ano_db)
+            vistas: set[tuple[Any, ...]] = set()
+            reasons = {
+                "projeto_vazio": 0,
+                "projeto_nao_resolvido": 0,
+                "projeto_ambiguo": 0,
+                "municipio_nao_resolvido": 0,
+                "compra_repetida_no_arquivo": 0,
+            }
+            nao_resolvidos: dict[str, int] = {}
             for r in rows:
-                mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
-                proj_id = self.resolve_projeto(r.get("projeto") or "")
-                nk = self._dat_compra_nk(r, mun_id, proj_id)
-                if mun_id is None or proj_id is None:
+                projeto = (r.get("projeto") or "").strip()
+                res = resolve_projeto_export(projeto, index=self._pidx)
+                if res.status != "matched" or res.projeto is None:
                     tally["would_reject"] += 1
+                    if not projeto:
+                        reasons["projeto_vazio"] += 1
+                    else:
+                        reasons["projeto_ambiguo" if res.status == "ambiguous" else "projeto_nao_resolvido"] += 1
+                        nao_resolvidos[projeto] = nao_resolvidos.get(projeto, 0) + 1
                     continue
-                st, _ = diff_and_classify({} if nk in existing else None, {}, protected)
-                tally[st] += 1
+                mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
+                if mun_id is None:
+                    tally["would_reject"] += 1
+                    reasons["municipio_nao_resolvido"] += 1
+                    continue
+                nk = self._dat_compra_nk(r, mun_id, res.projeto.id)
+                if nk in vistas:
+                    tally["would_reject"] += 1
+                    reasons["compra_repetida_no_arquivo"] += 1
+                    continue
+                vistas.add(nk)
+                anos = anos_por_nk.get(nk)
+                if anos is None:
+                    tally["would_create"] += 1
+                elif _dat_compra_ano_uso(r) in anos:
+                    tally["would_skip_same"] += 1
+                else:
+                    tally["would_update"] += 1  # mesma compra, outro ano_uso
+            tally["reject_reasons"] = reasons
+            tally["projetos_nao_resolvidos"] = nao_resolvidos
 
         elif name == "equipe_gerencia":
             # NK = (gerencia, usuario, papel). Papel fora do domínio ou usuário não-resolvido →
@@ -1062,11 +1116,21 @@ class ExportContractImporter:
 
     @staticmethod
     def _dat_compra_nk(r: dict[str, str], mun_id: int | None, proj_id: int | None) -> tuple[Any, ...]:
-        """NK existence-based da compra: (mun, proj, descricao, tipo, quantidade, ano_uso, data_compra).
+        """NK existence-based da compra: (mun, proj, descricao, tipo, quantidade, data_compra).
 
         `data_compra` faz parte da NK (alinhado ao dedupe_key do contrato): duas compras iguais em
         tudo menos a data (ex.: mesmo kit de professor comprado em 15/05 e 25/05) sao DISTINTAS —
         sem a data elas colidiam e a 2a era descartada, causando under-count de nr_codigos.
+
+        `ano_uso` NÃO faz parte da NK (RELAY-53): é atributo da compra, e a planilha o preenche
+        depois ("Usará a coleção em 2027"). Com ele na chave, a 2ª carga criou cópia de 42 compras
+        em prod. Medido nas 13 versões do dat_compra.csv: tirá-lo não junta nenhuma linha distinta.
+
+        `projeto` FAZ parte da NK: Superativar MAT 5 e PORT 5 são compradas no mesmo município, dia,
+        tipo e quantidade (~50 pares na v32), e só a descrição — texto livre, já trocado entre
+        Mat/Port em Atibaia e Mucambo — as separaria. Sem o projeto, a 2ª sumiria calada. O custo:
+        projeto renomeado entre versões ('TEMA' → 'TEMA 1') vira compra nova (would_create visível
+        no dry-run); reconciliar o projeto no banco antes de reimportar (imports.spec.md).
         """
         return (
             mun_id,
@@ -1074,9 +1138,6 @@ class ExportContractImporter:
             (r.get("descricao_produto") or "").strip(),
             (r.get("tipo") or "").strip() or None,
             _parse_int(r.get("quantidade")),
-            # Contrato v12 renomeou `ano_uso` -> `ano_uso_colecao` (ano de USO da coleção,
-            # distinto de `ano_compra`). Prefere o nome novo; cai no antigo p/ contratos <=v11.
-            _parse_int(r.get("ano_uso_colecao") or r.get("ano_uso")),
             _parse_iso_date(r.get("data_compra")),
         )
 
@@ -1828,7 +1889,7 @@ class ExportContractImporter:
             prod_idx.pop(key, None)
         existing = set(
             DATCompra.objects.values_list(
-                "municipio_id", "projeto_id", "descricao_produto", "tipo", "quantidade", "ano_uso", "data_compra"
+                "municipio_id", "projeto_id", "descricao_produto", "tipo", "quantidade", "data_compra"
             )
         )
         created = 0
@@ -1837,8 +1898,9 @@ class ExportContractImporter:
             proj_id = self.resolve_projeto(r.get("projeto") or "")
             nk = self._dat_compra_nk(r, mun_id, proj_id)
             if mun_id is None or proj_id is None:
-                continue  # FK não-resolvida (ano_uso vazio grava como pendente, ano_uso=NULL)
+                continue  # FK não-resolvida: o classify conta e dá o motivo (reject_reasons)
             if nk in existing:
+                # já existe (mesmo com outro ano_uso) ou repetida no arquivo: o classify espelha
                 continue
             DATCompra.objects.create(
                 municipio_id=mun_id,
@@ -1848,8 +1910,8 @@ class ExportContractImporter:
                 tipo=nk[3],
                 conta_para_codigos=_to_bool(r.get("conta_para_codigos")),
                 quantidade=nk[4] or 0,
-                ano_uso=nk[5],
-                data_compra=nk[6],
+                ano_uso=_dat_compra_ano_uso(r),  # vazio grava como pendente, ano_uso=NULL
+                data_compra=nk[5],
                 created_by=actor,
             )
             existing.add(nk)

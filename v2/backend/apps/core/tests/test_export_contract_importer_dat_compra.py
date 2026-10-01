@@ -5,19 +5,22 @@ ambiguidade de `projeto_geral` (CONTRATO-v4 §2).
 Segurança: apply exige allowlist + actor; create-only; idempotente; fixtures sintéticos.
 """
 
-# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportOptionalMemberAccess=false
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportOptionalMemberAccess=false, reportPrivateUsage=false
 
 from __future__ import annotations
 
 import json
 from datetime import date
 from decimal import Decimal
+from io import StringIO
 from typing import Any
+
+from django.core.management import call_command
 
 import pytest
 
 from apps.core.models import DATCompra, DATRegistro, Produto, ProjetoGeral
-from apps.core.services.export_contract_importer import ExportContractImporter
+from apps.core.services.export_contract_importer import ExportContractImporter, _parse_int
 from apps.core.tests.factories import MunicipioFactory, ProjetoFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
@@ -261,3 +264,216 @@ def test_apply_dat_compra_liga_produto_por_codigo_normalizando_zero(tmp_path):
     assert by_desc["desc A"].produto_id == p_zero.id  # 402002 -> 0402002 (RED: NULL hoje)
     assert by_desc["desc B"].produto_id == p_semzero.id  # 0000507 -> 507 (RED: NULL hoje)
     assert by_desc["desc C"].produto_id is None  # SKU ausente do catálogo
+
+
+# ───────── RELAY-53, defeito C: quantidade com separador de milhar pt-BR ─────────
+@pytest.mark.parametrize(
+    ("bruto", "esperado"),
+    [
+        # Formatos medidos nos dat_compra.csv das 13 versões do export-contract (06/2026 a 09/2026):
+        # inteiro puro (28.921 valores) e milhar com ponto (26: "1.000" e "4.619", em toda versão).
+        ("41", 41),
+        ("2026", 2026),
+        ("1.000", 1000),  # TEMA 2 KIT DO ALUNO, Bom Jesus da Lapa (prod gravou 1)
+        ("4.619", 4619),  # ACERTA BRASIL MATEMATICA KIT ALUNO, Contagem (prod gravou 4)
+        ("12.345.678", 12345678),
+        # O formato float que o parser antigo aceitava continua com o mesmo sentido.
+        ("100.0", 100),
+        ("", None),
+        ("   ", None),
+        ("abc", None),
+        (None, None),
+    ],
+)
+def test_parse_int_le_separador_de_milhar_pt_br(bruto, esperado):
+    assert _parse_int(bruto) == esperado
+
+
+def test_apply_dat_compra_quantidade_com_milhar_pt_br(tmp_path):
+    actor = _actor()
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
+    row = "Cidade X,CE,Proj X,115,TEMA 2 KIT DO ALUNO,Aluno,true,1.000,2026,2025-12-30"
+    r = ExportContractImporter(
+        path=_write_export(tmp_path, {"dat_compra": f"{COMPRA_HEADER}\n{row}\n"}),
+        apply=True,
+        allow=("dat_compra",),
+        actor=actor,
+    ).run()
+    assert r["applied"]["dat_compra"] == 1
+    assert DATCompra.objects.get().quantidade == 1000
+
+
+# ───────── RELAY-53, defeito A: ano_uso não faz parte da identidade da compra ─────────
+def _compra_catole(ano: str) -> str:
+    return f"Catolé do Rocha,PB,Proj X,0602003,KIT CRIANCA,Aluno,true,150,{ano},2026-08-19"
+
+
+def test_reimport_mesma_compra_com_ano_uso_diferente_nao_cria_copia(tmp_path):
+    """Prod, 09 e 10/09: a 1ª carga gravou 42 compras de Catolé do Rocha com ano_uso vazio; a
+    planilha passou a dizer "Usará a coleção em 2027" e a 2ª carga criou 42 cópias (6.004
+    unidades contadas duas vezes), porque ano_uso fazia parte da NK. Agora a compra existente é
+    reconhecida: o dry-run aponta a divergência (would_update) e o apply create-only não cria
+    nem sobrescreve."""
+    actor = _actor()
+    MunicipioFactory(nome="Catolé do Rocha", uf="PB", ativo=True)
+    ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
+    (tmp_path / "v1").mkdir()
+    (tmp_path / "v2").mkdir()
+    carga1 = _write_export(tmp_path / "v1", {"dat_compra": f"{COMPRA_HEADER_V12}\n{_compra_catole('')}\n"})
+    carga2 = _write_export(tmp_path / "v2", {"dat_compra": f"{COMPRA_HEADER_V12}\n{_compra_catole('2027')}\n"})
+    ExportContractImporter(path=carga1, apply=True, allow=("dat_compra",), actor=actor).run()
+
+    t = ExportContractImporter(path=carga2).run()["por_entidade"]["dat_compra"]
+    assert (t["would_create"], t["would_update"], t["would_skip_same"]) == (0, 1, 0)
+
+    r = ExportContractImporter(path=carga2, apply=True, allow=("dat_compra",), actor=actor).run()
+    assert r["applied"]["dat_compra"] == 0
+    assert DATCompra.objects.count() == 1
+    assert DATCompra.objects.get().ano_uso is None  # create-only: decisão humana na tela de compras
+
+
+def test_classify_compra_existente_com_mesmo_ano_uso_e_skip(tmp_path):
+    actor = _actor()
+    MunicipioFactory(nome="Catolé do Rocha", uf="PB", ativo=True)
+    ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
+    path = _write_export(tmp_path, {"dat_compra": f"{COMPRA_HEADER_V12}\n{_compra_catole('2027')}\n"})
+    ExportContractImporter(path=path, apply=True, allow=("dat_compra",), actor=actor).run()
+    t = ExportContractImporter(path=path).run()["por_entidade"]["dat_compra"]
+    assert (t["would_create"], t["would_update"], t["would_skip_same"]) == (0, 0, 1)
+
+
+# ───────── RELAY-53, rodada 3: o projeto faz parte da identidade da compra ─────────
+def _superativar_5(tmp_path):
+    """Duas compras distintas que só o projeto separa: Superativar MAT 5 e PORT 5, mesmo município,
+    dia, tipo e quantidade (~50 pares assim na v32) e a mesma descrição (a planilha já troca as
+    descrições Mat/Port em Atibaia e Mucambo). Devolve (path, actor)."""
+    actor = _actor()
+    MunicipioFactory(nome="Atibaia", uf="SP", ativo=True)
+    ProjetoFactory(nome="SUPERATIVAR MATEMÁTICA 5", fluxo="NAO_SUPER")
+    ProjetoFactory(nome="SUPERATIVAR LINGUAGENS 5", fluxo="NAO_SUPER")
+    desc = "SUPER ATIVAR - LÍNGUA PORTUGUESA ( 5° ANO ) - KIT ALUNO"
+    rows = "\n".join(
+        [
+            f"Atibaia,SP,SUPERATIVAR MATEMÁTICA 5,467,{desc},Aluno,true,2005,2026,2025-12-22",
+            f"Atibaia,SP,SUPERATIVAR LINGUAGENS 5,469,{desc},Aluno,true,2005,2026,2025-12-22",
+        ]
+    )
+    return _write_export(tmp_path, {"dat_compra": f"{COMPRA_HEADER_V12}\n{rows}\n"}), actor
+
+
+def test_mat_5_e_port_5_na_mesma_carga_criam_2_compras(tmp_path):
+    """Rodada 3 da revisão: sem o projeto na NK, a 2ª compra colapsava na 1ª em silêncio (dry-run
+    dizia 2, o apply criava 1) e a falta voltava no dry-run seguinte como troca de projeto."""
+    path, actor = _superativar_5(tmp_path)
+
+    t = ExportContractImporter(path=path).run()["por_entidade"]["dat_compra"]
+    assert (t["would_create"], t["would_reject"]) == (2, 0)
+
+    r = ExportContractImporter(path=path, apply=True, allow=("dat_compra",), actor=actor).run()
+    assert r["applied"]["dat_compra"] == 2
+    assert sorted(DATCompra.objects.values_list("projeto__nome", flat=True)) == [
+        "SUPERATIVAR LINGUAGENS 5",
+        "SUPERATIVAR MATEMÁTICA 5",
+    ]
+
+    t2 = ExportContractImporter(path=path).run()["por_entidade"]["dat_compra"]
+    assert (t2["would_create"], t2["would_skip_same"]) == (0, 2)
+
+
+def test_projeto_renomeado_entre_versoes_aparece_como_would_create(tmp_path):
+    """Decisão de 01/10: perda silenciosa é pior que cópia visível. Compra gravada sob o nome
+    antigo do projeto ('TEMA') e trazida pela planilha sob o novo ('TEMA 1') é outra compra para o
+    importer: o dry-run mostra would_create e o apply cria a cópia. Pré-condição do reimport
+    (imports.spec.md): reconciliar o projeto no banco antes."""
+    actor = _actor()
+    mun = MunicipioFactory(nome="Catolé do Rocha", uf="PB", ativo=True)
+    ProjetoFactory(nome="TEMA 1", fluxo="NAO_SUPER")
+    DATCompra.objects.create(
+        municipio=mun,
+        projeto=ProjetoFactory(nome="TEMA", fluxo="NAO_SUPER"),
+        descricao_produto="TEMA 1 - 3º ANO ALUNO",
+        tipo="Aluno",
+        quantidade=270,
+        ano_uso=2026,
+        data_compra=date(2026, 2, 20),
+        created_by=actor,
+    )
+    row = "Catolé do Rocha,PB,TEMA 1,0108001,TEMA 1 - 3º ANO ALUNO,Aluno,true,270,2026,2026-02-20"
+    path = _write_export(tmp_path, {"dat_compra": f"{COMPRA_HEADER_V12}\n{row}\n"})
+
+    t = ExportContractImporter(path=path).run()["por_entidade"]["dat_compra"]
+    assert (t["would_create"], t["would_update"], t["would_skip_same"]) == (1, 0, 0)
+
+    r = ExportContractImporter(path=path, apply=True, allow=("dat_compra",), actor=actor).run()
+    assert r["applied"]["dat_compra"] == t["would_create"]
+    assert sorted(DATCompra.objects.values_list("projeto__nome", flat=True)) == ["TEMA", "TEMA 1"]
+
+
+def test_compra_repetida_no_arquivo_dry_run_espelha_apply(tmp_path):
+    """O apply grava só a 1ª linha de cada NK do arquivo. O dry-run tem de dizer o mesmo: a 2ª
+    vira would_reject com motivo, e would_create é o número de compras que o apply cria."""
+    actor = _actor()
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
+    rows = "\n".join(
+        [
+            _compra_row(qtde=41, ano=2026),
+            _compra_row(qtde=41, ano=2027),  # mesma NK (ano_uso fora da chave): o apply não grava
+            _compra_row(qtde=41, ano=2026),  # linha repetida idêntica
+            _compra_row(qtde=99),
+        ]
+    )
+    path = _write_export(tmp_path, {"dat_compra": f"{COMPRA_HEADER}\n{rows}\n"})
+
+    t = ExportContractImporter(path=path).run()["por_entidade"]["dat_compra"]
+    assert (t["would_create"], t["would_reject"]) == (2, 2)
+    assert t["reject_reasons"]["compra_repetida_no_arquivo"] == 2
+    assert sum(t["reject_reasons"].values()) == t["would_reject"]
+
+    r = ExportContractImporter(path=path, apply=True, allow=("dat_compra",), actor=actor).run()
+    assert r["applied"]["dat_compra"] == t["would_create"]
+    assert sorted(DATCompra.objects.values_list("quantidade", "ano_uso")) == [(41, 2026), (99, 2026)]
+
+
+# ───────── RELAY-53, defeito D: linha rejeitada aparece com motivo ─────────
+def _export_com_rejeitos(tmp_path) -> str:
+    MunicipioFactory(nome="Cidade X", uf="CE", ativo=True)
+    ProjetoFactory(nome="Proj X", fluxo="NAO_SUPER")
+    # Duas grafias que colapsam na mesma chave canônica (& <-> E) → ambíguo.
+    ProjetoFactory(nome="Vida & Matemática 6", fluxo="NAO_SUPER")
+    ProjetoFactory(nome="Vida E Matemática 6", fluxo="NAO_SUPER")
+    rows = "\n".join(
+        [
+            _compra_row(),  # resolve → would_create
+            _compra_row(projeto=""),  # 507/508 de Maringá: projeto vazio
+            _compra_row(projeto="GESTÃO ESCOLAR 4"),  # variante fora do catálogo
+            _compra_row(projeto="GESTÃO ESCOLAR 4", qtde=7),
+            _compra_row(projeto="VIDA - E - MATEMATICA 6"),  # ambíguo
+            _compra_row(municipio="Cidade Inexistente"),
+        ]
+    )
+    return _write_export(tmp_path, {"dat_compra": f"{COMPRA_HEADER}\n{rows}\n"})
+
+
+def test_classify_dat_compra_rejeito_tem_motivo_e_nome_do_projeto(tmp_path):
+    t = ExportContractImporter(path=_export_com_rejeitos(tmp_path)).run()["por_entidade"]["dat_compra"]
+    assert t["would_create"] == 1
+    assert t["would_reject"] == 5
+    assert t["reject_reasons"] == {
+        "projeto_vazio": 1,
+        "projeto_nao_resolvido": 2,
+        "projeto_ambiguo": 1,
+        "municipio_nao_resolvido": 1,
+        "compra_repetida_no_arquivo": 0,
+    }
+    assert sum(t["reject_reasons"].values()) == t["would_reject"]
+    assert t["projetos_nao_resolvidos"] == {"GESTÃO ESCOLAR 4": 2, "VIDA - E - MATEMATICA 6": 1}
+
+
+def test_comando_texto_mostra_motivo_do_rejeito(tmp_path):
+    out = StringIO()
+    call_command("import_export_contract", "--path", _export_com_rejeitos(tmp_path), stdout=out)
+    texto = out.getvalue()
+    assert "projeto_nao_resolvido" in texto
+    assert "GESTÃO ESCOLAR 4" in texto

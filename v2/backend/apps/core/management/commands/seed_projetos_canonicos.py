@@ -15,6 +15,7 @@ que ja existe). Fica em `apps.core` (nao em dev_tools) para sobreviver ao CP-08
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from django.core.management.base import BaseCommand
@@ -24,8 +25,9 @@ from apps.core.rbac.helpers import GERENCIA_APROVADORA_NOME, fluxo_super_fora_da
 
 _FLUXOS = {"SUPER", "NAO_SUPER"}
 
-# 40 projetos canonicos (15 SUPER). Nomes definitivos revisados pelo dono do dado.
-# +7 variantes numeradas KEEP_NUMERADO do contrato DAT/v6 (Amma 1/2, Catavento 2 2/3 3, Gestao Escolar 4/5/8).
+# 38 projetos canonicos (13 SUPER). Nomes definitivos revisados pelo dono do dado.
+# +5 variantes numeradas KEEP_NUMERADO do contrato DAT/v6 (Amma 1/2, Gestao Escolar 4/5/8). "Catavento 2 2"
+# e "3 3" sairam: sao duplicatas de "Projeto Catavento 2" e "3".
 PROJETOS_CANONICOS: list[tuple[str, str]] = [
     ("A Cor da Gente", "NAO_SUPER"),
     ("ACerta Matemática", "NAO_SUPER"),
@@ -55,9 +57,7 @@ PROJETOS_CANONICOS: list[tuple[str, str]] = [
     ("Projeto Amma 1", "SUPER"),
     ("Projeto Amma 2", "SUPER"),
     ("Projeto Catavento 2", "SUPER"),
-    ("Projeto Catavento 2 2", "SUPER"),
     ("Projeto Catavento 3", "SUPER"),
-    ("Projeto Catavento 3 3", "SUPER"),
     ("Projeto Miudezas e Descobertas", "SUPER"),
     ("Sou da Paz", "NAO_SUPER"),
     ("Superativar Linguagens", "NAO_SUPER"),
@@ -102,7 +102,10 @@ def seed_projetos_canonicos(projetos: list[tuple[str, str]]) -> dict[str, int]:
         if fluxo_super_fora_da_superintendencia(fluxo, gerencia):
             stats["rejected"] += 1  # SUPER sem a gerencia Superintendencia no banco
             continue
-        Projeto.objects.get_or_create(nome=nome, defaults={"fluxo": fluxo, "gerencia": gerencia})
+        # Variante numerada nasce marcada como serie (fora da Nova Solicitacao e do Plano Anual): a
+        # mesma regra do preenchimento inicial (migration 0114). Depois de criado, vale a marca.
+        eh_serie = re.search(r"[0-9]+$", nome) is not None
+        Projeto.objects.get_or_create(nome=nome, defaults={"fluxo": fluxo, "gerencia": gerencia, "eh_serie": eh_serie})
         index = build_projeto_index()  # inclui o recem-criado nas proximas resolucoes (n pequeno)
         stats["created"] += 1
     return stats

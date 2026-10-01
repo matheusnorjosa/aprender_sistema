@@ -106,3 +106,33 @@ class TestResolveProjetoWithYearPrefix:
         projeto = resolve_projeto("2025 Sou da Paz")
         assert projeto is not None
         assert projeto.nome == "Sou da Paz"
+
+
+# ---------------------------------------------------------------------------
+# Projeto renomeado no catálogo (decisão do dono, 02/10): a agenda continua
+# mandando "FLUIR DAS EMOÇÕES" e o projeto vira "Fluir das Emoções (Antigo)"
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+class TestResolveProjetoRenomeado:
+    def test_antes_do_rename_resolve_pelo_nome(self):
+        ProjetoFactory(nome="Fluir das Emoções", fluxo="SUPER")
+        ProjetoFactory(nome="Fluir das Emoções 1", fluxo="SUPER")
+        for bruto in ("FLUIR DAS EMOÇÕES", "2026 Fluir das Emoções"):
+            projeto = resolve_projeto(bruto)
+            assert projeto is not None, bruto
+            assert projeto.nome == "Fluir das Emoções"
+
+    def test_depois_do_rename_resolve_para_o_antigo(self):
+        ProjetoFactory(nome="Fluir das Emoções (Antigo)", fluxo="SUPER")
+        ProjetoFactory(nome="Fluir das Emoções 1", fluxo="SUPER")
+        for bruto in ("FLUIR DAS EMOÇÕES", "2026 Fluir das Emoções", "fluir das emocoes"):
+            projeto = resolve_projeto(bruto)
+            assert projeto is not None, bruto
+            assert projeto.nome == "Fluir das Emoções (Antigo)"
+
+    def test_numerado_nao_cai_no_antigo(self):
+        ProjetoFactory(nome="Fluir das Emoções (Antigo)", fluxo="SUPER")
+        numerado = ProjetoFactory(nome="Fluir das Emoções 1", fluxo="SUPER")
+        assert resolve_projeto("FLUIR DAS EMOÇÕES 1") == numerado

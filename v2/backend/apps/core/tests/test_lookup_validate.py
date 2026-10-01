@@ -227,19 +227,22 @@ class TestProjetoLookup:
         item = next(d for d in data if d["id"] == p.id)
         assert item["label"] == "A COR DA GENTE", "label = nome, sem prefixo de codigo-slug"
 
-    def test_lookup_esconde_variantes_kit_numeradas(self, api_client, authenticated_user):
-        """Kits numerados (nome termina em número) não entram no dropdown de evento (decisão do dono:
-        os eventos usam o nome-família, ex.: 'A COR DA GENTE'; '... 1..9' são os kits das coleções)."""
+    def test_lookup_esconde_projeto_marcado_como_serie(self, api_client, authenticated_user):
+        """Série (`eh_serie=True`) não entra no dropdown de evento (decisão do dono: os eventos usam
+        o nome-família, ex.: 'A COR DA GENTE'; '... 1..9' são os kits das coleções). Vale a marca,
+        não o nome: o numerado sem a marca aparece."""
         fam = ProjetoFactory(nome="A COR DA GENTE", codigo="A_COR_DA_GENTE", ativo=True, fluxo="NAO_SUPER")
-        kit = ProjetoFactory(nome="A COR DA GENTE 3", codigo="", ativo=True, fluxo="NAO_SUPER")
+        kit = ProjetoFactory(nome="A COR DA GENTE 3", codigo="", ativo=True, fluxo="NAO_SUPER", eh_serie=True)
+        numerado = ProjetoFactory(nome="A COR DA GENTE 4", codigo="", ativo=True, fluxo="NAO_SUPER")
         api_client.force_authenticate(user=authenticated_user)
         ids = {d["id"] for d in api_client.get("/api/lookup/projetos/?q=GENTE").json()}
         assert fam.id in ids, "família (projeto-evento) aparece"
-        assert kit.id not in ids, "kit numerado escondido"
+        assert kit.id not in ids, "série escondida"
+        assert numerado.id in ids, "número no nome sem a marca não esconde"
 
-    def test_lookup_include_kits_traz_numeradas(self, api_client, authenticated_user):
-        """include_kits=true reexpõe os numerados (escape hatch p/ eventual consumidor de kit)."""
-        kit = ProjetoFactory(nome="A COR DA GENTE 3", codigo="", ativo=True, fluxo="NAO_SUPER")
+    def test_lookup_include_kits_traz_as_series(self, api_client, authenticated_user):
+        """include_kits=true reexpõe as séries (escape hatch p/ eventual consumidor de kit)."""
+        kit = ProjetoFactory(nome="A COR DA GENTE 3", codigo="", ativo=True, fluxo="NAO_SUPER", eh_serie=True)
         api_client.force_authenticate(user=authenticated_user)
         ids = {d["id"] for d in api_client.get("/api/lookup/projetos/?q=GENTE&include_kits=true").json()}
         assert kit.id in ids

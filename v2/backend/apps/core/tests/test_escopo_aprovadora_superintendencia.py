@@ -81,7 +81,8 @@ def _aprovadora(g1: Gerencia, groups: tuple[str, ...] = ("Gerente",), **kwargs) 
 
 
 def _projeto(fluxo: str, gerencia: Gerencia | None) -> Projeto:
-    # Nome sem dígito no fim: o /lookup/projetos/ esconde "kits" (nome terminado em número).
+    # O " x" no fim vem de quando o /lookup/projetos/ escondia nome terminado em número. Hoje quem
+    # esconde é a marca `Projeto.eh_serie`; o nome ficou.
     return ProjetoFactory(nome=f"Projeto escopo {next(_NOME)} x", fluxo=fluxo, gerencia=gerencia)
 
 

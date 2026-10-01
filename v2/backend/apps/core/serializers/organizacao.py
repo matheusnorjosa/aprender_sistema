@@ -123,6 +123,7 @@ class ProjetoSerializer(serializers.ModelSerializer):
             "setor",
             "setor_efetivo",
             "sem_operacao",
+            "eh_serie",
             "is_test",
         ]
         # sem_operacao: autoritativo do import (#1897), sem entrada-direta → read-only.

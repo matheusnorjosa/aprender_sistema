@@ -70,11 +70,11 @@ def test_seed_rejects_invalid_fluxo_and_empty_name():
 
 
 def test_constant_well_formed():
-    assert len(PROJETOS_CANONICOS) == 40
+    assert len(PROJETOS_CANONICOS) == 38
     nomes = [n for n, _ in PROJETOS_CANONICOS]
-    assert len(set(nomes)) == 40, "nomes de projeto devem ser unicos"
+    assert len(set(nomes)) == 38, "nomes de projeto devem ser unicos"
     assert all(f in {"SUPER", "NAO_SUPER"} for _, f in PROJETOS_CANONICOS)
-    assert sum(1 for _, f in PROJETOS_CANONICOS if f == "SUPER") == 15
+    assert sum(1 for _, f in PROJETOS_CANONICOS if f == "SUPER") == 13
 
 
 @pytest.mark.usefixtures("g1")
@@ -84,12 +84,12 @@ def test_command_seeds_catalogo():
     tema = Projeto.objects.get(nome="TEMA")
     assert tema.fluxo == "SUPER"
     assert Projeto.objects.get(nome="Superativar Matemática").fluxo == "NAO_SUPER"
-    assert Projeto.objects.filter(nome__in=[n for n, _ in PROJETOS_CANONICOS]).count() == 40
+    assert Projeto.objects.filter(nome__in=[n for n, _ in PROJETOS_CANONICOS]).count() == 38
 
 
 def test_command_idempotent(g1):
     call_command("seed_projetos_canonicos")
-    assert Projeto.objects.filter(fluxo="SUPER", gerencia=g1).count() == 15  # SUPER nasce na g1
+    assert Projeto.objects.filter(fluxo="SUPER", gerencia=g1).count() == 13  # SUPER nasce na g1
     before = Projeto.objects.count()
     call_command("seed_projetos_canonicos")
     assert Projeto.objects.count() == before  # 2a run nao duplica

@@ -432,6 +432,14 @@ class Projeto(models.Model):
             "catálogo que não gera eventos/operação. Autoritativo do import, SEM entrada-direta."
         ),
     )
+    eh_serie = models.BooleanField(
+        default=False,
+        help_text=(
+            "Série/variante de um projeto (ex.: A COR DA GENTE 3): não entra na Nova Solicitação; no Plano "
+            "Anual só aparece se já tiver plano; continua em Compras e DAT. Editável na tela Projetos. O import marca só ao "
+            "criar o projeto e nunca altera a marca de um projeto existente."
+        ),
+    )
 
     # Issue #145: Hierarquia organizacional
     gerencia = models.ForeignKey(  # type: ignore[misc]

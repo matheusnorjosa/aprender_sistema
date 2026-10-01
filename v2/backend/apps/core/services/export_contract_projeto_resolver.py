@@ -11,12 +11,22 @@ vem do export-contract para um `Projeto` existente, fechando os resíduos de for
    - normalizar vírgula (`LER, OUVIR` <-> `LER OUVIR`)
 2. Aliases ESCOPADOS por família (nunca regra global `Português -> Língua Portuguesa`):
    - `Superativar (Língua )Português N` -> `Superativar Linguagens N` (N in 3,4,5)
-   - `ACerta Brasil Português` -> `ACerta Brasil Língua Portuguesa`
+   - `ACerta Brasil Matemática` -> `ACerta Matemática`; `ACerta Brasil Português` e
+     `ACerta Brasil Língua Portuguesa` -> `ACerta Português` (fusão decidida pelo dono em 02/10/2026)
+   - `Fluir das Emoções` -> `Fluir das Emoções (Antigo)` (rename decidido pelo dono em 02/10/2026;
+     `Fluir das Emoções - 1/2/3` têm chave própria e não passam pelo apelido)
    - `Brincando e Aprendendo Professor` -> `Brincando e Aprendendo`
 
-Precedência: nome exato (norm) > alias > chave canônica. O nome que existe no catálogo vence
-qualquer alias, e alias cujo alvo não existe não encerra a busca (RELAY-53: prod tem
-`ACERTA BRASIL PORTUGUES` e não tem o alvo `ACerta Brasil Língua Portuguesa`).
+Precedência: nome exato (norm) > chave canônica > alias. O nome que existe no catálogo, em
+qualquer grafia, vence o alias; o alias só vale para nome que o catálogo não tem. Consequência,
+nos dois estados de um rename/fusão feito por script de dados (que roda depois do deploy):
+- antes do script (o projeto antigo existe): o nome da planilha casa o projeto antigo — nada é
+  desviado para o alvo do alias;
+- depois do script (o projeto antigo foi APAGADO ou RENOMEADO): o nome cai no alias e resolve
+  para o alvo — o master `projeto` não recria o projeto antigo.
+O índice inclui projeto inativo: a fusão que só desativar o projeto antigo NÃO ativa o alias.
+Alias cujo alvo não existe devolve `unmatched` (RELAY-53: o alias antigo de `ACERTA BRASIL
+PORTUGUES` apontava para um nome ausente de prod e sombreava o projeto de nome idêntico).
 
 Ambiguidade (a chave canônica casa >1 projeto distinto) **falha explicitamente**
 (`status="ambiguous"`), nunca escolhe um alvo no chute.
@@ -45,8 +55,14 @@ _SCOPED_ALIASES: dict[str, str] = {
     "SUPERATIVAR LINGUA PORTUGUESA 3": "SUPERATIVAR LINGUAGENS 3",
     "SUPERATIVAR LINGUA PORTUGUESA 4": "SUPERATIVAR LINGUAGENS 4",
     "SUPERATIVAR LINGUA PORTUGUESA 5": "SUPERATIVAR LINGUAGENS 5",
-    # ACerta Brasil: "Português" -> "Língua Portuguesa" (só vale se o alvo existir; prod não o tem)
-    "ACERTA BRASIL PORTUGUES": "ACERTA BRASIL LINGUA PORTUGUESA",
+    # ACerta Brasil juntado em ACerta (decisão do dono, 02/10/2026; a fusão é script de dados). Só
+    # vale depois da fusão: enquanto "ACERTA BRASIL ..." existir no catálogo, o nome vence o apelido.
+    "ACERTA BRASIL MATEMATICA": "ACERTA MATEMATICA",
+    "ACERTA BRASIL PORTUGUES": "ACERTA PORTUGUES",
+    "ACERTA BRASIL LINGUA PORTUGUESA": "ACERTA PORTUGUES",
+    # "Fluir das Emoções" (sem número) renomeado para "... (Antigo)" (decisão do dono, 02/10/2026);
+    # a planilha continua mandando o nome sem o sufixo. "FLUIR DAS EMOCOES 1/2/3" têm outra chave.
+    "FLUIR DAS EMOCOES": "FLUIR DAS EMOCOES (ANTIGO)",
     # E1 (merge já aplicado no catálogo)
     "BRINCANDO E APRENDENDO PROFESSOR": "BRINCANDO E APRENDENDO",
 }
@@ -130,8 +146,28 @@ def resolve_projeto_export(raw_name: str, *, index: ProjetoIndex | None = None) 
             reason="múltiplos projetos com o mesmo nome normalizado",
         )
 
-    # 2) alias escopado, keyed pela CHAVE CANÔNICA (tolerante a hífen/vírgula/&/prefixo). Alvo
-    # ausente do catálogo não encerra a busca: segue para a regra determinística (RELAY-53).
+    # 2) match por chave canônica determinística (& <-> E, hífen, vírgula, prefixo PROJETO). Vem
+    # antes do alias: "ACERTA BRASIL - PORTUGUES" fica em "ACERTA BRASIL PORTUGUES" enquanto ele existir.
+    canon_hits = idx.by_canon.get(ck, [])
+    if len(canon_hits) == 1:
+        return ProjetoResolution(
+            status="matched",
+            projeto=canon_hits[0],
+            matched_via="canon_rule",
+            canonical_key=ck,
+            reason="match por regra determinística",
+        )
+    if len(canon_hits) > 1:
+        return ProjetoResolution(
+            status="ambiguous",
+            canonical_key=ck,
+            candidates=sorted(str(p.nome) for p in canon_hits),
+            reason="chave canônica casa múltiplos projetos (não escolher no chute)",
+        )
+
+    # 3) alias escopado, keyed pela CHAVE CANÔNICA (tolerante a hífen/vírgula/&/prefixo). Só chega
+    # aqui o nome que NÃO existe no catálogo em nenhuma grafia: o apelido nunca desvia de um projeto
+    # que existe. Alvo ausente do catálogo = `unmatched`.
     alias_target = _SCOPED_ALIASES.get(ck, "")
     alias_hits = idx.by_canon.get(alias_target, []) if alias_target else []
     if len(alias_hits) == 1:
@@ -148,24 +184,6 @@ def resolve_projeto_export(raw_name: str, *, index: ProjetoIndex | None = None) 
             canonical_key=alias_target,
             candidates=sorted(str(p.nome) for p in alias_hits),
             reason="alias casa múltiplos projetos (não escolher no chute)",
-        )
-
-    # 3) match por chave canônica determinística (& <-> E, hífen, vírgula, prefixo PROJETO)
-    canon_hits = idx.by_canon.get(ck, [])
-    if len(canon_hits) == 1:
-        return ProjetoResolution(
-            status="matched",
-            projeto=canon_hits[0],
-            matched_via="canon_rule",
-            canonical_key=ck,
-            reason="match por regra determinística",
-        )
-    if len(canon_hits) > 1:
-        return ProjetoResolution(
-            status="ambiguous",
-            canonical_key=ck,
-            candidates=sorted(str(p.nome) for p in canon_hits),
-            reason="chave canônica casa múltiplos projetos (não escolher no chute)",
         )
 
     return ProjetoResolution(status="unmatched", canonical_key=ck, reason="nenhum projeto correspondente")

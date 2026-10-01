@@ -147,6 +147,8 @@ export interface ProjetoPayload {
   setor?: string;
   // Gerência do projeto (id). Regra do dono (30/09): fluxo SUPER só na gerência Superintendência.
   gerencia?: ID | undefined;
+  // Série/variante: fora da Nova Solicitação e do Plano Anual (Projeto.eh_serie).
+  eh_serie?: boolean;
 }
 
 /**

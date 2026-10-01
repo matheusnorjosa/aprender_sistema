@@ -76,8 +76,8 @@ def coordenador(gerencias):
 
 @pytest.fixture
 def projetos(municipio):
-    # ⚑ nomes NÃO podem terminar em dígito: ProjetoLookup exclui "kits" por
-    # `nome__regex=[0-9]+$` (views_lookup.py). Por isso "SS", não "S2".
+    # O "SS" no lugar de "S2" vem de quando o ProjetoLookup escondia nome terminado em dígito.
+    # Hoje quem esconde é a marca `Projeto.eh_serie`; o nome ficou.
     return {
         "vidas": _projeto_com_compra("Proj Vidas SS", "PVID-S2", "Vidas", municipio),
         "fluir": _projeto_com_compra("Proj Fluir SS", "PFLU-S2", "Fluir", municipio),

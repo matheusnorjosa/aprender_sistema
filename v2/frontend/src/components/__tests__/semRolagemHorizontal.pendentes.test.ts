@@ -61,7 +61,6 @@ const LINHA_DE_BASE: ListaPendentes = {
   '/controle/pre-agenda': [360, 768, 1024, 1280],
   '/acoes-notificacao': [360, 768, 1024, 1280],
   '/notificacoes-internas': [360, 768],
-  '/dat/admin/projetos': [360, 768, 1024],
   '/dat/cadastros': [360, 768, 1024, 1280],
   '/dat/registros': [360, 768, 1024, 1280],
 };
@@ -76,11 +75,12 @@ const LINHA_DE_BASE_SO_LINUX: ListaPendentes = {
 };
 
 /**
- * Tamanho atual de PENDENTES mais PENDENTES_SO_LINUX (90 + 2). Só desce. C0: 126 + 2; o C1
+ * Tamanho atual de PENDENTES mais PENDENTES_SO_LINUX (87 + 2). Só desce. C0: 126 + 2; o C1
  * tirou 9 (as 4 de Usuários e 5 que a sidebar nova liberou a 768 e 1024); o C2 tirou 27 (Admin
- * DAT: grupos, setores, funções, gerências, municípios, produtos e projetos gerais).
+ * DAT: grupos, setores, funções, gerências, municípios, produtos e projetos gerais); a tela
+ * Projetos (01/10/2026, marca de série) tirou 3.
  */
-const TETO_PENDENTES = 92;
+const TETO_PENDENTES = 89;
 
 const SO_LINUX = ' (só Linux)';
 
@@ -248,6 +248,13 @@ describe('ratchet de PENDENTES: lista real', () => {
     '/dat/admin/produtos': [360, 768, 1024, 1280],
     '/dat/admin/projetos-gerais': [360, 768, 1024],
   };
+  // A tela Projetos (01/10/2026, marca de série) também saiu da linha de base.
+  test.each([360, 768, 1024])('/dat/admin/projetos @ %ipx, consertada, não volta a PENDENTES', (largura) => {
+    expect(devolverAPendentes('/dat/admin/projetos', largura)).toEqual([
+      `combinação fora da linha de base: /dat/admin/projetos @ ${largura}px`,
+    ]);
+  });
+
   test.each(Object.entries(CONSERTADAS_NO_C2).flatMap(([chave, larguras]) => larguras.map((l) => [chave, l] as const)))(
     '%s @ %ipx, consertada no C2, não volta a PENDENTES',
     (chave, largura) => {

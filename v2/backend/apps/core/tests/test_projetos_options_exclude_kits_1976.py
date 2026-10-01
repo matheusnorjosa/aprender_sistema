@@ -5,14 +5,17 @@ O catálogo tem dois níveis (relay sheets.banco): família (`A COR DA GENTE`) �
 evento e plano apontam — e variante-por-série (`A COR DA GENTE 1..9`) — para onde DAT/compra
 apontam. O dropdown de solicitação já mostra só famílias (ProjetoLookup exclui numerados);
 o de plano de formação usava este endpoint sem filtro e mostrava os dois níveis misturados
-(a "duplicação" percebida). Este endpoint ganha `?exclude_kits=true` (mesma heurística do
-ProjetoLookup: exclui nomes terminados em número), default false (não afeta Compras).
+(a "duplicação" percebida). Este endpoint ganha `?exclude_kits=true` (mesma regra do
+ProjetoLookup: exclui o projeto marcado como série, `Projeto.eh_serie`), default false (não afeta
+Compras). A regra já foi o nome terminado em número; hoje é a marca. Exceção só deste endpoint
+(02/10/2026): a série que já tem plano de formação continua na lista — ver `test_projeto_eh_serie.py`.
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
 
+from django.core.cache import cache
 from rest_framework.test import APIClient
 
 import pytest
@@ -27,10 +30,11 @@ def regular_user(db):
 
 @pytest.fixture
 def projetos_dois_niveis(db):
-    """Família (sem número) + variantes por série (terminadas em número)."""
+    """Família + variantes por série (marcadas com `eh_serie`)."""
+    cache.clear()  # o endpoint guarda a lista por 5 min
     familia = ProjetoFactory(nome="A COR DA GENTE", fluxo="NAO_SUPER", ativo=True, is_test=False)
-    var1 = ProjetoFactory(nome="A COR DA GENTE 1", fluxo="NAO_SUPER", ativo=True, is_test=False)
-    var2 = ProjetoFactory(nome="A COR DA GENTE 2", fluxo="NAO_SUPER", ativo=True, is_test=False)
+    var1 = ProjetoFactory(nome="A COR DA GENTE 1", fluxo="NAO_SUPER", ativo=True, is_test=False, eh_serie=True)
+    var2 = ProjetoFactory(nome="A COR DA GENTE 2", fluxo="NAO_SUPER", ativo=True, is_test=False, eh_serie=True)
     return {"familia": familia, "variantes": [var1, var2]}
 
 
@@ -38,8 +42,8 @@ def projetos_dois_niveis(db):
 class TestProjetosOptionsExcludeKits:
     """#1976: filtro de nível no /api/options/projetos/."""
 
-    def test_exclude_kits_true_hides_numbered_variants(self, regular_user, projetos_dois_niveis):
-        """Com ?exclude_kits=true, só famílias (nomes sem número final) voltam."""
+    def test_exclude_kits_true_hides_series(self, regular_user, projetos_dois_niveis):
+        """Com ?exclude_kits=true, só o que não está marcado como série volta."""
         client = APIClient()
         client.force_authenticate(user=regular_user)
 

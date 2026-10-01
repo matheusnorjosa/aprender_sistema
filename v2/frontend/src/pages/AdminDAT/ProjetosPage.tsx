@@ -6,8 +6,7 @@
  */
 
 import { useState, useEffect, useMemo, type JSX } from 'react';
-import { Table, Button, Input, Space, Tag, Typography, Card, message, Modal, Form, Radio, Checkbox, Select, Alert } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import { Button, Input, Tag, Typography, Card, message, Modal, Form, Radio, Checkbox, Select, Alert, Switch, Grid } from 'antd';
 import type { TablePaginationConfig } from 'antd/es/table';
 import { ReloadOutlined, EditOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Link } from 'react-router';
@@ -20,6 +19,9 @@ import {
   listGerencias,
   type GerenciaRecord,
 } from '../../api/adminDAT';
+import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
+import { AcoesLinha, larguraAcoesLinha } from '../../components/AcoesLinha';
+import { TEXTO_DA_TAG } from '../../components/textoDaTag';
 import { DEFAULT_PAGE_SIZE } from '../../constants';
 import type { ID } from '../../types';
 
@@ -42,6 +44,10 @@ interface ProjetoRecord {
   gerencia: ID | null;
   // PR A: rótulo (nome de tela) da gerência do projeto; null sem gerência.
   gerencia_nome: string | null;
+  // Família do projeto (ProjetoGeral), só leitura; null sem família.
+  projeto_geral_nome?: string | null;
+  // Série/variante: fora da Nova Solicitação; no Plano Anual só entra se já tiver plano.
+  eh_serie?: boolean;
 }
 
 /**
@@ -54,6 +60,7 @@ interface ProjetoFormValues {
   ativo: boolean;
   setor?: string;
   gerencia?: ID | undefined;
+  eh_serie: boolean;
 }
 
 export default function ProjetosPage(): JSX.Element {
@@ -74,6 +81,9 @@ export default function ProjetosPage(): JSX.Element {
   const [gerencias, setGerencias] = useState<GerenciaRecord[]>([]);
   // Motivo da falha ao carregar as gerências (null = carregou). Sem a lista não dá para criar projeto.
   const [erroGerencias, setErroGerencias] = useState<string | null>(null);
+
+  // Celular (< 576 px): as ações da linha vão todas para o menu "Mais ações".
+  const acoesCompactas = !Grid.useBreakpoint().sm;
 
   const [form] = Form.useForm<ProjetoFormValues>();
 
@@ -175,6 +185,7 @@ export default function ProjetosPage(): JSX.Element {
       // gravaria a derivação no raw, contaminando-o (guarda anti-M17).
       setor: projeto.setor,
       gerencia: projeto.gerencia ?? undefined,
+      eh_serie: projeto.eh_serie ?? false,
     });
     setModalVisible(true);
   };
@@ -223,68 +234,109 @@ export default function ProjetosPage(): JSX.Element {
     });
   };
 
-  const columns: ColumnsType<ProjetoRecord> = [
-    { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-    { title: 'Nome', dataIndex: 'nome', key: 'nome', width: 300 },
-    { title: 'Código', dataIndex: 'codigo', key: 'codigo', width: 120 },
+  // Sem rolagem horizontal: colunas por prioridade de largura (VISIVEL_A_PARTIR). Sempre na linha:
+  // o nome (com a etiqueta de série), a situação e as ações. O que some da linha vai para a linha
+  // expandida (ResponsiveTable). O ID interno não vai para a grade.
+  const columns: ColunaResponsiva<ProjetoRecord>[] = [
+    {
+      title: 'Nome',
+      dataIndex: 'nome',
+      key: 'nome',
+      // Identidade: quebra linha em vez de cortar. A etiqueta fica junto do nome, sem coluna nova.
+      render: (_, record) => (
+        <div className="min-w-0">
+          <Text className="max-w-full break-words">{record.nome}</Text>
+          {record.eh_serie ? (
+            <div>
+              <Tag color="purple" style={{ marginInlineEnd: 0 }}>Série</Tag>
+            </div>
+          ) : null}
+        </div>
+      ),
+    },
+    { title: 'Código', dataIndex: 'codigo', key: 'codigo', width: 136, ellipsis: true, responsive: VISIVEL_A_PARTIR.sm },
     {
       // PR A: "Setor" = rótulo da gerência (nome de tela). O setor do catálogo (`setor_efetivo`,
       // derivado, read-only; o form de conferência grava no raw) fica na mesma célula quando
       // difere — sem coluna nova, para não alargar a tabela (regra: sem rolagem horizontal).
       title: 'Setor',
       key: 'setor',
-      width: 160,
+      responsive: VISIVEL_A_PARTIR.md,
       render: (_, record) => (
-        <>
-          {record.gerencia_nome ? <Tag color="geekblue">{record.gerencia_nome}</Tag> : <Tag>não definido</Tag>}
+        <div className="min-w-0">
+          {record.gerencia_nome ? (
+            // Rótulo longo quebra linha dentro da etiqueta (a do AntD não quebra e estouraria a coluna).
+            <Tag color="geekblue" className="whitespace-normal break-words" style={{ marginInlineEnd: 0, maxWidth: '100%' }}>
+              {record.gerencia_nome}
+            </Tag>
+          ) : (
+            <Tag style={{ marginInlineEnd: 0 }}>não definido</Tag>
+          )}
           {record.setor_efetivo && record.setor_efetivo !== record.gerencia_nome ? (
-            <div><Text type="secondary">catálogo: {record.setor_efetivo}</Text></div>
+            <Text type="secondary" className="block max-w-full break-words">
+              catálogo: {record.setor_efetivo}
+            </Text>
           ) : null}
-        </>
+        </div>
       ),
+    },
+    {
+      // Família (ProjetoGeral) do projeto: só leitura; a ligação vem do import ou de correção de dados.
+      title: 'Família',
+      dataIndex: 'projeto_geral_nome',
+      key: 'projeto_geral_nome',
+      ellipsis: true,
+      responsive: VISIVEL_A_PARTIR.lg,
+      render: (_, record) => record.projeto_geral_nome || '-',
     },
     {
       title: 'Fluxo',
       dataIndex: 'fluxo',
       key: 'fluxo',
       width: 150,
-      render: (fluxo: string) => (
-        <Tag color={fluxo === 'SUPER' ? 'gold' : 'blue'}>
-          {fluxo === 'SUPER' ? 'SUPER (Manual)' : 'NAO_SUPER (Auto)'}
-        </Tag>
-      ),
+      responsive: VISIVEL_A_PARTIR.xl,
+      render: (_, record) => {
+        const cor = record.fluxo === 'SUPER' ? 'gold' : 'blue';
+        return (
+          <Tag color={cor} style={{ marginInlineEnd: 0, color: TEXTO_DA_TAG[cor] }}>
+            {record.fluxo === 'SUPER' ? 'SUPER (Manual)' : 'NAO_SUPER (Auto)'}
+          </Tag>
+        );
+      },
     },
     {
-      title: 'Ativo',
+      title: 'Situação',
       dataIndex: 'ativo',
       key: 'ativo',
-      width: 100,
-      render: (ativo: boolean) => <Tag color={ativo ? 'green' : 'red'}>{ativo ? 'Sim' : 'Não'}</Tag>,
+      width: 88,
+      render: (_, record) => {
+        const cor = record.ativo ? 'green' : 'red';
+        return (
+          <Tag color={cor} style={{ marginInlineEnd: 0, color: TEXTO_DA_TAG[cor] }}>
+            {record.ativo ? 'Ativo' : 'Inativo'}
+          </Tag>
+        );
+      },
     },
     {
       title: 'Ações',
       key: 'acoes',
-      width: 150,
+      width: larguraAcoesLinha(2, acoesCompactas),
       render: (_, record) => (
-        <Space size="small">
-          <Button
-            type="link"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-          >
-            Editar
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleDelete(record)}
-          >
-            Excluir
-          </Button>
-        </Space>
+        <AcoesLinha
+          compacto={acoesCompactas}
+          alvo={record.nome}
+          acoes={[
+            { chave: 'editar', rotulo: 'Editar', icone: <EditOutlined />, onClick: () => handleEdit(record) },
+            {
+              chave: 'excluir',
+              rotulo: 'Excluir',
+              icone: <DeleteOutlined />,
+              onClick: () => handleDelete(record),
+              perigo: true,
+            },
+          ]}
+        />
       ),
     },
   ];
@@ -296,15 +348,16 @@ export default function ProjetosPage(): JSX.Element {
       </nav>
 
       <Card>
-        <header className="flex justify-between items-center mb-4">
+        <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <Title level={3} className="m-0" id="projetos-title">
             Projetos ({pagination.total || 0})
           </Title>
-          <Space>
+          <div className="flex flex-wrap items-center gap-2">
             <Search
               placeholder="Buscar por nome ou código"
+              aria-label="Buscar projetos por nome ou código"
               allowClear
-              style={{ width: '100%', maxWidth: 250 }}
+              style={{ width: 250, maxWidth: '100%' }}
               onSearch={setSearchText}
               onChange={(e) => !e.target.value && setSearchText('')}
             />
@@ -318,13 +371,14 @@ export default function ProjetosPage(): JSX.Element {
             <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
               Novo Projeto
             </Button>
-          </Space>
+          </div>
         </header>
 
-        <Table
+        <ResponsiveTable<ProjetoRecord>
           columns={columns}
           dataSource={projetos}
           rowKey="id"
+          nomeDaLinha={(projeto) => projeto.nome}
           loading={loading}
           onChange={handleTableChange}
           pagination={{
@@ -333,7 +387,6 @@ export default function ProjetosPage(): JSX.Element {
             pageSizeOptions: ['15', '30', '50', '100'],
             showTotal: (total) => `Total: ${total}`,
           }}
-          scroll={{ x: 900 }}
         />
       </Card>
 
@@ -413,6 +466,16 @@ export default function ProjetosPage(): JSX.Element {
               <Radio value="SUPER">Aprovação Manual</Radio>
               <Radio value="NAO_SUPER">Auto-aprovado</Radio>
             </Radio.Group>
+          </Form.Item>
+
+          <Form.Item
+            name="eh_serie"
+            label="É série"
+            valuePropName="checked"
+            initialValue={false}
+            extra="Série ou variante de um projeto (ex.: A COR DA GENTE 3). Marcada, não aparece na Nova Solicitação; no Plano Anual só aparece se já tiver plano. Continua em Compras e no DAT."
+          >
+            <Switch checkedChildren="Sim" unCheckedChildren="Não" />
           </Form.Item>
 
           <Form.Item name="ativo" valuePropName="checked" initialValue={true}>

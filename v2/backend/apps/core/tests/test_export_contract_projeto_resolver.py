@@ -2,8 +2,10 @@
 Tests para o resolver de Projeto do import do export-contract (Gap C).
 
 Cobre canonicalização determinística (& <-> E, hífen, prefixo PROJETO, vírgula) +
-aliases escopados por família (Superativar -> Linguagens, ACerta Brasil -> Língua
-Portuguesa, Brincando e Aprendendo Professor) e falha explícita em ambiguidade.
+aliases escopados por família (Superativar -> Linguagens, ACerta Brasil -> ACerta, Fluir das
+Emoções -> Fluir das Emoções (Antigo), Brincando e Aprendendo Professor) e falha explícita em
+ambiguidade. Os apelidos de ACerta Brasil e de Fluir são testados nos dois estados do catálogo:
+antes e depois do script de dados que junta/renomeia o projeto.
 
 O DB é o SSOT do catálogo (123 projetos). NÃO importa dados — só resolve nomes.
 """
@@ -79,8 +81,10 @@ def test_superativar_lingua_portuguesa_vira_linguagens(catalogo, n):
     _assert_matches(f"SUPERATIVAR LINGUA PORTUGUESA {n}", f"Superativar Linguagens {n}")
 
 
-def test_acerta_brasil_portugues_vira_lingua_portuguesa(catalogo):
-    _assert_matches("ACERTA BRASIL PORTUGUES", "ACerta Brasil Língua Portuguesa")
+def test_acerta_brasil_portugues_vira_acerta_portugues(catalogo):
+    # Decisão do dono (02/10): ACerta Brasil é juntado em ACerta. O alvo antigo do apelido
+    # ("ACerta Brasil Língua Portuguesa") nunca existiu em prod.
+    _assert_matches("ACERTA BRASIL PORTUGUES", "ACerta Português")
 
 
 def test_brincando_professor_vira_brincando(catalogo):
@@ -116,6 +120,73 @@ def test_nome_exato_vence_apelido_mesmo_com_alvo_existente(db):
     assert res.status == "matched"
     assert res.projeto == exato
     assert res.matched_via == "norm"
+
+
+def test_antes_da_fusao_grafia_com_hifen_fica_no_projeto_antigo(catalogo_prod_acerta):
+    # O PR pode ir para prod ANTES do script de fusão: enquanto "ACERTA BRASIL ..." existir, nenhuma
+    # grafia da planilha pode ser desviada para "ACerta ..." pelo apelido (compra iria para o projeto
+    # errado e viraria would_create). Nome no catálogo (exato ou canônico) vence o apelido.
+    _assert_matches("ACERTA BRASIL MATEMATICA", "ACERTA BRASIL MATEMATICA")
+    _assert_matches("ACERTA BRASIL - MATEMATICA", "ACERTA BRASIL MATEMATICA")
+    _assert_matches("PROJETO ACERTA BRASIL PORTUGUES", "ACERTA BRASIL PORTUGUES")
+
+
+# ---------- ACerta Brasil juntado em ACerta (decisão do dono, 02/10) ----------
+@pytest.fixture
+def catalogo_acerta_pos_fusao():
+    """Depois do script de dados: "ACERTA BRASIL MATEMATICA/PORTUGUES" não existem mais."""
+    nomes = ["ACerta Português", "ACerta Matemática"]
+    return {n: ProjetoFactory(nome=n, fluxo="NAO_SUPER") for n in nomes}
+
+
+@pytest.mark.parametrize(
+    ("raw", "esperado"),
+    [
+        ("ACERTA BRASIL MATEMATICA", "ACerta Matemática"),
+        ("ACERTA BRASIL - MATEMATICA", "ACerta Matemática"),
+        ("ACERTA BRASIL PORTUGUES", "ACerta Português"),
+        ("ACERTA BRASIL PORTUGUÊS", "ACerta Português"),
+        ("ACERTA BRASIL LINGUA PORTUGUESA", "ACerta Português"),
+        ("ACerta Brasil Língua Portuguesa", "ACerta Português"),
+    ],
+)
+def test_depois_da_fusao_acerta_brasil_cai_em_acerta(catalogo_acerta_pos_fusao, raw, esperado):
+    res = resolve_projeto_export(raw)
+    assert res.status == "matched", f"{raw!r} -> {res.status} ({res.reason})"
+    assert res.projeto.nome == esperado
+    assert res.matched_via == "alias"
+
+
+# ---------- Fluir das Emoções renomeado para "(Antigo)" (decisão do dono, 02/10) ----------
+_FLUIR_SERIES = ["Fluir das Emoções 1", "Fluir das Emoções 2", "Fluir das Emoções 3"]
+
+
+def test_fluir_antes_do_rename_resolve_pelo_nome_exato(db):
+    for n in ["Fluir das Emoções", *_FLUIR_SERIES]:
+        ProjetoFactory(nome=n, fluxo="NAO_SUPER")
+    res = resolve_projeto_export("FLUIR DAS EMOÇÕES")
+    assert res.projeto.nome == "Fluir das Emoções"
+    assert res.matched_via == "norm"
+
+
+def test_fluir_depois_do_rename_resolve_para_o_antigo(db):
+    # A planilha continua mandando "FLUIR DAS EMOÇÕES"; sem o apelido o nome viraria `unmatched`
+    # e o master `projeto` recriaria o projeto sem "(Antigo)".
+    for n in ["Fluir das Emoções (Antigo)", *_FLUIR_SERIES]:
+        ProjetoFactory(nome=n, fluxo="NAO_SUPER")
+    res = resolve_projeto_export("FLUIR DAS EMOÇÕES")
+    assert res.status == "matched", res.reason
+    assert res.projeto.nome == "Fluir das Emoções (Antigo)"
+    assert res.matched_via == "alias"
+
+
+@pytest.mark.parametrize("antigo", ["Fluir das Emoções", "Fluir das Emoções (Antigo)"])
+@pytest.mark.parametrize("n", [1, 2, 3])
+def test_fluir_numerado_nunca_cai_no_antigo(db, antigo, n):
+    for nome in [antigo, *_FLUIR_SERIES]:
+        ProjetoFactory(nome=nome, fluxo="NAO_SUPER")
+    _assert_matches(f"FLUIR DAS EMOÇÕES - {n}", f"Fluir das Emoções {n}")
+    _assert_matches(f"FLUIR DAS EMOÇÕES {n}", f"Fluir das Emoções {n}")
 
 
 # ---------- NÃO mapear (sem regra global Português) ----------

@@ -220,7 +220,14 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
     // C2: UF (< 576) e IBGE (< 768) vão para a linha expandida.
     estados: [expandida(T.municipio, 'IBGE', [360])],
   },
-  { path: '/dat/admin/projetos', perfil: 'dat', marco: 'Projetos', dados: { em: LINHA, texto: T.projeto } },
+  {
+    path: '/dat/admin/projetos',
+    perfil: 'dat',
+    marco: 'Projetos',
+    dados: { em: LINHA, texto: T.projeto },
+    // Código (< 576), Setor (< 768), Família (< 992) e Fluxo (< 1200) vão para a linha expandida.
+    estados: [expandida(T.projeto, 'Fluxo', [360, 768, 1024])],
+  },
   {
     path: '/dat/admin/grupos',
     // Superusuário: só ele vê a coluna Ações (P0-1). Setores e funções, o mesmo componente,
@@ -362,7 +369,9 @@ export const TELA_LOGIN = 'login';
  * (360 a 1024) e "detalhe" (o Drawer), são medidas e não rolam.
  * C2 (30/09/2026): saíram 27, todas as combinações de /dat/admin/grupos, /setores, /funcoes,
  * /gerencias, /municipios e /produtos (4 cada) e de /dat/admin/projetos-gerais (3). Ficam 90.
- * A vista "expandida" de cada uma é medida e não rola. /dat/admin/projetos fica para outro PR.
+ * A vista "expandida" de cada uma é medida e não rola.
+ * Projetos (01/10/2026, marca de série): saíram as 3 de /dat/admin/projetos. Ficam 87. A vista
+ * "expandida" é medida e não rola.
  * O ratchet do Vitest (semRolagemHorizontal.pendentes.test.ts) trava a lista: nada novo
  * entra e o tamanho só desce.
  */
@@ -390,7 +399,6 @@ export const PENDENTES: Readonly<Record<string, readonly Largura[]>> = {
   '/controle/pre-agenda': [360, 768, 1024, 1280],
   '/acoes-notificacao': [360, 768, 1024, 1280],
   '/notificacoes-internas': [360, 768],
-  '/dat/admin/projetos': [360, 768, 1024],
   '/dat/cadastros': [360, 768, 1024, 1280],
   '/dat/registros': [360, 768, 1024, 1280],
 };

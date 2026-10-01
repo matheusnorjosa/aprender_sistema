@@ -14,6 +14,10 @@ vem do export-contract para um `Projeto` existente, fechando os resíduos de for
    - `ACerta Brasil Português` -> `ACerta Brasil Língua Portuguesa`
    - `Brincando e Aprendendo Professor` -> `Brincando e Aprendendo`
 
+Precedência: nome exato (norm) > alias > chave canônica. O nome que existe no catálogo vence
+qualquer alias, e alias cujo alvo não existe não encerra a busca (RELAY-53: prod tem
+`ACERTA BRASIL PORTUGUES` e não tem o alvo `ACerta Brasil Língua Portuguesa`).
+
 Ambiguidade (a chave canônica casa >1 projeto distinto) **falha explicitamente**
 (`status="ambiguous"`), nunca escolhe um alvo no chute.
 
@@ -41,7 +45,7 @@ _SCOPED_ALIASES: dict[str, str] = {
     "SUPERATIVAR LINGUA PORTUGUESA 3": "SUPERATIVAR LINGUAGENS 3",
     "SUPERATIVAR LINGUA PORTUGUESA 4": "SUPERATIVAR LINGUAGENS 4",
     "SUPERATIVAR LINGUA PORTUGUESA 5": "SUPERATIVAR LINGUAGENS 5",
-    # ACerta Brasil: "Português" -> "Língua Portuguesa" (DB já tem o nome certo)
+    # ACerta Brasil: "Português" -> "Língua Portuguesa" (só vale se o alvo existir; prod não o tem)
     "ACERTA BRASIL PORTUGUES": "ACERTA BRASIL LINGUA PORTUGUESA",
     # E1 (merge já aplicado no catálogo)
     "BRINCANDO E APRENDENDO PROFESSOR": "BRINCANDO E APRENDENDO",
@@ -110,32 +114,9 @@ def resolve_projeto_export(raw_name: str, *, index: ProjetoIndex | None = None) 
 
     n = _norm(raw_name)
     ck = _canon_key(raw_name)
-    # alias é keyed pela CHAVE CANÔNICA (tolerante a hífen/vírgula/&/prefixo)
-    alias_target = _SCOPED_ALIASES.get(ck)
 
-    if alias_target is not None:
-        # alias escopado: resolve pelo alvo canônico (já é forma canônica do catálogo)
-        hits = idx.by_canon.get(alias_target, [])
-        if len(hits) == 1:
-            return ProjetoResolution(
-                status="matched",
-                projeto=hits[0],
-                matched_via="alias",
-                canonical_key=alias_target,
-                reason="match por alias escopado",
-            )
-        if len(hits) > 1:
-            return ProjetoResolution(
-                status="ambiguous",
-                canonical_key=alias_target,
-                candidates=sorted(str(p.nome) for p in hits),
-                reason="alias casa múltiplos projetos (não escolher no chute)",
-            )
-        return ProjetoResolution(
-            status="unmatched", canonical_key=alias_target, reason="alvo do alias não existe no catálogo"
-        )
-
-    # 1) match exato por norm (preferido — evita falsa ambiguidade da chave canônica)
+    # 1) match exato por norm. Vem antes do alias: o nome que existe no catálogo é a resposta,
+    # e evita a falsa ambiguidade da chave canônica.
     norm_hits = idx.by_norm.get(n, [])
     if len(norm_hits) == 1:
         return ProjetoResolution(
@@ -149,7 +130,27 @@ def resolve_projeto_export(raw_name: str, *, index: ProjetoIndex | None = None) 
             reason="múltiplos projetos com o mesmo nome normalizado",
         )
 
-    # 2) match por chave canônica determinística (& <-> E, hífen, vírgula, prefixo PROJETO)
+    # 2) alias escopado, keyed pela CHAVE CANÔNICA (tolerante a hífen/vírgula/&/prefixo). Alvo
+    # ausente do catálogo não encerra a busca: segue para a regra determinística (RELAY-53).
+    alias_target = _SCOPED_ALIASES.get(ck, "")
+    alias_hits = idx.by_canon.get(alias_target, []) if alias_target else []
+    if len(alias_hits) == 1:
+        return ProjetoResolution(
+            status="matched",
+            projeto=alias_hits[0],
+            matched_via="alias",
+            canonical_key=alias_target,
+            reason="match por alias escopado",
+        )
+    if len(alias_hits) > 1:
+        return ProjetoResolution(
+            status="ambiguous",
+            canonical_key=alias_target,
+            candidates=sorted(str(p.nome) for p in alias_hits),
+            reason="alias casa múltiplos projetos (não escolher no chute)",
+        )
+
+    # 3) match por chave canônica determinística (& <-> E, hífen, vírgula, prefixo PROJETO)
     canon_hits = idx.by_canon.get(ck, [])
     if len(canon_hits) == 1:
         return ProjetoResolution(

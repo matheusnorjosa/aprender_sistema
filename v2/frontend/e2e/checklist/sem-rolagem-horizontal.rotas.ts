@@ -80,6 +80,16 @@ export interface RotaMedida {
   /** Nas telas com tabela ou lista: a linha com o texto do seed. */
   dados?: DadosDaTela;
   estados?: readonly EstadoDaTela[];
+  /**
+   * Relógio do navegador fixo nesta data e hora (ISO 8601), para tela que desenha "o mês de hoje":
+   * sem ele, a medição muda com o dia em que a CI roda. Travado no ratchet do Vitest.
+   */
+  relogio?: string;
+  /**
+   * Larguras em que a rota (e as vistas dela) NÃO é medida. O motivo fica em NAO_MEDIDOS, com a
+   * chave `${path} @ ${largura}px`. Travado no ratchet do Vitest: não é atalho para tirar tela da medição.
+   */
+  naoMedirEm?: readonly Largura[];
 }
 
 const LINHA = '.ant-table-row';
@@ -133,6 +143,15 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
     perfil: 'controle',
     marco: 'Grade Mensal de Disponibilidade',
     dados: { em: 'tr', texto: T.pessoa },
+    // A Grade desenha o mês de hoje do navegador, 1 coluna por dia, e o dia com evento (49 px) é
+    // mais largo que o vazio (18 a 25 px). O seed põe evento em hoje+3 a hoje+20, que cai ou não no
+    // mês corrente: a largura mudava com o dia da CI (run 36845410982, 01/10/2026: passou a rolar a
+    // 1280, +76/+25 px; no Windows, um fevereiro sem evento no mês deixaria de rolar a 1024). Janeiro
+    // de 2026 tem 31 dias, o máximo de colunas, e nenhum evento do seed, que só cria datas a partir
+    // do dia em que roda. Sem evento é a Grade mais estreita: por isso ela não sai de PENDENTES por
+    // esta medição (ver NAO_MEDIDOS e o ratchet do Vitest).
+    relogio: '2026-01-15T12:00:00-03:00',
+    naoMedirEm: [1280],
   },
   {
     path: '/solicitacoes/bloqueios',
@@ -278,7 +297,16 @@ export const NAO_MEDIDOS: Readonly<Record<string, string>> = {
   '/controle/plano-formacoes (Calendário e Resumo)': 'placeholders "em desenvolvimento", sem conteúdo',
   '/controle/pre-agenda (modo Google)': 'a tabela de eventos do Google exige OAuth',
   '/solicitacoes/disponibilidade (detalhe do dia)':
-    'o drawer abre ao clicar num evento do mês corrente, e o seed não garante evento no mês (C4)',
+    'o drawer abre ao clicar num evento, e o mês medido (relógio fixo em janeiro de 2026) não tem evento do seed (C4)',
+  '/solicitacoes/disponibilidade @ 1280px':
+    'no mês fixo, sem evento, a Grade cabe a 1280 (sobram 40 px no Windows; no Linux da CI, estimado a ' +
+    'partir do run 36845410982, uns 15 a 30 px) e o ' +
+    'teste passaria; com dados reais (evento quase todo dia útil, coluna de 49 px) ela rola a 1280 em ' +
+    'qualquer mês. Medir de verdade exige mês com evento em dias fixos, e o seed não fixa isso. O C4 ' +
+    'redesenha a Grade (semana com ‹ › abaixo de 1280) e volta a medir com data fixa',
+  '/solicitacoes/disponibilidade (Grade com evento, 360 a 1024)':
+    'o mês fixo não tem evento do seed, e sem evento é a Grade mais estreita: ela segue em PENDENTES a 360, ' +
+    '768 e 1024 até o C4 medir com evento em data fixa (o ratchet do Vitest impede que saia por esta medição)',
   '/solicitacoes/nova (passos 2 em diante)': 'exige preencher o formulário do wizard (C3)',
   '/mapa-brasil (municípios do estado clicado)': 'exige clicar numa região do mapa',
   '/dat/cadastros (aba AVALIAR)': 'o seed só tem cadastro FORMAR',

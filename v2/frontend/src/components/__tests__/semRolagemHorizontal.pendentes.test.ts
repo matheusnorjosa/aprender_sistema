@@ -13,7 +13,13 @@
  */
 import { describe, expect, test } from 'vitest';
 
-import { PENDENTES, PENDENTES_SO_LINUX } from '../../../e2e/checklist/sem-rolagem-horizontal.rotas';
+import {
+  NAO_MEDIDOS,
+  PENDENTES,
+  PENDENTES_SO_LINUX,
+  ROTAS_MEDIDAS,
+  type RotaMedida,
+} from '../../../e2e/checklist/sem-rolagem-horizontal.rotas';
 
 type ListaPendentes = Readonly<Record<string, readonly number[]>>;
 
@@ -248,4 +254,136 @@ describe('ratchet de PENDENTES: lista real', () => {
       expect(devolverAPendentes(chave, largura)).toEqual([`combinação fora da linha de base: ${chave} @ ${largura}px`]);
     }
   );
+});
+
+/**
+ * Exceções à medição: rota com relógio do navegador fixo (`relogio`) e rota × largura que o spec
+ * não mede (`naoMedirEm`). As duas podem esconder dívida (um mês sem evento faz a Grade caber; uma
+ * largura fora da medição não reprova nunca), por isso seguem a regra da LINHA_DE_BASE: a lista
+ * é exatamente esta, nada entra sem mudar este arquivo, e quem volta a ser medido sai daqui.
+ * Toda largura não medida tem o motivo em NAO_MEDIDOS (chave `path @ largura px`) e não pode
+ * estar também em PENDENTES.
+ */
+const EXCECOES_DA_MEDICAO: readonly string[] = [
+  // 01/10/2026: a Grade desenha o mês de hoje do navegador, e a largura dela mudava com o dia em
+  // que a CI rodava (detalhe no comentário da rota e em NAO_MEDIDOS). O C4 redesenha a Grade.
+  '/solicitacoes/disponibilidade: relógio fixo em 2026-01-15T12:00:00-03:00',
+  '/solicitacoes/disponibilidade @ 1280px: não medida',
+];
+
+type RotaComExcecao = Pick<RotaMedida, 'path' | 'relogio' | 'naoMedirEm'>;
+
+function conferirExcecoes(
+  rotas: readonly RotaComExcecao[],
+  base: readonly string[],
+  naoMedidos: Readonly<Record<string, string>>,
+  pendentes: Pendencias
+): string[] {
+  const atuais = rotas.flatMap((r) => [
+    ...(r.relogio ? [`${r.path}: relógio fixo em ${r.relogio}`] : []),
+    ...(r.naoMedirEm ?? []).map((l) => `${r.path} @ ${l}px: não medida`),
+  ]);
+  const pendente = (path: string, largura: number) =>
+    [pendentes.todas, pendentes.soLinux].some((lista) =>
+      Object.entries(lista).some(([chave, ls]) => (chave === path || chave.startsWith(`${path}#`)) && ls.includes(largura))
+    );
+  const naoMedidas = new Set(rotas.flatMap((r) => (r.naoMedirEm ?? []).map((l) => `${r.path} @ ${l}px`)));
+  return [
+    ...atuais.filter((e) => !base.includes(e)).map((e) => `exceção fora da linha de base: ${e}`),
+    ...base.filter((e) => !atuais.includes(e)).map((e) => `folga na linha de base de exceções: ${e} (tire-a de EXCECOES_DA_MEDICAO)`),
+    ...rotas.flatMap((r) =>
+      (r.naoMedirEm ?? []).flatMap((l) => [
+        ...(naoMedidos[`${r.path} @ ${l}px`] ? [] : [`sem motivo em NAO_MEDIDOS: ${r.path} @ ${l}px`]),
+        ...(pendente(r.path, l) ? [`não medida e em PENDENTES ao mesmo tempo: ${r.path} @ ${l}px`] : []),
+      ])
+    ),
+    // O relógio fixo existe para medir o pior caso de colunas: mês de 31 dias.
+    ...rotas
+      .filter((r) => r.relogio && diasNoMes(r.relogio) !== 31)
+      .map((r) => `relógio fixo num mês sem 31 dias: ${r.path} (${r.relogio})`),
+    // Motivo sem largura correspondente desmentiria o código quando a rota voltar a ser medida.
+    ...Object.keys(naoMedidos)
+      .filter((k) => /^\S+ @ \d+px$/.test(k) && !naoMedidas.has(k))
+      .map((k) => `motivo órfão em NAO_MEDIDOS: ${k} (a rota é medida nessa largura)`),
+  ];
+}
+
+function diasNoMes(iso: string): number {
+  const [ano, mes] = iso.slice(0, 7).split('-').map(Number);
+  return new Date(Date.UTC(ano ?? 0, mes ?? 0, 0)).getUTCDate();
+}
+
+describe('exceções à medição: controles', () => {
+  const RELOGIO = '2026-01-15T12:00:00-03:00';
+  const ROTA: RotaComExcecao = { path: '/a', relogio: RELOGIO, naoMedirEm: [1280] };
+  const BASE = [`/a: relógio fixo em ${RELOGIO}`, '/a @ 1280px: não medida'];
+  const MOTIVO = { '/a @ 1280px': 'motivo' };
+  const SEM_PENDENTES: Pendencias = { todas: {}, soLinux: {} };
+
+  test('largura não medida fora da linha de base reprova', () => {
+    expect(conferirExcecoes([ROTA, { path: '/b', naoMedirEm: [1024] }], BASE, { ...MOTIVO, '/b @ 1024px': 'x' }, SEM_PENDENTES)).toEqual([
+      'exceção fora da linha de base: /b @ 1024px: não medida',
+    ]);
+  });
+
+  test('relógio fixo em rota fora da linha de base reprova', () => {
+    expect(conferirExcecoes([ROTA, { path: '/b', relogio: RELOGIO }], BASE, MOTIVO, SEM_PENDENTES)).toEqual([
+      `exceção fora da linha de base: /b: relógio fixo em ${RELOGIO}`,
+    ]);
+  });
+
+  test('largura não medida sem motivo em NAO_MEDIDOS reprova', () => {
+    expect(conferirExcecoes([ROTA], BASE, {}, SEM_PENDENTES)).toEqual(['sem motivo em NAO_MEDIDOS: /a @ 1280px']);
+  });
+
+  test('largura não medida que também está em PENDENTES (ou num estado da rota) reprova', () => {
+    expect(conferirExcecoes([ROTA], BASE, MOTIVO, { todas: { '/a#lista': [1280] }, soLinux: {} })).toEqual([
+      'não medida e em PENDENTES ao mesmo tempo: /a @ 1280px',
+    ]);
+  });
+
+  test('trocar a data do relógio muda a exceção: reprova até a linha de base mudar', () => {
+    const outra = '2026-03-15T12:00:00-03:00';
+    expect(conferirExcecoes([{ ...ROTA, relogio: outra }], BASE, MOTIVO, SEM_PENDENTES)).toEqual([
+      `exceção fora da linha de base: /a: relógio fixo em ${outra}`,
+      `folga na linha de base de exceções: /a: relógio fixo em ${RELOGIO} (tire-a de EXCECOES_DA_MEDICAO)`,
+    ]);
+  });
+
+  test('relógio fixo num mês sem 31 dias reprova', () => {
+    const fev = '2026-02-15T12:00:00-03:00';
+    expect(
+      conferirExcecoes([{ ...ROTA, relogio: fev }], [`/a: relógio fixo em ${fev}`, '/a @ 1280px: não medida'], MOTIVO, SEM_PENDENTES)
+    ).toEqual([`relógio fixo num mês sem 31 dias: /a (${fev})`]);
+  });
+
+  test('motivo de largura não medida que sobrou em NAO_MEDIDOS reprova', () => {
+    expect(conferirExcecoes([ROTA], BASE, { ...MOTIVO, '/c @ 768px': 'velho' }, SEM_PENDENTES)).toEqual([
+      'motivo órfão em NAO_MEDIDOS: /c @ 768px (a rota é medida nessa largura)',
+    ]);
+  });
+
+  test('voltou a medir e esqueceu a linha de base e o motivo: os dois reprovam', () => {
+    expect(conferirExcecoes([{ path: '/a', relogio: RELOGIO }], BASE, MOTIVO, SEM_PENDENTES)).toEqual([
+      'folga na linha de base de exceções: /a @ 1280px: não medida (tire-a de EXCECOES_DA_MEDICAO)',
+      'motivo órfão em NAO_MEDIDOS: /a @ 1280px (a rota é medida nessa largura)',
+    ]);
+  });
+
+  test('exceções iguais à linha de base, com motivo e fora de PENDENTES, passam', () => {
+    expect(conferirExcecoes([ROTA, { path: '/b' }], BASE, MOTIVO, SEM_PENDENTES)).toEqual([]);
+  });
+});
+
+describe('exceções à medição: lista real', () => {
+  test('a Grade medida no mês fixo (sem evento) não sai de PENDENTES: só o C4, medindo com evento', () => {
+    // Sem evento é a Grade mais estreita; caber assim não prova que a tela com dados reais cabe.
+    expect(PENDENTES['/solicitacoes/disponibilidade']).toEqual([360, 768, 1024]);
+  });
+
+  test('relógio fixo e larguras não medidas são exatamente a linha de base, com motivo', () => {
+    expect(
+      conferirExcecoes(ROTAS_MEDIDAS, EXCECOES_DA_MEDICAO, NAO_MEDIDOS, { todas: PENDENTES, soLinux: PENDENTES_SO_LINUX })
+    ).toEqual([]);
+  });
 });

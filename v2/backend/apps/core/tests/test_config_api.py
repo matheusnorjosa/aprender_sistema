@@ -435,11 +435,12 @@ def test_config_put_so_regrava_a_categoria_enviada(client: APIClient, dat_user: 
 
 
 def _codigos(usuario: Any, inicio: Any, minutos: int, municipio: Any = None) -> set[str]:
-    """Conflitos que o motor de disponibilidade (o mesmo de check_conflicts) aplica."""
+    """Códigos que o motor de disponibilidade (o mesmo de check_conflicts) devolve: os que
+    barram (`conflicts`) e os que só avisam (`warnings`, o limite diário M)."""
     resultado = check_conflicts_uncached(
         usuario=usuario, inicio=inicio, fim=inicio + timedelta(minutes=minutos), municipio=municipio
     )
-    return {c.code for c in resultado.conflicts}
+    return {c.code for c in [*resultado.conflicts, *resultado.warnings]}
 
 
 @pytest.mark.django_db

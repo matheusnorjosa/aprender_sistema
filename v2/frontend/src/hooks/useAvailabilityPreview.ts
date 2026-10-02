@@ -18,6 +18,7 @@ import { checkAvailabilityMany } from '../api/availability';
 import { TIMING } from '../constants';
 import logger from '../utils/logger';
 import type { BlockedParticipant, ID } from '../types';
+import type { AvisoDeAgenda } from '../types/availability';
 
 export interface PreviewParticipant {
   id: ID;
@@ -38,8 +39,9 @@ export interface AvailabilityPreviewInput {
 export type AvailabilityPreview =
   | { status: 'idle' }
   | { status: 'checking' }
-  | { status: 'ok' }
-  | { status: 'conflito'; bloqueados: BlockedParticipant[] }
+  // `avisos` só existe quando há aviso (limite diário): avisa, não bloqueia o botão.
+  | { status: 'ok'; avisos?: AvisoDeAgenda[] }
+  | { status: 'conflito'; bloqueados: BlockedParticipant[]; avisos?: AvisoDeAgenda[] }
   | { status: 'indisponivel'; motivo: 'throttled' | 'erro' };
 
 interface StoredResult {
@@ -92,21 +94,28 @@ export function useAvailabilityPreview(input: AvailabilityPreviewInput): Availab
       )
         .then((resp) => {
           if (seq !== seqRef.current) return; // chegou obsoleta
+          const nomeDe = (id: ID): string => nomePorId.get(id)?.nome ?? `Participante #${id}`;
+          // Aviso (limite diário) vem em `warnings` e não muda `ok`. Backend sem a chave = sem aviso.
+          const avisos: AvisoDeAgenda[] = resp.results
+            .filter((r) => (r.warnings?.length ?? 0) > 0)
+            .map((r) => ({
+              usuario_id: r.usuario_id,
+              usuario_nome: nomeDe(r.usuario_id),
+              warnings: r.warnings ?? [],
+            }));
+          const comAvisos = avisos.length > 0 ? { avisos } : {};
           if (resp.ok) {
-            setStored({ key, preview: { status: 'ok' } });
+            setStored({ key, preview: { status: 'ok', ...comAvisos } });
             return;
           }
           const bloqueados: BlockedParticipant[] = resp.results
             .filter((r) => !r.ok)
-            .map((r) => {
-              const p = nomePorId.get(r.usuario_id);
-              return {
-                usuario_id: r.usuario_id,
-                usuario_nome: p?.nome ?? `Participante #${r.usuario_id}`,
-                conflicts: r.conflicts,
-              };
-            });
-          setStored({ key, preview: { status: 'conflito', bloqueados } });
+            .map((r) => ({
+              usuario_id: r.usuario_id,
+              usuario_nome: nomeDe(r.usuario_id),
+              conflicts: r.conflicts,
+            }));
+          setStored({ key, preview: { status: 'conflito', bloqueados, ...comAvisos } });
         })
         .catch((err: unknown) => {
           if (controller.signal.aborted) return; // cancelamento não é falha

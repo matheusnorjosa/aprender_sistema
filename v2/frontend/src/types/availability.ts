@@ -70,7 +70,10 @@ export interface ConflictDetail {
  */
 export interface AvailabilityCheckResponse {
   ok: boolean;
+  /** O que barra: X, T, P, D. */
   conflicts: ConflictDetail[];
+  /** O que só avisa (limite diário, M). Não muda `ok`. */
+  warnings?: ConflictDetail[];
 }
 
 /**
@@ -89,7 +92,10 @@ export interface AvailabilityCheckManyRequest {
 export interface AvailabilityCheckManyResult {
   usuario_id: ID;
   ok: boolean;
+  /** O que barra: X, T, P, D. */
   conflicts: ConflictDetail[];
+  /** O que só avisa (limite diário, M). Não muda `ok`. */
+  warnings?: ConflictDetail[];
 }
 
 /**
@@ -108,6 +114,18 @@ export interface BlockedParticipant {
   usuario_id: ID;
   usuario_nome: string;
   conflicts: ConflictDetail[];
+  /** Avisos da mesma pessoa (limite diário). Vêm junto, mas não são o motivo do bloqueio. */
+  warnings?: ConflictDetail[];
+}
+
+/**
+ * Participante com aviso de agenda: o sistema calcula e mostra, mas não impede o evento
+ * (limite diário, RD-05 — decisão do dono em 02/10/2026).
+ */
+export interface AvisoDeAgenda {
+  usuario_id: ID;
+  usuario_nome: string;
+  warnings: ConflictDetail[];
 }
 
 /**
@@ -118,6 +136,8 @@ export interface AvailabilityConflictErrorPayload {
   code: 'availability_conflict';
   errors: {
     conflicts: ConflictDetail[];
+    /** Avisos calculados na mesma checagem (limite diário). Não barram. */
+    warnings?: ConflictDetail[];
     blocked_participants: BlockedParticipant[];
     skipped_guests: unknown[];
   };

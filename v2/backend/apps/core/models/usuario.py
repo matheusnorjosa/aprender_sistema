@@ -48,6 +48,16 @@ class Usuario(AbstractUser):
             "(`TrocaDeSenhaObrigatoriaMiddleware`). Desliga quando a própria pessoa troca a senha."
         ),
     )
+    senha_recebida_hash = models.CharField(
+        max_length=128,
+        blank=True,
+        default="",
+        editable=False,
+        help_text=(
+            "Hash da última senha recebida de outra pessoa, guardado quando a própria pessoa a troca. "
+            "Serve só para recusar a volta a ela (a senha padrão é a mesma para todos). Nunca o texto da senha."
+        ),
+    )
 
     class Meta:  # type: ignore[misc]
         db_table = "core_usuario"

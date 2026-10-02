@@ -262,6 +262,48 @@ def test_nova_igual_a_recebida_e_recusada_e_a_marca_continua():
     assert _bloqueada(client.get("/api/solicitacoes/"))
 
 
+def test_nao_da_para_voltar_a_senha_recebida_depois_da_troca():
+    """Senha padrão é a mesma para todos: voltar a ela deixaria a conta aberta e sem a marca."""
+    user = _marcado()
+    client = _logado(user)
+    assert (
+        client.post(TROCA, {"old_password": SENHA_RECEBIDA, "new_password": SENHA_NOVA}, format="json").status_code
+        == 200
+    )
+
+    volta = client.post(TROCA, {"old_password": SENHA_NOVA, "new_password": SENHA_RECEBIDA}, format="json")
+
+    assert volta.status_code == 400
+    assert "new_password" in volta.json()["errors"]
+    user.refresh_from_db()
+    assert user.check_password(SENHA_NOVA)
+    assert user.deve_trocar_senha is False
+
+    # Nem dando a volta por uma terceira senha: a recebida fica lembrada (só o hash).
+    outra = "Mandacaru#Verde88"
+    assert client.post(TROCA, {"old_password": SENHA_NOVA, "new_password": outra}, format="json").status_code == 200
+    de_novo = client.post(TROCA, {"old_password": outra, "new_password": SENHA_RECEBIDA}, format="json")
+    assert de_novo.status_code == 400
+    user.refresh_from_db()
+    assert user.check_password(outra)
+    assert SENHA_RECEBIDA not in user.senha_recebida_hash
+
+
+def test_troca_comum_sem_a_marca_nao_guarda_senha_recebida():
+    user = UsuarioFactory(password=SENHA_RECEBIDA)
+    client = _logado(user)
+
+    assert (
+        client.post(TROCA, {"old_password": SENHA_RECEBIDA, "new_password": SENHA_NOVA}, format="json").status_code
+        == 200
+    )
+    volta = client.post(TROCA, {"old_password": SENHA_NOVA, "new_password": SENHA_RECEBIDA}, format="json")
+
+    assert volta.status_code == 200
+    user.refresh_from_db()
+    assert user.senha_recebida_hash == ""
+
+
 def test_senha_fraca_nao_desliga_a_marca():
     user = _marcado()
     client = _logado(user)

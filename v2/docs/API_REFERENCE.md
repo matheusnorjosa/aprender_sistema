@@ -113,7 +113,7 @@ correspondentes).
 `POST /auth/logout/`; qualquer outra rota (inclusive `/api/v1/*`, `POST /auth/login/` e
 `/admin/`) responde `403` com `code: PASSWORD_CHANGE_REQUIRED`. `POST /me/change-password/`
 (`old_password`, `new_password`) desliga a marca e mantém a sessão; a senha nova tem de ser
-diferente da atual, ter 8+ caracteres, não ser só números nem senha comum e não parecer com
+diferente da atual e da recebida no primeiro acesso (também em trocas futuras), ter 8+ caracteres, não ser só números nem senha comum e não parecer com
 nome, CPF ou e-mail da pessoa (erros em `errors.old_password` / `errors.new_password`). O
 campo não é gravável por nenhuma rota. Regra completa:
 [rbac.spec](./specs/backend/rbac.spec.md).

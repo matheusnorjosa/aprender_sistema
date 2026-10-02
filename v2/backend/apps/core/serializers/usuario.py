@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import check_password
 from django.contrib.auth.models import Group
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
@@ -561,7 +562,8 @@ class ChangePasswordSerializer(serializers.Serializer):
 
     Valida a senha atual (``check_password`` do usuario no contexto) e a nova senha
     com os validadores do Django (``AUTH_PASSWORD_VALIDATORS``) COM o usuario — sem ele a
-    regra de semelhanca com nome/CPF/e-mail nao roda. NAO persiste — a view chama
+    regra de semelhanca com nome/CPF/e-mail nao roda. Recusa tambem a volta a senha recebida
+    de outra pessoa (``Usuario.senha_recebida_hash``). NAO persiste — a view chama
     ``set_password`` + ``update_session_auth_hash``.
     """
 
@@ -580,6 +582,12 @@ class ChangePasswordSerializer(serializers.Serializer):
             raise serializers.ValidationError({"old_password": "Senha atual incorreta."})
         if attrs["old_password"] == attrs["new_password"]:
             raise serializers.ValidationError({"new_password": "A nova senha deve ser diferente da senha atual."})
+        # A senha recebida e a mesma para todos: voltar a ela deixaria a conta aberta e sem a marca.
+        recebida = user.senha_recebida_hash
+        if recebida and check_password(attrs["new_password"], recebida):
+            raise serializers.ValidationError(
+                {"new_password": "Esta é a senha que você recebeu no primeiro acesso. Escolha outra."}
+            )
         try:
             validate_password(attrs["new_password"], user=user)
         except ValidationError as e:

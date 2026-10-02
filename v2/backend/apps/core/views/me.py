@@ -173,9 +173,12 @@ class ChangePasswordView(APIView):
         new_password = cast(str, serializer.validated_data["new_password"])
         # Senha recebida de outra pessoa (primeiro acesso): escolher a propria desliga a marca.
         era_obrigatoria = user.deve_trocar_senha
+        if era_obrigatoria:
+            # Guarda so o hash da recebida: o serializer recusa a volta a ela nas proximas trocas.
+            user.senha_recebida_hash = user.password
         user.set_password(new_password)
         user.deve_trocar_senha = False
-        user.save(update_fields=["password", "deve_trocar_senha"])
+        user.save(update_fields=["password", "deve_trocar_senha", "senha_recebida_hash"])
         # SessionAuthentication: mantem a sessao atual valida e invalida as demais.
         update_session_auth_hash(request, user)
         AuditLog.objects.create(

@@ -136,6 +136,30 @@ describe('API Config', () => {
   })
 
   // ============================================================================
+  // TESTES DE fetchAPI — 429 expõe o Retry-After (liberação 2026-10)
+  // ============================================================================
+
+  describe('fetchAPI — 429 (muitas requisições)', () => {
+    test('anota no erro o status e os segundos do cabeçalho Retry-After', async () => {
+      server.use(
+        http.get(apiUrl('/limitado/'), () =>
+          HttpResponse.json({ detail: 'Limite excedido.' }, { status: 429, headers: { 'Retry-After': '42' } }),
+        ),
+      )
+
+      await expect(fetchAPI('/limitado/')).rejects.toMatchObject({ status: 429, retryAfter: 42 })
+    })
+
+    test('429 sem Retry-After (ex.: nginx) não inventa tempo de espera', async () => {
+      server.use(http.get(apiUrl('/limitado/'), () => new HttpResponse('<html>429</html>', { status: 429 })))
+
+      const erro = await fetchAPI('/limitado/').catch((e: unknown) => e as { status?: number; retryAfter?: number })
+      expect(erro).toMatchObject({ status: 429 })
+      expect((erro as { retryAfter?: number }).retryAfter).toBeUndefined()
+    })
+  })
+
+  // ============================================================================
   // TESTES DE fetchAPI — sessão expirada global (Issue #1376)
   // ============================================================================
 

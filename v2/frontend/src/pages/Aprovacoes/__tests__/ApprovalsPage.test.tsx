@@ -45,11 +45,20 @@ vi.mock('../../../hooks/usePolling', () => ({
   usePolling: vi.fn(),
 }));
 
+// Espião sobre a função real: conta quantas vezes a coluna "Formadores" é desenhada.
+vi.mock('../../../utils/participants', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../../../utils/participants')>();
+  return { ...real, formadoresLabel: vi.fn(real.formadoresLabel) };
+});
+
 import ApprovalsPage from '../ApprovalsPage';
 import { approveSolicitacao, approveSolicitacoesBatch, listSolicitacoes } from '../../../api/solicitacoes';
 import { getMyPolicies } from '../../../api/me';
 import { getMe } from '../../../api/availability';
 import { usePolling } from '../../../hooks/usePolling';
+import { formadoresLabel } from '../../../utils/participants';
+
+const pausarPolling = vi.fn();
 
 /** Página vazia (nenhuma solicitação). */
 function emptyPage(): PaginatedResponse<Solicitacao> {
@@ -108,6 +117,7 @@ describe('ApprovalsPage', () => {
     vi.mocked(listSolicitacoes).mockResolvedValue(emptyPage());
     vi.mocked(getMyPolicies).mockResolvedValue([]);
     vi.mocked(getMe).mockResolvedValue(meUser());
+    vi.mocked(usePolling).mockReturnValue({ pausado: false, pausar: pausarPolling });
   });
 
   afterEach(() => {
@@ -400,6 +410,85 @@ describe('ApprovalsPage', () => {
     expect(screen.getByText('Municipio21')).toBeInTheDocument();
     expect(screen.queryByText('Municipio1')).not.toBeInTheDocument();
   }, 20000);
+  // ------------------------------------------------------------------
+  // Liberação 2026-10: intervalo, atualização sem piscar e pausa por 429.
+  // ------------------------------------------------------------------
+
+  test('polling a cada 20 s e sem busca dupla no mount (a carga inicial é da página)', async () => {
+    renderPage();
+    await waitFor(() => expect(listSolicitacoes).toHaveBeenCalledTimes(1));
+
+    expect(vi.mocked(usePolling).mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({ intervalMs: 20_000, immediate: false }),
+    );
+  });
+
+  test('atualização em segundo plano não mostra carregamento e mantém a lista na tela', async () => {
+    let responder: (dados: PaginatedResponse<Solicitacao>) => void = () => undefined;
+    vi.mocked(listSolicitacoes).mockResolvedValue(pagina(2, 2));
+
+    const { container } = renderPage();
+    await screen.findByText('Municipio1');
+    await waitFor(() => expect(container.querySelector('.ant-spin-spinning')).toBeNull());
+
+    vi.mocked(listSolicitacoes).mockReturnValueOnce(new Promise((resolve) => { responder = resolve; }));
+    const tick = vi.mocked(usePolling).mock.calls[0]?.[0];
+    await act(async () => { void tick?.(); });
+
+    // O Spin do antd liga com um setTimeout: dá tempo de ele aparecer antes de conferir.
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
+    // Carga em voo: nada de spinner; os dados antigos continuam na tela.
+    expect(container.querySelector('.ant-spin-spinning')).toBeNull();
+    expect(screen.getByText('Municipio1')).toBeInTheDocument();
+
+    await act(async () => { responder(pagina(3, 3)); });
+    expect(await screen.findByText('Municipio3')).toBeInTheDocument();
+  }, 20000);
+
+  test('atualização em segundo plano com os mesmos dados não redesenha a tabela', async () => {
+    vi.mocked(listSolicitacoes).mockImplementation(() => Promise.resolve(pagina(2, 2)));
+
+    renderPage();
+    await screen.findByText('Municipio2');
+    await waitFor(() => expect(getMe).toHaveBeenCalled());
+    await act(async () => { await Promise.resolve(); });
+    const desenhosAntes = vi.mocked(formadoresLabel).mock.calls.length;
+
+    const tick = vi.mocked(usePolling).mock.calls[0]?.[0];
+    await act(async () => { await tick?.(); });
+
+    expect(listSolicitacoes).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(formadoresLabel).mock.calls.length).toBe(desenhosAntes);
+  }, 20000);
+
+  test('429 na atualização: pausa o polling pelo Retry-After, sem mensagem de erro', async () => {
+    const erro = vi.spyOn(message, 'error');
+    vi.mocked(listSolicitacoes).mockResolvedValue(pagina(1, 1));
+
+    renderPage();
+    await screen.findByText('Municipio1');
+
+    vi.mocked(listSolicitacoes).mockRejectedValue(
+      Object.assign(new Error('Limite excedido.'), { status: 429, retryAfter: 30 }),
+    );
+    const tick = vi.mocked(usePolling).mock.calls[0]?.[0];
+    await act(async () => { await tick?.(); });
+
+    expect(pausarPolling).toHaveBeenCalledWith(30_000);
+    expect(erro).not.toHaveBeenCalled();
+    expect(screen.getByText('Municipio1')).toBeInTheDocument();
+  }, 20000);
+
+  test('polling pausado mostra UM aviso discreto (role=status)', async () => {
+    vi.mocked(usePolling).mockReturnValue({ pausado: true, pausar: pausarPolling });
+
+    renderPage();
+
+    const avisos = await screen.findAllByText('Atualização automática pausada por alguns instantes.');
+    expect(avisos).toHaveLength(1);
+    expect(avisos[0]?.closest('[role="status"]')).not.toBeNull();
+  });
+
   // ------------------------------------------------------------------
   // Mapa de acesso 02/10 (P9): o erro ao aprovar diz quem e por quê.
   // ------------------------------------------------------------------

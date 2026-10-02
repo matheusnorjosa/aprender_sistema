@@ -16,7 +16,7 @@
  * elimina o fetch pendente.
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { describe, test, expect, vi, afterEach } from 'vitest';
 
 vi.mock('../../../api/me', () => ({
@@ -45,6 +45,9 @@ vi.mock('../../../api/availability', () => ({
 }));
 
 import MonthlyPage from '../MonthlyPage';
+import { getMonthlyAvailability } from '../../../api/availability';
+
+const GRADE_VAZIA = { days: [], legend: {}, people: [], cells: [], details_index: {} };
 
 /**
  * Aguarda o fetch mockado resolver: cada Grid renderiza um cabeçalho "Nome".
@@ -111,5 +114,41 @@ describe('MonthlyPage — grade mensal', () => {
 
     const cabecalhosNome = await screen.findAllByText('Nome');
     expect(cabecalhosNome).toHaveLength(2);
+  });
+
+  // Liberação 2026-10: a atualização automática não desmonta as grades nem pisca.
+  test('atualização em segundo plano mantém as duas grades na tela, sem "Carregando..."', async () => {
+    await renderEDeixarResolver();
+    const cabecalhos = screen.getAllByText('Nome');
+    const cargasAntes = vi.mocked(getMonthlyAvailability).mock.calls.length;
+
+    // Mesma via do polling (usePolling): o evento dispara a busca; a resposta fica em voo.
+    vi.mocked(getMonthlyAvailability).mockReturnValue(new Promise(() => undefined));
+    await act(async () => { window.dispatchEvent(new Event('availability:refresh')); });
+
+    expect(vi.mocked(getMonthlyAvailability).mock.calls.length).toBe(cargasAntes + 2);
+    expect(screen.queryByText('Carregando...')).not.toBeInTheDocument();
+    // Os mesmos nós: as grades não foram desmontadas e remontadas.
+    expect(screen.getAllByText('Nome')).toEqual(cabecalhos);
+    cabecalhos.forEach((no) => expect(no).toBeInTheDocument());
+
+    vi.mocked(getMonthlyAvailability).mockResolvedValue(GRADE_VAZIA);
+  });
+
+  test('429 na atualização: UM aviso discreto (role=status), grades na tela, sem erro', async () => {
+    await renderEDeixarResolver();
+
+    vi.mocked(getMonthlyAvailability).mockRejectedValue(
+      Object.assign(new Error('Limite excedido.'), { status: 429, retryAfter: 30 }),
+    );
+    await act(async () => { window.dispatchEvent(new Event('availability:refresh')); });
+
+    const avisos = await screen.findAllByText('Atualização automática pausada por alguns instantes.');
+    expect(avisos).toHaveLength(1);
+    expect(avisos[0]?.closest('[role="status"]')).not.toBeNull();
+    expect(screen.getAllByText('Nome')).toHaveLength(2);
+    expect(screen.queryByText(/Erro ao carregar/)).not.toBeInTheDocument();
+
+    vi.mocked(getMonthlyAvailability).mockResolvedValue(GRADE_VAZIA);
   });
 });

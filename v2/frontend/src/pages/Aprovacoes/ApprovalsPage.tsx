@@ -80,6 +80,9 @@ import type {
 } from '../../types';
 import { ListaDeBloqueados } from '../../components/AvailabilityConflictAlert';
 import { formadoresLabel } from '../../utils/participants';
+import { mesmosDados } from '../../utils/mesmosDados';
+import { pausaDo429Ms } from '../../utils/retryAfter';
+import AvisoAtualizacaoPausada from '../../components/AvisoAtualizacaoPausada';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -100,6 +103,8 @@ const STATUS_LABELS: Record<SolicitacaoStatus, string> = {
 /** Tamanhos de página: o maior é o limite do lote no servidor (100 ids por requisição). */
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
 const DEFAULT_PAGE_SIZE = 20;
+/** Uma mensagem só para a falha de carga: a atualização automática não empilha erros. */
+const LOAD_ERROR_KEY = 'aprovacoes-erro-carga';
 
 /** Corpo do erro 400 da aprovação; no conflito de agenda traz quem está bloqueado. */
 interface ConflictErrorData {
@@ -159,13 +164,32 @@ export default function ApprovalsPage(): JSX.Element {
   const seqRef = useRef(0);
   // Cargas em voo: o tick do polling espera a resposta em vez de abrir outra carga, senão
   // em rede lenta (resposta > intervalo) cada tick descartaria a anterior e nada apareceria.
+  // (O usePolling tem a mesma guarda, mas só enxerga as cargas que ele abriu; esta cobre
+  // também a carga do mount, de filtro e de ação.)
   const emVooRef = useRef(0);
 
-  const loadData = useCallback(async (): Promise<void> => {
+  // RT-02: polling para sincronizar entre dispositivos (#1032); intervalo em constants/timing.ts.
+  // immediate:false: a carga inicial é do efeito abaixo (sem busca dupla no mount).
+  const loadDataRef = useRef<(silencioso?: boolean) => Promise<void>>(() => Promise.resolve());
+  const { pausado: pollingPausado, pausar: pausarPolling } = usePolling(
+    () => (emVooRef.current > 0 ? undefined : loadDataRef.current(true)),
+    {
+      enabled: true,
+      intervalMs: TIMING.LIST_POLL_INTERVAL_MS,
+      immediate: false,
+      events: ['solicitacoes:refresh', 'aprovacoes:refresh'],
+    },
+  );
+
+  /**
+   * `silencioso`: atualização em segundo plano (polling, outra aba). Não liga o
+   * carregamento da tabela; os dados antigos ficam na tela até chegarem os novos.
+   */
+  const loadData = useCallback(async (silencioso = false): Promise<void> => {
     const seq = ++seqRef.current;
     emVooRef.current += 1;
     try {
-      setLoading(true);
+      if (!silencioso) setLoading(true);
       const data = await listSolicitacoes({
         flow: 'SUPER',
         status: (statusFilter || 'pendente') as SolicitacaoStatus,
@@ -176,7 +200,8 @@ export default function ApprovalsPage(): JSX.Element {
       });
       if (seq !== seqRef.current) return;
       const results = data.results ?? [];
-      setRows(results);
+      // Só troca a lista se algo mudou: resposta igual não redesenha a tabela.
+      setRows((atuais) => (mesmosDados(atuais, results) ? atuais : results));
       setTotal(data.count ?? 0);
       // Item que saiu da lista (outra pessoa decidiu) não fica selecionado às cegas.
       const visiveis = new Set<Key>(results.map((r) => r.id));
@@ -188,12 +213,22 @@ export default function ApprovalsPage(): JSX.Element {
         setPage((p) => Math.max(1, p - 1));
         return;
       }
-      message.error('Erro ao carregar solicitações: ' + (error as Error).message);
+      // 429 (muitas requisições): pausa o polling pelo tempo pedido e mostra um aviso só.
+      const pausa = pausaDo429Ms(error);
+      if (pausa !== null) {
+        pausarPolling(pausa);
+        return;
+      }
+      message.error({
+        key: LOAD_ERROR_KEY,
+        content: 'Erro ao carregar solicitações: ' + (error as Error).message,
+      });
     } finally {
       emVooRef.current -= 1;
       if (seq === seqRef.current) setLoading(false);
     }
-  }, [statusFilter, searchTerm, page, pageSize]);
+  }, [statusFilter, searchTerm, page, pageSize, pausarPolling]);
+  loadDataRef.current = loadData;
 
   // Trocar filtro, busca, página ou tamanho muda o que está na tela: a seleção recomeça.
   const handleStatusChange = (value: SolicitacaoStatus | (string & {})): void => {
@@ -216,19 +251,10 @@ export default function ApprovalsPage(): JSX.Element {
     void loadData();
   }, [loadData]);
 
-  // RT-02: Polling 5s for cross-device sync (#1032)
-  const loadDataRef = useRef(loadData);
-  loadDataRef.current = loadData;
-  usePolling(() => (emVooRef.current > 0 ? undefined : loadDataRef.current()), {
-    enabled: true,
-    intervalMs: TIMING.SYNC_POLL_INTERVAL_MS,
-    events: ['solicitacoes:refresh', 'aprovacoes:refresh'],
-  });
-
   // RT-02: BroadcastChannel for instant cross-tab sync
   useEffect(() => {
-    const unsub1 = syncChannel.subscribe('solicitacoes', () => { void loadData(); });
-    const unsub2 = syncChannel.subscribe('aprovacoes', () => { void loadData(); });
+    const unsub1 = syncChannel.subscribe('solicitacoes', () => { void loadData(true); });
+    const unsub2 = syncChannel.subscribe('aprovacoes', () => { void loadData(true); });
     return () => { unsub1(); unsub2(); };
   }, [loadData]);
 
@@ -564,13 +590,15 @@ export default function ApprovalsPage(): JSX.Element {
                 placeholder="Buscar por município, projeto, autor..."
                 value={searchTerm}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => handleSearchChange(e.target.value)}
-                onSearch={loadData}
+                onSearch={() => { void loadData(); }}
                 style={{ width: '100%', maxWidth: 400 }}
                 allowClear
                 aria-label="Buscar solicitacoes"
               />
             </Space>
           </nav>
+
+          {pollingPausado && <AvisoAtualizacaoPausada />}
 
           {/* Contagem de pendentes */}
           {statusFilter === 'pendente' && total > 0 && (

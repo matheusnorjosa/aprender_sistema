@@ -11,6 +11,7 @@
 import { useState, useMemo, JSX } from 'react';
 import useMonthlyQuery from './useMonthlyQuery';
 import SyncIndicator from '../../components/SyncIndicator';
+import AvisoAtualizacaoPausada from '../../components/AvisoAtualizacaoPausada';
 import FiltersBar from './FiltersBar';
 import Legend from './Legend';
 import Grid from './Grid';
@@ -111,6 +112,8 @@ export default function MonthlyPage(): JSX.Element {
             />
           </div>
         </header>
+
+        {(formadores.pollingPausado || coordenadores.pollingPausado) && <AvisoAtualizacaoPausada />}
 
         {/* Filtros compartilhados */}
         <nav aria-label="Filtros da grade">

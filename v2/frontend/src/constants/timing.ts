@@ -25,7 +25,14 @@ export const TIMING = {
   // Delays
   GCAL_DETAIL_LOAD_DELAY_MS: 2000,
 
-  // Real-time sync (Epic #1032)
-  SYNC_POLL_INTERVAL_MS: 5_000, // 5s for critical pages (cross-device)
-  SYNC_POLL_BACKGROUND_MS: 30_000, // 30s when tab is hidden
+  // Telas que se atualizam sozinhas (Epic #1032; liberação 2026-10). Cada tick é um ou
+  // mais pedidos contra o limite por pessoa (throttle `user`, 6000/h): a 5 s a
+  // Pré-agenda (3 pedidos por tick) estourava o limite antigo em ~25 min. Com a aba
+  // oculta o polling para (hooks/usePolling.ts).
+  LIST_POLL_INTERVAL_MS: 20_000, // listas: Aprovações e Pré-agenda
+  GRADE_POLL_INTERVAL_MS: 30_000, // Grade Mensal (duas grades = 2 pedidos por tick)
+  // Publicação por setor: só enquanto há publicação em voo (PENDING), 1 pedido por tick.
+  PUBLICACAO_PENDENTE_POLL_MS: 5_000,
+  // Pausa do polling depois de um 429 que veio sem o cabeçalho Retry-After.
+  POLL_PAUSA_429_PADRAO_MS: 60_000,
 } as const;

@@ -79,12 +79,15 @@ import { formatFortaleza } from '../../utils/datetime';
 import logger from '../../utils/logger';
 import type { ID, Solicitacao, GCalStatus, CurrentUser, Gerencia, PaginatedResponse, Participation } from '../../types';
 import { formadoresLabel } from '../../utils/participants';
+import { mesmosDados } from '../../utils/mesmosDados';
+import { pausaDo429Ms } from '../../utils/retryAfter';
+import AvisoAtualizacaoPausada from '../../components/AvisoAtualizacaoPausada';
 
 // #1668 (M12-19): orçamento de requisições da Pré-agenda.
 /** Carrega a pré-agenda inteira como lista única (paginação client-side). */
 const PREAGENDA_PAGE_SIZE = 100;
-/** Após um 429, pula N ticks de polling (N × intervalo ≈ janela de backoff). */
-const POLL_BACKOFF_TICKS = 3;
+/** Uma mensagem só para a falha de carga: a atualização automática não empilha erros. */
+const LOAD_ERROR_KEY = 'preagenda-erro-carga';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -192,17 +195,30 @@ export default function PreAgendaPage(): JSX.Element {
 
   // #1668 (M12-19): controle do ciclo de requisições.
   // - seqRef: guarda de sequência (latest-wins) — descarta resposta obsoleta.
-  // - pollBackoffRef: ticks de polling a pular após um 429.
+  // - 429: o polling é pausado pelo tempo do Retry-After (usePolling.pausar).
   // - filtersRef: mantém loadData estável (não recria a cada tecla).
   const seqRef = useRef(0);
-  const pollBackoffRef = useRef(0);
   const filtersRef = useRef({ searchTerm, gerenciaFilter, dateRange });
   filtersRef.current = { searchTerm, gerenciaFilter, dateRange };
 
-  const loadData = useCallback(async (): Promise<void> => {
+  // RT-02: polling para sync cross-device (#1032; intervalo em constants/timing.ts).
+  // immediate:false → a carga inicial é do efeito de filtro (sem carga dupla).
+  const loadDataRef = useRef<(silencioso?: boolean) => Promise<void>>(() => Promise.resolve());
+  const { pausado: pollingPausado, pausar: pausarPolling } = usePolling(() => loadDataRef.current(true), {
+    enabled: true,
+    intervalMs: TIMING.LIST_POLL_INTERVAL_MS,
+    immediate: false,
+    events: ['preagenda:refresh', 'solicitacoes:refresh'],
+  });
+
+  /**
+   * `silencioso`: atualização em segundo plano (polling, outra aba). Não liga o
+   * carregamento da tabela; os dados antigos ficam na tela até chegarem os novos.
+   */
+  const loadData = useCallback(async (silencioso = false): Promise<void> => {
     const seq = ++seqRef.current;
     try {
-      setLoading(true);
+      if (!silencioso) setLoading(true);
 
       const { searchTerm, gerenciaFilter, dateRange } = filtersRef.current;
       const filters: Record<string, string> = {};
@@ -228,24 +244,29 @@ export default function PreAgendaPage(): JSX.Element {
       const naoRows = 'results' in naoSuperData ? naoSuperData.results : naoSuperData;
       const loadedRows = [...superRows, ...naoRows];
 
-      pollBackoffRef.current = 0; // sucesso zera o backoff
-      setRows(loadedRows);
+      // Só troca o estado se algo mudou: resposta igual não redesenha a tabela.
+      setRows((atuais) => (mesmosDados(atuais, loadedRows) ? atuais : loadedRows));
       // Contador honesto: exibe o total efetivamente carregado, nunca o count do
       // servidor sobre uma lista de 1 página (total inalcançável).
       setTotal(loadedRows.length);
-      setSummary(summaryData);
+      setSummary((atual) => (mesmosDados(atual, summaryData) ? atual : summaryData));
     } catch (error) {
       if (seq !== seqRef.current) return; // erro de carga obsoleta: não polui a UI
-      const status = (error as { status?: number }).status;
-      if (status === 429) {
-        // O operador estourou o próprio throttle; recua alguns ticks de polling.
-        pollBackoffRef.current = POLL_BACKOFF_TICKS;
+      // 429 (muitas requisições): pausa o polling pelo tempo pedido e mostra um aviso só.
+      const pausa = pausaDo429Ms(error);
+      if (pausa !== null) {
+        pausarPolling(pausa);
+        return;
       }
-      message.error('Erro ao carregar pré-agenda: ' + (error as Error).message);
+      message.error({
+        key: LOAD_ERROR_KEY,
+        content: 'Erro ao carregar pré-agenda: ' + (error as Error).message,
+      });
     } finally {
       if (seq === seqRef.current) setLoading(false);
     }
-  }, []);
+  }, [pausarPolling]);
+  loadDataRef.current = loadData;
 
   // Carga inicial imediata no mount + recargas por filtro com debounce: o valor
   // digitado nunca dispara um request por tecla, e não há carga dupla (o polling
@@ -263,26 +284,10 @@ export default function PreAgendaPage(): JSX.Element {
     return () => clearTimeout(timer);
   }, [searchTerm, gerenciaFilter, dateRange, loadData]);
 
-  // RT-02: Polling 5s para sync cross-device (#1032). immediate:false → a carga
-  // inicial é do efeito de filtro (sem carga dupla). O tick honra o backoff de 429.
-  const handlePollTick = useCallback((): void => {
-    if (pollBackoffRef.current > 0) {
-      pollBackoffRef.current -= 1;
-      return;
-    }
-    void loadData();
-  }, [loadData]);
-  usePolling(handlePollTick, {
-    enabled: true,
-    intervalMs: TIMING.SYNC_POLL_INTERVAL_MS,
-    immediate: false,
-    events: ['preagenda:refresh', 'solicitacoes:refresh'],
-  });
-
   // RT-02: BroadcastChannel for instant cross-tab sync
   useEffect(() => {
-    const unsub1 = syncChannel.subscribe('preagenda', () => { void loadData(); });
-    const unsub2 = syncChannel.subscribe('solicitacoes', () => { void loadData(); });
+    const unsub1 = syncChannel.subscribe('preagenda', () => { void loadData(true); });
+    const unsub2 = syncChannel.subscribe('solicitacoes', () => { void loadData(true); });
     return () => { unsub1(); unsub2(); };
   }, [loadData]);
 
@@ -756,6 +761,8 @@ export default function PreAgendaPage(): JSX.Element {
         {/* View: Solicitações (Pré-agenda) */}
         {viewMode === 'preagenda' && (
           <>
+            {pollingPausado && <AvisoAtualizacaoPausada />}
+
             {/* Resumo GCal */}
             <Card title="Resumo de Status GCal" size="small">
               <Row gutter={16}>
@@ -795,7 +802,7 @@ export default function PreAgendaPage(): JSX.Element {
                     placeholder="Buscar por município, projeto..."
                     value={searchTerm}
                     onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-                    onSearch={loadData}
+                    onSearch={() => { void loadData(); }}
                     style={{ width: '100%', maxWidth: 300 }}
                     allowClear
                   />

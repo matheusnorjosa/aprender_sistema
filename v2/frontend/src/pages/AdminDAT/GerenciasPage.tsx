@@ -27,13 +27,6 @@ import { errosDosCampos, mensagemDoErro } from './usuario_form_helpers';
 const { Title, Text } = Typography;
 const { Search } = Input;
 
-/** Confiança do de-para (vocabulário do importer) com o rótulo de tela e a cor da etiqueta. */
-const CONFIANCA: Record<string, { rotulo: string; cor: string }> = {
-  na: { rotulo: 'Conferir', cor: 'red' }, // não-aplicável: prioridade máxima da conferência
-  media: { rotulo: 'Média', cor: 'orange' },
-  alta: { rotulo: 'Alta', cor: 'green' },
-};
-
 /** Tag que corta com reticências em vez de estourar a coluna. */
 function Etiqueta({ cor, texto }: { cor: string; texto: string }): JSX.Element {
   return (
@@ -78,8 +71,6 @@ export default function GerenciasPage(): JSX.Element {
   const setorRef = useRef<RefSelectProps>(null);
   const [erroLista, setErroLista] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
-  // Filtro de confiança no topo (vale em qualquer largura; no cabeçalho da coluna, sumia com ela).
-  const [confiancaFiltro, setConfiancaFiltro] = useState<string | undefined>(undefined);
   // Celular (< 576 px): as ações da linha vão todas para o menu "Mais ações".
   const acoesCompactas = !Grid.useBreakpoint().sm;
 
@@ -258,23 +249,6 @@ export default function GerenciasPage(): JSX.Element {
       render: (_, g) => (g.setor_canonico ? <Etiqueta cor="geekblue" texto={g.setor_canonico} /> : <Tag>não definido</Tag>),
     },
     {
-      // Sinal de qualidade do de-para v15 (read-only) — ajuda a priorizar a conferência de
-      // baixa confiança (vocabulário definido pelo importer, RELAY 50), com rótulo de tela.
-      title: 'Confiança',
-      dataIndex: 'setor_canonico_confianca',
-      key: 'setor_canonico_confianca',
-      width: 120,
-      responsive: VISIVEL_A_PARTIR.md,
-      // Realça baixa qualidade p/ priorizar a conferência: Conferir (`na`) vermelho, Média
-      // laranja, Alta verde. O filtro fica no topo da página (confiancaFiltro).
-      render: (_, g) => {
-        const v = g.setor_canonico_confianca;
-        if (!v) return <Text type="secondary">—</Text>;
-        const confianca = CONFIANCA[v];
-        return <Etiqueta cor={confianca?.cor ?? 'green'} texto={confianca?.rotulo ?? v} />;
-      },
-    },
-    {
       title: 'Gerente',
       dataIndex: 'gerente_nome',
       key: 'gerente_nome',
@@ -347,15 +321,6 @@ export default function GerenciasPage(): JSX.Element {
               onSearch={setSearchText}
               onChange={(e) => !e.target.value && setSearchText('')}
             />
-            <Select
-              placeholder="Filtrar por confiança"
-              aria-label="Filtrar por confiança"
-              allowClear
-              style={{ width: 180 }}
-              value={confiancaFiltro}
-              onChange={setConfiancaFiltro}
-              options={Object.entries(CONFIANCA).map(([valor, { rotulo }]) => ({ value: valor, label: rotulo }))}
-            />
             <Button
               icon={<ReloadOutlined />}
               onClick={() => fetchGerencias(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE)}
@@ -371,24 +336,18 @@ export default function GerenciasPage(): JSX.Element {
 
         <ResponsiveTable<GerenciaRecord>
           columns={columns}
-          // O filtro de confiança vale sobre a página carregada (o backend ainda não filtra por ele).
-          dataSource={
-            confiancaFiltro ? gerencias.filter((g) => g.setor_canonico_confianca === confiancaFiltro) : gerencias
-          }
+          dataSource={gerencias}
           rowKey="id"
           nomeDaLinha={(g) => g.rotulo}
           loading={loading}
           erro={erroLista}
           onTentarDeNovo={() => void fetchGerencias(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE)}
-          {...(confiancaFiltro && {
-            locale: { emptyText: `Nenhuma gerência com confiança ${CONFIANCA[confiancaFiltro]?.rotulo ?? confiancaFiltro} nesta página.` },
-          })}
           onChange={handleTableChange}
           pagination={{
             ...pagination,
             showSizeChanger: true,
             pageSizeOptions: ['15', '30', '50', '100'],
-            showTotal: (total) => (confiancaFiltro ? `Total: ${total} (confiança filtrada nesta página)` : `Total: ${total}`),
+            showTotal: (total) => `Total: ${total}`,
           }}
         />
       </Card>

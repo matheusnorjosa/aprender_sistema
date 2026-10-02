@@ -5,8 +5,6 @@
  * - Salvar com loading; a exclusão começa no Cancelar, com acento; com projetos ativos vinculados,
  *   só o aviso de que não pode (Entendi), sem "Sim, excluir".
  * - O vocabulário de setor que não carregou avisa no campo, com "Tentar de novo".
- * - Confiança com rótulos de gente (Conferir/Média/Alta) e o filtro no topo, em qualquer largura:
- *   no cabeçalho da coluna, ele sumia abaixo de 768 px e deixava de valer sem aviso.
  */
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -14,8 +12,6 @@ import { ConfigProvider, Modal, message } from 'antd';
 import ptBR from 'antd/locale/pt_BR';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-
-import { definirLarguraTela } from '../../../test/larguraTela';
 
 const { GERENCIAS } = vi.hoisted(() => {
   const g = (id: number, rotulo: string, confianca: string, projetos: number) => ({
@@ -64,7 +60,7 @@ async function abrirEditar(user: ReturnType<typeof userEvent.setup>): Promise<HT
   return (await screen.findByText('Editar Gerencia', {}, { timeout: 10000 })).closest<HTMLElement>('[role="dialog"]')!;
 }
 
-describe('GerenciasPage: salvar, excluir e filtrar (C2)', () => {
+describe('GerenciasPage: salvar e excluir (C2)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(listGerencias).mockResolvedValue({ results: GERENCIAS, count: 3, next: null, previous: null });
@@ -253,22 +249,4 @@ describe('GerenciasPage: salvar, excluir e filtrar (C2)', () => {
     // Sem número no título: "(0)" diria que não há gerência.
     expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent(/^Gerencias$/);
   }, 30000);
-
-  test('confiança com rótulos de gente e filtro no topo que vale também a 360 px', async () => {
-    definirLarguraTela(360);
-    const user = userEvent.setup();
-    renderPage();
-    await linha(SETOR, 'Mais ações');
-
-    await user.click(screen.getByRole('combobox', { name: 'Filtrar por confiança' }));
-    await user.click(await screen.findByTitle('Conferir'));
-
-    await waitFor(() => expect(screen.queryByRole('button', { name: `Mais ações: ${SETOR}` })).not.toBeInTheDocument());
-    const conferir = await linha('Fluir das Emoções', 'Mais ações');
-    expect(screen.queryByRole('button', { name: 'Mais ações: Vidas' })).not.toBeInTheDocument();
-
-    await user.click(within(conferir).getByRole('button', { name: 'Expandir linha de Fluir das Emoções' }));
-    const expandida = within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);
-    expect(expandida.getByText('Conferir')).toBeInTheDocument();
-  }, 40000);
 });

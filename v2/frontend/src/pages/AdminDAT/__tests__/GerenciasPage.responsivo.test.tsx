@@ -2,9 +2,10 @@
  * C2 (Programa C) — Gerências sem rolagem horizontal: lista enxuta no ResponsiveTable.
  *
  * Sempre na linha: o setor (rótulo de tela), Situação e as ações (AcoesLinha, "Editar: <setor>").
- * As demais sobem por largura: Setor canônico e Confiança a partir de md, Projetos de lg,
- * Gerente de xl e Rótulo nas planilhas só de xxl (quase sempre repete o setor). O que some da
- * linha vai para a linha expandida. Nunca na grade: ID, código interno e descrição.
+ * As demais sobem por largura: Setor canônico a partir de md, Projetos de lg, Gerente de xl e
+ * Rótulo nas planilhas só de xxl (quase sempre repete o setor). O que some da linha vai para a
+ * linha expandida. Nunca na grade: ID, código interno e descrição. A Confiança do de-para não
+ * aparece em lugar nenhum (C2b, decisão do dono, 01/10: vazia nas 21 gerências de produção).
  */
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -42,9 +43,8 @@ vi.mock('../../../api/adminDAT', () => ({
 import GerenciasPage from '../GerenciasPage';
 
 const SETOR = 'Formação Continuada';
-/** Texto com contraste AA nas tags green e orange (TEXTO_DA_TAG do padrão). */
+/** Texto com contraste AA na tag green (TEXTO_DA_TAG do padrão). */
 const VERDE_AA = '#237804';
-const LARANJA_AA = '#ad4e00';
 
 function renderPage() {
   return render(
@@ -80,7 +80,7 @@ describe('GerenciasPage responsiva (C2)', () => {
     renderPage();
     const linha = await linhaDaGerencia();
 
-    expect(cabecalhos()).toEqual(['Setor', 'Setor canônico', 'Confiança', 'Gerente', 'Projetos', 'Situação', 'Ações']);
+    expect(cabecalhos()).toEqual(['Setor', 'Setor canônico', 'Gerente', 'Projetos', 'Situação', 'Ações']);
     // O setor (identidade) quebra linha em vez de cortar com reticências: não há detalhe que o mostre.
     expect(within(linha).getByText(SETOR).closest('td')).not.toHaveClass('ant-table-cell-ellipsis');
     expect(within(linha).getByRole('button', { name: `Excluir: ${SETOR}` })).toBeInTheDocument();
@@ -92,8 +92,8 @@ describe('GerenciasPage responsiva (C2)', () => {
   }, 20000);
 
   test.each([
-    [768, ['Setor', 'Setor canônico', 'Confiança', 'Situação', 'Ações']],
-    [1024, ['Setor', 'Setor canônico', 'Confiança', 'Projetos', 'Situação', 'Ações']],
+    [768, ['Setor', 'Setor canônico', 'Situação', 'Ações']],
+    [1024, ['Setor', 'Setor canônico', 'Projetos', 'Situação', 'Ações']],
   ])('a %i px: colunas por prioridade', async (largura, esperadas) => {
     definirLarguraTela(largura);
     renderPage();
@@ -113,10 +113,13 @@ describe('GerenciasPage responsiva (C2)', () => {
 
     await user.click(within(linha).getByRole('button', { name: `Expandir linha de ${SETOR}` }));
     const expandida = within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);
-    for (const texto of ['Ler, Ouvir e Contar', 'Média', 'Joana Fictícia', 'Formação Planilha', '5']) {
+    for (const texto of ['Ler, Ouvir e Contar', 'Joana Fictícia', 'Formação Planilha', '5']) {
       expect(expandida.getByText(texto)).toBeInTheDocument();
     }
-    expect(expandida.queryByText('GERENCIA 7')).not.toBeInTheDocument();
+    // Nem o código interno nem a Confiança (C2b) vão para a linha expandida.
+    for (const oculto of ['GERENCIA 7', 'Confiança', 'Média']) {
+      expect(expandida.queryByText(oculto)).not.toBeInTheDocument();
+    }
   }, 20000);
 
   test('mudar a largura com a página aberta reorganiza as colunas', async () => {
@@ -128,13 +131,22 @@ describe('GerenciasPage responsiva (C2)', () => {
     expect(cabecalhos()).toEqual(['Setor', 'Situação', 'Ações']);
   }, 20000);
 
-  test('tags verdes e laranjas com texto de contraste AA', async () => {
+  test('tag verde com texto de contraste AA', async () => {
     renderPage();
     const linha = await linhaDaGerencia();
 
     expect(within(linha).getByText('Ativo')).toHaveStyle({ color: VERDE_AA });
-    expect(within(linha).getByText('Média')).toHaveStyle({ color: LARANJA_AA });
-    expect(screen.getByText('Alta')).toHaveStyle({ color: VERDE_AA });
+  }, 20000);
+
+  test('a Confiança do de-para fica fora da tela: sem coluna, sem valor e sem filtro (C2b)', async () => {
+    renderPage();
+    await linhaDaGerencia();
+
+    expect(screen.queryByText('Confiança')).not.toBeInTheDocument();
+    for (const rotulo of ['Média', 'Alta', 'Conferir']) {
+      expect(screen.queryByText(rotulo)).not.toBeInTheDocument();
+    }
+    expect(screen.queryByRole('combobox', { name: /confiança/i })).not.toBeInTheDocument();
   }, 20000);
 
   test('a busca tem nome acessível', async () => {

@@ -18,6 +18,7 @@ import {
   autocompleteMunicipiosAdmin,
 } from '../../api/adminDAT';
 import type { MunicipioAutocompleteItem } from '../../api/adminDAT';
+import { checkAuth } from '../../api/auth';
 import { importMunicipios } from '../../api/ops';
 import ImportUploader from '../../components/ImportUploader';
 import { aplicacaoDoImport, validacaoDoImport } from '../../components/resultadoDoImport';
@@ -77,6 +78,7 @@ export default function MunicipiosPage(): JSX.Element {
   const [lookupOptions, setLookupOptions] = useState<MunicipioAutocompleteItem[]>([]);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [ibgeLocked, setIbgeLocked] = useState(false);
+  const [podeImportar, setPodeImportar] = useState(false);
   const [pagination, setPagination] = useState<TablePaginationConfig>({
     current: 1,
     pageSize: DEFAULT_PAGE_SIZE,
@@ -125,6 +127,13 @@ export default function MunicipiosPage(): JSX.Element {
   useEffect(() => {
     void fetchMunicipios(1, pagination.pageSize || DEFAULT_PAGE_SIZE);
   }, [searchText, ufFilter]);
+
+  // Importação pela tela: só superusuário (decisão do dono, 02/10/2026). Falha ao consultar = sem o cartão.
+  useEffect(() => {
+    checkAuth()
+      .then((auth) => setPodeImportar(Boolean(auth.user?.is_superuser)))
+      .catch(() => setPodeImportar(false));
+  }, []);
 
   const handleTableChange = (newPagination: TablePaginationConfig): void => {
     void fetchMunicipios(
@@ -481,17 +490,20 @@ export default function MunicipiosPage(): JSX.Element {
         />
       </Card>
 
-      <Card className="mt-6">
-        <header className="flex justify-between items-center mb-4">
-          <Title level={4} className="m-0">Importação de Municípios</Title>
-        </header>
-        <ImportUploader
-          label="Importar Municípios"
-          description="CSV/XLSX com colunas: nome, uf (obrigatórios), ibge_code e ativo (opcionais)"
-          onDryRun={async (file: File) => validacaoDoImport(await importMunicipios(file, true))}
-          onApply={async (file: File) => aplicacaoDoImport(await importMunicipios(file, false))}
-        />
-      </Card>
+      {/* Importação pela tela: só superusuário (decisão do dono, 02/10/2026). */}
+      {podeImportar && (
+        <Card className="mt-6">
+          <header className="flex justify-between items-center mb-4">
+            <Title level={4} className="m-0">Importação de Municípios</Title>
+          </header>
+          <ImportUploader
+            label="Importar Municípios"
+            description="CSV/XLSX com colunas: nome, uf (obrigatórios), ibge_code e ativo (opcionais)"
+            onDryRun={async (file: File) => validacaoDoImport(await importMunicipios(file, true))}
+            onApply={async (file: File) => aplicacaoDoImport(await importMunicipios(file, false))}
+          />
+        </Card>
+      )}
 
       {/* Modal Criar/Editar Município */}
       <Modal

@@ -26,7 +26,8 @@ export default function DatImportsCentralizedBanner({
       try {
         const user = await getMe();
         if (active) {
-          setCanAccessDatImports(computePermissions(user).canDAT);
+          // Importação pela tela: só superusuário (decisão do dono, 02/10/2026).
+          setCanAccessDatImports(computePermissions(user).isAdmin);
         }
       } catch {
         if (active) {

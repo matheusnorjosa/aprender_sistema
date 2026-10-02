@@ -34,7 +34,23 @@ describe('DatImportsCentralizedBanner', () => {
     vi.mocked(getMe).mockReset();
   });
 
-  test('exibe link para DAT > Importações quando usuário pode acessar DAT', async () => {
+  test('exibe link para DAT > Importações para o superusuário', async () => {
+    vi.mocked(getMe).mockResolvedValue({
+      ...baseUser,
+      is_superuser: true,
+    });
+
+    render(
+      <MemoryRouter>
+        <DatImportsCentralizedBanner />
+      </MemoryRouter>,
+    );
+
+    const link = await screen.findByRole('link', { name: 'DAT > Importações' });
+    expect(link).toHaveAttribute('href', '/dat/importacoes');
+  });
+
+  test('DAT não é superusuário: só o texto, sem link (importação pela tela é só do superusuário, 02/10/2026)', async () => {
     vi.mocked(getMe).mockResolvedValue({
       ...baseUser,
       setores: ['DAT'],
@@ -46,8 +62,11 @@ describe('DatImportsCentralizedBanner', () => {
       </MemoryRouter>,
     );
 
-    const link = await screen.findByRole('link', { name: 'DAT > Importações' });
-    expect(link).toHaveAttribute('href', '/dat/importacoes');
+    await waitFor(() => {
+      expect(screen.getByText(DAT_IMPORTS_CENTRALIZED_MESSAGE)).toBeInTheDocument();
+    });
+    expect(getMe).toHaveBeenCalled();
+    expect(screen.queryByRole('link', { name: 'DAT > Importações' })).not.toBeInTheDocument();
   });
 
   test('exibe apenas texto informativo para usuário sem acesso ao DAT', async () => {

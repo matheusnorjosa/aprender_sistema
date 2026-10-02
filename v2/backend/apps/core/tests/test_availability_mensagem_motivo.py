@@ -239,6 +239,21 @@ class TestMensagemDizMotivoEAcao:
         assert response.status_code == 400, response.data
         assert response.data["detail"] == f"Não é possível criar o evento: Bruno Formador {MOTIVOS['X']}."
 
+    def test_editar_com_conflito_diz_salvar_a_alteracao(
+        self, coordenador, formador, municipio, tipo_evento, projeto_super
+    ):
+        sol = _pendente(coordenador, formador, municipio, tipo_evento, projeto_super)
+        _ocupar_agenda("X", formador, municipio, tipo_evento)
+
+        response = _client(coordenador).patch(
+            f"/api/solicitacoes/{sol.id}/", {"observacoes": "Sala trocada"}, format="json"
+        )
+
+        assert response.status_code == 400, response.data
+        assert response.data["code"] == "availability_conflict"
+        assert response.data["detail"] == f"Não é possível salvar a alteração: Bruno Formador {MOTIVOS['X']}."
+        assert Solicitacao.objects.get(pk=sol.pk).observacoes != "Sala trocada"
+
     def test_lote_item_de_conflito_traz_code_motivo_e_quem(
         self, coordenador, formador, aprovador, municipio, tipo_evento, projeto_super
     ):

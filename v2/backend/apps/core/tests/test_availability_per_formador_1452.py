@@ -550,7 +550,7 @@ class TestCacheSplit:
     def test_exclude_solicitacao_id_tambem_tira_do_limite_diario(self, formador, municipio, tipo_evento):
         """
         A exclusão precisa valer na origem da query, não como filtro por `ref_id` depois:
-        o conflito de capacidade diária (M, RD-05) não tem `ref_id` e somaria as horas do
+        o aviso de limite diário (M, RD-05) não tem `ref_id` e somaria as horas do
         próprio evento em dobro.
         """
         from apps.core.services.availability_service import check_conflicts_uncached
@@ -561,7 +561,7 @@ class TestCacheSplit:
 
         # 5h já gravadas + 5h do mesmo evento = 10h > limite de 8h/dia
         sem_exclusao = check_conflicts_uncached(usuario=formador, inicio=inicio, fim=fim, municipio=municipio)
-        assert [c.code for c in sem_exclusao.conflicts].count("M") == 1
+        assert [w.code for w in sem_exclusao.warnings].count("M") == 1
 
         com_exclusao = check_conflicts_uncached(
             usuario=formador,
@@ -571,3 +571,4 @@ class TestCacheSplit:
             exclude_solicitacao_id=solicitacao.pk,
         )
         assert com_exclusao.ok
+        assert com_exclusao.warnings == []

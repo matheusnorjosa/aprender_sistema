@@ -70,7 +70,9 @@ def cache_availability_check(timeout: int | None = None) -> Callable[[F], F]:
             }
             key_str = json.dumps(key_data, sort_keys=True)
             key_hash = hashlib.md5(key_str.encode(), usedforsecurity=False).hexdigest()
-            cache_key = f"availability_check:{key_hash}"
+            # v2: o resultado ganhou `warnings` (limite diário como aviso, 02/10/2026). A
+            # versão no prefixo impede servir objeto guardado antes do deploy, sem o campo.
+            cache_key = f"availability_check:v2:{key_hash}"
 
             cached_result = cache.get(cache_key)
             if cached_result is not None:

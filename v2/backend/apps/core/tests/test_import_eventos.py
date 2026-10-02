@@ -574,6 +574,25 @@ class TestEventosImportAvailabilityAndReimport:
         assert result["stats"]["skipped"]["availability"] == 1
         assert len(result["pendencias"]["availability"]) == 1
 
+    def test_future_evento_acima_do_limite_diario_e_criado(
+        self, coordenador_user, formador1_user, municipio, projeto_super, tipo_evento
+    ):
+        """Decisão do dono (02/10/2026): o limite diário (M) avisa, não barra. Evento FUTURO de
+        10 h é gravado e não vira pendência de disponibilidade."""
+        d = date.today() + timedelta(days=60)
+        csv = _write_csv(
+            "municipio,projeto,tipo_evento,data,hora_inicio,hora_fim,coordenador,formador1\n"
+            f"{municipio.nome},{projeto_super.nome},{tipo_evento.nome},{d.isoformat()},"
+            f"08:00,18:00,{coordenador_user.email},{formador1_user.email}\n"
+        )
+        result = import_eventos_from_file(path=csv, dry_run=False)
+        Path(csv).unlink(missing_ok=True)
+
+        assert result["stats"]["solicitacoes"]["created"] == 1
+        assert Solicitacao.objects.count() == 1
+        assert result["stats"]["skipped"].get("availability", 0) == 0
+        assert not result["pendencias"].get("availability")
+
     def test_past_conflict_is_created_historical(
         self, coordenador_user, formador1_user, municipio, projeto_super, tipo_evento
     ):

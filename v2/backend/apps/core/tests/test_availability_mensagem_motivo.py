@@ -2,8 +2,11 @@
 Testes: o erro de disponibilidade diz o motivo real e a ação certa (mapa de acesso 02/10, P9).
 
 Antes, qualquer bloqueio devolvia "<pessoa> já está alocado neste horário. Não é possível
-criar o evento." — mesmo quando o motivo era o limite diário e a ação era aprovar. No lote, o
+criar o evento." — mesmo quando o motivo era um bloqueio e a ação era aprovar. No lote, o
 item de erro trazia só a frase.
+
+Desde 02/10/2026 (decisão do dono) o limite diário (M) é aviso e não barra: saiu dos motivos
+de bloqueio. Os casos dele estão em `test_availability_limite_diario_aviso.py`.
 
 Só o TEXTO e o FORMATO do erro mudam. `TestDecisaoNaoMuda` prova que os mesmos casos
 continuam barrados e o caso livre continua aprovado.
@@ -23,6 +26,7 @@ import pytest
 from apps.core.models import AvailabilityBlock, Compra, Participation, Solicitacao
 from apps.core.services import solicitacao_availability as guard_module
 from apps.core.services.availability_service import CheckResult, Conflict
+from apps.core.services.config_service import bust_cfg
 from apps.core.services.solicitacao_availability import GuardResult, ParticipantConflicts, _build_message
 from apps.core.tests.factories import (
     GroupFactory,
@@ -40,7 +44,6 @@ MOTIVOS = {
     "T": "tem bloqueio de agenda no período",
     "P": "tem bloqueio parcial de agenda no período",
     "D": "não tem o intervalo de deslocamento entre cidades",
-    "M": "passa do limite diário de horas",
 }
 
 
@@ -57,6 +60,9 @@ INICIO, FIM = _utc(18), _utc(20)
 def _parametros(settings):
     settings.AVAILABILITY_DAILY_LIMIT_HOURS = 8
     settings.TRAVEL_BUFFER_MINUTES = 120
+    # O cache de Config sobrevive ao rollback do teste: um valor deixado por outro arquivo
+    # (ex.: Buffer 45 em test_config_api) valeria aqui no lugar do settings.
+    bust_cfg("availability")
 
 
 @pytest.fixture
@@ -141,9 +147,6 @@ def _ocupar_agenda(code, formador, municipio, tipo_evento):
     elif code == "D":
         outra_cidade = MunicipioFactory(nome="Outra Cidade Motivo", uf="CE")
         _evento(formador, outra_cidade, tipo_evento, _utc(16), _utc(17), status="aprovado", formador=formador)
-    elif code == "M":
-        # 8h no mesmo município (sem deslocamento), terminando antes: 8h + 2h passa do limite de 8h.
-        _evento(formador, municipio, tipo_evento, _utc(9), _utc(17), status="aprovado", formador=formador)
 
 
 # ============================================================================
@@ -152,7 +155,7 @@ def _ocupar_agenda(code, formador, municipio, tipo_evento):
 
 
 class TestDecisaoNaoMuda:
-    @pytest.mark.parametrize("code", ["X", "T", "P", "D", "M"])
+    @pytest.mark.parametrize("code", ["X", "T", "P", "D"])
     def test_cada_motivo_continua_barrando_a_aprovacao(
         self, code, coordenador, formador, aprovador, municipio, tipo_evento, projeto_super
     ):
@@ -185,7 +188,7 @@ class TestDecisaoNaoMuda:
             coordenador, municipio, tipo_evento, _utc(12), _utc(13), status="pendente", projeto=projeto_super
         )
         barrada = _pendente(coordenador, formador, municipio, tipo_evento, projeto_super)
-        _ocupar_agenda("M", formador, municipio, tipo_evento)
+        _ocupar_agenda("X", formador, municipio, tipo_evento)
 
         response = _client(aprovador).post(
             "/api/solicitacoes/batch-approve/", {"ids": [livre.id, barrada.id]}, format="json"
@@ -210,7 +213,7 @@ class TestDecisaoNaoMuda:
 
 
 class TestMensagemDizMotivoEAcao:
-    @pytest.mark.parametrize("code", ["X", "T", "P", "D", "M"])
+    @pytest.mark.parametrize("code", ["X", "T", "P", "D"])
     def test_aprovar_diz_o_motivo_e_a_acao(
         self, code, coordenador, formador, aprovador, municipio, tipo_evento, projeto_super
     ):
@@ -258,7 +261,7 @@ class TestMensagemDizMotivoEAcao:
         self, coordenador, formador, aprovador, municipio, tipo_evento, projeto_super
     ):
         barrada = _pendente(coordenador, formador, municipio, tipo_evento, projeto_super)
-        _ocupar_agenda("M", formador, municipio, tipo_evento)
+        _ocupar_agenda("X", formador, municipio, tipo_evento)
 
         response = _client(aprovador).post("/api/solicitacoes/batch-approve/", {"ids": [barrada.id]}, format="json")
 
@@ -266,10 +269,10 @@ class TestMensagemDizMotivoEAcao:
         (item,) = response.data["errors"]
         assert item["id"] == barrada.id
         assert item["code"] == "availability_conflict"
-        assert item["detail"] == f"Não é possível aprovar a solicitação: Bruno Formador {MOTIVOS['M']}."
+        assert item["detail"] == f"Não é possível aprovar a solicitação: Bruno Formador {MOTIVOS['X']}."
         (bloqueado,) = item["blocked_participants"]
         assert bloqueado["usuario_id"] == formador.id
-        assert [c["code"] for c in bloqueado["conflicts"]] == ["M"]
+        assert [c["code"] for c in bloqueado["conflicts"]] == ["X"]
 
 
 class TestMontagemDaMensagem:
@@ -288,7 +291,7 @@ class TestMontagemDaMensagem:
         )
 
     def test_acoes(self):
-        guard = self._guard(("Bruno Formador", [Conflict("M", "Capacidade diária excedida", "x")]))
+        guard = self._guard(("Bruno Formador", [Conflict("D", "Buffer deslocamento insuficiente", "x")]))
         esperado = {
             "create": "criar o evento",
             "update": "salvar a alteração",
@@ -306,7 +309,7 @@ class TestMontagemDaMensagem:
                 [
                     Conflict("D", "Buffer deslocamento insuficiente", "x"),
                     Conflict("D", "Buffer deslocamento insuficiente", "y"),
-                    Conflict("M", "Capacidade diária excedida", "z"),
+                    Conflict("P", "Bloqueio parcial", "z"),
                 ],
             ),
             ("Dora Formadora", [Conflict("T", "Bloqueio total", "w")]),
@@ -314,7 +317,7 @@ class TestMontagemDaMensagem:
 
         assert _build_message(guard, action="approve") == (
             "Não é possível aprovar a solicitação: Bruno Formador "
-            + f"{MOTIVOS['D']} e {MOTIVOS['M']}; Dora Formadora {MOTIVOS['T']}."
+            + f"{MOTIVOS['D']} e {MOTIVOS['P']}; Dora Formadora {MOTIVOS['T']}."
         )
 
     def test_intervalo_invalido_nao_diz_outro_evento(self):

@@ -225,14 +225,15 @@ curl -X POST http://localhost:8000/api/solicitacoes/batch-approve/ \
     {
       "id": 5,
       "code": "availability_conflict",
-      "detail": "Nao e possivel aprovar a solicitacao: Fulano de Tal passa do limite diario de horas.",
+      "detail": "Nao e possivel aprovar a solicitacao: Fulano de Tal tem outro evento aprovado neste horario.",
       "blocked_participants": [
         {
           "usuario_id": 12,
           "usuario_nome": "Fulano de Tal",
           "conflicts": [
-            {"code": "M", "title": "Capacidade diaria excedida", "detail": "Total do dia 05/10: 600 min > limite 480 min (8.0h)", "ref_id": null}
-          ]
+            {"code": "X", "title": "Sobreposicao", "detail": "Conflita com evento aprovado #87 (08:00 05/10-12:00 05/10)", "ref_id": 87}
+          ],
+          "warnings": []
         }
       ]
     }
@@ -242,7 +243,8 @@ curl -X POST http://localhost:8000/api/solicitacoes/batch-approve/ \
 
 O item de conflito de agenda traz `code: availability_conflict`, o `detail` com a pessoa e o
 motivo (os textos reais vem acentuados) e `blocked_participants`, igual ao erro 400 da
-aprovacao individual. Os outros itens (`Status ja e ...`, nao encontrada, decisao propria,
+aprovacao individual. So X, T, P e D barram; o limite diario (M) e aviso e, quando existe,
+vem em `warnings` do participante, nunca em `conflicts`. Os outros itens (`Status ja e ...`, nao encontrada, decisao propria,
 fora do escopo) nao mudaram.
 
 `ids` vazio retorna **400** (`code: ids_required`); acima de 100 itens retorna

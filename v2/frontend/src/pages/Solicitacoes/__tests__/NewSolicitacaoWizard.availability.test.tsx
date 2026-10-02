@@ -196,6 +196,42 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
     expect(screen.getByRole('button', { name: /Ir para proximo passo/i })).not.toBeDisabled();
   });
 
+  test('limite diário é só aviso: mostra a informação e NÃO desabilita o Próximo', async () => {
+    checkAvailabilityManyMock.mockResolvedValue({
+      ok: true,
+      results: [
+        { usuario_id: 1, ok: true, conflicts: [], warnings: [] },
+        {
+          usuario_id: 99,
+          ok: true,
+          conflicts: [],
+          warnings: [
+            {
+              code: 'M',
+              title: 'Dia com mais de 8 horas de eventos',
+              detail: 'No dia 01/08 a soma dos eventos chega a 10h. Isso não impede o evento.',
+              ref_id: null,
+            },
+          ],
+        },
+      ],
+    });
+    render(
+      <MemoryRouter>
+        <NewSolicitacaoWizard />
+      </MemoryRouter>
+    );
+    await irParaParticipantesESelecionarFormador();
+
+    // A região já está na página, vazia; o texto entra nela quando a checagem responde.
+    const aviso = screen.getByRole('status');
+    await waitFor(() => expect(aviso).toHaveTextContent('Aviso de agenda: isso não impede o evento'));
+    expect(aviso).toHaveTextContent('Bruno Formador');
+    expect(aviso).toHaveTextContent('Dia com mais de 8 horas de eventos');
+    expect(screen.queryByText('Não é possível criar o evento')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Ir para proximo passo/i })).not.toBeDisabled();
+  });
+
   test('checagem falha (500): fail-open — Próximo continua habilitado', async () => {
     checkAvailabilityManyMock.mockRejectedValue(Object.assign(new Error('boom'), { status: 500 }));
     render(

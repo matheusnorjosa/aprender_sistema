@@ -15,7 +15,7 @@ errada e o formador podia ser alocado em dois eventos simultâneos.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from django.db import connection
 
@@ -35,11 +35,12 @@ _LOCK_NAMESPACE = 1452
 
 @dataclass
 class ParticipantConflicts:
-    """Conflitos encontrados para um participante específico."""
+    """Conflitos (barram) e avisos (não barram) de um participante específico."""
 
     usuario_id: int
     usuario_nome: str
     conflicts: list[Conflict]
+    warnings: list[Conflict] = field(default_factory=list)
 
 
 @dataclass
@@ -47,16 +48,19 @@ class GuardResult:
     """
     Resultado da checagem de todos os participantes de uma solicitação.
 
-    ok: True se nenhum participante tem conflito
+    ok: True se nenhum participante tem conflito (aviso não conta)
     blocked: participantes com conflito (vazio se ok)
     skipped_guests: e-mails de convidados externos que não puderam ser checados
     checked_usuario_ids: ids efetivamente checados (já deduplicados)
+    warnings: participantes com aviso (limite diário, RD-05), bloqueados ou não. Nunca
+        muda `ok`: o aviso é devolvido e registrado, não barra.
     """
 
     ok: bool
     blocked: list[ParticipantConflicts]
     skipped_guests: list[str]
     checked_usuario_ids: list[int]
+    warnings: list[ParticipantConflicts] = field(default_factory=list)
 
 
 def _display_name(usuario: Usuario) -> str:
@@ -137,15 +141,18 @@ def check_solicitacao_availability(solicitacao: Solicitacao, *, lock: bool = Tru
 
     A própria solicitação é excluída da checagem (`exclude_solicitacao_id`) — senão um
     evento já gravado conflitaria consigo mesmo. A exclusão acontece na origem da query e
-    não como filtro por `ref_id` depois: o conflito de capacidade diária (M, RD-05) não
+    não como filtro por `ref_id` depois: o aviso de limite diário (M, RD-05) não
     tem `ref_id` e somaria as horas do próprio evento em dobro.
+
+    Só `conflicts` (X, T, P, D) bloqueia. O limite diário vem em `warnings` e é repassado
+    por pessoa, sem bloquear (decisão do dono, 02/10/2026).
 
     Args:
         solicitacao: evento já gravado (precisa de pk, inicio, fim)
         lock: trava os participantes antes de ler. False só para leitura consultiva.
 
     Returns:
-        GuardResult com ok/blocked/skipped_guests
+        GuardResult com ok/blocked/skipped_guests/warnings
     """
     usuarios, skipped_guests = collect_participants(solicitacao)
 
@@ -153,6 +160,7 @@ def check_solicitacao_availability(solicitacao: Solicitacao, *, lock: bool = Tru
         lock_participants([u.id for u in usuarios])
 
     blocked: list[ParticipantConflicts] = []
+    warned: list[ParticipantConflicts] = []
     for usuario in usuarios:
         result = check_conflicts_uncached(
             usuario=usuario,
@@ -161,20 +169,25 @@ def check_solicitacao_availability(solicitacao: Solicitacao, *, lock: bool = Tru
             municipio=solicitacao.municipio,
             exclude_solicitacao_id=solicitacao.pk,
         )
+        if result.ok and not result.warnings:
+            continue
+        participante = ParticipantConflicts(
+            usuario_id=usuario.id,
+            usuario_nome=_display_name(usuario),
+            conflicts=result.conflicts,
+            warnings=result.warnings,
+        )
         if not result.ok:
-            blocked.append(
-                ParticipantConflicts(
-                    usuario_id=usuario.id,
-                    usuario_nome=_display_name(usuario),
-                    conflicts=result.conflicts,
-                )
-            )
+            blocked.append(participante)
+        if result.warnings:
+            warned.append(participante)
 
     return GuardResult(
         ok=not blocked,
         blocked=blocked,
         skipped_guests=skipped_guests,
         checked_usuario_ids=[u.id for u in usuarios],
+        warnings=warned,
     )
 
 
@@ -187,15 +200,15 @@ _ACAO_TEXTO: dict[str, str] = {
 }
 _ACAO_GENERICA = "concluir a ação"
 
-# Motivo em linguagem de quem usa, por código de conflito do motor (X/T/P/D/M). É só
+# Motivo em linguagem de quem usa, por código de conflito do motor (X/T/P/D). É só
 # apresentação: quem decide o conflito continua sendo `check_conflicts_uncached`. Sempre
 # consultado com `.get` — código fora do mapa cai no texto genérico, nunca em KeyError.
+# O limite diário (M) não está aqui: desde 02/10/2026 é aviso e não entra em `conflicts`.
 _MOTIVO_TEXTO: dict[str, str] = {
     "X": "tem outro evento aprovado neste horário",
     "T": "tem bloqueio de agenda no período",
     "P": "tem bloqueio parcial de agenda no período",
     "D": "não tem o intervalo de deslocamento entre cidades",
-    "M": "passa do limite diário de horas",
 }
 _MOTIVO_GENERICO = "tem conflito de agenda"
 # O motor usa o código X também para "Intervalo inválido" (fim <= início): só a
@@ -226,11 +239,15 @@ def raise_if_blocked(guard: GuardResult, *, action: str = "create") -> None:
     """
     Converte um GuardResult bloqueado em 400 `availability_conflict`.
 
-    Conflito é bloqueio duro, sem override: vale para todos os fluxos, inclusive
-    NAO_SUPER (decisão de negócio, 2026-07-16).
+    Conflito (X, T, P, D) é bloqueio duro, sem override: vale para todos os fluxos,
+    inclusive NAO_SUPER (decisão de negócio, 2026-07-16). O limite diário (M) não é
+    conflito: nunca chega aqui sozinho (decisão do dono, 02/10/2026).
 
     O payload mantém `conflicts` achatado como antes do #1452 (clientes existentes leem
-    essa chave) e acrescenta `blocked_participants` com a atribuição por pessoa.
+    essa chave) e acrescenta `blocked_participants` com a atribuição por pessoa. As chaves
+    `warnings` (achatada, de todos os participantes com aviso) e
+    `blocked_participants[].warnings` são aditivas: trazem o que foi calculado e não barra.
+    A mensagem e `conflicts` só falam do que barra.
     """
     if guard.ok:
         return
@@ -241,11 +258,13 @@ def raise_if_blocked(guard: GuardResult, *, action: str = "create") -> None:
         code="availability_conflict",
         extra={
             "conflicts": [c.__dict__ for c in todos],
+            "warnings": [w.__dict__ for p in guard.warnings for w in p.warnings],
             "blocked_participants": [
                 {
                     "usuario_id": p.usuario_id,
                     "usuario_nome": p.usuario_nome,
                     "conflicts": [c.__dict__ for c in p.conflicts],
+                    "warnings": [w.__dict__ for w in p.warnings],
                 }
                 for p in guard.blocked
             ],
@@ -266,7 +285,7 @@ def enforce_solicitacao_availability(solicitacao: Solicitacao, *, action: str) -
             escolhe o verbo da mensagem de bloqueio. Não muda o que é checado nem a decisão.
 
     Returns:
-        GuardResult (ok=True) quando passa
+        GuardResult (ok=True) quando passa; `warnings` traz quem passou do limite diário
 
     Raises:
         ValidationAPIError: `availability_conflict` quando algum participante tem conflito
@@ -283,6 +302,19 @@ def enforce_solicitacao_availability(solicitacao: Solicitacao, *, action: str) -
                 "action": action,
                 "solicitacao_id": solicitacao.pk,
                 "skipped_guests": guard.skipped_guests,
+            },
+        )
+
+    if guard.warnings:
+        # RD-05: o limite diário não barra, mas fica registrado. Só ids, sem nome.
+        logger.info(
+            "availability_warning",
+            extra={
+                "event": "availability_warning",
+                "action": action,
+                "solicitacao_id": solicitacao.pk,
+                "warned_usuario_ids": [p.usuario_id for p in guard.warnings],
+                "codes": sorted({w.code for p in guard.warnings for w in p.warnings}),
             },
         )
 

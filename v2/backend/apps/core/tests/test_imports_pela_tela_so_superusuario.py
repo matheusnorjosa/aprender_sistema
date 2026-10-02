@@ -23,20 +23,28 @@ Endpoints cobertos:
 - POST /api/imports/bloqueios/ (assíncrono, ASQ-005)
 
 Cada perfil é testado contra todos os endpoints; a falha mostra o endpoint no id do parametrize.
-A sentinela no fim cobra que view de upload nova entre aqui.
+A sentinela no fim cobra que view nova que receba arquivo entre aqui (os sinais estão em
+``_recebe_arquivo``).
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportMissingTypeStubs=false, reportUnusedFunction=false
 
 from __future__ import annotations
 
+import inspect
 import io
 import itertools
 
-from django.urls import get_resolver
-from rest_framework.parsers import MultiPartParser
+from django.urls import get_resolver, include, path
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.parsers import FileUploadParser, FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.routers import SimpleRouter
+from rest_framework.serializers import FileField, Serializer
 from rest_framework.test import APIClient
+from rest_framework.views import APIView
+from rest_framework.viewsets import ViewSet
 
 import pytest
 
@@ -181,9 +189,38 @@ def test_superusuario_passa(endpoint: str):
 # ============================================================================
 
 
-def _views_de_upload() -> dict[str, type]:
-    """As views do `/api/` que recebem arquivo (multipart-only) por POST, pela rota."""
-    achadas: dict[str, type] = {}
+_METODOS_DE_ESCRITA = ("post", "put", "patch")
+_PARSERS_DE_ARQUIVO = (MultiPartParser, FileUploadParser)
+
+
+def _recebe_arquivo(rota: str, dono: type, handlers: list, opcoes: dict) -> bool:
+    """A rota recebe arquivo? Basta um sinal; nenhum deles depende do nome da rota, salvo o primeiro.
+
+    1. a rota diz "import";
+    2. parser de arquivo declarado na view ou na `@action` (o padrão do DRF não conta: toda view o tem);
+    3. o código da view (APIView: a classe; `@api_view`: a função; ViewSet: o método da rota) lê `request.FILES`;
+    4. o `serializer_class` tem campo de arquivo.
+
+    Fica de fora a view que entrega `request` a uma função de outro módulo sem nenhum destes sinais.
+    """
+    if "import" in rota:
+        return True
+    parsers = opcoes.get("parser_classes", dono.parser_classes)
+    if list(parsers) != list(APIView.parser_classes) and any(issubclass(p, _PARSERS_DE_ARQUIVO) for p in parsers):
+        return True
+    if any(".FILES" in inspect.getsource(h) for h in handlers):
+        return True
+    serializer = opcoes.get("serializer_class", getattr(dono, "serializer_class", None))
+    return serializer is not None and any(isinstance(c, FileField) for c in serializer().fields.values())
+
+
+def _views_de_upload(padroes=None) -> dict[str, list]:
+    """Rota -> `permission_classes` de cada view do projeto que recebe arquivo por POST/PUT/PATCH.
+
+    Cobre `APIView` (`callback.view_class`) e rota de `ViewSet`, inclusive `@action`
+    (`callback.cls` + `callback.actions`, com as opções da ação em `callback.initkwargs`).
+    """
+    achadas: dict[str, list] = {}
 
     def percorrer(padroes, prefixo: str) -> None:
         for padrao in padroes:
@@ -191,13 +228,25 @@ def _views_de_upload() -> dict[str, type]:
             if hasattr(padrao, "url_patterns"):
                 percorrer(padrao.url_patterns, rota)
                 continue
-            view = getattr(padrao.callback, "view_class", None)
-            if view is None or not hasattr(view, "post"):
-                continue
-            if list(getattr(view, "parser_classes", [])) == [MultiPartParser] or "import" in rota:
-                achadas["/" + rota.replace("api/v1/", "api/", 1)] = view
+            callback = padrao.callback
+            opcoes = getattr(callback, "initkwargs", {})
+            acoes = getattr(callback, "actions", None)
+            if acoes:  # ViewSet: só os métodos que esta rota liga a verbo de escrita
+                dono = callback.cls
+                handlers = [getattr(dono, acoes[m]) for m in _METODOS_DE_ESCRITA if m in acoes]
+            else:
+                dono = getattr(callback, "view_class", None)
+                if dono is None or not issubclass(dono, APIView):
+                    continue
+                metodos = [getattr(dono, m) for m in _METODOS_DE_ESCRITA if hasattr(dono, m)]
+                # `@api_view` gera a classe em tempo de execução: o código é a função embrulhada.
+                funcoes = [inspect.getclosurevars(m).nonlocals.get("func") for m in metodos]
+                handlers = [f for f in funcoes if f] or ([dono] if metodos else [])
+            if handlers and _recebe_arquivo(rota, dono, handlers, opcoes):
+                permissoes = opcoes.get("permission_classes", dono.permission_classes)
+                achadas["/" + rota.replace("api/v1/", "api/", 1)] = list(permissoes)
 
-    percorrer(get_resolver().url_patterns, "")
+    percorrer(get_resolver().url_patterns if padroes is None else padroes, "")
     return achadas
 
 
@@ -205,8 +254,105 @@ def test_sentinela_toda_view_de_upload_de_planilha_exige_superusuario():
     views = _views_de_upload()
 
     assert sorted(views) == sorted(ENDPOINTS_DE_IMPORT), (
-        "Endpoint de importação pela tela novo (ou removido): atualize ENDPOINTS_DE_IMPORT. "
+        "View que recebe arquivo nova (ou removida): atualize ENDPOINTS_DE_IMPORT. "
         "Importação pela tela é só do superusuário (decisão do dono, 02/10/2026)."
     )
-    for rota, view in views.items():
-        assert list(view.permission_classes) == [IsAuthenticated, SuperuserOnly], rota
+    for rota, permissoes in views.items():
+        assert permissoes == [IsAuthenticated, SuperuserOnly], rota
+
+
+# ============================================================================
+# A sentinela enxerga upload novo mesmo sem "import" na rota (prova com rotas de mentira)
+# ============================================================================
+
+
+class _CargaSemImportNaRota(APIView):
+    """Lê o arquivo com os parsers padrão, numa rota que não diz "import"."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        return Response({"nome": request.FILES["file"].name})
+
+
+class _UploadComParserDeArquivo(APIView):
+    """Declara parser de arquivo e delega a leitura (o corpo da view não cita o arquivo)."""
+
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        return Response({})
+
+
+class _CadastroComAcaoDeUpload(ViewSet):
+    permission_classes = [IsAuthenticated]
+
+    def create(self, request):
+        return Response({})
+
+    @action(detail=False, methods=["post"], url_path="enviar-planilha", parser_classes=[MultiPartParser])
+    def enviar_planilha(self, request):
+        return Response({})
+
+    @action(detail=False, methods=["post"], url_path="recalcular")
+    def recalcular(self, request):
+        return Response({})
+
+
+class _ArquivoNoSerializer(Serializer):
+    anexo = FileField()
+
+
+class _UploadPeloSerializer(APIView):
+    """O arquivo entra pelo serializer: sem parser declarado e sem `request.FILES`."""
+
+    permission_classes = [IsAuthenticated]
+    serializer_class = _ArquivoNoSerializer
+
+    def post(self, request):
+        return Response({})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def _carga_por_funcao(request):
+    return Response({"nome": request.FILES["file"].name})
+
+
+class _SoJson(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        return Response({"ok": request.data.get("ok")})
+
+
+def _rotas_de_prova() -> list:
+    router = SimpleRouter()
+    router.register("cadastros", _CadastroComAcaoDeUpload, basename="prova-cadastro")
+    return [
+        path("api/compras/carga-planilha/", _CargaSemImportNaRota.as_view()),
+        path("api/compras/upload/", _UploadComParserDeArquivo.as_view()),
+        path("api/anexos/", _UploadPeloSerializer.as_view()),
+        path("api/carga-por-funcao/", _carga_por_funcao),
+        path("api/so-json/", _SoJson.as_view()),
+        path("api/", include(router.urls)),
+    ]
+
+
+def test_sentinela_enxerga_upload_sem_import_na_rota():
+    achadas = _views_de_upload(_rotas_de_prova())
+
+    assert sorted(achadas) == [
+        "/api/^cadastros/enviar-planilha/$",
+        "/api/anexos/",
+        "/api/carga-por-funcao/",
+        "/api/compras/carga-planilha/",
+        "/api/compras/upload/",
+    ]
+
+
+def test_sentinela_le_a_permissao_da_propria_acao_do_viewset():
+    achadas = _views_de_upload(_rotas_de_prova())
+
+    assert achadas["/api/^cadastros/enviar-planilha/$"] == [IsAuthenticated]

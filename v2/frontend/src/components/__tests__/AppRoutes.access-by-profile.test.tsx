@@ -657,8 +657,9 @@ describe('AppRoutes — sanity da matriz', () => {
 // ============================================================================
 // Antes: `element={user ? <EditSolicitacaoPage /> : <Forbidden />}` — qualquer
 // autenticado abria a tela e falhava no submit (backend IsOwnerOrPrivileged → 403).
-// Depois: gate alinhado ao menu — só canCoordenador (owner plausível) ou
-// canApproveSuper (privilegiado) carregam. Backend segue autoritativo.
+// Depois: gate alinhado ao menu — canCoordenador (owner plausível), canApproveSuper
+// (privilegiado) ou a policy `create_solicitation` (quem cria é dono, e o servidor
+// deixa o dono editar: é o caso do gerente de setor). Backend segue autoritativo.
 describe('AppRoutes — gate de /solicitacoes/:id/editar (Issue #1169)', () => {
   const EDITAR = '/solicitacoes/42/editar';
 
@@ -676,6 +677,32 @@ describe('AppRoutes — gate de /solicitacoes/:id/editar (Issue #1169)', () => {
   test('canApproveSuper → carrega a edição (não Forbidden)', async () => {
     renderRoute(EDITAR, BASE_USER, { ...EMPTY_PERMISSIONS, canApproveSuper: true }, []);
     expect(await screen.findByText('EDIT_PAGE')).toBeInTheDocument();
+  });
+
+  // Mapa de acesso 02/10 (P13): o gerente de setor cria solicitação (policy
+  // create_solicitation) e é dono dela, mas a rota de edição não abria para ele.
+  test('gerente de setor (create_solicitation, sem canCoordenador nem canApproveSuper) → carrega a edição', async () => {
+    const gerente: CurrentUser = { ...BASE_USER, funcoes: ['Gerente'], setores: ['Vidas'] };
+    const permissions = computePermissions(gerente);
+    expect(permissions.canCoordenador).toBe(false);
+    expect(permissions.canApproveSuper).toBe(false);
+
+    renderRoute(EDITAR, gerente, permissions, ['create_solicitation']);
+    expect(await screen.findByText('EDIT_PAGE')).toBeInTheDocument();
+    expect(screen.queryByText(FORBIDDEN_TEXT)).not.toBeInTheDocument();
+  });
+
+  test('Formador sem a policy create_solicitation → Forbidden', async () => {
+    const formador: CurrentUser = { ...BASE_USER, funcoes: ['Formador'], setores: ['Vidas'] };
+    renderRoute(EDITAR, formador, computePermissions(formador), []);
+    expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
+    expect(screen.queryByText('EDIT_PAGE')).not.toBeInTheDocument();
+  });
+
+  test('gestor só por vínculo, sem a policy create_solicitation → Forbidden', async () => {
+    renderRoute(EDITAR, BASE_USER, { ...EMPTY_PERMISSIONS, isGestorPorVinculo: true }, []);
+    expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
+    expect(screen.queryByText('EDIT_PAGE')).not.toBeInTheDocument();
   });
 });
 

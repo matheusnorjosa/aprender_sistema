@@ -1,7 +1,7 @@
 ---
 title: Páginas (React)
 status: canonical
-last_verified: 2026-09-11
+last_verified: 2026-10-02
 verified_at_commit: 0dd1dcb630fdc1cf9b2b488121553e89488dde3c
 sources_of_truth:
   - v2/frontend/src/App.tsx
@@ -154,7 +154,7 @@ Inventário por domínio (rota → componente → guard **como o código aplica 
 | `/solicitacoes/minhas` | `Solicitacoes/MySolicitacoesPage` | policy `create_solicitation` |
 | `/solicitacoes/nova` | `Solicitacoes/NewSolicitacaoWizard` | policy `create_solicitation` |
 | `/solicitacoes/publicacao` | `Solicitacoes/PublicacaoSetorPage` | policy `publish_setor_solicitacao` (#1656) — Apoio de Coordenação publica no Google Agenda os aprovados do próprio setor; `use_gcal` **não** abre esta rota |
-| `/solicitacoes/:id/editar` | `Solicitacoes/EditSolicitacaoPage` | `allow={canCoordenador \|\| canApproveSuper}` (#1169) — **não** é "autenticado". A aprovadora por vínculo abre qualquer uma (ler é global), mas só salva as próprias, as do fluxo SUPER da Superintendência e as das gerências de um 2º vínculo de GERENTE dela; fora disso dá 403 e a tela mostra o `detail` do backend ("A gerência da Superintendência só edita ou exclui solicitações do fluxo SUPER da Superintendência."; sem `detail`, o texto padrão); mover para projeto fora desse alcance dá 400 e a tela mostra o motivo de `errors.projeto`. O seletor de projeto (`/lookup/projetos/`) só oferece esse alcance (regra do dono, 30/09) |
+| `/solicitacoes/:id/editar` | `Solicitacoes/EditSolicitacaoPage` | `allow={canCoordenador \|\| canApproveSuper \|\| access.can('create_solicitation')}` (#1169; policy acrescentada em 2026-10-02) — **não** é "autenticado". Quem tem a policy `create_solicitation` cria e é dono, e o servidor (`IsOwnerOrPrivileged`) deixa o dono editar: sem ela no gate, o gerente de setor criava e caía em "Recurso indisponível" ao clicar em Editar. Resíduo conhecido: o DAT ainda abre a tela por `canCoordenador` e leva 403 ao salvar o que não é dele. A aprovadora por vínculo abre qualquer uma (ler é global), mas só salva as próprias, as do fluxo SUPER da Superintendência e as das gerências de um 2º vínculo de GERENTE dela; fora disso dá 403 e a tela mostra o `detail` do backend ("A gerência da Superintendência só edita ou exclui solicitações do fluxo SUPER da Superintendência."; sem `detail`, o texto padrão); mover para projeto fora desse alcance dá 400 e a tela mostra o motivo de `errors.projeto`. O seletor de projeto (`/lookup/projetos/`) só oferece esse alcance (regra do dono, 30/09) |
 | `/solicitacoes/meus-eventos` | `MeusEventos/MeusEventosPage` | `allow={!!user}` |
 
 ### Aprovações
@@ -270,7 +270,7 @@ páginas fazem, não o que deveriam fazer.
 
 ## Pontos de atenção / dívidas conhecidas
 
-- **Guard duplicado FE/BE.** Os guards `allow=` ainda são reimplementação client-side da matriz RBAC do backend; divergência silenciosa é possível. A matriz viva no backend é o SSOT — qualquer página nova deve casar com a policy/permission do endpoint que consome. Os composites que sobraram sem policy pública são: `/solicitacoes/:id/editar`, `/solicitacoes/disponibilidade`, `/solicitacoes/bloqueios`, `/solicitacoes/deslocamentos`, `/controle/compras`, `/compras-materiais`, `/dat/compras-materiais`.
+- **Guard duplicado FE/BE.** Os guards `allow=` ainda são reimplementação client-side da matriz RBAC do backend; divergência silenciosa é possível. A matriz viva no backend é o SSOT — qualquer página nova deve casar com a policy/permission do endpoint que consome. Os composites que sobraram sem policy pública (ou que só têm a policy como parte do gate, caso de `/solicitacoes/:id/editar`: `create_solicitation` OU flags) são: `/solicitacoes/:id/editar`, `/solicitacoes/disponibilidade`, `/solicitacoes/bloqueios`, `/solicitacoes/deslocamentos`, `/controle/compras`, `/compras-materiais`, `/dat/compras-materiais`.
 - **`usePermissions` é `@deprecated` mas ainda gateia rotas.** O hook declara remoção na onda 4.5 (#1269), e sete rotas dependem dele via `allow=`. Migrar exige criar as policies públicas correspondentes primeiro.
 - **`pages/Solicitacoes.tsx` removido (#1728).** O arquivo raiz (~15 KB) era dead code — **não importado por nenhum módulo**, nenhuma rota o alcançava — e foi removido nesta limpeza. `pages/Disponibilidade.tsx` (também na raiz) **está** roteado; os dois não devem ser tratados como o mesmo caso.
 - **Logout via `window.location.reload()`.** Tech-debt assumido (#927, `App.tsx`, `handleLogout`) — sem auth store centralizado, logout força reload em vez de limpeza de estado.

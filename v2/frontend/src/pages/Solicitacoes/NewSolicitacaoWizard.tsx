@@ -50,7 +50,7 @@ import DateTimeRange from '../../components/DateTimeRange';
 import ComboBox from '../../components/ComboBox';
 import FormadoresPicker from '../../components/FormadoresPicker';
 import CoordenadoresPicker from '../../components/CoordenadoresPicker';
-import AvailabilityConflictAlert from '../../components/AvailabilityConflictAlert';
+import AvailabilityConflictAlert, { AvisosDeAgenda } from '../../components/AvailabilityConflictAlert';
 import logger from '../../utils/logger';
 import type { ID, FluxoType, BlockedParticipant, AvailabilityConflictErrorPayload } from '../../types';
 
@@ -441,7 +441,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   const conflitoAntecipado = preview.status === 'conflito';
 
   // Bloco de UX da checagem (aviso antecipado). Só render — o gate real é o backend.
-  const renderPreviewAviso = (): ReactNode => {
+  const renderPreviewEstado = (): ReactNode => {
     if (preview.status === 'conflito') {
       return <AvailabilityConflictAlert bloqueados={preview.bloqueados} id="preview-conflito" />;
     }
@@ -472,6 +472,17 @@ export default function NewSolicitacaoWizard(): JSX.Element {
     }
     return null;
   };
+
+  // Limite diário (RD-05): só avisa, o botão continua liberado. A região do aviso fica
+  // sempre montada (vazia sem aviso) para o leitor de tela anunciar quando o texto entrar.
+  const avisosDaPrevia =
+    preview.status === 'ok' || preview.status === 'conflito' ? (preview.avisos ?? []) : [];
+  const renderPreviewAviso = (): ReactNode => (
+    <>
+      {renderPreviewEstado()}
+      <AvisosDeAgenda avisos={avisosDaPrevia} />
+    </>
+  );
 
   // Passos do wizard memoizados (Issue #426)
   const steps: StepType[] = useMemo(() => [

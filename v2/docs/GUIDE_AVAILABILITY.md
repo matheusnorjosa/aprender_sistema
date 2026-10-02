@@ -188,7 +188,10 @@ versões atrás.)*
 
 - `POST /api/availability/check/` e `/check-many/` (rotas `availability-check` / `availability-check-many` em `apps/core/urls.py`) — autorização
   por `can_check_availability_for_others` (`views_availability.py`), distinta da regra
-  de leitura acima.
+  de leitura acima. A resposta separa `conflicts` (barra: sobreposição, bloqueio, deslocamento)
+  de `warnings` (só avisa: limite diário). Desde 02/10/2026, por decisão do dono, o limite
+  diário não impede criar, editar nem aprovar evento
+  ([regras-disponibilidade.spec](./specs/domain/regras-disponibilidade.spec.md)).
 
 ## Referências
 

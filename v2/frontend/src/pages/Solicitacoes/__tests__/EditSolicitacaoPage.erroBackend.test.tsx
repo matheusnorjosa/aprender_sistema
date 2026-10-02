@@ -109,16 +109,16 @@ describe('EditSolicitacaoPage — motivo do backend ao recusar o salvar', () => 
   });
 
   test('400 de conflito de agenda mostra a frase do detail, não o e-mail do convidado', async () => {
-    const detail = 'Não é possível salvar a alteração: Bruno Formador passa do limite diário de horas.';
+    const detail = 'Não é possível salvar a alteração: Bruno Formador tem bloqueio de agenda no período.';
     const convidado = 'convidado.externo@example.invalid';
     updateSolicitacaoMock.mockRejectedValue(
       erroDaApi(400, {
         detail,
         code: 'availability_conflict',
         errors: {
-          conflicts: [{ code: 'M', title: 'Capacidade diária excedida', detail: 'x' }],
+          conflicts: [{ code: 'T', title: 'Bloqueio total', detail: 'x' }],
           blocked_participants: [
-            { usuario_id: 7, usuario_nome: 'Bruno Formador', conflicts: [{ code: 'M', title: 'Capacidade diária excedida', detail: 'x' }] },
+            { usuario_id: 7, usuario_nome: 'Bruno Formador', conflicts: [{ code: 'T', title: 'Bloqueio total', detail: 'x' }] },
           ],
           skipped_guests: [convidado],
         },

@@ -13,6 +13,13 @@ import { useAvailabilityPreview, type AvailabilityPreviewInput } from '../useAva
 
 const DEBOUNCE = 400;
 
+const AVISO_M = {
+  code: 'M',
+  title: 'Dia com mais de 8 horas de eventos',
+  detail: 'No dia 01/08 a soma dos eventos chega a 10h. Isso não impede o evento.',
+  ref_id: null,
+};
+
 function baseInput(over: Partial<AvailabilityPreviewInput> = {}): AvailabilityPreviewInput {
   return {
     inicio: '2026-08-01T12:00:00Z',
@@ -110,6 +117,60 @@ describe('useAvailabilityPreview', () => {
     if (result.current.status !== 'conflito') throw new Error(`esperava conflito, veio ${result.current.status}`);
     expect(result.current.bloqueados).toHaveLength(1);
     expect(result.current.bloqueados[0]).toMatchObject({ usuario_id: 99, usuario_nome: 'Bruno Formador' });
+  });
+
+  test('ok com aviso de limite diário: status ok carregando os avisos por pessoa', async () => {
+    checkAvailabilityManyMock.mockResolvedValue({
+      ok: true,
+      results: [
+        { usuario_id: 1, ok: true, conflicts: [], warnings: [] },
+        { usuario_id: 99, ok: true, conflicts: [], warnings: [AVISO_M] },
+      ],
+    });
+    const { result } = renderHook(() => useAvailabilityPreview(baseInput()));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DEBOUNCE);
+    });
+    expect(result.current).toEqual({
+      status: 'ok',
+      avisos: [{ usuario_id: 99, usuario_nome: 'Bruno Formador', warnings: [AVISO_M] }],
+    });
+  });
+
+  test('ok sem aviso (ou backend antigo, sem a chave): continua só { status: ok }', async () => {
+    checkAvailabilityManyMock.mockResolvedValue({
+      ok: true,
+      results: [
+        { usuario_id: 1, ok: true, conflicts: [] },
+        { usuario_id: 99, ok: true, conflicts: [], warnings: [] },
+      ],
+    });
+    const { result } = renderHook(() => useAvailabilityPreview(baseInput()));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DEBOUNCE);
+    });
+    expect(result.current).toEqual({ status: 'ok' });
+  });
+
+  test('conflito com aviso junto: o aviso não vira bloqueio', async () => {
+    checkAvailabilityManyMock.mockResolvedValue({
+      ok: false,
+      results: [
+        {
+          usuario_id: 99,
+          ok: false,
+          conflicts: [{ code: 'X', title: 'Sobreposição', detail: 'evento #5', ref_id: 5 }],
+          warnings: [AVISO_M],
+        },
+      ],
+    });
+    const { result } = renderHook(() => useAvailabilityPreview(baseInput()));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DEBOUNCE);
+    });
+    if (result.current.status !== 'conflito') throw new Error(`esperava conflito, veio ${result.current.status}`);
+    expect(result.current.bloqueados[0]?.conflicts.map((c) => c.code)).toEqual(['X']);
+    expect(result.current.avisos).toEqual([{ usuario_id: 99, usuario_nome: 'Bruno Formador', warnings: [AVISO_M] }]);
   });
 
   test('429 -> indisponivel throttled (fail-open, não bloqueia)', async () => {

@@ -326,7 +326,10 @@ class AvailabilityCheckView(APIView):
 
     @extend_schema(
         summary="Verificar disponibilidade",
-        description="Verifica conflitos de agenda para um formador (RD-01 a RD-08). Retorna se o período está disponível e lista de conflitos.",
+        description=(
+            "Verifica conflitos de agenda para um formador (RD-01 a RD-08). `ok` e `conflicts` trazem o que "
+            "barra (X, T, P, D). `warnings` traz o que só avisa: o limite diário (M) não impede o evento."
+        ),
         parameters=[
             OpenApiParameter("usuario_id", OpenApiTypes.INT, required=True, description="ID do formador"),
             OpenApiParameter("inicio", OpenApiTypes.DATETIME, required=True, description="Data/hora início (ISO8601)"),
@@ -341,7 +344,7 @@ class AvailabilityCheckView(APIView):
         responses={
             200: OpenApiExample(
                 "Resposta",
-                value={"available": True, "conflicts": []},
+                value={"ok": True, "conflicts": [], "warnings": []},
             ),
             400: COMMON_ERROR_RESPONSES[400],
             403: COMMON_ERROR_RESPONSES[403],
@@ -431,6 +434,7 @@ class AvailabilityCheckView(APIView):
             {
                 "ok": result.ok,
                 "conflicts": [c.__dict__ for c in result.conflicts],
+                "warnings": [w.__dict__ for w in result.warnings],
             },
             status=status.HTTP_200_OK,
         )
@@ -446,6 +450,9 @@ class AvailabilityCheckManyView(APIView):
 
     POST /api/availability/check-many/
     Body: {"usuarios_ids": [1, 2], "inicio": "...", "fim": "...", "municipio_id": ...}
+
+    Cada item de `results` traz `ok`, `conflicts` (o que barra) e `warnings` (o que só
+    avisa: limite diário, RD-05). Aviso não muda `ok`.
     """
 
     # Issue #1222 (Epic 1 RBAC Access Policy Realignment): semântica correta
@@ -543,6 +550,7 @@ class AvailabilityCheckManyView(APIView):
                                 "ref_id": None,
                             }
                         ],
+                        "warnings": [],
                     }
                 )
                 all_ok = False
@@ -563,6 +571,7 @@ class AvailabilityCheckManyView(APIView):
                     "usuario_id": usuario_id,
                     "ok": result.ok,
                     "conflicts": [c.__dict__ for c in result.conflicts],
+                    "warnings": [w.__dict__ for w in result.warnings],
                 }
             )
 

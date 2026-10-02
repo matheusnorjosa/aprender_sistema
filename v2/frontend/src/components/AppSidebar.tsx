@@ -418,7 +418,10 @@ export function AppSidebar({
               <SubMenu key="dat-submenu" icon={<SolutionOutlined />} title="DAT">
                 <Menu.Item key="dat-admin"><Link to="/dat/admin">Administração</Link></Menu.Item>
                 <Menu.Item key="dat-cadastros"><Link to="/dat/cadastros">Cadastros</Link></Menu.Item>
-                <Menu.Item key="dat-importacoes"><Link to="/dat/importacoes">Importações</Link></Menu.Item>
+                {/* Importação pela tela: só superusuário (decisão do dono, 02/10/2026). */}
+                {permissions.isAdmin && (
+                  <Menu.Item key="dat-importacoes"><Link to="/dat/importacoes">Importações</Link></Menu.Item>
+                )}
                 <Menu.Item key="dat-registros"><Link to="/dat/registros">Registros de Turmas</Link></Menu.Item>
               </SubMenu>
             )}

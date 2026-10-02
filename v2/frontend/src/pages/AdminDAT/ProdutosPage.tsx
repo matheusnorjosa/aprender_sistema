@@ -26,6 +26,7 @@ import { FalhaAoCarregar } from '../../components/FalhaAoCarregar';
 import { TEXTO_DA_TAG } from '../../components/textoDaTag';
 import { DEFAULT_PAGE_SIZE } from '../../constants';
 import type { ID, Projeto } from '../../types';
+import { aposConfirmacaoFechar, dialogoDeExclusaoEmUso } from './excluirEmUso';
 import { errosDosCampos, mensagemDoErro } from './usuario_form_helpers';
 
 const { Title, Text } = Typography;
@@ -205,6 +206,9 @@ export default function ProdutosPage(): JSX.Element {
   };
 
   const handleDelete = (produto: ProdutoRecord): void => {
+    // 409 (em uso): o diálogo "Não é possível excluir" abre quando este terminar de fechar, ou na hora,
+    // se a pessoa já o fechou com o DELETE em andamento (excluirEmUso.ts).
+    const aposFechar = aposConfirmacaoFechar();
     Modal.confirm({
       title: 'Confirmar exclusão',
       // O nome pode repetir; o código, não.
@@ -220,9 +224,19 @@ export default function ProdutosPage(): JSX.Element {
           message.success('Produto excluido com sucesso');
           void fetchProdutos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
         } catch (error) {
-          message.error(`Erro ao excluir: ${mensagemDoErro(error)}`);
+          const emUso = dialogoDeExclusaoEmUso({
+            erro: error,
+            registro: `o produto "${produto.nome}" (código ${produto.codigo})`,
+            ativo: produto.ativo,
+            desativar: () => updateProduto(produto.id, { ativo: false }),
+            desativado: 'Produto desativado',
+            recarregar: () => void fetchProdutos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE),
+          });
+          if (emUso) aposFechar.abrir(emUso);
+          else message.error(`Erro ao excluir: ${mensagemDoErro(error)}`);
         }
       },
+      afterClose: aposFechar.afterClose,
     });
   };
 

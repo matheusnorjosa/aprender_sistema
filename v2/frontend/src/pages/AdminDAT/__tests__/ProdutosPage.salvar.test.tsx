@@ -302,9 +302,10 @@ describe('ProdutosPage: salvar e filtrar (C2)', () => {
     expect(screen.getByRole('searchbox', { name: 'Buscar produtos por nome ou código' })).toHaveFocus();
   }, 40000);
 
-  test('excluir registro em uso: o motivo do backend (409) no toast', async () => {
+  test('excluir registro em uso (409): o motivo e "Desativar", que grava ativo=false e recarrega a lista (C2b)', async () => {
     const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }));
     const erro = vi.spyOn(message, 'error').mockImplementation(() => (() => undefined) as never);
+    const sucesso = vi.spyOn(message, 'success').mockImplementation(() => (() => undefined) as never);
     const motivo = 'Este registro não pode ser excluído porque está em uso (Compras).';
     vi.mocked(deleteProduto).mockRejectedValue(
       Object.assign(new Error(motivo), { response: { status: 409, data: { detail: motivo, code: 'CONFLICT' } } }),
@@ -315,9 +316,25 @@ describe('ProdutosPage: salvar e filtrar (C2)', () => {
     const nome = await screen.findByText(PRODUTO.nome, { selector: 'td, td *' }, { timeout: 15000 });
     await user.click(within(nome.closest<HTMLElement>('tr')!).getByRole('button', { name: `Excluir: ${PRODUTO.nome}` }));
     await confirmar.mock.calls[0]![0].onOk!();
+    // O diálogo do 409 só abre quando a confirmação termina de fechar: um por vez, sem perder o foco.
+    expect(confirmar).toHaveBeenCalledTimes(1);
+    confirmar.mock.calls[0]![0].afterClose!();
 
-    expect(erro).toHaveBeenCalledWith(`Erro ao excluir: ${motivo}`);
+    expect(erro).not.toHaveBeenCalled();
+    expect(confirmar).toHaveBeenCalledTimes(2);
+    const emUso = confirmar.mock.calls[1]![0];
+    expect(String(emUso.content)).toContain(motivo);
+    // O nome pode repetir; o código, não.
+    expect(String(emUso.content)).toContain(`Você pode desativar o produto "${PRODUTO.nome}" (código ${PRODUTO.codigo})`);
+    expect(emUso.okText).toBe('Desativar');
+    const cargas = vi.mocked(listProdutos).mock.calls.length;
+    await emUso.onOk!();
+
+    expect(updateProduto).toHaveBeenCalledWith(PRODUTO.id, { ativo: false });
+    expect(sucesso).toHaveBeenCalledWith('Produto desativado');
+    await waitFor(() => expect(listProdutos).toHaveBeenCalledTimes(cargas + 1));
     confirmar.mockRestore();
     erro.mockRestore();
+    sucesso.mockRestore();
   }, 30000);
 });

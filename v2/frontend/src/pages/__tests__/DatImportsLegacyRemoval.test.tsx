@@ -154,12 +154,14 @@ describe('DAT Imports PR-D — remoção de entrypoints legados', () => {
     }));
   });
 
-  test('ControlePage (hub Painel de Controle): sem cards de importação, exibe banner', async () => {
+  test('ControlePage (hub Painel de Controle): sem cards de importação nem aviso para quem não é superusuário', async () => {
     renderPage(<ControlePage />);
 
     // #1984: /controle virou hub — heading "Painel de Controle" (não mais "Controle" + lista de compras).
     expect(screen.getByRole('heading', { name: 'Painel de Controle' })).toBeInTheDocument();
-    expect(await screen.findByLabelText(DAT_IMPORTS_CENTRALIZED_MESSAGE)).toBeInTheDocument();
+    // Controle não é superusuário: o aviso de DAT > Importações não aparece (02/10/2026).
+    await waitFor(() => expect(getMe).toHaveBeenCalled());
+    expect(screen.queryByLabelText(DAT_IMPORTS_CENTRALIZED_MESSAGE)).not.toBeInTheDocument();
     // Invariante PR-D preservado: nenhum entrypoint de import legado.
     expectLegacyImportsRemoved();
     expect(screen.queryByRole('link', { name: 'DAT > Importações' })).not.toBeInTheDocument();
@@ -171,7 +173,9 @@ describe('DAT Imports PR-D — remoção de entrypoints legados', () => {
     expect(screen.getByRole('heading', { name: /Gestão de Compras\/Materiais/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Nova Compra/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Exportar/i })).toBeInTheDocument();
-    expect(await screen.findByLabelText(DAT_IMPORTS_CENTRALIZED_MESSAGE)).toBeInTheDocument();
+    // Controle não é superusuário: o aviso de DAT > Importações não aparece (02/10/2026).
+    await waitFor(() => expect(getMe).toHaveBeenCalled());
+    expect(screen.queryByLabelText(DAT_IMPORTS_CENTRALIZED_MESSAGE)).not.toBeInTheDocument();
     expectLegacyImportsRemoved();
     expect(screen.queryByRole('button', { name: /^Importar$/i })).not.toBeInTheDocument();
   }, 15_000);
@@ -182,7 +186,9 @@ describe('DAT Imports PR-D — remoção de entrypoints legados', () => {
     expect(screen.getByRole('heading', { name: /Gerenciar Disponibilidade/i })).toBeInTheDocument();
     expect(screen.getByText('Criar Bloqueio')).toBeInTheDocument();
     expect(screen.getByText('Meus Bloqueios')).toBeInTheDocument();
-    expect(await screen.findByLabelText(DAT_IMPORTS_CENTRALIZED_MESSAGE)).toBeInTheDocument();
+    // Controle não é superusuário: o aviso de DAT > Importações não aparece (02/10/2026).
+    await waitFor(() => expect(getMe).toHaveBeenCalled());
+    expect(screen.queryByLabelText(DAT_IMPORTS_CENTRALIZED_MESSAGE)).not.toBeInTheDocument();
     expectLegacyImportsRemoved();
     expect(screen.queryByRole('button', { name: /^Importar$/i })).not.toBeInTheDocument();
   });
@@ -193,7 +199,9 @@ describe('DAT Imports PR-D — remoção de entrypoints legados', () => {
     expect(await screen.findByRole('heading', { name: /Deslocamentos/i })).toBeInTheDocument();
     expect(screen.getByText('Filtros')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Novo Deslocamento/i })).toBeInTheDocument();
-    expect(await screen.findByLabelText(DAT_IMPORTS_CENTRALIZED_MESSAGE)).toBeInTheDocument();
+    // Controle não é superusuário: o aviso de DAT > Importações não aparece (02/10/2026).
+    await waitFor(() => expect(getMe).toHaveBeenCalled());
+    expect(screen.queryByLabelText(DAT_IMPORTS_CENTRALIZED_MESSAGE)).not.toBeInTheDocument();
     expectLegacyImportsRemoved();
     expect(screen.queryByRole('button', { name: /^Importar$/i })).not.toBeInTheDocument();
 

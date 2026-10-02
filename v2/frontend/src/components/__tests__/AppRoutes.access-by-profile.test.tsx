@@ -287,7 +287,7 @@ const ACTORS: ActorSnapshot[] = [
       '/solicitacoes/deslocamentos': true, // canDAT
       '/controle': false, // canControle=false
       '/dat/admin': true,
-      '/dat/importacoes': true,
+      '/dat/importacoes': false, // importação pela tela: só superusuário (02/10/2026)
     },
   },
   {
@@ -555,6 +555,28 @@ describe('AppRoutes — gates de rota por perfil canônico', () => {
       }
     });
   }
+});
+
+// ============================================================================
+// Importação pela tela: só superusuário (decisão do dono, 02/10/2026)
+// ============================================================================
+
+describe('AppRoutes — telas de importação só abrem para superusuário', () => {
+  const ROTAS_DE_IMPORTACAO = ['/dat/importacoes', '/dat/importacao', '/dat/admin/colecoes', '/dat/admin/equipe-gerencia'];
+  const ator = (nome: string): ActorSnapshot => ACTORS.find((a) => a.actor === nome)!;
+
+  test.each(ROTAS_DE_IMPORTACAO)('DAT (manage_admin_registries, import_*) em %s → Recurso indisponível', async (rota) => {
+    const dat = ator('DAT');
+    renderRoute(rota, BASE_USER, dat.permissions, dat.policies);
+    expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
+  });
+
+  test.each(ROTAS_DE_IMPORTACAO)('Superusuário em %s → abre a tela', async (rota) => {
+    const su = ator('Superuser');
+    renderRoute(rota, { ...BASE_USER, is_superuser: true }, su.permissions, su.policies);
+    expect((await screen.findAllByText(/Importa/, {}, { timeout: 15000 })).length).toBeGreaterThan(0);
+    expect(screen.queryByText(FORBIDDEN_TEXT)).not.toBeInTheDocument();
+  });
 });
 
 // ============================================================================

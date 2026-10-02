@@ -31,7 +31,7 @@ IMPORT_DESLOCAMENTOS_URL = "/api/deslocamentos/import/"
 
 @pytest.fixture
 def dat_import_user(db):
-    """Usuario do grupo DAT (PR-A1 DAT-Imports: detentor de import_spreadsheet)."""
+    """Usuario do grupo DAT: tem `import_spreadsheet`, mas não importa pela tela (403)."""
     user = UsuarioFactory(
         username="dat_import_user",
         email="dat_imports@test.com",
@@ -43,6 +43,12 @@ def dat_import_user(db):
     group = GroupFactory(name="DAT")
     user.groups.add(group)
     return user
+
+
+@pytest.fixture
+def superuser(db):
+    """Superusuário: o único que importa pela tela (decisão do dono, 02/10/2026)."""
+    return UsuarioFactory(superuser=True)
 
 
 @pytest.fixture
@@ -267,8 +273,8 @@ class TestImportDeslocamentosView:
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_dat_import_user_can_import(self, api_client, dat_import_user, sample_csv, target_user):
-        """Usuario Controle pode importar."""
+    def test_dat_recebe_403(self, api_client, dat_import_user, sample_csv, target_user):
+        """Importação pela tela é só do superusuário (decisão do dono, 02/10/2026): 403."""
         api_client.force_authenticate(user=dat_import_user)
 
         with open(sample_csv, "rb") as f:
@@ -278,13 +284,11 @@ class TestImportDeslocamentosView:
                 format="multipart",
             )
 
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["dry_run"] is True
-        assert response.data["stats"]["created"] == 2
+        assert response.status_code == 403
 
-    def test_apply_mode_persists(self, api_client, dat_import_user, sample_csv, target_user):
+    def test_apply_mode_persists(self, api_client, superuser, sample_csv, target_user):
         """dry_run=false persiste os dados."""
-        api_client.force_authenticate(user=dat_import_user)
+        api_client.force_authenticate(user=superuser)
 
         with open(sample_csv, "rb") as f:
             response = api_client.post(
@@ -297,9 +301,9 @@ class TestImportDeslocamentosView:
         assert response.data["dry_run"] is False
         assert Deslocamento.objects.count() == 2
 
-    def test_missing_file_returns_400(self, api_client, dat_import_user):
+    def test_missing_file_returns_400(self, api_client, superuser):
         """Arquivo ausente retorna 400."""
-        api_client.force_authenticate(user=dat_import_user)
+        api_client.force_authenticate(user=superuser)
 
         response = api_client.post(
             IMPORT_DESLOCAMENTOS_URL,
@@ -310,11 +314,11 @@ class TestImportDeslocamentosView:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "file" in response.data["detail"].lower()
 
-    def test_invalid_mime_type_returns_400(self, api_client, dat_import_user):
+    def test_invalid_mime_type_returns_400(self, api_client, superuser):
         """Tipo de arquivo invalido retorna 400."""
         from django.core.files.uploadedfile import SimpleUploadedFile
 
-        api_client.force_authenticate(user=dat_import_user)
+        api_client.force_authenticate(user=superuser)
 
         # Usar MIME type explicitamente inválido (não text/plain, pois CSVs podem ser text/plain)
         fake_file = SimpleUploadedFile("malicious.exe", b"MZ\x90\x00", content_type="application/x-msdownload")

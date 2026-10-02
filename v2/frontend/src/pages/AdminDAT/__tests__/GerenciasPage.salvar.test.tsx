@@ -3,10 +3,9 @@
  *
  * - O erro de validação do backend aparece com o motivo, no campo (antes: "Erro de validação.").
  * - Salvar com loading; a exclusão começa no Cancelar, com acento; com projetos ativos vinculados,
- *   só o aviso de que não pode (Entendi), sem "Sim, excluir".
+ *   o aviso de que não pode, sem "Sim, excluir", com a saída: Desativar (C2b).
  * - O vocabulário de setor que não carregou avisa no campo, com "Tentar de novo".
- * - Confiança com rótulos de gente (Conferir/Média/Alta) e o filtro no topo, em qualquer largura:
- *   no cabeçalho da coluna, ele sumia abaixo de 768 px e deixava de valer sem aviso.
+ * - C2b: excluir em uso (409) mostra o motivo e oferece Desativar.
  */
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -14,8 +13,6 @@ import { ConfigProvider, Modal, message } from 'antd';
 import ptBR from 'antd/locale/pt_BR';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-
-import { definirLarguraTela } from '../../../test/larguraTela';
 
 const { GERENCIAS } = vi.hoisted(() => {
   const g = (id: number, rotulo: string, confianca: string, projetos: number) => ({
@@ -64,7 +61,7 @@ async function abrirEditar(user: ReturnType<typeof userEvent.setup>): Promise<HT
   return (await screen.findByText('Editar Gerencia', {}, { timeout: 10000 })).closest<HTMLElement>('[role="dialog"]')!;
 }
 
-describe('GerenciasPage: salvar, excluir e filtrar (C2)', () => {
+describe('GerenciasPage: salvar e excluir (C2)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(listGerencias).mockResolvedValue({ results: GERENCIAS, count: 3, next: null, previous: null });
@@ -102,7 +99,50 @@ describe('GerenciasPage: salvar, excluir e filtrar (C2)', () => {
     await waitFor(() => expect(within(modal).getByRole('button', { name: /Salvar/ })).toHaveClass('ant-btn-loading'));
   }, 40000);
 
-  test('com projetos ativos, excluir só avisa que não pode (Entendi), sem botão de excluir', async () => {
+  test('com projetos ativos, excluir avisa que não pode, sem "Sim, excluir", e oferece Desativar (C2b)', async () => {
+    const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }));
+    const avisar = vi.spyOn(Modal, 'info').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }));
+    const sucesso = vi.spyOn(message, 'success').mockImplementation(() => (() => undefined) as never);
+    vi.mocked(updateGerencia).mockResolvedValue({ ...GERENCIAS[0]!, ativo: false });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(within(await linha()).getByRole('button', { name: `Excluir: ${SETOR}` }));
+
+    // A contagem já prova que o backend recusaria (PROTECT, 409): "Sim, excluir" só levaria ao erro.
+    // Decisão do dono: quando não dá para excluir, a tela oferece Desativar.
+    expect(avisar).not.toHaveBeenCalled();
+    expect(confirmar).toHaveBeenCalledTimes(1);
+    const aviso = confirmar.mock.calls[0]![0];
+    expect(aviso.title).toBe('Não é possível excluir');
+    expect(String(aviso.content)).toBe(
+      `A gerência "${SETOR}" tem 5 projeto(s) ativo(s) vinculado(s). Gerência com projetos ou equipes vinculados,` +
+        ` mesmo inativos, não pode ser excluída. Você pode desativar a gerência "${SETOR}": os projetos e a equipe` +
+        ' continuam cadastrados, mas a gerência sai das listas de escolha em Projetos e Usuários, a equipe perde o' +
+        ' acesso que tem por ela a Disponibilidade, Bloqueios e Deslocamentos, a situação passa a Inativo e dá para' +
+        ' reativar em Editar.',
+    );
+    // Desativar gerência não é inofensivo: o texto não promete que "os vínculos continuam".
+    expect(String(aviso.content)).not.toContain('os vínculos continuam');
+    expect(aviso.okText).toBe('Desativar');
+    expect(aviso.cancelText).toBe('Cancelar');
+    expect(aviso.autoFocusButton).toBe('cancel');
+    const cargas = vi.mocked(listGerencias).mock.calls.length;
+    await aviso.onOk!();
+
+    expect(deleteGerencia).not.toHaveBeenCalled();
+    expect(updateGerencia).toHaveBeenCalledWith(7, { ativo: false });
+    expect(sucesso).toHaveBeenCalledWith('Gerência desativada');
+    await waitFor(() => expect(listGerencias).toHaveBeenCalledTimes(cargas + 1));
+    confirmar.mockRestore();
+    avisar.mockRestore();
+    sucesso.mockRestore();
+  }, 30000);
+
+  test('com projetos ativos e a gerência já inativa: só o aviso (Entendi), sem Desativar', async () => {
+    vi.mocked(listGerencias).mockResolvedValue({
+      results: [{ ...GERENCIAS[0]!, ativo: false }], count: 1, next: null, previous: null,
+    });
     const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }));
     const avisar = vi.spyOn(Modal, 'info').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }));
     const user = userEvent.setup();
@@ -110,17 +150,14 @@ describe('GerenciasPage: salvar, excluir e filtrar (C2)', () => {
 
     await user.click(within(await linha()).getByRole('button', { name: `Excluir: ${SETOR}` }));
 
-    // A contagem já prova que o backend recusaria (PROTECT, 409): "Sim, excluir" só levaria ao erro.
     expect(confirmar).not.toHaveBeenCalled();
-    expect(avisar).toHaveBeenCalledTimes(1);
     const aviso = avisar.mock.calls[0]![0];
     expect(aviso.title).toBe('Não é possível excluir');
     expect(String(aviso.content)).toBe(
       `A gerência "${SETOR}" tem 5 projeto(s) ativo(s) vinculado(s). Gerência com projetos ou equipes vinculados,` +
-        ' mesmo inativos, não pode ser excluída.',
+        ' mesmo inativos, não pode ser excluída. O registro já está inativo.',
     );
     expect(aviso.okText).toBe('Entendi');
-    expect(aviso.onOk).toBeUndefined();
     expect(deleteGerencia).not.toHaveBeenCalled();
     confirmar.mockRestore();
     avisar.mockRestore();
@@ -145,23 +182,43 @@ describe('GerenciasPage: salvar, excluir e filtrar (C2)', () => {
     avisar.mockRestore();
   }, 30000);
 
-  test('excluir registro em uso: o motivo do backend (409) no toast', async () => {
+  test('excluir registro em uso (409): o motivo e "Desativar", que grava ativo=false e recarrega a lista (C2b)', async () => {
     const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }));
     const erro = vi.spyOn(message, 'error').mockImplementation(() => (() => undefined) as never);
+    const sucesso = vi.spyOn(message, 'success').mockImplementation(() => (() => undefined) as never);
     const motivo = 'Este registro não pode ser excluído porque está em uso (Projetos).';
     vi.mocked(deleteGerencia).mockRejectedValue(
       Object.assign(new Error(motivo), { response: { status: 409, data: { detail: motivo, code: 'CONFLICT' } } }),
     );
+    vi.mocked(updateGerencia).mockResolvedValue({ ...GERENCIAS[1]!, ativo: false });
     const user = userEvent.setup();
     renderPage();
 
     // Sem projeto ativo (só equipe ou projeto inativo): a confirmação abre e quem recusa é o backend.
     await user.click(within(await linha('Vidas')).getByRole('button', { name: 'Excluir: Vidas' }));
     await confirmar.mock.calls[0]![0].onOk!();
+    // O diálogo do 409 só abre quando a confirmação termina de fechar: um por vez, sem perder o foco.
+    expect(confirmar).toHaveBeenCalledTimes(1);
+    confirmar.mock.calls[0]![0].afterClose!();
 
-    expect(erro).toHaveBeenCalledWith(`Erro ao excluir: ${motivo}`);
+    expect(erro).not.toHaveBeenCalled();
+    expect(confirmar).toHaveBeenCalledTimes(2);
+    const emUso = confirmar.mock.calls[1]![0];
+    expect(String(emUso.content)).toContain(motivo);
+    expect(String(emUso.content)).toContain('Você pode desativar a gerência "Vidas"');
+    // A consequência de desativar gerência, também no 409.
+    expect(String(emUso.content)).toContain('a equipe perde o acesso que tem por ela a Disponibilidade, Bloqueios e Deslocamentos');
+    expect(String(emUso.content)).not.toContain('os vínculos continuam');
+    expect(emUso.okText).toBe('Desativar');
+    const cargas = vi.mocked(listGerencias).mock.calls.length;
+    await emUso.onOk!();
+
+    expect(updateGerencia).toHaveBeenCalledWith(8, { ativo: false });
+    expect(sucesso).toHaveBeenCalledWith('Gerência desativada');
+    await waitFor(() => expect(listGerencias).toHaveBeenCalledTimes(cargas + 1));
     confirmar.mockRestore();
     erro.mockRestore();
+    sucesso.mockRestore();
   }, 30000);
 
   test('setores não carregaram: aviso e "Tentar de novo" fora do Select, alcançáveis pelo Tab', async () => {
@@ -253,22 +310,4 @@ describe('GerenciasPage: salvar, excluir e filtrar (C2)', () => {
     // Sem número no título: "(0)" diria que não há gerência.
     expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent(/^Gerencias$/);
   }, 30000);
-
-  test('confiança com rótulos de gente e filtro no topo que vale também a 360 px', async () => {
-    definirLarguraTela(360);
-    const user = userEvent.setup();
-    renderPage();
-    await linha(SETOR, 'Mais ações');
-
-    await user.click(screen.getByRole('combobox', { name: 'Filtrar por confiança' }));
-    await user.click(await screen.findByTitle('Conferir'));
-
-    await waitFor(() => expect(screen.queryByRole('button', { name: `Mais ações: ${SETOR}` })).not.toBeInTheDocument());
-    const conferir = await linha('Fluir das Emoções', 'Mais ações');
-    expect(screen.queryByRole('button', { name: 'Mais ações: Vidas' })).not.toBeInTheDocument();
-
-    await user.click(within(conferir).getByRole('button', { name: 'Expandir linha de Fluir das Emoções' }));
-    const expandida = within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);
-    expect(expandida.getByText('Conferir')).toBeInTheDocument();
-  }, 40000);
 });

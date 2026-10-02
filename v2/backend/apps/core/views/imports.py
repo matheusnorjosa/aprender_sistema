@@ -10,7 +10,7 @@ Endpoints:
     GET    /api/imports/             — lista jobs do usuario (filtros: type, status)
 
 Seguranca:
-    - Upload: IsAuthenticated + HasPerm("import_spreadsheet") + validate_upload (magic bytes)
+    - Upload: IsAuthenticated + SuperuserOnly + validate_upload (magic bytes)
     - Leitura: IsAuthenticated + filtro por owner (ou super) no queryset
     - error_traceback NAO e exposto (debug-only, fica em logs)
 """
@@ -35,7 +35,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 from apps.core.api_schemas import COMMON_ERROR_RESPONSES
 from apps.core.imports.request_params import parse_dry_run
 from apps.core.models import ImportJob
-from apps.core.rbac.policies import CanImportGenericSpreadsheet
+from apps.core.permissions import SuperuserOnly
 from apps.core.serializers.import_job import ImportJobSerializer, ImportJobUploadRequestSerializer
 from apps.core.serializers.openapi_critical_contract import ImportOperationErrorResponseSerializer
 from apps.core.upload_validators import validate_upload
@@ -66,8 +66,8 @@ class ImportJobBloqueiosUploadView(APIView):
         ImportJobSerializer do job recem criado (status=QUEUED).
     """
 
-    # Issue #1222 (Epic 1): import operacional aceita Controle (run_daily_operations) ou DAT (import_spreadsheet)
-    permission_classes = [IsAuthenticated, CanImportGenericSpreadsheet]
+    # Decisão do dono (02/10/2026): importação pela tela é só do superusuário.
+    permission_classes = [IsAuthenticated, SuperuserOnly]
     throttle_scope = "import"
 
     @extend_schema(

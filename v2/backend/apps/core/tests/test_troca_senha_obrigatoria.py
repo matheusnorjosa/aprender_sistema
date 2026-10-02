@@ -23,6 +23,7 @@ from rest_framework.test import APIClient
 import pytest
 
 from apps.core.middleware import ROTAS_LIBERADAS_NA_TROCA_DE_SENHA, TrocaDeSenhaObrigatoriaMiddleware
+from apps.core.models import AuditLog
 from apps.core.tests.factories import UsuarioFactory
 
 pytestmark = pytest.mark.django_db
@@ -211,3 +212,115 @@ def test_lista_liberada_e_exatamente_me_csrf_troca_e_sair():
             ("core:auth-logout", "POST"),
         }
     )
+
+
+# ---------------------------------------------------------------------------
+# A troca: desliga a marca, mantém a sessão e fica na trilha
+# ---------------------------------------------------------------------------
+
+TROCA = "/api/me/change-password/"
+SENHA_NOVA = "Girassol#Azul77"
+
+
+def test_troca_desliga_a_marca_mantem_a_sessao_e_audita(settings):
+    user = _marcado(username="52998224725", cpf="52998224725")
+    client = APIClient()
+    entrada = client.post("/api/auth/login/", {"username": "52998224725", "password": SENHA_RECEBIDA}, format="json")
+    assert entrada.status_code == 200
+    sessao_antes = client.cookies[settings.SESSION_COOKIE_NAME].value
+    assert _bloqueada(client.get("/api/solicitacoes/"))
+
+    resp = client.post(TROCA, {"old_password": SENHA_RECEBIDA, "new_password": SENHA_NOVA}, format="json")
+
+    assert resp.status_code == 200
+    user.refresh_from_db()
+    assert user.deve_trocar_senha is False
+    assert user.check_password(SENHA_NOVA)
+    # A chave da sessão é renovada e a pessoa continua dentro, sem novo login.
+    assert client.cookies[settings.SESSION_COOKIE_NAME].value != sessao_antes
+    depois = client.get("/api/me/")
+    assert depois.status_code == 200
+    assert depois.json()["deve_trocar_senha"] is False
+    assert client.get("/api/me/policies/").status_code == 200
+
+    audit = AuditLog.objects.filter(usuario=user, action=AuditLog.Action.CHANGE_PASSWORD).get()
+    assert audit.details["primeiro_acesso"] is True
+    assert SENHA_NOVA not in str(audit.details)
+    assert SENHA_RECEBIDA not in str(audit.details)
+
+
+def test_nova_igual_a_recebida_e_recusada_e_a_marca_continua():
+    user = _marcado()
+    client = _logado(user)
+
+    resp = client.post(TROCA, {"old_password": SENHA_RECEBIDA, "new_password": SENHA_RECEBIDA}, format="json")
+
+    assert resp.status_code == 400
+    assert "new_password" in resp.json()["errors"]
+    user.refresh_from_db()
+    assert user.deve_trocar_senha is True
+    assert _bloqueada(client.get("/api/solicitacoes/"))
+
+
+def test_senha_fraca_nao_desliga_a_marca():
+    user = _marcado()
+    client = _logado(user)
+
+    resp = client.post(TROCA, {"old_password": SENHA_RECEBIDA, "new_password": "12345678"}, format="json")
+
+    assert resp.status_code == 400
+    assert "new_password" in resp.json()["errors"]
+    user.refresh_from_db()
+    assert user.deve_trocar_senha is True
+    assert user.check_password(SENHA_RECEBIDA)
+
+
+@pytest.mark.parametrize(
+    ("parecida_com", "senha_nova"),
+    [
+        ("nome", "marcolina77"),
+        ("sobrenome", "Albuquerque#1"),
+        ("e-mail", "marcolina.teste9"),
+        ("CPF", "52998224725ab"),
+    ],
+)
+def test_senha_parecida_com_os_dados_da_pessoa_e_recusada(parecida_com, senha_nova):
+    """A tela promete a regra de semelhança com nome, CPF e e-mail: o servidor cumpre."""
+    user = _marcado(
+        username="conta.ficticia",  # diferente do CPF: prova que o CPF entra por conta própria
+        cpf="52998224725",
+        first_name="Marcolina",
+        last_name="Albuquerque",
+        email="marcolina.teste@example.invalid",
+    )
+    client = _logado(user)
+
+    resp = client.post(TROCA, {"old_password": SENHA_RECEBIDA, "new_password": senha_nova}, format="json")
+
+    assert resp.status_code == 400, parecida_com
+    assert "new_password" in resp.json()["errors"]
+    user.refresh_from_db()
+    assert user.deve_trocar_senha is True
+    assert user.check_password(SENHA_RECEBIDA)
+
+
+def test_marca_nao_sai_por_escrita_direta_no_me():
+    user = _marcado()
+    client = _logado(user)
+
+    resp = client.patch("/api/me/", {"deve_trocar_senha": False, "telefone": "85900000000"}, format="json")
+
+    assert _bloqueada(resp)
+    user.refresh_from_db()
+    assert user.deve_trocar_senha is True
+
+
+def test_pessoa_sem_a_marca_nao_consegue_ligar_pelo_me():
+    user = UsuarioFactory()
+    client = _logado(user)
+
+    resp = client.patch("/api/me/", {"deve_trocar_senha": True, "telefone": "85900000000"}, format="json")
+
+    assert resp.status_code == 200
+    user.refresh_from_db()
+    assert user.deve_trocar_senha is False

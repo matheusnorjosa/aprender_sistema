@@ -357,6 +357,9 @@ SESSION_COOKIE_SECURE = False if ENVIRONMENT == "development" else True  # HTTPS
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+        # Padrão do Django + `cpf`: a senha não pode parecer com o CPF mesmo quando o
+        # username não é o CPF.
+        "OPTIONS": {"user_attributes": ("username", "first_name", "last_name", "email", "cpf")},
     },
     {
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",

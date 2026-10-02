@@ -119,6 +119,34 @@ def test_availability_check_cached(clear_cache, usuario_formador, municipio):
 
 
 @pytest.mark.django_db
+def test_resultado_guardado_na_chave_antiga_nao_e_lido(clear_cache, usuario_formador, municipio):
+    """
+    O resultado ganhou `warnings` (limite diário como aviso, 02/10/2026). Um objeto guardado
+    antes do deploy não tem esse campo e quebraria a leitura por até 5 min: a chave mudou de
+    versão (`availability_check:v2:`), então o que está na chave antiga nunca é servido.
+    """
+    inicio = timezone.now()
+    fim = inicio + timedelta(hours=2)
+    lidas: list[str] = []
+
+    def get_com_chave_antiga_povoada(key, *args, **kwargs):
+        lidas.append(key)
+        if key.startswith("availability_check:") and not key.startswith("availability_check:v2:"):
+            return "OBJETO_ANTIGO_SEM_WARNINGS"
+        return None
+
+    with patch("apps.core.utils.cache_utils.cache") as cache_mock:
+        cache_mock.get.side_effect = get_com_chave_antiga_povoada
+        result = check_conflicts(usuario=usuario_formador, inicio=inicio, fim=fim, municipio=municipio)
+
+    assert result != "OBJETO_ANTIGO_SEM_WARNINGS"
+    assert result.warnings == []
+    assert any(key.startswith("availability_check:v2:") for key in lidas)
+    (gravada,) = [c.args[0] for c in cache_mock.set.call_args_list]
+    assert gravada.startswith("availability_check:v2:")
+
+
+@pytest.mark.django_db
 def test_cache_invalidated_on_solicitacao_create(clear_cache, usuario_formador, municipio, projeto_super, tipo_evento):
     """
     Test: Cache é invalidado ao criar Solicitacao.

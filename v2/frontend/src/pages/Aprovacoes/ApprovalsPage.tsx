@@ -3,9 +3,14 @@
  *
  * Features:
  * - Filtra solicitações pendentes do fluxo SUPER
+ * - Paginação no servidor (20, 50 ou 100 por página), do evento mais próximo de hoje
+ *   para o mais distante e depois os passados (`ordering=proximidade`); a seleção em
+ *   lote vale para a página visível
  * - Botões para preview, aprovar e reprovar
  * - Modal para preview de payload JSON
  * - Confirmação simples para reprovação (sem justificativa obrigatória)
+ * - Erro ao aprovar diz quem está bloqueado e por quê; no lote, a tela lista o evento e o
+ *   motivo de cada item que não foi decidido
  *
  * PA-06 (Política de Aprovação Manual):
  * - Botões de aprovar/reprovar aparecem para quem tem a policy `access_solicitation_approvals`:
@@ -18,6 +23,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, ChangeEvent, Key, JSX } from 'react';
 import {
+  Alert,
   Table,
   Card,
   Input,
@@ -63,7 +69,16 @@ import { usePolling } from '../../hooks/usePolling';
 import { syncChannel } from '../../services/syncChannel';
 import { formatFortaleza, FORTALEZA_TZ } from '../../utils/datetime';
 import logger from '../../utils/logger';
-import type { CurrentUser, ID, Solicitacao, SolicitacaoStatus, PaginatedResponse, Participation } from '../../types';
+import type {
+  BatchOperationResult,
+  BlockedParticipant,
+  CurrentUser,
+  ID,
+  Solicitacao,
+  SolicitacaoStatus,
+  Participation,
+} from '../../types';
+import { ListaDeBloqueados } from '../../components/AvailabilityConflictAlert';
 import { formadoresLabel } from '../../utils/participants';
 
 const { Title, Paragraph, Text } = Typography;
@@ -81,6 +96,23 @@ const STATUS_LABELS: Record<SolicitacaoStatus, string> = {
   aprovado: 'Aprovado',
   reprovado: 'Reprovado',
 };
+
+/** Tamanhos de página: o maior é o limite do lote no servidor (100 ids por requisição). */
+const PAGE_SIZE_OPTIONS = [20, 50, 100];
+const DEFAULT_PAGE_SIZE = 20;
+
+/** Corpo do erro 400 da aprovação; no conflito de agenda traz quem está bloqueado. */
+interface ConflictErrorData {
+  code?: string;
+  detail?: string;
+  errors?: { blocked_participants?: BlockedParticipant[] };
+}
+
+/** Itens que um lote não decidiu, já com o rótulo do evento para a pessoa reconhecer. */
+interface BatchErrors {
+  acao: 'aprovadas' | 'reprovadas';
+  itens: Array<{ id: ID; evento: string; detail: string }>;
+}
 
 /** Preview data type */
 interface PreviewDataType {
@@ -106,6 +138,8 @@ export default function ApprovalsPage(): JSX.Element {
 
   const [statusFilter, setStatusFilter] = useState<SolicitacaoStatus | (string & {})>('pendente');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
 
   const [previewVisible, setPreviewVisible] = useState<boolean>(false);
   const [previewData, setPreviewData] = useState<PreviewDataType | null>(null);
@@ -118,23 +152,65 @@ export default function ApprovalsPage(): JSX.Element {
   // Estados para seleção em lote
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([]);
   const [batchLoading, setBatchLoading] = useState<boolean>(false);
+  const [batchErrors, setBatchErrors] = useState<BatchErrors | null>(null);
+
+  // Latest-wins: polling, paginação, filtros e ações disparam cargas concorrentes; só a
+  // mais recente grava na tela.
+  const seqRef = useRef(0);
+  // Cargas em voo: o tick do polling espera a resposta em vez de abrir outra carga, senão
+  // em rede lenta (resposta > intervalo) cada tick descartaria a anterior e nada apareceria.
+  const emVooRef = useRef(0);
 
   const loadData = useCallback(async (): Promise<void> => {
+    const seq = ++seqRef.current;
+    emVooRef.current += 1;
     try {
       setLoading(true);
-      const filters = { flow: 'SUPER' as const, status: statusFilter || 'pendente', q: searchTerm };
-
-      const data = await listSolicitacoes(filters as unknown as Record<string, string>) as PaginatedResponse<Solicitacao> | Solicitacao[];
-      const results = 'results' in data ? data.results : data;
-      const count = 'count' in data ? data.count : (data).length;
-      setRows(results || []);
-      setTotal(count || 0);
+      const data = await listSolicitacoes({
+        flow: 'SUPER',
+        status: (statusFilter || 'pendente') as SolicitacaoStatus,
+        q: searchTerm,
+        ordering: 'proximidade',
+        page,
+        page_size: pageSize,
+      });
+      if (seq !== seqRef.current) return;
+      const results = data.results ?? [];
+      setRows(results);
+      setTotal(data.count ?? 0);
+      // Item que saiu da lista (outra pessoa decidiu) não fica selecionado às cegas.
+      const visiveis = new Set<Key>(results.map((r) => r.id));
+      setSelectedRowKeys((keys) => (keys.every((k) => visiveis.has(k)) ? keys : keys.filter((k) => visiveis.has(k))));
     } catch (error) {
+      if (seq !== seqRef.current) return;
+      // A página deixou de existir (os últimos itens dela foram decididos): volta uma.
+      if ((error as { status?: number }).status === 404 && page > 1) {
+        setPage((p) => Math.max(1, p - 1));
+        return;
+      }
       message.error('Erro ao carregar solicitações: ' + (error as Error).message);
     } finally {
-      setLoading(false);
+      emVooRef.current -= 1;
+      if (seq === seqRef.current) setLoading(false);
     }
-  }, [statusFilter, searchTerm]);
+  }, [statusFilter, searchTerm, page, pageSize]);
+
+  // Trocar filtro, busca, página ou tamanho muda o que está na tela: a seleção recomeça.
+  const handleStatusChange = (value: SolicitacaoStatus | (string & {})): void => {
+    setStatusFilter(value);
+    setPage(1);
+    setSelectedRowKeys([]);
+  };
+  const handleSearchChange = (value: string): void => {
+    setSearchTerm(value);
+    setPage(1);
+    setSelectedRowKeys([]);
+  };
+  const handlePageChange = (nextPage: number, nextPageSize: number): void => {
+    setPage(nextPageSize === pageSize ? nextPage : 1);
+    setPageSize(nextPageSize);
+    setSelectedRowKeys([]);
+  };
 
   useEffect(() => {
     void loadData();
@@ -143,7 +219,7 @@ export default function ApprovalsPage(): JSX.Element {
   // RT-02: Polling 5s for cross-device sync (#1032)
   const loadDataRef = useRef(loadData);
   loadDataRef.current = loadData;
-  usePolling(() => loadDataRef.current(), {
+  usePolling(() => (emVooRef.current > 0 ? undefined : loadDataRef.current()), {
     enabled: true,
     intervalMs: TIMING.SYNC_POLL_INTERVAL_MS,
     events: ['solicitacoes:refresh', 'aprovacoes:refresh'],
@@ -210,6 +286,23 @@ export default function ApprovalsPage(): JSX.Element {
           message.success('Solicitação aprovada com sucesso!');
           void loadData();
         } catch (error) {
+          // Conflito de agenda: o servidor diz quem está bloqueado e por quê.
+          const payload = (error as { response?: { data?: ConflictErrorData } }).response?.data;
+          if (payload?.code === 'availability_conflict') {
+            Modal.error({
+              title: 'Não foi possível aprovar',
+              content: (
+                <>
+                  <Paragraph>{payload.detail || (error as Error).message}</Paragraph>
+                  <ListaDeBloqueados
+                    bloqueados={payload.errors?.blocked_participants ?? []}
+                    orientacao="Reprove a solicitação ou peça a quem criou para ajustar data, horário ou participantes."
+                  />
+                </>
+              ),
+            });
+            return;
+          }
           message.error('Erro ao aprovar: ' + (error as Error).message);
         }
       },
@@ -235,6 +328,26 @@ export default function ApprovalsPage(): JSX.Element {
     });
   }, [loadData]);
 
+  // Lote: cada item não decidido vira uma linha "evento — motivo" acima da tabela. O rótulo
+  // do evento sai das linhas visíveis ANTES da recarga (o lote só tem itens da página atual).
+  const reportBatchErrors = (acao: BatchErrors['acao'], errors: BatchOperationResult['errors'] | undefined): void => {
+    if (!errors?.length) {
+      setBatchErrors(null);
+      return;
+    }
+    const porId = new Map(rows.map((r) => [r.id, r]));
+    setBatchErrors({
+      acao,
+      itens: errors.map((e) => {
+        const row = porId.get(e.id);
+        const evento = row
+          ? [formatFortaleza(row.inicio, 'DD/MM/YYYY'), row.municipio_nome, row.projeto_nome].filter(Boolean).join(' · ')
+          : `Solicitação #${e.id}`;
+        return { id: e.id, evento, detail: e.detail };
+      }),
+    });
+  };
+
   // Handlers de operações em lote
   const handleBatchApprove = (): void => {
     Modal.confirm({
@@ -251,9 +364,7 @@ export default function ApprovalsPage(): JSX.Element {
           if (result.approved && result.approved > 0) {
             message.success(`${result.approved} solicitação(ões) aprovada(s)!`);
           }
-          if (result.errors?.length > 0) {
-            message.warning(`${result.errors.length} erro(s) encontrado(s)`);
-          }
+          reportBatchErrors('aprovadas', result.errors);
 
           setSelectedRowKeys([]);
           void loadData();
@@ -281,9 +392,7 @@ export default function ApprovalsPage(): JSX.Element {
           if (result.rejected && result.rejected > 0) {
             message.success(`${result.rejected} solicitação(ões) reprovada(s)!`);
           }
-          if (result.errors?.length > 0) {
-            message.warning(`${result.errors.length} erro(s) encontrado(s)`);
-          }
+          reportBatchErrors('reprovadas', result.errors);
 
           setSelectedRowKeys([]);
           void loadData();
@@ -441,7 +550,7 @@ export default function ApprovalsPage(): JSX.Element {
             <Space>
               <Select
                 value={statusFilter}
-                onChange={setStatusFilter}
+                onChange={handleStatusChange}
                 style={{ width: '100%', maxWidth: 200 }}
                 placeholder="Status"
                 aria-label="Filtrar por status"
@@ -454,7 +563,7 @@ export default function ApprovalsPage(): JSX.Element {
               <Input.Search
                 placeholder="Buscar por município, projeto, autor..."
                 value={searchTerm}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => handleSearchChange(e.target.value)}
                 onSearch={loadData}
                 style={{ width: '100%', maxWidth: 400 }}
                 allowClear
@@ -502,6 +611,27 @@ export default function ApprovalsPage(): JSX.Element {
             </nav>
           )}
 
+          {/* Itens que o último lote não decidiu: evento + motivo de cada um */}
+          {batchErrors && (
+            <Alert
+              type="warning"
+              showIcon
+              closable
+              role="status"
+              onClose={() => setBatchErrors(null)}
+              message={`${batchErrors.itens.length} solicitação(ões) não foram ${batchErrors.acao}`}
+              description={
+                <ul className="pl-5 m-0">
+                  {batchErrors.itens.map((item) => (
+                    <li key={item.id} className="break-words">
+                      <strong>{item.evento}</strong> — {item.detail}
+                    </li>
+                  ))}
+                </ul>
+              }
+            />
+          )}
+
           {/* Tabela */}
           <section aria-label="Lista de solicitacoes para aprovacao">
             <Table
@@ -512,9 +642,13 @@ export default function ApprovalsPage(): JSX.Element {
               rowKey="id"
               scroll={{ x: 1090 }}
               pagination={{
+                current: page,
+                pageSize,
                 total,
-                pageSize: 20,
-                showTotal: (total) => `Total: ${total} solicitações`,
+                showSizeChanger: true,
+                pageSizeOptions: PAGE_SIZE_OPTIONS,
+                showTotal: (count) => `Total: ${count} solicitações`,
+                onChange: handlePageChange,
               }}
             />
           </section>

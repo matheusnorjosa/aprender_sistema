@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, test } from 'vitest';
 
-import AvailabilityConflictAlert from '../AvailabilityConflictAlert';
+import AvailabilityConflictAlert, { ListaDeBloqueados } from '../AvailabilityConflictAlert';
 import type { BlockedParticipant } from '../../types';
 
 describe('AvailabilityConflictAlert', () => {
@@ -24,7 +24,33 @@ describe('AvailabilityConflictAlert', () => {
     expect(screen.getByText('Não é possível criar o evento')).toBeInTheDocument();
     expect(screen.getByText('Bruno Formador')).toBeInTheDocument();
     expect(screen.getByText('Conflita com evento aprovado #5')).toBeInTheDocument();
-    expect(screen.getByText('X')).toBeInTheDocument();
+    // A tag diz o motivo por extenso (não a letra do código), e a frase fixa de
+    // sobreposição saiu: o motivo pode ser limite diário, bloqueio ou deslocamento.
+    expect(screen.getByText('Sobreposição')).toBeInTheDocument();
+    expect(screen.queryByText('X')).not.toBeInTheDocument();
+    expect(screen.queryByText(/já está alocado neste horário/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Remova o participante em conflito/)).toBeInTheDocument();
+  });
+
+  test('conflito sem detalhe mostra o motivo uma vez só', () => {
+    const bloqueados: BlockedParticipant[] = [
+      { usuario_id: 7, usuario_nome: 'Dora Formadora', conflicts: [{ code: 'M', title: 'Capacidade diária excedida', detail: '' }] },
+    ];
+    render(<AvailabilityConflictAlert bloqueados={bloqueados} />);
+
+    expect(screen.getAllByText('Capacidade diária excedida')).toHaveLength(1);
+  });
+
+  test('ListaDeBloqueados aceita a orientação de quem usa (aprovação)', () => {
+    const bloqueados: BlockedParticipant[] = [
+      { usuario_id: 7, usuario_nome: 'Dora Formadora', conflicts: [{ code: 'M', title: 'Capacidade diária excedida', detail: 'Total do dia' }] },
+    ];
+    render(<ListaDeBloqueados bloqueados={bloqueados} orientacao="Reprove ou peça o ajuste a quem criou." />);
+
+    expect(screen.getByText('Dora Formadora')).toBeInTheDocument();
+    expect(screen.getByText('Reprove ou peça o ajuste a quem criou.')).toBeInTheDocument();
+    expect(screen.queryByText(/Remova o participante em conflito/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   test('lista múltiplos participantes bloqueados', () => {

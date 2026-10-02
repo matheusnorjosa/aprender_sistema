@@ -153,7 +153,7 @@ vínculo de GERENTE dela (fora: 403), e só cria ou move para projeto desse alca
 |--------|----------|--------|-----------|-----------|
 | **PATCH** | `/api/solicitacoes/{id}/approve/` | ![Stable](https://img.shields.io/badge/-stable-green) | Aprovar solicitação SUPER | `CanAccessSolicitationApprovals` |
 | **PATCH** | `/api/solicitacoes/{id}/reject/` | ![Stable](https://img.shields.io/badge/-stable-green) | Reprovar solicitação SUPER | `CanAccessSolicitationApprovals` |
-| POST | `/api/solicitacoes/batch-approve/` | ![Stable](https://img.shields.io/badge/-stable-green) | Aprovar em lote (máx. 100 `ids`) | `CanAccessSolicitationApprovals` |
+| POST | `/api/solicitacoes/batch-approve/` | ![Stable](https://img.shields.io/badge/-stable-green) | Aprovar em lote (máx. 100 `ids`); item barrado por agenda vem em `errors[]` com `code: availability_conflict`, `detail` (quem e por quê) e `blocked_participants` | `CanAccessSolicitationApprovals` |
 | POST | `/api/solicitacoes/batch-reject/` | ![Stable](https://img.shields.io/badge/-stable-green) | Reprovar em lote (máx. 100 `ids`) | `CanAccessSolicitationApprovals` |
 
 `approve`/`reject` são **PATCH**, não POST (actions `SolicitacaoViewSet.approve` e
@@ -184,11 +184,16 @@ Superintendência por vínculo, solicitação que não é do fluxo SUPER da Supe
 ?date_to=2026-12-31              # inicio__date__lte
 ?q=texto                         # municipio/projeto/tipo_evento/observacoes/usuário
 ?search=texto                    # SearchFilter (usuário, município, observações)
-?ordering=inicio|fim|id          # únicos campos ordenáveis (aceita prefixo "-")
+?ordering=inicio|fim|id          # campos ordenáveis (aceita prefixo "-"); default -inicio
+?ordering=proximidade            # de hoje em diante (início do dia em America/Fortaleza), do mais próximo
+                                 # ao mais distante; depois os passados, do mais recente ao mais antigo;
+                                 # desempate por id. É a ordem da tela de Aprovações. Sem prefixo "-".
+?page=1&page_size=20             # paginação (default 100, máximo 500); página inexistente → 404
 ```
 
 Não existem `?projeto=`, `?municipio=`, `?usuario=`, `?data_inicio__gte=`,
-`?data_inicio__lte=` nem `?ordering=-created_at` — são ignorados silenciosamente.
+`?data_inicio__lte=` nem `?ordering=-created_at` — são ignorados silenciosamente (um `ordering`
+desconhecido cai no default `-inicio`).
 
 ---
 

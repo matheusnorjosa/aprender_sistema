@@ -11,6 +11,9 @@ Cobertura:
 
 from __future__ import annotations
 
+from datetime import datetime
+from datetime import timezone as dt_timezone
+
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -237,3 +240,100 @@ def test_non_superintendencia_sees_only_own_solicitacoes(setup_data):
         # Verificar que todas são do João
         usuario_id = item["usuario"] if isinstance(item["usuario"], int) else item["usuario"]["id"]
         assert usuario_id == user_joao.id
+
+
+# ---------------------------------------------------------------------------
+# Mapa de acesso 02/10 (P6): ?ordering=proximidade — a ordem da tela de Aprovações.
+# De hoje em diante, do mais próximo ao mais distante; depois os passados, do mais
+# recente ao mais antigo. "Hoje" é o início do dia em America/Fortaleza.
+#
+# Relógio fixo: a view recalcula "hoje" a cada requisição; com o relógio real, um teste
+# que atravessa a meia-noite de Fortaleza falha. O instante escolhido (09/03/2027 23:30
+# em Fortaleza) já é dia 10 em UTC — quem calcular "hoje" em UTC erra a borda.
+# ---------------------------------------------------------------------------
+
+AGORA = datetime(2027, 3, 10, 2, 30, tzinfo=dt_timezone.utc)  # 09/03/2027 23:30 em Fortaleza
+HOJE = datetime(2027, 3, 9, 3, 0, tzinfo=dt_timezone.utc)  # 09/03/2027 00:00 em Fortaleza
+
+
+@pytest.fixture
+def relogio_fixo(monkeypatch):
+    monkeypatch.setattr("django.utils.timezone.now", lambda: AGORA)
+
+
+def _admin_e_base():
+    admin = UsuarioFactory(username="ordenador", email="ordenador@x.com", password="x", is_superuser=True)
+    return admin, {
+        "usuario": admin,
+        "municipio": MunicipioFactory(nome="Municipio Ordem", uf="CE"),
+        "tipo_evento": TipoEventoFactory(nome="Formação Ordem"),
+        "projeto": None,
+        "status": "pendente",
+    }
+
+
+def _sol_em(base, inicio):
+    return SolicitacaoFactory(**base, inicio=inicio, fim=inicio + timezone.timedelta(hours=1))
+
+
+def _ids(client, **params):
+    res = client.get(reverse("core:solicitacao-list"), params)
+    assert res.status_code == 200, res.data
+    return [item["id"] for item in res.json()["results"]]
+
+
+def test_ordering_proximidade_futuros_crescente_depois_passados_recentes(relogio_fixo):
+    admin, base = _admin_e_base()
+    hoje = HOJE
+    daqui_30d = _sol_em(base, hoje + timezone.timedelta(days=30, hours=9))
+    ha_60d = _sol_em(base, hoje - timezone.timedelta(days=60))
+    amanha = _sol_em(base, hoje + timezone.timedelta(days=1, hours=9))
+    # Borda do fuso: ontem 22:30 em Fortaleza é 09/03 01:30 em UTC, e continua sendo passado.
+    ontem_a_noite = _sol_em(base, hoje - timezone.timedelta(hours=1, minutes=30))
+    # Hoje 00:30 em Fortaleza: já é "de hoje em diante", mesmo que a hora tenha passado.
+    hoje_cedo = _sol_em(base, hoje + timezone.timedelta(minutes=30))
+
+    client = APIClient()
+    client.force_authenticate(user=admin)
+
+    assert _ids(client, status="pendente", ordering="proximidade", page_size=20) == [
+        hoje_cedo.id,
+        amanha.id,
+        daqui_30d.id,
+        ontem_a_noite.id,
+        ha_60d.id,
+    ]
+
+
+def test_ordering_proximidade_paginas_seguem_a_ordem_e_desempatam_por_id(relogio_fixo):
+    admin, base = _admin_e_base()
+    hoje = HOJE
+    distante = _sol_em(base, hoje + timezone.timedelta(days=40))
+    perto_1 = _sol_em(base, hoje + timezone.timedelta(days=2))
+    perto_2 = _sol_em(base, hoje + timezone.timedelta(days=2))  # mesmo início: desempate por id
+    passado_1 = _sol_em(base, hoje - timezone.timedelta(days=3))
+    passado_2 = _sol_em(base, hoje - timezone.timedelta(days=3))
+
+    client = APIClient()
+    client.force_authenticate(user=admin)
+    paginas = [_ids(client, ordering="proximidade", page_size=2, page=n) for n in (1, 2, 3)]
+
+    assert paginas == [[perto_1.id, perto_2.id], [distante.id, passado_1.id], [passado_2.id]]
+
+    res = client.get(reverse("core:solicitacao-list"), {"ordering": "proximidade", "page_size": 2})
+    assert res.json()["count"] == 5
+
+
+def test_ordering_proximidade_nao_muda_os_outros_valores_de_ordering(relogio_fixo):
+    """Guarda: `inicio` e o default (-inicio) seguem como eram."""
+    admin, base = _admin_e_base()
+    hoje = HOJE
+    passado = _sol_em(base, hoje - timezone.timedelta(days=5))
+    futuro = _sol_em(base, hoje + timezone.timedelta(days=5))
+
+    client = APIClient()
+    client.force_authenticate(user=admin)
+
+    assert _ids(client, ordering="inicio") == [passado.id, futuro.id]
+    assert _ids(client, ordering="-inicio") == [futuro.id, passado.id]
+    assert _ids(client) == [futuro.id, passado.id]

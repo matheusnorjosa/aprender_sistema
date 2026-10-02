@@ -106,6 +106,22 @@ correspondentes).
 | GET | `/me/events/` | ![Stable](https://img.shields.io/badge/-stable-green) | Eventos em que o usuário participa | IsAuthenticated |
 | POST | `/me/change-password/` | ![Stable](https://img.shields.io/badge/-stable-green) | Troca de senha self-service | IsAuthenticated |
 
+**Troca obrigatória de senha (primeiro acesso).** `GET /me/` inclui `deve_trocar_senha`
+(bool): `true` quando a senha em uso foi definida por um administrador (`POST`/`PATCH
+/usuarios-admin/` com `password`, por alguém que não a própria pessoa). Enquanto estiver
+`true`, a API só aceita `GET /me/`, `GET /csrf/`, `POST /me/change-password/` e
+`POST /auth/logout/`; qualquer outra rota (inclusive `/api/v1/*`, `POST /auth/login/` e
+`/admin/`) responde `403` com `code: PASSWORD_CHANGE_REQUIRED`. `POST /me/change-password/`
+(`old_password`, `new_password`) desliga a marca e mantém a sessão; a senha nova tem de ser
+diferente da atual, ter 8+ caracteres, não ser só números nem senha comum e não parecer com
+nome, CPF ou e-mail da pessoa (erros em `errors.old_password` / `errors.new_password`). O
+campo não é gravável por nenhuma rota. Regra completa:
+[rbac.spec](./specs/backend/rbac.spec.md).
+
+**Limite de tentativas.** `POST /auth/login/` e `GET /csrf/` respondem `429` com
+`code: THROTTLED` e cabeçalho `Retry-After` (segundos). Senha errada e bloqueio por
+tentativas respondem o mesmo `400` genérico (o bloqueio não é revelado).
+
 `GET /me/` inclui `gerencias: [{id, rotulo, papeis[]}]` (PR A, 2026-09-29): vínculos
 `EquipeGerencia` vigentes (`vigentes_em()`) em gerência ativa, um item por gerência,
 ordenados pelo `rotulo`. É por ele que a Grade Mensal escolhe a gerência de quem não tem

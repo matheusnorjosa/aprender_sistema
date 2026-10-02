@@ -20,6 +20,8 @@ import sys
 
 import pytest
 
+from apps.core.tests.ambiente_repo import exige_raiz_do_repo
+
 SCRIPTS = pathlib.Path(__file__).resolve().parents[3] / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
@@ -115,7 +117,7 @@ def test_status_normaliza_caixa():
 
 def test_specs_reais_do_repo_sao_lidas():
     """Guarda contra regressao que so aparece nos arquivos de verdade."""
-    raiz = pathlib.Path(__file__).resolve().parents[5]
+    raiz = exige_raiz_do_repo()
     specs = sorted((raiz / "v2" / "docs" / "specs").rglob("*.spec.md"))
     assert specs, "nenhuma spec encontrada — o caminho mudou?"
 

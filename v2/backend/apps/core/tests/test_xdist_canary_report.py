@@ -35,8 +35,13 @@ import pathlib
 import subprocess
 import sys
 
-RAIZ_V2 = pathlib.Path(__file__).resolve().parents[4]
-SCRIPT = RAIZ_V2 / "scripts" / "xdist_canary_report.py"
+from apps.core.tests.ambiente_repo import exige_raiz_do_repo
+
+
+def _script() -> pathlib.Path:
+    """O relatorio mora em `<raiz>/v2/scripts/`, fora do que o container de dev monta."""
+    return exige_raiz_do_repo() / "v2" / "scripts" / "xdist_canary_report.py"
+
 
 MAIN = "refs/heads/main"
 CELULAS = (("2", "loadscope"), ("2", "loadfile"), ("auto", "loadscope"), ("auto", "loadfile"))
@@ -89,7 +94,7 @@ def _run(tmp_path: pathlib.Path, artefatos: pathlib.Path, *, ref=MAIN, extra="",
     r = subprocess.run(
         [
             sys.executable,
-            str(SCRIPT),
+            str(_script()),
             "--artifacts-dir",
             str(artefatos),
             "--output-json",
@@ -111,7 +116,8 @@ def _run(tmp_path: pathlib.Path, artefatos: pathlib.Path, *, ref=MAIN, extra="",
 
 
 def test_script_existe():
-    assert SCRIPT.exists(), f"xdist_canary_report.py nao encontrado em {SCRIPT}"
+    script = _script()
+    assert script.exists(), f"xdist_canary_report.py nao encontrado em {script}"
 
 
 def test_limpo_completo_na_main_fecha(tmp_path):

@@ -665,22 +665,24 @@ usam o throttle scope `import` (30/min). O modo de execução vem no query param
 **`dry_run`** — o default é `true` (preview); `?dry_run=false` aplica
 (`ImportUsuariosView.post`, `views_import_usuarios.py`).
 
+Importação pela tela é só do superusuário (decisão do dono, 02/10/2026): nenhuma capability abre estes endpoints, e os demais perfis recebem 403.
+
 | Endpoint | Permissão |
 |----------|-----------|
-| `/api/usuarios/import/` | `IsAuthenticated` + `manage_admin_registries` |
-| `/api/municipios/import/` | `IsAuthenticated` + `manage_admin_registries` |
-| `/api/colecoes/import/` | `IsAuthenticated` + `manage_admin_registries` |
-| `/api/equipe-gerencia/import/` | `IsAuthenticated` + `manage_admin_registries` |
-| `/api/dat/import-cadastros/` | `IsAuthenticated` + `manage_admin_registries` |
-| `/api/solicitacoes/import/` | `IsAuthenticated` + `import_spreadsheet` |
-| `/api/produtos/import/` | `IsAuthenticated` + `import_spreadsheet` |
-| `/api/deslocamentos/import/` | `IsAuthenticated` + `import_spreadsheet` |
-| `/api/disponibilidade/import-bloqueios/` | `IsAuthenticated` + `import_spreadsheet` |
-| `/api/controle/import-acoes/` | `IsAuthenticated` + `import_spreadsheet` |
-| `/api/controle/import-compras/` (alias `/api/import-compras/`) | `IsAuthenticated` + `import_spreadsheet` |
+| `/api/usuarios/import/` | `IsAuthenticated` + `SuperuserOnly` |
+| `/api/municipios/import/` | `IsAuthenticated` + `SuperuserOnly` |
+| `/api/colecoes/import/` | `IsAuthenticated` + `SuperuserOnly` |
+| `/api/equipe-gerencia/import/` | `IsAuthenticated` + `SuperuserOnly` |
+| `/api/dat/import-cadastros/` | `IsAuthenticated` + `SuperuserOnly` |
+| `/api/solicitacoes/import/` | `IsAuthenticated` + `SuperuserOnly` |
+| `/api/produtos/import/` | `IsAuthenticated` + `SuperuserOnly` |
+| `/api/deslocamentos/import/` | `IsAuthenticated` + `SuperuserOnly` |
+| `/api/disponibilidade/import-bloqueios/` | `IsAuthenticated` + `SuperuserOnly` |
+| `/api/controle/import-acoes/` | `IsAuthenticated` + `SuperuserOnly` |
+| `/api/controle/import-compras/` (alias `/api/import-compras/`) | `IsAuthenticated` + `SuperuserOnly` |
 
 Imports assíncronos (ASQ-005): `POST /api/imports/bloqueios/`
-(`IsAuthenticated` + `CanImportGenericSpreadsheet`), `GET /api/imports/` e
+(`IsAuthenticated` + `SuperuserOnly`), `GET /api/imports/` e
 `GET /api/imports/{id}/` (`IsAuthenticated`, queryset filtrado por dono).
 
 > ✅ Resolvido em #1649 (achado `M04-05`): o parse de `dry_run` é **fail-closed** — valor

@@ -79,7 +79,7 @@ A regra de ouro **pretendida** é a segurança contra reimportação cega: todo 
 - **Imports bypassam invariantes que a API impõe** (épico #1659). Em `eventos_import`, o evento **FUTURO** agora passa por `check_solicitacao_availability` (RD-01..08 + `pg_advisory_xact_lock`) e, em conflito, vira pendência `availability` sem gravar; **evento histórico entra sem checar** (decisão do dono 2026-09-14: import de evento passado não é re-litigado, já aconteceu) — achado `M08-12`/#1620 **resolvido no #2021**. Seguem sem gate: `M15-04` (compras) e `M17-01` (cadastros DAT).
 - **Reimport de eventos** (`M10-07`/#1628) **não reverte mais decisão humana** — **resolvido no #2021**. O `_process_row` busca a linha existente com `select_for_update` e: se um campo protegido (`status`/`usuario`/`coordenador`/`local`) divergir → pendência `protected`, **sem escrita**; sem divergência, atualiza só `observacoes`/`encontro` com diff **real** (`updated`/`unchanged` deixam de ser código morto — a comparação era pós-mutação); participante ocupante ausente da planilha no reimport → pendência `orfaos` (reportado, **não removido**). Cobre os itens 2/3/4 de #1628; o item 1 (`source_key`/`content_hash`, toca ADR-012) fica p/ PR separado.
 - **Resolução de entidade por rótulo humano** (épico #1658). O SSOT dos resolvers fuzzy é `services/resolvers.py`, que usa `.first()` sem ordenação determinística; `resolve_user_by_name` fazia, no último fallback, `icontains` em qualquer parte do nome — "Ana Silva" casava com Mariana/Luana/Adriana ou qualquer sobrenome contendo "silva". Consumidores: `bloqueios_import.py` (`_process_row` — bloqueio pode ir para a agenda da pessoa errada, `M22-14`), `eventos_import.py` (`_resolve_user` — define `usuario`/`coordenador` e as `Participation`), `controle_acoes_import.py`, `controle_imports.py` (`resolve_municipio`/`resolve_projeto`, `M15-05`), `equipe_gerencia_import.py` (`_get_or_create_gerencia`, `M04-01`) e `usuarios_import.py` (`_resolve_grupos`, o resolvedor de grupo do `M03-01`). A regra correta é **rejeitar ambiguidade**, não escolher em silêncio: **#1613 (`M02-09`) implementou isso para `resolve_projeto` e `resolve_tipo_evento`** (helper `_pick_unique` → `None` + WARNING com candidatos) e corrigiu a normalização assimétrica do import DAT (`dat_cadastros_import.py` passou a usar `resolve_projeto`). **`resolve_user_by_name` deixou de usar `icontains`/`.first()`** (corrigido em #1929, reusando `_pick_unique`): o resíduo de `M22-14`/#1643 não é mais o resolvedor, e sim a falta de checagem de `is_active`/grupo Formador/`created_by`/`AuditLog` em `bloqueios_import.py`. **`resolve_municipio` também passou a rejeitar ambiguidade** (#2003, reusando `_pick_unique`): homônimo entre UFs sem a UF no texto (ex.: "Bonito" em MS/PA/PE/BA) vira pendência, em vez de gravar o município errado em silêncio. O resolver de `M04-01`/#1615 (`equipe_gerencia_import.py`) foi **resolvido no #2022**: `_resolve_gerencia` (resolve-only) devolve `None` no miss → pendência `setor_missing`, sem criar unidade por rótulo (o create ficou só no `export_contract --apply`); o resíduo de `M15-05`/#1635 é a UF não chegar ao `resolve_municipio` para desempatar (+ `Compra.produto` FK não gravado), não mais o `.first()` do resolver.
-- **RBAC por capability, não por grupo** (`scripts/rbac_lint.py` bane grupos diretos): gates via `permission_classes=[HasPerm("import_spreadsheet")]` ou `HasPerm("manage_admin_registries")`; o upload assíncrono usa a Policy `CanImportGenericSpreadsheet` (`import_spreadsheet` OU `run_daily_operations` — Controle/DAT).
+- **Importação pela tela é só do superusuário** (decisão do dono, 02/10/2026). Nenhum perfil importa planilha pela tela na liberação: as cargas passam por script (`import_export_contract`), com ensaio. Os 12 endpoints de upload usam `permission_classes = [IsAuthenticated, SuperuserOnly]` (`apps.core.permissions`); nenhuma capability abre, nem `import_spreadsheet` nem `manage_admin_registries` (o DAT, que importava desde o PR-A1 de 2026-04-29, recebe 403). As capabilities e as policies `import_*` de `/api/me/policies/` continuam existindo, mas não abrem endpoint nem tela. Cobertura: `tests/test_imports_pela_tela_so_superusuario.py` (cada perfil contra cada endpoint, mais uma sentinela que reprova view de upload nova sem o gate) e o recurso `import_pela_tela` da Matriz Viva (`rbac/matrix.py`, D20 em [`rbac_authorization_matrix.md`](../../rbac_authorization_matrix.md)). O command de terminal não passa por estes endpoints e não mudou. Sem grupos diretos (`scripts/rbac_lint.py`).
 - **Timezone** (RD-06): datas de calendário armazenadas em UTC, interpretadas como `America/Fortaleza`. Datas do CSV (`dd/mm/yyyy`) são local Fortaleza antes de virar UTC.
 - **Sem PII no relatório** do export-contract: só counts e nomes de entidade.
 
@@ -89,23 +89,23 @@ Endpoints síncronos (`{stats, pendencias, dry_run, file}`; todos com `?dry_run`
 
 | Endpoint | Gate |
 |---|---|
-| `POST /api/usuarios/import/` | `HasPerm("manage_admin_registries")` |
-| `POST /api/municipios/import/` | `HasPerm("manage_admin_registries")` |
-| `POST /api/colecoes/import/` | `HasPerm("manage_admin_registries")` |
-| `POST /api/equipe-gerencia/import/` | `HasPerm("manage_admin_registries")` |
-| `POST /api/dat/import-cadastros/` | `HasPerm("manage_admin_registries")` |
-| `POST /api/produtos/import/` | `HasPerm("import_spreadsheet")` |
-| `POST /api/solicitacoes/import/` | `HasPerm("import_spreadsheet")` |
-| `POST /api/disponibilidade/import-bloqueios/` | `HasPerm("import_spreadsheet")` |
-| `POST /api/controle/import-compras/` (alias `/api/import-compras/`) | `HasPerm("import_spreadsheet")` |
-| `POST /api/controle/import-acoes/` | `HasPerm("import_spreadsheet")` |
-| `POST /api/deslocamentos/import/` | `HasPerm("import_spreadsheet")` |
+| `POST /api/usuarios/import/` | `SuperuserOnly` |
+| `POST /api/municipios/import/` | `SuperuserOnly` |
+| `POST /api/colecoes/import/` | `SuperuserOnly` |
+| `POST /api/equipe-gerencia/import/` | `SuperuserOnly` |
+| `POST /api/dat/import-cadastros/` | `SuperuserOnly` |
+| `POST /api/produtos/import/` | `SuperuserOnly` |
+| `POST /api/solicitacoes/import/` | `SuperuserOnly` |
+| `POST /api/disponibilidade/import-bloqueios/` | `SuperuserOnly` |
+| `POST /api/controle/import-compras/` (alias `/api/import-compras/`) | `SuperuserOnly` |
+| `POST /api/controle/import-acoes/` | `SuperuserOnly` |
+| `POST /api/deslocamentos/import/` | `SuperuserOnly` |
 
-Todos são precedidos de `IsAuthenticated`. **Não há gate de ator×alvo em nenhum deles** — a capability autoriza a ação, nunca restringe sobre quem ela incide (ver `M03-01`).
+Todos são precedidos de `IsAuthenticated`. **Não há gate de ator×alvo em nenhum deles**: quem passa pelo gate (hoje, só o superusuário) importa sobre qualquer alvo (ver `M03-01`).
 
 Endpoints assíncronos (ASQ-005 Fase 1 — só `bloqueios`):
 
-- `POST /api/imports/bloqueios/` — cria `ImportJob` (status `QUEUED`) + despacha Celery `task_run_import_job`; retorna `202 Accepted` com o job serializado. Gate: `IsAuthenticated + CanImportGenericSpreadsheet`.
+- `POST /api/imports/bloqueios/` — cria `ImportJob` (status `QUEUED`) + despacha Celery `task_run_import_job`; retorna `202 Accepted` com o job serializado. Gate: `IsAuthenticated + SuperuserOnly` (antes, `CanImportGenericSpreadsheet`: Controle/DAT).
 - `GET /api/imports/<id>/` — estado do job (owner ou superuser).
 - `GET /api/imports/` — lista jobs do usuário (filtros `type=`, `status=`).
 

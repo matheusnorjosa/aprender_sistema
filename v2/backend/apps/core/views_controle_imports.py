@@ -26,7 +26,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.core.api_schemas import COMMON_ERROR_RESPONSES
 from apps.core.imports.request_params import parse_dry_run
-from apps.core.permissions import HasPerm
+from apps.core.permissions import SuperuserOnly
 from apps.core.serializers.openapi_critical_contract import (
     ImportFileUploadRequestSerializer,
     ImportOperationErrorResponseSerializer,
@@ -42,7 +42,7 @@ class ImportComprasView(APIView):
     """
     Importa Compras de CSV/XLSX.
 
-    Requer permissão: HasPerm("import_spreadsheet") (grupo DAT, ou superuser).
+    Requer superusuário (`SuperuserOnly`): importação pela tela é só do superusuário.
 
     Query params:
         dry_run: "true" (default) para preview, "false" para aplicar
@@ -65,10 +65,8 @@ class ImportComprasView(APIView):
         }
     """
 
-    # PR-A1 DAT-Imports (2026-04-29): centralização. Importações de massa
-    # passam a ser DAT-only via `HasPerm("import_spreadsheet")`. Controle
-    # consome o dado mas não importa (D-1 do plano DAT-Imports).
-    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
+    # Decisão do dono (02/10/2026): importação pela tela é só do superusuário.
+    permission_classes = [IsAuthenticated, SuperuserOnly]
     throttle_scope = "import"
 
     @extend_schema(

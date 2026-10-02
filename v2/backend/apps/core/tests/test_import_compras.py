@@ -28,18 +28,9 @@ pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture
-def user_dat():
-    """Cria usuário no grupo DAT (PR-A1 DAT-Imports: detentor de
-    `import_spreadsheet` via seed_functional_permissions)."""
-    user = UsuarioFactory(
-        username="dat_imports",
-        email="dat_imports@test.com",
-        password="testpass",
-        cpf="11111111111",
-    )
-    group = GroupFactory(name="DAT")
-    user.groups.add(group)
-    return user
+def superuser(db):
+    """Superusuário: o único que importa pela tela (decisão do dono, 02/10/2026)."""
+    return UsuarioFactory(superuser=True)
 
 
 @pytest.fixture
@@ -169,7 +160,7 @@ def test_import_compras_idempotence(csv_compras_temp, setup_data):
     assert Compra.objects.count() == 2  # Não duplicou
 
 
-def test_import_compras_endpoint_dry_run(user_dat, csv_compras_temp, setup_data):
+def test_import_compras_endpoint_dry_run(superuser, csv_compras_temp, setup_data):
     """
     Testa endpoint POST /api/controle/import-compras/ com dry_run=true.
 
@@ -180,7 +171,7 @@ def test_import_compras_endpoint_dry_run(user_dat, csv_compras_temp, setup_data)
     Compra.objects.all().delete()
 
     client = APIClient()
-    client.force_authenticate(user=user_dat)
+    client.force_authenticate(user=superuser)
 
     # Upload de arquivo
     with open(csv_compras_temp, "rb") as f:
@@ -201,7 +192,7 @@ def test_import_compras_endpoint_dry_run(user_dat, csv_compras_temp, setup_data)
     assert Compra.objects.count() == 0
 
 
-def test_import_compras_endpoint_apply(user_dat, csv_compras_temp, setup_data):
+def test_import_compras_endpoint_apply(superuser, csv_compras_temp, setup_data):
     """
     Testa endpoint POST /api/controle/import-compras/ com dry_run=false.
 
@@ -212,7 +203,7 @@ def test_import_compras_endpoint_apply(user_dat, csv_compras_temp, setup_data):
     Compra.objects.all().delete()
 
     client = APIClient()
-    client.force_authenticate(user=user_dat)
+    client.force_authenticate(user=superuser)
 
     # Upload de arquivo
     with open(csv_compras_temp, "rb") as f:

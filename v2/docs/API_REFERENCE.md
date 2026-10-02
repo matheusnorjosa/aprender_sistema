@@ -232,7 +232,9 @@ Parâmetros da grade mensal (`MonthlyAvailabilityView.get`, `views_availability_
 
 ### Resposta de Conflito
 
-A chave é `ok`, não `available` (`AvailabilityCheckView.get`, `views_availability.py`):
+A chave é `ok`, não `available` (`AvailabilityCheckView.get`, `views_availability.py`).
+`conflicts` traz o que barra; `warnings` traz o que só avisa (limite diário) e não muda `ok`.
+No `check-many/`, cada item de `results` tem as mesmas três chaves, mais `usuario_id`:
 
 ```json
 {
@@ -244,9 +246,31 @@ A chave é `ok`, não `available` (`AvailabilityCheckView.get`, `views_availabil
       "detail": "Conflita com bloqueio total 15/01/2026 09:00-12:00",
       "ref_id": 123
     }
+  ],
+  "warnings": []
+}
+```
+
+Limite diário sozinho (o evento **pode** ser criado e aprovado):
+
+```json
+{
+  "ok": true,
+  "conflicts": [],
+  "warnings": [
+    {
+      "code": "M",
+      "title": "Dia com mais de 8 horas de eventos",
+      "detail": "No dia 10/03 a soma dos eventos chega a 16h. Isso não impede o evento.",
+      "ref_id": null
+    }
   ]
 }
 ```
+
+O erro 400 `availability_conflict` de criar, editar e aprovar segue o mesmo corte: `errors.conflicts`
+e a mensagem só falam do que barra; `errors.warnings` e `errors.blocked_participants[].warnings`
+são aditivas e trazem os avisos calculados na mesma checagem.
 
 ### Códigos de Conflito
 
@@ -256,7 +280,7 @@ A chave é `ok`, não `available` (`AvailabilityCheckView.get`, `views_availabil
 | T | Bloqueio total | Formador bloqueado completamente |
 | P | Bloqueio parcial | Subintervalo bloqueado |
 | D | Deslocamento | Buffer de viagem insuficiente |
-| M | Capacidade diária | Limite de horas/dia excedido |
+| M | Limite diário (aviso) | Dia com mais de N horas de eventos. **Não barra** (decisão do dono, 02/10/2026): vem em `warnings`, nunca em `conflicts` |
 
 ### Bloqueios de Disponibilidade
 

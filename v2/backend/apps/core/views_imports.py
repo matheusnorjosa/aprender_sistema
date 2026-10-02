@@ -2,13 +2,13 @@
 Endpoints DRF para importação de Ações de Controle e Cadastros DAT.
 
 POST /api/controle/import-acoes/
-- Permission: HasPerm("import_spreadsheet")
+- Permission: SuperuserOnly
 - Query param: dry_run=true|false (default: true)
 - Body: {file: upload}
 - Returns: Relatório com stats, pendências
 
 POST /api/dat/import-cadastros/
-- Permission: HasPerm("manage_admin_registries")
+- Permission: SuperuserOnly
 - Query param: dry_run=true|false (default: true)
 - Body: {file: upload}
 - Returns: Relatório com stats, pendências
@@ -33,7 +33,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.core.api_schemas import COMMON_ERROR_RESPONSES
 from apps.core.imports.request_params import parse_dry_run
-from apps.core.permissions import HasPerm
+from apps.core.permissions import SuperuserOnly
 from apps.core.serializers.openapi_critical_contract import (
     ImportFileUploadRequestSerializer,
     ImportOperationErrorResponseSerializer,
@@ -50,7 +50,7 @@ class ControleImportAcoesView(APIView):
     """
     Importa Ações de Controle de CSV/XLSX.
 
-    Requer permissão: HasPerm("import_spreadsheet") (grupo DAT, ou superuser).
+    Requer superusuário (`SuperuserOnly`): importação pela tela é só do superusuário.
 
     Query params:
         dry_run: "true" (default) para preview, "false" para aplicar
@@ -71,9 +71,8 @@ class ControleImportAcoesView(APIView):
         }
     """
 
-    # PR-A1 DAT-Imports (2026-04-29): centralização DAT-only via
-    # `HasPerm("import_spreadsheet")`. Controle perde acesso (D-1).
-    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
+    # Decisão do dono (02/10/2026): importação pela tela é só do superusuário.
+    permission_classes = [IsAuthenticated, SuperuserOnly]
     throttle_scope = "import"
 
     @extend_schema(
@@ -149,7 +148,7 @@ class DATImportCadastrosView(APIView):
     """
     Importa Cadastros DAT de CSV/XLSX.
 
-    Requer permissão: HasPerm("manage_admin_registries") (grupos DAT ou Superintendência)
+    Requer superusuário (`SuperuserOnly`): importação pela tela é só do superusuário.
 
     Query params:
         dry_run: "true" (default) para preview, "false" para aplicar
@@ -170,7 +169,8 @@ class DATImportCadastrosView(APIView):
         }
     """
 
-    permission_classes = [IsAuthenticated, HasPerm("manage_admin_registries")]
+    # Decisão do dono (02/10/2026): importação pela tela é só do superusuário.
+    permission_classes = [IsAuthenticated, SuperuserOnly]
     throttle_scope = "import"
 
     @extend_schema(

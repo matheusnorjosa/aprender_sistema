@@ -5,6 +5,9 @@
  * ações; Tipo, Usuários e Permissões sobem por largura (sm, md, lg) e, abaixo delas, ficam
  * na linha expandida do ResponsiveTable. As ações são o AcoesLinha: ícones com nome
  * acessível "Editar: <grupo>", e no celular todas no menu "Mais ações".
+ *
+ * A lista recarrega ao montar (quando chegam os metadados RBAC) e o Spin recusa o clique nesse meio
+ * tempo: todo clique na linha passa pelo `clicarNaLinha`, que espera a tabela assentar.
  */
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -13,6 +16,7 @@ import ptBR from 'antd/locale/pt_BR';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
+import { clicarNaLinha } from '../../../test/clicarNaLinha';
 import { definirLarguraTela } from '../../../test/larguraTela';
 
 const { GRUPOS } = vi.hoisted(() => {
@@ -114,7 +118,7 @@ describe('GruposPage responsiva (C2)', () => {
     expect(cabecalhos()).toEqual(['Nome', 'Tipo', 'Usuários', 'Ações']);
     expect(within(linha).queryByText('Aprovar solicitações')).not.toBeInTheDocument();
 
-    await user.click(within(linha).getByRole('button', { name: `Expandir linha de ${NOME}` }));
+    await clicarNaLinha(user, NOME, `Expandir linha de ${NOME}`);
     const expandida = within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);
     expect(expandida.getByText('Permissões funcionais')).toBeInTheDocument();
     expect(expandida.getByText('Aprovar solicitações')).toBeInTheDocument();
@@ -130,7 +134,7 @@ describe('GruposPage responsiva (C2)', () => {
     expect(cabecalhos()).toEqual(['Nome', 'Ações']);
     expect(within(linha).queryByRole('button', { name: `Editar: ${NOME}` })).not.toBeInTheDocument();
 
-    await user.click(within(linha).getByRole('button', { name: `Expandir linha de ${NOME}` }));
+    await clicarNaLinha(user, NOME, `Expandir linha de ${NOME}`);
     const expandida = within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);
     expect(expandida.getByText('Setor')).toBeInTheDocument();
     expect(expandida.getByText('2 usuário(s)')).toBeInTheDocument();
@@ -152,9 +156,9 @@ describe('GruposPage responsiva (C2)', () => {
     const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }));
     const user = userEvent.setup();
     renderPage();
-    const linha = await linhaDo(NOME);
+    await within(await linhaDo(NOME)).findByRole('button', { name: `Excluir: ${NOME}` });
 
-    await user.click(await within(linha).findByRole('button', { name: `Excluir: ${NOME}` }));
+    await clicarNaLinha(user, NOME, `Excluir: ${NOME}`);
 
     // Modal.confirm não monta de forma confiável sob React 19 no jsdom: confere o que ele recebe.
     expect(confirmar).toHaveBeenCalledTimes(1);
@@ -173,7 +177,8 @@ describe('GruposPage responsiva (C2)', () => {
     const etiqueta = (await within(linha).findByText('Reservado')).closest<HTMLElement>('.ant-tag');
     expect(etiqueta).toHaveStyle({ color: '#874d00' }); // gold-9: 6,53:1
 
-    await user.click(await within(linha).findByRole('button', { name: `Excluir (reservado): ${RESERVADO}` }));
+    await within(linha).findByRole('button', { name: `Excluir (reservado): ${RESERVADO}` });
+    await clicarNaLinha(user, RESERVADO, `Excluir (reservado): ${RESERVADO}`);
     expect(aviso).toHaveBeenCalledWith('Grupo reservado: exclusão bloqueada na interface.');
     // O toast do AntD não é região viva: o aviso também vai para o leitor de tela (WCAG 4.1.3).
     expect(screen.getByRole('status')).toHaveTextContent('Grupo reservado: exclusão bloqueada na interface.');

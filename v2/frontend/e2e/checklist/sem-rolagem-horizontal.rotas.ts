@@ -278,15 +278,16 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
     estados: [expandida(T.projetoGeral, 'Usa AVALIAR', [360, 768])],
   },
   { path: '/dat/admin/configuracoes', perfil: 'dat', marco: 'Configurações do Sistema' },
-  { path: '/dat/admin/colecoes', perfil: 'dat', marco: 'Importação de Coleções' },
-  { path: '/dat/admin/equipe-gerencia', perfil: 'dat', marco: 'Importação de Vínculos' },
+  // Importação pela tela: só superusuário (decisão do dono, 02/10/2026).
+  { path: '/dat/admin/colecoes', perfil: 'superusuario', marco: 'Importação de Coleções' },
+  { path: '/dat/admin/equipe-gerencia', perfil: 'superusuario', marco: 'Importação de Vínculos' },
   {
     path: '/dat/cadastros',
     perfil: 'dat',
     marco: 'Gestão de Cadastros em Plataformas',
     dados: { em: LINHA, texto: T.municipio },
   },
-  { path: '/dat/importacoes', perfil: 'dat', marco: 'DAT > Importações' },
+  { path: '/dat/importacoes', perfil: 'superusuario', marco: 'DAT > Importações' },
   { path: '/dat/registros', perfil: 'dat', marco: 'Listagem de Registros DAT', dados: { em: LINHA, texto: T.municipio } },
 ];
 

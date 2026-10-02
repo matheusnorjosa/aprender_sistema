@@ -187,8 +187,8 @@ class GerenciaSerializer(serializers.ModelSerializer["Gerencia"]):
             "created_at",
             "updated_at",
         ]
-        # setor_canonico_confianca: sinal importado do de-para (RELAY 50, item 8), exibido na
-        # conferência mas SEM entrada-direta → read-only (o usuário confere `setor_canonico`, não a confiança).
+        # setor_canonico_confianca: sinal importado do de-para (RELAY 50, item 8), SEM entrada-direta →
+        # read-only. Fora da tela desde o C2b; o campo segue na API.
         read_only_fields = ["created_at", "updated_at", "setor_canonico_confianca"]
 
     def validate_nome(self, value: str) -> str:

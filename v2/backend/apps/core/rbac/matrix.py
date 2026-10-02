@@ -150,6 +150,10 @@ RESOURCES: Final[tuple[ResourceCase, ...]] = (
     ResourceCase("produtos_list", "GET", "/api/produtos/"),
     # UsuarioLookup (PR 5 #1310): cap-gated, sem hardcode de grupos.
     ResourceCase("usuario_lookup", "GET", "/api/lookup/usuarios/"),
+    # Upload de planilha (2026-10-02): import-compras representa as 13 rotas (12 endpoints + 1 alias) de
+    # import pela tela (mesmo gate `SuperuserOnly`); cada um tem cobertura em
+    # test_imports_pela_tela_so_superusuario.py.
+    ResourceCase("import_pela_tela", "POST", "/api/controle/import-compras/"),
 )
 
 
@@ -322,6 +326,23 @@ ACCESS_MATRIX: Final[dict[str, dict[str, int]]] = {
         ASST_ADMIN_CONTROLE: DENY,  # composite Asst Admin não tem create_solicitation
         COORDENADOR: ALLOW,  # create_solicitation
         APOIO: ALLOW,  # create_solicitation
+        FORMADOR: DENY,
+    },
+    #
+    # Import pela tela (2026-10-02): `[IsAuthenticated, SuperuserOnly]`.
+    # Nenhuma capability abre (nem `import_spreadsheet` nem `manage_admin_registries`
+    # do DAT): cargas passam por script, com ensaio. POST sem arquivo: o gate aprova
+    # o superuser e a view responde 400.
+    "import_pela_tela": {
+        SUPERUSER: ALLOW_PAYLOAD_INVALID,
+        DAT: DENY,  # antes importava (PR-A1 DAT-Imports, 2026-04-29)
+        CONTROLE: DENY,
+        DIRETORIA: DENY,
+        GERENTE: DENY,
+        GERENTE_SUPER: DENY,
+        ASST_ADMIN_CONTROLE: DENY,
+        COORDENADOR: DENY,
+        APOIO: DENY,
         FORMADOR: DENY,
     },
 }

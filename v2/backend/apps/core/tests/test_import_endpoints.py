@@ -21,7 +21,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.tests.factories import GroupFactory, UsuarioFactory
+from apps.core.tests.factories import UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -33,22 +33,9 @@ def _file(bytes_: bytes, name="sample.csv"):
     return f
 
 
-def _user_in_group(group_name: str):
-    """Helper para criar usuário em grupo específico."""
-    u = UsuarioFactory(
-        username=f"u{group_name}",
-        email=f"{group_name}@x.com",
-        password="x",
-        cpf="1" * 11,
-    )
-    g = GroupFactory(name=group_name)
-    u.groups.add(g)
-    return u
-
-
-def test_import_compras_requires_dat():
-    """PR-A1 DAT-Imports: import de COMPRAS requer grupo DAT."""
-    user = _user_in_group("DAT")
+def test_import_compras_com_superusuario():
+    """Import de COMPRAS pela tela: superusuário."""
+    user = UsuarioFactory(superuser=True)
     client = APIClient()
     client.force_authenticate(user=user)
 
@@ -64,9 +51,9 @@ def test_import_compras_requires_dat():
     assert r.json()["dry_run"] is True
 
 
-def test_import_acoes_requires_dat():
+def test_import_acoes_com_superusuario():
     """PR-A1 DAT-Imports: import de AÇÕES requer grupo DAT."""
-    user = _user_in_group("DAT")
+    user = UsuarioFactory(superuser=True)
     client = APIClient()
     client.force_authenticate(user=user)
 
@@ -89,9 +76,9 @@ def test_import_acoes_requires_dat():
     assert mock_import.call_args.kwargs["dry_run"] is True
 
 
-def test_import_cadastros_requires_dat():
-    """Import de CADASTROS requer grupo DAT."""
-    user = _user_in_group("DAT")
+def test_import_cadastros_com_superusuario():
+    """Import de CADASTROS pela tela: superusuário."""
+    user = UsuarioFactory(superuser=True)
     client = APIClient()
     client.force_authenticate(user=user)
 
@@ -136,7 +123,7 @@ def test_import_unauthorized_returns_403():
 
 def test_import_acoes_without_file_returns_400():
     """Import sem arquivo retorna 400 Bad Request."""
-    user = _user_in_group("DAT")
+    user = UsuarioFactory(superuser=True)
     client = APIClient()
     client.force_authenticate(user=user)
 
@@ -148,7 +135,7 @@ def test_import_acoes_without_file_returns_400():
 
 def test_import_cadastros_without_file_returns_400():
     """Import sem arquivo retorna 400 Bad Request."""
-    user = _user_in_group("DAT")
+    user = UsuarioFactory(superuser=True)
     client = APIClient()
     client.force_authenticate(user=user)
 
@@ -160,7 +147,7 @@ def test_import_cadastros_without_file_returns_400():
 
 def test_trailing_slash_in_import_endpoints():
     """Endpoints de import devem ter trailing slash."""
-    user = _user_in_group("DAT")
+    user = UsuarioFactory(superuser=True)
     client = APIClient()
     client.force_authenticate(user=user)
 

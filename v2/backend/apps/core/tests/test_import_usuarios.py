@@ -339,8 +339,8 @@ class TestImportUsuariosView:
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_dat_user_can_import(self, api_client, dat_user, sample_csv):
-        """Usuario DAT pode importar."""
+    def test_dat_recebe_403(self, api_client, dat_user, sample_csv):
+        """Importação pela tela é só do superusuário (decisão do dono, 02/10/2026): 403."""
         api_client.force_authenticate(user=dat_user)
 
         with open(sample_csv, "rb") as f:
@@ -350,9 +350,7 @@ class TestImportUsuariosView:
                 format="multipart",
             )
 
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["dry_run"] is True
-        assert response.data["stats"]["created"] == 2
+        assert response.status_code == 403
 
     def test_superuser_can_import(self, api_client, superuser, sample_csv):
         """Superusuario pode importar."""
@@ -367,10 +365,10 @@ class TestImportUsuariosView:
 
         assert response.status_code == status.HTTP_200_OK
 
-    def test_apply_mode_persists(self, api_client, dat_user, sample_csv):
+    def test_apply_mode_persists(self, api_client, superuser, sample_csv):
         """dry_run=false persiste os dados."""
         initial_count = User.objects.count()
-        api_client.force_authenticate(user=dat_user)
+        api_client.force_authenticate(user=superuser)
 
         with open(sample_csv, "rb") as f:
             response = api_client.post(
@@ -383,9 +381,9 @@ class TestImportUsuariosView:
         assert response.data["dry_run"] is False
         assert User.objects.count() == initial_count + 2
 
-    def test_missing_file_returns_400(self, api_client, dat_user):
+    def test_missing_file_returns_400(self, api_client, superuser):
         """Arquivo ausente retorna 400."""
-        api_client.force_authenticate(user=dat_user)
+        api_client.force_authenticate(user=superuser)
 
         response = api_client.post(
             IMPORT_USUARIOS_URL,
@@ -396,11 +394,11 @@ class TestImportUsuariosView:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "file" in str(response.data).lower()
 
-    def test_invalid_mime_type_returns_400(self, api_client, dat_user):
+    def test_invalid_mime_type_returns_400(self, api_client, superuser):
         """Tipo de arquivo invalido retorna 400."""
         from django.core.files.uploadedfile import SimpleUploadedFile
 
-        api_client.force_authenticate(user=dat_user)
+        api_client.force_authenticate(user=superuser)
 
         # Usar MIME type explicitamente inválido (não text/plain, pois CSVs podem ser text/plain)
         fake_file = SimpleUploadedFile("malicious.exe", b"MZ\x90\x00", content_type="application/x-msdownload")
@@ -636,7 +634,11 @@ class TestImportGrupoGateTier0:
     # --- view: prova que o ator chega mesmo ao service --------------------
 
     def test_dat_nao_escala_o_proprio_privilegio_via_import(self, api_client, dat_user, grupos_de_autoridade, tmp_path):
-        """O ataque: DAT sobe CSV com o proprio CPF pedindo autoridade (PA-01)."""
+        """O ataque: DAT sobe CSV com o proprio CPF pedindo autoridade (PA-01).
+
+        Desde 02/10/2026 o import pela tela e so do superusuario: o DAT recebe 403 antes do service.
+        O gate do service (`_actor_pode_atribuir_grupos`) segue coberto pelos testes acima.
+        """
         grupos_antes = set(dat_user.groups.values_list("name", flat=True))
         path = _write_csv(tmp_path, f'cpf,nome,grupos\n{dat_user.cpf},DAT User,"Superintendência,Gerente"\n')
         api_client.force_authenticate(user=dat_user)
@@ -644,21 +646,10 @@ class TestImportGrupoGateTier0:
         with open(path, "rb") as f:
             response = api_client.post(IMPORT_USUARIOS_URL + "?dry_run=false", {"file": f}, format="multipart")
 
-        assert response.status_code == status.HTTP_200_OK
+        assert response.status_code == status.HTTP_403_FORBIDDEN
         dat_user.refresh_from_db()
         assert set(dat_user.groups.values_list("name", flat=True)) == grupos_antes
         assert not dat_user.groups.filter(name__in=["Superintendência", "Gerente"]).exists()
-
-    def test_resposta_da_api_expoe_grupos_ignorados(self, api_client, dat_user, grupos_de_autoridade, tmp_path):
-        """A UI precisa conseguir mostrar o que foi ignorado."""
-        path = _write_csv(tmp_path, "cpf,nome,grupos\n10000005673,Novo Usuario,Gerente\n")
-        api_client.force_authenticate(user=dat_user)
-
-        with open(path, "rb") as f:
-            response = api_client.post(IMPORT_USUARIOS_URL + "?dry_run=false", {"file": f}, format="multipart")
-
-        assert response.status_code == status.HTTP_200_OK
-        assert len(response.data["pendencias"]["grupos_ignorados"]) == 1
 
     def test_superuser_ainda_atribui_grupos_via_api(self, api_client, superuser, grupos_de_autoridade, tmp_path):
         """O caminho legitimo (superusuario) continua funcionando pela API."""

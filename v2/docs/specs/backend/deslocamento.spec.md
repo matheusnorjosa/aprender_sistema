@@ -61,7 +61,7 @@ E um cadastro operacional simples (CRUD + import em massa), sem fluxo de aprovac
 - **Validacao de datas** (serializer): exige `end_date > start_date` (estrito; `end_date <= start_date` -> 400 em `end_date`). Suporta PATCH parcial (usa o valor da instancia para o campo ausente).
 - **Origem != destino** (serializer): comparacao case-insensitive (`.strip().lower()`); igual -> 400 em `destino`.
 - **Idempotencia de import**: `external_hash = SHA1(usuario_id|origem|destino|start_iso|end_iso)` via `stable_import_hash` (byte-equivalente ao formato historico). Re-import do mesmo registro nao duplica; so `observacao` e atualizada quando muda (never-overwrite dos demais campos). `unique=True` no `external_hash` e a barreira de banco.
-- **Dry-run por padrao no import**: `dry_run=true` faz `transaction.set_rollback(True)`; nada e persistido. O endpoint inteiro exige `HasPerm("import_spreadsheet")` (DAT ou superuser), tanto em dry-run quanto em apply. Isolamento savepoint-por-linha (ASQ-016): uma linha ruim nao derruba o lote. **O parse de `dry_run` e FAIL-CLOSED** (corrigido em [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649); achado historico `M04-05`): `views_import_deslocamentos.py` chama `parse_dry_run(request.query_params.get("dry_run"))` — só um token de apply explícito (`false`/`0`/`no`/…) grava; qualquer valor desconhecido (`sim`, `maybe`, typo, vazio) permanece em dry-run (preview). Antes de #1649 o parse era uma allowlist do valor verdadeiro e o valor desconhecido virava apply silencioso.
+- **Dry-run por padrao no import**: `dry_run=true` faz `transaction.set_rollback(True)`; nada e persistido. O endpoint inteiro exige `SuperuserOnly` (so superusuario, decisao do dono de 02/10/2026: nenhum perfil importa pela tela), tanto em dry-run quanto em apply. Isolamento savepoint-por-linha (ASQ-016): uma linha ruim nao derruba o lote. **O parse de `dry_run` e FAIL-CLOSED** (corrigido em [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649); achado historico `M04-05`): `views_import_deslocamentos.py` chama `parse_dry_run(request.query_params.get("dry_run"))` — só um token de apply explícito (`false`/`0`/`no`/…) grava; qualquer valor desconhecido (`sim`, `maybe`, typo, vazio) permanece em dry-run (preview). Antes de #1649 o parse era uma allowlist do valor verdadeiro e o valor desconhecido virava apply silencioso.
 - **Leitura: scope por gerencia + self-service** (`views_deslocamento.py`, `get_queryset`):
   - Superuser **ou** capability `view_all_availability` (Controle/Gerente via seed 0078) -> ve todos os deslocamentos.
   - Demais autenticados -> `Q(usuario=user) | Q(usuario__equipes__gerencia_id__in=<gerencias do user>)`. **O proprio dono SEMPRE ve os proprios deslocamentos**, mesmo sem vinculo de `EquipeGerencia` (#1454). A regra anterior desta spec ("sem vinculo -> 0 resultados") deixou de valer.
@@ -85,7 +85,7 @@ CRUD (router DRF, basename `deslocamento`):
 
 Import em massa:
 
-- `POST /api/deslocamentos/import/` — `ImportDeslocamentosView`. Permissao `[IsAuthenticated, HasPerm("import_spreadsheet")]` (DAT ou superuser). Query `dry_run=true|false` (default `true`). Body multipart `file` (CSV/XLSX). Validacao de upload (tamanho/MIME/magic bytes) e temp-file sanitizado (path-injection mitigado). Retorna `{stats:{created,updated,unchanged,skipped}, pendencias:{usuarios,dates,outros}, dry_run, file}`. Colunas aceitas com headers flexiveis (`usuario|email|nome`, `origem`, `destino`, `data_inicio`, `data_fim`, `observacao`); datas parseadas em ISO, `dd/mm/yyyy` e serial Excel.
+- `POST /api/deslocamentos/import/` — `ImportDeslocamentosView`. Permissao `[IsAuthenticated, SuperuserOnly]` (so superusuario; ver [imports.spec](./imports.spec.md)). Query `dry_run=true|false` (default `true`). Body multipart `file` (CSV/XLSX). Validacao de upload (tamanho/MIME/magic bytes) e temp-file sanitizado (path-injection mitigado). Retorna `{stats:{created,updated,unchanged,skipped}, pendencias:{usuarios,dates,outros}, dry_run, file}`. Colunas aceitas com headers flexiveis (`usuario|email|nome`, `origem`, `destino`, `data_inicio`, `data_fim`, `observacao`); datas parseadas em ISO, `dd/mm/yyyy` e serial Excel.
 
 Schema detalhado/exemplos: ver `API_REFERENCE` quando disponivel.
 
@@ -93,7 +93,7 @@ Schema detalhado/exemplos: ver `API_REFERENCE` quando disponivel.
 
 **Lancamento manual (UI dedicada)**: operador abre `DeslocamentosPage`, filtra por usuario/datas/origem/destino, cria/edita via modal -> `POST`/`PUT` -> serializer valida (datas, origem!=destino) -> `perform_create/update` aplica o gate owner-or-delegate, grava registro + `AuditLog`. `external_hash` so e setado pelo import (CRUD manual deixa null). ⚠️ Hoje esse fluxo **falha com 403 para Coordenador** — ver `M09-05` em §Contratos.
 
-**Import em massa (caminho feliz)**: DAT envia planilha -> `dry_run=true` retorna `stats`/`pendencias` para revisao -> apos validacao, `dry_run=false` persiste create-only (atualiza so `observacao`). Idempotente por `external_hash`.
+**Import em massa (caminho feliz)**: o superusuario envia planilha -> `dry_run=true` retorna `stats`/`pendencias` para revisao -> apos validacao, `dry_run=false` persiste create-only (atualiza so `observacao`). Idempotente por `external_hash`.
 
 **Erros relevantes do import**: usuario nao resolvido (email>nome) -> `skipped.usuario` + `pendencias.usuarios`; origem/destino ausentes -> `skipped.other`; data invalida ou `data_fim < data_inicio` -> `skipped.dates`; qualquer excecao de linha e isolada por savepoint e some em `pendencias.outros` (o lote continua).
 
@@ -103,14 +103,14 @@ Schema detalhado/exemplos: ver `API_REFERENCE` quando disponivel.
 
 - Idempotencia de import via SHA1 — ADR-012 (hashing `apps/core/imports/hashing.py`), reutilizada por `_compute_external_hash`.
 - Scope C2 de Deslocamentos (Coord/Apoio/DAT scoped via `EquipeGerencia`, Controle/Gerente full) — decisao de stakeholder 2026-04-27, documentada em [`rbac_authorization_matrix.md`](../../rbac_authorization_matrix.md) (§3) e PR #1250.
-- Centralizacao DAT-only do import (`HasPerm("import_spreadsheet")`) — PR-A1 DAT-Imports (2026-04-29).
+- Centralizacao DAT-only do import (`HasPerm("import_spreadsheet")`) — PR-A1 DAT-Imports (2026-04-29); substituida em 02/10/2026 por `SuperuserOnly` (importacao pela tela so do superusuario, decisao do dono).
 
 ## Testes que cobrem
 
 - [`apps/core/tests/test_deslocamento_api.py`](../../../backend/apps/core/tests/test_deslocamento_api.py) — CRUD, filtros, validacoes (datas, origem!=destino), AuditLog.
 - [`apps/core/tests/test_deslocamento_rbac.py`](../../../backend/apps/core/tests/test_deslocamento_rbac.py) — scope de leitura (Coord/DAT veem a propria gerencia; Controle/Gerente full).
 - [`apps/core/tests/test_deslocamento_idor_1454.py`](../../../backend/apps/core/tests/test_deslocamento_idor_1454.py) — gate owner-or-delegate no create/update/destroy (#1454).
-- [`apps/core/tests/test_import_deslocamentos.py`](../../../backend/apps/core/tests/test_import_deslocamentos.py) — service + view + RBAC `import_spreadsheet` + idempotencia.
+- [`apps/core/tests/test_import_deslocamentos.py`](../../../backend/apps/core/tests/test_import_deslocamentos.py) — service + view + gate (DAT recebe 403; superusuario importa) + idempotencia.
 - [`apps/core/tests/test_monthly_with_deslocamento.py`](../../../backend/apps/core/tests/test_monthly_with_deslocamento.py) — codigos `D`/`D1` e precedencia na grade.
 - [`apps/core/tests/test_rbac_matrix_endpoint_coverage.py`](../../../backend/apps/core/tests/test_rbac_matrix_endpoint_coverage.py) / [`test_rbac_matrix_living.py`](../../../backend/apps/core/tests/test_rbac_matrix_living.py) — `deslocamentos` na matriz viva (`_ALL_AUTH`).
 

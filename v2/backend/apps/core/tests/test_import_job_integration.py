@@ -28,18 +28,9 @@ UPLOAD_URL = "/api/imports/bloqueios/"
 
 
 @pytest.fixture
-def controle_user(db):
-    # O seed RBAC (incl. pos-truncate de transaction=True) e garantido globalmente
-    # pela fixture autouse `ensure_rbac_seed` (conftest raiz, #1402).
-    return UsuarioFactory(
-        username="ctrl_intg",
-        email="ctrl_intg@test.com",
-        password="testpass123",
-        cpf="11111111111",
-        first_name="Ctrl",
-        last_name="Intg",
-        groups=["Controle"],
-    )
+def superuser(db):
+    """Superusuário: o único que importa pela tela (decisão do dono, 02/10/2026)."""
+    return UsuarioFactory(superuser=True)
 
 
 @pytest.fixture
@@ -84,8 +75,8 @@ class TestAsyncPipelineEndToEnd:
         settings.CELERY_TASK_ALWAYS_EAGER = True
         settings.CELERY_TASK_EAGER_PROPAGATES = True
 
-    def test_dry_run_full_pipeline(self, api_client, controle_user, target_user, sample_csv):
-        api_client.force_authenticate(user=controle_user)
+    def test_dry_run_full_pipeline(self, api_client, superuser, target_user, sample_csv):
+        api_client.force_authenticate(user=superuser)
 
         with open(sample_csv, "rb") as f:
             post = api_client.post(
@@ -110,8 +101,8 @@ class TestAsyncPipelineEndToEnd:
         # dry_run: nenhum bloqueio persistido
         assert AvailabilityBlock.objects.count() == 0
 
-    def test_apply_full_pipeline_persists(self, api_client, controle_user, target_user, sample_csv):
-        api_client.force_authenticate(user=controle_user)
+    def test_apply_full_pipeline_persists(self, api_client, superuser, target_user, sample_csv):
+        api_client.force_authenticate(user=superuser)
 
         with open(sample_csv, "rb") as f:
             post = api_client.post(
@@ -159,9 +150,9 @@ class TestImportBloqueiosPermissions:
             resp = api_client.post(UPLOAD_URL, {"file": f}, format="multipart")
         assert resp.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_upload_without_file_returns_400(self, api_client, controle_user):
+    def test_upload_without_file_returns_400(self, api_client, superuser):
         """POST sem o campo 'file' → 400 (validação antes de despachar a task)."""
-        api_client.force_authenticate(user=controle_user)
+        api_client.force_authenticate(user=superuser)
         resp = api_client.post(UPLOAD_URL, {}, format="multipart")
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
@@ -175,8 +166,8 @@ class TestImportBloqueiosMalformed:
         settings.CELERY_TASK_ALWAYS_EAGER = True
         settings.CELERY_TASK_EAGER_PROPAGATES = True
 
-    def test_malformed_csv_pula_linhas_job_success(self, api_client, controle_user, malformed_csv):
-        api_client.force_authenticate(user=controle_user)
+    def test_malformed_csv_pula_linhas_job_success(self, api_client, superuser, malformed_csv):
+        api_client.force_authenticate(user=superuser)
 
         with open(malformed_csv, "rb") as f:
             post = api_client.post(

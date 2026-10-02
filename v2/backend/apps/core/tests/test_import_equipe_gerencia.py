@@ -202,11 +202,12 @@ class TestEquipeGerenciaImportView:
             response = api_client.post(IMPORT_EQUIPE_URL, {"file": f}, format="multipart")
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_permission_allowed_for_dat(self, api_client, dat_user, sample_csv):
+    def test_permission_denied_for_dat(self, api_client, dat_user, sample_csv):
         api_client.force_authenticate(user=dat_user)
         with open(sample_csv, "rb") as f:
             response = api_client.post(IMPORT_EQUIPE_URL, {"file": f}, format="multipart")
-        assert response.status_code == status.HTTP_200_OK
+
+        assert response.status_code == 403
 
     def test_permission_allowed_for_superuser(self, api_client, superuser, sample_csv):
         api_client.force_authenticate(user=superuser)

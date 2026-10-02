@@ -42,7 +42,6 @@ const DAT_ACCESSIBLE_ROUTES = [
   '/deslocamentos', // IsControleOrDAT
   '/dat/admin',
   '/dat/cadastros',
-  '/dat/importacao',
   '/dat/registros',
   '/dashboards/compras', // canDashboardCompras (atual já permite DAT)
 ];

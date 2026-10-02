@@ -77,7 +77,7 @@ Para atualizar:
 CI valida sync com `python manage.py rbac_matrix_doc --check` — drift
 silencioso entre Markdown e Python falha o pipeline.
 
-> Recursos não listados na matriz Python (Bloqueios, Reports, Imports,
+> Recursos não listados na matriz Python (Bloqueios, Reports,
 > Ações Internas, Solicitações Criar, Dashboard Geral isolado) ficam fora
 > deste contrato auto-sync. Suas regras vivem nos respectivos
 > `permission_classes` e em testes dedicados; expansão de
@@ -106,6 +106,7 @@ Legenda dos status codes (matriz executável):
 | **solicitacoes_batch_approve** (`POST /api/solicitacoes/batch-approve/`) | ⚠️ 400 | 🔒 | 🔒 | 🔒 | 🔒 | ⚠️ 400 | ⚠️ 400 | 🔒 | 🔒 | 🔒 |
 | **produtos_list** (`GET /api/produtos/`) | ✅ | ✅ | ✅ | 🔒 | 🔒 | 🔒 | ✅ | 🔒 | 🔒 | 🔒 |
 | **usuario_lookup** (`GET /api/lookup/usuarios/`) | ✅ | ✅ | 🔒 | 🔒 | ✅ | ✅ | 🔒 | ✅ | ✅ | 🔒 |
+| **import_pela_tela** (`POST /api/controle/import-compras/`) | ⚠️ 400 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 |
 
 *Para atualizar este bloco: edite `apps/core/rbac/matrix.py` e rode `python manage.py rbac_matrix_doc --write` no container backend.*
 
@@ -124,11 +125,11 @@ Estado autoritativo após `0080_redistribute_view_all_availability` (2026-04-28,
 | `create_solicitation` | Coordenador, Apoio de Coordenação, Gerente | Quem cria pedido de evento |
 | `edit_solicitation_as_owner_or_privileged` | Gerente, Coordenador, Apoio de Coordenação | Edição da própria solicitação ou de qualquer com privilégio |
 | `execute_restricted_operations` | Superintendência | Operações irreversíveis (bloqueio executivo) |
-| `import_spreadsheet` | DAT | Único setor que faz importação massa |
+| `import_spreadsheet` | DAT | Sem efeito em endpoint desde 02/10/2026 (D20): nenhuma capability abre importação pela tela, só superusuário. O grupo segue atribuído, mas a capability não libera rota nem tela |
 | `manage_admin_registries` | DAT | Manutenção de cadastros administrativos |
 | `manage_purchases_and_materials` | DAT, Controle | Compras e materiais (DAT operacionaliza, Controle audita uso) |
 | `operate_preagenda` | Controle | Operação diária do calendário |
-| `run_daily_operations` | Controle | Imports operacionais e workflow diário |
+| `run_daily_operations` | Controle | Workflow diário do Controle. Não abre importação pela tela desde 02/10/2026 (D20): só superusuário |
 | `supervise_operations` | Diretoria | Visão executiva consolidada |
 | **`view_all_availability`** | **Controle, DAT** *(Gerente perdeu a cap global na 0080 e cai em scope via EquipeGerencia; Coord/Apoio idem — D9)* | **Visão transversal sem restrição** (decisão D9, pós migration 0080) |
 | `view_compras_dashboard` | Diretoria | Decisão executiva de compras |
@@ -198,6 +199,7 @@ permission_classes = [IsAdminUser]                    # ❌ DRF built-in fora da
 | D17 | Atribuição **Group × Capability é admin-driven** pós-PR 16 | 2026-05-04 (PR 16) | Capability codenames continuam SSOT em `apps/core/services/functional_permissions_seed.py` (16 itens, validados em `_validate_seed`). A relação Group × Capability migra para Django Admin superuser-only (`PermissaoFuncionalAdmin`). Migrations e seed futuros **só devem criar/remover/renomear** capability — não devem usar `groups.set()`/`groups.clear()` para sobrescrever atribuições admin. Reset de defaults, se necessário, vira comando explícito (não automático). Cada operação Admin emite AuditLog `GROUP_CAPABILITY_CHANGED` consolidado por capability (com `actor_user_id`, `capability_codename`, `added_groups`, `removed_groups`, `groups_after`). Cache funcional invalidado automaticamente via signal `m2m_changed`. Guardas estritos no Admin: add/delete bloqueados; codename, label, description, category, is_system read-only. |
 | D18 | Aprovação pela **gerência** (vínculo) + **segregação** (PR B1) | 2026-09-29 | Aprova quem tem `EquipeGerencia` vigente com papel GERENTE na gerência `Gerencia.nome == "SUPERINTENDENCIA"` (`GERENCIA_APROVADORA_NOME`) — ninguém de g1 tinha o par de grupos. SSOT `solicitation_approval_basis` (`superuser` / `gerente_superintendencia` / `asst_admin_controle` / `grupo_superintendencia_gerente`), gravada em `AuditLog.details.autoridade`. Chave = `nome` (rótulos e `setor_canonico` são editáveis/reescritos; id muda entre ambientes); `Gerencia.ativo` não é checado. Segregação: ninguém decide a própria solicitação (403 `self_approval_forbidden`; lote → `errors[]`); superuser pode, marcado `details.autoaprovacao`. Anti-escalada no mesmo PR: importers recusam criar/reativar o vínculo aprovador, `validate_nome` protege a chave, lotação audita concessão/revogação. `is_superintendencia` não muda. O composite de grupos sai no B2. |
 | D19 | **Escopo da aprovadora por vínculo** + trava de cadastro de projeto SUPER (regra do dono) | 2026-09-30 | A base `gerente_superintendencia` aprova/reprova (individual e lote), edita, exclui e cria **só** solicitação de projeto do fluxo SUPER da gerência `SUPERINTENDENCIA` (`projeto_no_escopo_da_superintendencia`, fail-closed). Fora: decidir → 403 `out_of_approval_scope` (lote → `errors[]`); editar/excluir → 403; criar/mover → 400 em `projeto`. **Ver não muda** (lista, detalhe, prévia). As próprias seguem editáveis como para qualquer coordenador. Não mudam: superuser, par Controle + Assistente Administrativo, par legado (sai no B2) e quem é global por capability (Controle/DAT) para editar/excluir. Exceção: 2º vínculo vigente de GERENTE dela em outra gerência (COORDENADOR, APOIO e FORMADOR não) abre criar/editar/excluir/mover naquela gerência, não decidir. Racional: o B1 pôs a policy em `user_is_solicitacao_global` e devolveu o `M10-01` para as 5 aprovadoras. Trava de cadastro: `fluxo = SUPER` só em projeto da `SUPERINTENDENCIA` (API 400, admin, import não cria SUPER, seed cria na g1) — toda pendente SUPER fica no escopo delas. |
+| D20 | **Importação pela tela = só superusuário** | 2026-10-02 (decisão do dono) | Nenhuma importação pela tela na liberação: as cargas passam por script (`import_export_contract`), com ensaio. As 13 rotas de upload de planilha (12 endpoints + 1 alias, `/api/import-compras/`) trocam `HasPerm("import_spreadsheet")` / `HasPerm("manage_admin_registries")` / `CanImportGenericSpreadsheet` por `[IsAuthenticated, SuperuserOnly]`; nenhuma capability abre. Recurso `import_pela_tela` na Matriz Viva (representado por `POST /api/controle/import-compras/`); rota a rota em `test_imports_pela_tela_so_superusuario.py`, com sentinela para view nova que receba arquivo (`APIView`, `@api_view` ou rota de `ViewSet`; sinais: "import" na rota, parser de arquivo declarado, `request.FILES` lido no próprio handler ou `serializer_class` com campo de arquivo). A sentinela é uma rede auxiliar, não a garantia: ela **não pega** (a) a view que entrega o `request` a função de outro módulo sem ler arquivo no próprio handler, (b) o serializer escolhido só por `get_serializer_class()` e (c) a permissão definida só por `get_permissions()`. A garantia real são os testes por rota (cada perfil contra cada uma das 13 rotas) e a Matriz Viva (recurso `import_pela_tela`). No frontend, o item DAT > Importações, as rotas `/dat/importacoes`, `/dat/admin/colecoes` e `/dat/admin/equipe-gerencia` e os uploads dentro de Municípios e Usuários só aparecem para superusuário. Substitui a regra do PR-A1 DAT-Imports (2026-04-29, "DAT importa"). |
 
 ---
 

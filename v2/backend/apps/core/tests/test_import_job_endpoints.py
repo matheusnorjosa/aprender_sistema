@@ -101,8 +101,8 @@ def sample_csv():
 
 @pytest.mark.django_db
 class TestUploadEndpoint:
-    def test_controle_upload_creates_job_and_dispatches_task(self, api_client, controle_user, sample_csv):
-        api_client.force_authenticate(user=controle_user)
+    def test_superuser_upload_creates_job_and_dispatches_task(self, api_client, super_user, sample_csv):
+        api_client.force_authenticate(user=super_user)
 
         mocked_async = MagicMock(id="celery-id-abc")
         with patch("apps.core.tasks.task_run_import_job.delay", return_value=mocked_async) as mocked_delay:
@@ -124,7 +124,7 @@ class TestUploadEndpoint:
 
         # ImportJob foi persistido
         job = ImportJob.objects.get(id=payload["id"])
-        assert job.user_id == controle_user.id
+        assert job.user_id == super_user.id
         assert job.file.name.endswith(".csv")
 
         # Task foi despachada com o id correto
@@ -141,20 +141,20 @@ class TestUploadEndpoint:
             response = api_client.post(UPLOAD_URL, {"file": f}, format="multipart")
         assert response.status_code in {status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN}
 
-    def test_missing_file_returns_400(self, api_client, controle_user):
-        api_client.force_authenticate(user=controle_user)
+    def test_missing_file_returns_400(self, api_client, super_user):
+        api_client.force_authenticate(user=super_user)
         response = api_client.post(UPLOAD_URL, {}, format="multipart")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "file" in response.data["detail"].lower()
 
-    def test_invalid_mime_returns_400(self, api_client, controle_user):
-        api_client.force_authenticate(user=controle_user)
+    def test_invalid_mime_returns_400(self, api_client, super_user):
+        api_client.force_authenticate(user=super_user)
         fake = SimpleUploadedFile("malware.exe", b"MZ\x90\x00", content_type="application/x-msdownload")
         response = api_client.post(UPLOAD_URL, {"file": fake}, format="multipart")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    def test_dry_run_default_is_true(self, api_client, controle_user, sample_csv):
-        api_client.force_authenticate(user=controle_user)
+    def test_dry_run_default_is_true(self, api_client, super_user, sample_csv):
+        api_client.force_authenticate(user=super_user)
         mocked_async = MagicMock(id="abc")
         with patch("apps.core.tasks.task_run_import_job.delay", return_value=mocked_async):
             with open(sample_csv, "rb") as f:
@@ -162,8 +162,8 @@ class TestUploadEndpoint:
         assert response.status_code == status.HTTP_202_ACCEPTED
         assert response.data["dry_run"] is True
 
-    def test_dry_run_false_param(self, api_client, controle_user, sample_csv):
-        api_client.force_authenticate(user=controle_user)
+    def test_dry_run_false_param(self, api_client, super_user, sample_csv):
+        api_client.force_authenticate(user=super_user)
         mocked_async = MagicMock(id="abc")
         with patch("apps.core.tasks.task_run_import_job.delay", return_value=mocked_async):
             with open(sample_csv, "rb") as f:

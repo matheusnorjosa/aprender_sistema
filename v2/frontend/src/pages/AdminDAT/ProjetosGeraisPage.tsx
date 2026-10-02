@@ -29,6 +29,7 @@ import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../
 import { AcoesLinha, larguraAcoesLinha } from '../../components/AcoesLinha';
 import { TEXTO_DA_TAG } from '../../components/textoDaTag';
 import { DEFAULT_PAGE_SIZE } from '../../constants';
+import { aposConfirmacaoFechar, dialogoDeExclusaoEmUso } from './excluirEmUso';
 import { errosDosCampos, mensagemDoErro } from './usuario_form_helpers';
 
 const { Title, Text } = Typography;
@@ -163,6 +164,9 @@ export default function ProjetosGeraisPage(): JSX.Element {
 
   const handleDelete = (record: ProjetoGeralRecord): void => {
     const projetos = record.projetos_count ?? 0;
+    // 409 (em uso): o diálogo "Não é possível excluir" abre quando este terminar de fechar, ou na hora,
+    // se a pessoa já o fechou com o DELETE em andamento (excluirEmUso.ts).
+    const aposFechar = aposConfirmacaoFechar();
     Modal.confirm({
       title: 'Excluir projeto geral',
       // Os projetos da família não somem: ficam sem projeto geral (SET_NULL no backend), inclusive os
@@ -183,9 +187,19 @@ export default function ProjetosGeraisPage(): JSX.Element {
           message.success('Projeto geral excluído');
           void fetchProjetos(pagination.current ?? 1, pagination.pageSize ?? DEFAULT_PAGE_SIZE);
         } catch (error) {
-          message.error(`Erro ao excluir: ${mensagemDoErro(error)}`);
+          const emUso = dialogoDeExclusaoEmUso({
+            erro: error,
+            registro: `o projeto geral "${record.nome}"`,
+            ativo: record.ativo,
+            desativar: () => updateProjetoGeral(record.id, { ativo: false }),
+            desativado: 'Projeto geral desativado',
+            recarregar: () => void fetchProjetos(pagination.current ?? 1, pagination.pageSize ?? DEFAULT_PAGE_SIZE),
+          });
+          if (emUso) aposFechar.abrir(emUso);
+          else message.error(`Erro ao excluir: ${mensagemDoErro(error)}`);
         }
       },
+      afterClose: aposFechar.afterClose,
     });
   };
 

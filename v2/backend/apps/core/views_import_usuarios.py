@@ -2,7 +2,7 @@
 Endpoint DRF para importacao de Usuarios.
 
 POST /api/usuarios/import/
-- Permission: HasPerm("manage_admin_registries")
+- Permission: SuperuserOnly
 - Query param: dry_run=true|false (default: true)
 - Body: {file: upload}
 - Returns: Relatorio com stats, pendencias
@@ -27,7 +27,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.core.api_schemas import COMMON_ERROR_RESPONSES
 from apps.core.imports.request_params import parse_dry_run
-from apps.core.permissions import HasPerm
+from apps.core.permissions import SuperuserOnly
 from apps.core.serializers.openapi_critical_contract import (
     ImportFileUploadRequestSerializer,
     ImportOperationErrorResponseSerializer,
@@ -43,7 +43,7 @@ class ImportUsuariosView(APIView):
     """
     Importa Usuarios de CSV/XLSX.
 
-    Requer permissao: HasPerm("manage_admin_registries") (grupos DAT ou Superintendencia, ou superuser)
+    Requer superusuário (`SuperuserOnly`): importação pela tela é só do superusuário.
 
     A coluna `grupos` do arquivo so e aplicada quando o ator e superusuario;
     para os demais ela e ignorada e reportada em `pendencias.grupos_ignorados`.
@@ -67,7 +67,8 @@ class ImportUsuariosView(APIView):
         }
     """
 
-    permission_classes = [IsAuthenticated, HasPerm("manage_admin_registries")]
+    # Decisão do dono (02/10/2026): importação pela tela é só do superusuário.
+    permission_classes = [IsAuthenticated, SuperuserOnly]
     throttle_scope = "import"
 
     @extend_schema(

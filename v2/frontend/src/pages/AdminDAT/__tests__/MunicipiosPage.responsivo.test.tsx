@@ -21,6 +21,9 @@ const { MUNICIPIOS } = vi.hoisted(() => ({
   ],
 }));
 
+vi.mock('../../../api/auth', () => ({
+  checkAuth: vi.fn().mockResolvedValue({ authenticated: true, user: { is_superuser: true } }),
+}));
 vi.mock('../../../api/ops', () => ({ importMunicipios: vi.fn() }));
 vi.mock('../../../api/adminDAT', () => ({
   listMunicipios: vi.fn().mockResolvedValue({ results: MUNICIPIOS, count: 1, next: null, previous: null }),

@@ -22,17 +22,11 @@ import { AcoesLinha, larguraAcoesLinha } from '../../components/AcoesLinha';
 import { FalhaAoCarregar } from '../../components/FalhaAoCarregar';
 import { TEXTO_DA_TAG } from '../../components/textoDaTag';
 import { DEFAULT_PAGE_SIZE } from '../../constants';
+import { aposConfirmacaoFechar, dialogoDeExclusaoEmUso, dialogoNaoPodeExcluir } from './excluirEmUso';
 import { errosDosCampos, mensagemDoErro } from './usuario_form_helpers';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
-
-/** Confiança do de-para (vocabulário do importer) com o rótulo de tela e a cor da etiqueta. */
-const CONFIANCA: Record<string, { rotulo: string; cor: string }> = {
-  na: { rotulo: 'Conferir', cor: 'red' }, // não-aplicável: prioridade máxima da conferência
-  media: { rotulo: 'Média', cor: 'orange' },
-  alta: { rotulo: 'Alta', cor: 'green' },
-};
 
 /** Tag que corta com reticências em vez de estourar a coluna. */
 function Etiqueta({ cor, texto }: { cor: string; texto: string }): JSX.Element {
@@ -78,8 +72,6 @@ export default function GerenciasPage(): JSX.Element {
   const setorRef = useRef<RefSelectProps>(null);
   const [erroLista, setErroLista] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
-  // Filtro de confiança no topo (vale em qualquer largura; no cabeçalho da coluna, sumia com ela).
-  const [confiancaFiltro, setConfiancaFiltro] = useState<string | undefined>(undefined);
   // Celular (< 576 px): as ações da linha vão todas para o menu "Mais ações".
   const acoesCompactas = !Grid.useBreakpoint().sm;
 
@@ -198,17 +190,34 @@ export default function GerenciasPage(): JSX.Element {
 
   const handleDelete = (gerencia: GerenciaRecord): void => {
     const projetos = gerencia.projetos_count ?? 0;
-    // Com projeto ativo, a exclusão já se sabe recusada (PROTECT, 409): só o aviso, sem "Sim, excluir".
+    const saida = {
+      registro: `a gerência "${gerencia.rotulo}"`,
+      ativo: gerencia.ativo,
+      desativar: () => updateGerencia(gerencia.id, { ativo: false }),
+      desativado: 'Gerência desativada',
+      // Desativar gerência não muda só a coluna Situação: `/api/me` só devolve vínculo de gerência ativa
+      // (é por ele que a equipe vê Disponibilidade, Bloqueios e Deslocamentos), e os seletores de Projetos
+      // e de Usuários só listam as ativas.
+      oQueFica: 'os projetos e a equipe continuam cadastrados',
+      aoDesativar:
+        'mas a gerência sai das listas de escolha em Projetos e Usuários, a equipe perde o acesso que tem por ela' +
+        ' a Disponibilidade, Bloqueios e Deslocamentos, a situação passa a Inativo',
+      recarregar: () => void fetchGerencias(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE),
+    };
+    // Com projeto ativo, a exclusão já se sabe recusada (PROTECT, 409): o aviso, sem "Sim, excluir",
+    // com a mesma saída do 409 (Desativar).
     if (projetos > 0) {
-      Modal.info({
-        title: 'Não é possível excluir',
-        content:
+      dialogoNaoPodeExcluir({
+        motivo:
           `A gerência "${gerencia.rotulo}" tem ${projetos} projeto(s) ativo(s) vinculado(s).` +
           ' Gerência com projetos ou equipes vinculados, mesmo inativos, não pode ser excluída.',
-        okText: 'Entendi',
-      });
+        ...saida,
+      })();
       return;
     }
+    // 409 (em uso): o diálogo "Não é possível excluir" abre quando este terminar de fechar, ou na hora,
+    // se a pessoa já o fechou com o DELETE em andamento (excluirEmUso.ts).
+    const aposFechar = aposConfirmacaoFechar();
     Modal.confirm({
       title: 'Confirmar exclusão',
       // A contagem é só dos ativos: projeto inativo ou equipe (EquipeGerencia) também barram, e o
@@ -225,9 +234,12 @@ export default function GerenciasPage(): JSX.Element {
           message.success('Gerencia excluida com sucesso');
           void fetchGerencias(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
         } catch (error) {
-          message.error(`Erro ao excluir: ${mensagemDoErro(error)}`);
+          const emUso = dialogoDeExclusaoEmUso({ erro: error, ...saida });
+          if (emUso) aposFechar.abrir(emUso);
+          else message.error(`Erro ao excluir: ${mensagemDoErro(error)}`);
         }
       },
+      afterClose: aposFechar.afterClose,
     });
   };
 
@@ -256,23 +268,6 @@ export default function GerenciasPage(): JSX.Element {
       key: 'setor_canonico',
       responsive: VISIVEL_A_PARTIR.md,
       render: (_, g) => (g.setor_canonico ? <Etiqueta cor="geekblue" texto={g.setor_canonico} /> : <Tag>não definido</Tag>),
-    },
-    {
-      // Sinal de qualidade do de-para v15 (read-only) — ajuda a priorizar a conferência de
-      // baixa confiança (vocabulário definido pelo importer, RELAY 50), com rótulo de tela.
-      title: 'Confiança',
-      dataIndex: 'setor_canonico_confianca',
-      key: 'setor_canonico_confianca',
-      width: 120,
-      responsive: VISIVEL_A_PARTIR.md,
-      // Realça baixa qualidade p/ priorizar a conferência: Conferir (`na`) vermelho, Média
-      // laranja, Alta verde. O filtro fica no topo da página (confiancaFiltro).
-      render: (_, g) => {
-        const v = g.setor_canonico_confianca;
-        if (!v) return <Text type="secondary">—</Text>;
-        const confianca = CONFIANCA[v];
-        return <Etiqueta cor={confianca?.cor ?? 'green'} texto={confianca?.rotulo ?? v} />;
-      },
     },
     {
       title: 'Gerente',
@@ -347,15 +342,6 @@ export default function GerenciasPage(): JSX.Element {
               onSearch={setSearchText}
               onChange={(e) => !e.target.value && setSearchText('')}
             />
-            <Select
-              placeholder="Filtrar por confiança"
-              aria-label="Filtrar por confiança"
-              allowClear
-              style={{ width: 180 }}
-              value={confiancaFiltro}
-              onChange={setConfiancaFiltro}
-              options={Object.entries(CONFIANCA).map(([valor, { rotulo }]) => ({ value: valor, label: rotulo }))}
-            />
             <Button
               icon={<ReloadOutlined />}
               onClick={() => fetchGerencias(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE)}
@@ -371,24 +357,18 @@ export default function GerenciasPage(): JSX.Element {
 
         <ResponsiveTable<GerenciaRecord>
           columns={columns}
-          // O filtro de confiança vale sobre a página carregada (o backend ainda não filtra por ele).
-          dataSource={
-            confiancaFiltro ? gerencias.filter((g) => g.setor_canonico_confianca === confiancaFiltro) : gerencias
-          }
+          dataSource={gerencias}
           rowKey="id"
           nomeDaLinha={(g) => g.rotulo}
           loading={loading}
           erro={erroLista}
           onTentarDeNovo={() => void fetchGerencias(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE)}
-          {...(confiancaFiltro && {
-            locale: { emptyText: `Nenhuma gerência com confiança ${CONFIANCA[confiancaFiltro]?.rotulo ?? confiancaFiltro} nesta página.` },
-          })}
           onChange={handleTableChange}
           pagination={{
             ...pagination,
             showSizeChanger: true,
             pageSizeOptions: ['15', '30', '50', '100'],
-            showTotal: (total) => (confiancaFiltro ? `Total: ${total} (confiança filtrada nesta página)` : `Total: ${total}`),
+            showTotal: (total) => `Total: ${total}`,
           }}
         />
       </Card>

@@ -720,14 +720,17 @@ export default function UsuariosPage(): JSX.Element {
               ? `Usuários (${pagination.total})`
               : 'Importar Usuários'}
           </Title>
-          <Radio.Group
-            value={viewMode}
-            onChange={(e: RadioChangeEvent) => setViewMode(e.target.value as ViewMode)}
-            buttonStyle="solid"
-          >
-            <Radio.Button value="lista">Lista</Radio.Button>
-            <Radio.Button value="importar">Importar</Radio.Button>
-          </Radio.Group>
+          {/* Importação pela tela: só superusuário (decisão do dono, 02/10/2026). */}
+          {currentIsSuperuser && (
+            <Radio.Group
+              value={viewMode}
+              onChange={(e: RadioChangeEvent) => setViewMode(e.target.value as ViewMode)}
+              buttonStyle="solid"
+            >
+              <Radio.Button value="lista">Lista</Radio.Button>
+              <Radio.Button value="importar">Importar</Radio.Button>
+            </Radio.Group>
+          )}
           {viewMode === 'lista' && (
             <div className="flex flex-wrap items-center gap-2">
               <Search

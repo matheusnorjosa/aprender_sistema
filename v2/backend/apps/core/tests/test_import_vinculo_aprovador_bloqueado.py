@@ -53,7 +53,7 @@ def _csv(tmp_path, papel: str, cpf: str, ativo: str = "true") -> str:
 # =============================================================================
 
 
-def test_dat_importando_gerente_em_super_nao_grava_e_gera_pendencia(tmp_path, g1):
+def test_dat_importando_gerente_em_super_recebe_403_e_nao_grava(tmp_path, g1):
     dat = UsuarioFactory(groups=["DAT"])
     content = f"setor,papel,usuario_cpf\nSuper,GERENTE,{dat.cpf}\n".encode()
     client = APIClient()
@@ -65,8 +65,24 @@ def test_dat_importando_gerente_em_super_nao_grava_e_gera_pendencia(tmp_path, g1
         format="multipart",
     )
 
-    assert resp.status_code == 200, resp.content
+    # Import pela tela é só do superusuário (02/10/2026): o DAT nem chega ao service.
+    assert resp.status_code == 403, resp.content
     assert not EquipeGerencia.objects.filter(usuario=dat).exists()
+
+
+def test_superusuario_importando_gerente_em_super_nao_grava_e_gera_pendencia(tmp_path, g1, alvo):
+    content = f"setor,papel,usuario_cpf\nSuper,GERENTE,{alvo.cpf}\n".encode()
+    client = APIClient()
+    client.force_authenticate(user=UsuarioFactory(superuser=True))
+
+    resp = client.post(
+        "/api/equipe-gerencia/import/?dry_run=false",
+        {"file": SimpleUploadedFile("equipe.csv", content, content_type="text/csv")},
+        format="multipart",
+    )
+
+    assert resp.status_code == 200, resp.content
+    assert not EquipeGerencia.objects.filter(usuario=alvo).exists()
     body = resp.json()
     assert body["stats"]["created"] == 0
     assert len(body["pendencias"]["vinculo_aprovador_bloqueado"]) == 1

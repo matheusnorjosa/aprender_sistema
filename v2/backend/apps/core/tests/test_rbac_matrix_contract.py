@@ -33,7 +33,7 @@ ALLOW_PAYLOAD_INVALID = 400
 
 
 # ============================================================================
-# Snapshot literal — 10 atores × 11 recursos
+# Snapshot literal — 10 atores × 12 recursos
 # ============================================================================
 #
 # REGRA:
@@ -175,6 +175,19 @@ EXPECTED_MATRIX: dict[str, dict[str, int]] = {
         "Apoio de Coordenação": ALLOW,
         "Formador": DENY,
     },
+    # Import pela tela = só superusuário (decisão do dono, 2026-10-02; D20).
+    "import_pela_tela": {
+        "Superuser": ALLOW_PAYLOAD_INVALID,
+        "DAT": DENY,
+        "Controle": DENY,
+        "Diretoria": DENY,
+        "Gerente": DENY,
+        "Gerente da Superintendência": DENY,
+        "Assistente Administrativo do Controle": DENY,
+        "Coordenador": DENY,
+        "Apoio de Coordenação": DENY,
+        "Formador": DENY,
+    },
 }
 
 
@@ -198,10 +211,10 @@ def test_matrix_snapshot_is_unchanged():
     )
 
 
-def test_matrix_resource_count_is_eleven():
-    """Matriz tem 11 recursos (PR 8 #1313 expandiu de 8 → 11)."""
-    assert len(ACCESS_MATRIX) == 11, (
-        f"ACCESS_MATRIX tem {len(ACCESS_MATRIX)} recursos; esperado 11. "
+def test_matrix_resource_count_is_twelve():
+    """Matriz tem 12 recursos (PR 8 #1313: 8 → 11; import pela tela, 2026-10-02: 12)."""
+    assert len(ACCESS_MATRIX) == 12, (
+        f"ACCESS_MATRIX tem {len(ACCESS_MATRIX)} recursos; esperado 12. "
         "Adicione recurso em RESOURCES + ACCESS_MATRIX + EXPECTED_MATRIX juntos."
     )
 

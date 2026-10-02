@@ -1,7 +1,7 @@
 /**
  * Tests do redirect /dat/importacao → /dat/importacoes (PR-C DAT Imports).
  *
- * Cobre apenas o redirect. Tests de guard `canDAT` em outras rotas DAT
+ * Cobre o redirect e o gate das telas de importação (só superusuário). Tests de guard em outras rotas DAT
  * permanecem responsabilidade dos arquivos próprios de cada página
  * (PR 11/12 do programa hardening RBAC fazem cobertura ampla por perfil).
  */
@@ -72,17 +72,17 @@ const DAT_PERMISSIONS: Permissions = {
   canSeeAllSectors: false,
 };
 
-// #1271: as rotas /dat/* passaram a ser gateadas por <RequirePolicy
-// policy="manage_admin_registries"> (antes: flag legacy canDAT). O DAT em
-// produção possui essa policy pública — o fixture reflete isso para exercitar
-// o caminho autorizado (redirect + load direto).
+// O DAT em produção possui a policy pública `manage_admin_registries`, que abre as demais rotas
+// /dat/*. As telas de importação não: desde 02/10/2026 (decisão do dono) só o superusuário as abre.
 const DAT_POLICIES = ['manage_admin_registries'];
+const SUPERUSUARIO: CurrentUser = { ...DAT_USER, groups: [], setores: [], is_superuser: true };
+const PERMISSOES_SUPERUSUARIO: Permissions = { ...DAT_PERMISSIONS, isAdmin: true, inDAT: false };
 
 describe('AppRoutes — DAT Imports redirect (PR-C)', () => {
   test('rota /dat/importacao redireciona para /dat/importacoes', async () => {
     render(
       <MemoryRouter initialEntries={['/dat/importacao']}>
-        <AppRoutes user={DAT_USER} permissions={DAT_PERMISSIONS} policies={DAT_POLICIES} />
+        <AppRoutes user={SUPERUSUARIO} permissions={PERMISSOES_SUPERUSUARIO} policies={DAT_POLICIES} />
       </MemoryRouter>,
     );
 
@@ -92,16 +92,27 @@ describe('AppRoutes — DAT Imports redirect (PR-C)', () => {
     ).toBeInTheDocument();
   });
 
-  test('rota /dat/importacoes carrega ImportacoesPage diretamente para DAT', async () => {
+  test('rota /dat/importacoes carrega ImportacoesPage diretamente para o superusuário', async () => {
     render(
       <MemoryRouter initialEntries={['/dat/importacoes']}>
-        <AppRoutes user={DAT_USER} permissions={DAT_PERMISSIONS} policies={DAT_POLICIES} />
+        <AppRoutes user={SUPERUSUARIO} permissions={PERMISSOES_SUPERUSUARIO} policies={DAT_POLICIES} />
       </MemoryRouter>,
     );
 
     expect(
       await screen.findByRole('heading', { level: 2, name: /DAT.*Importações/i }, { timeout: 5000 }),
     ).toBeInTheDocument();
+  });
+
+  test.each(['/dat/importacoes', '/dat/importacao'])('rota %s mostra Forbidden para o DAT', async (rota) => {
+    render(
+      <MemoryRouter initialEntries={[rota]}>
+        <AppRoutes user={DAT_USER} permissions={DAT_PERMISSIONS} policies={DAT_POLICIES} />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText(/Recurso indisponível/i)).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 2, name: /DAT.*Importações/i })).not.toBeInTheDocument();
   });
 
   test('rota /dat/importacoes mostra Forbidden para não-DAT', async () => {

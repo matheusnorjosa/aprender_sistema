@@ -69,6 +69,9 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
   const {
     canCoordenador, canControle, canDAT, canApproveSuper, canDisponibilidade, isFormador, isGestorPorVinculo,
   } = permissions;
+  // Importação pela tela é só do superusuário (decisão do dono, 02/10/2026): as cargas passam por
+  // script, com ensaio. O backend recusa os demais com 403 (`SuperuserOnly`).
+  const podeImportarPelaTela = permissions.isAdmin;
 
   // #1271: rotas gateadas por <RequirePolicy> (policy= direto p/ policies públicas, allow=
   // p/ composites/auth). `access` (useCanAccess) permanece só para os composites de
@@ -157,8 +160,8 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
         <Route path="/dat/admin/produtos" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><ProdutosPage /></RequirePolicy>} />
         <Route path="/dat/admin/projetos-gerais" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><ProjetosGeraisPage /></RequirePolicy>} />
         <Route path="/dat/admin/configuracoes" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><ConfiguracoesPage /></RequirePolicy>} />
-        <Route path="/dat/admin/colecoes" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><ColecoesImportPage /></RequirePolicy>} />
-        <Route path="/dat/admin/equipe-gerencia" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><EquipeGerenciaImportPage /></RequirePolicy>} />
+        <Route path="/dat/admin/colecoes" element={<RequirePolicy allow={podeImportarPelaTela}><ColecoesImportPage /></RequirePolicy>} />
+        <Route path="/dat/admin/equipe-gerencia" element={<RequirePolicy allow={podeImportarPelaTela}><EquipeGerenciaImportPage /></RequirePolicy>} />
         <Route path="/dat/cadastros" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><CadastrosPage /></RequirePolicy>} />
         <Route path="/dat/compras-materiais" element={<RequirePolicy allow={canControle || canDAT}><DATComprasPage /></RequirePolicy>} />
         <Route path="/dat/coordenadores" element={<RequirePolicy policy="access_controle_section" policies={policies}><CoordenadoresPage /></RequirePolicy>} />
@@ -166,7 +169,7 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
             de Cadastros DAT) redireciona para /dat/importacoes (plural, página
             unificada de imports). Evita 404 em links antigos. */}
         <Route path="/dat/importacao" element={<Navigate to="/dat/importacoes" replace />} />
-        <Route path="/dat/importacoes" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><DATImportacoesPage /></RequirePolicy>} />
+        <Route path="/dat/importacoes" element={<RequirePolicy allow={podeImportarPelaTela}><DATImportacoesPage /></RequirePolicy>} />
         <Route path="/dat/registros" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><DATRegistrosPage /></RequirePolicy>} />
       </Routes>
     </Suspense>

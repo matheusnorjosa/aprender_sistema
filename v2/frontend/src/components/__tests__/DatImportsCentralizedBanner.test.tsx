@@ -34,10 +34,10 @@ describe('DatImportsCentralizedBanner', () => {
     vi.mocked(getMe).mockReset();
   });
 
-  test('exibe link para DAT > Importações quando usuário pode acessar DAT', async () => {
+  test('exibe link para DAT > Importações para o superusuário', async () => {
     vi.mocked(getMe).mockResolvedValue({
       ...baseUser,
-      setores: ['DAT'],
+      is_superuser: true,
     });
 
     render(
@@ -48,41 +48,45 @@ describe('DatImportsCentralizedBanner', () => {
 
     const link = await screen.findByRole('link', { name: 'DAT > Importações' });
     expect(link).toHaveAttribute('href', '/dat/importacoes');
+    expect(screen.getByLabelText(DAT_IMPORTS_CENTRALIZED_MESSAGE)).toBeInTheDocument();
   });
 
-  test('exibe apenas texto informativo para usuário sem acesso ao DAT', async () => {
-    vi.mocked(getMe).mockResolvedValue({
-      ...baseUser,
-      setores: ['Controle'],
-    });
+  // Quem não é superusuário não tem a tela DAT > Importações (02/10/2026): o aviso apontaria
+  // para um lugar que a pessoa não alcança, então não aparece.
+  test.each([
+    ['DAT', { ...baseUser, setores: ['DAT'] }],
+    ['Controle', { ...baseUser, setores: ['Controle'] }],
+  ])('%s não é superusuário: o aviso não aparece', async (_perfil, usuario) => {
+    vi.mocked(getMe).mockResolvedValue(usuario);
 
-    render(
+    const { container } = render(
       <MemoryRouter>
         <DatImportsCentralizedBanner />
       </MemoryRouter>,
     );
 
     await waitFor(() => {
-      expect(screen.getByLabelText(DAT_IMPORTS_CENTRALIZED_MESSAGE)).toBeInTheDocument();
+      expect(getMe).toHaveBeenCalled();
     });
-
+    expect(screen.queryByText(DAT_IMPORTS_CENTRALIZED_MESSAGE)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(DAT_IMPORTS_CENTRALIZED_MESSAGE)).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'DAT > Importações' })).not.toBeInTheDocument();
-    expect(screen.getByText(DAT_IMPORTS_CENTRALIZED_MESSAGE)).toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
   });
 
-  test('não expõe link quando /api/me falha', async () => {
+  test('o aviso não aparece quando /api/me falha', async () => {
     vi.mocked(getMe).mockRejectedValue(new Error('unauthorized'));
 
-    render(
+    const { container } = render(
       <MemoryRouter>
         <DatImportsCentralizedBanner />
       </MemoryRouter>,
     );
 
     await waitFor(() => {
-      expect(screen.getByText(DAT_IMPORTS_CENTRALIZED_MESSAGE)).toBeInTheDocument();
+      expect(getMe).toHaveBeenCalled();
     });
-
     expect(screen.queryByRole('link', { name: 'DAT > Importações' })).not.toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
   });
 });

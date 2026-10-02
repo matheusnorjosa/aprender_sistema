@@ -76,9 +76,8 @@ def test_happy_path_import_compra_create_solicitacao_approve_and_publish():
     """
     client = APIClient()
 
-    # PR-A1 DAT-Imports (2026-04-29): import-compras agora é DAT-only;
-    # publish continua sendo operação Controle.
-    user_dat = _create_user_in_group(prefix="dat_chain", group_name="DAT")
+    # Import pela tela é só do superusuário (02/10/2026); publish continua sendo operação Controle.
+    user_importador = UsuarioFactory(superuser=True)
     user_controle = _create_user_in_group(prefix="controle_chain", group_name="Controle")
     user_coordenador = _create_user_in_group(prefix="coord_chain", group_name="Coordenador")
     # PR 3 hardening RBAC (2026-04-29): aprovar exige composite Setor Sup + Função Gerente.
@@ -90,8 +89,8 @@ def test_happy_path_import_compra_create_solicitacao_approve_and_publish():
     projeto = ProjetoFactory(nome="Novo Lendo", codigo="NL", fluxo="SUPER", ativo=True)
     tipo_evento = TipoEventoFactory(nome="Formacao")
 
-    # 1) Import compras via endpoint real (DAT-only após PR-A1 DAT-Imports).
-    client.force_authenticate(user=user_dat)
+    # 1) Import compras via endpoint real (só superusuário).
+    client.force_authenticate(user=user_importador)
     import_report = _upload_compras_csv(
         client,
         codigo="COMP-CHAIN-001",
@@ -156,8 +155,8 @@ def test_invalid_path_blocks_solicitacao_when_pair_municipio_projeto_has_no_comp
     """
     client = APIClient()
 
-    # PR-A1 DAT-Imports (2026-04-29): import-compras agora é DAT-only.
-    user_controle = _create_user_in_group(prefix="dat_invalid", group_name="DAT")
+    # Import pela tela é só do superusuário (02/10/2026).
+    user_importador = UsuarioFactory(superuser=True)
     user_coordenador = _create_user_in_group(prefix="coord_invalid", group_name="Coordenador")
 
     municipio = MunicipioFactory(nome="Sobral", uf="CE", ativo=True)
@@ -166,7 +165,7 @@ def test_invalid_path_blocks_solicitacao_when_pair_municipio_projeto_has_no_comp
     tipo_evento = TipoEventoFactory(nome="Acompanhamento")
 
     # Import cria compra somente para "Novo Lendo".
-    client.force_authenticate(user=user_controle)
+    client.force_authenticate(user=user_importador)
     import_report = _upload_compras_csv(
         client,
         codigo="COMP-CHAIN-002",

@@ -241,13 +241,8 @@ def test_endpoint_solicitacoes_list_requires_authentication(run_seed_rbac):
     assert res.status_code == 403, "Endpoints de solicitações devem requerer autenticação"
 
 
-def test_endpoint_import_compras_dat_allowed(run_seed_rbac):
-    """PR-A1 DAT-Imports (2026-04-29): DAT tem acesso ao endpoint de import compras.
-
-    Nota: `seed_rbac` invoca `seed_functional_permissions(assign_default_groups=False)`,
-    portanto os vínculos cap↔grupo precisam ser explicitamente reatribuídos no
-    teste (mesmo padrão do test obsoleto `*_controle_allowed`).
-    """
+def test_endpoint_import_compras_dat_forbidden(run_seed_rbac):
+    """Import pela tela é só do superusuário (02/10/2026): DAT com `import_spreadsheet` recebe 403."""
     user = UsuarioFactory(username="dat1", email="dat@x.com", password="x", cpf="66666666666")
     dat = Group.objects.get(name="DAT")
     PermissaoFuncional.objects.get(codename="import_spreadsheet").groups.add(dat)
@@ -259,8 +254,7 @@ def test_endpoint_import_compras_dat_allowed(run_seed_rbac):
     url = reverse("core:import-compras")
     res = client.post(url, {})
 
-    # 400 (dados inválidos) ou 200, mas NÃO 403
-    assert res.status_code != 403, f"DAT deve ter acesso POST {url}: {res.status_code}"
+    assert res.status_code == 403
 
 
 def test_endpoint_import_compras_controle_forbidden(run_seed_rbac):

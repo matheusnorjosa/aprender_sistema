@@ -2,7 +2,7 @@
 Endpoint DRF para importacao de EquipeGerencia (vinculos).
 
 POST /api/equipe-gerencia/import/
-- Permission: HasPerm("manage_admin_registries")
+- Permission: SuperuserOnly
 - Query param: dry_run=true|false (default: true)
 - Body: {file: upload}
 - Returns: Relatorio com stats, pendencias
@@ -27,7 +27,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.core.api_schemas import COMMON_ERROR_RESPONSES
 from apps.core.imports.request_params import parse_dry_run
-from apps.core.permissions import HasPerm
+from apps.core.permissions import SuperuserOnly
 from apps.core.serializers.openapi_critical_contract import (
     ImportFileUploadRequestSerializer,
     ImportOperationErrorResponseSerializer,
@@ -43,7 +43,7 @@ class ImportEquipeGerenciaView(APIView):
     """
     Importa EquipeGerencia (vinculos) de CSV/XLSX.
 
-    Requer permissao: HasPerm("manage_admin_registries") (grupos DAT ou Superintendencia, ou superuser)
+    Requer superusuário (`SuperuserOnly`): importação pela tela é só do superusuário.
 
     Query params:
         dry_run: "true" (default) para preview, "false" para aplicar
@@ -52,7 +52,8 @@ class ImportEquipeGerenciaView(APIView):
         file: Arquivo CSV/XLSX (upload obrigatorio)
     """
 
-    permission_classes = [IsAuthenticated, HasPerm("manage_admin_registries")]
+    # Decisão do dono (02/10/2026): importação pela tela é só do superusuário.
+    permission_classes = [IsAuthenticated, SuperuserOnly]
     throttle_scope = "import"
 
     @extend_schema(

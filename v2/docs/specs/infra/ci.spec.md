@@ -114,6 +114,7 @@ A CI é infra-as-code; sua "prova" são os próprios checks de gate e o canary, 
 - **Docker parity smoke** — `apps/core/tests/test_modular_imports.py` + `apps/core/tests/test_auth_backends.py` dentro do container.
 - **Validação de paths de teste** — guard `no /app hardcoded` no reusable (`validate_test_paths`).
 - **Suíte backend completa** — `apps/core/tests` + `apps/dev_tools/tests` (não há `apps/dat_ingest` — módulo removido).
+- **Testes que precisam da raiz do repositório ou do `git`** — os dos gates de documentação e do relatório do canary são pulados no container de desenvolvimento (que monta só `v2/backend` e não tem `git`), com o motivo «precisa da raiz do repositório e do git (roda na CI)». Na CI (`CI` ou `GITHUB_ACTIONS` definidos) o mesmo caso **falha** em vez de pular. Ponto único: [`ambiente_repo.py`](../../../../v2/backend/apps/core/tests/ambiente_repo.py).
 
 ## Pontos de atenção / dívidas conhecidas
 

@@ -39,8 +39,12 @@ import pathlib
 import subprocess
 import sys
 
-RAIZ_REPO = pathlib.Path(__file__).resolve().parents[5]
-SCRIPT = RAIZ_REPO / "scripts" / "check_doc_links.py"
+from apps.core.tests.ambiente_repo import exige_raiz_do_repo
+
+
+def _script() -> pathlib.Path:
+    """O checador mora em `<raiz>/scripts/`, fora do que o container de dev monta."""
+    return exige_raiz_do_repo() / "scripts" / "check_doc_links.py"
 
 
 def _monta(base: pathlib.Path, arquivos: dict[str, str]) -> None:
@@ -52,7 +56,7 @@ def _monta(base: pathlib.Path, arquivos: dict[str, str]) -> None:
 
 def _run(raiz: pathlib.Path):
     return subprocess.run(
-        [sys.executable, str(SCRIPT), "docs"],
+        [sys.executable, str(_script()), "docs"],
         cwd=raiz,
         capture_output=True,
         text=True,
@@ -62,7 +66,8 @@ def _run(raiz: pathlib.Path):
 
 
 def test_script_existe():
-    assert SCRIPT.exists(), f"check_doc_links.py nao encontrado em {SCRIPT}"
+    script = _script()
+    assert script.exists(), f"check_doc_links.py nao encontrado em {script}"
 
 
 def test_baseline_limpo_passa(tmp_path):

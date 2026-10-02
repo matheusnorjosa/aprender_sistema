@@ -13,6 +13,8 @@ import os
 import pathlib
 import subprocess
 
+from apps.core.tests.ambiente_repo import exige_git
+
 
 def git(raiz: pathlib.Path, *args: str) -> str:
     r = subprocess.run(
@@ -27,6 +29,7 @@ def git(raiz: pathlib.Path, *args: str) -> str:
 
 
 def cria_repo(tmp_path: pathlib.Path, nome: str = "repo") -> pathlib.Path:
+    exige_git()
     raiz = tmp_path / nome
     raiz.mkdir()
     git(raiz, "init", "-q", "-b", "main")

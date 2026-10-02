@@ -12,7 +12,7 @@ Interface React para gerenciamento de disponibilidade no sistema Aprender Sistem
 
 ## 📋 Pré-requisitos
 
-- **Node.js 18+** e **npm**
+- **Node.js 22** (versão em `.nvmrc`, a mesma da CI e das imagens) e **npm**
 - **Backend AS v2** rodando em `http://localhost:8002`
 - **Autenticação**: Usuário deve estar logado no Django Admin (sessão/cookie)
 

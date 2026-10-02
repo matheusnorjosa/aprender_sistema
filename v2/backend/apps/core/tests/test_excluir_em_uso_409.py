@@ -14,11 +14,24 @@ from __future__ import annotations
 import itertools
 from datetime import date
 
+from django.apps import apps
+from django.db.models import PROTECT, ProtectedError
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Compra, DATCadastro, Gerencia, Municipio, Produto, Projeto, ProjetoGeral, Solicitacao
+from apps.core.exceptions import _mensagem_em_uso
+from apps.core.models import (
+    Colecao,
+    Compra,
+    DATCadastro,
+    EquipeGerencia,
+    Gerencia,
+    Municipio,
+    Produto,
+    Projeto,
+    ProjetoGeral,
+)
 from apps.core.tests.factories import MunicipioFactory, ProjetoFactory, SolicitacaoFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
@@ -57,7 +70,8 @@ def test_municipio_com_solicitacao_da_409_sem_citar_a_solicitacao():
 
     resp = _root_client().delete(f"/api/municipios/{municipio.id}/")
 
-    _assert_409_em_uso(resp, str(Solicitacao._meta.verbose_name_plural), "Formação Sigilosa de Outro Setor")
+    # C2b: com acento (o `verbose_name_plural` do model é "Solicitacoes de Evento").
+    _assert_409_em_uso(resp, "Solicitações de Evento", "Formação Sigilosa de Outro Setor")
     assert Municipio.objects.filter(pk=municipio.pk).exists()
 
 
@@ -69,6 +83,26 @@ def test_gerencia_com_projeto_inativo_da_409():
 
     _assert_409_em_uso(resp, str(Projeto._meta.verbose_name_plural), "Projeto Inativo 409")
     assert Gerencia.objects.filter(pk=gerencia.pk).exists()
+
+
+def test_gerencia_com_equipe_da_409_com_acento():
+    gerencia = Gerencia.objects.create(nome="GERENCIA 409 EQUIPE", nome_setor="Setor 409 Equipe")
+    EquipeGerencia.objects.create(gerencia=gerencia, usuario=UsuarioFactory(), papel="COORDENADOR")
+
+    resp = _root_client().delete(f"/api/gerencias/{gerencia.id}/")
+
+    _assert_409_em_uso(resp, "Equipes de Gerências")
+    assert Gerencia.objects.filter(pk=gerencia.pk).exists()
+
+
+def test_projeto_com_colecao_da_409_com_acento():
+    projeto = ProjetoFactory()
+    Colecao.objects.create(nome="Coleção 409", projeto=projeto)
+
+    resp = _root_client().delete(f"/api/projetos/{projeto.id}/")
+
+    _assert_409_em_uso(resp, "Coleções")
+    assert Projeto.objects.filter(pk=projeto.pk).exists()
 
 
 def test_produto_com_compra_da_409():
@@ -101,8 +135,7 @@ def test_varios_tipos_saem_em_ordem_e_sem_repetir():
 
     resp = _root_client().delete(f"/api/municipios/{municipio.id}/")
 
-    tipos = sorted({str(Compra._meta.verbose_name_plural), str(Solicitacao._meta.verbose_name_plural)})
-    _assert_409_em_uso(resp, ", ".join(tipos))
+    _assert_409_em_uso(resp, "Compras, Solicitações de Evento")
 
 
 def test_excluir_sem_vinculo_continua_204():
@@ -112,3 +145,48 @@ def test_excluir_sem_vinculo_continua_204():
 
     assert resp.status_code == 204
     assert not Municipio.objects.filter(pk=municipio.pk).exists()
+
+
+def _tipo_no_409(model) -> str:
+    mensagem = _mensagem_em_uso(ProtectedError("em uso", [model()]))
+    return mensagem.removeprefix("Este registro não pode ser excluído porque está em uso (").removesuffix(").")
+
+
+def test_sentinela_todo_model_com_fk_protect_sai_com_acento_no_409():
+    """O motivo do 409 vai para a tela: model novo com FK PROTECT entra aqui com o nome que ela mostra.
+
+    Vários `verbose_name_plural` saíram sem acento ("Solicitacoes de Evento"); corrigir o Meta pede
+    migration, então o nome com acento fica no `_mensagem_em_uso`.
+    """
+    com_protect = sorted(
+        (
+            model
+            for model in apps.get_models()
+            if any(getattr(campo.remote_field, "on_delete", None) is PROTECT for campo in model._meta.concrete_fields)
+        ),
+        key=lambda model: model._meta.label,
+    )
+
+    assert {model._meta.label: _tipo_no_409(model) for model in com_protect} == {
+        "core.AcaoDAT": "Ações DAT",
+        "core.AcaoInstancia": "Ações Instância",
+        "core.AcaoTemplate": "Ações Template",
+        "core.AcaoTemplateExecutor": "Executores de Ações Template",
+        "core.AvailabilityBlock": "Bloqueios de Disponibilidade",
+        "core.CicloAcoes": "Ciclos de Ações",
+        "core.Colecao": "Coleções",
+        "core.Compra": "Compras",
+        "core.DATAcao": "Ações DAT",
+        "core.DATCadastro": "Cadastros DAT",
+        "core.DATCompra": "Compras DAT",
+        "core.DATCoordenador": "Coordenadores DAT",
+        "core.DATRegistro": "Registros DAT",
+        "core.Deslocamento": "Deslocamentos",
+        "core.EquipeGerencia": "Equipes de Gerências",
+        "core.ImportJob": "Jobs de Importação",
+        "core.Participation": "Participações",
+        "core.PlanoFormacoes": "Planos de Formações",
+        "core.Produto": "Produtos",
+        "core.Projeto": "Projetos",
+        "core.Solicitacao": "Solicitações de Evento",
+    }

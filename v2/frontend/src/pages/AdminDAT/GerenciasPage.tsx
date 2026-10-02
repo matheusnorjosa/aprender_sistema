@@ -22,6 +22,7 @@ import { AcoesLinha, larguraAcoesLinha } from '../../components/AcoesLinha';
 import { FalhaAoCarregar } from '../../components/FalhaAoCarregar';
 import { TEXTO_DA_TAG } from '../../components/textoDaTag';
 import { DEFAULT_PAGE_SIZE } from '../../constants';
+import { aposConfirmacaoFechar, dialogoDeExclusaoEmUso, dialogoNaoPodeExcluir } from './excluirEmUso';
 import { errosDosCampos, mensagemDoErro } from './usuario_form_helpers';
 
 const { Title, Text } = Typography;
@@ -189,17 +190,34 @@ export default function GerenciasPage(): JSX.Element {
 
   const handleDelete = (gerencia: GerenciaRecord): void => {
     const projetos = gerencia.projetos_count ?? 0;
-    // Com projeto ativo, a exclusão já se sabe recusada (PROTECT, 409): só o aviso, sem "Sim, excluir".
+    const saida = {
+      registro: `a gerência "${gerencia.rotulo}"`,
+      ativo: gerencia.ativo,
+      desativar: () => updateGerencia(gerencia.id, { ativo: false }),
+      desativado: 'Gerência desativada',
+      // Desativar gerência não muda só a coluna Situação: `/api/me` só devolve vínculo de gerência ativa
+      // (é por ele que a equipe vê Disponibilidade, Bloqueios e Deslocamentos), e os seletores de Projetos
+      // e de Usuários só listam as ativas.
+      oQueFica: 'os projetos e a equipe continuam cadastrados',
+      aoDesativar:
+        'mas a gerência sai das listas de escolha em Projetos e Usuários, a equipe perde o acesso que tem por ela' +
+        ' a Disponibilidade, Bloqueios e Deslocamentos, a situação passa a Inativo',
+      recarregar: () => void fetchGerencias(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE),
+    };
+    // Com projeto ativo, a exclusão já se sabe recusada (PROTECT, 409): o aviso, sem "Sim, excluir",
+    // com a mesma saída do 409 (Desativar).
     if (projetos > 0) {
-      Modal.info({
-        title: 'Não é possível excluir',
-        content:
+      dialogoNaoPodeExcluir({
+        motivo:
           `A gerência "${gerencia.rotulo}" tem ${projetos} projeto(s) ativo(s) vinculado(s).` +
           ' Gerência com projetos ou equipes vinculados, mesmo inativos, não pode ser excluída.',
-        okText: 'Entendi',
-      });
+        ...saida,
+      })();
       return;
     }
+    // 409 (em uso): o diálogo "Não é possível excluir" abre quando este terminar de fechar, ou na hora,
+    // se a pessoa já o fechou com o DELETE em andamento (excluirEmUso.ts).
+    const aposFechar = aposConfirmacaoFechar();
     Modal.confirm({
       title: 'Confirmar exclusão',
       // A contagem é só dos ativos: projeto inativo ou equipe (EquipeGerencia) também barram, e o
@@ -216,9 +234,12 @@ export default function GerenciasPage(): JSX.Element {
           message.success('Gerencia excluida com sucesso');
           void fetchGerencias(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
         } catch (error) {
-          message.error(`Erro ao excluir: ${mensagemDoErro(error)}`);
+          const emUso = dialogoDeExclusaoEmUso({ erro: error, ...saida });
+          if (emUso) aposFechar.abrir(emUso);
+          else message.error(`Erro ao excluir: ${mensagemDoErro(error)}`);
         }
       },
+      afterClose: aposFechar.afterClose,
     });
   };
 

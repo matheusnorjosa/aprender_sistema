@@ -24,6 +24,7 @@ import { AcoesLinha, larguraAcoesLinha } from '../../components/AcoesLinha';
 import { TEXTO_DA_TAG } from '../../components/textoDaTag';
 import { DEFAULT_PAGE_SIZE } from '../../constants';
 import type { ID } from '../../types';
+import { aposConfirmacaoFechar, dialogoDeExclusaoEmUso } from './excluirEmUso';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
@@ -216,6 +217,9 @@ export default function ProjetosPage(): JSX.Element {
   };
 
   const handleDelete = (projeto: ProjetoRecord): void => {
+    // 409 (em uso): o diálogo "Não é possível excluir" abre quando este terminar de fechar, ou na hora,
+    // se a pessoa já o fechou com o DELETE em andamento (excluirEmUso.ts).
+    const aposFechar = aposConfirmacaoFechar();
     Modal.confirm({
       title: 'Confirmar exclusão',
       content: `Tem certeza que deseja excluir o projeto "${projeto.nome}"?`,
@@ -228,9 +232,21 @@ export default function ProjetosPage(): JSX.Element {
           message.success('Projeto excluído com sucesso');
           void fetchProjetos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE);
         } catch (error) {
-          message.error(`Erro ao excluir: ${(error as Error).message}`);
+          const emUso = dialogoDeExclusaoEmUso({
+            erro: error,
+            registro: `o projeto "${projeto.nome}"`,
+            ativo: projeto.ativo,
+            desativar: () => updateProjeto(projeto.id, { ativo: false }),
+            desativado: 'Projeto desativado',
+            // Esta tela mostra a coluna "Ativo" com Sim/Não, não "Situação".
+            aoDesativar: 'a coluna Ativo passa a "Não"',
+            recarregar: () => void fetchProjetos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE),
+          });
+          if (emUso) aposFechar.abrir(emUso);
+          else message.error(`Erro ao excluir: ${(error as Error).message}`);
         }
       },
+      afterClose: aposFechar.afterClose,
     });
   };
 

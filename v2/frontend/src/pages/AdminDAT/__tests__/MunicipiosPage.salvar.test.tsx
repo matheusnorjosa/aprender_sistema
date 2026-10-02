@@ -156,21 +156,38 @@ describe('MunicipiosPage: importar e salvar (C2)', () => {
     expect(screen.getByRole('heading', { level: 3, name: /^Municípios/ })).toHaveTextContent(/^Municípios$/);
   }, 30000);
 
-  test('excluir registro em uso: o motivo do backend (409) no toast', async () => {
+  test('excluir registro em uso (409): o motivo e "Desativar", que grava ativo=false e recarrega a lista (C2b)', async () => {
     const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }));
     const erro = vi.spyOn(message, 'error').mockImplementation(() => (() => undefined) as never);
-    const motivo = 'Este registro não pode ser excluído porque está em uso (Compras, Solicitacoes de Evento).';
+    const sucesso = vi.spyOn(message, 'success').mockImplementation(() => (() => undefined) as never);
+    const motivo = 'Este registro não pode ser excluído porque está em uso (Compras, Solicitações de Evento).';
     vi.mocked(deleteMunicipio).mockRejectedValue(
       Object.assign(new Error(motivo), { response: { status: 409, data: { detail: motivo, code: 'CONFLICT' } } }),
     );
+    vi.mocked(updateMunicipio).mockResolvedValue({ ...MUNICIPIO, ativo: false } as never);
     const user = userEvent.setup();
     renderPage();
 
     await user.click(within(await linha()).getByRole('button', { name: `Excluir: ${MUNICIPIO.nome} - BA` }));
     await confirmar.mock.calls[0]![0].onOk!();
+    // O diálogo do 409 só abre quando a confirmação termina de fechar: um por vez, sem perder o foco.
+    expect(confirmar).toHaveBeenCalledTimes(1);
+    confirmar.mock.calls[0]![0].afterClose!();
 
-    expect(erro).toHaveBeenCalledWith(`Erro ao excluir: ${motivo}`);
+    expect(erro).not.toHaveBeenCalled();
+    expect(confirmar).toHaveBeenCalledTimes(2);
+    const emUso = confirmar.mock.calls[1]![0];
+    expect(String(emUso.content)).toContain(motivo);
+    expect(String(emUso.content)).toContain(`Você pode desativar o município "${MUNICIPIO.nome} - BA"`);
+    expect(emUso.okText).toBe('Desativar');
+    const cargas = vi.mocked(listMunicipios).mock.calls.length;
+    await emUso.onOk!();
+
+    expect(updateMunicipio).toHaveBeenCalledWith(MUNICIPIO.id, { ativo: false });
+    expect(sucesso).toHaveBeenCalledWith('Município desativado');
+    await waitFor(() => expect(listMunicipios).toHaveBeenCalledTimes(cargas + 1));
     confirmar.mockRestore();
     erro.mockRestore();
+    sucesso.mockRestore();
   }, 30000);
 });

@@ -16,6 +16,8 @@ import ptBR from 'antd/locale/pt_BR';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
+import { clicarNaLinha } from '../../../test/clicarNaLinha';
+
 const { GRUPO, MARIA } = vi.hoisted(() => ({
   GRUPO: { id: 9741, name: 'Formação Continuada do Litoral Leste', group_type: 'setor', user_count: 2, permissoes_funcionais: [] },
   MARIA: {
@@ -56,9 +58,8 @@ function renderPage(forcedType: 'setor' | 'funcao' = 'setor'): void {
 }
 
 async function abrirEditar(user: ReturnType<typeof userEvent.setup>): Promise<HTMLElement> {
-  const nome = await screen.findByText(GRUPO.name, {}, { timeout: 15000 });
-  const linha = nome.closest<HTMLElement>('tr')!;
-  await user.click(await within(linha).findByRole('button', { name: `Editar: ${GRUPO.name}` }));
+  // A lista de grupos recarrega ao abrir (metadados RBAC) e depois de salvar: clicarNaLinha espera.
+  await clicarNaLinha(user, GRUPO.name, `Editar: ${GRUPO.name}`);
   const titulo = await screen.findByText('Editar Setor', {}, { timeout: 10000 });
   return titulo.closest<HTMLElement>('[role="dialog"]')!;
 }
@@ -67,8 +68,9 @@ describe('GruposPage: salvar sem apagar membros (C2)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(checkAuth).mockResolvedValue({ authenticated: true, user: { is_superuser: true } } as never);
-    vi.mocked(listGroups).mockResolvedValue({ results: [GRUPO], count: 1, next: null, previous: null } as never);
-    vi.mocked(listUsers).mockResolvedValue({ results: [MARIA], count: 1, next: null, previous: null } as never);
+    // mockReset: o clearAllMocks não limpa os `*Once` que um teste que falhou deixou (o retry os herdaria).
+    vi.mocked(listGroups).mockReset().mockResolvedValue({ results: [GRUPO], count: 1, next: null, previous: null } as never);
+    vi.mocked(listUsers).mockReset().mockResolvedValue({ results: [MARIA], count: 1, next: null, previous: null } as never);
     vi.mocked(getGroup).mockResolvedValue(GRUPO as never);
     vi.mocked(updateGroup).mockResolvedValue(GRUPO as never);
     vi.mocked(syncGroupMembers).mockResolvedValue({ added: 0, removed: 0, members_count: 1 } as never);
@@ -145,9 +147,8 @@ describe('GruposPage: salvar sem apagar membros (C2)', () => {
     const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }));
     const user = userEvent.setup();
     renderPage();
-    const linha = (await screen.findByText(GRUPO.name, {}, { timeout: 15000 })).closest<HTMLElement>('tr')!;
 
-    await user.click(await within(linha).findByRole('button', { name: `Excluir: ${GRUPO.name}` }));
+    await clicarNaLinha(user, GRUPO.name, `Excluir: ${GRUPO.name}`);
 
     expect(String(confirmar.mock.calls[0]![0].content)).toContain('2 usuário(s) deixarão de ter este setor');
     confirmar.mockRestore();
@@ -224,8 +225,7 @@ describe('GruposPage: salvar sem apagar membros (C2)', () => {
     vi.mocked(listGroups).mockResolvedValue({ results: [FUNCAO], count: 1, next: null, previous: null } as never);
     const user = userEvent.setup();
     renderPage('funcao');
-    const linha = (await screen.findByText(FUNCAO.name, {}, { timeout: 15000 })).closest<HTMLElement>('tr')!;
-    await user.click(await within(linha).findByRole('button', { name: `Excluir: ${FUNCAO.name}` }));
+    await clicarNaLinha(user, FUNCAO.name, `Excluir: ${FUNCAO.name}`);
     expect(String(confirmar.mock.calls[0]![0].content)).toContain('2 usuário(s) deixarão de ter esta função.');
     confirmar.mockRestore();
 
@@ -265,8 +265,7 @@ describe('GruposPage: nenhum caminho da lista de usuários esvazia o grupo (C2)'
   }
 
   async function editar(user: ReturnType<typeof userEvent.setup>, grupo: { name: string } = GRUPO): Promise<HTMLElement> {
-    const linha = (await screen.findByText(grupo.name, {}, { timeout: 15000 })).closest<HTMLElement>('tr')!;
-    await user.click(await within(linha).findByRole('button', { name: `Editar: ${grupo.name}` }));
+    await clicarNaLinha(user, grupo.name, `Editar: ${grupo.name}`);
     await waitFor(() => expect(oModal()).toHaveTextContent('Editar Setor'), { timeout: 10000 });
     return oModal();
   }
@@ -288,8 +287,10 @@ describe('GruposPage: nenhum caminho da lista de usuários esvazia o grupo (C2)'
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(checkAuth).mockResolvedValue({ authenticated: true, user: { is_superuser: true } } as never);
-    vi.mocked(listGroups).mockResolvedValue(pagina([GRUPO]));
-    vi.mocked(listUsers).mockResolvedValue(pagina([MARIA]));
+    // mockReset: o clearAllMocks não limpa os `*Once` que um teste que falhou deixou. Na CI (01/10), o
+    // retry herdou a recarga que nunca resolve do "Editar logo depois de salvar" e falhou de novo.
+    vi.mocked(listGroups).mockReset().mockResolvedValue(pagina([GRUPO]));
+    vi.mocked(listUsers).mockReset().mockResolvedValue(pagina([MARIA]));
     vi.mocked(getGroup).mockImplementation(async (id) => (id === OUTRO.id ? OUTRO : GRUPO) as never);
     vi.mocked(updateGroup).mockResolvedValue(GRUPO as never);
     vi.mocked(syncGroupMembers).mockResolvedValue({ added: 0, removed: 0, members_count: 1 } as never);
@@ -373,6 +374,22 @@ describe('GruposPage: nenhum caminho da lista de usuários esvazia o grupo (C2)'
     expect(syncGroupMembers).not.toHaveBeenCalled();
     expect(aviso).toHaveBeenCalledWith('Grupo atualizado, mas os membros não foram alterados: a lista de usuários não carregou.');
     aviso.mockRestore();
+  }, 60000);
+
+  test('Editar com a lista de grupos recarregando (os metadados RBAC chegam depois): o clique espera a lista', async () => {
+    // A causa da falha da CI (01/10): ao abrir, a chegada dos metadados RBAC recarrega a lista, e o
+    // Spin do AntD põe `pointer-events: none` na tabela enquanto ela carrega. Aqui a recarga dura
+    // 500 ms, de propósito: o Editar tem de esperar, não falhar.
+    vi.mocked(listGroups)
+      .mockResolvedValueOnce(pagina([GRUPO]))
+      .mockImplementationOnce(() => new Promise((resolver) => setTimeout(() => resolver(pagina([GRUPO])), 500)));
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await within(await editar(user)).findByText(MARIA_ROTULO)).toBeInTheDocument();
+    await salvar(user);
+
+    await esperarSync(GRUPO.id, [MARIA.id]);
   }, 60000);
 
   test('Editar logo depois de salvar, com a lista recarregando: quando ela chega, o campo tem os membros de agora', async () => {

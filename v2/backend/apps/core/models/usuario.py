@@ -40,6 +40,14 @@ class Usuario(AbstractUser):
             "(#1894). A planilha pode reativar quem ela mesma desativou (flag False)."
         ),
     )
+    deve_trocar_senha = models.BooleanField(
+        default=False,
+        help_text=(
+            "Ligado quando a senha em uso foi definida por outra pessoa (administrador ou carga). "
+            "Enquanto ligado, a API só aceita ler o próprio /me, CSRF, trocar a senha e sair "
+            "(`TrocaDeSenhaObrigatoriaMiddleware`). Desliga quando a própria pessoa troca a senha."
+        ),
+    )
 
     class Meta:  # type: ignore[misc]
         db_table = "core_usuario"

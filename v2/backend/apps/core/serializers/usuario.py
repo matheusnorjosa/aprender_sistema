@@ -102,6 +102,8 @@ class CurrentUserSerializer(serializers.Serializer):  # type: ignore[misc]
     is_superintendencia = serializers.BooleanField()
     can_approve_super = serializers.BooleanField()
     permissions = serializers.ListField(child=serializers.CharField())
+    # Senha em uso foi definida por outra pessoa: a tela só mostra a troca de senha.
+    deve_trocar_senha = serializers.BooleanField()
 
 
 class MeContactUpdateSerializer(serializers.Serializer):  # type: ignore[misc]

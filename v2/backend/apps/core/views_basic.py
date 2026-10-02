@@ -80,7 +80,8 @@ class CurrentUserView(APIView):
             "is_superuser": bool,
             "is_superintendencia": bool,
             "can_approve_super": bool,  # Legado: = policy access_solicitation_approvals (DAT não aprova)
-            "permissions": list[str]    # Permissões funcionais efetivas (codenames)
+            "permissions": list[str],   # Permissões funcionais efetivas (codenames)
+            "deve_trocar_senha": bool   # Senha definida por outra pessoa: só a troca é liberada
         }
     """
 
@@ -161,6 +162,7 @@ class CurrentUserView(APIView):
                 "is_superintendencia": is_superintendencia,
                 "can_approve_super": can_approve_super,
                 "permissions": sorted(get_user_functional_permissions(user)),
+                "deve_trocar_senha": user.deve_trocar_senha,
             },
             status=status.HTTP_200_OK,
         )

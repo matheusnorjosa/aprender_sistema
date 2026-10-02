@@ -182,6 +182,20 @@ Fechado pelo PR #2077 (branch `fix/aprovadora-escopo-superintendencia`), 2026-09
 |---|---|---|---|---|
 | `M10-01` (volta no B1) | P1 | resolvido (PR #2077, 2026-09-30) | A aprovadora por vínculo herdou edição, exclusão e decisão globais; o lote não tinha escopo de queryset | Predicado único `projeto_no_escopo_da_superintendencia` (`policies.py`): decidir fora → 403 `out_of_approval_scope` (lote → `errors[]`); editar/excluir fora → 403 (`user_can_access_solicitacao`); criar/mover para fora → 400 (tier do 2º vínculo só com papel GERENTE). Ver, próprias e bases amplas sem mudança. Trava de cadastro: projeto SUPER só na `SUPERINTENDENCIA`, com o campo Gerência na ProjetosPage. `test_escopo_aprovadora_superintendencia.py`, `test_projeto_fluxo_super_so_superintendencia.py`, `ProjetosPage.gerencia.test.tsx`; [`politica-aprovacao.spec.md`](../specs/domain/politica-aprovacao.spec.md) |
 
+## Mapa de acesso — consertos de 2026-10-02
+
+Notas do mapa de acesso de 02/10 (branch `fix/mapa-acesso-consertos`). Não mudam o status de nenhuma
+linha da fila adjudicada; registram o que o mapa mediu e o que cada conserto fecha.
+
+- **Conferência de compra na edição (liga com `M10-08`)**: o conserto do `M10-08` passou a conferir a
+  compra no update, mas decidia "o par foi reatribuído" pela **presença** de `municipio`/`projeto` no
+  payload. A tela de edição manda os dois em todo salvamento, então editar só o horário devolvia 400
+  ("não possui compra registrada") em toda solicitação cujo par não tem `Compra`. Agora a comparação é
+  por **valor** (`SolicitacaoSerializer.validate`): mesmo par não confere; trocar município ou projeto
+  para par sem compra continua barrado. Testes com o payload completo da tela em
+  `test_solicitacao_edit.py` (`TestSolicitacaoEditCompraEligibility`). Depois do conserto a edição
+  segue passando pelo escopo de setor do projeto e pela conferência de agenda, que não mudaram.
+
 ## PR A — setor = gerência na tela (2026-09-29)
 
 Achados medidos durante o PR A (branch `feat/gerencia-nome-exibicao-pr-a`, base `a56d9027`), fora

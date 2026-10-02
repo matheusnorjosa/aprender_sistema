@@ -513,7 +513,7 @@ def test_aprovadora_edita_e_exclui_a_propria_fora_do_escopo(aprovadora, outra_ge
     """Caminho de dona: como qualquer coordenador (a regra não mexe nas próprias)."""
     editar = _sol("NAO_SUPER", outra_gerencia, dono=aprovadora, status="aprovado")
     excluir = _sol("NAO_SUPER", outra_gerencia, dono=aprovadora, status="aprovado")
-    _compra(editar.municipio, editar.projeto)  # mandar `projeto` reaplica a Regra 4 (compra do par)
+    _compra(editar.municipio, editar.projeto)  # par com compra: o teste é de escopo, não da Regra 4
     client = _client(aprovadora)
 
     # O EditSolicitacaoPage manda `projeto` em todo save: o mesmo projeto não é "mover".

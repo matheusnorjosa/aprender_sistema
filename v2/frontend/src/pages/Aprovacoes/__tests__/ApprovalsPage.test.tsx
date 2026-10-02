@@ -416,12 +416,12 @@ describe('ApprovalsPage', () => {
     await act(async () => { await config.onOk?.(); });
   }
 
-  const DETALHE_LIMITE = 'Não é possível aprovar a solicitação: Bruno Formador passa do limite diário de horas.';
+  const DETALHE_CONFLITO = 'Não é possível aprovar a solicitação: Bruno Formador tem outro evento aprovado neste horário.';
   const BLOQUEADOS = [
     {
       usuario_id: 7,
       usuario_nome: 'Bruno Formador',
-      conflicts: [{ code: 'M' as const, title: 'Capacidade diária excedida', detail: 'Total do dia 10/03: 600 min' }],
+      conflicts: [{ code: 'X' as const, title: 'Sobreposição', detail: 'Conflita com evento aprovado #5 (15:00 10/03–17:00 10/03)', ref_id: 5 }],
     },
   ];
 
@@ -431,7 +431,7 @@ describe('ApprovalsPage', () => {
     vi.mocked(approveSolicitacoesBatch).mockResolvedValue({
       approved: 1,
       errors: [
-        { id: 2, code: 'availability_conflict', detail: DETALHE_LIMITE, blocked_participants: BLOQUEADOS },
+        { id: 2, code: 'availability_conflict', detail: DETALHE_CONFLITO, blocked_participants: BLOQUEADOS },
         { id: 77, detail: 'Solicitação não encontrada' },
       ],
     });
@@ -450,7 +450,7 @@ describe('ApprovalsPage', () => {
     expect(within(aviso).getByText('2 solicitação(ões) não foram aprovadas')).toBeInTheDocument();
     // Evento (data · município · projeto) + motivo; o que não está na tela vai pelo número.
     expect(within(aviso).getByText(/25\/08\/2026 · Municipio2 · ProjetoTeste/)).toBeInTheDocument();
-    expect(within(aviso).getByText(/passa do limite diário de horas/)).toBeInTheDocument();
+    expect(within(aviso).getByText(/tem outro evento aprovado neste horário/)).toBeInTheDocument();
     expect(within(aviso).getByText(/Solicitação #77/)).toBeInTheDocument();
     expect(within(aviso).getByText(/Solicitação não encontrada/)).toBeInTheDocument();
   }, 30000);
@@ -459,11 +459,11 @@ describe('ApprovalsPage', () => {
     const erro = vi.spyOn(message, 'error');
     vi.mocked(listSolicitacoes).mockResolvedValue(pagina(1, 1));
     vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
-    vi.mocked(approveSolicitacao).mockRejectedValue(Object.assign(new Error(DETALHE_LIMITE), {
+    vi.mocked(approveSolicitacao).mockRejectedValue(Object.assign(new Error(DETALHE_CONFLITO), {
       status: 400,
       response: {
         status: 400,
-        data: { code: 'availability_conflict', detail: DETALHE_LIMITE, errors: { blocked_participants: BLOQUEADOS } },
+        data: { code: 'availability_conflict', detail: DETALHE_CONFLITO, errors: { blocked_participants: BLOQUEADOS } },
       },
     }));
 
@@ -479,9 +479,9 @@ describe('ApprovalsPage', () => {
     const modal = modalDeErro.mock.calls[0]?.[0];
     expect(modal?.title).toBe('Não foi possível aprovar');
     render(<>{modal?.content}</>);
-    expect(screen.getByText(DETALHE_LIMITE)).toBeInTheDocument();
+    expect(screen.getByText(DETALHE_CONFLITO)).toBeInTheDocument();
     expect(screen.getByText('Bruno Formador')).toBeInTheDocument();
-    expect(screen.getByText('Capacidade diária excedida')).toBeInTheDocument();
+    expect(screen.getByText('Sobreposição')).toBeInTheDocument();
     expect(screen.getByText(/Reprove a solicitação ou peça a quem criou/)).toBeInTheDocument();
     expect(erro).not.toHaveBeenCalled();
     erro.mockRestore();

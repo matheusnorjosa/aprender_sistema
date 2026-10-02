@@ -27,8 +27,8 @@ import LoginPage from '../LoginPage';
 import { guardarAvisoDoLogin, lerAvisoDoLogin, apagarAvisoDoLogin } from '../../../utils/storage';
 
 async function tentarEntrar(): Promise<void> {
-  await userEvent.type(screen.getByPlaceholderText('CPF'), '52998224725');
-  await userEvent.type(screen.getByPlaceholderText('Sua senha'), 'qualquer-senha');
+  fireEvent.change(screen.getByPlaceholderText('CPF'), { target: { value: '52998224725' } });
+  fireEvent.change(screen.getByPlaceholderText('Sua senha'), { target: { value: 'qualquer-senha' } });
   await userEvent.click(screen.getByRole('button', { name: 'Entrar' }));
 }
 

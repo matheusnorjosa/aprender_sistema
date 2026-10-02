@@ -6,7 +6,7 @@
  * certo e oferece "Sair".
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -29,10 +29,12 @@ function montar() {
   return { onConcluida, onSair, onSessaoEncerrada };
 }
 
-async function preencher(recebida: string, nova: string, repetida: string = nova): Promise<void> {
-  if (recebida) await userEvent.type(screen.getByLabelText('Senha que você recebeu'), recebida);
-  if (nova) await userEvent.type(screen.getByLabelText('Nova senha'), nova);
-  if (repetida) await userEvent.type(screen.getByLabelText('Repita a nova senha'), repetida);
+// `fireEvent.change` (não `userEvent.type`): digitar tecla a tecla três senhas estoura o tempo
+// do teste quando a suíte inteira roda em paralelo.
+function preencher(recebida: string, nova: string, repetida: string = nova): void {
+  fireEvent.change(screen.getByLabelText('Senha que você recebeu'), { target: { value: recebida } });
+  fireEvent.change(screen.getByLabelText('Nova senha'), { target: { value: nova } });
+  fireEvent.change(screen.getByLabelText('Repita a nova senha'), { target: { value: repetida } });
 }
 
 const salvar = (): Promise<void> => userEvent.click(screen.getByRole('button', { name: 'Salvar e continuar' }));
@@ -98,7 +100,7 @@ describe('TrocaSenhaObrigatoriaPage', () => {
   test('confirmação diferente: "As senhas não conferem." e não chama a API', async () => {
     montar();
 
-    await preencher(RECEBIDA, NOVA, 'Outra#Coisa99');
+    preencher(RECEBIDA, NOVA, 'Outra#Coisa99');
     await salvar();
 
     expect(await screen.findByText('As senhas não conferem.')).toBeInTheDocument();
@@ -108,7 +110,7 @@ describe('TrocaSenhaObrigatoriaPage', () => {
   test('nova igual à recebida é recusada na tela, sem chamar a API', async () => {
     montar();
 
-    await preencher(RECEBIDA, RECEBIDA);
+    preencher(RECEBIDA, RECEBIDA);
     await salvar();
 
     expect(await screen.findByText('A nova senha tem de ser diferente da que você recebeu.')).toBeInTheDocument();
@@ -119,7 +121,7 @@ describe('TrocaSenhaObrigatoriaPage', () => {
     changeMyPasswordMock.mockResolvedValue({ detail: 'Senha alterada com sucesso.' });
     const { onConcluida } = montar();
 
-    await preencher(RECEBIDA, NOVA);
+    preencher(RECEBIDA, NOVA);
     await salvar();
 
     await waitFor(() => expect(onConcluida).toHaveBeenCalledTimes(1));
@@ -132,7 +134,7 @@ describe('TrocaSenhaObrigatoriaPage', () => {
     );
     const { onConcluida } = montar();
 
-    await preencher(RECEBIDA, NOVA);
+    preencher(RECEBIDA, NOVA);
     await salvar();
 
     expect(await screen.findByText('Esta senha é muito comum.')).toBeInTheDocument();
@@ -148,7 +150,7 @@ describe('TrocaSenhaObrigatoriaPage', () => {
     );
     montar();
 
-    await preencher('errada-de-proposito', NOVA);
+    preencher('errada-de-proposito', NOVA);
     await salvar();
 
     expect(await screen.findByText('Esta não é a senha que você recebeu. Confira e digite de novo.')).toBeInTheDocument();
@@ -159,7 +161,7 @@ describe('TrocaSenhaObrigatoriaPage', () => {
     changeMyPasswordMock.mockRejectedValue(erroHttp(403, { code: 'NOT_AUTHENTICATED' }));
     const { onSessaoEncerrada, onConcluida } = montar();
 
-    await preencher(RECEBIDA, NOVA);
+    preencher(RECEBIDA, NOVA);
     await salvar();
 
     await waitFor(() => expect(onSessaoEncerrada).toHaveBeenCalledTimes(1));
@@ -170,7 +172,7 @@ describe('TrocaSenhaObrigatoriaPage', () => {
     changeMyPasswordMock.mockRejectedValue(new TypeError('Sem conexão com o servidor.'));
     montar();
 
-    await preencher(RECEBIDA, NOVA);
+    preencher(RECEBIDA, NOVA);
     await salvar();
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -182,7 +184,7 @@ describe('TrocaSenhaObrigatoriaPage', () => {
     changeMyPasswordMock.mockRejectedValue(erroHttp(429, { code: 'THROTTLED' }, { retryAfter: 42 }));
     montar();
 
-    await preencher(RECEBIDA, NOVA);
+    preencher(RECEBIDA, NOVA);
     await salvar();
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -194,7 +196,7 @@ describe('TrocaSenhaObrigatoriaPage', () => {
     changeMyPasswordMock.mockRejectedValue(erroHttp(500, { detail: 'boom' }));
     montar();
 
-    await preencher(RECEBIDA, NOVA);
+    preencher(RECEBIDA, NOVA);
     await salvar();
 
     expect(await screen.findByRole('alert')).toHaveTextContent(

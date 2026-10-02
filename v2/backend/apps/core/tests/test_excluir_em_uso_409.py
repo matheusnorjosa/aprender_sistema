@@ -158,14 +158,11 @@ def test_sentinela_todo_model_com_fk_protect_sai_com_acento_no_409():
     Vários `verbose_name_plural` saíram sem acento ("Solicitacoes de Evento"); corrigir o Meta pede
     migration, então o nome com acento fica no `_mensagem_em_uso`.
     """
-    com_protect = sorted(
-        (
-            model
-            for model in apps.get_models()
-            if any(getattr(campo.remote_field, "on_delete", None) is PROTECT for campo in model._meta.concrete_fields)
-        ),
-        key=lambda model: model._meta.label,
-    )
+    com_protect = [
+        model
+        for model in apps.get_models()
+        if any(getattr(campo.remote_field, "on_delete", None) is PROTECT for campo in model._meta.concrete_fields)
+    ]
 
     assert {model._meta.label: _tipo_no_409(model) for model in com_protect} == {
         "core.AcaoDAT": "Ações DAT",

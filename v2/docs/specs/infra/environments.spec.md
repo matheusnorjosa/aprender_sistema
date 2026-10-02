@@ -73,6 +73,11 @@ Definições das variáveis de composição estão no topo de [`v2/infra/Makefil
   `ENVIRONMENT=staging` (`DEBUG=0`); prod/prod-like = `ENVIRONMENT=production`. O `settings.py` deriva
   comportamento disso (cookies `Secure`, `statement_timeout=30000ms`, JSON logging em staging/prod, Silk
   profiler só em staging).
+- **Borda HTTP difere por ambiente.** Só produção tem o Nginx Proxy Manager na frente do nginx do `frontend`.
+  Em staging/prod-like/dev o navegador (ou o smoke test) fala direto com o nginx do `frontend`; o `limit_req`
+  por cliente e o `real_ip_header X-Real-IP` valem igual, mas sem NPM o cabeçalho não vem e o endereço usado é
+  o da conexão (em Docker Desktop, o gateway da rede). A cadeia completa e o `NUM_PROXIES` estão em
+  [deploy.spec](./deploy.spec.md), seção "Borda HTTP".
 - **`.env.*` versionados são templates.** `SECRET_KEY=CHANGE_ME_*` e senhas placeholder. Segredos reais de
   produção vivem no `stack.env` do Portainer, **não** no repo.
 - **Observabilidade é DEV-only.** Prometheus+Grafana sobem só via `make up-obs` (compose de observabilidade é

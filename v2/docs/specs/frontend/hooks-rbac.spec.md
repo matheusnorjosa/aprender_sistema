@@ -106,7 +106,7 @@ Guard de rota (componente, nao hook):
 3. `usePermissions(user)` computa flags legacy; `AppRoutes` chama `useCanAccess(policies, { canBloqueios })` — **so essa flag legacy** (`AppRoutes.tsx`) — e `App.tsx` chama `useCanAccess(policies)` sem legacy nenhum.
 4. Menu deriva de `useCapabilities(policies)` (`AppSidebar.tsx`); rotas derivam de `<RequirePolicy>` (policy publica ou `allow=`). Rota negada renderiza o `Result` generico `DefaultForbidden` (OWASP — nao revela recurso/permissao necessaria).
 
-**Atualizacao de RBAC**: nao ha polling das capabilities. Mudancas de permissao so refletem apos reload/relogin (logout faz `window.location.reload()`). Os pollings existentes em `App.tsx` sao de dados operacionais e nao re-buscam policies: `useGCalAlertsPolling` e gated por `permissions.canControle` (`App.tsx`, flag legacy) e `useUnreadNotificationsPolling` por `access.canManageInternalActions` (`App.tsx`, policy pura).
+**Atualizacao de RBAC**: nao ha polling das capabilities. Mudancas de permissao so refletem apos reload/relogin (logout faz `window.location.reload()`). Os pollings existentes em `App.tsx` sao de dados operacionais e nao re-buscam policies: `useGCalAlertsPolling` e gated por `permissions.canControle` (`App.tsx`, flag legacy) e `useUnreadNotificationsPolling` por `access.canManageInternalActions` (`App.tsx`, policy pura). Os dois usam `hooks/usePolling.ts`, que para com a aba oculta, nao abre carga nova com outra em voo e devolve `{ pausado, pausar }` para a pausa apos 429 (regras em [pages.spec](./pages.spec.md), "Telas que se atualizam sozinhas").
 
 **Guard Google (caminho feliz + erro):**
 

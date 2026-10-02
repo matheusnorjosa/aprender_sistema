@@ -946,17 +946,27 @@ Valores de produção — `REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]` (`v2/backen
 
 | Escopo | Limite | Descrição |
 |--------|--------|-----------|
-| `anon` | 100/hour | Usuários não autenticados |
-| `user` | 1000/hour | Usuários autenticados |
+| `anon` | 1000/hour | Usuários não autenticados (por IP) |
+| `user` | 6000/hour | Usuários autenticados (por pessoa) |
 | `availability_check` | 60/min | Verificação de conflitos |
 | `metrics` | 30/min | Métricas (geo + agregações) |
 | `reports` | 30/min | Relatórios (agregações pesadas) |
 | `gcal_write` | 10/min | Escritas no Google Calendar (publish/batch) |
 | `export` | 10/min | Exports CSV/JSON |
 | `import` | 30/min | Uploads de importação (balde único por usuário) |
-| `login` | 10/minute | Anti brute-force no `/auth/login/` |
+| `login` | 30/minute | `/auth/login/`, por IP |
 | `change_password` | 20/min | Troca de senha self-service |
 | `oauth` | 10/hour | `/api/oauth/google/start/` |
+
+**Por que estes valores (2026-10)**: `user` precisa caber as telas que se atualizam sozinhas — Pré-agenda
+(3 pedidos a cada 20 s), Aprovações (1 a cada 20 s) e Grade Mensal (2 a cada 30 s) somam ~960/h com as três
+abertas; 1000/h estourava em ~25 min de Pré-agenda aberta. `anon` e `login` são **por IP**, e o escritório
+inteiro sai pelo mesmo endereço. Quem barra força bruta de senha é o bloqueio **por conta**
+(`ACCOUNT_LOCKOUT_THRESHOLD` = 10 erros → 15 min; 50 erros somando todos os IPs → 30 min, `views_auth.py`),
+que não mudou. O 429 do DRF traz o cabeçalho `Retry-After` (segundos); o frontend o lê em `fetchAPI`
+(`error.retryAfterSeconds`) e as telas com polling pausam por esse tempo. Antes do Django há o `limit_req`
+do nginx do frontend (30 r/s por cliente, rajada de 60, resposta 429 sem `Retry-After`) — ver
+[deploy.spec](specs/infra/deploy.spec.md).
 
 **Nota**: fora de produção os limites são relaxados (override em `ENVIRONMENT == "development"` de `REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]`, `settings.py`) —
 não são exatamente "10x" para todos os escopos (`login` vai a `1000/minute`).

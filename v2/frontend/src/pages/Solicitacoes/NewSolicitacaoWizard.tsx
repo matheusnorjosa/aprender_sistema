@@ -50,7 +50,7 @@ import DateTimeRange from '../../components/DateTimeRange';
 import ComboBox from '../../components/ComboBox';
 import FormadoresPicker from '../../components/FormadoresPicker';
 import CoordenadoresPicker from '../../components/CoordenadoresPicker';
-import AvailabilityConflictAlert from '../../components/AvailabilityConflictAlert';
+import AvailabilityConflictAlert, { AvisosDeAgenda } from '../../components/AvailabilityConflictAlert';
 import logger from '../../utils/logger';
 import type { ID, FluxoType, BlockedParticipant, AvailabilityConflictErrorPayload } from '../../types';
 
@@ -443,7 +443,16 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   // Bloco de UX da checagem (aviso antecipado). Só render — o gate real é o backend.
   const renderPreviewAviso = (): ReactNode => {
     if (preview.status === 'conflito') {
-      return <AvailabilityConflictAlert bloqueados={preview.bloqueados} id="preview-conflito" />;
+      return (
+        <>
+          <AvailabilityConflictAlert bloqueados={preview.bloqueados} id="preview-conflito" />
+          <AvisosDeAgenda avisos={preview.avisos ?? []} />
+        </>
+      );
+    }
+    // Limite diário (RD-05): só avisa. O botão continua liberado.
+    if (preview.status === 'ok' && preview.avisos) {
+      return <AvisosDeAgenda avisos={preview.avisos} />;
     }
     if (preview.status === 'checking') {
       return (

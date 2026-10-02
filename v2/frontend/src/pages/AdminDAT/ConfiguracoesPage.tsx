@@ -3,9 +3,9 @@
  *
  * Issue #187: UI para Configurações do Sistema
  *
- * Mostra só os 2 parâmetros que o sistema lê: Buffer de deslocamento (RD-04) e Limite diário
- * de horas (RD-05), os mesmos que a checagem de disponibilidade aplica. Os outros 13 campos do
- * `/api/config/` não têm leitor e saíram da tela por decisão do dono (01/10); o backend os
+ * Mostra só os 2 parâmetros que o sistema lê: Buffer de deslocamento (RD-04) e Aviso de horas
+ * por dia (RD-05, só avisa desde 02/10/2026), os mesmos que a checagem de disponibilidade
+ * aplica. Os outros 13 campos do `/api/config/` não têm leitor e saíram da tela por decisão do dono (01/10); o backend os
  * guarda como estão (ver pages.spec.md, "Configurações").
  *
  * Salva via PUT /api/config/ só o que mudou (o backend mescla com o vigente).
@@ -129,9 +129,9 @@ export default function ConfiguracoesPage(): JSX.Element {
           </Form.Item>
 
           <Form.Item
-            label="Limite diário de horas"
+            label="Aviso de horas por dia"
             name="AVAILABILITY_DAILY_LIMIT_HOURS"
-            extra="Máximo de horas de eventos por dia para cada formador."
+            extra="Quando os eventos de uma pessoa no mesmo dia somam mais que este número de horas, o sistema avisa quem está criando. O aviso não impede o evento."
             rules={[
               { required: true, message: 'Campo obrigatório' },
               { type: 'integer', min: 1, max: 12, message: 'Use um número inteiro entre 1 e 12.' }

@@ -80,9 +80,21 @@ describe('AvisosDeAgenda — limite diário avisa, não barra (decisão de 02/10
     },
   ];
 
-  test('não renderiza nada quando não há avisos', () => {
-    const { container } = render(<AvisosDeAgenda avisos={[]} />);
-    expect(container).toBeEmptyDOMElement();
+  test('sem avisos, a região viva já existe e está vazia', () => {
+    render(<AvisosDeAgenda avisos={[]} />);
+
+    // Leitor de tela só anuncia o que entra numa região que já estava na página.
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+  });
+
+  test('o aviso entra na região que já estava montada', () => {
+    const { rerender } = render(<AvisosDeAgenda avisos={[]} />);
+    const regiao = screen.getByRole('status');
+
+    rerender(<AvisosDeAgenda avisos={avisos} />);
+
+    expect(screen.getByRole('status')).toBe(regiao);
+    expect(regiao).toHaveTextContent('Dia com mais de 8 horas de eventos');
   });
 
   test('é informação (role status), nunca alerta de erro', () => {

@@ -189,6 +189,15 @@ class TestMotorSeparaAvisoDeConflito:
         assert "contagem" not in texto.lower()
         assert "min" not in texto  # sem o texto técnico antigo ("960 min > limite 480 min")
 
+    def test_limite_de_uma_hora_fica_no_singular(self, formador, municipio, settings):
+        settings.AVAILABILITY_DAILY_LIMIT_HOURS = 1
+        bust_cfg("availability")
+
+        result = check_conflicts_uncached(usuario=formador, inicio=INICIO, fim=FIM, municipio=municipio)
+
+        (aviso,) = result.warnings
+        assert aviso.title == "Dia com mais de 1 hora de eventos"
+
     def test_agenda_dentro_do_limite_nao_tem_aviso(self, formador, municipio):
         result = check_conflicts_uncached(usuario=formador, inicio=INICIO, fim=FIM, municipio=municipio)
 

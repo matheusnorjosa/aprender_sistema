@@ -441,18 +441,9 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   const conflitoAntecipado = preview.status === 'conflito';
 
   // Bloco de UX da checagem (aviso antecipado). Só render — o gate real é o backend.
-  const renderPreviewAviso = (): ReactNode => {
+  const renderPreviewEstado = (): ReactNode => {
     if (preview.status === 'conflito') {
-      return (
-        <>
-          <AvailabilityConflictAlert bloqueados={preview.bloqueados} id="preview-conflito" />
-          <AvisosDeAgenda avisos={preview.avisos ?? []} />
-        </>
-      );
-    }
-    // Limite diário (RD-05): só avisa. O botão continua liberado.
-    if (preview.status === 'ok' && preview.avisos) {
-      return <AvisosDeAgenda avisos={preview.avisos} />;
+      return <AvailabilityConflictAlert bloqueados={preview.bloqueados} id="preview-conflito" />;
     }
     if (preview.status === 'checking') {
       return (
@@ -481,6 +472,17 @@ export default function NewSolicitacaoWizard(): JSX.Element {
     }
     return null;
   };
+
+  // Limite diário (RD-05): só avisa, o botão continua liberado. A região do aviso fica
+  // sempre montada (vazia sem aviso) para o leitor de tela anunciar quando o texto entrar.
+  const avisosDaPrevia =
+    preview.status === 'ok' || preview.status === 'conflito' ? (preview.avisos ?? []) : [];
+  const renderPreviewAviso = (): ReactNode => (
+    <>
+      {renderPreviewEstado()}
+      <AvisosDeAgenda avisos={avisosDaPrevia} />
+    </>
+  );
 
   // Passos do wizard memoizados (Issue #426)
   const steps: StepType[] = useMemo(() => [

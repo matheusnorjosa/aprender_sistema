@@ -96,32 +96,38 @@ export interface AvisosDeAgendaProps {
  * Diferente do bloqueio em tudo o que a pessoa percebe: é informação (azul, `role="status"`,
  * lido sem interromper), diz no título que não impede e não manda remover ninguém. O texto
  * de cada aviso (`title`/`detail`) vem pronto do backend.
+ *
+ * A região viva fica sempre montada (vazia e sem ocupar espaço quando não há aviso): leitor
+ * de tela só anuncia o que entra numa região que já estava na página. Quem usa deve manter
+ * o componente montado e variar só `avisos`.
  */
-export function AvisosDeAgenda({ avisos }: AvisosDeAgendaProps): JSX.Element | null {
-  if (avisos.length === 0) return null;
-
+export function AvisosDeAgenda({ avisos }: AvisosDeAgendaProps): JSX.Element {
   return (
-    <Alert
-      type="info"
-      showIcon
-      role="status"
-      className="mb-4"
-      message="Aviso de agenda: isso não impede o evento"
-      description={
-        <ul className="list-none pl-0 m-0">
-          {avisos.map((p) => (
-            <li key={p.usuario_id} className="mb-2">
-              <strong>{p.usuario_nome}</strong>
-              {p.warnings.map((w, i) => (
-                <div key={`${p.usuario_id}-${i}`} className="text-sm">
-                  {w.title}
-                  {w.detail ? `. ${w.detail}` : null}
-                </div>
+    <div role="status">
+      {avisos.length > 0 && (
+        <Alert
+          type="info"
+          showIcon
+          role="none"
+          className="mb-4"
+          message="Aviso de agenda: isso não impede o evento"
+          description={
+            <ul className="list-none pl-0 m-0">
+              {avisos.map((p) => (
+                <li key={p.usuario_id} className="mb-2">
+                  <strong>{p.usuario_nome}</strong>
+                  {p.warnings.map((w, i) => (
+                    <div key={`${p.usuario_id}-${i}`} className="text-sm">
+                      {w.title}
+                      {w.detail ? `. ${w.detail}` : null}
+                    </div>
+                  ))}
+                </li>
               ))}
-            </li>
-          ))}
-        </ul>
-      }
-    />
+            </ul>
+          }
+        />
+      )}
+    </div>
   );
 }

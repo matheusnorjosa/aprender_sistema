@@ -223,8 +223,9 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
     );
     await irParaParticipantesESelecionarFormador();
 
-    const aviso = await screen.findByRole('status');
-    expect(aviso).toHaveTextContent('Aviso de agenda: isso não impede o evento');
+    // A região já está na página, vazia; o texto entra nela quando a checagem responde.
+    const aviso = screen.getByRole('status');
+    await waitFor(() => expect(aviso).toHaveTextContent('Aviso de agenda: isso não impede o evento'));
     expect(aviso).toHaveTextContent('Bruno Formador');
     expect(aviso).toHaveTextContent('Dia com mais de 8 horas de eventos');
     expect(screen.queryByText('Não é possível criar o evento')).not.toBeInTheDocument();

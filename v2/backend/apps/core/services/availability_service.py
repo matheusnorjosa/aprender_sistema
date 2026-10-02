@@ -345,7 +345,7 @@ def _check_conflicts_impl(
                 warnings.append(
                     Conflict(
                         "M",
-                        f"Dia com mais de {daily_limit_h:g} horas de eventos",
+                        f"Dia com mais de {daily_limit_h:g} {'hora' if daily_limit_h == 1 else 'horas'} de eventos",
                         f"No dia {day:%d/%m} a soma dos eventos chega a {_fmt_horas(total_minutes)}. "
                         "Isso não impede o evento.",
                     )

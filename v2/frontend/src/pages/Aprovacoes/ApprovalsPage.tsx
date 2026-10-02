@@ -9,6 +9,8 @@
  * - Botões para preview, aprovar e reprovar
  * - Modal para preview de payload JSON
  * - Confirmação simples para reprovação (sem justificativa obrigatória)
+ * - Erro ao aprovar diz quem está bloqueado e por quê; no lote, a tela lista o evento e o
+ *   motivo de cada item que não foi decidido
  *
  * PA-06 (Política de Aprovação Manual):
  * - Botões de aprovar/reprovar aparecem para quem tem a policy `access_solicitation_approvals`:
@@ -21,6 +23,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, ChangeEvent, Key, JSX } from 'react';
 import {
+  Alert,
   Table,
   Card,
   Input,
@@ -66,7 +69,16 @@ import { usePolling } from '../../hooks/usePolling';
 import { syncChannel } from '../../services/syncChannel';
 import { formatFortaleza, FORTALEZA_TZ } from '../../utils/datetime';
 import logger from '../../utils/logger';
-import type { CurrentUser, ID, Solicitacao, SolicitacaoStatus, Participation } from '../../types';
+import type {
+  BatchOperationResult,
+  BlockedParticipant,
+  CurrentUser,
+  ID,
+  Solicitacao,
+  SolicitacaoStatus,
+  Participation,
+} from '../../types';
+import { ListaDeBloqueados } from '../../components/AvailabilityConflictAlert';
 import { formadoresLabel } from '../../utils/participants';
 
 const { Title, Paragraph, Text } = Typography;
@@ -88,6 +100,19 @@ const STATUS_LABELS: Record<SolicitacaoStatus, string> = {
 /** Tamanhos de página: o maior é o limite do lote no servidor (100 ids por requisição). */
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
 const DEFAULT_PAGE_SIZE = 20;
+
+/** Corpo do erro 400 da aprovação; no conflito de agenda traz quem está bloqueado. */
+interface ConflictErrorData {
+  code?: string;
+  detail?: string;
+  errors?: { blocked_participants?: BlockedParticipant[] };
+}
+
+/** Itens que um lote não decidiu, já com o rótulo do evento para a pessoa reconhecer. */
+interface BatchErrors {
+  acao: 'aprovadas' | 'reprovadas';
+  itens: Array<{ id: ID; evento: string; detail: string }>;
+}
 
 /** Preview data type */
 interface PreviewDataType {
@@ -127,6 +152,7 @@ export default function ApprovalsPage(): JSX.Element {
   // Estados para seleção em lote
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([]);
   const [batchLoading, setBatchLoading] = useState<boolean>(false);
+  const [batchErrors, setBatchErrors] = useState<BatchErrors | null>(null);
 
   // Latest-wins: polling, paginação, filtros e ações disparam cargas concorrentes; só a
   // mais recente grava na tela.
@@ -255,6 +281,23 @@ export default function ApprovalsPage(): JSX.Element {
           message.success('Solicitação aprovada com sucesso!');
           void loadData();
         } catch (error) {
+          // Conflito de agenda: o servidor diz quem está bloqueado e por quê.
+          const payload = (error as { response?: { data?: ConflictErrorData } }).response?.data;
+          if (payload?.code === 'availability_conflict') {
+            Modal.error({
+              title: 'Não foi possível aprovar',
+              content: (
+                <>
+                  <Paragraph>{payload.detail || (error as Error).message}</Paragraph>
+                  <ListaDeBloqueados
+                    bloqueados={payload.errors?.blocked_participants ?? []}
+                    orientacao="Reprove a solicitação ou peça a quem criou para ajustar data, horário ou participantes."
+                  />
+                </>
+              ),
+            });
+            return;
+          }
           message.error('Erro ao aprovar: ' + (error as Error).message);
         }
       },
@@ -280,6 +323,26 @@ export default function ApprovalsPage(): JSX.Element {
     });
   }, [loadData]);
 
+  // Lote: cada item não decidido vira uma linha "evento — motivo" acima da tabela. O rótulo
+  // do evento sai das linhas visíveis ANTES da recarga (o lote só tem itens da página atual).
+  const reportBatchErrors = (acao: BatchErrors['acao'], errors: BatchOperationResult['errors'] | undefined): void => {
+    if (!errors?.length) {
+      setBatchErrors(null);
+      return;
+    }
+    const porId = new Map(rows.map((r) => [r.id, r]));
+    setBatchErrors({
+      acao,
+      itens: errors.map((e) => {
+        const row = porId.get(e.id);
+        const evento = row
+          ? [formatFortaleza(row.inicio, 'DD/MM/YYYY'), row.municipio_nome, row.projeto_nome].filter(Boolean).join(' · ')
+          : `Solicitação #${e.id}`;
+        return { id: e.id, evento, detail: e.detail };
+      }),
+    });
+  };
+
   // Handlers de operações em lote
   const handleBatchApprove = (): void => {
     Modal.confirm({
@@ -296,9 +359,7 @@ export default function ApprovalsPage(): JSX.Element {
           if (result.approved && result.approved > 0) {
             message.success(`${result.approved} solicitação(ões) aprovada(s)!`);
           }
-          if (result.errors?.length > 0) {
-            message.warning(`${result.errors.length} erro(s) encontrado(s)`);
-          }
+          reportBatchErrors('aprovadas', result.errors);
 
           setSelectedRowKeys([]);
           void loadData();
@@ -326,9 +387,7 @@ export default function ApprovalsPage(): JSX.Element {
           if (result.rejected && result.rejected > 0) {
             message.success(`${result.rejected} solicitação(ões) reprovada(s)!`);
           }
-          if (result.errors?.length > 0) {
-            message.warning(`${result.errors.length} erro(s) encontrado(s)`);
-          }
+          reportBatchErrors('reprovadas', result.errors);
 
           setSelectedRowKeys([]);
           void loadData();
@@ -545,6 +604,27 @@ export default function ApprovalsPage(): JSX.Element {
                 </Button>
               </Space>
             </nav>
+          )}
+
+          {/* Itens que o último lote não decidiu: evento + motivo de cada um */}
+          {batchErrors && (
+            <Alert
+              type="warning"
+              showIcon
+              closable
+              role="status"
+              onClose={() => setBatchErrors(null)}
+              message={`${batchErrors.itens.length} solicitação(ões) não foram ${batchErrors.acao}`}
+              description={
+                <ul className="pl-5 m-0">
+                  {batchErrors.itens.map((item) => (
+                    <li key={item.id} className="break-words">
+                      <strong>{item.evento}</strong> — {item.detail}
+                    </li>
+                  ))}
+                </ul>
+              }
+            />
           )}
 
           {/* Tabela */}

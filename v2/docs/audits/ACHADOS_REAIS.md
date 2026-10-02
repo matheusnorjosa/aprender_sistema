@@ -202,6 +202,13 @@ linha da fila adjudicada; registram o que o mapa mediu e o que cada conserto fec
   `ordering=proximidade` (de hoje em diante, do mais próximo ao mais distante; depois os passados).
   Testes: `test_solicitacoes_filters.py` e `ApprovalsPage.test.tsx`.
 
+- **Erro ao aprovar não dizia o motivo**: todo bloqueio de agenda devolvia a frase da criação por
+  sobreposição ("já está alocado neste horário. Não é possível criar o evento"), mesmo com limite
+  diário e ação de aprovar; o lote guardava só a frase e a tela mostrava só a contagem. Agora o
+  `detail` diz a ação, a pessoa e o motivo, o item do lote traz `code` e `blocked_participants`, e
+  a tela lista evento e motivo. Só texto e formato: a decisão de aprovar ou barrar é a mesma
+  (`test_availability_mensagem_motivo.py`, classe `TestDecisaoNaoMuda`).
+
 ## PR A — setor = gerência na tela (2026-09-29)
 
 Achados medidos durante o PR A (branch `feat/gerencia-nome-exibicao-pr-a`, base `a56d9027`), fora

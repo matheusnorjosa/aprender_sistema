@@ -178,15 +178,51 @@ def check_solicitacao_availability(solicitacao: Solicitacao, *, lock: bool = Tru
     )
 
 
-def _build_message(guard: GuardResult) -> str:
-    """Mensagem de bloqueio nomeando quem está alocado (RD-08)."""
-    nomes = ", ".join(p.usuario_nome for p in guard.blocked)
-    if len(guard.blocked) == 1:
-        return f"{nomes} já está alocado neste horário. Não é possível criar o evento."
-    return f"{nomes} já estão alocados neste horário. Não é possível criar o evento."
+# Texto da ação barrada, por call-site (`action` de `enforce_solicitacao_availability`).
+_ACAO_TEXTO: dict[str, str] = {
+    "create": "criar o evento",
+    "update": "salvar a alteração",
+    "approve": "aprovar a solicitação",
+    "batch_approve": "aprovar a solicitação",
+}
+_ACAO_GENERICA = "concluir a ação"
+
+# Motivo em linguagem de quem usa, por código de conflito do motor (X/T/P/D/M). É só
+# apresentação: quem decide o conflito continua sendo `check_conflicts_uncached`. Sempre
+# consultado com `.get` — código fora do mapa cai no texto genérico, nunca em KeyError.
+_MOTIVO_TEXTO: dict[str, str] = {
+    "X": "tem outro evento aprovado neste horário",
+    "T": "tem bloqueio de agenda no período",
+    "P": "tem bloqueio parcial de agenda no período",
+    "D": "não tem o intervalo de deslocamento entre cidades",
+    "M": "passa do limite diário de horas",
+}
+_MOTIVO_GENERICO = "tem conflito de agenda"
+# O motor usa o código X também para "Intervalo inválido" (fim <= início): só a
+# sobreposição de fato pode dizer "outro evento".
+_TITULO_SOBREPOSICAO = "Sobreposição"
 
 
-def raise_if_blocked(guard: GuardResult) -> None:
+def _motivo(conflict: Conflict) -> str:
+    """Motivo legível de um conflito; texto genérico (com o título, se houver) fora do mapa."""
+    code = str(getattr(conflict, "code", "") or "")
+    titulo = str(getattr(conflict, "title", "") or "").strip()
+    texto = _MOTIVO_TEXTO.get(code)
+    if texto is not None and (code != "X" or titulo == _TITULO_SOBREPOSICAO):
+        return texto
+    return f"{_MOTIVO_GENERICO} ({titulo.lower()})" if titulo else _MOTIVO_GENERICO
+
+
+def _build_message(guard: GuardResult, *, action: str = "create") -> str:
+    """Mensagem de bloqueio: a ação barrada, quem está bloqueado e por quê (RD-08)."""
+    partes: list[str] = []
+    for p in guard.blocked:
+        motivos = list(dict.fromkeys(_motivo(c) for c in p.conflicts)) or [_MOTIVO_GENERICO]
+        partes.append(f"{p.usuario_nome} {' e '.join(motivos)}")
+    return f"Não é possível {_ACAO_TEXTO.get(action, _ACAO_GENERICA)}: {'; '.join(partes)}."
+
+
+def raise_if_blocked(guard: GuardResult, *, action: str = "create") -> None:
     """
     Converte um GuardResult bloqueado em 400 `availability_conflict`.
 
@@ -201,7 +237,7 @@ def raise_if_blocked(guard: GuardResult) -> None:
 
     todos: list[Conflict] = [c for p in guard.blocked for c in p.conflicts]
     raise ValidationAPIError(
-        message=_build_message(guard),
+        message=_build_message(guard, action=action),
         code="availability_conflict",
         extra={
             "conflicts": [c.__dict__ for c in todos],
@@ -226,7 +262,8 @@ def enforce_solicitacao_availability(solicitacao: Solicitacao, *, action: str) -
 
     Args:
         solicitacao: evento já gravado
-        action: rótulo do call-site, só para log/auditoria
+        action: rótulo do call-site (create/update/approve/batch_approve): vai para o log e
+            escolhe o verbo da mensagem de bloqueio. Não muda o que é checado nem a decisão.
 
     Returns:
         GuardResult (ok=True) quando passa
@@ -259,6 +296,6 @@ def enforce_solicitacao_availability(solicitacao: Solicitacao, *, action: str) -
                 "blocked_usuario_ids": [p.usuario_id for p in guard.blocked],
             },
         )
-        raise_if_blocked(guard)
+        raise_if_blocked(guard, action=action)
 
     return guard

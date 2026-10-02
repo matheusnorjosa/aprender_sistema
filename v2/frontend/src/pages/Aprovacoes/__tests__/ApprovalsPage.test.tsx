@@ -19,7 +19,7 @@
  */
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { message } from 'antd';
+import { message, Modal } from 'antd';
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MemoryRouter } from 'react-router';
 import type { CurrentUser, PaginatedResponse, Solicitacao, SolicitacaoFilters } from '../../../types';
@@ -46,7 +46,7 @@ vi.mock('../../../hooks/usePolling', () => ({
 }));
 
 import ApprovalsPage from '../ApprovalsPage';
-import { listSolicitacoes } from '../../../api/solicitacoes';
+import { approveSolicitacao, approveSolicitacoesBatch, listSolicitacoes } from '../../../api/solicitacoes';
 import { getMyPolicies } from '../../../api/me';
 import { getMe } from '../../../api/availability';
 import { usePolling } from '../../../hooks/usePolling';
@@ -111,6 +111,7 @@ describe('ApprovalsPage', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.clearAllMocks();
   });
 
@@ -360,4 +361,112 @@ describe('ApprovalsPage', () => {
     await waitFor(() => expect(screen.queryByText('Municipio2')).not.toBeInTheDocument());
     expect(screen.queryByText(/selecionada\(s\)/)).not.toBeInTheDocument();
   }, 20000);
+  // ------------------------------------------------------------------
+  // Mapa de acesso 02/10 (P9): o erro ao aprovar diz quem e por quê.
+  // ------------------------------------------------------------------
+
+  /**
+   * Modal.confirm/Modal.error são estáticos e não montam no jsdom deste projeto: o teste
+   * espia a chamada (padrão das telas AdminDAT) e dispara o `onOk` à mão.
+   */
+  const semModal = (): { destroy: () => void; update: () => void } => ({ destroy: vi.fn(), update: vi.fn() });
+
+  async function confirmar(spy: ReturnType<typeof vi.spyOn>): Promise<void> {
+    await waitFor(() => expect(spy).toHaveBeenCalled());
+    const config = spy.mock.calls[0]?.[0] as { onOk?: () => Promise<void> };
+    await act(async () => { await config.onOk?.(); });
+  }
+
+  const DETALHE_LIMITE = 'Não é possível aprovar a solicitação: Bruno Formador passa do limite diário de horas.';
+  const BLOQUEADOS = [
+    {
+      usuario_id: 7,
+      usuario_nome: 'Bruno Formador',
+      conflicts: [{ code: 'M' as const, title: 'Capacidade diária excedida', detail: 'Total do dia 10/03: 600 min' }],
+    },
+  ];
+
+  test('lote com erros lista o evento e o motivo de cada um', async () => {
+    vi.mocked(listSolicitacoes).mockResolvedValue(pagina(2, 2));
+    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
+    vi.mocked(approveSolicitacoesBatch).mockResolvedValue({
+      approved: 1,
+      errors: [
+        { id: 2, code: 'availability_conflict', detail: DETALHE_LIMITE, blocked_participants: BLOQUEADOS },
+        { id: 77, detail: 'Solicitação não encontrada' },
+      ],
+    });
+
+    renderPage();
+
+    for (const municipio of ['Municipio1', 'Municipio2']) {
+      const linha = (await screen.findByText(municipio)).closest('tr') as HTMLElement;
+      fireEvent.click(await within(linha).findByRole('checkbox', {}, { timeout: 10000 }));
+    }
+    const confirmacao = vi.spyOn(Modal, 'confirm').mockImplementation(semModal);
+    fireEvent.click(await screen.findByRole('button', { name: /Aprovar Selecionadas/ }));
+    await confirmar(confirmacao);
+
+    const aviso = await screen.findByRole('status');
+    expect(within(aviso).getByText('2 solicitação(ões) não foram aprovadas')).toBeInTheDocument();
+    // Evento (data · município · projeto) + motivo; o que não está na tela vai pelo número.
+    expect(within(aviso).getByText(/25\/08\/2026 · Municipio2 · ProjetoTeste/)).toBeInTheDocument();
+    expect(within(aviso).getByText(/passa do limite diário de horas/)).toBeInTheDocument();
+    expect(within(aviso).getByText(/Solicitação #77/)).toBeInTheDocument();
+    expect(within(aviso).getByText(/Solicitação não encontrada/)).toBeInTheDocument();
+  }, 30000);
+
+  test('aprovar um com conflito de agenda mostra quem e por quê', async () => {
+    const erro = vi.spyOn(message, 'error');
+    vi.mocked(listSolicitacoes).mockResolvedValue(pagina(1, 1));
+    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
+    vi.mocked(approveSolicitacao).mockRejectedValue(Object.assign(new Error(DETALHE_LIMITE), {
+      status: 400,
+      response: {
+        status: 400,
+        data: { code: 'availability_conflict', detail: DETALHE_LIMITE, errors: { blocked_participants: BLOQUEADOS } },
+      },
+    }));
+
+    renderPage();
+
+    const linha = (await screen.findByText('Municipio1')).closest('tr') as HTMLElement;
+    const confirmacao = vi.spyOn(Modal, 'confirm').mockImplementation(semModal);
+    const modalDeErro = vi.spyOn(Modal, 'error').mockImplementation(semModal);
+    fireEvent.click(await within(linha).findByRole('button', { name: /Aprovar/ }, { timeout: 10000 }));
+    await confirmar(confirmacao);
+
+    expect(modalDeErro).toHaveBeenCalledTimes(1);
+    const modal = modalDeErro.mock.calls[0]?.[0];
+    expect(modal?.title).toBe('Não foi possível aprovar');
+    render(<>{modal?.content}</>);
+    expect(screen.getByText(DETALHE_LIMITE)).toBeInTheDocument();
+    expect(screen.getByText('Bruno Formador')).toBeInTheDocument();
+    expect(screen.getByText('Capacidade diária excedida')).toBeInTheDocument();
+    expect(screen.getByText(/Reprove a solicitação ou peça a quem criou/)).toBeInTheDocument();
+    expect(erro).not.toHaveBeenCalled();
+    erro.mockRestore();
+  }, 30000);
+
+  test('aprovar um com outro erro segue na mensagem curta', async () => {
+    const erro = vi.spyOn(message, 'error');
+    vi.mocked(listSolicitacoes).mockResolvedValue(pagina(1, 1));
+    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
+    vi.mocked(approveSolicitacao).mockRejectedValue(Object.assign(new Error('Solicitação já aprovada.'), {
+      status: 400,
+      response: { status: 400, data: { code: 'already_approved', detail: 'Solicitação já aprovada.' } },
+    }));
+
+    renderPage();
+
+    const linha = (await screen.findByText('Municipio1')).closest('tr') as HTMLElement;
+    const confirmacao = vi.spyOn(Modal, 'confirm').mockImplementation(semModal);
+    const modalDeErro = vi.spyOn(Modal, 'error').mockImplementation(semModal);
+    fireEvent.click(await within(linha).findByRole('button', { name: /Aprovar/ }, { timeout: 10000 }));
+    await confirmar(confirmacao);
+
+    expect(erro).toHaveBeenCalledWith('Erro ao aprovar: Solicitação já aprovada.');
+    expect(modalDeErro).not.toHaveBeenCalled();
+    erro.mockRestore();
+  }, 30000);
 });

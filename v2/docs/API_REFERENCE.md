@@ -153,7 +153,7 @@ vínculo de GERENTE dela (fora: 403), e só cria ou move para projeto desse alca
 |--------|----------|--------|-----------|-----------|
 | **PATCH** | `/api/solicitacoes/{id}/approve/` | ![Stable](https://img.shields.io/badge/-stable-green) | Aprovar solicitação SUPER | `CanAccessSolicitationApprovals` |
 | **PATCH** | `/api/solicitacoes/{id}/reject/` | ![Stable](https://img.shields.io/badge/-stable-green) | Reprovar solicitação SUPER | `CanAccessSolicitationApprovals` |
-| POST | `/api/solicitacoes/batch-approve/` | ![Stable](https://img.shields.io/badge/-stable-green) | Aprovar em lote (máx. 100 `ids`) | `CanAccessSolicitationApprovals` |
+| POST | `/api/solicitacoes/batch-approve/` | ![Stable](https://img.shields.io/badge/-stable-green) | Aprovar em lote (máx. 100 `ids`); item barrado por agenda vem em `errors[]` com `code: availability_conflict`, `detail` (quem e por quê) e `blocked_participants` | `CanAccessSolicitationApprovals` |
 | POST | `/api/solicitacoes/batch-reject/` | ![Stable](https://img.shields.io/badge/-stable-green) | Reprovar em lote (máx. 100 `ids`) | `CanAccessSolicitationApprovals` |
 
 `approve`/`reject` são **PATCH**, não POST (actions `SolicitacaoViewSet.approve` e

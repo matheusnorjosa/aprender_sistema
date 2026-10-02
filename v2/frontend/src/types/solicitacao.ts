@@ -11,6 +11,7 @@
 
 import type { ID, ISODateTime } from './common';
 import type { UserSlim } from './usuario';
+import type { BlockedParticipant } from './availability';
 
 /**
  * Solicitacao status (Portuguese)
@@ -167,9 +168,11 @@ export interface EventDetail extends Omit<Solicitacao, 'usuario' | 'municipio' |
 export interface BatchOperationResult {
   approved?: number;
   rejected?: number;
-  // Mesmo formato do backend (`_batch_response_schema`): `code` = self_approval_forbidden ou
-  // out_of_approval_scope quando há; "não encontrada"/"Status já é" vêm só com `detail`.
-  errors: Array<{ id: ID; detail: string; code?: string }>;
+  // Mesmo formato do backend (`_batch_response_schema`): `code` = self_approval_forbidden,
+  // out_of_approval_scope ou availability_conflict quando há; "não encontrada"/"Status já é"
+  // vêm só com `detail`. No conflito de agenda o `detail` já diz quem e por quê, e
+  // `blocked_participants` traz o mesmo por pessoa (como na aprovação individual).
+  errors: Array<{ id: ID; detail: string; code?: string; blocked_participants?: BlockedParticipant[] }>;
 }
 
 /**

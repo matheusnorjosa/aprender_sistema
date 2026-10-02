@@ -91,7 +91,11 @@ class _ExtraParticipantsSerializer(serializers.Serializer):
 
 
 def _batch_response_schema(contador: str) -> dict[str, Any]:
-    """Schema OpenAPI da resposta dos lotes: contador + errors[{id, detail, code?}] (PR B1)."""
+    """Schema OpenAPI da resposta dos lotes: contador + errors[{id, detail, code?, blocked_participants?}].
+
+    `code` (PR B1) vem em decisão própria, fora do escopo e conflito de agenda; neste último o item
+    traz também `blocked_participants` (quem está bloqueado e por quê), como na aprovação individual.
+    """
     return {
         "type": "object",
         "properties": {
@@ -103,7 +107,11 @@ def _batch_response_schema(contador: str) -> dict[str, Any]:
                     "properties": {
                         "id": {"type": "integer"},
                         "detail": {"type": "string"},
-                        "code": {"type": "string", "enum": ["self_approval_forbidden", "out_of_approval_scope"]},
+                        "code": {
+                            "type": "string",
+                            "enum": ["self_approval_forbidden", "out_of_approval_scope", "availability_conflict"],
+                        },
+                        "blocked_participants": {"type": "array", "items": {"type": "object"}},
                     },
                     "required": ["id", "detail"],
                 },

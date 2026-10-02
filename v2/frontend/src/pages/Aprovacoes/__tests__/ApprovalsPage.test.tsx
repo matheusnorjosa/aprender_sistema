@@ -361,6 +361,45 @@ describe('ApprovalsPage', () => {
     await waitFor(() => expect(screen.queryByText('Municipio2')).not.toBeInTheDocument());
     expect(screen.queryByText(/selecionada\(s\)/)).not.toBeInTheDocument();
   }, 20000);
+
+  test('resposta mais lenta que o polling ainda aparece (o tick não descarta a carga em voo)', async () => {
+    // Rede lenta: a carga do mount só responde depois do tick de 5 s.
+    let responder: (dados: PaginatedResponse<Solicitacao>) => void = () => undefined;
+    vi.mocked(listSolicitacoes)
+      .mockReset()
+      .mockReturnValueOnce(new Promise((resolve) => { responder = resolve; }))
+      .mockReturnValue(new Promise(() => undefined));
+
+    renderPage();
+    await waitFor(() => expect(listSolicitacoes).toHaveBeenCalledTimes(1));
+
+    const tick = vi.mocked(usePolling).mock.calls[0]?.[0];
+    await act(async () => { void tick?.(); });
+    await act(async () => { responder(pagina(1, 1)); });
+
+    expect(await screen.findByText('Municipio1')).toBeInTheDocument();
+    expect(listSolicitacoes).toHaveBeenCalledTimes(1);
+  }, 20000);
+
+  test('trocar de página com carga em voo busca a página nova (latest-wins continua valendo)', async () => {
+    let responder: (dados: PaginatedResponse<Solicitacao>) => void = () => undefined;
+    vi.mocked(listSolicitacoes).mockResolvedValue(pagina(20, 45));
+
+    renderPage();
+    await screen.findByText('Municipio1');
+
+    // Um tick fica em voo; a troca de página não espera por ele e a resposta dele é descartada.
+    vi.mocked(listSolicitacoes).mockReturnValueOnce(new Promise((resolve) => { responder = resolve; }));
+    const tick = vi.mocked(usePolling).mock.calls[0]?.[0];
+    await act(async () => { void tick?.(); });
+    vi.mocked(listSolicitacoes).mockResolvedValue(pagina(20, 45, 21));
+    fireEvent.click(await screen.findByTitle('2'));
+
+    expect(await screen.findByText('Municipio21')).toBeInTheDocument();
+    await act(async () => { responder(pagina(20, 45)); });
+    expect(screen.getByText('Municipio21')).toBeInTheDocument();
+    expect(screen.queryByText('Municipio1')).not.toBeInTheDocument();
+  }, 20000);
   // ------------------------------------------------------------------
   // Mapa de acesso 02/10 (P9): o erro ao aprovar diz quem e por quê.
   // ------------------------------------------------------------------

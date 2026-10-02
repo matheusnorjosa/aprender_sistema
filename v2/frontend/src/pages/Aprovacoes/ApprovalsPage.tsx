@@ -157,9 +157,13 @@ export default function ApprovalsPage(): JSX.Element {
   // Latest-wins: polling, paginação, filtros e ações disparam cargas concorrentes; só a
   // mais recente grava na tela.
   const seqRef = useRef(0);
+  // Cargas em voo: o tick do polling espera a resposta em vez de abrir outra carga, senão
+  // em rede lenta (resposta > intervalo) cada tick descartaria a anterior e nada apareceria.
+  const emVooRef = useRef(0);
 
   const loadData = useCallback(async (): Promise<void> => {
     const seq = ++seqRef.current;
+    emVooRef.current += 1;
     try {
       setLoading(true);
       const data = await listSolicitacoes({
@@ -186,6 +190,7 @@ export default function ApprovalsPage(): JSX.Element {
       }
       message.error('Erro ao carregar solicitações: ' + (error as Error).message);
     } finally {
+      emVooRef.current -= 1;
       if (seq === seqRef.current) setLoading(false);
     }
   }, [statusFilter, searchTerm, page, pageSize]);
@@ -214,7 +219,7 @@ export default function ApprovalsPage(): JSX.Element {
   // RT-02: Polling 5s for cross-device sync (#1032)
   const loadDataRef = useRef(loadData);
   loadDataRef.current = loadData;
-  usePolling(() => loadDataRef.current(), {
+  usePolling(() => (emVooRef.current > 0 ? undefined : loadDataRef.current()), {
     enabled: true,
     intervalMs: TIMING.SYNC_POLL_INTERVAL_MS,
     events: ['solicitacoes:refresh', 'aprovacoes:refresh'],

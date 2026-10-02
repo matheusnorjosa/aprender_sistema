@@ -63,9 +63,9 @@ describe('ProjetosPage: excluir projeto em uso (C2b)', () => {
     const emUso = confirmar.mock.calls[1]![0];
     expect(String(emUso.content)).toContain(motivo);
     expect(String(emUso.content)).toContain(`Você pode desativar o projeto "${PROJETO.nome}"`);
-    // A tela de Projetos mostra a coluna "Ativo" com Sim/Não, não "Situação: Inativo".
-    expect(String(emUso.content)).toContain('a coluna Ativo passa a "Não"');
-    expect(String(emUso.content)).not.toContain('Inativo');
+    // A tela de Projetos mostra a coluna "Situação" com as etiquetas Ativo/Inativo.
+    expect(String(emUso.content)).toContain('a Situação passa a "Inativo"');
+    expect(String(emUso.content)).not.toContain('coluna Ativo');
     expect(emUso.okText).toBe('Desativar');
     const cargas = vi.mocked(listProjetos).mock.calls.length;
     await emUso.onOk!();

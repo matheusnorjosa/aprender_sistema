@@ -238,8 +238,8 @@ export default function ProjetosPage(): JSX.Element {
             ativo: projeto.ativo,
             desativar: () => updateProjeto(projeto.id, { ativo: false }),
             desativado: 'Projeto desativado',
-            // Esta tela mostra a coluna "Ativo" com Sim/Não, não "Situação".
-            aoDesativar: 'a coluna Ativo passa a "Não"',
+            // Esta tela mostra a coluna "Situação" com as etiquetas Ativo/Inativo.
+            aoDesativar: 'a Situação passa a "Inativo"',
             recarregar: () => void fetchProjetos(pagination.current || 1, pagination.pageSize || DEFAULT_PAGE_SIZE),
           });
           if (emUso) aposFechar.abrir(emUso);

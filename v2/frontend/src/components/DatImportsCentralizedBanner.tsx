@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode, JSX } from 'react';
+import type { CSSProperties, JSX } from 'react';
 import { useEffect, useState } from 'react';
 import { Alert } from 'antd';
 import { Link } from 'react-router';
@@ -16,7 +16,7 @@ interface DatImportsCentralizedBannerProps {
 export default function DatImportsCentralizedBanner({
   className,
   style,
-}: DatImportsCentralizedBannerProps): JSX.Element {
+}: DatImportsCentralizedBannerProps): JSX.Element | null {
   const [canAccessDatImports, setCanAccessDatImports] = useState(false);
 
   useEffect(() => {
@@ -43,14 +43,8 @@ export default function DatImportsCentralizedBanner({
     };
   }, []);
 
-  const description: ReactNode = canAccessDatImports ? (
-    <>
-      Importações foram centralizadas em{' '}
-      <Link to="/dat/importacoes">DAT &gt; Importações</Link>.
-    </>
-  ) : (
-    DAT_IMPORTS_CENTRALIZED_MESSAGE
-  );
+  // Quem não é superusuário não tem a tela DAT > Importações: o aviso não aparece.
+  if (!canAccessDatImports) return null;
 
   return (
     <Alert
@@ -59,7 +53,12 @@ export default function DatImportsCentralizedBanner({
       {...(style !== undefined && { style })}
       type="info"
       showIcon
-      message={description}
+      message={
+        <>
+          Importações foram centralizadas em{' '}
+          <Link to="/dat/importacoes">DAT &gt; Importações</Link>.
+        </>
+      }
     />
   );
 }

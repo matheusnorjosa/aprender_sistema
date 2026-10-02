@@ -16,7 +16,7 @@
  * elimina o fetch pendente.
  */
 
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, test, expect, vi, afterEach } from 'vitest';
 
 vi.mock('../../../api/me', () => ({
@@ -148,6 +148,38 @@ describe('MonthlyPage — grade mensal', () => {
     expect(avisos[0]?.closest('[role="status"]')).not.toBeNull();
     expect(screen.getAllByText('Nome')).toHaveLength(2);
     expect(screen.queryByText(/Erro ao carregar/)).not.toBeInTheDocument();
+
+    vi.mocked(getMonthlyAvailability).mockResolvedValue(GRADE_VAZIA);
+  });
+
+  test('falha ao atualizar com a grade na tela: avisa (role=alert) e mantém as grades', async () => {
+    await renderEDeixarResolver();
+
+    vi.mocked(getMonthlyAvailability).mockRejectedValue(new Error('Sem conexão com o servidor.'));
+    await act(async () => { window.dispatchEvent(new Event('availability:refresh')); });
+
+    const avisos = await screen.findAllByText(/Não foi possível atualizar a grade/);
+    expect(avisos).toHaveLength(1);
+    expect(avisos[0]?.closest('[role="alert"]')).not.toBeNull();
+    expect(avisos[0]?.textContent).toContain('Sem conexão com o servidor.');
+    expect(screen.getAllByText('Nome')).toHaveLength(2);
+
+    vi.mocked(getMonthlyAvailability).mockResolvedValue(GRADE_VAZIA);
+  });
+
+  test('botão de atualizar: o ícone gira enquanto busca e as grades continuam na tela', async () => {
+    const { container } = render(<MonthlyPage />);
+    await waitFor(() => expect(screen.getAllByText('Nome')).toHaveLength(2));
+    expect(container.querySelector('.anticon-spin')).toBeNull();
+
+    vi.mocked(getMonthlyAvailability).mockReturnValue(new Promise(() => undefined));
+    const botao = container.querySelector('.anticon-sync');
+    expect(botao).not.toBeNull();
+    await act(async () => { fireEvent.click(botao as Element); });
+
+    expect(container.querySelector('.anticon-spin')).not.toBeNull();
+    expect(screen.queryByText('Carregando...')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Nome')).toHaveLength(2);
 
     vi.mocked(getMonthlyAvailability).mockResolvedValue(GRADE_VAZIA);
   });

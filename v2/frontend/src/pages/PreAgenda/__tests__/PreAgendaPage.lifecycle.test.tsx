@@ -267,4 +267,32 @@ describe('PreAgendaPage — ciclo de requisições (#1668 / M12-19)', () => {
     expect(avisos).toHaveLength(1);
     expect(avisos[0]?.closest('[role="status"]')).not.toBeNull();
   });
+
+  test('10. 429 na carga pedida pela pessoa (primeira carga): diz que a lista não carregou; some quando carrega', async () => {
+    const naoCarregou = /Não foi possível carregar agora/;
+    listSolicitacoesMock.mockRejectedValue(Object.assign(new Error('Throttled'), { status: 429 }));
+    render(<PreAgendaPage />);
+
+    const aviso = await screen.findByText(naoCarregou);
+    expect(aviso.closest('[role="alert"]')).not.toBeNull();
+    expect(poll.pausar).toHaveBeenLastCalledWith(60_000);
+
+    // Fim da pausa: o polling busca de novo e a lista chega.
+    listSolicitacoesMock.mockResolvedValue({ results: [row(1, 'Municipio Um')], count: 1 });
+    await act(async () => { await poll.fn?.(); });
+    expect(screen.queryByText(naoCarregou)).not.toBeInTheDocument();
+    expect(screen.getAllByText('Municipio Um').length).toBeGreaterThan(0);
+  });
+
+  test('11. 429 só na atualização em segundo plano não mostra o aviso de carga que falhou', async () => {
+    listSolicitacoesMock.mockResolvedValue({ results: [row(1, 'Municipio Um')], count: 1 });
+    render(<PreAgendaPage />);
+    await screen.findAllByText('Municipio Um');
+
+    listSolicitacoesMock.mockRejectedValue(Object.assign(new Error('Throttled'), { status: 429 }));
+    await act(async () => { await poll.fn?.(); });
+
+    expect(poll.pausar).toHaveBeenLastCalledWith(60_000);
+    expect(screen.queryByText(/Não foi possível carregar agora/)).not.toBeInTheDocument();
+  });
 });

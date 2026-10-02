@@ -553,4 +553,60 @@ describe('PublicacaoSetorPage — polling (d)', () => {
     await vi.advanceTimersByTimeAsync(TIMING.PUBLICACAO_PENDENTE_POLL_MS * 3);
     expect(listCalls()).toHaveLength(2);
   });
+
+  const avancar = async (ms: number): Promise<void> => {
+    await act(async () => { await vi.advanceTimersByTimeAsync(ms); });
+  };
+
+  test('o tick não liga o carregamento da tabela (sem piscar a cada 5 s)', async () => {
+    vi.useFakeTimers();
+    listResponse = pageOf([makeSolic({ gcal_status: 'PENDING' })]);
+    const { container } = renderPage();
+    await avancar(0);
+    expect(container.querySelector('.ant-spin-spinning')).toBeNull();
+
+    // A carga do tick fica em voo.
+    fetchAPIMock.mockImplementation(() => new Promise(() => undefined));
+    await avancar(TIMING.PUBLICACAO_PENDENTE_POLL_MS);
+    // O Spin do antd liga com um setTimeout: dá tempo de ele aparecer antes de conferir.
+    await avancar(100);
+
+    expect(listCalls()).toHaveLength(2);
+    expect(container.querySelector('.ant-spin-spinning')).toBeNull();
+    expect(screen.getByText('Vidas Em Rede')).toBeInTheDocument();
+  });
+
+  test('429 no tick: pausa pelo Retry-After, UM aviso (role=status) e nenhum erro por tick', async () => {
+    vi.useFakeTimers();
+    listResponse = pageOf([makeSolic({ gcal_status: 'PENDING' })]);
+    renderPage();
+    await avancar(0);
+
+    fetchAPIMock.mockImplementation(() =>
+      Promise.reject(Object.assign(apiError(429, { detail: 'Limite excedido.' }), { retryAfterSeconds: 30 })));
+    await avancar(TIMING.PUBLICACAO_PENDENTE_POLL_MS);
+    expect(listCalls()).toHaveLength(2);
+
+    const avisos = screen.getAllByText('Atualização automática pausada por alguns instantes.');
+    expect(avisos).toHaveLength(1);
+    expect(avisos[0]?.closest('[role="status"]')).not.toBeNull();
+    expect(message.error).not.toHaveBeenCalled();
+
+    // Durante a pausa (30 s) passam vários ticks de 5 s: nenhum pedido.
+    await avancar(29_000);
+    expect(listCalls()).toHaveLength(2);
+
+    await avancar(1_000);
+    expect(listCalls()).toHaveLength(3);
+  });
+
+  test('429 na primeira carga: diz que a lista não carregou (role=alert)', async () => {
+    vi.useFakeTimers();
+    fetchAPIMock.mockImplementation(() => Promise.reject(apiError(429, { detail: 'Limite excedido.' })));
+    renderPage();
+    await avancar(0);
+
+    const aviso = screen.getByText(/Não foi possível carregar agora/);
+    expect(aviso.closest('[role="alert"]')).not.toBeNull();
+  });
 });

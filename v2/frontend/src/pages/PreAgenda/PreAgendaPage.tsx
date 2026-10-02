@@ -136,6 +136,8 @@ export default function PreAgendaPage(): JSX.Element {
   const [loading, setLoading] = useState<boolean>(false);
   const [rows, setRows] = useState<Solicitacao[]>([]);
   const [total, setTotal] = useState<number>(0);
+  // Uma carga pedida pela pessoa recebeu 429: a tela pode não corresponder ao pedido.
+  const [cargaFalhou, setCargaFalhou] = useState<boolean>(false);
 
   const [summary, setSummary] = useState<GCalStatusSummary>({
     counts: { NONE: 0, PENDING: 0, PUBLISHED: 0, ERROR: 0 },
@@ -250,12 +252,15 @@ export default function PreAgendaPage(): JSX.Element {
       // servidor sobre uma lista de 1 página (total inalcançável).
       setTotal(loadedRows.length);
       setSummary((atual) => (mesmosDados(atual, summaryData) ? atual : summaryData));
+      setCargaFalhou(false);
     } catch (error) {
       if (seq !== seqRef.current) return; // erro de carga obsoleta: não polui a UI
       // 429 (muitas requisições): pausa o polling pelo tempo pedido e mostra um aviso só.
+      // Se a carga foi pedida pela pessoa, o aviso diz que a lista não carregou.
       const pausa = pausaDo429Ms(error);
       if (pausa !== null) {
         pausarPolling(pausa);
+        if (!silencioso) setCargaFalhou(true);
         return;
       }
       message.error({
@@ -761,7 +766,7 @@ export default function PreAgendaPage(): JSX.Element {
         {/* View: Solicitações (Pré-agenda) */}
         {viewMode === 'preagenda' && (
           <>
-            {pollingPausado && <AvisoAtualizacaoPausada />}
+            {(pollingPausado || cargaFalhou) && <AvisoAtualizacaoPausada cargaFalhou={cargaFalhou} />}
 
             {/* Resumo GCal */}
             <Card title="Resumo de Status GCal" size="small">

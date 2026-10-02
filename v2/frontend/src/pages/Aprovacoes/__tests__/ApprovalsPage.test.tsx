@@ -489,6 +489,49 @@ describe('ApprovalsPage', () => {
     expect(avisos[0]?.closest('[role="status"]')).not.toBeNull();
   });
 
+  const LISTA_NAO_CARREGOU = /Não foi possível carregar agora/;
+  const erro429 = (): Error => Object.assign(new Error('Limite excedido.'), { status: 429 });
+
+  test('429 na primeira carga: diz que a lista não carregou (role=alert) e pausa o polling', async () => {
+    vi.mocked(listSolicitacoes).mockRejectedValue(erro429());
+
+    renderPage();
+
+    const aviso = await screen.findByText(LISTA_NAO_CARREGOU);
+    expect(aviso.closest('[role="alert"]')).not.toBeNull();
+    expect(pausarPolling).toHaveBeenCalledWith(60_000);
+  });
+
+  test('429 em carga pedida pela pessoa (busca): avisa que a tela pode não corresponder; some quando carrega', async () => {
+    vi.mocked(listSolicitacoes).mockResolvedValue(pagina(1, 1));
+    renderPage();
+    await screen.findByText('Municipio1');
+    expect(screen.queryByText(LISTA_NAO_CARREGOU)).not.toBeInTheDocument();
+
+    vi.mocked(listSolicitacoes).mockRejectedValue(erro429());
+    fireEvent.change(screen.getByRole('searchbox', { name: /Buscar solicitacoes/i }), { target: { value: 'sobral' } });
+    expect(await screen.findByText(LISTA_NAO_CARREGOU)).toBeInTheDocument();
+
+    // Fim da pausa: o polling busca de novo e a carga atende o filtro pedido.
+    vi.mocked(listSolicitacoes).mockResolvedValue(pagina(1, 1));
+    const tick = vi.mocked(usePolling).mock.calls[0]?.[0];
+    await act(async () => { await tick?.(); });
+    expect(screen.queryByText(LISTA_NAO_CARREGOU)).not.toBeInTheDocument();
+  }, 20000);
+
+  test('429 só na atualização em segundo plano não mostra o aviso de carga que falhou', async () => {
+    vi.mocked(listSolicitacoes).mockResolvedValue(pagina(1, 1));
+    renderPage();
+    await screen.findByText('Municipio1');
+
+    vi.mocked(listSolicitacoes).mockRejectedValue(erro429());
+    const tick = vi.mocked(usePolling).mock.calls[0]?.[0];
+    await act(async () => { await tick?.(); });
+
+    expect(pausarPolling).toHaveBeenCalledWith(60_000);
+    expect(screen.queryByText(LISTA_NAO_CARREGOU)).not.toBeInTheDocument();
+  }, 20000);
+
   // ------------------------------------------------------------------
   // Mapa de acesso 02/10 (P9): o erro ao aprovar diz quem e por quê.
   // ------------------------------------------------------------------

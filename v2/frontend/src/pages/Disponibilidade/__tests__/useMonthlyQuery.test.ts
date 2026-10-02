@@ -106,15 +106,67 @@ describe('useMonthlyQuery — atualização automática', () => {
     expect(result.current.data?.people[0]?.name).toBe('Pessoa Dois');
   });
 
-  test('falha na atualização em segundo plano mantém a grade (sem erro na tela)', async () => {
+  test('falha na atualização em segundo plano mantém a grade e avisa que ela pode estar velha', async () => {
     const { result } = renderQuery();
     await assentar();
 
     getMonthlyAvailabilityMock.mockImplementation(() => Promise.reject(new Error('Sem conexão com o servidor.')));
     await act(async () => { await vi.advanceTimersByTimeAsync(TICK_MS); });
 
+    // `error` (que troca a grade pela caixa de erro) continua vazio; o aviso é à parte.
     expect(result.current.error).toBeNull();
     expect(result.current.data?.people[0]?.name).toBe('Pessoa Um');
+    expect(result.current.erroAtualizacao).toBe('Sem conexão com o servidor.');
+
+    // A atualização seguinte que dá certo tira o aviso.
+    getMonthlyAvailabilityMock.mockImplementation(() => Promise.resolve(grade('Pessoa Um')));
+    await act(async () => { await vi.advanceTimersByTimeAsync(TICK_MS); });
+    expect(result.current.erroAtualizacao).toBeNull();
+  });
+
+  test('botão de atualizar: mostra andamento sem desmontar a grade', async () => {
+    const { result, loadings } = renderQuery();
+    await assentar();
+    expect(result.current.atualizando).toBe(false);
+    loadings.length = 0;
+
+    let responder: (g: unknown) => void = () => undefined;
+    getMonthlyAvailabilityMock.mockImplementation(() => new Promise((resolve) => { responder = resolve; }));
+    act(() => { void result.current.refetch(); });
+
+    expect(result.current.atualizando).toBe(true);
+    expect(loadings).not.toContain(true);
+    expect(result.current.data?.people[0]?.name).toBe('Pessoa Um');
+
+    await act(async () => { responder(grade('Pessoa Dois')); });
+    expect(result.current.atualizando).toBe(false);
+    expect(result.current.data?.people[0]?.name).toBe('Pessoa Dois');
+  });
+
+  test('botão de atualizar que falha: a pessoa fica sabendo e a grade continua', async () => {
+    const { result } = renderQuery();
+    await assentar();
+
+    getMonthlyAvailabilityMock.mockImplementation(() => Promise.reject(new Error('Sem conexão com o servidor.')));
+    await act(async () => { await result.current.refetch(); });
+
+    expect(result.current.erroAtualizacao).toBe('Sem conexão com o servidor.');
+    expect(result.current.atualizando).toBe(false);
+    expect(result.current.error).toBeNull();
+    expect(result.current.data?.people[0]?.name).toBe('Pessoa Um');
+  });
+
+  test('botão de atualizar com 429: avisa a falha (não só a pausa do polling)', async () => {
+    const { result } = renderQuery();
+    await assentar();
+
+    getMonthlyAvailabilityMock.mockImplementation(() =>
+      Promise.reject(Object.assign(new Error('Limite excedido.'), { status: 429, retryAfterSeconds: 90 })),
+    );
+    await act(async () => { await result.current.refetch(); });
+
+    expect(result.current.pollingPausado).toBe(true);
+    expect(result.current.erroAtualizacao).toBe('Limite excedido.');
   });
 
   test('falha na primeira carga mostra o erro', async () => {
@@ -138,6 +190,8 @@ describe('useMonthlyQuery — atualização automática', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(TICK_MS); });
     expect(result.current.pollingPausado).toBe(true);
     expect(result.current.error).toBeNull();
+    // No tick, o aviso de pausa já explica: sem segundo aviso.
+    expect(result.current.erroAtualizacao).toBeNull();
     expect(result.current.data?.people[0]?.name).toBe('Pessoa Um');
     const chamadas = getMonthlyAvailabilityMock.mock.calls.length;
 

@@ -140,6 +140,8 @@ export default function ApprovalsPage(): JSX.Element {
   const [loading, setLoading] = useState<boolean>(false);
   const [rows, setRows] = useState<Solicitacao[]>([]);
   const [total, setTotal] = useState<number>(0);
+  // Uma carga pedida pela pessoa recebeu 429: a tela pode não corresponder ao pedido.
+  const [cargaFalhou, setCargaFalhou] = useState<boolean>(false);
 
   const [statusFilter, setStatusFilter] = useState<SolicitacaoStatus | (string & {})>('pendente');
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -206,6 +208,7 @@ export default function ApprovalsPage(): JSX.Element {
       // Item que saiu da lista (outra pessoa decidiu) não fica selecionado às cegas.
       const visiveis = new Set<Key>(results.map((r) => r.id));
       setSelectedRowKeys((keys) => (keys.every((k) => visiveis.has(k)) ? keys : keys.filter((k) => visiveis.has(k))));
+      setCargaFalhou(false);
     } catch (error) {
       if (seq !== seqRef.current) return;
       // A página deixou de existir (os últimos itens dela foram decididos): volta uma.
@@ -214,9 +217,11 @@ export default function ApprovalsPage(): JSX.Element {
         return;
       }
       // 429 (muitas requisições): pausa o polling pelo tempo pedido e mostra um aviso só.
+      // Se a carga foi pedida pela pessoa, o aviso diz que a lista não carregou.
       const pausa = pausaDo429Ms(error);
       if (pausa !== null) {
         pausarPolling(pausa);
+        if (!silencioso) setCargaFalhou(true);
         return;
       }
       message.error({
@@ -598,7 +603,7 @@ export default function ApprovalsPage(): JSX.Element {
             </Space>
           </nav>
 
-          {pollingPausado && <AvisoAtualizacaoPausada />}
+          {(pollingPausado || cargaFalhou) && <AvisoAtualizacaoPausada cargaFalhou={cargaFalhou} />}
 
           {/* Contagem de pendentes */}
           {statusFilter === 'pendente' && total > 0 && (

@@ -157,11 +157,19 @@ Regras (valem para qualquer tela nova com polling):
   (`utils/retryAfter.ts`; 60 s quando o cabeçalho não vem, caso do 429 do nginx) e mostra **um** aviso
   (`components/AvisoAtualizacaoPausada.tsx`, `role=status`): "Atualização automática pausada por alguns
   instantes." Ao fim do prazo o polling retoma sozinho com uma busca.
+- **Carga pedida pela pessoa que falha aparece.** Se o 429 veio numa carga que a pessoa pediu (abrir a tela,
+  filtrar, trocar de página, recarregar depois de aprovar ou publicar), o mesmo componente recebe `cargaFalhou`
+  e diz que a lista não carregou e que a tela pode não corresponder ao filtro (`role=alert`); some na próxima
+  carga que der certo. Vale para Aprovações, Pré-agenda e Publicar na agenda. Na Grade Mensal, o botão de
+  atualizar gira o ícone (`atualizando`) sem desmontar as grades, e qualquer falha de atualização com a grade
+  na tela (botão, polling, outra aba) mostra um aviso com o motivo (`erroAtualizacao`, `role=alert`) até a
+  próxima atualização que der certo; só o 429 do tick fica apenas no aviso de pausa.
 - **Orçamento.** A soma dos pedidos por hora de uma pessoa com as telas abertas tem de caber no throttle `user`
   (6000/h, [API_REFERENCE](../../API_REFERENCE.md), seção Rate Limiting). Hoje: ~960/h com as três telas abertas.
 
 Testes: `hooks/__tests__/usePolling.test.ts`, `pages/Disponibilidade/__tests__/useMonthlyQuery.test.ts`,
-`pages/Aprovacoes/__tests__/ApprovalsPage.test.tsx`, `pages/PreAgenda/__tests__/PreAgendaPage.lifecycle.test.tsx`.
+`pages/Disponibilidade/__tests__/MonthlyPage.test.tsx`, `pages/Aprovacoes/__tests__/ApprovalsPage.test.tsx`,
+`pages/PreAgenda/__tests__/PreAgendaPage.lifecycle.test.tsx`, `pages/Solicitacoes/__tests__/PublicacaoSetorPage.test.tsx`.
 
 ## API / Interface
 

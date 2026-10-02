@@ -42,7 +42,14 @@ interface UseMonthlyQueryResult {
   lastUpdated: number | null;
   /** O servidor respondeu 429: a atualização automática está suspensa por um prazo. */
   pollingPausado: boolean;
-  /** Atualiza em segundo plano (a grade continua na tela). */
+  /** Atualização pedida pela pessoa (botão de atualizar) em andamento; a grade fica na tela. */
+  atualizando: boolean;
+  /**
+   * A última atualização falhou com a grade na tela: o que aparece pode estar velho.
+   * Some na próxima atualização que der certo.
+   */
+  erroAtualizacao: string | null;
+  /** Botão de atualizar: busca de novo sem desmontar a grade; mostra andamento e falha. */
   refetch: () => Promise<void>;
 }
 
@@ -65,6 +72,8 @@ export default function useMonthlyQuery(
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+  const [atualizando, setAtualizando] = useState(false);
+  const [erroAtualizacao, setErroAtualizacao] = useState<string | null>(null);
 
   // Desestruturar params para evitar loop infinito
   const { year, month, role, sector, q, gerenciaId } = params;
@@ -86,19 +95,23 @@ export default function useMonthlyQuery(
   });
 
   /**
-   * `silencioso`: atualização em segundo plano (polling, outra aba, botão de atualizar).
+   * `silencioso`: atualização com a grade na tela (polling, outra aba, botão de atualizar).
    * Não liga `loading` (a página desmontaria as grades e piscaria "Carregando...") e, se
-   * falhar, a grade que está na tela fica. Sem `silencioso` é carga nova (mount ou troca
-   * de filtro): limpa os dados do filtro anterior e mostra carregamento.
+   * falhar, a grade que está na tela fica e `erroAtualizacao` avisa que ela pode estar velha.
+   * Sem `silencioso` é carga nova (mount ou troca de filtro): limpa os dados do filtro
+   * anterior e mostra carregamento.
+   * `manual`: a pessoa clicou em atualizar; liga `atualizando` e a falha sempre aparece.
    */
-  const fetchData = useCallback(async (silencioso = false): Promise<void> => {
+  const fetchData = useCallback(async (silencioso = false, manual = false): Promise<void> => {
     const seq = ++seqRef.current;
     if (!silencioso) {
       setLoading(true);
       setError(null);
+      setErroAtualizacao(null);
       setData(null);
       temGradeRef.current = false;
     }
+    if (manual) setAtualizando(true);
 
     try {
       const queryParams = {
@@ -115,6 +128,7 @@ export default function useMonthlyQuery(
       setData((atual) => (mesmosDados(atual, result) ? atual : result));
       temGradeRef.current = true;
       setError(null);
+      setErroAtualizacao(null);
       setLastUpdated(Date.now());
     } catch (err) {
       if (seq !== seqRef.current) return;
@@ -123,11 +137,14 @@ export default function useMonthlyQuery(
       if (pausa !== null) pausarPolling(pausa);
       const errorMessage =
         err instanceof Error ? err.message : 'Erro ao carregar grade mensal';
-      // Com grade na tela, a falha em segundo plano não a derruba: a próxima tentativa
-      // atualiza. Sem grade (primeira carga), mostra o erro.
+      // Sem grade (primeira carga), mostra o erro no lugar dela. Com grade na tela, a
+      // falha não a derruba, mas a pessoa fica sabendo que ela pode estar velha. O 429 do
+      // tick fica só no aviso de pausa (um aviso só); o do botão de atualizar aparece.
       if (!temGradeRef.current) setError(errorMessage);
+      else if (pausa === null || manual) setErroAtualizacao(errorMessage);
     } finally {
       if (seq === seqRef.current) setLoading(false);
+      if (manual) setAtualizando(false);
     }
   }, [year, month, role, sector, q, gerenciaId, pausarPolling]);
   fetchRef.current = fetchData;
@@ -144,7 +161,7 @@ export default function useMonthlyQuery(
     return unsub;
   }, [fetchData]);
 
-  const refetch = useCallback((): Promise<void> => fetchData(true), [fetchData]);
+  const refetch = useCallback((): Promise<void> => fetchData(true, true), [fetchData]);
 
   return {
     data,
@@ -152,6 +169,8 @@ export default function useMonthlyQuery(
     error,
     lastUpdated,
     pollingPausado,
+    atualizando,
+    erroAtualizacao,
     refetch,
   };
 }

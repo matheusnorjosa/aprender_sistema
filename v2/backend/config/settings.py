@@ -210,6 +210,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # Troca obrigatória de senha: depende de request.user, por isso logo depois da autenticação.
+    "apps.core.middleware.TrocaDeSenhaObrigatoriaMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "apps.core.middleware_security.SecurityHeadersMiddleware",  # Security Audit 2025-01: CSP + Permissions-Policy

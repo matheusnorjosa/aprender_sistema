@@ -184,11 +184,16 @@ Superintendência por vínculo, solicitação que não é do fluxo SUPER da Supe
 ?date_to=2026-12-31              # inicio__date__lte
 ?q=texto                         # municipio/projeto/tipo_evento/observacoes/usuário
 ?search=texto                    # SearchFilter (usuário, município, observações)
-?ordering=inicio|fim|id          # únicos campos ordenáveis (aceita prefixo "-")
+?ordering=inicio|fim|id          # campos ordenáveis (aceita prefixo "-"); default -inicio
+?ordering=proximidade            # de hoje em diante (início do dia em America/Fortaleza), do mais próximo
+                                 # ao mais distante; depois os passados, do mais recente ao mais antigo;
+                                 # desempate por id. É a ordem da tela de Aprovações. Sem prefixo "-".
+?page=1&page_size=20             # paginação (default 100, máximo 500); página inexistente → 404
 ```
 
 Não existem `?projeto=`, `?municipio=`, `?usuario=`, `?data_inicio__gte=`,
-`?data_inicio__lte=` nem `?ordering=-created_at` — são ignorados silenciosamente.
+`?data_inicio__lte=` nem `?ordering=-created_at` — são ignorados silenciosamente (um `ordering`
+desconhecido cai no default `-inicio`).
 
 ---
 

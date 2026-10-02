@@ -163,6 +163,8 @@ Inventário por domínio (rota → componente → guard **como o código aplica 
 |---|---|---|
 | `/solicitacoes/aprovacoes` | `Aprovacoes/ApprovalsPage` | policy `access_solicitation_approvals` |
 
+> **Lista paginada no servidor (2026-10-02).** A `ApprovalsPage` pede `flow=SUPER`, `status`, `q`, `ordering=proximidade`, `page` e `page_size` a cada carga — antes pedia uma vez só, recebia as 100 primeiras em `-inicio` e paginava no cliente, com o rodapé prometendo páginas que vinham vazias. A ordem é "de hoje em diante, do mais próximo ao mais distante; depois os passados, do mais recente ao mais antigo" (nada é escondido). Tamanho de página 20, 50 ou 100 — 100 é o limite do lote no servidor. A seleção em lote vale para a **página visível**: é limpa ao trocar de página, de tamanho, de status ou de busca, e a recarga (polling de 5 s) tira da seleção o item que saiu da lista. Página que deixou de existir (404, quando os últimos itens dela são decididos) volta para a anterior sem mensagem de erro. Cargas concorrentes seguem *latest-wins*. A tela continua com `Table` cru e `scroll.x` (item C3 da allowlist `eslint.tabela-antd-allowlist.js`); a migração para `ResponsiveTable` não entrou aqui.
+
 ### Disponibilidade
 
 | Rota | Página | Guard (`AppRoutes.tsx`) |

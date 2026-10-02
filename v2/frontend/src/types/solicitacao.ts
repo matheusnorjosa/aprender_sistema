@@ -133,7 +133,10 @@ export interface SolicitacaoFilters {
   date_to?: string;
   page?: number;
   page_size?: number;
-  /** Campo de ordenação do DRF (`inicio`, `-inicio`, `fim`, `id`). */
+  /**
+   * Ordenação: campo do DRF (`inicio`, `-inicio`, `fim`, `id`) ou `proximidade` — de hoje em
+   * diante do mais próximo ao mais distante, depois os passados do mais recente ao mais antigo.
+   */
   ordering?: string;
   /** #1656: só as solicitações que o usuário pode publicar no Google Agenda. */
   publishable?: 'true';

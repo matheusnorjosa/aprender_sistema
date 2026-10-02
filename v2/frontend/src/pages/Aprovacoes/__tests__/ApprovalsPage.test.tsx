@@ -18,10 +18,11 @@
  * policies mockadas, exercitando a tradução policy → canApprove de verdade.
  */
 
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { message } from 'antd';
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MemoryRouter } from 'react-router';
-import type { CurrentUser, PaginatedResponse, Solicitacao } from '../../../types';
+import type { CurrentUser, PaginatedResponse, Solicitacao, SolicitacaoFilters } from '../../../types';
 
 vi.mock('../../../api/solicitacoes', () => ({
   listSolicitacoes: vi.fn(),
@@ -222,5 +223,141 @@ describe('ApprovalsPage', () => {
     expect(linha.queryByRole('checkbox')).not.toBeInTheDocument();
     expect(linha.queryByRole('button', { name: /Aprovar/i })).not.toBeInTheDocument();
     expect(linha.queryByRole('button', { name: /Reprovar/i })).not.toBeInTheDocument();
+  }, 20000);
+  // ------------------------------------------------------------------
+  // Mapa de acesso 02/10 (P6): paginação de verdade no servidor e ordem
+  // "de hoje em diante, do mais próximo ao mais distante".
+  // ------------------------------------------------------------------
+
+  /** `n` pendentes de outra pessoa, ids a partir de `primeiroId`. */
+  function pagina(n: number, count: number, primeiroId = 1): PaginatedResponse<Solicitacao> {
+    return {
+      count,
+      next: null,
+      previous: null,
+      results: Array.from({ length: n }, (_, i) =>
+        pendingRow({ id: primeiroId + i, usuario: 5, municipio_nome: `Municipio${primeiroId + i}` })),
+    };
+  }
+
+  /** Último filtro enviado ao servidor. */
+  function ultimoFiltro(): SolicitacaoFilters {
+    const calls = vi.mocked(listSolicitacoes).mock.calls;
+    return calls[calls.length - 1]?.[0] ?? {};
+  }
+
+  test('pede a primeira página ao servidor, do evento mais próximo para o mais distante', async () => {
+    renderPage();
+
+    await waitFor(() => expect(listSolicitacoes).toHaveBeenCalled());
+    expect(listSolicitacoes).toHaveBeenCalledWith(expect.objectContaining({
+      flow: 'SUPER',
+      status: 'pendente',
+      ordering: 'proximidade',
+      page: 1,
+      page_size: 20,
+    }));
+  });
+
+  test('trocar de página busca a página no servidor e limpa a seleção', async () => {
+    vi.mocked(listSolicitacoes).mockImplementation((filters = {}) =>
+      Promise.resolve(filters.page === 2 ? pagina(20, 45, 21) : pagina(20, 45)));
+    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
+
+    renderPage();
+
+    const linha = (await screen.findByText('Municipio1')).closest('tr') as HTMLElement;
+    fireEvent.click(await within(linha).findByRole('checkbox', {}, { timeout: 10000 }));
+    expect(await screen.findByText(/1 solicitação\(ões\) selecionada\(s\)/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTitle('2'));
+
+    await waitFor(() => expect(ultimoFiltro()).toEqual(expect.objectContaining({ page: 2, page_size: 20 })));
+    expect(await screen.findByText('Municipio21')).toBeInTheDocument();
+    expect(screen.queryByText(/selecionada\(s\)/)).not.toBeInTheDocument();
+  }, 20000);
+
+  test('buscar volta para a página 1 e manda a busca ao servidor', async () => {
+    vi.mocked(listSolicitacoes).mockImplementation((filters = {}) =>
+      Promise.resolve(filters.page === 2 ? pagina(20, 45, 21) : pagina(20, 45)));
+
+    renderPage();
+
+    await screen.findByText('Municipio1');
+    fireEvent.click(screen.getByTitle('2'));
+    await screen.findByText('Municipio21');
+
+    fireEvent.change(screen.getByRole('searchbox', { name: /Buscar solicitacoes/i }), { target: { value: 'sobral' } });
+
+    await waitFor(() => expect(ultimoFiltro()).toEqual(expect.objectContaining({ q: 'sobral', page: 1 })));
+  }, 20000);
+
+  test('oferece 20, 50 e 100 por página (o lote do servidor aceita até 100)', async () => {
+    vi.mocked(listSolicitacoes).mockResolvedValue(pagina(20, 45));
+
+    renderPage();
+
+    await screen.findByText('Municipio1');
+    const seletor = document.querySelector('.ant-pagination-options .ant-select-selector');
+    expect(seletor).not.toBeNull();
+    fireEvent.mouseDown(seletor as Element);
+
+    const opcoes = await waitFor(() => {
+      const itens = Array.from(document.querySelectorAll('.ant-select-item-option'));
+      expect(itens).toHaveLength(3);
+      return itens;
+    });
+    expect(opcoes.map((o) => o.textContent?.replace(/\D/g, ''))).toEqual(['20', '50', '100']);
+
+    fireEvent.click(opcoes[2] as Element);
+    await waitFor(() => expect(ultimoFiltro()).toEqual(expect.objectContaining({ page: 1, page_size: 100 })));
+  }, 20000);
+
+  test('página que deixou de existir (404) volta para a anterior, sem mensagem de erro', async () => {
+    const erro = vi.spyOn(message, 'error');
+    let pagina2Existe = true;
+    vi.mocked(listSolicitacoes).mockImplementation((filters = {}) => {
+      if (filters.page === 2) {
+        return pagina2Existe
+          ? Promise.resolve(pagina(1, 21, 21))
+          : Promise.reject(Object.assign(new Error('Página inválida.'), { status: 404 }));
+      }
+      return Promise.resolve(pagina(20, pagina2Existe ? 21 : 20));
+    });
+
+    renderPage();
+
+    await screen.findByText('Municipio1');
+    fireEvent.click(screen.getByTitle('2'));
+    await screen.findByText('Municipio21');
+
+    // Outra pessoa decide o último item da última página; o polling recarrega a página 2.
+    pagina2Existe = false;
+    const recarregar = vi.mocked(usePolling).mock.calls[0]?.[0];
+    await act(async () => { await recarregar?.(); });
+
+    await waitFor(() => expect(ultimoFiltro()).toEqual(expect.objectContaining({ page: 1 })));
+    expect(await screen.findByText('Municipio1')).toBeInTheDocument();
+    expect(erro).not.toHaveBeenCalled();
+    erro.mockRestore();
+  }, 20000);
+
+  test('polling tira da seleção o item que saiu da lista (sem chave órfã)', async () => {
+    vi.mocked(listSolicitacoes).mockResolvedValue(pagina(2, 2));
+    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
+
+    renderPage();
+
+    const linha = (await screen.findByText('Municipio2')).closest('tr') as HTMLElement;
+    fireEvent.click(await within(linha).findByRole('checkbox', {}, { timeout: 10000 }));
+    expect(await screen.findByText(/1 solicitação\(ões\) selecionada\(s\)/)).toBeInTheDocument();
+
+    // Outra pessoa decidiu o item 2: a recarga não o traz mais.
+    vi.mocked(listSolicitacoes).mockResolvedValue(pagina(1, 1));
+    const recarregar = vi.mocked(usePolling).mock.calls[0]?.[0];
+    await act(async () => { await recarregar?.(); });
+
+    await waitFor(() => expect(screen.queryByText('Municipio2')).not.toBeInTheDocument());
+    expect(screen.queryByText(/selecionada\(s\)/)).not.toBeInTheDocument();
   }, 20000);
 });

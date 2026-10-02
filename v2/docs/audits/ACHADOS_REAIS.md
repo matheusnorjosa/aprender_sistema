@@ -196,6 +196,12 @@ linha da fila adjudicada; registram o que o mapa mediu e o que cada conserto fec
   `test_solicitacao_edit.py` (`TestSolicitacaoEditCompraEligibility`). Depois do conserto a edição
   segue passando pelo escopo de setor do projeto e pela conferência de agenda, que não mudaram.
 
+- **Aprovações mostrava só 100 pendentes**: a tela pedia a lista uma vez, sem página, e o servidor
+  entrega 100 por vez em `-inicio`; o rodapé anunciava o total e as páginas além da quinta vinham
+  vazias. Agora a paginação é do servidor (`page`/`page_size` de 20, 50 ou 100) e a ordem é
+  `ordering=proximidade` (de hoje em diante, do mais próximo ao mais distante; depois os passados).
+  Testes: `test_solicitacoes_filters.py` e `ApprovalsPage.test.tsx`.
+
 ## PR A — setor = gerência na tela (2026-09-29)
 
 Achados medidos durante o PR A (branch `feat/gerencia-nome-exibicao-pr-a`, base `a56d9027`), fora

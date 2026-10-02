@@ -11,7 +11,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from django.db.models import QuerySet
+from django.db.models import Case, F, IntegerField, QuerySet, Value, When
+from django.utils import timezone
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
@@ -111,6 +112,31 @@ def _batch_response_schema(contador: str) -> dict[str, Any]:
     }
 
 
+class _SolicitacaoOrderingFilter(OrderingFilter):
+    """
+    `?ordering=proximidade` (tela de Aprovações): de hoje em diante, do mais próximo
+    ao mais distante; depois os passados, do mais recente ao mais antigo. Nada é
+    escondido — só muda a ordem. "Hoje" é o início do dia em America/Fortaleza
+    (`TIME_ZONE`). Qualquer outro valor segue o `OrderingFilter` padrão (default
+    `-inicio` e `ordering_fields` intactos).
+    """
+
+    PROXIMIDADE = "proximidade"
+
+    def filter_queryset(self, request, queryset, view):
+        if request.query_params.get(self.ordering_param) != self.PROXIMIDADE:
+            return super().filter_queryset(request, queryset, view)
+        hoje = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
+        return queryset.annotate(
+            ja_passou=Case(When(inicio__lt=hoje, then=Value(1)), default=Value(0), output_field=IntegerField())
+        ).order_by(
+            "ja_passou",
+            Case(When(ja_passou=0, then=F("inicio"))).asc(nulls_last=True),
+            F("inicio").desc(),
+            "id",
+        )
+
+
 class _BatchIdsSerializer(serializers.Serializer):
     """
     M11-04 (#1650): valida o TIPO do corpo das ações batch-approve/batch-reject.
@@ -143,6 +169,11 @@ class _BatchIdsSerializer(serializers.Serializer):
             ),
             OpenApiParameter(
                 "search", OpenApiTypes.STR, description="Busca textual em usuário, município, observações"
+            ),
+            OpenApiParameter(
+                "ordering",
+                OpenApiTypes.STR,
+                description="`inicio`, `fim`, `id` (`-` inverte; default `-inicio`) ou `proximidade` (futuros, depois passados)",
             ),
             OpenApiParameter(
                 "publishable",
@@ -225,7 +256,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     serializer_class = SolicitacaoSerializer
     permission_classes = [IsAuthenticated]
 
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, _SolicitacaoOrderingFilter]
     filterset_fields = []  # PR15: status handled manually in get_queryset with alias mapping
     search_fields = [
         "usuario__username",

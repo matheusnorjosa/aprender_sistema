@@ -77,6 +77,8 @@ Endpoints do `SolicitacaoViewSet` (prefixo `/api/solicitacoes/`). Catálogo comp
 - Lote → `200 OK` com `{ "approved" | "rejected": int, "errors": [{ "id", "detail", "code"? }] }`. Erros por-ID em vez de falha global: IDs inexistentes (`"Solicitação não encontrada"`), já decididos (`"Status já é 'X'"`) do próprio ator (`code: "self_approval_forbidden"`) ou fora do escopo da aprovadora por vínculo (`code: "out_of_approval_scope"`) entram em `errors` sem abortar os válidos.
 - Erros de status / validação → `400` via `ValidationAPIError`. Falta de permissão → `403`. Decisão própria → `403` com `code: "self_approval_forbidden"`. Fora do escopo da aprovadora por vínculo → `403` com `code: "out_of_approval_scope"`. Não autenticado → `401/403`.
 
+**Lista para a tela de Aprovações**: `GET /api/solicitacoes/?flow=SUPER&status=pendente&ordering=proximidade&page=N&page_size=20|50|100`. `ordering=proximidade` (`_SolicitacaoOrderingFilter`, em `views_solicitacao.py`) ordena de hoje em diante do mais próximo ao mais distante e depois os passados do mais recente ao mais antigo, com desempate por `id`; "hoje" é o início do dia em `America/Fortaleza`. É só ordem: o queryset passa pelo mesmo `scope_solicitacoes` e pelos mesmos filtros, e nenhuma linha é escondida. Os demais valores de `ordering` (`inicio`, `fim`, `id`) e o default `-inicio` não mudaram. Cobertura: `tests/test_solicitacoes_filters.py`.
+
 Interface de serviço (chamável internamente): `approve_solicitacao(solicitacao, user, request, justificativa="") -> ApprovalResult` e simétricos; lote recebe `ids: list[int]` e devolve `BatchApprovalResult(approved_count, rejected_count, errors)`.
 
 ## Fluxos principais

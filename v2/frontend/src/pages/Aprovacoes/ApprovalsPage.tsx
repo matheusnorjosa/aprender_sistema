@@ -3,6 +3,9 @@
  *
  * Features:
  * - Filtra solicitações pendentes do fluxo SUPER
+ * - Paginação no servidor (20, 50 ou 100 por página), do evento mais próximo de hoje
+ *   para o mais distante e depois os passados (`ordering=proximidade`); a seleção em
+ *   lote vale para a página visível
  * - Botões para preview, aprovar e reprovar
  * - Modal para preview de payload JSON
  * - Confirmação simples para reprovação (sem justificativa obrigatória)
@@ -63,7 +66,7 @@ import { usePolling } from '../../hooks/usePolling';
 import { syncChannel } from '../../services/syncChannel';
 import { formatFortaleza, FORTALEZA_TZ } from '../../utils/datetime';
 import logger from '../../utils/logger';
-import type { CurrentUser, ID, Solicitacao, SolicitacaoStatus, PaginatedResponse, Participation } from '../../types';
+import type { CurrentUser, ID, Solicitacao, SolicitacaoStatus, Participation } from '../../types';
 import { formadoresLabel } from '../../utils/participants';
 
 const { Title, Paragraph, Text } = Typography;
@@ -81,6 +84,10 @@ const STATUS_LABELS: Record<SolicitacaoStatus, string> = {
   aprovado: 'Aprovado',
   reprovado: 'Reprovado',
 };
+
+/** Tamanhos de página: o maior é o limite do lote no servidor (100 ids por requisição). */
+const PAGE_SIZE_OPTIONS = [20, 50, 100];
+const DEFAULT_PAGE_SIZE = 20;
 
 /** Preview data type */
 interface PreviewDataType {
@@ -106,6 +113,8 @@ export default function ApprovalsPage(): JSX.Element {
 
   const [statusFilter, setStatusFilter] = useState<SolicitacaoStatus | (string & {})>('pendente');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
 
   const [previewVisible, setPreviewVisible] = useState<boolean>(false);
   const [previewData, setPreviewData] = useState<PreviewDataType | null>(null);
@@ -119,22 +128,58 @@ export default function ApprovalsPage(): JSX.Element {
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([]);
   const [batchLoading, setBatchLoading] = useState<boolean>(false);
 
+  // Latest-wins: polling, paginação, filtros e ações disparam cargas concorrentes; só a
+  // mais recente grava na tela.
+  const seqRef = useRef(0);
+
   const loadData = useCallback(async (): Promise<void> => {
+    const seq = ++seqRef.current;
     try {
       setLoading(true);
-      const filters = { flow: 'SUPER' as const, status: statusFilter || 'pendente', q: searchTerm };
-
-      const data = await listSolicitacoes(filters as unknown as Record<string, string>) as PaginatedResponse<Solicitacao> | Solicitacao[];
-      const results = 'results' in data ? data.results : data;
-      const count = 'count' in data ? data.count : (data).length;
-      setRows(results || []);
-      setTotal(count || 0);
+      const data = await listSolicitacoes({
+        flow: 'SUPER',
+        status: (statusFilter || 'pendente') as SolicitacaoStatus,
+        q: searchTerm,
+        ordering: 'proximidade',
+        page,
+        page_size: pageSize,
+      });
+      if (seq !== seqRef.current) return;
+      const results = data.results ?? [];
+      setRows(results);
+      setTotal(data.count ?? 0);
+      // Item que saiu da lista (outra pessoa decidiu) não fica selecionado às cegas.
+      const visiveis = new Set<Key>(results.map((r) => r.id));
+      setSelectedRowKeys((keys) => (keys.every((k) => visiveis.has(k)) ? keys : keys.filter((k) => visiveis.has(k))));
     } catch (error) {
+      if (seq !== seqRef.current) return;
+      // A página deixou de existir (os últimos itens dela foram decididos): volta uma.
+      if ((error as { status?: number }).status === 404 && page > 1) {
+        setPage((p) => Math.max(1, p - 1));
+        return;
+      }
       message.error('Erro ao carregar solicitações: ' + (error as Error).message);
     } finally {
-      setLoading(false);
+      if (seq === seqRef.current) setLoading(false);
     }
-  }, [statusFilter, searchTerm]);
+  }, [statusFilter, searchTerm, page, pageSize]);
+
+  // Trocar filtro, busca, página ou tamanho muda o que está na tela: a seleção recomeça.
+  const handleStatusChange = (value: SolicitacaoStatus | (string & {})): void => {
+    setStatusFilter(value);
+    setPage(1);
+    setSelectedRowKeys([]);
+  };
+  const handleSearchChange = (value: string): void => {
+    setSearchTerm(value);
+    setPage(1);
+    setSelectedRowKeys([]);
+  };
+  const handlePageChange = (nextPage: number, nextPageSize: number): void => {
+    setPage(nextPageSize === pageSize ? nextPage : 1);
+    setPageSize(nextPageSize);
+    setSelectedRowKeys([]);
+  };
 
   useEffect(() => {
     void loadData();
@@ -441,7 +486,7 @@ export default function ApprovalsPage(): JSX.Element {
             <Space>
               <Select
                 value={statusFilter}
-                onChange={setStatusFilter}
+                onChange={handleStatusChange}
                 style={{ width: '100%', maxWidth: 200 }}
                 placeholder="Status"
                 aria-label="Filtrar por status"
@@ -454,7 +499,7 @@ export default function ApprovalsPage(): JSX.Element {
               <Input.Search
                 placeholder="Buscar por município, projeto, autor..."
                 value={searchTerm}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => handleSearchChange(e.target.value)}
                 onSearch={loadData}
                 style={{ width: '100%', maxWidth: 400 }}
                 allowClear
@@ -512,9 +557,13 @@ export default function ApprovalsPage(): JSX.Element {
               rowKey="id"
               scroll={{ x: 1090 }}
               pagination={{
+                current: page,
+                pageSize,
                 total,
-                pageSize: 20,
-                showTotal: (total) => `Total: ${total} solicitações`,
+                showSizeChanger: true,
+                pageSizeOptions: PAGE_SIZE_OPTIONS,
+                showTotal: (count) => `Total: ${count} solicitações`,
+                onChange: handlePageChange,
               }}
             />
           </section>

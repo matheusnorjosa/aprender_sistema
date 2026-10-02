@@ -16,6 +16,24 @@ import {
 
 type RequestLog = { url: string; method: string; body?: unknown };
 
+/**
+ * Lê o conteúdo de um Blob sem depender de qual construtor o gerou.
+ *
+ * `Response.blob()` devolve o Blob do Node no Node 22 (undici 6), que tem
+ * `text()`. No Node 24 (undici 7) ele usa o `globalThis.Blob`, que no ambiente
+ * de teste é o do jsdom, sem `text()`/`arrayBuffer()` e lido só por `FileReader`.
+ * No navegador os dois caminhos existem.
+ */
+function lerTexto(blob: Blob): Promise<string> {
+  if (typeof blob.text === 'function') return blob.text();
+  return new Promise((resolve, reject) => {
+    const leitor = new FileReader();
+    leitor.onload = () => resolve(String(leitor.result));
+    leitor.onerror = () => reject(leitor.error ?? new Error('falha ao ler o Blob'));
+    leitor.readAsText(blob);
+  });
+}
+
 describe('me API (MSW)', () => {
   let requests: RequestLog[];
 
@@ -115,9 +133,9 @@ describe('me API (MSW)', () => {
     const blob = await exportMyData();
 
     // O ambiente de teste tem dois construtores Blob (undici do fetch vs jsdom),
-    // então `instanceof Blob` é frágil cross-realm — asserta o shape do Blob.
+    // então `instanceof Blob` é frágil cross-realm — confere o conteúdo baixado.
     expect(blob.size).toBeGreaterThan(0);
-    expect(typeof blob.arrayBuffer).toBe('function');
+    expect(JSON.parse(await lerTexto(blob))).toEqual({ titular: 'dossie' });
     expect(requests).toHaveLength(1);
     expect(new URL(requests[0].url).pathname).toBe('/api/me/export/');
     expect(requests[0].method).toBe('GET');

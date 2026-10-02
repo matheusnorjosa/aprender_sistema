@@ -109,9 +109,9 @@ correspondentes).
 **Troca obrigatória de senha (primeiro acesso).** `GET /me/` inclui `deve_trocar_senha`
 (bool): `true` quando a senha em uso foi definida por um administrador (`POST`/`PATCH
 /usuarios-admin/` com `password`, por alguém que não a própria pessoa). Enquanto estiver
-`true`, a API só aceita `GET /me/`, `GET /csrf/`, `POST /me/change-password/` e
-`POST /auth/logout/`; qualquer outra rota (inclusive `/api/v1/*`, `POST /auth/login/` e
-`/admin/`) responde `403` com `code: PASSWORD_CHANGE_REQUIRED`. `POST /me/change-password/`
+`true`, a API só aceita `GET /me/`, `GET /csrf/`, `POST /me/change-password/`,
+`POST /auth/logout/` e `POST /auth/login/` (entrar de novo não desliga a marca); qualquer
+outra rota (inclusive `/api/v1/*` e `/admin/`) responde `403` com `code: PASSWORD_CHANGE_REQUIRED`. `POST /me/change-password/`
 (`old_password`, `new_password`) desliga a marca e mantém a sessão; a senha nova tem de ser
 diferente da atual e da recebida no primeiro acesso (também em trocas futuras), ter 8+ caracteres, não ser só números nem senha comum e não parecer com
 nome, CPF ou e-mail da pessoa (erros em `errors.old_password` / `errors.new_password`). O

@@ -10,6 +10,7 @@
 import { useState, type JSX } from 'react';
 import { Alert, Button, Form, Input } from 'antd';
 import { changeMyPassword } from '../../api/me';
+import { getMe } from '../../api/availability';
 import type { ErroHttp } from '../../api/config';
 import logoLogin from '../../assets/logo-login.webp';
 import logger from '../../utils/logger';
@@ -49,6 +50,21 @@ const paraTexto = (valor: unknown): string | null => {
   return null;
 };
 
+/**
+ * A senha recebida foi recusada (400): se a marca já saiu (troca feita em outra aba), a senha
+ * recebida deixou de valer e não há o que corrigir. Consulta o /api/me/ uma vez; na dúvida, não.
+ */
+const trocaJaFeita = async (error: unknown): Promise<boolean> => {
+  const err = error as ErroHttp;
+  const dados = (err.response?.data ?? {}) as { errors?: Record<string, unknown> };
+  if (err.status !== 400 || !paraTexto(dados.errors?.['old_password'])) return false;
+  try {
+    return (await getMe()).deve_trocar_senha !== true;
+  } catch {
+    return false;
+  }
+};
+
 export default function TrocaSenhaObrigatoriaPage({
   onConcluida,
   onSair,
@@ -70,6 +86,10 @@ export default function TrocaSenhaObrigatoriaPage({
     try {
       await changeMyPassword({ old_password: values.senha_recebida, new_password: values.nova_senha });
     } catch (error) {
+      if (await trocaJaFeita(error)) {
+        await onConcluida();
+        return;
+      }
       setSalvando(false);
       if (error instanceof TypeError) {
         setErroGeral('Sem conexão com o servidor. Sua senha não foi alterada. Confira a internet e tente de novo.');

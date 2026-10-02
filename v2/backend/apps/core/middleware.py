@@ -101,6 +101,9 @@ ROTAS_LIBERADAS_NA_TROCA_DE_SENHA: frozenset[tuple[str, str]] = frozenset(
         ("core:csrf-token", "GET"),  # sem o token nenhum POST passa
         ("core:me-change-password", "POST"),  # a troca em si
         ("core:auth-logout", "POST"),  # sair sem trocar
+        # Entrar de novo (navegador com o cookie antigo): não dá acesso a nada — a conta que
+        # entrar continua sujeita à marca.
+        ("core:auth-login", "POST"),
     }
 )
 

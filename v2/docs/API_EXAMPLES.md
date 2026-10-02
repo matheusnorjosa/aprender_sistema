@@ -445,7 +445,7 @@ o `default_code` em MAIUSCULAS (por isso o `ValidationError` do serializer vira
 | `VALIDATION_ERROR` | 400 | `ValidationError` do Django (nao-DRF) |
 | `NOT_AUTHENTICATED` | 401 | Autenticacao necessaria |
 | `PERMISSION_DENIED` | 403 | Sem permissao |
-| `PASSWORD_CHANGE_REQUIRED` | 403 | Troca de senha obrigatoria pendente: so `/me/`, `/csrf/`, `/me/change-password/` e `/auth/logout/` respondem |
+| `PASSWORD_CHANGE_REQUIRED` | 403 | Troca de senha obrigatoria pendente: so `/me/`, `/csrf/`, `/me/change-password/`, `/auth/logout/` e `/auth/login/` respondem |
 | `NOT_FOUND` | 404 | Recurso nao encontrado |
 | `METHOD_NOT_ALLOWED` | 405 | Metodo errado (ex.: POST em `approve/`) |
 | `THROTTLED` | 429 | Limite de requisicoes |

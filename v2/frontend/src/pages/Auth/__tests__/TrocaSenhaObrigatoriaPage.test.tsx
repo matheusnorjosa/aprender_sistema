@@ -10,9 +10,13 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
-const { changeMyPasswordMock } = vi.hoisted(() => ({ changeMyPasswordMock: vi.fn() }));
+const { changeMyPasswordMock, getMeMock } = vi.hoisted(() => ({
+  changeMyPasswordMock: vi.fn(),
+  getMeMock: vi.fn(),
+}));
 
 vi.mock('../../../api/me', () => ({ changeMyPassword: changeMyPasswordMock }));
+vi.mock('../../../api/availability', () => ({ getMe: getMeMock }));
 
 import TrocaSenhaObrigatoriaPage from '../TrocaSenhaObrigatoriaPage';
 
@@ -45,6 +49,9 @@ const erroHttp = (status: number, data: unknown, extra: object = {}): Error =>
 describe('TrocaSenhaObrigatoriaPage', () => {
   beforeEach(() => {
     changeMyPasswordMock.mockReset();
+    getMeMock.mockReset();
+    // Padrão: a troca continua pendente (nenhuma outra aba trocou a senha).
+    getMeMock.mockResolvedValue({ deve_trocar_senha: true });
   });
 
   test('diz o que está acontecendo e mostra as cinco regras antes de qualquer digitação', () => {
@@ -155,6 +162,50 @@ describe('TrocaSenhaObrigatoriaPage', () => {
 
     expect(await screen.findByText('Esta não é a senha que você recebeu. Confira e digite de novo.')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByLabelText('Senha que você recebeu')).toHaveFocus());
+  });
+
+  test('senha já trocada em outra aba: o 400 da senha recebida vira troca concluída, sem erro', async () => {
+    changeMyPasswordMock.mockRejectedValue(
+      erroHttp(400, { code: 'INVALID', errors: { old_password: 'Senha atual incorreta.' } }),
+    );
+    getMeMock.mockResolvedValue({ deve_trocar_senha: false });
+    const { onConcluida } = montar();
+
+    preencher(RECEBIDA, NOVA);
+    await salvar();
+
+    await waitFor(() => expect(onConcluida).toHaveBeenCalledTimes(1));
+    expect(getMeMock).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Esta não é a senha que você recebeu. Confira e digite de novo.')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  test('senha recebida errada com a troca ainda pendente: consulta o /me uma vez e mantém o erro', async () => {
+    changeMyPasswordMock.mockRejectedValue(
+      erroHttp(400, { code: 'INVALID', errors: { old_password: 'Senha atual incorreta.' } }),
+    );
+    const { onConcluida } = montar();
+
+    preencher('errada-de-proposito', NOVA);
+    await salvar();
+
+    expect(await screen.findByText('Esta não é a senha que você recebeu. Confira e digite de novo.')).toBeInTheDocument();
+    expect(getMeMock).toHaveBeenCalledTimes(1);
+    expect(onConcluida).not.toHaveBeenCalled();
+  });
+
+  test('consulta ao /me falha depois do 400 da senha recebida: mantém o erro no campo', async () => {
+    changeMyPasswordMock.mockRejectedValue(
+      erroHttp(400, { code: 'INVALID', errors: { old_password: 'Senha atual incorreta.' } }),
+    );
+    getMeMock.mockRejectedValue(new TypeError('Sem conexão com o servidor.'));
+    const { onConcluida } = montar();
+
+    preencher('errada-de-proposito', NOVA);
+    await salvar();
+
+    expect(await screen.findByText('Esta não é a senha que você recebeu. Confira e digite de novo.')).toBeInTheDocument();
+    expect(onConcluida).not.toHaveBeenCalled();
   });
 
   test('sessão encerrada no servidor (403 NOT_AUTHENTICATED): avisa o App, sem erro na tela', async () => {

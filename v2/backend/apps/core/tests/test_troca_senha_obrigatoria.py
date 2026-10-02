@@ -1,7 +1,7 @@
 """Troca obrigatória de senha no primeiro acesso (decisão do dono, 02/10/2026).
 
 Enquanto `Usuario.deve_trocar_senha` está ligado, a API só aceita ler o próprio `/api/me/`,
-buscar o CSRF, trocar a senha e sair. O ponto ÚNICO de imposição é o
+buscar o CSRF, trocar a senha, sair e entrar de novo. O ponto ÚNICO de imposição é o
 `TrocaDeSenhaObrigatoriaMiddleware`, que NEGA POR PADRÃO: rota nova nasce bloqueada.
 
 ATENÇÃO: estes testes usam `force_login` (sessão de verdade). O `force_authenticate` do DRF
@@ -203,15 +203,49 @@ def test_nega_por_padrao_em_todas_as_rotas_registradas():
     assert passaram == set(ROTAS_LIBERADAS_NA_TROCA_DE_SENHA)
 
 
-def test_lista_liberada_e_exatamente_me_csrf_troca_e_sair():
+def test_lista_liberada_e_exatamente_me_csrf_troca_sair_e_entrar():
     assert ROTAS_LIBERADAS_NA_TROCA_DE_SENHA == frozenset(
         {
             ("core:current-user", "GET"),
             ("core:csrf-token", "GET"),
             ("core:me-change-password", "POST"),
             ("core:auth-logout", "POST"),
+            ("core:auth-login", "POST"),
         }
     )
+
+
+# ---------------------------------------------------------------------------
+# Entrar de novo com o cookie de uma conta marcada (navegador que ficou com a sessão antiga)
+# ---------------------------------------------------------------------------
+
+LOGIN = "/api/auth/login/"
+
+
+def test_cookie_de_conta_marcada_nao_barra_a_entrada_com_outra_conta():
+    client = _logado(_marcado())
+    outra = UsuarioFactory(username="outra.conta", password=SENHA_NOVA)
+
+    resp = client.post(LOGIN, {"username": "outra.conta", "password": SENHA_NOVA}, format="json")
+
+    assert resp.status_code == 200
+    me = client.get("/api/me/")
+    assert me.status_code == 200
+    assert me.json()["id"] == outra.pk
+    assert me.json()["deve_trocar_senha"] is False
+    assert client.get("/api/me/policies/").status_code == 200
+
+
+def test_entrar_de_novo_com_a_propria_conta_marcada_nao_libera_nada():
+    user = _marcado(username="conta.marcada")
+    client = _logado(user)
+
+    resp = client.post(LOGIN, {"username": "conta.marcada", "password": SENHA_RECEBIDA}, format="json")
+
+    assert resp.status_code == 200
+    assert client.get("/api/me/").json()["deve_trocar_senha"] is True
+    for _rotulo, metodo, caminho in ROTAS_DE_NEGOCIO:
+        assert _bloqueada(getattr(client, metodo)(caminho, {}, format="json")), caminho
 
 
 # ---------------------------------------------------------------------------

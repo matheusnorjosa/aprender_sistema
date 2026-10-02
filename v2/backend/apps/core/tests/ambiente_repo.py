@@ -33,7 +33,7 @@ _NIVEIS_ATE_A_RAIZ = 5
 def raiz_do_repo(arquivo: pathlib.Path | None = None) -> pathlib.Path | None:
     """Raiz do repositorio, ou None quando so `v2/backend` esta montado.
 
-    Nao indexa `parents[5]` direto: em `/app/apps/core/tests/` esse indice nao
+    Nao indexa `parents[5]` direto: no container (so 4 niveis acima) esse indice nao
     existe e estourava `IndexError` na coleta.
     """
     pais = (arquivo or pathlib.Path(__file__)).resolve().parents

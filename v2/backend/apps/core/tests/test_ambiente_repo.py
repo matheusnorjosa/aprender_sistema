@@ -110,8 +110,8 @@ def test_com_git_roda_dentro_e_fora_da_ci(monkeypatch: pytest.MonkeyPatch, ci: s
 
 
 def test_caminho_raso_nao_estoura() -> None:
-    """`/app/apps/core/tests/` nao tem `parents[5]`: era o IndexError da coleta."""
-    assert ambiente_repo.raiz_do_repo(pathlib.Path("/app/apps/core/tests/ambiente_repo.py")) is None
+    """Caminho com so 4 niveis (o do container) nao tem `parents[5]`: era o IndexError da coleta."""
+    assert ambiente_repo.raiz_do_repo(pathlib.Path("/raso/apps/core/tests/ambiente_repo.py")) is None
 
 
 def test_so_o_backend_montado_nao_e_raiz(tmp_path: pathlib.Path) -> None:

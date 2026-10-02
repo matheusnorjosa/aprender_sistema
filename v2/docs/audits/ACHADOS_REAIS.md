@@ -182,6 +182,33 @@ Fechado pelo PR #2077 (branch `fix/aprovadora-escopo-superintendencia`), 2026-09
 |---|---|---|---|---|
 | `M10-01` (volta no B1) | P1 | resolvido (PR #2077, 2026-09-30) | A aprovadora por vínculo herdou edição, exclusão e decisão globais; o lote não tinha escopo de queryset | Predicado único `projeto_no_escopo_da_superintendencia` (`policies.py`): decidir fora → 403 `out_of_approval_scope` (lote → `errors[]`); editar/excluir fora → 403 (`user_can_access_solicitacao`); criar/mover para fora → 400 (tier do 2º vínculo só com papel GERENTE). Ver, próprias e bases amplas sem mudança. Trava de cadastro: projeto SUPER só na `SUPERINTENDENCIA`, com o campo Gerência na ProjetosPage. `test_escopo_aprovadora_superintendencia.py`, `test_projeto_fluxo_super_so_superintendencia.py`, `ProjetosPage.gerencia.test.tsx`; [`politica-aprovacao.spec.md`](../specs/domain/politica-aprovacao.spec.md) |
 
+## Mapa de acesso — consertos de 2026-10-02
+
+Notas do mapa de acesso de 02/10 (branch `fix/mapa-acesso-consertos`). Não mudam o status de nenhuma
+linha da fila adjudicada; registram o que o mapa mediu e o que cada conserto fecha.
+
+- **Conferência de compra na edição (liga com `M10-08`)**: o conserto do `M10-08` passou a conferir a
+  compra no update, mas decidia "o par foi reatribuído" pela **presença** de `municipio`/`projeto` no
+  payload. A tela de edição manda os dois em todo salvamento, então editar só o horário devolvia 400
+  ("não possui compra registrada") em toda solicitação cujo par não tem `Compra`. Agora a comparação é
+  por **valor** (`SolicitacaoSerializer.validate`): mesmo par não confere; trocar município ou projeto
+  para par sem compra continua barrado. Testes com o payload completo da tela em
+  `test_solicitacao_edit.py` (`TestSolicitacaoEditCompraEligibility`). Depois do conserto a edição
+  segue passando pelo escopo de setor do projeto e pela conferência de agenda, que não mudaram.
+
+- **Aprovações mostrava só 100 pendentes**: a tela pedia a lista uma vez, sem página, e o servidor
+  entrega 100 por vez em `-inicio`; o rodapé anunciava o total e as páginas além da quinta vinham
+  vazias. Agora a paginação é do servidor (`page`/`page_size` de 20, 50 ou 100) e a ordem é
+  `ordering=proximidade` (de hoje em diante, do mais próximo ao mais distante; depois os passados).
+  Testes: `test_solicitacoes_filters.py` e `ApprovalsPage.test.tsx`.
+
+- **Erro ao aprovar não dizia o motivo**: todo bloqueio de agenda devolvia a frase da criação por
+  sobreposição ("já está alocado neste horário. Não é possível criar o evento"), mesmo com limite
+  diário e ação de aprovar; o lote guardava só a frase e a tela mostrava só a contagem. Agora o
+  `detail` diz a ação, a pessoa e o motivo, o item do lote traz `code` e `blocked_participants`, e
+  a tela lista evento e motivo. Só texto e formato: a decisão de aprovar ou barrar é a mesma
+  (`test_availability_mensagem_motivo.py`, classe `TestDecisaoNaoMuda`).
+
 ## PR A — setor = gerência na tela (2026-09-29)
 
 Achados medidos durante o PR A (branch `feat/gerencia-nome-exibicao-pr-a`, base `a56d9027`), fora

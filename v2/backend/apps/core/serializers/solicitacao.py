@@ -164,7 +164,8 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
         2. Bloqueia edição de solicitações já publicadas no Google Calendar
            (gcal_status == 'PUBLISHED') para evitar drift.
         3. Bloqueia edição de solicitações reprovadas.
-        4. Exige compra para o par município+projeto na criação (exceto superuser).
+        4. Exige compra para o par município+projeto na criação e quando o VALOR de
+           município ou de projeto muda na edição (exceto superuser).
         """
         instance = getattr(self, "instance", None)
 
@@ -205,29 +206,33 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
                 )
 
         # Regra 4: Elegibilidade de compra por município+projeto.
-        # Aplica na criação e sempre que o par município/projeto for (re)atribuído
-        # num update. (#1738: a checagem era create-only, então um PATCH trocando o
-        # par para um sem compra contornava a regra.) Edições que não mexem no par
-        # não disparam a checagem, preservando a edição de solicitações antigas.
-        # Superuser mantém bypass explícito.
+        # Aplica na criação e quando o VALOR de município ou de projeto muda num
+        # update. (#1738: a checagem era create-only, então um PATCH trocando o par
+        # para um sem compra contornava a regra.) Compara valor, não presença da
+        # chave: a tela de edição manda os dois campos em todo salvamento, e salvar
+        # com o mesmo par não é reatribuição — preserva a edição de solicitações
+        # antigas cujo par não tem compra. Superuser mantém bypass explícito.
         request = cast(Any, self.context.get("request"))
         user = getattr(request, "user", None)
         if not (user and getattr(user, "is_superuser", False)):
-            reatribui_par = instance is None or "municipio" in attrs or "projeto" in attrs
-            if reatribui_par:
-                municipio = attrs.get("municipio", getattr(instance, "municipio", None))
-                projeto = attrs.get("projeto", getattr(instance, "projeto", None))
-                if municipio is not None and projeto is not None:
-                    has_compra = Compra.objects.filter(municipio=municipio, projeto=projeto).exists()
-                    if not has_compra:
-                        raise serializers.ValidationError(
-                            {
-                                "municipio": (
-                                    f"O município '{municipio.nome} - {municipio.uf}' não possui compra registrada "
-                                    f"para o projeto '{projeto.nome}'. Registre a compra antes de vincular esse par."
-                                )
-                            }
-                        )
+            municipio = attrs.get("municipio", getattr(instance, "municipio", None))
+            projeto = attrs.get("projeto", getattr(instance, "projeto", None))
+            reatribui_par = (
+                instance is None
+                or getattr(municipio, "pk", None) != instance.municipio_id
+                or getattr(projeto, "pk", None) != instance.projeto_id
+            )
+            if reatribui_par and municipio is not None and projeto is not None:
+                has_compra = Compra.objects.filter(municipio=municipio, projeto=projeto).exists()
+                if not has_compra:
+                    raise serializers.ValidationError(
+                        {
+                            "municipio": (
+                                f"O município '{municipio.nome} - {municipio.uf}' não possui compra registrada "
+                                f"para o projeto '{projeto.nome}'. Registre a compra antes de vincular esse par."
+                            )
+                        }
+                    )
 
         # Regra 1: Validação de intervalo (fim > inicio)
         inicio = attrs.get("inicio", getattr(instance, "inicio", None))

@@ -1079,3 +1079,126 @@ class TestSolicitacaoEditCompraEligibility:
         assert response.status_code == status.HTTP_200_OK
         solicitacao_editavel.refresh_from_db()
         assert solicitacao_editavel.observacoes == "editado sem mexer no par"
+
+    # ------------------------------------------------------------------
+    # Mapa de acesso 02/10 (P3): a tela de edição manda `municipio` e `projeto`
+    # em TODO salvamento. A conferência de compra tem de olhar o VALOR do par,
+    # não a presença das chaves no payload.
+    # ------------------------------------------------------------------
+
+    def _solicitacao_com_data_fixa(self, usuario_owner, municipio, projeto, tipo_evento):
+        """Data fixa (quarta, 09h-11h em Fortaleza) para a agenda não interferir no resultado."""
+        from datetime import datetime
+        from datetime import timezone as dt_timezone
+
+        return SolicitacaoFactory(
+            usuario=usuario_owner,
+            municipio=municipio,
+            projeto=projeto,
+            tipo_evento=tipo_evento,
+            inicio=datetime(2027, 3, 10, 12, 0, tzinfo=dt_timezone.utc),
+            fim=datetime(2027, 3, 10, 14, 0, tzinfo=dt_timezone.utc),
+            status="pendente",
+            gcal_status="NONE",
+            local="Local Original",
+            observacoes="Observações originais",
+        )
+
+    def _formador_livre(self):
+        """Formador sem setor e sem agenda: nunca gera conflito de disponibilidade."""
+        return UsuarioFactory(
+            username=f"formador_{uuid4().hex[:8]}",
+            email=f"formador_{uuid4().hex[:8]}@test.com",
+            cpf=str(uuid4().int % 10**11).zfill(11),
+            is_active=True,
+        )
+
+    def _payload_da_tela(self, sol, formador, **troca):
+        """O payload COMPLETO que o EditSolicitacaoPage envia por PATCH (novo horário: 10h-12h)."""
+        payload = {
+            "municipio": sol.municipio_id,
+            "projeto": sol.projeto_id,
+            "tipo_evento": sol.tipo_evento_id,
+            "inicio": "2027-03-10T13:00:00Z",
+            "fim": "2027-03-10T15:00:00Z",
+            "tipo": None,
+            "encontro": None,
+            "segmento": None,
+            "observacoes": "",
+            "local": "Local Original",
+            "is_online": False,
+            "extra_participants": {"formador_ids": [formador.id]},
+        }
+        payload.update(troca)
+        return payload
+
+    def test_patch_com_payload_da_tela_sem_trocar_o_par_nao_exige_compra(
+        self, api_client, usuario_owner, municipio, projeto, tipo_evento
+    ):
+        """Mudar só o horário pela tela (par igual, sem Compra) salva: 200."""
+        sol = self._solicitacao_com_data_fixa(usuario_owner, municipio, projeto, tipo_evento)
+        api_client.force_authenticate(user=usuario_owner)
+
+        response = api_client.patch(
+            f"/api/solicitacoes/{sol.id}/",
+            self._payload_da_tela(sol, self._formador_livre()),
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK, response.data
+        sol.refresh_from_db()
+        assert sol.inicio.isoformat() == "2027-03-10T13:00:00+00:00"
+        assert sol.fim.isoformat() == "2027-03-10T15:00:00+00:00"
+
+    def test_put_com_o_mesmo_par_nao_exige_compra(self, api_client, usuario_owner, municipio, projeto, tipo_evento):
+        """O mesmo vale para PUT: par igual não é reatribuição."""
+        sol = self._solicitacao_com_data_fixa(usuario_owner, municipio, projeto, tipo_evento)
+        api_client.force_authenticate(user=usuario_owner)
+
+        response = api_client.put(
+            f"/api/solicitacoes/{sol.id}/",
+            self._payload_da_tela(sol, self._formador_livre()),
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK, response.data
+
+    def test_patch_payload_da_tela_trocando_municipio_para_par_sem_compra_e_rejeitado(
+        self, api_client, usuario_owner, municipio, projeto, tipo_evento
+    ):
+        """Guarda: o payload completo trocando o MUNICÍPIO para par sem Compra continua barrado."""
+        sol = self._solicitacao_com_data_fixa(usuario_owner, municipio, projeto, tipo_evento)
+        outro_municipio = MunicipioFactory(nome=f"Município {uuid4().hex[:8]}", uf="CE")
+        api_client.force_authenticate(user=usuario_owner)
+
+        response = api_client.patch(
+            f"/api/solicitacoes/{sol.id}/",
+            self._payload_da_tela(sol, self._formador_livre(), municipio=outro_municipio.id),
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        errors = response.data.get("errors", response.data)
+        assert "municipio" in errors
+        sol.refresh_from_db()
+        assert sol.municipio_id == municipio.id
+
+    def test_patch_payload_da_tela_trocando_so_o_projeto_para_par_sem_compra_e_rejeitado(
+        self, api_client, usuario_owner, municipio, projeto, tipo_evento
+    ):
+        """Guarda: o payload completo trocando só o PROJETO para par sem Compra continua barrado."""
+        sol = self._solicitacao_com_data_fixa(usuario_owner, municipio, projeto, tipo_evento)
+        outro_projeto = ProjetoFactory(nome=f"Projeto sem compra {uuid4().hex[:8]}", fluxo="SUPER")
+        api_client.force_authenticate(user=usuario_owner)
+
+        response = api_client.patch(
+            f"/api/solicitacoes/{sol.id}/",
+            self._payload_da_tela(sol, self._formador_livre(), projeto=outro_projeto.id),
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        errors = response.data.get("errors", response.data)
+        assert "municipio" in errors
+        sol.refresh_from_db()
+        assert sol.projeto_id == projeto.id

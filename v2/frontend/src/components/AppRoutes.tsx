@@ -72,7 +72,8 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
 
   // #1271: rotas gateadas por <RequirePolicy> (policy= direto p/ policies públicas, allow=
   // p/ composites/auth). `access` (useCanAccess) permanece só para os composites de
-  // disponibilidade/bloqueios (view_all_availability OU escopo próprio, sem policy única).
+  // disponibilidade/bloqueios (view_all_availability OU escopo próprio, sem policy única)
+  // e para a rota de edição de solicitação (policy create_solicitation OU flags).
   // PR A: vínculo de gestão (me.gerencias) entra em Bloqueios/Deslocamentos — o backend escopa.
   const access = useCanAccess(policies, {
     canBloqueios: canControle || canCoordenador || isFormador || isGestorPorVinculo,
@@ -105,8 +106,10 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
         {/* #1656: Apoio de Coordenação publica no Google Agenda os aprovados do próprio setor
             (mesma policy da API; use_gcal/Pré-agenda não dão acesso). */}
         <Route path="/solicitacoes/publicacao" element={<RequirePolicy policy="publish_setor_solicitacao" policies={policies}><PublicacaoSetorPage /></RequirePolicy>} />
-        {/* :id/editar — composite (#1169): owner plausível OU privilegiado, sem policy única. */}
-        <Route path="/solicitacoes/:id/editar" element={<RequirePolicy allow={canCoordenador || canApproveSuper}><EditSolicitacaoPage /></RequirePolicy>} />
+        {/* :id/editar — composite (#1169): owner plausível OU privilegiado. Quem tem a policy
+            create_solicitation cria e é dono (o servidor deixa o dono editar): sem ela aqui, o
+            gerente de setor criava e não abria a edição. O servidor segue decidindo o salvar. */}
+        <Route path="/solicitacoes/:id/editar" element={<RequirePolicy allow={canCoordenador || canApproveSuper || access.can('create_solicitation')}><EditSolicitacaoPage /></RequirePolicy>} />
 
         {/* Páginas movidas para sob /solicitacoes/* (com redirects abaixo) */}
         <Route path="/solicitacoes/aprovacoes" element={<RequirePolicy policy="access_solicitation_approvals" policies={policies}><ApprovalsPage /></RequirePolicy>} />

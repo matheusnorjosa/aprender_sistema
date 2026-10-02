@@ -435,7 +435,14 @@ def batch_approve_solicitacoes(
             try:
                 enforce_solicitacao_availability(sol, action="batch_approve")
             except ValidationAPIError as exc:
-                errors.append({"id": sol.id, "detail": exc.message})
+                errors.append(
+                    {
+                        "id": sol.id,
+                        "code": exc.code,
+                        "detail": exc.message,
+                        "blocked_participants": exc.details.get("blocked_participants", []),
+                    }
+                )
                 continue
 
             prev_status = sol.status

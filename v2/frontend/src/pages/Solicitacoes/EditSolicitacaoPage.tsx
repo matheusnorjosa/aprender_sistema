@@ -98,6 +98,7 @@ interface ApiErrorResponse {
     data?: {
       non_field_errors?: string[];
       detail?: string;
+      code?: string;
       errors?: Record<string, unknown>;
     };
   };
@@ -298,7 +299,11 @@ export default function EditSolicitacaoPage(): JSX.Element {
       const motivoDoCampo = Object.values(data?.errors ?? {})
         .flat()
         .find((texto): texto is string => typeof texto === 'string');
-      if (data?.non_field_errors) {
+      if (data?.code === 'availability_conflict' && data.detail) {
+        // Conflito de agenda: o motivo está no `detail`. `errors` traz objetos e os e-mails dos
+        // convidados externos (`skipped_guests`), que não são a mensagem.
+        message.error(data.detail);
+      } else if (data?.non_field_errors) {
         message.error(data.non_field_errors[0]);
       } else if (apiErr.response?.status === 403) {
         message.error(data?.detail || 'Você não tem permissão para editar esta solicitação.');

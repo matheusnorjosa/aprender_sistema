@@ -161,7 +161,7 @@ describe('useMonthlyQuery — atualização automática', () => {
     await assentar();
 
     getMonthlyAvailabilityMock.mockImplementation(() =>
-      Promise.reject(Object.assign(new Error('Limite excedido.'), { status: 429, retryAfterSeconds: 90 })),
+      Promise.reject(Object.assign(new Error('Limite excedido.'), { status: 429, retryAfter: 90 })),
     );
     await act(async () => { await result.current.refetch(); });
 

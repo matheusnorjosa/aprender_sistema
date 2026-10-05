@@ -964,7 +964,7 @@ abertas; 1000/h estourava em ~25 min de Pré-agenda aberta. `anon` e `login` sã
 inteiro sai pelo mesmo endereço. Quem barra força bruta de senha é o bloqueio **por conta**
 (`ACCOUNT_LOCKOUT_THRESHOLD` = 10 erros → 15 min; 50 erros somando todos os IPs → 30 min, `views_auth.py`),
 que não mudou. O 429 do DRF traz o cabeçalho `Retry-After` (segundos); o frontend o lê em `fetchAPI`
-(`error.retryAfterSeconds`) e Aprovações, Pré-agenda e Grade Mensal pausam o polling por esse tempo. Antes do Django há o `limit_req`
+(`error.retryAfter`) e Aprovações, Pré-agenda e Grade Mensal pausam o polling por esse tempo. Antes do Django há o `limit_req`
 do nginx do frontend (30 r/s por cliente, rajada de 60, resposta 429 sem `Retry-After`) — ver
 [deploy.spec](specs/infra/deploy.spec.md).
 

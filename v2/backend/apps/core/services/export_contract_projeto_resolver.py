@@ -16,6 +16,9 @@ vem do export-contract para um `Projeto` existente, fechando os resíduos de for
    - `Fluir das Emoções` -> `Fluir das Emoções (Antigo)` (rename decidido pelo dono em 02/10/2026;
      `Fluir das Emoções - 1/2/3` têm chave própria e não passam pelo apelido)
    - `Brincando e Aprendendo Professor` -> `Brincando e Aprendendo`
+   - nomes antigos apagados/renomeados em prod (decisão do dono em 05/10/2026):
+     `Escrever, Comunicar e Ser` -> `ECS`; `Educação Financeira Livro N` -> `ED FINANCEIRA N` (N=1..4);
+     `Aprendendo Mais Matemática N` -> `PROJETO AMMA N` (N=1,2)
 
 Precedência: nome exato (norm) > chave canônica > alias. O nome que existe no catálogo, em
 qualquer grafia, vence o alias; o alias só vale para nome que o catálogo não tem. Consequência,
@@ -65,6 +68,16 @@ _SCOPED_ALIASES: dict[str, str] = {
     "FLUIR DAS EMOCOES": "FLUIR DAS EMOCOES (ANTIGO)",
     # E1 (merge já aplicado no catálogo)
     "BRINCANDO E APRENDENDO PROFESSOR": "BRINCANDO E APRENDENDO",
+    # Nomes antigos que não existem mais em prod (decisão do dono, 05/10/2026), 1 para 1. Sem eles um
+    # pacote antigo recriaria o projeto. A chave canônica já tira a vírgula de "ESCREVER, COMUNICAR E SER"
+    # e o prefixo de "PROJETO AMMA n".
+    "ESCREVER COMUNICAR E SER": "ECS",
+    "EDUCACAO FINANCEIRA LIVRO 1": "ED FINANCEIRA 1",
+    "EDUCACAO FINANCEIRA LIVRO 2": "ED FINANCEIRA 2",
+    "EDUCACAO FINANCEIRA LIVRO 3": "ED FINANCEIRA 3",
+    "EDUCACAO FINANCEIRA LIVRO 4": "ED FINANCEIRA 4",
+    "APRENDENDO MAIS MATEMATICA 1": "AMMA 1",
+    "APRENDENDO MAIS MATEMATICA 2": "AMMA 2",
 }
 
 

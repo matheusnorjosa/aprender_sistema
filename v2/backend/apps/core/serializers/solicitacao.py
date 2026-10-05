@@ -175,7 +175,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
 
     def _um_evento(self) -> bool:
         """True fora de listagem (detalhe, criar, editar): os campos de apoio à tela só saem aqui."""
-        view: object = self.context.get("view")
+        view = cast(object, self.context.get("view"))
         parent: object = getattr(self, "parent", None)
         return getattr(view, "action", None) != "list" and not isinstance(parent, serializers.ListSerializer)
 

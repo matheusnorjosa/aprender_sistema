@@ -11,6 +11,7 @@
 import { useState, useMemo, JSX } from 'react';
 import useMonthlyQuery from './useMonthlyQuery';
 import SyncIndicator from '../../components/SyncIndicator';
+import AvisoAtualizacaoPausada from '../../components/AvisoAtualizacaoPausada';
 import FiltersBar from './FiltersBar';
 import Legend from './Legend';
 import Grid from './Grid';
@@ -84,6 +85,9 @@ export default function MonthlyPage(): JSX.Element {
     : null;
   const day: number | null = (selected && dataset?.days?.[selected.dayIdx]) ?? null;
 
+  // Falha ao atualizar com a grade na tela (uma mensagem só para as duas grades).
+  const erroAtualizacao = formadores.erroAtualizacao ?? coordenadores.erroAtualizacao;
+
   /**
    * Handler de mudança de filtros.
    */
@@ -106,11 +110,20 @@ export default function MonthlyPage(): JSX.Element {
           <div className="mt-2">
             <SyncIndicator
               lastUpdated={formadores.lastUpdated}
-              loading={formadores.loading}
+              loading={formadores.loading || formadores.atualizando}
               onRefresh={formadores.refetch}
             />
           </div>
         </header>
+
+        {(formadores.pollingPausado || coordenadores.pollingPausado) && <AvisoAtualizacaoPausada />}
+
+        {erroAtualizacao && (
+          <div role="alert" className="bg-yellow-50 border border-yellow-300 rounded-lg p-4 text-sm text-yellow-900">
+            Não foi possível atualizar a grade: {erroAtualizacao} O que está na tela pode estar
+            desatualizado; a próxima atualização automática tenta de novo.
+          </div>
+        )}
 
         {/* Filtros compartilhados */}
         <nav aria-label="Filtros da grade">

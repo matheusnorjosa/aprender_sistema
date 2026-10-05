@@ -16,6 +16,7 @@ import { ThemeProvider, useTheme, useBrandColors } from './contexts/ThemeContext
 import ptBR from 'antd/locale/pt_BR';
 import { getMe } from './api/availability';
 import { getMyPolicies } from './api/me';
+import { TROCA_DE_SENHA_OBRIGATORIA } from './api/config';
 import { logout as apiLogout } from './api/auth';
 import { Toaster } from 'react-hot-toast';
 import { LAYOUT } from './constants';
@@ -39,6 +40,7 @@ import type { CurrentUser } from './types';
 import './App.css';
 
 const LoginPage = lazy(() => import('./pages/Auth/LoginPage'));
+const TrocaSenhaObrigatoriaPage = lazy(() => import('./pages/Auth/TrocaSenhaObrigatoriaPage'));
 
 const { Content } = Layout;
 
@@ -79,6 +81,10 @@ function AppContent(): JSX.Element {
   // #1741 (F2): erro transitório (5xx/rede) no boot → tela de erro com retry,
   // NÃO logout. Distingue "falhou ao carregar" de "sessão ausente".
   const [bootError, setBootError] = useState(false);
+  // Troca obrigatória de senha (primeiro acesso): sessão viva, mas o servidor só aceita a
+  // troca. `user` fica nulo para nenhum hook (policies, polling, monitor) pedir o que o
+  // servidor recusaria; a tela de troca ocupa o lugar do sistema.
+  const [trocaPendente, setTrocaPendente] = useState(false);
   const isMountedRef = useRef(true);
 
   // ── Mobile responsiveness ──
@@ -108,6 +114,13 @@ function AppContent(): JSX.Element {
     try {
       const userData = await getMe();
       if (!isMountedRef.current) return;
+      if (userData.deve_trocar_senha === true) {
+        setTrocaPendente(true);
+        setUser(null);
+        setPolicies([]);
+        return;
+      }
+      setTrocaPendente(false);
       setUser(userData);
       // Sessão viva: um motivo guardado para o login (ex.: expiração dada por engano) não vale mais.
       apagarAvisoDoLogin();
@@ -126,6 +139,7 @@ function AppContent(): JSX.Element {
       if (isMountedRef.current) {
         if (isAuthError(error)) {
           // Genuinamente sem sessão (401/403) → login.
+          setTrocaPendente(false);
           setUser(null);
           setPolicies([]);
         } else {
@@ -253,13 +267,21 @@ function AppContent(): JSX.Element {
         void conferirSessao(AVISO_SAIU_EM_OUTRA_ABA);
       }
     };
+    // A marca foi ligada com a pessoa já dentro (ex.: administrador redefiniu a senha): o
+    // servidor passa a responder 403 PASSWORD_CHANGE_REQUIRED. Recarrega o usuário, que cai
+    // na tela de troca. Só com usuário na tela (na própria tela de troca não há o que fazer).
+    const trocaExigida = (): void => {
+      if (userRef.current && isMountedRef.current) void loadUser();
+    };
     window.addEventListener('auth:expired', ouvinte);
     window.addEventListener('storage', saiuEmOutraAba);
+    window.addEventListener(TROCA_DE_SENHA_OBRIGATORIA, trocaExigida);
     return () => {
       window.removeEventListener('auth:expired', ouvinte);
       window.removeEventListener('storage', saiuEmOutraAba);
+      window.removeEventListener(TROCA_DE_SENHA_OBRIGATORIA, trocaExigida);
     };
-  }, [handleSessaoEncerrada]);
+  }, [handleSessaoEncerrada, loadUser]);
 
   // ── Render ──
   if (loading) {
@@ -281,6 +303,21 @@ function AppContent(): JSX.Element {
             </Button>
           }
         />
+      </ConfigProvider>
+    );
+  }
+
+  // Fora do Router de propósito: o endereço pedido fica intacto e abre depois da troca.
+  if (trocaPendente) {
+    return (
+      <ConfigProvider locale={ptBR} theme={antThemeConfig}>
+        <Suspense fallback={<FullscreenLoader />}>
+          <TrocaSenhaObrigatoriaPage
+            onConcluida={loadUser}
+            onSair={handleLogout}
+            onSessaoEncerrada={() => handleSessaoEncerrada(AVISO_SESSAO_EXPIRADA)}
+          />
+        </Suspense>
       </ConfigProvider>
     );
   }

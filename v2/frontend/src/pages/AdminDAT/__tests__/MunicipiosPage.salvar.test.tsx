@@ -18,6 +18,7 @@ const { MUNICIPIO } = vi.hoisted(() => ({
   MUNICIPIO: { id: 917, nome: 'São Sebastião dos Campos Gerais', uf: 'BA', ibge_code: '2927408', ativo: true },
 }));
 
+vi.mock('../../../api/auth', () => ({ checkAuth: vi.fn() }));
 vi.mock('../../../api/ops', () => ({ importMunicipios: vi.fn() }));
 vi.mock('../../../api/adminDAT', () => ({
   listMunicipios: vi.fn(),
@@ -27,6 +28,7 @@ vi.mock('../../../api/adminDAT', () => ({
   autocompleteMunicipiosAdmin: vi.fn().mockResolvedValue([]),
 }));
 
+import { checkAuth } from '../../../api/auth';
 import { importMunicipios } from '../../../api/ops';
 import { deleteMunicipio, listMunicipios, updateMunicipio } from '../../../api/adminDAT';
 import MunicipiosPage from '../MunicipiosPage';
@@ -54,8 +56,27 @@ async function abrirEditar(user: ReturnType<typeof userEvent.setup>): Promise<HT
 describe('MunicipiosPage: importar e salvar (C2)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(checkAuth).mockResolvedValue({ authenticated: true, user: { is_superuser: true } } as never);
     vi.mocked(listMunicipios).mockResolvedValue({ results: [MUNICIPIO], count: 1, next: null, previous: null } as never);
   });
+
+  test('importação pela tela é só do superusuário: para os demais o cartão de importar não aparece', async () => {
+    // Decisão do dono (02/10/2026). O backend também recusa (403).
+    vi.mocked(checkAuth).mockResolvedValue({ authenticated: true, user: { is_superuser: false } } as never);
+    const { container } = renderPage();
+    await linha();
+    await waitFor(() => expect(checkAuth).toHaveBeenCalled());
+
+    expect(screen.queryByText('Importação de Municípios')).not.toBeInTheDocument();
+    expect(container.querySelector('input[type="file"]')).toBeNull();
+  }, 30000);
+
+  test('superusuário vê o cartão de importar', async () => {
+    renderPage();
+    await linha();
+
+    expect(await screen.findByText('Importação de Municípios')).toBeInTheDocument();
+  }, 30000);
 
   test('validação da importação: contagens e pendências reais; pendência que bloqueia não diz "Validação OK"', async () => {
     // O que o cliente `importMunicipios` devolve (ImportResult, já achatado pelo api/ops).
@@ -69,6 +90,7 @@ describe('MunicipiosPage: importar e salvar (C2)', () => {
     const user = userEvent.setup();
     const { container } = renderPage();
     await linha();
+    await screen.findByText('Importação de Municípios');
 
     const arquivo = new File(['nome,uf\nCidade Fictícia,\n'], 'municipios.csv', { type: 'text/csv' });
     await user.upload(container.querySelector<HTMLInputElement>('input[type="file"]')!, arquivo);
@@ -156,21 +178,38 @@ describe('MunicipiosPage: importar e salvar (C2)', () => {
     expect(screen.getByRole('heading', { level: 3, name: /^Municípios/ })).toHaveTextContent(/^Municípios$/);
   }, 30000);
 
-  test('excluir registro em uso: o motivo do backend (409) no toast', async () => {
+  test('excluir registro em uso (409): o motivo e "Desativar", que grava ativo=false e recarrega a lista (C2b)', async () => {
     const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }));
     const erro = vi.spyOn(message, 'error').mockImplementation(() => (() => undefined) as never);
-    const motivo = 'Este registro não pode ser excluído porque está em uso (Compras, Solicitacoes de Evento).';
+    const sucesso = vi.spyOn(message, 'success').mockImplementation(() => (() => undefined) as never);
+    const motivo = 'Este registro não pode ser excluído porque está em uso (Compras, Solicitações de Evento).';
     vi.mocked(deleteMunicipio).mockRejectedValue(
       Object.assign(new Error(motivo), { response: { status: 409, data: { detail: motivo, code: 'CONFLICT' } } }),
     );
+    vi.mocked(updateMunicipio).mockResolvedValue({ ...MUNICIPIO, ativo: false } as never);
     const user = userEvent.setup();
     renderPage();
 
     await user.click(within(await linha()).getByRole('button', { name: `Excluir: ${MUNICIPIO.nome} - BA` }));
     await confirmar.mock.calls[0]![0].onOk!();
+    // O diálogo do 409 só abre quando a confirmação termina de fechar: um por vez, sem perder o foco.
+    expect(confirmar).toHaveBeenCalledTimes(1);
+    confirmar.mock.calls[0]![0].afterClose!();
 
-    expect(erro).toHaveBeenCalledWith(`Erro ao excluir: ${motivo}`);
+    expect(erro).not.toHaveBeenCalled();
+    expect(confirmar).toHaveBeenCalledTimes(2);
+    const emUso = confirmar.mock.calls[1]![0];
+    expect(String(emUso.content)).toContain(motivo);
+    expect(String(emUso.content)).toContain(`Você pode desativar o município "${MUNICIPIO.nome} - BA"`);
+    expect(emUso.okText).toBe('Desativar');
+    const cargas = vi.mocked(listMunicipios).mock.calls.length;
+    await emUso.onOk!();
+
+    expect(updateMunicipio).toHaveBeenCalledWith(MUNICIPIO.id, { ativo: false });
+    expect(sucesso).toHaveBeenCalledWith('Município desativado');
+    await waitFor(() => expect(listMunicipios).toHaveBeenCalledTimes(cargas + 1));
     confirmar.mockRestore();
     erro.mockRestore();
+    sucesso.mockRestore();
   }, 30000);
 });

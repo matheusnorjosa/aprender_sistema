@@ -152,6 +152,7 @@ class TestOpenAPISchema(TestCase):
             "is_superintendencia",
             "can_approve_super",
             "permissions",
+            "deve_trocar_senha",
         ]:
             self.assertIn(field, properties, f"Missing field '{field}' in /api/me/ OpenAPI response schema")
 

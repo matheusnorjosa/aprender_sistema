@@ -61,6 +61,7 @@ vi.mock('../../../api/adminDAT', () => ({
 }));
 
 import { listUsers, updateUser } from '../../../api/adminDAT';
+import { checkAuth } from '../../../api/auth';
 import UsuariosPage from '../UsuariosPage';
 
 const NOME = 'Maria Aparecida da Conceição';
@@ -324,4 +325,25 @@ describe('UsuariosPage: lista ordenada pelo nome (decisão 5 do dono)', () => {
     expect(ordenacoes().at(-1)).toBe(decrescente);
     expect(cabecalho(/^Nome/)).toHaveAttribute('aria-sort', 'descending');
   }, 30000);
+});
+
+describe('UsuariosPage: importar pela tela é só do superusuário (decisão do dono, 02/10/2026)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  test('superusuário vê a opção Importar', async () => {
+    renderPage();
+    await linhaDoUsuario();
+
+    expect(await screen.findByRole('radio', { name: 'Importar' })).toBeInTheDocument();
+  }, 20000);
+
+  test('quem não é superusuário (DAT) não vê a opção Importar', async () => {
+    vi.mocked(checkAuth).mockResolvedValueOnce({ authenticated: true, user: { is_superuser: false } } as never);
+    renderPage();
+    await linhaDoUsuario();
+    await vi.waitFor(() => expect(checkAuth).toHaveBeenCalled());
+
+    expect(screen.queryByRole('radio', { name: 'Importar' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Lista' })).not.toBeInTheDocument();
+  }, 20000);
 });

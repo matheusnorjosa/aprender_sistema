@@ -18,6 +18,7 @@ import {
   clearCsrfCache,
   buildUrl,
   SERVIDOR_RESPONDEU,
+  TROCA_DE_SENHA_OBRIGATORIA,
 } from '../config'
 
 // Helper para limpar cookies
@@ -131,6 +132,30 @@ describe('API Config', () => {
       const result = buildUrl('/items/', { page: 1, limit: 10 })
       expect(result).toContain('page=1')
       expect(result).toContain('limit=10')
+    })
+  })
+
+  // ============================================================================
+  // TESTES DE fetchAPI — 429 expõe o Retry-After (liberação 2026-10)
+  // ============================================================================
+
+  describe('fetchAPI — 429 (muitas requisições)', () => {
+    test('anota no erro o status e os segundos do cabeçalho Retry-After', async () => {
+      server.use(
+        http.get(apiUrl('/limitado/'), () =>
+          HttpResponse.json({ detail: 'Limite excedido.' }, { status: 429, headers: { 'Retry-After': '42' } }),
+        ),
+      )
+
+      await expect(fetchAPI('/limitado/')).rejects.toMatchObject({ status: 429, retryAfter: 42 })
+    })
+
+    test('429 sem Retry-After (ex.: nginx) não inventa tempo de espera', async () => {
+      server.use(http.get(apiUrl('/limitado/'), () => new HttpResponse('<html>429</html>', { status: 429 })))
+
+      const erro = await fetchAPI('/limitado/').catch((e: unknown) => e as { status?: number; retryAfter?: number })
+      expect(erro).toMatchObject({ status: 429 })
+      expect((erro as { retryAfter?: number }).retryAfter).toBeUndefined()
     })
   })
 
@@ -341,6 +366,96 @@ describe('API Config', () => {
       const erro: unknown = await fetchAPI('/config/', { signal: controle.signal }).catch((e: unknown) => e)
 
       expect((erro as Error).name).toBe('AbortError')
+    })
+  })
+
+  // ============================================================================
+  // TESTES DE fetchAPI — limite de tentativas (429) e troca de senha obrigatória
+  // ============================================================================
+
+  describe('fetchAPI — 429 leva o tempo de espera (Retry-After)', () => {
+    const limitado = (retryAfter?: string) =>
+      HttpResponse.json(
+        { detail: 'Request was throttled.', code: 'THROTTLED' },
+        { status: 429, headers: retryAfter === undefined ? {} : { 'Retry-After': retryAfter } },
+      )
+
+    beforeEach(() => {
+      clearCsrfCache()
+    })
+
+    test('429 com Retry-After: o erro carrega status 429 e retryAfter em segundos', async () => {
+      server.use(http.post(apiUrl('/auth/login/'), () => limitado('37')))
+
+      await expect(fetchAPI('/auth/login/', { method: 'POST' })).rejects.toMatchObject({
+        status: 429,
+        retryAfter: 37,
+      })
+    })
+
+    test('429 sem Retry-After (ou com valor que não é número): retryAfter fica indefinido', async () => {
+      server.use(http.post(apiUrl('/auth/login/'), () => limitado()))
+      const semCabecalho = await fetchAPI('/auth/login/', { method: 'POST' }).catch((e: unknown) => e)
+      expect(semCabecalho).toMatchObject({ status: 429 })
+      expect((semCabecalho as { retryAfter?: number }).retryAfter).toBeUndefined()
+
+      server.use(http.post(apiUrl('/auth/login/'), () => limitado('amanhã')))
+      const invalido = await fetchAPI('/auth/login/', { method: 'POST' }).catch((e: unknown) => e)
+      expect((invalido as { retryAfter?: number }).retryAfter).toBeUndefined()
+    })
+
+    // Toda carga de página antes do login busca o CSRF como anônimo; o limite é por rede.
+    // Antes, o 429 daqui virava "CSRF token ausente" (erro sem status) e a tela culpava o sistema.
+    test('429 no GET /csrf/ (antes de um POST): o erro carrega status 429 e retryAfter', async () => {
+      const login = vi.fn(() => HttpResponse.json({}))
+      server.use(
+        http.get(apiUrl('/csrf/'), () => limitado('1800')),
+        http.post(apiUrl('/auth/login/'), login),
+      )
+
+      await expect(fetchAPI('/auth/login/', { method: 'POST' })).rejects.toMatchObject({
+        status: 429,
+        retryAfter: 1800,
+      })
+      expect(login).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('fetchAPI — 403 PASSWORD_CHANGE_REQUIRED avisa a troca de senha obrigatória', () => {
+    const tipos = (spy: ReturnType<typeof vi.spyOn>): string[] =>
+      spy.mock.calls.flatMap(([event]) => (event instanceof Event ? [event.type] : []))
+
+    test('emite "auth:troca-de-senha" e NÃO "auth:expired" (a sessão está viva)', async () => {
+      const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
+      server.use(
+        http.get(apiUrl('/solicitacoes/'), () =>
+          HttpResponse.json(
+            { detail: 'Defina uma senha própria para continuar.', code: 'PASSWORD_CHANGE_REQUIRED' },
+            { status: 403 },
+          ),
+        ),
+      )
+
+      await expect(fetchAPI('/solicitacoes/')).rejects.toMatchObject({ status: 403 })
+
+      expect(tipos(dispatchSpy)).toContain(TROCA_DE_SENHA_OBRIGATORIA)
+      expect(TROCA_DE_SENHA_OBRIGATORIA).toBe('auth:troca-de-senha')
+      expect(tipos(dispatchSpy)).not.toContain('auth:expired')
+      dispatchSpy.mockRestore()
+    })
+
+    test('403 de falta de permissão NÃO emite "auth:troca-de-senha"', async () => {
+      const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
+      server.use(
+        http.get(apiUrl('/solicitacoes/'), () =>
+          HttpResponse.json({ detail: 'Sem permissão.', code: 'PERMISSION_DENIED' }, { status: 403 }),
+        ),
+      )
+
+      await expect(fetchAPI('/solicitacoes/')).rejects.toThrow()
+
+      expect(tipos(dispatchSpy)).not.toContain(TROCA_DE_SENHA_OBRIGATORIA)
+      dispatchSpy.mockRestore()
     })
   })
 

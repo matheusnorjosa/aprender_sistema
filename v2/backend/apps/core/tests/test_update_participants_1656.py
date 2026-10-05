@@ -92,6 +92,9 @@ def _create_sol(client, municipio, projeto, tipo_evento, extra):
             "municipio": municipio.id,
             "projeto": projeto.id,
             "tipo_evento": tipo_evento.id,
+            "coordenador_acompanha": False,
+            # 05/10/2026: com formador avaliável a pergunta de avaliar é obrigatória
+            "pretende_avaliar_formador": False if extra.get("formador_ids") else None,
             "tipo": "PRESENCIAL",
             "inicio": inicio.isoformat(),
             "fim": (inicio + timedelta(hours=2)).isoformat(),
@@ -129,21 +132,38 @@ class TestUpdateFiltersInactive:
         assert inativo.id not in formadores, "usuário INATIVO não pode ser anexado como formador no update"
 
 
-class TestUpdateReconcilesCoordAcompanha:
-    def test_coord_acompanha_replaced_on_update(self, client_coord, municipio, projeto, tipo_evento):
-        """RED: _update_formadores nunca reconciliava COORD_ACOMPANHA."""
+class TestUpdateCoordAcompanhaSaiu:
+    """Decisão do dono (05/10/2026): a lista de coordenadores acompanhantes saiu da tela e da API.
+
+    Com itens → 400; vazia → aceita sem apagar as linhas antigas (convite do Google, sem ocupar).
+    """
+
+    def test_coord_acompanha_com_itens_recusado_no_update(self, client_coord, municipio, projeto, tipo_evento):
+        f_a = _formador("ca0")
         coord_a = _formador("ca")
         coord_b = _formador("cb")
-        sol_id = _create_sol(client_coord, municipio, projeto, tipo_evento, {"coord_acompanha_ids": [coord_a.id]})
-        assert _ids(sol_id, "COORD_ACOMPANHA") == {coord_a.id}
+        sol_id = _create_sol(client_coord, municipio, projeto, tipo_evento, {"formador_ids": [f_a.id]})
+        Participation.objects.create(solicitacao_id=sol_id, usuario=coord_a, role="COORD_ACOMPANHA")  # linha antiga
 
         resp = client_coord.patch(
             f"/api/solicitacoes/{sol_id}/",
             {"extra_participants": {"coord_acompanha_ids": [coord_b.id]}},
             format="json",
         )
+        assert resp.status_code == 400, resp.data
+        assert _ids(sol_id, "COORD_ACOMPANHA") == {coord_a.id}
+
+    def test_coord_acompanha_vazia_nao_apaga_linha_antiga(self, client_coord, municipio, projeto, tipo_evento):
+        f_a = _formador("cv0")
+        coord_a = _formador("cv")
+        sol_id = _create_sol(client_coord, municipio, projeto, tipo_evento, {"formador_ids": [f_a.id]})
+        Participation.objects.create(solicitacao_id=sol_id, usuario=coord_a, role="COORD_ACOMPANHA")
+
+        resp = client_coord.patch(
+            f"/api/solicitacoes/{sol_id}/", {"extra_participants": {"coord_acompanha_ids": []}}, format="json"
+        )
         assert resp.status_code in (200, 202), resp.data
-        assert _ids(sol_id, "COORD_ACOMPANHA") == {coord_b.id}, "update deve reconciliar COORD_ACOMPANHA (troca A→B)"
+        assert _ids(sol_id, "COORD_ACOMPANHA") == {coord_a.id}
 
 
 class TestUpdateReconcilesFormadores:

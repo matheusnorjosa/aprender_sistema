@@ -84,6 +84,7 @@ def _payload(municipio, projeto, tipo_evento, extra):
         "municipio": municipio.id,
         "projeto": projeto.id,
         "tipo_evento": tipo_evento.id,
+        "coordenador_acompanha": False,
         "tipo": "PRESENCIAL",
         "inicio": inicio.isoformat(),
         "fim": (inicio + timedelta(hours=2)).isoformat(),
@@ -137,11 +138,9 @@ class TestParticipantResolution:
         """Não-regressão: formador ativo válido vira participante."""
         formador = UsuarioFactory(username="form_1626", cpf="77000000010")
         formador.groups.add(GroupFactory(name="Formador"))
-        resp = client_coord.post(
-            "/api/solicitacoes/",
-            _payload(municipio, projeto, tipo_evento, {"formador_ids": [formador.id]}),
-            format="json",
-        )
+        payload = _payload(municipio, projeto, tipo_evento, {"formador_ids": [formador.id]})
+        payload["pretende_avaliar_formador"] = False  # 05/10/2026: formador avaliável → pergunta obrigatória
+        resp = client_coord.post("/api/solicitacoes/", payload, format="json")
         assert resp.status_code == 201, resp.data
         sol_id = resp.json()["id"]
         roles = set(Participation.objects.filter(solicitacao_id=sol_id).values_list("role", flat=True))

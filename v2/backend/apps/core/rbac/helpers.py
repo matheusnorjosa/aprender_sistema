@@ -16,11 +16,13 @@ Ver v2/docs/RBAC_NAMING.md §4 e master-plan §4.
 
 from __future__ import annotations
 
-from typing import Final
+from typing import Any, Final
 
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
+from django.db.models import QuerySet
 
 from apps.core.models import EquipeGerencia
+from apps.core.rbac.constants import FORMADOR_ROLE_GROUPS, FUNCAO_COORDENADOR_GROUPS
 from apps.core.services.rbac_permissions import get_user_functional_permissions
 
 # SSOT dos composites Setor×Função que conferem autoridade de APROVAÇÃO de
@@ -176,3 +178,24 @@ def user_has_all_perms(
         return False
     user_perms = get_user_functional_permissions(user)
     return all(code in user_perms for code in codenames)
+
+
+def user_tem_funcao_coordenador(user: AbstractBaseUser | AnonymousUser | None) -> bool:
+    """True se `user` tem a função Coordenador (`FUNCAO_COORDENADOR_GROUPS`). Data scope, não authz.
+
+    Decide a queda do coordenador responsável na Nova Solicitação (decisão do dono, 05/10/2026).
+    """
+    if not user or not user.is_authenticated:
+        return False
+    return bool(user.groups.filter(name__in=FUNCAO_COORDENADOR_GROUPS).exists())  # type: ignore[union-attr]
+
+
+def filtrar_formadores_avaliaveis(qs: QuerySet[Any]) -> QuerySet[Any]:
+    """Restringe um queryset de Usuario aos AVALIÁVEIS: função Formador e SEM a função Coordenador.
+
+    Decisão do dono (05/10/2026): coordenador não avalia coordenador; quem tem as duas funções
+    não conta. Data scope (`FORMADOR_ROLE_GROUPS`/`FUNCAO_COORDENADOR_GROUPS`), não autorização.
+    """
+    return (
+        qs.filter(groups__name__in=FORMADOR_ROLE_GROUPS).exclude(groups__name__in=FUNCAO_COORDENADOR_GROUPS).distinct()
+    )

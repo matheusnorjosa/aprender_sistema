@@ -16,6 +16,7 @@ from rest_framework import serializers  # type: ignore[attr-defined]
 
 from apps.core.models import AuditLog, Compra, Participation, Solicitacao
 from apps.core.serializers.usuario import UserSlimSerializer
+from apps.core.services.avaliacao_formador import formadores_avaliaveis_ids, gerencia_pergunta
 
 
 class ParticipationNestedSerializer(serializers.ModelSerializer):
@@ -56,6 +57,13 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
     projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
     projeto_geral_nome = serializers.CharField(source="projeto.projeto_geral.nome", read_only=True, allow_null=True)
     tipo_evento_nome = serializers.CharField(source="tipo_evento.nome", read_only=True)
+    # Decisão do dono (05/10/2026): a resposta "pretende avaliar o formador" é lida por outro
+    # sistema interno; o nome sai junto para a tela não precisar de outra chamada.
+    formador_avaliado_nome = serializers.SerializerMethodField()
+    # Para a tela de edição decidir se mostra a pergunta (mesma regra do backend). Só no
+    # detalhe de UM evento (null na lista): na lista custaria consultas por linha.
+    avaliaveis_ids = serializers.SerializerMethodField()
+    projeto_pergunta_avaliar_formador = serializers.SerializerMethodField()
 
     class Meta:
         model = Solicitacao
@@ -79,6 +87,11 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "coordenador",
             "coordenador_username",
             "coordenador_nome",
+            "pretende_avaliar_formador",
+            "formador_avaliado",
+            "formador_avaliado_nome",
+            "avaliaveis_ids",
+            "projeto_pergunta_avaliar_formador",
             "inicio",
             "fim",
             "status",
@@ -154,6 +167,24 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             return nome if nome else user.username
         return None
 
+    def get_formador_avaliado_nome(self, obj: Solicitacao) -> str | None:
+        user = obj.formador_avaliado
+        if user is None:
+            return None
+        return user.get_full_name() or user.username
+
+    def _um_evento(self) -> bool:
+        """True fora de listagem (detalhe, criar, editar): os campos de apoio à tela só saem aqui."""
+        view: object = self.context.get("view")
+        parent: object = getattr(self, "parent", None)
+        return getattr(view, "action", None) != "list" and not isinstance(parent, serializers.ListSerializer)
+
+    def get_avaliaveis_ids(self, obj: Solicitacao) -> list[int] | None:
+        return sorted(formadores_avaliaveis_ids(obj)) if self._um_evento() else None
+
+    def get_projeto_pergunta_avaliar_formador(self, obj: Solicitacao) -> bool | None:
+        return gerencia_pergunta(obj) if self._um_evento() else None
+
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         """
         Validações para criação e edição de solicitações.
@@ -166,6 +197,8 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
         3. Bloqueia edição de solicitações reprovadas.
         4. Exige compra para o par município+projeto na criação e quando o VALOR de
            município ou de projeto muda na edição (exceto superuser).
+        5. Na criação, `coordenador_acompanha` é obrigatório (decisão do dono, 05/10/2026):
+           o padrão do model (False) esconderia a falta da resposta. Null o campo já recusa.
         """
         instance = getattr(self, "instance", None)
 
@@ -242,6 +275,12 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
         if inicio is not None and fim is not None:
             if fim <= inicio:
                 raise serializers.ValidationError({"fim": "O fim do evento deve ser posterior ao início."})
+
+        # Regra 5
+        if instance is None and "coordenador_acompanha" not in getattr(self, "initial_data", {}):
+            raise serializers.ValidationError(
+                {"coordenador_acompanha": ["Informe se o coordenador responsável vai acompanhar o evento."]}
+            )
 
         return super().validate(attrs)
 

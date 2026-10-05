@@ -118,6 +118,7 @@ def _payload(municipio, tipo_evento, inicio, fim, projeto=None, **extra):
     payload = {
         "municipio": municipio.pk,
         "tipo_evento": tipo_evento.pk,
+        "coordenador_acompanha": False,
         "inicio": inicio.isoformat(),
         "fim": fim.isoformat(),
     }
@@ -234,13 +235,11 @@ class TestCreateChecaFormador:
 
         assert response.status_code == http_status.HTTP_201_CREATED
 
-    def test_coord_acompanha_tambem_e_checado(self, coordenador, municipio, tipo_evento, horario):
+    def test_coordenador_que_atua_entra_como_formador_e_e_checado(self, coordenador, municipio, tipo_evento, horario):
         """
-        COORD_ACOMPANHA ocupa a agenda como qualquer outro recurso.
-
-        Também é por aqui que o gerente entra: "Gerente" é função RBAC, não papel de
-        Participation — um gerente que participa é gravado como COORDENADOR ou
-        COORD_ACOMPANHA, então já está coberto.
+        Decisão do dono (05/10/2026): a lista de coordenadores acompanhantes saiu. Outro
+        coordenador (ou gerente) que atua no evento entra na LISTA DE FORMADORES e é
+        conferido como formador.
         """
         inicio, fim = horario
         acompanhante = UsuarioFactory(username="acompanha_1452", first_name="Dora", last_name="Acompanha")
@@ -255,7 +254,7 @@ class TestCreateChecaFormador:
                 tipo_evento,
                 inicio,
                 fim,
-                extra_participants={"coord_acompanha_ids": [acompanhante.pk]},
+                extra_participants={"formador_ids": [acompanhante.pk]},
             ),
             format="json",
         )

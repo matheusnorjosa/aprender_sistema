@@ -102,6 +102,8 @@ def _payload(municipio, projeto, tipo_evento, extra):
         "municipio": municipio.id,
         "projeto": projeto.id,
         "tipo_evento": tipo_evento.id,
+        "coordenador_acompanha": False,
+        "pretende_avaliar_formador": False,
         "tipo": "PRESENCIAL",
         "inicio": inicio.isoformat(),
         "fim": (inicio + timedelta(hours=2)).isoformat(),
@@ -170,9 +172,9 @@ class TestPrivilegedExempt:
         """Isenção: criador global (superuser) pode cruzar setor (cobre os 3 casos da Superintendência)."""
         su = UsuarioFactory(username="su_setor_1656", cpf=str(next(_CPF)), superuser=True)
         outro = _formador("fluir_su", gerencias["fluir"])
-        resp = _client(su).post(
-            "/api/solicitacoes/", _payload(municipio, projeto, tipo_evento, {"formador_ids": [outro.id]}), format="json"
-        )
+        payload = _payload(municipio, projeto, tipo_evento, {"formador_ids": [outro.id]})
+        payload["coordenador"] = UsuarioFactory(groups=["Coordenador"]).id  # 05/10/2026: responsável obrigatório
+        resp = _client(su).post("/api/solicitacoes/", payload, format="json")
         assert resp.status_code == 201, resp.data
 
 

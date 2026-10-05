@@ -13,3 +13,9 @@ COORDENADOR_ROLE_GROUPS: tuple[str, ...] = ("Coordenador", "Apoio de Coordenaç�
 
 # Formadores (para dropdown /api/options/formadores/)
 FORMADOR_ROLE_GROUPS: tuple[str, ...] = ("Formador",)
+
+# Função "Coordenador" em sentido estrito (sem o Apoio). Decisão do dono (05/10/2026):
+# - quem cria e tem esta função vira o coordenador responsável do evento quando não informa outro;
+# - formador avaliável = função Formador SEM esta função ("coordenador não avalia coordenador";
+#   pessoa com as duas funções não é avaliável).
+FUNCAO_COORDENADOR_GROUPS: tuple[str, ...] = ("Coordenador",)

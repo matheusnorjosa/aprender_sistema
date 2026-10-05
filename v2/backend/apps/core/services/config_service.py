@@ -3,16 +3,16 @@ Config Service — Cache layer para Config model (5min TTL)
 
 Funções:
 - get_cfg(key, default): Busca config com cache (5min TTL)
-- parametros_disponibilidade(): Buffer (RD-04) e limite diário (RD-05) vigentes
+- parametros_disponibilidade(): Buffer (RD-04) e teto de horas por evento (RD-05) vigentes
 - bust_cfg(key): Invalida cache para key específica
 
 Uso:
     from apps.core.services.config_service import parametros_disponibilidade
 
-    # Buffer de deslocamento (RD-04) e limite diário (RD-05): Config gravado ou settings
+    # Buffer de deslocamento (RD-04) e teto de horas por evento (RD-05): Config gravado ou settings
     parametros = parametros_disponibilidade()
     buffer_min = parametros["TRAVEL_BUFFER_MINUTES"]
-    daily_limit_h = parametros["AVAILABILITY_DAILY_LIMIT_HOURS"]
+    teto_h = parametros["AVAILABILITY_DAILY_LIMIT_HOURS"]
 
 Invalidação automática:
     - Via signal post_save em apps/core/signals.py
@@ -74,7 +74,7 @@ def get_cfg(key: str, default: Any = None) -> Any:
 
 def parametros_disponibilidade() -> dict[str, Any]:
     """
-    Buffer de deslocamento (RD-04) e limite diário (RD-05) vigentes.
+    Buffer de deslocamento (RD-04) e teto de horas por evento (RD-05, contagem de horas) vigentes.
 
     Fonte única da tela de Configurações (GET /api/config/) e do motor de disponibilidade
     (auditoria UX 30/09): vale o Config gravado; sem a chave, o settings (env). Antes a tela

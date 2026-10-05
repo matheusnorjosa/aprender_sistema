@@ -21,7 +21,7 @@ const COR_POR_CODIGO: Record<ConflictDetail['code'], string> = {
   T: 'volcano', // bloqueio total
   P: 'orange', // bloqueio parcial
   D: 'gold', // deslocamento
-  M: 'geekblue', // limite diário: só aviso, nunca vem como bloqueio (ver AvisosDeAgenda)
+  M: 'geekblue', // antigo limite diário: o backend não emite desde 05/10/2026; fica para resposta antiga
 };
 
 const ORIENTACAO_PADRAO =
@@ -91,7 +91,9 @@ export interface AvisosDeAgendaProps {
 }
 
 /**
- * Aviso que NÃO impede o evento (limite diário, RD-05 — decisão do dono em 02/10/2026).
+ * Aviso que NÃO impede o evento, vindo em `warnings` do backend. Hoje o backend não manda
+ * nenhum (o limite diário M saiu em 05/10/2026, decisão do dono); o componente continua
+ * mostrando o que vier, para uma resposta antiga não quebrar a tela.
  *
  * Diferente do bloqueio em tudo o que a pessoa percebe: é informação (azul, `role="status"`,
  * lido sem interromper), diz no título que não impede e não manda remover ninguém. O texto

@@ -1,9 +1,9 @@
 /**
  * UsuarioPicker - Seleção múltipla de usuários por papel (autocomplete).
  *
- * Implementação compartilhada de FormadoresPicker/CoordenadoresPicker, que eram
- * ~95% idênticos. Parametrizado por papel do lookup, cor da Tag e aria-label;
- * cada picker de domínio vira um wrapper fino sobre este.
+ * Implementação compartilhada dos pickers de usuário (hoje o FormadoresPicker).
+ * Parametrizado por papel do lookup, cor da Tag e aria-label; cada picker de
+ * domínio vira um wrapper fino sobre este.
  */
 
 import { useState, type JSX } from 'react';
@@ -17,6 +17,8 @@ export interface UsuarioItem {
   id: ID;
   label: string;
   name?: string;
+  /** Do lookup: função Formador sem a função Coordenador (pode ser avaliado; 05/10/2026). */
+  avaliavel?: boolean;
 }
 
 /** Opção do AutoComplete. */
@@ -26,13 +28,14 @@ interface UserOption {
   data: {
     id: ID;
     label: string;
+    avaliavel: boolean;
   };
 }
 
 export interface UsuarioPickerProps {
   value?: UsuarioItem[];
   onChange?: (value: UsuarioItem[]) => void;
-  /** Papel para filtrar o lookup (ex.: 'Formador', 'Coordenador'). */
+  /** Papel para filtrar o lookup (ex.: 'Formador'; vários separados por vírgula = OU). */
   role: string;
   /** Cor da Tag dos selecionados. */
   tagColor?: string;
@@ -67,7 +70,7 @@ export default function UsuarioPicker({
         results.map(item => ({
           value: String(item.id),
           label: item.label,
-          data: item,
+          data: { id: item.id, label: item.label, avaliavel: item['avaliavel'] === true },
         }))
       );
     } catch (error) {
@@ -82,6 +85,7 @@ export default function UsuarioPicker({
       id: option.data.id,
       label: option.data.label,
       name: option.data.label, // Alias para compatibilidade
+      avaliavel: option.data.avaliavel,
     };
 
     // Verificar se já existe (by ID only — SEC-ENUM-01)

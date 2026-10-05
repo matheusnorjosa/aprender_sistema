@@ -74,6 +74,14 @@ export interface Solicitacao {
   coordenador: ID | null;
   coordenador_username: string | null;
   coordenador_nome: string | null;
+  /** "Você pretende avaliar o formador nesse evento?" — null = não perguntado/não informado (05/10/2026). */
+  pretende_avaliar_formador?: boolean | null;
+  formador_avaliado?: ID | null;
+  formador_avaliado_nome?: string | null;
+  /** Só no detalhe de um evento (null na lista): formadores do evento que podem ser avaliados. */
+  avaliaveis_ids?: ID[] | null;
+  /** Só no detalhe de um evento (null na lista): a gerência do projeto usa a pergunta de avaliar. */
+  projeto_pergunta_avaliar_formador?: boolean | null;
   inicio: ISODateTime;
   fim: ISODateTime;
   status: SolicitacaoStatus;
@@ -96,7 +104,6 @@ export interface Solicitacao {
  */
 export interface ExtraParticipantsPayload {
   formador_ids?: ID[];
-  coord_acompanha_ids?: ID[];
 }
 
 /**
@@ -111,6 +118,8 @@ export interface SolicitacaoPayload {
   segmento?: string | null;
   coordenador_acompanha?: boolean;
   coordenador?: ID | null;
+  pretende_avaliar_formador?: boolean | null;
+  formador_avaliado?: ID | null;
   inicio?: string;
   fim?: string;
   observacoes?: string | null;

@@ -9,9 +9,9 @@ Extracted from views_metrics.py.
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 
-from django.db.models import Count, F, Sum
+from django.db.models import Count
 from django.utils import timezone
 from rest_framework import status as http_status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
@@ -21,6 +21,7 @@ from rest_framework.throttling import ScopedRateThrottle
 
 from apps.core.models import Participation
 from apps.core.permissions import HasPerm
+from apps.core.services.horas_formacao import horas_formacao
 
 
 @api_view(["GET"])
@@ -55,20 +56,30 @@ def formadores_metrics(request: Request) -> Response:
         }
 
     Calculations:
-        - Filter Participation by role=FORMADOR and solicitacao__status=aprovado
-        - Aggregate by usuario: count events, sum hours, count distinct municipios
+        - Filter Participation by role=FORMADOR and solicitacao__status=aprovado, events
+          whose local start date is in [today - days, today]
+        - Aggregate by usuario: count events, count distinct municipios
+        - horas_trabalhadas: services/horas_formacao.py (teto por evento, mesma conta da
+          Grade Mensal)
         - Order by -eventos, limit to top 10
 
     Permissions: HasPerm("run_daily_operations") | HasPerm("supervise_operations") (only authorized users)
     """
     days = int(request.GET.get("days", 30))
-    cutoff = timezone.now() - timedelta(days=days)
+    # Período = dias locais [hoje − days, hoje], pelo INÍCIO do evento (antes filtrava
+    # `created_at`, e um evento antigo importado hoje entrava como hora do período).
+    ate = timezone.localdate()
+    de = ate - timedelta(days=days)
+    tz = timezone.get_current_timezone()
+    janela_inicio = datetime.combine(de, time.min, tzinfo=tz)
+    janela_fim = datetime.combine(ate + timedelta(days=1), time.min, tzinfo=tz)
 
     # Query participations (formador role only, approved events only, in date range)
     participations = Participation.objects.filter(
         role=Participation.Role.FORMADOR,
         solicitacao__status="aprovado",
-        solicitacao__created_at__gte=cutoff,
+        solicitacao__inicio__gte=janela_inicio,
+        solicitacao__inicio__lt=janela_fim,
         usuario__isnull=False,  # Exclude guest participations
     )
 
@@ -82,23 +93,19 @@ def formadores_metrics(request: Request) -> Response:
         )
         .annotate(
             eventos=Count("solicitacao_id", distinct=True),
-            # Calculate hours worked: sum of (solicitacao.fim - solicitacao.inicio)
-            horas_trabalhadas=Sum(
-                (F("solicitacao__fim") - F("solicitacao__inicio")),
-                output_field=None,
-            ),
             municipios_atendidos=Count("solicitacao__municipio_id", distinct=True),
         )
         .order_by("-eventos")[:10]
     )
 
-    # Convert timedelta to hours and format response
+    # Horas = a contagem única de horas de formação (teto por evento), a mesma da Grade
+    # Mensal: duas consultas para os 10, sem N+1.
+    formadores_stats = list(formadores_stats)
+    horas_por_pessoa = horas_formacao([stat["usuario_id"] for stat in formadores_stats], de=de, ate=ate)
+
     formadores_list = []
     for stat in formadores_stats:
-        # Convert timedelta to hours
-        horas = 0.0
-        if stat["horas_trabalhadas"] is not None:
-            horas = round(stat["horas_trabalhadas"].total_seconds() / 3600, 1)
+        horas = round(horas_por_pessoa[stat["usuario_id"]].total, 1)
 
         # Build full name — use username from same query as fallback
         nome = f"{stat['usuario__first_name']} {stat['usuario__last_name']}".strip()

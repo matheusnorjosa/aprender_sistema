@@ -18,7 +18,7 @@ Permissões (Bug 1 fix pós RBAC Access Policy Realignment, 2026-04-27):
     - Sem capability + sem gerencia_id: comportamento SUPER (permitido)
     - Sem capability + com gerencia_id: verifica EquipeGerencia
 
-Cache Redis 5 minutos por (year, month, role, escopo, sector, q).
+Cache Redis 5 minutos por (year, month, role, escopo, sector, q, teto de horas).
 """
 
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportMissingParameterType=false, reportAttributeAccessIssue=false, reportReturnType=false, reportArgumentType=false, reportUntypedBaseClass=false, reportMissingTypeArgument=false, reportOptionalMemberAccess=false, reportCallIssue=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false
@@ -45,6 +45,7 @@ from apps.core.serializers.openapi_critical_contract import (
     MonthlyAvailabilityErrorResponseSerializer,
     MonthlyAvailabilityResponseSerializer,
 )
+from apps.core.services.config_service import parametros_disponibilidade
 from apps.core.services.monthly_grid_service import build_monthly_grid
 
 logger = logging.getLogger(__name__)
@@ -223,9 +224,12 @@ class MonthlyAvailabilityView(APIView):
         # ~5min) já limita a defasagem de uma expiração de vínculo exatamente como
         # já limita o toggle de `ativo` (não há signal EquipeGerencia→cache). Pôr
         # `localdate()` aqui só criaria um burst diário de cache-miss sem ganho real.
+        # O teto da contagem de horas (Configurações) entra na chave: salvar um teto novo
+        # vale já na consulta seguinte. v6: CH com teto por evento (05/10/2026).
+        teto = parametros_disponibilidade()["AVAILABILITY_DAILY_LIMIT_HOURS"]
         cache_key = (
-            f"monthly:v5:{monthly_ver}:{year}:{month}:{role}:"
-            f"{cache_scope}:{sector or '*'}:{(q or '').strip().lower()}"
+            f"monthly:v6:{monthly_ver}:{year}:{month}:{role}:"
+            f"{cache_scope}:{sector or '*'}:{(q or '').strip().lower()}:teto{teto}"
         )
 
         # Tentar buscar do cache

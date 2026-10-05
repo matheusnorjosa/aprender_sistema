@@ -8,9 +8,10 @@ RD-01: Não-sobreposição (overlap ≥ 1 min → X; adjacente OK)
 RD-02: Bloqueio Total (T) impede qualquer evento
 RD-03: Bloqueio Parcial (P) impede dentro do subintervalo
 RD-04: Deslocamento (D) buffer configurável entre municípios
-RD-05: Limite diário (M) configurável de horas/dia — AVISA, não barra (decisão do dono, 02/10/2026)
+RD-05: deixou de ser checagem de agenda (decisão do dono, 05/10/2026): o parâmetro virou o teto
+       da contagem de horas de formação (services/horas_formacao.py). O motor não emite M.
 RD-06: Timezone-aware (UTC storage, America/Fortaleza comparison)
-RD-07: Prioridade de checagem (reporta todos: `conflicts` barra, `warnings` só avisa)
+RD-07: Prioridade de checagem (reporta todos em `conflicts`; `warnings` fica vazio)
 RD-08: Mensagens com formador, intervalo, tipo, detalhe
 """
 
@@ -19,7 +20,7 @@ RD-08: Mensagens com formador, intervalo, tipo, detalhe
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, time, timedelta
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
@@ -66,18 +67,13 @@ def coordenador_ocupante(solicitacao: Solicitacao) -> Usuario | None:
     return solicitacao.coordenador or solicitacao.usuario
 
 
-# Códigos que o motor calcula e devolve, mas que NÃO barram: saem em `CheckResult.warnings`.
-# Decisão do dono (02/10/2026): "o evento na agenda pode ter quantas horas quiser". Tudo o
-# que está em `CheckResult.conflicts` continua barrando (X, T, P, D).
-CODIGOS_DE_AVISO: frozenset[str] = frozenset({"M"})
-
 
 @dataclass
 class Conflict:
     """
     Representa um conflito de disponibilidade.
 
-    code: Código do tipo de conflito (X/T/P/D/M)
+    code: Código do tipo de conflito (X/T/P/D)
     title: Título breve do conflito
     detail: Mensagem descritiva detalhada
     ref_id: ID do evento/bloqueio relacionado (opcional)
@@ -96,7 +92,8 @@ class CheckResult:
 
     ok: True se não há conflitos (avisos não contam)
     conflicts: o que barra (X, T, P, D)
-    warnings: o que só avisa (`CODIGOS_DE_AVISO`: limite diário M); nunca muda `ok`
+    warnings: o que só avisa; nunca muda `ok`. Hoje nenhum código usa (o M saiu em
+        05/10/2026); a chave fica para não quebrar quem já lê a resposta.
     """
 
     ok: bool
@@ -154,24 +151,6 @@ def _fmt_interval_local(start: datetime, end: datetime) -> str:
     return f"{s:%H:%M %d/%m}–{e:%H:%M %d/%m}"
 
 
-def _fmt_horas(minutos: int) -> str:
-    """Minutos como horas legíveis: 600 → "10h", 570 → "9h30"."""
-    horas, resto = divmod(minutos, 60)
-    return f"{horas}h{resto:02d}" if resto else f"{horas}h"
-
-
-def _clip_minutes(start: datetime, end: datetime, window_start: datetime, window_end: datetime) -> int:
-    """Minutos de [start, end] que caem dentro de [window_start, window_end] (>= 0).
-
-    Usado pela RD-05 para recortar tanto os eventos existentes quanto o novo pela
-    janela de UM dia local — assim um evento que cruza a meia-noite contribui só a
-    fração correta em cada dia (M08-09 / #1664).
-    """
-    lo = max(start, window_start)
-    hi = min(end, window_end)
-    return max(int((hi - lo).total_seconds() // 60), 0)
-
-
 def _check_conflicts_impl(
     *,
     usuario: Usuario,
@@ -192,7 +171,6 @@ def _check_conflicts_impl(
     - Solicitações aprovadas (eventos confirmados) → RD-01 (X)
     - AvailabilityBlock com status=aprovado → RD-02 (T), RD-03 (P)
     - Buffer de deslocamento entre municípios → RD-04 (D)
-    - Limite diário → RD-05 (M), devolvido em `warnings`: avisa, não barra
 
     Args:
         usuario: Usuário para verificar disponibilidade
@@ -202,8 +180,7 @@ def _check_conflicts_impl(
         exclude_solicitacao_id: Ignora esta solicitação em TODOS os checks. Usado ao
             revalidar um evento já gravado (update/aprovação), para que ele não
             conflite consigo mesmo. Precisa ser aplicado na origem (`events_qs`) e não
-            filtrado depois por `ref_id`: o aviso M (RD-05) não tem `ref_id` e
-            somaria as horas do próprio evento em dobro.
+            filtrado depois por `ref_id`.
 
     Returns:
         CheckResult com ok=True/False, a lista de conflitos e a lista de avisos
@@ -215,10 +192,9 @@ def _check_conflicts_impl(
             conflicts=[Conflict("X", "Intervalo inválido", "fim deve ser > início")],
         )
 
-    # Configurações (RD-04, RD-05): a mesma fonte que a tela de Configurações mostra
+    # Configurações (RD-04): a mesma fonte que a tela de Configurações mostra
     parametros = parametros_disponibilidade()
     buffer_min: int = int(parametros["TRAVEL_BUFFER_MINUTES"])
-    daily_limit_h: float = float(parametros["AVAILABILITY_DAILY_LIMIT_HOURS"])
 
     conflicts: list[Conflict] = []
     warnings: list[Conflict] = []
@@ -333,49 +309,6 @@ def _check_conflicts_impl(
                         ref_id=next_ev.id,
                     )
                 )
-
-    # ================================================================
-    # RD-05: LIMITE DIÁRIO — aviso, não barra (decisão do dono, 02/10/2026)
-    # ================================================================
-    # O M vai para `warnings`, nunca para `conflicts`: `ok` não muda por causa dele.
-    # M08-09 (#1664): checa CADA dia LOCAL que o novo evento toca. Eventos
-    # existentes E o novo são recortados pela janela do dia (`_clip_minutes`),
-    # então um evento que cruza a meia-noite (ex.: 22h→02h) contribui só a fração
-    # certa em D e em D+1 — antes, o novo evento entrava com a duração CHEIA no dia
-    # do início e o dia seguinte nunca era checado.
-    # Issue #249: ranges de datetime (não `.date()`) por causa de UTC vs local (RD-06).
-    tz_name: str = getattr(settings, "TZ_PROJECT", "America/Fortaleza")
-    local_tz = ZoneInfo(tz_name)
-    daily_limit_minutes: int = int(daily_limit_h * 60)
-
-    first_day = to_local(inicio).date()
-    last_day = to_local(fim).date()
-    day = first_day
-    while day <= last_day:
-        day_start: datetime = datetime.combine(day, time.min, tzinfo=local_tz)
-        day_end: datetime = datetime.combine(day, time.max, tzinfo=local_tz)
-
-        # Só checa dias onde o novo evento realmente ocupa tempo (evita falso M num
-        # dia adjacente onde o evento apenas toca a fronteira).
-        new_minutes = _clip_minutes(inicio, fim, day_start, day_end)
-        if new_minutes > 0:
-            total_minutes = new_minutes
-            for ev in events_qs.filter(inicio__lt=day_end, fim__gt=day_start).distinct():
-                total_minutes += _clip_minutes(ev.inicio, ev.fim, day_start, day_end)
-
-            if total_minutes > daily_limit_minutes:
-                # Texto para quem usa: só o que é verdade hoje. Não promete contagem de
-                # horas com teto (ainda não existe); diz que passa do limite e que não impede.
-                warnings.append(
-                    Conflict(
-                        "M",
-                        f"Dia com mais de {daily_limit_h:g} {'hora' if daily_limit_h == 1 else 'horas'} de eventos",
-                        f"No dia {day:%d/%m} a soma dos eventos chega a {_fmt_horas(total_minutes)}. "
-                        "Isso não impede o evento.",
-                    )
-                )
-
-        day += timedelta(days=1)
 
     # ================================================================
     # RD-07: Retornar tudo o que foi encontrado. Só `conflicts` decide `ok`.

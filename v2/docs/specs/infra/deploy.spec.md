@@ -7,6 +7,7 @@ sources_of_truth:
   - v2/infra/docker-compose.prod.yml
   - v2/infra/Dockerfile.prod
   - v2/frontend/Dockerfile.prod
+  - v2/frontend/nginx.conf
   - .github/workflows/deploy.yaml
   - .github/workflows/promote.yml
   - .github/workflows/release-notes-producao.yml
@@ -184,6 +185,34 @@ gravável no `worker` graças ao bind-mount do #1455), `INCLUDE_DEV_TOOLS`/`INCL
 1. Portainer → Stacks → stack de prod → **Editor** (compose vivo) e **Environment variables** (valores reais).
 2. (Opcional) VM01 via SSH: `docker ps`, `docker inspect <svc>` (mounts/read_only/env). **Nunca** reiniciar
    Docker/containers (Kaspersky/KESL derruba o site).
+
+## Borda HTTP: Nginx Proxy Manager → nginx do `frontend` → gunicorn
+
+Cadeia de produção: navegador → **Nginx Proxy Manager (NPM)**, que termina o TLS → nginx do container
+`frontend` ([`v2/frontend/nginx.conf`](../../../frontend/nginx.conf)) → gunicorn (`web:8000`).
+
+**NPM (fora do repositório; lido em produção pelo Portainer em 2026-10-02, só leitura):** um único proxy host
+apontando para `http://aprender_prod-frontend-1:80` pela rede Docker; HTTP/2, TLS 1.2/1.3, redireciona HTTP para
+HTTPS; repassa `X-Real-IP` e `X-Forwarded-For` com o endereço do cliente; `client_max_body_size 2000m`;
+`proxy_read_timeout 90s` (corta antes dos 120 s do gunicorn); imagem em `latest`, sem versão fixa.
+
+**nginx do `frontend` (versionado):**
+
+| Item | Valor | Por quê |
+|---|---|---|
+| IP do cliente | `real_ip_header X-Real-IP` + `set_real_ip_from` 172.16.0.0/12, 10.0.0.0/8, 192.168.0.0/16 + `real_ip_recursive on` | Quem conecta é sempre o NPM; sem isto o `limit_req` era um balde único para todos. O cabeçalho só vale quando a conexão vem de faixa privada (rede Docker). |
+| Limite de taxa em `/api/` | `limit_req` 30 r/s por cliente, `burst=60 nodelay`, resposta **429** (`limit_req_status`) | Válvula antes do Django; o limite por pessoa é o throttle do DRF ([API_REFERENCE](../../API_REFERENCE.md), Rate Limiting). |
+| Upload | `client_max_body_size 11m` | O Django aceita planilha de 10 MB (`upload_validators.py`); com o padrão de 1 MB a de 5 MB recebia 413 do nginx. |
+| Rotas | `location ^~` em `/api/`, `/admin/`, `/static/`, `/assets/` | O prefixo ganha das locations por regex: a regra de imagens capturava `/static/admin/img/*.svg` (ícones do admin em 404). O bloqueio de `.map` é repetido dentro de `/assets/`. |
+
+**`NUM_PROXIES=2` continua certo.** Com o IP real restaurado, o nginx do frontend passa a anexar o endereço do
+**cliente** (não o do NPM) ao `X-Forwarded-For`: a cadeia que chega ao Django muda de `cliente, NPM` para
+`cliente, cliente`. O DRF e `apps.core.utils.net.get_client_ip` leem a 2ª entrada a partir da direita, que é o
+cliente nos dois casos; uma entrada forjada à esquerda continua ignorada. Mudar a quantidade de proxies (CDN,
+segundo proxy) ou o que o NPM repassa exige rever `NUM_PROXIES` **e** o `set_real_ip_from`.
+
+Como conferir (sem tocar em produção): `docker run --rm -v <nginx.conf>:/etc/nginx/conf.d/default.conf:ro -v
+<security-headers.conf>:/etc/nginx/security-headers.conf:ro nginx:alpine nginx -t`.
 
 ## Gaps abertos relacionados
 

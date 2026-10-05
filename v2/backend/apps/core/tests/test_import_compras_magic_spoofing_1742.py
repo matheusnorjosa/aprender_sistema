@@ -38,10 +38,9 @@ PNG_MAGIC = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
 VALID_CSV = b"codigo,produto,quant,municipio,uf,data,uso\nC1,X,10,Acarape,CE,2025-01-01,Formacao\n"
 
 
-def _dat_client(cpf: str) -> APIClient:
-    """APIClient autenticado como usuário do grupo DAT (detentor de
-    import_spreadsheet via seed RBAC)."""
-    user = UsuarioFactory(username=f"dat_s6_{cpf}", cpf=cpf, groups=["DAT"])
+def _cliente_superusuario(cpf: str) -> APIClient:
+    """APIClient autenticado como superusuário (o único que importa pela tela)."""
+    user = UsuarioFactory(username=f"su_s6_{cpf}", cpf=cpf, superuser=True)
     client = APIClient()
     client.force_authenticate(user=user)
     return client
@@ -50,7 +49,7 @@ def _dat_client(cpf: str) -> APIClient:
 @override_settings(UPLOAD_MAGIC_FAIL_OPEN=False)
 def test_import_compras_rejects_png_spoofed_as_csv():
     """Conteúdo PNG com Content-Type text/csv é rejeitado com 400 (anti-spoofing)."""
-    client = _dat_client("90000000201")
+    client = _cliente_superusuario("90000000201")
     spoofed = SimpleUploadedFile("compras.csv", PNG_MAGIC, content_type="text/csv")
 
     r = client.post(IMPORT_COMPRAS_URL, {"file": spoofed}, format="multipart")
@@ -61,7 +60,7 @@ def test_import_compras_rejects_png_spoofed_as_csv():
 
 def test_import_compras_valid_csv_dry_run_ok():
     """Não-regressão: um CSV válido em dry_run continua retornando 200."""
-    client = _dat_client("90000000202")
+    client = _cliente_superusuario("90000000202")
     valid = SimpleUploadedFile("compras.csv", VALID_CSV, content_type="text/csv")
 
     r = client.post(IMPORT_COMPRAS_URL, {"file": valid}, format="multipart")

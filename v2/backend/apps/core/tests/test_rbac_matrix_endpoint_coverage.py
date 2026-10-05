@@ -52,6 +52,23 @@ MATRIX_ENDPOINT_COVERAGE: dict[str, list[str]] = {
     ],
     "produtos_list": ["/api/produtos/"],
     "usuario_lookup": ["/api/lookup/usuarios/"],
+    # import_pela_tela cobre os endpoints de upload de planilha (mesmo gate
+    # `SuperuserOnly`, 2026-10-02); um a um em test_imports_pela_tela_so_superusuario.py.
+    "import_pela_tela": [
+        "/api/controle/import-compras/",
+        "/api/import-compras/",
+        "/api/controle/import-acoes/",
+        "/api/dat/import-cadastros/",
+        "/api/disponibilidade/import-bloqueios/",
+        "/api/deslocamentos/import/",
+        "/api/solicitacoes/import/",
+        "/api/usuarios/import/",
+        "/api/produtos/import/",
+        "/api/municipios/import/",
+        "/api/colecoes/import/",
+        "/api/equipe-gerencia/import/",
+        "/api/imports/bloqueios/",
+    ],
 }
 
 

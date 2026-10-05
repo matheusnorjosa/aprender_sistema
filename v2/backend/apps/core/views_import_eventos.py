@@ -2,7 +2,7 @@
 Endpoint DRF para importacao de Eventos (Solicitacao + Participation).
 
 POST /api/solicitacoes/import/
-- Permission: HasPerm("import_spreadsheet")
+- Permission: SuperuserOnly
 - Query param: dry_run=true|false (default: true)
 - Body: {file: upload}
 - Returns: Relatorio com stats, pendencias
@@ -28,7 +28,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from apps.core.api_schemas import COMMON_ERROR_RESPONSES
 from apps.core.imports.request_params import parse_dry_run
-from apps.core.permissions import HasPerm
+from apps.core.permissions import SuperuserOnly
 from apps.core.serializers.openapi_critical_contract import (
     ImportFileUploadRequestSerializer,
     ImportOperationErrorResponseSerializer,
@@ -44,7 +44,7 @@ class ImportEventosView(APIView):
     """
     Importa Eventos de CSV/XLSX.
 
-    Requer permissao: HasPerm("import_spreadsheet") (grupo DAT, ou superuser).
+    Requer superusuário (`SuperuserOnly`): importação pela tela é só do superusuário.
 
     Query params:
         dry_run: "true" (default) para preview, "false" para aplicar
@@ -72,10 +72,8 @@ class ImportEventosView(APIView):
         }
     """
 
-    # PR-A1 DAT-Imports (2026-04-29): centralização DAT-only via
-    # `HasPerm("import_spreadsheet")`. Controle perde acesso ao import em
-    # massa (D-1 do plano).
-    permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]
+    # Decisão do dono (02/10/2026): importação pela tela é só do superusuário.
+    permission_classes = [IsAuthenticated, SuperuserOnly]
     throttle_scope = "import"
 
     @extend_schema(

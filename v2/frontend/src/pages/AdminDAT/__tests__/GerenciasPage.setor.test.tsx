@@ -4,12 +4,13 @@
  * com flag "não definido" quando vazio) e edita-o (Select fechado do vocabulário
  * setor-de-produto).
  *
- * Continuação (PR-A): (a) coluna `setor_canonico_confianca` (read-only, sinal de qualidade
- * do de-para v15 — RELAY 50) e (b) o Select passa a ser alimentado pelo endpoint de options
+ * Continuação (PR-A): o Select passa a ser alimentado pelo endpoint de options
  * (`getRBACMeta().setores_produto`) em vez da constante FE temporária — que havia DRIFTADO do
- * canônico ("Ler Ouvir e Contar" sem vírgulas vs "Ler, Ouvir e Contar").
+ * canônico ("Ler Ouvir e Contar" sem vírgulas vs "Ler, Ouvir e Contar"). A coluna de confiança do
+ * de-para (`setor_canonico_confianca`) saiu da tela no C2b (vazia nas 21 gerências de produção);
+ * o campo continua no backend.
  *
- * RED no código antigo (sem coluna de confiança; Select vem da constante hardcoded).
+ * RED no código antigo (Select vem da constante hardcoded).
  */
 import { describe, expect, test, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
@@ -55,27 +56,6 @@ describe('GerenciasPage — conferência de setor_canonico (#1914)', () => {
     expect(await screen.findByText('ACerta', {}, { timeout: 15000 })).toBeInTheDocument();
     // gerência 2 tem setor_canonico vazio → flag
     expect(await screen.findByText('não definido')).toBeInTheDocument();
-  }, 20000);
-
-  test('coluna Confiança mostra o valor importado (read-only) e "—" quando ausente', async () => {
-    renderPage();
-    // header da coluna (AntD duplica o header quando a Table tem scroll → getAllByText)
-    expect((await screen.findAllByText('Confiança', {}, { timeout: 15000 })).length).toBeGreaterThan(0);
-    // gerência 1 tem confianca "alta" (sinal do de-para, célula única); gerência 2 não tem → em-dash
-    // C2: o valor aparece com rótulo de tela (alta → Alta).
-    expect(await screen.findByText('Alta')).toBeInTheDocument();
-    expect(await screen.findByText('—')).toBeInTheDocument();
-  }, 20000);
-
-  test('Confiança realça baixa qualidade: "na" (Conferir) vermelho e "media" (Média) laranja', async () => {
-    renderPage();
-    const na = await screen.findByText('Conferir', {}, { timeout: 15000 });
-    expect(na.closest('.ant-tag')?.className).toContain('ant-tag-red');
-    const media = await screen.findByText('Média');
-    expect(media.closest('.ant-tag')?.className).toContain('ant-tag-orange');
-    // "alta" fica neutro (não é vermelho nem laranja)
-    const alta = await screen.findByText('Alta');
-    expect(alta.closest('.ant-tag')?.className).not.toContain('ant-tag-red');
   }, 20000);
 
   test('Select de setor_canonico é alimentado pelo endpoint de options (canônico com vírgulas)', async () => {

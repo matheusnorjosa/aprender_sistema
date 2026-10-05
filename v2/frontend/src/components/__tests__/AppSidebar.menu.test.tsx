@@ -253,7 +253,8 @@ const ACTORS: ActorSnapshot[] = [
       'Dashboard Equipe',
       'Dashboard GCal',
     ],
-    expectedDatChildren: ['Administração', 'Cadastros', 'Importações', 'Registros de Turmas'],
+    // Importação pela tela é só do superusuário (decisão do dono, 02/10/2026): o item some para o DAT.
+    expectedDatChildren: ['Administração', 'Cadastros', 'Registros de Turmas'],
   },
   {
     actor: 'Controle',

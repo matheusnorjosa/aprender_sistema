@@ -226,9 +226,29 @@ def custom_exception_handler(exc: Exception, context: dict[str, Any]) -> Respons
     return response
 
 
+# O motivo do 409 vai para a tela. Estes models têm `verbose_name_plural` sem acento (ou sem nome
+# nenhum), e corrigir o Meta pede migration: o nome que a tela mostra fica aqui. Model novo com FK
+# PROTECT entra pela sentinela de `tests/test_excluir_em_uso_409.py`.
+_TIPO_EM_USO: dict[str, str] = {
+    "core.AcaoDAT": "Ações DAT",
+    "core.AcaoInstancia": "Ações Instância",
+    "core.AcaoTemplate": "Ações Template",
+    "core.AcaoTemplateExecutor": "Executores de Ações Template",
+    "core.CicloAcoes": "Ciclos de Ações",
+    "core.Colecao": "Coleções",
+    "core.EquipeGerencia": "Equipes de Gerências",
+    "core.ImportJob": "Jobs de Importação",
+    "core.Participation": "Participações",
+    "core.PlanoFormacoes": "Planos de Formações",
+    "core.Solicitacao": "Solicitações de Evento",
+}
+
+
 def _mensagem_em_uso(exc: ProtectedError) -> str:
     """Só os TIPOS de registro vinculados; nunca os registros em si (podem ser de outro setor)."""
-    tipos = sorted({str(obj._meta.verbose_name_plural) for obj in exc.protected_objects})
+    tipos = sorted(
+        {_TIPO_EM_USO.get(obj._meta.label, str(obj._meta.verbose_name_plural)) for obj in exc.protected_objects}
+    )
     return f"Este registro não pode ser excluído porque está em uso ({', '.join(tipos)})."
 
 

@@ -134,7 +134,7 @@ Notas: a composition OR do #1220 vale só para Coordenador/Ação. Em Compras, a
 - [`tests/test_controle_dat_api.py`](../../../backend/apps/core/tests/test_controle_dat_api.py) — RBAC e filtros de `/api/dat/acoes/` (legacy `AcaoDAT`).
 - [`tests/test_dat_tipo_acao_choices.py`](../../../backend/apps/core/tests/test_dat_tipo_acao_choices.py) — choices/normalização de `TipoAcaoDAT` + data migration `0057`.
 - [`tests/test_etl_dat_cadastros.py`](../../../backend/apps/core/tests/test_etl_dat_cadastros.py) — import legacy idempotente.
-- [`tests/test_dat_imports_dat_only.py`](../../../backend/apps/core/tests/test_dat_imports_dat_only.py) — escopo de import restrito a DAT.
+- [`tests/test_imports_pela_tela_so_superusuario.py`](../../../backend/apps/core/tests/test_imports_pela_tela_so_superusuario.py) — import pela tela só para superusuário (o DAT recebe 403).
 
 ## Pontos de atenção / dívidas conhecidas
 

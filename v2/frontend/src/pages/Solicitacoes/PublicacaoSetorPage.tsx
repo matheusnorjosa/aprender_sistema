@@ -184,7 +184,7 @@ export default function PublicacaoSetorPage(): JSX.Element {
   // Só há o que acompanhar enquanto alguma publicação está em voo (PENDING).
   usePolling(load, {
     enabled: rows.some((row) => row.gcal_status === 'PENDING'),
-    intervalMs: TIMING.SYNC_POLL_INTERVAL_MS,
+    intervalMs: TIMING.PUBLICACAO_PENDENTE_POLL_MS,
     immediate: false,
   });
 

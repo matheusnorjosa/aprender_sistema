@@ -124,3 +124,37 @@ def test_todo_scope_de_throttle_usado_tem_rate_definido():
         f"Scopes de throttle usados em views sem rate em DEFAULT_THROTTLE_RATES: {sorted(missing)}. "
         "Adicione o rate no dict base E no override de dev (config/settings.py)."
     )
+
+
+def _base_throttle_rates_from_source() -> dict[str, str]:
+    """Dict BASE (producao) de DEFAULT_THROTTLE_RATES lido do fonte.
+
+    Os testes rodam com ENVIRONMENT=development, em que o dict e substituido pelo
+    override relaxado; o valor de producao so e visivel no literal do settings.py.
+    """
+    src = (Path(settings.BASE_DIR) / "config" / "settings.py").read_text(encoding="utf-8")
+    for node in ast.walk(ast.parse(src)):
+        if isinstance(node, ast.Dict):
+            pairs = {
+                k: v for k, v in ((_str_const(k), _str_const(v)) for k, v in zip(node.keys, node.values)) if k and v
+            }
+            if {"anon", "user"} <= set(pairs):
+                return pairs
+    raise AssertionError("dict base de DEFAULT_THROTTLE_RATES nao encontrado em config/settings.py")
+
+
+def test_limites_de_producao_cabem_o_polling_e_o_escritorio_atras_de_um_ip():
+    """Liberacao 2026-10: os limites por pessoa e por IP nao podem barrar o uso normal.
+
+    - `user`: Pre-agenda (3 pedidos a cada 20 s = 540/h por aba) + Aprovacoes + Grade
+      Mensal em varias abas cabem em 6000/h; 1000/h estourava em ~25 min.
+    - `login` e `anon` sao por IP: o escritorio inteiro sai pelo mesmo endereco. A forca
+      bruta e barrada pelo bloqueio por CONTA (ACCOUNT_LOCKOUT_THRESHOLD), nao por este limite.
+    - `gcal_write` (escrita no Google Calendar) fica como estava.
+    """
+    rates = _base_throttle_rates_from_source()
+    assert rates["user"] == "6000/hour"
+    assert rates["login"] == "30/minute"
+    assert rates["anon"] == "1000/hour"
+    assert rates["gcal_write"] == "10/min"
+    assert settings.ACCOUNT_LOCKOUT_THRESHOLD == 10

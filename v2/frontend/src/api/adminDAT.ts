@@ -348,8 +348,8 @@ export interface GerenciaRecord {
   /** Read-only: nome que a tela mostra (nome_exibicao || nome_setor). */
   rotulo: string;
   setor_canonico: string;
-  // Confiança do de-para v15 que atribuiu setor_canonico (RELAY 50) — read-only, só-import,
-  // exibido na conferência para priorizar baixa confiança. Sem entrada-direta.
+  // Confiança do de-para v15 que atribuiu setor_canonico (RELAY 50) — read-only, só-import. Fora
+  // da tela desde o C2b (vazia nas 21 gerências de produção, decisão do dono 01/10).
   setor_canonico_confianca: string;
   gerente: ID | null;
   gerente_nome: string;

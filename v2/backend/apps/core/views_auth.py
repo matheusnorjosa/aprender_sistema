@@ -190,12 +190,13 @@ class LoginThrottle(SimpleRateThrottle):
     """
     Rate limiting para endpoint de login — configurado por ambiente.
 
-    Em **produção**: 10 tentativas/minuto por IP (brute-force protection).
+    Em **produção**: 30 tentativas/minuto por IP (o escritório sai por um IP só; a força
+    bruta é barrada pelo bloqueio por conta, `ACCOUNT_LOCKOUT_THRESHOLD`).
     Em **dev/staging**: relaxado para não bloquear testes E2E multi-role
     e fluxos de desenvolvimento manual (12+ logins em sequência).
 
     A taxa é lida de `REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["login"]`
-    em `config/settings.py` — `10/minute` por padrão, sobrescrito para
+    em `config/settings.py` — `30/minute` por padrão, sobrescrito para
     `1000/minute` quando `ENVIRONMENT=development`.
 
     M03-03 (#1614): herda de `SimpleRateThrottle` (não `AnonRateThrottle`) e

@@ -50,7 +50,7 @@ vi.mock('../../../hooks/useGoogleIntegration', () => ({
 vi.mock('../../../hooks/useGoogleGuard', () => ({
   default: () => ({ requireGoogleConnection: () => true, handleGoogleError: () => false, isConnected: true }),
 }));
-vi.mock('../../../hooks/usePolling', () => ({ usePolling: () => {} }));
+vi.mock('../../../hooks/usePolling', () => ({ usePolling: () => ({ pausado: false, pausar: () => {} }) }));
 vi.mock('../../../services/syncChannel', () => ({
   syncChannel: { subscribe: () => () => {}, publish: vi.fn() },
 }));

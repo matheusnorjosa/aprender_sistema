@@ -533,7 +533,7 @@ describe('PublicacaoSetorPage — polling (d)', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(listCalls()).toHaveLength(1);
 
-    await vi.advanceTimersByTimeAsync(TIMING.SYNC_POLL_INTERVAL_MS * 3);
+    await vi.advanceTimersByTimeAsync(TIMING.PUBLICACAO_PENDENTE_POLL_MS * 3);
 
     expect(listCalls()).toHaveLength(1);
   });
@@ -547,10 +547,10 @@ describe('PublicacaoSetorPage — polling (d)', () => {
 
     // O worker terminou: a próxima carga já vem PUBLISHED.
     listResponse = pageOf([makeSolic({ gcal_status: 'PUBLISHED', external_event_id: 'asv27' })]);
-    await vi.advanceTimersByTimeAsync(TIMING.SYNC_POLL_INTERVAL_MS);
+    await vi.advanceTimersByTimeAsync(TIMING.PUBLICACAO_PENDENTE_POLL_MS);
     expect(listCalls()).toHaveLength(2);
 
-    await vi.advanceTimersByTimeAsync(TIMING.SYNC_POLL_INTERVAL_MS * 3);
+    await vi.advanceTimersByTimeAsync(TIMING.PUBLICACAO_PENDENTE_POLL_MS * 3);
     expect(listCalls()).toHaveLength(2);
   });
 });

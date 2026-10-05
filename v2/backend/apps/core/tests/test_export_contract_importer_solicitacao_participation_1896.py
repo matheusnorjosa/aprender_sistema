@@ -79,7 +79,10 @@ def test_apply_solicitacao_coordenador_as_solicitante_and_participation(tmp_path
     assert (sol.municipio_id, sol.projeto_id, sol.tipo_evento_id) == (mun.id, proj.id, tipo.id)
     assert sol.status == "aprovado", "NAO_SUPER → resolve_initial_status"
     assert sol.segmento == "Fund I"
-    assert sol.coordenador_acompanha is True, "coord_acompanha Sim → True"
+    # Decisão do dono (05/10/2026): a marca da planilha não é confiável; evento importado = o
+    # responsável NÃO acompanha (não ocupa a agenda dele). A coluna deixa de ser lida.
+    assert sol.coordenador_acompanha is False, "coord_acompanha Sim da planilha → False"
+    assert sol.pretende_avaliar_formador is None
     assert sol.external_hash == eh
     assert Participation.objects.filter(solicitacao=sol, usuario=coord, role="COORDENADOR").exists()
 

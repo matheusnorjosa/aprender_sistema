@@ -78,6 +78,7 @@ class TestAvailabilityServiceRules:
             inicio=now,
             fim=now + timedelta(hours=2),  # 10:00-12:00
             status="aprovado",
+            coordenador_acompanha=True,  # 05/10/2026: o coordenador só ocupa a agenda quando acompanha
         )
 
         # Verificar novo intervalo sobreposto
@@ -106,6 +107,7 @@ class TestAvailabilityServiceRules:
             inicio=now,
             fim=now + timedelta(hours=2),
             status="aprovado",
+            coordenador_acompanha=True,
         )
 
         # Novo intervalo com overlap parcial
@@ -133,6 +135,7 @@ class TestAvailabilityServiceRules:
             inicio=now,
             fim=now + timedelta(hours=2),  # 10:00-12:00
             status="aprovado",
+            coordenador_acompanha=True,
         )
 
         # Novo intervalo adjacente (início == fim anterior)
@@ -227,6 +230,7 @@ class TestAvailabilityServiceRules:
             inicio=now,
             fim=now + timedelta(hours=2),  # 08:00-10:00
             status="aprovado",
+            coordenador_acompanha=True,
         )
 
         # Novo evento em Município B apenas 30 min depois (buffer insuficiente)
@@ -257,6 +261,7 @@ class TestAvailabilityServiceRules:
             inicio=now,
             fim=now + timedelta(hours=2),  # 08:00-10:00
             status="aprovado",
+            coordenador_acompanha=True,
         )
 
         # Novo evento no MESMO município apenas 10 min depois
@@ -285,6 +290,7 @@ class TestAvailabilityServiceRules:
             inicio=now,
             fim=now + timedelta(hours=7),  # 7h
             status="aprovado",
+            coordenador_acompanha=True,
         )
 
         # Tentar adicionar mais 2h no mesmo dia (total 9h > limite 8h)
@@ -363,6 +369,7 @@ class TestAvailabilityServiceRules:
             inicio=event_start_local,  # 23:30 Fortaleza = 02:30 UTC
             fim=event_end_local,  # 23:59 Fortaleza = 02:59 UTC
             status="aprovado",
+            coordenador_acompanha=True,
         )
 
         # Verificar conflito com outro evento no MESMO dia local (Fortaleza)
@@ -423,6 +430,7 @@ class TestAvailabilityCheckEndpoint:
             inicio=now,
             fim=now + timedelta(hours=2),
             status="aprovado",
+            coordenador_acompanha=True,
         )
 
         # Fazer request sobreposto
@@ -559,6 +567,7 @@ class TestAvailabilityCheckEndpoint:
             inicio=now,
             fim=now + timedelta(hours=2),
             status="aprovado",
+            coordenador_acompanha=True,
         )
 
         # Checar ambos usuários
@@ -645,6 +654,7 @@ class TestAvailabilityServiceAdditional:
             inicio=now,
             fim=now + timedelta(hours=2),
             status="aprovado",
+            coordenador_acompanha=True,
         )
 
         # Checar usuario_test (não tem conflito)
@@ -682,6 +692,7 @@ class TestAvailabilityServiceAdditional:
             inicio=now,
             fim=now + timedelta(hours=2),  # 14:00-16:00
             status="aprovado",
+            coordenador_acompanha=True,
         )
 
         # Gerar conflito

@@ -173,6 +173,7 @@ def test_cache_invalidated_on_solicitacao_create(clear_cache, usuario_formador, 
         projeto=projeto_super,
         tipo_evento=tipo_evento,
         status="aprovado",
+        coordenador_acompanha=True,  # 05/10/2026: o coordenador só ocupa a agenda quando acompanha
     )
 
     # Segunda chamada: cache invalidado, agora tem conflito
@@ -205,6 +206,7 @@ def test_cache_invalidated_on_solicitacao_update(clear_cache, usuario_formador, 
         projeto=projeto_super,
         tipo_evento=tipo_evento,
         status="pendente",
+        coordenador_acompanha=True,  # 05/10/2026: só ocupa quem acompanha
     )
 
     # Cachear resultado (pendente não conflita)
@@ -244,6 +246,7 @@ def test_cache_invalidated_on_solicitacao_delete(clear_cache, usuario_formador, 
         projeto=projeto_super,
         tipo_evento=tipo_evento,
         status="aprovado",
+        coordenador_acompanha=True,
     )
 
     # Cachear resultado com conflito

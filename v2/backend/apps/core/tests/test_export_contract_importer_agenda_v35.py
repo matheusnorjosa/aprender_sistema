@@ -21,6 +21,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 import pytest
+from django.core.management import call_command
 from django.utils import timezone
 
 from apps.core.models import AuditLog, Municipio, TipoEvento
@@ -218,3 +219,57 @@ def test_linha_sem_id_antigo_segue_igual_a_hoje(tmp_path, masters):
     r = _apply(path)
     assert r["applied"]["solicitacao"] == 1
     assert set(Solicitacao.objects.values_list("external_hash", flat=True)) == {"EV000100", "EV900100"}
+
+
+# ---------- entrada contraditória (revisão do PR-4) ----------
+def test_id_antigo_que_tambem_vem_como_evento_id_proprio_nao_rechaveia(tmp_path, masters):
+    _sol_existente(masters, "EV000100", Solicitacao.Status.APROVADO)
+    rows = [
+        _row(evento_id="EV000100"),
+        _row(evento_id="EV900100", evento_ids_anteriores='["EV000100"]', hora_inicio="14:00", hora_fim="17:00"),
+    ]
+    path = _write_export(tmp_path, rows)
+    tally = ExportContractImporter(path=path).run()["por_entidade"]["solicitacao"]
+    assert (tally["would_rekey"], tally["would_create"], tally["would_skip_same"]) == (0, 1, 1)
+    r1 = _apply(path)
+    assert r1["applied"]["solicitacao"] == 1, "dry-run espelha o apply"
+    assert "solicitacao__rechaveada" not in r1["applied"]
+    r2 = _apply(path)
+    assert r2["applied"]["solicitacao"] == 0, "2º apply não recria o EV000100"
+    assert set(Solicitacao.objects.values_list("external_hash", flat=True)) == {"EV000100", "EV900100"}
+
+
+def test_mesmo_id_antigo_em_duas_linhas_so_rechaveia_uma(tmp_path, masters):
+    _sol_existente(masters, "EV000100", Solicitacao.Status.APROVADO)
+    rows = [
+        _row(evento_id="EV900100", evento_ids_anteriores='["EV000100"]'),
+        _row(evento_id="EV900101", evento_ids_anteriores='["EV000100"]', hora_inicio="14:00", hora_fim="17:00"),
+    ]
+    path = _write_export(tmp_path, rows)
+    tally = ExportContractImporter(path=path).run()["por_entidade"]["solicitacao"]
+    assert (tally["would_rekey"], tally["would_create"], tally["would_skip_same"]) == (1, 1, 1)
+    r1 = _apply(path)
+    assert (r1["applied"]["solicitacao"], r1["applied"]["solicitacao__rechaveada"]) == (1, 1)
+    r2 = _apply(path)
+    assert r2["applied"]["solicitacao"] == 0
+    assert "solicitacao__rechaveada" not in r2["applied"]
+    assert Solicitacao.objects.count() == 2
+
+
+def test_dry_run_conta_canceladas_novas(tmp_path, masters):
+    _sol_existente(masters, "EV000100", Solicitacao.Status.APROVADO)
+    rows = [_row(evento_id="EV900200", cancelado="true"), _row(evento_id="EV000100", cancelado="true")]
+    tally = ExportContractImporter(path=_write_export(tmp_path, rows)).run()["por_entidade"]["solicitacao"]
+    assert tally["would_create_cancelada"] == 1, "só a linha nova; a existente não muda de status"
+
+
+def test_saida_em_texto_mostra_rekey_e_canceladas(tmp_path, masters):
+    _sol_existente(masters, "EV000100", Solicitacao.Status.APROVADO)
+    rows = [
+        _row(evento_id="EV900100", evento_ids_anteriores='["EV000100"]'),
+        _row(evento_id="EV900200", cancelado="true", hora_inicio="14:00", hora_fim="17:00"),
+    ]
+    out = io.StringIO()
+    call_command("import_export_contract", "--path", _write_export(tmp_path, rows), stdout=out)
+    assert "rekey=1" in out.getvalue()
+    assert "canceladas_reprovadas=1" in out.getvalue()

@@ -367,11 +367,20 @@ def _parse_json_list(v: Any) -> list[Any]:
     return parsed if isinstance(parsed, list) else []
 
 
-def _id_antigo_em_prod(r: dict[str, str], existentes: set[str] | dict[str, Any]) -> str | None:
-    """Primeiro id de `evento_ids_anteriores` (array JSON do v35) que já é `external_hash` em prod."""
+def _ids_proprios(rows: list[dict[str, str]]) -> set[str]:
+    """`evento_id` de todas as linhas do arquivo. Id antigo que também vem como id próprio é entrada
+    contraditória: não serve para re-chavear (senão a carga seguinte recriaria o evento antigo)."""
+    return {s for s in ((r.get("evento_id") or "").strip() for r in rows) if s}
+
+
+def _id_antigo_em_prod(r: dict[str, str], existentes: set[str] | dict[str, Any], bloqueados: set[str]) -> str | None:
+    """Primeiro id de `evento_ids_anteriores` (array JSON do v35) que já é `external_hash` em prod e não
+    está em `bloqueados` (ids próprios do arquivo + ids antigos já usados). O id devolvido entra em
+    `bloqueados`: cada id antigo re-chaveia uma linha só, no dry-run e no apply."""
     for antigo in _parse_json_list(r.get("evento_ids_anteriores")):
         s = str(antigo).strip()
-        if s and s in existentes:
+        if s and s in existentes and s not in bloqueados:
+            bloqueados.add(s)
             return s
     return None
 
@@ -975,17 +984,21 @@ class ExportContractImporter:
                 Solicitacao.objects.exclude(external_hash__isnull=True).values_list("external_hash", flat=True)
             )
             tally["would_rekey"] = 0  # id antigo (`evento_ids_anteriores`) já em prod: existente, re-chaveia
+            tally["would_create_cancelada"] = 0  # linha nova com cancelado=true: nasce reprovada
+            bloqueados = _ids_proprios(rows)
             for r in rows:
                 key = self._resolve_solicitacao_key(r, mun_idx, tipo_idx, cpf_idx)
                 if key is None:
                     tally["would_reject"] += 1
                     continue
                 existe = key[-1] in existing
-                if not existe and _id_antigo_em_prod(r, existing) is not None:
+                if not existe and _id_antigo_em_prod(r, existing, bloqueados) is not None:
                     existe = True
                     tally["would_rekey"] += 1
                 st, _ = diff_and_classify({} if existe else None, {}, protected)
                 tally[st] += 1
+                if st == "would_create" and _to_bool(r.get("cancelado")):
+                    tally["would_create_cancelada"] += 1
 
         elif name == "participation":
             # Liga por evento_id (fallback evento_hash_natural) → solicitacao.external_hash. Papel do CSV (posição), não cargo.
@@ -1603,6 +1616,7 @@ class ExportContractImporter:
         reconciled = 0
         canceladas = 0
         rechaveadas = 0
+        bloqueados = _ids_proprios(rows)
         for r in rows:
             key = self._resolve_solicitacao_key(r, mun_idx, tipo_idx, cpf_idx)
             if key is None:
@@ -1610,7 +1624,7 @@ class ExportContractImporter:
             mun_id, proj_id, tipo_id, data_ev, hora_ini, hora_fim, segmento, coord_id, ext_hash = key
             seg_norm = (r.get("segmento_norm") or "").strip()[:100]
             seg_conf = (r.get("segmento_norm_confianca") or "").strip()[:30]
-            antigo = None if ext_hash in existing else _id_antigo_em_prod(r, existing)
+            antigo = None if ext_hash in existing else _id_antigo_em_prod(r, existing, bloqueados)
             if antigo is not None:
                 # Evento que trocou de id na planilha e já está em prod pelo id antigo: é o mesmo evento.
                 # Re-chaveia para as próximas cargas acharem; status/data/campos protegidos ficam.

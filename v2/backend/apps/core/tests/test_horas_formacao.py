@@ -275,3 +275,41 @@ class TestGradeEPainel:
         bust_cfg("availability")
 
         assert ch_mes() == 10.0
+
+    def test_grade_e_painel_arredondam_igual(self, formador, projeto_super, monkeypatch):
+        # 08:00–11:45 = 3,75 h e 14:00–15:20 = 1h20 (1,333… h) em dias diferentes.
+        _evento(_local(DIA, 8), datetime(2026, 3, 10, 11, 45, tzinfo=TZ), formador=formador, projeto=projeto_super)
+        _evento(_local(date(2026, 3, 12), 14), datetime(2026, 3, 12, 15, 20, tzinfo=TZ), formador=formador)
+        monkeypatch.setattr("django.utils.timezone.now", lambda: _local(date(2026, 3, 31), 12))
+
+        grade = build_monthly_grid(year=2026, month=3, role="FORMADOR")
+        ch_grade = next(p for p in grade["people"] if p["id"] == formador.id)["ch_month"]
+        client = APIClient()
+        client.force_authenticate(user=UsuarioFactory(is_superuser=True, email="adm_ch4@example.invalid"))
+        resposta = client.get("/api/metrics/team/formadores/", {"days": 31})
+        ch_painel = next(f for f in resposta.json()["formadores"] if f["id"] == formador.id)["horas_trabalhadas"]
+
+        assert ch_grade == 5.08
+        assert ch_painel == ch_grade
+
+    def test_painel_de_7_dias_cobre_7_dias_locais(self, formador, monkeypatch):
+        monkeypatch.setattr("django.utils.timezone.now", lambda: _local(date(2026, 10, 5), 12))
+        _evento(_local(date(2026, 9, 28), 8), _local(date(2026, 9, 28), 10), formador=formador)  # 8º dia: fora
+        _evento(_local(date(2026, 9, 29), 8), _local(date(2026, 9, 29), 11), formador=formador)  # 1º dia: dentro
+
+        client = APIClient()
+        client.force_authenticate(user=UsuarioFactory(is_superuser=True, email="adm_ch5@example.invalid"))
+        resposta = client.get("/api/metrics/team/formadores/", {"days": 7})
+
+        (linha,) = [f for f in resposta.json()["formadores"] if f["id"] == formador.id]
+        assert linha["eventos"] == 1
+        assert linha["horas_trabalhadas"] == 3.0
+
+    def test_openapi_do_check_nao_fala_mais_do_limite_diario(self):
+        client = APIClient()
+        client.force_authenticate(user=UsuarioFactory(is_superuser=True, email="adm_ch6@example.invalid"))
+        schema = client.get("/api/schema/?format=json").json()
+        descricao = schema["paths"]["/api/availability/check/"]["get"]["description"]
+
+        assert "não impede o evento" not in descricao
+        assert "não é mais emitido" in descricao

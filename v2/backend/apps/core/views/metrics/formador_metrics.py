@@ -57,7 +57,7 @@ def formadores_metrics(request: Request) -> Response:
 
     Calculations:
         - Filter Participation by role=FORMADOR and solicitacao__status=aprovado, events
-          whose local start date is in [today - days, today]
+          whose local start date is in the last `days` local days, today included
         - Aggregate by usuario: count events, count distinct municipios
         - horas_trabalhadas: services/horas_formacao.py (teto por evento, mesma conta da
           Grade Mensal)
@@ -66,10 +66,10 @@ def formadores_metrics(request: Request) -> Response:
     Permissions: HasPerm("run_daily_operations") | HasPerm("supervise_operations") (only authorized users)
     """
     days = int(request.GET.get("days", 30))
-    # Período = dias locais [hoje − days, hoje], pelo INÍCIO do evento (antes filtrava
+    # Período = os `days` dias locais [hoje − (days − 1), hoje], pelo INÍCIO do evento (antes filtrava
     # `created_at`, e um evento antigo importado hoje entrava como hora do período).
     ate = timezone.localdate()
-    de = ate - timedelta(days=days)
+    de = ate - timedelta(days=days - 1)
     tz = timezone.get_current_timezone()
     janela_inicio = datetime.combine(de, time.min, tzinfo=tz)
     janela_fim = datetime.combine(ate + timedelta(days=1), time.min, tzinfo=tz)
@@ -105,7 +105,8 @@ def formadores_metrics(request: Request) -> Response:
 
     formadores_list = []
     for stat in formadores_stats:
-        horas = round(horas_por_pessoa[stat["usuario_id"]].total, 1)
+        # 2 casas, como `ch_month`/`ch_year` da Grade Mensal: os dois mostram o mesmo número.
+        horas = round(horas_por_pessoa[stat["usuario_id"]].total, 2)
 
         # Build full name — use username from same query as fallback
         nome = f"{stat['usuario__first_name']} {stat['usuario__last_name']}".strip()

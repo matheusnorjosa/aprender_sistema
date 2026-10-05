@@ -328,7 +328,8 @@ class AvailabilityCheckView(APIView):
         summary="Verificar disponibilidade",
         description=(
             "Verifica conflitos de agenda para um formador (RD-01 a RD-08). `ok` e `conflicts` trazem o que "
-            "barra (X, T, P, D). `warnings` traz o que só avisa: o limite diário (M) não impede o evento."
+            "barra (X, T, P, D). `warnings` fica no contrato, mas vem vazio: o limite diário (M) não é mais emitido "
+            "desde 05/10/2026."
         ),
         parameters=[
             OpenApiParameter("usuario_id", OpenApiTypes.INT, required=True, description="ID do formador"),

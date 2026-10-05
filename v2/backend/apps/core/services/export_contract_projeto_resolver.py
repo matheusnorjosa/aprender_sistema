@@ -44,7 +44,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from apps.core.models import Projeto
 
@@ -87,7 +87,7 @@ class ProjetoResolution:
 
     status: str
     projeto: Projeto | None = None
-    matched_via: str = ""  # "norm" | "alias" | "canon_rule"
+    matched_via: str = ""  # "norm" | "alias" | "canon_rule" | "disciplina"
     canonical_key: str = ""
     candidates: list[str] = field(default_factory=list)
     reason: str = ""
@@ -200,3 +200,27 @@ def resolve_projeto_export(raw_name: str, *, index: ProjetoIndex | None = None) 
         )
 
     return ProjetoResolution(status="unmatched", canonical_key=ck, reason="nenhum projeto correspondente")
+
+
+# ── Agenda: agrupador + disciplina (decisão do dono P8, 05/10/2026) ──
+# (chave canônica do agrupador, disciplina do export) -> nome do projeto da disciplina. Disciplina dupla
+# (LING-MAT), vazia ou de público não está aqui: o evento fica no agrupador. Só Superativar e ACerta.
+_AGRUPADOR_POR_DISCIPLINA: dict[tuple[str, str], str] = {
+    ("SUPERATIVAR", "LING"): "Superativar Linguagens",
+    ("SUPERATIVAR", "MAT"): "Superativar Matemática",
+    ("ACERTA", "LING"): "ACerta Português",
+    ("ACERTA", "MAT"): "ACerta Matemática",
+}
+
+
+def resolve_projeto_agenda(raw_name: str, disciplina: str, *, index: ProjetoIndex | None = None) -> ProjetoResolution:
+    """Resolve o projeto de um evento da agenda. Agrupador (Superativar/ACerta) com disciplina única
+    (`LING`/`MAT`) vai para o projeto da disciplina; o resto segue `resolve_projeto_export`. Se o projeto
+    da disciplina não existir no catálogo, o evento fica no agrupador (nunca `unmatched` por causa disto)."""
+    idx = index or build_projeto_index()
+    alvo = _AGRUPADOR_POR_DISCIPLINA.get((_canon_key(raw_name), (disciplina or "").strip().upper()))
+    if alvo:
+        res = resolve_projeto_export(alvo, index=idx)
+        if res.status == "matched":
+            return replace(res, matched_via="disciplina", reason="agrupador classificado pela disciplina")
+    return resolve_projeto_export(raw_name, index=idx)

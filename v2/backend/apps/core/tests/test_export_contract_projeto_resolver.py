@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from apps.core.services.export_contract_projeto_resolver import resolve_projeto_export
+from apps.core.services.export_contract_projeto_resolver import resolve_projeto_agenda, resolve_projeto_export
 from apps.core.tests.factories import ProjetoFactory
 
 pytestmark = pytest.mark.django_db
@@ -268,3 +268,19 @@ def test_nome_antigo_ainda_no_catalogo_vence_o_apelido(db):
     ProjetoFactory(nome="ECS", fluxo="NAO_SUPER")
     res = resolve_projeto_export("ESCREVER, COMUNICAR E SER")
     assert res.projeto == antigo
+
+
+# ---------- agenda: agrupador + disciplina (decisão do dono P8, 05/10) ----------
+def test_disciplina_sem_projeto_da_disciplina_fica_no_agrupador(db):
+    agrupador = ProjetoFactory(nome="Superativar", fluxo="NAO_SUPER")
+    res = resolve_projeto_agenda("Superativar", "LING")
+    assert res.projeto == agrupador, "alvo ausente do catálogo nunca vira unmatched"
+    assert res.matched_via == "norm"
+
+
+def test_disciplina_marca_a_origem_do_match(db):
+    ProjetoFactory(nome="ACerta", fluxo="NAO_SUPER")
+    ProjetoFactory(nome="ACerta Português", fluxo="NAO_SUPER")
+    res = resolve_projeto_agenda("ACerta", "ling")
+    assert res.projeto.nome == "ACerta Português"
+    assert res.matched_via == "disciplina"

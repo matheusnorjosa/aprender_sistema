@@ -265,7 +265,8 @@ Parâmetros da grade mensal (`MonthlyAvailabilityView.get`, `views_availability_
 ### Resposta de Conflito
 
 A chave é `ok`, não `available` (`AvailabilityCheckView.get`, `views_availability.py`).
-`conflicts` traz o que barra; `warnings` traz o que só avisa (limite diário) e não muda `ok`.
+`conflicts` traz o que barra; `warnings` é o canal do que só avisa e não muda `ok` — hoje vem
+sempre vazio (o limite diário `M` saiu em 05/10/2026, decisão do dono).
 No `check-many/`, cada item de `results` tem as mesmas três chaves, mais `usuario_id`:
 
 ```json
@@ -283,26 +284,9 @@ No `check-many/`, cada item de `results` tem as mesmas três chaves, mais `usuar
 }
 ```
 
-Limite diário sozinho (o evento **pode** ser criado e aprovado):
-
-```json
-{
-  "ok": true,
-  "conflicts": [],
-  "warnings": [
-    {
-      "code": "M",
-      "title": "Dia com mais de 8 horas de eventos",
-      "detail": "No dia 10/03 a soma dos eventos chega a 16h. Isso não impede o evento.",
-      "ref_id": null
-    }
-  ]
-}
-```
-
 O erro 400 `availability_conflict` de criar, editar e aprovar segue o mesmo corte: `errors.conflicts`
 e a mensagem só falam do que barra; `errors.warnings` e `errors.blocked_participants[].warnings`
-são aditivas e trazem os avisos calculados na mesma checagem.
+são aditivas e trazem os avisos calculados na mesma checagem (hoje, nenhum).
 
 ### Códigos de Conflito
 
@@ -312,7 +296,7 @@ são aditivas e trazem os avisos calculados na mesma checagem.
 | T | Bloqueio total | Formador bloqueado completamente |
 | P | Bloqueio parcial | Subintervalo bloqueado |
 | D | Deslocamento | Buffer de viagem insuficiente |
-| M | Limite diário (aviso) | Dia com mais de N horas de eventos. **Não barra** (decisão do dono, 02/10/2026): vem em `warnings`, nunca em `conflicts` |
+| M | Limite diário (removido) | **Não é mais emitido** desde 05/10/2026 (decisão do dono). O parâmetro `AVAILABILITY_DAILY_LIMIT_HOURS` virou o teto por evento da contagem de horas de formação (`ch_month`/`ch_year` da grade, `horas_trabalhadas` do painel de Equipe). Cliente antigo que ainda receba `M` deve tratá-lo como aviso |
 
 ### Bloqueios de Disponibilidade
 

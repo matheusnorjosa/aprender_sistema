@@ -123,7 +123,8 @@ const RESP_CONFLITO = {
   ],
 };
 
-describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)', () => {
+// Percorrer o assistente com antd leva ~3 s por teste isolado; na suíte inteira passa dos 5 s padrão.
+describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)', { timeout: 20000 }, () => {
   beforeEach(() => {
     if (!window.matchMedia) {
       Object.defineProperty(window, 'matchMedia', {

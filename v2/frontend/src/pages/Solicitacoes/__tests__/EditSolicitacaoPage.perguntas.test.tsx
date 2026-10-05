@@ -95,7 +95,7 @@ function renderPage() {
 const ACOMPANHA = /O coordenador responsável vai acompanhar o evento\?/;
 const AVALIAR = /Você pretende avaliar o formador nesse evento\?/;
 
-describe('EditSolicitacaoPage — responsável e perguntas', () => {
+describe('EditSolicitacaoPage — responsável e perguntas', { timeout: 20000 }, () => {
   beforeEach(() => {
     if (!window.matchMedia) {
       Object.defineProperty(window, 'matchMedia', {

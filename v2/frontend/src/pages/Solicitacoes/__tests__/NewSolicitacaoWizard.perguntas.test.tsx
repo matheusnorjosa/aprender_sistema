@@ -140,7 +140,8 @@ function responder(pergunta: RegExp, resposta: 'Sim' | 'Não'): void {
 const ACOMPANHA = /O coordenador responsável vai acompanhar o evento\?/;
 const AVALIAR = /Você pretende avaliar o formador nesse evento\?/;
 
-describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', () => {
+// Percorrer o assistente com antd leva ~3 s por teste isolado; na suíte inteira passa dos 5 s padrão.
+describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { timeout: 20000 }, () => {
   beforeEach(() => {
     if (!window.matchMedia) {
       Object.defineProperty(window, 'matchMedia', {
@@ -245,5 +246,5 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', () =>
     expect(payload.coordenador_acompanha).toBe(true);
     expect(payload.pretende_avaliar_formador).toBe(false);
     expect(payload.extra_participants).toEqual({ formador_ids: [99] });
-  }, 20000); // percorre os 4 passos: na suíte inteira passa dos 5 s padrão
+  });
 });

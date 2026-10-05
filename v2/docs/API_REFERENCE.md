@@ -171,7 +171,9 @@ vínculo de GERENTE dela (fora: 403), e só cria ou move para projeto desse alca
 >   a agenda do responsável é conferida; trocar para `true` com conflito → 400 `availability_conflict`.
 > - `pretende_avaliar_formador` (bool|null) e `formador_avaliado` (id|null): obrigatórios quando a
 >   gerência do projeto pergunta e há formador avaliável (Formador sem a função Coordenador); `true`
->   exige um formador avaliável do evento; fora disso, resposta não nula → 400. Leitura em
+>   exige um formador avaliável do evento; fora disso, resposta nova não nula → 400. No `PATCH`,
+>   resposta já dada não se apaga nem se troca quando a pergunta deixa de valer (400), e tirar da
+>   lista o formador escolhido → 400; pergunta que passa a valer exige resposta. Leitura em
 >   `GET` (lista e detalhe), com `formador_avaliado_nome`; `avaliaveis_ids` e
 >   `projeto_pergunta_avaliar_formador` só no detalhe (null na lista).
 > - `extra_participants.coord_acompanha_ids`/`coord_acompanha_emails` com itens → 400 (a lista saiu;

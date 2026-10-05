@@ -338,6 +338,62 @@ class TestPretendeAvaliarFormador:
         assert resp.status_code == 200, resp.data
         assert Solicitacao.objects.get(pk=r.data["id"]).pretende_avaliar_formador is None
 
+    def test_pergunta_que_passa_a_valer_na_edicao_exige_resposta(self, c):
+        """Evento criado sem a pergunta (só coordenadores) não é evento antigo: se ela passa a
+        valer na edição, a resposta é obrigatória (null nunca vale)."""
+        coord2 = _pessoa("Coordenador", gerencia=c["gerencia"], papel="COORDENADOR")
+        r = _post(c["coord"], _payload(c, formadores=[coord2], coordenador_acompanha=False))
+        assert r.status_code == 201, r.data
+        url = f"/api/solicitacoes/{r.data['id']}/"
+        troca = {"extra_participants": {"formador_ids": [c["formador"].id]}}
+        resp = _client(c["coord"]).patch(url, {**troca, "pretende_avaliar_formador": None}, format="json")
+        assert resp.status_code == 400, resp.data
+        assert "pretende_avaliar_formador" in get_field_errors(resp)
+        assert Participation.objects.filter(solicitacao_id=r.data["id"], usuario=coord2).exists()
+        resp2 = _client(c["coord"]).patch(url, {**troca, "pretende_avaliar_formador": False}, format="json")
+        assert resp2.status_code == 200, resp2.data
+        assert Solicitacao.objects.get(pk=r.data["id"]).pretende_avaliar_formador is False
+
+    def test_editar_trocando_o_escolhido_por_quem_nao_e_avaliavel_recusa(self, c):
+        """A pergunta deixa de valer porque o escolhido saiu: recusa (não apaga a resposta em silêncio)."""
+        coord2 = _pessoa("Coordenador", gerencia=c["gerencia"], papel="COORDENADOR")
+        r = _post(
+            c["coord"],
+            _payload(
+                c, coordenador_acompanha=False, pretende_avaliar_formador=True, formador_avaliado=c["formador"].id
+            ),
+        )
+        assert r.status_code == 201, r.data
+        url = f"/api/solicitacoes/{r.data['id']}/"
+        troca = {"extra_participants": {"formador_ids": [coord2.id]}}
+        for extra in ({}, {"pretende_avaliar_formador": None, "formador_avaliado": None}):
+            resp = _client(c["coord"]).patch(url, {**troca, **extra}, format="json")
+            assert resp.status_code == 400, resp.data
+            assert "formador_avaliado" in get_field_errors(resp)
+        sol = Solicitacao.objects.get(pk=r.data["id"])
+        assert (sol.pretende_avaliar_formador, sol.formador_avaliado_id) == (True, c["formador"].id)
+        assert Participation.objects.filter(solicitacao=sol, usuario=c["formador"]).exists()
+
+    def test_gerencia_que_deixa_de_perguntar_mantem_a_resposta_dada(self, c):
+        r = _post(
+            c["coord"],
+            _payload(
+                c, coordenador_acompanha=False, pretende_avaliar_formador=True, formador_avaliado=c["formador"].id
+            ),
+        )
+        assert r.status_code == 201, r.data
+        Gerencia.objects.filter(pk=c["gerencia"].pk).update(pergunta_avaliar_formador=False)
+        url = f"/api/solicitacoes/{r.data['id']}/"
+        resp = _client(c["coord"]).patch(url, {"local": "Sala Ficticia"}, format="json")
+        assert resp.status_code == 200, resp.data
+        apagar = {"local": "Outra Sala", "pretende_avaliar_formador": None, "formador_avaliado": None}
+        resp2 = _client(c["coord"]).patch(url, apagar, format="json")
+        assert resp2.status_code == 400, resp2.data
+        assert "pretende_avaliar_formador" in get_field_errors(resp2)
+        sol = Solicitacao.objects.get(pk=r.data["id"])
+        assert (sol.pretende_avaliar_formador, sol.formador_avaliado_id) == (True, c["formador"].id)
+        assert sol.local == "Sala Ficticia"
+
     def test_edicao_registra_as_respostas_na_trilha(self, c):
         r = _post(c["coord"], _payload(c, coordenador_acompanha=False, pretende_avaliar_formador=False))
         resp = _client(c["coord"]).patch(

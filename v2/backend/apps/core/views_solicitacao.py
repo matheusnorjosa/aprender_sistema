@@ -645,7 +645,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         from django.db import transaction
 
         from .models import Participation, Usuario
-        from .services.avaliacao_formador import validar_avaliacao_formador
+        from .services.avaliacao_formador import pergunta_se_aplica, validar_avaliacao_formador
         from .services.solicitacao_availability import enforce_solicitacao_availability
 
         instance = serializer.instance
@@ -669,6 +669,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                     raise serializers.ValidationError({"coordenador": [self._MSG_RESPONSAVEL_OBRIGATORIO]})
                 self._assert_coordenador_in_setor_scope(novo_coordenador)
         resposta_avaliar_anterior = instance.pretende_avaliar_formador
+        avaliado_anterior_id = instance.formador_avaliado_id
+        avaliar_aplicavel_antes = pergunta_se_aplica(instance)
 
         # Captura formadores atuais antes do update
         old_formador_ids = set(
@@ -730,7 +732,13 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             if instance.coordenador_id != coordenador_antigo_id:
                 self._trocar_convite_do_responsavel(instance, coordenador_antigo_id)
 
-            validar_avaliacao_formador(instance, criando=False, resposta_anterior=resposta_avaliar_anterior)
+            validar_avaliacao_formador(
+                instance,
+                criando=False,
+                resposta_anterior=resposta_avaliar_anterior,
+                avaliado_anterior_id=avaliado_anterior_id,
+                aplicavel_antes=avaliar_aplicavel_antes,
+            )
             enforce_solicitacao_availability(instance, action="update")
 
         # Coleta dados novos após save

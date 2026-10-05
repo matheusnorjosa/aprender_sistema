@@ -3,15 +3,19 @@
  *
  * A edição mostra o coordenador responsável e as duas respostas gravadas, deixa trocá-las e
  * envia o que mudou. Evento antigo sem resposta de avaliar mostra "Não informado" e salva
- * sem obrigar a responder.
+ * sem obrigar a responder; evento em que a pergunta passa a valer na edição obriga. Pergunta
+ * que deixa de se aplicar não manda resposta (a gravada fica; quem decide é o backend).
  */
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
+import message from 'antd/es/message';
 
-const { getSolicitacaoMock, updateSolicitacaoMock } = vi.hoisted(() => ({
+const { getSolicitacaoMock, updateSolicitacaoMock, novaLista } = vi.hoisted(() => ({
   getSolicitacaoMock: vi.fn(),
   updateSolicitacaoMock: vi.fn(),
+  /** Lista que o FormadoresPicker simulado entrega ao clicar em "Trocar formadores". */
+  novaLista: { value: [] as { id: number; label: string; avaliavel?: boolean }[] },
 }));
 
 vi.mock('../../../api/solicitacoes', () => ({
@@ -25,7 +29,13 @@ vi.mock('../../../api/lookup', () => ({
 }));
 vi.mock('../../../components/ComboBox', () => ({ default: () => null }));
 vi.mock('../../../components/DateTimeRange', () => ({ default: () => null }));
-vi.mock('../../../components/FormadoresPicker', () => ({ default: () => null }));
+vi.mock('../../../components/FormadoresPicker', () => ({
+  default: ({ onChange }: { onChange: (v: typeof novaLista.value) => void }) => (
+    <button type="button" onClick={() => onChange(novaLista.value)}>
+      Trocar formadores
+    </button>
+  ),
+}));
 
 import EditSolicitacaoPage from '../EditSolicitacaoPage';
 import type { Solicitacao } from '../../../types';
@@ -115,6 +125,7 @@ describe('EditSolicitacaoPage — responsável e perguntas', { timeout: 20000 },
     getSolicitacaoMock.mockReset();
     updateSolicitacaoMock.mockReset();
     updateSolicitacaoMock.mockResolvedValue({});
+    vi.spyOn(message, 'error').mockImplementation(vi.fn()).mockClear();
   });
 
   test('mostra o responsável e as respostas gravadas', async () => {
@@ -158,7 +169,70 @@ describe('EditSolicitacaoPage — responsável e perguntas', { timeout: 20000 },
     expect(screen.queryByRole('radiogroup', { name: AVALIAR })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/ }));
     await waitFor(() => expect(updateSolicitacaoMock).toHaveBeenCalled());
-    expect(updateSolicitacaoMock.mock.calls[0][1].pretende_avaliar_formador).toBeNull();
-    expect(updateSolicitacaoMock.mock.calls[0][1].formador_avaliado).toBeNull();
+    expect(updateSolicitacaoMock.mock.calls[0][1]).not.toHaveProperty('pretende_avaliar_formador');
+    expect(updateSolicitacaoMock.mock.calls[0][1]).not.toHaveProperty('formador_avaliado');
+  });
+
+  test('gerência que deixou de perguntar: a resposta gravada não é apagada', async () => {
+    getSolicitacaoMock.mockResolvedValue(makeSolic({ projeto_pergunta_avaliar_formador: false }));
+    renderPage();
+    await screen.findByText('Ana Coordenadora');
+    expect(screen.queryByRole('radiogroup', { name: AVALIAR })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/ }));
+    await waitFor(() => expect(updateSolicitacaoMock).toHaveBeenCalled());
+    const payload = updateSolicitacaoMock.mock.calls[0][1];
+    expect(payload).not.toHaveProperty('pretende_avaliar_formador');
+    expect(payload).not.toHaveProperty('formador_avaliado');
+  });
+
+  test('trocar o formador escolhido por quem não é avaliável não manda resposta nula', async () => {
+    getSolicitacaoMock.mockResolvedValue(makeSolic());
+    novaLista.value = [{ id: 7, label: 'Carla Coordenadora', avaliavel: false }];
+    renderPage();
+    await screen.findByText('Ana Coordenadora');
+    fireEvent.click(screen.getByRole('button', { name: 'Trocar formadores' }));
+    expect(screen.queryByRole('radiogroup', { name: AVALIAR })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/ }));
+    await waitFor(() => expect(updateSolicitacaoMock).toHaveBeenCalled());
+    const payload = updateSolicitacaoMock.mock.calls[0][1];
+    expect(payload).not.toHaveProperty('pretende_avaliar_formador');
+    expect(payload).not.toHaveProperty('formador_avaliado');
+  });
+
+  test('pergunta que passa a valer na edição é obrigatória', async () => {
+    getSolicitacaoMock.mockResolvedValue(
+      makeSolic({
+        pretende_avaliar_formador: null,
+        formador_avaliado: null,
+        avaliaveis_ids: [],
+        participations: [
+          {
+            usuario: { id: 7, username: 'carla', first_name: 'Carla', last_name: 'Coordenadora', email: 'c@example.invalid' },
+            guest_email: null,
+            guest_nome: null,
+            email: 'c@example.invalid',
+            role: 'FORMADOR',
+            ch_horas: null,
+            observacao: null,
+          },
+        ] as unknown as Solicitacao['participations'],
+      })
+    );
+    novaLista.value = [{ id: 99, label: 'Bruno Formador', avaliavel: true }];
+    renderPage();
+    await screen.findByText('Ana Coordenadora');
+    expect(screen.queryByRole('radiogroup', { name: AVALIAR })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Trocar formadores' }));
+    expect(screen.getByRole('radiogroup', { name: AVALIAR })).toBeInTheDocument();
+    expect(screen.queryByText('Não informado')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/ }));
+    await waitFor(() =>
+      expect(message.error).toHaveBeenCalledWith('Informe se você pretende avaliar o formador neste evento.')
+    );
+    expect(updateSolicitacaoMock).not.toHaveBeenCalled();
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: AVALIAR })).getByLabelText('Não'));
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/ }));
+    await waitFor(() => expect(updateSolicitacaoMock).toHaveBeenCalled());
+    expect(updateSolicitacaoMock.mock.calls[0][1].pretende_avaliar_formador).toBe(false);
   });
 });

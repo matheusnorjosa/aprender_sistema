@@ -266,6 +266,14 @@ export default function EditSolicitacaoPage(): JSX.Element {
   // avaliável na lista (mesma regra do backend, decisão do dono de 05/10/2026).
   const formadoresAvaliaveis = formData.formadores.filter(f => f.avaliavel);
   const perguntaAvaliar = formData.projeto?.pergunta_avaliar_formador !== false && formadoresAvaliaveis.length > 0;
+  // Resposta obrigatória (mesma regra do backend): quem já respondeu, ou evento em que a pergunta
+  // passa a valer agora. Só o evento antigo (pergunta já valia, sem resposta) segue "Não informado".
+  const avaliarAplicavaAoCarregar =
+    solicitacao !== null &&
+    solicitacao.projeto_pergunta_avaliar_formador !== false &&
+    (solicitacao.avaliaveis_ids ?? []).length > 0;
+  const avaliarObrigatoria =
+    perguntaAvaliar && (solicitacao?.pretende_avaliar_formador != null || !avaliarAplicavaAoCarregar);
 
   // Trocar a lista de formadores: se o escolhido para avaliação saiu, a escolha é limpa.
   const handleFormadoresChange = (value: FormadorType[]): void => {
@@ -314,6 +322,12 @@ export default function EditSolicitacaoPage(): JSX.Element {
         return;
       }
 
+      if (avaliarObrigatoria && formData.pretendeAvaliar === null) {
+        message.error('Informe se você pretende avaliar o formador neste evento.');
+        setSaving(false);
+        return;
+      }
+
       if (perguntaAvaliar && formData.pretendeAvaliar === true && formData.formadorAvaliado === null) {
         message.error('Escolha qual formador você pretende avaliar.');
         setSaving(false);
@@ -333,9 +347,12 @@ export default function EditSolicitacaoPage(): JSX.Element {
         local: formData.local || '',
         is_online: !!formData.is_online,
         coordenador_acompanha: formData.coordenadorAcompanha,
-        // Pergunta que não se aplica: sem resposta (o backend recusa resposta não nula).
-        pretende_avaliar_formador: perguntaAvaliar ? formData.pretendeAvaliar : null,
-        formador_avaliado: perguntaAvaliar && formData.pretendeAvaliar === true ? formData.formadorAvaliado : null,
+        // Pergunta que não se aplica: a resposta não vai (a gravada fica; o backend recusa
+        // apagá-la e recusa tirar da lista o formador escolhido).
+        ...(perguntaAvaliar && {
+          pretende_avaliar_formador: formData.pretendeAvaliar,
+          formador_avaliado: formData.pretendeAvaliar === true ? formData.formadorAvaliado : null,
+        }),
         extra_participants: {
           formador_ids: formadores.map(f => f.id),
         },
@@ -528,7 +545,8 @@ export default function EditSolicitacaoPage(): JSX.Element {
           {perguntaAvaliar && (
             <Form.Item
               label={<span id="edit-pergunta-avaliar">Você pretende avaliar o formador nesse evento?</span>}
-              extra={formData.pretendeAvaliar === null ? 'Não informado' : undefined}
+              required={avaliarObrigatoria}
+              extra={formData.pretendeAvaliar === null && !avaliarObrigatoria ? 'Não informado' : undefined}
             >
               <Radio.Group
                 {...{ role: 'radiogroup' }}

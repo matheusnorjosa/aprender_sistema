@@ -184,3 +184,20 @@ def test_me_classifies_dynamic_funcao_group():
     assert "Analista de Campo" in data["groups"]
     assert "Analista de Campo" in data["funcoes"]
     assert "Analista de Campo" not in data["setores"]
+
+
+@pytest.mark.parametrize("marca", [True, False])
+def test_me_expoe_deve_trocar_senha(marca):
+    """/api/me/ diz à tela se a pessoa ainda usa uma senha que outra pessoa definiu."""
+    user = UsuarioFactory(deve_trocar_senha=marca)
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    res = client.get(reverse("core:current-user"))
+
+    assert res.status_code == 200
+    assert res.json()["deve_trocar_senha"] is marca
+
+
+def test_usuario_novo_nasce_sem_a_marca_de_troca():
+    assert UsuarioFactory().deve_trocar_senha is False

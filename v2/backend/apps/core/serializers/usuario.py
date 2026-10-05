@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import check_password
 from django.contrib.auth.models import Group
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
@@ -102,6 +103,8 @@ class CurrentUserSerializer(serializers.Serializer):  # type: ignore[misc]
     is_superintendencia = serializers.BooleanField()
     can_approve_super = serializers.BooleanField()
     permissions = serializers.ListField(child=serializers.CharField())
+    # Senha em uso foi definida por outra pessoa: a tela só mostra a troca de senha.
+    deve_trocar_senha = serializers.BooleanField()
 
 
 class MeContactUpdateSerializer(serializers.Serializer):  # type: ignore[misc]
@@ -441,6 +444,22 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
                 },
             )
 
+    @staticmethod
+    def _definir_senha_por_admin(user: Any, password: str, actor: Any, *, contexto: str) -> None:
+        """Grava a senha definida por esta API (criar usuário / redefinir senha) e audita (#1672).
+
+        Senha dada por OUTRA pessoa liga `deve_trocar_senha`: a dona da conta entra com ela e
+        só usa o sistema depois de escolher a própria. Quem muda a PRÓPRIA senha por esta rota
+        (ator == alvo) não é marcado. Sem ator identificável, marca (lado seguro). É o único
+        lugar da API que liga a marca; o campo fica fora de `Meta.fields`, então não é gravável
+        por PATCH/POST.
+        """
+        user.set_password(password)
+        if actor is None or actor.pk != user.pk:
+            user.deve_trocar_senha = True
+        user.save()
+        auditar_reset_senha(actor=actor, target_user=user, contexto=contexto)
+
     def create(self, validated_data: dict[str, Any]) -> Any:
         """Create user with hashed password, groups e vínculo de gerência."""
         groups = validated_data.pop("groups", None)
@@ -461,10 +480,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         auditar_privilege_flags(actor=actor, target_user=user, before=None, via="rest_api")
 
         if password:
-            user.set_password(password)
-            user.save()
-            # #1672: senha definida por um admin para outro usuario -> trilha.
-            auditar_reset_senha(actor=actor, target_user=user, contexto="create")
+            self._definir_senha_por_admin(user, password, actor, contexto="create")
 
         # P0-1 Tier-0 (D-1=2a): membership + lotação são superuser-only. group_ids /
         # gerencia_id de não-superuser são ignorados (o frontend já não envia — aqui é a
@@ -513,10 +529,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             )
 
         if password:
-            user.set_password(password)
-            user.save()
-            # #1672: senha redefinida por um admin para outro usuario -> trilha.
-            auditar_reset_senha(actor=actor, target_user=user, contexto="update")
+            self._definir_senha_por_admin(user, password, actor, contexto="update")
 
         # P0-1 Tier-0 (D-1=2a): membership + lotação são superuser-only (ver create()).
         # group_ids / gerencia_id de não-superuser são ignorados.
@@ -548,8 +561,9 @@ class ChangePasswordSerializer(serializers.Serializer):
     """Troca de senha self-service (POST /api/me/change-password/).
 
     Valida a senha atual (``check_password`` do usuario no contexto) e a nova senha
-    com os validadores do Django (``AUTH_PASSWORD_VALIDATORS``), reusando o mesmo
-    padrao de ``UsuarioAdminSerializer.validate_password``. NAO persiste — a view chama
+    com os validadores do Django (``AUTH_PASSWORD_VALIDATORS``) COM o usuario — sem ele a
+    regra de semelhanca com nome/CPF/e-mail nao roda. Recusa tambem a volta a senha recebida
+    de outra pessoa (``Usuario.senha_recebida_hash``). NAO persiste — a view chama
     ``set_password`` + ``update_session_auth_hash``.
     """
 
@@ -559,10 +573,6 @@ class ChangePasswordSerializer(serializers.Serializer):
     def validate_new_password(self, value: str) -> str:
         if len(value) < 8:
             raise serializers.ValidationError("A senha deve ter no minimo 8 caracteres.")
-        try:
-            validate_password(value)
-        except ValidationError as e:
-            raise serializers.ValidationError(list(e.messages))
         return value
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
@@ -572,6 +582,16 @@ class ChangePasswordSerializer(serializers.Serializer):
             raise serializers.ValidationError({"old_password": "Senha atual incorreta."})
         if attrs["old_password"] == attrs["new_password"]:
             raise serializers.ValidationError({"new_password": "A nova senha deve ser diferente da senha atual."})
+        # A senha recebida e a mesma para todos: voltar a ela deixaria a conta aberta e sem a marca.
+        recebida = user.senha_recebida_hash
+        if recebida and check_password(attrs["new_password"], recebida):
+            raise serializers.ValidationError(
+                {"new_password": "Esta é a senha que você recebeu no primeiro acesso. Escolha outra."}
+            )
+        try:
+            validate_password(attrs["new_password"], user=user)
+        except ValidationError as e:
+            raise serializers.ValidationError({"new_password": list(e.messages)})
         return attrs
 
 

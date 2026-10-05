@@ -44,6 +44,17 @@ class TestChangePassword:
         assert "N0vaSenh@Forte" not in details_str
         assert "SenhaAtual123!" not in details_str
 
+    def test_troca_voluntaria_registra_primeiro_acesso_false_e_nao_liga_a_marca(self):
+        user = UsuarioFactory(password="SenhaAtual123!")
+        resp = _client(user).post(
+            URL, {"old_password": "SenhaAtual123!", "new_password": "N0vaSenh@Forte"}, format="json"
+        )
+        assert resp.status_code == status.HTTP_200_OK
+        user.refresh_from_db()
+        assert user.deve_trocar_senha is False
+        audit = AuditLog.objects.get(usuario=user, action=AuditLog.Action.CHANGE_PASSWORD)
+        assert audit.details["primeiro_acesso"] is False
+
     def test_senha_atual_incorreta_400_e_nao_altera(self):
         user = UsuarioFactory(password="SenhaAtual123!")
         resp = _client(user).post(URL, {"old_password": "errada", "new_password": "N0vaSenh@Forte"}, format="json")

@@ -11,6 +11,7 @@ import { useEffect, useState, type JSX } from 'react';
 import { Form, Input, Button, message, Alert } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { login } from '../../api/auth';
+import type { ErroHttp } from '../../api/config';
 import logoLogin from '../../assets/logo-login.webp';
 import logger from '../../utils/logger';
 import { apagarAvisoDoLogin, lerAvisoDoLogin } from '../../utils/storage';
@@ -34,8 +35,36 @@ export interface LoginPageProps {
   onLoginSuccess?: () => void;
 }
 
+/** Quanto esperar depois de um 429, em palavras (o Retry-After vem em segundos). */
+function tempoDeEspera(segundos: number | undefined): string {
+  if (!segundos) return 'cerca de um minuto';
+  if (segundos <= 90) return `${segundos} segundos`;
+  return `cerca de ${Math.ceil(segundos / 60)} minutos`;
+}
+
+/**
+ * Frase do erro ao entrar, por causa. Decide pelo STATUS (a falha de login responde
+ * `{error}`, sem `code`). Senha errada e bloqueio por tentativas têm a MESMA frase de
+ * propósito: o servidor não revela o bloqueio (#745).
+ */
+function mensagemDoErroDeLogin(error: unknown): string {
+  if (error instanceof TypeError) {
+    return 'Sem conexão com o servidor. Confira a internet e tente de novo. Sua senha não foi recusada.';
+  }
+  const { status, retryAfter } = error as ErroHttp;
+  if (status === 429) {
+    return `Muitas tentativas de entrada vindas desta rede. Aguarde ${tempoDeEspera(retryAfter)} e tente de novo. Sua senha não foi recusada.`;
+  }
+  if (status === 400) {
+    return 'CPF ou senha incorretos. Depois de 10 erros o acesso fica bloqueado por alguns minutos.';
+  }
+  return 'Não foi possível entrar agora. O problema é no sistema, não na sua senha. Tente de novo em alguns minutos.';
+}
+
 export default function LoginPage({ onLoginSuccess }: LoginPageProps): JSX.Element {
   const [loading, setLoading] = useState(false);
+  // Erro da última tentativa: fica na tela (um toast some antes de a pessoa ler).
+  const [erro, setErro] = useState<string | null>(null);
   // Motivo guardado pelo App antes do reload (ex.: "Sua sessão expirou por inatividade").
   // Lido uma vez e apagado, para não reaparecer no próximo login.
   const [aviso] = useState(lerAvisoDoLogin);
@@ -45,6 +74,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps): JSX.Eleme
 
   const handleSubmit = async (values: LoginFormValues): Promise<void> => {
     setLoading(true);
+    setErro(null);
     try {
       await login(values.username, values.password);
       message.success('Login realizado com sucesso!');
@@ -53,7 +83,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps): JSX.Eleme
       }
     } catch (error) {
       logger.error('Erro no login:', error);
-      message.error('Usuário ou senha incorretos.');
+      setErro(mensagemDoErroDeLogin(error));
     } finally {
       setLoading(false);
     }
@@ -104,7 +134,10 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps): JSX.Eleme
           Login
         </h1>
 
-        {aviso && <Alert type="warning" showIcon message={aviso} style={{ marginBottom: '24px' }} />}
+        {/* Um alerta só: o erro da tentativa substitui o aviso de sessão expirada. */}
+        {erro
+          ? <Alert type="error" showIcon message={erro} style={{ marginBottom: '24px' }} />
+          : aviso && <Alert type="warning" showIcon message={aviso} style={{ marginBottom: '24px' }} />}
 
         <Form
           name="login"

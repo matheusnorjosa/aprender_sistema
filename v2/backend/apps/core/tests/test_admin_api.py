@@ -493,6 +493,81 @@ class TestUsuarioAdminAPI:
         assert user.password != "SecurePass456!"  # senha não em plaintext
         assert user.has_usable_password()  # armazenada como hash (independe do algoritmo)
         assert user.check_password("SecurePass456!")  # hash válido e verificável
+        # Senha dada por outra pessoa: a dona da conta terá de trocar ao entrar.
+        assert user.deve_trocar_senha is True
+
+    def test_criar_sem_senha_nao_liga_a_marca(self, api_client, usuario_dat):
+        api_client.force_authenticate(user=usuario_dat)
+        payload = {"username": "sem_senha", "email": "sem.senha@example.invalid", "cpf": "11111111112"}
+        response = api_client.post("/api/usuarios-admin/", payload, format="json")
+        assert response.status_code == status.HTTP_201_CREATED
+        assert Usuario.objects.get(username="sem_senha").deve_trocar_senha is False
+
+    def test_redefinir_senha_de_outra_pessoa_liga_a_marca(self, api_client, usuario_dat):
+        target = UsuarioFactory(username="alvo_reset", cpf="22233344455")
+        assert target.deve_trocar_senha is False
+        api_client.force_authenticate(user=usuario_dat)
+
+        response = api_client.patch(f"/api/usuarios-admin/{target.id}/", {"password": "Provisoria#2026"}, format="json")
+
+        assert response.status_code == status.HTTP_200_OK
+        target.refresh_from_db()
+        assert target.check_password("Provisoria#2026")
+        assert target.deve_trocar_senha is True
+
+    def test_editar_sem_mexer_na_senha_nao_liga_a_marca(self, api_client, usuario_dat):
+        target = UsuarioFactory(username="alvo_cadastro", cpf="22233344456")
+        api_client.force_authenticate(user=usuario_dat)
+
+        response = api_client.patch(f"/api/usuarios-admin/{target.id}/", {"cargo": "Formadora"}, format="json")
+
+        assert response.status_code == status.HTTP_200_OK
+        target.refresh_from_db()
+        assert target.deve_trocar_senha is False
+
+    def test_admin_trocando_a_propria_senha_pela_rota_admin_nao_liga_a_marca(self, api_client, usuario_super):
+        api_client.force_authenticate(user=usuario_super)
+
+        response = api_client.patch(
+            f"/api/usuarios-admin/{usuario_super.id}/", {"password": "MinhaPropria#2026"}, format="json"
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        usuario_super.refresh_from_db()
+        assert usuario_super.check_password("MinhaPropria#2026")
+        assert usuario_super.deve_trocar_senha is False
+
+    @pytest.mark.parametrize("ator", ["usuario_dat", "usuario_super"])
+    def test_marca_nao_e_gravavel_pela_api_de_administracao(self, api_client, request, ator):
+        """Nem DAT nem superusuário desligam (ou ligam) a marca de alguém por PATCH direto."""
+        api_client.force_authenticate(user=request.getfixturevalue(ator))
+        marcada = UsuarioFactory(username="alvo_marcado", cpf="22233344457", deve_trocar_senha=True)
+        livre = UsuarioFactory(username="alvo_livre", cpf="22233344458")
+
+        desligar = api_client.patch(
+            f"/api/usuarios-admin/{marcada.id}/", {"deve_trocar_senha": False, "cargo": "Apoio"}, format="json"
+        )
+        ligar = api_client.patch(f"/api/usuarios-admin/{livre.id}/", {"deve_trocar_senha": True}, format="json")
+
+        assert desligar.status_code == status.HTTP_200_OK
+        assert ligar.status_code == status.HTTP_200_OK
+        assert "deve_trocar_senha" not in desligar.data
+        marcada.refresh_from_db()
+        livre.refresh_from_db()
+        assert marcada.deve_trocar_senha is True
+        assert livre.deve_trocar_senha is False
+
+    def test_marca_nao_e_gravavel_na_criacao(self, api_client, usuario_super):
+        api_client.force_authenticate(user=usuario_super)
+        payload = {
+            "username": "nasce_marcado",
+            "email": "nasce@example.invalid",
+            "cpf": "11111111113",
+            "deve_trocar_senha": True,
+        }
+        response = api_client.post("/api/usuarios-admin/", payload, format="json")
+        assert response.status_code == status.HTTP_201_CREATED
+        assert Usuario.objects.get(username="nasce_marcado").deve_trocar_senha is False
 
     def test_controle_cannot_create_usuario(self, api_client, usuario_controle):
         """Controle NÃO pode criar usuário"""

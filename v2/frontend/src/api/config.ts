@@ -69,6 +69,26 @@ async function ehRespostaOfflineDoServiceWorker(response: Response): Promise<boo
  */
 export const SERVIDOR_RESPONDEU = 'sessao:servidor-respondeu';
 
+/**
+ * Evento de `window` quando o servidor responde 403 com code PASSWORD_CHANGE_REQUIRED: a conta
+ * está com a troca de senha obrigatória pendente (a sessão está viva; não é `auth:expired`).
+ * O App ouve e mostra a tela "Defina sua senha".
+ */
+export const TROCA_DE_SENHA_OBRIGATORIA = 'auth:troca-de-senha';
+
+/** Erro HTTP lançado por `fetchAPI`. `retryAfter` = segundos do cabeçalho Retry-After (429). */
+export type ErroHttp = Error & {
+  status?: number;
+  retryAfter?: number | undefined;
+  response?: { status: number; data: unknown };
+};
+
+/** Segundos do cabeçalho Retry-After; `undefined` quando falta ou não é um número positivo. */
+function lerRetryAfter(response: Response): number | undefined {
+  const segundos = Number.parseInt(response.headers.get('Retry-After') ?? '', 10);
+  return Number.isFinite(segundos) && segundos > 0 ? segundos : undefined;
+}
+
 /** 401, ou o 403 do DRF com code NOT_AUTHENTICATED: o servidor disse que não há sessão. */
 async function ehRespostaSemSessao(response: Response): Promise<boolean> {
   if (response.status === 401) return true;
@@ -127,13 +147,21 @@ function isCsrfTokenValid(): boolean {
 
 /**
  * Busca um token CSRF fresco do servidor. Sem rede, lança `TypeError(SEM_CONEXAO)`: a falha
- * de rede não vira "CSRF token ausente" (auditoria UX 30/09).
+ * de rede não vira "CSRF token ausente" (auditoria UX 30/09). O 429 (limite de pedidos
+ * anônimos por rede) também não: sai como erro com `status` 429 e `retryAfter`.
  */
 async function fetchFreshCsrfToken(): Promise<string | null> {
   const response = await fetchNaRede(`${API_BASE}/csrf/`, {
     method: 'GET',
     credentials: 'include',
   });
+  if (response.status === 429) {
+    const err: ErroHttp = new Error('Muitas tentativas. Aguarde e tente de novo.');
+    err.status = 429;
+    err.retryAfter = lerRetryAfter(response);
+    err.response = { status: 429, data: null };
+    throw err;
+  }
   try {
     if (response.ok) {
       const data = (await response.json()) as { csrfToken?: string };
@@ -277,14 +305,14 @@ export async function fetchAPI<T = unknown>(url: string, options: FetchOptions =
       }
     }
 
-    const err = new Error(error.detail || error.message || `Erro ${response.status}`) as Error & {
-      status?: number;
-      response?: {
-        status: number;
-        data: unknown;
-      };
-    };
+    // Troca de senha obrigatória pendente: a sessão está viva, mas só a troca é aceita.
+    if (response.status === 403 && error.code === 'PASSWORD_CHANGE_REQUIRED' && typeof window !== 'undefined') {
+      window.dispatchEvent(new Event(TROCA_DE_SENHA_OBRIGATORIA));
+    }
+
+    const err: ErroHttp = new Error(error.detail || error.message || `Erro ${response.status}`);
     err.status = response.status;
+    err.retryAfter = lerRetryAfter(response);
     err.response = {
       status: response.status,
       data: error,

@@ -146,6 +146,9 @@ class ChangePasswordView(APIView):
     a propria senha: valida a senha atual + a nova (validadores do Django), atualiza o
     hash da sessao (mantem a atual viva; invalida as OUTRAS) e audita (PA-05,
     CHANGE_PASSWORD). Nunca loga a senha.
+
+    E tambem a saida da troca OBRIGATORIA: desliga ``deve_trocar_senha`` (a unica rota de
+    escrita que o ``TrocaDeSenhaObrigatoriaMiddleware`` deixa passar com a marca ligada).
     """
 
     permission_classes = [IsAuthenticated]
@@ -168,8 +171,14 @@ class ChangePasswordView(APIView):
         serializer.is_valid(raise_exception=True)
         user = cast(Usuario, request.user)
         new_password = cast(str, serializer.validated_data["new_password"])
+        # Senha recebida de outra pessoa (primeiro acesso): escolher a propria desliga a marca.
+        era_obrigatoria = user.deve_trocar_senha
+        if era_obrigatoria:
+            # Guarda so o hash da recebida: o serializer recusa a volta a ela nas proximas trocas.
+            user.senha_recebida_hash = user.password
         user.set_password(new_password)
-        user.save(update_fields=["password"])
+        user.deve_trocar_senha = False
+        user.save(update_fields=["password", "deve_trocar_senha", "senha_recebida_hash"])
         # SessionAuthentication: mantem a sessao atual valida e invalida as demais.
         update_session_auth_hash(request, user)
         AuditLog.objects.create(
@@ -179,6 +188,7 @@ class ChangePasswordView(APIView):
             details={
                 "ip_address": get_client_ip(request),
                 "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
+                "primeiro_acesso": era_obrigatoria,
             },
         )
         return Response({"detail": "Senha alterada com sucesso."})

@@ -532,6 +532,63 @@ def test_login_throttla_caller_autenticado():
     assert results == [True, True, False]
 
 
+def _cache_dedicado() -> dict[str, dict[str, str]]:
+    return {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": f"throttle-429-{uuid4().hex}",
+        }
+    }
+
+
+def test_login_429_tem_code_throttled_e_retry_after(monkeypatch):
+    """CONTRATO que a tela de login lê: 429 + code THROTTLED + cabeçalho Retry-After numérico.
+
+    A taxa vem de THROTTLE_RATES capturado na importação (override_settings não alcança) e a
+    view cria a própria instância do throttle: o ajuste é na CLASSE. Cache dedicado + IP
+    único deixam o teste imune a outros testes.
+    """
+    from apps.core.views_auth import LoginThrottle
+
+    monkeypatch.setattr(LoginThrottle, "rate", "2/minute", raising=False)
+    ip = f"172.17.1.{uuid4().int % 250}"
+
+    with override_settings(CACHES=_cache_dedicado()):
+        client = APIClient()
+        respostas = [
+            client.post(
+                "/api/auth/login/",
+                {"username": "ninguem", "password": "senha-errada"},
+                format="json",
+                REMOTE_ADDR=ip,
+            )
+            for _ in range(3)
+        ]
+
+    assert [r.status_code for r in respostas[:2]] == [400, 400]
+    excedente = respostas[2]
+    assert excedente.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+    assert excedente.json()["code"] == "THROTTLED"
+    assert 0 < int(excedente["Retry-After"]) <= 60
+
+
+def test_csrf_429_tem_retry_after(monkeypatch):
+    """CONTRATO: o GET /api/csrf/ (anônimo, antes de qualquer login) também devolve 429 + Retry-After."""
+    from rest_framework.throttling import AnonRateThrottle
+
+    monkeypatch.setattr(AnonRateThrottle, "rate", "2/minute", raising=False)
+    ip = f"172.17.2.{uuid4().int % 250}"
+
+    with override_settings(CACHES=_cache_dedicado()):
+        client = APIClient()
+        respostas = [client.get("/api/csrf/", REMOTE_ADDR=ip) for _ in range(3)]
+
+    assert [r.status_code for r in respostas[:2]] == [200, 200]
+    assert respostas[2].status_code == status.HTTP_429_TOO_MANY_REQUESTS
+    assert respostas[2].json()["code"] == "THROTTLED"
+    assert 0 < int(respostas[2]["Retry-After"]) <= 60
+
+
 def test_incremento_concorrente_nao_perde_tentativa():
     """30 incrementos concorrentes de _safe_increment não podem perder tentativa.
 

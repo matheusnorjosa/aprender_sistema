@@ -175,6 +175,7 @@ jobs:
             "v2/backend/apps/core/middleware.py"       # Deprecation middleware
             "v2/backend/apps/core/api_schemas.py"     # Example URLs in docstrings
             "v2/backend/apps/core/views_solicitacao.py"  # Curl example in docstring
+            "v2/backend/apps/core/tests/test_troca_senha_obrigatoria.py"  # prova que o alias antigo também é barrado na troca de senha
             "v2/backend/apps/core/management/commands/sync_municipios_ibge.py"  # IBGE external API
             "v2/docs/"                                 # Documentation
             ".claude/"                                 # AI context

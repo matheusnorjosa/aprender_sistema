@@ -64,6 +64,11 @@ export interface CurrentUser {
   is_superintendencia: boolean;
   can_approve_super: boolean;
   permissions: string[];
+  /**
+   * A senha em uso foi definida por outra pessoa: o servidor só aceita a troca de senha.
+   * Fora do guard: payload antigo sem o campo não derruba o login (a tela testa `=== true`).
+   */
+  deve_trocar_senha?: boolean;
 }
 
 /**

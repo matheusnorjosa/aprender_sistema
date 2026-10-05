@@ -138,8 +138,13 @@ com os intervalos em [`constants/timing.ts`](../../../frontend/src/constants/tim
 | `Aprovacoes/ApprovalsPage` | 20 s (`LIST_POLL_INTERVAL_MS`) | 1 | sempre ligado |
 | `PreAgenda/PreAgendaPage` | 20 s (`LIST_POLL_INTERVAL_MS`) | 3 (duas listas + resumo) | sempre ligado |
 | `Disponibilidade/MonthlyPage` (`useMonthlyQuery`, uma instância por grade) | 30 s (`GRADE_POLL_INTERVAL_MS`) | 2 | sempre ligado |
-| `Solicitacoes/PublicacaoSetorPage` | 5 s (`PUBLICACAO_PENDENTE_POLL_MS`) | 1 | só enquanto há linha `PENDING` |
-| `useGCalAlertsPolling`, `useUnreadNotificationsPolling` (`App.tsx`) | 30 s | 1 cada | por permissão |
+| `Solicitacoes/PublicacaoSetorPage` | 5 s (`PUBLICACAO_PENDENTE_POLL_MS`) | 1 | só enquanto há linha `PENDING`; **fora do padrão** (abaixo) |
+| `useGCalAlertsPolling`, `useUnreadNotificationsPolling` (`App.tsx`) | 30 s | 1 cada | por permissão; sem pausa no 429 (abaixo) |
+
+**Exceções (ficam na fila).** "Publicar na agenda" (`PublicacaoSetorPage`) não segue as regras de piscar e
+de 429 abaixo: o polling de 5 s só liga enquanto há linha `PENDING`, cada tick liga o carregamento da tabela e
+um 429 vira erro como qualquer outro, sem pausa. `useGCalAlertsPolling` e `useUnreadNotificationsPolling` não
+tratam o 429: herdam do hook só a parada com a aba oculta e a guarda de uma carga por vez.
 
 `SyncIndicator` e `useSessionMonitor` também usam `setInterval`, mas só para o relógio local (não buscam nada).
 
@@ -160,7 +165,7 @@ Regras (valem para qualquer tela nova com polling):
 - **Carga pedida pela pessoa que falha aparece.** Se o 429 veio numa carga que a pessoa pediu (abrir a tela,
   filtrar, trocar de página, recarregar depois de aprovar ou publicar), o mesmo componente recebe `cargaFalhou`
   e diz que a lista não carregou e que a tela pode não corresponder ao filtro (`role=alert`); some na próxima
-  carga que der certo. Vale para Aprovações, Pré-agenda e Publicar na agenda. Na Grade Mensal, o botão de
+  carga que der certo. Vale para Aprovações e Pré-agenda. Na Grade Mensal, o botão de
   atualizar gira o ícone (`atualizando`) sem desmontar as grades, e qualquer falha de atualização com a grade
   na tela (botão, polling, outra aba) mostra um aviso com o motivo (`erroAtualizacao`, `role=alert`) até a
   próxima atualização que der certo; só o 429 do tick fica apenas no aviso de pausa.
@@ -169,7 +174,8 @@ Regras (valem para qualquer tela nova com polling):
 
 Testes: `hooks/__tests__/usePolling.test.ts`, `pages/Disponibilidade/__tests__/useMonthlyQuery.test.ts`,
 `pages/Disponibilidade/__tests__/MonthlyPage.test.tsx`, `pages/Aprovacoes/__tests__/ApprovalsPage.test.tsx`,
-`pages/PreAgenda/__tests__/PreAgendaPage.lifecycle.test.tsx`, `pages/Solicitacoes/__tests__/PublicacaoSetorPage.test.tsx`.
+`pages/PreAgenda/__tests__/PreAgendaPage.lifecycle.test.tsx` (o polling condicional de Publicar na agenda:
+`pages/Solicitacoes/__tests__/PublicacaoSetorPage.test.tsx`).
 
 ## API / Interface
 

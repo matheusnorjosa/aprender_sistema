@@ -11,8 +11,6 @@
  * - Prontidão: `status.publishReady`/`publishBlockReason`; sem prontidão as ações ficam
  *   desabilitadas, com o motivo visível.
  * - Polling só enquanto alguma linha está PENDING; `seqRef` descarta resposta obsoleta.
- *   O tick atualiza em segundo plano (sem ligar o carregamento da tabela) e, no 429,
- *   pausa pelo `Retry-After` com um aviso só (specs/frontend/pages.spec.md).
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
@@ -25,7 +23,6 @@ import {
   publishSolicitacao,
   resyncSolicitacao,
 } from '../../api/solicitacoes';
-import AvisoAtualizacaoPausada from '../../components/AvisoAtualizacaoPausada';
 import { MeetLink } from '../../components/MeetLink';
 import GoogleIntegrationCard from '../../components/google/GoogleIntegrationCard';
 import { TIMING } from '../../constants/timing';
@@ -36,8 +33,6 @@ import type { ID, Solicitacao } from '../../types';
 import type { PublishBlockReason } from '../../types/gcal';
 import { formatFortaleza } from '../../utils/datetime';
 import { gcalRowActions, type GcalRowAction } from '../../utils/gcalRowActions';
-import { mesmosDados } from '../../utils/mesmosDados';
-import { pausaDo429Ms } from '../../utils/retryAfter';
 
 const { Title, Text } = Typography;
 
@@ -150,29 +145,15 @@ export default function PublicacaoSetorPage(): JSX.Element {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
-  // Uma carga pedida pela pessoa recebeu 429: a tela pode não corresponder ao pedido.
-  const [cargaFalhou, setCargaFalhou] = useState(false);
   const [oauthReturn, setOauthReturn] = useState<OAuthReturn | null>(null);
 
   // Latest-wins: polling, paginação e ações disparam cargas concorrentes; só a
   // mais recente grava na tela.
   const seqRef = useRef(0);
 
-  // Só há o que acompanhar enquanto alguma publicação está em voo (PENDING).
-  const loadRef = useRef<(silencioso?: boolean) => Promise<void>>(() => Promise.resolve());
-  const { pausado: pollingPausado, pausar: pausarPolling } = usePolling(() => loadRef.current(true), {
-    enabled: rows.some((row) => row.gcal_status === 'PENDING'),
-    intervalMs: TIMING.PUBLICACAO_PENDENTE_POLL_MS,
-    immediate: false,
-  });
-
-  /**
-   * `silencioso`: atualização em segundo plano (polling, outra aba). Não liga o
-   * carregamento da tabela; os dados antigos ficam na tela até chegarem os novos.
-   */
-  const load = useCallback(async (silencioso = false): Promise<void> => {
+  const load = useCallback(async (): Promise<void> => {
     const seq = ++seqRef.current;
-    if (!silencioso) setLoading(true);
+    setLoading(true);
     try {
       const data = await listSolicitacoes({
         status: 'aprovado',
@@ -183,20 +164,10 @@ export default function PublicacaoSetorPage(): JSX.Element {
         page_size: PAGE_SIZE,
       });
       if (seq !== seqRef.current) return;
-      // Só troca a lista se algo mudou: resposta igual não redesenha a tabela.
-      setRows((atuais) => (mesmosDados(atuais, data.results) ? atuais : data.results));
+      setRows(data.results);
       setTotal(data.count);
-      setCargaFalhou(false);
     } catch (error) {
       if (seq !== seqRef.current) return;
-      // 429 (muitas requisições): pausa o polling pelo tempo pedido e mostra um aviso só.
-      // Se a carga foi pedida pela pessoa, o aviso diz que a lista não carregou.
-      const pausa = pausaDo429Ms(error);
-      if (pausa !== null) {
-        pausarPolling(pausa);
-        if (!silencioso) setCargaFalhou(true);
-        return;
-      }
       message.error({
         key: LOAD_ERROR_KEY,
         content: `Erro ao carregar os eventos: ${(error as Error).message}`,
@@ -204,15 +175,21 @@ export default function PublicacaoSetorPage(): JSX.Element {
     } finally {
       if (seq === seqRef.current) setLoading(false);
     }
-  }, [page, pausarPolling]);
-  loadRef.current = load;
+  }, [page]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  // Mudança de solicitação em outra aba → recarrega em segundo plano.
-  useEffect(() => syncChannel.subscribe('solicitacoes', () => { void load(true); }), [load]);
+  // Só há o que acompanhar enquanto alguma publicação está em voo (PENDING).
+  usePolling(load, {
+    enabled: rows.some((row) => row.gcal_status === 'PENDING'),
+    intervalMs: TIMING.PUBLICACAO_PENDENTE_POLL_MS,
+    immediate: false,
+  });
+
+  // Mudança de solicitação em outra aba → recarrega.
+  useEffect(() => syncChannel.subscribe('solicitacoes', () => { void load(); }), [load]);
 
   // Volta do OAuth (?google=connected | ?google=error&reason=…): mostra o resultado,
   // tira os parâmetros da URL e recarrega o status da integração.
@@ -416,8 +393,6 @@ export default function PublicacaoSetorPage(): JSX.Element {
             onDisconnect={handleDisconnect}
           />
         )}
-
-        {(pollingPausado || cargaFalhou) && <AvisoAtualizacaoPausada cargaFalhou={cargaFalhou} />}
 
         <Card>
           <Table

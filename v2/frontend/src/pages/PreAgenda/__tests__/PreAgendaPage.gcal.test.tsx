@@ -95,7 +95,7 @@ vi.mock('../../../hooks/useGoogleGuard', () => ({
 }));
 
 vi.mock('../../../hooks/usePolling', () => ({
-  usePolling: vi.fn(),
+  usePolling: vi.fn(() => ({ pausado: false, pausar: () => {} })),
 }));
 
 vi.mock('../../../services/syncChannel', () => ({

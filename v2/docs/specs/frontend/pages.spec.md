@@ -128,6 +128,55 @@ Grupos RBAC, Setores e Funções (um componente, `GruposPage`), Gerências, Muni
 - **Gerências sem Confiança.** A Confiança do de-para (`setor_canonico_confianca`) saiu da tela, coluna e filtro, por decisão do dono (01/10): está vazia nas 21 gerências de produção. O campo continua no backend.
 - **Testes.** `GruposPage.responsivo.test.tsx`, `GerenciasPage.responsivo.test.tsx`, `MunicipiosPage.responsivo.test.tsx`, `ProdutosPage.responsivo.test.tsx` e `ProjetosGeraisPage.responsivo.test.tsx` (em `pages/AdminDAT/__tests__/`) cobrem as colunas por largura, a linha expandida, a troca de largura com a página aberta, o contraste das etiquetas, o nome acessível das ações e a confirmação de Excluir; os `*.salvar.test.tsx` das 5 telas cobrem o salvar, a exclusão (com o 409) e as falhas de carga, inclusive o Tab até o "Tentar de novo" das opções e o foco depois dele; o de Grupos cobre os caminhos da lista de usuários (nunca carregou, carregando, falhou, carregou, reabrir o Editar, criar grupo, trocar de grupo com o modal aberto), sem `user_ids: []` nem menos membros para grupo que já existe. A lista de grupos recarrega ao abrir (quando chegam os metadados RBAC) e depois de salvar, e enquanto ela carrega o Spin do AntD põe `pointer-events: none` na tabela: os testes de Grupos (`salvar` e `responsivo`) só clicam nas ações da linha quando a tabela deixa, pelo util [`clicarNaLinha`](../../../frontend/src/test/clicarNaLinha.ts), e um caso com a recarga demorando 500 ms prova isso (na CI de 01/10, o Editar caía nessa recarga). `excluirEmUso.test.ts` cobre o diálogo do 409 (Desativar, falha ao desativar, registro já inativo, erro que não é 409; o vocabulário por tela, o aviso sem DELETE de Gerências e a confirmação fechada antes do 409), os `*.salvar.test.tsx` conferem que ele só abre no `afterClose` da confirmação, e `ProjetosPage.excluir.test.tsx` cobre a tela de Projetos.
 
+## Telas que se atualizam sozinhas
+
+Padrão único (liberação 2026-10), implementado em [`hooks/usePolling.ts`](../../../frontend/src/hooks/usePolling.ts)
+com os intervalos em [`constants/timing.ts`](../../../frontend/src/constants/timing.ts):
+
+| Onde | Intervalo | Pedidos por tick | Observação |
+|---|---|---|---|
+| `Aprovacoes/ApprovalsPage` | 20 s (`LIST_POLL_INTERVAL_MS`) | 1 | sempre ligado |
+| `PreAgenda/PreAgendaPage` | 20 s (`LIST_POLL_INTERVAL_MS`) | 3 (duas listas + resumo) | sempre ligado |
+| `Disponibilidade/MonthlyPage` (`useMonthlyQuery`, uma instância por grade) | 30 s (`GRADE_POLL_INTERVAL_MS`) | 2 | sempre ligado |
+| `Solicitacoes/PublicacaoSetorPage` | 5 s (`PUBLICACAO_PENDENTE_POLL_MS`) | 1 | só enquanto há linha `PENDING`; **fora do padrão** (abaixo) |
+| `useGCalAlertsPolling`, `useUnreadNotificationsPolling` (`App.tsx`) | 30 s | 1 cada | por permissão; sem pausa no 429 (abaixo) |
+
+**Exceções (ficam na fila).** "Publicar na agenda" (`PublicacaoSetorPage`) não segue as regras de piscar e
+de 429 abaixo: o polling de 5 s só liga enquanto há linha `PENDING`, cada tick liga o carregamento da tabela e
+um 429 vira erro como qualquer outro, sem pausa. `useGCalAlertsPolling` e `useUnreadNotificationsPolling` não
+tratam o 429: herdam do hook só a parada com a aba oculta e a guarda de uma carga por vez.
+
+`SyncIndicator` e `useSessionMonitor` também usam `setInterval`, mas só para o relógio local (não buscam nada).
+
+Regras (valem para qualquer tela nova com polling):
+
+- **Aba oculta não busca.** O polling para com `document.hidden` e faz **uma** atualização ao voltar.
+- **Uma carga por vez.** O hook não abre carga nova enquanto a anterior (aberta por ele) está em voo; um evento
+  de atualização que chega nesse meio-tempo refaz a busca uma vez no fim. Para isso a função passada ao hook
+  **devolve a Promise** da carga.
+- **Sem piscar.** Só a primeira carga (ou a troca de filtro/página) mostra carregamento. A atualização em
+  segundo plano (polling, outra aba via `syncChannel`) não liga `loading`, não desmonta o conteúdo e só troca o
+  estado se os dados mudaram (`utils/mesmosDados.ts`). A ação da própria pessoa (aprovar, publicar, filtrar)
+  continua recarregando na hora.
+- **429 não vira cascata de erros.** A tela chama `pausar(ms)` do hook com o tempo do `Retry-After`
+  (`utils/retryAfter.ts`; 60 s quando o cabeçalho não vem, caso do 429 do nginx) e mostra **um** aviso
+  (`components/AvisoAtualizacaoPausada.tsx`, `role=status`): "Atualização automática pausada por alguns
+  instantes." Ao fim do prazo o polling retoma sozinho com uma busca.
+- **Carga pedida pela pessoa que falha aparece.** Se o 429 veio numa carga que a pessoa pediu (abrir a tela,
+  filtrar, trocar de página, recarregar depois de aprovar ou publicar), o mesmo componente recebe `cargaFalhou`
+  e diz que a lista não carregou e que a tela pode não corresponder ao filtro (`role=alert`); some na próxima
+  carga que der certo. Vale para Aprovações e Pré-agenda. Na Grade Mensal, o botão de
+  atualizar gira o ícone (`atualizando`) sem desmontar as grades, e qualquer falha de atualização com a grade
+  na tela (botão, polling, outra aba) mostra um aviso com o motivo (`erroAtualizacao`, `role=alert`) até a
+  próxima atualização que der certo; só o 429 do tick fica apenas no aviso de pausa.
+- **Orçamento.** A soma dos pedidos por hora de uma pessoa com as telas abertas tem de caber no throttle `user`
+  (6000/h, [API_REFERENCE](../../API_REFERENCE.md), seção Rate Limiting). Hoje: ~960/h com as três telas abertas.
+
+Testes: `hooks/__tests__/usePolling.test.ts`, `pages/Disponibilidade/__tests__/useMonthlyQuery.test.ts`,
+`pages/Disponibilidade/__tests__/MonthlyPage.test.tsx`, `pages/Aprovacoes/__tests__/ApprovalsPage.test.tsx`,
+`pages/PreAgenda/__tests__/PreAgendaPage.lifecycle.test.tsx` (o polling condicional de Publicar na agenda:
+`pages/Solicitacoes/__tests__/PublicacaoSetorPage.test.tsx`).
+
 ## API / Interface
 
 Inventário por domínio (rota → componente → guard **como o código aplica hoje**). `policy=X` significa `<RequirePolicy policy="X" policies={policies}>`; `allow=` significa expressão booleana. Detalhe da capability na [matriz RBAC](../../rbac_authorization_matrix.md).
@@ -167,7 +216,7 @@ Inventário por domínio (rota → componente → guard **como o código aplica 
 |---|---|---|
 | `/solicitacoes/aprovacoes` | `Aprovacoes/ApprovalsPage` | policy `access_solicitation_approvals` |
 
-> **Lista paginada no servidor (2026-10-02).** A `ApprovalsPage` pede `flow=SUPER`, `status`, `q`, `ordering=proximidade`, `page` e `page_size` a cada carga — antes pedia uma vez só, recebia as 100 primeiras em `-inicio` e paginava no cliente, com o rodapé prometendo páginas que vinham vazias. A ordem é "de hoje em diante, do mais próximo ao mais distante; depois os passados, do mais recente ao mais antigo" (nada é escondido). Tamanho de página 20, 50 ou 100 — 100 é o limite do lote no servidor. A seleção em lote vale para a **página visível**: é limpa ao trocar de página, de tamanho, de status ou de busca, e a recarga (polling de 5 s) tira da seleção o item que saiu da lista. Página que deixou de existir (404, quando os últimos itens dela são decididos) volta para a anterior sem mensagem de erro. Cargas concorrentes seguem *latest-wins*. A tela continua com `Table` cru e `scroll.x` (item C3 da allowlist `eslint.tabela-antd-allowlist.js`); a migração para `ResponsiveTable` não entrou aqui.
+> **Lista paginada no servidor (2026-10-02).** A `ApprovalsPage` pede `flow=SUPER`, `status`, `q`, `ordering=proximidade`, `page` e `page_size` a cada carga — antes pedia uma vez só, recebia as 100 primeiras em `-inicio` e paginava no cliente, com o rodapé prometendo páginas que vinham vazias. A ordem é "de hoje em diante, do mais próximo ao mais distante; depois os passados, do mais recente ao mais antigo" (nada é escondido). Tamanho de página 20, 50 ou 100 — 100 é o limite do lote no servidor. A seleção em lote vale para a **página visível**: é limpa ao trocar de página, de tamanho, de status ou de busca, e a recarga (polling de 20 s, ver "Telas que se atualizam sozinhas") tira da seleção o item que saiu da lista. Página que deixou de existir (404, quando os últimos itens dela são decididos) volta para a anterior sem mensagem de erro. Cargas concorrentes seguem *latest-wins*. A tela continua com `Table` cru e `scroll.x` (item C3 da allowlist `eslint.tabela-antd-allowlist.js`); a migração para `ResponsiveTable` não entrou aqui.
 
 ### Disponibilidade
 
@@ -277,7 +326,7 @@ páginas fazem, não o que deveriam fazer.
 | `M05-07` (#1655) | `Home/HomePage` | Os cards "Enviar Solicitação"/"Minhas Solicitações" são gateados por `perms.canCoordenador` (`HomePage.tsx`, `isCoordenador`), isto é, por setor/função — **não** pela policy `create_solicitation` que gateia as rotas de destino (`AppRoutes.tsx`, rotas `/solicitacoes/{minhas,nova}`). Quem tem a policy sem ser Coordenador/DAT não vê o atalho; quem é DAT vê um atalho para uma rota que a policy pode negar. |
 | `M09-05` (#1621) | `Deslocamentos/DeslocamentosPage` | O campo "Formador" do modal é `required` (`Form.Item name="usuario"`) e só oferece terceiros; o POST sempre manda `usuario` (`handleModalSubmit`). O backend exige delegação (`views_deslocamento.py`, `DeslocamentoViewSet.perform_create`) satisfeita apenas por `operate_preagenda`/`view_all_availability` (`rbac/policies.py`, `user_can_delegate_deslocamento`) — capabilities que Coordenador não tem. Resultado: Coordenador acessa a página e falha em 100% dos creates. |
 | `M09-06` (#1622) | `Deslocamentos/DeslocamentosPage` | **RESOLVIDO (#1622)** (PRs #1731/#1737/#1753). Era: filtros Origem/Destino como `<Input>` não-controlados, sem debounce, e o early-return `if (loading) return …` desmontava a árvore inteira a cada tecla (o input perdia foco e o caractere). Hoje: inputs **controlados** (`value={filters.origem ?? ''}`), **debounce de 350 ms**, `pageLoading`/`tableLoading` separados (o early-return cobre só a carga inicial) e `seqRef` (latest-wins) + `AbortController` descartando respostas obsoletas. |
-| `M12-19` (#1629) | `PreAgenda/PreAgendaPage` | **RESOLVIDO (#1629)** (#1750). Era: a tabela anunciava `total = superCount + naoCount` mas só carregava a primeira página de cada lista e paginava no cliente sem handler — as páginas além do buscado ficavam vazias, e o polling pressionava o throttle `user: 1000/hour`. Hoje: carrega as duas listas de uma vez, `total = loadedRows.length` (contador honesto), guarda latest-wins e **backoff após 429** no polling. |
+| `M12-19` (#1629) | `PreAgenda/PreAgendaPage` | **RESOLVIDO (#1629)** (#1750). Era: a tabela anunciava `total = superCount + naoCount` mas só carregava a primeira página de cada lista e paginava no cliente sem handler — as páginas além do buscado ficavam vazias, e o polling pressionava o throttle `user: 1000/hour`. Hoje: carrega as duas listas de uma vez, `total = loadedRows.length` (contador honesto), guarda latest-wins e **pausa após 429** no polling (desde 2026-10 pelo `Retry-After`, ver "Telas que se atualizam sozinhas"). |
 | `M15-10` (#1637) | `DATModule/ComprasPage` | **Fase A resolvida (#1714/#1716); resta Fase B (#1637 OPEN)** — o achado NÃO fechou por inteiro. Fase A: `buildCompraPayload` faz strip **explícito** dos campos extras (não é mais spread cru) e o save reporta erro por-campo; `codigo_produto` **existe** no serializer como mirror read-only (`source="produto.codigo"`); `valor_unitario` e `ano_uso` viraram **obrigatórios** no modal (o `valor_total` R$0 sumiu — card removido em #1983). Fase B (aberta): persistir `fornecedor`, `numero_nota_fiscal` e `data_entrega` no lado do Controle — hoje `buildCompraPayload` ainda os remove por não terem destino no serializer. |
 | `M16-08` (#1639) | `DATModule/DATRegistrosPage` | **RESOLVIDO (#1712).** Era: um único `STATUS_OPTIONS` de 3 valores reusado para dois conjuntos de choices diferentes do backend (`DATRegistro.STATUS_CHOICES`/`TURMA_STATUS_CHOICES`), tornando `em_andamento`/`concluido` inválidos em `turma_formar_status` → 400. Hoje partido em `TURMA_STATUS_OPTIONS` (3, casa `TURMA_STATUS_CHOICES`) e `ETAPA_STATUS_OPTIONS` (5, casa `STATUS_CHOICES`) em `DATRegistros/constants.tsx`; `turma_formar_status` usa `TURMA_STATUS_OPTIONS`; contrato travado por `statusOptionsContract.test.ts`. |
 | `M18-06` (#1653) | telas DAT com `useTableFilters` | **RESOLVIDO (#1653)** (commit `062df0ec`). Era: o FE enviava `page_size` mas o DRF usava `PageNumberPagination` de estoque como `DEFAULT_PAGINATION_CLASS`, com `page_size_query_param` = `None` — o parâmetro era ignorado e a API devolvia 100 linhas. Hoje o default é `StandardPagination(PageNumberPagination)` com `page_size_query_param="page_size"` e `max_page_size=500`, honrando `?page_size` (coberto por teste). |

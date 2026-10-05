@@ -521,8 +521,13 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.ScopedRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon": "100/hour",
-        "user": "1000/hour",
+        # Liberacao 2026-10: `anon` e por IP e o escritorio inteiro sai pelo mesmo
+        # endereco (100/h esbarrava no dia da liberacao). `user` e por pessoa: as telas
+        # com atualizacao automatica (Pre-agenda 3 pedidos/20 s, Aprovacoes 1/20 s, Grade
+        # Mensal 2/30 s) somam ~960/h com as tres abertas; 6000/h da folga para varias
+        # abas e ainda barra abuso (1000/h estourava em ~25 min de Pre-agenda aberta).
+        "anon": "1000/hour",
+        "user": "6000/hour",
         # Scopes para endpoints específicos (#409)
         "availability_check": "60/min",  # 60 requests por minuto para availability check
         "metrics": "30/min",  # Geo queries + aggregations
@@ -533,10 +538,11 @@ REST_FRAMEWORK = {
         # gunicorn — tier pesado como metrics/reports. Balde unico por usuario, compartilhado
         # por todos os endpoints de import (Onda 4, pos-incidente 2026-07-06).
         "import": "30/min",
-        # Login: restrito em produção (brute-force protection — Issue #133),
-        # relaxado fora dela para não atrapalhar dev / testes E2E multi-role.
-        # Sobrescrito abaixo com valor ambiente-dependente.
-        "login": "10/minute",
+        # Login: limite por IP (Issue #133), relaxado fora de produção para não
+        # atrapalhar dev / testes E2E multi-role (sobrescrito abaixo). 30/min porque o
+        # escritório inteiro sai pelo mesmo IP; quem barra força bruta é o bloqueio por
+        # CONTA (ACCOUNT_LOCKOUT_THRESHOLD = 10 erros → 15 min, views_auth.py).
+        "login": "30/minute",
         # Troca de senha self-service: defesa contra brute-force do old_password.
         "change_password": "20/min",
         # OAuth connect (GAP-3): conectar conta Google no /pre-agenda, anti-abuso por usuario.
@@ -614,7 +620,7 @@ if ENVIRONMENT == "development":
         "import": "300/min",  # 10x prod — uploads em dev/testes E2E nao devem bloquear
         # Login: 1000/min em dev para não bloquear testes E2E multi-role e
         # desenvolvimento manual (12+ logins em sequência). Em prod mantém
-        # 10/min contra brute force (ver bloco DEFAULT_THROTTLE_RATES acima).
+        # 30/min por IP (ver bloco DEFAULT_THROTTLE_RATES acima).
         "login": "1000/minute",
         # Troca de senha: relaxado em dev/testes (prod usa 20/min, bloco acima).
         "change_password": "200/min",

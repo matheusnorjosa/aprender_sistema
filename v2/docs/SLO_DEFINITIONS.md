@@ -103,8 +103,8 @@ Error Budget (horas/mês) = (100 - SLO%) × 720 / 100
 
 | Tipo | Limite | Período |
 |------|--------|---------|
-| Anônimo | 100 | por hora |
-| Autenticado | 1000 | por hora |
+| Anônimo (por IP) | 1000 | por hora |
+| Autenticado (por pessoa) | 6000 | por hora |
 | Availability Check | 60 | por minuto |
 
 ---

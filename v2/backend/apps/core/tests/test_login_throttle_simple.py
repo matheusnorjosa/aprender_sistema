@@ -29,7 +29,7 @@ def test_login_throttle_rate_is_not_hardcoded():
     """
     A `rate` não deve estar hardcoded na classe — deve ser resolvida via
     DEFAULT_THROTTLE_RATES['login'] do settings (permite override por
-    ambiente: 10/minute em prod, 1000/minute em dev).
+    ambiente: 30/minute em prod, 1000/minute em dev).
     """
     assert (
         "rate" not in LoginThrottle.__dict__

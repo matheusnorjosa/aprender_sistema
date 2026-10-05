@@ -210,6 +210,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # Troca obrigatória de senha: depende de request.user, por isso logo depois da autenticação.
+    "apps.core.middleware.TrocaDeSenhaObrigatoriaMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "apps.core.middleware_security.SecurityHeadersMiddleware",  # Security Audit 2025-01: CSP + Permissions-Policy
@@ -355,6 +357,9 @@ SESSION_COOKIE_SECURE = False if ENVIRONMENT == "development" else True  # HTTPS
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+        # Padrão do Django + `cpf`: a senha não pode parecer com o CPF mesmo quando o
+        # username não é o CPF.
+        "OPTIONS": {"user_attributes": ("username", "first_name", "last_name", "email", "cpf")},
     },
     {
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",

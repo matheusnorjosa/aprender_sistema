@@ -53,8 +53,8 @@ test.describe('Fluxo de Autenticação', () => {
       // Clicar no botão de login
       await page.click('button[type="submit"]');
 
-      // Deve mostrar mensagem de erro
-      await expect(page.locator('.ant-message-error')).toBeVisible({ timeout: 5000 });
+      // Deve mostrar o erro na própria tela (alerta que fica, não toast)
+      await expect(page.getByRole('alert')).toContainText('CPF ou senha incorretos', { timeout: 5000 });
     });
   });
 

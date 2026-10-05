@@ -67,7 +67,7 @@ Esta spec é o **índice canônico do inventário de páginas**: domínio, rota 
 - [`v2/frontend/src/components/AppSidebar.tsx`](../../../frontend/src/components/AppSidebar.tsx) — menu lateral; desde o #1270 deriva os itens de [`useCapabilities(policies)`](../../../frontend/src/hooks/useCapabilities.ts) (`AppSidebar.tsx`), ou seja, **policy pura** — não usa mais as mesmas flags legacy das rotas. É UX, não é o gate autoritativo.
 - Diretório [`v2/frontend/src/pages/`](../../../frontend/src/pages) — **15 diretórios de domínio** (AdminDAT, Aprovacoes, Auth, Controle, DAT, DATModule, Dashboards, Deslocamentos, Disponibilidade, Home, MapaBrasil, MeusEventos, Perfil, PreAgenda, Solicitacoes) + `__tests__`.
 
-> **Contagem real:** **43 páginas lazy-loaded** (42 em `AppRoutes` + `LoginPage` em `App.tsx`), não "45+".
+> **Contagem real:** **44 páginas lazy-loaded** (42 em `AppRoutes` + `LoginPage` e `TrocaSenhaObrigatoriaPage` em `App.tsx`), não "45+".
 >
 > **Correção de mito (o inverso do que esta spec dizia até 2026-07-20):** `pages/Disponibilidade/` (diretório) **não tem `index`**; quem está roteado em `/solicitacoes/bloqueios` é o arquivo solto [`pages/Disponibilidade.tsx`](../../../frontend/src/pages/Disponibilidade.tsx) (`AppRoutes.tsx`, const `DisponibilidadeBlocks` → `import('../pages/Disponibilidade')` resolve o arquivo antes do diretório). Do diretório homônimo, só `MonthlyPage` é roteada (`AppRoutes.tsx`, const `MonthlyPage`).
 
@@ -143,6 +143,7 @@ Inventário por domínio (rota → componente → guard **como o código aplica 
 | Rota | Página | Guard |
 |---|---|---|
 | (sem rota — render condicional em `App.tsx`, `AppContent` → ramo `if (!user)`) | `Auth/LoginPage` | anônimo |
+| (sem rota — render condicional em `App.tsx`, `AppContent` → ramo `if (trocaPendente)`, fora do `Router`) | `Auth/TrocaSenhaObrigatoriaPage` | sessão viva com `deve_trocar_senha` |
 
 ### Perfil
 
@@ -232,9 +233,14 @@ Inventário por domínio (rota → componente → guard **como o código aplica 
 
 > As flags legacy `canDashboardOverview`/`canDashboardEquipe`/`canDashboardGcal`/`canMapaBrasil` de `usePermissions` **não gateiam mais** essas rotas desde o #1271; continuam existindo no hook e são usadas por outros consumidores (ex.: menu antigo, widgets).
 
+> **Entrada: login e troca obrigatória de senha (02/10/2026, decisão do dono).**
+>
+> - **Login (`LoginPage`)**: o erro da tentativa fica na tela, num alerta (`role="alert"`) que substitui o aviso de sessão expirada (um alerta só), e muda conforme a causa, decidida pelo **status**: sem rede (`TypeError`) → "Sem conexão com o servidor. Confira a internet e tente de novo. Sua senha não foi recusada."; `429` (do login ou do `GET /api/csrf/`) → "Muitas tentativas de entrada vindas desta rede. Aguarde N segundos e tente de novo. Sua senha não foi recusada." (N do `Retry-After`; acima de 90 s fala em minutos; sem o número, "cerca de um minuto"); `400` → "CPF ou senha incorretos. Depois de 10 erros o acesso fica bloqueado por alguns minutos."; o resto (5xx, 403, erro sem status) → "Não foi possível entrar agora. O problema é no sistema, não na sua senha. Tente de novo em alguns minutos.". Senha errada e bloqueio por tentativas têm **a mesma frase** de propósito: o servidor não revela o bloqueio (#745). O "10" é o padrão de `ACCOUNT_LOCKOUT_THRESHOLD`; se o ambiente mudar o valor, a frase tem de mudar junto.
+> - **Troca obrigatória (`TrocaSenhaObrigatoriaPage`)**: quando o `/api/me/` traz `deve_trocar_senha: true`, o App mostra só esta tela no lugar do sistema — sem menu, sem rotas, sem fechar — e **fora do `Router`**, de modo que o endereço pedido fica intacto e abre depois da troca. Título "Defina sua senha"; as 5 regras da senha ficam escritas antes de qualquer erro e ligadas ao campo "Nova senha" por `aria-describedby`; foco no primeiro campo ao abrir e no primeiro campo com erro; o erro do servidor volta no campo certo (`errors.new_password` → "Nova senha"; `errors.old_password` → "Senha que você recebeu"); se a senha recebida for recusada (`400` em `errors.old_password`), a tela consulta o `/api/me/` uma vez e, com a marca já desligada (troca feita em outra aba), segue como troca concluída, sem erro; sem rede, `429` e erro do servidor aparecem num alerta dizendo que a senha não foi alterada. Ações: "Salvar e continuar" e "Sair" (o mesmo logout do cabeçalho). Sessão encerrada no meio (`401`/`403 NOT_AUTHENTICATED`) leva ao login com o aviso. Se a marca for ligada com a pessoa já dentro, o `403 PASSWORD_CHANGE_REQUIRED` de qualquer chamada dispara `auth:troca-de-senha` e o App recarrega o usuário. Regra do servidor: [rbac.spec](../backend/rbac.spec.md).
+
 ## Fluxos principais
 
-1. **Boot / autenticação** — `App.tsx` chama `getMe()`; se anônimo (`isAuthError`), renderiza `LoginPage`. Autenticado: busca `getMyPolicies()` (sequencial, evita 403 espúrio pré-login), monta sidebar/header/rotas. Loading → `FullscreenLoader`.
+1. **Boot / autenticação** — `App.tsx` chama `getMe()`; se anônimo (`isAuthError`), renderiza `LoginPage`. Com `deve_trocar_senha: true`, renderiza só a `TrocaSenhaObrigatoriaPage` e não busca policies. Autenticado: busca `getMyPolicies()` (sequencial, evita 403 espúrio pré-login), monta sidebar/header/rotas. Loading → `FullscreenLoader`.
 2. **Navegação para página guardada** — `AppRoutes` recebe `permissions` (`usePermissions`) + `policies` e resolve `access` (`useCanAccess`, só para os composites de disponibilidade). Cada rota delega a decisão a `<RequirePolicy>`: se concedido, monta a página lazy (fallback `PageLoader` durante o chunk); se não, monta `DefaultForbidden`.
 3. **URL legada** — `<Navigate replace>` redireciona para a rota canônica antes de qualquer render de página, preservando histórico/bookmark.
 4. **Erro de runtime na página** — `ErrorBoundary` (raiz, `App.tsx`) captura; falhas de auth em chamadas de API são tratadas por `isAuthError` e degradam para estado anônimo/`[]`. O servidor dizer que não há sessão — `401`, ou o `403` do DRF com `code: NOT_AUTHENTICATED` (o backend só usa `SessionAuthentication`, que não manda `WWW-Authenticate`, então o DRF responde 403; o 403 de falta de permissão tem `code: PERMISSION_DENIED` e não conta) — dispara o evento global `auth:expired`, tratado uma única vez em `App.tsx` (`conferirSessao`): pergunta ao servidor (`GET /api/me/`); sem sessão → `LoginPage` com "Sua sessão expirou. Entre de novo.", sem POST de logout; sessão viva → fica onde está.

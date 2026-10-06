@@ -43,12 +43,14 @@ def api_root(request: HttpRequest) -> JsonResponse:
 
 
 def _gerencias_do_vinculo(user: Any) -> list[dict[str, Any]]:
-    """`[{id, rotulo, papeis}]` dos vínculos vigentes do usuário em gerências ativas.
+    """`[{id, rotulo, papeis}]` dos vínculos vigentes com escopo (menos EQUIPE) em gerências ativas.
 
     Agrupa por gerência (dois papéis na mesma gerência viram um item) e ordena pelo
     rótulo. Uma query só (`select_related` da gerência).
     """
-    vinculos = EquipeGerencia.vigentes_em().filter(usuario=user, gerencia__ativo=True).select_related("gerencia")
+    vinculos = (
+        EquipeGerencia.vigentes_com_escopo_em().filter(usuario=user, gerencia__ativo=True).select_related("gerencia")
+    )
     por_gerencia: dict[int, dict[str, Any]] = {}
     for v in vinculos:
         item = por_gerencia.setdefault(v.gerencia_id, {"id": v.gerencia_id, "rotulo": v.gerencia.rotulo, "papeis": []})

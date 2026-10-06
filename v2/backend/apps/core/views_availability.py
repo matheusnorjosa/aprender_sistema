@@ -85,7 +85,7 @@ def can_check_availability_for_others(user):
 
 def get_user_gerencias_ids(user) -> list[int]:
     """Retorna IDs de todas as gerências do usuário (via EquipeGerencia)."""
-    return list(EquipeGerencia.vigentes_em().filter(usuario=user).values_list("gerencia_id", flat=True))
+    return list(EquipeGerencia.vigentes_com_escopo_em().filter(usuario=user).values_list("gerencia_id", flat=True))
 
 
 class AvailabilityBlockViewSet(viewsets.ModelViewSet):
@@ -129,7 +129,7 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
             else:
                 # Bloqueios de usuários das suas gerências
                 usuarios_na_gerencia = (
-                    EquipeGerencia.vigentes_em()
+                    EquipeGerencia.vigentes_com_escopo_em()
                     .filter(gerencia_id__in=gerencias_ids)
                     .values_list("usuario_id", flat=True)
                 )

@@ -117,6 +117,8 @@ interface UserRecord {
   group_ids_display?: ID[];
   // Lotação vigente (EquipeGerencia) — hidrata a gerência no EDIT. null se não há vínculo.
   gerencia_atual?: { gerencia_id: number; rotulo: string; nome_setor: string; setor_canonico: string; papel: string } | null;
+  // Tem vínculo vigente de papel EQUIPE ("Equipe administrativa").
+  equipe_administrativa?: boolean;
   date_joined?: string;
   last_login?: string | null;
 }
@@ -165,6 +167,7 @@ const PAPEL: Record<string, string> = {
   COORDENADOR: 'Coordenador',
   APOIO: 'Apoio de Coordenação',
   FORMADOR: 'Formador',
+  EQUIPE: 'Equipe administrativa',
 };
 
 /** Tags que quebram linha e cortam com reticências em vez de estourar a coluna. */
@@ -293,6 +296,7 @@ interface UserFormValues {
   is_superuser: boolean;
   gerencia_id?: ID | null | undefined;
   funcao_ids: ID[];
+  equipe_administrativa?: boolean | undefined;
   password?: string;
 }
 
@@ -364,10 +368,12 @@ export default function UsuariosPage(): JSX.Element {
   const [form] = Form.useForm<UserFormValues>();
   const [resetForm] = Form.useForm<{ nova_senha: string; confirmar_nova_senha: string }>();
   const selectedGerenciaId = Form.useWatch('gerencia_id', form);
+  const equipeMarcada = Form.useWatch('equipe_administrativa', form);
   const obrigatorio = lotacaoObrigatoria({
     currentIsSuperuser,
     isEditing: !!editingUser,
     temLotacao: !!editingUser?.gerencia_atual,
+    equipeAdministrativa: equipeMarcada,
   });
   const selectedFuncaoIds = Form.useWatch('funcao_ids', form) || [];
 
@@ -515,6 +521,7 @@ export default function UsuariosPage(): JSX.Element {
       is_superuser: false,
       gerencia_id: undefined,
       funcao_ids: [],
+      equipe_administrativa: false,
     });
     setModalVisible(true);
   };
@@ -542,6 +549,7 @@ export default function UsuariosPage(): JSX.Element {
       is_superuser: user.is_superuser,
       gerencia_id: user.gerencia_atual?.gerencia_id ?? undefined,
       funcao_ids: funcaoIds,
+      equipe_administrativa: user.equipe_administrativa,
     });
     setModalVisible(true);
   };
@@ -987,6 +995,14 @@ export default function UsuariosPage(): JSX.Element {
               options={funcaoOptions}
               disabled={!currentIsSuperuser}
             />
+          </Form.Item>
+
+          <Form.Item
+            name="equipe_administrativa"
+            valuePropName="checked"
+            extra="Só registra que a pessoa trabalha nesta gerência (ex.: suporte do DAT, Controle). Não dá função, grupo, permissão nem acesso a dados da gerência, e não a põe em nenhuma lista."
+          >
+            <Checkbox disabled={!currentIsSuperuser}>Equipe administrativa</Checkbox>
           </Form.Item>
 
           <Card size="small" title="Resumo do perfil de acesso" className="mb-4">

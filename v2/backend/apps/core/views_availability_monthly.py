@@ -191,7 +191,7 @@ class MonthlyAvailabilityView(APIView):
                 cache_scope = "wide"
             else:
                 user_gerencia_ids = list(
-                    EquipeGerencia.vigentes_em()
+                    EquipeGerencia.vigentes_com_escopo_em()
                     .filter(
                         usuario=request.user,
                     )
@@ -200,7 +200,7 @@ class MonthlyAvailabilityView(APIView):
                 if user_gerencia_ids:
                     # PERF-SQL-04: filter nulls at DB level instead of Python
                     allowed_user_ids = list(
-                        EquipeGerencia.vigentes_em()
+                        EquipeGerencia.vigentes_com_escopo_em()
                         .filter(
                             gerencia_id__in=user_gerencia_ids,
                             usuario_id__isnull=False,

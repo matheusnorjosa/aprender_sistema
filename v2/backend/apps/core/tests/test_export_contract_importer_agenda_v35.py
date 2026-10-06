@@ -20,9 +20,10 @@ from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
-import pytest
 from django.core.management import call_command
 from django.utils import timezone
+
+import pytest
 
 from apps.core.models import AuditLog, Municipio, TipoEvento
 from apps.core.models.solicitacao import Solicitacao

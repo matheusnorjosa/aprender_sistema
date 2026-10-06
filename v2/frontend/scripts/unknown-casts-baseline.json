@@ -1,7 +1,6 @@
 {
   "src/api/adminDAT.ts": 1,
   "src/api/availability.ts": 1,
-  "src/pages/AdminDAT/ColecoesImportPage.tsx": 2,
   "src/pages/AdminDAT/ConfiguracoesPage.tsx": 4,
   "src/pages/AdminDAT/EquipeGerenciaImportPage.tsx": 2,
   "src/pages/AdminDAT/MunicipiosPage.tsx": 2,

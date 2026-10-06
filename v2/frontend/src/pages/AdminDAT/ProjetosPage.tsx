@@ -297,8 +297,8 @@ export default function ProjetosPage(): JSX.Element {
       ),
     },
     {
-      // Família (ProjetoGeral) do projeto: só leitura; a ligação vem do import ou de correção de dados.
-      title: 'Família',
+      // Coleção = família (ProjetoGeral) do projeto: só leitura; a ligação vem do import ou de correção de dados.
+      title: 'Coleção',
       dataIndex: 'projeto_geral_nome',
       key: 'projeto_geral_nome',
       ellipsis: true,

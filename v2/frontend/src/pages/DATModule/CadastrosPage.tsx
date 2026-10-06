@@ -423,7 +423,7 @@ export default function CadastrosPage(): JSX.Element {
           <Col xs={24} sm={12} md={8} lg={4}>
             <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
-                Projeto
+                Coleção
               </Text>
             </div>
             <Select
@@ -625,8 +625,8 @@ export default function CadastrosPage(): JSX.Element {
               <Col xs={24} sm={12}>
                 <Form.Item
                   name="projeto_geral"
-                  label="Projeto"
-                  rules={[{ required: true, message: 'Selecione o projeto' }]}
+                  label="Coleção"
+                  rules={[{ required: true, message: 'Selecione a coleção' }]}
                 >
                   <Select
                     placeholder="Selecione..."

@@ -235,7 +235,6 @@ _TIPO_EM_USO: dict[str, str] = {
     "core.AcaoTemplate": "Ações Template",
     "core.AcaoTemplateExecutor": "Executores de Ações Template",
     "core.CicloAcoes": "Ciclos de Ações",
-    "core.Colecao": "Coleções",
     "core.EquipeGerencia": "Equipes de Gerências",
     "core.ImportJob": "Jobs de Importação",
     "core.Participation": "Participações",

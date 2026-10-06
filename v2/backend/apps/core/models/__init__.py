@@ -62,7 +62,6 @@ from apps.core.models.group_classificacao import GroupClassificacao
 from apps.core.models.import_job import ImportJob
 from apps.core.models.integracao import GoogleOAuthCredential
 from apps.core.models.organizacao import (
-    Colecao,
     EquipeGerencia,
     Gerencia,
     Municipio,
@@ -90,7 +89,6 @@ __all__ = [
     "ProjetoGeral",
     "Projeto",
     "TipoEvento",
-    "Colecao",
     "Produto",
     # Solicitacao
     "Solicitacao",

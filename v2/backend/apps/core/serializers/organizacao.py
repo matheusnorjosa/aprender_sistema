@@ -13,7 +13,7 @@ from typing import Any
 
 from rest_framework import serializers  # type: ignore[attr-defined]
 
-from apps.core.models import Colecao, Gerencia, Municipio, Produto, Projeto, ProjetoGeral, TipoEvento
+from apps.core.models import Gerencia, Municipio, Produto, Projeto, ProjetoGeral, TipoEvento
 from apps.core.rbac.helpers import (
     GERENCIA_APROVADORA_NOME,
     MSG_FLUXO_SUPER_SO_NA_SUPERINTENDENCIA,
@@ -230,9 +230,6 @@ class ProdutoSerializer(serializers.ModelSerializer["Produto"]):
     """
 
     projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
-    # Cadastro direto da coleção (#2 diretriz: todo campo importado tem home de
-    # cadastro). `colecao` é FK nullable → PrimaryKeyRelatedField writable/allow_null.
-    colecao_nome = serializers.CharField(source="colecao.nome", read_only=True)
 
     class Meta:
         model = Produto
@@ -243,8 +240,6 @@ class ProdutoSerializer(serializers.ModelSerializer["Produto"]):
             "descricao",
             "projeto",
             "projeto_nome",
-            "colecao",
-            "colecao_nome",
             "ativo",
             "created_at",
             "updated_at",
@@ -260,12 +255,3 @@ class ProdutoOptionSerializer(serializers.ModelSerializer["Produto"]):
     class Meta:
         model = Produto
         fields = ["id", "nome", "codigo"]
-
-
-class ColecaoOptionSerializer(serializers.ModelSerializer["Colecao"]):
-    """Serializer minimalista para dropdowns de Coleção (inclui `projeto` para
-    filtrar as coleções da família selecionada no cadastro de Produto)."""
-
-    class Meta:
-        model = Colecao
-        fields = ["id", "nome", "projeto"]

@@ -23,7 +23,6 @@ vi.mock('../../../api/ops', () => ({
   importAcoes: vi.fn(),
   importBloqueios: vi.fn(),
   importCadastros: vi.fn(),
-  importColecoes: vi.fn(),
   importCompras: vi.fn(),
   importDeslocamentos: vi.fn(),
   importEquipeGerencia: vi.fn(),
@@ -53,7 +52,8 @@ describe('ImportacoesPage — DAT > Importações (PR-B)', () => {
     const section = screen.getByRole('region', { name: 'Cadastros base' });
     expect(within(section).getByText(/Importar USUÁRIOS/)).toBeInTheDocument();
     expect(within(section).getByText(/Importar MUNICÍPIOS/)).toBeInTheDocument();
-    expect(within(section).getByText(/Importar COLEÇÕES/)).toBeInTheDocument();
+    // Coleção é a família do projeto (06/10/2026): não há mais importação própria de coleções.
+    expect(within(section).queryByText(/Importar COLEÇÕES/)).not.toBeInTheDocument();
     expect(within(section).getByText(/Importar CADASTROS DAT/)).toBeInTheDocument();
     expect(within(section).getByText(/Importar VÍNCULOS/)).toBeInTheDocument();
   });
@@ -78,6 +78,6 @@ describe('ImportacoesPage — DAT > Importações (PR-B)', () => {
     render(<ImportacoesPage />);
     // Cada card tem um label começando com "Importar X".
     const cardLabels = screen.getAllByText(/^Importar [A-Z]/);
-    expect(cardLabels).toHaveLength(11);
+    expect(cardLabels).toHaveLength(10);
   });
 });

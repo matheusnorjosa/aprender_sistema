@@ -193,7 +193,6 @@ from apps.core.models import Compra, Municipio, Produto, Projeto
 | `POST /api/controle/import-compras/` | `ImportComprasView` em `apps/core/views_controle_imports.py` | `IsAuthenticated + HasPerm("import_spreadsheet")` (PR-A1 DAT-Imports 2026-04-29 centralizou em DAT-only) |
 | `POST /api/produtos/import/` | `ImportProdutosView` em `apps/core/views_import_produtos.py` | `IsAuthenticated + HasPerm("import_spreadsheet")` |
 | `POST /api/municipios/import/` | `ImportMunicipiosView` em `apps/core/views_import_municipios.py` | `IsAuthenticated + HasPerm("manage_admin_registries")` |
-| `POST /api/colecoes/import/` | `ImportColecoesView` em `apps/core/views_import_colecoes.py` | `IsAuthenticated + HasPerm("manage_admin_registries")` |
 | `POST /api/controle/import-acoes/` | `ControleImportAcoesView` em `apps/core/views_imports.py` | `IsAuthenticated + HasPerm("import_spreadsheet")` |
 | `POST /api/dat/import-cadastros/` | `DATImportCadastrosView` em `apps/core/views_imports.py` | `IsAuthenticated + HasPerm("manage_admin_registries")` |
 

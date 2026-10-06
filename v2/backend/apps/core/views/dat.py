@@ -220,7 +220,7 @@ class DATRegistroViewSet(LockOnWriteMixin, viewsets.ModelViewSet):
             [
                 "Município",
                 "UF",
-                "Projeto Geral",
+                "Coleção",
                 "Projeto",
                 "Qtde Alunos",
                 "Qtde Professores",

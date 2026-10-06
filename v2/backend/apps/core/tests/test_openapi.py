@@ -289,7 +289,6 @@ class TestOpenAPISchema(TestCase):
             "/api/solicitacoes/import/",
             "/api/usuarios/import/",
             "/api/municipios/import/",
-            "/api/colecoes/import/",
             "/api/equipe-gerencia/import/",
             "/api/produtos/import/",
         ]

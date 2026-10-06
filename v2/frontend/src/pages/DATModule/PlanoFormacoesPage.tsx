@@ -603,8 +603,8 @@ export default function PlanoFormacoesPage(): JSX.Element {
       ellipsis: true,
     },
     {
-      // Família (projeto_geral_nome) ao lado da variante. ⚠️ sorter CLIENT-SIDE (só a página carregada).
-      title: 'Família',
+      // Coleção = família (projeto_geral_nome) ao lado da variante. ⚠️ sorter CLIENT-SIDE (só a página carregada).
+      title: 'Coleção',
       dataIndex: 'projeto_geral_nome',
       key: 'projeto_geral',
       width: 150,

@@ -69,7 +69,7 @@ O sistema original funcionava integralmente sobre planilhas Google/Excel, que ac
 > exporta **43 nomes** em `__all__` de `apps/core/models/__init__.py`. Não confie na contagem daqui:
 > o **SSOT é `apps/core/models/__init__.py`**.
 >
-> Ausentes da tabela abaixo: `Colecao`, `MunicipioReferencia`, `ImportJob`, `PermissaoFuncional`,
+> Ausentes da tabela abaixo: `MunicipioReferencia`, `ImportJob`, `PermissaoFuncional`,
 > `GroupClassificacao` e os 8 modelos de ações/notificações (`AcaoTemplate`,
 > `AcaoTemplateExecutor`, `CicloAcoes`, `AcaoInstancia`, `RegistroAncora`,
 > `RegistroConclusaoAcao`, `FeriadoLocal`, `NotificacaoInterna`) —

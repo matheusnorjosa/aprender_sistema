@@ -39,7 +39,6 @@ Evitar regressão silenciosa de schema (`No response body` ou respostas genéric
   - `POST /api/solicitacoes/import/`
   - `POST /api/usuarios/import/`
   - `POST /api/municipios/import/`
-  - `POST /api/colecoes/import/`
   - `POST /api/equipe-gerencia/import/`
   - `POST /api/produtos/import/`
 

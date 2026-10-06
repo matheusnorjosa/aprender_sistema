@@ -1,7 +1,8 @@
 /**
- * AdminDAT — CRUD de Projetos Gerais (#1914)
+ * AdminDAT — CRUD de Coleções (#1914)
  *
- * ProjetoGeral é a FAMÍLIA de projeto (nome-base, ex.: "PROJETO AMMA"), com a política de
+ * ProjetoGeral é a FAMÍLIA de projeto (nome-base, ex.: "PROJETO AMMA"), que na tela se chama
+ * Coleção (decisão do dono, 06/10/2026; model, campos e URL da API seguem `projeto_geral`), com a política de
  * cálculo de códigos (por aluno / por professor) e o flag de AVALIAR. O ViewSet já existia
  * (/api/projetos-gerais/); esta tela dá o CRUD que faltava.
  *
@@ -147,10 +148,10 @@ export default function ProjetosGeraisPage(): JSX.Element {
       };
       if (editing) {
         await updateProjetoGeral(editing.id, payload);
-        message.success('Projeto geral atualizado');
+        message.success('Coleção atualizada');
       } else {
         await createProjetoGeral(payload);
-        message.success('Projeto geral criado');
+        message.success('Coleção criada');
       }
       setModalVisible(false);
       void fetchProjetos(pagination.current ?? 1, pagination.pageSize ?? DEFAULT_PAGE_SIZE);
@@ -168,14 +169,14 @@ export default function ProjetosGeraisPage(): JSX.Element {
     // se a pessoa já o fechou com o DELETE em andamento (excluirEmUso.ts).
     const aposFechar = aposConfirmacaoFechar();
     Modal.confirm({
-      title: 'Excluir projeto geral',
-      // Os projetos da família não somem: ficam sem projeto geral (SET_NULL no backend), inclusive os
+      title: 'Excluir coleção',
+      // Os projetos da coleção não somem: ficam sem coleção (SET_NULL no backend), inclusive os
       // inativos, que a contagem (só de ativos) não inclui.
       content:
         `Tem certeza que deseja excluir "${record.nome}"?` +
         (projetos > 0
-          ? ` Os projetos desta família (${projetos} ativo(s) e os inativos) ficarão sem projeto geral.`
-          : ' Não há projetos ativos nesta família; os inativos, se houver, ficarão sem projeto geral.'),
+          ? ` Os projetos desta coleção (${projetos} ativo(s) e os inativos) ficarão sem coleção.`
+          : ' Não há projetos ativos nesta coleção; os inativos, se houver, ficarão sem coleção.'),
       okText: 'Sim, excluir',
       cancelText: 'Cancelar',
       okButtonProps: { danger: true },
@@ -184,15 +185,15 @@ export default function ProjetosGeraisPage(): JSX.Element {
       onOk: async () => {
         try {
           await deleteProjetoGeral(record.id);
-          message.success('Projeto geral excluído');
+          message.success('Coleção excluída');
           void fetchProjetos(pagination.current ?? 1, pagination.pageSize ?? DEFAULT_PAGE_SIZE);
         } catch (error) {
           const emUso = dialogoDeExclusaoEmUso({
             erro: error,
-            registro: `o projeto geral "${record.nome}"`,
+            registro: `a coleção "${record.nome}"`,
             ativo: record.ativo,
             desativar: () => updateProjetoGeral(record.id, { ativo: false }),
-            desativado: 'Projeto geral desativado',
+            desativado: 'Coleção desativada',
             recarregar: () => void fetchProjetos(pagination.current ?? 1, pagination.pageSize ?? DEFAULT_PAGE_SIZE),
           });
           if (emUso) aposFechar.abrir(emUso);
@@ -288,12 +289,12 @@ export default function ProjetosGeraisPage(): JSX.Element {
       <Card style={{ marginTop: 16 }}>
         <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <Title level={2} id="projetos-gerais-title" className="m-0">
-            Projetos Gerais
+            Coleções
           </Title>
           <div className="flex flex-wrap items-center gap-2">
             <Search
               placeholder="Buscar por nome..."
-              aria-label="Buscar projetos gerais por nome"
+              aria-label="Buscar coleções por nome"
               allowClear
               onSearch={(v) => setSearchText(v)}
               style={{ width: 240, maxWidth: '100%' }}
@@ -306,7 +307,7 @@ export default function ProjetosGeraisPage(): JSX.Element {
               Atualizar
             </Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-              Novo Projeto Geral
+              Nova Coleção
             </Button>
           </div>
         </header>
@@ -324,7 +325,7 @@ export default function ProjetosGeraisPage(): JSX.Element {
       </Card>
 
       <Modal
-        title={editing ? 'Editar Projeto Geral' : 'Novo Projeto Geral'}
+        title={editing ? 'Editar Coleção' : 'Nova Coleção'}
         open={modalVisible}
         onCancel={() => setModalVisible(false)}
         onOk={() => form.submit()}

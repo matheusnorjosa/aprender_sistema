@@ -170,6 +170,7 @@ export interface ComprasDashboardKpis {
   total_entregue: number;
   total_disponivel: number;
   produtos_diferentes: number;
+  /** Coleção = família (ProjetoGeral) do projeto da compra. */
   colecoes_diferentes: number;
 }
 

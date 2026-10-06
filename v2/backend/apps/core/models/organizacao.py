@@ -302,6 +302,9 @@ class EquipeGerencia(models.Model):
         ("COORDENADOR", "Coordenador"),
         ("APOIO", "Apoio de Coordenacao"),
         ("FORMADOR", "Formador"),
+        # Só diz "trabalha neste setor" (DAT, Controle e outros): não entra em lista de pessoas,
+        # Grade, gestão nem aprovação, e não vem de grupo. Ver `specs/backend/rbac.spec.md`.
+        ("EQUIPE", "Equipe administrativa"),
     ]
 
     gerencia = models.ForeignKey(  # type: ignore[misc]

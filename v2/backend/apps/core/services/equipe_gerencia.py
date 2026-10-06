@@ -35,6 +35,16 @@ PAPEL_POR_FUNCAO: dict[str, str] = {
 }
 
 
+# Papel "Equipe administrativa" (05/10/2026): só diz "trabalha neste setor". Não vem de grupo de
+# função (o form marca à parte) e não dá lista, Grade, gestão nem aprovação.
+PAPEL_EQUIPE = "EQUIPE"
+
+
+def tem_equipe_administrativa(usuario: Any) -> bool:
+    """True se o usuário tem vínculo VIGENTE de papel EQUIPE (em qualquer gerência)."""
+    return EquipeGerencia.vigentes_em().filter(usuario=usuario, papel=PAPEL_EQUIPE).exists()
+
+
 def papeis_de_grupos(groups: Iterable[Any]) -> set[str]:
     """Deriva o conjunto de papéis (EquipeGerencia) a partir dos grupos de FUNÇÃO."""
     return {PAPEL_POR_FUNCAO[g.name] for g in groups if g.name in PAPEL_POR_FUNCAO}

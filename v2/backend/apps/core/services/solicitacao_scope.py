@@ -45,6 +45,7 @@ from apps.core.rbac.policies import (
     user_has_policy,
 )
 from apps.core.rbac_helpers import user_has_any_perm
+from apps.core.services.equipe_gerencia import PAPEL_EQUIPE
 
 # Caps que hoje concediam alcance nacional de solicitação (vazam para todo Gerente).
 _MANAGER_CAPS = ("approve_solicitation", "approve_solicitation_batch")
@@ -230,13 +231,18 @@ def user_setores(user: Any) -> set[str]:
 
 
 def _setores_por_usuario(user_ids: list[int]) -> dict[int, set[str]]:
-    """Mapa user_id → setores (1 query) para checar vários participantes de uma vez."""
+    """Mapa user_id → setores de PARTICIPANTE (1 query) para checar vários de uma vez.
+
+    O vínculo EQUIPE ("Equipe administrativa") conta como setor de quem AGE (`user_setores`), mas não
+    põe a pessoa no setor como participante: ela não é formadora nem coordenadora ali.
+    """
     out: dict[int, set[str]] = defaultdict(set)
     if not user_ids:
         return out
     rows = (
         EquipeGerencia.vigentes_em()
         .filter(usuario_id__in=user_ids)
+        .exclude(papel=PAPEL_EQUIPE)
         .exclude(gerencia__setor_canonico="")
         .exclude(gerencia__setor_canonico__isnull=True)
         .values_list("usuario_id", "gerencia__setor_canonico")
@@ -281,7 +287,8 @@ def scope_usuarios_by_setor(qs: QuerySet, user: Any) -> QuerySet:
     - Global/privilegiado (`user_is_solicitacao_global`: superuser, Superintendência,
       Controle, DAT) → sem filtro.
     - `user` sem setor → sem filtro (fail-open; espelha o write-path).
-    - Caso contrário: só usuários com vínculo vigente em algum desses setores.
+    - Caso contrário: só usuários com vínculo vigente em algum desses setores (o papel EQUIPE não
+      conta, como em `_setores_por_usuario`).
     """
     if user_is_solicitacao_global(user):
         return qs
@@ -289,7 +296,10 @@ def scope_usuarios_by_setor(qs: QuerySet, user: Any) -> QuerySet:
     if not setores:
         return qs
     vigentes = (
-        EquipeGerencia.vigentes_em().filter(gerencia__setor_canonico__in=setores).values_list("usuario_id", flat=True)
+        EquipeGerencia.vigentes_em()
+        .filter(gerencia__setor_canonico__in=setores)
+        .exclude(papel=PAPEL_EQUIPE)
+        .values_list("usuario_id", flat=True)
     )
     return qs.filter(id__in=vigentes)
 

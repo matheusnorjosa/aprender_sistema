@@ -1,5 +1,5 @@
 /**
- * C2 (Programa C) — Projetos Gerais sem rolagem horizontal: lista enxuta no ResponsiveTable.
+ * C2 (Programa C) — Coleções (ProjetoGeral) sem rolagem horizontal: lista enxuta no ResponsiveTable.
  *
  * Sempre na linha: o nome, Situação e as ações (AcoesLinha, "Editar: <nome>"). As demais sobem
  * por largura: Cálculo de códigos a partir de md, Usa AVALIAR e Projetos de lg. O que some da
@@ -131,7 +131,15 @@ describe('ProjetosGeraisPage responsiva (C2)', () => {
     renderPage();
     await linhaDoProjeto();
 
-    expect(screen.getByRole('searchbox', { name: /Buscar projetos gerais/ })).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: /Buscar coleções/ })).toBeInTheDocument();
+  }, 20000);
+
+  test('a tela se chama Coleções: a família do projeto é a coleção (decisão do dono, 06/10/2026)', async () => {
+    renderPage();
+    await linhaDoProjeto();
+
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(/^Coleções$/);
+    expect(screen.getByRole('button', { name: /Nova Coleção/ })).toBeInTheDocument();
   }, 20000);
 
   test('Excluir: a confirmação cita o nome e começa no Cancelar', async () => {
@@ -153,7 +161,7 @@ describe('ProjetosGeraisPage responsiva (C2)', () => {
     const linha = await linhaDoProjeto();
 
     await user.click(within(linha).getByRole('button', { name: `Editar: ${NOME}` }));
-    const modal = (await screen.findByText('Editar Projeto Geral', {}, { timeout: 10000 })).closest<HTMLElement>(
+    const modal = (await screen.findByText('Editar Coleção', {}, { timeout: 10000 })).closest<HTMLElement>(
       '[role="dialog"]',
     );
     expect(modal).not.toBeNull();

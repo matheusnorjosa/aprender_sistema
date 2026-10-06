@@ -351,8 +351,8 @@ export default function AcoesPage(): JSX.Element {
       render: (nome: string) => <Tag color="blue">{nome}</Tag>,
     },
     {
-      // Família (projeto_geral_nome) ao lado da variante. ⚠️ sorter CLIENT-SIDE (só a página carregada).
-      title: 'Família',
+      // Coleção = família (projeto_geral_nome) ao lado da variante. ⚠️ sorter CLIENT-SIDE (só a página carregada).
+      title: 'Coleção',
       dataIndex: 'projeto_geral_nome',
       key: 'projeto_geral',
       width: 140,
@@ -729,7 +729,7 @@ export default function AcoesPage(): JSX.Element {
         >
           <div
             style={{
-              // 620 = Município-UF(180) + Projeto(150) + Família(140) + Coordenador(150).
+              // 620 = Município-UF(180) + Projeto(150) + Coleção(140) + Coordenador(150).
               flex: '0 0 620px',
               padding: '8px 16px',
               borderRight: '1px solid #f0f0f0',

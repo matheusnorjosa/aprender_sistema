@@ -345,9 +345,9 @@ export default function ComprasPage(): JSX.Element {
       render: (nome: string) => <Tag color="blue">{nome}</Tag>,
     },
     {
-      // Família (projeto_geral_nome) ao lado da variante — reagrupar por família via ordenar.
+      // Coleção = família (projeto_geral_nome) ao lado da variante — reagrupar por coleção via ordenar.
       // ⚠️ sorter CLIENT-SIDE: ordena só a página carregada (ordering server-side não é wired aqui).
-      title: 'Família',
+      title: 'Coleção',
       dataIndex: 'projeto_geral_nome',
       key: 'projeto_geral',
       width: 140,

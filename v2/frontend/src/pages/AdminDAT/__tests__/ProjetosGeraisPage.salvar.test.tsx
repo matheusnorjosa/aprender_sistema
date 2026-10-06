@@ -1,8 +1,8 @@
 /**
- * C2 (Programa C) — Projetos Gerais: salvar, excluir e o formulário só com o que importa.
+ * C2 (Programa C) — Coleções (ProjetoGeral, a família do projeto): salvar, excluir e o formulário só com o que importa.
  *
  * - O erro de validação do backend (nome repetido) aparece com o motivo, no campo.
- * - Salvar com loading; a exclusão diz que os projetos da família ficam sem projeto geral.
+ * - Salvar com loading; a exclusão diz que os projetos da coleção ficam sem coleção.
  * - Só o parâmetro do cálculo escolhido aparece (divisor por aluno, multiplicador por professor),
  *   e as opções falam português, não nome de campo ("qtde_alunos / divisor").
  */
@@ -46,7 +46,7 @@ async function linha(): Promise<HTMLElement> {
 
 async function abrirEditar(user: ReturnType<typeof userEvent.setup>): Promise<HTMLElement> {
   await user.click(within(await linha()).getByRole('button', { name: `Editar: ${ITEM.nome}` }));
-  return (await screen.findByText('Editar Projeto Geral', {}, { timeout: 10000 })).closest<HTMLElement>('[role="dialog"]')!;
+  return (await screen.findByText('Editar Coleção', {}, { timeout: 10000 })).closest<HTMLElement>('[role="dialog"]')!;
 }
 
 /** O campo está escondido (Form.Item `hidden`: continua no formulário, fora da tela). */
@@ -65,7 +65,7 @@ describe('ProjetosGeraisPage: salvar e excluir (C2)', () => {
     const erro = vi.spyOn(message, 'error').mockImplementation(() => (() => undefined) as never);
     vi.mocked(updateProjetoGeral).mockRejectedValue(
       Object.assign(new Error('Erro de validação.'), {
-        response: { status: 400, data: { detail: 'Erro de validação.', errors: { nome: ['projeto geral com este nome já existe.'] } } },
+        response: { status: 400, data: { detail: 'Erro de validação.', errors: { nome: ['Coleção com este nome já existe.'] } } },
       }),
     );
     const user = userEvent.setup();
@@ -74,8 +74,8 @@ describe('ProjetosGeraisPage: salvar e excluir (C2)', () => {
     const modal = await abrirEditar(user);
     await user.click(within(modal).getByRole('button', { name: 'Salvar' }));
 
-    await waitFor(() => expect(erro).toHaveBeenCalledWith('Erro ao salvar: projeto geral com este nome já existe.'));
-    expect(await within(modal).findByText('projeto geral com este nome já existe.')).toBeInTheDocument();
+    await waitFor(() => expect(erro).toHaveBeenCalledWith('Erro ao salvar: Coleção com este nome já existe.'));
+    expect(await within(modal).findByText('Coleção com este nome já existe.')).toBeInTheDocument();
     erro.mockRestore();
   }, 40000);
 
@@ -90,7 +90,7 @@ describe('ProjetosGeraisPage: salvar e excluir (C2)', () => {
     await waitFor(() => expect(within(modal).getByRole('button', { name: /Salvar/ })).toHaveClass('ant-btn-loading'));
   }, 40000);
 
-  test('a exclusão diz que os projetos da família, ativos e inativos, ficam sem projeto geral', async () => {
+  test('a exclusão diz que os projetos da coleção, ativos e inativos, ficam sem coleção', async () => {
     const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() }));
     vi.mocked(listProjetosGerais).mockResolvedValue({
       results: [ITEM, { ...ITEM, id: 2, nome: 'PROJETO VIDAS', projetos_count: 0 }], count: 2, next: null, previous: null,
@@ -104,10 +104,10 @@ describe('ProjetosGeraisPage: salvar e excluir (C2)', () => {
     const [comAtivos, semAtivos] = confirmar.mock.calls.map(([opcoes]) => String(opcoes.content));
     // A contagem é só dos ativos, mas o SET_NULL também desvincula os inativos.
     expect(comAtivos).toBe(
-      `Tem certeza que deseja excluir "${ITEM.nome}"? Os projetos desta família (3 ativo(s) e os inativos) ficarão sem projeto geral.`,
+      `Tem certeza que deseja excluir "${ITEM.nome}"? Os projetos desta coleção (3 ativo(s) e os inativos) ficarão sem coleção.`,
     );
     expect(semAtivos).toBe(
-      'Tem certeza que deseja excluir "PROJETO VIDAS"? Não há projetos ativos nesta família; os inativos, se houver, ficarão sem projeto geral.',
+      'Tem certeza que deseja excluir "PROJETO VIDAS"? Não há projetos ativos nesta coleção; os inativos, se houver, ficarão sem coleção.',
     );
     confirmar.mockRestore();
   }, 30000);
@@ -134,13 +134,13 @@ describe('ProjetosGeraisPage: salvar e excluir (C2)', () => {
     expect(confirmar).toHaveBeenCalledTimes(2);
     const emUso = confirmar.mock.calls[1]![0];
     expect(String(emUso.content)).toContain(motivo);
-    expect(String(emUso.content)).toContain(`Você pode desativar o projeto geral "${ITEM.nome}"`);
+    expect(String(emUso.content)).toContain(`Você pode desativar a coleção "${ITEM.nome}"`);
     expect(emUso.okText).toBe('Desativar');
     const cargas = vi.mocked(listProjetosGerais).mock.calls.length;
     await emUso.onOk!();
 
     expect(updateProjetoGeral).toHaveBeenCalledWith(ITEM.id, { ativo: false });
-    expect(sucesso).toHaveBeenCalledWith('Projeto geral desativado');
+    expect(sucesso).toHaveBeenCalledWith('Coleção desativada');
     await waitFor(() => expect(listProjetosGerais).toHaveBeenCalledTimes(cargas + 1));
     confirmar.mockRestore();
     erro.mockRestore();

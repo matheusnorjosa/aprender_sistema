@@ -67,7 +67,6 @@ def coordenador_ocupante(solicitacao: Solicitacao) -> Usuario | None:
     return solicitacao.coordenador or solicitacao.usuario
 
 
-
 @dataclass
 class Conflict:
     """

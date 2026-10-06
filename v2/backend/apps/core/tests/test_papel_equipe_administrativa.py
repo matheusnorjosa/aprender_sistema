@@ -317,6 +317,19 @@ class TestFormularioDeUsuarios:
         assert resp.data["equipe_administrativa"] is True
         assert resp.data["gerencia_atual"]["papel"] == "EQUIPE"
 
+    def test_form_mostra_a_gerencia_da_funcao_e_nao_a_da_equipe(self, root, vidas):
+        dat = _gerencia("G DAT FORM", "DAT")
+        alvo = _pessoa("form_mostra")
+        _vincula(alvo, dat, "EQUIPE")  # id menor: antes era o vínculo exibido
+        _vincula(alvo, vidas, "FORMADOR")
+        client = APIClient()
+        client.force_authenticate(root)
+
+        resp = client.get(f"/api/usuarios-admin/{alvo.id}/")
+
+        assert resp.data["gerencia_atual"]["gerencia_id"] == vidas.id
+        assert resp.data["gerencia_atual"]["papel"] == "FORMADOR"
+
     @pytest.mark.parametrize(
         "extra", [{"equipe_administrativa": True}, {}], ids=["form_reenvia_marcado", "campo_ausente"]
     )

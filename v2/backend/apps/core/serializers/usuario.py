@@ -52,14 +52,15 @@ _PAR_LEGADO: tuple[str, str] = ("Superintendência", "Gerente")
 
 def _vinculo_exibido(user: Any) -> Any:
     """O vínculo vigente que o form de Usuários mostra (e reenvia no save): o primeiro por id, preferindo
-    gerência ativa (senão um vínculo antigo em gerência desativada viraria a lotação editada)."""
-    return (
-        EquipeGerencia.vigentes_em()
-        .filter(usuario=user)
-        .select_related("gerencia")
-        .order_by("-gerencia__ativo", "id")
-        .first()
-    )
+    gerência ativa (senão um vínculo antigo em gerência desativada viraria a lotação editada).
+
+    Prefere vínculo com escopo (papel de função); o EQUIPE só aparece quando é o único vigente.
+    """
+    for vigentes in (EquipeGerencia.vigentes_com_escopo_em, EquipeGerencia.vigentes_em):
+        vinculo = vigentes().filter(usuario=user).select_related("gerencia").order_by("-gerencia__ativo", "id").first()
+        if vinculo is not None:
+            return vinculo
+    return None
 
 
 class UserSlimSerializer(serializers.ModelSerializer):

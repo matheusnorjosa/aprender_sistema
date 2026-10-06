@@ -302,10 +302,11 @@ class EquipeGerencia(models.Model):
         ("COORDENADOR", "Coordenador"),
         ("APOIO", "Apoio de Coordenacao"),
         ("FORMADOR", "Formador"),
-        # Só diz "trabalha neste setor" (DAT, Controle e outros): não entra em lista de pessoas,
-        # Grade, gestão nem aprovação, e não vem de grupo. Ver `specs/backend/rbac.spec.md`.
+        # Só diz "trabalha neste setor" (DAT, Controle e outros): nenhum efeito em lista, escopo ou
+        # permissão, e não vem nem dá grupo. Ver `specs/backend/rbac.spec.md`.
         ("EQUIPE", "Equipe administrativa"),
     ]
+    PAPEL_EQUIPE = "EQUIPE"
 
     gerencia = models.ForeignKey(  # type: ignore[misc]
         Gerencia,
@@ -390,6 +391,15 @@ class EquipeGerencia(models.Model):
         return EquipeGerencia.objects.filter(ativo=True, valid_from__lte=hoje).filter(
             models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=hoje)
         )
+
+    @classmethod
+    def vigentes_com_escopo_em(cls, hoje: date | None = None) -> models.QuerySet["EquipeGerencia"]:
+        """Vínculos vigentes que dão ESCOPO (leitura por gerência/setor, listas, permissão): todos menos EQUIPE.
+
+        SSOT para todo ponto que usa o vínculo como "a pessoa atua nesta gerência" para autorizar ou
+        listar. O papel EQUIPE ("Equipe administrativa") só registra onde a pessoa trabalha.
+        """
+        return cls.vigentes_em(hoje).exclude(papel=cls.PAPEL_EQUIPE)  # type: ignore[reportUnknownMemberType]
 
     def __str__(self) -> str:
         papel = self.get_papel_display()  # type: ignore[reportUnknownMemberType,reportAttributeAccessIssue]

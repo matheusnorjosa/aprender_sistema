@@ -2,8 +2,9 @@
 Papel EQUIPE ("Equipe administrativa") no vínculo `EquipeGerencia` (decisão do dono, 05/10/2026).
 
 Diz só "trabalha neste setor": serve para a equipe de suporte do DAT, o Controle e outros setores.
-Não entra em lista de formadores/coordenadores, na Grade Mensal, no tier de gestor, na aprovação,
-nem gera grupo RBAC. Vale como setor da pessoa onde o sistema lê o setor pelo vínculo (`user_setores`).
+Sem NENHUM efeito em listas, escopo ou permissão: não entra em lista de formadores/coordenadores,
+na Grade Mensal, no tier de gestor, na aprovação, não abre escopo de leitura (bloqueios, Grade,
+deslocamentos, opções, setor da pessoa, `/api/me/.gerencias`) e não concede grupo, nem o de setor.
 O formulário de Usuários põe e tira o papel pelo campo `equipe_administrativa`; salvar sem mudar
 nada mantém o vínculo (regra do #2071/#2072).
 """
@@ -14,20 +15,23 @@ from __future__ import annotations
 
 import itertools
 import tempfile
+from datetime import date, timedelta
 from pathlib import Path
 
 from django.core.cache import cache
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import EquipeGerencia, Gerencia, Usuario
+from apps.core.models import AvailabilityBlock, Deslocamento, EquipeGerencia, Gerencia, Usuario
 from apps.core.rbac.helpers import GERENCIA_APROVADORA_NOME, user_is_gerente_superintendencia
 from apps.core.services.equipe_gerencia_import import import_equipe_gerencia_from_file
 from apps.core.services.monthly_grid_service import build_monthly_grid
 from apps.core.services.solicitacao_scope import (
     _PAPEIS_DE_GESTAO,
+    _user_gerencia_ids,
     participants_out_of_setor,
     scope_usuarios_by_setor,
     user_setores,
@@ -151,13 +155,81 @@ class TestSemPoder:
         assert user_is_gerente_superintendencia(pessoa) is False
 
 
-class TestSetorDaPessoa:
-    def test_vinculo_equipe_define_o_setor_da_pessoa(self):
-        dat = _gerencia("G DAT EQ", "DAT")
-        pessoa = _pessoa("equipe_dat")
-        _vincula(pessoa, dat, "EQUIPE")
+class TestSemEscopo:
+    """Controle positivo: o mesmo ator com vínculo COORDENADOR enxerga; com EQUIPE, não."""
 
-        assert user_setores(pessoa) == {"DAT"}
+    @pytest.fixture
+    def cenario(self, vidas):
+        formador = _pessoa("alvo_form", "Formador")
+        _vincula(formador, vidas, "FORMADOR")
+        agora = timezone.now()
+        bloco = AvailabilityBlock.objects.create(
+            usuario=formador, inicio=agora + timedelta(hours=24), fim=agora + timedelta(hours=26), tipo="T"
+        )
+        desl = Deslocamento.objects.create(
+            usuario=formador,
+            origem="Fortaleza",
+            destino="Sobral",
+            start_date=date.today(),
+            end_date=date.today() + timedelta(days=1),
+        )
+        ator = _pessoa("ator_asst", "Assistente Administrativo")
+        client = APIClient()
+        client.force_authenticate(ator)
+        return {"formador": formador, "bloco": bloco, "desl": desl, "ator": ator, "client": client}
+
+    PAPEIS = pytest.mark.parametrize("papel,ve", [("COORDENADOR", True), ("EQUIPE", False)])
+
+    @staticmethod
+    def _ids(resp):
+        data = resp.data["results"] if isinstance(resp.data, dict) and "results" in resp.data else resp.data
+        return {item["id"] for item in data}
+
+    @PAPEIS
+    def test_bloqueios(self, cenario, vidas, papel, ve):
+        _vincula(cenario["ator"], vidas, papel)
+        resp = cenario["client"].get("/api/availability-blocks/")
+        assert resp.status_code == status.HTTP_200_OK
+        assert (cenario["bloco"].id in self._ids(resp)) is ve
+
+    @PAPEIS
+    @pytest.mark.parametrize("com_gerencia", [True, False])
+    def test_grade_mensal(self, cenario, vidas, papel, ve, com_gerencia):
+        _vincula(cenario["ator"], vidas, papel)
+        url = "/api/availability/monthly/?year=2026&month=10&role=FORMADOR"
+        if com_gerencia:
+            url += f"&gerencia_id={vidas.id}"
+        resp = cenario["client"].get(url)
+        assert resp.status_code == (status.HTTP_200_OK if ve else status.HTTP_403_FORBIDDEN)
+
+    @PAPEIS
+    def test_deslocamentos(self, cenario, vidas, papel, ve):
+        _vincula(cenario["ator"], vidas, papel)
+        resp = cenario["client"].get("/api/deslocamentos/")
+        assert resp.status_code == status.HTTP_200_OK
+        assert (cenario["desl"].id in self._ids(resp)) is ve
+
+    @PAPEIS
+    def test_formadores_do_setor(self, cenario, vidas, papel, ve):
+        _vincula(cenario["ator"], vidas, papel)
+        resp = cenario["client"].get("/api/options/formadores-do-setor/")
+        assert (cenario["formador"].id in {u["id"] for u in resp.data}) is ve
+
+    @PAPEIS
+    def test_me_gerencias(self, cenario, vidas, papel, ve):
+        _vincula(cenario["ator"], vidas, papel)
+        resp = cenario["client"].get("/api/me/")
+        assert (vidas.id in {g["id"] for g in resp.data["gerencias"]}) is ve
+
+    @PAPEIS
+    def test_setor_da_pessoa(self, cenario, vidas, papel, ve):
+        _vincula(cenario["ator"], vidas, papel)
+        assert user_setores(cenario["ator"]) == ({"Vidas"} if ve else set())
+
+    @PAPEIS
+    def test_gerencias_de_escopo_do_gestor(self, cenario, vidas, papel, ve):
+        _vincula(cenario["ator"], vidas, papel)
+        assert _user_gerencia_ids(cenario["ator"]) == ({vidas.id} if ve else set())
 
 
 # ---------------------------------------------------------------- formulário de Usuários
@@ -192,7 +264,27 @@ class TestFormularioDeUsuarios:
         _salvar(root, alvo, {"group_ids": [], "gerencia_id": vidas.id, "equipe_administrativa": True})
 
         assert _ativos(alvo) == {(vidas.id, "EQUIPE")}
-        assert _grupos(alvo) <= {"Vidas"}  # só o grupo de setor da gerência (regra que já existia)
+        assert _grupos(alvo) == set()
+
+    def test_equipe_no_dat_nao_da_o_grupo_do_setor(self, root):
+        GroupFactory(name="DAT")
+        dat = _gerencia("G DAT GRUPO", "DAT")
+        alvo = _pessoa("form_dat_grupo")
+
+        _salvar(root, alvo, {"group_ids": [], "gerencia_id": dat.id, "equipe_administrativa": True})
+
+        assert _ativos(alvo) == {(dat.id, "EQUIPE")}
+        assert _grupos(alvo) == set()
+
+    def test_funcao_com_papel_continua_dando_o_grupo_do_setor(self, root):
+        GroupFactory(name="DAT")
+        dat = _gerencia("G DAT GRUPO2", "DAT")
+        formador = GroupFactory(name="Formador")
+        alvo = _pessoa("form_dat_funcao")
+
+        _salvar(root, alvo, {"group_ids": [formador.id], "gerencia_id": dat.id, "equipe_administrativa": True})
+
+        assert _grupos(alvo) == {"Formador", "DAT"}
 
     def test_criar_usuario_so_com_equipe(self, root, vidas):
         client = APIClient()

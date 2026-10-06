@@ -36,8 +36,8 @@ PAPEL_POR_FUNCAO: dict[str, str] = {
 
 
 # Papel "Equipe administrativa" (05/10/2026): só diz "trabalha neste setor". Não vem de grupo de
-# função (o form marca à parte) e não dá lista, Grade, gestão nem aprovação.
-PAPEL_EQUIPE = "EQUIPE"
+# função (o form marca à parte) e não dá lista, escopo, permissão nem grupo.
+PAPEL_EQUIPE = EquipeGerencia.PAPEL_EQUIPE
 
 
 def tem_equipe_administrativa(usuario: Any) -> bool:

@@ -388,6 +388,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         - `group_ids` substitui só os grupos de FUNÇÃO; os demais (setor, permissão funcional) ficam.
         - O grupo de setor derivado da gerência (`setor_group_for`, nome == `setor_canonico`) entra e
           sai só quando a gerência muda (ou na primeira lotação); a gerência aprovadora não deriva grupo.
+          Só com função que tem papel (`papeis_de_grupos`); o papel EQUIPE nunca dá grupo.
         - A lotação `EquipeGerencia` só é re-sincronizada quando a gerência ou os PAPÉIS mudam. Aí o form
           é a fonte: encerra os outros vínculos; sem papel nenhum, encerra todos (revoga a aprovação).
         - `groups=None` = não mexer nas funções; `gerencia` ausente/`_UNSET`/None = não mexer na lotação.
@@ -409,7 +410,9 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         final = [g for g in antes if groups is None or g.name not in funcoes]
         if groups is not None:
             final += [g for g in groups if g not in final]
-        if nova_lotacao:
+        # O grupo de setor só vem de lotação com papel de FUNÇÃO (FORMADOR/COORDENADOR/APOIO/GERENTE): o papel
+        # EQUIPE nunca concede grupo, e sem função com papel não há lotação que o explique.
+        if nova_lotacao and papeis_de_grupos(final):
             setor_antigo = setor_group_for(anterior) if anterior is not None else None
             setor_novo = setor_group_for(gerencia)
             if (

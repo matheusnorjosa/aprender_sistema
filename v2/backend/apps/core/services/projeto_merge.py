@@ -10,7 +10,7 @@ sobrevivente (que já tem o nome canônico — não renomeia) e deleta a duplica
 Segurança:
 - **dry-run é o default** (`apply=False`): só conta o que faria, não escreve nada.
 - `apply=True` roda tudo numa transação única (all-or-nothing).
-- reparent acontece ANTES do delete — relações `on_delete=PROTECT` (ex.: Colecao)
+- reparent acontece ANTES do delete — relações `on_delete=PROTECT` (ex.: Produto)
   bloqueariam um delete cego.
 - idempotente: duplicata ausente = já mesclada = skip.
 - survivor ausente ou colisão O2O/M2M = falha alto (não silencia).

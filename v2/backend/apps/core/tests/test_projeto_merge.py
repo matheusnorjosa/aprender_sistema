@@ -8,7 +8,7 @@ antes de o resolver (#1372) ser aplicado de ponta a ponta. O merge reconcilia nu
 única linha canônica (sem renomear — o sobrevivente já tem o nome canônico).
 
 Invariantes provados aqui:
-- reparent acontece ANTES do delete (relações PROTECT como Colecao bloqueariam senão);
+- reparent acontece ANTES do delete (relações PROTECT como Produto bloqueariam senão);
 - dry-run (default) não muta nada, mas reporta o que faria;
 - idempotente (2ª execução pula a duplicata já mesclada);
 - survivor ausente falha alto (não cria nada silenciosamente).
@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import pytest
 
-from apps.core.models import Colecao, Projeto
+from apps.core.models import Produto, Projeto
 from apps.core.services.projeto_merge import merge_projeto_duplicates
 from apps.core.tests.factories import ProjetoFactory
 
@@ -31,35 +31,35 @@ class TestApply:
     def test_reparents_all_relations_and_deletes_dup(self):
         survivor = ProjetoFactory(nome="CANONICO X", codigo="CANON_X", fluxo="NAO_SUPER", ativo=True)
         dup = ProjetoFactory(nome="Canonico & X", codigo="dup_x", fluxo="NAO_SUPER", ativo=True)
-        # Colecao.projeto é PROTECT: se o reparent não vier antes do delete, o delete estoura.
-        Colecao.objects.create(nome="Col Dup", projeto=dup)
-        Colecao.objects.create(nome="Col Surv", projeto=survivor)
+        # Produto.projeto é PROTECT: se o reparent não vier antes do delete, o delete estoura.
+        Produto.objects.create(codigo="MERGE-DUP", nome="Prod Dup", projeto=dup)
+        Produto.objects.create(codigo="MERGE-SURV", nome="Prod Surv", projeto=survivor)
 
         report = merge_projeto_duplicates(pairs=[("CANONICO X", "Canonico & X")], apply=True)
 
         assert not Projeto.objects.filter(nome="Canonico & X").exists(), "duplicata deve ser deletada"
-        assert set(Colecao.objects.filter(projeto=survivor).values_list("nome", flat=True)) == {
-            "Col Dup",
-            "Col Surv",
-        }, "todas as coleções passam para o sobrevivente"
+        assert set(Produto.objects.filter(projeto=survivor).values_list("nome", flat=True)) == {
+            "Prod Dup",
+            "Prod Surv",
+        }, "todos os produtos passam para o sobrevivente"
         entry = report["pairs"][0]
         assert entry["status"] == "merged"
-        assert entry["reparented"]["Colecao"] == 1
+        assert entry["reparented"]["Produto"] == 1
 
 
 class TestDryRun:
     def test_default_is_dry_run_and_mutates_nothing(self):
         survivor = ProjetoFactory(nome="CANONICO Y", codigo="CANON_Y", fluxo="NAO_SUPER", ativo=True)
         dup = ProjetoFactory(nome="Canonico & Y", codigo="dup_y", fluxo="NAO_SUPER", ativo=True)
-        Colecao.objects.create(nome="Col Dup Y", projeto=dup)
+        Produto.objects.create(codigo="MERGE-DUP-Y", nome="Prod Dup Y", projeto=dup)
 
         report = merge_projeto_duplicates(pairs=[("CANONICO Y", "Canonico & Y")])  # apply omitido
 
         assert Projeto.objects.filter(nome="Canonico & Y").exists(), "dry-run não deleta a duplicata"
-        assert Colecao.objects.filter(projeto=dup).count() == 1, "dry-run não move relações"
+        assert Produto.objects.filter(projeto=dup).count() == 1, "dry-run não move relações"
         entry = report["pairs"][0]
         assert entry["status"] == "would_merge"
-        assert entry["reparented"]["Colecao"] == 1, "mas reporta o que FARIA"
+        assert entry["reparented"]["Produto"] == 1, "mas reporta o que FARIA"
 
 
 class TestIdempotent:

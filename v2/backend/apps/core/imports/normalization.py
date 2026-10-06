@@ -35,7 +35,7 @@ from datetime import date, time
 from typing import Any
 
 # ============================================================================
-# Modern helpers (PR #1344) — used by produtos/colecoes/municipios/
+# Modern helpers (PR #1344) — used by produtos/municipios/
 # deslocamentos imports plus future callers.
 # ============================================================================
 

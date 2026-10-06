@@ -18,7 +18,6 @@ Endpoints cobertos:
 - POST /api/usuarios/import/
 - POST /api/produtos/import/
 - POST /api/municipios/import/
-- POST /api/colecoes/import/
 - POST /api/equipe-gerencia/import/
 - POST /api/imports/bloqueios/ (assíncrono, ASQ-005)
 
@@ -66,7 +65,6 @@ ENDPOINTS_DE_IMPORT: list[str] = [
     "/api/usuarios/import/",
     "/api/produtos/import/",
     "/api/municipios/import/",
-    "/api/colecoes/import/",
     "/api/equipe-gerencia/import/",
     "/api/imports/bloqueios/",
 ]

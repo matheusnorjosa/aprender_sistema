@@ -71,7 +71,6 @@ from .views_gcal import (  # Core GCal; Dashboard views
 )
 from .views_health import features, readyz, versionz
 from .views_import_bloqueios import ImportBloqueiosView
-from .views_import_colecoes import ImportColecoesView
 from .views_import_deslocamentos import ImportDeslocamentosView
 from .views_import_equipe_gerencia import ImportEquipeGerenciaView
 from .views_import_eventos import ImportEventosView
@@ -98,7 +97,6 @@ from .views_oauth import (
 )
 from .views_options import (
     areas_options,
-    colecoes_options,
     coordenadores_options,
     formadores_do_setor_options,
     municipios_options,
@@ -252,11 +250,6 @@ urlpatterns = [
         name="import-municipios",
     ),
     path(
-        "colecoes/import/",
-        ImportColecoesView.as_view(),
-        name="import-colecoes",
-    ),
-    path(
         "equipe-gerencia/import/",
         ImportEquipeGerenciaView.as_view(),
         name="import-equipe-gerencia",
@@ -325,7 +318,6 @@ urlpatterns = [
     path("options/tipos-evento/", tipos_evento_options, name="options-tipos-evento"),
     path("options/usuarios/", usuarios_options, name="options-usuarios"),
     path("options/produtos/", produtos_options, name="options-produtos"),
-    path("options/colecoes/", colecoes_options, name="options-colecoes"),
     path("options/coordenadores/", coordenadores_options, name="options-coordenadores"),
     path("options/areas/", areas_options, name="options-areas"),
     path("options/formadores-do-setor/", formadores_do_setor_options, name="options-formadores-do-setor"),

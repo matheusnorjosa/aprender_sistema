@@ -1000,7 +1000,7 @@ export default function UsuariosPage(): JSX.Element {
           <Form.Item
             name="equipe_administrativa"
             valuePropName="checked"
-            extra="Só registra que a pessoa trabalha nesta gerência (ex.: suporte do DAT, Controle). Não dá função nem permissão e não a põe em listas de formadores, coordenadores ou na Grade."
+            extra="Só registra que a pessoa trabalha nesta gerência (ex.: suporte do DAT, Controle). Não dá função, grupo, permissão nem acesso a dados da gerência, e não a põe em nenhuma lista."
           >
             <Checkbox disabled={!currentIsSuperuser}>Equipe administrativa</Checkbox>
           </Form.Item>

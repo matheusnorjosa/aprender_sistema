@@ -139,10 +139,14 @@ function setorDaGerencia<G extends GrupoLike>(grupos: G[], gerencia: GerenciaLik
   return grupos.find((g) => g.name === setor);
 }
 
+/** Funções que viram papel no vínculo; espelha `PAPEL_POR_FUNCAO` (`services/equipe_gerencia.py`). */
+const FUNCOES_COM_PAPEL = new Set(['Formador', 'Coordenador', 'Gerente', 'Apoio de Coordenação']);
+
 /**
  * #2071: grupos da pessoa depois do Salvar, espelhando `_apply_lotacao` do backend. Os grupos
  * atuais que não são FUNÇÃO ficam; as funções vêm do form; o grupo de setor da gerência entra e
- * sai só quando a gerência muda; setor de par aprovador (Superintendência, Controle) não vira grupo.
+ * sai só quando a gerência muda e só com função que tem papel (a Equipe administrativa nunca dá
+ * grupo); setor de par aprovador (Superintendência, Controle) não vira grupo.
  */
 export function gruposAposSalvar<G extends GrupoLike>(args: {
   grupos: G[];
@@ -155,7 +159,8 @@ export function gruposAposSalvar<G extends GrupoLike>(args: {
   const { grupos, idsAtuais, funcoes, funcaoIds, gerencia, gerenciaAnterior } = args;
   let final = grupos.filter((g) => idsAtuais.includes(g.id) && !funcoes.has(g.name));
   final.push(...grupos.filter((g) => funcaoIds.includes(g.id) && !final.includes(g)));
-  if (gerencia && gerencia.id !== gerenciaAnterior?.id) {
+  const temFuncaoComPapel = final.some((g) => FUNCOES_COM_PAPEL.has(g.name));
+  if (gerencia && gerencia.id !== gerenciaAnterior?.id && temFuncaoComPapel) {
     const antigo = setorDaGerencia(grupos, gerenciaAnterior);
     const novo = setorDaGerencia(grupos, gerencia);
     if (antigo && antigo !== novo) final = final.filter((g) => g !== antigo);

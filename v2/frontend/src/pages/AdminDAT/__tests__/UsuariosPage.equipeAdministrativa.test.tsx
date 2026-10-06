@@ -5,13 +5,19 @@
  * - O Salvar reenvia o valor hidratado (salvar sem mudar mantém o vínculo); só o superuser envia.
  * - Com a caixa marcada, a função deixa de ser obrigatória ao criar e a gerência passa a ser.
  * - O detalhe mostra o papel em pt-BR.
+ * - A prévia de grupos espelha o backend: o grupo de setor só vem com função que tem papel no vínculo.
  */
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 
-import { buildUsuarioPayload, lotacaoObrigatoria, type UsuarioFormValues } from '../usuario_form_helpers';
+import {
+  buildUsuarioPayload,
+  gruposAposSalvar,
+  lotacaoObrigatoria,
+  type UsuarioFormValues,
+} from '../usuario_form_helpers';
 
 const { USUARIOS, GERENCIAS } = vi.hoisted(() => ({
   USUARIOS: [
@@ -101,6 +107,32 @@ describe('lotacaoObrigatoria — equipe administrativa', () => {
     expect(
       lotacaoObrigatoria({ currentIsSuperuser: true, isEditing: true, temLotacao: false, equipeAdministrativa: true }),
     ).toEqual({ gerencia: true, funcao: false });
+  });
+});
+
+describe('gruposAposSalvar — grupo de setor só com função que tem papel', () => {
+  const grupos = [
+    { id: 1, name: 'Formador' },
+    { id: 4, name: 'Assistente Administrativo' },
+    { id: 5, name: 'Vidas' },
+  ];
+  const funcoes = new Set(['Formador', 'Assistente Administrativo']);
+  const vidas = { id: 2, nome: 'GERENCIA 2', setor_canonico: 'Vidas' };
+  const nomes = (funcaoIds: number[]): string[] =>
+    gruposAposSalvar({ grupos, idsAtuais: [], funcoes, funcaoIds, gerencia: vidas, gerenciaAnterior: undefined })
+      .map((g) => g.name)
+      .sort();
+
+  test('só a equipe administrativa (sem função) não dá o grupo do setor', () => {
+    expect(nomes([])).toEqual([]);
+  });
+
+  test('função sem papel no vínculo não dá o grupo do setor', () => {
+    expect(nomes([4])).toEqual(['Assistente Administrativo']);
+  });
+
+  test('função com papel continua dando o grupo do setor', () => {
+    expect(nomes([1])).toEqual(['Formador', 'Vidas']);
   });
 });
 

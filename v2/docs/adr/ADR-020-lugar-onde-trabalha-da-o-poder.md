@@ -66,6 +66,11 @@ Antes do merge, roda-se `python manage.py rbac_diff` em produção (somente leit
 por pessoa, quem ganha e quem perde. A mudança só segue com o OK dele. O comando lê o banco real,
 não grava nada e não mostra dado pessoal (a pessoa aparece como `u<id>`).
 
+Em produção a raiz do container é só leitura e o `/tmp` some no deploy: grava-se o retrato em
+`/tmp/antes.json`, copia-se para o host da VM (`docker exec <web> cat /tmp/antes.json > antes.json`)
+antes do deploy, e depois do deploy ele volta para o `/tmp` do container novo para o `--comparar`.
+O passo a passo está no docstring do comando.
+
 ## Consequências
 
 - O poder passa a ter uma resposta por pergunta: onde trabalha (vínculo), o que o lugar permite

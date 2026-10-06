@@ -33,7 +33,10 @@ CAMPOS: tuple[str, ...] = ("superusuario", "grupos", "capacidades", "policies", 
 
 
 def capacidades_de_hoje(usuario: Any) -> set[str]:
-    """Capacidades de hoje, por consulta direta: a de `get_user_functional_permissions`, sem cache."""
+    """Capacidades de hoje, por consulta direta: a de `get_user_functional_permissions`, sem cache.
+
+    Mudou a fórmula de lá? Mude aqui também: `test_capacidades_de_hoje_igual_a_fonte_da_api` trava a paridade.
+    """
     return set(PermissaoFuncional.objects.filter(groups__user__id=usuario.id).values_list("codename", flat=True))
 
 
@@ -126,17 +129,38 @@ def diff_snapshots(antes: Snapshot, depois: Snapshot) -> dict[str, Any]:
     }
 
 
+# Grupo de setor → `Gerencia.nome` (código interno, único, ninguém altera pela tela) da(s) gerência(s)
+# daquele setor. Fonte: comentários de `constants.SETOR_GROUPS` e o mapa medido em prod em 29/09
+# (`definir_nome_exibicao_gerencias`: g17 GERENCIA BRINCANDO, g19 GERENCIA DAT). CONTROLE e DIRETORIA
+# ainda não existem (PR 5 cria). Não serve `setor_canonico`: ele usa o vocabulário de produto
+# (`SETORES_PRODUTO`, ex. "Brincando e Aprendendo"), não os 13 grupos. Setor fora daqui = sem gerência
+# mapeada, e o diagnóstico não aponta ninguém dele como "sem vínculo".
+GERENCIAS_DO_GRUPO_DE_SETOR: dict[str, tuple[str, ...]] = {
+    "Superintendência": ("SUPERINTENDENCIA",),
+    "Vidas": ("GERENCIA 2",),
+    "Fluir": ("GERENCIA 3",),
+    "ACerta": ("GERENCIA 4",),
+    "Brincando": ("GERENCIA 5", "GERENCIA BRINCANDO"),
+    "Sou da Paz": ("GERENCIA 6",),
+    "DAT": ("GERENCIA DAT",),
+    "Controle": ("CONTROLE",),
+    "Diretoria": ("DIRETORIA",),
+}
+
+
 def diagnostico_de_lotacao() -> dict[str, Any]:
     """Medições do PR 1 (relatório de arquitetura de permissões, seção 4). Sem dado pessoal.
 
     "Grupo de setor sem vínculo": pessoa ativa num grupo de `SETOR_GROUPS` sem vínculo vigente
-    (qualquer papel, inclusive EQUIPE) numa gerência daquele setor. Gerência do setor = a de
-    `setor_canonico` igual ao nome do grupo, o mesmo casamento de `setor_group_for`.
+    (qualquer papel, inclusive EQUIPE) numa gerência daquele setor, pelo mapa
+    `GERENCIAS_DO_GRUPO_DE_SETOR`. Setor sem mapa vai para `setores_sem_gerencia_mapeada` (só a contagem).
     """
     gerencias = list(Gerencia.objects.order_by("id").values_list("id", "setor_canonico"))
-    gerencias_do_setor: dict[str, set[int]] = {}
-    for gid, setor in gerencias:
-        gerencias_do_setor.setdefault((setor or "").strip(), set()).add(gid)
+    id_por_nome = dict(Gerencia.objects.values_list("nome", "id"))
+    gerencias_do_setor: dict[str, set[int]] = {
+        setor: {id_por_nome[n] for n in nomes if n in id_por_nome}
+        for setor, nomes in GERENCIAS_DO_GRUPO_DE_SETOR.items()
+    }
 
     vigentes = list(
         EquipeGerencia.vigentes_em().filter(usuario__is_active=True).values_list("usuario_id", "gerencia_id")
@@ -147,10 +171,15 @@ def diagnostico_de_lotacao() -> dict[str, Any]:
         gerencias_por_pessoa.setdefault(uid, set()).add(gid)
 
     sem_vinculo: dict[str, list[str]] = {}
+    sem_mapa: dict[str, int] = {}
     for setor in SETOR_GROUPS:
-        do_setor = gerencias_do_setor.get(setor, set())
-        membros = Usuario.objects.filter(is_active=True, groups__name=setor).values_list("id", flat=True)
-        faltam = [_uid(uid) for uid in sorted(set(membros)) if not gerencias_por_pessoa.get(uid, set()) & do_setor]
+        membros = set(Usuario.objects.filter(is_active=True, groups__name=setor).values_list("id", flat=True))
+        if setor not in gerencias_do_setor:
+            if membros:
+                sem_mapa[setor] = len(membros)
+            continue
+        do_setor = gerencias_do_setor[setor]
+        faltam = [_uid(uid) for uid in sorted(membros) if not gerencias_por_pessoa.get(uid, set()) & do_setor]
         if faltam:
             sem_vinculo[setor] = faltam
 
@@ -166,6 +195,7 @@ def diagnostico_de_lotacao() -> dict[str, Any]:
         },
         "pessoas_com_mais_de_um_vinculo": sum(1 for n in por_pessoa.values() if n > 1),
         "pessoas_em_mais_de_uma_gerencia": sum(1 for gs in gerencias_por_pessoa.values() if len(gs) > 1),
-        "gerencias_por_setor": {s: sorted(gerencias_do_setor.get(s, set())) for s in SETOR_GROUPS},
+        "gerencias_por_setor": {s: sorted(gs) for s, gs in gerencias_do_setor.items()},
         "grupo_de_setor_sem_vinculo": sem_vinculo,
+        "setores_sem_gerencia_mapeada": sem_mapa,
     }

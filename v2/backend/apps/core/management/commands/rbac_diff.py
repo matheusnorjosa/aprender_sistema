@@ -10,7 +10,17 @@ Uso:
     python manage.py rbac_diff --comparar antes.json --depois depois.json
     python manage.py rbac_diff --diagnostico
 
-Termina sempre com exit 0 quando roda: é relatório, não gate.
+Em produção a raiz do container é só leitura e /tmp (tmpfs) some quando o deploy recria o
+container. Por isso o retrato sai do container antes do deploy e volta depois (o JSON não tem
+dado pessoal, pode ficar no host da VM). `--salvar -` não serve: o settings imprime uma linha no
+stdout ao carregar e sujaria o JSON.
+    docker exec <web> python manage.py rbac_diff --salvar /tmp/antes.json
+    docker exec <web> cat /tmp/antes.json > antes.json                    # antes do deploy
+    docker exec -i <web> sh -c 'cat > /tmp/antes.json' < antes.json       # depois do deploy
+    docker exec <web> python manage.py rbac_diff --comparar /tmp/antes.json
+
+Exit 0 quando roda: é relatório, não gate. Arquivo que não dá para ler ou gravar sai com
+mensagem legível e exit 1 (CommandError).
 """
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false
@@ -69,7 +79,10 @@ class Command(BaseCommand):
     def _salvar(self, caminho: str) -> None:
         snapshot = snapshot_de_poder()
         texto = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
-        Path(caminho).write_text(texto, encoding="utf-8")
+        try:
+            Path(caminho).write_text(texto, encoding="utf-8")
+        except OSError as exc:
+            raise CommandError(f"rbac_diff: não consegui gravar {caminho}: {exc} (em prod, use /tmp)") from exc
         self.stdout.write(f"rbac_diff: retrato de {len(snapshot)} pessoa(s) ativa(s) gravado em {caminho}")
 
     @staticmethod
@@ -115,4 +128,6 @@ class Command(BaseCommand):
         for setor, pessoas in sem.items():
             gerencias = ", ".join(f"g{i}" for i in diag["gerencias_por_setor"][setor]) or "nenhuma gerência"
             linhas.append(f"   {setor} ({gerencias}): {len(pessoas)} — {', '.join(pessoas)}")
+        for setor, n in diag["setores_sem_gerencia_mapeada"].items():
+            linhas.append(f"   {setor}: setor sem gerência mapeada ({n} pessoa(s) no grupo, não avaliadas)")
         return "\n".join(linhas)

@@ -25,7 +25,7 @@ from typing import Any
 
 from django.contrib.auth.models import Group
 from django.core.cache import cache
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
@@ -34,7 +34,13 @@ import pytest
 
 from apps.core.models import EquipeGerencia, Gerencia, Usuario
 from apps.core.rbac.policies import PUBLIC_POLICY_KEYS, resolve_public_policies
-from apps.core.services.rbac_snapshot import diagnostico_de_lotacao, diff_snapshots, snapshot_de_poder
+from apps.core.services.rbac_permissions import get_user_functional_permissions
+from apps.core.services.rbac_snapshot import (
+    capacidades_de_hoje,
+    diagnostico_de_lotacao,
+    diff_snapshots,
+    snapshot_de_poder,
+)
 from apps.core.tests.factories import UsuarioFactory
 
 pytestmark = pytest.mark.django_db
@@ -53,6 +59,14 @@ def _so(*usuarios: Usuario):
 
 def _gerencia(nome: str, setor: str) -> Gerencia:
     return Gerencia.objects.create(nome=nome, nome_setor=setor, setor_canonico=setor)
+
+
+def _gerencia_real(nome: str, setor_canonico: str = "") -> Gerencia:
+    """Gerência com o `nome` (código interno) de produção e o `setor_canonico` do vocabulário real."""
+    g, _ = Gerencia.objects.get_or_create(nome=nome, defaults={"nome_setor": nome})
+    g.setor_canonico = setor_canonico
+    g.save(update_fields=["setor_canonico"])
+    return g
 
 
 def _vincula(usuario: Usuario, gerencia: Gerencia, papel: str, **extra: Any) -> EquipeGerencia:
@@ -150,6 +164,21 @@ class TestSnapshot:
         for campo in ("superusuario", "grupos", "gerencias_escopo", "vinculos"):
             assert simulado[campo] == hoje[campo], campo
 
+    def test_capacidades_de_hoje_igual_a_fonte_da_api(self):
+        # Trava de paridade: se a fórmula de `get_user_functional_permissions` mudar (PR 6, PR 11)
+        # e o padrão do simulador não, o `--comparar` pós-deploy mostraria o poder antigo.
+        vidas = _gerencia_real("GERENCIA 2", "Vidas")
+        com_grupo = UsuarioFactory(groups=["DAT", "Coordenador"])
+        sem_grupo = UsuarioFactory()
+        com_vinculo = UsuarioFactory(groups=["Formador"])
+        _vincula(com_vinculo, vidas, "FORMADOR")
+        _vincula(sem_grupo, vidas, "EQUIPE")
+
+        for u in (com_grupo, sem_grupo, com_vinculo):
+            cache.clear()
+            assert capacidades_de_hoje(u) == get_user_functional_permissions(u), u.id
+        assert capacidades_de_hoje(com_grupo)
+
 
 class TestDiff:
     def test_detecta_ganho_e_perda_por_campo(self):
@@ -204,8 +233,8 @@ class TestDiff:
 
 class TestDiagnostico:
     def test_lista_quem_tem_grupo_de_setor_sem_vinculo_na_gerencia_do_setor(self):
-        dat = _gerencia("GER DAT DIAG", "DAT")
-        vidas = _gerencia("GER VIDAS DIAG", "Vidas")
+        dat = _gerencia_real("GERENCIA DAT")
+        vidas = _gerencia_real("GERENCIA 2", "Vidas")
         com_vinculo = UsuarioFactory(groups=["DAT"])
         _vincula(com_vinculo, dat, "EQUIPE")
         sem_vinculo = UsuarioFactory(groups=["DAT"])
@@ -226,6 +255,39 @@ class TestDiagnostico:
         diag = diagnostico_de_lotacao()
 
         assert f"u{controle.id}" in diag["grupo_de_setor_sem_vinculo"]["Controle"]
+
+    def test_brincando_casa_com_a_gerencia_pelo_nome_e_nao_pelo_setor_canonico(self):
+        # setor_canonico usa o vocabulário de produto ("Brincando e Aprendendo"), não o nome do grupo.
+        brincando = _gerencia_real("GERENCIA BRINCANDO", "Brincando e Aprendendo")
+        lotado = UsuarioFactory(groups=["Brincando"])
+        _vincula(lotado, brincando, "FORMADOR")
+        solto = UsuarioFactory(groups=["Brincando"])
+
+        diag = diagnostico_de_lotacao()
+
+        sem = diag["grupo_de_setor_sem_vinculo"].get("Brincando", [])
+        assert f"u{lotado.id}" not in sem
+        assert f"u{solto.id}" in sem
+        assert brincando.id in diag["gerencias_por_setor"]["Brincando"]
+
+    def test_dat_casa_com_a_gerencia_dat_mesmo_com_setor_canonico_vazio(self):
+        dat = _gerencia_real("GERENCIA DAT", "")
+        lotado = UsuarioFactory(groups=["DAT"])
+        _vincula(lotado, dat, "EQUIPE")
+
+        diag = diagnostico_de_lotacao()
+
+        assert f"u{lotado.id}" not in diag["grupo_de_setor_sem_vinculo"].get("DAT", [])
+        assert diag["gerencias_por_setor"]["DAT"] == [dat.id]
+
+    def test_setor_sem_gerencia_mapeada_nao_lista_ninguem_como_sem_vinculo(self):
+        comercial = UsuarioFactory(groups=["Comercial"])
+
+        diag = diagnostico_de_lotacao()
+
+        assert "Comercial" not in diag["grupo_de_setor_sem_vinculo"]
+        assert diag["setores_sem_gerencia_mapeada"]["Comercial"] >= 1
+        assert f"u{comercial.id}" not in json.dumps(diag)
 
     def test_setor_canonico_das_gerencias_e_controle_diretoria(self):
         dat = _gerencia("GER DAT SETOR", "DAT")
@@ -296,6 +358,13 @@ class TestComando:
         assert "− grupos: Diretoria" in saida
         assert "rbac_diff: 0 ganhos, 0 perdas" not in saida
 
+    def test_salvar_em_lugar_sem_escrita_da_erro_legivel(self, tmp_path: Path):
+        # Em prod a raiz do container é só leitura (só /tmp aceita escrita): sem traceback cru.
+        destino = tmp_path / "nao_existe" / "antes.json"
+
+        with pytest.raises(CommandError, match="não consegui gravar"):
+            _rbac_diff("--salvar", str(destino))
+
     def test_comparar_dois_arquivos(self, tmp_path: Path):
         antes, depois = tmp_path / "antes.json", tmp_path / "depois.json"
         antes.write_text(json.dumps({"u1": _pessoa()}), encoding="utf-8")
@@ -308,8 +377,9 @@ class TestComando:
         assert "rbac_diff: 1 ganhos, 0 perdas" in saida
 
     def test_diagnostico_imprime_as_medicoes(self):
-        dat = _gerencia("GER DAT CMD", "DAT")
+        dat = _gerencia_real("GERENCIA DAT", "DAT")
         sem_vinculo = UsuarioFactory(groups=["DAT"])
+        UsuarioFactory(groups=["Comercial"])
 
         saida = _rbac_diff("--diagnostico")
 
@@ -318,7 +388,10 @@ class TestComando:
         assert "DIRETORIA: não existe" in saida
         assert "mais de um vínculo vigente" in saida
         linha_dat = next(linha for linha in saida.splitlines() if linha.strip().startswith("DAT ("))
+        assert f"g{dat.id}" in linha_dat
         assert _tem_uid(linha_dat, sem_vinculo)
+        linha_comercial = next(linha for linha in saida.splitlines() if linha.strip().startswith("Comercial"))
+        assert "sem gerência mapeada" in linha_comercial
 
 
 class TestSomenteLeituraESemDadoPessoal:

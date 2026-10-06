@@ -173,8 +173,11 @@ A grade mensal é cacheada no Redis por 5 minutos + jitter de até 30 s
 Chave real (`cache_key` em `MonthlyAvailabilityView.get`, `views_availability_monthly.py`):
 
 ```
-monthly:v5:{monthly_ver}:{year}:{month}:{role}:{cache_scope}:{sector or '*'}:{q_lower}
+monthly:v6:{monthly_ver}:{year}:{month}:{role}:{cache_scope}:{sector or '*'}:{q_lower}:teto{teto}
 ```
+
+- `teto` = o teto de horas por evento vigente (`parametros_disponibilidade()`); salvar um teto
+  novo em Configurações vale na consulta seguinte. `v6` entrou em 05/10/2026 com a CH com teto.
 
 - `monthly_ver` = `get_monthly_cache_version(request.user.id)` (`:218-220`) — permite invalidar
   por usuário sem varrer o Redis.
@@ -189,8 +192,8 @@ versões atrás.)*
 - `POST /api/availability/check/` e `/check-many/` (rotas `availability-check` / `availability-check-many` em `apps/core/urls.py`) — autorização
   por `can_check_availability_for_others` (`views_availability.py`), distinta da regra
   de leitura acima. A resposta separa `conflicts` (barra: sobreposição, bloqueio, deslocamento)
-  de `warnings` (só avisa: limite diário). Desde 02/10/2026, por decisão do dono, o limite
-  diário não impede criar, editar nem aprovar evento
+  de `warnings` (só avisa; hoje sempre vazio). O limite diário (M) não impede nada desde
+  02/10/2026 e não é mais emitido desde 05/10/2026, por decisão do dono
   ([regras-disponibilidade.spec](./specs/domain/regras-disponibilidade.spec.md)).
 
 ## Referências

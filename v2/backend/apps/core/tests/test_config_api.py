@@ -25,8 +25,9 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AuditLog, Config
+from apps.core.models import AuditLog, Config, Participation
 from apps.core.services.availability_service import check_conflicts_uncached
+from apps.core.services.horas_formacao import horas_formacao
 from apps.core.tests.factories import GroupFactory, MunicipioFactory, SolicitacaoFactory, UsuarioFactory
 
 
@@ -436,7 +437,7 @@ def test_config_put_so_regrava_a_categoria_enviada(client: APIClient, dat_user: 
 
 def _codigos(usuario: Any, inicio: Any, minutos: int, municipio: Any = None) -> set[str]:
     """Códigos que o motor de disponibilidade (o mesmo de check_conflicts) devolve: os que
-    barram (`conflicts`) e os que só avisam (`warnings`, o limite diário M)."""
+    barram (`conflicts`) e os que só avisam (`warnings`)."""
     resultado = check_conflicts_uncached(
         usuario=usuario, inicio=inicio, fim=inicio + timedelta(minutes=minutos), municipio=municipio
     )
@@ -477,8 +478,9 @@ def test_config_buffer_exibido_e_o_aplicado_no_rd04(
 
 
 @pytest.mark.django_db
-def test_config_limite_diario_exibido_e_o_aplicado_no_rd05(client: APIClient, dat_user: Any, settings: Any) -> None:
-    """Mesma divergência no limite diário: a tela completava com 8 fixo e o motor (RD-05) usava o settings."""
+def test_config_teto_exibido_e_o_aplicado_na_contagem_de_horas(client: APIClient, dat_user: Any, settings: Any) -> None:
+    """A tela mostra o mesmo teto que a contagem de horas aplica (RD-05 = teto por evento,
+    decisão do dono de 05/10/2026). Antes era a mesma checagem contra o aviso M, que saiu."""
     _limpar_config()
     settings.AVAILABILITY_DAILY_LIMIT_HOURS = 6
     client.force_authenticate(user=dat_user)
@@ -486,8 +488,12 @@ def test_config_limite_diario_exibido_e_o_aplicado_no_rd05(client: APIClient, da
     exibido = client.get(reverse("core:config")).json()["AVAILABILITY_DAILY_LIMIT_HOURS"]
 
     inicio = timezone.now().replace(hour=12, minute=0, second=0, microsecond=0)  # 09:00 em Fortaleza
-    assert "M" not in _codigos(dat_user, inicio, exibido * 60)
-    assert "M" in _codigos(dat_user, inicio, exibido * 60 + 1)
+    sol = SolicitacaoFactory(inicio=inicio, fim=inicio + timedelta(hours=exibido + 1), status="aprovado")
+    Participation.objects.create(solicitacao=sol, usuario=dat_user, role=Participation.Role.FORMADOR)
+    dia = timezone.localdate(inicio)
+
+    assert horas_formacao([dat_user.id], de=dia, ate=dia)[dat_user.id].total == exibido
+    assert "M" not in _codigos(dat_user, inicio + timedelta(days=1), (exibido + 1) * 60)
 
 
 @pytest.mark.django_db

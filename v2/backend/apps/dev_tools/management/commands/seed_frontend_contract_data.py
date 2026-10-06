@@ -298,7 +298,6 @@ class Command(BaseCommand):
             "segmento": SEGMENTO_LONGO,
             "observacoes": TEXTO_OBSERVACAO_LONGO,
             "coordenador": coord_vidas,
-            # created_at recente: o dashboard de equipe só olha os últimos 7 dias.
             "created_at": timezone.now(),
         }
         # Pendente de coord_vidas: Minhas, Aprovações (SUPER) e a tela de edição.
@@ -307,12 +306,18 @@ class Command(BaseCommand):
             defaults={**comum, "usuario": coord_vidas, "status": "pendente", "inicio": _em(10, 9), "fim": _em(10, 17)},
         )
         # Aprovada futura criada pela pessoa de nome longo: Publicação, Pré-agenda, Meus eventos
-        # (coord_vidas participa), Grade Mensal e os dashboards (visão geral, equipe, GCal).
+        # (coord_vidas participa), Grade Mensal e os dashboards (visão geral, GCal).
         aprovada, _ = Solicitacao.objects.update_or_create(
             external_hash="sem-rolagem-horizontal:aprovada",
             defaults={**comum, "usuario": pessoa_longa, "status": "aprovado", "inicio": _em(5, 9), "fim": _em(5, 17)},
         )
-        for solicitacao in (pendente, aprovada):
+        # Aprovada de ontem: o painel de Equipe conta pelo INÍCIO do evento nos últimos 7 dias
+        # (padrão da tela), então a futura acima não entra lá.
+        realizada, _ = Solicitacao.objects.update_or_create(
+            external_hash="sem-rolagem-horizontal:realizada",
+            defaults={**comum, "usuario": pessoa_longa, "status": "aprovado", "inicio": _em(-1, 9), "fim": _em(-1, 17)},
+        )
+        for solicitacao in (pendente, aprovada, realizada):
             Participation.objects.get_or_create(solicitacao=solicitacao, usuario=coord_vidas, role="COORDENADOR")
             Participation.objects.get_or_create(solicitacao=solicitacao, usuario=pessoa_longa, role="FORMADOR")
 

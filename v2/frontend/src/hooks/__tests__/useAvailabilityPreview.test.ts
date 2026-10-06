@@ -119,7 +119,7 @@ describe('useAvailabilityPreview', () => {
     expect(result.current.bloqueados[0]).toMatchObject({ usuario_id: 99, usuario_nome: 'Bruno Formador' });
   });
 
-  test('ok com aviso de limite diário: status ok carregando os avisos por pessoa', async () => {
+  test('ok com aviso (ex.: M antigo): status ok carregando os avisos por pessoa', async () => {
     checkAvailabilityManyMock.mockResolvedValue({
       ok: true,
       results: [

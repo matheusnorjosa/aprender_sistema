@@ -65,7 +65,7 @@ describe('AvailabilityConflictAlert', () => {
   });
 });
 
-describe('AvisosDeAgenda — limite diário avisa, não barra (decisão de 02/10/2026)', () => {
+describe('AvisosDeAgenda — aviso não barra (inclusive um M antigo, de antes de 05/10/2026)', () => {
   const avisos: AvisoDeAgenda[] = [
     {
       usuario_id: 99,

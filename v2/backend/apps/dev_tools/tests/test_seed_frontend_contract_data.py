@@ -226,6 +226,17 @@ class TestSeedFrontendContractDataTextosLongos:
         hoje = timezone.localdate()
         assert Solicitacao.objects.filter(status="aprovado", inicio__date__gte=hoje).exists()
 
+    def test_formador_de_nome_longo_aparece_no_painel_de_equipe(self):
+        """O painel de Equipe conta eventos pelo início nos últimos `days` dias (padrão da tela: 7)."""
+        from rest_framework.test import APIClient
+
+        client = APIClient()
+        client.force_authenticate(user=Usuario.objects.get(username="admin_matrix@test.com"))
+        resposta = client.get("/api/metrics/team/formadores/", {"days": 7})
+        assert resposta.status_code == 200, resposta.data
+        nomes = [f["nome"] for f in resposta.json()["formadores"]]
+        assert any(nome.startswith("Aaa Maria Aparecida da Conceição") for nome in nomes), nomes
+
     def test_municipio_longo_tem_coordenadas_para_a_lista_do_mapa(self):
         """O Mapa (vista Lista) só mostra município com latitude e longitude."""
         municipio = Municipio.objects.get(nome__startswith="Aaa ", uf="BA")

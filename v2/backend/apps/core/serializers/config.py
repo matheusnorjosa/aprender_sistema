@@ -20,7 +20,8 @@ class ConfigSerializer(serializers.Serializer):  # type: ignore[misc]
 
     Categorias:
     - Disponibilidade (RD-04, RD-05): TRAVEL_BUFFER_MINUTES, AVAILABILITY_DAILY_LIMIT_HOURS
-      (o limite diário só avisa, não impede o evento — decisão do dono, 02/10/2026)
+      (RD-05 = teto de horas por evento na contagem de horas de formação; não limita a agenda
+      — decisão do dono, 05/10/2026)
     - GCal (RF05/RF06): BATCH_SIZE, LOCK_TTL_SECONDS, AUTO_RETRY_ON_ERROR, MAX_RETRIES, SEND_UPDATES
     - Sessões/UX: SESSION_COOKIE_AGE, SESSION_WARNING_THRESHOLD, AUTOCOMPLETE_DEBOUNCE_MS
     - Features: ENABLE_MULTI_CALENDAR, ENABLE_BATCH_ACTIONS, ENABLE_ADVANCED_FILTERS

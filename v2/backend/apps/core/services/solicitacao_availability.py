@@ -57,8 +57,8 @@ class GuardResult:
     blocked: participantes com conflito (vazio se ok)
     skipped_guests: e-mails de convidados externos que não puderam ser checados
     checked_usuario_ids: ids efetivamente checados (já deduplicados)
-    warnings: participantes com aviso (limite diário, RD-05), bloqueados ou não. Nunca
-        muda `ok`: o aviso é devolvido e registrado, não barra.
+    warnings: participantes com aviso, bloqueados ou não. Nunca muda `ok`. Hoje fica
+        vazio: o motor não emite aviso desde 05/10/2026 (o M saiu).
     """
 
     ok: bool
@@ -148,11 +148,10 @@ def check_solicitacao_availability(solicitacao: Solicitacao, *, lock: bool = Tru
 
     A própria solicitação é excluída da checagem (`exclude_solicitacao_id`) — senão um
     evento já gravado conflitaria consigo mesmo. A exclusão acontece na origem da query e
-    não como filtro por `ref_id` depois: o aviso de limite diário (M, RD-05) não
-    tem `ref_id` e somaria as horas do próprio evento em dobro.
+    não como filtro por `ref_id` depois.
 
-    Só `conflicts` (X, T, P, D) bloqueia. O limite diário vem em `warnings` e é repassado
-    por pessoa, sem bloquear (decisão do dono, 02/10/2026).
+    Só `conflicts` (X, T, P, D) bloqueia. `warnings` é repassado por pessoa, sem bloquear;
+    hoje vem vazio (o limite diário M saiu em 05/10/2026).
 
     Args:
         solicitacao: evento já gravado (precisa de pk, inicio, fim)
@@ -210,7 +209,7 @@ _ACAO_GENERICA = "concluir a ação"
 # Motivo em linguagem de quem usa, por código de conflito do motor (X/T/P/D). É só
 # apresentação: quem decide o conflito continua sendo `check_conflicts_uncached`. Sempre
 # consultado com `.get` — código fora do mapa cai no texto genérico, nunca em KeyError.
-# O limite diário (M) não está aqui: desde 02/10/2026 é aviso e não entra em `conflicts`.
+# O limite diário (M) não está aqui: o motor não o emite desde 05/10/2026.
 _MOTIVO_TEXTO: dict[str, str] = {
     "X": "tem outro evento aprovado neste horário",
     "T": "tem bloqueio de agenda no período",
@@ -247,8 +246,8 @@ def raise_if_blocked(guard: GuardResult, *, action: str = "create") -> None:
     Converte um GuardResult bloqueado em 400 `availability_conflict`.
 
     Conflito (X, T, P, D) é bloqueio duro, sem override: vale para todos os fluxos,
-    inclusive NAO_SUPER (decisão de negócio, 2026-07-16). O limite diário (M) não é
-    conflito: nunca chega aqui sozinho (decisão do dono, 02/10/2026).
+    inclusive NAO_SUPER (decisão de negócio, 2026-07-16). O limite diário (M) não existe
+    mais (decisão do dono, 05/10/2026).
 
     O payload mantém `conflicts` achatado como antes do #1452 (clientes existentes leem
     essa chave) e acrescenta `blocked_participants` com a atribuição por pessoa. As chaves
@@ -292,7 +291,7 @@ def enforce_solicitacao_availability(solicitacao: Solicitacao, *, action: str) -
             escolhe o verbo da mensagem de bloqueio. Não muda o que é checado nem a decisão.
 
     Returns:
-        GuardResult (ok=True) quando passa; `warnings` traz quem passou do limite diário
+        GuardResult (ok=True) quando passa; `warnings` traz quem teve aviso (hoje, ninguém)
 
     Raises:
         ValidationAPIError: `availability_conflict` quando algum participante tem conflito
@@ -313,7 +312,7 @@ def enforce_solicitacao_availability(solicitacao: Solicitacao, *, action: str) -
         )
 
     if guard.warnings:
-        # RD-05: o limite diário não barra, mas fica registrado. Só ids, sem nome.
+        # Aviso não barra, mas fica registrado. Só ids, sem nome.
         logger.info(
             "availability_warning",
             extra={

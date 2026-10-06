@@ -89,6 +89,6 @@ def test_evento_cruzando_meia_noite_conta_capacidade_no_dia_seguinte():
 
     result = check_conflicts_uncached(usuario=pessoa, inicio=inicio, fim=fim, municipio=municipio)
 
-    # Desde 02/10/2026 o M é aviso: o dia seguinte é checado, mas não barra.
+    # Desde 05/10/2026 não há M (decisão do dono): 10 h no dia seguinte não barram nem avisam.
     assert result.ok, [(c.code, c.detail) for c in result.conflicts]
-    assert any(w.code == "M" for w in result.warnings), [(w.code, w.detail) for w in result.warnings]
+    assert result.warnings == [], [(w.code, w.detail) for w in result.warnings]

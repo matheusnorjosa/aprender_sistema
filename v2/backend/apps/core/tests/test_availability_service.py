@@ -275,10 +275,10 @@ class TestAvailabilityServiceRules:
         # Não deve ter conflito D (mesmo município)
         assert not any(c.code == "D" for c in result.conflicts), "Mesmo município não exige buffer"
 
-    def test_daily_capacity_M_exceeded(self, usuario_test, tipo_evento_test, municipio_a):
+    def test_dia_acima_de_8_horas_nao_gera_M(self, usuario_test, tipo_evento_test, municipio_a):
         """
-        RD-05: limite diário passado → M como AVISO (decisão do dono, 02/10/2026).
-        Já tem 7h aprovadas no dia, novo de 2h com limite 8h → M em `warnings`, sem barrar.
+        RD-05 virou teto da contagem de horas (decisão do dono, 05/10/2026): o motor não
+        emite mais M. Já tem 7h aprovadas no dia, novo de 2h → ok, sem conflito nem aviso.
         """
         now = timezone.now().replace(hour=8, minute=0, second=0, microsecond=0)
 
@@ -301,11 +301,9 @@ class TestAvailabilityServiceRules:
             municipio=municipio_a,
         )
 
-        daily_limit = getattr(settings, "AVAILABILITY_DAILY_LIMIT_HOURS", 8)
-        if daily_limit <= 8:  # Se limite é 8h ou menos
-            assert result.ok, "Limite diário não barra"
-            assert not any(c.code == "M" for c in result.conflicts), "M não é conflito"
-            assert any(w.code == "M" for w in result.warnings), "Deve ter aviso M"
+        assert result.ok, "Limite diário não barra"
+        assert not any(c.code == "M" for c in result.conflicts), "M não é conflito"
+        assert result.warnings == [], "M também não é aviso"
 
     def test_timezone_aware_fortaleza_localtime(self, usuario_test):
         """

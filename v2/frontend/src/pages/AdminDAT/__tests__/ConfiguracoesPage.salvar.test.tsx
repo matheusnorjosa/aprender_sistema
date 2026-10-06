@@ -11,7 +11,7 @@
  * Falha de carga desabilita o Salvar e mostra o motivo.
  *
  * Rodada 4 (decisão do dono, 01/10): a tela mostra só os 2 campos que o sistema lê (Buffer de
- * deslocamento e Aviso de horas por dia). Os outros 13 não tinham efeito e saíram da tela; o
+ * deslocamento e Teto de horas por evento). Os outros 13 não tinham efeito e saíram da tela; o
  * backend os guarda como estão (o PUT mescla), e o salvar não os manda.
  */
 
@@ -96,10 +96,14 @@ describe('ConfiguracoesPage — salvar não desfaz o que não foi tocado', () =>
     await abrir();
 
     expect(screen.getByLabelText('Buffer de deslocamento')).toHaveValue('90');
-    expect(screen.getByLabelText('Aviso de horas por dia')).toHaveValue('10');
-    // Rótulo honesto (02/10/2026): o limite avisa, não impede, e não promete contagem com teto.
-    expect(screen.getByText(/O aviso não impede o evento\./)).toBeInTheDocument();
-    expect(screen.queryByText(/Máximo de horas/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Teto de horas por evento (contagem)')).toHaveValue('10');
+    // Desde 05/10/2026 o número é só o teto da contagem de horas de formação: não limita a agenda.
+    expect(
+      screen.getByText(
+        'Máximo de horas que um evento conta para as horas de formação (Grade Mensal e painel de Equipe). Não limita a agenda.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/avisa/)).not.toBeInTheDocument();
     const campos = [...document.querySelectorAll('input, [role="switch"], [role="combobox"]')].map((c) => c.id);
     expect(campos.sort()).toEqual(['AVAILABILITY_DAILY_LIMIT_HOURS', 'TRAVEL_BUFFER_MINUTES']);
     expect(screen.queryAllByRole('tab')).toHaveLength(0);

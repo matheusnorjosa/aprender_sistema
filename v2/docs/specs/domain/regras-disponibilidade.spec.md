@@ -4,6 +4,7 @@ status: canonical
 last_verified: 2026-10-05
 sources_of_truth:
   - v2/backend/apps/core/services/availability_service.py
+  - v2/backend/apps/core/services/horas_formacao.py
   - v2/backend/apps/core/services/solicitacao_availability.py
   - v2/backend/apps/core/views_availability.py
   - v2/backend/apps/core/views_availability_monthly.py
@@ -34,11 +35,13 @@ O calculo e a SSOT da logica de conflito, e hoje ele tem **dois consumidores com
 | Camada | Funcao | Cache | Efeito |
 |---|---|---|---|
 | **Consultiva** | `check_conflicts` | 300s | So informa. Telas de disponibilidade, Grade Mensal, feedback no wizard. |
-| **Enforcement** | `check_conflicts_uncached` via `solicitacao_availability.enforce_solicitacao_availability` | nenhum | **Bloqueia** create/update/approve/batch_approve com HTTP 400 `availability_conflict` quando ha conflito `X`, `T`, `P` ou `D`. O limite diario (`M`) so avisa. |
+| **Enforcement** | `check_conflicts_uncached` via `solicitacao_availability.enforce_solicitacao_availability` | nenhum | **Bloqueia** create/update/approve/batch_approve com HTTP 400 `availability_conflict` quando ha conflito `X`, `T`, `P` ou `D`. O limite diario (`M`) nao existe mais (05/10/2026). |
 
 A afirmacao "RD e apenas consultivo" era verdadeira ate o #1452 e **nao vale mais**: conflito e bloqueio duro, sem override, inclusive no fluxo `NAO_SUPER` ([`solicitacao_availability.py`](../../../backend/apps/core/services/solicitacao_availability.py)). A decisao humana da Superintendencia continua sendo o gate de *aprovacao* (PA), mas ela nao consegue mais aprovar por cima de um conflito.
 
-> **Decisao do dono, 02/10/2026 — o limite diario avisa, nao barra.** "O evento na agenda pode ter quantas horas quiser." O motor continua calculando o RD-05, mas devolve o `M` em `warnings`, separado de `conflicts`. Criar, editar, aprovar (um e lote), a checagem previa do assistente e o importador de eventos **nao recusam mais** por limite diario. Sobreposicao (`X`), bloqueio (`T`, `P`) e deslocamento (`D`) continuam barrando exatamente como antes. A contagem de horas de formacao com teto por dia **ainda nao existe** (esta na fila): o aviso so diz que o dia passa de N horas e que isso nao impede o evento.
+> **Decisao do dono, 02/10/2026 — o limite diario avisa, nao barra.** "O evento na agenda pode ter quantas horas quiser." O motor continua calculando o RD-05, mas devolve o `M` em `warnings`, separado de `conflicts`. Criar, editar, aprovar (um e lote), a checagem previa do assistente e o importador de eventos **nao recusam mais** por limite diario. Sobreposicao (`X`), bloqueio (`T`, `P`) e deslocamento (`D`) continuam barrando exatamente como antes. A contagem de horas de formacao com teto por dia **ainda nao existe** (esta na fila): o aviso so diz que o dia passa de N horas e que isso nao impede o evento. *(Historico: o aviso saiu em 05/10/2026, ver abaixo.)*
+
+> **Decisao do dono, 05/10/2026 (OK explicito para mudar a RD-05 e a CP-03) — o aviso `M` sai; o parametro vira so o teto da contagem de horas.** O motor **nao calcula mais** o RD-05 e nao emite `M` em nenhum caminho (criar, editar, aprovar, lote, `check/`, `check-many/`, importador de eventos, 400 por outro motivo). O parametro `AVAILABILITY_DAILY_LIMIT_HOURS` continua em Configuracoes, editavel de 1 a 12 (padrao 8), com o rotulo "Teto de horas por evento (contagem)": e o teto da **contagem de horas de formacao (CH)**, nao limita a agenda. A regra da contagem (decisoes de 02/10 e 05/10/2026, como a planilha `Eventos!R`, exceto o coordenador): CH de um evento para uma pessoa = `min(fim − inicio, teto)`; as CH do dia se somam (5 h + 5 h = 10 h; nao ha teto por dia); evento que cruza a meia-noite conta inteiro no dia local do **inicio**; sem desconto de almoco; online conta igual; so evento **aprovado**, de qualquer projeto ou gerencia; conta o participante `FORMADOR` sempre e o coordenador responsavel (`Solicitacao.coordenador`; sem ele, quem criou) **so** com `coordenador_acompanha=True`; `COORD_ACOMPANHA` e `CONVIDADO` nao contam; a mesma pessoa conta uma vez por evento. SSOT: [`horas_formacao.py`](../../../backend/apps/core/services/horas_formacao.py), usada pela Grade Mensal (`ch_month`, `ch_year`, ranking; as duas abas) e pelo painel de Equipe (`horas_trabalhadas`), que dao o mesmo numero para a mesma pessoa e periodo. A decisao 6 de 02/10 falava em teto "por dia"; a de 05/10 a corrigiu para **por evento**.
 
 > **Decisao do dono, 05/10/2026 (OK explicito para mudar a CP-03) — o coordenador so ocupa a agenda quando acompanha.** A conferencia de agenda (RD-01 sobreposicao, RD-02/03 bloqueios, RD-04 deslocamento e o aviso M) vale para **todos os formadores** do evento, sempre, e para o **coordenador responsavel** (`Solicitacao.coordenador`; sem ele, quem criou) **so quando `coordenador_acompanha=True`** ("O coordenador responsavel vai acompanhar o evento?", obrigatoria na criacao). Quem cria deixa de ser conferido por ter criado; os papeis `COORDENADOR` e `COORD_ACOMPANHA` nao ocupam mais (servem ao convite do Google). Segundo coordenador num evento entra na lista de formadores e e conferido como formador. Mudar a resposta de Nao para Sim num evento com conflito → 400 `availability_conflict` com o motivo. Eventos ja gravados ficam com a marca que tem no banco (um script de dados separado zera as importadas); o codigo nao depende dele.
 
@@ -58,7 +61,7 @@ Doc detalhado da API/permissoes da grade: [`v2/docs/GUIDE_AVAILABILITY.md`](../.
 
 ## Contratos e invariantes
 
-Codigos **emitidos pelo servico** (confirmado no codigo). `X`, `T`, `P` e `D` saem em `CheckResult.conflicts` e **barram**; `M` sai em `CheckResult.warnings` e **so avisa** (`CODIGOS_DE_AVISO`):
+Codigos **emitidos pelo servico** (confirmado no codigo). `X`, `T`, `P` e `D` saem em `CheckResult.conflicts` e **barram**. `CheckResult.warnings` continua no contrato (chave aditiva de 02/10/2026), mas hoje vem sempre vazio: o `M` nao e mais emitido desde 05/10/2026.
 
 | Codigo | Regra | Significado | Condicao |
 |--------|-------|-------------|----------|
@@ -66,16 +69,16 @@ Codigos **emitidos pelo servico** (confirmado no codigo). `X`, `T`, `P` e `D` sa
 | `T` | RD-02 | Bloqueio total | `AvailabilityBlock` aprovado, `tipo="T"`, interseccao com o intervalo. |
 | `P` | RD-03 | Bloqueio parcial | `AvailabilityBlock` aprovado, `tipo != "T"` (ex.: `"P"`), interseccao com o subintervalo. |
 | `D` | RD-04 | Buffer de deslocamento insuficiente | Evento vizinho (anterior/posterior) em cidade diferente com gap `< buffer_min`. |
-| `M` | RD-05 | Dia com mais de N horas de eventos (**aviso, nao barra**) | Soma de minutos no mesmo dia local `> AVAILABILITY_DAILY_LIMIT_HOURS * 60`. |
+| ~~`M`~~ | RD-05 | **Nao emitido desde 05/10/2026.** Era "dia com mais de N horas de eventos" (aviso). | O RD-05 agora e o teto da contagem de horas de formacao (`horas_formacao.py`), fora do motor de conflito. |
 
 Invariantes (NAO podem ser violados):
 
 - **CP-03** — RD-01..RD-08 sao clausula petrea. Timezone Fortaleza com storage UTC.
 - **RD-01 (adjacencia)**: `fim == inicio_vizinho` NAO conflita. Interseccao usa `<`/`>` estritos, nunca `<=`/`>=`.
 - **RD-04 (limite exato)**: gap exatamente igual ao buffer **passa**; so `mins < buffer_min` conflita. `municipio=None` (de qualquer lado) e tratado como **cidade diferente** → exige buffer (fix #588). Mesmo municipio → buffer 0.
-- **RD-05 (aviso)**: o limite diario **nao barra** (decisao do dono, 02/10/2026). A soma e feita em **cada dia local** que o novo intervalo toca; eventos existentes e o novo sao recortados a janela do dia (`_clip_minutes`), com range de datetime derivado do dia local, nunca `.date()` cru (fix #249; virada do dia corrigida no #1664). Passou do limite → `Conflict("M", ...)` em `warnings`, com `title`/`detail` em linguagem de quem usa ("Dia com mais de 8 horas de eventos" / "No dia 10/03 a soma dos eventos chega a 10h. Isso nao impede o evento."). `ok` nao muda por causa dele.
+- **RD-05 (teto da contagem de horas)**: desde 05/10/2026 (decisao do dono) nao e checagem de agenda: o motor nao soma horas do dia nem emite `M`. `AVAILABILITY_DAILY_LIMIT_HOURS` e o teto **por evento** da contagem de horas de formacao ([`horas_formacao.py`](../../../backend/apps/core/services/horas_formacao.py)): `min(fim − inicio, teto)`, somado no dia local do inicio, sem teto por dia. Regra completa na decisao de 05/10 acima. (De 02/10 a 05/10/2026 o `M` foi aviso em `warnings`; antes de 02/10, barrava.)
 - **RD-06**: comparacao sempre em `America/Fortaleza` via `to_local()`; entradas naive sao assumidas UTC (`make_aware(..., utc)`).
-- **RD-07**: o servico **reporta TUDO** o que encontra, sem short-circuit: em `conflicts`, na ordem Bloqueios (T/P) → Sobreposicao (X) → Buffer (D); em `warnings`, o limite diario (M). Invariante: `ok` e verdadeiro exatamente quando `conflicts` esta vazio; tudo em `conflicts` barra; nada em `warnings` barra.
+- **RD-07**: o servico **reporta TUDO** o que encontra, sem short-circuit: em `conflicts`, na ordem Bloqueios (T/P) → Sobreposicao (X) → Buffer (D); `warnings` vem vazio desde 05/10/2026 (era o limite diario M). Invariante: `ok` e verdadeiro exatamente quando `conflicts` esta vazio; tudo em `conflicts` barra; nada em `warnings` barra.
 - **RD-08**: cada `Conflict` carrega `code`, `title`, `detail` (com intervalo formatado `HH:MM dd/mm`) e `ref_id` opcional.
 - **Pureza do calculo**: o calculo so le; considera apenas `Solicitacao.status == APROVADO` e `AvailabilityBlock.status == APROVADO`. Validacao basica: `fim <= inicio` → `ok=False` com conflito `X` "Intervalo invalido". Solicitacao `pendente` e **invisivel** para a checagem — e por isso que o guard precisa do advisory lock (duas transacoes concorrentes leriam a outra como inexistente).
 - **Cache**: so na camada consultiva (`check_conflicts`, 300s via `@cache_availability_check`); TTL curto porque dados mudam com frequencia. O caminho de enforcement **nunca** le do cache. A chave tem versao no prefixo (`availability_check:v2:`): o objeto guardado ganhou `warnings` em 02/10/2026 e a versao impede servir um resultado antigo, sem o campo.
@@ -103,12 +106,12 @@ RBAC dos endpoints de check: `permission_classes = [HasPerm("view_all_availabili
 Caminho feliz / deteccao (`check_conflicts`):
 
 1. Valida `fim > inicio` (senao retorna `X` "Intervalo invalido").
-2. Carrega `buffer_min` e `daily_limit_h` por `parametros_disponibilidade()`: a chave gravada no Config `availability` vale (inclusive Buffer 0); sem ela, o settings (env; default 120 min / 8 h). É a mesma fonte do `GET /api/config/`, então o valor que a tela mostra é o aplicado (auditoria UX 30/09).
+2. Carrega `buffer_min` por `parametros_disponibilidade()`: a chave gravada no Config `availability` vale (inclusive Buffer 0); sem ela, o settings (env; default 120 min). O teto de horas (default 8 h) vem da mesma funcao, mas so a contagem de horas o le. É a mesma fonte do `GET /api/config/`, então o valor que a tela mostra é o aplicado (auditoria UX 30/09).
 3. Monta `events_qs` = `Solicitacao` APROVADO filtrada por `ocupa_agenda_q(usuario)`: a pessoa e FORMADORA, ou e a responsavel de evento com `coordenador_acompanha=True`.
 4. RD-02/RD-03: itera blocos aprovados que intersectam → emite `T` ou `P`.
 5. RD-01: itera eventos aprovados que intersectam → emite `X`.
 6. RD-04: pega evento imediatamente anterior (`fim__lte=inicio`) e posterior (`inicio__gte=fim`); se cidade difere e gap `< buffer_min`, emite `D`.
-7. RD-05: para cada dia local que o novo intervalo toca, soma os minutos dos eventos existentes e do novo, recortados ao dia; se `> limite`, acrescenta `M` em `warnings` (nao em `conflicts`).
+7. (RD-05 nao roda aqui desde 05/10/2026.)
 8. Retorna `CheckResult(ok=(len(conflicts)==0), conflicts=..., warnings=...)`.
 
 Caminho de enforcement (`enforce_solicitacao_availability`, dentro de `transaction.atomic()`):
@@ -117,12 +120,10 @@ Caminho de enforcement (`enforce_solicitacao_availability`, dentro de `transacti
 2. `lock_participants` toma `pg_advisory_xact_lock(1452, usuario_id)` em ordem ASC.
 3. Para cada participante, `check_conflicts_uncached(..., exclude_solicitacao_id=solicitacao.pk)`.
 4. `skipped_guests` nao vazio → `logger.warning("availability_guest_check_skipped")` (nao bloqueia).
-5. Aviso de limite diario (`guard.warnings`) → `logger.info("availability_warning")` com ids, sem nome (nao bloqueia).
+5. Aviso (`guard.warnings`) → `logger.info("availability_warning")` com ids, sem nome (nao bloqueia). Hoje nao dispara: o motor nao emite aviso desde 05/10/2026.
 6. Qualquer bloqueado → `ValidationAPIError` **400 `availability_conflict`**, com `conflicts` achatado (contrato legado) e `blocked_participants` por pessoa. A mensagem e `conflicts` so falam do que barra; os avisos calculados na mesma checagem vao em chaves aditivas (`errors.warnings` e `blocked_participants[].warnings`). A transacao inteira e desfeita — no `update`, a edicao nao persiste.
 
-Call-sites: `perform_create` e `perform_update` ([`views_solicitacao.py`](../../../backend/apps/core/views_solicitacao.py)); `approve_solicitacao` e `batch_approve_solicitacoes` ([`solicitacao_approval.py`](../../../backend/apps/core/services/solicitacao_approval.py)). O importador de eventos pela tela (`eventos_import.py`, so evento futuro) usa `check_solicitacao_availability` e segue a mesma regra: `M` sozinho nao vira pendencia.
-
-O que a resposta de **sucesso** de criar, editar e aprovar devolve: nada sobre o aviso (fila). Hoje o aviso aparece na checagem previa (`check/`, `check-many/`), no log e dentro do 400 quando ha outro motivo.
+Call-sites: `perform_create` e `perform_update` ([`views_solicitacao.py`](../../../backend/apps/core/views_solicitacao.py)); `approve_solicitacao` e `batch_approve_solicitacoes` ([`solicitacao_approval.py`](../../../backend/apps/core/services/solicitacao_approval.py)). O importador de eventos pela tela (`eventos_import.py`, so evento futuro) usa `check_solicitacao_availability` e segue a mesma regra (sem `M`, nenhum dia cheio vira pendencia).
 
 Caminhos de erro do endpoint `check/`: `usuario_id` ausente/invalido → 400; usuario inexistente → 404; consultar outro sem permissao → 403; `municipio_id` invalido → 400; `inicio`/`fim` ausentes ou nao-ISO → 400; `fim <= inicio` → 400; nao autenticado → 401/403. Datetimes naive sao convertidos para UTC antes do servico (RD-06).
 
@@ -135,11 +136,13 @@ Caminhos de erro do endpoint `check/`: `usuario_id` ausente/invalido → 400; us
 
 [`v2/backend/apps/core/tests/test_availability_service.py`](../../../backend/apps/core/tests/test_availability_service.py):
 
-- `TestAvailabilityServiceRules` — `test_conflict_overlap_total`/`_partial` (X), `test_no_conflict_adjacent_end_equals_start` (RD-01 adjacencia), `test_block_total_T_prevents_any_event` (T), `test_block_partial_P_prevents_inside_allows_outside` (P), `test_travel_buffer_between_cities_required` / `test_same_city_allows_zero_buffer` (D), `test_daily_capacity_M_exceeded` (M como aviso), `test_timezone_aware_fortaleza_localtime` + `test_midnight_boundary_timezone_aware` (RD-06).
+- `TestAvailabilityServiceRules` — `test_conflict_overlap_total`/`_partial` (X), `test_no_conflict_adjacent_end_equals_start` (RD-01 adjacencia), `test_block_total_T_prevents_any_event` (T), `test_block_partial_P_prevents_inside_allows_outside` (P), `test_travel_buffer_between_cities_required` / `test_same_city_allows_zero_buffer` (D), `test_dia_acima_de_8_horas_nao_gera_M` (sem M), `test_timezone_aware_fortaleza_localtime` + `test_midnight_boundary_timezone_aware` (RD-06).
 - `TestAvailabilityCheckEndpoint` — 200/400/401-403/404, `usuario_id` obrigatorio, validacao de datas, batch `check-many/`, e `test_permission_only_self_or_privileged` (403 RBAC ao checar outro).
 - `TestAvailabilityServiceAdditional` — `test_multi_formador_any_conflict_blocks` (RD-01 multi-formador), `test_conflict_messages_include_codes_and_intervals` (RD-08: estrutura `{code,title,detail}` + intervalo).
 
-[`v2/backend/apps/core/tests/test_availability_limite_diario_aviso.py`](../../../backend/apps/core/tests/test_availability_limite_diario_aviso.py) (decisao de 02/10/2026): evento sozinho das 07:00 as 23:00 e criado e aprovado com aviso; criar, editar, aprovar e lote nao recusam por limite diario; `check/` e `check-many/` devolvem `warnings`; `X` + `M` na mesma pessoa da 400 so pelo `X`; e a guarda `TestOQueBarraContinuaBarrando`: `X`, `T`, `P` e `D` seguem dando 400 em criar, editar, aprovar e lote.
+[`v2/backend/apps/core/tests/test_availability_sem_aviso_m.py`](../../../backend/apps/core/tests/test_availability_sem_aviso_m.py) (decisao de 05/10/2026): nenhum caminho devolve `M` — motor (inclusive teto 1 h e dia com 10 h), criar, editar, aprovar, lote, `check/` e `check-many/` (`warnings` vazio) e o 400 por sobreposicao; o evento das 07:00 as 23:00 e criado e aprovado sem log de aviso; e a guarda `TestOQueBarraContinuaBarrando`: `X`, `T`, `P` e `D` seguem dando 400 em criar, editar, aprovar e lote.
+
+[`v2/backend/apps/core/tests/test_horas_formacao.py`](../../../backend/apps/core/tests/test_horas_formacao.py) (RD-05 como teto da contagem): 7h–23h = 8 h; 5 h + 5 h = 10 h; 22h–02h no dia do inicio; pendente nao conta; coordenador so com `coordenador_acompanha=True`; `COORD_ACOMPANHA`/convidado nao contam; online e `NAO_SUPER` contam; teto vem de Configuracoes; varias pessoas sem N+1; Grade Mensal (mes, ano, aba Coordenadores) e painel de Equipe dao o mesmo numero; grade em cache acompanha o teto salvo.
 
 ## Divergencias entre a regra escrita e o codigo
 
@@ -151,7 +154,7 @@ Caminhos de erro do endpoint `check/`: `usuario_id` ausente/invalido → 400; us
 
 ### `M08-09` — RD-05 nao vale para intervalos que cruzam a meia-noite
 
-**Severidade P2 · resolvido (PR #1796) · epico #1664 (`motor-disponibilidade-sem-ssot-de-regra`).** Desde 02/10/2026 o RD-05 e so aviso, entao o efeito que restava (recusa indevida) deixou de existir de qualquer forma.
+**Severidade P2 · resolvido (PR #1796) · epico #1664 (`motor-disponibilidade-sem-ssot-de-regra`).** Desde 02/10/2026 o RD-05 e so aviso, entao o efeito que restava (recusa indevida) deixou de existir de qualquer forma; desde 05/10/2026 o motor nem calcula mais o RD-05.
 
 O que a regra diz: nenhum usuario acumula mais de `AVAILABILITY_DAILY_LIMIT_HOURS` por dia local.
 

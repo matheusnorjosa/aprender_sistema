@@ -12,7 +12,7 @@ Retorna uma grade mensal (ano/mês) com códigos por dia/pessoa:
 
 Precedência: X > D1 > 2 > E > T/P > D
 
-Calcula CH mês/ano, ranking por CH mês (denso).
+Calcula CH mês/ano (services/horas_formacao.py, teto por evento), ranking por CH mês (denso).
 Details_index para dias com E/2/X/D1 (lista de eventos).
 """
 
@@ -28,6 +28,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from apps.core.models import AvailabilityBlock, Deslocamento, EquipeGerencia, Participation, Solicitacao, Usuario
+from apps.core.services.horas_formacao import horas_formacao
 from apps.core.types import UserId
 
 
@@ -82,10 +83,6 @@ def build_monthly_grid(
     # Converter para datetime aware (início/fim do mês)
     month_start = timezone.make_aware(datetime.combine(first_day, datetime.min.time()), tz)
     month_end = timezone.make_aware(datetime.combine(last_day, datetime.max.time()), tz)
-
-    # Converter para datetime aware (início/fim do ano)
-    year_start_dt = timezone.make_aware(datetime.combine(year_start, datetime.min.time()), tz)
-    year_end_dt = timezone.make_aware(datetime.combine(year_end, datetime.max.time()), tz)
 
     # 1. Pessoas - estratégia depende de gerencia_id
     if gerencia_id is not None:
@@ -235,44 +232,15 @@ def build_monthly_grid(
                 events_by_user_day[(uid, day_num)].append(event)
             current += timedelta(days=1)
 
-        # CH mês por usuário (uma vez por evento, somada a cada participant).
-        # CH ano é agregada à parte, sobre a janela do ANO — `events` só
-        # intersecta o mês consultado (M14-03 / #1663).
-        ch_month_hours = _calc_hours_in_range(event.inicio, event.fim, month_start, month_end)
-        for uid in event_users:
-            if uid in user_ids_set:
-                ch_month_by_user[uid] += ch_month_hours
-
-    # 5.5. CH Ano por usuário — janela do ANO, independente do mês consultado.
-    # `events` acima só intersecta [month_start, month_end], então somar ch_year
-    # sobre ele contava um único mês (CH Ano ≈ CH Mês, repetindo o CH Mês). Query
-    # própria sobre a janela do ano alimenta ch_year (M14-03 / #1663).
-    year_events_q = Solicitacao.objects.filter(
-        status="aprovado",
-        participations__role=role,
-        participations__usuario_id__in=user_ids,
-        inicio__lt=year_end_dt,
-        fim__gt=year_start_dt,
-    )
-    if sector and sector.strip():
-        year_events_q = year_events_q.filter(projeto__nome__iexact=sector.strip())
-    year_rows = list(year_events_q.values_list("id", "inicio", "fim").distinct())
-
-    year_event_to_users: dict[int, list[int]] = defaultdict(list)
-    year_event_ids = [row[0] for row in year_rows]
-    if year_event_ids:
-        for sol_id, uid in Participation.objects.filter(
-            solicitacao_id__in=year_event_ids,
-            role=role,
-            usuario_id__in=user_ids,
-        ).values_list("solicitacao_id", "usuario_id"):
-            year_event_to_users[sol_id].append(uid)
-
-    for ev_id, ev_inicio, ev_fim in year_rows:
-        ch_year_hours = _calc_hours_in_range(ev_inicio, ev_fim, year_start_dt, year_end_dt)
-        for uid in year_event_to_users.get(ev_id, ()):
-            if uid in user_ids_set:
-                ch_year_by_user[uid] += ch_year_hours
+    # 5.5. CH mês e ano por usuário: a contagem única de horas de formação (teto por
+    # evento, dia do início, formador + responsável que acompanha, qualquer projeto;
+    # decisão do dono, 05/10/2026). Vale para as duas abas e não segue o filtro `sector`:
+    # é a CH da pessoa, a mesma do painel de Equipe. Uma chamada para o ano inteiro; o mês
+    # sai dos dias dele.
+    horas = horas_formacao(user_ids, de=year_start, ate=year_end)
+    for uid, ch in horas.items():
+        ch_year_by_user[uid] = ch.total
+        ch_month_by_user[uid] = sum(h for dia, h in ch.por_dia.items() if dia.month == month)
 
     # 6. Distribuir bloqueios por dia/pessoa
     for block in blocks:
@@ -398,33 +366,6 @@ def build_monthly_grid(
         "cells": cells,
         "details_index": details_index,
     }
-
-
-def _calc_hours_in_range(
-    event_start: datetime, event_end: datetime, range_start: datetime, range_end: datetime
-) -> float:
-    """
-    Calcula horas de interseção entre evento e intervalo.
-
-    Args:
-        event_start: Início do evento (aware)
-        event_end: Fim do evento (aware)
-        range_start: Início do intervalo (aware)
-        range_end: Fim do intervalo (aware)
-
-    Returns:
-        Horas decimais (interseção)
-    """
-    # Interseção
-    start = max(event_start, range_start)
-    end = min(event_end, range_end)
-
-    if start >= end:
-        return 0.0
-
-    delta = end - start
-    hours = delta.total_seconds() / 3600.0
-    return hours
 
 
 def _event_to_detail(event: Solicitacao, tz) -> dict[str, Any]:

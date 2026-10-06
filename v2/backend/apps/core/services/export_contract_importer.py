@@ -75,6 +75,7 @@ from apps.core.services.equipe_gerencia_import import (
 from apps.core.services.eventos_import import _compute_external_hash
 from apps.core.services.export_contract_projeto_resolver import (
     build_projeto_index,
+    projeto_geral_index,
     resolve_projeto_agenda,
     resolve_projeto_export,
 )
@@ -552,7 +553,7 @@ class ExportContractImporter:
 
     def _projeto_geral_index(self) -> dict[str, int]:
         """Índice norm(nome) → projeto_geral_id (ProjetoGeral.nome é unique)."""
-        return {_norm(n): pid for pid, n in ProjetoGeral.objects.values_list("id", "nome")}
+        return projeto_geral_index()  # com os apelidos de família (decisão do dono, 06/10/2026)
 
     def _tipo_evento_index(self) -> dict[str, int]:
         """Índice norm(nome) → tipo_evento_id (resolver FK de solicitacao por nome do tipo)."""
@@ -657,18 +658,21 @@ class ExportContractImporter:
                 tally[st] += 1
 
         elif name == "projeto_geral":
-            idx = {_norm(n): {"usa_avaliar": a} for n, a in ProjetoGeral.objects.values_list("nome", "usa_avaliar")}
+            # Existência pelo mesmo índice da resolução (nome normalizado + apelidos de família): nome antigo
+            # de família juntada casa a coleção nova e não conta como criação.
+            pg_idx = self._projeto_geral_index()
+            usa = dict(ProjetoGeral.objects.values_list("id", "usa_avaliar"))
             for r in rows:
                 nome = (r.get("nome") or "").strip()
                 if not nome:
                     tally["would_reject"] += 1
                     continue
-                if _norm(nome) not in idx and _norm(nome) in _AMBIGUOUS_PG_NAMES:
+                pg_id = pg_idx.get(_norm(nome))
+                if pg_id is None and _norm(nome) in _AMBIGUOUS_PG_NAMES:
                     tally["would_reject"] += 1  # alias ambíguo → decisão humana, não criar
                     continue
-                st, _ = diff_and_classify(
-                    idx.get(_norm(nome)), {"usa_avaliar": _to_bool(r.get("usa_avaliar"))}, protected
-                )
+                existing = None if pg_id is None else {"usa_avaliar": usa[pg_id]}
+                st, _ = diff_and_classify(existing, {"usa_avaliar": _to_bool(r.get("usa_avaliar"))}, protected)
                 tally[st] += 1
 
         elif name == "projeto":
@@ -1303,6 +1307,7 @@ class ExportContractImporter:
                     applied[name] = self._apply_deslocamento(self._load(name))
                     continue
                 created = 0
+                pg_idx = self._projeto_geral_index() if name == "projeto_geral" else {}
                 for r in self._load(name):
                     nome = (r.get("nome") or "").strip()
                     if not nome:
@@ -1315,12 +1320,15 @@ class ExportContractImporter:
                         if not Municipio.objects.filter(nome__iexact=nome, uf=uf).exists():
                             Municipio.objects.create(nome=nome, uf=uf, ativo=_to_bool(r.get("ativo")))
                             created += 1
-                    elif name == "projeto_geral" and not ProjetoGeral.objects.filter(nome__iexact=nome).exists():
+                    elif name == "projeto_geral" and _norm(nome) not in pg_idx:
+                        # Existe = mesmo índice da resolução (sem acento/caixa, com os apelidos de família):
+                        # o nome antigo de uma família juntada NÃO recria a família.
                         if _norm(nome) in _AMBIGUOUS_PG_NAMES:
                             continue  # alias ambíguo (regra divergente) → decisão humana, não criar
-                        ProjetoGeral.objects.create(
+                        novo_pg = ProjetoGeral.objects.create(
                             nome=nome, usa_avaliar=_to_bool(r.get("usa_avaliar")), **_pg_calc_fields(r)
                         )
+                        pg_idx[_norm(nome)] = novo_pg.pk
                         created += 1
                     elif name == "tipo_evento" and not TipoEvento.objects.filter(nome__iexact=nome).exists():
                         TipoEvento.objects.create(

@@ -46,7 +46,7 @@ import unicodedata
 from collections import defaultdict
 from dataclasses import dataclass, field, replace
 
-from apps.core.models import Projeto
+from apps.core.models import Projeto, ProjetoGeral
 
 # ── Aliases escopados (chave = nome NORMALIZADO de origem; valor = nome NORMALIZADO alvo) ──
 # Apenas famílias confirmadas por decisão humana. NÃO é regra global.
@@ -78,6 +78,25 @@ _SCOPED_ALIASES: dict[str, str] = {
     "EDUCACAO FINANCEIRA LIVRO 4": "ED FINANCEIRA 4",
     "APRENDENDO MAIS MATEMATICA 1": "AMMA 1",
     "APRENDENDO MAIS MATEMATICA 2": "AMMA 2",
+}
+
+# ── Apelidos de FAMÍLIA (ProjetoGeral), chave e alvo = nome NORMALIZADO ──
+# Decisão do dono (06/10/2026): Catavento, Superativar, ACerta e Fluir das Emoções viram uma coleção
+# cada, com nome curto. A planilha continua mandando os nomes das famílias antigas; sem o apelido a carga
+# de projeto_geral recriaria cada uma (create-only por nome) e o dat_registro/dat_cadastro entrariam nela
+# como novos, com os códigos em dobro. Cada nome antigo vai para UMA coleção. Mesma precedência do
+# apelido de projeto: a família que existe com o nome antigo vence (antes da junção nada muda), e apelido
+# cujo alvo não existe não entra. "FLUIR DAS EMOÇÕES" (sem número) já tem a chave da coleção nova.
+_PROJETO_GERAL_ALIASES: dict[str, str] = {
+    "PROJETO CATAVENTO 2": "CATAVENTO",
+    "PROJETO CATAVENTO 3": "CATAVENTO",
+    "SUPERATIVAR - LINGUAGENS": "SUPERATIVAR",
+    "SUPERATIVAR - MATEMATICA": "SUPERATIVAR",
+    "ACERTA MATEMATICA": "ACERTA",
+    "ACERTA PORTUGUES": "ACERTA",
+    "FLUIR DAS EMOCOES - 1": "FLUIR DAS EMOCOES",
+    "FLUIR DAS EMOCOES - 2": "FLUIR DAS EMOCOES",
+    "FLUIR DAS EMOCOES - 3": "FLUIR DAS EMOCOES",
 }
 
 
@@ -224,3 +243,15 @@ def resolve_projeto_agenda(raw_name: str, disciplina: str, *, index: ProjetoInde
         if res.status == "matched":
             return replace(res, matched_via="disciplina", reason="agrupador classificado pela disciplina")
     return resolve_projeto_export(raw_name, index=idx)
+
+
+def projeto_geral_index() -> dict[str, int]:
+    """Índice norm(nome) -> id das famílias (ProjetoGeral.nome é unique), com os apelidos de família.
+
+    O apelido só entra quando o nome antigo NÃO existe no banco e o alvo existe: a família que ainda tem
+    o nome antigo continua sendo a resposta (antes da junção o import não muda nada)."""
+    idx = {_norm(n): pid for pid, n in ProjetoGeral.objects.values_list("id", "nome")}
+    for antigo, alvo in _PROJETO_GERAL_ALIASES.items():
+        if antigo not in idx and alvo in idx:
+            idx[antigo] = idx[alvo]
+    return idx

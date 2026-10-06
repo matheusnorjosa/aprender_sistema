@@ -62,7 +62,6 @@ const ROUTE_TO_MENU_KEY: Record<string, string> = {
   '/dashboards/gcal': 'gcal-dashboard',
   '/mapa-brasil': 'mapa-brasil',
   '/dat/admin': 'dat-admin',
-  '/dat/admin/colecoes': 'dat-importacoes',
   '/dat/admin/equipe-gerencia': 'dat-importacoes',
   '/dat/admin/gerencias': 'dat-admin',
   '/dat/admin/produtos': 'dat-admin',

@@ -1,8 +1,8 @@
 /**
- * C2 (Programa C) — Produtos: salvar sem gravar coleção de outro projeto e estados que não mentem.
+ * C2 (Programa C) — Produtos: salvar e estados que não mentem.
  *
- * - Trocar o Projeto limpa a Coleção: a antiga sumia das opções, o Select mostrava o id cru e o
- *   Salvar gravava a coleção do projeto anterior.
+ * - O produto não tem Coleção própria: coleção é a família do projeto (decisão do dono, 06/10/2026),
+ *   então o cadastro não tem o campo nem o envia.
  * - O erro de validação do backend (código repetido) aparece com o motivo, no campo.
  * - Salvar com loading; filtro por projeto no topo; falhas de carga com motivo e "Tentar de novo".
  */
@@ -16,7 +16,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 const { PRODUTO } = vi.hoisted(() => ({
   PRODUTO: {
     id: 731, codigo: 'KIT-ALF-2026', nome: 'Kit Pedagógico de Alfabetização', descricao: '',
-    projeto: 5, projeto_nome: 'Alfabetização e Letramento', colecao: 9, colecao_nome: 'Coleção Primeiros Passos',
+    projeto: 5, projeto_nome: 'Alfabetização e Letramento',
     ativo: true, created_at: '', updated_at: '',
   },
 }));
@@ -27,10 +27,9 @@ vi.mock('../../../api/adminDAT', () => ({
   updateProduto: vi.fn(),
   deleteProduto: vi.fn(),
   listProjetos: vi.fn(),
-  listColecoesOptions: vi.fn(),
 }));
 
-import { deleteProduto, listColecoesOptions, listProdutos, listProjetos, updateProduto } from '../../../api/adminDAT';
+import { deleteProduto, listProdutos, listProjetos, updateProduto } from '../../../api/adminDAT';
 import ProdutosPage from '../ProdutosPage';
 
 function renderPage() {
@@ -57,24 +56,23 @@ describe('ProdutosPage: salvar e filtrar (C2)', () => {
       results: [{ id: 5, nome: 'Alfabetização e Letramento' }, { id: 6, nome: 'Matemática em Foco' }],
       count: 2, next: null, previous: null,
     } as never);
-    vi.mocked(listColecoesOptions).mockResolvedValue([
-      { id: 9, nome: 'Coleção Primeiros Passos', projeto: 5 },
-      { id: 10, nome: 'Coleção Números', projeto: 6 },
-    ] as never);
     vi.mocked(updateProduto).mockResolvedValue(PRODUTO);
   });
 
-  test('trocar o projeto limpa a coleção: não grava coleção de outro projeto', async () => {
+  test('o cadastro do produto não tem Coleção: nem o campo, nem no que o Salvar envia', async () => {
     const user = userEvent.setup();
     renderPage();
 
     const modal = await abrirEditar(user);
+    expect(within(modal).queryByRole('combobox', { name: 'Coleção' })).not.toBeInTheDocument();
     await user.click(within(modal).getByRole('combobox', { name: 'Projeto' }));
     await user.click(await screen.findByTitle('Matemática em Foco'));
     await user.click(within(modal).getByRole('button', { name: 'Salvar' }));
 
     await waitFor(() => expect(updateProduto).toHaveBeenCalledTimes(1));
-    expect(vi.mocked(updateProduto).mock.calls[0]![1]).toMatchObject({ projeto: 6, colecao: null });
+    const payload = vi.mocked(updateProduto).mock.calls[0]![1];
+    expect(payload).toMatchObject({ projeto: 6 });
+    expect(payload).not.toHaveProperty('colecao');
   }, 40000);
 
   test('erro de validação ao salvar: o motivo do backend no toast e no campo Código', async () => {
@@ -165,38 +163,6 @@ describe('ProdutosPage: salvar e filtrar (C2)', () => {
     expect(within(alerta).getByRole('button', { name: 'Tentar de novo: carregar os projetos' })).toHaveFocus();
   }, 40000);
 
-  test('coleções não carregaram: o aviso fica abaixo do campo e o "Tentar de novo" entra no Tab', async () => {
-    vi.mocked(listColecoesOptions).mockRejectedValueOnce(new Error('Falha de rede'));
-    const user = userEvent.setup();
-    renderPage();
-
-    const modal = await abrirEditar(user);
-    const alerta = await within(modal).findByRole('alert');
-    expect(alerta).toHaveTextContent('Não foi possível carregar as coleções.');
-    expect(within(modal).getByRole('combobox', { name: 'Coleção' })).toBeDisabled();
-
-    within(modal).getByRole('combobox', { name: 'Projeto' }).focus();
-    await user.tab();
-    expect(within(alerta).getByRole('button', { name: 'Tentar de novo: carregar as coleções' })).toHaveFocus();
-    await user.keyboard('{Enter}');
-    await waitFor(() => expect(listColecoesOptions).toHaveBeenCalledTimes(2));
-  }, 40000);
-
-  test('cada "Tentar de novo" diz o que recarrega: dois no mesmo modal não têm o mesmo nome', async () => {
-    vi.mocked(listProjetos).mockRejectedValueOnce(new Error('Falha de rede'));
-    vi.mocked(listColecoesOptions).mockRejectedValueOnce(new Error('Falha de rede'));
-    const user = userEvent.setup();
-    renderPage();
-
-    const modal = await abrirEditar(user);
-    await waitFor(() => expect(within(modal).getAllByRole('alert')).toHaveLength(2));
-    // O nome começa pelo texto visível (WCAG 2.5.3) e diz o que recarrega.
-    const projetos = within(modal).getByRole('button', { name: 'Tentar de novo: carregar os projetos' });
-    const colecoes = within(modal).getByRole('button', { name: 'Tentar de novo: carregar as coleções' });
-    expect(projetos).toHaveTextContent(/^Tentar de novo$/);
-    expect(colecoes).toHaveTextContent(/^Tentar de novo$/);
-  }, 40000);
-
   test('"Tentar de novo" dos projetos no topo: falhou de novo, o foco fica no botão; carregou, vai para o filtro', async () => {
     vi.mocked(listProjetos)
       .mockRejectedValueOnce(new Error('Falha de rede'))
@@ -244,25 +210,20 @@ describe('ProdutosPage: salvar e filtrar (C2)', () => {
     expect(busca).toHaveValue('kit');
   }, 40000);
 
-  test('"Tentar de novo" no modal: projetos e coleções que carregam levam o foco ao próprio campo', async () => {
+  test('"Tentar de novo" no modal: os projetos que carregam levam o foco ao próprio campo', async () => {
     vi.mocked(listProjetos).mockRejectedValueOnce(new Error('Falha de rede'));
-    vi.mocked(listColecoesOptions).mockRejectedValueOnce(new Error('Falha de rede'));
     const user = userEvent.setup();
     renderPage();
     const modal = await abrirEditar(user);
-    await waitFor(() => expect(within(modal).getAllByRole('alert')).toHaveLength(2));
-    const alertaDe = (texto: string): HTMLElement =>
-      within(modal).getAllByRole('alert').find((alerta) => alerta.textContent?.includes(texto))!;
+    const alerta = await within(modal).findByRole('alert');
+    // O nome começa pelo texto visível (WCAG 2.5.3) e diz o que recarrega.
+    const botao = within(alerta).getByRole('button', { name: 'Tentar de novo: carregar os projetos' });
+    expect(botao).toHaveTextContent(/^Tentar de novo$/);
 
-    within(alertaDe('os projetos')).getByRole('button', { name: /^Tentar de novo/ }).focus();
-    await user.keyboard('{Enter}');
-    await waitFor(() => expect(within(modal).getAllByRole('alert')).toHaveLength(1));
-    expect(within(modal).getByRole('combobox', { name: 'Projeto' })).toHaveFocus();
-
-    within(alertaDe('as coleções')).getByRole('button', { name: /^Tentar de novo/ }).focus();
+    botao.focus();
     await user.keyboard('{Enter}');
     await waitFor(() => expect(within(modal).queryByRole('alert')).not.toBeInTheDocument());
-    expect(within(modal).getByRole('combobox', { name: 'Coleção' })).toHaveFocus();
+    expect(within(modal).getByRole('combobox', { name: 'Projeto' })).toHaveFocus();
   }, 40000);
 
   test('filtro de projeto e busca sem produto: cita os dois e oferece limpar os dois', async () => {

@@ -78,7 +78,7 @@ ApprovalStatus: TypeAlias = Literal["pendente", "aprovado", "reprovado"]
 # 3. Códigos de Conflito (RD-01 a RD-08)
 # ==============================================================================
 
-ConflictCode: TypeAlias = Literal["X", "T", "P", "D", "M", "E"]
+ConflictCode: TypeAlias = Literal["X", "T", "P", "D", "E"]
 """Código de conflito de disponibilidade (RD-08).
 
 Códigos:
@@ -86,8 +86,10 @@ Códigos:
 - T: Bloqueio total (RD-02)
 - P: Bloqueio parcial (RD-03)
 - D: Deslocamento necessário (RD-04)
-- M: Mais de um evento / Capacidade excedida (RD-05)
 - E: Evento existente (informativo)
+
+O M (limite diário, RD-05) saiu em 05/10/2026: o parâmetro virou teto da contagem de horas
+(services/horas_formacao.py), e o motor não emite mais o código.
 """
 
 # ==============================================================================

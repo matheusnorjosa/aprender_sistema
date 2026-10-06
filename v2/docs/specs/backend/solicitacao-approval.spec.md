@@ -1,7 +1,7 @@
 ---
 title: Aprovação de Solicitações
 status: canonical
-last_verified: 2026-10-05
+last_verified: 2026-10-06
 verified_at_commit: 0dd1dcb630fdc1cf9b2b488121553e89488dde3c
 sources_of_truth:
   - v2/backend/apps/core/services/solicitacao_approval.py
@@ -81,7 +81,7 @@ Endpoints do `SolicitacaoViewSet` (prefixo `/api/solicitacoes/`). Catálogo comp
 
 - Individual → `200 OK` com `{ "detail", "solicitacao": <SolicitacaoSerializer> }`.
 - Lote → `200 OK` com `{ "approved" | "rejected": int, "errors": [{ "id", "detail", "code"?, "blocked_participants"? }] }`. Erros por-ID em vez de falha global: IDs inexistentes (`"Solicitação não encontrada"`), já decididos (`"Status já é 'X'"`) do próprio ator (`code: "self_approval_forbidden"`) ou fora do escopo da aprovadora por vínculo (`code: "out_of_approval_scope"`) entram em `errors` sem abortar os válidos.
-- **Item de conflito de agenda no lote (2026-10-02)**: `{ "id", "code": "availability_conflict", "detail", "blocked_participants": [{ usuario_id, usuario_nome, conflicts[], warnings[] }] }` — o mesmo `blocked_participants` do 400 individual. Antes vinha só `{ id, detail }`. Mudança aditiva; os outros itens de `errors[]` não mudaram.
+- **Item de conflito de agenda no lote (2026-10-02)**: `{ "id", "code": "availability_conflict", "detail", "blocked_participants": [{ usuario_id, usuario_nome, conflicts[] }] }` — o mesmo `blocked_participants` do 400 individual (o `warnings[]` por pessoa saiu em 06/10/2026 com o resto do aviso M). Antes vinha só `{ id, detail }`. Mudança aditiva; os outros itens de `errors[]` não mudaram.
 - **Texto do bloqueio de agenda (2026-10-02)**: `detail` = "Não é possível `<ação>`: `<pessoa>` `<motivo>`[ e `<motivo>`][; `<pessoa>` `<motivo>`]." A ação vem do call-site (`create` → "criar o evento", `update` → "salvar a alteração", `approve`/`batch_approve` → "aprovar a solicitação"; outro valor → "concluir a ação"). O motivo vem do código do conflito: X "tem outro evento aprovado neste horário", T "tem bloqueio de agenda no período", P "tem bloqueio parcial de agenda no período", D "não tem o intervalo de deslocamento entre cidades". O limite diário (M, RD-05) saiu dessa lista: por decisão do dono em 02/10/2026 virou aviso e, desde 05/10/2026, não é mais emitido — nunca aparece em `conflicts`, no `detail` nem em `warnings` (as chaves aditivas do 400 seguem, vazias). Código fora do mapa, ou X que não é sobreposição ("Intervalo inválido"), cai em "tem conflito de agenda (`<título>`)" — o mapa é lido com `.get`, então um código novo nunca vira 500 nem desfaz o lote. É a segunda cópia dos nomes das regras RD (os títulos técnicos seguem em `availability_service.py`), aceita por ser só apresentação: `_build_message` e `_motivo` em `solicitacao_availability.py` não participam da decisão. A mesma frase aparece ao criar e ao editar. Cobertura: `tests/test_availability_mensagem_motivo.py` (inclui a guarda de que os mesmos casos seguem barrados/aprovados).
 - Erros de status / validação → `400` via `ValidationAPIError`. Falta de permissão → `403`. Decisão própria → `403` com `code: "self_approval_forbidden"`. Fora do escopo da aprovadora por vínculo → `403` com `code: "out_of_approval_scope"`. Não autenticado → `401/403`.
 

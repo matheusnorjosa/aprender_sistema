@@ -18,14 +18,12 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from datetime import timezone as dt_timezone
-from unittest.mock import patch
 
 from rest_framework.test import APIClient
 
 import pytest
 
 from apps.core.models import AvailabilityBlock, Compra, Participation, Solicitacao
-from apps.core.services import solicitacao_availability as guard_module
 from apps.core.services.availability_service import check_conflicts_uncached
 from apps.core.services.config_service import bust_cfg
 from apps.core.tests.factories import (
@@ -247,15 +245,11 @@ class TestLimiteDiarioNaoBarra:
         sol_id = criado.data["id"]
         assert Solicitacao.objects.get(pk=sol_id).status == "pendente"
 
-        with patch.object(guard_module.logger, "info") as log_info:
-            aprovado = _client(aprovador).patch(f"/api/solicitacoes/{sol_id}/approve/", {}, format="json")
+        aprovado = _client(aprovador).patch(f"/api/solicitacoes/{sol_id}/approve/", {}, format="json")
 
         assert aprovado.status_code == 200, aprovado.data
         assert _codigos_m(aprovado.data) == []
         assert Solicitacao.objects.get(pk=sol_id).status == "aprovado"
-        # Sem aviso, sem log de aviso.
-        avisos = [c for c in log_info.call_args_list if c.args and c.args[0] == "availability_warning"]
-        assert avisos == []
 
     def test_editar_com_dia_acima_do_limite_devolve_200(
         self, coordenador, formador, municipio, tipo_evento, projeto_super
@@ -366,6 +360,10 @@ class TestBloqueioSemM:
         assert [c["code"] for c in bloqueado["conflicts"]] == ["X"]
         assert [c["code"] for c in erros["conflicts"]] == ["X"]
         assert _codigos_m(response.data) == []
+        # O 400 não traz mais `warnings` (nem no topo, nem por pessoa): sem o M, nada produzia
+        # aviso e nenhum cliente lia essas chaves. A checagem prévia mantém a dela (o assistente lê).
+        assert "warnings" not in erros
+        assert "warnings" not in bloqueado
         assert "limite diário" not in response.data["detail"]
         assert response.data["detail"] == (
             "Não é possível aprovar a solicitação: Bruno Formador tem outro evento aprovado neste horário."

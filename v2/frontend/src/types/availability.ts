@@ -115,8 +115,6 @@ export interface BlockedParticipant {
   usuario_id: ID;
   usuario_nome: string;
   conflicts: ConflictDetail[];
-  /** Avisos da mesma pessoa. Vêm junto, mas não são o motivo do bloqueio. Hoje sempre vazio. */
-  warnings?: ConflictDetail[];
 }
 
 /**
@@ -137,8 +135,6 @@ export interface AvailabilityConflictErrorPayload {
   code: 'availability_conflict';
   errors: {
     conflicts: ConflictDetail[];
-    /** Avisos calculados na mesma checagem. Não barram. Hoje sempre vazio. */
-    warnings?: ConflictDetail[];
     blocked_participants: BlockedParticipant[];
     skipped_guests: unknown[];
   };

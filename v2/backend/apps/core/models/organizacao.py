@@ -70,8 +70,9 @@ class ProjetoGeral(models.Model):
 
     class Meta:  # type: ignore[misc]
         db_table = "core_projeto_geral"
-        verbose_name = "Projeto Geral"
-        verbose_name_plural = "Projetos Gerais"
+        # Na tela a família se chama coleção (decisão do dono, 06/10/2026); o nome no código fica.
+        verbose_name = "Coleção"
+        verbose_name_plural = "Coleções"
         ordering = ["nome"]
 
     def __str__(self) -> str:

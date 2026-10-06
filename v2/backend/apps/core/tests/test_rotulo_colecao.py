@@ -59,3 +59,12 @@ def test_exportacao_dos_registros_dat_chama_a_coluna_de_colecao():
     cabecalho = next(csv.reader(io.StringIO(resp.content.decode("utf-8-sig"))))
     assert cabecalho[2] == "Coleção"
     assert "Projeto Geral" not in cabecalho
+
+
+def test_colecao_com_nome_repetido_diz_colecao():
+    ProjetoGeral.objects.create(nome="COLECAO REPETIDA")
+
+    resp = _client().post("/api/projetos-gerais/", {"nome": "COLECAO REPETIDA"}, format="json")
+
+    assert resp.status_code == 400, resp.data
+    assert resp.data["errors"]["nome"] == ["Coleção com este nome já existe."]

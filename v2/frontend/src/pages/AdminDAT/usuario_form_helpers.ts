@@ -31,6 +31,9 @@ export interface UsuarioFormValues {
   // auto-atribui o grupo de setor — o FE só envia a Gerência + as Funções.
   gerencia_id?: ID | null | undefined;
   funcao_ids: ID[];
+  // Papel EQUIPE ("Equipe administrativa") na gerência: não vem de função, tem caixa própria.
+  // undefined = não hidratado, o payload não envia e o backend mantém como está.
+  equipe_administrativa?: boolean | undefined;
   password?: string | undefined;
 }
 
@@ -61,7 +64,7 @@ export function buildUsuarioPayload(
   values: UsuarioFormValues,
   options: BuildPayloadOptions,
 ): Record<string, unknown> {
-  const { funcao_ids = [], gerencia_id, is_superuser, cpf, ...rest } = values;
+  const { funcao_ids = [], gerencia_id, equipe_administrativa, is_superuser, cpf, ...rest } = values;
   const { isEditing, cpfEditUnlocked, currentIsSuperuser, funcoesCarregadas = true } = options;
   const editaLotacao = currentIsSuperuser && funcoesCarregadas;
 
@@ -82,6 +85,9 @@ export function buildUsuarioPayload(
   // gerencia_id (lotação): mesmo gate superuser-only. O backend cria/sincroniza
   // o vínculo EquipeGerencia; null = não altera o vínculo existente.
   const gerenciaPayload = editaLotacao ? { gerencia_id: gerencia_id ?? null } : {};
+  // Papel EQUIPE: mesmo gate; reenvia o valor hidratado (salvar sem mudar mantém o vínculo).
+  const equipePayload =
+    editaLotacao && typeof equipe_administrativa === 'boolean' ? { equipe_administrativa } : {};
 
   return {
     ...rest,
@@ -89,6 +95,7 @@ export function buildUsuarioPayload(
     ...superuserPayload,
     ...groupsPayload,
     ...gerenciaPayload,
+    ...equipePayload,
   };
 }
 
@@ -110,17 +117,19 @@ interface GerenciaLike {
  * #2071: o que é obrigatório no form (só para superuser, o único que edita lotação). Ao criar,
  * gerência e função. Na edição, a função é opcional (o DAT não tem) e a gerência só é obrigatória
  * para quem já tem lotação: o Controle não tem, e limpar a gerência não pode ser um jeito de salvar
- * uma aprovadora sem revogar.
+ * uma aprovadora sem revogar. Com "Equipe administrativa" marcada, a gerência é obrigatória (o vínculo
+ * é nela) e a função não (a equipe do DAT e do Controle não tem função).
  */
 export function lotacaoObrigatoria(opts: {
   currentIsSuperuser: boolean;
   isEditing: boolean;
   temLotacao: boolean;
+  equipeAdministrativa?: boolean | undefined;
 }): { gerencia: boolean; funcao: boolean } {
-  const { currentIsSuperuser, isEditing, temLotacao } = opts;
+  const { currentIsSuperuser, isEditing, temLotacao, equipeAdministrativa = false } = opts;
   return {
-    gerencia: currentIsSuperuser && (!isEditing || temLotacao),
-    funcao: currentIsSuperuser && !isEditing,
+    gerencia: currentIsSuperuser && (!isEditing || temLotacao || equipeAdministrativa),
+    funcao: currentIsSuperuser && !isEditing && !equipeAdministrativa,
   };
 }
 

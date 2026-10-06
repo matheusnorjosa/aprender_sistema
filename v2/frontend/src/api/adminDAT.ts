@@ -28,6 +28,8 @@ export interface AdminUser {
   group_ids_display?: ID[];
   // Lotação vigente (EquipeGerencia) para hidratar o form no EDIT. null se não há vínculo.
   gerencia_atual?: { gerencia_id: number; rotulo: string; nome_setor: string; setor_canonico: string; papel: string } | null;
+  // Tem vínculo vigente de papel EQUIPE ("Equipe administrativa").
+  equipe_administrativa?: boolean;
   date_joined: string;
   last_login: string | null;
 }
@@ -51,6 +53,8 @@ export interface UserPayload {
   // Gerência (Lotação): backend cria/sincroniza o vínculo EquipeGerencia e auto-atribui
   // o grupo de setor. null = não altera o vínculo existente.
   gerencia_id?: ID | null;
+  // Papel EQUIPE ("Equipe administrativa") na gerência; ausente = não altera.
+  equipe_administrativa?: boolean;
 }
 
 /**

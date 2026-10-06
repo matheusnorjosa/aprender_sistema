@@ -5,7 +5,7 @@ Padrao: dry_run + (gerencia, usuario, papel) para idempotencia.
 
 Colunas esperadas (flexiveis):
 - setor / gerencia (obrigatorio): nome do setor
-- papel / funcao (obrigatorio): GERENTE, COORDENADOR, APOIO, FORMADOR
+- papel / funcao (obrigatorio): GERENTE, COORDENADOR, APOIO, FORMADOR, EQUIPE (Equipe administrativa)
 - usuario_cpf / cpf (opcional)
 - usuario_email / email (opcional)
 - usuario_nome / nome (opcional)
@@ -76,6 +76,10 @@ PAPEL_MAPPING = {
     "Formadores": "FORMADOR",
     "Formador": "FORMADOR",
     "FORMADOR": "FORMADOR",
+    "Equipe administrativa": "EQUIPE",
+    "EQUIPE ADMINISTRATIVA": "EQUIPE",
+    "Equipe": "EQUIPE",
+    "EQUIPE": "EQUIPE",
 }
 
 
@@ -377,7 +381,7 @@ def _process_row(
     setor = SETOR_MAPPING.get(setor_raw) or setor_raw
     papel = _resolve_papel(papel_raw)
 
-    if papel not in {"GERENTE", "COORDENADOR", "APOIO", "FORMADOR"}:
+    if papel not in {"GERENTE", "COORDENADOR", "APOIO", "FORMADOR", "EQUIPE"}:
         stats["skipped"]["papel_missing"] += 1
         pendencias["papel_missing"].append(
             {"linha": linha_num, "erro": f"Papel invalido: {papel_raw}", "papel": papel_raw}

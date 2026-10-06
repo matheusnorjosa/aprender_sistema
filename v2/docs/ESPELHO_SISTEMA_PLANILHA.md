@@ -202,8 +202,8 @@ COORDENADOR**. As pessoas de SUPORTE/OPERACIONAL veem a grade via a capability d
 DAT (`view_all_availability`), não via papel.
 
 **DECIDIDO (dono, 05/10/2026):** essas pessoas ganham o papel `EQUIPE` ("Equipe administrativa"),
-que só diz "trabalha neste setor" e também serve ao Controle e a outros setores — sem lista, Grade,
-gestão, aprovação nem grupo. Regra completa em [`rbac.spec.md`](specs/backend/rbac.spec.md).
+que só diz "trabalha neste setor" e também serve ao Controle e a outros setores — sem efeito em
+lista, escopo, permissão ou grupo (a capability do grupo DAT segue valendo por ser grupo). Regra completa em [`rbac.spec.md`](specs/backend/rbac.spec.md).
 
 ---
 

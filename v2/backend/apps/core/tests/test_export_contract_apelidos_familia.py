@@ -54,7 +54,7 @@ def _write_export(tmp_path, files: dict[str, str]) -> str:
 def _familias_ja_juntadas():
     """As migrações semeiam as famílias com os nomes antigos; aqui o banco fica como depois dos scripts
     de junção (as famílias antigas não existem). Cada teste cria a coleção nova de que precisa."""
-    nomes = set(_PROJETO_GERAL_ALIASES) | set(_PROJETO_GERAL_ALIASES.values())
+    nomes = set(_PROJETO_GERAL_ALIASES) | {_norm(v) for v in _PROJETO_GERAL_ALIASES.values()}
     ids = [pk for pk, n in ProjetoGeral.objects.values_list("id", "nome") if _norm(n) in nomes]
     ProjetoGeral.objects.filter(id__in=ids).delete()
 
@@ -72,20 +72,20 @@ def _actor():
 # ───────── a tabela ─────────
 def test_tabela_de_apelidos_cobre_os_nomes_que_somem():
     esperado = {
-        "PROJETO CATAVENTO 2": "CATAVENTO",
-        "PROJETO CATAVENTO 3": "CATAVENTO",
-        "SUPERATIVAR - LINGUAGENS": "SUPERATIVAR",
-        "SUPERATIVAR - MATEMATICA": "SUPERATIVAR",
-        "ACERTA MATEMATICA": "ACERTA",
-        "ACERTA PORTUGUES": "ACERTA",
-        "FLUIR DAS EMOCOES - 1": "FLUIR DAS EMOCOES",
-        "FLUIR DAS EMOCOES - 2": "FLUIR DAS EMOCOES",
-        "FLUIR DAS EMOCOES - 3": "FLUIR DAS EMOCOES",
+        "PROJETO CATAVENTO 2": "Catavento",
+        "PROJETO CATAVENTO 3": "Catavento",
+        "SUPERATIVAR - LINGUAGENS": "Superativar",
+        "SUPERATIVAR - MATEMATICA": "Superativar",
+        "ACERTA MATEMATICA": "ACerta",
+        "ACERTA PORTUGUES": "ACerta",
+        "FLUIR DAS EMOCOES - 1": "Fluir das Emoções",
+        "FLUIR DAS EMOCOES - 2": "Fluir das Emoções",
+        "FLUIR DAS EMOCOES - 3": "Fluir das Emoções",
     }
     assert _PROJETO_GERAL_ALIASES == esperado
-    # chave e alvo já normalizados; um nome antigo vai para UMA coleção só; alvo nunca é apelido
-    assert all(_norm(k) == k and _norm(v) == v for k, v in _PROJETO_GERAL_ALIASES.items())
-    assert not set(_PROJETO_GERAL_ALIASES.values()) & set(_PROJETO_GERAL_ALIASES)
+    # chave normalizada; alvo = nome EXATO da coleção unificada; um nome antigo vai para UMA coleção só
+    assert all(_norm(k) == k for k in _PROJETO_GERAL_ALIASES)
+    assert not {_norm(v) for v in _PROJETO_GERAL_ALIASES.values()} & set(_PROJETO_GERAL_ALIASES)
 
 
 # ───────── o índice ─────────
@@ -104,6 +104,18 @@ def test_nome_que_existe_vence_o_apelido():
     idx = projeto_geral_index()
     assert idx["PROJETO CATAVENTO 3"] == antiga.id
     assert idx["PROJETO CATAVENTO 2"] == cat.id
+
+
+def test_fluir_antes_da_juncao_nao_vai_para_a_familia_antiga():
+    # A família antiga do Fluir Antigo tem a mesma chave normalizada da coleção nova. Antes da junção (nome
+    # antigo 'FLUIR DAS EMOÇÕES', regra nao_aplicavel) o apelido NÃO vale: Fluir 1/2/3 não caem nela.
+    antiga = ProjetoGeral.objects.create(nome="FLUIR DAS EMOÇÕES", tipo_calculo_codigos="nao_aplicavel")
+    idx = projeto_geral_index()
+    assert idx["FLUIR DAS EMOCOES"] == antiga.id
+    assert "FLUIR DAS EMOCOES - 1" not in idx
+    # o script unificar_fluir.py renomeia para o nome exato da coleção: aí o apelido vale
+    ProjetoGeral.objects.filter(pk=antiga.pk).update(nome="Fluir das Emoções", tipo_calculo_codigos="por_professor")
+    assert projeto_geral_index()["FLUIR DAS EMOCOES - 1"] == antiga.id
 
 
 def test_apelido_sem_alvo_nao_entra():
@@ -194,3 +206,57 @@ def test_serie_nova_com_familia_antiga_nasce_na_colecao(tmp_path):
     p = Projeto.objects.get(nome="SUPERATIVAR - MATEMÁTICA 6")
     assert p.projeto_geral_id == sup.id
     assert p.eh_serie is True
+
+
+# ───────── linhas que colapsam na mesma chave: classify conta como o apply ─────────
+def test_dat_cadastro_linhas_que_colapsam_contam_uma_vez_e_divergencia_aparece(tmp_path):
+    actor = _actor()
+    MunicipioFactory(nome="Cidade Y", uf="PR", ativo=True)
+    ProjetoGeral.objects.create(nome="Fluir das Emoções", tipo_calculo_codigos="por_professor")
+    csv = (
+        f"{CAD_HEADER}\n"
+        "Cidade Y,CIDADE Y,PR,FLUIR DAS EMOÇÕES - 1,X,FORMAR,concluido,2026-03-01,concluido,2026-03-05,,,,,1\n"
+        "Cidade Y,CIDADE Y,PR,FLUIR DAS EMOÇÕES - 2,X,FORMAR,concluido,2026-03-01,concluido,2026-03-09,,,,,1\n"
+        "Cidade Y,CIDADE Y,PR,FLUIR DAS EMOÇÕES - 3,X,FORMAR,concluido,2026-03-01,concluido,2026-03-05,,,,,1\n"
+    )
+    path = _write_export(tmp_path, {"dat_cadastro": csv})
+    seco = ExportContractImporter(path=path).run()["por_entidade"]["dat_cadastro"]
+    assert seco["would_create"] == 1
+    assert seco["reject_reasons"]["repetida_no_arquivo"] == 2
+    assert seco["repetidas_divergentes"] == ["CIDADE Y/PR | Fluir das Emoções | FORMAR | 2026"]
+    r = ExportContractImporter(path=path, apply=True, allow=("dat_cadastro",), actor=actor).run()
+    assert r["applied"]["dat_cadastro"] == seco["would_create"] == 1
+
+
+def test_dat_registro_linha_repetida_conta_uma_vez(tmp_path):
+    actor = _actor()
+    MunicipioFactory(nome="Cidade Z", uf="CE", ativo=True)
+    acerta = ProjetoGeral.objects.create(nome="ACerta", usa_avaliar=True)
+    ProjetoFactory(nome="ACerta Português", projeto_geral=acerta)
+    csv = (
+        f"{REG_HEADER}\n"
+        "Cidade Z,CE,ACERTA PORTUGUES,ACERTA PORTUGUES,20,3\n"
+        "Cidade Z,CE,ACERTA PORTUGUES,ACERTA PORTUGUES,25,3\n"
+    )
+    path = _write_export(tmp_path, {"dat_registro": csv})
+    seco = ExportContractImporter(path=path).run()["por_entidade"]["dat_registro"]
+    assert seco["would_create"] == 1
+    assert seco["reject_reasons"]["repetida_no_arquivo"] == 1
+    assert seco["repetidas_divergentes"] == ["CIDADE Z/CE | ACerta | ACerta Português"]
+    r = ExportContractImporter(path=path, apply=True, allow=("dat_registro",), actor=actor).run()
+    assert r["applied"]["dat_registro"] == seco["would_create"] == 1
+
+
+def test_projeto_mesma_variante_repetida_conta_uma_vez(tmp_path):
+    ProjetoGeral.objects.create(nome="Superativar")
+    csv = (
+        "projeto,projeto_geral,fluxo\n"
+        "SUPERATIVAR - MATEMÁTICA 7,SUPERATIVAR - MATEMÁTICA,NAO_SUPER\n"
+        "Superativar Matemática 7,SUPERATIVAR - MATEMÁTICA,NAO_SUPER\n"
+    )
+    path = _write_export(tmp_path, {"projeto": csv})
+    seco = ExportContractImporter(path=path).run()["por_entidade"]["projeto"]
+    assert seco["would_create"] == 1
+    assert seco["reject_reasons"]["repetido_no_arquivo"] == 1
+    r = ExportContractImporter(path=path, apply=True, allow=("projeto",)).run()
+    assert r["applied"]["projeto"] == seco["would_create"] == 1

@@ -80,23 +80,26 @@ _SCOPED_ALIASES: dict[str, str] = {
     "APRENDENDO MAIS MATEMATICA 2": "AMMA 2",
 }
 
-# ── Apelidos de FAMÍLIA (ProjetoGeral), chave e alvo = nome NORMALIZADO ──
+# ── Apelidos de FAMÍLIA (ProjetoGeral): chave = nome antigo NORMALIZADO; alvo = nome EXATO da coleção ──
 # Decisão do dono (06/10/2026): Catavento, Superativar, ACerta e Fluir das Emoções viram uma coleção
 # cada, com nome curto. A planilha continua mandando os nomes das famílias antigas; sem o apelido a carga
 # de projeto_geral recriaria cada uma (create-only por nome) e o dat_registro/dat_cadastro entrariam nela
 # como novos, com os códigos em dobro. Cada nome antigo vai para UMA coleção. Mesma precedência do
 # apelido de projeto: a família que existe com o nome antigo vence (antes da junção nada muda), e apelido
-# cujo alvo não existe não entra. "FLUIR DAS EMOÇÕES" (sem número) já tem a chave da coleção nova.
+# cujo alvo não existe não entra. O alvo casa pelo nome EXATO (caixa e acento), não normalizado: a família
+# antiga do Fluir Antigo ('FLUIR DAS EMOÇÕES', regra nao_aplicavel) tem a mesma chave normalizada da
+# coleção nova; só depois que o script de junção a renomeia para 'Fluir das Emoções' (e troca a regra) o
+# apelido de 'FLUIR DAS EMOÇÕES - 1/2/3' passa a valer. Antes disso Fluir 1/2/3 não caem na família antiga.
 _PROJETO_GERAL_ALIASES: dict[str, str] = {
-    "PROJETO CATAVENTO 2": "CATAVENTO",
-    "PROJETO CATAVENTO 3": "CATAVENTO",
-    "SUPERATIVAR - LINGUAGENS": "SUPERATIVAR",
-    "SUPERATIVAR - MATEMATICA": "SUPERATIVAR",
-    "ACERTA MATEMATICA": "ACERTA",
-    "ACERTA PORTUGUES": "ACERTA",
-    "FLUIR DAS EMOCOES - 1": "FLUIR DAS EMOCOES",
-    "FLUIR DAS EMOCOES - 2": "FLUIR DAS EMOCOES",
-    "FLUIR DAS EMOCOES - 3": "FLUIR DAS EMOCOES",
+    "PROJETO CATAVENTO 2": "Catavento",
+    "PROJETO CATAVENTO 3": "Catavento",
+    "SUPERATIVAR - LINGUAGENS": "Superativar",
+    "SUPERATIVAR - MATEMATICA": "Superativar",
+    "ACERTA MATEMATICA": "ACerta",
+    "ACERTA PORTUGUES": "ACerta",
+    "FLUIR DAS EMOCOES - 1": "Fluir das Emoções",
+    "FLUIR DAS EMOCOES - 2": "Fluir das Emoções",
+    "FLUIR DAS EMOCOES - 3": "Fluir das Emoções",
 }
 
 
@@ -248,10 +251,13 @@ def resolve_projeto_agenda(raw_name: str, disciplina: str, *, index: ProjetoInde
 def projeto_geral_index() -> dict[str, int]:
     """Índice norm(nome) -> id das famílias (ProjetoGeral.nome é unique), com os apelidos de família.
 
-    O apelido só entra quando o nome antigo NÃO existe no banco e o alvo existe: a família que ainda tem
-    o nome antigo continua sendo a resposta (antes da junção o import não muda nada)."""
-    idx = {_norm(n): pid for pid, n in ProjetoGeral.objects.values_list("id", "nome")}
+    O apelido só entra quando o nome antigo NÃO existe no banco e existe uma família com o nome EXATO do
+    alvo: a família que ainda tem o nome antigo continua sendo a resposta, e uma família antiga com a mesma
+    chave normalizada do alvo (Fluir) não recebe os apelidos (antes da junção o import não muda nada)."""
+    familias = list(ProjetoGeral.objects.values_list("id", "nome"))
+    idx = {_norm(n): pid for pid, n in familias}
+    por_nome_exato = {n: pid for pid, n in familias}
     for antigo, alvo in _PROJETO_GERAL_ALIASES.items():
-        if antigo not in idx and alvo in idx:
-            idx[antigo] = idx[alvo]
+        if antigo not in idx and alvo in por_nome_exato:
+            idx[antigo] = por_nome_exato[alvo]
     return idx

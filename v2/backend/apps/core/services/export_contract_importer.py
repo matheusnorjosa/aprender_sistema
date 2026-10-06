@@ -691,7 +691,10 @@ class ExportContractImporter:
                 "fluxo_ausente": 0,
                 "familia_vazia_com_dat": 0,
                 "fluxo_super_sem_superintendencia": 0,
+                "repetido_no_arquivo": 0,
             }
+            # Espelha o dedup do apply por chave canônica: a 2ª grafia da mesma variante não conta como criação.
+            vistos_proj: set[str] = set()
             for r in rows:
                 nome = (r.get("projeto") or r.get("nome") or "").strip()
                 if not nome:
@@ -705,6 +708,10 @@ class ExportContractImporter:
                 if res.status == "ambiguous":
                     tally["would_reject"] += 1
                     reasons["ambiguous"] += 1
+                    continue
+                if res.canonical_key in vistos_proj:
+                    tally["would_reject"] += 1
+                    reasons["repetido_no_arquivo"] += 1
                     continue
                 # unmatched → candidato a create.
                 pg_raw = (r.get("projeto_geral") or "").strip()
@@ -729,6 +736,7 @@ class ExportContractImporter:
                     tally["would_reject"] += 1
                     reasons["fluxo_super_sem_superintendencia"] += 1
                     continue
+                vistos_proj.add(res.canonical_key)
                 tally["would_create"] += 1
             tally["reject_reasons"] = reasons
 
@@ -863,6 +871,14 @@ class ExportContractImporter:
             mun_idx = self._municipio_index()
             pg_idx = self._projeto_geral_index()
             existing = set(DATRegistro.objects.values_list("municipio_id", "projeto_geral_id", "projeto_id"))
+            # Espelha o apply, que grava só a 1ª linha de cada chave do arquivo: a repetição (inclusive nomes
+            # antigos de família que o apelido junta na mesma chave) vira would_reject(repetida_no_arquivo), e
+            # a chave cujas linhas trazem dados diferentes é listada em `repetidas_divergentes` (não escolhe
+            # em silêncio: o apply fica com a 1ª linha).
+            vistas_reg: dict[tuple[Any, ...], tuple[str, ...]] = {}
+            divergentes_reg: list[str] = []
+            reasons = {"repetida_no_arquivo": 0}
+            pg_nomes = dict(ProjetoGeral.objects.values_list("id", "nome"))
             for r in rows:
                 mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
                 pg_id = pg_idx.get(_norm(r.get("projeto_geral") or ""))
@@ -870,8 +886,23 @@ class ExportContractImporter:
                 if mun_id is None or pg_id is None or proj_id is None:
                     tally["would_reject"] += 1
                     continue
-                st, _ = diff_and_classify({} if (mun_id, pg_id, proj_id) in existing else None, {}, protected)
+                nk = (mun_id, pg_id, proj_id)
+                dados = tuple((r.get(c) or "").strip() for c in ("aluno_qtde", "professor_qtde", "ano"))
+                if nk in vistas_reg:
+                    tally["would_reject"] += 1
+                    reasons["repetida_no_arquivo"] += 1
+                    rotulo = (
+                        f"{_norm(r.get('municipio') or '')}/{(r.get('uf') or '').upper()} | {pg_nomes.get(pg_id)} | "
+                        f"{Projeto.objects.filter(pk=proj_id).values_list('nome', flat=True).first()}"
+                    )
+                    if vistas_reg[nk] != dados and rotulo not in divergentes_reg:
+                        divergentes_reg.append(rotulo)
+                    continue
+                vistas_reg[nk] = dados
+                st, _ = diff_and_classify({} if nk in existing else None, {}, protected)
                 tally[st] += 1
+            tally["reject_reasons"] = reasons
+            tally["repetidas_divergentes"] = divergentes_reg
 
         elif name == "dat_cadastro":
             # NK = (municipio_id, projeto_geral_id, plataforma). plataforma faz parte da chave
@@ -879,6 +910,15 @@ class ExportContractImporter:
             mun_idx = self._municipio_index()
             pg_idx = self._projeto_geral_index()
             existing = set(DATCadastro.objects.values_list("municipio_id", "projeto_geral_id", "plataforma", "ano"))
+            # Mesma regra do dat_registro: a planilha repete o curso por família, e o apelido junta as famílias
+            # antigas numa coleção só. A chave vista no arquivo conta uma vez (o apply grava só a 1ª linha); a
+            # repetição vira would_reject(repetida_no_arquivo) e etapas diferentes aparecem em
+            # `repetidas_divergentes`.
+            vistas_cad: dict[tuple[Any, ...], tuple[str, ...]] = {}
+            divergentes_cad: list[str] = []
+            reasons_cad = {"repetida_no_arquivo": 0}
+            pg_nomes_cad = dict(ProjetoGeral.objects.values_list("id", "nome"))
+            etapas = [f"etapa{i}_{c}" for i in range(1, 5) for c in ("status", "data")]
             for r in rows:
                 mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
                 pg_id = pg_idx.get(_norm(r.get("projeto_geral") or ""))
@@ -887,8 +927,22 @@ class ExportContractImporter:
                     tally["would_reject"] += 1
                     continue
                 nk = (mun_id, pg_id, plataforma, _dat_cadastro_ano(r))
+                dados = tuple((r.get(c) or "").strip() for c in etapas)
+                if nk in vistas_cad:
+                    tally["would_reject"] += 1
+                    reasons_cad["repetida_no_arquivo"] += 1
+                    rotulo = (
+                        f"{_norm(r.get('municipio') or '')}/{(r.get('uf') or '').upper()} | {pg_nomes_cad.get(pg_id)} | "
+                        f"{plataforma} | {nk[3]}"
+                    )
+                    if vistas_cad[nk] != dados and rotulo not in divergentes_cad:
+                        divergentes_cad.append(rotulo)
+                    continue
+                vistas_cad[nk] = dados
                 st, _ = diff_and_classify({} if nk in existing else None, {}, protected)
                 tally[st] += 1
+            tally["reject_reasons"] = reasons_cad
+            tally["repetidas_divergentes"] = divergentes_cad
 
         elif name == "dat_compra":
             # NK existence-based por tupla (idioma dos handlers DAT), SEM ano_uso (ver `_dat_compra_nk`).

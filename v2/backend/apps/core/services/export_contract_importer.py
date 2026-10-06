@@ -38,6 +38,7 @@ from apps.core.imports.hashing import stable_import_hash
 from apps.core.imports.normalization import normalize_cpf_digits
 from apps.core.models import (
     Acompanhamento,
+    AuditLog,
     AvailabilityBlock,
     DATAcao,
     DATArea,
@@ -72,7 +73,11 @@ from apps.core.services.equipe_gerencia_import import (
     is_vinculo_aprovador,
 )
 from apps.core.services.eventos_import import _compute_external_hash
-from apps.core.services.export_contract_projeto_resolver import build_projeto_index, resolve_projeto_export
+from apps.core.services.export_contract_projeto_resolver import (
+    build_projeto_index,
+    resolve_projeto_agenda,
+    resolve_projeto_export,
+)
 from apps.core.services.resolvers import resolve_user_by_email, resolve_user_by_name
 from apps.core.services.solicitacao_create import resolve_initial_status
 from apps.core.validators import CPF_ABSENT, CPF_INVALID, classify_cpf, is_valid_cpf
@@ -198,6 +203,9 @@ _CONSUMED_FIELDS: dict[str, frozenset[str]] = {
             "evento_id",
             "evento_id_origem",
             "evento_hash_natural",
+            "disciplina",
+            "cancelado",
+            "evento_ids_anteriores",
         }
     ),
     "participation": frozenset(
@@ -359,6 +367,24 @@ def _parse_json_list(v: Any) -> list[Any]:
     return parsed if isinstance(parsed, list) else []
 
 
+def _ids_proprios(rows: list[dict[str, str]]) -> set[str]:
+    """`evento_id` de todas as linhas do arquivo. Id antigo que também vem como id próprio é entrada
+    contraditória: não serve para re-chavear (senão a carga seguinte recriaria o evento antigo)."""
+    return {s for s in ((r.get("evento_id") or "").strip() for r in rows) if s}
+
+
+def _id_antigo_em_prod(r: dict[str, str], existentes: set[str] | dict[str, Any], bloqueados: set[str]) -> str | None:
+    """Primeiro id de `evento_ids_anteriores` (array JSON do v35) que já é `external_hash` em prod e não
+    está em `bloqueados` (ids próprios do arquivo + ids antigos já usados). O id devolvido entra em
+    `bloqueados`: cada id antigo re-chaveia uma linha só, no dry-run e no apply."""
+    for antigo in _parse_json_list(r.get("evento_ids_anteriores")):
+        s = str(antigo).strip()
+        if s and s in existentes and s not in bloqueados:
+            bloqueados.add(s)
+            return s
+    return None
+
+
 # projeto_geral: config de cálculo do contrato v5 → choices do Django.
 _TIPO_CALCULO_MAP = {
     "aluno_div_divisor": "por_aluno",
@@ -499,6 +525,13 @@ class ExportContractImporter:
         res = resolve_projeto_export(raw_name, index=self._pidx)
         return res.projeto.id if res.status == "matched" and res.projeto else None
 
+    def resolve_projeto_agenda(self, raw_name: str, disciplina: str) -> int | None:
+        """Projeto de um evento: Superativar/ACerta com disciplina única vai para o projeto da disciplina."""
+        if self._pidx is None:
+            self._pidx = build_projeto_index()
+        res = resolve_projeto_agenda(raw_name, disciplina, index=self._pidx)
+        return res.projeto.id if res.status == "matched" and res.projeto else None
+
     def _load(self, name: str) -> list[dict[str, str]]:
         fp = os.path.join(self.path, f"{name}.csv")
         if not os.path.exists(fp):
@@ -565,7 +598,7 @@ class ExportContractImporter:
         if lc is not None and not _to_bool(lc):
             return None
         mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
-        proj_id = self.resolve_projeto(r.get("projeto") or "")
+        proj_id = self.resolve_projeto_agenda(r.get("projeto") or "", r.get("disciplina") or "")
         tipo_id = tipo_idx.get(_norm(r.get("tipo_evento") or ""))
         data_ev = _parse_iso_date(r.get("data"))
         hora_ini = _parse_hora(r.get("hora_inicio"))
@@ -950,13 +983,22 @@ class ExportContractImporter:
             existing = set(
                 Solicitacao.objects.exclude(external_hash__isnull=True).values_list("external_hash", flat=True)
             )
+            tally["would_rekey"] = 0  # id antigo (`evento_ids_anteriores`) já em prod: existente, re-chaveia
+            tally["would_create_cancelada"] = 0  # linha nova com cancelado=true: nasce reprovada
+            bloqueados = _ids_proprios(rows)
             for r in rows:
                 key = self._resolve_solicitacao_key(r, mun_idx, tipo_idx, cpf_idx)
                 if key is None:
                     tally["would_reject"] += 1
                     continue
-                st, _ = diff_and_classify({} if key[-1] in existing else None, {}, protected)
+                existe = key[-1] in existing
+                if not existe and _id_antigo_em_prod(r, existing, bloqueados) is not None:
+                    existe = True
+                    tally["would_rekey"] += 1
+                st, _ = diff_and_classify({} if existe else None, {}, protected)
                 tally[st] += 1
+                if st == "would_create" and _to_bool(r.get("cancelado")):
+                    tally["would_create_cancelada"] += 1
 
         elif name == "participation":
             # Liga por evento_id (fallback evento_hash_natural) → solicitacao.external_hash. Papel do CSV (posição), não cargo.
@@ -1231,10 +1273,14 @@ class ExportContractImporter:
                 if name == "solicitacao":
                     # Create-only da Solicitacao + reconcile de segmento_norm (autoritativo do import,
                     # reportado à parte — #1896). Mesmo shape do plano_formacao/coordenadores.
-                    created_sol, reconciled_sol = self._apply_solicitacao(self._load(name))
+                    created_sol, reconciled_sol, canceladas, rechaveadas = self._apply_solicitacao(self._load(name))
                     applied[name] = created_sol
                     if reconciled_sol:
                         applied["solicitacao__segmento_norm_reconciled"] = reconciled_sol
+                    if canceladas:
+                        applied["solicitacao__cancelada_reprovada"] = canceladas
+                    if rechaveadas:
+                        applied["solicitacao__rechaveada"] = rechaveadas
                     continue
                 if name == "participation":
                     # DEPOIS de solicitacao (ENTITY_ORDER garante): liga por external_hash já criado.
@@ -1537,7 +1583,7 @@ class ExportContractImporter:
             created += 1
         return created, reconciled
 
-    def _apply_solicitacao(self, rows: list[dict[str, str]]) -> tuple[int, int]:
+    def _apply_solicitacao(self, rows: list[dict[str, str]]) -> tuple[int, int, int, int]:
         """Create-only de Solicitacao + reconcile de `segmento_norm`. NK = external_hash = `evento_id`
         estável do CSV (fallback `evento_hash_natural`, depois `_compute_external_hash`/ADR-012 — ver
         `_resolve_solicitacao_key`). Solicitante (dono) via `_resolve_solicitante`
@@ -1547,7 +1593,12 @@ class ExportContractImporter:
         sempre (decisão do dono, 05/10/2026: a coluna `coord_acompanha` da planilha não é confiável). inicio/fim montados de
         data+hora LOCAL (America/Fortaleza), armazenados em UTC. Sem `created_by` no model → não exige actor.
 
-        Retorna `(created, reconciled)`. `segmento_norm`/`segmento_norm_confianca` são autoritativos do
+        Agenda do v35 (decisões do dono, 05/10/2026): linha NOVA com `cancelado=true` nasce `reprovado`
+        (AuditLog REJECT, `motivo=cancelado_na_planilha`); linha cujo `evento_id` não está em prod mas um
+        dos `evento_ids_anteriores` está é o MESMO evento: não cria, re-chaveia o `external_hash` da
+        existente para o id novo (AuditLog UPDATE) e segue como existente (só o reconcile abaixo).
+
+        Retorna `(created, reconciled, canceladas, rechaveadas)`. `segmento_norm`/`segmento_norm_confianca` são autoritativos do
         import (de-para do sheets, sem entrada-direta — #1896): create-only pula o registro existente por
         external_hash, mas RECONCILIA esse campo — escopado (só norm/confianca), reportado à parte,
         idempotente (só grava se difere), NUNCA esvazia (fonte vazia = ausência de sinal, não remoção)."""
@@ -1563,6 +1614,9 @@ class ExportContractImporter:
         }
         created = 0
         reconciled = 0
+        canceladas = 0
+        rechaveadas = 0
+        bloqueados = _ids_proprios(rows)
         for r in rows:
             key = self._resolve_solicitacao_key(r, mun_idx, tipo_idx, cpf_idx)
             if key is None:
@@ -1570,6 +1624,26 @@ class ExportContractImporter:
             mun_id, proj_id, tipo_id, data_ev, hora_ini, hora_fim, segmento, coord_id, ext_hash = key
             seg_norm = (r.get("segmento_norm") or "").strip()[:100]
             seg_conf = (r.get("segmento_norm_confianca") or "").strip()[:30]
+            antigo = None if ext_hash in existing else _id_antigo_em_prod(r, existing, bloqueados)
+            if antigo is not None:
+                # Evento que trocou de id na planilha e já está em prod pelo id antigo: é o mesmo evento.
+                # Re-chaveia para as próximas cargas acharem; status/data/campos protegidos ficam.
+                sid, cur_sn = existing.pop(antigo)
+                Solicitacao.objects.filter(id=sid).update(external_hash=ext_hash)
+                existing[ext_hash] = (sid, cur_sn)
+                AuditLog.objects.create(
+                    usuario=self.actor,
+                    action=AuditLog.Action.UPDATE,
+                    model_name="Solicitacao",
+                    details={
+                        "solicitacao_id": sid,
+                        "origem": "import_export_contract",
+                        "campo": "external_hash",
+                        "de": antigo,
+                        "para": ext_hash,
+                    },
+                )
+                rechaveadas += 1
             if ext_hash in existing:
                 sid, cur_sn = existing[ext_hash]
                 if seg_norm and seg_norm != cur_sn:
@@ -1581,7 +1655,14 @@ class ExportContractImporter:
             fim = timezone.make_aware(datetime.combine(data_ev, hora_fim), _FORTALEZA_TZ)
             if fim <= inicio:
                 continue  # constraint solicitacao_fim_gt_inicio: linha inconsistente
-            status = resolve_initial_status(projeto=proj_by_id.get(proj_id)).status
+            cancelado = _to_bool(r.get("cancelado"))
+            # Cancelado na planilha: o modelo não tem "cancelado" e a linha nunca entra pendente/aprovada
+            # (decisão do dono, 05/10/2026: nasce reprovada e fica no AuditLog).
+            status = (
+                Solicitacao.Status.REPROVADO
+                if cancelado
+                else resolve_initial_status(projeto=proj_by_id.get(proj_id)).status
+            )
             sol = Solicitacao.objects.create(
                 usuario_id=coord_id,  # solicitante = coordenador (D3)
                 municipio_id=mun_id,
@@ -1605,9 +1686,21 @@ class ExportContractImporter:
             Participation.objects.get_or_create(
                 solicitacao=sol, usuario_id=coord_id, role=Participation.Role.COORDENADOR
             )
+            if cancelado:
+                AuditLog.objects.create(
+                    usuario=self.actor,
+                    action=AuditLog.Action.REJECT,
+                    model_name="Solicitacao",
+                    details={
+                        "solicitacao_id": sol.id,
+                        "origem": "import_export_contract",
+                        "motivo": "cancelado_na_planilha",
+                    },
+                )
+                canceladas += 1
             existing[ext_hash] = (sol.id, seg_norm)
             created += 1
-        return created, reconciled
+        return created, reconciled, canceladas, rechaveadas
 
     def _resolve_participante(self, r: dict[str, str], cpf_idx: dict[str, int]) -> Usuario | None:
         """EMAIL-first (`resolve_user_by_email`, exato, sem filtro is_active — inclui inativos, RELAY 50)

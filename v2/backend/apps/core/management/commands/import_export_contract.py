@@ -113,6 +113,10 @@ class Command(BaseCommand):
                 motivos = {k: n for k, n in (v.get("reject_reasons") or {}).items() if n}
                 if motivos:
                     self.stdout.write(f"    reject_reasons={motivos}")
+                if "would_rekey" in v:
+                    self.stdout.write(
+                        f"    rekey={v['would_rekey']} canceladas_reprovadas={v.get('would_create_cancelada', 0)}"
+                    )
                 if v.get("projetos_nao_resolvidos"):
                     self.stdout.write(f"    projetos_nao_resolvidos={v['projetos_nao_resolvidos']}")
         if report["applied"]:

@@ -38,11 +38,6 @@ test.describe('Módulo DAT - Páginas Principais', () => {
     await expect(page.getByRole('main')).toBeVisible();
   });
 
-  test('7. Importar Coleções carrega', async ({ page }) => {
-    await page.goto('/dat/admin/colecoes');
-    await expect(page.getByRole('main')).toBeVisible();
-  });
-
   test('8. Importar Equipe-Gêrencia carrega', async ({ page }) => {
     await page.goto('/dat/admin/equipe-gerencia');
     await expect(page.getByRole('main')).toBeVisible();

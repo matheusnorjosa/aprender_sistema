@@ -1,10 +1,12 @@
 """
-Testes: o limite diário (RD-05, código M) avisa e não barra.
+Testes: o limite diário (antigo RD-05, código M) não existe mais na agenda.
 
-Decisão do dono em 02/10/2026: "o evento na agenda pode ter quantas horas quiser". O motor
-continua calculando o M, mas devolve em `warnings`; `conflicts` (e portanto o 400
-`availability_conflict`) fica só com o que barra: sobreposição (X), bloqueio (T, P) e
-deslocamento (D).
+Decisão do dono em 02/10/2026: "o evento na agenda pode ter quantas horas quiser" (o M virou
+aviso). Em 05/10/2026 o dono mandou tirar o aviso: o parâmetro de Configurações passa a ser só
+o teto da contagem de horas de formação (`services/horas_formacao.py`). Nenhum caminho (motor,
+criar, editar, aprovar, lote, `check`, `check-many`, o 400 por outro motivo) devolve M.
+`conflicts` (e portanto o 400 `availability_conflict`) segue só com o que barra:
+sobreposição (X), bloqueio (T, P) e deslocamento (D).
 
 `TestOQueBarraContinuaBarrando` é a guarda contra afrouxar demais: X, T, P e D seguem dando
 400 em criar, editar, aprovar e no lote.
@@ -147,6 +149,18 @@ def _ocupar_agenda(code, formador, municipio, tipo_evento):
         _evento(formador, outra_cidade, tipo_evento, _utc(16), _utc(17), status="aprovado", formador=formador)
 
 
+def _codigos_m(dados) -> list[str]:
+    """Todo `code == "M"` em qualquer nível de uma resposta (dict/list) ou objeto do motor."""
+    if isinstance(dados, dict):
+        proprio = ["M"] if dados.get("code") == "M" else []
+        return proprio + [m for v in dados.values() for m in _codigos_m(v)]
+    if isinstance(dados, (list, tuple)):
+        return [m for v in dados for m in _codigos_m(v)]
+    if hasattr(dados, "__dict__"):
+        return _codigos_m(vars(dados))
+    return []
+
+
 def _payload_criar(municipio, tipo_evento, formador, inicio, fim, projeto=None):
     payload = {
         "municipio": municipio.pk,
@@ -162,50 +176,38 @@ def _payload_criar(municipio, tipo_evento, formador, inicio, fim, projeto=None):
 
 
 # ============================================================================
-# Motor: M sai de `conflicts` e vai para `warnings`
+# Motor: não calcula mais o M
 # ============================================================================
 
 
-class TestMotorSeparaAvisoDeConflito:
-    def test_evento_sozinho_das_7_as_23_passa_com_aviso(self, formador, municipio):
+class TestMotorNaoEmiteM:
+    def test_evento_sozinho_das_7_as_23_passa_sem_aviso(self, formador, municipio):
         result = check_conflicts_uncached(
             usuario=formador, inicio=DIA_INTEIRO_INICIO, fim=DIA_INTEIRO_FIM, municipio=municipio
         )
 
         assert result.ok
         assert result.conflicts == []
-        assert [w.code for w in result.warnings] == ["M"]
+        assert result.warnings == []
 
-    def test_aviso_fala_a_lingua_de_quem_usa_e_nao_promete_contagem(self, formador, municipio):
-        result = check_conflicts_uncached(
-            usuario=formador, inicio=DIA_INTEIRO_INICIO, fim=DIA_INTEIRO_FIM, municipio=municipio
-        )
-
-        (aviso,) = result.warnings
-        texto = f"{aviso.title} {aviso.detail}"
-        assert "8 horas" in aviso.title
-        assert "10/03" in aviso.detail
-        assert "não impede" in aviso.detail
-        # A contagem de horas com teto ainda não existe: o aviso não pode prometê-la.
-        assert "contagem" not in texto.lower()
-        assert "min" not in texto  # sem o texto técnico antigo ("960 min > limite 480 min")
-
-    def test_limite_de_uma_hora_fica_no_singular(self, formador, municipio, settings):
+    def test_teto_de_uma_hora_nao_gera_aviso(self, formador, municipio, settings):
         settings.AVAILABILITY_DAILY_LIMIT_HOURS = 1
         bust_cfg("availability")
 
         result = check_conflicts_uncached(usuario=formador, inicio=INICIO, fim=FIM, municipio=municipio)
 
-        (aviso,) = result.warnings
-        assert aviso.title == "Dia com mais de 1 hora de eventos"
+        assert result.ok
+        assert _codigos_m(result) == []
 
-    def test_agenda_dentro_do_limite_nao_tem_aviso(self, formador, municipio):
+    def test_dia_com_10_horas_nao_gera_aviso(self, formador, municipio, tipo_evento):
+        _oito_horas_no_dia(formador, municipio, tipo_evento)
+
         result = check_conflicts_uncached(usuario=formador, inicio=INICIO, fim=FIM, municipio=municipio)
 
         assert result.ok
-        assert result.warnings == []
+        assert _codigos_m(result) == []
 
-    def test_sobreposicao_e_limite_juntos_barra_so_pela_sobreposicao(self, formador, municipio, tipo_evento):
+    def test_sobreposicao_com_dia_cheio_barra_so_pela_sobreposicao(self, formador, municipio, tipo_evento):
         _oito_horas_no_dia(formador, municipio, tipo_evento)
         _ocupar_agenda("X", formador, municipio, tipo_evento)
 
@@ -213,11 +215,11 @@ class TestMotorSeparaAvisoDeConflito:
 
         assert not result.ok
         assert [c.code for c in result.conflicts] == ["X"]
-        assert [w.code for w in result.warnings] == ["M"]
+        assert result.warnings == []
 
 
 # ============================================================================
-# Criar, editar, aprovar e lote: o limite diário não barra mais
+# Criar, editar, aprovar e lote: passam e não devolvem M
 # ============================================================================
 
 
@@ -230,8 +232,9 @@ class TestLimiteDiarioNaoBarra:
         )
 
         assert response.status_code == 201, response.data
+        assert _codigos_m(response.data) == []
 
-    def test_evento_das_7_as_23_e_criado_e_aprovado_com_aviso(
+    def test_evento_das_7_as_23_e_criado_e_aprovado_sem_aviso(
         self, coordenador, formador, aprovador, municipio, tipo_evento, projeto_super
     ):
         criado = _client(coordenador).post(
@@ -240,6 +243,7 @@ class TestLimiteDiarioNaoBarra:
             format="json",
         )
         assert criado.status_code == 201, criado.data
+        assert _codigos_m(criado.data) == []
         sol_id = criado.data["id"]
         assert Solicitacao.objects.get(pk=sol_id).status == "pendente"
 
@@ -247,15 +251,11 @@ class TestLimiteDiarioNaoBarra:
             aprovado = _client(aprovador).patch(f"/api/solicitacoes/{sol_id}/approve/", {}, format="json")
 
         assert aprovado.status_code == 200, aprovado.data
+        assert _codigos_m(aprovado.data) == []
         assert Solicitacao.objects.get(pk=sol_id).status == "aprovado"
-        # O aviso é registrado (só ids, sem nome de ninguém).
+        # Sem aviso, sem log de aviso.
         avisos = [c for c in log_info.call_args_list if c.args and c.args[0] == "availability_warning"]
-        assert len(avisos) == 1
-        extra = avisos[0].kwargs["extra"]
-        assert extra["action"] == "approve"
-        assert extra["solicitacao_id"] == sol_id
-        assert formador.id in extra["warned_usuario_ids"]
-        assert "Bruno" not in str(extra)
+        assert avisos == []
 
     def test_editar_com_dia_acima_do_limite_devolve_200(
         self, coordenador, formador, municipio, tipo_evento, projeto_super
@@ -268,6 +268,7 @@ class TestLimiteDiarioNaoBarra:
         )
 
         assert response.status_code == 200, response.data
+        assert _codigos_m(response.data) == []
         assert Solicitacao.objects.get(pk=sol.pk).observacoes == "Sala trocada"
 
     def test_aprovar_com_formador_ja_em_8_horas_devolve_200(
@@ -279,6 +280,7 @@ class TestLimiteDiarioNaoBarra:
         response = _client(aprovador).patch(f"/api/solicitacoes/{sol.id}/approve/", {}, format="json")
 
         assert response.status_code == 200, response.data
+        assert _codigos_m(response.data) == []
         assert Solicitacao.objects.get(pk=sol.pk).status == "aprovado"
 
     def test_lote_aprova_com_formador_ja_em_8_horas(
@@ -292,16 +294,17 @@ class TestLimiteDiarioNaoBarra:
         assert response.status_code == 200, response.data
         assert response.data["approved"] == 1
         assert response.data["errors"] == []
+        assert _codigos_m(response.data) == []
         assert Solicitacao.objects.get(pk=sol.pk).status == "aprovado"
 
 
 # ============================================================================
-# Checagem prévia (assistente): ok com o aviso junto
+# Checagem prévia (assistente): ok, sem M
 # ============================================================================
 
 
-class TestChecagemPreviaDevolveAviso:
-    def test_check_many_com_limite_sozinho_devolve_ok_e_aviso(self, aprovador, formador, municipio):
+class TestChecagemPreviaSemM:
+    def test_check_many_com_dia_inteiro_devolve_ok_sem_aviso(self, aprovador, formador, municipio):
         response = _client(aprovador).post(
             "/api/availability/check-many/",
             {
@@ -318,9 +321,11 @@ class TestChecagemPreviaDevolveAviso:
         (resultado,) = response.data["results"]
         assert resultado["ok"] is True
         assert resultado["conflicts"] == []
-        assert [w["code"] for w in resultado["warnings"]] == ["M"]
+        # A chave continua (contrato aditivo de 02/10/2026), vazia.
+        assert resultado["warnings"] == []
+        assert _codigos_m(response.data) == []
 
-    def test_check_individual_devolve_a_chave_warnings(self, aprovador, formador, municipio):
+    def test_check_individual_devolve_warnings_vazio(self, aprovador, formador, municipio):
         response = _client(aprovador).get(
             "/api/availability/check/",
             {
@@ -334,15 +339,16 @@ class TestChecagemPreviaDevolveAviso:
         assert response.status_code == 200, response.data
         assert response.data["ok"] is True
         assert response.data["conflicts"] == []
-        assert [w["code"] for w in response.data["warnings"]] == ["M"]
+        assert response.data["warnings"] == []
+        assert _codigos_m(response.data) == []
 
 
 # ============================================================================
-# 400 por outro motivo: o aviso vai junto, separado do que barra
+# 400 por outro motivo: só o que barra, sem M
 # ============================================================================
 
 
-class TestAvisoVaiJuntoNoBloqueio:
+class TestBloqueioSemM:
     def test_sobreposicao_mais_limite_na_mesma_pessoa(
         self, coordenador, formador, aprovador, municipio, tipo_evento, projeto_super
     ):
@@ -358,9 +364,8 @@ class TestAvisoVaiJuntoNoBloqueio:
         (bloqueado,) = erros["blocked_participants"]
         assert bloqueado["usuario_id"] == formador.id
         assert [c["code"] for c in bloqueado["conflicts"]] == ["X"]
-        assert [w["code"] for w in bloqueado["warnings"]] == ["M"]
         assert [c["code"] for c in erros["conflicts"]] == ["X"]
-        assert [w["code"] for w in erros["warnings"]] == ["M"]
+        assert _codigos_m(response.data) == []
         assert "limite diário" not in response.data["detail"]
         assert response.data["detail"] == (
             "Não é possível aprovar a solicitação: Bruno Formador tem outro evento aprovado neste horário."

@@ -39,7 +39,8 @@ export interface AvailabilityPreviewInput {
 export type AvailabilityPreview =
   | { status: 'idle' }
   | { status: 'checking' }
-  // `avisos` só existe quando há aviso (limite diário): avisa, não bloqueia o botão.
+  // `avisos` só existe quando o backend manda aviso (hoje nenhum; o limite diário saiu em
+  // 05/10/2026): avisa, não bloqueia o botão.
   | { status: 'ok'; avisos?: AvisoDeAgenda[] }
   | { status: 'conflito'; bloqueados: BlockedParticipant[]; avisos?: AvisoDeAgenda[] }
   | { status: 'indisponivel'; motivo: 'throttled' | 'erro' };
@@ -95,7 +96,7 @@ export function useAvailabilityPreview(input: AvailabilityPreviewInput): Availab
         .then((resp) => {
           if (seq !== seqRef.current) return; // chegou obsoleta
           const nomeDe = (id: ID): string => nomePorId.get(id)?.nome ?? `Participante #${id}`;
-          // Aviso (limite diário) vem em `warnings` e não muda `ok`. Backend sem a chave = sem aviso.
+          // Aviso vem em `warnings` e não muda `ok`. Backend sem a chave (ou com ela vazia) = sem aviso.
           const avisos: AvisoDeAgenda[] = resp.results
             .filter((r) => (r.warnings?.length ?? 0) > 0)
             .map((r) => ({

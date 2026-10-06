@@ -546,11 +546,11 @@ class TestCacheSplit:
 
         assert not check_conflicts_uncached(usuario=formador, inicio=inicio, fim=fim, municipio=municipio).ok
 
-    def test_exclude_solicitacao_id_tambem_tira_do_limite_diario(self, formador, municipio, tipo_evento):
+    def test_exclude_solicitacao_id_tira_o_proprio_evento_da_checagem(self, formador, municipio, tipo_evento):
         """
-        A exclusão precisa valer na origem da query, não como filtro por `ref_id` depois:
-        o aviso de limite diário (M, RD-05) não tem `ref_id` e somaria as horas do
-        próprio evento em dobro.
+        A exclusão vale na origem da query: revalidar um evento já gravado não conflita
+        consigo mesmo. (Antes também evitava somar as horas do próprio evento em dobro no
+        limite diário, que deixou de existir em 05/10/2026.)
         """
         from apps.core.services.availability_service import check_conflicts_uncached
 
@@ -558,9 +558,8 @@ class TestCacheSplit:
         fim = inicio + timedelta(hours=5)
         solicitacao = _evento_aprovado_para(formador, municipio, tipo_evento, inicio, fim)
 
-        # 5h já gravadas + 5h do mesmo evento = 10h > limite de 8h/dia
         sem_exclusao = check_conflicts_uncached(usuario=formador, inicio=inicio, fim=fim, municipio=municipio)
-        assert [w.code for w in sem_exclusao.warnings].count("M") == 1
+        assert [(c.code, c.ref_id) for c in sem_exclusao.conflicts] == [("X", solicitacao.pk)]
 
         com_exclusao = check_conflicts_uncached(
             usuario=formador,

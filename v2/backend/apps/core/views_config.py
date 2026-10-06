@@ -52,7 +52,7 @@ _CAMPOS_POR_CHAVE: dict[str, tuple[str, ...]] = {
 def _config_atual() -> dict[str, Any]:
     """Configurações vigentes em formato flat (lidas do Config model via get_cfg, com cache)."""
     availability = get_cfg("availability", {})
-    disponibilidade = parametros_disponibilidade()  # a mesma fonte que o motor (RD-04/RD-05) aplica
+    disponibilidade = parametros_disponibilidade()  # a mesma fonte do motor (RD-04) e da contagem de horas (RD-05)
     gcal_sync = get_cfg("gcal_sync", {})
     session_settings = get_cfg("session_settings", {})
     features = get_cfg("features", {})

@@ -59,6 +59,7 @@ export interface AvailabilityCheckRequest {
  * Conflict detail in availability check response
  */
 export interface ConflictDetail {
+  /** 'M' (antigo limite diário) não é mais emitido desde 05/10/2026; fica para resposta antiga. */
   code: 'X' | 'T' | 'P' | 'D' | 'M';
   title: string;
   detail: string;
@@ -72,7 +73,7 @@ export interface AvailabilityCheckResponse {
   ok: boolean;
   /** O que barra: X, T, P, D. */
   conflicts: ConflictDetail[];
-  /** O que só avisa (limite diário, M). Não muda `ok`. */
+  /** O que só avisa. Não muda `ok`. Hoje sempre vazio (o limite diário M saiu em 05/10/2026). */
   warnings?: ConflictDetail[];
 }
 
@@ -94,7 +95,7 @@ export interface AvailabilityCheckManyResult {
   ok: boolean;
   /** O que barra: X, T, P, D. */
   conflicts: ConflictDetail[];
-  /** O que só avisa (limite diário, M). Não muda `ok`. */
+  /** O que só avisa. Não muda `ok`. Hoje sempre vazio (o limite diário M saiu em 05/10/2026). */
   warnings?: ConflictDetail[];
 }
 
@@ -114,13 +115,13 @@ export interface BlockedParticipant {
   usuario_id: ID;
   usuario_nome: string;
   conflicts: ConflictDetail[];
-  /** Avisos da mesma pessoa (limite diário). Vêm junto, mas não são o motivo do bloqueio. */
+  /** Avisos da mesma pessoa. Vêm junto, mas não são o motivo do bloqueio. Hoje sempre vazio. */
   warnings?: ConflictDetail[];
 }
 
 /**
  * Participante com aviso de agenda: o sistema calcula e mostra, mas não impede o evento
- * (limite diário, RD-05 — decisão do dono em 02/10/2026).
+ * (hoje o backend não emite nenhum: o limite diário M saiu em 05/10/2026).
  */
 export interface AvisoDeAgenda {
   usuario_id: ID;
@@ -136,7 +137,7 @@ export interface AvailabilityConflictErrorPayload {
   code: 'availability_conflict';
   errors: {
     conflicts: ConflictDetail[];
-    /** Avisos calculados na mesma checagem (limite diário). Não barram. */
+    /** Avisos calculados na mesma checagem. Não barram. Hoje sempre vazio. */
     warnings?: ConflictDetail[];
     blocked_participants: BlockedParticipant[];
     skipped_guests: unknown[];

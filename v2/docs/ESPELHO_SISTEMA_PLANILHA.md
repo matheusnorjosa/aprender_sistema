@@ -66,8 +66,8 @@ Rótulos, como na `REFERENCIA-DOMINIO.md`: **MEDIDO** (contado no código/banco,
 - **Vínculo** — `EquipeGerencia(usuario, gerencia, papel, valid_from/to)`; vigência via
   `EquipeGerencia.vigentes_em()` (`models/organizacao.py`, é o SSOT de vigência, RD-06).
 
-**MEDIDO:** `EquipeGerencia.PAPEL_CHOICES` = `GERENTE, COORDENADOR, APOIO, FORMADOR`
-(`models/organizacao.py`). Escopo de autorização deve sair do **vínculo**
+**MEDIDO:** `EquipeGerencia.PAPEL_CHOICES` = `GERENTE, COORDENADOR, APOIO, FORMADOR`, mais `EQUIPE`
+("Equipe administrativa", 05/10/2026 — ver §4.4) (`models/organizacao.py`). Escopo de autorização deve sair do **vínculo**
 (`EquipeGerencia` + setor canônico), não do **grupo** — grupo serve para *capability*,
 vínculo serve para *escopo*.
 
@@ -200,6 +200,10 @@ Dados de co-coordenação em prod = re-import futuro à parte.
 **não** mapeiam para `APOIO`. `APOIO DE COORDENAÇÃO` tem as **mesmas permissões de
 COORDENADOR**. As pessoas de SUPORTE/OPERACIONAL veem a grade via a capability do grupo
 DAT (`view_all_availability`), não via papel.
+
+**DECIDIDO (dono, 05/10/2026):** essas pessoas ganham o papel `EQUIPE` ("Equipe administrativa"),
+que só diz "trabalha neste setor" e também serve ao Controle e a outros setores — sem lista, Grade,
+gestão, aprovação nem grupo. Regra completa em [`rbac.spec.md`](specs/backend/rbac.spec.md).
 
 ---
 

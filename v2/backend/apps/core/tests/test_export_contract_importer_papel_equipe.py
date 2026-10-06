@@ -119,6 +119,24 @@ def test_apply_equipe_e_idempotente(tmp_path):
     assert EquipeGerencia.objects.filter(papel="EQUIPE").count() == 1
 
 
+@pytest.mark.parametrize("vinculo_ja_existe", [False, True])
+def test_linha_equipe_nao_reescreve_setor_canonico_da_gerencia(tmp_path, vinculo_ja_existe):
+    """setor_canonico é eixo de escopo (user_setores compara com Projeto.setor): uma linha EQUIPE,
+    inerte por definição, não pode reescrevê-lo, nem quando o vínculo já existe."""
+    g = Gerencia.objects.create(nome="GERENCIA CONTROLE", nome_setor="Controle", setor_canonico="Controle")
+    u = UsuarioFactory(cpf=_CPF)
+    if vinculo_ja_existe:
+        EquipeGerencia.objects.create(gerencia=g, usuario=u, papel="EQUIPE", ativo=True)
+    csv = f"gerencia,usuario_cpf,papel,setor_canonico\nControle,{_CPF},EQUIPE,Vidas\n"
+    path = _export(tmp_path, {"equipe_gerencia": csv})
+
+    ExportContractImporter(path=path, apply=True, allow=("equipe_gerencia",)).run()
+
+    g.refresh_from_db()
+    assert g.setor_canonico == "Controle"
+    assert EquipeGerencia.objects.filter(gerencia=g, usuario=u, papel="EQUIPE").count() == 1
+
+
 def test_usuario_so_com_equipe_nasce_sem_grupo_mesmo_com_cargo(tmp_path):
     """Usuário novo cujo único papel no export é EQUIPE: nenhum grupo, e o `cargo` não entra como
     fallback (o papel do export é a fonte primária e EQUIPE não tem grupo)."""

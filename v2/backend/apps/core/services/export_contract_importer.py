@@ -1442,7 +1442,8 @@ class ExportContractImporter:
             if not exists and is_vinculo_aprovador(gerencia, papel):
                 continue
             setor_canon = (r.get("setor_canonico") or "").strip()
-            if setor_canon and gerencia.setor_canonico != setor_canon:
+            # setor_canonico é eixo de escopo (user_setores): a linha EQUIPE, inerte, não o reescreve.
+            if setor_canon and papel != EquipeGerencia.PAPEL_EQUIPE and gerencia.setor_canonico != setor_canon:
                 gerencia.setor_canonico = setor_canon
                 gerencia.save(update_fields=["setor_canonico"])
             if exists:

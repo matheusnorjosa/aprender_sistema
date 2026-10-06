@@ -14,6 +14,8 @@ Retorna: [{id, label, kind, alias?}]
 
 from __future__ import annotations
 
+import operator
+from functools import reduce
 from typing import Any
 
 from django.db.models import Q, QuerySet
@@ -23,7 +25,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.permissions import HasPerm
-from apps.core.rbac.helpers import user_has_any_perm
+from apps.core.rbac.helpers import filtrar_formadores_avaliaveis, user_has_any_perm
 from apps.core.services.normalize import norm_text
 from apps.core.services.solicitacao_scope import scope_projetos_by_setor, scope_usuarios_by_setor
 
@@ -111,7 +113,10 @@ class ProjetoLookup(APIView):
     - com_compra=true|false: filtra apenas projetos com compra registrada
     - municipio_id=<id>: restringe projetos com compra no município informado
 
-    Retorna: [{id, label, kind: "projeto"}]
+    Retorna: [{id, label, kind: "projeto", fluxo, pergunta_avaliar_formador}]
+
+    `pergunta_avaliar_formador` = a gerência do projeto usa a pergunta "Você pretende avaliar o
+    formador?" (projeto sem gerência: True). Decisão do dono, 05/10/2026.
     """
 
     permission_classes = [IsAuthenticated]
@@ -129,7 +134,7 @@ class ProjetoLookup(APIView):
         except ValueError:
             municipio_id = None
 
-        qs: QuerySet[Projeto] = Projeto.objects.filter(ativo=True)
+        qs: QuerySet[Projeto] = Projeto.objects.filter(ativo=True).select_related("gerencia")
         if com_compra or municipio_id is not None:
             qs = qs.filter(compras__isnull=False)
         if municipio_id is not None:
@@ -163,6 +168,7 @@ class ProjetoLookup(APIView):
                     "label": proj.nome,
                     "kind": "projeto",
                     "fluxo": proj.fluxo,
+                    "pergunta_avaliar_formador": proj.gerencia is None or proj.gerencia.pergunta_avaliar_formador,
                 }
             )
 
@@ -201,7 +207,12 @@ class TipoEventoLookup(APIView):
 class UsuarioLookup(APIView):
     """
     GET /api/lookup/usuarios/?q=maria&role=formador
-    Retorna: [{id, label, kind: "usuario"}]
+    Retorna: [{id, label, kind: "usuario", avaliavel}]
+
+    `role` aceita vários papéis separados por vírgula (`Formador,Coordenador`): a lista de
+    formadores da Nova Solicitação oferece também os coordenadores do setor (decisão do dono,
+    05/10/2026: coordenador que atua no evento entra como formador). `avaliavel` = função
+    Formador sem a função Coordenador (`filtrar_formadores_avaliaveis`).
 
     PR 5 hardening RBAC (2026-04-30):
     - Capability gate: somente perfis com motivo legítimo (criar
@@ -256,9 +267,11 @@ class UsuarioLookup(APIView):
             else:
                 qs = qs.filter(Q(first_name__icontains=q) | Q(last_name__icontains=q))
 
-        # Filtrar por role/group ANTES do slice
-        if role:
-            qs = qs.filter(groups__name__iexact=role)
+        # Filtrar por role/group ANTES do slice (vários papéis separados por vírgula = OU)
+        papeis = [p.strip() for p in role.split(",") if p.strip()]
+        if papeis:
+            por_papel: list[Q] = [Q(groups__name__iexact=papel) for papel in papeis]
+            qs = qs.filter(reduce(operator.or_, por_papel)).distinct()
 
         # M10-04/#1656 Wave 1: o coordenador regular só enxerga usuários do PRÓPRIO
         # setor (o picker do wizard consome este lookup → FE já filtrado, sem 400).
@@ -266,16 +279,22 @@ class UsuarioLookup(APIView):
         qs = scope_usuarios_by_setor(qs, request.user)
 
         # Aplicar ordenação e limite
-        qs = qs.order_by("-id")[: 50 if q else 20]
+        usuarios = list(qs.order_by("-id")[: 50 if q else 20])
+        avaliaveis = set(
+            filtrar_formadores_avaliaveis(Usuario.objects.filter(id__in=[u.id for u in usuarios])).values_list(
+                "id", flat=True
+            )
+        )
 
         results = []
-        for user in qs:
+        for user in usuarios:
             label = user.get_full_name() or user.username
             results.append(
                 {
                     "id": user.id,
                     "label": label,
                     "kind": "usuario",
+                    "avaliavel": user.id in avaliaveis,
                 }
             )
 

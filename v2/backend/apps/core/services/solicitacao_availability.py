@@ -21,7 +21,12 @@ from django.db import connection
 
 from apps.core.exceptions import ValidationAPIError
 from apps.core.models import Participation, Solicitacao, Usuario
-from apps.core.services.availability_service import ENFORCED_ROLES, Conflict, check_conflicts_uncached
+from apps.core.services.availability_service import (
+    ENFORCED_ROLES,
+    Conflict,
+    check_conflicts_uncached,
+    coordenador_ocupante,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -76,8 +81,9 @@ def collect_participants(solicitacao: Solicitacao) -> tuple[list[Usuario], list[
     o payload de novo aqui abriria espaço para checar pessoas diferentes das que foram
     salvas, que é exatamente a falha que este guard existe para fechar.
 
-    O criador (`solicitacao.usuario`) entra sempre, mesmo sem `Participation`: preserva a
-    checagem que já existia antes do #1452 e cobre eventos sem participantes extras.
+    Entram os FORMADORES (papéis de `ENFORCED_ROLES`) e, só quando o evento tem
+    `coordenador_acompanha=True`, o coordenador responsável (`coordenador_ocupante`). Quem
+    criou não entra por ter criado (decisão do dono, 05/10/2026; antes entrava sempre).
 
     Convidado externo sem cadastro (`usuario=NULL` + `guest_email`) é fisicamente
     não-checável: não tem `AvailabilityBlock` nem casa com `Q(participations__usuario=)`.
@@ -90,13 +96,14 @@ def collect_participants(solicitacao: Solicitacao) -> tuple[list[Usuario], list[
         "usuario"
     )
 
-    # Dedup por id é obrigatório: o coordenador é sempre gravado como COORDENADOR e pode
-    # também estar em formador_ids. Sem dedup as horas dele contariam 2x no RD-05.
+    # Dedup por id é obrigatório: o responsável que acompanha pode também estar em
+    # formador_ids. Sem dedup as horas dele contariam 2x no RD-05.
     usuarios_by_id: dict[int, Usuario] = {}
     skipped_guests: list[str] = []
 
-    if solicitacao.usuario_id:
-        usuarios_by_id[solicitacao.usuario_id] = solicitacao.usuario
+    responsavel = coordenador_ocupante(solicitacao)
+    if responsavel is not None:
+        usuarios_by_id[responsavel.id] = responsavel
 
     for p in participations:
         if p.usuario_id:

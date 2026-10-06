@@ -151,6 +151,7 @@ def _payload_criar(municipio, tipo_evento, formador, inicio, fim, projeto=None):
     payload = {
         "municipio": municipio.pk,
         "tipo_evento": tipo_evento.pk,
+        "coordenador_acompanha": False,
         "inicio": inicio.isoformat(),
         "fim": fim.isoformat(),
         "extra_participants": {"formador_ids": [formador.pk]},

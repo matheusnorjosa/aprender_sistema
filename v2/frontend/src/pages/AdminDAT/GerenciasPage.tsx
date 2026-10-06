@@ -52,6 +52,7 @@ interface GerenciaFormValues {
   setor_canonico?: string;
   descricao: string;
   ativo: boolean;
+  pergunta_avaliar_formador: boolean;
 }
 
 export default function GerenciasPage(): JSX.Element {
@@ -153,6 +154,7 @@ export default function GerenciasPage(): JSX.Element {
       setor_canonico: gerencia.setor_canonico,
       descricao: gerencia.descricao,
       ativo: gerencia.ativo,
+      pergunta_avaliar_formador: gerencia.pergunta_avaliar_formador ?? true,
     });
     setModalVisible(true);
   };
@@ -165,6 +167,7 @@ export default function GerenciasPage(): JSX.Element {
         nome_exibicao: values.nome_exibicao ?? '',
         descricao: values.descricao,
         ativo: values.ativo,
+        pergunta_avaliar_formador: values.pergunta_avaliar_formador,
         // setor_canonico é opcional (CharField allow_blank); envia string vazia se limpo.
         setor_canonico: values.setor_canonico ?? '',
       };
@@ -445,6 +448,15 @@ export default function GerenciasPage(): JSX.Element {
 
           <Form.Item name="ativo" valuePropName="checked" initialValue={true}>
             <Checkbox>Gerencia ativa</Checkbox>
+          </Form.Item>
+
+          <Form.Item
+            name="pergunta_avaliar_formador"
+            valuePropName="checked"
+            initialValue={true}
+            extra="Vale para os eventos de projetos desta gerência. Desmarcado: a pergunta não aparece."
+          >
+            <Checkbox>Perguntar, na Nova Solicitação, se a pessoa pretende avaliar o formador</Checkbox>
           </Form.Item>
         </Form>
       </Modal>

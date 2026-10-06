@@ -77,6 +77,7 @@ class TestAPICreateSolicitacaoPendente:
         payload = {
             "usuario": user_test.pk,
             "tipo_evento": tipo_evento_test.pk,
+            "coordenador_acompanha": False,
             "municipio": municipio_test.pk,
             "inicio": inicio.isoformat(),
             "fim": fim.isoformat(),
@@ -118,6 +119,7 @@ class TestAPICreateSolicitacaoPendente:
         payload = {
             "usuario": user_test.pk,
             "tipo_evento": tipo_evento_test.pk,
+            "coordenador_acompanha": False,
             "municipio": municipio_test.pk,
             "inicio": inicio.isoformat(),
             "fim": fim.isoformat(),
@@ -150,6 +152,7 @@ class TestAPICreateSolicitacaoPendente:
         payload = {
             "usuario": user_test.pk,
             "tipo_evento": tipo_evento_test.pk,
+            "coordenador_acompanha": False,
             "municipio": municipio_test.pk,
             "inicio": now.isoformat(),
             "fim": now.isoformat(),  # fim == inicio (inválido)
@@ -165,6 +168,7 @@ class TestAPICreateSolicitacaoPendente:
         payload2 = {
             "usuario": user_test.pk,
             "tipo_evento": tipo_evento_test.pk,
+            "coordenador_acompanha": False,
             "municipio": municipio_test.pk,
             "inicio": now.isoformat(),
             "fim": (now - timedelta(hours=1)).isoformat(),  # fim < inicio (inválido)
@@ -188,6 +192,7 @@ class TestAPICreateSolicitacaoPendente:
         payload = {
             "usuario": user_test.pk,
             "tipo_evento": tipo_evento_test.pk,
+            "coordenador_acompanha": False,
             # municipio NÃO informado (opcional)
             "inicio": inicio.isoformat(),
             "fim": fim.isoformat(),
@@ -218,6 +223,7 @@ class TestAPICreateSolicitacaoPendente:
         payload = {
             "usuario": user_test.pk,
             "tipo_evento": tipo_evento_test.pk,
+            "coordenador_acompanha": False,
             "municipio": municipio_test.pk,
             "inicio": inicio.isoformat(),
             "fim": fim.isoformat(),
@@ -246,6 +252,7 @@ class TestAPICreateSolicitacaoPendente:
         payload = {
             "usuario": 1,  # ID fictício
             "tipo_evento": tipo_evento_test.pk,
+            "coordenador_acompanha": False,
             "municipio": municipio_test.pk,
             "inicio": now.isoformat(),
             "fim": (now + timedelta(hours=1)).isoformat(),
@@ -277,11 +284,15 @@ class TestAPICreateSolicitacaoPendente:
             inicio=inicio_existente,
             fim=fim_existente,
             status="aprovado",
+            # 05/10/2026: o coordenador só ocupa a agenda quando acompanha (nos dois eventos).
+            coordenador=user_test,
+            coordenador_acompanha=True,
         )
 
         payload = {
             "usuario": user_test.pk,
             "tipo_evento": tipo_evento_test.pk,
+            "coordenador_acompanha": True,
             "municipio": municipio_test.pk,
             "inicio": (inicio_existente + timedelta(minutes=30)).isoformat(),
             "fim": (fim_existente + timedelta(minutes=30)).isoformat(),

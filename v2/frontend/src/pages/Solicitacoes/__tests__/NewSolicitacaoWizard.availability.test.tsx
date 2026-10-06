@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { MemoryRouter } from 'react-router';
 
@@ -62,9 +62,6 @@ vi.mock('../../../components/FormadoresPicker', () => ({
     </button>
   ),
 }));
-vi.mock('../../../components/CoordenadoresPicker', () => ({
-  default: () => <div data-testid="coordenadores-picker">CoordenadoresPicker</div>,
-}));
 
 function MockComboBox({
   placeholder = '',
@@ -126,7 +123,8 @@ const RESP_CONFLITO = {
   ],
 };
 
-describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)', () => {
+// Percorrer o assistente com antd leva ~3 s por teste isolado; na suíte inteira passa dos 5 s padrão.
+describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)', { timeout: 20000 }, () => {
   beforeEach(() => {
     if (!window.matchMedia) {
       Object.defineProperty(window, 'matchMedia', {
@@ -151,7 +149,7 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
     checkAvailabilityManyMock.mockResolvedValue({ ok: true, results: [] });
   });
 
-  test('selecionar formador + data dispara check-many com o criador incluso e deduplicado', async () => {
+  test('selecionar formador + data dispara check-many com os formadores (quem cria não entra por criar)', async () => {
     render(
       <MemoryRouter>
         <NewSolicitacaoWizard />
@@ -161,7 +159,8 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
 
     await waitFor(() => expect(checkAvailabilityManyMock).toHaveBeenCalled());
     const arg = checkAvailabilityManyMock.mock.calls[0][0];
-    expect(arg.usuarios_ids).toEqual([1, 99]); // criador (1) + formador (99)
+    // 05/10/2026: quem cria (1) não entra por ter criado; o responsável só entra se acompanhar.
+    expect(arg.usuarios_ids).toEqual([99]);
     expect(arg.municipio_id).toBe(456);
     expect(arg.inicio).toBeTruthy();
   });
@@ -248,19 +247,21 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
     );
   });
 
-  test('avançar sem tocar em Coordenadores NÃO quebra o wizard (guarda do P0)', async () => {
+  test('avançar do passo Participantes com as respostas chega ao passo Detalhes (guarda do P0)', async () => {
     render(
       <MemoryRouter>
         <NewSolicitacaoWizard />
       </MemoryRouter>
     );
     await irParaParticipantesESelecionarFormador();
-    // sai do step 1 SEM ter tocado no CoordenadoresPicker
-    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
-    // Se o P0 (coordenadores undefined -> .length) não estivesse guardado, o render
-    // do resumo estouraria e desmontaria a árvore. Chegar ao passo seguinte prova o fix.
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /Voltar para passo anterior/i })).toBeInTheDocument()
+    // Quem cria aqui não tem a função Coordenador: escolhe o responsável e responde se acompanha.
+    fireEvent.click(screen.getByTestId('cb-municipio')); // no passo 2, o único ComboBox é o do responsável
+    fireEvent.click(
+      within(screen.getByRole('radiogroup', { name: /vai acompanhar o evento/ })).getByLabelText('Não')
     );
+    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
+    // Campos opcionais não tocados chegam `undefined` do validateFields; o merge não pode
+    // apagar o estado (P0). Chegar ao passo Detalhes prova o fix.
+    expect(await screen.findByLabelText('Local do Evento')).toBeInTheDocument();
   });
 });

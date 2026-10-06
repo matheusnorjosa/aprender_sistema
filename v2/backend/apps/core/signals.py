@@ -70,8 +70,13 @@ def _invalidate_cache_on_solicitacao_change(
     Invalida cache de availability ao modificar Solicitacao.
 
     ASQ-007: Scoped invalidation — only bumps version for the affected user.
+    O coordenador responsável também: ele ocupa a agenda quando acompanha (05/10/2026) e
+    pode não ser quem criou. O responsável ANTERIOR, numa troca, é invalidado na edição.
     """
     invalidate_availability_cache(usuario_id=getattr(instance, "usuario_id", None))
+    coordenador_id = getattr(instance, "coordenador_id", None)
+    if coordenador_id is not None and coordenador_id != getattr(instance, "usuario_id", None):
+        invalidate_availability_cache(usuario_id=coordenador_id)
 
 
 @receiver([post_save, post_delete], sender=AvailabilityBlock)

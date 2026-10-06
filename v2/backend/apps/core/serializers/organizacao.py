@@ -183,6 +183,9 @@ class GerenciaSerializer(serializers.ModelSerializer["Gerencia"]):
             "gerente_nome",
             "ativo",
             "descricao",
+            # Decisão do dono (05/10/2026): False = a Nova Solicitação não pergunta se a pessoa
+            # pretende avaliar o formador (vale a gerência do PROJETO do evento).
+            "pergunta_avaliar_formador",
             "projetos_count",
             "created_at",
             "updated_at",

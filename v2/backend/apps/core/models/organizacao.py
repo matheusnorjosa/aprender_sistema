@@ -249,6 +249,13 @@ class Gerencia(models.Model):
     )
     ativo = models.BooleanField(default=True)
     descricao = models.TextField(blank=True)
+    pergunta_avaliar_formador = models.BooleanField(
+        default=True,
+        help_text=(
+            "Nova Solicitação de projeto desta gerência pergunta 'Você pretende avaliar o formador nesse "
+            "evento?'. False = a gerência não usa a pergunta (decisão do dono, 05/10/2026)."
+        ),
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

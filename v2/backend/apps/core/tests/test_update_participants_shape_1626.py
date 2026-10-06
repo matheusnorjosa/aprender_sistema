@@ -96,6 +96,9 @@ def _create_sol(client, municipio, projeto, tipo_evento, extra):
             "municipio": municipio.id,
             "projeto": projeto.id,
             "tipo_evento": tipo_evento.id,
+            "coordenador_acompanha": False,
+            # 05/10/2026: com formador avaliável a pergunta de avaliar é obrigatória
+            "pretende_avaliar_formador": False if extra.get("formador_ids") else None,
             "tipo": "PRESENCIAL",
             "inicio": inicio.isoformat(),
             "fim": (inicio + timedelta(hours=2)).isoformat(),
@@ -164,13 +167,9 @@ class TestUpdateAbsentKeyDoesNotTouchOtherRole:
         f_a = _formador("k1")
         coord_a = _formador("k2")
         f_b = _formador("k3")
-        sol_id = _create_sol(
-            client_coord,
-            municipio,
-            projeto,
-            tipo_evento,
-            {"formador_ids": [f_a.id], "coord_acompanha_ids": [coord_a.id]},
-        )
+        sol_id = _create_sol(client_coord, municipio, projeto, tipo_evento, {"formador_ids": [f_a.id]})
+        # Linha antiga (a lista saiu da tela e da API em 05/10/2026; as gravadas antes ficam).
+        Participation.objects.create(solicitacao_id=sol_id, usuario=coord_a, role="COORD_ACOMPANHA")
         assert _ids(sol_id, "FORMADOR") == {f_a.id}
         assert _ids(sol_id, "COORD_ACOMPANHA") == {coord_a.id}
 

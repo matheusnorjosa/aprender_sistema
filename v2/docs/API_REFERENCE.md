@@ -163,6 +163,22 @@ vínculo de GERENTE dela (fora: 403), e só cria ou move para projeto desse alca
 > delega a `resolve_initial_status(projeto=...)`: projeto com `fluxo=SUPER` nasce
 > `pendente`; `fluxo=NAO_SUPER` nasce `aprovado` (`SolicitacaoViewSet.perform_create`, `views_solicitacao.py`).
 
+> **Responsável e perguntas (decisão do dono, 05/10/2026)** — detalhe em
+> [`solicitacao-approval.spec.md`](specs/backend/solicitacao-approval.spec.md):
+> - `coordenador` (id): sem valor, quem cria se tem a função Coordenador; senão **400** no campo.
+>   Mesmo escopo de setor dos formadores. Recebe o convite do Google mesmo sem acompanhar.
+> - `coordenador_acompanha` (bool): **obrigatório no POST** (ausente ou `null` → 400). Só com `true`
+>   a agenda do responsável é conferida; trocar para `true` com conflito → 400 `availability_conflict`.
+> - `pretende_avaliar_formador` (bool|null) e `formador_avaliado` (id|null): obrigatórios quando a
+>   gerência do projeto pergunta e há formador avaliável (Formador sem a função Coordenador); `true`
+>   exige um formador avaliável do evento; fora disso, resposta nova não nula → 400. No `PATCH`,
+>   resposta já dada não se apaga nem se troca quando a pergunta deixa de valer (400), e tirar da
+>   lista o formador escolhido → 400; pergunta que passa a valer exige resposta. Leitura em
+>   `GET` (lista e detalhe), com `formador_avaliado_nome`; `avaliaveis_ids` e
+>   `projeto_pergunta_avaliar_formador` só no detalhe (null na lista).
+> - `extra_participants.coord_acompanha_ids`/`coord_acompanha_emails` com itens → 400 (a lista saiu;
+>   coordenador que atua vai em `formador_ids`).
+
 ### Ações de Aprovação (PA-01 a PA-07)
 
 | Método | Endpoint | Status | Descrição | Permissão |
@@ -517,7 +533,9 @@ CRUD de `TipoEvento` só pelo Django Admin (superuser).
 | GET | `/api/gerencias/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Detalhes da gerência | IsAuthenticated |
 | POST/PUT/PATCH/DELETE | `/api/gerencias/` | ![Stable](https://img.shields.io/badge/-stable-green) | Escrita de gerência | `IsAuthenticated` + `manage_purchases_and_materials` |
 
-Gate em `GerenciaViewSet.get_permissions` (`views/admin.py`).
+Gate em `GerenciaViewSet.get_permissions` (`views/admin.py`). Campo `pergunta_avaliar_formador` (bool,
+padrão `true`; 05/10/2026): `false` tira da Nova Solicitação a pergunta "pretende avaliar o formador?"
+nos eventos de projetos da gerência.
 
 Filtros: `?ativo=true|false`, `?search=` (`nome`, `nome_setor`, `nome_exibicao`),
 `?ordering=nome|nome_setor|rotulo_ordem` (default `nome_setor`). Sem `ativo` a lista traz
@@ -760,6 +778,10 @@ Registro das rotas em `v2/backend/apps/core/urls.py` (paths `options-*`). **Não
 | GET | `/api/lookup/usuarios/` | ![Stable](https://img.shields.io/badge/-stable-green) | Autocomplete de usuários | `create_solicitation` \| `manage_admin_registries` |
 
 `UsuarioLookup` é o único com gate de capability (`views_lookup.py`, D12).
+
+Desde 05/10/2026: `/api/lookup/projetos/` devolve `pergunta_avaliar_formador` por projeto (da gerência;
+`true` sem gerência); `/api/lookup/usuarios/` aceita vários papéis em `role` separados por vírgula
+(`?role=Formador,Coordenador`, OU) e devolve `avaliavel` (função Formador sem a função Coordenador).
 
 ---
 

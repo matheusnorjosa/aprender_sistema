@@ -1,7 +1,7 @@
 ---
 title: Regras de Disponibilidade (RD-01..RD-08)
 status: canonical
-last_verified: 2026-10-02
+last_verified: 2026-10-05
 sources_of_truth:
   - v2/backend/apps/core/services/availability_service.py
   - v2/backend/apps/core/services/solicitacao_availability.py
@@ -40,6 +40,8 @@ A afirmacao "RD e apenas consultivo" era verdadeira ate o #1452 e **nao vale mai
 
 > **Decisao do dono, 02/10/2026 — o limite diario avisa, nao barra.** "O evento na agenda pode ter quantas horas quiser." O motor continua calculando o RD-05, mas devolve o `M` em `warnings`, separado de `conflicts`. Criar, editar, aprovar (um e lote), a checagem previa do assistente e o importador de eventos **nao recusam mais** por limite diario. Sobreposicao (`X`), bloqueio (`T`, `P`) e deslocamento (`D`) continuam barrando exatamente como antes. A contagem de horas de formacao com teto por dia **ainda nao existe** (esta na fila): o aviso so diz que o dia passa de N horas e que isso nao impede o evento.
 
+> **Decisao do dono, 05/10/2026 (OK explicito para mudar a CP-03) — o coordenador so ocupa a agenda quando acompanha.** A conferencia de agenda (RD-01 sobreposicao, RD-02/03 bloqueios, RD-04 deslocamento e o aviso M) vale para **todos os formadores** do evento, sempre, e para o **coordenador responsavel** (`Solicitacao.coordenador`; sem ele, quem criou) **so quando `coordenador_acompanha=True`** ("O coordenador responsavel vai acompanhar o evento?", obrigatoria na criacao). Quem cria deixa de ser conferido por ter criado; os papeis `COORDENADOR` e `COORD_ACOMPANHA` nao ocupam mais (servem ao convite do Google). Segundo coordenador num evento entra na lista de formadores e e conferido como formador. Mudar a resposta de Nao para Sim num evento com conflito → 400 `availability_conflict` com o motivo. Eventos ja gravados ficam com a marca que tem no banco (um script de dados separado zera as importadas); o codigo nao depende dele.
+
 ## Fonte de verdade no codigo
 
 - [`v2/backend/apps/core/services/availability_service.py`](../../../backend/apps/core/services/availability_service.py) — `_check_conflicts_impl` e o calculo RD-01..RD-08; dataclasses `Conflict` e `CheckResult`; helpers `to_local`, `same_day_local`, `_fmt_interval_local`. Duas entradas publicas:
@@ -77,7 +79,8 @@ Invariantes (NAO podem ser violados):
 - **RD-08**: cada `Conflict` carrega `code`, `title`, `detail` (com intervalo formatado `HH:MM dd/mm`) e `ref_id` opcional.
 - **Pureza do calculo**: o calculo so le; considera apenas `Solicitacao.status == APROVADO` e `AvailabilityBlock.status == APROVADO`. Validacao basica: `fim <= inicio` → `ok=False` com conflito `X` "Intervalo invalido". Solicitacao `pendente` e **invisivel** para a checagem — e por isso que o guard precisa do advisory lock (duas transacoes concorrentes leriam a outra como inexistente).
 - **Cache**: so na camada consultiva (`check_conflicts`, 300s via `@cache_availability_check`); TTL curto porque dados mudam com frequencia. O caminho de enforcement **nunca** le do cache. A chave tem versao no prefixo (`availability_check:v2:`): o objeto guardado ganhou `warnings` em 02/10/2026 e a versao impede servir um resultado antigo, sem o campo.
-- **Quem e checado (enforcement)**: todos os participantes gravados com `role` em `ENFORCED_ROLES` = `COORDENADOR`, `FORMADOR`, `COORD_ACOMPANHA` ([`solicitacao_availability.py`](../../../backend/apps/core/services/solicitacao_availability.py)), mais o criador (`solicitacao.usuario`), deduplicados por id. `CONVIDADO` fica de fora **de proposito** — e audiencia, nao recurso alocado; checa-lo estouraria o RD-05 de quem e convidado a varios eventos no mesmo dia. Convidado externo sem cadastro (`usuario=NULL` + `guest_email`) e fisicamente nao-checavel e volta em `skipped_guests`, sempre logado como `availability_guest_check_skipped` — nunca ignorado em silencio.
+- **Quem e checado (enforcement)** (decisao do dono, 05/10/2026): os participantes gravados com `role` em `ENFORCED_ROLES` = `FORMADOR`, mais o coordenador responsavel quando o evento tem `coordenador_acompanha=True` (`coordenador_ocupante`: `solicitacao.coordenador`, ou `solicitacao.usuario` se a FK estiver vazia), deduplicados por id ([`solicitacao_availability.py`](../../../backend/apps/core/services/solicitacao_availability.py)). Quem criou **nao** entra por ter criado; `COORDENADOR` e `COORD_ACOMPANHA` nao ocupam. `CONVIDADO` fica de fora **de proposito** — e audiencia, nao recurso alocado; checa-lo estouraria o RD-05 de quem e convidado a varios eventos no mesmo dia. Convidado externo sem cadastro (`usuario=NULL` + `guest_email`) e fisicamente nao-checavel e volta em `skipped_guests`, sempre logado como `availability_guest_check_skipped` — nunca ignorado em silencio.
+- **Evento existente que ocupa (SSOT `ocupa_agenda_q`)**: um evento aprovado ocupa a agenda de uma pessoa se ela e FORMADORA nele, ou se e a responsavel e ele tem `coordenador_acompanha=True` (mesma queda para `usuario` quando a FK esta vazia). E o par de `coordenador_ocupante`; os dois vivem em [`availability_service.py`](../../../backend/apps/core/services/availability_service.py) e valem para criar, editar, aprovar (um e lote), `check`/`check-many` e o importador de eventos.
 - **Exclusao mutua (enforcement)**: `pg_advisory_xact_lock(1452, usuario_id)` em ordem ASC de id antes de ler. `select_for_update` sozinho tranca so a linha da propria solicitacao; duas solicitacoes distintas do mesmo formador trancam linhas disjuntas e ambas commitariam.
 
 > Nota: `ConflictCode` inclui `E`, mas o servico **nao emite `E`** — `E`/`D1`/`2` sao codigos de celula da legenda da Grade Mensal (`GUIDE_AVAILABILITY.md`), nao saidas de `check_conflicts`.
@@ -101,7 +104,7 @@ Caminho feliz / deteccao (`check_conflicts`):
 
 1. Valida `fim > inicio` (senao retorna `X` "Intervalo invalido").
 2. Carrega `buffer_min` e `daily_limit_h` por `parametros_disponibilidade()`: a chave gravada no Config `availability` vale (inclusive Buffer 0); sem ela, o settings (env; default 120 min / 8 h). É a mesma fonte do `GET /api/config/`, então o valor que a tela mostra é o aplicado (auditoria UX 30/09).
-3. Monta `events_qs` = `Solicitacao` APROVADO onde o usuario e dono **ou** participante (`participations__usuario`).
+3. Monta `events_qs` = `Solicitacao` APROVADO filtrada por `ocupa_agenda_q(usuario)`: a pessoa e FORMADORA, ou e a responsavel de evento com `coordenador_acompanha=True`.
 4. RD-02/RD-03: itera blocos aprovados que intersectam → emite `T` ou `P`.
 5. RD-01: itera eventos aprovados que intersectam → emite `X`.
 6. RD-04: pega evento imediatamente anterior (`fim__lte=inicio`) e posterior (`inicio__gte=fim`); se cidade difere e gap `< buffer_min`, emite `D`.
@@ -110,7 +113,7 @@ Caminho feliz / deteccao (`check_conflicts`):
 
 Caminho de enforcement (`enforce_solicitacao_availability`, dentro de `transaction.atomic()`):
 
-1. `collect_participants` le `Participation` gravada (`role__in=ENFORCED_ROLES`) + o criador, dedup por id.
+1. `collect_participants` le `Participation` gravada (`role__in=ENFORCED_ROLES`, so FORMADOR) + o responsavel se acompanha (`coordenador_ocupante`), dedup por id.
 2. `lock_participants` toma `pg_advisory_xact_lock(1452, usuario_id)` em ordem ASC.
 3. Para cada participante, `check_conflicts_uncached(..., exclude_solicitacao_id=solicitacao.pk)`.
 4. `skipped_guests` nao vazio → `logger.warning("availability_guest_check_skipped")` (nao bloqueia).

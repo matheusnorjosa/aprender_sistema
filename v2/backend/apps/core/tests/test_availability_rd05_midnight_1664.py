@@ -46,6 +46,7 @@ def _evento(pessoa, municipio, projeto, tipo, ini: datetime, fim: datetime):
         inicio=ini,
         fim=fim,
         status=Solicitacao.Status.APROVADO,
+        coordenador_acompanha=True,  # 05/10/2026: o coordenador só ocupa a agenda quando acompanha
     )
 
 

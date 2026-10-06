@@ -355,6 +355,8 @@ export interface GerenciaRecord {
   gerente_nome: string;
   ativo: boolean;
   descricao: string;
+  /** False = a Nova Solicitação não pergunta se a pessoa pretende avaliar o formador (05/10/2026). */
+  pergunta_avaliar_formador?: boolean;
   projetos_count: number;
   created_at: string;
   updated_at: string;
@@ -368,6 +370,7 @@ export interface GerenciaPayload {
   gerente?: ID | null;
   ativo?: boolean;
   descricao?: string;
+  pergunta_avaliar_formador?: boolean;
 }
 
 export async function listGerencias(params: ListParams = {}): Promise<PaginatedResponse<GerenciaRecord>> {

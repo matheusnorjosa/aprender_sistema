@@ -1,9 +1,10 @@
 /**
- * #1666: o wizard coletava "Coordenadores Acompanhantes" (M2M) mas NUNCA enviava o FK
- * `coordenador` (dono/responsável) → o backend caía no default (o criador). O fix captura
- * um "Coordenador responsável" e o envia como `coordenador`, distinto dos acompanhantes.
+ * Payload de criação da Nova Solicitação.
  *
- * RED sem o campo `coordenador` no payload construído.
+ * #1666: o FK `coordenador` (responsável) vai no payload quando escolhido.
+ * Decisão do dono (05/10/2026): a lista "Coordenadores Acompanhantes" saiu; `coordenador_acompanha`
+ * é a resposta Sim/Não da pergunta "O coordenador responsável vai acompanhar o evento?". A resposta
+ * de "pretende avaliar o formador" só vai quando a pergunta foi feita.
  */
 import { describe, it, expect } from 'vitest';
 import { buildSolicitacaoPayload } from '../NewSolicitacaoWizard';
@@ -21,24 +22,43 @@ const base = {
   local: '',
   isOnline: false,
   formadorIds: [10],
-  coordAcompanhaIds: [],
   coordenadorResponsavelId: null as number | null,
+  coordenadorAcompanha: false,
+  avaliar: null as { pretende: boolean; formadorAvaliadoId: number | null } | null,
 };
 
-describe('buildSolicitacaoPayload (#1666)', () => {
+describe('buildSolicitacaoPayload', () => {
   it('envia o FK coordenador quando um responsável é escolhido', () => {
     expect(buildSolicitacaoPayload({ ...base, coordenadorResponsavelId: 42 }).coordenador).toBe(42);
   });
 
-  it('coordenador = null quando nenhum responsável (backend usa o default)', () => {
+  it('coordenador = null quando nenhum responsável (backend usa quem cria, se for coordenador)', () => {
     expect(buildSolicitacaoPayload(base).coordenador).toBeNull();
   });
 
-  it('o FK coordenador (dono) é DISTINTO dos coord_acompanha_ids (M2M acompanhantes)', () => {
-    const p = buildSolicitacaoPayload({ ...base, coordenadorResponsavelId: 42, coordAcompanhaIds: [7, 8] });
-    expect(p.coordenador).toBe(42);
-    expect((p.extra_participants as { coord_acompanha_ids: number[] }).coord_acompanha_ids).toEqual([7, 8]);
-    expect(p.coordenador_acompanha).toBe(true);
+  it('coordenador_acompanha segue a resposta Sim/Não', () => {
+    expect(buildSolicitacaoPayload({ ...base, coordenadorAcompanha: true }).coordenador_acompanha).toBe(true);
+    expect(buildSolicitacaoPayload({ ...base, coordenadorAcompanha: false }).coordenador_acompanha).toBe(false);
+  });
+
+  it('não manda mais a lista de coordenadores acompanhantes', () => {
+    const p = buildSolicitacaoPayload(base);
+    expect(p.extra_participants).toEqual({ formador_ids: [10] });
+  });
+
+  it('sem a pergunta de avaliar, não manda resposta', () => {
+    const p = buildSolicitacaoPayload(base);
+    expect(p).not.toHaveProperty('pretende_avaliar_formador');
+    expect(p).not.toHaveProperty('formador_avaliado');
+  });
+
+  it('com a pergunta de avaliar, manda a resposta e o formador escolhido', () => {
+    const sim = buildSolicitacaoPayload({ ...base, avaliar: { pretende: true, formadorAvaliadoId: 10 } });
+    expect(sim.pretende_avaliar_formador).toBe(true);
+    expect(sim.formador_avaliado).toBe(10);
+    const nao = buildSolicitacaoPayload({ ...base, avaliar: { pretende: false, formadorAvaliadoId: null } });
+    expect(nao.pretende_avaliar_formador).toBe(false);
+    expect(nao.formador_avaliado).toBeNull();
   });
 
   it('mantém o contrato existente (municipio/projeto/tipo_evento + datas UTC)', () => {

@@ -230,6 +230,7 @@ class TestSolicitacaoRBAC:
             "/api/solicitacoes/",
             {
                 "tipo_evento": tipo_evento.id,
+                "coordenador_acompanha": False,
                 "tipo": "evento",
                 "inicio": inicio.isoformat(),
                 "fim": fim.isoformat(),
@@ -258,6 +259,9 @@ class TestSolicitacaoRBAC:
             "/api/solicitacoes/",
             {
                 "tipo_evento": tipo_evento.id,
+                "coordenador_acompanha": False,
+                # 05/10/2026: quem cria sem a função Coordenador informa o responsável.
+                "coordenador": UsuarioFactory(groups=["Coordenador"]).id,
                 "tipo": "evento",
                 "inicio": inicio.isoformat(),
                 "fim": fim.isoformat(),
@@ -291,6 +295,7 @@ class TestSolicitacaoRBAC:
                 "projeto": projeto.id,
                 "tipo": "evento",
                 "tipo_evento": tipo_evento.id,
+                "coordenador_acompanha": False,
                 "inicio": inicio.isoformat(),
                 "fim": fim.isoformat(),
             },

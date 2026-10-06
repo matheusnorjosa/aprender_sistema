@@ -49,9 +49,6 @@ vi.mock('../../../components/FormadoresPicker', () => ({
   default: () => <div data-testid="formadores-picker">FormadoresPicker</div>,
 }));
 
-vi.mock('../../../components/CoordenadoresPicker', () => ({
-  default: () => <div data-testid="coordenadores-picker">CoordenadoresPicker</div>,
-}));
 
 function MockComboBox({
   placeholder = '',

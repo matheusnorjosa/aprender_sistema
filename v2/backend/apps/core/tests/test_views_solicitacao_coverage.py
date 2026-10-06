@@ -535,6 +535,7 @@ class TestExtraParticipantsEdgeCases:
                 "municipio": municipio.id,
                 "projeto": projeto_super.id,
                 "tipo_evento": tipo_evento.id,
+                "coordenador_acompanha": False,
                 "tipo": "PRESENCIAL",
                 "inicio": timezone.now().isoformat(),
                 "fim": (timezone.now() + timedelta(hours=2)).isoformat(),
@@ -556,7 +557,16 @@ class TestExtraParticipantsEdgeCases:
         assert participations.count() == 1
         assert participations.first().role == "COORDENADOR"
 
-    def test_coord_acompanha_id_creates_participation(
+    @pytest.mark.parametrize(
+        ("chave", "valor"),
+        [
+            ("coord_acompanha_ids", "formador"),
+            ("coord_acompanha_ids", 888888),
+            ("coord_acompanha_emails", "formador_email"),
+            ("coord_acompanha_emails", "guest_coord_x@example.invalid"),
+        ],
+    )
+    def test_coord_acompanha_com_itens_e_recusado(
         self,
         api_client,
         usuario_coordenador,
@@ -564,9 +574,17 @@ class TestExtraParticipantsEdgeCases:
         municipio,
         projeto_super,
         tipo_evento,
+        chave,
+        valor,
     ):
-        """coord_acompanha_ids creates COORD_ACOMPANHA participation (lines 244-253)."""
+        """Decisão do dono (05/10/2026): a lista de coordenadores acompanhantes saiu (ids e e-mails).
+
+        Coordenador que atua entra em `formador_ids`; o responsável responde `coordenador_acompanha`.
+        """
         api_client.force_authenticate(user=usuario_coordenador)
+        item = {"formador": usuario_formador.id, "formador_email": usuario_formador.email.upper()}.get(valor, valor)
+        extra = {"formador_ids": [], "formador_emails": [], "coord_acompanha_ids": [], "coord_acompanha_emails": []}
+        extra[chave] = [item]
 
         response = api_client.post(
             "/api/solicitacoes/",
@@ -574,150 +592,18 @@ class TestExtraParticipantsEdgeCases:
                 "municipio": municipio.id,
                 "projeto": projeto_super.id,
                 "tipo_evento": tipo_evento.id,
+                "coordenador_acompanha": False,
                 "tipo": "PRESENCIAL",
                 "inicio": timezone.now().isoformat(),
                 "fim": (timezone.now() + timedelta(hours=2)).isoformat(),
-                "extra_participants": {
-                    "formador_ids": [],
-                    "formador_emails": [],
-                    "coord_acompanha_ids": [usuario_formador.id],
-                    "coord_acompanha_emails": [],
-                },
+                "extra_participants": extra,
             },
             format="json",
         )
 
-        assert response.status_code == 201
-        sol_id = response.json()["id"]
-
-        # Verify COORD_ACOMPANHA participation was created
-        coord_part = Participation.objects.filter(
-            solicitacao_id=sol_id,
-            usuario=usuario_formador,
-            role="COORD_ACOMPANHA",
-        )
-        assert coord_part.exists()
-
-    def test_coord_acompanha_id_not_found_is_ignored(
-        self,
-        api_client,
-        usuario_coordenador,
-        municipio,
-        projeto_super,
-        tipo_evento,
-    ):
-        """Invalid coord_acompanha_id is silently ignored (lines 252-253)."""
-        api_client.force_authenticate(user=usuario_coordenador)
-
-        response = api_client.post(
-            "/api/solicitacoes/",
-            {
-                "municipio": municipio.id,
-                "projeto": projeto_super.id,
-                "tipo_evento": tipo_evento.id,
-                "tipo": "PRESENCIAL",
-                "inicio": timezone.now().isoformat(),
-                "fim": (timezone.now() + timedelta(hours=2)).isoformat(),
-                "extra_participants": {
-                    "formador_ids": [],
-                    "formador_emails": [],
-                    "coord_acompanha_ids": [888888],  # Non-existent ID
-                    "coord_acompanha_emails": [],
-                },
-            },
-            format="json",
-        )
-
-        assert response.status_code == 201
-        sol_id = response.json()["id"]
-
-        # Only coordinator participation should exist
-        participations = Participation.objects.filter(solicitacao_id=sol_id)
-        assert participations.count() == 1
-
-    def test_coord_acompanha_email_existing_user(
-        self,
-        api_client,
-        usuario_coordenador,
-        usuario_formador,
-        municipio,
-        projeto_super,
-        tipo_evento,
-    ):
-        """coord_acompanha_emails resolves to existing user (lines 257-264)."""
-        api_client.force_authenticate(user=usuario_coordenador)
-
-        response = api_client.post(
-            "/api/solicitacoes/",
-            {
-                "municipio": municipio.id,
-                "projeto": projeto_super.id,
-                "tipo_evento": tipo_evento.id,
-                "tipo": "PRESENCIAL",
-                "inicio": timezone.now().isoformat(),
-                "fim": (timezone.now() + timedelta(hours=2)).isoformat(),
-                "extra_participants": {
-                    "formador_ids": [],
-                    "formador_emails": [],
-                    "coord_acompanha_ids": [],
-                    "coord_acompanha_emails": [usuario_formador.email.upper()],
-                },
-            },
-            format="json",
-        )
-
-        assert response.status_code == 201
-        sol_id = response.json()["id"]
-
-        # Verify resolved to existing user
-        coord_part = Participation.objects.filter(
-            solicitacao_id=sol_id,
-            usuario=usuario_formador,
-            role="COORD_ACOMPANHA",
-        )
-        assert coord_part.exists()
-
-    def test_coord_acompanha_email_guest(
-        self,
-        api_client,
-        usuario_coordenador,
-        municipio,
-        projeto_super,
-        tipo_evento,
-    ):
-        """coord_acompanha_emails creates guest participation (lines 265-271)."""
-        api_client.force_authenticate(user=usuario_coordenador)
-        guest_email = f"guest_coord_{uuid4().hex[:8]}@external.com"
-
-        response = api_client.post(
-            "/api/solicitacoes/",
-            {
-                "municipio": municipio.id,
-                "projeto": projeto_super.id,
-                "tipo_evento": tipo_evento.id,
-                "tipo": "PRESENCIAL",
-                "inicio": timezone.now().isoformat(),
-                "fim": (timezone.now() + timedelta(hours=2)).isoformat(),
-                "extra_participants": {
-                    "formador_ids": [],
-                    "formador_emails": [],
-                    "coord_acompanha_ids": [],
-                    "coord_acompanha_emails": [guest_email],
-                },
-            },
-            format="json",
-        )
-
-        assert response.status_code == 201
-        sol_id = response.json()["id"]
-
-        # Verify guest participation with role COORD_ACOMPANHA
-        guest_part = Participation.objects.filter(
-            solicitacao_id=sol_id,
-            guest_email=guest_email.lower(),
-            role="COORD_ACOMPANHA",
-        )
-        assert guest_part.exists()
+        assert response.status_code == 400, response.data
+        assert chave in response.json()["errors"]
+        assert not Participation.objects.filter(role="COORD_ACOMPANHA").exists()
 
 
 # ============================================================

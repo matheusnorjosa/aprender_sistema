@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from apps.core.services.export_contract_projeto_resolver import resolve_projeto_export
+from apps.core.services.export_contract_projeto_resolver import resolve_projeto_agenda, resolve_projeto_export
 from apps.core.tests.factories import ProjetoFactory
 
 pytestmark = pytest.mark.django_db
@@ -223,3 +223,64 @@ def test_sem_match_retorna_unmatched(catalogo):
 def test_vazio_retorna_unmatched(catalogo):
     res = resolve_projeto_export("")
     assert res.status == "unmatched"
+
+
+# ---------- nomes antigos que não existem mais em prod (decisão do dono, 05/10) ----------
+@pytest.fixture
+def catalogo_pos_renomeacao_05_10():
+    """Prod depois dos scripts de 05/10: os nomes antigos foram apagados/renomeados."""
+    nomes = [
+        "ECS",
+        "ED FINANCEIRA 1",
+        "ED FINANCEIRA 2",
+        "ED FINANCEIRA 3",
+        "ED FINANCEIRA 4",
+        "PROJETO AMMA 1",
+        "PROJETO AMMA 2",
+    ]
+    return {n: ProjetoFactory(nome=n, fluxo="NAO_SUPER") for n in nomes}
+
+
+@pytest.mark.parametrize(
+    ("raw", "esperado"),
+    [
+        ("ESCREVER, COMUNICAR E SER", "ECS"),
+        ("ESCREVER COMUNICAR E SER", "ECS"),
+        ("EDUCAÇÃO FINANCEIRA LIVRO 1", "ED FINANCEIRA 1"),
+        ("EDUCAÇÃO FINANCEIRA LIVRO 2", "ED FINANCEIRA 2"),
+        ("EDUCAÇÃO FINANCEIRA LIVRO 3", "ED FINANCEIRA 3"),
+        ("EDUCACAO FINANCEIRA LIVRO 4", "ED FINANCEIRA 4"),
+        ("APRENDENDO MAIS MATEMÁTICA 1", "PROJETO AMMA 1"),
+        ("APRENDENDO MAIS MATEMATICA 2", "PROJETO AMMA 2"),
+    ],
+)
+def test_nome_antigo_cai_no_nome_de_prod(catalogo_pos_renomeacao_05_10, raw, esperado):
+    # Sem o apelido o nome antigo vira `unmatched` e o master `projeto` de um pacote velho o recriaria.
+    res = resolve_projeto_export(raw)
+    assert res.status == "matched", f"{raw!r} -> {res.status} ({res.reason})"
+    assert res.projeto.nome == esperado
+    assert res.matched_via == "alias"
+
+
+def test_nome_antigo_ainda_no_catalogo_vence_o_apelido(db):
+    # Antes do script que apaga o projeto antigo, o nome exato continua casando nele.
+    antigo = ProjetoFactory(nome="ESCREVER COMUNICAR E SER", fluxo="NAO_SUPER")
+    ProjetoFactory(nome="ECS", fluxo="NAO_SUPER")
+    res = resolve_projeto_export("ESCREVER, COMUNICAR E SER")
+    assert res.projeto == antigo
+
+
+# ---------- agenda: agrupador + disciplina (decisão do dono P8, 05/10) ----------
+def test_disciplina_sem_projeto_da_disciplina_fica_no_agrupador(db):
+    agrupador = ProjetoFactory(nome="Superativar", fluxo="NAO_SUPER")
+    res = resolve_projeto_agenda("Superativar", "LING")
+    assert res.projeto == agrupador, "alvo ausente do catálogo nunca vira unmatched"
+    assert res.matched_via == "norm"
+
+
+def test_disciplina_marca_a_origem_do_match(db):
+    ProjetoFactory(nome="ACerta", fluxo="NAO_SUPER")
+    ProjetoFactory(nome="ACerta Português", fluxo="NAO_SUPER")
+    res = resolve_projeto_agenda("ACerta", "ling")
+    assert res.projeto.nome == "ACerta Português"
+    assert res.matched_via == "disciplina"

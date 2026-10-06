@@ -16,6 +16,9 @@ vem do export-contract para um `Projeto` existente, fechando os resíduos de for
    - `Fluir das Emoções` -> `Fluir das Emoções (Antigo)` (rename decidido pelo dono em 02/10/2026;
      `Fluir das Emoções - 1/2/3` têm chave própria e não passam pelo apelido)
    - `Brincando e Aprendendo Professor` -> `Brincando e Aprendendo`
+   - nomes antigos apagados/renomeados em prod (decisão do dono em 05/10/2026):
+     `Escrever, Comunicar e Ser` -> `ECS`; `Educação Financeira Livro N` -> `ED FINANCEIRA N` (N=1..4);
+     `Aprendendo Mais Matemática N` -> `PROJETO AMMA N` (N=1,2)
 
 Precedência: nome exato (norm) > chave canônica > alias. O nome que existe no catálogo, em
 qualquer grafia, vence o alias; o alias só vale para nome que o catálogo não tem. Consequência,
@@ -41,7 +44,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from apps.core.models import Projeto
 
@@ -65,6 +68,16 @@ _SCOPED_ALIASES: dict[str, str] = {
     "FLUIR DAS EMOCOES": "FLUIR DAS EMOCOES (ANTIGO)",
     # E1 (merge já aplicado no catálogo)
     "BRINCANDO E APRENDENDO PROFESSOR": "BRINCANDO E APRENDENDO",
+    # Nomes antigos que não existem mais em prod (decisão do dono, 05/10/2026), 1 para 1. Sem eles um
+    # pacote antigo recriaria o projeto. A chave canônica já tira a vírgula de "ESCREVER, COMUNICAR E SER"
+    # e o prefixo de "PROJETO AMMA n".
+    "ESCREVER COMUNICAR E SER": "ECS",
+    "EDUCACAO FINANCEIRA LIVRO 1": "ED FINANCEIRA 1",
+    "EDUCACAO FINANCEIRA LIVRO 2": "ED FINANCEIRA 2",
+    "EDUCACAO FINANCEIRA LIVRO 3": "ED FINANCEIRA 3",
+    "EDUCACAO FINANCEIRA LIVRO 4": "ED FINANCEIRA 4",
+    "APRENDENDO MAIS MATEMATICA 1": "AMMA 1",
+    "APRENDENDO MAIS MATEMATICA 2": "AMMA 2",
 }
 
 
@@ -74,7 +87,7 @@ class ProjetoResolution:
 
     status: str
     projeto: Projeto | None = None
-    matched_via: str = ""  # "norm" | "alias" | "canon_rule"
+    matched_via: str = ""  # "norm" | "alias" | "canon_rule" | "disciplina"
     canonical_key: str = ""
     candidates: list[str] = field(default_factory=list)
     reason: str = ""
@@ -187,3 +200,27 @@ def resolve_projeto_export(raw_name: str, *, index: ProjetoIndex | None = None) 
         )
 
     return ProjetoResolution(status="unmatched", canonical_key=ck, reason="nenhum projeto correspondente")
+
+
+# ── Agenda: agrupador + disciplina (decisão do dono P8, 05/10/2026) ──
+# (chave canônica do agrupador, disciplina do export) -> nome do projeto da disciplina. Disciplina dupla
+# (LING-MAT), vazia ou de público não está aqui: o evento fica no agrupador. Só Superativar e ACerta.
+_AGRUPADOR_POR_DISCIPLINA: dict[tuple[str, str], str] = {
+    ("SUPERATIVAR", "LING"): "Superativar Linguagens",
+    ("SUPERATIVAR", "MAT"): "Superativar Matemática",
+    ("ACERTA", "LING"): "ACerta Português",
+    ("ACERTA", "MAT"): "ACerta Matemática",
+}
+
+
+def resolve_projeto_agenda(raw_name: str, disciplina: str, *, index: ProjetoIndex | None = None) -> ProjetoResolution:
+    """Resolve o projeto de um evento da agenda. Agrupador (Superativar/ACerta) com disciplina única
+    (`LING`/`MAT`) vai para o projeto da disciplina; o resto segue `resolve_projeto_export`. Se o projeto
+    da disciplina não existir no catálogo, o evento fica no agrupador (nunca `unmatched` por causa disto)."""
+    idx = index or build_projeto_index()
+    alvo = _AGRUPADOR_POR_DISCIPLINA.get((_canon_key(raw_name), (disciplina or "").strip().upper()))
+    if alvo:
+        res = resolve_projeto_export(alvo, index=idx)
+        if res.status == "matched":
+            return replace(res, matched_via="disciplina", reason="agrupador classificado pela disciplina")
+    return resolve_projeto_export(raw_name, index=idx)

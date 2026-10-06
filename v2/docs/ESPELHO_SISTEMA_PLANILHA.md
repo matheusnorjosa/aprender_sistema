@@ -46,17 +46,17 @@ Rótulos, como na `REFERENCIA-DOMINIO.md`: **MEDIDO** (contado no código/banco,
 
 ### 1.1 Hierarquia de produto
 
-**MEDIDO** (`models/organizacao.py`, FKs): `ProjetoGeral` → `Projeto` → `Coleção` → `Produto`.
+**MEDIDO** (`models/organizacao.py`, FKs): `ProjetoGeral` → `Projeto` → `Produto`. Na tela, `ProjetoGeral` se chama **Coleção** (decisão do dono, 06/10/2026).
 
 - `Projeto.projeto_geral` → `ProjetoGeral` (família); `Projeto.gerencia` → `Gerencia` (o setor).
-- `Colecao.projeto` → `Projeto`; `Produto.projeto` + `Produto.colecao`.
+- `Produto.projeto` → `Projeto`.
 - `Produto` carrega o tipo (Aluno/Professor) que alimenta o cálculo de códigos do DAT.
 
-> ⚠️ **Alinhamento com a `REFERENCIA-DOMINIO.md`:** do lado da planilha, `Coleção`
-> **não é** nível da hierarquia (`produto.colecao` vazio 784/784) e significa **edição
-> anual do material**. No sistema, `Colecao` é um model **vivo** (endpoint de import +
-> FK `Produto.colecao` + leitura no dashboard DAT, §3), mas hoje sem dado. Não construir
-> regra de negócio sobre `Colecao` até o significado "edição anual" estar modelado.
+> ⚠️ **Coleção = família (decisão do dono, P1, 05/10/2026):** coleção é a obra, que no sistema
+> é o `ProjetoGeral`. O model `Colecao` e a FK `Produto.colecao` (vazios em produção) saíram na
+> migração 0118, com o import `POST /api/colecoes/import/`; os cards "Coleções ativas" e
+> "Quantidade por Coleção" do dashboard de compras contam a família do projeto da compra. Do
+> lado da planilha, `produto.colecao` já vinha vazio (784/784).
 
 ### 1.2 Identidade das pessoas — três camadas independentes
 
@@ -145,7 +145,7 @@ Registro durável da verificação adversarial de 2026-08-26 (11 afirmações de
 |---|---|
 | "~20 classes RBAC mortas" | **load-bearing.** `test_every_matrix_key_has_policy_class` (`test_rbac_policies.py`) obriga uma classe `Can*` por key de `ACCESS_POLICIES`; `GET /api/me/policies/` (`MePoliciesView` em `views/me.py`, rota `me-policies` em `urls.py`) é **contrato público do frontend**. Apagar quebra o teste **e** o contrato |
 | "`RegistroConclusaoAcao`/`RegistroAncora` mortos" | **vivos** — persistência de dois endpoints; a view chama o **método** do model (`.registrar_ancora()`, `.concluir()`), não o nome da classe |
-| "`Colecao` nunca exposto" | **vivo** — `POST /api/colecoes/import/` + FK `Produto.colecao` + dashboard DAT |
+| "`Colecao` nunca exposto" | era vivo (import + FK + dashboard); **removido em 06/10/2026**: coleção é a família (`ProjetoGeral`), migração 0118 |
 | "`FeriadoLocal` nunca usado" | **vivo** — query em runtime (`get_holidays` em `business_calendar_service.py`), admin, Celery de notificações |
 | "varrer os 6 scripts atrás de de-para hardcoded antes de apagar" | **não há** `SETOR_DO_PROJETO`; o único alias (`IDEB`→Gestão Escolar) já vive em `normalize_projeto_name` (`resolvers.py`). Os 6 scripts são **seguros de remover** |
 

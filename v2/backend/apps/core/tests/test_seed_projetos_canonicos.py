@@ -93,3 +93,12 @@ def test_command_idempotent(g1):
     before = Projeto.objects.count()
     call_command("seed_projetos_canonicos")
     assert Projeto.objects.count() == before  # 2a run nao duplica
+
+
+def test_seed_nao_recria_os_duplicados_apagados(g1):
+    """#19 'NL e AMMA Português e Matemática' e #9 'Educação Financeira' foram apagados (decisão do dono,
+    06/10/2026): o canônico é o nome que o export manda. O seed não pode trazê-los de volta."""
+    ProjetoFactory(nome="ED FINANCEIRA", fluxo="NAO_SUPER")
+    ProjetoFactory(nome="NL E AMMA PORT E MAT", fluxo="SUPER", gerencia=g1)
+    call_command("seed_projetos_canonicos")
+    assert not Projeto.objects.filter(nome__in=["Educação Financeira", "NL e AMMA Português e Matemática"]).exists()

@@ -37,7 +37,8 @@ PROJETOS_CANONICOS: list[tuple[str, str]] = [
     ("Brincando e Aprendendo", "NAO_SUPER"),
     ("Cirandar", "SUPER"),
     ("ECS", "NAO_SUPER"),
-    ("Educação Financeira", "NAO_SUPER"),
+    # Nome do export (decisão do dono, 06/10/2026): o duplicado "Educação Financeira" foi apagado.
+    ("ED FINANCEIRA", "NAO_SUPER"),
     ("Fluir das Emoções", "NAO_SUPER"),
     ("Fluir das Emoções 1", "NAO_SUPER"),
     ("Fluir das Emoções 2", "NAO_SUPER"),
@@ -51,7 +52,8 @@ PROJETOS_CANONICOS: list[tuple[str, str]] = [
     ("Lendo e Escrevendo", "SUPER"),
     ("Ler, Ouvir e Contar", "SUPER"),
     ("My Companion", "NAO_SUPER"),
-    ("NL e AMMA Português e Matemática", "SUPER"),
+    # Nome do export (decisão do dono, 06/10/2026): o duplicado "NL e AMMA Português e Matemática" foi apagado.
+    ("NL E AMMA PORT E MAT", "SUPER"),
     ("Novo Lendo", "SUPER"),
     ("Projeto Amma", "SUPER"),
     ("Projeto Amma 1", "SUPER"),

@@ -665,6 +665,9 @@ def _payload(municipio, projeto, tipo_evento) -> dict:
         "municipio": municipio.id,
         "projeto": projeto.id if projeto else None,
         "tipo_evento": tipo_evento.id,
+        "coordenador_acompanha": False,
+        # 05/10/2026: quem cria sem a função Coordenador informa o responsável.
+        "coordenador": UsuarioFactory(groups=["Coordenador"]).id,
         "tipo": "PRESENCIAL",
         "inicio": inicio.isoformat(),
         "fim": (inicio + timedelta(hours=2)).isoformat(),

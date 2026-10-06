@@ -22,7 +22,10 @@ import Typography from 'antd/es/typography';
 import Spin from 'antd/es/spin';
 import Checkbox from 'antd/es/checkbox';
 import Result from 'antd/es/result';
+import Radio from 'antd/es/radio';
+import Select from 'antd/es/select';
 import type { CheckboxChangeEvent } from 'antd/es/checkbox';
+import type { RadioChangeEvent } from 'antd/es/radio';
 // icons - direct imports for tree-shaking (Issue #425)
 import ArrowLeftOutlined from '@ant-design/icons/ArrowLeftOutlined';
 import SaveOutlined from '@ant-design/icons/SaveOutlined';
@@ -54,11 +57,19 @@ const { Title, Text } = Typography;
 
 const RANGE_TIMEZONE = 'America/Fortaleza';
 
+/** Opções das perguntas Sim/Não (decisão do dono, 05/10/2026). */
+const SIM_NAO = [
+  { label: 'Sim', value: true },
+  { label: 'Não', value: false },
+];
+
 /** ComboBox value type */
 interface ComboBoxValue {
   id: ID;
   label: string;
   fluxo?: string;
+  /** Projeto: a gerência usa a pergunta "pretende avaliar o formador?". */
+  pergunta_avaliar_formador?: boolean;
 }
 
 /** Formador type */
@@ -66,6 +77,8 @@ interface FormadorType {
   id: ID;
   label: string;
   email?: string;
+  /** Função Formador sem a função Coordenador: pode ser avaliado. */
+  avaliavel?: boolean;
 }
 
 /** Form data type */
@@ -82,6 +95,10 @@ interface FormDataType {
   local: string;
   is_online: boolean;
   formadores: FormadorType[];
+  coordenadorAcompanha: boolean;
+  /** null = não informado (eventos antigos) ou pergunta que não se aplica. */
+  pretendeAvaliar: boolean | null;
+  formadorAvaliado: ID | null;
 }
 
 /** Range value type */
@@ -128,6 +145,9 @@ export default function EditSolicitacaoPage(): JSX.Element {
     local: '',
     is_online: false,
     formadores: [],
+    coordenadorAcompanha: false,
+    pretendeAvaliar: null,
+    formadorAvaliado: null,
   });
 
   // Carregar dados da solicitação
@@ -138,7 +158,8 @@ export default function EditSolicitacaoPage(): JSX.Element {
         const data = await getSolicitacao(Number(id));
         setSolicitacao(data);
 
-        // Extrair formadores das participations
+        // Extrair formadores das participations (avaliável = está em `avaliaveis_ids` do detalhe)
+        const avaliaveis = new Set(data.avaliaveis_ids ?? []);
         const formadores: FormadorType[] = (data.participations || [])
           .filter((p: Participation) => p.role === 'FORMADOR' && p.usuario)
           .map((p: Participation) => ({
@@ -147,11 +168,18 @@ export default function EditSolicitacaoPage(): JSX.Element {
               ? `${p.usuario!.first_name} ${p.usuario!.last_name}`.trim()
               : p.usuario!.username,
             email: p.usuario!.email,
+            avaliavel: avaliaveis.has(p.usuario!.id),
           }));
 
         // Preencher o formData com os dados existentes
         setFormData({
-          projeto: data.projeto ? { id: data.projeto, label: data.projeto_nome || '' } : null,
+          projeto: data.projeto
+            ? {
+                id: data.projeto,
+                label: data.projeto_nome || '',
+                pergunta_avaliar_formador: data.projeto_pergunta_avaliar_formador ?? true,
+              }
+            : null,
           tipoEvento: data.tipo_evento ? { id: data.tipo_evento, label: data.tipo_evento_nome || '' } : null,
           municipio: data.municipio ? { id: data.municipio, label: data.municipio_nome || '' } : null,
           inicio: data.inicio,
@@ -163,6 +191,9 @@ export default function EditSolicitacaoPage(): JSX.Element {
           local: data.local || '',
           is_online: data.is_online || false,
           formadores,
+          coordenadorAcompanha: data.coordenador_acompanha,
+          pretendeAvaliar: data.pretende_avaliar_formador ?? null,
+          formadorAvaliado: data.formador_avaliado ?? null,
         });
 
         // Preencher o form do Ant Design
@@ -231,6 +262,28 @@ export default function EditSolicitacaoPage(): JSX.Element {
     };
   }, [formData.inicio, formData.fim]);
 
+  // "Você pretende avaliar o formador?" só quando a gerência do projeto pergunta e há formador
+  // avaliável na lista (mesma regra do backend, decisão do dono de 05/10/2026).
+  const formadoresAvaliaveis = formData.formadores.filter(f => f.avaliavel);
+  const perguntaAvaliar = formData.projeto?.pergunta_avaliar_formador !== false && formadoresAvaliaveis.length > 0;
+  // Resposta obrigatória (mesma regra do backend): quem já respondeu, ou evento em que a pergunta
+  // passa a valer agora. Só o evento antigo (pergunta já valia, sem resposta) segue "Não informado".
+  const avaliarAplicavaAoCarregar =
+    solicitacao !== null &&
+    solicitacao.projeto_pergunta_avaliar_formador !== false &&
+    (solicitacao.avaliaveis_ids ?? []).length > 0;
+  const avaliarObrigatoria =
+    perguntaAvaliar && (solicitacao?.pretende_avaliar_formador != null || !avaliarAplicavaAoCarregar);
+
+  // Trocar a lista de formadores: se o escolhido para avaliação saiu, a escolha é limpa.
+  const handleFormadoresChange = (value: FormadorType[]): void => {
+    setFormData(prev => ({
+      ...prev,
+      formadores: value,
+      formadorAvaliado: value.some(f => f.avaliavel && f.id === prev.formadorAvaliado) ? prev.formadorAvaliado : null,
+    }));
+  };
+
   // Submit
   const handleSubmit = async (): Promise<void> => {
     setSaving(true);
@@ -269,6 +322,18 @@ export default function EditSolicitacaoPage(): JSX.Element {
         return;
       }
 
+      if (avaliarObrigatoria && formData.pretendeAvaliar === null) {
+        message.error('Informe se você pretende avaliar o formador neste evento.');
+        setSaving(false);
+        return;
+      }
+
+      if (perguntaAvaliar && formData.pretendeAvaliar === true && formData.formadorAvaliado === null) {
+        message.error('Escolha qual formador você pretende avaliar.');
+        setSaving(false);
+        return;
+      }
+
       const payload = {
         municipio: formData.municipio.id,
         projeto: formData.projeto.id,
@@ -281,6 +346,13 @@ export default function EditSolicitacaoPage(): JSX.Element {
         observacoes: optionalText(formData.observacoes),
         local: formData.local || '',
         is_online: !!formData.is_online,
+        coordenador_acompanha: formData.coordenadorAcompanha,
+        // Pergunta que não se aplica: a resposta não vai (a gravada fica; o backend recusa
+        // apagá-la e recusa tirar da lista o formador escolhido).
+        ...(perguntaAvaliar && {
+          pretende_avaliar_formador: formData.pretendeAvaliar,
+          formador_avaliado: formData.pretendeAvaliar === true ? formData.formadorAvaliado : null,
+        }),
         extra_participants: {
           formador_ids: formadores.map(f => f.id),
         },
@@ -445,9 +517,61 @@ export default function EditSolicitacaoPage(): JSX.Element {
           >
             <FormadoresPicker
               value={formData.formadores}
-              onChange={(value: FormadorType[]) => setFormData({ ...formData, formadores: value })}
+              onChange={handleFormadoresChange}
             />
           </Form.Item>
+
+          <Form.Item label="Coordenador responsável">
+            <Text>{solicitacao?.coordenador_nome || 'Não informado'}</Text>
+          </Form.Item>
+
+          <Form.Item
+            label={<span id="edit-pergunta-acompanha">O coordenador responsável vai acompanhar o evento?</span>}
+            extra="Se Sim, a agenda do coordenador responsável é conferida como a dos formadores."
+          >
+            <Radio.Group
+              // role e aria-* vão ao <div> do grupo (o tipo do antd não declara role)
+              {...{ role: 'radiogroup' }}
+              aria-labelledby="edit-pergunta-acompanha"
+              name="coordenador_acompanha"
+              options={SIM_NAO}
+              value={formData.coordenadorAcompanha}
+              onChange={(e: RadioChangeEvent) =>
+                setFormData(prev => ({ ...prev, coordenadorAcompanha: e.target.value as boolean }))
+              }
+            />
+          </Form.Item>
+
+          {perguntaAvaliar && (
+            <Form.Item
+              label={<span id="edit-pergunta-avaliar">Você pretende avaliar o formador nesse evento?</span>}
+              required={avaliarObrigatoria}
+              extra={formData.pretendeAvaliar === null && !avaliarObrigatoria ? 'Não informado' : undefined}
+            >
+              <Radio.Group
+                {...{ role: 'radiogroup' }}
+                aria-labelledby="edit-pergunta-avaliar"
+                name="pretende_avaliar_formador"
+                options={SIM_NAO}
+                value={formData.pretendeAvaliar}
+                onChange={(e: RadioChangeEvent) =>
+                  setFormData(prev => ({ ...prev, pretendeAvaliar: e.target.value as boolean }))
+                }
+              />
+            </Form.Item>
+          )}
+
+          {perguntaAvaliar && formData.pretendeAvaliar === true && (
+            <Form.Item label="Qual formador você pretende avaliar?" htmlFor="edit-formador-avaliado">
+              <Select
+                id="edit-formador-avaliado"
+                placeholder="Escolha um formador"
+                {...(formData.formadorAvaliado !== null && { value: formData.formadorAvaliado })}
+                options={formadoresAvaliaveis.map(f => ({ value: f.id, label: f.label }))}
+                onChange={(value: ID) => setFormData(prev => ({ ...prev, formadorAvaliado: value }))}
+              />
+            </Form.Item>
+          )}
 
           <DateTimeRange
             value={rangeValue}

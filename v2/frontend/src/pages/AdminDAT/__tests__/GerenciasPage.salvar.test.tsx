@@ -88,6 +88,24 @@ describe('GerenciasPage: salvar e excluir (C2)', () => {
     erro.mockRestore();
   }, 40000);
 
+  test('a marca "pergunta se pretende avaliar o formador" vai no payload (decisão do dono, 05/10/2026)', async () => {
+    vi.mocked(updateGerencia).mockResolvedValue({ ...GERENCIAS[0]!, pergunta_avaliar_formador: false });
+    const user = userEvent.setup();
+    renderPage();
+
+    const modal = await abrirEditar(user);
+    const marca = within(modal).getByRole('checkbox', {
+      name: 'Perguntar, na Nova Solicitação, se a pessoa pretende avaliar o formador',
+    });
+    expect(marca).toBeChecked();
+    await user.click(marca);
+    await user.click(within(modal).getByRole('button', { name: 'Salvar' }));
+
+    await waitFor(() =>
+      expect(updateGerencia).toHaveBeenCalledWith(7, expect.objectContaining({ pergunta_avaliar_formador: false })),
+    );
+  }, 40000);
+
   test('Salvar fica em loading enquanto a API trabalha', async () => {
     vi.mocked(updateGerencia).mockReturnValue(new Promise(() => undefined));
     const user = userEvent.setup();

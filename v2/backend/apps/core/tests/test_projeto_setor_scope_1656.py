@@ -97,6 +97,7 @@ def _payload(municipio, projeto, tipo_evento):
         "municipio": municipio.id,
         "projeto": projeto.id,
         "tipo_evento": tipo_evento.id,
+        "coordenador_acompanha": False,
         "tipo": "PRESENCIAL",
         "inicio": inicio.isoformat(),
         "fim": (inicio + timedelta(hours=2)).isoformat(),
@@ -127,9 +128,9 @@ class TestCreateProjetoScope:
 class TestPrivilegedExemptProjeto:
     def test_superuser_may_use_cross_setor_projeto(self, projetos, municipio, tipo_evento):
         su = UsuarioFactory(username="su_proj_1656", cpf=str(next(_CPF)), superuser=True)
-        resp = _client(su).post(
-            "/api/solicitacoes/", _payload(municipio, projetos["fluir"], tipo_evento), format="json"
-        )
+        payload = _payload(municipio, projetos["fluir"], tipo_evento)
+        payload["coordenador"] = UsuarioFactory(groups=["Coordenador"]).id  # 05/10/2026: responsável obrigatório
+        resp = _client(su).post("/api/solicitacoes/", payload, format="json")
         assert resp.status_code == 201, resp.data
 
 

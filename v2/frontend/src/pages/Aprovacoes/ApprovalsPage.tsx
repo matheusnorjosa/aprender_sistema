@@ -21,7 +21,7 @@
  * - Conformidade ISO 9241-110: Controle explícito (usuário vê apenas ações permitidas)
  */
 
-import { useState, useEffect, useCallback, useMemo, useRef, ChangeEvent, Key, JSX } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, ChangeEvent, Key, JSX, CSSProperties } from 'react';
 import {
   Alert,
   Table,
@@ -135,6 +135,10 @@ interface PreviewDataType {
     meet_link?: string;
   };
 }
+
+// Célula de duas linhas: o `ellipsis` da coluna só corta texto simples, então cada linha corta a si mesma
+// e mostra o texto inteiro no title (achado da revisão do PR-2, 05/10/2026).
+const UMA_LINHA: CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 
 export default function ApprovalsPage(): JSX.Element {
   const [loading, setLoading] = useState<boolean>(false);
@@ -501,7 +505,14 @@ export default function ApprovalsPage(): JSX.Element {
       title: 'Coordenador',
       dataIndex: 'coordenador_nome',
       key: 'coordenador_nome',
-      render: (nome: string | null) => nome || '-',
+      // 05/10/2026: a resposta "acompanha?" vai numa 2ª linha da mesma célula — sem coluna nova,
+      // para não alargar a tabela (a rolagem lateral desta tela já está na fila).
+      render: (nome: string | null, record) => (
+        <div style={{ lineHeight: 1.3 }}>
+          <div style={UMA_LINHA} title={nome || undefined}>{nome || '-'}</div>
+          <small className="text-gray-500">{record.coordenador_acompanha ? 'Acompanha' : 'Não acompanha'}</small>
+        </div>
+      ),
       width: 130,
       ellipsis: true,
     },
@@ -510,7 +521,20 @@ export default function ApprovalsPage(): JSX.Element {
       dataIndex: 'participations',
       key: 'formadores',
       // Nome do formador (inclui convidados "que saíram" via guest_nome — sem FK). Ver utils/participants.
-      render: (participations: Participation[] | undefined) => formadoresLabel(participations) || '-',
+      // 2ª linha: "pretende avaliar o formador?" (05/10/2026); sem resposta (antigas), nada.
+      render: (participations: Participation[] | undefined, record) => (
+        <div style={{ lineHeight: 1.3 }}>
+          <div style={UMA_LINHA} title={formadoresLabel(participations) || undefined}>
+            {formadoresLabel(participations) || '-'}
+          </div>
+          {record.pretende_avaliar_formador === true && (
+            <small className="text-gray-500" style={{ ...UMA_LINHA, display: 'block' }} title={record.formador_avaliado_nome || undefined}>
+              Pretende avaliar: {record.formador_avaliado_nome || '-'}
+            </small>
+          )}
+          {record.pretende_avaliar_formador === false && <small className="text-gray-500">Não pretende avaliar</small>}
+        </div>
+      ),
       width: 150,
       ellipsis: true,
     },

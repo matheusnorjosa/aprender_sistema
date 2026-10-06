@@ -468,6 +468,7 @@ def test_config_buffer_exibido_e_o_aplicado_no_rd04(
         inicio=fim_anterior - timedelta(hours=1),
         fim=fim_anterior,
         status="aprovado",
+        coordenador_acompanha=True,  # 05/10/2026: o coordenador só ocupa a agenda quando acompanha
     )
     outra_cidade = MunicipioFactory()
     assert "D" not in _codigos(dat_user, fim_anterior + timedelta(minutes=exibido), 30, outra_cidade)
@@ -500,7 +501,13 @@ def test_config_buffer_salvo_vale_ja_na_checagem_consultiva_com_cache(client: AP
     client.force_authenticate(user=dat_user)
 
     fim_anterior = timezone.now().replace(hour=8, minute=0, second=0, microsecond=0) + timedelta(days=7)
-    SolicitacaoFactory(usuario=dat_user, inicio=fim_anterior - timedelta(hours=1), fim=fim_anterior, status="aprovado")
+    SolicitacaoFactory(
+        usuario=dat_user,
+        inicio=fim_anterior - timedelta(hours=1),
+        fim=fim_anterior,
+        status="aprovado",
+        coordenador_acompanha=True,
+    )
     inicio = fim_anterior + timedelta(minutes=90)  # 90 min depois, em outra cidade
     consulta = {
         "usuario_id": dat_user.id,

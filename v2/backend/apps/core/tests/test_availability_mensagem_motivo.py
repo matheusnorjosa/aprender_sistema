@@ -232,6 +232,7 @@ class TestMensagemDizMotivoEAcao:
             {
                 "municipio": municipio.pk,
                 "tipo_evento": tipo_evento.pk,
+                "coordenador_acompanha": False,
                 "inicio": INICIO.isoformat(),
                 "fim": FIM.isoformat(),
                 "extra_participants": {"formador_ids": [formador.pk]},

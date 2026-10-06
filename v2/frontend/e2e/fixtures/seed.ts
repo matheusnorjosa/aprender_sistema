@@ -90,6 +90,11 @@ export interface SeedSolicitacaoInput {
   fim?: string;
   /** IDs de formadores que participam. Default: nenhum. */
   formadorIds?: number[];
+  /**
+   * Coordenador responsável (FK `coordenador`). Default: quem cria, se tem a função Coordenador;
+   * senão o primeiro coordenador que o lookup oferece (decisão do dono, 05/10/2026).
+   */
+  coordenadorId?: number;
 }
 
 export interface SeededSolicitacao {
@@ -146,11 +151,16 @@ export async function seedSolicitacao(
     tipo_evento: tipoEventoId,
     inicio,
     fim,
+    // 05/10/2026: resposta obrigatória na criação; "Não" = a agenda do responsável não é conferida.
+    coordenador_acompanha: false,
   };
+  if (input.coordenadorId !== undefined) payload.coordenador = input.coordenadorId;
   if (input.formadorIds?.length) {
     // Backend espera `extra_participants: { formador_ids: [...] }` — ver
     // views_solicitacao.py::perform_create (PR15).
     payload.extra_participants = { formador_ids: input.formadorIds };
+    // Com formador avaliável a pergunta "pretende avaliar o formador?" é obrigatória.
+    payload.pretende_avaliar_formador = false;
   }
 
   // Retry loop: se receber 400 `availability_conflict` (RD-01 overlap),
@@ -169,6 +179,16 @@ export async function seedSolicitacao(
     }
     lastStatus = res.status();
     lastBody = await res.text();
+    // Quem cria sem a função Coordenador precisa informar o responsável: usa o 1º do lookup.
+    if (res.status() === 400 && lastBody.includes('"coordenador"') && payload.coordenador === undefined) {
+      payload.coordenador = await findCoordenadorId(api);
+      continue;
+    }
+    // Formador não avaliável (ex.: coordenador na lista): a pergunta não se aplica.
+    if (res.status() === 400 && lastBody.includes('pretende_avaliar_formador') && payload.pretende_avaliar_formador === false) {
+      delete payload.pretende_avaliar_formador;
+      continue;
+    }
     if (res.status() !== 400 || !lastBody.includes('availability_conflict')) {
       break;
     }
@@ -187,6 +207,14 @@ export async function seedSolicitacao(
 
   expect(false, `[seed] POST /api/solicitacoes falhou após ${maxAttempts} tentativas: ${lastStatus} ${lastBody}`).toBeTruthy();
   throw new Error('unreachable');
+}
+
+async function findCoordenadorId(api: APIRequestContext): Promise<number> {
+  const res = await api.get('/api/lookup/usuarios/?role=Coordenador');
+  expect(res.ok(), `[seed] lookup coordenadores falhou (${res.status()})`).toBeTruthy();
+  const list = (await res.json()) as Array<{ id: number }>;
+  expect(list.length, '[seed] nenhum coordenador para ser o responsável').toBeGreaterThan(0);
+  return list[0]!.id;
 }
 
 async function findProjetoId(api: APIRequestContext, nome: string): Promise<number> {

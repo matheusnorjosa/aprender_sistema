@@ -5,7 +5,7 @@
  *
  * Passos:
  * 1. Informações Básicas (projeto, tipo, município, data/hora)
- * 2. Participantes (formadores com badges de disponibilidade)
+ * 2. Participantes (formadores, coordenador responsável e as perguntas de acompanhar/avaliar)
  * 3. Detalhes Adicionais (tipo, encontro, segmento, observações)
  * 4. Revisão e Confirmação
  */
@@ -25,6 +25,9 @@ import Descriptions from 'antd/es/descriptions';
 import Tag from 'antd/es/tag';
 import Checkbox from 'antd/es/checkbox';
 import type { CheckboxChangeEvent } from 'antd/es/checkbox';
+import Radio from 'antd/es/radio';
+import type { RadioChangeEvent } from 'antd/es/radio';
+import Select from 'antd/es/select';
 // icons - direct imports for tree-shaking (Issue #425)
 import FileTextOutlined from '@ant-design/icons/FileTextOutlined';
 import TeamOutlined from '@ant-design/icons/TeamOutlined';
@@ -49,7 +52,6 @@ import { useAvailabilityPreview, type PreviewParticipant } from '../../hooks/use
 import DateTimeRange from '../../components/DateTimeRange';
 import ComboBox from '../../components/ComboBox';
 import FormadoresPicker from '../../components/FormadoresPicker';
-import CoordenadoresPicker from '../../components/CoordenadoresPicker';
 import AvailabilityConflictAlert, { AvisosDeAgenda } from '../../components/AvailabilityConflictAlert';
 import logger from '../../utils/logger';
 import type { ID, FluxoType, BlockedParticipant, AvailabilityConflictErrorPayload } from '../../types';
@@ -67,19 +69,29 @@ const lookupCoordenadores = (q: string): Promise<Array<{ id: ID; label: string }
 
 const RANGE_TIMEZONE = 'America/Fortaleza';
 
+/** Opções das perguntas Sim/Não (decisão do dono, 05/10/2026). */
+const SIM_NAO = [
+  { label: 'Sim', value: true },
+  { label: 'Não', value: false },
+];
+
 /** ComboBox value type */
 interface ComboBoxValue {
   id: ID;
   label: string;
   fluxo?: FluxoType;
+  /** Projeto: a gerência usa a pergunta "pretende avaliar o formador?" (lookup de projetos). */
+  pergunta_avaliar_formador?: boolean;
 }
 
-/** Formador/Coordenador type */
+/** Formador type */
 interface ParticipantType {
   id: ID;
   label?: string;
   name?: string;
   email?: string;
+  /** Função Formador sem a função Coordenador (lookup de usuários). */
+  avaliavel?: boolean;
 }
 
 /** Form data type */
@@ -92,10 +104,12 @@ interface FormDataType {
   fim: string | null;
   // Passo 2
   formadores: ParticipantType[];
-  coordenadores: ParticipantType[];
-  // #1666: coordenador RESPONSÁVEL (FK dono da solicitação), distinto dos acompanhantes (M2M).
-  // O wizard não capturava este campo → backend caía no default (o criador).
+  // #1666: coordenador RESPONSÁVEL (FK). Vazio: o backend usa quem cria, se for coordenador.
   coordenadorResponsavel: ComboBoxValue | null;
+  // Decisão do dono (05/10/2026): respostas Sim/Não; null = ainda não respondida.
+  coordenadorAcompanha: boolean | null;
+  pretendeAvaliar: boolean | null;
+  formadorAvaliado: ID | null;
   // Passo 3
   tipo: string;
   encontro: string;
@@ -134,14 +148,17 @@ export interface SolicitacaoWizardPayloadInput {
   local: string;
   isOnline: boolean;
   formadorIds: ID[];
-  coordAcompanhaIds: ID[];
-  /** #1666: FK do coordenador RESPONSÁVEL (dono da solicitação). null → backend usa o default. */
+  /** #1666: FK do coordenador RESPONSÁVEL. null → backend usa quem cria, se for coordenador. */
   coordenadorResponsavelId: ID | null;
+  /** "O coordenador responsável vai acompanhar o evento?" */
+  coordenadorAcompanha: boolean;
+  /** "Você pretende avaliar o formador nesse evento?" — null quando a pergunta não foi feita. */
+  avaliar: { pretende: boolean; formadorAvaliadoId: ID | null } | null;
 }
 
 /**
  * Monta o payload de criação de solicitação (co-locado + exportado p/ teste, como buildCompraPayload).
- * Distingue o coordenador RESPONSÁVEL (FK `coordenador`) dos ACOMPANHANTES (M2M em extra_participants).
+ * A lista de coordenadores acompanhantes saiu (05/10/2026): só formadores em extra_participants.
  */
 export function buildSolicitacaoPayload(input: SolicitacaoWizardPayloadInput): Record<string, unknown> {
   return {
@@ -156,12 +173,17 @@ export function buildSolicitacaoPayload(input: SolicitacaoWizardPayloadInput): R
     observacoes: optionalText(input.observacoes),
     local: input.local || '',
     is_online: input.isOnline,
-    // #1666: FK do coordenador RESPONSÁVEL (dono). Antes ausente → backend usava o criador.
+    // #1666: FK do coordenador RESPONSÁVEL. Antes ausente → backend usava o criador.
     coordenador: input.coordenadorResponsavelId,
-    coordenador_acompanha: input.coordAcompanhaIds.length > 0,
+    coordenador_acompanha: input.coordenadorAcompanha,
+    ...(input.avaliar
+      ? {
+          pretende_avaliar_formador: input.avaliar.pretende,
+          formador_avaliado: input.avaliar.pretende ? input.avaliar.formadorAvaliadoId : null,
+        }
+      : {}),
     extra_participants: {
       formador_ids: input.formadorIds,
-      coord_acompanha_ids: input.coordAcompanhaIds,
     },
   };
 }
@@ -174,9 +196,9 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   const [loading, setLoading] = useState<boolean>(false);
   const [isSuperuser, setIsSuperuser] = useState<boolean>(false);
   const [municipioLookupHasResults, setMunicipioLookupHasResults] = useState<boolean | null>(null);
-  // #1452: identidade do criador — sempre entra na checagem de disponibilidade
-  // (o backend também o checa), e o nome preenche o alerta de conflito.
-  const [me, setMe] = useState<{ id: ID; nome: string } | null>(null);
+  // Quem cria: se tem a função Coordenador, é o responsável quando nenhum outro é escolhido
+  // (decisão do dono, 05/10/2026). Só entra na checagem de agenda se acompanhar.
+  const [me, setMe] = useState<{ id: ID; nome: string; coordenador: boolean } | null>(null);
   // #1452: conflito devolvido pelo backend no submit (fecha o TOCTOU / cache).
   const [submitConflito, setSubmitConflito] = useState<BlockedParticipant[]>([]);
 
@@ -190,8 +212,10 @@ export default function NewSolicitacaoWizard(): JSX.Element {
     fim: null,
     // Passo 2
     formadores: [],
-    coordenadores: [],
     coordenadorResponsavel: null,
+    coordenadorAcompanha: null,
+    pretendeAvaliar: null,
+    formadorAvaliado: null,
     // Passo 3
     tipo: '',
     encontro: '',
@@ -211,8 +235,11 @@ export default function NewSolicitacaoWizard(): JSX.Element {
           // Epic 3.3 cleanup: usa flag derivada (SSOT). Admin escape hatch
           // do wizard — bypassa exigência de projeto/município no Step 2.
           setIsSuperuser(computePermissions(me).isAdmin);
-          // #1452: guarda o criador para a checagem de disponibilidade.
-          setMe({ id: me.id, nome: me.name || me.username || 'Você' });
+          setMe({
+            id: me.id,
+            nome: me.name || me.username || 'Você',
+            coordenador: (me.funcoes ?? []).includes('Coordenador'),
+          });
         }
       } catch (error) {
         logger.warn('Falha ao carregar perfil do usuário no wizard:', error);
@@ -343,8 +370,11 @@ export default function NewSolicitacaoWizard(): JSX.Element {
         return;
       }
 
-      // Validar dados completos
-      const coordenadores = Array.isArray(formData.coordenadores) ? formData.coordenadores : [];
+      if (formData.coordenadorAcompanha === null) {
+        message.error('Responda se o coordenador responsável vai acompanhar o evento.');
+        setLoading(false);
+        return;
+      }
 
       // Validações específicas
       if (!formData.inicio || !formData.fim) {
@@ -385,9 +415,12 @@ export default function NewSolicitacaoWizard(): JSX.Element {
         // PR19: modalidade online/presencial
         isOnline: !!formData.is_online,
         formadorIds: formadores.map(f => f.id),
-        coordAcompanhaIds: coordenadores.map(c => c.id),
-        // #1666: FK do coordenador responsável escolhido no wizard (null → default do backend).
+        // #1666: FK do coordenador responsável escolhido no wizard (null → quem cria, se coordenador).
         coordenadorResponsavelId: formData.coordenadorResponsavel?.id ?? null,
+        coordenadorAcompanha: formData.coordenadorAcompanha,
+        avaliar: perguntaAvaliar
+          ? { pretende: formData.pretendeAvaliar === true, formadorAvaliadoId: formData.formadorAvaliado }
+          : null,
       });
 
       await createSolicitacao(payload);
@@ -414,21 +447,47 @@ export default function NewSolicitacaoWizard(): JSX.Element {
     }
   };
 
-  // #1452: quem entra na checagem de disponibilidade. Espelha o backend (PR A):
-  // criador + FORMADOR + COORD_ACOMPANHA, deduplicados por id. O criador frequentemente
-  // também está em coordenadores — sem dedup as horas dele contariam 2x (RD-05).
-  // CONVIDADO fica fora (o wizard não coleta convidados).
+  // Coordenador responsável: o escolhido; sem escolha, quem cria (se tem a função Coordenador).
+  const responsavel = useMemo((): { id: ID; nome: string } | null => {
+    if (formData.coordenadorResponsavel) {
+      return { id: formData.coordenadorResponsavel.id, nome: formData.coordenadorResponsavel.label };
+    }
+    return me?.coordenador ? { id: me.id, nome: me.nome } : null;
+  }, [formData.coordenadorResponsavel, me]);
+
+  // "Você pretende avaliar o formador?" só quando a gerência do projeto pergunta e há formador
+  // avaliável (função Formador sem a função Coordenador). Mesma regra do backend.
+  const formadoresAvaliaveis = useMemo(
+    (): ParticipantType[] => (Array.isArray(formData.formadores) ? formData.formadores : []).filter(f => f.avaliavel),
+    [formData.formadores]
+  );
+  const perguntaAvaliar = formData.projeto?.pergunta_avaliar_formador !== false && formadoresAvaliaveis.length > 0;
+
+  // Quem entra na checagem de disponibilidade. Espelha o backend (decisão do dono, 05/10/2026):
+  // todos os formadores; o coordenador responsável só se vai acompanhar. Deduplicado por id
+  // (o responsável pode estar também na lista de formadores; sem dedup contaria 2x no RD-05).
   const participantes = useMemo((): PreviewParticipant[] => {
     const formadores = Array.isArray(formData.formadores) ? formData.formadores : [];
-    const coordenadores = Array.isArray(formData.coordenadores) ? formData.coordenadores : [];
     const lista: PreviewParticipant[] = [
-      ...(me ? [{ id: me.id, nome: me.nome, criador: true }] : []),
+      ...(formData.coordenadorAcompanha === true && responsavel
+        ? [{ id: responsavel.id, nome: responsavel.nome, criador: false }]
+        : []),
       ...formadores.map(f => ({ id: f.id, nome: f.label || f.name || `#${f.id}`, criador: false })),
-      ...coordenadores.map(c => ({ id: c.id, nome: c.label || c.name || `#${c.id}`, criador: false })),
     ];
     const vistos = new Set<ID>();
     return lista.filter(p => (vistos.has(p.id) ? false : (vistos.add(p.id), true)));
-  }, [me, formData.formadores, formData.coordenadores]);
+  }, [responsavel, formData.formadores, formData.coordenadorAcompanha]);
+
+  // Trocar a lista de formadores: se o escolhido para avaliação saiu, a escolha é limpa.
+  const handleFormadoresChange = useCallback((value: ParticipantType[]): void => {
+    setFormData(prev => {
+      const aindaAvaliavel = value.some(f => f.avaliavel && f.id === prev.formadorAvaliado);
+      return { ...prev, formadores: value, formadorAvaliado: aindaAvaliavel ? prev.formadorAvaliado : null };
+    });
+    if (!value.some(f => f.avaliavel && f.id === form.getFieldValue('formadorAvaliado'))) {
+      form.setFieldsValue({ formadorAvaliado: undefined });
+    }
+  }, [form]);
 
   const preview = useAvailabilityPreview({
     inicio: formData.inicio,
@@ -578,7 +637,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
         <>
           <Alert
             message="Selecione os Participantes"
-            description="Selecione os formadores que participarão do evento e, opcionalmente, os coordenadores acompanhantes."
+            description="Selecione os formadores do evento. Coordenador que vai atuar no evento entra na lista de formadores."
             type="info"
             showIcon
             className="mb-4"
@@ -591,32 +650,73 @@ export default function NewSolicitacaoWizard(): JSX.Element {
           >
             <FormadoresPicker
               value={formData.formadores as unknown as Array<{ id: ID; email: string; label: string; name?: string }>}
-              onChange={(value: ParticipantType[]) => setFormData({ ...formData, formadores: value })}
+              onChange={handleFormadoresChange}
             />
           </Form.Item>
 
           <Form.Item
             label="Coordenador responsável"
             name="coordenadorResponsavel"
-            tooltip="Dono da solicitação (FK). Distinto dos acompanhantes. Se vazio, o backend assume o criador."
+            extra={me?.coordenador ? 'Vazio: você é o coordenador responsável.' : undefined}
+            rules={me?.coordenador ? [] : [{ required: true, message: 'Escolha o coordenador responsável pelo evento.' }]}
           >
             <ComboBox
               lookupFunction={lookupCoordenadores}
               onChange={(value: ComboBoxValue | null) => setFormData({ ...formData, coordenadorResponsavel: value })}
               value={formData.coordenadorResponsavel as unknown as { id: ID; label: string; [key: string]: unknown } | null}
-              placeholder="Busque o coordenador responsável (opcional)"
+              placeholder={me?.coordenador ? 'Busque o coordenador responsável (opcional)' : 'Busque o coordenador responsável'}
             />
           </Form.Item>
 
           <Form.Item
-            label="Coordenadores Acompanhantes"
-            name="coordenadores"
+            label={<span id="pergunta-acompanha">O coordenador responsável vai acompanhar o evento?</span>}
+            name="coordenadorAcompanha"
+            extra="Se Sim, a agenda do coordenador responsável é conferida como a dos formadores."
+            rules={[{ required: true, message: 'Responda se o coordenador responsável vai acompanhar o evento.' }]}
           >
-            <CoordenadoresPicker
-              value={formData.coordenadores as unknown as Array<{ id: ID; email: string; label: string; name?: string }>}
-              onChange={(value: ParticipantType[]) => setFormData({ ...formData, coordenadores: value })}
+            <Radio.Group
+              // role e aria-* vão ao <div> do grupo (o tipo do antd não declara role)
+              {...{ role: 'radiogroup' }}
+              aria-labelledby="pergunta-acompanha"
+              name="coordenador_acompanha"
+              options={SIM_NAO}
+              onChange={(e: RadioChangeEvent) =>
+                setFormData(prev => ({ ...prev, coordenadorAcompanha: e.target.value as boolean }))
+              }
             />
           </Form.Item>
+
+          {perguntaAvaliar && (
+            <Form.Item
+              label={<span id="pergunta-avaliar">Você pretende avaliar o formador nesse evento?</span>}
+              name="pretendeAvaliar"
+              rules={[{ required: true, message: 'Responda se você pretende avaliar o formador.' }]}
+            >
+              <Radio.Group
+                {...{ role: 'radiogroup' }}
+                aria-labelledby="pergunta-avaliar"
+                name="pretende_avaliar_formador"
+                options={SIM_NAO}
+                onChange={(e: RadioChangeEvent) =>
+                  setFormData(prev => ({ ...prev, pretendeAvaliar: e.target.value as boolean }))
+                }
+              />
+            </Form.Item>
+          )}
+
+          {perguntaAvaliar && formData.pretendeAvaliar === true && (
+            <Form.Item
+              label="Qual formador você pretende avaliar?"
+              name="formadorAvaliado"
+              rules={[{ required: true, message: 'Escolha qual formador você pretende avaliar.' }]}
+            >
+              <Select
+                placeholder="Escolha um formador"
+                options={formadoresAvaliaveis.map(f => ({ value: f.id, label: f.label || f.name || `#${f.id}` }))}
+                onChange={(value: ID) => setFormData(prev => ({ ...prev, formadorAvaliado: value }))}
+              />
+            </Form.Item>
+          )}
 
           {/* #1452: aviso antecipado de conflito, no ponto em que o coordenador
               acabou de escolher formador + data. */}
@@ -761,11 +861,21 @@ export default function NewSolicitacaoWizard(): JSX.Element {
                 ? formData.formadores.map(f => f.label || f.name).join(', ')
                 : 'Nenhum'}
             </Descriptions.Item>
-            <Descriptions.Item label="Coordenadores Acompanhantes">
-              {Array.isArray(formData.coordenadores) && formData.coordenadores.length > 0
-                ? formData.coordenadores.map(c => c.label || c.name).join(', ')
-                : 'Nenhum'}
+            <Descriptions.Item label="Coordenador responsável">
+              {formData.coordenadorResponsavel?.label ?? (me?.coordenador ? `${me.nome} (você)` : 'Não informado')}
             </Descriptions.Item>
+            <Descriptions.Item label="Acompanhamento">
+              {formData.coordenadorAcompanha
+                ? 'O coordenador responsável acompanha o evento'
+                : 'O coordenador responsável não acompanha o evento'}
+            </Descriptions.Item>
+            {perguntaAvaliar && (
+              <Descriptions.Item label="Avaliação do formador">
+                {formData.pretendeAvaliar
+                  ? `Sim: ${formadoresAvaliaveis.find(f => f.id === formData.formadorAvaliado)?.label ?? 'formador não escolhido'}`
+                  : 'Não'}
+              </Descriptions.Item>
+            )}
             {formData.tipo && (
               <Descriptions.Item label="Tipo">{formData.tipo}</Descriptions.Item>
             )}
@@ -806,7 +916,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
         </>
       ),
     },
-  ], [formData, rangeValue, handleRangeChange, handleProjetoChange, lookupMunicipiosElegiveis, isSuperuser, municipioLookupHasResults, preview, submitConflito]);
+  ], [formData, rangeValue, handleRangeChange, handleProjetoChange, lookupMunicipiosElegiveis, isSuperuser, municipioLookupHasResults, preview, submitConflito, me, perguntaAvaliar, formadoresAvaliaveis, handleFormadoresChange]);
 
   return (
     <section className="p-6 max-w-4xl mx-auto" aria-labelledby="nova-solicitacao-title">

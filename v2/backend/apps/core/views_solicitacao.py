@@ -33,6 +33,7 @@ from .api_schemas import (
 )
 from .models import AuditLog, Solicitacao
 from .permissions import HasPerm, IsOwnerOrPrivileged
+from .rbac.helpers import user_tem_funcao_coordenador
 from .rbac.policies import (
     CanAccessSolicitationApprovals,
     CanPublishSetorSolicitacao,
@@ -88,6 +89,22 @@ class _ExtraParticipantsSerializer(serializers.Serializer):
     coord_acompanha_emails = serializers.ListField(
         child=serializers.EmailField(), required=False, default=list, max_length=_MAX
     )
+
+    _MSG_ACOMPANHANTES_SAIU = (
+        "A lista de coordenadores acompanhantes saiu. Coordenador que vai atuar no evento entra na "
+        "lista de formadores; o coordenador responsável responde se vai acompanhar."
+    )
+
+    def validate_coord_acompanha_ids(self, value: list[int]) -> list[int]:
+        """Decisão do dono (05/10/2026): a lista saiu da tela. Vazia é aceita (cliente antigo)."""
+        if value:
+            raise serializers.ValidationError(self._MSG_ACOMPANHANTES_SAIU)
+        return value
+
+    def validate_coord_acompanha_emails(self, value: list[str]) -> list[str]:
+        if value:
+            raise serializers.ValidationError(self._MSG_ACOMPANHANTES_SAIU)
+        return value
 
 
 def _batch_response_schema(contador: str) -> dict[str, Any]:
@@ -307,7 +324,13 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             qs = (
                 Solicitacao.objects.filter(usuario=self.request.user)
                 .select_related(
-                    "usuario", "municipio", "tipo_evento", "projeto", "projeto__projeto_geral", "coordenador"
+                    "usuario",
+                    "municipio",
+                    "tipo_evento",
+                    "projeto",
+                    "projeto__projeto_geral",
+                    "coordenador",
+                    "formador_avaliado",
                 )
                 .prefetch_related("participations__usuario")
             )
@@ -320,7 +343,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         # qualquer Gerente, inclusive os que não podem aprovar.
         else:
             base = Solicitacao.objects.select_related(
-                "usuario", "municipio", "tipo_evento", "projeto", "coordenador"
+                "usuario", "municipio", "tipo_evento", "projeto", "coordenador", "formador_avaliado"
             ).prefetch_related("participations__usuario")
             qs = scope_solicitacoes(base, self.request.user)
 
@@ -408,17 +431,20 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         """
         from django.db import transaction
 
+        from .models import Participation
+        from .services.avaliacao_formador import validar_avaliacao_formador
         from .services.solicitacao_availability import enforce_solicitacao_availability
 
         projeto = serializer.validated_data.get("projeto")
         # M10-04/#1656 Wave 1 (S2): o projeto tem que ser do setor do criador.
         self._assert_projeto_in_setor_scope(projeto)
         self._assert_projeto_no_alcance_da_aprovadora(projeto)
+        coordenador = self._resolver_coordenador_responsavel(serializer.validated_data.get("coordenador"))
         initial_status = resolve_initial_status(projeto=projeto)
 
         with transaction.atomic():
             # ASQ-002: status inicial decidido em camada de serviço (não no model.save()).
-            instance = serializer.save(usuario=self.request.user, status=initial_status.status)
+            instance = serializer.save(usuario=self.request.user, status=initial_status.status, coordenador=coordenador)
 
             # PR15: Processar extra_participants
             # M10-04 (#1626): valida o shape antes de materializar Participation —
@@ -429,6 +455,10 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 extra_serializer.is_valid(raise_exception=True)
                 self._create_participants(instance, extra_serializer.validated_data)
 
+            # Convite do Google para o responsável, mesmo que não acompanhe (decisão do dono,
+            # 05/10/2026). O papel COORDENADOR não ocupa a agenda (`ENFORCED_ROLES`).
+            Participation.objects.get_or_create(solicitacao=instance, usuario=coordenador, role="COORDENADOR")
+            validar_avaliacao_formador(instance, criando=True, resposta_anterior=None)
             enforce_solicitacao_availability(instance, action="create")
 
         logger.info(
@@ -464,6 +494,30 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             raise serializers.ValidationError(
                 {"extra_participants": [f"{self._SETOR_SCOPE_MSG} Fora do escopo (ids): {ids}."]}
             )
+
+    _MSG_RESPONSAVEL_OBRIGATORIO = "Informe o coordenador responsável pelo evento."
+    _MSG_RESPONSAVEL_FORA_DO_SETOR = "O coordenador responsável precisa ser do seu setor."
+
+    def _resolver_coordenador_responsavel(self, coordenador):
+        """Decisão do dono (05/10/2026): UM coordenador responsável por evento.
+
+        Informado → passa pelo mesmo escopo de setor dos formadores (ele ocupa a agenda quando
+        acompanha; crítica ALTA do desenho). Não informado → quem cria, se tem a função
+        Coordenador; senão 400 (DAT, apoio, gerente, superusuário precisam escolher).
+        """
+        user = self.request.user
+        if coordenador is None:
+            if user_tem_funcao_coordenador(user):
+                return user
+            raise serializers.ValidationError({"coordenador": [self._MSG_RESPONSAVEL_OBRIGATORIO]})
+        self._assert_coordenador_in_setor_scope(coordenador)
+        return coordenador
+
+    def _assert_coordenador_in_setor_scope(self, coordenador):
+        """Mesmo gate de `_assert_participants_in_setor_scope`, com o erro no campo `coordenador`."""
+        creator = getattr(getattr(self, "request", None), "user", None)
+        if coordenador.pk != getattr(creator, "pk", None) and participants_out_of_setor(creator, [coordenador]):
+            raise serializers.ValidationError({"coordenador": [self._MSG_RESPONSAVEL_FORA_DO_SETOR]})
 
     _SETOR_SCOPE_MSG_PROJETO = "Você só pode criar/editar solicitação de projeto do seu setor."
 
@@ -502,9 +556,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             "coordenador_id": int,  # sempre o request.user, mas pode ser explícito
             "formador_ids": [int, ...],
             "formador_emails": [str, ...],
-            "coord_acompanha_ids": [int, ...],
-            "coord_acompanha_emails": [str, ...]
         }
+        `coord_acompanha_ids/_emails` não são mais aceitos com itens (decisão do dono, 05/10/2026;
+        `_ExtraParticipantsSerializer` recusa): os laços abaixo só veem listas vazias.
         """
         from .models import Participation, Usuario
 
@@ -591,6 +645,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         from django.db import transaction
 
         from .models import Participation, Usuario
+        from .services.avaliacao_formador import pergunta_se_aplica, validar_avaliacao_formador
         from .services.solicitacao_availability import enforce_solicitacao_availability
 
         instance = serializer.instance
@@ -604,6 +659,18 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             # O EditSolicitacaoPage manda `projeto` em todo save: o mesmo projeto não é mover.
             if getattr(novo_projeto, "pk", None) != instance.projeto_id:
                 self._assert_projeto_no_alcance_da_aprovadora(novo_projeto)
+
+        # Responsável: trocar passa pelo mesmo escopo de setor; não dá para esvaziar.
+        coordenador_antigo_id = instance.coordenador_id
+        if "coordenador" in serializer.validated_data:
+            novo_coordenador = serializer.validated_data["coordenador"]
+            if getattr(novo_coordenador, "pk", None) != coordenador_antigo_id:
+                if novo_coordenador is None:
+                    raise serializers.ValidationError({"coordenador": [self._MSG_RESPONSAVEL_OBRIGATORIO]})
+                self._assert_coordenador_in_setor_scope(novo_coordenador)
+        resposta_avaliar_anterior = instance.pretende_avaliar_formador
+        avaliado_anterior_id = instance.formador_avaliado_id
+        avaliar_aplicavel_antes = pergunta_se_aplica(instance)
 
         # Captura formadores atuais antes do update
         old_formador_ids = set(
@@ -622,6 +689,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             "is_online": instance.is_online,
             "coordenador_acompanha": instance.coordenador_acompanha,
             "coordenador_id": instance.coordenador_id,
+            "pretende_avaliar_formador": instance.pretende_avaliar_formador,
+            "formador_avaliado_id": instance.formador_avaliado_id,
             "tipo": instance.tipo,
             "encontro": instance.encontro,
             "segmento": instance.segmento,
@@ -660,6 +729,16 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 validated = {k: v for k, v in extra_serializer.validated_data.items() if k in extra_participants}
                 self._update_formadores(instance, validated)
 
+            if instance.coordenador_id != coordenador_antigo_id:
+                self._trocar_convite_do_responsavel(instance, coordenador_antigo_id)
+
+            validar_avaliacao_formador(
+                instance,
+                criando=False,
+                resposta_anterior=resposta_avaliar_anterior,
+                avaliado_anterior_id=avaliado_anterior_id,
+                aplicavel_antes=avaliar_aplicavel_antes,
+            )
             enforce_solicitacao_availability(instance, action="update")
 
         # Coleta dados novos após save
@@ -682,6 +761,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             "is_online": instance.is_online,
             "coordenador_acompanha": instance.coordenador_acompanha,
             "coordenador_id": instance.coordenador_id,
+            "pretende_avaliar_formador": instance.pretende_avaliar_formador,
+            "formador_avaliado_id": instance.formador_avaliado_id,
             "tipo": instance.tipo,
             "encontro": instance.encontro,
             "segmento": instance.segmento,
@@ -708,6 +789,23 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 },
             )
 
+    def _trocar_convite_do_responsavel(self, solicitacao, coordenador_antigo_id):
+        """Troca de responsável na edição: o novo ganha o convite (papel COORDENADOR); o antigo
+        perde, salvo se for quem criou (esse sempre teve a linha). O cache de agenda do antigo
+        é renovado aqui porque o sinal de Solicitacao só vê o valor novo."""
+        from .models import Participation
+        from .utils.cache_utils import invalidate_availability_cache
+
+        Participation.objects.get_or_create(
+            solicitacao=solicitacao, usuario_id=solicitacao.coordenador_id, role="COORDENADOR"
+        )
+        if coordenador_antigo_id is not None:
+            if coordenador_antigo_id != solicitacao.usuario_id:
+                Participation.objects.filter(
+                    solicitacao=solicitacao, usuario_id=coordenador_antigo_id, role="COORDENADOR"
+                ).delete()
+            invalidate_availability_cache(usuario_id=coordenador_antigo_id)
+
     def _update_formadores(self, solicitacao, extra):
         """
         Atualiza formadores de uma solicitação.
@@ -724,8 +822,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         changed = False
         touched: set[int] = set()
 
-        # Reconcilia FORMADOR e COORD_ACOMPANHA por id (diff-set), espelhando o create.
-        for role, key in (("FORMADOR", "formador_ids"), ("COORD_ACOMPANHA", "coord_acompanha_ids")):
+        # Reconcilia FORMADOR por id (diff-set), espelhando o create. COORD_ACOMPANHA saiu da tela
+        # (05/10/2026): as linhas antigas ficam como estão (convite do Google, sem ocupar).
+        for role, key in (("FORMADOR", "formador_ids"),):
             if key not in extra:
                 continue  # campo ausente = não mexer neste papel
             new_ids = {i for i in extra.get(key, []) if i}

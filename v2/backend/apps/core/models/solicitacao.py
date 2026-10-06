@@ -177,7 +177,30 @@ class Solicitacao(models.Model):
     )
     coordenador_acompanha = models.BooleanField(
         default=False,
-        help_text="Indica se o coordenador acompanha o evento",
+        help_text=(
+            "Resposta a 'O coordenador responsável vai acompanhar o evento?'. True: a agenda do "
+            "coordenador responsável é conferida (RD-01..04) como a dos formadores (decisão do dono, "
+            "05/10/2026). Obrigatória na criação pela API; os eventos antigos ficam como estão."
+        ),
+    )
+    pretende_avaliar_formador = models.BooleanField(
+        null=True,
+        blank=True,
+        default=None,
+        help_text=(
+            "Resposta a 'Você pretende avaliar o formador nesse evento?'. None = não perguntado ou não "
+            "informado (eventos antigos, gerência que não pergunta, evento sem formador avaliável)."
+        ),
+    )
+    formador_avaliado = models.ForeignKey(  # type: ignore[misc]
+        "core.Usuario",
+        # PROTECT como Participation.usuario: o avaliado é sempre um FORMADOR do evento, cuja
+        # participação já impede apagar a pessoa. SET_NULL deixaria "Sim" sem formador.
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="eventos_como_avaliado",
+        help_text="Formador que quem criou pretende avaliar (só com pretende_avaliar_formador=True).",
     )
     coordenador = models.ForeignKey(  # type: ignore[misc]
         "core.Usuario",

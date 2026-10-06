@@ -1543,8 +1543,8 @@ class ExportContractImporter:
         `_resolve_solicitacao_key`). Solicitante (dono) via `_resolve_solicitante`
         (solicitante_cpf→email→coordenador_cpf, v16.4); grava `usuario` E a FK `coordenador` (decisão a —
         a tela lê a FK) + uma Participation(COORDENADOR) e carimba `solicitante_procedencia`. Status via
-        `resolve_initial_status` (PA-01: SUPER/desconhecido → pendente). `coord_acompanha` (Sim/Não) →
-        BooleanField `coordenador_acompanha` (RELAY 50: visual, vazio→False). inicio/fim montados de
+        `resolve_initial_status` (PA-01: SUPER/desconhecido → pendente). `coordenador_acompanha` = False
+        sempre (decisão do dono, 05/10/2026: a coluna `coord_acompanha` da planilha não é confiável). inicio/fim montados de
         data+hora LOCAL (America/Fortaleza), armazenados em UTC. Sem `created_by` no model → não exige actor.
 
         Retorna `(created, reconciled)`. `segmento_norm`/`segmento_norm_confianca` são autoritativos do
@@ -1594,7 +1594,9 @@ class ExportContractImporter:
                 segmento_norm=seg_norm,
                 segmento_norm_confianca=seg_conf,
                 encontro=(r.get("encontro") or "").strip() or None,
-                coordenador_acompanha=_to_bool(r.get("coord_acompanha")),
+                # Decisão do dono (05/10/2026): a marca da planilha não é confiável; evento importado
+                # = o responsável não acompanha (não ocupa a agenda). A coluna não é mais lida.
+                coordenador_acompanha=False,
                 is_online=_to_bool(r.get("is_online")),
                 status=status,
                 external_hash=ext_hash,

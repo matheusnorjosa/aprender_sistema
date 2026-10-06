@@ -176,6 +176,36 @@ describe('ApprovalsPage', () => {
     expect(screen.queryByRole('button', { name: /Reprovar/i })).not.toBeInTheDocument();
   });
 
+  test('mostra as respostas de acompanhar e de avaliar o formador na linha (05/10/2026)', async () => {
+    vi.mocked(listSolicitacoes).mockResolvedValue({
+      count: 3,
+      next: null,
+      previous: null,
+      results: [
+        pendingRow({
+          id: 1,
+          municipio_nome: 'MunicipioSim',
+          coordenador_acompanha: true,
+          pretende_avaliar_formador: true,
+          formador_avaliado_nome: 'Bruno Formador',
+        }),
+        pendingRow({ id: 2, municipio_nome: 'MunicipioNao', coordenador_acompanha: false, pretende_avaliar_formador: false }),
+        pendingRow({ id: 3, municipio_nome: 'MunicipioAntigo', coordenador_acompanha: false, pretende_avaliar_formador: null }),
+      ],
+    });
+
+    renderPage();
+
+    const sim = (await screen.findByText('MunicipioSim')).closest('tr') as HTMLElement;
+    expect(within(sim).getByText('Acompanha')).toBeInTheDocument();
+    expect(within(sim).getByText('Pretende avaliar: Bruno Formador')).toBeInTheDocument();
+    const nao = screen.getByText('MunicipioNao').closest('tr') as HTMLElement;
+    expect(within(nao).getByText('Não acompanha')).toBeInTheDocument();
+    expect(within(nao).getByText('Não pretende avaliar')).toBeInTheDocument();
+    const antigo = screen.getByText('MunicipioAntigo').closest('tr') as HTMLElement;
+    expect(within(antigo).queryByText(/avaliar/)).not.toBeInTheDocument();
+  });
+
   test('com permissão: exibe "Aprovar"/"Reprovar" para solicitação pendente', async () => {
     vi.mocked(listSolicitacoes).mockResolvedValue({
       count: 1,

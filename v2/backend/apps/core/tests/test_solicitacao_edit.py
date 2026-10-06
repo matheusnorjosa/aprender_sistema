@@ -657,9 +657,11 @@ class TestSolicitacaoEditFormadores:
         response = api_client.patch(
             f"/api/solicitacoes/{solicitacao_editavel.id}/",
             {
+                # 05/10/2026: com formador avaliável a pergunta de avaliar passa a valer e é obrigatória.
+                "pretende_avaliar_formador": False,
                 "extra_participants": {
                     "formador_ids": [formador_1.id],
-                }
+                },
             },
             format="json",
         )
@@ -713,9 +715,11 @@ class TestSolicitacaoEditFormadores:
         response = api_client.patch(
             f"/api/solicitacoes/{solicitacao_editavel.id}/",
             {
+                # 05/10/2026: com formador avaliável a pergunta de avaliar passa a valer e é obrigatória.
+                "pretende_avaliar_formador": False,
                 "extra_participants": {
                     "formador_ids": [formador_1.id, formador_2.id, formador_3.id],
-                }
+                },
             },
             format="json",
         )

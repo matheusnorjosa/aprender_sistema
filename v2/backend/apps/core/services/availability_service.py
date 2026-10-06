@@ -32,14 +32,39 @@ from apps.core.types import ConflictCode
 from apps.core.utils.cache_utils import cache_availability_check
 
 # SSOT dos papéis OCUPANTES (RD): quem, participando de um evento aprovado, ocupa a
-# agenda para efeito de conflito/capacidade. CONVIDADO não ocupa. Usado tanto no
-# enforcement (solicitacao_availability) quanto na query de eventos existentes aqui —
-# um único predicado, sem lista de papéis duplicada fora deste módulo. (M08-07 / #1664)
-ENFORCED_ROLES: tuple[str, ...] = (
-    Participation.Role.COORDENADOR.value,
-    Participation.Role.FORMADOR.value,
-    Participation.Role.COORD_ACOMPANHA.value,
-)
+# agenda para efeito de conflito/capacidade. Usado tanto no enforcement
+# (solicitacao_availability) quanto na query de eventos existentes aqui — um único
+# predicado, sem lista de papéis duplicada fora deste módulo. (M08-07 / #1664)
+# Decisão do dono (05/10/2026): só o FORMADOR ocupa por papel. COORDENADOR (quem criou),
+# COORD_ACOMPANHA (lista que saiu da tela) e CONVIDADO não ocupam; servem ao convite do
+# Google. O coordenador responsável ocupa só quando acompanha: ver `ocupa_agenda_q` e
+# `coordenador_ocupante`.
+ENFORCED_ROLES: tuple[str, ...] = (Participation.Role.FORMADOR.value,)
+
+
+def ocupa_agenda_q(usuario: Usuario) -> Q:
+    """Eventos (Solicitacao) que ocupam a agenda de `usuario` — SSOT do lado "evento existente".
+
+    Ocupa se a pessoa é FORMADORA no evento, ou se é a coordenadora responsável e o evento
+    tem `coordenador_acompanha=True` (sem `coordenador` gravado, a responsável é quem criou —
+    mesma queda de `coordenador_ocupante` e da tela). Decisão do dono, 05/10/2026.
+    """
+    responsavel = Q(coordenador=usuario) | Q(coordenador__isnull=True, usuario=usuario)
+    return Q(participations__usuario=usuario, participations__role__in=ENFORCED_ROLES) | (
+        Q(coordenador_acompanha=True) & responsavel
+    )
+
+
+def coordenador_ocupante(solicitacao: Solicitacao) -> Usuario | None:
+    """Coordenador responsável que este evento confere — só quando ele acompanha.
+
+    SSOT do lado "evento novo/editado" (par de `ocupa_agenda_q`). Responsável =
+    `solicitacao.coordenador`, ou quem criou quando a FK está vazia (eventos antigos).
+    """
+    if not solicitacao.coordenador_acompanha:
+        return None
+    return solicitacao.coordenador or solicitacao.usuario
+
 
 # Códigos que o motor calcula e devolve, mas que NÃO barram: saem em `CheckResult.warnings`.
 # Decisão do dono (02/10/2026): "o evento na agenda pode ter quantas horas quiser". Tudo o
@@ -197,12 +222,11 @@ def _check_conflicts_impl(
 
     conflicts: list[Conflict] = []
     warnings: list[Conflict] = []
-    # M08-07 (#1664): só papéis OCUPANTES (ENFORCED_ROLES) bloqueiam. Antes qualquer
-    # participação casava, então um CONVIDADO bloqueava indevidamente o FORMADOR. O
-    # filtro por role vai na ORIGEM da query (events_qs), não em Python depois.
-    events_qs = Solicitacao.objects.filter(status=Solicitacao.Status.APROVADO).filter(
-        Q(usuario=usuario) | Q(participations__usuario=usuario, participations__role__in=ENFORCED_ROLES)
-    )
+    # M08-07 (#1664): só quem OCUPA bloqueia. Antes qualquer participação casava, então um
+    # CONVIDADO bloqueava indevidamente o FORMADOR. Desde 05/10/2026 quem criou também não
+    # ocupa por ter criado: `ocupa_agenda_q` (formador, ou responsável que acompanha). O
+    # filtro vai na ORIGEM da query (events_qs), não em Python depois.
+    events_qs = Solicitacao.objects.filter(status=Solicitacao.Status.APROVADO).filter(ocupa_agenda_q(usuario))
     if exclude_solicitacao_id is not None:
         events_qs = events_qs.exclude(pk=exclude_solicitacao_id)
 

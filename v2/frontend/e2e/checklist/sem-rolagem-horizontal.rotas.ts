@@ -225,7 +225,7 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
     perfil: 'dat',
     marco: 'Projetos',
     dados: { em: LINHA, texto: T.projeto },
-    // Código (< 576), Setor (< 768), Família (< 992) e Fluxo (< 1200) vão para a linha expandida.
+    // Código (< 576), Setor (< 768), Coleção (< 992) e Fluxo (< 1200) vão para a linha expandida.
     estados: [expandida(T.projeto, 'Fluxo', [360, 768, 1024])],
   },
   {
@@ -272,14 +272,13 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
   {
     path: '/dat/admin/projetos-gerais',
     perfil: 'dat',
-    marco: 'Projetos Gerais',
+    marco: 'Coleções',
     dados: { em: LINHA, texto: T.projetoGeral },
     // C2: Usa AVALIAR e Projetos (< 992) e Cálculo de códigos (< 768) vão para a linha expandida.
     estados: [expandida(T.projetoGeral, 'Usa AVALIAR', [360, 768])],
   },
   { path: '/dat/admin/configuracoes', perfil: 'dat', marco: 'Configurações do Sistema' },
   // Importação pela tela: só superusuário (decisão do dono, 02/10/2026).
-  { path: '/dat/admin/colecoes', perfil: 'superusuario', marco: 'Importação de Coleções' },
   { path: '/dat/admin/equipe-gerencia', perfil: 'superusuario', marco: 'Importação de Vínculos' },
   {
     path: '/dat/cadastros',
@@ -319,7 +318,7 @@ export const NAO_MEDIDOS: Readonly<Record<string, string>> = {
   '/mapa-brasil (municípios do estado clicado)': 'exige clicar numa região do mapa',
   '/dat/cadastros (aba AVALIAR)': 'o seed só tem cadastro FORMAR',
   'ImportUploader depois da validação':
-    'exige upload de planilha e validação no backend (importações, coleções, vínculos, municípios)',
+    'exige upload de planilha e validação no backend (importações, vínculos, municípios)',
   'Modais e drawers de edição':
     'exigem abrir o formulário de cada tela; o AntD limita modal e drawer à largura da tela. O Drawer de ' +
     'detalhe de Usuários (C1) é medido (/dat/admin/usuarios#detalhe); cada PR do Programa C que criar um ' +

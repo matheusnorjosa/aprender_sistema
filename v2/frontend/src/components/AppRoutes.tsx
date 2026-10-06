@@ -35,7 +35,6 @@ const GruposPage = lazy(() => import('../pages/AdminDAT/GruposPage'));
 const SetoresPage = lazy(() => import('../pages/AdminDAT/SetoresPage'));
 const FuncoesPage = lazy(() => import('../pages/AdminDAT/FuncoesPage'));
 const ConfiguracoesPage = lazy(() => import('../pages/AdminDAT/ConfiguracoesPage'));
-const ColecoesImportPage = lazy(() => import('../pages/AdminDAT/ColecoesImportPage'));
 const EquipeGerenciaImportPage = lazy(() => import('../pages/AdminDAT/EquipeGerenciaImportPage'));
 const DeslocamentosPage = lazy(() => import('../pages/Deslocamentos/DeslocamentosPage'));
 const DATRegistrosPage = lazy(() => import('../pages/DATModule/DATRegistrosPage'));
@@ -160,7 +159,6 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
         <Route path="/dat/admin/produtos" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><ProdutosPage /></RequirePolicy>} />
         <Route path="/dat/admin/projetos-gerais" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><ProjetosGeraisPage /></RequirePolicy>} />
         <Route path="/dat/admin/configuracoes" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><ConfiguracoesPage /></RequirePolicy>} />
-        <Route path="/dat/admin/colecoes" element={<RequirePolicy allow={podeImportarPelaTela}><ColecoesImportPage /></RequirePolicy>} />
         <Route path="/dat/admin/equipe-gerencia" element={<RequirePolicy allow={podeImportarPelaTela}><EquipeGerenciaImportPage /></RequirePolicy>} />
         <Route path="/dat/cadastros" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><CadastrosPage /></RequirePolicy>} />
         <Route path="/dat/compras-materiais" element={<RequirePolicy allow={canControle || canDAT}><DATComprasPage /></RequirePolicy>} />

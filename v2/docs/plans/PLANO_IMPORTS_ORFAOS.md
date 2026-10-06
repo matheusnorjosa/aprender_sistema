@@ -112,6 +112,9 @@ deletado já, independente do redirect.
   via `Projeto.projeto_geral` (quando `None` → rejeita a linha); upsert por chave natural;
   `created_by` = usuário-serviço; idempotência via `external_hash`. Depois **apagar `AcaoDAT`**.
 - **Coleções → WIRE** (veredito: wiring incompleto — os leitores JÁ existem):
+  - **Superado em 06/10/2026:** coleção é a família (`ProjetoGeral`), decisão do dono. O
+    cadastro `Colecao` e o import saíram, e os 2 cards do dashboard contam a família do projeto
+    da compra. O que segue abaixo é o histórico da proposta.
   - O ComprasDashboard **já tem** os cards "Coleções ativas" (`dat_module.py:497`,
     `ComprasDashboardPage.tsx:571`) e "Quantidade por Coleção" (`dat_module.py:500-515`,
     `ComprasDashboardPage.tsx:638-645`) — mas mostram **sempre 0 / "Sem coleção"** porque a

@@ -34,7 +34,7 @@ export interface ColumnHandlers {
 export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }: ColumnHandlers): ColumnsType<CadastroRecord> {
   return [
     {
-      title: 'Projeto',
+      title: 'Coleção',
       dataIndex: 'projeto_geral_nome',
       key: 'projeto',
       width: 120,
@@ -275,7 +275,7 @@ export function getColumnsFormar({ onQuickStatusUpdate, onEdit, onDelete }: Colu
 export function getColumnsAvaliar({ onQuickStatusUpdate, onEdit, onDelete }: ColumnHandlers): ColumnsType<CadastroRecord> {
   return [
     {
-      title: 'Projeto',
+      title: 'Coleção',
       dataIndex: 'projeto_geral_nome',
       key: 'projeto',
       width: 120,

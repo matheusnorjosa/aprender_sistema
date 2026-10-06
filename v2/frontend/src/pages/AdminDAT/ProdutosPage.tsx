@@ -17,9 +17,8 @@ import {
   updateProduto,
   deleteProduto,
   listProjetos,
-  listColecoesOptions,
 } from '../../api/adminDAT';
-import type { ProdutoRecord, ProdutoPayload, ColecaoOption } from '../../api/adminDAT';
+import type { ProdutoRecord, ProdutoPayload } from '../../api/adminDAT';
 import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
 import { AcoesLinha, larguraAcoesLinha } from '../../components/AcoesLinha';
 import { FalhaAoCarregar } from '../../components/FalhaAoCarregar';
@@ -43,14 +42,12 @@ interface ProdutoFormValues {
   nome: string;
   descricao: string;
   projeto: ID;
-  colecao?: ID | null;
   ativo: boolean;
 }
 
 export default function ProdutosPage(): JSX.Element {
   const [produtos, setProdutos] = useState<ProdutoRecord[]>([]);
   const [projetos, setProjetos] = useState<Projeto[]>([]);
-  const [colecoes, setColecoes] = useState<ColecaoOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   // O texto no campo de busca (a busca só vale no Enter): controlado para o "Limpar" do vazio o apagar.
@@ -67,11 +64,9 @@ export default function ProdutosPage(): JSX.Element {
   const [projetoFiltro, setProjetoFiltro] = useState<ID | undefined>(undefined);
   const [erroLista, setErroLista] = useState<string | null>(null);
   const [erroProjetos, setErroProjetos] = useState<string | null>(null);
-  const [erroColecoes, setErroColecoes] = useState<string | null>(null);
   // O "Tentar de novo" que carregou põe o foco no campo que ele recarregou.
   const filtroProjetoRef = useRef<RefSelectProps>(null);
   const projetoRef = useRef<RefSelectProps>(null);
-  const colecaoRef = useRef<RefSelectProps>(null);
   const [salvando, setSalvando] = useState(false);
 
   // Celular (< 576 px): as ações da linha vão todas para o menu "Mais ações", e o Código sai
@@ -79,8 +74,6 @@ export default function ProdutosPage(): JSX.Element {
   const acoesCompactas = !Grid.useBreakpoint().sm;
 
   const [form] = Form.useForm<ProdutoFormValues>();
-  const selectedProjeto = Form.useWatch('projeto', form);
-  const colecoesDoProjeto = colecoes.filter((c) => selectedProjeto == null || c.projeto === selectedProjeto);
 
   const fetchProdutos = async (
     current = pagination.current || 1,
@@ -127,20 +120,6 @@ export default function ProdutosPage(): JSX.Element {
     }
   };
 
-  const fetchColecoes = async (): Promise<boolean> => {
-    try {
-      const data = await listColecoesOptions();
-      flushSync(() => {
-        setColecoes(data);
-        setErroColecoes(null);
-      });
-      return true;
-    } catch (error) {
-      setErroColecoes(mensagemDoErro(error));
-      return false;
-    }
-  };
-
   useEffect(() => {
     void fetchProdutos(1, pagination.pageSize || DEFAULT_PAGE_SIZE);
   }, [searchText, projetoFiltro]);
@@ -154,7 +133,6 @@ export default function ProdutosPage(): JSX.Element {
 
   useEffect(() => {
     void fetchProjetos();
-    void fetchColecoes();
   }, []);
 
   const handleCreate = (): void => {
@@ -170,7 +148,6 @@ export default function ProdutosPage(): JSX.Element {
       nome: produto.nome,
       descricao: produto.descricao,
       projeto: produto.projeto,
-      colecao: produto.colecao,
       ativo: produto.ativo,
     });
     setModalVisible(true);
@@ -184,7 +161,6 @@ export default function ProdutosPage(): JSX.Element {
         nome: values.nome,
         descricao: values.descricao,
         projeto: values.projeto,
-        colecao: values.colecao ?? null,
         ativo: values.ativo,
       };
       if (editingProduto) {
@@ -289,14 +265,6 @@ export default function ProdutosPage(): JSX.Element {
     },
     { title: 'Código', dataIndex: 'codigo', key: 'codigo', width: 136, ellipsis: true, responsive: VISIVEL_A_PARTIR.sm },
     { title: 'Projeto', dataIndex: 'projeto_nome', key: 'projeto_nome', ellipsis: true, responsive: VISIVEL_A_PARTIR.md },
-    {
-      title: 'Coleção',
-      dataIndex: 'colecao_nome',
-      key: 'colecao_nome',
-      ellipsis: true,
-      responsive: VISIVEL_A_PARTIR.lg,
-      render: (_, record) => ouTraco(record.colecao_nome),
-    },
     {
       title: 'Descrição',
       dataIndex: 'descricao',
@@ -483,41 +451,10 @@ export default function ProdutosPage(): JSX.Element {
               filterOption={(input, option) =>
                 (option?.children as unknown as string)?.toLowerCase().includes(input.toLowerCase()) ?? false
               }
-              // A coleção é do projeto: trocar o projeto a limpa (senão gravava a de outro projeto).
-              onChange={() => form.setFieldValue('colecao', undefined)}
             >
               {projetos.map((p) => (
                 <Select.Option key={p.id} value={p.id}>
                   {p.nome}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          <Form.Item
-            name="colecao"
-            label="Coleção"
-            help={selectedProjeto == null ? 'Selecione um projeto para listar as coleções' : undefined}
-            extra={
-              erroColecoes ? (
-                <FalhaAoCarregar oque="as coleções" erro={erroColecoes} onTentarDeNovo={fetchColecoes} campo={colecaoRef} />
-              ) : undefined
-            }
-          >
-            <Select
-              ref={colecaoRef}
-              placeholder="Selecione uma coleção (opcional)"
-              allowClear
-              showSearch
-              disabled={!!erroColecoes && colecoes.length === 0}
-              optionFilterProp="children"
-              filterOption={(input, option) =>
-                (option?.children as unknown as string)?.toLowerCase().includes(input.toLowerCase()) ?? false
-              }
-            >
-              {colecoesDoProjeto.map((c) => (
-                <Select.Option key={c.id} value={c.id}>
-                  {c.nome}
                 </Select.Option>
               ))}
             </Select>

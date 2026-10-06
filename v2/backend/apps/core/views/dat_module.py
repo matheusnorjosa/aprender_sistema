@@ -525,11 +525,14 @@ class DATCompraViewSet(LockOnWriteMixin, viewsets.ModelViewSet):
             else 0
         )
         produtos_diferentes = qs.values("produto_id").distinct().count()
-        colecoes_diferentes = qs.exclude(produto__colecao__isnull=True).values("produto__colecao_id").distinct().count()
+        # Coleção = família (ProjetoGeral) do projeto da compra (P1, decisão do dono 05/10/2026).
+        colecoes_diferentes = (
+            qs.exclude(projeto__projeto_geral__isnull=True).values("projeto__projeto_geral_id").distinct().count()
+        )
         valor_total = qs.aggregate(total=Sum(F("valor_unitario") * F("quantidade")))["total"] or 0
 
         colecao_raw = (
-            qs.annotate(colecao_nome=Coalesce("produto__colecao__nome", Value("Sem coleção")))
+            qs.annotate(colecao_nome=Coalesce("projeto__projeto_geral__nome", Value("Sem coleção")))
             .values("colecao_nome")
             .annotate(quantidade=Sum("quantidade"))
             .order_by("-quantidade")

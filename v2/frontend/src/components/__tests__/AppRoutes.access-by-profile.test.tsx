@@ -43,7 +43,6 @@ vi.mock('../../api/ops', () => ({
   importAcoes: vi.fn(),
   importBloqueios: vi.fn(),
   importCadastros: vi.fn(),
-  importColecoes: vi.fn(),
   importCompras: vi.fn(),
   importDeslocamentos: vi.fn(),
   importEquipeGerencia: vi.fn(),
@@ -562,7 +561,7 @@ describe('AppRoutes — gates de rota por perfil canônico', () => {
 // ============================================================================
 
 describe('AppRoutes — telas de importação só abrem para superusuário', () => {
-  const ROTAS_DE_IMPORTACAO = ['/dat/importacoes', '/dat/importacao', '/dat/admin/colecoes', '/dat/admin/equipe-gerencia'];
+  const ROTAS_DE_IMPORTACAO = ['/dat/importacoes', '/dat/importacao', '/dat/admin/equipe-gerencia'];
   const ator = (nome: string): ActorSnapshot => ACTORS.find((a) => a.actor === nome)!;
 
   test.each(ROTAS_DE_IMPORTACAO)('DAT (manage_admin_registries, import_*) em %s → Recurso indisponível', async (rota) => {

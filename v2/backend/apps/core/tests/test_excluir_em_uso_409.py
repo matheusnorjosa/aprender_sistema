@@ -22,7 +22,6 @@ import pytest
 
 from apps.core.exceptions import _mensagem_em_uso
 from apps.core.models import (
-    Colecao,
     Compra,
     DATCadastro,
     EquipeGerencia,
@@ -95,13 +94,13 @@ def test_gerencia_com_equipe_da_409_com_acento():
     assert Gerencia.objects.filter(pk=gerencia.pk).exists()
 
 
-def test_projeto_com_colecao_da_409_com_acento():
+def test_projeto_com_produto_da_409():
     projeto = ProjetoFactory()
-    Colecao.objects.create(nome="Coleção 409", projeto=projeto)
+    Produto.objects.create(codigo="P409-PROJ", nome="Kit Projeto 409", projeto=projeto)
 
     resp = _root_client().delete(f"/api/projetos/{projeto.id}/")
 
-    _assert_409_em_uso(resp, "Coleções")
+    _assert_409_em_uso(resp, str(Produto._meta.verbose_name_plural), "Kit Projeto 409")
     assert Projeto.objects.filter(pk=projeto.pk).exists()
 
 
@@ -171,7 +170,6 @@ def test_sentinela_todo_model_com_fk_protect_sai_com_acento_no_409():
         "core.AcaoTemplateExecutor": "Executores de Ações Template",
         "core.AvailabilityBlock": "Bloqueios de Disponibilidade",
         "core.CicloAcoes": "Ciclos de Ações",
-        "core.Colecao": "Coleções",
         "core.Compra": "Compras",
         "core.DATAcao": "Ações DAT",
         "core.DATCadastro": "Cadastros DAT",

@@ -31,7 +31,6 @@ import {
   importAcoes,
   importBloqueios,
   importCadastros,
-  importColecoes,
   importCompras,
   importDeslocamentos,
   importEquipeGerencia,
@@ -100,12 +99,6 @@ const CADASTROS_BASE: ImportCard[] = [
     label: 'Importar MUNICÍPIOS',
     description: 'CSV/XLSX: nome, uf (obrigatórios); ibge_code, ativo (opcionais)',
     importFn: importMunicipios,
-  },
-  {
-    key: 'colecoes',
-    label: 'Importar COLEÇÕES',
-    description: 'CSV/XLSX: codigo, nome, projeto (obrigatórios)',
-    importFn: importColecoes,
   },
   {
     key: 'cadastros-dat',

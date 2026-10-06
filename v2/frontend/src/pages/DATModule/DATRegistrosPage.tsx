@@ -445,7 +445,7 @@ export default function DATRegistrosPage(): JSX.Element {
           <Col xs={24} sm={12} md={8} lg={4}>
             <div className="mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
-                Projeto Geral
+                Coleção
               </Text>
             </div>
             <Select
@@ -681,8 +681,8 @@ export default function DATRegistrosPage(): JSX.Element {
               <Col xs={24} sm={12} md={8}>
                 <Form.Item
                   name="projeto_geral"
-                  label="Projeto Geral"
-                  rules={[{ required: true, message: 'Selecione o projeto geral' }]}
+                  label="Coleção"
+                  rules={[{ required: true, message: 'Selecione a coleção' }]}
                 >
                   <Select
                     placeholder="Selecione..."
@@ -697,7 +697,7 @@ export default function DATRegistrosPage(): JSX.Element {
                   rules={[{ required: true, message: 'Selecione o projeto' }]}
                 >
                   <Select
-                    placeholder="Filtrado pelo geral..."
+                    placeholder="Filtrado pela coleção..."
                     showSearch
                     optionFilterProp="label"
                     options={projetos.map((p) => ({ label: `${p.nome} (${p.codigo})`, value: p.id }))}

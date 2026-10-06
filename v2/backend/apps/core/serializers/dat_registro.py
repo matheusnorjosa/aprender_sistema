@@ -145,7 +145,7 @@ class DATRegistroCreateSerializer(serializers.ModelSerializer["DATRegistro"]):
         if projeto and projeto.projeto_geral and projeto_geral:
             if projeto.projeto_geral_id != projeto_geral.id:
                 raise serializers.ValidationError(
-                    {"projeto": f"Projeto '{projeto.nome}' não pertence ao Projeto Geral '{projeto_geral.nome}'."}
+                    {"projeto": f"Projeto '{projeto.nome}' não pertence à coleção '{projeto_geral.nome}'."}
                 )
 
         # Check professor_qtde for por_professor calculation

@@ -220,7 +220,6 @@ Helpers de reconciliação compartilhados em `apps/core/services/resolvers.py`:
 | `POST /api/disponibilidade/import-bloqueios/` | `ImportBloqueiosView` | `HasPerm("import_spreadsheet")` |
 | `POST /api/produtos/import/` | `ImportProdutosView` | `HasPerm("import_spreadsheet")` |
 | `POST /api/municipios/import/` | `ImportMunicipiosView` | `HasPerm("manage_admin_registries")` |
-| `POST /api/colecoes/import/` | `ImportColecoesView` | `HasPerm("manage_admin_registries")` |
 | `POST /api/equipe-gerencia/import/` | `ImportEquipeGerenciaView` | `HasPerm("manage_admin_registries")` |
 | `POST /api/controle/import-compras/` | `ImportComprasView` | `HasPerm("import_spreadsheet")` |
 | `POST /api/controle/import-acoes/` | `ControleImportAcoesView` | `HasPerm("import_spreadsheet")` |

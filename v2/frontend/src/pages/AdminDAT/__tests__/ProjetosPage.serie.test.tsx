@@ -1,8 +1,8 @@
 /**
  * Marca de série (`Projeto.eh_serie`) e família na tela Projetos.
  *
- * - Grade: a etiqueta "Série" junto do nome (sempre na linha) e a coluna "Família"
- *   (`projeto_geral_nome`, só leitura), que sobe a partir de `lg`.
+ * - Grade: a etiqueta "Série" junto do nome (sempre na linha) e a coluna "Coleção", que é a família
+ *   (`projeto_geral_nome`, só leitura; decisão do dono, 06/10/2026), e sobe a partir de `lg`.
  * - Modal: o interruptor "É série", com o texto que diz o efeito; o valor vai no PATCH/POST.
  * - Sem rolagem horizontal: lista no ResponsiveTable. Sempre na linha: nome, situação e ações;
  *   o resto sobe por largura e, escondido, aparece na linha expandida. O ID não vai para a grade.
@@ -105,7 +105,7 @@ describe('ProjetosPage — série e família', () => {
     const serie = await linhaDe(SERIE);
     const semFamilia = await linhaDe(FAMILIA_SEM);
 
-    expect(cabecalhos()).toEqual(['Nome', 'Código', 'Setor', 'Família', 'Fluxo', 'Situação', 'Ações']);
+    expect(cabecalhos()).toEqual(['Nome', 'Código', 'Setor', 'Coleção', 'Fluxo', 'Situação', 'Ações']);
     expect(within(serie).getByText('Série')).toBeInTheDocument();
     expect(within(serie).getByText('A COR DA GENTE', { exact: true })).toBeInTheDocument();
     expect(within(semFamilia).queryByText('Série')).not.toBeInTheDocument();
@@ -125,7 +125,7 @@ describe('ProjetosPage — série e família', () => {
 
     await user.click(within(linha).getByRole('button', { name: `Expandir linha de ${SERIE}` }));
     const expandida = within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);
-    expect(expandida.getByText('Família')).toBeInTheDocument();
+    expect(expandida.getByText('Coleção')).toBeInTheDocument();
     expect(expandida.getByText('A COR DA GENTE', { exact: true })).toBeInTheDocument();
     expect(expandida.getByText('ACG3')).toBeInTheDocument();
   }, 20000);

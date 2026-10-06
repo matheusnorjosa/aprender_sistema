@@ -41,7 +41,7 @@ class ImportJob(models.Model):
     class ImportType(models.TextChoices):
         BLOQUEIOS = "bloqueios", "Bloqueios"
         # Fase 2 adicionara: USUARIOS, COMPRAS, ACOES, DESLOCAMENTOS,
-        # EVENTOS, PRODUTOS, MUNICIPIOS, COLECOES, EQUIPE_GERENCIA
+        # EVENTOS, PRODUTOS, MUNICIPIOS, EQUIPE_GERENCIA
 
     user = models.ForeignKey(  # type: ignore[misc]
         "core.Usuario",

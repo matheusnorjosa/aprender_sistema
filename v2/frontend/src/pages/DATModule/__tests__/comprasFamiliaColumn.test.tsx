@@ -1,6 +1,7 @@
 /**
- * H.1/#1897: coluna "Família" (projeto_geral_nome) ao lado da variante (projeto_nome) nas
- * telas DAT — o "reagrupar por família" vem de ordenar por ela. Teste representativo em Compras
+ * H.1/#1897: coluna da família (projeto_geral_nome) ao lado da variante (projeto_nome) nas
+ * telas DAT — o "reagrupar por família" vem de ordenar por ela. Na tela ela se chama "Coleção"
+ * (decisão do dono, 06/10/2026: coleção é a família). Teste representativo em Compras
  * (Ações/PlanoFormações/Formações recebem a MESMA adição mecânica: campo no record + coluna).
  */
 import { describe, expect, test, vi, beforeEach } from 'vitest';
@@ -29,7 +30,7 @@ vi.mock('../../../api/datModule', () => ({
 
 import ComprasPage from '../ComprasPage';
 
-describe('ComprasPage — coluna Família (H.1)', () => {
+describe('ComprasPage — coluna Coleção, a família (H.1)', () => {
   beforeEach(() => vi.clearAllMocks());
 
   test(
@@ -40,8 +41,9 @@ describe('ComprasPage — coluna Família (H.1)', () => {
           <ComprasPage />
         </MemoryRouter>,
       );
-      // colunas Projeto+Família são fixed:left → AntD duplica células/headers → findAllByText
-      expect((await screen.findAllByText('Família', {}, { timeout: 20000 })).length).toBeGreaterThan(0);
+      // colunas Projeto+Coleção são fixed:left → AntD duplica células/headers → findAllByText
+      expect((await screen.findAllByText('Coleção', {}, { timeout: 20000 })).length).toBeGreaterThan(0);
+      expect(screen.queryByText('Família')).not.toBeInTheDocument();
       // variante e família aparecem (valores distintos → provam colunas distintas)
       expect((await screen.findAllByText('NOVO LENDO 1')).length).toBeGreaterThan(0); // variante
       expect((await screen.findAllByText('NOVO LENDO')).length).toBeGreaterThan(0); // família

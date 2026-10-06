@@ -116,7 +116,7 @@ async function postMultipart(url: string, file: File, dryRun: boolean = true): P
  * `toApplyResult`) can read it as `{created, updated, skipped, errors}`.
  *
  * Variants seen in production:
- *   - bloqueios / usuarios / municipios / colecoes / produtos / equipe_gerencia /
+ *   - bloqueios / usuarios / municipios / produtos / equipe_gerencia /
  *     acoes / deslocamentos / cadastros:
  *       stats = { created, updated, unchanged, skipped: {cat1: N, cat2: N, ...} }
  *       pendencias = { cat1: [{linha, erro, ...}], ... }
@@ -311,19 +311,6 @@ export async function importUsuarios(file: File, dryRun: boolean = true): Promis
  */
 export async function importMunicipios(file: File, dryRun: boolean = true): Promise<ImportResult> {
   return await postMultipart('/municipios/import/', file, dryRun);
-}
-
-/**
- * Importa COLECOES de CSV/XLSX.
- *
- * Colunas esperadas:
- * - codigo, nome, projeto (obrigatorios)
- *
- * @param file - Arquivo a enviar
- * @param dryRun - Se true, apenas preview
- */
-export async function importColecoes(file: File, dryRun: boolean = true): Promise<ImportResult> {
-  return await postMultipart('/colecoes/import/', file, dryRun);
 }
 
 /**

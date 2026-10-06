@@ -96,7 +96,6 @@ ENTITY_ORDER = [
     "projeto_geral",
     "projeto",
     "produto",
-    "colecao",
     "usuario",
     "gerencia",
     "equipe_gerencia",

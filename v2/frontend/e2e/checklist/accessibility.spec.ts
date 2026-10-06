@@ -616,7 +616,7 @@ test.describe('Checklist: Acessibilidade — opções que não carregaram (C2, a
       await expect(page.getByRole('combobox', { name: 'Filtrar por projeto' })).toBeFocused();
     });
 
-    test(`🔴 Produtos a ${largura}px: modal sem projetos e coleções — dois avisos no Tab, cada um com o seu nome`, async ({
+    test(`🔴 Produtos a ${largura}px: modal sem projetos — o aviso no Tab, com o seu nome`, async ({
       page,
       baseURL,
     }) => {
@@ -625,32 +625,27 @@ test.describe('Checklist: Acessibilidade — opções que não carregaram (C2, a
       const rede = vigiarRede(page, baseURL);
       await entrar(page, rota.perfil, largura);
       await page.route(/\/api\/projetos\/(\?|$)/, (r) => r.fulfill(FALHA));
-      await page.route(/\/api\/options\/colecoes\//, (r) => r.fulfill(FALHA));
       await page.goto(rota.path);
-      const alvo = { ...rota, redeEsperada: [/^500 \/api\/projetos\//, /^500 \/api\/options\/colecoes\//] };
+      const alvo = { ...rota, redeEsperada: [/^500 \/api\/projetos\//] };
       const problemas = await verificarTela(page, alvo, rede);
       expect(problemas, 'a tela de Produtos não ficou pronta').toEqual(['erro na tela: 1 Result/Alert de erro em main']);
 
       await page.getByRole('button', { name: /Novo Produto/ }).click();
       const modal = page.getByRole('dialog');
       const projetos = modal.getByRole('button', { name: 'Tentar de novo: carregar os projetos', exact: true });
-      const colecoes = modal.getByRole('button', { name: 'Tentar de novo: carregar as coleções', exact: true });
       await expect(modal.getByRole('combobox', { name: 'Projeto' })).toBeDisabled();
-      await expect(modal.getByRole('combobox', { name: 'Coleção' })).toBeDisabled();
 
       await modal.getByLabel('Descricao').focus();
       await page.keyboard.press('Tab');
       await expect(projetos).toBeFocused();
-      await page.keyboard.press('Tab');
-      await expect(colecoes).toBeFocused();
 
       await expect(page.locator('.ant-modal[class*="ant-zoom"]')).toHaveCount(0);
       await semViolacoesCriticas(page, `o modal de Produtos a ${largura}px`, '.ant-modal-wrap');
 
       // Carregou: o foco vai para o campo que o botão recarregou.
-      await page.unroute(/\/api\/options\/colecoes\//);
+      await page.unroute(/\/api\/projetos\/(\?|$)/);
       await page.keyboard.press('Enter');
-      await expect(modal.getByRole('combobox', { name: 'Coleção' })).toBeFocused();
+      await expect(modal.getByRole('combobox', { name: 'Projeto' })).toBeFocused();
     });
   }
 });

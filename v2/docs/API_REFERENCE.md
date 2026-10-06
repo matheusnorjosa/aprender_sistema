@@ -713,7 +713,6 @@ Importação pela tela é só do superusuário (decisão do dono, 02/10/2026): n
 |----------|-----------|
 | `/api/usuarios/import/` | `IsAuthenticated` + `SuperuserOnly` |
 | `/api/municipios/import/` | `IsAuthenticated` + `SuperuserOnly` |
-| `/api/colecoes/import/` | `IsAuthenticated` + `SuperuserOnly` |
 | `/api/equipe-gerencia/import/` | `IsAuthenticated` + `SuperuserOnly` |
 | `/api/dat/import-cadastros/` | `IsAuthenticated` + `SuperuserOnly` |
 | `/api/solicitacoes/import/` | `IsAuthenticated` + `SuperuserOnly` |

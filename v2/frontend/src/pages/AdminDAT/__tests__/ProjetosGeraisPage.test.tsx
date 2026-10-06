@@ -37,7 +37,7 @@ function renderPage() {
 describe('ProjetosGeraisPage (#1914 — CRUD admin)', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  test('lista os projetos gerais retornados pela API', async () => {
+  test('lista as coleções retornadas pela API', async () => {
     renderPage();
     expect(await screen.findByText('PROJETO AMMA', {}, { timeout: 15000 })).toBeInTheDocument();
     expect(await screen.findByText('PROJETO VIDAS')).toBeInTheDocument();
@@ -48,7 +48,7 @@ describe('ProjetosGeraisPage (#1914 — CRUD admin)', () => {
   test('o botão "Novo" abre o modal e cria via createProjetoGeral', async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(await screen.findByRole('button', { name: /novo projeto geral/i }, { timeout: 15000 }));
+    await user.click(await screen.findByRole('button', { name: /nova coleção/i }, { timeout: 15000 }));
     const nome = await screen.findByLabelText('Nome', {}, { timeout: 10000 });
     await user.type(nome, 'PROJETO NOVO');
     await user.click(screen.getByRole('button', { name: /salvar/i }));

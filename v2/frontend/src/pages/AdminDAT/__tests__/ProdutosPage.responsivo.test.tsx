@@ -2,7 +2,7 @@
  * C2 (Programa C) — Produtos sem rolagem horizontal: lista enxuta no ResponsiveTable.
  *
  * Sempre na linha: o nome, a situação e as ações (AcoesLinha). Código sobe a partir de
- * `sm`, Projeto de `md` e Coleção de `lg`; a Descrição (texto longo) só aparece na grade
+ * `sm` e Projeto de `md`; a Descrição (texto longo) só aparece na grade
  * a partir de `xxl` (1600 px): nas larguras medidas (até 1280 px) ela fica na linha
  * expandida, inteira. O ID interno não vai para a grade. A 360 px as ações ficam no menu
  * "Mais ações".
@@ -25,8 +25,6 @@ const { PRODUTOS } = vi.hoisted(() => ({
       descricao: 'Caixa com cartilhas, fichas de leitura e jogos de consciência fonológica para o 1º ano',
       projeto: 5,
       projeto_nome: 'Alfabetização e Letramento',
-      colecao: 9,
-      colecao_nome: 'Coleção Primeiros Passos',
       ativo: true,
       created_at: '2026-03-02T12:00:00Z',
       updated_at: '2026-09-29T13:30:00Z',
@@ -42,7 +40,6 @@ vi.mock('../../../api/adminDAT', () => ({
   listProjetos: vi.fn().mockResolvedValue({
     results: [{ id: 5, nome: 'Alfabetização e Letramento' }], count: 1, next: null, previous: null,
   }),
-  listColecoesOptions: vi.fn().mockResolvedValue([{ id: 9, nome: 'Coleção Primeiros Passos', projeto: 5 }]),
 }));
 
 import ProdutosPage from '../ProdutosPage';
@@ -83,12 +80,12 @@ function linhaExpandida() {
 describe('ProdutosPage responsiva (C2)', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  test('a 1280 px: nome, código, projeto, coleção, situação e ações; descrição na linha expandida', async () => {
+  test('a 1280 px: nome, código, projeto, situação e ações (sem coluna Coleção); descrição na linha expandida', async () => {
     const user = userEvent.setup();
     renderPage();
     const linha = await linhaDoProduto();
 
-    expect(cabecalhos()).toEqual(['Nome', 'Código', 'Projeto', 'Coleção', 'Situação', 'Ações']);
+    expect(cabecalhos()).toEqual(['Nome', 'Código', 'Projeto', 'Situação', 'Ações']);
     // O nome (identidade) quebra linha em vez de cortar com reticências: não há detalhe que o mostre.
     expect(within(linha).getByText(NOME).closest('td')).not.toHaveClass('ant-table-cell-ellipsis');
     expect(within(linha).queryByText('731')).not.toBeInTheDocument();
@@ -113,7 +110,7 @@ describe('ProdutosPage responsiva (C2)', () => {
     expect(within(linha).getByRole('button', { name: `Mais ações: ${NOME}` })).toBeInTheDocument();
 
     await user.click(within(linha).getByRole('button', { name: `Expandir linha de ${NOME}` }));
-    for (const texto of ['KIT-ALF-2026', 'Alfabetização e Letramento', 'Coleção Primeiros Passos', DESCRICAO]) {
+    for (const texto of ['KIT-ALF-2026', 'Alfabetização e Letramento', DESCRICAO]) {
       expect(linhaExpandida().getByText(texto)).toBeInTheDocument();
     }
   }, 20000);
@@ -121,7 +118,7 @@ describe('ProdutosPage responsiva (C2)', () => {
   test('mudar a largura com a página aberta reorganiza as colunas', async () => {
     renderPage();
     await linhaDoProduto();
-    expect(cabecalhos()).toContain('Coleção');
+    expect(cabecalhos()).toContain('Projeto');
 
     act(() => definirLarguraTela(360));
 

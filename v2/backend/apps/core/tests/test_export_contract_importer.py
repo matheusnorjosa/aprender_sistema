@@ -34,6 +34,8 @@ from apps.core.models import (
     ProjetoGeral,
 )
 from apps.core.services.export_contract_importer import (
+    ENTITY_ORDER,
+    IMPLEMENTED,
     ExportContractImporter,
     diff_and_classify,
 )
@@ -189,13 +191,14 @@ def test_uses_projeto_resolver():
     assert Projeto.objects.get(id=pid).nome == "Vida & Matemática 6"
 
 
-# ───────── entidades não implementadas ─────────
-def test_not_implemented_entities_marked(tmp_path):
-    # As 22 entidades do contrato agora são IMPLEMENTED (#1896, incl. deslocamento). `colecao` segue
-    # em ENTITY_ORDER mas FORA de IMPLEMENTED (a fonte não a emite) — o caso de not_implemented restante.
+# ───────── entidades do contrato ─────────
+def test_todas_as_entidades_do_contrato_estao_implementadas(tmp_path):
+    # As 22 entidades do contrato são IMPLEMENTED (#1896, incl. deslocamento). `colecao` saiu do
+    # ENTITY_ORDER (06/10/2026): coleção é a família (`projeto_geral`) e a fonte nunca a emitiu.
+    assert set(ENTITY_ORDER) <= IMPLEMENTED
     path = _write_export(tmp_path, {"colecao": "nome\nX\n"})
     r = ExportContractImporter(path=path).run()["por_entidade"]
-    assert r["colecao"]["status"] == "not_implemented"
+    assert "colecao" not in r
 
 
 # ───────── sem PII no relatório ─────────

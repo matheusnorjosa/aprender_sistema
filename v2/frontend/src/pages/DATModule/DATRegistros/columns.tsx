@@ -70,7 +70,7 @@ export function getColumns({ onEdit, onDelete }: ColumnHandlers): ColumnsType<DA
       ),
     },
     {
-      title: 'Projeto Geral',
+      title: 'Coleção',
       dataIndex: 'projeto_geral_nome',
       key: 'projeto_geral',
       width: 150,

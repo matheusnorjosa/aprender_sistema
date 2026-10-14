@@ -252,3 +252,93 @@ def test_ano_ja_criado_vazio_pelo_split_aparece_no_dry_run(tmp_path, base):
     assert (seco["would_skip_same"], seco["existe_sem_quantidade"]) == (1, 1)
     assert _apply(path, base["actor"])["applied"]["dat_registro"] == 0
     assert _quantidades() == {2027: (None, None)}
+
+
+@pytest.mark.parametrize(
+    ("no_banco", "linhas", "pulados"),
+    [
+        ({2027: (100, 10)}, ["2026,100,10", "2027,300,30"], 1),
+        ({2026: (300, 30)}, ["2026,100,10", "2027,300,30"], 1),
+        ({2026: (100, 10)}, ["2027,100,10"], 0),
+        ({2027: (100, 10)}, ["2026,100,10"], 0),
+    ],
+    ids=["linha_2026_no_registro_2027", "linha_2027_no_registro_2026", "so_2027_no_2026", "so_2026_no_2027"],
+)
+def test_registro_com_a_quantidade_de_outro_ano_nao_ganha_copia(tmp_path, base, no_banco, linhas, pulados):
+    """O split antigo dava ao flat o ano das compras (2026 se houvesse, senão o maior), não o da linha de
+    onde vinham as quantidades. Registro com ano que guarda a quantidade da linha de OUTRO ano, e não a do
+    próprio ano: criar o ano da linha copiaria a quantidade para os dois anos. A tripla não ganha registro,
+    a linha é rejeitada em `quantidade_em_outro_ano` e o banco fica como está, para uma pessoa decidir."""
+    for ano, (aluno, prof) in no_banco.items():
+        DATRegistro.objects.create(
+            municipio=base["mun"],
+            projeto_geral=base["pg"],
+            projeto=base["proj"],
+            ano=ano,
+            aluno_qtde=aluno,
+            professor_qtde=prof,
+            created_by=base["actor"],
+        )
+    csv = REG_HEADER + "\n"
+    for linha in linhas:
+        ano, aluno, prof = linha.split(",")
+        csv += f"Cidade Ano,CE,PG Ano,Proj Ano,{aluno},{prof},{ano}\n"
+    path = _write_export(tmp_path, {"dat_registro": csv})
+
+    seco = _seco(path)
+    assert (seco["would_create"], seco["would_skip_same"], seco["would_reject"]) == (0, pulados, 1)
+    assert seco["reject_reasons"]["quantidade_em_outro_ano"] == 1
+
+    r = _apply(path, base["actor"])
+
+    assert r["applied"]["dat_registro"] == 0
+    assert _quantidades() == no_banco
+
+
+def test_registro_com_a_quantidade_do_proprio_ano_deixa_o_outro_ano_entrar(tmp_path, base):
+    """Controle: os dois anos com a mesma quantidade na planilha. O registro de 2026 bate com a linha de
+    2026, então não foi movido de ano; a linha de 2027 entra."""
+    DATRegistro.objects.create(
+        municipio=base["mun"],
+        projeto_geral=base["pg"],
+        projeto=base["proj"],
+        ano=2026,
+        aluno_qtde=100,
+        professor_qtde=10,
+        created_by=base["actor"],
+    )
+    csv = f"{REG_HEADER}\nCidade Ano,CE,PG Ano,Proj Ano,100,10,2026\nCidade Ano,CE,PG Ano,Proj Ano,100,10,2027\n"
+    path = _write_export(tmp_path, {"dat_registro": csv})
+
+    seco = _seco(path)
+    assert (seco["would_create"], seco["would_reject"]) == (1, 0)
+
+    assert _apply(path, base["actor"])["applied"]["dat_registro"] == 1
+    assert _quantidades() == {2026: (100, 10), 2027: (100, 10)}
+
+
+def test_flat_divergente_continua_sem_ano_depois_do_split(tmp_path, base):
+    """O flat que não bate com nenhuma linha (`sem_ano_divergente`) fica sem ano também depois do split
+    do mesmo apply: o split não lhe dá o ano primário das compras ao lado do registro com ano da planilha."""
+    DATRegistro.objects.create(
+        municipio=base["mun"],
+        projeto_geral=base["pg"],
+        projeto=base["proj"],
+        ano=None,
+        aluno_qtde=300,
+        professor_qtde=30,
+        created_by=base["actor"],
+    )
+    compras = (
+        f"{COMPRA_HEADER}\n"
+        "Cidade Ano,CE,Proj Ano,Kit prof,Professor,20,2026-03-01,true,2026\n"
+        "Cidade Ano,CE,Proj Ano,Kit prof,Professor,100,2026-03-02,true,2027\n"
+    )
+    reg = "Cidade Ano,CE,PG Ano,Proj Ano,310,30,2027\n"
+    path = _write_export(tmp_path, {"dat_registro": f"{REG_HEADER}\n{reg}", "dat_compra": compras})
+
+    assert _seco(path)["sem_ano_divergente"] == 1
+
+    _apply(path, base["actor"], "dat_registro", "dat_compra")
+
+    assert _quantidades() == {None: (300, 30), 2026: (None, None), 2027: (310, 30)}

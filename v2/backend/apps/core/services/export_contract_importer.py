@@ -517,6 +517,28 @@ def _dat_registro_existente(
     return st
 
 
+def _dat_registro_quantidade_em_outro_ano(
+    arquivo: dict[tuple[int, int, int], dict[int, tuple[int | None, int | None]]],
+) -> set[tuple[int, int, int]]:
+    """Triplas cujo registro COM ano no banco guarda a quantidade da linha de OUTRO ano do arquivo, e não a
+    do próprio ano. `arquivo`: tripla → {ano: (aluno_qtde, professor_qtde)} da 1ª linha com ano.
+
+    O split antigo (até o export v37) dava ao flat o ano das compras (2026 se houvesse, senão o maior), não
+    o da linha de onde vinham as quantidades. Nessa tripla, criar o ano que falta copiaria a quantidade para
+    os dois anos; o classify rejeita a linha (`quantidade_em_outro_ano`) e o apply não cria, para uma pessoa
+    decidir. Registro vazio (o ano que o split criou sem quantidade) não conta."""
+    triplas: set[tuple[int, int, int]] = set()
+    for mid, pgid, pid, ano, aluno, prof in (
+        DATRegistro.objects.filter(ano__isnull=False)
+        .exclude(aluno_qtde__isnull=True, professor_qtde__isnull=True)
+        .values_list("municipio_id", "projeto_geral_id", "projeto_id", "ano", "aluno_qtde", "professor_qtde")
+    ):
+        linhas = arquivo.get((mid, pgid, pid), {})
+        if linhas.get(ano) != (aluno, prof) and any(a != ano and q == (aluno, prof) for a, q in linhas.items()):
+            triplas.add((mid, pgid, pid))
+    return triplas
+
+
 def diff_and_classify(
     existing: dict[str, Any] | None, export: dict[str, Any], protected: set[str]
 ) -> tuple[str, list[str]]:
@@ -928,6 +950,7 @@ class ExportContractImporter:
             pg_idx = self._projeto_geral_index()
             anos_db = _dat_registro_anos()
             flats_db = _dat_registro_flats(anos_db)
+            em_outro_ano = self._dat_registro_triplas_em_outro_ano(rows)
             triplas_com_ano: set[tuple[int, int, int]] = set()
             vazios_reg = set(
                 DATRegistro.objects.filter(aluno_qtde__isnull=True, professor_qtde__isnull=True).values_list(
@@ -941,7 +964,7 @@ class ExportContractImporter:
             # em silêncio: o apply fica com a 1ª linha).
             vistas_reg: dict[tuple[Any, ...], tuple[str, ...]] = {}
             divergentes_reg: list[str] = []
-            reasons = {"repetida_no_arquivo": 0}
+            reasons = {"repetida_no_arquivo": 0, "quantidade_em_outro_ano": 0}
             pg_nomes = dict(ProjetoGeral.objects.values_list("id", "nome"))
             for r in rows:
                 mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
@@ -969,6 +992,9 @@ class ExportContractImporter:
                     triplas_com_ano.add((mun_id, pg_id, proj_id))
                 qtdes = (_parse_int(r.get("aluno_qtde")), _parse_int(r.get("professor_qtde")))
                 st = _dat_registro_existente(anos_db, flats_db, nk, qtdes)
+                if st == "would_create" and nk[:3] in em_outro_ano:
+                    st = "would_reject"
+                    reasons["quantidade_em_outro_ano"] += 1
                 tally[st] += 1
                 if st == "would_skip_same" and nk in vazios_reg and any(dados):
                     # O split por ano das compras cria o registro do ano sem quantidade; o create-only não o
@@ -2059,12 +2085,15 @@ class ExportContractImporter:
         a existência segue `_dat_registro_existente` (a mesma do classify). DATRegistro.save() recalcula
         nr_codigos + espelha usa_avaliar; nr_codigos_planilha guarda o valor cru da planilha para
         reconciliação. Única escrita em registro existente: o flat sem ano de carga antiga recebe o ano da
-        linha com as mesmas quantidades (seed-if-empty, só o campo `ano`). Retorna `(created, ano_preenchido)`."""
+        linha com as mesmas quantidades (seed-if-empty, só o campo `ano`). Tripla com registro que guarda a
+        quantidade de outro ano não ganha registro (`_dat_registro_quantidade_em_outro_ano`). Retorna
+        `(created, ano_preenchido)`."""
         actor = self._require_actor("dat_registro")
         mun_idx = self._municipio_index()
         pg_idx = self._projeto_geral_index()
         anos_db = _dat_registro_anos()
         flats_db = _dat_registro_flats(anos_db)
+        em_outro_ano = self._dat_registro_triplas_em_outro_ano(rows)
         created = 0
         ano_preenchido = 0
         for r in rows:
@@ -2085,8 +2114,8 @@ class ExportContractImporter:
                 flat.save(update_fields=["ano", "nr_codigos", "updated_at"])  # save() recalcula nr_codigos do ano
                 ano_preenchido += 1
                 continue
-            if st != "would_create":
-                continue
+            if st != "would_create" or (mun_id, pg_id, proj_id) in em_outro_ano:
+                continue  # existe, ou a tripla tem registro com a quantidade de outro ano (decide uma pessoa)
             reg = DATRegistro(
                 municipio_id=mun_id,
                 projeto_geral_id=pg_id,
@@ -2271,6 +2300,22 @@ class ExportContractImporter:
                 Projeto.objects.filter(id=pid).update(**updates)
                 reconciled += 1
         return reconciled
+
+    def _dat_registro_triplas_em_outro_ano(self, rows: list[dict[str, str]]) -> set[tuple[int, int, int]]:
+        """`_dat_registro_quantidade_em_outro_ano` com as linhas com ano do arquivo (1ª de cada chave)."""
+        mun_idx = self._municipio_index()
+        pg_idx = self._projeto_geral_index()
+        arquivo: dict[tuple[int, int, int], dict[int, tuple[int | None, int | None]]] = {}
+        for r in rows:
+            mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
+            pg_id = pg_idx.get(_norm(r.get("projeto_geral") or ""))
+            proj_id = self.resolve_projeto(r.get("projeto") or "")
+            ano = _parse_int(r.get("ano"))
+            if mun_id is None or pg_id is None or proj_id is None or ano is None:
+                continue
+            qtdes = (_parse_int(r.get("aluno_qtde")), _parse_int(r.get("professor_qtde")))
+            arquivo.setdefault((mun_id, pg_id, proj_id), {}).setdefault(ano, qtdes)
+        return _dat_registro_quantidade_em_outro_ano(arquivo)
 
     def _papel_index_from_equipe(self) -> dict[str, str]:
         """Mapa cpf(11 dig) -> papel canonico, de equipe_gerencia.csv (fonte primaria do papel).

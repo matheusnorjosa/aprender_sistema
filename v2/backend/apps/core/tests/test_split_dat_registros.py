@@ -123,6 +123,20 @@ class SplitDatRegistrosTest(TestCase):
         self.assertEqual((regs[2026].aluno_qtde, regs[2026].professor_qtde), (None, None))
         self.assertEqual((res["reatribuidos"], res["criados"]), (0, 1))
 
+    def test_flat_ao_lado_de_registro_com_ano_fica_sem_ano(self):
+        """O registro sem ano ao lado de um com ano (flat que não bateu com nenhuma linha da planilha)
+        não é de ano conhecido: fica sem ano, e o ano primário das compras nasce vazio."""
+        self._flat(aluno=300, prof=30)
+        self._flat(ano=2027, aluno=310, prof=30)
+        self._compra(20, 2026)
+        self._compra(100, 2027)
+        res = split_dat_registros()
+        regs = self._regs()
+        self.assertEqual(set(regs), {None, 2026, 2027})
+        self.assertEqual((regs[None].aluno_qtde, regs[None].professor_qtde), (300, 30))
+        self.assertEqual((regs[2026].aluno_qtde, regs[2026].professor_qtde), (None, None))
+        self.assertEqual(res, {"pares": 1, "criados": 1, "reatribuidos": 0, "compras_sem_registro": 0})
+
     def test_compra_sem_registro_reportada(self):
         """Compra para um par SEM registro (anomalia de origem: planilha dat_registro não tem a
         linha) não é splitada nem inventada — é reportada em `compras_sem_registro`."""

@@ -11,9 +11,9 @@ Os atributos do flat (aluno_qtde/professor_qtde) ficam no ano PRIMÁRIO (2026 se
 o maior ano real); os anos secundários nascem sem esses campos. `nr_codigos` é recomputado por
 ano no `save()` (ver `dat_codigos.calcular_nr_codigos`, que filtra por `ano_uso=registro.ano`).
 
-Só o registro SEM ano muda de ano. Desde o export v37 o import grava o ano da planilha (2026 e 2027
-da mesma tripla viram dois registros); registro com ano nunca é movido, e o ano de compra sem
-registro nasce vazio ao lado dele.
+Só o registro SEM ano que é o único do par muda de ano. Desde o export v37 o import grava o ano da
+planilha (2026 e 2027 da mesma tripla viram dois registros); registro com ano nunca é movido, o sem
+ano ao lado dele também não, e o ano de compra sem registro nasce vazio ao lado deles.
 """
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportArgumentType=false
@@ -61,10 +61,11 @@ def split_dat_registros(dry_run: bool = False) -> dict[str, int]:
         existing: dict[int | None, DATRegistro] = {r.ano: r for r in regs}
         primary = _primary_ano(target)
 
-        # 1. O registro SEM ano (flat, ano desconhecido) vira o do ano primário, com os atributos. Registro
-        #    que já tem ano fica nele: desde o export v37 o import grava o ano da planilha, e mover o
-        #    registro levaria as quantidades de um ano para outro.
-        if primary is not None and primary not in existing and None in existing:
+        # 1. O registro SEM ano (flat, ano desconhecido) vira o do ano primário, com os atributos, quando é
+        #    o único do par. Registro que já tem ano fica nele: desde o export v37 o import grava o ano da
+        #    planilha, e mover o registro levaria as quantidades de um ano para outro. O sem ano ao lado de
+        #    um com ano (flat que não bateu com nenhuma linha) também fica: de que ano ele é, decide uma pessoa.
+        if primary is not None and primary not in existing and list(existing) == [None]:
             anchor = existing.pop(None)
             reatribuidos += 1
             if not dry_run:

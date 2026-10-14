@@ -2,9 +2,9 @@
 Retrato do poder de cada pessoa, para o simulador `rbac_diff` (PR 1, ADR-020). Somente leitura.
 
 Antes de cada PR que muda poder, roda-se em produção e o dono vê quem ganha e quem perde.
-Nada aqui grava no banco nem no cache: as capacidades de hoje vêm de consulta direta (a mesma de
-`rbac_permissions.get_user_functional_permissions`, sem o cache), e as policies são calculadas
-sobre essas capacidades (`resolve_public_policies(..., capacidades=...)`).
+Nada aqui grava no banco nem no cache: as capacidades de hoje vêm de consulta direta
+(`rbac_permissions.capacidades_sem_cache`, a mesma função que a API usa por trás do cache), e as
+policies são calculadas sobre essas capacidades (`resolve_public_policies(..., capacidades=...)`).
 
 Sem dado pessoal: a pessoa é só `u<id>`. Nunca username (é o CPF), nome, e-mail nem telefone.
 
@@ -27,6 +27,7 @@ from apps.core.models import EquipeGerencia, Gerencia, PermissaoFuncional, Usuar
 from apps.core.rbac.policies import resolve_public_policies
 from apps.core.services.functional_permissions_seed import FUNCTIONAL_PERMISSIONS_SEED
 from apps.core.services.rbac_pacotes import PERFIL_PERMITIDO
+from apps.core.services.rbac_permissions import capacidades_sem_cache
 
 Snapshot = dict[str, dict[str, Any]]
 
@@ -35,11 +36,12 @@ CAMPOS: tuple[str, ...] = ("superusuario", "grupos", "capacidades", "policies", 
 
 
 def capacidades_de_hoje(usuario: Any) -> set[str]:
-    """Capacidades de hoje, por consulta direta: a de `get_user_functional_permissions`, sem cache.
+    """Capacidades de hoje sem cache: a mesma função da API (grupos ∪ pacote do perfil, ADR-020).
 
-    Mudou a fórmula de lá? Mude aqui também: `test_capacidades_de_hoje_igual_a_fonte_da_api` trava a paridade.
+    A paridade com `get_user_functional_permissions` vem por construção; o teste
+    `test_capacidades_de_hoje_igual_a_fonte_da_api` continua travando.
     """
-    return set(PermissaoFuncional.objects.filter(groups__user__id=usuario.id).values_list("codename", flat=True))
+    return capacidades_sem_cache(usuario.id)
 
 
 def _uid(usuario_id: int) -> str:

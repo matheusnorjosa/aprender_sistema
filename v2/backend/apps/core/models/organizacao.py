@@ -189,7 +189,7 @@ class Gerencia(models.Model):
         rotulo (property): `nome_exibicao or nome_setor` — nunca cai para `nome`
         gerente (FK Usuario): Gerente responsavel pela gerencia (nullable)
         ativo (bool): Se a gerencia esta ativa
-        perfil (str): pacote de capacidades do lugar (ADR-020); fora da API, nada lê até o PR B
+        perfil (str): pacote de capacidades do lugar (ADR-020); fora da API, lido pela fórmula da união
         descricao (str): Descricao adicional
     """
 
@@ -323,8 +323,9 @@ class EquipeGerencia(models.Model):
         ("COORDENADOR", "Coordenador"),
         ("APOIO", "Apoio de Coordenacao"),
         ("FORMADOR", "Formador"),
-        # Só diz "trabalha neste setor" (DAT, Controle e outros): nenhum efeito em lista, escopo ou
-        # permissão, e não vem nem dá grupo. Ver `specs/backend/rbac.spec.md`.
+        # Só diz "trabalha neste setor" (DAT, Controle e outros): nenhum efeito em lista nem escopo,
+        # e não vem nem dá grupo. Dá o pacote do perfil da gerência (ADR-020; vazio em PADRAO).
+        # Ver `specs/backend/rbac.spec.md`.
         ("EQUIPE", "Equipe administrativa"),
     ]
     PAPEL_EQUIPE = "EQUIPE"

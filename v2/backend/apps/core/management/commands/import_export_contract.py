@@ -109,6 +109,8 @@ class Command(BaseCommand):
                     + f" update={v['would_update']} skip={v['would_skip_same']}"
                     + f" protected_diff={v['protected_diff']} reject={v['would_reject']}"
                 )
+                if v.get("nota"):
+                    linha += f" ({v['nota']})"
                 self.stdout.write(linha)
                 motivos = {k: n for k, n in (v.get("reject_reasons") or {}).items() if n}
                 if motivos:

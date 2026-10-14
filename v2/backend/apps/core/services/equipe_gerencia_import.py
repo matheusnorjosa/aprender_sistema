@@ -34,7 +34,7 @@ from django.utils import timezone
 
 import pandas as pd
 
-from apps.core.imports.normalization import normalize_active_flag, normalize_blank, normalize_cpf_digits
+from apps.core.imports.normalization import norm_text, normalize_active_flag, normalize_blank, normalize_cpf_digits
 from apps.core.imports.row_errors import registrar_erro_import
 from apps.core.models import EquipeGerencia, Gerencia, Usuario
 from apps.core.rbac.helpers import GERENCIA_APROVADORA_NOME
@@ -56,16 +56,23 @@ SETOR_MAPPING = {
     "FLUIR": "Fluir",
     "Vidas": "Vidas",
     "VIDAS": "Vidas",
+    # Vidas L/M/C e Avançando Juntos são equipes da gerência Vidas (decisão do dono, 14/10).
+    "Vidas L": "Vidas",
+    "Vidas M": "Vidas",
+    "Vidas C": "Vidas",
+    "Avançando Juntos": "Vidas",
     "A Cor da Gente": "A Cor da Gente",
     "Sou da Paz": "Sou da Paz",
     "Educação Financeira": "Educação Financeira",
     "Ed Financeira": "Educação Financeira",
     "Ler, Ouvir e Contar": "Ler, Ouvir e Contar",
     "Ler Ouvir e Contar": "Ler, Ouvir e Contar",
-    "Avançando Juntos": "Avançando Juntos",
     "IDEB10": "IDEB10",
     "My Companion": "My Companion",
 }
+# O mesmo de-para sem maiúscula nem acento: "VIDAS L", "Avancando juntos" e "brincando" não podem cair
+# nas gerências antigas inativas que o catálogo guarda com o rótulo cru ("Vidas L", "Brincando").
+_SETOR_MAPPING_NORM = {norm_text(k): v for k, v in SETOR_MAPPING.items()}
 
 # Mapeamento de nome de papel -> papel canonico
 PAPEL_MAPPING = {
@@ -269,41 +276,21 @@ def _generate_gerencia_nome(nome_setor: str) -> str:
 def _resolve_gerencia(nome_setor: str) -> Gerencia | None:
     """Resolve uma Gerencia EXISTENTE pelo setor/nome. NÃO cria (fail-closed, #1615).
 
-    Ordem de match: nome_setor canônico → nome == setor → nome == nome-gerado. Miss = None,
-    para o chamador tratar como pendência — o catálogo de gerências é SSOT semeado; a planilha
-    resolve contra ele, não provisiona unidade nova por rótulo (evita duplicata por grafia).
+    Ordem de match: nome_setor canônico → nome == setor → nome == nome-gerado → nome_setor == rótulo
+    cru (o catálogo guarda "Brincando", que o de-para leva a "Brincando e Aprendendo"; o de-para vem
+    antes para "Avançando Juntos" ir à Vidas). O de-para ignora maiúscula e acento. Miss = None, para o chamador tratar como pendência — o
+    catálogo de gerências é SSOT semeado; a planilha resolve contra ele, não provisiona unidade nova
+    por rótulo (evita duplicata por grafia).
     """
-    nome_setor = SETOR_MAPPING.get(nome_setor, nome_setor)
+    rotulo = nome_setor
+    nome_setor = _SETOR_MAPPING_NORM.get(norm_text(nome_setor), nome_setor)
     nome_gerencia = _generate_gerencia_nome(nome_setor)
     return (
         Gerencia.objects.filter(nome_setor__iexact=nome_setor).first()
         or Gerencia.objects.filter(nome__iexact=nome_setor).first()
         or Gerencia.objects.filter(nome__iexact=nome_gerencia).first()
+        or Gerencia.objects.filter(nome_setor__iexact=rotulo).first()
     )
-
-
-def _get_or_create_gerencia(nome_setor: str, stats: dict[str, Any]) -> Gerencia | None:
-    """Resolve ou CRIA a Gerencia — caminho do export_contract `--apply` autorizado.
-
-    Diferente do import de equipe (#1615, resolve-only via `_resolve_gerencia`): o import mestre
-    pode provisionar a unidade quando não existe. Mantém o comportamento de criar no miss.
-    """
-    gerencia = _resolve_gerencia(nome_setor)
-    if gerencia:
-        stats["gerencias_existing"] += 1
-        return gerencia
-
-    nome_setor_c = SETOR_MAPPING.get(nome_setor, nome_setor)
-    nome_gerencia = _generate_gerencia_nome(nome_setor_c)
-    gerencia, created = Gerencia.objects.get_or_create(
-        nome=nome_gerencia,
-        defaults={"nome_setor": nome_setor_c, "ativo": True},
-    )
-    if created:
-        stats["gerencias_created"] += 1
-    else:
-        stats["gerencias_existing"] += 1
-    return gerencia
 
 
 def is_vinculo_aprovador(gerencia: Gerencia, papel: str) -> bool:

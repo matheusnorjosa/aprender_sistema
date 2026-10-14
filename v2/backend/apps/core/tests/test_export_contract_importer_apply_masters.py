@@ -26,7 +26,7 @@ from django.contrib.auth.models import Group
 
 import pytest
 
-from apps.core.models import Projeto, ProjetoGeral, TipoEvento, Usuario
+from apps.core.models import Gerencia, Projeto, ProjetoGeral, TipoEvento, Usuario
 from apps.core.services.export_contract_importer import ExportContractImporter
 from apps.core.tests.factories import ProjetoFactory, TipoEventoFactory, UsuarioFactory
 
@@ -346,7 +346,9 @@ def test_apply_usuario_assigns_group_from_cargo(tmp_path):
 
 
 def test_apply_usuario_equipe_gerencia_papel_takes_precedence(tmp_path):
-    # cargo diz Formadores, mas equipe_gerencia diz COORDENADOR (fonte primaria) -> Coordenador
+    # cargo diz Formadores, mas equipe_gerencia diz COORDENADOR (fonte primaria) -> Coordenador.
+    # A linha so da papel quando a gerencia existe (IMP-1: o import nunca cria gerencia).
+    Gerencia.objects.create(nome="GERENCIA G", nome_setor="G")
     files = {
         "usuario": "nome_completo,cpf,email,cargo\nBia,11144477735,,Formadores\n",
         "equipe_gerencia": "gerencia,usuario_cpf,usuario_email,papel\nG,11144477735,,COORDENADOR\n",

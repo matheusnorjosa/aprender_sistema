@@ -50,6 +50,12 @@ def _seed_grupos() -> None:
         Group.objects.get_or_create(name=g)
 
 
+def _seed_gerencias() -> None:
+    """A linha de equipe só dá papel quando a gerência existe (IMP-1: o import nunca cria gerência)."""
+    Gerencia.objects.create(nome="GERENCIA CONTROLE", nome_setor="Controle")
+    Gerencia.objects.create(nome="GERENCIA 2", nome_setor="Vidas")
+
+
 @pytest.mark.parametrize("rotulo", ["EQUIPE", "Equipe administrativa"])
 def test_classify_conta_equipe_como_would_create(tmp_path, rotulo):
     Gerencia.objects.create(nome="GERENCIA CONTROLE", nome_setor="Controle")
@@ -166,6 +172,7 @@ def test_usuario_novo_com_equipe_e_funcao_nasce_com_o_grupo_da_funcao(tmp_path, 
     """Pessoa em duas linhas, EQUIPE e FORMADOR: o papel de função vence EQUIPE nas duas ordens.
     Antes valia a 1ª linha, e com EQUIPE primeiro a pessoa nascia sem grupo."""
     _seed_grupos()
+    _seed_gerencias()
     path = _export(
         tmp_path,
         {
@@ -182,6 +189,7 @@ def test_usuario_novo_com_equipe_e_funcao_nasce_com_o_grupo_da_funcao(tmp_path, 
 def test_usuario_novo_com_duas_funcoes_fica_com_a_primeira(tmp_path):
     """Entre duas funções diferentes não há regra nova: vale a 1ª linha, como antes."""
     _seed_grupos()
+    _seed_gerencias()
     path = _export(
         tmp_path,
         {
@@ -223,7 +231,8 @@ def test_usuario_existente_nao_muda_de_grupo_pela_regra_da_funcao(tmp_path):
 def test_linha_barrada_no_vinculo_nao_da_o_grupo_da_funcao(tmp_path, linhas, com_gerencia_no_banco):
     """A linha GERENTE na Superintendência é barrada no `equipe_gerencia` (anti-escalada, PR B1). O
     papel dela não pode dar ao usuário novo o grupo Gerente: só a linha que o vínculo aceita conta, e o
-    EQUIPE que sobra não dá grupo. Vale também quando a gerência ainda não existe (o apply a criaria)."""
+    EQUIPE que sobra não dá grupo. Sem a gerência no banco nenhuma linha grava (IMP-1: o import não a
+    cria), e o usuário também nasce sem grupo."""
     _seed_grupos()
     if com_gerencia_no_banco:
         Gerencia.objects.create(nome="SUPERINTENDENCIA", nome_setor="Super")
@@ -239,7 +248,9 @@ def test_linha_barrada_no_vinculo_nao_da_o_grupo_da_funcao(tmp_path, linhas, com
 
     u = Usuario.objects.get(cpf="11144477735")
     assert u.groups.count() == 0
-    assert set(EquipeGerencia.objects.filter(usuario=u).values_list("papel", flat=True)) == {"EQUIPE"}
+    esperado = {"EQUIPE"} if com_gerencia_no_banco else set()
+    assert set(EquipeGerencia.objects.filter(usuario=u).values_list("papel", flat=True)) == esperado
+    assert Gerencia.objects.filter(nome="SUPERINTENDENCIA").exists() is com_gerencia_no_banco
 
 
 def test_linha_gerente_em_gerencia_com_pacote_nao_da_o_grupo_da_funcao(tmp_path):

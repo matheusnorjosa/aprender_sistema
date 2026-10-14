@@ -238,10 +238,10 @@ Todos aceitam `?dry_run=true|false` (default `true`). O parse é **fail-closed**
 > Achado `M17-01`, issue [#1640](https://github.com/matheusnorjosa/aprender_sistema/issues/1640).
 
 > ✅ **[RESOLVIDO #2022] `POST /api/equipe-gerencia/import/` não cria mais Gerência por rótulo.**
-> `_resolve_gerencia` faz os três lookups (`nome_setor__iexact`, `nome__iexact` do setor,
-> `nome__iexact` do nome gerado) e, no miss, retorna `None` → o import registra pendência
+> `_resolve_gerencia` faz os lookups (`nome_setor__iexact`, `nome__iexact` do setor,
+> `nome__iexact` do nome gerado e, por último, `nome_setor__iexact` do rótulo cru) e, no miss, retorna `None` → o import registra pendência
 > `setor_missing` (o catálogo de Gerência é SSOT semeado; a planilha resolve contra ele).
-> `_get_or_create_gerencia` (que ainda cria) ficou só no `export_contract --apply` autorizado.
+> O `export_contract --apply` também não cria mais gerência (IMP-1): `_get_or_create_gerencia` foi removido.
 > Achado `M04-01`, issue [#1615](https://github.com/matheusnorjosa/aprender_sistema/issues/1615).
 
 **Assíncronos (ASQ-005 Fase 1)** — apenas `bloqueios` por enquanto:

@@ -42,8 +42,9 @@ def cache_availability_check(timeout: int | None = None) -> Callable[[F], F]:
     Cache key includes a per-user version counter. When user's data changes,
     the version increments and all old entries become cache misses naturally.
 
-    A chave é montada a partir destes 4 argumentos e dos parâmetros vigentes (Buffer de
-    deslocamento e limite diário, os mesmos que o motor aplica), e mais nada. Salvar esses
+    A chave é montada a partir destes 4 argumentos e dos parâmetros vigentes de disponibilidade
+    (`parametros_disponibilidade`: o Buffer de deslocamento, que o motor aplica, e o teto de horas
+    por evento, que o motor não usa desde 05/10/2026), e mais nada. Salvar esses
     parâmetros em Configurações muda a chave: a consulta seguinte já usa o valor novo, sem
     esperar o cache vencer (auditoria UX 30/09, rodada 4). Por isso também o wrapper aceita
     SÓ os 4 argumentos: um kwarg extra mudaria o resultado sem mudar a chave, e a próxima

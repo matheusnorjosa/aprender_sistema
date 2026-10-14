@@ -232,8 +232,7 @@ curl -X POST http://localhost:8000/api/solicitacoes/batch-approve/ \
           "usuario_nome": "Fulano de Tal",
           "conflicts": [
             {"code": "X", "title": "Sobreposicao", "detail": "Conflita com evento aprovado #87 (08:00 05/10-12:00 05/10)", "ref_id": 87}
-          ],
-          "warnings": []
+          ]
         }
       ]
     }
@@ -244,7 +243,7 @@ curl -X POST http://localhost:8000/api/solicitacoes/batch-approve/ \
 O item de conflito de agenda traz `code: availability_conflict`, o `detail` com a pessoa e o
 motivo (os textos reais vem acentuados) e `blocked_participants`, igual ao erro 400 da
 aprovacao individual. So X, T, P e D barram; o limite diario (M) nao e mais emitido desde
-05/10/2026 (`warnings` do participante vem vazio). Os outros itens (`Status ja e ...`, nao encontrada, decisao propria,
+05/10/2026. Os outros itens (`Status ja e ...`, nao encontrada, decisao propria,
 fora do escopo) nao mudaram.
 
 `ids` vazio retorna **400** (`code: ids_required`); acima de 100 itens retorna

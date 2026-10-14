@@ -153,7 +153,9 @@ _PAPEL_TO_GROUP: dict[str, str] = {
     "FORMADOR": "Formador",
 }
 # Papéis canônicos válidos de EquipeGerencia (NK inclui o papel; fora disto = would_reject).
-_EQUIPE_PAPEIS = frozenset(_PAPEL_TO_GROUP)
+# EQUIPE ("Equipe administrativa", #2094) grava o vínculo e nada mais: fica fora de
+# _PAPEL_TO_GROUP, então nunca dá grupo, e não abre escopo (EquipeGerencia.vigentes_com_escopo_em).
+_EQUIPE_PAPEIS = frozenset(_PAPEL_TO_GROUP) | {EquipeGerencia.PAPEL_EQUIPE}
 
 # Tipos válidos de Acompanhamento (choices do model, sem CheckConstraint no BD → guard no importer).
 _ACOMPANHAMENTO_TIPOS = frozenset({"primeiro", "segundo"})
@@ -232,7 +234,7 @@ _CONSUMED_FIELDS: dict[str, frozenset[str]] = {
 
 
 def _resolve_papel(raw: str | None) -> str:
-    """Nome de papel bruto -> canonico (GERENTE/COORDENADOR/APOIO/FORMADOR) via PAPEL_MAPPING."""
+    """Nome de papel bruto -> canonico (GERENTE/COORDENADOR/APOIO/FORMADOR/EQUIPE) via PAPEL_MAPPING."""
     s = (raw or "").strip()
     return PAPEL_MAPPING.get(s) or PAPEL_MAPPING.get(s.upper()) or ""
 
@@ -1440,7 +1442,8 @@ class ExportContractImporter:
             if not exists and is_vinculo_aprovador(gerencia, papel):
                 continue
             setor_canon = (r.get("setor_canonico") or "").strip()
-            if setor_canon and gerencia.setor_canonico != setor_canon:
+            # setor_canonico é eixo de escopo (user_setores): a linha EQUIPE, inerte, não o reescreve.
+            if setor_canon and papel != EquipeGerencia.PAPEL_EQUIPE and gerencia.setor_canonico != setor_canon:
                 gerencia.setor_canonico = setor_canon
                 gerencia.save(update_fields=["setor_canonico"])
             if exists:

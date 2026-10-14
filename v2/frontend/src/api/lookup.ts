@@ -53,12 +53,21 @@ export async function lookupMunicipiosWithFilters(params: LookupMunicipiosParams
 }
 
 /**
+ * Filtros opcionais para lookup de projetos.
+ */
+export type LookupProjetosParams = QueryParams & {
+  /** Esconde o projeto "em espera" (sem compra que o libere); o servidor isenta quem é isento. */
+  com_compra?: boolean | undefined;
+};
+
+/**
  * Buscar projetos (autocomplete)
  *
  * @param q - Query string
+ * @param params - Filtros do lookup (a assinatura de `q` não muda: o ComboBox chama só com `q`)
  */
-export async function lookupProjetos(q: string = ''): Promise<LookupItem[]> {
-  const url = buildUrl('/lookup/projetos/', { q });
+export async function lookupProjetos(q: string = '', params: LookupProjetosParams = {}): Promise<LookupItem[]> {
+  const url = buildUrl('/lookup/projetos/', { ...params, q });
   return await fetchAPI(url);
 }
 

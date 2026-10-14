@@ -282,7 +282,8 @@ export default function PlanoFormacoesPage(): JSX.Element {
       try {
         const [munData, projData] = await Promise.all([
           getMunicipiosOptions(),
-          getProjetosOptions({ excludeKits: true }), // #1976: plano aponta família, não variante-por-série
+          // #1976: plano aponta família, não variante-por-série. Regra da compra: sem o projeto "em espera".
+          getProjetosOptions({ excludeKits: true, comCompra: true }),
         ]);
         setMunicipios(munData);
         setProjetos(projData);
@@ -321,6 +322,16 @@ export default function PlanoFormacoesPage(): JSX.Element {
     form.setFieldsValue({ ano: dayjs().year() });
     setModalVisible(true);
   };
+
+  // O plano já gravado num projeto "em espera" continua mostrando o nome dele no modal (o campo
+  // fica travado na edição; a lista só esconde o projeto para quem cria plano novo).
+  const opcoesProjetoDoModal = useMemo(() => {
+    const opcoes = projetos.map((p) => ({ label: p.nome, value: p.id }));
+    if (editingPlano && !projetos.some((p) => p.id === editingPlano.projeto)) {
+      opcoes.push({ label: editingPlano.projeto_nome, value: editingPlano.projeto });
+    }
+    return opcoes;
+  }, [projetos, editingPlano]);
 
   const handleEdit = (record: PlanoFormacaoRecord) => {
     setEditingPlano(record);
@@ -973,7 +984,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
                   showSearch
                   optionFilterProp="label"
                   disabled={!!editingPlano}
-                  options={projetos.map((p) => ({ label: p.nome, value: p.id }))}
+                  options={opcoesProjetoDoModal}
                 />
               </Form.Item>
             </Col>

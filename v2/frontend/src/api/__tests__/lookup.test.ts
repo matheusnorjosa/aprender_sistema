@@ -56,5 +56,14 @@ describe('lookup API filters (MSW)', () => {
     expect(requests).toHaveLength(1);
     expect(requests[0].pathname).toBe('/api/lookup/projetos/');
     expect(requests[0].params.get('q')).toBe('Ace');
+    expect(requests[0].params.has('com_compra')).toBe(false);
+  });
+
+  test('lookupProjetos envia com_compra quando pedido (regra da compra)', async () => {
+    await lookupProjetos('', { com_compra: true });
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0].pathname).toBe('/api/lookup/projetos/');
+    expect(requests[0].params.get('com_compra')).toBe('true');
   });
 });

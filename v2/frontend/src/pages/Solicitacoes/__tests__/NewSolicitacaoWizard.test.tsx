@@ -138,7 +138,7 @@ describe('NewSolicitacaoWizard - filtros dependentes municipio/projeto', () => {
 
     expect(await screen.findByText('Sem municípios elegíveis')).toBeInTheDocument();
     expect(
-      screen.getByText('Não há municípios com compra registrada para o projeto selecionado.')
+      screen.getByText('Não há municípios com compra que libere o projeto selecionado.')
     ).toBeInTheDocument();
   });
 
@@ -177,5 +177,36 @@ describe('NewSolicitacaoWizard - filtros dependentes municipio/projeto', () => {
     });
 
     expect(screen.queryByText('Sem municípios elegíveis')).not.toBeInTheDocument();
+  });
+
+  // Regra da compra: o projeto "em espera" (sem compra que o libere) some da lista.
+  test('usuário comum busca projetos com com_compra e vê a linha de ajuda', async () => {
+    render(
+      <MemoryRouter>
+        <NewSolicitacaoWizard />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(getMeMock).toHaveBeenCalled();
+      expect(lookupProjetosMock).toHaveBeenLastCalledWith('', { com_compra: true });
+    });
+    expect(screen.getByText('Projetos sem compra não aparecem.')).toBeInTheDocument();
+  });
+
+  test('superusuário busca projetos sem filtro de compra depois de o me carregar', async () => {
+    getMeMock.mockResolvedValue({ is_superuser: true });
+
+    render(
+      <MemoryRouter>
+        <NewSolicitacaoWizard />
+      </MemoryRouter>
+    );
+
+    await screen.findByRole('button', { name: 'Busque ou selecione um município' });
+    await waitFor(() => {
+      expect(lookupProjetosMock).toHaveBeenLastCalledWith('', {});
+    });
+    expect(screen.queryByText('Projetos sem compra não aparecem.')).not.toBeInTheDocument();
   });
 });

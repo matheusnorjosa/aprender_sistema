@@ -263,6 +263,9 @@ def test_ano_ja_criado_vazio_pelo_split_aparece_no_dry_run(tmp_path, base):
         ({2027: (100, 10)}, ["2026,100,10"]),
         ({2026: (300, 30), 2027: (None, None)}, ["2026,100,10", "2027,300,30"]),
         ({2026: (None, None), 2027: (100, 10)}, ["2026,100,10", "2027,300,30"]),
+        ({2026: (400, 40)}, ["2026,100,10", "2027,300,30"]),
+        ({2027: (400, 40)}, ["2026,100,10", "2027,300,30"]),
+        ({2026: (400, 40), 2027: (None, None)}, ["2026,100,10", "2027,300,30"]),
     ],
     ids=[
         "linha_2026_no_registro_2027",
@@ -271,6 +274,9 @@ def test_ano_ja_criado_vazio_pelo_split_aparece_no_dry_run(tmp_path, base):
         "so_2026_no_2027",
         "outro_ano_ja_criado_vazio_pelo_split",
         "ano_rejeitado_criado_vazio_pelo_split",
+        "soma_dos_anos_no_registro_2026",
+        "soma_dos_anos_no_registro_2027",
+        "soma_dos_anos_com_o_outro_ano_vazio",
     ],
 )
 def test_registro_com_a_quantidade_de_outro_ano_nao_ganha_copia(tmp_path, base, no_banco, linhas):
@@ -278,7 +284,9 @@ def test_registro_com_a_quantidade_de_outro_ano_nao_ganha_copia(tmp_path, base, 
     onde vinham as quantidades. Registro com ano que guarda a quantidade da linha de OUTRO ano, e não a do
     próprio ano: criar o ano da linha copiaria a quantidade para os dois anos. A tripla não ganha registro,
     todas as linhas dela são rejeitadas em `quantidade_em_outro_ano` e o banco fica como está, para uma
-    pessoa decidir. Vale também quando o outro ano já existe vazio (o split antigo criava cada ano de
+    pessoa decidir. O mesmo quando o registro guarda a SOMA das linhas da tripla (exports até o v28
+    mandavam uma linha só, com 2026 e 2027 somados, e o split antigo a deu a um dos anos): criar o
+    outro ano contaria a quantidade dele duas vezes. Vale também quando o outro ano já existe vazio (o split antigo criava cada ano de
     compra que faltava): a linha dele não vira `existe_sem_quantidade`, que mandaria preenchê-lo e
     duplicaria a quantidade."""
     for ano, (aluno, prof) in no_banco.items():

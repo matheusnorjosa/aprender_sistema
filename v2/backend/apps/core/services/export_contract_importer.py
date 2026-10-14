@@ -526,8 +526,10 @@ def _dat_registro_quantidade_em_outro_ano(
     O split antigo (até o export v37) dava ao flat o ano das compras (2026 se houvesse, senão o maior), não
     o da linha de onde vinham as quantidades. Nessa tripla, criar o ano que falta copiaria a quantidade para
     os dois anos; o classify rejeita todas as linhas da tripla (`quantidade_em_outro_ano`), também a do ano
-    que já existe vazio, e o apply não cria, para uma pessoa decidir. Registro vazio (o ano que o split
-    criou sem quantidade) não conta."""
+    que já existe vazio, e o apply não cria, para uma pessoa decidir. O mesmo quando o registro guarda a SOMA
+    das linhas da tripla: os exports até o v28 mandavam uma linha só, com 2026 e 2027 somados, e o split
+    antigo a deu a um dos anos; criar o outro ano contaria a quantidade dele duas vezes. Registro vazio (o
+    ano que o split criou sem quantidade) não conta."""
     triplas: set[tuple[int, int, int]] = set()
     for mid, pgid, pid, ano, aluno, prof in (
         DATRegistro.objects.filter(ano__isnull=False)
@@ -535,7 +537,12 @@ def _dat_registro_quantidade_em_outro_ano(
         .values_list("municipio_id", "projeto_geral_id", "projeto_id", "ano", "aluno_qtde", "professor_qtde")
     ):
         linhas = arquivo.get((mid, pgid, pid), {})
-        if linhas.get(ano) != (aluno, prof) and any(a != ano and q == (aluno, prof) for a, q in linhas.items()):
+        if linhas.get(ano) == (aluno, prof):
+            continue
+        soma = (sum(a or 0 for a, _ in linhas.values()), sum(p or 0 for _, p in linhas.values()))
+        if any(a != ano and q == (aluno, prof) for a, q in linhas.items()) or (
+            len(linhas) > 1 and soma == (aluno or 0, prof or 0)
+        ):
             triplas.add((mid, pgid, pid))
     return triplas
 
@@ -2360,13 +2367,17 @@ class ExportContractImporter:
         qualquer ordem; EQUIPE so vale quando e o unico papel. Entre duas funcoes diferentes vale a 1a
         linha (sem regra de precedencia entre funcoes). So conta a linha que o `equipe_gerencia` aceita:
         a sem gerencia, com papel fora do dominio ou com o vinculo aprovador (PR B1, anti-escalada) nao da
-        papel, senao o grupo de funcao nasceria de uma linha barrada."""
+        papel, senao o grupo de funcao nasceria de uma linha barrada. O CPF so com linhas barradas fica no
+        mapa com papel "" (sem grupo): estar no export de equipe tira o `cargo` do fallback, como antes."""
         idx: dict[str, str] = {}
         for r in self._load("equipe_gerencia"):
             cpf = normalize_cpf_digits(r.get("usuario_cpf") or "")
             setor = (r.get("gerencia") or r.get("setor") or "").strip()
             papel = _resolve_papel(r.get("papel"))
-            if len(cpf) != 11 or not setor or papel not in _EQUIPE_PAPEIS:
+            if len(cpf) != 11 or not papel:
+                continue
+            idx.setdefault(cpf, "")
+            if not setor or papel not in _EQUIPE_PAPEIS:
                 continue
             # A gerencia que o apply criaria se faltar (`_get_or_create_gerencia`), sem cria-la aqui.
             ger = self._resolve_gerencia_readonly(setor) or Gerencia(
@@ -2374,7 +2385,7 @@ class ExportContractImporter:
             )
             if is_vinculo_aprovador(ger, papel):
                 continue
-            if idx.get(cpf, EquipeGerencia.PAPEL_EQUIPE) == EquipeGerencia.PAPEL_EQUIPE:
+            if idx[cpf] in ("", EquipeGerencia.PAPEL_EQUIPE):
                 idx[cpf] = papel
         return idx
 
@@ -2419,7 +2430,7 @@ class ExportContractImporter:
             existing_cpfs.add(cpf)
             if email:
                 existing_emails.add(email)
-            papel = papel_by_cpf.get(cpf) or _resolve_papel(r.get("cargo"))
+            papel = papel_by_cpf[cpf] if cpf in papel_by_cpf else _resolve_papel(r.get("cargo"))
             group_name = _PAPEL_TO_GROUP.get(papel)
             if group_name and group_name in ALLOWED_USER_GROUPS:
                 grupo = Group.objects.filter(name__iexact=group_name).first()

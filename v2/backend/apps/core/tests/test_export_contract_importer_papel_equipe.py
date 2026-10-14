@@ -256,3 +256,30 @@ def test_linha_de_funcao_sem_gerencia_nao_da_grupo(tmp_path):
     ExportContractImporter(path=path, apply=True, allow=("usuario",)).run()
 
     assert Usuario.objects.get(cpf="11144477735").groups.count() == 0
+
+
+@pytest.mark.parametrize(
+    ("linha", "cargo"),
+    [
+        (",11144477735,EQUIPE", "Coordenadores"),
+        (",11144477735,FORMADOR", "Gerentes"),
+        ("Super,11144477735,GERENTE", "Gerentes"),
+    ],
+    ids=["equipe_sem_gerencia", "funcao_sem_gerencia", "vinculo_aprovador"],
+)
+def test_cpf_so_com_linha_barrada_nao_cai_no_cargo(tmp_path, linha, cargo):
+    """CPF cujas linhas no `equipe_gerencia` foram todas barradas (gerência vazia ou vínculo aprovador):
+    a linha barrada não dá papel, e o `cargo` também não entra como fallback. O CPF está no export de
+    equipe, então o cargo não decide o grupo; senão a linha barrada abriria o grupo da coluna cargo."""
+    _seed_grupos()
+    path = _export(
+        tmp_path,
+        {
+            "usuario": f"nome_completo,cpf,email,cargo\nBia,11144477735,,{cargo}\n",
+            "equipe_gerencia": f"gerencia,usuario_cpf,papel\n{linha}\n",
+        },
+    )
+
+    ExportContractImporter(path=path, apply=True, allow=("usuario",)).run()
+
+    assert Usuario.objects.get(cpf="11144477735").groups.count() == 0

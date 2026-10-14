@@ -246,9 +246,13 @@ Lint AST custom em `v2/backend/scripts/rbac_lint.py` falha PRs que:
   `# noqa: RBAC-migration-allowed`. Desde a D4 do ADR-020 (§8) a migration com o marcador
   é o caminho certo para mudar a matriz.
 - **V004 (ADR-020, 2026-10-14)**: `.groups`/`.user_set`/`.permissoes_funcionais` seguido de
-  `add`/`set`/`remove`/`clear` fora de `V004_ALLOWLIST` (arquivos que já fazem isso hoje).
-- **V005 (ADR-020, 2026-10-14)**: `EquipeGerencia.objects.create`/`get_or_create`/
-  `update_or_create`/`bulk_create` fora de `V005_ALLOWLIST`. Não pega reativação por `.save()`.
+  `add`/`set`/`remove`/`clear`, ou a tabela M2M direto (`<lado>.through.objects.create`/
+  `get_or_create`/`update_or_create`/`bulk_create`), fora de `V004_ALLOWLIST` (arquivos que já
+  fazem isso hoje).
+- **V005 (ADR-020, 2026-10-14)**: `[mod.]EquipeGerencia.objects.create`/`get_or_create`/
+  `update_or_create`/`bulk_create`, o manager reverso `<x>.equipes.<mesmos métodos>` e o
+  construtor `[mod.]EquipeGerencia(...)` fora de `V005_ALLOWLIST`. Não pega reativação por
+  `.save()` de um vínculo que já existe.
   V004 e V005 são ratchet por arquivo (arquivo novo reprova, sem noqa) e isentam `tests/`,
   `migrations/` e `apps/dev_tools/`.
   Implementação: `MigrationLintVisitor` (`rbac_lint.py`), dispatch em `check_file`,

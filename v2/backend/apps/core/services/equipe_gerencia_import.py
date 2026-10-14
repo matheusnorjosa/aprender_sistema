@@ -34,7 +34,7 @@ from django.utils import timezone
 
 import pandas as pd
 
-from apps.core.imports.normalization import normalize_active_flag, normalize_blank, normalize_cpf_digits
+from apps.core.imports.normalization import norm_text, normalize_active_flag, normalize_blank, normalize_cpf_digits
 from apps.core.imports.row_errors import registrar_erro_import
 from apps.core.models import EquipeGerencia, Gerencia, Usuario
 from apps.core.rbac.helpers import GERENCIA_APROVADORA_NOME
@@ -58,13 +58,9 @@ SETOR_MAPPING = {
     "VIDAS": "Vidas",
     # Vidas L/M/C e Avançando Juntos são equipes da gerência Vidas (decisão do dono, 14/10).
     "Vidas L": "Vidas",
-    "VIDAS L": "Vidas",
     "Vidas M": "Vidas",
-    "VIDAS M": "Vidas",
     "Vidas C": "Vidas",
-    "VIDAS C": "Vidas",
     "Avançando Juntos": "Vidas",
-    "AVANCANDO JUNTOS": "Vidas",
     "A Cor da Gente": "A Cor da Gente",
     "Sou da Paz": "Sou da Paz",
     "Educação Financeira": "Educação Financeira",
@@ -74,6 +70,9 @@ SETOR_MAPPING = {
     "IDEB10": "IDEB10",
     "My Companion": "My Companion",
 }
+# O mesmo de-para sem maiúscula nem acento: "VIDAS L", "Avancando juntos" e "brincando" não podem cair
+# nas gerências antigas inativas que o catálogo guarda com o rótulo cru ("Vidas L", "Brincando").
+_SETOR_MAPPING_NORM = {norm_text(k): v for k, v in SETOR_MAPPING.items()}
 
 # Mapeamento de nome de papel -> papel canonico
 PAPEL_MAPPING = {
@@ -279,12 +278,12 @@ def _resolve_gerencia(nome_setor: str) -> Gerencia | None:
 
     Ordem de match: nome_setor canônico → nome == setor → nome == nome-gerado → nome_setor == rótulo
     cru (o catálogo guarda "Brincando", que o de-para leva a "Brincando e Aprendendo"; o de-para vem
-    antes para "Avançando Juntos" ir à Vidas). Miss = None, para o chamador tratar como pendência — o
+    antes para "Avançando Juntos" ir à Vidas). O de-para ignora maiúscula e acento. Miss = None, para o chamador tratar como pendência — o
     catálogo de gerências é SSOT semeado; a planilha resolve contra ele, não provisiona unidade nova
     por rótulo (evita duplicata por grafia).
     """
     rotulo = nome_setor
-    nome_setor = SETOR_MAPPING.get(nome_setor, nome_setor)
+    nome_setor = _SETOR_MAPPING_NORM.get(norm_text(nome_setor), nome_setor)
     nome_gerencia = _generate_gerencia_nome(nome_setor)
     return (
         Gerencia.objects.filter(nome_setor__iexact=nome_setor).first()

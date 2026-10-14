@@ -12,7 +12,7 @@ IMP-1 — o import_export_contract acha a gerência da linha e nunca a cria (dec
 Fixtures sintéticas: CPFs de teste com DV válido, sem dado real.
 """
 
-# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportPrivateUsage=false
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ from django.core.management import call_command
 import pytest
 
 from apps.core.models import EquipeGerencia, Gerencia, Usuario
-from apps.core.services.export_contract_importer import ExportContractImporter
+from apps.core.services.export_contract_importer import ExportContractImporter, _gerencia_da_linha
 from apps.core.tests.factories import UsuarioFactory
 
 pytestmark = pytest.mark.django_db
@@ -117,6 +117,61 @@ def test_gerencia_nao_resolvida_rejeita_com_motivo_e_nao_grava(tmp_path, rotulo,
     assert report["applied"]["equipe_gerencia"] == 0
     assert not EquipeGerencia.objects.exists()
     assert Gerencia.objects.count() == antes, "gerência não resolvida não é criada"
+
+
+def test_outros_nao_lota_mesmo_com_gerencia_outros_ativa_no_catalogo(tmp_path):
+    """A guarda de "Outros" vem antes da busca no catálogo: uma gerência "Outros" ativa (sobra de carga
+    antiga) não recebe o vínculo."""
+    Gerencia.objects.create(nome="GERENCIA OUTROS", nome_setor="Outros", ativo=True)
+    UsuarioFactory(cpf=_CPF)
+    path = _export(tmp_path, {"equipe_gerencia": _equipe(f"Outros,{_CPF},COORDENADOR,Outros")})
+
+    pe = ExportContractImporter(path=path).run()["por_entidade"]["equipe_gerencia"]
+    assert (pe["would_create"], pe["would_reject"]) == (0, 1)
+    assert pe["reject_reasons"]["setor_sem_lotacao"] == 1
+
+    report = ExportContractImporter(path=path, apply=True, allow=("equipe_gerencia",)).run()
+
+    assert report["applied"]["equipe_gerencia"] == 0
+    assert not EquipeGerencia.objects.exists()
+
+
+@pytest.mark.parametrize(
+    ("rotulo", "esperada"),
+    [
+        ("Vidas L", "GERENCIA 2"),
+        ("Vidas l", "GERENCIA 2"),
+        ("VIDAS L", "GERENCIA 2"),
+        ("vidas m", "GERENCIA 2"),
+        ("VIDAS C", "GERENCIA 2"),
+        ("Avançando Juntos", "GERENCIA 2"),
+        ("AVANÇANDO JUNTOS", "GERENCIA 2"),
+        ("Avançando juntos", "GERENCIA 2"),
+        ("Avancando Juntos", "GERENCIA 2"),
+        ("AVANCANDO JUNTOS", "GERENCIA 2"),
+        ("Brincando", "GERENCIA BRINCANDO"),
+        ("brincando", "GERENCIA BRINCANDO"),
+        ("BRINCANDO", "GERENCIA BRINCANDO"),
+    ],
+)
+def test_rotulo_em_outra_grafia_vai_para_a_gerencia_ativa(rotulo, esperada):
+    """O de-para ignora maiúscula e acento: com as gerências antigas inativas ainda no catálogo (retrato
+    de prod), outra grafia do rótulo não cai nelas e não vira `gerencia_inativa`."""
+    for nome, nome_setor, ativo in (
+        ("GERENCIA 2", "Vidas", True),
+        ("GERENCIA 5", "Brincando", False),
+        ("GERENCIA VIDAS L", "Vidas L", False),
+        ("GERENCIA VIDAS M", "Vidas M", False),
+        ("GERENCIA BRINCANDO", "Brincando e Aprendendo", True),
+        ("GERENCIA AVANCANDO JUNTOS", "Avançando Juntos", False),
+        ("GERENCIA VIDAS C", "Vidas C", False),
+    ):
+        Gerencia.objects.create(nome=nome, nome_setor=nome_setor, ativo=ativo)
+
+    gerencia, motivo = _gerencia_da_linha(rotulo)
+
+    assert motivo == ""
+    assert gerencia is not None and gerencia.nome == esperada
 
 
 def test_setor_canonico_ja_preenchido_nao_e_sobrescrito(tmp_path):

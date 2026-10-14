@@ -33,6 +33,7 @@ Ver `v2/docs/RBAC_NAMING.md §9` (Policy Resolution Rules).
 
 from __future__ import annotations
 
+from collections.abc import Set as AbstractSet
 from typing import Any, Final, Literal
 
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
@@ -570,9 +571,17 @@ def user_can_delegate_deslocamento(user: AbstractBaseUser | AnonymousUser | None
     return user_has_any_perm(user, "operate_preagenda", "view_all_availability")
 
 
-def user_has_policy(user: AbstractBaseUser | AnonymousUser | None, key: str) -> bool:
+def user_has_policy(
+    user: AbstractBaseUser | AnonymousUser | None,
+    key: str,
+    *,
+    capacidades: AbstractSet[str] | None = None,
+) -> bool:
     """
     True sse o usuário possui a policy identificada por `key`.
+
+    `capacidades`: só para o simulador `rbac_diff` (somente leitura). Quando vem, o caso geral
+    usa esse conjunto no lugar das capacidades de hoje (que passam pelo cache). None = hoje.
 
     Semântica (idêntica a `_PolicyPermission.has_permission` — esta função
     é a fonte única de verdade; `_PolicyPermission` delega para cá):
@@ -599,10 +608,16 @@ def user_has_policy(user: AbstractBaseUser | AnonymousUser | None, key: str) -> 
     codenames = ACCESS_POLICIES.get(key)
     if not codenames:
         return False
+    if capacidades is not None:
+        return not codenames.isdisjoint(capacidades)
     return user_has_any_perm(user, *codenames)
 
 
-def resolve_public_policies(user: AbstractBaseUser | AnonymousUser | None) -> list[str]:
+def resolve_public_policies(
+    user: AbstractBaseUser | AnonymousUser | None,
+    *,
+    capacidades: AbstractSet[str] | None = None,
+) -> list[str]:
     """
     Retorna lista ordenada (alfabética) das `PUBLIC_POLICY_KEYS` que o
     usuário possui. Backend de `GET /api/me/policies/`.
@@ -612,8 +627,9 @@ def resolve_public_policies(user: AbstractBaseUser | AnonymousUser | None) -> li
     - User regular → subset baseado em capabilities (OR semantics)
 
     Não vaza capability codenames — só keys do registro público.
+    `capacidades`: ver `user_has_policy` (simulador `rbac_diff`).
     """
-    return sorted(k for k in PUBLIC_POLICY_KEYS if user_has_policy(user, k))
+    return sorted(k for k in PUBLIC_POLICY_KEYS if user_has_policy(user, k, capacidades=capacidades))
 
 
 def can_admin_mutate_target(

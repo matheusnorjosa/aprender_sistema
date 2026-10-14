@@ -189,8 +189,18 @@ class Gerencia(models.Model):
         rotulo (property): `nome_exibicao or nome_setor` — nunca cai para `nome`
         gerente (FK Usuario): Gerente responsavel pela gerencia (nullable)
         ativo (bool): Se a gerencia esta ativa
+        perfil (str): pacote de capacidades do lugar (ADR-020); fora da API, nada lê até o PR B
         descricao (str): Descricao adicional
     """
+
+    class Perfil(models.TextChoices):
+        """Perfil da gerência (ADR-020). O pacote de cada um fica em `services/rbac_pacotes.py`."""
+
+        PADRAO = "PADRAO", "Padrão"
+        ADMIN_OPERACIONAL = "ADMIN_OPERACIONAL", "Administração operacional"
+        CONTROLE = "CONTROLE", "Controle"
+        APROVACAO = "APROVACAO", "Aprovação"
+        DIRETORIA = "DIRETORIA", "Diretoria"
 
     nome = models.CharField(
         max_length=50,
@@ -249,6 +259,16 @@ class Gerencia(models.Model):
         help_text="Gerente responsavel pela gerencia",
     )
     ativo = models.BooleanField(default=True)
+    perfil = models.CharField(
+        max_length=20,
+        choices=Perfil.choices,
+        default=Perfil.PADRAO,
+        help_text=(
+            "Perfil do lugar (ADR-020): define o pacote de capacidades de quem é EQUIPE ou GERENTE "
+            "aqui (`services/rbac_pacotes.py`). Fora da API; só o superusuário grava, por script "
+            "auditado. Nada lê este campo até o PR B (fórmula da união)."
+        ),
+    )
     descricao = models.TextField(blank=True)
     pergunta_avaliar_formador = models.BooleanField(
         default=True,

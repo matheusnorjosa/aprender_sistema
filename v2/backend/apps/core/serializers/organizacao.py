@@ -200,12 +200,20 @@ class GerenciaSerializer(serializers.ModelSerializer["Gerencia"]):
         GERENTE vigente em `GERENCIA_APROVADORA_NOME` aprova solicitações. Renomear g1
         desligaria as aprovações; dar esse nome a outra gerência ligaria o poder de aprovar
         para os GERENTEs dela. Rótulo de tela é `nome_exibicao` (editável; `rotulo`).
+
+        ADR-020 (PR A): gerência com perfil ≠ PADRAO também não muda de `nome` pela tela, porque
+        `rbac_diff --auditar` reconhece a gerência pelo `nome` (`PERFIL_PERMITIDO`). `perfil` fica
+        fora de `fields`: a API não o lê nem o grava.
         """
         instance: Any = self.instance
         atual = getattr(instance, "nome", None)
         if atual == GERENCIA_APROVADORA_NOME and value != atual:
             raise serializers.ValidationError(
                 "O nome desta gerência não pode ser alterado: ele define quem aprova solicitações."
+            )
+        if instance is not None and instance.perfil != Gerencia.Perfil.PADRAO and value != atual:
+            raise serializers.ValidationError(
+                "O nome desta gerência não pode ser alterado: ela define permissões de acesso."
             )
         if value == GERENCIA_APROVADORA_NOME and atual != GERENCIA_APROVADORA_NOME:
             raise serializers.ValidationError(

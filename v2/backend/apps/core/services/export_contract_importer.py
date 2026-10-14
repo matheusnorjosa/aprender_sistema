@@ -478,13 +478,58 @@ def _dat_compra_ano_uso(r: dict[str, str]) -> int | None:
 
 
 def _dat_cadastro_ano(r: dict[str, str]) -> int | None:
-    """Ano-cohort do cadastro = ano da 1ª etapa com data (início do ciclo FORMAR/AVALIAR), fallback
-    pelas etapas seguintes. Nenhuma data → None (pendente)."""
+    """Ano-cohort do cadastro = coluna `ano` do arquivo, quando vem e é um inteiro válido (IMP-3). Sem
+    ela, ano da 1ª etapa com data (início do ciclo FORMAR/AVALIAR), fallback pelas etapas seguintes.
+    Nenhum dos dois → None (pendente)."""
+    ano = _parse_int(r.get("ano"))
+    if ano is not None and ano > 0:
+        return ano
     for col in ("etapa1_data", "etapa2_data", "etapa3_data", "etapa4_data"):
         d = _parse_iso_date(r.get(col))
         if d:
             return d.year
     return None
+
+
+def _dat_cadastro_anos() -> dict[tuple[int, int, str], set[int | None]]:
+    """(municipio_id, projeto_geral_id, plataforma) → anos dos DATCadastro existentes (None = sem ano)."""
+    anos: dict[tuple[int, int, str], set[int | None]] = {}
+    for mid, pgid, plat, ano in DATCadastro.objects.values_list(
+        "municipio_id", "projeto_geral_id", "plataforma", "ano"
+    ):
+        anos.setdefault((mid, pgid, plat), set()).add(ano)
+    return anos
+
+
+def _dat_cadastro_existente(
+    anos: dict[tuple[int, int, str], set[int | None]],
+    arquivo: dict[tuple[int, int, str], set[int | None]],
+    nk: tuple[Any, ...],
+) -> str:
+    """Classifica a linha (municipio, projeto_geral, plataforma, ano) contra os anos gravados da tripla, e
+    registra em `anos` o que o apply deixa gravado (classify e apply percorrem o arquivo igual). `arquivo`:
+    tripla → anos que o arquivo traz para ela (None = linha sem ano).
+
+    - ano já gravado → would_skip_same;
+    - o banco tem SÓ o cadastro sem ano da tripla e o arquivo traz um ano só para ela → would_update: esse
+      cadastro é esta linha, e o apply preenche só o ano (decisão do dono, 14/10);
+    - mesmo caso, mas o arquivo traz dois anos ou mais → would_reject (`sem_ano_ambiguo`): não adota nem
+      cria ao lado, porque o cadastro sem ano pode ser qualquer um deles; decide uma pessoa;
+    - o arquivo também traz a linha sem ano da tripla: ela é o cadastro sem ano, e o ano é cadastro novo;
+    - senão → would_create."""
+    tripla, ano = nk[:3], nk[3]
+    gravados = anos.setdefault(tripla, set())
+    no_arquivo = arquivo.get(tripla, set())
+    if ano in gravados:
+        return "would_skip_same"
+    if ano is not None and gravados == {None} and None not in no_arquivo:
+        if no_arquivo != {ano}:
+            return "would_reject"
+        gravados.discard(None)
+        gravados.add(ano)
+        return "would_update"
+    gravados.add(ano)
+    return "would_create"
 
 
 def _dat_registro_anos() -> dict[tuple[int, int, int], set[int | None]]:
@@ -873,16 +918,15 @@ class ExportContractImporter:
             tally["reject_reasons"] = reasons
 
         elif name == "produto":
-            # NK = codigo (unique). Compara nome (não-protegido).
-            idx = {
-                (c or "").strip().upper(): {"nome": n or ""} for c, n in Produto.objects.values_list("codigo", "nome")
-            }
+            # NK = codigo (unique), com `_norm_codigo` dos dois lados. Só leitura: decide pela existência e
+            # não compara nome (o apply não grava produto; o nome diferente só fazia ruído de would_update).
+            codigos = {_norm_codigo(c) for c in Produto.objects.values_list("codigo", flat=True)}
             for r in rows:
-                codigo = (r.get("codigo") or "").strip()
+                codigo = _norm_codigo(r.get("codigo") or "")
                 if not codigo:
                     tally["would_reject"] += 1
                     continue
-                st, _ = diff_and_classify(idx.get(codigo.upper()), {"nome": r.get("nome") or ""}, protected)
+                st, _ = diff_and_classify({} if codigo in codigos else None, {}, protected)
                 tally[st] += 1
 
         elif name == "usuario":
@@ -1082,18 +1126,20 @@ class ExportContractImporter:
             tally["repetidas_divergentes"] = divergentes_reg
 
         elif name == "dat_cadastro":
-            # NK = (municipio_id, projeto_geral_id, plataforma). plataforma faz parte da chave
-            # (FORMAR|AVALIAR); valor fora do domínio → would_reject. Existence-based.
+            # NK = (municipio_id, projeto_geral_id, plataforma, ano). plataforma faz parte da chave
+            # (FORMAR|AVALIAR); valor fora do domínio → would_reject. A existência segue
+            # `_dat_cadastro_existente` (adoção do cadastro sem ano, IMP-3).
             mun_idx = self._municipio_index()
             pg_idx = self._projeto_geral_index()
-            existing = set(DATCadastro.objects.values_list("municipio_id", "projeto_geral_id", "plataforma", "ano"))
+            anos_db = _dat_cadastro_anos()
+            arquivo_anos = self._dat_cadastro_arquivo_anos(rows)
             # Mesma regra do dat_registro: a planilha repete o curso por família, e o apelido junta as famílias
             # antigas numa coleção só. A chave vista no arquivo conta uma vez (o apply grava só a 1ª linha); a
             # repetição vira would_reject(repetida_no_arquivo) e etapas diferentes aparecem em
             # `repetidas_divergentes`.
             vistas_cad: dict[tuple[Any, ...], tuple[str, ...]] = {}
             divergentes_cad: list[str] = []
-            reasons_cad = {"repetida_no_arquivo": 0}
+            reasons_cad = {"repetida_no_arquivo": 0, "sem_ano_ambiguo": 0}
             pg_nomes_cad = dict(ProjetoGeral.objects.values_list("id", "nome"))
             etapas = [f"etapa{i}_{c}" for i in range(1, 5) for c in ("status", "data")]
             for r in rows:
@@ -1116,7 +1162,9 @@ class ExportContractImporter:
                         divergentes_cad.append(rotulo)
                     continue
                 vistas_cad[nk] = dados
-                st, _ = diff_and_classify({} if nk in existing else None, {}, protected)
+                st = _dat_cadastro_existente(anos_db, arquivo_anos, nk)
+                if st == "would_reject":
+                    reasons_cad["sem_ano_ambiguo"] += 1
                 tally[st] += 1
             tally["reject_reasons"] = reasons_cad
             tally["repetidas_divergentes"] = divergentes_cad
@@ -1538,7 +1586,10 @@ class ExportContractImporter:
                     applied[name] = self._apply_equipe_gerencia(self._load(name))
                     continue
                 if name == "dat_cadastro":
-                    applied[name] = self._apply_dat_cadastro(self._load(name))
+                    created_cad, cad_ano_preenchido = self._apply_dat_cadastro(self._load(name))
+                    applied[name] = created_cad
+                    if cad_ano_preenchido:
+                        applied["dat_cadastro__ano_preenchido"] = cad_ano_preenchido
                     continue
                 if name == "dat_registro":
                     created_reg, ano_preenchido = self._apply_dat_registro(self._load(name))
@@ -1709,13 +1760,19 @@ class ExportContractImporter:
             created += 1
         return created
 
-    def _apply_dat_cadastro(self, rows: list[dict[str, str]]) -> int:
-        """Create-only de DATCadastro. NK (municipio, projeto_geral, plataforma).
-        Status/data já chegam normalizados (enum/ISO) do export-contract v3."""
+    def _apply_dat_cadastro(self, rows: list[dict[str, str]]) -> tuple[int, int]:
+        """Create-only de DATCadastro. NK (municipio, projeto_geral, plataforma, ano); a existência segue
+        `_dat_cadastro_existente` (a mesma do classify). Status/data já chegam normalizados (enum/ISO) do
+        export-contract v3. Única escrita em cadastro existente: o sem ano, quando é o único da tripla e o
+        arquivo traz um ano só para ela, recebe esse ano (só o campo `ano`; etapas não mudam). Retorna
+        `(created, ano_preenchido)`."""
         actor = self._require_actor("dat_cadastro")
         mun_idx = self._municipio_index()
         pg_idx = self._projeto_geral_index()
+        anos_db = _dat_cadastro_anos()
+        arquivo_anos = self._dat_cadastro_arquivo_anos(rows)
         created = 0
+        ano_preenchido = 0
         for r in rows:
             mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
             pg_id = pg_idx.get(_norm(r.get("projeto_geral") or ""))
@@ -1723,10 +1780,17 @@ class ExportContractImporter:
             if mun_id is None or pg_id is None or plataforma not in _CAD_ETAPAS:
                 continue
             ano = _dat_cadastro_ano(r)
-            if DATCadastro.objects.filter(
-                municipio_id=mun_id, projeto_geral_id=pg_id, plataforma=plataforma, ano=ano
-            ).exists():
+            st = _dat_cadastro_existente(anos_db, arquivo_anos, (mun_id, pg_id, plataforma, ano))
+            if st == "would_update":
+                sem_ano = DATCadastro.objects.get(
+                    municipio_id=mun_id, projeto_geral_id=pg_id, plataforma=plataforma, ano__isnull=True
+                )
+                sem_ano.ano = ano
+                sem_ano.save(update_fields=["ano", "updated_at"])
+                ano_preenchido += 1
                 continue
+            if st != "would_create":
+                continue  # existe, ou o cadastro sem ano tem dois anos no arquivo (decide uma pessoa)
             campos: dict[str, Any] = {}
             for prefix, status_field, data_field in _CAD_ETAPAS[plataforma]:
                 campos[status_field] = (r.get(f"{prefix}_status") or "pendente").strip() or "pendente"
@@ -1740,7 +1804,7 @@ class ExportContractImporter:
                 **campos,
             )
             created += 1
-        return created
+        return created, ano_preenchido
 
     def _apply_dat_acao(self, rows: list[dict[str, str]]) -> int:
         """Create-only de DATAcao. NK (municipio, projeto, ano); ano = cohort anual derivado da data
@@ -2461,6 +2525,20 @@ class ExportContractImporter:
                 Projeto.objects.filter(id=pid).update(**updates)
                 reconciled += 1
         return reconciled
+
+    def _dat_cadastro_arquivo_anos(self, rows: list[dict[str, str]]) -> dict[tuple[int, int, str], set[int | None]]:
+        """(municipio, projeto_geral, plataforma) → anos que o arquivo traz para a tripla (None = sem ano)."""
+        mun_idx = self._municipio_index()
+        pg_idx = self._projeto_geral_index()
+        arquivo: dict[tuple[int, int, str], set[int | None]] = {}
+        for r in rows:
+            mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
+            pg_id = pg_idx.get(_norm(r.get("projeto_geral") or ""))
+            plataforma = (r.get("plataforma") or "").strip().upper()
+            if mun_id is None or pg_id is None or plataforma not in _CAD_ETAPAS:
+                continue
+            arquivo.setdefault((mun_id, pg_id, plataforma), set()).add(_dat_cadastro_ano(r))
+        return arquivo
 
     def _dat_registro_arquivo_com_ano(
         self, rows: list[dict[str, str]]

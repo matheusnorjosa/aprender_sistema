@@ -1,6 +1,9 @@
 """
 Issue #723 - Cadeia funcional compras -> solicitacao -> publish gcal.
 
+Regra da compra (14/10/2026): a compra que libera o par é a `DATCompra`, lançada pela tela de
+Compras do DAT (`/api/dat/compras-materiais/`), não mais o import da lista antiga.
+
 Objetivo:
 - Cobrir o fluxo feliz ponta-a-ponta usando endpoints reais do backend.
 - Cobrir o fluxo invalido sem compra elegivel (municipio + projeto).
@@ -15,14 +18,13 @@ from datetime import timedelta
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AuditLog, Compra, Solicitacao, Usuario
+from apps.core.models import AuditLog, DATCompra, Solicitacao, Usuario
 from apps.core.tests.factories import (
     GroupFactory,
     MunicipioFactory,
@@ -47,37 +49,32 @@ def _create_user_in_group(*, prefix: str, group_name: str) -> Usuario:
     return user
 
 
-def _upload_compras_csv(client: APIClient, *, codigo: str, produto: str, municipio: str, uf: str) -> dict:
-    csv_content = (
-        "COD,Produto,Quant.,Municipio,UF,Data,Uso das colecoes\n"
-        f"{codigo},{produto},10,{municipio},{uf},2026-01-15,Fluxo cadeia\n"
-    )
-    upload = SimpleUploadedFile(
-        "compras.csv",
-        csv_content.encode("utf-8"),
-        content_type="text/csv",
-    )
+def _lancar_compra(client: APIClient, *, municipio, projeto, descricao: str) -> None:
+    """Lança a compra pela tela de Compras do DAT (endpoint real)."""
     response = client.post(
-        "/api/controle/import-compras/?dry_run=false",
-        {"file": upload},
-        format="multipart",
+        "/api/dat/compras-materiais/",
+        {
+            "municipio": municipio.id,
+            "projeto": projeto.id,
+            "descricao_produto": descricao,
+            "quantidade": 10,
+            "ano_uso": 2026,
+        },
+        format="json",
         secure=True,
     )
-    error_payload = getattr(response, "data", getattr(response, "content", b""))
-    assert response.status_code == 200, error_payload
-    return response.json()
+    assert response.status_code == 201, getattr(response, "data", response.content)
 
 
 @override_settings(GCAL_CLIENT="google")
 def test_happy_path_import_compra_create_solicitacao_approve_and_publish():
     """
     Fluxo feliz esperado:
-    import compras -> cria solicitacao valida -> aprova -> publish retorna sucesso.
+    lança compra -> cria solicitacao valida -> aprova -> publish retorna sucesso.
     """
     client = APIClient()
 
-    # Import pela tela é só do superusuário (02/10/2026); publish continua sendo operação Controle.
-    user_importador = UsuarioFactory(superuser=True)
+    # O Controle lança a compra (policy `view_compras_stats`) e publica.
     user_controle = _create_user_in_group(prefix="controle_chain", group_name="Controle")
     user_coordenador = _create_user_in_group(prefix="coord_chain", group_name="Coordenador")
     # PR 3 hardening RBAC (2026-04-29): aprovar exige composite Setor Sup + Função Gerente.
@@ -89,17 +86,10 @@ def test_happy_path_import_compra_create_solicitacao_approve_and_publish():
     projeto = ProjetoFactory(nome="Novo Lendo", codigo="NL", fluxo="SUPER", ativo=True)
     tipo_evento = TipoEventoFactory(nome="Formacao")
 
-    # 1) Import compras via endpoint real (só superusuário).
-    client.force_authenticate(user=user_importador)
-    import_report = _upload_compras_csv(
-        client,
-        codigo="COMP-CHAIN-001",
-        produto="LIVRO NOVO LENDO",
-        municipio=municipio.nome,
-        uf=municipio.uf,
-    )
-    assert import_report["stats"]["created"] == 1
-    assert Compra.objects.filter(municipio=municipio, projeto=projeto).exists()
+    # 1) Compra lançada via endpoint real.
+    client.force_authenticate(user=user_controle)
+    _lancar_compra(client, municipio=municipio, projeto=projeto, descricao="LIVRO NOVO LENDO")
+    assert DATCompra.objects.filter(municipio=municipio, projeto=projeto).exists()
 
     # 2) Criacao da solicitacao (projeto SUPER => pendente).
     client.force_authenticate(user=user_coordenador)
@@ -156,8 +146,7 @@ def test_invalid_path_blocks_solicitacao_when_pair_municipio_projeto_has_no_comp
     """
     client = APIClient()
 
-    # Import pela tela é só do superusuário (02/10/2026).
-    user_importador = UsuarioFactory(superuser=True)
+    user_controle = _create_user_in_group(prefix="controle_invalid", group_name="Controle")
     user_coordenador = _create_user_in_group(prefix="coord_invalid", group_name="Coordenador")
 
     municipio = MunicipioFactory(nome="Sobral", uf="CE", ativo=True)
@@ -165,18 +154,11 @@ def test_invalid_path_blocks_solicitacao_when_pair_municipio_projeto_has_no_comp
     projeto_sem_compra = ProjetoFactory(nome="ACerta", codigo="AC", fluxo="SUPER", ativo=True)
     tipo_evento = TipoEventoFactory(nome="Acompanhamento")
 
-    # Import cria compra somente para "Novo Lendo".
-    client.force_authenticate(user=user_importador)
-    import_report = _upload_compras_csv(
-        client,
-        codigo="COMP-CHAIN-002",
-        produto="LIVRO NOVO LENDO",
-        municipio=municipio.nome,
-        uf=municipio.uf,
-    )
-    assert import_report["stats"]["created"] == 1
-    assert Compra.objects.filter(municipio=municipio, projeto=projeto_com_compra).exists()
-    assert not Compra.objects.filter(municipio=municipio, projeto=projeto_sem_compra).exists()
+    # Compra lançada somente para "Novo Lendo".
+    client.force_authenticate(user=user_controle)
+    _lancar_compra(client, municipio=municipio, projeto=projeto_com_compra, descricao="LIVRO NOVO LENDO")
+    assert DATCompra.objects.filter(municipio=municipio, projeto=projeto_com_compra).exists()
+    assert not DATCompra.objects.filter(municipio=municipio, projeto=projeto_sem_compra).exists()
 
     # Tenta criar solicitacao para projeto sem compra => bloqueio.
     client.force_authenticate(user=user_coordenador)
@@ -200,4 +182,4 @@ def test_invalid_path_blocks_solicitacao_when_pair_municipio_projeto_has_no_comp
     assert create_response.status_code == 400
     assert "errors" in create_response.data
     assert "municipio" in create_response.data["errors"]
-    assert "compra registrada" in str(create_response.data["errors"]["municipio"]).lower()
+    assert "compra que libere" in str(create_response.data["errors"]["municipio"]).lower()

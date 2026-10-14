@@ -10,7 +10,7 @@ from django.core.management import call_command
 
 import pytest
 
-from apps.core.models import Compra, EquipeGerencia, Municipio, Projeto, Usuario
+from apps.core.models import DATCompra, EquipeGerencia, Municipio, Projeto, Usuario
 
 SEED_USERNAMES = [
     "coord_e2e@test.com",
@@ -26,11 +26,11 @@ SEED_MUNICIPIOS = [("Salvador", "BA"), ("Fortaleza", "CE")]
 def _clean_seed_entities() -> None:
     """Remove entidades seedadas pelo comando, respeitando FK PROTECT.
 
-    Ordem importa: Compra tem FK PROTECT para Municipio e Projeto. Se
-    apagarmos Municipio/Projeto antes, o Django levanta ProtectedError
-    no teardown.
+    Ordem importa: DATCompra tem FK PROTECT para Municipio, Projeto e o autor
+    (created_by). Se apagarmos Municipio/Projeto/Usuario antes, o Django levanta
+    ProtectedError no teardown.
     """
-    Compra.objects.filter(
+    DATCompra.objects.filter(
         projeto__nome__in=SEED_PROJETOS,
     ).delete()
     # EquipeGerencia.usuario é PROTECT: o vínculo GERENTE de super_e2e (PR B1) sai antes.

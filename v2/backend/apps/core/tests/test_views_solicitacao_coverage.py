@@ -15,7 +15,7 @@ Covers:
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import timedelta
 from uuid import uuid4
 
 from django.test import override_settings
@@ -24,7 +24,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AuditLog, Compra, Gerencia, Participation
+from apps.core.models import AuditLog, Gerencia, Participation
 from apps.core.tests.factories import (
     GroupFactory,
     MunicipioFactory,
@@ -32,6 +32,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    liberar_par,
 )
 
 
@@ -136,15 +137,7 @@ def tipo_evento():
 @pytest.fixture
 def compra_projeto_super(municipio, projeto_super):
     """Compra base para habilitar criação de solicitações via API nos edge cases."""
-    return Compra.objects.create(
-        codigo="COMP-VIEWS-COVERAGE",
-        projeto=projeto_super,
-        municipio=municipio,
-        quantidade=8,
-        data=date(2026, 1, 16),
-        uso="Teste views_solicitacao",
-        external_hash=f"test-views-solicitacao-{projeto_super.id}",
-    )
+    return liberar_par(municipio, projeto_super)
 
 
 # ============================================================

@@ -9,7 +9,7 @@ pelo projeto, não pelo campo coordenador_acompanha.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import timedelta
 
 from django.test import TestCase
 from django.utils import timezone
@@ -18,7 +18,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Compra, Projeto, Solicitacao
+from apps.core.models import Projeto, Solicitacao
 from apps.core.tests.factories import (
     GroupFactory,
     MunicipioFactory,
@@ -26,6 +26,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    liberar_par,
 )
 
 
@@ -89,24 +90,8 @@ class TestFluxoPorProjeto(TestCase):
         )
 
         # Regra de elegibilidade: compras liberam solicitação por município+projeto.
-        Compra.objects.create(
-            codigo="COMP-FLUXO-SUPER",
-            projeto=self.projeto_super,
-            municipio=self.municipio,
-            quantidade=20,
-            data=date(2026, 1, 10),
-            uso="Fluxo SUPER",
-            external_hash="fluxo-super-hash",
-        )
-        Compra.objects.create(
-            codigo="COMP-FLUXO-OUTROS",
-            projeto=self.projeto_outros,
-            municipio=self.municipio,
-            quantidade=15,
-            data=date(2026, 1, 11),
-            uso="Fluxo NAO_SUPER",
-            external_hash="fluxo-outros-hash",
-        )
+        liberar_par(self.municipio, self.projeto_super)
+        liberar_par(self.municipio, self.projeto_outros)
 
         # Datas para testes
         self.inicio = timezone.now() + timedelta(days=7)
@@ -228,15 +213,7 @@ class TestFluxoPorProjeto(TestCase):
         # Forçar fluxo como None para simular projeto antigo
         Projeto.objects.filter(id=projeto_sem_fluxo.id).update(fluxo="NAO_SUPER")
         projeto_sem_fluxo.refresh_from_db()
-        Compra.objects.create(
-            codigo="COMP-FLUXO-LEGADO",
-            projeto=projeto_sem_fluxo,
-            municipio=self.municipio,
-            quantidade=10,
-            data=date(2026, 1, 12),
-            uso="Fluxo legado",
-            external_hash="fluxo-legado-hash",
-        )
+        liberar_par(self.municipio, projeto_sem_fluxo)
 
         self.client.force_authenticate(user=self.coordenador)
 

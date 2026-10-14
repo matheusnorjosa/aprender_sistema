@@ -14,7 +14,7 @@ COORD_ACOMPANHA.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import timedelta
 
 from django.utils import timezone
 from rest_framework import status as http_status
@@ -22,7 +22,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Compra, Participation, Solicitacao
+from apps.core.models import Participation, Solicitacao
 from apps.core.tests.factories import (
     GroupFactory,
     MunicipioFactory,
@@ -30,6 +30,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    liberar_par,
 )
 
 pytestmark = pytest.mark.django_db
@@ -59,15 +60,7 @@ def projeto_super(municipio):
     compra registrada. Os testes de criação usam `projeto=None` e não precisam dela.
     """
     projeto = ProjetoFactory(nome="Projeto SUPER 1452", fluxo="SUPER")
-    Compra.objects.create(
-        codigo="COMP-1452",
-        projeto=projeto,
-        municipio=municipio,
-        quantidade=10,
-        data=date(2026, 1, 10),
-        uso="Fixture #1452",
-        external_hash="compra-1452-hash",
-    )
+    liberar_par(municipio, projeto)
     return projeto
 
 

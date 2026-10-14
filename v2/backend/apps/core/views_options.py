@@ -20,6 +20,8 @@ from rest_framework.response import Response
 
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 
+from apps.core.services.compra_elegibilidade import isento_da_regra_da_compra, projetos_liberados
+
 from .models import (
     DATArea,
     DATCoordenador,
@@ -92,6 +94,13 @@ def municipios_options(request: Request) -> Response:
             type=bool,
             description="Quando true, inclui projetos de teste.",
         ),
+        OpenApiParameter(
+            name="com_compra",
+            location=OpenApiParameter.QUERY,
+            required=False,
+            type=bool,
+            description='Quando true, esconde o projeto "em espera" (sem compra que o libere), salvo para quem é isento.',
+        ),
     ],
     responses=ProjetoOptionSerializer(many=True),
     tags=["options"],
@@ -114,19 +123,34 @@ def projetos_options(request: Request) -> Response:
         ...
     ]
 
+    `com_compra=true` (Plano Anual): esconde o projeto "em espera" pela regra única da compra
+    (`services/compra_elegibilidade`), salvo para quem é isento. O filtro roda DEPOIS do cache, por
+    usuário e sem cache: o projeto volta assim que a compra entra.
+
     Permissions: IsAuthenticated
     Cache: 5 minutos (CP3)
     """
+    com_compra = request.query_params.get("com_compra", "false").lower() == "true"
     # CP3: Cache manual (não usar decorator com DRF views)
     include_test = request.query_params.get("include_test", "false").lower() == "true"
     # #1976: exclui variantes-por-série (famílias + série que já tem plano) — Plano Anual.
     exclude_kits = request.query_params.get("exclude_kits", "false").lower() == "true"
     cache_key = f"static_endpoint:projetos_options:include_test={include_test}:exclude_kits={exclude_kits}"
-    cached_data = cache.get(cache_key)
-    if cached_data is not None:
-        return Response(cached_data)
+    data = cache.get(cache_key)
+    if data is None:
+        data = _projetos_options_data(include_test=include_test, exclude_kits=exclude_kits)
+        cache.set(cache_key, data, timeout=settings.CACHE_DEFAULT_TIMEOUT)  # 5 min
 
-    # Cache miss: buscar do banco
+    if com_compra and not isento_da_regra_da_compra(request.user):
+        liberados = set(
+            projetos_liberados(Projeto.objects.filter(pk__in=[p["id"] for p in data])).values_list("pk", flat=True)
+        )
+        data = [p for p in data if p["id"] in liberados]
+
+    return Response(data)
+
+
+def _projetos_options_data(*, include_test: bool, exclude_kits: bool) -> Any:
     # Filter active projects
     projetos = Projeto.objects.filter(ativo=True)
 
@@ -144,13 +168,7 @@ def projetos_options(request: Request) -> Response:
 
     projetos = projetos.order_by("nome")
 
-    serializer = ProjetoOptionSerializer(projetos, many=True)
-    data = serializer.data
-
-    # Salvar no cache
-    cache.set(cache_key, data, timeout=settings.CACHE_DEFAULT_TIMEOUT)  # 5 min
-
-    return Response(data)
+    return ProjetoOptionSerializer(projetos, many=True).data
 
 
 @extend_schema(

@@ -12,7 +12,7 @@ Um cenário com dois setores (Vidas e Fluir) e cada perfil que usa a tela.
 from __future__ import annotations
 
 import itertools
-from datetime import date, datetime
+from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -20,8 +20,8 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Compra, EquipeGerencia, Gerencia
-from apps.core.tests.factories import MunicipioFactory, ProjetoFactory, TipoEventoFactory, UsuarioFactory
+from apps.core.models import EquipeGerencia, Gerencia
+from apps.core.tests.factories import MunicipioFactory, ProjetoFactory, TipoEventoFactory, UsuarioFactory, liberar_par
 
 pytestmark = pytest.mark.django_db
 
@@ -48,15 +48,7 @@ def mundo():
     projeto = ProjetoFactory(
         nome="Projeto Ficticio Vidas", codigo="PFESC", fluxo="NAO_SUPER", gerencia=vidas, setor="Vidas"
     )
-    Compra.objects.create(
-        codigo="C-ESC",
-        projeto=projeto,
-        municipio=municipio,
-        quantidade=1,
-        data=date(2026, 3, 1),
-        uso="teste",
-        external_hash=f"{1:064d}",
-    )
+    liberar_par(municipio, projeto)
     return {
         "municipio": municipio,
         "projeto": projeto,

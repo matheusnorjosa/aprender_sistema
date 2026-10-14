@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import itertools
 import logging
-from datetime import date, timedelta
+from datetime import timedelta
 
 from django.core.cache import cache
 from django.db import connection
@@ -31,13 +31,14 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AuditLog, Compra, EquipeGerencia, Gerencia, Projeto, Solicitacao, Usuario
+from apps.core.models import AuditLog, EquipeGerencia, Gerencia, Projeto, Solicitacao, Usuario
 from apps.core.tests.factories import (
     MunicipioFactory,
     ProjetoFactory,
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    liberar_par,
 )
 
 pytestmark = pytest.mark.django_db
@@ -110,15 +111,7 @@ def _sol(
 
 
 def _compra(municipio, projeto) -> None:
-    Compra.objects.create(
-        codigo=f"C-ESC-{next(_HASH)}",
-        projeto=projeto,
-        municipio=municipio,
-        quantidade=1,
-        data=date(2026, 3, 1),
-        uso="teste escopo",
-        external_hash=f"escopo-{next(_HASH):057d}",
-    )
+    liberar_par(municipio, projeto)
 
 
 def _client(user: Usuario) -> APIClient:

@@ -202,6 +202,18 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
         category="solicitacao",
         group_names=("Apoio de Coordenação",),
     ),
+    # Regra da compra (14/10/2026): isenção checada em `compra_elegibilidade`. Sem grupo até o PR que
+    # a põe no pacote do DAT (migration 0123 só cria a capacidade).
+    FunctionalPermissionSeed(
+        codename="create_solicitation_without_purchase",
+        label="Criar solicitações sem compra",
+        description=(
+            "Criar e editar evento em município e projeto sem compra que os libere (isenção da regra da "
+            "compra). Sem grupo atribuído por padrão: só o superusuário passa."
+        ),
+        category="solicitacao",
+        group_names=(),
+    ),
 )
 
 
@@ -211,8 +223,9 @@ def _validate_seed() -> None:
     # grupos atribuídos por seed; só superuser bypassa). Total: 16.
     # #1656 Feature 2: +1 capability `publish_setor_solicitacao` (Apoio de
     # Coordenação). Total: 17.
-    if len(FUNCTIONAL_PERMISSIONS_SEED) != 17:
-        raise ValueError("Seed de permissoes funcionais deve conter exatamente 17 itens.")
+    # Regra da compra (14/10/2026): +1 `create_solicitation_without_purchase` (0 grupos). Total: 18.
+    if len(FUNCTIONAL_PERMISSIONS_SEED) != 18:
+        raise ValueError("Seed de permissoes funcionais deve conter exatamente 18 itens.")
 
     seen: set[str] = set()
     for item in FUNCTIONAL_PERMISSIONS_SEED:

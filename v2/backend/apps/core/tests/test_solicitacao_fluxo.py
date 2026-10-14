@@ -15,14 +15,12 @@ Valida:
 
 from __future__ import annotations
 
-from datetime import date
-
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Compra, Projeto, Solicitacao
+from apps.core.models import Projeto, Solicitacao
 from apps.core.tests.factories import (
     GroupFactory,
     MunicipioFactory,
@@ -30,6 +28,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    liberar_par,
 )
 
 
@@ -96,24 +95,8 @@ def tipo_evento():
 @pytest.fixture
 def compras_fluxo_base(municipio, projeto_super, projeto_outros):
     """Semear compras para liberar criação de solicitação por município+projeto."""
-    Compra.objects.create(
-        codigo="COMP-FLUXO-SUPER",
-        projeto=projeto_super,
-        municipio=municipio,
-        quantidade=10,
-        data=date(2026, 1, 10),
-        uso="Teste fluxo SUPER",
-        external_hash="test-solicitacao-fluxo-super",
-    )
-    Compra.objects.create(
-        codigo="COMP-FLUXO-OUTROS",
-        projeto=projeto_outros,
-        municipio=municipio,
-        quantidade=10,
-        data=date(2026, 1, 11),
-        uso="Teste fluxo NAO_SUPER",
-        external_hash="test-solicitacao-fluxo-outros",
-    )
+    liberar_par(municipio, projeto_super)
+    liberar_par(municipio, projeto_outros)
 
 
 @pytest.mark.django_db
@@ -468,15 +451,7 @@ class TestProjetoSemFluxo:
 
         assert projeto_default.fluxo == "NAO_SUPER"
 
-        Compra.objects.create(
-            codigo="COMP-FLUXO-DEFAULT",
-            projeto=projeto_default,
-            municipio=municipio,
-            quantidade=10,
-            data=date(2026, 1, 12),
-            uso="Teste fluxo default",
-            external_hash="test-solicitacao-fluxo-default",
-        )
+        liberar_par(municipio, projeto_default)
 
         api_client.force_authenticate(user=usuario_coordenador)
 

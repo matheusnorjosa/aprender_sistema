@@ -54,9 +54,10 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.services.compra_elegibilidade import isento_da_regra_da_compra, par_liberado
 from apps.core.services.resolvers import resolve_municipio, resolve_projeto, resolve_tipo_evento, resolve_user_by_email
 
-from .models import Compra, Municipio, Projeto, TipoEvento
+from .models import Municipio, Projeto, TipoEvento
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,7 @@ class SolicitationValidateView(APIView):
                 errors.append(f"Município não encontrado: {municipio_input}")
 
         # 2. Validar e resolver projeto
+        projeto_obj: Projeto | None = None
         projeto_input = data.get("projeto")
         if not projeto_input:
             errors.append("Campo 'projeto' é obrigatório")
@@ -107,19 +109,14 @@ class SolicitationValidateView(APIView):
             else:
                 errors.append(f"Tipo de evento não encontrado: {tipo_input}")
 
-        # 3.1 Validar elegibilidade de compra (município + projeto) para não-superuser
+        # 3.1 Regra da compra (SSOT `compra_elegibilidade`); isentos: superuser e a capacidade.
         if (
-            request.user
-            and not request.user.is_superuser
+            not isento_da_regra_da_compra(request.user)
             and canonical.get("municipio_id") is not None
-            and canonical.get("projeto_id") is not None
+            and projeto_obj is not None
+            and not par_liberado(canonical["municipio_id"], projeto_obj)
         ):
-            has_compra = Compra.objects.filter(
-                municipio_id=canonical["municipio_id"],
-                projeto_id=canonical["projeto_id"],
-            ).exists()
-            if not has_compra:
-                errors.append("Município e projeto sem compra registrada para elegibilidade de solicitação")
+            errors.append("Município e projeto sem compra que os libere para a solicitação")
 
         # 4. Validar data/hora
         date_str = data.get("date")

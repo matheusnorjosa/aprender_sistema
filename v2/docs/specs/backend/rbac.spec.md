@@ -12,6 +12,8 @@ sources_of_truth:
   - v2/backend/apps/core/rbac/constants.py
   - v2/backend/apps/core/constants.py
   - v2/backend/apps/core/services/rbac_permissions.py
+  - v2/backend/apps/core/services/rbac_snapshot.py
+  - v2/backend/apps/core/management/commands/rbac_diff.py
   - v2/backend/apps/core/services/functional_permissions_seed.py
   - v2/backend/apps/core/services/solicitacao_scope.py
   - v2/backend/apps/core/services/equipe_gerencia.py
@@ -91,6 +93,7 @@ Existem três conceitos ortogonais: **capability** (autorização binária por f
 - [`v2/backend/apps/core/middleware.py`](../../../backend/apps/core/middleware.py) — `TrocaDeSenhaObrigatoriaMiddleware` e a lista fechada `ROTAS_LIBERADAS_NA_TROCA_DE_SENHA` (troca obrigatória de senha).
 - [`v2/backend/apps/core/signals.py`](../../../backend/apps/core/signals.py) — signal `m2m_changed` em `PermissaoFuncional.groups`: faz **cache-bust** dos usuários afetados. A auditoria de Grupo×Capability **não** passa mais por este signal — o buffer de módulo `_PENDING_GROUP_CAP_DELTAS` / `flush_group_capability_audit` foi removido no #1672 e o `AuditLog GROUP_CAPABILITY_CHANGED` agora é gravado no ponto de escrita — ver D17 abaixo.
 - [`v2/backend/scripts/rbac_lint.py`](../../../backend/scripts/rbac_lint.py) — lint AST (V001/V002/V003) que enforça a convenção em CI.
+- [`v2/backend/apps/core/management/commands/rbac_diff.py`](../../../backend/apps/core/management/commands/rbac_diff.py) + [`services/rbac_snapshot.py`](../../../backend/apps/core/services/rbac_snapshot.py) — simulador **somente leitura** (`--salvar`, `--comparar`, `--diagnostico`): retrato do poder de cada pessoa ativa (`u<id>`, sem dado pessoal) e o que cada uma ganha ou perde. Não grava banco nem cache (capacidades por consulta direta; policies por `resolve_public_policies(..., capacidades=...)`). Roda em produção antes de todo PR que muda poder ([ADR-020](../../adr/ADR-020-lugar-onde-trabalha-da-o-poder.md)).
 
 Doc canônico detalhado (não duplicado aqui): convenção de nomes em [`RBAC_NAMING.md`](../../RBAC_NAMING.md), matriz declarativa ator × recurso em [`rbac_authorization_matrix.md`](../../rbac_authorization_matrix.md), e operação via Admin em [`GUIA_ADMIN_RBAC.md`](../../GUIA_ADMIN_RBAC.md).
 
@@ -143,6 +146,7 @@ Doc canônico detalhado (não duplicado aqui): convenção de nomes em [`RBAC_NA
 
 - Princípios de naming, vocabulário de verbos e enforcement: [`RBAC_NAMING.md`](../../RBAC_NAMING.md) (Epic 2; §8/D17 Admin-driven).
 - Matriz declarativa ator × recurso e motivo legítimo de acesso: [`rbac_authorization_matrix.md`](../../rbac_authorization_matrix.md).
+- Lugar onde a pessoa trabalha dá o poder (perfil da gerência → pacote; papel só na própria gerência; 13 PRs): [ADR-020](../../adr/ADR-020-lugar-onde-trabalha-da-o-poder.md).
 - Decisões D7–D9 (Grade Mensal / Diretoria / DAT transversal), D17 (Admin-driven), PR 3 (composite aprovações), PR 5/6 (lookup/audit hardening) — registradas como comentários rastreáveis em `policies.py` e `matrix.py`.
 
 ## Testes que cobrem
@@ -153,6 +157,7 @@ Doc canônico detalhado (não duplicado aqui): convenção de nomes em [`RBAC_NA
 - [`v2/backend/apps/core/tests/test_me_policies.py`](../../../backend/apps/core/tests/test_me_policies.py) — `GET /api/me/policies/` (incl. test de paridade que obriga registrar `Can*` nova como pública).
 - [`v2/backend/apps/core/tests/test_troca_senha_obrigatoria.py`](../../../backend/apps/core/tests/test_troca_senha_obrigatoria.py) — troca obrigatória de senha: um caso por grupo de rota, a lista liberada, e `test_nega_por_padrao_em_todas_as_rotas_registradas`, que percorre todas as rotas do resolver em 7 métodos e prova que só a lista fechada passa. Usa `force_login` (o `force_authenticate` do DRF não passa pelo middleware). Marca ligada/não gravável: `test_admin_api.py`.
 - [`v2/backend/apps/core/tests/test_rbac_permissions.py`](../../../backend/apps/core/tests/test_rbac_permissions.py), [`test_rbac_helpers.py`](../../../backend/apps/core/tests/test_rbac_helpers.py) — classes DRF e helpers.
+- [`v2/backend/apps/core/tests/test_rbac_diff.py`](../../../backend/apps/core/tests/test_rbac_diff.py) — simulador `rbac_diff`: retrato, diff, diagnóstico, nenhuma escrita (banco e cache) e nenhum dado pessoal.
 - [`v2/backend/apps/core/tests/test_rbac_lint.py`](../../../backend/apps/core/tests/test_rbac_lint.py) — self-test do lint (aceita baseline, rejeita padrões banidos).
 - [`v2/backend/apps/core/tests/test_pr3_approvals_policy.py`](../../../backend/apps/core/tests/test_pr3_approvals_policy.py), [`test_pr6_audit_logs_policy.py`](../../../backend/apps/core/tests/test_pr6_audit_logs_policy.py) — gates compostos endurecidos.
 - [`v2/backend/apps/core/tests/test_rbac_labels_capability_oriented.py`](../../../backend/apps/core/tests/test_rbac_labels_capability_oriented.py), [`test_rbac_seed.py`](../../../backend/apps/core/tests/test_rbac_seed.py) — convenção de labels e seed idempotente.

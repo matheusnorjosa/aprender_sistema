@@ -110,6 +110,19 @@ class SplitDatRegistrosTest(TestCase):
         reg.refresh_from_db()
         self.assertEqual(reg.ano, 2026)
 
+    def test_registro_com_ano_nao_muda_de_ano(self):
+        """Registro que já tem ano (veio da planilha, export v37) fica no ano dele: compras de 2026 e
+        2027 com só o registro de 2027 criam o de 2026 vazio, sem mover o de 2027 para o primário."""
+        self._flat(ano=2027, aluno=300, prof=30)
+        self._compra(20, 2026)
+        self._compra(100, 2027)
+        res = split_dat_registros()
+        regs = self._regs()
+        self.assertEqual(set(regs), {2026, 2027})
+        self.assertEqual((regs[2027].aluno_qtde, regs[2027].professor_qtde), (300, 30))
+        self.assertEqual((regs[2026].aluno_qtde, regs[2026].professor_qtde), (None, None))
+        self.assertEqual((res["reatribuidos"], res["criados"]), (0, 1))
+
     def test_compra_sem_registro_reportada(self):
         """Compra para um par SEM registro (anomalia de origem: planilha dat_registro não tem a
         linha) não é splitada nem inventada — é reportada em `compras_sem_registro`."""

@@ -463,6 +463,38 @@ def _dat_cadastro_ano(r: dict[str, str]) -> int | None:
     return None
 
 
+def _dat_registro_anos() -> dict[tuple[int, int, int], set[int | None]]:
+    """(municipio_id, projeto_geral_id, projeto_id) → anos dos DATRegistro existentes (None = sem ano)."""
+    anos: dict[tuple[int, int, int], set[int | None]] = {}
+    for mid, pgid, pid, ano in DATRegistro.objects.values_list("municipio_id", "projeto_geral_id", "projeto_id", "ano"):
+        anos.setdefault((mid, pgid, pid), set()).add(ano)
+    return anos
+
+
+def _dat_registro_existente(anos: dict[tuple[int, int, int], set[int | None]], nk: tuple[Any, ...]) -> str:
+    """Classifica a linha (municipio, projeto_geral, projeto, ano) contra os anos já gravados da tripla, e
+    registra em `anos` o que o apply deixa gravado (classify e apply percorrem o arquivo igual).
+
+    - linha sem ano (CSV antigo): qualquer registro da tripla conta como existente (regra de antes);
+    - ano já gravado → would_skip_same;
+    - a tripla só tem o registro SEM ano (carga flat antiga, que o split nunca dividiu) → would_update:
+      esse registro é esta linha, e o apply preenche só o ano vazio. Criar outro duplicaria as quantidades,
+      e o split, vendo o ano primário já gravado, deixaria o flat ao lado;
+    - senão → would_create."""
+    tripla, ano = nk[:3], nk[3]
+    gravados = anos.setdefault(tripla, set())
+    if ano is None:
+        st = "would_skip_same" if gravados else "would_create"
+    elif ano in gravados:
+        st = "would_skip_same"
+    elif gravados == {None}:
+        st = "would_update"
+    else:
+        st = "would_create"
+    gravados.add(ano)
+    return st
+
+
 def diff_and_classify(
     existing: dict[str, Any] | None, export: dict[str, Any], protected: set[str]
 ) -> tuple[str, list[str]]:
@@ -866,12 +898,19 @@ class ExportContractImporter:
                 tally[st] += 1
 
         elif name == "dat_registro":
-            # NK = (municipio_id, projeto_geral_id, projeto_id). Município por (norm(nome), uf);
-            # projeto_geral por norm(nome); projeto via resolver (#1372). FK não-resolvida → would_reject.
-            # Existence-based (não compara campos operacionais; status/nr_codigos ficam para o apply).
+            # NK = (municipio_id, projeto_geral_id, projeto_id, ano), a mesma unicidade do modelo. Município
+            # por (norm(nome), uf); projeto_geral por norm(nome); projeto via resolver (#1372). FK
+            # não-resolvida → would_reject. O ano é o do arquivo (export v37: a tripla vem em 2026 e em
+            # 2027, cada linha com a sua quantidade); a regra de existência é `_dat_registro_existente`.
             mun_idx = self._municipio_index()
             pg_idx = self._projeto_geral_index()
-            existing = set(DATRegistro.objects.values_list("municipio_id", "projeto_geral_id", "projeto_id"))
+            anos_db = _dat_registro_anos()
+            vazios_reg = set(
+                DATRegistro.objects.filter(aluno_qtde__isnull=True, professor_qtde__isnull=True).values_list(
+                    "municipio_id", "projeto_geral_id", "projeto_id", "ano"
+                )
+            )
+            tally["existe_sem_quantidade"] = 0
             # Espelha o apply, que grava só a 1ª linha de cada chave do arquivo: a repetição (inclusive nomes
             # antigos de família que o apelido junta na mesma chave) vira would_reject(repetida_no_arquivo), e
             # a chave cujas linhas trazem dados diferentes é listada em `repetidas_divergentes` (não escolhe
@@ -887,21 +926,27 @@ class ExportContractImporter:
                 if mun_id is None or pg_id is None or proj_id is None:
                     tally["would_reject"] += 1
                     continue
-                nk = (mun_id, pg_id, proj_id)
-                dados = tuple((r.get(c) or "").strip() for c in ("aluno_qtde", "professor_qtde", "ano"))
+                ano = _parse_int(r.get("ano"))
+                nk = (mun_id, pg_id, proj_id, ano)
+                dados = tuple((r.get(c) or "").strip() for c in ("aluno_qtde", "professor_qtde"))
                 if nk in vistas_reg:
                     tally["would_reject"] += 1
                     reasons["repetida_no_arquivo"] += 1
                     rotulo = (
                         f"{_norm(r.get('municipio') or '')}/{(r.get('uf') or '').upper()} | {pg_nomes.get(pg_id)} | "
                         f"{Projeto.objects.filter(pk=proj_id).values_list('nome', flat=True).first()}"
+                        + (f" | {ano}" if ano is not None else "")
                     )
                     if vistas_reg[nk] != dados and rotulo not in divergentes_reg:
                         divergentes_reg.append(rotulo)
                     continue
                 vistas_reg[nk] = dados
-                st, _ = diff_and_classify({} if nk in existing else None, {}, protected)
+                st = _dat_registro_existente(anos_db, nk)
                 tally[st] += 1
+                if st == "would_skip_same" and nk in vazios_reg and any(dados):
+                    # O split por ano das compras cria o registro do ano sem quantidade; o create-only não o
+                    # preenche. Contado à parte para a quantidade da planilha não sumir calada.
+                    tally["existe_sem_quantidade"] += 1
             tally["reject_reasons"] = reasons
             tally["repetidas_divergentes"] = divergentes_reg
 
@@ -1298,7 +1343,10 @@ class ExportContractImporter:
                     applied[name] = self._apply_dat_cadastro(self._load(name))
                     continue
                 if name == "dat_registro":
-                    applied[name] = self._apply_dat_registro(self._load(name))
+                    created_reg, ano_preenchido = self._apply_dat_registro(self._load(name))
+                    applied[name] = created_reg
+                    if ano_preenchido:
+                        applied["dat_registro__ano_preenchido"] = ano_preenchido
                     continue
                 if name == "dat_compra":
                     applied[name] = self._apply_dat_compra(self._load(name))
@@ -1976,15 +2024,18 @@ class ExportContractImporter:
             created += 1
         return created
 
-    def _apply_dat_registro(self, rows: list[dict[str, str]]) -> int:
-        """Create-only de DATRegistro. NK (municipio, projeto_geral, projeto).
-        aluno_qtde é obrigatório → linha sem ele é pulada. DATRegistro.save()
-        recalcula nr_codigos + espelha usa_avaliar; nr_codigos_planilha guarda o
-        valor cru da planilha para reconciliação."""
+    def _apply_dat_registro(self, rows: list[dict[str, str]]) -> tuple[int, int]:
+        """Create-only de DATRegistro. NK (municipio, projeto_geral, projeto, ano), com o ano do arquivo;
+        a existência segue `_dat_registro_existente` (a mesma do classify). DATRegistro.save() recalcula
+        nr_codigos + espelha usa_avaliar; nr_codigos_planilha guarda o valor cru da planilha para
+        reconciliação. Única escrita em registro existente: o flat sem ano de carga antiga recebe o ano da
+        linha (seed-if-empty, só o campo `ano`). Retorna `(created, ano_preenchido)`."""
         actor = self._require_actor("dat_registro")
         mun_idx = self._municipio_index()
         pg_idx = self._projeto_geral_index()
+        anos_db = _dat_registro_anos()
         created = 0
+        ano_preenchido = 0
         for r in rows:
             mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
             pg_id = pg_idx.get(_norm(r.get("projeto_geral") or ""))
@@ -1992,12 +2043,23 @@ class ExportContractImporter:
             aluno_qtde = _parse_int(r.get("aluno_qtde"))
             if mun_id is None or pg_id is None or proj_id is None:
                 continue  # FK não-resolvida (aluno_qtde é opcional: registros professor-only)
-            if DATRegistro.objects.filter(municipio_id=mun_id, projeto_geral_id=pg_id, projeto_id=proj_id).exists():
+            ano = _parse_int(r.get("ano"))
+            st = _dat_registro_existente(anos_db, (mun_id, pg_id, proj_id, ano))
+            if st == "would_update":
+                flat = DATRegistro.objects.get(
+                    municipio_id=mun_id, projeto_geral_id=pg_id, projeto_id=proj_id, ano__isnull=True
+                )
+                flat.ano = ano
+                flat.save(update_fields=["ano", "nr_codigos", "updated_at"])  # save() recalcula nr_codigos do ano
+                ano_preenchido += 1
+                continue
+            if st != "would_create":
                 continue
             reg = DATRegistro(
                 municipio_id=mun_id,
                 projeto_geral_id=pg_id,
                 projeto_id=proj_id,
+                ano=ano,
                 created_by=actor,
                 aluno_qtde=aluno_qtde,
                 professor_qtde=_parse_int(r.get("professor_qtde")),
@@ -2025,7 +2087,7 @@ class ExportContractImporter:
             )
             reg.save()  # calcula nr_codigos + espelha usa_avaliar do projeto_geral
             created += 1
-        return created
+        return created, ano_preenchido
 
     def _apply_dat_compra(self, rows: list[dict[str, str]]) -> int:
         """Create-only de DATCompra. NK existence-based por tupla; `tipo`/`conta_para_codigos`

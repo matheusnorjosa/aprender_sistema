@@ -10,6 +10,10 @@ Idempotente.
 Os atributos do flat (aluno_qtde/professor_qtde) ficam no ano PRIMÁRIO (2026 se houver, senão
 o maior ano real); os anos secundários nascem sem esses campos. `nr_codigos` é recomputado por
 ano no `save()` (ver `dat_codigos.calcular_nr_codigos`, que filtra por `ano_uso=registro.ano`).
+
+Só o registro SEM ano muda de ano. Desde o export v37 o import grava o ano da planilha (2026 e 2027
+da mesma tripla viram dois registros); registro com ano nunca é movido, e o ano de compra sem
+registro nasce vazio ao lado dele.
 """
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportArgumentType=false
@@ -57,18 +61,19 @@ def split_dat_registros(dry_run: bool = False) -> dict[str, int]:
         existing: dict[int | None, DATRegistro] = {r.ano: r for r in regs}
         primary = _primary_ano(target)
 
-        # 1. Garante o registro PRIMÁRIO (carrega os atributos do flat).
-        if primary not in existing:
-            anchor = max(regs, key=lambda r: ((r.aluno_qtde or 0) + (r.professor_qtde or 0), int(r.pk)))
+        # 1. O registro SEM ano (flat, ano desconhecido) vira o do ano primário, com os atributos. Registro
+        #    que já tem ano fica nele: desde o export v37 o import grava o ano da planilha, e mover o
+        #    registro levaria as quantidades de um ano para outro.
+        if primary is not None and primary not in existing and None in existing:
+            anchor = existing.pop(None)
             reatribuidos += 1
-            existing.pop(anchor.ano, None)
             if not dry_run:
                 anchor.ano = primary
                 anchor.save()  # recomputa nr_codigos para o ano primário
             existing[primary] = anchor
-        primary_reg = existing[primary]
+        primary_reg = existing.get(primary) or regs[0]
 
-        # 2. Cria um registro para cada OUTRO ano de uso (atributos só no primário).
+        # 2. Cria um registro para cada ano de uso que falta (atributos só no registro que já os tinha).
         for ano in sorted(target, key=lambda a: (a is None, a or 0)):
             if ano in existing:
                 continue

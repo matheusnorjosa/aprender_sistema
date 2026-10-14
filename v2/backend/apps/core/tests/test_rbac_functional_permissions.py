@@ -69,7 +69,8 @@ def test_functional_permission_cache_hit_miss(django_assert_num_queries):
     request = _request_with_user(APIRequestFactory(), user)
     permission = HasPerm("manage_purchases_and_materials")()
 
-    with django_assert_num_queries(1):
+    # Cache miss: grupos + vínculos que dão pacote (fórmula da união, ADR-020 PR B).
+    with django_assert_num_queries(2):
         assert permission.has_permission(request, _MockView()) is True
 
     with django_assert_num_queries(0):

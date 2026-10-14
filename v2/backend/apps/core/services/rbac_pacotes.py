@@ -1,12 +1,13 @@
 """
-Pacote de capacidades por perfil de gerência (ADR-020). Só constantes; nada lê o pacote até o PR B.
+Pacote de capacidades por perfil de gerência (ADR-020). Só constantes; quem lê é a fórmula da união
+(`rbac_permissions.capacidades_sem_cache`, PR B).
 
 O pacote é o **estado de produção de hoje** do grupo de setor correspondente (medição de 02/10/2026),
 não o pacote final do relatório de arquitetura (seção 2.3). Por isso o PR B (grupos ∪ pacote) não dá
 poder novo a quem já está no grupo. Mudar um pacote é mudar poder: PR com `rbac_diff` medido.
 
 Fica fora de `apps/core/rbac/` de propósito: `rbac/__init__` importa `rbac/helpers`, que importa
-`services/rbac_permissions`. Quando `rbac_permissions` passar a ler o pacote (PR B), um módulo dentro
+`services/rbac_permissions`. Como `rbac_permissions` lê o pacote (PR B), um módulo dentro
 de `rbac/` fecharia um ciclo de import na subida. Este módulo não importa nada do projeto
 (`test_import_do_modulo_nao_cria_ciclo`). As chaves são os valores de `Gerencia.Perfil`
 (`test_todo_perfil_tem_linha_explicita`).

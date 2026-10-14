@@ -185,9 +185,10 @@ class TestDashboardEventsExportOptimization:
         assert response.status_code == 200
         assert response["Content-Type"] == "text/csv; charset=utf-8"
 
-        # Validar número de queries (máximo 3)
-        assert len(queries) <= 3, (
-            f"Expected ≤3 queries with select_related, got {len(queries)}. " f"Queries: {[q['sql'] for q in queries]}"
+        # Validar número de queries (máximo 4: as 2 da capacidade no cache miss — grupos e vínculos
+        # que dão pacote, ADR-020 PR B — + a base com select_related + o prefetch de participações)
+        assert len(queries) <= 4, (
+            f"Expected ≤4 queries with select_related, got {len(queries)}. " f"Queries: {[q['sql'] for q in queries]}"
         )
 
 

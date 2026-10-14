@@ -1,5 +1,12 @@
 """
 Signals de invalidação de cache para RBAC funcional.
+
+Grupos, `PermissaoFuncional` e `Group` invalidam na hora. Vínculo (`EquipeGerencia`) e perfil
+(`Gerencia`), que entram na fórmula desde o PR B (grupos ∪ pacote, ADR-020), invalidam só
+depois do commit (`transaction.on_commit`): o ensaio com rollback não mexe no cache, e nenhum
+request repovoa o cache com o estado velho entre a invalidação e o commit. Escrita por
+`.update()`/`bulk_update` não dispara sinal: quem a fizer chama
+`bump_functional_permissions_cache_version()` à mão.
 """
 
 # pyright: reportUnusedFunction=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false
@@ -9,10 +16,11 @@ from typing import Any
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.db import transaction
 from django.db.models.signals import m2m_changed, post_delete, post_save, pre_delete
 from django.dispatch import receiver
 
-from apps.core.models import PermissaoFuncional
+from apps.core.models import EquipeGerencia, Gerencia, PermissaoFuncional
 from apps.core.services.rbac_permissions import (
     bump_functional_permissions_cache_version,
     invalidate_group_functional_permissions_cache,
@@ -127,3 +135,27 @@ def _invalidate_funcperm_on_group_delete_members(
     member_ids = list(instance.user_set.values_list("id", flat=True))
     if member_ids:
         invalidate_users_functional_permissions_cache(member_ids)
+
+
+@receiver(post_save, sender=EquipeGerencia)
+@receiver(post_delete, sender=EquipeGerencia)
+def _invalidate_funcperm_on_vinculo_change(
+    sender: type[EquipeGerencia],
+    instance: EquipeGerencia,
+    **kwargs: Any,
+) -> None:
+    # PR B (ADR-020): vínculo EQUIPE/GERENTE pode dar o pacote do perfil. Invalida sempre (o
+    # papel pode ter mudado de/para um papel com pacote); só depois do commit.
+    usuario_id = int(instance.usuario_id)
+    transaction.on_commit(lambda: invalidate_user_functional_permissions_cache(usuario_id))
+
+
+@receiver(post_save, sender=Gerencia)
+def _invalidate_funcperm_on_gerencia_change(
+    sender: type[Gerencia],
+    instance: Gerencia,
+    **kwargs: Any,
+) -> None:
+    # PR B (ADR-020): o perfil muda o pacote de todos os vínculos da gerência. Gerência muda
+    # raramente; invalidação global (bump de versão), só depois do commit.
+    transaction.on_commit(bump_functional_permissions_cache_version)

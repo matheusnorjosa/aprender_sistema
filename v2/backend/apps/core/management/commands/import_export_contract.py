@@ -82,6 +82,14 @@ class Command(BaseCommand):
             raise CommandError(
                 f"--allow-entity não-escrivível: {', '.join(bad)}. " f"Escrivíveis: {', '.join(sorted(APPLIABLE))}."
             )
+        # IMP-2: participation só vincula a evento criado na mesma execução; sem solicitacao seria um apply
+        # que não grava nada (ou, se mudar, que mexe em evento existente). Barra antes de tocar arquivos.
+        allow = set(opts.get("allow") or [])
+        if "participation" in allow and "solicitacao" not in allow:
+            raise CommandError(
+                "--allow-entity participation exige --allow-entity solicitacao na mesma execução"
+                + " (participação só vincula a evento criado nesta carga)."
+            )
         actor = self._resolve_actor(opts.get("as_user"))
         importer = ExportContractImporter(
             path=opts["path"],
@@ -115,9 +123,13 @@ class Command(BaseCommand):
                 motivos = {k: n for k, n in (v.get("reject_reasons") or {}).items() if n}
                 if motivos:
                     self.stdout.write(f"    reject_reasons={motivos}")
+                pulos = {k: n for k, n in (v.get("skip_reasons") or {}).items() if n}
+                if pulos:
+                    self.stdout.write(f"    skip_reasons={pulos}")
                 if "would_rekey" in v:
                     self.stdout.write(
-                        f"    rekey={v['would_rekey']} canceladas_reprovadas={v.get('would_create_cancelada', 0)}"
+                        f"    rekey={v['would_rekey']} rekey_contraditorio={v.get('rekey_contraditorio', 0)}"
+                        + f" canceladas_reprovadas={v.get('would_create_cancelada', 0)}"
                     )
                 if v.get("projetos_nao_resolvidos"):
                     self.stdout.write(f"    projetos_nao_resolvidos={v['projetos_nao_resolvidos']}")

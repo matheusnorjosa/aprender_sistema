@@ -411,6 +411,40 @@ def test_v005_rejeita_equipegerencia_create_novo(tmp_path, metodo):
 
 
 @pytest.mark.parametrize(
+    "linha",
+    [
+        "PermissaoFuncional.groups.through.objects.create(permissaofuncional=p, group=g)",
+        "user.groups.through.objects.bulk_create(linhas)",
+        "grupo.permissoes_funcionais.through.objects.get_or_create(permissaofuncional=p, group=g)",
+    ],
+)
+def test_v004_rejeita_escrita_direta_na_tabela_m2m(tmp_path, linha):
+    _write_app_file(tmp_path, "apps/core/services/novo_servico.py", f"def f(user, grupo, p, g, linhas):\n    {linha}\n")
+    result = _run_lint(tmp_path / "apps")
+    assert result.returncode == 1, f"Esperava V004 em '{linha}'"
+    assert "V004" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "linha",
+    [
+        "gerencia.equipes.create(usuario=u, papel='EQUIPE')",
+        "u.equipes.get_or_create(gerencia=gerencia)",
+        "EquipeGerencia(gerencia=gerencia, usuario=u, papel='GERENTE').save()",
+        "models.EquipeGerencia.objects.create(gerencia=gerencia, usuario=u)",
+        "models.EquipeGerencia(gerencia=gerencia, usuario=u)",
+    ],
+)
+def test_v005_rejeita_outras_formas_de_criar_vinculo(tmp_path, linha):
+    _write_app_file(
+        tmp_path, "apps/core/views/nova_lotacao.py", f"def f(EquipeGerencia, models, gerencia, u):\n    {linha}\n"
+    )
+    result = _run_lint(tmp_path / "apps")
+    assert result.returncode == 1, f"Esperava V005 em '{linha}'"
+    assert "V005" in result.stderr
+
+
+@pytest.mark.parametrize(
     "rel",
     [
         "apps/core/services/equipe_gerencia.py",

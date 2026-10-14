@@ -64,11 +64,13 @@ em uma view e a dívida voltaria.
   `# noqa: RBAC-migration-allowed` na linha, para a mudança ficar explícita.
 
 - **V004** `<expr>.groups|user_set|permissoes_funcionais.add|set|remove|clear(...)`
+  e `<expr>.<lado>.through.objects.create|get_or_create|update_or_create|bulk_create(...)`
   fora de `V004_ALLOWLIST` (mutação de grupo ou capacidade). O AST não distingue
   `user.groups` de `perm.groups`, então os dois lados da M2M são uma regra só.
   Allowlist de arquivos em modo ratchet: arquivo novo reprova, sem marcador noqa.
 
-- **V005** `EquipeGerencia.objects.create|get_or_create|update_or_create|bulk_create`
+- **V005** `[mod.]EquipeGerencia.objects.create|get_or_create|update_or_create|bulk_create`,
+  o manager reverso `<expr>.equipes.<mesmos métodos>` e o construtor `[mod.]EquipeGerencia(...)`
   fora de `V005_ALLOWLIST`. Limite declarado: não pega reativação por `.save()`
   (`upsert_vinculo`, importadores); quem protege a reativação é o predicado
   `vinculo_exige_superusuario` mais o superusuário.
@@ -324,33 +326,67 @@ class MutationLintVisitor(ast.NodeVisitor):
 
     def visit_Call(self, node: ast.Call) -> None:
         func = node.func
-        if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Attribute):
-            inner = func.value
-            if self.check_v004 and func.attr in M2M_MUTATION_METHODS and inner.attr in GROUP_MUTATION_ATTRS:
-                self._add(
-                    node,
-                    "V004",
-                    f"Mutação de grupo ou capacidade (.{inner.attr}.{func.attr}) fora da allowlist. "
-                    "Grupo e capacidade dão poder: use um caminho existente (superusuário, auditado) "
-                    "ou, para a matriz, uma migration de dados em PR (D4). Ver V004_ALLOWLIST.",
-                )
-            if (
-                self.check_v005
-                and func.attr in EQUIPE_GERENCIA_CREATE_METHODS
-                and inner.attr == "objects"
-                and isinstance(inner.value, ast.Name)
-                and inner.value.id == "EquipeGerencia"
-            ):
-                self._add(
-                    node,
-                    "V005",
-                    f"EquipeGerencia.objects.{func.attr} fora de V005_ALLOWLIST. Vínculo pode dar "
-                    "poder (aprovador, pacote do perfil): use os serviços de equipe_gerencia.",
-                )
+        if self.check_v004 and self._is_group_mutation(func):
+            self._add(
+                node,
+                "V004",
+                "Mutação de grupo ou capacidade (M2M ou tabela `through`) fora da allowlist. "
+                "Grupo e capacidade dão poder: use um caminho existente (superusuário, auditado) "
+                "ou, para a matriz, uma migration de dados em PR (D4). Ver V004_ALLOWLIST.",
+            )
+        if self.check_v005 and self._is_equipe_gerencia_creation(func):
+            self._add(
+                node,
+                "V005",
+                "Criação de EquipeGerencia fora de V005_ALLOWLIST. Vínculo pode dar "
+                "poder (aprovador, pacote do perfil): use os serviços de equipe_gerencia.",
+            )
         self.generic_visit(node)
+
+    @staticmethod
+    def _is_group_mutation(func: ast.expr) -> bool:
+        """`<x>.<lado>.add|set|remove|clear(...)` ou `<x>.<lado>.through.objects.create|...(...)`."""
+        if not isinstance(func, ast.Attribute) or not isinstance(func.value, ast.Attribute):
+            return False
+        inner = func.value
+        if func.attr in M2M_MUTATION_METHODS and inner.attr in GROUP_MUTATION_ATTRS:
+            return True
+        through = inner.value
+        return (
+            func.attr in EQUIPE_GERENCIA_CREATE_METHODS
+            and inner.attr == "objects"
+            and isinstance(through, ast.Attribute)
+            and through.attr == "through"
+            and isinstance(through.value, ast.Attribute)
+            and through.value.attr in GROUP_MUTATION_ATTRS
+        )
+
+    @staticmethod
+    def _is_equipe_gerencia_creation(func: ast.expr) -> bool:
+        """`[mod.]EquipeGerencia(...)`, `[mod.]EquipeGerencia.objects.<criar>(...)` ou `<x>.equipes.<criar>(...)`.
+
+        `equipes` é o related_name dos dois FKs de EquipeGerencia (gerencia e usuario).
+        """
+        if _simple_name(func) == "EquipeGerencia":
+            return True
+        if not isinstance(func, ast.Attribute) or func.attr not in EQUIPE_GERENCIA_CREATE_METHODS:
+            return False
+        inner = func.value
+        if not isinstance(inner, ast.Attribute):
+            return False
+        return inner.attr == "equipes" or (inner.attr == "objects" and _simple_name(inner.value) == "EquipeGerencia")
 
     def _add(self, node: ast.Call, code: str, message: str) -> None:
         self.violations.append(Violation(filepath=str(self.filepath), lineno=node.lineno, code=code, message=message))
+
+
+def _simple_name(node: ast.expr) -> str | None:
+    """`Nome` → "Nome"; `mod.Nome` → "Nome"; outro nó → None."""
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    return None
 
 
 def _in_allowlist(path: pathlib.Path, allowlist: tuple[str, ...]) -> bool:

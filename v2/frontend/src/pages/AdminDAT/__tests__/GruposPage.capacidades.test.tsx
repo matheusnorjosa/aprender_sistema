@@ -105,6 +105,18 @@ describe('GruposPage: permissões do grupo só leitura (D4)', () => {
     expect(within(modal).getByText(/Definido no sistema/)).toBeInTheDocument();
   }, 40000);
 
+  test('sem o catálogo, editar ainda mostra as permissões que vêm no grupo', async () => {
+    vi.mocked(listPermissoesFuncionais).mockRejectedValue(new Error('falhou'));
+    const user = userEvent.setup();
+    renderPage();
+
+    await clicarNaLinha(user, GRUPO.name, `Editar: ${GRUPO.name}`);
+    const modal = (await screen.findByText('Editar Setor', {}, { timeout: 10000 })).closest<HTMLElement>('[role="dialog"]')!;
+
+    expect(await within(modal).findByText(CAPACIDADE.label)).toBeInTheDocument();
+    expect(within(modal).queryByText('Este grupo não tem permissões de acesso')).not.toBeInTheDocument();
+  }, 40000);
+
   test('o Salvar da edição não manda permissao_funcional_ids', async () => {
     const user = userEvent.setup();
     renderPage();

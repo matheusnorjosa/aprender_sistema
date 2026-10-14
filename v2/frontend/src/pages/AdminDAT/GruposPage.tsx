@@ -181,11 +181,13 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
     return { added, removed };
   }, [currentMemberIds, selectedMemberIds]);
 
-  // D4 (ADR-020): as permissões do grupo são só leitura; o catálogo dá a descrição de cada uma.
+  // D4 (ADR-020): as permissões do grupo são só leitura. Rótulo e categoria vêm no próprio grupo;
+  // o catálogo só acrescenta a descrição, e a lista fica certa mesmo sem ele (falhou ou não chegou).
   const permissionsByCategory = useMemo(() => {
-    const idsDoGrupo = new Set((editingGroup?.permissoes_funcionais || []).map((permissao) => permissao.id));
+    const descricoes = new Map(permissoesDisponiveis.map((permissao) => [permissao.id, permissao.description]));
     const grouped = new Map<string, PermissaoFuncional[]>();
-    permissoesDisponiveis.filter((permissao) => idsDoGrupo.has(permissao.id)).forEach((permissao) => {
+    (editingGroup?.permissoes_funcionais || []).forEach((doGrupo) => {
+      const permissao = { ...doGrupo, description: descricoes.get(doGrupo.id) ?? '' };
       const key = permissao.category || 'geral';
       const current = grouped.get(key) || [];
       current.push(permissao);

@@ -66,9 +66,7 @@ from apps.core.services.dat_codigos import recompute_all
 from apps.core.services.dat_registro_split import split_dat_registros
 from apps.core.services.equipe_gerencia_import import (
     PAPEL_MAPPING,
-    SETOR_MAPPING,
-    _generate_gerencia_nome,
-    _get_or_create_gerencia,
+    _resolve_gerencia,
     _resolve_usuario,
     motivo_vinculo_bloqueado,
     vinculo_exige_superusuario,
@@ -158,6 +156,10 @@ _PAPEL_TO_GROUP: dict[str, str] = {
 # _PAPEL_TO_GROUP, então nunca dá grupo, e não abre escopo (EquipeGerencia.vigentes_com_escopo_em).
 _EQUIPE_PAPEIS = frozenset(_PAPEL_TO_GROUP) | {EquipeGerencia.PAPEL_EQUIPE}
 
+# Rótulo de equipe que não é gerência: a linha não lota ninguém (decisão do dono, 14/10). Comparado
+# por `_norm`, então cobre "Outros" e o `gerencia_norm` "OUTROS".
+_SETORES_SEM_LOTACAO = frozenset({"OUTROS"})
+
 # Tipos válidos de Acompanhamento (choices do model, sem CheckConstraint no BD → guard no importer).
 _ACOMPANHAMENTO_TIPOS = frozenset({"primeiro", "segundo"})
 
@@ -244,6 +246,22 @@ def _norm(s: str) -> str:
     s = unicodedata.normalize("NFKD", (s or "").strip())
     s = "".join(c for c in s if not unicodedata.combining(c))
     return re.sub(r"\s+", " ", s).upper()
+
+
+def _gerencia_da_linha(setor: str) -> tuple[Gerencia | None, str]:
+    """Gerência EXISTENTE e ativa da linha, ou (None, motivo). Nunca cria gerência (IMP-1).
+
+    Motivos: `setor_sem_lotacao` ("Outros"), `gerencia_inexistente`, `gerencia_inativa`. A resolução é a
+    do upload de equipe (`_resolve_gerencia`, com o de-para `SETOR_MAPPING`): o catálogo de gerências é
+    semeado, a planilha resolve contra ele."""
+    if _norm(setor) in _SETORES_SEM_LOTACAO:
+        return None, "setor_sem_lotacao"
+    gerencia = _resolve_gerencia(setor)
+    if gerencia is None:
+        return None, "gerencia_inexistente"
+    if not gerencia.ativo:
+        return None, "gerencia_inativa"
+    return gerencia, ""
 
 
 def _norm_codigo(code: str) -> str:
@@ -901,16 +919,21 @@ class ExportContractImporter:
                 tally[st] += 1
 
         elif name == "gerencia":
-            # Export `nome` é o SETOR ("Vidas"); casa DB.nome_setor (não DB.nome="GERENCIA N").
-            # Create é complexo (falta o `nome` canônico) → classifica, mas apply de create não suportado.
-            idx = {_norm(s) for s in Gerencia.objects.values_list("nome_setor", flat=True)}
+            # Export `nome` é o SETOR ("Vidas"); resolve como a linha de equipe (`_gerencia_da_linha`).
+            # Só leitura: o import nunca cria gerência (IMP-1) → o que não resolve é rejeitado com o motivo.
+            reasons = {"setor_sem_lotacao": 0, "gerencia_inexistente": 0, "gerencia_inativa": 0}
             for r in rows:
                 nome = (r.get("nome") or "").strip()
                 if not nome or nome == "-":
                     tally["would_reject"] += 1
                     continue
-                st, _ = diff_and_classify({} if _norm(nome) in idx else None, {}, protected)
-                tally[st] += 1
+                ger, motivo = _gerencia_da_linha(nome)
+                if ger is None:
+                    tally["would_reject"] += 1
+                    reasons[motivo] += 1
+                    continue
+                tally["would_skip_same"] += 1
+            tally["reject_reasons"] = reasons
 
         elif name == "dat_coordenador":
             # Existence-based UNION (cpf ∪ email/alt ∪ norm(nome)) — ESPELHA a NK do apply, senão o
@@ -1147,10 +1170,16 @@ class ExportContractImporter:
 
         elif name == "equipe_gerencia":
             # NK = (gerencia, usuario, papel). Papel fora do domínio ou usuário não-resolvido →
-            # would_reject. Gerência resolvida read-only (o apply cria se faltar via
-            # _get_or_create_gerencia). PII: usuário (CPF) só entra na contagem de existência.
+            # would_reject. Gerência não resolvida (`_gerencia_da_linha`: o apply nunca a cria) →
+            # would_reject com o motivo. PII: usuário (CPF) só entra na contagem de existência.
             existing = set(EquipeGerencia.objects.values_list("gerencia_id", "usuario_id", "papel"))
-            reasons = {"vinculo_aprovador_bloqueado": 0, "vinculo_com_pacote_bloqueado": 0}
+            reasons = {
+                "vinculo_aprovador_bloqueado": 0,
+                "vinculo_com_pacote_bloqueado": 0,
+                "setor_sem_lotacao": 0,
+                "gerencia_inexistente": 0,
+                "gerencia_inativa": 0,
+            }
             for r in rows:
                 setor = (r.get("gerencia") or r.get("setor") or "").strip()
                 papel = _resolve_papel(r.get("papel"))
@@ -1165,11 +1194,15 @@ class ExportContractImporter:
                 if usuario is None:
                     tally["would_reject"] += 1
                     continue
-                ger = self._resolve_gerencia_readonly(setor)
-                exists = ger is not None and (ger.id, usuario.id, papel) in existing
+                ger, motivo = _gerencia_da_linha(setor)
+                if ger is None:
+                    tally["would_reject"] += 1
+                    reasons[motivo] += 1
+                    continue
+                exists = (ger.id, usuario.id, papel) in existing
                 # PR B1 + ADR-020 (anti-escalada): o import nunca cria vínculo que dá poder
                 # (aprovador ou EQUIPE/GERENTE em gerência com pacote).
-                if not exists and ger is not None and vinculo_exige_superusuario(ger, papel):
+                if not exists and vinculo_exige_superusuario(ger, papel):
                     tally["would_reject"] += 1
                     reasons[motivo_vinculo_bloqueado(ger, papel)] += 1
                     continue
@@ -1299,6 +1332,9 @@ class ExportContractImporter:
         if name in _CONSUMED_FIELDS and rows:
             # Guardrail: colunas presentes no CSV que o handler não lê (aliases já contam como consumidos).
             tally["ignored_fields"] = sorted(set(rows[0].keys()) - _CONSUMED_FIELDS[name])
+        if name not in APPLIABLE:
+            # produto/gerencia classificam, mas o apply não os grava: o relatório diz isso.
+            tally["nota"] = "só leitura, não grava"
 
         tally["export_rows"] = len(rows)
         return tally
@@ -1348,16 +1384,6 @@ class ExportContractImporter:
         obs = (r.get("observacao") or "").strip()
         h = stable_import_hash(str(usr_id), start.isoformat(), end.isoformat(), origem, destino, obs)
         return (usr_id, origem, destino, start, end, obs, h)
-
-    def _resolve_gerencia_readonly(self, setor_raw: str) -> Gerencia | None:
-        """Resolve Gerencia por setor SEM criar (espelha a precedência de _get_or_create_gerencia,
-        p/ o classify dry-run): nome_setor → nome → nome canônico gerado."""
-        setor = SETOR_MAPPING.get(setor_raw, setor_raw)
-        return (
-            Gerencia.objects.filter(nome_setor__iexact=setor).first()
-            or Gerencia.objects.filter(nome__iexact=setor).first()
-            or Gerencia.objects.filter(nome__iexact=_generate_gerencia_nome(setor)).first()
-        )
 
     @staticmethod
     def _dat_compra_nk(r: dict[str, str], mun_id: int | None, proj_id: int | None) -> tuple[Any, ...]:
@@ -1559,13 +1585,12 @@ class ExportContractImporter:
 
     def _apply_equipe_gerencia(self, rows: list[dict[str, str]]) -> int:
         """Create-only de EquipeGerencia. NK (gerencia, usuario, papel); vigência aberta
-        (valid_from=hoje, valid_to=None). Reusa os resolvers do serviço de upload
-        (_get_or_create_gerencia / _resolve_usuario). Popula Gerencia.setor_canonico do row
-        (vocabulário de produto, de-para) — o fio de leitura do #1893. EquipeGerencia não audita
-        (sem created_by) → NÃO exige actor. CPF por string (não valida dígito: a linha de dígito
-        inválido casa por igualdade); papel/usuário não-resolvido → pula (nunca o substring do #1643)."""
+        (valid_from=hoje, valid_to=None). Gerência pela `_gerencia_da_linha` (nunca cria; não resolvida
+        → pula) e usuário pelo `_resolve_usuario` do upload. Popula Gerencia.setor_canonico do row só
+        quando está vazio (vocabulário de produto, de-para) — o fio de leitura do #1893. EquipeGerencia
+        não audita (sem created_by) → NÃO exige actor. CPF por string (não valida dígito: a linha de
+        dígito inválido casa por igualdade); papel/usuário não-resolvido → pula (nunca o substring do #1643)."""
         hoje = timezone.localdate()
-        ger_stats: dict[str, Any] = {"gerencias_created": 0, "gerencias_existing": 0}
         created = 0
         for r in rows:
             setor_raw = (r.get("gerencia") or r.get("setor") or "").strip()
@@ -1579,7 +1604,7 @@ class ExportContractImporter:
             )
             if usuario is None:
                 continue
-            gerencia = _get_or_create_gerencia(setor_raw, ger_stats)
+            gerencia, _ = _gerencia_da_linha(setor_raw)
             if gerencia is None:
                 continue
             exists = EquipeGerencia.objects.filter(gerencia=gerencia, usuario=usuario, papel=papel).exists()
@@ -1589,8 +1614,9 @@ class ExportContractImporter:
             if not exists and vinculo_exige_superusuario(gerencia, papel):
                 continue
             setor_canon = (r.get("setor_canonico") or "").strip()
-            # setor_canonico é eixo de escopo (user_setores): a linha EQUIPE, inerte, não o reescreve.
-            if setor_canon and papel != EquipeGerencia.PAPEL_EQUIPE and gerencia.setor_canonico != setor_canon:
+            # setor_canonico é eixo de escopo (user_setores): só preenche o vazio, e a linha EQUIPE, inerte,
+            # nem isso. Já preenchido não muda pelo import (Avançando Juntos é Vidas e traria outro setor).
+            if setor_canon and papel != EquipeGerencia.PAPEL_EQUIPE and not gerencia.setor_canonico:
                 gerencia.setor_canonico = setor_canon
                 gerencia.save(update_fields=["setor_canonico"])
             if exists:
@@ -2368,8 +2394,8 @@ class ExportContractImporter:
         Pessoa em varias linhas: o papel de funcao (GERENTE/COORDENADOR/APOIO/FORMADOR) vence EQUIPE, em
         qualquer ordem; EQUIPE so vale quando e o unico papel. Entre duas funcoes diferentes vale a 1a
         linha (sem regra de precedencia entre funcoes). So conta a linha que o `equipe_gerencia` aceita:
-        a sem gerencia, com papel fora do dominio ou com o vinculo que exige superusuario (PR B1 + ADR-020,
-        anti-escalada) nao da papel, senao o grupo de funcao nasceria de uma linha barrada. O CPF so com
+        a sem gerencia ou com gerencia nao resolvida, com papel fora do dominio ou com o vinculo que exige
+        superusuario (PR B1 + ADR-020, anti-escalada) nao da papel, senao o grupo de funcao nasceria de uma linha barrada. O CPF so com
         linhas barradas fica no mapa com papel "" (sem grupo): estar no export de equipe tira o `cargo` do
         fallback, como antes."""
         idx: dict[str, str] = {}
@@ -2382,11 +2408,10 @@ class ExportContractImporter:
             idx.setdefault(cpf, "")
             if not setor or papel not in _EQUIPE_PAPEIS:
                 continue
-            # A gerencia que o apply criaria se faltar (`_get_or_create_gerencia`), sem cria-la aqui.
-            ger = self._resolve_gerencia_readonly(setor) or Gerencia(
-                nome=_generate_gerencia_nome(SETOR_MAPPING.get(setor, setor))
-            )
-            if vinculo_exige_superusuario(ger, papel):
+            # Gerencia nao resolvida ("Outros", inexistente, inativa): o apply nao grava o vinculo, entao
+            # a linha nao da papel (IMP-1; antes uma gerencia falsa abria o grupo da funcao).
+            ger, _ = _gerencia_da_linha(setor)
+            if ger is None or vinculo_exige_superusuario(ger, papel):
                 continue
             if idx[cpf] in ("", EquipeGerencia.PAPEL_EQUIPE):
                 idx[cpf] = papel

@@ -260,8 +260,9 @@ def test_classify_gerencia_matches_by_setor(tmp_path):
     csv = "nome,nome_setor\nSetor Existente,Setor Existente\nSetor Novo,Setor Novo\n-,-\n"
     r = ExportContractImporter(path=_write_export(tmp_path, {"gerencia": csv})).run()["por_entidade"]["gerencia"]
     assert r["would_skip_same"] == 1  # casou por nome_setor
-    assert r["would_create"] == 1  # setor novo (create exige nome canônico — caveat)
-    assert r["would_reject"] == 1  # linha "-"
+    assert r["would_create"] == 0  # o import nunca cria gerência (IMP-1)
+    assert r["would_reject"] == 2  # setor novo + linha "-"
+    assert r["reject_reasons"]["gerencia_inexistente"] == 1
 
 
 def test_classify_dat_coordenador(tmp_path):

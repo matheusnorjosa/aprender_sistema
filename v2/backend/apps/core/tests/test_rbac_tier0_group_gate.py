@@ -87,15 +87,17 @@ class TestGroupViewSetTier0Gate:
         resp = api_client.post("/api/grupos/", {"name": "NovoSuper", "group_type_input": "setor"}, format="json")
         assert resp.status_code == status.HTTP_201_CREATED
 
-    def test_superuser_can_edit_group_matrix(self, api_client, root):
+    def test_superuser_nao_edita_matriz_pela_api(self, api_client, root):
+        """D4 do ADR-020: a matriz muda só por PR (migration), nem o superusuário a edita pela tela."""
         grupo = GroupFactory(name="Coordenador")
+        antes = set(grupo.permissoes_funcionais.values_list("id", flat=True))
         perm = PermissaoFuncional.objects.create(
             codename="rbac.gate_super", label="GateS", description="", category="operacao", is_system=False
         )
         api_client.force_authenticate(root)
         resp = api_client.patch(f"/api/grupos/{grupo.id}/", {"permissao_funcional_ids": [perm.id]}, format="json")
-        assert resp.status_code == status.HTTP_200_OK
-        assert grupo.permissoes_funcionais.count() == 1
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert set(grupo.permissoes_funcionais.values_list("id", flat=True)) == antes
 
 
 @pytest.mark.django_db

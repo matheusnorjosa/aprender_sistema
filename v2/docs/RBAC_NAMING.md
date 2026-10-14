@@ -241,8 +241,20 @@ Lint AST custom em `v2/backend/scripts/rbac_lint.py` falha PRs que:
   `{IsGerenteSuperintendencia, IsOwnerOrPrivileged}`.
 
 - **V003 (D17, 2026-05-04)**: proíbe mutação M2M de `groups`/`permissions`
-  (`.set()`, `.add()`, `.clear()`) em migrations **numeradas acima do corte D17**
-  (`D17_LEGACY_MIGRATIONS_MAX = 82`, `scripts/rbac_lint.py`).
+  (`.set()`, `.add()`, `.clear()`, `.remove()`) em migrations **numeradas acima do corte D17**
+  (`D17_LEGACY_MIGRATIONS_MAX = 82`, `scripts/rbac_lint.py`) sem o marcador
+  `# noqa: RBAC-migration-allowed`. Desde a D4 do ADR-020 (§8) a migration com o marcador
+  é o caminho certo para mudar a matriz.
+- **V004 (ADR-020, 2026-10-14)**: `.groups`/`.user_set`/`.permissoes_funcionais` seguido de
+  `add`/`set`/`remove`/`clear`, ou a tabela M2M direto (`<lado>.through.objects.create`/
+  `get_or_create`/`update_or_create`/`bulk_create`), fora de `V004_ALLOWLIST` (arquivos que já
+  fazem isso hoje).
+- **V005 (ADR-020, 2026-10-14)**: `[mod.]EquipeGerencia.objects.create`/`get_or_create`/
+  `update_or_create`/`bulk_create`, o manager reverso `<x>.equipes.<mesmos métodos>` e o
+  construtor `[mod.]EquipeGerencia(...)` fora de `V005_ALLOWLIST`. Não pega reativação por
+  `.save()` de um vínculo que já existe.
+  V004 e V005 são ratchet por arquivo (arquivo novo reprova, sem noqa) e isentam `tests/`,
+  `migrations/` e `apps/dev_tools/`.
   Implementação: `MigrationLintVisitor` (`rbac_lint.py`), dispatch em `check_file`,
   documentação no docblock do módulo.
 
@@ -285,6 +297,15 @@ python scripts/rbac_lint.py apps/
 ---
 
 ## 8. Admin-driven Group × Capability (PR 16, 2026-05-04 — Decisão D17)
+
+> **Substituída em 2026-10-14 pela D4 do
+> [ADR-020](adr/ADR-020-lugar-onde-trabalha-da-o-poder.md): a matriz muda só por PR.**
+> `FUNCTIONAL_PERMISSIONS_SEED[*].group_names` é a matriz (alinhada à produção). Para mudar o
+> que um grupo pode: altere o seed e escreva a migration de dados que aplica a mudança, com
+> `# noqa: RBAC-migration-allowed` na linha (precedente: `0111_seed_publish_setor_capability`),
+> e mostre o `rbac_diff` no PR. O Admin (`has_change_permission → False`) e a API de grupos
+> (400 "capacidades mudam por PR") não mudam mais a matriz. Depois do deploy,
+> `rbac_diff --auditar` confere banco = seed. O texto abaixo é o histórico da D17.
 
 A partir do PR 16 (último do programa hardening RBAC), a **atribuição
 Group × Capability migra para o Django Admin** superuser-only. Capability

@@ -16,6 +16,10 @@ Anti-escalada (PR B1): GERENTE vigente na gerencia `GERENCIA_APROVADORA_NOME` ap
 solicitacoes. O import NUNCA cria nem reativa esse vinculo (pendencia
 `vinculo_aprovador_bloqueado`); desativar continua permitido. Conceder = formulario de
 usuario (superuser, auditado).
+
+Lotacao com pacote (ADR-020, PR A): EQUIPE ou GERENTE numa gerencia cujo perfil tem pacote
+nao vazio dara as capacidades do pacote (PR B). O import tambem nunca cria nem reativa esse
+vinculo (pendencia `vinculo_com_pacote_bloqueado`). SSOT: `vinculo_exige_superusuario`.
 """
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false
@@ -34,6 +38,7 @@ from apps.core.imports.normalization import normalize_active_flag, normalize_bla
 from apps.core.imports.row_errors import registrar_erro_import
 from apps.core.models import EquipeGerencia, Gerencia, Usuario
 from apps.core.rbac.helpers import GERENCIA_APROVADORA_NOME
+from apps.core.services.rbac_pacotes import PACOTE, PAPEIS_COM_PACOTE
 from apps.core.services.resolvers import resolve_user_by_email, resolve_user_by_name
 
 # Mapeamento de nomes de setor -> nome_setor canonico
@@ -107,6 +112,7 @@ def import_equipe_gerencia_from_file(*, path: str, dry_run: bool = True) -> dict
             "usuario_not_found": 0,
             "apoio_supervisor_missing": 0,
             "vinculo_aprovador_bloqueado": 0,
+            "vinculo_com_pacote_bloqueado": 0,
             "other": 0,
         },
         "gerencias_created": 0,
@@ -118,6 +124,7 @@ def import_equipe_gerencia_from_file(*, path: str, dry_run: bool = True) -> dict
         "usuario_not_found": [],
         "apoio_supervisor_missing": [],
         "vinculo_aprovador_bloqueado": [],
+        "vinculo_com_pacote_bloqueado": [],
         "outros": [],
     }
 
@@ -304,6 +311,23 @@ def is_vinculo_aprovador(gerencia: Gerencia, papel: str) -> bool:
     return papel == "GERENTE" and gerencia.nome == GERENCIA_APROVADORA_NOME
 
 
+def vinculo_exige_superusuario(gerencia: Gerencia, papel: str) -> bool:
+    """True se (gerencia, papel) da poder: aprovador (PR B1) ou pacote do perfil (ADR-020, D3).
+
+    Cobre exatamente o que da poder: FORMADOR, COORDENADOR e APOIO nao recebem pacote, e
+    perfil de pacote vazio (PADRAO, APROVACAO) nao trava ninguem. Os importadores nunca criam
+    nem reativam esse vinculo; quem concede e o superusuario.
+    """
+    return is_vinculo_aprovador(gerencia, papel) or (
+        papel in PAPEIS_COM_PACOTE and bool(PACOTE.get(str(gerencia.perfil)))
+    )
+
+
+def motivo_vinculo_bloqueado(gerencia: Gerencia, papel: str) -> str:
+    """Chave da pendencia/reject_reason de um vinculo que `vinculo_exige_superusuario` recusa."""
+    return "vinculo_aprovador_bloqueado" if is_vinculo_aprovador(gerencia, papel) else "vinculo_com_pacote_bloqueado"
+
+
 def _resolve_usuario(cpf: str, email: str, nome: str) -> Usuario | None:
     """Resolve usuario por CPF > email > nome."""
     cpf_norm = normalize_cpf_digits(cpf)
@@ -439,15 +463,20 @@ def _process_row(
 
     existing = EquipeGerencia.objects.filter(gerencia=gerencia, usuario=usuario, papel=papel).first()
 
-    # PR B1 (anti-escalada): criar ou reativar vinculo aprovador fica fora do import.
-    if is_active and is_vinculo_aprovador(gerencia, papel) and not (existing and existing.ativo):
-        stats["skipped"]["vinculo_aprovador_bloqueado"] += 1
-        pendencias["vinculo_aprovador_bloqueado"].append(
+    # PR B1 + ADR-020 (anti-escalada): criar ou reativar vinculo que da poder fica fora do import.
+    if is_active and vinculo_exige_superusuario(gerencia, papel) and not (existing and existing.ativo):
+        motivo = motivo_vinculo_bloqueado(gerencia, papel)
+        stats["skipped"][motivo] += 1
+        pendencias[motivo].append(
             {
                 "linha": linha_num,
                 "setor": setor,
                 "papel": papel,
-                "erro": "Vinculo que da poder de aprovar so e concedido pelo cadastro de usuario (superuser).",
+                "erro": (
+                    "Vinculo que da poder de aprovar so e concedido pelo cadastro de usuario (superuser)."
+                    if motivo == "vinculo_aprovador_bloqueado"
+                    else "Vinculo que da o pacote do setor so e concedido pelo superusuario."
+                ),
             }
         )
         return

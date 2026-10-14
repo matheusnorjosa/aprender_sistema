@@ -308,10 +308,9 @@ def test_v003_does_not_fire_outside_migrations(tmp_path):
     views_dir.mkdir(parents=True)
     (views_dir / "view.py").write_text("def handler(perm, groups):\n" "    perm.groups.set(groups)\n")
     result = _run_lint(views_dir)
-    # Não dispara V003 (path não-migration); pode disparar outros lints, mas
-    # neste caso `perm.groups.set` não tem prefixo Is<> nem groups.filter(name=...),
-    # então deve passar limpo.
-    assert result.returncode == 0, f"V003 não deveria pegar paths não-migration: {result.stderr}"
+    # Não dispara V003 (path não-migration). Desde o PR A da arquitetura de permissões
+    # a mesma linha fora da allowlist é V004.
+    assert "V003" not in result.stderr, f"V003 não deveria pegar paths não-migration: {result.stderr}"
 
 
 def test_v003_does_not_fire_in_dev_tools_seeds(tmp_path):
@@ -334,3 +333,106 @@ def test_v003_baseline_current_core_migrations_pass(tmp_path):
     assert result.returncode == 0, (
         f"Migrations atuais devem passar limpas (V003).\n" f"STDOUT: {result.stdout}\n" f"STDERR: {result.stderr}"
     )
+
+
+# ============================================================================
+# PR A da arquitetura de permissões (ADR-020): V004 (mutação de grupo ou
+# capacidade) e V005 (criação de EquipeGerencia) com allowlist de arquivos em
+# modo ratchet — arquivo novo reprova. tests/, migrations/ e apps/dev_tools/
+# ficam isentos. V003 passa a pegar `remove`.
+# ============================================================================
+
+
+def _write_app_file(tmp_path: pathlib.Path, rel: str, body: str) -> pathlib.Path:
+    path = tmp_path / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(body)
+    return path
+
+
+@pytest.mark.parametrize(
+    "mutation_line",
+    [
+        "    user.groups.add(grupo)\n",
+        "    user.groups.set([grupo])\n",
+        "    user.groups.remove(grupo)\n",
+        "    user.groups.clear()\n",
+        "    grupo.user_set.add(user)\n",
+        "    perm.groups.set(grupos)\n",
+    ],
+)
+def test_v004_rejeita_groups_add_fora_da_allowlist(tmp_path, mutation_line):
+    _write_app_file(
+        tmp_path, "apps/core/services/novo_servico.py", "def f(user, grupo, perm, grupos):\n" + mutation_line
+    )
+    result = _run_lint(tmp_path / "apps")
+    assert result.returncode == 1, f"Esperava V004 em '{mutation_line.strip()}'"
+    assert "V004" in result.stderr
+
+
+@pytest.mark.parametrize("metodo", ["set", "add", "remove", "clear"])
+def test_v004_rejeita_permissoes_funcionais_set(tmp_path, metodo):
+    _write_app_file(
+        tmp_path,
+        "apps/core/views/nova_view.py",
+        f"def f(grupo, caps):\n    grupo.permissoes_funcionais.{metodo}(caps)\n",
+    )
+    result = _run_lint(tmp_path / "apps")
+    assert result.returncode == 1
+    assert "V004" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "rel",
+    [
+        "apps/core/views/admin.py",
+        "apps/core/services/usuarios_import.py",
+        "apps/core/services/export_contract_importer.py",
+        "apps/core/services/functional_permissions_seed.py",
+        "apps/core/serializers/usuario.py",
+        "apps/dev_tools/management/commands/seed_qualquer.py",
+        "apps/core/tests/test_qualquer.py",
+    ],
+)
+def test_v004_aceita_allowlist(tmp_path, rel):
+    _write_app_file(tmp_path, rel, "def f(user, grupos):\n    user.groups.set(grupos)\n")
+    result = _run_lint(tmp_path / "apps")
+    assert result.returncode == 0, f"{rel} está na allowlist: {result.stderr}"
+
+
+@pytest.mark.parametrize("metodo", ["create", "get_or_create", "update_or_create", "bulk_create"])
+def test_v005_rejeita_equipegerencia_create_novo(tmp_path, metodo):
+    _write_app_file(
+        tmp_path, "apps/core/views/nova_lotacao.py", f"def f(EquipeGerencia):\n    EquipeGerencia.objects.{metodo}()\n"
+    )
+    result = _run_lint(tmp_path / "apps")
+    assert result.returncode == 1
+    assert "V005" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "rel",
+    [
+        "apps/core/services/equipe_gerencia.py",
+        "apps/core/services/equipe_gerencia_import.py",
+        "apps/core/services/export_contract_importer.py",
+    ],
+)
+def test_v005_aceita_allowlist(tmp_path, rel):
+    _write_app_file(tmp_path, rel, "def f(EquipeGerencia):\n    EquipeGerencia.objects.create()\n")
+    result = _run_lint(tmp_path / "apps")
+    assert result.returncode == 0, f"{rel} está na allowlist: {result.stderr}"
+
+
+def test_v003_pega_remove(tmp_path):
+    body = "from django.db import migrations\n" "def forwards(apps, schema_editor):\n" "    perm.groups.remove(grupo)\n"
+    _write_fake_migration(tmp_path, 130, body)
+    result = _run_lint(tmp_path / "apps" / "core" / "migrations")
+    assert result.returncode == 1
+    assert "V003" in result.stderr
+
+
+def test_lint_limpo_na_arvore_atual():
+    """O mesmo alvo do CI (`ci.yaml`: `python scripts/rbac_lint.py apps/`). Pega a 0111 e o seed."""
+    result = _run_lint(BACKEND_ROOT / "apps")
+    assert result.returncode == 0, f"STDOUT: {result.stdout}\nSTDERR: {result.stderr}"

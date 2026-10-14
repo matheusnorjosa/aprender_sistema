@@ -103,6 +103,14 @@ Dois conjuntos de token AntD (`lightThemeTokens` / `darkThemeTokens`) trocados p
 visível nos labels do `Descriptions`. Escurecemos para `rgba(0,0,0,.55)` ≈ `#737373`
 (**4.74:1**, passa). Mudança sutil, só aumenta contraste.
 
+**Fix de a11y no "Carregando..." de tela cheia** (`components/FullscreenLoader.tsx`): o AntD
+pinta o texto em branco sobre a máscara `colorBgMask` = `rgba(0,0,0,.45)`, que na página
+branca vira `#8c8c8c` (**3.35:1**, reprova). O loader sobrescreve a máscara só no `Spin`
+para `rgba(0,0,0,.55)` (mesma régua do texto terciário) — `#737373`, **4.76:1**. A página
+branca é o pior caso: no tema claro o `<body>` não tem fundo; no escuro ele é `#141414`,
+mais escuro, e o contraste só aumenta. Vale nos dois temas e no boot, que roda fora do
+`ConfigProvider`. Teste: `components/__tests__/FullscreenLoader.test.tsx`.
+
 ---
 
 ## 4. O acento do tema escuro — por que verde, não vermelho

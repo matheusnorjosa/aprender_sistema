@@ -242,6 +242,26 @@ def test_linha_barrada_no_vinculo_nao_da_o_grupo_da_funcao(tmp_path, linhas, com
     assert set(EquipeGerencia.objects.filter(usuario=u).values_list("papel", flat=True)) == {"EQUIPE"}
 
 
+def test_linha_gerente_em_gerencia_com_pacote_nao_da_o_grupo_da_funcao(tmp_path):
+    """ADR-020: GERENTE numa gerência com perfil de pacote é barrado no `equipe_gerencia`. O papel
+    dessa linha também não pode dar ao usuário novo o grupo Gerente pelo apply de `usuario`."""
+    _seed_grupos()
+    Gerencia.objects.create(nome="CONTROLE PACOTE", nome_setor="Pacote", perfil=Gerencia.Perfil.CONTROLE)
+    path = _export(
+        tmp_path,
+        {
+            "usuario": "nome_completo,cpf,email,cargo\nBia,11144477735,,\n",
+            "equipe_gerencia": "gerencia,usuario_cpf,papel\nPacote,11144477735,GERENTE\n",
+        },
+    )
+
+    ExportContractImporter(path=path, apply=True, allow=("usuario", "equipe_gerencia")).run()
+
+    u = Usuario.objects.get(cpf="11144477735")
+    assert u.groups.count() == 0
+    assert not EquipeGerencia.objects.filter(usuario=u).exists()
+
+
 def test_linha_de_funcao_sem_gerencia_nao_da_grupo(tmp_path):
     """Linha FORMADOR com a gerência vazia: o `equipe_gerencia` a recusa, então ela não define o papel."""
     _seed_grupos()

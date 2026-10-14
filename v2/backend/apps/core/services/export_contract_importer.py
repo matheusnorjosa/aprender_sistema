@@ -2368,9 +2368,10 @@ class ExportContractImporter:
         Pessoa em varias linhas: o papel de funcao (GERENTE/COORDENADOR/APOIO/FORMADOR) vence EQUIPE, em
         qualquer ordem; EQUIPE so vale quando e o unico papel. Entre duas funcoes diferentes vale a 1a
         linha (sem regra de precedencia entre funcoes). So conta a linha que o `equipe_gerencia` aceita:
-        a sem gerencia, com papel fora do dominio ou com o vinculo aprovador (PR B1, anti-escalada) nao da
-        papel, senao o grupo de funcao nasceria de uma linha barrada. O CPF so com linhas barradas fica no
-        mapa com papel "" (sem grupo): estar no export de equipe tira o `cargo` do fallback, como antes."""
+        a sem gerencia, com papel fora do dominio ou com o vinculo que exige superusuario (PR B1 + ADR-020,
+        anti-escalada) nao da papel, senao o grupo de funcao nasceria de uma linha barrada. O CPF so com
+        linhas barradas fica no mapa com papel "" (sem grupo): estar no export de equipe tira o `cargo` do
+        fallback, como antes."""
         idx: dict[str, str] = {}
         for r in self._load("equipe_gerencia"):
             cpf = normalize_cpf_digits(r.get("usuario_cpf") or "")
@@ -2385,7 +2386,7 @@ class ExportContractImporter:
             ger = self._resolve_gerencia_readonly(setor) or Gerencia(
                 nome=_generate_gerencia_nome(SETOR_MAPPING.get(setor, setor))
             )
-            if is_vinculo_aprovador(ger, papel):
+            if vinculo_exige_superusuario(ger, papel):
                 continue
             if idx[cpf] in ("", EquipeGerencia.PAPEL_EQUIPE):
                 idx[cpf] = papel

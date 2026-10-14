@@ -255,20 +255,32 @@ def test_ano_ja_criado_vazio_pelo_split_aparece_no_dry_run(tmp_path, base):
 
 
 @pytest.mark.parametrize(
-    ("no_banco", "linhas", "pulados"),
+    ("no_banco", "linhas"),
     [
-        ({2027: (100, 10)}, ["2026,100,10", "2027,300,30"], 1),
-        ({2026: (300, 30)}, ["2026,100,10", "2027,300,30"], 1),
-        ({2026: (100, 10)}, ["2027,100,10"], 0),
-        ({2027: (100, 10)}, ["2026,100,10"], 0),
+        ({2027: (100, 10)}, ["2026,100,10", "2027,300,30"]),
+        ({2026: (300, 30)}, ["2026,100,10", "2027,300,30"]),
+        ({2026: (100, 10)}, ["2027,100,10"]),
+        ({2027: (100, 10)}, ["2026,100,10"]),
+        ({2026: (300, 30), 2027: (None, None)}, ["2026,100,10", "2027,300,30"]),
+        ({2026: (None, None), 2027: (100, 10)}, ["2026,100,10", "2027,300,30"]),
     ],
-    ids=["linha_2026_no_registro_2027", "linha_2027_no_registro_2026", "so_2027_no_2026", "so_2026_no_2027"],
+    ids=[
+        "linha_2026_no_registro_2027",
+        "linha_2027_no_registro_2026",
+        "so_2027_no_2026",
+        "so_2026_no_2027",
+        "outro_ano_ja_criado_vazio_pelo_split",
+        "ano_rejeitado_criado_vazio_pelo_split",
+    ],
 )
-def test_registro_com_a_quantidade_de_outro_ano_nao_ganha_copia(tmp_path, base, no_banco, linhas, pulados):
+def test_registro_com_a_quantidade_de_outro_ano_nao_ganha_copia(tmp_path, base, no_banco, linhas):
     """O split antigo dava ao flat o ano das compras (2026 se houvesse, senão o maior), não o da linha de
     onde vinham as quantidades. Registro com ano que guarda a quantidade da linha de OUTRO ano, e não a do
     próprio ano: criar o ano da linha copiaria a quantidade para os dois anos. A tripla não ganha registro,
-    a linha é rejeitada em `quantidade_em_outro_ano` e o banco fica como está, para uma pessoa decidir."""
+    todas as linhas dela são rejeitadas em `quantidade_em_outro_ano` e o banco fica como está, para uma
+    pessoa decidir. Vale também quando o outro ano já existe vazio (o split antigo criava cada ano de
+    compra que faltava): a linha dele não vira `existe_sem_quantidade`, que mandaria preenchê-lo e
+    duplicaria a quantidade."""
     for ano, (aluno, prof) in no_banco.items():
         DATRegistro.objects.create(
             municipio=base["mun"],
@@ -286,8 +298,9 @@ def test_registro_com_a_quantidade_de_outro_ano_nao_ganha_copia(tmp_path, base, 
     path = _write_export(tmp_path, {"dat_registro": csv})
 
     seco = _seco(path)
-    assert (seco["would_create"], seco["would_skip_same"], seco["would_reject"]) == (0, pulados, 1)
-    assert seco["reject_reasons"]["quantidade_em_outro_ano"] == 1
+    assert (seco["would_create"], seco["would_skip_same"], seco["would_reject"]) == (0, 0, len(linhas))
+    assert seco["reject_reasons"]["quantidade_em_outro_ano"] == len(linhas)
+    assert seco["existe_sem_quantidade"] == 0
 
     r = _apply(path, base["actor"])
 
@@ -342,3 +355,90 @@ def test_flat_divergente_continua_sem_ano_depois_do_split(tmp_path, base):
     _apply(path, base["actor"], "dat_registro", "dat_compra")
 
     assert _quantidades() == {None: (300, 30), 2026: (None, None), 2027: (310, 30)}
+
+
+def test_rejeicao_de_outro_ano_continua_depois_que_o_split_cria_o_ano_vazio(tmp_path, base):
+    """O apply não cria nada na tripla rejeitada, mas o split por compras cria vazio o ano que falta. A
+    carga seguinte com o mesmo arquivo continua rejeitando a tripla: o aviso não some depois da 1ª vez."""
+    DATRegistro.objects.create(
+        municipio=base["mun"],
+        projeto_geral=base["pg"],
+        projeto=base["proj"],
+        ano=2027,
+        aluno_qtde=100,
+        professor_qtde=10,
+        created_by=base["actor"],
+    )
+    reg = "Cidade Ano,CE,PG Ano,Proj Ano,100,10,2026\nCidade Ano,CE,PG Ano,Proj Ano,300,30,2027\n"
+    compras = (
+        f"{COMPRA_HEADER}\n"
+        "Cidade Ano,CE,Proj Ano,Kit prof,Professor,20,2026-03-01,true,2026\n"
+        "Cidade Ano,CE,Proj Ano,Kit prof,Professor,100,2026-03-02,true,2027\n"
+    )
+    path = _write_export(tmp_path, {"dat_registro": f"{REG_HEADER}\n{reg}", "dat_compra": compras})
+    assert _seco(path)["reject_reasons"]["quantidade_em_outro_ano"] == 2
+
+    _apply(path, base["actor"], "dat_registro", "dat_compra")
+    assert _quantidades() == {2026: (None, None), 2027: (100, 10)}
+
+    seco = _seco(path)
+    assert seco["reject_reasons"]["quantidade_em_outro_ano"] == 2
+    assert seco["existe_sem_quantidade"] == 0
+
+
+@pytest.mark.parametrize(
+    ("no_banco", "linhas", "divergentes"),
+    [
+        ({2026: (280, 28)}, ["2027,300,30"], 1),
+        ({2026: (100, 10)}, ["2026,100,10", "2027,300,30"], 0),
+        ({2026: (None, None)}, ["2027,300,30"], 0),
+    ],
+    ids=["ano_sem_linha_com_outra_quantidade", "ano_com_a_propria_linha", "ano_sem_linha_vazio"],
+)
+def test_registro_de_ano_sem_linha_no_arquivo_aparece_no_dry_run(tmp_path, base, no_banco, linhas, divergentes):
+    """Registro com ano cujo ano não tem linha no arquivo e cuja quantidade não bate com nenhuma linha da
+    tripla (ex.: o flat que o split antigo moveu para 2026 e a planilha editou depois). A linha do outro ano
+    entra (rejeitar barraria export legítimo), e o dry-run conta o registro em `ano_sem_linha_divergente`
+    para uma pessoa conferir a soma dos anos."""
+    for ano, (aluno, prof) in no_banco.items():
+        DATRegistro.objects.create(
+            municipio=base["mun"],
+            projeto_geral=base["pg"],
+            projeto=base["proj"],
+            ano=ano,
+            aluno_qtde=aluno,
+            professor_qtde=prof,
+            created_by=base["actor"],
+        )
+    csv = REG_HEADER + "\n"
+    for linha in linhas:
+        ano, aluno, prof = linha.split(",")
+        csv += f"Cidade Ano,CE,PG Ano,Proj Ano,{aluno},{prof},{ano}\n"
+    path = _write_export(tmp_path, {"dat_registro": csv})
+
+    seco = _seco(path)
+
+    assert seco["ano_sem_linha_divergente"] == divergentes
+    assert seco["would_create"] == 1
+
+
+def test_linha_sem_ano_nao_acusa_falta_de_quantidade_se_outro_registro_a_tem(tmp_path, base):
+    """CSV antigo, sem a coluna `ano`: a tripla tem o registro de 2026 com a quantidade e o registro sem
+    ano vazio que o split cria para compra sem ano de uso. A linha pula (a tripla existe) e a quantidade
+    dela está gravada: não é `existe_sem_quantidade`."""
+    for ano, aluno, prof in ((2026, 100, 10), (None, None, None)):
+        DATRegistro.objects.create(
+            municipio=base["mun"],
+            projeto_geral=base["pg"],
+            projeto=base["proj"],
+            ano=ano,
+            aluno_qtde=aluno,
+            professor_qtde=prof,
+            created_by=base["actor"],
+        )
+    header = REG_HEADER.removesuffix(",ano")
+    path = _write_export(tmp_path, {"dat_registro": f"{header}\nCidade Ano,CE,PG Ano,Proj Ano,100,10\n"})
+
+    seco = _seco(path)
+
+    assert (seco["would_skip_same"], seco["existe_sem_quantidade"]) == (1, 0)

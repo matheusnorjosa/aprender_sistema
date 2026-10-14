@@ -525,8 +525,9 @@ def _dat_registro_quantidade_em_outro_ano(
 
     O split antigo (até o export v37) dava ao flat o ano das compras (2026 se houvesse, senão o maior), não
     o da linha de onde vinham as quantidades. Nessa tripla, criar o ano que falta copiaria a quantidade para
-    os dois anos; o classify rejeita a linha (`quantidade_em_outro_ano`) e o apply não cria, para uma pessoa
-    decidir. Registro vazio (o ano que o split criou sem quantidade) não conta."""
+    os dois anos; o classify rejeita todas as linhas da tripla (`quantidade_em_outro_ano`), também a do ano
+    que já existe vazio, e o apply não cria, para uma pessoa decidir. Registro vazio (o ano que o split
+    criou sem quantidade) não conta."""
     triplas: set[tuple[int, int, int]] = set()
     for mid, pgid, pid, ano, aluno, prof in (
         DATRegistro.objects.filter(ano__isnull=False)
@@ -537,6 +538,24 @@ def _dat_registro_quantidade_em_outro_ano(
         if linhas.get(ano) != (aluno, prof) and any(a != ano and q == (aluno, prof) for a, q in linhas.items()):
             triplas.add((mid, pgid, pid))
     return triplas
+
+
+def _dat_registro_ano_sem_linha_divergente(
+    arquivo: dict[tuple[int, int, int], dict[int, tuple[int | None, int | None]]],
+) -> int:
+    """Registros COM ano de tripla do arquivo cujo ano não tem linha no arquivo e cuja quantidade não é a de
+    nenhuma linha da tripla (ex.: o flat que o split antigo moveu para 2026 e a planilha editou depois).
+    Só sinal: a linha de outro ano entra (rejeitar barraria export legítimo que traz só o ano corrente), e
+    uma pessoa confere se a soma dos anos não duplica. Registro vazio não conta."""
+    return sum(
+        1
+        for mid, pgid, pid, ano, aluno, prof in (
+            DATRegistro.objects.filter(ano__isnull=False)
+            .exclude(aluno_qtde__isnull=True, professor_qtde__isnull=True)
+            .values_list("municipio_id", "projeto_geral_id", "projeto_id", "ano", "aluno_qtde", "professor_qtde")
+        )
+        if (linhas := arquivo.get((mid, pgid, pid))) and ano not in linhas and (aluno, prof) not in linhas.values()
+    )
 
 
 def diff_and_classify(
@@ -950,11 +969,18 @@ class ExportContractImporter:
             pg_idx = self._projeto_geral_index()
             anos_db = _dat_registro_anos()
             flats_db = _dat_registro_flats(anos_db)
-            em_outro_ano = self._dat_registro_triplas_em_outro_ano(rows)
+            arquivo_com_ano = self._dat_registro_arquivo_com_ano(rows)
+            em_outro_ano = _dat_registro_quantidade_em_outro_ano(arquivo_com_ano)
             triplas_com_ano: set[tuple[int, int, int]] = set()
             vazios_reg = set(
                 DATRegistro.objects.filter(aluno_qtde__isnull=True, professor_qtde__isnull=True).values_list(
                     "municipio_id", "projeto_geral_id", "projeto_id", "ano"
+                )
+            )
+            # Linha sem ano (CSV antigo) casa qualquer registro da tripla: só falta quantidade se nenhum a tem.
+            cheias_reg = set(
+                DATRegistro.objects.exclude(aluno_qtde__isnull=True, professor_qtde__isnull=True).values_list(
+                    "municipio_id", "projeto_geral_id", "projeto_id"
                 )
             )
             tally["existe_sem_quantidade"] = 0
@@ -992,17 +1018,25 @@ class ExportContractImporter:
                     triplas_com_ano.add((mun_id, pg_id, proj_id))
                 qtdes = (_parse_int(r.get("aluno_qtde")), _parse_int(r.get("professor_qtde")))
                 st = _dat_registro_existente(anos_db, flats_db, nk, qtdes)
-                if st == "would_create" and nk[:3] in em_outro_ano:
+                if nk[:3] in em_outro_ano:
+                    # Toda linha da tripla, também a do ano que o split antigo criou vazio (would_skip_same):
+                    # senão ela viraria `existe_sem_quantidade` e preenchê-la duplicaria a quantidade.
                     st = "would_reject"
                     reasons["quantidade_em_outro_ano"] += 1
                 tally[st] += 1
-                if st == "would_skip_same" and nk in vazios_reg and any(dados):
+                if (
+                    st == "would_skip_same"
+                    and nk in vazios_reg
+                    and any(dados)
+                    and (ano is not None or nk[:3] not in cheias_reg)
+                ):
                     # O split por ano das compras cria o registro do ano sem quantidade; o create-only não o
                     # preenche. Contado à parte para a quantidade da planilha não sumir calada.
                     tally["existe_sem_quantidade"] += 1
             # Flat antigo sem ano cuja quantidade não é a de nenhuma linha com ano da tripla: fica sem ano ao
             # lado dos registros novos. De que ano ele é, decide uma pessoa.
             tally["sem_ano_divergente"] = len(triplas_com_ano & flats_db.keys())
+            tally["ano_sem_linha_divergente"] = _dat_registro_ano_sem_linha_divergente(arquivo_com_ano)
             tally["reject_reasons"] = reasons
             tally["repetidas_divergentes"] = divergentes_reg
 
@@ -2093,7 +2127,7 @@ class ExportContractImporter:
         pg_idx = self._projeto_geral_index()
         anos_db = _dat_registro_anos()
         flats_db = _dat_registro_flats(anos_db)
-        em_outro_ano = self._dat_registro_triplas_em_outro_ano(rows)
+        em_outro_ano = _dat_registro_quantidade_em_outro_ano(self._dat_registro_arquivo_com_ano(rows))
         created = 0
         ano_preenchido = 0
         for r in rows:
@@ -2301,8 +2335,10 @@ class ExportContractImporter:
                 reconciled += 1
         return reconciled
 
-    def _dat_registro_triplas_em_outro_ano(self, rows: list[dict[str, str]]) -> set[tuple[int, int, int]]:
-        """`_dat_registro_quantidade_em_outro_ano` com as linhas com ano do arquivo (1ª de cada chave)."""
+    def _dat_registro_arquivo_com_ano(
+        self, rows: list[dict[str, str]]
+    ) -> dict[tuple[int, int, int], dict[int, tuple[int | None, int | None]]]:
+        """Tripla → {ano: (aluno_qtde, professor_qtde)} das linhas com ano do arquivo (1ª de cada chave)."""
         mun_idx = self._municipio_index()
         pg_idx = self._projeto_geral_index()
         arquivo: dict[tuple[int, int, int], dict[int, tuple[int | None, int | None]]] = {}
@@ -2315,7 +2351,7 @@ class ExportContractImporter:
                 continue
             qtdes = (_parse_int(r.get("aluno_qtde")), _parse_int(r.get("professor_qtde")))
             arquivo.setdefault((mun_id, pg_id, proj_id), {}).setdefault(ano, qtdes)
-        return _dat_registro_quantidade_em_outro_ano(arquivo)
+        return arquivo
 
     def _papel_index_from_equipe(self) -> dict[str, str]:
         """Mapa cpf(11 dig) -> papel canonico, de equipe_gerencia.csv (fonte primaria do papel).

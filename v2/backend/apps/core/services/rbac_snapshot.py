@@ -25,6 +25,8 @@ from django.db.models import Q, QuerySet
 from apps.core.constants import SETOR_GROUPS
 from apps.core.models import EquipeGerencia, Gerencia, PermissaoFuncional, Usuario
 from apps.core.rbac.policies import resolve_public_policies
+from apps.core.services.functional_permissions_seed import FUNCTIONAL_PERMISSIONS_SEED
+from apps.core.services.rbac_pacotes import PERFIL_PERMITIDO
 
 Snapshot = dict[str, dict[str, Any]]
 
@@ -198,4 +200,27 @@ def diagnostico_de_lotacao() -> dict[str, Any]:
         "gerencias_por_setor": {s: sorted(gs) for s, gs in gerencias_do_setor.items()},
         "grupo_de_setor_sem_vinculo": sem_vinculo,
         "setores_sem_gerencia_mapeada": sem_mapa,
+    }
+
+
+def auditoria_de_matriz() -> dict[str, list[list[str]]]:
+    """`rbac_diff --auditar` (D4 do ADR-020): o que diverge do código. Só leitura, sem dado pessoal.
+
+    - pares (grupo, capacidade) do banco × os do seed (`FUNCTIONAL_PERMISSIONS_SEED`, que é a matriz);
+    - gerência com perfil ≠ PADRAO fora de `PERFIL_PERMITIDO` (pelo `nome`, que a tela não muda
+      numa gerência com perfil).
+    """
+    do_banco = set(PermissaoFuncional.objects.filter(groups__isnull=False).values_list("groups__name", "codename"))
+    do_seed = {(grupo, item.codename) for item in FUNCTIONAL_PERMISSIONS_SEED for grupo in item.group_names}
+    perfis_fora = [
+        [nome, perfil]
+        for nome, perfil in Gerencia.objects.exclude(perfil=Gerencia.Perfil.PADRAO)
+        .order_by("nome")
+        .values_list("nome", "perfil")
+        if PERFIL_PERMITIDO.get(nome) != perfil
+    ]
+    return {
+        "so_no_banco": [list(par) for par in sorted(do_banco - do_seed)],
+        "so_no_seed": [list(par) for par in sorted(do_seed - do_banco)],
+        "perfis_fora_da_lista": perfis_fora,
     }

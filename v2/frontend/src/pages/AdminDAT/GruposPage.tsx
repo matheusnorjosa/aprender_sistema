@@ -14,7 +14,6 @@ import {
   Alert,
   Button,
   Card,
-  Checkbox,
   Empty,
   Form,
   Grid,
@@ -80,7 +79,6 @@ interface UserRecord {
 interface GroupFormValues {
   name: string;
   group_type_input: 'setor' | 'funcao';
-  permissao_funcional_ids: ID[];
   member_ids: ID[];
 }
 
@@ -157,7 +155,6 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
   const [rbacMeta, setRbacMeta] = useState<RBACMetaPayload | null>(null);
 
   const [form] = Form.useForm<GroupFormValues>();
-  const selectedPermissionIds = Form.useWatch('permissao_funcional_ids', form) || [];
   const selectedMemberIds = Form.useWatch('member_ids', form) || [];
   const selectedGroupType = Form.useWatch('group_type_input', form) || forcedType || 'setor';
   const pageTypeMeta = forcedType ? TYPE_UI[forcedType] : null;
@@ -184,9 +181,11 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
     return { added, removed };
   }, [currentMemberIds, selectedMemberIds]);
 
+  // D4 (ADR-020): as permissões do grupo são só leitura; o catálogo dá a descrição de cada uma.
   const permissionsByCategory = useMemo(() => {
+    const idsDoGrupo = new Set((editingGroup?.permissoes_funcionais || []).map((permissao) => permissao.id));
     const grouped = new Map<string, PermissaoFuncional[]>();
-    permissoesDisponiveis.forEach((permissao) => {
+    permissoesDisponiveis.filter((permissao) => idsDoGrupo.has(permissao.id)).forEach((permissao) => {
       const key = permissao.category || 'geral';
       const current = grouped.get(key) || [];
       current.push(permissao);
@@ -201,7 +200,8 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
         categoryHelp: CATEGORY_LABELS[category]?.help || 'Permissões relacionadas a este módulo.',
         permissions: perms.sort((a, b) => a.label.localeCompare(b.label)),
       }));
-  }, [permissoesDisponiveis]);
+  }, [permissoesDisponiveis, editingGroup]);
+  const totalPermissoesDoGrupo = editingGroup?.permissoes_funcionais?.length ?? 0;
 
   const isReservedGroup = (groupName: string): boolean => reservedGroupNames.has(groupName);
 
@@ -337,7 +337,6 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
     form.setFieldsValue({
       name: '',
       group_type_input: 'setor',
-      permissao_funcional_ids: [],
       member_ids: [],
     });
     setModalVisible(true);
@@ -354,7 +353,6 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
       form.setFieldsValue({
         name: groupDetail.name,
         group_type_input: groupType || 'setor',
-        permissao_funcional_ids: (groupDetail.permissoes_funcionais || []).map((permissao) => permissao.id),
       });
       // Não tocado: o setFieldsValue marca o campo como tocado quando o valor muda (o modal não é
       // destruído, e o valor anterior é o do Editar ou do Novo de antes), e aí o efeito acima não
@@ -669,48 +667,46 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
             </Form.Item>
           ) : null}
 
+          {/* D4 (ADR-020): só leitura. O que um grupo pode muda por alteração revisada do sistema. */}
           <Form.Item
-            name="permissao_funcional_ids"
             label={selectedGroupType === 'funcao' ? 'Permissões de acesso da Função' : 'Permissões de acesso'}
-            extra="Use termos de negócio: selecione apenas o necessário para este perfil."
+            extra="Definido no sistema: o que um grupo pode fazer muda só por uma alteração revisada do sistema, não por esta tela."
           >
             {permissionsByCategory.length === 0 ? (
               <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="Nenhuma permissão funcional disponível"
+                description={editingGroup ? 'Este grupo não tem permissões de acesso' : 'Um grupo novo começa sem permissões de acesso'}
               />
             ) : (
-              <Checkbox.Group className="w-full">
-                <Space direction="vertical" className="w-full" size="middle">
-                  {permissionsByCategory.map(({ category, categoryTitle, categoryHelp, permissions }) => (
-                    <Card
-                      key={category}
-                      size="small"
-                      title={
-                        <Space direction="vertical" size={0}>
-                          <Text strong>{categoryTitle}</Text>
-                          <Text type="secondary" style={{ fontSize: 12 }}>{categoryHelp}</Text>
-                        </Space>
-                      }
-                    >
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {permissions.map((permissao) => (
-                          <Checkbox key={permissao.id} value={permissao.id}>
-                            <Space direction="vertical" size={0}>
-                              <Text>{permissao.label}</Text>
-                              {permissao.description ? (
-                                <Text type="secondary" style={{ fontSize: 12 }}>
-                                  {permissao.description}
-                                </Text>
-                              ) : null}
-                            </Space>
-                          </Checkbox>
-                        ))}
-                      </div>
-                    </Card>
-                  ))}
-                </Space>
-              </Checkbox.Group>
+              <Space direction="vertical" className="w-full" size="middle">
+                {permissionsByCategory.map(({ category, categoryTitle, categoryHelp, permissions }) => (
+                  <Card
+                    key={category}
+                    size="small"
+                    title={
+                      <Space direction="vertical" size={0}>
+                        <Text strong>{categoryTitle}</Text>
+                        <Text type="secondary" style={{ fontSize: 12 }}>{categoryHelp}</Text>
+                      </Space>
+                    }
+                  >
+                    <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {permissions.map((permissao) => (
+                        <li key={permissao.id}>
+                          <Space direction="vertical" size={0}>
+                            <Text>{permissao.label}</Text>
+                            {permissao.description ? (
+                              <Text type="secondary" style={{ fontSize: 12 }}>
+                                {permissao.description}
+                              </Text>
+                            ) : null}
+                          </Space>
+                        </li>
+                      ))}
+                    </ul>
+                  </Card>
+                ))}
+              </Space>
             )}
           </Form.Item>
 
@@ -755,7 +751,7 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
           <Card size="small" title="Resumo antes de salvar" className="mb-2">
             <Space direction="vertical" size={8} style={{ width: '100%' }}>
               <Text>
-                Permissões selecionadas: <Tag color="purple">{selectedPermissionIds.length}</Tag>
+                Permissões do grupo: <Tag color="purple">{totalPermissoesDoGrupo}</Tag>
               </Text>
               {/* Sem a lista, a contagem seria 0 (o campo está vazio): mostra o estado da lista, não um número. */}
               {usuariosProntos ? (

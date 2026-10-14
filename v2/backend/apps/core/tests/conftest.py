@@ -76,7 +76,7 @@ def seed_functional_permissions_fixture(django_db_setup, django_db_blocker):
 
     `ensure_base_groups()` cria os 18 grupos base (setor + funcao). Sob
     `pytest --no-migrations` nenhuma migration RunPython cria os grupos, e
-    `seed_functional_permissions` so cria os 7 com capability — este passo
+    `seed_functional_permissions` so cria os 8 com capability — este passo
     cobre os demais (Formador, setores sem capability, etc.). #1404.
     """
 

@@ -213,15 +213,15 @@ def test_map_metrics_controle_forbidden(user_controle):
     assert res.status_code == 403
 
 
-def test_map_metrics_dat_forbidden(user_dat):
-    """Issue #1222 (Epic 1): DAT não tem view_map_metrics no seed realinhado."""
+def test_map_metrics_dat_permitido(user_dat):
+    """D4 do ADR-020: o seed é a matriz de produção, e o DAT tem view_map_metrics lá (medido em 02/10/2026)."""
     client = APIClient()
     client.force_authenticate(user=user_dat)
 
     url = reverse("core:metrics-map")
     res = client.get(url)
 
-    assert res.status_code == 403
+    assert res.status_code == 200
 
 
 def test_map_metrics_coordenador_forbidden(user_coordenador):

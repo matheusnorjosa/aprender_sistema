@@ -25,7 +25,6 @@ from apps.core.rbac import can_admin_mutate_target
 from apps.core.rbac.policies import solicitation_approval_basis
 from apps.core.services.audit import (
     auditar_assign_groups,
-    auditar_group_capabilities_set,
     auditar_privilege_flags,
     auditar_reset_senha,
     registrar_auditoria,
@@ -647,6 +646,9 @@ class GroupSerializer(serializers.ModelSerializer):
         allow_null=True,
         write_only=True,
     )
+    # D4 (ADR-020): a matriz Grupo×Capacidade muda só por PR (migration com
+    # `# noqa: RBAC-migration-allowed`). O campo segue aceito para a aba aberta com o bundle
+    # antigo (manda `[]` ao criar e os ids atuais ao editar), mas nunca grava.
     permissao_funcional_ids = serializers.PrimaryKeyRelatedField(
         many=True,
         queryset=PermissaoFuncional.objects.all(),
@@ -712,43 +714,30 @@ class GroupSerializer(serializers.ModelSerializer):
                 )
         return value
 
-    def _actor(self) -> Any:
-        return getattr(self.context.get("request"), "user", None)
+    def validate_permissao_funcional_ids(self, value: list[PermissaoFuncional]) -> list[PermissaoFuncional]:
+        """D4: 400 só quando o conjunto enviado difere do atual (o de um grupo novo é vazio)."""
+        instance: Group | None = self.instance
+        atual = set(instance.permissoes_funcionais.values_list("pk", flat=True)) if instance is not None else set()
+        if {p.pk for p in value} != atual:
+            raise serializers.ValidationError(
+                "As capacidades de um grupo não mudam pela tela: capacidades mudam por PR."
+            )
+        return value
 
     def create(self, validated_data: dict[str, Any]) -> Group:
         group_type = validated_data.pop("group_type_input", None)
-        permissoes_funcionais = validated_data.pop("permissoes_funcionais", [])
+        validated_data.pop("permissoes_funcionais", None)  # D4: validado igual ao atual, nunca grava
         instance = super().create(validated_data)
         if group_type:
             GroupClassificacao.objects.update_or_create(group=instance, defaults={"tipo": group_type})
-        if permissoes_funcionais:
-            instance.permissoes_funcionais.set(permissoes_funcionais)
-            # #1672: mudanca Group x Capability via REST tambem e auditada — este
-            # e o path que antes perdia o registro por nao passar pelo Admin.
-            auditar_group_capabilities_set(
-                actor=self._actor(),
-                group=instance,
-                before_cap_ids=[],
-                after_cap_ids=[c.pk for c in permissoes_funcionais],
-            )
         return instance
 
     def update(self, instance: Group, validated_data: dict[str, Any]) -> Group:
         group_type = validated_data.pop("group_type_input", None)
-        permissoes_funcionais = validated_data.pop("permissoes_funcionais", None)
-        before_cap_ids = set(instance.permissoes_funcionais.values_list("pk", flat=True))
+        validated_data.pop("permissoes_funcionais", None)  # D4: validado igual ao atual, nunca grava
         instance = super().update(instance, validated_data)
         if group_type:
             GroupClassificacao.objects.update_or_create(group=instance, defaults={"tipo": group_type})
-        if permissoes_funcionais is not None:
-            instance.permissoes_funcionais.set(permissoes_funcionais)
-            # #1672: idem — REST auditado (antes so o Admin persistia a trilha).
-            auditar_group_capabilities_set(
-                actor=self._actor(),
-                group=instance,
-                before_cap_ids=before_cap_ids,
-                after_cap_ids=set(instance.permissoes_funcionais.values_list("pk", flat=True)),
-            )
         return instance
 
 

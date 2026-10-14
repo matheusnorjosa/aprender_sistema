@@ -368,27 +368,19 @@ class NotificacaoInternaAdmin(admin.ModelAdmin):
 
 class PermissaoFuncionalAdmin(admin.ModelAdmin):
     """
-    PR 16 hardening RBAC (2026-05-04): Admin UI superuser-only para
-    atribuição Group × Capability.
+    Capacidades no Admin: só leitura (D4 do ADR-020, PR A da arquitetura de permissões).
 
-    Decisão D17: pós-PR 16, a relação Group × Capability passa a ser
-    admin-driven. Migrations só criam/removem/renomeiam capability
-    codename — não devem mais usar `groups.set()` para sobrescrever
-    atribuições feitas via Admin (`v2/docs/RBAC_NAMING.md` §X +
-    `v2/docs/rbac_authorization_matrix.md` §6 D17).
+    Decisão D4 (a): a matriz Grupo × Capability muda só por PR, numa migration de dados com
+    `# noqa: RBAC-migration-allowed` (precedente: `0111_seed_publish_setor_capability`). Isso
+    substitui a D17 (2026-05-04), que fazia do Admin o lugar da atribuição e deixou o banco de
+    produção diferente do seed. `rbac_diff --auditar` compara os dois
+    (`v2/docs/RBAC_NAMING.md` e `v2/docs/rbac_authorization_matrix.md` §6).
 
-    Guardas estritos:
-    - `has_add_permission` / `has_delete_permission` desabilitados.
-      Capability codenames são SSOT em
-      `apps/core/services/functional_permissions_seed.py` (17 itens
-      validados em `_validate_seed`). Adicionar via Admin violaria essa
-      contagem; remover quebraria policies hardcoded.
-    - Todos os campos descritivos read-only — admin só edita `groups`.
-      Renomear `codename` quebra `ACCESS_POLICIES` (referencia literal).
-
-    Cache bust e AuditLog ficam em `m2m_changed` signal (ver
-    `apps/core/signals.py`) — disparam por SAVE direto via shell, ETL
-    interno ou Admin.
+    Guardas:
+    - `has_add_permission` / `has_change_permission` / `has_delete_permission` desabilitados.
+      Capability codenames são SSOT em `apps/core/services/functional_permissions_seed.py`
+      (17 itens validados em `_validate_seed`), que também é a matriz Grupo × Capability.
+    - O superusuário continua vendo cada capacidade e os grupos dela.
     """
 
     list_display = ("category", "codename", "label", "groups_count")
@@ -428,27 +420,9 @@ class PermissaoFuncionalAdmin(admin.ModelAdmin):
         # Remover capability quebraria policies hardcoded em ACCESS_POLICIES.
         return False
 
-    def save_related(self, request: HttpRequest, form: Any, formsets: Any, change: bool) -> None:
-        """
-        Emite o AuditLog `GROUP_CAPABILITY_CHANGED` desta operação Admin (#1672).
-
-        Captura o snapshot dos grupos ANTES de persistir os m2m e compara com o
-        DEPOIS, delegando ao serviço transacional (emite em `on_commit`). O
-        signal `m2m_changed` já cuidou do cache bust. Substitui o antigo
-        buffer global + `flush_group_capability_audit`, que só persistia daqui.
-        """
-        from apps.core.services.audit import auditar_group_capability_change
-
-        capability = form.instance
-        before_group_ids = set(capability.groups.values_list("pk", flat=True)) if capability.pk else set()
-        super().save_related(request, form, formsets, change)
-        after_group_ids = set(capability.groups.values_list("pk", flat=True))
-        auditar_group_capability_change(
-            actor=request.user,
-            capability=capability,
-            before_group_ids=before_group_ids,
-            after_group_ids=after_group_ids,
-        )
+    def has_change_permission(self, request: HttpRequest, obj: PermissaoFuncional | None = None) -> bool:
+        # D4: a matriz Grupo × Capability muda só por PR (migration), nunca pelo Admin.
+        return False
 
 
 # Registro funcional (evita problemas de importação circular com decoradores)

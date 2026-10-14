@@ -6,7 +6,8 @@ Como a auditoria é emitida em `transaction.on_commit`, cada chamada mutante rod
 dentro de `django_capture_on_commit_callbacks(execute=True)`.
 
 Cobre os caminhos que ANTES perdiam o registro por não passar pelo Django Admin:
-- Group × Capability via REST (GroupSerializer create/update) — o bug do issue.
+- Group × Capability via REST (GroupSerializer create/update) — o bug do issue. Desde a D4 do
+  ADR-020 esse caminho só recusa (400, nada gravado nem auditado): a matriz muda por PR.
 - `assign_groups` (membership).
 - Reset de senha de outro usuário (admin).
 - Exclusão de usuário e de grupo.
@@ -70,7 +71,12 @@ def caps() -> list[PermissaoFuncional]:
 
 
 class TestGroupCapabilityViaREST:
-    def test_create_group_com_caps_audita(self, api_client, superuser, caps, django_capture_on_commit_callbacks):
+    """D4 do ADR-020: o REST deixou de mudar a matriz (capacidades mudam por PR), então não há o
+    que auditar por aqui. A recusa não grava nem audita."""
+
+    def test_create_group_com_caps_recusa_sem_auditar(
+        self, api_client, superuser, caps, django_capture_on_commit_callbacks
+    ):
         AuditLog.objects.filter(action="GROUP_CAPABILITY_CHANGED").delete()
         api_client.force_authenticate(user=superuser)
         with django_capture_on_commit_callbacks(execute=True):
@@ -79,16 +85,11 @@ class TestGroupCapabilityViaREST:
                 {"name": "GrupoAudit", "permissao_funcional_ids": [caps[0].id]},
                 format="json",
             )
-        assert resp.status_code == 201, resp.content
-        logs = AuditLog.objects.filter(action="GROUP_CAPABILITY_CHANGED")
-        assert logs.count() == 1
-        d = logs.first().details
-        assert d["via"] == "group_serializer"
-        assert d["capability_id"] == caps[0].id
-        assert d["added_groups"] == ["GrupoAudit"]
-        assert d["removed_groups"] == []
+        assert resp.status_code == 400, resp.content
+        assert not Group.objects.filter(name="GrupoAudit").exists()
+        assert not AuditLog.objects.filter(action="GROUP_CAPABILITY_CHANGED").exists()
 
-    def test_update_group_caps_audita_uma_por_cap(
+    def test_update_group_caps_recusa_sem_auditar(
         self, api_client, superuser, caps, django_capture_on_commit_callbacks
     ):
         group = GroupFactory(name="GrupoUpd")
@@ -100,8 +101,9 @@ class TestGroupCapabilityViaREST:
                 {"permissao_funcional_ids": [caps[0].id, caps[1].id]},
                 format="json",
             )
-        assert resp.status_code == 200, resp.content
-        assert AuditLog.objects.filter(action="GROUP_CAPABILITY_CHANGED").count() == 2
+        assert resp.status_code == 400, resp.content
+        assert not group.permissoes_funcionais.exists()
+        assert not AuditLog.objects.filter(action="GROUP_CAPABILITY_CHANGED").exists()
 
 
 # ============================================================================

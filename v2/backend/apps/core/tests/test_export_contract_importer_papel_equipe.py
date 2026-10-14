@@ -152,3 +152,134 @@ def test_usuario_so_com_equipe_nasce_sem_grupo_mesmo_com_cargo(tmp_path):
     ExportContractImporter(path=path, apply=True, allow=("usuario",)).run()
 
     assert Usuario.objects.get(cpf="11144477735").groups.count() == 0
+
+
+@pytest.mark.parametrize(
+    "linhas",
+    [
+        ["Controle,11144477735,EQUIPE", "Vidas,11144477735,FORMADOR"],
+        ["Vidas,11144477735,FORMADOR", "Controle,11144477735,EQUIPE"],
+    ],
+    ids=["equipe_antes", "formador_antes"],
+)
+def test_usuario_novo_com_equipe_e_funcao_nasce_com_o_grupo_da_funcao(tmp_path, linhas):
+    """Pessoa em duas linhas, EQUIPE e FORMADOR: o papel de função vence EQUIPE nas duas ordens.
+    Antes valia a 1ª linha, e com EQUIPE primeiro a pessoa nascia sem grupo."""
+    _seed_grupos()
+    path = _export(
+        tmp_path,
+        {
+            "usuario": "nome_completo,cpf,email,cargo\nBia,11144477735,,\n",
+            "equipe_gerencia": "gerencia,usuario_cpf,papel\n" + "\n".join(linhas) + "\n",
+        },
+    )
+
+    ExportContractImporter(path=path, apply=True, allow=("usuario",)).run()
+
+    assert set(Usuario.objects.get(cpf="11144477735").groups.values_list("name", flat=True)) == {"Formador"}
+
+
+def test_usuario_novo_com_duas_funcoes_fica_com_a_primeira(tmp_path):
+    """Entre duas funções diferentes não há regra nova: vale a 1ª linha, como antes."""
+    _seed_grupos()
+    path = _export(
+        tmp_path,
+        {
+            "usuario": "nome_completo,cpf,email,cargo\nBia,11144477735,,\n",
+            "equipe_gerencia": "gerencia,usuario_cpf,papel\nVidas,11144477735,COORDENADOR\nVidas,11144477735,FORMADOR\n",
+        },
+    )
+
+    ExportContractImporter(path=path, apply=True, allow=("usuario",)).run()
+
+    assert set(Usuario.objects.get(cpf="11144477735").groups.values_list("name", flat=True)) == {"Coordenador"}
+
+
+def test_usuario_existente_nao_muda_de_grupo_pela_regra_da_funcao(tmp_path):
+    _seed_grupos()
+    u = UsuarioFactory(cpf="11144477735")
+    path = _export(
+        tmp_path,
+        {
+            "usuario": "nome_completo,cpf,email,cargo\nBia,11144477735,,\n",
+            "equipe_gerencia": "gerencia,usuario_cpf,papel\nControle,11144477735,EQUIPE\nVidas,11144477735,FORMADOR\n",
+        },
+    )
+
+    ExportContractImporter(path=path, apply=True, allow=("usuario",)).run()
+
+    assert u.groups.count() == 0
+
+
+@pytest.mark.parametrize("com_gerencia_no_banco", [True, False], ids=["super_existe", "super_ainda_nao_existe"])
+@pytest.mark.parametrize(
+    "linhas",
+    [
+        ["Super,11144477735,EQUIPE", "Super,11144477735,GERENTE"],
+        ["Super,11144477735,GERENTE", "Super,11144477735,EQUIPE"],
+    ],
+    ids=["equipe_antes", "gerente_antes"],
+)
+def test_linha_barrada_no_vinculo_nao_da_o_grupo_da_funcao(tmp_path, linhas, com_gerencia_no_banco):
+    """A linha GERENTE na Superintendência é barrada no `equipe_gerencia` (anti-escalada, PR B1). O
+    papel dela não pode dar ao usuário novo o grupo Gerente: só a linha que o vínculo aceita conta, e o
+    EQUIPE que sobra não dá grupo. Vale também quando a gerência ainda não existe (o apply a criaria)."""
+    _seed_grupos()
+    if com_gerencia_no_banco:
+        Gerencia.objects.create(nome="SUPERINTENDENCIA", nome_setor="Super")
+    path = _export(
+        tmp_path,
+        {
+            "usuario": "nome_completo,cpf,email,cargo\nBia,11144477735,,\n",
+            "equipe_gerencia": "gerencia,usuario_cpf,papel\n" + "\n".join(linhas) + "\n",
+        },
+    )
+
+    ExportContractImporter(path=path, apply=True, allow=("usuario", "equipe_gerencia")).run()
+
+    u = Usuario.objects.get(cpf="11144477735")
+    assert u.groups.count() == 0
+    assert set(EquipeGerencia.objects.filter(usuario=u).values_list("papel", flat=True)) == {"EQUIPE"}
+
+
+def test_linha_de_funcao_sem_gerencia_nao_da_grupo(tmp_path):
+    """Linha FORMADOR com a gerência vazia: o `equipe_gerencia` a recusa, então ela não define o papel."""
+    _seed_grupos()
+    path = _export(
+        tmp_path,
+        {
+            "usuario": "nome_completo,cpf,email,cargo\nBia,11144477735,,\n",
+            "equipe_gerencia": "gerencia,usuario_cpf,papel\nControle,11144477735,EQUIPE\n,11144477735,FORMADOR\n",
+        },
+    )
+
+    ExportContractImporter(path=path, apply=True, allow=("usuario",)).run()
+
+    assert Usuario.objects.get(cpf="11144477735").groups.count() == 0
+
+
+@pytest.mark.parametrize(
+    ("linha", "cargo"),
+    [
+        (",11144477735,EQUIPE", "Coordenadores"),
+        (",11144477735,FORMADOR", "Gerentes"),
+        ("Super,11144477735,GERENTE", "Gerentes"),
+    ],
+    ids=["equipe_sem_gerencia", "funcao_sem_gerencia", "vinculo_aprovador"],
+)
+def test_cpf_so_com_linha_barrada_nao_cai_no_cargo(tmp_path, linha, cargo):
+    """CPF cujas linhas no `equipe_gerencia` foram todas barradas (gerência vazia ou vínculo aprovador):
+    a linha barrada não dá papel, e o `cargo` também não entra como fallback. O CPF está no export de
+    equipe, então o cargo não decide o grupo; senão a linha barrada abriria o grupo da coluna cargo."""
+    _seed_grupos()
+    path = _export(
+        tmp_path,
+        {
+            "usuario": f"nome_completo,cpf,email,cargo\nBia,11144477735,,{cargo}\n",
+            "equipe_gerencia": f"gerencia,usuario_cpf,papel\n{linha}\n",
+        },
+    )
+
+    ExportContractImporter(path=path, apply=True, allow=("usuario",)).run()
+
+    assert Usuario.objects.get(cpf="11144477735").groups.count() == 0

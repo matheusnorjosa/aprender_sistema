@@ -268,8 +268,9 @@ def _norm_codigo(code: str) -> str:
     """SKU comparável p/ casar `produto_codigo` (planilha) com `produto.codigo` (catálogo):
     strip + upper + remove ZERO À ESQUERDA. Normaliza OS DOIS LADOS (#1635): '0402002' e '402002'
     são o mesmo SKU do Protheus; comparar cru×cru perde quem difere só no zero (medido: 99,4%→99,9%).
-    Vazio permanece vazio (não linka)."""
-    return (code or "").strip().upper().lstrip("0")
+    Código só de zeros vira '0' (não some). Vazio permanece vazio (não linka)."""
+    code = (code or "").strip().upper()
+    return code.lstrip("0") or code[:1]
 
 
 def _cmp(v: Any) -> str:
@@ -477,12 +478,17 @@ def _dat_compra_ano_uso(r: dict[str, str]) -> int | None:
     return _parse_int(r.get("ano_uso_colecao") or r.get("ano_uso"))
 
 
+# Faixa plausível do ano-cohort vindo da coluna `ano`. Fora dela ('26', '1.000', '40000') é digitação:
+# vira ano errado sem volta na adoção, ou estoura o smallint de DATCadastro.ano só no apply.
+_CAD_ANO_MIN, _CAD_ANO_MAX = 2000, 2100
+
+
 def _dat_cadastro_ano(r: dict[str, str]) -> int | None:
-    """Ano-cohort do cadastro = coluna `ano` do arquivo, quando vem e é um inteiro válido (IMP-3). Sem
+    """Ano-cohort do cadastro = coluna `ano` do arquivo, quando vem e é um ano plausível (IMP-3). Sem
     ela, ano da 1ª etapa com data (início do ciclo FORMAR/AVALIAR), fallback pelas etapas seguintes.
     Nenhum dos dois → None (pendente)."""
     ano = _parse_int(r.get("ano"))
-    if ano is not None and ano > 0:
+    if ano is not None and _CAD_ANO_MIN <= ano <= _CAD_ANO_MAX:
         return ano
     for col in ("etapa1_data", "etapa2_data", "etapa3_data", "etapa4_data"):
         d = _parse_iso_date(r.get(col))

@@ -21,6 +21,8 @@ from datetime import date
 from typing import Any
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
 from apps.core.models import DATCadastro, Produto, ProjetoGeral
 from apps.core.services.export_contract_importer import ExportContractImporter
@@ -86,7 +88,11 @@ def test_ano_da_coluna_vence_a_data_da_etapa(tmp_path, base):
     assert DATCadastro.objects.get().ano == 2026
 
 
-@pytest.mark.parametrize("ano", ["", "abc"], ids=["vazio", "invalido"])
+@pytest.mark.parametrize(
+    "ano",
+    ["", "abc", "0", "-1", "1", "26", "1.000", "20262", "40000"],
+    ids=["vazio", "invalido", "zero", "negativo", "um", "dois_digitos", "mil", "digito_a_mais", "acima_smallint"],
+)
 def test_coluna_ano_vazia_ou_invalida_cai_na_data_da_etapa(tmp_path, base, ano):
     path = _write_export(tmp_path, _cad_csv(f"Cidade Cad,CE,PG Cad,FORMAR,concluido,2025-12-01,{ano}"))
 
@@ -103,13 +109,19 @@ def test_sem_ano_no_banco_e_um_ano_no_arquivo_adota_so_o_ano(tmp_path, base):
     seco = _seco(path)
     assert (seco["would_update"], seco["would_create"], seco["would_reject"]) == (1, 0, 0)
 
-    r = _apply(path, base["actor"])
+    with CaptureQueriesContext(connection) as ctx:
+        r = _apply(path, base["actor"])
 
     assert r["applied"]["dat_cadastro"] == 0
     assert r["applied"]["dat_cadastro__ano_preenchido"] == 1
     assert DATCadastro.objects.count() == 1
     cad.refresh_from_db()
     assert cad.ano == 2026
+    # a adoção grava SÓ o ano: uma edição concorrente das etapas não é apagada por um save() completo
+    updates = [q["sql"] for q in ctx.captured_queries if q["sql"].startswith('UPDATE "core_dat_cadastro"')]
+    assert len(updates) == 1
+    set_clause = updates[0].split(" SET ", 1)[1].split(" WHERE ", 1)[0]
+    assert sorted(c.split(" = ")[0] for c in set_clause.split(", ")) == ['"ano"', '"updated_at"']
     # never-overwrite: a etapa e a observação do cadastro não vêm da planilha
     assert (cad.status_criacao_curso, cad.data_criacao_curso, cad.observacoes) == (
         "concluido",
@@ -122,6 +134,23 @@ def test_sem_ano_no_banco_e_um_ano_no_arquivo_adota_so_o_ano(tmp_path, base):
     r2 = _apply(path, base["actor"])
     assert r2["applied"]["dat_cadastro"] == 0
     assert "dat_cadastro__ano_preenchido" not in r2["applied"]
+
+
+@pytest.mark.parametrize("ano", ["26", "40000"], ids=["dois_digitos", "acima_smallint"])
+def test_ano_fora_da_faixa_sem_data_nao_adota_o_sem_ano(tmp_path, base, ano):
+    # Ano implausível não vira ano: sem data de etapa, a linha é o próprio cadastro sem ano (nada muda).
+    # Antes: '26' adotava ano=26 sem volta; '40000' passava no dry-run e quebrava o apply (smallint).
+    _sem_ano(base)
+    path = _write_export(tmp_path, _cad_csv(f"Cidade Cad,CE,PG Cad,FORMAR,pendente,,{ano}"))
+
+    seco = _seco(path)
+    assert (seco["would_skip_same"], seco["would_update"], seco["would_create"]) == (1, 0, 0)
+
+    r = _apply(path, base["actor"])
+
+    assert r["applied"]["dat_cadastro"] == 0
+    assert "dat_cadastro__ano_preenchido" not in r["applied"]
+    assert list(DATCadastro.objects.values_list("ano", flat=True)) == [None]
 
 
 def test_linha_repetida_do_mesmo_ano_adota_uma_vez(tmp_path, base):
@@ -212,3 +241,15 @@ def test_classify_produto_so_pela_existencia_do_codigo_normalizado(tmp_path):
     assert r["would_skip_same"] == 2
     assert r["would_create"] == 1
     assert r["would_reject"] == 1
+
+
+def test_classify_produto_normaliza_o_codigo_do_lado_do_arquivo(tmp_path):
+    # Zero à esquerda na planilha casa com o catálogo sem zero; código só de zeros casa consigo mesmo.
+    proj = ProjetoFactory(nome="Proj Prod Imp3 Arq", fluxo="NAO_SUPER")
+    Produto.objects.create(codigo="402002", nome="Sem Zero", projeto=proj)
+    Produto.objects.create(codigo="000", nome="Zeros", projeto=proj)
+    csv = "codigo,nome\n0402002,Com Zero\n000,Zeros\n00,Zeros Curto\n"
+
+    r = ExportContractImporter(path=_write_export(tmp_path, {"produto": csv})).run()["por_entidade"]["produto"]
+
+    assert (r["would_skip_same"], r["would_create"], r["would_reject"]) == (3, 0, 0)

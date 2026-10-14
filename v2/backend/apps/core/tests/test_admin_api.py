@@ -810,8 +810,8 @@ class TestRbacFunctionalAPI:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "group_type_input" in response.data["errors"]
 
-    def test_superuser_can_patch_group_permissoes_funcionais(self, api_client, usuario_super):
-        """Superuser vincula permissões funcionais a um grupo (P0-1: matriz superuser-only)."""
+    def test_superuser_nao_muda_permissoes_funcionais_do_grupo(self, api_client, usuario_super):
+        """D4 do ADR-020: nem o superusuário muda a matriz pela API (capacidades mudam por PR)."""
         group = GroupFactory(name="Equipe Operacional")
         permissao_a = PermissaoFuncional.objects.create(
             codename="rbac.group_patch_a",
@@ -832,12 +832,9 @@ class TestRbacFunctionalAPI:
         payload = {"permissao_funcional_ids": [permissao_a.id, permissao_b.id]}
         response = api_client.patch(f"/api/grupos/{group.id}/", payload, format="json")
 
-        assert response.status_code == status.HTTP_200_OK
-        group.refresh_from_db()
-        linked_ids = set(group.permissoes_funcionais.values_list("id", flat=True))
-        assert linked_ids == {permissao_a.id, permissao_b.id}
-        returned_ids = {item["id"] for item in response.data["permissoes_funcionais"]}
-        assert returned_ids == {permissao_a.id, permissao_b.id}
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "capacidades mudam por PR" in str(response.data)
+        assert not group.permissoes_funcionais.exists()
 
     def test_rename_reserved_group_requires_confirmation(self, api_client, usuario_super):
         """Renomeio de grupo reservado exige ?confirm_reserved=true (P0-1: só superuser)."""

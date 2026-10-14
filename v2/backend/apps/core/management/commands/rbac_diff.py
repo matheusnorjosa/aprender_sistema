@@ -9,6 +9,7 @@ Uso:
     python manage.py rbac_diff --comparar antes.json                 # contra o banco de agora
     python manage.py rbac_diff --comparar antes.json --depois depois.json
     python manage.py rbac_diff --diagnostico
+    python manage.py rbac_diff --auditar                             # exit 1 se divergir do código
 
 Em produção a raiz do container é só leitura e /tmp (tmpfs) some quando o deploy recria o
 container. Por isso o retrato sai do container antes do deploy e volta depois (o JSON não tem
@@ -21,6 +22,11 @@ stdout ao carregar e sujaria o JSON.
 
 Exit 0 quando roda: é relatório, não gate. Arquivo que não dá para ler ou gravar sai com
 mensagem legível e exit 1 (CommandError).
+
+`--auditar` (D4 do ADR-020) é a exceção que sai com exit 1: quando os pares (grupo, capacidade)
+do banco diferem dos do seed (`functional_permissions_seed.py`, que é a matriz) ou quando há
+gerência com perfil ≠ PADRAO fora de `PERFIL_PERMITIDO` (`services/rbac_pacotes.py`). Roda no
+checklist pós-deploy, junto do `--comparar` (`DEPLOY_CHECKLIST.md`).
 """
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false
@@ -33,7 +39,13 @@ from typing import TYPE_CHECKING, Any
 
 from django.core.management.base import BaseCommand, CommandError
 
-from apps.core.services.rbac_snapshot import CAMPOS, diagnostico_de_lotacao, diff_snapshots, snapshot_de_poder
+from apps.core.services.rbac_snapshot import (
+    CAMPOS,
+    auditoria_de_matriz,
+    diagnostico_de_lotacao,
+    diff_snapshots,
+    snapshot_de_poder,
+)
 
 if TYPE_CHECKING:
     from argparse import ArgumentParser
@@ -62,6 +74,9 @@ class Command(BaseCommand):
         modo.add_argument("--salvar", metavar="ARQ.json", help="Grava o retrato de agora em arquivo")
         modo.add_argument("--comparar", metavar="ANTES.json", help="Compara ANTES com DEPOIS (ou com o banco)")
         modo.add_argument("--diagnostico", action="store_true", help="Medições do PR 1 (lotação × grupos)")
+        modo.add_argument(
+            "--auditar", action="store_true", help="Matriz do banco × seed e perfis de gerência (exit 1 se divergir)"
+        )
         parser.add_argument("--depois", metavar="DEPOIS.json", help="Com --comparar: retrato de depois")
 
     def handle(self, *args: Any, **options: Any) -> None:
@@ -73,8 +88,27 @@ class Command(BaseCommand):
             antes = _ler(options["comparar"])
             depois = _ler(options["depois"]) if options["depois"] else snapshot_de_poder()
             self.stdout.write(self._texto_diff(diff_snapshots(antes, depois)))
+        elif options["auditar"]:
+            self._auditar()
         else:
             self.stdout.write(self._texto_diagnostico(diagnostico_de_lotacao()))
+
+    def _auditar(self) -> None:
+        auditoria = auditoria_de_matriz()
+        rotulos = {
+            "so_no_banco": "par (grupo, capacidade) no banco e fora do seed",
+            "so_no_seed": "par (grupo, capacidade) no seed e fora do banco",
+            "perfis_fora_da_lista": "gerência com perfil fora de PERFIL_PERMITIDO",
+        }
+        total = 0
+        for chave, rotulo in rotulos.items():
+            for a, b in auditoria[chave]:
+                self.stdout.write(f"  {rotulo}: {a} / {b}")
+                total += 1
+        resumo = f"rbac_diff --auditar: {total} divergência(s)"
+        if total:
+            raise CommandError(resumo)
+        self.stdout.write(resumo)
 
     def _salvar(self, caminho: str) -> None:
         snapshot = snapshot_de_poder()

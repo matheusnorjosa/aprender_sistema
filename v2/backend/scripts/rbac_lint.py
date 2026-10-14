@@ -10,6 +10,11 @@ Histórico:
 - D17 (2026-05-04): proíbe mutação de `PermissaoFuncional.groups` /
   `Group.permissions` via migrations versionadas — atribuição é responsabilidade
   do admin UI / seed manual. V003 enforça preventivamente em migrations novas.
+- D4 do ADR-020 (2026-10-14, PR A da arquitetura de permissões): a matriz
+  Grupo × Capability fica só leitura na tela e no admin e passa a mudar SÓ por PR,
+  numa migration de dados com `# noqa: RBAC-migration-allowed` (precedente:
+  `0111_seed_publish_setor_capability`). V003 continua exigindo o marcador; V004 e
+  V005 fecham os caminhos de escrita de grupo e de vínculo fora dos arquivos de hoje.
 
 Sem este guard, em 6-12 meses alguém escreveria `user.groups.filter(name="DAT")`
 em uma view e a dívida voltaria.
@@ -52,12 +57,25 @@ em uma view e a dívida voltaria.
   prefixo `Is<Upper>` é banido). Não precisam whitelist.
 
 - **V003** `<expr>.permissions.set|add|clear(...)` ou
-  `<expr>.groups.set|add|clear(...)` em migrations de `apps/core/` com número
+  `<expr>.groups.set|add|clear|remove(...)` em migrations de `apps/core/` com número
   acima do cutoff D17 (`D17_LEGACY_MIGRATIONS_MAX`). Migrations existentes antes
-  da ratificação D17 (2026-05-04) são histórico aceitável; novas migrations
-  devem deixar a atribuição de grupos para admin UI / management commands de
-  seed manuais (`apps/dev_tools/`). Para casos legítimos (ex: backfill após
-  rename de grupo), adicionar `# noqa: RBAC-migration-allowed` na linha.
+  da ratificação D17 (2026-05-04) são histórico aceitável. Desde a D4, mudar o que
+  um grupo pode é exatamente uma migration nova revisada em PR: ela leva
+  `# noqa: RBAC-migration-allowed` na linha, para a mudança ficar explícita.
+
+- **V004** `<expr>.groups|user_set|permissoes_funcionais.add|set|remove|clear(...)`
+  e `<expr>.<lado>.through.objects.create|get_or_create|update_or_create|bulk_create(...)`
+  fora de `V004_ALLOWLIST` (mutação de grupo ou capacidade). O AST não distingue
+  `user.groups` de `perm.groups`, então os dois lados da M2M são uma regra só.
+  Allowlist de arquivos em modo ratchet: arquivo novo reprova, sem marcador noqa.
+
+- **V005** `[mod.]EquipeGerencia.objects.create|get_or_create|update_or_create|bulk_create`,
+  o manager reverso `<expr>.equipes.<mesmos métodos>` e o construtor `[mod.]EquipeGerencia(...)`
+  fora de `V005_ALLOWLIST`. Limite declarado: não pega reativação por `.save()`
+  (`upsert_vinculo`, importadores); quem protege a reativação é o predicado
+  `vinculo_exige_superusuario` mais o superusuário.
+
+V004/V005 isentam `tests/`, `migrations/` (cobertas pela V003) e `apps/dev_tools/`.
 
 Whitelist de paths (não linta V001/V002):
 - `tests/`, `migrations/`, `fixtures/` (test data e data migrations podem
@@ -134,10 +152,36 @@ GROUP_NAME_KWARGS: frozenset[str] = frozenset({"name", "name__in", "name__exact"
 D17_LEGACY_MIGRATIONS_MAX: int = 82
 
 # Métodos M2M que constituem mutação de atribuição grupo↔permissão.
-M2M_MUTATION_METHODS: frozenset[str] = frozenset({"set", "add", "clear"})
+M2M_MUTATION_METHODS: frozenset[str] = frozenset({"set", "add", "clear", "remove"})
 
 # Atributos do lado da relação M2M que V003 protege.
 M2M_PROTECTED_ATTRS: frozenset[str] = frozenset({"groups", "permissions"})
+
+
+# V004/V005 (ADR-020, PR A): isentos de V004/V005 (V003 cobre migrations de apps/core/).
+MUTATION_EXEMPT_PATH_SUBSTRINGS: tuple[str, ...] = ("/tests/", "/migrations/", "/apps/dev_tools/")
+
+# V004: lados da M2M de grupo/capacidade (os métodos são os de M2M_MUTATION_METHODS).
+GROUP_MUTATION_ATTRS: frozenset[str] = frozenset({"groups", "user_set", "permissoes_funcionais"})
+
+# V004 ratchet: únicos arquivos que hoje mutam grupo ou capacidade (conferido por grep em 14/10/2026).
+V004_ALLOWLIST: tuple[str, ...] = (
+    "apps/core/serializers/usuario.py",  # lotação no form do superusuário (user.groups.set)
+    "apps/core/views/admin.py",  # assign_groups e sync-members (superusuário)
+    "apps/core/services/usuarios_import.py",  # coluna `grupos` do import de usuários
+    "apps/core/services/export_contract_importer.py",  # papel → grupo no export-contract
+    "apps/core/services/functional_permissions_seed.py",  # o seed É a matriz (dev e testes)
+)
+
+# V005: métodos que criam EquipeGerencia, e os únicos arquivos que podem chamá-los.
+EQUIPE_GERENCIA_CREATE_METHODS: frozenset[str] = frozenset(
+    {"create", "get_or_create", "update_or_create", "bulk_create"}
+)
+V005_ALLOWLIST: tuple[str, ...] = (
+    "apps/core/services/equipe_gerencia.py",
+    "apps/core/services/equipe_gerencia_import.py",
+    "apps/core/services/export_contract_importer.py",
+)
 
 
 @dataclass(frozen=True)
@@ -240,10 +284,10 @@ class MigrationLintVisitor(ast.NodeVisitor):
                     code="V003",
                     message=(
                         "Mutação de PermissaoFuncional.groups / Group.permissions em "
-                        "migration nova viola D17 (2026-05-04). Atribuição de grupos "
-                        "deve ser feita via admin UI ou management command de seed "
-                        "manual (apps/dev_tools/), não em migration versionada. "
-                        "Se o uso for legítimo (ex: backfill pós-rename), adicione "
+                        "migration nova sem marcador. Desde a D4 do ADR-020 a matriz "
+                        "Grupo × Capability muda só por PR, numa migration de dados que "
+                        "acompanha a mudança do seed (functional_permissions_seed.py). "
+                        "Sendo essa a intenção, adicione "
                         "'# noqa: RBAC-migration-allowed' na linha."
                     ),
                 )
@@ -269,6 +313,85 @@ class MigrationLintVisitor(ast.NodeVisitor):
             return False
         line = self.source_lines[lineno - 1]
         return "# noqa: RBAC-migration-allowed" in line
+
+
+class MutationLintVisitor(ast.NodeVisitor):
+    """V004 (mutação de grupo/capacidade) e V005 (criação de EquipeGerencia) fora da allowlist."""
+
+    def __init__(self, filepath: pathlib.Path, *, check_v004: bool, check_v005: bool) -> None:
+        self.filepath: pathlib.Path = filepath
+        self.check_v004: bool = check_v004
+        self.check_v005: bool = check_v005
+        self.violations: list[Violation] = []
+
+    def visit_Call(self, node: ast.Call) -> None:
+        func = node.func
+        if self.check_v004 and self._is_group_mutation(func):
+            self._add(
+                node,
+                "V004",
+                "Mutação de grupo ou capacidade (M2M ou tabela `through`) fora da allowlist. "
+                "Grupo e capacidade dão poder: use um caminho existente (superusuário, auditado) "
+                "ou, para a matriz, uma migration de dados em PR (D4). Ver V004_ALLOWLIST.",
+            )
+        if self.check_v005 and self._is_equipe_gerencia_creation(func):
+            self._add(
+                node,
+                "V005",
+                "Criação de EquipeGerencia fora de V005_ALLOWLIST. Vínculo pode dar "
+                "poder (aprovador, pacote do perfil): use os serviços de equipe_gerencia.",
+            )
+        self.generic_visit(node)
+
+    @staticmethod
+    def _is_group_mutation(func: ast.expr) -> bool:
+        """`<x>.<lado>.add|set|remove|clear(...)` ou `<x>.<lado>.through.objects.create|...(...)`."""
+        if not isinstance(func, ast.Attribute) or not isinstance(func.value, ast.Attribute):
+            return False
+        inner = func.value
+        if func.attr in M2M_MUTATION_METHODS and inner.attr in GROUP_MUTATION_ATTRS:
+            return True
+        through = inner.value
+        return (
+            func.attr in EQUIPE_GERENCIA_CREATE_METHODS
+            and inner.attr == "objects"
+            and isinstance(through, ast.Attribute)
+            and through.attr == "through"
+            and isinstance(through.value, ast.Attribute)
+            and through.value.attr in GROUP_MUTATION_ATTRS
+        )
+
+    @staticmethod
+    def _is_equipe_gerencia_creation(func: ast.expr) -> bool:
+        """`[mod.]EquipeGerencia(...)`, `[mod.]EquipeGerencia.objects.<criar>(...)` ou `<x>.equipes.<criar>(...)`.
+
+        `equipes` é o related_name dos dois FKs de EquipeGerencia (gerencia e usuario).
+        """
+        if _simple_name(func) == "EquipeGerencia":
+            return True
+        if not isinstance(func, ast.Attribute) or func.attr not in EQUIPE_GERENCIA_CREATE_METHODS:
+            return False
+        inner = func.value
+        if not isinstance(inner, ast.Attribute):
+            return False
+        return inner.attr == "equipes" or (inner.attr == "objects" and _simple_name(inner.value) == "EquipeGerencia")
+
+    def _add(self, node: ast.Call, code: str, message: str) -> None:
+        self.violations.append(Violation(filepath=str(self.filepath), lineno=node.lineno, code=code, message=message))
+
+
+def _simple_name(node: ast.expr) -> str | None:
+    """`Nome` → "Nome"; `mod.Nome` → "Nome"; outro nó → None."""
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    return None
+
+
+def _in_allowlist(path: pathlib.Path, allowlist: tuple[str, ...]) -> bool:
+    posix = path.as_posix()
+    return any(posix == rel or posix.endswith("/" + rel) for rel in allowlist)
 
 
 def _is_core_migration(path: pathlib.Path) -> bool:
@@ -322,7 +445,12 @@ def check_file(path: pathlib.Path, root: pathlib.Path) -> list[Violation]:
         migration_visitor.visit(tree)
         return migration_visitor.violations
 
-    if _is_path_whitelisted(path, root):
+    posix = path.as_posix()
+    mutation_exempt = any(s in posix for s in MUTATION_EXEMPT_PATH_SUBSTRINGS)
+    check_v004 = not mutation_exempt and not _in_allowlist(path, V004_ALLOWLIST)
+    check_v005 = not mutation_exempt and not _in_allowlist(path, V005_ALLOWLIST)
+    check_v001 = not _is_path_whitelisted(path, root)
+    if not (check_v001 or check_v004 or check_v005):
         return []
     try:
         source = path.read_text(encoding="utf-8")
@@ -332,9 +460,16 @@ def check_file(path: pathlib.Path, root: pathlib.Path) -> list[Violation]:
         tree = ast.parse(source, filename=str(path))
     except SyntaxError:
         return []
-    visitor = RBACLintVisitor(path, source.splitlines())
-    visitor.visit(tree)
-    return visitor.violations
+    violations: list[Violation] = []
+    if check_v001:
+        visitor = RBACLintVisitor(path, source.splitlines())
+        visitor.visit(tree)
+        violations.extend(visitor.violations)
+    if check_v004 or check_v005:
+        mutation_visitor = MutationLintVisitor(path, check_v004=check_v004, check_v005=check_v005)
+        mutation_visitor.visit(tree)
+        violations.extend(mutation_visitor.violations)
+    return violations
 
 
 def iter_py_files(root: pathlib.Path) -> Iterable[pathlib.Path]:

@@ -81,7 +81,7 @@ export interface SyncGroupMembersResponse {
 export interface GroupPayload {
   name: string;
   group_type_input?: 'setor' | 'funcao' | null;
-  permissao_funcional_ids?: ID[];
+  // Sem `permissao_funcional_ids`: as permissões do grupo mudam só por PR (D4, ADR-020).
 }
 
 /**

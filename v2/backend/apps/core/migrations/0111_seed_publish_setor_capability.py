@@ -70,7 +70,7 @@ def backwards(apps, schema_editor):
     if perm is not None:
         grupo = Group.objects.filter(name=GROUP_NAME).first()
         if grupo is not None:
-            perm.groups.remove(grupo)
+            perm.groups.remove(grupo)  # noqa: RBAC-migration-allowed
         perm.delete()
 
 

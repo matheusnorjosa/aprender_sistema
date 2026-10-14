@@ -25,8 +25,8 @@ def ensure_base_groups() -> int:
     Idempotente. Necessário em ambientes sem as migrations de seed RunPython
     (ex.: `pytest --no-migrations`), onde nenhuma migration cria os grupos.
     `seed_functional_permissions(assign_default_groups=True)` só cria os grupos
-    que têm capability atribuída (7 dos 18); este helper cobre os demais
-    (setores sem capability, Formador, Assistente Administrativo). Retorna a
+    que têm capability atribuída (8 dos 18); este helper cobre os demais
+    (setores sem capability, Formador). Retorna a
     quantidade de grupos criados nesta chamada.
     """
     created = 0
@@ -57,6 +57,13 @@ class FunctionalPermissionSeed:
 #   - Funções (Gerente, Coordenador, Apoio Coord): solicitações + availability
 #   - Formador: nenhuma perm (acessa só /meus-eventos via IsAuthenticated)
 # Ver v2/docs/RBAC_NAMING.md §1, §2 e §3.4 para regras vigentes.
+#
+# D4 do ADR-020 (PR A da arquitetura de permissões, 14/10/2026): `group_names` é A matriz
+# Grupo × Capability. Ela é igual à de produção (medida em 02/10/2026: DAT com
+# `view_map_metrics`; Assistente Administrativo com compras, pré-agenda e rotinas) e muda só por PR,
+# junto com a migration de dados que aplica a mudança em produção (`# noqa: RBAC-migration-allowed`;
+# a do PR A é a 0121, que grava estes quatro pares num banco montado só por `migrate`).
+# `rbac_diff --auditar` sai com exit 1 quando o banco difere daqui.
 FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
     FunctionalPermissionSeed(
         codename="approve_solicitation",
@@ -112,21 +119,21 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
         label="Administrar compras e materiais",
         description="Operações administrativas restritas sobre compras e materiais.",
         category="cadastros_administrativos",
-        group_names=("DAT", "Controle"),
+        group_names=("DAT", "Controle", "Assistente Administrativo"),
     ),
     FunctionalPermissionSeed(
         codename="operate_preagenda",
         label="Operar pré-agenda e relatórios",
         description="Pré-agenda, relatórios gerenciais e publicações operacionais.",
         category="operacao",
-        group_names=("Controle",),
+        group_names=("Controle", "Assistente Administrativo"),
     ),
     FunctionalPermissionSeed(
         codename="run_daily_operations",
         label="Executar rotinas operacionais",
         description="Imports, workflow diário e conferências.",
         category="operacao",
-        group_names=("Controle",),
+        group_names=("Controle", "Assistente Administrativo"),
     ),
     FunctionalPermissionSeed(
         codename="supervise_operations",
@@ -147,7 +154,7 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
         label="Visualizar métricas geográficas",
         description="Dashboards com distribuição por região.",
         category="dashboard",
-        group_names=("Diretoria",),
+        group_names=("Diretoria", "DAT"),
     ),
     FunctionalPermissionSeed(
         codename="edit_solicitation_as_owner_or_privileged",

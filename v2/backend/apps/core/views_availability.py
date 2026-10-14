@@ -452,8 +452,8 @@ class AvailabilityCheckManyView(APIView):
     POST /api/availability/check-many/
     Body: {"usuarios_ids": [1, 2], "inicio": "...", "fim": "...", "municipio_id": ...}
 
-    Cada item de `results` traz `ok`, `conflicts` (o que barra) e `warnings` (o que só
-    avisa: limite diário, RD-05). Aviso não muda `ok`.
+    Cada item de `results` traz `ok`, `conflicts` (o que barra) e `warnings`, que fica no
+    contrato (o assistente lê) mas vem vazio: o limite diário (M) saiu em 05/10/2026.
     """
 
     # Issue #1222 (Epic 1 RBAC Access Policy Realignment): semântica correta

@@ -15,7 +15,7 @@ errada e o formador podia ser alocado em dois eventos simultâneos.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from django.db import connection
 
@@ -40,12 +40,11 @@ _LOCK_NAMESPACE = 1452
 
 @dataclass
 class ParticipantConflicts:
-    """Conflitos (barram) e avisos (não barram) de um participante específico."""
+    """Conflitos de um participante específico."""
 
     usuario_id: int
     usuario_nome: str
     conflicts: list[Conflict]
-    warnings: list[Conflict] = field(default_factory=list)
 
 
 @dataclass
@@ -53,19 +52,16 @@ class GuardResult:
     """
     Resultado da checagem de todos os participantes de uma solicitação.
 
-    ok: True se nenhum participante tem conflito (aviso não conta)
+    ok: True se nenhum participante tem conflito
     blocked: participantes com conflito (vazio se ok)
     skipped_guests: e-mails de convidados externos que não puderam ser checados
     checked_usuario_ids: ids efetivamente checados (já deduplicados)
-    warnings: participantes com aviso, bloqueados ou não. Nunca muda `ok`. Hoje fica
-        vazio: o motor não emite aviso desde 05/10/2026 (o M saiu).
     """
 
     ok: bool
     blocked: list[ParticipantConflicts]
     skipped_guests: list[str]
     checked_usuario_ids: list[int]
-    warnings: list[ParticipantConflicts] = field(default_factory=list)
 
 
 def _display_name(usuario: Usuario) -> str:
@@ -97,7 +93,7 @@ def collect_participants(solicitacao: Solicitacao) -> tuple[list[Usuario], list[
     )
 
     # Dedup por id é obrigatório: o responsável que acompanha pode também estar em
-    # formador_ids. Sem dedup as horas dele contariam 2x no RD-05.
+    # formador_ids. Sem dedup a mesma pessoa seria checada (e listada como bloqueada) 2x.
     usuarios_by_id: dict[int, Usuario] = {}
     skipped_guests: list[str] = []
 
@@ -150,15 +146,14 @@ def check_solicitacao_availability(solicitacao: Solicitacao, *, lock: bool = Tru
     evento já gravado conflitaria consigo mesmo. A exclusão acontece na origem da query e
     não como filtro por `ref_id` depois.
 
-    Só `conflicts` (X, T, P, D) bloqueia. `warnings` é repassado por pessoa, sem bloquear;
-    hoje vem vazio (o limite diário M saiu em 05/10/2026).
+    Só `conflicts` (X, T, P, D) bloqueia; o limite diário (M) saiu em 05/10/2026.
 
     Args:
         solicitacao: evento já gravado (precisa de pk, inicio, fim)
         lock: trava os participantes antes de ler. False só para leitura consultiva.
 
     Returns:
-        GuardResult com ok/blocked/skipped_guests/warnings
+        GuardResult com ok/blocked/skipped_guests
     """
     usuarios, skipped_guests = collect_participants(solicitacao)
 
@@ -166,7 +161,6 @@ def check_solicitacao_availability(solicitacao: Solicitacao, *, lock: bool = Tru
         lock_participants([u.id for u in usuarios])
 
     blocked: list[ParticipantConflicts] = []
-    warned: list[ParticipantConflicts] = []
     for usuario in usuarios:
         result = check_conflicts_uncached(
             usuario=usuario,
@@ -175,25 +169,20 @@ def check_solicitacao_availability(solicitacao: Solicitacao, *, lock: bool = Tru
             municipio=solicitacao.municipio,
             exclude_solicitacao_id=solicitacao.pk,
         )
-        if result.ok and not result.warnings:
-            continue
-        participante = ParticipantConflicts(
-            usuario_id=usuario.id,
-            usuario_nome=_display_name(usuario),
-            conflicts=result.conflicts,
-            warnings=result.warnings,
-        )
         if not result.ok:
-            blocked.append(participante)
-        if result.warnings:
-            warned.append(participante)
+            blocked.append(
+                ParticipantConflicts(
+                    usuario_id=usuario.id,
+                    usuario_nome=_display_name(usuario),
+                    conflicts=result.conflicts,
+                )
+            )
 
     return GuardResult(
         ok=not blocked,
         blocked=blocked,
         skipped_guests=skipped_guests,
         checked_usuario_ids=[u.id for u in usuarios],
-        warnings=warned,
     )
 
 
@@ -251,9 +240,7 @@ def raise_if_blocked(guard: GuardResult, *, action: str = "create") -> None:
 
     O payload mantém `conflicts` achatado como antes do #1452 (clientes existentes leem
     essa chave) e acrescenta `blocked_participants` com a atribuição por pessoa. As chaves
-    `warnings` (achatada, de todos os participantes com aviso) e
-    `blocked_participants[].warnings` são aditivas: trazem o que foi calculado e não barra.
-    A mensagem e `conflicts` só falam do que barra.
+    `warnings` do aviso de limite diário saíram com o M (nada as produzia nem lia).
     """
     if guard.ok:
         return
@@ -264,13 +251,11 @@ def raise_if_blocked(guard: GuardResult, *, action: str = "create") -> None:
         code="availability_conflict",
         extra={
             "conflicts": [c.__dict__ for c in todos],
-            "warnings": [w.__dict__ for p in guard.warnings for w in p.warnings],
             "blocked_participants": [
                 {
                     "usuario_id": p.usuario_id,
                     "usuario_nome": p.usuario_nome,
                     "conflicts": [c.__dict__ for c in p.conflicts],
-                    "warnings": [w.__dict__ for w in p.warnings],
                 }
                 for p in guard.blocked
             ],
@@ -291,7 +276,7 @@ def enforce_solicitacao_availability(solicitacao: Solicitacao, *, action: str) -
             escolhe o verbo da mensagem de bloqueio. Não muda o que é checado nem a decisão.
 
     Returns:
-        GuardResult (ok=True) quando passa; `warnings` traz quem teve aviso (hoje, ninguém)
+        GuardResult (ok=True) quando passa
 
     Raises:
         ValidationAPIError: `availability_conflict` quando algum participante tem conflito
@@ -308,19 +293,6 @@ def enforce_solicitacao_availability(solicitacao: Solicitacao, *, action: str) -
                 "action": action,
                 "solicitacao_id": solicitacao.pk,
                 "skipped_guests": guard.skipped_guests,
-            },
-        )
-
-    if guard.warnings:
-        # Aviso não barra, mas fica registrado. Só ids, sem nome.
-        logger.info(
-            "availability_warning",
-            extra={
-                "event": "availability_warning",
-                "action": action,
-                "solicitacao_id": solicitacao.pk,
-                "warned_usuario_ids": [p.usuario_id for p in guard.warnings],
-                "codes": sorted({w.code for p in guard.warnings for w in p.warnings}),
             },
         )
 

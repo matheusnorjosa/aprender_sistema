@@ -265,8 +265,8 @@ Parâmetros da grade mensal (`MonthlyAvailabilityView.get`, `views_availability_
 ### Resposta de Conflito
 
 A chave é `ok`, não `available` (`AvailabilityCheckView.get`, `views_availability.py`).
-`conflicts` traz o que barra; `warnings` é o canal do que só avisa e não muda `ok` — hoje vem
-sempre vazio (o limite diário `M` saiu em 05/10/2026, decisão do dono).
+`conflicts` traz o que barra; `warnings` fica no contrato da checagem prévia (o assistente lê),
+mas vem sempre vazio (o limite diário `M` saiu em 05/10/2026, decisão do dono).
 No `check-many/`, cada item de `results` tem as mesmas três chaves, mais `usuario_id`:
 
 ```json
@@ -284,9 +284,10 @@ No `check-many/`, cada item de `results` tem as mesmas três chaves, mais `usuar
 }
 ```
 
-O erro 400 `availability_conflict` de criar, editar e aprovar segue o mesmo corte: `errors.conflicts`
-e a mensagem só falam do que barra; `errors.warnings` e `errors.blocked_participants[].warnings`
-são aditivas e trazem os avisos calculados na mesma checagem (hoje, nenhum).
+O erro 400 `availability_conflict` de criar, editar e aprovar traz `errors.conflicts`,
+`errors.blocked_participants[]` (`usuario_id`, `usuario_nome`, `conflicts`) e `errors.skipped_guests`;
+a mensagem só fala do que barra. As chaves `warnings` do 400 saíram em 06/10/2026 (sem o M, vinham
+sempre vazias e nenhum cliente as lia).
 
 ### Códigos de Conflito
 
@@ -296,7 +297,7 @@ são aditivas e trazem os avisos calculados na mesma checagem (hoje, nenhum).
 | T | Bloqueio total | Formador bloqueado completamente |
 | P | Bloqueio parcial | Subintervalo bloqueado |
 | D | Deslocamento | Buffer de viagem insuficiente |
-| M | Limite diário (removido) | **Não é mais emitido** desde 05/10/2026 (decisão do dono). O parâmetro `AVAILABILITY_DAILY_LIMIT_HOURS` virou o teto por evento da contagem de horas de formação (`ch_month`/`ch_year` da grade, `horas_trabalhadas` do painel de Equipe). Cliente antigo que ainda receba `M` deve tratá-lo como aviso |
+| M | Limite diário (removido) | **Não é mais emitido** desde 05/10/2026 (decisão do dono). O parâmetro `AVAILABILITY_DAILY_LIMIT_HOURS` virou o teto por evento da contagem de horas de formação (`ch_month`/`ch_year` da grade, `horas_trabalhadas` do painel de Equipe), não é bloqueio nem aviso |
 
 ### Bloqueios de Disponibilidade
 

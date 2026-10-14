@@ -24,7 +24,7 @@ vi.mock('../../../api/solicitacoes', () => ({
   updateSolicitacao: updateSolicitacaoMock,
 }));
 vi.mock('../../../api/lookup', () => ({
-  lookupMunicipios: vi.fn().mockResolvedValue([]),
+  lookupMunicipiosWithFilters: vi.fn().mockResolvedValue([]),
   lookupProjetos: vi.fn().mockResolvedValue([]),
   lookupTiposEvento: vi.fn().mockResolvedValue([]),
 }));

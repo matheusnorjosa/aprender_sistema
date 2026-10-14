@@ -153,6 +153,8 @@ export interface ProjetoPayload {
   gerencia?: ID | undefined;
   // Série/variante: fora da Nova Solicitação e do Plano Anual (Projeto.eh_serie).
   eh_serie?: boolean;
+  // Regra da compra: nome geral aceita compra de qualquer projeto da mesma gerência (Projeto.eh_nome_geral).
+  eh_nome_geral?: boolean;
 }
 
 /**

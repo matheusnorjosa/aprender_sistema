@@ -49,6 +49,8 @@ interface ProjetoRecord {
   projeto_geral_nome?: string | null;
   // Série/variante: fora da Nova Solicitação; no Plano Anual só entra se já tiver plano.
   eh_serie?: boolean;
+  // Regra da compra: nome geral aceita compra de qualquer projeto da mesma gerência.
+  eh_nome_geral?: boolean;
 }
 
 /**
@@ -62,6 +64,7 @@ interface ProjetoFormValues {
   setor?: string;
   gerencia?: ID | undefined;
   eh_serie: boolean;
+  eh_nome_geral: boolean;
 }
 
 export default function ProjetosPage(): JSX.Element {
@@ -187,6 +190,7 @@ export default function ProjetosPage(): JSX.Element {
       setor: projeto.setor,
       gerencia: projeto.gerencia ?? undefined,
       eh_serie: projeto.eh_serie ?? false,
+      eh_nome_geral: projeto.eh_nome_geral ?? false,
     });
     setModalVisible(true);
   };
@@ -265,6 +269,11 @@ export default function ProjetosPage(): JSX.Element {
           {record.eh_serie ? (
             <div>
               <Tag color="purple" style={{ marginInlineEnd: 0 }}>Série</Tag>
+            </div>
+          ) : null}
+          {record.eh_nome_geral ? (
+            <div>
+              <Tag color="gold" style={{ marginInlineEnd: 0 }}>Nome geral</Tag>
             </div>
           ) : null}
         </div>
@@ -490,6 +499,16 @@ export default function ProjetosPage(): JSX.Element {
             valuePropName="checked"
             initialValue={false}
             extra="Série ou variante de um projeto (ex.: A COR DA GENTE 3). Marcada, não aparece na Nova Solicitação; no Plano Anual só aparece se já tiver plano. Continua em Compras e no DAT."
+          >
+            <Switch checkedChildren="Sim" unCheckedChildren="Não" />
+          </Form.Item>
+
+          <Form.Item
+            name="eh_nome_geral"
+            label="Nome geral"
+            valuePropName="checked"
+            initialValue={false}
+            extra="Libera este projeto na Nova Solicitação com a compra de qualquer projeto da mesma gerência, no mesmo município. Não combina com série."
           >
             <Switch checkedChildren="Sim" unCheckedChildren="Não" />
           </Form.Item>

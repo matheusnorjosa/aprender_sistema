@@ -14,14 +14,12 @@ Valida:
 
 from __future__ import annotations
 
-from datetime import date
-
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Compra, Participation
+from apps.core.models import Participation
 from apps.core.tests.factories import (
     GroupFactory,
     MunicipioFactory,
@@ -29,6 +27,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    liberar_par,
 )
 
 
@@ -103,15 +102,7 @@ def tipo_evento():
 @pytest.fixture
 def compra_projeto_super(municipio, projeto_super):
     """Compra base para habilitar criação de solicitações no fluxo PR15."""
-    return Compra.objects.create(
-        codigo="COMP-PR15-SUPER",
-        projeto=projeto_super,
-        municipio=municipio,
-        quantidade=12,
-        data=date(2026, 1, 15),
-        uso="Teste PR15",
-        external_hash="test-solicitacao-pr15-super",
-    )
+    return liberar_par(municipio, projeto_super)
 
 
 @pytest.mark.django_db

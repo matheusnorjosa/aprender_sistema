@@ -72,12 +72,13 @@ def test_seed_functional_permissions_idempotent():
     snapshot_second = _snapshot()
 
     # Onda 1 C3 (2026-04-27): +1 `manage_internal_actions`. #1656 Feature 2:
-    # +1 `publish_setor_solicitacao`. Total: 17.
-    assert len(snapshot_first) == 17
+    # +1 `publish_setor_solicitacao`. Regra da compra (14/10/2026): +1
+    # `create_solicitation_without_purchase`. Total: 18.
+    assert len(snapshot_first) == 18
     assert snapshot_first == snapshot_second
-    assert first["permissions_created"] + first["permissions_updated"] == 17
+    assert first["permissions_created"] + first["permissions_updated"] == 18
     assert second["permissions_created"] == 0
-    assert second["permissions_updated"] == 17
+    assert second["permissions_updated"] == 18
 
 
 def test_seed_functional_permissions_has_no_default_group_links():
@@ -101,7 +102,8 @@ def test_seed_functional_permissions_can_assign_groups_in_legacy_mode():
 def test_seed_rbac_includes_functional_permissions():
     call_command("seed_rbac")
 
-    assert PermissaoFuncional.objects.count() == 17  # +manage_internal_actions +publish_setor_solicitacao
+    # +manage_internal_actions +publish_setor_solicitacao +create_solicitation_without_purchase
+    assert PermissaoFuncional.objects.count() == 18
     expected = {item.codename for item in FUNCTIONAL_PERMISSIONS_SEED}
     assert set(PermissaoFuncional.objects.values_list("codename", flat=True)) == expected
 

@@ -13,19 +13,17 @@ Testa:
 
 from __future__ import annotations
 
-from datetime import date
-
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Compra
 from apps.core.tests.factories import (
     GroupFactory,
     MunicipioFactory,
     ProjetoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    liberar_par,
 )
 
 
@@ -122,15 +120,7 @@ class TestMunicipioLookup:
         m1, m2 = sample_data["municipios"]
         p1 = sample_data["projetos"][0]
 
-        Compra.objects.create(
-            codigo="C-001",
-            projeto=p1,
-            municipio=m1,
-            quantidade=10,
-            data=date(2026, 1, 20),
-            uso="teste",
-            external_hash="lookup-municipio-1",
-        )
+        liberar_par(m1, p1)
 
         response = api_client.get("/api/lookup/municipios/?com_compra=true")
         assert response.status_code == 200
@@ -145,24 +135,8 @@ class TestMunicipioLookup:
         m1, m2 = sample_data["municipios"]
         p1, p2 = sample_data["projetos"]
 
-        Compra.objects.create(
-            codigo="C-002",
-            projeto=p1,
-            municipio=m1,
-            quantidade=5,
-            data=date(2026, 1, 21),
-            uso="teste",
-            external_hash="lookup-municipio-2",
-        )
-        Compra.objects.create(
-            codigo="C-003",
-            projeto=p2,
-            municipio=m2,
-            quantidade=7,
-            data=date(2026, 1, 22),
-            uso="teste",
-            external_hash="lookup-municipio-3",
-        )
+        liberar_par(m1, p1)
+        liberar_par(m2, p2)
 
         response = api_client.get(f"/api/lookup/municipios/?com_compra=true&projeto_id={p1.id}")
         assert response.status_code == 200
@@ -193,24 +167,8 @@ class TestProjetoLookup:
         m1, m2 = sample_data["municipios"]
         p1, p2 = sample_data["projetos"]
 
-        Compra.objects.create(
-            codigo="C-004",
-            projeto=p1,
-            municipio=m1,
-            quantidade=3,
-            data=date(2026, 1, 23),
-            uso="teste",
-            external_hash="lookup-projeto-1",
-        )
-        Compra.objects.create(
-            codigo="C-005",
-            projeto=p2,
-            municipio=m2,
-            quantidade=4,
-            data=date(2026, 1, 24),
-            uso="teste",
-            external_hash="lookup-projeto-2",
-        )
+        liberar_par(m1, p1)
+        liberar_par(m2, p2)
 
         response = api_client.get(f"/api/lookup/projetos/?com_compra=true&municipio_id={m1.id}")
         assert response.status_code == 200
@@ -321,15 +279,7 @@ class TestSolicitationValidate:
         projeto = sample_data["projetos"][0]
         tipo_evento = sample_data["tipos_evento"][0]
         formador = sample_data["usuarios"][0]
-        Compra.objects.create(
-            codigo="C-VALID-001",
-            projeto=projeto,
-            municipio=municipio,
-            quantidade=6,
-            data=date(2026, 1, 19),
-            uso="validação",
-            external_hash="lookup-validate-valid",
-        )
+        liberar_par(municipio, projeto)
 
         payload = {
             "municipio": {"id": municipio.id},
@@ -457,7 +407,7 @@ class TestSolicitationValidate:
         assert response.status_code == 200
         data = response.json()
         assert data["ok"] is False
-        assert any("sem compra registrada" in err.lower() for err in data["errors"])
+        assert any("sem compra que os libere" in err.lower() for err in data["errors"])
 
     def test_validate_aceita_com_compra_municipio_projeto(self, api_client, authenticated_user, sample_data):
         """Validação canônica deve aprovar quando existe compra para município+projeto."""
@@ -467,15 +417,7 @@ class TestSolicitationValidate:
         projeto = sample_data["projetos"][0]
         tipo_evento = sample_data["tipos_evento"][0]
 
-        Compra.objects.create(
-            codigo="C-006",
-            projeto=projeto,
-            municipio=municipio,
-            quantidade=8,
-            data=date(2026, 1, 25),
-            uso="teste",
-            external_hash="lookup-validate-1",
-        )
+        liberar_par(municipio, projeto)
 
         payload = {
             "municipio": {"id": municipio.id},

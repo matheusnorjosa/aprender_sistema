@@ -20,25 +20,25 @@ Nuances medidas:
 from __future__ import annotations
 
 import itertools
-from datetime import date, timedelta
+from datetime import timedelta
 
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Compra, EquipeGerencia, Gerencia, Participation
+from apps.core.models import EquipeGerencia, Gerencia, Participation
 from apps.core.tests.factories import (
     GroupFactory,
     MunicipioFactory,
     ProjetoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    liberar_par,
 )
 
 pytestmark = pytest.mark.django_db
 
-_HASH = itertools.count(1)
 _CPF = itertools.count(79100000001)
 
 
@@ -84,15 +84,7 @@ def tipo_evento():
 @pytest.fixture
 def projeto(municipio):
     proj = ProjetoFactory(nome="Projeto setor 1656", codigo="PS1656", fluxo="NAO_SUPER", ativo=True)
-    Compra.objects.create(
-        codigo="C-S1656",
-        projeto=proj,
-        municipio=municipio,
-        quantidade=1,
-        data=date(2026, 3, 1),
-        uso="teste",
-        external_hash=f"{next(_HASH):064d}",
-    )
+    liberar_par(municipio, proj)
     return proj
 
 

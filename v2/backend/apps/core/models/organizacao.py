@@ -481,6 +481,13 @@ class Projeto(models.Model):
             "criar o projeto e nunca altera a marca de um projeto existente."
         ),
     )
+    eh_nome_geral = models.BooleanField(
+        default=False,
+        help_text=(
+            "Nome geral: vale compra de qualquer projeto da mesma gerência (no mesmo município) para "
+            "liberar este projeto na Nova Solicitação. Não combina com série. Editável na tela Projetos."
+        ),
+    )
 
     # Issue #145: Hierarquia organizacional
     gerencia = models.ForeignKey(  # type: ignore[misc]
@@ -522,6 +529,12 @@ class Projeto(models.Model):
             models.CheckConstraint(
                 condition=models.Q(fluxo__in=["SUPER", "NAO_SUPER"]),
                 name="projeto_fluxo_valid",
+            ),
+            # Regra da compra (14/10/2026): nome geral é o projeto de evento que cobre a gerência; série
+            # é kit de coleção. As duas marcas juntas não fazem sentido.
+            models.CheckConstraint(
+                condition=~models.Q(eh_serie=True, eh_nome_geral=True),
+                name="projeto_serie_nao_e_nome_geral",
             ),
         ]
 

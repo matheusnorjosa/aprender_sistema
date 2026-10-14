@@ -18,14 +18,14 @@ responsável e ele tem `coordenador_acompanha=True` (`availability_service.ocupa
 from __future__ import annotations
 
 import itertools
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AvailabilityBlock, Compra, Participation, Solicitacao
+from apps.core.models import AvailabilityBlock, Participation, Solicitacao
 from apps.core.services.availability_service import check_conflicts, check_conflicts_uncached
 from apps.core.services.solicitacao_availability import collect_participants
 from apps.core.tests.factories import (
@@ -34,6 +34,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    liberar_par,
 )
 
 pytestmark = pytest.mark.django_db
@@ -43,7 +44,6 @@ _TZ = ZoneInfo("America/Fortaleza")
 _DIA = datetime(2031, 3, 10, tzinfo=_TZ)
 _INICIO = _DIA.replace(hour=9)
 _FIM = _DIA.replace(hour=11)
-_HASH = itertools.count(1)
 _N = itertools.count(1)
 
 
@@ -174,15 +174,7 @@ def cenario():
     projeto = ProjetoFactory(nome="Projeto Ficticio Agenda", codigo="PFAG", fluxo="NAO_SUPER", ativo=True)
     projeto_super = ProjetoFactory(nome="Projeto Ficticio Agenda Super", codigo="PFAGS", fluxo="SUPER", ativo=True)
     for p in (projeto, projeto_super):
-        Compra.objects.create(
-            codigo=f"C-AG-{p.codigo}",
-            projeto=p,
-            municipio=municipio,
-            quantidade=1,
-            data=date(2026, 3, 1),
-            uso="teste",
-            external_hash=f"{next(_HASH):064d}",
-        )
+        liberar_par(municipio, p)
     return {
         "municipio": municipio,
         "projeto": projeto,

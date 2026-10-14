@@ -45,6 +45,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    liberar_par,
 )
 
 pytestmark = pytest.mark.django_db
@@ -1017,17 +1018,7 @@ class TestSolicitacaoEditCompraEligibility:
     """
 
     def _make_compra(self, municipio, projeto):
-        from apps.core.models import Compra
-
-        return Compra.objects.create(
-            codigo=f"COMP-{uuid4().hex[:8]}",
-            projeto=projeto,
-            municipio=municipio,
-            quantidade=1,
-            data=timezone.now().date(),
-            uso="teste elegibilidade",
-            external_hash=uuid4().hex,
-        )
+        return liberar_par(municipio, projeto)
 
     def test_patch_changing_projeto_to_pair_without_compra_is_rejected(
         self, api_client, usuario_owner, solicitacao_editavel

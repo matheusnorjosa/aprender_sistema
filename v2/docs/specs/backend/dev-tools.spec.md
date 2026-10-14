@@ -1,7 +1,7 @@
 ---
 title: dev_tools — Catálogo de Seeds
 status: canonical
-last_verified: 2026-07-24
+last_verified: 2026-10-14
 sources_of_truth:
   - v2/backend/apps/dev_tools/__init__.py
   - v2/backend/apps/dev_tools/apps.py
@@ -56,7 +56,7 @@ O app é **condicional**: só entra em `INSTALLED_APPS` quando `INCLUDE_DEV_TOOL
 | Comando | O que semeia / faz |
 |---------|--------------------|
 | `seed_rbac` | Grupos e permissões mínimas. `GROUPS = SETOR_GROUPS + FUNCAO_GROUPS` (`seed_rbac.py`) = **13 setores + 5 funções = 18**; o loop de `PERMS_BY_GROUP` cria ainda o grupo legado `"Gerência"`, fora de `GROUPS`. Idempotente; é a base do RBAC. ⚠️ O docstring do próprio comando ainda diz "FUNCAO_GROUPS (4)" — desatualizado: `apps/core/constants.py` (`FUNCAO_GROUPS`) tem **5** funções desde a inclusão de `Assistente Administrativo`. |
-| `seed_e2e_users` | **13** usuários (`coord_e2e`, `super_e2e`, `controle_e2e`, `formador_e2e`, `coord_vidas`, `coord_fluir`, `coord_acerta`, `gerente_vidas`, `dat_e2e`, `super_geral`, `approver_03`, `formador_vidas`, `formador_fluir`) + grupos, **2** municípios (Salvador/BA e Fortaleza/CE, para cobrir RD-04), **2** projetos (`TESTE E2E` fluxo SUPER e `TESTE E2E NAO_SUPER` fluxo NAO_SUPER), além de `TipoEvento` e `Compra`. Vínculos `EquipeGerencia`: os coords/formadores de setor e, desde o PR B1, `super_e2e`, `super_geral` e `approver_03` como GERENTE na gerência `Super` (`SUPERINTENDENCIA`) — é o vínculo que dá o poder de aprovar. Idempotente. ⚠️ O docstring do comando (`seed_e2e_users.py`) ainda anuncia "4 usuários / 1 município / 1 projeto" — desatualizado. |
+| `seed_e2e_users` | **13** usuários (`coord_e2e`, `super_e2e`, `controle_e2e`, `formador_e2e`, `coord_vidas`, `coord_fluir`, `coord_acerta`, `gerente_vidas`, `dat_e2e`, `super_geral`, `approver_03`, `formador_vidas`, `formador_fluir`) + grupos, **2** municípios (Salvador/BA e Fortaleza/CE, para cobrir RD-04), **2** projetos (`TESTE E2E` fluxo SUPER e `TESTE E2E NAO_SUPER` fluxo NAO_SUPER), além de `TipoEvento` e das `DATCompra` que liberam os 4 pares (regra da compra, 14/10/2026), gravadas em nome da conta inativa `compras_e2e@test.com`, fora das personas, para que `cleanup_e2e_data` e os testes que apagam personas não esbarrem no `created_by` (PROTECT). Vínculos `EquipeGerencia`: os coords/formadores de setor e, desde o PR B1, `super_e2e`, `super_geral` e `approver_03` como GERENTE na gerência `Super` (`SUPERINTENDENCIA`) — é o vínculo que dá o poder de aprovar. Idempotente. ⚠️ O docstring do comando (`seed_e2e_users.py`) ainda anuncia "4 usuários / 1 município / 1 projeto" — desatualizado. |
 | `seed_frontend_contract_data` | Dados determinísticos do checklist Playwright. Roda `seed_e2e_users` e cria a matriz funcional crítica frontend↔backend (`dat_matrix`, Matrizopolis, a Compra `MATRIX-PEND-001` e o DATCompra "KIT MATRIX CONTRACT"). Para o spec "sem rolagem horizontal" (Programa C), cria também o superusuário `admin_matrix@test.com`, único perfil que abre as rotas cuja policy não tem grupo no seed, e uma linha com texto de 80+ caracteres (prefixo "Aaa", para cair na 1ª página) em cada tabela: pessoa, município (com coordenadas, para a vista Lista do Mapa), projeto, projeto geral, produto, tipo de evento, gerência inativa, grupo, solicitações pendente e aprovada, bloqueio, deslocamento, ação/coordenador/plano/cadastro/registro DAT, ação interna e notificação. Nenhuma dessas linhas aponta para Matrizopolis, `dat_matrix` ou `controle_e2e`, que o teste do seed apaga. Idempotente. |
 | `seed_gerencias` | Seed inicial de gerências (7 registros). |
 | `seed_gerentes` | Vincula gerentes ao grupo função Gerente + `EquipeGerencia.papel=GERENTE`. |
@@ -69,7 +69,7 @@ O app é **condicional**: só entra em `INSTALLED_APPS` quando `INCLUDE_DEV_TOOL
 | `migrate_rbac_groups` | Migra usuários para a estrutura RBAC atual (Setor + Função). Backfill. |
 | `backfill_is_online` | Backfill a partir da coluna G da planilha original; grava **três** campos de `Solicitacao` num só `update`: `tipo`, `is_online` e `tipo_evento` (`backfill_is_online.py`). |
 | `populate_municipio_coords` | Popula latitude/longitude de `Municipio` a partir de CSV. |
-| `cleanup_e2e_data` | Remove os dados E2E criados por `seed_e2e_users` (Playwright). Apaga os vínculos `EquipeGerencia` dos usuários E2E antes deles (FK PROTECT; `super_e2e` tem vínculo desde o PR B1). ⚠️ O passo do município falha quando o seed criou `Compra` (FK PROTECT) — defeito anterior ao PR B1, não corrigido. |
+| `cleanup_e2e_data` | Remove os dados E2E criados por `seed_e2e_users` (Playwright). Apaga os vínculos `EquipeGerencia` dos usuários E2E antes deles (FK PROTECT; `super_e2e` tem vínculo desde o PR B1). ⚠️ O passo do município falha quando há compra no município (FK PROTECT; desde 14/10/2026 as `DATCompra` do seed) — defeito anterior ao PR B1, não corrigido. |
 
 ## Contratos e invariantes
 

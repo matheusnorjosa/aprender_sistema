@@ -17,19 +17,25 @@ Fail-open (transição/dado incompleto, espelha o S1):
 from __future__ import annotations
 
 import itertools
-from datetime import date, timedelta
+from datetime import timedelta
 
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Compra, EquipeGerencia, Gerencia
-from apps.core.tests.factories import GroupFactory, MunicipioFactory, ProjetoFactory, TipoEventoFactory, UsuarioFactory
+from apps.core.models import EquipeGerencia, Gerencia
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    ProjetoFactory,
+    TipoEventoFactory,
+    UsuarioFactory,
+    liberar_par,
+)
 
 pytestmark = pytest.mark.django_db
 
-_HASH = itertools.count(1)
 _CPF = itertools.count(79300000001)
 
 
@@ -39,15 +45,7 @@ def _gerencia(nome, setor):
 
 def _projeto_com_compra(nome, codigo, setor, municipio):
     proj = ProjetoFactory(nome=nome, codigo=codigo, setor=setor, fluxo="NAO_SUPER", ativo=True)
-    Compra.objects.create(
-        codigo=f"C-{codigo}",
-        projeto=proj,
-        municipio=municipio,
-        quantidade=1,
-        data=date(2026, 3, 1),
-        uso="teste",
-        external_hash=f"{next(_HASH):064d}",
-    )
+    liberar_par(municipio, proj)
     return proj
 
 

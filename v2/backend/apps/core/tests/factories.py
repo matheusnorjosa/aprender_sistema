@@ -29,7 +29,7 @@ from django.utils import timezone
 
 import factory
 
-from apps.core.models import Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import DATCompra, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
 
 
 class GroupFactory(factory.django.DjangoModelFactory[Group]):
@@ -136,3 +136,18 @@ class SolicitacaoFactory(factory.django.DjangoModelFactory[Solicitacao]):
     inicio = factory.LazyFunction(lambda: timezone.now() + timedelta(days=1))
     fim = factory.LazyAttribute(lambda o: o.inicio + timedelta(hours=2))
     status = Solicitacao.Status.PENDENTE
+
+
+def liberar_par(municipio: Municipio, projeto: Projeto, **extra) -> DATCompra:
+    """Grava a compra que libera o par para a regra da compra (`services/compra_elegibilidade`).
+
+    `DATCompra` ativa com `quantidade=1` por padrão; `extra` sobrescreve (ex.: `ativo=False`,
+    `quantidade=0`, `ano_uso=2027`). O autor (`created_by`, obrigatório) é uma conta inativa fixa,
+    para não aparecer nas listas de pessoas dos testes.
+    """
+    autor, _ = Usuario.objects.get_or_create(
+        username="liberar_par_autor",
+        defaults={"email": "liberar_par_autor@example.invalid", "cpf": "00000000000", "is_active": False},
+    )
+    dados = {"quantidade": 1, "created_by": autor, **extra}
+    return DATCompra.objects.create(municipio=municipio, projeto=projeto, **dados)

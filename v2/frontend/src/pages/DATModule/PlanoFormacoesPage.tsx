@@ -223,6 +223,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
   // Options state
   const [municipios, setMunicipios] = useState<MunicipioOption[]>([]);
   const [projetos, setProjetos] = useState<ProjetoOption[]>([]);
+  const [projetosComCompra, setProjetosComCompra] = useState<ProjetoOption[]>([]);
 
   const {
     data: planos,
@@ -280,12 +281,16 @@ export default function PlanoFormacoesPage(): JSX.Element {
   useEffect(() => {
     const loadOptions = async () => {
       try {
-        const [munData, projData] = await Promise.all([
+        // #1976: plano aponta família, não variante-por-série. O filtro da listagem é consulta e
+        // recebe todos; o modal segue a regra da compra (sem o projeto "em espera").
+        const [munData, projData, projComCompraData] = await Promise.all([
           getMunicipiosOptions(),
-          getProjetosOptions({ excludeKits: true }), // #1976: plano aponta família, não variante-por-série
+          getProjetosOptions({ excludeKits: true }),
+          getProjetosOptions({ excludeKits: true, comCompra: true }),
         ]);
         setMunicipios(munData);
         setProjetos(projData);
+        setProjetosComCompra(projComCompraData);
       } catch (error) {
         message.error(`Erro ao carregar opcoes: ${(error as Error).message}`);
       }
@@ -321,6 +326,16 @@ export default function PlanoFormacoesPage(): JSX.Element {
     form.setFieldsValue({ ano: dayjs().year() });
     setModalVisible(true);
   };
+
+  // O plano já gravado num projeto "em espera" continua mostrando o nome dele no modal (o campo
+  // fica travado na edição; a lista só esconde o projeto para quem cria plano novo).
+  const opcoesProjetoDoModal = useMemo(() => {
+    const opcoes = projetosComCompra.map((p) => ({ label: p.nome, value: p.id }));
+    if (editingPlano && !projetosComCompra.some((p) => p.id === editingPlano.projeto)) {
+      opcoes.push({ label: editingPlano.projeto_nome, value: editingPlano.projeto });
+    }
+    return opcoes;
+  }, [projetosComCompra, editingPlano]);
 
   const handleEdit = (record: PlanoFormacaoRecord) => {
     setEditingPlano(record);
@@ -973,7 +988,7 @@ export default function PlanoFormacoesPage(): JSX.Element {
                   showSearch
                   optionFilterProp="label"
                   disabled={!!editingPlano}
-                  options={projetos.map((p) => ({ label: p.nome, value: p.id }))}
+                  options={opcoesProjetoDoModal}
                 />
               </Form.Item>
             </Col>

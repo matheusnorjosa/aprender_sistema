@@ -97,9 +97,13 @@ export async function getMunicipiosOptions(): Promise<MunicipioOption[]> {
   );
 }
 
-export async function getProjetosOptions(opts?: { excludeKits?: boolean }): Promise<ProjetoOption[]> {
+export async function getProjetosOptions(opts?: { excludeKits?: boolean; comCompra?: boolean }): Promise<ProjetoOption[]> {
   // #1976: excludeKits=true traz as famílias e a série que já tem plano (Plano Anual); default traz tudo (Compras/DAT).
-  const url = opts?.excludeKits ? '/options/projetos/?exclude_kits=true' : '/options/projetos/';
+  // Regra da compra: comCompra=true esconde o projeto "em espera" (o servidor isenta quem é isento).
+  const url = buildUrl('/options/projetos/', {
+    exclude_kits: opts?.excludeKits ? 'true' : undefined,
+    com_compra: opts?.comCompra ? 'true' : undefined,
+  });
   return unwrapList(
     await fetchAPI<ProjetoOption[] | PaginatedResponse<ProjetoOption>>(url),
   );

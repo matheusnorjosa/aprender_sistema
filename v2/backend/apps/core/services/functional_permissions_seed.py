@@ -61,7 +61,8 @@ class FunctionalPermissionSeed:
 # D4 do ADR-020 (PR A da arquitetura de permissões, 14/10/2026): `group_names` é A matriz
 # Grupo × Capability. Ela é igual à de produção (medida em 02/10/2026: DAT com
 # `view_map_metrics`; Assistente Administrativo com compras, pré-agenda e rotinas) e muda só por PR,
-# junto com a migration de dados que aplica a mudança em produção (`# noqa: RBAC-migration-allowed`).
+# junto com a migration de dados que aplica a mudança em produção (`# noqa: RBAC-migration-allowed`;
+# a do PR A é a 0121, que grava estes quatro pares num banco montado só por `migrate`).
 # `rbac_diff --auditar` sai com exit 1 quando o banco difere daqui.
 FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
     FunctionalPermissionSeed(

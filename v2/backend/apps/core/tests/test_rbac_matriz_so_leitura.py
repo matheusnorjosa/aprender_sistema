@@ -14,9 +14,11 @@ PR A da arquitetura de permissões, D4 (a) do ADR-020: a matriz Grupo×Capacidad
 
 from __future__ import annotations
 
+import importlib
 import re
 from io import StringIO
 
+from django.apps import apps as django_apps
 from django.contrib.auth.models import Group
 from django.core.management import CommandError, call_command
 from django.db import connection
@@ -28,6 +30,7 @@ import pytest
 
 from apps.core.admin_site import admin_site
 from apps.core.models import Gerencia, PermissaoFuncional
+from apps.core.services.rbac_snapshot import auditoria_de_matriz
 from apps.core.tests.factories import UsuarioFactory
 
 pytestmark = pytest.mark.django_db
@@ -127,6 +130,30 @@ def test_rbac_diff_auditar_exit0_quando_banco_igual_seed():
     saida = _auditar()
 
     assert "rbac_diff --auditar: 0 divergência(s)" in saida
+
+
+# Pares que o PR A pôs no seed (matriz medida em produção em 02/10) e que nenhuma migration até a
+# 0120 grava. Num banco montado só por `migrate`, eles faltam.
+_PARES_DO_PR_A = (
+    ("Assistente Administrativo", "manage_purchases_and_materials"),
+    ("Assistente Administrativo", "operate_preagenda"),
+    ("Assistente Administrativo", "run_daily_operations"),
+    ("DAT", "view_map_metrics"),
+)
+
+
+@pytest.mark.migrations
+def test_migration_0121_leva_o_banco_das_migrations_ate_o_seed():
+    """D4: a matriz muda por PR, com a migration de dados. Sem a 0121, `migrate` + `--auditar` = exit 1."""
+    migracao = importlib.import_module("apps.core.migrations.0121_matriz_assistente_administrativo_e_dat")
+    for grupo, codename in _PARES_DO_PR_A:
+        Group.objects.get(name=grupo).permissoes_funcionais.remove(PermissaoFuncional.objects.get(codename=codename))
+    assert auditoria_de_matriz()["so_no_seed"] == sorted([list(par) for par in _PARES_DO_PR_A])
+
+    migracao.forwards(django_apps, None)
+    migracao.forwards(django_apps, None)  # reaplicar não muda nada
+
+    assert "rbac_diff --auditar: 0 divergência(s)" in _auditar()
 
 
 def test_rbac_diff_auditar_exit1_grupo_com_capacidade_a_mais():

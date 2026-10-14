@@ -17,15 +17,14 @@ NAO_SUPER (auto-aprovado) e edições que não trocam o projeto não são afetad
 
 from __future__ import annotations
 
-import itertools
-from datetime import date, timedelta
+from datetime import timedelta
 
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Compra
+from apps.core.models import DATCompra
 from apps.core.tests.factories import (
     GroupFactory,
     MunicipioFactory,
@@ -33,24 +32,15 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    liberar_par,
 )
 
 pytestmark = pytest.mark.django_db
 
-_HASH = itertools.count(1)
 
-
-def _registra_compra(municipio, projeto) -> Compra:
-    """#1738: trocar/vincular par município+projeto exige Compra registrada."""
-    return Compra.objects.create(
-        codigo=f"C-{projeto.codigo}",
-        projeto=projeto,
-        municipio=municipio,
-        quantidade=1,
-        data=date(2026, 3, 1),
-        uso="teste laundering",
-        external_hash=f"{next(_HASH):064d}",
-    )
+def _registra_compra(municipio, projeto) -> DATCompra:
+    """#1738: trocar/vincular par município+projeto exige compra que o libere (DATCompra)."""
+    return liberar_par(municipio, projeto)
 
 
 @pytest.fixture

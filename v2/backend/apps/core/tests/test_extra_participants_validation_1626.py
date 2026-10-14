@@ -16,26 +16,24 @@ malformado → 400 (nunca 500); só usuários ativos entram por id.
 
 from __future__ import annotations
 
-import itertools
-from datetime import date, timedelta
+from datetime import timedelta
 
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Compra, Participation
+from apps.core.models import Participation
 from apps.core.tests.factories import (
     GroupFactory,
     MunicipioFactory,
     ProjetoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    liberar_par,
 )
 
 pytestmark = pytest.mark.django_db
-
-_HASH = itertools.count(1)
 
 
 @pytest.fixture
@@ -59,15 +57,7 @@ def tipo_evento():
 def projeto(municipio):
     proj = ProjetoFactory(nome="Projeto 1626", codigo="P1626", fluxo="NAO_SUPER", ativo=True)
     # #1738: criar exige Compra para o par município+projeto.
-    Compra.objects.create(
-        codigo="C-1626",
-        projeto=proj,
-        municipio=municipio,
-        quantidade=1,
-        data=date(2026, 3, 1),
-        uso="teste",
-        external_hash=f"{next(_HASH):064d}",
-    )
+    liberar_par(municipio, proj)
     return proj
 
 

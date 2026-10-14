@@ -125,6 +125,7 @@ class ProjetoSerializer(serializers.ModelSerializer):
             "setor_efetivo",
             "sem_operacao",
             "eh_serie",
+            "eh_nome_geral",
             "is_test",
         ]
         # sem_operacao: autoritativo do import (#1897), sem entrada-direta → read-only.
@@ -143,6 +144,11 @@ class ProjetoSerializer(serializers.ModelSerializer):
             gerencia = attrs.get("gerencia", getattr(instance, "gerencia", None))
             if fluxo_super_fora_da_superintendencia(fluxo, gerencia):
                 raise serializers.ValidationError(MSG_FLUXO_SUPER_SO_NA_SUPERINTENDENCIA)
+        # Regra da compra: a constraint `projeto_serie_nao_e_nome_geral` vira 400, não 500.
+        instance = getattr(self, "instance", None)
+        eh_serie = attrs.get("eh_serie", getattr(instance, "eh_serie", False))
+        if eh_serie and attrs.get("eh_nome_geral", getattr(instance, "eh_nome_geral", False)):
+            raise serializers.ValidationError("Série não pode ser nome geral: desmarque uma das duas.")
         return attrs
 
 

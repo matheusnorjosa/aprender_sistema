@@ -14,9 +14,10 @@ from typing import Any, cast
 
 from rest_framework import serializers  # type: ignore[attr-defined]
 
-from apps.core.models import AuditLog, Compra, Participation, Solicitacao
+from apps.core.models import AuditLog, Participation, Solicitacao
 from apps.core.serializers.usuario import UserSlimSerializer
 from apps.core.services.avaliacao_formador import formadores_avaliaveis_ids, gerencia_pergunta
+from apps.core.services.compra_elegibilidade import isento_da_regra_da_compra, par_liberado
 
 
 class ParticipationNestedSerializer(serializers.ModelSerializer):
@@ -195,8 +196,9 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
         2. Bloqueia edição de solicitações já publicadas no Google Calendar
            (gcal_status == 'PUBLISHED') para evitar drift.
         3. Bloqueia edição de solicitações reprovadas.
-        4. Exige compra para o par município+projeto na criação e quando o VALOR de
-           município ou de projeto muda na edição (exceto superuser).
+        4. Exige compra que libere o par município+projeto (regra única em
+           `services/compra_elegibilidade`) na criação e quando o VALOR de município ou de
+           projeto muda na edição. Isentos: superuser e a capacidade de isenção.
         5. Na criação, `coordenador_acompanha` é obrigatório (decisão do dono, 05/10/2026):
            o padrão do model (False) esconderia a falta da resposta. Null o campo já recusa.
         """
@@ -244,10 +246,11 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
         # para um sem compra contornava a regra.) Compara valor, não presença da
         # chave: a tela de edição manda os dois campos em todo salvamento, e salvar
         # com o mesmo par não é reatribuição — preserva a edição de solicitações
-        # antigas cujo par não tem compra. Superuser mantém bypass explícito.
+        # antigas cujo par não tem compra. A regra (DATCompra, coleção, nome geral) e a isenção
+        # (superuser ou capacidade) moram em `compra_elegibilidade`.
         request = cast(Any, self.context.get("request"))
         user = getattr(request, "user", None)
-        if not (user and getattr(user, "is_superuser", False)):
+        if not isento_da_regra_da_compra(user):
             municipio = attrs.get("municipio", getattr(instance, "municipio", None))
             projeto = attrs.get("projeto", getattr(instance, "projeto", None))
             reatribui_par = (
@@ -256,13 +259,12 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
                 or getattr(projeto, "pk", None) != instance.projeto_id
             )
             if reatribui_par and municipio is not None and projeto is not None:
-                has_compra = Compra.objects.filter(municipio=municipio, projeto=projeto).exists()
-                if not has_compra:
+                if not par_liberado(municipio.pk, projeto):
                     raise serializers.ValidationError(
                         {
                             "municipio": (
-                                f"O município '{municipio.nome} - {municipio.uf}' não possui compra registrada "
-                                f"para o projeto '{projeto.nome}'. Registre a compra antes de vincular esse par."
+                                f"O município '{municipio.nome} - {municipio.uf}' não tem compra que libere "
+                                f"o projeto '{projeto.nome}'. Registre a compra antes de vincular esse par."
                             )
                         }
                     )

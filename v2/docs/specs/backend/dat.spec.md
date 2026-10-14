@@ -1,8 +1,8 @@
 ---
 title: Módulo DAT
 status: canonical
-last_verified: 2026-09-14
-verified_at_commit: 0dd1dcb630fdc1cf9b2b488121553e89488dde3c
+last_verified: 2026-10-14
+verified_at_commit: 120f8a89bc56ab9ae9210e55f2efbc34eb849932
 sources_of_truth:
   - v2/backend/apps/core/services/controle_acoes_import.py
   - v2/backend/apps/core/models/dat_acao.py
@@ -76,6 +76,7 @@ Roteamento: [`urls.py`](../../../backend/apps/core/urls.py). Serviço de import 
 - **Workflow de 4 etapas (`DATAcao`):** Carta → Contato → Reunião → Entrega. Cada etapa tem status `pendente|em_andamento|concluido|cancelado`. `progresso` e `etapa_atual` são derivados (primeira não concluída).
 - **Auditoria obrigatória:** todos os models gravam `created_by` (PROTECT) e `updated_by` via `perform_create`/`perform_update`; FKs para `Municipio`/`Projeto`/`ProjetoGeral` são `PROTECT` (não deletar mestre com dependentes).
 - **`projeto_geral_nome` (read-only) nos serializers de `DATAcao` e `DATCompra`** (#1932): campo derivado via `source="projeto.projeto_geral.nome"` (presente tanto no List quanto no Full — `serializers/dat_module/dat_acao.py`, `.../dat_compra.py`), para exibir a família na UI sem lookup extra.
+- **`DATCompra` libera par para criar evento (regra da compra, 14/10/2026)**: a `DATCompra` ativa com `quantidade > 0` é a lista que a regra única lê ([`services/compra_elegibilidade.py`](../../../backend/apps/core/services/compra_elegibilidade.py); detalhe em [solicitacao-approval](./solicitacao-approval.spec.md)). Gravar, desativar ou zerar uma linha pelo `DATCompraViewSet` (policy `view_compras_stats`) ou pelo import por script muda em que par quem não é isento cria evento. As pendências do painel de Compras e o Mapa ainda leem a lista legada `Compra` até o PR que a remove.
 - **Coleção = família (`ProjetoGeral`)** (decisão do dono, P1, 05/10/2026; 06/10/2026 na tela): coleção é a obra. Na tela e nas mensagens a família se chama "Coleção" (`ProjetoGeral.verbose_name`, migração 0119, sem SQL; o erro de validação do registro diz "não pertence à coleção" e a exportação CSV dos registros chama a coluna de "Coleção"); model, campos e URLs da API seguem `projeto_geral`/`projetos-gerais`. O cadastro `Colecao` e a FK `Produto.colecao`, vazios em produção, saíram (migração 0118). No `dashboard` de compras, `kpis.colecoes_diferentes` e `por_colecao` agrupam pela família do projeto da compra (`projeto__projeto_geral`); compra de projeto sem família cai em "Sem coleção".
 - **SEC-007:** export CSV de `DATRegistro` passa por `sanitize_csv_value` (anti CSV-injection) — no `@action export` de `DATRegistroViewSet` (`views/dat.py`). Não remover. (Esta cláusula **não** é a CP-08: CP-08 é `INCLUDE_DEV_TOOLS=false` em produção — ver `docs/business-rules/clausulas-petreas.md` e [dev-tools.spec](./dev-tools.spec.md).)
 - **Disciplina de import (CP / memória do projeto):** o caminho de import real é via `import_export_contract` (dry-run por padrão; `--apply` exige allowlist). Re-import cego sobrescreveria data-fixes manuais — **não importar dados reais sem dry-run verde + autorização**.

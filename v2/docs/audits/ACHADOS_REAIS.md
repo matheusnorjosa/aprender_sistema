@@ -187,6 +187,10 @@ Fechado pelo PR #2077 (branch `fix/aprovadora-escopo-superintendencia`), 2026-09
 Notas do mapa de acesso de 02/10 (branch `fix/mapa-acesso-consertos`). Não mudam o status de nenhuma
 linha da fila adjudicada; registram o que o mapa mediu e o que cada conserto fecha.
 
+- **14/10/2026 — regra única da compra (liga com `M10-08`)**: a conferência do `M10-08` (e a do salvar, a do
+  `validate` e as listas) passou a ler a `DATCompra` ativa com quantidade > 0, valendo coleção e, nos projetos
+  "nome geral", a gerência — SSOT `services/compra_elegibilidade.py`. A comparação por valor do par continua.
+  A lista legada `Compra` sai num PR próprio.
 - **Conferência de compra na edição (liga com `M10-08`)**: o conserto do `M10-08` passou a conferir a
   compra no update, mas decidia "o par foi reatribuído" pela **presença** de `municipio`/`projeto` no
   payload. A tela de edição manda os dois em todo salvamento, então editar só o horário devolvia 400

@@ -45,6 +45,7 @@ import {
   lookupProjetos,
   lookupTiposEvento,
   lookupUsuarios,
+  type LookupItem,
 } from '../../api/lookup';
 import { getMe } from '../../api/availability';
 import { computePermissions } from '../../hooks/usePermissions';
@@ -328,6 +329,12 @@ export default function NewSolicitacaoWizard(): JSX.Element {
     return results;
   }, [formData.projeto?.id, isSuperuser]);
 
+  // Regra da compra: projeto sem compra que o libere ("em espera") some da lista.
+  const lookupProjetosElegiveis = useCallback(
+    (q: string): Promise<LookupItem[]> => lookupProjetos(q, isSuperuser ? {} : { com_compra: true }),
+    [isSuperuser],
+  );
+
   // Navegação entre passos
   const next = (): void => {
     // DateTimeRange (Step 0) fica fora de Form.Item, então validateFields() não o vê.
@@ -554,9 +561,10 @@ export default function NewSolicitacaoWizard(): JSX.Element {
             label="Projeto"
             name="projeto"
             rules={[{ required: true, message: 'Por favor selecione um projeto' }]}
+            extra={isSuperuser ? undefined : 'Projetos sem compra não aparecem.'}
           >
             <ComboBox
-              lookupFunction={lookupProjetos as unknown as (query: string) => Promise<Array<{ id: ID; label: string; [key: string]: unknown }>>}
+              lookupFunction={lookupProjetosElegiveis}
               onChange={handleProjetoChange}
               value={formData.projeto as unknown as { id: ID; label: string; [key: string]: unknown } | null}
               placeholder="Busque ou selecione um projeto"
@@ -616,7 +624,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
           {!isSuperuser && formData.projeto && municipioLookupHasResults === false && (
             <Alert
               message="Sem municípios elegíveis"
-              description="Não há municípios com compra registrada para o projeto selecionado."
+              description="Não há municípios com compra que libere o projeto selecionado."
               type="warning"
               showIcon
               style={{ marginBottom: 16 }}
@@ -916,7 +924,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
         </>
       ),
     },
-  ], [formData, rangeValue, handleRangeChange, handleProjetoChange, lookupMunicipiosElegiveis, isSuperuser, municipioLookupHasResults, preview, submitConflito, me, perguntaAvaliar, formadoresAvaliaveis, handleFormadoresChange]);
+  ], [formData, rangeValue, handleRangeChange, handleProjetoChange, lookupProjetosElegiveis, lookupMunicipiosElegiveis, isSuperuser, municipioLookupHasResults, preview, submitConflito, me, perguntaAvaliar, formadoresAvaliaveis, handleFormadoresChange]);
 
   return (
     <section className="p-6 max-w-4xl mx-auto" aria-labelledby="nova-solicitacao-title">

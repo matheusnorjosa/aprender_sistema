@@ -16,14 +16,14 @@ sobreposição (X), bloqueio (T, P) e deslocamento (D).
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 from datetime import timezone as dt_timezone
 
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AvailabilityBlock, Compra, Participation, Solicitacao
+from apps.core.models import AvailabilityBlock, Participation, Solicitacao
 from apps.core.services.availability_service import check_conflicts_uncached
 from apps.core.services.config_service import bust_cfg
 from apps.core.tests.factories import (
@@ -33,6 +33,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    liberar_par,
 )
 
 pytestmark = pytest.mark.django_db
@@ -71,15 +72,7 @@ def tipo_evento():
 @pytest.fixture
 def projeto_super(municipio):
     projeto = ProjetoFactory(nome="Projeto SUPER Aviso", fluxo="SUPER")
-    Compra.objects.create(
-        codigo="COMP-AVISO",
-        projeto=projeto,
-        municipio=municipio,
-        quantidade=10,
-        data=date(2026, 1, 10),
-        uso="Fixture aviso",
-        external_hash="compra-aviso-hash",
-    )
+    liberar_par(municipio, projeto)
     return projeto
 
 

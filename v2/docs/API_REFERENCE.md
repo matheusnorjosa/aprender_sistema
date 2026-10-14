@@ -767,6 +767,15 @@ Desde 05/10/2026: `/api/lookup/projetos/` devolve `pergunta_avaliar_formador` po
 `true` sem gerência); `/api/lookup/usuarios/` aceita vários papéis em `role` separados por vírgula
 (`?role=Formador,Coordenador`, OU) e devolve `avaliavel` (função Formador sem a função Coordenador).
 
+Regra da compra (14/10/2026; SSOT `services/compra_elegibilidade.py`): `/api/lookup/municipios/?com_compra=true`
+devolve os municípios com alguma `DATCompra` ativa e com quantidade > 0; com `projeto_id`, os liberados
+para o projeto (mesmo projeto, mesma coleção ou, se o projeto é nome geral, mesma gerência; projeto
+inexistente = lista vazia). `/api/lookup/projetos/?com_compra=true` esconde o projeto "em espera";
+com `municipio_id`, só os liberados no município. `/api/options/projetos/?com_compra=true` faz o mesmo
+(Plano Anual). Os filtros não valem para quem é isento (superusuário ou a capacidade
+`create_solicitation_without_purchase`). `POST /api/solicitacoes/validate/` usa a mesma regra e devolve
+"Município e projeto sem compra que os libere para a solicitação".
+
 ---
 
 ## ❤️ Health Checks

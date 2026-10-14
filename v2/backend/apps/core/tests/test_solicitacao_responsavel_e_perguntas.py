@@ -20,7 +20,7 @@ Decisões do dono (05/10/2026):
 from __future__ import annotations
 
 import itertools
-from datetime import date, datetime
+from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -28,17 +28,16 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AuditLog, Compra, EquipeGerencia, Gerencia, Participation, Solicitacao
+from apps.core.models import AuditLog, EquipeGerencia, Gerencia, Participation, Solicitacao
 from apps.core.services.gcal.payload import build_attendees_for_solicitacao
 from apps.core.tests.conftest import get_field_errors
-from apps.core.tests.factories import MunicipioFactory, ProjetoFactory, TipoEventoFactory, UsuarioFactory
+from apps.core.tests.factories import MunicipioFactory, ProjetoFactory, TipoEventoFactory, UsuarioFactory, liberar_par
 
 pytestmark = pytest.mark.django_db
 
 _TZ = ZoneInfo("America/Fortaleza")
 _INICIO = datetime(2031, 4, 7, 9, tzinfo=_TZ)
 _FIM = datetime(2031, 4, 7, 11, tzinfo=_TZ)
-_HASH = itertools.count(1)
 _N = itertools.count(1)
 
 
@@ -69,15 +68,7 @@ def c():
         p = ProjetoFactory(
             nome=f"Projeto Ficticio {chave}", codigo=f"PF{chave[:6]}", fluxo="NAO_SUPER", gerencia=ger, setor="SetorP"
         )
-        Compra.objects.create(
-            codigo=f"C-PERG-{chave}",
-            projeto=p,
-            municipio=municipio,
-            quantidade=1,
-            data=date(2026, 3, 1),
-            uso="teste",
-            external_hash=f"{next(_HASH):064d}",
-        )
+        liberar_par(municipio, p)
         projetos[chave] = p
     return {
         "municipio": municipio,

@@ -31,7 +31,7 @@ from django.core.management.base import BaseCommand
 from django.db import IntegrityError, transaction
 
 from apps.core.constants import FUNCAO_GROUPS, SETOR_GROUPS
-from apps.core.models import Compra, EquipeGerencia, Gerencia, Municipio, Projeto, TipoEvento
+from apps.core.models import DATCompra, EquipeGerencia, Gerencia, Municipio, Projeto, TipoEvento, Usuario
 
 User = get_user_model()
 
@@ -128,17 +128,17 @@ class Command(BaseCommand):
                 continue
             self._upsert_equipe_gerencia(usuario=user_obj, gerencia=gerencia, papel=papel)
 
-        # 4b. Compras (pré-requisito para criação de solicitação: o serializer
-        # exige que exista Compra para o par (municipio, projeto)).
+        # 4b. Compras (pré-requisito para criação de solicitação: a regra da compra
+        # exige DATCompra ativa com quantidade > 0 que libere o par (municipio, projeto)).
         self.stdout.write("\n4b. Criando compras pré-requisitas...")
         pares_compra = [
-            (municipio_salvador, projeto_super, "COMP-E2E-SALV-SUPER"),
-            (municipio_salvador, projeto_nao_super, "COMP-E2E-SALV-NS"),
-            (municipio_fortaleza, projeto_super, "COMP-E2E-FORT-SUPER"),
-            (municipio_fortaleza, projeto_nao_super, "COMP-E2E-FORT-NS"),
+            (municipio_salvador, projeto_super),
+            (municipio_salvador, projeto_nao_super),
+            (municipio_fortaleza, projeto_super),
+            (municipio_fortaleza, projeto_nao_super),
         ]
-        for muni, proj, codigo in pares_compra:
-            self._upsert_compra(codigo=codigo, municipio=muni, projeto=proj)
+        for muni, proj in pares_compra:
+            self._upsert_compra(municipio=muni, projeto=proj)
 
         # 5. Resumo
         self.stdout.write("\n" + "=" * 80)
@@ -439,31 +439,30 @@ class Command(BaseCommand):
     def _upsert_compra(
         self,
         *,
-        codigo: str,
         municipio: Municipio,
         projeto: Projeto,
-    ) -> Compra:
-        """Upsert idempotente de Compra para testes E2E.
+    ) -> DATCompra:
+        """Upsert idempotente da compra que libera o par para os testes E2E.
 
-        Serializer de Solicitacao exige que exista Compra para o par
-        (municipio, projeto). Este helper garante a pré-condição em dev.
+        A regra da compra (`services/compra_elegibilidade`) só deixa criar solicitação em par
+        (municipio, projeto) com DATCompra ativa e quantidade > 0. Este helper garante a
+        pré-condição em dev.
+
+        O autor (`created_by`, PROTECT) é uma conta inativa própria, fora das personas: assim
+        `cleanup_e2e_data` e os testes que apagam personas não esbarram na compra.
         """
-        import hashlib
-
-        external_hash = hashlib.sha256(f"e2e-{codigo}-{municipio.id}-{projeto.id}".encode()).hexdigest()
-        compra, created = Compra.objects.update_or_create(
-            external_hash=external_hash,
-            defaults={
-                "codigo": codigo,
-                "municipio": municipio,
-                "projeto": projeto,
-                "quantidade": 1,
-                "data": "2026-01-01",
-                "uso": "E2E test fixture",
-            },
+        autor, _ = Usuario.objects.get_or_create(
+            username="compras_e2e@test.com",
+            defaults={"email": "compras_e2e@test.com", "cpf": "99900000090", "is_active": False},
+        )
+        compra, created = DATCompra.objects.update_or_create(
+            municipio=municipio,
+            projeto=projeto,
+            descricao_produto="E2E test fixture",
+            defaults={"quantidade": 1, "ativo": True, "created_by": autor},
         )
         status = "✅ Criada" if created else "⏭️  Já existe"
-        self.stdout.write(f"   {status}: {codigo} ({municipio.nome} × {projeto.codigo})")
+        self.stdout.write(f"   {status}: compra E2E ({municipio.nome} × {projeto.codigo})")
         return compra
 
     def _upsert_projeto(

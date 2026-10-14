@@ -16,14 +16,14 @@ continuam barrados e o caso livre continua aprovado.
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 from datetime import timezone as dt_timezone
 
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AvailabilityBlock, Compra, Participation, Solicitacao
+from apps.core.models import AvailabilityBlock, Participation, Solicitacao
 from apps.core.services import solicitacao_availability as guard_module
 from apps.core.services.availability_service import CheckResult, Conflict
 from apps.core.services.config_service import bust_cfg
@@ -35,6 +35,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    liberar_par,
 )
 
 pytestmark = pytest.mark.django_db
@@ -78,15 +79,7 @@ def tipo_evento():
 @pytest.fixture
 def projeto_super(municipio):
     projeto = ProjetoFactory(nome="Projeto SUPER Motivo", fluxo="SUPER")
-    Compra.objects.create(
-        codigo="COMP-MOTIVO",
-        projeto=projeto,
-        municipio=municipio,
-        quantidade=10,
-        data=date(2026, 1, 10),
-        uso="Fixture motivo",
-        external_hash="compra-motivo-hash",
-    )
+    liberar_par(municipio, projeto)
     return projeto
 
 

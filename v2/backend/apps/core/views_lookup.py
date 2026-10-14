@@ -26,6 +26,11 @@ from rest_framework.views import APIView
 
 from apps.core.permissions import HasPerm
 from apps.core.rbac.helpers import filtrar_formadores_avaliaveis, user_has_any_perm
+from apps.core.services.compra_elegibilidade import (
+    isento_da_regra_da_compra,
+    municipios_liberados,
+    projetos_liberados,
+)
 from apps.core.services.normalize import norm_text
 from apps.core.services.solicitacao_scope import scope_projetos_by_setor, scope_usuarios_by_setor
 
@@ -48,8 +53,12 @@ class MunicipioLookup(APIView):
     GET /api/lookup/municipios/?q=fortaleza
 
     Query params adicionais:
-    - com_compra=true|false: filtra apenas municípios com compra registrada
-    - projeto_id=<id>: restringe municípios com compra no projeto informado
+    - com_compra=true|false: só municípios com alguma compra válida (regra única em
+      `services/compra_elegibilidade`)
+    - projeto_id=<id>: só municípios liberados para o projeto (mesmo projeto, coleção ou, se o
+      projeto é nome geral, gerência); projeto inexistente devolve lista vazia
+
+    Os filtros de compra não valem para quem é isento da regra (superuser ou a capacidade).
 
     Retorna: [{id, label, kind: "municipio"}]
     """
@@ -74,11 +83,12 @@ class MunicipioLookup(APIView):
         # dropdown de solicitação por padrão; `include_hubs=true` reexpõe (fluxo de deslocamento).
         if not include_hubs:
             qs = qs.exclude(uf="")
-        if com_compra or projeto_id is not None:
-            qs = qs.filter(compras__isnull=False)
-        if projeto_id is not None:
-            qs = qs.filter(compras__projeto_id=projeto_id)
-        qs = qs.distinct()
+        if (com_compra or projeto_id is not None) and not isento_da_regra_da_compra(request.user):
+            if projeto_id is None:
+                qs = municipios_liberados(qs, None)
+            else:
+                projeto = Projeto.objects.filter(pk=projeto_id).first()
+                qs = municipios_liberados(qs, projeto) if projeto is not None else qs.none()
 
         if not q:
             # Retornar municípios (max 100)
@@ -110,8 +120,11 @@ class ProjetoLookup(APIView):
     GET /api/lookup/projetos/?q=acerta
 
     Query params adicionais:
-    - com_compra=true|false: filtra apenas projetos com compra registrada
-    - municipio_id=<id>: restringe projetos com compra no município informado
+    - com_compra=true|false: esconde o projeto "em espera" (sem compra que o libere em município
+      nenhum; regra única em `services/compra_elegibilidade`)
+    - municipio_id=<id>: só projetos liberados no município informado
+
+    Os filtros de compra não valem para quem é isento da regra (superuser ou a capacidade).
 
     Retorna: [{id, label, kind: "projeto", fluxo, pergunta_avaliar_formador}]
 
@@ -135,10 +148,8 @@ class ProjetoLookup(APIView):
             municipio_id = None
 
         qs: QuerySet[Projeto] = Projeto.objects.filter(ativo=True).select_related("gerencia")
-        if com_compra or municipio_id is not None:
-            qs = qs.filter(compras__isnull=False)
-        if municipio_id is not None:
-            qs = qs.filter(compras__municipio_id=municipio_id)
+        if (com_compra or municipio_id is not None) and not isento_da_regra_da_compra(request.user):
+            qs = projetos_liberados(qs, municipio_id)
         # Os EVENTOS usam o nome-família (ex.: "A COR DA GENTE"); as séries ("A COR DA GENTE 3") são
         # os kits das coleções e NÃO entram no dropdown de solicitação por padrão (decisão do dono).
         # Quem diz o que é série é a marca `Projeto.eh_serie` (editável na tela Projetos), não o

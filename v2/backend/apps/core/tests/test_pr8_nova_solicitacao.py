@@ -13,15 +13,12 @@ Testa:
 
 from __future__ import annotations
 
-from datetime import date
-
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import Compra
 from apps.core.tests.factories import (
     GroupFactory,
     MunicipioFactory,
@@ -29,6 +26,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    liberar_par,
 )
 
 pytestmark = pytest.mark.django_db
@@ -170,15 +168,7 @@ class TestSolicitacaoRBAC:
         tipo_evento = TipoEventoFactory(nome="Formação")
         municipio = MunicipioFactory(nome="Fortaleza", uf="CE")
         projeto = ProjetoFactory(nome="Projeto X", fluxo="SUPER")  # SUPER=pendente
-        Compra.objects.create(
-            codigo="COMP-COORD-001",
-            projeto=projeto,
-            municipio=municipio,
-            quantidade=12,
-            data=date(2026, 1, 10),
-            uso="Teste PR8/N",
-            external_hash="pr8-coord-create",
-        )
+        liberar_par(municipio, projeto)
 
         client.force_authenticate(user=coord)
 

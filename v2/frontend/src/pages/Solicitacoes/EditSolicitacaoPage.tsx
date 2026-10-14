@@ -38,9 +38,10 @@ import timezone from 'dayjs/plugin/timezone';
 import { getSolicitacao, updateSolicitacao } from '../../api/solicitacoes';
 import { optionalText } from './optionalText';
 import {
-  lookupMunicipios,
+  lookupMunicipiosWithFilters,
   lookupProjetos,
   lookupTiposEvento,
+  type LookupItem,
 } from '../../api/lookup';
 import DateTimeRange from '../../components/DateTimeRange';
 import ComboBox from '../../components/ComboBox';
@@ -262,6 +263,19 @@ export default function EditSolicitacaoPage(): JSX.Element {
     };
   }, [formData.inicio, formData.fim]);
 
+  // Regra da compra: as listas oferecem só o que a compra libera (o projeto "em espera" some e o
+  // município segue o projeto escolhido). Quem é isento (superusuário ou a capacidade) recebe tudo
+  // do servidor. O par já gravado continua como valor, e salvar com o mesmo par segue livre.
+  const lookupProjetosElegiveis = useCallback(
+    (q: string): Promise<LookupItem[]> => lookupProjetos(q, { com_compra: true }),
+    [],
+  );
+  const projetoId = formData.projeto?.id;
+  const lookupMunicipiosElegiveis = useCallback(
+    (q: string): Promise<LookupItem[]> => lookupMunicipiosWithFilters({ q, com_compra: true, projeto_id: projetoId }),
+    [projetoId],
+  );
+
   // "Você pretende avaliar o formador?" só quando a gerência do projeto pergunta e há formador
   // avaliável na lista (mesma regra do backend, decisão do dono de 05/10/2026).
   const formadoresAvaliaveis = formData.formadores.filter(f => f.avaliavel);
@@ -480,7 +494,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
             rules={[{ required: true, message: 'Por favor selecione um projeto' }]}
           >
             <ComboBox
-              lookupFunction={lookupProjetos}
+              lookupFunction={lookupProjetosElegiveis}
               onChange={(value: ComboBoxValue | null) => setFormData({ ...formData, projeto: value })}
               value={formData.projeto as unknown as { id: ID; label: string; [key: string]: unknown } | null}
               placeholder="Busque ou selecione um projeto"
@@ -504,7 +518,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
             rules={[{ required: true, message: 'Por favor selecione um município' }]}
           >
             <ComboBox
-              lookupFunction={lookupMunicipios}
+              lookupFunction={lookupMunicipiosElegiveis}
               onChange={(value: ComboBoxValue | null) => setFormData({ ...formData, municipio: value })}
               value={formData.municipio as unknown as { id: ID; label: string; [key: string]: unknown } | null}
               placeholder="Busque ou selecione um município"

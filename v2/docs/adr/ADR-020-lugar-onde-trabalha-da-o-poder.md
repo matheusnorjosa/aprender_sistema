@@ -60,6 +60,22 @@ Os PRs 1 a 11 entram antes da liberação; o 12 e o 13, depois.
 12. Corte: o poder deixa de ler grupos.
 13. Limpeza do M2M, dos símbolos e dos grupos, 2 a 4 semanas depois do 12.
 
+**Recorte A/B (14/10/2026, decisão técnica sem mudar decisão do dono).** Os PRs 3, 4 e 6 viram
+dois PRs de código, cada um com `rbac_diff` = 0 ganhos e 0 perdas:
+
+- **PR A = 3 + 4.** `Gerencia.perfil` (migration `0120`, default `PADRAO`, fora da API; nada lê);
+  pacotes em `services/rbac_pacotes.py` (estado de produção de hoje, fora de `rbac/` para não
+  fechar ciclo de import); trava dos importadores só para o vínculo que dá poder (EQUIPE ou GERENTE
+  em gerência de pacote não vazio, mais o aprovador); lint V004/V005; matriz só leitura na tela e
+  no admin. Em vez de uma matriz congelada nova, **o seed vira a matriz**, alinhado à de produção,
+  e `rbac_diff --auditar` (checklist pós-deploy) sai com exit 1 se o banco divergir dele ou se
+  houver perfil fora de `PERFIL_PERMITIDO`. A D4 se cumpre assim: capacidade muda por migration de
+  dados no PR, com `# noqa: RBAC-migration-allowed`.
+- **PR B = 6.** Capacidades = grupos ∪ pacote, sem o setting `RBAC_FONTE` (entra no PR 12).
+- O PR 5 (dados) roda depois, por script com ensaio, mais enxuto: g19 = `ADMIN_OPERACIONAL`,
+  gerência CONTROLE e o vínculo EQUIPE da u7. A Superintendência como `APROVACAO` e a DIRETORIA
+  entram quando tiverem efeito.
+
 ## Regra para todo PR que muda poder
 
 Antes do merge, roda-se `python manage.py rbac_diff` em produção (somente leitura) e o dono vê,

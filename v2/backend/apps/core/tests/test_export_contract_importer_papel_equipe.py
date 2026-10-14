@@ -209,3 +209,50 @@ def test_usuario_existente_nao_muda_de_grupo_pela_regra_da_funcao(tmp_path):
     ExportContractImporter(path=path, apply=True, allow=("usuario",)).run()
 
     assert u.groups.count() == 0
+
+
+@pytest.mark.parametrize("com_gerencia_no_banco", [True, False], ids=["super_existe", "super_ainda_nao_existe"])
+@pytest.mark.parametrize(
+    "linhas",
+    [
+        ["Super,11144477735,EQUIPE", "Super,11144477735,GERENTE"],
+        ["Super,11144477735,GERENTE", "Super,11144477735,EQUIPE"],
+    ],
+    ids=["equipe_antes", "gerente_antes"],
+)
+def test_linha_barrada_no_vinculo_nao_da_o_grupo_da_funcao(tmp_path, linhas, com_gerencia_no_banco):
+    """A linha GERENTE na Superintendência é barrada no `equipe_gerencia` (anti-escalada, PR B1). O
+    papel dela não pode dar ao usuário novo o grupo Gerente: só a linha que o vínculo aceita conta, e o
+    EQUIPE que sobra não dá grupo. Vale também quando a gerência ainda não existe (o apply a criaria)."""
+    _seed_grupos()
+    if com_gerencia_no_banco:
+        Gerencia.objects.create(nome="SUPERINTENDENCIA", nome_setor="Super")
+    path = _export(
+        tmp_path,
+        {
+            "usuario": "nome_completo,cpf,email,cargo\nBia,11144477735,,\n",
+            "equipe_gerencia": "gerencia,usuario_cpf,papel\n" + "\n".join(linhas) + "\n",
+        },
+    )
+
+    ExportContractImporter(path=path, apply=True, allow=("usuario", "equipe_gerencia")).run()
+
+    u = Usuario.objects.get(cpf="11144477735")
+    assert u.groups.count() == 0
+    assert set(EquipeGerencia.objects.filter(usuario=u).values_list("papel", flat=True)) == {"EQUIPE"}
+
+
+def test_linha_de_funcao_sem_gerencia_nao_da_grupo(tmp_path):
+    """Linha FORMADOR com a gerência vazia: o `equipe_gerencia` a recusa, então ela não define o papel."""
+    _seed_grupos()
+    path = _export(
+        tmp_path,
+        {
+            "usuario": "nome_completo,cpf,email,cargo\nBia,11144477735,,\n",
+            "equipe_gerencia": "gerencia,usuario_cpf,papel\nControle,11144477735,EQUIPE\n,11144477735,FORMADOR\n",
+        },
+    )
+
+    ExportContractImporter(path=path, apply=True, allow=("usuario",)).run()
+
+    assert Usuario.objects.get(cpf="11144477735").groups.count() == 0

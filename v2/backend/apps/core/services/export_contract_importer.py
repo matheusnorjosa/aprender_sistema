@@ -2322,12 +2322,23 @@ class ExportContractImporter:
 
         Pessoa em varias linhas: o papel de funcao (GERENTE/COORDENADOR/APOIO/FORMADOR) vence EQUIPE, em
         qualquer ordem; EQUIPE so vale quando e o unico papel. Entre duas funcoes diferentes vale a 1a
-        linha (sem regra de precedencia entre funcoes)."""
+        linha (sem regra de precedencia entre funcoes). So conta a linha que o `equipe_gerencia` aceita:
+        a sem gerencia, com papel fora do dominio ou com o vinculo aprovador (PR B1, anti-escalada) nao da
+        papel, senao o grupo de funcao nasceria de uma linha barrada."""
         idx: dict[str, str] = {}
         for r in self._load("equipe_gerencia"):
             cpf = normalize_cpf_digits(r.get("usuario_cpf") or "")
+            setor = (r.get("gerencia") or r.get("setor") or "").strip()
             papel = _resolve_papel(r.get("papel"))
-            if len(cpf) == 11 and papel and idx.get(cpf, EquipeGerencia.PAPEL_EQUIPE) == EquipeGerencia.PAPEL_EQUIPE:
+            if len(cpf) != 11 or not setor or papel not in _EQUIPE_PAPEIS:
+                continue
+            # A gerencia que o apply criaria se faltar (`_get_or_create_gerencia`), sem cria-la aqui.
+            ger = self._resolve_gerencia_readonly(setor) or Gerencia(
+                nome=_generate_gerencia_nome(SETOR_MAPPING.get(setor, setor))
+            )
+            if is_vinculo_aprovador(ger, papel):
+                continue
+            if idx.get(cpf, EquipeGerencia.PAPEL_EQUIPE) == EquipeGerencia.PAPEL_EQUIPE:
                 idx[cpf] = papel
         return idx
 

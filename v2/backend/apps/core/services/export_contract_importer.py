@@ -497,6 +497,17 @@ def _dat_cadastro_ano(r: dict[str, str]) -> int | None:
     return None
 
 
+# Marca, no mapa de anos do arquivo, a linha de `ano` preenchido e ilegível sem data de etapa: pode ser
+# qualquer ano, então não é "linha sem ano" e deixa ambígua a adoção do cadastro sem ano da tripla.
+_CAD_ANO_INVALIDO = 0
+
+
+def _dat_cadastro_ano_invalido(r: dict[str, str]) -> bool:
+    """Coluna `ano` preenchida, fora da faixa (ou não numérica), e sem data de etapa que dê o ano. Ano
+    digitado errado não é ano ausente: a linha é rejeitada (`ano_invalido`) em vez de virar cadastro sem ano."""
+    return bool((r.get("ano") or "").strip()) and _dat_cadastro_ano(r) is None
+
+
 def _dat_cadastro_anos() -> dict[tuple[int, int, str], set[int | None]]:
     """(municipio_id, projeto_geral_id, plataforma) → anos dos DATCadastro existentes (None = sem ano)."""
     anos: dict[tuple[int, int, str], set[int | None]] = {}
@@ -514,7 +525,8 @@ def _dat_cadastro_existente(
 ) -> str:
     """Classifica a linha (municipio, projeto_geral, plataforma, ano) contra os anos gravados da tripla, e
     registra em `anos` o que o apply deixa gravado (classify e apply percorrem o arquivo igual). `arquivo`:
-    tripla → anos que o arquivo traz para ela (None = linha sem ano).
+    tripla → anos que o arquivo traz para ela (None = linha sem ano; `_CAD_ANO_INVALIDO` = ano ilegível, que
+    conta como outro ano).
 
     - ano já gravado → would_skip_same;
     - o banco tem SÓ o cadastro sem ano da tripla e o arquivo traz um ano só para ela → would_update: esse
@@ -1145,7 +1157,7 @@ class ExportContractImporter:
             # `repetidas_divergentes`.
             vistas_cad: dict[tuple[Any, ...], tuple[str, ...]] = {}
             divergentes_cad: list[str] = []
-            reasons_cad = {"repetida_no_arquivo": 0, "sem_ano_ambiguo": 0}
+            reasons_cad = {"repetida_no_arquivo": 0, "sem_ano_ambiguo": 0, "ano_invalido": 0}
             pg_nomes_cad = dict(ProjetoGeral.objects.values_list("id", "nome"))
             etapas = [f"etapa{i}_{c}" for i in range(1, 5) for c in ("status", "data")]
             for r in rows:
@@ -1154,6 +1166,10 @@ class ExportContractImporter:
                 plataforma = (r.get("plataforma") or "").strip().upper()
                 if mun_id is None or pg_id is None or plataforma not in ("FORMAR", "AVALIAR"):
                     tally["would_reject"] += 1
+                    continue
+                if _dat_cadastro_ano_invalido(r):
+                    tally["would_reject"] += 1
+                    reasons_cad["ano_invalido"] += 1
                     continue
                 nk = (mun_id, pg_id, plataforma, _dat_cadastro_ano(r))
                 dados = tuple((r.get(c) or "").strip() for c in etapas)
@@ -1783,7 +1799,7 @@ class ExportContractImporter:
             mun_id = mun_idx.get((_norm(r.get("municipio") or ""), (r.get("uf") or "").upper()))
             pg_id = pg_idx.get(_norm(r.get("projeto_geral") or ""))
             plataforma = (r.get("plataforma") or "").strip().upper()
-            if mun_id is None or pg_id is None or plataforma not in _CAD_ETAPAS:
+            if mun_id is None or pg_id is None or plataforma not in _CAD_ETAPAS or _dat_cadastro_ano_invalido(r):
                 continue
             ano = _dat_cadastro_ano(r)
             st = _dat_cadastro_existente(anos_db, arquivo_anos, (mun_id, pg_id, plataforma, ano))
@@ -2543,7 +2559,8 @@ class ExportContractImporter:
             plataforma = (r.get("plataforma") or "").strip().upper()
             if mun_id is None or pg_id is None or plataforma not in _CAD_ETAPAS:
                 continue
-            arquivo.setdefault((mun_id, pg_id, plataforma), set()).add(_dat_cadastro_ano(r))
+            ano = _CAD_ANO_INVALIDO if _dat_cadastro_ano_invalido(r) else _dat_cadastro_ano(r)
+            arquivo.setdefault((mun_id, pg_id, plataforma), set()).add(ano)
         return arquivo
 
     def _dat_registro_arquivo_com_ano(

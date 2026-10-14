@@ -4,7 +4,7 @@ IMP-3 do importador export-contract: `dat_cadastro` com o ano da planilha e `pro
 Decisão do dono (14/10): o cadastro DAT sem ano passa ao ano da planilha QUANDO a planilha trouxer um
 ano só para aquele cadastro; com dois anos, não mexe e reporta (`sem_ano_ambiguo`). A adoção preenche só
 o campo `ano`: etapas e demais campos ficam como estão (never-overwrite). O ano vem da coluna `ano` do
-CSV; sem ela (ou inválida), das datas de etapa como antes.
+CSV; sem ela (ou inválida), das datas de etapa como antes. Inválida e sem data → `ano_invalido` (rejeita).
 
 Produto: o classify decide só pela existência do código (`_norm_codigo` dos dois lados), sem comparar
 nome. O apply segue sem gravar produto.
@@ -136,21 +136,73 @@ def test_sem_ano_no_banco_e_um_ano_no_arquivo_adota_so_o_ano(tmp_path, base):
     assert "dat_cadastro__ano_preenchido" not in r2["applied"]
 
 
-@pytest.mark.parametrize("ano", ["26", "40000"], ids=["dois_digitos", "acima_smallint"])
-def test_ano_fora_da_faixa_sem_data_nao_adota_o_sem_ano(tmp_path, base, ano):
-    # Ano implausível não vira ano: sem data de etapa, a linha é o próprio cadastro sem ano (nada muda).
+@pytest.mark.parametrize("ano", ["26", "40000", "abc"], ids=["dois_digitos", "acima_smallint", "texto"])
+def test_ano_fora_da_faixa_sem_data_rejeita_e_nao_mexe(tmp_path, base, ano):
+    # Ano digitado errado não é ano ausente: sem data de etapa, a linha é rejeitada (`ano_invalido`).
     # Antes: '26' adotava ano=26 sem volta; '40000' passava no dry-run e quebrava o apply (smallint).
     _sem_ano(base)
     path = _write_export(tmp_path, _cad_csv(f"Cidade Cad,CE,PG Cad,FORMAR,pendente,,{ano}"))
 
     seco = _seco(path)
-    assert (seco["would_skip_same"], seco["would_update"], seco["would_create"]) == (1, 0, 0)
+    assert (seco["would_skip_same"], seco["would_update"], seco["would_create"], seco["would_reject"]) == (0, 0, 0, 1)
+    assert seco["reject_reasons"]["ano_invalido"] == 1
 
     r = _apply(path, base["actor"])
 
     assert r["applied"]["dat_cadastro"] == 0
     assert "dat_cadastro__ano_preenchido" not in r["applied"]
     assert list(DATCadastro.objects.values_list("ano", flat=True)) == [None]
+
+
+def test_ano_fora_da_faixa_sem_data_nao_cria_cadastro_sem_ano(tmp_path, base):
+    path = _write_export(tmp_path, _cad_csv("Cidade Cad,CE,PG Cad,FORMAR,pendente,,26"))
+
+    assert _seco(path)["reject_reasons"]["ano_invalido"] == 1
+    r = _apply(path, base["actor"])
+
+    assert r["applied"]["dat_cadastro"] == 0
+    assert not DATCadastro.objects.exists()
+
+
+@pytest.mark.parametrize("ordem", [("2026", "26"), ("26", "2026")], ids=["valido_antes", "invalido_antes"])
+def test_ano_invalido_ao_lado_de_ano_valido_nao_adota_nem_duplica(tmp_path, base, ordem):
+    # A linha de ano ilegível pode ser outro ano: o cadastro sem ano fica ambíguo (decide uma pessoa).
+    # Antes: ela contava como "linha sem ano" e a de 2026 criava um cadastro novo ao lado do sem ano.
+    cad = _sem_ano(base)
+    path = _write_export(tmp_path, _cad_csv(*(f"Cidade Cad,CE,PG Cad,FORMAR,pendente,,{ano}" for ano in ordem)))
+
+    seco = _seco(path)
+    assert (seco["would_update"], seco["would_create"], seco["would_skip_same"], seco["would_reject"]) == (0, 0, 0, 2)
+    assert (seco["reject_reasons"]["ano_invalido"], seco["reject_reasons"]["sem_ano_ambiguo"]) == (1, 1)
+
+    r = _apply(path, base["actor"])
+
+    assert r["applied"]["dat_cadastro"] == 0
+    assert "dat_cadastro__ano_preenchido" not in r["applied"]
+    assert DATCadastro.objects.count() == 1
+    cad.refresh_from_db()
+    assert cad.ano is None
+
+
+def test_adocao_preenche_so_o_sem_ano_da_tripla_certa(tmp_path, base):
+    # O get da adoção filtra pelos três campos da tripla: outro município, outra plataforma e outro projeto
+    # geral com cadastro sem ano não podem ser pegos (nem estourar MultipleObjectsReturned).
+    alvo = _sem_ano(base, "FORMAR")
+    _sem_ano(base, "AVALIAR")
+    outro_mun = MunicipioFactory(nome="Cidade Vizinha", uf="CE", ativo=True)
+    outro_pg = ProjetoGeral.objects.create(nome="PG Outro", usa_avaliar=True)
+    for mun, pg in ((outro_mun, base["pg"]), (base["mun"], outro_pg)):
+        DATCadastro.objects.create(
+            municipio=mun, projeto_geral=pg, plataforma="FORMAR", ano=None, created_by=base["actor"]
+        )
+    path = _write_export(tmp_path, _cad_csv("Cidade Cad,CE,PG Cad,FORMAR,pendente,,2026"))
+
+    assert _seco(path)["would_update"] == 1
+    r = _apply(path, base["actor"])
+
+    assert r["applied"]["dat_cadastro__ano_preenchido"] == 1
+    assert DATCadastro.objects.count() == 4
+    assert list(DATCadastro.objects.exclude(ano=None).values_list("pk", "ano")) == [(alvo.pk, 2026)]
 
 
 def test_linha_repetida_do_mesmo_ano_adota_uma_vez(tmp_path, base):

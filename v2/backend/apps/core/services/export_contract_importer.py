@@ -471,15 +471,36 @@ def _dat_registro_anos() -> dict[tuple[int, int, int], set[int | None]]:
     return anos
 
 
-def _dat_registro_existente(anos: dict[tuple[int, int, int], set[int | None]], nk: tuple[Any, ...]) -> str:
+def _dat_registro_flats(
+    anos: dict[tuple[int, int, int], set[int | None]],
+) -> dict[tuple[int, int, int], tuple[int | None, int | None]]:
+    """Tripla cujo único registro no banco é o SEM ano (carga flat antiga) → (aluno_qtde, professor_qtde)
+    dele. Chamar antes de `_dat_registro_existente` mexer em `anos`."""
+    return {
+        (mid, pgid, pid): (aluno, prof)
+        for mid, pgid, pid, aluno, prof in DATRegistro.objects.filter(ano__isnull=True).values_list(
+            "municipio_id", "projeto_geral_id", "projeto_id", "aluno_qtde", "professor_qtde"
+        )
+        if anos.get((mid, pgid, pid)) == {None}
+    }
+
+
+def _dat_registro_existente(
+    anos: dict[tuple[int, int, int], set[int | None]],
+    flats: dict[tuple[int, int, int], tuple[int | None, int | None]],
+    nk: tuple[Any, ...],
+    qtdes: tuple[int | None, int | None],
+) -> str:
     """Classifica a linha (municipio, projeto_geral, projeto, ano) contra os anos já gravados da tripla, e
-    registra em `anos` o que o apply deixa gravado (classify e apply percorrem o arquivo igual).
+    registra em `anos` e `flats` o que o apply deixa gravado (classify e apply percorrem o arquivo igual).
 
     - linha sem ano (CSV antigo): qualquer registro da tripla conta como existente (regra de antes);
     - ano já gravado → would_skip_same;
-    - a tripla só tem o registro SEM ano (carga flat antiga, que o split nunca dividiu) → would_update:
-      esse registro é esta linha, e o apply preenche só o ano vazio. Criar outro duplicaria as quantidades,
-      e o split, vendo o ano primário já gravado, deixaria o flat ao lado;
+    - a tripla só tinha no banco o registro SEM ano (carga flat antiga, que o split nunca dividiu) e as
+      quantidades `qtdes` da linha são as dele → would_update: esse registro é esta linha, e o apply
+      preenche só o ano vazio. Criar outro duplicaria as quantidades. Casar pela quantidade, e não pela
+      1ª linha da tripla, deixa o resultado igual em qualquer ordem do arquivo; o flat que não bate com
+      nenhuma linha fica sem ano (o classify o conta em `sem_ano_divergente`);
     - senão → would_create."""
     tripla, ano = nk[:3], nk[3]
     gravados = anos.setdefault(tripla, set())
@@ -487,7 +508,8 @@ def _dat_registro_existente(anos: dict[tuple[int, int, int], set[int | None]], n
         st = "would_skip_same" if gravados else "would_create"
     elif ano in gravados:
         st = "would_skip_same"
-    elif gravados == {None}:
+    elif tripla in flats and flats[tripla] == qtdes:
+        del flats[tripla]  # o flat é desta linha; outro ano da tripla vira registro novo
         st = "would_update"
     else:
         st = "would_create"
@@ -905,6 +927,8 @@ class ExportContractImporter:
             mun_idx = self._municipio_index()
             pg_idx = self._projeto_geral_index()
             anos_db = _dat_registro_anos()
+            flats_db = _dat_registro_flats(anos_db)
+            triplas_com_ano: set[tuple[int, int, int]] = set()
             vazios_reg = set(
                 DATRegistro.objects.filter(aluno_qtde__isnull=True, professor_qtde__isnull=True).values_list(
                     "municipio_id", "projeto_geral_id", "projeto_id", "ano"
@@ -941,12 +965,18 @@ class ExportContractImporter:
                         divergentes_reg.append(rotulo)
                     continue
                 vistas_reg[nk] = dados
-                st = _dat_registro_existente(anos_db, nk)
+                if ano is not None:
+                    triplas_com_ano.add((mun_id, pg_id, proj_id))
+                qtdes = (_parse_int(r.get("aluno_qtde")), _parse_int(r.get("professor_qtde")))
+                st = _dat_registro_existente(anos_db, flats_db, nk, qtdes)
                 tally[st] += 1
                 if st == "would_skip_same" and nk in vazios_reg and any(dados):
                     # O split por ano das compras cria o registro do ano sem quantidade; o create-only não o
                     # preenche. Contado à parte para a quantidade da planilha não sumir calada.
                     tally["existe_sem_quantidade"] += 1
+            # Flat antigo sem ano cuja quantidade não é a de nenhuma linha com ano da tripla: fica sem ano ao
+            # lado dos registros novos. De que ano ele é, decide uma pessoa.
+            tally["sem_ano_divergente"] = len(triplas_com_ano & flats_db.keys())
             tally["reject_reasons"] = reasons
             tally["repetidas_divergentes"] = divergentes_reg
 
@@ -2029,11 +2059,12 @@ class ExportContractImporter:
         a existência segue `_dat_registro_existente` (a mesma do classify). DATRegistro.save() recalcula
         nr_codigos + espelha usa_avaliar; nr_codigos_planilha guarda o valor cru da planilha para
         reconciliação. Única escrita em registro existente: o flat sem ano de carga antiga recebe o ano da
-        linha (seed-if-empty, só o campo `ano`). Retorna `(created, ano_preenchido)`."""
+        linha com as mesmas quantidades (seed-if-empty, só o campo `ano`). Retorna `(created, ano_preenchido)`."""
         actor = self._require_actor("dat_registro")
         mun_idx = self._municipio_index()
         pg_idx = self._projeto_geral_index()
         anos_db = _dat_registro_anos()
+        flats_db = _dat_registro_flats(anos_db)
         created = 0
         ano_preenchido = 0
         for r in rows:
@@ -2044,7 +2075,8 @@ class ExportContractImporter:
             if mun_id is None or pg_id is None or proj_id is None:
                 continue  # FK não-resolvida (aluno_qtde é opcional: registros professor-only)
             ano = _parse_int(r.get("ano"))
-            st = _dat_registro_existente(anos_db, (mun_id, pg_id, proj_id, ano))
+            qtdes = (aluno_qtde, _parse_int(r.get("professor_qtde")))
+            st = _dat_registro_existente(anos_db, flats_db, (mun_id, pg_id, proj_id, ano), qtdes)
             if st == "would_update":
                 flat = DATRegistro.objects.get(
                     municipio_id=mun_id, projeto_geral_id=pg_id, projeto_id=proj_id, ano__isnull=True

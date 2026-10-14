@@ -126,9 +126,18 @@ def test_ano_existente_pula_e_ano_novo_entra(tmp_path, base):
     assert _quantidades() == {2026: (100, 10), 2027: (300, 30)}
 
 
-def test_registro_sem_ano_de_carga_antiga_recebe_o_ano_e_nao_duplica(tmp_path, base):
-    """A carga antiga gravou a tripla sem ano (flat). A linha com ano é esse registro: o ano vazio é
-    preenchido (só o ano, nada mais) e não nasce um segundo registro com as mesmas quantidades."""
+@pytest.mark.parametrize(
+    "linhas",
+    [
+        ["Cidade Ano,CE,PG Ano,Proj Ano,100,10,2026", "Cidade Ano,CE,PG Ano,Proj Ano,300,30,2027"],
+        ["Cidade Ano,CE,PG Ano,Proj Ano,300,30,2027", "Cidade Ano,CE,PG Ano,Proj Ano,100,10,2026"],
+    ],
+    ids=["2026_antes", "2027_antes"],
+)
+def test_registro_sem_ano_de_carga_antiga_recebe_o_ano_e_nao_duplica(tmp_path, base, linhas):
+    """A carga antiga gravou a tripla sem ano (flat). A linha com ano e as mesmas quantidades é esse
+    registro: o ano vazio é preenchido (só o ano, nada mais) e não nasce um segundo registro com as
+    mesmas quantidades. A ordem das linhas no arquivo não muda o resultado."""
     flat = DATRegistro.objects.create(
         municipio=base["mun"],
         projeto_geral=base["pg"],
@@ -138,11 +147,10 @@ def test_registro_sem_ano_de_carga_antiga_recebe_o_ano_e_nao_duplica(tmp_path, b
         professor_qtde=10,
         created_by=base["actor"],
     )
-    csv = f"{REG_HEADER}\nCidade Ano,CE,PG Ano,Proj Ano,100,10,2026\nCidade Ano,CE,PG Ano,Proj Ano,300,30,2027\n"
-    path = _write_export(tmp_path, {"dat_registro": csv})
+    path = _write_export(tmp_path, {"dat_registro": REG_HEADER + "\n" + "\n".join(linhas) + "\n"})
 
     seco = _seco(path)
-    assert (seco["would_create"], seco["would_update"]) == (1, 1)
+    assert (seco["would_create"], seco["would_update"], seco["sem_ano_divergente"]) == (1, 1, 0)
 
     r = _apply(path, base["actor"])
 
@@ -151,6 +159,47 @@ def test_registro_sem_ano_de_carga_antiga_recebe_o_ano_e_nao_duplica(tmp_path, b
     flat.refresh_from_db()
     assert flat.ano == 2026
     assert _quantidades() == {2026: (100, 10), 2027: (300, 30)}
+
+
+def test_registro_sem_ano_com_quantidade_de_nenhuma_linha_fica_como_esta(tmp_path, base):
+    """O flat antigo não bate com a quantidade de nenhuma linha: não se sabe de que ano ele é. Nenhuma
+    linha o assume (a quantidade dela não se perde), ele fica sem ano e o dry-run o conta em
+    `sem_ano_divergente` para uma pessoa decidir."""
+    DATRegistro.objects.create(
+        municipio=base["mun"],
+        projeto_geral=base["pg"],
+        projeto=base["proj"],
+        ano=None,
+        aluno_qtde=100,
+        professor_qtde=10,
+        created_by=base["actor"],
+    )
+    csv = f"{REG_HEADER}\nCidade Ano,CE,PG Ano,Proj Ano,300,30,2027\nCidade Ano,CE,PG Ano,Proj Ano,80,8,2026\n"
+    path = _write_export(tmp_path, {"dat_registro": csv})
+
+    seco = _seco(path)
+    assert (seco["would_create"], seco["would_update"], seco["sem_ano_divergente"]) == (2, 0, 1)
+
+    r = _apply(path, base["actor"])
+
+    assert r["applied"]["dat_registro"] == 2
+    assert "dat_registro__ano_preenchido" not in r["applied"]
+    assert _quantidades() == {None: (100, 10), 2026: (80, 8), 2027: (300, 30)}
+
+
+def test_registro_sem_ano_criado_na_mesma_carga_nao_recebe_ano(tmp_path, base):
+    """Só o flat que já estava no banco pode receber o ano. O que a linha sem ano do próprio arquivo
+    acabou de criar não é carga antiga: a linha com ano ao lado vira registro dela."""
+    csv = f"{REG_HEADER}\nCidade Ano,CE,PG Ano,Proj Ano,50,5,\nCidade Ano,CE,PG Ano,Proj Ano,300,30,2027\n"
+    path = _write_export(tmp_path, {"dat_registro": csv})
+
+    seco = _seco(path)
+    assert (seco["would_create"], seco["would_update"]) == (2, 0)
+
+    r = _apply(path, base["actor"])
+
+    assert r["applied"]["dat_registro"] == 2
+    assert _quantidades() == {None: (50, 5), 2027: (300, 30)}
 
 
 def test_split_das_compras_nao_desfaz_o_ano_da_planilha(tmp_path, base):

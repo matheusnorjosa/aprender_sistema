@@ -1,7 +1,7 @@
 ---
 title: Clientes de API (Fetch)
 status: canonical
-last_verified: 2026-09-29
+last_verified: 2026-10-14
 sources_of_truth:
   - v2/frontend/src/api/config.ts
   - v2/frontend/src/api/auth.ts
@@ -80,7 +80,8 @@ Wrapper publico exportado por `config.ts`:
 2. **Mutacao (POST/PUT/PATCH/DELETE)**: `fetchAPI` chama `ensureCsrfToken()` -> injeta `X-CSRFToken` -> envia. Se backend responder `403 + "CSRF"`: limpa cache, busca token fresco e retenta 1x; se ainda falhar, propaga `Error`.
 3. **Login**: `auth.login()` -> `POST /auth/login/` -> sucesso -> `clearCsrfCache()` (Django rotacionou o token) de forma que a proxima mutacao busca token novo.
 4. **Bootstrap**: no carregamento do app, `initCsrfToken()` pre-aquece o token para evitar race no primeiro submit.
-5. **Download de arquivo**: `fetchBlob('/dat/compras/export/')` retorna `Blob`; o caller cria `URL.createObjectURL`. Falha lanca `Error('Export failed: HTTP <status>')`; sem rede, `TypeError('Sem conexão com o servidor.')`.
+5. **Regra da compra nas listas (14/10/2026)**: `lookupProjetos(q, params)` aceita `{ com_compra }` sem mudar a assinatura de `q` (o `ComboBox` chama só com `q`); `lookupMunicipiosWithFilters({ q, com_compra, projeto_id })`; `getProjetosOptions({ excludeKits, comCompra })` monta `/options/projetos/` com `buildUrl`. O servidor isenta quem é isento.
+6. **Download de arquivo**: `fetchBlob('/dat/compras/export/')` retorna `Blob`; o caller cria `URL.createObjectURL`. Falha lanca `Error('Export failed: HTTP <status>')`; sem rede, `TypeError('Sem conexão com o servidor.')`.
 
 ## Decisoes relacionadas (ADRs)
 

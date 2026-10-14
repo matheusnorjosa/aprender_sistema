@@ -211,6 +211,24 @@ def test_usuario_so_em_gerencia_nao_resolvida_nasce_sem_grupo(tmp_path, rotulo, 
     assert Usuario.objects.get(cpf=_CPF).groups.count() == 0
 
 
+def test_usuario_so_em_outros_nasce_sem_grupo_mesmo_com_outros_ativa_no_catalogo(tmp_path):
+    """Linha 93 pelo motivo certo: a guarda de Outros vale no índice de papel mesmo quando há uma gerência
+    'Outros' ativa no banco (sem ela o caso cairia em gerencia_inexistente)."""
+    _seed_grupos()
+    Gerencia.objects.create(nome="GERENCIA OUTROS", nome_setor="Outros", ativo=True)
+    path = _export(
+        tmp_path,
+        {
+            "usuario": f"nome_completo,cpf,email,cargo\nPessoa Teste,{_CPF},,Coordenadores\n",
+            "equipe_gerencia": _equipe(f"Outros,{_CPF},COORDENADOR,"),
+        },
+    )
+
+    ExportContractImporter(path=path, apply=True, allow=("usuario",)).run()
+
+    assert Usuario.objects.get(cpf=_CPF).groups.count() == 0
+
+
 def test_classify_gerencia_rejeita_o_que_nao_resolve_e_nunca_cria(tmp_path, vidas):
     Gerencia.objects.create(nome="GERENCIA FECHADA", nome_setor="Fechada", ativo=False)
     csv = (

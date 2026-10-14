@@ -1,10 +1,11 @@
 /**
- * Plano Anual e a regra da compra (14/10/2026): a lista de projetos esconde o projeto "em espera"
- * (`comCompra`; o servidor isenta quem é isento). O plano já gravado num projeto em espera continua
- * mostrando o nome dele no modal de edição.
+ * Plano Anual e a regra da compra (14/10/2026): a lista de projetos do modal esconde o projeto
+ * "em espera" (`comCompra`; o servidor isenta quem é isento). O plano já gravado num projeto em
+ * espera continua mostrando o nome dele no modal de edição. O filtro da listagem é consulta e fica
+ * fora da regra: oferece todos os projetos.
  */
 import { describe, expect, test, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 
@@ -45,7 +46,16 @@ vi.mock('../../../api/datModule', () => ({
   }),
   updateFormacaoInline: vi.fn().mockResolvedValue({}),
   getMunicipiosOptions: vi.fn().mockResolvedValue([{ id: 1, nome: 'Municipio Teste' }]),
-  getProjetosOptions: vi.fn().mockResolvedValue([{ id: 2, nome: 'Projeto Com Compra' }]),
+  getProjetosOptions: vi.fn((opts?: { comCompra?: boolean }) =>
+    Promise.resolve(
+      opts?.comCompra
+        ? [{ id: 2, nome: 'Projeto Com Compra' }]
+        : [
+            { id: 2, nome: 'Projeto Com Compra' },
+            { id: 9, nome: 'Projeto Em Espera' },
+          ],
+    ),
+  ),
   getCoordenadoresOptions: vi.fn().mockResolvedValue([]),
 }));
 
@@ -68,6 +78,27 @@ describe('Plano Anual — regra da compra', () => {
     await screen.findByText('Projeto Em Espera', {}, { timeout: 15000 });
     expect(getProjetosOptions).toHaveBeenCalledWith({ excludeKits: true, comCompra: true });
   }, 20000);
+
+  test('filtro Projeto da listagem (consulta) oferece o projeto em espera', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <PlanoFormacoesPage />
+      </MemoryRouter>,
+    );
+    await screen.findByText('Projeto Em Espera', {}, { timeout: 15000 });
+    expect(getProjetosOptions).toHaveBeenCalledWith({ excludeKits: true });
+    const filtros = screen.getByRole('navigation', { name: 'Filtros de busca' });
+    const [, filtroProjeto] = within(filtros).getAllByRole('combobox');
+    await user.click(filtroProjeto);
+    await waitFor(
+      () => {
+        const opcoes = screen.getAllByTitle('Projeto Em Espera');
+        expect(opcoes.some((el) => el.classList.contains('ant-select-item-option'))).toBe(true);
+      },
+      { timeout: 5000 },
+    );
+  }, 30000);
 
   test('editar plano de projeto em espera mostra o nome do projeto no modal', async () => {
     const user = userEvent.setup();

@@ -3,9 +3,10 @@
  *
  * O AntD pinta o texto em branco (colorTextLightSolid) sobre a máscara (colorBgMask), que é
  * translúcida. A máscara padrão, rgba(0,0,0,0.45), sobre a página branca vira #8c8c8c e o
- * texto dá 3,36:1. A página branca é o pior caso (o <body> não tem fundo, nos dois temas):
- * qualquer fundo mais escuro só aumenta o contraste. O teste mede a cor que o AntD realmente
- * aplica, sobre o branco, sozinho (boot, fora do ConfigProvider) e nos dois temas do app.
+ * texto dá 3,36:1. A página branca é o pior caso (no tema claro o <body> não tem fundo; no
+ * escuro ele é #141414): qualquer fundo mais escuro só aumenta o contraste. O teste mede a cor
+ * que o AntD realmente aplica, sobre o branco, sozinho (boot, fora do ConfigProvider) e nos
+ * dois temas do app.
  */
 import { render, screen } from '@testing-library/react';
 import { ConfigProvider, theme } from 'antd';

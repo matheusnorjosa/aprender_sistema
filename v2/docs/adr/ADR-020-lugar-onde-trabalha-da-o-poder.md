@@ -72,6 +72,11 @@ dois PRs de código, cada um com `rbac_diff` = 0 ganhos e 0 perdas:
   houver perfil fora de `PERFIL_PERMITIDO`. A D4 se cumpre assim: capacidade muda por migration de
   dados no PR, com `# noqa: RBAC-migration-allowed`.
 - **PR B = 6.** Capacidades = grupos ∪ pacote, sem o setting `RBAC_FONTE` (entra no PR 12).
+  Implementado em `rbac_permissions.capacidades_sem_cache`, a função única que a API (por trás do
+  cache) e o `rbac_diff` usam: pacote de cada vínculo vigente EQUIPE/GERENTE em gerência com perfil
+  ≠ `PADRAO`, sem olhar `Gerencia.ativo`. O cache cai depois do commit quando o vínculo ou a
+  gerência é gravado. Com toda gerência `PADRAO`, o pacote é vazio e o `rbac_diff` dá 0/0; a volta
+  rápida depois do PR 5 é o dado (perfil de volta a `PADRAO`, que já derruba o cache pelo sinal).
 - O PR 5 (dados) roda depois, por script com ensaio, mais enxuto: g19 = `ADMIN_OPERACIONAL`,
   gerência CONTROLE e o vínculo EQUIPE da u7. A Superintendência como `APROVACAO` e a DIRETORIA
   entram quando tiverem efeito.

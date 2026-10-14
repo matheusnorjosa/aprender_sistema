@@ -165,19 +165,26 @@ class TestSnapshot:
             assert simulado[campo] == hoje[campo], campo
 
     def test_capacidades_de_hoje_igual_a_fonte_da_api(self):
-        # Trava de paridade: se a fórmula de `get_user_functional_permissions` mudar (PR 6, PR 11)
+        # Trava de paridade: se a fórmula de `get_user_functional_permissions` mudar (PR 11)
         # e o padrão do simulador não, o `--comparar` pós-deploy mostraria o poder antigo.
+        # Desde o PR B as duas chamam `capacidades_sem_cache` (grupos ∪ pacote do perfil).
         vidas = _gerencia_real("GERENCIA 2", "Vidas")
+        dat = _gerencia_real("GERENCIA DAT", "DAT")
+        dat.perfil = Gerencia.Perfil.ADMIN_OPERACIONAL
+        dat.save()
         com_grupo = UsuarioFactory(groups=["DAT", "Coordenador"])
         sem_grupo = UsuarioFactory()
         com_vinculo = UsuarioFactory(groups=["Formador"])
+        com_pacote = UsuarioFactory()
         _vincula(com_vinculo, vidas, "FORMADOR")
         _vincula(sem_grupo, vidas, "EQUIPE")
+        _vincula(com_pacote, dat, "EQUIPE")
 
-        for u in (com_grupo, sem_grupo, com_vinculo):
+        for u in (com_grupo, sem_grupo, com_vinculo, com_pacote):
             cache.clear()
             assert capacidades_de_hoje(u) == get_user_functional_permissions(u), u.id
         assert capacidades_de_hoje(com_grupo)
+        assert capacidades_de_hoje(com_pacote)
 
 
 class TestDiff:

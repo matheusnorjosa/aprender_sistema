@@ -2241,13 +2241,17 @@ class ExportContractImporter:
         return reconciled
 
     def _papel_index_from_equipe(self) -> dict[str, str]:
-        """Mapa cpf(11 dig) -> papel canonico, de equipe_gerencia.csv (fonte primaria do papel)."""
+        """Mapa cpf(11 dig) -> papel canonico, de equipe_gerencia.csv (fonte primaria do papel).
+
+        Pessoa em varias linhas: o papel de funcao (GERENTE/COORDENADOR/APOIO/FORMADOR) vence EQUIPE, em
+        qualquer ordem; EQUIPE so vale quando e o unico papel. Entre duas funcoes diferentes vale a 1a
+        linha (sem regra de precedencia entre funcoes)."""
         idx: dict[str, str] = {}
         for r in self._load("equipe_gerencia"):
             cpf = normalize_cpf_digits(r.get("usuario_cpf") or "")
             papel = _resolve_papel(r.get("papel"))
-            if len(cpf) == 11 and papel:
-                idx.setdefault(cpf, papel)
+            if len(cpf) == 11 and papel and idx.get(cpf, EquipeGerencia.PAPEL_EQUIPE) == EquipeGerencia.PAPEL_EQUIPE:
+                idx[cpf] = papel
         return idx
 
     def _apply_usuario(self, rows: list[dict[str, Any]]) -> int:

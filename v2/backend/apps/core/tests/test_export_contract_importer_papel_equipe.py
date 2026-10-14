@@ -152,3 +152,60 @@ def test_usuario_so_com_equipe_nasce_sem_grupo_mesmo_com_cargo(tmp_path):
     ExportContractImporter(path=path, apply=True, allow=("usuario",)).run()
 
     assert Usuario.objects.get(cpf="11144477735").groups.count() == 0
+
+
+@pytest.mark.parametrize(
+    "linhas",
+    [
+        ["Controle,11144477735,EQUIPE", "Vidas,11144477735,FORMADOR"],
+        ["Vidas,11144477735,FORMADOR", "Controle,11144477735,EQUIPE"],
+    ],
+    ids=["equipe_antes", "formador_antes"],
+)
+def test_usuario_novo_com_equipe_e_funcao_nasce_com_o_grupo_da_funcao(tmp_path, linhas):
+    """Pessoa em duas linhas, EQUIPE e FORMADOR: o papel de função vence EQUIPE nas duas ordens.
+    Antes valia a 1ª linha, e com EQUIPE primeiro a pessoa nascia sem grupo."""
+    _seed_grupos()
+    path = _export(
+        tmp_path,
+        {
+            "usuario": "nome_completo,cpf,email,cargo\nBia,11144477735,,\n",
+            "equipe_gerencia": "gerencia,usuario_cpf,papel\n" + "\n".join(linhas) + "\n",
+        },
+    )
+
+    ExportContractImporter(path=path, apply=True, allow=("usuario",)).run()
+
+    assert set(Usuario.objects.get(cpf="11144477735").groups.values_list("name", flat=True)) == {"Formador"}
+
+
+def test_usuario_novo_com_duas_funcoes_fica_com_a_primeira(tmp_path):
+    """Entre duas funções diferentes não há regra nova: vale a 1ª linha, como antes."""
+    _seed_grupos()
+    path = _export(
+        tmp_path,
+        {
+            "usuario": "nome_completo,cpf,email,cargo\nBia,11144477735,,\n",
+            "equipe_gerencia": "gerencia,usuario_cpf,papel\nVidas,11144477735,COORDENADOR\nVidas,11144477735,FORMADOR\n",
+        },
+    )
+
+    ExportContractImporter(path=path, apply=True, allow=("usuario",)).run()
+
+    assert set(Usuario.objects.get(cpf="11144477735").groups.values_list("name", flat=True)) == {"Coordenador"}
+
+
+def test_usuario_existente_nao_muda_de_grupo_pela_regra_da_funcao(tmp_path):
+    _seed_grupos()
+    u = UsuarioFactory(cpf="11144477735")
+    path = _export(
+        tmp_path,
+        {
+            "usuario": "nome_completo,cpf,email,cargo\nBia,11144477735,,\n",
+            "equipe_gerencia": "gerencia,usuario_cpf,papel\nControle,11144477735,EQUIPE\nVidas,11144477735,FORMADOR\n",
+        },
+    )
+
+    ExportContractImporter(path=path, apply=True, allow=("usuario",)).run()
+
+    assert u.groups.count() == 0

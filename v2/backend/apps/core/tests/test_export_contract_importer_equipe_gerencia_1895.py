@@ -2,7 +2,7 @@
 #1895 — handler export-contract de `equipe_gerencia` (classify + apply).
 
 Primeiro NOT_IMPLEMENTED do dry-run v15. Reusa os helpers do serviço de upload existente
-(`equipe_gerencia_import`: _get_or_create_gerencia / _resolve_usuario / _resolve_papel).
+(`equipe_gerencia_import`: _resolve_gerencia / _resolve_usuario / _resolve_papel; nunca cria gerência, IMP-1).
 Contrato:
 - classify: conta would_create/would_skip por NK (gerencia, usuario, papel), FK não-resolvida = reject;
 - apply (create-only, --allow equipe_gerencia): cria EquipeGerencia com valid_from=hoje / valid_to=None;

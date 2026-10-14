@@ -11,7 +11,7 @@
 Fixtures sintéticos, sem dado pessoal.
 """
 
-# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportOptionalMemberAccess=false
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportOptionalMemberAccess=false, reportPrivateUsage=false
 
 from __future__ import annotations
 
@@ -328,3 +328,88 @@ def test_saida_em_texto_mostra_skip_reasons_e_rekey_contraditorio(tmp_path, mast
     assert "skip_reasons={'evento_passado_novo': 1}" in texto
     assert "skip_reasons={'evento_existente': 1}" in texto
     assert "rekey_contraditorio=1" in texto
+
+
+# ---------- (d) dry-run coerente com o apply: casos de borda ----------
+_HOJE_REAL = export_contract_importer._hoje  # capturado antes da fixture autouse trocar
+
+
+def _dry_e_apply(path: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    return _dry(path), _apply(path)["applied"]
+
+
+def test_dry_run_mesmo_id_novo_em_duas_linhas_re_chaveadas_nao_preve_participacao(tmp_path, masters):
+    _existente(masters, "EV000200", date(2026, 11, 21))
+    sols = [
+        _sol(evento_id="EV900200", data="2026-11-21", evento_ids_anteriores='["EV000200"]'),
+        _sol(evento_id="EV900200", data="2026-11-22", evento_ids_anteriores='["EV000200"]'),
+    ]
+    dry, applied = _dry_e_apply(_export(tmp_path, sols, [_part("EV900200")]))
+    assert dry["solicitacao"]["would_create"] == applied["solicitacao"] == 0
+    assert dry["participation"]["would_create"] == applied["participation"] == 0
+    assert _motivos(dry["participation"]) == {"evento_existente": 1}
+
+
+def test_dry_run_re_chave_seguida_do_mesmo_id_sem_antigo_nao_preve_criacao(tmp_path, masters):
+    _existente(masters, "EVA", date(2026, 11, 1))
+    sols = [_sol(evento_id="EVX", evento_ids_anteriores='["EVA"]'), _sol(evento_id="EVX")]
+    dry, applied = _dry_e_apply(_export(tmp_path, sols, [_part("EVX")]))
+    assert (dry["solicitacao"]["would_create"], dry["solicitacao"]["would_rekey"]) == (0, 1)
+    assert dry["participation"]["would_create"] == applied["participation"] == 0
+    assert applied["solicitacao__rechaveada"] == 1
+
+
+def test_dry_run_fim_antes_do_inicio_e_rejeitado_como_no_apply(tmp_path, masters):
+    sols = [_sol(evento_id="EV900300", hora_inicio="14:00", hora_fim="10:00")]
+    dry, applied = _dry_e_apply(_export(tmp_path, sols, [_part("EV900300")]))
+    assert dry["solicitacao"]["would_create"] == applied["solicitacao"] == 0
+    assert dry["solicitacao"]["would_reject"] == 1
+    assert dry["solicitacao"]["reject_reasons"] == {"fim_antes_do_inicio": 1}
+    assert dry["participation"]["would_create"] == applied["participation"] == 0
+    assert dry["participation"]["would_reject"] == 1
+
+
+def test_dry_run_coordenador_solicitante_nao_conta_como_participacao_nova(tmp_path, masters):
+    parts = [_part("EVC", cpf=_CPF_COORD, role="COORDENADOR"), _part("EVC", cpf=_CPF_FORM, role="COORDENADOR")]
+    dry, applied = _dry_e_apply(_export(tmp_path, [_sol(evento_id="EVC")], parts))
+    assert dry["participation"]["would_create"] == applied["participation"] == 1, "só o outro coordenador"
+    assert _motivos(dry["participation"]) == {"coordenador_solicitante": 1}
+
+
+def test_dry_run_re_chave_comum_nao_e_contraditoria(tmp_path, masters):
+    _existente(masters, "EV000100", date(2026, 11, 20))
+    linha = _sol(evento_id="EV900100", data="2026-11-20", evento_ids_anteriores='["EV000100"]')
+    tally = _dry(_export(tmp_path, [linha]))["solicitacao"]
+    assert (tally["would_rekey"], tally["rekey_contraditorio"]) == (1, 0)
+
+
+def test_dry_run_id_proprio_listado_como_antigo_nao_e_contraditorio(tmp_path, masters):
+    _existente(masters, "EV000100", date(2026, 11, 20))
+    linha = _sol(evento_id="EV000100", data="2026-11-20", evento_ids_anteriores='["EV000100"]')
+    assert _dry(_export(tmp_path, [linha]))["solicitacao"]["rekey_contraditorio"] == 0
+
+
+def test_dry_run_evento_de_hoje_seria_criado(tmp_path, masters):
+    tally = _dry(_export(tmp_path, [_sol(data=HOJE.isoformat())]))["solicitacao"]
+    assert tally["would_create"] == 1
+    assert _motivos(tally) == {}
+
+
+def test_dry_run_participation_sem_solicitacao_csv_usa_o_banco(tmp_path, masters):
+    _existente(masters, "EV000100", date(2026, 11, 20))
+    d = tmp_path / "so_part"
+    d.mkdir()
+    (d / "participation.csv").write_text(_csv(_PART_COLS, [_part("EV000100")]), encoding="utf-8")
+    manifest = {"entities": {"participation": {"file_csv": "participation.csv", "rows": 1}}}
+    (d / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    tally = _dry(str(d))["participation"]
+    assert _motivos(tally) == {"evento_existente": 1}
+    assert tally["would_reject"] == 0
+
+
+def test_hoje_usa_o_fuso_de_fortaleza(tmp_path, masters, monkeypatch):
+    # 23:30 de 14/10 em Fortaleza = 02:30 de 15/10 em UTC: o evento de 14/10 ainda é de hoje.
+    monkeypatch.setattr(export_contract_importer, "_hoje", _HOJE_REAL)
+    monkeypatch.setattr(timezone, "now", lambda: datetime(2026, 10, 15, 2, 30, tzinfo=ZoneInfo("UTC")))
+    r = _apply(_export(tmp_path, [_sol(data="2026-10-14")]), allow=("solicitacao",))
+    assert r["applied"]["solicitacao"] == 1

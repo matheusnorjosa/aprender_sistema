@@ -632,7 +632,7 @@ class ExportContractImporter:
         self._pidx = None
         self._dat_uso_projetos: set[str] | None = None
         # IMP-2: previsão do classify de solicitacao (para o de participation) e o que o apply criou.
-        self._sol_criaria: set[str] = set()
+        self._sol_criaria: dict[str, int] = {}  # external_hash → id do coordenador solicitante
         self._sol_existente: set[str] | None = None
         self._sol_passado_novo: set[str] = set()
         self._criadas_nesta_execucao: set[str] = set()
@@ -1235,10 +1235,13 @@ class ExportContractImporter:
             # re-chaveia (entrada contraditória); o contador só deixa visível para corrigir na planilha.
             tally["rekey_contraditorio"] = 0
             skip_reasons = {"evento_passado_novo": 0}
+            reject_reasons = {"fim_antes_do_inicio": 0}
             ids_proprios = _ids_proprios(rows)
             bloqueados = set(ids_proprios)
             hoje = _hoje()
-            self._sol_criaria = set()
+            # `atual` evolui linha a linha como o `existing` do apply (re-chave e criação nesta execução).
+            atual = set(existing)
+            self._sol_criaria = {}
             self._sol_existente = set(existing)
             self._sol_passado_novo = set()
             for r in rows:
@@ -1253,44 +1256,64 @@ class ExportContractImporter:
                     for s in (str(a).strip() for a in _parse_json_list(r.get("evento_ids_anteriores")))
                 ):
                     tally["rekey_contraditorio"] += 1
-                existe = ext_hash in existing
-                if not existe and _id_antigo_em_prod(r, existing, bloqueados) is not None:
+                existe = ext_hash in atual
+                antigo = None if existe else _id_antigo_em_prod(r, atual, bloqueados)
+                if antigo is not None:
+                    atual.discard(antigo)
+                    atual.add(ext_hash)
                     existe = True
                     tally["would_rekey"] += 1
                 if existe:
-                    self._sol_existente.add(ext_hash)
+                    if ext_hash not in self._sol_criaria:
+                        self._sol_existente.add(ext_hash)
                 elif key[3] < hoje:
                     # Evento novo no passado não nasce (fica para a virada), espelha o apply.
                     tally["would_skip_same"] += 1
                     skip_reasons["evento_passado_novo"] += 1
                     self._sol_passado_novo.add(ext_hash)
                     continue
+                elif key[5] <= key[4]:
+                    # Mesma data e fuso: fim <= inicio, o apply pula (constraint solicitacao_fim_gt_inicio).
+                    tally["would_reject"] += 1
+                    reject_reasons["fim_antes_do_inicio"] += 1
+                    continue
                 else:
-                    self._sol_criaria.add(ext_hash)
+                    self._sol_criaria[ext_hash] = key[7]
+                    atual.add(ext_hash)
                 st, _ = diff_and_classify({} if existe else None, {}, protected)
                 tally[st] += 1
                 if st == "would_create" and _to_bool(r.get("cancelado")):
                     tally["would_create_cancelada"] += 1
             tally["skip_reasons"] = skip_reasons
+            tally["reject_reasons"] = reject_reasons
 
         elif name == "participation":
             # Liga por evento_id (fallback evento_hash_natural) → solicitacao.external_hash. Papel do CSV (posição), não cargo.
             # IMP-2: espelha o apply, que só vincula a evento criado nesta execução. Usa o que o classify de
             # solicitacao (antes, por ENTITY_ORDER) previu: evento que seria criado → would_create; evento que
             # já existe (ou re-chaveado) ou passado novo → skip com motivo; o resto (órfã) → would_reject.
-            # Resolução de usuário/dedup fica para o apply.
+            # Linha COORDENADOR do próprio solicitante vira skip: o apply de solicitacao já o vinculou.
+            # O resto da resolução de usuário/dedup fica para o apply.
             existentes = self._sol_existente
             if existentes is None:  # sem solicitacao.csv: só o que já está no banco
                 existentes = set(
                     Solicitacao.objects.exclude(external_hash__isnull=True).values_list("external_hash", flat=True)
                 )
-            skip_reasons = {"evento_existente": 0, "evento_passado_novo": 0}
+            skip_reasons = {"evento_existente": 0, "evento_passado_novo": 0, "coordenador_solicitante": 0}
+            cpf_idx: dict[str, int] | None = None
             for r in rows:
                 ehash = (r.get("evento_id") or r.get("evento_hash_natural") or "").strip()
                 role = _map_participation_role(r.get("role"))
                 if not ehash or role is None:
                     tally["would_reject"] += 1
                 elif ehash in self._sol_criaria:
+                    if role == Participation.Role.COORDENADOR:
+                        cpf_idx = self._usuario_cpf_index() if cpf_idx is None else cpf_idx
+                        u = self._resolve_participante(r, cpf_idx)
+                        if u is not None and u.id == self._sol_criaria[ehash]:
+                            tally["would_skip_same"] += 1
+                            skip_reasons["coordenador_solicitante"] += 1
+                            continue
                     tally["would_create"] += 1
                 elif ehash in existentes:
                     tally["would_skip_same"] += 1

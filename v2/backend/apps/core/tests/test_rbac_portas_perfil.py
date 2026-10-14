@@ -110,6 +110,37 @@ def test_nome_de_gerencia_com_perfil_nao_muda_pela_api():
     assert g.nome == "CONTROLE PORTA"
 
 
+@pytest.mark.parametrize("nome", ["GERENCIA DAT", "CONTROLE"])
+def test_nome_de_perfil_permitido_nao_sai_da_gerencia_mesmo_com_perfil_padrao(nome):
+    """A auditoria acha a gerência pelo `nome` e a 0120 deixa todas em PADRAO: o nome é a trava."""
+    g, _ = Gerencia.objects.update_or_create(nome=nome, defaults={"nome_setor": f"Setor {nome}"})
+    assert g.perfil == Gerencia.Perfil.PADRAO
+    controle = _cliente(UsuarioFactory(groups=["Controle"]))
+
+    resp = controle.patch(f"/api/gerencias/{g.id}/", {"nome": f"{nome} ANTIGA"}, format="json")
+
+    assert resp.status_code == 400, resp.content
+    assert "nome" in resp.json()["errors"]
+    g.refresh_from_db()
+    assert g.nome == nome
+
+
+@pytest.mark.parametrize("nome", ["GERENCIA DAT", "CONTROLE"])
+def test_nome_de_perfil_permitido_nao_vai_para_outra_gerencia(nome):
+    Gerencia.objects.filter(nome=nome).delete()  # nome livre: a trava vale mesmo assim
+    g = _gerencia()
+    controle = _cliente(UsuarioFactory(groups=["Controle"]))
+
+    editar = controle.patch(f"/api/gerencias/{g.id}/", {"nome": nome}, format="json")
+    criar = controle.post("/api/gerencias/", {"nome": nome, "nome_setor": "Setor Porta Nova"}, format="json")
+
+    assert editar.status_code == 400, editar.content
+    assert criar.status_code == 400, criar.content
+    g.refresh_from_db()
+    assert g.nome != nome
+    assert not Gerencia.objects.filter(nome=nome).exists()
+
+
 def test_nome_de_gerencia_padrao_muda_como_hoje():
     g = _gerencia()
     dat = _cliente(UsuarioFactory(groups=["DAT"]))

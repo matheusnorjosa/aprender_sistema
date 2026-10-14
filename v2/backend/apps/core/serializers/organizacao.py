@@ -19,6 +19,7 @@ from apps.core.rbac.helpers import (
     MSG_FLUXO_SUPER_SO_NA_SUPERINTENDENCIA,
     fluxo_super_fora_da_superintendencia,
 )
+from apps.core.services.rbac_pacotes import PERFIL_PERMITIDO
 
 
 class MunicipioSerializer(serializers.ModelSerializer):
@@ -203,7 +204,9 @@ class GerenciaSerializer(serializers.ModelSerializer["Gerencia"]):
 
         ADR-020 (PR A): gerência com perfil ≠ PADRAO também não muda de `nome` pela tela, porque
         `rbac_diff --auditar` reconhece a gerência pelo `nome` (`PERFIL_PERMITIDO`). `perfil` fica
-        fora de `fields`: a API não o lê nem o grava.
+        fora de `fields`: a API não o lê nem o grava. Os nomes de `PERFIL_PERMITIDO` valem como o da
+        aprovadora mesmo com perfil PADRAO (a 0120 não grava perfil): não saem da gerência nem vão
+        para outra, senão o perfil gravado pelo nome cairia na gerência errada.
         """
         instance: Any = self.instance
         atual = getattr(instance, "nome", None)
@@ -211,10 +214,13 @@ class GerenciaSerializer(serializers.ModelSerializer["Gerencia"]):
             raise serializers.ValidationError(
                 "O nome desta gerência não pode ser alterado: ele define quem aprova solicitações."
             )
-        if instance is not None and instance.perfil != Gerencia.Perfil.PADRAO and value != atual:
+        com_perfil = instance is not None and (instance.perfil != Gerencia.Perfil.PADRAO or atual in PERFIL_PERMITIDO)
+        if com_perfil and value != atual:
             raise serializers.ValidationError(
                 "O nome desta gerência não pode ser alterado: ela define permissões de acesso."
             )
+        if value in PERFIL_PERMITIDO and atual != value:
+            raise serializers.ValidationError(f"O nome '{value}' é reservado: ele define permissões de acesso.")
         if value == GERENCIA_APROVADORA_NOME and atual != GERENCIA_APROVADORA_NOME:
             raise serializers.ValidationError(
                 f"O nome '{GERENCIA_APROVADORA_NOME}' é reservado à gerência que aprova solicitações."

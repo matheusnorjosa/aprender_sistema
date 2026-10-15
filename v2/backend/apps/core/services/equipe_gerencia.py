@@ -60,11 +60,20 @@ def setor_group_for(gerencia: Any) -> Group | None:
     #2071: setor que compõe um par aprovador (`APPROVER_COMPOSITES`: Superintendência, Controle)
     também retorna None. O grupo "Superintendência" abre todos os setores e, com Gerente, aprova pelo
     composite legado; quem é lotado na gerência aprovadora aprova pelo vínculo (PR B1), não pelo grupo.
+
+    S3 (auditoria 14/10, C4): grupo com capacidade funcional (DAT, Controle, Diretoria, funções…) também
+    retorna None. A lista vem do banco (`grupos_com_capacidade`), não de nome escrito aqui. O poder do
+    DAT vem do pacote do perfil da gerência (ADR-020), não do grupo derivado da lotação.
     """
     setor = (getattr(gerencia, "setor_canonico", "") or "").strip()
     if not setor or setor in {s for s, _ in APPROVER_COMPOSITES}:
         return None
-    return Group.objects.filter(name=setor).first()
+    return Group.objects.filter(name=setor).exclude(name__in=grupos_com_capacidade()).first()
+
+
+def grupos_com_capacidade() -> set[str]:
+    """Nomes dos grupos que têm alguma capacidade funcional (`PermissaoFuncional`) ligada."""
+    return set(Group.objects.filter(permissoes_funcionais__isnull=False).values_list("name", flat=True))
 
 
 def upsert_vinculo(gerencia: Any, usuario: Any, papel: str, *, ativo: bool = True, supervisor: Any = None) -> Any:

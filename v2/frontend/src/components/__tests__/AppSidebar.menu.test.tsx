@@ -1,23 +1,12 @@
 /**
  * AppSidebar — Matriz Viva por perfil canônico (PR 11 hardening RBAC).
  *
- * Cobre visibilidade de todos os itens top-level do menu lateral por 10
- * atores canônicos, espelhando a Matriz Viva do backend (`apps/core/rbac/matrix.py`)
- * e o `rbac_matrix.test.ts` do hook. Falha indica drift entre setor/função
- * legacy e capabilities/policies atuais.
+ * Linha de base persona × menu para os 10 atores de `apps/core/rbac/matrix.py`
+ * (`src/test/atoresRbac.ts`: payload de /me e policies medidas no backend). Cobre os
+ * itens de topo, os filhos de Dashboards, DAT, Controle (Compras) e Solicitações.
  *
- * Cobertura especial para children críticos:
- * - Dashboards: cada child (geral, compras, equipe, gcal, mapa) tem condição própria.
- * - DAT: 4 children (admin, cadastros, importações, registros) — atalho para
- *   imports unificados (PR-A1/B/C/D DAT Imports, abril 2026).
- *
- * Fora de escopo (intencionalmente):
- * - Backend / policies / usePermissions / useCanAccess (apenas leitura).
- * - AppRoutes / HomePage / ApprovalsPage (cobertos pelos próprios testes).
- *
- * Convenção: `permissions` espelha `usePermissions(user)`; `policies` espelha
- * `GET /api/me/policies/`. Atualizar fixtures aqui exige atualizar
- * `rbac_matrix.test.ts` em paralelo.
+ * PR 7 das permissões: o menu passa a decidir só por policy. Esta matriz foi
+ * commitada verde com o código antigo; depois da troca ela não pode mudar.
  */
 
 import { useState } from 'react';
@@ -27,7 +16,9 @@ import { describe, expect, test, vi } from 'vitest';
 
 import { AppSidebar } from '../AppSidebar';
 import type { Permissions } from '../../hooks/usePermissions';
+import { computePermissions } from '../../hooks/usePermissions';
 import type { ModoSidebar } from '../../hooks/useResponsive';
+import { ATORES_RBAC, atorRbac, type AtorRbac, type NomeDoAtor } from '../../test/atoresRbac';
 
 // ============================================================================
 // Setup
@@ -78,6 +69,11 @@ function renderSidebar(permissions: Permissions, policies: readonly string[]): v
   );
 }
 
+/** Renderiza o menu como o App o monta para a pessoa (payload de /me + /me/policies). */
+function renderSidebarDoAtor({ user, policies }: Pick<AtorRbac, 'user' | 'policies'>): void {
+  renderSidebar(computePermissions(user), policies);
+}
+
 // ============================================================================
 // Snapshot por ator
 // ============================================================================
@@ -102,10 +98,7 @@ const TOP_LEVEL_ITEMS = [
 
 type TopLevelItem = (typeof TOP_LEVEL_ITEMS)[number];
 
-/**
- * Children críticos do submenu Dashboards (cada um tem condição independente).
- * Usado apenas para atores cujo `Dashboards` é visível.
- */
+/** Filhos do submenu Dashboards (cada um tem condição própria). */
 const DASHBOARDS_CHILDREN = [
   'Dashboard Geral',
   'Dashboard Compras',
@@ -116,127 +109,36 @@ const DASHBOARDS_CHILDREN = [
 
 type DashboardsChild = (typeof DASHBOARDS_CHILDREN)[number];
 
+const DAT_CHILDREN = ['Administração', 'Cadastros', 'Importações', 'Registros de Turmas'] as const;
+const CONTROLE_CHILDREN = ['Ações', 'Compras', 'Coordenadores', 'Painel de Controle', 'Plano Anual', 'Pré-agenda'] as const;
+const SOLICITACOES_CHILDREN = ['Minhas Solicitações', 'Nova Solicitação', 'Publicar na agenda'] as const;
+
 interface ActorSnapshot {
-  actor: string;
-  permissions: Permissions;
-  policies: readonly string[];
+  actor: NomeDoAtor;
   /** Subset literal de TOP_LEVEL_ITEMS visível para este ator. */
   expectedVisible: readonly TopLevelItem[];
-  /**
-   * Subset de DASHBOARDS_CHILDREN visível DENTRO do submenu Dashboards.
-   * Use `[]` quando 'Dashboards' não está em `expectedVisible`.
-   */
+  /** Filhos visíveis dentro de cada submenu. `[]` quando o submenu não aparece. */
   expectedDashboardsChildren: readonly DashboardsChild[];
-  /** Children do DAT submenu visíveis. `[]` quando 'DAT' não está visível. */
-  expectedDatChildren: readonly string[];
+  expectedDatChildren: readonly (typeof DAT_CHILDREN)[number][];
+  expectedControleChildren: readonly (typeof CONTROLE_CHILDREN)[number][];
+  expectedSolicitacoesChildren: readonly (typeof SOLICITACOES_CHILDREN)[number][];
 }
 
-// SSOT: cada ator declara setores/funções (espelhando usePermissions) e
-// policies (espelhando seed do backend). Asserções de visibilidade derivam
-// das condições em AppSidebar.tsx (linhas 285-373).
+const TODO_O_CONTROLE = [...CONTROLE_CHILDREN];
+
 const ACTORS: ActorSnapshot[] = [
   {
     actor: 'Superuser',
-    permissions: {
-      ...EMPTY_PERMISSIONS,
-      isAdmin: true,
-      canControle: true,
-      canDAT: true,
-      canCoordenador: true,
-      canAcoesInternas: true,
-      canDashboardOverview: true,
-      canDashboardEquipe: true,
-      canDashboardGcal: true,
-      canDashboardCompras: true,
-      canMapaBrasil: true,
-      canDashboardsMenu: true,
-      canDisponibilidade: true,
-      canSeeAllSectors: true,
-      canApproveSuper: true,
-    },
-    // Policies verificadas em produção (#1588): superuser recebe todas as 18 PUBLIC_POLICY_KEYS.
-    policies: [
-      'access_audit_logs',
-      'access_solicitation_approvals',
-      'create_solicitation',
-      'import_availability_blocks',
-      'import_compras',
-      'import_generic_spreadsheet',
-      'manage_admin_registries',
-      'manage_internal_actions',
-      'manage_purchases_and_materials',
-      'manage_solicitacao_status',
-      'use_gcal',
-      'view_all_availability',
-      'view_compras_dashboard',
-      'view_compras_pendencias',
-      'view_compras_stats',
-      'view_map_metrics',
-      'view_overview_dashboard',
-      'view_reports',
-      'access_controle_section',
-      'view_team_dashboard',
-      'view_gcal_dashboard',
-    ],
-    expectedVisible: [
-      'Página Inicial',
-      'Meus Eventos',
-      'Aprovações',
-      'Bloqueios',
-      'Controle',
-      'Ações Internas',
-      'Deslocamentos',
-      'Dashboards',
-      'DAT',
-      'Grade Mensal',
-      'Solicitações',
-    ],
-    expectedDashboardsChildren: [
-      'Dashboard Geral',
-      'Dashboard Compras',
-      'Dashboard Equipe',
-      'Dashboard GCal',
-      'Mapa do Brasil',
-    ],
-    expectedDatChildren: ['Administração', 'Cadastros', 'Importações', 'Registros de Turmas'],
+    expectedVisible: [...TOP_LEVEL_ITEMS],
+    expectedDashboardsChildren: [...DASHBOARDS_CHILDREN],
+    expectedDatChildren: [...DAT_CHILDREN],
+    expectedControleChildren: TODO_O_CONTROLE,
+    expectedSolicitacoesChildren: [...SOLICITACOES_CHILDREN],
   },
   {
+    // Sem Aprovações, Controle, Ações Internas e Solicitações (nenhuma dessas policies).
+    // Bloqueios, Deslocamentos e Grade: view_all_availability e o grupo DAT.
     actor: 'DAT',
-    permissions: {
-      ...EMPTY_PERMISSIONS,
-      inDAT: true,
-      canDAT: true,
-      canCoordenador: true, // canCoordenador inclui inDAT
-      canAcoesInternas: true,
-      canDashboardEquipe: true,
-      canDashboardGcal: true,
-      canDashboardCompras: true,
-      canMapaBrasil: true,
-      canDashboardsMenu: true,
-      canDisponibilidade: true,
-    },
-    // Policies verificadas em produção (#1588).
-    policies: [
-      'access_audit_logs',
-      'import_availability_blocks',
-      'import_compras',
-      'import_generic_spreadsheet',
-      'manage_admin_registries',
-      'manage_purchases_and_materials',
-      'view_all_availability',
-      'view_compras_dashboard',
-      'view_compras_pendencias',
-      'view_compras_stats',
-      'view_reports',
-      'view_team_dashboard',
-      'view_gcal_dashboard',
-    ],
-    // Sem 'Aprovações' (sem policy), sem 'Controle' (sem access_controle_section).
-    // #1270: 'Solicitações' e 'Mapa do Brasil' saem — DAT não tem create_solicitation
-    // nem view_map_metrics; antes apareciam via grupo (over-showing), backend nega.
-    // Sem 'Ações Internas': agora policy-gated por `manage_internal_actions` (#1263),
-    // ausente no seed do DAT — antes aparecia via grupo e levava a 403.
-    // 'Bloqueios' aparece via canBloqueios = canCoordenador (DAT atua como coord operacional).
     expectedVisible: [
       'Página Inicial',
       'Meus Eventos',
@@ -246,44 +148,15 @@ const ACTORS: ActorSnapshot[] = [
       'DAT',
       'Grade Mensal',
     ],
-    expectedDashboardsChildren: [
-      // 'Dashboard Geral' escondido (sem view_overview_dashboard; só Diretoria/superuser)
-      // 'Mapa do Brasil' escondido (#1270: sem view_map_metrics — Diretoria-only)
-      'Dashboard Compras',
-      'Dashboard Equipe',
-      'Dashboard GCal',
-    ],
-    // Importação pela tela é só do superusuário (decisão do dono, 02/10/2026): o item some para o DAT.
+    // Sem Dashboard Geral (view_overview_dashboard é da Diretoria). O seed dá view_map_metrics ao DAT.
+    expectedDashboardsChildren: ['Dashboard Compras', 'Dashboard Equipe', 'Dashboard GCal', 'Mapa do Brasil'],
+    // Importação pela tela é só do superusuário (decisão do dono, 02/10/2026).
     expectedDatChildren: ['Administração', 'Cadastros', 'Registros de Turmas'],
+    expectedControleChildren: [],
+    expectedSolicitacoesChildren: [],
   },
   {
     actor: 'Controle',
-    permissions: {
-      ...EMPTY_PERMISSIONS,
-      inControle: true,
-      canControle: true,
-      canDashboardGcal: true,
-      canDashboardsMenu: true,
-      canDisponibilidade: true,
-    },
-    // Policies verificadas em produção (#1588).
-    policies: [
-      'access_audit_logs',
-      'import_availability_blocks',
-      'import_compras',
-      'import_generic_spreadsheet',
-      'manage_purchases_and_materials',
-      'manage_solicitacao_status',
-      'use_gcal',
-      'view_all_availability',
-      'view_compras_pendencias',
-      'view_compras_stats',
-      'view_reports',
-      'access_controle_section',
-      'view_gcal_dashboard',
-    ],
-    // Sem 'Aprovações' (sem policy access_solicitation_approvals — Controle puro).
-    // Sem 'DAT', sem 'Solicitações', sem 'Ações Internas'.
     expectedVisible: [
       'Página Inicial',
       'Meus Eventos',
@@ -293,135 +166,39 @@ const ACTORS: ActorSnapshot[] = [
       'Dashboards',
       'Grade Mensal',
     ],
-    // Apenas Dashboard GCal (operação do calendário). Resto é Diretoria/DAT.
     expectedDashboardsChildren: ['Dashboard GCal'],
     expectedDatChildren: [],
+    expectedControleChildren: TODO_O_CONTROLE,
+    expectedSolicitacoesChildren: [],
   },
   {
+    // D8: Diretoria fora da Grade Mensal; só dashboards.
     actor: 'Diretoria',
-    permissions: {
-      ...EMPTY_PERMISSIONS,
-      inDiretoria: true,
-      canDashboardOverview: true,
-      canDashboardEquipe: true,
-      canDashboardGcal: true,
-      canDashboardCompras: true,
-      canMapaBrasil: true,
-      canDashboardsMenu: true,
-      // canDisponibilidade=false (D8/D9: Diretoria removida da Grade Mensal).
-    },
-    // Policies verificadas em produção (#1588).
-    policies: ['view_compras_dashboard', 'view_compras_pendencias', 'view_map_metrics', 'view_overview_dashboard', 'view_team_dashboard', 'view_gcal_dashboard'],
     expectedVisible: ['Página Inicial', 'Meus Eventos', 'Dashboards'],
-    expectedDashboardsChildren: [
-      'Dashboard Geral',
-      'Dashboard Compras',
-      'Dashboard Equipe',
-      'Dashboard GCal',
-      'Mapa do Brasil',
-    ],
+    expectedDashboardsChildren: [...DASHBOARDS_CHILDREN],
     expectedDatChildren: [],
+    expectedControleChildren: [],
+    expectedSolicitacoesChildren: [],
   },
   {
+    // Vínculo GERENTE vigente: Bloqueios, Deslocamentos e Grade (PR A).
     actor: 'Gerente da Superintendência',
-    permissions: {
-      ...EMPTY_PERMISSIONS,
-      isGerente: true,
-      inSuperintendencia: true,
-      canSeeAllSectors: true,
-      canAcoesInternas: true, // canAcoesInternas inclui isGerente
-      canDisponibilidade: true, // canDisponibilidade inclui isGerente
-    },
-    // Policies verificadas em produção (#1588): Gerente Sup NÃO tem view_all_availability
-    // (scoped via EquipeGerencia, não policy global) nem access_audit_logs (PR6); TEM create_solicitation.
-    policies: [
-      'access_solicitation_approvals',
-      'create_solicitation',
-      'manage_solicitacao_status',
-      'use_gcal',
-      'view_reports',
-    ],
-    // Aprovações via policy access_solicitation_approvals (composite).
-    // Sem 'Bloqueios'/'Deslocamentos': dependem de view_all_availability (que Gerente Sup
-    //   NÃO tem em produção) e não há fallback legacy (canControle/canCoordenador/isFormador
-    //   todos false). #1588 corrigiu a fixture que afirmava o contrário.
-    // 'Grade Mensal' aparece via canDisponibilidade (legacy, inclui isGerente).
-    // #1270: 'Solicitações' passa a aparecer — Gerente Sup TEM create_solicitation
-    // (antes escondido: o gate legacy era canCoordenador, false aqui — under-showing).
-    // Sem 'Ações Internas' (manage_internal_actions ausente) e sem dashboards próprios.
     expectedVisible: [
       'Página Inicial',
       'Meus Eventos',
       'Aprovações',
+      'Bloqueios',
+      'Deslocamentos',
       'Grade Mensal',
       'Solicitações',
     ],
     expectedDashboardsChildren: [],
     expectedDatChildren: [],
+    expectedControleChildren: [],
+    expectedSolicitacoesChildren: ['Minhas Solicitações', 'Nova Solicitação'],
   },
   {
     actor: 'Gerente pedagógico (Vidas)',
-    permissions: {
-      ...EMPTY_PERMISSIONS,
-      isGerente: true,
-      inGerencia: true,
-      canAcoesInternas: true,
-      canDisponibilidade: true,
-    },
-    // Gerente pedagógico/Vidas é scoped (sem view_all_availability após D9).
-    // Produção (#1588): tem create_solicitation (Função Gerente). Não afeta o menu
-    // (Solicitações usa canCoordenador legacy, false aqui) — só acurácia da fixture.
-    policies: ['create_solicitation'],
-    // Sem 'Aprovações' (não é Sup), sem 'Bloqueios' (sem view_all e sem canBloqueios).
-    // Sem 'Deslocamentos' (não tem nenhuma das 4 condições).
-    // Sem 'Ações Internas': policy-gated por `manage_internal_actions` (#1263), ausente aqui.
-    // #1270: 'Solicitações' passa a aparecer — tem create_solicitation (antes escondido
-    // pelo gate legacy canCoordenador, false p/ Função Gerente — under-showing).
-    expectedVisible: [
-      'Página Inicial',
-      'Meus Eventos',
-      'Grade Mensal',
-      'Solicitações',
-    ],
-    expectedDashboardsChildren: [],
-    expectedDatChildren: [],
-  },
-  {
-    actor: 'Coordenador',
-    permissions: {
-      ...EMPTY_PERMISSIONS,
-      isCoordenador: true,
-      canCoordenador: true,
-      canAcoesInternas: true,
-      canDisponibilidade: true,
-    },
-    // Produção (#1588): create_solicitation (Função Coordenador).
-    policies: ['create_solicitation'],
-    expectedVisible: [
-      'Página Inicial',
-      'Meus Eventos',
-      'Bloqueios', // canBloqueios via canCoordenador
-      // Sem 'Ações Internas': policy-gated por `manage_internal_actions` (#1263), ausente aqui.
-      'Deslocamentos', // via canCoordenador
-      'Grade Mensal',
-      'Solicitações',
-    ],
-    expectedDashboardsChildren: [],
-    expectedDatChildren: [],
-  },
-  {
-    actor: 'Apoio de Coordenação',
-    permissions: {
-      ...EMPTY_PERMISSIONS,
-      // usePermissions trata Apoio igual a Coordenador (isCoordenador=true).
-      isCoordenador: true,
-      canCoordenador: true,
-      canAcoesInternas: true,
-      canDisponibilidade: true,
-    },
-    // Produção (#1588): create_solicitation (Função Apoio de Coordenação).
-    policies: ['create_solicitation'],
-    // Sem 'Ações Internas': policy-gated por `manage_internal_actions` (#1263), ausente aqui.
     expectedVisible: [
       'Página Inicial',
       'Meus Eventos',
@@ -432,57 +209,55 @@ const ACTORS: ActorSnapshot[] = [
     ],
     expectedDashboardsChildren: [],
     expectedDatChildren: [],
+    expectedControleChildren: [],
+    expectedSolicitacoesChildren: ['Minhas Solicitações', 'Nova Solicitação'],
   },
   {
-    actor: 'Formador',
-    permissions: {
-      ...EMPTY_PERMISSIONS,
-      isFormador: true,
-      // Formador NÃO está em canDisponibilidade após D8 (RD-02/03 — declara próprio bloqueio).
-      // canBloqueios via isFormador.
-    },
-    policies: [],
+    actor: 'Coordenador',
     expectedVisible: [
       'Página Inicial',
       'Meus Eventos',
-      'Bloqueios', // canBloqueios via isFormador (RD-02/03 — escopo próprio via queryset)
+      'Bloqueios',
+      'Deslocamentos',
+      'Grade Mensal',
+      'Solicitações',
     ],
     expectedDashboardsChildren: [],
     expectedDatChildren: [],
+    expectedControleChildren: [],
+    expectedSolicitacoesChildren: ['Minhas Solicitações', 'Nova Solicitação'],
   },
   {
-    actor: 'Assistente Administrativo Controle',
-    // Composite (PR 3 hardening RBAC, #1308): Asst Admin + setor Controle.
-    // Recebe a policy access_solicitation_approvals + capabilities do Controle.
-    permissions: {
-      ...EMPTY_PERMISSIONS,
-      inControle: true,
-      canControle: true,
-      canDashboardGcal: true,
-      canDashboardsMenu: true,
-      canDisponibilidade: true,
-    },
-    // Policies verificadas em produção (#1588): setor Controle + composite de aprovação.
-    policies: [
-      'access_audit_logs',
-      'access_solicitation_approvals',
-      'import_availability_blocks',
-      'import_compras',
-      'import_generic_spreadsheet',
-      'manage_purchases_and_materials',
-      'manage_solicitacao_status',
-      'use_gcal',
-      'view_all_availability',
-      'view_compras_pendencias',
-      'view_compras_stats',
-      'view_reports',
-      'access_controle_section',
-      'view_gcal_dashboard',
-    ],
+    actor: 'Apoio de Coordenação',
     expectedVisible: [
       'Página Inicial',
       'Meus Eventos',
-      'Aprovações', // policy presente (composite)
+      'Bloqueios',
+      'Deslocamentos',
+      'Grade Mensal',
+      'Solicitações',
+    ],
+    expectedDashboardsChildren: [],
+    expectedDatChildren: [],
+    expectedControleChildren: [],
+    // #1656: a Apoio publica na agenda os aprovados do próprio setor.
+    expectedSolicitacoesChildren: [...SOLICITACOES_CHILDREN],
+  },
+  {
+    // RD-02/03: o Formador declara o próprio bloqueio; fora da Grade (D8).
+    actor: 'Formador',
+    expectedVisible: ['Página Inicial', 'Meus Eventos', 'Bloqueios'],
+    expectedDashboardsChildren: [],
+    expectedDatChildren: [],
+    expectedControleChildren: [],
+    expectedSolicitacoesChildren: [],
+  },
+  {
+    actor: 'Assistente Administrativo Controle',
+    expectedVisible: [
+      'Página Inicial',
+      'Meus Eventos',
+      'Aprovações',
       'Bloqueios',
       'Controle',
       'Deslocamentos',
@@ -491,8 +266,13 @@ const ACTORS: ActorSnapshot[] = [
     ],
     expectedDashboardsChildren: ['Dashboard GCal'],
     expectedDatChildren: [],
+    expectedControleChildren: TODO_O_CONTROLE,
+    expectedSolicitacoesChildren: [],
   },
 ];
+
+const renderAtor = (nome: NomeDoAtor): void => renderSidebarDoAtor(atorRbac(nome));
+
 
 // ============================================================================
 // Helpers de assertion
@@ -542,19 +322,18 @@ function openSubmenuByTitle(title: string): boolean {
   return false;
 }
 
-function getDashboardsChildren(): string[] {
-  if (!openSubmenuByTitle('Dashboards')) return [];
-  return DASHBOARDS_CHILDREN.filter(
-    (child) => screen.queryByRole('link', { name: new RegExp(child, 'i') }) !== null,
-  );
+/** Filhos visíveis de um submenu (abre o submenu; `[]` quando ele não aparece). */
+function filhosDoSubmenu(titulo: string, filhos: readonly string[]): string[] {
+  if (!openSubmenuByTitle(titulo)) return [];
+  return filhos.filter((label) => screen.queryByRole('link', { name: new RegExp(`^${label}$`, 'i') }) !== null);
 }
 
-function getDatChildren(): string[] {
-  if (!openSubmenuByTitle('DAT')) return [];
-  const labels = ['Administração', 'Cadastros', 'Importações', 'Registros de Turmas'];
-  return labels.filter(
-    (label) => screen.queryByRole('link', { name: new RegExp(`^${label}$`, 'i') }) !== null,
-  );
+function getDashboardsChildren(): string[] {
+  return filhosDoSubmenu('Dashboards', DASHBOARDS_CHILDREN);
+}
+
+function getSolicitacoesChildren(): string[] {
+  return filhosDoSubmenu('Solicitações', SOLICITACOES_CHILDREN);
 }
 
 // ============================================================================
@@ -562,38 +341,35 @@ function getDatChildren(): string[] {
 // ============================================================================
 
 describe('AppSidebar — visibilidade top-level por perfil', () => {
-  test.each(ACTORS)(
-    '$actor: top-level visíveis batem com matriz canônica',
-    ({ actor, permissions, policies, expectedVisible }) => {
-      renderSidebar(permissions, policies);
-      const actualVisible = TOP_LEVEL_ITEMS.filter(isTopLevelVisible);
-      expect(actualVisible, `Drift de visibilidade para ${actor}`).toEqual(expectedVisible);
-    },
-  );
+  test.each(ACTORS)('$actor: top-level visíveis batem com matriz canônica', ({ actor, expectedVisible }) => {
+    renderAtor(actor);
+    const actualVisible = TOP_LEVEL_ITEMS.filter(isTopLevelVisible);
+    expect(actualVisible, `Drift de visibilidade para ${actor}`).toEqual(expectedVisible);
+  });
 });
 
-describe('AppSidebar — children de Dashboards por perfil', () => {
-  test.each(ACTORS)(
-    '$actor: children de Dashboards batem com matriz',
-    ({ actor, permissions, policies, expectedDashboardsChildren }) => {
-      renderSidebar(permissions, policies);
-      const actual = getDashboardsChildren();
-      expect(actual, `Drift de children Dashboards para ${actor}`).toEqual(
-        expectedDashboardsChildren,
-      );
-    },
-  );
-});
+describe('AppSidebar — filhos dos submenus por perfil', () => {
+  test.each(ACTORS)('$actor: filhos de Dashboards', ({ actor, expectedDashboardsChildren }) => {
+    renderAtor(actor);
+    expect(getDashboardsChildren(), `Drift de Dashboards para ${actor}`).toEqual(expectedDashboardsChildren);
+  });
 
-describe('AppSidebar — children de DAT por perfil', () => {
-  test.each(ACTORS)(
-    '$actor: children de DAT batem com matriz',
-    ({ actor, permissions, policies, expectedDatChildren }) => {
-      renderSidebar(permissions, policies);
-      const actual = getDatChildren();
-      expect(actual, `Drift de children DAT para ${actor}`).toEqual(expectedDatChildren);
-    },
-  );
+  test.each(ACTORS)('$actor: filhos de DAT', ({ actor, expectedDatChildren }) => {
+    renderAtor(actor);
+    expect(filhosDoSubmenu('DAT', DAT_CHILDREN), `Drift de DAT para ${actor}`).toEqual(expectedDatChildren);
+  });
+
+  test.each(ACTORS)('$actor: filhos de Controle (Compras)', ({ actor, expectedControleChildren }) => {
+    renderAtor(actor);
+    expect(filhosDoSubmenu('Controle', CONTROLE_CHILDREN), `Drift de Controle para ${actor}`).toEqual(
+      expectedControleChildren,
+    );
+  });
+
+  test.each(ACTORS)('$actor: filhos de Solicitações', ({ actor, expectedSolicitacoesChildren }) => {
+    renderAtor(actor);
+    expect(getSolicitacoesChildren(), `Drift de Solicitações para ${actor}`).toEqual(expectedSolicitacoesChildren);
+  });
 });
 
 // ============================================================================
@@ -630,8 +406,8 @@ describe('AppSidebar — sanity da matriz', () => {
       'Formador',
       'Assistente Administrativo Controle',
     ]);
-    const actual = new Set(ACTORS.map((a) => a.actor));
-    expect(actual).toEqual(expected);
+    expect(new Set(ACTORS.map((a) => a.actor))).toEqual(expected);
+    expect(new Set(ATORES_RBAC.map((a) => a.ator))).toEqual(expected);
   });
 });
 
@@ -662,15 +438,6 @@ describe('AppSidebar — Aprovações é policy-only (PR 10 hardening RBAC)', ()
 // ============================================================================
 // Solicitações → "Publicar na agenda" (#1656, policy publish_setor_solicitacao)
 // ============================================================================
-
-const SOLICITACOES_CHILDREN = ['Minhas Solicitações', 'Nova Solicitação', 'Publicar na agenda'];
-
-function getSolicitacoesChildren(): string[] {
-  if (!openSubmenuByTitle('Solicitações')) return [];
-  return SOLICITACOES_CHILDREN.filter(
-    (label) => screen.queryByRole('link', { name: new RegExp(`^${label}$`, 'i') }) !== null,
-  );
-}
 
 describe('AppSidebar — "Publicar na agenda" (#1656)', () => {
   // usePermissions trata Apoio igual a Coordenador; a diferença está na policy.
@@ -857,8 +624,7 @@ describe('AppSidebar — modo pela largura (Programa C, C1)', () => {
   });
 
   test('cada item de topo tem ícone próprio (na recolhida, só o ícone distingue os itens)', () => {
-    const superuser = ACTORS.find((a) => a.actor === 'Superuser')!;
-    renderSidebar(superuser.permissions, superuser.policies);
+    renderAtor('Superuser');
     const nav = screen.getByRole('navigation', { name: 'Navegacao principal' });
     const raiz = within(nav).getAllByRole('menu')[0]!;
     const iconePorItem = Array.from(raiz.children)

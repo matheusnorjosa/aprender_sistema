@@ -26,6 +26,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_papel,
     liberar_par,
 )
 
@@ -162,8 +163,7 @@ class TestSolicitacaoRBAC:
         # Arrange
         client = APIClient()
         coord = UsuarioFactory(username="coord1", password="pass", cpf="11111111111")
-        group_coord = GroupFactory(name="Coordenador")
-        coord.groups.add(group_coord)
+        com_papel(coord, "COORDENADOR")
 
         tipo_evento = TipoEventoFactory(nome="Formação")
         municipio = MunicipioFactory(nome="Fortaleza", uf="CE")
@@ -206,8 +206,7 @@ class TestSolicitacaoRBAC:
         # Arrange
         client = APIClient()
         formador = UsuarioFactory(username="formador1", password="pass", cpf="11111111111")
-        group_formador = GroupFactory(name="Formador")
-        formador.groups.add(group_formador)
+        com_papel(formador, "FORMADOR")
 
         tipo_evento = TipoEventoFactory(nome="Formação")
         client.force_authenticate(user=formador)
@@ -266,8 +265,7 @@ class TestSolicitacaoRBAC:
         """Coordenador não pode criar solicitação quando município+projeto não têm compra."""
         client = APIClient()
         coord = UsuarioFactory(username="coord2", password="pass", cpf="22222222222")
-        group_coord = GroupFactory(name="Coordenador")
-        coord.groups.add(group_coord)
+        com_papel(coord, "COORDENADOR")
 
         tipo_evento = TipoEventoFactory(nome="Acompanhamento")
         municipio = MunicipioFactory(nome="Sobral", uf="CE")

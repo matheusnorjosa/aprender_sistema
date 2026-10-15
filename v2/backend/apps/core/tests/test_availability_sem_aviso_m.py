@@ -33,6 +33,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_papel,
     liberar_par,
 )
 
@@ -79,7 +80,7 @@ def projeto_super(municipio):
 @pytest.fixture
 def coordenador():
     user = UsuarioFactory(username="coord_aviso", first_name="Ana", last_name="Coordenadora")
-    user.groups.add(GroupFactory(name="Coordenador"))
+    com_papel(user, "COORDENADOR")
     return user
 
 
@@ -91,7 +92,8 @@ def formador():
 @pytest.fixture
 def aprovador():
     user = UsuarioFactory(username="gerente_aviso", first_name="Carla", last_name="Gerente")
-    user.groups.add(GroupFactory(name="Superintendência"), GroupFactory(name="Gerente"))
+    user.groups.add(GroupFactory(name="Superintendência"))
+    com_papel(user, "GERENTE")
     return user
 
 

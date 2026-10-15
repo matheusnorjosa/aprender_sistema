@@ -15,21 +15,32 @@ Convenções:
 - `TipoEventoFactory` e `GroupFactory` usam `django_get_or_create` para espelhar
   o padrão `get_or_create(nome=...)` predominante (reaproveita a mesma linha).
 - `UsuarioFactory(groups=["Coordenador", ...])` anexa o usuário a grupos base
-  já existentes (criados pelo seed de sessão).
+  já existentes (criados pelo seed de sessão). Grupo de FUNÇÃO com papel de gerência
+  (Coordenador, Apoio, Gerente, Formador) vem junto com o vínculo vigente (`com_papel`),
+  como o cadastro de usuário faz; `groups__gerencia=g` escolhe a gerência e
+  `groups__vinculo=False` cria só o grupo (teste de "grupo sem vínculo").
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownLambdaType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false, reportPrivateImportUsage=false, reportIncompatibleVariableOverride=false
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import date, timedelta
+from typing import Any, cast
 
 from django.contrib.auth.models import Group
 from django.utils import timezone
 
 import factory
 
-from apps.core.models import DATCompra, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.models import DATCompra, EquipeGerencia, Gerencia, Municipio, Projeto, Solicitacao, TipoEvento, Usuario
+from apps.core.services.equipe_gerencia import PAPEL_POR_FUNCAO
+
+# Papel de gerência → grupo de função (inverso do cadastro). EQUIPE não tem grupo.
+GRUPO_POR_PAPEL: dict[str, str] = {papel: grupo for grupo, papel in PAPEL_POR_FUNCAO.items()}
+
+# Início de vigência fixo no passado: o vínculo segue vigente em teste com data congelada.
+_INICIO_VINCULO = date(2000, 1, 1)
 
 
 class GroupFactory(factory.django.DjangoModelFactory[Group]):
@@ -77,12 +88,50 @@ class UsuarioFactory(factory.django.DjangoModelFactory[Usuario]):
 
     @factory.post_generation
     def groups(self, create: bool, extracted, **kwargs):  # noqa: ANN001
-        """UsuarioFactory(groups=["Coordenador", "DAT"]) anexa aos grupos."""
+        """UsuarioFactory(groups=["Coordenador", "DAT"]) anexa aos grupos.
+
+        Grupo de função com papel ganha o vínculo vigente junto (`com_papel`). Opções:
+        `groups__gerencia=g` (default: gerência neutra própria) e `groups__vinculo=False` (só o grupo).
+        """
         if not create or not extracted:
             return
+        com_vinculo = kwargs.get("vinculo", True)
         for name in extracted:
+            if com_vinculo and name in PAPEL_POR_FUNCAO:
+                com_papel(cast(Usuario, self), PAPEL_POR_FUNCAO[name], kwargs.get("gerencia"))
+                continue
             group, _ = Group.objects.get_or_create(name=name)
             self.groups.add(group)
+
+
+class GerenciaFactory(factory.django.DjangoModelFactory[Gerencia]):
+    """Gerência neutra: perfil PADRAO (sem pacote) e `setor_canonico` vazio (não define escopo de setor)."""
+
+    class Meta:
+        model = Gerencia
+
+    nome = factory.Sequence(lambda n: f"GERENCIA TESTE {n}")
+    nome_setor = factory.Sequence(lambda n: f"Teste {n}")
+    ativo = True
+
+
+def com_papel(user: Usuario, papel: str, gerencia: Gerencia | None = None, **extra: Any) -> EquipeGerencia:
+    """Dá a `user` o papel `papel` em `gerencia`: o grupo de função do papel e o vínculo vigente.
+
+    É o par que o cadastro de usuário grava (função + lotação). O vínculo começa em 2000-01-01 e não
+    tem fim; `extra` sobrescreve (ex.: `valid_to=...`, `ativo=False`). Sem `gerencia`, cria uma
+    gerência neutra só deste vínculo (`GerenciaFactory`): sem pacote, sem setor e sem projeto, ela
+    não muda o que a pessoa enxerga. Passe a gerência quando o teste depende dela.
+    EQUIPE não tem grupo de função; só o vínculo é criado.
+    """
+    grupo = GRUPO_POR_PAPEL.get(papel)
+    if grupo is not None:
+        user.groups.add(Group.objects.get_or_create(name=grupo)[0])
+    dados: dict[str, Any] = {"ativo": True, "valid_from": _INICIO_VINCULO, "valid_to": None, **extra}
+    vinculo, _ = EquipeGerencia.objects.update_or_create(
+        gerencia=gerencia or GerenciaFactory(), usuario=user, papel=papel, defaults=dados
+    )
+    return vinculo
 
 
 class MunicipioFactory(factory.django.DjangoModelFactory[Municipio]):

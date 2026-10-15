@@ -26,6 +26,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_papel,
     liberar_par,
 )
 
@@ -40,7 +41,6 @@ class TestFluxoPorProjeto(TestCase):
         self.client = APIClient()
 
         # Criar grupos
-        self.grupo_coordenador = GroupFactory(name="Coordenador")
         self.grupo_superintendencia = GroupFactory(name="Superintendência")
         self.grupo_controle = GroupFactory(name="Controle")
         self.grupo_dat = GroupFactory(name="DAT")
@@ -52,7 +52,7 @@ class TestFluxoPorProjeto(TestCase):
             email="coord@test.com",
             cpf="12345678901",
         )
-        self.coordenador.groups.add(self.grupo_coordenador)
+        com_papel(self.coordenador, "COORDENADOR")
 
         self.superintendente = UsuarioFactory(
             username="super1",

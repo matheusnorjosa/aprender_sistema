@@ -25,11 +25,11 @@ import pytest
 
 from apps.core.models import Participation
 from apps.core.tests.factories import (
-    GroupFactory,
     MunicipioFactory,
     ProjetoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_papel,
     liberar_par,
 )
 
@@ -39,7 +39,7 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture
 def coordenador():
     user = UsuarioFactory(username="coord_1626", cpf="77000000001")
-    user.groups.add(GroupFactory(name="Coordenador"))
+    com_papel(user, "COORDENADOR")
     return user
 
 
@@ -127,7 +127,7 @@ class TestParticipantResolution:
     def test_active_formador_added_as_participant(self, client_coord, municipio, projeto, tipo_evento):
         """Não-regressão: formador ativo válido vira participante."""
         formador = UsuarioFactory(username="form_1626", cpf="77000000010")
-        formador.groups.add(GroupFactory(name="Formador"))
+        com_papel(formador, "FORMADOR")
         payload = _payload(municipio, projeto, tipo_evento, {"formador_ids": [formador.id]})
         payload["pretende_avaliar_formador"] = False  # 05/10/2026: formador avaliável → pergunta obrigatória
         resp = client_coord.post("/api/solicitacoes/", payload, format="json")

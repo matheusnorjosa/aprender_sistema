@@ -34,10 +34,11 @@ def _next_cpf():
 def _make_user_with_caps(username, group_names, cap_codenames):
     from apps.core.models import PermissaoFuncional
 
-    user = UsuarioFactory(username=username, email=f"{username}@t.com", password="x", cpf=_next_cpf())
+    user = UsuarioFactory(
+        username=username, email=f"{username}@t.com", password="x", cpf=_next_cpf(), groups=group_names
+    )
     for gn in group_names:
         g = GroupFactory(name=gn)
-        user.groups.add(g)
         for code in cap_codenames:
             p = PermissaoFuncional.objects.filter(codename=code).first()
             assert p is not None

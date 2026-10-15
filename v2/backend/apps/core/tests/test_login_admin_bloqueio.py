@@ -245,6 +245,26 @@ def test_admin_conta_bloqueada_nao_chama_authenticate(superusuario):
     assert not _entrou(resposta, client)
 
 
+def _sem_csrf(html: str) -> str:
+    """Tira o token CSRF, que muda a cada cliente, para comparar o resto da página."""
+    return re.sub(r'name="csrfmiddlewaretoken" value="[^"]*"', 'name="csrfmiddlewaretoken"', html)
+
+
+@override_settings(ACCOUNT_LOCKOUT_THRESHOLD=10)
+def test_admin_conta_bloqueada_responde_igual_a_senha_errada(superusuario):
+    """C2: conta bloqueada recebe a mesma resposta da senha errada (status, erro do
+    formulário e página), para a resposta não denunciar o bloqueio."""
+    senha_errada = _admin(Client(), superusuario.username, _ERRADA)
+    _bloquear(superusuario.username)
+    bloqueada = _admin(Client(), superusuario.username, _SENHA)
+
+    assert bloqueada.status_code == senha_errada.status_code == 200
+    erros = bloqueada.context["form"].errors.get_json_data()
+    assert erros  # controle: a tentativa bloqueada mostra erro de fato
+    assert erros == senha_errada.context["form"].errors.get_json_data()
+    assert _sem_csrf(bloqueada.content.decode()) == _sem_csrf(senha_errada.content.decode())
+
+
 # ===================================================================
 # C7 — mesmo número de hashes nos três casos
 # ===================================================================

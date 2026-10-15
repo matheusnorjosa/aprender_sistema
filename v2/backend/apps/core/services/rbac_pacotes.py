@@ -1,6 +1,6 @@
 """
-Pacote de capacidades por perfil de gerência (ADR-020). Só constantes; quem lê é a fórmula da união
-(`rbac_permissions.capacidades_sem_cache`, PR B).
+Pacote de capacidades por perfil de gerência (ADR-020) e direitos de evento do papel (PR 8). Só
+constantes; quem lê é a fórmula da união (`rbac_permissions.capacidades_sem_cache`).
 
 O pacote é o **estado de produção de hoje** do grupo de setor correspondente (medição de 02/10/2026),
 não o pacote final do relatório de arquitetura (seção 2.3). Por isso o PR B (grupos ∪ pacote) não dá
@@ -49,6 +49,19 @@ PACOTE: dict[str, frozenset[str]] = {
 
 # D3 (a): só EQUIPE e GERENTE recebem o pacote. FORMADOR, COORDENADOR e APOIO nunca.
 PAPEIS_COM_PACOTE: frozenset[str] = frozenset({"EQUIPE", "GERENTE"})
+
+# PR 8 das permissões (ADR-020, "o papel dá o poder"): direito de EVENTO do papel vigente, em qualquer
+# gerência ativa. Não é pacote: não depende do perfil da gerência, e o D3 continua valendo para o
+# pacote (FORMADOR, COORDENADOR e APOIO não recebem pacote). Uma linha explícita por papel
+# (`EquipeGerencia.PAPEL_CHOICES`). A GERENTE não publica no Google (O8-4, paridade).
+_DIREITOS_DE_EVENTO: frozenset[str] = frozenset({"create_solicitation", "edit_solicitation_as_owner_or_privileged"})
+DIREITOS_PAPEL: dict[str, frozenset[str]] = {
+    "FORMADOR": frozenset(),
+    "EQUIPE": frozenset(),
+    "COORDENADOR": _DIREITOS_DE_EVENTO,
+    "GERENTE": _DIREITOS_DE_EVENTO,
+    "APOIO": _DIREITOS_DE_EVENTO | {"publish_setor_solicitacao"},
+}
 
 # Capacidades técnicas: nunca entram em pacote (só o superusuário as tem pelo grupo).
 TECNICAS: frozenset[str] = frozenset({"import_spreadsheet"})

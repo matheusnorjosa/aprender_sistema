@@ -39,8 +39,8 @@ em uma view e a dívida voltaria.
 4. **Composition OR temporária** (`HasPerm("a") | HasPerm("b")`): aceita pelo
    lint atual; cleanup via Policy Layer é incremental (Epic 4.6 follow-up).
 
-5. **Whitelist de classes não-reduzíveis**: `IsGerenteSuperintendencia` (composite
-   funcperm + grupo Django) e `IsOwnerOrPrivileged` (object-level).
+5. **Whitelist de classes não-reduzíveis**: `IsOwnerOrPrivileged` (object-level).
+   `IsGerenteSuperintendencia` saiu no PR 8 das permissões (15/10/2026).
 
 ## Regras enforçadas
 
@@ -49,8 +49,7 @@ em uma view e a dívida voltaria.
   `HasPerm("<codename>")`. Se o uso for legítimo (composite, block, data scope),
   adicionar marcador `# noqa: RBAC-<tipo>-allowed` na mesma linha.
 
-- **V002** `class Is<Word>(...):` fora da whitelist (`IsGerenteSuperintendencia`,
-  `IsOwnerOrPrivileged`). Use a forma canônica nova:
+- **V002** `class Is<Word>(...):` fora da whitelist (`IsOwnerOrPrivileged`). Use a forma canônica nova:
   `Can<Word>` (Capability Policy Layer) ou `HasPerm(codename)` inline.
 
   Nota: classes `Can*` são automaticamente aceitas (não match no V002 — só
@@ -108,7 +107,6 @@ from dataclasses import dataclass
 # Classes `Is<Word>` permitidas (não-reduzíveis a HasPerm — ver RBAC_NAMING §3).
 WHITELISTED_CLASS_NAMES: frozenset[str] = frozenset(
     {
-        "IsGerenteSuperintendencia",  # composite: funcperm + grupo Django
         "IsOwnerOrPrivileged",  # object-level: checa obj.usuario
     }
 )

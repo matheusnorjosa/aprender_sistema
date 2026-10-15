@@ -5,15 +5,17 @@ Antes, quem tinha as caps `approve_solicitation` / `approve_solicitation_batch`
 (concedidas ao grupo FUNÇÃO "Gerente" inteiro, não só ao aprovador composto)
 via/editava/excluía solicitações de QUALQUER gerência — alcance nacional sem
 escopo. Um Gerente pedagógico (não-Superintendência) não consegue aprovar (isso
-exige o composite), mas conseguia ler/editar/excluir tudo.
+exige o composite), mas conseguia ler/editar/excluir tudo. Desde o PR 8 (15/10/2026) a
+gestora é o papel GERENTE vigente em gerência ativa (`_e_gestora`), não o grupo nem a
+capacidade `approve_solicitation_batch` (apagada na migration 0125).
 
 Regra:
 - GLOBAL (vê tudo): superuser, Controle (`operate_preagenda`), DAT
   (`manage_admin_registries`) e o aprovador composto
   (`access_solicitation_approvals` = Gerente-da-Superintendência OU Assistente
   Administrativo do Controle).
-- GESTOR não-global (tem `approve_solicitation*` mas não é global): reduzido de
-  nacional para a(s) própria(s) gerência(s) (via EquipeGerencia) + as próprias.
+- GESTORA não-global (papel GERENTE vigente, `_e_gestora`): a(s) própria(s) gerência(s)
+  (via EquipeGerencia) + as próprias.
 - DEMAIS (Coordenador etc.): apenas as próprias (comportamento inalterado).
 
 Consumido tanto pelo `get_queryset` do `SolicitacaoViewSet` quanto pelo
@@ -46,14 +48,9 @@ from apps.core.rbac.policies import (
 )
 from apps.core.rbac_helpers import user_has_any_perm
 
-# Caps que hoje concediam alcance nacional de solicitação (vazam para todo Gerente).
-_MANAGER_CAPS = ("approve_solicitation", "approve_solicitation_batch")
-
 # `approve_solicitation` é EXCLUSIVA do setor Superintendência (o órgão de
-# oversight/aprovação) — visão global legítima. NÃO incluir
-# `approve_solicitation_batch` aqui: essa é concedida ao grupo FUNÇÃO "Gerente"
-# inteiro e é justamente o que vazava alcance nacional p/ Gerente pedagógico
-# (por isso o escopo abaixo). `operate_preagenda`=Controle, `manage_admin_registries`=DAT.
+# oversight/aprovação) — visão global legítima. `operate_preagenda`=Controle,
+# `manage_admin_registries`=DAT. A gestora por gerência é o papel (`_e_gestora`).
 _GLOBAL_CAPS = ("operate_preagenda", "manage_admin_registries", "approve_solicitation")
 
 
@@ -69,6 +66,16 @@ def user_is_solicitacao_global(user: Any) -> bool:
     return user_has_policy(user, "access_solicitation_approvals")
 
 
+def _e_gestora(user: Any) -> bool:
+    """Gestora de solicitação da gerência (PR 8): papel GERENTE vigente em gerência ativa.
+
+    O alcance continua `_user_gerencia_ids` (todo vínculo com escopo); o PR 9 estreita.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    return bool(EquipeGerencia.gerencias_com_papel(user, _PAPEIS_DE_GESTAO))
+
+
 def _user_gerencia_ids(user: Any) -> set[int]:
     return set(EquipeGerencia.vigentes_com_escopo_em().filter(usuario=user).values_list("gerencia_id", flat=True))
 
@@ -77,7 +84,7 @@ def scope_solicitacoes(qs: QuerySet, user: Any) -> QuerySet:
     """Restringe `qs` ao escopo do `user` (ver regra no módulo)."""
     if user_is_solicitacao_global(user):
         return qs
-    if user_has_any_perm(user, *_MANAGER_CAPS):
+    if _e_gestora(user):
         gerencia_ids = _user_gerencia_ids(user)
         return qs.filter(Q(usuario=user) | Q(projeto__gerencia_id__in=gerencia_ids))
     # #1656 Feature 2: Apoio de Coordenação com `publish_setor_solicitacao` enxerga
@@ -112,8 +119,8 @@ _PAPEIS_DE_GESTAO = ("GERENTE",)
 
 def _gerencias_de_gestor_sem_g1(user: Any) -> set[int]:
     """Tier de gestor da restrita: gerências dos OUTROS vínculos de GERENTE dela (`_PAPEIS_DE_GESTAO`;
-    g1 fora, senão o NAO_SUPER de g1 voltaria ao alcance). Vazio sem as caps de gestor."""
-    if not user_has_any_perm(user, *_MANAGER_CAPS):
+    g1 fora, senão o NAO_SUPER de g1 voltaria ao alcance). Vazio se ela não é gestora (`_e_gestora`)."""
+    if not _e_gestora(user):
         return set()
     return set(
         EquipeGerencia.vigentes_com_escopo_em()
@@ -147,7 +154,7 @@ def user_can_access_solicitacao(user: Any, obj: Any) -> bool:
         return True
     if user_is_solicitacao_global(user):
         return not projeto_fora_do_alcance_da_restrita(user, getattr(obj, "projeto", None))
-    if user_has_any_perm(user, *_MANAGER_CAPS):
+    if _e_gestora(user):
         gerencia_id = getattr(getattr(obj, "projeto", None), "gerencia_id", None)
         return gerencia_id is not None and gerencia_id in _user_gerencia_ids(user)
     return False

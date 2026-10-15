@@ -387,9 +387,17 @@ def formadores_do_setor_options(request: Request) -> Response:
     Permissions: IsAuthenticated
     Cache: Não aplicável (resultado varia por usuário)
     """
-    from .models import EquipeGerencia
+    serializer = UsuarioOptionSerializer(formadores_do_setor(request.user), many=True)
+    return Response(serializer.data)
 
-    user = request.user
+
+def formadores_do_setor(user: Any) -> Any:
+    """Usuários ativos de `/api/options/formadores-do-setor/` (também a lista de quem delega deslocamento
+    de qualquer um, `DeslocamentoViewSet.alvos`).
+
+    Superuser: formadores e coordenadores vigentes. Demais: formadores das gerências do usuário.
+    """
+    from .models import EquipeGerencia
 
     # Superusers veem todos os formadores e coordenadores
     if user.is_superuser:
@@ -399,18 +407,14 @@ def formadores_do_setor_options(request: Request) -> Response:
             .values_list("usuario_id", flat=True)
             .distinct()
         )
-
-        usuarios = Usuario.objects.filter(id__in=user_ids, is_active=True).order_by("first_name", "last_name")
-
-        serializer = UsuarioOptionSerializer(usuarios, many=True)
-        return Response(serializer.data)
+        return Usuario.objects.filter(id__in=user_ids, is_active=True).order_by("first_name", "last_name")
 
     # Buscar as gerencias do usuário logado
     user_gerencias = EquipeGerencia.vigentes_com_escopo_em().filter(usuario=user).values_list("gerencia_id", flat=True)
 
     if not user_gerencias:
         # Se usuário não tem gerencias, retorna lista vazia
-        return Response([])
+        return Usuario.objects.none()
 
     # Buscar formadores das mesmas gerencias
     formador_ids = (
@@ -421,7 +425,4 @@ def formadores_do_setor_options(request: Request) -> Response:
     )
 
     # Buscar usuarios formadores ativos
-    usuarios = Usuario.objects.filter(id__in=formador_ids, is_active=True).order_by("first_name", "last_name")
-
-    serializer = UsuarioOptionSerializer(usuarios, many=True)
-    return Response(serializer.data)
+    return Usuario.objects.filter(id__in=formador_ids, is_active=True).order_by("first_name", "last_name")

@@ -8,9 +8,10 @@ Type-checked with Pyright (strict mode).
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import date
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from django.db import models
 from django.utils import timezone
@@ -422,6 +423,20 @@ class EquipeGerencia(models.Model):
         listar. O papel EQUIPE ("Equipe administrativa") só registra onde a pessoa trabalha.
         """
         return cls.vigentes_em(hoje).exclude(papel=cls.PAPEL_EQUIPE)  # type: ignore[reportUnknownMemberType]
+
+    @classmethod
+    def gerencias_com_papel(cls, usuario: Any, papeis: Iterable[str], hoje: date | None = None) -> set[int]:
+        """Ids das gerências ATIVAS onde `usuario` tem vínculo VIGENTE com um dos `papeis` (PR 8: o papel dá o poder).
+
+        SSOT do papel vigente: mesma regra do `/api/me/.gerencias` (`views_basic._gerencias_do_vinculo`).
+        `usuario` é o objeto ou o id. Os direitos do papel (`rbac_permissions.capacidades_sem_cache`)
+        aplicam a mesma regra numa consulta só.
+        """
+        return set(
+            cls.vigentes_em(hoje)
+            .filter(usuario=usuario, papel__in=list(papeis), gerencia__ativo=True)
+            .values_list("gerencia_id", flat=True)
+        )
 
     def __str__(self) -> str:
         papel = self.get_papel_display()  # type: ignore[reportUnknownMemberType,reportAttributeAccessIssue]

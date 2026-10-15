@@ -11,8 +11,10 @@ Endpoints:
 Permissions (#1454):
 - IsAuthenticated. Escrita é owner-forced: cada usuário registra a própria
   viagem. Registrar/transferir em nome de outro exige delegação
-  (operate_preagenda | view_all_availability). Leitura escopada por
-  EquipeGerencia + próprio (owner).
+  (`user_can_delegate_deslocamento`: operate_preagenda | view_all_availability, ou
+  o P16 do PR 8 — GERENTE/COORDENADOR para o formador da própria gerência).
+  Leitura escopada por EquipeGerencia + próprio (owner).
+- GET /api/deslocamentos/alvos/ - Quem o usuário pode pôr no campo Formador (seletor)
 
 Filters:
 - usuario_id: Filter by usuario ID
@@ -36,18 +38,27 @@ from __future__ import annotations
 from django.db import transaction
 from django.db.models import Exists, OuterRef, Q, QuerySet
 from rest_framework import viewsets
+from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.filters import OrderingFilter
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.request import Request
+from rest_framework.response import Response
 
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.utils import extend_schema
 
-from .models import AuditLog, Deslocamento, EquipeGerencia
+from .models import AuditLog, Deslocamento, EquipeGerencia, Usuario
 from .rbac.helpers import user_has_any_perm
-from .rbac.policies import user_can_delegate_deslocamento
-from .serializers import DeslocamentoSerializer
+from .rbac.policies import (
+    gerencias_que_delegam_deslocamento,
+    user_can_delegate_deslocamento,
+    user_delega_deslocamento_de_qualquer_um,
+)
+from .serializers import DeslocamentoSerializer, UsuarioOptionSerializer
 from .utils.net import get_client_ip
+from .views_options import formadores_do_setor
 
 
 class DeslocamentoPagination(PageNumberPagination):
@@ -66,8 +77,9 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
 
     Permissions (#1454):
         - IsAuthenticated. Escrita owner-forced (self-service); delegação
-          (registrar/transferir p/ outro) exige operate_preagenda |
-          view_all_availability. Leitura escopada por EquipeGerencia + owner.
+          (registrar/transferir p/ outro) exige `user_can_delegate_deslocamento`
+          (operate_preagenda | view_all_availability, ou o P16 do PR 8 para o
+          formador da gerência). Leitura escopada por EquipeGerencia + owner.
 
     Filters:
         - usuario_id: Filter by usuario ID
@@ -175,8 +187,35 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
         IDOR do CREATE, só que na mutação/remoção.
         """
         user = self.request.user
-        if instance.usuario_id != user.id and not user_can_delegate_deslocamento(user):
+        if instance.usuario_id != user.id and not user_can_delegate_deslocamento(user, instance.usuario):
             raise PermissionDenied("Você não tem permissão para alterar deslocamento de outro usuário.")
+
+    @extend_schema(
+        summary="Quem posso pôr no campo Formador do deslocamento",
+        description=(
+            "Usuários (além de si) para quem o usuário registra deslocamento: a lista de formadores do "
+            "setor para Controle, DAT e superusuário; os formadores das gerências onde é GERENTE ou "
+            "COORDENADOR vigente (P16); vazio para os demais (registram só a própria viagem)."
+        ),
+        responses=UsuarioOptionSerializer(many=True),
+    )
+    @action(detail=False, methods=["get"], pagination_class=None)
+    def alvos(self, request: Request) -> Response:
+        """Seletor da tela de Deslocamentos: só quem `user_can_delegate_deslocamento` aceita (P16, O8-5)."""
+        user = request.user
+        if user_delega_deslocamento_de_qualquer_um(user):
+            usuarios = formadores_do_setor(user)
+        else:
+            gerencias = gerencias_que_delegam_deslocamento(user)
+            formadores = EquipeGerencia.vigentes_em().filter(
+                papel="FORMADOR", gerencia_id__in=gerencias, gerencia__ativo=True
+            )
+            usuarios = (
+                Usuario.objects.filter(is_active=True, id__in=formadores.values("usuario_id"))
+                .exclude(pk=user.pk)
+                .order_by("first_name", "last_name")
+            )
+        return Response(UsuarioOptionSerializer(usuarios, many=True).data)
 
     def perform_create(self, serializer: DeslocamentoSerializer) -> None:
         """
@@ -201,7 +240,7 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
             deslocamento = serializer.save(usuario=request_user)
             delegated = False
         else:
-            if not user_can_delegate_deslocamento(request_user):
+            if not user_can_delegate_deslocamento(request_user, target):
                 raise PermissionDenied("Você não tem permissão para registrar deslocamento em nome de outro usuário.")
             deslocamento = serializer.save()
             delegated = True
@@ -246,7 +285,7 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
             reassign_target is not None
             and reassign_target.id != instance.usuario_id
             and reassign_target.id != request_user.id
-            and not user_can_delegate_deslocamento(request_user)
+            and not user_can_delegate_deslocamento(request_user, reassign_target)
         ):
             raise PermissionDenied("Você não tem permissão para transferir deslocamento para outro usuário.")
 

@@ -33,7 +33,7 @@ from .api_schemas import (
 )
 from .models import AuditLog, Solicitacao
 from .permissions import HasPerm, IsOwnerOrPrivileged
-from .rbac.helpers import user_tem_funcao_coordenador
+from .rbac.helpers import user_e_coordenador
 from .rbac.policies import (
     CanAccessSolicitationApprovals,
     CanPublishSetorSolicitacao,
@@ -544,12 +544,12 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         """Decisão do dono (05/10/2026): UM coordenador responsável por evento.
 
         Informado → passa pelo mesmo escopo de setor dos formadores (ele ocupa a agenda quando
-        acompanha; crítica ALTA do desenho). Não informado → quem cria, se tem a função
-        Coordenador; senão 400 (DAT, apoio, gerente, superusuário precisam escolher).
+        acompanha; crítica ALTA do desenho). Não informado → quem cria, se tem o papel
+        COORDENADOR vigente (PR 8); senão 400 (DAT, apoio, gerente, superusuário precisam escolher).
         """
         user = self.request.user
         if coordenador is None:
-            if user_tem_funcao_coordenador(user):
+            if user_e_coordenador(user):
                 return user
             raise serializers.ValidationError({"coordenador": [self._MSG_RESPONSAVEL_OBRIGATORIO]})
         self._assert_coordenador_in_setor_scope(coordenador)

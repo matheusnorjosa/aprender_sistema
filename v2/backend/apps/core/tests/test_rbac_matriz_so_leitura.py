@@ -144,15 +144,24 @@ _PARES_DO_PR_A = (
 
 @pytest.mark.migrations
 def test_migration_0121_leva_o_banco_das_migrations_ate_o_seed():
-    """D4: a matriz muda por PR, com a migration de dados. Sem a 0121, `migrate` + `--auditar` = exit 1."""
+    """D4: a matriz muda por PR, com a migration de dados. Sem a 0121, `migrate` + `--auditar` = exit 1.
+
+    PR 8: a 0125 tira as capacidades dos grupos de função, então os três pares do Assistente
+    Administrativo que a 0121 grava saem de novo. A cadeia 0121 → 0125 chega ao seed.
+    """
     migracao = importlib.import_module("apps.core.migrations.0121_matriz_assistente_administrativo_e_dat")
+    pr8 = importlib.import_module("apps.core.migrations.0125_funcoes_sem_capacidade")
     for grupo, codename in _PARES_DO_PR_A:
         Group.objects.get(name=grupo).permissoes_funcionais.remove(PermissaoFuncional.objects.get(codename=codename))
-    assert auditoria_de_matriz()["so_no_seed"] == sorted([list(par) for par in _PARES_DO_PR_A])
+    assert auditoria_de_matriz()["so_no_seed"] == [["DAT", "view_map_metrics"]]
 
     migracao.forwards(django_apps, None)
     migracao.forwards(django_apps, None)  # reaplicar não muda nada
+    assert auditoria_de_matriz()["so_no_banco"] == sorted(
+        [list(par) for par in _PARES_DO_PR_A if par[0] == "Assistente Administrativo"]
+    )
 
+    pr8.forwards(django_apps, None)
     assert "rbac_diff --auditar: 0 divergência(s)" in _auditar()
 
 

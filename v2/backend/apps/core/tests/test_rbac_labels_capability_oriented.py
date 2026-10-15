@@ -137,15 +137,16 @@ def test_labels_follow_infinitive_verb_form():
     )
 
 
-def test_seed_count_is_eighteen_post_regra_da_compra():
+def test_seed_count_is_seventeen_post_pr8():
     """
     Pós-Onda 1 C3 (2026-04-27): 16 codenames `verb_noun` (+`manage_internal_actions`).
     #1656 Feature 2: +1 `publish_setor_solicitacao` (Apoio de Coordenação). Total: 17.
     Regra da compra (14/10/2026): +1 `create_solicitation_without_purchase` (sem grupo). Total: 18.
+    PR 8 das permissões (15/10/2026): -1 `approve_solicitation_batch` (migration 0125). Total: 17.
     """
     assert (
-        len(FUNCTIONAL_PERMISSIONS_SEED) == 18
-    ), f"Seed deve conter exatamente 18 permissões pós-regra da compra. Achei {len(FUNCTIONAL_PERMISSIONS_SEED)}."
+        len(FUNCTIONAL_PERMISSIONS_SEED) == 17
+    ), f"Seed deve conter exatamente 17 permissões pós-PR 8. Achei {len(FUNCTIONAL_PERMISSIONS_SEED)}."
 
 
 def test_old_pode_codenames_absent_post_epic_4_3():
@@ -178,11 +179,11 @@ def test_new_verb_noun_codenames_present_post_epic_4_1():
     """
     Codenames novos `verb_noun` em inglês devem existir após Epic 4.1
     (dual-write seed). Mapeamento canônico em epic-4-codenames.md.
+    `approve_solicitation_batch` saiu no PR 8 das permissões (migration 0125).
     """
     expected_new_codenames = frozenset(
         {
             "approve_solicitation",
-            "approve_solicitation_batch",
             "execute_restricted_operations",
             "create_solicitation",
             "import_spreadsheet",
@@ -200,3 +201,4 @@ def test_new_verb_noun_codenames_present_post_epic_4_1():
     )
     actual = frozenset(seed.codename for seed in FUNCTIONAL_PERMISSIONS_SEED)
     assert expected_new_codenames.issubset(actual), f"Codenames novos faltando: {expected_new_codenames - actual}"
+    assert "approve_solicitation_batch" not in actual

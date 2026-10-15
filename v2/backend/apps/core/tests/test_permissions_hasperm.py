@@ -222,9 +222,12 @@ def test_funcperm_factory_removed():
 
 
 def test_kept_classes_still_exported():
-    """As 3 classes mantidas (composite/object-level/dynamic) continuam acessíveis."""
-    from apps.core.permissions import HasSectorAccess, IsGerenteSuperintendencia, IsOwnerOrPrivileged
+    """As classes mantidas (object-level/dynamic) continuam acessíveis; `IsGerenteSuperintendencia` saiu (PR 8)."""
+    import apps.core.permissions as perms_module
+    import apps.core.rbac as rbac_module
+    from apps.core.permissions import HasSectorAccess, IsOwnerOrPrivileged
 
-    assert IsGerenteSuperintendencia is not None
     assert IsOwnerOrPrivileged is not None
     assert HasSectorAccess is not None
+    assert not hasattr(perms_module, "IsGerenteSuperintendencia")
+    assert not hasattr(rbac_module, "IsGerenteSuperintendencia")

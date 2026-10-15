@@ -26,6 +26,7 @@ from apps.core.rbac.matrix import (
     APOIO,
     ASST_ADMIN_CONTROLE,
     COORDENADOR,
+    FORMADOR,
     GERENTE,
     GERENTE_SUPER,
     RESOURCES,
@@ -72,10 +73,18 @@ def _make_user_for_actor(actor: str) -> Usuario:
         email=f"matrix_{actor.lower().replace(' ', '_')}_{_USER_COUNTER['i']:06d}@example.com",
         cpf=_next_cpf(),
         groups=ACTOR_GROUPS[actor],
-        # Os vínculos ficam abaixo, na gerência de cada ator. O Formador fica sem: com FORMADOR
-        # vigente, a grade mensal abre (200) e a matriz espera 403. Muda no PR 8 (item 12).
+        # Os vínculos ficam abaixo, na gerência de cada ator.
         groups__vinculo=False,
     )
+
+    # PR 8 das permissões (item 12): o Formador tem o papel FORMADOR vigente, como em produção. Sem o
+    # papel, o grupo sozinho não abre nem a tela Bloqueios.
+    if actor == FORMADOR:
+        gerencia, _ = Gerencia.objects.get_or_create(
+            nome=f"GERENCIA MATRIX {_USER_COUNTER['i']:06d}",
+            defaults={"nome_setor": "Vidas"},
+        )
+        EquipeGerencia.objects.create(gerencia=gerencia, usuario=user, papel="FORMADOR", ativo=True)
 
     # D8 + D9 + PR 8: Coord/Apoio/Gerente* precisam de vínculo organizacional
     # para passar HasSectorAccess na grade mensal.

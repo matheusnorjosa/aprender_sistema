@@ -27,8 +27,8 @@ from typing import Any
 
 from django.contrib.auth.models import Group
 from django.core.cache import cache
-from django.utils import timezone
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest

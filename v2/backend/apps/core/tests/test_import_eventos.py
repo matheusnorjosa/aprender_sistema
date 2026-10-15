@@ -647,6 +647,40 @@ class TestEventosImportAvailabilityAndReimport:
         assert result["stats"]["skipped"]["protected"] == 1
         assert len(result["pendencias"]["protected"]) == 1
 
+    def test_reimport_nao_poe_formador_em_evento_movido_para_super_aprovada(
+        self, coordenador_user, formador1_user, municipio, projeto_nao_super, projeto_super, tipo_evento
+    ):
+        """Evento que nasceu NAO_SUPER na carga e depois foi movido para um projeto SUPER e aprovado:
+        o reimport da mesma linha não pode pôr formador na SUPER aprovada (adendo da PA-04)."""
+        d = date.today() + timedelta(days=75)
+        sem_formador = (
+            "municipio,projeto,tipo_evento,data,hora_inicio,hora_fim,coordenador\n"
+            f"{municipio.nome},{projeto_nao_super.nome},{tipo_evento.nome},{d.isoformat()},"
+            f"08:00,12:00,{coordenador_user.email}\n"
+        )
+        csv1 = _write_csv(sem_formador)
+        import_eventos_from_file(path=csv1, dry_run=False)
+        Path(csv1).unlink(missing_ok=True)
+        sol = Solicitacao.objects.get()
+
+        # movido pela API para o projeto SUPER e aprovado pela Superintendência
+        Solicitacao.objects.filter(pk=sol.pk).update(projeto=projeto_super, status=Solicitacao.Status.APROVADO)
+
+        com_formador = (
+            "municipio,projeto,tipo_evento,data,hora_inicio,hora_fim,coordenador,formador1\n"
+            f"{municipio.nome},{projeto_nao_super.nome},{tipo_evento.nome},{d.isoformat()},"
+            f"08:00,12:00,{coordenador_user.email},{formador1_user.email}\n"
+        )
+        csv2 = _write_csv(com_formador)
+        result = import_eventos_from_file(path=csv2, dry_run=False)
+        Path(csv2).unlink(missing_ok=True)
+
+        sol.refresh_from_db()
+        assert sol.projeto_id == projeto_super.pk
+        assert sol.status == "aprovado"
+        assert not Participation.objects.filter(solicitacao=sol, role=Participation.Role.FORMADOR).exists()
+        assert result["pendencias"]["protected"] == [{"linha": 1, "solicitacao_id": sol.pk, "campos": ["projeto_id"]}]
+
     def test_reimport_changed_nonprotected_field_counts_as_updated(
         self, coordenador_user, municipio, projeto_nao_super, tipo_evento
     ):

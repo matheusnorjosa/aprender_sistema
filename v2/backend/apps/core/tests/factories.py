@@ -26,7 +26,7 @@ Convenções:
 from __future__ import annotations
 
 from datetime import date, timedelta
-from typing import Any
+from typing import Any, cast
 
 from django.contrib.auth.models import Group
 from django.utils import timezone
@@ -98,7 +98,7 @@ class UsuarioFactory(factory.django.DjangoModelFactory[Usuario]):
         com_vinculo = kwargs.get("vinculo", True)
         for name in extracted:
             if com_vinculo and name in PAPEL_POR_FUNCAO:
-                com_papel(self, PAPEL_POR_FUNCAO[name], kwargs.get("gerencia"))
+                com_papel(cast(Usuario, self), PAPEL_POR_FUNCAO[name], kwargs.get("gerencia"))
                 continue
             group, _ = Group.objects.get_or_create(name=name)
             self.groups.add(group)

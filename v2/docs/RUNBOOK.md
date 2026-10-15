@@ -903,7 +903,7 @@ Endpoints RESTful para consulta e criação de ações com **RBAC** (Role-Based 
 > [!note] As classes `IsControleOrSuper` / `IsDATOrSuper` não existem mais.
 > Este runbook citava as duas como permissão destes endpoints. O `rbac_lint`
 > **bane** qualquer `class Is<Word>(...)` fora da whitelist
-> (`IsGerenteSuperintendencia`, `IsOwnerOrPrivileged`) — regra **V002**,
+> (`IsOwnerOrPrivileged`; `IsGerenteSuperintendencia` saiu no PR 8) — regra **V002**,
 > `v2/backend/scripts/rbac_lint.py`, com job obrigatório no CI
 > (`[required] backend rbac-lint`). O idioma canônico é
 > `HasPerm("<codename>")` ou uma classe `Can*` do Capability Policy Layer; o

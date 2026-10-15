@@ -293,10 +293,13 @@ def test_login_failure_response_is_uniform_across_invalid_nonexistent_and_locked
     assert locked.data == expected
 
 
-@patch("apps.core.views_auth.make_password")
+@patch("apps.core.auth_backends._hash_falso")
 def test_login_uses_dummy_hash_for_failed_authentication(mock_make_password, api_client):
     """
     Em falha de autenticação, deve executar hash dummy para reduzir timing leak.
+
+    O hash falso mora no backend (C7, auditoria 2026-10-14), para valer também no
+    /admin/login/; a contagem de hashes por caminho está em test_login_admin_bloqueio.
     """
     response = api_client.post(
         "/api/auth/login/",

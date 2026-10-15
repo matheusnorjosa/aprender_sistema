@@ -21,6 +21,16 @@ User = get_user_model()
 _CPF_DIGITS = 11
 
 
+def _hash_falso(password: str) -> None:
+    """Custo de um hash para conta inexistente, igual ao de senha errada (C7).
+
+    Sem ele, CPF inexistente respondia mais rápido que CPF existente e o tempo
+    revelava quem tem conta. Mesmo truque do ``ModelBackend`` do Django, que deixou
+    de estar em ``AUTHENTICATION_BACKENDS`` justamente por somar um hash a mais.
+    """
+    User().set_password(password)
+
+
 class CPFOrUsernameBackend(ModelBackend):
     """
     Authentication backend that accepts CPF or username.
@@ -67,13 +77,20 @@ class CPFOrUsernameBackend(ModelBackend):
             try:
                 user = User.objects.get(cpf=canonical)
             except User.DoesNotExist:
-                # CPF not found, return None
-                return None
+                # Username com formato de CPF diferente do campo cpf (ex.: CPF corrigido
+                # com o username travado). Era o ModelBackend de fallback que achava essa
+                # conta; aqui é uma busca a mais e continua um hash só (C7).
+                try:
+                    user = User.objects.get(username=canonical)
+                except User.DoesNotExist:
+                    _hash_falso(password)
+                    return None
         else:
             # Try username lookup (canonical == input cru para não-CPF)
             try:
                 user = User.objects.get(username=canonical)
             except User.DoesNotExist:
+                _hash_falso(password)
                 return None
 
         # Validate password and user status

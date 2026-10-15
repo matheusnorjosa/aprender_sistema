@@ -3,6 +3,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { MemoryRouter } from 'react-router';
 
+import { ComAcesso } from '../../../test/comAcesso';
+
 const {
   createSolicitacaoMock,
   getMeMock,
@@ -152,7 +154,9 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
   test('selecionar formador + data dispara check-many com os formadores (quem cria não entra por criar)', async () => {
     render(
       <MemoryRouter>
-        <NewSolicitacaoWizard />
+        <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+          <NewSolicitacaoWizard />
+        </ComAcesso>
       </MemoryRouter>
     );
     await irParaParticipantesESelecionarFormador();
@@ -169,7 +173,9 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
     checkAvailabilityManyMock.mockResolvedValue(RESP_CONFLITO);
     render(
       <MemoryRouter>
-        <NewSolicitacaoWizard />
+        <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+          <NewSolicitacaoWizard />
+        </ComAcesso>
       </MemoryRouter>
     );
     await irParaParticipantesESelecionarFormador();
@@ -185,7 +191,9 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
     checkAvailabilityManyMock.mockResolvedValue({ ok: true, results: [] });
     render(
       <MemoryRouter>
-        <NewSolicitacaoWizard />
+        <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+          <NewSolicitacaoWizard />
+        </ComAcesso>
       </MemoryRouter>
     );
     await irParaParticipantesESelecionarFormador();
@@ -217,7 +225,9 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
     });
     render(
       <MemoryRouter>
-        <NewSolicitacaoWizard />
+        <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+          <NewSolicitacaoWizard />
+        </ComAcesso>
       </MemoryRouter>
     );
     await irParaParticipantesESelecionarFormador();
@@ -235,7 +245,9 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
     checkAvailabilityManyMock.mockRejectedValue(Object.assign(new Error('boom'), { status: 500 }));
     render(
       <MemoryRouter>
-        <NewSolicitacaoWizard />
+        <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+          <NewSolicitacaoWizard />
+        </ComAcesso>
       </MemoryRouter>
     );
     await irParaParticipantesESelecionarFormador();
@@ -250,7 +262,9 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
   test('avançar do passo Participantes com as respostas chega ao passo Detalhes (guarda do P0)', async () => {
     render(
       <MemoryRouter>
-        <NewSolicitacaoWizard />
+        <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+          <NewSolicitacaoWizard />
+        </ComAcesso>
       </MemoryRouter>
     );
     await irParaParticipantesESelecionarFormador();

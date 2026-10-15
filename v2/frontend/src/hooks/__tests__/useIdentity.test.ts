@@ -3,8 +3,7 @@
  *
  * `useIdentity` responde "quem é o usuário" (organograma: setor/função) e dados
  * de display (displayName, badge). É DISPLAY-ONLY — não decide autorização (isso
- * é `useCapabilities`, derivado de policies). Co-existe com `usePermissions`
- * (legacy) até a migração de callers (ondas 3.2/3.3).
+ * é `useCapabilities`, derivado de policies, lido via `useAcesso()`).
  */
 import { describe, test, expect } from 'vitest';
 import { computeIdentity } from '../useIdentity';

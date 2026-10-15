@@ -11,13 +11,11 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { MemoryRouter } from 'react-router';
 
-const { getMeMock, listDeslocamentosMock, listFormadoresMock } = vi.hoisted(() => ({
-  getMeMock: vi.fn(),
+const { listDeslocamentosMock, listFormadoresMock } = vi.hoisted(() => ({
   listDeslocamentosMock: vi.fn(),
   listFormadoresMock: vi.fn(),
 }));
 
-vi.mock('../../../api/availability', () => ({ getMe: getMeMock }));
 vi.mock('../../../api/deslocamentos', () => ({
   listDeslocamentos: listDeslocamentosMock,
   listFormadoresDoSetor: listFormadoresMock,
@@ -25,32 +23,25 @@ vi.mock('../../../api/deslocamentos', () => ({
   updateDeslocamento: vi.fn(),
   deleteDeslocamento: vi.fn(),
 }));
-vi.mock('../../../hooks/usePermissions', () => ({
-  computePermissions: () => ({
-    canControle: false,
-    canCoordenador: true,
-    canDAT: false,
-    inSuperintendencia: false,
-  }),
-}));
 vi.mock('../../../components/DatImportsCentralizedBanner', () => ({ default: () => null }));
 
 import DeslocamentosPage from '../DeslocamentosPage';
+import { ComAcesso } from '../../../test/comAcesso';
 
 function renderPage() {
   return render(
     <MemoryRouter>
-      <DeslocamentosPage />
+      <ComAcesso policies={['access_travel']}>
+        <DeslocamentosPage />
+      </ComAcesso>
     </MemoryRouter>
   );
 }
 
 describe('DeslocamentosPage — filtros (#1622)', () => {
   beforeEach(() => {
-    getMeMock.mockReset();
     listDeslocamentosMock.mockReset();
     listFormadoresMock.mockReset();
-    getMeMock.mockResolvedValue({ id: 1, username: 'coord', groups: ['Coordenador'] });
     listDeslocamentosMock.mockResolvedValue({ count: 0, next: null, previous: null, results: [] });
     listFormadoresMock.mockResolvedValue([]);
   });

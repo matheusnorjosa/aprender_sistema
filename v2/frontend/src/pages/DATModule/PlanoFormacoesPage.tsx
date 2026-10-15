@@ -71,8 +71,7 @@ import {
   // getPlanoFormacoesResumoProjeto,
 } from '../../api/datModule';
 import { getMunicipiosOptions, getProjetosOptions } from '../../api/datModule';
-import { getMe } from '../../api/availability';
-import { computePermissions } from '../../hooks/usePermissions';
+import { useAcesso } from '../../contexts/AcessoContext';
 
 const { Title, Text } = Typography;
 
@@ -271,7 +270,10 @@ export default function PlanoFormacoesPage(): JSX.Element {
   const [detailPlano, setDetailPlano] = useState<PlanoFormacaoRecord | null>(null);
 
   // Gate do botao Excluir (#1740): so quem pode executar a operacao restrita.
-  const [canDeletePlano, setCanDeletePlano] = useState<boolean>(false);
+  // Gate do botao Excluir (#1740): o destroy exige `execute_restricted_operations` (superuser OU
+  // Superintendencia). PR 7 das permissoes: a mesma policy, de /api/me/policies/. O backend ja e
+  // autoritativo (403 + bloqueio de historico); evita exibir um botao que so retornaria erro.
+  const canDeletePlano = useAcesso().caps.canExecuteRestrictedOperations;
 
   // ============================================================
   // DATA LOADING
@@ -296,23 +298,6 @@ export default function PlanoFormacoesPage(): JSX.Element {
       }
     };
     void loadOptions();
-  }, []);
-
-  // Gate do botao Excluir (#1740): o destroy exige `execute_restricted_operations`
-  // (superuser OU Superintendencia). O backend ja e autoritativo (403 + bloqueio de
-  // historico); este check e defesa em camadas — evita exibir um botao que so
-  // retornaria erro.
-  useEffect(() => {
-    const loadPermissions = async () => {
-      try {
-        const userData = await getMe();
-        const perms = computePermissions(userData);
-        setCanDeletePlano(perms.isAdmin || perms.inSuperintendencia);
-      } catch {
-        setCanDeletePlano(false);
-      }
-    };
-    void loadPermissions();
   }, []);
 
   // ============================================================

@@ -7,7 +7,7 @@
  * Issue #927: App.tsx decomposition (Frente A — Arquitetura Frontend)
  */
 
-import { useState, useEffect, useRef, useCallback, lazy, Suspense, type JSX } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense, type JSX } from 'react';
 import { BrowserRouter as Router } from 'react-router';
 import { ConfigProvider, Layout, message, Result, Button } from 'antd';
 import logger from './utils/logger';
@@ -29,8 +29,7 @@ import { FullscreenLoader } from './components/FullscreenLoader';
 import { AppSidebar } from './components/AppSidebar';
 import { AppHeader } from './components/AppHeader';
 import { AppRoutes } from './components/AppRoutes';
-import { usePermissions } from './hooks/usePermissions';
-import { useCanAccess } from './hooks/useCanAccess';
+import { AcessoContext, montarAcesso } from './contexts/AcessoContext';
 import { useResponsive, sidebarSobrepondo } from './hooks/useResponsive';
 import { useGCalAlertsPolling } from './hooks/useGCalAlertsPolling';
 import { useUnreadNotificationsPolling } from './hooks/useUnreadNotificationsPolling';
@@ -97,11 +96,10 @@ function AppContent(): JSX.Element {
   // Sidebar aberta por cima: cabeçalho e conteúdo atrás do fundo saem do Tab e do leitor de tela.
   const conteudoInerte = sidebarSobrepondo(modo, sidebarCollapsed);
 
-  // ── Permissions (single source of truth) ──
-  const permissions = usePermissions(user);
-  // Issue #1263: Ações Internas é policy-driven (manage_internal_actions), não mais
-  // a flag legacy por grupo. Policy-only, então basta `policies` (sem legacy flags).
-  const access = useCanAccess(policies);
+  // ── Acesso (fonte única, PR 7 das permissões) ──
+  // Menu, rotas, botões e Página Inicial leem `useAcesso()`: as policies de /api/me/policies/
+  // e, onde a regra é o superusuário, `ehSuperusuario`.
+  const acesso = useMemo(() => montarAcesso(policies, user, loading), [policies, user, loading]);
 
   // ── Load user ──
   // `getMe()` primeiro (estabelece sessão); `getMyPolicies()` depois APENAS se
@@ -170,12 +168,12 @@ function AppContent(): JSX.Element {
   }, [user]);
 
   // ── GCal alerts polling ──
-  // Epic 3.3 cleanup: usa flag derivada do usePermissions (canControle já cobre superuser).
-  const { alerts } = useGCalAlertsPolling({ enabled: permissions.canControle });
+  // Quem opera o Controle (access_controle_section; o superusuário recebe todas as policies).
+  const { alerts } = useGCalAlertsPolling({ enabled: acesso.caps.canAccessControleSection });
 
   // ── Notification badge polling ──
   const { unreadNotifications } = useUnreadNotificationsPolling({
-    enabled: access.canManageInternalActions,
+    enabled: acesso.caps.canManageInternalActions,
     userId: user?.id,
   });
 
@@ -335,13 +333,12 @@ function AppContent(): JSX.Element {
   return (
     <ConfigProvider locale={ptBR} theme={antThemeConfig}>
       <Toaster position="top-right" toastOptions={{ duration: 5000 }} />
+      <AcessoContext.Provider value={acesso}>
       <Router>
         <OfflineBanner />
         <MonitorDeSessao onExpirada={handleInatividade} onSair={handleLogout} />
         <Layout style={{ minHeight: '100vh', background: colors.pageBackground }}>
           <AppSidebar
-            permissions={permissions}
-            policies={policies}
             gcalErrorCount={alerts.errors}
             unreadNotifications={unreadNotifications}
             modo={modo}
@@ -357,7 +354,7 @@ function AppContent(): JSX.Element {
           }}>
             <AppHeader
               user={user}
-              canManageInternalActions={access.canManageInternalActions}
+              canManageInternalActions={acesso.caps.canManageInternalActions}
               unreadNotifications={unreadNotifications}
               modo={modo}
               sidebarCollapsed={sidebarCollapsed}
@@ -370,11 +367,12 @@ function AppContent(): JSX.Element {
               role="main"
               style={{ padding: '0', minHeight: 'calc(100vh - 64px)', background: colors.pageBackground }}
             >
-              <AppRoutes user={user} permissions={permissions} policies={policies} />
+              <AppRoutes user={user} />
             </Content>
           </Layout>
         </Layout>
       </Router>
+      </AcessoContext.Provider>
     </ConfigProvider>
   );
 }

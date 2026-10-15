@@ -22,6 +22,7 @@ import {
 import { useTableFilters } from '../../hooks/useTableFilters';
 import { DAT_IMPORTS_CENTRALIZED_MESSAGE } from '../../components/DatImportsCentralizedBanner';
 import type { CurrentUser } from '../../types';
+import { ComAcesso } from '../../test/comAcesso';
 
 vi.mock('../../components/BlockForm', () => ({
   default: () => <div>Criar Bloqueio Form</div>,
@@ -194,7 +195,12 @@ describe('DAT Imports PR-D — remoção de entrypoints legados', () => {
   });
 
   test('DeslocamentosPage remove Importar deslocamentos e mantém filtros/tabela', async () => {
-    renderPage(<DeslocamentosPage />);
+    // A página decide pela policy access_travel (PR 7 das permissões), que o Controle recebe.
+    renderPage(
+      <ComAcesso policies={['access_travel']}>
+        <DeslocamentosPage />
+      </ComAcesso>,
+    );
 
     expect(await screen.findByRole('heading', { name: /Deslocamentos/i })).toBeInTheDocument();
     expect(screen.getByText('Filtros')).toBeInTheDocument();

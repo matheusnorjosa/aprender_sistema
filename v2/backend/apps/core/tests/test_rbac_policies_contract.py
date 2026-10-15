@@ -50,9 +50,14 @@ pytestmark = pytest.mark.django_db
 
 EXPECTED_PUBLIC_POLICY_KEYS_SORTED: list[str] = [
     "access_audit_logs",
+    "access_availability_blocks",  # PR 7 das permissões (15/10/2026): Bloqueios
     "access_controle_section",
+    "access_monthly_availability",  # PR 7: Grade Mensal
     "access_solicitation_approvals",
+    "access_travel",  # PR 7: Deslocamentos
     "create_solicitation",
+    "create_solicitation_without_purchase",  # PR 7: Nova Solicitação sem compra
+    "execute_restricted_operations",  # PR 7: excluir plano de formações
     "import_availability_blocks",
     "import_compras",
     "import_generic_spreadsheet",

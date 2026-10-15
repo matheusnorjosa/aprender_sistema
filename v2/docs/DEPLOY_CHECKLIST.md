@@ -100,7 +100,10 @@ manual, no container `web` novo. Os comandos são só leitura e não mostram dad
       (passo a passo no docstring de `management/commands/rbac_diff.py`)
 - [ ] Depois do deploy: devolver o arquivo ao `/tmp` do container novo e rodar
       `rbac_diff --comparar /tmp/antes.json`. Num PR que não muda poder, o esperado é literal:
-      `rbac_diff: 0 ganhos, 0 perdas`
+      `rbac_diff: 0 ganhos, 0 perdas`. PR que soma chave a `PUBLIC_POLICY_KEYS` é a exceção: mostra
+      `+ policies: <chaves novas>` para quem passa a tê-las, 0 perdas e nenhuma linha de `grupos`,
+      `capacidades`, `gerencias_escopo` ou `vinculos`. As chaves esperadas estão na decisão do PR
+      (ex.: D22 em `rbac_authorization_matrix.md`)
 - [ ] `rbac_diff --auditar` termina com exit 0: matriz Grupo × Capability do banco igual à do seed
       (`functional_permissions_seed.py`) e nenhuma gerência com perfil fora de `PERFIL_PERMITIDO`
       (`services/rbac_pacotes.py`). Exit 1 lista a divergência (grupo / capacidade, ou gerência / perfil)

@@ -60,6 +60,7 @@ import { formatFortaleza } from '../../utils/datetime';
 import type { ValidationResult, ApplyResult } from '../../components/ImportUploader';
 import logger from '../../utils/logger';
 import { PAGE_SIZES } from '../../constants';
+import { ehSuperusuario } from '../../contexts/AcessoContext';
 import type { ID } from '../../types';
 
 /** View mode type */
@@ -474,7 +475,7 @@ export default function UsuariosPage(): JSX.Element {
       // read-only (espelha GruposPage) em vez de deixar uma unhandled rejection.
       try {
         const auth = await checkAuth();
-        setCurrentIsSuperuser(Boolean(auth.user?.is_superuser));
+        setCurrentIsSuperuser(ehSuperusuario(auth.user));
       } catch {
         setCurrentIsSuperuser(false);
       }

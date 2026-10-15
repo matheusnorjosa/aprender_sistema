@@ -67,8 +67,8 @@ import {
 } from '../../api/solicitacoes';
 import { getStatusSummary, reapplyBatch, resyncBatch, type GCalStatusSummary } from '../../api/gcal';
 import { MeetLink } from '../../components/MeetLink';
-import { getGerencias, getMe } from '../../api/availability';
-import { computePermissions } from '../../hooks/usePermissions';
+import { getGerencias } from '../../api/availability';
+import { useAcesso } from '../../contexts/AcessoContext';
 import useGoogleIntegration from '../../hooks/useGoogleIntegration';
 import useGoogleGuard from '../../hooks/useGoogleGuard';
 import GoogleIntegrationCard from '../../components/google/GoogleIntegrationCard';
@@ -77,7 +77,7 @@ import { usePolling } from '../../hooks/usePolling';
 import { syncChannel } from '../../services/syncChannel';
 import { formatFortaleza } from '../../utils/datetime';
 import logger from '../../utils/logger';
-import type { ID, Solicitacao, GCalStatus, CurrentUser, Gerencia, PaginatedResponse, Participation } from '../../types';
+import type { ID, Solicitacao, GCalStatus, Gerencia, PaginatedResponse, Participation } from '../../types';
 import { formadoresLabel } from '../../utils/participants';
 import { mesmosDados } from '../../utils/mesmosDados';
 import { pausaDo429Ms } from '../../utils/retryAfter';
@@ -169,8 +169,8 @@ export default function PreAgendaPage(): JSX.Element {
   const [gcalCalendarId, setGcalCalendarId] = useState<string | null>(null);
   const gcalHasDateFilter = !!(gcalDateRange[0] || gcalDateRange[1]);
 
-  // OAuth Phase 5: Estado do usuário e integração Google
-  const [user, setUser] = useState<CurrentUser | null>(null);
+  // OAuth Phase 5: acesso (AcessoContext) e integração Google
+  const { caps, ehSuperusuario } = useAcesso();
   const { status: googleStatus, disconnect: googleDisconnect } = useGoogleIntegration();
 
   // Section 4 Epic #459: Consolidated Google OAuth guard
@@ -179,17 +179,8 @@ export default function PreAgendaPage(): JSX.Element {
     returnTo: '/pre-agenda',
   });
 
-  // Carregar dados do usuário
+  // Gerências do filtro
   useEffect(() => {
-    const loadUser = async (): Promise<void> => {
-      try {
-        const userData = await getMe();
-        setUser(userData);
-      } catch (error) {
-        logger.error('Erro ao carregar usuário:', error);
-      }
-    };
-    void loadUser();
     getGerencias({ ativo: true })
       .then((data) => setGerencias([...data].sort((a, b) => a.rotulo.localeCompare(b.rotulo, 'pt-BR'))))
       .catch((error: unknown) => logger.error('Erro ao carregar gerências:', error));
@@ -697,10 +688,8 @@ export default function PreAgendaPage(): JSX.Element {
     },
   ];
 
-  // OAuth Phase 5: RBAC — verificar se é Controle ou Super.
-  // Epic 3.3 cleanup: usa flags derivadas do usePermissions (SSOT).
-  const userPerms = user ? computePermissions(user) : null;
-  const showGoogleCard = !!(userPerms?.canControle || userPerms?.canSeeAllSectors);
+  // OAuth Phase 5: o cartão do Google é de quem opera o Controle (a mesma policy da rota).
+  const showGoogleCard = caps.canAccessControleSection;
 
   // Handlers para o card Google
   const handleGoogleConnect = (): void => {
@@ -1112,8 +1101,8 @@ export default function PreAgendaPage(): JSX.Element {
               </Card>
             )}
 
-            {/* Informações Técnicas (Colapsável) — apenas superuser (debug widget). Epic 3.3: usa flag isAdmin (SSOT). */}
-            {userPerms?.isAdmin && (
+            {/* Informações Técnicas (Colapsável) — apenas superuser (debug widget). */}
+            {ehSuperusuario && (
               <Collapse
                 size="small"
                 items={[

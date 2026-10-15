@@ -443,6 +443,7 @@ Limitar prefixos de Policy keys ao vocabulário:
 
 - `access_X` — acesso de leitura ao módulo (ex: `access_audit_logs`)
 - `create_X` — criação de recurso (ex: `create_solicitation`)
+- `execute_X` — operação restrita com nome próprio de capacidade (ex: `execute_restricted_operations`, PR 7)
 - `publish_X` — publicação/exposição de recurso (ex: `publish_setor_solicitacao`)
 - `use_X` — operação ativa (ex: `use_gcal_endpoints`)
 - `import_X` — importação de dados
@@ -495,9 +496,13 @@ PUBLIC_POLICY_KEYS: Final[frozenset[str]] = frozenset({
     "access_audit_logs",
     "use_gcal",
     "view_compras_dashboard",
-    # ... 19 outras — total 22 (apps/core/rbac/policies.py:363-387)
+    # ... 24 outras — total 27 (apps/core/rbac/policies.py, PUBLIC_POLICY_KEYS)
 })
 ```
+
+*(2026-10-15, PR 7 das permissões: +5 chaves — `access_monthly_availability`, `access_availability_blocks`,
+`access_travel`, `execute_restricted_operations`, `create_solicitation_without_purchase` — para o front
+decidir menu, rotas e botões só por policy. Ver "Front: acesso só por policy" abaixo.)*
 
 *(Corrigido em 2026-07-24: o comentário dizia "12 outras", implicando 15 chaves. São **21**.
 O SSOT é `PUBLIC_POLICY_KEYS` (`apps/core/rbac/policies.py`) — não replique a lista aqui, ela envelhece.)*
@@ -531,16 +536,34 @@ def user_has_policy(user, key: str) -> bool:
         return False
     if user.is_superuser:
         return True
+    # Composites: semântica que não cabe em "OR de capabilities".
+    if key == "access_solicitation_approvals":
+        return _user_has_solicitation_approvals(user)
+    if key in TELAS_DE_ESCOPO:  # Grade, Bloqueios, Deslocamentos (PR 7)
+        return _abre_tela_de_escopo(user, key, capacidades)
     codenames = ACCESS_POLICIES.get(key)
     if not codenames:
         return False
     return user_has_any_perm(user, *codenames)
 ```
 
+**Front: acesso só por policy (PR 7 das permissões, 15/10/2026)**:
+
+O frontend decide menu, rotas, botões e Página Inicial **só** pelas policies de `GET /api/me/policies/`
+(`useAcesso().caps`, `frontend/src/contexts/AcessoContext.ts`). Setor, função, grupos e vínculo do
+`/api/me/` são exibição. `is_superuser` só onde a regra É o superusuário, pelo helper único
+`ehSuperusuario(user)`. Trava: `frontend/src/test/lint/acessoSoPorPolicy.test.ts`.
+
+O que o front calculava sobre o organograma virou policy composta no servidor, com a mesma fórmula
+(`TELAS_DE_ESCOPO`): `view_all_availability` OU grupo listado OU vínculo GERENTE/COORDENADOR/APOIO
+vigente em gerência ativa (`user_tem_vinculo_de_gestao`). Prova pessoa a pessoa:
+`apps/core/tests/test_rbac_politicas_de_tela.py`. Os grupos de função saem dessa lista no PR 8.
+
 ---
 
 ## 10. Changelog
 
+- **2026-10-15** — PR 7 das permissões: +5 policies públicas (3 compostas de tela, 2 simples), verbo `execute_` no vocabulário, bloco "Front: acesso só por policy" no §9-bis.
 - **2026-04-23** — v1.0 criada com Epic 2 (#1181). `HasPerm` introduzido, 12 classes factory marcadas com `warnings.warn(DeprecationWarning)` + aviso para remoção no Epic 5.
 - **2026-04-26** — v1.1 adicionou §9 Policy Resolution Rules em planejamento para Epic 4 (Issue #1231). Documenta princípios de naming, vocabulário canônico, motivo legítimo de acesso, e anti-pattern de hardcode de role.
 - **2026-04-26** — v1.2 §9 atualizado para "implementada" (Epics 4.1–4.4) + adicionado bloco "Public surface" descrevendo `GET /api/me/policies/`, `PUBLIC_POLICY_KEYS`, stability rules, procedure para nova policy pública, e SSOT da semântica via `user_has_policy` (Epic 4.4, Issue #1235).

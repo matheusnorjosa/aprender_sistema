@@ -201,6 +201,7 @@ permission_classes = [IsAdminUser]                    # ❌ DRF built-in fora da
 | D19 | **Escopo da aprovadora por vínculo** + trava de cadastro de projeto SUPER (regra do dono) | 2026-09-30 | A base `gerente_superintendencia` aprova/reprova (individual e lote), edita, exclui e cria **só** solicitação de projeto do fluxo SUPER da gerência `SUPERINTENDENCIA` (`projeto_no_escopo_da_superintendencia`, fail-closed). Fora: decidir → 403 `out_of_approval_scope` (lote → `errors[]`); editar/excluir → 403; criar/mover → 400 em `projeto`. **Ver não muda** (lista, detalhe, prévia). As próprias seguem editáveis como para qualquer coordenador. Não mudam: superuser, par Controle + Assistente Administrativo, par legado (sai no B2) e quem é global por capability (Controle/DAT) para editar/excluir. Exceção: 2º vínculo vigente de GERENTE dela em outra gerência (COORDENADOR, APOIO e FORMADOR não) abre criar/editar/excluir/mover naquela gerência, não decidir. Racional: o B1 pôs a policy em `user_is_solicitacao_global` e devolveu o `M10-01` para as 5 aprovadoras. Trava de cadastro: `fluxo = SUPER` só em projeto da `SUPERINTENDENCIA` (API 400, admin, import não cria SUPER, seed cria na g1) — toda pendente SUPER fica no escopo delas. |
 | D21 | **Matriz Group × Capability muda só por PR** (D4 do [ADR-020](adr/ADR-020-lugar-onde-trabalha-da-o-poder.md)) | 2026-10-14 (PR A da arquitetura de permissões) | Substitui a D17. `FUNCTIONAL_PERMISSIONS_SEED[*].group_names` é a matriz, alinhada à de produção medida em 02/10 (DAT + `view_map_metrics`; Assistente Administrativo + `manage_purchases_and_materials`, `operate_preagenda`, `run_daily_operations`). Mudar = seed + migration de dados com `# noqa: RBAC-migration-allowed`, com `rbac_diff` no PR. `PermissaoFuncionalAdmin` só leitura (`has_change_permission → False`); `GroupSerializer` responde 400 quando `permissao_funcional_ids` difere do conjunto atual e nunca grava; a tela de Grupos mostra as permissões só para leitura. `rbac_diff --auditar` (checklist pós-deploy) sai com exit 1 se banco ≠ seed ou se houver gerência com perfil ≠ PADRAO fora de `PERFIL_PERMITIDO`. No mesmo PR: `Gerencia.perfil` (sem efeito até o PR B), trava dos importadores para EQUIPE/GERENTE em gerência com pacote (`vinculo_com_pacote_bloqueado`) e lint V004/V005. |
 | D20 | **Importação pela tela = só superusuário** | 2026-10-02 (decisão do dono) | Nenhuma importação pela tela na liberação: as cargas passam por script (`import_export_contract`), com ensaio. As 13 rotas de upload de planilha (12 endpoints + 1 alias, `/api/import-compras/`) trocam `HasPerm("import_spreadsheet")` / `HasPerm("manage_admin_registries")` / `CanImportGenericSpreadsheet` por `[IsAuthenticated, SuperuserOnly]`; nenhuma capability abre. Recurso `import_pela_tela` na Matriz Viva (representado por `POST /api/controle/import-compras/`); rota a rota em `test_imports_pela_tela_so_superusuario.py`, com sentinela para view nova que receba arquivo (`APIView`, `@api_view` ou rota de `ViewSet`; sinais: "import" na rota, parser de arquivo declarado, `request.FILES` lido no próprio handler ou `serializer_class` com campo de arquivo). A sentinela é uma rede auxiliar, não a garantia: ela **não pega** (a) a view que entrega o `request` a função de outro módulo sem ler arquivo no próprio handler, (b) o serializer escolhido só por `get_serializer_class()` e (c) a permissão definida só por `get_permissions()`. A garantia real são os testes por rota (cada perfil contra cada uma das 13 rotas) e a Matriz Viva (recurso `import_pela_tela`). No frontend, o item DAT > Importações, as rotas `/dat/importacoes`, `/dat/admin/colecoes` e `/dat/admin/equipe-gerencia` e os uploads dentro de Municípios e Usuários só aparecem para superusuário. Substitui a regra do PR-A1 DAT-Imports (2026-04-29, "DAT importa"). |
+| D22 | **Front decide acesso só por policy** (PR 7 das permissões) | 2026-10-15 | Menu, rotas, botões e Página Inicial leem só `/api/me/policies/` (`useAcesso().caps`) e, onde a regra é o superusuário (importação pela tela, PA-02 do próprio, campos só dele, debug), o helper `ehSuperusuario`. Sem mudar poder: 5 policies públicas novas — `access_monthly_availability`, `access_availability_blocks`, `access_travel` (compostas, `TELAS_DE_ESCOPO`: `view_all_availability` OU o grupo que o front lia OU vínculo GERENTE/COORDENADOR/APOIO vigente em gerência ativa; provadas pessoa a pessoa em `test_rbac_politicas_de_tela.py`), `execute_restricted_operations` e `create_solicitation_without_purchase` (a capacidade de mesmo nome). Matriz persona × tela (menu e rotas) igual para os 10 atores; exceções aprovadas pelo dono só na Página Inicial: E1 "Enviar"/"Minhas Solicitações" por `create_solicitation` (DAT sai, Gerente entra), E2 "Desempenho da Equipe" por `view_team_dashboard` (Diretoria/DAT entram, Gerente do setor Gerência sai), E3 bloco Administração só do superusuário. Compras passa a `view_compras_stats`: quem tem o grupo Assistente Administrativo sem o Controle passa a abrir Compras (já via o submenu Controle). `usePermissions`/`useCanAccess` apagados; trava `acessoSoPorPolicy.test.ts`. Os grupos de função saem das telas de escopo no PR 8. |
 
 ---
 
@@ -210,17 +211,19 @@ permission_classes = [IsAdminUser]                    # ❌ DRF built-in fora da
 
 | # | Recurso | Problema | Fix |
 |---|---------|----------|-----|
-| C1 | Dashboards sidebar | `usePermissions.canDashboardEquipe`/`canMapaBrasil`/`canDashboardGcal` hardcoded inclui Controle, contra D7 | Restringir a Diretoria/DAT/superuser |
 | C2 | Deslocamentos sidebar | UI mostra para Coord/DAT, backend exige `view_all_availability` (Controle/DAT após 0080) | Alinhar gate (esconder pra Coord) ou alargar backend (decisão pendente) |
 
 ### Onda 2 — Altos
 
 | # | Recurso | Problema | Fix |
 |---|---------|----------|-----|
-| A2 | `usePermissions.canDashboardCompras` | Hardcoded em vez de consumir policy `view_compras_dashboard` (que está em PUBLIC_POLICY_KEYS) | Migrar para `useCanAccess` derived flag |
 | A3 | 4 viewsets com `[IsAuthenticated]` apenas | Confiando 100% em queryset filter; sem capability check explícito | Adicionar `CanAccessBlocks` ou similar |
 
 ### Concluído (entregue — antes rastreado aqui como pendência)
+
+- **C1 — Dashboards no menu** e **A2 — Dashboard Compras**: o menu lê as policies
+  (`view_team_dashboard`, `view_map_metrics`, `view_gcal_dashboard`, `view_compras_dashboard`) desde o
+  #1270; as flags de organograma (`usePermissions`) foram apagadas no PR 7 (D22).
 
 - **C3 — Ações Internas**: `[IsAdminUser]` substituído pela capability `manage_internal_actions`
   (migration `0079_add_manage_internal_actions`); `CicloAcoesViewSet`/`AcaoInstanciaViewSet` usam
@@ -252,6 +255,6 @@ Ver memória `project_rbac_access_policy_realignment.md` para detalhes do escopo
 - `apps/core/services/functional_permissions_seed.py` — SSOT do seed (mestre da §4)
 - `apps/core/migrations/0077_realign_funcperm_groups.py` + `0078_scope_view_all_availability.py` — realinhamentos data-only aplicados
 - `apps/core/rbac/permissions.py` — `HasPerm`, `HasSectorAccess`, `IsGerenteSuperintendencia`, `IsOwnerOrPrivileged`
-- `v2/frontend/src/hooks/usePermissions.ts` — flags derivadas legacy (em migração para `useCanAccess`)
-- `v2/frontend/src/hooks/useCanAccess.ts` — camada de tradução semântica (D5)
+- `v2/frontend/src/contexts/AcessoContext.ts` — fonte única de acesso no front (`useAcesso`, `ehSuperusuario`; D22)
+- `v2/frontend/src/hooks/useCapabilities.ts` — uma flag por policy pública
 - `v2/frontend/src/components/access/RequirePolicy.tsx` — wrapper de rota

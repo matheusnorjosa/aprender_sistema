@@ -202,6 +202,7 @@ HTTPS; repassa `X-Real-IP` e `X-Forwarded-For` com o endereço do cliente; `clie
 |---|---|---|
 | IP do cliente | `real_ip_header X-Real-IP` + `set_real_ip_from` 172.16.0.0/12, 10.0.0.0/8, 192.168.0.0/16 + `real_ip_recursive on` | Quem conecta é sempre o NPM; sem isto o `limit_req` era um balde único para todos. O cabeçalho só vale quando a conexão vem de faixa privada (rede Docker). |
 | Limite de taxa em `/api/` | `limit_req` 30 r/s por cliente, `burst=60 nodelay`, resposta **429** (`limit_req_status`) | Válvula antes do Django; o limite por pessoa é o throttle do DRF ([API_REFERENCE](../../API_REFERENCE.md), Rate Limiting). |
+| Limite de taxa em `/admin/` | zona própria `admin`, 30 r/min por cliente, `burst=10 nodelay`, resposta **429** | Cada POST em `/admin/login/` roda um PBKDF2: segura força bruta e esgotamento dos workers. Os estáticos do admin vão por `/static/`, sem limite. O bloqueio por conta é o mesmo da API (`views_auth.conta_bloqueada` + receptor de `user_login_failed`). |
 | Upload | `client_max_body_size 11m` | O Django aceita planilha de 10 MB (`upload_validators.py`); com o padrão de 1 MB a de 5 MB recebia 413 do nginx. |
 | Rotas | `location ^~` em `/api/`, `/admin/`, `/static/`, `/assets/` | O prefixo ganha das locations por regex: a regra de imagens capturava `/static/admin/img/*.svg` (ícones do admin em 404). O bloqueio de `.map` é repetido dentro de `/assets/`. |
 

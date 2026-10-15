@@ -191,9 +191,11 @@ AUTH_USER_MODEL = "core.Usuario"
 # AUTHENTICATION BACKENDS
 # ================================================================
 # Custom backend: permite login por CPF ou username
+# Um backend só (C7, auditoria 2026-10-14): o ModelBackend de fallback refazia a busca
+# por username e somava um hash, e o tempo separava CPF existente de inexistente. O
+# CPFOrUsernameBackend já cobre login por username e herda as permissões do ModelBackend.
 AUTHENTICATION_BACKENDS = [
-    "apps.core.auth_backends.CPFOrUsernameBackend",  # Custom: CPF or username
-    "django.contrib.auth.backends.ModelBackend",  # Fallback: default Django
+    "apps.core.auth_backends.CPFOrUsernameBackend",  # CPF ou username
 ]
 
 # ================================================================

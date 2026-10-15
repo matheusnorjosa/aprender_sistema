@@ -11,8 +11,34 @@ Uso:
 
 from __future__ import annotations
 
+from typing import Any
+
 from django.contrib.admin import AdminSite as BaseAdminSite
+from django.contrib.admin.forms import AdminAuthenticationForm
 from django.http import HttpRequest
+
+from apps.core.views_auth import conta_bloqueada, limpar_falhas_de_login
+
+
+class LoginAdminComBloqueioForm(AdminAuthenticationForm):
+    """Login do admin com o mesmo bloqueio de conta da API (auditoria 2026-10-14, C1/C2).
+
+    Antes de ``authenticate()``: conta bloqueada recebe o mesmo erro de senha errada, sem
+    a senha ser testada. A falha é contada e gravada em ``LOGIN_FAILED`` pelo receptor de
+    ``user_login_failed`` (``views_auth.registrar_falha_de_login``), igual à API.
+    """
+
+    def clean(self) -> dict[str, Any]:
+        username = self.cleaned_data.get("username")
+        password = self.cleaned_data.get("password")
+        request = self.request
+        if request is None or not isinstance(username, str) or not isinstance(password, str):
+            return super().clean()  # sem credencial completa o Django não autentica
+        if conta_bloqueada(request, username, password):
+            raise self.get_invalid_login_error()
+        cleaned_data = super().clean()
+        limpar_falhas_de_login(request, username)
+        return cleaned_data
 
 
 class SuperuserOnlyAdminSite(BaseAdminSite):
@@ -28,6 +54,7 @@ class SuperuserOnlyAdminSite(BaseAdminSite):
     site_header = "AS v2 Admin (Dev Only)"
     site_title = "AS v2 Admin"
     index_title = "Administração (Superusers apenas)"
+    login_form = LoginAdminComBloqueioForm
 
     def has_permission(self, request: HttpRequest) -> bool:
         """

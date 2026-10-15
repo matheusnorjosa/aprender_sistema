@@ -20,9 +20,10 @@ import json
 from datetime import date
 from typing import Any
 
-import pytest
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
+
+import pytest
 
 from apps.core.models import DATCadastro, Produto, ProjetoGeral
 from apps.core.services.export_contract_importer import ExportContractImporter

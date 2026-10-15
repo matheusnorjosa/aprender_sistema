@@ -14,7 +14,7 @@
  * Sem isso, o fetch rejeita no jsdom e loga async no teardown do worker →
  * EnvironmentTeardownError, reprovando o CI mesmo com asserts verdes.
  * `usePolling` também é mockado (no-op) para não disparar polling real.
- * `computeAccess` (useCanAccess) fica REAL — a permissão é dirigida via as
+ * `computeCapabilities` fica REAL — a permissão é dirigida via as
  * policies mockadas, exercitando a tradução policy → canApprove de verdade.
  */
 
@@ -218,7 +218,7 @@ describe('ApprovalsPage', () => {
     renderPage();
 
     // Espera a LINHA renderizar (query de texto, rápida) e então os botões de ação
-    // DENTRO da tabela. canApprove vem de computeAccess(policies) real. `findByRole`
+    // DENTRO da tabela. canApprove vem de computeCapabilities(policies) real. `findByRole`
     // por nome acessível numa tabela AntD é lento no CI (recomputa o nome de todos os
     // botões a cada poll); escopar na tabela + timeout folgado evita estourar o
     // timeout do teste sob carga (o ícone entra no nome acessível, daí o regex).

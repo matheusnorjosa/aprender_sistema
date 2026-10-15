@@ -5,8 +5,9 @@
  * (`src/test/atoresRbac.ts`: payload de /me e policies medidas no backend). Cobre os
  * itens de topo, os filhos de Dashboards, DAT, Controle (Compras) e Solicitações.
  *
- * PR 7 das permissões: o menu passa a decidir só por policy. Esta matriz foi
- * commitada verde com o código antigo; depois da troca ela não pode mudar.
+ * PR 7 das permissões: o menu decide só por policy (`AcessoContext`). Esta matriz foi
+ * commitada verde com o código antigo e não mudou com a troca. As personas por vínculo
+ * ("Ana" ≡ DAT, "Bruno" ≡ Controle) provam que quem recebe as mesmas policies vê o mesmo menu.
  */
 
 import { useState } from 'react';
@@ -15,10 +16,16 @@ import { render, screen, within, fireEvent } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 
 import { AppSidebar } from '../AppSidebar';
-import type { Permissions } from '../../hooks/usePermissions';
-import { computePermissions } from '../../hooks/usePermissions';
 import type { ModoSidebar } from '../../hooks/useResponsive';
-import { ATORES_RBAC, atorRbac, type AtorRbac, type NomeDoAtor } from '../../test/atoresRbac';
+import {
+  ATORES_RBAC,
+  PERSONAS_POR_VINCULO,
+  atorRbac,
+  usuarioDeTeste,
+  type AtorRbac,
+  type NomeDoAtor,
+} from '../../test/atoresRbac';
+import { ComAcesso } from '../../test/comAcesso';
 
 // ============================================================================
 // Setup
@@ -35,43 +42,20 @@ const SIDEBAR_PROPS = {
   colors: COLORS,
 };
 
-const EMPTY_PERMISSIONS: Permissions = {
-  isAdmin: false,
-  isCoordenador: false,
-  isFormador: false,
-  isGerente: false,
-  inSuperintendencia: false,
-  inGerencia: false,
-  inDAT: false,
-  inControle: false,
-  inDiretoria: false,
-  canApproveSuper: false,
-  canCoordenador: false,
-  canControle: false,
-  canDAT: false,
-  canAcoesInternas: false,
-  canDashboardOverview: false,
-  canDashboardEquipe: false,
-  canDashboardGcal: false,
-  canDashboardCompras: false,
-  canMapaBrasil: false,
-  canDashboardsMenu: false,
-  canDisponibilidade: false,
-  isGestorPorVinculo: false,
-  canSeeAllSectors: false,
-};
-
-function renderSidebar(permissions: Permissions, policies: readonly string[]): void {
+/** Renderiza o menu com o acesso que o App monta (policies + superusuário). */
+function renderSidebar(policies: readonly string[], superusuario = false): void {
   render(
     <MemoryRouter>
-      <AppSidebar permissions={permissions} policies={policies} {...SIDEBAR_PROPS} />
+      <ComAcesso policies={policies} superusuario={superusuario}>
+        <AppSidebar {...SIDEBAR_PROPS} />
+      </ComAcesso>
     </MemoryRouter>,
   );
 }
 
-/** Renderiza o menu como o App o monta para a pessoa (payload de /me + /me/policies). */
+/** O menu da pessoa: só as policies e o superusuário do payload de /me contam. */
 function renderSidebarDoAtor({ user, policies }: Pick<AtorRbac, 'user' | 'policies'>): void {
-  renderSidebar(computePermissions(user), policies);
+  renderSidebar(policies, user.is_superuser);
 }
 
 // ============================================================================
@@ -412,26 +396,40 @@ describe('AppSidebar — sanity da matriz', () => {
 });
 
 describe('AppSidebar — Aprovações é policy-only (PR 10 hardening RBAC)', () => {
-  test('legacy canApproveSuper=true sem policy → Aprovações ESCONDIDA', () => {
-    // Garante que o regression do PR 10 (#1315) não regrediu: o frontend não
-    // deve consultar `permissions.canApproveSuper`. Mesmo com a flag legacy
-    // setada, sem `access_solicitation_approvals` o item não aparece.
-    renderSidebar(
-      {
-        ...EMPTY_PERMISSIONS,
-        canApproveSuper: true, // legacy — não deve influenciar
-        inSuperintendencia: true,
-        isGerente: true,
-        canSeeAllSectors: true,
-      },
-      [], // policy ausente
-    );
-    expect(screen.queryByRole('link', { name: /^Aprovações$/i })).not.toBeInTheDocument();
+  test('policy access_solicitation_approvals → Aprovações VISÍVEL', () => {
+    renderSidebar(['access_solicitation_approvals']);
+    expect(screen.getByRole('link', { name: /^Aprovações$/i })).toBeInTheDocument();
   });
 
-  test('policy access_solicitation_approvals sem flag legacy → Aprovações VISÍVEL', () => {
-    renderSidebar(EMPTY_PERMISSIONS, ['access_solicitation_approvals']);
-    expect(screen.getByRole('link', { name: /^Aprovações$/i })).toBeInTheDocument();
+  test('sem a policy → Aprovações ESCONDIDA', () => {
+    renderSidebar([]);
+    expect(screen.queryByRole('link', { name: /^Aprovações$/i })).not.toBeInTheDocument();
+  });
+});
+
+// ============================================================================
+// PR 7: setor, função e vínculo do /me não abrem item; quem tem as mesmas policies vê o mesmo menu
+// ============================================================================
+
+describe('AppSidebar — personas por vínculo ≡ grupo (PR 7)', () => {
+  test.each(PERSONAS_POR_VINCULO)('$ator vê o mesmo menu que $equivale', ({ user, policies, equivale }) => {
+    const esperado = ACTORS.find((a) => a.actor === equivale)!;
+    renderSidebarDoAtor({ user, policies });
+    expect(TOP_LEVEL_ITEMS.filter(isTopLevelVisible)).toEqual(esperado.expectedVisible);
+  });
+
+  test.each(PERSONAS_POR_VINCULO)('$ator: filhos de DAT e Controle iguais aos de $equivale', ({ user, policies, equivale }) => {
+    const esperado = ACTORS.find((a) => a.actor === equivale)!;
+    renderSidebarDoAtor({ user, policies });
+    expect(filhosDoSubmenu('DAT', DAT_CHILDREN)).toEqual(esperado.expectedDatChildren);
+    expect(filhosDoSubmenu('Controle', CONTROLE_CHILDREN)).toEqual(esperado.expectedControleChildren);
+  });
+
+  test('o payload de /me (grupos, vínculo, can_approve_super) sozinho não abre nada', () => {
+    // Gerente da Superintendência inteiro no /me, nenhuma policy: só os itens de todos.
+    const { user } = atorRbac('Gerente da Superintendência');
+    renderSidebarDoAtor({ user, policies: [] });
+    expect(TOP_LEVEL_ITEMS.filter(isTopLevelVisible)).toEqual(['Página Inicial', 'Meus Eventos']);
   });
 });
 
@@ -440,18 +438,10 @@ describe('AppSidebar — Aprovações é policy-only (PR 10 hardening RBAC)', ()
 // ============================================================================
 
 describe('AppSidebar — "Publicar na agenda" (#1656)', () => {
-  // usePermissions trata Apoio igual a Coordenador; a diferença está na policy.
-  const APOIO_PERMISSIONS: Permissions = {
-    ...EMPTY_PERMISSIONS,
-    isCoordenador: true,
-    canCoordenador: true,
-    canAcoesInternas: true,
-    canDisponibilidade: true,
-  };
   const APOIO_POLICIES = ['create_solicitation', 'publish_setor_solicitacao'];
 
   test('Apoio de Coordenação vê Minhas, Nova e Publicar na agenda (→ /solicitacoes/publicacao)', () => {
-    renderSidebar(APOIO_PERMISSIONS, APOIO_POLICIES);
+    renderSidebar(APOIO_POLICIES);
     expect(getSolicitacoesChildren()).toEqual(SOLICITACOES_CHILDREN);
     expect(
       screen.getByRole('link', { name: /^Publicar na agenda$/i }).getAttribute('href'),
@@ -459,12 +449,12 @@ describe('AppSidebar — "Publicar na agenda" (#1656)', () => {
   });
 
   test('Coordenador (só create_solicitation) continua com Minhas e Nova', () => {
-    renderSidebar(APOIO_PERMISSIONS, ['create_solicitation']);
+    renderSidebar(['create_solicitation']);
     expect(getSolicitacoesChildren()).toEqual(['Minhas Solicitações', 'Nova Solicitação']);
   });
 
   test('só publish_setor_solicitacao: o submenu aparece, só com Publicar na agenda', () => {
-    renderSidebar(EMPTY_PERMISSIONS, ['publish_setor_solicitacao']);
+    renderSidebar(['publish_setor_solicitacao']);
     expect(isTopLevelVisible('Solicitações')).toBe(true);
     expect(getSolicitacoesChildren()).toEqual(['Publicar na agenda']);
   });
@@ -472,7 +462,9 @@ describe('AppSidebar — "Publicar na agenda" (#1656)', () => {
   test('deep-link em /solicitacoes/publicacao abre o submenu e seleciona o item', () => {
     render(
       <MemoryRouter initialEntries={['/solicitacoes/publicacao']}>
-        <AppSidebar permissions={APOIO_PERMISSIONS} policies={APOIO_POLICIES} {...SIDEBAR_PROPS} />
+        <ComAcesso policies={APOIO_POLICIES}>
+          <AppSidebar {...SIDEBAR_PROPS} />
+        </ComAcesso>
       </MemoryRouter>,
     );
     const link = screen.getByRole('link', { name: /^Publicar na agenda$/i });
@@ -481,31 +473,40 @@ describe('AppSidebar — "Publicar na agenda" (#1656)', () => {
 });
 
 describe('AppSidebar — Ações Internas é policy-only (Issue #1263)', () => {
-  test('legacy canAcoesInternas=true sem policy → Ações Internas ESCONDIDA', () => {
-    // Bug #1263: a flag legacy por grupo mostrava o menu para DAT/Coordenador/
-    // Gerente, mas o backend exige `manage_internal_actions` (0 grupos no seed).
-    // Sem a policy, o item some — alinhando frontend e backend (fim do menu→403).
-    renderSidebar(
-      { ...EMPTY_PERMISSIONS, canAcoesInternas: true, inDAT: true, canCoordenador: true },
-      [], // policy ausente
-    );
+  test('sem manage_internal_actions → Ações Internas ESCONDIDA (mesmo para DAT)', () => {
+    // Bug #1263: o grupo mostrava o menu, mas o backend exige a policy (0 grupos no seed).
+    renderSidebarDoAtor(atorRbac('DAT'));
     expect(isTopLevelVisible('Ações Internas')).toBe(false);
   });
 
-  test('policy manage_internal_actions sem flag legacy → Ações Internas VISÍVEL', () => {
-    renderSidebar(EMPTY_PERMISSIONS, ['manage_internal_actions']);
+  test('policy manage_internal_actions → Ações Internas VISÍVEL', () => {
+    renderSidebar(['manage_internal_actions']);
     expect(isTopLevelVisible('Ações Internas')).toBe(true);
   });
 });
 
-describe('AppSidebar — gestor só por vínculo (PR A)', () => {
-  test('vínculo de gestão sem grupo → Grade Mensal, Bloqueios e Deslocamentos visíveis', () => {
-    // Espelha as rotas (AppRoutes): o backend escopa por vínculo EquipeGerencia.
-    renderSidebar({ ...EMPTY_PERMISSIONS, isGestorPorVinculo: true, canDisponibilidade: true }, []);
-    expect(isTopLevelVisible('Grade Mensal')).toBe(true);
-    expect(isTopLevelVisible('Bloqueios')).toBe(true);
-    expect(isTopLevelVisible('Deslocamentos')).toBe(true);
-    expect(isTopLevelVisible('Aprovações')).toBe(false);
+describe('AppSidebar — telas de escopo pela policy (PR 7)', () => {
+  test.each([
+    ['access_monthly_availability', 'Grade Mensal'],
+    ['access_availability_blocks', 'Bloqueios'],
+    ['access_travel', 'Deslocamentos'],
+  ] as const)('%s → %s visível, e só ela', (policy, item) => {
+    renderSidebar([policy]);
+    expect(TOP_LEVEL_ITEMS.filter(isTopLevelVisible)).toEqual(['Página Inicial', 'Meus Eventos', item]);
+  });
+
+  test('vínculo de gestão no /me sem as policies → nenhuma das três', () => {
+    // O servidor já soma o vínculo nas policies (access_*); a tela não relê o payload.
+    const user = usuarioDeTeste({ gerencias: [{ id: 4, rotulo: 'Superativar', papeis: ['COORDENADOR'] }] });
+    renderSidebarDoAtor({ user, policies: [] });
+    expect(isTopLevelVisible('Grade Mensal')).toBe(false);
+    expect(isTopLevelVisible('Bloqueios')).toBe(false);
+    expect(isTopLevelVisible('Deslocamentos')).toBe(false);
+  });
+
+  test('Importações (DAT) é do superusuário, não da policy', () => {
+    renderSidebar(['manage_admin_registries'], false);
+    expect(filhosDoSubmenu('DAT', DAT_CHILDREN)).not.toContain('Importações');
   });
 });
 
@@ -514,28 +515,23 @@ describe('AppSidebar — modo pela largura (Programa C, C1)', () => {
   function SidebarComEstado({ modo, recolhidaInicial }: { modo: ModoSidebar; recolhidaInicial: boolean }) {
     const [recolhida, setRecolhida] = useState(recolhidaInicial);
     return (
-      <AppSidebar
-        permissions={EMPTY_PERMISSIONS}
-        policies={['manage_admin_registries']}
-        {...SIDEBAR_PROPS}
-        modo={modo}
-        sidebarCollapsed={recolhida}
-        toggleSidebar={() => setRecolhida((r) => !r)}
-      />
+      <ComAcesso policies={['manage_admin_registries']}>
+        <AppSidebar
+          {...SIDEBAR_PROPS}
+          modo={modo}
+          sidebarCollapsed={recolhida}
+          toggleSidebar={() => setRecolhida((r) => !r)}
+        />
+      </ComAcesso>
     );
   }
 
   function renderModo(modo: 'sobreposta' | 'recolhida' | 'aberta', sidebarCollapsed: boolean, toggleSidebar = () => {}) {
     render(
       <MemoryRouter initialEntries={['/dat/admin/usuarios']}>
-        <AppSidebar
-          permissions={EMPTY_PERMISSIONS}
-          policies={['manage_admin_registries']}
-          {...SIDEBAR_PROPS}
-          modo={modo}
-          sidebarCollapsed={sidebarCollapsed}
-          toggleSidebar={toggleSidebar}
-        />
+        <ComAcesso policies={['manage_admin_registries']}>
+          <AppSidebar {...SIDEBAR_PROPS} modo={modo} sidebarCollapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
+        </ComAcesso>
       </MemoryRouter>,
     );
   }
@@ -584,14 +580,9 @@ describe('AppSidebar — modo pela largura (Programa C, C1)', () => {
     const toggle = vi.fn();
     render(
       <MemoryRouter initialEntries={['/home']}>
-        <AppSidebar
-          permissions={EMPTY_PERMISSIONS}
-          policies={['manage_admin_registries']}
-          {...SIDEBAR_PROPS}
-          modo="sobreposta"
-          sidebarCollapsed={false}
-          toggleSidebar={toggle}
-        />
+        <ComAcesso policies={['manage_admin_registries']}>
+          <AppSidebar {...SIDEBAR_PROPS} modo="sobreposta" sidebarCollapsed={false} toggleSidebar={toggle} />
+        </ComAcesso>
       </MemoryRouter>,
     );
     const inicio = screen.getByRole('link', { name: 'Página Inicial' });
@@ -606,17 +597,20 @@ describe('AppSidebar — modo pela largura (Programa C, C1)', () => {
   });
 
   test('recolhida → expandida: abre o submenu da página atual', () => {
-    const props = { permissions: EMPTY_PERMISSIONS, policies: ['manage_admin_registries'], ...SIDEBAR_PROPS };
     const { rerender } = render(
       <MemoryRouter initialEntries={['/dat/admin/usuarios']}>
-        <AppSidebar {...props} modo="recolhida" sidebarCollapsed />
+        <ComAcesso policies={['manage_admin_registries']}>
+          <AppSidebar {...SIDEBAR_PROPS} modo="recolhida" sidebarCollapsed />
+        </ComAcesso>
       </MemoryRouter>,
     );
     expect(screen.queryByRole('link', { name: 'Administração' })).not.toBeInTheDocument();
 
     rerender(
       <MemoryRouter initialEntries={['/dat/admin/usuarios']}>
-        <AppSidebar {...props} modo="recolhida" sidebarCollapsed={false} />
+        <ComAcesso policies={['manage_admin_registries']}>
+          <AppSidebar {...SIDEBAR_PROPS} modo="recolhida" sidebarCollapsed={false} />
+        </ComAcesso>
       </MemoryRouter>,
     );
 

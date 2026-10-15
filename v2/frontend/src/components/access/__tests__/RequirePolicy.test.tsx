@@ -44,6 +44,24 @@ describe('<RequirePolicy>', () => {
     expect(screen.queryByText(/403/)).not.toBeInTheDocument();
   });
 
+  test('lista de policies: qualquer uma basta (PR 7)', () => {
+    renderWithRouter(
+      <RequirePolicy policy={['create_solicitation', 'manage_admin_registries']} policies={['manage_admin_registries']}>
+        <ProtectedContent />
+      </RequirePolicy>
+    );
+    expect(screen.getByTestId('protected-content')).toBeInTheDocument();
+  });
+
+  test('lista de policies: nenhuma presente → Forbidden', () => {
+    renderWithRouter(
+      <RequirePolicy policy={['create_solicitation', 'manage_admin_registries']} policies={['use_gcal']}>
+        <ProtectedContent />
+      </RequirePolicy>
+    );
+    expect(screen.queryByTestId('protected-content')).not.toBeInTheDocument();
+  });
+
   test('renders custom fallback when provided', () => {
     renderWithRouter(
       <RequirePolicy

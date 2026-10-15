@@ -15,8 +15,7 @@ import {
   BellOutlined,
   TableOutlined,
 } from '@ant-design/icons';
-import type { Permissions } from '../hooks/usePermissions';
-import { useCapabilities } from '../hooks/useCapabilities';
+import { useAcesso } from '../contexts/AcessoContext';
 import { LAYOUT } from '../constants';
 import { ID_NAVEGACAO_PRINCIPAL, sidebarSobrepondo, type ModoSidebar } from '../hooks/useResponsive';
 
@@ -176,8 +175,6 @@ function SidebarMenu({ recolhido, openKeys, onOpenChange, onItemClick, children 
 // ============================================================================
 
 interface AppSidebarProps {
-  permissions: Permissions;
-  policies: readonly string[];
   gcalErrorCount: number;
   unreadNotifications: number;
   modo: ModoSidebar;
@@ -190,8 +187,6 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({
-  permissions,
-  policies,
   gcalErrorCount,
   unreadNotifications,
   modo,
@@ -229,16 +224,9 @@ export function AppSidebar({
     if (sobrepondo) toggleSidebar();
   }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // #1270 (RBAC 3.2): os itens de menu derivam de `useCapabilities` (policy pura,
-  // fonte de verdade do backend). As flags legacy de organograma permanecem SÓ onde
-  // não há policy pública equivalente: escopo próprio de Formador/Coordenador em
-  // Bloqueios/Deslocamentos e o acesso scoped da Grade Mensal (`canDisponibilidade`).
-  // Todas são flags can*/is* (não `in*`).
-  const {
-    canCoordenador, canControle, canDAT, isFormador, canDisponibilidade, isGestorPorVinculo,
-  } = permissions;
-
-  const caps = useCapabilities(policies);
+  // PR 7 das permissões: cada item lê só a policy (/api/me/policies/) e, em Importações, o
+  // superusuário. Setor, função e vínculo já entram no cálculo do servidor.
+  const { caps, ehSuperusuario } = useAcesso();
 
   return (
     <>
@@ -348,9 +336,8 @@ export function AppSidebar({
               </Menu.Item>
             )}
 
-            {/* Bloqueios: policy view_all_availability + escopo próprio de Formador/Coordenador
-                (sem policy pública) e Controle (access_controle_section). */}
-            {(caps.canViewAllAvailability || canControle || canCoordenador || isFormador || isGestorPorVinculo) && (
+            {/* Bloqueios: access_availability_blocks (inclui o próprio bloqueio do Formador). */}
+            {caps.canAccessAvailabilityBlocks && (
               <Menu.Item key="bloqueios" icon={<StopOutlined />} onClick={closeAllSubmenus}>
                 <Link to="/solicitacoes/bloqueios">Bloqueios</Link>
               </Menu.Item>
@@ -379,7 +366,7 @@ export function AppSidebar({
               </SubMenu>
             )}
 
-            {(caps.canViewAllAvailability || canControle || canCoordenador || canDAT || isGestorPorVinculo) && (
+            {caps.canAccessTravel && (
               <Menu.Item key="deslocamentos" icon={<CarOutlined />} onClick={closeAllSubmenus}>
                 <Link to="/solicitacoes/deslocamentos">Deslocamentos</Link>
               </Menu.Item>
@@ -418,16 +405,15 @@ export function AppSidebar({
                 <Menu.Item key="dat-admin"><Link to="/dat/admin">Administração</Link></Menu.Item>
                 <Menu.Item key="dat-cadastros"><Link to="/dat/cadastros">Cadastros</Link></Menu.Item>
                 {/* Importação pela tela: só superusuário (decisão do dono, 02/10/2026). */}
-                {permissions.isAdmin && (
+                {ehSuperusuario && (
                   <Menu.Item key="dat-importacoes"><Link to="/dat/importacoes">Importações</Link></Menu.Item>
                 )}
                 <Menu.Item key="dat-registros"><Link to="/dat/registros">Registros de Turmas</Link></Menu.Item>
               </SubMenu>
             )}
 
-            {/* Grade Mensal: policy view_all_availability (Controle/DAT global) + acesso
-                scoped de Coordenador/Apoio/Gerente via canDisponibilidade (sem policy pública). */}
-            {(caps.canViewAllAvailability || canDisponibilidade) && (
+            {/* Grade Mensal: access_monthly_availability (global ou escopada; o backend escopa). */}
+            {caps.canAccessMonthlyAvailability && (
               <Menu.Item key="grade-mensal" icon={<TableOutlined />} onClick={closeAllSubmenus}>
                 <Link to="/solicitacoes/disponibilidade">Grade Mensal</Link>
               </Menu.Item>

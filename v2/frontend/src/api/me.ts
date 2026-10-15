@@ -67,8 +67,8 @@ export async function getMyEvents(
  * Backend: `GET /api/me/policies/` (Epic 4.4, Issue #1235).
  *
  * Subset de `PUBLIC_POLICY_KEYS` definido em `apps.core.rbac.policies`.
- * Frontend usa para menu condicional, redirects e mensagens de erro
- * via `useCanAccess` hook (Epic 3, Issue #1228).
+ * É a fonte única de acesso do frontend (PR 7 das permissões): o App carrega uma vez e
+ * menu, rotas, botões e Página Inicial leem via `useAcesso()` (`contexts/AcessoContext`).
  *
  * Contrato:
  * - Anonymous → 401 (chamada nunca deve ocorrer pré-login)

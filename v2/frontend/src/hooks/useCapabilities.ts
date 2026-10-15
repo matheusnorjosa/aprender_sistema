@@ -2,12 +2,11 @@
  * useCapabilities — "o que o usuário pode fazer" (Issue #1269, RBAC 3.1).
  *
  * Deriva capabilities EXCLUSIVAMENTE de `policies` (subset das PUBLIC_POLICY_KEYS
- * do backend, via `GET /api/me/policies/`). Sem fallback legacy, sem organograma —
- * essa é a diferença para `usePermissions`/`useCanAccess`. É a fonte de verdade de
- * autorização no frontend; o backend permanece autoritativo.
+ * do backend, via `GET /api/me/policies/`). Sem organograma. É a fonte de verdade de
+ * autorização no frontend (PR 7 das permissões: `usePermissions`/`useCanAccess` saíram);
+ * o backend permanece autoritativo. Os componentes leem via `useAcesso().caps`.
  *
- * Para "quem é o usuário" (setor/função, display) use `useIdentity`. Co-existe com
- * `usePermissions` (legacy) até a migração de callers (ondas 3.2/3.3).
+ * Para "quem é o usuário" (setor/função, display) use `useIdentity`.
  *
  * Cada flag `can*` espelha 1:1 uma policy key. Ao adicionar uma policy pública nova
  * no backend, adicione a flag correspondente aqui + um caso no teste de completude.
@@ -38,15 +37,21 @@ export interface Capabilities {
   canManageAdminRegistries: boolean;
   canManageInternalActions: boolean;
   canManagePurchasesAndMaterials: boolean;
-  // Policies de seção de menu (#1589) — paridade exata com os gates legacy do
-  // usePermissions (canControle / canDashboardEquipe / canDashboardGcal). Consumidas
-  // pelo AppSidebar em #1270.
+  // Policies de seção de menu (#1589). Consumidas pelo AppSidebar desde #1270.
   canAccessControleSection: boolean;
   canViewTeamDashboard: boolean;
   canViewGcalDashboard: boolean;
   // Apoio de Coordenação publica no Google Agenda os eventos aprovados do PRÓPRIO
   // setor (#1656) — distinto de `canUseGcal` (operação global da Pré-agenda).
   canPublishSetorSolicitacao: boolean;
+  // PR 7 das permissões (15/10/2026). Telas de escopo: o servidor soma view_all_availability,
+  // o grupo e o vínculo de gestão vigente (a fórmula que o front aplicava).
+  canAccessMonthlyAvailability: boolean;
+  canAccessAvailabilityBlocks: boolean;
+  canAccessTravel: boolean;
+  // Botões: excluir plano de formações e Nova Solicitação sem compra.
+  canExecuteRestrictedOperations: boolean;
+  canCreateSolicitationWithoutPurchase: boolean;
 }
 
 /** Versão pura (sem React) — usada em tests e call sites sem render. */
@@ -79,6 +84,11 @@ export function computeCapabilities(policies: readonly string[]): Capabilities {
     canViewTeamDashboard: can('view_team_dashboard'),
     canViewGcalDashboard: can('view_gcal_dashboard'),
     canPublishSetorSolicitacao: can('publish_setor_solicitacao'),
+    canAccessMonthlyAvailability: can('access_monthly_availability'),
+    canAccessAvailabilityBlocks: can('access_availability_blocks'),
+    canAccessTravel: can('access_travel'),
+    canExecuteRestrictedOperations: can('execute_restricted_operations'),
+    canCreateSolicitationWithoutPurchase: can('create_solicitation_without_purchase'),
   };
 }
 

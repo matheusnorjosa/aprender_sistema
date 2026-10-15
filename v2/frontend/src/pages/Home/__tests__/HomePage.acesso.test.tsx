@@ -3,19 +3,22 @@
  *
  * Os 10 atores de `src/test/atoresRbac.ts` mais um Gerente do setor "Gerência" (o único
  * que via "Desempenho da Equipe" pela regra antiga). Commitada verde com o código antigo;
- * no PR 7 só mudam as exceções aprovadas pelo dono em 15/10 (E1, E2), anotadas linha a linha.
+ * no PR 7 só mudaram as exceções aprovadas pelo dono em 15/10, anotadas linha a linha:
+ *
+ * - E1: "Enviar Solicitação" e "Minhas Solicitações" seguem `create_solicitation` (o mesmo
+ *   gate da rota). O DAT perde o atalho que dava "Recurso indisponível"; os Gerentes ganham.
+ * - E2: "Desempenho da Equipe" segue `view_team_dashboard` (o gate de /dashboards/equipe).
+ *   Diretoria e DAT ganham; o Gerente do setor Gerência perde o link que não abria.
+ * - E3: o bloco Acesso Administrativo continua só do superusuário.
  */
 import { MemoryRouter } from 'react-router';
 import { render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
-import { getMe } from '../../../api/availability';
-import { getMyPolicies } from '../../../api/me';
 import { ATORES_RBAC, usuarioDeTeste, type AtorRbac } from '../../../test/atoresRbac';
+import { ComAcesso } from '../../../test/comAcesso';
 import HomePage from '../HomePage';
 
-vi.mock('../../../api/availability', () => ({ getMe: vi.fn() }));
-vi.mock('../../../api/me', () => ({ getMyPolicies: vi.fn() }));
 vi.mock('../../../api/stats', () => ({
   getHomeStats: vi.fn().mockResolvedValue({ pending_approvals: 0, my_requests: 0, upcoming_events: 0 }),
 }));
@@ -45,33 +48,34 @@ const ESPERADO: Record<string, readonly Cartao[]> = {
     'Gerenciamento de Usuários',
     'Análises',
     'Solicitações de Aprovação',
+    'Desempenho da Equipe', // E2: ganha (view_team_dashboard)
     'Meu Painel',
     'Enviar Solicitação',
     'Minhas Solicitações',
   ],
-  DAT: ['Meu Painel', 'Enviar Solicitação', 'Minhas Solicitações'],
+  // E1: perde Enviar/Minhas (sem create_solicitation: a rota negava). E2: ganha Desempenho.
+  DAT: ['Desempenho da Equipe', 'Meu Painel'],
   Controle: ['Meu Painel'],
-  Diretoria: ['Meu Painel'],
-  'Gerente da Superintendência': ['Solicitações de Aprovação', 'Meu Painel'],
-  'Gerente pedagógico (Vidas)': ['Meu Painel'],
+  Diretoria: ['Desempenho da Equipe', 'Meu Painel'], // E2: ganha
+  // E1: ganha Enviar/Minhas (create_solicitation).
+  'Gerente da Superintendência': ['Solicitações de Aprovação', 'Meu Painel', 'Enviar Solicitação', 'Minhas Solicitações'],
+  'Gerente pedagógico (Vidas)': ['Meu Painel', 'Enviar Solicitação', 'Minhas Solicitações'], // E1: ganha
   Coordenador: ['Meu Painel', 'Enviar Solicitação', 'Minhas Solicitações'],
   'Apoio de Coordenação': ['Meu Painel', 'Enviar Solicitação', 'Minhas Solicitações'],
   Formador: ['Meu Painel'],
   'Assistente Administrativo Controle': ['Solicitações de Aprovação', 'Meu Painel'],
-  'Gerente do setor Gerência': ['Desempenho da Equipe', 'Meu Painel'],
+  // E2: perde Desempenho (sem view_team_dashboard: a rota negava). E1: ganha Enviar/Minhas.
+  'Gerente do setor Gerência': ['Meu Painel', 'Enviar Solicitação', 'Minhas Solicitações'],
 };
 
-const PESSOAS: readonly Pessoa[] = [
-  ...ATORES_RBAC,
-  GERENTE_DO_SETOR_GERENCIA,
-];
+const PESSOAS: readonly Pessoa[] = [...ATORES_RBAC, GERENTE_DO_SETOR_GERENCIA];
 
-async function cartoesVisiveis(pessoa: Pick<AtorRbac, 'user' | 'policies'>): Promise<Cartao[]> {
-  vi.mocked(getMe).mockResolvedValue(pessoa.user);
-  vi.mocked(getMyPolicies).mockResolvedValue([...pessoa.policies]);
+async function cartoesVisiveis(pessoa: Pessoa): Promise<Cartao[]> {
   render(
     <MemoryRouter>
-      <HomePage />
+      <ComAcesso policies={pessoa.policies} superusuario={pessoa.user.is_superuser}>
+        <HomePage />
+      </ComAcesso>
     </MemoryRouter>,
   );
   await screen.findByRole('heading', { name: 'Acesso Geral' });
@@ -79,13 +83,16 @@ async function cartoesVisiveis(pessoa: Pick<AtorRbac, 'user' | 'policies'>): Pro
 }
 
 describe('Página Inicial — cartões por pessoa', () => {
-  beforeEach(() => vi.clearAllMocks());
-
   test('todas as pessoas têm linha esperada', () => {
     expect(PESSOAS.map((p) => p.ator).sort()).toEqual(Object.keys(ESPERADO).sort());
   });
 
   test.each(PESSOAS)('$ator', async (pessoa) => {
     expect(await cartoesVisiveis(pessoa)).toEqual(ESPERADO[pessoa.ator]);
+  });
+
+  test('o KPI "Minhas Solicitações" segue o cartão (create_solicitation)', async () => {
+    await cartoesVisiveis({ ator: 'só create_solicitation', user: usuarioDeTeste({}), policies: ['create_solicitation'] });
+    expect(screen.getByText('Minhas Solicitações', { selector: '.ant-statistic-title' })).toBeInTheDocument();
   });
 });

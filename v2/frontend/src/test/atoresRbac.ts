@@ -6,7 +6,8 @@
  * - Grupos e vínculos espelham `_make_user_for_actor` (test_rbac_matrix_living.py): Gerente,
  *   Gerente da Superintendência, Coordenador e Apoio têm vínculo vigente de gestão.
  * - `policies` foi medida no backend para esses mesmos usuários (`resolve_public_policies`,
- *   seed do RBAC, 15/10/2026). Mudou o seed ou uma policy? Meça de novo e atualize aqui.
+ *   seed do RBAC, 15/10/2026, já com as 5 policies do PR 7). Mudou o seed ou uma policy? Meça de
+ *   novo e atualize aqui; o backend trava a fórmula em `test_rbac_politicas_de_tela.py`.
  *
  * Sem dado pessoal: nomes e e-mails são de teste.
  */
@@ -79,9 +80,14 @@ export const ATORES_RBAC: readonly AtorRbac[] = [
     // O backend dá ao superusuário todas as PUBLIC_POLICY_KEYS.
     policies: [
       'access_audit_logs',
+      'access_availability_blocks',
       'access_controle_section',
+      'access_monthly_availability',
       'access_solicitation_approvals',
+      'access_travel',
       'create_solicitation',
+      'create_solicitation_without_purchase',
+      'execute_restricted_operations',
       'import_availability_blocks',
       'import_compras',
       'import_generic_spreadsheet',
@@ -107,6 +113,9 @@ export const ATORES_RBAC: readonly AtorRbac[] = [
     user: usuarioDeTeste({ setores: ['DAT'] }),
     policies: [
       'access_audit_logs',
+      'access_availability_blocks',
+      'access_monthly_availability',
+      'access_travel',
       'import_availability_blocks',
       'import_compras',
       'import_generic_spreadsheet',
@@ -127,7 +136,10 @@ export const ATORES_RBAC: readonly AtorRbac[] = [
     user: usuarioDeTeste({ setores: ['Controle'] }),
     policies: [
       'access_audit_logs',
+      'access_availability_blocks',
       'access_controle_section',
+      'access_monthly_availability',
+      'access_travel',
       'import_availability_blocks',
       'import_compras',
       'import_generic_spreadsheet',
@@ -162,8 +174,12 @@ export const ATORES_RBAC: readonly AtorRbac[] = [
       aprovador: true,
     }),
     policies: [
+      'access_availability_blocks',
+      'access_monthly_availability',
       'access_solicitation_approvals',
+      'access_travel',
       'create_solicitation',
+      'execute_restricted_operations',
       'manage_solicitacao_status',
       'use_gcal',
       'view_reports',
@@ -172,30 +188,105 @@ export const ATORES_RBAC: readonly AtorRbac[] = [
   {
     ator: 'Gerente pedagógico (Vidas)',
     user: usuarioDeTeste({ funcoes: ['Gerente'], gerencias: vinculo('GERENTE') }),
-    policies: ['create_solicitation'],
+    policies: [
+      'access_availability_blocks',
+      'access_monthly_availability',
+      'access_travel',
+      'create_solicitation',
+    ],
   },
   {
     ator: 'Coordenador',
     user: usuarioDeTeste({ funcoes: ['Coordenador'], gerencias: vinculo('COORDENADOR') }),
-    policies: ['create_solicitation'],
+    policies: [
+      'access_availability_blocks',
+      'access_monthly_availability',
+      'access_travel',
+      'create_solicitation',
+    ],
   },
   {
     ator: 'Apoio de Coordenação',
     user: usuarioDeTeste({ funcoes: ['Apoio de Coordenação'], gerencias: vinculo('APOIO') }),
-    policies: ['create_solicitation', 'publish_setor_solicitacao'],
+    policies: [
+      'access_availability_blocks',
+      'access_monthly_availability',
+      'access_travel',
+      'create_solicitation',
+      'publish_setor_solicitacao',
+    ],
   },
   {
     ator: 'Formador',
     user: usuarioDeTeste({ funcoes: ['Formador'] }),
-    policies: [],
+    policies: ['access_availability_blocks'],
   },
   {
     ator: 'Assistente Administrativo Controle',
     user: usuarioDeTeste({ setores: ['Controle'], funcoes: ['Assistente Administrativo'], aprovador: true }),
     policies: [
       'access_audit_logs',
+      'access_availability_blocks',
       'access_controle_section',
+      'access_monthly_availability',
       'access_solicitation_approvals',
+      'access_travel',
+      'import_availability_blocks',
+      'import_compras',
+      'import_generic_spreadsheet',
+      'manage_purchases_and_materials',
+      'manage_solicitacao_status',
+      'use_gcal',
+      'view_all_availability',
+      'view_compras_pendencias',
+      'view_compras_stats',
+      'view_gcal_dashboard',
+      'view_reports',
+    ],
+  },
+];
+
+/**
+ * Quem trabalha numa gerência com perfil (vínculo EQUIPE, sem grupo) recebe o pacote do perfil
+ * (ADR-020) e, com ele, as policies do grupo equivalente. O `/me` não traz setor, função nem
+ * vínculo de gestão (EQUIPE não entra em `gerencias`). Policies medidas no backend
+ * (`test_rbac_politicas_de_tela.py::TestPersonasPorPacote`).
+ */
+export const PERSONAS_POR_VINCULO: readonly (Omit<AtorRbac, 'ator'> & { ator: string; equivale: NomeDoAtor })[] = [
+  {
+    ator: 'Ana (EQUIPE no perfil ADMIN_OPERACIONAL)',
+    equivale: 'DAT',
+    user: usuarioDeTeste({}),
+    // O pacote não tem `import_spreadsheet`: sem import_generic_spreadsheet (não é tela).
+    policies: [
+      'access_audit_logs',
+      'access_availability_blocks',
+      'access_monthly_availability',
+      'access_travel',
+      'import_availability_blocks',
+      'import_compras',
+      'manage_admin_registries',
+      'manage_purchases_and_materials',
+      'view_all_availability',
+      'view_compras_dashboard',
+      'view_compras_pendencias',
+      'view_compras_stats',
+      'view_gcal_dashboard',
+      'view_map_metrics',
+      'view_reports',
+      'view_team_dashboard',
+    ],
+  },
+  {
+    ator: 'Bruno (EQUIPE no perfil CONTROLE)',
+    equivale: 'Controle',
+    user: usuarioDeTeste({}),
+    policies: [
+      'access_audit_logs',
+      'access_availability_blocks',
+      'access_controle_section',
+      'access_monthly_availability',
+      'access_travel',
       'import_availability_blocks',
       'import_compras',
       'import_generic_spreadsheet',

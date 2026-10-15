@@ -1,8 +1,7 @@
 import { lazy, Suspense, type JSX } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router';
 import { Spin } from 'antd';
-import type { Permissions } from '../hooks/usePermissions';
-import { useCanAccess } from '../hooks/useCanAccess';
+import { useAcesso } from '../contexts/AcessoContext';
 import { RequirePolicy } from './access/RequirePolicy';
 import { ErrorBoundary } from './ErrorBoundary';
 import type { CurrentUser } from '../types';
@@ -60,26 +59,16 @@ function PageLoader(): JSX.Element {
 
 interface AppRoutesProps {
   user: CurrentUser;
-  permissions: Permissions;
-  policies: readonly string[];
 }
 
-export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.Element {
-  const {
-    canCoordenador, canControle, canDAT, canApproveSuper, canDisponibilidade, isFormador, isGestorPorVinculo,
-  } = permissions;
+export function AppRoutes({ user }: AppRoutesProps): JSX.Element {
+  // PR 7 das permissões: toda rota de negócio é `policy=` (de /api/me/policies/, via AcessoContext).
+  // `allow=` fica só para "autenticado" e para o que é do superusuário.
+  const { caps, ehSuperusuario } = useAcesso();
+  const { policies } = caps;
   // Importação pela tela é só do superusuário (decisão do dono, 02/10/2026): as cargas passam por
   // script, com ensaio. O backend recusa os demais com 403 (`SuperuserOnly`).
-  const podeImportarPelaTela = permissions.isAdmin;
-
-  // #1271: rotas gateadas por <RequirePolicy> (policy= direto p/ policies públicas, allow=
-  // p/ composites/auth). `access` (useCanAccess) permanece só para os composites de
-  // disponibilidade/bloqueios (view_all_availability OU escopo próprio, sem policy única)
-  // e para a rota de edição de solicitação (policy create_solicitation OU flags).
-  // PR A: vínculo de gestão (me.gerencias) entra em Bloqueios/Deslocamentos — o backend escopa.
-  const access = useCanAccess(policies, {
-    canBloqueios: canControle || canCoordenador || isFormador || isGestorPorVinculo,
-  });
+  const podeImportarPelaTela = ehSuperusuario;
 
   // H.2: um crash de página (throw no render OU falha ao baixar o chunk lazy) fica isolado
   // no conteúdo — a casca (sidebar/header, fora deste boundary) sobrevive. `resetKeys` pela
@@ -108,18 +97,17 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
         {/* #1656: Apoio de Coordenação publica no Google Agenda os aprovados do próprio setor
             (mesma policy da API; use_gcal/Pré-agenda não dão acesso). */}
         <Route path="/solicitacoes/publicacao" element={<RequirePolicy policy="publish_setor_solicitacao" policies={policies}><PublicacaoSetorPage /></RequirePolicy>} />
-        {/* :id/editar — composite (#1169): owner plausível OU privilegiado. Quem tem a policy
-            create_solicitation cria e é dono (o servidor deixa o dono editar): sem ela aqui, o
-            gerente de setor criava e não abria a edição. O servidor segue decidindo o salvar. */}
-        <Route path="/solicitacoes/:id/editar" element={<RequirePolicy allow={canCoordenador || canApproveSuper || access.can('create_solicitation')}><EditSolicitacaoPage /></RequirePolicy>} />
+        {/* :id/editar (#1169): quem pode ser dono (create_solicitation: quem cria é dono e o servidor
+            deixa o dono editar), o aprovador e o DAT. O servidor segue decidindo o salvar. */}
+        <Route path="/solicitacoes/:id/editar" element={<RequirePolicy policy={['create_solicitation', 'access_solicitation_approvals', 'manage_admin_registries']} policies={policies}><EditSolicitacaoPage /></RequirePolicy>} />
 
         {/* Páginas movidas para sob /solicitacoes/* (com redirects abaixo) */}
         <Route path="/solicitacoes/aprovacoes" element={<RequirePolicy policy="access_solicitation_approvals" policies={policies}><ApprovalsPage /></RequirePolicy>} />
-        {/* Grade Mensal / Bloqueios / Deslocamentos — composites: policy view_all_availability
-            OU acesso scoped/próprio (Coordenador/Formador) sem policy pública. */}
-        <Route path="/solicitacoes/disponibilidade" element={<RequirePolicy allow={access.can('view_all_availability') || canDisponibilidade}><MonthlyPage /></RequirePolicy>} />
-        <Route path="/solicitacoes/bloqueios" element={<RequirePolicy allow={access.canAccessBlocks}><DisponibilidadeBlocks /></RequirePolicy>} />
-        <Route path="/solicitacoes/deslocamentos" element={<RequirePolicy allow={access.can('view_all_availability') || canControle || canCoordenador || canDAT || isGestorPorVinculo}><DeslocamentosPage /></RequirePolicy>} />
+        {/* Grade Mensal / Bloqueios / Deslocamentos — policies compostas no servidor
+            (view_all_availability OU grupo OU vínculo de gestão vigente); o backend escopa. */}
+        <Route path="/solicitacoes/disponibilidade" element={<RequirePolicy policy="access_monthly_availability" policies={policies}><MonthlyPage /></RequirePolicy>} />
+        <Route path="/solicitacoes/bloqueios" element={<RequirePolicy policy="access_availability_blocks" policies={policies}><DisponibilidadeBlocks /></RequirePolicy>} />
+        <Route path="/solicitacoes/deslocamentos" element={<RequirePolicy policy="access_travel" policies={policies}><DeslocamentosPage /></RequirePolicy>} />
         <Route path="/solicitacoes/meus-eventos" element={<RequirePolicy allow={!!user}><MeusEventosPage /></RequirePolicy>} />
         <Route path="/perfil" element={<RequirePolicy allow={!!user}><PerfilPage user={user} /></RequirePolicy>} />
         <Route path="/politica-privacidade" element={<RequirePolicy allow={!!user}><PoliticaPrivacidadePage /></RequirePolicy>} />
@@ -131,13 +119,13 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
         <Route path="/deslocamentos" element={<Navigate to="/solicitacoes/deslocamentos" replace />} />
         <Route path="/meus-eventos" element={<Navigate to="/solicitacoes/meus-eventos" replace />} />
 
-        {/* Controle Module — #1271: policy access_controle_section (paridade com canControle);
-            compras somam DAT via allow (composite sem policy única). */}
+        {/* Controle Module — #1271: policy access_controle_section; Compras: view_compras_stats
+            (Controle e DAT, a mesma policy das estatísticas de compras). */}
         <Route path="/controle" element={<RequirePolicy policy="access_controle_section" policies={policies}><ControlePage /></RequirePolicy>} />
         <Route path="/controle/acoes" element={<RequirePolicy policy="access_controle_section" policies={policies}><AcoesPage /></RequirePolicy>} />
-        <Route path="/controle/compras" element={<RequirePolicy allow={canControle || canDAT}><DATComprasPage /></RequirePolicy>} />
+        <Route path="/controle/compras" element={<RequirePolicy policy="view_compras_stats" policies={policies}><DATComprasPage /></RequirePolicy>} />
         <Route path="/controle/coordenadores" element={<RequirePolicy policy="access_controle_section" policies={policies}><CoordenadoresPage /></RequirePolicy>} />
-        <Route path="/compras-materiais" element={<RequirePolicy allow={canControle || canDAT}><DATComprasPage /></RequirePolicy>} />
+        <Route path="/compras-materiais" element={<RequirePolicy policy="view_compras_stats" policies={policies}><DATComprasPage /></RequirePolicy>} />
         {/* /deslocamentos movido para /solicitacoes/deslocamentos (Epic 3, Issue #1227 — redirect já registrado acima) */}
         <Route path="/controle/plano-formacoes" element={<RequirePolicy policy="access_controle_section" policies={policies}><PlanoFormacoesPage /></RequirePolicy>} />
         <Route path="/controle/pre-agenda" element={<RequirePolicy policy="access_controle_section" policies={policies}><PreAgendaPage /></RequirePolicy>} />
@@ -161,7 +149,7 @@ export function AppRoutes({ user, permissions, policies }: AppRoutesProps): JSX.
         <Route path="/dat/admin/configuracoes" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><ConfiguracoesPage /></RequirePolicy>} />
         <Route path="/dat/admin/equipe-gerencia" element={<RequirePolicy allow={podeImportarPelaTela}><EquipeGerenciaImportPage /></RequirePolicy>} />
         <Route path="/dat/cadastros" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><CadastrosPage /></RequirePolicy>} />
-        <Route path="/dat/compras-materiais" element={<RequirePolicy allow={canControle || canDAT}><DATComprasPage /></RequirePolicy>} />
+        <Route path="/dat/compras-materiais" element={<RequirePolicy policy="view_compras_stats" policies={policies}><DATComprasPage /></RequirePolicy>} />
         <Route path="/dat/coordenadores" element={<RequirePolicy policy="access_controle_section" policies={policies}><CoordenadoresPage /></RequirePolicy>} />
         {/* PR-C DAT Imports (2026-04-29): /dat/importacao (singular, página antiga
             de Cadastros DAT) redireciona para /dat/importacoes (plural, página

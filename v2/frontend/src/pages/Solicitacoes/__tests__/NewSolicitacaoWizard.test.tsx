@@ -3,6 +3,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { MemoryRouter } from 'react-router';
 
+import { ComAcesso } from '../../../test/comAcesso';
+
 const {
   createSolicitacaoMock,
   getMeMock,
@@ -142,13 +144,16 @@ describe('NewSolicitacaoWizard - filtros dependentes municipio/projeto', () => {
     ).toBeInTheDocument();
   });
 
-  test('superuser mantém lookup de municípios sem filtro de compra/projeto', async () => {
-    getMeMock.mockResolvedValue({ is_superuser: true });
+  // PR 7 das permissões: a dispensa da compra vem da policy create_solicitation_without_purchase
+  // (hoje só o superusuário a recebe), não do is_superuser do /me.
+  test('quem dispensa a compra mantém lookup de municípios sem filtro de compra/projeto', async () => {
     lookupMunicipiosWithFiltersMock.mockResolvedValue([{ id: 1, label: 'Fortaleza - CE' }]);
 
     render(
       <MemoryRouter>
-        <NewSolicitacaoWizard />
+        <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+          <NewSolicitacaoWizard />
+        </ComAcesso>
       </MemoryRouter>
     );
 
@@ -194,12 +199,12 @@ describe('NewSolicitacaoWizard - filtros dependentes municipio/projeto', () => {
     expect(screen.getByText('Projetos sem compra não aparecem.')).toBeInTheDocument();
   });
 
-  test('superusuário busca projetos sem filtro de compra depois de o me carregar', async () => {
-    getMeMock.mockResolvedValue({ is_superuser: true });
-
+  test('quem dispensa a compra busca projetos sem filtro de compra', async () => {
     render(
       <MemoryRouter>
-        <NewSolicitacaoWizard />
+        <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+          <NewSolicitacaoWizard />
+        </ComAcesso>
       </MemoryRouter>
     );
 
@@ -208,5 +213,21 @@ describe('NewSolicitacaoWizard - filtros dependentes municipio/projeto', () => {
       expect(lookupProjetosMock).toHaveBeenLastCalledWith('', {});
     });
     expect(screen.queryByText('Projetos sem compra não aparecem.')).not.toBeInTheDocument();
+  });
+
+  test('is_superuser no /me sem a policy: continua filtrando por compra (o payload não decide)', async () => {
+    getMeMock.mockResolvedValue({ is_superuser: true });
+    render(
+      <MemoryRouter>
+        <ComAcesso policies={['create_solicitation']}>
+          <NewSolicitacaoWizard />
+        </ComAcesso>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(getMeMock).toHaveBeenCalled();
+      expect(lookupProjetosMock).toHaveBeenLastCalledWith('', { com_compra: true });
+    });
   });
 });

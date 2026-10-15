@@ -20,11 +20,11 @@ import pytest
 from apps.core.models import Solicitacao
 from apps.core.tests.conftest import get_field_errors
 from apps.core.tests.factories import (
-    GroupFactory,
     MunicipioFactory,
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_papel,
 )
 
 
@@ -38,9 +38,8 @@ def user_test(db):
         cpf="12345678901",
     )
 
-    # PA-06: Adicionar grupo Coordenador para poder criar solicitações
-    coord_group = GroupFactory(name="Coordenador")
-    user.groups.add(coord_group)
+    # PA-06: grupo Coordenador e vínculo vigente para poder criar solicitações
+    com_papel(user, "COORDENADOR")
 
     return user
 

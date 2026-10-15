@@ -26,11 +26,11 @@ import pytest
 
 from apps.core.models import AuditLog, DATCompra, Solicitacao, Usuario
 from apps.core.tests.factories import (
-    GroupFactory,
     MunicipioFactory,
     ProjetoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_papel,
 )
 
 pytestmark = pytest.mark.django_db
@@ -43,9 +43,8 @@ def _create_user_in_group(*, prefix: str, group_name: str) -> Usuario:
         email=f"{prefix}_{uid}@example.com",
         password="testpass",
         cpf=str(uuid4().int % 10**11).zfill(11),
+        groups=[group_name],
     )
-    group = GroupFactory(name=group_name)
-    user.groups.add(group)
     return user
 
 
@@ -79,8 +78,7 @@ def test_happy_path_import_compra_create_solicitacao_approve_and_publish():
     user_coordenador = _create_user_in_group(prefix="coord_chain", group_name="Coordenador")
     # PR 3 hardening RBAC (2026-04-29): aprovar exige composite Setor Sup + Função Gerente.
     user_super = _create_user_in_group(prefix="super_chain", group_name="Superintendência")
-    grupo_gerente = GroupFactory(name="Gerente")
-    user_super.groups.add(grupo_gerente)
+    com_papel(user_super, "GERENTE")
 
     municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
     projeto = ProjetoFactory(nome="Novo Lendo", codigo="NL", fluxo="SUPER", ativo=True)

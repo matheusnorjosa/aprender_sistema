@@ -16,7 +16,7 @@ from rest_framework.test import APIClient
 
 from apps.core.models import AuditLog
 from apps.core.serializers.auditoria import _mask_email, _mask_ip, _redact_details
-from apps.core.tests.factories import GroupFactory, UsuarioFactory
+from apps.core.tests.factories import GroupFactory, UsuarioFactory, com_papel
 
 _cpf_counter = 0
 
@@ -66,11 +66,10 @@ class TestUsuarioLookupNoEmail(TestCase):
     """
 
     def setUp(self):
-        coord_group = GroupFactory(name="Coordenador")
         self.user = UsuarioFactory(
             username="lookup_test", email="lookup@test.com", password="pass1234", cpf=_next_cpf()
         )
-        self.user.groups.add(coord_group)
+        com_papel(self.user, "COORDENADOR")
         UsuarioFactory(
             username="lookup_target",
             email="target@secret.com",
@@ -109,20 +108,18 @@ class TestEmailSearchRestriction(TestCase):
 
     def setUp(self):
         # Create groups
-        self.formador_group = GroupFactory(name="Formador")
-        self.coord_group = GroupFactory(name="Coordenador")
 
         # Create formador user
         self.formador = UsuarioFactory(
             username="formador1", email="formador@test.com", password="pass1234", cpf=_next_cpf()
         )
-        self.formador.groups.add(self.formador_group)
+        com_papel(self.formador, "FORMADOR")
 
         # Create coordenador user
         self.coordenador = UsuarioFactory(
             username="coord1", email="coord@test.com", password="pass1234", cpf=_next_cpf()
         )
-        self.coordenador.groups.add(self.coord_group)
+        com_papel(self.coordenador, "COORDENADOR")
 
         # Create target user with distinct email
         UsuarioFactory(

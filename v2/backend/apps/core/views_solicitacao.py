@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from django.db.models import Case, F, IntegerField, QuerySet, Value, When
+from django.db.models import Case, F, IntegerField, Q, QuerySet, Value, When
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
@@ -743,6 +743,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         }
 
         materiais_antes = _campos_materiais(instance, old_formador_ids)
+        # Trava de exclusão: a edição que parte de uma SUPER `aprovado` deixa a prova no AuditLog,
+        # com ou sem APPROVE (carga antiga, admin Django, data-fix) e mesmo se ela sair do SUPER.
+        aprovada_como_super = instance.status == "aprovado" and getattr(instance.projeto, "fluxo", None) == "SUPER"
 
         with transaction.atomic():
             # Salva as alterações
@@ -821,6 +824,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             }
             if campos_reaprovacao:
                 details["reaprovacao"] = {"campos": campos_reaprovacao}
+            if aprovada_como_super:
+                details["aprovada_como_super"] = True
 
             # AuditLog persistente
             AuditLog.objects.create(
@@ -916,10 +921,12 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         Regras por fluxo do projeto:
         - SUPER: Pode excluir apenas se status=pendente E não publicado no GCal
         - NAO_SUPER: Pode excluir se não publicado no GCal (auto-aprovado)
-        - Já aprovada manualmente (AuditLog APPROVE, individual ou em lote) não se exclui, nem
-          depois de voltar a pendente pela reaprovação (decisão do dono 15/10, adendo da PA-04).
-          Vale para todos na API, superusuário incluso: o evento sai por reprovação ou
-          cancelamento. A auto-aprovação da NAO_SUPER não grava APPROVE e não trava.
+        - Já aprovada não se exclui, nem depois de voltar a pendente pela reaprovação (decisão do
+          dono 15/10, adendo da PA-04). A prova é o AuditLog APPROVE (individual ou em lote) ou o
+          UPDATE de uma edição que partiu de SUPER `aprovado` (`aprovada_como_super`, cobre a
+          aprovada sem APPROVE: carga antiga, admin Django, data-fix; inclusive a movida para
+          NAO_SUPER, que segue `aprovado`). Vale para todos na API, superusuário incluso. A
+          auto-aprovação da NAO_SUPER não grava nenhum dos dois e não trava.
 
         Registra exclusão no AuditLog antes de deletar.
         """
@@ -955,15 +962,24 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 }
             )
 
-        if AuditLog.objects.filter(
-            action=AuditLog.Action.APPROVE, model_name="Solicitacao", details__solicitacao_id=instance.id
-        ).exists():
-            raise ValidationError(
-                {
-                    "detail": "Esta solicitação já foi aprovada e não pode ser excluída. Para tirar o evento, "
-                    "reprove a solicitação ou cancele o evento: assim a saída fica registrada."
-                }
+        ja_aprovada = (
+            AuditLog.objects.filter(model_name="Solicitacao", details__solicitacao_id=instance.id)
+            .filter(
+                Q(action=AuditLog.Action.APPROVE) | Q(action=AuditLog.Action.UPDATE, details__aprovada_como_super=True)
             )
+            .exists()
+        )
+        if ja_aprovada:
+            # Publicada já parou acima. Pendente sai pela reprovação; aprovada (ou reprovada) não
+            # pendente não tem reject nem cancel-gcal na API: só a administração tira o evento.
+            if instance.status == "pendente":
+                saida = "Para tirar o evento, peça a reprovação a quem aprova: assim a saída fica registrada."
+            else:
+                saida = (
+                    "Como ela não está pendente, não há reprovação a pedir: para tirar o evento, "
+                    "fale com a administração do sistema."
+                )
+            raise ValidationError({"detail": f"Esta solicitação já foi aprovada e não pode ser excluída. {saida}"})
 
         # Capturar dados antes da exclusão para o AuditLog
         solicitacao_data = {

@@ -4,14 +4,19 @@ Trava de exclusão (decisão do dono, 15/10/2026): «já aprovado não se exclui
 Com o S2, uma SUPER aprovada volta para `pendente` quando muda data, horário, município, formadores
 ou projeto. Sem a trava, o criador apagaria pelo `DELETE` um evento que a Superintendência já
 aprovou, e a aprovação sumiria sem decisão registrada. A marca de «já aprovada» é o AuditLog
-`APPROVE` da solicitação, gravado pela aprovação individual e pela aprovação em lote (PA-05).
-A auto-aprovação da NAO_SUPER não grava `APPROVE` (só o status inicial) e segue excluível.
+`APPROVE` da solicitação, gravado pela aprovação individual e pela aprovação em lote (PA-05), ou o
+`UPDATE` de uma edição que partiu de SUPER `aprovado` (`details.aprovada_como_super`), que cobre a
+SUPER `aprovado` sem `APPROVE` (carga antiga, admin Django, data-fix), rebaixada ou movida para
+NAO_SUPER.
+A auto-aprovação da NAO_SUPER não grava nenhum dos dois e segue excluível.
 
 Contrato:
-- teve aprovação manual (individual ou em lote) → `DELETE` dá 400, o registro fica, e a mensagem
-  manda reprovar ou cancelar (caminho registrado);
+- já aprovada → `DELETE` dá 400 e o registro fica, qualquer que seja o status ou o fluxo atual;
+  pendente: a mensagem manda pedir a reprovação; fora de pendente (reject e cancel-gcal não
+  servem): manda falar com a administração;
 - vale para todos na API, superusuário incluso; o admin Django não muda;
-- SUPER pendente nunca aprovada e NAO_SUPER auto-aprovada não publicada continuam excluíveis.
+- SUPER pendente nunca aprovada, NAO_SUPER auto-aprovada não publicada e NAO_SUPER movida para
+  SUPER continuam excluíveis.
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOptionalSubscript=false
@@ -126,21 +131,107 @@ class TestJaAprovadaNaoSeExclui:
         assert Solicitacao.objects.filter(pk=sol.pk).exists()
         assert not AuditLog.objects.filter(action="DELETE", model_name="Solicitacao").exists()
 
-    def test_mensagem_orienta_reprovar_ou_cancelar(self, coordenador, super_aprovada_e_rebaixada):
+    def test_mensagem_da_pendente_orienta_pedir_reprovacao(self, coordenador, super_aprovada_e_rebaixada):
+        """Pendente não publicada: só a reprovação tira o evento (cancel-gcal dá 409 not_published)."""
         resp = _client(coordenador).delete(f"/api/solicitacoes/{super_aprovada_e_rebaixada.id}/")
 
         detalhe = str(resp.data["detail"]).lower()
         assert "já foi aprovada" in detalhe
-        assert "reprov" in detalhe and "cancel" in detalhe
+        assert "reprova" in detalhe
+        assert "cancel" not in detalhe
 
     def test_superusuario_tambem_e_barrado_na_api(self, super_aprovada_e_rebaixada):
-        """Decisão: a trava vale para todos na API; evento já aprovado sai por reprovação ou cancelamento."""
+        """Decisão: a trava vale para todos na API; a já aprovada de volta a pendente sai pela reprovação."""
         sol = super_aprovada_e_rebaixada
 
         resp = _client(UsuarioFactory(is_superuser=True, is_staff=True)).delete(f"/api/solicitacoes/{sol.id}/")
 
         assert resp.status_code == 400, resp.data
         assert Solicitacao.objects.filter(pk=sol.pk).exists()
+
+    def test_super_aprovada_movida_para_nao_super_segue_travada(self, coordenador, aprovador, municipio):
+        """SUPER → NAO_SUPER não rebaixa: continua `aprovado`, e a aprovação manual segue travando."""
+        sol = _solicitacao(coordenador, municipio, _projeto(municipio, "SUPER"), "pendente")
+        _aprovar(aprovador, sol, lote=False)
+        nao_super = _projeto(municipio, "NAO_SUPER")
+        resp = _client(coordenador).patch(f"/api/solicitacoes/{sol.id}/", {"projeto": nao_super.id}, format="json")
+        assert resp.status_code == 200, resp.data
+        sol.refresh_from_db()
+        assert sol.status == "aprovado"
+
+        resp = _client(coordenador).delete(f"/api/solicitacoes/{sol.id}/")
+
+        assert resp.status_code == 400, resp.data
+        assert Solicitacao.objects.filter(pk=sol.pk).exists()
+
+    def test_mensagem_da_aprovada_nao_promete_reprovar_nem_cancelar(self, coordenador, aprovador, municipio):
+        """Aprovada não publicada: reject dá 400 already_approved e cancel-gcal dá 409 not_published."""
+        sol = _solicitacao(coordenador, municipio, _projeto(municipio, "SUPER"), "pendente")
+        _aprovar(aprovador, sol, lote=False)
+        nao_super = _projeto(municipio, "NAO_SUPER")
+        _client(coordenador).patch(f"/api/solicitacoes/{sol.id}/", {"projeto": nao_super.id}, format="json")
+
+        resp = _client(coordenador).delete(f"/api/solicitacoes/{sol.id}/")
+
+        detalhe = str(resp.data["detail"]).lower()
+        assert "já foi aprovada" in detalhe
+        assert "reprove" not in detalhe and "cancele" not in detalhe
+        assert "administração" in detalhe
+
+    def test_super_aprovada_que_perdeu_o_projeto_segue_travada(self, coordenador, aprovador, municipio):
+        sol = _solicitacao(coordenador, municipio, _projeto(municipio, "SUPER"), "pendente")
+        _aprovar(aprovador, sol, lote=False)
+        resp = _client(coordenador).patch(f"/api/solicitacoes/{sol.id}/", {"projeto": None}, format="json")
+        assert resp.status_code == 200, resp.data
+
+        resp = _client(coordenador).delete(f"/api/solicitacoes/{sol.id}/")
+
+        assert resp.status_code == 400, resp.data
+        assert Solicitacao.objects.filter(pk=sol.pk).exists()
+
+
+class TestAprovadaSemApproveRebaixadaPelaEdicao:
+    """SUPER `aprovado` sem AuditLog APPROVE (carga antiga, admin Django, data-fix): a edição que
+    parte dela grava `details.aprovada_como_super`, e essa é a prova de que ela estava aprovada."""
+
+    def test_super_aprovada_sem_approve_nao_se_exclui_depois_de_rebaixada(self, coordenador, municipio):
+        sol = _solicitacao(coordenador, municipio, _projeto(municipio, "SUPER"), "aprovado")
+        assert not AuditLog.objects.filter(action="APPROVE").exists()
+        _rebaixar_por_edicao(coordenador, sol)
+
+        resp = _client(coordenador).delete(f"/api/solicitacoes/{sol.id}/")
+
+        assert resp.status_code == 400, resp.data
+        assert Solicitacao.objects.filter(pk=sol.pk).exists()
+
+    def test_super_aprovada_sem_approve_movida_para_nao_super_nao_se_exclui(self, coordenador, municipio):
+        """SUPER → NAO_SUPER não rebaixa: ela segue `aprovado`, e o UPDATE da mudança é a prova."""
+        sol = _solicitacao(coordenador, municipio, _projeto(municipio, "SUPER"), "aprovado")
+        nao_super = _projeto(municipio, "NAO_SUPER")
+        resp = _client(coordenador).patch(f"/api/solicitacoes/{sol.id}/", {"projeto": nao_super.id}, format="json")
+        assert resp.status_code == 200, resp.data
+        sol.refresh_from_db()
+        assert sol.status == "aprovado"
+
+        resp = _client(coordenador).delete(f"/api/solicitacoes/{sol.id}/")
+
+        assert resp.status_code == 400, resp.data
+        assert "administração" in str(resp.data["detail"]).lower()
+        assert Solicitacao.objects.filter(pk=sol.pk).exists()
+
+    def test_nao_super_auto_aprovada_movida_para_super_segue_excluivel(self, coordenador, municipio):
+        """A auto-aprovação da NAO_SUPER não trava; movida para SUPER, é SUPER pendente nunca aprovada."""
+        sol = _solicitacao(coordenador, municipio, _projeto(municipio, "NAO_SUPER"), "aprovado")
+        super_ = _projeto(municipio, "SUPER")
+        resp = _client(coordenador).patch(f"/api/solicitacoes/{sol.id}/", {"projeto": super_.id}, format="json")
+        assert resp.status_code == 200, resp.data
+        sol.refresh_from_db()
+        assert sol.status == "pendente"
+
+        resp = _client(coordenador).delete(f"/api/solicitacoes/{sol.id}/")
+
+        assert resp.status_code == 204, resp.data
+        assert not Solicitacao.objects.filter(pk=sol.pk).exists()
 
 
 class TestSemAprovacaoManualContinuaExcluivel:

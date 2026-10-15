@@ -203,6 +203,8 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> JsonDict:
     # Seção 7: Links e Observações
     # LGPD arts. 6-III/33: `observacoes` é texto livre transferido ao Google — redige
     # PII incidental (CPF/e-mail) antes da transferência, preservando o restante da nota.
+    # S6 (auditoria 14/10, C5): redige o texto INTEIRO e só depois a descrição é cortada em 5000; cortar
+    # antes partiria um e-mail no limite e o pedaço iria sem redação. A regex é linear (`minimize.py`).
     observacoes = minimize_free_text(getattr(s, "observacoes", ""))
     if observacoes:
         description_lines.append("")

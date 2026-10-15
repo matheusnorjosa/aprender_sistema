@@ -277,14 +277,16 @@ class TestFormularioDeUsuarios:
         assert _grupos(alvo) == set()
 
     def test_funcao_com_papel_continua_dando_o_grupo_do_setor(self, root):
-        GroupFactory(name="DAT")
-        dat = _gerencia("G DAT GRUPO2", "DAT")
+        # S3: setor sem capacidade (Vidas). Grupo com capacidade (DAT) nunca é derivado:
+        # `test_setor_canonico_sem_grupo_com_poder.py`.
+        GroupFactory(name="Vidas")
+        ger = _gerencia("G VIDAS GRUPO2", "Vidas")
         formador = GroupFactory(name="Formador")
         alvo = _pessoa("form_dat_funcao")
 
-        _salvar(root, alvo, {"group_ids": [formador.id], "gerencia_id": dat.id, "equipe_administrativa": True})
+        _salvar(root, alvo, {"group_ids": [formador.id], "gerencia_id": ger.id, "equipe_administrativa": True})
 
-        assert _grupos(alvo) == {"Formador", "DAT"}
+        assert _grupos(alvo) == {"Formador", "Vidas"}
 
     def test_criar_usuario_so_com_equipe(self, root, vidas):
         client = APIClient()

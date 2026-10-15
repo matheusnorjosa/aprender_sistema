@@ -105,6 +105,7 @@ const SETORES_DE_PAR_APROVADOR = new Set(['Superintendência', 'Controle']);
 interface GrupoLike {
   id: ID;
   name: string;
+  permissoes_funcionais?: readonly unknown[] | undefined;
 }
 
 interface GerenciaLike {
@@ -133,10 +134,18 @@ export function lotacaoObrigatoria(opts: {
   };
 }
 
-function setorDaGerencia<G extends GrupoLike>(grupos: G[], gerencia: GerenciaLike | undefined): G | undefined {
+/**
+ * Espelha `setor_group_for`: grupo com capacidade funcional não entra pela gerência (S3), mas
+ * `comCapacidade` o devolve para achar o grupo que SAI na troca de gerência, como no backend.
+ */
+function setorDaGerencia<G extends GrupoLike>(
+  grupos: G[],
+  gerencia: GerenciaLike | undefined,
+  comCapacidade = false,
+): G | undefined {
   const setor = (gerencia?.setor_canonico ?? '').trim();
   if (!setor || SETORES_DE_PAR_APROVADOR.has(setor)) return undefined;
-  return grupos.find((g) => g.name === setor);
+  return grupos.find((g) => g.name === setor && (comCapacidade || !g.permissoes_funcionais?.length));
 }
 
 /** Funções que viram papel no vínculo; espelha `PAPEL_POR_FUNCAO` (`services/equipe_gerencia.py`). */
@@ -146,7 +155,8 @@ const FUNCOES_COM_PAPEL = new Set(['Formador', 'Coordenador', 'Gerente', 'Apoio 
  * #2071: grupos da pessoa depois do Salvar, espelhando `_apply_lotacao` do backend. Os grupos
  * atuais que não são FUNÇÃO ficam; as funções vêm do form; o grupo de setor da gerência entra e
  * sai só quando a gerência muda e só com função que tem papel (a Equipe administrativa nunca dá
- * grupo); setor de par aprovador (Superintendência, Controle) não vira grupo.
+ * grupo); setor de par aprovador (Superintendência, Controle) não vira grupo, nem grupo com
+ * capacidade (S3), que só sai.
  */
 export function gruposAposSalvar<G extends GrupoLike>(args: {
   grupos: G[];
@@ -161,7 +171,7 @@ export function gruposAposSalvar<G extends GrupoLike>(args: {
   final.push(...grupos.filter((g) => funcaoIds.includes(g.id) && !final.includes(g)));
   const temFuncaoComPapel = final.some((g) => FUNCOES_COM_PAPEL.has(g.name));
   if (gerencia && gerencia.id !== gerenciaAnterior?.id && temFuncaoComPapel) {
-    const antigo = setorDaGerencia(grupos, gerenciaAnterior);
+    const antigo = setorDaGerencia(grupos, gerenciaAnterior, true);
     const novo = setorDaGerencia(grupos, gerencia);
     if (antigo && antigo !== novo) final = final.filter((g) => g !== antigo);
     if (novo && !final.includes(novo)) final.push(novo);

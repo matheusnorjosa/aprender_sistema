@@ -11,7 +11,10 @@ import re
 import threading
 
 # PII patterns para o PIIRedactionFilter.
-_EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+# S6 (auditoria 14/10, C5): sem backtracking quadrático; mesma forma e mesma explicação de
+# `services/gcal/minimize.py` (uma cadeia `a@b.c+d@e.f` casa num só match, um e-mail por `@`).
+_EMAIL = r"[\w.+-]+@[\w-]+\.[\w.-]+"
+_EMAIL_RE = re.compile(rf"(?<![\w.+-]){_EMAIL}(?:(?=\+){_EMAIL})*")
 _CPF_RE = re.compile(r"\b\d{11}\b")
 
 
@@ -71,8 +74,8 @@ class PIIRedactionFilter(logging.Filter):
 
     @staticmethod
     def _mask_email(m: re.Match[str]) -> str:
-        dom = m.group(0).split("@", 1)[1]
-        return f"***@{dom}"
+        # Cada trecho após um `@` é o domínio daquele e-mail seguido, numa cadeia, do `+local` do próximo.
+        return "".join(f"***@{trecho.split('+', 1)[0]}" for trecho in m.group(0).split("@")[1:])
 
     def filter(self, record: logging.LogRecord) -> bool:
         try:

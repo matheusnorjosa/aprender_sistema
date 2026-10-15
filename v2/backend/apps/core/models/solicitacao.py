@@ -84,7 +84,9 @@ class Solicitacao(models.Model):
         help_text="PA-01: Sempre comeca pendente",
     )
 
-    observacoes = models.TextField(blank=True, help_text="Observacoes adicionais sobre o evento")
+    # S6 (auditoria 14/10, C5): teto de 5000 (o mesmo da descrição do GCal). Validado pela API;
+    # TextField segue sem limite no banco (sem migração de tipo, nenhum dado existente perdido).
+    observacoes = models.TextField(blank=True, max_length=5000, help_text="Observacoes adicionais sobre o evento")
 
     local = models.CharField(
         max_length=300,

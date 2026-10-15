@@ -14,7 +14,13 @@ from __future__ import annotations
 
 import re
 
-_EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+# S6 (auditoria 14/10, C5): a forma antiga `[\w.+-]+@[\w-]+\.[\w.-]+`, sem âncora, recomeçava em cada
+# posição de uma sequência longa e a percorria até o fim (tempo quadrático). Aqui o e-mail só começa
+# no início de uma sequência (lookbehind). O único começo legítimo no meio de uma sequência era o `+`
+# logo após um e-mail (`a@b.c+d@e.f`): a cadeia `(?=\+)` o casa no mesmo match, e cada `@` da cadeia
+# é um e-mail. Redige exatamente o que a forma antiga redigia (`test_observacoes_limite_e_redacao_linear`).
+_EMAIL = r"[\w.+-]+@[\w-]+\.[\w.-]+"
+_EMAIL_RE = re.compile(rf"(?<![\w.+-]){_EMAIL}(?:(?=\+){_EMAIL})*")
 # CPF formatado (000.000.000-00) OU sequência crua de 11 dígitos (CPF ou telefone móvel).
 _CPF_RE = re.compile(r"\b(?:\d{3}\.\d{3}\.\d{3}-\d{2}|\d{11})\b")
 
@@ -28,6 +34,6 @@ def minimize_free_text(text: str | None) -> str:
     """
     if not text:
         return ""
-    redacted = _EMAIL_RE.sub(_PLACEHOLDER, text)
+    redacted = _EMAIL_RE.sub(lambda m: _PLACEHOLDER * m.group(0).count("@"), text)
     redacted = _CPF_RE.sub(_PLACEHOLDER, redacted)
     return redacted

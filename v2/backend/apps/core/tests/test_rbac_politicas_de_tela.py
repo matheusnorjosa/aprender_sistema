@@ -25,6 +25,7 @@ from collections.abc import Callable
 from datetime import timedelta
 from typing import Any
 
+from django.contrib.auth.models import Group
 from django.core.cache import cache
 from django.utils import timezone
 from django.urls import reverse
@@ -32,7 +33,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import EquipeGerencia, Gerencia, Usuario
+from apps.core.models import EquipeGerencia, Gerencia, PermissaoFuncional, Usuario
 from apps.core.rbac import policies as modulo_policies
 from apps.core.rbac.matrix import ACTOR_GROUPS, ACTORS, SUPERUSER
 from apps.core.rbac.policies import PUBLIC_POLICY_KEYS, resolve_public_policies
@@ -229,6 +230,18 @@ class TestPoliciesNovas:
         esperado = _formula_antiga_do_front(me, policies)
         obtido = {chave: chave in policies for chave in NOVAS}
         assert obtido == esperado, f"{pessoa}: /me={me['setores']}/{me['funcoes']}/{me['gerencias']}"
+
+    @pytest.mark.parametrize("setor", ["DAT", "Controle"])
+    def test_so_o_setor_abre_as_compostas_sem_view_all_availability(self, setor):
+        """No seed todo DAT/Controle tem `view_all_availability`; sem ela, só o setor decide (fórmula antiga)."""
+        PermissaoFuncional.objects.get(codename="view_all_availability").groups.remove(Group.objects.get(name=setor))
+        usuario = UsuarioFactory(groups=[setor])
+        me, policies = _me(usuario)
+        assert "view_all_availability" not in policies, "pré-condição: o setor é o único caminho"
+        assert set(COMPOSTAS) <= set(policies)
+        assert {chave: chave in policies for chave in NOVAS} == _formula_antiga_do_front(me, policies)
+        # O simulador `rbac_diff` (capacidades sem view_all_availability) chega ao mesmo resultado.
+        assert snapshot_de_poder(Usuario.objects.filter(id=usuario.id))[f"u{usuario.id}"]["policies"] == policies
 
     def test_superusuario_recebe_todas(self):
         _, policies = _me(UsuarioFactory(superuser=True))

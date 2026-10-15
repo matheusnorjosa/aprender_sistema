@@ -215,11 +215,12 @@ def test_classify_produto(tmp_path):
     proj = ProjetoFactory(nome="Proj Prod Teste", fluxo="NAO_SUPER")
     Produto.objects.create(codigo="PT-1", nome="Produto Existente", projeto=proj)
     Produto.objects.create(codigo="PT-2", nome="Produto Upd", projeto=proj)
-    # PT-1 nome igual -> skip; PT-2 nome diverge -> update; PT-NOVO -> create; vazio -> reject
+    # Só leitura, decide pela existência do código (IMP-3): PT-1 e PT-2 (nome diverge) -> skip;
+    # PT-NOVO -> create; vazio -> reject
     csv = "codigo,nome\nPT-1,Produto Existente\nPT-2,Nome Mudou\nPT-NOVO,Novo\n,Sem Codigo\n"
     r = ExportContractImporter(path=_write_export(tmp_path, {"produto": csv})).run()["por_entidade"]["produto"]
-    assert r["would_skip_same"] == 1
-    assert r["would_update"] == 1
+    assert r["would_skip_same"] == 2
+    assert r["would_update"] == 0
     assert r["would_create"] == 1
     assert r["would_reject"] == 1
 

@@ -68,7 +68,9 @@ TZ = ZoneInfo("America/Fortaleza")
 # Campos que carregam DECISAO ou EDICAO humana: o reimport NUNCA os sobrescreve (#1628/M10-07).
 # `inicio`/`fim`/`segmento` nao entram porque fazem parte do external_hash (mesma chave => mesmos
 # valores), logo nunca divergem para a mesma linha.
-_PROTECTED_FIELDS: tuple[str, ...] = ("status", "usuario_id", "coordenador_id", "local")
+# `projeto_id` tambem e da chave, mas a API pode mover o evento depois da carga: movido (ex.: de
+# NAO_SUPER para uma SUPER ja aprovada), o reimport nao pode por formador nele (adendo da PA-04).
+_PROTECTED_FIELDS: tuple[str, ...] = ("status", "usuario_id", "coordenador_id", "local", "projeto_id")
 
 
 class _AvailabilityConflict(Exception):
@@ -577,7 +579,7 @@ def _process_row(
 
     if existing is not None:
         _reimport_existing(
-            existing, coordenador, status, local, observacoes, encontro, row, stats, pendencias, linha_num
+            existing, coordenador, projeto, status, local, observacoes, encontro, row, stats, pendencias, linha_num
         )
         return
 
@@ -622,6 +624,7 @@ def _process_row(
 def _reimport_existing(
     existing: Any,
     coordenador: Any,
+    projeto: Any,
     status: str,
     local: str,
     observacoes: str,
@@ -633,8 +636,9 @@ def _reimport_existing(
 ) -> None:
     """Reimport de linha existente: protege decisao humana, atualiza so o descritivo (#1628).
 
-    Se um campo PROTEGIDO divergir (status decidido por humano, reatribuicao de dono, ou edicao
-    manual de local), a linha NAO e sobrescrita — vira pendencia `protected` p/ decisao humana.
+    Se um campo PROTEGIDO divergir (status decidido por humano, reatribuicao de dono, edicao
+    manual de local ou projeto movido pela API), a linha NAO e sobrescrita — vira pendencia
+    `protected` p/ decisao humana.
     Sem divergencia protegida, atualiza apenas observacoes/encontro e reporta o diff REAL (o
     `updated` deixa de ser codigo morto: antes comparava a instancia JA mutada pelo upsert).
     """
@@ -643,6 +647,7 @@ def _reimport_existing(
         "usuario_id": coordenador.pk,
         "coordenador_id": coordenador.pk,
         "local": local,
+        "projeto_id": projeto.pk,
     }
     divergences = [f for f in _PROTECTED_FIELDS if getattr(existing, f) != would_be[f]]
     if divergences:

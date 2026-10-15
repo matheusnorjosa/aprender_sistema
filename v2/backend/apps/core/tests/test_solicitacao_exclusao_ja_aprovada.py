@@ -189,6 +189,25 @@ class TestJaAprovadaNaoSeExclui:
         assert resp.status_code == 400, resp.data
         assert Solicitacao.objects.filter(pk=sol.pk).exists()
 
+    @pytest.mark.parametrize(
+        "lote", [pytest.param(False, id="aprovacao_individual"), pytest.param(True, id="aprovacao_em_lote")]
+    )
+    def test_so_o_approve_trava_quando_o_projeto_vira_nao_super(self, coordenador, aprovador, municipio, lote):
+        """Sem edição da solicitação não há a marca do UPDATE: só o AuditLog APPROVE segura a trava."""
+        projeto = _projeto(municipio, "SUPER")
+        sol = _solicitacao(coordenador, municipio, projeto, "pendente")
+        _aprovar(aprovador, sol, lote=lote)
+        resp = _client(aprovador).patch(f"/api/projetos/{projeto.id}/", {"fluxo": "NAO_SUPER"}, format="json")
+        assert resp.status_code == 200, resp.data
+        sol.refresh_from_db()
+        assert sol.status == "aprovado"
+        assert not AuditLog.objects.filter(action="UPDATE", details__aprovada_como_super=True).exists()
+
+        resp = _client(coordenador).delete(f"/api/solicitacoes/{sol.id}/")
+
+        assert resp.status_code == 400, resp.data
+        assert Solicitacao.objects.filter(pk=sol.pk).exists()
+
 
 class TestAprovadaSemApproveRebaixadaPelaEdicao:
     """SUPER `aprovado` sem AuditLog APPROVE (carga antiga, admin Django, data-fix): a edição que
@@ -237,6 +256,17 @@ class TestAprovadaSemApproveRebaixadaPelaEdicao:
 class TestSemAprovacaoManualContinuaExcluivel:
     def test_super_pendente_nunca_aprovada(self, coordenador, municipio):
         sol = _solicitacao(coordenador, municipio, _projeto(municipio, "SUPER"), "pendente")
+
+        resp = _client(coordenador).delete(f"/api/solicitacoes/{sol.id}/")
+
+        assert resp.status_code == 204, resp.data
+        assert not Solicitacao.objects.filter(pk=sol.pk).exists()
+
+    def test_super_pendente_editada_pelo_criador_segue_excluivel(self, coordenador, municipio):
+        """A marca `aprovada_como_super` só nasce da edição de SUPER `aprovado`, não de pendente."""
+        sol = _solicitacao(coordenador, municipio, _projeto(municipio, "SUPER"), "pendente")
+        resp = _client(coordenador).patch(f"/api/solicitacoes/{sol.id}/", {"observacoes": "x"}, format="json")
+        assert resp.status_code == 200, resp.data
 
         resp = _client(coordenador).delete(f"/api/solicitacoes/{sol.id}/")
 

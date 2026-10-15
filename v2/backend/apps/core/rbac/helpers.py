@@ -21,7 +21,8 @@ from typing import Any, Final
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
 from django.db.models import QuerySet
 
-from apps.core.models import EquipeGerencia
+from apps.core.constants import FUNCAO_GROUPS, SETOR_GROUPS
+from apps.core.models import EquipeGerencia, GroupClassificacao
 from apps.core.rbac.constants import FORMADOR_ROLE_GROUPS, FUNCAO_COORDENADOR_GROUPS
 from apps.core.services.rbac_permissions import get_user_functional_permissions
 
@@ -152,6 +153,48 @@ def user_is_gerente_superintendencia(
     return (
         EquipeGerencia.vigentes_em()
         .filter(usuario=user, papel="GERENTE", gerencia__nome=GERENCIA_APROVADORA_NOME)
+        .exists()
+    )
+
+
+def separar_setores_e_funcoes(grupos: list[str]) -> tuple[list[str], list[str]]:
+    """Separa nomes de grupo em (setores, funções), na ordem recebida. É o `setores`/`funcoes` de `/api/me/`.
+
+    A classificação do grupo (`GroupClassificacao`) vence; sem ela, vale a lista fixa
+    (`SETOR_GROUPS`/`FUNCAO_GROUPS`). Grupo fora das duas fica de fora.
+    """
+    classificacoes: dict[str, str] = dict(
+        GroupClassificacao.objects.filter(group__name__in=grupos).values_list("group__name", "tipo")
+    )
+    setores: list[str] = []
+    funcoes: list[str] = []
+    for nome in grupos:
+        tipo = classificacoes.get(nome)
+        if tipo == GroupClassificacao.Tipo.SETOR:
+            setores.append(nome)
+        elif tipo == GroupClassificacao.Tipo.FUNCAO:
+            funcoes.append(nome)
+        elif nome in SETOR_GROUPS:
+            setores.append(nome)
+        elif nome in FUNCAO_GROUPS:
+            funcoes.append(nome)
+    return setores, funcoes
+
+
+# Papéis de vínculo que dão acesso escopado à Grade, aos Bloqueios e aos Deslocamentos (PR A).
+PAPEIS_DE_GESTAO: Final[tuple[str, ...]] = ("GERENTE", "COORDENADOR", "APOIO")
+
+
+def user_tem_vinculo_de_gestao(user: AbstractBaseUser | AnonymousUser | None) -> bool:
+    """Vínculo vigente GERENTE, COORDENADOR ou APOIO em gerência ativa (o `me.gerencias` com esses papéis).
+
+    Mesma base de `views_basic._gerencias_do_vinculo`: `vigentes_com_escopo_em` + `gerencia__ativo`.
+    """
+    if not user or not user.is_authenticated:
+        return False
+    return bool(
+        EquipeGerencia.vigentes_com_escopo_em()
+        .filter(usuario=user, gerencia__ativo=True, papel__in=PAPEIS_DE_GESTAO)
         .exists()
     )
 

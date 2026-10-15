@@ -59,6 +59,7 @@ vi.mock('../../../components/google/GoogleIntegrationCard', () => ({
 }));
 
 import PreAgendaPage from '../PreAgendaPage';
+import { ComAcesso } from '../../../test/comAcesso';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -114,5 +115,24 @@ describe('PreAgendaPage — filtro por gerência (PR A)', () => {
     for (const [filtros] of getStatusSummaryMock.mock.calls) {
       expect(filtros).not.toHaveProperty('status');
     }
+  });
+});
+
+// PR 7 das permissões: o cartão do Google segue a policy access_controle_section (a mesma da
+// rota), não o setor do /me nem a Superintendência.
+describe('PreAgendaPage — cartão do Google pela policy (PR 7)', () => {
+  test('com access_controle_section: mostra o cartão', async () => {
+    render(
+      <ComAcesso policies={['access_controle_section']}>
+        <PreAgendaPage />
+      </ComAcesso>,
+    );
+    expect(await screen.findByTestId('google-card')).toBeInTheDocument();
+  });
+
+  test('setor Controle no /me, sem a policy: não mostra', async () => {
+    render(<PreAgendaPage />);
+    await waitFor(() => expect(getGerenciasMock).toHaveBeenCalled());
+    expect(screen.queryByTestId('google-card')).not.toBeInTheDocument();
   });
 });

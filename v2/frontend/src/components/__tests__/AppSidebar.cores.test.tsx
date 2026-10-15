@@ -21,7 +21,7 @@ import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, test } from 'vitest';
 
 import { AppSidebar } from '../AppSidebar';
-import type { Permissions } from '../../hooks/usePermissions';
+import { ComAcesso } from '../../test/comAcesso';
 
 // `?raw` de CSS volta vazio no Vitest (CSS desligado): lê o arquivo do disco.
 const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../App.css'), 'utf-8');
@@ -73,19 +73,18 @@ describe('App.css — submenu da página atual na sidebar (tema claro)', () => {
   });
 
   test('o seletor casa com o submenu "DAT" na recolhida, em /dat/admin/usuarios', () => {
-    const permissions = { canDAT: true } as Permissions;
     render(
       <MemoryRouter initialEntries={['/dat/admin/usuarios']}>
-        <AppSidebar
-          permissions={permissions}
-          policies={['manage_admin_registries']}
-          gcalErrorCount={0}
-          unreadNotifications={0}
-          modo="recolhida"
-          sidebarCollapsed
-          toggleSidebar={() => {}}
-          colors={{ sidebarBackground: '#006B52', borderLight: '#303030' }}
-        />
+        <ComAcesso policies={['manage_admin_registries']}>
+          <AppSidebar
+            gcalErrorCount={0}
+            unreadNotifications={0}
+            modo="recolhida"
+            sidebarCollapsed
+            toggleSidebar={() => {}}
+            colors={{ sidebarBackground: '#006B52', borderLight: '#303030' }}
+          />
+        </ComAcesso>
       </MemoryRouter>,
     );
     const titulos = Array.from(document.querySelectorAll(TITULO_SELECIONADO));
@@ -156,8 +155,6 @@ describe('App.css — foco visível nos links do menu lateral', () => {
     render(
       <MemoryRouter initialEntries={['/home']}>
         <AppSidebar
-          permissions={{} as Permissions}
-          policies={[]}
           gcalErrorCount={0}
           unreadNotifications={0}
           modo="aberta"
@@ -181,8 +178,6 @@ describe('App.css — foco visível nos links do menu lateral', () => {
     render(
       <MemoryRouter initialEntries={['/home']}>
         <AppSidebar
-          permissions={{} as Permissions}
-          policies={[]}
           gcalErrorCount={0}
           unreadNotifications={0}
           modo="sobreposta"

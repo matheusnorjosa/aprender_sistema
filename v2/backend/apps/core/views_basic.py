@@ -19,8 +19,8 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema
 
 from .api_schemas import COMMON_ERROR_RESPONSES
-from .constants import FUNCAO_GROUPS, SETOR_GROUPS
-from .models import AuditLog, EquipeGerencia, GroupClassificacao
+from .models import AuditLog, EquipeGerencia
+from .rbac.helpers import separar_setores_e_funcoes
 from .rbac.policies import user_has_policy
 from .serializers import CurrentUserSerializer, MeContactUpdateSerializer
 from .services.audit import registrar_auditoria
@@ -103,23 +103,8 @@ class CurrentUserView(APIView):
         user = request.user
         groups: list[str] = list(user.groups.values_list("name", flat=True))
 
-        classificacoes = dict(
-            GroupClassificacao.objects.filter(group__name__in=groups).values_list("group__name", "tipo")
-        )
-
         # Separar grupos em setores e funções (dinâmico com fallback legado).
-        setores: list[str] = []
-        funcoes: list[str] = []
-        for group_name in groups:
-            tipo = classificacoes.get(group_name)
-            if tipo == GroupClassificacao.Tipo.SETOR:
-                setores.append(group_name)
-            elif tipo == GroupClassificacao.Tipo.FUNCAO:
-                funcoes.append(group_name)
-            elif group_name in SETOR_GROUPS:
-                setores.append(group_name)
-            elif group_name in FUNCAO_GROUPS:
-                funcoes.append(group_name)
+        setores, funcoes = separar_setores_e_funcoes(groups)
 
         # Superusers sempre têm acesso completo
         is_superintendencia: bool = user.is_superuser or ("Superintendência" in setores)

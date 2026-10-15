@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Alert } from 'antd';
 import { Link } from 'react-router';
 import { getMe } from '../api/availability';
-import { computePermissions } from '../hooks/usePermissions';
+import { ehSuperusuario } from '../contexts/AcessoContext';
 
 export const DAT_IMPORTS_CENTRALIZED_MESSAGE =
   'Importações foram centralizadas em DAT > Importações.';
@@ -27,7 +27,7 @@ export default function DatImportsCentralizedBanner({
         const user = await getMe();
         if (active) {
           // Importação pela tela: só superusuário (decisão do dono, 02/10/2026).
-          setCanAccessDatImports(computePermissions(user).isAdmin);
+          setCanAccessDatImports(ehSuperusuario(user));
         }
       } catch {
         if (active) {

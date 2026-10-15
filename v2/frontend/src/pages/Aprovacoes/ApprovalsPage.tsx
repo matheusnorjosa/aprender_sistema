@@ -63,7 +63,8 @@ import {
 } from '../../api/solicitacoes';
 import { getMyPolicies } from '../../api/me';
 import { getMe } from '../../api/availability';
-import { computeAccess } from '../../hooks/useCanAccess';
+import { computeCapabilities } from '../../hooks/useCapabilities';
+import { ehSuperusuario } from '../../contexts/AcessoContext';
 import { TIMING } from '../../constants/timing';
 import { usePolling } from '../../hooks/usePolling';
 import { syncChannel } from '../../services/syncChannel';
@@ -280,8 +281,7 @@ export default function ApprovalsPage(): JSX.Element {
           getMyPolicies().catch(() => [] as string[]),
           getMe().catch(() => null),
         ]);
-        const access = computeAccess(policies);
-        setCanApprove(access.canAccessApprovals);
+        setCanApprove(computeCapabilities(policies).canAccessApprovals);
         setMe(currentUser);
       } catch (error) {
         logger.error('Erro ao carregar policies:', error);
@@ -293,7 +293,7 @@ export default function ApprovalsPage(): JSX.Element {
 
   // PA-02 (segregação): quem criou não decide a própria; superusuário pode (fica no AuditLog).
   const isPropria = useCallback(
-    (record: Solicitacao): boolean => me !== null && !me.is_superuser && record.usuario === me.id,
+    (record: Solicitacao): boolean => me !== null && !ehSuperusuario(me) && record.usuario === me.id,
     [me],
   );
 

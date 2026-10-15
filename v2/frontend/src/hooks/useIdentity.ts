@@ -6,12 +6,12 @@
  * o usuário pode fazer", use `useCapabilities(policies)`, derivado exclusivamente
  * de policies públicas.
  *
- * A separação existe para o lint (futuro) distinguir "quem é" de "o que pode":
- * `useIdentity.*` em contexto de route/guard/gate é um smell (autorizar por
- * organograma). Co-existe com `usePermissions` (legacy) até a migração de callers
- * (ondas 3.2/3.3); `usePermissions` será removido na onda 4.5.
+ * A separação existe para distinguir "quem é" de "o que pode": `useIdentity.*` em
+ * route/guard/gate é um smell (autorizar por organograma). Acesso se decide por
+ * `useAcesso()` (PR 7 das permissões; trava em `src/test/lint/acessoSoPorPolicy.test.ts`).
  */
 import { useMemo } from 'react';
+import { ehSuperusuario } from '../contexts/AcessoContext';
 import type { CurrentUser } from '../types';
 
 export interface Identity {
@@ -71,7 +71,7 @@ export function computeIdentity(user: CurrentUser | null): Identity {
   const setores = user.setores || [];
   const funcoes = user.funcoes || [];
 
-  const isAdmin = user.is_superuser === true;
+  const isAdmin = ehSuperusuario(user);
   const isCoordenador = funcoes.includes('Coordenador') || funcoes.includes('Apoio de Coordenação');
   const isFormador = funcoes.includes('Formador');
   const isGerente = funcoes.includes('Gerente');

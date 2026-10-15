@@ -12,7 +12,7 @@ import { describe, expect, test, vi } from 'vitest';
 
 import { AppRoutes } from '../AppRoutes';
 import type { CurrentUser } from '../../types';
-import type { Permissions } from '../../hooks/usePermissions';
+import { ComAcesso } from '../../test/comAcesso';
 
 // Mock api/ops para evitar fetch real durante render da ImportacoesPage
 vi.mock('../../api/ops', () => ({
@@ -45,45 +45,24 @@ const DAT_USER: CurrentUser = {
   permissions: [],
 };
 
-const DAT_PERMISSIONS: Permissions = {
-  isAdmin: false,
-  isCoordenador: false,
-  isFormador: false,
-  isGerente: false,
-  inSuperintendencia: false,
-  inGerencia: false,
-  inDAT: true,
-  inControle: false,
-  inDiretoria: false,
-  canApproveSuper: false,
-  canCoordenador: false,
-  canControle: false,
-  canDAT: true,
-  canAcoesInternas: false,
-  canDashboardOverview: false,
-  canDashboardEquipe: false,
-  canDashboardGcal: false,
-  canDashboardCompras: false,
-  canMapaBrasil: false,
-  canDashboardsMenu: false,
-  canDisponibilidade: true,
-  isGestorPorVinculo: false,
-  canSeeAllSectors: false,
-};
-
 // O DAT em produção possui a policy pública `manage_admin_registries`, que abre as demais rotas
 // /dat/*. As telas de importação não: desde 02/10/2026 (decisão do dono) só o superusuário as abre.
 const DAT_POLICIES = ['manage_admin_registries'];
 const SUPERUSUARIO: CurrentUser = { ...DAT_USER, groups: [], setores: [], is_superuser: true };
-const PERMISSOES_SUPERUSUARIO: Permissions = { ...DAT_PERMISSIONS, isAdmin: true, inDAT: false };
+
+function renderRota(rota: string, user: CurrentUser, policies: readonly string[]): void {
+  render(
+    <MemoryRouter initialEntries={[rota]}>
+      <ComAcesso policies={policies} superusuario={user.is_superuser}>
+        <AppRoutes user={user} />
+      </ComAcesso>
+    </MemoryRouter>,
+  );
+}
 
 describe('AppRoutes — DAT Imports redirect (PR-C)', () => {
   test('rota /dat/importacao redireciona para /dat/importacoes', async () => {
-    render(
-      <MemoryRouter initialEntries={['/dat/importacao']}>
-        <AppRoutes user={SUPERUSUARIO} permissions={PERMISSOES_SUPERUSUARIO} policies={DAT_POLICIES} />
-      </MemoryRouter>,
-    );
+    renderRota('/dat/importacao', SUPERUSUARIO, DAT_POLICIES);
 
     // ImportacoesPage tem heading "DAT > Importações"
     expect(
@@ -92,11 +71,7 @@ describe('AppRoutes — DAT Imports redirect (PR-C)', () => {
   });
 
   test('rota /dat/importacoes carrega ImportacoesPage diretamente para o superusuário', async () => {
-    render(
-      <MemoryRouter initialEntries={['/dat/importacoes']}>
-        <AppRoutes user={SUPERUSUARIO} permissions={PERMISSOES_SUPERUSUARIO} policies={DAT_POLICIES} />
-      </MemoryRouter>,
-    );
+    renderRota('/dat/importacoes', SUPERUSUARIO, DAT_POLICIES);
 
     expect(
       await screen.findByRole('heading', { level: 2, name: /DAT.*Importações/i }, { timeout: 5000 }),
@@ -104,24 +79,15 @@ describe('AppRoutes — DAT Imports redirect (PR-C)', () => {
   });
 
   test.each(['/dat/importacoes', '/dat/importacao'])('rota %s mostra Forbidden para o DAT', async (rota) => {
-    render(
-      <MemoryRouter initialEntries={[rota]}>
-        <AppRoutes user={DAT_USER} permissions={DAT_PERMISSIONS} policies={DAT_POLICIES} />
-      </MemoryRouter>,
-    );
+    renderRota(rota, DAT_USER, DAT_POLICIES);
 
     expect(await screen.findByText(/Recurso indisponível/i)).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 2, name: /DAT.*Importações/i })).not.toBeInTheDocument();
   });
 
   test('rota /dat/importacoes mostra Forbidden para não-DAT', async () => {
-    const nonDatPerms: Permissions = { ...DAT_PERMISSIONS, canDAT: false, inDAT: false };
     const nonDatUser: CurrentUser = { ...DAT_USER, groups: ['Coordenador'], setores: ['Vidas'] };
-    render(
-      <MemoryRouter initialEntries={['/dat/importacoes']}>
-        <AppRoutes user={nonDatUser} permissions={nonDatPerms} policies={[]} />
-      </MemoryRouter>,
-    );
+    renderRota('/dat/importacoes', nonDatUser, []);
 
     expect(await screen.findByText(/Recurso indisponível/i)).toBeInTheDocument();
   });

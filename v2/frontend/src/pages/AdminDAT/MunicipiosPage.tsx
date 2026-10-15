@@ -26,6 +26,7 @@ import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../
 import { AcoesLinha, larguraAcoesLinha } from '../../components/AcoesLinha';
 import { TEXTO_DA_TAG } from '../../components/textoDaTag';
 import { DEFAULT_PAGE_SIZE, UF_NORDESTE_OPTIONS } from '../../constants';
+import { ehSuperusuario } from '../../contexts/AcessoContext';
 import type { ID } from '../../types';
 import { aposConfirmacaoFechar, dialogoDeExclusaoEmUso } from './excluirEmUso';
 import { errosDosCampos, mensagemDoErro } from './usuario_form_helpers';
@@ -131,7 +132,7 @@ export default function MunicipiosPage(): JSX.Element {
   // Importação pela tela: só superusuário (decisão do dono, 02/10/2026). Falha ao consultar = sem o cartão.
   useEffect(() => {
     checkAuth()
-      .then((auth) => setPodeImportar(Boolean(auth.user?.is_superuser)))
+      .then((auth) => setPodeImportar(ehSuperusuario(auth.user)))
       .catch(() => setPodeImportar(false));
   }, []);
 

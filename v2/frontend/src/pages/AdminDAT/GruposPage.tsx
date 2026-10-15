@@ -52,6 +52,7 @@ import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../
 import { AcoesLinha, larguraAcoesLinha } from '../../components/AcoesLinha';
 import { TEXTO_DA_TAG } from '../../components/textoDaTag';
 import { PAGE_SIZES } from '../../constants';
+import { ehSuperusuario } from '../../contexts/AcessoContext';
 import type { ID } from '../../types';
 
 const { Title, Text } = Typography;
@@ -326,7 +327,7 @@ export default function GruposPage({ forcedType }: GruposPageProps = {}): JSX.El
     void (async () => {
       try {
         const auth = await checkAuth();
-        setCurrentIsSuperuser(Boolean(auth.user?.is_superuser));
+        setCurrentIsSuperuser(ehSuperusuario(auth.user));
       } catch {
         setCurrentIsSuperuser(false);
       }

@@ -6,6 +6,9 @@
  * garantindo 403 para nao-Superintendencia.
  *
  * RED no codigo antigo: o botao Excluir aparecia para qualquer usuario.
+ *
+ * PR 7 das permissoes: o gate le a policy `execute_restricted_operations` (/api/me/policies/),
+ * nao mais o setor do /me.
  */
 import { describe, expect, test, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
@@ -53,10 +56,18 @@ vi.mock('../../../api/datModule', () => ({
   getCoordenadoresOptions: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock('../../../api/availability', () => ({ getMe: vi.fn() }));
-
-import { getMe } from '../../../api/availability';
+import { ComAcesso } from '../../../test/comAcesso';
 import PlanoFormacoesPage from '../PlanoFormacoesPage';
+
+function renderPagina(policies: readonly string[]) {
+  render(
+    <MemoryRouter>
+      <ComAcesso policies={policies}>
+        <PlanoFormacoesPage />
+      </ComAcesso>
+    </MemoryRouter>,
+  );
+}
 
 describe('#1740: botao Excluir do Plano so aparece para operacao restrita', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -64,20 +75,9 @@ describe('#1740: botao Excluir do Plano so aparece para operacao restrita', () =
   // Timeouts folgados: renderizar a pagina inteira (Table + filtros + options) em jsdom
   // e lento; o comportamento testado (visibilidade do botao) e rapido.
   test(
-    'Superintendencia ve o botao Excluir',
+    'com execute_restricted_operations (Superintendencia) ve o botao Excluir',
     async () => {
-      vi.mocked(getMe).mockResolvedValue({
-        is_superuser: false,
-        is_superintendencia: true,
-        setores: ['Superintendência'],
-        funcoes: ['Gerente'],
-      } as never);
-
-      render(
-        <MemoryRouter>
-          <PlanoFormacoesPage />
-        </MemoryRouter>,
-      );
+      renderPagina(['execute_restricted_operations', 'access_controle_section']);
 
       const btn = await screen.findByRole('button', { name: /Excluir plano/i }, { timeout: 15000 });
       expect(btn).toBeTruthy();
@@ -86,20 +86,9 @@ describe('#1740: botao Excluir do Plano so aparece para operacao restrita', () =
   );
 
   test(
-    'Coordenador (sem operacao restrita) NAO ve o botao Excluir',
+    'sem execute_restricted_operations NAO ve o botao Excluir',
     async () => {
-      vi.mocked(getMe).mockResolvedValue({
-        is_superuser: false,
-        is_superintendencia: false,
-        setores: ['DAT'],
-        funcoes: ['Coordenador'],
-      } as never);
-
-      render(
-        <MemoryRouter>
-          <PlanoFormacoesPage />
-        </MemoryRouter>,
-      );
+      renderPagina(['access_controle_section', 'create_solicitation']);
 
       // A linha renderiza (o botao Editar aparece sempre); o Excluir deve estar ausente.
       await screen.findByRole('button', { name: /Editar plano/i }, { timeout: 15000 });

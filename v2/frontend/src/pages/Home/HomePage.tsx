@@ -21,13 +21,9 @@ import {
   ShoppingOutlined,
   SafetyOutlined,
 } from '@ant-design/icons';
-import { getMe } from '../../api/availability';
-import { getMyPolicies } from '../../api/me';
 import { getHomeStats } from '../../api/stats';
-import { computePermissions } from '../../hooks/usePermissions';
-import { computeAccess } from '../../hooks/useCanAccess';
+import { useAcesso } from '../../contexts/AcessoContext';
 import logger from '../../utils/logger';
-import type { CurrentUser } from '../../types';
 
 const { Title, Text } = Typography;
 
@@ -93,8 +89,8 @@ function AccessCard({ icon, title, description, link, badge, disabled = false }:
 }
 
 export default function HomePage(): JSX.Element {
-  const [user, setUser] = useState<CurrentUser | null>(null);
-  const [policies, setPolicies] = useState<readonly string[]>([]);
+  // PR 7 das permissões: cada cartão segue a policy da rota para onde leva (E1/E2, dono 15/10).
+  const { caps, ehSuperusuario } = useAcesso();
   const [loading, setLoading] = useState<boolean>(true);
   const [stats, setStats] = useState<StatsType>({
     pendingApprovals: 0,
@@ -105,18 +101,8 @@ export default function HomePage(): JSX.Element {
   useEffect(() => {
     const loadUserAndStats = async (): Promise<void> => {
       try {
-        // Carregar dados do usuário, policies e estatísticas em paralelo.
-        // PR 10 hardening RBAC (2026-04-30): policies viraram fonte oficial
-        // para gating de Aprovações no frontend (campo `can_approve_super`
-        // continua na API mas não é consumido aqui).
-        const [userData, userPolicies, statsData] = await Promise.all([
-          getMe(),
-          getMyPolicies().catch(() => [] as string[]),
-          getHomeStats() as Promise<HomeStatsResponse>,
-        ]);
-
-        setUser(userData);
-        setPolicies(userPolicies);
+        // Usuário e policies já vêm do App (AcessoContext); aqui só as estatísticas.
+        const statsData = (await getHomeStats()) as HomeStatsResponse;
         setStats({
           pendingApprovals: statsData.pending_approvals ?? 0,
           myRequests: statsData.my_requests ?? 0,
@@ -140,18 +126,13 @@ export default function HomePage(): JSX.Element {
     );
   }
 
-  // Calcular permissões (RBAC com Setor + Função).
-  // Epic 3.3 cleanup: usa computePermissions (SSOT) em vez de hardcodes inline.
-  const perms = computePermissions(user);
-  const isAdmin = perms.isAdmin;
-  // PR 10 hardening RBAC (2026-04-30): Aprovações depende exclusivamente da
-  // policy `access_solicitation_approvals`. Legacy `can_approve_super` não
-  // é mais consultado pelo frontend.
-  const access = computeAccess(policies);
-  const canAccessApprovals = access.canAccessApprovals;
-  const isManager = perms.isGerente && (perms.inGerencia || perms.isAdmin);
-  const isCoordenador = perms.canCoordenador;
-  const canDAT = perms.canDAT;
+  // E3: o bloco administrativo continua só do superusuário.
+  const isAdmin = ehSuperusuario;
+  const canAccessApprovals = caps.canAccessApprovals;
+  // E2: "Desempenho da Equipe" leva a /dashboards/equipe (view_team_dashboard).
+  const podeVerDesempenho = caps.canViewTeamDashboard;
+  // E1: "Enviar" e "Minhas Solicitações" levam a rotas de create_solicitation.
+  const podeCriarSolicitacao = caps.canCreateSolicitation;
 
   return (
     <div className="p-6">
@@ -169,16 +150,14 @@ export default function HomePage(): JSX.Element {
             Acesso Administrativo
           </Title>
           <Row gutter={[16, 16]}>
-            {canDAT && (
-              <Col xs={24} sm={12} md={8}>
-                <AccessCard
-                  icon={<UserOutlined />}
-                  title="Gerenciamento de Usuários"
-                  description="Gerenciar usuários, grupos e permissões."
-                  link="/dat/admin/usuarios"
-                />
-              </Col>
-            )}
+            <Col xs={24} sm={12} md={8}>
+              <AccessCard
+                icon={<UserOutlined />}
+                title="Gerenciamento de Usuários"
+                description="Gerenciar usuários, grupos e permissões."
+                link="/dat/admin/usuarios"
+              />
+            </Col>
             <Col xs={24} sm={12} md={8}>
               <AccessCard
                 icon={<BarChartOutlined />}
@@ -211,8 +190,8 @@ export default function HomePage(): JSX.Element {
         </>
       )}
 
-      {/* Acesso Gerencial (Gerência) */}
-      {isManager && (
+      {/* Acesso Gerencial */}
+      {podeVerDesempenho && (
         <>
           <Title level={4} className="mt-6 mb-4">
             Acesso Gerencial
@@ -243,7 +222,7 @@ export default function HomePage(): JSX.Element {
             link="/disponibilidade"
           />
         </Col>
-        {isCoordenador && (
+        {podeCriarSolicitacao && (
           <>
             <Col xs={24} sm={12} md={8}>
               <AccessCard
@@ -279,7 +258,7 @@ export default function HomePage(): JSX.Element {
               prefix={<SafetyOutlined />}
             />
           </Col>
-          {isCoordenador && (
+          {podeCriarSolicitacao && (
             <Col xs={24} sm={8}>
               <Statistic
                 title="Minhas Solicitações"

@@ -45,7 +45,6 @@ import {
   CarOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { getMe } from '../../api/availability';
 import {
   listDeslocamentos,
   listFormadoresDoSetor,
@@ -56,7 +55,7 @@ import {
   type DeslocamentoFilters as FiltersType,
   type FormadorOption as UsuarioOptionType,
 } from '../../api/deslocamentos';
-import { computePermissions } from '../../hooks/usePermissions';
+import { useAcesso } from '../../contexts/AcessoContext';
 import DatImportsCentralizedBanner from '../../components/DatImportsCentralizedBanner';
 import logger from '../../utils/logger';
 import type { ID } from '../../types';
@@ -83,12 +82,13 @@ interface ApiErrorType {
 }
 
 export default function DeslocamentosPage(): JSX.Element {
-  const [canAccess, setCanAccess] = useState<boolean>(false);
-  // #1622: dois loadings separados. `pageLoading` gateia a página inteira (só o
-  // carregamento inicial de usuário/permissão); `tableLoading` gateia SÓ a tabela.
-  // Antes um `loading` único fazia o fetch de filtro desmontar a página (input
-  // perdia foco/valor).
-  const [pageLoading, setPageLoading] = useState<boolean>(true);
+  // PR 7 das permissões: a mesma policy da rota e do menu (access_travel). A rota já protege
+  // (<RequirePolicy>); este check é defesa em camadas.
+  // #1622: dois loadings separados. `pageLoading` gateia a página inteira (só o acesso
+  // da pessoa); `tableLoading` gateia SÓ a tabela. Antes um `loading` único fazia o fetch
+  // de filtro desmontar a página (input perdia foco/valor).
+  const { caps, loading: pageLoading } = useAcesso();
+  const canAccess = caps.canAccessTravel;
   const [tableLoading, setTableLoading] = useState<boolean>(false);
   const [deslocamentos, setDeslocamentos] = useState<DeslocamentoRecord[]>([]);
   const [usuarios, setUsuarios] = useState<UsuarioOptionType[]>([]);
@@ -98,31 +98,6 @@ export default function DeslocamentosPage(): JSX.Element {
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [currentRecord, setCurrentRecord] = useState<DeslocamentoRecord | null>(null);
   const [form] = Form.useForm<FormValuesType>();
-
-  // Load user and check permissions
-  // Epic 3.3 cleanup: substitui hardcode `is_superuser || is_superintendencia` por
-  // `computePermissions(userData)` (SSOT). Nota: a rota já é protegida por
-  // <RequirePolicy> no AppRoutes (Epic 3.1+3.2) — este check local é defesa
-  // em camadas e fonte do banner de loading da página.
-  useEffect(() => {
-    async function loadUser(): Promise<void> {
-      try {
-        const userData = await getMe();
-        const perms = computePermissions(userData);
-        // PR A: vínculo de gestão (me.gerencias) também entra — mesma regra da rota/menu.
-        setCanAccess(
-          perms.canControle || perms.canCoordenador || perms.canDAT || perms.inSuperintendencia || perms.isGestorPorVinculo,
-        );
-      } catch (error) {
-        logger.error('Erro ao carregar usuário:', error);
-        setCanAccess(false);
-      } finally {
-        setPageLoading(false);
-      }
-    }
-
-    void loadUser();
-  }, []);
 
   // M09-06 (#1622): guarda de sequência (latest-wins). O debounce reduz mas não
   // elimina a corrida — se um request antigo (filtro obsoleto) resolver DEPOIS do

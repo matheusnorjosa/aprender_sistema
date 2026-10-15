@@ -7,7 +7,7 @@
  * mensagem precisa ser genérica ("Recurso indisponível" — OWASP: não
  * vazar nome de policy/recurso).
  *
- * 10 atores canônicos × 12 rotas críticas = matriz declarativa.
+ * 10 atores canônicos × 16 rotas críticas = matriz declarativa.
  *
  * Foco: gate de rota. Conteúdo da página é responsabilidade dos testes
  * próprios. Mockamos APIs internas para evitar fetch real.
@@ -15,14 +15,20 @@
 
 import { MemoryRouter } from 'react-router';
 import { render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
 import { AppRoutes } from '../AppRoutes';
 import type { CurrentUser } from '../../types';
-import type { Permissions } from '../../hooks/usePermissions';
-import { computePermissions } from '../../hooks/usePermissions';
-import { getMe } from '../../api/availability';
 import { listDeslocamentos } from '../../api/deslocamentos';
+import {
+  ATORES_RBAC,
+  PERSONAS_POR_VINCULO,
+  atorRbac,
+  usuarioDeTeste,
+  type AtorRbac,
+  type NomeDoAtor,
+} from '../../test/atoresRbac';
+import { ComAcesso } from '../../test/comAcesso';
 
 // ============================================================================
 // Mocks de APIs internas das páginas (evita fetch real durante render)
@@ -82,6 +88,10 @@ vi.mock('../../api/stats', () => ({
 vi.mock('../../pages/Solicitacoes/EditSolicitacaoPage', () => ({
   default: () => 'EDIT_PAGE',
 }));
+// Idem para Compras (/controle/compras, /compras-materiais, /dat/compras-materiais).
+vi.mock('../../pages/DATModule/ComprasPage', () => ({
+  default: () => 'COMPRAS_PAGE',
+}));
 // #1656: idem para /solicitacoes/publicacao — o teste cobre o gate, não a página.
 vi.mock('../../pages/Solicitacoes/PublicacaoSetorPage', () => ({
   default: () => 'PUBLICACAO_PAGE',
@@ -108,43 +118,15 @@ const BASE_USER: CurrentUser = {
   permissions: [],
 };
 
-const EMPTY_PERMISSIONS: Permissions = {
-  isAdmin: false,
-  isCoordenador: false,
-  isFormador: false,
-  isGerente: false,
-  inSuperintendencia: false,
-  inGerencia: false,
-  inDAT: false,
-  inControle: false,
-  inDiretoria: false,
-  canApproveSuper: false,
-  canCoordenador: false,
-  canControle: false,
-  canDAT: false,
-  canAcoesInternas: false,
-  canDashboardOverview: false,
-  canDashboardEquipe: false,
-  canDashboardGcal: false,
-  canDashboardCompras: false,
-  canMapaBrasil: false,
-  canDashboardsMenu: false,
-  canDisponibilidade: false,
-  isGestorPorVinculo: false,
-  canSeeAllSectors: false,
-};
-
 const FORBIDDEN_TEXT = /Recurso indisponível/i;
 
-function renderRoute(
-  route: string,
-  user: CurrentUser,
-  permissions: Permissions,
-  policies: readonly string[],
-): void {
+/** Rota com o acesso que o App monta: policies de /me/policies + superusuário do /me. */
+function renderRoute(route: string, user: CurrentUser, policies: readonly string[]): void {
   render(
     <MemoryRouter initialEntries={[route]}>
-      <AppRoutes user={user} permissions={permissions} policies={policies} />
+      <ComAcesso policies={policies} superusuario={user.is_superuser}>
+        <AppRoutes user={user} />
+      </ComAcesso>
     </MemoryRouter>,
   );
 }
@@ -152,6 +134,8 @@ function renderRoute(
 // ============================================================================
 // Rotas críticas (espelham AppRoutes.tsx)
 // ============================================================================
+
+const EDITAR = '/solicitacoes/42/editar';
 
 const CRITICAL_ROUTES = [
   '/dashboards',
@@ -163,7 +147,11 @@ const CRITICAL_ROUTES = [
   '/solicitacoes/disponibilidade',
   '/solicitacoes/bloqueios',
   '/solicitacoes/deslocamentos',
+  EDITAR,
   '/controle',
+  '/controle/compras',
+  '/compras-materiais',
+  '/dat/compras-materiais',
   '/dat/admin',
   '/dat/importacoes',
 ] as const;
@@ -171,360 +159,111 @@ const CRITICAL_ROUTES = [
 type CriticalRoute = (typeof CRITICAL_ROUTES)[number];
 
 // ============================================================================
-// Snapshot por ator: setores/funções (Permissions) + policies (do backend)
-// + matriz `expectedAccess[route] = true|false`. Espelha rbac_matrix.test.ts
-// e AppSidebar.menu.test.tsx (PR 11 #1316).
+// Linha de base persona × rota: os 10 atores de `src/test/atoresRbac.ts` (payload de /me e
+// policies medidas no backend). PR 7 das permissões: as rotas decidem só por policy; esta
+// matriz foi commitada verde com o código antigo e não mudou com a troca.
 // ============================================================================
 
 interface ActorSnapshot {
-  actor: string;
-  permissions: Permissions;
-  policies: readonly string[];
+  actor: NomeDoAtor;
   expectedAccess: Record<CriticalRoute, boolean>;
 }
+
+const NEGA_TUDO: Record<CriticalRoute, boolean> = Object.fromEntries(
+  CRITICAL_ROUTES.map((r) => [r, false]),
+) as Record<CriticalRoute, boolean>;
+
+/** Rotas de Compras (su ∨ Controle ∨ DAT hoje). */
+const COMPRAS = { '/controle/compras': true, '/compras-materiais': true, '/dat/compras-materiais': true } as const;
+/** Grade, Bloqueios e Deslocamentos. */
+const ESCOPO = {
+  '/solicitacoes/disponibilidade': true,
+  '/solicitacoes/bloqueios': true,
+  '/solicitacoes/deslocamentos': true,
+} as const;
 
 const ACTORS: ActorSnapshot[] = [
   {
     actor: 'Superuser',
-    permissions: {
-      ...EMPTY_PERMISSIONS,
-      isAdmin: true,
-      canControle: true,
-      canDAT: true,
-      canCoordenador: true,
-      canAcoesInternas: true,
-      canDashboardOverview: true,
-      canDashboardEquipe: true,
-      canDashboardGcal: true,
-      canDashboardCompras: true,
-      canMapaBrasil: true,
-      canDashboardsMenu: true,
-      canDisponibilidade: true,
-      canSeeAllSectors: true,
-      canApproveSuper: true,
-    },
-    // Superuser recebe todas as PUBLIC_POLICY_KEYS (bypass no backend). #1271: inclui
-    // as 3 policies de menu do #1589.
-    policies: [
-      'access_audit_logs',
-      'access_solicitation_approvals',
-      'access_controle_section',
-      'create_solicitation',
-      'import_availability_blocks',
-      'import_compras',
-      'import_generic_spreadsheet',
-      'manage_admin_registries',
-      'manage_internal_actions',
-      'manage_purchases_and_materials',
-      'manage_solicitacao_status',
-      'use_gcal',
-      'view_all_availability',
-      'view_compras_dashboard',
-      'view_compras_pendencias',
-      'view_compras_stats',
-      'view_gcal_dashboard',
-      'view_map_metrics',
-      'view_overview_dashboard',
-      'view_reports',
-      'view_team_dashboard',
-    ],
+    expectedAccess: Object.fromEntries(CRITICAL_ROUTES.map((r) => [r, true])) as Record<CriticalRoute, boolean>,
+  },
+  {
+    actor: 'DAT',
     expectedAccess: {
+      ...NEGA_TUDO,
+      '/dashboards/compras': true,
+      '/dashboards/equipe': true,
+      '/dashboards/gcal': true,
+      '/mapa-brasil': true, // o seed dá view_map_metrics ao DAT
+      ...ESCOPO,
+      [EDITAR]: true,
+      ...COMPRAS,
+      '/dat/admin': true,
+      // '/dat/importacoes' fica negada: importação pela tela é só do superusuário (02/10/2026)
+    },
+  },
+  {
+    actor: 'Controle',
+    expectedAccess: {
+      ...NEGA_TUDO,
+      '/dashboards/gcal': true,
+      ...ESCOPO,
+      '/controle': true,
+      ...COMPRAS,
+    },
+  },
+  {
+    actor: 'Diretoria',
+    expectedAccess: {
+      ...NEGA_TUDO,
       '/dashboards': true,
       '/dashboards/compras': true,
       '/dashboards/equipe': true,
       '/dashboards/gcal': true,
       '/mapa-brasil': true,
-      '/solicitacoes/aprovacoes': true,
-      '/solicitacoes/disponibilidade': true,
-      '/solicitacoes/bloqueios': true,
-      '/solicitacoes/deslocamentos': true,
-      '/controle': true,
-      '/dat/admin': true,
-      '/dat/importacoes': true,
+      // D8: fora da Grade Mensal.
     },
   },
   {
-    actor: 'DAT',
-    permissions: {
-      ...EMPTY_PERMISSIONS,
-      inDAT: true,
-      canDAT: true,
-      canCoordenador: true,
-      canAcoesInternas: true,
-      canDashboardEquipe: true,
-      canDashboardGcal: true,
-      canDashboardCompras: true,
-      canMapaBrasil: true,
-      canDashboardsMenu: true,
-      canDisponibilidade: true,
-    },
-    // Prod-verificado (#1588) + view_team/gcal_dashboard (#1589: DAT via manage_admin_registries).
-    policies: [
-      'access_audit_logs',
-      'import_availability_blocks',
-      'import_compras',
-      'import_generic_spreadsheet',
-      'manage_admin_registries',
-      'manage_purchases_and_materials',
-      'view_all_availability',
-      'view_compras_dashboard',
-      'view_compras_pendencias',
-      'view_compras_stats',
-      'view_reports',
-      'view_team_dashboard',
-      'view_gcal_dashboard',
-    ],
-    expectedAccess: {
-      '/dashboards': false, // sem view_overview_dashboard (Diretoria/superuser only)
-      '/dashboards/compras': true,
-      '/dashboards/equipe': true, // view_team_dashboard (via manage_admin_registries)
-      '/dashboards/gcal': true, // view_gcal_dashboard
-      '/mapa-brasil': false, // #1271: sem view_map_metrics (Diretoria-only) — antes via grupo
-      '/solicitacoes/aprovacoes': false, // sem policy
-      '/solicitacoes/disponibilidade': true, // canDisponibilidade
-      '/solicitacoes/bloqueios': true, // canCoordenador (via inDAT) → canBloqueios
-      '/solicitacoes/deslocamentos': true, // canDAT
-      '/controle': false, // canControle=false
-      '/dat/admin': true,
-      '/dat/importacoes': false, // importação pela tela: só superusuário (02/10/2026)
-    },
-  },
-  {
-    actor: 'Controle',
-    permissions: {
-      ...EMPTY_PERMISSIONS,
-      inControle: true,
-      canControle: true,
-      canDashboardGcal: true,
-      canDashboardsMenu: true,
-      canDisponibilidade: true,
-    },
-    policies: [
-      'access_audit_logs',
-      'access_controle_section',
-      'manage_purchases_and_materials',
-      'manage_solicitacao_status',
-      'use_gcal',
-      'view_all_availability',
-      'view_gcal_dashboard',
-      'view_reports',
-    ],
-    expectedAccess: {
-      '/dashboards': false,
-      '/dashboards/compras': false, // sem policy view_compras_dashboard
-      '/dashboards/equipe': false, // sem view_team_dashboard
-      '/dashboards/gcal': true, // view_gcal_dashboard
-      '/mapa-brasil': false,
-      '/solicitacoes/aprovacoes': false, // Controle puro: sem policy
-      '/solicitacoes/disponibilidade': true,
-      '/solicitacoes/bloqueios': true, // canControle → canBloqueios
-      '/solicitacoes/deslocamentos': true,
-      '/controle': true,
-      '/dat/admin': false,
-      '/dat/importacoes': false,
-    },
-  },
-  {
-    actor: 'Diretoria',
-    permissions: {
-      ...EMPTY_PERMISSIONS,
-      inDiretoria: true,
-      canDashboardOverview: true,
-      canDashboardEquipe: true,
-      canDashboardGcal: true,
-      canDashboardCompras: true,
-      canMapaBrasil: true,
-      canDashboardsMenu: true,
-    },
-    policies: [
-      'view_compras_dashboard',
-      'view_gcal_dashboard',
-      'view_map_metrics',
-      'view_overview_dashboard',
-      'view_team_dashboard',
-    ],
-    expectedAccess: {
-      '/dashboards': true,
-      '/dashboards/compras': true,
-      '/dashboards/equipe': true, // view_team_dashboard
-      '/dashboards/gcal': true, // view_gcal_dashboard
-      '/mapa-brasil': true,
-      '/solicitacoes/aprovacoes': false,
-      '/solicitacoes/disponibilidade': false, // D8/D9: removida
-      '/solicitacoes/bloqueios': false, // sem view_all_availability nem canBloqueios
-      '/solicitacoes/deslocamentos': false,
-      '/controle': false,
-      '/dat/admin': false,
-      '/dat/importacoes': false,
-    },
-  },
-  {
+    // Vínculo GERENTE vigente: Grade, Bloqueios e Deslocamentos (PR A).
     actor: 'Gerente da Superintendência',
-    permissions: {
-      ...EMPTY_PERMISSIONS,
-      isGerente: true,
-      inSuperintendencia: true,
-      canSeeAllSectors: true,
-      canAcoesInternas: true,
-      canDisponibilidade: true,
-    },
-    policies: [
-      'access_audit_logs',
-      'access_solicitation_approvals',
-      'manage_solicitacao_status',
-      'use_gcal',
-      'view_all_availability',
-      'view_reports',
-    ],
-    expectedAccess: {
-      '/dashboards': false,
-      '/dashboards/compras': false,
-      '/dashboards/equipe': false,
-      '/dashboards/gcal': false,
-      '/mapa-brasil': false,
-      '/solicitacoes/aprovacoes': true, // policy presente
-      '/solicitacoes/disponibilidade': true,
-      '/solicitacoes/bloqueios': true, // view_all_availability
-      '/solicitacoes/deslocamentos': true, // view_all_availability
-      '/controle': false,
-      '/dat/admin': false,
-      '/dat/importacoes': false,
-    },
+    expectedAccess: { ...NEGA_TUDO, '/solicitacoes/aprovacoes': true, ...ESCOPO, [EDITAR]: true },
   },
   {
     actor: 'Gerente pedagógico (Vidas)',
-    permissions: {
-      ...EMPTY_PERMISSIONS,
-      isGerente: true,
-      inGerencia: true,
-      canAcoesInternas: true,
-      canDisponibilidade: true,
-    },
-    policies: [], // scoped após D9 — sem view_all_availability
-    expectedAccess: {
-      '/dashboards': false,
-      '/dashboards/compras': false,
-      '/dashboards/equipe': false,
-      '/dashboards/gcal': false,
-      '/mapa-brasil': false,
-      '/solicitacoes/aprovacoes': false,
-      '/solicitacoes/disponibilidade': true, // canDisponibilidade
-      '/solicitacoes/bloqueios': false, // sem view_all_availability nem canBloqueios
-      '/solicitacoes/deslocamentos': false,
-      '/controle': false,
-      '/dat/admin': false,
-      '/dat/importacoes': false,
-    },
+    expectedAccess: { ...NEGA_TUDO, ...ESCOPO, [EDITAR]: true },
   },
   {
     actor: 'Coordenador',
-    permissions: {
-      ...EMPTY_PERMISSIONS,
-      isCoordenador: true,
-      canCoordenador: true,
-      canAcoesInternas: true,
-      canDisponibilidade: true,
-    },
-    policies: [],
-    expectedAccess: {
-      '/dashboards': false,
-      '/dashboards/compras': false,
-      '/dashboards/equipe': false,
-      '/dashboards/gcal': false,
-      '/mapa-brasil': false,
-      '/solicitacoes/aprovacoes': false,
-      '/solicitacoes/disponibilidade': true,
-      '/solicitacoes/bloqueios': true, // canCoordenador → canBloqueios
-      '/solicitacoes/deslocamentos': true, // canCoordenador
-      '/controle': false,
-      '/dat/admin': false,
-      '/dat/importacoes': false,
-    },
+    expectedAccess: { ...NEGA_TUDO, ...ESCOPO, [EDITAR]: true },
   },
   {
     actor: 'Apoio de Coordenação',
-    permissions: {
-      ...EMPTY_PERMISSIONS,
-      isCoordenador: true, // usePermissions trata Apoio igual a Coordenador
-      canCoordenador: true,
-      canAcoesInternas: true,
-      canDisponibilidade: true,
-    },
-    policies: [],
-    expectedAccess: {
-      '/dashboards': false,
-      '/dashboards/compras': false,
-      '/dashboards/equipe': false,
-      '/dashboards/gcal': false,
-      '/mapa-brasil': false,
-      '/solicitacoes/aprovacoes': false,
-      '/solicitacoes/disponibilidade': true,
-      '/solicitacoes/bloqueios': true,
-      '/solicitacoes/deslocamentos': true,
-      '/controle': false,
-      '/dat/admin': false,
-      '/dat/importacoes': false,
-    },
+    expectedAccess: { ...NEGA_TUDO, ...ESCOPO, [EDITAR]: true },
   },
   {
+    // RD-02/03: só o próprio bloqueio.
     actor: 'Formador',
-    permissions: {
-      ...EMPTY_PERMISSIONS,
-      isFormador: true,
-    },
-    policies: [],
-    expectedAccess: {
-      '/dashboards': false,
-      '/dashboards/compras': false,
-      '/dashboards/equipe': false,
-      '/dashboards/gcal': false,
-      '/mapa-brasil': false,
-      '/solicitacoes/aprovacoes': false,
-      '/solicitacoes/disponibilidade': false, // D8: Formador removido
-      '/solicitacoes/bloqueios': true, // isFormador (RD-02/03)
-      '/solicitacoes/deslocamentos': false,
-      '/controle': false,
-      '/dat/admin': false,
-      '/dat/importacoes': false,
-    },
+    expectedAccess: { ...NEGA_TUDO, '/solicitacoes/bloqueios': true },
   },
   {
     actor: 'Assistente Administrativo Controle',
-    permissions: {
-      ...EMPTY_PERMISSIONS,
-      inControle: true,
-      canControle: true,
-      canDashboardGcal: true,
-      canDashboardsMenu: true,
-      canDisponibilidade: true,
-    },
-    policies: [
-      'access_audit_logs',
-      'access_controle_section',
-      'access_solicitation_approvals',
-      'manage_purchases_and_materials',
-      'manage_solicitacao_status',
-      'use_gcal',
-      'view_all_availability',
-      'view_gcal_dashboard',
-      'view_reports',
-    ],
     expectedAccess: {
-      '/dashboards': false,
-      '/dashboards/compras': false,
-      '/dashboards/equipe': false, // sem view_team_dashboard
-      '/dashboards/gcal': true, // view_gcal_dashboard
-      '/mapa-brasil': false,
-      '/solicitacoes/aprovacoes': true, // access_solicitation_approvals
-      '/solicitacoes/disponibilidade': true,
-      '/solicitacoes/bloqueios': true,
-      '/solicitacoes/deslocamentos': true,
+      ...NEGA_TUDO,
+      '/dashboards/gcal': true,
+      '/solicitacoes/aprovacoes': true,
+      ...ESCOPO,
+      [EDITAR]: true,
       '/controle': true,
-      '/dat/admin': false,
-      '/dat/importacoes': false,
+      ...COMPRAS,
     },
   },
 ];
+
+/** Renderiza a rota como o App a monta para a pessoa (payload de /me + /me/policies). */
+function renderRotaDoAtor(route: string, { user, policies }: Pick<AtorRbac, 'user' | 'policies'>): void {
+  renderRoute(route, user, policies);
+}
 
 // ============================================================================
 // Tests parametrizados
@@ -537,7 +276,7 @@ describe('AppRoutes — gates de rota por perfil canônico', () => {
         const expected = actor.expectedAccess[route];
         const label = expected ? 'NÃO renderiza Forbidden' : 'renderiza Forbidden';
         test(`${route} → ${label}`, async () => {
-          renderRoute(route, BASE_USER, actor.permissions, actor.policies);
+          renderRotaDoAtor(route, atorRbac(actor.actor));
           if (expected) {
             // Ator autorizado: a página pode estar carregando, com erros de
             // fetch ou já renderizada — qualquer coisa exceto Forbidden.
@@ -556,23 +295,62 @@ describe('AppRoutes — gates de rota por perfil canônico', () => {
   }
 });
 
+// PR 7: quem recebe as mesmas policies abre as mesmas rotas, com ou sem grupo.
+describe('AppRoutes — personas por vínculo ≡ grupo (PR 7)', () => {
+  for (const persona of PERSONAS_POR_VINCULO) {
+    const esperado = ACTORS.find((a) => a.actor === persona.equivale)!.expectedAccess;
+    describe(`${persona.ator} ≡ ${persona.equivale}`, () => {
+      for (const route of CRITICAL_ROUTES) {
+        test(`${route} → ${esperado[route] ? 'abre' : 'Recurso indisponível'}`, async () => {
+          renderRotaDoAtor(route, persona);
+          if (esperado[route]) {
+            await waitFor(() => expect(screen.queryByText(FORBIDDEN_TEXT)).not.toBeInTheDocument());
+          } else {
+            expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
+          }
+        });
+      }
+    });
+  }
+});
+
+// Os atores sempre recebem as três juntas; aqui cada policy vem sozinha. Quem a recebe sozinha
+// existe: o Gerente do setor Gerência (grupos Gerência + Gerente, sem vínculo) tem só a da Grade.
+describe('AppRoutes — Grade, Bloqueios e Deslocamentos: cada policy abre a sua rota, e só ela', () => {
+  const ROTA_DA_POLICY = {
+    access_monthly_availability: '/solicitacoes/disponibilidade',
+    access_availability_blocks: '/solicitacoes/bloqueios',
+    access_travel: '/solicitacoes/deslocamentos',
+  } as const;
+
+  for (const [policy, rotaDela] of Object.entries(ROTA_DA_POLICY)) {
+    for (const route of Object.values(ROTA_DA_POLICY)) {
+      const abre = route === rotaDela;
+      test(`${policy} → ${route} ${abre ? 'abre' : 'Recurso indisponível'}`, async () => {
+        renderRoute(route, BASE_USER, [policy]);
+        if (abre) {
+          await waitFor(() => expect(screen.queryByText(FORBIDDEN_TEXT)).not.toBeInTheDocument());
+        } else {
+          expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
+        }
+      });
+    }
+  }
+});
+
 // ============================================================================
 // Importação pela tela: só superusuário (decisão do dono, 02/10/2026)
 // ============================================================================
 
 describe('AppRoutes — telas de importação só abrem para superusuário', () => {
   const ROTAS_DE_IMPORTACAO = ['/dat/importacoes', '/dat/importacao', '/dat/admin/equipe-gerencia'];
-  const ator = (nome: string): ActorSnapshot => ACTORS.find((a) => a.actor === nome)!;
-
   test.each(ROTAS_DE_IMPORTACAO)('DAT (manage_admin_registries, import_*) em %s → Recurso indisponível', async (rota) => {
-    const dat = ator('DAT');
-    renderRoute(rota, BASE_USER, dat.permissions, dat.policies);
+    renderRotaDoAtor(rota, atorRbac('DAT'));
     expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
   });
 
   test.each(ROTAS_DE_IMPORTACAO)('Superusuário em %s → abre a tela', async (rota) => {
-    const su = ator('Superuser');
-    renderRoute(rota, { ...BASE_USER, is_superuser: true }, su.permissions, su.policies);
+    renderRotaDoAtor(rota, atorRbac('Superuser'));
     expect((await screen.findAllByText(/Importa/, {}, { timeout: 15000 })).length).toBeGreaterThan(0);
     expect(screen.queryByText(FORBIDDEN_TEXT)).not.toBeInTheDocument();
   });
@@ -595,12 +373,7 @@ describe('AppRoutes — Forbidden é mensagem genérica (OWASP)', () => {
   ];
 
   test('Forbidden em /controle (Coordenador) não vaza policy/setor', async () => {
-    renderRoute(
-      '/controle',
-      BASE_USER,
-      { ...EMPTY_PERMISSIONS, isCoordenador: true, canCoordenador: true },
-      [],
-    );
+    renderRotaDoAtor('/controle', atorRbac('Coordenador'));
     expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
     for (const pat of FORBIDDEN_LEAKAGE_PATTERNS) {
       expect(screen.queryByText(pat)).not.toBeInTheDocument();
@@ -608,12 +381,7 @@ describe('AppRoutes — Forbidden é mensagem genérica (OWASP)', () => {
   });
 
   test('Forbidden em /solicitacoes/aprovacoes (DAT) não vaza policy', async () => {
-    renderRoute(
-      '/solicitacoes/aprovacoes',
-      BASE_USER,
-      { ...EMPTY_PERMISSIONS, inDAT: true, canDAT: true, canCoordenador: true },
-      [], // sem policy
-    );
+    renderRotaDoAtor('/solicitacoes/aprovacoes', atorRbac('DAT'));
     expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
     for (const pat of FORBIDDEN_LEAKAGE_PATTERNS) {
       expect(screen.queryByText(pat)).not.toBeInTheDocument();
@@ -668,60 +436,36 @@ describe('AppRoutes — sanity da matriz', () => {
       'Formador',
       'Assistente Administrativo Controle',
     ]);
-    const actual = new Set(ACTORS.map((a) => a.actor));
-    expect(actual).toEqual(expected);
+    expect(new Set(ACTORS.map((a) => a.actor))).toEqual(expected);
+    expect(new Set(ATORES_RBAC.map((a) => a.ator))).toEqual(expected);
   });
 });
 
 // ============================================================================
-// Gate de /solicitacoes/:id/editar (Issue #1169, Item 1)
+// Gate de /solicitacoes/:id/editar (Issue #1169; PR 7 das permissões)
 // ============================================================================
-// Antes: `element={user ? <EditSolicitacaoPage /> : <Forbidden />}` — qualquer
-// autenticado abria a tela e falhava no submit (backend IsOwnerOrPrivileged → 403).
-// Depois: gate alinhado ao menu — canCoordenador (owner plausível), canApproveSuper
-// (privilegiado) ou a policy `create_solicitation` (quem cria é dono, e o servidor
-// deixa o dono editar: é o caso do gerente de setor). Backend segue autoritativo.
-describe('AppRoutes — gate de /solicitacoes/:id/editar (Issue #1169)', () => {
-  const EDITAR = '/solicitacoes/42/editar';
+// Quem pode ser dono ou decidir: `create_solicitation` (quem cria é dono, e o servidor deixa o
+// dono editar), `access_solicitation_approvals` (aprovador) ou `manage_admin_registries` (DAT).
+// Antes o gate lia o grupo (Coordenador/Apoio/DAT) e o `can_approve_super` do /me. O backend
+// segue autoritativo no salvar.
+describe('AppRoutes — gate de /solicitacoes/:id/editar', () => {
+  test.each(['create_solicitation', 'access_solicitation_approvals', 'manage_admin_registries'])(
+    '%s → carrega a edição',
+    async (policy) => {
+      renderRoute(EDITAR, BASE_USER, [policy]);
+      expect(await screen.findByText('EDIT_PAGE')).toBeInTheDocument();
+      expect(screen.queryByText(FORBIDDEN_TEXT)).not.toBeInTheDocument();
+    },
+  );
 
-  test('autenticado sem canCoordenador nem canApproveSuper → Forbidden', async () => {
-    renderRoute(EDITAR, BASE_USER, { ...EMPTY_PERMISSIONS }, []);
+  test('sem nenhuma das três → Forbidden', async () => {
+    renderRoute(EDITAR, BASE_USER, ['view_all_availability', 'access_travel']);
     expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
   });
 
-  test('canCoordenador → carrega a edição (não Forbidden)', async () => {
-    renderRoute(EDITAR, BASE_USER, { ...EMPTY_PERMISSIONS, canCoordenador: true }, []);
-    expect(await screen.findByText('EDIT_PAGE')).toBeInTheDocument();
-    expect(screen.queryByText(FORBIDDEN_TEXT)).not.toBeInTheDocument();
-  });
-
-  test('canApproveSuper → carrega a edição (não Forbidden)', async () => {
-    renderRoute(EDITAR, BASE_USER, { ...EMPTY_PERMISSIONS, canApproveSuper: true }, []);
-    expect(await screen.findByText('EDIT_PAGE')).toBeInTheDocument();
-  });
-
-  // Mapa de acesso 02/10 (P13): o gerente de setor cria solicitação (policy
-  // create_solicitation) e é dono dela, mas a rota de edição não abria para ele.
-  test('gerente de setor (create_solicitation, sem canCoordenador nem canApproveSuper) → carrega a edição', async () => {
-    const gerente: CurrentUser = { ...BASE_USER, funcoes: ['Gerente'], setores: ['Vidas'] };
-    const permissions = computePermissions(gerente);
-    expect(permissions.canCoordenador).toBe(false);
-    expect(permissions.canApproveSuper).toBe(false);
-
-    renderRoute(EDITAR, gerente, permissions, ['create_solicitation']);
-    expect(await screen.findByText('EDIT_PAGE')).toBeInTheDocument();
-    expect(screen.queryByText(FORBIDDEN_TEXT)).not.toBeInTheDocument();
-  });
-
-  test('Formador sem a policy create_solicitation → Forbidden', async () => {
-    const formador: CurrentUser = { ...BASE_USER, funcoes: ['Formador'], setores: ['Vidas'] };
-    renderRoute(EDITAR, formador, computePermissions(formador), []);
-    expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
-    expect(screen.queryByText('EDIT_PAGE')).not.toBeInTheDocument();
-  });
-
-  test('gestor só por vínculo, sem a policy create_solicitation → Forbidden', async () => {
-    renderRoute(EDITAR, BASE_USER, { ...EMPTY_PERMISSIONS, isGestorPorVinculo: true }, []);
+  test('can_approve_super e grupos no /me, sem policy → Forbidden (o payload não decide)', async () => {
+    const user = usuarioDeTeste({ setores: ['DAT'], funcoes: ['Coordenador'], aprovador: true });
+    renderRoute(EDITAR, user, []);
     expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
     expect(screen.queryByText('EDIT_PAGE')).not.toBeInTheDocument();
   });
@@ -735,92 +479,69 @@ describe('AppRoutes — gate de /solicitacoes/:id/editar (Issue #1169)', () => {
 // Apoio continua fora da Pré-agenda (access_controle_section).
 describe('AppRoutes — gate de /solicitacoes/publicacao (#1656)', () => {
   const PUBLICACAO = '/solicitacoes/publicacao';
-  const APOIO_PERMISSIONS: Permissions = {
-    ...EMPTY_PERMISSIONS,
-    isCoordenador: true,
-    canCoordenador: true,
-    canAcoesInternas: true,
-    canDisponibilidade: true,
-  };
   const APOIO_POLICIES = ['create_solicitation', 'publish_setor_solicitacao'];
 
   test('Apoio de Coordenação (publish_setor_solicitacao) → carrega a página', async () => {
-    renderRoute(PUBLICACAO, BASE_USER, APOIO_PERMISSIONS, APOIO_POLICIES);
+    renderRoute(PUBLICACAO, BASE_USER, APOIO_POLICIES);
     expect(await screen.findByText('PUBLICACAO_PAGE')).toBeInTheDocument();
     expect(screen.queryByText(FORBIDDEN_TEXT)).not.toBeInTheDocument();
   });
 
   test('Coordenador (só create_solicitation) → Forbidden', async () => {
-    renderRoute(PUBLICACAO, BASE_USER, APOIO_PERMISSIONS, ['create_solicitation']);
+    renderRoute(PUBLICACAO, BASE_USER, ['create_solicitation']);
     expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
     expect(screen.queryByText('PUBLICACAO_PAGE')).not.toBeInTheDocument();
   });
 
   test('Controle (use_gcal, sem publish_setor_solicitacao) → Forbidden', async () => {
-    renderRoute(
-      PUBLICACAO,
-      BASE_USER,
-      { ...EMPTY_PERMISSIONS, inControle: true, canControle: true },
-      ['access_controle_section', 'manage_solicitacao_status', 'use_gcal', 'view_gcal_dashboard'],
-    );
+    renderRoute(PUBLICACAO, BASE_USER, [
+      'access_controle_section',
+      'manage_solicitacao_status',
+      'use_gcal',
+      'view_gcal_dashboard',
+    ]);
     expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
     expect(screen.queryByText('PUBLICACAO_PAGE')).not.toBeInTheDocument();
   });
 
   test('Apoio continua bloqueada na /pre-agenda', async () => {
-    renderRoute('/pre-agenda', BASE_USER, APOIO_PERMISSIONS, APOIO_POLICIES);
+    renderRoute('/pre-agenda', BASE_USER, APOIO_POLICIES);
     expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
   });
 });
 
 // ============================================================================
-// PR A (condicional medido em prod, 29/09): gestão só por VÍNCULO (sem grupo de FUNÇÃO)
+// PR A + PR 7: gestão só por VÍNCULO (sem grupo de FUNÇÃO)
 // ============================================================================
-// O backend já autoriza Grade, Bloqueios e Deslocamentos por vínculo EquipeGerencia
-// (HasSectorAccess / querysets escopados). A rota não pode barrar quem tem vínculo
-// GERENTE/COORDENADOR/APOIO; Formador por vínculo continua fora da Grade.
+// O servidor soma o vínculo GERENTE/COORDENADOR/APOIO nas policies access_* (Grade, Bloqueios,
+// Deslocamentos). A rota lê só a policy: com ela abre, sem ela nega, tenha o /me o vínculo ou não.
 describe('AppRoutes — gestor só por vínculo (PR A)', () => {
-  // Usuário e flags derivados do payload real de /me (não montados à mão): prova a cadeia
-  // me.gerencias → computePermissions → gate da rota → gate local da página.
-  const comVinculo = (papel: string): CurrentUser => ({
-    ...BASE_USER,
-    gerencias: [{ id: 4, rotulo: 'Superativar', papeis: [papel] }],
-  });
-
-  afterEach(() => {
-    vi.mocked(getMe).mockResolvedValue({} as CurrentUser);
-  });
+  const comVinculo = (papel: string): CurrentUser =>
+    usuarioDeTeste({ gerencias: [{ id: 4, rotulo: 'Superativar', papeis: [papel] }] });
+  const POLICIES_DO_VINCULO = ['access_availability_blocks', 'access_monthly_availability', 'access_travel'];
 
   for (const route of ['/solicitacoes/disponibilidade', '/solicitacoes/bloqueios', '/solicitacoes/deslocamentos']) {
-    test(`COORDENADOR por vínculo: ${route} → NÃO renderiza Forbidden`, async () => {
-      const user = comVinculo('COORDENADOR');
-      vi.mocked(getMe).mockResolvedValue(user);
-      renderRoute(route, user, computePermissions(user), []);
+    test(`COORDENADOR por vínculo (policies do servidor): ${route} → NÃO renderiza Forbidden`, async () => {
+      renderRoute(route, comVinculo('COORDENADOR'), POLICIES_DO_VINCULO);
       await waitFor(() => {
         expect(screen.queryByText(FORBIDDEN_TEXT)).not.toBeInTheDocument();
       });
     });
+
+    test(`vínculo no /me sem as policies: ${route} → Forbidden`, async () => {
+      renderRoute(route, comVinculo('COORDENADOR'), []);
+      expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
+    });
   }
 
   test('COORDENADOR por vínculo: Deslocamentos abre de fato (sem "Sem permissão") e lista', async () => {
-    const user = comVinculo('COORDENADOR');
-    vi.mocked(getMe).mockResolvedValue(user);
-    renderRoute('/solicitacoes/deslocamentos', user, computePermissions(user), []);
+    renderRoute('/solicitacoes/deslocamentos', comVinculo('COORDENADOR'), POLICIES_DO_VINCULO);
     await waitFor(() => expect(listDeslocamentos).toHaveBeenCalled(), { timeout: 3000 });
     expect(screen.queryByText('Sem permissão')).not.toBeInTheDocument();
   });
 
   test('COORDENADOR por vínculo: /solicitacoes/aprovacoes continua negada (vínculo não é policy)', async () => {
-    const user = comVinculo('COORDENADOR');
-    renderRoute('/solicitacoes/aprovacoes', user, computePermissions(user), []);
+    renderRoute('/solicitacoes/aprovacoes', comVinculo('COORDENADOR'), POLICIES_DO_VINCULO);
     expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
   });
-
-  for (const route of ['/solicitacoes/disponibilidade', '/solicitacoes/deslocamentos']) {
-    test(`FORMADOR por vínculo: ${route} → Forbidden`, async () => {
-      const user = comVinculo('FORMADOR');
-      renderRoute(route, user, computePermissions(user), []);
-      expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
-    });
-  }
 });

@@ -96,7 +96,7 @@ describe('computeCapabilities — flags nomeadas por ator', () => {
     expect(caps.canUseGcal).toBe(false);
   });
 
-  test('cada uma das 22 flags reflete exatamente sua policy', () => {
+  test('cada uma das 27 flags reflete exatamente sua policy', () => {
     const CASES: ReadonlyArray<readonly [keyof ReturnType<typeof computeCapabilities>, string]> = [
       ['canAccessAuditLogs', 'access_audit_logs'],
       ['canAccessApprovals', 'access_solicitation_approvals'],
@@ -120,7 +120,16 @@ describe('computeCapabilities — flags nomeadas por ator', () => {
       ['canViewTeamDashboard', 'view_team_dashboard'],
       ['canViewGcalDashboard', 'view_gcal_dashboard'],
       ['canPublishSetorSolicitacao', 'publish_setor_solicitacao'],
+      ['canAccessMonthlyAvailability', 'access_monthly_availability'],
+      ['canAccessAvailabilityBlocks', 'access_availability_blocks'],
+      ['canAccessTravel', 'access_travel'],
+      ['canExecuteRestrictedOperations', 'execute_restricted_operations'],
+      ['canCreateSolicitationWithoutPurchase', 'create_solicitation_without_purchase'],
     ];
+    // Uma flag por PUBLIC_POLICY_KEY do backend (test_rbac_policies_contract.py: 27 chaves).
+    expect(CASES).toHaveLength(27);
+    const flags = Object.keys(computeCapabilities([])).filter((k) => k.startsWith('can') && k !== 'can');
+    expect(flags.sort()).toEqual(CASES.map(([flag]) => String(flag)).sort());
     for (const [flag, policy] of CASES) {
       const caps = computeCapabilities([policy]);
       expect(caps[flag], `${String(flag)} deve refletir ${policy}`).toBe(true);

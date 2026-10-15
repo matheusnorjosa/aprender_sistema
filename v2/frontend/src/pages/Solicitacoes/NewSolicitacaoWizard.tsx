@@ -48,7 +48,7 @@ import {
   type LookupItem,
 } from '../../api/lookup';
 import { getMe } from '../../api/availability';
-import { computePermissions } from '../../hooks/usePermissions';
+import { useAcesso } from '../../contexts/AcessoContext';
 import { useAvailabilityPreview, type PreviewParticipant } from '../../hooks/useAvailabilityPreview';
 import DateTimeRange from '../../components/DateTimeRange';
 import ComboBox from '../../components/ComboBox';
@@ -195,7 +195,9 @@ export default function NewSolicitacaoWizard(): JSX.Element {
 
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
-  const [isSuperuser, setIsSuperuser] = useState<boolean>(false);
+  // Regra da compra: quem tem create_solicitation_without_purchase (hoje, só o superusuário)
+  // escolhe projeto e município sem compra. A mesma capacidade que o backend aceita.
+  const dispensaCompra = useAcesso().caps.canCreateSolicitationWithoutPurchase;
   const [municipioLookupHasResults, setMunicipioLookupHasResults] = useState<boolean | null>(null);
   // Quem cria: se tem a função Coordenador, é o responsável quando nenhum outro é escolhido
   // (decisão do dono, 05/10/2026). Só entra na checagem de agenda se acompanhar.
@@ -233,9 +235,6 @@ export default function NewSolicitacaoWizard(): JSX.Element {
       try {
         const me = await getMe();
         if (mounted) {
-          // Epic 3.3 cleanup: usa flag derivada (SSOT). Admin escape hatch
-          // do wizard — bypassa exigência de projeto/município no Step 2.
-          setIsSuperuser(computePermissions(me).isAdmin);
           setMe({
             id: me.id,
             nome: me.name || me.username || 'Você',
@@ -244,9 +243,6 @@ export default function NewSolicitacaoWizard(): JSX.Element {
         }
       } catch (error) {
         logger.warn('Falha ao carregar perfil do usuário no wizard:', error);
-        if (mounted) {
-          setIsSuperuser(false);
-        }
       }
     };
 
@@ -311,15 +307,15 @@ export default function NewSolicitacaoWizard(): JSX.Element {
     const projetoId = formData.projeto?.id;
 
     // Para usuário comum, exige projeto para aplicar filtro município+projeto.
-    if (!isSuperuser && !projetoId) {
+    if (!dispensaCompra && !projetoId) {
       setMunicipioLookupHasResults(false);
       return [];
     }
 
     const results = await lookupMunicipiosWithFilters({
       q,
-      com_compra: isSuperuser ? undefined : true,
-      projeto_id: !isSuperuser ? projetoId : undefined,
+      com_compra: dispensaCompra ? undefined : true,
+      projeto_id: !dispensaCompra ? projetoId : undefined,
     });
 
     if (!q.trim()) {
@@ -327,12 +323,12 @@ export default function NewSolicitacaoWizard(): JSX.Element {
     }
 
     return results;
-  }, [formData.projeto?.id, isSuperuser]);
+  }, [formData.projeto?.id, dispensaCompra]);
 
   // Regra da compra: projeto sem compra que o libere ("em espera") some da lista.
   const lookupProjetosElegiveis = useCallback(
-    (q: string): Promise<LookupItem[]> => lookupProjetos(q, isSuperuser ? {} : { com_compra: true }),
-    [isSuperuser],
+    (q: string): Promise<LookupItem[]> => lookupProjetos(q, dispensaCompra ? {} : { com_compra: true }),
+    [dispensaCompra],
   );
 
   // Navegação entre passos
@@ -561,7 +557,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
             label="Projeto"
             name="projeto"
             rules={[{ required: true, message: 'Por favor selecione um projeto' }]}
-            extra={isSuperuser ? undefined : 'Projetos sem compra não aparecem.'}
+            extra={dispensaCompra ? undefined : 'Projetos sem compra não aparecem.'}
           >
             <ComboBox
               lookupFunction={lookupProjetosElegiveis}
@@ -608,20 +604,20 @@ export default function NewSolicitacaoWizard(): JSX.Element {
               onChange={(value: ComboBoxValue | null) => setFormData({ ...formData, municipio: value })}
               value={formData.municipio as unknown as { id: ID; label: string; [key: string]: unknown } | null}
               placeholder={
-                !isSuperuser && !formData.projeto
+                !dispensaCompra && !formData.projeto
                   ? 'Selecione um projeto para carregar municípios elegíveis'
                   : 'Busque ou selecione um município'
               }
-              disabled={!isSuperuser && !formData.projeto}
+              disabled={!dispensaCompra && !formData.projeto}
               notFoundContent={
-                !isSuperuser && formData.projeto
+                !dispensaCompra && formData.projeto
                   ? 'Nenhum município elegível para o projeto selecionado'
                   : 'Nenhum resultado encontrado'
               }
             />
           </Form.Item>
 
-          {!isSuperuser && formData.projeto && municipioLookupHasResults === false && (
+          {!dispensaCompra && formData.projeto && municipioLookupHasResults === false && (
             <Alert
               message="Sem municípios elegíveis"
               description="Não há municípios com compra que libere o projeto selecionado."
@@ -924,7 +920,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
         </>
       ),
     },
-  ], [formData, rangeValue, handleRangeChange, handleProjetoChange, lookupProjetosElegiveis, lookupMunicipiosElegiveis, isSuperuser, municipioLookupHasResults, preview, submitConflito, me, perguntaAvaliar, formadoresAvaliaveis, handleFormadoresChange]);
+  ], [formData, rangeValue, handleRangeChange, handleProjetoChange, lookupProjetosElegiveis, lookupMunicipiosElegiveis, dispensaCompra, municipioLookupHasResults, preview, submitConflito, me, perguntaAvaliar, formadoresAvaliaveis, handleFormadoresChange]);
 
   return (
     <section className="p-6 max-w-4xl mx-auto" aria-labelledby="nova-solicitacao-title">

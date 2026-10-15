@@ -5,12 +5,11 @@
  * Caso contrário, mostra `fallback` (default: <Forbidden /> Ant Design).
  *
  * Aceita 2 modos:
- *   1. Por policy literal: `<RequirePolicy policy="view_compras_dashboard" policies={...}>`
- *   2. Por flag derivada (escape hatch): `<RequirePolicy allow={canAccessApprovals}>`
- *
- * O segundo modo é necessário para acessos compostos sem policy pública
- * mapeada hoje (ex: aprovações = composite Gerente+Superintendência;
- * bloqueios = view_all_availability OR Formador-owns-own).
+ *   1. Por policy: `<RequirePolicy policy="view_compras_dashboard" policies={...}>`, ou uma
+ *      lista (`policy={['a', 'b']}`) quando qualquer uma basta.
+ *   2. Por condição que não é policy: `<RequirePolicy allow={...}>` — só autenticado
+ *      (`!!user`) e o que é do superusuário (`ehSuperusuario`). PR 7 das permissões: acesso de
+ *      negócio é sempre policy.
  *
  * Componente é PURO: recebe `policies` por prop, não busca do backend.
  * Testabilidade alta, zero side-effects.
@@ -24,8 +23,8 @@ interface RequirePolicyProps {
   children: ReactNode;
   /** Lista de policy keys do user. Required quando usar `policy`, ignorado se `allow` for definido. */
   policies?: readonly string[];
-  /** Policy key a verificar (modo 1). */
-  policy?: string;
+  /** Policy key a verificar (modo 1); numa lista, qualquer uma basta. */
+  policy?: string | readonly string[];
   /** Override semântico: se `true`, renderiza children incondicionalmente (modo 2). */
   allow?: boolean;
   /** Fallback custom (default: <Forbidden /> 403 Result). */
@@ -78,7 +77,8 @@ export function RequirePolicy({
   if (typeof allow === 'boolean') {
     granted = allow;
   } else if (policy && policies) {
-    granted = policies.includes(policy);
+    const aceitas: readonly string[] = typeof policy === 'string' ? [policy] : policy;
+    granted = aceitas.some((p) => policies.includes(p));
   } else {
     // Sem policy nem allow → fail-secure
     granted = false;

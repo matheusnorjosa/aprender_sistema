@@ -76,5 +76,5 @@ def backwards(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-    dependencies = [("core", "0123_capacidade_criar_sem_compra")]
+    dependencies = [("core", "0124_solicitacao_observacoes_max_length")]
     operations = [migrations.RunPython(forwards, backwards)]

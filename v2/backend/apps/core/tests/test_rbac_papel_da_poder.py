@@ -244,6 +244,21 @@ class TestGestoraPorPapel:
 # ============================================================================
 
 
+# Os pares do seed anterior, escritos à mão (não lidos da migration): a reversa tem de recriar todos.
+PARES_DO_SEED_ANTERIOR: tuple[tuple[str, str], ...] = (
+    ("Coordenador", "create_solicitation"),
+    ("Apoio de Coordenação", "create_solicitation"),
+    ("Gerente", "create_solicitation"),
+    ("Coordenador", "edit_solicitation_as_owner_or_privileged"),
+    ("Apoio de Coordenação", "edit_solicitation_as_owner_or_privileged"),
+    ("Gerente", "edit_solicitation_as_owner_or_privileged"),
+    ("Apoio de Coordenação", "publish_setor_solicitacao"),
+    ("Assistente Administrativo", "manage_purchases_and_materials"),
+    ("Assistente Administrativo", "operate_preagenda"),
+    ("Assistente Administrativo", "run_daily_operations"),
+)
+
+
 def _migration_0125():
     return importlib.import_module("apps.core.migrations.0125_funcoes_sem_capacidade")
 
@@ -271,8 +286,8 @@ class TestTravas:
         migration.backwards(django_apps, None)
         batch = PermissaoFuncional.objects.get(codename="approve_solicitation_batch")
         assert set(batch.groups.values_list("name", flat=True)) == {"Gerente", "Superintendência"}
-        criar = PermissaoFuncional.objects.get(codename="create_solicitation")
-        assert {"Coordenador", "Apoio de Coordenação", "Gerente"} <= set(criar.groups.values_list("name", flat=True))
+        for grupo, codename in PARES_DO_SEED_ANTERIOR:
+            assert PermissaoFuncional.objects.filter(codename=codename, groups__name=grupo).exists(), (grupo, codename)
         migration.forwards(django_apps, None)
         assert not PermissaoFuncional.objects.filter(codename="approve_solicitation_batch").exists()
 
@@ -416,6 +431,14 @@ class TestP16Deslocamento:
         assert response.status_code == 200
         assert [u["id"] for u in response.data] == [formador.id]
 
+    def test_quem_delega_de_qualquer_um_ve_os_formadores_do_setor(self, duas_gerencias):
+        """Ramo global do seletor (`user_delega_deslocamento_de_qualquer_um`): formador de qualquer gerência."""
+        _, outra = duas_gerencias
+        formador = _so_vinculo("FORMADOR", outra)
+        response = _cliente(UsuarioFactory(superuser=True)).get("/api/deslocamentos/alvos/")
+        assert response.status_code == 200
+        assert formador.id in [u["id"] for u in response.data]
+
     def test_sem_delegacao_alvos_vazio(self, duas_gerencias):
         minha, _ = duas_gerencias
         apoio = _so_vinculo("APOIO", minha)
@@ -482,6 +505,14 @@ class TestBloqueioDelegado:
         assert response.status_code == 400
         assert "usuario_id" in str(response.data)
 
+    def test_alvo_formador_em_gerencia_inativa_recusado(self):
+        alvo = _so_vinculo("FORMADOR", GerenciaFactory(ativo=False))
+        response = _cliente(UsuarioFactory(superuser=True)).post(
+            "/api/availability-blocks/", _payload_bloqueio(alvo.id), format="json"
+        )
+        assert response.status_code == 400
+        assert "usuario_id" in str(response.data)
+
     def test_alvo_com_vinculo_sem_grupo_aceito(self):
         alvo = _so_vinculo("FORMADOR")
         response = _cliente(UsuarioFactory(superuser=True)).post(
@@ -524,6 +555,21 @@ class TestTelasPadraoECache:
         response = _cria(gerente)
         assert response.status_code == 400
         assert "coordenador" in str(response.data)
+
+    def test_apoio_por_vinculo_nao_vira_coordenador_padrao(self):
+        """Só o papel COORDENADOR vira coordenador responsável por padrão; a APOIO cria, mas escolhe."""
+        response = _cria(_so_vinculo("APOIO"))
+        assert response.status_code == 400
+        assert "coordenador" in str(response.data)
+
+    def test_lookup_role_ignora_vinculo_em_gerencia_inativa(self):
+        inativa = _so_vinculo("COORDENADOR", GerenciaFactory(ativo=False))
+        ativa = _so_vinculo("COORDENADOR")
+        response = _cliente(UsuarioFactory(superuser=True)).get("/api/lookup/usuarios/", {"role": "Coordenador"})
+        assert response.status_code == 200
+        ids = {item["id"] for item in response.data}
+        assert ativa.id in ids
+        assert inativa.id not in ids
 
     def test_lookup_role_coordenador_por_vinculo(self):
         por_vinculo = _so_vinculo("COORDENADOR")

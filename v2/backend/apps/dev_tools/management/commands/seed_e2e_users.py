@@ -13,6 +13,7 @@ Uso:
 
 Dados criados:
     - 4 usuários (coord, super, controle, formador) + grupos
+    - vínculo EquipeGerencia vigente junto de cada grupo de função
     - 1 município (Salvador, BA)
     - 1 projeto (TESTE E2E, fluxo SUPER)
     - Logs de criação
@@ -102,9 +103,18 @@ class Command(BaseCommand):
         # Necessário para HasSectorAccess — grade mensal e filtros de setor
         # exigem que o usuário esteja em EquipeGerencia da gerência consultada.
         # Também usado para resolver gerência do usuário em outras views.
+        # Todo grupo de função vem com o vínculo do papel (o PR 8 faz o papel dar o poder).
         self.stdout.write("\n4a. Criando vínculos EquipeGerencia...")
+        # Gerência das personas legadas: perfil PADRAO (sem pacote), sem setor_canonico e sem
+        # projeto. O vínculo nela não muda o escopo de setor delas, que segue aberto.
+        Gerencia.objects.update_or_create(
+            nome="GERENCIA E2E",
+            defaults={"nome_setor": "E2E", "setor_canonico": "", "perfil": Gerencia.Perfil.PADRAO, "ativo": True},
+        )
         vinculos = [
             # (username, nome_setor, papel)
+            ("coord_e2e@test.com", "E2E", "COORDENADOR"),
+            ("formador_e2e@test.com", "E2E", "FORMADOR"),
             ("coord_vidas@test.com", "Vidas", "COORDENADOR"),
             ("coord_fluir@test.com", "Fluir", "COORDENADOR"),
             ("coord_acerta@test.com", "ACerta", "COORDENADOR"),
@@ -420,7 +430,7 @@ class Command(BaseCommand):
         gerencia: Gerencia,
         papel: str,
     ) -> EquipeGerencia:
-        """Upsert idempotente de EquipeGerencia.
+        """Upsert idempotente de EquipeGerencia, sempre vigente (reabre vínculo encerrado).
 
         Unique constraint: (gerencia, usuario, papel) — é possível o mesmo
         usuário ter múltiplos papéis na mesma gerência (raro, mas suportado).
@@ -430,7 +440,7 @@ class Command(BaseCommand):
             gerencia=gerencia,
             usuario=usuario,
             papel=papel,
-            defaults={"ativo": True},
+            defaults={"ativo": True, "valid_to": None},
         )
         status = "✅ Criado" if created else "⏭️  Já existe"
         self.stdout.write(f"   {status}: {usuario.username} → {gerencia.nome_setor} ({papel})")

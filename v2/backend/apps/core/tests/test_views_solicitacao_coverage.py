@@ -32,6 +32,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_papel,
     liberar_par,
 )
 
@@ -64,7 +65,7 @@ def usuario_coordenador(grupos):
         cpf=str(uuid4().int % 10**11).zfill(11),
         email=f"coord_{uid}@test.com",
     )
-    user.groups.add(grupos["Coordenador"])
+    com_papel(user, "COORDENADOR")
     return user
 
 
@@ -78,7 +79,7 @@ def usuario_gerente_superintendencia(grupos):
         cpf=str(uuid4().int % 10**11).zfill(11),
         email=f"gerente_super_{uid}@test.com",
     )
-    user.groups.add(grupos["Gerente"])
+    com_papel(user, "GERENTE")
     user.groups.add(grupos["Superintendência"])
     return user
 
@@ -94,7 +95,8 @@ def usuario_superintendencia(grupos):
         cpf=str(uuid4().int % 10**11).zfill(11),
         email=f"super_{uid}@test.com",
     )
-    user.groups.add(grupos["Superintendência"], grupos["Gerente"])
+    user.groups.add(grupos["Superintendência"])
+    com_papel(user, "GERENTE")
     return user
 
 

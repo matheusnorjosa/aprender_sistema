@@ -45,6 +45,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_papel,
     liberar_par,
 )
 
@@ -71,14 +72,7 @@ def grupo_dat():
 
 
 @pytest.fixture
-def grupo_coordenador():
-    """Grupo Coordenador para testes."""
-    group = GroupFactory(name="Coordenador")
-    return group
-
-
-@pytest.fixture
-def usuario_owner(grupo_coordenador):
+def usuario_owner():
     """Usuário dono da solicitação (Coordenador)."""
     cpf = str(uuid4().int % 10**11).zfill(11)
     user = UsuarioFactory(
@@ -88,12 +82,12 @@ def usuario_owner(grupo_coordenador):
         cpf=cpf,
         is_active=True,
     )
-    user.groups.add(grupo_coordenador)
+    com_papel(user, "COORDENADOR")
     return user
 
 
 @pytest.fixture
-def usuario_outro(grupo_coordenador):
+def usuario_outro():
     """Outro usuário comum (não é owner nem privilegiado)."""
     cpf = str(uuid4().int % 10**11).zfill(11)
     user = UsuarioFactory(
@@ -103,19 +97,12 @@ def usuario_outro(grupo_coordenador):
         cpf=cpf,
         is_active=True,
     )
-    user.groups.add(grupo_coordenador)
+    com_papel(user, "COORDENADOR")
     return user
 
 
 @pytest.fixture
-def grupo_gerente():
-    """Issue #1222 (Epic 1): grupo Gerente tem edit_solicitation_as_owner_or_privileged."""
-    group = GroupFactory(name="Gerente")
-    return group
-
-
-@pytest.fixture
-def usuario_superintendencia(grupo_superintendencia, grupo_gerente):
+def usuario_superintendencia(grupo_superintendencia):
     """Issue #1222 (Epic 1): para preservar tests legacy de 'privileged'
     edit/delete, fixture adiciona grupo Gerente que tem
     `edit_solicitation_as_owner_or_privileged` no seed realinhado."""
@@ -127,12 +114,13 @@ def usuario_superintendencia(grupo_superintendencia, grupo_gerente):
         cpf=cpf,
         is_active=True,
     )
-    user.groups.add(grupo_superintendencia, grupo_gerente)
+    user.groups.add(grupo_superintendencia)
+    com_papel(user, "GERENTE")
     return user
 
 
 @pytest.fixture
-def usuario_dat(grupo_dat, grupo_gerente):
+def usuario_dat(grupo_dat):
     """Issue #1222 (Epic 1): fixture adiciona grupo Gerente para preservar
     tests legacy de 'privileged' edit/delete."""
     cpf = str(uuid4().int % 10**11).zfill(11)
@@ -143,7 +131,8 @@ def usuario_dat(grupo_dat, grupo_gerente):
         cpf=cpf,
         is_active=True,
     )
-    user.groups.add(grupo_dat, grupo_gerente)
+    user.groups.add(grupo_dat)
+    com_papel(user, "GERENTE")
     return user
 
 
@@ -569,14 +558,7 @@ class TestSolicitacaoEditFields:
 
 
 @pytest.fixture
-def grupo_formador():
-    """Grupo Formador para testes."""
-    group = GroupFactory(name="Formador")
-    return group
-
-
-@pytest.fixture
-def formador_1(grupo_formador):
+def formador_1():
     """Formador 1 para testes."""
     cpf = str(uuid4().int % 10**11).zfill(11)
     user = UsuarioFactory(
@@ -588,12 +570,12 @@ def formador_1(grupo_formador):
         last_name="Um",
         is_active=True,
     )
-    user.groups.add(grupo_formador)
+    com_papel(user, "FORMADOR")
     return user
 
 
 @pytest.fixture
-def formador_2(grupo_formador):
+def formador_2():
     """Formador 2 para testes."""
     cpf = str(uuid4().int % 10**11).zfill(11)
     user = UsuarioFactory(
@@ -605,12 +587,12 @@ def formador_2(grupo_formador):
         last_name="Dois",
         is_active=True,
     )
-    user.groups.add(grupo_formador)
+    com_papel(user, "FORMADOR")
     return user
 
 
 @pytest.fixture
-def formador_3(grupo_formador):
+def formador_3():
     """Formador 3 para testes."""
     cpf = str(uuid4().int % 10**11).zfill(11)
     user = UsuarioFactory(
@@ -622,7 +604,7 @@ def formador_3(grupo_formador):
         last_name="Tres",
         is_active=True,
     )
-    user.groups.add(grupo_formador)
+    com_papel(user, "FORMADOR")
     return user
 
 

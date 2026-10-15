@@ -27,6 +27,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_papel,
     liberar_par,
 )
 
@@ -54,7 +55,7 @@ def grupos():
 def usuario_coordenador(grupos):
     """Usuário com perfil Coordenador."""
     user = UsuarioFactory(username="coord1", password="senha123", cpf="11111111111", email="coord@test.com")
-    user.groups.add(grupos["Coordenador"])
+    com_papel(user, "COORDENADOR")
     return user
 
 
@@ -63,7 +64,8 @@ def usuario_superintendencia(grupos):
     """Gerente da Superintendência (PR 3 hardening RBAC, 2026-04-29):
     composite Setor `Superintendência` + Função `Gerente`."""
     user = UsuarioFactory(username="super1", password="senha123", cpf="22222222222", email="super@test.com")
-    user.groups.add(grupos["Superintendência"], grupos["Gerente"])
+    user.groups.add(grupos["Superintendência"])
+    com_papel(user, "GERENTE")
     return user
 
 

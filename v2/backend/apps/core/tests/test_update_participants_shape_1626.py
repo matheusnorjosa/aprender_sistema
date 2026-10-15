@@ -29,11 +29,11 @@ import pytest
 
 from apps.core.models import Participation
 from apps.core.tests.factories import (
-    GroupFactory,
     MunicipioFactory,
     ProjetoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_papel,
     liberar_par,
 )
 
@@ -45,7 +45,7 @@ _CPF = itertools.count(79000000001)
 @pytest.fixture
 def coordenador():
     user = UsuarioFactory(username="coord_1626u", cpf=str(next(_CPF)))
-    user.groups.add(GroupFactory(name="Coordenador"))
+    com_papel(user, "COORDENADOR")
     return user
 
 
@@ -76,7 +76,7 @@ def client_coord(coordenador):
 
 def _formador(n):
     u = UsuarioFactory(username=f"form_1626u_{n}", cpf=str(next(_CPF)))
-    u.groups.add(GroupFactory(name="Formador"))
+    com_papel(u, "FORMADOR")
     return u
 
 

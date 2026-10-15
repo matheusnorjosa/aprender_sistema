@@ -25,6 +25,10 @@ const __dirname = dirname(__filename);
 /**
  * Roles suportadas. Cada uma mapeia para um usuário em `seed_e2e_users.py`
  * e tem um `storageState` dedicado após `auth.setup.ts`.
+ *
+ * Toda role com grupo de função (Coordenador, Gerente, Formador) tem também
+ * o vínculo vigente do papel na gerência (`EquipeGerencia`). `coord_e2e` e
+ * `formador_e2e` ficam na "GERENCIA E2E", sem setor nem projeto.
  */
 export const E2E_ROLES = [
   'coord_e2e', // legacy, mantido para back-compat

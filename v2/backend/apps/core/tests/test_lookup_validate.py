@@ -18,11 +18,11 @@ from rest_framework.test import APIClient
 import pytest
 
 from apps.core.tests.factories import (
-    GroupFactory,
     MunicipioFactory,
     ProjetoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_papel,
     liberar_par,
 )
 
@@ -43,8 +43,7 @@ def authenticated_user(db):
         first_name="Test",
         last_name="User",
     )
-    coord_group = GroupFactory(name="Coordenador")
-    user.groups.add(coord_group)
+    com_papel(user, "COORDENADOR")
     return user
 
 
@@ -72,8 +71,7 @@ def sample_data(db):
         first_name="João",
         last_name="Silva",
     )
-    formador_group = GroupFactory(name="Formador")
-    u1.groups.add(formador_group)
+    com_papel(u1, "FORMADOR")
 
     return {
         "municipios": [m1, m2],

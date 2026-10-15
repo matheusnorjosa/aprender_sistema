@@ -11,14 +11,16 @@ from __future__ import annotations
 
 import pytest
 
-from apps.core.models import Solicitacao
+from apps.core.models import EquipeGerencia, Gerencia, Solicitacao
 from apps.core.tests.factories import (
+    GerenciaFactory,
     GroupFactory,
     MunicipioFactory,
     ProjetoFactory,
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_papel,
 )
 
 pytestmark = pytest.mark.django_db
@@ -79,3 +81,34 @@ def test_solicitacao_factory_is_pendente_with_fks():
     assert s.status == Solicitacao.Status.PENDENTE
     assert s.usuario_id and s.tipo_evento_id and s.municipio_id and s.projeto_id
     assert s.fim > s.inicio
+
+
+def test_grupo_de_funcao_vem_com_vinculo_vigente_em_gerencia_neutra():
+    """PR 8.0: `UsuarioFactory(groups=[...])` cria o vínculo do papel junto do grupo de função."""
+    user = UsuarioFactory(groups=["Coordenador", "DAT"])
+
+    vinculo = EquipeGerencia.vigentes_em().get(usuario=user)
+    assert vinculo.papel == "COORDENADOR"
+    assert vinculo.gerencia.ativo and vinculo.gerencia.perfil == Gerencia.Perfil.PADRAO
+    assert vinculo.gerencia.setor_canonico == ""
+
+
+def test_grupo_sem_vinculo_e_gerencia_escolhida():
+    gerencia = GerenciaFactory()
+    so_grupo = UsuarioFactory(groups=["Gerente"], groups__vinculo=False)
+    na_gerencia = UsuarioFactory(groups=["Apoio de Coordenação"], groups__gerencia=gerencia)
+
+    assert not EquipeGerencia.objects.filter(usuario=so_grupo).exists()
+    assert EquipeGerencia.vigentes_em().filter(usuario=na_gerencia, gerencia=gerencia, papel="APOIO").exists()
+
+
+def test_com_papel_da_grupo_e_vinculo_e_equipe_so_vinculo():
+    user = UsuarioFactory()
+    com_papel(user, "FORMADOR")
+    com_papel(user, "EQUIPE")
+
+    assert set(user.groups.values_list("name", flat=True)) == {"Formador"}
+    assert set(EquipeGerencia.vigentes_em().filter(usuario=user).values_list("papel", flat=True)) == {
+        "FORMADOR",
+        "EQUIPE",
+    }

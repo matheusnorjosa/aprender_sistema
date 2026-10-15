@@ -30,6 +30,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_papel,
     liberar_par,
 )
 
@@ -68,7 +69,7 @@ def projeto_super(municipio):
 def coordenador():
     """Quem cria o evento. Não é o formador — é justamente esse o ponto do #1452."""
     user = UsuarioFactory(username="coord_1452", first_name="Ana", last_name="Coordenadora")
-    user.groups.add(GroupFactory(name="Coordenador"))
+    com_papel(user, "COORDENADOR")
     return user
 
 
@@ -81,7 +82,8 @@ def formador():
 def aprovador():
     """Gerente da Superintendência — único perfil que aprova além do superuser (PA-02)."""
     user = UsuarioFactory(username="gerente_1452", first_name="Carla", last_name="Gerente")
-    user.groups.add(GroupFactory(name="Superintendência"), GroupFactory(name="Gerente"))
+    user.groups.add(GroupFactory(name="Superintendência"))
+    com_papel(user, "GERENTE")
     return user
 
 

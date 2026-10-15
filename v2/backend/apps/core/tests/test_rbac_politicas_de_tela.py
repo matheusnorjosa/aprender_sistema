@@ -273,7 +273,7 @@ class TestPersonasPorPacote:
 
 
 def _gates_antigos(me: dict[str, Any], policies: list[str]) -> dict[str, bool]:
-    """AppRoutes, PreAgendaPage e App.tsx antes do PR 7 (flags de `usePermissions.ts` sobre o /me)."""
+    """AppRoutes, PreAgendaPage, DeslocamentosPage e App.tsx antes do PR 7 (flags de `usePermissions.ts` sobre o /me)."""
     su = me["is_superuser"] is True
     setores = set(me["setores"])
     funcoes = set(me["funcoes"])
@@ -281,8 +281,14 @@ def _gates_antigos(me: dict[str, Any], policies: list[str]) -> dict[str, bool]:
     can_dat = su or "DAT" in setores
     can_coordenador = su or "Coordenador" in funcoes or "Apoio de Coordenação" in funcoes or "DAT" in setores
     can_see_all_sectors = su or me["is_superintendencia"] is True or "Superintendência" in setores
+    gestor_por_vinculo = any(p in _PAPEIS_DE_GESTAO for g in me["gerencias"] for p in g["papeis"])
     rota_pre_agenda = "access_controle_section" in policies  # a rota não mudou
+    # A rota aceitava view_all_availability; o check da própria página não (dava "Sem permissão").
+    deslocamentos = can_controle or can_coordenador or can_dat or gestor_por_vinculo
+    rota_deslocamentos = "view_all_availability" in policies or deslocamentos
+    pagina_deslocamentos = deslocamentos or "Superintendência" in setores
     return {
+        "tela Deslocamentos (página)": rota_deslocamentos and pagina_deslocamentos,
         "rota Compras": can_controle or can_dat,
         "rota Editar solicitação": can_coordenador
         or me["can_approve_super"] is True
@@ -296,6 +302,7 @@ def _gates_novos(policies: list[str]) -> dict[str, bool]:
     """Os mesmos pontos depois do PR 7: só policy."""
     tem = set(policies)
     return {
+        "tela Deslocamentos (página)": "access_travel" in tem,
         "rota Compras": "view_compras_stats" in tem,
         "rota Editar solicitação": bool(
             tem & {"create_solicitation", "access_solicitation_approvals", "manage_admin_registries"}
@@ -318,9 +325,14 @@ DELTA_MEDIDO: dict[str, dict[str, tuple[bool, bool]]] = {
     "só função Assistente Administrativo": _COMPRAS_E_GOOGLE,
     "Vidas + Assistente Administrativo": _COMPRAS_E_GOOGLE,
     # O pacote do perfil CONTROLE dá as capacidades do Controle; o front lia o setor.
-    "Bruno (EQUIPE no CONTROLE)": _COMPRAS_E_GOOGLE,
+    # Deslocamentos: a rota abria por view_all_availability, a página respondia "Sem permissão".
+    "Bruno (EQUIPE no CONTROLE)": {**_COMPRAS_E_GOOGLE, "tela Deslocamentos (página)": (False, True)},
     # O pacote do ADMIN_OPERACIONAL dá as capacidades do DAT; o front lia o setor.
-    "Ana (EQUIPE no ADMIN_OPERACIONAL)": {"rota Compras": (False, True), "rota Editar solicitação": (False, True)},
+    "Ana (EQUIPE no ADMIN_OPERACIONAL)": {
+        "rota Compras": (False, True),
+        "rota Editar solicitação": (False, True),
+        "tela Deslocamentos (página)": (False, True),
+    },
 }
 
 

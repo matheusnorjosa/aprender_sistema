@@ -77,8 +77,14 @@ class CPFOrUsernameBackend(ModelBackend):
             try:
                 user = User.objects.get(cpf=canonical)
             except User.DoesNotExist:
-                _hash_falso(password)
-                return None
+                # Username com formato de CPF diferente do campo cpf (ex.: CPF corrigido
+                # com o username travado). Era o ModelBackend de fallback que achava essa
+                # conta; aqui é uma busca a mais e continua um hash só (C7).
+                try:
+                    user = User.objects.get(username=canonical)
+                except User.DoesNotExist:
+                    _hash_falso(password)
+                    return None
         else:
             # Try username lookup (canonical == input cru para não-CPF)
             try:

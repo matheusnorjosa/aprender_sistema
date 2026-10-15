@@ -155,6 +155,19 @@ def _get_lockout_remaining_time(bucket: str, ip: str) -> int | None:
     return None
 
 
+def _username_para_auditoria(username: str) -> str:
+    """Identificador digitado, pronto para ``AuditLog.details``, sem CPF em nenhuma grafia.
+
+    O ``redact_cpf`` só reconhece 11 dígitos colados ou ``000.000.000-00``, mas o login
+    aceita qualquer mistura de ``.``, ``-`` e espaço. Se a forma canônica é um CPF, grava
+    ``<cpf>``; senão, o ``redact_cpf`` limpa um CPF que esteja no meio do texto.
+    """
+    canonical = normalize_login_identifier(username)
+    if len(canonical) == 11 and canonical.isdigit():
+        return "<cpf>"
+    return redact_cpf(username)
+
+
 def conta_bloqueada(request: HttpRequest | Request, username: str, password: str) -> bool:
     """Checa o bloqueio ANTES de autenticar. Regra única da API e do admin (C1/C2).
 
@@ -173,7 +186,7 @@ def conta_bloqueada(request: HttpRequest | Request, username: str, password: str
         action=AuditLog.Action.LOGIN_BLOCKED,
         model_name="Usuario",
         details={
-            "username": redact_cpf(username),
+            "username": _username_para_auditoria(username),
             "ip_address": client_ip,
             "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
             "reason": "account_locked",
@@ -210,7 +223,7 @@ def registrar_falha_de_login(
         action=AuditLog.Action.LOGIN_FAILED,
         model_name="Usuario",
         details={
-            "username": redact_cpf(username),
+            "username": _username_para_auditoria(username),
             "ip_address": client_ip,
             "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
             "reason": "invalid_credentials",
@@ -356,7 +369,7 @@ def login(request: Request) -> Response:
             action=AuditLog.Action.LOGIN_FAILED,
             model_name="Usuario",
             details={
-                "username": redact_cpf(username),
+                "username": _username_para_auditoria(username),
                 "ip_address": client_ip,
                 "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
                 "reason": "inactive_user",

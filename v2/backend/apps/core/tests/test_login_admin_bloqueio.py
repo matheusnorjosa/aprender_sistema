@@ -131,6 +131,89 @@ def test_api_e_admin_compartilham_o_contador_sem_contar_em_dobro(superusuario):
     assert not _entrou(_admin(admin, superusuario.username, _SENHA), admin)
 
 
+def _grafias_do_cpf(cpf: str) -> list[str]:
+    """Grafias que o ``normalize_login_identifier`` aceita e que o ``redact_cpf`` não pega."""
+    return [
+        f"{cpf[:9]}-{cpf[9:]}",
+        f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:]}",
+        f"{cpf[:3]} {cpf[3:6]} {cpf[6:9]} {cpf[9:]}",
+        f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]} - {cpf[9:]}",
+    ]
+
+
+@pytest.mark.parametrize("canal", ["api", "admin"])
+@pytest.mark.parametrize("indice_grafia", range(4))
+@override_settings(ACCOUNT_LOCKOUT_THRESHOLD=10)
+def test_auditlog_redige_cpf_em_qualquer_grafia_aceita_no_login(canal, indice_grafia, superusuario):
+    """LOGIN_FAILED e LOGIN_BLOCKED nunca guardam o CPF, em qualquer grafia que autentica."""
+    grafia = _grafias_do_cpf(superusuario.cpf)[indice_grafia]
+
+    def tentar() -> None:
+        if canal == "api":
+            assert _api(APIClient(), grafia, _ERRADA).status_code == 400
+        else:
+            assert _admin(Client(), grafia, _ERRADA).status_code == 200
+
+    tentar()
+    _bloquear(superusuario.cpf)
+    tentar()
+
+    logs = AuditLog.objects.filter(action__in=[AuditLog.Action.LOGIN_FAILED, AuditLog.Action.LOGIN_BLOCKED])
+    assert {log.action for log in logs} == {AuditLog.Action.LOGIN_FAILED, AuditLog.Action.LOGIN_BLOCKED}
+    for log in logs:
+        assert log.details["username"] == "<cpf>"
+
+
+@override_settings(ACCOUNT_LOCKOUT_THRESHOLD=10)
+def test_admin_login_certo_zera_o_contador_como_na_api(superusuario):
+    """Depois de 9 erros e 1 acerto no admin, 1 erro a mais não bloqueia a conta."""
+    bucket = _lockout_bucket(superusuario.username)
+    for _ in range(9):
+        assert _admin(Client(), superusuario.username, _ERRADA).status_code == 200
+    assert _get_failed_attempts(bucket, _IP) == 9
+
+    client = Client()
+    assert _entrou(_admin(client, superusuario.username, _SENHA), client)
+    assert _get_failed_attempts(bucket, _IP) == 0
+
+    assert _admin(Client(), superusuario.username, _ERRADA).status_code == 200
+    client = Client()
+    assert _entrou(_admin(client, superusuario.username, _SENHA), client)
+
+
+# ===================================================================
+# Login pelo username com formato de CPF diferente do campo cpf
+# ===================================================================
+
+
+@pytest.fixture
+def username_diferente_do_cpf() -> Any:
+    """Conta cujo username tem 11 dígitos mas difere do campo cpf (ex.: CPF corrigido
+    depois pelo botão 'Alterar CPF', com o username travado)."""
+    usuario = UsuarioFactory(superuser=True, password=_SENHA)
+    usuario.username = "9" + usuario.cpf[1:]
+    usuario.save(update_fields=["username"])
+    assert usuario.username != usuario.cpf
+    return usuario
+
+
+@pytest.mark.parametrize("campo", ["username", "cpf"])
+def test_api_entra_pelo_username_com_formato_de_cpf_e_pelo_cpf(campo, username_diferente_do_cpf):
+    identificador = getattr(username_diferente_do_cpf, campo)
+    assert _api(APIClient(), identificador, _SENHA).status_code == 200
+
+
+@pytest.mark.parametrize("campo", ["username", "cpf"])
+def test_admin_entra_pelo_username_com_formato_de_cpf_e_pelo_cpf(campo, username_diferente_do_cpf):
+    client = Client()
+    assert _entrou(_admin(client, getattr(username_diferente_do_cpf, campo), _SENHA), client)
+
+
+def test_username_com_formato_de_cpf_custa_um_hash_so(username_diferente_do_cpf):
+    """O fallback por username (CPF não achado) não soma hash: continua 1 (C7)."""
+    assert _contar_hashes(lambda: _api(APIClient(), username_diferente_do_cpf.username, _ERRADA)) == 1
+
+
 # ===================================================================
 # C2 — conta bloqueada não chama authenticate()
 # ===================================================================
@@ -211,16 +294,22 @@ def _taxa_por_segundo(conf: str, zona: str) -> float:
     return int(m.group(1)) / (60 if m.group(2) == "m" else 1)
 
 
-def test_nginx_admin_tem_limit_req_com_zona_propria_e_mais_baixa_que_a_api():
+def test_nginx_limita_so_o_login_do_admin_com_zona_propria_e_mais_baixa_que_a_api():
+    """A zona baixa vale só para /admin/login/; navegar no admin (autocomplete do select2
+    a cada tecla, jsi18n, salvar) segue na zona da API e não leva 429 no meio do trabalho."""
     conf = (exige_raiz_do_repo() / "v2" / "frontend" / "nginx.conf").read_text(encoding="utf-8")
 
-    admin = _location(conf, "location ^~ /admin/")
-    m = re.search(r"limit_req\s+zone=(\w+)", admin)
-    assert m, "location /admin/ sem limit_req"
+    login = _location(conf, "location = /admin/login/")
+    m = re.search(r"limit_req\s+zone=(\w+)", login)
+    assert m, "location /admin/login/ sem limit_req"
     zona = m.group(1)
     assert zona != "api"
     assert _taxa_por_segundo(conf, zona) < _taxa_por_segundo(conf, "api")
+    assert "proxy_pass" in login
 
-    # A zona do admin não vaza para a API nem para os estáticos do admin.
+    # A zona do login não vaza para o resto do admin, para a API nem para os estáticos.
+    resto_do_admin = _location(conf, "location ^~ /admin/")
+    assert f"zone={zona}" not in resto_do_admin
+    assert "limit_req zone=api" in resto_do_admin
     assert f"zone={zona}" not in _location(conf, "location ^~ /api/")
     assert "limit_req" not in _location(conf, "location ^~ /static/")

@@ -72,6 +72,9 @@ def _make_user_for_actor(actor: str) -> Usuario:
         email=f"matrix_{actor.lower().replace(' ', '_')}_{_USER_COUNTER['i']:06d}@example.com",
         cpf=_next_cpf(),
         groups=ACTOR_GROUPS[actor],
+        # Os vínculos ficam abaixo, na gerência de cada ator. O Formador fica sem: com FORMADOR
+        # vigente, a grade mensal abre (200) e a matriz espera 403. Muda no PR 8 (item 12).
+        groups__vinculo=False,
     )
 
     # D8 + D9 + PR 8: Coord/Apoio/Gerente* precisam de vínculo organizacional

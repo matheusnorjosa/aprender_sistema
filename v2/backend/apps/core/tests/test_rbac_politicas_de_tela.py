@@ -13,7 +13,8 @@ Cinco policies entram em `PUBLIC_POLICY_KEYS` sem mudar poder:
 O teste central compara, pessoa a pessoa, a policy com a fórmula antiga do front avaliada sobre
 as respostas REAIS de `/api/me/` e `/api/me/policies/`. Pessoas: os 10 atores de `matrix.py`
 (com os vínculos da matriz viva), os mesmos grupos sem vínculo, só vínculo (cada papel) e as duas
-personas por pacote do perfil da gerência ("Ana" ≡ DAT, "Bruno" ≡ Controle).
+personas por pacote do perfil da gerência ("Ana" ≡ DAT, "Bruno" ≡ Controle), mais o vínculo
+GERENTE (o outro papel com pacote) no ADMIN_OPERACIONAL, no CONTROLE e na DIRETORIA.
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false
@@ -172,6 +173,17 @@ def _bruno() -> Usuario:
     return usuario
 
 
+def _gerente_com_pacote(nome: str, perfil: str) -> Callable[[], Usuario]:
+    """GERENTE (papel com pacote, como EQUIPE) numa gerência com perfil, sem grupo."""
+
+    def criar() -> Usuario:
+        usuario = UsuarioFactory()
+        _vincula(usuario, _gerencia(nome, perfil), "GERENTE")
+        return usuario
+
+    return criar
+
+
 def _so_grupos(ator: str) -> Callable[[], Usuario]:
     return lambda: UsuarioFactory(groups=ACTOR_GROUPS[ator])
 
@@ -195,6 +207,9 @@ PESSOAS: dict[str, Callable[[], Usuario]] = {
     "Vidas + Assistente Administrativo": lambda: UsuarioFactory(groups=["Vidas", "Assistente Administrativo"]),
     "Ana (EQUIPE no ADMIN_OPERACIONAL)": _ana,
     "Bruno (EQUIPE no CONTROLE)": _bruno,
+    "GERENTE no ADMIN_OPERACIONAL": _gerente_com_pacote("GERENCIA DAT", Gerencia.Perfil.ADMIN_OPERACIONAL),
+    "GERENTE no CONTROLE": _gerente_com_pacote("CONTROLE", Gerencia.Perfil.CONTROLE),
+    "GERENTE na DIRETORIA": _gerente_com_pacote("DIRETORIA", Gerencia.Perfil.DIRETORIA),
     "sem nada": lambda: UsuarioFactory(),
 }
 
@@ -332,6 +347,13 @@ DELTA_MEDIDO: dict[str, dict[str, tuple[bool, bool]]] = {
         "rota Compras": (False, True),
         "rota Editar solicitação": (False, True),
         "tela Deslocamentos (página)": (False, True),
+    },
+    # GERENTE também está em PAPEIS_COM_PACOTE: ganha o mesmo pacote que EQUIPE. Deslocamentos
+    # não muda porque o vínculo de gestão já abria a página antes.
+    "GERENTE no CONTROLE": _COMPRAS_E_GOOGLE,
+    "GERENTE no ADMIN_OPERACIONAL": {
+        "rota Compras": (False, True),
+        "rota Editar solicitação": (False, True),
     },
 }
 

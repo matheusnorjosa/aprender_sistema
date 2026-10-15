@@ -372,8 +372,16 @@ export default function EditSolicitacaoPage(): JSX.Element {
         },
       };
 
-      await updateSolicitacao(Number(id), payload);
-      message.success('Solicitação atualizada com sucesso!');
+      const atualizada = await updateSolicitacao(Number(id), payload);
+      // Decisão do dono (14/10/2026): o backend devolve a SUPER aprovada para pendente quando
+      // muda data, horário, município, projeto ou formadores. A tela só avisa o que a API fez.
+      if (solicitacao?.status === 'aprovado' && atualizada.status === 'pendente') {
+        message.warning(
+          'Solicitação atualizada. A mudança de data, horário, município, projeto ou formadores voltou o evento para aprovação.',
+        );
+      } else {
+        message.success('Solicitação atualizada com sucesso!');
+      }
       void navigate('/solicitacoes/minhas');
     } catch (err) {
       logger.error('Erro ao atualizar solicitação:', err);

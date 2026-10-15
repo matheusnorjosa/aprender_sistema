@@ -107,6 +107,45 @@ class _ExtraParticipantsSerializer(serializers.Serializer):
         return value
 
 
+def _campos_materiais(solicitacao: Solicitacao, formador_ids: set[int | None]) -> dict[str, Any]:
+    """O que a aprovação SUPER aprovou: projeto (M10-02/#1624) mais data, horário, município e
+    formadores (decisão do dono, 14/10/2026). Observação, local e evento online ficam de fora.
+    Datas comparadas como instante (o mesmo horário em outro fuso não é mudança)."""
+    return {
+        "projeto": solicitacao.projeto_id,
+        "municipio": solicitacao.municipio_id,
+        "inicio": solicitacao.inicio,
+        "fim": solicitacao.fim,
+        "formadores": frozenset(formador_ids),
+    }
+
+
+def _formador_ids(solicitacao: Solicitacao) -> set[int | None]:
+    from .models import Participation
+
+    return set(
+        Participation.objects.filter(solicitacao=solicitacao, role="FORMADOR").values_list("usuario_id", flat=True)
+    )
+
+
+def _rebaixar_se_mudou_campo_material(solicitacao: Solicitacao, antes: dict[str, Any]) -> list[str]:
+    """Regra única de reaprovação (adendo da PA-04; sem ela a edição lavaria a aprovação, CP-02):
+    aprovada cujo fluxo exige aprovação (`resolve_initial_status` → pendente) e que teve campo
+    material mudado volta para `pendente`.
+    NAO_SUPER e quem não está aprovada não mudam. Só troca o status: não toca no Google Agenda
+    (publicada nem chega aqui, o serializer recusa editar). Devolve os campos que mudaram."""
+    if solicitacao.status != "aprovado":
+        return []
+    if resolve_initial_status(projeto=solicitacao.projeto).status != "pendente":
+        return []
+    depois = _campos_materiais(solicitacao, _formador_ids(solicitacao))
+    mudaram = [campo for campo, valor in antes.items() if depois[campo] != valor]
+    if mudaram:
+        solicitacao.status = "pendente"
+        solicitacao.save(update_fields=["status"])
+    return mudaram
+
+
 def _batch_response_schema(contador: str) -> dict[str, Any]:
     """Schema OpenAPI da resposta dos lotes: contador + errors[{id, detail, code?, blocked_participants?}].
 
@@ -641,6 +680,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         #1452: editar data, município ou formadores realoca gente — a checagem roda depois
         das alterações, sobre o estado final, e um conflito desfaz a edição inteira.
+
+        Reaprovação: SUPER aprovada com projeto, data, horário, município ou formadores mudados
+        volta para pendente (`_rebaixar_se_mudou_campo_material`; o AuditLog leva `reaprovacao`).
         """
         from django.db import transaction
 
@@ -697,20 +739,11 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             "formador_ids": list(old_formador_ids),
         }
 
+        materiais_antes = _campos_materiais(instance, old_formador_ids)
+
         with transaction.atomic():
             # Salva as alterações
             serializer.save()
-
-            # M10-02 (#1624): trocar o projeto de um item já "aprovado" para um de
-            # fluxo SUPER não pode manter o status — publicaria sem passar pela
-            # aprovação da Superintendência (lavagem de aprovação, viola CP-02/PA-01).
-            # Se o projeto mudou e o novo fluxo exige aprovação
-            # (resolve_initial_status → "pendente"), rebaixa para "pendente",
-            # forçando reaprovação. Fluxo NAO_SUPER (auto-aprovado) não é afetado.
-            if old_data["projeto_id"] != instance.projeto_id and instance.status == "aprovado":
-                if resolve_initial_status(projeto=instance.projeto).status == "pendente":
-                    instance.status = "pendente"
-                    instance.save(update_fields=["status"])
 
             # Processa extra_participants se presente
             # M10-04 (#1626): valida o shape ANTES de reconciliar (espelha o create) —
@@ -731,6 +764,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
             if instance.coordenador_id != coordenador_antigo_id:
                 self._trocar_convite_do_responsavel(instance, coordenador_antigo_id)
+
+            campos_reaprovacao = _rebaixar_se_mudou_campo_material(instance, materiais_antes)
 
             validar_avaliacao_formador(
                 instance,
@@ -775,18 +810,21 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         # Se houver alterações, registra no AuditLog
         if changed_fields:
             client_ip = get_client_ip(self.request)
+            details: dict[str, Any] = {
+                "solicitacao_id": instance.id,
+                "changed_fields": changed_fields,
+                "ip_address": client_ip,
+                "user_agent": self.request.META.get("HTTP_USER_AGENT", "")[:200],
+            }
+            if campos_reaprovacao:
+                details["reaprovacao"] = {"campos": campos_reaprovacao}
 
             # AuditLog persistente
             AuditLog.objects.create(
                 usuario=self.request.user,
                 action=AuditLog.Action.UPDATE,
                 model_name="Solicitacao",
-                details={
-                    "solicitacao_id": instance.id,
-                    "changed_fields": changed_fields,
-                    "ip_address": client_ip,
-                    "user_agent": self.request.META.get("HTTP_USER_AGENT", "")[:200],
-                },
+                details=details,
             )
 
     def _trocar_convite_do_responsavel(self, solicitacao, coordenador_antigo_id):

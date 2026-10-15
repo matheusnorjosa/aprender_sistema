@@ -49,12 +49,10 @@ Solicitação de projeto com `fluxo='SUPER'` nasce com `status='pendente'`.
 Projeto com `fluxo='NAO_SUPER'` nasce `'aprovado'`
 (`apps/core/services/solicitacao_create.py:23-44`, `resolve_initial_status`).
 
-!!! danger "Lavagem de aprovação (P1 · #1624)"
-    Editar uma solicitação `NAO_SUPER` (nascida `aprovado`) trocando o **projeto** para um de
-    fluxo `SUPER` mantém `status='aprovado'`: `perform_update` não reavalia
-    `resolve_initial_status` nem reseta o status
-    (`apps/core/views_solicitacao.py:401-497`). O evento fica `SUPER` e aprovado sem nunca ter
-    tido um `AuditLog` de `APPROVE`.
+!!! success "Editar a SUPER aprovada pede nova aprovação (#1624, resolvido; estendido em 2026-10-15)"
+    Trocar o **projeto** para um de fluxo `SUPER` (#1624), ou mudar **data, horário, município ou
+    formadores** de uma SUPER aprovada (decisão do dono, 14/10/2026), devolve a solicitação para
+    `pendente`. Observação, local e evento online não devolvem. Detalhe no adendo da PA-04 da spec.
 
 ## PA-05: Auditoria
 

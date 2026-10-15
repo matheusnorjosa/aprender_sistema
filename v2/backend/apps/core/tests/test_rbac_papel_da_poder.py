@@ -419,6 +419,36 @@ class TestP16Deslocamento:
         deslocamento.refresh_from_db()
         assert deslocamento.usuario_id == formador.id
 
+    def test_ve_mas_nao_edita_nem_apaga_o_do_colega_coordenador(self, duas_gerencias):
+        """Trava de alvo no PATCH/DELETE: o escopo de leitura entrega o colega, a delegação não."""
+        minha, _ = duas_gerencias
+        gerente = _so_vinculo("GERENTE", minha)
+        colega = _so_vinculo("COORDENADOR", minha)
+        deslocamento = Deslocamento.objects.create(usuario=colega, **_payload_deslocamento())
+        client = _cliente(gerente)
+
+        assert client.get(f"/api/deslocamentos/{deslocamento.id}/").status_code == 200
+        editado = client.patch(f"/api/deslocamentos/{deslocamento.id}/", {"destino": "Crato"}, format="json")
+        assert editado.status_code == 403
+        assert client.delete(f"/api/deslocamentos/{deslocamento.id}/").status_code == 403
+        deslocamento.refresh_from_db()
+        assert deslocamento.destino == "Sobral"
+
+    def test_gerente_em_a_e_formador_em_b_nao_edita_o_do_formador_de_b(self, duas_gerencias):
+        """Caso u91: vê os formadores de B pela leitura, mas o papel em B (FORMADOR) não delega."""
+        minha, outra = duas_gerencias
+        usuario = _so_vinculo("GERENTE", minha)
+        _vinculo(usuario, "FORMADOR", outra)
+        formador_de_b = _so_vinculo("FORMADOR", outra)
+        deslocamento = Deslocamento.objects.create(usuario=formador_de_b, **_payload_deslocamento())
+        client = _cliente(usuario)
+
+        assert client.get(f"/api/deslocamentos/{deslocamento.id}/").status_code == 200
+        editado = client.patch(f"/api/deslocamentos/{deslocamento.id}/", {"destino": "Crato"}, format="json")
+        assert editado.status_code == 403
+        assert client.delete(f"/api/deslocamentos/{deslocamento.id}/").status_code == 403
+        assert Deslocamento.objects.filter(pk=deslocamento.id, destino="Sobral").exists()
+
     def test_alvos_do_seletor_sao_os_formadores_das_gerencias_dela(self, duas_gerencias):
         """O seletor da tela oferece a quem pode, e só esses formadores (decisão O8-5)."""
         minha, outra = duas_gerencias

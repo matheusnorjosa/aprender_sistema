@@ -299,6 +299,11 @@ def _parse_iso_date(v: Any) -> date | None:
 _FORTALEZA_TZ = ZoneInfo("America/Fortaleza")
 
 
+def _hoje() -> date:
+    """Data de hoje em Fortaleza. Ponto único para os testes fixarem o dia (monkeypatch)."""
+    return timezone.localdate(timezone=_FORTALEZA_TZ)
+
+
 def _parse_local_datetime(v: Any) -> datetime | None:
     """Parseia datetime ISO (YYYY-MM-DDTHH:MM:SS) LOCAL de Fortaleza → aware em UTC (RD-06).
     Vazio/inválido → None. Ignora offset já embutido (a fonte emite naive + timezone=Fortaleza)."""
@@ -626,6 +631,11 @@ class ExportContractImporter:
         self.actor = actor  # created_by no apply de entidades com auditoria (dat_cadastro/dat_registro)
         self._pidx = None
         self._dat_uso_projetos: set[str] | None = None
+        # IMP-2: previsão do classify de solicitacao (para o de participation) e o que o apply criou.
+        self._sol_criaria: dict[str, int] = {}  # external_hash → id do coordenador solicitante
+        self._sol_existente: set[str] | None = None
+        self._sol_passado_novo: set[str] = set()
+        self._criadas_nesta_execucao: set[str] = set()
 
     def _projetos_com_dat_uso(self) -> set[str]:
         """norm(nome) dos projetos que aparecem em dat_registro.csv/dat_compra.csv (coluna `projeto`).
@@ -1221,36 +1231,99 @@ class ExportContractImporter:
             )
             tally["would_rekey"] = 0  # id antigo (`evento_ids_anteriores`) já em prod: existente, re-chaveia
             tally["would_create_cancelada"] = 0  # linha nova com cancelado=true: nasce reprovada
-            bloqueados = _ids_proprios(rows)
+            # IMP-2 (caso Filadélfia): id antigo que é também id próprio de outra linha e já está em prod. Não
+            # re-chaveia (entrada contraditória); o contador só deixa visível para corrigir na planilha.
+            tally["rekey_contraditorio"] = 0
+            skip_reasons = {"evento_passado_novo": 0}
+            reject_reasons = {"fim_antes_do_inicio": 0}
+            ids_proprios = _ids_proprios(rows)
+            bloqueados = set(ids_proprios)
+            hoje = _hoje()
+            # `atual` evolui linha a linha como o `existing` do apply (re-chave e criação nesta execução).
+            atual = set(existing)
+            self._sol_criaria = {}
+            self._sol_existente = set(existing)
+            self._sol_passado_novo = set()
             for r in rows:
                 key = self._resolve_solicitacao_key(r, mun_idx, tipo_idx, cpf_idx)
                 if key is None:
                     tally["would_reject"] += 1
                     continue
-                existe = key[-1] in existing
-                if not existe and _id_antigo_em_prod(r, existing, bloqueados) is not None:
+                ext_hash = key[-1]
+                proprio = (r.get("evento_id") or "").strip()
+                if any(
+                    s != proprio and s in ids_proprios and s in existing
+                    for s in (str(a).strip() for a in _parse_json_list(r.get("evento_ids_anteriores")))
+                ):
+                    tally["rekey_contraditorio"] += 1
+                existe = ext_hash in atual
+                antigo = None if existe else _id_antigo_em_prod(r, atual, bloqueados)
+                if antigo is not None:
+                    atual.discard(antigo)
+                    atual.add(ext_hash)
                     existe = True
                     tally["would_rekey"] += 1
+                if existe:
+                    if ext_hash not in self._sol_criaria:
+                        self._sol_existente.add(ext_hash)
+                elif key[3] < hoje:
+                    # Evento novo no passado não nasce (fica para a virada), espelha o apply.
+                    tally["would_skip_same"] += 1
+                    skip_reasons["evento_passado_novo"] += 1
+                    self._sol_passado_novo.add(ext_hash)
+                    continue
+                elif key[5] <= key[4]:
+                    # Mesma data e fuso: fim <= inicio, o apply pula (constraint solicitacao_fim_gt_inicio).
+                    tally["would_reject"] += 1
+                    reject_reasons["fim_antes_do_inicio"] += 1
+                    continue
+                else:
+                    self._sol_criaria[ext_hash] = key[7]
+                    atual.add(ext_hash)
                 st, _ = diff_and_classify({} if existe else None, {}, protected)
                 tally[st] += 1
                 if st == "would_create" and _to_bool(r.get("cancelado")):
                     tally["would_create_cancelada"] += 1
+            tally["skip_reasons"] = skip_reasons
+            tally["reject_reasons"] = reject_reasons
 
         elif name == "participation":
             # Liga por evento_id (fallback evento_hash_natural) → solicitacao.external_hash. Papel do CSV (posição), não cargo.
-            # No dry-run a solicitacao pode ainda não existir no DB → would_reject inflado (esperado; o apply
-            # ordenado cria a solicitacao antes). Resolução de usuário/existência fica para o apply.
-            sol_hashes = set(
-                Solicitacao.objects.exclude(external_hash__isnull=True).values_list("external_hash", flat=True)
-            )
+            # IMP-2: espelha o apply, que só vincula a evento criado nesta execução. Usa o que o classify de
+            # solicitacao (antes, por ENTITY_ORDER) previu: evento que seria criado → would_create; evento que
+            # já existe (ou re-chaveado) ou passado novo → skip com motivo; o resto (órfã) → would_reject.
+            # Linha COORDENADOR do próprio solicitante vira skip: o apply de solicitacao já o vinculou.
+            # O resto da resolução de usuário/dedup fica para o apply.
+            existentes = self._sol_existente
+            if existentes is None:  # sem solicitacao.csv: só o que já está no banco
+                existentes = set(
+                    Solicitacao.objects.exclude(external_hash__isnull=True).values_list("external_hash", flat=True)
+                )
+            skip_reasons = {"evento_existente": 0, "evento_passado_novo": 0, "coordenador_solicitante": 0}
+            cpf_idx: dict[str, int] | None = None
             for r in rows:
                 ehash = (r.get("evento_id") or r.get("evento_hash_natural") or "").strip()
                 role = _map_participation_role(r.get("role"))
-                if not ehash or ehash not in sol_hashes or role is None:
+                if not ehash or role is None:
                     tally["would_reject"] += 1
-                    continue
-                st, _ = diff_and_classify(None, {}, protected)  # would_create (dedup por-usuário no apply)
-                tally[st] += 1
+                elif ehash in self._sol_criaria:
+                    if role == Participation.Role.COORDENADOR:
+                        cpf_idx = self._usuario_cpf_index() if cpf_idx is None else cpf_idx
+                        u = self._resolve_participante(r, cpf_idx)
+                        if u is not None and u.id == self._sol_criaria[ehash]:
+                            tally["would_skip_same"] += 1
+                            skip_reasons["coordenador_solicitante"] += 1
+                            continue
+                    tally["would_create"] += 1
+                elif ehash in existentes:
+                    tally["would_skip_same"] += 1
+                    skip_reasons["evento_existente"] += 1
+                elif ehash in self._sol_passado_novo:
+                    tally["would_skip_same"] += 1
+                    skip_reasons["evento_passado_novo"] += 1
+                else:
+                    tally["would_reject"] += 1
+            tally["skip_reasons"] = skip_reasons
 
         elif name == "formacao":
             # Filha de PlanoFormacoes. NK (plano_id, numero_formacao); plano pai resolvido por
@@ -1505,7 +1578,9 @@ class ExportContractImporter:
                 if name == "solicitacao":
                     # Create-only da Solicitacao + reconcile de segmento_norm (autoritativo do import,
                     # reportado à parte — #1896). Mesmo shape do plano_formacao/coordenadores.
-                    created_sol, reconciled_sol, canceladas, rechaveadas = self._apply_solicitacao(self._load(name))
+                    created_sol, reconciled_sol, canceladas, rechaveadas, passadas = self._apply_solicitacao(
+                        self._load(name)
+                    )
                     applied[name] = created_sol
                     if reconciled_sol:
                         applied["solicitacao__segmento_norm_reconciled"] = reconciled_sol
@@ -1513,9 +1588,11 @@ class ExportContractImporter:
                         applied["solicitacao__cancelada_reprovada"] = canceladas
                     if rechaveadas:
                         applied["solicitacao__rechaveada"] = rechaveadas
+                    if passadas:
+                        applied["solicitacao__pulada_passado"] = passadas
                     continue
                 if name == "participation":
-                    # DEPOIS de solicitacao (ENTITY_ORDER garante): liga por external_hash já criado.
+                    # DEPOIS de solicitacao (ENTITY_ORDER garante): liga só ao evento criado nesta execução.
                     applied[name] = self._apply_participation(self._load(name))
                     continue
                 if name == "formacao":
@@ -1820,7 +1897,7 @@ class ExportContractImporter:
             created += 1
         return created, reconciled
 
-    def _apply_solicitacao(self, rows: list[dict[str, str]]) -> tuple[int, int, int, int]:
+    def _apply_solicitacao(self, rows: list[dict[str, str]]) -> tuple[int, int, int, int, int]:
         """Create-only de Solicitacao + reconcile de `segmento_norm`. NK = external_hash = `evento_id`
         estável do CSV (fallback `evento_hash_natural`, depois `_compute_external_hash`/ADR-012 — ver
         `_resolve_solicitacao_key`). Solicitante (dono) via `_resolve_solicitante`
@@ -1835,7 +1912,11 @@ class ExportContractImporter:
         dos `evento_ids_anteriores` está é o MESMO evento: não cria, re-chaveia o `external_hash` da
         existente para o id novo (AuditLog UPDATE) e segue como existente (só o reconcile abaixo).
 
-        Retorna `(created, reconciled, canceladas, rechaveadas)`. `segmento_norm`/`segmento_norm_confianca` são autoritativos do
+        IMP-2 (decisão do dono, 14/10/2026): evento NOVO com data antes de hoje (Fortaleza) não é criado,
+        fica para a virada (`passadas`). Evento existente passado segue igual (re-chave e reconcile). Os
+        `external_hash` criados aqui vão para `_criadas_nesta_execucao` (só neles a participation vincula).
+
+        Retorna `(created, reconciled, canceladas, rechaveadas, passadas)`. `segmento_norm`/`segmento_norm_confianca` são autoritativos do
         import (de-para do sheets, sem entrada-direta — #1896): create-only pula o registro existente por
         external_hash, mas RECONCILIA esse campo — escopado (só norm/confianca), reportado à parte,
         idempotente (só grava se difere), NUNCA esvazia (fonte vazia = ausência de sinal, não remoção)."""
@@ -1853,6 +1934,8 @@ class ExportContractImporter:
         reconciled = 0
         canceladas = 0
         rechaveadas = 0
+        passadas = 0
+        hoje = _hoje()
         bloqueados = _ids_proprios(rows)
         for r in rows:
             key = self._resolve_solicitacao_key(r, mun_idx, tipo_idx, cpf_idx)
@@ -1888,6 +1971,9 @@ class ExportContractImporter:
                     existing[ext_hash] = (sid, seg_norm)
                     reconciled += 1
                 continue
+            if data_ev < hoje:
+                passadas += 1
+                continue  # passado novo: não nasce pendente/aprovado; fica para a virada
             inicio = timezone.make_aware(datetime.combine(data_ev, hora_ini), _FORTALEZA_TZ)
             fim = timezone.make_aware(datetime.combine(data_ev, hora_fim), _FORTALEZA_TZ)
             if fim <= inicio:
@@ -1936,8 +2022,9 @@ class ExportContractImporter:
                 )
                 canceladas += 1
             existing[ext_hash] = (sol.id, seg_norm)
+            self._criadas_nesta_execucao.add(ext_hash)
             created += 1
-        return created, reconciled, canceladas, rechaveadas
+        return created, reconciled, canceladas, rechaveadas, passadas
 
     def _resolve_participante(self, r: dict[str, str], cpf_idx: dict[str, int]) -> Usuario | None:
         """EMAIL-first (`resolve_user_by_email`, exato, sem filtro is_active — inclui inativos, RELAY 50)
@@ -1969,11 +2056,16 @@ class ExportContractImporter:
 
     def _apply_participation(self, rows: list[dict[str, str]]) -> int:
         """Create-only de Participation. Liga por `evento_id` (fallback `evento_hash_natural`) →
-        `solicitacao.external_hash`.
+        `solicitacao.external_hash`, e SÓ a evento criado nesta execução (IMP-2, decisão do dono 14/10/2026):
+        evento que já existia, ou re-chaveado, não ganha nem perde participante (fica para a virada).
         Papel vem do CSV (POSIÇÃO), NUNCA do cargo. Usuário resolvido EMAIL-first → CPF → nome; sem match
         mas com nome → `guest_nome` (preserva quem saiu, MARCA não descarta). Sem solicitacao ou papel
         inválido → pula. Dedup existence-based (por-usuário e nome-only), índices atualizados in-memory."""
-        sol_idx = dict(Solicitacao.objects.exclude(external_hash__isnull=True).values_list("external_hash", "id"))
+        sol_idx = dict(
+            Solicitacao.objects.filter(external_hash__in=self._criadas_nesta_execucao).values_list(
+                "external_hash", "id"
+            )
+        )
         cpf_idx = self._usuario_cpf_index()
         existing_user = set(
             Participation.objects.exclude(usuario__isnull=True).values_list("solicitacao_id", "usuario_id", "role")
@@ -1987,7 +2079,7 @@ class ExportContractImporter:
             sol_id = sol_idx.get(ehash)
             role = _map_participation_role(r.get("role"))
             if sol_id is None or role is None:
-                continue  # solicitacao inexistente (órfã) ou papel fora do domínio
+                continue  # evento não criado nesta execução (existente/órfã) ou papel fora do domínio
             usuario = self._resolve_participante(r, cpf_idx)
             if usuario is not None:
                 ukey = (sol_id, usuario.id, role)

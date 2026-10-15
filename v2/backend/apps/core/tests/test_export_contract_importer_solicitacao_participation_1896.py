@@ -25,7 +25,7 @@ from apps.core.services.eventos_import import _compute_external_hash
 from apps.core.services.export_contract_importer import ExportContractImporter
 from apps.core.tests.factories import MunicipioFactory, ProjetoFactory, TipoEventoFactory, UsuarioFactory
 
-pytestmark = pytest.mark.django_db
+pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("hoje_importador_fixo")]
 
 SOL_HEADER = (
     "municipio,uf,projeto,tipo_evento,data,hora_inicio,hora_fim,segmento,"

@@ -83,3 +83,16 @@ def seed_functional_permissions_fixture(django_db_setup, django_db_blocker):
     with django_db_blocker.unblock():
         ensure_base_groups()
         seed_functional_permissions(assign_default_groups=True)
+
+
+@pytest.fixture
+def hoje_importador_fixo(monkeypatch):
+    """Fixa o `_hoje()` do importer export-contract em 1/1/2026 (IMP-2: evento NOVO passado não é criado).
+
+    Para testes de agenda com datas fixas de 2026 não envelhecerem: o que eles provam não depende do dia.
+    """
+    from datetime import date
+
+    from apps.core.services import export_contract_importer
+
+    monkeypatch.setattr(export_contract_importer, "_hoje", lambda: date(2026, 1, 1))

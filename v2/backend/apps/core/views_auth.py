@@ -25,7 +25,10 @@ from django.contrib.auth import authenticate
 from django.contrib.auth import login as django_login
 from django.contrib.auth import logout as django_logout
 from django.contrib.auth.hashers import make_password
+from django.contrib.auth.signals import user_login_failed
 from django.core.cache import cache
+from django.dispatch import receiver
+from django.http import HttpRequest
 from django.middleware.csrf import get_token
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status
@@ -152,6 +155,84 @@ def _get_lockout_remaining_time(bucket: str, ip: str) -> int | None:
     return None
 
 
+def _username_para_auditoria(username: str) -> str:
+    """Identificador digitado, pronto para ``AuditLog.details``, sem CPF em nenhuma grafia.
+
+    O ``redact_cpf`` só reconhece 11 dígitos colados ou ``000.000.000-00``, mas o login
+    aceita qualquer mistura de ``.``, ``-`` e espaço. Se a forma canônica é um CPF, grava
+    ``<cpf>``; senão, o ``redact_cpf`` limpa um CPF que esteja no meio do texto.
+    """
+    canonical = normalize_login_identifier(username)
+    if len(canonical) == 11 and canonical.isdigit():
+        return "<cpf>"
+    return redact_cpf(username)
+
+
+def conta_bloqueada(request: HttpRequest | Request, username: str, password: str) -> bool:
+    """Checa o bloqueio ANTES de autenticar. Regra única da API e do admin (C1/C2).
+
+    Com a conta bloqueada, não chama ``authenticate()``: roda um hash falso de custo
+    fixo (o mesmo custo de uma tentativa normal, C7) e grava ``LOGIN_BLOCKED``. Assim a
+    senha não pode ser testada durante o bloqueio, nem pelo tempo de resposta.
+    """
+    bucket = _lockout_bucket(username)
+    client_ip = _get_client_ip(request)
+    if not _is_account_locked(bucket, client_ip):
+        return False
+
+    make_password(password)  # custo fixo; o resultado não é usado
+    AuditLog.objects.create(
+        usuario=None,
+        action=AuditLog.Action.LOGIN_BLOCKED,
+        model_name="Usuario",
+        details={
+            "username": _username_para_auditoria(username),
+            "ip_address": client_ip,
+            "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
+            "reason": "account_locked",
+            "attempts": _get_failed_attempts(bucket, client_ip),
+            "threshold": getattr(settings, "ACCOUNT_LOCKOUT_THRESHOLD", 10),
+            "lockout_remaining_seconds": _get_lockout_remaining_time(bucket, client_ip),
+        },
+    )
+    return True
+
+
+def limpar_falhas_de_login(request: HttpRequest | Request, username: str) -> None:
+    """Zera os contadores depois de um login bem-sucedido (API e admin)."""
+    _clear_failed_attempts(_lockout_bucket(username), _get_client_ip(request))
+
+
+@receiver(user_login_failed, dispatch_uid="core.registrar_falha_de_login")
+def registrar_falha_de_login(
+    sender: object, credentials: dict[str, object], request: HttpRequest | Request | None = None, **kwargs: object
+) -> None:
+    """Conta a falha e grava ``LOGIN_FAILED`` para todo ``authenticate()`` que falha.
+
+    Regra única (C1): o login da API e o ``/admin/login/`` passam por aqui e usam os
+    mesmos contadores, então nenhum dos dois conta em dobro. Sem ``request`` (ex.:
+    ``Client.login`` em teste) não há IP nem tentativa pela rede: nada a contar.
+    """
+    username = credentials.get("username")
+    if request is None or not isinstance(username, str):
+        return
+    client_ip = _get_client_ip(request)
+    attempts = _increment_failed_attempts(_lockout_bucket(username), client_ip)
+    AuditLog.objects.create(
+        usuario=None,
+        action=AuditLog.Action.LOGIN_FAILED,
+        model_name="Usuario",
+        details={
+            "username": _username_para_auditoria(username),
+            "ip_address": client_ip,
+            "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
+            "reason": "invalid_credentials",
+            "attempts": attempts,
+            "threshold": getattr(settings, "ACCOUNT_LOCKOUT_THRESHOLD", 10),
+        },
+    )
+
+
 def _invalid_credentials_response() -> Response:
     """
     Generic authentication failure response to prevent account enumeration.
@@ -268,59 +349,15 @@ def login(request: Request) -> Response:
     client_ip = _get_client_ip(request)
     bucket = _lockout_bucket(username)
 
-    # Security hardening #745:
-    # - Keep a generic client response for all auth failures
-    # - Preserve detailed reason only in AuditLog
-    is_locked = _is_account_locked(bucket, client_ip)
-
-    user = authenticate(request, username=username, password=password)
-    if user is None:
-        # Dummy hash to reduce timing differences between existing/non-existing users.
-        make_password(password)
-
-    if is_locked:
-        threshold = getattr(settings, "ACCOUNT_LOCKOUT_THRESHOLD", 10)
-        attempts = _get_failed_attempts(bucket, client_ip)
-        lockout_remaining_seconds = _get_lockout_remaining_time(bucket, client_ip)
-
-        # Log tentativa de login em conta bloqueada (detalhes só internamente)
-        AuditLog.objects.create(
-            usuario=None,
-            action=AuditLog.Action.LOGIN_BLOCKED,
-            model_name="Usuario",
-            details={
-                "username": redact_cpf(username),
-                "ip_address": client_ip,
-                "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
-                "reason": "account_locked",
-                "attempts": attempts,
-                "threshold": threshold,
-                "lockout_remaining_seconds": lockout_remaining_seconds,
-            },
-        )
-
+    # C2 (auditoria 2026-10-14): o bloqueio é checado ANTES de autenticar; bloqueada,
+    # a senha nem é testada. Resposta genérica igual à de credencial inválida (#745).
+    if conta_bloqueada(request, username, password):
         return _invalid_credentials_response()
 
+    # Falha: o receptor de user_login_failed (registrar_falha_de_login) conta e grava
+    # LOGIN_FAILED. O hash falso do CPF inexistente fica no backend (C7).
+    user = authenticate(request, username=username, password=password)
     if user is None:
-        # Incrementa contador de tentativas falhas (estado interno)
-        attempts = _increment_failed_attempts(bucket, client_ip)
-        threshold = getattr(settings, "ACCOUNT_LOCKOUT_THRESHOLD", 10)
-
-        # Log tentativa falha
-        AuditLog.objects.create(
-            usuario=None,
-            action=AuditLog.Action.LOGIN_FAILED,
-            model_name="Usuario",
-            details={
-                "username": redact_cpf(username),
-                "ip_address": client_ip,
-                "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
-                "reason": "invalid_credentials",
-                "attempts": attempts,
-                "threshold": threshold,
-            },
-        )
-
         return _invalid_credentials_response()
 
     if not user.is_active:
@@ -332,7 +369,7 @@ def login(request: Request) -> Response:
             action=AuditLog.Action.LOGIN_FAILED,
             model_name="Usuario",
             details={
-                "username": redact_cpf(username),
+                "username": _username_para_auditoria(username),
                 "ip_address": client_ip,
                 "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
                 "reason": "inactive_user",

@@ -19,6 +19,7 @@ class CoreConfig(AppConfig):
         - post_save/delete(Municipio): Invalida cache de endpoints estáticos (CP3)
         - post_save/delete(Projeto): Invalida cache de endpoints estáticos (CP3)
         - post_save/delete(TipoEvento): Invalida cache de endpoints estáticos (CP3)
+        - user_login_failed: conta a falha e grava LOGIN_FAILED (API e admin, views_auth)
 
         Admin registrado:
         - Registro explícito de modelos essenciais (Usuario, Projeto, Municipio, etc.)
@@ -27,3 +28,4 @@ class CoreConfig(AppConfig):
         import apps.core.rbac.checks  # noqa: F401  # pyright: ignore[reportUnusedImport]  # registra system check de drift dos composites (H2)
         import apps.core.rbac_signals  # noqa: F401  # pyright: ignore[reportUnusedImport]
         import apps.core.signals  # noqa: F401  # pyright: ignore[reportUnusedImport]
+        import apps.core.views_auth  # noqa: F401  # pyright: ignore[reportUnusedImport]  # receptor de user_login_failed (bloqueio de login)

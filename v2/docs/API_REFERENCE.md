@@ -978,7 +978,8 @@ Valores de produção — `REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]` (`v2/backen
 abertas; 1000/h estourava em ~25 min de Pré-agenda aberta. `anon` e `login` são **por IP**, e o escritório
 inteiro sai pelo mesmo endereço. Quem barra força bruta de senha é o bloqueio **por conta**
 (`ACCOUNT_LOCKOUT_THRESHOLD` = 10 erros → 15 min; 50 erros somando todos os IPs → 30 min, `views_auth.py`),
-que não mudou. O 429 do DRF traz o cabeçalho `Retry-After` (segundos); o frontend o lê em `fetchAPI`
+que não mudou. Desde 2026-10 o `/admin/login/` usa os mesmos contadores e o mesmo `LOGIN_FAILED` (erros na API
+e no admin somam), e com a conta bloqueada a senha nem é testada. O 429 do DRF traz o cabeçalho `Retry-After` (segundos); o frontend o lê em `fetchAPI`
 (`error.retryAfter`) e Aprovações, Pré-agenda e Grade Mensal pausam o polling por esse tempo. Antes do Django há o `limit_req`
 do nginx do frontend (30 r/s por cliente, rajada de 60, resposta 429 sem `Retry-After`) — ver
 [deploy.spec](specs/infra/deploy.spec.md).

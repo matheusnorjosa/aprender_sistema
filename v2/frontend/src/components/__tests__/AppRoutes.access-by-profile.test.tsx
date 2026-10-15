@@ -314,6 +314,30 @@ describe('AppRoutes — personas por vínculo ≡ grupo (PR 7)', () => {
   }
 });
 
+// Os atores sempre recebem as três juntas; aqui cada policy vem sozinha. Quem a recebe sozinha
+// existe: o Gerente do setor Gerência (grupos Gerência + Gerente, sem vínculo) tem só a da Grade.
+describe('AppRoutes — Grade, Bloqueios e Deslocamentos: cada policy abre a sua rota, e só ela', () => {
+  const ROTA_DA_POLICY = {
+    access_monthly_availability: '/solicitacoes/disponibilidade',
+    access_availability_blocks: '/solicitacoes/bloqueios',
+    access_travel: '/solicitacoes/deslocamentos',
+  } as const;
+
+  for (const [policy, rotaDela] of Object.entries(ROTA_DA_POLICY)) {
+    for (const route of Object.values(ROTA_DA_POLICY)) {
+      const abre = route === rotaDela;
+      test(`${policy} → ${route} ${abre ? 'abre' : 'Recurso indisponível'}`, async () => {
+        renderRoute(route, BASE_USER, [policy]);
+        if (abre) {
+          await waitFor(() => expect(screen.queryByText(FORBIDDEN_TEXT)).not.toBeInTheDocument());
+        } else {
+          expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
+        }
+      });
+    }
+  }
+});
+
 // ============================================================================
 // Importação pela tela: só superusuário (decisão do dono, 02/10/2026)
 // ============================================================================

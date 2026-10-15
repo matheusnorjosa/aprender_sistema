@@ -262,6 +262,14 @@ class TestRbacDiffDoDeploy:
             assert set(mudancas) == {"policies"}, f"{pessoa}: {mudancas}"
             assert set(mudancas["policies"]["ganha"]) <= set(NOVAS), f"{pessoa}: {mudancas}"
 
+    @pytest.mark.parametrize("pessoa", list(PESSOAS))
+    def test_policies_do_retrato_sao_as_da_api(self, pessoa):
+        """O simulador calcula as policies pelas capacidades que recebe; o resultado é o de /api/me/policies/."""
+        usuario = PESSOAS[pessoa]()
+        _, da_api = _me(usuario)
+        retrato = snapshot_de_poder(Usuario.objects.filter(id=usuario.id))[f"u{usuario.id}"]
+        assert retrato["policies"] == da_api, pessoa
+
 
 class TestPersonasPorPacote:
     """Quem trabalha numa gerência com perfil vê as mesmas telas de quem tem o grupo."""

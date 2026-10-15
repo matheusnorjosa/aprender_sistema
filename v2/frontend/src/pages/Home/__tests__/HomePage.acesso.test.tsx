@@ -40,7 +40,7 @@ type Pessoa = Pick<AtorRbac, 'user' | 'policies'> & { ator: string };
 const GERENTE_DO_SETOR_GERENCIA: Pessoa = {
   ator: 'Gerente do setor Gerência',
   user: usuarioDeTeste({ setores: ['Gerência'], funcoes: ['Gerente'] }),
-  policies: ['create_solicitation'],
+  policies: ['access_monthly_availability', 'create_solicitation'], // o que o backend devolve
 };
 
 const ESPERADO: Record<string, readonly Cartao[]> = {

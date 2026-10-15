@@ -3,8 +3,9 @@
  * vindas de `/api/me/policies/`) e, onde a regra é o superusuário, por `ehSuperusuario(user)`.
  *
  * Recusa ler, fora da allowlist de exibição:
- * - `setores`, `funcoes`, `groups` (organograma do /me ou de outro usuário) e `is_superuser` (o
- *   helper único é `ehSuperusuario`), por ponto, por colchete ou desestruturados;
+ * - `setores`, `funcoes`, `groups` (organograma do /me ou de outro usuário), `permissions` (as
+ *   capacidades cruas do /me) e `is_superuser` (o helper único é `ehSuperusuario`), por ponto, por
+ *   colchete (aspas ou crase) ou desestruturados, inclusive aninhados;
  * - `is_superintendencia` e `can_approve_super` (flags legadas do /me);
  * - `useIdentity`/`computeIdentity` (flags de organograma: `inDAT`, `isCoordenador`...).
  *
@@ -20,15 +21,16 @@ import { describe, expect, test } from 'vitest';
 
 const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-const CAMPO = '(?:setores|funcoes|groups|is_superuser)';
+const CAMPO = '(?:setores|funcoes|groups|permissions|is_superuser)';
 
 /** Leituras de identidade que não podem decidir acesso. */
 const LEITURA_DE_IDENTIDADE = new RegExp(
   [
     String.raw`\??\.${CAMPO}\b`, // user.setores, me?.is_superuser
-    String.raw`\[\s*['"]${CAMPO}['"]\s*\]`, // user['setores']
-    // const { setores } = user; ({ is_superuser }) => ...; ({ funcoes }: CurrentUser) — pode quebrar linha
-    String.raw`\{[^{}]*(?<![\w'"./-])${CAMPO}\b(?!['"])[^{}]*\}\s*(?:=(?![=>])|\)|:)`,
+    String.raw`\[\s*['"\`]${CAMPO}['"\`]\s*\]`, // user['setores'], user[`setores`]
+    // const { setores } = user; ({ is_superuser }) => ...; ({ funcoes }: CurrentUser) — pode quebrar
+    // linha. Aninhado ({ user: { setores } }: P): depois do `}` de dentro, os `}` de fora.
+    String.raw`\{[^{}]*(?<![\w'"\`./-])${CAMPO}\b(?!['"\`])[^{}]*\}(?:[^{}]*\})*\s*(?:=(?![=>])|\)|:)`,
     String.raw`\bis_superintendencia\b`,
     String.raw`\bcan_approve_super\b`,
     String.raw`\b(?:useIdentity|computeIdentity)\b`,
@@ -45,7 +47,11 @@ const LINHA_DE_COMENTARIO = /^\s*(\/\/|\*|\/\*)/;
  */
 const ALLOWLIST: Readonly<Record<string, { motivo: string; leituras: number }>> = {
   'contexts/AcessoContext.ts': { motivo: 'o helper único ehSuperusuario', leituras: 1 },
-  'types/usuario.ts': { motivo: 'tipo e guarda do payload de /api/me/', leituras: 8 },
+  'types/usuario.ts': { motivo: 'tipo e guarda do payload de /api/me/', leituras: 9 },
+  'pages/AdminDAT/GruposPage.tsx': {
+    motivo: 'exibição: permissões de um GRUPO agrupadas por categoria (só leitura)',
+    leituras: 2,
+  },
   'hooks/useIdentity.ts': { motivo: 'exibição: rótulo de papel (badge) a partir de setor/função', leituras: 7 },
   'pages/Perfil/PerfilPage.tsx': { motivo: 'exibição: o titular vê os próprios setores e funções', leituras: 2 },
   'pages/AdminDAT/UsuariosPage.tsx': {
@@ -101,6 +107,11 @@ describe('lint: acesso só por policy (PR 7 das permissões)', () => {
     ['const grupos = me["groups"];', 'colchete com aspas duplas'],
     ['if (useIdentity(user).inDAT) abrir();', 'useIdentity'],
     ['if (computeIdentity(me).isAdmin) abrir();', 'computeIdentity'],
+    ["export function Menu({ user: { setores } }: Props) { return setores.includes('DAT'); }", 'aninhado no parâmetro'],
+    ['const { me: { funcoes } } = props;', 'aninhado'],
+    ['const { me: { funcoes }, id } = props;', 'aninhado com chave depois'],
+    ["if (user[`setores`].includes('DAT')) abrir();", 'colchete com crase'],
+    ["const pode = me.permissions.includes('core.view_x');", '.permissions do /me'],
   ])('controle positivo: %s é pego (%s)', (codigo) => {
     expect(leiturasDeIdentidade(codigo)).toEqual([codigo]);
   });
@@ -118,6 +129,7 @@ describe('lint: acesso só por policy (PR 7 das permissões)', () => {
     ['setSetoresProduto(meta.setores_produto);', 'outro campo com prefixo parecido'],
     ["{ key: 'setores', path: '/dat/admin/setores' },", 'texto que cita o campo'],
     ['const { caps, ehSuperusuario } = useAcesso();', 'desestruturação de outro objeto'],
+    ['type Props = { user: { setores: string[] } };', 'tipo aninhado que declara o campo'],
   ])('não pega: %s (%s)', (codigo) => {
     expect(leiturasDeIdentidade(codigo)).toEqual([]);
   });

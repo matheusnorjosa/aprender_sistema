@@ -8,7 +8,8 @@ então um texto grande travava a prévia, o painel de drift e o worker de public
 
 Regras:
 - `observacoes`: no máximo 5000 caracteres (model + serializer).
-- `payload.py` corta `observacoes` em 5000 ANTES de redigir.
+- `payload.py` redige `observacoes` inteira e só depois corta a descrição em 5000 (cortar antes partia
+  um e-mail no limite do corte e o pedaço ia sem redação).
 - A regex de `minimize.py` e `logging_filters.py` só começa no início de uma sequência (lookbehind)
   e redige exatamente o que a antiga redigia (equivalência medida contra a regex antiga).
 """
@@ -90,22 +91,22 @@ class TestLimiteObservacoes:
 
 
 @pytest.mark.django_db
-def test_payload_corta_observacoes_antes_de_redigir(monkeypatch):
+def test_payload_nao_parte_email_no_limite_do_corte():
+    # Revisão do S6: o corte não pode partir um e-mail ao meio ("joao.silva@escola", sem ponto no
+    # domínio, não casa com a regex e iria sem redação para o Google).
     from apps.core.tests.factories import SolicitacaoFactory
 
-    recebido: list[int] = []
-    original = payload_mod.minimize_free_text
+    prefixo = " ".join(f"fulano{i:03d}.de.tal.sobrenome@prefeitura.ce.gov.br" for i in range(90)) + " "
+    alvo = "joao.silva@escola"
+    preenchimento = 5000 - len(prefixo) - 1 - len(alvo)
+    obs = prefixo + "y" * preenchimento + " " + alvo + ".ce.gov.br fim"
+    assert obs[:5000].endswith(alvo)
+    s = SolicitacaoFactory(observacoes=obs)
 
-    def _espiao(texto):
-        recebido.append(len(texto or ""))
-        return original(texto)
+    descricao = payload_mod.build_event_payload(s)["description"]
 
-    monkeypatch.setattr(payload_mod, "minimize_free_text", _espiao)
-    s = SolicitacaoFactory(observacoes="a" * 20_000)
-
-    payload_mod.build_event_payload(s)
-
-    assert recebido and max(recebido) <= 5000
+    assert "joao.silva@" not in descricao
+    assert "@prefeitura" not in descricao
 
 
 class TestRedacaoLinear:

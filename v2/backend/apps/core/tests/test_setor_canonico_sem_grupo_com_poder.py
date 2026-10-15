@@ -13,7 +13,7 @@ Regras:
   (`SETORES_PRODUTO` ∪ `setor_canonico` já gravado em alguma gerência ∪ vazio).
 """
 
-# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false
+# pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportOptionalSubscript=false
 
 from __future__ import annotations
 

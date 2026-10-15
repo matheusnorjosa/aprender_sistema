@@ -243,7 +243,8 @@ class GerenciaSerializer(serializers.ModelSerializer["Gerencia"]):
         de `SETORES_PRODUTO` ou já gravado em alguma gerência, e nunca nome de grupo com capacidade
         funcional (a lotação pela tela derivava esse grupo; `setor_group_for` também o recusa).
         """
-        atual = getattr(self.instance, "setor_canonico", None)
+        instance: Any = self.instance
+        atual = getattr(instance, "setor_canonico", None)
         if value == atual or not value:
             return value
         if value in grupos_com_capacidade():

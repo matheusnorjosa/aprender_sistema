@@ -48,6 +48,7 @@ import dayjs from 'dayjs';
 import {
   listDeslocamentos,
   listFormadoresDoSetor,
+  listAlvosDeslocamento,
   createDeslocamento,
   updateDeslocamento,
   deleteDeslocamento,
@@ -66,7 +67,7 @@ const { TextArea } = Input;
 
 /** Form values type */
 interface FormValuesType {
-  usuario: ID;
+  usuario?: ID;
   origem: string;
   destino: string;
   start_date: Dayjs;
@@ -92,6 +93,8 @@ export default function DeslocamentosPage(): JSX.Element {
   const [tableLoading, setTableLoading] = useState<boolean>(false);
   const [deslocamentos, setDeslocamentos] = useState<DeslocamentoRecord[]>([]);
   const [usuarios, setUsuarios] = useState<UsuarioOptionType[]>([]);
+  // P16 (PR 8): quem a pessoa pode pôr no campo "Formador". Vazio = o campo some e ela registra o próprio.
+  const [alvos, setAlvos] = useState<UsuarioOptionType[]>([]);
   const [pagination, setPagination] = useState<TablePaginationConfig>({ current: 1, pageSize: 50, total: 0 });
   const [filters, setFilters] = useState<FiltersType>({});
   const [modalVisible, setModalVisible] = useState<boolean>(false);
@@ -127,14 +130,13 @@ export default function DeslocamentosPage(): JSX.Element {
     }
   }, [filters]);
 
-  // Load formadores do setor do usuário logado
+  // Load formadores do setor do usuário logado (filtro) e quem ele pode registrar (formulário)
   const loadFormadores = useCallback(async (): Promise<void> => {
-    try {
-      const data = await listFormadoresDoSetor();
-      setUsuarios(data);
-    } catch (error) {
-      logger.error('Erro ao carregar formadores:', error);
-    }
+    const [doSetor, delegaveis] = await Promise.allSettled([listFormadoresDoSetor(), listAlvosDeslocamento()]);
+    if (doSetor.status === 'fulfilled') setUsuarios(doSetor.value);
+    else logger.error('Erro ao carregar formadores:', doSetor.reason);
+    if (delegaveis.status === 'fulfilled') setAlvos(delegaveis.value);
+    else logger.error('Erro ao carregar formadores do deslocamento:', delegaveis.reason);
   }, []);
 
   // Opções de formador carregam UMA vez (não dependem dos filtros).
@@ -215,9 +217,9 @@ export default function DeslocamentosPage(): JSX.Element {
     try {
       const values = await form.validateFields();
 
-      // Format data
+      // Format data. Sem `usuario` (campo vazio ou oculto), o backend grava para quem está logado.
       const data = {
-        usuario: values.usuario,
+        ...(values.usuario !== undefined ? { usuario: values.usuario } : {}),
         origem: values.origem,
         destino: values.destino,
         start_date: values.start_date.format('YYYY-MM-DD'),
@@ -331,6 +333,12 @@ export default function DeslocamentosPage(): JSX.Element {
     },
   ];
 
+  // Opções do campo "Formador": os alvos; na edição, também o dono do registro (para mostrar o nome).
+  const opcoesFormador: UsuarioOptionType[] =
+    currentRecord && !alvos.some((u) => u.id === currentRecord.usuario)
+      ? [...alvos, { id: currentRecord.usuario, first_name: currentRecord.usuario_nome, last_name: '' }]
+      : alvos;
+
   // Permission check
   if (pageLoading) {
     return <div className="p-6">Carregando...</div>;
@@ -441,23 +449,26 @@ export default function DeslocamentosPage(): JSX.Element {
         width={600}
       >
         <Form form={form} layout="vertical" autoComplete="off" className="mt-4">
-          <Form.Item
-            name="usuario"
-            label="Formador"
-            rules={[{ required: true, message: 'Selecione um formador' }]}
-          >
-            <Select
-              placeholder="Selecione um formador"
-              showSearch
-              optionFilterProp="children"
+          {alvos.length > 0 && (
+            <Form.Item
+              name="usuario"
+              label="Formador"
+              extra="Deixe em branco para registrar o seu próprio deslocamento."
             >
-              {usuarios.map((u) => (
-                <Select.Option key={u.id} value={u.id}>
-                  {u.first_name} {u.last_name}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
+              <Select
+                placeholder="Você"
+                allowClear
+                showSearch
+                optionFilterProp="children"
+              >
+                {opcoesFormador.map((u) => (
+                  <Select.Option key={u.id} value={u.id}>
+                    {u.first_name} {u.last_name}
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+          )}
 
           <Row gutter={16}>
             <Col span={12}>

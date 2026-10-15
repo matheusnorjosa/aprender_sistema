@@ -916,6 +916,10 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         Regras por fluxo do projeto:
         - SUPER: Pode excluir apenas se status=pendente E não publicado no GCal
         - NAO_SUPER: Pode excluir se não publicado no GCal (auto-aprovado)
+        - Já aprovada manualmente (AuditLog APPROVE, individual ou em lote) não se exclui, nem
+          depois de voltar a pendente pela reaprovação (decisão do dono 15/10, adendo da PA-04).
+          Vale para todos na API, superusuário incluso: o evento sai por reprovação ou
+          cancelamento. A auto-aprovação da NAO_SUPER não grava APPROVE e não trava.
 
         Registra exclusão no AuditLog antes de deletar.
         """
@@ -948,6 +952,16 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 {
                     "detail": "Solicitações do fluxo SUPER só podem ser excluídas enquanto estiverem pendentes. "
                     "Esta solicitação já foi aprovada ou reprovada."
+                }
+            )
+
+        if AuditLog.objects.filter(
+            action=AuditLog.Action.APPROVE, model_name="Solicitacao", details__solicitacao_id=instance.id
+        ).exists():
+            raise ValidationError(
+                {
+                    "detail": "Esta solicitação já foi aprovada e não pode ser excluída. Para tirar o evento, "
+                    "reprove a solicitação ou cancele o evento: assim a saída fica registrada."
                 }
             )
 

@@ -136,7 +136,11 @@ def test_sem_ano_no_banco_e_um_ano_no_arquivo_adota_so_o_ano(tmp_path, base):
     assert "dat_cadastro__ano_preenchido" not in r2["applied"]
 
 
-@pytest.mark.parametrize("ano", ["26", "40000", "abc"], ids=["dois_digitos", "acima_smallint", "texto"])
+@pytest.mark.parametrize(
+    "ano",
+    ["26", "40000", "abc", "1999", "2101", "inf", "1e999"],
+    ids=["dois_digitos", "acima_smallint", "texto", "abaixo_do_piso", "acima_do_teto", "infinito", "notacao_enorme"],
+)
 def test_ano_fora_da_faixa_sem_data_rejeita_e_nao_mexe(tmp_path, base, ano):
     # Ano digitado errado não é ano ausente: sem data de etapa, a linha é rejeitada (`ano_invalido`).
     # Antes: '26' adotava ano=26 sem volta; '40000' passava no dry-run e quebrava o apply (smallint).
@@ -152,6 +156,16 @@ def test_ano_fora_da_faixa_sem_data_rejeita_e_nao_mexe(tmp_path, base, ano):
     assert r["applied"]["dat_cadastro"] == 0
     assert "dat_cadastro__ano_preenchido" not in r["applied"]
     assert list(DATCadastro.objects.values_list("ano", flat=True)) == [None]
+
+
+@pytest.mark.parametrize("ano", [2000, 2100], ids=["piso", "teto"])
+def test_bordas_da_faixa_adotam(tmp_path, base, ano):
+    _sem_ano(base)
+    path = _write_export(tmp_path, _cad_csv(f"Cidade Cad,CE,PG Cad,FORMAR,pendente,,{ano}"))
+
+    _apply(path, base["actor"])
+
+    assert list(DATCadastro.objects.values_list("ano", flat=True)) == [ano]
 
 
 def test_ano_fora_da_faixa_sem_data_nao_cria_cadastro_sem_ano(tmp_path, base):

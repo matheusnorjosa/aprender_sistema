@@ -367,7 +367,7 @@ def _parse_int(v: Any) -> int | None:
         return int(s.replace(".", ""))
     try:
         return int(float(s))
-    except ValueError:
+    except (ValueError, OverflowError):  # "inf"/"1e999" não é número
         return None
 
 

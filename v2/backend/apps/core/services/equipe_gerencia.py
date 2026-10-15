@@ -50,7 +50,7 @@ def papeis_de_grupos(groups: Iterable[Any]) -> set[str]:
     return {PAPEL_POR_FUNCAO[g.name] for g in groups if g.name in PAPEL_POR_FUNCAO}
 
 
-def setor_group_for(gerencia: Any) -> Group | None:
+def setor_group_for(gerencia: Any, *, com_capacidade: bool = False) -> Group | None:
     """Grupo RBAC de setor cujo nome == `Gerencia.setor_canonico`, se existir.
 
     Os 13 grupos de setor são um vocabulário fixo; nem todo `setor_canonico` tem
@@ -64,11 +64,16 @@ def setor_group_for(gerencia: Any) -> Group | None:
     S3 (auditoria 14/10, C4): grupo com capacidade funcional (DAT, Controle, Diretoria, funções…) também
     retorna None. A lista vem do banco (`grupos_com_capacidade`), não de nome escrito aqui. O poder do
     DAT vem do pacote do perfil da gerência (ADR-020), não do grupo derivado da lotação.
+    `com_capacidade=True` desliga esse filtro: serve para achar o grupo que SAI na troca de gerência,
+    que sai como antes (quem tinha o DAT da lotação na gerência "DAT" o perde ao ser transferido).
     """
     setor = (getattr(gerencia, "setor_canonico", "") or "").strip()
     if not setor or setor in {s for s, _ in APPROVER_COMPOSITES}:
         return None
-    return Group.objects.filter(name=setor).exclude(name__in=grupos_com_capacidade()).first()
+    grupos = Group.objects.filter(name=setor)
+    if not com_capacidade:
+        grupos = grupos.exclude(name__in=grupos_com_capacidade())
+    return grupos.first()
 
 
 def grupos_com_capacidade() -> set[str]:

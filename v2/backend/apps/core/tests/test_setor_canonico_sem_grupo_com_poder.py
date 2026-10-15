@@ -95,6 +95,28 @@ class TestLotacaoPelaTela:
         assert resp.status_code == 200, resp.data
         assert set(alvo.groups.values_list("name", flat=True)) == {"Formador", "Vidas"}
 
+    def test_sair_da_gerencia_dat_tira_o_grupo_dat_como_antes(self):
+        # Revisão do S3: o filtro de capacidade vale só para o grupo que ENTRA. Quem já tem o grupo DAT
+        # (lotação antiga na gerência de setor "DAT") e é transferido continua perdendo o DAT, como na main.
+        formador = GroupFactory(name="Formador")
+        GroupFactory(name="Vidas")
+        g19 = _gerencia("GERENCIA DAT S3 SAIDA", "DAT")
+        vidas = _gerencia("G VIDAS S3 SAIDA", "Vidas")
+        alvo = UsuarioFactory(username="saida_dat_s3", cpf="93000000003")
+        client = _root_client()
+        resp = client.patch(
+            f"/api/usuarios-admin/{alvo.id}/", {"group_ids": [formador.id], "gerencia_id": g19.id}, format="json"
+        )
+        assert resp.status_code == 200, resp.data
+        alvo.groups.add(Group.objects.get(name="DAT"))
+
+        resp = client.patch(
+            f"/api/usuarios-admin/{alvo.id}/", {"group_ids": [formador.id], "gerencia_id": vidas.id}, format="json"
+        )
+
+        assert resp.status_code == 200, resp.data
+        assert set(alvo.groups.values_list("name", flat=True)) == {"Formador", "Vidas"}
+
 
 class TestValidateSetorCanonico:
     @pytest.mark.parametrize("setor", ["DAT", "Controle", "Diretoria", "Superintendência"])

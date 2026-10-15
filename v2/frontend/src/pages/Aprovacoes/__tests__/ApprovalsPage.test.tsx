@@ -265,6 +265,25 @@ describe('ApprovalsPage', () => {
     expect(linha.queryByRole('button', { name: /Aprovar/i })).not.toBeInTheDocument();
     expect(linha.queryByRole('button', { name: /Reprovar/i })).not.toBeInTheDocument();
   }, 20000);
+
+  test('PA-02: o superusuário decide a própria (checkbox e Aprovar/Reprovar, sem a Tag)', async () => {
+    vi.mocked(listSolicitacoes).mockResolvedValue({
+      count: 1,
+      next: null,
+      previous: null,
+      results: [pendingRow({ id: 1, usuario: 99, municipio_nome: 'MunicipioProprio' })],
+    });
+    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
+    vi.mocked(getMe).mockResolvedValue(meUser({ id: 99, is_superuser: true }));
+
+    renderPage();
+
+    const linha = within((await screen.findByText('MunicipioProprio')).closest('tr') as HTMLElement);
+    await linha.findByRole('button', { name: /Aprovar/i }, { timeout: 10000 });
+    expect(linha.getByRole('button', { name: /Reprovar/i })).toBeInTheDocument();
+    expect(linha.getByRole('checkbox')).toBeInTheDocument();
+    expect(linha.queryByText('Sua solicitação')).not.toBeInTheDocument();
+  }, 20000);
   // ------------------------------------------------------------------
   // Mapa de acesso 02/10 (P6): paginação de verdade no servidor e ordem
   // "de hoje em diante, do mais próximo ao mais distante".

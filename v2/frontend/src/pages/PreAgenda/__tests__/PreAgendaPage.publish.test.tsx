@@ -13,7 +13,7 @@
  *
  * Reusa o harness de mocks do PreAgendaPage.lifecycle.test.tsx.
  */
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 const { getMeMock, listSolicitacoesMock, getStatusSummaryMock, fetchAPIMock } = vi.hoisted(() => ({
@@ -60,6 +60,8 @@ vi.mock('../../../components/google/GoogleIntegrationCard', () => ({
   default: () => <div data-testid="google-card" />,
 }));
 
+import { previewSolicitacao } from '../../../api/solicitacoes';
+import { ComAcesso } from '../../../test/comAcesso';
 import PreAgendaPage from '../PreAgendaPage';
 
 const row = (overrides: Record<string, unknown> = {}) => ({
@@ -102,5 +104,33 @@ describe('PreAgendaPage — publicação (M12-19 / #1629)', () => {
     render(<PreAgendaPage />);
     await screen.findByText('Caucaia');
     expect(screen.getByLabelText('Publicar evento no Google Calendar')).not.toBeDisabled();
+  });
+});
+
+// Widget de debug do preview ("Informações Técnicas"): a regra É o superusuário (ehSuperusuario).
+describe('PreAgendaPage — Informações Técnicas do preview', () => {
+  async function abrirPreview(superusuario: boolean): Promise<void> {
+    mockRows([row({ id: 40, municipio_nome: 'Iguatu' })]);
+    vi.mocked(previewSolicitacao).mockResolvedValue({
+      preview: { payload: { summary: 'Evento de teste' }, event_id: 'evt-1', meet_link: null, payload_hash: 'hash-1' },
+    } as unknown as Awaited<ReturnType<typeof previewSolicitacao>>);
+    render(
+      <ComAcesso policies={['access_controle_section']} superusuario={superusuario}>
+        <PreAgendaPage />
+      </ComAcesso>,
+    );
+    await screen.findByText('Iguatu');
+    fireEvent.click(screen.getByLabelText('Visualizar preview do evento'));
+    await screen.findByText('Evento de teste');
+  }
+
+  test('superusuário vê o widget', async () => {
+    await abrirPreview(true);
+    expect(screen.getByText('Informações Técnicas (JSON)')).toBeInTheDocument();
+  });
+
+  test('quem não é superusuário não vê', async () => {
+    await abrirPreview(false);
+    expect(screen.queryByText('Informações Técnicas (JSON)')).not.toBeInTheDocument();
   });
 });

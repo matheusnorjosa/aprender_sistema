@@ -50,10 +50,12 @@ from apps.core.rbac import permissions as _rbac_permissions  # noqa: F401
 from apps.core.rbac.helpers import (
     GERENCIA_APROVADORA_NOME,
     fluxo_super_fora_da_superintendencia,
+    separar_setores_e_funcoes,
     user_has_any_perm,
     user_is_assistente_administrativo_controle,
     user_is_gerente_superintendencia,
     user_matches_any_approver_composite,
+    user_tem_vinculo_de_gestao,
 )
 
 # ============================================================================
@@ -77,11 +79,39 @@ from apps.core.rbac.helpers import (
 
 
 # Composite policies: keys cuja semântica não cabe em "OR de capabilities"
-# (ex: composite Setor × Função). `ACCESS_POLICIES[k]` é frozenset() vazio
-# como sentinela; a lógica vive em helpers dedicados despachados por
-# `user_has_policy`. Tests que assumem "frozenset não-vazio" devem
-# excluir essas keys.
-COMPOSITE_POLICY_KEYS: Final[frozenset[str]] = frozenset({"access_solicitation_approvals"})
+# (ex: composite Setor × Função). A lógica vive em helpers dedicados despachados por
+# `user_has_policy`. `access_solicitation_approvals` tem frozenset() vazio como
+# sentinela; as telas de escopo (`TELAS_DE_ESCOPO`) listam a capacidade que também abre.
+# Tests que assumem "frozenset não-vazio" devem excluir essas keys.
+COMPOSITE_POLICY_KEYS: Final[frozenset[str]] = frozenset(
+    {
+        "access_solicitation_approvals",
+        "access_monthly_availability",
+        "access_availability_blocks",
+        "access_travel",
+    }
+)
+
+# Telas de escopo (PR 7 das permissões, 15/10/2026): Grade Mensal, Bloqueios e Deslocamentos.
+# Cópia da fórmula que o front aplicava sobre o `/api/me/` (usePermissions.ts), para o front ler
+# só policies sem mudar poder. Abre a tela: a capacidade em ACCESS_POLICIES (view_all_availability)
+# OU um dos setores/funções abaixo OU vínculo de gestão vigente (`user_tem_vinculo_de_gestao`).
+# O PR 8 tira o poder dos grupos de função.
+TELAS_DE_ESCOPO: Final[dict[str, tuple[frozenset[str], frozenset[str]]]] = {
+    # chave: (setores, funções)
+    "access_monthly_availability": (
+        frozenset({"Controle", "DAT"}),
+        frozenset({"Gerente", "Coordenador", "Apoio de Coordenação"}),
+    ),
+    "access_availability_blocks": (
+        frozenset({"Controle", "DAT"}),
+        frozenset({"Coordenador", "Apoio de Coordenação", "Formador"}),
+    ),
+    "access_travel": (
+        frozenset({"Controle", "DAT"}),
+        frozenset({"Coordenador", "Apoio de Coordenação"}),
+    ),
+}
 
 
 ACCESS_POLICIES: Final[dict[str, frozenset[str]]] = {
@@ -187,6 +217,15 @@ ACCESS_POLICIES: Final[dict[str, frozenset[str]]] = {
     "view_gcal_dashboard": frozenset(
         {"supervise_operations", "manage_admin_registries", "operate_preagenda", "run_daily_operations"}
     ),
+    # --- Telas de escopo (PR 7, 15/10/2026): composite, ver TELAS_DE_ESCOPO ---
+    "access_monthly_availability": frozenset({"view_all_availability"}),
+    "access_availability_blocks": frozenset({"view_all_availability"}),
+    "access_travel": frozenset({"view_all_availability"}),
+    # --- Botões (PR 7): a capacidade de mesmo nome, exposta para o front ---
+    # Excluir plano de formações (o destroy exige HasPerm("execute_restricted_operations")).
+    "execute_restricted_operations": frozenset({"execute_restricted_operations"}),
+    # Nova Solicitação sem compra (regra da compra, 14/10/2026; 0 grupos no seed).
+    "create_solicitation_without_purchase": frozenset({"create_solicitation_without_purchase"}),
 }
 
 
@@ -334,6 +373,26 @@ class CanManageInternalActions(_PolicyPermission):
     policy = "manage_internal_actions"
 
 
+class CanAccessMonthlyAvailability(_PolicyPermission):
+    policy = "access_monthly_availability"
+
+
+class CanAccessAvailabilityBlocks(_PolicyPermission):
+    policy = "access_availability_blocks"
+
+
+class CanAccessTravel(_PolicyPermission):
+    policy = "access_travel"
+
+
+class CanExecuteRestrictedOperations(_PolicyPermission):
+    policy = "execute_restricted_operations"
+
+
+class CanCreateSolicitationWithoutPurchase(_PolicyPermission):
+    policy = "create_solicitation_without_purchase"
+
+
 class CanAccessSolicitationApprovals(_PolicyPermission):
     """
     Policy composta de aprovação de solicitações (PR 3, 2026-04-29; PR B1, 2026-09-29).
@@ -408,6 +467,12 @@ PUBLIC_POLICY_KEYS: Final[frozenset[str]] = frozenset(
         "access_controle_section",
         "view_team_dashboard",
         "view_gcal_dashboard",
+        # PR 7 das permissões (15/10/2026): o front decide menu, rotas e botões só por policy.
+        "access_monthly_availability",
+        "access_availability_blocks",
+        "access_travel",
+        "execute_restricted_operations",
+        "create_solicitation_without_purchase",
     }
 )
 
@@ -524,6 +589,29 @@ def _user_has_solicitation_approvals(user: AbstractBaseUser | AnonymousUser | No
     return solicitation_approval_basis(user) is not None
 
 
+def _abre_tela_de_escopo(
+    user: AbstractBaseUser | AnonymousUser,
+    key: str,
+    capacidades: AbstractSet[str] | None,
+) -> bool:
+    """Grade, Bloqueios ou Deslocamentos (`TELAS_DE_ESCOPO`): capacidade OU setor/função OU vínculo de gestão.
+
+    Sem bypass de superuser (`user_has_policy` decide antes). `capacidades` vale só para a parte da
+    capacidade (simulador `rbac_diff`); grupos e vínculos são os de hoje.
+    """
+    codenames = ACCESS_POLICIES[key]
+    if capacidades is not None:
+        if not codenames.isdisjoint(capacidades):
+            return True
+    elif user_has_any_perm(user, *codenames):
+        return True
+    setores_da_tela, funcoes_da_tela = TELAS_DE_ESCOPO[key]
+    setores, funcoes = separar_setores_e_funcoes(list(user.groups.values_list("name", flat=True)))
+    if not setores_da_tela.isdisjoint(setores) or not funcoes_da_tela.isdisjoint(funcoes):
+        return True
+    return user_tem_vinculo_de_gestao(user)
+
+
 def user_can_delegate_availability_block(user: AbstractBaseUser | AnonymousUser | None) -> bool:
     """
     Composite check (PR 13 hardening RBAC, 2026-05-04): autoriza criar
@@ -605,6 +693,8 @@ def user_has_policy(
     # Composite policies — semântica não cabe em "OR de capabilities".
     if key == "access_solicitation_approvals":
         return _user_has_solicitation_approvals(user)
+    if key in TELAS_DE_ESCOPO:
+        return _abre_tela_de_escopo(user, key, capacidades)
     codenames = ACCESS_POLICIES.get(key)
     if not codenames:
         return False
@@ -673,6 +763,7 @@ __all__ = [
     "ESCOPO_SUPERINTENDENCIA_PROJETO_Q",
     "ESCOPO_SUPERINTENDENCIA_Q",
     "PUBLIC_POLICY_KEYS",
+    "TELAS_DE_ESCOPO",
     "_PolicyPermission",
     "aprovadora_restrita_a_superintendencia",
     "can_admin_mutate_target",
@@ -699,4 +790,9 @@ __all__ = [
     "CanImportGenericSpreadsheet",
     "CanManageAdminRegistries",
     "CanManagePurchasesAndMaterials",
+    "CanAccessMonthlyAvailability",
+    "CanAccessAvailabilityBlocks",
+    "CanAccessTravel",
+    "CanExecuteRestrictedOperations",
+    "CanCreateSolicitationWithoutPurchase",
 ]

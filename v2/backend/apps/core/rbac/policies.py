@@ -468,6 +468,7 @@ PUBLIC_POLICY_KEYS: Final[frozenset[str]] = frozenset(
         "view_team_dashboard",
         "view_gcal_dashboard",
         # PR 7 das permissões (15/10/2026): o front decide menu, rotas e botões só por policy.
+        # Chave nova aparece no rbac_diff do deploy como `+ policies` (DEPLOY_CHECKLIST §8, D22).
         "access_monthly_availability",
         "access_availability_blocks",
         "access_travel",

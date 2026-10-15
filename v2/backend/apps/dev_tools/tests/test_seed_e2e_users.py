@@ -125,6 +125,24 @@ class TestSeedE2EUsersCommand:
         )
         assert {"super_e2e@test.com", "super_geral@test.com", "approver_03@test.com"} <= vinculados
 
+    def test_todo_grupo_de_funcao_vem_com_vinculo_vigente(self, clean_seed_e2e_state):
+        """PR 8.0: cada grupo de função de cada persona vem com o vínculo vigente do papel, em
+        gerência ativa. O PR 8 faz o papel dar o poder; persona só com o grupo perderia o acesso."""
+        from apps.core.services.equipe_gerencia import PAPEL_POR_FUNCAO
+
+        _run_seed_command()
+
+        sem_vinculo = [
+            (usuario.username, grupo.name)
+            for usuario in Usuario.objects.filter(username__endswith="@test.com").prefetch_related("groups")
+            for grupo in usuario.groups.all()
+            if grupo.name in PAPEL_POR_FUNCAO
+            and not EquipeGerencia.vigentes_em()
+            .filter(usuario=usuario, papel=PAPEL_POR_FUNCAO[grupo.name], gerencia__ativo=True)
+            .exists()
+        ]
+        assert sem_vinculo == []
+
     def test_cleanup_remove_persona_com_vinculo(self, clean_seed_e2e_state):
         """`cleanup_e2e_data` apaga super_e2e mesmo com o vínculo GERENTE (FK PROTECT).
 

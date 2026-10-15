@@ -191,6 +191,29 @@ class TestEdicaoQueNaoRebaixa:
         assert sol.status == "aprovado"
         assert "reaprovacao" not in _ultimo_log(sol).details
 
+    @pytest.mark.parametrize(
+        "campo",
+        ["coordenador", "tipo_evento", "coordenador_acompanha", "encontro", "segmento"],
+    )
+    def test_outros_campos_mantem_aprovada(self, campo, coordenador, municipio, projeto_super, formadores):
+        """Decisão do dono: só projeto, data, horário, município e formadores são materiais."""
+        sol = _solicitacao(coordenador, municipio, projeto_super, [formadores[0]])
+        if campo == "coordenador":
+            valor = UsuarioFactory(groups=["Coordenador"]).id
+        elif campo == "tipo_evento":
+            valor = TipoEventoFactory(nome="Outro Tipo Reaprovacao").id
+        elif campo == "coordenador_acompanha":
+            valor = not sol.coordenador_acompanha
+        else:
+            valor = f"{campo} novo"
+
+        _patch(coordenador, sol, {campo: valor})
+
+        log = _ultimo_log(sol)
+        assert {campo, f"{campo}_id"} & log.details["changed_fields"].keys()  # a edição gravou
+        assert sol.status == "aprovado"
+        assert "reaprovacao" not in log.details
+
     def test_reenviar_mesmos_valores_mantem_aprovada(self, coordenador, municipio, projeto_super, formadores):
         """A tela manda tudo em todo salvar: mesmo instante em outro fuso e a mesma lista não são mudança."""
         sol = _solicitacao(coordenador, municipio, projeto_super, [formadores[0]])
@@ -217,6 +240,24 @@ class TestEdicaoQueNaoRebaixa:
         _patch(coordenador, sol, _payload_material("data", sol, formadores))
 
         assert sol.status == "aprovado"
+
+    def test_aprovada_sem_projeto_nao_muda(self, coordenador, municipio, formadores):
+        """Sem projeto o fluxo é NAO_SUPER (`get_fluxo`): mudar data não pede aprovação."""
+        sol = _solicitacao(coordenador, municipio, None, [formadores[0]])
+
+        _patch(coordenador, sol, _payload_material("hora_fim", sol, formadores))
+
+        assert sol.status == "aprovado"
+        assert "reaprovacao" not in _ultimo_log(sol).details
+
+    def test_tirar_o_projeto_da_super_aprovada_rebaixa(self, coordenador, municipio, projeto_super, formadores):
+        """M10-02 como na main: o projeto mudou e o fluxo novo (sem projeto) não é NAO_SUPER."""
+        sol = _solicitacao(coordenador, municipio, projeto_super, [formadores[0]])
+
+        _patch(coordenador, sol, {"projeto": None})
+
+        assert sol.status == "pendente"
+        assert _ultimo_log(sol).details["reaprovacao"]["campos"] == ["projeto"]
 
     def test_super_pendente_continua_pendente(self, coordenador, municipio, projeto_super, formadores):
         sol = _solicitacao(coordenador, municipio, projeto_super, [formadores[0]], status="pendente")

@@ -91,4 +91,15 @@ describe('EditSolicitacaoPage — aviso de volta para aprovação', () => {
     await waitFor(() => expect(message.success).toHaveBeenCalledWith('Solicitação atualizada com sucesso!'));
     expect(message.warning).not.toHaveBeenCalled();
   });
+
+  test('pendente que continua pendente mostra o sucesso de sempre', async () => {
+    const pendente = { ...SOLICITACAO, status: 'pendente' };
+    getSolicitacaoMock.mockResolvedValue(pendente);
+    updateSolicitacaoMock.mockResolvedValue(pendente);
+
+    await salvar();
+
+    await waitFor(() => expect(message.success).toHaveBeenCalledWith('Solicitação atualizada com sucesso!'));
+    expect(message.warning).not.toHaveBeenCalled();
+  });
 });

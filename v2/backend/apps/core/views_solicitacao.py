@@ -140,6 +140,9 @@ def _rebaixar_se_mudou_campo_material(solicitacao: Solicitacao, antes: dict[str,
         return []
     depois = _campos_materiais(solicitacao, _formador_ids(solicitacao))
     mudaram = [campo for campo, valor in antes.items() if depois[campo] != valor]
+    # Sem projeto o fluxo é NAO_SUPER (`get_fluxo`): só o M10-02 (o projeto mudou) rebaixa.
+    if solicitacao.projeto_id is None and "projeto" not in mudaram:
+        return []
     if mudaram:
         solicitacao.status = "pendente"
         solicitacao.save(update_fields=["status"])

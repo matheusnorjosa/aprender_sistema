@@ -13,12 +13,14 @@ from typing import Any
 
 from rest_framework import serializers  # type: ignore[attr-defined]
 
+from apps.core.constants import SETORES_PRODUTO
 from apps.core.models import Gerencia, Municipio, Produto, Projeto, ProjetoGeral, TipoEvento
 from apps.core.rbac.helpers import (
     GERENCIA_APROVADORA_NOME,
     MSG_FLUXO_SUPER_SO_NA_SUPERINTENDENCIA,
     fluxo_super_fora_da_superintendencia,
 )
+from apps.core.services.equipe_gerencia import grupos_com_capacidade
 from apps.core.services.rbac_pacotes import PERFIL_PERMITIDO
 
 
@@ -231,6 +233,27 @@ class GerenciaSerializer(serializers.ModelSerializer["Gerencia"]):
             raise serializers.ValidationError(
                 f"O nome '{GERENCIA_APROVADORA_NOME}' é reservado à gerência que aprova solicitações."
             )
+        return value
+
+    def validate_setor_canonico(self, value: str) -> str:
+        """S3 (auditoria 14/10, C4): `setor_canonico` não pode virar nome de grupo com poder.
+
+        O valor atual sempre passa: a tela reenvia o setor ao salvar, e valores de produção fora da
+        lista (ex.: 'SOU DA PAZ', 'DAT') não podem travar o salvar. Valor NOVO só se for vazio,
+        de `SETORES_PRODUTO` ou já gravado em alguma gerência, e nunca nome de grupo com capacidade
+        funcional (a lotação pela tela derivava esse grupo; `setor_group_for` também o recusa).
+        """
+        instance: Any = self.instance
+        atual = getattr(instance, "setor_canonico", None)
+        if value == atual or not value:
+            return value
+        if value in grupos_com_capacidade():
+            raise serializers.ValidationError(
+                f"'{value}' é nome de grupo com permissões e não pode ser o setor de uma gerência."
+            )
+        em_uso = set(Gerencia.objects.exclude(setor_canonico="").values_list("setor_canonico", flat=True))
+        if value not in set(SETORES_PRODUTO) | em_uso:
+            raise serializers.ValidationError(f"Setor '{value}' desconhecido. Escolha um setor da lista.")
         return value
 
 

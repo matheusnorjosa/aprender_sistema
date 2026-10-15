@@ -413,7 +413,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         # O grupo de setor só vem de lotação com papel de FUNÇÃO (FORMADOR/COORDENADOR/APOIO/GERENTE): o papel
         # EQUIPE nunca concede grupo, e sem função com papel não há lotação que o explique.
         if nova_lotacao and papeis_de_grupos(final):
-            setor_antigo = setor_group_for(anterior) if anterior is not None else None
+            setor_antigo = setor_group_for(anterior, com_capacidade=True) if anterior is not None else None
             setor_novo = setor_group_for(gerencia)
             if (
                 setor_antigo is not None

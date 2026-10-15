@@ -117,6 +117,26 @@ describe('gruposAposSalvar (#2071)', () => {
   });
 });
 
+describe('gruposAposSalvar: grupo com capacidade (S3)', () => {
+  // Espelha `setor_group_for`: grupo com capacidade funcional não ENTRA pela gerência, mas o que a
+  // pessoa já tem SAI na troca de gerência, como antes.
+  const dat = { id: 10, name: 'DAT', permissoes_funcionais: [{ label: 'Importação' }] };
+  const gruposComDat = [...grupos, dat];
+  const g19 = { id: 19, nome: 'GERENCIA 19', setor_canonico: 'DAT' };
+
+  test('lotar na gerência de setor DAT não dá o grupo DAT', () => {
+    expect(
+      nomes({ grupos: gruposComDat, idsAtuais: [], funcoes, funcaoIds: [1], gerencia: g19, gerenciaAnterior: undefined }),
+    ).toEqual(['Formador']);
+  });
+
+  test('sair da gerência de setor DAT tira o grupo DAT', () => {
+    expect(
+      nomes({ grupos: gruposComDat, idsAtuais: [1, 10], funcoes, funcaoIds: [1], gerencia: vidas, gerenciaAnterior: g19 }),
+    ).toEqual(['Formador', 'Vidas']);
+  });
+});
+
 describe('mensagemDoErro (#2071)', () => {
   test('mostra o texto de validação do backend, não só "Erro de validação."', () => {
     const err = Object.assign(new Error('Erro de validação.'), {

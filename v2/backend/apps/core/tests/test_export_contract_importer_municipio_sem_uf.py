@@ -23,7 +23,7 @@ from apps.core.models import Acompanhamento, Formacao, Municipio, PlanoFormacoes
 from apps.core.services.export_contract_importer import ExportContractImporter
 from apps.core.tests.factories import MunicipioFactory, ProjetoFactory, TipoEventoFactory, UsuarioFactory
 
-pytestmark = pytest.mark.django_db
+pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("hoje_importador_fixo")]
 
 _CPF = "11144477735"
 _ENTIDADES = ("solicitacao", "plano_formacao", "formacao", "acompanhamento")

@@ -93,30 +93,44 @@ def _ids(resp) -> set[int]:
 
 
 @pytest.fixture
-def alvo():
-    return _conta(nome="Maria", sobrenome="Alvo", groups=["Formador"])
+def g():
+    """Quem busca e o alvo na mesma gerência: desde o PR 9 o lookup só mostra gente da gerência de atuação."""
+    return GerenciaFactory()
 
 
-def test_coordenador_busca_so_com_digitos_do_cpf_nao_acha_ninguem(alvo):
+def _coord_em(gerencia):
     coord = _conta(nome="Coord", groups=["Coordenador"])
+    com_papel(coord, "COORDENADOR", gerencia)
+    return coord
+
+
+@pytest.fixture
+def alvo(g):
+    u = _conta(nome="Maria", sobrenome="Alvo", groups=["Formador"])
+    com_papel(u, "FORMADOR", g)
+    return u
+
+
+def test_coordenador_busca_so_com_digitos_do_cpf_nao_acha_ninguem(alvo, g):
+    coord = _coord_em(g)
     resp = _client(coord).get("/api/lookup/usuarios/", {"q": alvo.username[:6]})
     assert _ids(resp) == set()
 
 
-def test_coordenador_busca_o_cpf_inteiro_nao_acha_ninguem(alvo):
-    coord = _conta(nome="Coord", groups=["Coordenador"])
+def test_coordenador_busca_o_cpf_inteiro_nao_acha_ninguem(alvo, g):
+    coord = _coord_em(g)
     resp = _client(coord).get("/api/lookup/usuarios/", {"q": alvo.username})
     assert _ids(resp) == set()
 
 
-def test_coordenador_busca_por_pedaco_do_email_nao_acha_ninguem(alvo):
-    coord = _conta(nome="Coord", groups=["Coordenador"])
+def test_coordenador_busca_por_pedaco_do_email_nao_acha_ninguem(alvo, g):
+    coord = _coord_em(g)
     resp = _client(coord).get("/api/lookup/usuarios/", {"q": f"pessoa{alvo.cpf}"})
     assert _ids(resp) == set()
 
 
-def test_coordenador_continua_achando_por_nome(alvo):
-    coord = _conta(nome="Coord", groups=["Coordenador"])
+def test_coordenador_continua_achando_por_nome(alvo, g):
+    coord = _coord_em(g)
     resp = _client(coord).get("/api/lookup/usuarios/", {"q": "Maria"})
     assert alvo.id in _ids(resp)
 
@@ -129,16 +143,17 @@ def _conceicao(**extra):
     return u
 
 
-def test_busca_sem_acento_e_sem_digito_acha_o_nome_acentuado_pelo_email():
+def test_busca_sem_acento_e_sem_digito_acha_o_nome_acentuado_pelo_email(g):
     alvo = _conceicao(groups=["Formador"])
-    coord = _conta(nome="Coord", groups=["Coordenador"])
+    com_papel(alvo, "FORMADOR", g)
+    coord = _coord_em(g)
     assert alvo.id in _ids(_client(coord).get("/api/lookup/usuarios/", {"q": "conceicao"}))
 
 
 @pytest.mark.parametrize("q", ["lima7", "conceicao.lima7"])
-def test_busca_com_digito_nao_casa_o_email(q):
-    _conceicao(groups=["Formador"])
-    coord = _conta(nome="Coord", groups=["Coordenador"])
+def test_busca_com_digito_nao_casa_o_email(q, g):
+    com_papel(_conceicao(groups=["Formador"]), "FORMADOR", g)
+    coord = _coord_em(g)
     assert _ids(_client(coord).get("/api/lookup/usuarios/", {"q": q})) == set()
 
 
@@ -161,9 +176,10 @@ def test_quem_administra_cadastros_acha_pelo_email_exato_e_nao_por_pedaco(alvo):
     assert _ids(_client(dat).get("/api/lookup/usuarios/", {"q": f"pessoa{alvo.cpf}"})) == set()
 
 
-def test_rotulo_de_conta_sem_nome_nao_e_o_cpf():
+def test_rotulo_de_conta_sem_nome_nao_e_o_cpf(g):
     sem_nome = _conta(groups=["Formador"])
-    coord = _conta(nome="Coord", groups=["Coordenador"])
+    com_papel(sem_nome, "FORMADOR", g)
+    coord = _coord_em(g)
     resp = _client(coord).get("/api/lookup/usuarios/", {"role": "Formador"})
     assert resp.status_code == 200
     rotulos = {item["id"]: item["label"] for item in resp.json()}

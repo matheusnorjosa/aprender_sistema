@@ -50,9 +50,8 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
     participations = ParticipationNestedSerializer(many=True, read_only=True)
     fluxo = serializers.SerializerMethodField()
 
-    # Campos legíveis para exibição (além dos IDs)
-    usuario_username = serializers.SerializerMethodField()
-    coordenador_username = serializers.SerializerMethodField()
+    # Campos legíveis para exibição (além dos IDs). S5 (auditoria 14/10, C10): sem o login, que é
+    # o CPF; o nome sai em `coordenador_nome` e `str(usuario)` (nome ou "Usuario #id").
     coordenador_nome = serializers.SerializerMethodField()
     municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
     projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
@@ -71,7 +70,6 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "usuario",
-            "usuario_username",
             "municipio",
             "municipio_nome",
             "projeto",
@@ -86,7 +84,6 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "segmento_norm_confianca",
             "coordenador_acompanha",
             "coordenador",
-            "coordenador_username",
             "coordenador_nome",
             "pretende_avaliar_formador",
             "formador_avaliado",
@@ -138,41 +135,19 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             return obj.projeto.fluxo
         return "NAO_SUPER"  # PR15: Fallback para solicitações sem projeto
 
-    def get_usuario_username(self, obj: Solicitacao) -> str | None:
-        """Retorna username do usuário que criou a solicitação."""
-        if obj.usuario:
-            return obj.usuario.username
-        return None
-
-    def get_coordenador_username(self, obj: Solicitacao) -> str | None:
-        """
-        Retorna username do coordenador.
-        Prioriza: coordenador field -> usuario (fallback para ETL imports).
-        """
-        if obj.coordenador:
-            return obj.coordenador.username
-        # Fallback: Se coordenador não foi preenchido, usa usuario
-        # (para eventos importados via ETL onde usuario = coordenador resolvido)
-        if obj.usuario:
-            return obj.usuario.username
-        return None
-
     def get_coordenador_nome(self, obj: Solicitacao) -> str | None:
         """
         Retorna nome completo do coordenador (first_name + last_name).
         Prioriza: coordenador field -> usuario (fallback para ETL imports).
         """
         user = obj.coordenador or obj.usuario
-        if user:
-            nome = f"{user.first_name} {user.last_name}".strip()
-            return nome if nome else user.username
-        return None
+        return str(user) if user else None
 
     def get_formador_avaliado_nome(self, obj: Solicitacao) -> str | None:
         user = obj.formador_avaliado
         if user is None:
             return None
-        return user.get_full_name() or user.username
+        return str(user)
 
     def _um_evento(self) -> bool:
         """True fora de listagem (detalhe, criar, editar): os campos de apoio à tela só saem aqui."""
@@ -318,10 +293,7 @@ class AuditLogTimelineSerializer(serializers.ModelSerializer):
 
     def get_usuario_nome(self, obj: AuditLog) -> str:
         """Retorna nome do usuário ou 'Sistema' se null."""
-        if obj.usuario:
-            full_name = obj.usuario.get_full_name()
-            return full_name if full_name.strip() else obj.usuario.username
-        return "Sistema"
+        return str(obj.usuario) if obj.usuario else "Sistema"
 
 
 class EventDetailSerializer(serializers.ModelSerializer):
@@ -330,7 +302,7 @@ class EventDetailSerializer(serializers.ModelSerializer):
 
     Campos expostos:
     - Dados do evento: id, municipio_nome, projeto_nome, tipo_evento_nome,
-      inicio, fim, usuario_username, coordenador_username, fluxo
+      inicio, fim, usuario_nome, coordenador_nome, fluxo (nomes; nunca o login, que é o CPF)
     - Dados GCal: gcal_status, external_event_id, gcal_last_sync_at,
       gcal_last_error, meet_link, updated_at
     - participations: Lista de participantes (read-only)
@@ -346,8 +318,8 @@ class EventDetailSerializer(serializers.ModelSerializer):
     municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
     projeto_nome = serializers.CharField(source="projeto.nome", read_only=True)
     tipo_evento_nome = serializers.CharField(source="tipo_evento.nome", read_only=True)
-    usuario_username = serializers.SerializerMethodField()
-    coordenador_username = serializers.SerializerMethodField()
+    usuario_nome = serializers.SerializerMethodField()
+    coordenador_nome = serializers.SerializerMethodField()
     fluxo = serializers.SerializerMethodField()
 
     # Participations (aninhado)
@@ -365,8 +337,8 @@ class EventDetailSerializer(serializers.ModelSerializer):
             "tipo_evento_nome",
             "inicio",
             "fim",
-            "usuario_username",
-            "coordenador_username",
+            "usuario_nome",
+            "coordenador_nome",
             "fluxo",
             "gcal_status",
             "external_event_id",
@@ -380,17 +352,14 @@ class EventDetailSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
-    def get_usuario_username(self, obj: Solicitacao) -> str | None:
-        """Retorna username do usuário que criou a solicitação."""
-        return obj.usuario.username if obj.usuario else None
+    def get_usuario_nome(self, obj: Solicitacao) -> str | None:
+        """Nome de quem criou a solicitação (ou "Usuario #id")."""
+        return str(obj.usuario) if obj.usuario else None
 
-    def get_coordenador_username(self, obj: Solicitacao) -> str | None:
-        """Retorna username do coordenador (ou usuario se coordenador null)."""
-        if obj.coordenador:
-            return obj.coordenador.username
-        if obj.usuario:
-            return obj.usuario.username
-        return None
+    def get_coordenador_nome(self, obj: Solicitacao) -> str | None:
+        """Nome do coordenador (ou de quem criou, se o coordenador é nulo)."""
+        user = obj.coordenador or obj.usuario
+        return str(user) if user else None
 
     def get_fluxo(self, obj: Solicitacao) -> str:
         """Retorna fluxo do projeto (SUPER ou NAO_SUPER)."""

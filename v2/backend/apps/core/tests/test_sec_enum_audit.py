@@ -107,7 +107,7 @@ class TestUsuarioLookupNoEmail(TestCase):
 # SEC-ENUM-02: Email search restricted to Coordenador+ (#1135)
 # ================================================================
 class TestEmailSearchRestriction(TestCase):
-    """SEC-ENUM-02: Only Coordenador+ can search by email."""
+    """SEC-ENUM-02 / S5 (C6): e-mail só exato e só para quem administra cadastros."""
 
     def setUp(self):
         # PR 9: o lookup é por gerência de atuação; coordenador e alvo na mesma gerência.
@@ -146,12 +146,14 @@ class TestEmailSearchRestriction(TestCase):
         response = self.client.get("/api/lookup/usuarios/?q=distinct.email")
         assert response.status_code == 403, f"Formador deveria receber 403 após PR 5, recebeu {response.status_code}"
 
-    def test_coordenador_can_search_by_email(self):
-        """Coordenador searching by email should find the user."""
+    def test_coordenador_cannot_search_by_email(self):
+        """S5 (C6): Coordenador acha só por nome; e-mail (inteiro ou pedaço) não casa ninguém."""
         self.client.force_authenticate(user=self.coordenador)
-        response = self.client.get("/api/lookup/usuarios/?q=distinct.email")
-        data = response.json()
-        assert len(data) > 0, "Coordenador should find users by email search"
+        for q in ("distinct.email", "distinct.email@example.com"):
+            response = self.client.get(f"/api/lookup/usuarios/?q={q}")
+            assert response.json() == [], q
+        response = self.client.get("/api/lookup/usuarios/?q=Ana")
+        assert len(response.json()) > 0
 
     def test_formador_cannot_search_by_name_either(self):
         """PR 5 hardening RBAC: Formador também perde a busca por nome

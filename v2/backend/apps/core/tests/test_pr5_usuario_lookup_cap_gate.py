@@ -18,8 +18,9 @@ o endpoint — portanto `approve_solicitation_batch` e `operate_preagenda`
 ficam fora do gate.
 
 SEC-ENUM-01: email permanece fora do payload (anti-enumeração).
-SEC-ENUM-02: busca por email/username é cap-gated (mesma matriz),
-sem hardcode de group names.
+SEC-ENUM-02 / S5 (C6, 16/10): o login é o CPF, então a busca é só por nome; só quem
+administra cadastros acha por e-mail ou CPF, e só pelo valor exato
+(`test_cpf_fora_de_telas_busca_logs.py`).
 
 Personas:
 - ✅ DAT, Coordenador, Apoio, Gerente, superuser → 200
@@ -146,31 +147,38 @@ def test_anonymous_blocked():
 
 
 # =============================================================================
-# SEC-ENUM-02: busca por email é cap-gated (sem hardcode de grupo)
+# SEC-ENUM-02 / S5 (C6): e-mail só exato e só para quem administra cadastros
 # =============================================================================
 
 
-EMAIL_SEARCH_ALLOWED: list[tuple[str, tuple[str, ...]]] = [
-    ("dat_email", ("DAT",)),
+EMAIL_SEARCH_DENIED: list[tuple[str, tuple[str, ...]]] = [
     ("coordenador_email", ("Coordenador",)),
     ("apoio_email", ("Apoio de Coordenação",)),
     ("gerente_pedagogico_email", ("Vidas", "Gerente")),
 ]
 
 
-@pytest.mark.parametrize("persona", EMAIL_SEARCH_ALLOWED, ids=[p[0] for p in EMAIL_SEARCH_ALLOWED])
-def test_email_search_finds_user_for_allowed_personas(persona, target_formador, gerencia):
+@pytest.mark.parametrize("persona", EMAIL_SEARCH_DENIED, ids=[p[0] for p in EMAIL_SEARCH_DENIED])
+def test_email_search_finds_nobody_for_non_admin_personas(persona, target_formador, gerencia):
     label, group_names = persona
     user = _user_in_groups(*group_names, label=label, gerencia=gerencia)
     client = APIClient()
     client.force_authenticate(user=user)
 
-    # Buscar pelo prefixo do email (não usa nome).
-    response = client.get(f"/api/lookup/usuarios/?q=maria_alvo_{target_formador.cpf}")
+    response = client.get(f"/api/lookup/usuarios/?q={target_formador.email}")
     assert response.status_code == 200
-    body = response.json()
-    ids = [item["id"] for item in body]
-    assert target_formador.id in ids, f"{label} deveria encontrar usuário por email; payload={body}"
+    assert response.json() == [], f"{label} não deveria achar ninguém por e-mail"
+
+
+def test_email_search_exact_finds_user_for_dat(target_formador):
+    user = _user_in_groups("DAT", label="dat_email")
+    client = APIClient()
+    client.force_authenticate(user=user)
+
+    exato = client.get(f"/api/lookup/usuarios/?q={target_formador.email}")
+    assert target_formador.id in [item["id"] for item in exato.json()]
+    prefixo = client.get(f"/api/lookup/usuarios/?q=maria_alvo_{target_formador.cpf}")
+    assert prefixo.json() == []
 
 
 # =============================================================================

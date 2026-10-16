@@ -60,7 +60,6 @@ export interface Participation {
 export interface Solicitacao {
   id: ID;
   usuario: ID;
-  usuario_username: string | null;
   municipio: ID | null;
   municipio_nome: string | null;
   projeto: ID | null;
@@ -72,7 +71,6 @@ export interface Solicitacao {
   segmento: string | null;
   coordenador_acompanha: boolean;
   coordenador: ID | null;
-  coordenador_username: string | null;
   coordenador_nome: string | null;
   /** "Você pretende avaliar o formador nesse evento?" — null = não perguntado/não informado (05/10/2026). */
   pretende_avaliar_formador?: boolean | null;

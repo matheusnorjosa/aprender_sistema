@@ -188,8 +188,9 @@ export interface GCalDashboardEventDetail {
   tipo_evento_nome: string | null;
   inicio: string | null;
   fim: string | null;
-  usuario_username: string | null;
-  coordenador_username: string | null;
+  /** Nome de quem criou (ou "Usuario #id"); nunca o login, que é o CPF. */
+  usuario_nome: string | null;
+  coordenador_nome: string | null;
   fluxo: string;
   gcal_status: 'NONE' | 'PENDING' | 'PUBLISHED' | 'ERROR';
   external_event_id: string | null;

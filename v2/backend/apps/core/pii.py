@@ -27,3 +27,24 @@ def redact_cpf(value: Any) -> Any:
     if not isinstance(value, str):
         return value
     return _CPF_RE.sub(_CPF_PLACEHOLDER, value)
+
+
+# O login aceita qualquer mistura de `.`, `-` e espaço (`auth_normalize`).
+_LOGIN_PUNCT_RE = re.compile(r"[.\-\s]")
+# CPF digitado com um ou dois dígitos a menos ou a mais ainda é o CPF de alguém.
+_MIN_DIGITOS_CPF_DIGITADO = 9
+
+
+def redact_login_identifier(value: Any) -> Any:
+    """Identificador digitado no login, sem CPF em nenhuma grafia (S5, AuditLog de login).
+
+    Só dígitos e pontuação de CPF, com 9 ou mais dígitos: vira `<cpf>` (cobre grafias que o
+    `redact_cpf` não reconhece e CPF digitado errado). Fora isso, `redact_cpf` limpa um CPF
+    no meio do texto. Não-string volta intacto.
+    """
+    if not isinstance(value, str):
+        return value
+    digitos = _LOGIN_PUNCT_RE.sub("", value)
+    if digitos.isdigit() and len(digitos) >= _MIN_DIGITOS_CPF_DIGITADO:
+        return _CPF_PLACEHOLDER
+    return redact_cpf(value)

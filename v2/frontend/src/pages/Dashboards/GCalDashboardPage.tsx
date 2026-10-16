@@ -749,8 +749,8 @@ export default function GCalDashboardPage(): JSX.Element {
               <Descriptions.Item label="Fim">
                 {eventDetail.fim ? formatFortaleza(eventDetail.fim) : '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="Usuário">{eventDetail.usuario_username || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Coordenador">{eventDetail.coordenador_username || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Usuário">{eventDetail.usuario_nome || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Coordenador">{eventDetail.coordenador_nome || '-'}</Descriptions.Item>
               <Descriptions.Item label="Fluxo">
                 <Tag color={eventDetail.fluxo === 'SUPER' ? 'blue' : 'green'}>
                   {eventDetail.fluxo}

@@ -162,8 +162,9 @@ class DashboardEventsExportView(APIView):
                     sanitize_csv_value(s.tipo_evento.nome if s.tipo_evento else ""),
                     s.inicio.isoformat() if s.inicio else "",
                     s.fim.isoformat() if s.fim else "",
-                    sanitize_csv_value(s.usuario.username if s.usuario else ""),
-                    sanitize_csv_value(s.coordenador.username if s.coordenador else ""),
+                    # S5 (C10): o nome, nunca o login (que é o CPF).
+                    sanitize_csv_value(str(s.usuario) if s.usuario else ""),
+                    sanitize_csv_value(str(s.coordenador) if s.coordenador else ""),
                     sanitize_csv_value(fluxo),
                     s.gcal_status,
                     s.external_event_id or "",

@@ -22,6 +22,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.auth_normalize import normalize_login_identifier
 from apps.core.permissions import HasPerm
 from apps.core.rbac.helpers import filtrar_formadores_avaliaveis, user_has_any_perm
 from apps.core.services.compra_elegibilidade import (
@@ -262,8 +263,10 @@ class UsuarioLookup(APIView):
     - Não usa hardcode de grupos.
 
     SEC-ENUM-01: email permanece fora do payload (anti-enumeração).
-    SEC-ENUM-02: busca por email/username é cap-gated, mantendo a matriz
-    via `user_has_any_perm`.
+    SEC-ENUM-02 / S5 (auditoria 14/10, C6): o login é o CPF desde 29/09, então a busca
+    é só por nome para todos. Quem administra cadastros (`manage_admin_registries`) ou o
+    superusuário acha também pelo CPF (cru ou formatado) ou pelo e-mail, mas só com o valor
+    EXATO: pedaço de CPF ou de e-mail não casa ninguém (senão o lookup vira oráculo de CPF).
 
     Consumidores legítimos confirmados (auditoria 2026-04-30):
     - `NewSolicitacaoWizard` (Coord/Apoio/Gerente cria) →
@@ -279,14 +282,6 @@ class UsuarioLookup(APIView):
 
     permission_classes = [HasPerm("create_solicitation") | HasPerm("manage_admin_registries")]
 
-    # Capabilities habilitadas a buscar por email/username (SEC-ENUM-02).
-    # Idêntico ao gate de leitura: quem tem motivo legítimo para usar o
-    # picker no fluxo de solicitação ou para admin de cadastros.
-    _EMAIL_SEARCH_CAPS: tuple[str, ...] = (
-        "create_solicitation",
-        "manage_admin_registries",
-    )
-
     def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         q = request.GET.get("q", "").strip()
         role = request.GET.get("role", "").strip()
@@ -294,20 +289,12 @@ class UsuarioLookup(APIView):
         # Começar com queryset base
         qs = Usuario.objects.filter(is_active=True)
 
-        # SEC-ENUM-02 (cap-based, sem hardcode de grupo).
-        can_search_email = bool(request.user.is_superuser or user_has_any_perm(request.user, *self._EMAIL_SEARCH_CAPS))
-
-        # Aplicar filtro de busca
+        # Aplicar filtro de busca: nome para todos; CPF/e-mail só exatos e só para quem administra contas.
         if q:
-            if can_search_email:
-                qs = qs.filter(
-                    Q(first_name__icontains=q)
-                    | Q(last_name__icontains=q)
-                    | Q(email__icontains=q)
-                    | Q(username__icontains=q)
-                )
-            else:
-                qs = qs.filter(Q(first_name__icontains=q) | Q(last_name__icontains=q))
+            busca = Q(first_name__icontains=q) | Q(last_name__icontains=q)
+            if request.user.is_superuser or user_has_any_perm(request.user, "manage_admin_registries"):
+                busca |= Q(username=normalize_login_identifier(q)) | Q(email__iexact=q)
+            qs = qs.filter(busca)
 
         # Filtrar por papel vigente ANTES do slice (vários papéis separados por vírgula = OU)
         roles = [p.strip().lower() for p in role.split(",") if p.strip()]
@@ -336,7 +323,7 @@ class UsuarioLookup(APIView):
 
         results = []
         for user in usuarios:
-            label = user.get_full_name() or user.username
+            label = str(user)  # nome, ou "Usuario #id": nunca o login (CPF)
             results.append(
                 {
                     "id": user.id,

@@ -110,7 +110,6 @@ espelhado, nao como objetos aninhados:
   "is_online": false,
   "local": "Sala 101",
   "usuario": 1,
-  "usuario_username": "11144477735",
   "municipio": 1,
   "municipio_nome": "Fortaleza",
   "projeto": 1,

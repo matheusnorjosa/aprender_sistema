@@ -16,7 +16,7 @@ from typing import Any
 from rest_framework import serializers  # type: ignore[attr-defined]
 
 from apps.core.models import AuditLog
-from apps.core.pii import redact_cpf
+from apps.core.pii import redact_login_identifier
 
 # SEC-AUDIT-01: PII fields to redact for non-superuser access
 _PII_KEYS_TO_REMOVE = {"user_agent"}
@@ -61,8 +61,9 @@ def _redact_details(details: Any) -> Any:
         elif key == "username" and isinstance(value, str):
             # M03-10 (#1657): 'username' de login pode ser um CPF -> redigir POR VALOR
             # (nao por chave: 'admin'/username real devem passar). Cobre linhas legadas
-            # gravadas antes da redacao na escrita (views_auth.py).
-            redacted[key] = redact_cpf(value)
+            # gravadas antes da redacao na escrita (views_auth.py). S5: mesma regra da escrita
+            # (qualquer grafia e CPF digitado com digito a menos ou a mais).
+            redacted[key] = redact_login_identifier(value)
         elif isinstance(value, dict):
             redacted[key] = _redact_details(value)
         else:

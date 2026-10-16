@@ -766,6 +766,9 @@ Registro das rotas em `v2/backend/apps/core/urls.py` (paths `options-*`). **Não
 Desde 05/10/2026: `/api/lookup/projetos/` devolve `pergunta_avaliar_formador` por projeto (da gerência;
 `true` sem gerência); `/api/lookup/usuarios/` aceita vários papéis em `role` separados por vírgula
 (`?role=Formador,Coordenador`, OU) e devolve `avaliavel` (função Formador sem a função Coordenador).
+Desde 16/10/2026 (PR 9): `/api/lookup/projetos/` devolve também `responsavel_padrao` por projeto — `true` quando
+deixar o coordenador responsável vazio faz de quem busca a responsável (papel COORDENADOR vigente na gerência do
+projeto; global/privilegiado, em qualquer gerência), a mesma regra do `POST /api/solicitacoes/`.
 
 Regra da compra (14/10/2026; SSOT `services/compra_elegibilidade.py`): `/api/lookup/municipios/?com_compra=true`
 devolve os municípios com alguma `DATCompra` ativa e com quantidade > 0; com `projeto_id`, os liberados

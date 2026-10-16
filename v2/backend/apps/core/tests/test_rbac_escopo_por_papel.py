@@ -511,6 +511,32 @@ class TestCoordenadorResponsavel:
         evento.refresh_from_db()
         assert evento.projeto.gerencia_id == a.id
 
+    @pytest.mark.parametrize(
+        "persona",
+        ["gerente", "apoio", "coordenadora", "coordenadora_em_B_apoio_em_A", "superusuario_coordenadora_em_B"],
+    )
+    def test_lookup_de_projetos_diz_quando_o_vazio_e_quem_cria(self, a_b, persona):
+        """`responsavel_padrao` do `/lookup/projetos/` = o backend aceita o vazio (quem cria vira a
+        responsável). A tela usa o campo para o texto "Vazio: você é o coordenador responsável"."""
+        a, b = a_b
+        papeis = {
+            "gerente": [("GERENTE", a)],
+            "apoio": [("APOIO", a)],
+            "coordenadora": [("COORDENADOR", a)],
+            "coordenadora_em_B_apoio_em_A": [("COORDENADOR", b), ("APOIO", a)],
+            "superusuario_coordenadora_em_B": [("COORDENADOR", b)],
+        }[persona]
+        pessoa = _pessoa(*papeis)
+        if persona.startswith("superusuario"):
+            pessoa.is_superuser = True
+            pessoa.save(update_fields=["is_superuser"])
+        projeto = _projeto(a)
+        itens = _cliente(pessoa).get("/api/lookup/projetos/").data
+        flag = next(item["responsavel_padrao"] for item in itens if item["id"] == projeto.id)
+        aceita_o_vazio = _cria(pessoa, projeto).status_code == 201
+        assert flag is aceita_o_vazio
+        assert flag is (persona in {"coordenadora", "superusuario_coordenadora_em_B"})
+
 
 # ============================================================================
 # Trocar o projeto por outro da MESMA gerência: ninguém entra em gerência nova, então quem já está

@@ -30,7 +30,11 @@ from apps.core.services.compra_elegibilidade import (
     projetos_liberados,
 )
 from apps.core.services.normalize import norm_text
-from apps.core.services.solicitacao_scope import scope_projetos_por_gerencia, scope_usuarios_por_gerencia
+from apps.core.services.solicitacao_scope import (
+    scope_projetos_por_gerencia,
+    scope_usuarios_por_gerencia,
+    user_is_solicitacao_global,
+)
 
 from .models import EquipeGerencia, Municipio, Projeto, TipoEvento, Usuario
 
@@ -142,10 +146,14 @@ class ProjetoLookup(APIView):
 
     Os filtros de compra não valem para quem é isento da regra (superuser ou a capacidade).
 
-    Retorna: [{id, label, kind: "projeto", fluxo, pergunta_avaliar_formador}]
+    Retorna: [{id, label, kind: "projeto", fluxo, pergunta_avaliar_formador, responsavel_padrao}]
 
     `pergunta_avaliar_formador` = a gerência do projeto usa a pergunta "Você pretende avaliar o
     formador?" (projeto sem gerência: True). Decisão do dono, 05/10/2026.
+
+    `responsavel_padrao` = deixar o "Coordenador responsável" vazio faz de quem busca a responsável
+    pelo evento do projeto (mesma regra de `SolicitacaoViewSet._resolver_coordenador_responsavel`):
+    papel COORDENADOR vigente na gerência do projeto; global/privilegiado, em qualquer gerência (PR 9).
     """
 
     permission_classes = [IsAuthenticated]
@@ -185,6 +193,9 @@ class ProjetoLookup(APIView):
             _q_norm = norm_text(q)  # noqa: F841 - reserved for future normalized search
             qs = qs.filter(Q(nome__icontains=q) | Q(codigo__icontains=q)).order_by("nome")[:200]
 
+        coordena = EquipeGerencia.gerencias_com_papel(request.user, {"COORDENADOR"})
+        coordena_em_qualquer = bool(coordena) and user_is_solicitacao_global(request.user)
+
         results = []
         for proj in qs:
             # Label = nome puro. O `codigo` do catálogo é um slug do próprio nome (Á/ç/ê→"_"), então
@@ -196,6 +207,7 @@ class ProjetoLookup(APIView):
                     "kind": "projeto",
                     "fluxo": proj.fluxo,
                     "pergunta_avaliar_formador": proj.gerencia is None or proj.gerencia.pergunta_avaliar_formador,
+                    "responsavel_padrao": coordena_em_qualquer or proj.gerencia_id in coordena,
                 }
             )
 

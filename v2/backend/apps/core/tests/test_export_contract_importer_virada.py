@@ -498,6 +498,15 @@ def test_29_petrolina_projeto_decidido_pelo_dono_fica(tmp_path, m):
     assert s.projeto_id == miudezas.id
 
 
+def test_29b_disciplina_que_casa_nao_tira_o_evento_de_projeto_fora_do_agrupador(tmp_path, m):
+    s = _existente(m)
+    path = _export(tmp_path, [_sol(projeto="Superativar", disciplina="MAT")])
+    assert _dry(path)["projeto_diverge"] == 1
+    _virada(path)
+    s.refresh_from_db()
+    assert s.projeto_id == m.nao_super.id, "projeto atual fora do agrupador (decisão do dono) não muda"
+
+
 # ---------- 13/24/25. formadores ----------
 def test_13_formador_trocado_sai_o_antigo_entra_o_novo(tmp_path, m):
     s = _existente(m, formadores=(m.f1, m.f3))

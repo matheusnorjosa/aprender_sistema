@@ -370,3 +370,35 @@ def test_monthly_availability_invalid_params(api_client, user_auth):
         {"year": 2025, "month": 10, "role": "INVALID"},
     )
     assert response.status_code == 400
+
+
+def test_f8_sector_asterisco_nao_envenena_a_grade_sem_filtro(api_client, user_auth, setup_data):
+    """F8 (scan 16/10/2026): `sector=*` tinha a mesma chave de cache que a grade sem filtro.
+
+    A grade com `sector=*` filtra por projeto chamado "*" (nenhum evento); quem pedia sem filtro
+    depois recebia essa grade vazia do cache.
+    """
+    params = {"year": 2025, "month": 10, "role": "FORMADOR"}
+    api_client.force_authenticate(user=user_auth)
+
+    cache.clear()
+    esperado = api_client.get("/api/availability/monthly/", params).json()
+
+    cache.clear()
+    assert api_client.get("/api/availability/monthly/", {**params, "sector": "*"}).status_code == 200
+    depois = api_client.get("/api/availability/monthly/", params).json()
+
+    assert depois == esperado
+
+
+def test_f8_chave_nao_colide_por_dois_pontos_nem_por_setor_ausente():
+    from apps.core.views_availability_monthly import chave_cache_grade
+
+    base = {"monthly_ver": 0, "year": 2026, "month": 11, "role": "FORMADOR", "escopo": "gerencia:1", "teto": 8}
+    assert chave_cache_grade(**base, sector=None, q=None) != chave_cache_grade(**base, sector="*", q=None)
+    assert chave_cache_grade(**base, sector="a:b", q="c") != chave_cache_grade(**base, sector="a", q="b:c")
+    # Normalização que a própria grade faz (setor com espaço sobrando; busca sem caixa) não muda a chave.
+    assert chave_cache_grade(**base, sector=" ACerta ", q=" Ana ") == chave_cache_grade(
+        **base, sector="ACerta", q="ana"
+    )
+    assert chave_cache_grade(**base, sector="", q="") == chave_cache_grade(**base, sector=None, q=None)

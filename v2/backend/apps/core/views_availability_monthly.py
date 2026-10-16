@@ -25,6 +25,8 @@ Cache Redis 5 minutos por (year, month, role, escopo, sector, q, teto de horas).
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from typing import Any
 
@@ -49,6 +51,30 @@ from apps.core.services.config_service import parametros_disponibilidade
 from apps.core.services.monthly_grid_service import build_monthly_grid
 
 logger = logging.getLogger(__name__)
+
+
+def chave_cache_grade(
+    *,
+    monthly_ver: int,
+    year: int,
+    month: int,
+    role: str,
+    escopo: str,
+    sector: str | None,
+    q: str | None,
+    teto: Any,
+) -> str:
+    """Chave de cache da Grade: hash do JSON dos parâmetros (F8, scan 16/10/2026).
+
+    Antes a chave juntava a entrada crua com ':' e trocava o setor ausente por '*': `sector=*`
+    caía na chave da grade sem filtro (e a envenenava com uma grade vazia) e um ':' no setor ou na
+    busca deslocava os campos. No JSON cada valor fica no seu lugar e o setor ausente é `null`.
+    Normaliza como a grade: setor sem espaço nas pontas (vazio = sem filtro), busca sem caixa.
+    """
+    setor = (sector or "").strip() or None
+    busca = (q or "").strip().lower()
+    parametros = json.dumps([year, month, role, escopo, setor, busca, str(teto)], ensure_ascii=False)
+    return f"monthly:v8:{monthly_ver}:{hashlib.sha256(parametros.encode('utf-8')).hexdigest()}"
 
 
 class MonthlyAvailabilityView(APIView):
@@ -222,10 +248,17 @@ class MonthlyAvailabilityView(APIView):
         # O teto da contagem de horas (Configurações) entra na chave: salvar um teto novo
         # vale já na consulta seguinte. v6: CH com teto por evento (05/10/2026). v7: S5, sem CPF
         # no nome nem no e-mail e `q` sem e-mail se tem dígito (16/10/2026): a grade em cache levava os dois.
+        # v8: chave por hash dos parâmetros (F8).
         teto = parametros_disponibilidade()["AVAILABILITY_DAILY_LIMIT_HOURS"]
-        cache_key = (
-            f"monthly:v7:{monthly_ver}:{year}:{month}:{role}:"
-            f"{cache_scope}:{sector or '*'}:{(q or '').strip().lower()}:teto{teto}"
+        cache_key = chave_cache_grade(
+            monthly_ver=monthly_ver,
+            year=year,
+            month=month,
+            role=role,
+            escopo=cache_scope,
+            sector=sector,
+            q=q,
+            teto=teto,
         )
 
         # Tentar buscar do cache

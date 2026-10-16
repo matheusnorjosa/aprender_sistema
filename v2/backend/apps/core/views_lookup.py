@@ -299,15 +299,20 @@ class UsuarioLookup(APIView):
 
         # Filtrar por papel vigente ANTES do slice (vários papéis separados por vírgula = OU)
         roles = [p.strip().lower() for p in role.split(",") if p.strip()]
+        papeis: frozenset[str] = frozenset()
         if roles:
-            papeis = {_PAPEL_DO_ROLE[r] for r in roles if r in _PAPEL_DO_ROLE}
+            papeis = frozenset(_PAPEL_DO_ROLE[r] for r in roles if r in _PAPEL_DO_ROLE)
             vigentes = EquipeGerencia.vigentes_em().filter(papel__in=papeis, gerencia__ativo=True)
             qs = qs.filter(id__in=vigentes.values("usuario_id"))
 
         # PR 9: só pessoas das gerências onde quem busca tem papel G/C/A vigente; com `projeto_id`,
-        # só da gerência do projeto (P9-5). O seletor da Nova Solicitação consome este lookup → FE
-        # já filtrado, sem 400. Global/privilegiado (superuser, Superintendência, Controle, DAT) isento.
-        qs = scope_usuarios_por_gerencia(qs, request.user, _projeto_do_parametro(request.GET.get("projeto_id", "")))
+        # só da gerência do projeto (P9-5), e o papel pedido tem que ser NESSA gerência (o mesmo
+        # papel na mesma gerência que o write-path exige do responsável). O seletor da Nova
+        # Solicitação consome este lookup → FE já filtrado, sem 400. Global/privilegiado
+        # (superuser, Superintendência, Controle, DAT) isento.
+        qs = scope_usuarios_por_gerencia(
+            qs, request.user, _projeto_do_parametro(request.GET.get("projeto_id", "")), papeis
+        )
 
         # Aplicar ordenação e limite
         usuarios = list(qs.order_by("-id")[: 50 if q else 20])

@@ -700,11 +700,14 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         # Mover para outro projeto: ele tem que ser de uma gerência onde quem edita tem papel G/C/A
         # (PR 9) e, para a aprovadora, do alcance dela (regra do dono, 30/09). O EditSolicitacaoPage
         # manda `projeto` em todo save: o mesmo projeto não é mover, e quem perdeu o papel na gerência
-        # continua salvando a própria (análise de impacto do PR 9). perform_update é atômico.
+        # continua salvando a própria (análise de impacto do PR 9). Mover também revalida quem fica no
+        # evento (`_assert_pessoas_na_gerencia_do_projeto_novo`, P9-5). perform_update é atômico.
         projeto_final = serializer.validated_data.get("projeto", instance.projeto)
+        mudou_projeto = False
         if "projeto" in serializer.validated_data:
             novo_projeto = serializer.validated_data["projeto"]
             if getattr(novo_projeto, "pk", None) != instance.projeto_id:
+                mudou_projeto = True
                 self._assert_projeto_na_gerencia(novo_projeto)
                 self._assert_projeto_no_alcance_da_aprovadora(novo_projeto)
 
@@ -770,6 +773,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 extra_serializer.is_valid(raise_exception=True)
                 validated = {k: v for k, v in extra_serializer.validated_data.items() if k in extra_participants}
                 self._update_formadores(instance, validated)
+
+            if mudou_projeto and instance.projeto is not None:
+                self._assert_pessoas_na_gerencia_do_projeto_novo(instance)
 
             if instance.coordenador_id != coordenador_antigo_id:
                 self._trocar_convite_do_responsavel(instance, coordenador_antigo_id)
@@ -837,6 +843,23 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 model_name="Solicitacao",
                 details=details,
             )
+
+    def _assert_pessoas_na_gerencia_do_projeto_novo(self, solicitacao):
+        """P9-5 ao mover o evento de projeto: quem fica (formadores, acompanhantes e o responsável) tem
+        que ser da gerência do projeto novo. Roda sobre o estado final, dentro do atomic → 400 desfaz.
+        Editar sem trocar o projeto não revalida quem já está (decisão do dono, 15/10); tirar o projeto
+        também não (projeto None é isento, como em `projeto_fora_da_gerencia`)."""
+        from .models import Participation
+
+        ficam = [
+            p.usuario
+            for p in Participation.objects.filter(
+                solicitacao=solicitacao, role__in=("FORMADOR", "COORD_ACOMPANHA"), usuario__isnull=False
+            ).select_related("usuario")
+        ]
+        self._assert_participantes_na_gerencia(solicitacao.projeto, ficam)
+        if solicitacao.coordenador is not None:
+            self._assert_coordenador_na_gerencia(solicitacao.projeto, solicitacao.coordenador)
 
     def _trocar_convite_do_responsavel(self, solicitacao, coordenador_antigo_id):
         """Troca de responsável na edição: o novo ganha o convite (papel COORDENADOR); o antigo

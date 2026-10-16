@@ -16,7 +16,8 @@ Regra:
   Administrativo do Controle).
 - GESTORA não-global (papel GERENTE vigente, `_e_gestora`): as gerências onde ela é GERENTE (PR 9; C9
   da auditoria) + as próprias.
-- APOIO (`publish_setor_solicitacao`): as aprovadas das gerências onde é APOIO + as próprias.
+- APOIO (`publish_setor_solicitacao`): as aprovadas das gerências onde é APOIO + as próprias (soma-se
+  ao alcance da gestora, se ela também for GERENTE em outra gerência).
 - DEMAIS (Coordenador etc.): apenas as próprias (comportamento inalterado).
 
 PR 9 (16/10/2026): o alcance é a gerência do PROJETO (`projeto.gerencia_id`), nunca o texto do setor
@@ -91,21 +92,22 @@ def scope_solicitacoes(qs: QuerySet, user: Any) -> QuerySet:
     """Restringe `qs` ao escopo do `user` (ver regra no módulo)."""
     if user_is_solicitacao_global(user):
         return qs
+    filtro = Q(usuario=user)
     gestora = _gerencias_da_gestora(user)
     if gestora:
-        return qs.filter(Q(usuario=user) | Q(projeto__gerencia_id__in=gestora))
+        filtro |= Q(projeto__gerencia_id__in=gestora)
     # #1656 Feature 2: Apoio de Coordenação com `publish_setor_solicitacao` enxerga
     # (para publicar/preview/resync/cancel) as solicitações APROVADAS das gerências onde é APOIO,
     # além das suas (estas em qualquer status, pois é dona). O ramo filtra `status="aprovado"` para
     # não expor PII de eventos pendentes/reprovados de terceiros. PR 9: a gerência do evento é
-    # `projeto.gerencia_id` (antes era o texto do setor do projeto). Tier de LEITURA apenas:
-    # `user_can_access_solicitacao` (edição) NÃO muda.
+    # `projeto.gerencia_id` (antes era o texto do setor do projeto). Soma-se ao da gestora (GERENTE
+    # em A e APOIO em B publica em B). Tier de LEITURA apenas: `user_can_access_solicitacao` (edição)
+    # NÃO muda.
     if user_has_any_perm(user, "publish_setor_solicitacao"):
         apoio = _gerencias_de_apoio(user)
         if apoio:
-            return qs.filter(Q(usuario=user) | Q(projeto__gerencia_id__in=apoio, status="aprovado"))
-        return qs.filter(usuario=user)
-    return qs.filter(usuario=user)
+            filtro |= Q(projeto__gerencia_id__in=apoio, status="aprovado")
+    return qs.filter(filtro)
 
 
 def _gerencias_de_apoio(user: Any) -> set[int]:
@@ -270,14 +272,17 @@ def participantes_fora_da_gerencia(
     return [u for u in users if u.id not in dentro]
 
 
-def scope_usuarios_por_gerencia(qs: QuerySet, user: Any, projeto: Any = None) -> QuerySet:
+def scope_usuarios_por_gerencia(
+    qs: QuerySet, user: Any, projeto: Any = None, papeis: frozenset[str] | None = None
+) -> QuerySet:
     """Restringe um queryset de `Usuario` às pessoas que `user` pode pôr num evento.
 
     Espelho de LEITURA do `participantes_fora_da_gerencia` (write-path): alimenta o
     `/lookup/usuarios/` para o seletor da Nova Solicitação oferecer só quem o backend aceita.
 
     - Global/privilegiado (`user_is_solicitacao_global`) → sem filtro.
-    - Com `projeto`: só a gerência do projeto, se `user` atua nela (P9-5).
+    - Com `projeto`: só a gerência do projeto, se `user` atua nela (P9-5); com `papeis`, só quem tem
+      um deles NESSA gerência (o responsável é COORDENADOR da gerência do projeto, como no write-path).
     - Sem `projeto`: as gerências onde `user` tem papel G/C/A vigente.
     - Sem gerência de atuação → vazio (fail-closed).
     """
@@ -290,8 +295,10 @@ def scope_usuarios_por_gerencia(qs: QuerySet, user: Any, projeto: Any = None) ->
         gerencias = EquipeGerencia.gerencias_de_atuacao(user)
     if not gerencias:
         return qs.none()
-    vigentes = EquipeGerencia.vigentes_com_escopo_em().filter(gerencia_id__in=gerencias).values("usuario_id")
-    return qs.filter(id__in=vigentes)
+    vigentes = EquipeGerencia.vigentes_com_escopo_em().filter(gerencia_id__in=gerencias)
+    if projeto is not None and papeis:
+        vigentes = vigentes.filter(papel__in=list(papeis))
+    return qs.filter(id__in=vigentes.values("usuario_id"))
 
 
 def scope_projetos_por_gerencia(qs: QuerySet, user: Any) -> QuerySet:

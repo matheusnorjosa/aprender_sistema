@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 from typing import Any
+from unittest.mock import Mock, patch
 
 from django.core.cache import cache
 from django.utils import timezone
@@ -27,7 +28,15 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AvailabilityBlock, Deslocamento, EquipeGerencia, Gerencia, Solicitacao, Usuario
+from apps.core.models import (
+    AvailabilityBlock,
+    Deslocamento,
+    EquipeGerencia,
+    Gerencia,
+    Participation,
+    Solicitacao,
+    Usuario,
+)
 from apps.core.services import solicitacao_scope
 from apps.core.tests.factories import (
     GerenciaFactory,
@@ -281,6 +290,113 @@ class TestGerenciaDoProjeto:
         )
         assert response.status_code == 200, response.data
 
+    def test_lookup_de_coordenador_com_projeto_exige_o_papel_na_gerencia_do_projeto(self, a_b):
+        """O seletor do responsável oferece só quem o backend aceita: COORDENADOR na gerência do projeto."""
+        a, b = a_b
+        gerente = _pessoa(("GERENTE", a))
+        coord_a = _pessoa(("COORDENADOR", a))
+        coord_em_b_formador_em_a = _pessoa(("COORDENADOR", b), ("FORMADOR", a))
+        projeto_a = _projeto(a)
+        ids = _ids(_cliente(gerente).get(f"/api/lookup/usuarios/?role=Coordenador&projeto_id={projeto_a.id}"))
+        assert coord_a.id in ids
+        assert coord_em_b_formador_em_a.id not in ids
+        response = _cria(gerente, projeto_a, coordenador=coord_em_b_formador_em_a.id)
+        assert response.status_code == 400
+        assert "coordenador" in _erros(response)
+
+
+# ============================================================================
+# Mover o evento para projeto de outra gerência: as pessoas que ficam são revalidadas (P9-5)
+# ============================================================================
+
+
+def _evento_com_pessoas(dono: Usuario, projeto, coordenador: Usuario, formadores: list[Usuario]) -> Solicitacao:
+    evento = SolicitacaoFactory(usuario=dono, projeto=projeto, coordenador=coordenador)
+    Participation.objects.create(solicitacao=evento, usuario=coordenador, role="COORDENADOR")
+    for formador in formadores:
+        Participation.objects.create(solicitacao=evento, usuario=formador, role="FORMADOR")
+    return evento
+
+
+class TestMoverEventoDeGerencia:
+    def test_mover_para_B_mantendo_formador_de_A_400(self, a_b, coord_a_e_b):
+        a, b = a_b
+        formador_a = _pessoa(("FORMADOR", a))
+        evento = _evento_com_pessoas(coord_a_e_b, _projeto(a), coord_a_e_b, [formador_a])
+        projeto_b = _projeto(b)
+        liberar_par(evento.municipio, projeto_b)
+        response = _cliente(coord_a_e_b).patch(
+            f"/api/solicitacoes/{evento.id}/", {"projeto": projeto_b.id}, format="json"
+        )
+        assert response.status_code == 400
+        assert "extra_participants" in _erros(response)
+        evento.refresh_from_db()
+        assert evento.projeto.gerencia_id == a.id
+
+    def test_mover_para_B_com_o_payload_da_tela_editar_400(self, a_b, coord_a_e_b):
+        a, b = a_b
+        formador_a = _pessoa(("FORMADOR", a))
+        evento = _evento_com_pessoas(coord_a_e_b, _projeto(a), coord_a_e_b, [formador_a])
+        projeto_b = _projeto(b)
+        liberar_par(evento.municipio, projeto_b)
+        response = _cliente(coord_a_e_b).patch(
+            f"/api/solicitacoes/{evento.id}/",
+            {"projeto": projeto_b.id, "extra_participants": {"formador_ids": [formador_a.id]}},
+            format="json",
+        )
+        assert response.status_code == 400
+        assert "extra_participants" in _erros(response)
+
+    def test_mover_para_B_mantendo_o_responsavel_de_A_400(self, a_b, coord_a_e_b):
+        a, b = a_b
+        coord_a = _pessoa(("COORDENADOR", a))
+        evento = _evento_com_pessoas(coord_a_e_b, _projeto(a), coord_a, [])
+        projeto_b = _projeto(b)
+        liberar_par(evento.municipio, projeto_b)
+        response = _cliente(coord_a_e_b).patch(
+            f"/api/solicitacoes/{evento.id}/", {"projeto": projeto_b.id}, format="json"
+        )
+        assert response.status_code == 400
+        assert "coordenador" in _erros(response)
+        evento.refresh_from_db()
+        assert evento.projeto.gerencia_id == a.id
+
+    def test_u91_move_a_propria_de_B_para_A_com_pessoas_de_B_400(self, a_b, u91):
+        a, b = a_b
+        formadora_b = _pessoa(("FORMADOR", b))
+        coord_b = _pessoa(("COORDENADOR", b))
+        evento = _evento_com_pessoas(u91, _projeto(b), coord_b, [formadora_b])
+        projeto_a = _projeto(a)
+        liberar_par(evento.municipio, projeto_a)
+        response = _cliente(u91).patch(f"/api/solicitacoes/{evento.id}/", {"projeto": projeto_a.id}, format="json")
+        assert response.status_code == 400
+        evento.refresh_from_db()
+        assert evento.projeto.gerencia_id == b.id
+
+    def test_mover_para_B_com_pessoas_tambem_de_B_200(self, a_b, coord_a_e_b):
+        a, b = a_b
+        formador_a_e_b = _pessoa(("FORMADOR", a), ("FORMADOR", b))
+        coord_a_e_b_2 = _pessoa(("COORDENADOR", a), ("COORDENADOR", b))
+        evento = _evento_com_pessoas(coord_a_e_b, _projeto(a), coord_a_e_b_2, [formador_a_e_b])
+        projeto_b = _projeto(b)
+        liberar_par(evento.municipio, projeto_b)
+        response = _cliente(coord_a_e_b).patch(
+            f"/api/solicitacoes/{evento.id}/", {"projeto": projeto_b.id}, format="json"
+        )
+        assert response.status_code == 200, response.data
+
+    def test_editar_sem_trocar_projeto_nao_revalida_quem_ja_esta(self, a_b, u91):
+        """Decisão do dono: o escopo só é checado quando o projeto muda."""
+        _, b = a_b
+        formadora_b = _pessoa(("FORMADOR", b))
+        coord_b = _pessoa(("COORDENADOR", b))
+        projeto_b = _projeto(b)
+        evento = _evento_com_pessoas(u91, projeto_b, coord_b, [formadora_b])
+        response = _cliente(u91).patch(
+            f"/api/solicitacoes/{evento.id}/", {"local": "Depois", "projeto": projeto_b.id}, format="json"
+        )
+        assert response.status_code == 200, response.data
+
 
 # ============================================================================
 # Coordenador responsável: só quem tem o papel COORDENADOR na gerência do projeto
@@ -328,6 +444,41 @@ class TestPublicacaoEGerencias:
         )
         assert vistas == {aprovada_a.id}
         assert solicitacao_scope.has_publish_scope(pessoa) is True
+
+    @patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
+    @patch("django.conf.settings.GCAL_CLIENT", "fake")
+    @patch("rest_framework.throttling.UserRateThrottle.allow_request", return_value=True)
+    def test_gerente_em_A_apoio_em_B_publica_em_B(self, _throttle, mock_task, a_b):
+        """Publicar vale nas gerências onde a pessoa é APOIO, mesmo sendo GERENTE em outra."""
+        a, b = a_b
+        pessoa = _pessoa(("GERENTE", a), ("APOIO", b))
+        aprovada_b = SolicitacaoFactory(projeto=_projeto(b), status="aprovado")
+        mock_task.return_value = Mock(id="fake-task-id")
+        cliente = _cliente(pessoa)
+        assert aprovada_b.id in _ids(cliente.get("/api/solicitacoes/?publishable=true"))
+        response = cliente.post(
+            f"/api/solicitacoes/{aprovada_b.id}/publish/", {"dry_run": False, "apply_blocked": True}, format="json"
+        )
+        assert response.status_code == 202, response.data
+
+    def test_gerente_em_A_apoio_em_B_nao_ve_pendente_nem_reprovada_de_B(self, a_b):
+        a, b = a_b
+        pessoa = _pessoa(("GERENTE", a), ("APOIO", b))
+        pendente_b = SolicitacaoFactory(projeto=_projeto(b), status="pendente")
+        reprovada_b = SolicitacaoFactory(projeto=_projeto(b), status="reprovado")
+        cliente = _cliente(pessoa)
+        ids = _ids(cliente.get("/api/solicitacoes/"))
+        assert pendente_b.id not in ids
+        assert reprovada_b.id not in ids
+        assert cliente.patch(f"/api/solicitacoes/{pendente_b.id}/", {"local": "x"}, format="json").status_code == 404
+
+    def test_gerente_em_A_apoio_em_B_nao_edita_aprovada_de_B(self, a_b):
+        """O Apoio só ganha a LEITURA para publicar; a edição segue presa à gerência onde é GERENTE."""
+        a, b = a_b
+        pessoa = _pessoa(("GERENTE", a), ("APOIO", b))
+        aprovada_b = SolicitacaoFactory(projeto=_projeto(b), status="aprovado")
+        response = _cliente(pessoa).patch(f"/api/solicitacoes/{aprovada_b.id}/", {"local": "x"}, format="json")
+        assert response.status_code in (403, 404)
 
     def test_coordenadora_sem_apoio_nao_tem_escopo_de_publicacao(self, a_b):
         a, _ = a_b

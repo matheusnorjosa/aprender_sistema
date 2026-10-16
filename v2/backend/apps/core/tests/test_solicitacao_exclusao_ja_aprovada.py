@@ -84,7 +84,9 @@ def _solicitacao(coordenador, municipio, projeto, status):
         status=status,
     )
     Participation.objects.create(solicitacao=sol, usuario=coordenador, role="COORDENADOR")
-    Participation.objects.create(solicitacao=sol, usuario=UsuarioFactory(groups=["Formador"]), role="FORMADOR")
+    # PR 9 (P9-5): o formador é da gerência do projeto, senão mover o evento entre projetos dá 400.
+    formador = UsuarioFactory(groups=["Formador"], groups__gerencia=projeto.gerencia)
+    Participation.objects.create(solicitacao=sol, usuario=formador, role="FORMADOR")
     return sol
 
 

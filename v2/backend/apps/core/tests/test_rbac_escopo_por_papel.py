@@ -419,6 +419,123 @@ class TestCoordenadorResponsavel:
         response = _cria(gerente, _projeto(a), coordenador=coordenadora.id)
         assert response.status_code == 201, response.data
 
+    def test_u91_nao_se_nomeia_responsavel_na_propria_de_B(self, a_b, u91):
+        """Na B a u91 é só formadora: não vira a responsável nem do evento dela."""
+        _, b = a_b
+        coord_b = _pessoa(("COORDENADOR", b))
+        evento = _evento_com_pessoas(u91, _projeto(b), coord_b, [])
+        response = _cliente(u91).patch(f"/api/solicitacoes/{evento.id}/", {"coordenador": u91.id}, format="json")
+        assert response.status_code == 400
+        assert "coordenador" in _erros(response)
+        evento.refresh_from_db()
+        assert evento.coordenador_id == coord_b.id
+
+    def test_apoio_nao_se_nomeia_responsavel_400(self, a_b):
+        a, _ = a_b
+        apoio = _pessoa(("APOIO", a))
+        response = _cria(apoio, _projeto(a), coordenador=apoio.id)
+        assert response.status_code == 400
+        assert "coordenador" in _erros(response)
+
+    def test_gerente_nao_se_nomeia_responsavel_400(self, a_b):
+        a, _ = a_b
+        gerente = _pessoa(("GERENTE", a))
+        response = _cria(gerente, _projeto(a), coordenador=gerente.id)
+        assert response.status_code == 400
+        assert "coordenador" in _erros(response)
+
+    def test_coordenadora_em_B_apoio_em_A_sem_informar_responsavel_400(self, a_b):
+        """O padrão "quem cria" vale só para quem é COORDENADOR na gerência do projeto."""
+        a, b = a_b
+        pessoa = _pessoa(("COORDENADOR", b), ("APOIO", a))
+        response = _cria(pessoa, _projeto(a))
+        assert response.status_code == 400
+        assert "coordenador" in _erros(response)
+
+    def test_coordenadora_da_gerencia_sem_informar_vira_a_responsavel_201(self, a_b):
+        a, _ = a_b
+        coordenadora = _pessoa(("COORDENADOR", a))
+        response = _cria(coordenadora, _projeto(a))
+        assert response.status_code == 201, response.data
+        assert Solicitacao.objects.get(pk=response.data["id"]).coordenador_id == coordenadora.id
+
+    def test_global_coordenadora_em_outra_gerencia_continua_o_padrao_201(self, a_b):
+        """Quem é global por capacidade não perde nada: o padrão "quem cria" segue valendo."""
+        a, b = a_b
+        superusuario = _pessoa(("COORDENADOR", b))
+        superusuario.is_superuser = True
+        superusuario.save(update_fields=["is_superuser"])
+        response = _cria(superusuario, _projeto(a))
+        assert response.status_code == 201, response.data
+        assert Solicitacao.objects.get(pk=response.data["id"]).coordenador_id == superusuario.id
+
+    def test_coordenadora_em_A_apoio_em_B_nao_leva_a_propria_responsabilidade_para_B(self, a_b):
+        a, b = a_b
+        pessoa = _pessoa(("COORDENADOR", a), ("APOIO", b))
+        evento = _evento_com_pessoas(pessoa, _projeto(a), pessoa, [])
+        projeto_b = _projeto(b)
+        liberar_par(evento.municipio, projeto_b)
+        response = _cliente(pessoa).patch(f"/api/solicitacoes/{evento.id}/", {"projeto": projeto_b.id}, format="json")
+        assert response.status_code == 400
+        assert "coordenador" in _erros(response)
+        evento.refresh_from_db()
+        assert evento.projeto.gerencia_id == a.id
+
+
+# ============================================================================
+# Trocar o projeto por outro da MESMA gerência: ninguém entra em gerência nova, então quem já está
+# no evento não é revalidado (como antes do PR 9). A tela Editar não mostra o responsável nem as
+# linhas COORD_ACOMPANHA, e não teria como corrigir um 400 nesses campos.
+# ============================================================================
+
+
+def _mover_na_mesma_gerencia(editora: Usuario, evento: Solicitacao, gerencia: Gerencia):
+    """PATCH da tela Editar: o projeto novo (da mesma gerência) e a lista atual de formadores."""
+    outro = _projeto(gerencia)
+    liberar_par(evento.municipio, outro)
+    formador_ids = list(
+        Participation.objects.filter(solicitacao=evento, role="FORMADOR").values_list("usuario_id", flat=True)
+    )
+    return _cliente(editora).patch(
+        f"/api/solicitacoes/{evento.id}/",
+        {"projeto": outro.id, "extra_participants": {"formador_ids": formador_ids}},
+        format="json",
+    )
+
+
+class TestMoverNaMesmaGerencia:
+    def test_coord_acompanha_antigo_de_outra_gerencia_200(self, a_b):
+        a, b = a_b
+        coordenadora = _pessoa(("COORDENADOR", a))
+        evento = _evento_com_pessoas(coordenadora, _projeto(a), coordenadora, [])
+        Participation.objects.create(solicitacao=evento, usuario=_pessoa(("COORDENADOR", b)), role="COORD_ACOMPANHA")
+        response = _mover_na_mesma_gerencia(coordenadora, evento, a)
+        assert response.status_code == 200, response.data
+
+    def test_responsavel_com_vinculo_encerrado_200(self, a_b):
+        a, _ = a_b
+        gerente = _pessoa(("GERENTE", a))
+        ex_coordenadora = _pessoa(("COORDENADOR", a))
+        EquipeGerencia.objects.filter(usuario=ex_coordenadora).update(valid_to=date(2001, 1, 1))
+        evento = _evento_com_pessoas(gerente, _projeto(a), ex_coordenadora, [])
+        response = _mover_na_mesma_gerencia(gerente, evento, a)
+        assert response.status_code == 200, response.data
+
+    def test_responsavel_formadora_antiga_200(self, a_b):
+        a, _ = a_b
+        gerente = _pessoa(("GERENTE", a))
+        formadora = _pessoa(("FORMADOR", a))
+        evento = _evento_com_pessoas(gerente, _projeto(a), formadora, [])
+        response = _mover_na_mesma_gerencia(gerente, evento, a)
+        assert response.status_code == 200, response.data
+
+    def test_formador_antigo_de_outra_gerencia_200(self, a_b):
+        a, b = a_b
+        coordenadora = _pessoa(("COORDENADOR", a))
+        evento = _evento_com_pessoas(coordenadora, _projeto(a), coordenadora, [_pessoa(("FORMADOR", b))])
+        response = _mover_na_mesma_gerencia(coordenadora, evento, a)
+        assert response.status_code == 200, response.data
+
 
 # ============================================================================
 # Publicação no Google (ramo Apoio) e gerências

@@ -542,24 +542,30 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         """Decisão do dono (05/10/2026): UM coordenador responsável por evento.
 
         Informado → passa por `_assert_coordenador_na_gerencia` (ele ocupa a agenda quando acompanha;
-        crítica ALTA do desenho). Não informado → quem cria, se tem o papel COORDENADOR vigente (PR 8);
-        senão 400 (DAT, apoio, gerente, superusuário precisam escolher).
+        crítica ALTA do desenho). Não informado → quem cria, se tem o papel COORDENADOR vigente (PR 8)
+        na gerência do projeto (PR 9; global/privilegiado em qualquer gerência); senão 400 (DAT, apoio,
+        gerente, superusuário precisam escolher).
         """
         user = self.request.user
         if coordenador is None:
-            if user_e_coordenador(user):
+            if user_e_coordenador(user) and not self._coordenador_fora_da_gerencia(projeto, user):
                 return user
             raise serializers.ValidationError({"coordenador": [self._MSG_RESPONSAVEL_OBRIGATORIO]})
         self._assert_coordenador_na_gerencia(projeto, coordenador)
         return coordenador
 
-    def _assert_coordenador_na_gerencia(self, projeto, coordenador):
-        """PR 9: o responsável tem o papel COORDENADOR vigente na gerência do projeto (P9-5), como o
-        seletor da tela (`role=Coordenador`). Quem cria pode ser o próprio responsável (o padrão)."""
+    def _coordenador_fora_da_gerencia(self, projeto, coordenador) -> bool:
+        """PR 9: True se o responsável NÃO tem o papel COORDENADOR vigente na gerência do projeto (P9-5),
+        como o seletor da tela (`role=Coordenador&projeto_id`). Vale também para quem cria se nomear;
+        criador global/privilegiado é isento (`participantes_fora_da_gerencia`). Sem projeto não há
+        gerência a conferir: quem cria segue podendo ser a própria responsável (como antes do PR 9)."""
         creator = getattr(getattr(self, "request", None), "user", None)
-        if coordenador.pk != getattr(creator, "pk", None) and participantes_fora_da_gerencia(
-            creator, projeto, [coordenador], papeis=frozenset({"COORDENADOR"})
-        ):
+        if projeto is None and coordenador.pk == getattr(creator, "pk", None):
+            return False
+        return bool(participantes_fora_da_gerencia(creator, projeto, [coordenador], papeis=frozenset({"COORDENADOR"})))
+
+    def _assert_coordenador_na_gerencia(self, projeto, coordenador):
+        if self._coordenador_fora_da_gerencia(projeto, coordenador):
             raise serializers.ValidationError({"coordenador": [self._MSG_RESPONSAVEL_FORA_DA_GERENCIA]})
 
     _MSG_PROJETO_FORA_DA_GERENCIA = "Você só pode criar ou mover solicitação para projeto da sua gerência."
@@ -700,9 +706,12 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         # Mover para outro projeto: ele tem que ser de uma gerência onde quem edita tem papel G/C/A
         # (PR 9) e, para a aprovadora, do alcance dela (regra do dono, 30/09). O EditSolicitacaoPage
         # manda `projeto` em todo save: o mesmo projeto não é mover, e quem perdeu o papel na gerência
-        # continua salvando a própria (análise de impacto do PR 9). Mover também revalida quem fica no
-        # evento (`_assert_pessoas_na_gerencia_do_projeto_novo`, P9-5). perform_update é atômico.
+        # continua salvando a própria (análise de impacto do PR 9). Mover para OUTRA gerência também
+        # revalida quem fica no evento (`_assert_pessoas_na_gerencia_do_projeto_novo`, P9-5); dentro da
+        # mesma gerência ninguém entra em gerência nova, e quem fica não é revalidado (como antes do
+        # PR 9). perform_update é atômico.
         projeto_final = serializer.validated_data.get("projeto", instance.projeto)
+        gerencia_antiga_id = getattr(instance.projeto, "gerencia_id", None)
         mudou_projeto = False
         if "projeto" in serializer.validated_data:
             novo_projeto = serializer.validated_data["projeto"]
@@ -774,7 +783,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 validated = {k: v for k, v in extra_serializer.validated_data.items() if k in extra_participants}
                 self._update_formadores(instance, validated)
 
-            if mudou_projeto and instance.projeto is not None:
+            if mudou_projeto and instance.projeto is not None and instance.projeto.gerencia_id != gerencia_antiga_id:
                 self._assert_pessoas_na_gerencia_do_projeto_novo(instance)
 
             if instance.coordenador_id != coordenador_antigo_id:
@@ -845,10 +854,11 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             )
 
     def _assert_pessoas_na_gerencia_do_projeto_novo(self, solicitacao):
-        """P9-5 ao mover o evento de projeto: quem fica (formadores, acompanhantes e o responsável) tem
-        que ser da gerência do projeto novo. Roda sobre o estado final, dentro do atomic → 400 desfaz.
-        Editar sem trocar o projeto não revalida quem já está (decisão do dono, 15/10); tirar o projeto
-        também não (projeto None é isento, como em `projeto_fora_da_gerencia`)."""
+        """P9-5 ao mover o evento para projeto de OUTRA gerência: quem fica (formadores, acompanhantes e
+        o responsável) tem que ser da gerência do projeto novo. Roda sobre o estado final, dentro do
+        atomic → 400 desfaz. Editar sem trocar o projeto não revalida quem já está (decisão do dono,
+        15/10), nem trocar por projeto da mesma gerência ou tirar o projeto (projeto None é isento, como
+        em `projeto_fora_da_gerencia`)."""
         from .models import Participation
 
         ficam = [

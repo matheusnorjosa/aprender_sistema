@@ -19,6 +19,7 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from django.core.management import call_command
+from django.db import connection
 from django.test import RequestFactory, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -308,3 +309,26 @@ def test_lote_de_publicacao_recusa_passado_publicado_e_fora_do_sistema(controle_
         fora.id: "publicado_fora_do_sistema",
     }
     assert task.call_count == 1
+
+
+def test_insert_sem_a_coluna_nasce_false_pelo_default_do_banco():
+    """Deploy: a migration roda antes da troca do container; o código antigo não conhece a coluna.
+
+    O INSERT dele (sem `publicado_fora_do_sistema`) precisa passar pelo DEFAULT do banco (`db_default`),
+    senão falha com NOT NULL ao criar Solicitação durante o deploy.
+    """
+    base = SolicitacaoFactory()
+    with connection.cursor() as cursor:
+        colunas = [
+            c.name
+            for c in connection.introspection.get_table_description(cursor, Solicitacao._meta.db_table)
+            if c.name not in {"id", "publicado_fora_do_sistema"}
+        ]
+        lista = ", ".join(connection.ops.quote_name(c) for c in colunas)
+        tabela = connection.ops.quote_name(Solicitacao._meta.db_table)
+        cursor.execute(
+            f"INSERT INTO {tabela} ({lista}) SELECT {lista} FROM {tabela} WHERE id = %s RETURNING id",  # noqa: S608
+            [base.pk],
+        )
+        novo_id = cursor.fetchone()[0]
+    assert Solicitacao.objects.get(pk=novo_id).publicado_fora_do_sistema is False

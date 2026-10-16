@@ -256,6 +256,7 @@ class Solicitacao(models.Model):
         help_text="SHA1 do payload aplicado no GCal (drift detection)",
     )
     publicado_fora_do_sistema = models.BooleanField(
+        db_default=False,
         default=False,
         verbose_name="Publicado fora do sistema",
         help_text=(

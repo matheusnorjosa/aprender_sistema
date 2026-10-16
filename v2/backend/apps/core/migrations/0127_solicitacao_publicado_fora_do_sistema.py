@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("core", "0125_funcoes_sem_capacidade"),
+        ("core", "0126_dat_admin_operacional_grupos"),
     ]
 
     operations = [
@@ -14,6 +14,7 @@ class Migration(migrations.Migration):
             model_name="solicitacao",
             name="publicado_fora_do_sistema",
             field=models.BooleanField(
+                db_default=False,
                 default=False,
                 help_text="Está no Google Agenda pela planilha (sheet2gcal) e o sistema não o adotou: publicar daria um segundo evento, então o sistema não cria. Ligado pela carga da virada; a adoção do Event ID desliga.",
                 verbose_name="Publicado fora do sistema",

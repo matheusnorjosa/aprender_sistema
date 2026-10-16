@@ -540,6 +540,7 @@ export default function EditSolicitacaoPage(): JSX.Element {
             <FormadoresPicker
               value={formData.formadores}
               onChange={handleFormadoresChange}
+              projetoId={projetoId}
             />
           </Form.Item>
 

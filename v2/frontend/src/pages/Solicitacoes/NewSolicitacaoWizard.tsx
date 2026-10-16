@@ -65,8 +65,6 @@ const { TextArea } = Input;
 const { Title, Text } = Typography;
 const { Step } = Steps;
 
-/** Lookup de coordenadores (papel fixo) p/ o ComboBox single-select "Coordenador responsável" (#1666). */
-const lookupCoordenadores = (q: string): Promise<Array<{ id: ID; label: string }>> => lookupUsuarios(q, 'Coordenador');
 
 const RANGE_TIMEZONE = 'America/Fortaleza';
 
@@ -325,6 +323,13 @@ export default function NewSolicitacaoWizard(): JSX.Element {
 
     return results;
   }, [formData.projeto?.id, dispensaCompra]);
+
+  // ComboBox "Coordenador responsável" (#1666): papel Coordenador vigente na gerência do projeto
+  // escolhido (PR 9, P9-5: num evento da gerência A só entram pessoas da A).
+  const lookupCoordenadores = useCallback(
+    (q: string): Promise<Array<{ id: ID; label: string }>> => lookupUsuarios(q, 'Coordenador', formData.projeto?.id),
+    [formData.projeto?.id],
+  );
 
   // Regra da compra: projeto sem compra que o libere ("em espera") some da lista.
   const lookupProjetosElegiveis = useCallback(
@@ -656,6 +661,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
             <FormadoresPicker
               value={formData.formadores as unknown as Array<{ id: ID; email: string; label: string; name?: string }>}
               onChange={handleFormadoresChange}
+              projetoId={formData.projeto?.id}
             />
           </Form.Item>
 
@@ -921,7 +927,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
         </>
       ),
     },
-  ], [formData, rangeValue, handleRangeChange, handleProjetoChange, lookupProjetosElegiveis, lookupMunicipiosElegiveis, dispensaCompra, municipioLookupHasResults, preview, submitConflito, me, perguntaAvaliar, formadoresAvaliaveis, handleFormadoresChange]);
+  ], [formData, rangeValue, handleRangeChange, handleProjetoChange, lookupProjetosElegiveis, lookupMunicipiosElegiveis, lookupCoordenadores, dispensaCompra, municipioLookupHasResults, preview, submitConflito, me, perguntaAvaliar, formadoresAvaliaveis, handleFormadoresChange]);
 
   return (
     <section className="p-6 max-w-4xl mx-auto" aria-labelledby="nova-solicitacao-title">

@@ -85,9 +85,10 @@ export async function lookupTiposEvento(q: string = ''): Promise<LookupItem[]> {
  * Buscar usuários (autocomplete)
  *
  * @param q - Query string
- * @param role - Filtro por role/grupo (opcional)
+ * @param role - Filtro por papel vigente (opcional; vários separados por vírgula)
+ * @param projetoId - Projeto do evento (opcional): só pessoas da gerência dele (PR 9, P9-5)
  */
-export async function lookupUsuarios(q: string = '', role: string = ''): Promise<UserLookupItem[]> {
-  const url = buildUrl('/lookup/usuarios/', { q, role });
+export async function lookupUsuarios(q: string = '', role: string = '', projetoId?: ID | undefined): Promise<UserLookupItem[]> {
+  const url = buildUrl('/lookup/usuarios/', { q, role, projeto_id: projetoId });
   return await fetchAPI(url);
 }

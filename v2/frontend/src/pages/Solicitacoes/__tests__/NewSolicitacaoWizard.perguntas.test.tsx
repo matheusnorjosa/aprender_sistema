@@ -23,6 +23,8 @@ const {
   lookupTiposEventoMock,
   navigateMock,
   formadoresEscolhidos,
+  lookupUsuariosMock,
+  formadoresPickerProps,
 } = vi.hoisted(() => ({
   createSolicitacaoMock: vi.fn(),
   getMeMock: vi.fn(),
@@ -32,6 +34,8 @@ const {
   lookupTiposEventoMock: vi.fn(),
   navigateMock: vi.fn(),
   formadoresEscolhidos: { atual: [] as Array<{ id: number; label: string; avaliavel?: boolean }> },
+  lookupUsuariosMock: vi.fn(),
+  formadoresPickerProps: { projetoIds: [] as unknown[] },
 }));
 
 vi.mock('react-router', async () => {
@@ -47,7 +51,7 @@ vi.mock('../../../api/lookup', () => ({
   lookupMunicipiosWithFilters: lookupMunicipiosWithFiltersMock,
   lookupProjetos: lookupProjetosMock,
   lookupTiposEvento: lookupTiposEventoMock,
-  lookupUsuarios: vi.fn().mockResolvedValue([]),
+  lookupUsuarios: lookupUsuariosMock,
 }));
 vi.mock('../../../components/DateTimeRange', () => ({
   default: ({ onChange }: { onChange?: (v: unknown) => void }) => (
@@ -61,11 +65,14 @@ vi.mock('../../../components/DateTimeRange', () => ({
   ),
 }));
 vi.mock('../../../components/FormadoresPicker', () => ({
-  default: ({ onChange }: { onChange?: (v: unknown) => void }) => (
-    <button type="button" data-testid="pick-formador" onClick={() => onChange?.(formadoresEscolhidos.atual)}>
-      pick-formador
-    </button>
-  ),
+  default: ({ onChange, projetoId }: { onChange?: (v: unknown) => void; projetoId?: unknown }) => {
+    formadoresPickerProps.projetoIds.push(projetoId);
+    return (
+      <button type="button" data-testid="pick-formador" onClick={() => onChange?.(formadoresEscolhidos.atual)}>
+        pick-formador
+      </button>
+    );
+  },
 }));
 
 let projetoEscolhido: Record<string, unknown> = {};
@@ -186,6 +193,16 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     getMeMock.mockResolvedValue(COORDENADORA);
     checkAvailabilityManyMock.mockResolvedValue({ ok: true, results: [] });
     createSolicitacaoMock.mockResolvedValue({ id: 1 });
+    lookupUsuariosMock.mockResolvedValue([]);
+    formadoresPickerProps.projetoIds.length = 0;
+  });
+
+  test('formadores e responsável vêm da gerência do projeto escolhido (PR 9, P9-5)', async () => {
+    getMeMock.mockResolvedValue(SEM_FUNCAO_COORDENADOR);
+    renderWizard();
+    await irParaParticipantes();
+    expect(formadoresPickerProps.projetoIds.at(-1)).toBe(123);
+    await waitFor(() => expect(lookupUsuariosMock).toHaveBeenCalledWith('', 'Coordenador', 123));
   });
 
   test('a lista de coordenadores acompanhantes saiu e a pergunta Sim/Não entrou', async () => {

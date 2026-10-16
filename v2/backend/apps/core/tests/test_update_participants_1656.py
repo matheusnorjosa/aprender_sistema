@@ -25,6 +25,7 @@ import pytest
 
 from apps.core.models import Participation
 from apps.core.tests.factories import (
+    GerenciaFactory,
     MunicipioFactory,
     ProjetoFactory,
     TipoEventoFactory,
@@ -39,9 +40,15 @@ _CPF = itertools.count(78000000001)
 
 
 @pytest.fixture
-def coordenador():
+def gerencia():
+    """Gerência do projeto, do coordenador e dos formadores (PR 9: o evento só aceita gente da gerência)."""
+    return GerenciaFactory()
+
+
+@pytest.fixture
+def coordenador(gerencia):
     user = UsuarioFactory(username="coord_1656", cpf=str(next(_CPF)))
-    com_papel(user, "COORDENADOR")
+    com_papel(user, "COORDENADOR", gerencia)
     return user
 
 
@@ -56,8 +63,8 @@ def tipo_evento():
 
 
 @pytest.fixture
-def projeto(municipio):
-    proj = ProjetoFactory(nome="Projeto 1656", codigo="P1656", fluxo="NAO_SUPER", ativo=True)
+def projeto(municipio, gerencia):
+    proj = ProjetoFactory(nome="Projeto 1656", codigo="P1656", fluxo="NAO_SUPER", ativo=True, gerencia=gerencia)
     # #1738: criar exige Compra para o par município+projeto.
     liberar_par(municipio, proj)
     return proj
@@ -70,9 +77,9 @@ def client_coord(coordenador):
     return c
 
 
-def _formador(n):
+def _formador(n, gerencia):
     u = UsuarioFactory(username=f"form_1656_{n}", cpf=str(next(_CPF)))
-    com_papel(u, "FORMADOR")
+    com_papel(u, "FORMADOR", gerencia)
     return u
 
 
@@ -109,8 +116,9 @@ def _ids(sol_id, role):
 class TestUpdateFiltersInactive:
     def test_inactive_formador_not_added_on_update(self, client_coord, municipio, projeto, tipo_evento):
         """RED: o UPDATE não filtrava is_active → um formador INATIVO é anexado no PATCH."""
-        ativo = _formador("a")
+        ativo = _formador("a", projeto.gerencia)
         inativo = UsuarioFactory(username="form_1656_inativo", cpf=str(next(_CPF)), is_active=False)
+        com_papel(inativo, "FORMADOR", projeto.gerencia)  # da gerência: só o is_active o barra
         sol_id = _create_sol(client_coord, municipio, projeto, tipo_evento, {"formador_ids": [ativo.id]})
 
         resp = client_coord.patch(
@@ -131,9 +139,9 @@ class TestUpdateCoordAcompanhaSaiu:
     """
 
     def test_coord_acompanha_com_itens_recusado_no_update(self, client_coord, municipio, projeto, tipo_evento):
-        f_a = _formador("ca0")
-        coord_a = _formador("ca")
-        coord_b = _formador("cb")
+        f_a = _formador("ca0", projeto.gerencia)
+        coord_a = _formador("ca", projeto.gerencia)
+        coord_b = _formador("cb", projeto.gerencia)
         sol_id = _create_sol(client_coord, municipio, projeto, tipo_evento, {"formador_ids": [f_a.id]})
         Participation.objects.create(solicitacao_id=sol_id, usuario=coord_a, role="COORD_ACOMPANHA")  # linha antiga
 
@@ -146,8 +154,8 @@ class TestUpdateCoordAcompanhaSaiu:
         assert _ids(sol_id, "COORD_ACOMPANHA") == {coord_a.id}
 
     def test_coord_acompanha_vazia_nao_apaga_linha_antiga(self, client_coord, municipio, projeto, tipo_evento):
-        f_a = _formador("cv0")
-        coord_a = _formador("cv")
+        f_a = _formador("cv0", projeto.gerencia)
+        coord_a = _formador("cv", projeto.gerencia)
         sol_id = _create_sol(client_coord, municipio, projeto, tipo_evento, {"formador_ids": [f_a.id]})
         Participation.objects.create(solicitacao_id=sol_id, usuario=coord_a, role="COORD_ACOMPANHA")
 
@@ -161,8 +169,8 @@ class TestUpdateCoordAcompanhaSaiu:
 class TestUpdateReconcilesFormadores:
     def test_formadores_add_remove_still_works(self, client_coord, municipio, projeto, tipo_evento):
         """Não-regressão: reconciliação de FORMADOR por id (add/remove) segue funcionando."""
-        f_a = _formador("na")
-        f_b = _formador("nb")
+        f_a = _formador("na", projeto.gerencia)
+        f_b = _formador("nb", projeto.gerencia)
         sol_id = _create_sol(client_coord, municipio, projeto, tipo_evento, {"formador_ids": [f_a.id]})
         assert _ids(sol_id, "FORMADOR") == {f_a.id}
 

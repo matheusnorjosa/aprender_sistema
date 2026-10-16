@@ -438,6 +438,16 @@ class EquipeGerencia(models.Model):
             .values_list("gerencia_id", flat=True)
         )
 
+    # PR 9 das permissões: papéis que atuam PELA gerência (G/C/A). Dão o alcance da gerência: projetos e
+    # pessoas do evento, Grade, formadores nas opções, painel e bloqueios/deslocamentos dos colegas.
+    # FORMADOR fica de fora: vê só o que é dele (P9-1). Ver `specs/backend/rbac.spec.md`.
+    PAPEIS_DE_ATUACAO: frozenset[str] = frozenset({"GERENTE", "COORDENADOR", "APOIO"})
+
+    @classmethod
+    def gerencias_de_atuacao(cls, usuario: Any, hoje: date | None = None) -> set[int]:
+        """Gerências ativas onde `usuario` tem papel G/C/A vigente (`PAPEIS_DE_ATUACAO`): o alcance do PR 9."""
+        return cls.gerencias_com_papel(usuario, cls.PAPEIS_DE_ATUACAO, hoje)
+
     def __str__(self) -> str:
         papel = self.get_papel_display()  # type: ignore[reportUnknownMemberType,reportAttributeAccessIssue]
         return f"{self.usuario.get_full_name() or self.usuario.username} - {papel} ({self.gerencia.nome_setor})"  # type: ignore[reportUnknownMemberType]

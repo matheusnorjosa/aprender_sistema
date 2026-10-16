@@ -26,12 +26,13 @@ import pytest
 
 from apps.core.models import DATCompra
 from apps.core.tests.factories import (
-    GroupFactory,
+    GerenciaFactory,
     MunicipioFactory,
     ProjetoFactory,
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_papel,
     liberar_par,
 )
 
@@ -44,9 +45,15 @@ def _registra_compra(municipio, projeto) -> DATCompra:
 
 
 @pytest.fixture
-def coordenador():
+def gerencia():
+    """Gerência dos projetos e do coordenador (PR 9: só se move evento para projeto da gerência onde se atua)."""
+    return GerenciaFactory()
+
+
+@pytest.fixture
+def coordenador(gerencia):
     user = UsuarioFactory(username="coord_1624", cpf="75000000001")
-    user.groups.add(GroupFactory(name="Coordenador"))
+    com_papel(user, "COORDENADOR", gerencia)
     return user
 
 
@@ -61,13 +68,13 @@ def tipo_evento():
 
 
 @pytest.fixture
-def projeto_nao_super():
-    return ProjetoFactory(nome="NaoSuper 1624", codigo="NS1624", fluxo="NAO_SUPER", ativo=True)
+def projeto_nao_super(gerencia):
+    return ProjetoFactory(nome="NaoSuper 1624", codigo="NS1624", fluxo="NAO_SUPER", ativo=True, gerencia=gerencia)
 
 
 @pytest.fixture
-def projeto_super():
-    return ProjetoFactory(nome="Super 1624", codigo="SU1624", fluxo="SUPER", ativo=True)
+def projeto_super(gerencia):
+    return ProjetoFactory(nome="Super 1624", codigo="SU1624", fluxo="SUPER", ativo=True, gerencia=gerencia)
 
 
 def _solicitacao(coordenador, municipio, tipo_evento, projeto, status="aprovado"):
@@ -144,7 +151,9 @@ class TestLegitimateEditsUnaffected:
         self, client_coord, coordenador, municipio, tipo_evento, projeto_nao_super
     ):
         """Trocar entre dois projetos NAO_SUPER mantém auto-aprovado (não exige aprovação)."""
-        outro_nao_super = ProjetoFactory(nome="NaoSuper2 1624", codigo="NS21624", fluxo="NAO_SUPER", ativo=True)
+        outro_nao_super = ProjetoFactory(
+            nome="NaoSuper2 1624", codigo="NS21624", fluxo="NAO_SUPER", ativo=True, gerencia=projeto_nao_super.gerencia
+        )
         sol = _solicitacao(coordenador, municipio, tipo_evento, projeto_nao_super, status="aprovado")
         _registra_compra(municipio, outro_nao_super)
 

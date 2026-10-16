@@ -29,6 +29,7 @@ from apps.core.services.availability_service import CheckResult, Conflict
 from apps.core.services.config_service import bust_cfg
 from apps.core.services.solicitacao_availability import GuardResult, ParticipantConflicts, _build_message
 from apps.core.tests.factories import (
+    GerenciaFactory,
     GroupFactory,
     MunicipioFactory,
     ProjetoFactory,
@@ -78,22 +79,38 @@ def tipo_evento():
 
 
 @pytest.fixture
-def projeto_super(municipio):
-    projeto = ProjetoFactory(nome="Projeto SUPER Motivo", fluxo="SUPER")
+def gerencia():
+    """Gerência dos projetos (PR 9: criador e formador têm papel nela), sem a pergunta de avaliar."""
+    return GerenciaFactory(pergunta_avaliar_formador=False)
+
+
+@pytest.fixture
+def projeto(municipio, gerencia):
+    """NAO_SUPER da gerência: o evento com formador precisa de projeto da gerência (PR 9)."""
+    projeto = ProjetoFactory(nome="Projeto Motivo", gerencia=gerencia)
     liberar_par(municipio, projeto)
     return projeto
 
 
 @pytest.fixture
-def coordenador():
+def projeto_super(municipio, gerencia):
+    projeto = ProjetoFactory(nome="Projeto SUPER Motivo", fluxo="SUPER", gerencia=gerencia)
+    liberar_par(municipio, projeto)
+    return projeto
+
+
+@pytest.fixture
+def coordenador(gerencia):
     user = UsuarioFactory(username="coord_motivo", first_name="Ana", last_name="Coordenadora")
-    com_papel(user, "COORDENADOR")
+    com_papel(user, "COORDENADOR", gerencia)
     return user
 
 
 @pytest.fixture
-def formador():
-    return UsuarioFactory(username="formador_motivo", first_name="Bruno", last_name="Formador")
+def formador(gerencia):
+    user = UsuarioFactory(username="formador_motivo", first_name="Bruno", last_name="Formador")
+    com_papel(user, "FORMADOR", gerencia)
+    return user
 
 
 @pytest.fixture
@@ -219,13 +236,14 @@ class TestMensagemDizMotivoEAcao:
 
         assert response.data["detail"] == f"Não é possível aprovar a solicitação: Bruno Formador {MOTIVOS[code]}."
 
-    def test_criar_com_conflito_mantem_a_acao_criar(self, coordenador, formador, municipio, tipo_evento):
+    def test_criar_com_conflito_mantem_a_acao_criar(self, coordenador, formador, municipio, tipo_evento, projeto):
         _ocupar_agenda("X", formador, municipio, tipo_evento)
 
         response = _client(coordenador).post(
             "/api/solicitacoes/",
             {
                 "municipio": municipio.pk,
+                "projeto": projeto.pk,
                 "tipo_evento": tipo_evento.pk,
                 "coordenador_acompanha": False,
                 "inicio": INICIO.isoformat(),

@@ -25,6 +25,7 @@ import pytest
 
 from apps.core.models import Participation
 from apps.core.tests.factories import (
+    GerenciaFactory,
     MunicipioFactory,
     ProjetoFactory,
     TipoEventoFactory,
@@ -37,9 +38,15 @@ pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture
-def coordenador():
+def gerencia():
+    """Gerência do projeto: PR 9 só aceita criador e formadores com papel nela."""
+    return GerenciaFactory()
+
+
+@pytest.fixture
+def coordenador(gerencia):
     user = UsuarioFactory(username="coord_1626", cpf="77000000001")
-    com_papel(user, "COORDENADOR")
+    com_papel(user, "COORDENADOR", gerencia)
     return user
 
 
@@ -54,8 +61,8 @@ def tipo_evento():
 
 
 @pytest.fixture
-def projeto(municipio):
-    proj = ProjetoFactory(nome="Projeto 1626", codigo="P1626", fluxo="NAO_SUPER", ativo=True)
+def projeto(municipio, gerencia):
+    proj = ProjetoFactory(nome="Projeto 1626", codigo="P1626", fluxo="NAO_SUPER", ativo=True, gerencia=gerencia)
     # #1738: criar exige Compra para o par município+projeto.
     liberar_par(municipio, proj)
     return proj
@@ -112,6 +119,7 @@ class TestMalformedExtraParticipants:
 class TestParticipantResolution:
     def test_inactive_user_not_added_as_participant(self, client_coord, municipio, projeto, tipo_evento):
         inativo = UsuarioFactory(username="inativo_1626", cpf="77000000009", is_active=False)
+        com_papel(inativo, "FORMADOR", projeto.gerencia)  # da gerência: só a inatividade o tira
         resp = client_coord.post(
             "/api/solicitacoes/",
             _payload(municipio, projeto, tipo_evento, {"formador_ids": [inativo.id]}),
@@ -127,7 +135,7 @@ class TestParticipantResolution:
     def test_active_formador_added_as_participant(self, client_coord, municipio, projeto, tipo_evento):
         """Não-regressão: formador ativo válido vira participante."""
         formador = UsuarioFactory(username="form_1626", cpf="77000000010")
-        com_papel(formador, "FORMADOR")
+        com_papel(formador, "FORMADOR", projeto.gerencia)
         payload = _payload(municipio, projeto, tipo_evento, {"formador_ids": [formador.id]})
         payload["pretende_avaliar_formador"] = False  # 05/10/2026: formador avaliável → pergunta obrigatória
         resp = client_coord.post("/api/solicitacoes/", payload, format="json")

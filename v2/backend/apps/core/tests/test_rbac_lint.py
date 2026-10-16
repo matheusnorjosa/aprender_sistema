@@ -480,3 +480,57 @@ def test_lint_limpo_na_arvore_atual():
     """O mesmo alvo do CI (`ci.yaml`: `python scripts/rbac_lint.py apps/`). Pega a 0111 e o seed."""
     result = _run_lint(BACKEND_ROOT / "apps")
     assert result.returncode == 0, f"STDOUT: {result.stdout}\nSTDERR: {result.stderr}"
+
+
+# PR 9 das permissões (16/10/2026): o escopo é a gerência do projeto. V006 proíbe o texto do setor nos
+# arquivos de escopo (proibição simples, sem ratchet).
+@pytest.mark.parametrize(
+    "linha",
+    [
+        "qs.filter(gerencia__setor_canonico__in=setores)",
+        "qs.values_list('gerencia__setor_canonico', flat=True)",
+        "qs.filter(projeto__setor__in=setores)",
+        "qs.filter(setor__in=setores)",
+        "qs.filter(setor='')",
+        "qs.filter(Q(setor__isnull=True))",
+        "x = projeto.setor",
+        "x = getattr(projeto, 'setor', '')",
+        "x = gerencia.setor_canonico",
+    ],
+)
+def test_v006_rejeita_setor_no_escopo(tmp_path, linha):
+    _write_app_file(
+        tmp_path, "apps/core/services/solicitacao_scope.py", f"def f(qs, Q, projeto, gerencia, setores):\n    {linha}\n"
+    )
+    result = _run_lint(tmp_path / "apps")
+    assert result.returncode == 1, f"Esperava V006 em '{linha}'"
+    assert "V006" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "rel",
+    [
+        "apps/core/views_lookup.py",
+        "apps/core/views_options.py",
+        "apps/core/views_availability.py",
+        "apps/core/views_availability_monthly.py",
+        "apps/core/views_solicitacao.py",
+        "apps/core/rbac/permissions.py",
+        "apps/core/views_deslocamento.py",
+        "apps/core/views/stats.py",
+    ],
+)
+def test_v006_vale_em_todo_arquivo_de_escopo(tmp_path, rel):
+    _write_app_file(tmp_path, rel, "def f(qs, setores):\n    return qs.filter(projeto__setor__in=setores)\n")
+    result = _run_lint(tmp_path / "apps")
+    assert result.returncode == 1, f"Esperava V006 em {rel}"
+    assert "V006" in result.stderr
+
+
+def test_v006_nao_vale_fora_dos_arquivos_de_escopo_nem_em_texto(tmp_path):
+    _write_app_file(tmp_path, "apps/core/services/export_contract_importer.py", "def f(p):\n    return p.setor\n")
+    _write_app_file(
+        tmp_path, "apps/core/views_lookup.py", "MSG = 'Você só pode adicionar gente do seu setor.'\nSETOR = 'sector'\n"
+    )
+    result = _run_lint(tmp_path / "apps")
+    assert result.returncode == 0, result.stderr

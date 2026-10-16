@@ -29,6 +29,7 @@ from apps.core.models import AvailabilityBlock, Participation, Solicitacao
 from apps.core.services.availability_service import check_conflicts, check_conflicts_uncached
 from apps.core.services.solicitacao_availability import collect_participants
 from apps.core.tests.factories import (
+    GerenciaFactory,
     MunicipioFactory,
     ProjetoFactory,
     SolicitacaoFactory,
@@ -47,7 +48,7 @@ _FIM = _DIA.replace(hour=11)
 _N = itertools.count(1)
 
 
-def _pessoa(*grupos: str):
+def _pessoa(*grupos: str, gerencia=None):
     n = next(_N)
     return UsuarioFactory(
         username=f"agenda_acomp_{n}",
@@ -55,6 +56,7 @@ def _pessoa(*grupos: str):
         first_name=f"Pessoa{n}",
         last_name="Ficticia",
         groups=list(grupos),
+        groups__gerencia=gerencia,
     )
 
 
@@ -170,18 +172,30 @@ class TestQuemEConferidoNoEvento:
 
 @pytest.fixture
 def cenario():
+    """Projetos, coordenador e formadores na mesma gerência: o PR 9 só aceita evento assim."""
+    gerencia = GerenciaFactory()
     municipio = MunicipioFactory(nome="Municipio Ficticio Agenda", uf="CE")
-    projeto = ProjetoFactory(nome="Projeto Ficticio Agenda", codigo="PFAG", fluxo="NAO_SUPER", ativo=True)
-    projeto_super = ProjetoFactory(nome="Projeto Ficticio Agenda Super", codigo="PFAGS", fluxo="SUPER", ativo=True)
+    projeto = ProjetoFactory(
+        nome="Projeto Ficticio Agenda", codigo="PFAG", fluxo="NAO_SUPER", ativo=True, gerencia=gerencia
+    )
+    projeto_super = ProjetoFactory(
+        nome="Projeto Ficticio Agenda Super", codigo="PFAGS", fluxo="SUPER", ativo=True, gerencia=gerencia
+    )
     for p in (projeto, projeto_super):
         liberar_par(municipio, p)
     return {
+        "gerencia": gerencia,
         "municipio": municipio,
         "projeto": projeto,
         "projeto_super": projeto_super,
         "tipo": TipoEventoFactory(nome="Formacao Ficticia Agenda"),
-        "coord": _pessoa("Coordenador"),
+        "coord": _pessoa("Coordenador", gerencia=gerencia),
     }
+
+
+def _formador(c):
+    """Formador da gerência do cenário."""
+    return _pessoa("Formador", gerencia=c["gerencia"])
 
 
 def _client(user):
@@ -207,15 +221,15 @@ def _criar(c, user, formador, *, acompanha, projeto=None, inicio=_INICIO, fim=_F
 class TestCriarEditarAprovar:
     def test_coordenador_cria_dois_eventos_no_mesmo_horario_sem_acompanhar(self, cenario):
         coord = cenario["coord"]
-        r1 = _criar(cenario, coord, _pessoa("Formador"), acompanha=False)
-        r2 = _criar(cenario, coord, _pessoa("Formador"), acompanha=False)
+        r1 = _criar(cenario, coord, _formador(cenario), acompanha=False)
+        r2 = _criar(cenario, coord, _formador(cenario), acompanha=False)
         assert r1.status_code == 201, r1.data
         assert r2.status_code == 201, r2.data
 
     def test_acompanha_com_conflito_recusa_com_motivo(self, cenario):
         coord = cenario["coord"]
-        assert _criar(cenario, coord, _pessoa("Formador"), acompanha=True).status_code == 201
-        r = _criar(cenario, coord, _pessoa("Formador"), acompanha=True)
+        assert _criar(cenario, coord, _formador(cenario), acompanha=True).status_code == 201
+        r = _criar(cenario, coord, _formador(cenario), acompanha=True)
         assert r.status_code == 400, r.data
         assert r.data["code"] == "availability_conflict"
         assert [p["usuario_id"] for p in r.data["errors"]["blocked_participants"]] == [coord.id]
@@ -230,15 +244,15 @@ class TestCriarEditarAprovar:
             tipo="T",
             status=AvailabilityBlock.Status.APROVADO,
         )
-        assert _criar(cenario, coord, _pessoa("Formador"), acompanha=False).status_code == 201
-        r = _criar(cenario, coord, _pessoa("Formador"), acompanha=True)
+        assert _criar(cenario, coord, _formador(cenario), acompanha=False).status_code == 201
+        r = _criar(cenario, coord, _formador(cenario), acompanha=True)
         assert r.status_code == 400, r.data
         assert "tem bloqueio de agenda no período" in r.data["detail"]
 
     def test_editar_de_nao_para_sim_com_conflito_recusa_e_nao_grava(self, cenario):
         coord = cenario["coord"]
-        assert _criar(cenario, coord, _pessoa("Formador"), acompanha=True).status_code == 201
-        r = _criar(cenario, coord, _pessoa("Formador"), acompanha=False)
+        assert _criar(cenario, coord, _formador(cenario), acompanha=True).status_code == 201
+        r = _criar(cenario, coord, _formador(cenario), acompanha=False)
         assert r.status_code == 201, r.data
         sol_id = r.data["id"]
 
@@ -250,17 +264,17 @@ class TestCriarEditarAprovar:
 
     def test_editar_de_sim_para_nao_libera(self, cenario):
         coord = cenario["coord"]
-        r = _criar(cenario, coord, _pessoa("Formador"), acompanha=True)
+        r = _criar(cenario, coord, _formador(cenario), acompanha=True)
         sol_id = r.data["id"]
         resp = _client(coord).patch(f"/api/solicitacoes/{sol_id}/", {"coordenador_acompanha": False}, format="json")
         assert resp.status_code == 200, resp.data
-        assert _criar(cenario, coord, _pessoa("Formador"), acompanha=True).status_code == 201
+        assert _criar(cenario, coord, _formador(cenario), acompanha=True).status_code == 201
 
     def test_aprovar_segundo_evento_do_coordenador_que_nao_acompanha(self, cenario):
         coord = cenario["coord"]
         aprovadora = UsuarioFactory(superuser=True, username="aprov_agenda", email="aprov_agenda@example.invalid")
-        r1 = _criar(cenario, coord, _pessoa("Formador"), acompanha=False, projeto=cenario["projeto_super"])
-        r2 = _criar(cenario, coord, _pessoa("Formador"), acompanha=False, projeto=cenario["projeto_super"])
+        r1 = _criar(cenario, coord, _formador(cenario), acompanha=False, projeto=cenario["projeto_super"])
+        r2 = _criar(cenario, coord, _formador(cenario), acompanha=False, projeto=cenario["projeto_super"])
         assert r1.status_code == r2.status_code == 201
         for sol_id in (r1.data["id"], r2.data["id"]):
             resp = _client(aprovadora).patch(f"/api/solicitacoes/{sol_id}/approve/", {}, format="json")

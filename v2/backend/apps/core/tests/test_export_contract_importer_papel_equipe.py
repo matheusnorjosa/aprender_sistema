@@ -127,8 +127,8 @@ def test_apply_equipe_e_idempotente(tmp_path):
 
 @pytest.mark.parametrize("vinculo_ja_existe", [False, True])
 def test_linha_equipe_nao_reescreve_setor_canonico_da_gerencia(tmp_path, vinculo_ja_existe):
-    """setor_canonico é eixo de escopo (user_setores compara com Projeto.setor): uma linha EQUIPE,
-    inerte por definição, não pode reescrevê-lo, nem quando o vínculo já existe."""
+    """setor_canonico é rótulo da gerência (o escopo, desde o PR 9, é a gerência do projeto): uma linha
+    EQUIPE, inerte por definição, não pode reescrevê-lo, nem quando o vínculo já existe."""
     g = Gerencia.objects.create(nome="GERENCIA CONTROLE", nome_setor="Controle", setor_canonico="Controle")
     u = UsuarioFactory(cpf=_CPF)
     if vinculo_ja_existe:

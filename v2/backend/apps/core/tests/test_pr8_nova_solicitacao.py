@@ -20,6 +20,7 @@ from rest_framework.test import APIClient
 import pytest
 
 from apps.core.tests.factories import (
+    GerenciaFactory,
     GroupFactory,
     MunicipioFactory,
     ProjetoFactory,
@@ -163,11 +164,12 @@ class TestSolicitacaoRBAC:
         # Arrange
         client = APIClient()
         coord = UsuarioFactory(username="coord1", password="pass", cpf="11111111111")
-        com_papel(coord, "COORDENADOR")
+        gerencia = GerenciaFactory()  # PR 9: o projeto é da gerência onde o coordenador atua
+        com_papel(coord, "COORDENADOR", gerencia)
 
         tipo_evento = TipoEventoFactory(nome="Formação")
         municipio = MunicipioFactory(nome="Fortaleza", uf="CE")
-        projeto = ProjetoFactory(nome="Projeto X", fluxo="SUPER")  # SUPER=pendente
+        projeto = ProjetoFactory(nome="Projeto X", fluxo="SUPER", gerencia=gerencia)  # SUPER=pendente
         liberar_par(municipio, projeto)
 
         client.force_authenticate(user=coord)

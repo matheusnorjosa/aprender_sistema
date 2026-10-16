@@ -196,8 +196,9 @@ class TestDeslocamentoDelegation:
         assert audit.details.get("delegated") is True
 
 
-def _in_gerencia(user, gerencia):
-    EquipeGerencia.objects.create(usuario=user, gerencia=gerencia)
+def _in_gerencia(user, gerencia, papel=""):
+    """Vínculo na gerência. PR 9: quem lê os deslocamentos dos colegas precisa de papel G/C/A."""
+    EquipeGerencia.objects.create(usuario=user, gerencia=gerencia, papel=papel)
     return user
 
 
@@ -225,7 +226,8 @@ class TestDeslocamentoWriteOwnerForced:
 
     def _colleague_setup(self, coord_name="coord_scoped", victim_name="victim_scoped"):
         gerencia = Gerencia.objects.create(nome="GERENCIA 2", nome_setor="Vidas")
-        coord = _in_gerencia(_make_user(coord_name, ["Coordenador"]), gerencia)
+        coord = _in_gerencia(_make_user(coord_name, ["Coordenador"]), gerencia, "COORDENADOR")
+        # Colega sem o papel FORMADOR: a coordenadora não registra o deslocamento dele (P16, PR 8).
         victim = _in_gerencia(_make_user(victim_name, ["Formador"]), gerencia)
         return coord, victim, _own_deslocamento(victim)
 

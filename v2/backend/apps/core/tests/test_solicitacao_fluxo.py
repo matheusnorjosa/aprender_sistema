@@ -22,6 +22,7 @@ import pytest
 
 from apps.core.models import Projeto, Solicitacao
 from apps.core.tests.factories import (
+    GerenciaFactory,
     GroupFactory,
     MunicipioFactory,
     ProjetoFactory,
@@ -53,10 +54,16 @@ def grupos():
 
 
 @pytest.fixture
-def usuario_coordenador(grupos):
-    """Usuário com perfil Coordenador."""
+def gerencia():
+    """Gerência dos projetos: PR 9 só deixa criar evento em projeto da gerência de quem cria."""
+    return GerenciaFactory()
+
+
+@pytest.fixture
+def usuario_coordenador(grupos, gerencia):
+    """Usuário com perfil Coordenador na gerência dos projetos."""
     user = UsuarioFactory(username="coord1", password="senha123", cpf="11111111111", email="coord@test.com")
-    com_papel(user, "COORDENADOR")
+    com_papel(user, "COORDENADOR", gerencia)
     return user
 
 
@@ -77,15 +84,15 @@ def municipio():
 
 
 @pytest.fixture
-def projeto_super():
+def projeto_super(gerencia):
     """Projeto com fluxo SUPER (requer aprovação)."""
-    return ProjetoFactory(nome="ACerta", codigo="ACERTA", fluxo="SUPER", ativo=True)
+    return ProjetoFactory(nome="ACerta", codigo="ACERTA", fluxo="SUPER", ativo=True, gerencia=gerencia)
 
 
 @pytest.fixture
-def projeto_outros():
+def projeto_outros(gerencia):
     """Projeto com fluxo NAO_SUPER (auto-aprovado)."""
-    return ProjetoFactory(nome="Alfabetização Ceará", codigo="ALFCE", fluxo="NAO_SUPER", ativo=True)
+    return ProjetoFactory(nome="Alfabetização Ceará", codigo="ALFCE", fluxo="NAO_SUPER", ativo=True, gerencia=gerencia)
 
 
 @pytest.fixture
@@ -436,7 +443,9 @@ class TestProjetoSemFluxo:
     Testes para projetos sem campo fluxo definido (edge case).
     """
 
-    def test_projeto_sem_fluxo_usa_padrao_outros(self, api_client, usuario_coordenador, municipio, tipo_evento):
+    def test_projeto_sem_fluxo_usa_padrao_outros(
+        self, api_client, usuario_coordenador, gerencia, municipio, tipo_evento
+    ):
         """
         Teste PR 13/N-T9: Projeto sem fluxo definido usa padrão NAO_SUPER.
 
@@ -448,6 +457,7 @@ class TestProjetoSemFluxo:
         projeto_default = Projeto.objects.create(
             nome="Projeto Default",
             ativo=True,
+            gerencia=gerencia,
             # fluxo não especificado → usa default do modelo
         )
 

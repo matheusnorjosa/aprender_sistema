@@ -27,6 +27,7 @@ from apps.core.models import AvailabilityBlock, Participation, Solicitacao
 from apps.core.services.availability_service import check_conflicts_uncached
 from apps.core.services.config_service import bust_cfg
 from apps.core.tests.factories import (
+    GerenciaFactory,
     GroupFactory,
     MunicipioFactory,
     ProjetoFactory,
@@ -71,22 +72,38 @@ def tipo_evento():
 
 
 @pytest.fixture
-def projeto_super(municipio):
-    projeto = ProjetoFactory(nome="Projeto SUPER Aviso", fluxo="SUPER")
+def gerencia():
+    """Gerência dos projetos (PR 9: criador e formador têm papel nela), sem a pergunta de avaliar."""
+    return GerenciaFactory(pergunta_avaliar_formador=False)
+
+
+@pytest.fixture
+def projeto(municipio, gerencia):
+    """NAO_SUPER da gerência: o evento com formador precisa de projeto da gerência (PR 9)."""
+    projeto = ProjetoFactory(nome="Projeto Aviso", gerencia=gerencia)
     liberar_par(municipio, projeto)
     return projeto
 
 
 @pytest.fixture
-def coordenador():
+def projeto_super(municipio, gerencia):
+    projeto = ProjetoFactory(nome="Projeto SUPER Aviso", fluxo="SUPER", gerencia=gerencia)
+    liberar_par(municipio, projeto)
+    return projeto
+
+
+@pytest.fixture
+def coordenador(gerencia):
     user = UsuarioFactory(username="coord_aviso", first_name="Ana", last_name="Coordenadora")
-    com_papel(user, "COORDENADOR")
+    com_papel(user, "COORDENADOR", gerencia)
     return user
 
 
 @pytest.fixture
-def formador():
-    return UsuarioFactory(username="formador_aviso", first_name="Bruno", last_name="Formador")
+def formador(gerencia):
+    user = UsuarioFactory(username="formador_aviso", first_name="Bruno", last_name="Formador")
+    com_papel(user, "FORMADOR", gerencia)
+    return user
 
 
 @pytest.fixture
@@ -217,10 +234,10 @@ class TestMotorNaoEmiteM:
 
 
 class TestLimiteDiarioNaoBarra:
-    def test_criar_evento_de_10_horas_devolve_201(self, coordenador, formador, municipio, tipo_evento):
+    def test_criar_evento_de_10_horas_devolve_201(self, coordenador, formador, municipio, tipo_evento, projeto):
         response = _client(coordenador).post(
             "/api/solicitacoes/",
-            _payload_criar(municipio, tipo_evento, formador, _utc(10), _utc(20)),
+            _payload_criar(municipio, tipo_evento, formador, _utc(10), _utc(20), projeto),
             format="json",
         )
 
@@ -372,12 +389,12 @@ class TestBloqueioSemM:
 
 @pytest.mark.parametrize("code", ["X", "T", "P", "D"])
 class TestOQueBarraContinuaBarrando:
-    def test_criar(self, code, coordenador, formador, municipio, tipo_evento):
+    def test_criar(self, code, coordenador, formador, municipio, tipo_evento, projeto):
         _ocupar_agenda(code, formador, municipio, tipo_evento)
         antes = Solicitacao.objects.count()
 
         response = _client(coordenador).post(
-            "/api/solicitacoes/", _payload_criar(municipio, tipo_evento, formador, INICIO, FIM), format="json"
+            "/api/solicitacoes/", _payload_criar(municipio, tipo_evento, formador, INICIO, FIM, projeto), format="json"
         )
 
         assert response.status_code == 400, response.data

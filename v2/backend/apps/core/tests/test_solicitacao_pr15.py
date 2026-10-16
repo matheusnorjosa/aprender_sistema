@@ -21,6 +21,7 @@ import pytest
 
 from apps.core.models import Participation
 from apps.core.tests.factories import (
+    GerenciaFactory,
     GroupFactory,
     MunicipioFactory,
     ProjetoFactory,
@@ -52,10 +53,16 @@ def grupos():
 
 
 @pytest.fixture
-def usuario_coordenador(grupos):
-    """Usuário com perfil Coordenador."""
+def gerencia():
+    """Gerência do projeto SUPER e do coordenador (PR 9: só se cria evento em projeto da gerência onde se atua)."""
+    return GerenciaFactory()
+
+
+@pytest.fixture
+def usuario_coordenador(grupos, gerencia):
+    """Usuário com perfil Coordenador na gerência do projeto."""
     user = UsuarioFactory(username="coord1", password="senha123", cpf="11111111111", email="coord@test.com")
-    com_papel(user, "COORDENADOR")
+    com_papel(user, "COORDENADOR", gerencia)
     return user
 
 
@@ -70,10 +77,10 @@ def usuario_superintendencia(grupos):
 
 
 @pytest.fixture
-def usuario_controle(grupos):
-    """Usuário com perfil Controle."""
-    user = UsuarioFactory(username="controle1", password="senha123", cpf="33333333333", email="controle@test.com")
-    user.groups.add(grupos["Controle"])
+def usuario_formador(gerencia):
+    """Formador da gerência do projeto (PR 9: só entra no evento quem é da gerência do projeto)."""
+    user = UsuarioFactory(username="formador1", password="senha123", cpf="33333333333", email="formador@test.com")
+    com_papel(user, "FORMADOR", gerencia)
     return user
 
 
@@ -84,9 +91,9 @@ def municipio():
 
 
 @pytest.fixture
-def projeto_super():
+def projeto_super(gerencia):
     """Projeto com fluxo SUPER (requer aprovação)."""
-    return ProjetoFactory(nome="ACerta", codigo="ACERTA", fluxo="SUPER", ativo=True)
+    return ProjetoFactory(nome="ACerta", codigo="ACERTA", fluxo="SUPER", ativo=True, gerencia=gerencia)
 
 
 @pytest.fixture
@@ -310,7 +317,7 @@ class TestExtraParticipants:
         assert participations.first().role == "COORDENADOR"
 
     def test_creates_formador_from_id(
-        self, api_client, usuario_coordenador, usuario_controle, municipio, projeto_super, tipo_evento
+        self, api_client, usuario_coordenador, usuario_formador, municipio, projeto_super, tipo_evento
     ):
         """Cria Participation FORMADOR a partir de formador_ids."""
         api_client.force_authenticate(user=usuario_coordenador)
@@ -322,11 +329,13 @@ class TestExtraParticipants:
                 "projeto": projeto_super.id,
                 "tipo_evento": tipo_evento.id,
                 "coordenador_acompanha": False,
+                # 05/10/2026: com formador avaliável a pergunta de avaliar é obrigatória
+                "pretende_avaliar_formador": False,
                 "tipo": "PRESENCIAL",
                 "inicio": timezone.now().isoformat(),
                 "fim": (timezone.now() + timezone.timedelta(hours=2)).isoformat(),
                 "extra_participants": {
-                    "formador_ids": [usuario_controle.id],
+                    "formador_ids": [usuario_formador.id],
                     "formador_emails": [],
                     "coord_acompanha_ids": [],
                     "coord_acompanha_emails": [],
@@ -339,11 +348,11 @@ class TestExtraParticipants:
         sol_id = response.json()["id"]
 
         # Verificar formador participation
-        formador_part = Participation.objects.filter(solicitacao_id=sol_id, usuario=usuario_controle, role="FORMADOR")
+        formador_part = Participation.objects.filter(solicitacao_id=sol_id, usuario=usuario_formador, role="FORMADOR")
         assert formador_part.exists()
 
     def test_creates_formador_from_email_existing_user(
-        self, api_client, usuario_coordenador, usuario_controle, municipio, projeto_super, tipo_evento
+        self, api_client, usuario_coordenador, usuario_formador, municipio, projeto_super, tipo_evento
     ):
         """Resolve email para Usuario existente e cria Participation."""
         api_client.force_authenticate(user=usuario_coordenador)
@@ -355,12 +364,14 @@ class TestExtraParticipants:
                 "projeto": projeto_super.id,
                 "tipo_evento": tipo_evento.id,
                 "coordenador_acompanha": False,
+                # 05/10/2026: com formador avaliável a pergunta de avaliar é obrigatória
+                "pretende_avaliar_formador": False,
                 "tipo": "PRESENCIAL",
                 "inicio": timezone.now().isoformat(),
                 "fim": (timezone.now() + timezone.timedelta(hours=2)).isoformat(),
                 "extra_participants": {
                     "formador_ids": [],
-                    "formador_emails": ["CONTROLE@TEST.COM"],  # Case-insensitive
+                    "formador_emails": ["FORMADOR@TEST.COM"],  # Case-insensitive
                     "coord_acompanha_ids": [],
                     "coord_acompanha_emails": [],
                 },
@@ -371,8 +382,8 @@ class TestExtraParticipants:
         assert response.status_code == 201
         sol_id = response.json()["id"]
 
-        # Verificar que resolveu para usuario_controle
-        formador_part = Participation.objects.filter(solicitacao_id=sol_id, usuario=usuario_controle, role="FORMADOR")
+        # Verificar que resolveu para usuario_formador
+        formador_part = Participation.objects.filter(solicitacao_id=sol_id, usuario=usuario_formador, role="FORMADOR")
         assert formador_part.exists()
 
     def test_creates_guest_email_for_unknown_email(

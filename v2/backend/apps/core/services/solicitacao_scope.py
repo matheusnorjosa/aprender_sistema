@@ -14,9 +14,14 @@ Regra:
   (`manage_admin_registries`) e o aprovador composto
   (`access_solicitation_approvals` = Gerente-da-Superintendência OU Assistente
   Administrativo do Controle).
-- GESTORA não-global (papel GERENTE vigente, `_e_gestora`): a(s) própria(s) gerência(s)
-  (via EquipeGerencia) + as próprias.
+- GESTORA não-global (papel GERENTE vigente, `_e_gestora`): as gerências onde ela é GERENTE (PR 9; C9
+  da auditoria) + as próprias.
+- APOIO (`publish_setor_solicitacao`): as aprovadas das gerências onde é APOIO + as próprias.
 - DEMAIS (Coordenador etc.): apenas as próprias (comportamento inalterado).
+
+PR 9 (16/10/2026): o alcance é a gerência do PROJETO (`projeto.gerencia_id`), nunca o texto do setor
+(o lint V006 proíbe o setor nos arquivos de escopo). Cada superfície conta só o papel vigente certo em
+gerência ativa (`EquipeGerencia.gerencias_com_papel`); a falta de dado nega (fail-closed).
 
 Consumido tanto pelo `get_queryset` do `SolicitacaoViewSet` quanto pelo
 `IsOwnerOrPrivileged.has_object_permission` (mesma semântica em list e em objeto;
@@ -32,7 +37,6 @@ nele e nas próprias. Fora disso o objeto aparece e a escrita dá 403/400.
 
 from __future__ import annotations
 
-from collections import defaultdict
 from collections.abc import Sequence
 from typing import Any
 
@@ -66,40 +70,47 @@ def user_is_solicitacao_global(user: Any) -> bool:
     return user_has_policy(user, "access_solicitation_approvals")
 
 
-def _e_gestora(user: Any) -> bool:
-    """Gestora de solicitação da gerência (PR 8): papel GERENTE vigente em gerência ativa.
+def tem_capacidade_global(user: Any) -> bool:
+    """Controle, DAT ou Superintendência (`_GLOBAL_CAPS`; superusuário incluso): alcance de todas as gerências."""
+    return user_has_any_perm(user, *_GLOBAL_CAPS)
 
-    O alcance continua `_user_gerencia_ids` (todo vínculo com escopo); o PR 9 estreita.
-    """
+
+def _gerencias_da_gestora(user: Any) -> set[int]:
+    """Gerências onde `user` é GERENTE vigente em gerência ativa: o alcance da gestora (PR 8 e PR 9, C9)."""
     if not user or not getattr(user, "is_authenticated", False):
-        return False
-    return bool(EquipeGerencia.gerencias_com_papel(user, _PAPEIS_DE_GESTAO))
+        return set()
+    return EquipeGerencia.gerencias_com_papel(user, _PAPEIS_DE_GESTAO)
 
 
-def _user_gerencia_ids(user: Any) -> set[int]:
-    return set(EquipeGerencia.vigentes_com_escopo_em().filter(usuario=user).values_list("gerencia_id", flat=True))
+def _e_gestora(user: Any) -> bool:
+    """Gestora de solicitação da gerência (PR 8): papel GERENTE vigente em gerência ativa."""
+    return bool(_gerencias_da_gestora(user))
 
 
 def scope_solicitacoes(qs: QuerySet, user: Any) -> QuerySet:
     """Restringe `qs` ao escopo do `user` (ver regra no módulo)."""
     if user_is_solicitacao_global(user):
         return qs
-    if _e_gestora(user):
-        gerencia_ids = _user_gerencia_ids(user)
-        return qs.filter(Q(usuario=user) | Q(projeto__gerencia_id__in=gerencia_ids))
+    gestora = _gerencias_da_gestora(user)
+    if gestora:
+        return qs.filter(Q(usuario=user) | Q(projeto__gerencia_id__in=gestora))
     # #1656 Feature 2: Apoio de Coordenação com `publish_setor_solicitacao` enxerga
-    # (para publicar/preview/resync/cancel) as solicitações APROVADAS do PRÓPRIO setor,
-    # além das suas (estas em qualquer status, pois é dona). O ramo do setor filtra
-    # `status="aprovado"` para não expor PII de eventos pendentes/reprovados de
-    # terceiros. O setor do EVENTO é `Projeto.setor` (o SSOT do S2), NÃO
-    # `projeto.gerencia` — vazio em prod até o backfill da Fase 2, o que deixava a feature
-    # inerte. Tier de LEITURA apenas: `user_can_access_solicitacao` (edição) NÃO muda.
+    # (para publicar/preview/resync/cancel) as solicitações APROVADAS das gerências onde é APOIO,
+    # além das suas (estas em qualquer status, pois é dona). O ramo filtra `status="aprovado"` para
+    # não expor PII de eventos pendentes/reprovados de terceiros. PR 9: a gerência do evento é
+    # `projeto.gerencia_id` (antes era o texto do setor do projeto). Tier de LEITURA apenas:
+    # `user_can_access_solicitacao` (edição) NÃO muda.
     if user_has_any_perm(user, "publish_setor_solicitacao"):
-        setores = user_setores(user)
-        if setores:
-            return qs.filter(Q(usuario=user) | Q(projeto__setor__in=setores, status="aprovado"))
+        apoio = _gerencias_de_apoio(user)
+        if apoio:
+            return qs.filter(Q(usuario=user) | Q(projeto__gerencia_id__in=apoio, status="aprovado"))
         return qs.filter(usuario=user)
     return qs.filter(usuario=user)
+
+
+def _gerencias_de_apoio(user: Any) -> set[int]:
+    """Gerências onde `user` é APOIO vigente em gerência ativa: o alcance de publicação no Google (PR 9)."""
+    return EquipeGerencia.gerencias_com_papel(user, {"APOIO"})
 
 
 def restrita_ao_escopo_da_superintendencia(user: Any) -> bool:
@@ -109,7 +120,7 @@ def restrita_ao_escopo_da_superintendencia(user: Any) -> bool:
     SÓ da policy de aprovação. Global por outra base (Controle, DAT, `approve_solicitation`) segue
     global: o vínculo em g1 não tira o que outra base dá.
     """
-    return aprovadora_restrita_a_superintendencia(user) and not user_has_any_perm(user, *_GLOBAL_CAPS)
+    return aprovadora_restrita_a_superintendencia(user) and not tem_capacidade_global(user)
 
 
 # Papéis que dão o tier do 2º vínculo da restrita: só GERENTE. Coordenadora ou apoio comum não mexe
@@ -154,10 +165,8 @@ def user_can_access_solicitacao(user: Any, obj: Any) -> bool:
         return True
     if user_is_solicitacao_global(user):
         return not projeto_fora_do_alcance_da_restrita(user, getattr(obj, "projeto", None))
-    if _e_gestora(user):
-        gerencia_id = getattr(getattr(obj, "projeto", None), "gerencia_id", None)
-        return gerencia_id is not None and gerencia_id in _user_gerencia_ids(user)
-    return False
+    gerencia_id = getattr(getattr(obj, "projeto", None), "gerencia_id", None)
+    return gerencia_id is not None and gerencia_id in _gerencias_da_gestora(user)
 
 
 def can_publish_solicitacao(user: Any, obj: Any) -> bool:
@@ -165,25 +174,24 @@ def can_publish_solicitacao(user: Any, obj: Any) -> bool:
 
     Guarda de OBJETO das 4 @actions GCal (#1656 Feature 2). Separa "publicabilidade"
     de "visibilidade": o `scope_solicitacoes` deixa a Apoio VER as próprias (qualquer
-    status) + as APROVADAS do setor; mas PUBLICAR exige que o evento seja do PRÓPRIO
-    setor da Apoio — fecha o caso-limite de uma Apoio sem vínculo vigente (setor vazio)
-    publicar um evento próprio que caiu em outro setor (via fail-open do create).
+    status) + as APROVADAS da gerência; mas PUBLICAR exige que o evento seja de uma gerência
+    onde ela é APOIO, inclusive o próprio.
 
     - Global (`use_gcal`: superuser / Controle / Superintendência) → qualquer evento.
       ⚑ É o `use_gcal`, NÃO `user_is_solicitacao_global`: este inclui a DAT para VER tudo,
-      e uma pessoa da DAT que também fosse Apoio publicaria evento de qualquer setor.
-    - `publish_setor_solicitacao` (Apoio) → só evento cujo `Projeto.setor` ∈
-      `user_setores(user)`. Sem setor vigente, ou projeto sem setor → False (fail-closed).
+      e uma pessoa da DAT que também fosse Apoio publicaria evento de qualquer gerência.
+    - `publish_setor_solicitacao` (Apoio) → só evento cujo `projeto.gerencia_id` está entre as
+      gerências onde ela é APOIO vigente (PR 9). Projeto sem gerência → False (fail-closed).
     """
-    is_global, setores = _publish_tier(user)
+    is_global, gerencias = _publish_tier(user)
     if is_global:
         return True
-    setor = str(getattr(getattr(obj, "projeto", None), "setor", "") or "")
-    return bool(setor) and setor in setores
+    gerencia_id = getattr(getattr(obj, "projeto", None), "gerencia_id", None)
+    return gerencia_id is not None and gerencia_id in gerencias
 
 
-def _publish_tier(user: Any) -> tuple[bool, frozenset[str]]:
-    """(global?, setores) de quem publica no GCal — SSOT da guarda de objeto e da lista.
+def _publish_tier(user: Any) -> tuple[bool, frozenset[int]]:
+    """(global?, gerências de APOIO) de quem publica no GCal — SSOT da guarda de objeto e da lista.
 
     `can_publish_solicitacao` (objeto) e `scope_publishable_solicitacoes` (lista) leem
     daqui, então a lista nunca mostra evento que as 4 ações recusariam.
@@ -193,151 +201,121 @@ def _publish_tier(user: Any) -> tuple[bool, frozenset[str]]:
     if user_has_policy(user, "use_gcal"):
         return True, frozenset()
     if user_has_any_perm(user, "publish_setor_solicitacao"):
-        return False, frozenset(user_setores(user))
+        return False, frozenset(_gerencias_de_apoio(user))
     return False, frozenset()
 
 
 def scope_publishable_solicitacoes(qs: QuerySet, user: Any) -> QuerySet:
     """Restringe `qs` ao que `user` pode publicar no GCal (`?publishable=true`, #1656).
 
-    Global → tudo; Apoio → eventos cujo `Projeto.setor` está entre os setores vigentes
-    do usuário; sem setor, ou sem nenhuma das duas permissões → vazio. Mesma regra da
-    guarda de objeto.
+    Global → tudo; Apoio → eventos das gerências onde ela é APOIO vigente; sem gerência de APOIO,
+    ou sem nenhuma das duas permissões → vazio. Mesma regra da guarda de objeto.
     """
-    is_global, setores = _publish_tier(user)
+    is_global, gerencias = _publish_tier(user)
     if is_global:
         return qs
-    if not setores:
+    if not gerencias:
         return qs.none()
-    return qs.filter(projeto__setor__in=setores)
+    return qs.filter(projeto__gerencia_id__in=gerencias)
 
 
 def has_publish_scope(user: Any) -> bool:
-    """True sse `user` pode publicar ALGUM evento (global, ou Apoio com setor vigente)."""
-    is_global, setores = _publish_tier(user)
-    return is_global or bool(setores)
+    """True sse `user` pode publicar ALGUM evento (global, ou APOIO vigente em alguma gerência)."""
+    is_global, gerencias = _publish_tier(user)
+    return is_global or bool(gerencias)
 
 
-def user_setores(user: Any) -> set[str]:
-    """Setores (`Gerencia.setor_canonico`) das gerências vigentes do `user`.
+def _gerencia_do_evento(creator: Any, projeto: Any) -> int | None:
+    """Gerência do `projeto` do evento, se `creator` atua nela (papel G/C/A vigente); senão None.
 
-    SSOT do "setor do ator" para o escopo de participantes (M10-04/#1656 Wave 1).
-    ⚑ Setor ≠ Gerencia: o modelo `Gerencia` é fino (Vidas L/M/C são registros
-    distintos) e colapsa em um SETOR por `setor_canonico`. Usa a mesma vigência
-    (`vigentes_com_escopo_em()`: vigentes menos o papel EQUIPE) do resto do módulo e descarta `setor_canonico` vazio/nulo
-    (gerência sem setor não define escopo).
+    P9-5 (decisão do dono, 15/10/2026): num evento da gerência A só entram pessoas da A. Quem não atua
+    na gerência do projeto (inclusive a dona de evento antigo que perdeu o papel lá) não põe ninguém.
     """
-    return set(
-        EquipeGerencia.vigentes_com_escopo_em()
-        .filter(usuario=user)
-        .exclude(gerencia__setor_canonico="")
-        .exclude(gerencia__setor_canonico__isnull=True)
-        .values_list("gerencia__setor_canonico", flat=True)
-    )
+    gerencia_id = getattr(projeto, "gerencia_id", None)
+    if gerencia_id is None or gerencia_id not in EquipeGerencia.gerencias_de_atuacao(creator):
+        return None
+    return gerencia_id
 
 
-def _setores_por_usuario(user_ids: list[int]) -> dict[int, set[str]]:
-    """Mapa user_id → setores (1 query) para checar vários participantes de uma vez."""
-    out: dict[int, set[str]] = defaultdict(set)
-    if not user_ids:
-        return out
-    rows = (
-        EquipeGerencia.vigentes_com_escopo_em()
-        .filter(usuario_id__in=user_ids)
-        .exclude(gerencia__setor_canonico="")
-        .exclude(gerencia__setor_canonico__isnull=True)
-        .values_list("usuario_id", "gerencia__setor_canonico")
-    )
-    for uid, setor in rows:
-        out[uid].add(setor)
-    return out
+def _isento_do_escopo(creator: Any) -> bool:
+    """Sem ator (chamada interna sem `request`) ou global/privilegiado: o escopo de gerência não se aplica."""
+    if not creator or not getattr(creator, "is_authenticated", False):
+        return True
+    return user_is_solicitacao_global(creator)
 
 
-def participants_out_of_setor(creator: Any, users: Sequence[Any]) -> list[Any]:
-    """Retorna os `users` cujo SETOR é disjunto do setor do `creator`.
+def participantes_fora_da_gerencia(
+    creator: Any, projeto: Any, users: Sequence[Any], papeis: frozenset[str] | None = None
+) -> list[Any]:
+    """Os `users` que NÃO podem entrar no evento de `projeto` criado ou editado por `creator`.
 
-    M10-04/#1656 Wave 1: o coordenador regular só adiciona formador/coord do próprio
-    setor. Medido em prod (2026-09-15): 0 cross-setor para coordenador regular; os 3
-    cross-setor reais são todos da Superintendência (isenta abaixo).
+    Pode entrar quem tem vínculo vigente com escopo (papel ≠ EQUIPE; ou um dos `papeis`, se vierem) na
+    gerência do projeto, desde que `creator` atue nela (`_gerencia_do_evento`). Fail-closed: projeto
+    sem gerência, ou criador sem papel G/C/A lá → todos ficam fora.
 
-    - Criador GLOBAL/privilegiado (`user_is_solicitacao_global`: superuser,
-      Superintendência, Controle, DAT) → isento → lista vazia.
-    - Criador SEM setor → fail-open (não dá p/ escopar; 0 em prod) → lista vazia.
-    - Caso contrário: participante sem setor OU de setor disjunto = fora do escopo
-      (fail-closed para o participante).
+    Criador global/privilegiado (`user_is_solicitacao_global`: superuser, Superintendência, Controle,
+    DAT) ou ausente → isento → lista vazia.
     """
-    if not users:
+    if not users or _isento_do_escopo(creator):
         return []
-    if user_is_solicitacao_global(creator):
-        return []
-    creator_setores = user_setores(creator)
-    if not creator_setores:
-        return []
-    smap = _setores_por_usuario([u.id for u in users])
-    return [u for u in users if not (smap.get(u.id, set()) & creator_setores)]
+    gerencia_id = _gerencia_do_evento(creator, projeto)
+    if gerencia_id is None:
+        return list(users)
+    vinculos = EquipeGerencia.vigentes_com_escopo_em().filter(
+        gerencia_id=gerencia_id, usuario_id__in=[u.id for u in users]
+    )
+    if papeis is not None:
+        vinculos = vinculos.filter(papel__in=list(papeis))
+    dentro = set(vinculos.values_list("usuario_id", flat=True))
+    return [u for u in users if u.id not in dentro]
 
 
-def scope_usuarios_by_setor(qs: QuerySet, user: Any) -> QuerySet:
-    """Restringe um queryset de `Usuario` aos que compartilham SETOR com `user`.
+def scope_usuarios_por_gerencia(qs: QuerySet, user: Any, projeto: Any = None) -> QuerySet:
+    """Restringe um queryset de `Usuario` às pessoas que `user` pode pôr num evento.
 
-    Espelho de LEITURA do `participants_out_of_setor` (write-path): alimenta o
-    `/lookup/usuarios/` para o picker do wizard já oferecer só o setor do
-    coordenador (M10-04/#1656 Wave 1) — assim o FE nunca mostra opção que o
-    backend recusaria (contrato FE-first satisfeito pela fonte de dados).
+    Espelho de LEITURA do `participantes_fora_da_gerencia` (write-path): alimenta o
+    `/lookup/usuarios/` para o seletor da Nova Solicitação oferecer só quem o backend aceita.
 
-    - Global/privilegiado (`user_is_solicitacao_global`: superuser, Superintendência,
-      Controle, DAT) → sem filtro.
-    - `user` sem setor → sem filtro (fail-open; espelha o write-path).
-    - Caso contrário: só usuários com vínculo vigente em algum desses setores.
+    - Global/privilegiado (`user_is_solicitacao_global`) → sem filtro.
+    - Com `projeto`: só a gerência do projeto, se `user` atua nela (P9-5).
+    - Sem `projeto`: as gerências onde `user` tem papel G/C/A vigente.
+    - Sem gerência de atuação → vazio (fail-closed).
     """
     if user_is_solicitacao_global(user):
         return qs
-    setores = user_setores(user)
-    if not setores:
-        return qs
-    vigentes = (
-        EquipeGerencia.vigentes_com_escopo_em()
-        .filter(gerencia__setor_canonico__in=setores)
-        .values_list("usuario_id", flat=True)
-    )
+    if projeto is not None:
+        gerencia_id = _gerencia_do_evento(user, projeto)
+        gerencias = set() if gerencia_id is None else {gerencia_id}
+    else:
+        gerencias = EquipeGerencia.gerencias_de_atuacao(user)
+    if not gerencias:
+        return qs.none()
+    vigentes = EquipeGerencia.vigentes_com_escopo_em().filter(gerencia_id__in=gerencias).values("usuario_id")
     return qs.filter(id__in=vigentes)
 
 
-def scope_projetos_by_setor(qs: QuerySet, user: Any) -> QuerySet:
-    """Restringe um queryset de `Projeto` aos do SETOR do `user` (S2, épico #1656).
+def scope_projetos_por_gerencia(qs: QuerySet, user: Any) -> QuerySet:
+    """Restringe um queryset de `Projeto` aos das gerências onde `user` tem papel G/C/A vigente.
 
-    Mesma regra do participante, eixo projeto: alimenta o `/lookup/projetos/` para o
-    wizard só oferecer projetos do setor do coordenador. `Projeto.setor` casa com
-    `Gerencia.setor_canonico` por igualdade (o mesmo de-para v15).
+    Alimenta o `/lookup/projetos/` da Nova Solicitação e da tela Editar.
     - Global/privilegiado (`user_is_solicitacao_global`) → sem filtro, salvo a aprovadora restrita
       (regra do dono, 30/09): só o alcance dela, o mesmo de `projeto_fora_do_alcance_da_restrita`.
-    - `user` sem setor → sem filtro (fail-open).
-    - Projeto SEM setor → incluído (fail-open; `Projeto.setor` é gap conhecido).
+    - Sem gerência de atuação → vazio; projeto sem gerência nunca entra (fail-closed).
     """
     if user_is_solicitacao_global(user):
         if restrita_ao_escopo_da_superintendencia(user):
             return qs.filter(ESCOPO_SUPERINTENDENCIA_PROJETO_Q | Q(gerencia_id__in=_gerencias_de_gestor_sem_g1(user)))
         return qs
-    setores = user_setores(user)
-    if not setores:
-        return qs
-    return qs.filter(Q(setor__in=[*setores, ""]) | Q(setor__isnull=True))
+    return qs.filter(gerencia_id__in=EquipeGerencia.gerencias_de_atuacao(user))
 
 
-def projeto_out_of_setor(creator: Any, projeto: Any) -> bool:
-    """True sse `projeto` é de um SETOR ao qual o `creator` regular não pertence.
+def projeto_fora_da_gerencia(creator: Any, projeto: Any) -> bool:
+    """True sse `creator` não pode criar evento em `projeto` nem mover um evento para ele.
 
-    Write-path do S2 (create/update de Solicitacao). Fail-open (False) quando:
-    criador global/privilegiado, criador sem setor, `projeto` None, ou projeto sem
-    setor (gap de dado). Só barra quando o criador TEM setor e o projeto tem um
-    setor diferente.
+    Write-path do `scope_projetos_por_gerencia`. Fica fora o projeto sem gerência ou de gerência onde o
+    criador não tem papel G/C/A vigente. Isentos: criador global/privilegiado, criador ausente e
+    `projeto` None (o serializer cuida do obrigatório).
     """
-    if projeto is None or user_is_solicitacao_global(creator):
+    if projeto is None or _isento_do_escopo(creator):
         return False
-    creator_setores = user_setores(creator)
-    if not creator_setores:
-        return False
-    proj_setor = getattr(projeto, "setor", "") or ""
-    if not proj_setor:
-        return False
-    return proj_setor not in creator_setores
+    return _gerencia_do_evento(creator, projeto) is None

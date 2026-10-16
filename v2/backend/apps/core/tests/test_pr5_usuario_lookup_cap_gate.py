@@ -25,6 +25,10 @@ Personas:
 - ✅ DAT, Coordenador, Apoio, Gerente, superuser → 200
 - ❌ Controle puro, Formador, Diretoria, Sup pura sem Função → 403
 - Anonymous → 401/403
+
+PR 9: o resultado só traz pessoas das gerências onde quem busca atua (G/C/A); globais (DAT,
+superuser) sem filtro. Quem busca e o alvo ficam na mesma gerência (`gerencia`) nos testes que
+esperam achar o alvo.
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportMissingTypeStubs=false, reportUnusedFunction=false
@@ -37,7 +41,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.tests.factories import UsuarioFactory
+from apps.core.tests.factories import GerenciaFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -45,7 +49,7 @@ pytestmark = pytest.mark.django_db
 _CPF_COUNTER = itertools.count(50000000000)
 
 
-def _user_in_groups(*group_names: str, label: str = "user"):
+def _user_in_groups(*group_names: str, label: str = "user", gerencia=None):
     cpf = str(next(_CPF_COUNTER)).zfill(11)
     return UsuarioFactory(
         username=f"{label}_{cpf}",
@@ -55,11 +59,18 @@ def _user_in_groups(*group_names: str, label: str = "user"):
         first_name=label.capitalize(),
         last_name="User",
         groups=list(group_names),
+        groups__gerencia=gerencia,
     )
 
 
 @pytest.fixture
-def target_formador():
+def gerencia():
+    """Gerência do alvo e de quem busca (o lookup é por gerência de atuação, PR 9)."""
+    return GerenciaFactory()
+
+
+@pytest.fixture
+def target_formador(gerencia):
     """Usuário-alvo para a busca."""
     cpf = str(next(_CPF_COUNTER)).zfill(11)
     return UsuarioFactory(
@@ -70,6 +81,7 @@ def target_formador():
         first_name="Maria",
         last_name="Silva",
         groups=["Formador"],
+        groups__gerencia=gerencia,
     )
 
 
@@ -147,9 +159,9 @@ EMAIL_SEARCH_ALLOWED: list[tuple[str, tuple[str, ...]]] = [
 
 
 @pytest.mark.parametrize("persona", EMAIL_SEARCH_ALLOWED, ids=[p[0] for p in EMAIL_SEARCH_ALLOWED])
-def test_email_search_finds_user_for_allowed_personas(persona, target_formador):
+def test_email_search_finds_user_for_allowed_personas(persona, target_formador, gerencia):
     label, group_names = persona
-    user = _user_in_groups(*group_names, label=label)
+    user = _user_in_groups(*group_names, label=label, gerencia=gerencia)
     client = APIClient()
     client.force_authenticate(user=user)
 
@@ -183,9 +195,9 @@ def test_payload_never_exposes_email(target_formador):
 # =============================================================================
 
 
-def test_role_filter_returns_only_role(target_formador):
+def test_role_filter_returns_only_role(target_formador, gerencia):
     """Garantir que `?role=Formador` continua filtrando por grupo."""
-    user = _user_in_groups("Coordenador", label="coord_role")
+    user = _user_in_groups("Coordenador", label="coord_role", gerencia=gerencia)
     client = APIClient()
     client.force_authenticate(user=user)
 

@@ -103,9 +103,8 @@ class HomeStatsView(APIView):
             "manage_admin_registries",
         )
 
-        user_gerencias = list(
-            EquipeGerencia.vigentes_com_escopo_em().filter(usuario=user).values_list("gerencia_id", flat=True)
-        )
+        # PR 9 (P9-6): o painel conta só as gerências onde a pessoa tem papel G/C/A vigente.
+        user_gerencias = list(EquipeGerencia.gerencias_de_atuacao(user))
 
         # === APROVAÇÕES PENDENTES ===
         # M11-16 (PR B1): mesmo gate dos endpoints de aprovação e mesmo recorte da

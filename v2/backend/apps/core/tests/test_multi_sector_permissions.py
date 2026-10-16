@@ -83,6 +83,12 @@ class TestHasSectorAccessPermission(TestCase):
             usuario=self.user_vidas,
             papel="FORMADOR",
         )
+        # PR 9 (P9-3): a Grade pede papel G/C/A na gerência; o FORMADOR sozinho não abre.
+        EquipeGerencia.objects.create(
+            gerencia=self.gerencia_vidas,
+            usuario=self.user_vidas,
+            papel="COORDENADOR",
+        )
 
         self.user_fluir = UsuarioFactory(
             username="fluir_user",
@@ -139,10 +145,19 @@ class TestHasSectorAccessPermission(TestCase):
         view = MockView()
         self.assertFalse(self.permission.has_permission(request, view))
 
+    def test_formador_sem_papel_de_gestao_is_blocked(self):
+        """PR 9 (P9-3): vínculo só de FORMADOR não abre a Grade, nem na própria gerência."""
+        request = self.factory.get("/")
+        request.user = self.user_fluir
+        request.query_params = {"gerencia_id": str(self.gerencia_fluir.id)}
+
+        view = MockView()
+        self.assertFalse(self.permission.has_permission(request, view))
+
     def test_user_with_gerencia_without_gerencia_id_is_allowed(self):
         """
-        Usuário com EquipeGerencia ativa (qualquer gerência) e sem gerencia_id na query → permitido.
-        D8 (2026-04-28): vínculo organizacional autoriza acesso; view escopa dados em runtime.
+        Usuário com papel G/C/A vigente (qualquer gerência) e sem gerencia_id na query → permitido.
+        D8 (2026-04-28): vínculo organizacional autoriza acesso; view escopa dados em runtime (PR 9: G/C/A).
         """
         request = self.factory.get("/")
         request.user = self.user_vidas  # tem EquipeGerencia (Vidas)
@@ -198,6 +213,12 @@ class TestMonthlyAvailabilityViewMultiSector(TestCase):
             gerencia=self.gerencia_vidas,
             usuario=self.user_vidas,
             papel="FORMADOR",
+        )
+        # PR 9 (P9-3): a Grade pede papel G/C/A na gerência; o FORMADOR sozinho não abre.
+        EquipeGerencia.objects.create(
+            gerencia=self.gerencia_vidas,
+            usuario=self.user_vidas,
+            papel="COORDENADOR",
         )
 
         self.user_controle = UsuarioFactory(

@@ -81,19 +81,16 @@ class TestScopeExcludesExpiredMember:
     """
     Ex-membro EXPIRADO perde acesso — o bug latente que a vigência fecha.
     Cobertura antes: ZERO (os read-sites só filtravam `ativo`, ou nem isso).
+    PR 9: o alcance de escopo é `EquipeGerencia.gerencias_de_atuacao` (sucessor de `_user_gerencia_ids`).
     """
 
-    def test_user_gerencia_ids_excludes_expired_member(self):
-        from apps.core.services.solicitacao_scope import _user_gerencia_ids
-
+    def test_gerencias_de_atuacao_excludes_expired_member(self):
         g = _gerencia()
         hoje = timezone.localdate()
         m = _membro(g, papel="COORDENADOR", valid_from=hoje - timedelta(days=30), valid_to=hoje - timedelta(days=1))
-        assert g.pk not in _user_gerencia_ids(m.usuario)
+        assert g.pk not in EquipeGerencia.gerencias_de_atuacao(m.usuario)
 
-    def test_user_gerencia_ids_includes_current_member(self):
-        from apps.core.services.solicitacao_scope import _user_gerencia_ids
-
+    def test_gerencias_de_atuacao_includes_current_member(self):
         g = _gerencia()
         m = _membro(g, papel="COORDENADOR")  # vigente hoje (default)
-        assert g.pk in _user_gerencia_ids(m.usuario)
+        assert g.pk in EquipeGerencia.gerencias_de_atuacao(m.usuario)

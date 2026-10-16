@@ -55,8 +55,10 @@ def _usuario(*grupos, gerencia=None):
 
 @pytest.fixture
 def mundo():
-    """Forma de prod: `Projeto.setor` preenchido, `gerencia` NULL."""
-    fluir = Gerencia.objects.create(nome="GERENCIA 3 PUB", nome_setor="Fluir", setor_canonico="Fluir", ativo=True)
+    """PR 9: o alcance da Apoio é `projeto.gerencia_id`; o projeto sem gerência não é publicável por ninguém
+    (exceto global)."""
+    fluir = Gerencia.objects.create(nome="GERENCIA 3 PUB", nome_setor="Fluir", ativo=True)
+    vidas = Gerencia.objects.create(nome="GERENCIA 2 PUB", nome_setor="Vidas", ativo=True)
     atores = {
         "apoio_fluir": _usuario("Apoio de Coordenação", gerencia=fluir),
         "coordenador": _usuario("Coordenador"),
@@ -64,15 +66,15 @@ def mundo():
         "dat_apoio": _usuario("DAT", "Apoio de Coordenação", gerencia=fluir),
     }
     terceiro = _usuario("Coordenador")
-    projeto_fluir = ProjetoFactory(nome="Fluir PUB", setor="Fluir", gerencia=None)
-    projeto_vidas = ProjetoFactory(nome="Vidas PUB", setor="Vidas", gerencia=None)
-    projeto_sem_setor = ProjetoFactory(nome="Sem setor PUB", setor="", gerencia=None)
+    projeto_fluir = ProjetoFactory(nome="Fluir PUB", gerencia=fluir)
+    projeto_vidas = ProjetoFactory(nome="Vidas PUB", gerencia=vidas)
+    projeto_sem_gerencia = ProjetoFactory(nome="Sem gerencia PUB", setor="Fluir", gerencia=None)
     eventos = {
         "fluir_terceiro": _aprovada(terceiro, projeto_fluir),
         "fluir_propria": _aprovada(atores["apoio_fluir"], projeto_fluir),
         "vidas_terceiro": _aprovada(terceiro, projeto_vidas),
-        "vidas_propria": _aprovada(atores["apoio_fluir"], projeto_vidas),  # própria, mas de outro setor
-        "sem_setor_propria": _aprovada(atores["apoio_fluir"], projeto_sem_setor),
+        "vidas_propria": _aprovada(atores["apoio_fluir"], projeto_vidas),  # própria, mas de outra gerência
+        "sem_gerencia_propria": _aprovada(atores["apoio_fluir"], projeto_sem_gerencia),
         "coord_propria": _aprovada(atores["coordenador"], projeto_fluir),
     }
     return atores, eventos
@@ -86,14 +88,14 @@ def _ids(user, **extra):
     return {row["id"] for row in resp.data["results"]}
 
 
-def test_publishable_true_apoio_so_eventos_do_setor(mundo):
+def test_publishable_true_apoio_so_eventos_da_gerencia(mundo):
     atores, eventos = mundo
 
     ids = _ids(atores["apoio_fluir"], publishable="true")
 
     assert ids == {eventos["fluir_terceiro"].id, eventos["fluir_propria"].id, eventos["coord_propria"].id}
-    # sem o filtro, a própria de outro setor e a sem setor aparecem (são dela) — mas não são publicáveis
-    assert eventos["vidas_propria"].id in _ids(atores["apoio_fluir"])
+    # sem o filtro, a própria de outra gerência e a sem gerência aparecem (são dela) — mas não são publicáveis
+    assert {eventos["vidas_propria"].id, eventos["sem_gerencia_propria"].id} <= _ids(atores["apoio_fluir"])
 
 
 def test_publishable_true_sem_policy_retorna_vazio(mundo):

@@ -1,21 +1,23 @@
-"""#1656 Feature 2 — publish/preview/resync/cancel GCal ESCOPADO por setor.
+"""#1656 Feature 2 — publish/preview/resync/cancel GCal ESCOPADO por gerência.
 
-Uma "Apoio de Coordenação" (grupo `Apoio de Coordenação`, vínculo EquipeGerencia
-vigente numa Gerencia com `setor_canonico`) pode VER e PUBLICAR/prever/resincronizar/
-cancelar no Google Calendar os eventos APROVADOS do PRÓPRIO setor — de qualquer
-criador — SEM virar global e SEM poder editar/excluir eventos alheios.
+Uma "Apoio de Coordenação" (papel APOIO vigente em gerência ativa) pode VER e
+PUBLICAR/prever/resincronizar/cancelar no Google Calendar os eventos APROVADOS das
+gerências onde é APOIO — de qualquer criador — SEM virar global e SEM poder
+editar/excluir eventos alheios. PR 9 (16/10/2026): a gerência do evento é
+`projeto.gerencia_id`; `Projeto.setor` e `Gerencia.setor_canonico` não dão escopo.
 
 Garantias travadas aqui:
-- ✅ Apoio publica evento aprovado do seu setor criado por TERCEIRO → 202 (o coração).
-- ✅ Apoio publica a própria aprovada → 202; preview/resync/cancel do setor → ok.
-- ✅ Evento de OUTRO setor → 404 (fora do escopo do get_object; indistinguível de inexistente).
-- ⚑ SEGURANÇA: PATCH/DELETE de evento do setor que não é dela → 403/404
+- ✅ Apoio publica evento aprovado da sua gerência criado por TERCEIRO → 202 (o coração).
+- ✅ Apoio publica a própria aprovada → 202; preview/resync/cancel da gerência → ok.
+- ✅ Evento de OUTRA gerência → 404 (fora do escopo do get_object; indistinguível de inexistente).
+- ⚑ SEGURANÇA: PATCH/DELETE de evento da gerência que não é dela → 403/404
   (`user_can_access_solicitacao` intacto; IsOwnerOrPrivileged barra a edição).
 - ⚑ CONTENÇÃO: não ganhou `use_gcal` → 403 nos endpoints GCal em lote.
 - ⚑ SENTINELA: `user_is_solicitacao_global(apoio) is False`; `scope_solicitacoes`
-  não retorna evento de outro setor.
+  não retorna evento de outra gerência.
 - Regressão: Controle/Super publicam qualquer evento; escopo de Gerente inalterado.
-- Vigência: EquipeGerencia expirada → sem setor → publica só as próprias.
+- Vigência: EquipeGerencia expirada → sem papel APOIO vigente → não publica.
+- Fail-closed: projeto sem gerência → ninguém (exceto global) publica, nem a própria.
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
@@ -82,7 +84,7 @@ def gerencia_vidas():
 
 @pytest.fixture
 def apoio_fluir(gerencia_fluir):
-    """Apoio de Coordenação vinculada (vigente) ao setor Fluir."""
+    """Apoio de Coordenação: papel APOIO vigente na gerência do Fluir."""
     user = UsuarioFactory(username="apoio_fluir_pss", cpf="63000000001")
     user.groups.add(GroupFactory(name="Apoio de Coordenação"))
     EquipeGerencia.objects.create(usuario=user, gerencia=gerencia_fluir, papel="APOIO")
@@ -365,7 +367,7 @@ class TestRegressao:
 
 
 # ---------------------------------------------------------------------------
-# G. Vigência — vínculo expirado → sem setor → só as próprias
+# G. Vigência — vínculo expirado ou APOIO de outra gerência → não publica
 # ---------------------------------------------------------------------------
 
 
@@ -386,7 +388,8 @@ class TestVigenciaExpirada:
 
     @pytest.fixture
     def apoio_sem_setor(self):
-        """Papel APOIO VIGENTE numa gerência sem `setor_canonico`: tem o direito de publicar (PR 8), sem setor."""
+        """Papel APOIO VIGENTE numa gerência que não é a do projeto: tem o direito de publicar (PR 8),
+        mas nenhum projeto no alcance."""
         sem_setor = Gerencia.objects.create(nome="GERENCIA SEM SETOR PSS", nome_setor="Sem setor", ativo=True)
         user = UsuarioFactory(username="apoio_sem_setor_pss", cpf="63000000016")
         user.groups.add(GroupFactory(name="Apoio de Coordenação"))
@@ -405,7 +408,7 @@ class TestVigenciaExpirada:
     @patch("rest_framework.throttling.AnonRateThrottle.allow_request", return_value=True)
     @patch("rest_framework.throttling.UserRateThrottle.allow_request", return_value=True)
     def test_expirada_nao_publica_nem_a_propria(self, _t1, _t2, apoio_expirada, projeto_fluir):
-        """#1656 F2 (fix review): publish exige vínculo de setor VIGENTE. Apoio com
+        """#1656 F2 (fix review): publish exige o papel APOIO VIGENTE. Apoio com
         vínculo expirado NÃO publica — nem a própria. Desde o PR 8 o gate já recusa (403): o
         direito de publicar vem do papel vigente."""
         propria = _aprovada(apoio_expirada, projeto_fluir)
@@ -417,7 +420,7 @@ class TestVigenciaExpirada:
     @patch("rest_framework.throttling.AnonRateThrottle.allow_request", return_value=True)
     @patch("rest_framework.throttling.UserRateThrottle.allow_request", return_value=True)
     def test_sem_setor_nao_publica_evento_do_setor_de_terceiro(self, _t1, _t2, apoio_sem_setor, sol_fluir_terceiro):
-        """Papel vigente, setor vazio: passa o gate, mas o escopo não alcança o evento (404)."""
+        """Papel vigente em outra gerência: passa o gate, mas o escopo não alcança o evento (404)."""
         client = APIClient()
         client.force_authenticate(apoio_sem_setor)
         resp = _publish(client, sol_fluir_terceiro.id)
@@ -426,7 +429,8 @@ class TestVigenciaExpirada:
     @patch("rest_framework.throttling.AnonRateThrottle.allow_request", return_value=True)
     @patch("rest_framework.throttling.UserRateThrottle.allow_request", return_value=True)
     def test_sem_setor_nao_publica_nem_a_propria(self, _t1, _t2, apoio_sem_setor, projeto_fluir):
-        """Guarda de objeto `can_publish_solicitacao`: sem setor vigente, nem a própria (caso-limite do F2)."""
+        """Guarda de objeto `can_publish_solicitacao`: sem APOIO na gerência do projeto, nem a própria
+        (caso-limite do F2)."""
         propria = _aprovada(apoio_sem_setor, projeto_fluir)
         client = APIClient()
         client.force_authenticate(apoio_sem_setor)
@@ -479,8 +483,8 @@ class TestSetorSomenteAprovados:
         assert resp.status_code == status.HTTP_404_NOT_FOUND
 
     def test_can_publish_barra_evento_proprio_de_outro_setor(self, apoio_fluir, projeto_vidas):
-        """fix review finding 2: evento PRÓPRIO caído em OUTRO setor não é publicável pela
-        Apoio (guarda de objeto fecha o caso-limite do fail-open de create)."""
+        """fix review finding 2: evento PRÓPRIO caído em OUTRA gerência não é publicável pela
+        Apoio (guarda de objeto; o evento antigo pode ter sido criado antes do gate de projeto)."""
         from apps.core.services.solicitacao_scope import can_publish_solicitacao
 
         propria_vidas = _aprovada(apoio_fluir, projeto_vidas)
@@ -488,91 +492,94 @@ class TestSetorSomenteAprovados:
 
 
 # ---------------------------------------------------------------------------
-# I. Forma de PROD — o setor do EVENTO vem de `Projeto.setor`
+# I. A gerência do EVENTO vem de `projeto.gerencia_id` (PR 9), não de `Projeto.setor`
 # ---------------------------------------------------------------------------
 
 
 @pytest.fixture
-def projeto_fluir_prod():
-    """Forma de prod (2026-09-28): `Projeto.setor` preenchido (109/109) e `gerencia` NULL (109/109)."""
+def projeto_fluir_sem_gerencia():
+    """Forma antiga de prod (2026-09-28): `Projeto.setor` preenchido e `gerencia` NULL."""
     return ProjetoFactory(nome="Fluir das Emocoes PSS", setor="Fluir", gerencia=None)
 
 
-class TestSetorVemDoProjetoSetor:
-    """#2043 ficou inerte em prod: lia `projeto.gerencia.setor_canonico`, e `Projeto.gerencia`
-    está vazio em prod (o backfill é outra fase). O setor do evento vem de `Projeto.setor`, o
-    mesmo SSOT do escopo de projeto do S2 (`scope_projetos_by_setor`/`projeto_out_of_setor`)."""
+class TestGerenciaVemDoProjeto:
+    """PR 9: o alcance da Apoio é a gerência do projeto (`projeto.gerencia_id`). Antes (#2043) valia
+    `Projeto.setor` contra `Gerencia.setor_canonico`; agora o texto do setor não dá escopo e o projeto
+    sem gerência não é de ninguém (fail-closed), o mesmo SSOT do escopo de projeto
+    (`scope_projetos_por_gerencia`/`projeto_fora_da_gerencia`)."""
 
-    def test_scope_inclui_aprovada_do_setor_sem_gerencia_no_projeto(
-        self, apoio_fluir, outro_usuario, projeto_fluir_prod
+    def test_scope_exclui_aprovada_de_projeto_sem_gerencia(
+        self, apoio_fluir, outro_usuario, projeto_fluir_sem_gerencia
     ):
-        sol = _aprovada(outro_usuario, projeto_fluir_prod)
+        sol = _aprovada(outro_usuario, projeto_fluir_sem_gerencia)
         ids = set(scope_solicitacoes(Solicitacao.objects.all(), apoio_fluir).values_list("id", flat=True))
-        assert sol.id in ids
+        assert sol.id not in ids
 
     @patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
     @patch("django.conf.settings.GCAL_CLIENT", "fake")
     @patch("rest_framework.throttling.AnonRateThrottle.allow_request", return_value=True)
     @patch("rest_framework.throttling.UserRateThrottle.allow_request", return_value=True)
-    def test_apoio_publica_a_propria_sem_gerencia_no_projeto(
-        self, _t1, _t2, mock_task, apoio_fluir, projeto_fluir_prod
+    def test_apoio_nao_publica_a_propria_sem_gerencia_no_projeto(
+        self, _t1, _t2, mock_task, apoio_fluir, projeto_fluir_sem_gerencia
     ):
-        """O caso real da Taís: ela mesma cria o evento do Fluir e publica."""
+        """Fail-closed: nem a própria, se o projeto não tem gerência (antes o setor do projeto bastava)."""
         mock_task.return_value = _mock_task_result()
-        propria = _aprovada(apoio_fluir, projeto_fluir_prod)
+        propria = _aprovada(apoio_fluir, projeto_fluir_sem_gerencia)
         client = APIClient()
         client.force_authenticate(apoio_fluir)
 
         resp = _publish(client, propria.id)
 
-        assert resp.status_code == status.HTTP_202_ACCEPTED
+        assert resp.status_code == status.HTTP_404_NOT_FOUND
+        mock_task.assert_not_called()
 
     @patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
     @patch("django.conf.settings.GCAL_CLIENT", "fake")
     @patch("rest_framework.throttling.AnonRateThrottle.allow_request", return_value=True)
     @patch("rest_framework.throttling.UserRateThrottle.allow_request", return_value=True)
-    def test_apoio_publica_do_setor_de_terceiro_sem_gerencia_no_projeto(
-        self, _t1, _t2, mock_task, apoio_fluir, outro_usuario, projeto_fluir_prod
+    def test_apoio_nao_publica_de_terceiro_sem_gerencia_no_projeto(
+        self, _t1, _t2, mock_task, apoio_fluir, outro_usuario, projeto_fluir_sem_gerencia
     ):
         mock_task.return_value = _mock_task_result()
-        sol = _aprovada(outro_usuario, projeto_fluir_prod)
+        sol = _aprovada(outro_usuario, projeto_fluir_sem_gerencia)
         client = APIClient()
         client.force_authenticate(apoio_fluir)
 
         resp = _publish(client, sol.id)
 
-        assert resp.status_code == status.HTTP_202_ACCEPTED
+        assert resp.status_code == status.HTTP_404_NOT_FOUND
+        mock_task.assert_not_called()
 
-    def test_setor_vem_do_projeto_e_nao_da_gerencia(self, apoio_fluir, outro_usuario, gerencia_fluir):
-        """Projeto rotulado Vidas mas pendurado na gerência do Fluir: vale `Projeto.setor`."""
+    def test_gerencia_vence_o_setor_do_projeto(self, apoio_fluir, outro_usuario, gerencia_fluir):
+        """Projeto rotulado Vidas mas pendurado na gerência do Fluir: vale `projeto.gerencia_id`."""
         from apps.core.services.solicitacao_scope import can_publish_solicitacao
 
         projeto = ProjetoFactory(nome="Vidas com gerencia Fluir PSS", setor="Vidas", gerencia=gerencia_fluir)
         sol = _aprovada(outro_usuario, projeto)
 
         ids = set(scope_solicitacoes(Solicitacao.objects.all(), apoio_fluir).values_list("id", flat=True))
-        assert sol.id not in ids
-        assert can_publish_solicitacao(apoio_fluir, sol) is False
+        assert sol.id in ids
+        assert can_publish_solicitacao(apoio_fluir, sol) is True
 
     def test_projeto_sem_setor_nao_publica(self, apoio_fluir):
-        """Guarda (fail-closed): evento próprio num projeto SEM setor não é publicável."""
+        """Guarda (fail-closed): evento próprio num projeto sem setor e sem gerência não é publicável."""
         from apps.core.services.solicitacao_scope import can_publish_solicitacao
 
         projeto = ProjetoFactory(nome="Sem setor PSS", setor="", gerencia=None)
         propria = _aprovada(apoio_fluir, projeto)
         assert can_publish_solicitacao(apoio_fluir, propria) is False
 
-    def test_setor_casa_mesmo_com_gerencia_divergente(self, apoio_fluir, outro_usuario, gerencia_vidas):
-        """Guarda: projeto rotulado Fluir mas pendurado na gerência do Vidas → vale `Projeto.setor`.
-        Um backfill futuro de `Projeto.gerencia` não muda o que a Apoio publica."""
+    def test_setor_igual_nao_alcanca_gerencia_divergente(self, apoio_fluir, outro_usuario, gerencia_vidas):
+        """Projeto rotulado Fluir mas pendurado na gerência do Vidas: fora do alcance da Apoio do Fluir.
+        O texto do setor não dá escopo."""
         from apps.core.services.solicitacao_scope import can_publish_solicitacao
 
         projeto = ProjetoFactory(nome="Fluir com gerencia Vidas PSS", setor="Fluir", gerencia=gerencia_vidas)
         sol = _aprovada(outro_usuario, projeto)
 
         ids = set(scope_solicitacoes(Solicitacao.objects.all(), apoio_fluir).values_list("id", flat=True))
-        assert sol.id in ids
-        assert can_publish_solicitacao(apoio_fluir, sol) is True
+        assert sol.id not in ids
+        assert can_publish_solicitacao(apoio_fluir, sol) is False
 
 
 class TestPublishGlobalSoComUseGcal:

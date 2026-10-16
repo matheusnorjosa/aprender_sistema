@@ -796,3 +796,17 @@ class TestBloqueiosEDeslocamentosP91:
         cliente = _cliente(u91)
         assert bloqueio.id not in _ids(cliente.get("/api/availability-blocks/"))
         assert deslocamento.id not in _ids(cliente.get("/api/deslocamentos/"))
+
+    def test_formadora_so_pelo_vinculo_ve_os_proprios_eventos_no_painel(self, a_b):
+        """Formadora com vínculo FORMADOR vigente e sem o grupo: o painel conta os eventos dela (P9-1)."""
+        a, _ = a_b
+        formadora = _pessoa(("FORMADOR", a))
+        futuro = timezone.now() + timedelta(days=5)
+        dela = SolicitacaoFactory(
+            projeto=_projeto(a), status="aprovado", inicio=futuro, fim=futuro + timedelta(hours=2)
+        )
+        Participation.objects.create(solicitacao=dela, usuario=formadora, role="FORMADOR")
+        SolicitacaoFactory(projeto=_projeto(a), status="aprovado", inicio=futuro, fim=futuro + timedelta(hours=2))
+        response = _cliente(formadora).get("/api/stats/home/")
+        assert response.status_code == 200
+        assert response.data["upcoming_events"] == 1

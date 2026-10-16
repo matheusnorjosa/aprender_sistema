@@ -2826,7 +2826,9 @@ class ExportContractImporter:
         cpf_idx = self._usuario_cpf_index()
         vistos: set[int] = set()
         adotados = 0
-        for r in self._load("solicitacao"):
+        rows = self._load("solicitacao")
+        tally["export_rows"] = len(rows)
+        for r in rows:
             eid = (r.get("external_event_id") or "").strip()
             conf = (r.get("external_event_id_confianca") or "").strip().lower()
             motivo = None

@@ -805,3 +805,13 @@ def test_existente_fora_do_csv_conta(tmp_path, m):
     rows = [_sol(evento_id="EVNOVO", evento_ids_anteriores='["EVVELHO"]')]
     tally = ExportContractImporter(path=_export(tmp_path, rows), mode="virada").run()["por_entidade"]["solicitacao"]
     assert tally["existente_fora_do_csv"] == {"futuro:pendente:nao_tocado": 1}
+
+
+def test_34c_comando_virada_em_texto_mostra_os_contadores(tmp_path, m):
+    _existente(m)
+    path = _export(tmp_path, [_sol(hora_inicio="09:00", external_event_id="x" * 26)])
+    out = io.StringIO()
+    call_command("import_export_contract", "--path", path, "--mode", "virada", stdout=out)
+    texto = out.getvalue()
+    assert "[solicitacao] virada=" in texto
+    assert "[gcal_adocao] rows=1" in texto

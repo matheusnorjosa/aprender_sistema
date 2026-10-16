@@ -169,6 +169,31 @@ def test_update_de_evento_passado_ja_publicado_segue():
     assert client.inserts == []
 
 
+class _ClienteSoftDelete(_Cliente):
+    """O DELETE do Google é soft-delete: o GET pelo `asv2{id}` acha o evento cancelado."""
+
+    def get(self, calendar_id, event_id):  # noqa: ARG002
+        return {"id": event_id, "status": "cancelled"} if event_id in self.store else None
+
+
+@pytest.mark.parametrize(
+    "fazer,code",
+    [
+        (lambda: _passado(last_sync_action="DELETE"), "evento_passado"),
+        (lambda: _futuro(publicado_fora_do_sistema=True), "publicado_fora_do_sistema"),
+    ],
+)
+def test_adopt_de_asv2_cancelado_tambem_passa_pela_guarda(fazer, code):
+    """Evento tirado do Google ("Remover do Google" zera o id e o status e deixa aprovado): o GET acha o
+    `asv2{id}` cancelado e o sync cairia no ADOPT, que o traz de volta (status confirmed) sem guarda."""
+    s = fazer()
+    client = _ClienteSoftDelete(store={f"asv2{s.id}"})
+    with pytest.raises(CriacaoRecusada) as exc:
+        _upsert(client, s)
+    assert exc.value.code == code
+    assert client.updates == [] and client.inserts == []
+
+
 def test_preagenda_to_gcal_pula_passado_aprovado_e_segue():
     passado = _passado()
     futuro = _futuro()

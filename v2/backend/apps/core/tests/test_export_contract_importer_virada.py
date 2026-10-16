@@ -697,6 +697,61 @@ def test_30_evento_apagado_no_sistema_nao_volta(tmp_path, m, modo):
     assert Solicitacao.objects.count() == 0
 
 
+def _apagar_pela_tela_retrato_antigo(m, ext: str, dia: date) -> None:
+    """DELETE pela tela antes do retrato com `external_hash`: só id, município, projeto, início, fim e status."""
+    s = _existente(m, ext, dia=dia)
+    AuditLog.objects.create(
+        action="DELETE",
+        model_name="Solicitacao",
+        details={
+            "solicitacao_data": {
+                "id": s.id,
+                "municipio_id": s.municipio_id,
+                "projeto_id": s.projeto_id,
+                "inicio": s.inicio.isoformat(),
+                "fim": s.fim.isoformat(),
+                "status": s.status,
+            },
+            "ip_address": _ADMIN_IP,
+        },
+    )
+    s.delete()
+
+
+@pytest.mark.parametrize(
+    "modo,dia",
+    [("virada", FUTURO), ("virada", PASSADO), ("create-only", FUTURO)],
+)
+def test_30b_retrato_antigo_sem_external_hash_nao_recria(tmp_path, m, modo, dia):
+    _apagar_pela_tela_retrato_antigo(m, "EVDEL", dia)
+    rows = [
+        _sol(evento_id="EVDEL", data=dia.isoformat()),
+        _sol(evento_id="EVOUTRO", hora_inicio="13:00", hora_fim="17:00"),
+    ]
+    path = _export(tmp_path, rows)
+    tally = ExportContractImporter(path=path, mode=modo).run()["por_entidade"]["solicitacao"]
+    assert tally["skip_reasons"]["apagado_no_sistema"] == 1
+    ExportContractImporter(path=path, mode=modo, apply=True, allow=("solicitacao", "participation")).run()
+    assert set(Solicitacao.objects.values_list("external_hash", flat=True)) == {"EVOUTRO"}
+
+
+def test_30c_apagado_pelo_admin_entra_num_contador(tmp_path, m):
+    from django.contrib.admin.models import DELETION
+
+    s = _existente(m, "EVADM")
+    LogEntry.objects.create(
+        user_id=m.coord.id,
+        content_type_id=ContentType.objects.get_for_model(Solicitacao).id,
+        object_id=str(s.id),
+        object_repr=str(Solicitacao.objects.get(id=s.id)),  # como o admin: lido do banco, início em UTC
+        action_flag=DELETION,
+    )
+    s.delete()
+    rows = [_sol(evento_id="EVADM"), _sol(evento_id="EVOUTRO", hora_inicio="13:00", hora_fim="17:00")]
+    tally = ExportContractImporter(path=_export(tmp_path, rows), mode="virada").run()["por_entidade"]["solicitacao"]
+    assert tally["possivel_apagado_pelo_admin"] == 1
+
+
 # ---------- 31. remarcado por script ----------
 def test_31_remarcado_por_script_recebe_formadores_e_fica_com_data(tmp_path, m):
     s = _existente(m, "EVNOVO", formadores=(m.f1,), horas=(13, 17))

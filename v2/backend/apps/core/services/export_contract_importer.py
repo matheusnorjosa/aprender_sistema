@@ -846,11 +846,13 @@ def _tocado(
     return ("script" if script else "nao_tocado"), frozenset(travados), reprovado_pela_carga
 
 
-def _apagados_no_sistema() -> set[str]:
-    """`evento_id` de todo evento apagado no sistema (AuditLog DELETE de Solicitacao): o retrato da tela
-    (`solicitacao_data.external_hash`) e o dos scripts (`evento_id`, `backup.external_hash`). A carga não
-    o recria."""
-    out: set[str] = set()
+def _apagados_no_sistema() -> tuple[set[str], set[tuple[int, int, datetime]]]:
+    """Eventos apagados no sistema (AuditLog DELETE de Solicitacao), que a carga não recria:
+    - `evento_id` do retrato da tela (`solicitacao_data.external_hash`) e dos scripts (`evento_id`,
+      `backup.external_hash`);
+    - (município, projeto, início) do retrato da tela sem `external_hash` (o formato antigo, antes da virada)."""
+    hashes: set[str] = set()
+    vagas: set[tuple[int, int, datetime]] = set()
     for details in AuditLog.objects.filter(model_name="Solicitacao", action=AuditLog.Action.DELETE).values_list(
         "details", flat=True
     ):
@@ -861,7 +863,42 @@ def _apagados_no_sistema() -> set[str]:
                 for chave in ("evento_id", "external_hash"):
                     v = fonte.get(chave)
                     if isinstance(v, str) and v.strip():
-                        out.add(v.strip())
+                        hashes.add(v.strip())
+        retrato = details.get("solicitacao_data")
+        if isinstance(retrato, dict) and not str(retrato.get("external_hash") or "").strip():
+            try:
+                vagas.add(
+                    (
+                        int(retrato["municipio_id"]),
+                        int(retrato["projeto_id"]),
+                        datetime.fromisoformat(retrato["inicio"]),
+                    )
+                )
+            except (KeyError, TypeError, ValueError):
+                continue
+    return hashes, vagas
+
+
+def _vaga_da_chave(key: tuple[Any, ...]) -> tuple[int, int, datetime]:
+    """(município, projeto, início) da linha resolvida, para casar com o retrato antigo do DELETE."""
+    return key[0], key[1], timezone.make_aware(datetime.combine(key[3], key[4]), _FORTALEZA_TZ)
+
+
+_REPR_ADMIN_DATA = re.compile(r"\((\d{2}/\d{2}/\d{4} \d{2}:\d{2})\)$")
+
+
+def _inicios_apagados_pelo_admin() -> set[str]:
+    """Início (UTC, `dd/mm/aaaa HH:MM`) dos eventos apagados pelo admin do Django: o LogEntry não leva o
+    `external_hash`, só o `__str__` do evento. Serve só de contador (`possivel_apagado_pelo_admin`)."""
+    from django.contrib.admin.models import DELETION, LogEntry
+    from django.contrib.contenttypes.models import ContentType
+
+    ct_sol = ContentType.objects.get_for_model(Solicitacao)
+    out: set[str] = set()
+    for rep in LogEntry.objects.filter(content_type=ct_sol, action_flag=DELETION).values_list("object_repr", flat=True):
+        achado = _REPR_ADMIN_DATA.search(rep or "")
+        if achado:
+            out.add(achado.group(1))
     return out
 
 
@@ -905,6 +942,7 @@ _MOTIVOS_NAO_ADOTA = (
     "sem_marca",
     "id_em_outro_evento",
     "tocado_com_diferenca",
+    "diverge_da_planilha",
 )
 
 
@@ -1550,7 +1588,9 @@ class ExportContractImporter:
             ids_proprios = _ids_proprios(rows)
             bloqueados = set(ids_proprios)
             hoje = _hoje()
-            apagados = _apagados_no_sistema()
+            apagados, vagas_apagadas = _apagados_no_sistema()
+            apagados_admin = _inicios_apagados_pelo_admin()
+            tally["possivel_apagado_pelo_admin"] = 0
             # `atual` evolui linha a linha como o `existing` do apply (re-chave e criação nesta execução;
             # o criado nesta execução fica com id None).
             atual: dict[str, int | None] = dict(existing)
@@ -1612,7 +1652,7 @@ class ExportContractImporter:
                         _somar_contagem(contagem, plano["c"])
                         tally["would_update" if plano["c"]["evento_atualizado"] else "would_skip_same"] += 1
                         continue
-                elif ext_hash in apagados:
+                elif ext_hash in apagados or (key is not None and _vaga_da_chave(key) in vagas_apagadas):
                     # Apagado no sistema (tela ou script): a carga não recria (plano da virada, item 11).
                     tally["would_skip_same"] += 1
                     skip_reasons["apagado_no_sistema"] += 1
@@ -1631,6 +1671,9 @@ class ExportContractImporter:
                 elif key is not None:
                     self._sol_criaria[ext_hash] = key[7]
                     atual[ext_hash] = None
+                    if _vaga_da_chave(key)[2].astimezone(ZoneInfo("UTC")).strftime("%d/%m/%Y %H:%M") in apagados_admin:
+                        # Mesmo início de um evento apagado pelo admin: só conta, para o dono conferir.
+                        tally["possivel_apagado_pelo_admin"] += 1
                     if virada and _marca_da_linha(r):
                         _conta(contagem, "marca_fora_do_sistema")
                 st, _ = diff_and_classify({} if existe else None, {}, protected)
@@ -2335,7 +2378,7 @@ class ExportContractImporter:
         passadas = 0
         hoje = _hoje()
         bloqueados = _ids_proprios(rows)
-        apagados = _apagados_no_sistema()
+        apagados, vagas_apagadas = _apagados_no_sistema()
         virada = self.mode == "virada"
         contagem = _contagem_virada()
         ctx = self._virada_ctx(hoje, cpf_idx) if virada else {}
@@ -2386,9 +2429,9 @@ class ExportContractImporter:
                     vistos.add(sid)
                     atualizadas += self._aplicar_virada(sid, r, key, ext_hash, ctx, contagem)
                 continue
-            if ext_hash in apagados:
-                continue  # apagado no sistema (tela ou script): a carga não recria
             assert key is not None
+            if ext_hash in apagados or _vaga_da_chave(key) in vagas_apagadas:
+                continue  # apagado no sistema (tela ou script): a carga não recria
             mun_id, proj_id, tipo_id, data_ev, hora_ini, hora_fim, segmento, coord_id, ext_hash = key
             if data_ev < hoje and not virada:
                 passadas += 1
@@ -2889,10 +2932,11 @@ class ExportContractImporter:
             return "sem_marca"
         if usados.get(eid, s.id) != s.id:
             return "id_em_outro_evento"
-        logs, admin = tocado
-        if _tocado(s, logs, admin)[0] != "nao_tocado" and self._diverge_da_planilha(s, r, parts, parts_csv, cpf_idx):
-            # O hash diria "igual ao sistema" e o Reapply pularia, com o Google mostrando outra coisa.
-            return "tocado_com_diferenca"
+        if self._diverge_da_planilha(s, r, parts, parts_csv, cpf_idx):
+            # O hash diria "igual ao sistema" e o Reapply pularia, com o Google mostrando outra coisa. Vale
+            # também para o não tocado: a carga pode não ter igualado (remoção bloqueada, formador inativo).
+            logs, admin = tocado
+            return "tocado_com_diferenca" if _tocado(s, logs, admin)[0] != "nao_tocado" else "diverge_da_planilha"
         return None
 
     def _diverge_da_planilha(

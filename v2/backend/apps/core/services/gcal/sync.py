@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 class CriacaoRecusada(ValueError):
-    """O sync ia CRIAR o evento no Google e a guarda da virada recusou (`code` diz por quê).
+    """O sync ia CRIAR (ou adotar o `asv2{id}`) no Google e a guarda da virada recusou (`code` diz por quê).
 
     `evento_passado`: o evento já terminou. `publicado_fora_do_sistema`: ele já está no Google pela
     planilha e não foi adotado, então criar daria um segundo evento. Quem chama marca ERROR (tarefa)
@@ -40,7 +40,7 @@ class CriacaoRecusada(ValueError):
 
 
 def _motivo_para_nao_criar(s: Solicitacao) -> CriacaoRecusada | None:
-    """Guarda única do CREATE (Publicar, lote, Reapply, Resync e `preagenda_to_gcal` passam por aqui)."""
+    """Guarda única do CREATE e do ADOPT (Publicar, lote, Reapply, Resync e `preagenda_to_gcal` passam por aqui)."""
     if s.publicado_fora_do_sistema:
         return CriacaoRecusada(
             "publicado_fora_do_sistema",
@@ -305,10 +305,14 @@ def upsert_one(
                 if error_msg is None:
                     error_msg = f"Erro ao buscar evento determinístico: {str(e)}"
 
-        if existing is None:
+        if existing is None or not s.external_event_id:
+            # Publicar (CREATE, ou ADOPT do `asv2{id}` que o GET achou, mesmo cancelado: o DELETE do Google é
+            # soft-delete e o UPDATE o traz de volta) passa pela guarda. UPDATE de evento já publicado não.
             recusa = _motivo_para_nao_criar(s)
             if recusa is not None:
                 raise recusa
+
+        if existing is None:
             # CREATE: Evento não existe
             action = "CREATE"
             external_event_id = deterministic_eid

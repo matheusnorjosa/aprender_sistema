@@ -156,6 +156,21 @@ def test_17d_tocado_com_formador_diferente_nao_adota(tmp_path, m):
     assert _dry(path)["skip_reasons"]["tocado_com_diferenca"] == 1
 
 
+def test_17f_nao_tocado_que_a_carga_nao_igualou_nao_adota(tmp_path, m):
+    """Formador sem cadastro na planilha: a carga não tira ninguém (decisão 5) e o evento fica {f1, f2},
+    enquanto o Google (= planilha) tem outros convidados. Adotar gravaria um hash "igual ao sistema"."""
+    s = _pronto(m, formadores=(m.f1,))
+    parts = [_part("EV1", _CPF_F2), _part("EV1", "", nome="Pessoa Sem Cadastro")]
+    path = _export(tmp_path, [_linha()], parts)
+    ExportContractImporter(path=path, mode="virada", apply=True, allow=("solicitacao", "participation")).run()
+    tally = _dry(path)
+    assert tally["would_adopt_gcal"] == 0
+    assert tally["skip_reasons"]["diverge_da_planilha"] == 1
+    _adocao(path)
+    s.refresh_from_db()
+    assert s.external_event_id is None and s.publicado_fora_do_sistema is True
+
+
 def test_17e_tocado_igual_a_planilha_adota(tmp_path, m):
     s = _pronto(m, formadores=(m.f1,))
     _log_tela(s)

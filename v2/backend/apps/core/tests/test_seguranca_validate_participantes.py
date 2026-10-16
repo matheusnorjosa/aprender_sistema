@@ -13,6 +13,7 @@ from typing import Any
 
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
+from rest_framework import serializers
 from rest_framework.test import APIClient
 
 import pytest
@@ -95,6 +96,28 @@ class TestCorpoValidado:
         emails = [f"p{i}@example.invalid" for i in range(201)]
         resp = _post(cenario["coord"], _payload(cenario, {"formadores": emails}))
         assert resp.status_code == 400
+
+    @pytest.mark.parametrize("item", ["x", "a@b.cc"])
+    def test_lista_gigante_e_recusada_pelo_tamanho_sem_validar_os_itens(self, cenario, item, monkeypatch):
+        """Revisão do F2: o `ListField(max_length=)` do DRF valida TODOS os itens e só depois olha o
+        tamanho, juntando um erro por item. 10 mil itens têm de dar um erro só, sem tocar nos itens."""
+        chamadas = 0
+        original = serializers.EmailField.to_internal_value
+
+        def contar(self, data):
+            nonlocal chamadas
+            chamadas += 1
+            return original(self, data)
+
+        monkeypatch.setattr(serializers.EmailField, "to_internal_value", contar)
+
+        resp = _post(cenario["coord"], _payload(cenario, {"formadores": [item] * 10_000}))
+
+        assert resp.status_code == 400
+        assert chamadas == 0
+        erros = resp.json()["errors"]["participants"]["formadores"]
+        assert len(erros) == 1 and "200" in erros[0], erros
+        assert len(resp.content) < 1_000
 
     def test_lista_no_teto_passa(self, cenario):
         emails = [f"p{i}@example.invalid" for i in range(200)]

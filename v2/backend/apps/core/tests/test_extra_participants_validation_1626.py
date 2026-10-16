@@ -115,6 +115,19 @@ class TestMalformedExtraParticipants:
         )
         assert resp.status_code == 400
 
+    @pytest.mark.parametrize("campo,item", [("formador_emails", "x"), ("formador_ids", "abc")])
+    def test_lista_gigante_e_recusada_pelo_tamanho_com_um_erro_so(
+        self, client_coord, municipio, projeto, tipo_evento, campo, item
+    ):
+        """Revisão do F2 (mesmo padrão do validate): o teto de 200 vale antes de validar cada item."""
+        resp = client_coord.post(
+            "/api/solicitacoes/",
+            _payload(municipio, projeto, tipo_evento, {campo: [item] * 10_000}),
+            format="json",
+        )
+        assert resp.status_code == 400
+        assert len(resp.content) < 1_000, resp.content[:300]
+
 
 class TestParticipantResolution:
     def test_inactive_user_not_added_as_participant(self, client_coord, municipio, projeto, tipo_evento):

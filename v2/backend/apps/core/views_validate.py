@@ -62,6 +62,7 @@ from apps.core.services.solicitacao_scope import scope_usuarios_por_gerencia
 
 from .models import Municipio, Projeto, TipoEvento, Usuario
 from .permissions import HasPerm
+from .serializers.campos import ListaComTeto
 
 logger = logging.getLogger(__name__)
 
@@ -70,13 +71,16 @@ _MAX_PARTICIPANTES = 200
 
 
 class _ParticipantsSerializer(serializers.Serializer):
-    """F2 (scan 16/10/2026): forma de `participants` antes de qualquer consulta ao banco."""
+    """F2 (scan 16/10/2026): forma de `participants` antes de qualquer consulta ao banco.
+
+    `ListaComTeto`: o teto vale antes de validar cada item (lista gigante não prende o worker).
+    """
 
     coordenador = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
-    formadores = serializers.ListField(
+    formadores = ListaComTeto(
         child=serializers.EmailField(allow_blank=True), required=False, default=list, max_length=_MAX_PARTICIPANTES
     )
-    coord_acompanha = serializers.ListField(
+    coord_acompanha = ListaComTeto(
         child=serializers.EmailField(allow_blank=True), required=False, default=list, max_length=_MAX_PARTICIPANTES
     )
 

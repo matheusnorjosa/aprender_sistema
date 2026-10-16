@@ -130,10 +130,11 @@ def dashboard_overview(request: Request) -> Response:
         for item in por_gerencia_raw[:5]  # Top 5
     ]
 
-    # Top Coordenadores (por eventos criados nos últimos 30 dias)
+    # Top Coordenadores (por eventos criados nos últimos 30 dias). S5: agrupa pela conta
+    # (id) e, sem nome, mostra "Usuario #id"; o login é o CPF e não sai daqui.
     top_coord_raw = (
         qs_30d.exclude(usuario__isnull=True)
-        .values("usuario__first_name", "usuario__last_name", "usuario__username")
+        .values("usuario", "usuario__first_name", "usuario__last_name")
         .annotate(eventos=Count("id"))
         .order_by("-eventos")[:5]
     )
@@ -145,7 +146,7 @@ def dashboard_overview(request: Request) -> Response:
         nome_completo = f"{first} {last}".strip()
         top_coordenadores.append(
             {
-                "nome": nome_completo or item["usuario__username"],
+                "nome": nome_completo or f"Usuario #{item['usuario']}",
                 "eventos": item["eventos"],
             }
         )

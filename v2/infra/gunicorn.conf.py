@@ -38,7 +38,10 @@ worker_tmp_dir = "/dev/shm" if os.path.exists("/dev/shm") else None
 accesslog = "-"  # stdout
 errorlog = "-"   # stderr
 loglevel = os.getenv("GUNICORN_LOG_LEVEL", "info")
-access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s" %(D)s'
+# S5 (CPF fora dos logs): este log não passa pelo PIIRedactionFilter do Django. A linha
+# do pedido vai sem a query string (%(U)s em vez de %(r)s: ?q=<cpf> na busca) e sem o
+# referer (%(f)s), que repete a query da tela.
+access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(m)s %(U)s %(H)s" %(s)s %(b)s "%(a)s" %(D)s'
 
 # ================================================================
 # BIND

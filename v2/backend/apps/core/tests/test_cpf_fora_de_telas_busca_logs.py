@@ -23,8 +23,11 @@ import io
 import itertools
 import json
 import logging
+import pathlib
 import re
+import runpy
 from datetime import timedelta
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from django.conf import settings
@@ -38,6 +41,7 @@ from pythonjsonlogger.jsonlogger import JsonFormatter
 from apps.core.logging_filters import PIIRedactionFilter
 from apps.core.models import AuditLog, AvailabilityBlock, Deslocamento, Participation, PlanoFormacoes, Solicitacao
 from apps.core.services.monthly_grid_service import build_monthly_grid
+from apps.core.tests.ambiente_repo import exige_raiz_do_repo
 from apps.core.tests.factories import (
     GerenciaFactory,
     MunicipioFactory,
@@ -295,6 +299,51 @@ def test_filtro_redige_cpf_no_traceback():
     linha = saida.getvalue()
     assert "ValueError" in linha
     assert not _ONZE_DIGITOS.search(linha), linha
+
+
+# O access log do gunicorn e do nginx não passa pelo PIIRedactionFilter: a linha do pedido
+# não pode levar a query string (?q=<cpf> na busca de quem administra cadastros) nem o referer.
+
+
+def _gunicorn_conf(qual: str) -> pathlib.Path:
+    if qual == "backend":  # o que o container de desenvolvimento usa (/app/infra)
+        return pathlib.Path(__file__).resolve().parents[3] / "infra" / "gunicorn.conf.py"
+    return exige_raiz_do_repo() / "v2" / "infra" / "gunicorn.conf.py"  # o da imagem de produção
+
+
+@pytest.mark.parametrize("qual", ["backend", "imagem"])
+def test_access_log_do_gunicorn_nao_grava_a_query_nem_o_referer(qual):
+    from gunicorn.config import Config
+    from gunicorn.glogging import Logger
+
+    formato = runpy.run_path(str(_gunicorn_conf(qual)))["access_log_format"]
+    cpf = _cpf()
+    environ = {
+        "REQUEST_METHOD": "GET",
+        "RAW_URI": f"/api/lookup/usuarios/?q={cpf}",
+        "PATH_INFO": "/api/lookup/usuarios/",
+        "QUERY_STRING": f"q={cpf}",
+        "SERVER_PROTOCOL": "HTTP/1.1",
+        "HTTP_REFERER": f"https://sistema.example.invalid/usuarios?busca={cpf}",
+        "HTTP_USER_AGENT": "pytest",
+        "REMOTE_ADDR": "10.0.0.1",
+    }
+    resp = SimpleNamespace(status="200 OK", sent=10, headers=[])
+    atoms = Logger(Config()).atoms(resp, SimpleNamespace(headers=[]), environ, timedelta(milliseconds=5))
+    linha = formato % atoms
+    assert "/api/lookup/usuarios/" in linha
+    assert not _ONZE_DIGITOS.search(linha), linha
+
+
+def test_access_log_do_nginx_nao_grava_a_query_nem_o_referer():
+    conf = (exige_raiz_do_repo() / "v2" / "frontend" / "nginx.conf").read_text(encoding="utf-8")
+    m = re.search(r"^\s*access_log\s+\S+\s+(\w+)\s*;", conf, re.MULTILINE)
+    assert m, "o server não declara access_log com formato próprio (o padrão grava $request)"
+    fmt = re.search(rf"log_format\s+{m.group(1)}\s+(?P<corpo>[^;]*);", conf)
+    assert fmt, f"log_format {m.group(1)} não declarado"
+    variaveis = set(re.findall(r"\$(\w+)", fmt.group("corpo")))
+    assert "uri" in variaveis
+    assert not variaveis & {"request", "request_uri", "args", "query_string", "http_referer"}, variaveis
 
 
 def test_criar_solicitacao_loga_user_id_sem_username(caplog):
@@ -562,6 +611,17 @@ def test_metricas_de_formadores_e_coordenadores_nao_levam_cpf_de_quem_nao_tem_no
         resp = _client(quem).get(rota)
         _sem_cpf(resp, rota)
         assert "Usuario #" in resp.content.decode(), rota
+
+
+def test_painel_geral_nao_leva_cpf_de_coordenador_sem_nome():
+    # Diretoria vê o painel geral e não administra contas.
+    diretoria = _conta(nome="Diretora", groups=["Diretoria"])
+    sem_nome = _conta(groups=["Coordenador"])
+    inicio = timezone.now() - timedelta(days=2)
+    SolicitacaoFactory(status="aprovado", usuario=sem_nome, inicio=inicio, fim=inicio + timedelta(hours=2))
+    resp = _client(diretoria).get("/api/dashboard/overview/")
+    _sem_cpf(resp, "dashboard/overview")
+    assert resp.json()["top_coordenadores"] == [{"nome": f"Usuario #{sem_nome.id}", "eventos": 1}]
 
 
 def _membro_super_sem_nome():

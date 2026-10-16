@@ -15,7 +15,7 @@ from typing import Any, cast
 from rest_framework import serializers  # type: ignore[attr-defined]
 
 from apps.core.models import AuditLog, Participation, Solicitacao
-from apps.core.pii import redact_cpf_deep
+from apps.core.pii import email_sem_cpf, redact_cpf_deep
 from apps.core.serializers.usuario import UserSlimSerializer
 from apps.core.services.avaliacao_formador import formadores_avaliaveis_ids, gerencia_pergunta
 from apps.core.services.compra_elegibilidade import isento_da_regra_da_compra, par_liberado
@@ -36,7 +36,8 @@ class ParticipationNestedSerializer(serializers.ModelSerializer):
 
     def get_email(self, obj: Participation) -> str | None:
         user_email = getattr(getattr(obj, "usuario", None), "email", None)
-        return user_email or getattr(obj, "guest_email", None)
+        # S5: sem o e-mail de reserva `<cpf>@placeholder.local` nem e-mail que leve CPF.
+        return email_sem_cpf(user_email or getattr(obj, "guest_email", None))
 
 
 class SolicitacaoSerializer(serializers.ModelSerializer):

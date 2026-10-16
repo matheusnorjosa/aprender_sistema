@@ -34,7 +34,7 @@ import pytest
 from pythonjsonlogger.jsonlogger import JsonFormatter
 
 from apps.core.logging_filters import PIIRedactionFilter
-from apps.core.models import AuditLog, Solicitacao
+from apps.core.models import AuditLog, Participation, Solicitacao
 from apps.core.tests.factories import (
     MunicipioFactory,
     ProjetoFactory,
@@ -170,6 +170,11 @@ def cenario():
         external_event_id="evtsemcoord",
         **comum,
     )
+    # Conta importada sem e-mail na planilha: o e-mail de reserva é `<cpf>@placeholder.local`.
+    sem_email = _conta(nome="Rita", groups=["Formador"])
+    sem_email.email = f"{sem_email.cpf}@placeholder.local"
+    sem_email.save(update_fields=["email"])
+    Participation.objects.create(solicitacao=com_coord, usuario=sem_email, role=Participation.Role.FORMADOR)
     # Linha da timeline do detalhe feita por quem não tem nome.
     AuditLog.objects.create(
         usuario=criador_sem_nome,
@@ -182,6 +187,7 @@ def cenario():
         "criador": criador_sem_nome,
         "coordenador": coordenador,
         "avaliado": avaliado_sem_nome,
+        "sem_email": sem_email,
         "com_coord": com_coord,
         "sem_coord": sem_coord,
     }
@@ -203,7 +209,7 @@ def _rotas(c) -> list[str]:
 
 def test_respostas_de_solicitacoes_e_gcal_nao_levam_cpf(cenario):
     cliente = _client(cenario["controle"])
-    cpfs = {cenario["criador"].username, cenario["coordenador"].username, cenario["avaliado"].username}
+    cpfs = {cenario[k].username for k in ("criador", "coordenador", "avaliado", "sem_email")}
     for rota in _rotas(cenario):
         resp = cliente.get(rota)
         assert resp.status_code == 200, (rota, resp.status_code)
@@ -399,7 +405,7 @@ def test_erro_de_credencial_google_nao_leva_cpf_a_timeline_nem_a_auditoria(cenar
 
 
 def test_conflito_de_agenda_nao_leva_cpf_de_formador_sem_nome():
-    from apps.core.models import AvailabilityBlock, Participation
+    from apps.core.models import AvailabilityBlock
     from apps.core.tests.factories import liberar_par
 
     municipio = MunicipioFactory()
@@ -434,8 +440,6 @@ def test_conflito_de_agenda_nao_leva_cpf_de_formador_sem_nome():
 
 
 def test_meus_eventos_nao_levam_cpf_de_co_participante_sem_nome():
-    from apps.core.models import Participation
-
     eu = _conta(nome="Ana", sobrenome="Formadora", groups=["Formador"])
     colega_sem_nome = _conta(groups=["Formador"])
     s = SolicitacaoFactory(status="aprovado", inicio=timezone.now() + timedelta(days=5))
@@ -463,3 +467,18 @@ def test_descricao_do_evento_no_google_nao_leva_cpf_de_quem_nao_tem_nome():
     assert f"Coordenador(a): Usuario #{coordenador.id}" in descricao
     assert f"Formador(es): Usuario #{formador.id}" in descricao
     assert not _ONZE_DIGITOS.search(descricao), descricao
+
+
+def test_convite_do_google_nao_leva_email_de_reserva_com_cpf():
+    """O e-mail `<cpf>@placeholder.local` não é caixa de verdade e mostraria o CPF aos convidados."""
+    from apps.core.services.gcal.payload import build_attendees_for_solicitacao
+
+    sem_email = _conta(groups=["Formador"])
+    sem_email.email = f"{sem_email.cpf}@placeholder.local"
+    sem_email.save(update_fields=["email"])
+    com_email = _conta(groups=["Formador"])
+    s = SolicitacaoFactory(status="aprovado")
+    for u in (sem_email, com_email):
+        Participation.objects.create(solicitacao=s, usuario=u, role=Participation.Role.FORMADOR)
+
+    assert build_attendees_for_solicitacao(s) == [{"email": com_email.email}]

@@ -14,6 +14,7 @@ from datetime import timezone as dt_timezone
 from django.conf import settings
 
 from apps.core.models import Solicitacao
+from apps.core.pii import email_de_reserva
 from apps.core.types import JsonDict, PayloadHash
 
 from .minimize import minimize_free_text
@@ -53,7 +54,9 @@ def build_attendees_for_solicitacao(s: Solicitacao) -> list[JsonDict]:
         elif p.guest_email:
             email = p.guest_email
 
-        if email:
+        # S5: o e-mail de reserva `<cpf>@placeholder.local` não é caixa de verdade e mostraria o
+        # CPF a todos os convidados.
+        if email and not email_de_reserva(email):
             emails.add(email.strip().lower())
 
     # Retornar lista de dicts no formato Google Calendar

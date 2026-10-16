@@ -18,6 +18,10 @@ _CPF_RE = re.compile(r"\b(?:\d{3}\.\d{3}\.\d{3}-\d{2}|\d{11})\b")
 # Convencao alinhada ao PIIRedactionFilter dos logs (logging_filters.py).
 _CPF_PLACEHOLDER = "<cpf>"
 
+# Conta importada sem e-mail recebe `<cpf>@placeholder.local` (services/usuarios_import.py):
+# não é caixa de verdade e leva o CPF.
+EMAIL_DE_RESERVA_SUFIXO = "@placeholder.local"
+
 
 def redact_cpf(value: Any) -> Any:
     """Troca qualquer CPF (cru ou formatado) por `<cpf>`; no-op se nao houver CPF.
@@ -27,6 +31,18 @@ def redact_cpf(value: Any) -> Any:
     if not isinstance(value, str):
         return value
     return _CPF_RE.sub(_CPF_PLACEHOLDER, value)
+
+
+def email_de_reserva(email: str) -> bool:
+    """True para o e-mail `<cpf>@placeholder.local` dado a conta importada sem e-mail."""
+    return email.strip().lower().endswith(EMAIL_DE_RESERVA_SUFIXO)
+
+
+def email_sem_cpf(email: str | None) -> str | None:
+    """E-mail para mostrar fora da administração de contas: None se for o de reserva ou levar CPF."""
+    if not email or email_de_reserva(email) or redact_cpf(email) != email:
+        return None
+    return email
 
 
 def redact_cpf_deep(value: Any) -> Any:

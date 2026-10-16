@@ -31,8 +31,10 @@ describe('participantLabel', () => {
     expect(participantLabel({ ...base, usuario: usuario() })).toBe('João Silva');
   });
 
-  it('usuário sem first/last → username', () => {
-    expect(participantLabel({ ...base, usuario: usuario({ first_name: '', last_name: '' }) })).toBe('jsilva');
+  // S5: o login é o CPF e o e-mail pode ser o de reserva `<cpf>@placeholder.local`.
+  it('usuário sem first/last → "Usuario #id", nunca o login nem o e-mail', () => {
+    const semNome = usuario({ first_name: '', last_name: '', username: '52998224725', email: '52998224725@placeholder.local' });
+    expect(participantLabel({ ...base, usuario: semNome, email: semNome.email })).toBe('Usuario #1');
   });
 
   it('convidado sem FK com guest_nome → nome preservado (importado que saiu)', () => {

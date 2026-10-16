@@ -95,7 +95,7 @@ Legenda dos status codes (matriz executável):
 
 | Recurso (método URL) | Superuser | DAT | Controle | Diretoria | Gerente | Gerente da Superintendência | Assistente Administrativo do Controle | Coordenador | Apoio de Coordenação | Formador |
 |---|---|---|---|---|---|---|---|---|---|---|
-| **grade_mensal** (`GET /api/availability/monthly/`) | ✅ | ✅ | ✅ | 🔒 | ✅ | ✅ | ✅ | ✅ | ✅ | 🔒 (D24) |
+| **grade_mensal** (`GET /api/availability/monthly/`) | ✅ | ✅ | ✅ | 🔒 | ✅ | ✅ | ✅ | ✅ | ✅ | 🔒 |
 | **deslocamentos** (`GET /api/deslocamentos/`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **dashboard_compras** (`GET /api/dat/compras-materiais/dashboard/`) | ✅ | ✅ | 🔒 | ✅ | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 | 🔒 |
 | **metrics_team_productivity** (`GET /api/metrics/team/productivity/`) | ✅ | ✅ | ✅ | ✅ | 🔒 | 🔒 | ✅ | 🔒 | 🔒 | 🔒 |

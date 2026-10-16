@@ -79,6 +79,7 @@ SELF_APPROVAL_CODE = "self_approval_forbidden"
 ALTERED_ACCOUNT_CODE = "altered_account_approval_forbidden"
 ALTERED_BY_AUTHOR_CODE = "approver_account_altered_by_author_forbidden"
 EDITED_BY_APPROVER_CODE = "edited_by_approver_forbidden"
+SAME_ALTERER_CODE = "accounts_altered_by_same_person_forbidden"
 
 # PA-02, segregação por histórico (D2, PR 10; decisão do dono de 16/10: qualquer alteração pela tela
 # de Usuários conta, inclusive corrigir o nome e criar a conta). Filtro: `model_name="Usuario"`, ator =
@@ -110,6 +111,7 @@ DECISAO_IMPEDIDA: dict[str, str] = {
     SELF_APPROVAL_CODE: "propria",
     ALTERED_ACCOUNT_CODE: "conta_alterada",
     ALTERED_BY_AUTHOR_CODE: "conta_alterada_pelo_autor",
+    SAME_ALTERER_CODE: "contas_alteradas_pela_mesma_pessoa",
     EDITED_BY_APPROVER_CODE: "editada_pelo_ator",
 }
 
@@ -126,6 +128,11 @@ def mensagem_impedida(code: str, acao: str) -> str:
     if code == ALTERED_BY_AUTHOR_CODE:
         return (
             "Quem pediu esta solicitação alterou a sua conta nos últimos 30 dias. "
+            "Outra pessoa aprovadora precisa decidir."
+        )
+    if code == SAME_ALTERER_CODE:
+        return (
+            "A mesma pessoa alterou a sua conta e a de quem pediu esta solicitação nos últimos 30 dias. "
             "Outra pessoa aprovadora precisa decidir."
         )
     return (
@@ -154,8 +161,10 @@ def contas_alteradas_por(user: Usuario) -> dict[int, datetime]:
 def quem_alterou_a_conta_de(user: Usuario, desde: datetime) -> dict[int, datetime]:
     """{id de quem alterou a conta de `user` desde `desde`: última vez} (uma consulta).
 
-    Serve à D2 ao contrário (o autor redefine a senha de uma aprovadora e decide pela conta dela) e ao
-    fantoche ao contrário de "quem editou não decide" (quem editou faz o mesmo).
+    Serve à D2 ao contrário (o autor redefine a senha de uma aprovadora e decide pela conta dela), aos
+    dois fantoches (a mesma pessoa alterou a conta do autor e a da aprovadora) e ao fantoche ao contrário
+    de "quem editou não decide" (quem editou faz o mesmo). O superusuário fica de fora: ele já decide
+    tudo (break-glass), então tomar uma conta não lhe dá nada, e ele lota e corrige as contas de todos.
     """
     if not getattr(user, "pk", None):
         return {}
@@ -167,11 +176,35 @@ def quem_alterou_a_conta_de(user: Usuario, desde: datetime) -> dict[int, datetim
             created_at__gte=desde,
         )
         .exclude(usuario_id=None)
+        .exclude(usuario__is_superuser=True)
         .order_by()
         .values("usuario_id")
         .annotate(ultima=Max("created_at"))
         .values_list("usuario_id", "ultima")
     )
+
+
+def _autores_alterados_por(alteradores: set[int], autores: set[int], desde: datetime) -> dict[int, dict[int, datetime]]:
+    """{autor: {quem alterou a conta dele desde `desde`: última vez}}, só entre `alteradores` (uma consulta)."""
+    pares: dict[int, dict[int, datetime]] = {}
+    if not alteradores or not autores:
+        return pares
+    for alterador_id, autor_id, ultima in (
+        AuditLog.objects.filter(
+            model_name="Usuario",
+            action__in=ACOES_QUE_ALTERAM_CONTA,
+            usuario_id__in=alteradores,
+            details__target_user_id__in=list(autores),
+            created_at__gte=desde,
+        )
+        .order_by()
+        .values("usuario_id", "details__target_user_id")
+        .annotate(ultima=Max("created_at"))
+        .values_list("usuario_id", "details__target_user_id", "ultima")
+    ):
+        if isinstance(autor_id, int):
+            pares.setdefault(autor_id, {})[alterador_id] = ultima
+    return pares
 
 
 def _corte(criada_em: datetime | None, agora: datetime) -> datetime:
@@ -250,9 +283,10 @@ def impedimentos(user: Usuario, solicitacoes: QuerySet[Solicitacao]) -> dict[int
     """PA-02 (segregação): {id: código} das solicitações de `solicitacoes` que `user` não decide.
 
     Ordem: própria, conta do autor alterada pelo ator (D2), conta do ator alterada pelo autor (D2 ao
-    contrário), editada pelo ator (ou por quem alterou a conta dele). Calcula também para o
-    superusuário (o AuditLog dele marca o break-glass); quem bloqueia é `decisoes_impedidas`. Número de
-    consultas constante (sem consulta por item).
+    contrário), as duas contas alteradas pela mesma pessoa (dois fantoches), editada pelo ator (ou por
+    quem alterou a conta dele). Calcula também para o superusuário (o AuditLog dele marca o
+    break-glass); quem bloqueia é `decisoes_impedidas`. Número de consultas constante (sem consulta
+    por item).
     """
     if not getattr(user, "pk", None):
         return {}
@@ -263,6 +297,9 @@ def impedimentos(user: Usuario, solicitacoes: QuerySet[Solicitacao]) -> dict[int
     cortes = {sol_id: _corte(criada_em, agora) for sol_id, _, criada_em in linhas}
     alteradas = contas_alteradas_por(user)
     alteraram_a_minha = quem_alterou_a_conta_de(user, min(cortes.values()))
+    autores_alterados = _autores_alterados_por(
+        set(alteraram_a_minha) - {user.pk}, {autor_id for _, autor_id, _ in linhas}, min(cortes.values())
+    )
     resultado: dict[int, str] = {}
     for sol_id, autor_id, _ in linhas:
         corte = cortes[sol_id]
@@ -272,6 +309,11 @@ def impedimentos(user: Usuario, solicitacoes: QuerySet[Solicitacao]) -> dict[int
             resultado[sol_id] = ALTERED_ACCOUNT_CODE
         elif autor_id in alteraram_a_minha and alteraram_a_minha[autor_id] >= corte:
             resultado[sol_id] = ALTERED_BY_AUTHOR_CODE
+        elif any(
+            min(quando, alteraram_a_minha[alterador_id]) >= corte
+            for alterador_id, quando in autores_alterados.get(autor_id, {}).items()
+        ):
+            resultado[sol_id] = SAME_ALTERER_CODE
     restantes = {sol_id: corte for sol_id, corte in cortes.items() if sol_id not in resultado}
     if restantes:
         for sol_id in _editadas_pelo_ator(user, restantes, alteradas, alteraram_a_minha):
@@ -306,6 +348,7 @@ def _marcas(code: str | None) -> dict[str, bool]:
     return {
         "conta_alterada_pelo_ator": code == ALTERED_ACCOUNT_CODE,
         "conta_do_ator_alterada_pelo_autor": code == ALTERED_BY_AUTHOR_CODE,
+        "contas_alteradas_pela_mesma_pessoa": code == SAME_ALTERER_CODE,
         "editada_pelo_ator": code == EDITED_BY_APPROVER_CODE,
     }
 

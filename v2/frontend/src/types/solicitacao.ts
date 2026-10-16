@@ -61,6 +61,7 @@ export type DecisaoImpedida =
   | 'propria'
   | 'conta_alterada'
   | 'conta_alterada_pelo_autor'
+  | 'contas_alteradas_pela_mesma_pessoa'
   | 'editada_pelo_ator';
 
 export interface Solicitacao {
@@ -90,6 +91,7 @@ export interface Solicitacao {
    * PA-02 (PR 10): por que quem lê NÃO decide esta pendente; null quando decide ou não aprova.
    * `propria`: pediu; `conta_alterada`: alterou a conta de quem pediu nos 30 dias;
    * `conta_alterada_pelo_autor`: quem pediu alterou a conta de quem lê nos 30 dias;
+   * `contas_alteradas_pela_mesma_pessoa`: a mesma pessoa alterou a conta de quem lê e a de quem pediu;
    * `editada_pelo_ator`: mudou data, horário, município, projeto ou formadores.
    */
   decisao_impedida?: DecisaoImpedida | null;

@@ -93,6 +93,7 @@ const TAG_DA_DECISAO_IMPEDIDA: Record<DecisaoImpedida, string> = {
   propria: 'Sua solicitação',
   conta_alterada: 'Você alterou a conta de quem pediu',
   conta_alterada_pelo_autor: 'Quem pediu alterou a sua conta',
+  contas_alteradas_pela_mesma_pessoa: 'A mesma pessoa alterou a sua conta e a de quem pediu',
   editada_pelo_ator: 'Você editou esta solicitação',
 };
 

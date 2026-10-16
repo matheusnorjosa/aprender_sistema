@@ -9,9 +9,10 @@ Solicitacao ViewSet (views ativas)
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any
 
-from django.db.models import Case, F, IntegerField, Q, QuerySet, Value, When
+from django.db.models import Case, F, IntegerField, Max, Q, QuerySet, Value, When
 from django.db.models.functions import Lower
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
@@ -150,6 +151,21 @@ def _rebaixar_se_mudou_campo_material(solicitacao: Solicitacao, antes: dict[str,
     return mudaram
 
 
+def _projeto_saiu_do_super_depois_da_aprovacao(solicitacao: Solicitacao, projeto_id: int | None) -> bool:
+    """PA-04 (PR 10, decisão 5 do dono: troca de fluxo com registro): o projeto teve troca de fluxo
+    saindo do SUPER (AuditLog `model_name="Projeto"`) depois da última aprovação da solicitação, ou da
+    criação dela se não há APPROVE registrado. Até 2 consultas."""
+    if projeto_id is None:
+        return False
+    ultima_aprovacao: datetime | None = AuditLog.objects.filter(
+        model_name="Solicitacao", action=AuditLog.Action.APPROVE, details__solicitacao_id=solicitacao.pk
+    ).aggregate(ultima=Max("created_at"))["ultima"]
+    desde = max(solicitacao.created_at, ultima_aprovacao) if ultima_aprovacao else solicitacao.created_at
+    return AuditLog.objects.filter(
+        model_name="Projeto", details__projeto_id=projeto_id, details__fluxo__old="SUPER", created_at__gte=desde
+    ).exists()
+
+
 def _batch_response_schema(contador: str) -> dict[str, Any]:
     """Schema OpenAPI da resposta dos lotes: contador + errors[{id, detail, code?, blocked_participants?}].
 
@@ -173,6 +189,7 @@ def _batch_response_schema(contador: str) -> dict[str, Any]:
                                 "self_approval_forbidden",
                                 "altered_account_approval_forbidden",
                                 "approver_account_altered_by_author_forbidden",
+                                "accounts_altered_by_same_person_forbidden",
                                 "edited_by_approver_forbidden",
                                 "out_of_approval_scope",
                                 "availability_conflict",
@@ -724,6 +741,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         Reaprovação: SUPER aprovada com projeto, data, horário, município ou formadores mudados
         volta para pendente (`_rebaixar_se_mudou_campo_material`; o AuditLog leva `reaprovacao`).
+        Aprovada que não volta porque o projeto saiu do SUPER depois da aprovação (troca de fluxo) fica
+        marcada: o AuditLog leva `editada_com_fluxo_nao_super`.
         """
         from django.db import transaction
 
@@ -878,6 +897,15 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                     details["reaprovacao"] = {"campos": campos_reaprovacao}
                 if aprovada_como_super:
                     details["aprovada_como_super"] = True
+                # PA-04 (decisão 5 do dono): SUPER → NAO_SUPER → edição → SUPER deixaria a aprovada com
+                # data, município ou formadores novos sem reaprovação e sem registro.
+                if (
+                    old_data["status"] == "aprovado"
+                    and not campos_reaprovacao
+                    and _campos_materiais(instance, new_formador_ids) != materiais_antes
+                    and _projeto_saiu_do_super_depois_da_aprovacao(instance, old_data["projeto_id"])
+                ):
+                    details["editada_com_fluxo_nao_super"] = True
 
                 # AuditLog persistente
                 AuditLog.objects.create(

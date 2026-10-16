@@ -107,8 +107,10 @@ class Command(BaseCommand):
         # ================================================================
         # A janela conta da decisão ou da criação da solicitação, o que vier antes (decisão do
         # dono de 16/10). Vale nos dois sentidos: o ator alterou a conta do autor, ou o autor alterou
-        # a conta do ator. Só contam decisões gravadas com a trava (`conta_alterada_pelo_ator` no
-        # details); o break-glass do superuser vem com a marca True e não conta.
+        # a conta do ator; e quando a mesma pessoa alterou as duas contas (dois fantoches). Quem
+        # alterou sendo superuser não conta (ele já decide tudo). Só contam decisões gravadas com a
+        # trava (`conta_alterada_pelo_ator` no details); o break-glass do superuser vem com a marca
+        # True e não conta.
         from apps.core.services.solicitacao_approval import ACOES_QUE_ALTERAM_CONTA, JANELA_SEGREGACAO
 
         d2_violations = 0
@@ -130,17 +132,28 @@ class Command(BaseCommand):
             )
             autor_alterou_ator = not details.get("conta_do_ator_alterada_pelo_autor") and (
                 sol["usuario_id"] != log.usuario_id
-                and alteracoes.filter(usuario_id=sol["usuario_id"], details__target_user_id=log.usuario_id).exists()
+                and alteracoes.filter(
+                    usuario_id=sol["usuario_id"], usuario__is_superuser=False, details__target_user_id=log.usuario_id
+                ).exists()
             )
-            if ator_alterou_autor or autor_alterou_ator:
+            alteraram_o_ator = (
+                alteracoes.filter(details__target_user_id=log.usuario_id, usuario__is_superuser=False)
+                .exclude(usuario_id=log.usuario_id)
+                .values("usuario_id")
+            )
+            mesma_pessoa = not details.get("contas_alteradas_pela_mesma_pessoa") and (
+                alteracoes.filter(details__target_user_id=sol["usuario_id"], usuario_id__in=alteraram_o_ator).exists()
+            )
+            if ator_alterou_autor or autor_alterou_ator or mesma_pessoa:
                 d2_violations += 1
 
         report["checks"].append(
             {
                 "rule": "PA-02 (segregação D2)",
                 "description": (
-                    "No non-superuser decides a solicitation whose author's account they altered, or whose "
-                    "author altered theirs, in the 30 days before the decision or the creation"
+                    "No non-superuser decides a solicitation whose author's account they altered, whose "
+                    "author altered theirs, or when one person altered both accounts, in the 30 days before "
+                    "the decision or the creation"
                 ),
                 "status": "PASS" if d2_violations == 0 else "FAIL",
                 "violations": d2_violations,

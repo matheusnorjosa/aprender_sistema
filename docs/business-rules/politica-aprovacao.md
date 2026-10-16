@@ -38,7 +38,9 @@ Controle puro, Gerente pedagógico, Diretoria e o grupo DAT sem o vínculo **nã
   contados da decisão ou da criação da solicitação, o que vier antes
   (`altered_account_approval_forbidden`); vale ao contrário: quem teve a conta alterada pelo autor
   também não decide as solicitações dele no mesmo prazo
-  (`approver_account_altered_by_author_forbidden`);
+  (`approver_account_altered_by_author_forbidden`); nem quem teve a conta alterada pela mesma
+  pessoa que alterou a do autor (`accounts_altered_by_same_person_forbidden`). Alteração feita
+  pelo superuser não conta nesses dois casos;
 - quem **editou** data, horário, município, projeto ou formadores de uma solicitação depois da
   última aprovação dela não a decide (`edited_by_approver_forbidden`). Outra pessoa aprovadora decide.
 

@@ -80,6 +80,7 @@ PACOTE_FINAL = frozenset(
 ALTERED = "altered_account_approval_forbidden"
 ALTERED_BY_AUTHOR = "approver_account_altered_by_author_forbidden"
 EDITED = "edited_by_approver_forbidden"
+SAME_ALTERER = "accounts_altered_by_same_person_forbidden"
 SELF = "self_approval_forbidden"
 
 
@@ -619,6 +620,155 @@ class TestSegregacaoPorHistorico:
         assert checks["PA-02 (segregação D2)"]["violations"] == 1
 
 
+def _aprovadora(tipo: str, g19: Gerencia, g1: Gerencia) -> Usuario:
+    if tipo == "gerente g1":
+        return _gerente_g1(g1)
+    if tipo == "par Controle":
+        return _par_controle()
+    return _dat(g19)
+
+
+def _d2_status(resultado: StringIO) -> dict[str, Any]:
+    checks = {c["rule"]: c for c in json.loads(resultado.getvalue())["checks"]}
+    return checks["PA-02 (segregação D2)"]
+
+
+class TestSuperusuarioNaoTravaAD2:
+    """O superusuário já decide tudo (break-glass): alterar a conta de uma aprovadora não a impede de
+    decidir o que ele pediu ou editou. Ele lota, corrige nomes e define as senhas da virada."""
+
+    @pytest.mark.parametrize("tipo", ["gerente g1", "par Controle", "outro DAT"])
+    def test_aprovadora_alterada_pelo_superusuario_decide_o_que_ele_pediu(self, root, g19, g1, tipo):
+        aprovadora = _aprovadora(tipo, g19, g1)
+        resp = _client(root).patch(f"/api/usuarios-admin/{aprovadora.id}/", {"first_name": "Nome Certo"}, format="json")
+        assert resp.status_code == 200, resp.content
+        individual, lote = _pendente_super(g1, autor=root), _pendente_super(g1, autor=root)
+        assert _approve(aprovadora, individual).status_code == 200
+        resp = _client(aprovadora).post("/api/solicitacoes/batch-approve/", {"ids": [lote.id]}, format="json")
+        assert resp.data["approved"] == 1 and resp.data["errors"] == []
+
+    @pytest.mark.parametrize("tipo", ["gerente g1", "par Controle", "outro DAT"])
+    def test_aprovadora_alterada_pelo_superusuario_decide_o_que_ele_editou(self, root, g19, g1, tipo):
+        aprovadora = _aprovadora(tipo, g19, g1)
+        resp = _client(root).patch(f"/api/usuarios-admin/{aprovadora.id}/", {"first_name": "Nome Certo"}, format="json")
+        assert resp.status_code == 200, resp.content
+        individual, lote = _pendente_super(g1), _pendente_super(g1)
+        for sol in (individual, lote):
+            assert _editar(root, sol, {"municipio": MunicipioFactory().id}).status_code == 200
+        assert _approve(aprovadora, individual).status_code == 200
+        resp = _client(aprovadora).post("/api/solicitacoes/batch-reject/", {"ids": [lote.id]}, format="json")
+        assert resp.data["rejected"] == 1 and resp.data["errors"] == []
+
+    def test_compliance_audit_nao_acusa_autor_superusuario(self, root, g1):
+        aprovadora = _gerente_g1(g1)
+        sol = _pendente_super(g1, autor=root)
+        assert _approve(aprovadora, sol).status_code == 200
+        _alterou(root, aprovadora, quando=timezone.now() - timedelta(days=1))
+        out = StringIO()
+        call_command("compliance_audit", "--format=json", stdout=out)
+        assert _d2_status(out)["violations"] == 0
+
+
+class TestMesmaPessoaAlterouAutorEAprovadora:
+    """Dois fantoches: X altera a conta do autor e a da aprovadora, pede pela conta de um e aprova pela
+    do outro. Sem esta trava, nenhum dos dois alterou a conta do outro e a D2 não pegaria."""
+
+    def test_nao_decide(self, g19, g1):
+        x, aprovadora, autor = _dat(g19), _gerente_g1(g1), UsuarioFactory()
+        for alvo in (aprovadora, autor):
+            resp = _client(x).patch(f"/api/usuarios-admin/{alvo.id}/", {"password": "NovaSenha!pr10x"}, format="json")
+            assert resp.status_code == 200, resp.content
+        Usuario.objects.filter(pk=aprovadora.pk).update(deve_trocar_senha=False)  # a troca obrigatória feita
+        aprovadora.refresh_from_db()
+        sol = _pendente_super(g1, autor=autor)
+
+        for resp in (_approve(aprovadora, sol), _reject(aprovadora, sol)):
+            assert resp.status_code == 403, resp.data
+            assert resp.data["code"] == SAME_ALTERER
+        for rota in ("batch-approve", "batch-reject"):
+            resp = _client(aprovadora).post(f"/api/solicitacoes/{rota}/", {"ids": [sol.id]}, format="json")
+            assert resp.data["errors"] == [
+                {
+                    "id": sol.id,
+                    "code": SAME_ALTERER,
+                    "detail": solicitacao_approval.mensagem_impedida(
+                        SAME_ALTERER, "aprovar" if rota == "batch-approve" else "reprovar"
+                    ),
+                }
+            ]
+        sol.refresh_from_db()
+        assert sol.status == "pendente"
+        assert _decisoes(sol) == 0
+        resp = _client(aprovadora).get("/api/solicitacoes/?flow=SUPER&status=pendente&page_size=50")
+        marcas = {item["id"]: item["decisao_impedida"] for item in resp.data["results"]}
+        assert marcas[sol.id] == "contas_alteradas_pela_mesma_pessoa"
+        assert _client(aprovadora).get("/api/stats/home/").data["pending_approvals"] == 0
+        # Quem não teve a conta alterada por X decide.
+        assert _approve(_dat(g19), sol).status_code == 200
+
+    def test_so_a_aprovadora_alterada_nao_basta(self, g19, g1):
+        x, aprovadora = _dat(g19), _gerente_g1(g1)
+        _alterou(x, aprovadora)
+        _alterou(x, UsuarioFactory())
+        assert _approve(aprovadora, _pendente_super(g1)).status_code == 200
+
+    @pytest.mark.parametrize("quem", ["autor", "aprovadora"])
+    @pytest.mark.parametrize(("dias", "bloqueia"), [(29, True), (31, False)])
+    def test_janela_de_30_dias(self, g19, g1, quem, dias, bloqueia):
+        x, aprovadora, autor = _dat(g19), _gerente_g1(g1), UsuarioFactory()
+        agora = timezone.now()
+        _alterou(x, autor, quando=agora - timedelta(days=dias if quem == "autor" else 1))
+        _alterou(x, aprovadora, quando=agora - timedelta(days=dias if quem == "aprovadora" else 1))
+        resp = _approve(aprovadora, _pendente_super(g1, autor=autor, created_at=agora))
+        assert (resp.status_code == 403) is bloqueia, resp.data
+
+    def test_superusuario_que_alterou_as_duas_nao_trava(self, root, g1):
+        aprovadora, autor = _gerente_g1(g1), UsuarioFactory()
+        _alterou(root, aprovadora)
+        _alterou(root, autor)
+        assert _approve(aprovadora, _pendente_super(g1, autor=autor)).status_code == 200
+
+    def test_superusuario_decide_e_marca(self, root, g19, g1):
+        x, autor = _dat(g19), UsuarioFactory()
+        _alterou(x, root)
+        _alterou(x, autor)
+        sol = _pendente_super(g1, autor=autor)
+        assert _approve(root, sol).status_code == 200
+        log = AuditLog.objects.get(action="APPROVE", details__solicitacao_id=sol.id)
+        assert log.details["contas_alteradas_pela_mesma_pessoa"] is True
+
+    def test_numero_de_queries_constante(self, g19, g1):
+        aprovadora = _gerente_g1(g1)
+
+        def consultas(n: int) -> tuple[int, set[str]]:
+            ids = []
+            for _ in range(n):
+                x, autor = UsuarioFactory(), UsuarioFactory()
+                _alterou(x, aprovadora)
+                _alterou(x, autor)
+                ids.append(_pendente_super(g1, autor=autor).id)
+            cache.clear()
+            get_user_functional_permissions(aprovadora)
+            with CaptureQueriesContext(connection) as ctx:
+                impedidas = solicitacao_approval.decisoes_impedidas(aprovadora, Solicitacao.objects.filter(id__in=ids))
+            assert set(impedidas) == set(ids)
+            return len(ctx.captured_queries), set(impedidas.values())
+
+        assert consultas(1) == consultas(8) == (consultas(1)[0], {SAME_ALTERER})
+
+    def test_compliance_audit_acusa(self, g19, g1):
+        x, aprovadora, autor = _dat(g19), _gerente_g1(g1), UsuarioFactory()
+        sol = _pendente_super(g1, autor=autor)
+        assert _approve(aprovadora, sol).status_code == 200
+        # Alterações registradas antes da decisão, como se a trava tivesse falhado.
+        _alterou(x, aprovadora, quando=timezone.now() - timedelta(days=1))
+        _alterou(x, autor, quando=timezone.now() - timedelta(days=1))
+        out = StringIO()
+        call_command("compliance_audit", "--format=json", stdout=out)
+        assert _d2_status(out)["status"] == "FAIL"
+        assert _d2_status(out)["violations"] == 1
+
+
 class TestPa07:
     def test_segregacao_conta_alterada_bloqueia_decisao_existe(self):
         from apps.core.tests import test_approval_policy_PA as pa
@@ -719,7 +869,7 @@ class TestQuemEditouNaoDecide:
             assert resp.data["code"] == EDITED
 
     # Fantoche ao contrário: quem editou altera a conta da aprovadora (ex.: redefine a senha dela) e decide
-    # pela conta dela. Com o autor também alterado por ele, nenhum dos dois alterou a conta do outro.
+    # pela conta dela. Com o autor também alterado por ele, a trava dos dois fantoches vem antes.
     @pytest.mark.parametrize("autor_alterado_pelo_editor", [False, True])
     def test_editor_que_alterou_a_conta_da_aprovadora_trava_a_decisao(self, g19, g1, autor_alterado_pelo_editor):
         editor, aprovadora = _dat(g19), _dat(g19)
@@ -734,13 +884,14 @@ class TestQuemEditouNaoDecide:
         assert resp.status_code == 200, resp.content
         Usuario.objects.filter(pk=aprovadora.pk).update(deve_trocar_senha=False)  # a troca obrigatória feita
         aprovadora.refresh_from_db()
+        esperado = SAME_ALTERER if autor_alterado_pelo_editor else EDITED
 
         for resp in (_approve(aprovadora, sol), _reject(aprovadora, sol)):
             assert resp.status_code == 403, resp.data
-            assert resp.data["code"] == EDITED
+            assert resp.data["code"] == esperado
         for rota in ("batch-approve", "batch-reject"):
             resp = _client(aprovadora).post(f"/api/solicitacoes/{rota}/", {"ids": [sol.id]}, format="json")
-            assert resp.data["errors"][0]["code"] == EDITED
+            assert resp.data["errors"][0]["code"] == esperado
         sol.refresh_from_db()
         assert sol.status == "pendente"
         assert _decisoes(sol) == 0
@@ -939,6 +1090,48 @@ class TestTrocaDeFluxo:
         )
         assert log.details["auto_aprovada_por_fluxo"] == "NAO_SUPER"
         assert log.details["projeto_id"] == projeto.id
+
+    @staticmethod
+    def _trocar_fluxo(user: Usuario, projeto_id: int, fluxo: str) -> None:
+        resp = _client(user).patch(f"/api/projetos/{projeto_id}/", {"fluxo": fluxo}, format="json")
+        assert resp.status_code == 200, resp.content
+
+    @staticmethod
+    def _update_da_edicao(sol: Solicitacao) -> AuditLog:
+        return AuditLog.objects.get(
+            model_name="Solicitacao", action=AuditLog.Action.UPDATE, details__solicitacao_id=sol.id
+        )
+
+    def test_editar_aprovada_com_o_projeto_em_nao_super_fica_marcado(self, g19, g1):
+        """SUPER → NAO_SUPER → edição → SUPER: a aprovada não volta a pendente (o fluxo do momento é
+        NAO_SUPER), então a edição fica marcada para a troca dupla não lavar a aprovação sem registro."""
+        dat = _dat(g19)
+        sol = _pendente_super(g1)
+        assert _approve(_gerente_g1(g1), sol).status_code == 200
+        self._trocar_fluxo(dat, sol.projeto_id, "NAO_SUPER")
+        assert _editar(dat, sol, {"municipio": MunicipioFactory().id}).status_code == 200
+        self._trocar_fluxo(dat, sol.projeto_id, "SUPER")
+        sol.refresh_from_db()
+        assert sol.status == "aprovado"
+        assert self._update_da_edicao(sol).details.get("editada_com_fluxo_nao_super") is True
+
+    def test_editar_so_observacao_nao_marca(self, g19, g1):
+        dat = _dat(g19)
+        sol = _pendente_super(g1)
+        assert _approve(_gerente_g1(g1), sol).status_code == 200
+        self._trocar_fluxo(dat, sol.projeto_id, "NAO_SUPER")
+        assert _editar(dat, sol, {"observacoes": "só um recado"}).status_code == 200
+        assert "editada_com_fluxo_nao_super" not in self._update_da_edicao(sol).details
+
+    def test_projeto_que_ja_era_nao_super_nao_marca(self, g19, g1):
+        """A troca antes da criação não conta: o evento nasceu aprovado pelo fluxo (já marcado no CREATE)."""
+        dat = _dat(g19)
+        projeto = ProjetoFactory(super=True, gerencia=g1)
+        self._trocar_fluxo(dat, projeto.id, "NAO_SUPER")
+        AuditLog.objects.filter(model_name="Projeto").update(created_at=timezone.now() - timedelta(days=1))
+        sol = SolicitacaoFactory(projeto=projeto, status="aprovado")
+        assert _editar(dat, sol, {"municipio": MunicipioFactory().id}).status_code == 200
+        assert "editada_com_fluxo_nao_super" not in self._update_da_edicao(sol).details
 
 
 # ============================================================================

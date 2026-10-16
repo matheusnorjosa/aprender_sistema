@@ -26,6 +26,26 @@ from .permissions import HasPerm
 from .serializers import AvailabilityBlockSerializer
 from .services.availability_service import check_conflicts, check_conflicts_uncached
 
+# F3 (scan 16/10/2026): o check-many roda ~5 consultas sem cache por pessoa; o assistente manda os
+# participantes de UM evento. Acima disso é abuso (a lista crua prendia o worker por minutos).
+MAX_USUARIOS_CHECK_MANY = 50
+
+
+def _ids_da_lista(bruto: object) -> list[int] | None:
+    """`usuarios_ids` como lista de inteiros positivos sem repetição; None se a forma não serve.
+
+    Recusa (None): não-lista, lista vazia, mais de `MAX_USUARIOS_CHECK_MANY` itens (contados ANTES de
+    tirar a repetição) e item que não é inteiro positivo (texto, número quebrado, booleano).
+    """
+    if not isinstance(bruto, list) or not bruto or len(bruto) > MAX_USUARIOS_CHECK_MANY:
+        return None
+    ids: list[int] = []
+    for item in bruto:
+        if isinstance(item, bool) or not isinstance(item, int) or item < 1:
+            return None
+        ids.append(item)
+    return list(dict.fromkeys(ids))
+
 
 def is_privileged_user(user):
     """
@@ -475,10 +495,14 @@ class AvailabilityCheckManyView(APIView):
     throttle_scope = "availability_check"
 
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        usuarios_ids = request.data.get("usuarios_ids", [])
-        if not usuarios_ids or not isinstance(usuarios_ids, list):
+        usuarios_ids = _ids_da_lista(request.data.get("usuarios_ids"))
+        if usuarios_ids is None:
             return Response(
-                {"detail": "usuarios_ids deve ser uma lista não-vazia."},
+                {
+                    "detail": (
+                        f"usuarios_ids deve ser uma lista não-vazia de até {MAX_USUARIOS_CHECK_MANY} ids inteiros."
+                    )
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -533,11 +557,11 @@ class AvailabilityCheckManyView(APIView):
 
         results = []
         all_ok = True
+        usuarios_por_id = Usuario.objects.in_bulk(usuarios_ids)
 
         for usuario_id in usuarios_ids:
-            try:
-                usuario = Usuario.objects.get(pk=usuario_id)
-            except Usuario.DoesNotExist:
+            usuario = usuarios_por_id.get(usuario_id)
+            if usuario is None:
                 results.append(
                     {
                         "usuario_id": usuario_id,

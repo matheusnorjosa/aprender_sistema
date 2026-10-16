@@ -76,6 +76,7 @@ vi.mock('../../api/availability', () => ({
 vi.mock('../../api/deslocamentos', () => ({
   listDeslocamentos: vi.fn().mockResolvedValue({ count: 0, next: null, previous: null, results: [] }),
   listFormadoresDoSetor: vi.fn().mockResolvedValue([]),
+  listAlvosDeslocamento: vi.fn().mockResolvedValue([]),
   createDeslocamento: vi.fn(),
   updateDeslocamento: vi.fn(),
   deleteDeslocamento: vi.fn(),

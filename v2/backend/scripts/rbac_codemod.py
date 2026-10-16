@@ -12,8 +12,8 @@ Passos aplicados:
 3. Substituir `permission_classes = [IsDAT]` → `[HasPerm("manage_purchases_and_materials")]`
 4. Substituir `@permission_classes([IsDAT])` (decorator) idem
 5. Substituir referências inline `IsDAT()` → `HasPerm("manage_purchases_and_materials")`
-6. Preservar as 3 classes mantidas (`IsGerenteSuperintendencia`,
-   `IsOwnerOrPrivileged`, `HasSectorAccess`) inalteradas
+6. Preservar as classes mantidas (`IsOwnerOrPrivileged`, `HasSectorAccess`)
+   inalteradas (`IsGerenteSuperintendencia` saiu no PR 8 das permissões)
 
 Ver v2/docs/plans/rbac-refactor/epic-5-class-sweep.md.
 """
@@ -45,7 +45,7 @@ CLASS_TO_CODENAME: dict[str, str] = {
 }
 
 # Classes que DEVEM ser mantidas (object-level, composite, dynamic scope).
-KEEP_CLASSES: frozenset[str] = frozenset({"IsGerenteSuperintendencia", "IsOwnerOrPrivileged", "HasSectorAccess"})
+KEEP_CLASSES: frozenset[str] = frozenset({"IsOwnerOrPrivileged", "HasSectorAccess"})
 
 
 def transform_source(source: str) -> tuple[str, int]:

@@ -2,8 +2,10 @@
 Servicos RBAC para permissoes funcionais com cache.
 
 Formula (ADR-020, modo uniao): capacidades = grupos ∪ pacote do perfil de cada gerencia onde a
-pessoa tem vinculo VIGENTE com papel EQUIPE ou GERENTE (`services/rbac_pacotes.py`). Uma so
-funcao calcula: `capacidades_sem_cache`, usada pela API (com cache) e pelo simulador `rbac_diff`.
+pessoa tem vinculo VIGENTE com papel EQUIPE ou GERENTE ∪ direitos de evento de cada papel vigente em
+gerencia ativa (`DIREITOS_PAPEL`, PR 8; `services/rbac_pacotes.py`). Desde o PR 8 os grupos de FUNCAO
+nao tem capacidade (migration 0125): o cargo nao da poder, o papel na gerencia da. Uma so funcao
+calcula: `capacidades_sem_cache`, usada pela API (com cache) e pelo simulador `rbac_diff`.
 """
 
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false
@@ -15,7 +17,7 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 
 from apps.core.models import EquipeGerencia, Gerencia, PermissaoFuncional
-from apps.core.services.rbac_pacotes import PACOTE, PAPEIS_COM_PACOTE
+from apps.core.services.rbac_pacotes import DIREITOS_PAPEL, PACOTE, PAPEIS_COM_PACOTE
 
 CACHE_TTL_SECONDS = 300
 _CACHE_VERSION_KEY = "as2:funcperms:version"
@@ -71,25 +73,31 @@ def invalidate_group_functional_permissions_cache(group_ids: Iterable[int]) -> N
 
 def capacidades_sem_cache(user_id: int) -> set[str]:
     """
-    Capacidades efetivas, por consulta direta: grupos ∪ pacote do perfil (ADR-020, D3).
+    Capacidades efetivas, por consulta direta: grupos ∪ pacote do perfil (ADR-020, D3) ∪ direitos do papel.
 
     O pacote vem de cada vinculo vigente (`EquipeGerencia.vigentes_em`) com papel em
     `PAPEIS_COM_PACOTE`, numa gerencia com perfil != PADRAO. Nao depende de `Gerencia.ativo`
     (mesmo criterio de `user_is_gerente_superintendencia`). Gerencia toda PADRAO = so os grupos.
+
+    Os direitos do papel (`DIREITOS_PAPEL`, PR 8) vem de cada papel vigente em gerencia ATIVA, em
+    qualquer perfil: a regra de `EquipeGerencia.gerencias_com_papel` (e do `/api/me/`). Uma consulta
+    so de vinculos serve as duas partes (o pacote ignora `Gerencia.ativo`; o papel exige).
     """
 
     capacidades = set(
         PermissaoFuncional.objects.filter(groups__user__id=user_id).order_by().values_list("codename", flat=True)
     )
-    perfis = (
+    vinculos = (
         EquipeGerencia.vigentes_em()
-        .filter(usuario_id=user_id, papel__in=PAPEIS_COM_PACOTE)
-        .exclude(gerencia__perfil=Gerencia.Perfil.PADRAO)
+        .filter(usuario_id=user_id)
         .order_by()
-        .values_list("gerencia__perfil", flat=True)
+        .values_list("papel", "gerencia__perfil", "gerencia__ativo")
     )
-    for perfil in perfis:
-        capacidades |= PACOTE.get(perfil, frozenset())
+    for papel, perfil, gerencia_ativa in vinculos:
+        if papel in PAPEIS_COM_PACOTE and perfil != Gerencia.Perfil.PADRAO:
+            capacidades |= PACOTE.get(perfil, frozenset())
+        if gerencia_ativa:
+            capacidades |= DIREITOS_PAPEL.get(papel, frozenset())
     return capacidades
 
 

@@ -145,8 +145,8 @@ Só para lógica que **não** pode ser expressa por `HasPerm(codename)`:
 
 - **Object-level check**: `IsOwnerOrPrivileged` (`apps/core/rbac/permissions.py`) — verifica `obj.usuario`.
 - **Dynamic scope por query param**: `HasSectorAccess` (lê `gerencia_id` do request).
-- **Composite rule fixa**: `IsGerenteSuperintendencia` (permission funcional + grupo "Gerente")
-  e `IsAssistenteAdministrativoControle` (`apps/core/rbac/permissions.py`).
+- **Composite rule fixa**: `IsAssistenteAdministrativoControle` (`apps/core/rbac/permissions.py`;
+  sem consumidor, sai no PR 11). `IsGerenteSuperintendencia` saiu no PR 8 das permissões.
 
 *(Corrigido em 2026-07-24: `IsSolicitationOwner` **não existe** no codebase.)*
 
@@ -167,8 +167,8 @@ from apps.core.permissions import IsDAT, IsControle, IsSuperintendencia  # ❌ I
 
 > ✅ **Atualizado em 2026-07-24.** O texto anterior dizia "Epic 5 remove estas 12 classes" e
 > "❌ DeprecationWarning". A Epic 5 **já foi entregue**: `apps/core/permissions.py` exporta
-> somente `HasFunctionalPermission`, `HasPerm`, `HasSectorAccess`, `IsGerenteSuperintendencia`,
-> `IsOwnerOrPrivileged` e `SuperuserOnly`. Importar `IsDAT` hoje levanta **`ImportError`**,
+> somente `HasFunctionalPermission`, `HasPerm`, `HasSectorAccess`, `IsOwnerOrPrivileged` e
+> `SuperuserOnly` (`IsGerenteSuperintendencia` saiu no PR 8 das permissões, 15/10/2026). Importar `IsDAT` hoje levanta **`ImportError`**,
 > não warning.
 
 ---
@@ -238,7 +238,7 @@ Lint AST custom em `v2/backend/scripts/rbac_lint.py` falha PRs que:
 - **V001**: `user.groups.filter(name=...)` / `exclude(name=...)` em código de produção.
   Exceção: linha com marcador `# noqa: RBAC-<tipo>-allowed` documentando a justificativa (composite, block, data-scope).
 - **V002**: definem classe `class Is<Word>(...)` fora da whitelist
-  `{IsGerenteSuperintendencia, IsOwnerOrPrivileged}`.
+  `{IsOwnerOrPrivileged}` (`IsGerenteSuperintendencia` saiu no PR 8).
 
 - **V003 (D17, 2026-05-04)**: proíbe mutação M2M de `groups`/`permissions`
   (`.set()`, `.add()`, `.clear()`, `.remove()`) em migrations **numeradas acima do corte D17**
@@ -554,15 +554,22 @@ O frontend decide menu, rotas, botões e Página Inicial **só** pelas policies 
 `/api/me/` são exibição. `is_superuser` só onde a regra É o superusuário, pelo helper único
 `ehSuperusuario(user)`. Trava: `frontend/src/test/lint/acessoSoPorPolicy.test.ts`.
 
-O que o front calculava sobre o organograma virou policy composta no servidor, com a mesma fórmula
-(`TELAS_DE_ESCOPO`): `view_all_availability` OU grupo listado OU vínculo GERENTE/COORDENADOR/APOIO
-vigente em gerência ativa (`user_tem_vinculo_de_gestao`). Prova pessoa a pessoa:
-`apps/core/tests/test_rbac_politicas_de_tela.py`. Os grupos de função saem dessa lista no PR 8.
+O que o front calculava sobre o organograma virou policy composta no servidor (`TELAS_DE_ESCOPO`).
+Desde o PR 8: `view_all_availability` OU setor Controle/DAT OU papel vigente em gerência ativa
+(`EquipeGerencia.gerencias_com_papel`): Grade e Deslocamentos com GERENTE/COORDENADOR/APOIO,
+Bloqueios também com FORMADOR. O grupo de função não entra. Prova pessoa a pessoa:
+`apps/core/tests/test_rbac_politicas_de_tela.py`.
+
+**Papel dá o poder (PR 8 das permissões, 15/10/2026)**: grupo de FUNÇÃO não tem capacidade
+(migration `0125`). Criar, editar como privilegiada e publicar no setor vêm do papel vigente
+(`services/rbac_pacotes.DIREITOS_PAPEL`, somado na união de `capacidades_sem_cache`). A capacidade
+`approve_solicitation_batch` foi apagada. Regra de nome continua: o codename não diz o papel.
 
 ---
 
 ## 10. Changelog
 
+- **2026-10-15** — PR 8 das permissões: grupo de função sem capacidade, direitos do papel vigente (`DIREITOS_PAPEL`), `approve_solicitation_batch` e `IsGerenteSuperintendencia` removidos, telas compostas por papel.
 - **2026-10-15** — PR 7 das permissões: +5 policies públicas (3 compostas de tela, 2 simples), verbo `execute_` no vocabulário, bloco "Front: acesso só por policy" no §9-bis.
 - **2026-04-23** — v1.0 criada com Epic 2 (#1181). `HasPerm` introduzido, 12 classes factory marcadas com `warnings.warn(DeprecationWarning)` + aviso para remoção no Epic 5.
 - **2026-04-26** — v1.1 adicionou §9 Policy Resolution Rules em planejamento para Epic 4 (Issue #1231). Documenta princípios de naming, vocabulário canônico, motivo legítimo de acesso, e anti-pattern de hardcode de role.

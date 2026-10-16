@@ -66,8 +66,9 @@ def can_check_availability_for_others(user):
 
     Quem precisa consultar disponibilidade de OUTRO usuário (não o próprio):
     - Privilegiado (`view_all_availability`) — Controle/DAT visão global
-    - Coord/Apoio/Gerente ao criar solicitação (`create_solicitation`)
-    - Gerente Sup ao aprovar/reprovar em lote (`approve_solicitation_batch`)
+    - Coord/Apoio/Gerente ao criar solicitação (`create_solicitation`, do papel desde o PR 8)
+    - Superintendência ao aprovar (`approve_solicitation`; até o PR 8 era `approve_solicitation_batch`,
+      apagada na migration 0125)
 
     Este helper é deliberadamente separado de `is_privileged_user` porque
     `AvailabilityBlockViewSet.get_queryset` usa o último para decidir leitura
@@ -79,7 +80,7 @@ def can_check_availability_for_others(user):
         user,
         "view_all_availability",
         "create_solicitation",
-        "approve_solicitation_batch",
+        "approve_solicitation",
     )
 
 
@@ -185,8 +186,9 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
         if not target.is_active:
             raise ValidationError({"usuario_id": "Usuário alvo está inativo."})
 
-        if not target.groups.filter(name="Formador").exists():  # noqa: RBAC-composite-allowed
-            raise ValidationError({"usuario_id": "Usuário alvo não tem a Função Formador."})
+        # PR 8: o alvo é quem tem o papel FORMADOR vigente (o mesmo do seletor), não o grupo.
+        if not EquipeGerencia.gerencias_com_papel(target, {"FORMADOR"}):
+            raise ValidationError({"usuario_id": "Usuário alvo não tem vínculo de Formador vigente."})
 
         block = serializer.save(usuario=target, created_by=request_user, status="aprovado")
 
@@ -313,14 +315,14 @@ class AvailabilityCheckView(APIView):
     # D9 (PR 2 RBAC hardening, 2026-04-28): composition expandida — endpoint
     # de check de conflito é ferramenta consultiva usada por:
     #   - Coordenador/Apoio/Gerente: ao criar solicitação (create_solicitation)
-    #   - Superintendência/Gerente Sup: ao aprovar (approve_solicitation_batch)
+    #   - Superintendência: ao aprovar (approve_solicitation; o batch saiu no PR 8)
     #   - Controle/DAT: visão global (view_all_availability)
     # Antes do PR 2, Gerente tinha view_all_availability; após D9 perdeu cap
     # global mas continua precisando do check para aprovações. Idem Coord
     # para fluxo de criação. Filtro fino (consulta própria vs outros) é
     # aplicado em runtime via `is_privileged_user`.
     permission_classes = [
-        HasPerm("view_all_availability") | HasPerm("create_solicitation") | HasPerm("approve_solicitation_batch")
+        HasPerm("view_all_availability") | HasPerm("create_solicitation") | HasPerm("approve_solicitation")
     ]
     throttle_scope = "availability_check"
 
@@ -464,14 +466,14 @@ class AvailabilityCheckManyView(APIView):
     # D9 (PR 2 RBAC hardening, 2026-04-28): composition expandida — endpoint
     # de check de conflito é ferramenta consultiva usada por:
     #   - Coordenador/Apoio/Gerente: ao criar solicitação (create_solicitation)
-    #   - Superintendência/Gerente Sup: ao aprovar (approve_solicitation_batch)
+    #   - Superintendência: ao aprovar (approve_solicitation; o batch saiu no PR 8)
     #   - Controle/DAT: visão global (view_all_availability)
     # Antes do PR 2, Gerente tinha view_all_availability; após D9 perdeu cap
     # global mas continua precisando do check para aprovações. Idem Coord
     # para fluxo de criação. Filtro fino (consulta própria vs outros) é
     # aplicado em runtime via `is_privileged_user`.
     permission_classes = [
-        HasPerm("view_all_availability") | HasPerm("create_solicitation") | HasPerm("approve_solicitation_batch")
+        HasPerm("view_all_availability") | HasPerm("create_solicitation") | HasPerm("approve_solicitation")
     ]
     throttle_scope = "availability_check"
 

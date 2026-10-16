@@ -65,11 +65,14 @@ class TestD9CheckAvailabilityForOthers:
     """D9 (PR 2 RBAC hardening): expandir consulta de conflito para Coord/Gerente Sup."""
 
     def test_super_geral_consulta_formador(self):
-        """Gerente + Sup com approve_solicitation_batch: consulta formador → 200."""
+        """Sup com approve_solicitation (sem create): consulta formador → 200.
+
+        PR 8: o batch saiu; a consulta de quem aprova vem de `approve_solicitation`.
+        """
         user = _make_user_with_caps(
             "super_geral_check",
-            ["Gerente", "Superintendência"],
-            ["approve_solicitation_batch", "create_solicitation"],
+            ["Superintendência"],
+            ["approve_solicitation"],
         )
         target = _make_target()
         res = _check(user, target.id)

@@ -105,12 +105,22 @@ def test_lint_skips_dev_tools_path(tmp_path):
 
 
 def test_lint_whitelisted_classes_pass(tmp_path):
-    """IsGerenteSuperintendencia e IsOwnerOrPrivileged são whitelisted (V002)."""
+    """IsOwnerOrPrivileged é whitelisted (V002)."""
     mod = tmp_path / "apps" / "sample" / "permissions.py"
     mod.parent.mkdir(parents=True)
-    mod.write_text("class IsGerenteSuperintendencia:\n" "    pass\n" "class IsOwnerOrPrivileged:\n" "    pass\n")
+    mod.write_text("class IsOwnerOrPrivileged:\n" "    pass\n")
     result = _run_lint(mod.parent)
     assert result.returncode == 0, f"Esperava whitelist passar, mas: {result.stderr}"
+
+
+def test_lint_is_gerente_superintendencia_saiu_da_whitelist(tmp_path):
+    """PR 8 das permissões: a classe saiu; recriá-la reprova no V002."""
+    mod = tmp_path / "apps" / "sample" / "permissions.py"
+    mod.parent.mkdir(parents=True)
+    mod.write_text("class IsGerenteSuperintendencia:\n" "    pass\n")
+    result = _run_lint(mod.parent)
+    assert result.returncode == 1
+    assert "V002" in result.stdout + result.stderr
 
 
 @pytest.mark.parametrize(

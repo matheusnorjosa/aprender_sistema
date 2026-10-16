@@ -9,8 +9,7 @@ Idioma canônico:
 Para composition:
     permission_classes = [HasPerm("a") | HasPerm("b")]
 
-3 classes "não-reduzíveis" mantidas (ver RBAC_NAMING.md §3):
-- `IsGerenteSuperintendencia` (composite: funcperm + grupo Django)
+2 classes "não-reduzíveis" mantidas (ver RBAC_NAMING.md §3):
 - `IsOwnerOrPrivileged` (object-level: checa obj.usuario)
 - `HasSectorAccess` (dynamic scope via gerencia_id query param)
 
@@ -107,8 +106,7 @@ class HasFunctionalPermission(permissions.BasePermission):  # type: ignore[misc]
     Base class para checagem por codename funcional.
 
     Preferir `HasPerm(codename)` inline em `permission_classes` para endpoints
-    novos. Esta classe continua servindo de base para as 2 classes compostas
-    mantidas (`IsGerenteSuperintendencia`, `IsOwnerOrPrivileged`).
+    novos. Esta classe continua servindo de base para `IsOwnerOrPrivileged`.
     """
 
     functional_codename = ""
@@ -146,32 +144,13 @@ class SuperuserOnly(permissions.BasePermission):  # type: ignore[misc]
 
 
 # ============================================================================
-# 3 classes mantidas pós-Epic 5.3 — expressam lógica que `HasPerm(codename)`
+# Classes mantidas pós-Epic 5.3 — expressam lógica que `HasPerm(codename)`
 # não cobre:
-# - Composite rule (funcperm + grupo Django)
+# - Composite rule (Setor × Função; sem consumidor, sai no PR 11)
 # - Object-level check (obj.usuario)
 # - Dynamic scope via query param
+# (`IsGerenteSuperintendencia` saiu no PR 8 das permissões, junto com `approve_solicitation_batch`.)
 # ============================================================================
-
-
-class IsGerenteSuperintendencia(HasFunctionalPermission):  # type: ignore[misc]
-    """
-    Regra composta fixa:
-    - permissão funcional "approve_solicitation_batch"
-    - grupo de função "Gerente"
-    """
-
-    functional_codename = "approve_solicitation_batch"
-    message = "Apenas Gerentes da Superintendência podem realizar esta ação."
-
-    def has_permission(self, request: Request, view: APIView) -> bool:
-        if not super().has_permission(request, view):
-            return False
-        user = request.user
-        # `IsGerenteSuperintendencia` é composite (funcperm + grupo Django):
-        # valida que o usuário tem a função "Gerente" além da funcperm.
-        # Uso aqui é whitelist natural — a classe é uma das 3 mantidas por design (RBAC_NAMING §3).
-        return bool(user and user.groups.filter(name="Gerente").exists())  # noqa: RBAC-composite-allowed
 
 
 class IsAssistenteAdministrativoControle(permissions.BasePermission):  # type: ignore[misc]
@@ -180,9 +159,8 @@ class IsAssistenteAdministrativoControle(permissions.BasePermission):  # type: i
     - Setor Django "Controle"
     - Função Django "Assistente Administrativo"
 
-    Combinada via OR com `IsGerenteSuperintendencia` em
-    `CanAccessSolicitationApprovals` para autorizar aprovação/reprovação de
-    solicitações (individual e lote).
+    Sem consumidor de produção: a aprovação passa por `CanAccessSolicitationApprovals`
+    (`policies.solicitation_approval_basis`). Fica registrada para o PR 11.
 
     Por design não usa `HasFunctionalPermission` como base: a regra é
     estritamente composite role (Setor × Função). Cap funcional permanece

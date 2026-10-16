@@ -34,6 +34,7 @@ from apps.core.tests.factories import (
     ProjetoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_papel,
     liberar_par,
 )
 
@@ -172,9 +173,14 @@ class TestPrivilegedExempt:
 
 class TestCreatorWithoutSetorFailOpen:
     def test_creator_without_vinculo_is_not_blocked(self, gerencias, municipio, projeto, tipo_evento):
-        """Fail-open: criador SEM setor não é escopado (0 em prod; protege transição/suíte)."""
+        """Fail-open: criador SEM setor não é escopado (0 em prod; protege transição/suíte).
+
+        PR 8: criar exige o papel vigente; o criador sem setor é o COORDENADOR numa gerência sem
+        `setor_canonico` (o grupo sozinho já não cria).
+        """
         criador = UsuarioFactory(username="coord_sem_setor_1656", cpf=str(next(_CPF)))
-        criador.groups.add(GroupFactory(name="Coordenador"))  # sem EquipeGerencia
+        sem_setor = Gerencia.objects.create(nome="GERENCIA SEM SETOR 1656", nome_setor="Sem setor", ativo=True)
+        com_papel(criador, "COORDENADOR", sem_setor)
         f = _formador("qualquer", gerencias["fluir"])
         resp = _client(criador).post(
             "/api/solicitacoes/", _payload(municipio, projeto, tipo_evento, {"formador_ids": [f.id]}), format="json"

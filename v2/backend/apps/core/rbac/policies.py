@@ -42,6 +42,8 @@ from rest_framework import permissions
 from rest_framework.request import Request
 from rest_framework.views import APIView
 
+from apps.core.models import EquipeGerencia
+
 # Side-effect import: garante o monkey-patch de OR/AND/NOT.__call__ aplicado
 # em apps.core.rbac.permissions (necessário para `CanA() | CanB()` funcionar
 # em `permission_classes`). Não usamos HasPerm aqui, mas precisamos que o
@@ -50,12 +52,10 @@ from apps.core.rbac import permissions as _rbac_permissions  # noqa: F401
 from apps.core.rbac.helpers import (
     GERENCIA_APROVADORA_NOME,
     fluxo_super_fora_da_superintendencia,
-    separar_setores_e_funcoes,
     user_has_any_perm,
     user_is_assistente_administrativo_controle,
     user_is_gerente_superintendencia,
     user_matches_any_approver_composite,
-    user_tem_vinculo_de_gestao,
 )
 
 # ============================================================================
@@ -93,23 +93,22 @@ COMPOSITE_POLICY_KEYS: Final[frozenset[str]] = frozenset(
 )
 
 # Telas de escopo (PR 7 das permissões, 15/10/2026): Grade Mensal, Bloqueios e Deslocamentos.
-# Cópia da fórmula que o front aplicava sobre o `/api/me/` (usePermissions.ts), para o front ler
-# só policies sem mudar poder. Abre a tela: a capacidade em ACCESS_POLICIES (view_all_availability)
-# OU um dos setores/funções abaixo OU vínculo de gestão vigente (`user_tem_vinculo_de_gestao`).
-# O PR 8 tira o poder dos grupos de função.
+# Abre a tela: a capacidade em ACCESS_POLICIES (view_all_availability) OU um dos grupos de setor
+# abaixo OU um dos papéis abaixo, vigente em gerência ativa (`EquipeGerencia.gerencias_com_papel`).
+# PR 8: o papel substitui o grupo de função e o antigo "vínculo de gestão" (G/C/A).
 TELAS_DE_ESCOPO: Final[dict[str, tuple[frozenset[str], frozenset[str]]]] = {
-    # chave: (setores, funções)
+    # chave: (setores, papéis)
     "access_monthly_availability": (
         frozenset({"Controle", "DAT"}),
-        frozenset({"Gerente", "Coordenador", "Apoio de Coordenação"}),
+        frozenset({"GERENTE", "COORDENADOR", "APOIO"}),
     ),
     "access_availability_blocks": (
         frozenset({"Controle", "DAT"}),
-        frozenset({"Coordenador", "Apoio de Coordenação", "Formador"}),
+        frozenset({"GERENTE", "COORDENADOR", "APOIO", "FORMADOR"}),
     ),
     "access_travel": (
         frozenset({"Controle", "DAT"}),
-        frozenset({"Coordenador", "Apoio de Coordenação"}),
+        frozenset({"GERENTE", "COORDENADOR", "APOIO"}),
     ),
 }
 
@@ -595,7 +594,7 @@ def _abre_tela_de_escopo(
     key: str,
     capacidades: AbstractSet[str] | None,
 ) -> bool:
-    """Grade, Bloqueios ou Deslocamentos (`TELAS_DE_ESCOPO`): capacidade OU setor/função OU vínculo de gestão.
+    """Grade, Bloqueios ou Deslocamentos (`TELAS_DE_ESCOPO`): capacidade OU grupo de setor OU papel vigente.
 
     Sem bypass de superuser (`user_has_policy` decide antes). `capacidades` vale só para a parte da
     capacidade (simulador `rbac_diff`); grupos e vínculos são os de hoje.
@@ -606,58 +605,73 @@ def _abre_tela_de_escopo(
             return True
     elif user_has_any_perm(user, *codenames):
         return True
-    setores_da_tela, funcoes_da_tela = TELAS_DE_ESCOPO[key]
-    setores, funcoes = separar_setores_e_funcoes(list(user.groups.values_list("name", flat=True)))
-    if not setores_da_tela.isdisjoint(setores) or not funcoes_da_tela.isdisjoint(funcoes):
+    setores_da_tela, papeis_da_tela = TELAS_DE_ESCOPO[key]
+    if user.groups.filter(name__in=setores_da_tela).exists():
         return True
-    return user_tem_vinculo_de_gestao(user)
+    return bool(EquipeGerencia.gerencias_com_papel(user, papeis_da_tela))
 
 
 def user_can_delegate_availability_block(user: AbstractBaseUser | AnonymousUser | None) -> bool:
     """
-    Composite check (PR 13 hardening RBAC, 2026-05-04): autoriza criar
-    bloqueio em nome de outro Formador.
+    Autoriza criar bloqueio em nome de outro Formador e editar ou apagar bloqueio alheio
+    (PR 13 hardening RBAC, 2026-05-04; base nova no PR 8 das permissões, 15/10/2026).
 
     Habilitado para:
     - Superuser (bypass)
-    - Assistente Administrativo do Controle (composite Setor × Função)
-    - DAT (via capability `manage_admin_registries` — exclusiva de DAT
-      e superuser no seed atual)
+    - `operate_preagenda` (Controle, pelo grupo ou pelo pacote do perfil CONTROLE)
+    - `manage_admin_registries` (DAT, pelo grupo ou pelo pacote do ADMIN_OPERACIONAL)
 
-    Outros perfis (Coord, Apoio, Gerente Sup, Gerente pedagógico,
-    Diretoria, Controle puro, Formador) → False.
-
-    Não cria capability nova: composição de helpers SSOT existentes.
+    Antes do PR 8 a base era o par Controle × Assistente Administrativo: a função saiu da regra
+    (o cargo não dá poder) e o Controle puro passou a delegar (O8-7). Demais → False.
     """
     if not user or not getattr(user, "is_authenticated", False):
         return False
     if getattr(user, "is_superuser", False):
         return True
-    if user_is_assistente_administrativo_controle(user):
-        return True
-    return user_has_any_perm(user, "manage_admin_registries")
+    return user_has_any_perm(user, "operate_preagenda", "manage_admin_registries")
 
 
-def user_can_delegate_deslocamento(user: AbstractBaseUser | AnonymousUser | None) -> bool:
-    """
-    Composite check (#1454, 2026-07-09): autoriza registrar deslocamento em
-    nome de outro usuário.
+# P16 (PR 8 das permissões; decisão do dono O8-5, 15/10/2026): papéis que registram o deslocamento
+# do formador da própria gerência.
+PAPEIS_QUE_DELEGAM_DESLOCAMENTO: Final[frozenset[str]] = frozenset({"GERENTE", "COORDENADOR"})
 
-    Habilitado para:
-    - Superuser (bypass)
-    - Perfis operacionais / suporte transversal:
-      `operate_preagenda` (Controle) OU `view_all_availability` (Controle, DAT).
 
-    Demais (Coordenador, Apoio, Gerente, Diretoria, Formador) → False; cada um
-    registra apenas a própria viagem (self-service).
-
-    Não cria capability nova: composição de capabilities SSOT existentes.
-    """
+def user_delega_deslocamento_de_qualquer_um(user: AbstractBaseUser | AnonymousUser | None) -> bool:
+    """Delegação sem alvo fixo (#1454): superuser, `operate_preagenda` (Controle) ou `view_all_availability`."""
     if not user or not getattr(user, "is_authenticated", False):
         return False
     if getattr(user, "is_superuser", False):
         return True
     return user_has_any_perm(user, "operate_preagenda", "view_all_availability")
+
+
+def gerencias_que_delegam_deslocamento(user: AbstractBaseUser | AnonymousUser | None) -> set[int]:
+    """P16: gerências onde `user` é GERENTE ou COORDENADOR vigente (registra o deslocamento dos formadores)."""
+    if not user or not getattr(user, "is_authenticated", False):
+        return set()
+    return EquipeGerencia.gerencias_com_papel(user, PAPEIS_QUE_DELEGAM_DESLOCAMENTO)
+
+
+def user_can_delegate_deslocamento(
+    user: AbstractBaseUser | AnonymousUser | None,
+    alvo: Any = None,
+) -> bool:
+    """
+    Autoriza registrar, editar ou apagar deslocamento em nome de outro usuário (#1454, 2026-07-09).
+
+    Habilitado para:
+    - qualquer alvo: `user_delega_deslocamento_de_qualquer_um` (superuser, Controle, DAT);
+    - P16 (PR 8): GERENTE ou COORDENADOR vigente, para `alvo` com vínculo FORMADOR vigente numa
+      gerência onde ela tem um desses papéis (`gerencias_que_delegam_deslocamento`). Sem `alvo` → False.
+
+    Demais (Apoio, Diretoria, Formador) → False; cada um registra a própria viagem.
+    """
+    if user_delega_deslocamento_de_qualquer_um(user):
+        return True
+    if alvo is None:
+        return False
+    gerencias = gerencias_que_delegam_deslocamento(user)
+    return bool(gerencias & EquipeGerencia.gerencias_com_papel(alvo, {"FORMADOR"}))
 
 
 def user_has_policy(
@@ -772,6 +786,7 @@ __all__ = [
     "solicitation_approval_basis",
     "solicitation_approval_basis_for",
     "user_can_delegate_availability_block",
+    "user_can_delegate_deslocamento",
     "user_has_policy",
     "resolve_public_policies",
     "CanAccessAuditLogs",

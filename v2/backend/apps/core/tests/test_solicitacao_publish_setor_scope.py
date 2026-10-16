@@ -355,7 +355,7 @@ class TestRegressao:
     def test_gerente_escopo_por_gerencia_inalterado(
         self, gerencia_fluir, gerencia_vidas, sol_fluir_terceiro, sol_vidas_terceiro
     ):
-        """Gerente (approve_solicitation_batch) segue escopado por gerencia_id, não por setor."""
+        """Gerente (papel GERENTE vigente, PR 8) segue escopado por gerencia_id, não por setor."""
         gerente = UsuarioFactory(username="gerente_pss", cpf="63000000005")
         gerente.groups.add(GroupFactory(name="Gerente"))
         EquipeGerencia.objects.create(usuario=gerente, gerencia=gerencia_fluir, papel="GERENTE")
@@ -384,24 +384,52 @@ class TestVigenciaExpirada:
         )
         return user
 
+    @pytest.fixture
+    def apoio_sem_setor(self):
+        """Papel APOIO VIGENTE numa gerência sem `setor_canonico`: tem o direito de publicar (PR 8), sem setor."""
+        sem_setor = Gerencia.objects.create(nome="GERENCIA SEM SETOR PSS", nome_setor="Sem setor", ativo=True)
+        user = UsuarioFactory(username="apoio_sem_setor_pss", cpf="63000000016")
+        user.groups.add(GroupFactory(name="Apoio de Coordenação"))
+        EquipeGerencia.objects.create(usuario=user, gerencia=sem_setor, papel="APOIO")
+        return user
+
     @patch("rest_framework.throttling.AnonRateThrottle.allow_request", return_value=True)
     @patch("rest_framework.throttling.UserRateThrottle.allow_request", return_value=True)
     def test_expirada_nao_publica_evento_do_setor_de_terceiro(self, _t1, _t2, apoio_expirada, sol_fluir_terceiro):
+        """PR 8: o papel APOIO vencido não dá `publish_setor_solicitacao`; o gate recusa antes do objeto (403)."""
         client = APIClient()
         client.force_authenticate(apoio_expirada)
         resp = _publish(client, sol_fluir_terceiro.id)
-        assert resp.status_code == status.HTTP_404_NOT_FOUND
+        assert resp.status_code == status.HTTP_403_FORBIDDEN
 
     @patch("rest_framework.throttling.AnonRateThrottle.allow_request", return_value=True)
     @patch("rest_framework.throttling.UserRateThrottle.allow_request", return_value=True)
     def test_expirada_nao_publica_nem_a_propria(self, _t1, _t2, apoio_expirada, projeto_fluir):
         """#1656 F2 (fix review): publish exige vínculo de setor VIGENTE. Apoio com
-        vínculo expirado (sem setor) NÃO publica — nem a própria — para não reintroduzir
-        o caso-limite de publicar evento próprio caído em outro setor (guarda de objeto
-        `can_publish_solicitacao`)."""
+        vínculo expirado NÃO publica — nem a própria. Desde o PR 8 o gate já recusa (403): o
+        direito de publicar vem do papel vigente."""
         propria = _aprovada(apoio_expirada, projeto_fluir)
         client = APIClient()
         client.force_authenticate(apoio_expirada)
+        resp = _publish(client, propria.id)
+        assert resp.status_code == status.HTTP_403_FORBIDDEN
+
+    @patch("rest_framework.throttling.AnonRateThrottle.allow_request", return_value=True)
+    @patch("rest_framework.throttling.UserRateThrottle.allow_request", return_value=True)
+    def test_sem_setor_nao_publica_evento_do_setor_de_terceiro(self, _t1, _t2, apoio_sem_setor, sol_fluir_terceiro):
+        """Papel vigente, setor vazio: passa o gate, mas o escopo não alcança o evento (404)."""
+        client = APIClient()
+        client.force_authenticate(apoio_sem_setor)
+        resp = _publish(client, sol_fluir_terceiro.id)
+        assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+    @patch("rest_framework.throttling.AnonRateThrottle.allow_request", return_value=True)
+    @patch("rest_framework.throttling.UserRateThrottle.allow_request", return_value=True)
+    def test_sem_setor_nao_publica_nem_a_propria(self, _t1, _t2, apoio_sem_setor, projeto_fluir):
+        """Guarda de objeto `can_publish_solicitacao`: sem setor vigente, nem a própria (caso-limite do F2)."""
+        propria = _aprovada(apoio_sem_setor, projeto_fluir)
+        client = APIClient()
+        client.force_authenticate(apoio_sem_setor)
         resp = _publish(client, propria.id)
         assert resp.status_code == status.HTTP_404_NOT_FOUND
 

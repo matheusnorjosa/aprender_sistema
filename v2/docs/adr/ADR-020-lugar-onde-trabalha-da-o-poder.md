@@ -53,7 +53,12 @@ Os PRs 1 a 11 entram antes da liberação; o 12 e o 13, depois.
 5. Dados: perfis das gerências, gerências CONTROLE e DIRETORIA, vínculos EQUIPE de quem só tem grupo.
 6. Fórmula em modo união (grupos ∪ pacote).
 7. Frontend com uma fonte só (`useCapabilities`).
-8. Função deixa de dar poder; entram os direitos de papel.
+8. Função deixa de dar poder; entram os direitos de papel. Feito em 15/10/2026: papel = direito de
+   evento (`DIREITOS_PAPEL`: COORDENADOR e GERENTE criam e editam, APOIO também publica no setor;
+   FORMADOR e EQUIPE, nada), vigente em gerência ativa (`EquipeGerencia.gerencias_com_papel`). O
+   direito ainda vale para qualquer gerência; o recorte "só na própria" (decisão 2) entra no PR 9.
+   Na gerência dela, a GERENTE e a COORDENADORA registram o deslocamento dos formadores (P16).
+   Migration `0125` tira a capacidade dos grupos de função e apaga `approve_solicitation_batch`.
 9. Escopo por gerência, fail-closed.
 10. DAT = administrador operacional (antes, atualizar PA-02/CP-02).
 11. Aprovação com uma fonte só.

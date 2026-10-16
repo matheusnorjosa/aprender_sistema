@@ -199,8 +199,9 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   // escolhe projeto e município sem compra. A mesma capacidade que o backend aceita.
   const dispensaCompra = useAcesso().caps.canCreateSolicitationWithoutPurchase;
   const [municipioLookupHasResults, setMunicipioLookupHasResults] = useState<boolean | null>(null);
-  // Quem cria: se tem a função Coordenador, é o responsável quando nenhum outro é escolhido
-  // (decisão do dono, 05/10/2026). Só entra na checagem de agenda se acompanhar.
+  // Quem cria: se tem o papel COORDENADOR vigente (`me.gerencias`, PR 8 das permissões), é o
+  // responsável quando nenhum outro é escolhido (decisão do dono, 05/10/2026). Só entra na checagem
+  // de agenda se acompanhar. Mesma regra do backend (`user_e_coordenador`).
   const [me, setMe] = useState<{ id: ID; nome: string; coordenador: boolean } | null>(null);
   // #1452: conflito devolvido pelo backend no submit (fecha o TOCTOU / cache).
   const [submitConflito, setSubmitConflito] = useState<BlockedParticipant[]>([]);
@@ -238,7 +239,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
           setMe({
             id: me.id,
             nome: me.name || me.username || 'Você',
-            coordenador: (me.funcoes ?? []).includes('Coordenador'),
+            coordenador: (me.gerencias ?? []).some((g) => g.papeis.includes('COORDENADOR')),
           });
         }
       } catch (error) {
@@ -450,7 +451,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
     }
   };
 
-  // Coordenador responsável: o escolhido; sem escolha, quem cria (se tem a função Coordenador).
+  // Coordenador responsável: o escolhido; sem escolha, quem cria (se tem o papel COORDENADOR).
   const responsavel = useMemo((): { id: ID; nome: string } | null => {
     if (formData.coordenadorResponsavel) {
       return { id: formData.coordenadorResponsavel.id, nome: formData.coordenadorResponsavel.label };

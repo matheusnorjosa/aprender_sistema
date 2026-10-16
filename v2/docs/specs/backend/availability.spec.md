@@ -2,7 +2,7 @@
 title: Disponibilidade (serviço)
 status: canonical
 last_verified: 2026-10-16
-verified_at_commit: 067c6337fbcfa3c357392eeffa081e1cb8c7a5e9
+verified_at_commit: 5205b976648b0f481a8842101b3f0ddae4647965
 sources_of_truth:
   - v2/backend/apps/core/services/availability_service.py
   - v2/backend/apps/core/services/solicitacao_availability.py
@@ -35,7 +35,7 @@ O coração é um **serviço puro, sem efeitos colaterais** (`check_conflicts`):
 
 - [`services/availability_service.py`](../../../backend/apps/core/services/availability_service.py) — `check_conflicts(*, usuario, inicio, fim, municipio=None) -> CheckResult` (variante cacheada) e `check_conflicts_uncached` (mesma assinatura, sem cache, usada pelo check em lote e por todo o enforcement transacional); ambas delegam a `_check_conflicts_impl`, que aceita `exclude_solicitacao_id`. Dataclasses `Conflict` (code/title/detail/ref_id) e `CheckResult` (ok/conflicts); helpers `to_local`, `same_day_local`, `_fmt_interval_local`. **SSOT das RD-01 a RD-08.**
 - [`services/solicitacao_availability.py`](../../../backend/apps/core/services/solicitacao_availability.py) — guard de enforcement (#1452): `enforce_solicitacao_availability(solicitacao, *, action)` decide **quem** é checado (decisão do dono, 05/10/2026: todos os FORMADORES — `ENFORCED_ROLES` = FORMADOR — e o coordenador responsável só com `coordenador_acompanha=True`, via `coordenador_ocupante`; quem cria não entra por ter criado; COORDENADOR, COORD_ACOMPANHA e CONVIDADO não ocupam), toma advisory lock por participante e traduz conflito em `ValidationAPIError`. Chamado em create/update (`perform_create`/`perform_update` em `views_solicitacao.py`) e em approve/batch-approve (`approve_solicitacao`/`batch_approve_solicitacoes` em `solicitacao_approval.py`).
-- [`views_availability.py`](../../../backend/apps/core/views_availability.py) (raiz de `apps/core/` — **arquivo ativo**) — `AvailabilityBlockViewSet`, `AvailabilityCheckView`, `AvailabilityCheckManyView` + helpers `is_privileged_user`, `can_check_availability_for_others`, `get_user_gerencias_ids`.
+- [`views_availability.py`](../../../backend/apps/core/views_availability.py) (raiz de `apps/core/` — **arquivo ativo**) — `AvailabilityBlockViewSet`, `AvailabilityCheckView`, `AvailabilityCheckManyView` + helpers `is_privileged_user`, `can_check_availability_for_others`. Os bloqueios dos colegas seguem `EquipeGerencia.gerencias_de_atuacao` (PR 9).
 - [`views_availability_monthly.py`](../../../backend/apps/core/views_availability_monthly.py) — `MonthlyAvailabilityView` (grade mensal; delega para `services/monthly_grid_service.build_monthly_grid`).
 - [`models/agenda.py`](../../../backend/apps/core/models/agenda.py) — `AvailabilityBlock` (`tipo` T/P, `status` aprovado, `inicio`/`fim` UTC; check constraints `fim>inicio` e `tipo in {T,P}`).
 - [`utils/cache_utils.py`](../../../backend/apps/core/utils/cache_utils.py) — decorator `cache_availability_check` + `invalidate_availability_cache` (versionamento por usuário no Redis).

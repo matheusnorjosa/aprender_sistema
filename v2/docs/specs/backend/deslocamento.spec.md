@@ -2,7 +2,7 @@
 title: Deslocamento
 status: canonical
 last_verified: 2026-10-16
-verified_at_commit: 067c6337fbcfa3c357392eeffa081e1cb8c7a5e9
+verified_at_commit: 5205b976648b0f481a8842101b3f0ddae4647965
 sources_of_truth:
   - v2/backend/apps/core/models/workflow.py
   - v2/backend/apps/core/migrations/0016_create_deslocamento.py

@@ -1,8 +1,8 @@
 ---
 title: Integração Google Calendar + Meet
 status: canonical
-last_verified: 2026-09-11
-verified_at_commit: 0dd1dcb630fdc1cf9b2b488121553e89488dde3c
+last_verified: 2026-10-16
+verified_at_commit: 067c6337fbcfa3c357392eeffa081e1cb8c7a5e9
 sources_of_truth:
   - v2/backend/apps/core/services/gcal_client_factory.py
   - v2/backend/apps/core/services/gcal_google_client.py
@@ -94,7 +94,7 @@ Ações sobre `Solicitacao` (DRF `@action`, todas `CanUseGcal | CanPublishSetorS
 - `POST /api/solicitacoes/{id}/resync-gcal/` → força UPDATE (reseta `gcal_payload_hash`), enfileira publish (202).
 - `POST /api/solicitacoes/{id}/cancel-gcal/` → enfileira `task_cancel_solicitacao_from_gcal`; deleta evento e limpa campos (202); 409 se não publicado.
 - `meet_link` é exposto nos serializers de detalhe e lista de `Solicitacao`.
-- `GET /api/solicitacoes/?publishable=true` → só as solicitações que o usuário pode publicar (global: todo o escopo; Apoio: `Projeto.setor` entre os setores vigentes do usuário; sem permissão ou sem setor: vazio). Sem o parâmetro, a lista não muda.
+- `GET /api/solicitacoes/?publishable=true` → só as solicitações que o usuário pode publicar (global: todo o escopo; Apoio: `projeto.gerencia_id` entre as gerências onde é APOIO vigente, desde o PR 9 das permissões; sem permissão ou sem gerência de APOIO: vazio). Sem o parâmetro, a lista não muda.
 
 Fluxo OAuth (em [`urls.py`](../../../backend/apps/core/urls.py), sob prefixo `/api/`):
 

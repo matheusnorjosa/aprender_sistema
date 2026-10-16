@@ -1,8 +1,8 @@
 ---
 title: Deslocamento
 status: canonical
-last_verified: 2026-09-11
-verified_at_commit: 0dd1dcb630fdc1cf9b2b488121553e89488dde3c
+last_verified: 2026-10-16
+verified_at_commit: 067c6337fbcfa3c357392eeffa081e1cb8c7a5e9
 sources_of_truth:
   - v2/backend/apps/core/models/workflow.py
   - v2/backend/apps/core/migrations/0016_create_deslocamento.py
@@ -64,7 +64,7 @@ E um cadastro operacional simples (CRUD + import em massa), sem fluxo de aprovac
 - **Dry-run por padrao no import**: `dry_run=true` faz `transaction.set_rollback(True)`; nada e persistido. O endpoint inteiro exige `SuperuserOnly` (so superusuario, decisao do dono de 02/10/2026: nenhum perfil importa pela tela), tanto em dry-run quanto em apply. Isolamento savepoint-por-linha (ASQ-016): uma linha ruim nao derruba o lote. **O parse de `dry_run` e FAIL-CLOSED** (corrigido em [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649); achado historico `M04-05`): `views_import_deslocamentos.py` chama `parse_dry_run(request.query_params.get("dry_run"))` — só um token de apply explícito (`false`/`0`/`no`/…) grava; qualquer valor desconhecido (`sim`, `maybe`, typo, vazio) permanece em dry-run (preview). Antes de #1649 o parse era uma allowlist do valor verdadeiro e o valor desconhecido virava apply silencioso.
 - **Leitura: scope por gerencia + self-service** (`views_deslocamento.py`, `get_queryset`):
   - Superuser **ou** capability `view_all_availability` (Controle/Gerente via seed 0078) -> ve todos os deslocamentos.
-  - Demais autenticados -> `Q(usuario=user) | Q(usuario__equipes__gerencia_id__in=<gerencias do user>)`. **O proprio dono SEMPRE ve os proprios deslocamentos**, mesmo sem vinculo de `EquipeGerencia` (#1454). A regra anterior desta spec ("sem vinculo -> 0 resultados") deixou de valer.
+  - Demais autenticados -> `Q(usuario=user) | Q(usuario__equipes__gerencia_id__in=<gerencias de atuacao do user>)`. Desde o PR 9 das permissoes (16/10/2026, P9-1, decisao do dono de 15/10) as gerencias sao so as de papel GERENTE, COORDENADOR ou APOIO vigente (`EquipeGerencia.gerencias_de_atuacao`): a formadora ve so os proprios deslocamentos. **O proprio dono SEMPRE ve os proprios deslocamentos**, mesmo sem vinculo de `EquipeGerencia` (#1454). A regra anterior desta spec ("sem vinculo -> 0 resultados") deixou de valer.
 - **Escrita: owner-forced com delegacao por capability** (#1454, audit 2026-07-10) — **isto NAO estava documentado**:
   - `perform_create`: `usuario` omitido ou == `request.user` -> grava para o proprio (`delegated=False`). `usuario` != `request.user` -> exige `user_can_delegate_deslocamento`, senao **403**.
   - `perform_update`/`perform_destroy` passam por `_ensure_owner_or_delegate`: mexer no registro de outro exige a mesma capability, senao 403.
@@ -109,7 +109,7 @@ Schema detalhado/exemplos: ver `API_REFERENCE` quando disponivel.
 ## Testes que cobrem
 
 - [`apps/core/tests/test_deslocamento_api.py`](../../../backend/apps/core/tests/test_deslocamento_api.py) — CRUD, filtros, validacoes (datas, origem!=destino), AuditLog.
-- [`apps/core/tests/test_deslocamento_rbac.py`](../../../backend/apps/core/tests/test_deslocamento_rbac.py) — scope de leitura (Coord/DAT veem a propria gerencia; Controle/Gerente full).
+- [`apps/core/tests/test_deslocamento_rbac.py`](../../../backend/apps/core/tests/test_deslocamento_rbac.py) — scope de leitura (Coord/Apoio/Gerente veem a gerencia onde tem o papel; Controle/DAT full). P9-1 em `test_rbac_escopo_por_papel.py`.
 - [`apps/core/tests/test_deslocamento_idor_1454.py`](../../../backend/apps/core/tests/test_deslocamento_idor_1454.py) — gate owner-or-delegate no create/update/destroy (#1454).
 - [`apps/core/tests/test_rbac_papel_da_poder.py`](../../../backend/apps/core/tests/test_rbac_papel_da_poder.py) — P16 (PR 8): GERENTE e COORDENADORA registram, editam e excluem o deslocamento do formador da gerencia (AuditLog `delegated=True`); outra gerencia, alvo sem papel FORMADOR, Apoio e reatribuicao para fora dao 403; o seletor `alvos`.
 - [`apps/core/tests/test_import_deslocamentos.py`](../../../backend/apps/core/tests/test_import_deslocamentos.py) — service + view + gate (DAT recebe 403; superusuario importa) + idempotencia.

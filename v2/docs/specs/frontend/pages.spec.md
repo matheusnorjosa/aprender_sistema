@@ -1,8 +1,8 @@
 ---
 title: Páginas (React)
 status: canonical
-last_verified: 2026-10-15
-verified_at_commit: e18214ebe233bdc97e1cf7386955b7b5c85c5caf
+last_verified: 2026-10-16
+verified_at_commit: 067c6337fbcfa3c357392eeffa081e1cb8c7a5e9
 sources_of_truth:
   - v2/frontend/src/App.tsx
   - v2/frontend/src/components/AppRoutes.tsx
@@ -210,7 +210,7 @@ Inventário por domínio (rota → componente → guard **como o código aplica 
 |---|---|---|
 | `/solicitacoes/minhas` | `Solicitacoes/MySolicitacoesPage` | policy `create_solicitation` |
 | `/solicitacoes/nova` | `Solicitacoes/NewSolicitacaoWizard` | policy `create_solicitation` |
-| `/solicitacoes/publicacao` | `Solicitacoes/PublicacaoSetorPage` | policy `publish_setor_solicitacao` (#1656) — Apoio de Coordenação publica no Google Agenda os aprovados do próprio setor; `use_gcal` **não** abre esta rota |
+| `/solicitacoes/publicacao` | `Solicitacoes/PublicacaoSetorPage` | policy `publish_setor_solicitacao` (#1656) — Apoio de Coordenação publica no Google Agenda os aprovados das gerências onde é APOIO (PR 9); `use_gcal` **não** abre esta rota |
 | `/solicitacoes/:id/editar` | `Solicitacoes/EditSolicitacaoPage` | policy `create_solicitation` OU `access_solicitation_approvals` OU `manage_admin_registries` (#1169; PR 7: antes `canCoordenador \|\| canApproveSuper \|\| create_solicitation`, mesmo resultado para os 10 atores) — **não** é "autenticado". Quem tem a policy `create_solicitation` cria e é dono, e o servidor (`IsOwnerOrPrivileged`) deixa o dono editar: sem ela no gate, o gerente de setor criava e caía em "Recurso indisponível" ao clicar em Editar. Resíduo conhecido: o DAT ainda abre a tela (`manage_admin_registries`) e leva 403 ao salvar o que não é dele. A aprovadora por vínculo abre qualquer uma (ler é global), mas só salva as próprias, as do fluxo SUPER da Superintendência e as das gerências de um 2º vínculo de GERENTE dela; fora disso dá 403 e a tela mostra o `detail` do backend ("A gerência da Superintendência só edita ou exclui solicitações do fluxo SUPER da Superintendência."; sem `detail`, o texto padrão); mover para projeto fora desse alcance dá 400 e a tela mostra o motivo de `errors.projeto`. Conflito de agenda ao salvar (400 `availability_conflict`): a tela mostra a frase do `detail` ("Não é possível salvar a alteração: <quem> <motivo>."), não o conteúdo de `errors`. O seletor de projeto (`/lookup/projetos/`) só oferece esse alcance (regra do dono, 30/09) |
 | `/solicitacoes/meus-eventos` | `MeusEventos/MeusEventosPage` | `allow={!!user}` |
 
@@ -233,6 +233,8 @@ Inventário por domínio (rota → componente → guard **como o código aplica 
 | `/solicitacoes/disponibilidade` | `Disponibilidade/MonthlyPage` | policy `access_monthly_availability` |
 | `/solicitacoes/bloqueios` | `pages/Disponibilidade.tsx` (arquivo raiz) | policy `access_availability_blocks` — inclui Formador, escopo próprio |
 | `/solicitacoes/deslocamentos` | `Deslocamentos/DeslocamentosPage` | policy `access_travel` (a página confere a mesma policy) |
+
+> **PR 9 das permissões (16/10/2026):** a `FiltersBar` da Grade oferece só as gerências de `me.gerencias` com papel GERENTE, COORDENADOR ou APOIO (a API recusa o papel FORMADOR sozinho, P9-3). Na Nova Solicitação e na tela Editar, o seletor de formadores e o de responsável mandam `projeto_id` ao `/api/lookup/usuarios/`: só pessoas da gerência do projeto escolhido (P9-5).
 
 > **PR 7 das permissões (15/10/2026):** as três telas de escopo usam policies compostas no servidor (`TELAS_DE_ESCOPO`, `rbac/policies.py`): `view_all_availability` OU grupo (Grade: Controle, DAT, Gerente, Coordenador, Apoio; Bloqueios: Controle, DAT, Coordenador, Apoio, Formador; Deslocamentos: Controle, DAT, Coordenador, Apoio) OU vínculo GERENTE/COORDENADOR/APOIO vigente em gerência ativa — a fórmula que o front calculava, provada pessoa a pessoa em `test_rbac_politicas_de_tela.py`. Antes a `DeslocamentosPage` tinha regra própria (com Superintendência, sem `view_all_availability`) e divergia da rota.
 

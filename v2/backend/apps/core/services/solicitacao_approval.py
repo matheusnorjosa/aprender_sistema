@@ -94,6 +94,11 @@ ACOES_QUE_ALTERAM_CONTA: frozenset[str] = frozenset(
         AuditLog.Action.USER_ANONYMIZE,
     }
 )
+# Do lado da aprovadora (D2 ao contrário, dois fantoches e o fantoche ao contrário de "quem editou") só
+# conta o que dá a conta a outra pessoa: a senha definida por ela (`RESET_PASSWORD`, que também registra a
+# senha dada na criação, `contexto=create`). O login é CPF ou usuário + senha, sem recuperação por e-mail,
+# então corrigir nome, e-mail ou CPF da aprovadora não deixa ninguém decidir pela conta dela.
+ACOES_QUE_DAO_A_CONTA: frozenset[str] = frozenset({AuditLog.Action.RESET_PASSWORD})
 JANELA_SEGREGACAO = timedelta(days=30)
 
 # PA-02, quem editou não decide (PR 10): chave de `changed_fields` no AuditLog `UPDATE` da solicitação
@@ -159,11 +164,12 @@ def contas_alteradas_por(user: Usuario) -> dict[int, datetime]:
 
 
 def quem_alterou_a_conta_de(user: Usuario, desde: datetime) -> dict[int, datetime]:
-    """{id de quem alterou a conta de `user` desde `desde`: última vez} (uma consulta).
+    """{id de quem redefiniu a senha de `user` desde `desde`: última vez} (uma consulta).
 
-    Serve à D2 ao contrário (o autor redefine a senha de uma aprovadora e decide pela conta dela), aos
-    dois fantoches (a mesma pessoa alterou a conta do autor e a da aprovadora) e ao fantoche ao contrário
-    de "quem editou não decide" (quem editou faz o mesmo). O superusuário fica de fora: ele já decide
+    Só `ACOES_QUE_DAO_A_CONTA`: é o que deixa outra pessoa decidir pela conta de `user`. Serve à D2 ao
+    contrário (o autor redefine a senha de uma aprovadora e decide pela conta dela), aos dois fantoches (a
+    mesma pessoa alterou a conta do autor e redefiniu a senha da aprovadora) e ao fantoche ao contrário de
+    "quem editou não decide" (quem editou faz o mesmo). O superusuário fica de fora: ele já decide
     tudo (break-glass), então tomar uma conta não lhe dá nada, e ele lota e corrige as contas de todos.
     """
     if not getattr(user, "pk", None):
@@ -171,7 +177,7 @@ def quem_alterou_a_conta_de(user: Usuario, desde: datetime) -> dict[int, datetim
     return dict(
         AuditLog.objects.filter(
             model_name="Usuario",
-            action__in=ACOES_QUE_ALTERAM_CONTA,
+            action__in=ACOES_QUE_DAO_A_CONTA,
             details__target_user_id=user.pk,
             created_at__gte=desde,
         )
@@ -240,7 +246,7 @@ def _editadas_pelo_ator(
 
     O editor é `user`, uma conta que ele alterou nos 30 dias anteriores à edição (o fantoche: só conta
     a alteração em [edição − 30 dias, edição]; a feita depois não faz a edição virar do ator), ou quem
-    alterou a conta de `user` desde o corte da solicitação (o fantoche ao contrário: o editor redefine
+    redefiniu a senha de `user` desde o corte da solicitação (o fantoche ao contrário: o editor redefine
     a senha da aprovadora e decide pela conta dela).
     """
     fantoche = AuditLog.objects.alias(alvo=KeyTextTransform("target_user_id", "details")).filter(

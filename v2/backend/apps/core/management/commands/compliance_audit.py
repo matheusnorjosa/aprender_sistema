@@ -106,12 +106,17 @@ class Command(BaseCommand):
         # PA-02 (segregação D2, PR 10): quem alterou a conta do autor não decide por 30 dias
         # ================================================================
         # A janela conta da decisão ou da criação da solicitação, o que vier antes (decisão do
-        # dono de 16/10). Vale nos dois sentidos: o ator alterou a conta do autor, ou o autor alterou
-        # a conta do ator; e quando a mesma pessoa alterou as duas contas (dois fantoches). Quem
-        # alterou sendo superuser não conta (ele já decide tudo). Só contam decisões gravadas com a
-        # trava (`conta_alterada_pelo_ator` no details); o break-glass do superuser vem com a marca
-        # True e não conta.
-        from apps.core.services.solicitacao_approval import ACOES_QUE_ALTERAM_CONTA, JANELA_SEGREGACAO
+        # dono de 16/10). Vale nos dois sentidos: o ator alterou a conta do autor, ou o autor redefiniu
+        # a senha do ator; e quando a mesma pessoa alterou a conta do autor e redefiniu a senha do ator
+        # (dois fantoches). Do lado do ator só a senha conta (`ACOES_QUE_DAO_A_CONTA`). Quem alterou
+        # sendo superuser não conta (ele já decide tudo). Só contam decisões gravadas com a trava
+        # (`conta_alterada_pelo_ator` no details); o break-glass do superuser vem com a marca True e
+        # não conta.
+        from apps.core.services.solicitacao_approval import (
+            ACOES_QUE_ALTERAM_CONTA,
+            ACOES_QUE_DAO_A_CONTA,
+            JANELA_SEGREGACAO,
+        )
 
         d2_violations = 0
         for log in decision_logs.filter(details__has_key="conta_alterada_pelo_ator").exclude(usuario_id=None):
@@ -123,26 +128,26 @@ class Command(BaseCommand):
                 continue
             alteracoes = AuditLog.objects.filter(
                 model_name="Usuario",
-                action__in=ACOES_QUE_ALTERAM_CONTA,
                 created_at__gte=min(log.created_at, sol["created_at"]) - JANELA_SEGREGACAO,
                 created_at__lte=log.created_at,
             )
-            ator_alterou_autor = not details.get("conta_alterada_pelo_ator") and (
-                alteracoes.filter(usuario_id=log.usuario_id, details__target_user_id=sol["usuario_id"]).exists()
+            alteracoes_do_autor = alteracoes.filter(action__in=ACOES_QUE_ALTERAM_CONTA)
+            senhas_do_ator = alteracoes.filter(
+                action__in=ACOES_QUE_DAO_A_CONTA, details__target_user_id=log.usuario_id, usuario__is_superuser=False
             )
-            autor_alterou_ator = not details.get("conta_do_ator_alterada_pelo_autor") and (
-                sol["usuario_id"] != log.usuario_id
-                and alteracoes.filter(
-                    usuario_id=sol["usuario_id"], usuario__is_superuser=False, details__target_user_id=log.usuario_id
+            ator_alterou_autor = not details.get("conta_alterada_pelo_ator") and (
+                alteracoes_do_autor.filter(
+                    usuario_id=log.usuario_id, details__target_user_id=sol["usuario_id"]
                 ).exists()
             )
-            alteraram_o_ator = (
-                alteracoes.filter(details__target_user_id=log.usuario_id, usuario__is_superuser=False)
-                .exclude(usuario_id=log.usuario_id)
-                .values("usuario_id")
+            autor_alterou_ator = not details.get("conta_do_ator_alterada_pelo_autor") and (
+                sol["usuario_id"] != log.usuario_id and senhas_do_ator.filter(usuario_id=sol["usuario_id"]).exists()
             )
+            alteraram_o_ator = senhas_do_ator.exclude(usuario_id=log.usuario_id).values("usuario_id")
             mesma_pessoa = not details.get("contas_alteradas_pela_mesma_pessoa") and (
-                alteracoes.filter(details__target_user_id=sol["usuario_id"], usuario_id__in=alteraram_o_ator).exists()
+                alteracoes_do_autor.filter(
+                    details__target_user_id=sol["usuario_id"], usuario_id__in=alteraram_o_ator
+                ).exists()
             )
             if ator_alterou_autor or autor_alterou_ator or mesma_pessoa:
                 d2_violations += 1

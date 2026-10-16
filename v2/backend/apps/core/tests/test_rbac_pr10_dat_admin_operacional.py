@@ -351,6 +351,7 @@ class TestSegregacaoPorHistorico:
         assert solicitacao_approval.ACOES_QUE_ALTERAM_CONTA == frozenset(
             {"CREATE", "UPDATE", "RESET_PASSWORD", "USER_PRIVILEGE_CHANGED", "ASSIGN_GROUPS", "USER_ANONYMIZE"}
         )
+        assert solicitacao_approval.ACOES_QUE_DAO_A_CONTA == frozenset({"RESET_PASSWORD"})
 
     @pytest.mark.parametrize(("dias", "bloqueia"), [(29, True), (30, True), (31, False)])
     def test_d2_janela_conta_da_decisao(self, g19, g1, dias, bloqueia):
@@ -568,13 +569,13 @@ class TestSegregacaoPorHistorico:
     def test_d2_ao_contrario_janela_de_30_dias(self, g19, g1, dias, bloqueia):
         autor, aprovadora = _dat(g19), _dat(g19)
         agora = timezone.now()
-        _alterou(autor, aprovadora, quando=agora - timedelta(days=dias))
+        _alterou(autor, aprovadora, quando=agora - timedelta(days=dias), action=AuditLog.Action.RESET_PASSWORD)
         resp = _approve(aprovadora, _pendente_super(g1, autor=autor, created_at=agora))
         assert (resp.status_code == 403) is bloqueia, resp.data
 
     def test_d2_ao_contrario_superusuario_decide_e_marca(self, root, g19, g1):
         autor = _dat(g19)
-        _alterou(autor, root)
+        _alterou(autor, root, action=AuditLog.Action.RESET_PASSWORD)
         sol = _pendente_super(g1, autor=autor)
         assert _approve(root, sol).status_code == 200
         log = AuditLog.objects.get(action="APPROVE", details__solicitacao_id=sol.id)
@@ -583,7 +584,7 @@ class TestSegregacaoPorHistorico:
 
     def test_d2_ao_contrario_lista_e_home(self, g19, g1):
         autor, aprovadora = _dat(g19), _dat(g19)
-        _alterou(autor, aprovadora)
+        _alterou(autor, aprovadora, action=AuditLog.Action.RESET_PASSWORD)
         bloqueada = _pendente_super(g1, autor=autor)
         _pendente_super(g1)
         resp = _client(aprovadora).get("/api/solicitacoes/?flow=SUPER&status=pendente&page_size=50")
@@ -597,7 +598,7 @@ class TestSegregacaoPorHistorico:
         def consultas(n: int) -> int:
             autores = [UsuarioFactory() for _ in range(n)]
             for autor in autores:
-                _alterou(autor, aprovadora)
+                _alterou(autor, aprovadora, action=AuditLog.Action.RESET_PASSWORD)
             ids = [_pendente_super(g1, autor=a).id for a in autores]
             cache.clear()
             get_user_functional_permissions(aprovadora)
@@ -612,7 +613,7 @@ class TestSegregacaoPorHistorico:
         sol = _pendente_super(g1, autor=autor)
         assert _approve(aprovadora, sol).status_code == 200
         # Alteração registrada antes da decisão, como se a trava tivesse falhado.
-        _alterou(autor, aprovadora, quando=timezone.now() - timedelta(days=1))
+        _alterou(autor, aprovadora, quando=timezone.now() - timedelta(days=1), action=AuditLog.Action.RESET_PASSWORD)
         out = StringIO()
         call_command("compliance_audit", "--format=json", stdout=out)
         checks = {c["rule"]: c for c in json.loads(out.getvalue())["checks"]}
@@ -663,7 +664,7 @@ class TestSuperusuarioNaoTravaAD2:
         aprovadora = _gerente_g1(g1)
         sol = _pendente_super(g1, autor=root)
         assert _approve(aprovadora, sol).status_code == 200
-        _alterou(root, aprovadora, quando=timezone.now() - timedelta(days=1))
+        _alterou(root, aprovadora, quando=timezone.now() - timedelta(days=1), action=AuditLog.Action.RESET_PASSWORD)
         out = StringIO()
         call_command("compliance_audit", "--format=json", stdout=out)
         assert _d2_status(out)["violations"] == 0
@@ -706,9 +707,42 @@ class TestMesmaPessoaAlterouAutorEAprovadora:
         # Quem não teve a conta alterada por X decide.
         assert _approve(_dat(g19), sol).status_code == 200
 
+    @pytest.mark.parametrize("caso", ["dois fantoches", "autor alterou a aprovadora", "editor alterou a aprovadora"])
+    def test_corrigir_so_o_nome_da_aprovadora_nao_trava(self, g19, g1, caso):
+        """Do lado da aprovadora só conta a senha redefinida: corrigir o nome não dá a conta dela a ninguém
+        (o login é CPF ou usuário + senha). A conta do autor segue com qualquer alteração (decisão 1)."""
+        x, aprovadora = _dat(g19), _gerente_g1(g1)
+        autor = x if caso == "autor alterou a aprovadora" else UsuarioFactory(first_name="Nome")
+        alvos = [aprovadora, autor] if caso == "dois fantoches" else [aprovadora]
+        for alvo in alvos:
+            resp = _client(x).patch(f"/api/usuarios-admin/{alvo.id}/", {"first_name": "Nome Certo"}, format="json")
+            assert resp.status_code == 200, resp.content
+        sol = _pendente_super(g1, autor=autor)
+        if caso == "editor alterou a aprovadora":
+            assert _editar(x, sol, {"municipio": MunicipioFactory().id}).status_code == 200
+        assert _client(aprovadora).get("/api/stats/home/").data["pending_approvals"] == 1
+        assert _approve(aprovadora, sol).status_code == 200
+        out = StringIO()
+        call_command("compliance_audit", "--format=json", stdout=out)
+        assert _d2_status(out)["violations"] == 0
+
+    @pytest.mark.parametrize("caso", ["dois fantoches", "autor alterou a aprovadora", "editor alterou a aprovadora"])
+    def test_senha_da_aprovadora_redefinida_trava(self, g19, g1, caso):
+        x, aprovadora = _dat(g19), _gerente_g1(g1)
+        autor = x if caso == "autor alterou a aprovadora" else UsuarioFactory()
+        _alterou(x, aprovadora, action=AuditLog.Action.RESET_PASSWORD)
+        if caso == "dois fantoches":
+            _alterou(x, autor)
+        sol = _pendente_super(g1, autor=autor)
+        if caso == "editor alterou a aprovadora":
+            assert _editar(x, sol, {"municipio": MunicipioFactory().id}).status_code == 200
+        esperado = {"dois fantoches": SAME_ALTERER, "autor alterou a aprovadora": ALTERED_BY_AUTHOR}.get(caso, EDITED)
+        resp = _approve(aprovadora, sol)
+        assert resp.status_code == 403 and resp.data["code"] == esperado
+
     def test_so_a_aprovadora_alterada_nao_basta(self, g19, g1):
         x, aprovadora = _dat(g19), _gerente_g1(g1)
-        _alterou(x, aprovadora)
+        _alterou(x, aprovadora, action=AuditLog.Action.RESET_PASSWORD)
         _alterou(x, UsuarioFactory())
         assert _approve(aprovadora, _pendente_super(g1)).status_code == 200
 
@@ -718,19 +752,24 @@ class TestMesmaPessoaAlterouAutorEAprovadora:
         x, aprovadora, autor = _dat(g19), _gerente_g1(g1), UsuarioFactory()
         agora = timezone.now()
         _alterou(x, autor, quando=agora - timedelta(days=dias if quem == "autor" else 1))
-        _alterou(x, aprovadora, quando=agora - timedelta(days=dias if quem == "aprovadora" else 1))
+        _alterou(
+            x,
+            aprovadora,
+            quando=agora - timedelta(days=dias if quem == "aprovadora" else 1),
+            action=AuditLog.Action.RESET_PASSWORD,
+        )
         resp = _approve(aprovadora, _pendente_super(g1, autor=autor, created_at=agora))
         assert (resp.status_code == 403) is bloqueia, resp.data
 
     def test_superusuario_que_alterou_as_duas_nao_trava(self, root, g1):
         aprovadora, autor = _gerente_g1(g1), UsuarioFactory()
-        _alterou(root, aprovadora)
+        _alterou(root, aprovadora, action=AuditLog.Action.RESET_PASSWORD)
         _alterou(root, autor)
         assert _approve(aprovadora, _pendente_super(g1, autor=autor)).status_code == 200
 
     def test_superusuario_decide_e_marca(self, root, g19, g1):
         x, autor = _dat(g19), UsuarioFactory()
-        _alterou(x, root)
+        _alterou(x, root, action=AuditLog.Action.RESET_PASSWORD)
         _alterou(x, autor)
         sol = _pendente_super(g1, autor=autor)
         assert _approve(root, sol).status_code == 200
@@ -744,7 +783,7 @@ class TestMesmaPessoaAlterouAutorEAprovadora:
             ids = []
             for _ in range(n):
                 x, autor = UsuarioFactory(), UsuarioFactory()
-                _alterou(x, aprovadora)
+                _alterou(x, aprovadora, action=AuditLog.Action.RESET_PASSWORD)
                 _alterou(x, autor)
                 ids.append(_pendente_super(g1, autor=autor).id)
             cache.clear()
@@ -761,7 +800,7 @@ class TestMesmaPessoaAlterouAutorEAprovadora:
         sol = _pendente_super(g1, autor=autor)
         assert _approve(aprovadora, sol).status_code == 200
         # Alterações registradas antes da decisão, como se a trava tivesse falhado.
-        _alterou(x, aprovadora, quando=timezone.now() - timedelta(days=1))
+        _alterou(x, aprovadora, quando=timezone.now() - timedelta(days=1), action=AuditLog.Action.RESET_PASSWORD)
         _alterou(x, autor, quando=timezone.now() - timedelta(days=1))
         out = StringIO()
         call_command("compliance_audit", "--format=json", stdout=out)
@@ -909,7 +948,7 @@ class TestQuemEditouNaoDecide:
             model_name="Solicitacao",
             details={"solicitacao_id": sol.id, "changed_fields": {"inicio": {"old": "a", "new": "b"}}},
         )
-        _alterou(editor, aprovadora, quando=agora - timedelta(days=dias))
+        _alterou(editor, aprovadora, quando=agora - timedelta(days=dias), action=AuditLog.Action.RESET_PASSWORD)
         resp = _approve(aprovadora, sol)
         assert (resp.status_code == 403) is bloqueia, resp.data
         if bloqueia:
@@ -922,7 +961,7 @@ class TestQuemEditouNaoDecide:
             ids = []
             for _ in range(n):
                 editor = UsuarioFactory()
-                _alterou(editor, aprovadora)
+                _alterou(editor, aprovadora, action=AuditLog.Action.RESET_PASSWORD)
                 sol = _pendente_super(g1)
                 AuditLog.objects.create(
                     usuario=editor,

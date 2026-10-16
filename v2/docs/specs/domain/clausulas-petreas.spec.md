@@ -1,7 +1,7 @@
 ---
 title: Cláusulas Pétreas (CP-01..CP-08)
 status: canonical
-last_verified: 2026-10-05
+last_verified: 2026-10-16
 sources_of_truth:
   - docs/business-rules/clausulas-petreas.md
   - v2/backend/config/settings.py
@@ -48,7 +48,7 @@ Esta spec é o **índice canônico** das CPs: lista cada cláusula com seu **enf
 ## Contratos e invariantes
 
 - **CP-01 — REQUIRE_DOCKER**: v2 roda **apenas em Docker**. Quando `REQUIRE_DOCKER=1` e o processo **não** vê `/.dockerenv`, `settings.py` aborta com `sys.exit(1)`. Em dev a variável fica desligada (`"0"`); o job de integração da CI exporta `REQUIRE_DOCKER=1` e migra/roda dentro do container.
-- **CP-02 — Aprovação manual SUPER**: nenhum fluxo SUPER auto-aprova (nem evento passado, fix #1370); aprovam superuser OU (Gerente + Superintendência) OU (Assistente Administrativo + Controle); integrações (GCal) só disparam **após** aprovação. Contrato detalhado em PA-01..PA-07. A **imutabilidade** desta autoridade tinha um furo via import de usuários (`M03-01`), **corrigido** por #1610 (`ccbe1e05`) — ver §Divergências.
+- **CP-02 — Aprovação manual SUPER**: nenhum fluxo SUPER auto-aprova (nem evento passado, fix #1370). Aprovam o superuser, a GERENTE vigente da gerência Superintendência (vínculo; o par de grupos Gerente + Superintendência até o B2), o Assistente Administrativo do Controle (até o PR 11) e o **DAT pelo pacote `ADMIN_OPERACIONAL`** (decisão do dono de 02/10, nº 16; PR 10). Ninguém decide a própria solicitação nem a de pessoa cuja conta alterou nos últimos 30 dias (o superuser só como break-glass registrado). Integrações (GCal) só disparam **após** aprovação. Contrato detalhado em PA-01..PA-07. A **imutabilidade** desta autoridade tinha um furo via import de usuários (`M03-01`), **corrigido** por #1610 (`ccbe1e05`) — ver §Divergências.
 - **CP-03 — Disponibilidade**: não-sobreposição, bloqueios T/P e buffer de deslocamento (D) **barram**; não há limite de horas por dia na agenda; timezone `America/Fortaleza` (storage UTC). Contrato detalhado em RD-01..RD-08. **Alterada por decisão explícita do dono em 02/10/2026** ("o evento na agenda pode ter quantas horas quiser; para o cálculo de horas de formação, por dia o formador tem teto de 8 h"): até essa data o limite diário também barrava; de 02/10 a 05/10 ele só avisava (M). **Alterada de novo em 05/10/2026, com OK explícito do dono** ("Tirar o aviso"): o aviso M saiu de todos os caminhos e o RD-05 virou o **teto por evento da contagem de horas de formação** (`min(fim − início, teto)`, somado no dia do início, sem teto por dia; teto em Configurações, padrão 8 h; SSOT `services/horas_formacao.py`, usada pela Grade Mensal e pelo painel de Equipe). A decisão de 05/10 corrigiu o "por dia" de 02/10 para "por evento".
 - **CP-04 — Workflow**: agentes autônomos seguem a ordem **Entender → Planejar → Implementar → Testar** (Infra/ETL/UI como fases subsequentes). É disciplina de processo, **não** verificada por CI.
 - **CP-05 — v1 congelado**: v1 só muda por branch `fix/v1-*` + PR para `main-v1`, com aprovação. Não há script que bloqueie edição de v1 — o backstop é a separação de branches + revisão.

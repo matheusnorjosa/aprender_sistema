@@ -17,27 +17,36 @@ Uma `Solicitacao` **nunca** muda para "Aprovada" automaticamente, mesmo se não 
 
 ## PA-02: Perfil Exigido
 
-Podem aprovar/reprovar:
+Podem aprovar/reprovar, nesta ordem (`solicitation_approval_basis`, rótulo gravado no AuditLog):
 
-- **superuser**, ou
-- **Gerente da Superintendência** (Setor `Superintendência` + Função `Gerente`), ou
-- **Assistente Administrativo do Controle** (Setor `Controle` + Função `Assistente Administrativo`)
+1. **superuser** (`superuser`);
+2. **Gerente da Superintendência** por vínculo vigente na gerência `SUPERINTENDENCIA`
+   (`gerente_superintendencia`), só no fluxo SUPER dessa gerência;
+3. **Assistente Administrativo do Controle** (`asst_admin_controle`), até o PR 11;
+4. o par legado de grupos `Superintendência` + `Gerente` (`grupo_superintendencia_gerente`), até o B2;
+5. **o DAT** (`capacidade_aprovar`, PR 10; decisão do dono de 02/10, nº 16): quem tem a capacidade
+   `approve_solicitation`, que vem só do pacote `ADMIN_OPERACIONAL` (vínculo EQUIPE ou GERENTE
+   vigente na gerência DAT). Decide solicitação de qualquer gerência e fluxo.
 
-DAT, Controle puro e Gerente pedagógico **não** aprovam.
+Controle puro, Gerente pedagógico, Diretoria e o grupo DAT sem o vínculo **não** aprovam.
 
-```python
-# apps/core/rbac/policies.py:395-421 (_user_has_solicitation_approvals)
-pode_aprovar = is_superuser OR (
-    "Gerente" IN grupos AND "Superintendência" IN grupos
-) OR assistente_administrativo_do_controle
-```
+**Segregação** (o superuser pode, como break-glass marcado no AuditLog):
 
-!!! danger "A autoridade não é imutável hoje (P0 · #1610)"
-    O import de usuários permite que um membro do grupo **DAT** conceda a si próprio
-    `Gerente` + `Superintendência` — o composite acima — e passe a aprovar.
-    `POST /api/usuarios/import/?dry_run=false` devolve HTTP 200 e aplica os grupos
-    (`apps/core/services/usuarios_import.py:374-382`, sem allowlist nem checagem ator × alvo).
-    Enquanto #1610 estiver aberto, PA-02 descreve o gate, não a fronteira de confiança.
+- ninguém decide a **própria** solicitação (`self_approval_forbidden`);
+- quem **alterou a conta** do autor pela tela de Usuários (criar, editar qualquer campo, senha,
+  ativar ou desativar, grupos, anonimizar) não decide as solicitações dele por **30 dias**,
+  contados da decisão ou da criação da solicitação, o que vier antes
+  (`altered_account_approval_forbidden`);
+- quem **editou** data, horário, município, projeto ou formadores de uma solicitação depois da
+  última aprovação dela não a decide (`edited_by_approver_forbidden`). Outra pessoa aprovadora decide.
+
+**Contas** (S4, decisão do dono de 16/10): só o superusuário altera conta de superusuário. Quem tem
+`manage_admin_registries` (o DAT) altera as demais, com AuditLog; a senha redefinida por outra
+pessoa obriga a troca no próximo acesso.
+
+!!! success "A autoridade não é concedível pelo import (#1610, resolvido)"
+    O import de usuários só concede grupo pelo superusuário, e os importadores de equipe recusam
+    o vínculo que dá a aprovação. Detalhe na spec.
 
 ## PA-03: Gatilhos Pós-Aprovação
 
@@ -72,9 +81,11 @@ Registrar em `AuditLog`:
 ```python
 test_never_auto_approves_on_clean_or_save
 test_only_superintendencia_can_approve_or_reject
-test_calendar_integration_not_called_before_approval
-test_approval_flow_records_audit_log
 test_non_privileged_user_gets_403_on_approval_endpoint
+test_segregacao_conta_alterada_bloqueia_decisao
+test_calendar_integration_not_called_before_approval
+test_calendar_integration_is_called_after_approval
+test_approval_flow_records_audit_log
 ```
 
 ## Fluxos
@@ -82,11 +93,12 @@ test_non_privileged_user_gets_403_on_approval_endpoint
 ### SUPER (Manual)
 
 1. Coordenador cria solicitação → checagem de disponibilidade de **todos** os participantes; conflito bloqueia a criação (400 `availability_conflict`) → `status='pendente'`
-2. Gerente da Superintendência ou Assistente Administrativo do Controle aprova/reprova.
+2. Gerente da Superintendência, DAT ou Assistente Administrativo do Controle aprova/reprova
+   (nunca a própria, a de autor cuja conta alterou nos 30 dias, nem a que editou).
    Aprovar **revalida** a disponibilidade (#1452): se algum participante entrou em conflito
    desde a criação, a aprovação é recusada com 400
 3. Se aprovado → vai para Pré-Agenda
-4. Controle publica no Google Calendar
+4. Controle, Superintendência ou DAT publica no Google Calendar
 
 ### Aprovação em lote
 

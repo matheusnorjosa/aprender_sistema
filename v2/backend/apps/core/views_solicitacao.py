@@ -12,6 +12,7 @@ import logging
 from typing import Any
 
 from django.db.models import Case, F, IntegerField, Q, QuerySet, Value, When
+from django.db.models.functions import Lower
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
@@ -621,8 +622,15 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         all_emails = set()
         all_emails.update(e.strip().lower() for e in extra.get("formador_emails", []) if e and e.strip())
         all_emails.update(e.strip().lower() for e in extra.get("coord_acompanha_emails", []) if e and e.strip())
+        # O e-mail cadastrado pode ter maiúscula: comparar sem diferenciar, senão a pessoa vira convidada
+        # e escapa da checagem de gerência abaixo (PR 9, P9-5).
         usuarios_by_email = (
-            {u.email.lower(): u for u in Usuario.objects.filter(email__in=all_emails, is_active=True)}
+            {
+                u.email.lower(): u
+                for u in Usuario.objects.annotate(email_lower=Lower("email")).filter(
+                    email_lower__in=all_emails, is_active=True
+                )
+            }
             if all_emails
             else {}
         )

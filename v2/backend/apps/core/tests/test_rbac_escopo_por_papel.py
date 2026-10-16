@@ -270,6 +270,36 @@ class TestGerenciaDoProjeto:
         assert response.status_code == 400
         assert "coordenador" in _erros(response)
 
+    def test_participante_de_B_por_email_com_maiuscula_em_evento_de_A_400(self, a_b, coord_a_e_b):
+        """O e-mail cadastrado com maiúscula não pode virar convidado e driblar a gerência do projeto."""
+        a, b = a_b
+        formador_b = _pessoa(("FORMADOR", b))
+        formador_b.email = "Formadora.B@Example.com"
+        formador_b.save(update_fields=["email"])
+        response = _cria(
+            coord_a_e_b,
+            _projeto(a),
+            extra_participants={"formador_emails": ["Formadora.B@Example.com"]},
+        )
+        assert response.status_code == 400
+        assert "extra_participants" in _erros(response)
+        assert not Participation.objects.filter(guest_email__iexact="formadora.b@example.com").exists()
+
+    def test_participante_de_A_por_email_com_maiuscula_entra_como_pessoa_201(self, a_b, coord_a_e_b):
+        a, _ = a_b
+        formador_a = _pessoa(("FORMADOR", a))
+        formador_a.email = "Formadora.A@Example.com"
+        formador_a.save(update_fields=["email"])
+        response = _cria(
+            coord_a_e_b,
+            _projeto(a),
+            extra_participants={"formador_emails": ["formadora.a@example.com"]},
+        )
+        assert response.status_code == 201, response.data
+        evento = Solicitacao.objects.get(pk=response.data["id"])
+        assert Participation.objects.filter(solicitacao=evento, usuario=formador_a, role="FORMADOR").exists()
+        assert not Participation.objects.filter(solicitacao=evento, guest_email__isnull=False).exists()
+
     def test_lookup_de_usuarios_com_projeto_so_traz_a_gerencia_do_projeto(self, a_b, coord_a_e_b):
         a, b = a_b
         formador_a = _pessoa(("FORMADOR", a))

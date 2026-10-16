@@ -181,24 +181,6 @@ def separar_setores_e_funcoes(grupos: list[str]) -> tuple[list[str], list[str]]:
     return setores, funcoes
 
 
-# Papéis de vínculo que dão acesso escopado à Grade, aos Bloqueios e aos Deslocamentos (PR A).
-PAPEIS_DE_GESTAO: Final[tuple[str, ...]] = ("GERENTE", "COORDENADOR", "APOIO")
-
-
-def user_tem_vinculo_de_gestao(user: AbstractBaseUser | AnonymousUser | None) -> bool:
-    """Vínculo vigente GERENTE, COORDENADOR ou APOIO em gerência ativa (o `me.gerencias` com esses papéis).
-
-    Mesma base de `views_basic._gerencias_do_vinculo`: `vigentes_com_escopo_em` + `gerencia__ativo`.
-    """
-    if not user or not user.is_authenticated:
-        return False
-    return bool(
-        EquipeGerencia.vigentes_com_escopo_em()
-        .filter(usuario=user, gerencia__ativo=True, papel__in=PAPEIS_DE_GESTAO)
-        .exists()
-    )
-
-
 def user_has_all_perms(
     user: AbstractBaseUser | AnonymousUser | None,
     *codenames: str,
@@ -223,14 +205,14 @@ def user_has_all_perms(
     return all(code in user_perms for code in codenames)
 
 
-def user_tem_funcao_coordenador(user: AbstractBaseUser | AnonymousUser | None) -> bool:
-    """True se `user` tem a função Coordenador (`FUNCAO_COORDENADOR_GROUPS`). Data scope, não authz.
+def user_e_coordenador(user: AbstractBaseUser | AnonymousUser | None) -> bool:
+    """True se `user` tem o papel COORDENADOR vigente em gerência ativa (PR 8: o papel, não o grupo).
 
     Decide a queda do coordenador responsável na Nova Solicitação (decisão do dono, 05/10/2026).
     """
     if not user or not user.is_authenticated:
         return False
-    return bool(user.groups.filter(name__in=FUNCAO_COORDENADOR_GROUPS).exists())  # type: ignore[union-attr]
+    return bool(EquipeGerencia.gerencias_com_papel(user, {"COORDENADOR"}))
 
 
 def filtrar_formadores_avaliaveis(qs: QuerySet[Any]) -> QuerySet[Any]:

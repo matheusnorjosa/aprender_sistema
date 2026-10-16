@@ -6,7 +6,8 @@
  * - A prévia de agenda confere os formadores e o responsável só com "Sim".
  * - "Você pretende avaliar o formador nesse evento?" só aparece quando o projeto pergunta e há
  *   formador avaliável na lista; com "Sim", escolher qual formador.
- * - Quem cria sem a função Coordenador precisa escolher o responsável.
+ * - Quem cria sem o papel COORDENADOR vigente precisa escolher o responsável (PR 8 das permissões:
+ *   o papel em `me.gerencias`, não a função em `me.funcoes`).
  */
 import { useEffect } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -108,8 +109,26 @@ vi.mock('../../../components/ComboBox', () => ({ default: MockComboBox }));
 
 import NewSolicitacaoWizard from '../NewSolicitacaoWizard';
 
-const COORDENADORA = { id: 1, name: 'Ana Coordenadora', username: 'ana', is_superuser: false, funcoes: ['Coordenador'] };
-const SEM_FUNCAO_COORDENADOR = { id: 2, name: 'Davi Apoio', username: 'davi', is_superuser: false, funcoes: ['Apoio de Coordenação'] };
+const vinculo = (papel: string) => [{ id: 10, rotulo: 'Vidas', papeis: [papel] }];
+const COORDENADORA = {
+  id: 1,
+  name: 'Ana Coordenadora',
+  username: 'ana',
+  is_superuser: false,
+  funcoes: ['Coordenador'],
+  gerencias: vinculo('COORDENADOR'),
+};
+const SEM_FUNCAO_COORDENADOR = {
+  id: 2,
+  name: 'Davi Apoio',
+  username: 'davi',
+  is_superuser: false,
+  funcoes: ['Apoio de Coordenação'],
+  gerencias: vinculo('APOIO'),
+};
+// PR 8: o papel decide, não a função.
+const COORDENADORA_SO_PELO_PAPEL = { ...COORDENADORA, funcoes: [] };
+const FUNCAO_COORDENADOR_SEM_PAPEL = { ...COORDENADORA, gerencias: vinculo('GERENTE') };
 const AVALIAVEL = { id: 99, label: 'Bruno Formador', avaliavel: true };
 const NAO_AVALIAVEL = { id: 98, label: 'Celia Coordenadora', avaliavel: false };
 
@@ -222,6 +241,30 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
 
   test('quem não é coordenador precisa escolher o responsável', async () => {
     getMeMock.mockResolvedValue(SEM_FUNCAO_COORDENADOR);
+    renderWizard();
+    await irParaParticipantes();
+    responder(ACOMPANHA, 'Não');
+    responder(AVALIAR, 'Não');
+    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
+    expect(await screen.findByText('Escolha o coordenador responsável pelo evento.')).toBeInTheDocument();
+  });
+
+  test('papel COORDENADOR vigente sem a função: quem cria é o responsável (PR 8)', async () => {
+    getMeMock.mockResolvedValue(COORDENADORA_SO_PELO_PAPEL);
+    renderWizard();
+    await irParaParticipantes();
+    responder(ACOMPANHA, 'Sim');
+    responder(AVALIAR, 'Não');
+    await waitFor(() => expect(checkAvailabilityManyMock.mock.calls.at(-1)?.[0].usuarios_ids).toEqual([1, 99]));
+    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
+    await screen.findByLabelText('Local do Evento');
+    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
+    await screen.findByText('Revise sua solicitação');
+    expect(screen.getByText('Ana Coordenadora (você)')).toBeInTheDocument();
+  });
+
+  test('função Coordenador sem o papel: precisa escolher o responsável (PR 8)', async () => {
+    getMeMock.mockResolvedValue(FUNCAO_COORDENADOR_SEM_PAPEL);
     renderWizard();
     await irParaParticipantes();
     responder(ACOMPANHA, 'Não');

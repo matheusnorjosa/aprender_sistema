@@ -4,10 +4,12 @@
  * rotas e Página Inicial).
  *
  * - Grupos e vínculos espelham `_make_user_for_actor` (test_rbac_matrix_living.py): Gerente,
- *   Gerente da Superintendência, Coordenador e Apoio têm vínculo vigente de gestão.
+ *   Gerente da Superintendência, Coordenador e Apoio têm vínculo vigente de gestão; o Formador,
+ *   o papel FORMADOR (PR 8 das permissões: o papel, não a função, dá o poder).
  * - `policies` foi medida no backend para esses mesmos usuários (`resolve_public_policies`,
- *   seed do RBAC, 15/10/2026, já com as 5 policies do PR 7). Mudou o seed ou uma policy? Meça de
- *   novo e atualize aqui; o backend trava a fórmula em `test_rbac_politicas_de_tela.py`.
+ *   seed do RBAC, 15/10/2026, já com as 5 policies do PR 7; remedida com o PR 8, sem mudança).
+ *   Mudou o seed ou uma policy? Meça de novo e atualize aqui; o backend trava a fórmula em
+ *   `test_rbac_politicas_de_tela.py`.
  *
  * Sem dado pessoal: nomes e e-mails são de teste.
  */
@@ -218,7 +220,7 @@ export const ATORES_RBAC: readonly AtorRbac[] = [
   },
   {
     ator: 'Formador',
-    user: usuarioDeTeste({ funcoes: ['Formador'] }),
+    user: usuarioDeTeste({ funcoes: ['Formador'], gerencias: vinculo('FORMADOR') }),
     policies: ['access_availability_blocks'],
   },
   {

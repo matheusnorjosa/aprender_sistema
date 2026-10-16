@@ -14,8 +14,6 @@ Retorna: [{id, label, kind, alias?}]
 
 from __future__ import annotations
 
-import operator
-from functools import reduce
 from typing import Any
 
 from django.db.models import Q, QuerySet
@@ -34,7 +32,16 @@ from apps.core.services.compra_elegibilidade import (
 from apps.core.services.normalize import norm_text
 from apps.core.services.solicitacao_scope import scope_projetos_by_setor, scope_usuarios_by_setor
 
-from .models import Municipio, Projeto, TipoEvento, Usuario
+from .models import EquipeGerencia, Municipio, Projeto, TipoEvento, Usuario
+
+# PR 8 das permissões: o filtro `role` do picker é o papel vigente (gerência ativa), não o grupo.
+# Nome aceito (sem caixa) → papel de `EquipeGerencia`. Nome fora daqui não casa ninguém.
+_PAPEL_DO_ROLE: dict[str, str] = {
+    "formador": "FORMADOR",
+    "coordenador": "COORDENADOR",
+    "apoio de coordenação": "APOIO",
+    "gerente": "GERENTE",
+}
 
 
 def dedup_by_id(items):
@@ -242,7 +249,7 @@ class UsuarioLookup(APIView):
     - DAT admin (admin geral / suporte) → `manage_admin_registries`
 
     Aprovações, Controle/Operação e dashboards executivos não consomem
-    este endpoint, portanto `approve_solicitation_batch` e
+    este endpoint, portanto as capacidades de aprovação e
     `operate_preagenda` ficam fora do gate.
     """
 
@@ -278,11 +285,12 @@ class UsuarioLookup(APIView):
             else:
                 qs = qs.filter(Q(first_name__icontains=q) | Q(last_name__icontains=q))
 
-        # Filtrar por role/group ANTES do slice (vários papéis separados por vírgula = OU)
-        papeis = [p.strip() for p in role.split(",") if p.strip()]
-        if papeis:
-            por_papel: list[Q] = [Q(groups__name__iexact=papel) for papel in papeis]
-            qs = qs.filter(reduce(operator.or_, por_papel)).distinct()
+        # Filtrar por papel vigente ANTES do slice (vários papéis separados por vírgula = OU)
+        roles = [p.strip().lower() for p in role.split(",") if p.strip()]
+        if roles:
+            papeis = {_PAPEL_DO_ROLE[r] for r in roles if r in _PAPEL_DO_ROLE}
+            vigentes = EquipeGerencia.vigentes_em().filter(papel__in=papeis, gerencia__ativo=True)
+            qs = qs.filter(id__in=vigentes.values("usuario_id"))
 
         # M10-04/#1656 Wave 1: o coordenador regular só enxerga usuários do PRÓPRIO
         # setor (o picker do wizard consome este lookup → FE já filtrado, sem 400).

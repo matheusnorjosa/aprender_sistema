@@ -1,7 +1,7 @@
 /**
  * API Client - Deslocamentos
  *
- * Consome `/api/deslocamentos/` (CRUD) e `/api/options/formadores-do-setor/`.
+ * Consome `/api/deslocamentos/` (CRUD e `alvos/`) e `/api/options/formadores-do-setor/`.
  *
  * Issue #1453: a página chamava `fetch` cru, sem `X-CSRFToken` — toda mutação
  * dava 403 em produção (`SessionAuthentication` do DRF). `fetchAPI` injeta o
@@ -58,8 +58,8 @@ export interface DeslocamentoFilters {
 }
 
 /**
- * Payload de create/update. `usuario` é enviado apenas em update (o backend
- * força `usuario=request.user` no create — ver #1454).
+ * Payload de create/update. Sem `usuario`, o backend grava para quem está logado (#1454). Com
+ * `usuario` de outra pessoa, exige delegação (`user_can_delegate_deslocamento`; P16 do PR 8).
  */
 export interface DeslocamentoPayload {
   usuario?: ID;
@@ -94,7 +94,15 @@ export async function listFormadoresDoSetor(): Promise<FormadorOption[]> {
 }
 
 /**
- * Cria deslocamento. Backend força `usuario=request.user` (#1454).
+ * Quem o usuário logado pode pôr no campo "Formador" (além de si). Vazio = registra só o próprio.
+ * Saída de `GET /api/deslocamentos/alvos/` (PR 8 das permissões, P16).
+ */
+export async function listAlvosDeslocamento(): Promise<FormadorOption[]> {
+  return await fetchAPI<FormadorOption[]>('/deslocamentos/alvos/');
+}
+
+/**
+ * Cria deslocamento. Sem `usuario`, o backend grava para quem está logado (#1454).
  */
 export async function createDeslocamento(
   payload: DeslocamentoPayload

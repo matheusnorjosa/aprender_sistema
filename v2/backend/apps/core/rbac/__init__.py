@@ -9,7 +9,6 @@ Public API:
     HasPerm                      — Parametric DRF permission class
     HasFunctionalPermission      — Base class para permissions por codename
     HasSectorAccess              — Dynamic scope check via query param
-    IsGerenteSuperintendencia    — Composite: funcperm + grupo "Gerente"
     IsOwnerOrPrivileged          — Object-level: owner ou usuário privilegiado
     user_has_any_perm            — True se tem QUALQUER uma das codenames
     user_has_all_perms           — True se tem TODAS as codenames
@@ -36,7 +35,6 @@ from apps.core.rbac.permissions import (
     HasPerm,
     HasSectorAccess,
     IsAssistenteAdministrativoControle,
-    IsGerenteSuperintendencia,
     IsOwnerOrPrivileged,
 )
 
@@ -81,7 +79,6 @@ __all__ = [
     "HasFunctionalPermission",
     "HasSectorAccess",
     "IsAssistenteAdministrativoControle",
-    "IsGerenteSuperintendencia",
     "IsOwnerOrPrivileged",
     "user_has_any_perm",
     "user_has_all_perms",

@@ -8,11 +8,11 @@ Regra de negócio:
 - Sem `usuario_id` (ou == request.user.id): comportamento atual (próprio).
 - Com `usuario_id` diferente: requer permissão de delegar.
   - ✅ Superuser
-  - ✅ Assistente Administrativo do Controle (composite Setor × Função)
+  - ✅ Controle (capability `operate_preagenda`; com ou sem Assistente Administrativo).
+       PR 8 das permissões (O8-7): antes só o par Controle × Assistente Administrativo.
   - ✅ DAT (via capability `manage_admin_registries`)
-  - ❌ Coordenador, Apoio, Gerente Sup, Gerente pedagógico, Diretoria,
-       Controle puro, Formador
-- Target precisa ser Formador ativo (após autorizar requester).
+  - ❌ Coordenador, Apoio, Gerente Sup, Gerente pedagógico, Diretoria, Formador
+- Target precisa ser ativo e ter vínculo FORMADOR vigente (após autorizar requester; PR 8).
 - Anti-enumeração: requester não autorizado recebe 403 ANTES de qualquer
   lookup do target. ID inexistente vs existente vs inativo é
   indistinguível para requester sem permissão.
@@ -119,6 +119,18 @@ class TestDelegationAllowed:
         assert block.usuario_id == target.id
         assert block.created_by_id == delegate.id
 
+    def test_controle_puro_delega_para_formador(self):
+        """PR 8 (O8-7): a base é `operate_preagenda`; o Controle sem a função Assistente delega."""
+        delegate = _user_in_groups("Controle", label="controle_puro")
+        target = _formador(label="target_controle_puro")
+        client = APIClient()
+        client.force_authenticate(delegate)
+        response = _post(client, _make_block_payload(usuario_id=target.id))
+        assert response.status_code == 201
+        block = AvailabilityBlock.objects.get(pk=response.data["id"])
+        assert block.usuario_id == target.id
+        assert block.created_by_id == delegate.id
+
     def test_dat_delega_para_formador(self):
         # DAT possui capability `manage_admin_registries` atribuída via seed
         # de migrations (`0077_realign_funcperm_groups.py` + descendentes).
@@ -153,7 +165,6 @@ class TestDelegationDenied:
     @pytest.mark.parametrize(
         "groups,label",
         [
-            (("Controle",), "controle_puro"),  # Controle SEM Asst Admin
             (("Coordenador",), "coord"),
             (("Apoio de Coordenação",), "apoio"),
             (("Gerente", "Superintendência"), "gerente_sup"),

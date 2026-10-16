@@ -62,10 +62,6 @@ const ALLOWLIST: Readonly<Record<string, { motivo: string; leituras: number }>> 
     motivo: 'cadastro: monta o payload (superusuário, funções) de OUTRO usuário',
     leituras: 4,
   },
-  'pages/Solicitacoes/NewSolicitacaoWizard.tsx': {
-    motivo: 'PR 8: o campo coordenador opcional ainda lê a função (fora do PR 7)',
-    leituras: 1,
-  },
 };
 
 function arquivosDoSrc(dir = SRC): string[] {

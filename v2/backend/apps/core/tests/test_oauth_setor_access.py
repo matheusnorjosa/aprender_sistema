@@ -58,6 +58,12 @@ def _apoio(gerencia=None):
     return user
 
 
+def _apoio_sem_setor():
+    """PR 8: o direito de publicar vem do papel APOIO vigente; sem setor = gerência sem `setor_canonico`."""
+    sem_setor = Gerencia.objects.create(nome="GERENCIA SEM SETOR OAS", nome_setor="Sem setor", ativo=True)
+    return _apoio(sem_setor)
+
+
 def _controle():
     user = UsuarioFactory()
     user.groups.add(GroupFactory(name="Controle"))
@@ -118,11 +124,20 @@ def test_controle_start_sem_return_to_continua_em_pre_agenda(mock_build):
 
 @patch("apps.core.views_oauth.build_authorization_url", return_value=GOOGLE_AUTH_URL)
 def test_apoio_sem_setor_start_403_no_setor_scope(mock_build):
-    """M12-15: quem não pode publicar nada (Apoio sem vínculo vigente) não recebe token Google."""
-    resp = _cliente(_apoio(None)).get("/api/oauth/google/start/")
+    """M12-15: quem não pode publicar nada (Apoio sem setor vigente) não recebe token Google."""
+    resp = _cliente(_apoio_sem_setor()).get("/api/oauth/google/start/")
 
     assert resp.status_code == status.HTTP_403_FORBIDDEN
     assert resp.data["code"] == "no_setor_scope"
+    mock_build.assert_not_called()
+
+
+@patch("apps.core.views_oauth.build_authorization_url", return_value=GOOGLE_AUTH_URL)
+def test_grupo_apoio_sem_vinculo_start_403(mock_build):
+    """PR 8: o grupo Apoio sem o papel APOIO vigente não tem `publish_setor_solicitacao`; o start nem abre."""
+    resp = _cliente(_apoio(None)).get("/api/oauth/google/start/")
+
+    assert resp.status_code == status.HTTP_403_FORBIDDEN
     mock_build.assert_not_called()
 
 
@@ -169,7 +184,7 @@ def test_apoio_callback_state_invalido_volta_para_pagina_de_publicacao(_mock_val
 @patch("apps.core.services.google_oauth.validate_oauth_state")
 def test_apoio_sem_setor_callback_nao_grava_credencial(mock_validate, mock_exchange):
     """M12-15: o vínculo pode vencer entre o start e o callback (o state vive 10 min) — sem setor, sem token."""
-    apoio = _apoio(None)
+    apoio = _apoio_sem_setor()
     mock_validate.return_value = {"valid": True, "return_to": PAGINA_PUBLICACAO, "user_id": apoio.pk}
 
     resp = _cliente(apoio).get("/api/oauth/google/callback/", {"code": "c", "state": "s"})
@@ -238,7 +253,7 @@ def test_status_publish_block_reason_matriz(cenario, motivo, gerencia_fluir, set
     settings.GCAL_AUTH_MODE = "oauth"
     settings.GCAL_OAUTH_CALENDAR_ID = ORG if cenario == "apoio_conectada_com_pino" else ""
     if cenario == "apoio_sem_setor":
-        user = _apoio(None)
+        user = _apoio_sem_setor()
     elif cenario.startswith("apoio"):
         user = _apoio(gerencia_fluir)
         if "conectada" in cenario:

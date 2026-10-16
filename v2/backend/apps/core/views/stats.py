@@ -100,7 +100,6 @@ class HomeStatsView(APIView):
             user,
             "create_solicitation",
             "approve_solicitation",
-            "approve_solicitation_batch",
             "manage_admin_registries",
         )
 

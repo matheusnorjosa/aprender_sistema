@@ -6,12 +6,14 @@ Cinco policies entram em `PUBLIC_POLICY_KEYS` sem mudar poder:
 - três COMPOSTAS, cópia da fórmula que o front aplicava em `usePermissions.ts` sobre o payload
   de `/api/me/`: `access_monthly_availability` (Grade), `access_availability_blocks` (Bloqueios)
   e `access_travel` (Deslocamentos). Cada uma = `view_all_availability` OU grupo listado OU
-  vínculo de gestão (GERENTE/COORDENADOR/APOIO) vigente em gerência ativa;
+  vínculo de gestão (GERENTE/COORDENADOR/APOIO) vigente em gerência ativa. Desde o PR 8 das
+  permissões a função saiu da fórmula: setor Controle/DAT OU papel vigente (`me.gerencias`), com
+  FORMADOR também na tela Bloqueios;
 - duas SIMPLES, a capacidade de mesmo nome: `execute_restricted_operations` (excluir plano) e
   `create_solicitation_without_purchase` (Nova Solicitação sem compra).
 
-O teste central compara, pessoa a pessoa, a policy com a fórmula antiga do front avaliada sobre
-as respostas REAIS de `/api/me/` e `/api/me/policies/`. Pessoas: os 10 atores de `matrix.py`
+O teste central compara, pessoa a pessoa, a policy com a fórmula avaliada sobre as respostas
+REAIS de `/api/me/` e `/api/me/policies/` (a do PR 8: setor ou papel, sem a função). Pessoas: os 10 atores de `matrix.py`
 (com os vínculos da matriz viva), os mesmos grupos sem vínculo, só vínculo (cada papel) e as duas
 personas por pacote do perfil da gerência ("Ana" ≡ DAT, "Bruno" ≡ Controle), mais o vínculo
 GERENTE (o outro papel com pacote) no ADMIN_OPERACIONAL, no CONTROLE e na DIRETORIA.
@@ -69,6 +71,12 @@ CHAVES_DE_TELA = frozenset(
 )
 
 _PAPEIS_DE_GESTAO = {"GERENTE", "COORDENADOR", "APOIO"}
+# PR 8: papéis que abrem cada tela composta (`policies.TELAS_DE_ESCOPO`), lidos de `me.gerencias`.
+_PAPEIS_DA_TELA = {
+    "access_monthly_availability": _PAPEIS_DE_GESTAO,
+    "access_availability_blocks": _PAPEIS_DE_GESTAO | {"FORMADOR"},
+    "access_travel": _PAPEIS_DE_GESTAO,
+}
 
 
 @pytest.fixture(autouse=True)
@@ -88,29 +96,17 @@ def _me(usuario: Usuario) -> tuple[dict[str, Any], list[str]]:
     return me, policies
 
 
-def _formula_antiga_do_front(me: dict[str, Any], policies: list[str]) -> dict[str, bool]:
-    """`usePermissions.ts` + `useCanAccess.ts` + gates de AppRoutes/AppSidebar/páginas, antes do PR 7."""
+def _formula_do_front_sobre_o_me(me: dict[str, Any], policies: list[str]) -> dict[str, bool]:
+    """Fórmula das telas sobre o `/api/me/` desde o PR 8: superusuário, `view_all_availability`,
+    setor Controle/DAT ou papel vigente em `me.gerencias` (a função não entra mais)."""
     su = me["is_superuser"] is True
     setores = set(me["setores"])
-    funcoes = set(me["funcoes"])
-    gestor_por_vinculo = any(p in _PAPEIS_DE_GESTAO for g in me["gerencias"] for p in g["papeis"])
+    papeis = {p for g in me["gerencias"] for p in g["papeis"]}
     vaa = "view_all_availability" in policies
-
-    is_coordenador = "Coordenador" in funcoes or "Apoio de Coordenação" in funcoes
-    can_coordenador = su or is_coordenador or "DAT" in setores
-    can_controle = su or "Controle" in setores
-    can_dat = su or "DAT" in setores
-    can_disponibilidade = (
-        su or "Controle" in setores or "DAT" in setores or "Gerente" in funcoes or is_coordenador or gestor_por_vinculo
-    )
+    base = su or vaa or bool(setores & {"Controle", "DAT"})
+    compostas = {chave: base or bool(papeis & _PAPEIS_DA_TELA[chave]) for chave in COMPOSTAS}
     return {
-        "access_monthly_availability": vaa or can_disponibilidade,
-        "access_availability_blocks": vaa
-        or can_controle
-        or can_coordenador
-        or "Formador" in funcoes
-        or gestor_por_vinculo,
-        "access_travel": vaa or can_controle or can_coordenador or can_dat or gestor_por_vinculo,
+        **compostas,
         # PlanoFormacoesPage: isAdmin || inSuperintendencia.
         "execute_restricted_operations": su or "Superintendência" in setores,
         # NewSolicitacaoWizard: isAdmin.
@@ -225,9 +221,9 @@ class TestPoliciesNovas:
         assert set(NOVAS) <= PUBLIC_POLICY_KEYS
 
     @pytest.mark.parametrize("pessoa", list(PESSOAS))
-    def test_cada_policy_vale_sse_a_formula_antiga_do_front_vale(self, pessoa):
+    def test_cada_policy_vale_sse_a_formula_sobre_o_me_vale(self, pessoa):
         me, policies = _me(PESSOAS[pessoa]())
-        esperado = _formula_antiga_do_front(me, policies)
+        esperado = _formula_do_front_sobre_o_me(me, policies)
         obtido = {chave: chave in policies for chave in NOVAS}
         assert obtido == esperado, f"{pessoa}: /me={me['setores']}/{me['funcoes']}/{me['gerencias']}"
 
@@ -239,7 +235,7 @@ class TestPoliciesNovas:
         me, policies = _me(usuario)
         assert "view_all_availability" not in policies, "pré-condição: o setor é o único caminho"
         assert set(COMPOSTAS) <= set(policies)
-        assert {chave: chave in policies for chave in NOVAS} == _formula_antiga_do_front(me, policies)
+        assert {chave: chave in policies for chave in NOVAS} == _formula_do_front_sobre_o_me(me, policies)
         # O simulador `rbac_diff` (capacidades sem view_all_availability) chega ao mesmo resultado.
         assert snapshot_de_poder(Usuario.objects.filter(id=usuario.id))[f"u{usuario.id}"]["policies"] == policies
 
@@ -357,9 +353,8 @@ _COMPRAS_E_GOOGLE: dict[str, tuple[bool, bool]] = {
     "consulta periódica ao Google": (False, True),
 }
 DELTA_MEDIDO: dict[str, dict[str, tuple[bool, bool]]] = {
-    # view_compras_stats e access_controle_section vêm da função, sem o setor Controle.
-    "só função Assistente Administrativo": _COMPRAS_E_GOOGLE,
-    "Vidas + Assistente Administrativo": _COMPRAS_E_GOOGLE,
+    # PR 8: a função Assistente Administrativo sem o setor Controle não tem mais capacidade (O8-6),
+    # então "só função Assistente Administrativo" e "Vidas + Assistente Administrativo" saíram daqui.
     # O pacote do perfil CONTROLE dá as capacidades do Controle; o front lia o setor.
     # Deslocamentos: a rota abria por view_all_availability, a página respondia "Sem permissão".
     "Bruno (EQUIPE no CONTROLE)": {**_COMPRAS_E_GOOGLE, "tela Deslocamentos (página)": (False, True)},
@@ -370,12 +365,10 @@ DELTA_MEDIDO: dict[str, dict[str, tuple[bool, bool]]] = {
         "tela Deslocamentos (página)": (False, True),
     },
     # GERENTE também está em PAPEIS_COM_PACOTE: ganha o mesmo pacote que EQUIPE. Deslocamentos
-    # não muda porque o vínculo de gestão já abria a página antes.
+    # não muda porque o vínculo de gestão já abria a página antes. Editar solicitação também não:
+    # desde o PR 8 o papel GERENTE dá `create_solicitation`, que o gate antigo já lia.
     "GERENTE no CONTROLE": _COMPRAS_E_GOOGLE,
-    "GERENTE no ADMIN_OPERACIONAL": {
-        "rota Compras": (False, True),
-        "rota Editar solicitação": (False, True),
-    },
+    "GERENTE no ADMIN_OPERACIONAL": {"rota Compras": (False, True)},
 }
 
 

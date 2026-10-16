@@ -19,6 +19,7 @@ const { listDeslocamentosMock, listFormadoresMock } = vi.hoisted(() => ({
 vi.mock('../../../api/deslocamentos', () => ({
   listDeslocamentos: listDeslocamentosMock,
   listFormadoresDoSetor: listFormadoresMock,
+  listAlvosDeslocamento: vi.fn().mockResolvedValue([]),
   createDeslocamento: vi.fn(),
   updateDeslocamento: vi.fn(),
   deleteDeslocamento: vi.fn(),

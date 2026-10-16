@@ -25,8 +25,8 @@ def ensure_base_groups() -> int:
     Idempotente. Necessário em ambientes sem as migrations de seed RunPython
     (ex.: `pytest --no-migrations`), onde nenhuma migration cria os grupos.
     `seed_functional_permissions(assign_default_groups=True)` só cria os grupos
-    que têm capability atribuída (8 dos 18); este helper cobre os demais
-    (setores sem capability, Formador). Retorna a
+    que têm capability atribuída (4 dos 18 desde o PR 8: Superintendência, DAT,
+    Diretoria e Controle); este helper cobre os demais (outros setores e as funções). Retorna a
     quantidade de grupos criados nesta chamada.
     """
     created = 0
@@ -54,15 +54,16 @@ class FunctionalPermissionSeed:
 #   - Controle: operações diárias (controle, pre-agenda, gestão availability)
 #   - Diretoria: dashboards executivos
 #   - Superintendência: aprovações e operações restritas
-#   - Funções (Gerente, Coordenador, Apoio Coord): solicitações + availability
-#   - Formador: nenhuma perm (acessa só /meus-eventos via IsAuthenticated)
+#   - Funções: nenhuma capacidade desde o PR 8 (15/10/2026). Criar, editar e publicar vêm do
+#     papel vigente na gerência (`rbac_pacotes.DIREITOS_PAPEL`), não do grupo de função.
 # Ver v2/docs/RBAC_NAMING.md §1, §2 e §3.4 para regras vigentes.
 #
 # D4 do ADR-020 (PR A da arquitetura de permissões, 14/10/2026): `group_names` é A matriz
 # Grupo × Capability. Ela é igual à de produção (medida em 02/10/2026: DAT com
 # `view_map_metrics`; Assistente Administrativo com compras, pré-agenda e rotinas) e muda só por PR,
 # junto com a migration de dados que aplica a mudança em produção (`# noqa: RBAC-migration-allowed`;
-# a do PR A é a 0121, que grava estes quatro pares num banco montado só por `migrate`).
+# a do PR A é a 0121, que grava estes quatro pares num banco montado só por `migrate`; a do PR 8 é a
+# 0125, que tira as capacidades dos grupos de função e apaga `approve_solicitation_batch`).
 # `rbac_diff --auditar` sai com exit 1 quando o banco difere daqui.
 FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
     FunctionalPermissionSeed(
@@ -71,13 +72,6 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
         description="Aprovar ou reprovar solicitações pendentes.",
         category="solicitacao",
         group_names=("Superintendência",),
-    ),
-    FunctionalPermissionSeed(
-        codename="approve_solicitation_batch",
-        label="Aprovar solicitações em lote",
-        description="Aprovar múltiplas solicitações em uma operação.",
-        category="solicitacao",
-        group_names=("Gerente", "Superintendência"),
     ),
     FunctionalPermissionSeed(
         codename="execute_restricted_operations",
@@ -91,7 +85,7 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
         label="Criar solicitações de evento",
         description="Submeter novas solicitações ao fluxo de aprovação.",
         category="solicitacao",
-        group_names=("Coordenador", "Apoio de Coordenação", "Gerente"),
+        group_names=(),
     ),
     FunctionalPermissionSeed(
         codename="import_spreadsheet",
@@ -119,21 +113,21 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
         label="Administrar compras e materiais",
         description="Operações administrativas restritas sobre compras e materiais.",
         category="cadastros_administrativos",
-        group_names=("DAT", "Controle", "Assistente Administrativo"),
+        group_names=("DAT", "Controle"),
     ),
     FunctionalPermissionSeed(
         codename="operate_preagenda",
         label="Operar pré-agenda e relatórios",
         description="Pré-agenda, relatórios gerenciais e publicações operacionais.",
         category="operacao",
-        group_names=("Controle", "Assistente Administrativo"),
+        group_names=("Controle",),
     ),
     FunctionalPermissionSeed(
         codename="run_daily_operations",
         label="Executar rotinas operacionais",
         description="Imports, workflow diário e conferências.",
         category="operacao",
-        group_names=("Controle", "Assistente Administrativo"),
+        group_names=("Controle",),
     ),
     FunctionalPermissionSeed(
         codename="supervise_operations",
@@ -161,7 +155,7 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
         label="Editar solicitações próprias ou privilegiadas",
         description="Editar solicitações que você criou ou com privilégio.",
         category="solicitacao",
-        group_names=("Gerente", "Coordenador", "Apoio de Coordenação"),
+        group_names=(),
     ),
     FunctionalPermissionSeed(
         codename="manage_internal_actions",
@@ -200,7 +194,7 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
             "acesso aos endpoints GCal em lote (`use_gcal`). #1656 Feature 2."
         ),
         category="solicitacao",
-        group_names=("Apoio de Coordenação",),
+        group_names=(),
     ),
     # Regra da compra (14/10/2026): isenção checada em `compra_elegibilidade`. Sem grupo até o PR que
     # a põe no pacote do DAT (migration 0123 só cria a capacidade).
@@ -224,8 +218,9 @@ def _validate_seed() -> None:
     # #1656 Feature 2: +1 capability `publish_setor_solicitacao` (Apoio de
     # Coordenação). Total: 17.
     # Regra da compra (14/10/2026): +1 `create_solicitation_without_purchase` (0 grupos). Total: 18.
-    if len(FUNCTIONAL_PERMISSIONS_SEED) != 18:
-        raise ValueError("Seed de permissoes funcionais deve conter exatamente 18 itens.")
+    # PR 8 (15/10/2026): -1 `approve_solicitation_batch` (migration 0125). Total: 17.
+    if len(FUNCTIONAL_PERMISSIONS_SEED) != 17:
+        raise ValueError("Seed de permissoes funcionais deve conter exatamente 17 itens.")
 
     seen: set[str] = set()
     for item in FUNCTIONAL_PERMISSIONS_SEED:

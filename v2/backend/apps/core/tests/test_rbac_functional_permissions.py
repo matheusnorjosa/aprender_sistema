@@ -12,7 +12,7 @@ from rest_framework.test import APIRequestFactory
 import pytest
 
 from apps.core.models import PermissaoFuncional, Usuario
-from apps.core.permissions import HasPerm, IsGerenteSuperintendencia
+from apps.core.permissions import HasPerm
 from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
@@ -224,41 +224,12 @@ def test_cache_invalidated_when_permission_deleted():
     assert permission.has_permission(request, _MockView()) is False
 
 
-def test_is_gerente_superintendencia_requires_funcperm_and_gerente_group():
-    super_group = GroupFactory(name="Superintendência")
-    gerente_group = GroupFactory(name="Gerente")
+def test_is_gerente_superintendencia_saiu_com_o_batch():
+    """PR 8 das permissões: a classe (batch + grupo Gerente) e a capacidade `approve_solicitation_batch` saíram.
 
-    user_ok = UsuarioFactory(
-        username="gerente_super_ok",
-        email="gerente_super_ok@test.com",
-        password="test123",
-        cpf="10000000008",
-    )
-    user_ok.groups.add(super_group, gerente_group)
+    A gestora de solicitação é o papel GERENTE vigente (`solicitacao_scope._e_gestora`).
+    """
+    import apps.core.rbac.permissions as rbac_permissions
 
-    user_without_gerente = UsuarioFactory(
-        username="gerente_super_no_gerente",
-        email="gerente_super_no_gerente@test.com",
-        password="test123",
-        cpf="10000000009",
-    )
-    user_without_gerente.groups.add(super_group)
-
-    user_without_super = UsuarioFactory(
-        username="gerente_super_no_super",
-        email="gerente_super_no_super@test.com",
-        password="test123",
-        cpf="10000000010",
-    )
-    user_without_super.groups.add(gerente_group)
-
-    permission = IsGerenteSuperintendencia()
-    factory = APIRequestFactory()
-
-    assert permission.has_permission(_request_with_user(factory, user_ok), _MockView()) is True
-    assert permission.has_permission(_request_with_user(factory, user_without_gerente), _MockView()) is False
-    # Issue #1222 (Epic 1): após realign, `approve_solicitation_batch` é
-    # atribuído ao grupo Gerente (e Super). User só com Gerente passa o
-    # composite (tem perm + tem grupo Gerente). Antes era restrito a quem
-    # estava em Super.
-    assert permission.has_permission(_request_with_user(factory, user_without_super), _MockView()) is True
+    assert not hasattr(rbac_permissions, "IsGerenteSuperintendencia")
+    assert not PermissaoFuncional.objects.filter(codename="approve_solicitation_batch").exists()

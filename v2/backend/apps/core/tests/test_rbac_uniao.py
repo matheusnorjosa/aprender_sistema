@@ -3,7 +3,9 @@ PR B da arquitetura de permissões (ADR-020, PR 6 do relatório): fórmula em mo
 
 Capacidades = grupos ∪ pacote do perfil (`services/rbac_pacotes.PACOTE`) de cada gerência onde a
 pessoa tem vínculo VIGENTE com papel EQUIPE ou GERENTE (D3). Enquanto toda gerência for PADRAO o
-pacote é vazio e ninguém muda, por construção (`rbac_diff` 0/0).
+pacote é vazio e ninguém muda, por construção (`rbac_diff` 0/0). Desde o PR 8 a união soma também
+os direitos de evento do papel vigente (`DIREITOS_PAPEL`), que não são pacote: aqui eles entram
+explícitos em cada conta, para o pacote continuar medido à parte.
 
 Regras que estes testes travam:
 - uma fórmula só: a da API (`get_user_functional_permissions`) e a do simulador
@@ -32,7 +34,7 @@ from apps.core.models import EquipeGerencia, Gerencia, PermissaoFuncional, Usuar
 from apps.core.rbac.helpers import GERENCIA_APROVADORA_NOME
 from apps.core.rbac.matrix import ACTOR_GROUPS, SUPERUSER
 from apps.core.rbac.policies import PUBLIC_POLICY_KEYS, resolve_public_policies, solicitation_approval_basis
-from apps.core.services.rbac_pacotes import PACOTE
+from apps.core.services.rbac_pacotes import DIREITOS_PAPEL, PACOTE
 from apps.core.services.rbac_permissions import get_user_functional_permissions
 from apps.core.services.rbac_snapshot import capacidades_de_hoje, snapshot_de_poder
 from apps.core.tests.factories import UsuarioFactory
@@ -79,11 +81,12 @@ class TestFormula:
         for ator, grupos in ACTOR_GROUPS.items():
             if ator == SUPERUSER:
                 continue
-            usuario = UsuarioFactory(groups=grupos)
+            usuario = UsuarioFactory(groups=grupos, groups__vinculo=False)
             _vincula(usuario, padrao, "EQUIPE")
             _vincula(usuario, padrao, "GERENTE")
-            assert _caps(usuario) == _dos_grupos(usuario), ator
-            assert capacidades_de_hoje(usuario) == _dos_grupos(usuario), ator
+            # PADRAO não tem pacote: além dos grupos, só o direito de evento do papel GERENTE (PR 8).
+            assert _caps(usuario) == _dos_grupos(usuario) | DIREITOS_PAPEL["GERENTE"], ator
+            assert capacidades_de_hoje(usuario) == _dos_grupos(usuario) | DIREITOS_PAPEL["GERENTE"], ator
 
     def test_equipe_em_gerencia_admin_operacional_recebe_exatamente_o_pacote(self, g19):
         pessoa = UsuarioFactory()
@@ -94,14 +97,16 @@ class TestFormula:
     def test_gerente_em_gerencia_com_perfil_recebe_pacote(self, g19):
         gerente = UsuarioFactory(groups=["Gerente"])
         _vincula(gerente, g19, "GERENTE")
-        assert _caps(gerente) == _dos_grupos(gerente) | ADMIN_OPERACIONAL
+        assert _caps(gerente) == _dos_grupos(gerente) | ADMIN_OPERACIONAL | DIREITOS_PAPEL["GERENTE"]
         assert ADMIN_OPERACIONAL - _dos_grupos(gerente), "o grupo Gerente não pode já cobrir o pacote"
 
     @pytest.mark.parametrize("papel", ["FORMADOR", "COORDENADOR", "APOIO"])
     def test_formador_coordenador_apoio_nao_recebem_pacote(self, g19, papel):
         pessoa = UsuarioFactory()
         _vincula(pessoa, g19, papel)
-        assert _caps(pessoa) == set()
+        # Só o direito de evento do papel (PR 8), nada do pacote ADMIN_OPERACIONAL.
+        assert _caps(pessoa) == DIREITOS_PAPEL[papel]
+        assert not _caps(pessoa) & ADMIN_OPERACIONAL
 
     def test_vinculo_inativo_vencido_ou_futuro_nao_da_pacote(self, g19):
         hoje = timezone.localdate()
@@ -126,7 +131,7 @@ class TestFormula:
         gerente = UsuarioFactory()
         _vincula(gerente, g1, "GERENTE")
         assert solicitation_approval_basis(gerente) == "gerente_superintendencia"
-        assert _caps(gerente) == set()
+        assert _caps(gerente) == DIREITOS_PAPEL["GERENTE"]  # APROVACAO não tem pacote
 
     def test_superusuario_inalterado(self, g19):
         superusuario = UsuarioFactory(is_superuser=True)

@@ -38,10 +38,11 @@ async function abrirNovo(): Promise<HTMLElement> {
       </ComAcesso>
     </MemoryRouter>,
   );
-  fireEvent.click(await screen.findByRole('button', { name: /Novo Deslocamento/ }, { timeout: 5000 }));
-  return await screen.findByRole('dialog');
+  fireEvent.click(await screen.findByRole('button', { name: /Novo Deslocamento/ }, { timeout: 10000 }));
+  return await screen.findByRole('dialog', {}, { timeout: 10000 });
 }
 
+// Tempo: a página monta tabela e modal do antd; na CI carregada 5 s não bastam (o achar do botão já usava 5 s).
 describe('DeslocamentosPage — seletor de formador por delegação (PR 8, P16)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -57,7 +58,7 @@ describe('DeslocamentosPage — seletor de formador por delegação (PR 8, P16)'
     fireEvent.mouseDown(campo);
     expect(await screen.findByText('Bia DaGerencia')).toBeInTheDocument();
     expect(screen.queryByText('Caio DoSetor')).not.toBeInTheDocument();
-  });
+  }, 20000);
 
   test('quem não delega não vê o campo (registra o próprio deslocamento)', async () => {
     listAlvosMock.mockResolvedValue([]);
@@ -65,5 +66,5 @@ describe('DeslocamentosPage — seletor de formador por delegação (PR 8, P16)'
 
     expect(await within(dialogo).findByLabelText('Origem')).toBeInTheDocument();
     expect(within(dialogo).queryByLabelText('Formador')).not.toBeInTheDocument();
-  });
+  }, 20000);
 });

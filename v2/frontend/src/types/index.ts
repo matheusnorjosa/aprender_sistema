@@ -41,6 +41,7 @@ export type {
   TipoEventoCode,
   ParticipantRole,
   Participation,
+  DecisaoImpedida,
   Solicitacao,
   SolicitacaoPayload,
   SolicitacaoFilters,

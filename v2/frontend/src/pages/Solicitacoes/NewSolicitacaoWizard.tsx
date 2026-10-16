@@ -195,7 +195,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
 
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
-  // Regra da compra: quem tem create_solicitation_without_purchase (hoje, só o superusuário)
+  // Regra da compra: quem tem create_solicitation_without_purchase (o superusuário e, desde o PR 10, o DAT)
   // escolhe projeto e município sem compra. A mesma capacidade que o backend aceita.
   const dispensaCompra = useAcesso().caps.canCreateSolicitationWithoutPurchase;
   const [municipioLookupHasResults, setMunicipioLookupHasResults] = useState<boolean | null>(null);

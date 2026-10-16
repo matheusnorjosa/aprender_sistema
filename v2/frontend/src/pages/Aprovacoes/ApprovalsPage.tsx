@@ -74,6 +74,7 @@ import type {
   BatchOperationResult,
   BlockedParticipant,
   CurrentUser,
+  DecisaoImpedida,
   ID,
   Solicitacao,
   SolicitacaoStatus,
@@ -86,6 +87,13 @@ import { pausaDo429Ms } from '../../utils/retryAfter';
 import AvisoAtualizacaoPausada from '../../components/AvisoAtualizacaoPausada';
 
 const { Title, Paragraph, Text } = Typography;
+
+/** PA-02: Tag da linha que quem lê não decide (outra pessoa aprovadora decide). */
+const TAG_DA_DECISAO_IMPEDIDA: Record<DecisaoImpedida, string> = {
+  propria: 'Sua solicitação',
+  conta_alterada: 'Você alterou a conta de quem pediu',
+  editada_pelo_ator: 'Você editou esta solicitação',
+};
 
 /** Status colors */
 const STATUS_COLORS: Record<SolicitacaoStatus, string> = {
@@ -292,8 +300,13 @@ export default function ApprovalsPage(): JSX.Element {
   }, []);
 
   // PA-02 (segregação): quem criou não decide a própria; superusuário pode (fica no AuditLog).
-  const isPropria = useCallback(
-    (record: Solicitacao): boolean => me !== null && !ehSuperusuario(me) && record.usuario === me.id,
+  // PR 10: o backend também diz quando quem lê alterou a conta de quem pediu ou editou o evento
+  // (`decisao_impedida`); o 403 do servidor fica só como defesa.
+  const impedimento = useCallback(
+    (record: Solicitacao): DecisaoImpedida | null => {
+      if (record.decisao_impedida) return record.decisao_impedida;
+      return me !== null && !ehSuperusuario(me) && record.usuario === me.id ? 'propria' : null;
+    },
     [me],
   );
 
@@ -445,11 +458,11 @@ export default function ApprovalsPage(): JSX.Element {
     selectedRowKeys,
     onChange: (keys: Key[]) => setSelectedRowKeys(keys),
     getCheckboxProps: (record: Solicitacao) => ({
-      // Só pendentes; a própria nunca entra no lote (PA-02 segregação)
-      disabled: record.status !== 'pendente' || isPropria(record),
+      // Só pendentes; a impedida (própria, conta alterada, editada) nunca entra no lote (PA-02)
+      disabled: record.status !== 'pendente' || impedimento(record) !== null,
     }),
-    // A própria sai sem checkbox (não só desabilitado): não há ação possível nela.
-    renderCell: (_checked, record, _index, originNode) => (isPropria(record) ? null : originNode),
+    // A impedida sai sem checkbox (não só desabilitado): não há ação possível nela.
+    renderCell: (_checked, record, _index, originNode) => (impedimento(record) !== null ? null : originNode),
     selections: [
       Table.SELECTION_ALL,
       Table.SELECTION_INVERT,
@@ -560,13 +573,13 @@ export default function ApprovalsPage(): JSX.Element {
             onClick={() => handlePreview(record.id)}
             aria-label="Visualizar preview do evento"
           />
-          {/* PA-06: Aprovar/Reprovar para quem tem a policy; PA-02: nunca na própria */}
-          {record.status === 'pendente' && canApprove && isPropria(record) ? (
+          {/* PA-06: Aprovar/Reprovar para quem tem a policy; PA-02: nunca na impedida */}
+          {record.status === 'pendente' && canApprove && impedimento(record) !== null ? (
             <Tooltip title="Outra pessoa aprovadora precisa decidir">
-              <Tag color="blue">Sua solicitação</Tag>
+              <Tag color="blue">{TAG_DA_DECISAO_IMPEDIDA[impedimento(record) as DecisaoImpedida]}</Tag>
             </Tooltip>
           ) : null}
-          {record.status === 'pendente' && canApprove && !isPropria(record) ? (
+          {record.status === 'pendente' && canApprove && impedimento(record) === null ? (
             <>
               <Button
                 size="small"
@@ -589,7 +602,7 @@ export default function ApprovalsPage(): JSX.Element {
         </Space>
       ),
     },
-  ], [handlePreview, handleApprove, handleReject, canApprove, isPropria]);
+  ], [handlePreview, handleApprove, handleReject, canApprove, impedimento]);
 
   return (
     <section className="p-6" aria-labelledby="aprovacoes-title">

@@ -8,6 +8,8 @@
  * - Com permissão (`access_solicitation_approvals`): botão "Aprovar" presente.
  * - PR B1 (PA-02 segregação): a linha da PRÓPRIA solicitação sai sem checkbox e sem
  *   Aprovar/Reprovar, com a Tag "Sua solicitação" (a de outra pessoa segue normal).
+ * - PR 10 (PA-02 segregação por histórico): a linha com `decisao_impedida` (conta do autor
+ *   alterada por quem lê, ou evento editado por quem lê) também sai sem checkbox e sem ações.
  *
  * GOTCHA: todo cliente de API que a página dispara no useEffect de mount é
  * mockado (listSolicitacoes, getMyPolicies, getMe) resolvendo com dados vazios/mínimos.
@@ -261,6 +263,36 @@ describe('ApprovalsPage', () => {
 
     const linha = within(propria as HTMLElement);
     expect(linha.getByText('Sua solicitação')).toBeInTheDocument();
+    expect(linha.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(linha.queryByRole('button', { name: /Aprovar/i })).not.toBeInTheDocument();
+    expect(linha.queryByRole('button', { name: /Reprovar/i })).not.toBeInTheDocument();
+  }, 20000);
+
+  test.each([
+    ['conta_alterada', 'Você alterou a conta de quem pediu'],
+    ['editada_pelo_ator', 'Você editou esta solicitação'],
+  ] as const)('PR 10: decisao_impedida=%s sai sem checkbox e sem ações, com a Tag', async (motivo, tag) => {
+    vi.mocked(listSolicitacoes).mockResolvedValue({
+      count: 2,
+      next: null,
+      previous: null,
+      results: [
+        pendingRow({ id: 1, usuario: 5, municipio_nome: 'MunicipioImpedido', decisao_impedida: motivo }),
+        pendingRow({ id: 2, usuario: 6, municipio_nome: 'MunicipioLivre', decisao_impedida: null }),
+      ],
+    });
+    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
+    vi.mocked(getMe).mockResolvedValue(meUser({ id: 99 }));
+
+    renderPage();
+
+    const impedida = (await screen.findByText('MunicipioImpedido')).closest('tr') as HTMLElement;
+    const livre = screen.getByText('MunicipioLivre').closest('tr') as HTMLElement;
+    await within(livre).findByRole('button', { name: /Aprovar/i }, { timeout: 10000 });
+    expect(within(livre).getByRole('checkbox')).toBeInTheDocument();
+
+    const linha = within(impedida);
+    expect(linha.getByText(tag)).toBeInTheDocument();
     expect(linha.queryByRole('checkbox')).not.toBeInTheDocument();
     expect(linha.queryByRole('button', { name: /Aprovar/i })).not.toBeInTheDocument();
     expect(linha.queryByRole('button', { name: /Reprovar/i })).not.toBeInTheDocument();

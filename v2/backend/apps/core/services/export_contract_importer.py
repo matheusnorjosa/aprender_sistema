@@ -84,6 +84,8 @@ from apps.core.services.export_contract_projeto_resolver import (
     resolve_projeto_agenda,
     resolve_projeto_export,
 )
+from apps.core.services.gcal.payload import build_event_payload
+from apps.core.services.gcal.utils import _payload_hash
 from apps.core.services.resolvers import resolve_user_by_email, resolve_user_by_name
 from apps.core.services.solicitacao_create import resolve_initial_status
 from apps.core.utils.cache_utils import invalidate_availability_cache
@@ -144,6 +146,8 @@ IMPLEMENTED = {
     "prova",
     "availability_block",
     "deslocamento",
+    # Sem CSV próprio: lê o solicitacao.csv, só no modo `virada`, depois da carga e do A5.
+    "gcal_adocao",
 }
 # Escrivíveis = subconjunto de IMPLEMENTED com apply REAL. `produto`/`gerencia` classificam mas não
 # têm handler (silent-0) → `--allow-entity` neles é erro (CR-03), não "applied=0" calado.
@@ -884,6 +888,24 @@ def _identidade_da_linha(r: dict[str, str]) -> str:
 def _motivo_linha_incompleta(r: dict[str, str]) -> str:
     lc = r.get("linha_completa")
     return "linha_incompleta" if lc is not None and not _to_bool(lc) else "chave_sem_par"
+
+
+# Por que a adoção não grava o Event ID (contados em `gcal_adocao.skip_reasons`).
+_MOTIVOS_NAO_ADOTA = (
+    "sem_event_id",
+    "confianca_media",
+    "confianca_colisao",
+    "confianca_vazia",
+    "cancelado",
+    "evento_inexistente",
+    "repetido_no_arquivo",
+    "nao_aprovado",
+    "ja_tem_event_id",
+    "publicado_pelo_sistema",
+    "sem_marca",
+    "id_em_outro_evento",
+    "tocado_com_diferenca",
+)
 
 
 def _marca_da_linha(r: dict[str, str]) -> bool:
@@ -1845,6 +1867,8 @@ class ExportContractImporter:
                 por_entidade[name] = self._classify_master(name)
             else:
                 por_entidade[name] = {"status": "not_implemented", "export_rows": len(self._load(name))}
+        if self.mode == "virada" and os.path.exists(os.path.join(self.path, "solicitacao.csv")):
+            por_entidade["gcal_adocao"] = self._gcal_adocao(escrever=False)
 
         # ── escrita (create-only) — só se apply + allowlist; NÃO exercida no skeleton ──
         applied: dict[str, int] = {}
@@ -1875,6 +1899,10 @@ class ExportContractImporter:
                 self.allow, key=lambda n: ENTITY_ORDER.index(n) if n in ENTITY_ORDER else len(ENTITY_ORDER)
             ):
                 if name not in IMPLEMENTED:
+                    continue
+                if name == "gcal_adocao":
+                    if self.mode == "virada":
+                        applied[name] = self._gcal_adocao(escrever=True)["would_adopt_gcal"]
                     continue
                 if name == "usuario":
                     # NK = CPF (nao `nome`); atribui Group -> handler dedicado.
@@ -2775,6 +2803,167 @@ class ExportContractImporter:
                 usuario=self.actor, action=AuditLog.Action.UPDATE, model_name="Solicitacao", details=details
             )
         return True
+
+    # ── adoção do Event ID do Google (`gcal_adocao`, depois da carga e do A5) ──
+    def _gcal_adocao(self, *, escrever: bool) -> dict[str, Any]:
+        """Classifica (e, com `escrever`, grava) a adoção do Event ID que o sheet2gcal criou, lendo o mesmo
+        solicitacao.csv da carga. Só `confianca=alta` (decisão 3 do dono); o resto fica com a marca
+        `publicado_fora_do_sistema`, que segura o Publicar. Pode rodar de novo com o mesmo CSV para os
+        eventos aprovados depois: o adotado vira `ja_tem_event_id`. Nunca chama o Google."""
+        tally: dict[str, Any] = dict.fromkeys(
+            ("would_create", "would_update", "would_skip_same", "protected_diff", "would_reject"), 0
+        )
+        motivos: dict[str, int] = dict.fromkeys(_MOTIVOS_NAO_ADOTA, 0)
+        por_hash = {x.external_hash: x for x in Solicitacao.objects.exclude(external_hash__isnull=True)}
+        usados: dict[str, int] = {
+            eid: sid
+            for sid, eid in Solicitacao.objects.exclude(external_event_id__isnull=True)
+            .exclude(external_event_id="")
+            .values_list("id", "external_event_id")
+        }
+        logs_idx, admin_idx = ({}, set()) if escrever else self._indice_tocado()
+        parts_csv = self._participacoes_csv_por_evento()
+        cpf_idx = self._usuario_cpf_index()
+        vistos: set[int] = set()
+        adotados = 0
+        for r in self._load("solicitacao"):
+            eid = (r.get("external_event_id") or "").strip()
+            conf = (r.get("external_event_id_confianca") or "").strip().lower()
+            motivo = None
+            sol = por_hash.get(_identidade_da_linha(r))
+            if not eid:
+                motivo = "sem_event_id"
+            elif conf != "alta":
+                motivo = f"confianca_{conf or 'vazia'}"
+            elif _to_bool(r.get("cancelado")):
+                motivo = "cancelado"
+            elif sol is None:
+                motivo = "evento_inexistente"
+            elif sol.id in vistos:
+                motivo = "repetido_no_arquivo"
+            if motivo is None and sol is not None:
+                vistos.add(sol.id)
+                if escrever:
+                    sol = Solicitacao.objects.select_for_update().get(id=sol.id)
+                    parts = list(Participation.objects.filter(solicitacao_id=sol.id))
+                    logs, admin = self._tocado_do_evento(sol.id, [x.id for x in parts])
+                else:
+                    parts = list(Participation.objects.filter(solicitacao_id=sol.id))
+                    logs, admin = logs_idx.get(sol.id, []), sol.id in admin_idx
+                motivo = self._motivo_nao_adota(sol, r, eid, usados, (logs, admin), parts, parts_csv, cpf_idx)
+            if motivo is not None or sol is None:
+                motivos[motivo or "evento_inexistente"] = motivos.get(motivo or "evento_inexistente", 0) + 1
+                tally["would_skip_same"] += 1
+                continue
+            usados[eid] = sol.id
+            adotados += 1
+            tally["would_update"] += 1
+            if escrever:
+                self._adotar(sol, eid, conf)
+        tally["would_adopt_gcal"] = adotados
+        tally["skip_reasons"] = motivos
+        return tally
+
+    def _motivo_nao_adota(
+        self,
+        s: Solicitacao,
+        r: dict[str, str],
+        eid: str,
+        usados: dict[str, int],
+        tocado: tuple[list[tuple[str, dict[str, Any], bool]], bool],
+        parts: list[Participation],
+        parts_csv: dict[str, list[dict[str, str]]],
+        cpf_idx: dict[str, int],
+    ) -> str | None:
+        """Por que este evento não é adotado, ou None. Pendente com Event ID seria APAGADO no Google pelo
+        próximo sync (não aprovado com id → DELETE); evento em ERROR pode ter deixado um `asv2{id}` lá."""
+        if s.status != Solicitacao.Status.APROVADO:
+            return "nao_aprovado"
+        if s.external_event_id:
+            return "ja_tem_event_id"
+        if _publicado_pelo_sistema(s):
+            return "publicado_pelo_sistema"
+        if not s.publicado_fora_do_sistema:
+            return "sem_marca"
+        if usados.get(eid, s.id) != s.id:
+            return "id_em_outro_evento"
+        logs, admin = tocado
+        if _tocado(s, logs, admin)[0] != "nao_tocado" and self._diverge_da_planilha(s, r, parts, parts_csv, cpf_idx):
+            # O hash diria "igual ao sistema" e o Reapply pularia, com o Google mostrando outra coisa.
+            return "tocado_com_diferenca"
+        return None
+
+    def _diverge_da_planilha(
+        self,
+        s: Solicitacao,
+        r: dict[str, str],
+        parts: list[Participation],
+        parts_csv: dict[str, list[dict[str, str]]],
+        cpf_idx: dict[str, int],
+    ) -> bool:
+        """Data, hora ou formadores do evento diferem dos da linha (o que o sheet2gcal pôs no Google).
+        Linha sem formador é ausência de sinal; formador que não resolve conta como diferença."""
+        data_ev = _parse_iso_date(r.get("data"))
+        hora_ini = _parse_hora(r.get("hora_inicio"))
+        hora_fim = _parse_hora(r.get("hora_fim"))
+        if data_ev is None or hora_ini is None or hora_fim is None:
+            return True
+        ini = timezone.make_aware(datetime.combine(data_ev, hora_ini), _FORTALEZA_TZ)
+        fim = timezone.make_aware(datetime.combine(data_ev, hora_fim), _FORTALEZA_TZ)
+        if (ini, fim) != (s.inicio, s.fim):
+            return True
+        linhas = [
+            x
+            for x in parts_csv.get(_identidade_da_linha(r), [])
+            if _map_participation_role(x.get("role")) == Participation.Role.FORMADOR
+        ]
+        if not linhas:
+            return False
+        planilha: set[int | None] = set()
+        for linha in linhas:
+            u = self._resolve_participante(linha, cpf_idx)
+            if u is None:
+                return True
+            planilha.add(u.id)
+        return planilha != {x.usuario_id for x in parts if x.role == Participation.Role.FORMADOR}
+
+    def _adotar(self, s: Solicitacao, eid: str, conf: str) -> None:
+        """Grava a adoção. Salva sem `updated_at` e calcula o hash depois do `refresh_from_db()`: o payload
+        leva o `updated_at` do banco, e é com ele que o Reapply seguinte compara (e pula, sem e-mail)."""
+        agora = timezone.now()
+        s.external_event_id = eid
+        s.gcal_status = Solicitacao.GCalStatus.PUBLISHED
+        s.last_sync_action = "ADOPT"
+        s.last_synced_at = agora
+        s.gcal_last_sync_at = agora
+        s.publicado_fora_do_sistema = False
+        s.save(
+            update_fields=[
+                "external_event_id",
+                "gcal_status",
+                "last_sync_action",
+                "last_synced_at",
+                "gcal_last_sync_at",
+                "publicado_fora_do_sistema",
+            ]
+        )
+        s.refresh_from_db()
+        s.gcal_payload_hash = _payload_hash(build_event_payload(s, enable_meet=bool(s.is_online)))
+        s.save(update_fields=["gcal_payload_hash"])
+        AuditLog.objects.create(
+            usuario=self.actor,
+            action=AuditLog.Action.UPDATE,
+            model_name="Solicitacao",
+            details={
+                "solicitacao_id": s.id,
+                "origem": ORIGEM_IMPORTER,
+                "modo": "virada",
+                "campo": "external_event_id",
+                "de": None,
+                "para": eid,
+                "confianca": conf,
+            },
+        )
 
     def _resolve_participante(self, r: dict[str, str], cpf_idx: dict[str, int]) -> Usuario | None:
         """EMAIL-first (`resolve_user_by_email`, exato, sem filtro is_active — inclui inativos, RELAY 50)

@@ -8,6 +8,10 @@ Princípios de segurança:
 - **never-overwrite de campos protegidos**: se um registro existe e diverge num campo protegido
   (`Solicitacao.status`, `Formacao.data_formacao`, `Acompanhamento.data_acompanhamento/realizado`),
   classifica como `protected_diff` e deixa para decisão humana (nunca sobrescreve).
+- **modo `virada`** (carga única, plano de 16/10/2026): o evento existente que ninguém mexeu pela tela
+  recebe projeto (só pela disciplina), data e hora, formadores e status da planilha; a exceção ao campo
+  protegido é só cancelado → reprovado e a reaprovação (SUPER aprovado com mudança material → pendente).
+  Nunca aprova e nunca chama o Google. A adoção do Event ID (`gcal_adocao`) roda à parte, depois do A5.
 
 Primeira fatia implementada (master, baixo risco): `dat_area`, `municipio`, `projeto_geral`.
 Demais entidades → `not_implemented` (contagem reportada, sem processamento).
@@ -62,6 +66,7 @@ from apps.core.models import (
     Usuario,
 )
 from apps.core.rbac.helpers import fluxo_super_fora_da_superintendencia
+from apps.core.services.compra_elegibilidade import par_liberado
 from apps.core.services.dat_codigos import recompute_all
 from apps.core.services.dat_registro_split import split_dat_registros
 from apps.core.services.equipe_gerencia_import import (
@@ -75,11 +80,13 @@ from apps.core.services.eventos_import import _compute_external_hash
 from apps.core.services.export_contract_projeto_resolver import (
     build_projeto_index,
     projeto_geral_index,
+    projetos_do_agrupador,
     resolve_projeto_agenda,
     resolve_projeto_export,
 )
 from apps.core.services.resolvers import resolve_user_by_email, resolve_user_by_name
 from apps.core.services.solicitacao_create import resolve_initial_status
+from apps.core.utils.cache_utils import invalidate_availability_cache
 from apps.core.validators import CPF_ABSENT, CPF_INVALID, classify_cpf, is_valid_cpf
 
 # Campos protegidos por entidade — NUNCA sobrescrever em update (decisão humana).
@@ -675,6 +682,215 @@ def diff_and_classify(
     return "would_update", sorted(diffs)
 
 
+# ── Carga da virada (`mode="virada"`, plano de 16/10/2026) ──
+# A carga é uma só: evento que ninguém mexeu recebe o estado da planilha do dia; o que foi editado pela
+# tela vence. Exceção escrita ao PROTECTED_FIELDS, só neste modo: o status muda por cancelamento
+# (→ reprovado) e pela regra da reaprovação (SUPER aprovado com campo material mudado → pendente). A
+# carga nunca aprova, nunca tira de reprovado e nunca chama o Google.
+ORIGEM_IMPORTER = "import_export_contract"
+# Ações que, com ip (texto), são uma pessoa mexendo no evento pela tela. Aprovação e reprovação não
+# contam (decisão 6 do dono): a regra da reaprovação cuida do status. PREVIEW_GCAL só lê.
+_ACOES_DE_PESSOA = frozenset({"UPDATE", "PUBLISH_GCAL_REQUESTED", "RESYNC_GCAL_REQUESTED", "CANCEL_GCAL_REQUESTED"})
+# Ações de script que não mudam campo de dado da virada: o status nunca trava (decisão 1), e as do
+# ciclo do Google já marcam "publicado pelo sistema" pelos campos gcal_*.
+_ACOES_SEM_TRAVA = frozenset(
+    {
+        "APPROVE",
+        "REJECT",
+        "CREATE",
+        "DELETE",
+        "PREVIEW_GCAL",
+        "PUBLISH_GCAL",
+        "PUBLISH_GCAL_ERROR",
+        "CANCEL_GCAL",
+        "CELERY_GCAL_SYNC",
+        "GCAL_RETRY_SUCCESS",
+    }
+)
+# Campos de dado que a virada atualiza, e o nome com que os scripts os registram no AuditLog.
+_CAMPOS_VIRADA = frozenset({"horario", "projeto", "formadores"})
+_CAMPO_DO_SCRIPT = {
+    "inicio": "horario",
+    "fim": "horario",
+    "data": "horario",
+    "hora_inicio": "horario",
+    "hora_fim": "horario",
+    "horario": "horario",
+    "projeto": "projeto",
+    "projeto_id": "projeto",
+    "formador_ids": "formadores",
+    "formadores": "formadores",
+    "formador": "formadores",
+    "participacoes": "formadores",
+    "participantes": "formadores",
+}
+_CONTADORES_VIRADA = (
+    "evento_atualizado",
+    "nao_tocado",
+    "tocado_pessoa",
+    "tocado_script",
+    "publicado_pelo_sistema",
+    "cancelado_vira_reprovado",
+    "descancelado",
+    "super_volta_pendente",
+    "projeto_diverge",
+    "projeto_sem_compra",
+    "remocao_bloqueada",
+    "remocao_bloqueada_resolucao",
+    "formador_inativo",
+    "marca_fora_do_sistema",
+    "fim_antes_do_inicio",
+    "repetido_no_arquivo",
+)
+_CONTADORES_VIRADA_POR_CHAVE = ("would_update_virada", "fora_do_escopo", "existente_linha_incompleta")
+
+
+def _contagem_virada() -> dict[str, Any]:
+    c: dict[str, Any] = dict.fromkeys(_CONTADORES_VIRADA, 0)
+    for k in _CONTADORES_VIRADA_POR_CHAVE:
+        c[k] = {}
+    return c
+
+
+def _conta(c: dict[str, Any], chave: str, sub: str | None = None) -> None:
+    if sub is None:
+        c[chave] += 1
+    else:
+        c[chave][sub] = c[chave].get(sub, 0) + 1
+
+
+def _tem_ip(details: dict[str, Any]) -> bool:
+    """ip = texto não vazio. Os scripts gravam a chave com `None` (não é pessoa)."""
+    ip = details.get("ip_address")
+    return isinstance(ip, str) and bool(ip.strip())
+
+
+def _sids_do_log(details: dict[str, Any]) -> list[tuple[int, bool]]:
+    """(solicitacao_id, veio_de_lista) de um AuditLog. O id vem como número ou texto; o resumo de script
+    traz a lista `solicitacoes`."""
+    out: list[tuple[int, bool]] = []
+    lista = details.get("solicitacoes")
+    candidatos: list[tuple[Any, bool]] = [(details.get("solicitacao_id"), False)]
+    if isinstance(lista, list):
+        candidatos += [(v, True) for v in lista]
+    for valor, por_lista in candidatos:
+        if isinstance(valor, bool):
+            continue
+        if isinstance(valor, int):
+            out.append((valor, por_lista))
+        elif isinstance(valor, str) and valor.strip().isdigit():
+            out.append((int(valor.strip()), por_lista))
+    return out
+
+
+def _campos_que_o_script_mudou(details: dict[str, Any]) -> set[str] | None:
+    """Campos de dado da virada que o script disse ter mudado (`campo`, `campos`, chaves de `de`/`para`/
+    `antes`/`depois`/`changed_fields`). None = o script não diz (trava todos)."""
+    nomes: set[str] = set()
+    if isinstance(details.get("campo"), str):
+        nomes.add(details["campo"])
+    if isinstance(details.get("campos"), list):
+        nomes |= {str(c) for c in details["campos"]}
+    for k in ("de", "para", "antes", "depois", "changed_fields"):
+        if isinstance(details.get(k), dict):
+            nomes |= {str(c) for c in details[k]}
+    if not nomes:
+        return None
+    return {_CAMPO_DO_SCRIPT[n] for n in nomes if n in _CAMPO_DO_SCRIPT}
+
+
+def _publicado_pelo_sistema(s: Solicitacao) -> bool:
+    """Qualquer rastro de ida ao Google pelo sistema, inclusive o evento que foi e saiu (o cancelamento
+    zera `gcal_status` e `external_event_id`, mas deixa `last_sync_action=DELETE`)."""
+    return bool(
+        s.gcal_status != Solicitacao.GCalStatus.NONE
+        or s.external_event_id
+        or s.last_sync_action
+        or s.last_synced_at
+        or s.gcal_last_sync_at
+    )
+
+
+def _tocado(
+    s: Solicitacao, logs: list[tuple[str, dict[str, Any], bool]], admin: bool
+) -> tuple[str, frozenset[str], bool]:
+    """(categoria, campos travados por script, reprovado pela própria carga). Categorias, em ordem:
+    `publicado_pelo_sistema`, `pessoa` (AuditLog de edição com ip, ou LogEntry do admin), `script`
+    (AuditLog sem ip que não é do importador; trava só os campos que ele mudou) e `nao_tocado`."""
+    reprovado_pela_carga = any(
+        a == "REJECT" and d.get("origem") == ORIGEM_IMPORTER and d.get("motivo") == "cancelado_na_planilha"
+        for a, d, _ in logs
+    )
+    if _publicado_pelo_sistema(s):
+        return "publicado_pelo_sistema", frozenset(), reprovado_pela_carga
+    if admin or any(a in _ACOES_DE_PESSOA and _tem_ip(d) and d.get("origem") != ORIGEM_IMPORTER for a, d, _ in logs):
+        return "pessoa", frozenset(_CAMPOS_VIRADA), reprovado_pela_carga
+    # O resumo em lista que não diz o campo não trava quem já tem o log por evento do mesmo script.
+    scripts_por_evento = {d.get("script") for _, d, lista in logs if not lista and d.get("script")}
+    script = False
+    travados: set[str] = set()
+    for a, d, lista in logs:
+        if d.get("origem") == ORIGEM_IMPORTER or _tem_ip(d) or a in _ACOES_SEM_TRAVA:
+            continue
+        campos = _campos_que_o_script_mudou(d)
+        if campos is None:
+            if lista and d.get("script") in scripts_por_evento:
+                continue
+            campos = set(_CAMPOS_VIRADA)
+        script = True
+        travados |= campos
+    return ("script" if script else "nao_tocado"), frozenset(travados), reprovado_pela_carga
+
+
+def _apagados_no_sistema() -> set[str]:
+    """`evento_id` de todo evento apagado no sistema (AuditLog DELETE de Solicitacao): o retrato da tela
+    (`solicitacao_data.external_hash`) e o dos scripts (`evento_id`, `backup.external_hash`). A carga não
+    o recria."""
+    out: set[str] = set()
+    for details in AuditLog.objects.filter(model_name="Solicitacao", action=AuditLog.Action.DELETE).values_list(
+        "details", flat=True
+    ):
+        if not isinstance(details, dict):
+            continue
+        for fonte in (details, details.get("solicitacao_data"), details.get("backup")):
+            if isinstance(fonte, dict):
+                for chave in ("evento_id", "external_hash"):
+                    v = fonte.get(chave)
+                    if isinstance(v, str) and v.strip():
+                        out.add(v.strip())
+    return out
+
+
+def _somar_contagem(total: dict[str, Any], parcial: dict[str, Any]) -> None:
+    for k, v in parcial.items():
+        if isinstance(v, dict):
+            for sub, n in v.items():
+                total[k][sub] = total[k].get(sub, 0) + n
+        else:
+            total[k] += v
+
+
+def _ordem_id(v: int | None) -> tuple[bool, int]:
+    """Ordena ids de usuário com o convidado sem cadastro (None) no fim."""
+    return (v is None, v or 0)
+
+
+def _identidade_da_linha(r: dict[str, str]) -> str:
+    """`evento_id` (fallback `evento_hash_natural`) sem resolver FK: acha o evento existente mesmo com a
+    linha incompleta (plano da virada, item 8)."""
+    return (r.get("evento_id") or r.get("evento_hash_natural") or "").strip()
+
+
+def _motivo_linha_incompleta(r: dict[str, str]) -> str:
+    lc = r.get("linha_completa")
+    return "linha_incompleta" if lc is not None and not _to_bool(lc) else "chave_sem_par"
+
+
+def _marca_da_linha(r: dict[str, str]) -> bool:
+    """A linha diz que o evento está no Google pela planilha (Event ID casado ou `na_agenda_google`)."""
+    return bool((r.get("external_event_id") or "").strip()) or _to_bool(r.get("na_agenda_google"))
+
+
 class ExportContractImporter:
     """Importer dry-run-first do export-contract. Veja docstring do módulo."""
 
@@ -699,6 +915,9 @@ class ExportContractImporter:
         self._sol_existente: set[str] | None = None
         self._sol_passado_novo: set[str] = set()
         self._criadas_nesta_execucao: set[str] = set()
+        # Modo virada: o que o apply contou (mesmo formato do classify) e quantos eventos mudou.
+        self._virada_aplicada: dict[str, Any] | None = None
+        self._virada_atualizadas = 0
 
     def _projetos_com_dat_uso(self) -> set[str]:
         """norm(nome) dos projetos que aparecem em dat_registro.csv/dat_compra.csv (coluna `projeto`).
@@ -1292,34 +1511,51 @@ class ExportContractImporter:
 
         elif name == "solicitacao":
             # NK = external_hash (= evento_id estável do CSV; fallback hash/recompute). FK/hora/coordenador não resolvidos →
-            # would_reject. Existence-based (status/participations ficam para o apply).
+            # would_reject. Existence-based (status/participations ficam para o apply). No modo `virada`, o
+            # evento existente passa pelo mesmo plano do apply (`_plano_virada`), e os contadores vão em `virada`.
+            virada = self.mode == "virada"
             mun_idx = self._municipio_index()
             tipo_idx = self._tipo_evento_index()
             cpf_idx = self._usuario_cpf_index()
-            existing = set(
-                Solicitacao.objects.exclude(external_hash__isnull=True).values_list("external_hash", flat=True)
-            )
+            existing = dict(Solicitacao.objects.exclude(external_hash__isnull=True).values_list("external_hash", "id"))
             tally["would_rekey"] = 0  # id antigo (`evento_ids_anteriores`) já em prod: existente, re-chaveia
             tally["would_create_cancelada"] = 0  # linha nova com cancelado=true: nasce reprovada
             # IMP-2 (caso Filadélfia): id antigo que é também id próprio de outra linha e já está em prod. Não
             # re-chaveia (entrada contraditória); o contador só deixa visível para corrigir na planilha.
             tally["rekey_contraditorio"] = 0
-            skip_reasons = {"evento_passado_novo": 0}
+            skip_reasons = {"evento_passado_novo": 0, "apagado_no_sistema": 0}
             reject_reasons = {"fim_antes_do_inicio": 0}
             ids_proprios = _ids_proprios(rows)
             bloqueados = set(ids_proprios)
             hoje = _hoje()
-            # `atual` evolui linha a linha como o `existing` do apply (re-chave e criação nesta execução).
-            atual = set(existing)
+            apagados = _apagados_no_sistema()
+            # `atual` evolui linha a linha como o `existing` do apply (re-chave e criação nesta execução;
+            # o criado nesta execução fica com id None).
+            atual: dict[str, int | None] = dict(existing)
             self._sol_criaria = {}
             self._sol_existente = set(existing)
             self._sol_passado_novo = set()
+            contagem = _contagem_virada()
+            ctx: dict[str, Any] = {}
+            logs_idx: dict[int, list[tuple[str, dict[str, Any], bool]]] = {}
+            admin_idx: set[int] = set()
+            por_id: dict[int, Solicitacao] = {}
+            parts_por_sol: dict[int, list[Participation]] = {}
+            vistos: set[int] = set()
+            if virada:
+                ctx = self._virada_ctx(hoje, cpf_idx)
+                logs_idx, admin_idx = self._indice_tocado()
+                por_id = {
+                    x.id: x for x in Solicitacao.objects.exclude(external_hash__isnull=True).select_related("projeto")
+                }
+                for part in Participation.objects.filter(solicitacao_id__in=por_id):
+                    parts_por_sol.setdefault(part.solicitacao_id, []).append(part)
             for r in rows:
                 key = self._resolve_solicitacao_key(r, mun_idx, tipo_idx, cpf_idx)
-                if key is None:
+                ext_hash = key[-1] if key is not None else _identidade_da_linha(r)
+                if key is None and not (virada and ext_hash):
                     tally["would_reject"] += 1
                     continue
-                ext_hash = key[-1]
                 proprio = (r.get("evento_id") or "").strip()
                 if any(
                     s != proprio and s in ids_proprios and s in existing
@@ -1329,33 +1565,74 @@ class ExportContractImporter:
                 existe = ext_hash in atual
                 antigo = None if existe else _id_antigo_em_prod(r, atual, bloqueados)
                 if antigo is not None:
-                    atual.discard(antigo)
-                    atual.add(ext_hash)
+                    atual[ext_hash] = atual.pop(antigo)
                     existe = True
                     tally["would_rekey"] += 1
+                if key is None and not existe:
+                    tally["would_reject"] += 1  # linha incompleta só serve para achar o evento existente
+                    continue
                 if existe:
                     if ext_hash not in self._sol_criaria:
                         self._sol_existente.add(ext_hash)
-                elif key[3] < hoje:
+                    sid = atual[ext_hash]
+                    if virada and sid is not None:
+                        if key is None:
+                            _conta(contagem, "existente_linha_incompleta", _motivo_linha_incompleta(r))
+                        if sid in vistos:
+                            _conta(contagem, "repetido_no_arquivo")
+                            tally["would_skip_same"] += 1
+                            continue
+                        vistos.add(sid)
+                        sol = por_id[sid]
+                        tocado = _tocado(sol, logs_idx.get(sid, []), sid in admin_idx)
+                        parts_csv = ctx["parts_csv"].get(ext_hash, [])
+                        plano = self._plano_virada(sol, r, key, tocado, parts_por_sol.get(sid, []), parts_csv, ctx)
+                        _somar_contagem(contagem, plano["c"])
+                        tally["would_update" if plano["c"]["evento_atualizado"] else "would_skip_same"] += 1
+                        continue
+                elif ext_hash in apagados:
+                    # Apagado no sistema (tela ou script): a carga não recria (plano da virada, item 11).
+                    tally["would_skip_same"] += 1
+                    skip_reasons["apagado_no_sistema"] += 1
+                    continue
+                elif key is not None and key[3] < hoje and not virada:
                     # Evento novo no passado não nasce (fica para a virada), espelha o apply.
                     tally["would_skip_same"] += 1
                     skip_reasons["evento_passado_novo"] += 1
                     self._sol_passado_novo.add(ext_hash)
                     continue
-                elif key[5] <= key[4]:
+                elif key is not None and key[5] <= key[4]:
                     # Mesma data e fuso: fim <= inicio, o apply pula (constraint solicitacao_fim_gt_inicio).
                     tally["would_reject"] += 1
                     reject_reasons["fim_antes_do_inicio"] += 1
                     continue
-                else:
+                elif key is not None:
                     self._sol_criaria[ext_hash] = key[7]
-                    atual.add(ext_hash)
+                    atual[ext_hash] = None
+                    if virada and _marca_da_linha(r):
+                        _conta(contagem, "marca_fora_do_sistema")
                 st, _ = diff_and_classify({} if existe else None, {}, protected)
                 tally[st] += 1
                 if st == "would_create" and _to_bool(r.get("cancelado")):
                     tally["would_create_cancelada"] += 1
             tally["skip_reasons"] = skip_reasons
             tally["reject_reasons"] = reject_reasons
+            if virada:
+                tally["virada"] = contagem
+                # Evento de prod que a planilha não traz mais (nem como id antigo): só conta, por quando ×
+                # status × categoria. Quem reprova é o script das sumidas (decisão 8 do dono).
+                citados = ids_proprios | {
+                    str(a).strip() for r in rows for a in _parse_json_list(r.get("evento_ids_anteriores"))
+                }
+                fora: dict[str, int] = {}
+                for sol in por_id.values():
+                    if sol.external_hash in citados:
+                        continue
+                    quando = "futuro" if timezone.localtime(sol.fim, _FORTALEZA_TZ).date() >= hoje else "passado"
+                    cat = _tocado(sol, logs_idx.get(sol.id, []), sol.id in admin_idx)[0]
+                    chave = f"{quando}:{sol.status}:{cat}"
+                    fora[chave] = fora.get(chave, 0) + 1
+                tally["existente_fora_do_csv"] = fora
 
         elif name == "participation":
             # Liga por evento_id (fallback evento_hash_natural) → solicitacao.external_hash. Papel do CSV (posição), não cargo.
@@ -1571,7 +1848,7 @@ class ExportContractImporter:
 
         # ── escrita (create-only) — só se apply + allowlist; NÃO exercida no skeleton ──
         applied: dict[str, int] = {}
-        if self.apply and self.allow and self.mode == "create-only":
+        if self.apply and self.allow and self.mode in ("create-only", "virada"):
             applied = self._apply_create_only()
 
         return {
@@ -1584,6 +1861,7 @@ class ExportContractImporter:
             "por_entidade": por_entidade,
             "applied": applied,
             "protected_fields": {k: sorted(v) for k, v in PROTECTED_FIELDS.items()},
+            **({"virada_aplicada": self._virada_aplicada} if self.mode == "virada" else {}),
         }
 
     def _apply_create_only(self) -> dict[str, int]:
@@ -1663,6 +1941,8 @@ class ExportContractImporter:
                         applied["solicitacao__rechaveada"] = rechaveadas
                     if passadas:
                         applied["solicitacao__pulada_passado"] = passadas
+                    if self._virada_atualizadas:
+                        applied["solicitacao__virada_atualizada"] = self._virada_atualizadas
                     continue
                 if name == "participation":
                     # DEPOIS de solicitacao (ENTITY_ORDER garante): liga só ao evento criado nesta execução.
@@ -2002,6 +2282,10 @@ class ExportContractImporter:
         fica para a virada (`passadas`). Evento existente passado segue igual (re-chave e reconcile). Os
         `external_hash` criados aqui vão para `_criadas_nesta_execucao` (só neles a participation vincula).
 
+        Modo `virada`: o passado novo É criado; o evento existente (achado pelo `evento_id` mesmo com a linha
+        incompleta) passa por `_aplicar_virada`; toda linha no Google pela planilha liga
+        `publicado_fora_do_sistema`. Nos dois modos, evento apagado no sistema não é recriado.
+
         Retorna `(created, reconciled, canceladas, rechaveadas, passadas)`. `segmento_norm`/`segmento_norm_confianca` são autoritativos do
         import (de-para do sheets, sem entrada-direta — #1896): create-only pula o registro existente por
         external_hash, mas RECONCILIA esse campo — escopado (só norm/confianca), reportado à parte,
@@ -2023,11 +2307,18 @@ class ExportContractImporter:
         passadas = 0
         hoje = _hoje()
         bloqueados = _ids_proprios(rows)
+        apagados = _apagados_no_sistema()
+        virada = self.mode == "virada"
+        contagem = _contagem_virada()
+        ctx = self._virada_ctx(hoje, cpf_idx) if virada else {}
+        vistos: set[int] = set()
+        atualizadas = 0
         for r in rows:
             key = self._resolve_solicitacao_key(r, mun_idx, tipo_idx, cpf_idx)
-            if key is None:
+            if key is None and not (virada and _identidade_da_linha(r)):
                 continue  # would_reject (FK/hora/coordenador não resolvido)
-            mun_id, proj_id, tipo_id, data_ev, hora_ini, hora_fim, segmento, coord_id, ext_hash = key
+            # Linha incompleta, no modo virada: só serve para achar o evento existente (plano, item 8).
+            ext_hash = key[-1] if key is not None else _identidade_da_linha(r)
             seg_norm = (r.get("segmento_norm") or "").strip()[:100]
             seg_conf = (r.get("segmento_norm_confianca") or "").strip()[:30]
             antigo = None if ext_hash in existing else _id_antigo_em_prod(r, existing, bloqueados)
@@ -2050,14 +2341,28 @@ class ExportContractImporter:
                     },
                 )
                 rechaveadas += 1
+            if key is None and ext_hash not in existing:
+                continue
             if ext_hash in existing:
                 sid, cur_sn = existing[ext_hash]
-                if seg_norm and seg_norm != cur_sn:
+                if key is not None and seg_norm and seg_norm != cur_sn:
                     Solicitacao.objects.filter(id=sid).update(segmento_norm=seg_norm, segmento_norm_confianca=seg_conf)
                     existing[ext_hash] = (sid, seg_norm)
                     reconciled += 1
+                if virada and ext_hash not in self._criadas_nesta_execucao:
+                    if key is None:
+                        _conta(contagem, "existente_linha_incompleta", _motivo_linha_incompleta(r))
+                    if sid in vistos:
+                        _conta(contagem, "repetido_no_arquivo")
+                        continue
+                    vistos.add(sid)
+                    atualizadas += self._aplicar_virada(sid, r, key, ext_hash, ctx, contagem)
                 continue
-            if data_ev < hoje:
+            if ext_hash in apagados:
+                continue  # apagado no sistema (tela ou script): a carga não recria
+            assert key is not None
+            mun_id, proj_id, tipo_id, data_ev, hora_ini, hora_fim, segmento, coord_id, ext_hash = key
+            if data_ev < hoje and not virada:
                 passadas += 1
                 continue  # passado novo: não nasce pendente/aprovado; fica para a virada
             inicio = timezone.make_aware(datetime.combine(data_ev, hora_ini), _FORTALEZA_TZ)
@@ -2065,6 +2370,9 @@ class ExportContractImporter:
             if fim <= inicio:
                 continue  # constraint solicitacao_fim_gt_inicio: linha inconsistente
             cancelado = _to_bool(r.get("cancelado"))
+            marca = virada and _marca_da_linha(r)
+            if marca:
+                _conta(contagem, "marca_fora_do_sistema")
             # Cancelado na planilha: o modelo não tem "cancelado" e a linha nunca entra pendente/aprovada
             # (decisão do dono, 05/10/2026: nasce reprovada e fica no AuditLog).
             status = (
@@ -2091,6 +2399,7 @@ class ExportContractImporter:
                 status=status,
                 external_hash=ext_hash,
                 solicitante_procedencia=(r.get("solicitante_procedencia") or "").strip()[:30],
+                publicado_fora_do_sistema=marca,
             )
             Participation.objects.get_or_create(
                 solicitacao=sol, usuario_id=coord_id, role=Participation.Role.COORDENADOR
@@ -2110,7 +2419,362 @@ class ExportContractImporter:
             existing[ext_hash] = (sol.id, seg_norm)
             self._criadas_nesta_execucao.add(ext_hash)
             created += 1
+        if virada:
+            self._virada_aplicada = contagem
+            self._virada_atualizadas = atualizadas
+            # O sinal de Solicitacao só renova o cache do solicitante e do responsável: data, status e
+            # formadores mudados deixariam a Grade velha. Global, uma vez, no commit (como os scripts).
+            transaction.on_commit(lambda: invalidate_availability_cache(None))
         return created, reconciled, canceladas, rechaveadas, passadas
+
+    def _aplicar_virada(
+        self,
+        sid: int,
+        r: dict[str, str],
+        key: tuple[Any, ...] | None,
+        ext_hash: str,
+        ctx: dict[str, Any],
+        contagem: dict[str, Any],
+    ) -> int:
+        """Um evento existente, do começo ao fim, com a linha travada: relê o "tocado" (a tela grava o
+        AuditLog depois do save; a janela que sobra é de milissegundos e a carga roda sem gente usando),
+        monta o plano e grava. Devolve 1 se mudou."""
+        s = Solicitacao.objects.select_for_update().get(id=sid)
+        parts = list(Participation.objects.filter(solicitacao_id=sid))
+        logs, admin = self._tocado_do_evento(sid, [x.id for x in parts])
+        plano = self._plano_virada(s, r, key, _tocado(s, logs, admin), parts, ctx["parts_csv"].get(ext_hash, []), ctx)
+        _somar_contagem(contagem, plano["c"])
+        return 1 if self._executar_plano_virada(s, plano) else 0
+
+    # ── carga da virada: um evento existente por vez (classify e apply usam o mesmo plano) ──
+    def _virada_ctx(self, hoje: date, cpf_idx: dict[str, int]) -> dict[str, Any]:
+        if self._pidx is None:
+            self._pidx = build_projeto_index()
+        return {
+            "hoje": hoje,
+            "cpf_idx": cpf_idx,
+            "pidx": self._pidx,
+            "proj_by_id": {x.id: x for x in Projeto.objects.all()},
+            "parts_csv": self._participacoes_csv_por_evento(),
+        }
+
+    def _participacoes_csv_por_evento(self) -> dict[str, list[dict[str, str]]]:
+        """Linhas do participation.csv por `evento_id` (fallback `evento_hash_natural`)."""
+        idx: dict[str, list[dict[str, str]]] = {}
+        for r in self._load("participation"):
+            ehash = (r.get("evento_id") or r.get("evento_hash_natural") or "").strip()
+            if ehash:
+                idx.setdefault(ehash, []).append(r)
+        return idx
+
+    def _indice_tocado(self) -> tuple[dict[int, list[tuple[str, dict[str, Any], bool]]], set[int]]:
+        """Para o classify: AuditLog de Solicitacao por evento e os eventos com LogEntry do admin (no evento
+        ou numa participação dele)."""
+        from django.contrib.admin.models import LogEntry
+        from django.contrib.contenttypes.models import ContentType
+
+        logs: dict[int, list[tuple[str, dict[str, Any], bool]]] = {}
+        for action, details in AuditLog.objects.filter(model_name="Solicitacao").values_list("action", "details"):
+            if isinstance(details, dict):
+                for sid, por_lista in _sids_do_log(details):
+                    logs.setdefault(sid, []).append((action, details, por_lista))
+        ct_sol = ContentType.objects.get_for_model(Solicitacao)
+        ct_part = ContentType.objects.get_for_model(Participation)
+        admin = {
+            int(o)
+            for o in LogEntry.objects.filter(content_type=ct_sol).values_list("object_id", flat=True)
+            if o and o.isdigit()
+        }
+        part_ids = [
+            int(o)
+            for o in LogEntry.objects.filter(content_type=ct_part).values_list("object_id", flat=True)
+            if o and o.isdigit()
+        ]
+        admin |= set(Participation.objects.filter(id__in=part_ids).values_list("solicitacao_id", flat=True))
+        return logs, admin
+
+    @staticmethod
+    def _tocado_do_evento(sid: int, part_ids: list[int]) -> tuple[list[tuple[str, dict[str, Any], bool]], bool]:
+        """Para o apply, com a linha travada: o mesmo que `_indice_tocado`, só deste evento (relido para
+        pegar a edição que a tela gravou depois do classify)."""
+        from django.contrib.admin.models import LogEntry
+        from django.contrib.contenttypes.models import ContentType
+        from django.db.models import Q
+
+        qs = AuditLog.objects.filter(model_name="Solicitacao").filter(
+            Q(details__solicitacao_id=sid)
+            | Q(details__solicitacao_id=str(sid))
+            | Q(details__solicitacoes__contains=[sid])
+            | Q(details__solicitacoes__contains=[str(sid)])
+        )
+        logs = [
+            (action, details, por_lista)
+            for action, details in qs.values_list("action", "details")
+            if isinstance(details, dict)
+            for s_id, por_lista in _sids_do_log(details)
+            if s_id == sid
+        ]
+        ct_sol = ContentType.objects.get_for_model(Solicitacao)
+        ct_part = ContentType.objects.get_for_model(Participation)
+        admin = (
+            LogEntry.objects.filter(content_type=ct_sol, object_id=str(sid)).exists()
+            or LogEntry.objects.filter(content_type=ct_part, object_id__in=[str(p) for p in part_ids]).exists()
+        )
+        return logs, admin
+
+    def _plano_virada(
+        self,
+        s: Solicitacao,
+        r: dict[str, str],
+        key: tuple[Any, ...] | None,
+        tocado: tuple[str, frozenset[str], bool],
+        parts_atuais: list[Participation],
+        parts_csv: list[dict[str, str]],
+        ctx: dict[str, Any],
+    ) -> dict[str, Any]:
+        """O que a carga faria no evento existente `s` com a linha `r` (sem escrever). Ordem do plano:
+        projeto → data e hora → formadores → status (já com os formadores novos) → marca. `key` é None
+        quando a linha está incompleta: aí só muda o que resolve sozinho (cancelado, data e hora,
+        projeto pela disciplina, formadores)."""
+        c = _contagem_virada()
+        p: dict[str, Any] = {
+            "c": c,
+            "campos": {},
+            "sai": [],
+            "entra": [],
+            "convidados": [],
+            "status": None,
+            "rejeitar": False,
+            "reaprovacao": [],
+            "marca": False,
+        }
+        categoria, travados, reprovado_pela_carga = tocado
+        if categoria == "publicado_pelo_sistema":
+            _conta(c, "publicado_pelo_sistema")
+            return p
+        p["marca"] = _marca_da_linha(r) and not s.publicado_fora_do_sistema
+        if p["marca"]:
+            _conta(c, "marca_fora_do_sistema")
+        if categoria == "pessoa":
+            _conta(c, "tocado_pessoa")
+            if p["marca"]:
+                _conta(c, "evento_atualizado")
+            return p  # a tela vence; a marca (só contra duplicata no Google) entra assim mesmo
+        _conta(c, "tocado_script" if categoria == "script" else "nao_tocado")
+
+        if key is not None:
+            mun_id, _proj, tipo_id, _d, _hi, _hf, segmento, coord_id, _h = key
+            for campo, atual, novo in (
+                ("municipio", s.municipio_id, mun_id),
+                ("tipo_evento", s.tipo_evento_id, tipo_id),
+                ("solicitante", s.usuario_id, coord_id),
+                ("segmento", (s.segmento or "").strip(), segmento),
+                ("is_online", s.is_online, _to_bool(r.get("is_online"))),
+            ):
+                if atual != novo:
+                    _conta(c, "fora_do_escopo", campo)
+
+        # projeto: só pela disciplina, dentro do mesmo agrupador (o evento não guarda a disciplina)
+        projeto_id = s.projeto_id
+        raw_proj = r.get("projeto") or ""
+        res = resolve_projeto_agenda(raw_proj, r.get("disciplina") or "", index=ctx["pidx"])
+        novo_proj = res.projeto.id if res.status == "matched" and res.projeto is not None else None
+        if novo_proj is not None and novo_proj != s.projeto_id:
+            irmaos = projetos_do_agrupador(raw_proj, index=ctx["pidx"])
+            if res.matched_via == "disciplina" and s.projeto_id in irmaos:
+                if "projeto" not in travados:
+                    projeto_id = novo_proj
+                    p["campos"]["projeto_id"] = novo_proj
+                    _conta(c, "would_update_virada", "projeto")
+                    novo = ctx["proj_by_id"].get(novo_proj)
+                    if s.municipio_id is not None and novo is not None and not par_liberado(s.municipio_id, novo):
+                        _conta(c, "projeto_sem_compra")
+            else:
+                _conta(c, "projeto_diverge")
+
+        # data e hora (local de Fortaleza → UTC, como na criação)
+        data_ev = _parse_iso_date(r.get("data"))
+        hora_ini = _parse_hora(r.get("hora_inicio"))
+        hora_fim = _parse_hora(r.get("hora_fim"))
+        inicio, fim = s.inicio, s.fim
+        if data_ev is not None and hora_ini is not None and hora_fim is not None:
+            novo_ini = timezone.make_aware(datetime.combine(data_ev, hora_ini), _FORTALEZA_TZ)
+            novo_fim = timezone.make_aware(datetime.combine(data_ev, hora_fim), _FORTALEZA_TZ)
+            if novo_fim <= novo_ini:
+                _conta(c, "fim_antes_do_inicio")
+            elif (novo_ini, novo_fim) != (s.inicio, s.fim) and "horario" not in travados:
+                inicio, fim = novo_ini, novo_fim
+                p["campos"]["inicio"], p["campos"]["fim"] = novo_ini, novo_fim
+                _conta(c, "would_update_virada", "horario")
+
+        # formadores: troca com guardas; convidado só acrescenta; coordenador e acompanhante não mudam
+        form_atuais = [x for x in parts_atuais if x.role == Participation.Role.FORMADOR]
+        form_ids_antes: list[int | None] = sorted((x.usuario_id for x in form_atuais), key=_ordem_id)
+        form_depois: list[int | None] = list(form_ids_antes)
+        if "formadores" not in travados:
+            linhas_form = [
+                x for x in parts_csv if _map_participation_role(x.get("role")) == Participation.Role.FORMADOR
+            ]
+            if linhas_form:
+                resolvidos: dict[int, Usuario] = {}
+                nao_resolve = False
+                for linha in linhas_form:
+                    u = self._resolve_participante(linha, ctx["cpf_idx"])
+                    if u is None:
+                        nao_resolve = True
+                    else:
+                        resolvidos.setdefault(u.id, u)
+                atuais_ids = {x.usuario_id for x in form_atuais if x.usuario_id is not None}
+                futuro = timezone.localtime(inicio, _FORTALEZA_TZ).date() >= ctx["hoje"]
+                for uid, u in resolvidos.items():
+                    if uid in atuais_ids:
+                        continue
+                    if futuro and not u.is_active:
+                        _conta(c, "formador_inativo")
+                        continue
+                    p["entra"].append(uid)
+                if nao_resolve:
+                    _conta(c, "remocao_bloqueada_resolucao")  # ninguém sai; o nome solto não entra
+                else:
+                    for x in form_atuais:
+                        if x.usuario_id is not None and x.usuario_id in resolvidos:
+                            continue
+                        if (
+                            x.ch_horas is not None
+                            or (x.observacao or "").strip()
+                            or (x.usuario_id is not None and x.usuario_id == s.formador_avaliado_id)
+                        ):
+                            _conta(c, "remocao_bloqueada")
+                            continue
+                        p["sai"].append(x.id)
+                if p["entra"] or p["sai"]:
+                    _conta(c, "would_update_virada", "formadores")
+                    saem = set(p["sai"])
+                    form_depois = sorted(
+                        [x.usuario_id for x in form_atuais if x.id not in saem] + p["entra"],
+                        key=_ordem_id,
+                    )
+            conv_atuais = {
+                (x.usuario_id, "" if x.usuario_id is not None else x.guest_nome)
+                for x in parts_atuais
+                if x.role == Participation.Role.CONVIDADO
+            }
+            for linha in parts_csv:
+                if _map_participation_role(linha.get("role")) != Participation.Role.CONVIDADO:
+                    continue
+                u = self._resolve_participante(linha, ctx["cpf_idx"])
+                ident = (u.id, "") if u is not None else (None, (linha.get("usuario") or "").strip()[:200])
+                if ident == (None, "") or ident in conv_atuais:
+                    continue
+                conv_atuais.add(ident)
+                p["convidados"].append(ident)
+            if p["convidados"]:
+                _conta(c, "would_update_virada", "convidados")
+        p["formadores_antes"], p["formadores_depois"] = form_ids_antes, form_depois
+
+        # status: cancelado → reprovado vale por cima da trava de script; senão a regra da reaprovação
+        cancelado = _to_bool(r.get("cancelado"))
+        if cancelado and s.status in (Solicitacao.Status.PENDENTE, Solicitacao.Status.APROVADO):
+            p["status"], p["rejeitar"] = Solicitacao.Status.REPROVADO, True
+            _conta(c, "cancelado_vira_reprovado")
+        elif not cancelado and s.status == Solicitacao.Status.REPROVADO and reprovado_pela_carga:
+            _conta(c, "descancelado")  # o A1 só autoriza cancelado → reprovado
+        elif s.status == Solicitacao.Status.APROVADO:
+            projeto = ctx["proj_by_id"].get(projeto_id) if projeto_id is not None else None
+            if resolve_initial_status(projeto=projeto).status == Solicitacao.Status.PENDENTE:
+                mudaram = [
+                    campo
+                    for campo, antes, depois in (
+                        ("projeto", s.projeto_id, projeto_id),
+                        ("inicio", s.inicio, inicio),
+                        ("fim", s.fim, fim),
+                        ("formadores", frozenset(form_ids_antes), frozenset(form_depois)),
+                    )
+                    if antes != depois
+                ]
+                if projeto_id is None and "projeto" not in mudaram:
+                    mudaram = []  # sem projeto o fluxo é NAO_SUPER (mesma regra da tela)
+                if mudaram:
+                    p["status"], p["reaprovacao"] = Solicitacao.Status.PENDENTE, mudaram
+                    _conta(c, "super_volta_pendente")
+
+        if p["campos"] or p["entra"] or p["sai"] or p["convidados"] or p["status"] or p["marca"]:
+            _conta(c, "evento_atualizado")
+        return p
+
+    def _executar_plano_virada(self, s: Solicitacao, p: dict[str, Any]) -> bool:
+        """Grava o plano de um evento (linha já travada). AuditLog UPDATE no formato da tela, sem ip (a
+        carga seguinte não lê a própria escrita como pessoa) e REJECT `cancelado_na_planilha` no
+        cancelamento. Devolve se mudou algo."""
+        if not (p["campos"] or p["entra"] or p["sai"] or p["convidados"] or p["status"] or p["marca"]):
+            return False
+        changed: dict[str, dict[str, Any]] = {}
+        status_antes = s.status
+        aprovada_como_super = status_antes == Solicitacao.Status.APROVADO and (
+            getattr(s.projeto, "fluxo", None) == "SUPER"
+        )
+        update_fields: list[str] = []
+        for campo, novo in p["campos"].items():
+            antes = getattr(s, campo)
+            setattr(s, campo, novo)
+            update_fields.append(campo)
+            nome = campo
+            if isinstance(novo, datetime):
+                changed[nome] = {"old": antes.isoformat(), "new": novo.isoformat()}
+            else:
+                changed[nome] = {"old": antes, "new": novo}
+        if p["status"]:
+            s.status = p["status"]
+            update_fields.append("status")
+            if not p["rejeitar"]:
+                changed["status"] = {"old": status_antes, "new": p["status"]}
+        if p["marca"]:
+            s.publicado_fora_do_sistema = True
+            update_fields.append("publicado_fora_do_sistema")
+            changed["publicado_fora_do_sistema"] = {"old": False, "new": True}
+        if update_fields:
+            s.save(update_fields=[*update_fields, "updated_at"])
+        if p["sai"]:
+            Participation.objects.filter(id__in=p["sai"]).delete()
+        for uid in p["entra"]:
+            Participation.objects.create(solicitacao=s, usuario_id=uid, role=Participation.Role.FORMADOR)
+        for uid, nome in p["convidados"]:
+            if uid is not None:
+                Participation.objects.create(solicitacao=s, usuario_id=uid, role=Participation.Role.CONVIDADO)
+            else:
+                Participation.objects.create(solicitacao=s, guest_nome=nome, role=Participation.Role.CONVIDADO)
+        if p["entra"] or p["sai"]:
+            changed["formador_ids"] = {"old": p["formadores_antes"], "new": p["formadores_depois"]}
+        if p["convidados"]:
+            changed["convidados_novos"] = {"old": [], "new": [uid or nome for uid, nome in p["convidados"]]}
+        if p["rejeitar"]:
+            AuditLog.objects.create(
+                usuario=self.actor,
+                action=AuditLog.Action.REJECT,
+                model_name="Solicitacao",
+                details={
+                    "solicitacao_id": s.id,
+                    "origem": ORIGEM_IMPORTER,
+                    "modo": "virada",
+                    "motivo": "cancelado_na_planilha",
+                    "status_anterior": status_antes,
+                },
+            )
+        if changed:
+            details: dict[str, Any] = {
+                "solicitacao_id": s.id,
+                "origem": ORIGEM_IMPORTER,
+                "modo": "virada",
+                "changed_fields": changed,
+            }
+            if p["reaprovacao"]:
+                details["reaprovacao"] = {"campos": p["reaprovacao"]}
+            if aprovada_como_super:
+                details["aprovada_como_super"] = True
+            AuditLog.objects.create(
+                usuario=self.actor, action=AuditLog.Action.UPDATE, model_name="Solicitacao", details=details
+            )
+        return True
 
     def _resolve_participante(self, r: dict[str, str], cpf_idx: dict[str, int]) -> Usuario | None:
         """EMAIL-first (`resolve_user_by_email`, exato, sem filtro is_active — inclui inativos, RELAY 50)

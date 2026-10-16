@@ -11,10 +11,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.db import transaction
 from rest_framework import serializers  # type: ignore[attr-defined]
 
 from apps.core.constants import SETORES_PRODUTO
-from apps.core.models import Gerencia, Municipio, Produto, Projeto, ProjetoGeral, TipoEvento
+from apps.core.models import AuditLog, Gerencia, Municipio, Produto, Projeto, ProjetoGeral, TipoEvento
 from apps.core.rbac.helpers import (
     APPROVER_COMPOSITES,
     GERENCIA_APROVADORA_NOME,
@@ -153,6 +154,25 @@ class ProjetoSerializer(serializers.ModelSerializer):
         if eh_serie and attrs.get("eh_nome_geral", getattr(instance, "eh_nome_geral", False)):
             raise serializers.ValidationError("Série não pode ser nome geral: desmarque uma das duas.")
         return attrs
+
+    @transaction.atomic
+    def update(self, instance: Projeto, validated_data: dict[str, Any]) -> Projeto:
+        """PA-04 (PR 10, decisão do dono de 16/10): o DAT troca o fluxo do projeto, com registro.
+
+        Toda troca de `fluxo` grava `AuditLog` `UPDATE` (`model_name="Projeto"`) na mesma transação.
+        Salvar com o mesmo fluxo não grava nada.
+        """
+        fluxo_antes = instance.fluxo
+        projeto = super().update(instance, validated_data)
+        if projeto.fluxo != fluxo_antes:
+            request: Any = self.context.get("request")
+            AuditLog.objects.create(
+                usuario=getattr(request, "user", None),
+                action=AuditLog.Action.UPDATE,
+                model_name="Projeto",
+                details={"projeto_id": projeto.pk, "fluxo": {"old": fluxo_antes, "new": projeto.fluxo}},
+            )
+        return projeto
 
 
 class ProjetoOptionSerializer(serializers.ModelSerializer):

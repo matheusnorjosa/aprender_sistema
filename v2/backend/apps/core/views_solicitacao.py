@@ -511,6 +511,21 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             validar_avaliacao_formador(instance, criando=True, resposta_anterior=None)
             enforce_solicitacao_availability(instance, action="create")
 
+            # PA-04 (PR 10, decisão do dono de 16/10): quem tem o cadastro de projetos troca o fluxo, com
+            # registro. O evento que nasce aprovado porque o projeto estava NAO_SUPER fica marcado aqui; com
+            # o AuditLog da troca de fluxo (`ProjetoSerializer.update`) dá para achar o criado na janela.
+            if initial_status.status == "aprovado":
+                AuditLog.objects.create(
+                    usuario=self.request.user,
+                    action=AuditLog.Action.CREATE,
+                    model_name="Solicitacao",
+                    details={
+                        "solicitacao_id": instance.id,
+                        "projeto_id": getattr(projeto, "id", None),
+                        "auto_aprovada_por_fluxo": initial_status.fluxo,
+                    },
+                )
+
         logger.info(
             "solicitacao_initial_status_decided",
             extra={

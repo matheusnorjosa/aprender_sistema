@@ -330,5 +330,6 @@ def test_insert_sem_a_coluna_nasce_false_pelo_default_do_banco():
             f"INSERT INTO {tabela} ({lista}) SELECT {lista} FROM {tabela} WHERE id = %s RETURNING id",  # noqa: S608
             [base.pk],
         )
-        novo_id = cursor.fetchone()[0]
-    assert Solicitacao.objects.get(pk=novo_id).publicado_fora_do_sistema is False
+        linha = cursor.fetchone()
+    assert linha is not None
+    assert Solicitacao.objects.get(pk=linha[0]).publicado_fora_do_sistema is False

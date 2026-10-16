@@ -151,20 +151,22 @@ def contas_alteradas_por(user: Usuario) -> dict[int, datetime]:
     }
 
 
-def autores_que_alteraram_a_conta_de(user: Usuario, autores: set[int]) -> dict[int, datetime]:
-    """D2 ao contrário: {id do autor: última vez que ele alterou a conta de `user`} (uma consulta).
+def quem_alterou_a_conta_de(user: Usuario, desde: datetime) -> dict[int, datetime]:
+    """{id de quem alterou a conta de `user` desde `desde`: última vez} (uma consulta).
 
-    Fecha o caminho do autor que redefine a senha de uma aprovadora e decide pela conta dela.
+    Serve à D2 ao contrário (o autor redefine a senha de uma aprovadora e decide pela conta dela) e ao
+    fantoche ao contrário de "quem editou não decide" (quem editou faz o mesmo).
     """
-    if not getattr(user, "pk", None) or not autores:
+    if not getattr(user, "pk", None):
         return {}
     return dict(
         AuditLog.objects.filter(
-            usuario_id__in=autores,
             model_name="Usuario",
             action__in=ACOES_QUE_ALTERAM_CONTA,
             details__target_user_id=user.pk,
+            created_at__gte=desde,
         )
+        .exclude(usuario_id=None)
         .order_by()
         .values("usuario_id")
         .annotate(ultima=Max("created_at"))
@@ -194,12 +196,19 @@ def _ultima_aprovacao(ids: list[int]) -> dict[int, datetime]:
     return ultima
 
 
-def _editadas_pelo_ator(user: Usuario, ids: set[int], alteradas: dict[int, datetime]) -> set[int]:
-    """Quem editou não decide: ids em que `user` (ou uma conta que ele alterou nos 30 dias anteriores à
-    edição, o fantoche) mudou campo material depois do último APPROVE, ou desde a criação. Até 2 consultas.
+def _editadas_pelo_ator(
+    user: Usuario,
+    cortes: dict[int, datetime],
+    alteradas: dict[int, datetime],
+    alteraram_a_minha: dict[int, datetime],
+) -> set[int]:
+    """Quem editou não decide: ids de `cortes` em que um editor ligado a `user` mudou campo material
+    depois do último APPROVE, ou desde a criação. Até 2 consultas.
 
-    O fantoche se mede por edição: só conta a alteração da conta do editor em [edição − 30 dias, edição];
-    a feita depois da edição não faz a edição dele virar do ator.
+    O editor é `user`, uma conta que ele alterou nos 30 dias anteriores à edição (o fantoche: só conta
+    a alteração em [edição − 30 dias, edição]; a feita depois não faz a edição virar do ator), ou quem
+    alterou a conta de `user` desde o corte da solicitação (o fantoche ao contrário: o editor redefine
+    a senha da aprovadora e decide pela conta dela).
     """
     fantoche = AuditLog.objects.alias(alvo=KeyTextTransform("target_user_id", "details")).filter(
         usuario_id=user.pk,
@@ -213,17 +222,22 @@ def _editadas_pelo_ator(user: Usuario, ids: set[int], alteradas: dict[int, datet
         AuditLog.objects.filter(
             model_name="Solicitacao",
             action=AuditLog.Action.UPDATE,
-            usuario_id__in={user.pk, *alteradas},
+            usuario_id__in={user.pk, *alteradas, *alteraram_a_minha},
             details__changed_fields__has_any_keys=list(CAMPOS_MATERIAIS_NO_AUDITLOG),
         )
-        .filter(Q(usuario_id=user.pk) | Exists(fantoche))
+        .annotate(eh_fantoche=Exists(fantoche))
+        .filter(Q(usuario_id=user.pk) | Q(eh_fantoche=True) | Q(usuario_id__in=list(alteraram_a_minha)))
         .order_by()
-        .values_list("details__solicitacao_id", "created_at")
+        .values_list("details__solicitacao_id", "created_at", "usuario_id", "eh_fantoche")
     )
     candidatas: dict[int, datetime] = {}
-    for sol_id, quando in edicoes:
-        if sol_id not in ids:
+    for sol_id, quando, editor_id, eh_fantoche in edicoes:
+        if sol_id not in cortes:
             continue
+        if editor_id != user.pk and not eh_fantoche:
+            alterou_a_minha = alteraram_a_minha.get(editor_id)
+            if alterou_a_minha is None or alterou_a_minha < cortes[sol_id]:
+                continue
         if sol_id not in candidatas or quando > candidatas[sol_id]:
             candidatas[sol_id] = quando
     if not candidatas:
@@ -236,28 +250,31 @@ def impedimentos(user: Usuario, solicitacoes: QuerySet[Solicitacao]) -> dict[int
     """PA-02 (segregação): {id: código} das solicitações de `solicitacoes` que `user` não decide.
 
     Ordem: própria, conta do autor alterada pelo ator (D2), conta do ator alterada pelo autor (D2 ao
-    contrário), editada pelo ator. Calcula também para o
+    contrário), editada pelo ator (ou por quem alterou a conta dele). Calcula também para o
     superusuário (o AuditLog dele marca o break-glass); quem bloqueia é `decisoes_impedidas`. Número de
     consultas constante (sem consulta por item).
     """
     if not getattr(user, "pk", None):
         return {}
     agora = timezone.now()
-    alteradas = contas_alteradas_por(user)
     linhas = list(solicitacoes.order_by().values_list("id", "usuario_id", "created_at"))
-    alteraram_a_minha = autores_que_alteraram_a_conta_de(user, {autor_id for _, autor_id, _ in linhas} - {user.pk})
+    if not linhas:
+        return {}
+    cortes = {sol_id: _corte(criada_em, agora) for sol_id, _, criada_em in linhas}
+    alteradas = contas_alteradas_por(user)
+    alteraram_a_minha = quem_alterou_a_conta_de(user, min(cortes.values()))
     resultado: dict[int, str] = {}
-    for sol_id, autor_id, criada_em in linhas:
-        corte = _corte(criada_em, agora)
+    for sol_id, autor_id, _ in linhas:
+        corte = cortes[sol_id]
         if autor_id == user.pk:
             resultado[sol_id] = SELF_APPROVAL_CODE
         elif autor_id in alteradas and alteradas[autor_id] >= corte:
             resultado[sol_id] = ALTERED_ACCOUNT_CODE
         elif autor_id in alteraram_a_minha and alteraram_a_minha[autor_id] >= corte:
             resultado[sol_id] = ALTERED_BY_AUTHOR_CODE
-    restantes = {sol_id for sol_id, _, _ in linhas if sol_id not in resultado}
+    restantes = {sol_id: corte for sol_id, corte in cortes.items() if sol_id not in resultado}
     if restantes:
-        for sol_id in _editadas_pelo_ator(user, restantes, alteradas):
+        for sol_id in _editadas_pelo_ator(user, restantes, alteradas, alteraram_a_minha):
             resultado[sol_id] = EDITED_BY_APPROVER_CODE
     return resultado
 

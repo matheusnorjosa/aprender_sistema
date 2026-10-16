@@ -81,6 +81,8 @@ interface ComboBoxValue {
   fluxo?: FluxoType;
   /** Projeto: a gerência usa a pergunta "pretende avaliar o formador?" (lookup de projetos). */
   pergunta_avaliar_formador?: boolean;
+  /** Projeto: com o responsável vazio, quem cria é a responsável (lookup de projetos; regra do backend, PR 9). */
+  responsavel_padrao?: boolean;
 }
 
 /** Formador type */
@@ -197,10 +199,10 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   // escolhe projeto e município sem compra. A mesma capacidade que o backend aceita.
   const dispensaCompra = useAcesso().caps.canCreateSolicitationWithoutPurchase;
   const [municipioLookupHasResults, setMunicipioLookupHasResults] = useState<boolean | null>(null);
-  // Quem cria: se tem o papel COORDENADOR vigente (`me.gerencias`, PR 8 das permissões), é o
-  // responsável quando nenhum outro é escolhido (decisão do dono, 05/10/2026). Só entra na checagem
-  // de agenda se acompanhar. Mesma regra do backend (`user_e_coordenador`).
-  const [me, setMe] = useState<{ id: ID; nome: string; coordenador: boolean } | null>(null);
+  // Quem cria: é o responsável quando nenhum outro é escolhido (decisão do dono, 05/10/2026) se o
+  // backend aceita o vazio para o projeto escolhido (`responsavel_padrao` do lookup de projetos: papel
+  // COORDENADOR na gerência do projeto, PR 9). Só entra na checagem de agenda se acompanhar.
+  const [me, setMe] = useState<{ id: ID; nome: string } | null>(null);
   // #1452: conflito devolvido pelo backend no submit (fecha o TOCTOU / cache).
   const [submitConflito, setSubmitConflito] = useState<BlockedParticipant[]>([]);
 
@@ -234,11 +236,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
       try {
         const me = await getMe();
         if (mounted) {
-          setMe({
-            id: me.id,
-            nome: me.name || me.username || 'Você',
-            coordenador: (me.gerencias ?? []).some((g) => g.papeis.includes('COORDENADOR')),
-          });
+          setMe({ id: me.id, nome: me.name || me.username || 'Você' });
         }
       } catch (error) {
         logger.warn('Falha ao carregar perfil do usuário no wizard:', error);
@@ -290,14 +288,24 @@ export default function NewSolicitacaoWizard(): JSX.Element {
 
   const handleProjetoChange = useCallback((value: ComboBoxValue | null): void => {
     const projetoChanged = formData.projeto?.id !== value?.id;
+    // Trocar o projeto pode trocar a gerência (PR 9, P9-5: só entram pessoas da gerência do projeto):
+    // formadores, responsável e a resposta de avaliar escolhidos para o projeto anterior saem.
     setFormData(prev => ({
       ...prev,
       projeto: value,
-      municipio: projetoChanged ? null : prev.municipio,
+      ...(projetoChanged
+        ? { municipio: null, formadores: [], coordenadorResponsavel: null, pretendeAvaliar: null, formadorAvaliado: null }
+        : {}),
     }));
 
     if (projetoChanged) {
-      form.setFieldsValue({ municipio: null });
+      form.setFieldsValue({
+        municipio: null,
+        formadores: [],
+        coordenadorResponsavel: null,
+        pretendeAvaliar: undefined,
+        formadorAvaliado: undefined,
+      });
       setMunicipioLookupHasResults(null);
     }
   }, [form, formData.projeto?.id]);
@@ -456,13 +464,14 @@ export default function NewSolicitacaoWizard(): JSX.Element {
     }
   };
 
-  // Coordenador responsável: o escolhido; sem escolha, quem cria (se tem o papel COORDENADOR).
+  // Coordenador responsável: o escolhido; sem escolha, quem cria (se o backend aceita o vazio no projeto).
+  const vazioEhQuemCria = formData.projeto?.responsavel_padrao === true;
   const responsavel = useMemo((): { id: ID; nome: string } | null => {
     if (formData.coordenadorResponsavel) {
       return { id: formData.coordenadorResponsavel.id, nome: formData.coordenadorResponsavel.label };
     }
-    return me?.coordenador ? { id: me.id, nome: me.nome } : null;
-  }, [formData.coordenadorResponsavel, me]);
+    return vazioEhQuemCria && me ? { id: me.id, nome: me.nome } : null;
+  }, [formData.coordenadorResponsavel, me, vazioEhQuemCria]);
 
   // "Você pretende avaliar o formador?" só quando a gerência do projeto pergunta e há formador
   // avaliável (função Formador sem a função Coordenador). Mesma regra do backend.
@@ -668,14 +677,14 @@ export default function NewSolicitacaoWizard(): JSX.Element {
           <Form.Item
             label="Coordenador responsável"
             name="coordenadorResponsavel"
-            extra={me?.coordenador ? 'Vazio: você é o coordenador responsável.' : undefined}
-            rules={me?.coordenador ? [] : [{ required: true, message: 'Escolha o coordenador responsável pelo evento.' }]}
+            extra={vazioEhQuemCria ? 'Vazio: você é o coordenador responsável.' : undefined}
+            rules={vazioEhQuemCria ? [] : [{ required: true, message: 'Escolha o coordenador responsável pelo evento.' }]}
           >
             <ComboBox
               lookupFunction={lookupCoordenadores}
               onChange={(value: ComboBoxValue | null) => setFormData({ ...formData, coordenadorResponsavel: value })}
               value={formData.coordenadorResponsavel as unknown as { id: ID; label: string; [key: string]: unknown } | null}
-              placeholder={me?.coordenador ? 'Busque o coordenador responsável (opcional)' : 'Busque o coordenador responsável'}
+              placeholder={vazioEhQuemCria ? 'Busque o coordenador responsável (opcional)' : 'Busque o coordenador responsável'}
             />
           </Form.Item>
 
@@ -873,7 +882,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
                 : 'Nenhum'}
             </Descriptions.Item>
             <Descriptions.Item label="Coordenador responsável">
-              {formData.coordenadorResponsavel?.label ?? (me?.coordenador ? `${me.nome} (você)` : 'Não informado')}
+              {formData.coordenadorResponsavel?.label ?? (vazioEhQuemCria && me ? `${me.nome} (você)` : 'Não informado')}
             </Descriptions.Item>
             <Descriptions.Item label="Acompanhamento">
               {formData.coordenadorAcompanha
@@ -927,7 +936,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
         </>
       ),
     },
-  ], [formData, rangeValue, handleRangeChange, handleProjetoChange, lookupProjetosElegiveis, lookupMunicipiosElegiveis, lookupCoordenadores, dispensaCompra, municipioLookupHasResults, preview, submitConflito, me, perguntaAvaliar, formadoresAvaliaveis, handleFormadoresChange]);
+  ], [formData, rangeValue, handleRangeChange, handleProjetoChange, lookupProjetosElegiveis, lookupMunicipiosElegiveis, lookupCoordenadores, dispensaCompra, municipioLookupHasResults, preview, submitConflito, me, vazioEhQuemCria, perguntaAvaliar, formadoresAvaliaveis, handleFormadoresChange]);
 
   return (
     <section className="p-6 max-w-4xl mx-auto" aria-labelledby="nova-solicitacao-title">

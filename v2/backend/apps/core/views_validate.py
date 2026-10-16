@@ -51,15 +51,17 @@ from django.db.models import QuerySet
 from django.db.models.functions import Lower
 from django.utils import timezone
 from rest_framework import serializers
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.pii import email_sem_cpf
 from apps.core.services.compra_elegibilidade import isento_da_regra_da_compra, par_liberado
 from apps.core.services.resolvers import resolve_municipio, resolve_projeto, resolve_tipo_evento
+from apps.core.services.solicitacao_scope import scope_usuarios_por_gerencia
 
 from .models import Municipio, Projeto, TipoEvento, Usuario
+from .permissions import HasPerm
 
 logger = logging.getLogger(__name__)
 
@@ -90,17 +92,24 @@ def _sem_repetir(emails: list[str]) -> list[str]:
     return list(dict.fromkeys(e.strip().lower() for e in emails if e and e.strip()))
 
 
-def _resolver_emails(emails: list[str]) -> dict[str, int]:
+def _resolver_emails(emails: list[str], user: Any, projeto: Projeto | None) -> dict[str, int]:
     """Uma consulta para todos os e-mails: `{email: id}` só para os que batem com UMA conta.
 
     E-mail repetido em duas contas fica de fora (não escolhe no chute, #1658), como no
     `resolve_user_by_email`.
+
+    F6 (scan 16/10/2026): só contas ativas que `user` pode pôr no evento
+    (`scope_usuarios_por_gerencia`, o mesmo filtro do `/lookup/usuarios/`; com o projeto, só a
+    gerência dele). O e-mail de reserva (`<cpf>@placeholder.local`) e e-mail que leva CPF nunca
+    são resolvidos: senão o endpoint confirmaria se um CPF tem conta.
     """
+    emails = [e for e in emails if email_sem_cpf(e)]
     if not emails:
         return {}
+    alcance = scope_usuarios_por_gerencia(Usuario.objects.filter(is_active=True), user, projeto)
     contas: dict[str, list[int]] = {}
     for email, pk in (
-        Usuario.objects.annotate(email_minusculo=Lower("email"))
+        alcance.annotate(email_minusculo=Lower("email"))
         .filter(email_minusculo__in=emails)
         .values_list("email_minusculo", "pk")
     ):
@@ -115,9 +124,12 @@ class SolicitationValidateView(APIView):
     """
     POST /api/solicitacoes/validate/
     Valida e canoniza dados de solicitação antes do submit
+
+    F6 (scan 16/10/2026): mesmo gate do `UsuarioLookup` (criar solicitação ou administrar
+    cadastros). Nenhuma tela chama este endpoint hoje.
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [HasPerm("create_solicitation") | HasPerm("manage_admin_registries")]
 
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         corpo = _ValidateSerializer(data=request.data)
@@ -214,7 +226,9 @@ class SolicitationValidateView(APIView):
         coord_email = (participants.get("coordenador") or "").strip()
         formadores_emails = _sem_repetir(participants.get("formadores", []))
         coord_acomp_emails = _sem_repetir(participants.get("coord_acompanha", []))
-        ids_por_email = _resolver_emails(_sem_repetir([coord_email, *formadores_emails, *coord_acomp_emails]))
+        ids_por_email = _resolver_emails(
+            _sem_repetir([coord_email, *formadores_emails, *coord_acomp_emails]), request.user, projeto_obj
+        )
 
         usuarios_canonical: dict[str, Any] = {
             "coordenador_id": None,

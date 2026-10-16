@@ -147,3 +147,51 @@ class TestCorpoValidado:
 
         _contar(1)  # aquece caches (capacidades) antes de comparar
         assert _contar(150) == _contar(1)
+
+
+@pytest.mark.django_db
+class TestGateEEscopo:
+    """F6: só quem cria solicitação ou administra cadastros; resolve só pessoas ativas do escopo."""
+
+    def test_formador_sem_capacidade_recebe_403(self, cenario):
+        resp = _post(cenario["formador"], _payload(cenario, {"formadores": [cenario["coord"].email]}))
+        assert resp.status_code == 403
+
+    def test_conta_sem_papel_recebe_403(self, cenario):
+        resp = _post(UsuarioFactory(), _payload(cenario, {}))
+        assert resp.status_code == 403
+
+    def test_pessoa_de_outra_gerencia_nao_resolve(self, cenario):
+        de_fora = UsuarioFactory(email="de.fora@example.invalid")
+        com_papel(de_fora, "FORMADOR", GerenciaFactory())
+        resp = _post(cenario["coord"], _payload(cenario, {"formadores": [de_fora.email]}))
+        usuarios = resp.json()["canonical"]["usuarios"]
+        assert usuarios["formadores_ids"] == []
+        assert usuarios["formadores_not_found"] == [de_fora.email]
+
+    def test_conta_inativa_nao_resolve(self, cenario):
+        inativo = UsuarioFactory(email="inativo@example.invalid", is_active=False)
+        com_papel(inativo, "FORMADOR", cenario["gerencia"])
+        resp = _post(cenario["coord"], _payload(cenario, {"formadores": [inativo.email]}))
+        assert resp.json()["canonical"]["usuarios"]["formadores_ids"] == []
+
+    @pytest.mark.parametrize("email", ["52998224725@placeholder.local", "52998224725@example.invalid"])
+    def test_email_de_reserva_ou_com_cpf_nao_resolve(self, cenario, email):
+        """Nem dentro do escopo: senão o endpoint confirma se um CPF tem conta."""
+        pessoa = UsuarioFactory(email=email)
+        com_papel(pessoa, "FORMADOR", cenario["gerencia"])
+        resp = _post(cenario["coord"], _payload(cenario, {"formadores": [email]}))
+        usuarios = resp.json()["canonical"]["usuarios"]
+        assert usuarios["formadores_ids"] == []
+        assert usuarios["formadores_not_found"] == [email]
+
+    def test_dat_resolve_pessoa_de_qualquer_gerencia(self, cenario):
+        from apps.core.tests.factories import GroupFactory
+
+        dat = UsuarioFactory()
+        dat.groups.add(GroupFactory(name="DAT"))
+        de_fora = UsuarioFactory(email="outra.gerencia@example.invalid")
+        com_papel(de_fora, "FORMADOR", GerenciaFactory())
+        resp = _post(dat, _payload(cenario, {"formadores": [de_fora.email]}))
+        assert resp.status_code == 200, resp.content
+        assert resp.json()["canonical"]["usuarios"]["formadores_ids"] == [de_fora.id]

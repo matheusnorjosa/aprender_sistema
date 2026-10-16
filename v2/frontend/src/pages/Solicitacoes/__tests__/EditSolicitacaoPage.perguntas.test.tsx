@@ -44,7 +44,6 @@ function makeSolic(extra: Partial<Solicitacao> = {}): Solicitacao {
   return {
     id: 42,
     usuario: 1,
-    usuario_username: 'coord1',
     municipio: 5,
     municipio_nome: 'Sobral',
     projeto: 10,
@@ -56,7 +55,6 @@ function makeSolic(extra: Partial<Solicitacao> = {}): Solicitacao {
     segmento: null,
     coordenador_acompanha: false,
     coordenador: 1,
-    coordenador_username: 'coord1',
     coordenador_nome: 'Ana Coordenadora',
     pretende_avaliar_formador: true,
     formador_avaliado: 99,

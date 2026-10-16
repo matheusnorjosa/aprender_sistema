@@ -146,9 +146,10 @@ def test_filter_by_status_only_pendente(setup_data):
         assert item["status"] == "pendente"
 
 
-def test_search_matches_username_and_municipio(setup_data):
+def test_search_matches_nome_and_municipio(setup_data):
     """
-    Busca textual ?search=joao encontra registros por username.
+    Busca textual ?search=João encontra registros pelo nome de quem criou (S5/C10: o login,
+    que é o CPF, não entra na busca).
     Busca ?search=Fortaleza encontra por nome do município.
     """
     user_admin = setup_data["user_admin"]
@@ -158,8 +159,8 @@ def test_search_matches_username_and_municipio(setup_data):
 
     url = reverse("core:solicitacao-list")
 
-    # Busca por username "joao"
-    res = client.get(url, {"search": "joao"})
+    # Busca pelo nome "João"
+    res = client.get(url, {"search": "João"})
     assert res.status_code == 200
     data = res.json()
     results = data.get("results", data)
@@ -175,7 +176,7 @@ def test_search_matches_username_and_municipio(setup_data):
 
 def test_combined_status_and_search(setup_data):
     """
-    Combinação de filtros: ?status=pendente&search=joao retorna apenas pendentes do João.
+    Combinação de filtros: ?status=pendente&search=João retorna apenas pendentes do João.
     """
     user_admin = setup_data["user_admin"]
 
@@ -183,7 +184,7 @@ def test_combined_status_and_search(setup_data):
     client.force_authenticate(user=user_admin)
 
     url = reverse("core:solicitacao-list")
-    res = client.get(url, {"status": "pendente", "search": "joao"})
+    res = client.get(url, {"status": "pendente", "search": "João"})
 
     assert res.status_code == 200
     data = res.json()

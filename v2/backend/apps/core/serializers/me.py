@@ -16,9 +16,12 @@ Type-checked with Pyright (strict mode).
 
 from __future__ import annotations
 
+from typing import cast
+
 from rest_framework import serializers
 
 from apps.core.models import Solicitacao
+from apps.core.pii import email_sem_cpf
 
 
 class MeEventSerializer(serializers.ModelSerializer):
@@ -74,8 +77,9 @@ class MeEventSerializer(serializers.ModelSerializer):
         result: list[dict[str, str]] = []
         for p in parts:
             if p.usuario_id:
-                nome = f"{p.usuario.first_name} {p.usuario.last_name}".strip() or p.usuario.username
+                nome = f"{p.usuario.first_name} {p.usuario.last_name}".strip() or f"Usuario #{p.usuario_id}"
             else:
-                nome = (p.guest_nome or "").strip() or (p.guest_email or "").strip()
+                # S5: sem o e-mail de reserva `<cpf>@placeholder.local` nem e-mail que leve CPF.
+                nome = (p.guest_nome or "").strip() or (email_sem_cpf(cast("str | None", p.guest_email)) or "").strip()
             result.append({"role": p.role, "nome": nome})
         return result

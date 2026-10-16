@@ -72,7 +72,6 @@ function makeSolic(overrides: Partial<Solicitacao> = {}): Solicitacao {
   return {
     id: 7,
     usuario: 3,
-    usuario_username: 'coord.vidas',
     municipio: 5,
     municipio_nome: 'Sobral',
     projeto: 10,
@@ -84,7 +83,6 @@ function makeSolic(overrides: Partial<Solicitacao> = {}): Solicitacao {
     segmento: null,
     coordenador_acompanha: false,
     coordenador: null,
-    coordenador_username: null,
     coordenador_nome: 'Maria Coordenadora',
     inicio: '2026-10-10T12:00:00Z', // 09:00 em Fortaleza (UTC-3)
     fim: '2026-10-10T15:00:00Z',
@@ -206,10 +204,9 @@ describe('PublicacaoSetorPage — estrutura e lista', () => {
     expect(params.has('sector')).toBe(false);
   });
 
-  test('colunas: data/hora em Fortaleza, projeto, município, tipo, coordenador, status GCal e Meet — sem username (pode ser CPF)', async () => {
+  test('colunas: data/hora em Fortaleza, projeto, município, tipo, coordenador, status GCal e Meet', async () => {
     listResponse = pageOf([
       makeSolic({
-        usuario_username: '12345678901',
         gcal_status: 'ERROR',
         gcal_last_error: 'O Google recusou o acesso ao calendário da organização.',
         meet_link: 'https://meet.google.com/abc-defg-hij',
@@ -228,8 +225,6 @@ describe('PublicacaoSetorPage — estrutura e lista', () => {
       screen.getByText('O Google recusou o acesso ao calendário da organização.'),
     ).toBeInTheDocument();
     expect(screen.getByText('Entrar na reunião')).toBeInTheDocument();
-    // LGPD: username de login pode ser o CPF (import) — nunca exibido.
-    expect(screen.queryByText('12345678901')).not.toBeInTheDocument();
   });
 
   test('(i) lista vazia mostra a copy do estado vazio com link para Nova Solicitação', async () => {

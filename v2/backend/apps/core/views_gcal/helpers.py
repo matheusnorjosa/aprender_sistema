@@ -146,7 +146,6 @@ def _apply_common_filters(qs: QuerySet[Solicitacao], request: Request) -> QueryS
             | Q(observacoes__icontains=q)
             | Q(usuario__first_name__icontains=q)
             | Q(usuario__last_name__icontains=q)
-            | Q(usuario__username__icontains=q)
         )
 
     return qs

@@ -37,7 +37,6 @@ function makeSolic(overrides: Partial<Solicitacao> = {}): Solicitacao {
   return {
     id: 1,
     usuario: 1,
-    usuario_username: 'formador1',
     municipio: 5,
     municipio_nome: 'Juazeiro do Norte',
     projeto: 10,
@@ -49,7 +48,6 @@ function makeSolic(overrides: Partial<Solicitacao> = {}): Solicitacao {
     segmento: null,
     coordenador_acompanha: false,
     coordenador: null,
-    coordenador_username: null,
     coordenador_nome: null,
     inicio: '2026-05-10T13:00:00Z',
     fim: '2026-05-10T17:00:00Z',

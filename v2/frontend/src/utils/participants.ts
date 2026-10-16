@@ -3,7 +3,7 @@
  *
  * Convidados importados (import v15) podem não ter FK de usuário — pessoas "que saíram"
  * têm o nome preservado em `guest_nome`, sem FK. A exibição segue a cadeia:
- * usuario (nome) → guest_nome → guest_email → email.
+ * usuario (nome, ou "Usuario #id") → guest_nome → guest_email → email.
  */
 import type { Participation } from '../types/solicitacao';
 
@@ -11,7 +11,9 @@ import type { Participation } from '../types/solicitacao';
 export function participantLabel(p: Participation): string {
   if (p.usuario) {
     const nomeCompleto = [p.usuario.first_name, p.usuario.last_name].filter(Boolean).join(' ').trim();
-    return nomeCompleto || p.usuario.username || p.usuario.email || '';
+    // S5: sem nome, "Usuario #id" (como o backend); nunca o login (CPF) nem o e-mail, que pode
+    // ser o de reserva `<cpf>@placeholder.local`.
+    return nomeCompleto || `Usuario #${p.usuario.id}`;
   }
   return p.guest_nome || p.guest_email || p.email || '';
 }

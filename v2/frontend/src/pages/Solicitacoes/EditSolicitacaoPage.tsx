@@ -168,7 +168,6 @@ export default function EditSolicitacaoPage(): JSX.Element {
             label: p.usuario!.first_name && p.usuario!.last_name
               ? `${p.usuario!.first_name} ${p.usuario!.last_name}`.trim()
               : p.usuario!.username,
-            email: p.usuario!.email,
             avaliavel: avaliaveis.has(p.usuario!.id),
           }));
 

@@ -39,7 +39,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import SimpleRateThrottle
 
 from apps.core.auth_normalize import normalize_login_identifier
-from apps.core.pii import redact_cpf
+from apps.core.pii import redact_login_identifier
 from apps.core.views.utils import _get_client_ip
 
 from .models import AuditLog
@@ -158,14 +158,10 @@ def _get_lockout_remaining_time(bucket: str, ip: str) -> int | None:
 def _username_para_auditoria(username: str) -> str:
     """Identificador digitado, pronto para ``AuditLog.details``, sem CPF em nenhuma grafia.
 
-    O ``redact_cpf`` só reconhece 11 dígitos colados ou ``000.000.000-00``, mas o login
-    aceita qualquer mistura de ``.``, ``-`` e espaço. Se a forma canônica é um CPF, grava
-    ``<cpf>``; senão, o ``redact_cpf`` limpa um CPF que esteja no meio do texto.
+    Regra em ``redact_login_identifier``: qualquer grafia de CPF e CPF digitado com dígito a
+    menos ou a mais viram ``<cpf>`` (S5); a leitura de linhas antigas usa a mesma regra.
     """
-    canonical = normalize_login_identifier(username)
-    if len(canonical) == 11 and canonical.isdigit():
-        return "<cpf>"
-    return redact_cpf(username)
+    return redact_login_identifier(username)
 
 
 def conta_bloqueada(request: HttpRequest | Request, username: str, password: str) -> bool:

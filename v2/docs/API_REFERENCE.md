@@ -285,7 +285,8 @@ No `check-many/`, cada item de `results` tem as mesmas três chaves, mais `usuar
 ```
 
 O erro 400 `availability_conflict` de criar, editar e aprovar traz `errors.conflicts`,
-`errors.blocked_participants[]` (`usuario_id`, `usuario_nome`, `conflicts`) e `errors.skipped_guests`;
+`errors.blocked_participants[]` (`usuario_id`, `usuario_nome`, `conflicts`) e `errors.skipped_guests`
+(e-mail do convidado sem conta; o de reserva ou com CPF sai como `Convidado sem e-mail`);
 a mensagem só fala do que barra. As chaves `warnings` do 400 saíram em 06/10/2026 (sem o M, vinham
 sempre vazias e nenhum cliente as lia).
 

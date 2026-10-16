@@ -140,8 +140,10 @@ class TestEventDetail:
         assert data["municipio_nome"] == "Fortaleza"
         assert data["projeto_nome"] == "Projeto Detail Test"
         assert data["tipo_evento_nome"] == "Formação Detail Test"
-        assert data["usuario_username"] == "controle_test_detail"
-        assert data["coordenador_username"] == "controle_test_detail"  # Fallback para usuario
+        # S5 (C10): nome, nunca o login (CPF). Conta sem nome sai como "Usuario #id".
+        assert "usuario_username" not in data and "coordenador_username" not in data
+        assert data["usuario_nome"] == f"Usuario #{usuario_controle.id}"
+        assert data["coordenador_nome"] == f"Usuario #{usuario_controle.id}"  # Fallback para usuario
         assert data["fluxo"] == "SUPER"
 
         # Campos GCal
@@ -160,7 +162,7 @@ class TestEventDetail:
 
         # Primeiro item na timeline deve ser PUBLISH_GCAL (mais recente)
         assert data["timeline"][0]["action"] == "PUBLISH_GCAL"
-        assert data["timeline"][0]["usuario_nome"] == "controle_test_detail"
+        assert data["timeline"][0]["usuario_nome"] == f"Usuario #{usuario_controle.id}"  # sem nome: nunca o login
 
         # Segundo item deve ser PUBLISH_GCAL_REQUESTED
         assert data["timeline"][1]["action"] == "PUBLISH_GCAL_REQUESTED"

@@ -282,7 +282,6 @@ def publish_to_gcal(
         extra={
             "event": "publish_gcal_requested",
             "user_id": user.id,
-            "username": user.username,
             "solicitacao_id": solicitacao.id,
             "task_id": task.id,
             "dry_run": dry_run,
@@ -375,7 +374,6 @@ def resync_to_gcal(
         extra={
             "event": "resync_gcal_requested",
             "user_id": user.id,
-            "username": user.username,
             "solicitacao_id": solicitacao.id,
             "task_id": task.id,
             "ip_address": client_ip,
@@ -464,7 +462,6 @@ def cancel_from_gcal(
         extra={
             "event": "cancel_gcal_requested",
             "user_id": user.id,
-            "username": user.username,
             "solicitacao_id": solicitacao.id,
             "task_id": task.id,
             "external_event_id": solicitacao.external_event_id,

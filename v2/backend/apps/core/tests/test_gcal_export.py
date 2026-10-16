@@ -205,8 +205,9 @@ class TestGCalExport(TestCase):
         self.assertEqual(sol_pub_row[1], "Fortaleza")  # municipio
         self.assertEqual(sol_pub_row[2], "ACERTA")  # projeto
         self.assertEqual(sol_pub_row[3], "Fundamental I Online")  # tipo_evento
-        self.assertEqual(sol_pub_row[6], "controle_user")  # usuario
-        self.assertEqual(sol_pub_row[7], "coordenador_user")  # coordenador
+        # S5 (C10): nome, nunca o login (CPF); conta sem nome sai como "Usuario #id".
+        self.assertEqual(sol_pub_row[6], f"Usuario #{self.user_controle.id}")  # usuario
+        self.assertEqual(sol_pub_row[7], f"Usuario #{self.user_coordenador.id}")  # coordenador
         self.assertEqual(sol_pub_row[8], "SUPER")  # fluxo
         self.assertEqual(sol_pub_row[9], "PUBLISHED")  # gcal_status
         self.assertEqual(sol_pub_row[10], "asv2123")  # external_event_id

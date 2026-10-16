@@ -21,6 +21,7 @@ from rest_framework import serializers  # type: ignore[attr-defined]
 
 from apps.core.constants import FUNCAO_GROUPS, RESERVED_GROUPS, SETOR_GROUPS
 from apps.core.models import AuditLog, EquipeGerencia, Gerencia, GroupClassificacao, PermissaoFuncional
+from apps.core.pii import email_sem_cpf
 from apps.core.rbac import can_admin_mutate_target
 from apps.core.rbac.policies import solicitation_approval_basis
 from apps.core.services.audit import (
@@ -68,9 +69,15 @@ class UserSlimSerializer(serializers.ModelSerializer):
     Retorna apenas id, nome e email.
     """
 
+    # S5: sem o e-mail de reserva `<cpf>@placeholder.local` nem e-mail que leve CPF.
+    email = serializers.SerializerMethodField()
+
     class Meta:
         model = get_user_model()
         fields = ("id", "first_name", "last_name", "email")
+
+    def get_email(self, obj: Any) -> str | None:
+        return email_sem_cpf(obj.email)
 
 
 class GerenciaVinculoSerializer(serializers.Serializer):  # type: ignore[misc]

@@ -70,6 +70,17 @@ export interface CurrentUser {
    * Fora do guard: payload antigo sem o campo não derruba o login (a tela testa `=== true`).
    */
   deve_trocar_senha?: boolean;
+  /**
+   * F1: a senha foi redefinida por outra pessoa (rótulo de quem redefiniu + data dd/mm/aaaa).
+   * Mostrado na troca obrigatória; some quando a pessoa define a própria senha. Fora do guard.
+   */
+  aviso_senha_redefinida?: AvisoSenhaRedefinida | null;
+}
+
+/** F1 (scan de segurança 16/10/2026): quem redefiniu a senha e quando. */
+export interface AvisoSenhaRedefinida {
+  por: string;
+  em: string;
 }
 
 /**

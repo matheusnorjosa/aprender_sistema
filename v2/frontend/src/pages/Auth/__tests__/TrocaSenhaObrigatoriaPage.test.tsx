@@ -46,6 +46,27 @@ const salvar = (): Promise<void> => userEvent.click(screen.getByRole('button', {
 const erroHttp = (status: number, data: unknown, extra: object = {}): Error =>
   Object.assign(new Error('falhou'), { status, response: { status, data }, ...extra });
 
+describe('TrocaSenhaObrigatoriaPage — aviso de senha redefinida (F1)', () => {
+  test('mostra quem redefiniu e quando, como status para o leitor de tela', () => {
+    render(
+      <TrocaSenhaObrigatoriaPage
+        aviso={{ por: 'Pessoa Do Dat', em: '16/10/2026' }}
+        onConcluida={vi.fn()}
+        onSair={vi.fn()}
+        onSessaoEncerrada={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent('Sua senha foi redefinida por Pessoa Do Dat em 16/10/2026.');
+  });
+
+  test('sem aviso, não mostra o status', () => {
+    montar();
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+});
+
 describe('TrocaSenhaObrigatoriaPage', () => {
   beforeEach(() => {
     changeMyPasswordMock.mockReset();

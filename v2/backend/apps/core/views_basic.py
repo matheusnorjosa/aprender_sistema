@@ -10,6 +10,7 @@ from typing import Any
 
 from django.db import transaction
 from django.http import HttpRequest, JsonResponse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
@@ -60,6 +61,22 @@ def _gerencias_do_vinculo(user: Any) -> list[dict[str, Any]]:
     return sorted(por_gerencia.values(), key=lambda g: g["rotulo"].casefold())
 
 
+def _aviso_senha_redefinida(user: Any) -> dict[str, str] | None:
+    """F1 (scan 16/10/2026): quem redefiniu a senha desta conta e quando; None sem aviso.
+
+    O rótulo é o das telas (`str(usuario)`: nome, ou "Usuario #id"), nunca CPF, login ou e-mail.
+    Se a conta de quem redefiniu sumiu, o aviso continua, sem o nome.
+    """
+    quando = getattr(user, "senha_redefinida_em", None)
+    if quando is None:
+        return None
+    quem = user.senha_redefinida_por
+    return {
+        "por": str(quem) if quem is not None else "uma pessoa da administração",
+        "em": timezone.localtime(quando).strftime("%d/%m/%Y"),
+    }
+
+
 class CurrentUserView(APIView):
     """
     Endpoint que retorna informações do usuário autenticado.
@@ -83,7 +100,8 @@ class CurrentUserView(APIView):
             "is_superintendencia": bool,
             "can_approve_super": bool,  # Legado: = policy access_solicitation_approvals (DAT aprova: PR 10)
             "permissions": list[str],   # Permissões funcionais efetivas (codenames)
-            "deve_trocar_senha": bool   # Senha definida por outra pessoa: só a troca é liberada
+            "deve_trocar_senha": bool,  # Senha definida por outra pessoa: só a troca é liberada
+            "aviso_senha_redefinida": {"por": str, "em": "dd/mm/aaaa"} | null  # F1
         }
     """
 
@@ -150,6 +168,7 @@ class CurrentUserView(APIView):
                 "can_approve_super": can_approve_super,
                 "permissions": sorted(get_user_functional_permissions(user)),
                 "deve_trocar_senha": user.deve_trocar_senha,
+                "aviso_senha_redefinida": _aviso_senha_redefinida(user),
             },
             status=status.HTTP_200_OK,
         )

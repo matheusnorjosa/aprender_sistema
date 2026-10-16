@@ -178,7 +178,18 @@ class ChangePasswordView(APIView):
             user.senha_recebida_hash = user.password
         user.set_password(new_password)
         user.deve_trocar_senha = False
-        user.save(update_fields=["password", "deve_trocar_senha", "senha_recebida_hash"])
+        # F1: a pessoa já viu o aviso de "senha redefinida por outra pessoa" e escolheu a dela.
+        user.senha_redefinida_por = None
+        user.senha_redefinida_em = None
+        user.save(
+            update_fields=[
+                "password",
+                "deve_trocar_senha",
+                "senha_recebida_hash",
+                "senha_redefinida_por",
+                "senha_redefinida_em",
+            ]
+        )
         # SessionAuthentication: mantem a sessao atual valida e invalida as demais.
         update_session_auth_hash(request, user)
         AuditLog.objects.create(

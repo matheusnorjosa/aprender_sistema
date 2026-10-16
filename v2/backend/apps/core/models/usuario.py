@@ -58,6 +58,24 @@ class Usuario(AbstractUser):
             "Serve só para recusar a volta a ela (a senha padrão é a mesma para todos). Nunca o texto da senha."
         ),
     )
+    # F1 (scan de segurança, 16/10/2026): aviso à dona da conta quando OUTRA pessoa redefine a senha
+    # dela pela administração de usuários. Lido no /api/me/ (`aviso_senha_redefinida`); some quando
+    # ela define a própria senha (ChangePasswordView).
+    senha_redefinida_por = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        editable=False,
+        help_text="Quem redefiniu a senha desta conta (aviso no próximo acesso). Vazio depois que ela troca.",
+    )
+    senha_redefinida_em = models.DateTimeField(
+        null=True,
+        blank=True,
+        editable=False,
+        help_text="Quando a senha desta conta foi redefinida por outra pessoa. Vazio depois que ela troca.",
+    )
 
     class Meta:  # type: ignore[misc]
         db_table = "core_usuario"

@@ -11,9 +11,11 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Any
 
 from django.db import transaction
+from django.db.models import Max, QuerySet
 from django.utils import timezone
 
 from apps.core.exceptions import APIError, ValidationAPIError
@@ -72,39 +74,188 @@ class BatchApprovalResult:
 
 
 SELF_APPROVAL_CODE = "self_approval_forbidden"
+ALTERED_ACCOUNT_CODE = "altered_account_approval_forbidden"
+EDITED_BY_APPROVER_CODE = "edited_by_approver_forbidden"
+
+# PA-02, segregação por histórico (D2, PR 10; decisão do dono de 16/10: qualquer alteração pela tela
+# de Usuários conta, inclusive corrigir o nome e criar a conta). Filtro: `model_name="Usuario"`, ator =
+# `AuditLog.usuario`, alvo = `details.target_user_id`. `DELEGATE_BLOCK_*` também tem alvo, mas não é conta.
+ACOES_QUE_ALTERAM_CONTA: frozenset[str] = frozenset(
+    {
+        AuditLog.Action.CREATE,
+        AuditLog.Action.UPDATE,
+        AuditLog.Action.RESET_PASSWORD,
+        AuditLog.Action.USER_PRIVILEGE_CHANGED,
+        AuditLog.Action.ASSIGN_GROUPS,
+        AuditLog.Action.USER_ANONYMIZE,
+    }
+)
+JANELA_SEGREGACAO = timedelta(days=30)
+
+# PA-02, quem editou não decide (PR 10): chave de `changed_fields` no AuditLog `UPDATE` da solicitação
+# → campo material do adendo da PA-04 (`views_solicitacao._campos_materiais`). Paridade por teste.
+CAMPOS_MATERIAIS_NO_AUDITLOG: dict[str, str] = {
+    "projeto_id": "projeto",
+    "municipio_id": "municipio",
+    "inicio": "inicio",
+    "fim": "fim",
+    "formador_ids": "formadores",
+}
+
+# Código do impedimento → valor de `decisao_impedida` na lista (tela de Aprovações).
+DECISAO_IMPEDIDA: dict[str, str] = {
+    SELF_APPROVAL_CODE: "propria",
+    ALTERED_ACCOUNT_CODE: "conta_alterada",
+    EDITED_BY_APPROVER_CODE: "editada_pelo_ator",
+}
 
 
-def _mensagem_decisao_propria(acao: str) -> str:
-    return f"Você não pode {acao} a própria solicitação. Outra pessoa aprovadora precisa decidir."
+def mensagem_impedida(code: str, acao: str) -> str:
+    """Mensagem do 403 (e do item em `errors[]` no lote) para cada impedimento."""
+    if code == SELF_APPROVAL_CODE:
+        return f"Você não pode {acao} a própria solicitação. Outra pessoa aprovadora precisa decidir."
+    if code == ALTERED_ACCOUNT_CODE:
+        return (
+            "Você alterou a conta de quem pediu esta solicitação nos últimos 30 dias. "
+            "Outra pessoa aprovadora precisa decidir."
+        )
+    return (
+        "Você mudou data, horário, município, projeto ou formadores desta solicitação. "
+        "Outra pessoa aprovadora precisa decidir."
+    )
 
 
-def _decisao_propria_bloqueada(solicitacao: Solicitacao, user: Usuario) -> bool:
-    """PA-02 (segregação, PR B1): quem criou (`Solicitacao.usuario`) não decide a própria.
+def contas_alteradas_por(user: Usuario) -> dict[int, datetime]:
+    """D2: {id da conta: última vez que `user` a alterou} (uma consulta; índice `usuario, created_at`)."""
+    if not getattr(user, "pk", None):
+        return {}
+    linhas = (
+        AuditLog.objects.filter(usuario_id=user.pk, model_name="Usuario", action__in=ACOES_QUE_ALTERAM_CONTA)
+        .order_by()
+        .values("details__target_user_id")
+        .annotate(ultima=Max("created_at"))
+    )
+    return {
+        int(linha["details__target_user_id"]): linha["ultima"]
+        for linha in linhas
+        if isinstance(linha["details__target_user_id"], int)
+    }
 
-    Superuser pode (break-glass) — a decisão fica marcada com `details.autoaprovacao`.
-    Loga o bloqueio sem username (username é o CPF em produção).
+
+def _corte(criada_em: datetime | None, agora: datetime) -> datetime:
+    """Decisão 6(b) do dono: a janela conta da decisão ou da criação do evento, o que vier antes."""
+    return min(agora, criada_em or agora) - JANELA_SEGREGACAO
+
+
+def _ultima_aprovacao(ids: list[int]) -> dict[int, datetime]:
+    """{id: último AuditLog APPROVE} (uma consulta)."""
+    ultima: dict[int, datetime] = {}
+    for sol_id, quando in (
+        AuditLog.objects.filter(
+            model_name="Solicitacao",
+            action=AuditLog.Action.APPROVE,
+            details__solicitacao_id__in=ids,
+        )
+        .order_by()
+        .values_list("details__solicitacao_id", "created_at")
+    ):
+        if sol_id not in ultima or quando > ultima[sol_id]:
+            ultima[sol_id] = quando
+    return ultima
+
+
+def _editadas_pelo_ator(user: Usuario, ids: set[int], alteradas: dict[int, datetime]) -> set[int]:
+    """Quem editou não decide: ids em que `user` (ou uma conta que ele alterou nos 30 dias anteriores à
+    edição, o fantoche) mudou campo material depois do último APPROVE, ou desde a criação. Até 2 consultas."""
+    edicoes = (
+        AuditLog.objects.filter(
+            model_name="Solicitacao",
+            action=AuditLog.Action.UPDATE,
+            usuario_id__in={user.pk, *alteradas},
+            details__changed_fields__has_any_keys=list(CAMPOS_MATERIAIS_NO_AUDITLOG),
+        )
+        .order_by()
+        .values_list("details__solicitacao_id", "usuario_id", "created_at")
+    )
+    candidatas: dict[int, datetime] = {}
+    for sol_id, editor, quando in edicoes:
+        if sol_id not in ids:
+            continue
+        if editor != user.pk and alteradas[editor] < quando - JANELA_SEGREGACAO:
+            continue
+        if sol_id not in candidatas or quando > candidatas[sol_id]:
+            candidatas[sol_id] = quando
+    if not candidatas:
+        return set()
+    ultima = _ultima_aprovacao(list(candidatas))
+    return {sol_id for sol_id, quando in candidatas.items() if sol_id not in ultima or quando > ultima[sol_id]}
+
+
+def impedimentos(user: Usuario, solicitacoes: QuerySet[Solicitacao]) -> dict[int, str]:
+    """PA-02 (segregação): {id: código} das solicitações de `solicitacoes` que `user` não decide.
+
+    Ordem: própria, conta do autor alterada pelo ator (D2), editada pelo ator. Calcula também para o
+    superusuário (o AuditLog dele marca o break-glass); quem bloqueia é `decisoes_impedidas`. Número de
+    consultas constante (sem consulta por item).
     """
-    if solicitacao.usuario_id != user.pk or user.is_superuser:
-        return False
+    if not getattr(user, "pk", None):
+        return {}
+    agora = timezone.now()
+    alteradas = contas_alteradas_por(user)
+    linhas = list(solicitacoes.order_by().values_list("id", "usuario_id", "created_at"))
+    resultado: dict[int, str] = {}
+    for sol_id, autor_id, criada_em in linhas:
+        if autor_id == user.pk:
+            resultado[sol_id] = SELF_APPROVAL_CODE
+        elif autor_id in alteradas and alteradas[autor_id] >= _corte(criada_em, agora):
+            resultado[sol_id] = ALTERED_ACCOUNT_CODE
+    restantes = {sol_id for sol_id, _, _ in linhas if sol_id not in resultado}
+    if restantes:
+        for sol_id in _editadas_pelo_ator(user, restantes, alteradas):
+            resultado[sol_id] = EDITED_BY_APPROVER_CODE
+    return resultado
+
+
+def decisoes_impedidas(user: Usuario, solicitacoes: QuerySet[Solicitacao]) -> dict[int, str]:
+    """Impedimentos que barram a decisão: o superusuário decide tudo (break-glass registrado)."""
+    if getattr(user, "is_superuser", False):
+        return {}
+    return impedimentos(user, solicitacoes)
+
+
+def _log_decisao_impedida(solicitacao: Solicitacao, user: Usuario, code: str) -> None:
+    """Loga o bloqueio sem username (username é o CPF em produção)."""
+    # O bloqueio da própria mantém o nome do evento do PR B1 (alertas e testes o leem).
+    evento = "solicitacao_self_decision_blocked" if code == SELF_APPROVAL_CODE else "solicitacao_decision_blocked"
     logger.warning(
-        "solicitacao_self_decision_blocked",
+        evento,
         extra={
-            "event": "solicitacao_self_decision_blocked",
+            "event": evento,
+            "code": code,
             "user_id": user.pk,
             "solicitacao_id": solicitacao.pk,
         },
     )
-    return True
 
 
-def _bloquear_decisao_propria(solicitacao: Solicitacao, user: Usuario, acao: str) -> None:
-    """Decisão individual: levanta 403 `self_approval_forbidden` se a solicitação é do ator."""
-    if _decisao_propria_bloqueada(solicitacao, user):
-        raise APIError(
-            code=SELF_APPROVAL_CODE,
-            message=_mensagem_decisao_propria(acao),
-            status_code=403,
-        )
+def _marcas(code: str | None) -> dict[str, bool]:
+    """Marcas do AuditLog da decisão; só podem ser True no break-glass do superusuário."""
+    return {
+        "conta_alterada_pelo_ator": code == ALTERED_ACCOUNT_CODE,
+        "editada_pelo_ator": code == EDITED_BY_APPROVER_CODE,
+    }
+
+
+def _bloquear_decisao_impedida(solicitacao: Solicitacao, user: Usuario, acao: str) -> dict[str, bool]:
+    """Decisão individual: 403 com o código do impedimento (própria, conta alterada, editada).
+
+    Devolve as marcas do AuditLog da decisão.
+    """
+    code = impedimentos(user, Solicitacao.objects.filter(pk=solicitacao.pk)).get(solicitacao.pk)
+    if code is not None and not user.is_superuser:
+        _log_decisao_impedida(solicitacao, user, code)
+        raise APIError(code=code, message=mensagem_impedida(code, acao), status_code=403)
+    return _marcas(code)
 
 
 OUT_OF_SCOPE_CODE = "out_of_approval_scope"
@@ -155,9 +306,15 @@ def _autoridades_do_lote(user: Usuario, ids: set[int]) -> tuple[str | None, str 
     return autoridade, fora, no_escopo
 
 
-def _decision_details(solicitacao: Solicitacao, user: Usuario, autoridade: str | None) -> dict[str, Any]:
-    """Autoria comum a todo AuditLog de decisão (PR B1): base da autoridade + autoaprovação."""
-    details: dict[str, Any] = {"autoridade": autoridade}
+def _decision_details(
+    solicitacao: Solicitacao, user: Usuario, autoridade: str | None, marcas: dict[str, bool]
+) -> dict[str, Any]:
+    """Autoria comum a todo AuditLog de decisão (PR B1): base da autoridade + autoaprovação.
+
+    PR 10: `conta_alterada_pelo_ator` e `editada_pelo_ator` vão em toda decisão (True só no break-glass
+    do superusuário); a presença da chave separa a decisão tomada com a trava da anterior a ela.
+    """
+    details: dict[str, Any] = {"autoridade": autoridade, **marcas}
     if solicitacao.usuario_id == user.pk:
         details["autoaprovacao"] = True
     return details
@@ -234,7 +391,7 @@ def approve_solicitacao(
     client_ip = get_client_ip(request)
     with transaction.atomic():
         solicitacao = Solicitacao.objects.select_for_update().get(pk=solicitacao.pk)
-        _bloquear_decisao_propria(solicitacao, user, "aprovar")
+        marcas = _bloquear_decisao_impedida(solicitacao, user, "aprovar")
         autoridade = _autoridade_no_escopo(solicitacao, user, "aprovar")
         if solicitacao.status != "pendente":
             _raise_invalid_status_error(solicitacao)
@@ -265,7 +422,7 @@ def approve_solicitacao(
                 "justificativa": justificativa,
                 "ip_address": client_ip,
                 "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
-                **_decision_details(solicitacao, user, autoridade),
+                **_decision_details(solicitacao, user, autoridade, marcas),
             },
         )
 
@@ -317,7 +474,7 @@ def reject_solicitacao(
     client_ip = get_client_ip(request)
     with transaction.atomic():
         solicitacao = Solicitacao.objects.select_for_update().get(pk=solicitacao.pk)
-        _bloquear_decisao_propria(solicitacao, user, "reprovar")
+        marcas = _bloquear_decisao_impedida(solicitacao, user, "reprovar")
         autoridade = _autoridade_no_escopo(solicitacao, user, "reprovar")
         if solicitacao.status != "pendente":
             _raise_invalid_status_error(solicitacao)
@@ -338,7 +495,7 @@ def reject_solicitacao(
                 "justificativa": justificativa,
                 "ip_address": client_ip,
                 "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
-                **_decision_details(solicitacao, user, autoridade),
+                **_decision_details(solicitacao, user, autoridade, marcas),
             },
         )
 
@@ -408,16 +565,18 @@ def batch_approve_solicitacoes(
         )
         found_ids = {sol.id for sol in solicitacoes}
         autoridade_global, autoridade_fora, no_escopo = _autoridades_do_lote(user, found_ids)
+        impedidos = impedimentos(user, Solicitacao.objects.filter(id__in=found_ids))
 
         errors.extend(_build_batch_status_errors(ids, found_ids))
 
         # Approve in batch
         for sol in solicitacoes:
-            # PA-02 (segregação, PR B1): item próprio vai para errors[]; o resto do lote segue.
-            if _decisao_propria_bloqueada(sol, user):
-                errors.append(
-                    {"id": sol.id, "code": SELF_APPROVAL_CODE, "detail": _mensagem_decisao_propria("aprovar")}
-                )
+            # PA-02 (segregação): item próprio, de autor com conta alterada pelo ator ou editado pelo ator
+            # vai para errors[]; o resto do lote segue.
+            code = impedidos.get(sol.id)
+            if code is not None and not user.is_superuser:
+                _log_decisao_impedida(sol, user, code)
+                errors.append({"id": sol.id, "code": code, "detail": mensagem_impedida(code, "aprovar")})
                 continue
 
             # Regra do dono (30/09): fora do escopo da aprovadora por vínculo vai para errors[].
@@ -464,7 +623,7 @@ def batch_approve_solicitacoes(
                     "batch": True,
                     "ip_address": client_ip,
                     "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
-                    **_decision_details(sol, user, autoridade),
+                    **_decision_details(sol, user, autoridade, _marcas(impedidos.get(sol.id))),
                 },
             )
 
@@ -532,16 +691,18 @@ def batch_reject_solicitacoes(
         )
         found_ids = {sol.id for sol in solicitacoes}
         autoridade_global, autoridade_fora, no_escopo = _autoridades_do_lote(user, found_ids)
+        impedidos = impedimentos(user, Solicitacao.objects.filter(id__in=found_ids))
 
         errors.extend(_build_batch_status_errors(ids, found_ids))
 
         # Reject in batch
         for sol in solicitacoes:
-            # PA-02 (segregação, PR B1): item próprio vai para errors[]; o resto do lote segue.
-            if _decisao_propria_bloqueada(sol, user):
-                errors.append(
-                    {"id": sol.id, "code": SELF_APPROVAL_CODE, "detail": _mensagem_decisao_propria("reprovar")}
-                )
+            # PA-02 (segregação): item próprio, de autor com conta alterada pelo ator ou editado pelo ator
+            # vai para errors[]; o resto do lote segue.
+            code = impedidos.get(sol.id)
+            if code is not None and not user.is_superuser:
+                _log_decisao_impedida(sol, user, code)
+                errors.append({"id": sol.id, "code": code, "detail": mensagem_impedida(code, "reprovar")})
                 continue
 
             # Regra do dono (30/09): fora do escopo da aprovadora por vínculo vai para errors[].
@@ -567,7 +728,7 @@ def batch_reject_solicitacoes(
                     "batch": True,
                     "ip_address": client_ip,
                     "user_agent": request.META.get("HTTP_USER_AGENT", "")[:200],
-                    **_decision_details(sol, user, autoridade),
+                    **_decision_details(sol, user, autoridade, _marcas(impedidos.get(sol.id))),
                 },
             )
 

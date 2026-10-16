@@ -16,9 +16,11 @@ from rest_framework import serializers  # type: ignore[attr-defined]
 
 from apps.core.models import AuditLog, Participation, Solicitacao, Usuario
 from apps.core.pii import email_sem_cpf, redact_cpf_deep
+from apps.core.rbac.policies import user_has_policy
 from apps.core.serializers.usuario import UserSlimSerializer
 from apps.core.services.avaliacao_formador import formadores_avaliaveis_ids, gerencia_pergunta
 from apps.core.services.compra_elegibilidade import isento_da_regra_da_compra, par_liberado
+from apps.core.services.solicitacao_approval import DECISAO_IMPEDIDA, decisoes_impedidas
 
 
 class ParticipationNestedSerializer(serializers.ModelSerializer):
@@ -71,6 +73,9 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
     # detalhe de UM evento (null na lista): na lista custaria consultas por linha.
     avaliaveis_ids = serializers.SerializerMethodField()
     projeto_pergunta_avaliar_formador = serializers.SerializerMethodField()
+    # PA-02 (PR 10): por que quem lê NÃO decide esta pendente ("propria", "conta_alterada",
+    # "editada_pelo_ator"); null quando decide ou não aprova. A tela de Aprovações esconde os botões.
+    decisao_impedida = serializers.SerializerMethodField()
 
     class Meta:
         model = Solicitacao
@@ -97,6 +102,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "formador_avaliado_nome",
             "avaliaveis_ids",
             "projeto_pergunta_avaliar_formador",
+            "decisao_impedida",
             "inicio",
             "fim",
             "status",
@@ -167,6 +173,32 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
 
     def get_projeto_pergunta_avaliar_formador(self, obj: Solicitacao) -> bool | None:
         return gerencia_pergunta(obj) if self._um_evento() else None
+
+    def get_decisao_impedida(self, obj: Solicitacao) -> str | None:
+        """Impedimento de decisão de quem lê (PA-02), calculado uma vez para a página inteira.
+
+        Só para quem aprova e não é superusuário, e só em pendente. A lista calcula todos os ids da
+        página de uma vez (`decisoes_impedidas`, número de consultas constante), guardados no contexto.
+        """
+        if obj.status != Solicitacao.Status.PENDENTE:
+            return None
+        request: Any = self.context.get("request")
+        user: Any = getattr(request, "user", None)
+        if user is None or getattr(user, "is_superuser", False):
+            return None
+        calculados: dict[int, str | None] | None = cast(Any, self.context.get("_decisao_impedida"))
+        if calculados is None or obj.pk not in calculados:
+            calculados = calculados or {}
+            parent: object = getattr(self, "parent", None)
+            pagina: Any = getattr(parent, "instance", None) if isinstance(parent, serializers.ListSerializer) else None
+            ids: set[int] = {int(o.pk) for o in pagina} if pagina is not None else set()
+            ids.add(obj.pk)
+            impedidos: dict[int, str] = {}
+            if user_has_policy(user, "access_solicitation_approvals"):
+                impedidos = decisoes_impedidas(user, Solicitacao.objects.filter(id__in=ids))
+            calculados.update({sol_id: DECISAO_IMPEDIDA.get(impedidos.get(sol_id, "")) for sol_id in ids})
+            self.context["_decisao_impedida"] = calculados
+        return calculados[obj.pk]
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         """
@@ -323,7 +355,7 @@ class EventDetailSerializer(serializers.ModelSerializer):
 
     Note: gcal_payload_hash removed (internal implementation detail)
 
-    Permissions: HasPerm("import_spreadsheet")
+    Permissions: CanUseGcal (policy `use_gcal`)
     Endpoint: GET /api/gcal/dashboard/events/{id}/detail/
     """
 

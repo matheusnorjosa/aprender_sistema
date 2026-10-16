@@ -439,6 +439,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             target_user=user,
             before_group_ids=before_group_ids,
             after_group_ids=[g.pk for g in final],
+            imediato=True,
         )
         equipe_antes = tem_equipe_administrativa(user)
         equipe_depois = equipe_antes if equipe is None else equipe
@@ -486,6 +487,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
                     "target_user_id": user.pk,
                     "autoridade_aprovacao": "concedida" if aprova else "revogada",
                 },
+                imediato=True,
             )
 
     @staticmethod
@@ -502,10 +504,15 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         if actor is None or actor.pk != user.pk:
             user.deve_trocar_senha = True
         user.save()
-        auditar_reset_senha(actor=actor, target_user=user, contexto=contexto)
+        auditar_reset_senha(actor=actor, target_user=user, contexto=contexto, imediato=True)
 
+    @transaction.atomic
     def create(self, validated_data: dict[str, Any]) -> Any:
-        """Create user with hashed password, groups e vínculo de gerência."""
+        """Create user with hashed password, groups e vínculo de gerência.
+
+        PR 10 (D2): os registros da conta (`registrar_auditoria(..., imediato=True)`) entram na mesma
+        transação; se o insert falhar, a conta não é criada (a segregação por histórico lê esses registros).
+        """
         groups = validated_data.pop("groups", None)
         gerencia = validated_data.pop("gerencia_id", None)
         equipe = validated_data.pop("equipe_administrativa", None)
@@ -521,8 +528,9 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             action=AuditLog.Action.CREATE,
             model_name="Usuario",
             details={"target_user_id": user.pk, "target_username": user.username},
+            imediato=True,
         )
-        auditar_privilege_flags(actor=actor, target_user=user, before=None, via="rest_api")
+        auditar_privilege_flags(actor=actor, target_user=user, before=None, via="rest_api", imediato=True)
 
         if password:
             self._definir_senha_por_admin(user, password, actor, contexto="create")
@@ -537,7 +545,12 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def update(self, instance: Any, validated_data: dict[str, Any]) -> Any:
-        """Update user, hash password e sincroniza lotação de gerência (atômico: #2071 pode recusar)."""
+        """Update user, hash password e sincroniza lotação de gerência (atômico: #2071 pode recusar).
+
+        PR 10 (D2): o `UPDATE` do AuditLog lista só os campos cadastrais que MUDARAM (o formulário manda
+        todos em todo salvar; salvar sem mudança não grava nada), e os registros da conta entram na
+        mesma transação (`imediato=True`).
+        """
         groups = validated_data.pop("groups", None)
         # _UNSET distingue "não enviado" (não mexe no vínculo) de enviado (PATCH parcial).
         gerencia = validated_data.pop("gerencia_id", _UNSET)
@@ -548,9 +561,12 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         # M07-03 (#1618): snapshot dos flags ANTES do super().update (DRF muta a instance
         # in-place — ler depois daria before==after e nada auditaria).
         before_flags = {f: bool(getattr(instance, f)) for f in ("is_superuser", "is_staff", "is_active")}
-        cadastral_keys = sorted(k for k in validated_data if k not in ("is_superuser", "is_staff", "is_active"))
+        cadastrais_antes = {
+            k: getattr(instance, k, None) for k in validated_data if k not in ("is_superuser", "is_staff", "is_active")
+        }
 
         user = super().update(instance, validated_data)
+        cadastral_keys = sorted(k for k, antes in cadastrais_antes.items() if getattr(user, k, None) != antes)
 
         # #1894: desativação decidida NO SISTEMA (admin) é LOCAL -> marca `desativado_localmente`
         # para o import never-reactivate (o import nunca liga False->True com a flag). Reativar
@@ -564,14 +580,15 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             user.save(update_fields=["desativado_localmente"])
 
         # M07-03: flip de privilegio via REST (activate/deactivate/promote) audita igual ao Admin.
-        auditar_privilege_flags(actor=actor, target_user=user, before=before_flags, via="rest_api")
-        # M07-03: alteracao cadastral — so os NOMES dos campos escritos (nunca valores/PII).
+        auditar_privilege_flags(actor=actor, target_user=user, before=before_flags, via="rest_api", imediato=True)
+        # M07-03: alteracao cadastral — so os NOMES dos campos que mudaram (nunca valores/PII).
         if cadastral_keys:
             registrar_auditoria(
                 actor=actor,
                 action=AuditLog.Action.UPDATE,
                 model_name="Usuario",
                 details={"target_user_id": user.pk, "target_username": user.username, "campos": cadastral_keys},
+                imediato=True,
             )
 
         if password:

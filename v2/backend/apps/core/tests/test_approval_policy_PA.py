@@ -419,3 +419,37 @@ def test_approval_flow_records_audit_log(
     assert audit_log.details["new_status"] == "reprovado"
     assert audit_log.details["justificativa"] == "Motivo de teste"
     assert "ip_address" in audit_log.details
+
+
+# ===================================================================
+# PA-02 (segregação por histórico, D2; PR 10)
+# ===================================================================
+
+
+def test_segregacao_conta_alterada_bloqueia_decisao(solicitacao_pendente):
+    """
+    PA-02: quem alterou a conta do autor pela tela de Usuários nos últimos 30 dias não aprova nem
+    reprova as solicitações dele (403 `altered_account_approval_forbidden`, nada muda, sem AuditLog
+    de decisão). Outra aprovadora decide.
+    """
+    quem_alterou = APROVADORAS["dat_pelo_pacote"]()
+    client = APIClient()
+    client.force_authenticate(user=quem_alterou)
+    autor = solicitacao_pendente.usuario
+    resp = client.patch(f"/api/usuarios-admin/{autor.id}/", {"first_name": "Nome Corrigido"}, format="json")
+    assert resp.status_code == 200, resp.content
+
+    for acao, dados in (("approve", {}), ("reject", {"justificativa": "x"})):
+        resp = client.patch(f"/api/solicitacoes/{solicitacao_pendente.id}/{acao}/", dados, format="json")
+        assert resp.status_code == 403
+        assert resp.data["code"] == "altered_account_approval_forbidden"
+    solicitacao_pendente.refresh_from_db()
+    assert solicitacao_pendente.status == "pendente"
+    assert not AuditLog.objects.filter(
+        action__in=["APPROVE", "REJECT"], details__solicitacao_id=solicitacao_pendente.id
+    )
+
+    outra = APROVADORAS["gerente_g1_por_vinculo"]()
+    client.force_authenticate(user=outra)
+    resp = client.patch(f"/api/solicitacoes/{solicitacao_pendente.id}/approve/")
+    assert resp.status_code == 200

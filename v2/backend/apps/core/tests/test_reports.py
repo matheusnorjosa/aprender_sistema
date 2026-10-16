@@ -35,6 +35,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_dat,
 )
 
 pytestmark = pytest.mark.django_db
@@ -70,6 +71,8 @@ def user_super(grupos):
     """Usuário do grupo Superintendência."""
     user = UsuarioFactory(username="super1", email="super@x.com", password="x", cpf="11111111111")
     user.groups.add(grupos["superintendencia"])
+    # PR 10: o grupo Superintendência não tem capacidade (0126); o poder vem do pacote do DAT.
+    com_pacote_do_dat(user)
     return user
 
 

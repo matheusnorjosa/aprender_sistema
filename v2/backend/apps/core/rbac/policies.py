@@ -214,9 +214,8 @@ ACCESS_POLICIES: Final[dict[str, frozenset[str]]] = {
     #   canDashboardGcal   = Diretoria|DAT|Controle
     "access_controle_section": frozenset({"operate_preagenda", "run_daily_operations"}),
     "view_team_dashboard": frozenset({"supervise_operations", "manage_admin_registries"}),
-    "view_gcal_dashboard": frozenset(
-        {"supervise_operations", "manage_admin_registries", "operate_preagenda", "run_daily_operations"}
-    ),
+    # PR 10 (decisão do dono de 02/10, nº 13): a Diretoria (`supervise_operations`) sai do painel do Google.
+    "view_gcal_dashboard": frozenset({"manage_admin_registries", "operate_preagenda", "run_daily_operations"}),
     # --- Telas de escopo (PR 7, 15/10/2026): composite, ver TELAS_DE_ESCOPO ---
     "access_monthly_availability": frozenset({"view_all_availability"}),
     "access_availability_blocks": frozenset({"view_all_availability"}),
@@ -403,6 +402,7 @@ class CanAccessSolicitationApprovals(_PolicyPermission):
     - Assistente Administrativo do Controle (Setor `Controle` + Função
       `Assistente Administrativo`)
     - Legado até o B2: composite Setor `Superintendência` + Função `Gerente`
+    - PR 10: a capacidade `approve_solicitation` (pacote ADMIN_OPERACIONAL: o DAT pelo vínculo)
 
     Implementação composite (não OR de capabilities): a semântica vive em
     `_user_has_solicitation_approvals` e é compartilhada com
@@ -412,7 +412,7 @@ class CanAccessSolicitationApprovals(_PolicyPermission):
 
     policy = "access_solicitation_approvals"
     message = (
-        "Apenas a gerência da Superintendência ou o Assistente Administrativo do Controle "
+        "Apenas a gerência da Superintendência, o DAT ou o Assistente Administrativo do Controle "
         "podem aprovar solicitações."
     )
 
@@ -488,11 +488,14 @@ SolicitationApprovalBasis = Literal[
     "gerente_superintendencia",
     "asst_admin_controle",
     "grupo_superintendencia_gerente",
+    "capacidade_aprovar",
 ]
 
 
 def solicitation_approval_basis(
     user: AbstractBaseUser | AnonymousUser | None,
+    *,
+    capacidades: AbstractSet[str] | None = None,
 ) -> SolicitationApprovalBasis | None:
     """
     SSOT de QUEM aprova/reprova solicitações e POR QUÊ (PR B1, 2026-09-29).
@@ -507,6 +510,12 @@ def solicitation_approval_basis(
        Administrativo"
     4. `grupo_superintendencia_gerente` — composite Setor "Superintendência" + Função
        "Gerente" (legado; sai no B2)
+    5. `capacidade_aprovar` — a capacidade `approve_solicitation` (PR 10). Nenhum grupo a tem (seed e
+       migration 0126): vem do pacote ADMIN_OPERACIONAL, isto é, do vínculo EQUIPE/GERENTE vigente na
+       gerência DAT. Sem escopo: decide qualquer gerência e fluxo. Por último, para que nenhuma base
+       anterior mude de rótulo
+
+    `capacidades`: só para o simulador `rbac_diff` (a base 5 lê esse conjunto em vez do cache).
     """
     if not user or not getattr(user, "is_authenticated", False):
         return None
@@ -514,18 +523,24 @@ def solicitation_approval_basis(
         return "superuser"
     if user_is_gerente_superintendencia(user):
         return "gerente_superintendencia"
-    return _base_de_aprovacao_por_grupos(user)
+    return _base_de_aprovacao_fora_do_vinculo(user, capacidades=capacidades)
 
 
-def _base_de_aprovacao_por_grupos(
+def _base_de_aprovacao_fora_do_vinculo(
     user: AbstractBaseUser | AnonymousUser | None,
+    *,
+    capacidades: AbstractSet[str] | None = None,
 ) -> SolicitationApprovalBasis | None:
-    """Bases 3 e 4 de `solicitation_approval_basis` (pares de grupos), sem superuser nem vínculo."""
+    """Bases 3, 4 e 5 de `solicitation_approval_basis` (sem superuser nem o vínculo GERENTE em g1)."""
     if user_is_assistente_administrativo_controle(user):
         return "asst_admin_controle"
     if user_matches_any_approver_composite(user):
         return "grupo_superintendencia_gerente"
-    return None
+    if capacidades is not None:
+        tem_capacidade = "approve_solicitation" in capacidades
+    else:
+        tem_capacidade = user_has_any_perm(user, "approve_solicitation")
+    return "capacidade_aprovar" if tem_capacidade else None
 
 
 # ----------------------------------------------------------------------------
@@ -554,11 +569,12 @@ def aprovadora_restrita_a_superintendencia(user: AbstractBaseUser | AnonymousUse
     """A única base de aprovação do usuário é o vínculo GERENTE em g1?
 
     Então ela só decide solicitação no escopo (`projeto_no_escopo_da_superintendencia`). Superuser,
-    o par Controle + Assistente Administrativo e o par legado não são restringidos.
+    o par Controle + Assistente Administrativo, o par legado e a capacidade de aprovar (DAT) não são
+    restringidos.
     """
     if not user or not getattr(user, "is_authenticated", False) or getattr(user, "is_superuser", False):
         return False
-    return user_is_gerente_superintendencia(user) and _base_de_aprovacao_por_grupos(user) is None
+    return user_is_gerente_superintendencia(user) and _base_de_aprovacao_fora_do_vinculo(user) is None
 
 
 def solicitation_approval_basis_for(
@@ -568,7 +584,7 @@ def solicitation_approval_basis_for(
     """Base de aprovação do usuário para ESTA solicitação (vai para `AuditLog.details.autoridade`).
 
     Mesma precedência de `solicitation_approval_basis`, mas o vínculo GERENTE em g1 só vale no escopo
-    da Superintendência. Fora dele vale a próxima base (par Controle, par legado) ou None, e None com
+    da Superintendência. Fora dele vale a próxima base (par Controle, par legado, capacidade) ou None, e None com
     base global não nula = fora do escopo. `solicitacao=None` responde pelo "fora do escopo".
     """
     basis = solicitation_approval_basis(user)
@@ -576,10 +592,13 @@ def solicitation_approval_basis_for(
         return basis
     if projeto_no_escopo_da_superintendencia(getattr(solicitacao, "projeto", None)):
         return basis
-    return _base_de_aprovacao_por_grupos(user)
+    return _base_de_aprovacao_fora_do_vinculo(user)
 
 
-def _user_has_solicitation_approvals(user: AbstractBaseUser | AnonymousUser | None) -> bool:
+def _user_has_solicitation_approvals(
+    user: AbstractBaseUser | AnonymousUser | None,
+    capacidades: AbstractSet[str] | None = None,
+) -> bool:
     """
     Tem autoridade de aprovação? (`solicitation_approval_basis(user) is not None`).
 
@@ -587,7 +606,7 @@ def _user_has_solicitation_approvals(user: AbstractBaseUser | AnonymousUser | No
     quanto por `user_has_policy("access_solicitation_approvals")`. Mudar
     a regra = mudar `solicitation_approval_basis` e atualizar tests da matriz.
     """
-    return solicitation_approval_basis(user) is not None
+    return solicitation_approval_basis(user, capacidades=capacidades) is not None
 
 
 def _abre_tela_de_escopo(
@@ -708,7 +727,7 @@ def user_has_policy(
         return True
     # Composite policies — semântica não cabe em "OR de capabilities".
     if key == "access_solicitation_approvals":
-        return _user_has_solicitation_approvals(user)
+        return _user_has_solicitation_approvals(user, capacidades)
     if key in TELAS_DE_ESCOPO:
         return _abre_tela_de_escopo(user, key, capacidades)
     codenames = ACCESS_POLICIES.get(key)
@@ -744,34 +763,25 @@ def can_admin_mutate_target(
     action: str | None = None,
 ) -> bool:
     """
-    SSOT ator×alvo (M07-01/M07-02, #1616/#1617): um admin não-superuser pode
-    mutar `target` (reset de senha, e-mail, is_active, delete/anonimizar)?
+    SSOT ator×alvo (M07-01/M07-02, #1616/#1617; S4 do PR 10): um admin não-superuser pode
+    mutar `target` (senha, cadastro, is_active, delete/anonimizar)?
 
-    Regra (fail-secure):
-    - superuser-ator       → True  (bypass total; mantém P0-0/P0-1)
-    - target == actor      → True  (self-service nunca é escalonamento)
-    - target superuser     → False (Tier-0; a queryset da view já dá 404 antes)
-    - target APROVADOR     → False (tomar a conta viabiliza auto-aprovação de
-                                    solicitações, violando CP-02). "Aprovador" =
-                                    autoridade de aprovação — Gerente da
-                                    Superintendência OU Assistente Administrativo
-                                    do Controle (SSOT `access_solicitation_approvals`)
-    - demais (conta comum) → True
+    Regra (decisão do dono de 16/10/2026, que substitui a de 14/10 e a proteção da aprovadora do M07):
+    - superuser-ator   → True  (bypass total; mantém P0-0/P0-1)
+    - target superuser → False (Tier-0; a queryset da view já dá 404 antes)
+    - demais           → True  (o DAT administra todas as contas: outro DAT, Apoio, Controle e as
+                                aprovadoras)
 
-    `action` fica reservado para o épico #1656 (escopo por operação); hoje a
-    invariante é agnóstica à ação — qualquer mutação sobre alvo mais privilegiado
-    é barrada.
+    O que segura a segregação (CP-02) sem a proteção por alvo: toda alteração de conta grava AuditLog
+    na mesma transação, a senha dada por outra pessoa liga `deve_trocar_senha`, e por 30 dias quem
+    alterou a conta do autor não decide as solicitações dele, nem quem teve a conta alterada pelo autor
+    (PA-02, segregação por histórico, nos dois sentidos).
+
+    `action` fica reservado para o épico #1656 (escopo por operação).
     """
     if getattr(actor, "is_superuser", False):
         return True
-    actor_pk = getattr(actor, "pk", None)
-    if actor_pk is not None and actor_pk == getattr(target, "pk", None):
-        return True
-    if getattr(target, "is_superuser", False):
-        return False
-    if user_has_policy(target, "access_solicitation_approvals"):
-        return False
-    return True
+    return not getattr(target, "is_superuser", False)
 
 
 __all__ = [

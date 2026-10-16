@@ -19,13 +19,17 @@ Regras imutáveis do sistema que não podem ser alteradas.
 Ver [Política de Aprovação (PA)](politica-aprovacao.md).
 
 - Sem auto-aprovação para fluxo SUPER
-- Aprovam: superuser, **Gerente da Superintendência** ou **Assistente Administrativo do
-  Controle** (PA-02). DAT e Controle puro não aprovam
+- Aprovam: o superuser, a **Gerente da Superintendência** (vínculo; o par de grupos Gerente +
+  Superintendência até o B2), o **Assistente Administrativo do Controle** (até o PR 11) e o
+  **DAT** pelo pacote `ADMIN_OPERACIONAL` (decisão do dono de 02/10, nº 16; PR 10) (PA-02).
+  Controle puro não aprova
+- Ninguém decide a própria solicitação nem a de pessoa cuja conta alterou nos últimos 30 dias
+  (o superuser só como break-glass registrado)
 - Integrações só executam após aprovação
 
-!!! danger "Cláusula não cumprida hoje (P0 · #1610)"
-    A **imutabilidade** desta autoridade não existe: o import de usuários permite que um
-    membro do grupo DAT conceda a si próprio `Gerente` + `Superintendência` e passe a aprovar.
+!!! success "Autoridade imutável pelo import (#1610, resolvido)"
+    O import de usuários só concede grupo pelo superusuário, e o vínculo que dá a aprovação
+    (GERENTE na Superintendência, EQUIPE/GERENTE na gerência DAT) só nasce pelo superusuário.
     Detalhe em [PA-02](politica-aprovacao.md#pa-02-perfil-exigido).
 
 ## CP-03: Regras de Disponibilidade

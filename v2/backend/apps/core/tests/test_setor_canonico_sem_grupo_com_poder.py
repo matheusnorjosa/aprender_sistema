@@ -53,8 +53,9 @@ def _gerencia(nome: str, setor: str) -> Gerencia:
 
 class TestSetorGroupFor:
     def test_o_seed_tem_grupos_com_capacidade(self):
-        # Sentinela: sem isso os testes abaixo passariam no vazio.
-        assert {"DAT", "Controle", "Diretoria", "Superintendência"} <= _grupos_com_capacidade()
+        # Sentinela: sem isso os testes abaixo passariam no vazio. A Superintendência perdeu as
+        # capacidades no PR 10 (0126), mas segue recusada por compor o par aprovador legado.
+        assert {"DAT", "Controle", "Diretoria"} <= _grupos_com_capacidade()
 
     def test_nenhum_grupo_com_capacidade_e_derivado(self):
         for i, nome in enumerate(sorted(_grupos_com_capacidade())):

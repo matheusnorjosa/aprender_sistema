@@ -6,7 +6,7 @@ todo nome em `APPROVER_COMPOSITES` (SSOT dos composites aprovadores) existe em
 `SETOR_GROUPS`/`FUNCAO_GROUPS` (`apps.core.constants`). Se alguém renomear um grupo
 de composite em `constants.py` sem atualizar a SSOT, `manage.py check` (rodado no
 CI e no deploy) FALHA — em vez de o sistema deixar de reconhecer aprovadores em
-silêncio (fail-open em `can_admin_mutate_target`). Registrado em `CoreConfig.ready()`.
+silêncio (`solicitation_approval_basis`). Registrado em `CoreConfig.ready()`.
 """
 
 # pyright: reportMissingTypeStubs=false, reportUntypedFunctionDecorator=false, reportUnknownVariableType=false, reportImplicitStringConcatenation=false

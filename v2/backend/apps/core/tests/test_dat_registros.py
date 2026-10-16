@@ -24,6 +24,7 @@ from apps.core.tests.factories import (
     MunicipioFactory,
     ProjetoFactory,
     UsuarioFactory,
+    com_pacote_do_dat,
 )
 
 
@@ -333,6 +334,8 @@ class DATRegistroAPITests(APITestCase):
             cpf=f"333{suffix[:8]}",
         )
         cls.super_user.groups.add(cls.super_group)
+        # PR 10: o grupo Superintendência não tem capacidade (0126); o poder vem do pacote do DAT.
+        com_pacote_do_dat(cls.super_user)
 
     def test_list_requires_dat_permission(self):
         """GET /api/dat/registros/ should require DAT permission (HasPerm("manage_admin_registries"))."""

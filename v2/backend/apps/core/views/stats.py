@@ -30,6 +30,8 @@ Capability mapping aplicado:
 
 from __future__ import annotations
 
+from typing import cast
+
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status as http_status
@@ -40,7 +42,7 @@ from rest_framework.views import APIView
 
 from drf_spectacular.utils import extend_schema
 
-from apps.core.models import EquipeGerencia, Solicitacao
+from apps.core.models import EquipeGerencia, Solicitacao, Usuario
 from apps.core.rbac.constants import FORMADOR_ROLE_GROUPS
 from apps.core.rbac.helpers import user_has_any_perm
 from apps.core.rbac.policies import (
@@ -49,6 +51,7 @@ from apps.core.rbac.policies import (
     user_has_policy,
 )
 from apps.core.serializers.openapi_critical_contract import HomeStatsResponseSerializer
+from apps.core.services.solicitacao_approval import decisoes_impedidas
 
 
 class HomeStatsView(APIView):
@@ -121,7 +124,9 @@ class HomeStatsView(APIView):
             # Regra do dono (30/09): conta só o que ela decide (não restringe o que ela vê).
             if aprovadora_restrita_a_superintendencia(user):
                 pending_qs = pending_qs.filter(ESCOPO_SUPERINTENDENCIA_Q)
-            pending_approvals = pending_qs.count()
+            # PA-02 (PR 10): nem a de autor cuja conta ela alterou, nem a que ela editou.
+            impedidas = decisoes_impedidas(cast(Usuario, user), pending_qs)
+            pending_approvals = pending_qs.exclude(id__in=impedidas).count()
 
         # === EVENTOS FUTUROS (com fail-safe explícito — fix #1284) ===
         upcoming_qs = Solicitacao.objects.filter(status="aprovado", inicio__gte=now)

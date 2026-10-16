@@ -26,6 +26,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_dat,
 )
 
 pytestmark = pytest.mark.django_db
@@ -141,6 +142,8 @@ def test_preview_publish_allowed_for_superintendencia():
     - Publish → 202 (ou 409 se apply_blocked)
     """
     u = make_user_in_group("Superintendência")
+    # PR 10: o grupo Superintendência não tem capacidade (0126); o poder vem do pacote do DAT.
+    com_pacote_do_dat(u)
     s = _make_approved_solicitacao(u)
     client = APIClient()
     client.force_authenticate(user=u)

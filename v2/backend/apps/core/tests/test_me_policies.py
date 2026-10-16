@@ -304,10 +304,11 @@ class TestMenuPolicies1589:
         assert "view_gcal_dashboard" in policies
 
     def test_diretoria_user_gets_team_and_gcal(self, seeded_db):
+        """PR 10 (decisão do dono de 02/10, nº 13): a Diretoria sai do painel do Google."""
         user = _make_user("m1589_diretoria", "supervise_operations")
         policies = _policies_for(user)
         assert "view_team_dashboard" in policies
-        assert "view_gcal_dashboard" in policies
+        assert "view_gcal_dashboard" not in policies
         assert "access_controle_section" not in policies  # Diretoria NÃO é Controle
 
     def test_dat_user_gets_team_and_gcal(self, seeded_db):

@@ -565,10 +565,16 @@ Bloqueios também com FORMADOR. O grupo de função não entra. Prova pessoa a p
 (`services/rbac_pacotes.DIREITOS_PAPEL`, somado na união de `capacidades_sem_cache`). A capacidade
 `approve_solicitation_batch` foi apagada. Regra de nome continua: o codename não diz o papel.
 
+**DAT administrador operacional (PR 10 das permissões, 16/10/2026)**: `approve_solicitation` deixa de
+estar em grupo (migration `0126`) e vem só do pacote `ADMIN_OPERACIONAL`; ter a capacidade é a base 5 de
+`solicitation_approval_basis`, com o rótulo genérico `capacidade_aprovar` (o Controle usa a mesma base no
+PR 11). Nenhum codename novo.
+
 ---
 
 ## 10. Changelog
 
+- **2026-10-16** — PR 10 das permissões: `approve_solicitation` e `execute_restricted_operations` fora do grupo Superintendência, `import_spreadsheet` fora do DAT (migration `0126`); base de aprovação `capacidade_aprovar`.
 - **2026-10-15** — PR 8 das permissões: grupo de função sem capacidade, direitos do papel vigente (`DIREITOS_PAPEL`), `approve_solicitation_batch` e `IsGerenteSuperintendencia` removidos, telas compostas por papel.
 - **2026-10-15** — PR 7 das permissões: +5 policies públicas (3 compostas de tela, 2 simples), verbo `execute_` no vocabulário, bloco "Front: acesso só por policy" no §9-bis.
 - **2026-04-23** — v1.0 criada com Epic 2 (#1181). `HasPerm` introduzido, 12 classes factory marcadas com `warnings.warn(DeprecationWarning)` + aviso para remoção no Epic 5.

@@ -3,7 +3,9 @@ Testes obrigatórios para Política de Aprovação Manual (PA-01 a PA-07).
 
 Garante que:
 - PA-01: Nenhuma solicitação é auto-aprovada
-- PA-02: Apenas Superintendência pode aprovar/reprovar
+- PA-02: Apenas as bases de `solicitation_approval_basis` aprovam/reprovam (Superintendência por
+  vínculo, par legado e, desde o PR 10, o DAT pela capacidade `approve_solicitation` do pacote), e
+  ninguém decide a solicitação de quem teve a conta alterada por ele nos últimos 30 dias
 - PA-03: Integrações externas só executam após aprovação
 - PA-05: Auditoria completa de aprovações/reprovações
 - PA-07: Testes obrigatórios implementados
@@ -17,13 +19,14 @@ from datetime import timedelta
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
+from django.core.cache import cache
 from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AuditLog
+from apps.core.models import AuditLog, Gerencia, Usuario
 from apps.core.tests.factories import (
     GroupFactory,
     MunicipioFactory,
@@ -31,6 +34,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_papel,
 )
 
 pytestmark = pytest.mark.django_db
@@ -68,10 +72,18 @@ def usuario_superintendencia(faker):
 
 
 @pytest.fixture
+def usuario_controle():
+    """Quem publica no Google (`use_gcal` pelo `operate_preagenda` do Controle). Desde o PR 10 o grupo
+    Superintendência não tem capacidade (migration 0126): o par legado aprova, mas não publica."""
+    return UsuarioFactory(groups=["Controle"])
+
+
+@pytest.fixture
 def solicitacao_pendente(usuario_comum):
     """Solicitação pendente para testes (projeto SUPER)."""
     municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = ProjetoFactory(nome="Projeto Teste SUPER", ativo=True, fluxo="SUPER")
+    g1, _ = Gerencia.objects.get_or_create(nome="SUPERINTENDENCIA", defaults={"nome_setor": "Superintendência"})
+    projeto = ProjetoFactory(nome="Projeto Teste SUPER", ativo=True, fluxo="SUPER", gerencia=g1)
     tipo_evento = TipoEventoFactory(nome="Formação")
 
     now = timezone.now()
@@ -120,22 +132,56 @@ def test_never_auto_approves_on_clean_or_save(solicitacao_pendente):
 
 
 # ===================================================================
-# PA-02: Apenas Superintendência pode aprovar/reprovar
+# PA-02: Apenas as bases de aprovação aprovam/reprovam
 # ===================================================================
 
 
+def _gerencia(nome: str, perfil: str = "PADRAO") -> Gerencia:
+    gerencia, _ = Gerencia.objects.get_or_create(nome=nome, defaults={"nome_setor": nome.title()})
+    gerencia.perfil = perfil
+    gerencia.save()
+    return gerencia
+
+
+def _com_vinculo(papel: str, gerencia: Gerencia, grupos: tuple[str, ...] = ()) -> Usuario:
+    user = UsuarioFactory(groups=list(grupos) or None, groups__vinculo=False)
+    com_papel(user, papel, gerencia)
+    cache.clear()
+    return user
+
+
+# Bases 2, 4 e 5 de `solicitation_approval_basis` (a 1 é o superusuário; a 3, o par Controle).
+APROVADORAS = {
+    "gerente_g1_por_vinculo": lambda: _com_vinculo("GERENTE", _gerencia("SUPERINTENDENCIA")),
+    "par_legado": lambda: UsuarioFactory(groups=["Superintendência", "Gerente"], groups__vinculo=False),
+    "dat_pelo_pacote": lambda: _com_vinculo("EQUIPE", _gerencia("GERENCIA DAT", "ADMIN_OPERACIONAL"), ("DAT",)),
+}
+
+# Quem não aprova: Controle puro, COORDENADOR e FORMADOR na gerência DAT, grupo DAT sem vínculo,
+# Gerente pedagógico.
+SEM_PODER = {
+    "controle_puro": lambda: UsuarioFactory(groups=["Controle"]),
+    "coordenador_na_gerencia_dat": lambda: _com_vinculo("COORDENADOR", _gerencia("GERENCIA DAT", "ADMIN_OPERACIONAL")),
+    "formador_na_gerencia_dat": lambda: _com_vinculo("FORMADOR", _gerencia("GERENCIA DAT", "ADMIN_OPERACIONAL")),
+    "grupo_dat_sem_vinculo": lambda: UsuarioFactory(groups=["DAT"]),
+    "gerente_pedagogico": lambda: _com_vinculo("GERENTE", _gerencia("GERENCIA VIDAS PA07")),
+}
+
+
+@pytest.mark.parametrize("base", sorted(APROVADORAS))
 def test_only_superintendencia_can_approve_or_reject(
     solicitacao_pendente,
     usuario_comum,
-    usuario_superintendencia,
+    base,
 ):
     """
-    PA-02: Apenas usuários da Superintendência podem aprovar/reprovar.
+    PA-02: Só quem tem base de aprovação aprova/reprova.
 
     Verifica que:
     - Usuário comum → 403
-    - Superintendência → 200/204
+    - Base 2 (GERENTE por vínculo na Superintendência), 4 (par legado) e 5 (DAT pelo pacote) → 200/204
     """
+    usuario_superintendencia = APROVADORAS[base]()
     client = APIClient()
 
     # Teste 1: Usuário comum tenta aprovar → 403
@@ -175,17 +221,20 @@ def test_only_superintendencia_can_approve_or_reject(
     ), "Superintendência deve poder reprovar"
 
 
+@pytest.mark.parametrize("perfil", ["usuario_comum", *sorted(SEM_PODER)])
 def test_non_privileged_user_gets_403_on_approval_endpoint(
     solicitacao_pendente,
     usuario_comum,
+    perfil,
 ):
     """
     PA-07: Usuário não-privilegiado recebe 403 ao tentar aprovar.
 
     Complementar a test_only_superintendencia_can_approve_or_reject.
     """
+    usuario = usuario_comum if perfil == "usuario_comum" else SEM_PODER[perfil]()
     client = APIClient()
-    client.force_authenticate(user=usuario_comum)
+    client.force_authenticate(user=usuario)
 
     response_approve = client.patch(f"/api/solicitacoes/{solicitacao_pendente.id}/approve/")
     response_reject = client.patch(
@@ -213,7 +262,7 @@ def test_non_privileged_user_gets_403_on_approval_endpoint(
 def test_calendar_integration_not_called_before_approval(
     mock_celery_task,
     solicitacao_pendente,
-    usuario_superintendencia,
+    usuario_controle,
 ):
     """
     PA-03: Integrações externas (Google Calendar) só executam após aprovação.
@@ -228,7 +277,7 @@ def test_calendar_integration_not_called_before_approval(
     Removido mock de AuditLog pois não é criado no caminho de erro 400.
     """
     client = APIClient()
-    client.force_authenticate(user=usuario_superintendencia)
+    client.force_authenticate(user=usuario_controle)
 
     # Tentar publish em status pendente → deve falhar
     response = client.post(f"/api/solicitacoes/{solicitacao_pendente.id}/publish/")
@@ -246,7 +295,7 @@ def test_calendar_integration_not_called_before_approval(
 @patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
 def test_calendar_integration_is_called_after_approval(
     mock_celery_task,
-    usuario_superintendencia,
+    usuario_controle,
 ):
     """
     PA-03 (parte positiva): Integrações executam APÓS aprovação.
@@ -290,7 +339,7 @@ def test_calendar_integration_is_called_after_approval(
     )
 
     client = APIClient()
-    client.force_authenticate(user=usuario_superintendencia)
+    client.force_authenticate(user=usuario_controle)
 
     # Publish de solicitação aprovada → deve enfileirar task
     response = client.post(f"/api/solicitacoes/{sol.id}/publish/")
@@ -370,3 +419,37 @@ def test_approval_flow_records_audit_log(
     assert audit_log.details["new_status"] == "reprovado"
     assert audit_log.details["justificativa"] == "Motivo de teste"
     assert "ip_address" in audit_log.details
+
+
+# ===================================================================
+# PA-02 (segregação por histórico, D2; PR 10)
+# ===================================================================
+
+
+def test_segregacao_conta_alterada_bloqueia_decisao(solicitacao_pendente):
+    """
+    PA-02: quem alterou a conta do autor pela tela de Usuários nos últimos 30 dias não aprova nem
+    reprova as solicitações dele (403 `altered_account_approval_forbidden`, nada muda, sem AuditLog
+    de decisão). Outra aprovadora decide.
+    """
+    quem_alterou = APROVADORAS["dat_pelo_pacote"]()
+    client = APIClient()
+    client.force_authenticate(user=quem_alterou)
+    autor = solicitacao_pendente.usuario
+    resp = client.patch(f"/api/usuarios-admin/{autor.id}/", {"first_name": "Nome Corrigido"}, format="json")
+    assert resp.status_code == 200, resp.content
+
+    for acao, dados in (("approve", {}), ("reject", {"justificativa": "x"})):
+        resp = client.patch(f"/api/solicitacoes/{solicitacao_pendente.id}/{acao}/", dados, format="json")
+        assert resp.status_code == 403
+        assert resp.data["code"] == "altered_account_approval_forbidden"
+    solicitacao_pendente.refresh_from_db()
+    assert solicitacao_pendente.status == "pendente"
+    assert not AuditLog.objects.filter(
+        action__in=["APPROVE", "REJECT"], details__solicitacao_id=solicitacao_pendente.id
+    )
+
+    outra = APROVADORAS["gerente_g1_por_vinculo"]()
+    client.force_authenticate(user=outra)
+    resp = client.patch(f"/api/solicitacoes/{solicitacao_pendente.id}/approve/")
+    assert resp.status_code == 200

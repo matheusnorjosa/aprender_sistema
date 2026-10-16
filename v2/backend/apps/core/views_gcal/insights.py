@@ -50,7 +50,7 @@ class SuccessRateView(APIView):
         "window": { "start": "YYYY-MM-DD" | null, "end": "YYYY-MM-DD" | null }
     }
 
-    Permissions: HasPerm("import_spreadsheet")
+    Permissions: CanUseGcal (policy `use_gcal`)
     """
 
     permission_classes = [IsAuthenticated, CanUseGcal]
@@ -123,7 +123,7 @@ class TopInsightsView(APIView):
 
     Response 400: metric inválido
 
-    Permissions: HasPerm("import_spreadsheet")
+    Permissions: CanUseGcal (policy `use_gcal`)
     Ordenação: -error, -count
     """
 

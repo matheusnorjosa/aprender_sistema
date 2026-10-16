@@ -54,7 +54,8 @@ const ESPERADO: Record<string, readonly Cartao[]> = {
     'Minhas Solicitações',
   ],
   // E1: perde Enviar/Minhas (sem create_solicitation: a rota negava). E2: ganha Desempenho.
-  DAT: ['Desempenho da Equipe', 'Meu Painel'],
+  // PR 10: o DAT aprova e cria (pacote final do administrador operacional).
+  DAT: ['Solicitações de Aprovação', 'Desempenho da Equipe', 'Meu Painel', 'Enviar Solicitação', 'Minhas Solicitações'],
   Controle: ['Meu Painel'],
   Diretoria: ['Desempenho da Equipe', 'Meu Painel'], // E2: ganha
   // E1: ganha Enviar/Minhas (create_solicitation).

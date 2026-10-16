@@ -48,6 +48,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_dat,
 )
 
 pytestmark = pytest.mark.django_db
@@ -311,8 +312,12 @@ class TestGlobalAccess:
         assert response.json()["upcoming_events"] == world["total_events"]
 
     def test_superintendencia_sem_gerencia_ve_todos(self, world):
-        """Superintendência (decisão cross-org de aprovação) → vê todos mesmo sem EquipeGerencia."""
+        """Quem aprova pela capacidade (decisão cross-org de aprovação) → vê todos mesmo sem papel.
+
+        PR 10: o grupo Superintendência não tem mais `approve_solicitation` (0126); ela vem do pacote do DAT.
+        """
         user = _make_user("super", ["Superintendência"])
+        com_pacote_do_dat(user)
         response = _get_home_stats(user)
         assert response.status_code == 200
         # Antes do fix: dependia do else implícito (vazava). Depois do fix: explícito

@@ -15,7 +15,8 @@ Regra de negócio (D-1..D-4):
 - ❌ Gerente pedagógico (Função "Gerente" sem Setor "Superintendência")
 - ❌ Controle puro (sem Função "Assistente Administrativo")
 - ❌ Assistente Administrativo fora do Controle
-- ❌ DAT, Coordenador, Apoio, Formador, Diretoria
+- ❌ grupo DAT sem vínculo, Coordenador, Apoio, Formador, Diretoria (desde o PR 10 o DAT aprova pelo
+  vínculo EQUIPE/GERENTE na gerência DAT, não pelo grupo: `test_rbac_pr10_dat_admin_operacional.py`)
 
 Cobre tanto a matriz dos endpoints quanto o contrato `/api/me/policies/`.
 """

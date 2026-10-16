@@ -216,6 +216,26 @@ PESSOAS: dict[str, Callable[[], Usuario]] = {
 # ----------------------------------------------------------------------------
 
 
+# PR 10 (16/10/2026): o pacote ADMIN_OPERACIONAL final dá ao DAT excluir e criar sem compra, e o grupo
+# Superintendência perdeu as capacidades (migration 0126). As duas policies SIMPLES deixam de bater
+# com a fórmula antiga do front nestas pessoas, e só nelas (decisão do dono, lista do PR 10).
+DELTA_PR10: dict[str, dict[str, bool]] = {
+    # O ator DAT da matriz viva tem o vínculo EQUIPE na gerência DAT desde o PR 10, como em produção.
+    "matriz: DAT": {"execute_restricted_operations": True, "create_solicitation_without_purchase": True},
+    "matriz: Gerente da Superintendência": {"execute_restricted_operations": False},
+    "só grupos: Gerente da Superintendência": {"execute_restricted_operations": False},
+    "só setor Superintendência": {"execute_restricted_operations": False},
+    "Ana (EQUIPE no ADMIN_OPERACIONAL)": {
+        "execute_restricted_operations": True,
+        "create_solicitation_without_purchase": True,
+    },
+    "GERENTE no ADMIN_OPERACIONAL": {
+        "execute_restricted_operations": True,
+        "create_solicitation_without_purchase": True,
+    },
+}
+
+
 class TestPoliciesNovas:
     def test_as_cinco_sao_publicas(self):
         assert set(NOVAS) <= PUBLIC_POLICY_KEYS
@@ -223,7 +243,7 @@ class TestPoliciesNovas:
     @pytest.mark.parametrize("pessoa", list(PESSOAS))
     def test_cada_policy_vale_sse_a_formula_sobre_o_me_vale(self, pessoa):
         me, policies = _me(PESSOAS[pessoa]())
-        esperado = _formula_do_front_sobre_o_me(me, policies)
+        esperado = {**_formula_do_front_sobre_o_me(me, policies), **DELTA_PR10.get(pessoa, {})}
         obtido = {chave: chave in policies for chave in NOVAS}
         assert obtido == esperado, f"{pessoa}: /me={me['setores']}/{me['funcoes']}/{me['gerencias']}"
 
@@ -280,6 +300,10 @@ class TestRbacDiffDoDeploy:
         assert retrato["policies"] == da_api, pessoa
 
 
+# Telas que o pacote final do PR 10 abre ao DAT e o grupo DAT sozinho não abre.
+PR10_TELAS_DO_DAT = {"access_solicitation_approvals", "create_solicitation", "access_controle_section"}
+
+
 class TestPersonasPorPacote:
     """Quem trabalha numa gerência com perfil vê as mesmas telas de quem tem o grupo."""
 
@@ -292,11 +316,19 @@ class TestPersonasPorPacote:
         _, da_persona = _me(persona())
         _, do_grupo = _me(UsuarioFactory(groups=ACTOR_GROUPS[ator]))
         assert set(COMPOSTAS) <= set(da_persona), "Grade, Bloqueios e Deslocamentos vêm pela policy"
-        assert set(da_persona) & CHAVES_DE_TELA == set(do_grupo) & CHAVES_DE_TELA
+        # PR 10: o pacote do DAT é o final; o grupo DAT sozinho não aprova, não cria nem abre o Controle.
+        a_mais = PR10_TELAS_DO_DAT if ator == "DAT" else set()
+        assert set(da_persona) & CHAVES_DE_TELA == (set(do_grupo) & CHAVES_DE_TELA) | a_mais
 
     def test_ana_nao_herda_o_que_e_tecnico(self):
-        """O pacote do ADMIN_OPERACIONAL não tem `import_spreadsheet`: as policies de tela batem, as de import não."""
-        assert "import_generic_spreadsheet" not in resolve_public_policies(_ana())
+        """O pacote do ADMIN_OPERACIONAL não tem `import_spreadsheet` (a capacidade técnica).
+
+        PR 10: `import_generic_spreadsheet` vem agora pelo `run_daily_operations` do pacote final.
+        """
+        from apps.core.services.rbac_permissions import get_user_functional_permissions
+
+        assert "import_spreadsheet" not in get_user_functional_permissions(_ana())
+        assert "import_generic_spreadsheet" in resolve_public_policies(_ana())
 
 
 # ----------------------------------------------------------------------------
@@ -358,17 +390,20 @@ DELTA_MEDIDO: dict[str, dict[str, tuple[bool, bool]]] = {
     # O pacote do perfil CONTROLE dá as capacidades do Controle; o front lia o setor.
     # Deslocamentos: a rota abria por view_all_availability, a página respondia "Sem permissão".
     "Bruno (EQUIPE no CONTROLE)": {**_COMPRAS_E_GOOGLE, "tela Deslocamentos (página)": (False, True)},
-    # O pacote do ADMIN_OPERACIONAL dá as capacidades do DAT; o front lia o setor.
-    "Ana (EQUIPE no ADMIN_OPERACIONAL)": {
-        "rota Compras": (False, True),
-        "rota Editar solicitação": (False, True),
-        "tela Deslocamentos (página)": (False, True),
-    },
+    # O pacote do ADMIN_OPERACIONAL dá as capacidades do DAT; o front lia o setor. Desde o PR 10 o
+    # pacote final dá `create_solicitation` (o gate antigo de Editar já lia: sem delta) e
+    # `operate_preagenda`, que abre a seção Controle (cartão e consulta do Google).
+    "Ana (EQUIPE no ADMIN_OPERACIONAL)": {**_COMPRAS_E_GOOGLE, "tela Deslocamentos (página)": (False, True)},
     # GERENTE também está em PAPEIS_COM_PACOTE: ganha o mesmo pacote que EQUIPE. Deslocamentos
     # não muda porque o vínculo de gestão já abria a página antes. Editar solicitação também não:
     # desde o PR 8 o papel GERENTE dá `create_solicitation`, que o gate antigo já lia.
     "GERENTE no CONTROLE": _COMPRAS_E_GOOGLE,
-    "GERENTE no ADMIN_OPERACIONAL": {"rota Compras": (False, True)},
+    "GERENTE no ADMIN_OPERACIONAL": _COMPRAS_E_GOOGLE,
+    # PR 10: o ator DAT (grupo + vínculo EQUIPE na gerência DAT) abre a seção Controle pelo pacote final.
+    "matriz: DAT": {
+        "cartão do Google na Pré-agenda": (False, True),
+        "consulta periódica ao Google": (False, True),
+    },
 }
 
 
@@ -384,4 +419,5 @@ class TestDeltaDasTelasQueTrocaramDeRegra:
         assert delta == DELTA_MEDIDO
 
     def test_os_dez_atores_da_matriz_nao_mudam(self):
-        assert not [p for p in DELTA_MEDIDO if p.startswith("matriz: ")]
+        """Só o DAT muda, e pelo PR 10 (pacote final), não pela troca de regra das telas do PR 7."""
+        assert [p for p in DELTA_MEDIDO if p.startswith("matriz: ")] == ["matriz: DAT"]

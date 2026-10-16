@@ -65,7 +65,12 @@ Os PRs 1 a 11 entram antes da liberação; o 12 e o 13, depois.
    `EquipeGerencia.gerencias_de_atuacao`). Decisões do dono (15/10): num evento da gerência A só entram
    pessoas da A (P9-5) e a formadora vê só os próprios bloqueios e deslocamentos (P9-1). O lint V006 proíbe o
    setor nos arquivos de escopo. Medido em produção: ninguém perde tela que usa; nenhum vínculo a criar.
-10. DAT = administrador operacional (antes, atualizar PA-02/CP-02).
+10. DAT = administrador operacional. Feito em 16/10/2026: PA-02/CP-02 reescritas no primeiro commit; pacote
+    `ADMIN_OPERACIONAL` final (aprovar pela base 5 `capacidade_aprovar`, criar/editar/excluir em qualquer projeto,
+    isenção da compra, Pré-agenda, seção Controle; sem `import_spreadsheet`); migration `0126` tira
+    `import_spreadsheet` do grupo DAT e as capacidades do grupo Superintendência. Segregação por histórico (D2):
+    quem alterou a conta do autor não decide por 30 dias, e quem editou campo material não decide. S4 (decisão
+    do dono de 16/10): o DAT altera todas as contas menos a de superusuário.
 11. Aprovação com uma fonte só.
 12. Corte: o poder deixa de ler grupos.
 13. Limpeza do M2M, dos símbolos e dos grupos, 2 a 4 semanas depois do 12.

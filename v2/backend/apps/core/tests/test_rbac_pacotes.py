@@ -51,9 +51,12 @@ def test_codenames_do_pacote_existem_no_seed():
 
 
 def test_pacote_contido_no_grupo_do_seed():
-    """Limite: compara constante com constante. A prova contra o banco é o ensaio do PR 5."""
+    """Limite: compara constante com constante. A prova contra o banco é o ensaio do PR 5.
+
+    O ADMIN_OPERACIONAL saiu daqui no PR 10: é o pacote final, maior que o grupo DAT. A invariante dele
+    é a do PR 12 (`test_grupo_dat_menos_tecnicas_contido_no_pacote`).
+    """
     grupo_do_perfil = {
-        Gerencia.Perfil.ADMIN_OPERACIONAL: "DAT",
         Gerencia.Perfil.CONTROLE: "Controle",
         Gerencia.Perfil.DIRETORIA: "Diretoria",
     }

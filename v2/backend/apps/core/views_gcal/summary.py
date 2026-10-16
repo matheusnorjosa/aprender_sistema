@@ -160,7 +160,7 @@ class DashboardMetricsView(APIView):
         }
     }
 
-    Permissions: HasPerm("import_spreadsheet")
+    Permissions: CanUseGcal (policy `use_gcal`)
     """
 
     permission_classes = [IsAuthenticated, CanUseGcal]
@@ -264,7 +264,7 @@ class AlertsSummaryView(APIView):
         }
     }
 
-    Permissions: HasPerm("import_spreadsheet")
+    Permissions: CanUseGcal (policy `use_gcal`)
     Timezone-aware: Usa helper _filter_events_queryset (clamp local→UTC)
     """
 

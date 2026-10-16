@@ -120,24 +120,28 @@ const ACTORS: ActorSnapshot[] = [
     expectedSolicitacoesChildren: [...SOLICITACOES_CHILDREN],
   },
   {
-    // Sem Aprovações, Controle, Ações Internas e Solicitações (nenhuma dessas policies).
-    // Bloqueios, Deslocamentos e Grade: view_all_availability e o grupo DAT.
+    // PR 10: o DAT é o administrador operacional (pacote final): Aprovações, Controle e Solicitações.
+    // Sem Ações Internas. Bloqueios, Deslocamentos e Grade: view_all_availability e o grupo DAT.
     actor: 'DAT',
     expectedVisible: [
       'Página Inicial',
       'Meus Eventos',
+      'Aprovações',
       'Bloqueios',
+      'Controle',
       'Deslocamentos',
       'Dashboards',
       'DAT',
       'Grade Mensal',
+      'Solicitações',
     ],
     // Sem Dashboard Geral (view_overview_dashboard é da Diretoria). O seed dá view_map_metrics ao DAT.
     expectedDashboardsChildren: ['Dashboard Compras', 'Dashboard Equipe', 'Dashboard GCal', 'Mapa do Brasil'],
     // Importação pela tela é só do superusuário (decisão do dono, 02/10/2026).
     expectedDatChildren: ['Administração', 'Cadastros', 'Registros de Turmas'],
-    expectedControleChildren: [],
-    expectedSolicitacoesChildren: [],
+    expectedControleChildren: TODO_O_CONTROLE,
+    // Sem "Publicar na agenda" (é da Apoio de Coordenação, `publish_setor_solicitacao`).
+    expectedSolicitacoesChildren: ['Minhas Solicitações', 'Nova Solicitação'],
   },
   {
     actor: 'Controle',
@@ -156,10 +160,10 @@ const ACTORS: ActorSnapshot[] = [
     expectedSolicitacoesChildren: [],
   },
   {
-    // D8: Diretoria fora da Grade Mensal; só dashboards.
+    // D8: Diretoria fora da Grade Mensal; só dashboards. PR 10 (02/10, nº 13): fora do painel do Google.
     actor: 'Diretoria',
     expectedVisible: ['Página Inicial', 'Meus Eventos', 'Dashboards'],
-    expectedDashboardsChildren: [...DASHBOARDS_CHILDREN],
+    expectedDashboardsChildren: ['Dashboard Geral', 'Dashboard Compras', 'Dashboard Equipe', 'Mapa do Brasil'],
     expectedDatChildren: [],
     expectedControleChildren: [],
     expectedSolicitacoesChildren: [],

@@ -7,7 +7,11 @@
  *   Gerente da Superintendência, Coordenador e Apoio têm vínculo vigente de gestão; o Formador,
  *   o papel FORMADOR (PR 8 das permissões: o papel, não a função, dá o poder).
  * - `policies` foi medida no backend para esses mesmos usuários (`resolve_public_policies`,
- *   seed do RBAC, 15/10/2026, já com as 5 policies do PR 7; remedida com o PR 8, sem mudança).
+ *   seed do RBAC, 15/10/2026, já com as 5 policies do PR 7; remedida com o PR 8, sem mudança;
+ *   remedida com o PR 10, 16/10/2026: o DAT tem o vínculo EQUIPE na gerência DAT e o pacote final,
+ *   a Diretoria saiu do painel do Google, e o grupo Superintendência perdeu as capacidades, o que
+ *   tira do ator "Gerente da Superintendência" (que tem esse grupo) o Google, os relatórios e excluir;
+ *   em produção as gerentes aprovam pelo vínculo e não têm o grupo).
  *   Mudou o seed ou uma policy? Meça de novo e atualize aqui; o backend trava a fórmula em
  *   `test_rbac_politicas_de_tela.py`.
  *
@@ -116,13 +120,20 @@ export const ATORES_RBAC: readonly AtorRbac[] = [
     policies: [
       'access_audit_logs',
       'access_availability_blocks',
+      'access_controle_section',
       'access_monthly_availability',
+      'access_solicitation_approvals',
       'access_travel',
+      'create_solicitation',
+      'create_solicitation_without_purchase',
+      'execute_restricted_operations',
       'import_availability_blocks',
       'import_compras',
       'import_generic_spreadsheet',
       'manage_admin_registries',
       'manage_purchases_and_materials',
+      'manage_solicitacao_status',
+      'use_gcal',
       'view_all_availability',
       'view_compras_dashboard',
       'view_compras_pendencias',
@@ -161,7 +172,6 @@ export const ATORES_RBAC: readonly AtorRbac[] = [
     policies: [
       'view_compras_dashboard',
       'view_compras_pendencias',
-      'view_gcal_dashboard',
       'view_map_metrics',
       'view_overview_dashboard',
       'view_team_dashboard',
@@ -181,10 +191,6 @@ export const ATORES_RBAC: readonly AtorRbac[] = [
       'access_solicitation_approvals',
       'access_travel',
       'create_solicitation',
-      'execute_restricted_operations',
-      'manage_solicitacao_status',
-      'use_gcal',
-      'view_reports',
     ],
   },
   {
@@ -259,16 +265,25 @@ export const PERSONAS_POR_VINCULO: readonly (Omit<AtorRbac, 'ator'> & { ator: st
     ator: 'Ana (EQUIPE no perfil ADMIN_OPERACIONAL)',
     equivale: 'DAT',
     user: usuarioDeTeste({}),
-    // O pacote não tem `import_spreadsheet`: sem import_generic_spreadsheet (não é tela).
+    // PR 10: o pacote final do DAT (aprova, cria, exclui, Pré-agenda). Sem `import_spreadsheet`;
+    // import_generic_spreadsheet vem do run_daily_operations.
     policies: [
       'access_audit_logs',
       'access_availability_blocks',
+      'access_controle_section',
       'access_monthly_availability',
+      'access_solicitation_approvals',
       'access_travel',
+      'create_solicitation',
+      'create_solicitation_without_purchase',
+      'execute_restricted_operations',
       'import_availability_blocks',
       'import_compras',
+      'import_generic_spreadsheet',
       'manage_admin_registries',
       'manage_purchases_and_materials',
+      'manage_solicitacao_status',
+      'use_gcal',
       'view_all_availability',
       'view_compras_dashboard',
       'view_compras_pendencias',

@@ -255,6 +255,14 @@ class Solicitacao(models.Model):
         blank=True,
         help_text="SHA1 do payload aplicado no GCal (drift detection)",
     )
+    publicado_fora_do_sistema = models.BooleanField(
+        default=False,
+        verbose_name="Publicado fora do sistema",
+        help_text=(
+            "Está no Google Agenda pela planilha (sheet2gcal) e o sistema não o adotou: publicar daria um "
+            "segundo evento, então o sistema não cria. Ligado pela carga da virada; a adoção do Event ID desliga."
+        ),
+    )
     is_online = models.BooleanField(
         default=False,
         verbose_name="Evento online",

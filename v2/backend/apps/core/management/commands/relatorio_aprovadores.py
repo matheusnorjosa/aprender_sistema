@@ -1,6 +1,10 @@
 """
 Relatório SOMENTE LEITURA de quem passa a aprovar solicitações com o PR B1.
 
+Ferramenta do deploy do B1: NÃO é a fonte de quem aprova hoje. Ela não lista a base 5
+(`capacidade_aprovar`, o DAT pelo pacote ADMIN_OPERACIONAL, PR 10); a fonte é
+`solicitation_approval_basis`, e a lista do PR 10 saiu do script de medição do PR.
+
 No deploy do B1, todo GERENTE com vínculo vigente na gerência `GERENCIA_APROVADORA_NOME`
 passa a aprovar. Rodar ANTES do deploy e conferir a lista nome por nome
 (PLANOS_LIBERACAO_2026-09-29 §3, "Dado de produção"). Não grava nada e não imprime

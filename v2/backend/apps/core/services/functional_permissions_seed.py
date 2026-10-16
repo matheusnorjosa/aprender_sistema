@@ -53,7 +53,9 @@ class FunctionalPermissionSeed:
 #   - DAT: módulo administrativo (cadastros, importação, compras DAT)
 #   - Controle: operações diárias (controle, pre-agenda, gestão availability)
 #   - Diretoria: dashboards executivos
-#   - Superintendência: aprovações e operações restritas
+#   - Superintendência: nenhuma capacidade desde o PR 10 (migration 0126). A aprovação vem do vínculo
+#     GERENTE na gerência aprovadora; `approve_solicitation` e `execute_restricted_operations` vêm do
+#     pacote ADMIN_OPERACIONAL (`rbac_pacotes.PACOTE`)
 #   - Funções: nenhuma capacidade desde o PR 8 (15/10/2026). Criar, editar e publicar vêm do
 #     papel vigente na gerência (`rbac_pacotes.DIREITOS_PAPEL`), não do grupo de função.
 # Ver v2/docs/RBAC_NAMING.md §1, §2 e §3.4 para regras vigentes.
@@ -63,7 +65,8 @@ class FunctionalPermissionSeed:
 # `view_map_metrics`; Assistente Administrativo com compras, pré-agenda e rotinas) e muda só por PR,
 # junto com a migration de dados que aplica a mudança em produção (`# noqa: RBAC-migration-allowed`;
 # a do PR A é a 0121, que grava estes quatro pares num banco montado só por `migrate`; a do PR 8 é a
-# 0125, que tira as capacidades dos grupos de função e apaga `approve_solicitation_batch`).
+# 0125, que tira as capacidades dos grupos de função e apaga `approve_solicitation_batch`; a do PR 10
+# é a 0126, que tira `import_spreadsheet` do DAT e as duas capacidades da Superintendência).
 # `rbac_diff --auditar` sai com exit 1 quando o banco difere daqui.
 FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
     FunctionalPermissionSeed(
@@ -71,14 +74,16 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
         label="Aprovar solicitações",
         description="Aprovar ou reprovar solicitações pendentes.",
         category="solicitacao",
-        group_names=("Superintendência",),
+        # PR 10: nenhum grupo (migration 0126). Vem do pacote ADMIN_OPERACIONAL (base 5 da aprovação);
+        # um grupo com ela daria aprovação global a quem fosse posto nele.
+        group_names=(),
     ),
     FunctionalPermissionSeed(
         codename="execute_restricted_operations",
         label="Executar operações restritas",
         description="Operações destrutivas (exclusões críticas).",
         category="solicitacao",
-        group_names=("Superintendência",),
+        group_names=(),
     ),
     FunctionalPermissionSeed(
         codename="create_solicitation",
@@ -92,7 +97,7 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
         label="Importar planilhas e dados",
         description="Carregar dados em massa via CSV/XLSX.",
         category="importacao",
-        group_names=("DAT",),
+        group_names=(),
     ),
     FunctionalPermissionSeed(
         codename="manage_admin_registries",
@@ -196,8 +201,8 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
         category="solicitacao",
         group_names=(),
     ),
-    # Regra da compra (14/10/2026): isenção checada em `compra_elegibilidade`. Sem grupo até o PR que
-    # a põe no pacote do DAT (migration 0123 só cria a capacidade).
+    # Regra da compra (14/10/2026): isenção checada em `compra_elegibilidade`. Sem grupo; o PR 10 a pôs
+    # no pacote ADMIN_OPERACIONAL (migration 0123 só cria a capacidade).
     FunctionalPermissionSeed(
         codename="create_solicitation_without_purchase",
         label="Criar solicitações sem compra",

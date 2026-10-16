@@ -103,6 +103,70 @@ class Command(BaseCommand):
         )
 
         # ================================================================
+        # PA-02 (segregação D2, PR 10): quem alterou a conta do autor não decide por 30 dias
+        # ================================================================
+        # A janela conta da decisão ou da criação da solicitação, o que vier antes (decisão do
+        # dono de 16/10). Vale nos dois sentidos: o ator alterou a conta do autor, ou o autor redefiniu
+        # a senha do ator; e quando a mesma pessoa alterou a conta do autor e redefiniu a senha do ator
+        # (dois fantoches). Do lado do ator só a senha conta (`ACOES_QUE_DAO_A_CONTA`). Quem alterou
+        # sendo superuser não conta (ele já decide tudo). Só contam decisões gravadas com a trava
+        # (`conta_alterada_pelo_ator` no details); o break-glass do superuser vem com a marca True e
+        # não conta.
+        from apps.core.services.solicitacao_approval import (
+            ACOES_QUE_ALTERAM_CONTA,
+            ACOES_QUE_DAO_A_CONTA,
+            JANELA_SEGREGACAO,
+        )
+
+        d2_violations = 0
+        for log in decision_logs.filter(details__has_key="conta_alterada_pelo_ator").exclude(usuario_id=None):
+            details = log.details or {}
+            sol = (
+                Solicitacao.objects.filter(id=details.get("solicitacao_id")).values("usuario_id", "created_at").first()
+            )
+            if sol is None:
+                continue
+            alteracoes = AuditLog.objects.filter(
+                model_name="Usuario",
+                created_at__gte=min(log.created_at, sol["created_at"]) - JANELA_SEGREGACAO,
+                created_at__lte=log.created_at,
+            )
+            alteracoes_do_autor = alteracoes.filter(action__in=ACOES_QUE_ALTERAM_CONTA)
+            senhas_do_ator = alteracoes.filter(
+                action__in=ACOES_QUE_DAO_A_CONTA, details__target_user_id=log.usuario_id, usuario__is_superuser=False
+            )
+            ator_alterou_autor = not details.get("conta_alterada_pelo_ator") and (
+                alteracoes_do_autor.filter(
+                    usuario_id=log.usuario_id, details__target_user_id=sol["usuario_id"]
+                ).exists()
+            )
+            autor_alterou_ator = not details.get("conta_do_ator_alterada_pelo_autor") and (
+                sol["usuario_id"] != log.usuario_id and senhas_do_ator.filter(usuario_id=sol["usuario_id"]).exists()
+            )
+            alteraram_o_ator = senhas_do_ator.exclude(usuario_id=log.usuario_id).values("usuario_id")
+            mesma_pessoa = not details.get("contas_alteradas_pela_mesma_pessoa") and (
+                alteracoes_do_autor.filter(
+                    details__target_user_id=sol["usuario_id"], usuario_id__in=alteraram_o_ator
+                ).exists()
+            )
+            if ator_alterou_autor or autor_alterou_ator or mesma_pessoa:
+                d2_violations += 1
+
+        report["checks"].append(
+            {
+                "rule": "PA-02 (segregação D2)",
+                "description": (
+                    "No non-superuser decides a solicitation whose author's account they altered, whose "
+                    "author altered theirs, or when one person altered both accounts, in the 30 days before "
+                    "the decision or the creation"
+                ),
+                "status": "PASS" if d2_violations == 0 else "FAIL",
+                "violations": d2_violations,
+                "details": f"Found {d2_violations} decisions with the account of one side altered by the other",
+            }
+        )
+
+        # ================================================================
         # PA-02: Approvers have correct permissions
         # ================================================================
         # This check is simplified - we trust RBAC enforces permissions

@@ -30,22 +30,17 @@ type Flag = (typeof FLAGS)[number];
 /** Flags verdadeiras por ator (as ausentes são false). */
 const ESPERADO: Record<NomeDoAtor, readonly Flag[]> = {
   Superuser: FLAGS,
-  DAT: [
-    'canAccessAvailabilityBlocks',
-    'canAccessMonthlyAvailability',
-    'canAccessTravel',
-    'canViewComprasDashboard',
-    'canViewComprasStats',
-  ],
+  // PR 10: o DAT é o administrador operacional (pacote final): aprova, cria, exclui, sem a compra.
+  DAT: FLAGS,
   Controle: ['canAccessAvailabilityBlocks', 'canAccessMonthlyAvailability', 'canAccessTravel', 'canViewComprasStats'],
   Diretoria: ['canViewComprasDashboard'],
+  // PR 10: o grupo Superintendência perdeu `execute_restricted_operations` (migration 0126).
   'Gerente da Superintendência': [
     'canAccessApprovals',
     'canAccessAvailabilityBlocks',
     'canAccessMonthlyAvailability',
     'canAccessTravel',
     'canCreateSolicitation',
-    'canExecuteRestrictedOperations',
   ],
   'Gerente pedagógico (Vidas)': [
     'canAccessAvailabilityBlocks',

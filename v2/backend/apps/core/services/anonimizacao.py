@@ -185,5 +185,7 @@ def anonimizar_usuario(*, usuario: Usuario, actor: Any) -> bool:
                 "coordenadores_anonimizados": coordenadores_anonimizados,
                 "campos_anonimizados_coordenador": list(CAMPOS_ANONIMIZADOS_COORD),
             },
+            # PR 10 (D2): o registro da conta entra na mesma transação da anonimização.
+            imediato=True,
         )
     return True

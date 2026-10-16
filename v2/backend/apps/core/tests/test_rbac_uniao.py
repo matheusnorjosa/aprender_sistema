@@ -104,9 +104,10 @@ class TestFormula:
     def test_formador_coordenador_apoio_nao_recebem_pacote(self, g19, papel):
         pessoa = UsuarioFactory()
         _vincula(pessoa, g19, papel)
-        # Só o direito de evento do papel (PR 8), nada do pacote ADMIN_OPERACIONAL.
+        # Só o direito de evento do papel (PR 8), nada do pacote ADMIN_OPERACIONAL além dele (o pacote
+        # final do PR 10 também tem criar e editar).
         assert _caps(pessoa) == DIREITOS_PAPEL[papel]
-        assert not _caps(pessoa) & ADMIN_OPERACIONAL
+        assert not _caps(pessoa) & (ADMIN_OPERACIONAL - DIREITOS_PAPEL[papel])
 
     def test_vinculo_inativo_vencido_ou_futuro_nao_da_pacote(self, g19):
         hoje = timezone.localdate()

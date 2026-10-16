@@ -91,6 +91,16 @@ def _so_grupo(*grupos: str) -> Usuario:
     return UsuarioFactory(groups=list(grupos), groups__vinculo=False)
 
 
+def _so_aprovar() -> Usuario:
+    """Só a capacidade `approve_solicitation`, por um grupo de teste. Era o grupo Superintendência até o
+    PR 10 (a migration 0126 tirou dele as capacidades)."""
+    grupo, _ = Group.objects.get_or_create(name="Teste so aprovar PR10")
+    PermissaoFuncional.objects.get(codename="approve_solicitation").groups.add(grupo)
+    user = UsuarioFactory()
+    user.groups.add(grupo)
+    return user
+
+
 def _payload_solicitacao(gerencia_id: int | None = None, **extra: Any) -> dict[str, Any]:
     municipio = MunicipioFactory()
     projeto = ProjetoFactory(fluxo="SUPER", gerencia_id=gerencia_id)
@@ -226,7 +236,7 @@ class TestGestoraPorPapel:
     def test_superintendencia_pura_nao_edita_alheia(self, gerencia_com_alheia):
         """O8-11: vê (global por `approve_solicitation`), mas não edita."""
         _, alheia = gerencia_com_alheia
-        client = _cliente(_so_grupo("Superintendência"))
+        client = _cliente(_so_aprovar())
         assert client.get(f"/api/solicitacoes/{alheia.id}/").status_code == 200
         response = client.patch(f"/api/solicitacoes/{alheia.id}/", {"local": "Editado"}, format="json")
         assert response.status_code == 403
@@ -316,7 +326,7 @@ class TestTravas:
 
     def test_superintendencia_sem_gerente_checa_disponibilidade(self):
         """Sem papel C/A/G: consulta por `approve_solicitation` (o batch saiu)."""
-        sup = _so_grupo("Superintendência")
+        sup = _so_aprovar()
         alvo = UsuarioFactory()
         inicio = timezone.now() + timedelta(days=2)
         client = _cliente(sup)

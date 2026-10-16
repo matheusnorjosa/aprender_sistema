@@ -2,7 +2,7 @@
 Endpoint DRF para listagem de Compras.
 
 GET /api/controle/compras/
-- Permission: HasPerm("import_spreadsheet")
+- Permission: HasPerm("run_daily_operations")
 - Query params: municipio, projeto, uf, from, to, q
 - Returns: Lista de compras com campos relacionados
 """
@@ -52,7 +52,7 @@ class ControleComprasListView(ListAPIView):
     """
     Lista Compras com filtros opcionais.
 
-    Requer permissão: HasPerm("import_spreadsheet") (grupos Controle ou Superintendência)
+    Requer permissão: HasPerm("run_daily_operations") (Controle e, pelo pacote do PR 10, o DAT)
 
     Query params:
         municipio: Filtro por nome do município (icontains)

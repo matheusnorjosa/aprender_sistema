@@ -28,7 +28,13 @@ import pytest
 from apps.core.models import AuditLog, Config, Participation
 from apps.core.services.availability_service import check_conflicts_uncached
 from apps.core.services.horas_formacao import horas_formacao
-from apps.core.tests.factories import GroupFactory, MunicipioFactory, SolicitacaoFactory, UsuarioFactory
+from apps.core.tests.factories import (
+    GroupFactory,
+    MunicipioFactory,
+    SolicitacaoFactory,
+    UsuarioFactory,
+    com_pacote_do_dat,
+)
 
 
 @pytest.fixture
@@ -52,6 +58,8 @@ def super_user(db: Any) -> Any:
     user = UsuarioFactory(username="super_user", email="super@example.com", password="testpass123")
     super_group = GroupFactory(name="Superintendência")
     user.groups.add(super_group)
+    # PR 10: o grupo Superintendência não tem capacidade (0126); o poder vem do pacote do DAT.
+    com_pacote_do_dat(user)
     return user
 
 

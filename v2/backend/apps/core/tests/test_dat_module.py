@@ -41,6 +41,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_dat,
 )
 
 # ============================================================
@@ -345,6 +346,8 @@ class DATModuleAPITestCase(APITestCase):
             username=f"super_user_{uid2}", password="test123", cpf=f"777{uid2}777"  # 11 chars
         )
         cls.super_user.groups.add(cls.super_group, cls.gerente_group)
+        # PR 10: o grupo Superintendência não tem capacidade (0126); o poder vem do pacote do DAT.
+        com_pacote_do_dat(cls.super_user)
 
         uid3 = uuid.uuid4().hex[:5]
         cls.regular_user = UsuarioFactory(

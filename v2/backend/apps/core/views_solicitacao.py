@@ -9,9 +9,10 @@ Solicitacao ViewSet (views ativas)
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any
 
-from django.db.models import Case, F, IntegerField, Q, QuerySet, Value, When
+from django.db.models import Case, F, IntegerField, Max, Q, QuerySet, Value, When
 from django.db.models.functions import Lower
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
@@ -150,6 +151,23 @@ def _rebaixar_se_mudou_campo_material(solicitacao: Solicitacao, antes: dict[str,
     return mudaram
 
 
+def _projeto_saiu_do_super_depois_da_aprovacao(solicitacao: Solicitacao, projeto_ids: set[int | None]) -> bool:
+    """PA-04 (PR 10, decisão 5 do dono: troca de fluxo com registro): algum dos projetos (o de origem e
+    o de destino de uma edição) teve troca de fluxo saindo do SUPER (AuditLog `model_name="Projeto"`)
+    depois da última aprovação da solicitação, ou da criação dela se não há APPROVE registrado. Até 2
+    consultas."""
+    ids = [projeto_id for projeto_id in projeto_ids if projeto_id is not None]
+    if not ids:
+        return False
+    ultima_aprovacao: datetime | None = AuditLog.objects.filter(
+        model_name="Solicitacao", action=AuditLog.Action.APPROVE, details__solicitacao_id=solicitacao.pk
+    ).aggregate(ultima=Max("created_at"))["ultima"]
+    desde = max(solicitacao.created_at, ultima_aprovacao) if ultima_aprovacao else solicitacao.created_at
+    return AuditLog.objects.filter(
+        model_name="Projeto", details__projeto_id__in=ids, details__fluxo__old="SUPER", created_at__gte=desde
+    ).exists()
+
+
 def _batch_response_schema(contador: str) -> dict[str, Any]:
     """Schema OpenAPI da resposta dos lotes: contador + errors[{id, detail, code?, blocked_participants?}].
 
@@ -169,7 +187,15 @@ def _batch_response_schema(contador: str) -> dict[str, Any]:
                         "detail": {"type": "string"},
                         "code": {
                             "type": "string",
-                            "enum": ["self_approval_forbidden", "out_of_approval_scope", "availability_conflict"],
+                            "enum": [
+                                "self_approval_forbidden",
+                                "altered_account_approval_forbidden",
+                                "approver_account_altered_by_author_forbidden",
+                                "accounts_altered_by_same_person_forbidden",
+                                "edited_by_approver_forbidden",
+                                "out_of_approval_scope",
+                                "availability_conflict",
+                            ],
                         },
                         "blocked_participants": {"type": "array", "items": {"type": "object"}},
                     },
@@ -312,9 +338,11 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     PA-01: Status sempre começa pendente.
     PA-02 (Adaptada): aprovar/reprovar exige a policy `access_solicitation_approvals`
     (CanAccessSolicitationApprovals) — GERENTE vigente na gerência SUPERINTENDENCIA
-    (vínculo), Assistente Administrativo do Controle ou superuser (SSOT
-    `solicitation_approval_basis`). Segregação (PR B1): ninguém decide a própria
-    solicitação; superuser pode, marcado no AuditLog.
+    (vínculo), Assistente Administrativo do Controle, o DAT pela capacidade
+    `approve_solicitation` (PR 10) ou superuser (SSOT `solicitation_approval_basis`).
+    Segregação (PR B1, PR 10): ninguém decide a própria solicitação, a de autor cuja conta
+    alterou nos últimos 30 dias nem a que editou em campo material; superuser pode, marcado
+    no AuditLog.
     PR 8/N: Apenas Coordenador ou DAT podem criar solicitações.
     """
 
@@ -502,6 +530,21 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             Participation.objects.get_or_create(solicitacao=instance, usuario=coordenador, role="COORDENADOR")
             validar_avaliacao_formador(instance, criando=True, resposta_anterior=None)
             enforce_solicitacao_availability(instance, action="create")
+
+            # PA-04 (PR 10, decisão do dono de 16/10): quem tem o cadastro de projetos troca o fluxo, com
+            # registro. O evento que nasce aprovado porque o projeto estava NAO_SUPER fica marcado aqui; com
+            # o AuditLog da troca de fluxo (`ProjetoSerializer.update`) dá para achar o criado na janela.
+            if initial_status.status == "aprovado":
+                AuditLog.objects.create(
+                    usuario=self.request.user,
+                    action=AuditLog.Action.CREATE,
+                    model_name="Solicitacao",
+                    details={
+                        "solicitacao_id": instance.id,
+                        "projeto_id": getattr(projeto, "id", None),
+                        "auto_aprovada_por_fluxo": initial_status.fluxo,
+                    },
+                )
 
         logger.info(
             "solicitacao_initial_status_decided",
@@ -700,6 +743,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         Reaprovação: SUPER aprovada com projeto, data, horário, município ou formadores mudados
         volta para pendente (`_rebaixar_se_mudou_campo_material`; o AuditLog leva `reaprovacao`).
+        Aprovada que não volta porque o projeto de origem ou o de destino saiu do SUPER depois da
+        aprovação (troca de fluxo) fica marcada: o AuditLog leva `editada_com_fluxo_nao_super`.
         """
         from django.db import transaction
 
@@ -806,58 +851,73 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             )
             enforce_solicitacao_availability(instance, action="update")
 
-        # Coleta dados novos após save
-        instance.refresh_from_db()
+            # PR 10: o AuditLog UPDATE entra na transação da edição. Ele é a prova de "quem editou não
+            # decide" (PA-02); gravado fora, um insert que falhasse deixaria a edição sem registro.
+            # Coleta dados novos após save
+            instance.refresh_from_db()
 
-        # Captura formadores novos
-        new_formador_ids = set(
-            Participation.objects.filter(solicitacao=instance, role="FORMADOR").values_list("usuario_id", flat=True)
-        )
-
-        new_data = {
-            "status": instance.status,
-            "municipio_id": instance.municipio_id,
-            "projeto_id": instance.projeto_id,
-            "tipo_evento_id": instance.tipo_evento_id,
-            "inicio": instance.inicio.isoformat() if instance.inicio else None,
-            "fim": instance.fim.isoformat() if instance.fim else None,
-            "local": instance.local,
-            "observacoes": instance.observacoes,
-            "is_online": instance.is_online,
-            "coordenador_acompanha": instance.coordenador_acompanha,
-            "coordenador_id": instance.coordenador_id,
-            "pretende_avaliar_formador": instance.pretende_avaliar_formador,
-            "formador_avaliado_id": instance.formador_avaliado_id,
-            "tipo": instance.tipo,
-            "encontro": instance.encontro,
-            "segmento": instance.segmento,
-            "formador_ids": list(new_formador_ids),
-        }
-
-        # Identifica campos alterados
-        changed_fields = {k: {"old": old_data[k], "new": new_data[k]} for k in old_data if old_data[k] != new_data[k]}
-
-        # Se houver alterações, registra no AuditLog
-        if changed_fields:
-            client_ip = get_client_ip(self.request)
-            details: dict[str, Any] = {
-                "solicitacao_id": instance.id,
-                "changed_fields": changed_fields,
-                "ip_address": client_ip,
-                "user_agent": self.request.META.get("HTTP_USER_AGENT", "")[:200],
-            }
-            if campos_reaprovacao:
-                details["reaprovacao"] = {"campos": campos_reaprovacao}
-            if aprovada_como_super:
-                details["aprovada_como_super"] = True
-
-            # AuditLog persistente
-            AuditLog.objects.create(
-                usuario=self.request.user,
-                action=AuditLog.Action.UPDATE,
-                model_name="Solicitacao",
-                details=details,
+            # Captura formadores novos
+            new_formador_ids = set(
+                Participation.objects.filter(solicitacao=instance, role="FORMADOR").values_list("usuario_id", flat=True)
             )
+
+            new_data = {
+                "status": instance.status,
+                "municipio_id": instance.municipio_id,
+                "projeto_id": instance.projeto_id,
+                "tipo_evento_id": instance.tipo_evento_id,
+                "inicio": instance.inicio.isoformat() if instance.inicio else None,
+                "fim": instance.fim.isoformat() if instance.fim else None,
+                "local": instance.local,
+                "observacoes": instance.observacoes,
+                "is_online": instance.is_online,
+                "coordenador_acompanha": instance.coordenador_acompanha,
+                "coordenador_id": instance.coordenador_id,
+                "pretende_avaliar_formador": instance.pretende_avaliar_formador,
+                "formador_avaliado_id": instance.formador_avaliado_id,
+                "tipo": instance.tipo,
+                "encontro": instance.encontro,
+                "segmento": instance.segmento,
+                "formador_ids": list(new_formador_ids),
+            }
+
+            # Identifica campos alterados
+            changed_fields = {
+                k: {"old": old_data[k], "new": new_data[k]} for k in old_data if old_data[k] != new_data[k]
+            }
+
+            # Se houver alterações, registra no AuditLog
+            if changed_fields:
+                client_ip = get_client_ip(self.request)
+                details: dict[str, Any] = {
+                    "solicitacao_id": instance.id,
+                    "changed_fields": changed_fields,
+                    "ip_address": client_ip,
+                    "user_agent": self.request.META.get("HTTP_USER_AGENT", "")[:200],
+                }
+                if campos_reaprovacao:
+                    details["reaprovacao"] = {"campos": campos_reaprovacao}
+                if aprovada_como_super:
+                    details["aprovada_como_super"] = True
+                # PA-04 (decisão 5 do dono): SUPER → NAO_SUPER → edição → SUPER deixaria a aprovada com
+                # data, município ou formadores novos sem reaprovação e sem registro.
+                if (
+                    old_data["status"] == "aprovado"
+                    and not campos_reaprovacao
+                    and _campos_materiais(instance, new_formador_ids) != materiais_antes
+                    and _projeto_saiu_do_super_depois_da_aprovacao(
+                        instance, {old_data["projeto_id"], instance.projeto_id}
+                    )
+                ):
+                    details["editada_com_fluxo_nao_super"] = True
+
+                # AuditLog persistente
+                AuditLog.objects.create(
+                    usuario=self.request.user,
+                    action=AuditLog.Action.UPDATE,
+                    model_name="Solicitacao",
+                    details=details,
+                )
 
     def _assert_pessoas_na_gerencia_do_projeto_novo(self, solicitacao):
         """P9-5 ao mover o evento para projeto de OUTRA gerência: quem fica (formadores, acompanhantes e

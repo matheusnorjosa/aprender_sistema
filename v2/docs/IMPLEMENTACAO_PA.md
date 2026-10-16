@@ -32,8 +32,8 @@ PR17 implementa conformidade com a Política de Aprovação Manual (CP-02), gara
 3. Integrações externas só executam após aprovação (PA-03)
 4. Auditoria completa em AuditLog (PA-05)
 5. Botões ocultos para não-autorizados no frontend (PA-06)
-6. Testes obrigatórios implementados e passando (PA-07) — hoje **6** funções de teste em
-   `apps/core/tests/test_approval_policy_PA.py`
+6. Testes obrigatórios implementados e passando (PA-07) — hoje **7** funções de teste em
+   `apps/core/tests/test_approval_policy_PA.py` (PR 10: + `test_segregacao_conta_alterada_bloqueia_decisao`)
 
 > **Atualização hardening RBAC (2026-04-29 — PR 3 #1308):** PA-02 evoluiu da
 > regra original "Superintendência ou superuser" e da "PA-02 Adaptada" intermediária
@@ -41,7 +41,9 @@ PR17 implementa conformidade com a Política de Aprovação Manual (CP-02), gara
 > `access_solicitation_approvals` exige **Gerente da Superintendência** (Setor
 > `Superintendência` + Função `Gerente`) **OU** **Assistente Administrativo do
 > Controle** (Setor `Controle` + Função `Assistente Administrativo`).
-> DAT, Controle puro e Gerente pedagógico **não aprovam** mais.
+> DAT, Controle puro e Gerente pedagógico **não aprovam** mais. *(Desde o PR 10, 16/10/2026, o
+> DAT volta a aprovar, pelo pacote `ADMIN_OPERACIONAL` do vínculo na gerência DAT (base
+> `capacidade_aprovar`), com a segregação por histórico. Fonte atual: a spec.)*
 > Frontend usa `access_solicitation_approvals` direto (PR 10 #1315);
 > `can_approve_super` permanece no payload de `/api/me/` apenas como
 > contrato legado — não é fonte de decisão.
@@ -149,7 +151,7 @@ test_approval_policy_PA.py::test_approval_flow_records_audit_log PASSED
 | Requisito | Status | Implementação real | Arquivo:linha |
 |-----------|--------|---------------|---------|
 | **PA-01** | ✅ (SUPER) | `resolve_initial_status(*, projeto)` — SUPER→`pendente`, NAO_SUPER→`aprovado`. A **data não entra** na decisão | `services/solicitacao_create.py` |
-| **PA-02** | ✅ | Gate `CanAccessSolicitationApprovals`. A classe `IsSuperintendencia` **não existe**; `apps/core/permissions.py` exporta só `HasFunctionalPermission, HasPerm, HasSectorAccess, IsGerenteSuperintendencia, IsOwnerOrPrivileged, SuperuserOnly`. **DAT não aprova** | 4 `@action` gateados por `CanAccessSolicitationApprovals` (`approve`/`reject`/`batch_approve`/`batch_reject`); `_user_has_solicitation_approvals` (`rbac/policies.py`) |
+| **PA-02** | ✅ | Gate `CanAccessSolicitationApprovals`. A classe `IsSuperintendencia` **não existe**; `apps/core/permissions.py` exporta só `HasFunctionalPermission, HasPerm, HasSectorAccess, IsGerenteSuperintendencia, IsOwnerOrPrivileged, SuperuserOnly`. **DAT aprova desde o PR 10** (base `capacidade_aprovar`) | 4 `@action` gateados por `CanAccessSolicitationApprovals` (`approve`/`reject`/`batch_approve`/`batch_reject`); `_user_has_solicitation_approvals` (`rbac/policies.py`) |
 | **PA-03** | ✅ | Celery task `task_publish_solicitacao_to_gcal` validado via mock | `test_calendar_integration_not_called_before_approval` / `test_calendar_integration_is_called_after_approval` (`tests/test_approval_policy_PA.py`) |
 | **PA-04** | ✅ | Campo `status` com `default="pendente"` | `Solicitacao.status` (`models/solicitacao.py`) |
 | **PA-05** | ✅ | `AuditLog.objects.create()` em approve/reject | `approve_solicitacao`/`reject_solicitacao` (`services/solicitacao_approval.py`) |

@@ -140,6 +140,16 @@ class Command(BaseCommand):
                 continue
             self._upsert_equipe_gerencia(usuario=user_obj, gerencia=gerencia, papel=papel)
 
+        # PR 10 das permissões: o DAT de produção tem o vínculo EQUIPE na gerência DAT (perfil
+        # ADMIN_OPERACIONAL); o pacote final (aprovar, excluir, Pré-agenda) vem dele, não do grupo.
+        dat_user = by_username.get("dat_e2e@test.com")
+        if dat_user:
+            gerencia_dat, _ = Gerencia.objects.update_or_create(
+                nome="GERENCIA DAT",
+                defaults={"nome_setor": "DAT", "perfil": Gerencia.Perfil.ADMIN_OPERACIONAL, "ativo": True},
+            )
+            self._upsert_equipe_gerencia(usuario=dat_user, gerencia=gerencia_dat, papel="EQUIPE")
+
         # 4b. Compras (pré-requisito para criação de solicitação: a regra da compra
         # exige DATCompra ativa com quantidade > 0 que libere o par (municipio, projeto)).
         self.stdout.write("\n4b. Criando compras pré-requisitas...")

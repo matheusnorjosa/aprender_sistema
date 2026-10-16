@@ -200,6 +200,9 @@ const ACTORS: ActorSnapshot[] = [
       [EDITAR]: true,
       ...COMPRAS,
       '/dat/admin': true,
+      // PR 10: o DAT aprova (base 5) e opera a pré-agenda (seção Controle).
+      '/solicitacoes/aprovacoes': true,
+      '/controle': true,
       // '/dat/importacoes' fica negada: importação pela tela é só do superusuário (02/10/2026)
     },
   },
@@ -220,7 +223,7 @@ const ACTORS: ActorSnapshot[] = [
       '/dashboards': true,
       '/dashboards/compras': true,
       '/dashboards/equipe': true,
-      '/dashboards/gcal': true,
+      // PR 10 (decisão do dono de 02/10, nº 13): a Diretoria saiu do painel do Google.
       '/mapa-brasil': true,
       // D8: fora da Grade Mensal.
     },
@@ -381,8 +384,8 @@ describe('AppRoutes — Forbidden é mensagem genérica (OWASP)', () => {
     }
   });
 
-  test('Forbidden em /solicitacoes/aprovacoes (DAT) não vaza policy', async () => {
-    renderRotaDoAtor('/solicitacoes/aprovacoes', atorRbac('DAT'));
+  test('Forbidden em /solicitacoes/aprovacoes (Controle puro) não vaza policy', async () => {
+    renderRotaDoAtor('/solicitacoes/aprovacoes', atorRbac('Controle'));
     expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
     for (const pat of FORBIDDEN_LEAKAGE_PATTERNS) {
       expect(screen.queryByText(pat)).not.toBeInTheDocument();

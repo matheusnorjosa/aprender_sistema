@@ -81,7 +81,7 @@ class CurrentUserView(APIView):
             ],
             "is_superuser": bool,
             "is_superintendencia": bool,
-            "can_approve_super": bool,  # Legado: = policy access_solicitation_approvals (DAT não aprova)
+            "can_approve_super": bool,  # Legado: = policy access_solicitation_approvals (DAT aprova: PR 10)
             "permissions": list[str],   # Permissões funcionais efetivas (codenames)
             "deve_trocar_senha": bool   # Senha definida por outra pessoa: só a troca é liberada
         }

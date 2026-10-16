@@ -202,7 +202,14 @@ V006_ARQUIVOS: tuple[str, ...] = (
 )
 V006_ATRIBUTOS: frozenset[str] = frozenset({"setor", "setor_canonico"})
 # Lookup ORM cujo segmento é `setor` ou `setor_canonico` (`setor__in`, `projeto__setor`, ...).
-V006_LOOKUP = re.compile(r"^(?:[a-z_]+__)*setor(?:_canonico)?(?:__[a-z_]+)*$")
+# Por segmentos, sem regex aninhada (CodeQL py/redos).
+_V006_SO_LETRAS = re.compile(r"[a-z_]+")
+
+
+def _v006_lookup_de_setor(texto: str) -> bool:
+    return bool(_V006_SO_LETRAS.fullmatch(texto)) and any(seg in V006_ATRIBUTOS for seg in texto.split("__"))
+
+
 V006_MENSAGEM = (
     "Setor (texto) no escopo. Desde o PR 9 o alcance é a gerência do projeto (`projeto.gerencia_id`, "
     "`EquipeGerencia.gerencias_de_atuacao`). Ver specs/backend/rbac.spec.md."
@@ -418,12 +425,12 @@ class SetorNoEscopoVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_keyword(self, node: ast.keyword) -> None:
-        if node.arg is not None and V006_LOOKUP.match(node.arg):
+        if node.arg is not None and _v006_lookup_de_setor(node.arg):
             self._add(node.value.lineno)
         self.generic_visit(node)
 
     def visit_Constant(self, node: ast.Constant) -> None:
-        if isinstance(node.value, str) and V006_LOOKUP.match(node.value):
+        if isinstance(node.value, str) and _v006_lookup_de_setor(node.value):
             self._add(node.lineno)
 
     def _add(self, lineno: int) -> None:

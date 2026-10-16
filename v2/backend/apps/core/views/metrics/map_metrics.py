@@ -419,9 +419,7 @@ def metrics_map_coordinators(request: Request) -> Response:
     for p in participations:
         user_id = p.usuario_id
         if user_id not in coordenadores_data:
-            nome = f"{p.usuario.first_name} {p.usuario.last_name}".strip()
-            if not nome:
-                nome = p.usuario.username
+            nome = str(p.usuario)  # nome, ou "Usuario #id": nunca o login (CPF)
             coordenadores_data[user_id] = {
                 "id": user_id,
                 "nome": nome,

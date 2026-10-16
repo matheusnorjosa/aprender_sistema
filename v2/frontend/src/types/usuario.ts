@@ -18,7 +18,8 @@ export interface UserSlim {
   username: string;
   first_name: string;
   last_name: string;
-  email: string;
+  // S5: null quando é o e-mail de reserva `<cpf>@placeholder.local` ou leva CPF.
+  email: string | null;
 }
 
 /**

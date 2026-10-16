@@ -34,7 +34,6 @@ function makeSolic(gcal_status: GCalStatus): Solicitacao {
   return {
     id: 42,
     usuario: 1,
-    usuario_username: 'coord1',
     municipio: 5,
     municipio_nome: 'Sobral',
     projeto: 10,
@@ -46,7 +45,6 @@ function makeSolic(gcal_status: GCalStatus): Solicitacao {
     segmento: null,
     coordenador_acompanha: false,
     coordenador: null,
-    coordenador_username: null,
     coordenador_nome: null,
     inicio: '2026-10-10T12:00:00Z',
     fim: '2026-10-10T15:00:00Z',

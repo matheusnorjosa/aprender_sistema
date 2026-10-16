@@ -83,13 +83,12 @@ def formadores_metrics(request: Request) -> Response:
         usuario__isnull=False,  # Exclude guest participations
     )
 
-    # Aggregate by usuario — include username to avoid N+1 fallback (#781)
+    # Aggregate by usuario — o nome vem na mesma consulta, sem N+1 (#781)
     formadores_stats = (
         participations.values(
             "usuario_id",
             "usuario__first_name",
             "usuario__last_name",
-            "usuario__username",
         )
         .annotate(
             eventos=Count("solicitacao_id", distinct=True),
@@ -108,10 +107,10 @@ def formadores_metrics(request: Request) -> Response:
         # 2 casas, como `ch_month`/`ch_year` da Grade Mensal: os dois mostram o mesmo número.
         horas = round(horas_por_pessoa[stat["usuario_id"]].total, 2)
 
-        # Build full name — use username from same query as fallback
+        # Nome, ou "Usuario #id" como `str(usuario)`: nunca o login (CPF)
         nome = f"{stat['usuario__first_name']} {stat['usuario__last_name']}".strip()
         if not nome:
-            nome = stat["usuario__username"] or f"Usuário #{stat['usuario_id']}"
+            nome = f"Usuario #{stat['usuario_id']}"
 
         formadores_list.append(
             {

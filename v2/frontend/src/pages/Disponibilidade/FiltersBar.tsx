@@ -174,7 +174,7 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
           type="text"
           value={q}
           onChange={(e: ChangeEvent<HTMLInputElement>) => onChange({ q: e.target.value })}
-          placeholder="Buscar nome/email"
+          placeholder="Buscar nome"
           className="w-48 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>

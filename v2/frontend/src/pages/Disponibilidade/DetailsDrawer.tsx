@@ -12,7 +12,7 @@ import type { ID } from '../../types';
 export interface PersonType {
   id: ID;
   name: string;
-  email?: string;
+  email?: string | null;
   ch_month?: number;
   ch_year?: number;
   position_month?: number | string;

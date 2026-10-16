@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import re
 import threading
+from typing import cast
 
 # PII patterns para o PIIRedactionFilter.
 # S6 (auditoria 14/10, C5): sem backtracking quadrático; mesma forma e mesma explicação de
@@ -16,6 +17,9 @@ import threading
 _EMAIL = r"[\w.+-]+@[\w-]+\.[\w.-]+"
 _EMAIL_RE = re.compile(rf"(?<![\w.+-]){_EMAIL}(?:(?=\+){_EMAIL})*")
 _CPF_RE = re.compile(r"\b\d{11}\b")
+
+# Atributos que todo LogRecord tem. O resto veio do `extra=` de quem logou (ou de outro filtro).
+_ATRIBUTOS_PADRAO = frozenset(vars(logging.LogRecord("", 0, "", 0, "", (), None))) | {"message", "asctime"}
 
 
 class RequestIDFilter(logging.Filter):
@@ -60,13 +64,18 @@ class ContextFilter(logging.Filter):
 
 
 class PIIRedactionFilter(logging.Filter):
-    """Mascara PII na mensagem do log ANTES da formatacao (LGPD art. 46).
+    """Mascara PII no log ANTES da formatacao (LGPD art. 46): mensagem, `extra` e traceback.
 
     Camada de defesa central: em vez de confiar que cada call-site nao loga PII, o
     pipeline scrubba de QUALQUER mensagem:
     - e-mail (ex.: google_email de OAuth) -> mantem o dominio, mascara o local:
       `***@dominio` (observabilidade sem identificar a pessoa).
     - sequencia de 11 digitos (CPF, tambem username de usuarios importados) -> `<cpf>`.
+
+    S5 (auditoria 14/10, C11): o JsonFormatter grava cada `extra` como campo proprio e o
+    traceback inteiro, entao os valores texto dos `extra` (inclusive dentro de dict/lista) e o
+    traceback passam pela mesma mascara. Com PII no traceback, o texto ja redigido vai em
+    `exc_text` e `exc_info` sai (o formatter usa `exc_text` quando nao ha `exc_info`).
 
     Aplicado a todos os handlers em `LOGGING`. Nao substitui a disciplina de nao logar
     PII no call-site, mas garante o piso mesmo quando alguem esquece.
@@ -77,14 +86,40 @@ class PIIRedactionFilter(logging.Filter):
         # Cada trecho após um `@` é o domínio daquele e-mail seguido, numa cadeia, do `+local` do próximo.
         return "".join(f"***@{trecho.split('+', 1)[0]}" for trecho in m.group(0).split("@")[1:])
 
+    @classmethod
+    def _redigir(cls, valor: object) -> object:
+        if isinstance(valor, str):
+            return _CPF_RE.sub("<cpf>", _EMAIL_RE.sub(cls._mask_email, valor))
+        if isinstance(valor, dict):
+            return {k: cls._redigir(v) for k, v in cast(dict[object, object], valor).items()}
+        if isinstance(valor, list):
+            return [cls._redigir(v) for v in cast(list[object], valor)]
+        if isinstance(valor, tuple):
+            return tuple(cls._redigir(v) for v in cast(tuple[object, ...], valor))
+        return valor
+
     def filter(self, record: logging.LogRecord) -> bool:
         try:
             msg = record.getMessage()
         except Exception:
-            return True
-        redacted = _EMAIL_RE.sub(self._mask_email, msg)
-        redacted = _CPF_RE.sub("<cpf>", redacted)
-        if redacted != msg:
-            record.msg = redacted
-            record.args = ()
+            msg = None
+        if msg is not None:
+            redacted = str(self._redigir(msg))
+            if redacted != msg:
+                record.msg = redacted
+                record.args = ()
+
+        for nome, valor in list(vars(record).items()):
+            if nome not in _ATRIBUTOS_PADRAO:
+                setattr(record, nome, self._redigir(valor))
+
+        if record.exc_info and not record.exc_text:
+            record.exc_text = logging.Formatter().formatException(record.exc_info)
+        if record.exc_text:
+            redigido = self._redigir(record.exc_text)
+            if redigido != record.exc_text:
+                record.exc_text = str(redigido)
+                record.exc_info = None
+        if record.stack_info:
+            record.stack_info = str(self._redigir(record.stack_info))
         return True

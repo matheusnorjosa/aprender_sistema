@@ -326,8 +326,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
     filter_backends = [DjangoFilterBackend, SearchFilter, _SolicitacaoOrderingFilter]
     filterset_fields = []  # PR15: status handled manually in get_queryset with alias mapping
+    # S5 (C10): sem `usuario__username` (o login é o CPF; buscar por pedaço dele seria oráculo).
     search_fields = [
-        "usuario__username",
         "usuario__first_name",
         "usuario__last_name",
         "municipio__nome",
@@ -455,7 +455,6 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 | Q(observacoes__icontains=q)
                 | Q(usuario__first_name__icontains=q)
                 | Q(usuario__last_name__icontains=q)
-                | Q(usuario__username__icontains=q)
             )
 
         return qs
@@ -509,7 +508,6 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             extra={
                 "event": "solicitacao_initial_status_decided",
                 "user_id": self.request.user.id,
-                "username": self.request.user.username,
                 "solicitacao_id": instance.id,
                 "projeto_id": getattr(projeto, "id", None),
                 "projeto_fluxo": initial_status.fluxo,

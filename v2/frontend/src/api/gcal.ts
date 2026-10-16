@@ -8,6 +8,7 @@ import { fetchAPI, buildUrl, type QueryParams } from './config';
 import { API_BASE } from './config';
 import { syncChannel } from '../services/syncChannel';
 import type { ID, PaginatedResponse } from '../types';
+import type { Participation } from '../types/solicitacao';
 
 /**
  * GCal status summary counts
@@ -188,8 +189,9 @@ export interface GCalDashboardEventDetail {
   tipo_evento_nome: string | null;
   inicio: string | null;
   fim: string | null;
-  usuario_username: string | null;
-  coordenador_username: string | null;
+  /** Nome de quem criou (ou "Usuario #id"); nunca o login, que é o CPF. */
+  usuario_nome: string | null;
+  coordenador_nome: string | null;
   fluxo: string;
   gcal_status: 'NONE' | 'PENDING' | 'PUBLISHED' | 'ERROR';
   external_event_id: string | null;
@@ -198,12 +200,7 @@ export interface GCalDashboardEventDetail {
   gcal_payload_hash: string | null;
   gcal_last_error: string | null;
   updated_at: string | null;
-  participations: Array<{
-    email: string;
-    role: string;
-    ch_horas?: number;
-    observacao?: string;
-  }>;
+  participations: Participation[];
   timeline: GCalEventTimelineItem[];
 }
 

@@ -21,7 +21,8 @@ class HomeStatsResponseSerializer(serializers.Serializer):
 class MonthlyAvailabilityPersonSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     name = serializers.CharField()
-    email = serializers.EmailField(allow_blank=True)
+    # None quando o e-mail é o de reserva (`<cpf>@placeholder.local`) ou leva CPF (S5).
+    email = serializers.EmailField(allow_blank=True, allow_null=True)
     ch_month = serializers.FloatField()
     ch_year = serializers.FloatField()
     position_month = serializers.IntegerField()

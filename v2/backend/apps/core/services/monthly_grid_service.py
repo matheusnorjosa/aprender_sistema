@@ -24,10 +24,10 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from django.db.models import Q
 from django.utils import timezone
 
 from apps.core.models import AvailabilityBlock, Deslocamento, EquipeGerencia, Participation, Solicitacao, Usuario
+from apps.core.pii import busca_por_nome, email_sem_cpf
 from apps.core.services.horas_formacao import horas_formacao
 from apps.core.types import UserId
 
@@ -53,7 +53,8 @@ def build_monthly_grid(
             participações e eventos apenas dessa gerência. Quando None, mantém
             comportamento legado (apenas fluxo SUPER).
         sector: Filtro opcional por setor (projeto.nome)
-        q: Filtro opcional por nome/email (icontains)
+        q: Filtro opcional por nome (icontains); o e-mail só entra quando o termo não tem
+            dígito (acha "Conceição" por "conceicao" sem virar oráculo de CPF)
         allowed_user_ids: Lista de IDs de usuários permitidos (None = todos)
 
     Returns:
@@ -98,11 +99,7 @@ def build_monthly_grid(
 
         if q and q.strip():
             q_lower = q.strip().lower()
-            equipe_qs = equipe_qs.filter(
-                Q(usuario__first_name__icontains=q_lower)
-                | Q(usuario__last_name__icontains=q_lower)
-                | Q(usuario__email__icontains=q_lower)
-            )
+            equipe_qs = equipe_qs.filter(busca_por_nome(q_lower, "usuario__"))
 
         user_ids = list(set(equipe_qs.values_list("usuario_id", flat=True)))
     else:
@@ -112,11 +109,7 @@ def build_monthly_grid(
 
         if q and q.strip():
             q_lower = q.strip().lower()
-            participations_qs = participations_qs.filter(
-                Q(usuario__first_name__icontains=q_lower)
-                | Q(usuario__last_name__icontains=q_lower)
-                | Q(usuario__email__icontains=q_lower)
-            )
+            participations_qs = participations_qs.filter(busca_por_nome(q_lower, "usuario__"))
 
         user_ids = list(set(participations_qs.values_list("usuario_id", flat=True)))
 
@@ -279,19 +272,19 @@ def build_monthly_grid(
 
     # 7. People com CH mês/ano. Usar values() evita hidratação completa do
     # modelo Usuario (os únicos campos usados são nome/email).
-    user_rows = Usuario.objects.filter(id__in=user_ids).values("id", "first_name", "last_name", "email", "username")
+    user_rows = Usuario.objects.filter(id__in=user_ids).values("id", "first_name", "last_name", "email")
 
     people = []
     for row in user_rows:
         uid = row["id"]
-        # Replica get_full_name(): join de first+last, com fallback no username.
+        # Replica `str(usuario)`: nome, ou "Usuario #id". Nunca o login nem o e-mail de reserva (CPF).
         full = f"{row['first_name']} {row['last_name']}".strip()
-        name = full or row["username"]
+        name = full or f"Usuario #{uid}"
         people.append(
             {
                 "id": uid,
                 "name": name,
-                "email": row["email"],
+                "email": email_sem_cpf(row["email"]),
                 "ch_month": round(ch_month_by_user.get(uid, 0.0), 2),
                 "ch_year": round(ch_year_by_user.get(uid, 0.0), 2),
             }

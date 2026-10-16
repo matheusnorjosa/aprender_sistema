@@ -593,11 +593,11 @@ class TestMetricsMapCoordinators:
         assert data["uf"] == "SP"
         assert data["coordenadores"] == []
 
-    def test_coordinator_username_fallback(self, user_controle, municipios, projeto, tipo_evento, grupos):
+    def test_coordinator_sem_nome_mostra_usuario_id(self, user_controle, municipios, projeto, tipo_evento, grupos):
         """
-        Test: Coordinator without first/last name uses username.
+        Test: Coordinator without first/last name shows "Usuario #id".
 
-        Covers lines 212-213: Fallback to username.
+        S5: nunca o login, que é o CPF.
         """
         client = APIClient()
         client.force_authenticate(user=user_controle)
@@ -650,7 +650,7 @@ class TestMetricsMapCoordinators:
             None,
         )
         assert coord is not None
-        assert coord["nome"] == f"coord_anonimo_{uid}"
+        assert coord["nome"] == f"Usuario #{coord_sem_nome.id}"
 
 
 # ============================================================================
@@ -684,13 +684,13 @@ class TestFormadoresMetricsUsernameFallback:
         assert formador is not None
         assert formador["nome"] == "João Santos"
 
-    def test_formador_without_name_uses_username(
+    def test_formador_sem_nome_mostra_usuario_id(
         self, user_gerencia, municipios, projeto, tipo_evento, formador_sem_nome, grupos
     ):
         """
-        Test: Formador without first/last name uses username.
+        Test: Formador without first/last name shows "Usuario #id".
 
-        Covers lines 421-427: Fallback logic.
+        S5: nunca o login, que é o CPF.
         """
         client = APIClient()
         client.force_authenticate(user=user_gerencia)
@@ -733,8 +733,7 @@ class TestFormadoresMetricsUsernameFallback:
             None,
         )
         assert formador is not None
-        # Should use username as fallback
-        assert formador["nome"] == formador_sem_nome.username
+        assert formador["nome"] == f"Usuario #{formador_sem_nome.id}"
 
     def test_formadores_metrics_returns_expected_fields(self, user_gerencia, solicitacoes_ce, formador_com_nome):
         """

@@ -54,6 +54,7 @@ import dayjs from 'dayjs';
 import logger from '../../utils/logger';
 import { formatFortaleza } from '../../utils/datetime';
 import { TIMING } from '../../constants';
+import { participantLabel } from '../../utils/participants';
 import {
   getDashboardMetrics,
   listDashboardEvents,
@@ -749,8 +750,8 @@ export default function GCalDashboardPage(): JSX.Element {
               <Descriptions.Item label="Fim">
                 {eventDetail.fim ? formatFortaleza(eventDetail.fim) : '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="Usuário">{eventDetail.usuario_username || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Coordenador">{eventDetail.coordenador_username || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Usuário">{eventDetail.usuario_nome || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Coordenador">{eventDetail.coordenador_nome || '-'}</Descriptions.Item>
               <Descriptions.Item label="Fluxo">
                 <Tag color={eventDetail.fluxo === 'SUPER' ? 'blue' : 'green'}>
                   {eventDetail.fluxo}
@@ -794,11 +795,12 @@ export default function GCalDashboardPage(): JSX.Element {
               <>
                 <Divider orientation="left">Participações</Divider>
                 <Space direction="vertical" style={{ width: '100%' }}>
-                  {eventDetail.participations.map((p) => (
-                    <Card key={p.email} size="small">
+                  {eventDetail.participations.map((p, index) => (
+                    <Card key={p.usuario?.id ?? p.guest_email ?? index} size="small">
                       <Space>
                         <UserOutlined />
-                        <Text strong>{p.email}</Text>
+                        {/* S5: o e-mail vem null quando é o de reserva ou leva CPF; o rótulo é o nome. */}
+                        <Text strong>{participantLabel(p)}</Text>
                         <Tag>{p.role}</Tag>
                         {p.ch_horas && <Text type="secondary">{p.ch_horas}h</Text>}
                       </Space>

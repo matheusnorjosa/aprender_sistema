@@ -65,8 +65,8 @@ class GuardResult:
 
 
 def _display_name(usuario: Usuario) -> str:
-    """Nome legível do participante para as mensagens de conflito (RD-08)."""
-    return str(usuario.get_full_name() or usuario.username)
+    """Nome legível do participante para as mensagens de conflito (RD-08); nunca o login (CPF)."""
+    return str(usuario)
 
 
 def collect_participants(solicitacao: Solicitacao) -> tuple[list[Usuario], list[str]]:

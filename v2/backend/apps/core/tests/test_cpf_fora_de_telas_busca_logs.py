@@ -26,7 +26,7 @@ from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 from django.conf import settings
-from django.test import RequestFactory
+from django.test import RequestFactory, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -150,11 +150,13 @@ def cenario():
     controle = _conta(nome="Operadora", groups=["Controle", "Assistente Administrativo"])
     criador_sem_nome = _conta(groups=["Coordenador"])
     coordenador = _conta(nome="Joana", sobrenome="Coordenadora", groups=["Coordenador"])
+    avaliado_sem_nome = _conta(groups=["Formador"])
     agora = timezone.now()
     comum = {"status": "aprovado", "gcal_status": Solicitacao.GCalStatus.PUBLISHED, "gcal_payload_hash": "hash"}
     com_coord = SolicitacaoFactory(
         usuario=criador_sem_nome,
         coordenador=coordenador,
+        formador_avaliado=avaliado_sem_nome,
         inicio=agora + timedelta(days=2),
         fim=agora + timedelta(days=2, hours=2),
         external_event_id="evtcomcoord",
@@ -179,6 +181,7 @@ def cenario():
         "controle": controle,
         "criador": criador_sem_nome,
         "coordenador": coordenador,
+        "avaliado": avaliado_sem_nome,
         "com_coord": com_coord,
         "sem_coord": sem_coord,
     }
@@ -200,7 +203,7 @@ def _rotas(c) -> list[str]:
 
 def test_respostas_de_solicitacoes_e_gcal_nao_levam_cpf(cenario):
     cliente = _client(cenario["controle"])
-    cpfs = {cenario["criador"].username, cenario["coordenador"].username}
+    cpfs = {cenario["criador"].username, cenario["coordenador"].username, cenario["avaliado"].username}
     for rota in _rotas(cenario):
         resp = cliente.get(rota)
         assert resp.status_code == 200, (rota, resp.status_code)
@@ -214,6 +217,7 @@ def test_nome_continua_saindo_no_lugar_do_login(cenario):
     detalhe = cliente.get(f"/api/solicitacoes/{cenario['com_coord'].id}/").json()
     assert "usuario_username" not in detalhe and "coordenador_username" not in detalhe
     assert detalhe["coordenador_nome"] == "Joana Coordenadora"
+    assert detalhe["formador_avaliado_nome"] == f"Usuario #{cenario['avaliado'].id}"
 
     gcal = cliente.get(f"/api/gcal/dashboard/events/{cenario['com_coord'].id}/detail/").json()
     assert "usuario_username" not in gcal and "coordenador_username" not in gcal
@@ -346,3 +350,116 @@ def test_auditoria_redige_cpf_digitado_errado_em_linha_antiga():
 
     assert _redact_details({"username": "900.000.000-0"})["username"] == "<cpf>"
     assert _redact_details({"username": "admin"})["username"] == "admin"
+
+
+# =============================================================================
+# Família: nome de exibição, erro do GCal e descrição do evento sem o login
+# =============================================================================
+
+
+def _linha_de_erro_antiga(s, operador) -> None:
+    """Linha gravada antes do conserto: a mensagem da exceção levava o login do operador."""
+    AuditLog.objects.create(
+        usuario=operador,
+        action=AuditLog.Action.PUBLISH_GCAL_ERROR,
+        model_name="Solicitacao",
+        details={
+            "solicitacao_id": s.id,
+            "operation": "publish",
+            "error": f"Google OAuth credential not found for user '{operador.username}' (id={operador.id}).",
+        },
+    )
+
+
+@pytest.mark.parametrize("origem", ["task", "linha_antiga"])
+@override_settings(GCAL_AUTH_MODE="oauth")
+def test_erro_de_credencial_google_nao_leva_cpf_a_timeline_nem_a_auditoria(cenario, origem):
+    from apps.core.tasks import task_publish_solicitacao_to_gcal
+
+    operador = cenario["controle"]  # sem GoogleOAuthCredential
+    s = cenario["sem_coord"]
+    if origem == "task":
+        task_publish_solicitacao_to_gcal(s.id, operator_user_id=operador.id)
+    else:
+        _linha_de_erro_antiga(s, operador)
+    linha = AuditLog.objects.get(action=AuditLog.Action.PUBLISH_GCAL_ERROR, details__solicitacao_id=s.id)
+    if origem == "task":  # na origem: a mensagem da exceção já não leva o login
+        assert operador.username not in linha.details["error"], linha.details
+
+    cliente = _client(operador)
+    for rota in (
+        f"/api/gcal/dashboard/events/{s.id}/detail/",
+        f"/api/audit-logs/?action={AuditLog.Action.PUBLISH_GCAL_ERROR}",
+    ):
+        resp = cliente.get(rota)
+        assert resp.status_code == 200, (rota, resp.status_code)
+        corpo = resp.content.decode()
+        assert "credential not found" in corpo, rota
+        assert not _ONZE_DIGITOS.search(corpo), (rota, corpo)
+
+
+def test_conflito_de_agenda_nao_leva_cpf_de_formador_sem_nome():
+    from apps.core.models import AvailabilityBlock, Participation
+    from apps.core.tests.factories import liberar_par
+
+    municipio = MunicipioFactory()
+    projeto = ProjetoFactory(fluxo="SUPER")
+    liberar_par(municipio, projeto)
+    formador = _conta(groups=["Formador"])
+    inicio = timezone.now() + timedelta(days=30)
+    s = SolicitacaoFactory(
+        usuario=_conta(nome="Coord", groups=["Coordenador"]),
+        municipio=municipio,
+        projeto=projeto,
+        inicio=inicio,
+        fim=inicio + timedelta(hours=2),
+        status="pendente",
+    )
+    Participation.objects.create(solicitacao=s, usuario=formador, role=Participation.Role.FORMADOR)
+    AvailabilityBlock.objects.create(
+        usuario=formador,
+        inicio=inicio + timedelta(minutes=30),
+        fim=inicio + timedelta(hours=1),
+        tipo="T",
+        status="aprovado",
+        motivo="Bloqueio",
+    )
+
+    resp = _client(UsuarioFactory(superuser=True)).patch(f"/api/solicitacoes/{s.id}/approve/", {}, format="json")
+
+    assert resp.status_code == 400, resp.content
+    assert resp.data["code"] == "availability_conflict"
+    assert resp.data["errors"]["blocked_participants"][0]["usuario_nome"] == f"Usuario #{formador.id}"
+    assert not _ONZE_DIGITOS.search(resp.content.decode()), resp.content
+
+
+def test_meus_eventos_nao_levam_cpf_de_co_participante_sem_nome():
+    from apps.core.models import Participation
+
+    eu = _conta(nome="Ana", sobrenome="Formadora", groups=["Formador"])
+    colega_sem_nome = _conta(groups=["Formador"])
+    s = SolicitacaoFactory(status="aprovado", inicio=timezone.now() + timedelta(days=5))
+    for u in (eu, colega_sem_nome):
+        Participation.objects.create(solicitacao=s, usuario=u, role=Participation.Role.FORMADOR)
+
+    resp = _client(eu).get("/api/me/events/")
+
+    assert resp.status_code == 200, resp.content
+    corpo = resp.content.decode()
+    assert f"Usuario #{colega_sem_nome.id}" in corpo
+    assert not _ONZE_DIGITOS.search(corpo), corpo
+
+
+def test_descricao_do_evento_no_google_nao_leva_cpf_de_quem_nao_tem_nome():
+    from apps.core.services.gcal.payload import build_event_payload
+
+    coordenador = _conta(groups=["Coordenador"])
+    formador = _conta(groups=["Formador"])
+    s = SolicitacaoFactory(status="aprovado", coordenador=coordenador)
+    s.formadores.add(formador)
+
+    descricao = build_event_payload(s)["description"]
+
+    assert f"Coordenador(a): Usuario #{coordenador.id}" in descricao
+    assert f"Formador(es): Usuario #{formador.id}" in descricao
+    assert not _ONZE_DIGITOS.search(descricao), descricao

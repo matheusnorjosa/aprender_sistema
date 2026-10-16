@@ -8,7 +8,7 @@ cobre o que o filtro de log nao alcanca: valores que vao para o banco (ex.: o JS
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, cast
 
 # CPF nas DUAS formas: 11 digitos crus OU formatado 000.000.000-00. As ancoras `\b`
 # garantem que so o TOKEN inteiro casa — um username como `user_<hex>` (digitos cercados
@@ -27,6 +27,19 @@ def redact_cpf(value: Any) -> Any:
     if not isinstance(value, str):
         return value
     return _CPF_RE.sub(_CPF_PLACEHOLDER, value)
+
+
+def redact_cpf_deep(value: Any) -> Any:
+    """`redact_cpf` em todo texto de um valor JSON (dict e lista inclusive); o resto volta intacto.
+
+    Para ler `AuditLog.details` gravado antes da redação na escrita (S5: a mensagem de erro do
+    GCal levava o login, que é o CPF).
+    """
+    if isinstance(value, dict):
+        return {k: redact_cpf_deep(v) for k, v in cast(dict[Any, Any], value).items()}
+    if isinstance(value, list):
+        return [redact_cpf_deep(v) for v in cast(list[Any], value)]
+    return redact_cpf(value)
 
 
 # O login aceita qualquer mistura de `.`, `-` e espaço (`auth_normalize`).

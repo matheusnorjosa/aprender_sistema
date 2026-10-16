@@ -16,7 +16,7 @@ from typing import Any
 from rest_framework import serializers  # type: ignore[attr-defined]
 
 from apps.core.models import AuditLog
-from apps.core.pii import redact_login_identifier
+from apps.core.pii import redact_cpf_deep, redact_login_identifier
 
 # SEC-AUDIT-01: PII fields to redact for non-superuser access
 _PII_KEYS_TO_REMOVE = {"user_agent"}
@@ -67,7 +67,8 @@ def _redact_details(details: Any) -> Any:
         elif isinstance(value, dict):
             redacted[key] = _redact_details(value)
         else:
-            redacted[key] = value
+            # S5: texto livre (ex.: `error` do GCal em linha antiga) pode levar o login, que é o CPF.
+            redacted[key] = redact_cpf_deep(value)
 
     return redacted
 

@@ -15,6 +15,7 @@ from typing import Any, cast
 from rest_framework import serializers  # type: ignore[attr-defined]
 
 from apps.core.models import AuditLog, Participation, Solicitacao
+from apps.core.pii import redact_cpf_deep
 from apps.core.serializers.usuario import UserSlimSerializer
 from apps.core.services.avaliacao_formador import formadores_avaliaveis_ids, gerencia_pergunta
 from apps.core.services.compra_elegibilidade import isento_da_regra_da_compra, par_liberado
@@ -294,6 +295,12 @@ class AuditLogTimelineSerializer(serializers.ModelSerializer):
     def get_usuario_nome(self, obj: AuditLog) -> str:
         """Retorna nome do usuário ou 'Sistema' se null."""
         return str(obj.usuario) if obj.usuario else "Sistema"
+
+    def to_representation(self, instance: AuditLog) -> dict[str, Any]:
+        # S5: quem vê a timeline não administra contas; o `error` de linha antiga levava o login (CPF).
+        data = cast(dict[str, Any], super().to_representation(instance))
+        data["details"] = redact_cpf_deep(data["details"])
+        return data
 
 
 class EventDetailSerializer(serializers.ModelSerializer):

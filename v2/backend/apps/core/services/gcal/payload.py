@@ -186,12 +186,12 @@ def _build_payload(s: Solicitacao, *, enable_meet: bool = False) -> JsonDict:
     # Formadores (via ManyToMany)
     formadores = s.formadores.all()
     if formadores.exists():
-        formadores_names = [f.get_full_name() or f.username for f in formadores]
+        formadores_names = [str(f) for f in formadores]  # nome ou "Usuario #id", nunca o login (CPF)
         equipe_parts.append(f"Formador(es): {', '.join(formadores_names)}")
 
     # Coordenador
     if coordenador:
-        coord_name = coordenador.get_full_name() or coordenador.username
+        coord_name = str(coordenador)
         equipe_parts.append(f"Coordenador(a): {coord_name}")
 
     if equipe_parts:

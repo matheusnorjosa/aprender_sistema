@@ -92,7 +92,7 @@ def get_oauth_client_for_user(user: Usuario) -> tuple["CalendarClientAdapter", C
         credential: GoogleOAuthCredential = GoogleOAuthCredential.objects.get(user=user)
     except GoogleOAuthCredential.DoesNotExist:
         raise ValueError(
-            f"Google OAuth credential not found for user '{user.username}' (id={user.id}). "
+            f"Google OAuth credential not found for user id={user.id}. "
             f"User must connect their Google account first."
         )
 

@@ -74,7 +74,7 @@ class MeEventSerializer(serializers.ModelSerializer):
         result: list[dict[str, str]] = []
         for p in parts:
             if p.usuario_id:
-                nome = f"{p.usuario.first_name} {p.usuario.last_name}".strip() or p.usuario.username
+                nome = f"{p.usuario.first_name} {p.usuario.last_name}".strip() or f"Usuario #{p.usuario_id}"
             else:
                 nome = (p.guest_nome or "").strip() or (p.guest_email or "").strip()
             result.append({"role": p.role, "nome": nome})

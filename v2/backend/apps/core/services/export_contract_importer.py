@@ -850,7 +850,8 @@ def _apagados_no_sistema() -> tuple[set[str], set[tuple[int, int, datetime]]]:
     """Eventos apagados no sistema (AuditLog DELETE de Solicitacao), que a carga não recria:
     - `evento_id` do retrato da tela (`solicitacao_data.external_hash`) e dos scripts (`evento_id`,
       `backup.external_hash`);
-    - (município, projeto, início) do retrato da tela sem `external_hash` (o formato antigo, antes da virada)."""
+    - (município, projeto, início) do retrato antigo da tela, que não tem a chave `external_hash`. O retrato
+      novo com `external_hash` None é de evento que nasceu na tela: não bloqueia a vaga."""
     hashes: set[str] = set()
     vagas: set[tuple[int, int, datetime]] = set()
     for details in AuditLog.objects.filter(model_name="Solicitacao", action=AuditLog.Action.DELETE).values_list(
@@ -865,7 +866,7 @@ def _apagados_no_sistema() -> tuple[set[str], set[tuple[int, int, datetime]]]:
                     if isinstance(v, str) and v.strip():
                         hashes.add(v.strip())
         retrato = details.get("solicitacao_data")
-        if isinstance(retrato, dict) and not str(retrato.get("external_hash") or "").strip():
+        if isinstance(retrato, dict) and "external_hash" not in retrato:
             try:
                 vagas.add(
                     (
@@ -879,12 +880,30 @@ def _apagados_no_sistema() -> tuple[set[str], set[tuple[int, int, datetime]]]:
     return hashes, vagas
 
 
+def _linha_apagada(
+    r: dict[str, str],
+    ext_hash: str,
+    key: tuple[Any, ...] | None,
+    apagados: set[str],
+    vagas: set[tuple[int, int, datetime]],
+) -> bool:
+    """O evento da linha foi apagado no sistema: pelo próprio id, por um id antigo (`evento_ids_anteriores`,
+    o evento que a planilha remarcou) ou pela vaga do retrato antigo da tela."""
+    antigos = (str(a).strip() for a in _parse_json_list(r.get("evento_ids_anteriores")))
+    if ext_hash in apagados or any(a in apagados for a in antigos):
+        return True
+    return key is not None and _vaga_da_chave(key) in vagas
+
+
 def _vaga_da_chave(key: tuple[Any, ...]) -> tuple[int, int, datetime]:
     """(município, projeto, início) da linha resolvida, para casar com o retrato antigo do DELETE."""
     return key[0], key[1], timezone.make_aware(datetime.combine(key[3], key[4]), _FORTALEZA_TZ)
 
 
 _REPR_ADMIN_DATA = re.compile(r"\((\d{2}/\d{2}/\d{4} \d{2}:\d{2})\)$")
+# `Participation.__str__` começa pelo id do evento: liga o LogEntry do admin ao evento mesmo depois de a
+# participação ser apagada (ou movida para outro evento).
+_REPR_ADMIN_PARTICIPACAO = re.compile(r"^(\d+) - ")
 
 
 def _inicios_apagados_pelo_admin() -> set[str]:
@@ -1652,7 +1671,7 @@ class ExportContractImporter:
                         _somar_contagem(contagem, plano["c"])
                         tally["would_update" if plano["c"]["evento_atualizado"] else "would_skip_same"] += 1
                         continue
-                elif ext_hash in apagados or (key is not None and _vaga_da_chave(key) in vagas_apagadas):
+                elif _linha_apagada(r, ext_hash, key, apagados, vagas_apagadas):
                     # Apagado no sistema (tela ou script): a carga não recria (plano da virada, item 11).
                     tally["would_skip_same"] += 1
                     skip_reasons["apagado_no_sistema"] += 1
@@ -2430,7 +2449,7 @@ class ExportContractImporter:
                     atualizadas += self._aplicar_virada(sid, r, key, ext_hash, ctx, contagem)
                 continue
             assert key is not None
-            if ext_hash in apagados or _vaga_da_chave(key) in vagas_apagadas:
+            if _linha_apagada(r, ext_hash, key, apagados, vagas_apagadas):
                 continue  # apagado no sistema (tela ou script): a carga não recria
             mun_id, proj_id, tipo_id, data_ev, hora_ini, hora_fim, segmento, coord_id, ext_hash = key
             if data_ev < hoje and not virada:
@@ -2556,11 +2575,13 @@ class ExportContractImporter:
             for o in LogEntry.objects.filter(content_type=ct_sol).values_list("object_id", flat=True)
             if o and o.isdigit()
         }
-        part_ids = [
-            int(o)
-            for o in LogEntry.objects.filter(content_type=ct_part).values_list("object_id", flat=True)
-            if o and o.isdigit()
-        ]
+        part_ids: list[int] = []
+        for o, rep in LogEntry.objects.filter(content_type=ct_part).values_list("object_id", "object_repr"):
+            if o and o.isdigit():
+                part_ids.append(int(o))
+            achado = _REPR_ADMIN_PARTICIPACAO.match(rep or "")
+            if achado:
+                admin.add(int(achado.group(1)))  # a participação pode já ter sido apagada
         admin |= set(Participation.objects.filter(id__in=part_ids).values_list("solicitacao_id", flat=True))
         return logs, admin
 
@@ -2589,7 +2610,9 @@ class ExportContractImporter:
         ct_part = ContentType.objects.get_for_model(Participation)
         admin = (
             LogEntry.objects.filter(content_type=ct_sol, object_id=str(sid)).exists()
-            or LogEntry.objects.filter(content_type=ct_part, object_id__in=[str(p) for p in part_ids]).exists()
+            or LogEntry.objects.filter(content_type=ct_part)
+            .filter(Q(object_id__in=[str(p) for p in part_ids]) | Q(object_repr__startswith=f"{sid} - "))
+            .exists()
         )
         return logs, admin
 
@@ -2622,6 +2645,17 @@ class ExportContractImporter:
         categoria, travados, reprovado_pela_carga = tocado
         if categoria == "publicado_pelo_sistema":
             _conta(c, "publicado_pelo_sistema")
+            # Sem evento vivo do sistema no Google (ERROR ou PENDING sem id, ou já tirado de lá): Publicar ou
+            # Resync criaria um segundo evento ao lado do da planilha. A marca só segura isso; o resto fica.
+            p["marca"] = (
+                _marca_da_linha(r)
+                and not s.external_event_id
+                and s.gcal_status != Solicitacao.GCalStatus.PUBLISHED
+                and not s.publicado_fora_do_sistema
+            )
+            if p["marca"]:
+                _conta(c, "marca_fora_do_sistema")
+                _conta(c, "evento_atualizado")
             return p
         p["marca"] = _marca_da_linha(r) and not s.publicado_fora_do_sistema
         if p["marca"]:

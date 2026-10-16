@@ -870,3 +870,102 @@ def test_34c_comando_virada_em_texto_mostra_os_contadores(tmp_path, m):
     texto = out.getvalue()
     assert "[solicitacao] virada=" in texto
     assert "[gcal_adocao] rows=1" in texto
+
+
+# ---------- revisão: furos do "tocado" e do "apagado" ----------
+def test_admin_apagou_a_participacao_a_carga_nao_devolve_o_formador(tmp_path, m):
+    from django.contrib.admin.models import DELETION
+
+    s = _existente(m, formadores=(m.f1, m.f2))
+    p2 = Participation.objects.get(solicitacao=s, usuario=m.f2)
+    LogEntry.objects.create(
+        user=UsuarioFactory(username="admin_z", email="admin_z@example.invalid"),
+        content_type=ContentType.objects.get_for_model(Participation),
+        object_id=str(p2.id),
+        object_repr=str(p2),  # como o admin: "<solicitacao_id> - ..."
+        action_flag=DELETION,
+    )
+    p2.delete()
+    path = _export(tmp_path, [_sol()], [_part("EV1", _CPF_F1), _part("EV1", _CPF_F2)])
+    assert _dry(path)["tocado_pessoa"] == 1
+    _virada(path)
+    assert _formadores(s) == {"form1"}
+
+
+@pytest.mark.parametrize("modo", ["virada", "create-only"])
+def test_apagado_com_id_antigo_nao_volta_pelo_codigo_novo(tmp_path, m, modo):
+    s = _existente(m, "EV_OLD")
+    AuditLog.objects.create(
+        action="DELETE",
+        model_name="Solicitacao",
+        details={"solicitacao_data": {"id": s.id, "external_hash": "EV_OLD"}, "ip_address": _ADMIN_IP},
+    )
+    s.delete()
+    path = _export(tmp_path, [_sol(evento_id="EV_NEW", evento_ids_anteriores='["EV_OLD"]', data="2026-11-06")])
+    tally = ExportContractImporter(path=path, mode=modo).run()["por_entidade"]["solicitacao"]
+    assert tally["skip_reasons"]["apagado_no_sistema"] == 1
+    ExportContractImporter(path=path, mode=modo, apply=True, allow=("solicitacao", "participation")).run()
+    assert Solicitacao.objects.count() == 0
+
+
+@pytest.mark.parametrize(
+    "rastro",
+    [
+        {"gcal_status": "ERROR"},
+        {"gcal_status": "PENDING"},
+        {"last_sync_action": "DELETE"},
+    ],
+)
+def test_no_google_pela_planilha_sem_evento_vivo_do_sistema_recebe_a_marca(tmp_path, m, rastro):
+    s = _existente(m, **rastro)
+    path = _export(
+        tmp_path,
+        [
+            _sol(
+                na_agenda_google="true",
+                external_event_id="0a1b2c3d4e5f6g7h8i9j0k1l2m",
+                external_event_id_confianca="alta",
+            )
+        ],
+    )
+    assert _dry(path)["marca_fora_do_sistema"] == 1
+    _virada(path)
+    s.refresh_from_db()
+    assert s.publicado_fora_do_sistema is True
+    assert (s.gcal_status, s.last_sync_action) == (rastro.get("gcal_status", "NONE"), rastro.get("last_sync_action"))
+    assert motivo_nao_publicavel(s) == "publicado_fora_do_sistema"
+    assert motivo_nao_publicavel(s, reenvio=True) == "publicado_fora_do_sistema"
+
+
+def test_publicado_pelo_sistema_com_evento_vivo_nao_recebe_a_marca(tmp_path, m):
+    s = _existente(m, gcal_status="PUBLISHED", external_event_id="asv2x")
+    _virada(_export(tmp_path, [_sol(na_agenda_google="true")]))
+    s.refresh_from_db()
+    assert s.publicado_fora_do_sistema is False
+
+
+@pytest.mark.parametrize("modo", ["virada", "create-only"])
+def test_apagado_pela_tela_sem_external_hash_nao_bloqueia_a_vaga(tmp_path, m, modo):
+    s = _existente(m, None)
+    AuditLog.objects.create(
+        action="DELETE",
+        model_name="Solicitacao",
+        details={
+            "solicitacao_data": {
+                "id": s.id,
+                "municipio_id": s.municipio_id,
+                "projeto_id": s.projeto_id,
+                "inicio": s.inicio.isoformat(),
+                "fim": s.fim.isoformat(),
+                "status": s.status,
+                "external_hash": None,
+            },
+            "ip_address": _ADMIN_IP,
+        },
+    )
+    s.delete()
+    path = _export(tmp_path, [_sol(evento_id="EVNOVO")])
+    tally = ExportContractImporter(path=path, mode=modo).run()["por_entidade"]["solicitacao"]
+    assert tally["skip_reasons"]["apagado_no_sistema"] == 0
+    ExportContractImporter(path=path, mode=modo, apply=True, allow=("solicitacao", "participation")).run()
+    assert set(Solicitacao.objects.values_list("external_hash", flat=True)) == {"EVNOVO"}

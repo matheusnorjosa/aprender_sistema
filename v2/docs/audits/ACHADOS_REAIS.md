@@ -342,7 +342,10 @@ Nove desses 31 são só correção de contradição do registro: `M03-03`, `M12-
   `user_is_solicitacao_global`); coordenador regular = 0 casos. Global/privilegiado isento; criador sem
   setor = fail-open. Guests por e-mail (externos) seguem fora do escopo por design. ⚑A regra ancora no
   **setor do criador**, não na "gerência do projeto": a medição mostrou `Projeto.gerencia` VAZIO em prod
-  (só `dev_tools` seta, CP-08). **M10-04 resolvido no código**; a completude do enforcement em prod
+  (só `dev_tools` seta, CP-08). **Superado no PR 9 das permissões (16/10/2026):** com `Projeto.gerencia` preenchido
+  em produção (0 projetos ativos sem gerência), a regra passou a ser a gerência do projeto do evento
+  (`participantes_fora_da_gerencia`, P9-5) e o setor deixou de dar escopo (lint V006); C9 (gestora vendo
+  gerência onde só é formadora) fechado. **M10-04 resolvido no código**; a completude do enforcement em prod
   depende do backfill dos vínculos `EquipeGerencia` faltantes (S0). O escopo de **projeto** e o
   `can_act_on` central seguem no épico #1656.
 - **`M14-01`** — `2818a2ad` (#1824) fechou só o ramo de vigência: `HasSectorAccess` passou a usar

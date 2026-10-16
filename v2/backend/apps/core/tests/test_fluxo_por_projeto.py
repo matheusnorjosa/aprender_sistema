@@ -20,6 +20,7 @@ import pytest
 
 from apps.core.models import Projeto, Solicitacao
 from apps.core.tests.factories import (
+    GerenciaFactory,
     GroupFactory,
     MunicipioFactory,
     ProjetoFactory,
@@ -45,6 +46,9 @@ class TestFluxoPorProjeto(TestCase):
         self.grupo_controle = GroupFactory(name="Controle")
         self.grupo_dat = GroupFactory(name="DAT")
 
+        # PR 9: o coordenador só cria evento em projeto da gerência onde atua.
+        self.gerencia = GerenciaFactory()
+
         # Criar usuários
         self.coordenador = UsuarioFactory(
             username="coordenador1",
@@ -52,7 +56,7 @@ class TestFluxoPorProjeto(TestCase):
             email="coord@test.com",
             cpf="12345678901",
         )
-        com_papel(self.coordenador, "COORDENADOR")
+        com_papel(self.coordenador, "COORDENADOR", self.gerencia)
 
         self.superintendente = UsuarioFactory(
             username="super1",
@@ -80,6 +84,7 @@ class TestFluxoPorProjeto(TestCase):
             codigo="",  # Explicitly set empty string (default)
             fluxo="SUPER",
             ativo=True,
+            gerencia=self.gerencia,
         )
 
         self.projeto_outros = ProjetoFactory(
@@ -87,6 +92,7 @@ class TestFluxoPorProjeto(TestCase):
             codigo="",  # Explicitly set empty string (default)
             fluxo="NAO_SUPER",
             ativo=True,
+            gerencia=self.gerencia,
         )
 
         # Regra de elegibilidade: compras liberam solicitação por município+projeto.
@@ -208,6 +214,7 @@ class TestFluxoPorProjeto(TestCase):
             nome="Projeto Antigo",
             codigo="",  # Explicitly set empty string (default)
             ativo=True,
+            gerencia=self.gerencia,
             # fluxo será 'NAO_SUPER' por padrão do modelo
         )
         # Forçar fluxo como None para simular projeto antigo
@@ -426,6 +433,7 @@ class TestFluxoPorProjeto(TestCase):
             codigo="",
             fluxo="NAO_SUPER",
             ativo=True,
+            gerencia=self.gerencia,  # da gerência: só a falta de Compra o barra
         )
         self.client.force_authenticate(user=self.coordenador)
         response = self.client.post(

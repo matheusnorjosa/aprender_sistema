@@ -24,6 +24,7 @@ import pytest
 
 from apps.core.models import Participation, Solicitacao
 from apps.core.tests.factories import (
+    GerenciaFactory,
     GroupFactory,
     MunicipioFactory,
     ProjetoFactory,
@@ -53,29 +54,48 @@ def tipo_evento():
 
 
 @pytest.fixture
-def projeto_super(municipio):
-    """
-    Fluxo SUPER: fica pendente na criação (PA-04), permitindo testar a aprovação.
+def gerencia():
+    """Gerência do projeto: PR 9 só aceita formador e criador com papel na gerência do projeto.
 
-    A Compra é obrigatória: o serializer recusa solicitação para (município, projeto) sem
-    compra registrada. Os testes de criação usam `projeto=None` e não precisam dela.
+    Sem a pergunta "pretende avaliar o formador?": ela não é o assunto aqui.
     """
-    projeto = ProjetoFactory(nome="Projeto SUPER 1452", fluxo="SUPER")
+    return GerenciaFactory(pergunta_avaliar_formador=False)
+
+
+@pytest.fixture
+def projeto(municipio, gerencia):
+    """Fluxo NAO_SUPER da gerência, com a Compra do par: evento com formadores precisa de projeto (PR 9)."""
+    projeto = ProjetoFactory(nome="Projeto 1452", gerencia=gerencia)
     liberar_par(municipio, projeto)
     return projeto
 
 
 @pytest.fixture
-def coordenador():
+def projeto_super(municipio, gerencia):
+    """
+    Fluxo SUPER: fica pendente na criação (PA-04), permitindo testar a aprovação.
+
+    A Compra é obrigatória: o serializer recusa solicitação para (município, projeto) sem
+    compra registrada. Os testes de criação sem formador usam `projeto=None` e não precisam dela.
+    """
+    projeto = ProjetoFactory(nome="Projeto SUPER 1452", fluxo="SUPER", gerencia=gerencia)
+    liberar_par(municipio, projeto)
+    return projeto
+
+
+@pytest.fixture
+def coordenador(gerencia):
     """Quem cria o evento. Não é o formador — é justamente esse o ponto do #1452."""
     user = UsuarioFactory(username="coord_1452", first_name="Ana", last_name="Coordenadora")
-    com_papel(user, "COORDENADOR")
+    com_papel(user, "COORDENADOR", gerencia)
     return user
 
 
 @pytest.fixture
-def formador():
-    return UsuarioFactory(username="formador_1452", first_name="Bruno", last_name="Formador")
+def formador(gerencia):
+    user = UsuarioFactory(username="formador_1452", first_name="Bruno", last_name="Formador")
+    com_papel(user, "FORMADOR", gerencia)
+    return user
 
 
 @pytest.fixture
@@ -130,7 +150,7 @@ def _payload(municipio, tipo_evento, inicio, fim, projeto=None, **extra):
 
 class TestCreateChecaFormador:
     def test_bloqueia_quando_formador_ja_alocado_mesmo_com_coordenador_livre(
-        self, coordenador, formador, municipio, tipo_evento, horario
+        self, coordenador, formador, municipio, tipo_evento, projeto, horario
     ):
         """
         O coração do #1452: coordenador com agenda livre, formador já alocado.
@@ -150,6 +170,7 @@ class TestCreateChecaFormador:
                 tipo_evento,
                 inicio + timedelta(minutes=30),
                 fim + timedelta(minutes=30),
+                projeto=projeto,
                 extra_participants={"formador_ids": [formador.pk]},
             ),
             format="json",
@@ -162,7 +183,7 @@ class TestCreateChecaFormador:
         bloqueados = response.data["errors"]["blocked_participants"]
         assert [p["usuario_id"] for p in bloqueados] == [formador.pk]
 
-    def test_conflito_desfaz_o_evento_inteiro(self, coordenador, formador, municipio, tipo_evento, horario):
+    def test_conflito_desfaz_o_evento_inteiro(self, coordenador, formador, municipio, tipo_evento, projeto, horario):
         """Bloqueio precisa reverter a solicitação e as participações já gravadas."""
         inicio, fim = horario
         _evento_aprovado_para(formador, municipio, tipo_evento, inicio, fim)
@@ -171,22 +192,25 @@ class TestCreateChecaFormador:
 
         client = APIClient()
         client.force_authenticate(user=coordenador)
-        client.post(
+        response = client.post(
             "/api/solicitacoes/",
             _payload(
                 municipio,
                 tipo_evento,
                 inicio,
                 fim,
+                projeto=projeto,
                 extra_participants={"formador_ids": [formador.pk]},
             ),
             format="json",
         )
 
+        # O 400 tem que vir do conflito: um 400 de escopo (PR 9) também não grava nada.
+        assert response.data["code"] == "availability_conflict"
         assert Solicitacao.objects.count() == solicitacoes_antes
         assert Participation.objects.count() == participations_antes
 
-    def test_permite_quando_formador_esta_livre(self, coordenador, formador, municipio, tipo_evento, horario):
+    def test_permite_quando_formador_esta_livre(self, coordenador, formador, municipio, tipo_evento, projeto, horario):
         """Guarda contra o oposto: bloquear tudo também seria bug."""
         inicio, fim = horario
 
@@ -199,6 +223,7 @@ class TestCreateChecaFormador:
                 tipo_evento,
                 inicio,
                 fim,
+                projeto=projeto,
                 extra_participants={"formador_ids": [formador.pk]},
             ),
             format="json",
@@ -209,7 +234,7 @@ class TestCreateChecaFormador:
             solicitacao_id=response.data["id"], usuario=formador, role=Participation.Role.FORMADOR
         ).exists()
 
-    def test_evento_adjacente_nao_conflita(self, coordenador, formador, municipio, tipo_evento, horario):
+    def test_evento_adjacente_nao_conflita(self, coordenador, formador, municipio, tipo_evento, projeto, horario):
         """RD-01: `fim == inicio` é encosto, não sobreposição."""
         inicio, fim = horario
         _evento_aprovado_para(formador, municipio, tipo_evento, inicio, fim)
@@ -223,6 +248,7 @@ class TestCreateChecaFormador:
                 tipo_evento,
                 fim,  # começa exatamente quando o outro termina
                 fim + timedelta(hours=1),
+                projeto=projeto,
                 extra_participants={"formador_ids": [formador.pk]},
             ),
             format="json",
@@ -230,7 +256,9 @@ class TestCreateChecaFormador:
 
         assert response.status_code == http_status.HTTP_201_CREATED
 
-    def test_coordenador_que_atua_entra_como_formador_e_e_checado(self, coordenador, municipio, tipo_evento, horario):
+    def test_coordenador_que_atua_entra_como_formador_e_e_checado(
+        self, coordenador, gerencia, municipio, tipo_evento, projeto, horario
+    ):
         """
         Decisão do dono (05/10/2026): a lista de coordenadores acompanhantes saiu. Outro
         coordenador (ou gerente) que atua no evento entra na LISTA DE FORMADORES e é
@@ -238,6 +266,7 @@ class TestCreateChecaFormador:
         """
         inicio, fim = horario
         acompanhante = UsuarioFactory(username="acompanha_1452", first_name="Dora", last_name="Acompanha")
+        com_papel(acompanhante, "COORDENADOR", gerencia)
         _evento_aprovado_para(acompanhante, municipio, tipo_evento, inicio, fim)
 
         client = APIClient()
@@ -249,6 +278,7 @@ class TestCreateChecaFormador:
                 tipo_evento,
                 inicio,
                 fim,
+                projeto=projeto,
                 extra_participants={"formador_ids": [acompanhante.pk]},
             ),
             format="json",
@@ -287,7 +317,7 @@ class TestCreateChecaFormador:
         assert guard.ok
         assert convidado.pk not in guard.checked_usuario_ids
 
-    def test_coordenador_que_tambem_e_formador_conta_uma_vez(self, coordenador, municipio, tipo_evento):
+    def test_coordenador_que_tambem_e_formador_conta_uma_vez(self, coordenador, municipio, tipo_evento, projeto):
         """
         Dedup por usuario_id: o coordenador é sempre gravado como COORDENADOR e pode
         também vir em formador_ids. Sem dedup, as horas dele contariam 2x no RD-05 e um
@@ -305,6 +335,7 @@ class TestCreateChecaFormador:
                 tipo_evento,
                 inicio,
                 fim,
+                projeto=projeto,
                 extra_participants={"formador_ids": [coordenador.pk]},
             ),
             format="json",
@@ -354,7 +385,7 @@ class TestCreateChecaFormador:
 
 class TestUpdateChecaFormador:
     def test_mover_evento_para_horario_ocupado_do_formador_bloqueia(
-        self, coordenador, formador, municipio, tipo_evento, horario
+        self, coordenador, formador, municipio, tipo_evento, projeto, horario
     ):
         """`perform_update` não tinha checagem nenhuma: dava para editar até o conflito."""
         inicio, fim = horario
@@ -369,6 +400,7 @@ class TestUpdateChecaFormador:
                 tipo_evento,
                 fim + timedelta(days=2),
                 fim + timedelta(days=2, hours=2),
+                projeto=projeto,
                 extra_participants={"formador_ids": [formador.pk]},
             ),
             format="json",
@@ -388,7 +420,9 @@ class TestUpdateChecaFormador:
         solicitacao = Solicitacao.objects.get(pk=solicitacao_id)
         assert solicitacao.inicio != inicio, "edição bloqueada não pode ter sido persistida"
 
-    def test_editar_sem_mover_nao_conflita_consigo_mesmo(self, coordenador, formador, municipio, tipo_evento, horario):
+    def test_editar_sem_mover_nao_conflita_consigo_mesmo(
+        self, coordenador, formador, municipio, tipo_evento, projeto, horario
+    ):
         """
         `exclude_solicitacao_id`: o evento sendo editado não pode entrar na própria
         checagem — senão qualquer edição de evento aprovado seria bloqueada por ele mesmo.
@@ -404,6 +438,7 @@ class TestUpdateChecaFormador:
                 tipo_evento,
                 inicio,
                 fim,
+                projeto=projeto,
                 extra_participants={"formador_ids": [formador.pk]},
             ),
             format="json",

@@ -59,7 +59,12 @@ Os PRs 1 a 11 entram antes da liberação; o 12 e o 13, depois.
    direito ainda vale para qualquer gerência; o recorte "só na própria" (decisão 2) entra no PR 9.
    Na gerência dela, a GERENTE e a COORDENADORA registram o deslocamento dos formadores (P16).
    Migration `0125` tira a capacidade dos grupos de função e apaga `approve_solicitation_batch`.
-9. Escopo por gerência, fail-closed.
+9. Escopo por gerência, fail-closed. Feito em 16/10/2026: o alcance é a gerência do projeto
+   (`projeto.gerencia_id`), não o texto do setor, e cada superfície conta só o papel certo em gerência ativa
+   (gestora = GERENTE; publicação = APOIO; criar, pôr gente no evento, Grade, opções e painel = G/C/A,
+   `EquipeGerencia.gerencias_de_atuacao`). Decisões do dono (15/10): num evento da gerência A só entram
+   pessoas da A (P9-5) e a formadora vê só os próprios bloqueios e deslocamentos (P9-1). O lint V006 proíbe o
+   setor nos arquivos de escopo. Medido em produção: ninguém perde tela que usa; nenhum vínculo a criar.
 10. DAT = administrador operacional (antes, atualizar PA-02/CP-02).
 11. Aprovação com uma fonte só.
 12. Corte: o poder deixa de ler grupos.

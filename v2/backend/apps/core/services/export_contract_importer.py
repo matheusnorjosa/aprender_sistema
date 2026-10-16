@@ -1764,8 +1764,8 @@ class ExportContractImporter:
             if not exists and vinculo_exige_superusuario(gerencia, papel):
                 continue
             setor_canon = (r.get("setor_canonico") or "").strip()
-            # setor_canonico é eixo de escopo (user_setores): só preenche o vazio, e a linha EQUIPE, inerte,
-            # nem isso. Já preenchido não muda pelo import (Avançando Juntos é Vidas e traria outro setor).
+            # setor_canonico é rótulo (desde o PR 9 o escopo é a gerência do projeto): só preenche o vazio, e a
+            # linha EQUIPE, inerte, nem isso. Já preenchido não muda pelo import (Avançando Juntos é Vidas e traria outro setor).
             if setor_canon and papel != EquipeGerencia.PAPEL_EQUIPE and not gerencia.setor_canonico:
                 gerencia.setor_canonico = setor_canon
                 gerencia.save(update_fields=["setor_canonico"])

@@ -4,8 +4,8 @@ Nova Solicitação: coordenador responsável, "acompanha?" e "pretende avaliar o
 Decisões do dono (05/10/2026):
 - UM coordenador responsável por evento (`Solicitacao.coordenador`). Se quem cria é
   coordenador e não informa, é ele; se não é, o responsável é obrigatório. O responsável
-  passa pelo mesmo escopo de setor dos formadores e recebe o convite do Google mesmo
-  respondendo "Não".
+  passa pelo mesmo escopo de gerência dos formadores (a gerência do projeto, PR 9) e recebe
+  o convite do Google mesmo respondendo "Não".
 - A lista "Coordenadores Acompanhantes" saiu: `coord_acompanha_ids/_emails` não são mais
   aceitos. No lugar, `coordenador_acompanha` (Sim/Não) é obrigatório na criação; null nunca
   vale como resposta.
@@ -70,6 +70,9 @@ def c():
         )
         liberar_par(municipio, p)
         projetos[chave] = p
+    coord = _pessoa("Coordenador", gerencia=pergunta, papel="COORDENADOR")
+    # PR 9: o escopo é a gerência do projeto (não o setor comum); o coordenador atua nas duas.
+    EquipeGerencia.objects.create(usuario=coord, gerencia=nao_pergunta, papel="COORDENADOR", ativo=True)
     return {
         "municipio": municipio,
         "tipo": TipoEventoFactory(nome="Formacao Ficticia Perguntas"),
@@ -77,7 +80,7 @@ def c():
         "projeto_nao_pergunta": projetos["nao_pergunta"],
         "gerencia": pergunta,
         "outro_setor": outro_setor,
-        "coord": _pessoa("Coordenador", gerencia=pergunta, papel="COORDENADOR"),
+        "coord": coord,
         "formador": _pessoa("Formador", gerencia=pergunta),
     }
 
@@ -281,7 +284,7 @@ class TestPretendeAvaliarFormador:
         proj = c["projeto_nao_pergunta"]
 
         def novo():  # um formador por evento: o mesmo horário não pode repetir formador
-            return [_pessoa("Formador", gerencia=c["gerencia"])]
+            return [_pessoa("Formador", gerencia=proj.gerencia)]  # PR 9: da gerência do projeto
 
         r = _post(c["coord"], _payload(c, projeto=proj, formadores=novo(), coordenador_acompanha=False))
         assert r.status_code == 201, r.data
@@ -414,7 +417,7 @@ class TestLookupsEGerencia:
         duplo = _pessoa("Formador", "Coordenador", gerencia=c["gerencia"])
         data = _client(c["coord"]).get("/api/lookup/usuarios/", {"role": "Formador,Coordenador"}).data
         por_id = {u["id"]: u for u in data}
-        assert c["coord"].id in por_id, "coordenador do setor pode ir como formador"
+        assert c["coord"].id in por_id, "coordenador da gerência pode ir como formador"
         assert por_id[c["formador"].id]["avaliavel"] is True
         assert por_id[duplo.id]["avaliavel"] is False
         assert por_id[c["coord"].id]["avaliavel"] is False

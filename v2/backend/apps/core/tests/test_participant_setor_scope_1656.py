@@ -1,18 +1,19 @@
 """
-#1656 / M10-04 Wave 1 (Slice 1) — escopo do ALVO por SETOR em extra_participants.
+#1656 / M10-04 Wave 1 (Slice 1) — escopo do ALVO por GERÊNCIA em extra_participants.
 
-Regra (decidida pelo dono, medida em prod 2026-09-15): o coordenador REGULAR só
-pode adicionar como formador/coord-acompanha quem compartilha um SETOR
-(`Gerencia.setor_canonico`, via EquipeGerencia vigente) com ele. Cross-setor por
-um criador regular = 400 (o FE só mostra opções do setor; o backend é o gate).
+Regra (PR 9 das permissões, 16/10/2026; P9-5 do dono): num evento da gerência A só entram pessoas
+da A. O coordenador REGULAR só adiciona como formador quem tem vínculo vigente (papel ≠ EQUIPE) na
+gerência DO PROJETO do evento, e só se ele mesmo atua nela (papel GERENTE, COORDENADOR ou APOIO
+vigente; `participantes_fora_da_gerencia`). Fora disso = 400 em `extra_participants` (o FE só mostra
+as opções da gerência via `/lookup/usuarios/`; o backend é o gate).
 
-Nuances medidas:
-- Granularidade = SETOR (setor_canonico), não a Gerencia fina (Vidas L≠M colapsam
-  em "Vidas"). Em prod só 3 cross-setor reais, todos da Superintendência.
+Nuances:
+- Granularidade = GERÊNCIA do projeto (`projeto.gerencia_id`); `Gerencia.setor_canonico` não dá
+  escopo (antes o setor colapsava gerências).
 - Privilegiado/global (superuser, Superintendência, Controle, DAT) é ISENTO
-  (`user_is_solicitacao_global`) — cobre os 3 casos da Superintendência.
-- Criador SEM setor = fail-open (não dá p/ escopar; 0 em prod; não quebra criador
-  sem vínculo). Participante sem setor, com criador COM setor = fail-closed.
+  (`user_is_solicitacao_global`).
+- Criador sem papel de atuação na gerência do projeto = fail-closed (antes, sem setor, era
+  fail-open): não põe ninguém.
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportMissingTypeStubs=false
@@ -27,11 +28,12 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import EquipeGerencia, Gerencia, Participation
+from apps.core.models import Participation
 from apps.core.tests.factories import (
-    GroupFactory,
+    GerenciaFactory,
     MunicipioFactory,
     ProjetoFactory,
+    SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
     com_papel,
@@ -43,32 +45,21 @@ pytestmark = pytest.mark.django_db
 _CPF = itertools.count(79100000001)
 
 
-def _gerencia(nome, setor):
-    return Gerencia.objects.create(nome=nome, setor_canonico=setor)
-
-
-def _vincula(user, gerencia, papel="FORMADOR"):
-    EquipeGerencia.objects.create(usuario=user, gerencia=gerencia, papel=papel, ativo=True)
-
-
 def _formador(n, gerencia=None):
     u = UsuarioFactory(username=f"form_setor_{n}", cpf=str(next(_CPF)))
-    u.groups.add(GroupFactory(name="Formador"))
-    if gerencia is not None:
-        _vincula(u, gerencia, "FORMADOR")
+    com_papel(u, "FORMADOR", gerencia)
     return u
 
 
 @pytest.fixture
 def gerencias():
-    return {"vidas": _gerencia("G-Vidas-1656", "Vidas"), "fluir": _gerencia("G-Fluir-1656", "Fluir")}
+    return {"vidas": GerenciaFactory(nome="G-Vidas-1656"), "fluir": GerenciaFactory(nome="G-Fluir-1656")}
 
 
 @pytest.fixture
 def coordenador(gerencias):
     u = UsuarioFactory(username="coord_setor_1656", cpf=str(next(_CPF)))
-    u.groups.add(GroupFactory(name="Coordenador"))
-    _vincula(u, gerencias["vidas"], "COORDENADOR")  # criador é do setor Vidas
+    com_papel(u, "COORDENADOR", gerencias["vidas"])  # criador é da gerência Vidas
     return u
 
 
@@ -83,8 +74,11 @@ def tipo_evento():
 
 
 @pytest.fixture
-def projeto(municipio):
-    proj = ProjetoFactory(nome="Projeto setor 1656", codigo="PS1656", fluxo="NAO_SUPER", ativo=True)
+def projeto(municipio, gerencias):
+    """Projeto da gerência Vidas (a do coordenador)."""
+    proj = ProjetoFactory(
+        nome="Projeto setor 1656", codigo="PS1656", gerencia=gerencias["vidas"], fluxo="NAO_SUPER", ativo=True
+    )
     liberar_par(municipio, proj)
     return proj
 
@@ -110,17 +104,25 @@ def _client(user):
     return c
 
 
-class TestCreateSetorScope:
-    def test_cross_setor_formador_rejected_on_create(self, coordenador, gerencias, municipio, projeto, tipo_evento):
-        """RED: criador do setor Vidas NÃO pode adicionar formador do setor Fluir."""
+def _erros(resp):
+    """Campos com erro de um 400 (o handler embrulha em `errors`)."""
+    return resp.data.get("errors", resp.data)
+
+
+class TestCreateGerenciaScope:
+    def test_cross_gerencia_formador_rejected_on_create(self, coordenador, gerencias, municipio, projeto, tipo_evento):
+        """Evento de projeto da gerência Vidas NÃO aceita formador da gerência Fluir."""
         outro = _formador("fluir", gerencias["fluir"])
         resp = _client(coordenador).post(
             "/api/solicitacoes/", _payload(municipio, projeto, tipo_evento, {"formador_ids": [outro.id]}), format="json"
         )
-        assert resp.status_code == 400, f"esperava 400 (formador de outro setor), veio {resp.status_code}: {resp.data}"
+        assert (
+            resp.status_code == 400
+        ), f"esperava 400 (formador de outra gerência), veio {resp.status_code}: {resp.data}"
+        assert "extra_participants" in _erros(resp)
 
-    def test_same_setor_formador_allowed_on_create(self, coordenador, gerencias, municipio, projeto, tipo_evento):
-        """Não-regressão: formador do MESMO setor (Vidas) é aceito."""
+    def test_same_gerencia_formador_allowed_on_create(self, coordenador, gerencias, municipio, projeto, tipo_evento):
+        """Não-regressão: formador da MESMA gerência (Vidas) é aceito."""
         mesmo = _formador("vidas", gerencias["vidas"])
         resp = _client(coordenador).post(
             "/api/solicitacoes/", _payload(municipio, projeto, tipo_evento, {"formador_ids": [mesmo.id]}), format="json"
@@ -131,8 +133,8 @@ class TestCreateSetorScope:
             Participation.objects.filter(solicitacao_id=sol_id, role="FORMADOR").values_list("usuario_id", flat=True)
         )
 
-    def test_cross_setor_coord_acompanha_rejected(self, coordenador, gerencias, municipio, projeto, tipo_evento):
-        """RED: mesma regra para coord_acompanha (não só formador)."""
+    def test_cross_gerencia_coord_acompanha_rejected(self, coordenador, gerencias, municipio, projeto, tipo_evento):
+        """`coord_acompanha_ids` com itens também é recusado (desde 05/10/2026 a lista não aceita itens)."""
         outro = _formador("fluir_ca", gerencias["fluir"])
         resp = _client(coordenador).post(
             "/api/solicitacoes/",
@@ -142,9 +144,9 @@ class TestCreateSetorScope:
         assert resp.status_code == 400, resp.data
 
 
-class TestUpdateSetorScope:
-    def test_cross_setor_formador_rejected_on_update(self, coordenador, gerencias, municipio, projeto, tipo_evento):
-        """RED: o mesmo gate vale no PATCH (editar), não só no criar."""
+class TestUpdateGerenciaScope:
+    def test_cross_gerencia_formador_rejected_on_update(self, coordenador, gerencias, municipio, projeto, tipo_evento):
+        """O mesmo gate vale no PATCH (editar), não só no criar."""
         mesmo = _formador("vidas_u", gerencias["vidas"])
         outro = _formador("fluir_u", gerencias["fluir"])
         resp = _client(coordenador).post(
@@ -157,12 +159,15 @@ class TestUpdateSetorScope:
             {"extra_participants": {"formador_ids": [mesmo.id, outro.id]}},
             format="json",
         )
-        assert patch.status_code == 400, f"esperava 400 no update cross-setor, veio {patch.status_code}: {patch.data}"
+        assert (
+            patch.status_code == 400
+        ), f"esperava 400 no update cross-gerência, veio {patch.status_code}: {patch.data}"
+        assert "extra_participants" in _erros(patch)
 
 
 class TestPrivilegedExempt:
-    def test_superuser_creator_may_add_cross_setor(self, gerencias, municipio, projeto, tipo_evento):
-        """Isenção: criador global (superuser) pode cruzar setor (cobre os 3 casos da Superintendência)."""
+    def test_superuser_creator_may_add_cross_gerencia(self, gerencias, municipio, projeto, tipo_evento):
+        """Isenção: criador global (superuser) pode pôr formador de outra gerência."""
         su = UsuarioFactory(username="su_setor_1656", cpf=str(next(_CPF)), superuser=True)
         outro = _formador("fluir_su", gerencias["fluir"])
         payload = _payload(municipio, projeto, tipo_evento, {"formador_ids": [outro.id]})
@@ -171,44 +176,45 @@ class TestPrivilegedExempt:
         assert resp.status_code == 201, resp.data
 
 
-class TestCreatorWithoutSetorFailOpen:
-    def test_creator_without_vinculo_is_not_blocked(self, gerencias, municipio, projeto, tipo_evento):
-        """Fail-open: criador SEM setor não é escopado (0 em prod; protege transição/suíte).
+class TestCreatorSemAtuacaoFailClosed:
+    def test_creator_sem_atuacao_na_gerencia_do_projeto_is_blocked(self, gerencias, municipio, projeto, tipo_evento):
+        """Fail-closed (PR 9): quem não atua na gerência do projeto não põe ninguém no evento.
 
-        PR 8: criar exige o papel vigente; o criador sem setor é o COORDENADOR numa gerência sem
-        `setor_canonico` (o grupo sozinho já não cria).
+        Antes o criador sem setor era fail-open. Agora a dona do evento que só é FORMADOR na gerência
+        do projeto (papel que não atua) não adiciona nem formador da própria gerência.
         """
         criador = UsuarioFactory(username="coord_sem_setor_1656", cpf=str(next(_CPF)))
-        sem_setor = Gerencia.objects.create(nome="GERENCIA SEM SETOR 1656", nome_setor="Sem setor", ativo=True)
-        com_papel(criador, "COORDENADOR", sem_setor)
-        f = _formador("qualquer", gerencias["fluir"])
-        resp = _client(criador).post(
-            "/api/solicitacoes/", _payload(municipio, projeto, tipo_evento, {"formador_ids": [f.id]}), format="json"
+        com_papel(criador, "FORMADOR", gerencias["vidas"])
+        propria = SolicitacaoFactory(usuario=criador, projeto=projeto)
+        f = _formador("qualquer", gerencias["vidas"])
+        resp = _client(criador).patch(
+            f"/api/solicitacoes/{propria.id}/", {"extra_participants": {"formador_ids": [f.id]}}, format="json"
         )
-        assert resp.status_code == 201, resp.data
+        assert resp.status_code == 400, resp.data
+        assert "extra_participants" in _erros(resp)
 
 
-class TestUsuarioLookupSetorScope:
-    """O /lookup/usuarios/ (que alimenta o picker do wizard) já filtra por setor →
-    o FE mostra só o setor do coordenador sem mudar código de FE (FE-first satisfeito)."""
+class TestUsuarioLookupGerenciaScope:
+    """O /lookup/usuarios/ (que alimenta o picker do wizard) já filtra pelas gerências de atuação →
+    o FE mostra só a gerência do coordenador sem mudar código de FE (FE-first satisfeito)."""
 
     def _ids(self, resp):
         return {item["id"] for item in resp.json()}
 
-    def test_regular_coordenador_lookup_only_own_setor(self, coordenador, gerencias):
+    def test_regular_coordenador_lookup_only_own_gerencia(self, coordenador, gerencias):
         vidas = _formador("lk_vidas", gerencias["vidas"])
         fluir = _formador("lk_fluir", gerencias["fluir"])
         resp = _client(coordenador).get("/api/lookup/usuarios/", {"role": "Formador"})
         assert resp.status_code == 200, resp.data
         ids = self._ids(resp)
-        assert vidas.id in ids, "formador do MESMO setor deve aparecer no lookup"
-        assert fluir.id not in ids, "formador de OUTRO setor NÃO pode aparecer no lookup do coordenador regular"
+        assert vidas.id in ids, "formador da MESMA gerência deve aparecer no lookup"
+        assert fluir.id not in ids, "formador de OUTRA gerência NÃO pode aparecer no lookup do coordenador regular"
 
-    def test_superuser_lookup_sees_all_setores(self, gerencias):
+    def test_superuser_lookup_sees_all_gerencias(self, gerencias):
         su = UsuarioFactory(username="su_lk_1656", cpf=str(next(_CPF)), superuser=True)
         vidas = _formador("lk2_vidas", gerencias["vidas"])
         fluir = _formador("lk2_fluir", gerencias["fluir"])
         resp = _client(su).get("/api/lookup/usuarios/", {"role": "Formador"})
         assert resp.status_code == 200, resp.data
         ids = self._ids(resp)
-        assert {vidas.id, fluir.id} <= ids, "privilegiado/global vê todos os setores"
+        assert {vidas.id, fluir.id} <= ids, "privilegiado/global vê todas as gerências"

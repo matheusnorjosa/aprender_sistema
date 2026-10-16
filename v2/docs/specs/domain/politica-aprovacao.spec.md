@@ -1,7 +1,7 @@
 ---
 title: Política de Aprovação (PA-01..PA-07)
 status: canonical
-last_verified: 2026-10-15
+last_verified: 2026-10-16
 sources_of_truth:
   - v2/backend/apps/core/models/solicitacao.py
   - v2/backend/apps/core/services/solicitacao_create.py
@@ -111,7 +111,7 @@ Corpo de `approve`/`reject` aceita `{"justificativa": "..."}` (opcional). Lote a
 2. A gerência da Superintendência (ou o Assistente Administrativo do Controle) chama `approve`/`reject` — nunca na própria solicitação (segregação).
 3. Service trava a linha (`select_for_update`), recusa a decisão própria (403 `self_approval_forbidden`, salvo superuser), recusa o que está fora do escopo da aprovadora por vínculo (403 `out_of_approval_scope`), exige `status == "pendente"`, **revalida a disponibilidade de todos os participantes** (`enforce_solicitacao_availability`, #1452), grava novo status e cria `AuditLog`. `reject` não revalida — reprovar não aloca agenda.
 4. Editar a aprovada mudando projeto, data, horário, município ou formadores a devolve para `pendente` (adendo da PA-04) e o passo 2 se repete. Depois de aprovada uma vez, ela não se exclui mais: de volta a `pendente`, sai pela reprovação (adendo da PA-04).
-5. Aprovada → entra na Pré-Agenda; Controle/Super (ou a Apoio de Coordenação do setor do evento) publica no GCal via `publish` (PA-03).
+5. Aprovada → entra na Pré-Agenda; Controle/Super (ou a Apoio de Coordenação da gerência do evento, PR 9) publica no GCal via `publish` (PA-03).
 
 **Fluxo NAO_SUPER (auto-aprovado):**
 

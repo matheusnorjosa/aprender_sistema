@@ -4,7 +4,8 @@ Papel EQUIPE ("Equipe administrativa") no vínculo `EquipeGerencia` (decisão do
 Diz só "trabalha neste setor": serve para a equipe de suporte do DAT, o Controle e outros setores.
 Sem NENHUM efeito em listas, escopo ou permissão: não entra em lista de formadores/coordenadores,
 na Grade Mensal, no tier de gestor, na aprovação, não abre escopo de leitura (bloqueios, Grade,
-deslocamentos, opções, setor da pessoa, `/api/me/.gerencias`) e não concede grupo, nem o de setor.
+deslocamentos, opções, gerências de atuação, pessoas do evento, `/api/me/.gerencias`) e não concede
+grupo, nem o de setor.
 O formulário de Usuários põe e tira o papel pelo campo `equipe_administrativa`; salvar sem mudar
 nada mantém o vínculo (regra do #2071/#2072).
 """
@@ -31,12 +32,10 @@ from apps.core.services.equipe_gerencia_import import import_equipe_gerencia_fro
 from apps.core.services.monthly_grid_service import build_monthly_grid
 from apps.core.services.solicitacao_scope import (
     _PAPEIS_DE_GESTAO,
-    _user_gerencia_ids,
-    participants_out_of_setor,
-    scope_usuarios_by_setor,
-    user_setores,
+    participantes_fora_da_gerencia,
+    scope_usuarios_por_gerencia,
 )
-from apps.core.tests.factories import GroupFactory, UsuarioFactory
+from apps.core.tests.factories import GroupFactory, ProjetoFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -116,18 +115,19 @@ class TestForaDasListas:
         form = _pessoa("form3", "Formador")
         _vincula(form, vidas, "FORMADOR")
 
-        ids = set(scope_usuarios_by_setor(Usuario.objects.all(), coord).values_list("id", flat=True))
+        ids = set(scope_usuarios_por_gerencia(Usuario.objects.all(), coord).values_list("id", flat=True))
 
         assert form.id in ids
         assert so_equipe.id not in ids
 
-    def test_participante_so_com_equipe_fica_fora_do_setor(self, vidas):
+    def test_participante_so_com_equipe_fica_fora_da_gerencia(self, vidas):
         coord = _pessoa("coord4", "Coordenador")
         _vincula(coord, vidas, "COORDENADOR")
         so_equipe = _pessoa("equipe_part", "Formador")
         _vincula(so_equipe, vidas, "EQUIPE")
+        projeto = ProjetoFactory(gerencia=vidas)
 
-        assert participants_out_of_setor(coord, [so_equipe]) == [so_equipe]
+        assert participantes_fora_da_gerencia(coord, projeto, [so_equipe]) == [so_equipe]
 
     @pytest.mark.parametrize("role", ["FORMADOR", "COORDENADOR"])
     def test_grade_mensal_nao_traz_equipe(self, vidas, role):
@@ -222,14 +222,16 @@ class TestSemEscopo:
         assert (vidas.id in {g["id"] for g in resp.data["gerencias"]}) is ve
 
     @PAPEIS
-    def test_setor_da_pessoa(self, cenario, vidas, papel, ve):
+    def test_gerencias_de_atuacao(self, cenario, vidas, papel, ve):
+        """PR 9: sucessor de `user_setores`/`_user_gerencia_ids` (o alcance é a gerência, não o setor)."""
         _vincula(cenario["ator"], vidas, papel)
-        assert user_setores(cenario["ator"]) == ({"Vidas"} if ve else set())
+        assert EquipeGerencia.gerencias_de_atuacao(cenario["ator"]) == ({vidas.id} if ve else set())
 
     @PAPEIS
-    def test_gerencias_de_escopo_do_gestor(self, cenario, vidas, papel, ve):
+    def test_pessoas_do_evento(self, cenario, vidas, papel, ve):
         _vincula(cenario["ator"], vidas, papel)
-        assert _user_gerencia_ids(cenario["ator"]) == ({vidas.id} if ve else set())
+        ids = set(scope_usuarios_por_gerencia(Usuario.objects.all(), cenario["ator"]).values_list("id", flat=True))
+        assert (cenario["formador"].id in ids) is ve
 
 
 # ---------------------------------------------------------------- formulário de Usuários

@@ -10,6 +10,7 @@ import {
   lookupMunicipios,
   lookupMunicipiosWithFilters,
   lookupProjetos,
+  lookupUsuarios,
 } from '../lookup';
 
 type RequestLog = { pathname: string; params: URLSearchParams };
@@ -30,7 +31,29 @@ describe('lookup API filters (MSW)', () => {
         requests.push({ pathname: u.pathname, params: u.searchParams });
         return HttpResponse.json([]);
       }),
+      http.get(apiUrl('/lookup/usuarios/'), ({ request }) => {
+        const u = new URL(request.url);
+        requests.push({ pathname: u.pathname, params: u.searchParams });
+        return HttpResponse.json([]);
+      }),
     );
+  });
+
+  test('lookupUsuarios com projeto envia projeto_id (P9-5: pessoas da gerência do projeto)', async () => {
+    await lookupUsuarios('', 'Coordenador', 123);
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0].pathname).toBe('/api/lookup/usuarios/');
+    expect(requests[0].params.get('role')).toBe('Coordenador');
+    expect(requests[0].params.get('projeto_id')).toBe('123');
+  });
+
+  test('lookupUsuarios sem projeto não envia projeto_id', async () => {
+    await lookupUsuarios('ana', 'Formador');
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0].params.get('q')).toBe('ana');
+    expect(requests[0].params.has('projeto_id')).toBe(false);
   });
 
   test('lookupMunicipios mantém contrato atual (q simples)', async () => {

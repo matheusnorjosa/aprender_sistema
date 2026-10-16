@@ -16,7 +16,7 @@ from rest_framework.test import APIClient
 
 from apps.core.models import AuditLog
 from apps.core.serializers.auditoria import _mask_email, _mask_ip, _redact_details
-from apps.core.tests.factories import GroupFactory, UsuarioFactory, com_papel
+from apps.core.tests.factories import GerenciaFactory, GroupFactory, UsuarioFactory, com_papel
 
 _cpf_counter = 0
 
@@ -62,15 +62,17 @@ class TestUsuarioLookupNoEmail(TestCase):
 
     PR 5 hardening RBAC (2026-04-30): endpoint deixou de ser
     `IsAuthenticated`. User precisa ter cap legítima — usamos Coordenador
-    (cap `create_solicitation`) para validar SEC-ENUM-01.
+    (cap `create_solicitation`) para validar SEC-ENUM-01. PR 9: o lookup só traz pessoas da
+    gerência onde o coordenador atua, então o alvo fica na mesma gerência.
     """
 
     def setUp(self):
+        gerencia = GerenciaFactory()
         self.user = UsuarioFactory(
             username="lookup_test", email="lookup@test.com", password="pass1234", cpf=_next_cpf()
         )
-        com_papel(self.user, "COORDENADOR")
-        UsuarioFactory(
+        com_papel(self.user, "COORDENADOR", gerencia)
+        alvo = UsuarioFactory(
             username="lookup_target",
             email="target@secret.com",
             password="pass1234",
@@ -78,6 +80,7 @@ class TestUsuarioLookupNoEmail(TestCase):
             last_name="Silva",
             cpf=_next_cpf(),
         )
+        com_papel(alvo, "FORMADOR", gerencia)
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
 
@@ -107,7 +110,8 @@ class TestEmailSearchRestriction(TestCase):
     """SEC-ENUM-02: Only Coordenador+ can search by email."""
 
     def setUp(self):
-        # Create groups
+        # PR 9: o lookup é por gerência de atuação; coordenador e alvo na mesma gerência.
+        gerencia = GerenciaFactory()
 
         # Create formador user
         self.formador = UsuarioFactory(
@@ -119,10 +123,10 @@ class TestEmailSearchRestriction(TestCase):
         self.coordenador = UsuarioFactory(
             username="coord1", email="coord@test.com", password="pass1234", cpf=_next_cpf()
         )
-        com_papel(self.coordenador, "COORDENADOR")
+        com_papel(self.coordenador, "COORDENADOR", gerencia)
 
         # Create target user with distinct email
-        UsuarioFactory(
+        alvo = UsuarioFactory(
             username="target_email",
             email="distinct.email@example.com",
             password="pass1234",
@@ -130,6 +134,7 @@ class TestEmailSearchRestriction(TestCase):
             last_name="Costa",
             cpf=_next_cpf(),
         )
+        com_papel(alvo, "FORMADOR", gerencia)
 
         self.client = APIClient()
 

@@ -6,8 +6,10 @@
  * - A prévia de agenda confere os formadores e o responsável só com "Sim".
  * - "Você pretende avaliar o formador nesse evento?" só aparece quando o projeto pergunta e há
  *   formador avaliável na lista; com "Sim", escolher qual formador.
- * - Quem cria sem o papel COORDENADOR vigente precisa escolher o responsável (PR 8 das permissões:
- *   o papel em `me.gerencias`, não a função em `me.funcoes`).
+ * - Vazio no responsável = quem cria só quando o backend aceita para o projeto escolhido
+ *   (`responsavel_padrao` do lookup de projetos: papel COORDENADOR na gerência do projeto, PR 8/PR 9);
+ *   senão é obrigatório escolher.
+ * - Trocar o projeto limpa formadores e responsável (PR 9, P9-5: só pessoas da gerência do projeto).
  */
 import { useEffect } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -23,6 +25,8 @@ const {
   lookupTiposEventoMock,
   navigateMock,
   formadoresEscolhidos,
+  lookupUsuariosMock,
+  formadoresPickerProps,
 } = vi.hoisted(() => ({
   createSolicitacaoMock: vi.fn(),
   getMeMock: vi.fn(),
@@ -32,6 +36,8 @@ const {
   lookupTiposEventoMock: vi.fn(),
   navigateMock: vi.fn(),
   formadoresEscolhidos: { atual: [] as Array<{ id: number; label: string; avaliavel?: boolean }> },
+  lookupUsuariosMock: vi.fn(),
+  formadoresPickerProps: { projetoIds: [] as unknown[] },
 }));
 
 vi.mock('react-router', async () => {
@@ -47,7 +53,7 @@ vi.mock('../../../api/lookup', () => ({
   lookupMunicipiosWithFilters: lookupMunicipiosWithFiltersMock,
   lookupProjetos: lookupProjetosMock,
   lookupTiposEvento: lookupTiposEventoMock,
-  lookupUsuarios: vi.fn().mockResolvedValue([]),
+  lookupUsuarios: lookupUsuariosMock,
 }));
 vi.mock('../../../components/DateTimeRange', () => ({
   default: ({ onChange }: { onChange?: (v: unknown) => void }) => (
@@ -61,11 +67,14 @@ vi.mock('../../../components/DateTimeRange', () => ({
   ),
 }));
 vi.mock('../../../components/FormadoresPicker', () => ({
-  default: ({ onChange }: { onChange?: (v: unknown) => void }) => (
-    <button type="button" data-testid="pick-formador" onClick={() => onChange?.(formadoresEscolhidos.atual)}>
-      pick-formador
-    </button>
-  ),
+  default: ({ onChange, projetoId }: { onChange?: (v: unknown) => void; projetoId?: unknown }) => {
+    formadoresPickerProps.projetoIds.push(projetoId);
+    return (
+      <button type="button" data-testid="pick-formador" onClick={() => onChange?.(formadoresEscolhidos.atual)}>
+        pick-formador
+      </button>
+    );
+  },
 }));
 
 let projetoEscolhido: Record<string, unknown> = {};
@@ -126,9 +135,6 @@ const SEM_FUNCAO_COORDENADOR = {
   funcoes: ['Apoio de Coordenação'],
   gerencias: vinculo('APOIO'),
 };
-// PR 8: o papel decide, não a função.
-const COORDENADORA_SO_PELO_PAPEL = { ...COORDENADORA, funcoes: [] };
-const FUNCAO_COORDENADOR_SEM_PAPEL = { ...COORDENADORA, gerencias: vinculo('GERENTE') };
 const AVALIAVEL = { id: 99, label: 'Bruno Formador', avaliavel: true };
 const NAO_AVALIAVEL = { id: 98, label: 'Celia Coordenadora', avaliavel: false };
 
@@ -178,7 +184,13 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
       });
     }
     vi.clearAllMocks();
-    projetoEscolhido = { id: 123, label: 'Projeto X', fluxo: 'NAO_SUPER', pergunta_avaliar_formador: true };
+    projetoEscolhido = {
+      id: 123,
+      label: 'Projeto X',
+      fluxo: 'NAO_SUPER',
+      pergunta_avaliar_formador: true,
+      responsavel_padrao: true,
+    };
     formadoresEscolhidos.atual = [AVALIAVEL];
     lookupProjetosMock.mockResolvedValue([projetoEscolhido]);
     lookupTiposEventoMock.mockResolvedValue([{ id: 789, label: 'Formação' }]);
@@ -186,6 +198,17 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     getMeMock.mockResolvedValue(COORDENADORA);
     checkAvailabilityManyMock.mockResolvedValue({ ok: true, results: [] });
     createSolicitacaoMock.mockResolvedValue({ id: 1 });
+    lookupUsuariosMock.mockResolvedValue([]);
+    formadoresPickerProps.projetoIds.length = 0;
+  });
+
+  test('formadores e responsável vêm da gerência do projeto escolhido (PR 9, P9-5)', async () => {
+    getMeMock.mockResolvedValue(SEM_FUNCAO_COORDENADOR);
+    projetoEscolhido = { ...projetoEscolhido, responsavel_padrao: false };
+    renderWizard();
+    await irParaParticipantes();
+    expect(formadoresPickerProps.projetoIds.at(-1)).toBe(123);
+    await waitFor(() => expect(lookupUsuariosMock).toHaveBeenCalledWith('', 'Coordenador', 123));
   });
 
   test('a lista de coordenadores acompanhantes saiu e a pergunta Sim/Não entrou', async () => {
@@ -241,6 +264,7 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
 
   test('quem não é coordenador precisa escolher o responsável', async () => {
     getMeMock.mockResolvedValue(SEM_FUNCAO_COORDENADOR);
+    projetoEscolhido = { ...projetoEscolhido, responsavel_padrao: false };
     renderWizard();
     await irParaParticipantes();
     responder(ACOMPANHA, 'Não');
@@ -249,10 +273,10 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     expect(await screen.findByText('Escolha o coordenador responsável pelo evento.')).toBeInTheDocument();
   });
 
-  test('papel COORDENADOR vigente sem a função: quem cria é o responsável (PR 8)', async () => {
-    getMeMock.mockResolvedValue(COORDENADORA_SO_PELO_PAPEL);
+  test('projeto em que o backend aceita o vazio: quem cria é o responsável', async () => {
     renderWizard();
     await irParaParticipantes();
+    expect(screen.getByText('Vazio: você é o coordenador responsável.')).toBeInTheDocument();
     responder(ACOMPANHA, 'Sim');
     responder(AVALIAR, 'Não');
     await waitFor(() => expect(checkAvailabilityManyMock.mock.calls.at(-1)?.[0].usuarios_ids).toEqual([1, 99]));
@@ -263,10 +287,12 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     expect(screen.getByText('Ana Coordenadora (você)')).toBeInTheDocument();
   });
 
-  test('função Coordenador sem o papel: precisa escolher o responsável (PR 8)', async () => {
-    getMeMock.mockResolvedValue(FUNCAO_COORDENADOR_SEM_PAPEL);
+  test('coordenadora só de outra gerência: o texto do vazio não aparece e precisa escolher (PR 9)', async () => {
+    // `me.gerencias` diz COORDENADOR, mas não na gerência do projeto: o backend recusaria o vazio.
+    projetoEscolhido = { ...projetoEscolhido, responsavel_padrao: false };
     renderWizard();
     await irParaParticipantes();
+    expect(screen.queryByText('Vazio: você é o coordenador responsável.')).not.toBeInTheDocument();
     responder(ACOMPANHA, 'Não');
     responder(AVALIAR, 'Não');
     fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
@@ -288,6 +314,40 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     const payload = createSolicitacaoMock.mock.calls[0][0];
     expect(payload.coordenador_acompanha).toBe(true);
     expect(payload.pretende_avaliar_formador).toBe(false);
+    expect(payload.extra_participants).toEqual({ formador_ids: [99] });
+  });
+
+  test('trocar o projeto limpa os formadores e o responsável já escolhidos (PR 9, P9-5)', async () => {
+    renderWizard();
+    await irParaParticipantes();
+    fireEvent.click(screen.getByTestId('cb-responsavel'));
+    fireEvent.click(screen.getByRole('button', { name: /Voltar para passo anterior/i }));
+
+    projetoEscolhido = { ...projetoEscolhido, id: 124, label: 'Projeto Y' };
+    fireEvent.click(await screen.findByTestId('cb-projeto'));
+    fireEvent.click(screen.getByTestId('cb-municipio'));
+    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
+    await screen.findByTestId('pick-formador');
+    expect(formadoresPickerProps.projetoIds.at(-1)).toBe(124);
+
+    // Sem formador escolhido de novo, o passo não avança.
+    responder(ACOMPANHA, 'Não');
+    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
+    expect(await screen.findByText('Por favor selecione pelo menos um formador')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('pick-formador'));
+    responder(AVALIAR, 'Não');
+    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
+    await screen.findByLabelText('Local do Evento');
+    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
+    await screen.findByText('Revise sua solicitação');
+    expect(screen.queryByText('Carla Coordenadora')).not.toBeInTheDocument();
+    expect(screen.getByText('Ana Coordenadora (você)')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar Solicitação/i }));
+    await waitFor(() => expect(createSolicitacaoMock).toHaveBeenCalled());
+    const payload = createSolicitacaoMock.mock.calls[0][0];
+    expect(payload.projeto).toBe(124);
+    expect(payload.coordenador).toBeNull();
     expect(payload.extra_participants).toEqual({ formador_ids: [99] });
   });
 });

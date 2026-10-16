@@ -18,12 +18,13 @@ from rest_framework.test import APIClient
 
 from apps.core.models import AvailabilityBlock, Participation
 from apps.core.tests.factories import (
-    GroupFactory,
+    GerenciaFactory,
     MunicipioFactory,
     ProjetoFactory,
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_papel,
 )
 
 
@@ -156,9 +157,9 @@ class TestUpdateFormadoresQueryOptimization(TestCase):
             password="testpass123",
             cpf=unique_cpf(),
         )
-        # Add to Coordenador group
-        coord_group = GroupFactory(name="Coordenador")
-        self.coord.groups.add(coord_group)
+        # Coordenador na gerência do projeto (PR 9: só entra no evento gente da gerência do projeto)
+        self.gerencia = GerenciaFactory()
+        com_papel(self.coord, "COORDENADOR", self.gerencia)
         self.client.force_authenticate(user=self.coord)
 
         # Create required related objects
@@ -169,6 +170,7 @@ class TestUpdateFormadoresQueryOptimization(TestCase):
         self.projeto = ProjetoFactory(
             nome=f"Test Project Update {uuid.uuid4().hex[:8]}",
             fluxo="NAO_SUPER",
+            gerencia=self.gerencia,
         )
         self.tipo_evento = TipoEventoFactory(
             nome=f"Formação Update {uuid.uuid4().hex[:8]}",
@@ -182,6 +184,7 @@ class TestUpdateFormadoresQueryOptimization(TestCase):
                 password="testpass123",
                 cpf=unique_cpf(),
             )
+            com_papel(u, "FORMADOR", self.gerencia)
             self.formadores.append(u)
 
         # Create solicitacao
@@ -206,11 +209,13 @@ class TestUpdateFormadoresQueryOptimization(TestCase):
                     "extra_participants": {
                         "formador_ids": formador_ids,
                     },
+                    # 05/10/2026: com formador avaliável a pergunta de avaliar é obrigatória
+                    "pretende_avaliar_formador": False,
                 },
                 format="json",
             )
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 200, response.data)
 
         # Verify all participations were created
         participations = Participation.objects.filter(

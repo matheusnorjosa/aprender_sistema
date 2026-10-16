@@ -30,7 +30,11 @@ from apps.core.services.compra_elegibilidade import (
     projetos_liberados,
 )
 from apps.core.services.normalize import norm_text
-from apps.core.services.solicitacao_scope import scope_projetos_by_setor, scope_usuarios_by_setor
+from apps.core.services.solicitacao_scope import (
+    scope_projetos_por_gerencia,
+    scope_usuarios_por_gerencia,
+    user_is_solicitacao_global,
+)
 
 from .models import EquipeGerencia, Municipio, Projeto, TipoEvento, Usuario
 
@@ -42,6 +46,15 @@ _PAPEL_DO_ROLE: dict[str, str] = {
     "apoio de coordenação": "APOIO",
     "gerente": "GERENTE",
 }
+
+
+def _projeto_do_parametro(valor: str) -> Projeto | None:
+    """`projeto_id` da query (P9-5: o seletor de pessoas do evento é o da gerência do projeto). Inválido → None."""
+    try:
+        projeto_id = int(valor)
+    except ValueError:
+        return None
+    return Projeto.objects.filter(pk=projeto_id).first()
 
 
 def dedup_by_id(items):
@@ -133,10 +146,14 @@ class ProjetoLookup(APIView):
 
     Os filtros de compra não valem para quem é isento da regra (superuser ou a capacidade).
 
-    Retorna: [{id, label, kind: "projeto", fluxo, pergunta_avaliar_formador}]
+    Retorna: [{id, label, kind: "projeto", fluxo, pergunta_avaliar_formador, responsavel_padrao}]
 
     `pergunta_avaliar_formador` = a gerência do projeto usa a pergunta "Você pretende avaliar o
     formador?" (projeto sem gerência: True). Decisão do dono, 05/10/2026.
+
+    `responsavel_padrao` = deixar o "Coordenador responsável" vazio faz de quem busca a responsável
+    pelo evento do projeto (mesma regra de `SolicitacaoViewSet._resolver_coordenador_responsavel`):
+    papel COORDENADOR vigente na gerência do projeto; global/privilegiado, em qualquer gerência (PR 9).
     """
 
     permission_classes = [IsAuthenticated]
@@ -163,9 +180,9 @@ class ProjetoLookup(APIView):
         # nome. `include_kits=true` reexpõe.
         if not include_kits:
             qs = qs.exclude(eh_serie=True)
-        # M10-04/#1656 Wave 1 (S2): coordenador regular só vê projetos do PRÓPRIO
-        # setor (+ projetos sem setor, fail-open). Global/privilegiado isento.
-        qs = scope_projetos_by_setor(qs, request.user)
+        # PR 9: só projetos das gerências onde a pessoa tem papel G/C/A vigente (projeto sem
+        # gerência nunca entra). Global/privilegiado isento.
+        qs = scope_projetos_por_gerencia(qs, request.user)
         qs = qs.distinct()
 
         # Teto amplo: com os kits fora, o catálogo de projetos-evento cabe na lista (a busca `q`
@@ -175,6 +192,9 @@ class ProjetoLookup(APIView):
         else:
             _q_norm = norm_text(q)  # noqa: F841 - reserved for future normalized search
             qs = qs.filter(Q(nome__icontains=q) | Q(codigo__icontains=q)).order_by("nome")[:200]
+
+        coordena = EquipeGerencia.gerencias_com_papel(request.user, {"COORDENADOR"})
+        coordena_em_qualquer = bool(coordena) and user_is_solicitacao_global(request.user)
 
         results = []
         for proj in qs:
@@ -187,6 +207,7 @@ class ProjetoLookup(APIView):
                     "kind": "projeto",
                     "fluxo": proj.fluxo,
                     "pergunta_avaliar_formador": proj.gerencia is None or proj.gerencia.pergunta_avaliar_formador,
+                    "responsavel_padrao": coordena_em_qualquer or proj.gerencia_id in coordena,
                 }
             )
 
@@ -224,8 +245,11 @@ class TipoEventoLookup(APIView):
 
 class UsuarioLookup(APIView):
     """
-    GET /api/lookup/usuarios/?q=maria&role=formador
+    GET /api/lookup/usuarios/?q=maria&role=formador&projeto_id=12
     Retorna: [{id, label, kind: "usuario", avaliavel}]
+
+    `projeto_id` (PR 9, P9-5): só pessoas da gerência do projeto do evento. Sem ele, as das gerências
+    onde quem busca tem papel G/C/A (`scope_usuarios_por_gerencia`).
 
     `role` aceita vários papéis separados por vírgula (`Formador,Coordenador`): a lista de
     formadores da Nova Solicitação oferece também os coordenadores do setor (decisão do dono,
@@ -287,15 +311,20 @@ class UsuarioLookup(APIView):
 
         # Filtrar por papel vigente ANTES do slice (vários papéis separados por vírgula = OU)
         roles = [p.strip().lower() for p in role.split(",") if p.strip()]
+        papeis: frozenset[str] = frozenset()
         if roles:
-            papeis = {_PAPEL_DO_ROLE[r] for r in roles if r in _PAPEL_DO_ROLE}
+            papeis = frozenset(_PAPEL_DO_ROLE[r] for r in roles if r in _PAPEL_DO_ROLE)
             vigentes = EquipeGerencia.vigentes_em().filter(papel__in=papeis, gerencia__ativo=True)
             qs = qs.filter(id__in=vigentes.values("usuario_id"))
 
-        # M10-04/#1656 Wave 1: o coordenador regular só enxerga usuários do PRÓPRIO
-        # setor (o picker do wizard consome este lookup → FE já filtrado, sem 400).
-        # Global/privilegiado (superuser, Superintendência, Controle, DAT) é isento.
-        qs = scope_usuarios_by_setor(qs, request.user)
+        # PR 9: só pessoas das gerências onde quem busca tem papel G/C/A vigente; com `projeto_id`,
+        # só da gerência do projeto (P9-5), e o papel pedido tem que ser NESSA gerência (o mesmo
+        # papel na mesma gerência que o write-path exige do responsável). O seletor da Nova
+        # Solicitação consome este lookup → FE já filtrado, sem 400. Global/privilegiado
+        # (superuser, Superintendência, Controle, DAT) isento.
+        qs = scope_usuarios_por_gerencia(
+            qs, request.user, _projeto_do_parametro(request.GET.get("projeto_id", "")), papeis
+        )
 
         # Aplicar ordenação e limite
         usuarios = list(qs.order_by("-id")[: 50 if q else 20])

@@ -96,16 +96,18 @@ class HomeStatsView(APIView):
         # via IsAuthenticated). Aqui é data-scope de queryset, não autorização —
         # whitelisted no rbac_lint guard.
         has_formador_group = user.groups.filter(name__in=FORMADOR_ROLE_GROUPS).exists()  # noqa: RBAC-data-scope-allowed
-        is_formador_only = has_formador_group and not user_has_any_perm(
+        # PR 9 (P9-1): o papel FORMADOR vigente também faz dela formadora; sem isso, quem tem só o
+        # vínculo (sem o grupo) cairia no fail-safe abaixo e veria 0 eventos, nem os dela.
+        e_formadora = has_formador_group or bool(EquipeGerencia.gerencias_com_papel(user, {"FORMADOR"}))
+        is_formador_only = e_formadora and not user_has_any_perm(
             user,
             "create_solicitation",
             "approve_solicitation",
             "manage_admin_registries",
         )
 
-        user_gerencias = list(
-            EquipeGerencia.vigentes_com_escopo_em().filter(usuario=user).values_list("gerencia_id", flat=True)
-        )
+        # PR 9 (P9-6): o painel conta só as gerências onde a pessoa tem papel G/C/A vigente.
+        user_gerencias = list(EquipeGerencia.gerencias_de_atuacao(user))
 
         # === APROVAÇÕES PENDENTES ===
         # M11-16 (PR B1): mesmo gate dos endpoints de aprovação e mesmo recorte da

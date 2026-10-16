@@ -238,15 +238,16 @@ class HasSectorAccess(permissions.BasePermission):  # type: ignore[misc]
 
     Regras (D8 — 2026-04-28):
     - Superusers: acesso a todos os setores.
-    - Sem `gerencia_id` na query: exige pelo menos 1 vínculo de
-      `EquipeGerencia` ativa. Antes era "comportamento SUPER" (permitido a
+    - PR 9 (P9-3): só conta papel G/C/A vigente em gerência ativa
+      (`EquipeGerencia.gerencias_de_atuacao`), o mesmo da tela. O papel FORMADOR sozinho não abre.
+    - Sem `gerencia_id` na query: exige pelo menos 1 gerência de atuação.
+      Antes era "comportamento SUPER" (permitido a
       todos autenticados), mas isso permitia que Formador/DAT/Diretoria
       sem cap global e sem vínculo entrassem na Grade Mensal indevidamente.
       A composition `CanViewAllAvailability | HasSectorAccess` em
       `MonthlyAvailabilityView` ainda permite que Controle/Gerente passem
       pela cap, sem precisar de vínculo de gerência.
-    - Com `gerencia_id`: verifica se usuário pertence à gerência específica
-      via `EquipeGerencia`.
+    - Com `gerencia_id`: verifica se a gerência é uma das de atuação do usuário.
 
     Block antigo de "grupo Controle" foi REMOVIDO em 2026-04-27 (Bug 1 fix
     pós RBAC Access Policy Realignment). Razão: o seed 0077 atribui a
@@ -286,14 +287,9 @@ class HasSectorAccess(permissions.BasePermission):  # type: ignore[misc]
         # Quem precisa de visão ampla (Controle/Gerente) bate antes em
         # `CanViewAllAvailability` na composition; quem cai aqui sem vínculo
         # é Formador/DAT/Diretoria/sem-vínculo → 403.
+        gerencias = EquipeGerencia.gerencias_de_atuacao(request.user)
         if gerencia_id_raw is None:
-            has_any_vinculo = (
-                EquipeGerencia.vigentes_com_escopo_em()
-                .filter(
-                    usuario=request.user,
-                )
-                .exists()
-            )
+            has_any_vinculo = bool(gerencias)
             if not has_any_vinculo:
                 self.message = "Você não tem acesso à grade mensal de disponibilidade."
             return has_any_vinculo
@@ -305,15 +301,8 @@ class HasSectorAccess(permissions.BasePermission):  # type: ignore[misc]
             self.message = "gerencia_id deve ser um número inteiro."
             return False
 
-        # Com gerencia_id = verificar se usuário pertence à gerência
-        has_access = (
-            EquipeGerencia.vigentes_com_escopo_em()
-            .filter(
-                usuario=request.user,
-                gerencia_id=gerencia_id,
-            )
-            .exists()
-        )
+        # Com gerencia_id = verificar se o usuário atua na gerência (G/C/A)
+        has_access = gerencia_id in gerencias
 
         if not has_access:
             self.message = "Você não tem acesso a este setor."

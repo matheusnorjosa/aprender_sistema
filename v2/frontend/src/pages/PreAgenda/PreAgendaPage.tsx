@@ -76,6 +76,7 @@ import { TIMING } from '../../constants/timing';
 import { usePolling } from '../../hooks/usePolling';
 import { syncChannel } from '../../services/syncChannel';
 import { formatFortaleza } from '../../utils/datetime';
+import { MOTIVO_NAO_PUBLICAVEL, motivoNaoPublicavel } from '../../utils/gcalRowActions';
 import logger from '../../utils/logger';
 import type { ID, Solicitacao, GCalStatus, Gerencia, PaginatedResponse, Participation } from '../../types';
 import { formadoresLabel } from '../../utils/participants';
@@ -551,6 +552,13 @@ export default function PreAgendaPage(): JSX.Element {
         // Cancel: mostrar apenas quando PUBLISHED e tem event_id
         const showCancel = isPublished && hasEventId;
 
+        // Virada: evento que já terminou, ou que está no Google pela planilha, não se publica
+        // (o backend recusa com o mesmo motivo). O motivo vai no nome acessível do botão.
+        const motivo = motivoNaoPublicavel(record);
+        const publicarLabel = motivo
+          ? `Publicar evento no Google Calendar: ${MOTIVO_NAO_PUBLICAVEL[motivo]}`
+          : 'Publicar evento no Google Calendar';
+
         return (
           <Space size="small">
             <Button
@@ -564,8 +572,9 @@ export default function PreAgendaPage(): JSX.Element {
               type="primary"
               icon={<CloudUploadOutlined />}
               onClick={() => handlePublish(record.id)}
-              aria-label="Publicar evento no Google Calendar"
-              disabled={isPublished || isPending}
+              aria-label={publicarLabel}
+              title={motivo ? MOTIVO_NAO_PUBLICAVEL[motivo] : undefined}
+              disabled={isPublished || isPending || motivo !== null}
             />
             {showResync && (
               <Button
@@ -714,6 +723,15 @@ export default function PreAgendaPage(): JSX.Element {
   const rowSelection: TableRowSelection<Solicitacao> = {
     selectedRowKeys,
     onChange: (keys: Key[]) => setSelectedRowKeys(keys),
+    // A seleção alimenta Reaplicar/Reenviar: só o que já foi ao Google e não terminou (o backend
+    // recusa o resto, e no `NONE` o reenvio criaria um evento). O motivo fica no nome acessível.
+    getCheckboxProps: (record: Solicitacao) => {
+      const motivo = motivoNaoPublicavel(record, { reenvio: true });
+      return {
+        disabled: motivo !== null,
+        'aria-label': motivo ? `Selecionar evento: ${MOTIVO_NAO_PUBLICAVEL[motivo]}` : 'Selecionar evento',
+      };
+    },
     selections: [
       Table.SELECTION_ALL,
       Table.SELECTION_INVERT,

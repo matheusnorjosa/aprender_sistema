@@ -109,6 +109,8 @@ export interface Solicitacao {
   gcal_status: GCalStatus;
   gcal_last_sync_at: ISODateTime | null;
   gcal_last_error: string | null;
+  /** No Google Agenda pela planilha e não adotado (virada): o sistema não publica. */
+  publicado_fora_do_sistema?: boolean;
   meet_link: string | null;
 }
 

@@ -7,7 +7,7 @@
  * (cancel exige external_event_id).
  */
 import { describe, expect, test } from 'vitest';
-import { gcalRowActions, type GcalRowAction } from '../gcalRowActions';
+import { gcalRowActions, motivoNaoPublicavel, type GcalRowAction } from '../gcalRowActions';
 import type { GCalStatus } from '../../types';
 
 type Case = [GCalStatus, string | null, GcalRowAction[], string];
@@ -47,5 +47,48 @@ describe('gcalRowActions — cores da tag', () => {
     expect(color('PENDING')).toBe('processing');
     expect(color('PUBLISHED')).toBe('success');
     expect(color('ERROR')).toBe('error');
+  });
+});
+
+// Virada (16/10/2026): o mesmo `motivo_nao_publicavel` do backend, para a tela não oferecer o que ele recusa.
+describe('gcalRowActions — publicado fora do sistema', () => {
+  test('evento no Google pela planilha não oferece ação nenhuma', () => {
+    const result = gcalRowActions(
+      { gcal_status: 'NONE', external_event_id: null, publicado_fora_do_sistema: true },
+      { ready: true },
+    );
+    expect(result.actions).toEqual([]);
+    expect(result.tag.label).toBe('Na agenda pela planilha');
+  });
+});
+
+describe('motivoNaoPublicavel', () => {
+  const agora = Date.parse('2026-10-16T12:00:00-03:00');
+  const futuro = '2026-11-05T12:00:00-03:00';
+  const passado = '2026-10-10T12:00:00-03:00';
+  const linha = (o: Record<string, unknown>) => ({
+    gcal_status: 'NONE' as GCalStatus,
+    fim: futuro,
+    publicado_fora_do_sistema: false,
+    ...o,
+  });
+
+  test('publicar', () => {
+    expect(motivoNaoPublicavel(linha({}), { agora })).toBeNull();
+    expect(motivoNaoPublicavel(linha({ fim: passado }), { agora })).toBe('evento_passado');
+    expect(motivoNaoPublicavel(linha({ gcal_status: 'PUBLISHED' }), { agora })).toBe('ja_publicado');
+    expect(motivoNaoPublicavel(linha({ gcal_status: 'PENDING' }), { agora })).toBe('ja_publicado');
+    expect(motivoNaoPublicavel(linha({ gcal_status: 'ERROR' }), { agora })).toBeNull();
+    expect(motivoNaoPublicavel(linha({ publicado_fora_do_sistema: true }), { agora })).toBe(
+      'publicado_fora_do_sistema',
+    );
+  });
+
+  test('reenvio (Reaplicar / Reenviar)', () => {
+    expect(motivoNaoPublicavel(linha({}), { agora, reenvio: true })).toBe('nao_publicado');
+    expect(motivoNaoPublicavel(linha({ gcal_status: 'PUBLISHED' }), { agora, reenvio: true })).toBeNull();
+    expect(motivoNaoPublicavel(linha({ gcal_status: 'PUBLISHED', fim: passado }), { agora, reenvio: true })).toBe(
+      'evento_passado',
+    );
   });
 });

@@ -14,6 +14,9 @@
  * | ERROR       | tentar (= publicar)   | atualizar, remover    |
  *
  * Sem `ready` (status.publishReady) as ações continuam listadas, mas desabilitadas.
+ *
+ * Evento no Google pela planilha e não adotado (`publicado_fora_do_sistema`, virada de 16/10/2026)
+ * não oferece ação nenhuma: publicar criaria um segundo evento, e o backend recusa.
  */
 import type { GCalStatus, Solicitacao } from '../types';
 
@@ -50,13 +53,44 @@ function actionsFor(status: GCalStatus, hasEventId: boolean): GcalRowAction[] {
   }
 }
 
+const TAG_FORA_DO_SISTEMA: GcalRowTag = { label: 'Na agenda pela planilha', color: 'default' };
+
 export function gcalRowActions(
-  row: Pick<Solicitacao, 'gcal_status' | 'external_event_id'>,
+  row: Pick<Solicitacao, 'gcal_status' | 'external_event_id'> & Partial<Pick<Solicitacao, 'publicado_fora_do_sistema'>>,
   { ready }: { ready: boolean },
 ): GcalRowActionsResult {
+  if (row.publicado_fora_do_sistema) {
+    return { tag: TAG_FORA_DO_SISTEMA, actions: [], disabled: !ready };
+  }
   return {
     tag: TAGS[row.gcal_status],
     actions: actionsFor(row.gcal_status, !!row.external_event_id),
     disabled: !ready,
   };
+}
+
+/** Códigos do `motivo_nao_publicavel` do backend (services/solicitacao_publish.py). */
+export type MotivoNaoPublicavel = 'publicado_fora_do_sistema' | 'evento_passado' | 'ja_publicado' | 'nao_publicado';
+
+/** Motivo curto, para completar o nome acessível do botão ou da caixa de seleção. */
+export const MOTIVO_NAO_PUBLICAVEL: Record<MotivoNaoPublicavel, string> = {
+  publicado_fora_do_sistema: 'já está no Google Agenda pela planilha',
+  evento_passado: 'o evento já terminou',
+  ja_publicado: 'já publicado',
+  nao_publicado: 'ainda não publicado',
+};
+
+/**
+ * Espelho do `motivo_nao_publicavel` do backend: por que a linha não pode ser publicada
+ * (`reenvio=false`) ou reaplicada/reenviada (`reenvio=true`), ou null se pode.
+ * "Passado" compara instantes (o ISO traz o fuso), então vale em qualquer fuso do navegador.
+ */
+export function motivoNaoPublicavel(
+  row: Pick<Solicitacao, 'gcal_status'> & Partial<Pick<Solicitacao, 'fim' | 'publicado_fora_do_sistema'>>,
+  { reenvio = false, agora = Date.now() }: { reenvio?: boolean; agora?: number } = {},
+): MotivoNaoPublicavel | null {
+  if (row.publicado_fora_do_sistema) return 'publicado_fora_do_sistema';
+  if (row.fim && Date.parse(row.fim) < agora) return 'evento_passado';
+  if (reenvio) return row.gcal_status === 'NONE' ? 'nao_publicado' : null;
+  return row.gcal_status === 'PUBLISHED' || row.gcal_status === 'PENDING' ? 'ja_publicado' : null;
 }

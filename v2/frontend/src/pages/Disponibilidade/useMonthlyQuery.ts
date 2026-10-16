@@ -61,7 +61,7 @@ interface UseMonthlyQueryResult {
  * @param params.month - Mês (1..12)
  * @param params.role - Role ("FORMADOR" | "COORDENADOR")
  * @param params.sector - Filtro por setor (opcional)
- * @param params.q - Filtro por nome/email (opcional)
+ * @param params.q - Filtro por nome (opcional)
  * @param params.gerenciaId - ID da gerência (opcional)
  * @returns { data, loading, error, refetch }
  */

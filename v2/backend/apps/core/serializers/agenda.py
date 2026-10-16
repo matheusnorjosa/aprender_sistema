@@ -59,7 +59,7 @@ class AvailabilityBlockSerializer(serializers.ModelSerializer):
         u = getattr(obj, "usuario", None)
         if u is None:
             return ""
-        return u.get_full_name() or u.username
+        return str(u)  # nome, ou "Usuario #id": nunca o login (CPF)
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         """

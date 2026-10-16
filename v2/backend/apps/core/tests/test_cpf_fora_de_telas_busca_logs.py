@@ -9,6 +9,8 @@ Desde 29/09 o login (`username`) de toda conta é o CPF. Então:
   a busca textual dessas listas também não casa o login.
 - C11: os logs estruturados não levam o login nos `extra`, e o filtro de PII limpa também os
   valores dos `extra` e o traceback.
+- O mesmo atalho "nome ou login" fora dessas rotas: bloqueios, deslocamentos, Plano de
+  Formações, métricas de formadores e do mapa, e a Grade Mensal (nome, e-mail de reserva e `q`).
 
 Todos os CPFs aqui são sintéticos.
 """
@@ -34,13 +36,16 @@ import pytest
 from pythonjsonlogger.jsonlogger import JsonFormatter
 
 from apps.core.logging_filters import PIIRedactionFilter
-from apps.core.models import AuditLog, Participation, Solicitacao
+from apps.core.models import AuditLog, AvailabilityBlock, Deslocamento, Participation, PlanoFormacoes, Solicitacao
+from apps.core.services.monthly_grid_service import build_monthly_grid
 from apps.core.tests.factories import (
+    GerenciaFactory,
     MunicipioFactory,
     ProjetoFactory,
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_papel,
 )
 
 pytestmark = pytest.mark.django_db
@@ -482,3 +487,119 @@ def test_convite_do_google_nao_leva_email_de_reserva_com_cpf():
         Participation.objects.create(solicitacao=s, usuario=u, role=Participation.Role.FORMADOR)
 
     assert build_attendees_for_solicitacao(s) == [{"email": com_email.email}]
+
+
+# =============================================================================
+# Mesmo atalho "nome ou login" fora de /api/solicitacoes* e /api/gcal/*: bloqueios,
+# deslocamentos, Plano de Formações, métricas e Grade Mensal
+# =============================================================================
+
+
+@pytest.fixture
+def gerencia_com_sem_nome():
+    """Coordenador e uma conta sem nome (e com e-mail de reserva) na mesma gerência."""
+    g = GerenciaFactory()
+    coord = _conta(nome="Coord")
+    com_papel(coord, "COORDENADOR", g)
+    sem_nome = _conta()
+    sem_nome.email = f"{sem_nome.cpf}@placeholder.local"
+    sem_nome.save(update_fields=["email"])
+    com_papel(sem_nome, "FORMADOR", g)
+    return g, coord, sem_nome
+
+
+def _sem_cpf(resp, rotulo: str) -> None:
+    assert resp.status_code == 200, (rotulo, resp.status_code, resp.content[:300])
+    corpo = resp.content.decode()
+    assert not _ONZE_DIGITOS.search(corpo), rotulo
+
+
+def test_bloqueios_e_deslocamentos_da_gerencia_nao_levam_cpf(gerencia_com_sem_nome):
+    _, coord, sem_nome = gerencia_com_sem_nome
+    agora = timezone.now()
+    AvailabilityBlock.objects.create(
+        usuario=sem_nome, inicio=agora + timedelta(days=1), fim=agora + timedelta(days=1, hours=2), tipo="T"
+    )
+    Deslocamento.objects.create(
+        usuario=sem_nome,
+        origem="Fortaleza",
+        destino="Sobral",
+        start_date=timezone.localdate(),
+        end_date=timezone.localdate() + timedelta(days=1),
+    )
+    cliente = _client(coord)
+    for rota in ("/api/availability-blocks/", "/api/deslocamentos/"):
+        resp = cliente.get(rota)
+        _sem_cpf(resp, rota)
+        corpo = resp.json()
+        linhas = corpo["results"] if isinstance(corpo, dict) else corpo
+        assert [linha["usuario_nome"] for linha in linhas] == [f"Usuario #{sem_nome.id}"], rota
+
+
+def test_plano_de_formacoes_nao_leva_cpf_de_coordenador_sem_nome():
+    controle = _conta(nome="Operadora", groups=["Controle", "Assistente Administrativo"])
+    sem_nome = _conta(groups=["Coordenador"])
+    plano = PlanoFormacoes.objects.create(municipio=MunicipioFactory(), projeto=ProjetoFactory(), created_by=controle)
+    plano.coordenadores.add(sem_nome)
+    resp = _client(controle).get("/api/dat/plano-formacoes/")
+    _sem_cpf(resp, "plano-formacoes")
+    assert f"Usuario #{sem_nome.id}" in resp.content.decode()
+
+
+def test_metricas_de_formadores_e_coordenadores_nao_levam_cpf_de_quem_nao_tem_nome():
+    # Quem vê não administra contas: Controle (ranking de formadores) e Diretoria (mapa).
+    controle = _conta(nome="Operadora", groups=["Controle", "Assistente Administrativo"])
+    diretoria = _conta(nome="Diretora", groups=["Diretoria"])
+    formador, coordenador = _conta(groups=["Formador"]), _conta(groups=["Coordenador"])
+    inicio = timezone.now() - timedelta(days=1)
+    s = SolicitacaoFactory(status="aprovado", inicio=inicio, fim=inicio + timedelta(hours=2))
+    Participation.objects.create(solicitacao=s, usuario=formador, role=Participation.Role.FORMADOR)
+    Participation.objects.create(solicitacao=s, usuario=coordenador, role=Participation.Role.COORDENADOR)
+    for quem, rota in (
+        (controle, "/api/metrics/team/formadores/"),
+        (diretoria, f"/api/metrics/map/coordinators/?uf={s.municipio.uf}"),
+    ):
+        resp = _client(quem).get(rota)
+        _sem_cpf(resp, rota)
+        assert "Usuario #" in resp.content.decode(), rota
+
+
+def _membro_super_sem_nome():
+    """Conta sem nome, com e-mail de reserva, numa formação SUPER (caminho sem gerência da Grade)."""
+    sem_nome = _conta()
+    sem_nome.email = f"{sem_nome.cpf}@placeholder.local"
+    sem_nome.save(update_fields=["email"])
+    s = SolicitacaoFactory(status="aprovado", projeto=ProjetoFactory(super=True))
+    Participation.objects.create(solicitacao=s, usuario=sem_nome, role=Participation.Role.FORMADOR)
+    return sem_nome
+
+
+@pytest.mark.parametrize("com_gerencia", [True, False])
+def test_grade_mensal_nao_leva_cpf_no_nome_nem_no_email(gerencia_com_sem_nome, com_gerencia):
+    g, _, sem_nome = gerencia_com_sem_nome
+    if not com_gerencia:
+        sem_nome = _membro_super_sem_nome()
+    hoje = timezone.localdate()
+    grade = build_monthly_grid(
+        year=hoje.year, month=hoje.month, role="FORMADOR", gerencia_id=g.id if com_gerencia else None
+    )
+    pessoa = next(p for p in grade["people"] if p["id"] == sem_nome.id)
+    assert pessoa["name"] == f"Usuario #{sem_nome.id}"
+    assert pessoa["email"] is None
+    assert not _ONZE_DIGITOS.search(json.dumps(grade["people"]))
+
+
+@pytest.mark.parametrize("com_gerencia", [True, False])
+def test_grade_mensal_busca_so_com_digitos_do_cpf_nao_acha_ninguem(gerencia_com_sem_nome, com_gerencia):
+    g, _, sem_nome = gerencia_com_sem_nome
+    if not com_gerencia:
+        sem_nome = _membro_super_sem_nome()
+    hoje = timezone.localdate()
+    grade = build_monthly_grid(
+        year=hoje.year,
+        month=hoje.month,
+        role="FORMADOR",
+        gerencia_id=g.id if com_gerencia else None,
+        q=sem_nome.cpf[2:7],
+    )
+    assert grade["people"] == []

@@ -8,6 +8,7 @@ import { fetchAPI, buildUrl, type QueryParams } from './config';
 import { API_BASE } from './config';
 import { syncChannel } from '../services/syncChannel';
 import type { ID, PaginatedResponse } from '../types';
+import type { Participation } from '../types/solicitacao';
 
 /**
  * GCal status summary counts
@@ -199,12 +200,7 @@ export interface GCalDashboardEventDetail {
   gcal_payload_hash: string | null;
   gcal_last_error: string | null;
   updated_at: string | null;
-  participations: Array<{
-    email: string;
-    role: string;
-    ch_horas?: number;
-    observacao?: string;
-  }>;
+  participations: Participation[];
   timeline: GCalEventTimelineItem[];
 }
 

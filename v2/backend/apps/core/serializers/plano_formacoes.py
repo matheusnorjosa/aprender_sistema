@@ -27,7 +27,7 @@ def _ano_vigente() -> int:
 def _coordenadores_nomes(obj: PlanoFormacoes) -> str | None:
     """Nomes dos coordenadores juntados com ' & ' (convenção da fonte para co-liderança). Vazio → None.
     Mantém a chave `coordenador_nome` que a tabela do front já consome, agora agregando o M2M."""
-    nomes = [u.get_full_name() or u.username for u in obj.coordenadores.all()]
+    nomes = [str(u) for u in obj.coordenadores.all()]  # nome, ou "Usuario #id": nunca o login (CPF)
     nomes = [n for n in nomes if n]
     return " & ".join(nomes) if nomes else None
 

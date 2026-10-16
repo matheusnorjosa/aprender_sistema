@@ -74,7 +74,7 @@ class DeslocamentoSerializer(serializers.ModelSerializer):
 
     Fields:
         - id, usuario, origem, destino, start_date, end_date, observacao
-        - usuario_nome (read-only): Nome do usuário ou username
+        - usuario_nome (read-only): Nome do usuário, ou "Usuario #id" (nunca o login, que é o CPF)
         - external_hash (read-only): ETL idempotence hash
         - created_at, updated_at (read-only)
 
@@ -112,10 +112,9 @@ class DeslocamentoSerializer(serializers.ModelSerializer):
         }
 
     def get_usuario_nome(self, obj: Deslocamento) -> str:
-        """Retorna nome completo do usuário ou username como fallback."""
+        """Nome do usuário, ou "Usuario #id": nunca o login (CPF)."""
         if obj.usuario:
-            full_name = obj.usuario.get_full_name()
-            return full_name.strip() if full_name.strip() else obj.usuario.username
+            return str(obj.usuario)
         return ""
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:

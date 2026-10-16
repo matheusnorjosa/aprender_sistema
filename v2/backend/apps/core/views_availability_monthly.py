@@ -8,7 +8,7 @@ Query params:
     - role: str ("FORMADOR" | "COORDENADOR") - obrigatório
     - gerencia_id: int (opcional)
     - sector: str (opcional) - Filtro por nome do projeto
-    - q: str (opcional) - Filtro por nome/email
+    - q: str (opcional) - Filtro por nome (o e-mail não entra: pode levar o CPF)
 
 Permissões (Bug 1 fix pós RBAC Access Policy Realignment, 2026-04-27):
     - Superusers: acesso a todas as gerências
@@ -220,10 +220,11 @@ class MonthlyAvailabilityView(APIView):
         # já limita o toggle de `ativo` (não há signal EquipeGerencia→cache). Pôr
         # `localdate()` aqui só criaria um burst diário de cache-miss sem ganho real.
         # O teto da contagem de horas (Configurações) entra na chave: salvar um teto novo
-        # vale já na consulta seguinte. v6: CH com teto por evento (05/10/2026).
+        # vale já na consulta seguinte. v6: CH com teto por evento (05/10/2026). v7: S5, sem CPF
+        # no nome nem no e-mail e `q` só por nome (16/10/2026): a grade em cache levava os dois.
         teto = parametros_disponibilidade()["AVAILABILITY_DAILY_LIMIT_HOURS"]
         cache_key = (
-            f"monthly:v6:{monthly_ver}:{year}:{month}:{role}:"
+            f"monthly:v7:{monthly_ver}:{year}:{month}:{role}:"
             f"{cache_scope}:{sector or '*'}:{(q or '').strip().lower()}:teto{teto}"
         )
 

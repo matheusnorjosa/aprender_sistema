@@ -65,6 +65,39 @@ describe('TrocaSenhaObrigatoriaPage — aviso de senha redefinida (F1)', () => {
 
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
+
+  test('com mais redefinições que o aviso, lista todas (tomada de conta: o invasor apagou o aviso dele)', () => {
+    render(
+      <TrocaSenhaObrigatoriaPage
+        aviso={{ por: 'Outra Pessoa', em: '16/10/2026' }}
+        redefinicoes={[
+          { por: 'Outra Pessoa', em: '16/10/2026' },
+          { por: 'Pessoa Do Dat', em: '15/10/2026' },
+        ]}
+        onConcluida={vi.fn()}
+        onSair={vi.fn()}
+        onSessaoEncerrada={vi.fn()}
+      />,
+    );
+
+    const lista = screen.getByRole('list', { name: 'Redefinições da sua senha nos últimos 30 dias' });
+    expect(lista).toHaveTextContent('Outra Pessoa em 16/10/2026');
+    expect(lista).toHaveTextContent('Pessoa Do Dat em 15/10/2026');
+  });
+
+  test('com uma redefinição só, o aviso basta e a lista não aparece', () => {
+    render(
+      <TrocaSenhaObrigatoriaPage
+        aviso={{ por: 'Pessoa Do Dat', em: '16/10/2026' }}
+        redefinicoes={[{ por: 'Pessoa Do Dat', em: '16/10/2026' }]}
+        onConcluida={vi.fn()}
+        onSair={vi.fn()}
+        onSessaoEncerrada={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('list', { name: /Redefinições da sua senha/ })).not.toBeInTheDocument();
+  });
 });
 
 describe('TrocaSenhaObrigatoriaPage', () => {

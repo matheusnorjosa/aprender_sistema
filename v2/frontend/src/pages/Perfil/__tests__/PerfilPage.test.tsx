@@ -50,6 +50,29 @@ function fill(placeholder: string, value: string) {
   fireEvent.change(screen.getByPlaceholderText(placeholder), { target: { value } });
 }
 
+describe('PerfilPage — redefinições da senha por outra pessoa (F1)', () => {
+  test('lista as redefinições dos últimos 30 dias', () => {
+    renderPage(
+      makeUser({
+        redefinicoes_senha: [
+          { por: 'Outra Pessoa', em: '16/10/2026' },
+          { por: 'Pessoa Do Dat', em: '15/10/2026' },
+        ],
+      }),
+    );
+
+    const lista = screen.getByRole('list', { name: 'Redefinições da sua senha nos últimos 30 dias' });
+    expect(lista).toHaveTextContent('Outra Pessoa em 16/10/2026');
+    expect(lista).toHaveTextContent('Pessoa Do Dat em 15/10/2026');
+  });
+
+  test('sem redefinições, não mostra a seção', () => {
+    renderPage(makeUser({ redefinicoes_senha: [] }));
+
+    expect(screen.queryByRole('list', { name: /Redefinições da sua senha/ })).not.toBeInTheDocument();
+  });
+});
+
 describe('PerfilPage', () => {
   beforeEach(() => {
     changeMyPasswordMock.mockReset();

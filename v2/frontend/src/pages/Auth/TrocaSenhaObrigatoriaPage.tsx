@@ -20,6 +20,11 @@ import { BRAND_COLORS } from '../../contexts/ThemeContext';
 export interface TrocaSenhaObrigatoriaPageProps {
   /** F1: a senha foi redefinida por outra pessoa; a tela diz quem e quando. */
   aviso?: AvisoSenhaRedefinida | null;
+  /**
+   * F1: redefinições por outra pessoa nos últimos 30 dias. Listadas quando dizem mais que o aviso:
+   * quem tomou a conta apagou o aviso dele ao trocar a senha, mas não o histórico.
+   */
+  redefinicoes?: readonly AvisoSenhaRedefinida[];
   /** A senha foi trocada: o App recarrega o usuário e abre o endereço que a pessoa pediu. */
   onConcluida: () => void | Promise<void>;
   /** "Sair": encerra a sessão sem trocar a senha. */
@@ -70,6 +75,7 @@ const trocaJaFeita = async (error: unknown): Promise<boolean> => {
 
 export default function TrocaSenhaObrigatoriaPage({
   aviso = null,
+  redefinicoes = [],
   onConcluida,
   onSair,
   onSessaoEncerrada,
@@ -180,6 +186,19 @@ export default function TrocaSenhaObrigatoriaPage({
             message={`Sua senha foi redefinida por ${aviso.por} em ${aviso.em}.`}
             style={{ marginBottom: '16px' }}
           />
+        )}
+
+        {redefinicoes.length > (aviso ? 1 : 0) && (
+          <>
+            <p id="redefinicoes-senha-titulo" style={{ fontWeight: 600, marginBottom: '4px' }}>
+              Redefinições da sua senha nos últimos 30 dias
+            </p>
+            <ul aria-labelledby="redefinicoes-senha-titulo" style={{ margin: '0 0 16px', paddingLeft: '20px' }}>
+              {redefinicoes.map((r, i) => (
+                <li key={`${r.em}-${i}`}>{`${r.por} em ${r.em}`}</li>
+              ))}
+            </ul>
+          </>
         )}
 
         <p id={`${ID_REGRAS}-titulo`} style={{ fontWeight: 600, marginBottom: '4px' }}>

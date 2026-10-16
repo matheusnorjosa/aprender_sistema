@@ -781,7 +781,10 @@ def can_admin_mutate_target(
     por outra pessoa grava quem e quando, e o próximo acesso dela mostra "Sua senha foi redefinida por
     <rótulo> em dd/mm/aaaa" (`/api/me/` → `aviso_senha_redefinida`). O aviso NÃO protege contra quem
     entra na conta antes da dona: quem redefiniu e entrou primeiro vê o aviso e o apaga ao trocar a
-    senha. Para esse caso só resta o AuditLog (`auditar_reset_senha`).
+    senha, e a redefinição seguinte grava por cima. Para esse caso o `/api/me/` traz também
+    `redefinicoes_senha`, as redefinições por outra pessoa dos últimos 30 dias lidas do AuditLog
+    (`auditar_reset_senha`), que a troca de senha não apaga; a tela de troca e o Perfil as listam.
+    Nada disso impede a tomada: a dona só fica sabendo quando recupera o acesso.
 
     `action` fica reservado para o épico #1656 (escopo por operação).
     """

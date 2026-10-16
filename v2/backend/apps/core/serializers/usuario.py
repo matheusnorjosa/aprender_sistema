@@ -125,6 +125,8 @@ class CurrentUserSerializer(serializers.Serializer):  # type: ignore[misc]
     deve_trocar_senha = serializers.BooleanField()
     # F1: quem redefiniu a senha e quando ({"por": rótulo, "em": "dd/mm/aaaa"}); null sem aviso.
     aviso_senha_redefinida = AvisoSenhaRedefinidaSerializer(allow_null=True)
+    # F1: redefinições por outra pessoa nos últimos 30 dias (AuditLog); não some com a troca de senha.
+    redefinicoes_senha = AvisoSenhaRedefinidaSerializer(many=True)
 
 
 class MeContactUpdateSerializer(serializers.Serializer):  # type: ignore[misc]

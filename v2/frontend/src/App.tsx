@@ -87,6 +87,7 @@ function AppContent(): JSX.Element {
   const [trocaPendente, setTrocaPendente] = useState(false);
   // F1: quem redefiniu a senha e quando (mostrado na tela de troca obrigatória).
   const [avisoSenha, setAvisoSenha] = useState<AvisoSenhaRedefinida | null>(null);
+  const [redefinicoesSenha, setRedefinicoesSenha] = useState<AvisoSenhaRedefinida[]>([]);
   const isMountedRef = useRef(true);
 
   // ── Mobile responsiveness ──
@@ -118,6 +119,7 @@ function AppContent(): JSX.Element {
       if (userData.deve_trocar_senha === true) {
         setTrocaPendente(true);
         setAvisoSenha(userData.aviso_senha_redefinida ?? null);
+        setRedefinicoesSenha(userData.redefinicoes_senha ?? []);
         setUser(null);
         setPolicies([]);
         return;
@@ -316,6 +318,7 @@ function AppContent(): JSX.Element {
         <Suspense fallback={<FullscreenLoader />}>
           <TrocaSenhaObrigatoriaPage
             aviso={avisoSenha}
+            redefinicoes={redefinicoesSenha}
             onConcluida={loadUser}
             onSair={handleLogout}
             onSessaoEncerrada={() => handleSessaoEncerrada(AVISO_SESSAO_EXPIRADA)}

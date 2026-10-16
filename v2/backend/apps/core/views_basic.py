@@ -6,6 +6,7 @@ Basic Views (api_root, CurrentUser)
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Any
 
 from django.db import transaction
@@ -77,6 +78,40 @@ def _aviso_senha_redefinida(user: Any) -> dict[str, str] | None:
     }
 
 
+# F1 (revisão): quantos dias de redefinições de senha por outra pessoa a dona da conta vê, e o teto da lista.
+JANELA_REDEFINICOES_SENHA = timedelta(days=30)
+MAX_REDEFINICOES_SENHA = 10
+
+
+def _redefinicoes_senha(user: Any) -> list[dict[str, str]]:
+    """F1 (revisão): redefinições da senha de `user` por OUTRA pessoa nos últimos 30 dias, da mais nova.
+
+    Lido do AuditLog `RESET_PASSWORD` que `auditar_reset_senha` grava, e não dos campos do aviso: o aviso
+    some quando a senha é trocada e é gravado por cima na redefinição seguinte, então quem toma a conta
+    o apaga antes que a dona o veja. Fica de fora a criação da conta (`contexto="create"`) e a pessoa
+    mudando a própria senha pela rota de administração. Rótulo como em `_aviso_senha_redefinida`.
+    """
+    linhas = (
+        AuditLog.objects.filter(
+            model_name="Usuario",
+            action=AuditLog.Action.RESET_PASSWORD,
+            details__target_user_id=user.pk,
+            created_at__gte=timezone.now() - JANELA_REDEFINICOES_SENHA,
+        )
+        .exclude(details__contexto="create")
+        .exclude(usuario_id=user.pk)
+        .select_related("usuario")
+        .order_by("-created_at", "-pk")[:MAX_REDEFINICOES_SENHA]
+    )
+    return [
+        {
+            "por": str(linha.usuario) if linha.usuario is not None else "uma pessoa da administração",
+            "em": timezone.localtime(linha.created_at).strftime("%d/%m/%Y"),
+        }
+        for linha in linhas
+    ]
+
+
 class CurrentUserView(APIView):
     """
     Endpoint que retorna informações do usuário autenticado.
@@ -101,7 +136,8 @@ class CurrentUserView(APIView):
             "can_approve_super": bool,  # Legado: = policy access_solicitation_approvals (DAT aprova: PR 10)
             "permissions": list[str],   # Permissões funcionais efetivas (codenames)
             "deve_trocar_senha": bool,  # Senha definida por outra pessoa: só a troca é liberada
-            "aviso_senha_redefinida": {"por": str, "em": "dd/mm/aaaa"} | null  # F1
+            "aviso_senha_redefinida": {"por": str, "em": "dd/mm/aaaa"} | null,  # F1
+            "redefinicoes_senha": [{"por": str, "em": "dd/mm/aaaa"}]  # F1: últimos 30 dias, do AuditLog
         }
     """
 
@@ -169,6 +205,7 @@ class CurrentUserView(APIView):
                 "permissions": sorted(get_user_functional_permissions(user)),
                 "deve_trocar_senha": user.deve_trocar_senha,
                 "aviso_senha_redefinida": _aviso_senha_redefinida(user),
+                "redefinicoes_senha": _redefinicoes_senha(user),
             },
             status=status.HTTP_200_OK,
         )

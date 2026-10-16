@@ -1,7 +1,7 @@
 ---
 title: Ambientes (dev / staging / prod-like)
 status: canonical
-last_verified: 2026-07-10
+last_verified: 2026-10-16
 sources_of_truth:
   - v2/Makefile
   - v2/infra/Makefile
@@ -76,7 +76,8 @@ Definições das variáveis de composição estão no topo de [`v2/infra/Makefil
 - **Borda HTTP difere por ambiente.** Só produção tem o Nginx Proxy Manager na frente do nginx do `frontend`.
   Em staging/prod-like/dev o navegador (ou o smoke test) fala direto com o nginx do `frontend`; o `limit_req`
   por cliente e o `real_ip_header X-Real-IP` valem igual, mas sem NPM o cabeçalho não vem e o endereço usado é
-  o da conexão (em Docker Desktop, o gateway da rede). A cadeia completa e o `NUM_PROXIES` estão em
+  o da conexão (em Docker Desktop, o gateway da rede). A cadeia completa, o `NUM_PROXIES` e o
+  `TRUSTED_PROXY_NETWORKS` (F7, redes de quem pode repassar o `X-Forwarded-For`) estão em
   [deploy.spec](./deploy.spec.md), seção "Borda HTTP".
 - **`.env.*` versionados são templates.** `SECRET_KEY=CHANGE_ME_*` e senhas placeholder. Segredos reais de
   produção vivem no `stack.env` do Portainer, **não** no repo.

@@ -21,6 +21,7 @@ from django.db import connection
 
 from apps.core.exceptions import ValidationAPIError
 from apps.core.models import Participation, Solicitacao, Usuario
+from apps.core.pii import email_sem_cpf
 from apps.core.services.availability_service import (
     ENFORCED_ROLES,
     Conflict,
@@ -36,6 +37,9 @@ logger = logging.getLogger(__name__)
 
 # Namespace do advisory lock (classid), para não colidir com outros locks da aplicação.
 _LOCK_NAMESPACE = 1452
+
+# S5: na resposta, o convidado cujo e-mail é o de reserva (`<cpf>@placeholder.local`) ou leva CPF.
+_CONVIDADO_SEM_EMAIL = "Convidado sem e-mail"
 
 
 @dataclass
@@ -259,7 +263,8 @@ def raise_if_blocked(guard: GuardResult, *, action: str = "create") -> None:
                 }
                 for p in guard.blocked
             ],
-            "skipped_guests": guard.skipped_guests,
+            # S5: o log registra o e-mail (mascarado pelo filtro de PII); a resposta, só o seguro.
+            "skipped_guests": [email_sem_cpf(e) or _CONVIDADO_SEM_EMAIL for e in guard.skipped_guests],
         },
     )
 

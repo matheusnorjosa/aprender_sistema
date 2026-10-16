@@ -522,6 +522,45 @@ def test_conflito_de_agenda_nao_leva_cpf_de_formador_sem_nome():
     assert not _ONZE_DIGITOS.search(resp.content.decode()), resp.content
 
 
+def test_conflito_de_agenda_nao_leva_cpf_no_email_de_convidado_sem_conta():
+    """`skipped_guests` lista os convidados sem conta; o e-mail de reserva ou com CPF não sai."""
+    from apps.core.tests.factories import liberar_par
+
+    municipio = MunicipioFactory()
+    projeto = ProjetoFactory(fluxo="SUPER")
+    liberar_par(municipio, projeto)
+    formador = _conta(nome="Formadora", groups=["Formador"])
+    inicio = timezone.now() + timedelta(days=30)
+    s = SolicitacaoFactory(
+        usuario=_conta(nome="Coord", groups=["Coordenador"]),
+        municipio=municipio,
+        projeto=projeto,
+        inicio=inicio,
+        fim=inicio + timedelta(hours=2),
+        status="pendente",
+    )
+    Participation.objects.create(solicitacao=s, usuario=formador, role=Participation.Role.FORMADOR)
+    for email in (f"{_cpf()}@placeholder.local", f"{_cpf()}@example.invalid", "externo@fora.com"):
+        Participation.objects.create(solicitacao=s, guest_email=email, role=Participation.Role.FORMADOR)
+    AvailabilityBlock.objects.create(
+        usuario=formador,
+        inicio=inicio + timedelta(minutes=30),
+        fim=inicio + timedelta(hours=1),
+        tipo="T",
+        status="aprovado",
+        motivo="Bloqueio",
+    )
+
+    resp = _client(UsuarioFactory(superuser=True)).patch(f"/api/solicitacoes/{s.id}/approve/", {}, format="json")
+
+    assert resp.status_code == 400, resp.content
+    assert resp.data["code"] == "availability_conflict"
+    convidados = resp.data["errors"]["skipped_guests"]
+    assert len(convidados) == 3  # todo convidado sem conta continua reportado (PA-05)
+    assert "externo@fora.com" in convidados  # o e-mail seguro continua aparecendo
+    assert not _ONZE_DIGITOS.search(resp.content.decode()), resp.content
+
+
 def test_meus_eventos_nao_levam_cpf_de_co_participante_sem_nome():
     eu = _conta(nome="Ana", sobrenome="Formadora", groups=["Formador"])
     colega_sem_nome = _conta(groups=["Formador"])

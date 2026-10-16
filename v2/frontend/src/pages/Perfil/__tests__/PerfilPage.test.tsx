@@ -21,11 +21,11 @@ import type { CurrentUser } from '../../../types/usuario';
 function makeUser(overrides: Partial<CurrentUser> = {}): CurrentUser {
   return {
     id: 1,
-    username: '04944374305',
-    email: 'coord@aprendereditora.com.br',
-    first_name: 'Amanda',
-    last_name: 'Rodrigues',
-    name: 'Amanda Rodrigues',
+    username: '12345678900',
+    email: 'pessoa.teste@example.invalid',
+    first_name: 'Pessoa',
+    last_name: 'Teste',
+    name: 'Pessoa Teste',
     groups: ['Coordenador'],
     setores: ['Vidas'],
     funcoes: ['Coordenador'],
@@ -78,10 +78,10 @@ describe('PerfilPage', () => {
 
   test('mostra os dados do usuário com CPF mascarado', async () => {
     renderPage();
-    expect(await screen.findByText('Amanda Rodrigues')).toBeInTheDocument();
+    expect(await screen.findByText('Pessoa Teste')).toBeInTheDocument();
     // CPF mascarado (LGPD): 3 primeiros + 2 últimos.
-    expect(screen.getByText('049.***.***-05')).toBeInTheDocument();
-    expect(screen.getByText('coord@aprendereditora.com.br')).toBeInTheDocument();
+    expect(screen.getByText('123.***.***-00')).toBeInTheDocument();
+    expect(screen.getByText('pessoa.teste@example.invalid')).toBeInTheDocument();
   });
 
   test('PR A: o setor vem do vínculo (me.gerencias, nome de tela), não do grupo', async () => {
@@ -100,7 +100,7 @@ describe('PerfilPage', () => {
   test('mascara o CPF do campo cpf (não do username) e mostra telefone/cargo', async () => {
     renderPage(
       makeUser({
-        username: 'amanda.rodrigues', // username != cpf
+        username: 'pessoa.teste', // username != cpf
         cpf: '11144477735',
         telefone: '(85) 98888-1111',
         cargo: 'Coordenadora',

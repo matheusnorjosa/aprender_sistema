@@ -1,7 +1,7 @@
 ---
 title: Hooks de RBAC e Guards (Frontend)
 status: canonical
-last_verified: 2026-10-15
+last_verified: 2026-10-16
 sources_of_truth:
   - v2/frontend/src/contexts/AcessoContext.ts
   - v2/frontend/src/test/lint/acessoSoPorPolicy.test.ts
@@ -78,7 +78,7 @@ Um contexto e dois hooks (#1269 concluido no PR 7; `usePermissions` e `useCanAcc
 Endpoints backend consumidos (contrato detalhado em `v2/docs/API_REFERENCE.md` e `v2/docs/RBAC_NAMING.md`):
 
 - `GET /api/me/` — perfil do usuario autenticado (`CurrentUser`: `setores[]`, `funcoes[]`, `gerencias[]`, `is_superuser`, `is_superintendencia`, `can_approve_super`, `permissions[]`, ...). `403` com `code: NOT_AUTHENTICATED` se anonimo (o backend so usa `SessionAuthentication`, que nao manda `WWW-Authenticate`; o DRF entao responde 403, nao 401). `gerencias` (PR A, 2026-09-29) = `[{id, rotulo, papeis[]}]` dos vinculos `EquipeGerencia` **vigentes** em gerencia **ativa**, um item por gerencia, ordenados pelo rotulo (nome de tela: `nome_exibicao` ou `nome_setor`). Fica fora do `assertCurrentUserPayload` (payload antigo sem o campo nao derruba o boot; os consumidores usam `?? []`).
-  - **Grade Mensal (`FiltersBar`)**: a opcao "Participantes de projetos SUPER" (a antiga "Todas") e as gerencias ativas aparecem so para quem tem a policy `view_all_availability`; os demais veem so `me.gerencias`, com a primeira ja selecionada; sem vinculo e sem policy o select fica desabilitado ("Sem gerencia vinculada"). Grupo de setor (`setores`) e `canSeeAllSectors` **nao** decidem a Grade: o backend autoriza por vinculo (`HasSectorAccess`).
+  - **Grade Mensal (`FiltersBar`)**: a opcao "Participantes de projetos SUPER" (a antiga "Todas") e as gerencias ativas aparecem so para quem tem a policy `view_all_availability`; os demais veem so as `me.gerencias` com papel GERENTE, COORDENADOR ou APOIO (PR 9: a API recusa o FORMADOR sozinho), com a primeira ja selecionada; sem vinculo e sem policy o select fica desabilitado ("Sem gerencia vinculada"). Grupo de setor (`setores`) e `canSeeAllSectors` **nao** decidem a Grade: o backend autoriza por vinculo (`HasSectorAccess`).
   - **Vinculo de gestao** (PR A; desde o PR 7 calculado no servidor): vinculo GERENTE/COORDENADOR/APOIO vigente em gerencia ativa, mesmo sem grupo de FUNCAO, entra nas policies `access_monthly_availability`, `access_availability_blocks` e `access_travel` (`user_tem_vinculo_de_gestao`, mesma base de `me.gerencias`). FORMADOR por vinculo continua fora. O front nao rele `me.gerencias` para decidir acesso (so a `FiltersBar` usa a lista para escolher a gerencia).
   - **`deve_trocar_senha`** (02/10/2026): `true` quando a senha em uso foi definida por outra pessoa. Opcional em `CurrentUser` e fora do guard `isCurrentUserPayload` (payload antigo sem o campo nao derruba o login); a tela testa `=== true`. Com ele ligado o backend so aceita a troca de senha (ver [rbac.spec](../backend/rbac.spec.md)).
 - `GET /api/me/policies/` — array ordenado de strings (subset de `PUBLIC_POLICY_KEYS`); `403` (`NOT_AUTHENTICATED`) se anonimo; superuser recebe todas. Nunca expoe codenames brutos de capability.

@@ -76,11 +76,13 @@ class Command(BaseCommand):
 
         # 4. Criar projetos (SUPER e NAO_SUPER para cobrir ambos os fluxos em E2E)
         self.stdout.write("\n4. Criando projetos de teste...")
+        # PR 9: o projeto precisa ter gerência, e quem cria precisa atuar nela (coord_vidas cria os dois).
+        # Só no E2E o SUPER fica fora da SUPERINTENDENCIA: as aprovadoras daqui são globais pelo grupo.
         projeto_super = self._upsert_projeto(
             codigo="E2E",
             nome="TESTE E2E",
             fluxo="SUPER",
-            gerencia_setor=None,
+            gerencia_setor="Vidas",
         )
         projeto_nao_super = self._upsert_projeto(
             codigo="E2E_NS",

@@ -95,20 +95,21 @@ COMPOSITE_POLICY_KEYS: Final[frozenset[str]] = frozenset(
 # Telas de escopo (PR 7 das permissões, 15/10/2026): Grade Mensal, Bloqueios e Deslocamentos.
 # Abre a tela: a capacidade em ACCESS_POLICIES (view_all_availability) OU um dos grupos de setor
 # abaixo OU um dos papéis abaixo, vigente em gerência ativa (`EquipeGerencia.gerencias_com_papel`).
-# PR 8: o papel substitui o grupo de função e o antigo "vínculo de gestão" (G/C/A).
+# PR 8: o papel substitui o grupo de função e o antigo "vínculo de gestão" (G/C/A). PR 9: Grade e
+# Deslocamentos usam os mesmos papéis do alcance da API (`EquipeGerencia.PAPEIS_DE_ATUACAO`).
 TELAS_DE_ESCOPO: Final[dict[str, tuple[frozenset[str], frozenset[str]]]] = {
     # chave: (setores, papéis)
     "access_monthly_availability": (
         frozenset({"Controle", "DAT"}),
-        frozenset({"GERENTE", "COORDENADOR", "APOIO"}),
+        EquipeGerencia.PAPEIS_DE_ATUACAO,
     ),
     "access_availability_blocks": (
         frozenset({"Controle", "DAT"}),
-        frozenset({"GERENTE", "COORDENADOR", "APOIO", "FORMADOR"}),
+        EquipeGerencia.PAPEIS_DE_ATUACAO | {"FORMADOR"},
     ),
     "access_travel": (
         frozenset({"Controle", "DAT"}),
-        frozenset({"GERENTE", "COORDENADOR", "APOIO"}),
+        EquipeGerencia.PAPEIS_DE_ATUACAO,
     ),
 }
 

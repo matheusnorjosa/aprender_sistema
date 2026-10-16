@@ -190,13 +190,8 @@ class MonthlyAvailabilityView(APIView):
             if has_wide_scope:
                 cache_scope = "wide"
             else:
-                user_gerencia_ids = list(
-                    EquipeGerencia.vigentes_com_escopo_em()
-                    .filter(
-                        usuario=request.user,
-                    )
-                    .values_list("gerencia_id", flat=True)
-                )
+                # PR 9: as gerências onde a pessoa tem papel G/C/A (as mesmas do `HasSectorAccess`).
+                user_gerencia_ids = list(EquipeGerencia.gerencias_de_atuacao(request.user))
                 if user_gerencia_ids:
                     # PERF-SQL-04: filter nulls at DB level instead of Python
                     allowed_user_ids = list(

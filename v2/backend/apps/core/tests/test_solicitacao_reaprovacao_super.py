@@ -28,6 +28,7 @@ import pytest
 
 from apps.core.models import AuditLog, Participation
 from apps.core.tests.factories import (
+    GerenciaFactory,
     MunicipioFactory,
     ProjetoFactory,
     SolicitacaoFactory,
@@ -40,13 +41,19 @@ pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture
-def coordenador():
-    return UsuarioFactory(groups=["Coordenador"])
+def gerencia():
+    """Gerência do projeto SUPER, do coordenador e dos formadores (PR 9: escopo pela gerência do projeto)."""
+    return GerenciaFactory()
 
 
 @pytest.fixture
-def formadores():
-    return [UsuarioFactory(groups=["Formador"]) for _ in range(3)]
+def coordenador(gerencia):
+    return UsuarioFactory(groups=["Coordenador"], groups__gerencia=gerencia)
+
+
+@pytest.fixture
+def formadores(gerencia):
+    return [UsuarioFactory(groups=["Formador"], groups__gerencia=gerencia) for _ in range(3)]
 
 
 @pytest.fixture
@@ -55,8 +62,8 @@ def municipio():
 
 
 @pytest.fixture
-def projeto_super(municipio):
-    projeto = ProjetoFactory(nome="Super Reaprovacao", fluxo="SUPER")
+def projeto_super(municipio, gerencia):
+    projeto = ProjetoFactory(nome="Super Reaprovacao", fluxo="SUPER", gerencia=gerencia)
     liberar_par(municipio, projeto)
     return projeto
 
@@ -199,7 +206,7 @@ class TestEdicaoQueNaoRebaixa:
         """Decisão do dono: só projeto, data, horário, município e formadores são materiais."""
         sol = _solicitacao(coordenador, municipio, projeto_super, [formadores[0]])
         if campo == "coordenador":
-            valor = UsuarioFactory(groups=["Coordenador"]).id
+            valor = UsuarioFactory(groups=["Coordenador"], groups__gerencia=projeto_super.gerencia).id
         elif campo == "tipo_evento":
             valor = TipoEventoFactory(nome="Outro Tipo Reaprovacao").id
         elif campo == "coordenador_acompanha":

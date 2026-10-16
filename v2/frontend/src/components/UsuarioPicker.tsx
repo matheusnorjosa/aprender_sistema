@@ -37,6 +37,8 @@ export interface UsuarioPickerProps {
   onChange?: (value: UsuarioItem[]) => void;
   /** Papel para filtrar o lookup (ex.: 'Formador'; vários separados por vírgula = OU). */
   role: string;
+  /** Projeto do evento: o lookup oferece só pessoas da gerência dele (PR 9, P9-5). */
+  projetoId?: ID | undefined;
   /** Cor da Tag dos selecionados. */
   tagColor?: string;
   /** aria-label da lista de selecionados. */
@@ -47,6 +49,7 @@ export default function UsuarioPicker({
   value = [],
   onChange,
   role,
+  projetoId,
   tagColor = 'blue',
   ariaLabel,
 }: UsuarioPickerProps): JSX.Element {
@@ -65,7 +68,7 @@ export default function UsuarioPicker({
 
     try {
       setLoading(true);
-      const results = await lookupUsuarios(query || '', role);
+      const results = await lookupUsuarios(query || '', role, projetoId);
       setOptions(
         results.map(item => ({
           value: String(item.id),

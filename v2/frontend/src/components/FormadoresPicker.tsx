@@ -3,7 +3,8 @@
  *
  * Wrapper fino de UsuarioPicker (implementação compartilhada): papéis 'Formador' e
  * 'Coordenador', Tag azul. Decisão do dono (05/10/2026): coordenador que atua no evento
- * entra na lista de formadores (a lista de acompanhantes saiu). O backend escopa por setor.
+ * entra na lista de formadores (a lista de acompanhantes saiu). Com `projetoId`, só pessoas da
+ * gerência do projeto (PR 9, P9-5); o backend aplica a mesma regra.
  */
 
 import { type JSX } from 'react';
@@ -12,7 +13,7 @@ import UsuarioPicker, { type UsuarioItem, type UsuarioPickerProps } from './Usua
 /** Formador selecionado (mesmo shape de UsuarioItem). */
 export type FormadorItem = UsuarioItem;
 
-export type FormadoresPickerProps = Pick<UsuarioPickerProps, 'value' | 'onChange'>;
+export type FormadoresPickerProps = Pick<UsuarioPickerProps, 'value' | 'onChange' | 'projetoId'>;
 
 export default function FormadoresPicker(props: FormadoresPickerProps): JSX.Element {
   return (

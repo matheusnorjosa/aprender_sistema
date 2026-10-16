@@ -7,6 +7,9 @@ Testa:
 - GET /api/lookup/tipos-evento/?q=...
 - GET /api/lookup/usuarios/?q=...
 - POST /api/solicitacoes/validate/
+
+PR 9: os lookups de projeto e de pessoa só trazem a gerência onde quem busca atua (G/C/A). O
+coordenador, os projetos e o formador destes testes ficam todos na mesma gerência (`gerencia`).
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
@@ -18,6 +21,7 @@ from rest_framework.test import APIClient
 import pytest
 
 from apps.core.tests.factories import (
+    GerenciaFactory,
     MunicipioFactory,
     ProjetoFactory,
     TipoEventoFactory,
@@ -33,7 +37,13 @@ def api_client():
 
 
 @pytest.fixture
-def authenticated_user(db):
+def gerencia(db):
+    """Gerência onde o coordenador atua: os lookups de projeto e de pessoa são por gerência (PR 9)."""
+    return GerenciaFactory()
+
+
+@pytest.fixture
+def authenticated_user(gerencia):
     """Criar usuário autenticado para testes"""
     user = UsuarioFactory(
         username="testuser",
@@ -43,20 +53,22 @@ def authenticated_user(db):
         first_name="Test",
         last_name="User",
     )
-    com_papel(user, "COORDENADOR")
+    com_papel(user, "COORDENADOR", gerencia)
     return user
 
 
 @pytest.fixture
-def sample_data(db):
+def sample_data(gerencia):
     """Criar dados de exemplo para testes"""
     # Municípios
     m1 = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
     m2 = MunicipioFactory(nome="Sobral", uf="CE", ativo=True)
 
     # Projetos
-    p1 = ProjetoFactory(nome="ACerta", codigo="ACERTA", ativo=True, fluxo="SUPER")
-    p2 = ProjetoFactory(nome="Brincando e Aprendendo", codigo="BRINCANDO", ativo=True, fluxo="NAO_SUPER")
+    p1 = ProjetoFactory(nome="ACerta", codigo="ACERTA", ativo=True, fluxo="SUPER", gerencia=gerencia)
+    p2 = ProjetoFactory(
+        nome="Brincando e Aprendendo", codigo="BRINCANDO", ativo=True, fluxo="NAO_SUPER", gerencia=gerencia
+    )
 
     # Tipos de Evento
     t1 = TipoEventoFactory(nome="Formação")
@@ -71,7 +83,7 @@ def sample_data(db):
         first_name="João",
         last_name="Silva",
     )
-    com_papel(u1, "FORMADOR")
+    com_papel(u1, "FORMADOR", gerencia)
 
     return {
         "municipios": [m1, m2],
@@ -175,30 +187,38 @@ class TestProjetoLookup:
         assert p1.id in returned_ids
         assert p2.id not in returned_ids
 
-    def test_lookup_label_sem_prefixo_de_codigo(self, api_client, authenticated_user):
+    def test_lookup_label_sem_prefixo_de_codigo(self, api_client, authenticated_user, gerencia):
         """Label = nome (sem 'codigo - '): os codigos-slug (Á->_) poluíam a lista com 'A_COR_DA_GENTE -'."""
-        p = ProjetoFactory(nome="A COR DA GENTE", codigo="A_COR_DA_GENTE", ativo=True, fluxo="NAO_SUPER")
+        p = ProjetoFactory(
+            nome="A COR DA GENTE", codigo="A_COR_DA_GENTE", ativo=True, fluxo="NAO_SUPER", gerencia=gerencia
+        )
         api_client.force_authenticate(user=authenticated_user)
         data = api_client.get("/api/lookup/projetos/?q=GENTE").json()
         item = next(d for d in data if d["id"] == p.id)
         assert item["label"] == "A COR DA GENTE", "label = nome, sem prefixo de codigo-slug"
 
-    def test_lookup_esconde_projeto_marcado_como_serie(self, api_client, authenticated_user):
+    def test_lookup_esconde_projeto_marcado_como_serie(self, api_client, authenticated_user, gerencia):
         """Série (`eh_serie=True`) não entra no dropdown de evento (decisão do dono: os eventos usam
         o nome-família, ex.: 'A COR DA GENTE'; '... 1..9' são os kits das coleções). Vale a marca,
         não o nome: o numerado sem a marca aparece."""
-        fam = ProjetoFactory(nome="A COR DA GENTE", codigo="A_COR_DA_GENTE", ativo=True, fluxo="NAO_SUPER")
-        kit = ProjetoFactory(nome="A COR DA GENTE 3", codigo="", ativo=True, fluxo="NAO_SUPER", eh_serie=True)
-        numerado = ProjetoFactory(nome="A COR DA GENTE 4", codigo="", ativo=True, fluxo="NAO_SUPER")
+        fam = ProjetoFactory(
+            nome="A COR DA GENTE", codigo="A_COR_DA_GENTE", ativo=True, fluxo="NAO_SUPER", gerencia=gerencia
+        )
+        kit = ProjetoFactory(
+            nome="A COR DA GENTE 3", codigo="", ativo=True, fluxo="NAO_SUPER", eh_serie=True, gerencia=gerencia
+        )
+        numerado = ProjetoFactory(nome="A COR DA GENTE 4", codigo="", ativo=True, fluxo="NAO_SUPER", gerencia=gerencia)
         api_client.force_authenticate(user=authenticated_user)
         ids = {d["id"] for d in api_client.get("/api/lookup/projetos/?q=GENTE").json()}
         assert fam.id in ids, "família (projeto-evento) aparece"
         assert kit.id not in ids, "série escondida"
         assert numerado.id in ids, "número no nome sem a marca não esconde"
 
-    def test_lookup_include_kits_traz_as_series(self, api_client, authenticated_user):
+    def test_lookup_include_kits_traz_as_series(self, api_client, authenticated_user, gerencia):
         """include_kits=true reexpõe as séries (escape hatch p/ eventual consumidor de kit)."""
-        kit = ProjetoFactory(nome="A COR DA GENTE 3", codigo="", ativo=True, fluxo="NAO_SUPER", eh_serie=True)
+        kit = ProjetoFactory(
+            nome="A COR DA GENTE 3", codigo="", ativo=True, fluxo="NAO_SUPER", eh_serie=True, gerencia=gerencia
+        )
         api_client.force_authenticate(user=authenticated_user)
         ids = {d["id"] for d in api_client.get("/api/lookup/projetos/?q=GENTE&include_kits=true").json()}
         assert kit.id in ids

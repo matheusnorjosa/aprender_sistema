@@ -106,10 +106,9 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
     # Onda 1 C2 (2026-04-27): camada de tradução semântica.
     # Quem tem capability `view_all_availability` (Controle/Gerente via seed
     # 0078) bypassa scope. Quem não tem cai em filtro por gerência via
-    # `EquipeGerencia` (aplicado em `get_queryset`). Coord/Apoio/DAT
-    # autenticados veem APENAS deslocamentos de usuários nas próprias
-    # gerências vinculadas. Formador autenticado sem EquipeGerencia → 0
-    # resultados (fail-safe).
+    # `EquipeGerencia` (aplicado em `get_queryset`). Gerente/Coord/Apoio
+    # veem os próprios e os de usuários das gerências onde têm o papel (PR 9).
+    # A formadora vê só os próprios (P9-1).
     permission_classes = [IsAuthenticated]
     pagination_class = DeslocamentoPagination
     filter_backends = [DjangoFilterBackend, OrderingFilter]
@@ -123,8 +122,8 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
         Scope (Onda 1 C2, 2026-04-27):
         - Superuser: vê tudo (bypass)
         - Capability `view_all_availability` (Controle/Gerente): vê tudo
-        - Demais autenticados: vê apenas deslocamentos de usuários em
-          gerências vinculadas via EquipeGerencia. Sem vínculo → 0 resultados.
+        - Demais autenticados: os próprios, mais os de usuários com vínculo vigente
+          nas gerências onde têm papel G/C/A (PR 9, P9-1: a formadora vê só os próprios).
 
         Query param filters:
         - usuario_id, data_inicio, data_fim, origem, destino
@@ -135,9 +134,7 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
         # Scope filter — aplicar APÓS auth (IsAuthenticated em permission_classes)
         # mas antes dos filtros de query params (não filtra duas vezes).
         if not getattr(user, "is_superuser", False) and not user_has_any_perm(user, "view_all_availability"):
-            user_gerencia_ids = list(
-                EquipeGerencia.vigentes_com_escopo_em().filter(usuario=user).values_list("gerencia_id", flat=True)
-            )
+            user_gerencia_ids = list(EquipeGerencia.gerencias_de_atuacao(user))
             # #1454: o próprio dono sempre vê/edita os próprios deslocamentos
             # (self-service), além dos de usuários com vínculo VIGENTE na(s)
             # gerência(s) do solicitante. Exists correlaciona a vigência do

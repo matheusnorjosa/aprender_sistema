@@ -32,6 +32,7 @@ import pytest
 
 from apps.core.models import AuditLog, Participation, Solicitacao
 from apps.core.tests.factories import (
+    GerenciaFactory,
     MunicipioFactory,
     ProjetoFactory,
     SolicitacaoFactory,
@@ -44,8 +45,14 @@ pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture
-def coordenador():
-    return UsuarioFactory(groups=["Coordenador"])
+def gerencia():
+    """Gerência do coordenador e dos projetos para onde ele move o evento (PR 9: escopo pela gerência)."""
+    return GerenciaFactory()
+
+
+@pytest.fixture
+def coordenador(gerencia):
+    return UsuarioFactory(groups=["Coordenador"], groups__gerencia=gerencia)
 
 
 @pytest.fixture
@@ -58,8 +65,8 @@ def municipio():
     return MunicipioFactory(nome="Municipio Exclusao", uf="CE", ativo=True)
 
 
-def _projeto(municipio, fluxo):
-    projeto = ProjetoFactory(nome=f"Projeto Exclusao {fluxo}", fluxo=fluxo)
+def _projeto(municipio, fluxo, gerencia=None):
+    projeto = ProjetoFactory(nome=f"Projeto Exclusao {fluxo}", fluxo=fluxo, gerencia=gerencia)
     liberar_par(municipio, projeto)
     return projeto
 
@@ -77,7 +84,9 @@ def _solicitacao(coordenador, municipio, projeto, status):
         status=status,
     )
     Participation.objects.create(solicitacao=sol, usuario=coordenador, role="COORDENADOR")
-    Participation.objects.create(solicitacao=sol, usuario=UsuarioFactory(groups=["Formador"]), role="FORMADOR")
+    # PR 9 (P9-5): o formador é da gerência do projeto, senão mover o evento entre projetos dá 400.
+    formador = UsuarioFactory(groups=["Formador"], groups__gerencia=projeto.gerencia)
+    Participation.objects.create(solicitacao=sol, usuario=formador, role="FORMADOR")
     return sol
 
 
@@ -149,11 +158,11 @@ class TestJaAprovadaNaoSeExclui:
         assert resp.status_code == 400, resp.data
         assert Solicitacao.objects.filter(pk=sol.pk).exists()
 
-    def test_super_aprovada_movida_para_nao_super_segue_travada(self, coordenador, aprovador, municipio):
+    def test_super_aprovada_movida_para_nao_super_segue_travada(self, coordenador, aprovador, municipio, gerencia):
         """SUPER → NAO_SUPER não rebaixa: continua `aprovado`, e a aprovação manual segue travando."""
-        sol = _solicitacao(coordenador, municipio, _projeto(municipio, "SUPER"), "pendente")
+        sol = _solicitacao(coordenador, municipio, _projeto(municipio, "SUPER", gerencia), "pendente")
         _aprovar(aprovador, sol, lote=False)
-        nao_super = _projeto(municipio, "NAO_SUPER")
+        nao_super = _projeto(municipio, "NAO_SUPER", gerencia)
         resp = _client(coordenador).patch(f"/api/solicitacoes/{sol.id}/", {"projeto": nao_super.id}, format="json")
         assert resp.status_code == 200, resp.data
         sol.refresh_from_db()
@@ -164,12 +173,13 @@ class TestJaAprovadaNaoSeExclui:
         assert resp.status_code == 400, resp.data
         assert Solicitacao.objects.filter(pk=sol.pk).exists()
 
-    def test_mensagem_da_aprovada_nao_promete_reprovar_nem_cancelar(self, coordenador, aprovador, municipio):
+    def test_mensagem_da_aprovada_nao_promete_reprovar_nem_cancelar(self, coordenador, aprovador, municipio, gerencia):
         """Aprovada não publicada: reject dá 400 already_approved e cancel-gcal dá 409 not_published."""
-        sol = _solicitacao(coordenador, municipio, _projeto(municipio, "SUPER"), "pendente")
+        sol = _solicitacao(coordenador, municipio, _projeto(municipio, "SUPER", gerencia), "pendente")
         _aprovar(aprovador, sol, lote=False)
-        nao_super = _projeto(municipio, "NAO_SUPER")
-        _client(coordenador).patch(f"/api/solicitacoes/{sol.id}/", {"projeto": nao_super.id}, format="json")
+        nao_super = _projeto(municipio, "NAO_SUPER", gerencia)
+        resp = _client(coordenador).patch(f"/api/solicitacoes/{sol.id}/", {"projeto": nao_super.id}, format="json")
+        assert resp.status_code == 200, resp.data
 
         resp = _client(coordenador).delete(f"/api/solicitacoes/{sol.id}/")
 
@@ -223,10 +233,10 @@ class TestAprovadaSemApproveRebaixadaPelaEdicao:
         assert resp.status_code == 400, resp.data
         assert Solicitacao.objects.filter(pk=sol.pk).exists()
 
-    def test_super_aprovada_sem_approve_movida_para_nao_super_nao_se_exclui(self, coordenador, municipio):
+    def test_super_aprovada_sem_approve_movida_para_nao_super_nao_se_exclui(self, coordenador, municipio, gerencia):
         """SUPER → NAO_SUPER não rebaixa: ela segue `aprovado`, e o UPDATE da mudança é a prova."""
-        sol = _solicitacao(coordenador, municipio, _projeto(municipio, "SUPER"), "aprovado")
-        nao_super = _projeto(municipio, "NAO_SUPER")
+        sol = _solicitacao(coordenador, municipio, _projeto(municipio, "SUPER", gerencia), "aprovado")
+        nao_super = _projeto(municipio, "NAO_SUPER", gerencia)
         resp = _client(coordenador).patch(f"/api/solicitacoes/{sol.id}/", {"projeto": nao_super.id}, format="json")
         assert resp.status_code == 200, resp.data
         sol.refresh_from_db()
@@ -238,10 +248,10 @@ class TestAprovadaSemApproveRebaixadaPelaEdicao:
         assert "administração" in str(resp.data["detail"]).lower()
         assert Solicitacao.objects.filter(pk=sol.pk).exists()
 
-    def test_nao_super_auto_aprovada_movida_para_super_segue_excluivel(self, coordenador, municipio):
+    def test_nao_super_auto_aprovada_movida_para_super_segue_excluivel(self, coordenador, municipio, gerencia):
         """A auto-aprovação da NAO_SUPER não trava; movida para SUPER, é SUPER pendente nunca aprovada."""
-        sol = _solicitacao(coordenador, municipio, _projeto(municipio, "NAO_SUPER"), "aprovado")
-        super_ = _projeto(municipio, "SUPER")
+        sol = _solicitacao(coordenador, municipio, _projeto(municipio, "NAO_SUPER", gerencia), "aprovado")
+        super_ = _projeto(municipio, "SUPER", gerencia)
         resp = _client(coordenador).patch(f"/api/solicitacoes/{sol.id}/", {"projeto": super_.id}, format="json")
         assert resp.status_code == 200, resp.data
         sol.refresh_from_db()

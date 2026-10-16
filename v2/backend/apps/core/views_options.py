@@ -372,11 +372,12 @@ def formadores_do_setor_options(request: Request) -> Response:
     """
     GET /api/options/formadores-do-setor/
 
-    Retorna lista de formadores do mesmo setor do usuário logado.
+    Retorna os formadores que o usuário logado pode escolher (regra em `formadores_do_setor`).
 
     Lógica:
-    - Superusers: veem todos os formadores
-    - Coordenadores/outros: veem apenas formadores das suas gerencias
+    - Superusers: veem todos os formadores e coordenadores
+    - Controle, DAT e Superintendência: formadores de todas as gerências ativas
+    - Demais: formadores das gerências onde têm papel G/C/A vigente (PR 9)
 
     Response:
     [
@@ -395,9 +396,13 @@ def formadores_do_setor(user: Any) -> Any:
     """Usuários ativos de `/api/options/formadores-do-setor/` (também a lista de quem delega deslocamento
     de qualquer um, `DeslocamentoViewSet.alvos`).
 
-    Superuser: formadores e coordenadores vigentes. Demais: formadores das gerências do usuário.
+    Superuser: formadores e coordenadores vigentes. Controle, DAT e Superintendência
+    (`tem_capacidade_global`): os formadores de todas as gerências ativas (PR 9). Demais: os formadores
+    das gerências onde a pessoa tem papel G/C/A vigente (`gerencias_de_atuacao`); formadora sem papel
+    de gestão recebe a lista vazia.
     """
     from .models import EquipeGerencia
+    from .services.solicitacao_scope import tem_capacidade_global
 
     # Superusers veem todos os formadores e coordenadores
     if user.is_superuser:
@@ -409,20 +414,9 @@ def formadores_do_setor(user: Any) -> Any:
         )
         return Usuario.objects.filter(id__in=user_ids, is_active=True).order_by("first_name", "last_name")
 
-    # Buscar as gerencias do usuário logado
-    user_gerencias = EquipeGerencia.vigentes_com_escopo_em().filter(usuario=user).values_list("gerencia_id", flat=True)
-
-    if not user_gerencias:
-        # Se usuário não tem gerencias, retorna lista vazia
-        return Usuario.objects.none()
-
-    # Buscar formadores das mesmas gerencias
-    formador_ids = (
-        EquipeGerencia.vigentes_com_escopo_em()
-        .filter(gerencia_id__in=user_gerencias, papel="FORMADOR")
-        .values_list("usuario_id", flat=True)
-        .distinct()
+    formadores = EquipeGerencia.vigentes_em().filter(papel="FORMADOR", gerencia__ativo=True)
+    if not tem_capacidade_global(user):
+        formadores = formadores.filter(gerencia_id__in=EquipeGerencia.gerencias_de_atuacao(user))
+    return Usuario.objects.filter(id__in=formadores.values("usuario_id"), is_active=True).order_by(
+        "first_name", "last_name"
     )
-
-    # Buscar usuarios formadores ativos
-    return Usuario.objects.filter(id__in=formador_ids, is_active=True).order_by("first_name", "last_name")

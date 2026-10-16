@@ -84,11 +84,6 @@ def can_check_availability_for_others(user):
     )
 
 
-def get_user_gerencias_ids(user) -> list[int]:
-    """Retorna IDs de todas as gerências do usuário (via EquipeGerencia)."""
-    return list(EquipeGerencia.vigentes_com_escopo_em().filter(usuario=user).values_list("gerencia_id", flat=True))
-
-
 class AvailabilityBlockViewSet(viewsets.ModelViewSet):
     """
     ViewSet para Bloqueios de Disponibilidade.
@@ -97,9 +92,10 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
     Usuario é preenchido automaticamente com request.user.
     Status é auto-aprovado (bloqueios são informações factuais).
 
-    Permissões (conforme PLAN_multi_sector_availability.md):
+    Permissões (conforme PLAN_multi_sector_availability.md; PR 9, P9-1):
         - Privilegiados (superuser, Superintendência, Controle): veem todos
-        - Outros: bloqueios de usuários da mesma gerência
+        - Gerente, coordenadora e apoio: bloqueios das pessoas das gerências onde têm o papel
+        - Demais (a formadora): só os próprios
     """
 
     queryset = AvailabilityBlock.objects.select_related("usuario").all()
@@ -123,9 +119,10 @@ class AvailabilityBlockViewSet(viewsets.ModelViewSet):
             # update/delete: usuários comuns só veem seus próprios bloqueios
             qs = AvailabilityBlock.objects.select_related("usuario").filter(usuario=user)
         else:
-            gerencias_ids = get_user_gerencias_ids(user)
+            # P9-1 (decisão do dono, 15/10/2026): só o papel G/C/A dá os bloqueios dos colegas.
+            gerencias_ids = EquipeGerencia.gerencias_de_atuacao(user)
             if not gerencias_ids:
-                # Sem gerência, vê apenas os próprios
+                # Sem gerência de atuação (a formadora), vê apenas os próprios
                 qs = AvailabilityBlock.objects.select_related("usuario").filter(usuario=user)
             else:
                 # Bloqueios de usuários das suas gerências

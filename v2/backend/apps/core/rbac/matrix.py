@@ -186,12 +186,9 @@ ACCESS_MATRIX: Final[dict[str, dict[str, int]]] = {
         ASST_ADMIN_CONTROLE: ALLOW,  # PR 8: setor Controle herda view_all_availability via seed 0080
         COORDENADOR: ALLOW,  # scoped via EquipeGerencia (D6) — fixture cria vínculo
         APOIO: ALLOW,  # scoped via EquipeGerencia (D6) — fixture cria vínculo
-        # PR 8 (item 12): o ator Formador tem o papel FORMADOR vigente, como em produção, e o
-        # `HasSectorAccess` aceita qualquer vínculo com escopo: a API responde 200 (já respondia em
-        # produção; a matriz dava 403 só porque a fixture não tinha o vínculo). A TELA continua
-        # fechada para ele (policy `access_monthly_availability` = G/C/A). Estreitar a API é poder:
-        # fica para o PR 9, com medição.
-        FORMADOR: ALLOW,
+        # PR 9 (P9-3): o `HasSectorAccess` só aceita papel G/C/A vigente (`gerencias_de_atuacao`), o
+        # mesmo da tela (policy `access_monthly_availability`). O papel FORMADOR sozinho não abre a API.
+        FORMADOR: DENY,
     },
     #
     # Deslocamentos: `[IsAuthenticated]` + queryset scope filter (Onda 1 C2).

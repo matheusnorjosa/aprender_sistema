@@ -12,6 +12,7 @@ import logging
 from typing import Any
 
 from django.db.models import Case, F, IntegerField, Q, QuerySet, Value, When
+from django.db.models.functions import Lower
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
@@ -53,9 +54,9 @@ from .services.solicitacao_publish import preview_gcal as preview_gcal_service
 from .services.solicitacao_publish import publish_to_gcal, resync_to_gcal
 from .services.solicitacao_scope import (
     can_publish_solicitacao,
-    participants_out_of_setor,
+    participantes_fora_da_gerencia,
+    projeto_fora_da_gerencia,
     projeto_fora_do_alcance_da_restrita,
-    projeto_out_of_setor,
     scope_publishable_solicitacoes,
     scope_solicitacoes,
 )
@@ -478,10 +479,10 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         from .services.solicitacao_availability import enforce_solicitacao_availability
 
         projeto = serializer.validated_data.get("projeto")
-        # M10-04/#1656 Wave 1 (S2): o projeto tem que ser do setor do criador.
-        self._assert_projeto_in_setor_scope(projeto)
+        # PR 9: o projeto tem que ser de uma gerência onde quem cria tem papel G/C/A.
+        self._assert_projeto_na_gerencia(projeto)
         self._assert_projeto_no_alcance_da_aprovadora(projeto)
-        coordenador = self._resolver_coordenador_responsavel(serializer.validated_data.get("coordenador"))
+        coordenador = self._resolver_coordenador_responsavel(serializer.validated_data.get("coordenador"), projeto)
         initial_status = resolve_initial_status(projeto=projeto)
 
         with transaction.atomic():
@@ -517,61 +518,68 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             },
         )
 
-    _SETOR_SCOPE_MSG = "Você só pode adicionar formadores/coordenadores do seu setor."
+    _MSG_PARTICIPANTE_FORA_DA_GERENCIA = "Você só pode adicionar formadores/coordenadores da gerência do projeto."
 
-    def _assert_participants_in_setor_scope(self, users):
-        """M10-04/#1656 Wave 1: barra participante de outro SETOR com 400.
+    def _assert_participantes_na_gerencia(self, projeto, users):
+        """PR 9 (P9-5): barra com 400 participante que não é da gerência do projeto do evento.
 
-        O coordenador regular só adiciona formador/coord do próprio setor
-        (`Gerencia.setor_canonico` via EquipeGerencia vigente). Global/privilegiado
-        é isento e criador sem setor é fail-open — regra em `participants_out_of_setor`.
-        O FE já filtra as opções por setor; este é o gate de servidor (não confiar no FE).
-        Sem `request` (chamada interna direta, ex.: testes/serviços) → criador None →
-        fail-open em `participants_out_of_setor` (contexto de ator ausente não escopa).
+        Regra em `participantes_fora_da_gerencia`: entra quem tem vínculo vigente (papel ≠ EQUIPE) na
+        gerência do projeto, se quem cria ou edita atua nela (G/C/A). Global/privilegiado é isento. O FE
+        já filtra as opções (`/lookup/usuarios/?projeto_id=`); este é o gate de servidor. Sem `request`
+        (chamada interna direta) → ator None → isento.
         """
         creator = getattr(getattr(self, "request", None), "user", None)
-        offending = participants_out_of_setor(creator, users)
+        offending = participantes_fora_da_gerencia(creator, projeto, users)
         if offending:
             ids = ", ".join(sorted(str(u.id) for u in offending))
             raise serializers.ValidationError(
-                {"extra_participants": [f"{self._SETOR_SCOPE_MSG} Fora do escopo (ids): {ids}."]}
+                {"extra_participants": [f"{self._MSG_PARTICIPANTE_FORA_DA_GERENCIA} Fora do escopo (ids): {ids}."]}
             )
 
     _MSG_RESPONSAVEL_OBRIGATORIO = "Informe o coordenador responsável pelo evento."
-    _MSG_RESPONSAVEL_FORA_DO_SETOR = "O coordenador responsável precisa ser do seu setor."
+    _MSG_RESPONSAVEL_FORA_DA_GERENCIA = "O coordenador responsável precisa ser coordenador da gerência do projeto."
 
-    def _resolver_coordenador_responsavel(self, coordenador):
+    def _resolver_coordenador_responsavel(self, coordenador, projeto):
         """Decisão do dono (05/10/2026): UM coordenador responsável por evento.
 
-        Informado → passa pelo mesmo escopo de setor dos formadores (ele ocupa a agenda quando
-        acompanha; crítica ALTA do desenho). Não informado → quem cria, se tem o papel
-        COORDENADOR vigente (PR 8); senão 400 (DAT, apoio, gerente, superusuário precisam escolher).
+        Informado → passa por `_assert_coordenador_na_gerencia` (ele ocupa a agenda quando acompanha;
+        crítica ALTA do desenho). Não informado → quem cria, se tem o papel COORDENADOR vigente (PR 8)
+        na gerência do projeto (PR 9; global/privilegiado em qualquer gerência); senão 400 (DAT, apoio,
+        gerente, superusuário precisam escolher).
         """
         user = self.request.user
         if coordenador is None:
-            if user_e_coordenador(user):
+            if user_e_coordenador(user) and not self._coordenador_fora_da_gerencia(projeto, user):
                 return user
             raise serializers.ValidationError({"coordenador": [self._MSG_RESPONSAVEL_OBRIGATORIO]})
-        self._assert_coordenador_in_setor_scope(coordenador)
+        self._assert_coordenador_na_gerencia(projeto, coordenador)
         return coordenador
 
-    def _assert_coordenador_in_setor_scope(self, coordenador):
-        """Mesmo gate de `_assert_participants_in_setor_scope`, com o erro no campo `coordenador`."""
+    def _coordenador_fora_da_gerencia(self, projeto, coordenador) -> bool:
+        """PR 9: True se o responsável NÃO tem o papel COORDENADOR vigente na gerência do projeto (P9-5),
+        como o seletor da tela (`role=Coordenador&projeto_id`). Vale também para quem cria se nomear;
+        criador global/privilegiado é isento (`participantes_fora_da_gerencia`). Sem projeto não há
+        gerência a conferir: quem cria segue podendo ser a própria responsável (como antes do PR 9)."""
         creator = getattr(getattr(self, "request", None), "user", None)
-        if coordenador.pk != getattr(creator, "pk", None) and participants_out_of_setor(creator, [coordenador]):
-            raise serializers.ValidationError({"coordenador": [self._MSG_RESPONSAVEL_FORA_DO_SETOR]})
+        if projeto is None and coordenador.pk == getattr(creator, "pk", None):
+            return False
+        return bool(participantes_fora_da_gerencia(creator, projeto, [coordenador], papeis=frozenset({"COORDENADOR"})))
 
-    _SETOR_SCOPE_MSG_PROJETO = "Você só pode criar/editar solicitação de projeto do seu setor."
+    def _assert_coordenador_na_gerencia(self, projeto, coordenador):
+        if self._coordenador_fora_da_gerencia(projeto, coordenador):
+            raise serializers.ValidationError({"coordenador": [self._MSG_RESPONSAVEL_FORA_DA_GERENCIA]})
 
-    def _assert_projeto_in_setor_scope(self, projeto):
-        """M10-04/#1656 Wave 1 (S2): barra projeto de outro SETOR com 400.
+    _MSG_PROJETO_FORA_DA_GERENCIA = "Você só pode criar ou mover solicitação para projeto da sua gerência."
 
-        Mesma isenção/fail-open de `projeto_out_of_setor` (global/privilegiado, criador
-        sem setor, projeto sem setor → passa). Sem `request` → criador None → fail-open.
+    def _assert_projeto_na_gerencia(self, projeto):
+        """PR 9: barra com 400 projeto sem gerência ou de gerência onde quem cria não tem papel G/C/A.
+
+        Regra em `projeto_fora_da_gerencia` (global/privilegiado isento). Sem `request` → ator None →
+        isento.
         """
         creator = getattr(getattr(self, "request", None), "user", None)
-        if projeto_out_of_setor(creator, projeto):
-            raise serializers.ValidationError({"projeto": [self._SETOR_SCOPE_MSG_PROJETO]})
+        if projeto_fora_da_gerencia(creator, projeto):
+            raise serializers.ValidationError({"projeto": [self._MSG_PROJETO_FORA_DA_GERENCIA]})
 
     _ESCOPO_APROVADORA_MSG_PROJETO = (
         "Você só pode criar ou mover solicitação para projeto do fluxo SUPER da Superintendência."
@@ -580,7 +588,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     def _assert_projeto_no_alcance_da_aprovadora(self, projeto):
         """Regra do dono (30/09): a aprovadora por vínculo só cria ou move solicitação para projeto
         do alcance dela (`projeto_fora_do_alcance_da_restrita`; projeto None → 400). Sem `request` →
-        ator None → não restringe (como `_assert_projeto_in_setor_scope`)."""
+        ator None → não restringe (como `_assert_projeto_na_gerencia`)."""
         user = getattr(getattr(self, "request", None), "user", None)
         if projeto_fora_do_alcance_da_restrita(user, projeto):
             raise serializers.ValidationError({"projeto": [self._ESCOPO_APROVADORA_MSG_PROJETO]})
@@ -614,16 +622,24 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         all_emails = set()
         all_emails.update(e.strip().lower() for e in extra.get("formador_emails", []) if e and e.strip())
         all_emails.update(e.strip().lower() for e in extra.get("coord_acompanha_emails", []) if e and e.strip())
+        # O e-mail cadastrado pode ter maiúscula: comparar sem diferenciar, senão a pessoa vira convidada
+        # e escapa da checagem de gerência abaixo (PR 9, P9-5).
         usuarios_by_email = (
-            {u.email.lower(): u for u in Usuario.objects.filter(email__in=all_emails, is_active=True)}
+            {
+                u.email.lower(): u
+                for u in Usuario.objects.annotate(email_lower=Lower("email")).filter(
+                    email_lower__in=all_emails, is_active=True
+                )
+            }
             if all_emails
             else {}
         )
 
-        # M10-04/#1656 Wave 1: escopo por SETOR do criador ANTES de materializar
+        # PR 9 (P9-5): escopo pela gerência do projeto ANTES de materializar
         # qualquer Participation (perform_create é atômico → 400 desfaz tudo).
-        self._assert_participants_in_setor_scope(
-            list({u.id: u for u in (*usuarios_by_id.values(), *usuarios_by_email.values())}.values())
+        self._assert_participantes_na_gerencia(
+            solicitacao.projeto,
+            list({u.id: u for u in (*usuarios_by_id.values(), *usuarios_by_email.values())}.values()),
         )
 
         # Sempre criar participação do coordenador (request.user)
@@ -695,24 +711,31 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         instance = serializer.instance
 
-        # M10-04/#1656 Wave 1 (S2): se o PATCH troca o projeto, ele tem que ser do
-        # setor do editor (perform_update é atômico → 400 desfaz tudo).
+        # Mover para outro projeto: ele tem que ser de uma gerência onde quem edita tem papel G/C/A
+        # (PR 9) e, para a aprovadora, do alcance dela (regra do dono, 30/09). O EditSolicitacaoPage
+        # manda `projeto` em todo save: o mesmo projeto não é mover, e quem perdeu o papel na gerência
+        # continua salvando a própria (análise de impacto do PR 9). Mover para OUTRA gerência também
+        # revalida quem fica no evento (`_assert_pessoas_na_gerencia_do_projeto_novo`, P9-5); dentro da
+        # mesma gerência ninguém entra em gerência nova, e quem fica não é revalidado (como antes do
+        # PR 9). perform_update é atômico.
+        projeto_final = serializer.validated_data.get("projeto", instance.projeto)
+        gerencia_antiga_id = getattr(instance.projeto, "gerencia_id", None)
+        mudou_projeto = False
         if "projeto" in serializer.validated_data:
             novo_projeto = serializer.validated_data["projeto"]
-            self._assert_projeto_in_setor_scope(novo_projeto)
-            # Regra do dono (30/09): mover (inclusive a própria) só para o alcance da aprovadora.
-            # O EditSolicitacaoPage manda `projeto` em todo save: o mesmo projeto não é mover.
             if getattr(novo_projeto, "pk", None) != instance.projeto_id:
+                mudou_projeto = True
+                self._assert_projeto_na_gerencia(novo_projeto)
                 self._assert_projeto_no_alcance_da_aprovadora(novo_projeto)
 
-        # Responsável: trocar passa pelo mesmo escopo de setor; não dá para esvaziar.
+        # Responsável: trocar passa pela gerência do projeto final; não dá para esvaziar.
         coordenador_antigo_id = instance.coordenador_id
         if "coordenador" in serializer.validated_data:
             novo_coordenador = serializer.validated_data["coordenador"]
             if getattr(novo_coordenador, "pk", None) != coordenador_antigo_id:
                 if novo_coordenador is None:
                     raise serializers.ValidationError({"coordenador": [self._MSG_RESPONSAVEL_OBRIGATORIO]})
-                self._assert_coordenador_in_setor_scope(novo_coordenador)
+                self._assert_coordenador_na_gerencia(projeto_final, novo_coordenador)
         resposta_avaliar_anterior = instance.pretende_avaliar_formador
         avaliado_anterior_id = instance.formador_avaliado_id
         avaliar_aplicavel_antes = pergunta_se_aplica(instance)
@@ -767,6 +790,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 extra_serializer.is_valid(raise_exception=True)
                 validated = {k: v for k, v in extra_serializer.validated_data.items() if k in extra_participants}
                 self._update_formadores(instance, validated)
+
+            if mudou_projeto and instance.projeto is not None and instance.projeto.gerencia_id != gerencia_antiga_id:
+                self._assert_pessoas_na_gerencia_do_projeto_novo(instance)
 
             if instance.coordenador_id != coordenador_antigo_id:
                 self._trocar_convite_do_responsavel(instance, coordenador_antigo_id)
@@ -835,6 +861,24 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 details=details,
             )
 
+    def _assert_pessoas_na_gerencia_do_projeto_novo(self, solicitacao):
+        """P9-5 ao mover o evento para projeto de OUTRA gerência: quem fica (formadores, acompanhantes e
+        o responsável) tem que ser da gerência do projeto novo. Roda sobre o estado final, dentro do
+        atomic → 400 desfaz. Editar sem trocar o projeto não revalida quem já está (decisão do dono,
+        15/10), nem trocar por projeto da mesma gerência ou tirar o projeto (projeto None é isento, como
+        em `projeto_fora_da_gerencia`)."""
+        from .models import Participation
+
+        ficam = [
+            p.usuario
+            for p in Participation.objects.filter(
+                solicitacao=solicitacao, role__in=("FORMADOR", "COORD_ACOMPANHA"), usuario__isnull=False
+            ).select_related("usuario")
+        ]
+        self._assert_participantes_na_gerencia(solicitacao.projeto, ficam)
+        if solicitacao.coordenador is not None:
+            self._assert_coordenador_na_gerencia(solicitacao.projeto, solicitacao.coordenador)
+
     def _trocar_convite_do_responsavel(self, solicitacao, coordenador_antigo_id):
         """Troca de responsável na edição: o novo ganha o convite (papel COORDENADOR); o antigo
         perde, salvo se for quem criou (esse sempre teve a linha). O cache de agenda do antigo
@@ -894,9 +938,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             # Batch fetch: 1 query para todos (#406).
             if to_add:
                 usuarios = {u.id: u for u in Usuario.objects.filter(id__in=to_add, is_active=True)}
-                # M10-04/#1656 Wave 1: barra ADIÇÃO cross-setor (só as novas; manter
+                # PR 9 (P9-5): barra ADIÇÃO de fora da gerência do projeto (só as novas; manter
                 # quem já está não reprova). perform_update é atômico → 400 desfaz tudo.
-                self._assert_participants_in_setor_scope(list(usuarios.values()))
+                self._assert_participantes_na_gerencia(solicitacao.projeto, list(usuarios.values()))
                 added = [uid for uid in to_add if uid in usuarios]
                 if added:
                     Participation.objects.bulk_create(
@@ -1106,12 +1150,11 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         )
 
     def _get_publishable_solicitacao(self):
-        """`get_object()` + guarda de OBJETO por setor (#1656 Feature 2).
+        """`get_object()` + guarda de OBJETO por gerência (#1656 Feature 2; PR 9).
 
         Global (`use_gcal`: Controle/Super) publica qualquer evento; Apoio só evento
-        do PRÓPRIO setor. Fecha o caso-limite de publicar evento próprio caído em
-        outro setor (Apoio sem vínculo vigente). Fora do escopo → 404 (indistinguível
-        de inexistente, alinhado ao get_object).
+        de gerência onde ela é APOIO, inclusive o próprio. Fora do escopo → 404
+        (indistinguível de inexistente, alinhado ao get_object).
         """
         solicitacao = self.get_object()
         if not can_publish_solicitacao(self.request.user, solicitacao):
@@ -1125,16 +1168,16 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         methods=["post"],
         # Issue #1233 (Epic 4.2.a): operações GCal usam Policy `use_gcal`
         # (Controle + Super). #1656 Feature 2: OU `publish_setor_solicitacao`
-        # (Apoio de Coordenação), escopado por setor via `scope_solicitacoes`.
+        # (Apoio de Coordenação), escopado por gerência via `scope_solicitacoes`.
         # PR B1 (decisão 5): OU a policy de aprovação — a prévia é leitura e a tela de
-        # Aprovações a oferece; publicar continua exigindo `use_gcal` ou o setor.
+        # Aprovações a oferece; publicar continua exigindo `use_gcal` ou a gerência.
         permission_classes=[CanUseGcal | CanPublishSetorSolicitacao | CanAccessSolicitationApprovals],
         url_path="preview-gcal",
     )
     def preview_gcal(self, request, pk=None):
-        """Preview do payload GCal sem publicar (`use_gcal`, Apoio do setor do evento, ou aprovadora)."""
+        """Preview do payload GCal sem publicar (`use_gcal`, Apoio da gerência do evento, ou aprovadora)."""
         # A aprovadora enxerga toda solicitação (visão global da policy); a guarda de
-        # publicabilidade por setor só vale para quem chega pelas vias de publicação.
+        # publicabilidade por gerência só vale para quem chega pelas vias de publicação.
         if user_has_policy(request.user, "access_solicitation_approvals"):
             solicitacao = self.get_object()
         else:
@@ -1160,12 +1203,12 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         methods=["post"],
         # Issue #1233 (Epic 4.2.a): operações GCal usam Policy `use_gcal`
         # (Controle + Super). #1656 Feature 2: OU `publish_setor_solicitacao`
-        # (Apoio de Coordenação), escopado por setor via `scope_solicitacoes`.
+        # (Apoio de Coordenação), escopado por gerência via `scope_solicitacoes`.
         permission_classes=[CanUseGcal | CanPublishSetorSolicitacao],
         url_path="publish",
     )
     def publish(self, request, pk=None):
-        """Publica solicitação no Google Calendar via Celery (`use_gcal`, ou Apoio do setor do evento)."""
+        """Publica solicitação no Google Calendar via Celery (`use_gcal`, ou Apoio da gerência do evento)."""
         solicitacao = self._get_publishable_solicitacao()
         dry_run = request.data.get("dry_run", False)
         apply_blocked = request.data.get("apply_blocked", False)
@@ -1193,7 +1236,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         methods=["post"],
         # Issue #1233 (Epic 4.2.a): operações GCal usam Policy `use_gcal`
         # (Controle + Super). #1656 Feature 2: OU `publish_setor_solicitacao`
-        # (Apoio de Coordenação), escopado por setor via `scope_solicitacoes`.
+        # (Apoio de Coordenação), escopado por gerência via `scope_solicitacoes`.
         permission_classes=[CanUseGcal | CanPublishSetorSolicitacao],
         url_path="resync-gcal",
     )
@@ -1201,7 +1244,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         """
         Republicar solicitação no Google Calendar (força UPDATE) - Fase 4.
 
-        Permissão: `use_gcal` (global) ou `publish_setor_solicitacao` (setor do evento)
+        Permissão: `use_gcal` (global) ou `publish_setor_solicitacao` (gerência do evento)
         Returns: 202 Accepted (processamento assíncrono)
         """
         solicitacao = self._get_publishable_solicitacao()
@@ -1227,7 +1270,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         methods=["post"],
         # Issue #1233 (Epic 4.2.a): operações GCal usam Policy `use_gcal`
         # (Controle + Super). #1656 Feature 2: OU `publish_setor_solicitacao`
-        # (Apoio de Coordenação), escopado por setor via `scope_solicitacoes`.
+        # (Apoio de Coordenação), escopado por gerência via `scope_solicitacoes`.
         permission_classes=[CanUseGcal | CanPublishSetorSolicitacao],
         url_path="cancel-gcal",
     )
@@ -1235,7 +1278,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         """
         Cancelar evento no Google Calendar e limpar campos - Fase 4.
 
-        Permissão: `use_gcal` (global) ou `publish_setor_solicitacao` (setor do evento)
+        Permissão: `use_gcal` (global) ou `publish_setor_solicitacao` (gerência do evento)
         Returns: 202 Accepted (processamento assíncrono)
         """
         solicitacao = self._get_publishable_solicitacao()

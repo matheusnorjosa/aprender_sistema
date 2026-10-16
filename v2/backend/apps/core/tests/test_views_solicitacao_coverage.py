@@ -26,6 +26,7 @@ import pytest
 
 from apps.core.models import AuditLog, Gerencia, Participation
 from apps.core.tests.factories import (
+    GerenciaFactory,
     GroupFactory,
     MunicipioFactory,
     ProjetoFactory,
@@ -56,8 +57,14 @@ def grupos():
 
 
 @pytest.fixture
-def usuario_coordenador(grupos):
-    """User with Coordenador role."""
+def gerencia():
+    """Gerência do projeto e do coordenador (PR 9: só se cria evento em projeto da gerência onde se atua)."""
+    return GerenciaFactory()
+
+
+@pytest.fixture
+def usuario_coordenador(grupos, gerencia):
+    """User with Coordenador role na gerência do projeto."""
     uid = uuid4().hex[:8]
     user = UsuarioFactory(
         username=f"coord_{uid}",
@@ -65,7 +72,7 @@ def usuario_coordenador(grupos):
         cpf=str(uuid4().int % 10**11).zfill(11),
         email=f"coord_{uid}@test.com",
     )
-    com_papel(user, "COORDENADOR")
+    com_papel(user, "COORDENADOR", gerencia)
     return user
 
 
@@ -119,7 +126,7 @@ def municipio():
 
 
 @pytest.fixture
-def projeto_super():
+def projeto_super(gerencia):
     """Project with SUPER flow (requires approval)."""
     uid = uuid4().hex[:8]
     return ProjetoFactory(
@@ -127,6 +134,7 @@ def projeto_super():
         codigo=f"SUPER{uid[:4]}",
         fluxo="SUPER",
         ativo=True,
+        gerencia=gerencia,
     )
 
 

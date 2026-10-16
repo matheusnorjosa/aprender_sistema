@@ -29,6 +29,7 @@ import pytest
 
 from apps.core.models import Participation
 from apps.core.tests.factories import (
+    GerenciaFactory,
     MunicipioFactory,
     ProjetoFactory,
     TipoEventoFactory,
@@ -43,9 +44,15 @@ _CPF = itertools.count(79000000001)
 
 
 @pytest.fixture
-def coordenador():
+def gerencia():
+    """Gerência do projeto: PR 9 só aceita criador e formadores com papel nela."""
+    return GerenciaFactory()
+
+
+@pytest.fixture
+def coordenador(gerencia):
     user = UsuarioFactory(username="coord_1626u", cpf=str(next(_CPF)))
-    com_papel(user, "COORDENADOR")
+    com_papel(user, "COORDENADOR", gerencia)
     return user
 
 
@@ -60,8 +67,8 @@ def tipo_evento():
 
 
 @pytest.fixture
-def projeto(municipio):
-    proj = ProjetoFactory(nome="Projeto 1626u", codigo="P1626U", fluxo="NAO_SUPER", ativo=True)
+def projeto(municipio, gerencia):
+    proj = ProjetoFactory(nome="Projeto 1626u", codigo="P1626U", fluxo="NAO_SUPER", ativo=True, gerencia=gerencia)
     # #1738: criar exige Compra para o par município+projeto.
     liberar_par(municipio, proj)
     return proj
@@ -74,9 +81,9 @@ def client_coord(coordenador):
     return c
 
 
-def _formador(n):
+def _formador(n, gerencia):
     u = UsuarioFactory(username=f"form_1626u_{n}", cpf=str(next(_CPF)))
-    com_papel(u, "FORMADOR")
+    com_papel(u, "FORMADOR", gerencia)
     return u
 
 
@@ -113,7 +120,7 @@ def _ids(sol_id, role):
 class TestUpdateMalformedShape:
     def test_formador_ids_string_returns_400_not_500(self, client_coord, municipio, projeto, tipo_evento):
         """RED: `{"formador_ids": "abc"}` no PATCH itera a string → id__in inválido → 500."""
-        f_a = _formador("s1")
+        f_a = _formador("s1", projeto.gerencia)
         sol_id = _create_sol(client_coord, municipio, projeto, tipo_evento, {"formador_ids": [f_a.id]})
 
         resp = client_coord.patch(
@@ -156,9 +163,9 @@ class TestUpdateMalformedShape:
 class TestUpdateAbsentKeyDoesNotTouchOtherRole:
     def test_patch_only_formador_preserves_coord_acompanha(self, client_coord, municipio, projeto, tipo_evento):
         """A validação NÃO pode transformar 'coord_acompanha ausente' em 'lista vazia = apagar'."""
-        f_a = _formador("k1")
-        coord_a = _formador("k2")
-        f_b = _formador("k3")
+        f_a = _formador("k1", projeto.gerencia)
+        coord_a = _formador("k2", projeto.gerencia)
+        f_b = _formador("k3", projeto.gerencia)
         sol_id = _create_sol(client_coord, municipio, projeto, tipo_evento, {"formador_ids": [f_a.id]})
         # Linha antiga (a lista saiu da tela e da API em 05/10/2026; as gravadas antes ficam).
         Participation.objects.create(solicitacao_id=sol_id, usuario=coord_a, role="COORD_ACOMPANHA")
@@ -176,8 +183,8 @@ class TestUpdateAbsentKeyDoesNotTouchOtherRole:
 
     def test_patch_valid_formador_ids_still_works(self, client_coord, municipio, projeto, tipo_evento):
         """Não-regressão: shape válido segue reconciliando FORMADOR por id."""
-        f_a = _formador("v1")
-        f_b = _formador("v2")
+        f_a = _formador("v1", projeto.gerencia)
+        f_b = _formador("v2", projeto.gerencia)
         sol_id = _create_sol(client_coord, municipio, projeto, tipo_evento, {"formador_ids": [f_a.id]})
         resp = client_coord.patch(
             f"/api/solicitacoes/{sol_id}/",

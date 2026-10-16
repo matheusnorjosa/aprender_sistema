@@ -7,8 +7,12 @@ Os 7 endpoints OAuth eram só `CanUseGcal` (global). A Apoio — que publica os 
 calendário de publicação é o da organização, decidido no servidor.
 
 Também: o retorno do OAuth leva a pessoa a uma página que ela consegue abrir (a Apoio não abre
-/pre-agenda), quem não tem setor vigente não recebe token (M12-15), e o `status` diz se a pessoa
-já pode publicar (`publish_ready` / `publish_block_reason`).
+/pre-agenda), quem não tem gerência onde publicar não recebe token (M12-15), e o `status` diz se a
+pessoa já pode publicar (`publish_ready` / `publish_block_reason`).
+
+PR 9 (16/10/2026): o alcance de publicação (`has_publish_scope`) são as gerências onde a pessoa é
+APOIO vigente em gerência ativa; `Gerencia.setor_canonico` não dá escopo. O código de erro segue
+`no_setor_scope` (contrato com o FE).
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false, reportPrivateUsage=false
@@ -25,7 +29,7 @@ from rest_framework.test import APIClient
 import pytest
 
 from apps.core import views_oauth
-from apps.core.models import EquipeGerencia, Gerencia, GoogleOAuthCredential
+from apps.core.models import EquipeGerencia, Gerencia, GoogleOAuthCredential, PermissaoFuncional
 from apps.core.rbac.policies import CanPublishSetorSolicitacao, CanUseGcal
 from apps.core.services.oauth.oauth_flow import _is_safe_url
 from apps.core.services.oauth.token_manager import encrypt_token
@@ -59,9 +63,19 @@ def _apoio(gerencia=None):
 
 
 def _apoio_sem_setor():
-    """PR 8: o direito de publicar vem do papel APOIO vigente; sem setor = gerência sem `setor_canonico`."""
-    sem_setor = Gerencia.objects.create(nome="GERENCIA SEM SETOR OAS", nome_setor="Sem setor", ativo=True)
-    return _apoio(sem_setor)
+    """Tem `publish_setor_solicitacao` (por um grupo), mas nenhuma gerência onde é APOIO vigente.
+
+    PR 9: o papel APOIO vigente já traz o alcance (a gerência dele), então a única forma de ter o
+    direito sem alcance é a capacidade vir de grupo. Passa o gate da view; o escopo nega.
+    """
+    user = UsuarioFactory()
+    grupo = GroupFactory(name="Publicadora sem gerencia OAS")
+    PermissaoFuncional.objects.get_or_create(
+        codename="publish_setor_solicitacao",
+        defaults={"label": "Publicar evento da gerência", "category": "solicitacao"},
+    )[0].groups.add(grupo)
+    user.groups.add(grupo)
+    return user
 
 
 def _controle():
@@ -124,7 +138,7 @@ def test_controle_start_sem_return_to_continua_em_pre_agenda(mock_build):
 
 @patch("apps.core.views_oauth.build_authorization_url", return_value=GOOGLE_AUTH_URL)
 def test_apoio_sem_setor_start_403_no_setor_scope(mock_build):
-    """M12-15: quem não pode publicar nada (Apoio sem setor vigente) não recebe token Google."""
+    """M12-15: quem não pode publicar nada (sem gerência de APOIO vigente) não recebe token Google."""
     resp = _cliente(_apoio_sem_setor()).get("/api/oauth/google/start/")
 
     assert resp.status_code == status.HTTP_403_FORBIDDEN
@@ -183,7 +197,8 @@ def test_apoio_callback_state_invalido_volta_para_pagina_de_publicacao(_mock_val
 @patch("apps.core.views_oauth.exchange_code_for_tokens", return_value=TOKENS)
 @patch("apps.core.services.google_oauth.validate_oauth_state")
 def test_apoio_sem_setor_callback_nao_grava_credencial(mock_validate, mock_exchange):
-    """M12-15: o vínculo pode vencer entre o start e o callback (o state vive 10 min) — sem setor, sem token."""
+    """M12-15: o alcance pode sumir entre o start e o callback (o state vive 10 min) — sem gerência de
+    APOIO, sem token."""
     apoio = _apoio_sem_setor()
     mock_validate.return_value = {"valid": True, "return_to": PAGINA_PUBLICACAO, "user_id": apoio.pk}
 

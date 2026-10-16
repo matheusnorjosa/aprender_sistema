@@ -76,6 +76,11 @@ em uma view e a dívida voltaria.
 
 V004/V005 isentam `tests/`, `migrations/` (cobertas pela V003) e `apps/dev_tools/`.
 
+- **V006** (PR 9 das permissões, 16/10/2026) o texto do setor nos arquivos de escopo (`V006_ARQUIVOS`):
+  o atributo `.setor`/`.setor_canonico`, e o lookup ORM `setor`, `setor__*`, `*__setor`,
+  `*__setor_canonico*` em argumento nomeado ou em string (`getattr(p, "setor")`, `values_list(...)`).
+  O escopo é a gerência do projeto (`projeto.gerencia_id`). Proibição simples, sem allowlist nem noqa.
+
 Whitelist de paths (não linta V001/V002):
 - `tests/`, `migrations/`, `fixtures/` (test data e data migrations podem
   referenciar nomes de grupos por design)
@@ -100,6 +105,7 @@ from __future__ import annotations
 
 import ast
 import pathlib
+import re
 import sys
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -179,6 +185,34 @@ V005_ALLOWLIST: tuple[str, ...] = (
     "apps/core/services/equipe_gerencia.py",
     "apps/core/services/equipe_gerencia_import.py",
     "apps/core/services/export_contract_importer.py",
+)
+
+
+# V006: arquivos de escopo (alcance por gerência) onde o setor não volta.
+V006_ARQUIVOS: tuple[str, ...] = (
+    "apps/core/services/solicitacao_scope.py",
+    "apps/core/views_lookup.py",
+    "apps/core/views_options.py",
+    "apps/core/views_availability.py",
+    "apps/core/views_availability_monthly.py",
+    "apps/core/views_solicitacao.py",
+    "apps/core/rbac/permissions.py",
+    "apps/core/views_deslocamento.py",
+    "apps/core/views/stats.py",
+)
+V006_ATRIBUTOS: frozenset[str] = frozenset({"setor", "setor_canonico"})
+# Lookup ORM cujo segmento é `setor` ou `setor_canonico` (`setor__in`, `projeto__setor`, ...).
+# Por segmentos, sem regex aninhada (CodeQL py/redos).
+_V006_SO_LETRAS = re.compile(r"[a-z_]+")
+
+
+def _v006_lookup_de_setor(texto: str) -> bool:
+    return bool(_V006_SO_LETRAS.fullmatch(texto)) and any(seg in V006_ATRIBUTOS for seg in texto.split("__"))
+
+
+V006_MENSAGEM = (
+    "Setor (texto) no escopo. Desde o PR 9 o alcance é a gerência do projeto (`projeto.gerencia_id`, "
+    "`EquipeGerencia.gerencias_de_atuacao`). Ver specs/backend/rbac.spec.md."
 )
 
 
@@ -378,6 +412,33 @@ class MutationLintVisitor(ast.NodeVisitor):
         self.violations.append(Violation(filepath=str(self.filepath), lineno=node.lineno, code=code, message=message))
 
 
+class SetorNoEscopoVisitor(ast.NodeVisitor):
+    """V006: atributo, argumento nomeado ou string que usa o setor num arquivo de escopo."""
+
+    def __init__(self, filepath: pathlib.Path) -> None:
+        self.filepath: pathlib.Path = filepath
+        self.violations: list[Violation] = []
+
+    def visit_Attribute(self, node: ast.Attribute) -> None:
+        if node.attr in V006_ATRIBUTOS:
+            self._add(node.lineno)
+        self.generic_visit(node)
+
+    def visit_keyword(self, node: ast.keyword) -> None:
+        if node.arg is not None and _v006_lookup_de_setor(node.arg):
+            self._add(node.value.lineno)
+        self.generic_visit(node)
+
+    def visit_Constant(self, node: ast.Constant) -> None:
+        if isinstance(node.value, str) and _v006_lookup_de_setor(node.value):
+            self._add(node.lineno)
+
+    def _add(self, lineno: int) -> None:
+        self.violations.append(
+            Violation(filepath=str(self.filepath), lineno=lineno, code="V006", message=V006_MENSAGEM)
+        )
+
+
 def _simple_name(node: ast.expr) -> str | None:
     """`Nome` → "Nome"; `mod.Nome` → "Nome"; outro nó → None."""
     if isinstance(node, ast.Name):
@@ -448,7 +509,8 @@ def check_file(path: pathlib.Path, root: pathlib.Path) -> list[Violation]:
     check_v004 = not mutation_exempt and not _in_allowlist(path, V004_ALLOWLIST)
     check_v005 = not mutation_exempt and not _in_allowlist(path, V005_ALLOWLIST)
     check_v001 = not _is_path_whitelisted(path, root)
-    if not (check_v001 or check_v004 or check_v005):
+    check_v006 = _in_allowlist(path, V006_ARQUIVOS)
+    if not (check_v001 or check_v004 or check_v005 or check_v006):
         return []
     try:
         source = path.read_text(encoding="utf-8")
@@ -467,6 +529,10 @@ def check_file(path: pathlib.Path, root: pathlib.Path) -> list[Violation]:
         mutation_visitor = MutationLintVisitor(path, check_v004=check_v004, check_v005=check_v005)
         mutation_visitor.visit(tree)
         violations.extend(mutation_visitor.violations)
+    if check_v006:
+        setor_visitor = SetorNoEscopoVisitor(path)
+        setor_visitor.visit(tree)
+        violations.extend(setor_visitor.violations)
     return violations
 
 

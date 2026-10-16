@@ -53,9 +53,8 @@ EXPECTED_MATRIX: dict[str, dict[str, int]] = {
         "Assistente Administrativo do Controle": ALLOW,
         "Coordenador": ALLOW,
         "Apoio de Coordenação": ALLOW,
-        # PR 8 das permissões: o ator tem o papel FORMADOR vigente (como em produção) e a API da
-        # grade aceita qualquer vínculo com escopo. A tela segue fechada (rbac_authorization_matrix §6).
-        "Formador": ALLOW,
+        # PR 9 (P9-3): a API da grade pede papel G/C/A, o mesmo da tela (rbac_authorization_matrix §6).
+        "Formador": DENY,
     },
     "deslocamentos": {
         "Superuser": ALLOW,

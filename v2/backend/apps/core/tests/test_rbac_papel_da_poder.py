@@ -91,9 +91,9 @@ def _so_grupo(*grupos: str) -> Usuario:
     return UsuarioFactory(groups=list(grupos), groups__vinculo=False)
 
 
-def _payload_solicitacao(**extra: Any) -> dict[str, Any]:
+def _payload_solicitacao(gerencia_id: int | None = None, **extra: Any) -> dict[str, Any]:
     municipio = MunicipioFactory()
-    projeto = ProjetoFactory(fluxo="SUPER")
+    projeto = ProjetoFactory(fluxo="SUPER", gerencia_id=gerencia_id)
     liberar_par(municipio, projeto)
     inicio = timezone.now() + timedelta(days=3)
     return {
@@ -109,7 +109,11 @@ def _payload_solicitacao(**extra: Any) -> dict[str, Any]:
 
 
 def _cria(usuario: Usuario, **extra: Any):
-    return _cliente(usuario).post("/api/solicitacoes/", _payload_solicitacao(**extra), format="json")
+    """POST de solicitação num projeto da gerência onde `usuario` atua (PR 9: o escopo é a gerência do projeto)."""
+    gerencia_id = min(EquipeGerencia.gerencias_de_atuacao(usuario), default=None)
+    return _cliente(usuario).post(
+        "/api/solicitacoes/", _payload_solicitacao(gerencia_id=gerencia_id, **extra), format="json"
+    )
 
 
 # ============================================================================
@@ -435,7 +439,7 @@ class TestP16Deslocamento:
         assert deslocamento.destino == "Sobral"
 
     def test_gerente_em_a_e_formador_em_b_nao_edita_o_do_formador_de_b(self, duas_gerencias):
-        """Caso u91: vê os formadores de B pela leitura, mas o papel em B (FORMADOR) não delega."""
+        """Caso u91: o papel em B (FORMADOR) não delega nem dá leitura (PR 9, P9-1: 404)."""
         minha, outra = duas_gerencias
         usuario = _so_vinculo("GERENTE", minha)
         _vinculo(usuario, "FORMADOR", outra)
@@ -443,10 +447,10 @@ class TestP16Deslocamento:
         deslocamento = Deslocamento.objects.create(usuario=formador_de_b, **_payload_deslocamento())
         client = _cliente(usuario)
 
-        assert client.get(f"/api/deslocamentos/{deslocamento.id}/").status_code == 200
+        assert client.get(f"/api/deslocamentos/{deslocamento.id}/").status_code == 404
         editado = client.patch(f"/api/deslocamentos/{deslocamento.id}/", {"destino": "Crato"}, format="json")
-        assert editado.status_code == 403
-        assert client.delete(f"/api/deslocamentos/{deslocamento.id}/").status_code == 403
+        assert editado.status_code == 404
+        assert client.delete(f"/api/deslocamentos/{deslocamento.id}/").status_code == 404
         assert Deslocamento.objects.filter(pk=deslocamento.id, destino="Sobral").exists()
 
     def test_alvos_do_seletor_sao_os_formadores_das_gerencias_dela(self, duas_gerencias):

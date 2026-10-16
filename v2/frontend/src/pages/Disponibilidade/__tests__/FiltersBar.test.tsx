@@ -162,6 +162,31 @@ describe('FiltersBar — gerência pelo vínculo + policy', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  test('gerência só com o papel FORMADOR não entra: a API da Grade pede G/C/A (PR 9)', async () => {
+    getMeMock.mockResolvedValue(
+      makeMe({
+        gerencias: [
+          { id: 3, rotulo: 'Fluir', papeis: ['FORMADOR'] },
+          { id: 2, rotulo: 'Vidas', papeis: ['FORMADOR', 'GERENTE'] },
+        ],
+      }),
+    );
+    const onChange = renderBar();
+
+    expect(await opcoes()).toEqual(['Vidas']);
+    expect(onChange).toHaveBeenCalledWith({ gerenciaId: 2 });
+  });
+
+  test('só papel FORMADOR: select desabilitado, sem auto-seleção (PR 9)', async () => {
+    getMeMock.mockResolvedValue(makeMe({ gerencias: [{ id: 3, rotulo: 'Fluir', papeis: ['FORMADOR'] }] }));
+    const onChange = renderBar();
+
+    expect(await screen.findByRole('option', { name: 'Sem gerência vinculada' })).toBeInTheDocument();
+    await waitFor(() => expect(getMyPoliciesMock).toHaveBeenCalled());
+    expect(screen.getByLabelText('Gerência')).toBeDisabled();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   test('o filtro de texto se chama "Projeto" (filtra pelo nome do projeto)', async () => {
     getMeMock.mockResolvedValue(makeMe());
     renderBar();

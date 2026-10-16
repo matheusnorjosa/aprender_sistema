@@ -27,6 +27,7 @@ from rest_framework.test import APIClient
 import pytest
 
 from apps.core.models import Deslocamento, EquipeGerencia, Gerencia, Usuario
+from apps.core.services.equipe_gerencia import PAPEL_POR_FUNCAO
 from apps.core.tests.factories import GroupFactory, UsuarioFactory
 
 pytestmark = pytest.mark.django_db
@@ -78,8 +79,10 @@ URL = "/api/deslocamentos/"
 
 
 def _user_in_gerencia(username: str, group_names: list[str], gerencia: Gerencia) -> Usuario:
+    """Grupo + vínculo com o papel do grupo de função (PR 9: só o papel G/C/A dá os deslocamentos dos colegas)."""
     user = _make_user(username, group_names)
-    EquipeGerencia.objects.create(usuario=user, gerencia=gerencia)
+    papel = next((PAPEL_POR_FUNCAO[g] for g in group_names if g in PAPEL_POR_FUNCAO), "FORMADOR")
+    EquipeGerencia.objects.create(usuario=user, gerencia=gerencia, papel=papel)
     return user
 
 

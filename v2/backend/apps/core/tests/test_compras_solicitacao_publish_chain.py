@@ -26,6 +26,7 @@ import pytest
 
 from apps.core.models import AuditLog, DATCompra, Solicitacao, Usuario
 from apps.core.tests.factories import (
+    GerenciaFactory,
     MunicipioFactory,
     ProjetoFactory,
     TipoEventoFactory,
@@ -36,7 +37,8 @@ from apps.core.tests.factories import (
 pytestmark = pytest.mark.django_db
 
 
-def _create_user_in_group(*, prefix: str, group_name: str) -> Usuario:
+def _create_user_in_group(*, prefix: str, group_name: str, gerencia=None) -> Usuario:
+    """`gerencia`: onde o papel da função vale (PR 9: o coordenador cria só em projeto da gerência dele)."""
     uid = uuid4().hex[:8]
     user = UsuarioFactory(
         username=f"{prefix}_{uid}",
@@ -44,6 +46,7 @@ def _create_user_in_group(*, prefix: str, group_name: str) -> Usuario:
         password="testpass",
         cpf=str(uuid4().int % 10**11).zfill(11),
         groups=[group_name],
+        groups__gerencia=gerencia,
     )
     return user
 
@@ -74,14 +77,15 @@ def test_happy_path_import_compra_create_solicitacao_approve_and_publish():
     client = APIClient()
 
     # O Controle lança a compra (policy `view_compras_stats`) e publica.
+    gerencia = GerenciaFactory()
     user_controle = _create_user_in_group(prefix="controle_chain", group_name="Controle")
-    user_coordenador = _create_user_in_group(prefix="coord_chain", group_name="Coordenador")
+    user_coordenador = _create_user_in_group(prefix="coord_chain", group_name="Coordenador", gerencia=gerencia)
     # PR 3 hardening RBAC (2026-04-29): aprovar exige composite Setor Sup + Função Gerente.
     user_super = _create_user_in_group(prefix="super_chain", group_name="Superintendência")
     com_papel(user_super, "GERENTE")
 
     municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
-    projeto = ProjetoFactory(nome="Novo Lendo", codigo="NL", fluxo="SUPER", ativo=True)
+    projeto = ProjetoFactory(nome="Novo Lendo", codigo="NL", fluxo="SUPER", ativo=True, gerencia=gerencia)
     tipo_evento = TipoEventoFactory(nome="Formacao")
 
     # 1) Compra lançada via endpoint real.
@@ -144,12 +148,14 @@ def test_invalid_path_blocks_solicitacao_when_pair_municipio_projeto_has_no_comp
     """
     client = APIClient()
 
+    # Tudo na mesma gerência: o 400 vem só da falta de compra, não do escopo de gerência (PR 9).
+    gerencia = GerenciaFactory()
     user_controle = _create_user_in_group(prefix="controle_invalid", group_name="Controle")
-    user_coordenador = _create_user_in_group(prefix="coord_invalid", group_name="Coordenador")
+    user_coordenador = _create_user_in_group(prefix="coord_invalid", group_name="Coordenador", gerencia=gerencia)
 
     municipio = MunicipioFactory(nome="Sobral", uf="CE", ativo=True)
-    projeto_com_compra = ProjetoFactory(nome="Novo Lendo", codigo="NL2", fluxo="SUPER", ativo=True)
-    projeto_sem_compra = ProjetoFactory(nome="ACerta", codigo="AC", fluxo="SUPER", ativo=True)
+    projeto_com_compra = ProjetoFactory(nome="Novo Lendo", codigo="NL2", fluxo="SUPER", ativo=True, gerencia=gerencia)
+    projeto_sem_compra = ProjetoFactory(nome="ACerta", codigo="AC", fluxo="SUPER", ativo=True, gerencia=gerencia)
     tipo_evento = TipoEventoFactory(nome="Acompanhamento")
 
     # Compra lançada somente para "Novo Lendo".
@@ -180,4 +186,5 @@ def test_invalid_path_blocks_solicitacao_when_pair_municipio_projeto_has_no_comp
     assert create_response.status_code == 400
     assert "errors" in create_response.data
     assert "municipio" in create_response.data["errors"]
+    assert "projeto" not in create_response.data["errors"]
     assert "compra que libere" in str(create_response.data["errors"]["municipio"]).lower()

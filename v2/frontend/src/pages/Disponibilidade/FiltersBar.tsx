@@ -6,8 +6,9 @@
  *
  * Gerência (PR A — mesma regra do backend, `CanViewAllAvailability | HasSectorAccess`):
  * - Policy `view_all_availability`: "Participantes de projetos SUPER" + gerências ativas.
- * - Demais: só as gerências do vínculo EquipeGerencia (`me.gerencias`); a primeira é
- *   selecionada sozinha. Grupo de setor NÃO conta (o backend autoriza por vínculo).
+ * - Demais: só as gerências do vínculo EquipeGerencia (`me.gerencias`) com papel G/C/A (PR 9: o
+ *   `HasSectorAccess` recusa o papel FORMADOR sozinho); a primeira é selecionada sozinha. Grupo de
+ *   setor NÃO conta (o backend autoriza por vínculo).
  * - Sem vínculo e sem policy: select desabilitado ("Sem gerência vinculada").
  */
 
@@ -43,6 +44,13 @@ interface GerenciaOpcao {
 
 const porRotulo = (a: GerenciaOpcao, b: GerenciaOpcao): number => a.rotulo.localeCompare(b.rotulo, 'pt-BR');
 
+/** Papéis que abrem a Grade da gerência (`EquipeGerencia.PAPEIS_DE_ATUACAO` no backend). */
+const PAPEIS_DA_GRADE = new Set(['GERENTE', 'COORDENADOR', 'APOIO']);
+
+/** Gerências de `me` onde a pessoa tem papel G/C/A, em ordem de rótulo. */
+const gerenciasDaGrade = (me: CurrentUser): GerenciaOpcao[] =>
+  (me.gerencias ?? []).filter((g) => g.papeis.some((p) => PAPEIS_DA_GRADE.has(p))).sort(porRotulo);
+
 export default function FiltersBar({ year, month, gerenciaId, sector, q, onChange }: FiltersBarProps): JSX.Element {
   const [allGerencias, setAllGerencias] = useState<Gerencia[]>([]);
   const [userInfo, setUserInfo] = useState<CurrentUser | null>(null);
@@ -64,7 +72,7 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
         setCanSeeAll(veTodas);
 
         // Sem a policy, a Grade só abre na gerência do vínculo: seleciona a primeira.
-        const primeira = [...(meData.gerencias ?? [])].sort(porRotulo)[0];
+        const primeira = gerenciasDaGrade(meData)[0];
         if (!veTodas && primeira && !gerenciaId) {
           onChange({ gerenciaId: primeira.id });
         }
@@ -77,11 +85,10 @@ export default function FiltersBar({ year, month, gerenciaId, sector, q, onChang
     void fetchData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Com a policy: todas as ativas. Sem ela: só as do vínculo (`me.gerencias`). */
+  /** Com a policy: todas as ativas. Sem ela: só as do vínculo G/C/A (`me.gerencias`). */
   const gerencias = useMemo((): GerenciaOpcao[] => {
     if (!userInfo) return [];
-    const opcoes: GerenciaOpcao[] = canSeeAll ? allGerencias : (userInfo.gerencias ?? []);
-    return [...opcoes].sort(porRotulo);
+    return canSeeAll ? [...allGerencias].sort(porRotulo) : gerenciasDaGrade(userInfo);
   }, [allGerencias, userInfo, canSeeAll]);
 
   const semOpcoes = !loading && !canSeeAll && gerencias.length === 0;

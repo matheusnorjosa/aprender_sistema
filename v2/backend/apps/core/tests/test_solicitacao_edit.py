@@ -39,6 +39,7 @@ import pytest
 
 from apps.core.models import AuditLog, Participation, Solicitacao
 from apps.core.tests.factories import (
+    GerenciaFactory,
     GroupFactory,
     MunicipioFactory,
     ProjetoFactory,
@@ -72,8 +73,14 @@ def grupo_dat():
 
 
 @pytest.fixture
-def usuario_owner():
-    """Usuário dono da solicitação (Coordenador)."""
+def gerencia():
+    """Gerência dos projetos: PR 9 só aceita dono e formadores com papel na gerência do projeto."""
+    return GerenciaFactory()
+
+
+@pytest.fixture
+def usuario_owner(gerencia):
+    """Usuário dono da solicitação (Coordenador da gerência dos projetos)."""
     cpf = str(uuid4().int % 10**11).zfill(11)
     user = UsuarioFactory(
         username=f"owner_{uuid4().hex[:8]}",
@@ -82,7 +89,7 @@ def usuario_owner():
         cpf=cpf,
         is_active=True,
     )
-    com_papel(user, "COORDENADOR")
+    com_papel(user, "COORDENADOR", gerencia)
     return user
 
 
@@ -146,20 +153,22 @@ def municipio():
 
 
 @pytest.fixture
-def projeto():
+def projeto(gerencia):
     """Projeto para testes (SUPER para evitar auto-aprovação)."""
     return ProjetoFactory(
         nome=f"Projeto {uuid4().hex[:8]}",
         fluxo="SUPER",
+        gerencia=gerencia,
     )
 
 
 @pytest.fixture
-def projeto_nao_super():
+def projeto_nao_super(gerencia):
     """Projeto NAO_SUPER para testes (auto-aprovação)."""
     return ProjetoFactory(
         nome=f"Projeto NAO_SUPER {uuid4().hex[:8]}",
         fluxo="NAO_SUPER",
+        gerencia=gerencia,
     )
 
 
@@ -558,7 +567,7 @@ class TestSolicitacaoEditFields:
 
 
 @pytest.fixture
-def formador_1():
+def formador_1(gerencia):
     """Formador 1 para testes."""
     cpf = str(uuid4().int % 10**11).zfill(11)
     user = UsuarioFactory(
@@ -570,12 +579,12 @@ def formador_1():
         last_name="Um",
         is_active=True,
     )
-    com_papel(user, "FORMADOR")
+    com_papel(user, "FORMADOR", gerencia)
     return user
 
 
 @pytest.fixture
-def formador_2():
+def formador_2(gerencia):
     """Formador 2 para testes."""
     cpf = str(uuid4().int % 10**11).zfill(11)
     user = UsuarioFactory(
@@ -587,12 +596,12 @@ def formador_2():
         last_name="Dois",
         is_active=True,
     )
-    com_papel(user, "FORMADOR")
+    com_papel(user, "FORMADOR", gerencia)
     return user
 
 
 @pytest.fixture
-def formador_3():
+def formador_3(gerencia):
     """Formador 3 para testes."""
     cpf = str(uuid4().int % 10**11).zfill(11)
     user = UsuarioFactory(
@@ -604,7 +613,7 @@ def formador_3():
         last_name="Tres",
         is_active=True,
     )
-    com_papel(user, "FORMADOR")
+    com_papel(user, "FORMADOR", gerencia)
     return user
 
 
@@ -1007,7 +1016,9 @@ class TestSolicitacaoEditCompraEligibility:
     ):
         """PATCH que troca o projeto para um par município+projeto SEM Compra é rejeitado (400)."""
         api_client.force_authenticate(user=usuario_owner)
-        projeto_sem_compra = ProjetoFactory(nome=f"Projeto sem compra {uuid4().hex[:8]}", fluxo="SUPER")
+        projeto_sem_compra = ProjetoFactory(
+            nome=f"Projeto sem compra {uuid4().hex[:8]}", fluxo="SUPER", gerencia=solicitacao_editavel.projeto.gerencia
+        )
 
         response = api_client.patch(
             f"/api/solicitacoes/{solicitacao_editavel.id}/",
@@ -1027,7 +1038,9 @@ class TestSolicitacaoEditCompraEligibility:
     ):
         """PATCH que troca o projeto para um par COM Compra registrada é permitido (200)."""
         api_client.force_authenticate(user=usuario_owner)
-        projeto_com_compra = ProjetoFactory(nome=f"Projeto com compra {uuid4().hex[:8]}", fluxo="SUPER")
+        projeto_com_compra = ProjetoFactory(
+            nome=f"Projeto com compra {uuid4().hex[:8]}", fluxo="SUPER", gerencia=solicitacao_editavel.projeto.gerencia
+        )
         self._make_compra(municipio, projeto_com_compra)
 
         response = api_client.patch(
@@ -1081,14 +1094,16 @@ class TestSolicitacaoEditCompraEligibility:
             observacoes="Observações originais",
         )
 
-    def _formador_livre(self):
-        """Formador sem setor e sem agenda: nunca gera conflito de disponibilidade."""
-        return UsuarioFactory(
+    def _formador_livre(self, gerencia):
+        """Formador da gerência do projeto e sem agenda: nunca gera conflito de disponibilidade."""
+        user = UsuarioFactory(
             username=f"formador_{uuid4().hex[:8]}",
             email=f"formador_{uuid4().hex[:8]}@test.com",
             cpf=str(uuid4().int % 10**11).zfill(11),
             is_active=True,
         )
+        com_papel(user, "FORMADOR", gerencia)
+        return user
 
     def _payload_da_tela(self, sol, formador, **troca):
         """O payload COMPLETO que o EditSolicitacaoPage envia por PATCH (novo horário: 10h-12h)."""
@@ -1105,6 +1120,8 @@ class TestSolicitacaoEditCompraEligibility:
             "local": "Local Original",
             "is_online": False,
             "extra_participants": {"formador_ids": [formador.id]},
+            # A tela manda a resposta: com formador avaliável a pergunta passa a valer (05/10/2026).
+            "pretende_avaliar_formador": False,
         }
         payload.update(troca)
         return payload
@@ -1118,7 +1135,7 @@ class TestSolicitacaoEditCompraEligibility:
 
         response = api_client.patch(
             f"/api/solicitacoes/{sol.id}/",
-            self._payload_da_tela(sol, self._formador_livre()),
+            self._payload_da_tela(sol, self._formador_livre(projeto.gerencia)),
             format="json",
         )
 
@@ -1134,7 +1151,7 @@ class TestSolicitacaoEditCompraEligibility:
 
         response = api_client.put(
             f"/api/solicitacoes/{sol.id}/",
-            self._payload_da_tela(sol, self._formador_livre()),
+            self._payload_da_tela(sol, self._formador_livre(projeto.gerencia)),
             format="json",
         )
 
@@ -1150,7 +1167,7 @@ class TestSolicitacaoEditCompraEligibility:
 
         response = api_client.patch(
             f"/api/solicitacoes/{sol.id}/",
-            self._payload_da_tela(sol, self._formador_livre(), municipio=outro_municipio.id),
+            self._payload_da_tela(sol, self._formador_livre(projeto.gerencia), municipio=outro_municipio.id),
             format="json",
         )
 
@@ -1165,12 +1182,14 @@ class TestSolicitacaoEditCompraEligibility:
     ):
         """Guarda: o payload completo trocando só o PROJETO para par sem Compra continua barrado."""
         sol = self._solicitacao_com_data_fixa(usuario_owner, municipio, projeto, tipo_evento)
-        outro_projeto = ProjetoFactory(nome=f"Projeto sem compra {uuid4().hex[:8]}", fluxo="SUPER")
+        outro_projeto = ProjetoFactory(
+            nome=f"Projeto sem compra {uuid4().hex[:8]}", fluxo="SUPER", gerencia=projeto.gerencia
+        )
         api_client.force_authenticate(user=usuario_owner)
 
         response = api_client.patch(
             f"/api/solicitacoes/{sol.id}/",
-            self._payload_da_tela(sol, self._formador_livre(), projeto=outro_projeto.id),
+            self._payload_da_tela(sol, self._formador_livre(projeto.gerencia), projeto=outro_projeto.id),
             format="json",
         )
 

@@ -270,6 +270,7 @@ describe('ApprovalsPage', () => {
 
   test.each([
     ['conta_alterada', 'Você alterou a conta de quem pediu'],
+    ['conta_alterada_pelo_autor', 'Quem pediu alterou a sua conta'],
     ['editada_pelo_ator', 'Você editou esta solicitação'],
   ] as const)('PR 10: decisao_impedida=%s sai sem checkbox e sem ações, com a Tag', async (motivo, tag) => {
     vi.mocked(listSolicitacoes).mockResolvedValue({

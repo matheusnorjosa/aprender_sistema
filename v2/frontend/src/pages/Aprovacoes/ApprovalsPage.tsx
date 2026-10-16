@@ -92,6 +92,7 @@ const { Title, Paragraph, Text } = Typography;
 const TAG_DA_DECISAO_IMPEDIDA: Record<DecisaoImpedida, string> = {
   propria: 'Sua solicitação',
   conta_alterada: 'Você alterou a conta de quem pediu',
+  conta_alterada_pelo_autor: 'Quem pediu alterou a sua conta',
   editada_pelo_ator: 'Você editou esta solicitação',
 };
 

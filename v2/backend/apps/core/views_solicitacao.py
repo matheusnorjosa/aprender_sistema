@@ -172,6 +172,7 @@ def _batch_response_schema(contador: str) -> dict[str, Any]:
                             "enum": [
                                 "self_approval_forbidden",
                                 "altered_account_approval_forbidden",
+                                "approver_account_altered_by_author_forbidden",
                                 "edited_by_approver_forbidden",
                                 "out_of_approval_scope",
                                 "availability_conflict",

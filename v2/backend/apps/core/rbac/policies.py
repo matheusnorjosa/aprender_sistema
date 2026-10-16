@@ -773,8 +773,9 @@ def can_admin_mutate_target(
                                 aprovadoras)
 
     O que segura a segregação (CP-02) sem a proteção por alvo: toda alteração de conta grava AuditLog
-    na mesma transação, a senha dada por outra pessoa liga `deve_trocar_senha`, e quem alterou a conta
-    do autor não decide as solicitações dele por 30 dias (PA-02, segregação por histórico).
+    na mesma transação, a senha dada por outra pessoa liga `deve_trocar_senha`, e por 30 dias quem
+    alterou a conta do autor não decide as solicitações dele, nem quem teve a conta alterada pelo autor
+    (PA-02, segregação por histórico, nos dois sentidos).
 
     `action` fica reservado para o épico #1656 (escopo por operação).
     """

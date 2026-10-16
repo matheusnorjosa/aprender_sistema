@@ -78,6 +78,7 @@ PACOTE_FINAL = frozenset(
 )
 
 ALTERED = "altered_account_approval_forbidden"
+ALTERED_BY_AUTHOR = "approver_account_altered_by_author_forbidden"
 EDITED = "edited_by_approver_forbidden"
 SELF = "self_approval_forbidden"
 
@@ -540,6 +541,83 @@ class TestSegregacaoPorHistorico:
         assert checks["PA-02 (segregação D2)"]["status"] == "FAIL"
         assert checks["PA-02 (segregação D2)"]["violations"] == 1
 
+    # D2 ao contrário: quem pediu alterou a conta de quem aprovaria (ex.: redefiniu a senha dela e
+    # entrou por ela para aprovar o próprio evento).
+    @pytest.mark.parametrize("aprovadora", ["outro DAT", "gerente g1"])
+    def test_d2_autor_redefiniu_a_senha_da_aprovadora_nao_decide(self, g19, g1, aprovadora):
+        autor = _dat(g19)
+        alvo = _dat(g19) if aprovadora == "outro DAT" else _gerente_g1(g1)
+        resp = _client(autor).patch(f"/api/usuarios-admin/{alvo.id}/", {"password": "NovaSenha!pr10x"}, format="json")
+        assert resp.status_code == 200, resp.content
+        Usuario.objects.filter(pk=alvo.pk).update(deve_trocar_senha=False)  # a troca obrigatória feita
+        alvo.refresh_from_db()
+        sol = _pendente_super(g1, autor=autor)
+
+        for resp in (_approve(alvo, sol), _reject(alvo, sol)):
+            assert resp.status_code == 403, resp.data
+            assert resp.data["code"] == ALTERED_BY_AUTHOR
+        for rota in ("batch-approve", "batch-reject"):
+            resp = _client(alvo).post(f"/api/solicitacoes/{rota}/", {"ids": [sol.id]}, format="json")
+            assert resp.data["errors"][0]["code"] == ALTERED_BY_AUTHOR
+        sol.refresh_from_db()
+        assert sol.status == "pendente"
+        assert _decisoes(sol) == 0
+
+    @pytest.mark.parametrize(("dias", "bloqueia"), [(29, True), (31, False)])
+    def test_d2_ao_contrario_janela_de_30_dias(self, g19, g1, dias, bloqueia):
+        autor, aprovadora = _dat(g19), _dat(g19)
+        agora = timezone.now()
+        _alterou(autor, aprovadora, quando=agora - timedelta(days=dias))
+        resp = _approve(aprovadora, _pendente_super(g1, autor=autor, created_at=agora))
+        assert (resp.status_code == 403) is bloqueia, resp.data
+
+    def test_d2_ao_contrario_superusuario_decide_e_marca(self, root, g19, g1):
+        autor = _dat(g19)
+        _alterou(autor, root)
+        sol = _pendente_super(g1, autor=autor)
+        assert _approve(root, sol).status_code == 200
+        log = AuditLog.objects.get(action="APPROVE", details__solicitacao_id=sol.id)
+        assert log.details["conta_do_ator_alterada_pelo_autor"] is True
+        assert log.details["conta_alterada_pelo_ator"] is False
+
+    def test_d2_ao_contrario_lista_e_home(self, g19, g1):
+        autor, aprovadora = _dat(g19), _dat(g19)
+        _alterou(autor, aprovadora)
+        bloqueada = _pendente_super(g1, autor=autor)
+        _pendente_super(g1)
+        resp = _client(aprovadora).get("/api/solicitacoes/?flow=SUPER&status=pendente&page_size=50")
+        marcas = {item["id"]: item["decisao_impedida"] for item in resp.data["results"]}
+        assert marcas[bloqueada.id] == "conta_alterada_pelo_autor"
+        assert _client(aprovadora).get("/api/stats/home/").data["pending_approvals"] == 1
+
+    def test_d2_ao_contrario_numero_de_queries_constante(self, g19, g1):
+        aprovadora = _dat(g19)
+
+        def consultas(n: int) -> int:
+            autores = [UsuarioFactory() for _ in range(n)]
+            for autor in autores:
+                _alterou(autor, aprovadora)
+            ids = [_pendente_super(g1, autor=a).id for a in autores]
+            cache.clear()
+            get_user_functional_permissions(aprovadora)
+            with CaptureQueriesContext(connection) as ctx:
+                solicitacao_approval.decisoes_impedidas(aprovadora, Solicitacao.objects.filter(id__in=ids))
+            return len(ctx.captured_queries)
+
+        assert consultas(1) == consultas(8)
+
+    def test_compliance_audit_acusa_d2_ao_contrario(self, g19, g1):
+        autor, aprovadora = _dat(g19), _dat(g19)
+        sol = _pendente_super(g1, autor=autor)
+        assert _approve(aprovadora, sol).status_code == 200
+        # Alteração registrada antes da decisão, como se a trava tivesse falhado.
+        _alterou(autor, aprovadora, quando=timezone.now() - timedelta(days=1))
+        out = StringIO()
+        call_command("compliance_audit", "--format=json", stdout=out)
+        checks = {c["rule"]: c for c in json.loads(out.getvalue())["checks"]}
+        assert checks["PA-02 (segregação D2)"]["status"] == "FAIL"
+        assert checks["PA-02 (segregação D2)"]["violations"] == 1
+
 
 class TestPa07:
     def test_segregacao_conta_alterada_bloqueia_decisao_existe(self):
@@ -610,6 +688,35 @@ class TestQuemEditouNaoDecide:
         )
         resp = _approve(dat, sol)
         assert resp.status_code == 403 and resp.data["code"] == EDITED
+
+    @pytest.mark.parametrize(
+        ("alteracao_dias", "bloqueia"),
+        [
+            (-10, True),  # 10 dias antes da edição: fantoche
+            (-29, True),
+            (-31, False),  # fora dos 30 dias anteriores à edição
+            (1, False),  # depois da edição: quem editou não era fantoche
+            (5, False),  # hoje (a edição foi há 5 dias)
+        ],
+    )
+    def test_fantoche_so_conta_alteracao_nos_30_dias_antes_da_edicao(self, g19, g1, alteracao_dias, bloqueia):
+        dat = _dat(g19)
+        editor = UsuarioFactory()
+        agora = timezone.now()
+        editada_em = agora - timedelta(days=5)
+        sol = _pendente_super(g1, created_at=agora - timedelta(days=120))
+        AuditLog.objects.create(
+            usuario=editor,
+            action=AuditLog.Action.UPDATE,
+            model_name="Solicitacao",
+            details={"solicitacao_id": sol.id, "changed_fields": {"inicio": {"old": "a", "new": "b"}}},
+            created_at=editada_em,
+        )
+        _alterou(dat, editor, quando=editada_em + timedelta(days=alteracao_dias))
+        resp = _approve(dat, sol)
+        assert (resp.status_code == 403) is bloqueia, resp.data
+        if bloqueia:
+            assert resp.data["code"] == EDITED
 
     def test_superusuario_decide_e_marca_editada_pelo_ator(self, root, g1):
         sol = _pendente_super(g1)

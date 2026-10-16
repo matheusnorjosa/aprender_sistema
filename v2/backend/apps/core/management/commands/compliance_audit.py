@@ -106,40 +106,45 @@ class Command(BaseCommand):
         # PA-02 (segregação D2, PR 10): quem alterou a conta do autor não decide por 30 dias
         # ================================================================
         # A janela conta da decisão ou da criação da solicitação, o que vier antes (decisão do
-        # dono de 16/10). Só contam decisões gravadas com a trava (`conta_alterada_pelo_ator` no
+        # dono de 16/10). Vale nos dois sentidos: o ator alterou a conta do autor, ou o autor alterou
+        # a conta do ator. Só contam decisões gravadas com a trava (`conta_alterada_pelo_ator` no
         # details); o break-glass do superuser vem com a marca True e não conta.
         from apps.core.services.solicitacao_approval import ACOES_QUE_ALTERAM_CONTA, JANELA_SEGREGACAO
 
         d2_violations = 0
-        for log in decision_logs.filter(details__conta_alterada_pelo_ator=False).exclude(usuario_id=None):
+        for log in decision_logs.filter(details__has_key="conta_alterada_pelo_ator").exclude(usuario_id=None):
+            details = log.details or {}
             sol = (
-                Solicitacao.objects.filter(id=(log.details or {}).get("solicitacao_id"))
-                .values("usuario_id", "created_at")
-                .first()
+                Solicitacao.objects.filter(id=details.get("solicitacao_id")).values("usuario_id", "created_at").first()
             )
             if sol is None:
                 continue
-            corte = min(log.created_at, sol["created_at"]) - JANELA_SEGREGACAO
-            if AuditLog.objects.filter(
-                usuario_id=log.usuario_id,
+            alteracoes = AuditLog.objects.filter(
                 model_name="Usuario",
                 action__in=ACOES_QUE_ALTERAM_CONTA,
-                details__target_user_id=sol["usuario_id"],
-                created_at__gte=corte,
+                created_at__gte=min(log.created_at, sol["created_at"]) - JANELA_SEGREGACAO,
                 created_at__lte=log.created_at,
-            ).exists():
+            )
+            ator_alterou_autor = not details.get("conta_alterada_pelo_ator") and (
+                alteracoes.filter(usuario_id=log.usuario_id, details__target_user_id=sol["usuario_id"]).exists()
+            )
+            autor_alterou_ator = not details.get("conta_do_ator_alterada_pelo_autor") and (
+                sol["usuario_id"] != log.usuario_id
+                and alteracoes.filter(usuario_id=sol["usuario_id"], details__target_user_id=log.usuario_id).exists()
+            )
+            if ator_alterou_autor or autor_alterou_ator:
                 d2_violations += 1
 
         report["checks"].append(
             {
                 "rule": "PA-02 (segregação D2)",
                 "description": (
-                    "No non-superuser decides a solicitation whose author's account they altered in the "
-                    "30 days before the decision or the creation"
+                    "No non-superuser decides a solicitation whose author's account they altered, or whose "
+                    "author altered theirs, in the 30 days before the decision or the creation"
                 ),
                 "status": "PASS" if d2_violations == 0 else "FAIL",
                 "violations": d2_violations,
-                "details": f"Found {d2_violations} decisions on accounts altered by the approver",
+                "details": f"Found {d2_violations} decisions with the account of one side altered by the other",
             }
         )
 

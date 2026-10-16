@@ -403,13 +403,12 @@ class UsuarioAdminViewSet(viewsets.ModelViewSet):
 
     def get_object(self) -> Usuario:
         """
-        M07-01/M07-02 (#1616/#1617): guard ator×alvo nas ações de MUTAÇÃO. Um
-        não-superuser não toma conta APROVADORA (senha/e-mail/is_active/delete/
-        anonimizar) — tomar a conta viabiliza auto-aprovação (viola CP-02) → 403.
-
-        Leitura (retrieve/list) segue livre: aprovador NÃO é Tier-0 (o alvo
-        superuser já vira 404-invisível em `get_queryset`, P0-0). SSOT da regra:
-        `can_admin_mutate_target`.
+        M07-01/M07-02 (#1616/#1617; S4 do PR 10): guard ator×alvo nas ações de MUTAÇÃO
+        (senha/e-mail/is_active/delete/anonimizar) → 403. SSOT da regra:
+        `can_admin_mutate_target`. Desde a decisão do dono de 16/10/2026 só a conta de
+        superusuário é protegida, e ela já vira 404-invisível em `get_queryset` (P0-0):
+        o DAT administra todas as demais, inclusive as aprovadoras, com AuditLog e troca
+        obrigatória da senha redefinida. O guard fica como defesa em profundidade.
         """
         obj = super().get_object()
         mutating = {"update", "partial_update", "destroy", "anonimizar"}

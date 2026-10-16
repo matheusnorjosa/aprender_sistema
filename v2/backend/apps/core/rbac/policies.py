@@ -763,34 +763,24 @@ def can_admin_mutate_target(
     action: str | None = None,
 ) -> bool:
     """
-    SSOT ator×alvo (M07-01/M07-02, #1616/#1617): um admin não-superuser pode
-    mutar `target` (reset de senha, e-mail, is_active, delete/anonimizar)?
+    SSOT ator×alvo (M07-01/M07-02, #1616/#1617; S4 do PR 10): um admin não-superuser pode
+    mutar `target` (senha, cadastro, is_active, delete/anonimizar)?
 
-    Regra (fail-secure):
-    - superuser-ator       → True  (bypass total; mantém P0-0/P0-1)
-    - target == actor      → True  (self-service nunca é escalonamento)
-    - target superuser     → False (Tier-0; a queryset da view já dá 404 antes)
-    - target APROVADOR     → False (tomar a conta viabiliza auto-aprovação de
-                                    solicitações, violando CP-02). "Aprovador" =
-                                    autoridade de aprovação — Gerente da
-                                    Superintendência OU Assistente Administrativo
-                                    do Controle (SSOT `access_solicitation_approvals`)
-    - demais (conta comum) → True
+    Regra (decisão do dono de 16/10/2026, que substitui a de 14/10 e a proteção da aprovadora do M07):
+    - superuser-ator   → True  (bypass total; mantém P0-0/P0-1)
+    - target superuser → False (Tier-0; a queryset da view já dá 404 antes)
+    - demais           → True  (o DAT administra todas as contas: outro DAT, Apoio, Controle e as
+                                aprovadoras)
 
-    `action` fica reservado para o épico #1656 (escopo por operação); hoje a
-    invariante é agnóstica à ação — qualquer mutação sobre alvo mais privilegiado
-    é barrada.
+    O que segura a segregação (CP-02) sem a proteção por alvo: toda alteração de conta grava AuditLog
+    na mesma transação, a senha dada por outra pessoa liga `deve_trocar_senha`, e quem alterou a conta
+    do autor não decide as solicitações dele por 30 dias (PA-02, segregação por histórico).
+
+    `action` fica reservado para o épico #1656 (escopo por operação).
     """
     if getattr(actor, "is_superuser", False):
         return True
-    actor_pk = getattr(actor, "pk", None)
-    if actor_pk is not None and actor_pk == getattr(target, "pk", None):
-        return True
-    if getattr(target, "is_superuser", False):
-        return False
-    if user_has_policy(target, "access_solicitation_approvals"):
-        return False
-    return True
+    return not getattr(target, "is_superuser", False)
 
 
 __all__ = [

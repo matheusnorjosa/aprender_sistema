@@ -23,7 +23,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import EquipeGerencia, Gerencia, Solicitacao, Usuario
+from apps.core.models import AuditLog, EquipeGerencia, Gerencia, Solicitacao, Usuario
 from apps.core.tests.factories import (
     MunicipioFactory,
     ProjetoFactory,
@@ -183,16 +183,17 @@ def test_asst_admin_controle_e_superuser_continuam_aprovando(kwargs):
     assert _approve(user, sol).status_code == 200
 
 
-def test_dat_nao_altera_a_conta_da_aprovadora(g1):
+def test_dat_altera_a_conta_da_aprovadora_com_registro(g1):
+    """S4 do PR 10 (decisão do dono de 16/10): o DAT altera todas as contas menos a de superusuário."""
     aprovadora = _aprovadora(g1)
-    original = aprovadora.email
     dat = UsuarioFactory(groups=["DAT"])
 
-    resp = _client(dat).patch(f"/api/usuarios-admin/{aprovadora.id}/", {"email": "tomada@example.com"}, format="json")
+    resp = _client(dat).patch(f"/api/usuarios-admin/{aprovadora.id}/", {"email": "nova@example.com"}, format="json")
 
-    assert resp.status_code == 403
+    assert resp.status_code == 200
     aprovadora.refresh_from_db()
-    assert aprovadora.email == original
+    assert aprovadora.email == "nova@example.com"
+    assert AuditLog.objects.filter(usuario=dat, model_name="Usuario", details__target_user_id=aprovadora.id).exists()
 
 
 def test_lista_super_pendente_mostra_outras_gerencias(g1, outra_gerencia):

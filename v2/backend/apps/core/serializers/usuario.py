@@ -294,11 +294,10 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
                 {"detail": "Você não tem permissão para alterar uma conta de superusuário."}
             )
 
-        # M07-01/M07-02 (#1616/#1617): defense-in-depth ator×alvo — um não-superuser
-        # não muta conta APROVADORA (tomar a conta viabiliza auto-aprovação de
-        # solicitações, violando CP-02). A view (`UsuarioAdminViewSet.get_object`)
-        # já barra com 403 antes daqui; esta checagem protege reuso do serializer
-        # fora daquela view. SSOT: `can_admin_mutate_target`.
+        # M07-01/M07-02 (#1616/#1617; S4 do PR 10): defense-in-depth ator×alvo — SSOT
+        # `can_admin_mutate_target` (desde 16/10/2026 só a conta de superusuário é protegida).
+        # A view (`UsuarioAdminViewSet.get_object`) barra antes daqui; esta checagem protege
+        # reuso do serializer fora daquela view.
         if instance is not None and request_user is not None and not can_admin_mutate_target(request_user, instance):
             raise serializers.ValidationError({"detail": "Você não tem permissão para alterar esta conta."})
 

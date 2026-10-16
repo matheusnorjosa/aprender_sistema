@@ -181,9 +181,24 @@ def test_peer_publico_ignora_xff():
 
 
 @override_settings(NUM_PROXIES=2)
-def test_menos_entradas_que_num_proxies_usa_remote_addr():
-    """Com NPM → nginx o XFF chega com 2 entradas; 1 só não veio pelos dois saltos confiáveis."""
-    assert get_client_ip(_req(xff="127.0.0.1", remote_addr="172.16.0.2")) == "172.16.0.2"
+def test_cadeia_de_uma_entrada_vinda_do_nginx_usa_a_entrada():
+    """Revisão do F7: se o NPM mandar só o X-Real-IP, o XFF chega com 1 entrada, a que o nginx do
+    frontend anexou (o cliente, já resolvido pelo realip). Devolver o REMOTE_ADDR juntaria todo mundo
+    no IP do container do nginx (throttle e bloqueio de login num balde só). Mesma regra do DRF
+    (`addrs[-min(NUM_PROXIES, len)]`), que vale desde antes do F7."""
+    assert get_client_ip(_req(xff="203.0.113.9", remote_addr="172.18.0.5")) == "203.0.113.9"
+
+
+@override_settings(NUM_PROXIES=2)
+def test_cadeia_de_uma_entrada_middleware_e_throttle_veem_o_mesmo_ip():
+    from django.http import HttpResponse
+    from rest_framework.throttling import AnonRateThrottle
+
+    from apps.core.middleware import ForwardedForConfiavelMiddleware
+
+    req = _req(xff="203.0.113.9", remote_addr="172.18.0.5")
+    ForwardedForConfiavelMiddleware(lambda _r: HttpResponse())(req)
+    assert AnonRateThrottle().get_ident(req) == get_client_ip(req) == "203.0.113.9"
 
 
 @override_settings(NUM_PROXIES=2, TRUSTED_PROXY_NETWORKS=["10.9.0.0/16"])

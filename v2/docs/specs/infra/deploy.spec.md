@@ -216,7 +216,9 @@ segundo proxy) ou o que o NPM repassa exige rever `NUM_PROXIES` **e** o `set_rea
 **Proxy confiável (F7 do scan de segurança, 16/10/2026).** O `X-Forwarded-For` só vale quando quem conecta no
 gunicorn (`REMOTE_ADDR`) está em `TRUSTED_PROXY_NETWORKS` (env, lista de CIDRs separada por vírgula; padrão
 `127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16`, as faixas do `set_real_ip_from` do nginx do frontend,
-que conecta pela rede Docker) e traz ao menos `NUM_PROXIES` entradas; senão vale o `REMOTE_ADDR`. O
+que conecta pela rede Docker); senão vale o `REMOTE_ADDR`. Com menos de `NUM_PROXIES` entradas vale a mais à
+esquerda, como no `get_ident` do DRF: com 1 entrada (o NPM mandou só o `X-Real-IP`) é a que o nginx anexou, o
+cliente; devolver o `REMOTE_ADDR` juntaria todo mundo no IP do container do nginx (throttle e bloqueio num balde). O
 `ForwardedForConfiavelMiddleware` (primeiro do `MIDDLEWARE`) aplica a mesma regra ao `request.META`, para o throttle
 do DRF (`get_ident`) ver o mesmo IP que o bloqueio de login, a auditoria e os portões de `/metrics` e
 `/healthz/detailed/`. A cadeia NPM → nginx → gunicorn não muda: o par é o nginx (rede Docker) e o cabeçalho chega

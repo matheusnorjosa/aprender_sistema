@@ -22,8 +22,10 @@ so ``NUM_PROXIES = 2``.
 
 F7 (scan 16/10/2026): o ``X-Forwarded-For`` só vale quando quem conecta (``REMOTE_ADDR``) está em
 ``settings.TRUSTED_PROXY_NETWORKS`` (padrão: as faixas privadas da rede Docker, as mesmas do
-``set_real_ip_from`` do nginx do frontend) e traz pelo menos ``NUM_PROXIES`` entradas. Fora disso
-vale o ``REMOTE_ADDR``: quem alcança o gunicorn direto não escolhe o IP pelo cabeçalho.
+``set_real_ip_from`` do nginx do frontend). Fora disso vale o ``REMOTE_ADDR``: quem alcança o
+gunicorn direto não escolhe o IP pelo cabeçalho. Com menos de ``NUM_PROXIES`` entradas vale a mais
+à esquerda, como no DRF: com 1 entrada é a que o nginx do frontend anexou (o NPM mandou só o
+X-Real-IP), e o ``REMOTE_ADDR`` juntaria todo mundo no IP do container do nginx.
 ``ForwardedForConfiavelMiddleware`` aplica a mesma regra ao ``request.META`` para o throttle do DRF
 (``get_ident``), que lê o cabeçalho por conta própria.
 
@@ -62,17 +64,14 @@ def _proxy_confiavel(remote_addr: str) -> bool:
 def _xff_confiavel(meta: Any) -> list[str] | None:
     """Entradas do X-Forwarded-For, se ele merece confiança; None se não.
 
-    Merece quando quem conecta é proxy confiável e há ao menos `NUM_PROXIES` entradas (com menos,
-    a requisição não passou por todos os saltos confiáveis e a entrada lida seria a do cliente).
+    Merece quando quem conecta é proxy confiável. Quantas entradas vieram não importa: com menos de
+    `NUM_PROXIES`, `get_client_ip` lê a mais à esquerda, como o `get_ident` do DRF.
     """
     xff = meta.get("HTTP_X_FORWARDED_FOR")
     if not xff or not _proxy_confiavel(meta.get("REMOTE_ADDR") or ""):
         return None
     addrs = [addr.strip() for addr in xff.split(",") if addr.strip()]
-    num_proxies = getattr(settings, "NUM_PROXIES", 0)
-    if not addrs or (num_proxies is not None and len(addrs) < num_proxies):
-        return None
-    return addrs
+    return addrs or None
 
 
 def descartar_xff_nao_confiavel(meta: Any) -> None:
@@ -100,4 +99,4 @@ def get_client_ip(request: HttpRequest | Request) -> str:
     # NUM_PROXIES=None => legacy "trust the whole chain" (dev only, discouraged).
     if num_proxies is None:
         return ",".join(addrs)
-    return addrs[-num_proxies]
+    return addrs[-min(num_proxies, len(addrs))]

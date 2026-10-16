@@ -28,11 +28,16 @@ class ParticipationNestedSerializer(serializers.ModelSerializer):
     """
 
     usuario = UserSlimSerializer(read_only=True)
+    guest_email = serializers.SerializerMethodField()
     email = serializers.SerializerMethodField()
 
     class Meta:
         model = Participation
         fields = ("usuario", "guest_email", "guest_nome", "email", "role", "ch_horas", "observacao")
+
+    def get_guest_email(self, obj: Participation) -> str | None:
+        # S5: o convidado sem conta também pode ter o e-mail de reserva ou um e-mail com CPF.
+        return email_sem_cpf(getattr(obj, "guest_email", None))
 
     def get_email(self, obj: Participation) -> str | None:
         user_email = getattr(getattr(obj, "usuario", None), "email", None)

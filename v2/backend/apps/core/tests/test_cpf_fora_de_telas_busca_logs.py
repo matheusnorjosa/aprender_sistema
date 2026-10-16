@@ -184,6 +184,13 @@ def cenario():
     sem_email.email = f"{sem_email.cpf}@placeholder.local"
     sem_email.save(update_fields=["email"])
     Participation.objects.create(solicitacao=com_coord, usuario=sem_email, role=Participation.Role.FORMADOR)
+    # Convidados sem conta: um com o e-mail de reserva e outro com e-mail que leva o CPF.
+    Participation.objects.create(
+        solicitacao=sem_coord, guest_email=f"{_cpf()}@placeholder.local", role=Participation.Role.FORMADOR
+    )
+    Participation.objects.create(
+        solicitacao=com_coord, guest_email=f"{_cpf()}@example.invalid", role=Participation.Role.FORMADOR
+    )
     # Linha da timeline do detalhe feita por quem não tem nome.
     AuditLog.objects.create(
         usuario=criador_sem_nome,
@@ -505,6 +512,21 @@ def test_meus_eventos_nao_levam_cpf_de_co_participante_sem_nome():
     assert resp.status_code == 200, resp.content
     corpo = resp.content.decode()
     assert f"Usuario #{colega_sem_nome.id}" in corpo
+    assert not _ONZE_DIGITOS.search(corpo), corpo
+
+
+def test_meus_eventos_nao_levam_cpf_de_convidado_sem_conta():
+    eu = _conta(nome="Ana", sobrenome="Formadora", groups=["Formador"])
+    s = SolicitacaoFactory(status="aprovado", inicio=timezone.now() + timedelta(days=5))
+    Participation.objects.create(solicitacao=s, usuario=eu, role=Participation.Role.FORMADOR)
+    for email in (f"{_cpf()}@placeholder.local", f"{_cpf()}@example.invalid"):
+        Participation.objects.create(solicitacao=s, guest_email=email, role=Participation.Role.FORMADOR)
+
+    resp = _client(eu).get("/api/me/events/")
+
+    assert resp.status_code == 200, resp.content
+    corpo = resp.content.decode()
+    assert "Ana Formadora" in corpo
     assert not _ONZE_DIGITOS.search(corpo), corpo
 
 

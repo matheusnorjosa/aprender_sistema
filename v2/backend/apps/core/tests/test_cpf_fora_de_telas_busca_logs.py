@@ -371,8 +371,16 @@ def test_access_log_do_nginx_nao_grava_a_query_nem_o_referer():
     fmt = re.search(rf"log_format\s+{m.group(1)}\s+(?P<corpo>[^;]*);", conf)
     assert fmt, f"log_format {m.group(1)} não declarado"
     variaveis = set(re.findall(r"\$(\w+)", fmt.group("corpo")))
-    assert "uri" in variaveis
-    assert not variaveis & {"request", "request_uri", "args", "query_string", "http_referer"}, variaveis
+    # `$uri` vira /index.html nas rotas da SPA (try_files): o caminho sai do pedido original.
+    assert "caminho_sem_query" in variaveis
+    assert not variaveis & {"uri", "request", "request_uri", "args", "query_string", "http_referer"}, variaveis
+    mapa = re.search(
+        r"map\s+\$request_uri\s+\$caminho_sem_query\s*\{\s*\"~(?P<regex>[^\"]+)\"\s+\$(?P<grupo>\w+);", conf
+    )
+    assert mapa, "o caminho sem a query não sai de um map sobre $request_uri"
+    cpf = _cpf()
+    casou = re.match(mapa.group("regex").replace("(?<", "(?P<"), f"/usuarios?busca={cpf}")
+    assert casou and casou.group(mapa.group("grupo")) == "/usuarios"
 
 
 def test_criar_solicitacao_loga_user_id_sem_username(caplog):

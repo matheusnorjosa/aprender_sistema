@@ -242,13 +242,27 @@ def _editadas_pelo_ator(
     alteraram_a_minha: dict[int, datetime],
 ) -> set[int]:
     """Quem editou não decide: ids de `cortes` em que um editor ligado a `user` mudou campo material
-    depois do último APPROVE, ou desde a criação. Até 2 consultas.
+    depois do último APPROVE, ou desde a criação. Até 3 consultas.
 
     O editor é `user`, uma conta que ele alterou nos 30 dias anteriores à edição (o fantoche: só conta
-    a alteração em [edição − 30 dias, edição]; a feita depois não faz a edição virar do ator), ou quem
+    a alteração em [edição − 30 dias, edição]; a feita depois não faz a edição virar do ator), quem
     redefiniu a senha de `user` desde o corte da solicitação (o fantoche ao contrário: o editor redefine
-    a senha da aprovadora e decide pela conta dela).
+    a senha da aprovadora e decide pela conta dela), ou uma conta alterada, nos 30 dias anteriores à
+    edição, por quem redefiniu a senha de `user` desde o corte (dois fantoches: A edita pela conta de um
+    e decide pela de outro).
     """
+    alteradores = set(alteraram_a_minha) - {user.pk}
+    # {editor: [(quem redefiniu a senha de `user` e alterou a conta do editor, quando)]}
+    editores_alterados: dict[int, list[tuple[int, datetime]]] = {}
+    if alteradores:
+        for alterador_id, alvo_id, alterada_em in AuditLog.objects.filter(
+            model_name="Usuario",
+            action__in=ACOES_QUE_ALTERAM_CONTA,
+            usuario_id__in=alteradores,
+            created_at__gte=min(cortes.values()),
+        ).values_list("usuario_id", "details__target_user_id", "created_at"):
+            if isinstance(alvo_id, int) and alvo_id != user.pk:
+                editores_alterados.setdefault(alvo_id, []).append((alterador_id, alterada_em))
     fantoche = AuditLog.objects.alias(alvo=KeyTextTransform("target_user_id", "details")).filter(
         usuario_id=user.pk,
         model_name="Usuario",
@@ -261,11 +275,16 @@ def _editadas_pelo_ator(
         AuditLog.objects.filter(
             model_name="Solicitacao",
             action=AuditLog.Action.UPDATE,
-            usuario_id__in={user.pk, *alteradas, *alteraram_a_minha},
+            usuario_id__in={user.pk, *alteradas, *alteraram_a_minha, *editores_alterados},
             details__changed_fields__has_any_keys=list(CAMPOS_MATERIAIS_NO_AUDITLOG),
         )
         .annotate(eh_fantoche=Exists(fantoche))
-        .filter(Q(usuario_id=user.pk) | Q(eh_fantoche=True) | Q(usuario_id__in=list(alteraram_a_minha)))
+        .filter(
+            Q(usuario_id=user.pk)
+            | Q(eh_fantoche=True)
+            | Q(usuario_id__in=list(alteraram_a_minha))
+            | Q(usuario_id__in=list(editores_alterados))
+        )
         .order_by()
         .values_list("details__solicitacao_id", "created_at", "usuario_id", "eh_fantoche")
     )
@@ -274,8 +293,13 @@ def _editadas_pelo_ator(
         if sol_id not in cortes:
             continue
         if editor_id != user.pk and not eh_fantoche:
+            corte = cortes[sol_id]
             alterou_a_minha = alteraram_a_minha.get(editor_id)
-            if alterou_a_minha is None or alterou_a_minha < cortes[sol_id]:
+            dois_fantoches = any(
+                quando - JANELA_SEGREGACAO <= alterada_em <= quando and alteraram_a_minha[alterador_id] >= corte
+                for alterador_id, alterada_em in editores_alterados.get(editor_id, [])
+            )
+            if (alterou_a_minha is None or alterou_a_minha < corte) and not dois_fantoches:
                 continue
         if sol_id not in candidatas or quando > candidatas[sol_id]:
             candidatas[sol_id] = quando

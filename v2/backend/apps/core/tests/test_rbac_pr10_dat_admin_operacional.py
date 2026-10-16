@@ -979,6 +979,88 @@ class TestQuemEditouNaoDecide:
 
         assert consultas(1) == consultas(8) == (consultas(1)[0], {EDITED})
 
+    # Dois fantoches do lado do editor: A altera a conta de P e redefine a senha da aprovadora G, edita
+    # pela conta de P e decide pela de G. Nenhum dos dois alterou a conta do outro.
+    def test_mesma_pessoa_alterou_o_editor_e_a_aprovadora_trava_a_decisao(self, g19, g1):
+        a, editor, aprovadora = _dat(g19), _dat(g19), _gerente_g1(g1)
+        _alterou(a, editor)
+        _alterou(a, aprovadora, action=AuditLog.Action.RESET_PASSWORD)
+        sol = _pendente_super(g1)
+        assert _editar(editor, sol, {"inicio": (sol.inicio + timedelta(hours=1)).isoformat()}).status_code == 200
+
+        for resp in (_approve(aprovadora, sol), _reject(aprovadora, sol)):
+            assert resp.status_code == 403, resp.data
+            assert resp.data["code"] == EDITED
+        for rota in ("batch-approve", "batch-reject"):
+            resp = _client(aprovadora).post(f"/api/solicitacoes/{rota}/", {"ids": [sol.id]}, format="json")
+            assert resp.data["errors"][0]["code"] == EDITED
+        sol.refresh_from_db()
+        assert sol.status == "pendente"
+        assert _decisoes(sol) == 0
+        # Quem não teve a senha redefinida por A decide.
+        assert _approve(_dat(g19), sol).status_code == 200
+
+    @pytest.mark.parametrize(
+        ("alteracao_do_editor_dias", "senha_da_aprovadora_dias", "bloqueia"),
+        [
+            (-10, -1, True),
+            (1, -1, False),  # A alterou a conta do editor depois da edição: o editor não era fantoche
+            (-31, -1, False),  # fora dos 30 dias anteriores à edição
+            (-10, -31, False),  # senha da aprovadora fora da janela da solicitação
+        ],
+    )
+    def test_mesma_pessoa_alterou_o_editor_e_a_aprovadora_janela(
+        self, g19, g1, alteracao_do_editor_dias, senha_da_aprovadora_dias, bloqueia
+    ):
+        a, editor, aprovadora = _dat(g19), UsuarioFactory(), _gerente_g1(g1)
+        agora = timezone.now()
+        editada_em = agora - timedelta(days=2)
+        sol = _pendente_super(g1, created_at=agora - timedelta(days=3))
+        AuditLog.objects.create(
+            usuario=editor,
+            action=AuditLog.Action.UPDATE,
+            model_name="Solicitacao",
+            details={"solicitacao_id": sol.id, "changed_fields": {"inicio": {"old": "a", "new": "b"}}},
+            created_at=editada_em,
+        )
+        _alterou(a, editor, quando=editada_em + timedelta(days=alteracao_do_editor_dias))
+        _alterou(
+            a,
+            aprovadora,
+            quando=agora - timedelta(days=3) + timedelta(days=senha_da_aprovadora_dias),
+            action=AuditLog.Action.RESET_PASSWORD,
+        )
+        resp = _approve(aprovadora, sol)
+        assert (resp.status_code == 403) is bloqueia, resp.data
+        if bloqueia:
+            assert resp.data["code"] == EDITED
+
+    def test_mesma_pessoa_alterou_o_editor_e_a_aprovadora_numero_de_queries_constante(self, g19, g1):
+        aprovadora = _gerente_g1(g1)
+
+        def consultas(n: int) -> tuple[int, set[str]]:
+            ids = []
+            for _ in range(n):
+                a, editor = UsuarioFactory(), UsuarioFactory()
+                _alterou(a, editor)
+                _alterou(a, aprovadora, action=AuditLog.Action.RESET_PASSWORD)
+                sol = _pendente_super(g1)
+                AuditLog.objects.create(
+                    usuario=editor,
+                    action=AuditLog.Action.UPDATE,
+                    model_name="Solicitacao",
+                    details={"solicitacao_id": sol.id, "changed_fields": {"fim": {"old": "a", "new": "b"}}},
+                )
+                ids.append(sol.id)
+            cache.clear()
+            get_user_functional_permissions(aprovadora)
+            with CaptureQueriesContext(connection) as ctx:
+                impedidas = solicitacao_approval.decisoes_impedidas(aprovadora, Solicitacao.objects.filter(id__in=ids))
+            assert set(impedidas) == set(ids)
+            return len(ctx.captured_queries), set(impedidas.values())
+
+        assert consultas(1) == consultas(8) == (consultas(1)[0], {EDITED})
+
     def test_superusuario_decide_e_marca_editada_pelo_ator(self, root, g1):
         sol = _pendente_super(g1)
         assert _editar(root, sol, {"municipio": MunicipioFactory().id}).status_code == 200

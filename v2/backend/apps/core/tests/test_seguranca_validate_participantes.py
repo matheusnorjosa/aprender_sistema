@@ -218,3 +218,32 @@ class TestGateEEscopo:
         resp = _post(dat, _payload(cenario, {"formadores": [de_fora.email]}))
         assert resp.status_code == 200, resp.content
         assert resp.json()["canonical"]["usuarios"]["formadores_ids"] == [de_fora.id]
+
+    def test_com_o_projeto_so_a_gerencia_dele_resolve(self, cenario):
+        """P9-5 no F6: a coordenadora atua em A e em B, mas o evento é de um projeto de A; o formador
+        que só está em B não entra (sem o projeto, `scope_usuarios_por_gerencia` aceitaria os dois)."""
+        gerencia_b = GerenciaFactory()
+        com_papel(cenario["coord"], "COORDENADOR", gerencia_b)
+        so_de_b = UsuarioFactory(email="so.de.b@example.invalid")
+        com_papel(so_de_b, "FORMADOR", gerencia_b)
+        resp = _post(cenario["coord"], _payload(cenario, {"formadores": [so_de_b.email, cenario["formador"].email]}))
+        assert resp.status_code == 200, resp.content
+        usuarios = resp.json()["canonical"]["usuarios"]
+        assert usuarios["formadores_ids"] == [cenario["formador"].id]
+        assert usuarios["formadores_not_found"] == [so_de_b.email]
+
+    def test_projeto_de_gerencia_onde_quem_chama_nao_atua_nao_resolve_ninguem(self, cenario):
+        """Fail-closed: projeto de uma gerência onde a coordenadora não tem papel; nem o formador
+        dessa gerência nem o da gerência dela são resolvidos."""
+        gerencia_c = GerenciaFactory()
+        formador_c = UsuarioFactory(email="formador.c@example.invalid")
+        com_papel(formador_c, "FORMADOR", gerencia_c)
+        projeto_c = ProjetoFactory(gerencia=gerencia_c, fluxo="NAO_SUPER")
+        liberar_par(cenario["municipio"], projeto_c)
+        corpo = _payload(cenario, {"formadores": [formador_c.email, cenario["formador"].email]})
+        corpo["projeto"] = {"id": projeto_c.id}
+        resp = _post(cenario["coord"], corpo)
+        assert resp.status_code == 200, resp.content
+        usuarios = resp.json()["canonical"]["usuarios"]
+        assert usuarios["formadores_ids"] == []
+        assert sorted(usuarios["formadores_not_found"]) == sorted([formador_c.email, cenario["formador"].email])

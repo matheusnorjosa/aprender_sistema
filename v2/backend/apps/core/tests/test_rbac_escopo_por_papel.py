@@ -718,6 +718,21 @@ class TestGradeEOpcoes:
         assert cliente.get(base).status_code == 200
         assert cliente.get(f"{base}&gerencia_id={a.id}").status_code == 200
 
+    def test_grade_sem_gerencia_id_so_traz_as_gerencias_de_atuacao(self, a_b):
+        """Sem `gerencia_id`, a Grade recorta pelas gerências G/C/A: onde ela é só formadora não conta."""
+        a, b = a_b
+        pessoa = _pessoa(("COORDENADOR", a), ("FORMADOR", b))
+        formador_a, formador_b = _pessoa(("FORMADOR", a)), _pessoa(("FORMADOR", b))
+        for formador in (formador_a, formador_b):
+            # Sem `gerencia_id`, a grade lista quem participa de evento do fluxo SUPER.
+            evento = SolicitacaoFactory(projeto=ProjetoFactory(fluxo="SUPER"))
+            Participation.objects.create(solicitacao=evento, usuario=formador, role="FORMADOR")
+        response = _cliente(pessoa).get("/api/availability/monthly/?year=2026&month=11&role=FORMADOR")
+        assert response.status_code == 200
+        ids = {p["id"] for p in response.data["people"]}
+        assert formador_a.id in ids
+        assert formador_b.id not in ids
+
     def test_opcoes_formadores_global_controle(self, a_b):
         a, b = a_b
         controle, _ = Gerencia.objects.get_or_create(nome="CONTROLE", defaults={"nome_setor": "Controle"})

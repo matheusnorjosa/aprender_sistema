@@ -24,6 +24,7 @@ from rest_framework.views import APIView
 
 from apps.core.auth_normalize import normalize_login_identifier
 from apps.core.permissions import HasPerm
+from apps.core.pii import busca_por_nome
 from apps.core.rbac.helpers import filtrar_formadores_avaliaveis, user_has_any_perm
 from apps.core.services.compra_elegibilidade import (
     isento_da_regra_da_compra,
@@ -264,9 +265,10 @@ class UsuarioLookup(APIView):
 
     SEC-ENUM-01: email permanece fora do payload (anti-enumeração).
     SEC-ENUM-02 / S5 (auditoria 14/10, C6): o login é o CPF desde 29/09, então a busca
-    é só por nome para todos. Quem administra cadastros (`manage_admin_registries`) ou o
+    é por nome para todos (e pelo e-mail só se o termo não tem dígito: acha "Conceição" por
+    "conceicao" sem testar pedaço de CPF). Quem administra cadastros (`manage_admin_registries`) ou o
     superusuário acha também pelo CPF (cru ou formatado) ou pelo e-mail, mas só com o valor
-    EXATO: pedaço de CPF ou de e-mail não casa ninguém (senão o lookup vira oráculo de CPF).
+    EXATO: pedaço de CPF ou de e-mail com dígito não casa ninguém (senão o lookup vira oráculo de CPF).
 
     Consumidores legítimos confirmados (auditoria 2026-04-30):
     - `NewSolicitacaoWizard` (Coord/Apoio/Gerente cria) →
@@ -289,9 +291,10 @@ class UsuarioLookup(APIView):
         # Começar com queryset base
         qs = Usuario.objects.filter(is_active=True)
 
-        # Aplicar filtro de busca: nome para todos; CPF/e-mail só exatos e só para quem administra contas.
+        # Aplicar filtro de busca: nome para todos (e e-mail se o termo não tem dígito); CPF/e-mail
+        # exatos só para quem administra contas.
         if q:
-            busca = Q(first_name__icontains=q) | Q(last_name__icontains=q)
+            busca = busca_por_nome(q)
             if request.user.is_superuser or user_has_any_perm(request.user, "manage_admin_registries"):
                 busca |= Q(username=normalize_login_identifier(q)) | Q(email__iexact=q)
             qs = qs.filter(busca)

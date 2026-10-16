@@ -18,7 +18,7 @@ o endpoint — portanto `approve_solicitation_batch` e `operate_preagenda`
 ficam fora do gate.
 
 SEC-ENUM-01: email permanece fora do payload (anti-enumeração).
-SEC-ENUM-02 / S5 (C6, 16/10): o login é o CPF, então a busca é só por nome; só quem
+SEC-ENUM-02 / S5 (C6, 16/10): o login é o CPF, então a busca é por nome (e-mail só sem dígito); só quem
 administra cadastros acha por e-mail ou CPF, e só pelo valor exato
 (`test_cpf_fora_de_telas_busca_logs.py`).
 

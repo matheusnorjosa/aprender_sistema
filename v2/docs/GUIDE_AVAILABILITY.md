@@ -21,7 +21,7 @@ Retorna a grade mensal de disponibilidade.
 | `role` | string | Sim | "FORMADOR" ou "COORDENADOR" |
 | `gerencia_id` | int | Não | ID da gerência. **Se omitido, o escopo vem do usuário** — ver abaixo |
 | `sector` | string | Não | Filtro por nome do projeto |
-| `q` | string | Não | Filtro por nome do formador (o e-mail não entra: pode levar o CPF) |
+| `q` | string | Não | Filtro por nome do formador; o e-mail só entra se o termo não tem dígito (pode levar o CPF) |
 
 > 🔴 **Corrigido em 2026-07-24.** Este guia dizia que omitir `gerencia_id` "assume
 > SUPERINTENDENCIA (SUPER)". **Falso.** Em `MonthlyAvailabilityView.get` (`apps/core/views_availability_monthly.py`),
@@ -178,7 +178,7 @@ monthly:v7:{monthly_ver}:{year}:{month}:{role}:{cache_scope}:{sector or '*'}:{q_
 
 - `teto` = o teto de horas por evento vigente (`parametros_disponibilidade()`); salvar um teto
   novo em Configurações vale na consulta seguinte. `v6` entrou em 05/10/2026 com a CH com teto;
-  `v7`, em 16/10/2026, com o S5 (nome e e-mail sem CPF, `q` só por nome).
+  `v7`, em 16/10/2026, com o S5 (nome e e-mail sem CPF, `q` com dígito não casa o e-mail).
 
 - `monthly_ver` = `get_monthly_cache_version(request.user.id)` (`:218-220`) — permite invalidar
   por usuário sem varrer o Redis.

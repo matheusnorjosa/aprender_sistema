@@ -4,7 +4,8 @@ da busca e dos logs.
 
 Desde 29/09 o login (`username`) de toda conta é o CPF. Então:
 - C6: a busca de pessoas não pode casar o login nem o e-mail por pedaço (oráculo de CPF);
-  só quem administra cadastros acha por CPF ou e-mail, e só com o valor exato.
+  só quem administra cadastros acha por CPF ou e-mail, e só com o valor exato. Termo sem dígito
+  casa também o e-mail (acha "Conceição" por "conceicao"; sem dígito não há CPF a testar).
 - C10: as respostas de `/api/solicitacoes*` e `/api/gcal/*` (JSON e CSV) não levam o login;
   a busca textual dessas listas também não casa o login.
 - C11: os logs estruturados não levam o login nos `extra`, e o filtro de PII limpa também os
@@ -118,6 +119,27 @@ def test_coordenador_continua_achando_por_nome(alvo):
     coord = _conta(nome="Coord", groups=["Coordenador"])
     resp = _client(coord).get("/api/lookup/usuarios/", {"q": "Maria"})
     assert alvo.id in _ids(resp)
+
+
+def _conceicao(**extra):
+    """Nome acentuado com e-mail sem acento e com dígito: quem digita sem acento acha pelo e-mail."""
+    u = _conta(nome="Conceição", sobrenome="Lima", **extra)
+    u.email = "conceicao.lima7@example.invalid"
+    u.save(update_fields=["email"])
+    return u
+
+
+def test_busca_sem_acento_e_sem_digito_acha_o_nome_acentuado_pelo_email():
+    alvo = _conceicao(groups=["Formador"])
+    coord = _conta(nome="Coord", groups=["Coordenador"])
+    assert alvo.id in _ids(_client(coord).get("/api/lookup/usuarios/", {"q": "conceicao"}))
+
+
+@pytest.mark.parametrize("q", ["lima7", "conceicao.lima7"])
+def test_busca_com_digito_nao_casa_o_email(q):
+    _conceicao(groups=["Formador"])
+    coord = _conta(nome="Coord", groups=["Coordenador"])
+    assert _ids(_client(coord).get("/api/lookup/usuarios/", {"q": q})) == set()
 
 
 @pytest.mark.parametrize("grafia", ["cru", "formatado"])
@@ -685,3 +707,25 @@ def test_grade_mensal_busca_so_com_digitos_do_cpf_nao_acha_ninguem(gerencia_com_
         q=sem_nome.cpf[2:7],
     )
     assert grade["people"] == []
+
+
+@pytest.mark.parametrize("com_gerencia", [True, False])
+def test_grade_mensal_busca_sem_acento_acha_nome_acentuado_e_com_digito_nao_casa_email(com_gerencia):
+    g = GerenciaFactory()
+    alvo = _conceicao()
+    if com_gerencia:
+        com_papel(alvo, "FORMADOR", g)
+    else:
+        s = SolicitacaoFactory(status="aprovado", projeto=ProjetoFactory(super=True))
+        Participation.objects.create(solicitacao=s, usuario=alvo, role=Participation.Role.FORMADOR)
+    hoje = timezone.localdate()
+
+    def _grade(q: str) -> set[int]:
+        grade = build_monthly_grid(
+            year=hoje.year, month=hoje.month, role="FORMADOR", gerencia_id=g.id if com_gerencia else None, q=q
+        )
+        return {p["id"] for p in grade["people"]}
+
+    assert alvo.id in _grade("conceicao")
+    assert _grade("lima7") == set()
+    assert _grade("conceicao.lima7") == set()

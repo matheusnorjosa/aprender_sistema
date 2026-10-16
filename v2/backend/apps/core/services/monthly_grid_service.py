@@ -24,11 +24,10 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from django.db.models import Q
 from django.utils import timezone
 
 from apps.core.models import AvailabilityBlock, Deslocamento, EquipeGerencia, Participation, Solicitacao, Usuario
-from apps.core.pii import email_sem_cpf
+from apps.core.pii import busca_por_nome, email_sem_cpf
 from apps.core.services.horas_formacao import horas_formacao
 from apps.core.types import UserId
 
@@ -54,7 +53,8 @@ def build_monthly_grid(
             participações e eventos apenas dessa gerência. Quando None, mantém
             comportamento legado (apenas fluxo SUPER).
         sector: Filtro opcional por setor (projeto.nome)
-        q: Filtro opcional por nome (icontains); nunca o e-mail, que pode levar o CPF
+        q: Filtro opcional por nome (icontains); o e-mail só entra quando o termo não tem
+            dígito (acha "Conceição" por "conceicao" sem virar oráculo de CPF)
         allowed_user_ids: Lista de IDs de usuários permitidos (None = todos)
 
     Returns:
@@ -99,9 +99,7 @@ def build_monthly_grid(
 
         if q and q.strip():
             q_lower = q.strip().lower()
-            equipe_qs = equipe_qs.filter(
-                Q(usuario__first_name__icontains=q_lower) | Q(usuario__last_name__icontains=q_lower)
-            )
+            equipe_qs = equipe_qs.filter(busca_por_nome(q_lower, "usuario__"))
 
         user_ids = list(set(equipe_qs.values_list("usuario_id", flat=True)))
     else:
@@ -111,9 +109,7 @@ def build_monthly_grid(
 
         if q and q.strip():
             q_lower = q.strip().lower()
-            participations_qs = participations_qs.filter(
-                Q(usuario__first_name__icontains=q_lower) | Q(usuario__last_name__icontains=q_lower)
-            )
+            participations_qs = participations_qs.filter(busca_por_nome(q_lower, "usuario__"))
 
         user_ids = list(set(participations_qs.values_list("usuario_id", flat=True)))
 

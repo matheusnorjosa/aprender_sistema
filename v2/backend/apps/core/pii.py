@@ -10,6 +10,8 @@ from __future__ import annotations
 import re
 from typing import Any, cast
 
+from django.db.models import Q
+
 # CPF nas DUAS formas: 11 digitos crus OU formatado 000.000.000-00. As ancoras `\b`
 # garantem que so o TOKEN inteiro casa — um username como `user_<hex>` (digitos cercados
 # de word-chars) NAO tem fronteira de palavra no meio e por isso nunca e alterado.
@@ -43,6 +45,19 @@ def email_sem_cpf(email: str | None) -> str | None:
     if not email or email_de_reserva(email) or redact_cpf(email) != email:
         return None
     return email
+
+
+def busca_por_nome(q: str, prefixo: str = "") -> Q:
+    """Busca de pessoa por nome (`icontains`), sem virar oráculo de CPF (S5, C6).
+
+    O e-mail entra só quando o termo não tem dígito: sem dígito não há pedaço de CPF a testar,
+    e o e-mail (sem acento) é o que acha "Conceição" por quem digita "conceicao".
+    `prefixo` é o caminho até o usuário (ex.: `"usuario__"`).
+    """
+    campos = ["first_name", "last_name"]
+    if not any(c.isdigit() for c in q):
+        campos.append("email")
+    return Q(*[(f"{prefixo}{campo}__icontains", q) for campo in campos], _connector=Q.OR)
 
 
 def redact_cpf_deep(value: Any) -> Any:

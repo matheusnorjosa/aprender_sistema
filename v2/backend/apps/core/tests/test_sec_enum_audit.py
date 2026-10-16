@@ -128,7 +128,7 @@ class TestEmailSearchRestriction(TestCase):
         # Create target user with distinct email
         alvo = UsuarioFactory(
             username="target_email",
-            email="distinct.email@example.com",
+            email="distinct.email9@example.com",
             password="pass1234",
             first_name="Ana",
             last_name="Costa",
@@ -147,9 +147,9 @@ class TestEmailSearchRestriction(TestCase):
         assert response.status_code == 403, f"Formador deveria receber 403 após PR 5, recebeu {response.status_code}"
 
     def test_coordenador_cannot_search_by_email(self):
-        """S5 (C6): Coordenador acha só por nome; e-mail (inteiro ou pedaço) não casa ninguém."""
+        """S5 (C6): termo com dígito não casa o e-mail (inteiro ou pedaço); o nome continua achando."""
         self.client.force_authenticate(user=self.coordenador)
-        for q in ("distinct.email", "distinct.email@example.com"):
+        for q in ("distinct.email9", "distinct.email9@example.com"):
             response = self.client.get(f"/api/lookup/usuarios/?q={q}")
             assert response.json() == [], q
         response = self.client.get("/api/lookup/usuarios/?q=Ana")

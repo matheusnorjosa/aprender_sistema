@@ -26,6 +26,7 @@ from apps.core.rbac.matrix import (
     APOIO,
     ASST_ADMIN_CONTROLE,
     COORDENADOR,
+    DAT,
     FORMADOR,
     GERENTE,
     GERENTE_SUPER,
@@ -85,6 +86,16 @@ def _make_user_for_actor(actor: str) -> Usuario:
             defaults={"nome_setor": "Vidas"},
         )
         EquipeGerencia.objects.create(gerencia=gerencia, usuario=user, papel="FORMADOR", ativo=True)
+
+    # PR 10 das permissões: o DAT de produção tem o vínculo EQUIPE na gerência DAT (perfil
+    # ADMIN_OPERACIONAL), e é dele que vem o pacote final (aprovar, excluir, Pré-agenda). Sem o vínculo,
+    # o ator de teste só teria o grupo.
+    if actor == DAT:
+        gerencia, _ = Gerencia.objects.get_or_create(nome="GERENCIA DAT", defaults={"nome_setor": "DAT"})
+        if gerencia.perfil != Gerencia.Perfil.ADMIN_OPERACIONAL:
+            gerencia.perfil = Gerencia.Perfil.ADMIN_OPERACIONAL
+            gerencia.save(update_fields=["perfil"])
+        EquipeGerencia.objects.create(gerencia=gerencia, usuario=user, papel="EQUIPE", ativo=True)
 
     # D8 + D9 + PR 8: Coord/Apoio/Gerente* precisam de vínculo organizacional
     # para passar HasSectorAccess na grade mensal.

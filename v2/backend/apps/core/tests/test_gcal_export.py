@@ -33,6 +33,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_dat,
 )
 
 
@@ -62,6 +63,8 @@ class TestGCalExport(TestCase):
 
         self.user_super = UsuarioFactory(username="super_user", password="testpass123", cpf="22222222222")  # CPF único
         self.user_super.groups.add(self.grupo_super)
+        # PR 10: o grupo Superintendência não tem capacidade (0126); o poder vem do pacote do DAT.
+        com_pacote_do_dat(self.user_super)
 
         self.user_coordenador = UsuarioFactory(
             username="coordenador_user", password="testpass123", cpf="33333333333"  # CPF único

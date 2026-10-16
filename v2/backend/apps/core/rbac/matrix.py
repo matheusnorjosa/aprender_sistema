@@ -273,7 +273,8 @@ ACCESS_MATRIX: Final[dict[str, dict[str, int]]] = {
     # PR 8 (2026-04-30): consolida regras dos PRs 3, 4, 5 na matriz.
     #
     # Aprovação de solicitação (PR 3 #1308): policy composta
-    # `CanAccessSolicitationApprovals` = Gerente Sup OR Asst Admin Controle.
+    # `CanAccessSolicitationApprovals` = Gerente Sup OR Asst Admin Controle OR (PR 10) a capacidade
+    # `approve_solicitation`, que vem do pacote ADMIN_OPERACIONAL (o DAT pelo vínculo na gerência DAT).
     # Os 4 endpoints (approve/reject individual + batch) compartilham o mesmo
     # gate; batch-approve representa todos. Cobertura granular fica em
     # `test_pr3_approvals_policy.py`.
@@ -284,7 +285,7 @@ ACCESS_MATRIX: Final[dict[str, dict[str, int]]] = {
         # `ids: []` por ids_required. Cobertura granular dos 4 endpoints com
         # solicitação pendente real está em test_pr3_approvals_policy.py.
         SUPERUSER: ALLOW_PAYLOAD_INVALID,
-        DAT: DENY,
+        DAT: ALLOW_PAYLOAD_INVALID,  # PR 10: base 5 (`capacidade_aprovar`) pelo pacote ADMIN_OPERACIONAL
         CONTROLE: DENY,  # Controle puro não aprova (precisa Função Asst Admin)
         DIRETORIA: DENY,
         GERENTE: DENY,  # Gerente pedagógico (Vidas + Gerente) NÃO aprova

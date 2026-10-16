@@ -48,7 +48,7 @@ class DashboardEventsView(APIView):
     - page: Número da página (default: 1)
     - page_size: Itens por página (default: 20, max: 100)
 
-    Permissions: HasPerm("import_spreadsheet")
+    Permissions: CanUseGcal (policy `use_gcal`)
     """
 
     permission_classes = [IsAuthenticated, CanUseGcal]
@@ -191,7 +191,7 @@ class EventDetailAPIView(APIView):
 
     Retorna detalhes completos de um evento GCal com timeline de AuditLog.
 
-    Permissions: HasPerm("import_spreadsheet")
+    Permissions: CanUseGcal (policy `use_gcal`)
     """
 
     permission_classes = [IsAuthenticated, CanUseGcal]

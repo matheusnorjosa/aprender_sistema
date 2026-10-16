@@ -209,7 +209,7 @@ class GCalBatchReapplyView(APIView):
     - Sem credencial → 403 {code: 'google_not_connected'}
     - Com credencial → passa operator_user_id para task
 
-    Permissions: HasPerm("import_spreadsheet")
+    Permissions: CanUseGcal (policy `use_gcal`)
     """
 
     permission_classes = [IsAuthenticated, CanUseGcal]
@@ -341,7 +341,7 @@ class GCalBatchResyncView(APIView):
     - Sem credencial → 403 {code: 'google_not_connected'}
     - Com credencial → passa operator_user_id para task
 
-    Permissions: HasPerm("import_spreadsheet")
+    Permissions: CanUseGcal (policy `use_gcal`)
     """
 
     permission_classes = [IsAuthenticated, CanUseGcal]

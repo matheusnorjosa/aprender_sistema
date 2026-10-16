@@ -42,6 +42,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_dat,
 )
 
 pytestmark = pytest.mark.django_db
@@ -349,6 +350,8 @@ class TestRegressao:
         mock_task.return_value = _mock_task_result()
         sup = UsuarioFactory(username="super_pss", cpf="63000000004")
         sup.groups.add(GroupFactory(name="Superintendência"))
+        # PR 10: o grupo Superintendência não tem capacidade (0126); o poder vem do pacote do DAT.
+        com_pacote_do_dat(sup)
         client = APIClient()
         client.force_authenticate(sup)
         resp = _publish(client, sol_vidas_terceiro.id)

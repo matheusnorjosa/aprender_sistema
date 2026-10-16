@@ -45,7 +45,7 @@ def reports_status_counts(request: Request) -> Response:
         "period": {"start": "2025-01-01", "end": "2025-01-31"}
     }
 
-    Permissions: HasPerm("import_spreadsheet")
+    Permissions: CanViewReports (policy `view_reports`)
     """
     # Parse dates
     end_date = timezone.now().date()
@@ -119,7 +119,7 @@ def reports_top_projects(request: Request) -> Response:
         "limit": 10
     }
 
-    Permissions: HasPerm("import_spreadsheet")
+    Permissions: CanViewReports (policy `view_reports`)
     """
     limit = 5  # Default is 5
     limit_param = request.query_params.get("limit")
@@ -182,7 +182,7 @@ def reports_weekly_approved(request: Request) -> Response:
         "weeks_count": 4
     }
 
-    Permissions: HasPerm("import_spreadsheet")
+    Permissions: CanViewReports (policy `view_reports`)
     """
     weeks = 12  # Default is 12
     weeks_param = request.query_params.get("weeks")

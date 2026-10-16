@@ -136,12 +136,16 @@ def test_quem_nao_e_superusuario_recebe_403(endpoint: str, persona: tuple[str, t
 
 
 def test_o_dat_do_403_tem_as_capacidades_que_antes_importavam():
-    """Controle do teste acima: o 403 do DAT não é falta de seed (o grupo tem as capabilities)."""
+    """Controle do teste acima: o 403 do DAT não é falta de seed (o grupo tem as capabilities).
+
+    PR 10: o grupo DAT perdeu `import_spreadsheet` (migration 0126); o 403 vale com ou sem ela.
+    """
     from apps.core.rbac.helpers import get_user_functional_permissions
 
     capacidades = get_user_functional_permissions(_user_in_groups("DAT", username="dat_caps"))
 
-    assert {"import_spreadsheet", "manage_admin_registries"} <= set(capacidades)
+    assert "manage_admin_registries" in capacidades
+    assert "import_spreadsheet" not in capacidades
 
 
 # ============================================================================

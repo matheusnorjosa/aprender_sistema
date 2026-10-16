@@ -39,6 +39,7 @@ from apps.core.services.equipe_gerencia import (
     sync_user_lotacao,
     tem_equipe_administrativa,
 )
+from apps.core.services.rbac_permissions import invalidate_user_functional_permissions_cache
 from apps.core.services.rbac_service import get_assignable_group_names, nomes_grupos_funcao
 
 # Sentinela: distingue "campo não enviado" de "enviado como null" no PATCH parcial.
@@ -454,7 +455,12 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             encerrar_lotacao(user)
         elif has_gerencia and papeis and (nova_lotacao or papeis != papeis_antes or encerrou_gerente):
             sync_user_lotacao(user, gerencia, papeis)
+        # PR 10: a base 5 (`capacidade_aprovar`) lê as capacidades pelo cache, que o `base_antes` acabou
+        # de preencher e os sinais só limpam no commit. Limpa antes de ler o "depois" e de novo depois,
+        # para não deixar no cache um estado que a transação ainda pode desfazer (#2071 logo abaixo).
+        invalidate_user_functional_permissions_cache(user.pk)
         base = solicitation_approval_basis(user)
+        invalidate_user_functional_permissions_cache(user.pk)
         setor, funcao = _PAR_LEGADO
         pedido = groups is not None and setor in {g.name for g in groups}
         par_novo = {setor, funcao} <= {g.name for g in final} and not {setor, funcao} <= {g.name for g in antes}

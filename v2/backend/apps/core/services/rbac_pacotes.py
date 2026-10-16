@@ -2,9 +2,11 @@
 Pacote de capacidades por perfil de gerência (ADR-020) e direitos de evento do papel (PR 8). Só
 constantes; quem lê é a fórmula da união (`rbac_permissions.capacidades_sem_cache`).
 
-O pacote é o **estado de produção de hoje** do grupo de setor correspondente (medição de 02/10/2026),
-não o pacote final do relatório de arquitetura (seção 2.3). Por isso o PR B (grupos ∪ pacote) não dá
-poder novo a quem já está no grupo. Mudar um pacote é mudar poder: PR com `rbac_diff` medido.
+CONTROLE e DIRETORIA são o **estado de produção de hoje** do grupo de setor correspondente (medição de
+02/10/2026), para que o PR B (grupos ∪ pacote) não desse poder novo a quem já estava no grupo. O
+ADMIN_OPERACIONAL é o pacote **final** desde o PR 10 (16/10/2026, seção 2.3 do relatório de
+arquitetura mais a isenção da regra da compra): o DAT é o administrador operacional. Mudar um pacote é
+mudar poder: PR com `rbac_diff` medido.
 
 Fica fora de `apps/core/rbac/` de propósito: `rbac/__init__` importa `rbac/helpers`, que importa
 `services/rbac_permissions`. Como `rbac_permissions` lê o pacote (PR B), um módulo dentro
@@ -18,13 +20,23 @@ from __future__ import annotations
 # Uma linha explícita por perfil (`Gerencia.Perfil`).
 PACOTE: dict[str, frozenset[str]] = {
     "PADRAO": frozenset(),
-    # Grupo DAT em produção (02/10) menos `import_spreadsheet` ("técnico só para mim").
+    # PR 10 (decisões do dono de 02/10, nº 12 e 16, e de 14/10): o DAT aprova (base 5 de
+    # `solicitation_approval_basis`), cria, edita e exclui evento em qualquer projeto, sem a regra da
+    # compra, exclui nos cadastros e opera a pré-agenda e a seção Controle. Sem `import_spreadsheet`
+    # ("técnico só para mim"); o grupo DAT também o perdeu (migration 0126).
     "ADMIN_OPERACIONAL": frozenset(
         {
             "manage_admin_registries",
             "manage_purchases_and_materials",
             "view_all_availability",
             "view_map_metrics",
+            "create_solicitation",
+            "edit_solicitation_as_owner_or_privileged",
+            "approve_solicitation",
+            "execute_restricted_operations",
+            "operate_preagenda",
+            "run_daily_operations",
+            "create_solicitation_without_purchase",
         }
     ),
     "CONTROLE": frozenset(

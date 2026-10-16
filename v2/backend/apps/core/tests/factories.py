@@ -134,6 +134,24 @@ def com_papel(user: Usuario, papel: str, gerencia: Gerencia | None = None, **ext
     return vinculo
 
 
+def com_pacote_do_dat(user: Usuario) -> EquipeGerencia:
+    """Vínculo EQUIPE na `GERENCIA DAT` (perfil ADMIN_OPERACIONAL): o pacote do DAT (PR 10).
+
+    Desde a migration 0126 o grupo Superintendência não tem capacidade; quem aprova pela capacidade
+    (`approve_solicitation`), publica no Google e exclui nos cadastros é o DAT pelo pacote. Testes
+    cuja persona "Superintendência" representava esse poder ganham o vínculo por aqui.
+    """
+    from apps.core.services.rbac_permissions import invalidate_user_functional_permissions_cache
+
+    gerencia, _ = Gerencia.objects.get_or_create(nome="GERENCIA DAT", defaults={"nome_setor": "DAT"})
+    if gerencia.perfil != Gerencia.Perfil.ADMIN_OPERACIONAL:
+        gerencia.perfil = Gerencia.Perfil.ADMIN_OPERACIONAL
+        gerencia.save(update_fields=["perfil"])
+    vinculo = com_papel(user, "EQUIPE", gerencia)
+    invalidate_user_functional_permissions_cache(user.pk)
+    return vinculo
+
+
 class MunicipioFactory(factory.django.DjangoModelFactory[Municipio]):
     """Município com nome único (constraint unique nome+uf)."""
 

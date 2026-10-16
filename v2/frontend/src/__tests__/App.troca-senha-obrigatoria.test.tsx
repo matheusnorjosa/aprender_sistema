@@ -26,10 +26,35 @@ vi.mock('../components/AppRoutes', () => ({
   AppRoutes: () => <div data-testid="app-routes">ROUTES</div>,
 }));
 vi.mock('../pages/Auth/LoginPage', () => ({ default: () => <div>LOGIN_PAGE</div> }));
+interface RedefinicaoStub {
+  por: string;
+  em: string;
+}
+
+// O stub mostra o que o App passa em `aviso` e `redefinicoes` (F1): o teste cobre a ligação
+// /api/me/ → App → tela; o texto da tela real é coberto em TrocaSenhaObrigatoriaPage.test.tsx.
 vi.mock('../pages/Auth/TrocaSenhaObrigatoriaPage', () => ({
-  default: ({ onConcluida, onSair }: { onConcluida: () => void; onSair: () => void }) => (
+  default: ({
+    aviso,
+    redefinicoes,
+    onConcluida,
+    onSair,
+  }: {
+    aviso?: RedefinicaoStub | null;
+    redefinicoes?: readonly RedefinicaoStub[];
+    onConcluida: () => void;
+    onSair: () => void;
+  }) => (
     <div>
       <h1>Defina sua senha</h1>
+      {aviso && <p role="status">{`Sua senha foi redefinida por ${aviso.por} em ${aviso.em}.`}</p>}
+      {redefinicoes && redefinicoes.length > 0 && (
+        <ul aria-label="REDEFINICOES">
+          {redefinicoes.map((r) => (
+            <li key={`${r.por}-${r.em}`}>{`${r.por} em ${r.em}`}</li>
+          ))}
+        </ul>
+      )}
       <button type="button" onClick={onConcluida}>CONCLUIR</button>
       <button type="button" onClick={onSair}>SAIR</button>
     </div>
@@ -95,6 +120,37 @@ describe('App — troca obrigatória de senha no primeiro acesso', () => {
     expect(screen.queryByTestId('app-routes')).not.toBeInTheDocument();
     expect(screen.queryByText('LOGIN_PAGE')).not.toBeInTheDocument();
     expect(getMyPoliciesMock).not.toHaveBeenCalled();
+  });
+
+  test('F1: o aviso e o histórico do /api/me/ chegam à tela de troca', async () => {
+    getMeMock.mockResolvedValue({
+      ...pessoa,
+      deve_trocar_senha: true,
+      aviso_senha_redefinida: { por: 'Pessoa Do Dat', em: '16/10/2026' },
+      redefinicoes_senha: [
+        { por: 'Pessoa Do Dat', em: '16/10/2026' },
+        { por: 'Outra Pessoa', em: '15/10/2026' },
+      ],
+    });
+
+    render(<App />);
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Sua senha foi redefinida por Pessoa Do Dat em 16/10/2026.',
+    );
+    const lista = screen.getByRole('list', { name: 'REDEFINICOES' });
+    expect(lista).toHaveTextContent('Pessoa Do Dat em 16/10/2026');
+    expect(lista).toHaveTextContent('Outra Pessoa em 15/10/2026');
+  });
+
+  test('F1: sem aviso no /api/me/, a tela de troca não mostra o status', async () => {
+    getMeMock.mockResolvedValue({ ...pessoa, deve_trocar_senha: true, aviso_senha_redefinida: null });
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Defina sua senha' })).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'REDEFINICOES' })).not.toBeInTheDocument();
   });
 
   test('depois da troca: abre o sistema no endereço que a pessoa tinha pedido', async () => {

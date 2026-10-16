@@ -9,11 +9,11 @@ Type-checked with Pyright (strict mode).
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from rest_framework import serializers  # type: ignore[attr-defined]
 
-from apps.core.models import AcaoDAT, Deslocamento
+from apps.core.models import AcaoDAT, Deslocamento, Usuario
 
 
 class AcaoDATSerializer(serializers.ModelSerializer):
@@ -113,8 +113,9 @@ class DeslocamentoSerializer(serializers.ModelSerializer):
 
     def get_usuario_nome(self, obj: Deslocamento) -> str:
         """Nome do usuário, ou "Usuario #id": nunca o login (CPF)."""
-        if obj.usuario:
-            return str(obj.usuario)
+        usuario = cast("Usuario | None", obj.usuario)
+        if usuario:
+            return str(usuario)
         return ""
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:

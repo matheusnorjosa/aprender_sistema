@@ -14,7 +14,7 @@ from typing import Any, cast
 
 from rest_framework import serializers  # type: ignore[attr-defined]
 
-from apps.core.models import AuditLog, Participation, Solicitacao
+from apps.core.models import AuditLog, Participation, Solicitacao, Usuario
 from apps.core.pii import email_sem_cpf, redact_cpf_deep
 from apps.core.serializers.usuario import UserSlimSerializer
 from apps.core.services.avaliacao_formador import formadores_avaliaveis_ids, gerencia_pergunta
@@ -147,7 +147,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
         Retorna nome completo do coordenador (first_name + last_name).
         Prioriza: coordenador field -> usuario (fallback para ETL imports).
         """
-        user = obj.coordenador or obj.usuario
+        user = cast("Usuario | None", obj.coordenador or obj.usuario)
         return str(user) if user else None
 
     def get_formador_avaliado_nome(self, obj: Solicitacao) -> str | None:
@@ -367,11 +367,12 @@ class EventDetailSerializer(serializers.ModelSerializer):
 
     def get_usuario_nome(self, obj: Solicitacao) -> str | None:
         """Nome de quem criou a solicitação (ou "Usuario #id")."""
-        return str(obj.usuario) if obj.usuario else None
+        usuario = cast("Usuario | None", obj.usuario)
+        return str(usuario) if usuario else None
 
     def get_coordenador_nome(self, obj: Solicitacao) -> str | None:
         """Nome do coordenador (ou de quem criou, se o coordenador é nulo)."""
-        user = obj.coordenador or obj.usuario
+        user = cast("Usuario | None", obj.coordenador or obj.usuario)
         return str(user) if user else None
 
     def get_fluxo(self, obj: Solicitacao) -> str:

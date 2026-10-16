@@ -29,6 +29,7 @@ from apps.core.serializers.gcal_dashboard_contract import (
     BatchActionResponseSerializer,
     DetailMessageSerializer,
 )
+from apps.core.services.solicitacao_publish import MENSAGENS_NAO_PUBLICAVEL, motivo_nao_publicavel
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,7 @@ class GCalPublishBatchView(APIView):
 
     Regras:
     - Apenas solicitações com status='aprovado' são processadas
+    - Recusa (com `code`) evento passado, já publicado e publicado fora do sistema (`motivo_nao_publicavel`)
     - Se GCAL_CLIENT != "google" e dry_run=false e apply_blocked=false → erro
     - Válidas: marca gcal_status=PENDING e enfileira task Celery
     - Inválidas: retorna em 'errors' com motivo
@@ -138,6 +140,12 @@ class GCalPublishBatchView(APIView):
             # Validar status='aprovado'
             if sol.status != "aprovado":
                 errors.append({"id": sol_id, "detail": f"Status deve ser 'aprovado' (atual: {sol.status})"})
+                continue
+
+            # Virada: passado, já publicado ou no Google pela planilha não vai (o upsert_one também barra).
+            motivo = motivo_nao_publicavel(sol)
+            if motivo is not None:
+                errors.append({"id": sol_id, "detail": MENSAGENS_NAO_PUBLICAVEL[motivo], "code": motivo})
                 continue
 
             # Validar apply_blocked com GCAL_CLIENT
@@ -279,6 +287,12 @@ class GCalBatchReapplyView(APIView):
                 errors.append({"id": sol_id, "detail": f"Status deve ser 'aprovado' (atual: {sol.status})"})
                 continue
 
+            # Virada: só reenvia o que já foi ao Google e ainda não terminou. Em `NONE` o sync criaria.
+            motivo = motivo_nao_publicavel(sol, reenvio=True)
+            if motivo is not None:
+                errors.append({"id": sol_id, "detail": MENSAGENS_NAO_PUBLICAVEL[motivo], "code": motivo})
+                continue
+
             # Validar apply_blocked com GCAL_CLIENT
             if gcal_client != "google" and not dry_run and not apply_blocked:
                 errors.append(
@@ -409,6 +423,12 @@ class GCalBatchResyncView(APIView):
             # Validar status='aprovado'
             if sol.status != "aprovado":
                 errors.append({"id": sol_id, "detail": f"Status deve ser 'aprovado' (atual: {sol.status})"})
+                continue
+
+            # Virada: só reenvia o que já foi ao Google e ainda não terminou. Em `NONE` o sync criaria.
+            motivo = motivo_nao_publicavel(sol, reenvio=True)
+            if motivo is not None:
+                errors.append({"id": sol_id, "detail": MENSAGENS_NAO_PUBLICAVEL[motivo], "code": motivo})
                 continue
 
             # Validar apply_blocked com GCAL_CLIENT

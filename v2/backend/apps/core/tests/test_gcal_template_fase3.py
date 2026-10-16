@@ -434,13 +434,15 @@ class GCalTemplateFase3Tests(TestCase):
         - gcal_payload_hash setado (SHA1)
         - Título e descrição formatados conforme Fase 3
         """
+        # Evento futuro: publicar evento passado é recusado (virada, `motivo_nao_publicavel`).
+        inicio = timezone.now() + timedelta(days=30)
         solicitacao = SolicitacaoFactory(
             usuario=self.coord,
             municipio=self.municipio,
             projeto=self.projeto,
             tipo_evento=self.tipo_evento,
-            inicio=self.inicio,
-            fim=self.fim,
+            inicio=inicio,
+            fim=inicio + timedelta(hours=3),
             status="aprovado",
             segmento="Fundamental I",
             is_online=False,

@@ -66,7 +66,7 @@ class TestGCalSyncIdempotency:
         Solicitação aprovada sem external_event_id cria evento asv2{id}.
         Segunda rodada deve fazer UPDATE (ou SKIP se payload igual).
         """
-        now = timezone.now().replace(hour=10, minute=0, second=0, microsecond=0)
+        now = (timezone.now() + timedelta(days=1)).replace(hour=10, minute=0, second=0, microsecond=0)
 
         # Criar solicitação aprovada
         sol = SolicitacaoFactory(
@@ -124,7 +124,7 @@ class TestGCalSyncIdempotency:
         adopt_existing: Evento existe no Calendar com eventId determinístico,
         mas DB não tem external_event_id → ação ADOPT e preenche o campo.
         """
-        now = timezone.now().replace(hour=14, minute=0, second=0, microsecond=0)
+        now = (timezone.now() + timedelta(days=1)).replace(hour=14, minute=0, second=0, microsecond=0)
 
         # Criar solicitação aprovada SEM external_event_id
         sol = SolicitacaoFactory(
@@ -176,7 +176,7 @@ class TestGCalSyncIdempotency:
         """
         update_on_change: Muda horário/título → UPDATE.
         """
-        now = timezone.now().replace(hour=9, minute=0, second=0, microsecond=0)
+        now = (timezone.now() + timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0)
 
         # Criar e sincronizar evento inicial
         sol = SolicitacaoFactory(
@@ -231,7 +231,7 @@ class TestGCalSyncIdempotency:
         """
         delete_when_unapproved: Era approved com evento, agora reprovado → DELETE.
         """
-        now = timezone.now().replace(hour=11, minute=0, second=0, microsecond=0)
+        now = (timezone.now() + timedelta(days=1)).replace(hour=11, minute=0, second=0, microsecond=0)
 
         # Criar solicitação aprovada e sincronizar
         sol = SolicitacaoFactory(
@@ -288,7 +288,7 @@ class TestGCalSyncIdempotency:
         """
         Teste adicional: --no-delete protege eventos de serem deletados.
         """
-        now = timezone.now().replace(hour=15, minute=0, second=0, microsecond=0)
+        now = (timezone.now() + timedelta(days=1)).replace(hour=15, minute=0, second=0, microsecond=0)
 
         # Criar e sincronizar solicitação aprovada
         sol = SolicitacaoFactory(
@@ -341,7 +341,7 @@ class TestGCalSyncDryRun:
         """
         dry_run_no_side_effects: Com --dry-run, nenhuma alteração no DB ou Calendar.
         """
-        now = timezone.now().replace(hour=8, minute=0, second=0, microsecond=0)
+        now = (timezone.now() + timedelta(days=1)).replace(hour=8, minute=0, second=0, microsecond=0)
 
         # Criar solicitação aprovada sem external_event_id
         sol = SolicitacaoFactory(
@@ -381,7 +381,7 @@ class TestGCalSyncDryRun:
         """
         Dry-run deve reportar todas as ações planejadas sem executá-las.
         """
-        now = timezone.now().replace(hour=10, minute=0, second=0, microsecond=0)
+        now = (timezone.now() + timedelta(days=1)).replace(hour=10, minute=0, second=0, microsecond=0)
 
         # Criar solicitação aprovada
         sol = SolicitacaoFactory(
@@ -425,7 +425,7 @@ class TestGCalSyncFilters:
         """
         filters: --since/--until afetam o conjunto de solicitações processadas.
         """
-        base = timezone.now().replace(hour=10, minute=0, second=0, microsecond=0)
+        base = (timezone.now() + timedelta(days=1)).replace(hour=10, minute=0, second=0, microsecond=0)
 
         # Criar 3 solicitações em diferentes datas
         sol_passado = SolicitacaoFactory(
@@ -489,7 +489,7 @@ class TestGCalSyncFilters:
         """
         filters: --ids afeta o conjunto processado.
         """
-        now = timezone.now().replace(hour=14, minute=0, second=0, microsecond=0)
+        now = (timezone.now() + timedelta(days=1)).replace(hour=14, minute=0, second=0, microsecond=0)
 
         # Criar 3 solicitações
         sol1 = SolicitacaoFactory(
@@ -556,7 +556,7 @@ class TestGCalSyncEdgeCases:
         """
         SKIP: Solicitação pendente/reprovada sem evento → nada a fazer.
         """
-        now = timezone.now().replace(hour=13, minute=0, second=0, microsecond=0)
+        now = (timezone.now() + timedelta(days=1)).replace(hour=13, minute=0, second=0, microsecond=0)
 
         sol = SolicitacaoFactory(
             usuario=usuario_test,
@@ -586,7 +586,7 @@ class TestGCalSyncEdgeCases:
         """
         Verificar que payload inclui todos os campos obrigatórios.
         """
-        now = timezone.now().replace(hour=9, minute=30, second=0, microsecond=0)
+        now = (timezone.now() + timedelta(days=1)).replace(hour=9, minute=30, second=0, microsecond=0)
 
         sol = SolicitacaoFactory(
             usuario=usuario_test,

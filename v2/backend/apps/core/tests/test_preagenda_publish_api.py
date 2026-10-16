@@ -15,7 +15,7 @@ Valida:
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 from django.conf import settings
@@ -330,6 +330,10 @@ def test_publish_gcal_api_success(mock_task_delay, api_client, user_super, setup
     PR14: Deve marcar gcal_status como PENDING.
     """
     sol = setup_solicitacao["solicitacao"]
+    # Evento futuro: publicar evento passado é recusado (virada, `motivo_nao_publicavel`).
+    sol.inicio = timezone.now() + timedelta(days=30)
+    sol.fim = sol.inicio + timedelta(hours=4)
+    sol.save(update_fields=["inicio", "fim"])
     api_client.force_authenticate(user=user_super)
 
     # Mock do task

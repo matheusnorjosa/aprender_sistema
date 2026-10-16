@@ -151,18 +151,20 @@ def _rebaixar_se_mudou_campo_material(solicitacao: Solicitacao, antes: dict[str,
     return mudaram
 
 
-def _projeto_saiu_do_super_depois_da_aprovacao(solicitacao: Solicitacao, projeto_id: int | None) -> bool:
-    """PA-04 (PR 10, decisão 5 do dono: troca de fluxo com registro): o projeto teve troca de fluxo
-    saindo do SUPER (AuditLog `model_name="Projeto"`) depois da última aprovação da solicitação, ou da
-    criação dela se não há APPROVE registrado. Até 2 consultas."""
-    if projeto_id is None:
+def _projeto_saiu_do_super_depois_da_aprovacao(solicitacao: Solicitacao, projeto_ids: set[int | None]) -> bool:
+    """PA-04 (PR 10, decisão 5 do dono: troca de fluxo com registro): algum dos projetos (o de origem e
+    o de destino de uma edição) teve troca de fluxo saindo do SUPER (AuditLog `model_name="Projeto"`)
+    depois da última aprovação da solicitação, ou da criação dela se não há APPROVE registrado. Até 2
+    consultas."""
+    ids = [projeto_id for projeto_id in projeto_ids if projeto_id is not None]
+    if not ids:
         return False
     ultima_aprovacao: datetime | None = AuditLog.objects.filter(
         model_name="Solicitacao", action=AuditLog.Action.APPROVE, details__solicitacao_id=solicitacao.pk
     ).aggregate(ultima=Max("created_at"))["ultima"]
     desde = max(solicitacao.created_at, ultima_aprovacao) if ultima_aprovacao else solicitacao.created_at
     return AuditLog.objects.filter(
-        model_name="Projeto", details__projeto_id=projeto_id, details__fluxo__old="SUPER", created_at__gte=desde
+        model_name="Projeto", details__projeto_id__in=ids, details__fluxo__old="SUPER", created_at__gte=desde
     ).exists()
 
 
@@ -741,8 +743,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
         Reaprovação: SUPER aprovada com projeto, data, horário, município ou formadores mudados
         volta para pendente (`_rebaixar_se_mudou_campo_material`; o AuditLog leva `reaprovacao`).
-        Aprovada que não volta porque o projeto saiu do SUPER depois da aprovação (troca de fluxo) fica
-        marcada: o AuditLog leva `editada_com_fluxo_nao_super`.
+        Aprovada que não volta porque o projeto de origem ou o de destino saiu do SUPER depois da
+        aprovação (troca de fluxo) fica marcada: o AuditLog leva `editada_com_fluxo_nao_super`.
         """
         from django.db import transaction
 
@@ -903,7 +905,9 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                     old_data["status"] == "aprovado"
                     and not campos_reaprovacao
                     and _campos_materiais(instance, new_formador_ids) != materiais_antes
-                    and _projeto_saiu_do_super_depois_da_aprovacao(instance, old_data["projeto_id"])
+                    and _projeto_saiu_do_super_depois_da_aprovacao(
+                        instance, {old_data["projeto_id"], instance.projeto_id}
+                    )
                 ):
                     details["editada_com_fluxo_nao_super"] = True
 

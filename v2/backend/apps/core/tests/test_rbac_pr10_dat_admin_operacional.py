@@ -1115,6 +1115,35 @@ class TestTrocaDeFluxo:
         assert sol.status == "aprovado"
         assert self._update_da_edicao(sol).details.get("editada_com_fluxo_nao_super") is True
 
+    @pytest.mark.parametrize("trocado", ["origem", "destino"])
+    def test_mover_aprovada_com_um_dos_projetos_em_nao_super_fica_marcado(self, g19, g1, trocado):
+        """A troca dupla vale no projeto de origem e no de destino: o DAT tira do SUPER o projeto para
+        onde move o próprio evento aprovado, muda a data e devolve o projeto ao SUPER. Com a troca na
+        origem, o destino é SUPER na edição e o evento volta a pendente (reaprovação)."""
+        dat = _dat(g19)
+        sol = _pendente_super(g1, autor=dat)
+        destino = ProjetoFactory(super=True, gerencia=g1)
+        liberar_par(sol.municipio, destino)
+        assert _approve(_gerente_g1(g1), sol).status_code == 200
+        projeto_trocado = sol.projeto_id if trocado == "origem" else destino.id
+        self._trocar_fluxo(dat, projeto_trocado, "NAO_SUPER")
+        inicio = sol.inicio + timedelta(days=1)
+        resp = _editar(
+            dat,
+            sol,
+            {"projeto": destino.id, "inicio": inicio.isoformat(), "fim": (inicio + timedelta(hours=2)).isoformat()},
+        )
+        assert resp.status_code == 200, resp.content
+        self._trocar_fluxo(dat, projeto_trocado, "SUPER")
+        sol.refresh_from_db()
+        details = self._update_da_edicao(sol).details
+        if trocado == "destino":
+            assert sol.status == "aprovado"
+            assert details.get("editada_com_fluxo_nao_super") is True
+        else:
+            assert sol.status == "pendente"
+            assert "reaprovacao" in details
+
     def test_editar_so_observacao_nao_marca(self, g19, g1):
         dat = _dat(g19)
         sol = _pendente_super(g1)

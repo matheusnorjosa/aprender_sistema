@@ -171,10 +171,12 @@ test.describe(
       const solicitacao = await seedSolicitacao(coordApi, { fluxo: 'NAO_SUPER' });
       expect(solicitacao.status).toBe('aprovado');
 
+      // PR 11: a gerente da Superintendência só decide o SUPER da Superintendência (fora do escopo = 403
+      // out_of_approval_scope, antes do status). Quem decide qualquer evento é o DAT ou o Controle.
       const superApi = await createApiContext({
         baseURL: baseURL!,
-        username: ROLE_CREDENTIALS.super_geral.username,
-        password: ROLE_CREDENTIALS.super_geral.password,
+        username: ROLE_CREDENTIALS.dat_e2e.username,
+        password: ROLE_CREDENTIALS.dat_e2e.password,
       });
       const approveRes = await superApi.patch(`/api/solicitacoes/${solicitacao.id}/approve/`, { data: {} });
       expect(approveRes.status()).toBe(400);

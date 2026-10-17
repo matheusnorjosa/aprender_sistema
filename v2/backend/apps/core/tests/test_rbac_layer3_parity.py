@@ -135,6 +135,7 @@ def test_controle_tem_operar_controle_dat(rbac_seeded):
     assert user_has_any_perm(u, "operate_preagenda") is True
 
 
+@pytest.mark.usefixtures("modo_uniao")  # no corte o grupo não dá nada; a prova vale para a volta (PR 12)
 def test_dat_tem_operar_controle_dat(rbac_seeded):
     """Issue #1222 (Epic 1): o grupo DAT não tem operate_preagenda (o pacote do DAT tem, desde o PR 10)."""
     u = _user_with_groups("paridade_scd_dat", ["DAT"], vinculo=False)

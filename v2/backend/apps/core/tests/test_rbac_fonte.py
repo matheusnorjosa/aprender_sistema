@@ -124,12 +124,16 @@ class TestCanario:
             assert solicitation_approval_basis(pessoa) is None
 
     def test_no_modo_soma_o_mesmo_canario_tem_os_grupos(self):
-        """Controle positivo do canário: o modo soma ainda lê os grupos (a volta funciona)."""
-        pessoa = _so_grupos("DAT", "Controle", "Diretoria")
+        """Controle positivo do canário: o modo soma ainda lê os grupos (a volta funciona). E a volta não traz
+        de volta a aprovação por grupo (PR 11): nem os pares Controle + Assistente Administrativo e
+        Superintendência + Gerente aprovam."""
+        grupos = ("DAT", "Controle", "Diretoria", "Assistente Administrativo", "Superintendência", "Gerente")
+        pessoa = _so_grupos(*grupos)
         with UNIAO:
-            assert capacidades_sem_cache(pessoa.id) == _do_grupo("DAT") | _do_grupo("Controle") | _do_grupo("Diretoria")
+            assert capacidades_sem_cache(pessoa.id) == set().union(*(_do_grupo(nome) for nome in grupos))
             for chave in TELAS_DE_ESCOPO:
                 assert user_has_policy(pessoa, chave), chave
+            assert solicitation_approval_basis(pessoa) is None
 
 
 class TestCapacidades:

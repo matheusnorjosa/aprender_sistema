@@ -86,8 +86,8 @@ def solicitacao_aprovada(db, usuario_controle, projeto, municipio, tipo_evento):
         projeto=projeto,
         municipio=municipio,
         tipo_evento=tipo_evento,
-        inicio="2025-11-15T08:00:00-03:00",
-        fim="2025-11-15T12:00:00-03:00",
+        inicio="2099-11-15T08:00:00-03:00",
+        fim="2099-11-15T12:00:00-03:00",
         status="aprovado",
         gcal_status="NONE",
     )
@@ -101,8 +101,8 @@ def solicitacao_pendente(db, usuario_controle, projeto, municipio, tipo_evento):
         projeto=projeto,
         municipio=municipio,
         tipo_evento=tipo_evento,
-        inicio="2025-11-16T08:00:00-03:00",
-        fim="2025-11-16T12:00:00-03:00",
+        inicio="2099-11-16T08:00:00-03:00",
+        fim="2099-11-16T12:00:00-03:00",
         status="pendente",
         gcal_status="NONE",
     )
@@ -125,8 +125,8 @@ class TestGCalPublishBatchEndpoint:
             projeto=solicitacao_aprovada.projeto,
             municipio=solicitacao_aprovada.municipio,
             tipo_evento=solicitacao_aprovada.tipo_evento,
-            inicio="2025-11-17T08:00:00-03:00",
-            fim="2025-11-17T12:00:00-03:00",
+            inicio="2099-11-17T08:00:00-03:00",
+            fim="2099-11-17T12:00:00-03:00",
             status="aprovado",
             gcal_status="NONE",
         )

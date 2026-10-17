@@ -119,6 +119,8 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "gcal_status",
             "gcal_last_sync_at",
             "gcal_last_error",
+            # Virada (16/10/2026): no Google pela planilha e não adotado → a tela não oferece Publicar.
+            "publicado_fora_do_sistema",
             # gcal_payload_hash removed: internal implementation detail
             # PR19/RF06: Google Meet link
             "meet_link",
@@ -137,6 +139,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "gcal_status",
             "gcal_last_sync_at",
             "gcal_last_error",
+            "publicado_fora_do_sistema",
             # gcal_payload_hash removed: internal implementation detail
             # PR19/RF06: Google Meet link (gerado automaticamente)
             "meet_link",

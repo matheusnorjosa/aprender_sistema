@@ -27,6 +27,31 @@ from .validation import _event_id_for
 logger = logging.getLogger(__name__)
 
 
+class CriacaoRecusada(ValueError):
+    """O sync ia CRIAR (ou adotar o `asv2{id}`) no Google e a guarda da virada recusou (`code` diz por quê).
+
+    `evento_passado`: o evento já terminou. `publicado_fora_do_sistema`: ele já está no Google pela
+    planilha e não foi adotado, então criar daria um segundo evento. Quem chama marca ERROR (tarefa)
+    ou conta como SKIP (`preagenda_to_gcal`)."""
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
+def _motivo_para_nao_criar(s: Solicitacao) -> CriacaoRecusada | None:
+    """Guarda única do CREATE e do ADOPT (Publicar, lote, Reapply, Resync e `preagenda_to_gcal` passam por aqui)."""
+    if s.publicado_fora_do_sistema:
+        return CriacaoRecusada(
+            "publicado_fora_do_sistema",
+            f"Solicitação #{s.id} já está no Google Agenda pela planilha e não foi adotada; criar daria um "
+            "segundo evento.",
+        )
+    if s.fim < timezone.now():
+        return CriacaoRecusada("evento_passado", f"Solicitação #{s.id} já terminou; o sistema não cria evento passado.")
+    return None
+
+
 @retry_on_deadlock(operation="gcal.apply_one_solicitacao")
 def apply_one_solicitacao(
     s: Solicitacao,
@@ -256,12 +281,21 @@ def upsert_one(
 
         # Verificar se evento já existe no Calendar
         existing = None
+        # Event ID adotado (veio do Google pela planilha, não é o `asv2{id}`): se o GET por ele falha, o
+        # evento não pode ser recriado pelo id determinístico, senão o Google fica com dois (virada, #1899).
+        adotado = bool(s.external_event_id) and s.external_event_id != deterministic_eid
         if s.external_event_id:
             # Tentar buscar pelo ID armazenado no DB
             try:
                 existing = client.get(calendar_id, s.external_event_id)
             except Exception as e:
+                if adotado:
+                    raise
                 error_msg = f"Erro ao buscar evento: {str(e)}"
+            if existing is None and adotado:
+                raise ValueError(
+                    f"Solicitação #{s.id}: o evento adotado não foi achado no Google; nada foi criado para não duplicar."
+                )
 
         if existing is None:
             # Tentar adotar evento com eventId determinístico
@@ -270,6 +304,13 @@ def upsert_one(
             except Exception as e:
                 if error_msg is None:
                     error_msg = f"Erro ao buscar evento determinístico: {str(e)}"
+
+        if existing is None or not s.external_event_id:
+            # Publicar (CREATE, ou ADOPT do `asv2{id}` que o GET achou, mesmo cancelado: o DELETE do Google é
+            # soft-delete e o UPDATE o traz de volta) passa pela guarda. UPDATE de evento já publicado não.
+            recusa = _motivo_para_nao_criar(s)
+            if recusa is not None:
+                raise recusa
 
         if existing is None:
             # CREATE: Evento não existe
@@ -350,9 +391,11 @@ def upsert_one(
             return SyncOutcome(action, s.id, external_event_id, payload["summary"])
 
         else:
-            # UPDATE ou ADOPT
+            # UPDATE ou ADOPT. Alvo = o id gravado (o adotado da planilha, #1899); só sem id gravado o
+            # evento achado é o `asv2{id}`. (No 409 do insert acima o alvo segue o `asv2{id}`: é o id inserido.)
             action = "UPDATE"
-            external_event_id = deterministic_eid
+            external_event_id = s.external_event_id or deterministic_eid
+            alvo = external_event_id
 
             if not s.external_event_id:
                 # DB não tinha o ID, mas evento existe → ADOPT
@@ -371,11 +414,11 @@ def upsert_one(
                 try:
                     # RF05: Retry com backoff exponencial (PR19)
                     updated = _retry_with_circuit_breaker(
-                        lambda: client.update(calendar_id, deterministic_eid, payload),
+                        lambda: client.update(calendar_id, alvo, payload),
                         operation_name=f"GCal UPDATE #{s.id}",
                     )
                     if not s.external_event_id:
-                        s.external_event_id = deterministic_eid
+                        s.external_event_id = alvo
 
                     # RF06: Extrair hangoutLink se disponível
                     hangout_link = updated.get("hangoutLink") if updated else None

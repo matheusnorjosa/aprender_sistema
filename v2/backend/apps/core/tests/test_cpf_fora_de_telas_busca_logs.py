@@ -427,7 +427,12 @@ def test_pedidos_ao_gcal_logam_user_id_sem_username(caplog, acao):
     from apps.core.services import solicitacao_publish as svc
 
     user = _conta(nome="Operadora", groups=["Controle"])
-    s = SolicitacaoFactory(status="aprovado", external_event_id="evt1", gcal_status=Solicitacao.GCalStatus.PUBLISHED)
+    if acao == "publish":  # publicar o já publicado é recusado (virada, `motivo_nao_publicavel`)
+        s = SolicitacaoFactory(status="aprovado")
+    else:
+        s = SolicitacaoFactory(
+            status="aprovado", external_event_id="evt1", gcal_status=Solicitacao.GCalStatus.PUBLISHED
+        )
     request = RequestFactory().post("/")
     tarefa = MagicMock(id="tarefa-1")
     with (

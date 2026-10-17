@@ -1,15 +1,13 @@
 """
-PR B1 — comando `relatorio_aprovadores` (somente leitura, sem CPF/e-mail/telefone).
+PR B1 / PR 11 — comando `relatorio_aprovadores` (somente leitura, só u<id>, sem cache).
 
-Roda ANTES do deploy do B1: no deploy, todo GERENTE vigente na SUPERINTENDENCIA passa a
-aprovar, então o dono confere a lista nome por nome. O relatório traz as 5 informações
-da seção "Dado de produção" do plano:
+O relatório é o retrato de `solicitation_approval_basis` e traz 5 informações:
 1. quantas `Gerencia(nome="SUPERINTENDENCIA")` existem (esperado 1) e o id;
-2. os GERENTEs vigentes nela, com id, nome e os outros papéis de cada um;
+2. os GERENTEs vigentes nela, com id e os outros papéis de cada um;
 3. a comparação com `Gerencia.gerente` dessa gerência;
-4. quantas pessoas aprovam só pelo composite de grupos (esperado 0);
+4. os aprovadores por base (PR 11) e as contas inativas que aprovariam se reativadas;
 5. as pendentes por fluxo (SUPER, NAO_SUPER, sem projeto) e quantas foram criadas
-   pelos futuros aprovadores.
+   pelos aprovadores.
 """
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportMissingParameterType=false, reportUnknownParameterType=false
@@ -19,6 +17,7 @@ from __future__ import annotations
 import json
 from io import StringIO
 from typing import Any
+from unittest.mock import patch
 
 from django.core.management import call_command
 from django.db import connection
@@ -66,28 +65,39 @@ def test_relatorio_traz_as_cinco_informacoes(cenario):
 
     gerentes = {g["id"]: g for g in dados["gerentes_vigentes"]}
     assert set(gerentes) == {cenario["ana"].id, cenario["bia"].id}
-    assert gerentes[cenario["ana"].id]["nome"] == "Ana Aprovadora"
+    assert "nome" not in gerentes[cenario["ana"].id]
     assert gerentes[cenario["ana"].id]["outros_papeis"] == ["COORDENADOR em GERENCIA 2 REL"]
 
-    assert dados["gerente_cadastrado"] == {
-        "id": cenario["bia"].id,
-        "nome": "Bia Gerente",
-        "entre_os_gerentes_vigentes": True,
-    }
+    assert dados["gerente_cadastrado"] == {"id": cenario["bia"].id, "entre_os_gerentes_vigentes": True}
 
-    assert dados["so_composite_de_grupos"]["quantidade"] == 1
-    assert dados["so_composite_de_grupos"]["ids"] == [cenario["so_grupo"].id]
+    # PR 11: o par de grupos (Superintendência + Gerente) não aprova; o `so_grupo` não aparece.
+    assert dados["aprovadores_por_base"] == {
+        "superuser": [],
+        "gerente_superintendencia": sorted([cenario["ana"].id, cenario["bia"].id]),
+        "capacidade_aprovar": [],
+    }
+    assert dados["inativas_que_aprovariam_se_reativadas"] == []
 
     assert dados["pendentes_por_fluxo"] == {"SUPER": 2, "NAO_SUPER": 1, "sem_projeto": 1}
-    assert dados["pendentes_criadas_por_futuros_aprovadores"] == {"SUPER": 1, "NAO_SUPER": 0, "sem_projeto": 0}
+    assert dados["pendentes_criadas_por_aprovadores"] == {"SUPER": 1, "NAO_SUPER": 0, "sem_projeto": 0}
 
 
-def test_relatorio_nao_expoe_cpf_email_nem_telefone(cenario):
+def test_relatorio_nao_expoe_nome_cpf_email_nem_telefone(cenario):
     for saida in (_relatorio(), _relatorio("--json")):
         assert "52998224725" not in saida
         assert "ana@example.com" not in saida
         assert "85999990000" not in saida
         assert cenario["ana"].username not in saida
+        for nome in ("Ana", "Aprovadora", "Bia", "Caio"):
+            assert nome not in saida
+
+
+def test_relatorio_nao_le_nem_grava_o_cache(cenario):
+    """PR 11 (M6): a base `capacidade_aprovar` vem de `capacidades_sem_cache`; nada passa pelo cache."""
+    with patch("django.core.cache.cache.get") as get, patch("django.core.cache.cache.set") as set_:
+        _relatorio("--json")
+    assert not set_.called
+    assert not get.called
 
 
 def test_relatorio_e_somente_leitura(cenario):

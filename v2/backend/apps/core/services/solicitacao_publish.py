@@ -22,6 +22,36 @@ from apps.core.utils.net import get_client_ip
 
 logger = logging.getLogger(__name__)
 
+# Por que o evento não pode ir ao Google agora (virada, 16/10/2026). Mensagem para a tela e o lote.
+MENSAGENS_NAO_PUBLICAVEL: dict[str, str] = {
+    "publicado_fora_do_sistema": (
+        "Este evento já está no Google Agenda pela planilha e o sistema não o adotou: publicar criaria um "
+        "segundo evento. Ajuste no Google, ou peça a adoção."
+    ),
+    "evento_passado": "Este evento já terminou: o sistema não publica nem reenvia evento passado.",
+    "ja_publicado": "Este evento já foi publicado (ou está sendo). Use Atualizar no Google.",
+    "nao_publicado": "Este evento ainda não foi publicado: use Publicar, não Reaplicar nem Reenviar.",
+}
+
+
+def motivo_nao_publicavel(s: Solicitacao, *, reenvio: bool = False) -> str | None:
+    """Código do motivo para recusar Publicar (`reenvio=False`) ou Reapply/Resync (`reenvio=True`),
+    ou None se pode. Vem antes de enfileirar; a guarda final do CREATE fica no `upsert_one`.
+
+    Publicar: recusa o já publicado (PUBLISHED ou PENDING; ERROR pode tentar de novo). Reenvio: recusa o
+    que nunca foi ao Google (`NONE`), porque nele o sync cria. Os dois recusam o evento que já terminou e
+    o que está no Google pela planilha sem adoção (`publicado_fora_do_sistema`)."""
+    if s.publicado_fora_do_sistema:
+        return "publicado_fora_do_sistema"
+    if s.fim < timezone.now():
+        return "evento_passado"
+    if reenvio:
+        if s.gcal_status == Solicitacao.GCalStatus.NONE:
+            return "nao_publicado"
+    elif s.gcal_status in (Solicitacao.GCalStatus.PUBLISHED, Solicitacao.GCalStatus.PENDING):
+        return "ja_publicado"
+    return None
+
 
 @dataclass
 class PublishResult:
@@ -213,6 +243,9 @@ def publish_to_gcal(
             message="Apenas solicitações aprovadas podem ser publicadas no Google Calendar.",
             code="not_approved",
         )
+    motivo = motivo_nao_publicavel(solicitacao)
+    if motivo is not None:
+        raise ValidationAPIError(message=MENSAGENS_NAO_PUBLICAVEL[motivo], code=motivo)
 
     # #1452: revalidação NÃO bloqueante, de propósito.
     #

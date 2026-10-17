@@ -1094,6 +1094,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             "inicio": instance.inicio.isoformat() if instance.inicio else None,
             "fim": instance.fim.isoformat() if instance.fim else None,
             "status": instance.status,
+            # Virada: a carga da planilha não recria o evento que a tela apagou (lê este retrato).
+            "external_hash": instance.external_hash,
         }
 
         client_ip = get_client_ip(self.request)

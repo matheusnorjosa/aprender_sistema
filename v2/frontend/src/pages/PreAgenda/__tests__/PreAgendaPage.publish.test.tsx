@@ -96,7 +96,7 @@ describe('PreAgendaPage — publicação (M12-19 / #1629)', () => {
     mockRows([row({ id: 20, municipio_nome: 'Sobral', gcal_status: 'PENDING' })]);
     render(<PreAgendaPage />);
     await screen.findByText('Sobral');
-    expect(screen.getByLabelText('Publicar evento no Google Calendar')).toBeDisabled();
+    expect(screen.getByLabelText('Publicar evento no Google Calendar: já publicado')).toBeDisabled();
   });
 
   test('botão publicar fica habilitado quando gcal_status é NONE', async () => {
@@ -104,6 +104,48 @@ describe('PreAgendaPage — publicação (M12-19 / #1629)', () => {
     render(<PreAgendaPage />);
     await screen.findByText('Caucaia');
     expect(screen.getByLabelText('Publicar evento no Google Calendar')).not.toBeDisabled();
+  });
+});
+
+// Virada (16/10/2026): a tela segue o `motivo_nao_publicavel` do backend.
+describe('PreAgendaPage — evento passado e publicado fora do sistema', () => {
+  const FUTURO = { inicio: '2099-11-05T09:00:00-03:00', fim: '2099-11-05T12:00:00-03:00' };
+  const PASSADO = { inicio: '2020-01-10T09:00:00-03:00', fim: '2020-01-10T12:00:00-03:00' };
+
+  test('Publicar fica desabilitado no evento passado, com o motivo no nome acessível', async () => {
+    mockRows([row({ id: 50, municipio_nome: 'Crato', ...PASSADO })]);
+    render(<PreAgendaPage />);
+    await screen.findByText('Crato');
+    expect(screen.getByLabelText('Publicar evento no Google Calendar: o evento já terminou')).toBeDisabled();
+  });
+
+  test('Publicar fica desabilitado no evento que está no Google pela planilha', async () => {
+    mockRows([row({ id: 51, municipio_nome: 'Juazeiro', publicado_fora_do_sistema: true, ...FUTURO })]);
+    render(<PreAgendaPage />);
+    await screen.findByText('Juazeiro');
+    expect(
+      screen.getByLabelText('Publicar evento no Google Calendar: já está no Google Agenda pela planilha'),
+    ).toBeDisabled();
+  });
+
+  test('Publicar segue habilitado no evento futuro não publicado', async () => {
+    mockRows([row({ id: 52, municipio_nome: 'Quixadá', ...FUTURO })]);
+    render(<PreAgendaPage />);
+    await screen.findByText('Quixadá');
+    expect(screen.getByLabelText('Publicar evento no Google Calendar')).not.toBeDisabled();
+  });
+
+  test('a seleção para Reaplicar/Reenviar só deixa marcar o que já foi ao Google e não terminou', async () => {
+    mockRows([
+      row({ id: 60, municipio_nome: 'Nunca', ...FUTURO }),
+      row({ id: 61, municipio_nome: 'Passou', gcal_status: 'PUBLISHED', ...PASSADO }),
+      row({ id: 62, municipio_nome: 'Publicado', gcal_status: 'PUBLISHED', ...FUTURO }),
+    ]);
+    render(<PreAgendaPage />);
+    await screen.findByText('Publicado');
+    expect(screen.getByLabelText('Selecionar evento: ainda não publicado')).toBeDisabled();
+    expect(screen.getByLabelText('Selecionar evento: o evento já terminou')).toBeDisabled();
+    expect(screen.getByLabelText('Selecionar evento')).not.toBeDisabled();
   });
 });
 

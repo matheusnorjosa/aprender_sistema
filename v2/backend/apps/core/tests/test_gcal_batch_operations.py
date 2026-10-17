@@ -112,6 +112,15 @@ def setup_solicitacoes(usuario_controle):
 
 
 @pytest.fixture
+def setup_publicadas(setup_solicitacoes):
+    """As 3 aprovadas já no Google: Reapply só reenvia o que foi publicado (virada, `nao_publicado`)."""
+    for sol in setup_solicitacoes:
+        sol.gcal_status = Solicitacao.GCalStatus.PUBLISHED
+        sol.save(update_fields=["gcal_status"])
+    return setup_solicitacoes
+
+
+@pytest.fixture
 def google_oauth_credential(usuario_controle):
     """
     Cria credencial OAuth para testes.
@@ -161,7 +170,7 @@ def google_oauth_credential(usuario_controle):
 @pytest.mark.django_db
 @override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")
 @patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
-def test_batch_reapply_retorna_202_com_queued_count(mock_task, api_client, usuario_controle, setup_solicitacoes):
+def test_batch_reapply_retorna_202_com_queued_count(mock_task, api_client, usuario_controle, setup_publicadas):
     """
     Issue #95: Batch reapply retorna 202 Accepted com queued count correto.
 
@@ -176,7 +185,7 @@ def test_batch_reapply_retorna_202_com_queued_count(mock_task, api_client, usuar
 
     api_client.force_authenticate(user=usuario_controle)
 
-    ids = [sol.id for sol in setup_solicitacoes]
+    ids = [sol.id for sol in setup_publicadas]
 
     response = api_client.post(
         "/api/gcal/dashboard/batch/reapply/", {"ids": ids, "dry_run": False, "apply_blocked": True}, format="json"
@@ -198,7 +207,7 @@ def test_batch_reapply_retorna_202_com_queued_count(mock_task, api_client, usuar
 @pytest.mark.django_db
 @override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="service_account")
 @patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
-def test_batch_reapply_retorna_erros_para_ids_inexistentes(mock_task, api_client, usuario_controle, setup_solicitacoes):
+def test_batch_reapply_retorna_erros_para_ids_inexistentes(mock_task, api_client, usuario_controle, setup_publicadas):
     """
     Issue #95: Batch reapply retorna erros para IDs inexistentes em errors[].
 
@@ -209,7 +218,7 @@ def test_batch_reapply_retorna_erros_para_ids_inexistentes(mock_task, api_client
     """
     api_client.force_authenticate(user=usuario_controle)
 
-    ids_validos = [sol.id for sol in setup_solicitacoes]
+    ids_validos = [sol.id for sol in setup_publicadas]
     ids_invalidos = [99999, 99998]
     ids = ids_validos + ids_invalidos
 
@@ -361,7 +370,7 @@ def test_batch_reapply_oauth_mode_sem_credencial_retorna_403(
 @override_settings(GCAL_CLIENT="google", GCAL_AUTH_MODE="oauth")
 @patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
 def test_batch_reapply_oauth_mode_com_credencial_retorna_202(
-    mock_task, api_client, usuario_controle, setup_solicitacoes, google_oauth_credential
+    mock_task, api_client, usuario_controle, setup_publicadas, google_oauth_credential
 ):
     """
     OAuth Phase 7: Batch reapply com credencial → 202 Accepted.
@@ -376,7 +385,7 @@ def test_batch_reapply_oauth_mode_com_credencial_retorna_202(
 
     api_client.force_authenticate(user=usuario_controle)
 
-    ids = [sol.id for sol in setup_solicitacoes]
+    ids = [sol.id for sol in setup_publicadas]
 
     response = api_client.post(
         "/api/gcal/dashboard/batch/reapply/", {"ids": ids, "dry_run": False, "apply_blocked": True}, format="json"

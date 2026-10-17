@@ -70,7 +70,7 @@ Rodei um workflow de 8 agentes cruzando cada afirmação do **lado-sistema** da 
 |---|---|---|---|
 | `projeto.setor` × `gerencia.setor_canonico` (gate D6) | 🔶 reclass | **campos criados** (#1893 ✅ — `get_setor` prefere o model, fallback derivado); **populado via import (#1897 ✅ — setor seed-if-empty + sem_operacao)**; `projeto.gerencia` 124/125 vazio | #1893 ✅ · #1897 ✅ · #1898 |
 | `EquipeGerencia.vigentes_em()` + setor | 🟡 parcial | esqueleto **roda em prod**; `Gerencia.setor_canonico` **criado** (#1893 ✅, só em Gerencia) | #1893 ✅ |
-| `external_event_id` importável | 🔶 reclass ⚠️ | campo é **cache determinístico** (`asv2-{id}`); **NÃO importável** (landmine `tipo_compra`≠`tipo`) | #1899 |
+| `external_event_id` importável | ✅ resolvido (16/10/2026) | era só o `asv2{id}` derivado. Desde o importador da virada, o Event ID do sheet2gcal (`confianca=alta`) é **adotado** pela entidade `gcal_adocao`, e o sync atualiza pelo id gravado (#1899). Ver [`imports.spec.md`](../specs/backend/imports.spec.md) e [`gcal.spec.md`](../specs/backend/gcal.spec.md) | #1899 ✅ |
 | Colecao tem import próprio | ✅ ok | `POST /api/colecoes/import/` existe; remover `colecao.csv` é inócuo | — |
 | não apagar model `Prova` | ✅ ok | model **vivo** (PATCH `update_prova`, serializers, prefetch); "0 provas" = dado vazio | — |
 | `usuario.status`/`desativado_localmente` | 🔴 refutado ⚠️ | **não existem** (só `is_active`); a bomba foi **corrigida** (never-reactivate) e o campo persistente `desativado_localmente` **existe** (#1894) | #1891 ✅ · #1894 ✅ |
@@ -216,7 +216,8 @@ Onda 0 ✅ ──> Onda A (agora, independente)
 prova.csv com log explícito de origem-vazia · colecao.csv removido · 3 projetos de catálogo). Item que
 **volta** ao sheets.banco (#1899): **`external_event_id` reclassificar** — o sistema deriva a identidade
 (`asv2-{id}`) e não ingere id externo; **não é campo importável**. Conferir se a coluna não é, na verdade,
-outra coisa (link/observação).
+outra coisa (link/observação). *(Atualização de 16/10/2026: era o Event ID real do Google; ver a linha
+de `external_event_id` acima.)*
 
 **Dados/respostas:** lista dos 34 eventos futuros do Elienai (município/data/status publicação) —
 p/ desenhar a transferência (F.1) · quem atende os 21 projetos órfãos (A COR DA GENTE, ED

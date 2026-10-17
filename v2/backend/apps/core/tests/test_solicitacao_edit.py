@@ -986,6 +986,18 @@ class TestSolicitacaoDelete:
         assert log.usuario == usuario_owner
         assert log.details["solicitacao_data"]["id"] == sol_id
 
+    def test_delete_guarda_o_external_hash(self, api_client, usuario_owner, solicitacao_editavel):
+        """Virada: o retrato do DELETE leva o `external_hash`, para a carga não recriar o evento apagado."""
+        solicitacao_editavel.external_hash = "EV777001"
+        solicitacao_editavel.save(update_fields=["external_hash"])
+        api_client.force_authenticate(user=usuario_owner)
+
+        response = api_client.delete(f"/api/solicitacoes/{solicitacao_editavel.id}/")
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        log = AuditLog.objects.get(action="DELETE", model_name="Solicitacao")
+        assert log.details["solicitacao_data"]["external_hash"] == "EV777001"
+
     def test_unauthenticated_cannot_delete(self, api_client, solicitacao_editavel):
         """Usuário não autenticado não pode excluir."""
         response = api_client.delete(f"/api/solicitacoes/{solicitacao_editavel.id}/")

@@ -52,8 +52,20 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.core.models import Solicitacao
+from apps.core.services.gcal.sync import CriacaoRecusada
+from apps.core.services.gcal.types import SyncOutcome
 from apps.core.services.gcal_fake_client import FakeCalendarClient
 from apps.core.services.gcal_sync_service import upsert_one
+
+
+def _upsert_ou_pula(**kwargs: Any) -> SyncOutcome:
+    """`upsert_one`, mas a recusa da guarda do CREATE (evento passado ou já no Google pela planilha) vira
+    SKIP: um evento recusado não derruba a execução inteira (virada, 16/10/2026)."""
+    try:
+        return upsert_one(**kwargs)
+    except CriacaoRecusada as e:
+        s = kwargs["s"]
+        return SyncOutcome("SKIP", s.id, None, f"Solicitação #{s.id} ({e.code})")
 
 
 class Command(BaseCommand):
@@ -254,7 +266,7 @@ class Command(BaseCommand):
                 # Processamento em lote único (ou dry-run, que não precisa de lock)
                 with transaction.atomic():
                     for s in qs:
-                        outcome = upsert_one(
+                        outcome = _upsert_ou_pula(
                             client=client,
                             calendar_id=cal_id,
                             s=s,
@@ -305,7 +317,7 @@ class Command(BaseCommand):
                         # Re-fetch com select_for_update para garantir lock
                         s_locked = Solicitacao.objects.select_for_update().get(pk=s.pk)
 
-                        outcome = upsert_one(
+                        outcome = _upsert_ou_pula(
                             client=client,
                             calendar_id=cal_id,
                             s=s_locked,

@@ -8,10 +8,19 @@ Uso:
     # apply create-only de entidades EXPLICITAMENTE permitidas (futuro):
     python manage.py import_export_contract --path ... --apply --allow-entity dat_area
 
+    # carga da virada (uma só): dry-run, depois apply com solicitacao + participation
+    python manage.py import_export_contract --path ... --mode virada
+    python manage.py import_export_contract --path ... --mode virada --apply \
+        --allow-entity solicitacao --allow-entity participation
+    # adoção do Event ID do Google (depois do A5), sozinha
+    python manage.py import_export_contract --path ... --mode virada --apply --allow-entity gcal_adocao
+
 Segurança:
 - sem `--apply` → dry-run (só classifica).
 - `--apply` sem `--allow-entity` → BLOQUEADO (nada escrito).
 - modo `create-only`: só insere would_create; nunca atualiza; nunca sobrescreve campo protegido.
+- modo `virada`: atualiza o evento existente que ninguém mexeu pela tela (plano de 16/10/2026); exige
+  `solicitacao` e `participation` juntos, ou `gcal_adocao` sozinha. A carga nunca chama o Google.
 """
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAttributeAccessIssue=false, reportUnknownArgumentType=false
@@ -37,8 +46,8 @@ class Command(BaseCommand):
         parser.add_argument(
             "--mode",
             default="create-only",
-            choices=["create-only"],
-            help="Modo de import (apenas create-only nesta fase).",
+            choices=["create-only", "virada"],
+            help="create-only (padrão) ou virada (carga única: atualiza o evento não mexido pela tela).",
         )
         parser.add_argument(
             "--apply",
@@ -90,6 +99,22 @@ class Command(BaseCommand):
                 "--allow-entity participation exige --allow-entity solicitacao na mesma execução"
                 + " (participação só vincula a evento criado nesta carga)."
             )
+        # Virada: a adoção do Event ID roda sozinha, depois do A5 (gravar Event ID em evento ainda pendente
+        # faria o sync apagá-lo no Google). A carga troca formadores dentro da fase da solicitação, então
+        # `solicitacao` sem `participation` seria uma carga pela metade.
+        if "gcal_adocao" in allow:
+            if opts["mode"] != "virada":
+                raise CommandError("--allow-entity gcal_adocao exige --mode virada.")
+            if allow & {"solicitacao", "participation"}:
+                raise CommandError(
+                    "--allow-entity gcal_adocao roda sozinha: primeiro a carga (solicitacao + participation),"
+                    + " depois o A5, e só então a adoção."
+                )
+        elif opts["mode"] == "virada" and opts["apply"] and not {"solicitacao", "participation"} <= allow:
+            raise CommandError(
+                "--mode virada --apply exige --allow-entity solicitacao e --allow-entity participation"
+                + " (ou gcal_adocao sozinha)."
+            )
         actor = self._resolve_actor(opts.get("as_user"))
         importer = ExportContractImporter(
             path=opts["path"],
@@ -133,5 +158,11 @@ class Command(BaseCommand):
                     )
                 if v.get("projetos_nao_resolvidos"):
                     self.stdout.write(f"    projetos_nao_resolvidos={v['projetos_nao_resolvidos']}")
+        for ent in ("solicitacao", "gcal_adocao"):
+            v = report["por_entidade"].get(ent) or {}
+            if v.get("virada"):
+                self.stdout.write(f"    [{ent}] virada={v['virada']}")
+            if v.get("existente_fora_do_csv"):
+                self.stdout.write(f"    [{ent}] existente_fora_do_csv={v['existente_fora_do_csv']}")
         if report["applied"]:
-            self.stdout.write(self.style.SUCCESS(f"  applied(create-only)={report['applied']}"))
+            self.stdout.write(self.style.SUCCESS(f"  applied({report['mode']})={report['applied']}"))

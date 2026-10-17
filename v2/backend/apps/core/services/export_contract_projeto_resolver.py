@@ -248,6 +248,23 @@ def resolve_projeto_agenda(raw_name: str, disciplina: str, *, index: ProjetoInde
     return resolve_projeto_export(raw_name, index=idx)
 
 
+def projetos_do_agrupador(raw_name: str, *, index: ProjetoIndex | None = None) -> set[int]:
+    """Ids do agrupador `raw_name` (Superativar/ACerta) e dos projetos das disciplinas dele que existem no
+    catálogo. Vazio se `raw_name` não é agrupador. A carga da virada só troca o projeto de um evento dentro
+    deste conjunto (o evento não guarda a disciplina; fora dele a troca desfaria decisão do dono)."""
+    idx = index or build_projeto_index()
+    ck = _canon_key(raw_name)
+    nomes = [alvo for (agrupador, _disc), alvo in _AGRUPADOR_POR_DISCIPLINA.items() if agrupador == ck]
+    if not nomes:
+        return set()
+    ids: set[int] = set()
+    for nome in (raw_name, *nomes):
+        res = resolve_projeto_export(nome, index=idx)
+        if res.status == "matched" and res.projeto is not None:
+            ids.add(res.projeto.id)
+    return ids
+
+
 def projeto_geral_index() -> dict[str, int]:
     """Índice norm(nome) -> id das famílias (ProjetoGeral.nome é unique), com os apelidos de família.
 

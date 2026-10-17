@@ -13,8 +13,9 @@ Regras que estes testes travam:
 - o simulador recebe a fonte por parâmetro (sem `override_settings` em código de produção, K17) e bate
   com a API no mesmo modo;
 - o padrão do código é "lotacao" (K14) e o valor vazio também (K5);
-- catraca: cada acesso a grupo no código de produção (lido pela árvore sintática, não por linha) está numa
-  lista fechada, e os de poder estão sob `grupos_dao_poder()` (K4); todos os grupos sem vínculo = sem grupo
+- catraca: cada acesso a grupo que o detector reconhece no código de produção (lido pela árvore sintática,
+  não por linha; SQL cru e `getattr` com variável ficam fora) está na lista com o motivo, e os de poder estão
+  sob `grupos_dao_poder()` (K4); todos os grupos sem vínculo = sem grupo
   (status e, nos GET, corpo) em cada recurso de `RESOURCES`, com linhas de outra gerência no banco.
 """
 
@@ -323,8 +324,14 @@ def test_gerencia_diretoria_da_o_pacote_diretoria():
 # A varredura é pela árvore sintática dos .py de produção do backend, não por regex de linha: o formato
 # que o Black quebra em várias linhas, o apelido (`grupos = user.groups`) e `getattr(user, "groups")`
 # também aparecem. Conta como acesso a grupo: atributo `groups` ou `user_set`; argumento nomeado `groups`
-# ou `groups__*` em qualquer chamada; `user` ou `user__*` numa chamada sobre `Group.objects`; e
-# `getattr(_, "groups" | "user_set")`. Cada acesso vira o trecho normalizado (`ast.unparse`) da expressão
+# ou `groups__*` em qualquer chamada; lookup em string (`"groups"`, `"user_set"`, `"groups__*"`,
+# `"user_set__*"`) como argumento posicional (`values_list`, `F`, `Count`, `prefetch_related`…), como chave
+# de `**{...}` ou em `source=`; `user` ou `user__*` numa chamada sobre o gerenciador de `Group`
+# (`objects`, `_default_manager`, `_base_manager`; `Group`, apelido importado ou `get_model("auth", "Group")`);
+# e `getattr(_, "groups" | "user_set")`. Fora de alcance, e por isso a lista NÃO é fechada: SQL cru
+# (`core_usuario_groups`), `getattr` com nome em variável, lookup montado em f-string ou concatenação,
+# `x.Group` por módulo importado e a declaração de campos (`fields`/`filter_horizontal` de admin e
+# serializer). Cada acesso vira o trecho normalizado (`ast.unparse`) da expressão
 # que o contém (a cadeia de atributos e chamadas), e cada trecho aparece aqui com o motivo. A conferência é
 # por trecho, não por contagem por arquivo: trocar uma leitura com portão por outra sem portão, no mesmo
 # arquivo, também fica vermelho. Os trechos PODER ainda precisam estar sob `grupos_dao_poder(...)` (dentro
@@ -360,6 +367,14 @@ LEITURAS_DE_GRUPO: tuple[tuple[str, str, str], ...] = (
     ("apps/core/rbac_signals.py", "instance.groups.values_list('id', flat=True)", CACHE),
     ("apps/core/rbac_signals.py", "instance.groups.values_list('id', flat=True)", CACHE),
     ("apps/core/serializers/usuario.py", "obj.groups.all()", EXIBICAO),
+    (
+        "apps/core/serializers/usuario.py",
+        "serializers.PrimaryKeyRelatedField(many=True, queryset=Group.objects.all(), required=False, "
+        "allow_empty=True, write_only=True, source='groups')",
+        ESCRITA,
+    ),
+    ("apps/core/serializers/usuario.py", "validated_data.pop('groups', None)", ESCRITA),
+    ("apps/core/serializers/usuario.py", "validated_data.pop('groups', None)", ESCRITA),
     ("apps/core/serializers/usuario.py", "user.groups.all()", AUDITORIA),
     ("apps/core/serializers/usuario.py", "user.groups.set(final)", ESCRITA),
     ("apps/core/serializers/usuario.py", "instance.groups.values_list('pk', flat=True)", AUDITORIA),
@@ -402,6 +417,7 @@ LEITURAS_DE_GRUPO: tuple[tuple[str, str, str], ...] = (
         "PermissaoFuncional.objects.filter(groups__user__id=user_id).order_by().values_list('codename', flat=True)",
         PODER,
     ),
+    ("apps/core/services/rbac_snapshot.py", "qs.prefetch_related('groups').order_by('id')", DIAGNOSTICO),
     ("apps/core/services/rbac_snapshot.py", "usuario.groups.all()", DIAGNOSTICO),
     (
         "apps/core/services/rbac_snapshot.py",
@@ -416,11 +432,13 @@ LEITURAS_DE_GRUPO: tuple[tuple[str, str, str], ...] = (
     ("apps/core/services/usuarios_import.py", "usuario.groups.add(*permitidos)", ESCRITA),
     ("apps/core/signals.py", "receiver(m2m_changed, sender=PermissaoFuncional.groups.through)", CACHE),
     ("apps/core/signals.py", "instance.groups.values_list('pk', flat=True)", CACHE),
+    ("apps/core/views/admin.py", "Usuario.objects.prefetch_related('groups').all()", EXIBICAO),
     ("apps/core/views/admin.py", "usuario.groups.values_list('id', flat=True)", AUDITORIA),
     ("apps/core/views/admin.py", "usuario.groups.set(groups)", ESCRITA),
     ("apps/core/views/admin.py", "usuario.groups.values_list('id', flat=True)", AUDITORIA),
     ("apps/core/views/admin.py", "group.user_set.values_list('id', flat=True)", AUDITORIA),
     ("apps/core/views/admin.py", "group.user_set.set(users)", ESCRITA),
+    ("apps/core/views/admin.py", "PermissaoFuncional.objects.prefetch_related('groups').all()", EXIBICAO),
     ("apps/core/views/stats.py", "user.groups.filter(name__in=FORMADOR_ROLE_GROUPS).exists()", ESCOPO),
     ("apps/core/views_auth.py", "user.groups.values_list('name', flat=True)", EXIBICAO),
     ("apps/core/views_basic.py", "user.groups.values_list('name', flat=True)", EXIBICAO),
@@ -464,20 +482,52 @@ LEITURAS_DE_GRUPO: tuple[tuple[str, str, str], ...] = (
 _RAIZ_DO_BACKEND = Path(__file__).resolve().parents[3]
 
 
-def _sobre_group_objects(func: ast.expr) -> bool:
-    """A chamada sai de `Group.objects` (ex.: `Group.objects.filter(...)`, `Group.objects.all().exclude(...)`)."""
+_GERENCIADORES = frozenset({"objects", "_default_manager", "_base_manager"})
+
+
+def _nomes_de_group(arvore: ast.AST) -> frozenset[str]:
+    """`Group` e os apelidos do arquivo (`from django.contrib.auth.models import Group as G`)."""
+    apelidos = {
+        nome.asname
+        for no in ast.walk(arvore)
+        if isinstance(no, ast.ImportFrom)
+        for nome in no.names
+        if nome.name == "Group" and nome.asname
+    }
+    return frozenset({"Group", *apelidos})
+
+
+def _eh_classe_group(no: ast.expr, nomes_de_group: frozenset[str]) -> bool:
+    """`Group`, um apelido dele ou `get_model("auth", "Group")` / `get_model("auth.Group")`."""
+    if isinstance(no, ast.Name):
+        return no.id in nomes_de_group
+    if not isinstance(no, ast.Call):
+        return False
+    func = no.func
+    nome_da_funcao = func.attr if isinstance(func, ast.Attribute) else func.id if isinstance(func, ast.Name) else ""
+    textos = [a.value.lower() for a in no.args if isinstance(a, ast.Constant) and isinstance(a.value, str)]
+    return nome_da_funcao == "get_model" and textos in (["auth", "group"], ["auth.group"])
+
+
+def _sobre_group_objects(func: ast.expr, nomes_de_group: frozenset[str]) -> bool:
+    """A chamada sai do gerenciador de `Group` (ex.: `Group.objects.filter(...)`,
+    `Group._default_manager.all().exclude(...)`, `G.objects.filter(...)` com `Group as G`)."""
     no: ast.expr = func
     while isinstance(no, (ast.Attribute, ast.Call)):
         if isinstance(no, ast.Call):
             no = no.func
-        elif no.attr == "objects" and isinstance(no.value, ast.Name) and no.value.id == "Group":
+        elif no.attr in _GERENCIADORES and _eh_classe_group(no.value, nomes_de_group):
             return True
         else:
             no = no.value
     return False
 
 
-def _eh_acesso_a_grupo(no: ast.AST, pais: dict[ast.AST, ast.AST]) -> bool:
+def _eh_lookup_de_grupo(valor: object) -> bool:
+    return isinstance(valor, str) and (valor in _ATRIBUTOS_DE_GRUPO or valor.startswith(("groups__", "user_set__")))
+
+
+def _eh_acesso_a_grupo(no: ast.AST, pais: dict[ast.AST, ast.AST], nomes_de_group: frozenset[str]) -> bool:
     pai = pais.get(no)
     if isinstance(no, ast.Attribute):
         # `x.groups()` é método (ex.: `re.Match.groups()`); o gerenciador de grupos do Django não é chamado.
@@ -488,7 +538,21 @@ def _eh_acesso_a_grupo(no: ast.AST, pais: dict[ast.AST, ast.AST]) -> bool:
         if no.arg == "groups":
             # `"...{groups}".format(groups=n)` é texto.
             return not (isinstance(pai.func, ast.Attribute) and pai.func.attr == "format")
-        return (no.arg == "user" or no.arg.startswith("user__")) and _sobre_group_objects(pai.func)
+        if no.arg == "source":
+            # Campo DRF que lê o grupo: `PrimaryKeyRelatedField(source="groups")`.
+            return isinstance(no.value, ast.Constant) and _eh_lookup_de_grupo(no.value.value)
+        return (no.arg == "user" or no.arg.startswith("user__")) and _sobre_group_objects(pai.func, nomes_de_group)
+    if isinstance(no, ast.Constant) and _eh_lookup_de_grupo(no.value):
+        # Lookup escrito como string: `values_list("groups__name")`, `F("groups__name")`,
+        # `prefetch_related("groups")`, ou chave de `filter(**{"groups__name": x})`.
+        if isinstance(pai, ast.Call):
+            return no in pai.args
+        return (
+            isinstance(pai, ast.Dict)
+            and no in pai.keys
+            and isinstance(pais.get(pai), ast.keyword)
+            and pais[pai].arg is None
+        )
     if isinstance(no, ast.Call) and isinstance(no.func, ast.Name) and no.func.id == "getattr" and len(no.args) >= 2:
         nome = no.args[1]
         return isinstance(nome, ast.Constant) and nome.value in _ATRIBUTOS_DE_GRUPO
@@ -496,7 +560,10 @@ def _eh_acesso_a_grupo(no: ast.AST, pais: dict[ast.AST, ast.AST]) -> bool:
 
 
 def _expressao_do_acesso(no: ast.AST, pais: dict[ast.AST, ast.AST]) -> ast.AST:
-    """Sobe pela cadeia de atributos e chamadas: `user.groups` → `user.groups.filter(...).exists()`."""
+    """Sobe pela cadeia de atributos e chamadas: `user.groups` → `user.groups.filter(...).exists()`.
+    Um lookup em string começa pela chamada (ou pelo dict do `**`) que o recebe."""
+    if isinstance(no, ast.Constant) and isinstance(pais.get(no), ast.Call | ast.Dict):
+        no = pais[no]
     while True:
         pai = pais.get(no)
         if isinstance(pai, ast.Attribute | ast.Subscript) and pai.value is no:
@@ -513,9 +580,10 @@ def _acessos_a_grupo(fonte: str) -> list[tuple[str, ast.AST, dict[ast.AST, ast.A
     """(trecho normalizado, expressão, mapa de pais) de cada expressão do código que toca grupo, na ordem."""
     arvore = ast.parse(fonte)
     pais = {filho: pai for pai in ast.walk(arvore) for filho in ast.iter_child_nodes(pai)}
+    nomes_de_group = _nomes_de_group(arvore)
     expressoes: dict[int, ast.AST] = {}
     for no in ast.walk(arvore):
-        if _eh_acesso_a_grupo(no, pais):
+        if _eh_acesso_a_grupo(no, pais, nomes_de_group):
             expressao = _expressao_do_acesso(no, pais)
             expressoes[id(expressao)] = expressao
     ordem = sorted(expressoes.values(), key=lambda e: (getattr(e, "lineno", 0), getattr(e, "col_offset", 0)))
@@ -579,6 +647,43 @@ class TestDetectorDaCatraca:
             "Usuario.objects.filter(groups=g)",
         ]
 
+    def test_lookup_de_grupo_escrito_como_string(self):
+        fonte = (
+            '"DAT" in Usuario.objects.filter(pk=user.pk).values_list("groups__name", flat=True)\n'
+            'Usuario.objects.values("groups__name")\n'
+            'Usuario.objects.annotate(nome=F("groups__name"))\n'
+            'Usuario.objects.filter(**{"groups__name": x})\n'
+            'Usuario.objects.annotate(n=Count("groups"))\n'
+            'Usuario.objects.prefetch_related("groups")\n'
+            'campo = serializers.PrimaryKeyRelatedField(source="groups")\n'
+        )
+        assert _trechos(fonte) == [
+            "Usuario.objects.filter(pk=user.pk).values_list('groups__name', flat=True)",
+            "Usuario.objects.values('groups__name')",
+            "Usuario.objects.annotate(nome=F('groups__name'))",
+            "Usuario.objects.filter(**{'groups__name': x})",
+            "Usuario.objects.annotate(n=Count('groups'))",
+            "Usuario.objects.prefetch_related('groups')",
+            "serializers.PrimaryKeyRelatedField(source='groups')",
+        ]
+
+    def test_group_por_outro_nome(self):
+        fonte = (
+            "from django.contrib.auth.models import Group as G\n"
+            "G.objects.filter(user=u)\n"
+            "Group._default_manager.filter(user=u)\n"
+            "Group._base_manager.filter(user__id=uid)\n"
+            "apps.get_model('auth', 'Group').objects.filter(user=u)\n"
+            "apps.get_model('auth.Group').objects.filter(user=u)\n"
+        )
+        assert _trechos(fonte) == [
+            "G.objects.filter(user=u)",
+            "Group._default_manager.filter(user=u)",
+            "Group._base_manager.filter(user__id=uid)",
+            "apps.get_model('auth', 'Group').objects.filter(user=u)",
+            "apps.get_model('auth.Group').objects.filter(user=u)",
+        ]
+
     def test_o_que_nao_e_grupo_django_fica_de_fora(self):
         fonte = (
             '"""user.groups.filter(name="X") no texto."""\n'
@@ -587,6 +692,11 @@ class TestDetectorDaCatraca:
             "'{groups}'.format(groups=n)\n"
             "Group.objects.filter(name='DAT')\n"
             "Projeto.objects.filter(user=u)\n"
+            "G.objects.filter(user=u)\n"
+            "apps.get_model('core', 'Projeto').objects.filter(user=u)\n"
+            "Usuario.objects.values('grupos_label')\n"
+            "x = {'groups': 1}\n"
+            "Usuario.objects.filter(nome='groups')\n"
         )
         assert _trechos(fonte) == []
 

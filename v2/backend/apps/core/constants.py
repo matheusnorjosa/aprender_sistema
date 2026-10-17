@@ -38,9 +38,8 @@ FUNCAO_GROUPS: list[str] = [
     "Coordenador",
     "Apoio de Coordenação",
     "Gerente",
-    # PR 3 hardening RBAC (2026-04-29): função formal usada com Setor
-    # "Controle" pelo composite `IsAssistenteAdministrativoControle` para
-    # autorizar aprovação de solicitações.
+    # PR 3 hardening RBAC (2026-04-29): função formal. Sem poder desde o PR 8 (a função não dá
+    # capacidade); a aprovação pelo par com o setor Controle saiu no PR 11.
     "Assistente Administrativo",
 ]
 

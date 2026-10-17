@@ -50,8 +50,8 @@ vivas (#1664).
 
 ## RF04: Aprovar/Reprovar
 
-- Aprovam/reprovam (fluxo SUPER): superuser, **Gerente da Superintendência** ou
-  **Assistente Administrativo do Controle** — ver [PA-02](politica-aprovacao.md#pa-02-perfil-exigido)
+- Aprovam/reprovam (fluxo SUPER): superuser, **Gerente da Superintendência**, **DAT** ou
+  **Controle** — ver [PA-02](politica-aprovacao.md#pa-02-perfil-exigido)
 - Interface dedicada em `/aprovacoes`
 - Registro de justificativa em reprovações
 - AuditLog de todas as ações

@@ -28,6 +28,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
     com_papel,
     liberar_par,
 )
@@ -73,6 +74,7 @@ def usuario_superintendencia(grupos):
     user = UsuarioFactory(username="super1", password="senha123", cpf="22222222222", email="super@test.com")
     user.groups.add(grupos["Superintendência"])
     com_papel(user, "GERENTE")
+    com_pacote_do_controle(user)  # PR 11: aprova pelo vínculo no Controle (o par de grupos não aprova)
     return user
 
 

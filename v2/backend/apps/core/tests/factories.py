@@ -152,6 +152,23 @@ def com_pacote_do_dat(user: Usuario) -> EquipeGerencia:
     return vinculo
 
 
+def com_pacote_do_controle(user: Usuario, papel: str = "EQUIPE") -> EquipeGerencia:
+    """Vínculo EQUIPE (ou GERENTE) na gerência `CONTROLE` (perfil CONTROLE): o pacote do Controle (PR 11).
+
+    Desde o PR 11 (D1 de 06/10) o pacote CONTROLE tem `approve_solicitation`: quem trabalha no Controle
+    aprova pelo vínculo, não pelo par de grupos Controle + Assistente Administrativo.
+    """
+    from apps.core.services.rbac_permissions import invalidate_user_functional_permissions_cache
+
+    gerencia, _ = Gerencia.objects.get_or_create(nome="CONTROLE", defaults={"nome_setor": "Controle"})
+    if gerencia.perfil != Gerencia.Perfil.CONTROLE:
+        gerencia.perfil = Gerencia.Perfil.CONTROLE
+        gerencia.save(update_fields=["perfil"])
+    vinculo = com_papel(user, papel, gerencia)
+    invalidate_user_functional_permissions_cache(user.pk)
+    return vinculo
+
+
 class MunicipioFactory(factory.django.DjangoModelFactory[Municipio]):
     """Município com nome único (constraint unique nome+uf)."""
 

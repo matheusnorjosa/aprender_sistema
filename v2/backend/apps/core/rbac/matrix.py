@@ -50,10 +50,11 @@ FORMADOR: Final = "Formador"
 
 # PR 8 hardening RBAC (2026-04-30): atores compostos para distinguir
 # regras endurecidas em PRs 3-6 (Aprovações + Audit Logs).
-# PR B1: aprova pelo vínculo GERENTE na gerência SUPERINTENDENCIA (a fixture cria); os
-# grupos Setor Sup + Função Gerente seguem como composite legado até o B2.
+# PR B1: aprova pelo vínculo GERENTE na gerência SUPERINTENDENCIA (a fixture cria). PR 11: o
+# Assistente Administrativo do Controle aprova pelo vínculo EQUIPE na gerência CONTROLE (a fixture cria),
+# como a u7 em produção; os grupos ficam só como nome (renomear a persona fica para o PR 13).
 GERENTE_SUPER: Final = "Gerente da Superintendência"
-ASST_ADMIN_CONTROLE: Final = "Assistente Administrativo do Controle"  # Setor Controle + Função Asst Admin
+ASST_ADMIN_CONTROLE: Final = "Assistente Administrativo do Controle"  # grupos + vínculo EQUIPE no Controle
 
 ACTORS: Final[tuple[str, ...]] = (
     SUPERUSER,
@@ -77,7 +78,7 @@ ACTOR_GROUPS: Final[dict[str, list[str]]] = {
     DIRETORIA: ["Diretoria"],
     GERENTE: ["Gerente"],
     GERENTE_SUPER: ["Superintendência", "Gerente"],  # + vínculo GERENTE em SUPERINTENDENCIA (fixture)
-    ASST_ADMIN_CONTROLE: ["Controle", "Assistente Administrativo"],
+    ASST_ADMIN_CONTROLE: ["Controle", "Assistente Administrativo"],  # + vínculo EQUIPE em CONTROLE (fixture)
     COORDENADOR: ["Coordenador"],
     APOIO: ["Apoio de Coordenação"],
     FORMADOR: ["Formador"],
@@ -273,8 +274,9 @@ ACCESS_MATRIX: Final[dict[str, dict[str, int]]] = {
     # PR 8 (2026-04-30): consolida regras dos PRs 3, 4, 5 na matriz.
     #
     # Aprovação de solicitação (PR 3 #1308): policy composta
-    # `CanAccessSolicitationApprovals` = Gerente Sup OR Asst Admin Controle OR (PR 10) a capacidade
-    # `approve_solicitation`, que vem do pacote ADMIN_OPERACIONAL (o DAT pelo vínculo na gerência DAT).
+    # `CanAccessSolicitationApprovals` = vínculo GERENTE em g1 OR a capacidade `approve_solicitation`,
+    # que vem do pacote do perfil da gerência: ADMIN_OPERACIONAL (DAT, PR 10) e CONTROLE (PR 11), pelo
+    # vínculo EQUIPE/GERENTE. Nenhum grupo aprova (PR 11).
     # Os 4 endpoints (approve/reject individual + batch) compartilham o mesmo
     # gate; batch-approve representa todos. Cobertura granular fica em
     # `test_pr3_approvals_policy.py`.
@@ -285,12 +287,12 @@ ACCESS_MATRIX: Final[dict[str, dict[str, int]]] = {
         # `ids: []` por ids_required. Cobertura granular dos 4 endpoints com
         # solicitação pendente real está em test_pr3_approvals_policy.py.
         SUPERUSER: ALLOW_PAYLOAD_INVALID,
-        DAT: ALLOW_PAYLOAD_INVALID,  # PR 10: base 5 (`capacidade_aprovar`) pelo pacote ADMIN_OPERACIONAL
-        CONTROLE: DENY,  # Controle puro não aprova (precisa Função Asst Admin)
+        DAT: ALLOW_PAYLOAD_INVALID,  # PR 10: `capacidade_aprovar` pelo pacote ADMIN_OPERACIONAL
+        CONTROLE: DENY,  # grupo Controle sem vínculo não aprova (D1 vale pelo vínculo na g27)
         DIRETORIA: DENY,
         GERENTE: DENY,  # Gerente pedagógico (Vidas + Gerente) NÃO aprova
-        GERENTE_SUPER: ALLOW_PAYLOAD_INVALID,  # composite Setor Sup + Função Gerente
-        ASST_ADMIN_CONTROLE: ALLOW_PAYLOAD_INVALID,  # composite Setor Controle + Função Asst Admin
+        GERENTE_SUPER: ALLOW_PAYLOAD_INVALID,  # vínculo GERENTE na gerência SUPERINTENDENCIA
+        ASST_ADMIN_CONTROLE: ALLOW_PAYLOAD_INVALID,  # PR 11: `capacidade_aprovar` pelo pacote CONTROLE (vínculo)
         COORDENADOR: DENY,
         APOIO: DENY,
         FORMADOR: DENY,

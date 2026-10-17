@@ -44,6 +44,7 @@ import { listUsers, createUser, updateUser, deleteUser, resetUserPassword, listG
 import {
   buildUsuarioPayload,
   funcoesProntasParaSalvar,
+  gerenciaDaPacote,
   gruposAposSalvar,
   lotacaoObrigatoria,
   mensagemDoErro,
@@ -1001,7 +1002,7 @@ export default function UsuariosPage(): JSX.Element {
           <Form.Item
             name="equipe_administrativa"
             valuePropName="checked"
-            extra="Só registra que a pessoa trabalha nesta gerência (ex.: suporte do DAT, Controle). Não dá função, grupo, permissão nem acesso a dados da gerência, e não a põe em nenhuma lista."
+            extra="Na gerência do DAT ou do Controle, dá o pacote do setor, inclusive aprovar solicitações. Nas demais, só registra que a pessoa trabalha nesta gerência."
           >
             <Checkbox disabled={!currentIsSuperuser}>Equipe administrativa</Checkbox>
           </Form.Item>
@@ -1052,8 +1053,22 @@ export default function UsuariosPage(): JSX.Element {
                   selectedGroups.forEach((group) => {
                     (group.permissoes_funcionais || []).forEach((permissao) => labels.add(permissao.label));
                   });
+                  // PR 11: o pacote do DAT e do Controle vem do vínculo, não de grupo; a soma acima não o vê.
+                  const avisoPacote = gerenciaDaPacote(gerencias.find((ger) => ger.id === selectedGerenciaId)) ? (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      className="mt-2"
+                      message="Nesta gerência, Equipe e Gerente recebem o pacote do setor, inclusive aprovar solicitações."
+                    />
+                  ) : null;
                   if (labels.size === 0) {
-                    return <Text type="secondary">sem permissões específicas definidas</Text>;
+                    return (
+                      <>
+                        <Text type="secondary">sem permissões específicas definidas</Text>
+                        {avisoPacote}
+                      </>
+                    );
                   }
                   return (
                     <>
@@ -1062,6 +1077,7 @@ export default function UsuariosPage(): JSX.Element {
                         <Tag key={label} color="purple">{label}</Tag>
                       ))}
                       {labels.size > 6 ? <Tag>+{labels.size - 6}</Tag> : null}
+                      {avisoPacote}
                     </>
                   );
                 })()}

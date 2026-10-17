@@ -17,12 +17,11 @@ from rest_framework import serializers  # type: ignore[attr-defined]
 from apps.core.constants import SETORES_PRODUTO
 from apps.core.models import AuditLog, Gerencia, Municipio, Produto, Projeto, ProjetoGeral, TipoEvento
 from apps.core.rbac.helpers import (
-    APPROVER_COMPOSITES,
     GERENCIA_APROVADORA_NOME,
     MSG_FLUXO_SUPER_SO_NA_SUPERINTENDENCIA,
     fluxo_super_fora_da_superintendencia,
 )
-from apps.core.services.equipe_gerencia import grupos_com_capacidade
+from apps.core.services.equipe_gerencia import SETORES_RESERVADOS, grupos_com_capacidade
 from apps.core.services.rbac_pacotes import PERFIL_PERMITIDO
 
 
@@ -268,9 +267,9 @@ class GerenciaSerializer(serializers.ModelSerializer["Gerencia"]):
         atual = getattr(instance, "setor_canonico", None)
         if value == atual or not value:
             return value
-        # PR 10: a Superintendência perdeu as capacidades (0126), mas compõe o par aprovador legado
-        # (`APPROVER_COMPOSITES`), que `setor_group_for` também recusa.
-        if value in grupos_com_capacidade() or value in {setor for setor, _ in APPROVER_COMPOSITES}:
+        # PR 10: a Superintendência perdeu as capacidades (0126), mas é setor reservado
+        # (`SETORES_RESERVADOS`), que `setor_group_for` também recusa.
+        if value in grupos_com_capacidade() or value in SETORES_RESERVADOS:
             raise serializers.ValidationError(
                 f"'{value}' é nome de grupo com permissões e não pode ser o setor de uma gerência."
             )

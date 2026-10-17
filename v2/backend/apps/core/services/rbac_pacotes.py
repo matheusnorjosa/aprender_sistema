@@ -2,11 +2,12 @@
 Pacote de capacidades por perfil de gerência (ADR-020) e direitos de evento do papel (PR 8). Só
 constantes; quem lê é a fórmula da união (`rbac_permissions.capacidades_sem_cache`).
 
-CONTROLE e DIRETORIA são o **estado de produção de hoje** do grupo de setor correspondente (medição de
-02/10/2026), para que o PR B (grupos ∪ pacote) não desse poder novo a quem já estava no grupo. O
-ADMIN_OPERACIONAL é o pacote **final** desde o PR 10 (16/10/2026, seção 2.3 do relatório de
-arquitetura mais a isenção da regra da compra): o DAT é o administrador operacional. Mudar um pacote é
-mudar poder: PR com `rbac_diff` medido.
+DIRETORIA é o **estado de produção de hoje** do grupo de setor correspondente (medição de 02/10/2026),
+para que o PR B (grupos ∪ pacote) não desse poder novo a quem já estava no grupo. O ADMIN_OPERACIONAL é
+o pacote **final** desde o PR 10 (16/10/2026, seção 2.3 do relatório de arquitetura mais a isenção da
+regra da compra): o DAT é o administrador operacional. O CONTROLE é o pacote **final** do Controle desde
+o PR 11 (17/10/2026): o grupo Controle mais a aprovação (D1 de 06/10). Mudar um pacote é mudar poder: PR
+com `rbac_diff` medido.
 
 Fica fora de `apps/core/rbac/` de propósito: `rbac/__init__` importa `rbac/helpers`, que importa
 `services/rbac_permissions`. Como `rbac_permissions` lê o pacote (PR B), um módulo dentro
@@ -39,8 +40,12 @@ PACOTE: dict[str, frozenset[str]] = {
             "create_solicitation_without_purchase",
         }
     ),
+    # PR 11 (D1 de 06/10: todo o Controle aprova): `approve_solicitation` vem do vínculo EQUIPE/GERENTE na
+    # gerência CONTROLE, pela mesma base do DAT (`capacidade_aprovar`), e decide qualquer evento. O grupo
+    # Controle NÃO a tem (seed `group_names=()`): grupo sem vínculo não aprova.
     "CONTROLE": frozenset(
         {
+            "approve_solicitation",
             "manage_purchases_and_materials",
             "operate_preagenda",
             "run_daily_operations",

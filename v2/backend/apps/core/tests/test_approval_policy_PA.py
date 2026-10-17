@@ -4,8 +4,9 @@ Testes obrigatórios para Política de Aprovação Manual (PA-01 a PA-07).
 Garante que:
 - PA-01: Nenhuma solicitação é auto-aprovada
 - PA-02: Apenas as bases de `solicitation_approval_basis` aprovam/reprovam (Superintendência por
-  vínculo, par legado e, desde o PR 10, o DAT pela capacidade `approve_solicitation` do pacote), e
-  ninguém decide a solicitação de quem teve a conta alterada por ele nos últimos 30 dias
+  vínculo e a capacidade `approve_solicitation` do pacote: o DAT desde o PR 10 e o Controle desde o
+  PR 11; nenhum grupo aprova), e ninguém decide a solicitação de quem teve a conta alterada por ele nos
+  últimos 30 dias
 - PA-03: Integrações externas só executam após aprovação
 - PA-05: Auditoria completa de aprovações/reprovações
 - PA-07: Testes obrigatórios implementados
@@ -55,9 +56,8 @@ def usuario_comum(faker):
 
 @pytest.fixture
 def usuario_superintendencia(faker):
-    """Gerente da Superintendência (PR 3 hardening RBAC, 2026-04-29):
-    composite Setor `Superintendência` + Função `Gerente`. A regra antiga
-    (Setor sozinho aprovava via PA-02) foi descontinuada."""
+    """Gerente da Superintendência pelo vínculo GERENTE na g1 (PR B1). Desde o PR 11 o par de grupos
+    Setor `Superintendência` + Função `Gerente` não aprova; os grupos ficam só como nome."""
     uid = uuid4().hex  # 32 chars hex, 128-bit entropy
     user = UsuarioFactory(
         username=f"super_{uid}",
@@ -68,13 +68,15 @@ def usuario_superintendencia(faker):
     grupo_setor = GroupFactory(name="Superintendência")
     grupo_funcao = GroupFactory(name="Gerente")
     user.groups.add(grupo_setor, grupo_funcao)
+    g1, _ = Gerencia.objects.get_or_create(nome="SUPERINTENDENCIA", defaults={"nome_setor": "Superintendência"})
+    com_papel(user, "GERENTE", g1)
     return user
 
 
 @pytest.fixture
 def usuario_controle():
     """Quem publica no Google (`use_gcal` pelo `operate_preagenda` do Controle). Desde o PR 10 o grupo
-    Superintendência não tem capacidade (migration 0126): o par legado aprova, mas não publica."""
+    Superintendência não tem capacidade (migration 0126): a gerente da g1 aprova, mas não publica."""
     return UsuarioFactory(groups=["Controle"])
 
 
@@ -150,17 +152,24 @@ def _com_vinculo(papel: str, gerencia: Gerencia, grupos: tuple[str, ...] = ()) -
     return user
 
 
-# Bases 2, 4 e 5 de `solicitation_approval_basis` (a 1 é o superusuário; a 3, o par Controle).
+# Bases 2 e 3 de `solicitation_approval_basis` (a 1 é o superusuário). PR 11: a base 3 vem do pacote do
+# DAT e do Controle, pelo vínculo.
 APROVADORAS = {
     "gerente_g1_por_vinculo": lambda: _com_vinculo("GERENTE", _gerencia("SUPERINTENDENCIA")),
-    "par_legado": lambda: UsuarioFactory(groups=["Superintendência", "Gerente"], groups__vinculo=False),
     "dat_pelo_pacote": lambda: _com_vinculo("EQUIPE", _gerencia("GERENCIA DAT", "ADMIN_OPERACIONAL"), ("DAT",)),
+    "controle_pelo_pacote": lambda: _com_vinculo(
+        "EQUIPE", _gerencia("CONTROLE", "CONTROLE"), ("Controle", "Assistente Administrativo")
+    ),
 }
 
-# Quem não aprova: Controle puro, COORDENADOR e FORMADOR na gerência DAT, grupo DAT sem vínculo,
-# Gerente pedagógico.
+# Quem não aprova: Controle puro, os pares de grupos sem vínculo (PR 11), COORDENADOR e FORMADOR na
+# gerência DAT, grupo DAT sem vínculo, Gerente pedagógico.
 SEM_PODER = {
     "controle_puro": lambda: UsuarioFactory(groups=["Controle"]),
+    "par_controle_sem_vinculo": lambda: UsuarioFactory(
+        groups=["Controle", "Assistente Administrativo"], groups__vinculo=False
+    ),
+    "par_legado_sem_vinculo": lambda: UsuarioFactory(groups=["Superintendência", "Gerente"], groups__vinculo=False),
     "coordenador_na_gerencia_dat": lambda: _com_vinculo("COORDENADOR", _gerencia("GERENCIA DAT", "ADMIN_OPERACIONAL")),
     "formador_na_gerencia_dat": lambda: _com_vinculo("FORMADOR", _gerencia("GERENCIA DAT", "ADMIN_OPERACIONAL")),
     "grupo_dat_sem_vinculo": lambda: UsuarioFactory(groups=["DAT"]),
@@ -179,7 +188,7 @@ def test_only_superintendencia_can_approve_or_reject(
 
     Verifica que:
     - Usuário comum → 403
-    - Base 2 (GERENTE por vínculo na Superintendência), 4 (par legado) e 5 (DAT pelo pacote) → 200/204
+    - Base 2 (GERENTE por vínculo na Superintendência) e 3 (DAT e Controle pelo pacote) → 200/204
     """
     usuario_superintendencia = APROVADORAS[base]()
     client = APIClient()

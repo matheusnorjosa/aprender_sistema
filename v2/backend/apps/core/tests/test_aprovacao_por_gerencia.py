@@ -30,6 +30,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
 )
 
 pytestmark = pytest.mark.django_db
@@ -169,15 +170,22 @@ def test_vinculo_nao_vigente_em_g1_nao_aprova(g1, vinculo_kwargs):
     assert _negado_pela_base(_approve(user, sol))
 
 
+def _controle() -> Usuario:
+    """Perfil da u7: o par de grupos e o vínculo EQUIPE no Controle (PR 11: o vínculo é o que aprova)."""
+    user = UsuarioFactory(groups=["Controle", "Assistente Administrativo"], groups__vinculo=False)
+    com_pacote_do_controle(user)
+    return user
+
+
 @pytest.mark.parametrize(
-    "kwargs",
+    "persona",
     [
-        pytest.param({"groups": ["Controle", "Assistente Administrativo"]}, id="asst_admin_controle"),
-        pytest.param({"superuser": True}, id="superuser"),
+        pytest.param(_controle, id="controle"),
+        pytest.param(lambda: UsuarioFactory(superuser=True), id="superuser"),
     ],
 )
-def test_asst_admin_controle_e_superuser_continuam_aprovando(kwargs):
-    user = UsuarioFactory(**kwargs)
+def test_controle_e_superuser_continuam_aprovando(persona):
+    user = persona()
     sol = _pendente_super()
 
     assert _approve(user, sol).status_code == 200
@@ -235,10 +243,10 @@ def test_solicitation_approval_basis_por_persona(g1):
     composite = UsuarioFactory(groups=["Superintendência", "Gerente"])
     assert solicitation_approval_basis(UsuarioFactory(superuser=True)) == "superuser"
     assert solicitation_approval_basis(_aprovadora(g1)) == "gerente_superintendencia"
-    assert solicitation_approval_basis(UsuarioFactory(groups=["Controle", "Assistente Administrativo"])) == (
-        "asst_admin_controle"
-    )
-    assert solicitation_approval_basis(composite) == "grupo_superintendencia_gerente"
+    assert solicitation_approval_basis(_controle()) == "capacidade_aprovar"
+    # PR 11: grupo não aprova.
+    assert solicitation_approval_basis(UsuarioFactory(groups=["Controle", "Assistente Administrativo"])) is None
+    assert solicitation_approval_basis(composite) is None
     assert solicitation_approval_basis(UsuarioFactory(groups=["DAT"])) is None
 
 

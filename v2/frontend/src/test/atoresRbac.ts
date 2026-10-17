@@ -230,6 +230,8 @@ export const ATORES_RBAC: readonly AtorRbac[] = [
     policies: ['access_availability_blocks'],
   },
   {
+    // PR 11: aprova pelo vínculo EQUIPE na gerência CONTROLE (pacote), não pelo par de grupos. O nome do
+    // ator acompanha a persona do backend (`rbac/matrix.py`), que só muda no PR 13.
     ator: 'Assistente Administrativo Controle',
     user: usuarioDeTeste({ setores: ['Controle'], funcoes: ['Assistente Administrativo'], aprovador: true }),
     policies: [

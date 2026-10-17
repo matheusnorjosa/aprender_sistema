@@ -31,6 +31,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
 )
 
 pytestmark = pytest.mark.django_db
@@ -76,6 +77,7 @@ def user_superintendencia(grupo_superintendencia, grupo_gerente):
         cpf=str(uuid4().int % 10**11).zfill(11),
     )
     user.groups.add(grupo_superintendencia, grupo_gerente)
+    com_pacote_do_controle(user)  # PR 11: aprova pelo vínculo no Controle (o par de grupos não aprova)
     return user
 
 
@@ -187,9 +189,9 @@ class TestRBACApprovalEndpoints:
     def test_dat_cannot_approve(self, solicitacao_pendente, user_dat):
         """PR 3 hardening RBAC (2026-04-29): DAT NÃO aprova mais.
 
-        Regra antiga (PA-02 Adaptada) incluía DAT; após PR 3, apenas
-        Gerente da Superintendência ou Assistente Administrativo do
-        Controle podem aprovar.
+        Regra antiga (PA-02 Adaptada) incluía DAT pelo grupo. Desde o PR 10 o DAT
+        aprova pelo vínculo na gerência DAT (pacote), não pelo grupo; o grupo
+        sozinho não aprova (PR 11: nenhum grupo aprova).
         """
         client = APIClient()
         client.force_authenticate(user=user_dat)

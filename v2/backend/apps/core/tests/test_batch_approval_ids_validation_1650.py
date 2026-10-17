@@ -30,6 +30,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
 )
 
 pytestmark = pytest.mark.django_db
@@ -43,6 +44,7 @@ def aprovador():
     """Gerente da Superintendência → policy access_solicitation_approvals (PA-02)."""
     user = UsuarioFactory(username="aprovador_m1104", cpf="74000000001")
     user.groups.add(GroupFactory(name="Superintendência"), GroupFactory(name="Gerente"))
+    com_pacote_do_controle(user)  # PR 11: aprova pelo vínculo no Controle (o par de grupos não aprova)
     return user
 
 

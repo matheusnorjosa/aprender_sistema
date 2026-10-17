@@ -32,6 +32,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
 )
 
 pytestmark = pytest.mark.django_db
@@ -152,9 +153,10 @@ class TestInScopeAndGlobalStillWork:
         assert sol_a.id in ids and sol_b.id in ids
 
     def test_gerente_da_superintendencia_ve_todas(self, sol_a, sol_b):
-        """Aprovador composto (Gerente + Superintendência) é GLOBAL."""
+        """Aprovador global (PR 11: pelo vínculo no Controle; o par Gerente + Superintendência não aprova)."""
         user = UsuarioFactory(username="gsuper_1623", cpf="78000000010")
         user.groups.add(GroupFactory(name="Gerente"), GroupFactory(name="Superintendência"))
+        com_pacote_do_controle(user)
         client = APIClient()
         client.force_authenticate(user)
         resp = client.get("/api/solicitacoes/")

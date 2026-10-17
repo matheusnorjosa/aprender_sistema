@@ -97,6 +97,15 @@ def _make_user_for_actor(actor: str) -> Usuario:
             gerencia.save(update_fields=["perfil"])
         EquipeGerencia.objects.create(gerencia=gerencia, usuario=user, papel="EQUIPE", ativo=True)
 
+    # PR 11 das permissões: o Assistente Administrativo do Controle de produção (u7) tem o vínculo EQUIPE
+    # na gerência CONTROLE (perfil CONTROLE), e é dele que vem a aprovação. O par de grupos não aprova.
+    if actor == ASST_ADMIN_CONTROLE:
+        gerencia, _ = Gerencia.objects.get_or_create(nome="CONTROLE", defaults={"nome_setor": "Controle"})
+        if gerencia.perfil != Gerencia.Perfil.CONTROLE:
+            gerencia.perfil = Gerencia.Perfil.CONTROLE
+            gerencia.save(update_fields=["perfil"])
+        EquipeGerencia.objects.create(gerencia=gerencia, usuario=user, papel="EQUIPE", ativo=True)
+
     # D8 + D9 + PR 8: Coord/Apoio/Gerente* precisam de vínculo organizacional
     # para passar HasSectorAccess na grade mensal.
     if actor in (COORDENADOR, APOIO, GERENTE, GERENTE_SUPER):

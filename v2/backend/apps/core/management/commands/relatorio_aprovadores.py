@@ -34,7 +34,7 @@ from django.core.management.base import BaseCommand
 from django.db.models import Count, Q, QuerySet
 
 from apps.core.models import EquipeGerencia, Gerencia, Solicitacao, Usuario
-from apps.core.rbac.helpers import APPROVER_COMPOSITES, GERENCIA_APROVADORA_NOME
+from apps.core.rbac.helpers import GERENCIA_APROVADORA_NOME
 
 if TYPE_CHECKING:
     from argparse import ArgumentParser
@@ -97,7 +97,7 @@ class Command(BaseCommand):
                 "entre_os_gerentes_vigentes": gerente.pk in aprovadores,
             }
 
-        setor, funcao = APPROVER_COMPOSITES[0]
+        setor, funcao = "Superintendência", "Gerente"  # par legado (sem poder desde o PR 11)
         so_composite = list(
             Usuario.objects.filter(groups__name=setor)
             .filter(groups__name=funcao)

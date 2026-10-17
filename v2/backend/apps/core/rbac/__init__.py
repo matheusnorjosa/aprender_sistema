@@ -34,7 +34,6 @@ from apps.core.rbac.permissions import (
     HasFunctionalPermission,
     HasPerm,
     HasSectorAccess,
-    IsAssistenteAdministrativoControle,
     IsOwnerOrPrivileged,
 )
 
@@ -78,7 +77,6 @@ __all__ = [
     "HasPerm",
     "HasFunctionalPermission",
     "HasSectorAccess",
-    "IsAssistenteAdministrativoControle",
     "IsOwnerOrPrivileged",
     "user_has_any_perm",
     "user_has_all_perms",

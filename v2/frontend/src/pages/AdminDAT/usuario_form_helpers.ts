@@ -99,7 +99,7 @@ export function buildUsuarioPayload(
   };
 }
 
-/** Setores que compõem um par aprovador; espelha `APPROVER_COMPOSITES` (`apps/core/rbac/helpers.py`). */
+/** Setores que não viram grupo pela lotação; espelha `SETORES_RESERVADOS` (`apps/core/services/equipe_gerencia.py`). */
 const SETORES_DE_PAR_APROVADOR = new Set(['Superintendência', 'Controle']);
 
 interface GrupoLike {

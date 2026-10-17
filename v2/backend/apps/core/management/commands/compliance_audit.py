@@ -169,13 +169,18 @@ class Command(BaseCommand):
         # ================================================================
         # PA-02: Approvers have correct permissions
         # ================================================================
-        # This check is simplified - we trust RBAC enforces permissions
+        # This check is simplified - we trust RBAC enforces permissions. The gate is
+        # `solicitation_approval_basis` (PR 11: 3 bases). Comparing `details.autoridade` with
+        # those bases would flag the script decisions (`decisao_do_dono_por_script`, `sistema`).
         invalid_approvers = 0  # Would require checking user permissions at approval time
 
         report["checks"].append(
             {
                 "rule": "PA-02",
-                "description": "Approvers have correct permissions (Gerente or superuser)",
+                "description": (
+                    "Approvers have an approval basis (superuser, GERENTE of Superintendência by vínculo, "
+                    "or approve_solicitation from the DAT or Controle package)"
+                ),
                 "status": "PASS" if invalid_approvers == 0 else "WARN",
                 "violations": invalid_approvers,
                 "details": f"Found {invalid_approvers} approvals by non-authorized users",

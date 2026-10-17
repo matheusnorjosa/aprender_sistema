@@ -11,7 +11,7 @@ A01. All examples use real codenames and helpers from `apps.core.rbac`.
 #             Logística Viagens, Logística Galpão  (SSOT: apps.core.constants.SETOR_GROUPS)
 # 5 Funções: Formador, Coordenador, Apoio de Coordenação, Gerente,
 #            Assistente Administrativo                (SSOT: apps.core.constants.FUNCAO_GROUPS)
-# Approval: is_superuser OR (Gerente + Superintendência)
+# Approval: single rule solicitation_approval_basis; see PA-02 in v2/docs/specs/domain/politica-aprovacao.spec.md (no group grants approval)
 ```
 
 Authorization is **capability-based**, never identity-based. Gate with the

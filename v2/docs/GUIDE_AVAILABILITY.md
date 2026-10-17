@@ -129,7 +129,7 @@ aplicado em `get_queryset`, invariante travado por `test_availability_privileged
 ### Delegação de criação de bloqueio (PR 13)
 
 `user_can_delegate_availability_block` (`apps/core/rbac/policies.py`) permite que
-superuser, Assistente Administrativo do Controle e DAT criem bloqueio **em nome de** um Formador.
+superuser, o Controle (`operate_preagenda`) e o DAT (`manage_admin_registries`) criem bloqueio **em nome de** um Formador.
 A operação registra `AuditLog` `DELEGATE_BLOCK_CREATE`.
 
 ⚠️ O **import** de bloqueios não passa por essa policy e cria blocos auto-aprovados **sem

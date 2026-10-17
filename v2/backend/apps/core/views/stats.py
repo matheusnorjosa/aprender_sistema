@@ -92,7 +92,7 @@ class HomeStatsView(APIView):
         can_view_global_events = user_has_any_perm(
             user,
             "manage_admin_registries",  # DAT
-            "approve_solicitation",  # Superintendência
+            "approve_solicitation",  # DAT e Controle (pacote do perfil, PR 10 e PR 11)
         )
 
         # Formador é a única função sem capability própria (acessa /meus-eventos
@@ -132,7 +132,7 @@ class HomeStatsView(APIView):
         upcoming_qs = Solicitacao.objects.filter(status="aprovado", inicio__gte=now)
 
         if can_view_global_events:
-            # Superuser, DAT, Superintendência: cross-org por capability legítima.
+            # Superuser, DAT e Controle: cross-org por capability legítima.
             pass
         elif is_formador_only:
             # Formador: ownership (organizador OU participante).

@@ -37,7 +37,7 @@ def detect_intent(prompt: str) -> str:
         parts.append("<system-reminder>")
         parts.append("## Approval Policy Detected (auto-detected)")
         parts.append("Use /approve-flow to validate PA-01 to PA-07 compliance.")
-        parts.append("Rules: superuser OR (Gerente + Superintendencia) can approve.")
+        parts.append("Who approves: single rule solicitation_approval_basis; see PA-02 in v2/docs/specs/domain/politica-aprovacao.spec.md (no group grants approval).")
         parts.append("Use aprender-domain skill for full business rules reference.")
         parts.append("</system-reminder>")
 

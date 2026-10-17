@@ -279,7 +279,7 @@ Run against the **local prod-like stack** before merge (and spot-check prod afte
 
 - [ ] RF02: Create solicitação (wizard completes)
 - [ ] RF03: Check conflicts (displays conflicts correctly)
-- [ ] RF04: Approve/reject (superuser OR Gerente + Superintendência — PA-01)
+- [ ] RF04: Approve/reject (single rule solicitation_approval_basis; see PA-02 in v2/docs/specs/domain/politica-aprovacao.spec.md (no group grants approval))
 - [ ] RF05: Google Calendar preview (payload generated)
 - [ ] RF06: Meet link generation (field populated)
 - [ ] RF07: Audit log (actions recorded)

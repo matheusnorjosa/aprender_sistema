@@ -14,6 +14,7 @@ import { MemoryRouter } from 'react-router';
 
 import {
   buildUsuarioPayload,
+  gerenciaDaPacote,
   gruposAposSalvar,
   lotacaoObrigatoria,
   type UsuarioFormValues,
@@ -133,6 +134,16 @@ describe('gruposAposSalvar — grupo de setor só com função que tem papel', (
 
   test('função com papel continua dando o grupo do setor', () => {
     expect(nomes([1])).toEqual(['Formador', 'Vidas']);
+  });
+});
+
+describe('gerenciaDaPacote (PR 11)', () => {
+  test('DAT e Controle dão o pacote, inclusive aprovar; as demais não', () => {
+    expect(gerenciaDaPacote({ nome: 'GERENCIA DAT' })).toBe(true);
+    expect(gerenciaDaPacote({ nome: 'CONTROLE' })).toBe(true);
+    expect(gerenciaDaPacote({ nome: 'SUPERINTENDENCIA' })).toBe(false);
+    expect(gerenciaDaPacote({ nome: 'GERENCIA 2' })).toBe(false);
+    expect(gerenciaDaPacote(undefined)).toBe(false);
   });
 });
 

@@ -22,13 +22,14 @@ Podem aprovar/reprovar, nesta ordem (`solicitation_approval_basis`, rótulo grav
 1. **superuser** (`superuser`);
 2. **Gerente da Superintendência** por vínculo vigente na gerência `SUPERINTENDENCIA`
    (`gerente_superintendencia`), só no fluxo SUPER dessa gerência;
-3. **Assistente Administrativo do Controle** (`asst_admin_controle`), até o PR 11;
-4. o par legado de grupos `Superintendência` + `Gerente` (`grupo_superintendencia_gerente`), até o B2;
-5. **o DAT** (`capacidade_aprovar`, PR 10; decisão do dono de 02/10, nº 16): quem tem a capacidade
-   `approve_solicitation`, que vem só do pacote `ADMIN_OPERACIONAL` (vínculo EQUIPE ou GERENTE
-   vigente na gerência DAT). Decide solicitação de qualquer gerência e fluxo.
+3. **o DAT e o Controle** (`capacidade_aprovar`; decisões do dono de 02/10, nº 16, e de 06/10, D1): quem
+   tem a capacidade `approve_solicitation`, que vem do pacote do perfil da gerência (vínculo EQUIPE ou
+   GERENTE vigente): `ADMIN_OPERACIONAL` (gerência DAT, PR 10) e `CONTROLE` (gerência CONTROLE, PR 11).
+   Decide solicitação de qualquer gerência e fluxo.
 
-Controle puro, Gerente pedagógico, Diretoria e o grupo DAT sem o vínculo **não** aprovam.
+Até o PR 11 havia mais duas bases por grupo (`asst_admin_controle` e `grupo_superintendencia_gerente`);
+os rótulos seguem nos AuditLogs antigos. Gerente pedagógico, Diretoria e os grupos DAT, Controle,
+Superintendência, Gerente e Assistente Administrativo sem o vínculo **não** aprovam.
 
 **Segregação** (o superuser pode, como break-glass marcado no AuditLog):
 
@@ -98,7 +99,7 @@ test_approval_flow_records_audit_log
 ### SUPER (Manual)
 
 1. Coordenador cria solicitação → checagem de disponibilidade de **todos** os participantes; conflito bloqueia a criação (400 `availability_conflict`) → `status='pendente'`
-2. Gerente da Superintendência, DAT ou Assistente Administrativo do Controle aprova/reprova
+2. Gerente da Superintendência, DAT ou Controle aprova/reprova
    (nunca a própria, a de autor cuja conta alterou nos 30 dias, nem a que editou).
    Aprovar **revalida** a disponibilidade (#1452): se algum participante entrou em conflito
    desde a criação, a aprovação é recusada com 400

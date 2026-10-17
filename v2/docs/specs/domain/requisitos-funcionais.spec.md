@@ -1,7 +1,7 @@
 ---
 title: Requisitos Funcionais (RF01..RF08)
 status: canonical
-last_verified: 2026-10-16
+last_verified: 2026-10-17
 sources_of_truth:
   - v2/backend/apps/core/management/commands/import_export_contract.py
   - v2/backend/apps/core/services/export_contract_importer.py
@@ -82,7 +82,7 @@ Rotas registradas em [`urls.py`](../../../backend/apps/core/urls.py) (prefixo `/
 ## Fluxos principais
 
 1. **Importação (RF01)**: operador roda `import_export_contract` em dry-run → revisa classificação → (com autorização) `--apply --allow-entity X` → writes create-only idempotentes; campos protegidos preservados.
-2. **Solicitação → publicação (RF02→RF05/RF06)**: coordenador cria solicitação → sistema checa conflitos de todos os participantes e **bloqueia** se houver (RF03, #1452) → `NAO_SUPER` auto-aprova; `SUPER` fica `pendente` → a gerência da Superintendência (vínculo GERENTE vigente, PR B1) ou o Assistente Administrativo do Controle aprova — nunca a própria solicitação (RF04, revalida RF03 e grava AuditLog com `autoridade`) → Controle/Super faz `preview-gcal` (não persiste; a aprovadora também vê a prévia) → `publish` enfileira Celery → evento criado no GCal; se `is_online=True`, `meet_link` extraído de `hangoutLink` e persistido (RF06). **DAT não aprova** — a PA-02 o exclui (`solicitation_approval_basis` em [`policies.py`](../../../backend/apps/core/rbac/policies.py)).
+2. **Solicitação → publicação (RF02→RF05/RF06)**: coordenador cria solicitação → sistema checa conflitos de todos os participantes e **bloqueia** se houver (RF03, #1452) → `NAO_SUPER` auto-aprova; `SUPER` fica `pendente` → a gerência da Superintendência (vínculo GERENTE vigente, PR B1), o DAT ou o Controle (pacote do perfil, PR 10 e PR 11) aprova — nunca a própria solicitação (RF04, revalida RF03 e grava AuditLog com `autoridade`) → Controle/Super faz `preview-gcal` (não persiste; a aprovadora também vê a prévia) → `publish` enfileira Celery → evento criado no GCal; se `is_online=True`, `meet_link` extraído de `hangoutLink` e persistido (RF06). **DAT não aprova** — a PA-02 o exclui (`solicitation_approval_basis` em [`policies.py`](../../../backend/apps/core/rbac/policies.py)).
 3. **Mapa mensal (RF08)**: front pede `availability/monthly/` por ano/mês/papel/setor → `build_monthly_grid` agrega eventos, bloqueios e deslocamentos em códigos por dia/pessoa → resposta cacheada; clique abre detalhe do dia.
 
 - **Erros relevantes**: aprovar item não-`pendente` → `ValidationAPIError` (`already_approved`/`already_rejected`/`invalid_status`); lote > 100 → `batch_limit_exceeded`; `--apply` sem allowlist → bloqueado, nada escrito; publish com `apply_blocked=True` → respeitado (não escreve no GCal).

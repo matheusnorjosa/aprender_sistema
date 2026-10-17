@@ -173,7 +173,7 @@ def python_code_context(tool_input: dict) -> str:
         parts.append(
             "- 5 Funcoes: Formador, Coordenador, Apoio de Coordenacao, Gerente, Assistente Administrativo"
         )
-        parts.append("- Approval: superuser OR (Gerente + Superintendencia)")
+        parts.append("- Approval: single rule solicitation_approval_basis; see PA-02 in v2/docs/specs/domain/politica-aprovacao.spec.md (no group grants approval)")
         parts.append("- All authorization MUST be server-side (never trust client)")
         parts.append("- Check /approve-flow and /check-conflicts commands")
 
@@ -183,7 +183,7 @@ def python_code_context(tool_input: dict) -> str:
         parts.append("### PA (Approval Policy) Rules")
         parts.append("- PA-01 to PA-07 apply to SUPER flow")
         parts.append("- Run /approve-flow to validate compliance")
-        parts.append("- Superuser OR (Gerente + Superintendencia) can approve")
+        parts.append("- Who approves: single rule solicitation_approval_basis; see PA-02 in v2/docs/specs/domain/politica-aprovacao.spec.md (no group grants approval)")
 
     if "availability" in file_path or "disponibilidade" in file_path:
         parts.append("")

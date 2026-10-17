@@ -11,9 +11,9 @@ capacidade `approve_solicitation_batch` (apagada na migration 0125).
 
 Regra:
 - GLOBAL (vê tudo): superuser, Controle (`operate_preagenda`), DAT
-  (`manage_admin_registries`) e o aprovador composto
-  (`access_solicitation_approvals` = Gerente-da-Superintendência OU Assistente
-  Administrativo do Controle).
+  (`manage_admin_registries`) e quem aprova (`access_solicitation_approvals` =
+  `solicitation_approval_basis`: gerente da Superintendência por vínculo ou a capacidade
+  `approve_solicitation`, que o DAT e o Controle têm pelo pacote).
 - GESTORA não-global (papel GERENTE vigente, `_e_gestora`): as gerências onde ela é GERENTE (PR 9; C9
   da auditoria) + as próprias.
 - APOIO (`publish_setor_solicitacao`): as aprovadas das gerências onde é APOIO + as próprias (soma-se
@@ -53,8 +53,8 @@ from apps.core.rbac.policies import (
 )
 from apps.core.rbac_helpers import user_has_any_perm
 
-# `approve_solicitation` é EXCLUSIVA do setor Superintendência (o órgão de
-# oversight/aprovação) — visão global legítima. `operate_preagenda`=Controle,
+# `approve_solicitation` vem do pacote do DAT (PR 10) e do Controle (PR 11); nenhum grupo a tem —
+# visão global legítima de quem aprova qualquer evento. `operate_preagenda`=Controle,
 # `manage_admin_registries`=DAT. A gestora por gerência é o papel (`_e_gestora`).
 _GLOBAL_CAPS = ("operate_preagenda", "manage_admin_registries", "approve_solicitation")
 
@@ -67,7 +67,7 @@ def user_is_solicitacao_global(user: Any) -> bool:
         return True
     if user_has_any_perm(user, *_GLOBAL_CAPS):
         return True
-    # Aprovador composto (Gerente-da-Superintendência OU Asst-Admin-Controle).
+    # Quem aprova (`solicitation_approval_basis`): inclui a gerente da Superintendência por vínculo.
     return user_has_policy(user, "access_solicitation_approvals")
 
 

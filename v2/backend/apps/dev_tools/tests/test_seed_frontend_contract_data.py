@@ -19,6 +19,7 @@ from apps.core.models import (
     DATCompra,
     DATRegistro,
     Deslocamento,
+    EquipeGerencia,
     Gerencia,
     Municipio,
     NotificacaoInterna,
@@ -32,6 +33,7 @@ from apps.core.models import (
     TipoEvento,
     Usuario,
 )
+from apps.core.rbac.policies import user_has_policy
 
 SEED_EXTERNAL_HASH = "9" * 64
 SEED_COMPRA_CODE = "MATRIX-PEND-001"
@@ -55,11 +57,15 @@ def clean_contract_seed_state(db):
     DATCompra.objects.filter(descricao_produto=SEED_DAT_DESCRICAO, ano_uso=2026).delete()
     Compra.objects.filter(external_hash=SEED_EXTERNAL_HASH).delete()
     Municipio.objects.filter(nome="Matrizopolis", uf="BA").delete()
+    # EquipeGerencia.usuario é PROTECT: os vínculos (PR 12a) saem antes.
+    EquipeGerencia.objects.filter(usuario__username__in=[SEED_DAT_USERNAME, SEED_CONTROLE_USERNAME]).delete()
     Usuario.objects.filter(username__in=[SEED_DAT_USERNAME, SEED_CONTROLE_USERNAME]).delete()
     yield
     DATCompra.objects.filter(descricao_produto=SEED_DAT_DESCRICAO, ano_uso=2026).delete()
     Compra.objects.filter(external_hash=SEED_EXTERNAL_HASH).delete()
     Municipio.objects.filter(nome="Matrizopolis", uf="BA").delete()
+    # EquipeGerencia.usuario é PROTECT: os vínculos (PR 12a) saem antes.
+    EquipeGerencia.objects.filter(usuario__username__in=[SEED_DAT_USERNAME, SEED_CONTROLE_USERNAME]).delete()
     Usuario.objects.filter(username__in=[SEED_DAT_USERNAME, SEED_CONTROLE_USERNAME]).delete()
 
 
@@ -110,7 +116,16 @@ class TestSeedFrontendContractDataCommand:
         dat_user = Usuario.objects.get(username=SEED_DAT_USERNAME)
         assert dat_user.check_password("testpass123")
         assert set(dat_user.groups.values_list("name", flat=True)) == {"DAT"}
-        assert PermissaoFuncional.objects.get(codename="view_compras_dashboard").groups.filter(name="DAT").exists()
+        # PR 12a: o seed não mexe na matriz (o `--auditar` fica limpo) e o poder vem do vínculo na gerência DAT.
+        assert not PermissaoFuncional.objects.get(codename="view_compras_dashboard").groups.filter(name="DAT").exists()
+        assert (
+            EquipeGerencia.vigentes_em()
+            .filter(
+                usuario=dat_user, papel="EQUIPE", gerencia__nome="GERENCIA DAT", gerencia__perfil="ADMIN_OPERACIONAL"
+            )
+            .exists()
+        )
+        assert user_has_policy(dat_user, "view_compras_dashboard")
 
         assert Usuario.objects.filter(username=SEED_CONTROLE_USERNAME).exists()
 

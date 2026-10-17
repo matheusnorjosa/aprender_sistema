@@ -18,7 +18,9 @@ Convenções:
   já existentes (criados pelo seed de sessão). Grupo de FUNÇÃO com papel de gerência
   (Coordenador, Apoio, Gerente, Formador) vem junto com o vínculo vigente (`com_papel`),
   como o cadastro de usuário faz; `groups__gerencia=g` escolhe a gerência e
-  `groups__vinculo=False` cria só o grupo (teste de "grupo sem vínculo").
+  `groups__vinculo=False` cria só o grupo (teste de "grupo sem vínculo"). Grupo de setor com
+  capacidade (DAT, Controle, Diretoria) vem com o vínculo EQUIPE na gerência do pacote
+  (`PACOTE_DO_GRUPO_DE_SETOR`, PR 12a), como os membros desses grupos em produção.
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownLambdaType=false, reportAttributeAccessIssue=false, reportUntypedBaseClass=false, reportUntypedFunctionDecorator=false, reportMissingTypeStubs=false, reportPrivateImportUsage=false, reportIncompatibleVariableOverride=false
@@ -90,7 +92,8 @@ class UsuarioFactory(factory.django.DjangoModelFactory[Usuario]):
     def groups(self, create: bool, extracted, **kwargs):  # noqa: ANN001
         """UsuarioFactory(groups=["Coordenador", "DAT"]) anexa aos grupos.
 
-        Grupo de função com papel ganha o vínculo vigente junto (`com_papel`). Opções:
+        Grupo de função com papel ganha o vínculo vigente junto (`com_papel`); DAT, Controle e
+        Diretoria ganham o vínculo do pacote (`PACOTE_DO_GRUPO_DE_SETOR`). Opções:
         `groups__gerencia=g` (default: gerência neutra própria) e `groups__vinculo=False` (só o grupo).
         """
         if not create or not extracted:
@@ -102,6 +105,8 @@ class UsuarioFactory(factory.django.DjangoModelFactory[Usuario]):
                 continue
             group, _ = Group.objects.get_or_create(name=name)
             self.groups.add(group)
+            if com_vinculo and name in PACOTE_DO_GRUPO_DE_SETOR:
+                PACOTE_DO_GRUPO_DE_SETOR[name](cast(Usuario, self))
 
 
 class GerenciaFactory(factory.django.DjangoModelFactory[Gerencia]):
@@ -167,6 +172,41 @@ def com_pacote_do_controle(user: Usuario, papel: str = "EQUIPE") -> EquipeGerenc
     vinculo = com_papel(user, papel, gerencia)
     invalidate_user_functional_permissions_cache(user.pk)
     return vinculo
+
+
+def com_pacote_da_diretoria(user: Usuario) -> EquipeGerencia:
+    """Vínculo EQUIPE na gerência `DIRETORIA` (perfil DIRETORIA): o pacote da Diretoria (PR 12, C8).
+
+    O pacote DIRETORIA é igual ao grupo Diretoria do seed. Em produção ninguém está no grupo nem existe a
+    gerência; o vínculo é o caminho da Diretoria quando o grupo deixar de dar poder.
+    """
+    from apps.core.services.rbac_permissions import invalidate_user_functional_permissions_cache
+
+    gerencia, _ = Gerencia.objects.get_or_create(nome="DIRETORIA", defaults={"nome_setor": "Diretoria"})
+    if gerencia.perfil != Gerencia.Perfil.DIRETORIA:
+        gerencia.perfil = Gerencia.Perfil.DIRETORIA
+        gerencia.save(update_fields=["perfil"])
+    vinculo = com_papel(user, "EQUIPE", gerencia)
+    invalidate_user_functional_permissions_cache(user.pk)
+    return vinculo
+
+
+# Grupo de setor com capacidade → o vínculo que dá o mesmo poder pelo lugar (PR 12a). Em produção os
+# membros desses grupos têm esse vínculo (medição de 16/10); a factory espelha isso.
+PACOTE_DO_GRUPO_DE_SETOR = {
+    "DAT": com_pacote_do_dat,
+    "Controle": com_pacote_do_controle,
+    "Diretoria": com_pacote_da_diretoria,
+}
+
+
+def com_vinculo_dos_grupos(user: Usuario) -> None:
+    """Dá a `user` o vínculo do pacote de cada grupo de setor com capacidade que ele já tem (PR 12a).
+
+    Para os testes que põem o grupo à mão (`user.groups.add(...)`) com o grupo como variável ou parâmetro.
+    """
+    for nome in user.groups.filter(name__in=PACOTE_DO_GRUPO_DE_SETOR).values_list("name", flat=True):
+        PACOTE_DO_GRUPO_DE_SETOR[nome](user)
 
 
 class MunicipioFactory(factory.django.DjangoModelFactory[Municipio]):

@@ -129,10 +129,11 @@ def test_nome_de_perfil_permitido_nao_sai_da_gerencia_mesmo_com_perfil_padrao(no
 def test_nome_de_perfil_permitido_nao_vai_para_outra_gerencia(nome):
     Gerencia.objects.filter(nome=nome).delete()  # nome livre: a trava vale mesmo assim
     g = _gerencia()
-    controle = _cliente(UsuarioFactory(groups=["Controle"]))
+    # Superusuário: a trava vale para todos, e o vínculo de quem é do Controle recriaria a gerência CONTROLE.
+    root = _cliente(UsuarioFactory(superuser=True))
 
-    editar = controle.patch(f"/api/gerencias/{g.id}/", {"nome": nome}, format="json")
-    criar = controle.post("/api/gerencias/", {"nome": nome, "nome_setor": "Setor Porta Nova"}, format="json")
+    editar = root.patch(f"/api/gerencias/{g.id}/", {"nome": nome}, format="json")
+    criar = root.post("/api/gerencias/", {"nome": nome, "nome_setor": "Setor Porta Nova"}, format="json")
 
     assert editar.status_code == 400, editar.content
     assert criar.status_code == 400, criar.content

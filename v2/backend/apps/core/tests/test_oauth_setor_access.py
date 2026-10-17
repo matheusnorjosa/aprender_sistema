@@ -33,7 +33,7 @@ from apps.core.models import EquipeGerencia, Gerencia, GoogleOAuthCredential, Pe
 from apps.core.rbac.policies import CanPublishSetorSolicitacao, CanUseGcal
 from apps.core.services.oauth.oauth_flow import _is_safe_url
 from apps.core.services.oauth.token_manager import encrypt_token
-from apps.core.tests.factories import GroupFactory, UsuarioFactory
+from apps.core.tests.factories import GroupFactory, UsuarioFactory, com_pacote_do_controle
 
 pytestmark = pytest.mark.django_db
 
@@ -81,6 +81,7 @@ def _apoio_sem_setor():
 def _controle():
     user = UsuarioFactory()
     user.groups.add(GroupFactory(name="Controle"))
+    com_pacote_do_controle(user)
     return user
 
 

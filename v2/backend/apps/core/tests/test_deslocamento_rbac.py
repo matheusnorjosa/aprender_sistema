@@ -28,7 +28,7 @@ import pytest
 
 from apps.core.models import Deslocamento, EquipeGerencia, Gerencia, Usuario
 from apps.core.services.equipe_gerencia import PAPEL_POR_FUNCAO
-from apps.core.tests.factories import GroupFactory, UsuarioFactory
+from apps.core.tests.factories import GroupFactory, UsuarioFactory, com_vinculo_dos_grupos
 
 pytestmark = pytest.mark.django_db
 
@@ -46,6 +46,7 @@ def _make_user(username: str, group_names: list[str]) -> Usuario:
     for gname in group_names:
         group = GroupFactory(name=gname)
         user.groups.add(group)
+        com_vinculo_dos_grupos(user)
     return user
 
 

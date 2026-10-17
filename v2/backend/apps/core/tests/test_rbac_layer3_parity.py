@@ -33,13 +33,14 @@ def rbac_seeded():
     seed_functional_permissions(assign_default_groups=True)
 
 
-def _user_with_groups(username: str, groups: list[str]) -> Usuario:
+def _user_with_groups(username: str, groups: list[str], vinculo: bool = True) -> Usuario:
     return UsuarioFactory(
         username=username,
         email=f"{username}@test.com",
         password="x",
         cpf=username.rjust(11, "9")[-11:],
         groups=groups,
+        groups__vinculo=vinculo,
     )
 
 
@@ -135,8 +136,8 @@ def test_controle_tem_operar_controle_dat(rbac_seeded):
 
 
 def test_dat_tem_operar_controle_dat(rbac_seeded):
-    """Issue #1222 (Epic 1): DAT não tem mais operate_preagenda (só Controle)."""
-    u = _user_with_groups("paridade_scd_dat", ["DAT"])
+    """Issue #1222 (Epic 1): o grupo DAT não tem operate_preagenda (o pacote do DAT tem, desde o PR 10)."""
+    u = _user_with_groups("paridade_scd_dat", ["DAT"], vinculo=False)
     assert user_has_any_perm(u, "operate_preagenda") is False
 
 

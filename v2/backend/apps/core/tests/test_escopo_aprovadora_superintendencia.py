@@ -87,8 +87,8 @@ def _par_controle() -> Usuario:
 
 
 def _aprovadora(g1: Gerencia, groups: tuple[str, ...] = ("Gerente",), **kwargs) -> Usuario:
-    """GERENTE vigente em g1 + grupos (default: só "Gerente", como as 5 de produção)."""
-    user = UsuarioFactory(groups=list(groups), **kwargs)
+    """GERENTE vigente em g1 + grupos (default: só "Gerente", como as 5 de produção). Grupo sem vínculo."""
+    user = UsuarioFactory(groups=list(groups), groups__vinculo=False, **kwargs)
     EquipeGerencia.objects.create(usuario=user, gerencia=g1, papel="GERENTE")
     return user
 
@@ -235,11 +235,11 @@ def test_solicitation_approval_basis_for_por_persona(g1, outra_gerencia):
         ("controle", _par_controle(), "capacidade_aprovar", "capacidade_aprovar"),
         ("superuser", UsuarioFactory(superuser=True), "superuser", "superuser"),
         # PR 11: grupo não aprova.
-        ("par_controle_sem_vinculo", UsuarioFactory(groups=list(asst)), None, None),
+        ("par_controle_sem_vinculo", UsuarioFactory(groups=list(asst), groups__vinculo=False), None, None),
         ("legado", UsuarioFactory(groups=["Superintendência", "Gerente"]), None, None),
         ("aprovadora_com_asst", _aprovadora(g1, groups=asst), "gerente_superintendencia", None),
         ("aprovadora_no_controle", _controle(_aprovadora(g1)), "gerente_superintendencia", "capacidade_aprovar"),
-        ("dat", UsuarioFactory(groups=["DAT"]), None, None),
+        ("dat", UsuarioFactory(groups=["DAT"], groups__vinculo=False), None, None),
     ]
 
     for nome, user, esperado_dentro, esperado_fora in casos:

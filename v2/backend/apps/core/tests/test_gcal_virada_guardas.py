@@ -33,7 +33,7 @@ from apps.core.services.gcal.sync import CriacaoRecusada, upsert_one
 from apps.core.services.gcal.utils import _payload_hash
 from apps.core.services.gcal_fake_client import FakeCalendarClient
 from apps.core.services.solicitacao_publish import motivo_nao_publicavel, publish_to_gcal
-from apps.core.tests.factories import GroupFactory, SolicitacaoFactory, UsuarioFactory
+from apps.core.tests.factories import GroupFactory, SolicitacaoFactory, UsuarioFactory, com_pacote_do_controle
 
 pytestmark = pytest.mark.django_db
 
@@ -262,6 +262,7 @@ def test_publish_to_gcal_aceita_error():
 def controle_client():
     user = UsuarioFactory(username="controle_virada", email="controle_virada@example.invalid", cpf="11144477735")
     user.groups.add(GroupFactory(name="Controle"))
+    com_pacote_do_controle(user)
     c = APIClient()
     c.force_authenticate(user=user)
     return c

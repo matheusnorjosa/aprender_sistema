@@ -18,6 +18,8 @@ from apps.core.tests.factories import (
     MunicipioFactory,
     ProjetoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
+    com_pacote_do_dat,
 )
 
 pytestmark = pytest.mark.django_db
@@ -33,6 +35,7 @@ def controle_user() -> Usuario:
     user = UsuarioFactory(username="controle_boundary", password="test123", cpf="20000000001")
     group = GroupFactory(name="Controle")
     user.groups.add(group)
+    com_pacote_do_controle(user)
     return user
 
 
@@ -41,6 +44,7 @@ def dat_user() -> Usuario:
     user = UsuarioFactory(username="dat_boundary", password="test123", cpf="20000000002")
     group = GroupFactory(name="DAT")
     user.groups.add(group)
+    com_pacote_do_dat(user)
     return user
 
 
@@ -138,9 +142,10 @@ def test_controle_user_can_access_dat_compra_domain(
 
 def test_dat_user_cannot_access_controle_compra_domain(
     api_client: APIClient,
-    dat_user: Usuario,
 ) -> None:
-    api_client.force_authenticate(user=dat_user)
+    """O grupo DAT sozinho não abre o domínio do Controle. Desde o PR 10 quem abre é o pacote do DAT (vínculo)."""
+    so_grupo = UsuarioFactory(groups=["DAT"], groups__vinculo=False)
+    api_client.force_authenticate(user=so_grupo)
     response = api_client.get("/api/controle/compras/", secure=True)
     assert response.status_code == 403
 

@@ -293,7 +293,7 @@ def test_controle_nao_aprova_a_propria(g27):
 
 
 def test_grupo_controle_sozinho_nao_aprova():
-    user = UsuarioFactory(groups=["Controle"])
+    user = UsuarioFactory(groups=["Controle"], groups__vinculo=False)
     assert solicitation_approval_basis(user) is None
 
 

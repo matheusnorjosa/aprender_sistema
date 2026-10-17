@@ -25,6 +25,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
 )
 
 
@@ -414,6 +415,7 @@ class TestAvailabilityCheckEndpoint:
         # Dar permissão ao usuário (evitar 403)
         grupo_controle = GroupFactory(name="Controle")
         usuario_test.groups.add(grupo_controle)
+        com_pacote_do_controle(usuario_test)
 
         client = APIClient()
         client.force_authenticate(user=usuario_test)
@@ -486,6 +488,7 @@ class TestAvailabilityCheckEndpoint:
         # Dar permissão ao usuário (evitar 403 antes de validar parâmetros)
         grupo_controle = GroupFactory(name="Controle")
         usuario_test.groups.add(grupo_controle)
+        com_pacote_do_controle(usuario_test)
 
         client = APIClient()
         client.force_authenticate(user=usuario_test)
@@ -513,6 +516,7 @@ class TestAvailabilityCheckEndpoint:
         # Dar permissão ao usuário (evitar 403 antes de validar parâmetros)
         grupo_controle = GroupFactory(name="Controle")
         usuario_test.groups.add(grupo_controle)
+        com_pacote_do_controle(usuario_test)
 
         client = APIClient()
         client.force_authenticate(user=usuario_test)
@@ -543,6 +547,7 @@ class TestAvailabilityCheckEndpoint:
         # Tornar usuario_test privilegiado (grupo Controle tem view_all_availability)
         grupo_controle = GroupFactory(name="Controle")
         usuario_test.groups.add(grupo_controle)
+        com_pacote_do_controle(usuario_test)
 
         # Criar segundo usuário
         usuario_2 = UsuarioFactory(

@@ -27,6 +27,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
     com_papel,
     liberar_par,
 )
@@ -277,6 +278,7 @@ class TestFluxoPorProjeto(TestCase):
             cpf="11111111111",
         )
         usuario_controle.groups.add(self.grupo_controle)
+        com_pacote_do_controle(usuario_controle)
         self.client.force_authenticate(user=usuario_controle)
 
         # Filtrar por SUPER
@@ -316,6 +318,7 @@ class TestFluxoPorProjeto(TestCase):
             cpf="22222222222",
         )
         usuario_controle.groups.add(self.grupo_controle)
+        com_pacote_do_controle(usuario_controle)
         self.client.force_authenticate(user=usuario_controle)
 
         response = self.client.get("/api/pre-agenda/")

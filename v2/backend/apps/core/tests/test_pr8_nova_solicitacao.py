@@ -27,6 +27,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
     com_papel,
     liberar_par,
 )
@@ -123,6 +124,7 @@ class TestAvailabilityCheckMany:
         # P2.2: check-many endpoint requires HasPerm("operate_preagenda") permission
         controle_group = GroupFactory(name="Controle")
         coord.groups.add(controle_group)
+        com_pacote_do_controle(coord)
 
         client.force_authenticate(user=coord)
 

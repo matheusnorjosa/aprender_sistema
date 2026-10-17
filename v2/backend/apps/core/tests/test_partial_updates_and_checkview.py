@@ -26,6 +26,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
 )
 
 pytestmark = pytest.mark.django_db
@@ -58,6 +59,7 @@ def auth_client(user=None):
         user = UsuarioFactory(username="u1", email="u1@x.com", password="x")
         grupo_controle = GroupFactory(name="Controle")
         user.groups.add(grupo_controle)
+        com_pacote_do_controle(user)
     client.force_authenticate(user=user)
     return client, user
 

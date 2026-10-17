@@ -27,6 +27,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
 )
 
 
@@ -49,6 +50,7 @@ def usuario_controle(db, grupo_controle):
         username="controle_user", email="controle@test.com", password="testpass123", cpf="12345678901"  # CPF único
     )
     user.groups.add(grupo_controle)
+    com_pacote_do_controle(user)
     return user
 
 

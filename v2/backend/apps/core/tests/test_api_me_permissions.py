@@ -17,7 +17,7 @@ from rest_framework.test import APIClient
 import pytest
 
 from apps.core.models import GroupClassificacao, PermissaoFuncional
-from apps.core.tests.factories import GroupFactory, UsuarioFactory
+from apps.core.tests.factories import GroupFactory, UsuarioFactory, com_pacote_do_dat
 
 pytestmark = pytest.mark.django_db
 
@@ -139,6 +139,7 @@ def test_me_returns_effective_functional_permissions():
     user = UsuarioFactory(username="u5", email="u5@x.com", password="x", cpf="66666666666")
     dat_group = GroupFactory(name="DAT")
     user.groups.add(dat_group)
+    com_pacote_do_dat(user)
 
     perm = PermissaoFuncional.objects.create(
         codename="acoes.notificacao.manage",

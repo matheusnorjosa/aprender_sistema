@@ -30,6 +30,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
 )
 
 
@@ -60,6 +61,7 @@ def controle_user(db, grupos):
         last_name="User",
     )
     user.groups.add(grupos["controle"])
+    com_pacote_do_controle(user)
     return user
 
 
@@ -338,6 +340,7 @@ class TestFormadoresMetrics:
             cpf="99999999999",
         )
         controle_user.groups.add(grupos["controle"])
+        com_pacote_do_controle(controle_user)
 
         client.force_authenticate(user=controle_user)
 
@@ -434,6 +437,7 @@ class TestFormadoresMetrics:
             cpf="98765432109",
         )
         controle_user.groups.add(grupos["controle"])
+        com_pacote_do_controle(controle_user)
 
         client.force_authenticate(user=controle_user)
 
@@ -491,6 +495,7 @@ class TestFormadoresMetrics:
             cpf="11122233344",
         )
         controle_user.groups.add(grupos["controle"])
+        com_pacote_do_controle(controle_user)
 
         client.force_authenticate(user=controle_user)
 

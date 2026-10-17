@@ -42,6 +42,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
     com_pacote_do_dat,
 )
 
@@ -337,6 +338,7 @@ class TestRegressao:
         mock_task.return_value = _mock_task_result()
         controle = UsuarioFactory(username="controle_pss", cpf="63000000003")
         controle.groups.add(GroupFactory(name="Controle"))
+        com_pacote_do_controle(controle)
         client = APIClient()
         client.force_authenticate(controle)
         resp = _publish(client, sol_vidas_terceiro.id)
@@ -588,23 +590,26 @@ class TestGerenciaVemDoProjeto:
 class TestPublishGlobalSoComUseGcal:
     """O "global" do PUBLISH é `use_gcal`, não o "global" de VISIBILIDADE.
 
-    `user_is_solicitacao_global` inclui a DAT (`manage_admin_registries`) para VER tudo. Se
-    ele também valesse para publicar, uma pessoa da DAT que fosse Apoio passaria a classe
-    pela cap da Apoio e publicaria/cancelaria evento de QUALQUER setor sem ter `use_gcal`.
+    `user_is_solicitacao_global` inclui quem aprova (a gerente da Superintendência, pelo vínculo) para
+    VER tudo. Se ele também valesse para publicar, uma pessoa que vê tudo e fosse Apoio passaria a classe
+    pela cap da Apoio e publicaria/cancelaria evento de QUALQUER setor sem ter `use_gcal`. (Até o PR 12a o
+    exemplo era o grupo DAT; desde o PR 10 o pacote do DAT tem `use_gcal`, e o grupo sozinho não vale no corte.)
     """
 
     @patch("apps.core.tasks.task_publish_solicitacao_to_gcal.delay")
     @patch("django.conf.settings.GCAL_CLIENT", "fake")
     @patch("rest_framework.throttling.AnonRateThrottle.allow_request", return_value=True)
     @patch("rest_framework.throttling.UserRateThrottle.allow_request", return_value=True)
-    def test_dat_que_tambem_e_apoio_nao_publica_evento_de_outro_setor(
+    def test_quem_ve_tudo_e_tambem_e_apoio_nao_publica_evento_de_outro_setor(
         self, _t1, _t2, mock_task, gerencia_fluir, sol_vidas_terceiro
     ):
         mock_task.return_value = _mock_task_result()
         user = UsuarioFactory(username="dat_apoio_pss", cpf="63000000009")
-        user.groups.add(GroupFactory(name="DAT"), GroupFactory(name="Apoio de Coordenação"))
+        user.groups.add(GroupFactory(name="Apoio de Coordenação"))
+        g1, _ = Gerencia.objects.get_or_create(nome="SUPERINTENDENCIA", defaults={"nome_setor": "Super"})
+        EquipeGerencia.objects.create(usuario=user, gerencia=g1, papel="GERENTE")
         EquipeGerencia.objects.create(usuario=user, gerencia=gerencia_fluir, papel="APOIO")
-        assert user_is_solicitacao_global(user) is True  # premissa: a DAT VÊ tudo
+        assert user_is_solicitacao_global(user) is True  # premissa: VÊ tudo (aprova pelo vínculo em g1)
         client = APIClient()
         client.force_authenticate(user)
 

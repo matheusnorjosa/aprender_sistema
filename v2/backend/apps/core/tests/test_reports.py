@@ -35,6 +35,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
     com_pacote_do_dat,
 )
 
@@ -81,6 +82,7 @@ def user_controle(grupos):
     """Usuário do grupo Controle."""
     user = UsuarioFactory(username="controle1", email="controle@x.com", password="x", cpf="22222222222")
     user.groups.add(grupos["controle"])
+    com_pacote_do_controle(user)
     return user
 
 
@@ -89,6 +91,7 @@ def user_dat(grupos):
     """Usuário do grupo DAT."""
     user = UsuarioFactory(username="dat1", email="dat@x.com", password="x", cpf="33333333333")
     user.groups.add(grupos["dat"])
+    com_pacote_do_dat(user)
     return user
 
 

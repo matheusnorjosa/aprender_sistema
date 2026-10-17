@@ -26,7 +26,7 @@ from rest_framework.test import APIClient, APIRequestFactory
 import pytest
 
 from apps.core.models import DATCompra
-from apps.core.tests.factories import MunicipioFactory, ProjetoFactory, UsuarioFactory
+from apps.core.tests.factories import MunicipioFactory, ProjetoFactory, UsuarioFactory, com_pacote_do_dat
 from apps.core.views.dat import DATRegistroViewSet, ProjetoGeralViewSet
 from apps.core.views.dat_module import DATCompraViewSet
 from apps.core.views.mixins import LockOnWriteMixin
@@ -59,6 +59,7 @@ class TestPatchStillWorks:
         """Integração: PATCH real → 200 (lock+atomic não quebram o select_related com FK nula)."""
         user = UsuarioFactory(username="dat_lu", cpf="66600000901")
         user.groups.add(Group.objects.get_or_create(name="DAT")[0])
+        com_pacote_do_dat(user)
         compra = DATCompra.objects.create(
             municipio=MunicipioFactory(),
             projeto=ProjetoFactory(),

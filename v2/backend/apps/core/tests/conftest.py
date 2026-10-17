@@ -14,10 +14,15 @@ from django.conf import settings
 
 import pytest
 
+from apps.core.models import PermissaoFuncional
 from apps.core.services.functional_permissions_seed import (
     ensure_base_groups,
     seed_functional_permissions,
 )
+
+# PR 11: grupos com `approve_solicitation` no banco que a cadeia de migrations deixou, lidos antes
+# de o seed da sessão reescrever os grupos de cada capacidade.
+_GRUPOS_QUE_APROVAM_POS_MIGRATE = pytest.StashKey[list[str]]()
 
 
 def get_field_errors(response) -> dict[str, Any]:
@@ -67,7 +72,7 @@ def force_service_account_mode():
 
 
 @pytest.fixture(autouse=True, scope="session")
-def seed_functional_permissions_fixture(django_db_setup, django_db_blocker):
+def seed_functional_permissions_fixture(request, django_db_setup, django_db_blocker):
     """
     Garante baseline de RBAC (todos os grupos base + permissoes funcionais +
     vinculos) em todos os testes de apps.core.
@@ -78,11 +83,28 @@ def seed_functional_permissions_fixture(django_db_setup, django_db_blocker):
     `pytest --no-migrations` nenhuma migration RunPython cria os grupos, e
     `seed_functional_permissions` so cria os 8 com capability — este passo
     cobre os demais (Formador, setores sem capability, etc.). #1404.
+
+    PR 11: antes do seed, guarda quais grupos têm `approve_solicitation` (fixture
+    `grupos_que_aprovam_pos_migrate`). O seed faz `groups.set(())` nessa capacidade e apagaria
+    o que uma migration tivesse gravado.
     """
 
     with django_db_blocker.unblock():
+        request.config.stash[_GRUPOS_QUE_APROVAM_POS_MIGRATE] = sorted(
+            nome
+            for nome in PermissaoFuncional.objects.filter(codename="approve_solicitation").values_list(
+                "groups__name", flat=True
+            )
+            if nome
+        )
         ensure_base_groups()
         seed_functional_permissions(assign_default_groups=True)
+
+
+@pytest.fixture
+def grupos_que_aprovam_pos_migrate(request) -> list[str]:
+    """Grupos com `approve_solicitation` como o banco estava antes do seed da sessão (PR 11)."""
+    return request.config.stash[_GRUPOS_QUE_APROVAM_POS_MIGRATE]
 
 
 @pytest.fixture

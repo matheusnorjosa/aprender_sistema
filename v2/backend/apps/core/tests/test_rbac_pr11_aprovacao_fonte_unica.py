@@ -28,7 +28,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AuditLog, Gerencia, PermissaoFuncional, Solicitacao, Usuario
+from apps.core.models import AuditLog, Gerencia, Solicitacao, Usuario
 from apps.core.rbac.policies import (
     CanAccessSolicitationApprovals,
     SolicitationApprovalBasis,
@@ -168,10 +168,15 @@ def test_pacote_controle_aprova_e_nenhum_grupo_do_seed_aprova():
 
 
 @pytest.mark.migrations
-def test_nenhum_grupo_do_banco_aprova():
-    """Teste 7 (banco): no job migrate-integrity o banco vem da cadeia de migrations."""
-    cap = PermissaoFuncional.objects.get(codename="approve_solicitation")
-    assert list(cap.groups.values_list("name", flat=True)) == []
+def test_nenhum_grupo_do_banco_aprova(request, grupos_que_aprovam_pos_migrate):
+    """Teste 7 (banco): no job migrate-integrity o banco vem da cadeia de migrations.
+
+    Lê os grupos guardados pela fixture de sessão ANTES do seed, que faz `groups.set(())` em
+    `approve_solicitation` e apagaria o que uma migration tivesse posto ali.
+    """
+    if request.config.getoption("nomigrations"):
+        pytest.skip("sob --no-migrations o banco não vem da cadeia de migrations")
+    assert grupos_que_aprovam_pos_migrate == []
 
 
 def test_lotar_e_encerrar_equipe_no_controle_audita_a_autoridade(root, g27):

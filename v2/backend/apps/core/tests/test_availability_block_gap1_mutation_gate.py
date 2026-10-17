@@ -65,6 +65,7 @@ def _block_owned_by(owner: Usuario, motivo: str = "Bloqueio do dono") -> Availab
     )
 
 
+@pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
 class TestGap1MutationGate:
     """Update/destroy de bloqueio de terceiro seguem o gate de delegação (não o de leitura)."""
 

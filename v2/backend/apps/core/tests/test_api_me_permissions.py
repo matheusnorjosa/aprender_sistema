@@ -132,6 +132,7 @@ def test_superuser_always_has_access():
     assert data["is_superintendencia"] is True, "Superuser should always have access"
 
 
+@pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
 def test_me_returns_effective_functional_permissions():
     """
     /api/me/ deve retornar permissions (codenames) vindos do mapeamento funcional.

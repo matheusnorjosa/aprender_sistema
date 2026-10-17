@@ -97,6 +97,7 @@ def _pessoa(**campos: Any) -> dict[str, Any]:
 
 
 class TestSnapshot:
+    @pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
     def test_usuario_de_grupo_tem_as_capacidades_e_policies_do_grupo(self):
         u = UsuarioFactory(groups=["DAT"], groups__vinculo=False)
 
@@ -164,6 +165,7 @@ class TestSnapshot:
         for campo in ("superusuario", "grupos", "gerencias_escopo", "vinculos"):
             assert simulado[campo] == hoje[campo], campo
 
+    @pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
     def test_capacidades_de_hoje_igual_a_fonte_da_api(self):
         # Trava de paridade: se a fórmula de `get_user_functional_permissions` mudar (PR 11)
         # e o padrão do simulador não, o `--comparar` pós-deploy mostraria o poder antigo.

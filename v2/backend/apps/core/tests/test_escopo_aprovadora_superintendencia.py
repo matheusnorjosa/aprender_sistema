@@ -87,8 +87,8 @@ def _par_controle() -> Usuario:
 
 
 def _aprovadora(g1: Gerencia, groups: tuple[str, ...] = ("Gerente",), **kwargs) -> Usuario:
-    """GERENTE vigente em g1 + grupos (default: só "Gerente", como as 5 de produção). Grupo sem vínculo."""
-    user = UsuarioFactory(groups=list(groups), groups__vinculo=False, **kwargs)
+    """GERENTE vigente em g1 + grupos (default: só "Gerente", como as 5 de produção)."""
+    user = UsuarioFactory(groups=list(groups), **kwargs)
     EquipeGerencia.objects.create(usuario=user, gerencia=g1, papel="GERENTE")
     return user
 
@@ -210,11 +210,16 @@ def test_aprovadora_restrita_por_persona(g1):
     assert aprovadora_restrita_a_superintendencia(_aprovadora(g1)) is True
     assert aprovadora_restrita_a_superintendencia(_aprovadora(g1, groups=())) is True
     # Controle puro não aprova: a única base de aprovação continua sendo o vínculo.
-    assert aprovadora_restrita_a_superintendencia(_aprovadora(g1, groups=("Gerente", "Controle"))) is True
+    assert (
+        aprovadora_restrita_a_superintendencia(_aprovadora(g1, groups=("Gerente", "Controle"), groups__vinculo=False))
+        is True
+    )
     assert aprovadora_restrita_a_superintendencia(_aprovadora(g1, superuser=True)) is False
     # PR 11: os pares de grupos não são base; só o vínculo no Controle tira a restrição.
     assert (
-        aprovadora_restrita_a_superintendencia(_aprovadora(g1, groups=("Controle", "Assistente Administrativo")))
+        aprovadora_restrita_a_superintendencia(
+            _aprovadora(g1, groups=("Controle", "Assistente Administrativo"), groups__vinculo=False)
+        )
         is True
     )
     assert aprovadora_restrita_a_superintendencia(_aprovadora(g1, groups=("Superintendência", "Gerente"))) is True
@@ -237,7 +242,7 @@ def test_solicitation_approval_basis_for_por_persona(g1, outra_gerencia):
         # PR 11: grupo não aprova.
         ("par_controle_sem_vinculo", UsuarioFactory(groups=list(asst), groups__vinculo=False), None, None),
         ("legado", UsuarioFactory(groups=["Superintendência", "Gerente"]), None, None),
-        ("aprovadora_com_asst", _aprovadora(g1, groups=asst), "gerente_superintendencia", None),
+        ("aprovadora_com_asst", _aprovadora(g1, groups=asst, groups__vinculo=False), "gerente_superintendencia", None),
         ("aprovadora_no_controle", _controle(_aprovadora(g1)), "gerente_superintendencia", "capacidade_aprovar"),
         ("dat", UsuarioFactory(groups=["DAT"], groups__vinculo=False), None, None),
     ]
@@ -550,7 +555,7 @@ def test_gerente_de_g1_com_base_ampla_edita_fora_do_escopo(g1, outra_gerencia, g
 
 def test_gerente_de_g1_com_controle_puro_so_decide_o_escopo(g1, outra_gerencia):
     """Controle puro não aprova: a decisão fica no escopo, mesmo com a edição global."""
-    user = _aprovadora(g1, groups=("Gerente", "Controle"))
+    user = _aprovadora(g1, groups=("Gerente", "Controle"), groups__vinculo=False)
     sol = _sol("SUPER", outra_gerencia)
 
     resp = _client(user).patch(f"/api/solicitacoes/{sol.id}/approve/", format="json")

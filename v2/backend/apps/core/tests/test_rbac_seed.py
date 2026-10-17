@@ -196,6 +196,7 @@ def test_seed_rbac_assigns_permissions_to_formador(run_seed_rbac):
 # ============================================================================
 
 
+@pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
 def test_endpoint_municipios_dat_allowed(run_seed_rbac):
     """Issue #1222 (Epic 1): DAT acessa /api/municipios/ via `manage_admin_registries`
     (cadastro admin DAT puro). `seed_rbac` cria grupo DAT mas não atribui

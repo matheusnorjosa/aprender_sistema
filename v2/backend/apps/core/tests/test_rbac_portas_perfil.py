@@ -110,7 +110,7 @@ def test_nome_de_gerencia_com_perfil_nao_muda_pela_api():
     assert g.nome == "CONTROLE PORTA"
 
 
-@pytest.mark.parametrize("nome", ["GERENCIA DAT", "CONTROLE"])
+@pytest.mark.parametrize("nome", ["GERENCIA DAT", "CONTROLE", "DIRETORIA"])
 def test_nome_de_perfil_permitido_nao_sai_da_gerencia_mesmo_com_perfil_padrao(nome):
     """A auditoria acha a gerência pelo `nome` e a 0120 deixa todas em PADRAO: o nome é a trava."""
     g, _ = Gerencia.objects.update_or_create(nome=nome, defaults={"nome_setor": f"Setor {nome}"})
@@ -125,7 +125,7 @@ def test_nome_de_perfil_permitido_nao_sai_da_gerencia_mesmo_com_perfil_padrao(no
     assert g.nome == nome
 
 
-@pytest.mark.parametrize("nome", ["GERENCIA DAT", "CONTROLE"])
+@pytest.mark.parametrize("nome", ["GERENCIA DAT", "CONTROLE", "DIRETORIA"])
 def test_nome_de_perfil_permitido_nao_vai_para_outra_gerencia(nome):
     Gerencia.objects.filter(nome=nome).delete()  # nome livre: a trava vale mesmo assim
     g = _gerencia()

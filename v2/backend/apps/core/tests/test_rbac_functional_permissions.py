@@ -29,6 +29,7 @@ def _request_with_user(factory: APIRequestFactory, user: Usuario):
     return request
 
 
+@pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
 def test_functional_permission_allows_access_via_group_mapping():
     dat_group = GroupFactory(name="DAT")
     user = UsuarioFactory(
@@ -55,6 +56,7 @@ def test_functional_permission_denies_user_without_mapping():
     assert HasPerm("manage_purchases_and_materials")().has_permission(request, _MockView()) is False
 
 
+@pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
 def test_functional_permission_cache_hit_miss(django_assert_num_queries):
     cache.clear()
     dat_group = GroupFactory(name="DAT")
@@ -77,6 +79,7 @@ def test_functional_permission_cache_hit_miss(django_assert_num_queries):
         assert permission.has_permission(request, _MockView()) is True
 
 
+@pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
 def test_cache_invalidated_when_user_groups_change():
     cache.clear()
     dat_group = GroupFactory(name="DAT")
@@ -96,6 +99,7 @@ def test_cache_invalidated_when_user_groups_change():
     assert permission.has_permission(request, _MockView()) is False
 
 
+@pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
 def test_cache_invalidated_when_group_deleted():
     # M05-03 (#1667): deletar o Group deve invalidar o cache POR-USUÁRIO dos
     # ex-membros. O cascade de User.groups.through NÃO emite m2m_changed, então
@@ -130,6 +134,7 @@ def test_cache_invalidated_when_group_deleted():
     assert permission.has_permission(request, _MockView()) is False
 
 
+@pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
 def test_cache_invalidated_when_permission_m2m_changes():
     cache.clear()
     dat_group = GroupFactory(name="DAT")
@@ -161,6 +166,7 @@ def test_cache_invalidated_when_permission_m2m_changes():
     assert permission.has_permission(request, _MockView()) is False
 
 
+@pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
 def test_cache_invalidated_when_permission_saved():
     cache.clear()
     dat_group = GroupFactory(name="DAT")
@@ -193,6 +199,7 @@ def test_cache_invalidated_when_permission_saved():
     assert permission.has_permission(request, _MockView()) is False
 
 
+@pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
 def test_cache_invalidated_when_permission_deleted():
     cache.clear()
     dat_group = GroupFactory(name="DAT")

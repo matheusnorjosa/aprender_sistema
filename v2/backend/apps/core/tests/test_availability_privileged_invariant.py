@@ -74,6 +74,7 @@ class TestAvailabilityPrivilegedInvariant:
             "movê-lo para permission_classes quebra o own-block do Formador (RD-02/RD-03, #1221)."
         )
 
+    @pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
     def test_privileged_helper_true_for_view_all_availability(self, seeded):
         user = _user_with_caps("view_all_availability")
         assert is_privileged_user(user) is True

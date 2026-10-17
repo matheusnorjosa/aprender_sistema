@@ -246,6 +246,7 @@ DELTA_PR10: dict[str, dict[str, bool]] = {
 }
 
 
+@pytest.mark.usefixtures("modo_uniao")  # fórmula do front sobre grupo e vínculo (PR 7/10): modo soma (PR 12)
 class TestPoliciesNovas:
     def test_as_cinco_sao_publicas(self):
         assert set(NOVAS) <= PUBLIC_POLICY_KEYS
@@ -316,6 +317,7 @@ PR10_TELAS_DO_DAT = {"access_solicitation_approvals", "create_solicitation", "ac
 PR11_TELAS_DO_CONTROLE = {"access_solicitation_approvals"}
 
 
+@pytest.mark.usefixtures("modo_uniao")  # fórmula do front sobre grupo e vínculo (PR 7/10): modo soma (PR 12)
 class TestPersonasPorPacote:
     """Quem trabalha numa gerência com perfil vê as mesmas telas de quem tem o grupo."""
 
@@ -420,6 +422,7 @@ DELTA_MEDIDO: dict[str, dict[str, tuple[bool, bool]]] = {
 }
 
 
+@pytest.mark.usefixtures("modo_uniao")  # fórmula do front sobre grupo e vínculo (PR 7/10): modo soma (PR 12)
 class TestDeltaDasTelasQueTrocaramDeRegra:
     def test_so_as_pessoas_e_telas_listadas_mudam(self):
         delta: dict[str, dict[str, tuple[bool, bool]]] = {}

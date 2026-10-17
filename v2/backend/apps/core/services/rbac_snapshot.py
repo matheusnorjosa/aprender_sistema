@@ -6,6 +6,10 @@ Nada aqui grava no banco nem no cache: as capacidades de hoje vêm de consulta d
 (`rbac_permissions.capacidades_sem_cache`, a mesma função que a API usa por trás do cache), e as
 policies são calculadas sobre essas capacidades (`resolve_public_policies(..., capacidades=...)`).
 
+`fonte` (PR 12, o corte): simula o modo "uniao" ou "lotacao" de `settings.RBAC_FONTE` sem trocar a
+setting do processo. Capacidades e telas de escopo recebem a fonte por parâmetro (nada de
+`override_settings` em código de produção). None = o modo ativo.
+
 Sem dado pessoal: a pessoa é só `u<id>`. Nunca username (é o CPF), nome, e-mail nem telefone.
 
 `capacidades_de` é o ponto de extensão dos PRs seguintes: passa-se a fórmula nova e compara-se o
@@ -36,7 +40,8 @@ CAMPOS: tuple[str, ...] = ("superusuario", "grupos", "capacidades", "policies", 
 
 
 def capacidades_de_hoje(usuario: Any) -> set[str]:
-    """Capacidades de hoje sem cache: a mesma função da API (grupos ∪ pacote do perfil, ADR-020).
+    """Capacidades de hoje sem cache: a mesma função da API (pacote do perfil ∪ papel, ADR-020; no modo
+    "uniao", também os grupos).
 
     A paridade com `get_user_functional_permissions` vem por construção; o teste
     `test_capacidades_de_hoje_igual_a_fonte_da_api` continua travando.
@@ -51,9 +56,18 @@ def _uid(usuario_id: int) -> str:
 def snapshot_de_poder(
     usuarios: QuerySet[Usuario] | None = None,
     capacidades_de: Callable[[Any], set[str]] | None = None,
+    *,
+    fonte: str | None = None,
 ) -> Snapshot:
-    """Poder de cada pessoa ATIVA: superusuário, grupos, capacidades, policies, escopo e vínculos."""
-    calcular = capacidades_de or capacidades_de_hoje
+    """Poder de cada pessoa ATIVA: superusuário, grupos, capacidades, policies, escopo e vínculos.
+
+    `fonte`: "uniao" ou "lotacao" simula aquele modo (capacidades e telas); None = o modo ativo.
+    """
+
+    def da_fonte(usuario: Any) -> set[str]:
+        return capacidades_sem_cache(usuario.id, fonte=fonte)
+
+    calcular = capacidades_de or da_fonte
     qs = (usuarios if usuarios is not None else Usuario.objects.all()).filter(is_active=True)
     qs = qs.prefetch_related("groups").order_by("id")
 
@@ -76,7 +90,7 @@ def snapshot_de_poder(
             "superusuario": bool(usuario.is_superuser),
             "grupos": sorted(g.name for g in usuario.groups.all()),
             "capacidades": sorted(capacidades),
-            "policies": resolve_public_policies(usuario, capacidades=capacidades),
+            "policies": resolve_public_policies(usuario, capacidades=capacidades, fonte=fonte),
             "gerencias_escopo": sorted(escopo.get(usuario.id, set())),
             "vinculos": [list(v) for v in sorted(vinculos.get(usuario.id, set()))],
         }

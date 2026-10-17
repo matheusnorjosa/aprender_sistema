@@ -137,6 +137,7 @@ def test_controle_start_sem_return_to_continua_em_pre_agenda(mock_build):
     assert mock_build.call_args.kwargs["return_to"] == "/pre-agenda"
 
 
+@pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
 @patch("apps.core.views_oauth.build_authorization_url", return_value=GOOGLE_AUTH_URL)
 def test_apoio_sem_setor_start_403_no_setor_scope(mock_build):
     """M12-15: quem não pode publicar nada (sem gerência de APOIO vigente) não recebe token Google."""
@@ -195,6 +196,7 @@ def test_apoio_callback_state_invalido_volta_para_pagina_de_publicacao(_mock_val
     assert "invalid_state" in resp.url
 
 
+@pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
 @patch("apps.core.views_oauth.exchange_code_for_tokens", return_value=TOKENS)
 @patch("apps.core.services.google_oauth.validate_oauth_state")
 def test_apoio_sem_setor_callback_nao_grava_credencial(mock_validate, mock_exchange):
@@ -255,6 +257,7 @@ def test_apoio_sem_pino_nao_usa_calendario_herdado_da_credencial(apoio_fluir, se
     assert resp.data["publish_ready"] is False
 
 
+@pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
 @pytest.mark.parametrize(
     "cenario, motivo",
     [

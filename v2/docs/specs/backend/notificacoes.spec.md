@@ -86,7 +86,7 @@ Toda mutação relevante grava `AuditLog`: `CICLO_ACOES_CREATE`, `ACAO_REGISTRAR
 
 ## Decisões relacionadas (ADRs)
 
-- RBAC: capability hardcoded + atribuição group×capability admin-driven — ver [`rbac.spec.md`](./rbac.spec.md) e [`RBAC_NAMING.md`](../../RBAC_NAMING.md). A feature segue o padrão "capability sem grupos no seed = superuser-only" até maturar.
+- RBAC: capability hardcoded; o poder vem do pacote do perfil da gerência (ADR-020; o grupo não dá poder desde o PR 12) — ver [`rbac.spec.md`](./rbac.spec.md) e [`RBAC_NAMING.md`](../../RBAC_NAMING.md). A feature segue o padrão "capability sem grupos no seed = superuser-only" até maturar.
 - Issues de origem: `#870` (engine de prazo/calendário), `#871` (processador diário/escalonamento + beat), `#872` (API). Capability `manage_internal_actions` introduzida na Onda 1 C3 (migration `0079`).
 - Sem ADR formal dedicado; o plano antigo [`PLANO_NOTIFICACOES_TIMING.md`](../../_archive/PLANO_NOTIFICACOES_TIMING.md) está arquivado e foi superado por esta implementação.
 
@@ -102,7 +102,7 @@ Toda mutação relevante grava `AuditLog`: `CICLO_ACOES_CREATE`, `ACAO_REGISTRAR
 
 ## Pontos de atenção / dívidas conhecidas
 
-- **Feature superuser-only**: `manage_internal_actions` não tem grupos no seed; nenhum papel operacional acessa ciclos/ações pela UI hoje. Maturar = admin atribui grupo via interface (sem code change).
+- **Feature superuser-only**: `manage_internal_actions` não tem grupos no seed; nenhum papel operacional acessa ciclos/ações pela UI hoje. Maturar = PR que põe a capacidade no pacote de um perfil de gerência (D4 do ADR-020: a matriz muda só por PR). Desde o PR 12 (o corte) o grupo Django não dá poder, então atribuir grupo pela interface não libera nada.
 - **Sem reabertura de ação concluída** (decisão MVP): conclusões são irreversíveis; correções exigem intervenção manual/admin.
 - **Cache de feriados com TTL**: `BusinessCalendarService` cacheia `FeriadoLocal` por 300s por ano; mudanças em feriados só refletem após `invalidate_cache()` ou expiração — relevante ao editar `FeriadoLocal` perto de um vencimento.
 - **Régua de notificação discreta**: o processador só dispara nas distâncias exatas {7,3,1,0,-1,-3} dias úteis; se o beat falhar/pular um dia, aquela fase específica não é reemitida (a janela é por dia, não acumulativa).

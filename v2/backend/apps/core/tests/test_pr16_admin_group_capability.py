@@ -183,6 +183,7 @@ class TestAdminSemEdicaoDeGrupos:
 
 
 class TestCacheInvalidation:
+    @pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
     def test_usuario_do_grupo_recebe_capability_apos_escrita_na_m2m(self, capability, group_dat):
         # User pertence a DAT mas DAT ainda não tem `view_compras_dashboard`.
         member = _make_user(label="dat_member")

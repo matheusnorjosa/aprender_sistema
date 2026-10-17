@@ -6,6 +6,7 @@ no banco nem no cache, e não imprime dado pessoal: a pessoa aparece só como `u
 
 Uso:
     python manage.py rbac_diff --salvar antes.json
+    python manage.py rbac_diff --salvar uniao.json --simular-fonte uniao   # o que a volta daria (PR 12)
     python manage.py rbac_diff --comparar antes.json                 # contra o banco de agora
     python manage.py rbac_diff --comparar antes.json --depois depois.json
     python manage.py rbac_diff --diagnostico
@@ -23,6 +24,11 @@ stdout ao carregar e sujaria o JSON.
 Exit 0 quando roda: é relatório, não gate. Arquivo que não dá para ler ou gravar sai com
 mensagem legível e exit 1 (CommandError).
 
+`--simular-fonte {uniao,lotacao}` (PR 12, o corte) grava o retrato no modo pedido sem trocar
+`RBAC_FONTE`: antes de virar a volta (`RBAC_FONTE=uniao`), compare o retrato de agora com o de
+`--simular-fonte uniao`. Quem entrou num grupo DAT, Controle ou Diretoria depois do corte aparece com `+`.
+O `--diagnostico` imprime a fonte ativa no cabeçalho.
+
 `--auditar` (D4 do ADR-020) é a exceção que sai com exit 1: quando os pares (grupo, capacidade)
 do banco diferem dos do seed (`functional_permissions_seed.py`, que é a matriz) ou quando há
 gerência com perfil ≠ PADRAO fora de `PERFIL_PERMITIDO` (`services/rbac_pacotes.py`). Roda no
@@ -37,8 +43,10 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
+from apps.core.services.rbac_permissions import FONTES
 from apps.core.services.rbac_snapshot import (
     CAMPOS,
     auditoria_de_matriz,
@@ -78,12 +86,19 @@ class Command(BaseCommand):
             "--auditar", action="store_true", help="Matriz do banco × seed e perfis de gerência (exit 1 se divergir)"
         )
         parser.add_argument("--depois", metavar="DEPOIS.json", help="Com --comparar: retrato de depois")
+        parser.add_argument(
+            "--simular-fonte",
+            choices=FONTES,
+            help="Com --salvar: retrato no modo pedido (uniao = a volta; lotacao = o corte), sem trocar RBAC_FONTE",
+        )
 
     def handle(self, *args: Any, **options: Any) -> None:
         if options["depois"] and not options["comparar"]:
             raise CommandError("rbac_diff: --depois só vale com --comparar")
+        if options["simular_fonte"] and not options["salvar"]:
+            raise CommandError("rbac_diff: --simular-fonte só vale com --salvar")
         if options["salvar"]:
-            self._salvar(options["salvar"])
+            self._salvar(options["salvar"], options["simular_fonte"])
         elif options["comparar"]:
             antes = _ler(options["comparar"])
             depois = _ler(options["depois"]) if options["depois"] else snapshot_de_poder()
@@ -110,14 +125,17 @@ class Command(BaseCommand):
             raise CommandError(resumo)
         self.stdout.write(resumo)
 
-    def _salvar(self, caminho: str) -> None:
-        snapshot = snapshot_de_poder()
+    def _salvar(self, caminho: str, fonte: str | None = None) -> None:
+        snapshot = snapshot_de_poder(fonte=fonte)
         texto = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
         try:
             Path(caminho).write_text(texto, encoding="utf-8")
         except OSError as exc:
             raise CommandError(f"rbac_diff: não consegui gravar {caminho}: {exc} (em prod, use /tmp)") from exc
-        self.stdout.write(f"rbac_diff: retrato de {len(snapshot)} pessoa(s) ativa(s) gravado em {caminho}")
+        self.stdout.write(
+            f"rbac_diff: retrato de {len(snapshot)} pessoa(s) ativa(s) gravado em {caminho} "
+            f"(fonte: {fonte or settings.RBAC_FONTE}{', simulada' if fonte else ''})"
+        )
 
     @staticmethod
     def _texto_diff(diff: dict[str, Any]) -> str:
@@ -144,7 +162,12 @@ class Command(BaseCommand):
 
     @staticmethod
     def _texto_diagnostico(diag: dict[str, Any]) -> str:
-        linhas = ["rbac_diff --diagnostico (somente leitura)", "", "1. setor_canonico de cada gerência:"]
+        linhas = [
+            "rbac_diff --diagnostico (somente leitura)",
+            f"fonte ativa: {settings.RBAC_FONTE}",
+            "",
+            "1. setor_canonico de cada gerência:",
+        ]
         for gid, setor in diag["setor_canonico"].items():
             linhas.append(f"   g{gid}: {setor or '(vazio)'}")
         linhas.append("2. Gerências CONTROLE e DIRETORIA (por nome ou setor_canonico):")

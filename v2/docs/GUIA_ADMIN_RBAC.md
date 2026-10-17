@@ -10,16 +10,28 @@ grupo) e o fato de que **editar grupos virou superuser-only**.
 
 SSOT das listas: `SETOR_GROUPS`/`FUNCAO_GROUPS` (`v2/backend/apps/core/constants.py`).
 
+> 🔴 **Desde o PR 12 (17/10/2026, o corte), grupo não dá poder.** O acesso vem só do lugar onde a pessoa
+> trabalha: a **lotação** (gerência + papel, no formulário de Usuários). Os grupos de Setor e de Função viram
+> **etiquetas** na tabela e no Perfil. Pôr alguém no grupo "DAT", "Controle" ou "Diretoria" (pela tela de
+> Grupos, pelo `/admin/` ou por planilha) **não libera nada**. Para dar o acesso do DAT ou do Controle, lote a
+> pessoa como **Equipe administrativa** (ou Gerente) na gerência DAT ou CONTROLE. A volta de emergência
+> (`RBAC_FONTE=uniao`) e a correção de uma pessoa só estão no [DEPLOY_CHECKLIST.md §9](./DEPLOY_CHECKLIST.md).
+
 ---
 
 ## Conceito Básico
 
-O sistema usa **duas dimensões** para controlar permissões:
+O que a pessoa pode fazer vem da **lotação**: o vínculo vigente com uma gerência e o **papel** nela
+(Formador, Coordenador, Apoio, Gerente ou Equipe administrativa).
 
-1. **SETOR** - Onde o usuário trabalha
-2. **FUNÇÃO** - O que o usuário pode fazer
+1. **Gerência com perfil** (DAT, CONTROLE e, quando existir, DIRETORIA): quem é **Equipe** ou **Gerente** nela
+   recebe o pacote do setor (ex.: o DAT administra os cadastros, aprova e opera a Pré-agenda).
+2. **Papel em qualquer gerência ativa**: Coordenador, Gerente e Apoio criam e editam eventos da própria
+   gerência; o Apoio também publica no Google. Formador e Equipe, nada além do pacote.
+3. **Gerente na Superintendência**: aprova as solicitações SUPER da Superintendência.
 
-Cada usuário pode ter **um ou mais setores** e **uma ou mais funções**.
+Os grupos de Setor e de Função abaixo continuam existindo como etiqueta (e para o escopo de algumas listas,
+até o PR 13), mas não dão capacidade, tela nem aprovação.
 
 ---
 
@@ -58,8 +70,8 @@ São **5** (`FUNCAO_GROUPS`, `apps/core/constants.py`).
 | **Formador** | Visualiza grade mensal, gerencia bloqueios pessoais |
 | **Coordenador** | Cria solicitações de eventos para sua equipe |
 | **Apoio de Coordenação** | Auxilia coordenação, visualiza solicitações |
-| **Gerente** | Aprova/reprova solicitações (quando lotado como Gerente na gerência Superintendência), acessa dashboards |
-| **Assistente Administrativo** | Combinada com o Setor **Controle**, aprova solicitações (composite, PR 3 / #1308) |
+| **Gerente** | Etiqueta. O papel Gerente na lotação cria e edita eventos da gerência; na Superintendência, aprova |
+| **Assistente Administrativo** | Etiqueta. Não aprova (PR 11): quem trabalha no Controle aprova pela lotação |
 
 ---
 
@@ -86,11 +98,11 @@ Controle deixaram de dar o poder. A regra é `solicitation_approval_basis` (`app
 | Maria | Superintendência (lotação) | Gerente | ✅ **Sim** (vínculo) |
 | Beatriz | Controle (lotação Equipe) | Assistente Administrativo | ✅ **Sim** (pacote do Controle, PR 11) |
 | Bruna | Controle (só o grupo, sem lotação) | Assistente Administrativo | ❌ Não (grupo não aprova, PR 11) |
-| João | DAT | Gerente | ❌ Não (não é Superintendência) |
+| João | DAT (só o grupo, sem lotação) | Gerente | ❌ Não (grupo não dá poder, PR 12) |
 | Pedro | Superintendência | Formador | ❌ Não (não é Gerente) |
 | Ana | Superintendência | Coordenador | ❌ Não (não é Gerente) |
 | Carlos | Vidas | Gerente | ❌ Não (não é Superintendência) |
-| Rita | Controle | Coordenador | ❌ Não (Controle puro não aprova) |
+| Rita | Controle (lotação Coordenador) | Coordenador | ❌ Não (só Equipe e Gerente recebem o pacote) |
 | Admin | - | - (superuser) | ✅ **Sim** |
 
 ---
@@ -132,18 +144,19 @@ Passos (como superusuário):
 
 O Salvar mexe só no que você mudou no formulário (#2071):
 
-- Grupos que o formulário não mostra (como Controle, DAT ou grupos de permissão) continuam.
+- Grupos que o formulário não mostra (como Controle, DAT ou grupos de permissão) continuam. São etiquetas: desde
+  o PR 12 não dão poder.
 - Se a gerência e as funções não mudaram, a lotação não é alterada. Exceção: quem é Gerente na
   Superintendência sem ter a função Gerente (tirada na tela de Grupos) deixa de aprovar.
 - Ao criar, gerência e função são obrigatórias. Na edição, a função pode ficar vazia, e a gerência só pode
   ficar vazia para quem não tem lotação (como o Controle).
 - Lotar alguém na Superintendência não dá o grupo "Superintendência": quem é Gerente ali aprova pelo vínculo.
-- Se a pessoa já tem o grupo "Superintendência" (que o formulário não mostra) e o salvar a faria aprovar por
-  esse grupo junto com Gerente, o sistema recusa e pede para tirar o grupo na tela de Grupos antes.
 - Tirar a função Gerente de uma aprovadora encerra o vínculo e ela deixa de aprovar. Para revogar, use este
   formulário: tirar o Gerente pela tela de Grupos só vale depois do próximo Salvar aqui.
 - Atenção: mudar a gerência ou a função encerra os vínculos da pessoa em outras gerências (o formulário
-  mostra uma só).
+  mostra uma só). Desde o PR 12 a lotação é a única porta do poder: antes de salvar alguém da gerência DAT ou
+  CONTROLE, confira que "Equipe administrativa" continua marcada. Para quem já está lotado em outra gerência,
+  não use o formulário para dar o vínculo do DAT ou do Controle (ver [DEPLOY_CHECKLIST.md §9](./DEPLOY_CHECKLIST.md)).
 
 Se os campos aparecerem **desabilitados**, é porque sua conta não é superusuário — não é bug.
 
@@ -199,7 +212,7 @@ GET /api/me/
 # Para autorização atual de Aprovações, prefira:
 GET /api/me/policies/
 # Resposta: lista de keys públicas; `access_solicitation_approvals` indica
-# que o usuário pode aprovar (PR 3 #1308 — composite Setor × Função).
+# que o usuário pode aprovar (pela lotação; desde o PR 11 nenhum grupo aprova).
 ```
 
 > **⚠️ Legado:** `can_approve_super` permanece em `/api/me/` por compat externa.

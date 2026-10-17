@@ -73,9 +73,9 @@ class TestSeedE2EUsersCommand:
         assert set(Usuario.objects.get(username="coord_e2e@test.com").groups.values_list("name", flat=True)) == {
             "Coordenador"
         }
+        # PR 11: a aprovadora aprova pelo vínculo GERENTE na SUPERINTENDENCIA, sem o grupo Superintendência.
         assert set(Usuario.objects.get(username="super_e2e@test.com").groups.values_list("name", flat=True)) == {
-            "Superintendência",
-            "Gerente",
+            "Gerente"
         }
         assert set(Usuario.objects.get(username="controle_e2e@test.com").groups.values_list("name", flat=True)) == {
             "Controle"
@@ -124,6 +124,26 @@ class TestSeedE2EUsersCommand:
             .values_list("usuario__username", flat=True)
         )
         assert {"super_e2e@test.com", "super_geral@test.com", "approver_03@test.com"} <= vinculados
+
+    def test_super_do_e2e_na_superintendencia_e_quem_participa_atua_nela(self, clean_seed_e2e_state):
+        """PR 11: o projeto SUPER do E2E fica na SUPERINTENDENCIA, como em produção, e quem o usa nas
+        jornadas (coord_vidas cria; formador_vidas participa) tem papel vigente nela (P9-5). As aprovadoras
+        não têm o grupo Superintendência: aprovam pelo vínculo."""
+        from apps.core.rbac.policies import solicitation_approval_basis
+
+        _run_seed_command()
+
+        assert Projeto.objects.get(codigo="E2E").gerencia.nome == "SUPERINTENDENCIA"
+        papeis = set(
+            EquipeGerencia.vigentes_em()
+            .filter(gerencia__nome="SUPERINTENDENCIA")
+            .values_list("usuario__username", "papel")
+        )
+        assert {("coord_vidas@test.com", "COORDENADOR"), ("formador_vidas@test.com", "FORMADOR")} <= papeis
+        for username in ("super_e2e@test.com", "super_geral@test.com", "approver_03@test.com"):
+            usuario = Usuario.objects.get(username=username)
+            assert not usuario.groups.filter(name="Superintendência").exists(), username
+            assert solicitation_approval_basis(usuario) == "gerente_superintendencia", username
 
     def test_todo_grupo_de_funcao_vem_com_vinculo_vigente(self, clean_seed_e2e_state):
         """PR 8.0: cada grupo de função de cada persona vem com o vínculo vigente do papel, em

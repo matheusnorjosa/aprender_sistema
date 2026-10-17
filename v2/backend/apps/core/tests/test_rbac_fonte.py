@@ -13,8 +13,9 @@ Regras que estes testes travam:
 - o simulador recebe a fonte por parâmetro (sem `override_settings` em código de produção, K17) e bate
   com a API no mesmo modo;
 - o padrão do código é "lotacao" (K14) e o valor vazio também (K5);
-- catraca: cada linha do código de produção que toca grupo está numa lista fechada, e as de poder estão
-  sob `grupos_dao_poder()` (K4); todos os grupos sem vínculo = sem grupo em cada recurso da matriz viva.
+- catraca: cada acesso a grupo no código de produção (lido pela árvore sintática, não por linha) está numa
+  lista fechada, e os de poder estão sob `grupos_dao_poder()` (K4); todos os grupos sem vínculo = sem grupo
+  (status e, nos GET, corpo) em cada recurso de `RESOURCES`, com linhas de outra gerência no banco.
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportAttributeAccessIssue=false
@@ -22,8 +23,8 @@ Regras que estes testes travam:
 from __future__ import annotations
 
 import ast
-import re
 from collections import Counter
+from datetime import date
 from io import StringIO
 from pathlib import Path
 
@@ -37,7 +38,7 @@ from rest_framework.test import APIClient
 import pytest
 
 from apps.core.constants import FUNCAO_GROUPS, SETOR_GROUPS
-from apps.core.models import Gerencia, PermissaoFuncional, Usuario
+from apps.core.models import Deslocamento, Gerencia, PermissaoFuncional, Usuario
 from apps.core.rbac.matrix import RESOURCES
 from apps.core.rbac.policies import (
     COMPOSITE_POLICY_KEYS,
@@ -53,7 +54,15 @@ from apps.core.services.rbac_permissions import (
     grupos_dao_poder,
 )
 from apps.core.services.rbac_snapshot import snapshot_de_poder
-from apps.core.tests.factories import UsuarioFactory, com_pacote_do_controle, com_pacote_do_dat
+from apps.core.tests.factories import (
+    GerenciaFactory,
+    ProjetoFactory,
+    SolicitacaoFactory,
+    UsuarioFactory,
+    com_pacote_do_controle,
+    com_pacote_do_dat,
+    com_papel,
+)
 from config.settings import ler_rbac_fonte
 
 pytestmark = pytest.mark.django_db
@@ -302,8 +311,6 @@ def test_gerencia_diretoria_da_o_pacote_diretoria():
     assert PERFIL_PERMITIDO["DIRETORIA"] == Gerencia.Perfil.DIRETORIA
     pessoa = UsuarioFactory()
     gerencia = Gerencia.objects.create(nome="DIRETORIA", nome_setor="Diretoria", perfil=Gerencia.Perfil.DIRETORIA)
-    from apps.core.tests.factories import com_papel
-
     com_papel(pessoa, "EQUIPE", gerencia)
     with LOTACAO:
         assert capacidades_sem_cache(pessoa.id) == set(PACOTE["DIRETORIA"])
@@ -313,13 +320,17 @@ def test_gerencia_diretoria_da_o_pacote_diretoria():
 # Catraca das leituras de grupo (K4, teste 11 do plano)
 # ---------------------------------------------------------------------------
 # `scripts/rbac_lint.py` não serve: isenta `apps/core/rbac/` inteira e só vê `groups.filter(name=…)`.
-# Cada linha do código de produção do backend que toca grupo (leitura, escrita, sinal ou texto) aparece
-# aqui pelo texto exato, com o motivo. A conferência é por linha, não por contagem por arquivo: trocar uma
-# leitura com portão por outra sem portão, no mesmo arquivo, também fica vermelho. As linhas PODER ainda
-# precisam estar sob `grupos_dao_poder(...)` (dentro do `if` ou à direita do `and`), conferido pela árvore
-# sintática. Linha nova = este teste vermelho: ou ela é exibição/escopo e entra na lista, ou ela dá poder e
-# tem de passar por `grupos_dao_poder()`.
-_ACESSO_A_GRUPO = re.compile(r"\.groups\.|\bgroups__|\buser_set\b|Group\.objects\.filter\([^)]*\buser")
+# A varredura é pela árvore sintática dos .py de produção do backend, não por regex de linha: o formato
+# que o Black quebra em várias linhas, o apelido (`grupos = user.groups`) e `getattr(user, "groups")`
+# também aparecem. Conta como acesso a grupo: atributo `groups` ou `user_set`; argumento nomeado `groups`
+# ou `groups__*` em qualquer chamada; `user` ou `user__*` numa chamada sobre `Group.objects`; e
+# `getattr(_, "groups" | "user_set")`. Cada acesso vira o trecho normalizado (`ast.unparse`) da expressão
+# que o contém (a cadeia de atributos e chamadas), e cada trecho aparece aqui com o motivo. A conferência é
+# por trecho, não por contagem por arquivo: trocar uma leitura com portão por outra sem portão, no mesmo
+# arquivo, também fica vermelho. Os trechos PODER ainda precisam estar sob `grupos_dao_poder(...)` (dentro
+# do `if` ou à direita do `and`). Trecho novo = este teste vermelho: ou ele é exibição/escopo e entra na
+# lista, ou ele dá poder e tem de passar por `grupos_dao_poder()`.
+_ATRIBUTOS_DE_GRUPO = frozenset({"groups", "user_set"})
 
 PODER = "poder: só com grupos_dao_poder()"
 EXIBICAO = "exibição: etiqueta, contagem ou export do titular"
@@ -329,194 +340,104 @@ ESCRITA = "escrita: grava a etiqueta (sem poder no corte; recusar é o PR 13)"
 ESCOPO = "escopo de dado por cargo (PR 13)"
 DIAGNOSTICO = "diagnóstico do rbac_diff (só leitura)"
 SEED = "seed das capacidades dos grupos (a volta)"
-TEXTO = "comentário ou docstring"
 DEV_TOOLS = "dev_tools (desligado em produção)"
 
 LEITURAS_DE_GRUPO: tuple[tuple[str, str, str], ...] = (
-    (
-        "apps/core/admin.py",
-        'before_group_ids = set(obj.groups.values_list("pk", flat=True)) if obj.pk else set()',
-        AUDITORIA,
-    ),
-    ("apps/core/admin.py", 'after_group_ids = set(obj.groups.values_list("pk", flat=True))', AUDITORIA),
-    ("apps/core/admin.py", "return obj.groups.count()", EXIBICAO),
-    (
-        "apps/core/rbac/__init__.py",
-        'user.groups.filter(name="X")          → use HasPerm(codename) / user_has_any_perm',
-        TEXTO,
-    ),
-    (
-        "apps/core/rbac/helpers.py",
-        'Use estas funções **em vez de** `user.groups.filter(name="...").exists()`',
-        TEXTO,
-    ),
-    ("apps/core/rbac/helpers.py", "Preferido sobre `user.groups.filter(name=...).exists()` que é bypass", TEXTO),
+    ("apps/core/admin.py", "obj.groups.values_list('pk', flat=True)", AUDITORIA),
+    ("apps/core/admin.py", "obj.groups.values_list('pk', flat=True)", AUDITORIA),
+    ("apps/core/admin.py", "obj.groups.count()", EXIBICAO),
     (
         "apps/core/rbac/helpers.py",
         "qs.filter(groups__name__in=FORMADOR_ROLE_GROUPS).exclude(groups__name__in=FUNCAO_COORDENADOR_GROUPS)"
         ".distinct()",
         ESCOPO,
     ),
-    (
-        "apps/core/rbac/policies.py",
-        "if grupos_dao_poder(fonte) and user.groups.filter(name__in=setores_da_tela).exists():",
-        PODER,
-    ),
-    ("apps/core/rbac_signals.py", "@receiver(m2m_changed, sender=User.groups.through)", CACHE),
-    (
-        "apps/core/rbac_signals.py",
-        "# `group.user_set.set(...)`); os usuários afetados vêm em `pk_set`. O handler",
-        TEXTO,
-    ),
-    ("apps/core/rbac_signals.py", "# `group.user_set.clear()` não fornece pk_set → snapshot dos membros", TEXTO),
-    ("apps/core/rbac_signals.py", 'member_ids = list(instance.user_set.values_list("id", flat=True))', CACHE),
-    ("apps/core/rbac_signals.py", 'member_ids = list(instance.user_set.values_list("id", flat=True))', CACHE),
-    ("apps/core/rbac_signals.py", "@receiver(m2m_changed, sender=PermissaoFuncional.groups.through)", CACHE),
-    ("apps/core/rbac_signals.py", 'existing_group_ids = list(instance.groups.values_list("id", flat=True))', CACHE),
-    ("apps/core/rbac_signals.py", 'group_ids = list(instance.groups.values_list("id", flat=True))', CACHE),
-    ("apps/core/rbac_signals.py", "# User.groups.through NÃO emite m2m_changed, então", TEXTO),
-    ("apps/core/serializers/usuario.py", "return [g.id for g in obj.groups.all()]", EXIBICAO),
-    ("apps/core/serializers/usuario.py", "antes = list(user.groups.all())", AUDITORIA),
+    ("apps/core/rbac/policies.py", "user.groups.filter(name__in=setores_da_tela).exists()", PODER),
+    ("apps/core/rbac_signals.py", "receiver(m2m_changed, sender=User.groups.through)", CACHE),
+    ("apps/core/rbac_signals.py", "instance.user_set.values_list('id', flat=True)", CACHE),
+    ("apps/core/rbac_signals.py", "instance.user_set.values_list('id', flat=True)", CACHE),
+    ("apps/core/rbac_signals.py", "receiver(m2m_changed, sender=PermissaoFuncional.groups.through)", CACHE),
+    ("apps/core/rbac_signals.py", "instance.groups.values_list('id', flat=True)", CACHE),
+    ("apps/core/rbac_signals.py", "instance.groups.values_list('id', flat=True)", CACHE),
+    ("apps/core/serializers/usuario.py", "obj.groups.all()", EXIBICAO),
+    ("apps/core/serializers/usuario.py", "user.groups.all()", AUDITORIA),
     ("apps/core/serializers/usuario.py", "user.groups.set(final)", ESCRITA),
-    (
-        "apps/core/serializers/usuario.py",
-        'before_group_ids = set(instance.groups.values_list("pk", flat=True))',
-        AUDITORIA,
-    ),
-    ("apps/core/serializers/usuario.py", "return obj.user_set.count()", EXIBICAO),
-    (
-        "apps/core/serializers/usuario.py",
-        'return [{"id": group.id, "name": group.name} for group in obj.groups.all().order_by("name")]',
-        EXIBICAO,
-    ),
-    (
-        "apps/core/services/audit.py",
-        "Path `perm.groups.set(...)` (Django Admin `filter_horizontal`, shell). O",
-        TEXTO,
-    ),
-    (
-        "apps/core/services/audit.py",
-        '"groups_after": _group_names(cap.groups.values_list("pk", flat=True)),',
-        AUDITORIA,
-    ),
-    (
-        "apps/core/services/audit.py",
-        '"""Auditoria de mudanca de MEMBERSHIP de um usuario (`user.groups.set`).',
-        TEXTO,
-    ),
-    (
-        "apps/core/services/bloqueios_import.py",
-        'return bool(usuario.is_active and usuario.groups.filter(name="Formador").exists())'
-        "  # noqa: RBAC-composite-allowed",
-        ESCOPO,
-    ),
+    ("apps/core/serializers/usuario.py", "instance.groups.values_list('pk', flat=True)", AUDITORIA),
+    ("apps/core/serializers/usuario.py", "obj.user_set.count()", EXIBICAO),
+    ("apps/core/serializers/usuario.py", "obj.groups.all().order_by('name')", EXIBICAO),
+    ("apps/core/services/audit.py", "cap.groups.values_list('pk', flat=True)", AUDITORIA),
+    ("apps/core/services/bloqueios_import.py", "usuario.groups.filter(name='Formador').exists()", ESCOPO),
     ("apps/core/services/export_contract_importer.py", "usuario.groups.add(grupo)", ESCRITA),
     (
         "apps/core/services/functional_permissions_seed.py",
         "perm.groups.set([groups_by_name[name] for name in item.group_names])",
         SEED,
     ),
-    ("apps/core/services/functional_permissions_seed.py", "if perm.groups.exists():", SEED),
+    ("apps/core/services/functional_permissions_seed.py", "perm.groups.exists()", SEED),
     ("apps/core/services/functional_permissions_seed.py", "perm.groups.clear()", SEED),
-    (
-        "apps/core/services/lgpd_export_service.py",
-        '"groups": list(user.groups.values_list("name", flat=True)),',
-        EXIBICAO,
-    ),
+    ("apps/core/services/lgpd_export_service.py", "user.groups.values_list('name', flat=True)", EXIBICAO),
     (
         "apps/core/services/notificacoes_acoes_service.py",
-        "# Epic 3.2 RBAC Refactor (2026-04-23): `groups__name__in` aqui é",
-        TEXTO,
-    ),
-    ("apps/core/services/notificacoes_acoes_service.py", "groups__id__in=list(executor_group_ids),", ESCOPO),
-    (
-        "apps/core/services/notificacoes_acoes_service.py",
-        "groups__name__in=list(role_group_names),  # noqa: RBAC-data-scope-allowed",
+        "Usuario.objects.filter(is_active=True, groups__id__in=list(executor_group_ids)).values_list('id', flat=True)",
         ESCOPO,
     ),
     (
         "apps/core/services/notificacoes_acoes_service.py",
-        "groups__name__in=list(role_group_names),  # noqa: RBAC-data-scope-allowed",
+        "Usuario.objects.filter(is_active=True, id__in=executor_user_ids, groups__name__in=list(role_group_names))"
+        ".distinct()",
+        ESCOPO,
+    ),
+    (
+        "apps/core/services/notificacoes_acoes_service.py",
+        "Usuario.objects.filter(is_active=True, groups__name__in=list(role_group_names)).distinct()",
         ESCOPO,
     ),
     (
         "apps/core/services/rbac_permissions.py",
-        "impacted_user_ids = list(User.objects.filter(groups__id__in=normalized_ids)"
-        '.values_list("id", flat=True).distinct())',
+        "User.objects.filter(groups__id__in=normalized_ids).values_list('id', flat=True).distinct()",
         CACHE,
     ),
     (
         "apps/core/services/rbac_permissions.py",
-        'PermissaoFuncional.objects.filter(groups__user__id=user_id).order_by().values_list("codename", flat=True)',
+        "PermissaoFuncional.objects.filter(groups__user__id=user_id).order_by().values_list('codename', flat=True)",
         PODER,
     ),
-    ("apps/core/services/rbac_snapshot.py", '"grupos": sorted(g.name for g in usuario.groups.all()),', DIAGNOSTICO),
+    ("apps/core/services/rbac_snapshot.py", "usuario.groups.all()", DIAGNOSTICO),
     (
         "apps/core/services/rbac_snapshot.py",
-        'membros = set(Usuario.objects.filter(is_active=True, groups__name=setor).values_list("id", flat=True))',
+        "Usuario.objects.filter(is_active=True, groups__name=setor).values_list('id', flat=True)",
         DIAGNOSTICO,
     ),
     (
         "apps/core/services/rbac_snapshot.py",
-        "do_banco = set(PermissaoFuncional.objects.filter(groups__isnull=False)"
-        '.values_list("groups__name", "codename"))',
+        "PermissaoFuncional.objects.filter(groups__isnull=False).values_list('groups__name', 'codename')",
         DIAGNOSTICO,
     ),
     ("apps/core/services/usuarios_import.py", "usuario.groups.add(*permitidos)", ESCRITA),
-    ("apps/core/signals.py", "@receiver(m2m_changed, sender=PermissaoFuncional.groups.through)", CACHE),
-    (
-        "apps/core/signals.py",
-        "é o `Group` — o grupo afetado é ele mesmo. Forward (`perm.groups.{...}`):",
-        TEXTO,
-    ),
-    ("apps/core/signals.py", 'affected_group_ids = set(instance.groups.values_list("pk", flat=True))', CACHE),
-    (
-        "apps/core/views/admin.py",
-        'before_group_ids = set(usuario.groups.values_list("id", flat=True))',
-        AUDITORIA,
-    ),
+    ("apps/core/signals.py", "receiver(m2m_changed, sender=PermissaoFuncional.groups.through)", CACHE),
+    ("apps/core/signals.py", "instance.groups.values_list('pk', flat=True)", CACHE),
+    ("apps/core/views/admin.py", "usuario.groups.values_list('id', flat=True)", AUDITORIA),
     ("apps/core/views/admin.py", "usuario.groups.set(groups)", ESCRITA),
-    (
-        "apps/core/views/admin.py",
-        'after_group_ids=set(usuario.groups.values_list("id", flat=True)),',
-        AUDITORIA,
-    ),
-    (
-        "apps/core/views/admin.py",
-        'current_member_ids = set(group.user_set.values_list("id", flat=True))',
-        AUDITORIA,
-    ),
+    ("apps/core/views/admin.py", "usuario.groups.values_list('id', flat=True)", AUDITORIA),
+    ("apps/core/views/admin.py", "group.user_set.values_list('id', flat=True)", AUDITORIA),
     ("apps/core/views/admin.py", "group.user_set.set(users)", ESCRITA),
-    (
-        "apps/core/views/stats.py",
-        "has_formador_group = user.groups.filter(name__in=FORMADOR_ROLE_GROUPS).exists()"
-        "  # noqa: RBAC-data-scope-allowed",
-        ESCOPO,
-    ),
-    ("apps/core/views_auth.py", 'groups = list(user.groups.values_list("name", flat=True))', EXIBICAO),
-    (
-        "apps/core/views_basic.py",
-        'groups: list[str] = list(user.groups.values_list("name", flat=True))',
-        EXIBICAO,
-    ),
+    ("apps/core/views/stats.py", "user.groups.filter(name__in=FORMADOR_ROLE_GROUPS).exists()", ESCOPO),
+    ("apps/core/views_auth.py", "user.groups.values_list('name', flat=True)", EXIBICAO),
+    ("apps/core/views_basic.py", "user.groups.values_list('name', flat=True)", EXIBICAO),
     (
         "apps/dev_tools/management/commands/migrate_rbac_groups.py",
-        'groups: list[str] = list(user.groups.values_list("name", flat=True))',
+        "user.groups.values_list('name', flat=True)",
         DEV_TOOLS,
     ),
     (
         "apps/dev_tools/management/commands/migrate_rbac_groups.py",
-        'groups: list[str] = list(user.groups.values_list("name", flat=True))',
+        "user.groups.values_list('name', flat=True)",
         DEV_TOOLS,
     ),
     ("apps/dev_tools/management/commands/migrate_rbac_groups.py", "user.groups.add(gerente_group)", DEV_TOOLS),
     ("apps/dev_tools/management/commands/migrate_rbac_groups.py", "user.groups.add(gerente_group)", DEV_TOOLS),
-    (
-        "apps/dev_tools/management/commands/seed_e2e_users.py",
-        'grupos_str = ", ".join([g.name for g in usuario.groups.all()])',
-        DEV_TOOLS,
-    ),
-    ("apps/dev_tools/management/commands/seed_e2e_users.py", 'user.groups.set(user_data["groups"])', DEV_TOOLS),
+    ("apps/dev_tools/management/commands/seed_e2e_users.py", "usuario.groups.all()", DEV_TOOLS),
+    ("apps/dev_tools/management/commands/seed_e2e_users.py", "user.groups.set(user_data['groups'])", DEV_TOOLS),
     (
         "apps/dev_tools/management/commands/seed_frontend_contract_data.py",
         "dat_user.groups.set([dat_group])",
@@ -524,18 +445,18 @@ LEITURAS_DE_GRUPO: tuple[tuple[str, str, str], ...] = (
     ),
     (
         "apps/dev_tools/management/commands/seed_frontend_contract_data.py",
-        'pessoa_longa.groups.set(Group.objects.filter(name="Formador"))',
+        "pessoa_longa.groups.set(Group.objects.filter(name='Formador'))",
         DEV_TOOLS,
     ),
     (
         "apps/dev_tools/management/commands/seed_gerentes.py",
-        'if not usuario.groups.filter(name="Gerente").exists():',
+        "usuario.groups.filter(name='Gerente').exists()",
         DEV_TOOLS,
     ),
     ("apps/dev_tools/management/commands/seed_gerentes.py", "usuario.groups.add(gerente_group)", DEV_TOOLS),
     (
         "apps/dev_tools/management/commands/seed_gerentes.py",
-        'gerente_count = Group.objects.get(name="Gerente").user_set.count()  # type: ignore[attr-defined]',
+        "Group.objects.get(name='Gerente').user_set.count()",
         DEV_TOOLS,
     ),
 )
@@ -543,20 +464,135 @@ LEITURAS_DE_GRUPO: tuple[tuple[str, str, str], ...] = (
 _RAIZ_DO_BACKEND = Path(__file__).resolve().parents[3]
 
 
-def _linhas_que_tocam_grupo() -> Counter[tuple[str, str]]:
-    achadas: Counter[tuple[str, str]] = Counter()
-    for arquivo in (_RAIZ_DO_BACKEND / "apps").rglob("*.py"):
+def _sobre_group_objects(func: ast.expr) -> bool:
+    """A chamada sai de `Group.objects` (ex.: `Group.objects.filter(...)`, `Group.objects.all().exclude(...)`)."""
+    no: ast.expr = func
+    while isinstance(no, (ast.Attribute, ast.Call)):
+        if isinstance(no, ast.Call):
+            no = no.func
+        elif no.attr == "objects" and isinstance(no.value, ast.Name) and no.value.id == "Group":
+            return True
+        else:
+            no = no.value
+    return False
+
+
+def _eh_acesso_a_grupo(no: ast.AST, pais: dict[ast.AST, ast.AST]) -> bool:
+    pai = pais.get(no)
+    if isinstance(no, ast.Attribute):
+        # `x.groups()` é método (ex.: `re.Match.groups()`); o gerenciador de grupos do Django não é chamado.
+        return no.attr in _ATRIBUTOS_DE_GRUPO and not (isinstance(pai, ast.Call) and pai.func is no)
+    if isinstance(no, ast.keyword) and no.arg and isinstance(pai, ast.Call):
+        if no.arg.startswith("groups__"):
+            return True
+        if no.arg == "groups":
+            # `"...{groups}".format(groups=n)` é texto.
+            return not (isinstance(pai.func, ast.Attribute) and pai.func.attr == "format")
+        return (no.arg == "user" or no.arg.startswith("user__")) and _sobre_group_objects(pai.func)
+    if isinstance(no, ast.Call) and isinstance(no.func, ast.Name) and no.func.id == "getattr" and len(no.args) >= 2:
+        nome = no.args[1]
+        return isinstance(nome, ast.Constant) and nome.value in _ATRIBUTOS_DE_GRUPO
+    return False
+
+
+def _expressao_do_acesso(no: ast.AST, pais: dict[ast.AST, ast.AST]) -> ast.AST:
+    """Sobe pela cadeia de atributos e chamadas: `user.groups` → `user.groups.filter(...).exists()`."""
+    while True:
+        pai = pais.get(no)
+        if isinstance(pai, ast.Attribute | ast.Subscript) and pai.value is no:
+            no = pai
+        elif isinstance(pai, ast.Call) and (pai.func is no or no in pai.keywords):
+            no = pai
+        elif isinstance(pai, ast.keyword):
+            no = pai
+        else:
+            return no
+
+
+def _acessos_a_grupo(fonte: str) -> list[tuple[str, ast.AST, dict[ast.AST, ast.AST]]]:
+    """(trecho normalizado, expressão, mapa de pais) de cada expressão do código que toca grupo, na ordem."""
+    arvore = ast.parse(fonte)
+    pais = {filho: pai for pai in ast.walk(arvore) for filho in ast.iter_child_nodes(pai)}
+    expressoes: dict[int, ast.AST] = {}
+    for no in ast.walk(arvore):
+        if _eh_acesso_a_grupo(no, pais):
+            expressao = _expressao_do_acesso(no, pais)
+            expressoes[id(expressao)] = expressao
+    ordem = sorted(expressoes.values(), key=lambda e: (getattr(e, "lineno", 0), getattr(e, "col_offset", 0)))
+    return [(ast.unparse(expressao), expressao, pais) for expressao in ordem]
+
+
+def _arquivos_de_producao() -> list[tuple[str, str]]:
+    arquivos = []
+    for arquivo in sorted((_RAIZ_DO_BACKEND / "apps").rglob("*.py")):
         relativo = arquivo.relative_to(_RAIZ_DO_BACKEND).as_posix()
-        if "/tests/" in relativo or "/migrations/" in relativo:
-            continue
-        for linha in arquivo.read_text(encoding="utf-8").splitlines():
-            if _ACESSO_A_GRUPO.search(linha):
-                achadas[(relativo, linha.strip())] += 1
-    return achadas
+        if "/tests/" not in relativo and "/migrations/" not in relativo:
+            arquivos.append((relativo, arquivo.read_text(encoding="utf-8")))
+    return arquivos
+
+
+def _trechos_que_tocam_grupo() -> Counter[tuple[str, str]]:
+    return Counter(
+        (relativo, trecho)
+        for relativo, fonte in _arquivos_de_producao()
+        for trecho, _expressao, _pais in _acessos_a_grupo(fonte)
+    )
+
+
+def _trechos(fonte: str) -> list[str]:
+    return [trecho for trecho, _expressao, _pais in _acessos_a_grupo(fonte)]
+
+
+class TestDetectorDaCatraca:
+    """O detector lê a árvore sintática, não a linha: o formato do Black, o apelido e o `getattr` não escapam."""
+
+    def test_formato_do_black_em_varias_linhas(self):
+        fonte = 've_tudo_pelo_grupo = Group.objects.filter(\n    user=user, name__in=["Controle", "DAT"]\n).exists()\n'
+        assert _trechos(fonte) == ["Group.objects.filter(user=user, name__in=['Controle', 'DAT']).exists()"]
+
+    def test_mesmo_trecho_em_uma_linha_ou_em_varias(self):
+        uma = "x = user.groups.filter(name__in=NOMES).exists()\n"
+        varias = "x = (\n    user.groups.filter(\n        name__in=NOMES,\n    )\n    .exists()\n)\n"
+        assert _trechos(uma) == _trechos(varias) == ["user.groups.filter(name__in=NOMES).exists()"]
+
+    def test_apelido_aparece_onde_nasce(self):
+        fonte = "grupos = user.groups\nif grupos.filter(name='DAT').exists():\n    pass\n"
+        assert _trechos(fonte) == ["user.groups"]
+
+    def test_getattr(self):
+        assert _trechos("g = getattr(user, 'groups')\nm = getattr(grupo, 'user_set')\n") == [
+            "getattr(user, 'groups')",
+            "getattr(grupo, 'user_set')",
+        ]
+
+    def test_membro_em_group_objects_e_lookup_por_grupo(self):
+        fonte = (
+            "Group.objects.filter(user__id=uid)\n"
+            "Group.objects.all().exclude(user=u)\n"
+            "Usuario.objects.filter(\n    groups__name='DAT'\n)\n"
+            "Usuario.objects.filter(groups=g)\n"
+        )
+        assert _trechos(fonte) == [
+            "Group.objects.filter(user__id=uid)",
+            "Group.objects.all().exclude(user=u)",
+            "Usuario.objects.filter(groups__name='DAT')",
+            "Usuario.objects.filter(groups=g)",
+        ]
+
+    def test_o_que_nao_e_grupo_django_fica_de_fora(self):
+        fonte = (
+            '"""user.groups.filter(name="X") no texto."""\n'
+            "# user.groups.filter(name='X') no comentário\n"
+            "re.match(p, s).groups()\n"
+            "'{groups}'.format(groups=n)\n"
+            "Group.objects.filter(name='DAT')\n"
+            "Projeto.objects.filter(user=u)\n"
+        )
+        assert _trechos(fonte) == []
 
 
 def test_catraca_das_leituras_de_grupo():
-    achadas = _linhas_que_tocam_grupo()
+    achadas = _trechos_que_tocam_grupo()
     esperadas = Counter((arquivo, trecho) for arquivo, trecho, _motivo in LEITURAS_DE_GRUPO)
     novas, sumidas = sorted(achadas - esperadas), sorted(esperadas - achadas)
     assert not novas and not sumidas, (
@@ -570,64 +606,77 @@ def _eh_portao(no: ast.AST) -> bool:
     return isinstance(no, ast.Call) and isinstance(no.func, ast.Name) and no.func.id == "grupos_dao_poder"
 
 
-def _sob_o_portao(arvore: ast.Module, linha: int) -> bool:
-    """Todo acesso a grupo da linha está dentro de `if grupos_dao_poder(...):` ou à direita de
-    `grupos_dao_poder(...) and`, sem sair da função."""
-    pais = {filho: pai for pai in ast.walk(arvore) for filho in ast.iter_child_nodes(pai)}
-    acessos = [
-        no
-        for no in ast.walk(arvore)
-        if getattr(no, "lineno", None) == linha
-        and (
-            (isinstance(no, ast.Attribute) and no.attr in ("groups", "user_set"))
-            or (isinstance(no, ast.keyword) and (no.arg or "").startswith("groups__"))
-        )
-    ]
-
-    def protegido(no: ast.AST) -> bool:
-        while no in pais:
-            pai = pais[no]
-            if isinstance(pai, ast.If) and no in pai.body and _eh_portao(pai.test):
+def _sob_o_portao(expressao: ast.AST, pais: dict[ast.AST, ast.AST]) -> bool:
+    """A expressão está dentro de `if grupos_dao_poder(...):` ou à direita de `grupos_dao_poder(...) and`,
+    sem sair da função."""
+    no = expressao
+    while no in pais:
+        pai = pais[no]
+        if isinstance(pai, ast.If) and no in pai.body and _eh_portao(pai.test):
+            return True
+        if isinstance(pai, ast.BoolOp) and isinstance(pai.op, ast.And):
+            if _eh_portao(pai.values[0]) and no is not pai.values[0]:
                 return True
-            if isinstance(pai, ast.BoolOp) and isinstance(pai.op, ast.And):
-                if _eh_portao(pai.values[0]) and no is not pai.values[0]:
-                    return True
-            if isinstance(pai, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
-                return False
-            no = pai
-        return False
-
-    return bool(acessos) and all(protegido(no) for no in acessos)
+        if isinstance(pai, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            return False
+        no = pai
+    return False
 
 
 def test_leituras_que_dao_poder_estao_sob_o_portao():
-    """Tirar a leitura de poder do `if`/`and`, mesmo sem mudar o texto da linha, também fica vermelho."""
+    """Tirar a leitura de poder do `if`/`and`, mesmo sem mudar o trecho, também fica vermelho."""
     de_poder = [(arquivo, trecho) for arquivo, trecho, motivo in LEITURAS_DE_GRUPO if motivo == PODER]
     assert len(de_poder) == 2  # capacidades (rbac_permissions) e telas de escopo (policies)
     for arquivo, trecho in de_poder:
-        texto = (_RAIZ_DO_BACKEND / arquivo).read_text(encoding="utf-8")
-        numeros = [n for n, linha in enumerate(texto.splitlines(), 1) if linha.strip() == trecho]
-        assert numeros, f"{arquivo}: a linha de poder sumiu: {trecho}"
-        arvore = ast.parse(texto)
-        for n in numeros:
-            assert _sob_o_portao(arvore, n), f"{arquivo}:{n} lê grupo fora de grupos_dao_poder()"
+        fonte = (_RAIZ_DO_BACKEND / arquivo).read_text(encoding="utf-8")
+        achadas = [(expressao, pais) for t, expressao, pais in _acessos_a_grupo(fonte) if t == trecho]
+        assert achadas, f"{arquivo}: a leitura de poder sumiu: {trecho}"
+        for expressao, pais in achadas:
+            linha = getattr(expressao, "lineno", "?")
+            assert _sob_o_portao(expressao, pais), f"{arquivo}:{linha} lê grupo fora de grupos_dao_poder()"
+
+
+def test_portao_conferido_pela_arvore():
+    """Controle do teste acima: a mesma leitura com e sem o portão."""
+    leitura = "user.groups.filter(name__in=s).exists()"
+    com = f"def f(user, s, fonte):\n    if grupos_dao_poder(fonte) and {leitura}:\n        return True\n"
+    sem = f"def f(user, s, fonte):\n    ok = {leitura}\n    if grupos_dao_poder(fonte) and ok:\n        return True\n"
+    for fonte, esperado in ((com, True), (sem, False)):
+        [(trecho, expressao, pais)] = _acessos_a_grupo(fonte)
+        assert trecho == leitura
+        assert _sob_o_portao(expressao, pais) is esperado
 
 
 @pytest.mark.parametrize("recurso", RESOURCES, ids=lambda r: r.name)
 def test_todos_os_grupos_sem_vinculo_igual_a_sem_grupo_na_api(recurso):
-    """Canário no nível HTTP (K4): no corte, ter todos os grupos e nenhum vínculo dá o mesmo status de não
-    ter grupo nenhum em cada recurso da matriz viva. Pega classe DRF ou view que leia grupo sem policy."""
+    """Canário no nível HTTP (K4): no corte, ter todos os grupos e nenhum vínculo dá a mesma resposta de não
+    ter grupo nenhum em cada recurso de `RESOURCES` (a matriz viva: 13 rotas, não todas). O banco tem linhas
+    de outra pessoa, de outra gerência (um deslocamento e uma solicitação), e nos GET que respondem 200 o
+    corpo também é comparado: um escopo alargado pelo grupo aparece como linha a mais. Rota fora de
+    `RESOURCES` não é coberta aqui; a catraca acima é quem pega a leitura de grupo nova no código."""
     for nome in ("Gestor Tecnologico", "Programador"):
         Group.objects.get_or_create(name=nome)
+    outra_gerencia = GerenciaFactory()
+    outra = UsuarioFactory()
+    com_papel(outra, "FORMADOR", outra_gerencia)
+    Deslocamento.objects.create(
+        usuario=outra, origem="Fortaleza", destino="Sobral", start_date=date(2026, 5, 1), end_date=date(2026, 5, 3)
+    )
+    SolicitacaoFactory(usuario=outra, projeto=ProjetoFactory(gerencia=outra_gerencia))
     todos = _so_grupos(*SETOR_GROUPS, *FUNCAO_GROUPS, "Gestor Tecnologico", "Programador")
     nenhum = UsuarioFactory()
-    status = []
+    respostas = []
     with LOTACAO:
         for pessoa in (todos, nenhum):
             client = APIClient()
             client.force_authenticate(user=pessoa)
             if recurso.method == "GET":
-                status.append(client.get(recurso.full_url()).status_code)
+                respostas.append(client.get(recurso.full_url()))
             else:
-                status.append(client.post(recurso.full_url(), data=recurso.body or {}, format="json").status_code)
-    assert status[0] == status[1], f"{recurso.name}: todos os grupos={status[0]}, sem grupo={status[1]}"
+                respostas.append(client.post(recurso.full_url(), data=recurso.body or {}, format="json"))
+    com_grupos, sem_grupo = respostas
+    assert (
+        com_grupos.status_code == sem_grupo.status_code
+    ), f"{recurso.name}: todos os grupos={com_grupos.status_code}, sem grupo={sem_grupo.status_code}"
+    if recurso.method == "GET" and sem_grupo.status_code == 200:
+        assert com_grupos.json() == sem_grupo.json(), f"{recurso.name}: o grupo mudou o que a pessoa vê"

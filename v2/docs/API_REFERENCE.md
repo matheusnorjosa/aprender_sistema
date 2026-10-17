@@ -842,25 +842,21 @@ alteração de código.
 
 ### Regra de Aprovação SUPER
 
-> **Atualização hardening RBAC (2026-04-29 — PR 3 #1308 e PR 10 #1315):**
-> a regra atual é `access_solicitation_approvals` (composite Setor × Função).
+> **Atualização PR 11 das permissões (2026-10-17):** a regra é `access_solicitation_approvals`,
+> SSOT `solicitation_approval_basis` (`apps/core/rbac/policies.py`). Nenhum grupo aprova.
 > O campo `can_approve_super` permanece no payload de `/api/me/` por compat
-> externa, mas não é fonte de decisão no frontend.
+> externa (lê a mesma policy), mas não é fonte de decisão no frontend.
 
 ```python
-# Atual — policy `access_solicitation_approvals` (Gerente Sup OU Asst Admin Controle)
-access_solicitation_approvals = is_superuser OR (
-    ("Gerente" IN funcoes AND "Superintendência" IN setores)
-    OR
-    ("Assistente Administrativo" IN funcoes AND "Controle" IN setores)
+# Atual — policy `access_solicitation_approvals` (3 bases, nesta ordem)
+access_solicitation_approvals = (
+    is_superuser
+    OR vinculo_vigente(papel="GERENTE", gerencia.nome="SUPERINTENDENCIA")  # só o SUPER dessa gerência
+    OR "approve_solicitation" IN capacidades  # pacote do DAT e do Controle, por vínculo EQUIPE/GERENTE
 )
 
 # [legacy] mantido em /api/me/ por compat externa; não usar para decisão nova.
-# Desde o PR 3 (#1308) o flag foi alinhado à policy — inclui também o
-# Assistente Administrativo do Controle. Prova: cálculo de `can_approve_super` em `views_basic.py`.
-can_approve_super = is_superuser
-    OR ("Gerente" IN funcoes AND "Superintendência" IN setores)
-    OR ("Assistente Administrativo" IN funcoes AND "Controle" IN setores)
+can_approve_super = access_solicitation_approvals
 ```
 
 Para decisão nova, consuma `GET /api/me/policies/` e leia

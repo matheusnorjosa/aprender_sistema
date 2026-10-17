@@ -46,7 +46,7 @@ SSOT: `v2/docs/specs/domain/politica-aprovacao.spec.md`.
 Testes: `apps/core/tests/test_approval_policy_PA.py`.
 
 - **PA-01 — No auto-approval (SUPER)**: `Solicitacao` com `projeto.fluxo == 'SUPER'` NUNCA vira "aprovado" automaticamente, mesmo sem conflito. Decidido por `resolve_initial_status()` (`apps/core/services/solicitacao_create.py:23`), chamado em `views_solicitacao.py:320` — **não** há override de `Solicitacao.save()`.
-- **PA-02 — Perfil exigido**: só superuser OU (Gerente + Superintendência) aprova/rejeita. Idioma canônico `permission_classes = [HasPerm("codename")]` (`from apps.core.rbac import HasPerm`; políticas em `apps/core/rbac/`).
+- **PA-02 — Perfil exigido**: regra única `solicitation_approval_basis`; ver PA-02 em `v2/docs/specs/domain/politica-aprovacao.spec.md` (nenhum grupo aprova). Idioma canônico `permission_classes = [HasPerm("codename")]` (`from apps.core.rbac import HasPerm`; políticas em `apps/core/rbac/`).
 - **PA-03 — Triggers pós-aprovação**: integrações externas (GCal, RF05/RF06) só executam APÓS a aprovação manual; a task de publicação não é chamada na criação (fluxo service-layer: `solicitacao_create.py` + `views_solicitacao.py`).
 - **PA-04 — Estado inicial**: SUPER começa em `status = 'pendente'`. NAO_SUPER é auto-aprovado na criação (exceção a PA-01).
 - **PA-05 — Auditoria**: registra usuário, data/hora e justificativa em `Aprovacao` + `AuditLog`. Actions: `APPROVE`, `REJECT`, `PREVIEW_GCAL`, `PUBLISH_GCAL_REQUESTED`, `PUBLISH_GCAL`.

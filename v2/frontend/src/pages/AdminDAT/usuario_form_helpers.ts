@@ -115,6 +115,17 @@ interface GerenciaLike {
 }
 
 /**
+ * Gerências cujo perfil dá pacote a Equipe e Gerente; espelha `PERFIL_PERMITIDO`
+ * (`apps/core/services/rbac_pacotes.py`). PR 11: os dois pacotes aprovam solicitações.
+ */
+const GERENCIAS_COM_PACOTE = new Set(['GERENCIA DAT', 'CONTROLE']);
+
+/** A gerência dá o pacote do setor (DAT ou Controle) a quem é Equipe ou Gerente nela? */
+export function gerenciaDaPacote(gerencia: Pick<GerenciaLike, 'nome'> | undefined): boolean {
+  return gerencia !== undefined && GERENCIAS_COM_PACOTE.has(gerencia.nome);
+}
+
+/**
  * #2071: o que é obrigatório no form (só para superuser, o único que edita lotação). Ao criar,
  * gerência e função. Na edição, a função é opcional (o DAT não tem) e a gerência só é obrigatória
  * para quem já tem lotação: o Controle não tem, e limpar a gerência não pode ser um jeito de salvar

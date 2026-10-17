@@ -1,5 +1,5 @@
 /**
- * ApprovalsPage - Página de aprovação/reprovação de solicitações (Superintendência)
+ * ApprovalsPage - Página de aprovação/reprovação de solicitações (Superintendência, DAT e Controle)
  *
  * Features:
  * - Filtra solicitações pendentes do fluxo SUPER
@@ -14,8 +14,8 @@
  *
  * PA-06 (Política de Aprovação Manual):
  * - Botões de aprovar/reprovar aparecem para quem tem a policy `access_solicitation_approvals`:
- *   gerência da Superintendência, Assistente Administrativo do Controle e superusuários
- *   (DAT não aprova).
+ *   gerência da Superintendência (vínculo), DAT e Controle (pacote do perfil, PR 10 e PR 11) e
+ *   superusuários. Nenhum grupo aprova.
  * - PA-02 (segregação): a própria solicitação sai sem checkbox e sem Aprovar/Reprovar,
  *   com a Tag "Sua solicitação" — outra pessoa aprovadora decide (superusuário pode).
  * - Conformidade ISO 9241-110: Controle explícito (usuário vê apenas ações permitidas)
@@ -280,8 +280,8 @@ export default function ApprovalsPage(): JSX.Element {
 
   // PA-06 + PR 3 hardening RBAC (#1308) + PR 10 hardening RBAC (2026-04-30):
   // a fonte exclusiva de autorização passou a ser a policy pública
-  // `access_solicitation_approvals` (Gerente da Superintendência OU
-  // Assistente Administrativo do Controle). Legacy `can_approve_super`
+  // `access_solicitation_approvals` (gerência da Superintendência, DAT ou
+  // Controle; SSOT `solicitation_approval_basis`). Legacy `can_approve_super`
   // deixou de ser consultado pelo frontend.
   // PR B1: `getMe()` em paralelo, para a regra de segregação (PA-02) na tabela.
   useEffect(() => {

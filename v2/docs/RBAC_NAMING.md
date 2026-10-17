@@ -145,18 +145,17 @@ Só para lógica que **não** pode ser expressa por `HasPerm(codename)`:
 
 - **Object-level check**: `IsOwnerOrPrivileged` (`apps/core/rbac/permissions.py`) — verifica `obj.usuario`.
 - **Dynamic scope por query param**: `HasSectorAccess` (lê `gerencia_id` do request).
-- **Composite rule fixa**: `IsAssistenteAdministrativoControle` (`apps/core/rbac/permissions.py`;
-  sem consumidor, sai no PR 11). `IsGerenteSuperintendencia` saiu no PR 8 das permissões.
+
+`IsGerenteSuperintendencia` saiu no PR 8 das permissões e `IsAssistenteAdministrativoControle` no PR 11
+(a aprovação é `CanAccessSolicitationApprovals`, SSOT `solicitation_approval_basis`).
 
 *(Corrigido em 2026-07-24: `IsSolicitationOwner` **não existe** no codebase.)*
 
 Nomear como **condição** (não como identidade): `IsOwnerOrPrivileged`, `IsWithinEditWindow`,
 `HasSectorAccess`. **Nunca** `Is<Role>`, `Is<Setor>`, `Is<Group>`.
 
-> ⚠️ **Exceção existente à regra acima**: `IsAssistenteAdministrativoControle` é um nome de
-> identidade Função×Setor. Ele escapa do V002 porque `apps/core/rbac/` é caminho whitelisted
-> (`WHITELIST_PATH_SUBSTRINGS`, `scripts/rbac_lint.py`), **não** porque esteja em `WHITELISTED_CLASS_NAMES`
-> (`rbac_lint.py`). Registrado aqui para que não se replique o padrão fora de `rbac/`.
+> A única exceção que existia a esta regra, `IsAssistenteAdministrativoControle` (nome de identidade
+> Função×Setor, que escapava do V002 pelo caminho whitelisted `apps/core/rbac/`), saiu no PR 11.
 
 ### Proibido
 
@@ -567,8 +566,12 @@ Bloqueios também com FORMADOR. O grupo de função não entra. Prova pessoa a p
 
 **DAT administrador operacional (PR 10 das permissões, 16/10/2026)**: `approve_solicitation` deixa de
 estar em grupo (migration `0126`) e vem só do pacote `ADMIN_OPERACIONAL`; ter a capacidade é a base 5 de
-`solicitation_approval_basis`, com o rótulo genérico `capacidade_aprovar` (o Controle usa a mesma base no
-PR 11). Nenhum codename novo.
+`solicitation_approval_basis`, com o rótulo genérico `capacidade_aprovar`. Nenhum codename novo.
+
+**Uma fonte só para quem aprova (PR 11 das permissões, 17/10/2026)**: o pacote `CONTROLE` ganha
+`approve_solicitation` (D1 de 06/10); o Controle aprova pela mesma base do DAT. As bases por grupo
+(`asst_admin_controle`, `grupo_superintendencia_gerente`) saem: ficam `superuser`,
+`gerente_superintendencia` e `capacidade_aprovar`. Nenhum codename novo.
 
 ---
 

@@ -10,7 +10,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.tests.factories import GroupFactory, UsuarioFactory
+from apps.core.tests.factories import GerenciaFactory, GroupFactory, UsuarioFactory, com_papel
 
 pytestmark = pytest.mark.django_db
 
@@ -52,6 +52,16 @@ def _make_target():
     )
 
 
+def _mesma_gerencia(user, papel, target):
+    """F4 (scan 16/10/2026): quem não é global só consulta pessoas da gerência onde tem papel G/C/A."""
+    gerencia = GerenciaFactory()
+    extra = {}
+    if papel == "APOIO":
+        extra["coordenador_supervisor"] = com_papel(UsuarioFactory(), "COORDENADOR", gerencia).usuario
+    com_papel(user, papel, gerencia, **extra)
+    com_papel(target, "FORMADOR", gerencia)
+
+
 def _check(user, target_id, municipio_id=None):
     client = APIClient()
     client.force_authenticate(user=user)
@@ -82,6 +92,7 @@ class TestD9CheckAvailabilityForOthers:
         """Coord com create_solicitation: consulta formador → 200."""
         user = _make_user_with_caps("coord_check", ["Coordenador"], ["create_solicitation"])
         target = _make_target()
+        _mesma_gerencia(user, "COORDENADOR", target)
         res = _check(user, target.id)
         assert res.status_code == 200, f"Got {res.status_code}: {res.content[:200]}"
 
@@ -89,6 +100,7 @@ class TestD9CheckAvailabilityForOthers:
         """Apoio com create_solicitation: consulta formador → 200."""
         user = _make_user_with_caps("apoio_check", ["Apoio de Coordenação"], ["create_solicitation"])
         target = _make_target()
+        _mesma_gerencia(user, "APOIO", target)
         res = _check(user, target.id)
         assert res.status_code == 200, f"Got {res.status_code}: {res.content[:200]}"
 

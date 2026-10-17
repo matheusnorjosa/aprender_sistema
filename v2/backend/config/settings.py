@@ -203,6 +203,8 @@ AUTHENTICATION_BACKENDS = [
 # MIDDLEWARE
 # ================================================================
 MIDDLEWARE = [
+    # F7: tira o X-Forwarded-For que não veio de proxy confiável antes de qualquer leitura (throttle).
+    "apps.core.middleware.ForwardedForConfiavelMiddleware",
     "django_prometheus.middleware.PrometheusBeforeMiddleware",  # MP1: Metrics start
     "apps.core.middleware.RequestIDMiddleware",  # MP2: Correlation ID for structured logging
     "apps.core.middleware.APIv1DeprecationMiddleware",  # #793: Deprecation headers on /api/v1/
@@ -501,6 +503,16 @@ CSRF_COOKIE_HTTPONLY = True
 # RIGHT, so a forged left-most XFF entry is ignored. Override via env if the edge
 # topology differs (e.g. NPM set to OVERWRITE XFF → 1); 0 = trust only REMOTE_ADDR.
 NUM_PROXIES = int(os.getenv("NUM_PROXIES", "2"))
+# F7 (scan 16/10/2026): o X-Forwarded-For só vale quando quem conecta no gunicorn (REMOTE_ADDR) está
+# numa destas redes. Padrão = loopback + faixas privadas, as mesmas do `set_real_ip_from` do nginx do
+# frontend (o nginx conecta pela rede Docker). Peer público => vale o REMOTE_ADDR.
+TRUSTED_PROXY_NETWORKS = [
+    rede.strip()
+    for rede in os.getenv(
+        "TRUSTED_PROXY_NETWORKS", "127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+    ).split(",")
+    if rede.strip()
+]
 
 REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [

@@ -17,6 +17,7 @@ from django.contrib.auth.models import Group
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers  # type: ignore[attr-defined]
 
 from apps.core.constants import FUNCAO_GROUPS, RESERVED_GROUPS, SETOR_GROUPS
@@ -89,6 +90,13 @@ class GerenciaVinculoSerializer(serializers.Serializer):  # type: ignore[misc]
     papeis = serializers.ListField(child=serializers.CharField())
 
 
+class AvisoSenhaRedefinidaSerializer(serializers.Serializer):  # type: ignore[misc]
+    """F1: aviso à pessoa cuja senha foi redefinida por outra (rótulo de quem redefiniu + data)."""
+
+    por = serializers.CharField()
+    em = serializers.CharField()
+
+
 class CurrentUserSerializer(serializers.Serializer):  # type: ignore[misc]
     """
     Response serializer for authenticated user payload (/api/me/).
@@ -115,6 +123,10 @@ class CurrentUserSerializer(serializers.Serializer):  # type: ignore[misc]
     permissions = serializers.ListField(child=serializers.CharField())
     # Senha em uso foi definida por outra pessoa: a tela só mostra a troca de senha.
     deve_trocar_senha = serializers.BooleanField()
+    # F1: quem redefiniu a senha e quando ({"por": rótulo, "em": "dd/mm/aaaa"}); null sem aviso.
+    aviso_senha_redefinida = AvisoSenhaRedefinidaSerializer(allow_null=True)
+    # F1: redefinições por outra pessoa nos últimos 30 dias (AuditLog); não some com a troca de senha.
+    redefinicoes_senha = AvisoSenhaRedefinidaSerializer(many=True)
 
 
 class MeContactUpdateSerializer(serializers.Serializer):  # type: ignore[misc]
@@ -502,6 +514,11 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         user.set_password(password)
         if actor is None or actor.pk != user.pk:
             user.deve_trocar_senha = True
+        # F1 (scan 16/10/2026): redefinir a senha de conta existente de OUTRA pessoa deixa o aviso
+        # "Sua senha foi redefinida por <rótulo> em dd/mm/aaaa" para o próximo acesso dela.
+        if contexto == "update" and actor is not None and actor.pk != user.pk:
+            user.senha_redefinida_por = actor
+            user.senha_redefinida_em = timezone.now()
         user.save()
         auditar_reset_senha(actor=actor, target_user=user, contexto=contexto, imediato=True)
 

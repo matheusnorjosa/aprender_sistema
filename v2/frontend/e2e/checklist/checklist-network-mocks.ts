@@ -40,12 +40,12 @@ export async function mockChecklistAuthBootstrap(
 /** Payload de `/api/me/` para um titular autenticado (shape de `isCurrentUserPayload`). */
 export const CHECKLIST_AUTH_USER = {
   id: 42,
-  username: 'REMOVIDO',
-  email: 'REMOVIDO',
-  first_name: 'Amanda',
-  last_name: 'Rodrigues',
-  name: 'REMOVIDO',
-  cpf: 'REMOVIDO',
+  username: '12345678900',
+  email: 'pessoa.teste@example.invalid',
+  first_name: 'Pessoa',
+  last_name: 'Teste',
+  name: 'Pessoa Teste',
+  cpf: '12345678900',
   telefone: '(85) 90000-0000',
   cargo: 'Coordenadora',
   groups: ['Coordenador', 'Vidas'],

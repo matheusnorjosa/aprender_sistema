@@ -14,7 +14,7 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.tests.factories import GroupFactory, UsuarioFactory
+from apps.core.tests.factories import UsuarioFactory, com_papel
 
 
 @pytest.fixture
@@ -25,8 +25,8 @@ def authenticated_client(db) -> APIClient:
         password="testpass123",
         cpf="12345678901",
     )
-    coord_group = GroupFactory(name="Coordenador")
-    user.groups.add(coord_group)
+    # F6 (scan 16/10/2026): o endpoint exige criar solicitação, que vem do papel vigente (PR 8).
+    com_papel(user, "COORDENADOR")
     client = APIClient()
     client.force_authenticate(user=user)
     return client

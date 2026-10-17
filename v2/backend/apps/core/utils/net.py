@@ -20,6 +20,15 @@ onto the proxy IP (breaking per-client throttle); too high re-opens forgery.
 In production the chain is NPM edge → nginx ``frontend`` container → gunicorn,
 so ``NUM_PROXIES = 2``.
 
+F7 (scan 16/10/2026): o ``X-Forwarded-For`` só vale quando quem conecta (``REMOTE_ADDR``) está em
+``settings.TRUSTED_PROXY_NETWORKS`` (padrão: as faixas privadas da rede Docker, as mesmas do
+``set_real_ip_from`` do nginx do frontend). Fora disso vale o ``REMOTE_ADDR``: quem alcança o
+gunicorn direto não escolhe o IP pelo cabeçalho. Com menos de ``NUM_PROXIES`` entradas vale a mais
+à esquerda, como no DRF: com 1 entrada é a que o nginx do frontend anexou (o NPM mandou só o
+X-Real-IP), e o ``REMOTE_ADDR`` juntaria todo mundo no IP do container do nginx.
+``ForwardedForConfiavelMiddleware`` aplica a mesma regra ao ``request.META`` para o throttle do DRF
+(``get_ident``), que lê o cabeçalho por conta própria.
+
 Usage:
     from apps.core.utils.net import get_client_ip
 
@@ -30,6 +39,9 @@ Usage:
 
 from __future__ import annotations
 
+import ipaddress
+from typing import Any
+
 from django.conf import settings
 from django.http import HttpRequest
 from rest_framework.request import Request
@@ -37,6 +49,35 @@ from rest_framework.request import Request
 # Preserved from the legacy helper contract: callers store this when neither a
 # trusted proxy header nor REMOTE_ADDR is available (e.g. synthetic requests).
 UNKNOWN_IP = "unknown"
+
+
+def _proxy_confiavel(remote_addr: str) -> bool:
+    """True se `remote_addr` (o par TCP) está numa das redes de proxy confiáveis."""
+    try:
+        addr = ipaddress.ip_address(remote_addr)
+    except ValueError:
+        return False
+    redes: list[str] = list(getattr(settings, "TRUSTED_PROXY_NETWORKS", []))
+    return any(addr in ipaddress.ip_network(rede, strict=False) for rede in redes)
+
+
+def _xff_confiavel(meta: Any) -> list[str] | None:
+    """Entradas do X-Forwarded-For, se ele merece confiança; None se não.
+
+    Merece quando quem conecta é proxy confiável. Quantas entradas vieram não importa: com menos de
+    `NUM_PROXIES`, `get_client_ip` lê a mais à esquerda, como o `get_ident` do DRF.
+    """
+    xff = meta.get("HTTP_X_FORWARDED_FOR")
+    if not xff or not _proxy_confiavel(meta.get("REMOTE_ADDR") or ""):
+        return None
+    addrs = [addr.strip() for addr in xff.split(",") if addr.strip()]
+    return addrs or None
+
+
+def descartar_xff_nao_confiavel(meta: Any) -> None:
+    """Tira de `meta` o X-Forwarded-For que `get_client_ip` não usaria (ver `_xff_confiavel`)."""
+    if "HTTP_X_FORWARDED_FOR" in meta and _xff_confiavel(meta) is None:
+        del meta["HTTP_X_FORWARDED_FOR"]
 
 
 def get_client_ip(request: HttpRequest | Request) -> str:
@@ -47,19 +88,15 @@ def get_client_ip(request: HttpRequest | Request) -> str:
     server. Falls back to ``REMOTE_ADDR`` (the unforgeable TCP peer) whenever no
     trusted proxy header applies.
     """
-    xff = request.META.get("HTTP_X_FORWARDED_FOR")
     remote_addr = request.META.get("REMOTE_ADDR") or UNKNOWN_IP
     num_proxies = getattr(settings, "NUM_PROXIES", 0)
 
+    # 0 proxies, XFF ausente ou não confiável (F7) => the only trustworthy value is the TCP peer.
+    addrs = None if num_proxies == 0 else _xff_confiavel(request.META)
+    if addrs is None:
+        return remote_addr
+
     # NUM_PROXIES=None => legacy "trust the whole chain" (dev only, discouraged).
     if num_proxies is None:
-        return "".join(xff.split()) if xff else remote_addr
-
-    # 0 proxies, or no XFF at all => the only trustworthy value is the TCP peer.
-    if num_proxies == 0 or not xff:
-        return remote_addr
-
-    addrs = [addr.strip() for addr in xff.split(",") if addr.strip()]
-    if not addrs:
-        return remote_addr
+        return ",".join(addrs)
     return addrs[-min(num_proxies, len(addrs))]

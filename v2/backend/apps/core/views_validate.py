@@ -48,29 +48,96 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from django.db.models import QuerySet
+from django.db.models.functions import Lower
 from django.utils import timezone
-from rest_framework.permissions import IsAuthenticated
+from rest_framework import serializers
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.pii import email_sem_cpf
 from apps.core.services.compra_elegibilidade import isento_da_regra_da_compra, par_liberado
-from apps.core.services.resolvers import resolve_municipio, resolve_projeto, resolve_tipo_evento, resolve_user_by_email
+from apps.core.services.resolvers import resolve_municipio, resolve_projeto, resolve_tipo_evento
+from apps.core.services.solicitacao_scope import scope_usuarios_por_gerencia
 
-from .models import Municipio, Projeto, TipoEvento
+from .models import Municipio, Projeto, TipoEvento, Usuario
+from .permissions import HasPerm
+from .serializers.campos import ListaComTeto
 
 logger = logging.getLogger(__name__)
+
+# Mesmo teto das listas do criar/editar (`_ExtraParticipantsSerializer`, M10-04).
+_MAX_PARTICIPANTES = 200
+
+
+class _ParticipantsSerializer(serializers.Serializer):
+    """F2 (scan 16/10/2026): forma de `participants` antes de qualquer consulta ao banco.
+
+    `ListaComTeto`: o teto vale antes de validar cada item (lista gigante não prende o worker).
+    """
+
+    coordenador = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
+    formadores = ListaComTeto(
+        child=serializers.EmailField(allow_blank=True), required=False, default=list, max_length=_MAX_PARTICIPANTES
+    )
+    coord_acompanha = ListaComTeto(
+        child=serializers.EmailField(allow_blank=True), required=False, default=list, max_length=_MAX_PARTICIPANTES
+    )
+
+
+class _ValidateSerializer(serializers.Serializer):
+    """O corpo tem de ser um objeto; município, projeto, tipo e horários seguem na validação abaixo."""
+
+    participants = _ParticipantsSerializer(required=False)
+
+
+def _sem_repetir(emails: list[str]) -> list[str]:
+    """E-mails não vazios, sem repetição (sem diferença de caixa), na ordem em que vieram."""
+    return list(dict.fromkeys(e.strip().lower() for e in emails if e and e.strip()))
+
+
+def _resolver_emails(emails: list[str], user: Any, projeto: Projeto | None) -> dict[str, int]:
+    """Uma consulta para todos os e-mails: `{email: id}` só para os que batem com UMA conta.
+
+    E-mail repetido em duas contas fica de fora (não escolhe no chute, #1658), como no
+    `resolve_user_by_email`.
+
+    F6 (scan 16/10/2026): só contas ativas que `user` pode pôr no evento
+    (`scope_usuarios_por_gerencia`, o mesmo filtro do `/lookup/usuarios/`; com o projeto, só a
+    gerência dele). O e-mail de reserva (`<cpf>@placeholder.local`) e e-mail que leva CPF nunca
+    são resolvidos: senão o endpoint confirmaria se um CPF tem conta.
+    """
+    emails = [e for e in emails if email_sem_cpf(e)]
+    if not emails:
+        return {}
+    alcance = scope_usuarios_por_gerencia(Usuario.objects.filter(is_active=True), user, projeto)
+    contas: dict[str, list[int]] = {}
+    for email, pk in (
+        alcance.annotate(email_minusculo=Lower("email"))
+        .filter(email_minusculo__in=emails)
+        .values_list("email_minusculo", "pk")
+    ):
+        contas.setdefault(email, []).append(pk)
+    ambiguos = sum(1 for pks in contas.values() if len(pks) > 1)
+    if ambiguos:
+        logger.warning("Validate solicitacao: %d e-mail(s) ambíguo(s) — não resolvidos (#1658).", ambiguos)
+    return {e: pks[0] for e, pks in contas.items() if len(pks) == 1}
 
 
 class SolicitationValidateView(APIView):
     """
     POST /api/solicitacoes/validate/
     Valida e canoniza dados de solicitação antes do submit
+
+    F6 (scan 16/10/2026): mesmo gate do `UsuarioLookup` (criar solicitação ou administrar
+    cadastros). Nenhuma tela chama este endpoint hoje.
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [HasPerm("create_solicitation") | HasPerm("manage_admin_registries")]
 
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        corpo = _ValidateSerializer(data=request.data)
+        corpo.is_valid(raise_exception=True)
         data = request.data
         errors = []
         canonical = {}
@@ -158,9 +225,16 @@ class SolicitationValidateView(APIView):
                 logger.warning("Validate solicitacao: failed to parse data/hora", exc_info=True)
                 errors.append("Data ou horário em formato inválido (use YYYY-MM-DD para data e HH:MM para horários)")
 
-        # 5. Validar e resolver participantes
-        participants = data.get("participants", {})
-        usuarios_canonical = {
+        # 5. Validar e resolver participantes (forma já validada pelo serializer: F2)
+        participants = corpo.validated_data.get("participants") or {}
+        coord_email = (participants.get("coordenador") or "").strip()
+        formadores_emails = _sem_repetir(participants.get("formadores", []))
+        coord_acomp_emails = _sem_repetir(participants.get("coord_acompanha", []))
+        ids_por_email = _resolver_emails(
+            _sem_repetir([coord_email, *formadores_emails, *coord_acomp_emails]), request.user, projeto_obj
+        )
+
+        usuarios_canonical: dict[str, Any] = {
             "coordenador_id": None,
             "formadores_ids": [],
             "coord_acompanha_ids": [],
@@ -169,33 +243,24 @@ class SolicitationValidateView(APIView):
         }
 
         # Coordenador
-        coord_email = participants.get("coordenador")
         if coord_email:
-            coord_user = resolve_user_by_email(coord_email)
-            if coord_user:
-                usuarios_canonical["coordenador_id"] = coord_user.id
+            coord_id = ids_por_email.get(coord_email.lower())
+            if coord_id:
+                usuarios_canonical["coordenador_id"] = coord_id
             else:
                 errors.append(f"Coordenador não encontrado: {coord_email}")
 
-        # Formadores
-        formadores_emails = participants.get("formadores", [])
-        for email in formadores_emails:
-            if email:
-                user = resolve_user_by_email(email)
-                if user:
-                    usuarios_canonical["formadores_ids"].append(user.id)
+        # Formadores e coordenadores acompanhantes
+        for emails, campo_ids, campo_nao_achados in (
+            (formadores_emails, "formadores_ids", "formadores_not_found"),
+            (coord_acomp_emails, "coord_acompanha_ids", "coord_acompanha_not_found"),
+        ):
+            for email in emails:
+                user_id = ids_por_email.get(email)
+                if user_id:
+                    usuarios_canonical[campo_ids].append(user_id)
                 else:
-                    usuarios_canonical["formadores_not_found"].append(email)
-
-        # Coordenadores acompanhantes
-        coord_acomp_emails = participants.get("coord_acompanha", [])
-        for email in coord_acomp_emails:
-            if email:
-                user = resolve_user_by_email(email)
-                if user:
-                    usuarios_canonical["coord_acompanha_ids"].append(user.id)
-                else:
-                    usuarios_canonical["coord_acompanha_not_found"].append(email)
+                    usuarios_canonical[campo_nao_achados].append(email)
 
         canonical["usuarios"] = usuarios_canonical
 

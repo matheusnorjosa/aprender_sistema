@@ -1,101 +1,182 @@
 """
 Tests for seed_gerentes management command.
 
-Tests:
-- test_seed_gerentes_creates_group_if_not_exists
-- test_seed_gerentes_creates_missing_usuarios
-- test_seed_gerentes_adds_usuarios_to_group
-- test_seed_gerentes_links_gerencia_fk
-- test_seed_gerentes_idempotent
-- test_seed_gerentes_dry_run_does_not_commit
-- test_seed_gerentes_handles_existing_usuarios
-- test_seed_gerentes_handles_superintendencia_multiple_managers
+F5 (scan de segurança, 16/10/2026): a lista de gerentes NÃO mora no código. O operador passa um
+arquivo JSON fora do git (`--arquivo`); aqui os dados são sintéticos: CPFs que FALHAM no dígito
+verificador, nomes genéricos e e-mails @example.invalid.
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
 
 from __future__ import annotations
 
+import json
+import re
 from io import StringIO
+from pathlib import Path
 
 from django.contrib.auth.models import Group
 from django.core.management import call_command
+from django.core.management.base import CommandError
 
 import pytest
 
 from apps.core.models import EquipeGerencia, Gerencia, Usuario
+from apps.core.validators import is_valid_cpf
+
+# 4 na Superintendência (a primeira vira Gerencia.gerente), 1 em Brincando, ACerta e Vidas.
+GERENTES_SINTETICOS = [
+    {
+        "first_name": "Gerente",
+        "last_name": "Super Um",
+        "cpf": "10000000001",
+        "email": "gerente.super1@example.invalid",
+        "gerencia_setor": "Super",
+    },
+    {
+        "first_name": "Gerente",
+        "last_name": "Brincando",
+        "cpf": "10000000002",
+        "email": "gerente.brincando@example.invalid",
+        "gerencia_setor": "Brincando",
+    },
+    {
+        "first_name": "Gerente",
+        "last_name": "Acerta",
+        "cpf": "10000000003",
+        "email": "gerente.acerta@example.invalid",
+        "gerencia_setor": "ACerta",
+    },
+    {
+        "first_name": "Gerente",
+        "last_name": "Super Dois",
+        "cpf": "10000000004",
+        "email": "gerente.super2@example.invalid",
+        "gerencia_setor": "Super",
+    },
+    {
+        "first_name": "Gerente",
+        "last_name": "Super Tres",
+        "cpf": "10000000005",
+        "email": "gerente.super3@example.invalid",
+        "gerencia_setor": "Super",
+    },
+    {
+        "first_name": "Gerente",
+        "last_name": "Vidas",
+        "cpf": "10000000006",
+        "email": "gerente.vidas@example.invalid",
+        "gerencia_setor": "Vidas",
+    },
+    {
+        "first_name": "Gerente",
+        "last_name": "Super Quatro",
+        "cpf": "10000000007",
+        "email": "gerente.super4@example.invalid",
+        "gerencia_setor": "Super",
+    },
+]
+
+_SUPER_EMAILS = [g["email"] for g in GERENTES_SINTETICOS if g["gerencia_setor"] == "Super"]
+
+
+@pytest.fixture
+def arquivo(tmp_path: Path) -> str:
+    """Arquivo do operador (fora do git) com a lista sintética."""
+    caminho = tmp_path / "gerentes.json"
+    caminho.write_text(json.dumps(GERENTES_SINTETICOS), encoding="utf-8")
+    return str(caminho)
 
 
 @pytest.fixture
 def clean_gerencias(db):
     """Ensure Gerencias exist and have no gerente assigned."""
-    # Clear existing gerente assignments
     Gerencia.objects.all().update(gerente=None)
-
-    # Ensure all 7 Gerencias exist
     call_command("seed_gerencias")
-
     yield
-
-    # Cleanup
     Gerencia.objects.all().update(gerente=None)
 
 
 @pytest.fixture
 def clean_gerentes(db):
     """Remove gerentes from DB and Group."""
-    # Remove gerentes from canonical função group
     try:
-        gerente_group = Group.objects.get(name="Gerente")
-        gerente_group.user_set.clear()
+        Group.objects.get(name="Gerente").user_set.clear()
     except Group.DoesNotExist:
         pass
-
-    # Delete EquipeGerencia GERENTE + gerentes (keep other usuarios)
     EquipeGerencia.objects.filter(papel="GERENTE").delete()
     Usuario.objects.filter(cargo="Gerente").delete()
-
     yield
-
-    # Cleanup
     try:
-        gerente_group = Group.objects.get(name="Gerente")
-        gerente_group.user_set.clear()
+        Group.objects.get(name="Gerente").user_set.clear()
     except Group.DoesNotExist:
         pass
     EquipeGerencia.objects.filter(papel="GERENTE").delete()
     Usuario.objects.filter(cargo="Gerente").delete()
+
+
+def test_dados_sinteticos_falham_no_digito_verificador():
+    """Guarda do próprio teste: nenhum CPF daqui pode ser de gente de verdade."""
+    assert not any(is_valid_cpf(g["cpf"]) for g in GERENTES_SINTETICOS)
+
+
+def test_codigo_do_comando_nao_traz_dado_pessoal():
+    """F5: o comando não traz CPF que passe no dígito verificador nem e-mail da empresa."""
+    fonte = (Path(__file__).resolve().parents[1] / "management" / "commands" / "seed_gerentes.py").read_text(
+        encoding="utf-8"
+    )
+    # Conta, não lista: a mensagem do assert não pode repetir o CPF.
+    assert sum(1 for c in re.findall(r"\d{11}", fonte) if is_valid_cpf(c)) == 0
+    assert "@aprendereditora" not in fonte
 
 
 @pytest.mark.django_db
 class TestSeedGerentesCommand:
     """Tests for seed_gerentes management command."""
 
-    def test_seed_gerentes_creates_group_if_not_exists(self, clean_gerencias, clean_gerentes):
+    def test_sem_arquivo_recusa(self, clean_gerencias, clean_gerentes):
+        """Sem `--arquivo` não há lista: o comando para em vez de semear dado embutido."""
+        with pytest.raises(CommandError):
+            call_command("seed_gerentes")
+        assert Usuario.objects.filter(cargo="Gerente").count() == 0
+
+    def test_arquivo_inexistente_recusa(self, clean_gerencias, clean_gerentes, tmp_path):
+        with pytest.raises(CommandError):
+            call_command("seed_gerentes", "--arquivo", str(tmp_path / "nao-existe.json"))
+
+    def test_arquivo_sem_campo_obrigatorio_recusa(self, clean_gerencias, clean_gerentes, tmp_path):
+        caminho = tmp_path / "incompleto.json"
+        caminho.write_text(json.dumps([{"first_name": "Gerente", "cpf": "10000000001"}]), encoding="utf-8")
+        with pytest.raises(CommandError):
+            call_command("seed_gerentes", "--arquivo", str(caminho))
+        assert Usuario.objects.filter(cargo="Gerente").count() == 0
+
+    def test_saida_nao_traz_nome_nem_cpf(self, clean_gerencias, clean_gerentes, arquivo):
+        """A saída identifica a conta por u<id>, sem nome, CPF ou e-mail."""
+        out = StringIO()
+        call_command("seed_gerentes", "--arquivo", arquivo, stdout=out)
+        saida = out.getvalue()
+        for g in GERENTES_SINTETICOS:
+            assert g["cpf"] not in saida
+            assert g["email"] not in saida
+            assert f'{g["first_name"]} {g["last_name"]}' not in saida
+
+    def test_seed_gerentes_creates_group_if_not_exists(self, clean_gerencias, clean_gerentes, arquivo):
         """Test that command creates canonical função group 'Gerente' if it doesn't exist."""
-        # Simula ausência do grupo sem deletar registro referenciado por FKs auxiliares.
         existing = Group.objects.filter(name="Gerente").first()
         if existing is not None:
             existing.name = "Gerente (temp)"
             existing.save(update_fields=["name"])
 
-        # Run command
         out = StringIO()
-        call_command("seed_gerentes", stdout=out)
+        call_command("seed_gerentes", "--arquivo", arquivo, stdout=out)
 
-        # Verify group was created
         assert Group.objects.filter(name="Gerente").exists()
-        output = out.getvalue()
-        assert "Created Django Group: Gerente" in output
+        assert "Created Django Group: Gerente" in out.getvalue()
 
-    def test_seed_gerentes_does_not_use_legacy_gerencia_group(self, clean_gerencias, clean_gerentes):
-        """Regression C2-B1: gerentes vão para grupo canônico 'Gerente', não para o legado 'Gerência'.
-
-        Valida comportamento (a quais grupos os gerentes são atribuídos), não a
-        inexistência global do grupo 'Gerência' — que pode existir no DB por
-        migration/seed de RBAC independente deste command.
-        """
-        call_command("seed_gerentes")
+    def test_seed_gerentes_does_not_use_legacy_gerencia_group(self, clean_gerencias, clean_gerentes, arquivo):
+        """Regression C2-B1: gerentes vão para grupo canônico 'Gerente', não para o legado 'Gerência'."""
+        call_command("seed_gerentes", "--arquivo", arquivo)
 
         gerentes = Usuario.objects.filter(cargo="Gerente")
         assert gerentes.exists()
@@ -103,211 +184,125 @@ class TestSeedGerentesCommand:
             assert usuario.groups.filter(name="Gerente").exists()
             assert not usuario.groups.filter(name="Gerência").exists()
 
-    def test_seed_gerentes_creates_missing_usuarios(self, clean_gerencias, clean_gerentes):
-        """Test that command creates 4 missing usuarios."""
-        # Verify 0 gerentes before
+    def test_seed_gerentes_creates_missing_usuarios(self, clean_gerencias, clean_gerentes, arquivo):
+        """Cria as contas da lista do arquivo."""
         assert Usuario.objects.filter(cargo="Gerente").count() == 0
 
-        # Run command
-        out = StringIO()
-        call_command("seed_gerentes", stdout=out)
+        call_command("seed_gerentes", "--arquivo", arquivo, stdout=StringIO())
 
-        # Verify 7 gerentes created (4 new + 3 existing in fixture data)
-        # Since we deleted all gerentes in clean_gerentes, all 7 should be created
         gerentes = Usuario.objects.filter(cargo="Gerente")
         assert gerentes.count() == 7
+        assert set(gerentes.values_list("cpf", flat=True)) == {g["cpf"] for g in GERENTES_SINTETICOS}
 
-        # Verify expected CPFs
-        expected_cpfs = [
-            "REMOVIDO",  # Fernanda
-            "REMOVIDO",  # Gleice Anne
-            "REMOVIDO",  # Katy
-            "REMOVIDO",  # Maria Cristina
-            "REMOVIDO",  # Maria Solange
-            "REMOVIDO",  # Patrícia
-            "REMOVIDO",  # Paula
-        ]
-        actual_cpfs = list(gerentes.values_list("cpf", flat=True))
-        assert set(actual_cpfs) == set(expected_cpfs)
-
-    def test_seed_gerentes_adds_usuarios_to_group(self, clean_gerencias, clean_gerentes):
+    def test_seed_gerentes_adds_usuarios_to_group(self, clean_gerencias, clean_gerentes, arquivo):
         """Test that all 7 gerentes are added to canonical 'Gerente' group."""
-        # Run command
-        call_command("seed_gerentes")
+        call_command("seed_gerentes", "--arquivo", arquivo)
 
-        # Verify all gerentes are in group
         gerente_group = Group.objects.get(name="Gerente")
         assert gerente_group.user_set.count() == 7
-
-        # Verify all usuarios with cargo="Gerente" are in group
         for usuario in Usuario.objects.filter(cargo="Gerente"):
             assert gerente_group in usuario.groups.all()
 
-    def test_seed_gerentes_creates_equipe_gerencia_gerente(self, clean_gerencias, clean_gerentes):
+    def test_seed_gerentes_creates_equipe_gerencia_gerente(self, clean_gerencias, clean_gerentes, arquivo):
         """C2-B1: command must create EquipeGerencia.papel=GERENTE for each resolved gerente."""
-        call_command("seed_gerentes")
+        call_command("seed_gerentes", "--arquivo", arquivo)
 
-        # 7 gerentes, all with resolvable gerencia_setor → 7 EquipeGerencia GERENTE rows
-        equipe_gerente = EquipeGerencia.objects.filter(papel="GERENTE")
-        assert equipe_gerente.count() == 7
-
-        # Each gerente usuario has exactly one GERENTE row
+        assert EquipeGerencia.objects.filter(papel="GERENTE").count() == 7
         for usuario in Usuario.objects.filter(cargo="Gerente"):
             assert EquipeGerencia.objects.filter(usuario=usuario, papel="GERENTE").count() == 1
 
-    def test_seed_gerentes_equipe_gerencia_idempotent(self, clean_gerencias, clean_gerentes):
+    def test_seed_gerentes_equipe_gerencia_idempotent(self, clean_gerencias, clean_gerentes, arquivo):
         """C2-B1: running twice must not duplicate EquipeGerencia GERENTE rows."""
-        call_command("seed_gerentes")
+        call_command("seed_gerentes", "--arquivo", arquivo)
         first = EquipeGerencia.objects.filter(papel="GERENTE").count()
-        call_command("seed_gerentes")
+        call_command("seed_gerentes", "--arquivo", arquivo)
         second = EquipeGerencia.objects.filter(papel="GERENTE").count()
         assert first == second == 7
 
-    def test_seed_gerentes_links_gerencia_fk(self, clean_gerencias, clean_gerentes):
-        """Test that gerentes are linked to Gerencia.gerente FK."""
-        # Run command
-        call_command("seed_gerentes")
+    def test_seed_gerentes_links_gerencia_fk(self, clean_gerencias, clean_gerentes, arquivo):
+        """Liga Gerencia.gerente: 4 gerências, a Superintendência com a primeira da lista."""
+        call_command("seed_gerentes", "--arquivo", arquivo)
 
-        # Verify FK links (4 gerencias should have gerente assigned)
-        # SUPERINTENDENCIA: first manager assigned (Fernanda)
-        # GERENCIA 2 (Vidas): Patrícia
-        # GERENCIA 4 (ACerta): Katy
-        # GERENCIA 5 (Brincando): Gleice Anne
-        gerencias_with_gerente = Gerencia.objects.filter(gerente__isnull=False)
-        assert gerencias_with_gerente.count() == 4
+        assert Gerencia.objects.filter(gerente__isnull=False).count() == 4
 
-        # Verify specific assignments
-        super_gerencia = Gerencia.objects.get(nome="SUPERINTENDENCIA")
-        assert super_gerencia.gerente is not None
-        assert super_gerencia.gerente.first_name == "Fernanda"  # First in list
+        esperado = {
+            "SUPERINTENDENCIA": "Super Um",
+            "GERENCIA 2": "Vidas",
+            "GERENCIA 4": "Acerta",
+            "GERENCIA 5": "Brincando",
+        }
+        for nome, last_name in esperado.items():
+            gerencia = Gerencia.objects.get(nome=nome)
+            assert gerencia.gerente is not None
+            assert gerencia.gerente.last_name == last_name
 
-        vidas_gerencia = Gerencia.objects.get(nome="GERENCIA 2")
-        assert vidas_gerencia.gerente is not None
-        assert vidas_gerencia.gerente.first_name == "Patrícia"
-
-        acerta_gerencia = Gerencia.objects.get(nome="GERENCIA 4")
-        assert acerta_gerencia.gerente is not None
-        assert acerta_gerencia.gerente.first_name == "Katy"
-
-        brincando_gerencia = Gerencia.objects.get(nome="GERENCIA 5")
-        assert brincando_gerencia.gerente is not None
-        assert brincando_gerencia.gerente.first_name == "Gleice Anne"
-
-    def test_seed_gerentes_idempotent(self, clean_gerencias, clean_gerentes):
+    def test_seed_gerentes_idempotent(self, clean_gerencias, clean_gerentes, arquivo):
         """Test that running command twice doesn't create duplicates."""
-        # Run command first time
-        out1 = StringIO()
-        call_command("seed_gerentes", stdout=out1)
+        call_command("seed_gerentes", "--arquivo", arquivo, stdout=StringIO())
 
-        # Verify counts
         first_gerentes_count = Usuario.objects.filter(cargo="Gerente").count()
         first_group_count = Group.objects.get(name="Gerente").user_set.count()
         first_gerencia_links = Gerencia.objects.filter(gerente__isnull=False).count()
+        assert (first_gerentes_count, first_group_count, first_gerencia_links) == (7, 7, 4)
 
-        assert first_gerentes_count == 7
-        assert first_group_count == 7
-        assert first_gerencia_links == 4
-
-        # Run command second time
         out2 = StringIO()
-        call_command("seed_gerentes", stdout=out2)
+        call_command("seed_gerentes", "--arquivo", arquivo, stdout=out2)
 
-        # Verify counts haven't changed
-        second_gerentes_count = Usuario.objects.filter(cargo="Gerente").count()
-        second_group_count = Group.objects.get(name="Gerente").user_set.count()
-        second_gerencia_links = Gerencia.objects.filter(gerente__isnull=False).count()
+        assert Usuario.objects.filter(cargo="Gerente").count() == first_gerentes_count
+        assert Group.objects.get(name="Gerente").user_set.count() == first_group_count
+        assert Gerencia.objects.filter(gerente__isnull=False).count() == first_gerencia_links
+        assert "already exists" in out2.getvalue().lower()
 
-        assert second_gerentes_count == first_gerentes_count
-        assert second_group_count == first_group_count
-        assert second_gerencia_links == first_gerencia_links
-
-        # Verify output shows "already exists"
-        output2 = out2.getvalue()
-        assert "already exists" in output2.lower()
-
-    def test_seed_gerentes_dry_run_does_not_commit(self, clean_gerencias, clean_gerentes):
+    def test_seed_gerentes_dry_run_does_not_commit(self, clean_gerencias, clean_gerentes, arquivo):
         """Test that --dry-run doesn't commit changes."""
-        # Run command with dry-run
         out = StringIO()
-        call_command("seed_gerentes", "--dry-run", stdout=out)
+        call_command("seed_gerentes", "--arquivo", arquivo, "--dry-run", stdout=out)
 
-        # Verify no gerentes were created
         assert Usuario.objects.filter(cargo="Gerente").count() == 0
-
-        # Verify output shows dry-run mode
         output = out.getvalue()
         assert "DRY RUN" in output
         assert "Rolling back" in output
 
-    def test_seed_gerentes_handles_existing_usuarios(self, clean_gerencias, clean_gerentes):
-        """Test that command handles existing usuarios correctly."""
-        # Pre-create one gerente (Patrícia)
+    def test_seed_gerentes_handles_existing_usuarios(self, clean_gerencias, clean_gerentes, arquivo):
+        """Conta já existente (mesmo CPF) é reaproveitada."""
+        g = GERENTES_SINTETICOS[5]
         Usuario.objects.create(
-            cpf="REMOVIDO",
-            username="patricia.paiva",
-            first_name="Patrícia",
-            last_name="Lemos de Paiva",
-            email="REMOVIDO",
+            cpf=g["cpf"],
+            username="gerente.vidas",
+            first_name=g["first_name"],
+            last_name=g["last_name"],
+            email=g["email"],
             cargo="Gerente",
         )
-
-        # Verify 1 gerente exists
         assert Usuario.objects.filter(cargo="Gerente").count() == 1
 
-        # Run command
         out = StringIO()
-        call_command("seed_gerentes", stdout=out)
+        call_command("seed_gerentes", "--arquivo", arquivo, stdout=out)
 
-        # Verify 7 total gerentes (1 existing + 6 new)
         assert Usuario.objects.filter(cargo="Gerente").count() == 7
+        assert "already exists" in out.getvalue().lower()
 
-        # Verify output shows existing usuario
-        output = out.getvalue()
-        assert "already exists" in output.lower()
-
-    def test_seed_gerentes_handles_superintendencia_multiple_managers(self, clean_gerencias, clean_gerentes):
-        """Test that SUPERINTENDENCIA with 4 managers only links first one."""
-        # Run command
+    def test_seed_gerentes_handles_superintendencia_multiple_managers(self, clean_gerencias, clean_gerentes, arquivo):
+        """SUPERINTENDENCIA com 4 gerentes liga só a primeira; as 4 entram no grupo."""
         out = StringIO()
-        call_command("seed_gerentes", stdout=out)
+        call_command("seed_gerentes", "--arquivo", arquivo, stdout=out)
 
-        # Verify SUPERINTENDENCIA has exactly 1 gerente linked
-        super_gerencia = Gerencia.objects.get(nome="SUPERINTENDENCIA")
-        assert super_gerencia.gerente is not None
+        assert Gerencia.objects.get(nome="SUPERINTENDENCIA").gerente is not None
 
-        # Verify all 4 SUPERINTENDENCIA managers are in Group
         gerente_group = Group.objects.get(name="Gerente")
-        super_managers = Usuario.objects.filter(
-            cargo="Gerente",
-            email__in=[
-                "REMOVIDO",  # Fernanda
-                "REMOVIDO",  # Maria Cristina
-                "REMOVIDO",  # Maria Solange
-                "REMOVIDO",  # Paula
-            ],
-        )
+        super_managers = Usuario.objects.filter(cargo="Gerente", email__in=_SUPER_EMAILS)
         assert super_managers.count() == 4
-
         for manager in super_managers:
             assert gerente_group in manager.groups.all()
 
-        # Verify output warns about multiple managers
         output = out.getvalue()
-        # First manager (Fernanda) should be linked
         assert "Linked" in output or "already linked" in output
 
     def test_generate_username_function(self):
         """Test username generation from names."""
         from apps.dev_tools.management.commands.seed_gerentes import generate_username
 
-        # Test simple name
-        assert generate_username("Fernanda", "Ramos Lopes") == "fernanda.lopes"
-
-        # Test compound first name
-        assert generate_username("Gleice Anne", "Lima de Sousa") == "gleice.sousa"
-
-        # Test with accents
-        assert generate_username("Patrícia", "Lemos de Paiva") == "patricia.paiva"
-
-        # Test with ç
+        assert generate_username("Ana", "Lima Sousa") == "ana.sousa"
+        assert generate_username("Ana Clara", "Lima de Sousa") == "ana.sousa"
+        assert generate_username("Lúcia", "Mota de Araújo") == "lucia.araujo"
         assert generate_username("João", "Conceição") == "joao.conceicao"

@@ -1,7 +1,7 @@
 ---
 title: Deploy & Produção (spec)
 status: canonical
-last_verified: 2026-09-11
+last_verified: 2026-10-16
 verified_at_commit: 0dd1dcb630fdc1cf9b2b488121553e89488dde3c
 sources_of_truth:
   - v2/infra/docker-compose.prod.yml
@@ -212,6 +212,19 @@ HTTPS; repassa `X-Real-IP` e `X-Forwarded-For` com o endereço do cliente; `clie
 `cliente, cliente`. O DRF e `apps.core.utils.net.get_client_ip` leem a 2ª entrada a partir da direita, que é o
 cliente nos dois casos; uma entrada forjada à esquerda continua ignorada. Mudar a quantidade de proxies (CDN,
 segundo proxy) ou o que o NPM repassa exige rever `NUM_PROXIES` **e** o `set_real_ip_from`.
+
+**Proxy confiável (F7 do scan de segurança, 16/10/2026).** O `X-Forwarded-For` só vale quando quem conecta no
+gunicorn (`REMOTE_ADDR`) está em `TRUSTED_PROXY_NETWORKS` (env, lista de CIDRs separada por vírgula; padrão
+`127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16`, as faixas do `set_real_ip_from` do nginx do frontend,
+que conecta pela rede Docker); senão vale o `REMOTE_ADDR`. Com menos de `NUM_PROXIES` entradas vale a mais à
+esquerda, como no `get_ident` do DRF: com 1 entrada (o NPM mandou só o `X-Real-IP`) é a que o nginx anexou, o
+cliente; devolver o `REMOTE_ADDR` juntaria todo mundo no IP do container do nginx (throttle e bloqueio num balde). O
+`ForwardedForConfiavelMiddleware` (primeiro do `MIDDLEWARE`) aplica a mesma regra ao `request.META`, para o throttle
+do DRF (`get_ident`) ver o mesmo IP que o bloqueio de login, a auditoria e os portões de `/metrics` e
+`/healthz/detailed/`. A cadeia NPM → nginx → gunicorn não muda: o par é o nginx (rede Docker) e o cabeçalho chega
+com 2 entradas. Limite: se o acesso direto à porta publicada passar pelo `docker-proxy` (o par vira o gateway da
+rede, faixa privada), o cabeçalho volta a ser aceito; por isso o bind em `127.0.0.1` do #1660 abaixo continua
+pendente de infra.
 
 Como conferir (sem tocar em produção): `docker run --rm -v <nginx.conf>:/etc/nginx/conf.d/default.conf:ro -v
 <security-headers.conf>:/etc/nginx/security-headers.conf:ro nginx:alpine nginx -t`.

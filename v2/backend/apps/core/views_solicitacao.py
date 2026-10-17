@@ -43,6 +43,7 @@ from .rbac.policies import (
     user_has_policy,
 )
 from .serializers import SolicitacaoSerializer
+from .serializers.campos import ListaComTeto
 from .services.solicitacao_approval import (
     approve_solicitacao,
     batch_approve_solicitacoes,
@@ -75,22 +76,19 @@ class _ExtraParticipantsSerializer(serializers.Serializer):
     *_emails estourava `.strip()` (500), listas gigantes não tinham limite, e
     e-mails inválidos viravam guest_email. Aqui cada lista é de tamanho limitado,
     ids são inteiros positivos e e-mails passam por EmailField (normalizados).
+    `ListaComTeto`: o teto vale antes de validar cada item (revisão do F2, scan 16/10/2026).
     """
 
     _MAX = 200
     coordenador_id = serializers.IntegerField(required=False, allow_null=True)
-    formador_ids = serializers.ListField(
+    formador_ids = ListaComTeto(
         child=serializers.IntegerField(min_value=1), required=False, default=list, max_length=_MAX
     )
-    formador_emails = serializers.ListField(
-        child=serializers.EmailField(), required=False, default=list, max_length=_MAX
-    )
-    coord_acompanha_ids = serializers.ListField(
+    formador_emails = ListaComTeto(child=serializers.EmailField(), required=False, default=list, max_length=_MAX)
+    coord_acompanha_ids = ListaComTeto(
         child=serializers.IntegerField(min_value=1), required=False, default=list, max_length=_MAX
     )
-    coord_acompanha_emails = serializers.ListField(
-        child=serializers.EmailField(), required=False, default=list, max_length=_MAX
-    )
+    coord_acompanha_emails = ListaComTeto(child=serializers.EmailField(), required=False, default=list, max_length=_MAX)
 
     _MSG_ACOMPANHANTES_SAIU = (
         "A lista de coordenadores acompanhantes saiu. Coordenador que vai atuar no evento entra na "

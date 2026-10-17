@@ -149,6 +149,24 @@ export default function PerfilPage({ user }: { user: CurrentUser }) {
           </div>
         </Card>
 
+        {/* F1: redefinições da senha por outra pessoa (AuditLog, 30 dias). Ficam mesmo depois da troca. */}
+        {user.redefinicoes_senha && user.redefinicoes_senha.length > 0 && (
+          <Card title={
+            <span>
+              <LockOutlined /> <span id="redefinicoes-senha-titulo">Redefinições da sua senha nos últimos 30 dias</span>
+            </span>
+          }>
+            <ul aria-labelledby="redefinicoes-senha-titulo" className="m-0 pl-5">
+              {user.redefinicoes_senha.map((r, i) => (
+                <li key={`${r.em}-${i}`}>{`${r.por} em ${r.em}`}</li>
+              ))}
+            </ul>
+            <Typography.Text type="secondary">
+              Se você não reconhece alguma delas, avise a administração.
+            </Typography.Text>
+          </Card>
+        )}
+
         <Card title={
           <span>
             <PhoneOutlined /> Atualizar telefone

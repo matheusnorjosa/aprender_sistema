@@ -1,24 +1,24 @@
 """
 Seed gerentes ao grupo função canônico "Gerente" + EquipeGerencia.papel=GERENTE.
 
-Baseado em:
-- Planilha Usuários.xlsx (Cargo="Gerente", Gerência=setor)
-- 7 gerentes identificados, 4 faltam no banco (serão criados)
+A lista de gerentes NÃO mora no código (F5 do scan de segurança, 16/10/2026: CPF, nome e e-mail
+de pessoa real não entram no git). O operador passa um arquivo JSON guardado FORA do repositório:
+
+    [
+      {"first_name": "...", "last_name": "...", "cpf": "<11 dígitos>", "email": "...",
+       "gerencia_setor": "Super"},
+      ...
+    ]
 
 Fonte de verdade do papel hierárquico = Cargo (não participação na agenda).
 
 Usage:
-    python manage.py seed_gerentes --dry-run  # Preview
-    python manage.py seed_gerentes            # Apply
+    python manage.py seed_gerentes --arquivo /caminho/fora/do/git/gerentes.json --dry-run  # Preview
+    python manage.py seed_gerentes --arquivo /caminho/fora/do/git/gerentes.json            # Apply
 
-Mapping (Planilha Gerência → Database Gerencia.nome_setor):
-- "Superintendência" → nome_setor="Super" (SUPERINTENDENCIA)
-- "Vidas" → nome_setor="Vidas" (GERENCIA 2)
-- "Fluir" → nome_setor="Fluir" (GERENCIA 3)
-- "ACerta" → nome_setor="ACerta" (GERENCIA 4)
-- "Brincando" → nome_setor="Brincando" (GERENCIA 5)
-- "Sou da Paz" → nome_setor="Sou da Paz" (GERENCIA 6)
-- "Individual" → nome_setor="Individual" (GERENCIA INDIVIDUAL)
+Mapping (gerencia_setor → Database Gerencia.nome_setor):
+- "Super" (SUPERINTENDENCIA), "Vidas" (GERENCIA 2), "Fluir" (GERENCIA 3), "ACerta" (GERENCIA 4),
+  "Brincando" (GERENCIA 5), "Sou da Paz" (GERENCIA 6), "Individual" (GERENCIA INDIVIDUAL)
 
 Cada gerente recebe:
 - grupo Django função "Gerente" (FUNCAO_GROUPS canônico, não "Gerência")
@@ -26,75 +26,44 @@ Cada gerente recebe:
 - Gerencia.gerente FK (1 gerente principal por gerência)
 
 Gerência ambígua/sem mapping seguro é pulada (skip + warning), sem erro.
+A saída identifica cada conta por u<id>, sem nome, CPF ou e-mail.
 """
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
 from django.contrib.auth.models import Group
-from django.core.management.base import BaseCommand, CommandParser
+from django.core.management.base import BaseCommand, CommandError, CommandParser
 from django.db import transaction
-
-import pandas as pd
 
 from apps.core.models import EquipeGerencia, Gerencia, Usuario
 
-# Managers from Usuários.xlsx (Ativos sheet, cargo="Gerente")
-GERENTES = [
-    {
-        "first_name": "Fernanda",
-        "last_name": "Ramos Lopes",
-        "cpf": "REMOVIDO",  # Pad to 11 digits
-        "email": "REMOVIDO",
-        "gerencia_setor": "Super",  # Maps to SUPERINTENDENCIA
-    },
-    {
-        "first_name": "Gleice Anne",
-        "last_name": "Lima de Sousa",
-        "cpf": "REMOVIDO",
-        "email": "REMOVIDO",
-        "gerencia_setor": "Brincando",  # Maps to GERENCIA 5
-    },
-    {
-        "first_name": "Katy",
-        "last_name": "Araújo e Silva",
-        "cpf": "REMOVIDO",
-        "email": "REMOVIDO",
-        "gerencia_setor": "ACerta",  # Maps to GERENCIA 4
-    },
-    {
-        "first_name": "Maria Cristina",
-        "last_name": "Meaney",
-        "cpf": "REMOVIDO",
-        "email": "REMOVIDO",
-        "gerencia_setor": "Super",  # Maps to SUPERINTENDENCIA
-    },
-    {
-        "first_name": "Maria Solange",
-        "last_name": "de Almeida Cavalcante",
-        "cpf": "REMOVIDO",
-        "email": "REMOVIDO",
-        "gerencia_setor": "Super",  # Maps to SUPERINTENDENCIA
-    },
-    {
-        "first_name": "Patrícia",
-        "last_name": "Lemos de Paiva",
-        "cpf": "REMOVIDO",
-        "email": "REMOVIDO",
-        "gerencia_setor": "Vidas",  # Maps to GERENCIA 2
-    },
-    {
-        "first_name": "Paula",
-        "last_name": "Ferreira Freire",
-        "cpf": "REMOVIDO",
-        "email": "REMOVIDO",
-        "gerencia_setor": "Super",  # Maps to SUPERINTENDENCIA
-    },
-]
+CAMPOS_OBRIGATORIOS = ("first_name", "last_name", "cpf", "email", "gerencia_setor")
+
+
+def carregar_gerentes(caminho: str) -> list[dict[str, str]]:
+    """Lê e valida a lista do arquivo do operador. Erro de leitura ou de formato vira CommandError."""
+    arquivo = Path(caminho)
+    if not arquivo.is_file():
+        raise CommandError("Arquivo da lista de gerentes não encontrado (use --arquivo).")
+    try:
+        dados = json.loads(arquivo.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise CommandError("Arquivo da lista de gerentes não é um JSON legível.") from exc
+    if not isinstance(dados, list):
+        raise CommandError("O arquivo deve trazer uma lista de gerentes.")
+    gerentes: list[dict[str, str]] = []
+    for posicao, item in enumerate(dados, start=1):
+        if not isinstance(item, dict) or any(not isinstance(item.get(c), str) for c in CAMPOS_OBRIGATORIOS):
+            # Só a posição: a mensagem não repete o conteúdo (dado pessoal).
+            raise CommandError(f"Item {posicao} da lista sem um dos campos {', '.join(CAMPOS_OBRIGATORIOS)}.")
+        gerentes.append({c: item[c] for c in CAMPOS_OBRIGATORIOS})
+    return gerentes
 
 
 def generate_username(first_name: str, last_name: str) -> str:
@@ -102,7 +71,7 @@ def generate_username(first_name: str, last_name: str) -> str:
     Generate username from name.
 
     Pattern: firstname.lastname (lowercase, no accents)
-    Example: "REMOVIDO" → "maria.meaney"
+    Example: "Ana Lima Sousa" → "ana.sousa"
     """
     # Take first name and last surname
     first = first_name.split()[0].lower()
@@ -131,17 +100,25 @@ def generate_username(first_name: str, last_name: str) -> str:
 
 
 class Command(BaseCommand):
-    help = "Seed gerentes ao grupo função Gerente + EquipeGerencia.papel=GERENTE"
+    help = "Seed gerentes ao grupo função Gerente + EquipeGerencia.papel=GERENTE (lista em --arquivo)"
 
     def add_arguments(self, parser: CommandParser) -> None:
+        parser.add_argument(
+            "--arquivo",
+            help="JSON com a lista de gerentes, guardado FORA do repositório",
+        )
         parser.add_argument(
             "--dry-run",
             action="store_true",
             help="Preview only, don't commit changes",
         )
 
-    def handle(self, *args: str, **options: dict[str, Any]) -> None:
+    def handle(self, *args: str, **options: Any) -> None:
         dry_run = options.get("dry_run", False)
+        caminho = options.get("arquivo")
+        if not caminho:
+            raise CommandError("Informe a lista de gerentes com --arquivo (JSON fora do repositório).")
+        gerentes = carregar_gerentes(caminho)
 
         if dry_run:
             self.stdout.write(self.style.WARNING("\n🔍 DRY RUN MODE - No changes will be committed\n"))
@@ -166,7 +143,7 @@ class Command(BaseCommand):
             self.stdout.write("  - Group 'Gerente' already exists")
 
         with transaction.atomic():
-            for gerente_data in GERENTES:
+            for gerente_data in gerentes:
                 cpf = gerente_data["cpf"]
                 first_name = gerente_data["first_name"]
                 last_name = gerente_data["last_name"]
@@ -185,30 +162,29 @@ class Command(BaseCommand):
                         "is_active": True,
                     },
                 )
+                conta = f"u{usuario.pk}"
 
                 if created:
                     users_created += 1
-                    self.stdout.write(
-                        self.style.SUCCESS(f"  ✓ Created usuario: {usuario.username} ({first_name} {last_name})")
-                    )
+                    self.stdout.write(self.style.SUCCESS(f"  ✓ Created usuario: {conta}"))
                 else:
                     users_existing += 1
-                    self.stdout.write(f"  - Usuario already exists: {usuario.username} ({first_name} {last_name})")
+                    self.stdout.write(f"  - Usuario already exists: {conta}")
 
                 # 2. Add to canonical função group "Gerente"
                 if not usuario.groups.filter(name="Gerente").exists():
                     usuario.groups.add(gerente_group)
                     group_assignments += 1
-                    self.stdout.write(self.style.SUCCESS(f"    → Added {usuario.username} to group 'Gerente'"))
+                    self.stdout.write(self.style.SUCCESS(f"    → Added {conta} to group 'Gerente'"))
                 else:
-                    self.stdout.write(f"    - {usuario.username} already in group 'Gerente'")
+                    self.stdout.write(f"    - {conta} already in group 'Gerente'")
 
                 # Skip gerência ambígua/sem mapping seguro (sem erro).
                 if not gerencia_setor or gerencia_setor in {"-", "Individual"}:
                     skipped_ambiguous += 1
                     self.stdout.write(
                         self.style.WARNING(
-                            f"    ⚠️  Gerência ambígua para {usuario.username} (setor={gerencia_setor!r}) — "
+                            f"    ⚠️  Gerência ambígua para {conta} (setor={gerencia_setor!r}) — "
                             f"EquipeGerencia/FK pulados (decisão humana)"
                         )
                     )
@@ -238,20 +214,20 @@ class Command(BaseCommand):
                         gerencia_links += 1
                         self.stdout.write(
                             self.style.SUCCESS(
-                                f"    → Linked {usuario.username} as gerente of {gerencia.nome} ({gerencia.nome_setor})"
+                                f"    → Linked {conta} as gerente of {gerencia.nome} ({gerencia.nome_setor})"
                             )
                         )
                     elif gerencia.gerente == usuario:
-                        self.stdout.write(f"    - {usuario.username} already linked to {gerencia.nome}")
+                        self.stdout.write(f"    - {conta} already linked to {gerencia.nome}")
                     else:
                         self.stdout.write(
                             self.style.WARNING(
-                                f"    ⚠️  {gerencia.nome} already has gerente {gerencia.gerente.username}, skipping FK link for {usuario.username}"
+                                f"    ⚠️  {gerencia.nome} already has gerente u{gerencia.gerente.pk}, skipping {conta}"
                             )
                         )
 
                 except Gerencia.DoesNotExist:
-                    error_msg = f"Gerencia with nome_setor='{gerencia_setor}' not found for {usuario.username}"
+                    error_msg = f"Gerencia with nome_setor='{gerencia_setor}' not found for {conta}"
                     errors.append(error_msg)
                     self.stdout.write(self.style.ERROR(f"    ✗ {error_msg}"))
 
@@ -285,7 +261,7 @@ class Command(BaseCommand):
             )
         else:
             self.stdout.write("\n" + "=" * 60)
-            self.stdout.write(self.style.SUCCESS(f"\n✅ {len(GERENTES)} gerentes seeded to group 'Gerente'"))
+            self.stdout.write(self.style.SUCCESS(f"\n✅ {len(gerentes)} gerentes seeded to group 'Gerente'"))
 
             # Verification
             self.stdout.write("\n🔍 Verification:")

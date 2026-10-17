@@ -1,7 +1,7 @@
 ---
 title: dev_tools — Catálogo de Seeds
 status: canonical
-last_verified: 2026-10-14
+last_verified: 2026-10-16
 sources_of_truth:
   - v2/backend/apps/dev_tools/__init__.py
   - v2/backend/apps/dev_tools/apps.py
@@ -59,7 +59,7 @@ O app é **condicional**: só entra em `INSTALLED_APPS` quando `INCLUDE_DEV_TOOL
 | `seed_e2e_users` | **13** usuários (`coord_e2e`, `super_e2e`, `controle_e2e`, `formador_e2e`, `coord_vidas`, `coord_fluir`, `coord_acerta`, `gerente_vidas`, `dat_e2e`, `super_geral`, `approver_03`, `formador_vidas`, `formador_fluir`) + grupos, **2** municípios (Salvador/BA e Fortaleza/CE, para cobrir RD-04), **2** projetos (`TESTE E2E` fluxo SUPER e `TESTE E2E NAO_SUPER` fluxo NAO_SUPER, os dois na gerência Vidas: desde o PR 9 das permissões quem cria precisa atuar na gerência do projeto, e quem cria no E2E é `coord_vidas`), além de `TipoEvento` e das `DATCompra` que liberam os 4 pares (regra da compra, 14/10/2026), gravadas em nome da conta inativa `compras_e2e@test.com`, fora das personas, para que `cleanup_e2e_data` e os testes que apagam personas não esbarrem no `created_by` (PROTECT). Vínculos `EquipeGerencia`: os coords/formadores de setor e, desde o PR B1, `super_e2e`, `super_geral` e `approver_03` como GERENTE na gerência `Super` (`SUPERINTENDENCIA`) — é o vínculo que dá o poder de aprovar. Idempotente. ⚠️ O docstring do comando (`seed_e2e_users.py`) ainda anuncia "4 usuários / 1 município / 1 projeto" — desatualizado. |
 | `seed_frontend_contract_data` | Dados determinísticos do checklist Playwright. Roda `seed_e2e_users` e cria a matriz funcional crítica frontend↔backend (`dat_matrix`, Matrizopolis, a Compra `MATRIX-PEND-001` e o DATCompra "KIT MATRIX CONTRACT"). Para o spec "sem rolagem horizontal" (Programa C), cria também o superusuário `admin_matrix@test.com`, único perfil que abre as rotas cuja policy não tem grupo no seed, e uma linha com texto de 80+ caracteres (prefixo "Aaa", para cair na 1ª página) em cada tabela: pessoa, município (com coordenadas, para a vista Lista do Mapa), projeto, projeto geral, produto, tipo de evento, gerência inativa, grupo, solicitações pendente e aprovada, bloqueio, deslocamento, ação/coordenador/plano/cadastro/registro DAT, ação interna e notificação. Nenhuma dessas linhas aponta para Matrizopolis, `dat_matrix` ou `controle_e2e`, que o teste do seed apaga. Idempotente. |
 | `seed_gerencias` | Seed inicial de gerências (7 registros). |
-| `seed_gerentes` | Vincula gerentes ao grupo função Gerente + `EquipeGerencia.papel=GERENTE`. |
+| `seed_gerentes` | Vincula gerentes ao grupo função Gerente + `EquipeGerencia.papel=GERENTE`. A lista vem de um JSON do operador guardado **fora do git** (`--arquivo`; sem ele, `CommandError`); a saída identifica as contas por `u<id>`. Desde 16/10/2026 (F5 do scan de segurança) o código não traz CPF, nome nem e-mail de pessoa real. |
 | `seed_produtos` | Seed inicial dos principais produtos. |
 | `seed_tipos_evento` | `TipoEvento` com os tipos padrão. Idempotente. |
 | `seed_projetos_fluxo_from_csv` | Popula `Projeto.fluxo` a partir de CSV. Idempotente. |
@@ -97,7 +97,7 @@ Em CI o E2E roda com `INCLUDE_DEV_TOOLS=true` + `DEBUG_E2E=true` (ver `.github/w
 
 ## Fluxos principais
 
-1. **Bootstrap de dev** (caminho feliz): `make up` → aplica migrações → roda a sequência canônica de seeds (`seed_rbac` antes de tudo, depois masters como `seed_gerencias`/`seed_produtos`/`seed_tipos_evento`, vínculos `seed_gerentes`/`link_projetos_gerencias`, e fixos como `fix_projetos_gerencia`). Idempotente: re-rodar não duplica.
+1. **Bootstrap de dev** (caminho feliz): `make up` → aplica migrações → roda a sequência canônica de seeds (`seed_rbac` antes de tudo, depois masters como `seed_gerencias`/`seed_produtos`/`seed_tipos_evento`, vínculos `seed_gerentes --arquivo <json fora do git>`/`link_projetos_gerencias`, e fixos como `fix_projetos_gerencia`). Idempotente: re-rodar não duplica.
 2. **E2E (Playwright)**: `seed_rbac` → `seed_e2e_users` (ou `seed_frontend_contract_data` para a matriz de contrato) → suíte roda → `cleanup_e2e_data` remove o que `seed_e2e_users` criou.
 3. **Backfill pontual**: `migrate_rbac_groups` / `backfill_is_online` / `populate_municipio_coords` rodam uma vez para corrigir/preencher dados existentes.
 4. **Erro esperado em prod**: com `INCLUDE_DEV_TOOLS=false`, `manage.py seed_rbac` falha com "Unknown command" — o app não está em `INSTALLED_APPS`. Esse é o comportamento desejado (CP-08).

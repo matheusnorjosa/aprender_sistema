@@ -36,6 +36,7 @@ import { useUnreadNotificationsPolling } from './hooks/useUnreadNotificationsPol
 import useSessionMonitor from './hooks/useSessionMonitor';
 import SessionExpiryWarning from './components/SessionExpiryWarning';
 import type { CurrentUser } from './types';
+import type { AvisoSenhaRedefinida } from './types/usuario';
 import './App.css';
 
 const LoginPage = lazy(() => import('./pages/Auth/LoginPage'));
@@ -84,6 +85,9 @@ function AppContent(): JSX.Element {
   // troca. `user` fica nulo para nenhum hook (policies, polling, monitor) pedir o que o
   // servidor recusaria; a tela de troca ocupa o lugar do sistema.
   const [trocaPendente, setTrocaPendente] = useState(false);
+  // F1: quem redefiniu a senha e quando (mostrado na tela de troca obrigatória).
+  const [avisoSenha, setAvisoSenha] = useState<AvisoSenhaRedefinida | null>(null);
+  const [redefinicoesSenha, setRedefinicoesSenha] = useState<AvisoSenhaRedefinida[]>([]);
   const isMountedRef = useRef(true);
 
   // ── Mobile responsiveness ──
@@ -114,6 +118,8 @@ function AppContent(): JSX.Element {
       if (!isMountedRef.current) return;
       if (userData.deve_trocar_senha === true) {
         setTrocaPendente(true);
+        setAvisoSenha(userData.aviso_senha_redefinida ?? null);
+        setRedefinicoesSenha(userData.redefinicoes_senha ?? []);
         setUser(null);
         setPolicies([]);
         return;
@@ -311,6 +317,8 @@ function AppContent(): JSX.Element {
       <ConfigProvider locale={ptBR} theme={antThemeConfig}>
         <Suspense fallback={<FullscreenLoader />}>
           <TrocaSenhaObrigatoriaPage
+            aviso={avisoSenha}
+            redefinicoes={redefinicoesSenha}
             onConcluida={loadUser}
             onSair={handleLogout}
             onSessaoEncerrada={() => handleSessaoEncerrada(AVISO_SESSAO_EXPIRADA)}

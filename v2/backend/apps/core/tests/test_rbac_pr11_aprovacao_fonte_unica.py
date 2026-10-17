@@ -36,6 +36,7 @@ from apps.core.rbac.policies import (
     solicitation_approval_basis,
     solicitation_approval_basis_for,
 )
+from apps.core.services.equipe_gerencia import setor_group_for
 from apps.core.services.functional_permissions_seed import FUNCTIONAL_PERMISSIONS_SEED
 from apps.core.services.rbac_pacotes import PACOTE
 from apps.core.tests.factories import (
@@ -305,3 +306,12 @@ def test_gerente_g1_e_equipe_no_controle_fora_do_escopo_decide_como_capacidade(g
     assert solicitation_approval_basis(user) == "gerente_superintendencia"
     assert solicitation_approval_basis_for(user, fora) == "capacidade_aprovar"
     assert aprovadora_restrita_a_superintendencia(user) is False
+
+
+@pytest.mark.parametrize("com_capacidade", [False, True])
+@pytest.mark.parametrize("setor", ["Superintendência", "Controle"])
+def test_setor_group_for_recusa_setor_reservado(setor, com_capacidade):
+    """Guarda `SETORES_RESERVADOS` (1.4): sem ela, o grupo Controle sairia de quem é transferido de gerência."""
+    GroupFactory(name=setor)
+    gerencia = Gerencia.objects.create(nome=f"RESERVADO {setor} PR11", nome_setor=setor, setor_canonico=setor)
+    assert setor_group_for(gerencia, com_capacidade=com_capacidade) is None

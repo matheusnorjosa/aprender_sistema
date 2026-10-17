@@ -55,6 +55,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
     com_papel,
     liberar_par,
 )
@@ -133,7 +134,10 @@ def _gerente_g1(g1: Gerencia) -> Usuario:
 
 
 def _par_controle() -> Usuario:
-    return UsuarioFactory(groups=["Controle", "Assistente Administrativo"], groups__vinculo=False)
+    """Perfil da u7: o par de grupos e, desde o PR 11, o vínculo EQUIPE no Controle (que é o que aprova)."""
+    user = UsuarioFactory(groups=["Controle", "Assistente Administrativo"], groups__vinculo=False)
+    com_pacote_do_controle(user)
+    return user
 
 
 def _pendente_super(g1: Gerencia, autor: Usuario | None = None, **extra: Any) -> Solicitacao:
@@ -283,11 +287,12 @@ class TestAprovacaoDoDat:
         assert resp.data["errors"][0]["code"] == SELF
 
     def test_bases_existentes_inalteradas(self, g1, root):
+        """PR 11: as bases por grupo saíram; o Controle aprova pela capacidade, como o DAT."""
         legado = UsuarioFactory(groups=["Superintendência", "Gerente"], groups__vinculo=False)
         assert solicitation_approval_basis(root) == "superuser"
         assert solicitation_approval_basis(_gerente_g1(g1)) == "gerente_superintendencia"
-        assert solicitation_approval_basis(_par_controle()) == "asst_admin_controle"
-        assert solicitation_approval_basis(legado) == "grupo_superintendencia_gerente"
+        assert solicitation_approval_basis(_par_controle()) == "capacidade_aprovar"
+        assert solicitation_approval_basis(legado) is None
 
     def test_gerente_g1_e_dat_fora_do_escopo_decide_como_capacidade_aprovar(self, g19, g1):
         user = _gerente_g1(g1)

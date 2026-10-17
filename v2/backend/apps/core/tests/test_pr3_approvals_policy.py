@@ -1,6 +1,7 @@
 """
 PR 3 hardening RBAC (2026-04-29): matriz consolidada para a Policy
-`access_solicitation_approvals` (composite Setor × Função).
+`access_solicitation_approvals`. Desde o PR 11 (17/10/2026), nenhum grupo aprova: o Controle aprova
+pelo vínculo EQUIPE/GERENTE na gerência CONTROLE (pacote do perfil), como o DAT.
 
 Endpoints cobertos:
 - POST /api/solicitacoes/{id}/approve/
@@ -8,12 +9,12 @@ Endpoints cobertos:
 - POST /api/solicitacoes/batch-approve/
 - POST /api/solicitacoes/batch-reject/
 
-Regra de negócio (D-1..D-4):
-- ✅ Gerente da Superintendência (Setor "Superintendência" + Função "Gerente")
-- ✅ Assistente Administrativo do Controle (Setor "Controle" + Função
-  "Assistente Administrativo")
+Regra de negócio (PR 11):
+- ✅ quem trabalha no Controle (vínculo EQUIPE na gerência CONTROLE), com ou sem os grupos
+- ❌ par Controle + Assistente Administrativo sem o vínculo (PR 11: grupo não aprova)
+- ❌ par Superintendência + Gerente sem GERENTE na Superintendência (PR 11: grupo não aprova)
 - ❌ Gerente pedagógico (Função "Gerente" sem Setor "Superintendência")
-- ❌ Controle puro (sem Função "Assistente Administrativo")
+- ❌ Controle puro (sem vínculo)
 - ❌ Assistente Administrativo fora do Controle
 - ❌ grupo DAT sem vínculo, Coordenador, Apoio, Formador, Diretoria (desde o PR 10 o DAT aprova pelo
   vínculo EQUIPE/GERENTE na gerência DAT, não pelo grupo: `test_rbac_pr10_dat_admin_operacional.py`)
@@ -39,6 +40,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
 )
 
 pytestmark = pytest.mark.django_db
@@ -56,6 +58,13 @@ def _user_in_groups(*group_names: str, label: str = "user") -> Usuario:
         cpf=cpf,
         groups=list(group_names),
     )
+
+
+def _aprovador(*group_names: str, label: str = "user") -> Usuario:
+    """PR 11: aprova pelo vínculo EQUIPE na gerência CONTROLE (os grupos, se houver, não contam)."""
+    user = _user_in_groups(*group_names, label=label)
+    com_pacote_do_controle(user)
+    return user
 
 
 @pytest.fixture
@@ -90,7 +99,7 @@ def pendente_solicitacao() -> Solicitacao:
 
 
 ALLOWED_PERSONAS: list[tuple[str, tuple[str, ...]]] = [
-    ("gerente_super", ("Superintendência", "Gerente")),
+    ("equipe_controle", ()),
     ("asst_admin_controle", ("Controle", "Assistente Administrativo")),
 ]
 
@@ -98,7 +107,7 @@ ALLOWED_PERSONAS: list[tuple[str, tuple[str, ...]]] = [
 @pytest.mark.parametrize("persona", ALLOWED_PERSONAS, ids=[p[0] for p in ALLOWED_PERSONAS])
 def test_allowed_personas_can_approve_individual(persona, pendente_solicitacao):
     label, group_names = persona
-    user = _user_in_groups(*group_names, label=label)
+    user = _aprovador(*group_names, label=label)
 
     client = APIClient()
     client.force_authenticate(user=user)
@@ -114,7 +123,7 @@ def test_allowed_personas_can_approve_individual(persona, pendente_solicitacao):
 @pytest.mark.parametrize("persona", ALLOWED_PERSONAS, ids=[p[0] for p in ALLOWED_PERSONAS])
 def test_allowed_personas_can_reject_individual(persona, pendente_solicitacao):
     label, group_names = persona
-    user = _user_in_groups(*group_names, label=label)
+    user = _aprovador(*group_names, label=label)
 
     client = APIClient()
     client.force_authenticate(user=user)
@@ -128,7 +137,7 @@ def test_allowed_personas_can_reject_individual(persona, pendente_solicitacao):
 @pytest.mark.parametrize("persona", ALLOWED_PERSONAS, ids=[p[0] for p in ALLOWED_PERSONAS])
 def test_allowed_personas_can_batch_approve(persona, pendente_solicitacao):
     label, group_names = persona
-    user = _user_in_groups(*group_names, label=label)
+    user = _aprovador(*group_names, label=label)
 
     client = APIClient()
     client.force_authenticate(user=user)
@@ -142,7 +151,7 @@ def test_allowed_personas_can_batch_approve(persona, pendente_solicitacao):
 @pytest.mark.parametrize("persona", ALLOWED_PERSONAS, ids=[p[0] for p in ALLOWED_PERSONAS])
 def test_allowed_personas_can_batch_reject(persona, pendente_solicitacao):
     label, group_names = persona
-    user = _user_in_groups(*group_names, label=label)
+    user = _aprovador(*group_names, label=label)
 
     client = APIClient()
     client.force_authenticate(user=user)
@@ -163,6 +172,9 @@ def test_allowed_personas_can_batch_reject(persona, pendente_solicitacao):
 
 
 FORBIDDEN_PERSONAS: list[tuple[str, tuple[str, ...]]] = [
+    # PR 11: grupo não aprova; os pares sem o vínculo deixaram de aprovar.
+    ("par_controle_sem_vinculo", ("Controle", "Assistente Administrativo")),
+    ("par_legado_sem_vinculo", ("Superintendência", "Gerente")),
     ("controle_puro", ("Controle",)),
     ("asst_admin_sem_controle", ("Vidas", "Assistente Administrativo")),
     ("gerente_pedagogico", ("Vidas", "Gerente")),
@@ -260,12 +272,14 @@ def test_anonymous_blocked_on_approve(pendente_solicitacao):
 
 
 PUBLIC_POLICY_PERSONAS_HAS: list[tuple[str, tuple[str, ...]]] = [
-    ("gerente_super_policy", ("Superintendência", "Gerente")),
+    ("equipe_controle_policy", ()),
     ("asst_admin_controle_policy", ("Controle", "Assistente Administrativo")),
 ]
 
 
 PUBLIC_POLICY_PERSONAS_HAS_NOT: list[tuple[str, tuple[str, ...]]] = [
+    ("par_controle_sem_vinculo_policy", ("Controle", "Assistente Administrativo")),
+    ("par_legado_sem_vinculo_policy", ("Superintendência", "Gerente")),
     ("controle_puro_policy", ("Controle",)),
     ("dat_policy", ("DAT",)),
     ("gerente_pedagogico_policy", ("Vidas", "Gerente")),
@@ -275,7 +289,7 @@ PUBLIC_POLICY_PERSONAS_HAS_NOT: list[tuple[str, tuple[str, ...]]] = [
 @pytest.mark.parametrize("persona", PUBLIC_POLICY_PERSONAS_HAS, ids=[p[0] for p in PUBLIC_POLICY_PERSONAS_HAS])
 def test_me_policies_exposes_access_solicitation_approvals(persona):
     label, group_names = persona
-    user = _user_in_groups(*group_names, label=label)
+    user = _aprovador(*group_names, label=label)
     client = APIClient()
     client.force_authenticate(user=user)
     response = client.get(reverse("core:me-policies"))

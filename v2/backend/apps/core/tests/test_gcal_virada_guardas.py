@@ -327,7 +327,7 @@ def test_insert_sem_a_coluna_nasce_false_pelo_default_do_banco():
         lista = ", ".join(connection.ops.quote_name(c) for c in colunas)
         tabela = connection.ops.quote_name(Solicitacao._meta.db_table)
         cursor.execute(
-            f"INSERT INTO {tabela} ({lista}) SELECT {lista} FROM {tabela} WHERE id = %s RETURNING id",  # noqa: S608
+            f"INSERT INTO {tabela} ({lista}) SELECT {lista} FROM {tabela} WHERE id = %s RETURNING id",  # noqa: S608  # nosec B608 (nomes da introspecção; valor parametrizado)
             [base.pk],
         )
         linha = cursor.fetchone()

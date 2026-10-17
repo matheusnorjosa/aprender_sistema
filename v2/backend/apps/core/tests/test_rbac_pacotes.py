@@ -3,8 +3,9 @@ PR A da arquitetura de permissões (ADR-020): pacote de capacidades por perfil d
 
 `services/rbac_pacotes.py` só tem constantes e nada lê o pacote ainda (a fórmula da união é o
 PR B). Estes testes travam a tabela: todo perfil tem linha explícita, capacidade técnica nunca
-entra em pacote, PADRAO e APROVACAO são vazios e o pacote está contido no grupo de setor do seed,
-para que o PR B não dê poder novo a ninguém.
+entra em pacote, PADRAO e APROVACAO são vazios e o pacote DIRETORIA está contido no grupo de setor do
+seed, para que o PR B não dê poder novo a ninguém. ADMIN_OPERACIONAL (PR 10) e CONTROLE (PR 11) são
+pacotes finais: a invariante deles é a inversa (grupo do seed ⊆ pacote).
 """
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false
@@ -53,16 +54,23 @@ def test_codenames_do_pacote_existem_no_seed():
 def test_pacote_contido_no_grupo_do_seed():
     """Limite: compara constante com constante. A prova contra o banco é o ensaio do PR 5.
 
-    O ADMIN_OPERACIONAL saiu daqui no PR 10: é o pacote final, maior que o grupo DAT. A invariante dele
-    é a do PR 12 (`test_grupo_dat_menos_tecnicas_contido_no_pacote`).
+    O ADMIN_OPERACIONAL saiu daqui no PR 10 e o CONTROLE no PR 11: são pacotes finais, maiores que o
+    grupo. A invariante deles é a do PR 12 (`test_grupo_dat_menos_tecnicas_contido_no_pacote` e
+    `test_grupo_controle_contido_no_pacote`). Nunca pôr `approve_solicitation` no grupo Controle do
+    seed para fechar esta conta: daria aprovação global a todo membro do grupo.
     """
     grupo_do_perfil = {
-        Gerencia.Perfil.CONTROLE: "Controle",
         Gerencia.Perfil.DIRETORIA: "Diretoria",
     }
     for perfil, grupo in grupo_do_perfil.items():
         for codename in PACOTE[perfil]:
             assert grupo in _grupos_do_seed(codename), (perfil, codename)
+
+
+def test_grupo_controle_contido_no_pacote():
+    """Invariante do PR 12 (PR 11): quando o grupo deixar de contar, o Controle não perde nada."""
+    do_grupo = {item.codename for item in FUNCTIONAL_PERMISSIONS_SEED if "Controle" in item.group_names}
+    assert do_grupo - TECNICAS <= PACOTE[Gerencia.Perfil.CONTROLE]
 
 
 def test_papeis_com_pacote_sao_equipe_e_gerente():

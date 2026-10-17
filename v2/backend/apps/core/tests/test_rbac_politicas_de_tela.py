@@ -302,6 +302,8 @@ class TestRbacDiffDoDeploy:
 
 # Telas que o pacote final do PR 10 abre ao DAT e o grupo DAT sozinho não abre.
 PR10_TELAS_DO_DAT = {"access_solicitation_approvals", "create_solicitation", "access_controle_section"}
+# PR 11 (D1): o pacote CONTROLE aprova; o grupo Controle sozinho não.
+PR11_TELAS_DO_CONTROLE = {"access_solicitation_approvals"}
 
 
 class TestPersonasPorPacote:
@@ -317,7 +319,8 @@ class TestPersonasPorPacote:
         _, do_grupo = _me(UsuarioFactory(groups=ACTOR_GROUPS[ator]))
         assert set(COMPOSTAS) <= set(da_persona), "Grade, Bloqueios e Deslocamentos vêm pela policy"
         # PR 10: o pacote do DAT é o final; o grupo DAT sozinho não aprova, não cria nem abre o Controle.
-        a_mais = PR10_TELAS_DO_DAT if ator == "DAT" else set()
+        # PR 11: o pacote do Controle aprova; o grupo Controle sozinho não.
+        a_mais = PR10_TELAS_DO_DAT if ator == "DAT" else PR11_TELAS_DO_CONTROLE
         assert set(da_persona) & CHAVES_DE_TELA == (set(do_grupo) & CHAVES_DE_TELA) | a_mais
 
     def test_ana_nao_herda_o_que_e_tecnico(self):

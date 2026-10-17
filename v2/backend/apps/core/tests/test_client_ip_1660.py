@@ -168,3 +168,93 @@ def test_no_raw_xff_read_outside_net_module():
             if "HTTP_X_FORWARDED_FOR" in py.read_text(encoding="utf-8", errors="ignore"):
                 offenders.append(rel)
     assert offenders == [], f"raw X-Forwarded-For read outside net.py: {offenders}"
+
+
+# --- F7 (scan 16/10/2026): XFF só vale vindo de proxy confiável e com entradas suficientes ------
+
+
+@override_settings(NUM_PROXIES=2)
+def test_peer_publico_ignora_xff():
+    """Quem conecta direto no gunicorn (peer público) não escolhe o IP pelo cabeçalho."""
+    assert get_client_ip(_req(xff="127.0.0.1", remote_addr="8.8.4.4")) == "8.8.4.4"
+    assert get_client_ip(_req(xff="127.0.0.1, 10.0.0.1", remote_addr="8.8.4.4")) == "8.8.4.4"
+
+
+@override_settings(NUM_PROXIES=2)
+def test_cadeia_de_uma_entrada_vinda_do_nginx_usa_a_entrada():
+    """Revisão do F7: se o NPM mandar só o X-Real-IP, o XFF chega com 1 entrada, a que o nginx do
+    frontend anexou (o cliente, já resolvido pelo realip). Devolver o REMOTE_ADDR juntaria todo mundo
+    no IP do container do nginx (throttle e bloqueio de login num balde só). Mesma regra do DRF
+    (`addrs[-min(NUM_PROXIES, len)]`), que vale desde antes do F7."""
+    assert get_client_ip(_req(xff="203.0.113.9", remote_addr="172.18.0.5")) == "203.0.113.9"
+
+
+@override_settings(NUM_PROXIES=2)
+def test_cadeia_de_uma_entrada_middleware_e_throttle_veem_o_mesmo_ip():
+    from django.http import HttpResponse
+    from rest_framework.throttling import AnonRateThrottle
+
+    from apps.core.middleware import ForwardedForConfiavelMiddleware
+
+    req = _req(xff="203.0.113.9", remote_addr="172.18.0.5")
+    ForwardedForConfiavelMiddleware(lambda _r: HttpResponse())(req)
+    assert AnonRateThrottle().get_ident(req) == get_client_ip(req) == "203.0.113.9"
+
+
+@override_settings(NUM_PROXIES=2, TRUSTED_PROXY_NETWORKS=["10.9.0.0/16"])
+def test_redes_confiaveis_configuraveis():
+    assert get_client_ip(_req(xff="203.0.113.50, 172.16.0.1", remote_addr="172.16.0.2")) == "172.16.0.2"
+    assert get_client_ip(_req(xff="203.0.113.50, 172.16.0.1", remote_addr="10.9.3.4")) == "203.0.113.50"
+
+
+@override_settings(NUM_PROXIES=None)
+def test_legado_none_tambem_exige_proxy_confiavel():
+    assert get_client_ip(_req(xff="1.2.3.4, 203.0.113.50", remote_addr="8.8.4.4")) == "8.8.4.4"
+
+
+def test_redes_padrao_cobrem_a_cadeia_docker_de_producao():
+    """O nginx do frontend conecta no gunicorn pela rede Docker (faixa privada): continua confiável."""
+    from django.conf import settings
+
+    assert {"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8"} <= set(settings.TRUSTED_PROXY_NETWORKS)
+
+
+@override_settings(NUM_PROXIES=2)
+def test_metrics_gate_recusa_xff_forjado_de_peer_publico():
+    resp = Client().get("/metrics", REMOTE_ADDR="8.8.4.4", HTTP_X_FORWARDED_FOR="127.0.0.1")
+    assert resp.status_code == 403
+
+
+@override_settings(NUM_PROXIES=2)
+def test_healthz_detailed_recusa_xff_forjado_de_peer_publico():
+    resp = Client().get("/healthz/detailed/", REMOTE_ADDR="8.8.4.4", HTTP_X_FORWARDED_FOR="10.0.0.1, 127.0.0.1")
+    assert resp.status_code == 403
+
+
+@override_settings(NUM_PROXIES=2)
+def test_middleware_tira_xff_nao_confiavel_e_o_throttle_ve_o_peer():
+    """O throttle do DRF lê o cabeçalho sozinho (`get_ident`); o middleware tira o XFF não confiável
+    antes, para throttle, bloqueio de login e auditoria verem o mesmo IP."""
+    from django.http import HttpResponse
+    from rest_framework.throttling import AnonRateThrottle
+
+    from apps.core.middleware import ForwardedForConfiavelMiddleware
+
+    req = _req(xff="1.2.3.4, 5.6.7.8", remote_addr="8.8.4.4")
+    ForwardedForConfiavelMiddleware(lambda _r: HttpResponse())(req)
+    assert "HTTP_X_FORWARDED_FOR" not in req.META
+    assert AnonRateThrottle().get_ident(req) == "8.8.4.4"
+
+    confiavel = _req(xff="203.0.113.50, 172.16.0.1", remote_addr="172.16.0.2")
+    ForwardedForConfiavelMiddleware(lambda _r: HttpResponse())(confiavel)
+    assert AnonRateThrottle().get_ident(confiavel) == "203.0.113.50"
+
+
+def test_middleware_de_xff_vem_antes_dos_middlewares_do_app():
+    """Primeiro da lista base (em dev, debug-toolbar e FreezeTime entram na frente e não leem IP)."""
+    from django.conf import settings
+
+    middlewares = list(settings.MIDDLEWARE)
+    nosso = middlewares.index("apps.core.middleware.ForwardedForConfiavelMiddleware")
+    assert nosso < middlewares.index("django_prometheus.middleware.PrometheusBeforeMiddleware")
+    assert nosso < middlewares.index("django.contrib.auth.middleware.AuthenticationMiddleware")

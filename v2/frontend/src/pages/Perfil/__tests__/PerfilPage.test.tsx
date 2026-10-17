@@ -21,11 +21,11 @@ import type { CurrentUser } from '../../../types/usuario';
 function makeUser(overrides: Partial<CurrentUser> = {}): CurrentUser {
   return {
     id: 1,
-    username: '04944374305',
-    email: 'coord@aprendereditora.com.br',
-    first_name: 'Amanda',
-    last_name: 'Rodrigues',
-    name: 'Amanda Rodrigues',
+    username: '12345678900',
+    email: 'pessoa.teste@example.invalid',
+    first_name: 'Pessoa',
+    last_name: 'Teste',
+    name: 'Pessoa Teste',
     groups: ['Coordenador'],
     setores: ['Vidas'],
     funcoes: ['Coordenador'],
@@ -49,6 +49,29 @@ function renderPage(user: CurrentUser = makeUser()) {
 function fill(placeholder: string, value: string) {
   fireEvent.change(screen.getByPlaceholderText(placeholder), { target: { value } });
 }
+
+describe('PerfilPage — redefinições da senha por outra pessoa (F1)', () => {
+  test('lista as redefinições dos últimos 30 dias', () => {
+    renderPage(
+      makeUser({
+        redefinicoes_senha: [
+          { por: 'Outra Pessoa', em: '16/10/2026' },
+          { por: 'Pessoa Do Dat', em: '15/10/2026' },
+        ],
+      }),
+    );
+
+    const lista = screen.getByRole('list', { name: 'Redefinições da sua senha nos últimos 30 dias' });
+    expect(lista).toHaveTextContent('Outra Pessoa em 16/10/2026');
+    expect(lista).toHaveTextContent('Pessoa Do Dat em 15/10/2026');
+  });
+
+  test('sem redefinições, não mostra a seção', () => {
+    renderPage(makeUser({ redefinicoes_senha: [] }));
+
+    expect(screen.queryByRole('list', { name: /Redefinições da sua senha/ })).not.toBeInTheDocument();
+  });
+});
 
 describe('PerfilPage', () => {
   beforeEach(() => {
@@ -78,10 +101,10 @@ describe('PerfilPage', () => {
 
   test('mostra os dados do usuário com CPF mascarado', async () => {
     renderPage();
-    expect(await screen.findByText('Amanda Rodrigues')).toBeInTheDocument();
+    expect(await screen.findByText('Pessoa Teste')).toBeInTheDocument();
     // CPF mascarado (LGPD): 3 primeiros + 2 últimos.
-    expect(screen.getByText('049.***.***-05')).toBeInTheDocument();
-    expect(screen.getByText('coord@aprendereditora.com.br')).toBeInTheDocument();
+    expect(screen.getByText('123.***.***-00')).toBeInTheDocument();
+    expect(screen.getByText('pessoa.teste@example.invalid')).toBeInTheDocument();
   });
 
   test('PR A: o setor vem do vínculo (me.gerencias, nome de tela), não do grupo', async () => {
@@ -100,7 +123,7 @@ describe('PerfilPage', () => {
   test('mascara o CPF do campo cpf (não do username) e mostra telefone/cargo', async () => {
     renderPage(
       makeUser({
-        username: 'amanda.rodrigues', // username != cpf
+        username: 'pessoa.teste', // username != cpf
         cpf: '11144477735',
         telefone: '(85) 98888-1111',
         cargo: 'Coordenadora',

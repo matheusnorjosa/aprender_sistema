@@ -2,6 +2,7 @@
 Middleware para AS v2.
 
 Inclui:
+- ForwardedForConfiavelMiddleware: tira o X-Forwarded-For que não veio de proxy confiável (F7)
 - RequestIDMiddleware: Adiciona correlation ID (request_id) único por requisição
 - APIv1DeprecationMiddleware: Adds deprecation headers to /api/v1/ requests (#793)
 - TrocaDeSenhaObrigatoriaMiddleware: com `Usuario.deve_trocar_senha` ligado, só a troca de
@@ -16,7 +17,26 @@ from typing import Any, Callable
 
 from django.http import HttpRequest, HttpResponse, JsonResponse
 
+from apps.core.utils.net import descartar_xff_nao_confiavel
+
 logger = logging.getLogger(__name__)
+
+
+class ForwardedForConfiavelMiddleware:
+    """
+    F7 (scan 16/10/2026): ponto único da regra de confiança no X-Forwarded-For.
+
+    `get_client_ip` já ignora o cabeçalho que não veio de proxy confiável, mas o throttle do DRF
+    (`get_ident`) lê o `request.META` por conta própria. Tirar o cabeçalho aqui, antes de tudo, faz
+    throttle, bloqueio de login e auditoria verem o mesmo IP. Primeiro da lista `MIDDLEWARE`.
+    """
+
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> HttpResponse:
+        descartar_xff_nao_confiavel(request.META)
+        return self.get_response(request)
 
 
 class RequestIDMiddleware:

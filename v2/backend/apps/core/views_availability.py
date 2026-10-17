@@ -25,6 +25,27 @@ from .models import AuditLog, AvailabilityBlock, EquipeGerencia, Municipio, Usua
 from .permissions import HasPerm
 from .serializers import AvailabilityBlockSerializer
 from .services.availability_service import check_conflicts, check_conflicts_uncached
+from .services.solicitacao_scope import scope_usuarios_por_gerencia, user_is_solicitacao_global
+
+# F3 (scan 16/10/2026): o check-many roda ~5 consultas sem cache por pessoa; o assistente manda os
+# participantes de UM evento. Acima disso é abuso (a lista crua prendia o worker por minutos).
+MAX_USUARIOS_CHECK_MANY = 50
+
+
+def _ids_da_lista(bruto: object) -> list[int] | None:
+    """`usuarios_ids` como lista de inteiros positivos sem repetição; None se a forma não serve.
+
+    Recusa (None): não-lista, lista vazia, mais de `MAX_USUARIOS_CHECK_MANY` itens (contados ANTES de
+    tirar a repetição) e item que não é inteiro positivo (texto, número quebrado, booleano).
+    """
+    if not isinstance(bruto, list) or not bruto or len(bruto) > MAX_USUARIOS_CHECK_MANY:
+        return None
+    ids: list[int] = []
+    for item in bruto:
+        if isinstance(item, bool) or not isinstance(item, int) or item < 1:
+            return None
+        ids.append(item)
+    return list(dict.fromkeys(ids))
 
 
 def is_privileged_user(user):
@@ -82,6 +103,25 @@ def can_check_availability_for_others(user):
         "create_solicitation",
         "approve_solicitation",
     )
+
+
+def _alvos_no_escopo(user: Any, ids: list[int]) -> set[int]:
+    """Dos `ids`, as pessoas cuja agenda `user` pode consultar no /check/ e no /check-many/.
+
+    F4 (scan 16/10/2026), mesma regra do PR 9 (P9-1) para bloqueios e eventos de colegas:
+    - global (`user_is_solicitacao_global`: superusuário, Superintendência, Controle, DAT) ou
+      `view_all_availability` → todos;
+    - demais (G/C/A pelo papel) → a si e quem tem vínculo vigente ≠ EQUIPE nas gerências onde `user`
+      tem papel G/C/A (`scope_usuarios_por_gerencia`, o mesmo filtro do seletor de pessoas do assistente,
+      então o assistente nunca manda alguém de fora).
+    Quem fica de fora é tratado como inexistente pelo chamador (sem oráculo de existência).
+    """
+    if user_is_solicitacao_global(user) or is_privileged_user(user):
+        return set(ids)
+    alcance = set(scope_usuarios_por_gerencia(Usuario.objects.filter(pk__in=ids), user).values_list("pk", flat=True))
+    if user.pk in ids:
+        alcance.add(user.pk)
+    return alcance
 
 
 class AvailabilityBlockViewSet(viewsets.ModelViewSet):
@@ -369,9 +409,11 @@ class AvailabilityCheckView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        try:
-            usuario = Usuario.objects.get(pk=usuario_id)
-        except Usuario.DoesNotExist:
+        # F4: fora do escopo responde como inexistente (404), igual ao /availability-blocks/.
+        usuario = (
+            Usuario.objects.filter(pk=usuario_id).first() if _alvos_no_escopo(request.user, [usuario_id]) else None
+        )
+        if usuario is None:
             return Response(
                 {"detail": "Usuário não encontrado."},
                 status=status.HTTP_404_NOT_FOUND,
@@ -475,10 +517,14 @@ class AvailabilityCheckManyView(APIView):
     throttle_scope = "availability_check"
 
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        usuarios_ids = request.data.get("usuarios_ids", [])
-        if not usuarios_ids or not isinstance(usuarios_ids, list):
+        usuarios_ids = _ids_da_lista(request.data.get("usuarios_ids"))
+        if usuarios_ids is None:
             return Response(
-                {"detail": "usuarios_ids deve ser uma lista não-vazia."},
+                {
+                    "detail": (
+                        f"usuarios_ids deve ser uma lista não-vazia de até {MAX_USUARIOS_CHECK_MANY} ids inteiros."
+                    )
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -533,11 +579,12 @@ class AvailabilityCheckManyView(APIView):
 
         results = []
         all_ok = True
+        # F4: quem está fora do escopo volta como "Usuário não encontrado", igual a id inexistente.
+        usuarios_por_id = Usuario.objects.in_bulk(sorted(_alvos_no_escopo(request.user, usuarios_ids)))
 
         for usuario_id in usuarios_ids:
-            try:
-                usuario = Usuario.objects.get(pk=usuario_id)
-            except Usuario.DoesNotExist:
+            usuario = usuarios_por_id.get(usuario_id)
+            if usuario is None:
                 results.append(
                     {
                         "usuario_id": usuario_id,

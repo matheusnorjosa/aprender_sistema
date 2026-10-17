@@ -127,7 +127,7 @@ RBAC_MATRIX_EXEMPT_PREFIXES: dict[str, str] = {
     "/api/dashboard/": "Dashboards auxiliares — cobertura específica",
     # ── Misc ─────────────────────────────────────────────────────────────
     "/api/availability/check": "Availability checking — cobertura via test_availability_*",
-    "/api/solicitacoes/validate/": "Validation endpoint — IsAuthenticated por design",
+    "/api/solicitacoes/validate/": "Validation endpoint — gate do UsuarioLookup; cobertura em test_seguranca_validate_participantes.py",
     "/api/rbac/meta/": "RBAC metadata — admin tooling, cobertura via test_admin_api.py",
     # ── Admin Registries (DAT-only via manage_admin_registries) ──────────
     "/api/municipios/": "Admin DAT registry — cobertura via test_admin_api.py",

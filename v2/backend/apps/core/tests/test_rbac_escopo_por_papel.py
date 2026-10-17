@@ -851,3 +851,89 @@ class TestBloqueiosEDeslocamentosP91:
         response = _cliente(formadora).get("/api/stats/home/")
         assert response.status_code == 200
         assert response.data["upcoming_events"] == 1
+
+
+# ============================================================================
+# F4 (scan de segurança 16/10/2026): checagem de disponibilidade com o escopo do PR 9
+# ============================================================================
+
+
+def _janela(bloqueio: AvailabilityBlock) -> dict[str, str]:
+    return {
+        "inicio": (bloqueio.inicio - timedelta(hours=1)).isoformat(),
+        "fim": (bloqueio.fim + timedelta(hours=1)).isoformat(),
+    }
+
+
+def _check(usuario: Usuario, alvo: Usuario, bloqueio: AvailabilityBlock):
+    return _cliente(usuario).get("/api/availability/check/", {"usuario_id": alvo.id, **_janela(bloqueio)})
+
+
+def _check_many(usuario: Usuario, alvos: list[Usuario], bloqueio: AvailabilityBlock) -> dict[int, dict[str, Any]]:
+    response = _cliente(usuario).post(
+        "/api/availability/check-many/", {"usuarios_ids": [a.id for a in alvos], **_janela(bloqueio)}, format="json"
+    )
+    assert response.status_code == 200, response.content
+    return {r["usuario_id"]: r for r in response.data["results"]}
+
+
+class TestChecagemDeDisponibilidadeF4:
+    """Quem não é global só consulta a si e as pessoas com vínculo (≠ EQUIPE) nas gerências onde tem
+    papel G/C/A. Fora disso a pessoa é tratada como inexistente (404 no /check/, item "X" no
+    check-many): não dá para distinguir "fora do escopo" de "não existe", como no /availability-blocks/.
+    """
+
+    def test_coordenadora_de_A_nao_le_a_agenda_de_formador_de_B(self, a_b):
+        a, b = a_b
+        coord = _pessoa(("COORDENADOR", a))
+        formador_b = _pessoa(("FORMADOR", b))
+        bloqueio = _bloqueio(formador_b)
+
+        assert _check(coord, formador_b, bloqueio).status_code == 404
+        item = _check_many(coord, [formador_b], bloqueio)[formador_b.id]
+        assert item["ok"] is False
+        assert [c["code"] for c in item["conflicts"]] == ["X"]
+        assert all(c["ref_id"] != bloqueio.id for c in item["conflicts"])
+
+    def test_coordenadora_le_a_agenda_de_formador_da_propria_gerencia(self, a_b):
+        a, _ = a_b
+        coord = _pessoa(("COORDENADOR", a))
+        formador_a = _pessoa(("FORMADOR", a))
+        bloqueio = _bloqueio(formador_a)
+
+        response = _check(coord, formador_a, bloqueio)
+        assert response.status_code == 200
+        assert response.data["ok"] is False
+        assert "X" not in [c["code"] for c in response.data["conflicts"]]
+        item = _check_many(coord, [formador_a], bloqueio)[formador_a.id]
+        assert "X" not in [c["code"] for c in item["conflicts"]]
+
+    def test_check_many_misto_so_omite_quem_esta_fora(self, a_b):
+        a, b = a_b
+        coord = _pessoa(("COORDENADOR", a))
+        formador_a, formador_b = _pessoa(("FORMADOR", a)), _pessoa(("FORMADOR", b))
+        resultados = _check_many(coord, [formador_a, formador_b], _bloqueio(formador_a))
+        assert "X" not in [c["code"] for c in resultados[formador_a.id]["conflicts"]]
+        assert [c["code"] for c in resultados[formador_b.id]["conflicts"]] == ["X"]
+
+    def test_gerente_em_A_nao_le_colega_de_B_onde_e_formadora(self, a_b, u91):
+        _, b = a_b
+        colega_b = _pessoa(("FORMADOR", b))
+        assert _check(u91, colega_b, _bloqueio(colega_b)).status_code == 404
+
+    def test_consulta_a_si_mesma_continua_valendo(self, a_b):
+        a, _ = a_b
+        coord = _pessoa(("COORDENADOR", a))
+        assert _check(coord, coord, _bloqueio(coord)).status_code == 200
+
+    def test_equipe_administrativa_nao_conta_como_escopo(self, a_b):
+        a, _ = a_b
+        coord = _pessoa(("COORDENADOR", a))
+        so_equipe = _pessoa(("EQUIPE", a))
+        assert _check(coord, so_equipe, _bloqueio(so_equipe)).status_code == 404
+
+    def test_global_le_qualquer_gerencia(self, a_b):
+        _, b = a_b
+        formador_b = _pessoa(("FORMADOR", b))
+        superusuario = UsuarioFactory(is_superuser=True)
+        assert _check(superusuario, formador_b, _bloqueio(formador_b)).status_code == 200

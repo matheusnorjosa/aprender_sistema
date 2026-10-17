@@ -323,10 +323,11 @@ def test_gerencia_diretoria_da_o_pacote_diretoria():
 # `scripts/rbac_lint.py` não serve: isenta `apps/core/rbac/` inteira e só vê `groups.filter(name=…)`.
 # A varredura é pela árvore sintática dos .py de produção do backend, não por regex de linha: o formato
 # que o Black quebra em várias linhas, o apelido (`grupos = user.groups`) e `getattr(user, "groups")`
-# também aparecem. Conta como acesso a grupo: atributo `groups` ou `user_set`; argumento nomeado `groups`
-# ou `groups__*` em qualquer chamada; lookup em string (`"groups"`, `"user_set"`, `"groups__*"`,
-# `"user_set__*"`) como argumento posicional (`values_list`, `F`, `Count`, `prefetch_related`…), como chave
-# de `**{...}` ou em `source=`; `user` ou `user__*` numa chamada sobre o gerenciador de `Group`
+# também aparecem. Conta como acesso a grupo: atributo `groups` ou `user_set`; argumento nomeado com
+# `groups` ou `user_set` em qualquer segmento do lookup (`groups__name`, e também o que atravessa uma FK até
+# o usuário, `usuario__groups__name`) em qualquer chamada; lookup em string com esse segmento (`"groups"`,
+# `"groups__name"`, `"usuario__groups__name"`) como argumento posicional (`values_list`, `F`, `Count`,
+# `prefetch_related`…), como chave de `**{...}` ou em `source=`; `user` ou `user__*` numa chamada sobre o gerenciador de `Group`
 # (`objects`, `_default_manager`, `_base_manager`; `Group`, apelido importado ou `get_model("auth", "Group")`);
 # e `getattr(_, "groups" | "user_set")`. Fora de alcance, e por isso a lista NÃO é fechada: SQL cru
 # (`core_usuario_groups`), `getattr` com nome em variável, lookup montado em f-string ou concatenação,
@@ -524,7 +525,9 @@ def _sobre_group_objects(func: ast.expr, nomes_de_group: frozenset[str]) -> bool
 
 
 def _eh_lookup_de_grupo(valor: object) -> bool:
-    return isinstance(valor, str) and (valor in _ATRIBUTOS_DE_GRUPO or valor.startswith(("groups__", "user_set__")))
+    """`groups`, `user_set` em qualquer segmento do lookup: `groups__name`, mas também o que atravessa uma FK
+    até o usuário (`usuario__groups__name`, `user__groups__id`)."""
+    return isinstance(valor, str) and not _ATRIBUTOS_DE_GRUPO.isdisjoint(valor.split("__"))
 
 
 def _eh_acesso_a_grupo(no: ast.AST, pais: dict[ast.AST, ast.AST], nomes_de_group: frozenset[str]) -> bool:
@@ -533,11 +536,11 @@ def _eh_acesso_a_grupo(no: ast.AST, pais: dict[ast.AST, ast.AST], nomes_de_group
         # `x.groups()` é método (ex.: `re.Match.groups()`); o gerenciador de grupos do Django não é chamado.
         return no.attr in _ATRIBUTOS_DE_GRUPO and not (isinstance(pai, ast.Call) and pai.func is no)
     if isinstance(no, ast.keyword) and no.arg and isinstance(pai, ast.Call):
-        if no.arg.startswith("groups__"):
-            return True
         if no.arg == "groups":
             # `"...{groups}".format(groups=n)` é texto.
             return not (isinstance(pai.func, ast.Attribute) and pai.func.attr == "format")
+        if _eh_lookup_de_grupo(no.arg):
+            return True
         if no.arg == "source":
             # Campo DRF que lê o grupo: `PrimaryKeyRelatedField(source="groups")`.
             return isinstance(no.value, ast.Constant) and _eh_lookup_de_grupo(no.value.value)
@@ -665,6 +668,21 @@ class TestDetectorDaCatraca:
             "Usuario.objects.annotate(n=Count('groups'))",
             "Usuario.objects.prefetch_related('groups')",
             "serializers.PrimaryKeyRelatedField(source='groups')",
+        ]
+
+    def test_lookup_que_atravessa_fk_ate_o_grupo(self):
+        fonte = (
+            "EquipeGerencia.objects.filter(usuario__groups__name='DAT')\n"
+            "EquipeGerencia.objects.values_list('usuario__groups__name')\n"
+            'EquipeGerencia.objects.filter(**{"usuario__groups__name": x})\n'
+            "Solicitacao.objects.filter(usuario__groups__id__in=ids)\n"
+            "Projeto.objects.filter(subgroups__name='x', groupsx=1)\n"
+        )
+        assert _trechos(fonte) == [
+            "EquipeGerencia.objects.filter(usuario__groups__name='DAT')",
+            "EquipeGerencia.objects.values_list('usuario__groups__name')",
+            "EquipeGerencia.objects.filter(**{'usuario__groups__name': x})",
+            "Solicitacao.objects.filter(usuario__groups__id__in=ids)",
         ]
 
     def test_group_por_outro_nome(self):

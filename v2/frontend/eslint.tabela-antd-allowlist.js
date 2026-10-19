@@ -29,7 +29,6 @@ export const TABELA_ANTD_ALLOWLIST = {
   'src/pages/DATModule/CadastrosPage.tsx': 'C5 — Cadastros',
   'src/pages/DATModule/ComprasPage.tsx': 'C5 — Compras',
   'src/pages/DATModule/CoordenadoresPage.tsx': 'C5 — Coordenadores',
-  'src/pages/PreAgenda/PreAgendaPage.tsx': 'C5 — Pré-agenda',
   'src/pages/DATModule/DATRegistrosPage.tsx': 'C6 — Registros DAT (matriz, decisão 2)',
   'src/pages/DATModule/PlanoFormacoesPage.tsx': 'C6 — Plano de formações (matriz, decisão 2)',
   'src/pages/Dashboards/ComprasDashboardPage.tsx': 'C7 — dashboards',

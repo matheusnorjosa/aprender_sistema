@@ -9,10 +9,10 @@
  * - Operações em lote (Reapply/Resync) via seleção múltipla
  */
 
-import { useState, useEffect, useCallback, useMemo, useRef, ChangeEvent, Key, JSX } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, ChangeEvent, CSSProperties, Key, JSX } from 'react';
 import {
-  Table,
   Card,
+  Grid,
   Input,
   DatePicker,
   Button,
@@ -35,7 +35,6 @@ import {
   Spin,
   Select,
 } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
 import type { TableRowSelection } from 'antd/es/table/interface';
 import dayjs, { type Dayjs } from 'dayjs';
 import {
@@ -83,6 +82,7 @@ import { formadoresLabel } from '../../utils/participants';
 import { mesmosDados } from '../../utils/mesmosDados';
 import { pausaDo429Ms } from '../../utils/retryAfter';
 import AvisoAtualizacaoPausada from '../../components/AvisoAtualizacaoPausada';
+import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
 
 // #1668 (M12-19): orçamento de requisições da Pré-agenda.
 /** Carrega a pré-agenda inteira como lista única (paginação client-side). */
@@ -91,6 +91,9 @@ const PREAGENDA_PAGE_SIZE = 100;
 const LOAD_ERROR_KEY = 'preagenda-erro-carga';
 
 const { Title, Text } = Typography;
+
+/** Uma linha da célula, cortada com reticências (o texto inteiro fica no `title`). */
+const UMA_LINHA: CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 
 /**
  * A ordem de `?ordering=proximidade` do servidor, para intercalar as listas dos dois fluxos: de hoje
@@ -514,52 +517,26 @@ export default function PreAgendaPage(): JSX.Element {
     });
   };
 
+  // Celular: os ícones das ações quebram em duas por linha e a página perde padding.
+  const celular = !Grid.useBreakpoint().sm;
+
+  // Sem rolagem horizontal (achado do item 36): sempre na linha, o Evento (data/hora, município,
+  // projeto e o estado no Google, com o motivo do erro) e as ações; o resto sobe por largura e,
+  // escondido, vai para a linha expandida.
   // Issue #260: Memoizar columns para evitar re-renderização desnecessária da tabela
-  const columns: ColumnsType<Solicitacao> = useMemo(() => [
+  const columns: ColunaResponsiva<Solicitacao>[] = useMemo(() => [
     {
-      title: 'Data/Hora',
-      dataIndex: 'inicio',
-      key: 'inicio',
-      render: (inicio: string) => formatFortaleza(inicio),
-      width: 150,
-    },
-    {
-      title: 'Município',
-      dataIndex: 'municipio_nome',
-      key: 'municipio_nome',
-      render: (nome: string | null) => nome || '-',
-    },
-    {
-      title: 'Projeto',
-      dataIndex: 'projeto_nome',
-      key: 'projeto_nome',
-      render: (nome: string | null) => nome || '-',
-    },
-    {
-      title: 'Tipo',
-      dataIndex: 'tipo',
-      key: 'tipo',
-      render: (tipo: string | null) => tipo || '-',
-    },
-    {
-      // Nome do formador (inclui convidados "que saíram" via guest_nome — sem FK). Ver utils/participants.
-      title: 'Formadores',
-      dataIndex: 'participations',
-      key: 'formadores',
-      render: (participations: Participation[] | undefined) => formadoresLabel(participations) || '-',
-      ellipsis: true,
-      width: 160,
-    },
-    {
-      // Rótulo em pt-BR (o mesmo de Publicar na agenda) e, em ERROR, o motivo que o backend gravou
-      // (`gcal_last_error`, que diz o que fazer): antes só o código cru, e o Controle reenviava às cegas.
-      title: 'Google Agenda',
-      dataIndex: 'gcal_status',
-      key: 'gcal_status',
-      render: (_: GCalStatus, record) => {
+      title: 'Evento',
+      key: 'evento',
+      render: (_, record) => {
+        // Rótulo em pt-BR (o mesmo de Publicar na agenda) e, em ERROR, o motivo que o backend gravou
+        // (`gcal_last_error`, que diz o que fazer): antes só o código cru, e o Controle reenviava às cegas.
         const { tag } = gcalRowActions(record, { ready: true });
         return (
-          <Space direction="vertical" size={2}>
+          <Space direction="vertical" size={2} className="w-full">
+            <div style={UMA_LINHA}>{formatFortaleza(record.inicio)}</div>
+            <div style={UMA_LINHA} title={record.municipio_nome || undefined}>{record.municipio_nome || '-'}</div>
+            <div style={UMA_LINHA} title={record.projeto_nome || undefined}>{record.projeto_nome || '-'}</div>
             <Tag color={tag.color} style={{ whiteSpace: 'normal' }}>{tag.label}</Tag>
             {record.gcal_status === 'ERROR' && record.gcal_last_error && (
               <Text type="danger" style={{ fontSize: 12, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
@@ -569,12 +546,42 @@ export default function PreAgendaPage(): JSX.Element {
           </Space>
         );
       },
-      width: 160,
+    },
+    {
+      title: 'Tipo',
+      dataIndex: 'tipo',
+      key: 'tipo',
+      responsive: VISIVEL_A_PARTIR.lg,
+      ellipsis: true,
+      render: (tipo) => (tipo as string | null) || '-',
+    },
+    {
+      // Nome do formador (inclui convidados "que saíram" via guest_nome — sem FK). Ver utils/participants.
+      title: 'Formadores',
+      dataIndex: 'participations',
+      key: 'formadores',
+      responsive: VISIVEL_A_PARTIR.lg,
+      ellipsis: true,
+      render: (participations) => formadoresLabel(participations as Participation[] | undefined) || '-',
+    },
+    {
+      title: 'Meet',
+      dataIndex: 'meet_link',
+      key: 'meet',
+      responsive: VISIVEL_A_PARTIR.xl,
+      width: 170,
+      // Os dois botões do MeetLink quebram linha em vez de passar da célula.
+      render: (href) => (
+        <div className="[&_.ant-space]:flex-wrap">
+          <MeetLink href={href as string | null} />
+        </div>
+      ),
     },
     {
       title: 'Ações',
       key: 'actions',
-      width: 200,
+      // Até 4 ícones; no celular, dois por linha.
+      width: celular ? 76 : 128,
       render: (_, record) => {
         const isPublished = record.gcal_status === ('PUBLISHED' as GCalStatus);
         // PENDING = publicação já enfileirada (task Celery em voo). Bloquear o
@@ -597,7 +604,7 @@ export default function PreAgendaPage(): JSX.Element {
           : 'Publicar evento no Google Calendar';
 
         return (
-          <Space size="small">
+          <Space size={4} wrap>
             <Button
               size="small"
               icon={<EyeOutlined />}
@@ -632,12 +639,11 @@ export default function PreAgendaPage(): JSX.Element {
                 aria-label={`Remover do Google Agenda: ${rotuloDoEvento(record)}`}
               />
             )}
-            <MeetLink href={record.meet_link} />
           </Space>
         );
       },
     },
-  ], [handlePreview, handlePublish, handleResync, handleCancel]);
+  ], [handlePreview, handlePublish, handleResync, handleCancel, celular]);
 
   // Google Calendar events loader
   const loadGcalEvents = useCallback(async (): Promise<void> => {
@@ -682,20 +688,19 @@ export default function PreAgendaPage(): JSX.Element {
     }
   };
 
-  const gcalEventsColumns: ColumnsType<GoogleCalendarEvent> = [
+  const gcalEventsColumns: ColunaResponsiva<GoogleCalendarEvent>[] = [
     {
       title: 'Evento',
       dataIndex: 'summary',
       key: 'summary',
       ellipsis: true,
-      filterSearch: true,
     },
     {
       title: 'Início',
       dataIndex: 'start',
       key: 'start',
-      width: 160,
-      render: (val: string) => formatGcalDate(val),
+      width: 150,
+      render: (val) => formatGcalDate(val as string),
       sorter: (a: GoogleCalendarEvent, b: GoogleCalendarEvent) => a.start.localeCompare(b.start),
       defaultSortOrder: 'ascend',
     },
@@ -703,31 +708,33 @@ export default function PreAgendaPage(): JSX.Element {
       title: 'Fim',
       dataIndex: 'end',
       key: 'end',
-      width: 160,
-      render: (val: string) => formatGcalDate(val),
+      width: 150,
+      responsive: VISIVEL_A_PARTIR.lg,
+      render: (val) => formatGcalDate(val as string),
     },
     {
       title: 'Local',
       dataIndex: 'location',
       key: 'location',
       ellipsis: true,
-      render: (val: string) => val || '-',
+      responsive: VISIVEL_A_PARTIR.md,
+      render: (val) => (val as string) || '-',
     },
     {
       title: 'Criador',
       dataIndex: 'creator',
       key: 'creator',
       ellipsis: true,
-      width: 200,
+      responsive: VISIVEL_A_PARTIR.xl,
     },
     {
       title: 'Link',
       dataIndex: 'htmlLink',
       key: 'htmlLink',
       width: 70,
-      render: (val: string) =>
+      render: (val) =>
         val ? (
-          <a href={val} target="_blank" rel="noopener noreferrer">
+          <a href={val as string} target="_blank" rel="noopener noreferrer" aria-label="Abrir no Google Agenda">
             <LinkOutlined />
           </a>
         ) : '-',
@@ -769,19 +776,16 @@ export default function PreAgendaPage(): JSX.Element {
         'aria-label': motivo ? `Selecionar evento: ${MOTIVO_NAO_PUBLICAVEL[motivo]}` : 'Selecionar evento',
       };
     },
-    selections: [
-      Table.SELECTION_ALL,
-      Table.SELECTION_INVERT,
-      Table.SELECTION_NONE,
-    ],
+    // `true`: os atalhos padrão do AntD (tudo, inverter, nada) sem importar o `Table` cru.
+    selections: true,
   };
 
   return (
-    <div className="p-6">
+    <div className="p-3 sm:p-6">
       <Space direction="vertical" style={{ width: '100%' }} size="large">
         {/* Header */}
         <Card>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <Title level={2} className="m-0">
               Pré-agenda
             </Title>
@@ -877,11 +881,11 @@ export default function PreAgendaPage(): JSX.Element {
             </Card>
 
             {/* Tabela */}
-            <Card>
+            <Card {...(celular && { styles: { body: { padding: 12 } } })}>
               {/* Issue #95: Toolbar de Ações em Massa */}
               {selectedRowKeys.length > 0 && (
                 <div className="mb-4 p-3 bg-blue-50 rounded">
-                  <Space>
+                  <Space wrap>
                     <Text strong>{selectedRowKeys.length} evento(s) selecionado(s)</Text>
                     <Button
                       type="default"
@@ -921,13 +925,13 @@ export default function PreAgendaPage(): JSX.Element {
                   }
                 />
               )}
-              <Table
-                scroll={{ x: "max-content" }}
+              <ResponsiveTable<Solicitacao>
                 columns={columns}
                 dataSource={rows}
                 loading={loading}
                 rowKey="id"
                 rowSelection={rowSelection}
+                nomeDaLinha={rotuloDoEvento}
                 pagination={{
                   total,
                   pageSize: 20,
@@ -1019,12 +1023,12 @@ export default function PreAgendaPage(): JSX.Element {
                   />
                 )
               ) : (
-                <Table
-                  scroll={{ x: "max-content" }}
+                <ResponsiveTable<GoogleCalendarEvent>
                   columns={gcalEventsColumns}
                   dataSource={gcalEvents}
                   rowKey="id"
                   size="small"
+                  nomeDaLinha={(evento) => evento.summary || 'evento'}
                   pagination={{
                     pageSize: 20,
                     showSizeChanger: true,

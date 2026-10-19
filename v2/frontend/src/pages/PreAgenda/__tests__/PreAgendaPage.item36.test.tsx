@@ -55,6 +55,7 @@ vi.mock('../../../components/google/GoogleIntegrationCard', () => ({
   default: () => <div data-testid="google-card" />,
 }));
 
+import { definirLarguraTela } from '../../../test/larguraTela';
 import PreAgendaPage from '../PreAgendaPage';
 
 const FUTURO = { inicio: '2099-11-05T12:00:00Z', fim: '2099-11-05T15:00:00Z' };
@@ -174,5 +175,52 @@ describe('PreAgendaPage — os mais próximos primeiro, e aviso quando a lista �
     await screen.findByText('Crato');
 
     expect(screen.queryByText(/Mostrando \d+ de/)).not.toBeInTheDocument();
+  });
+});
+
+// A tabela rolava na horizontal nas 4 larguras (scroll.x max-content).
+describe('PreAgendaPage — sem rolagem horizontal', () => {
+  function cabecalhos(): string[] {
+    return screen
+      .getAllByRole('columnheader')
+      .filter((th) => !th.classList.contains('ant-table-row-expand-icon-cell') && !th.classList.contains('ant-table-selection-column'))
+      .map((th) => th.textContent?.trim() ?? '')
+      .filter(Boolean);
+  }
+
+  test('a 1280 px: o Evento (data, município, projeto, Google Agenda) e as ações, sem rolagem', async () => {
+    mockRows([row({ id: 1, municipio_nome: 'Crato', meet_link: 'https://meet.google.com/abc-defg-hij' })]);
+    const { container } = render(<PreAgendaPage />);
+    const linha = (await screen.findByText('Crato')).closest('tr') as HTMLElement;
+
+    expect(cabecalhos()).toEqual(['Evento', 'Tipo', 'Formadores', 'Meet', 'Ações']);
+    for (const texto of ['05/11/2099 09:00', 'Projeto Teste', 'Não publicado']) {
+      expect(within(linha).getByText(texto)).toBeInTheDocument();
+    }
+    expect(container.querySelector('.ant-table-content')?.getAttribute('style') ?? '').not.toMatch(/overflow/);
+  });
+
+  test('a 360 px: só o Evento e as ações; o resto na linha expandida', async () => {
+    definirLarguraTela(360);
+    mockRows([row({ id: 1, municipio_nome: 'Crato' })]);
+    render(<PreAgendaPage />);
+    const linha = (await screen.findByText('Crato')).closest('tr') as HTMLElement;
+
+    expect(cabecalhos()).toEqual(['Evento', 'Ações']);
+    expect(within(linha).getByLabelText('Publicar evento no Google Calendar')).toBeInTheDocument();
+    fireEvent.click(within(linha).getByRole('button', { name: /^Expandir linha de 05\/11\/2099 09:00 · Crato/ }));
+    const expandida = within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);
+    expect(expandida.getByText('Formação')).toBeInTheDocument();
+  });
+
+  test('a barra do lote quebra linha', async () => {
+    mockRows([row({ id: 1, municipio_nome: 'Crato', gcal_status: 'PUBLISHED', external_event_id: 'asv1' })]);
+    render(<PreAgendaPage />);
+    const linha = (await screen.findByText('Crato')).closest('tr') as HTMLElement;
+
+    fireEvent.click(within(linha).getByRole('checkbox'));
+
+    const barra = (await screen.findByText('1 evento(s) selecionado(s)')).closest('.ant-space') as HTMLElement;
+    expect(barra).toHaveStyle({ flexWrap: 'wrap' });
   });
 });

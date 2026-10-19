@@ -119,19 +119,26 @@ Controle deixaram de dar o poder. A regra é `solicitation_approval_basis` (`app
 
 *(Corrigido em 2026-07-24: não existe item "Admin DAT" no menu lateral.)*
 
-### Atribuir Grupos a um Usuário — 🔒 **somente superusuário**
+### Lotar e dar Função a um Usuário — superusuário em tudo, DAT nas gerências comuns
 
-> 🔴 **Mudou com o hardening Tier-0 (P0-1).** Editar Setor/Função de um usuário **não é mais
-> operação de "administrador"**: é restrita ao superusuário.
+> 🔴 **Mudou com o hardening Tier-0 (P0-1)** e de novo em **17/10/2026** (decisão do dono).
 >
-> - **Frontend**: os selects de Gerência (`gerencia_id`) e Função (`funcao_ids`) são renderizados com
->   `disabled={!currentIsSuperuser}` (`v2/frontend/src/pages/AdminDAT/UsuariosPage.tsx`), e o
->   payload de salvamento **não envia `group_ids`** para não-superuser.
-> - **Backend**: a action `assign_groups` é `permission_classes=[SuperuserOnly]`
->   (`apps/core/views/admin.py`).
+> - **Superusuário**: lota em qualquer gerência e papel.
+> - **DAT** (policy `manage_lotacao_comum`): lota nas **gerências comuns** como Formador, Coordenador,
+>   Apoio de Coordenação, Gerente (menos na Superintendência) e Equipe administrativa. A lista de
+>   gerências não mostra DAT, Controle nem Diretoria. Lotar nelas, ou como Gerente na Superintendência,
+>   é só do superusuário: o sistema responde com o motivo (400).
+> - O DAT **não** mexe na lotação da própria conta nem de quem trabalha no DAT, no Controle ou na
+>   Diretoria, ou é Gerente da Superintendência: os campos aparecem travados com o motivo. Salvar o
+>   cadastro dessas pessoas (telefone, cargo, senha) continua funcionando.
+> - O DAT só dá ou tira as funções Formador, Coordenador, Apoio de Coordenação e Gerente; os outros
+>   grupos da pessoa ficam como estão. Toda mudança de lotação fica no AuditLog.
+> - **Backend**: `UsuarioAdminSerializer` (`apps/core/serializers/usuario.py`, regra
+>   `lotacao_reservada` em `apps/core/services/equipe_gerencia_import.py`); a action `assign_groups`
+>   e os importadores seguem `SuperuserOnly`.
 >
-> Em produção há **1 superusuário ativo**. Consequência operacional: se essa conta ficar
-> indisponível, **ninguém** consegue atribuir Setor/Função. Isso é um bus factor conhecido —
+> Em produção há **1 superusuário ativo**. Se essa conta ficar indisponível, ninguém lota no DAT, no
+> Controle, na Diretoria nem como Gerente da Superintendência. Isso é um bus factor conhecido —
 > ver [audits/ACHADOS_REAIS.md](./audits/ACHADOS_REAIS.md), premissa F3.
 
 Passos (como superusuário):
@@ -253,9 +260,10 @@ Verifique se ele está **lotado como Gerente na gerência Superintendência** (f
 lotado em outra gerência não aprova.
 O outro caminho é Assistente Administrativo **do Controle**.
 
-### Por que os campos de Setor/Função aparecem desabilitados para mim?
-Porque desde o hardening Tier-0 essa edição é **somente superusuário**
-(`assign_groups`, `apps/core/views/admin.py`; UI em `UsuariosPage.tsx`). Não é bug.
+### Por que os campos de Gerência/Função aparecem desabilitados para mim?
+Sem a policy `manage_lotacao_comum`, a lotação é **somente do superusuário**. Com ela (o DAT), os campos
+travam na própria conta e em quem trabalha no DAT, no Controle ou na Diretoria, ou é Gerente da
+Superintendência; o formulário mostra o motivo. Não é bug.
 
 ### Posso dar múltiplas funções a um usuário?
 Sim. Por exemplo, alguém pode ser Coordenador e Gerente ao mesmo tempo.

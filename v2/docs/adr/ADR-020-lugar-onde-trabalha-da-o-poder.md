@@ -29,7 +29,11 @@ e some só quando alguém lembra de tirá-la. O seed e a produção já divergem
    GERENTE e EQUIPE nunca dão poder administrativo nem alcance sobre outra gerência.
 3. **Só EQUIPE e GERENTE recebem o pacote** de uma gerência com perfil.
 4. **Só o superusuário lota alguém em gerência com perfil** (ou como GERENTE na
-   Superintendência), porque esse cadastro passa a dar poder.
+   Superintendência), porque esse cadastro passa a dar poder. Desde 17/10/2026 (decisão do dono) o DAT
+   lota nas gerências comuns (formadora, coordenadora, apoio, gerente pedagógica e equipe), que não dão
+   poder administrativo; lotar no DAT, no Controle, na Diretoria ou como GERENTE da Superintendência
+   segue só com o superusuário (`lotacao_reservada`, policy `manage_lotacao_comum`; D28 da
+   [matriz](../rbac_authorization_matrix.md)).
 
 Decisões do dono que entram no modelo:
 

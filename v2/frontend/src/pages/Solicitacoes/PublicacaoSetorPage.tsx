@@ -12,10 +12,9 @@
  *   desabilitadas, com o motivo visível.
  * - Polling só enquanto alguma linha está PENDING; `seqRef` descarta resposta obsoleta.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type JSX } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { Alert, Button, Card, Empty, Modal, Space, Table, Tag, Typography, message } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import { Alert, Button, Card, Empty, Grid, Modal, Space, Tag, Typography, message } from 'antd';
 
 import {
   cancelSolicitacao,
@@ -24,6 +23,7 @@ import {
   resyncSolicitacao,
 } from '../../api/solicitacoes';
 import { MeetLink } from '../../components/MeetLink';
+import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
 import GoogleIntegrationCard from '../../components/google/GoogleIntegrationCard';
 import { TIMING } from '../../constants/timing';
 import useGoogleIntegration from '../../hooks/useGoogleIntegration';
@@ -42,6 +42,8 @@ const PAGE_SIZE = 20;
 const GOOGLE_CONNECT_URL = `/api/oauth/google/start/?return_to=${encodeURIComponent('/solicitacoes/publicacao')}`;
 /** Uma só mensagem de erro de carga na tela (o polling não empilha toasts). */
 const LOAD_ERROR_KEY = 'publicacao-setor-load';
+/** Uma linha da célula, cortada com reticências (o texto inteiro fica no `title`). */
+const UMA_LINHA: CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 
 const BLOCK_REASON_TEXT: Record<PublishBlockReason, string> = {
   no_setor_scope:
@@ -65,6 +67,8 @@ const OAUTH_ERROR_FALLBACK =
 interface ActionConfig {
   /** Texto do botão; também abre o aria-label (nome acessível contém o visível). */
   label: string;
+  /** Texto do botão no celular (abaixo de `sm`); o nome acessível continua com o `label`. */
+  labelCurto: string;
   /** Início do título da confirmação; o evento vem depois: "Remover do Google Agenda: <evento>?". */
   confirmTitle: string;
   confirmDescription: string;
@@ -79,6 +83,7 @@ interface ActionConfig {
 const ACTIONS: Record<GcalRowAction, ActionConfig> = {
   publicar: {
     label: 'Publicar',
+    labelCurto: 'Publicar',
     confirmTitle: 'Publicar na agenda da organização',
     confirmDescription: 'O evento é criado no calendário oficial da organização.',
     okText: 'Publicar',
@@ -88,6 +93,7 @@ const ACTIONS: Record<GcalRowAction, ActionConfig> = {
   },
   tentar: {
     label: 'Tentar de novo',
+    labelCurto: 'Tentar de novo',
     confirmTitle: 'Tentar publicar de novo',
     confirmDescription: 'O sistema envia o evento outra vez para o Google Agenda.',
     okText: 'Tentar de novo',
@@ -97,6 +103,7 @@ const ACTIONS: Record<GcalRowAction, ActionConfig> = {
   },
   atualizar: {
     label: 'Atualizar no Google',
+    labelCurto: 'Atualizar',
     confirmTitle: 'Atualizar no Google Agenda',
     confirmDescription: 'O evento no Google passa a ter os dados atuais do sistema.',
     okText: 'Atualizar',
@@ -106,6 +113,7 @@ const ACTIONS: Record<GcalRowAction, ActionConfig> = {
   },
   remover: {
     label: 'Remover do Google',
+    labelCurto: 'Remover',
     confirmTitle: 'Remover do Google Agenda',
     confirmDescription:
       'O evento sai da agenda da organização; a solicitação continua aprovada no sistema.',
@@ -275,63 +283,67 @@ export default function PublicacaoSetorPage(): JSX.Element {
   const blockedIsWarning =
     reason === 'no_setor_scope' || reason === 'google_calendar_not_configured' || (!reason && !!statusError);
 
-  const columns: ColumnsType<Solicitacao> = useMemo(() => [
+  // Sem rolagem horizontal (achado do item 36): sempre na linha, o Evento (data/hora, projeto,
+  // município e o estado no Google, com o motivo do erro quebrando linha) e as ações; o resto sobe por largura e,
+  // escondido, vai para a linha expandida. No celular os botões usam o rótulo curto.
+  const celular = !Grid.useBreakpoint().sm;
+  const columns: ColunaResponsiva<Solicitacao>[] = useMemo(() => [
     {
-      title: 'Data/hora',
-      dataIndex: 'inicio',
-      key: 'inicio',
-      width: 150,
-      render: (inicio: string) => formatFortaleza(inicio),
-    },
-    {
-      title: 'Projeto',
-      dataIndex: 'projeto_nome',
-      key: 'projeto',
-      render: (nome: string | null) => nome || '-',
-    },
-    {
-      title: 'Município',
-      dataIndex: 'municipio_nome',
-      key: 'municipio',
-      render: (nome: string | null) => nome || '-',
-    },
-    {
-      title: 'Tipo',
-      dataIndex: 'tipo_evento_nome',
-      key: 'tipo_evento',
-      render: (nome: string | null) => nome || '-',
-    },
-    {
-      // Nome, não username: o username de login pode ser o CPF (LGPD).
-      title: 'Coordenador',
-      dataIndex: 'coordenador_nome',
-      key: 'coordenador',
-      render: (nome: string | null) => nome || '-',
-    },
-    {
-      title: 'Google Agenda',
-      key: 'gcal',
+      title: 'Evento',
+      key: 'evento',
       render: (_, row) => {
         const { tag } = gcalRowActions(row, { ready });
         return (
-          <Space direction="vertical" size={2}>
-            <Tag color={tag.color}>{tag.label}</Tag>
+          <Space direction="vertical" size={2} className="w-full">
+            <div style={UMA_LINHA}>{formatFortaleza(row.inicio)}</div>
+            <div style={UMA_LINHA} title={row.projeto_nome || undefined}>{row.projeto_nome || '-'}</div>
+            <div style={UMA_LINHA} title={row.municipio_nome || undefined}>{row.municipio_nome || '-'}</div>
+            <Tag color={tag.color} style={{ whiteSpace: 'normal' }}>{tag.label}</Tag>
             {row.gcal_status === 'ERROR' && row.gcal_last_error && (
-              <Text type="danger" style={{ fontSize: 12 }}>{row.gcal_last_error}</Text>
+              // O motivo do Google tem até 500 caracteres: quebra linha na célula em vez de esticar a tabela.
+              <Text type="danger" style={{ fontSize: 12, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
+                {row.gcal_last_error}
+              </Text>
             )}
           </Space>
         );
       },
     },
     {
+      title: 'Tipo',
+      dataIndex: 'tipo_evento_nome',
+      key: 'tipo_evento',
+      responsive: VISIVEL_A_PARTIR.lg,
+      ellipsis: true,
+      render: (nome) => (nome as string | null) || '-',
+    },
+    {
+      // Nome, não username: o username de login pode ser o CPF (LGPD).
+      title: 'Coordenador',
+      dataIndex: 'coordenador_nome',
+      key: 'coordenador',
+      responsive: VISIVEL_A_PARTIR.lg,
+      ellipsis: true,
+      render: (nome) => (nome as string | null) || '-',
+    },
+    {
       title: 'Meet',
       dataIndex: 'meet_link',
       key: 'meet',
-      render: (href: string | null) => <MeetLink href={href} />,
+      responsive: VISIVEL_A_PARTIR.xl,
+      width: 170,
+      // Os dois botões do MeetLink quebram linha em vez de passar da célula.
+      render: (href) => (
+        <div className="[&_.ant-space]:flex-wrap">
+          <MeetLink href={href as string | null} />
+        </div>
+      ),
     },
     {
       title: 'Ações',
       key: 'acoes',
+      // Folga para a fonte mais larga do Linux da CI: "Atualizar no Google" com +1,5 px por letra.
+      width: celular ? 116 : 190,
       render: (_, row) => {
         const { actions, disabled } = gcalRowActions(row, { ready });
         const evento = `${row.projeto_nome ?? 'Evento'}, ${formatFortaleza(row.inicio)}`;
@@ -348,7 +360,7 @@ export default function PublicacaoSetorPage(): JSX.Element {
                   aria-label={`${config.label}: ${evento}`}
                   onClick={() => confirmar(row, action, evento)}
                 >
-                  {config.label}
+                  {celular ? config.labelCurto : config.label}
                 </Button>
               );
             })}
@@ -356,10 +368,10 @@ export default function PublicacaoSetorPage(): JSX.Element {
         );
       },
     },
-  ], [ready, confirmar]);
+  ], [ready, confirmar, celular]);
 
   return (
-    <section className="p-6" aria-labelledby={TITLE_ID}>
+    <section className="p-3 sm:p-6" aria-labelledby={TITLE_ID}>
       {contextoDoModal}
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         <Card>
@@ -404,13 +416,13 @@ export default function PublicacaoSetorPage(): JSX.Element {
           />
         )}
 
-        <Card>
-          <Table
+        <Card {...(celular && { styles: { body: { padding: 12 } } })}>
+          <ResponsiveTable<Solicitacao>
             rowKey="id"
             columns={columns}
             dataSource={rows}
             loading={loading}
-            scroll={{ x: 'max-content' }}
+            nomeDaLinha={(row) => `${row.projeto_nome ?? 'Evento'}, ${formatFortaleza(row.inicio)}`}
             pagination={{
               current: page,
               pageSize: PAGE_SIZE,

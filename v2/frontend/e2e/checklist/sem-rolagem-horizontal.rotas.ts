@@ -394,7 +394,8 @@ export const TELA_LOGIN = 'login';
  * vista "expandida" é medida e não rola.
  * Minhas Solicitações (item 36, 19/10/2026): saíram as 4 de /solicitacoes/minhas. Ficam 79. A
  * vista "expandida" é medida e não rola.
- * Aprovações (19/10/2026, item 36): saíram as 4 de /solicitacoes/aprovacoes. Ficam 75.
+ * Aprovações e Publicar na agenda (19/10/2026, item 36): saíram as 4 de /solicitacoes/aprovacoes e as
+ * 4 de /solicitacoes/publicacao. Ficam 71.
  * O ratchet do Vitest (semRolagemHorizontal.pendentes.test.ts) trava a lista: nada novo
  * entra e o tamanho só desce.
  */
@@ -405,7 +406,6 @@ export const PENDENTES: Readonly<Record<string, readonly Largura[]>> = {
   '/dashboards/gcal': [360, 768, 1024],
   '/mapa-brasil': [360, 1024, 1280],
   '/mapa-brasil#lista': [360, 1024, 1280],
-  '/solicitacoes/publicacao': [360, 768, 1024, 1280],
   '/solicitacoes/:id/editar': [360],
   '/solicitacoes/disponibilidade': [360, 768, 1024],
   '/solicitacoes/bloqueios': [360, 768, 1024, 1280],

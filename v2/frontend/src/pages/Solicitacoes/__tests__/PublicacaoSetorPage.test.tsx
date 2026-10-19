@@ -17,6 +17,7 @@ import { message } from 'antd';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { TIMING } from '../../../constants/timing';
+import { definirLarguraTela } from '../../../test/larguraTela';
 import type { GoogleIntegrationStatus } from '../../../types/gcal';
 import type { Solicitacao } from '../../../types';
 
@@ -582,5 +583,61 @@ describe('PublicacaoSetorPage — polling (d)', () => {
 
     await vi.advanceTimersByTimeAsync(TIMING.PUBLICACAO_PENDENTE_POLL_MS * 3);
     expect(listCalls()).toHaveLength(2);
+  });
+});
+
+// Achado do item 36 (19/10/2026): a tabela rolava na horizontal (scroll.x max-content) e, no
+// celular, os botões ficavam fora da tela; a mensagem de erro do Google virava uma linha só.
+describe('PublicacaoSetorPage — sem rolagem horizontal', () => {
+  /** Títulos das colunas de dados (sem a do botão de expandir). */
+  function cabecalhos(): string[] {
+    return screen
+      .getAllByRole('columnheader')
+      .filter((th) => !th.classList.contains('ant-table-row-expand-icon-cell'))
+      .map((th) => th.textContent?.trim() ?? '')
+      .filter(Boolean);
+  }
+
+  test('a 1280 px: o evento (data, projeto, município, Google Agenda) e as ações; sem rolagem nem coluna fixa', async () => {
+    listResponse = pageOf([makeSolic({ meet_link: 'https://meet.google.com/abc-defg-hij' })]);
+    const { container } = renderPage();
+    await screen.findByText('Vidas Em Rede');
+
+    expect(cabecalhos()).toEqual(['Evento', 'Tipo', 'Coordenador', 'Meet', 'Ações']);
+    const linha = screen.getByText('Vidas Em Rede').closest('tr') as HTMLElement;
+    expect(within(linha).getByText('10/10/2026 09:00')).toBeInTheDocument();
+    expect(within(linha).getByText('Sobral')).toBeInTheDocument();
+    expect(within(linha).getByText('Não publicado')).toBeInTheDocument();
+    expect(container.querySelector('.ant-table-content')?.getAttribute('style') ?? '').not.toMatch(/overflow/);
+  });
+
+  test('a 360 px: só o evento e as ações, com rótulo curto; o resto na linha expandida', async () => {
+    definirLarguraTela(360);
+    listResponse = pageOf([makeSolic({ gcal_status: 'PUBLISHED', external_event_id: 'asv27' })]);
+    renderPage();
+    await screen.findByText('Vidas Em Rede');
+
+    expect(cabecalhos()).toEqual(['Evento', 'Ações']);
+    const linha = screen.getByText('Vidas Em Rede').closest('tr') as HTMLElement;
+    expect(within(linha).getByText('Sobral')).toBeInTheDocument();
+    // Texto visível curto; o nome acessível continua completo e começa por ele (WCAG 2.5.3).
+    const atualizar = within(linha).getByLabelText(/^Atualizar no Google: Vidas Em Rede/);
+    expect(atualizar).toHaveTextContent(/^Atualizar$/);
+    expect(within(linha).getByLabelText(/^Remover do Google: Vidas Em Rede/)).toHaveTextContent(/^Remover$/);
+
+    fireEvent.click(within(linha).getByRole('button', { name: /^Expandir linha de Vidas Em Rede/ }));
+    const expandida = within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);
+    for (const texto of ['Formação', 'Maria Coordenadora']) {
+      expect(expandida.getByText(texto)).toBeInTheDocument();
+    }
+  });
+
+  test('a mensagem de erro do Google quebra linha na célula (não estica a tabela)', async () => {
+    const longa = 'O Google recusou o acesso ao calendário da organização. '.repeat(6).trim();
+    listResponse = pageOf([makeSolic({ gcal_status: 'ERROR', gcal_last_error: longa })]);
+    renderPage();
+
+    const erro = await screen.findByText(longa);
+    expect(erro).toHaveStyle({ overflowWrap: 'anywhere', whiteSpace: 'normal' });
   });
 });

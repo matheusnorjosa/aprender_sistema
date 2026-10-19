@@ -23,7 +23,6 @@ export const TABELA_ANTD_PADRAO = 'src/components/ResponsiveTable.tsx';
 export const TABELA_ANTD_ALLOWLIST = {
   'src/components/MyBlocksTable.tsx': 'C3 — Bloqueios',
   'src/pages/Deslocamentos/DeslocamentosPage.tsx': 'C3 — Deslocamentos',
-  'src/pages/Solicitacoes/PublicacaoSetorPage.tsx': 'C3 — Publicação',
   'src/pages/Controle/AcoesNotificacaoPage.tsx': 'C5 — Notificações',
   'src/pages/Controle/NotificacoesInternasPage.tsx': 'C5 — Notificações',
   'src/pages/DATModule/AcoesPage.tsx': 'C5 — Ações',

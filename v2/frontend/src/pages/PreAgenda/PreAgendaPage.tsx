@@ -91,6 +91,11 @@ const PREAGENDA_PAGE_SIZE = 100;
 const LOAD_ERROR_KEY = 'preagenda-erro-carga';
 
 const { Title, Text } = Typography;
+
+/** O evento como a pessoa o reconhece: "05/11/2026 09:00 · Sobral · Projeto X" (botões e confirmações). */
+function rotuloDoEvento(row: Solicitacao): string {
+  return [formatFortaleza(row.inicio), row.municipio_nome, row.projeto_nome].filter(Boolean).join(' · ');
+}
 const { RangePicker } = DatePicker;
 
 /** Google Calendar event from API */
@@ -352,21 +357,23 @@ export default function PreAgendaPage(): JSX.Element {
     });
   }, [requireGoogleConnection, handleGoogleError, loadData]);
 
-  const handleCancel = useCallback((id: ID): void => {
+  // Remover do Google tira o convite e o link do Meet de todos: a confirmação abre no Cancelar,
+  // cita o evento e diz que a solicitação continua aprovada ("Cancelar Evento" sugeria cancelá-la).
+  const handleCancel = useCallback((record: Solicitacao): void => {
+    const id = record.id;
     Modal.confirm({
-      title: 'Confirmar Cancelamento',
+      title: `Remover do Google Agenda: ${rotuloDoEvento(record)}?`,
       icon: <StopOutlined className="text-red-500" />,
       content: (
         <div>
-          <p>Deseja cancelar este evento no Google Calendar?</p>
-          <p className="text-red-500 font-bold text-xs">
-            Atenção: Esta ação irá deletar permanentemente o evento do Calendar e limpar todos os campos relacionados (event_id, meet_link, etc.).
-          </p>
+          <p>O evento e o link do Meet saem do Google Agenda.</p>
+          <p>A solicitação continua aprovada no sistema e pode ser publicada de novo.</p>
         </div>
       ),
-      okText: 'Sim, Cancelar Evento',
+      okText: 'Remover do Google',
       okType: 'danger',
-      cancelText: 'Não',
+      cancelText: 'Cancelar',
+      autoFocusButton: 'cancel',
       onOk: async () => {
         try {
           await cancelSolicitacao(id);
@@ -454,6 +461,7 @@ export default function PreAgendaPage(): JSX.Element {
       okText: 'Resync',
       okType: 'danger',
       cancelText: 'Cancelar',
+      autoFocusButton: 'cancel',
       onOk: async () => {
         try {
           setBatchLoading(true);
@@ -595,8 +603,8 @@ export default function PreAgendaPage(): JSX.Element {
                 size="small"
                 danger
                 icon={<StopOutlined />}
-                onClick={() => handleCancel(record.id)}
-                aria-label="Cancelar evento no Google Calendar"
+                onClick={() => handleCancel(record)}
+                aria-label={`Remover do Google Agenda: ${rotuloDoEvento(record)}`}
               />
             )}
             <MeetLink href={record.meet_link} />

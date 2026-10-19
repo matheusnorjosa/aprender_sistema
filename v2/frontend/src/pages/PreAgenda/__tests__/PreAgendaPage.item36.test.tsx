@@ -1,13 +1,16 @@
 /**
  * Pré-agenda — achados do item 36 (19/10/2026, telas de evento).
  *
+ * - "Remover do Google" (antes "Cancelar evento", com "Sim, Cancelar Evento" e foco no OK) abre no
+ *   Cancelar, cita o evento e diz que a solicitação continua aprovada.
  * - Status do Google em pt-BR (os rótulos de `gcalRowActions`) e, em ERROR, o motivo que o backend
  *   gravou (`gcal_last_error`): antes só a Tag com o código cru (ERROR/NONE/PENDING).
  *
  * Reusa o harness de mocks do PreAgendaPage.publish.test.tsx. Modal.confirm (estático) não monta
  * no jsdom deste projeto: o teste espia a chamada (padrão das telas AdminDAT).
  */
-import { render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { Modal } from 'antd';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 const { listSolicitacoesMock, getStatusSummaryMock } = vi.hoisted(() => ({
@@ -102,5 +105,32 @@ describe('PreAgendaPage — status do Google em pt-BR, com o motivo do erro', ()
     for (const codigo of ['ERROR', 'NONE', 'PUBLISHED']) {
       expect(screen.queryByText(codigo)).not.toBeInTheDocument();
     }
+  });
+});
+
+describe('PreAgendaPage — remover do Google começa no Cancelar e cita o evento', () => {
+  const semModal = (): { destroy: () => void; update: () => void } => ({ destroy: vi.fn(), update: vi.fn() });
+  const EVENTO = '05/11/2099 09:00 · Juazeiro · Projeto Teste';
+
+  test('a confirmação abre no Cancelar, cita o evento e diz que a solicitação continua aprovada', async () => {
+    mockRows([row({ id: 9, municipio_nome: 'Juazeiro', gcal_status: 'PUBLISHED', external_event_id: 'asv9' })]);
+    render(<PreAgendaPage />);
+    await screen.findByText('Juazeiro');
+    const confirmacao = vi.spyOn(Modal, 'confirm').mockImplementation(semModal);
+
+    fireEvent.click(screen.getByRole('button', { name: `Remover do Google Agenda: ${EVENTO}` }));
+
+    await waitFor(() => expect(confirmacao).toHaveBeenCalledTimes(1));
+    const config = confirmacao.mock.calls[0]?.[0];
+    expect(config).toMatchObject({
+      autoFocusButton: 'cancel',
+      title: `Remover do Google Agenda: ${EVENTO}?`,
+      okText: 'Remover do Google',
+      cancelText: 'Cancelar',
+    });
+    const { container } = render(<>{config?.content}</>);
+    expect(container.textContent).toMatch(/continua aprovada/);
+    expect(container.textContent).not.toMatch(/event_id|meet_link/);
+    await act(async () => {});
   });
 });

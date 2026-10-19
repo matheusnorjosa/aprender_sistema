@@ -179,6 +179,12 @@ export default function PublicacaoSetorPage(): JSX.Element {
       setErroCarga(null);
     } catch (error) {
       if (seq !== seqRef.current) return;
+      // A página deixou de existir (a lista encolheu): volta uma. Sem isso, o erro tirava a
+      // paginação e o "Tentar de novo" repetia o mesmo 404.
+      if ((error as ApiErrorLike).status === 404 && page > 1) {
+        setPage((p) => Math.max(1, p - 1));
+        return;
+      }
       setErroCarga((error as Error).message || 'Erro desconhecido.');
     } finally {
       if (seq === seqRef.current) setLoading(false);

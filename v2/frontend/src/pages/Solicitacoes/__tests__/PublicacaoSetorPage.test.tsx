@@ -278,6 +278,28 @@ describe('PublicacaoSetorPage — estrutura e lista', () => {
     expect(params.get('page_size')).toBe('20');
   });
 
+  // A lista encolheu com a pessoa na página 2 (evento cancelado, virada do dia): o DRF responde 404
+  // "Página inválida". Sem recuo, o erro tirava a paginação e o "Tentar de novo" repetia o 404.
+  test('página que deixou de existir (404): volta uma página em vez de travar no erro', async () => {
+    listResponse = pageOf([makeSolic()], 25);
+    renderPage();
+    await screen.findByText('Vidas Em Rede');
+
+    fetchAPIMock.mockImplementation((url: string) => {
+      if (!isList(url)) return Promise.reject(new Error(url));
+      const pagina = new URL(url, 'https://x').searchParams.get('page');
+      return pagina === '2'
+        ? Promise.reject(apiError(404, { detail: 'Página inválida.' }))
+        : Promise.resolve(pageOf([makeSolic({ municipio_nome: 'Crato' })], 20));
+    });
+    fireEvent.click(screen.getByTitle('2'));
+
+    expect(await screen.findByText('Crato')).toBeInTheDocument();
+    const ultima = new URL(String(listCalls().at(-1)?.[0]), 'https://x').searchParams;
+    expect(ultima.get('page')).toBe('1');
+    expect(screen.queryByText('Não foi possível carregar a lista.')).not.toBeInTheDocument();
+  });
+
   test('latest-wins: resposta obsoleta não sobrescreve a mais recente', async () => {
     const pending: Array<(value: unknown) => void> = [];
     fetchAPIMock.mockImplementation((url: string) =>

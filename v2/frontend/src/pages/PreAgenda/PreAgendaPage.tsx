@@ -75,7 +75,7 @@ import { TIMING } from '../../constants/timing';
 import { usePolling } from '../../hooks/usePolling';
 import { syncChannel } from '../../services/syncChannel';
 import { FORTALEZA_TZ, formatFortaleza } from '../../utils/datetime';
-import { MOTIVO_NAO_PUBLICAVEL, gcalRowActions, motivoNaoPublicavel } from '../../utils/gcalRowActions';
+import { MOTIVO_NAO_PUBLICAVEL, gcalRowActions, motivoNaoPublicavel, type GcalRowTag } from '../../utils/gcalRowActions';
 import logger from '../../utils/logger';
 import type { ID, Solicitacao, GCalStatus, Gerencia, PaginatedResponse, Participation } from '../../types';
 import { formadoresLabel } from '../../utils/participants';
@@ -94,6 +94,16 @@ const { Title, Text } = Typography;
 
 /** Uma linha da célula, cortada com reticências (o texto inteiro fica no `title`). */
 const UMA_LINHA: CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
+
+// Contraste AA (4,5:1) do estado no Google: o preset do AntD pinta a cor 6 sobre a cor 1 (success 2,21,
+// processing 3,66, error 2,99:1) e o Text danger, a 12 px no branco, dá 3,27:1. Mesmo padrão de
+// TEXTO_DA_TAG (components/textoDaTag.ts), que só cobre green, orange e gold.
+const TEXTO_DA_TAG_GCAL: Partial<Record<GcalRowTag['color'], string>> = {
+  success: '#237804', // green-8: 5,44:1
+  processing: '#0958d9', // blue-7: 5,50:1
+  error: '#b32430', // red-8: 5,98:1
+};
+const COR_DO_MOTIVO_DO_ERRO = '#b32430'; // red-8: 6,54:1 no branco
 
 /**
  * Junta as listas dos fluxos na ordem de `?ordering=proximidade` do servidor: de hoje em diante, do
@@ -558,9 +568,9 @@ export default function PreAgendaPage(): JSX.Element {
             <div style={UMA_LINHA}>{formatFortaleza(record.inicio)}</div>
             <div style={UMA_LINHA} title={record.municipio_nome || undefined}>{record.municipio_nome || '-'}</div>
             <div style={UMA_LINHA} title={record.projeto_nome || undefined}>{record.projeto_nome || '-'}</div>
-            <Tag color={tag.color} style={{ whiteSpace: 'normal' }}>{tag.label}</Tag>
+            <Tag color={tag.color} style={{ whiteSpace: 'normal', color: TEXTO_DA_TAG_GCAL[tag.color] }}>{tag.label}</Tag>
             {record.gcal_status === 'ERROR' && record.gcal_last_error && (
-              <Text type="danger" style={{ fontSize: 12, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
+              <Text type="danger" style={{ color: COR_DO_MOTIVO_DO_ERRO, fontSize: 12, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
                 {record.gcal_last_error}
               </Text>
             )}

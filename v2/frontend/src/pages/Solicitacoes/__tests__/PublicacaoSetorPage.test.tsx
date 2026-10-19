@@ -232,6 +232,22 @@ describe('PublicacaoSetorPage — estrutura e lista', () => {
     expect(screen.getByText('Entrar na reunião')).toBeInTheDocument();
   });
 
+  test('Publicado, Publicando… e Erro, e o motivo do erro, com contraste AA (4,5:1)', async () => {
+    // O preset do AntD pinta a cor 6 sobre a cor 1 (2,21, 3,66 e 2,99:1); o Text danger dá 3,27:1.
+    listResponse = pageOf([
+      makeSolic({ id: 1, municipio_nome: 'Crato', gcal_status: 'ERROR', gcal_last_error: 'Motivo do Google.' }),
+      makeSolic({ id: 2, municipio_nome: 'Iguatu', gcal_status: 'PENDING' }),
+      makeSolic({ id: 3, municipio_nome: 'Quixadá', gcal_status: 'PUBLISHED', external_event_id: 'asv3' }),
+    ]);
+    renderPage();
+
+    const erro = (await screen.findByText('Crato')).closest('tr') as HTMLElement;
+    expect(within(erro).getByText('Erro')).toHaveStyle({ color: '#b32430' });
+    expect(within(erro).getByText('Motivo do Google.')).toHaveStyle({ color: '#b32430' });
+    expect(within(screen.getByText('Iguatu').closest('tr') as HTMLElement).getByText('Publicando…')).toHaveStyle({ color: '#0958d9' });
+    expect(within(screen.getByText('Quixadá').closest('tr') as HTMLElement).getByText('Publicado')).toHaveStyle({ color: '#237804' });
+  });
+
   test('(i) lista vazia mostra a copy do estado vazio com link para Nova Solicitação', async () => {
     renderPage();
     const empty = await screen.findByText(/Nenhum evento aprovado do seu setor a partir de hoje\./);

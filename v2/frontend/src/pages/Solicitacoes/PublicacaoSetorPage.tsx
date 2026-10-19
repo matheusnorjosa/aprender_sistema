@@ -32,7 +32,7 @@ import { syncChannel } from '../../services/syncChannel';
 import type { ID, Solicitacao } from '../../types';
 import type { PublishBlockReason } from '../../types/gcal';
 import { formatFortaleza } from '../../utils/datetime';
-import { gcalRowActions, type GcalRowAction } from '../../utils/gcalRowActions';
+import { gcalRowActions, type GcalRowAction, type GcalRowTag } from '../../utils/gcalRowActions';
 
 const { Title, Text } = Typography;
 
@@ -44,6 +44,16 @@ const GOOGLE_CONNECT_URL = `/api/oauth/google/start/?return_to=${encodeURICompon
 const LOAD_ERROR_KEY = 'publicacao-setor-load';
 /** Uma linha da célula, cortada com reticências (o texto inteiro fica no `title`). */
 const UMA_LINHA: CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
+
+// Contraste AA (4,5:1) do estado no Google: o preset do AntD pinta a cor 6 sobre a cor 1 (success 2,21,
+// processing 3,66, error 2,99:1) e o Text danger, a 12 px no branco, dá 3,27:1. Mesmo padrão de
+// TEXTO_DA_TAG (components/textoDaTag.ts), que só cobre green, orange e gold.
+const TEXTO_DA_TAG_GCAL: Partial<Record<GcalRowTag['color'], string>> = {
+  success: '#237804', // green-8: 5,44:1
+  processing: '#0958d9', // blue-7: 5,50:1
+  error: '#b32430', // red-8: 5,98:1
+};
+const COR_DO_MOTIVO_DO_ERRO = '#b32430'; // red-8: 6,54:1 no branco
 
 const BLOCK_REASON_TEXT: Record<PublishBlockReason, string> = {
   no_setor_scope:
@@ -316,10 +326,10 @@ export default function PublicacaoSetorPage(): JSX.Element {
             <div style={UMA_LINHA}>{formatFortaleza(row.inicio)}</div>
             <div style={UMA_LINHA} title={row.projeto_nome || undefined}>{row.projeto_nome || '-'}</div>
             <div style={UMA_LINHA} title={row.municipio_nome || undefined}>{row.municipio_nome || '-'}</div>
-            <Tag color={tag.color} style={{ whiteSpace: 'normal' }}>{tag.label}</Tag>
+            <Tag color={tag.color} style={{ whiteSpace: 'normal', color: TEXTO_DA_TAG_GCAL[tag.color] }}>{tag.label}</Tag>
             {row.gcal_status === 'ERROR' && row.gcal_last_error && (
               // O motivo do Google tem até 500 caracteres: quebra linha na célula em vez de esticar a tabela.
-              <Text type="danger" style={{ fontSize: 12, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
+              <Text type="danger" style={{ color: COR_DO_MOTIVO_DO_ERRO, fontSize: 12, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
                 {row.gcal_last_error}
               </Text>
             )}

@@ -381,9 +381,11 @@ def formadores_do_setor_options(request: Request) -> Response:
 
     Response:
     [
-        {"id": 1, "first_name": "João", "last_name": "Silva", "email": "joao@example.com"},
+        {"id": 1, "first_name": "João", "last_name": "Silva"},
         ...
     ]
+
+    Sem e-mail (SEC-ENUM-01, `UsuarioOptionSerializer`).
 
     Permissions: IsAuthenticated
     Cache: Não aplicável (resultado varia por usuário)

@@ -52,8 +52,9 @@ A configuração está em `config/settings.py`, no bloco `LOGGING`:
   `request_id`, `environment` e `service`
 - **Redação de PII** (todos os ambientes): o filtro `PIIRedactionFilter`
   (`apps/core/logging_filters.py`) está ligado em **todos** os handlers e mascara, antes da
-  formatação, e-mail (preservando o domínio) e CPF de 11 dígitos crus — backstop automático
-  de LGPD (art. 46, #1698). ⚠️ **Não** cobre CPF formatado (`123.456.789-00`): é defesa em
+  formatação, e-mail (preservando o domínio) e CPF cru (11 dígitos) ou formatado
+  (`123.456.789-00`), com a mesma regra de `apps/core/pii.py` (#1964) — backstop automático
+  de LGPD (art. 46, #1698). Não pega o login `user_<cpf>` (o `_` cola no CPF): é defesa em
   profundidade, não substitui a disciplina de não logar PII (ver a seção **Dados Sensíveis**)
 - `SERVICE_NAME` (`web`/`worker`/`beat`) vem do compose e é o que permite distinguir a
   origem da linha

@@ -24,8 +24,6 @@ from __future__ import annotations
 
 import logging
 import re
-import secrets
-import string
 from pathlib import Path
 from typing import Any
 
@@ -245,12 +243,6 @@ def _parse_name(nome: str) -> tuple[str, str]:
     return first_name, last_name
 
 
-def _generate_password(length: int = 12) -> str:
-    """Gera senha aleatoria segura."""
-    alphabet = string.ascii_letters + string.digits + "!@#$%"
-    return "".join(secrets.choice(alphabet) for _ in range(length))
-
-
 def _generate_username(cpf: str, email: str) -> str:
     """Gera username unico a partir do email ou CPF."""
     if email and "@" in email:
@@ -462,7 +454,6 @@ def _process_row(
     else:
         # Criar novo usuario
         username = _generate_username(cpf, email)
-        password = _generate_password()
 
         if not dry_run:
             usuario = Usuario.objects.create(
@@ -475,7 +466,8 @@ def _process_row(
                 cargo=cargo,
                 is_active=is_active,
             )
-            usuario.set_password(password)
+            # P27: sem senha inventada; quem administra define a senha pela tela de Usuários.
+            usuario.set_unusable_password()
             usuario.save(update_fields=["password"])
 
             # Atribuir grupos
@@ -527,8 +519,8 @@ def _assign_groups(usuario: Usuario, grupos: list[Group], *, actor: Any = None) 
         recusados = [str(g.name) for g in grupos if str(g.name) not in ALLOWED_USER_GROUPS]
         if recusados:
             logger.warning(
-                "usuarios_import: grupo(s) fora da allowlist recusado(s) para %s: %s",
-                getattr(usuario, "username", usuario),
+                "usuarios_import: grupo(s) fora da allowlist recusado(s) para user_id=%s: %s",
+                usuario.pk,
                 ", ".join(recusados),
             )
         # `add` e idempotente para M2M — nao precisa checar pertinencia antes.

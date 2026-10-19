@@ -36,7 +36,7 @@ from apps.core.services.gcal.minimize import _PLACEHOLDER, minimize_free_text
 # A regex de antes (referência para a equivalência). Quadrática: só roda em texto curto aqui.
 _EMAIL_ANTIGO = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 _CPF_MINIMIZE = re.compile(r"\b(?:\d{3}\.\d{3}\.\d{3}-\d{2}|\d{11})\b")
-_CPF_LOG = re.compile(r"\b\d{11}\b")
+_CPF_LOG = _CPF_MINIMIZE  # #1964: o log redige também o CPF formatado, com a regra de `pii.py`
 
 _ADVERSARIOS = [
     "a" * 200_000,

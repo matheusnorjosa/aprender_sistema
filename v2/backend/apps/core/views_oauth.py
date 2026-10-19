@@ -303,7 +303,7 @@ def google_oauth_start(request: Request) -> Response:
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        logger.info(f"🔐 OAuth start: {request.user.username} → Google consent screen")
+        logger.info(f"🔐 OAuth start: user_id={request.user.pk} → Google consent screen")
 
         return redirect(auth_url)
 
@@ -422,7 +422,7 @@ def google_oauth_callback(request: Request) -> Response:
         )
 
         action = "created" if created else "updated"
-        logger.info(f"✅ OAuth callback: credencial {action} para " f"{request.user.username} ({tokens['email']})")
+        logger.info(f"✅ OAuth callback: credencial {action} para user_id={request.user.pk} ({tokens['email']})")
 
         # Auditoria (PA-05)
         AuditLog.objects.create(
@@ -563,7 +563,7 @@ def google_oauth_disconnect(request: Request) -> Response:
         success = revoke_token(credential)
 
         if success:
-            logger.info(f"✅ OAuth disconnect: {request.user.username} ({google_email})")
+            logger.info(f"✅ OAuth disconnect: user_id={request.user.pk} ({google_email})")
 
             return Response({"message": "Conta Google desconectada com sucesso", "google_email": google_email})
         else:
@@ -627,7 +627,7 @@ def google_oauth_list_events(request: Request) -> Response:
             max_results=max_results,
         )
 
-        logger.info(f"📅 Listed {len(events)} events from {calendar_id} for {request.user.username}")
+        logger.info(f"📅 Listed {len(events)} events from {calendar_id} for user_id={request.user.pk}")
 
         return Response({"events": events, "calendar_id": calendar_id, "count": len(events)})
 
@@ -684,7 +684,7 @@ def google_oauth_list_calendars(request: Request) -> Response:
         client = OAuthCalendarClient(credential)
         calendars = client.list_calendars()
 
-        logger.info(f"📅 Listed {len(calendars)} calendars for {request.user.username}")
+        logger.info(f"📅 Listed {len(calendars)} calendars for user_id={request.user.pk}")
         for cal in calendars:
             logger.info(
                 f"  📅 {cal['summary']}: id={cal['id']}, "
@@ -746,7 +746,7 @@ def google_oauth_select_calendar(request: Request) -> Response:
         credential.default_calendar_id = calendar_id
         credential.save(update_fields=["default_calendar_id", "updated_at"])
 
-        logger.info(f"📅 Calendar selected: {request.user.username} → {calendar_id}")
+        logger.info(f"📅 Calendar selected: user_id={request.user.pk} → {calendar_id}")
 
         # Auditoria (PA-05)
         AuditLog.objects.create(

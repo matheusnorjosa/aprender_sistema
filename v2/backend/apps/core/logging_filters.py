@@ -11,12 +11,13 @@ import re
 import threading
 from typing import cast
 
+from apps.core.pii import redact_cpf
+
 # PII patterns para o PIIRedactionFilter.
 # S6 (auditoria 14/10, C5): sem backtracking quadrático; mesma forma e mesma explicação de
 # `services/gcal/minimize.py` (uma cadeia `a@b.c+d@e.f` casa num só match, um e-mail por `@`).
 _EMAIL = r"[\w.+-]+@[\w-]+\.[\w.-]+"
 _EMAIL_RE = re.compile(rf"(?<![\w.+-]){_EMAIL}(?:(?=\+){_EMAIL})*")
-_CPF_RE = re.compile(r"\b\d{11}\b")
 
 # Atributos que todo LogRecord tem. O resto veio do `extra=` de quem logou (ou de outro filtro).
 _ATRIBUTOS_PADRAO = frozenset(vars(logging.LogRecord("", 0, "", 0, "", (), None))) | {"message", "asctime"}
@@ -70,7 +71,8 @@ class PIIRedactionFilter(logging.Filter):
     pipeline scrubba de QUALQUER mensagem:
     - e-mail (ex.: google_email de OAuth) -> mantem o dominio, mascara o local:
       `***@dominio` (observabilidade sem identificar a pessoa).
-    - sequencia de 11 digitos (CPF, tambem username de usuarios importados) -> `<cpf>`.
+    - CPF cru (11 digitos, tambem o username) ou formatado (000.000.000-00) -> `<cpf>`, pela
+      mesma regra de `apps.core.pii.redact_cpf` (#1964: as duas copias tinham divergido).
 
     S5 (auditoria 14/10, C11): o JsonFormatter grava cada `extra` como campo proprio e o
     traceback inteiro, entao os valores texto dos `extra` (inclusive dentro de dict/lista) e o
@@ -89,7 +91,7 @@ class PIIRedactionFilter(logging.Filter):
     @classmethod
     def _redigir(cls, valor: object) -> object:
         if isinstance(valor, str):
-            return _CPF_RE.sub("<cpf>", _EMAIL_RE.sub(cls._mask_email, valor))
+            return redact_cpf(_EMAIL_RE.sub(cls._mask_email, valor))
         if isinstance(valor, dict):
             return {k: cls._redigir(v) for k, v in cast(dict[object, object], valor).items()}
         if isinstance(valor, list):

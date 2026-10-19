@@ -271,7 +271,7 @@ AuditLog.objects.filter(
 2. **Mapa completo `Cargo` → Função RBAC**: confirmar termos reais da coluna `Cargo`. O service hoje só armazena texto livre em `Usuario.cargo`; **não atribui Função RBAC automaticamente**. Se atribuição automática for desejada, exige feature nova (não está no roadmap atual).
 3. **Coluna `grupos` no service real** aceita lista separada por vírgula (`"DAT,Vidas,Formador"`). Confirmar se `sheets.banco` exporta nesse formato ou se prefere `gerencia` + `cargo` separados (transformação no client).
 4. **Política de email**: aceita emails pessoais (`@gmail.com`) ou só institucional?
-5. **Senha inicial**: o service hoje usa `set_unusable_password()` + token de reset (não confirmado se já dispara email; verificar `_process_row`). Se não dispara, criar fluxo de envio é PR separada.
+5. **Senha inicial**: a conta criada pelo import fica sem senha (`set_unusable_password()`, P27 em 19/10/2026; antes ganhava uma senha aleatória que ninguém via). Não há email nem token de reset: quem administra define a senha pela tela de Usuários.
 6. **Cargo `"Gerente"`** + Setor `"Superintendência"`: política definitiva. Hoje o service simplesmente grava no campo `cargo` (texto) — não atribui grupo `Gerente` automaticamente. Atribuição via grupos só acontece pela coluna `grupos` explícita **e com ator
 superusuário** (§8.1) — a coluna explícita é condição necessária, não suficiente.
 7. **`Assistente Administrativo` + `Controle`** (composite de aprovação): mesma situação. Atribuição automática violaria D17; só admin manual.

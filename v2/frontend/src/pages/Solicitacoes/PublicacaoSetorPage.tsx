@@ -40,8 +40,6 @@ const TITLE_ID = 'publicacao-setor-title';
 const PAGE_SIZE = 20;
 /** O OAuth volta para esta página (o backend valida o `return_to`). */
 const GOOGLE_CONNECT_URL = `/api/oauth/google/start/?return_to=${encodeURIComponent('/solicitacoes/publicacao')}`;
-/** Uma só mensagem de erro de carga na tela (o polling não empilha toasts). */
-const LOAD_ERROR_KEY = 'publicacao-setor-load';
 /** Uma linha da célula, cortada com reticências (o texto inteiro fica no `title`). */
 const UMA_LINHA: CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 
@@ -154,6 +152,9 @@ export default function PublicacaoSetorPage(): JSX.Element {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
+  // A lista não carregou: o motivo vai no lugar das linhas. Antes só um toast de 3 s, e a tabela
+  // ficava no vazio "Nenhum evento aprovado do seu setor", como se não houvesse o que publicar.
+  const [erroCarga, setErroCarga] = useState<string | null>(null);
   const [oauthReturn, setOauthReturn] = useState<OAuthReturn | null>(null);
 
   // Latest-wins: polling, paginação e ações disparam cargas concorrentes; só a
@@ -175,12 +176,10 @@ export default function PublicacaoSetorPage(): JSX.Element {
       if (seq !== seqRef.current) return;
       setRows(data.results);
       setTotal(data.count);
+      setErroCarga(null);
     } catch (error) {
       if (seq !== seqRef.current) return;
-      message.error({
-        key: LOAD_ERROR_KEY,
-        content: `Erro ao carregar os eventos: ${(error as Error).message}`,
-      });
+      setErroCarga((error as Error).message || 'Erro desconhecido.');
     } finally {
       if (seq === seqRef.current) setLoading(false);
     }
@@ -423,6 +422,8 @@ export default function PublicacaoSetorPage(): JSX.Element {
             dataSource={rows}
             loading={loading}
             nomeDaLinha={(row) => `${row.projeto_nome ?? 'Evento'}, ${formatFortaleza(row.inicio)}`}
+            erro={erroCarga}
+            onTentarDeNovo={() => { void load(); }}
             pagination={{
               current: page,
               pageSize: PAGE_SIZE,

@@ -243,6 +243,27 @@ describe('PublicacaoSetorPage — estrutura e lista', () => {
     );
   });
 
+  // Achado do item 36 (19/10/2026): a falha virava "Nenhum evento aprovado do seu setor".
+  test('falha ao carregar: o motivo e "Tentar de novo" no lugar do vazio que mandava criar solicitação', async () => {
+    fetchAPIMock.mockImplementation((url: string) =>
+      isList(url) ? Promise.reject(apiError(500, { detail: 'Erro interno do servidor.' })) : Promise.reject(new Error(url)),
+    );
+    renderPage();
+
+    const aviso = await screen.findByText('Não foi possível carregar a lista.');
+    expect(aviso.closest('[role="alert"]')).not.toBeNull();
+    expect(screen.getByText('Erro interno do servidor.')).toBeInTheDocument();
+    expect(screen.queryByText(/Nenhum evento aprovado do seu setor/)).not.toBeInTheDocument();
+
+    fetchAPIMock.mockImplementation((url: string) =>
+      isList(url) ? Promise.resolve(pageOf([makeSolic()])) : Promise.reject(new Error(url)),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+
+    expect(await screen.findByText('Vidas Em Rede')).toBeInTheDocument();
+    expect(screen.queryByText('Não foi possível carregar a lista.')).not.toBeInTheDocument();
+  });
+
   test('paginação no servidor: trocar de página pede page=2 com os mesmos filtros', async () => {
     listResponse = pageOf([makeSolic()], 25);
     renderPage();

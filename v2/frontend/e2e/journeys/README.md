@@ -39,7 +39,7 @@ Jornadas que dependem de aprovação têm duas variantes (J01a/J01b).
 | J11 | E-mail ao formador após aprovação | `@rf-email` | ⏳ | SMTP mock |
 | J12 | Dashboard Compras reflete criação em <3s | `@perf @dashboards` | ⏳ | — |
 | J13 | Formador escalado vê em "Minhas Formações" | `@rf-minhas` | ⏳ não escrita | #1163 (fechada em 27/04/2026) |
-| J14 | Gerente cria solicitação com setor auto | `@rbac @gerente` | ⏳ não escrita | #1165 (aberta) |
+| J14 | Gerente cria solicitação com setor auto | `@rbac @gerente` | ⏳ não escrita | #1165 (fechada em 19/10: coberta pelos testes de backend) |
 | J15 | Formador chama `/api/metrics/team/*` → 403 | `@rbac @dashboards` | ⏳ não escrita | #1166 (fechada em 27/04/2026) |
 | J16 | Formador chama `/api/gcal/dashboard/*` → 403 | `@rbac @dashboards` | ⏳ não escrita | #1166 (fechada em 27/04/2026) |
 | J17 | Formador (papel FORMADOR) digita `/bloqueios` → abre `/solicitacoes/bloqueios` e vê só os próprios bloqueios | `@rbac` | ⏳ não escrita | — (policy `access_availability_blocks` inclui o papel FORMADOR) |

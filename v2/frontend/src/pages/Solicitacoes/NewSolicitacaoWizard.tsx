@@ -74,6 +74,9 @@ const SIM_NAO = [
   { label: 'Não', value: false },
 ];
 
+/** Lista vazia estável (o `steps` memoizado depende do conflito do envio). */
+const SEM_BLOQUEADOS: BlockedParticipant[] = [];
+
 /** ComboBox value type */
 interface ComboBoxValue {
   id: ID;
@@ -203,8 +206,10 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   // backend aceita o vazio para o projeto escolhido (`responsavel_padrao` do lookup de projetos: papel
   // COORDENADOR na gerência do projeto, PR 9). Só entra na checagem de agenda se acompanhar.
   const [me, setMe] = useState<{ id: ID; nome: string } | null>(null);
-  // #1452: conflito devolvido pelo backend no submit (fecha o TOCTOU / cache).
-  const [submitConflito, setSubmitConflito] = useState<BlockedParticipant[]>([]);
+  // #1452: conflito devolvido pelo backend no submit (fecha o TOCTOU / cache). Vale para a
+  // `chave` (horário, município e participantes) com que foi enviado: mudou um deles, o
+  // conflito antigo deixa de valer e o Confirmar volta (o backend confere de novo no envio).
+  const [conflitoDoEnvio, setConflitoDoEnvio] = useState<{ chave: string; bloqueados: BlockedParticipant[] } | null>(null);
 
   // Estado do formulário
   const [formData, setFormData] = useState<FormDataType>({
@@ -376,7 +381,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   // Submit final
   const handleSubmit = async (): Promise<void> => {
     setLoading(true);
-    setSubmitConflito([]);
+    setConflitoDoEnvio(null);
     try {
       // Garantir que formadores é um array
       const formadores = Array.isArray(formData.formadores) ? formData.formadores : [];
@@ -453,7 +458,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
 
       if (payloadErro?.code === 'availability_conflict') {
         const bloqueados = payloadErro.errors?.blocked_participants ?? [];
-        setSubmitConflito(bloqueados);
+        setConflitoDoEnvio({ chave: chaveDoEnvio, bloqueados });
         message.error(payloadErro.detail || 'Um participante já está alocado neste horário.');
       } else {
         const detail = (data as { detail?: string })?.detail;
@@ -506,6 +511,15 @@ export default function NewSolicitacaoWizard(): JSX.Element {
       form.setFieldsValue({ formadorAvaliado: undefined });
     }
   }, [form]);
+
+  // O que o conflito do envio confere: se mudar, ele já não descreve o evento da tela.
+  const chaveDoEnvio = [
+    formData.inicio,
+    formData.fim,
+    formData.municipio?.id,
+    participantes.map(p => p.id).sort((a, b) => Number(a) - Number(b)).join(','),
+  ].join('|');
+  const submitConflito = conflitoDoEnvio?.chave === chaveDoEnvio ? conflitoDoEnvio.bloqueados : SEM_BLOQUEADOS;
 
   const preview = useAvailabilityPreview({
     inicio: formData.inicio,

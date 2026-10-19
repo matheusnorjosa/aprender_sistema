@@ -83,18 +83,22 @@ test.describe('Fluxo Solicitação → Google Calendar (Fake)', () => {
 
   /**
    * Test Case 1: Coordenador cria solicitação
+   *
+   * O TESTE E2E (fluxo SUPER) fica na gerência Super. Quem cria é o coord_vidas, que tem o papel
+   * COORDENADOR nela (seed_e2e_users), e o formador é o formador_vidas, com FORMADOR na Super. O
+   * coord_e2e só atua na GERENCIA E2E: o lookup não lhe mostra o projeto (PR 9).
    */
   test('1. Deve criar solicitação como Coordenador', async ({ page }) => {
     console.log('\n🧪 Test 1: Criar solicitação como Coordenador');
 
     // 1. Login
-    await loginAs(page, 'coord_e2e@test.com', 'testpass123');
+    await loginAs(page, 'coord_vidas@test.com', 'testpass123');
 
     // 2. Resolver IDs via lookup (evita depender de IDs fixos)
     const projeto = await getLookupItem(page, '/api/lookup/projetos/?q=E2E', 'TESTE E2E');
     const municipio = await getLookupItem(page, '/api/lookup/municipios/?q=Salvador', 'Salvador');
     const tipoEvento = await getLookupItem(page, '/api/lookup/tipos-evento/');
-    const formador = await getLookupItem(page, '/api/lookup/usuarios/?role=Formador', 'Formador E2E');
+    const formador = await getLookupItem(page, '/api/lookup/usuarios/?role=Formador', 'FormadorVidas');
 
     // 3. Obter CSRF token para POST autenticado
     const csrfResponse = await page.request.get('/api/csrf/');
@@ -258,35 +262,16 @@ test.describe('Fluxo Solicitação → Google Calendar (Fake)', () => {
       }
     }
 
-    // 1. Login (qualquer usuário autorizado)
-    await loginAs(page, 'super_e2e@test.com', 'testpass123');
+    // 1. Login. `/api/audit-logs/` exige `access_audit_logs`, que o controle_e2e recebe pelo vínculo
+    // EQUIPE na gerência CONTROLE (pacote CONTROLE). A aprovadora (super_e2e) recebe 403.
+    await loginAs(page, 'controle_e2e@test.com', 'testpass123');
 
-    // 2. Consultar AuditLog via API
-    // Endpoint pode variar: /api/audit-log/, /api/audit-logs/, etc.
-    const auditEndpoints = [
-      `/api/audit-log/?model_name=Solicitacao&object_id=${sharedSolicitacaoId}`,
-      `/api/audit-logs/?model_name=Solicitacao&object_id=${sharedSolicitacaoId}`,
-      `/api/audit/?model_name=Solicitacao&object_id=${sharedSolicitacaoId}`,
-    ];
+    // 2. Consultar AuditLog via API. O endpoint filtra por action, usuario e model_name; um 403 aqui
+    // é falha, não motivo para pular.
+    const auditResponse = await page.request.get('/api/audit-logs/?model_name=Solicitacao');
+    expect(auditResponse.status(), 'controle_e2e deveria ler /api/audit-logs/').toBe(200);
 
-    let auditResponse;
-    let auditFound = false;
-
-    for (const endpoint of auditEndpoints) {
-      auditResponse = await page.request.get(endpoint);
-      if (auditResponse.ok()) {
-        auditFound = true;
-        break;
-      }
-    }
-
-    if (!auditFound) {
-      console.warn('⚠️  Endpoint de AuditLog não encontrado, pulando validação...');
-      test.skip();
-      return;
-    }
-
-    const auditData = await auditResponse!.json();
+    const auditData = await auditResponse.json();
     const logs: AuditLog[] = (auditData as PaginatedResponse<AuditLog>).results || (auditData as AuditLog[]);
 
     // 3. Asserts: pelo menos 3 logs (PREVIEW_GCAL, APPROVE, PUBLISH_GCAL_REQUESTED)
@@ -301,7 +286,7 @@ test.describe('Fluxo Solicitação → Google Calendar (Fake)', () => {
     const createLog = logs.find((log) => log.action === 'CREATE');
     if (createLog) {
       expect(createLog.usuario).toBeDefined();
-      expect(createLog.timestamp).toBeDefined();
+      expect(createLog.created_at).toBeDefined();
       expect(createLog.details).toBeDefined();
     }
 

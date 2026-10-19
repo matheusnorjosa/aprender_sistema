@@ -92,15 +92,12 @@ export interface Aprovacao {
  * AuditLog
  */
 export interface AuditLog {
+  // Campos de AuditLogSerializer (apps/core/serializers/auditoria.py).
   id: number;
   usuario: number; // FK
   action: string; // CREATE, APPROVE, PUBLISH, etc.
-  model_name: string; // Solicitacao, Usuario, etc.
-  object_id: number;
   details: Record<string, any>;
-  timestamp: string;
-  ip_address?: string;
-  user_agent?: string;
+  created_at: string;
 }
 
 /**

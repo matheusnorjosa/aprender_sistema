@@ -3,9 +3,13 @@ Tests for IDOR protection in AvailabilityBlockViewSet.
 
 Issue #560 (C-03): Users should not be able to edit/delete blocks of other users.
 
-Security rules:
-- Regular users can only edit/delete their own blocks
-- Controle, Superintendência, and superusers can manage any block
+Regras (o poder vem da lotação desde o PR 12):
+- Quem não é privilegiado (a formadora, com o papel FORMADOR vigente) só edita e apaga os próprios
+  bloqueios; o de terceiro dá 404, mesmo na mesma gerência, sem revelar que existe.
+- O superusuário edita e apaga qualquer bloqueio.
+- Editar ou apagar bloqueio de terceiro como privilegiado (Controle, DAT) segue o gate de delegação
+  (GAP-1): `test_availability_block_gap1_mutation_gate.py` e
+  `test_rbac_papel_da_poder.py::TestBloqueioDelegado`.
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false
@@ -19,8 +23,8 @@ from rest_framework.test import APIClient
 
 import pytest
 
-from apps.core.models import AvailabilityBlock, EquipeGerencia, Gerencia
-from apps.core.tests.factories import GroupFactory, UsuarioFactory
+from apps.core.models import AvailabilityBlock, Gerencia
+from apps.core.tests.factories import UsuarioFactory, com_papel
 
 
 @pytest.fixture
@@ -30,26 +34,22 @@ def api_client():
 
 
 @pytest.fixture
-def grupo_controle(db):
-    """Grupo Controle."""
-    return GroupFactory(name="Controle")
+def gerencia_vidas(db):
+    """Gerência de lotação da formadora."""
+    return Gerencia.objects.create(nome="GERENCIA 2", nome_setor="Vidas")
 
 
 @pytest.fixture
-def grupo_superintendencia(db):
-    """Grupo Superintendência."""
-    return GroupFactory(name="Superintendência")
-
-
-@pytest.fixture
-def usuario_comum(db):
-    """Usuário comum sem privilégios especiais."""
-    return UsuarioFactory(
+def usuario_comum(db, gerencia_vidas):
+    """Formadora: o papel FORMADOR vigente, sem privilégio."""
+    user = UsuarioFactory(
         username="comum",
         email="comum@example.com",
         password="testpass123",
         cpf="11111111111",
     )
+    com_papel(user, "FORMADOR", gerencia_vidas)
+    return user
 
 
 @pytest.fixture
@@ -64,43 +64,10 @@ def outro_usuario(db):
 
 
 @pytest.fixture
-def gerencia_vidas(db):
-    """Gerência para testes de mesma gerência."""
-    return Gerencia.objects.create(nome="GERENCIA 2", nome_setor="Vidas")
-
-
-@pytest.fixture
 def usuarios_mesma_gerencia(db, gerencia_vidas, usuario_comum, outro_usuario):
-    """Coloca dois usuários comuns na mesma gerência."""
-    EquipeGerencia.objects.create(gerencia=gerencia_vidas, usuario=usuario_comum, papel="FORMADOR")
-    EquipeGerencia.objects.create(gerencia=gerencia_vidas, usuario=outro_usuario, papel="FORMADOR")
+    """As duas formadoras na mesma gerência."""
+    com_papel(outro_usuario, "FORMADOR", gerencia_vidas)
     return (usuario_comum, outro_usuario)
-
-
-@pytest.fixture
-def usuario_controle(db, grupo_controle):
-    """Usuário com permissão Controle."""
-    user = UsuarioFactory(
-        username="controle",
-        email="controle@example.com",
-        password="testpass123",
-        cpf="33333333333",
-    )
-    user.groups.add(grupo_controle)
-    return user
-
-
-@pytest.fixture
-def usuario_super(db, grupo_superintendencia):
-    """Usuário com permissão Superintendência."""
-    user = UsuarioFactory(
-        username="super",
-        email="super@example.com",
-        password="testpass123",
-        cpf="44444444444",
-    )
-    user.groups.add(grupo_superintendencia)
-    return user
 
 
 @pytest.fixture
@@ -122,27 +89,9 @@ def bloqueio_outro_usuario(db, outro_usuario):
     )
 
 
-@pytest.mark.skip(
-    reason=(
-        "Issue #1221 (Epic 1 RBAC Access Policy Realignment): após a mudança "
-        "de `IsAuthenticated` para `HasPerm('view_all_availability')` em "
-        "AvailabilityBlockViewSet, o cenário 'usuario comum sem perm acessa "
-        "bloqueio próprio' deixou de existir. Agora qualquer user sem "
-        "view_all_availability é 403 GLOBAL no endpoint. IDOR scope original "
-        "(C-03 issue #560) virou data-scope dentro de privileged users — "
-        "ver test_multi_sector_permissions para cenários ainda relevantes. "
-        "⚑ GAP-1 (2026-09-14): a regra C-03 'Controle/Super gerenciam qualquer "
-        "bloqueio' foi SUPERADA — update/destroy de bloqueio de terceiro agora "
-        "exige o gate de delegação (só superuser/Assistente Admin Controle/DAT); "
-        "sentinela em test_availability_block_gap1_mutation_gate.py."
-    )
-)
 @pytest.mark.django_db
 class TestAvailabilityBlockIDOR:
-    """
-    C-03: Tests for IDOR protection in AvailabilityBlockViewSet.
-    OBSOLETO após Issue #1221 — ver docstring do skip.
-    """
+    """C-03: proteção contra IDOR no AvailabilityBlockViewSet (permission_classes = IsAuthenticated)."""
 
     # =========================================================================
     # Tests for regular users (should be blocked)
@@ -269,50 +218,8 @@ class TestAvailabilityBlockIDOR:
         assert not AvailabilityBlock.objects.filter(id=block_id).exists()
 
     # =========================================================================
-    # Tests for privileged users (should be allowed)
+    # Superusuário (o privilegiado sem gate de delegação: ver GAP-1 no docstring do módulo)
     # =========================================================================
-
-    def test_controle_can_update_other_users_block(self, api_client, usuario_controle, bloqueio_outro_usuario):
-        """
-        C-03: Controle CAN update another user's block.
-        """
-        api_client.force_authenticate(usuario_controle)
-
-        response = api_client.patch(
-            f"/api/availability-blocks/{bloqueio_outro_usuario.id}/",
-            {"motivo": "Atualizado pelo Controle"},
-            format="json",
-        )
-
-        assert response.status_code == 200
-        bloqueio_outro_usuario.refresh_from_db()
-        assert bloqueio_outro_usuario.motivo == "Atualizado pelo Controle"
-
-    def test_controle_can_delete_other_users_block(self, api_client, usuario_controle, bloqueio_outro_usuario):
-        """
-        C-03: Controle CAN delete another user's block.
-        """
-        block_id = bloqueio_outro_usuario.id
-        api_client.force_authenticate(usuario_controle)
-
-        response = api_client.delete(f"/api/availability-blocks/{block_id}/")
-
-        assert response.status_code == 204
-        assert not AvailabilityBlock.objects.filter(id=block_id).exists()
-
-    def test_superintendencia_can_update_other_users_block(self, api_client, usuario_super, bloqueio_outro_usuario):
-        """
-        C-03: Superintendência CAN update another user's block.
-        """
-        api_client.force_authenticate(usuario_super)
-
-        response = api_client.patch(
-            f"/api/availability-blocks/{bloqueio_outro_usuario.id}/",
-            {"motivo": "Atualizado pela Superintendência"},
-            format="json",
-        )
-
-        assert response.status_code == 200
 
     def test_superuser_can_update_other_users_block(self, api_client, superuser, bloqueio_outro_usuario):
         """

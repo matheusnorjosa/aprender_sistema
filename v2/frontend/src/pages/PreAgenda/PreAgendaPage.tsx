@@ -104,6 +104,9 @@ const TEXTO_DA_TAG_GCAL: Partial<Record<GcalRowTag['color'], string>> = {
   error: '#b32430', // red-8: 5,98:1
 };
 const COR_DO_MOTIVO_DO_ERRO = '#b32430'; // red-8: 6,54:1 no branco
+// Pendente e reenviar: o gold-6 (#faad14) dá 1,90:1 no branco; publicado: o green-6 (#52c41a), 2,27:1.
+const COR_PENDENTE = '#ad4e00'; // orange-8: 5,43:1 no branco, 4,99:1 no bg-blue-50 da barra do lote
+const COR_PUBLICADO = '#237804'; // green-8: 5,59:1
 
 /**
  * Junta as listas dos fluxos na ordem de `?ordering=proximidade` do servidor: de hoje em diante, do
@@ -658,7 +661,7 @@ export default function PreAgendaPage(): JSX.Element {
                 icon={<SyncOutlined />}
                 onClick={() => handleResync(record.id)}
                 aria-label="Reenviar evento (forçar atualização)"
-                style={{ color: '#faad14', borderColor: '#faad14' }}
+                style={{ color: COR_PENDENTE, borderColor: COR_PENDENTE }}
               />
             )}
             {showCancel && (
@@ -860,14 +863,14 @@ export default function PreAgendaPage(): JSX.Element {
                   <Statistic
                     title="Pendentes"
                     value={summary.counts?.PENDING || 0}
-                    valueStyle={{ color: '#faad14' }}
+                    valueStyle={{ color: COR_PENDENTE }}
                   />
                 </Col>
                 <Col span={6}>
                   <Statistic
                     title="Publicados"
                     value={summary.counts?.PUBLISHED || 0}
-                    valueStyle={{ color: '#52c41a' }}
+                    valueStyle={{ color: COR_PUBLICADO }}
                   />
                 </Col>
                 <Col span={6}>
@@ -926,7 +929,7 @@ export default function PreAgendaPage(): JSX.Element {
                       icon={<SyncOutlined />}
                       onClick={handleBatchReapply}
                       loading={batchLoading}
-                      style={{ color: '#faad14', borderColor: '#faad14' }}
+                      style={{ color: COR_PENDENTE, borderColor: COR_PENDENTE }}
                     >
                       Reapply Selecionados
                     </Button>

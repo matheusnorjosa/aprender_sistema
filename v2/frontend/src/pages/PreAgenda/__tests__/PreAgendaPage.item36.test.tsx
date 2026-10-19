@@ -124,6 +124,25 @@ describe('PreAgendaPage — status do Google em pt-BR, com o motivo do erro', ()
     expect(within(screen.getByText('Sobral').closest('tr') as HTMLElement).getByText('Publicando…')).toHaveStyle({ color: '#0958d9' });
     expect(within(screen.getByText('Iguatu').closest('tr') as HTMLElement).getByText('Publicado')).toHaveStyle({ color: '#237804' });
   });
+
+  test('resumo, Reenviar e "Reapply Selecionados" sem o gold-6/green-6 (1,90 e 2,27:1 no branco)', async () => {
+    mockRows([row({ id: 1, municipio_nome: 'Crato', gcal_status: 'PUBLISHED', external_event_id: 'asv1' })]);
+    render(<PreAgendaPage />);
+    const linha = (await screen.findByText('Crato')).closest('tr') as HTMLElement;
+
+    const valorDo = (titulo: string) =>
+      screen.getByText(titulo).closest('.ant-statistic')!.querySelector('.ant-statistic-content') as HTMLElement;
+    expect(valorDo('Pendentes')).toHaveStyle({ color: '#ad4e00' }); // orange-8: 5,43:1
+    expect(valorDo('Publicados')).toHaveStyle({ color: '#237804' }); // green-8: 5,59:1
+    expect(within(linha).getByRole('button', { name: 'Reenviar evento (forçar atualização)' })).toHaveStyle({
+      color: '#ad4e00',
+      borderColor: '#ad4e00',
+    });
+
+    fireEvent.click(within(linha).getByRole('checkbox'));
+    // 4,99:1 sobre o bg-blue-50 da barra do lote
+    expect(await screen.findByRole('button', { name: /Reapply Selecionados/ })).toHaveStyle({ color: '#ad4e00' });
+  });
 });
 
 describe('PreAgendaPage — remover do Google começa no Cancelar e cita o evento', () => {

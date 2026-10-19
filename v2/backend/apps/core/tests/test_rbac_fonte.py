@@ -349,6 +349,7 @@ ESCOPO = "escopo de dado por cargo (PR 13)"
 DIAGNOSTICO = "diagnóstico do rbac_diff (só leitura)"
 SEED = "seed das capacidades dos grupos (a volta)"
 DEV_TOOLS = "dev_tools (desligado em produção)"
+VALIDACAO = "validação: o que o salvar muda (o DAT lota nas comuns, 17/10/2026)"
 
 LEITURAS_DE_GRUPO: tuple[tuple[str, str, str], ...] = (
     ("apps/core/admin.py", "obj.groups.values_list('pk', flat=True)", AUDITORIA),
@@ -368,6 +369,7 @@ LEITURAS_DE_GRUPO: tuple[tuple[str, str, str], ...] = (
     ("apps/core/rbac_signals.py", "instance.groups.values_list('id', flat=True)", CACHE),
     ("apps/core/rbac_signals.py", "instance.groups.values_list('id', flat=True)", CACHE),
     ("apps/core/serializers/usuario.py", "obj.groups.all()", EXIBICAO),
+    ("apps/core/serializers/usuario.py", "instance.groups.all()", VALIDACAO),
     (
         "apps/core/serializers/usuario.py",
         "serializers.PrimaryKeyRelatedField(many=True, queryset=Group.objects.all(), required=False, "

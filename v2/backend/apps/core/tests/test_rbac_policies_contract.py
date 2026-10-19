@@ -63,6 +63,7 @@ EXPECTED_PUBLIC_POLICY_KEYS_SORTED: list[str] = [
     "import_generic_spreadsheet",
     "manage_admin_registries",
     "manage_internal_actions",
+    "manage_lotacao_comum",  # O DAT lota nas gerências comuns (17/10/2026)
     "manage_purchases_and_materials",
     "manage_solicitacao_status",
     "publish_setor_solicitacao",

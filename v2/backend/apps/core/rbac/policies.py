@@ -198,6 +198,10 @@ ACCESS_POLICIES: Final[dict[str, frozenset[str]]] = {
     "import_generic_spreadsheet": frozenset({"import_spreadsheet", "run_daily_operations"}),
     # --- Admin registries (single-cap, mas vira policy pra estabilizar contrato) ---
     "manage_admin_registries": frozenset({"manage_admin_registries"}),
+    # Lotar nas gerências comuns pela tela de Usuários (decisão do dono de 17/10/2026): o DAT. Lotar no
+    # DAT, no Controle, na Diretoria ou como GERENTE da Superintendência segue só do superusuário
+    # (`lotacao_reservada`; a regra vive em `UsuarioAdminSerializer`).
+    "manage_lotacao_comum": frozenset({"manage_admin_registries"}),
     "manage_purchases_and_materials": frozenset({"manage_purchases_and_materials"}),
     # CRUD de ações internas / notificações (motivo legítimo: operar). Seed = 0
     # grupos (só superuser bypassa); elevada a policy pública para #1263
@@ -352,6 +356,10 @@ class CanManageAdminRegistries(_PolicyPermission):
     policy = "manage_admin_registries"
 
 
+class CanManageLotacaoComum(_PolicyPermission):
+    policy = "manage_lotacao_comum"
+
+
 class CanManagePurchasesAndMaterials(_PolicyPermission):
     policy = "manage_purchases_and_materials"
 
@@ -474,6 +482,8 @@ PUBLIC_POLICY_KEYS: Final[frozenset[str]] = frozenset(
         "access_travel",
         "execute_restricted_operations",
         "create_solicitation_without_purchase",
+        # O DAT lota nas gerências comuns (17/10/2026): a tela de Usuários libera os campos de lotação.
+        "manage_lotacao_comum",
     }
 )
 
@@ -830,4 +840,5 @@ __all__ = [
     "CanAccessTravel",
     "CanExecuteRestrictedOperations",
     "CanCreateSolicitationWithoutPurchase",
+    "CanManageLotacaoComum",
 ]

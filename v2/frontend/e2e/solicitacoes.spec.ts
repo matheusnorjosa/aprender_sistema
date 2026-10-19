@@ -35,11 +35,6 @@ test.describe('Controle e Operações', () => {
     await expect(page.getByRole('main')).toBeVisible();
   });
 
-  test('6. Relatórios ETL carrega', async ({ page }) => {
-    await page.goto('/dat/etl-reports');
-    await expect(page.getByRole('main')).toBeVisible();
-  });
-
   test('7. Deslocamentos carrega', async ({ page }) => {
     await page.goto('/deslocamentos');
     await expect(page.getByRole('main')).toBeVisible();

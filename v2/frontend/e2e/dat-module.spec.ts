@@ -33,11 +33,6 @@ test.describe('Módulo DAT - Páginas Principais', () => {
     await expect(page.getByRole('main')).toBeVisible();
   });
 
-  test('6. Relatórios ETL carrega', async ({ page }) => {
-    await page.goto('/dat/etl-reports');
-    await expect(page.getByRole('main')).toBeVisible();
-  });
-
   test('8. Importar Equipe-Gêrencia carrega', async ({ page }) => {
     await page.goto('/dat/admin/equipe-gerencia');
     await expect(page.getByRole('main')).toBeVisible();

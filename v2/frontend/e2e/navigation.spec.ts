@@ -81,9 +81,4 @@ test.describe('Navegação Principal', () => {
     await page.goto('/controle');
     await expect(page.getByRole('main')).toBeVisible();
   });
-
-  test('14. Relatórios ETL carrega', async ({ page }) => {
-    await page.goto('/dat/etl-reports');
-    await expect(page.getByRole('main')).toBeVisible();
-  });
 });

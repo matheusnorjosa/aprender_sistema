@@ -527,8 +527,8 @@ def _assign_groups(usuario: Usuario, grupos: list[Group], *, actor: Any = None) 
         recusados = [str(g.name) for g in grupos if str(g.name) not in ALLOWED_USER_GROUPS]
         if recusados:
             logger.warning(
-                "usuarios_import: grupo(s) fora da allowlist recusado(s) para %s: %s",
-                getattr(usuario, "username", usuario),
+                "usuarios_import: grupo(s) fora da allowlist recusado(s) para user_id=%s: %s",
+                usuario.pk,
                 ", ".join(recusados),
             )
         # `add` e idempotente para M2M — nao precisa checar pertinencia antes.

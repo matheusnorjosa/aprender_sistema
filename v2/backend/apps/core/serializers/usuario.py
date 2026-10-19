@@ -22,7 +22,7 @@ from rest_framework import serializers  # type: ignore[attr-defined]
 
 from apps.core.constants import FUNCAO_GROUPS, RESERVED_GROUPS, SETOR_GROUPS
 from apps.core.models import AuditLog, EquipeGerencia, Gerencia, GroupClassificacao, PermissaoFuncional
-from apps.core.pii import email_sem_cpf
+from apps.core.pii import email_sem_cpf, redact_cpf
 from apps.core.rbac import can_admin_mutate_target
 from apps.core.rbac.policies import solicitation_approval_basis
 from apps.core.services.audit import (
@@ -524,7 +524,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             actor=actor,
             action=AuditLog.Action.CREATE,
             model_name="Usuario",
-            details={"target_user_id": user.pk, "target_username": user.username},
+            details={"target_user_id": user.pk, "target_username": redact_cpf(user.username)},
             imediato=True,
         )
         auditar_privilege_flags(actor=actor, target_user=user, before=None, via="rest_api", imediato=True)
@@ -584,7 +584,11 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
                 actor=actor,
                 action=AuditLog.Action.UPDATE,
                 model_name="Usuario",
-                details={"target_user_id": user.pk, "target_username": user.username, "campos": cadastral_keys},
+                details={
+                    "target_user_id": user.pk,
+                    "target_username": redact_cpf(user.username),
+                    "campos": cadastral_keys,
+                },
                 imediato=True,
             )
 

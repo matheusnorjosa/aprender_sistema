@@ -768,8 +768,10 @@ describe('ApprovalsPage', () => {
 
     renderPage();
 
-    expect(await screen.findByRole('button', { name: `Ver prévia do evento: ${EVENTO_1}` })).toBeInTheDocument();
-  });
+    // Linha primeiro (texto, rápido) e o botão dentro dela: findByRole na tabela inteira é lento no CI.
+    const linha = (await screen.findByText('Municipio1')).closest('tr') as HTMLElement;
+    expect(await within(linha).findByRole('button', { name: `Ver prévia do evento: ${EVENTO_1}` }, { timeout: 10000 })).toBeInTheDocument();
+  }, 20000);
 
   test.each([
     ['Aprovar Selecionadas'],

@@ -627,6 +627,26 @@ describe('PublicacaoSetorPage — polling (d)', () => {
     await vi.advanceTimersByTimeAsync(TIMING.PUBLICACAO_PENDENTE_POLL_MS * 3);
     expect(listCalls()).toHaveLength(2);
   });
+
+  // Revisão do item 36: uma falha passageira do polling (429, rede do celular) trocava a lista certa
+  // pelo erro, tirava os botões da linha (o foco caía no body) e a tabela piscava no tick seguinte.
+  test('falha de um tick do polling: a lista que estava na tela fica, com um aviso só', async () => {
+    vi.useFakeTimers();
+    listResponse = pageOf([makeSolic({ gcal_status: 'PENDING' })]);
+    renderPage();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(screen.getByText('Vidas Em Rede')).toBeInTheDocument();
+
+    fetchAPIMock.mockImplementation((url: string) =>
+      isList(url) ? Promise.reject(apiError(429, { detail: 'Muitas requisições.' })) : Promise.reject(new Error(url)),
+    );
+    await act(() => vi.advanceTimersByTimeAsync(TIMING.PUBLICACAO_PENDENTE_POLL_MS));
+    expect(listCalls()).toHaveLength(2);
+
+    expect(screen.queryByText('Não foi possível carregar a lista.')).not.toBeInTheDocument();
+    expect(screen.getByText('Vidas Em Rede')).toBeInTheDocument();
+    expect(message.error).toHaveBeenCalledWith(expect.objectContaining({ key: expect.any(String) }));
+  });
 });
 
 // Achado do item 36 (19/10/2026): a tabela rolava na horizontal (scroll.x max-content) e, no

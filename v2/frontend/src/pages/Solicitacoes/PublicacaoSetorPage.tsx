@@ -40,6 +40,8 @@ const TITLE_ID = 'publicacao-setor-title';
 const PAGE_SIZE = 20;
 /** O OAuth volta para esta página (o backend valida o `return_to`). */
 const GOOGLE_CONNECT_URL = `/api/oauth/google/start/?return_to=${encodeURIComponent('/solicitacoes/publicacao')}`;
+/** Uma só mensagem de erro de carga em segundo plano (o polling não empilha toasts). */
+const LOAD_ERROR_KEY = 'publicacao-setor-load';
 /** Uma linha da célula, cortada com reticências (o texto inteiro fica no `title`). */
 const UMA_LINHA: CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 
@@ -161,7 +163,11 @@ export default function PublicacaoSetorPage(): JSX.Element {
   // mais recente grava na tela.
   const seqRef = useRef(0);
 
-  const load = useCallback(async (): Promise<void> => {
+  /**
+   * `silencioso`: carga em segundo plano (polling, outra aba). Se falhar, a lista que estava na tela
+   * fica, com um toast; o aviso no lugar das linhas é só para a carga pedida pela pessoa.
+   */
+  const load = useCallback(async (silencioso = false): Promise<void> => {
     const seq = ++seqRef.current;
     setLoading(true);
     try {
@@ -185,7 +191,14 @@ export default function PublicacaoSetorPage(): JSX.Element {
         setPage((p) => Math.max(1, p - 1));
         return;
       }
-      setErroCarga((error as Error).message || 'Erro desconhecido.');
+      if (!silencioso) {
+        setErroCarga((error as Error).message || 'Erro desconhecido.');
+        return;
+      }
+      message.error({
+        key: LOAD_ERROR_KEY,
+        content: `Erro ao carregar os eventos: ${(error as Error).message}`,
+      });
     } finally {
       if (seq === seqRef.current) setLoading(false);
     }
@@ -196,14 +209,14 @@ export default function PublicacaoSetorPage(): JSX.Element {
   }, [load]);
 
   // Só há o que acompanhar enquanto alguma publicação está em voo (PENDING).
-  usePolling(load, {
+  usePolling(() => load(true), {
     enabled: rows.some((row) => row.gcal_status === 'PENDING'),
     intervalMs: TIMING.PUBLICACAO_PENDENTE_POLL_MS,
     immediate: false,
   });
 
   // Mudança de solicitação em outra aba → recarrega.
-  useEffect(() => syncChannel.subscribe('solicitacoes', () => { void load(); }), [load]);
+  useEffect(() => syncChannel.subscribe('solicitacoes', () => { void load(true); }), [load]);
 
   // Volta do OAuth (?google=connected | ?google=error&reason=…): mostra o resultado,
   // tira os parâmetros da URL e recarrega o status da integração.

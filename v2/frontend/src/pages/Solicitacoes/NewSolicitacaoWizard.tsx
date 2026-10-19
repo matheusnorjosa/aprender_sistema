@@ -250,18 +250,28 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   const irPara = useCallback((destino: string): void => {
     void navigate(destino, { replace: entradaExtra.current });
   }, [navigate]);
-  const confirmarSaida = useCallback((sair: () => void, ficar?: () => void): void => {
-    Modal.confirm({
+  // O aviso aberto: o `Modal.confirm` não é ligado ao componente, então ele é fechado à mão
+  // quando o assistente sai da tela (não fica aberto sobre outra) e no Voltar do Android.
+  const aviso = useRef<ReturnType<typeof Modal.confirm> | null>(null);
+  const confirmarSaida = useCallback((sair: () => void): void => {
+    const fechou = (): void => {
+      aviso.current = null;
+    };
+    aviso.current = Modal.confirm({
       title: 'Sair sem criar a solicitação?',
       content: 'O que você preencheu será perdido.',
       okText: 'Sair e descartar',
       okType: 'danger',
       cancelText: 'Continuar preenchendo',
       autoFocusButton: 'cancel',
-      onOk: sair,
-      ...(ficar !== undefined && { onCancel: ficar }),
+      onOk: () => {
+        fechou();
+        sair();
+      },
+      onCancel: fechou,
     });
   }, []);
+  useEffect(() => () => aviso.current?.destroy(), []);
   const sairDoAssistente = (): void => {
     if (!preenchido) {
       irPara('/solicitacoes/minhas');
@@ -289,11 +299,20 @@ export default function NewSolicitacaoWizard(): JSX.Element {
       e.preventDefault();
     };
     const aoVoltar = (): void => {
-      entradaExtra.current = false;
+      // O Voltar consumiu a entrada repetida: ela volta na hora, senão o Voltar seguinte (o do
+      // Android para fechar o aviso) sairia do assistente sem perguntar.
+      segurarVoltar();
+      if (aviso.current) {
+        // Voltar com o aviso aberto fecha o aviso, como Continuar preenchendo.
+        aviso.current.destroy();
+        aviso.current = null;
+        return;
+      }
       confirmarSaida(() => {
         window.removeEventListener('popstate', aoVoltar);
-        window.history.back();
-      }, segurarVoltar);
+        // Passa pela entrada repetida e segue o Voltar que a pessoa pediu.
+        window.history.go(-2);
+      });
     };
     const aoClicar = (e: MouseEvent): void => {
       if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;

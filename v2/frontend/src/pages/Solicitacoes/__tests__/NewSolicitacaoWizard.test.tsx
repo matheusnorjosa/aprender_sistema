@@ -305,7 +305,7 @@ describe('NewSolicitacaoWizard - sair do assistente (item 36)', { timeout: 20000
 
   test('o Voltar do navegador (ou do Android) com algo preenchido pergunta antes de sair', async () => {
     const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
-    const voltar = vi.spyOn(window.history, 'back').mockImplementation(() => {});
+    const voltar = vi.spyOn(window.history, 'go').mockImplementation(() => {});
     const { unmount } = render(
       <MemoryRouter>
         <NewSolicitacaoWizard />
@@ -318,15 +318,55 @@ describe('NewSolicitacaoWizard - sair do assistente (item 36)', { timeout: 20000
     expect(confirmar).toHaveBeenCalledTimes(1);
     const opcoes = confirmar.mock.calls[0]![0];
     expect(opcoes).toMatchObject({ title: 'Sair sem criar a solicitação?', autoFocusButton: 'cancel' });
-
-    // Continuar preenchendo: o assistente segura o próximo Voltar de novo.
-    void opcoes.onCancel?.();
+    // Com o aviso aberto, o próximo Voltar já está segurado: a entrada repetida volta na hora.
     expect(window.history.length).toBe(entradas + 1);
-    // Sair e descartar: segue o Voltar que a pessoa pediu.
+    // Sair e descartar: segue o Voltar que a pessoa pediu, passando pela entrada repetida.
     void opcoes.onOk?.();
-    expect(voltar).toHaveBeenCalledTimes(1);
+    expect(voltar).toHaveBeenCalledWith(-2);
     unmount();
     voltar.mockRestore();
+    confirmar.mockRestore();
+  });
+
+  test('o Voltar do Android com o aviso aberto fecha o aviso e continua no assistente', async () => {
+    const destruir = vi.fn();
+    const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: destruir, update: vi.fn(), then: vi.fn() }) as never);
+    const voltar = vi.spyOn(window.history, 'go').mockImplementation(() => {});
+    const { unmount } = render(
+      <MemoryRouter>
+        <NewSolicitacaoWizard />
+      </MemoryRouter>
+    );
+    await preencher();
+
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    const entradas = window.history.length;
+    window.dispatchEvent(new PopStateEvent('popstate'));
+
+    expect(confirmar).toHaveBeenCalledTimes(1);
+    expect(destruir).toHaveBeenCalledTimes(1);
+    expect(voltar).not.toHaveBeenCalled();
+    // Segue segurando o Voltar seguinte.
+    expect(window.history.length).toBe(entradas + 1);
+    unmount();
+    voltar.mockRestore();
+    confirmar.mockRestore();
+  });
+
+  test('o aviso de sair não fica aberto sobre outra tela quando o assistente sai', async () => {
+    const destruir = vi.fn();
+    const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: destruir, update: vi.fn(), then: vi.fn() }) as never);
+    const { unmount } = render(
+      <MemoryRouter>
+        <NewSolicitacaoWizard />
+      </MemoryRouter>
+    );
+    await preencher();
+    fireEvent.click(sair());
+    expect(confirmar).toHaveBeenCalledTimes(1);
+
+    unmount();
+    expect(destruir).toHaveBeenCalledTimes(1);
     confirmar.mockRestore();
   });
 

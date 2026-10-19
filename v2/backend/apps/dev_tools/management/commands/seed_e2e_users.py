@@ -77,12 +77,13 @@ class Command(BaseCommand):
         # 4. Criar projetos (SUPER e NAO_SUPER para cobrir ambos os fluxos em E2E)
         self.stdout.write("\n4. Criando projetos de teste...")
         # PR 9: o projeto precisa ter gerência, e quem cria precisa atuar nela (coord_vidas cria os dois).
-        # Só no E2E o SUPER fica fora da SUPERINTENDENCIA: as aprovadoras daqui são globais pelo grupo.
+        # PR 11: o SUPER fica na SUPERINTENDENCIA (nome_setor "Super"), como em produção. As aprovadoras
+        # daqui aprovam pelo vínculo GERENTE nela, que só decide o SUPER dessa gerência; o grupo não aprova.
         projeto_super = self._upsert_projeto(
             codigo="E2E",
             nome="TESTE E2E",
             fluxo="SUPER",
-            gerencia_setor="Vidas",
+            gerencia_setor="Super",
         )
         projeto_nao_super = self._upsert_projeto(
             codigo="E2E_NS",
@@ -123,6 +124,10 @@ class Command(BaseCommand):
             ("gerente_vidas@test.com", "Vidas", "GERENTE"),
             ("formador_vidas@test.com", "Vidas", "FORMADOR"),
             ("formador_fluir@test.com", "Fluir", "FORMADOR"),
+            # PR 11 (P9-5): o SUPER fica na "Super"; quem cria (responsável) e os formadores das jornadas
+            # SUPER (j03, j06: formador_vidas) precisam de papel vigente nela.
+            ("coord_vidas@test.com", "Super", "COORDENADOR"),
+            ("formador_vidas@test.com", "Super", "FORMADOR"),
             # PR B1: aprovar = vínculo GERENTE vigente na SUPERINTENDENCIA (nome_setor "Super").
             ("super_e2e@test.com", "Super", "GERENTE"),
             ("super_geral@test.com", "Super", "GERENTE"),
@@ -193,7 +198,7 @@ class Command(BaseCommand):
         Por combinação setor × função (jornadas J01-J19 do plano QA 2026-04-22):
         - coord_vidas, coord_fluir, coord_acerta (Coordenador + setor)
         - gerente_vidas (Gerente + setor — jornada J14, issue #1165)
-        - super_geral (Gerente + Superintendência — PA-02 quorum composto)
+        - super_geral (Gerente, vínculo GERENTE na SUPERINTENDENCIA — PA-02; PR 11: sem o grupo Superintendência)
         - formador_vidas, formador_fluir (Formador + setor — jornadas J06, J11, J13)
         """
         users_data = [
@@ -215,7 +220,8 @@ class Command(BaseCommand):
                 "last_name": "E2E",
                 "cpf": "99900000002",
                 "password": "testpass123",
-                "groups": [grupos["Superintendência"], grupos["Gerente"]],
+                # PR 11: aprova pelo vínculo GERENTE na SUPERINTENDENCIA, sem o grupo Superintendência.
+                "groups": [grupos["Gerente"]],
                 "is_superuser": False,
             },
             {
@@ -291,7 +297,7 @@ class Command(BaseCommand):
                 "groups": [grupos["DAT"]],
                 "is_superuser": False,
             },
-            # === Gerente + Superintendência (PA-02 quorum composto) ===
+            # === Gerente da Superintendência (PA-02; PR 11: aprova pelo vínculo, sem o grupo) ===
             {
                 "username": "super_geral@test.com",
                 "email": "super_geral@test.com",
@@ -299,7 +305,7 @@ class Command(BaseCommand):
                 "last_name": "SuperGeral",
                 "cpf": "99900000021",
                 "password": "testpass123",
-                "groups": [grupos["Gerente"], grupos["Superintendência"]],
+                "groups": [grupos["Gerente"]],
                 "is_superuser": False,
             },
             # === Aprovador adicional (J08 race-condition com 3 supers em paralelo) ===
@@ -310,7 +316,7 @@ class Command(BaseCommand):
                 "last_name": "Approver03",
                 "cpf": "99900000022",
                 "password": "testpass123",
-                "groups": [grupos["Gerente"], grupos["Superintendência"]],
+                "groups": [grupos["Gerente"]],
                 "is_superuser": False,
             },
             # === Formadores por setor (jornadas J06, J11, J13) ===

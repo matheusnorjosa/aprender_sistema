@@ -24,6 +24,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
 )
 
 pytestmark = pytest.mark.django_db
@@ -45,6 +46,7 @@ def super_user():
     grupo_setor = GroupFactory(name="Superintendência")
     grupo_funcao = GroupFactory(name="Gerente")
     user.groups.add(grupo_setor, grupo_funcao)
+    com_pacote_do_controle(user)  # PR 11: aprova pelo vínculo no Controle (o par de grupos não aprova)
     return user
 
 

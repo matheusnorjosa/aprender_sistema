@@ -170,7 +170,7 @@ export default function HomePage(): JSX.Element {
         </>
       )}
 
-      {/* Aprovações (Superintendência/DAT) */}
+      {/* Aprovações (DAT, Controle e Superintendência) */}
       {canAccessApprovals && (
         <>
           <Title level={4} className="mt-6 mb-4">

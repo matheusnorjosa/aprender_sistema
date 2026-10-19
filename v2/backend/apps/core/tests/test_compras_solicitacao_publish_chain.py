@@ -31,6 +31,7 @@ from apps.core.tests.factories import (
     ProjetoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
     com_papel,
 )
 
@@ -80,9 +81,10 @@ def test_happy_path_import_compra_create_solicitacao_approve_and_publish():
     gerencia = GerenciaFactory()
     user_controle = _create_user_in_group(prefix="controle_chain", group_name="Controle")
     user_coordenador = _create_user_in_group(prefix="coord_chain", group_name="Coordenador", gerencia=gerencia)
-    # PR 3 hardening RBAC (2026-04-29): aprovar exige composite Setor Sup + Função Gerente.
+    # PR 11: aprova pelo vínculo no Controle (o par Superintendência + Gerente não aprova).
     user_super = _create_user_in_group(prefix="super_chain", group_name="Superintendência")
     com_papel(user_super, "GERENTE")
+    com_pacote_do_controle(user_super)
 
     municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
     projeto = ProjetoFactory(nome="Novo Lendo", codigo="NL", fluxo="SUPER", ativo=True, gerencia=gerencia)

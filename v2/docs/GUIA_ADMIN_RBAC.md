@@ -5,7 +5,8 @@ Este guia explica como gerenciar permissões de usuários no Aprender Sistema v2
 **Revisto em 2026-07-24** contra `apps/core/constants.py`, `apps/core/rbac/policies.py`,
 `apps/core/views/admin.py` e as telas do frontend. Correções principais desta revisão:
 as listas de Setor (9 → **13**) e Função (4 → **5**), o terceiro caminho de aprovação SUPER
-(Assistente Administrativo do Controle) e o fato de que **editar grupos virou superuser-only**.
+(na época, Assistente Administrativo do Controle; desde o PR 11 o Controle aprova pelo vínculo, não pelo
+grupo) e o fato de que **editar grupos virou superuser-only**.
 
 SSOT das listas: `SETOR_GROUPS`/`FUNCAO_GROUPS` (`v2/backend/apps/core/constants.py`).
 
@@ -72,18 +73,19 @@ A regra fica em `solicitation_approval_basis` (`apps/core/rbac/policies.py`), es
 **OU** estar **lotado como Gerente na gerência Superintendência** (vínculo vigente, sem depender de grupo). É assim
 que as aprovadoras são cadastradas: no formulário de Usuários, gerência Superintendência + função Gerente.
 
-**OU** ter **ambos** os grupos (regra antiga, sai no B2; o formulário recusa formar esse par sem querer):
-- Função **Gerente** + Setor **Superintendência**
+**OU** estar **lotado no DAT ou no Controle como Equipe ou Gerente** (vínculo vigente na `GERENCIA DAT` ou na
+gerência `CONTROLE`). O pacote do setor dá a capacidade de aprovar (PR 10 e PR 11). Só o superusuário faz essa lotação.
 
-**OU** ter **ambos** (`_user_has_solicitation_approvals`, via `user_is_assistente_administrativo_controle`):
-- Função **Assistente Administrativo** + Setor **Controle**
+Desde o PR 11 (17/10/2026) **nenhum grupo aprova**: os pares Gerente + Superintendência e Assistente Administrativo +
+Controle deixaram de dar o poder. A regra é `solicitation_approval_basis` (`apps/core/rbac/policies.py`).
 
 ### Exemplos
 
 | Usuário | Setor | Função | Pode Aprovar? |
 |---------|-------|--------|---------------|
 | Maria | Superintendência (lotação) | Gerente | ✅ **Sim** (vínculo) |
-| Beatriz | Controle | Assistente Administrativo | ✅ **Sim** (composite #1308) |
+| Beatriz | Controle (lotação Equipe) | Assistente Administrativo | ✅ **Sim** (pacote do Controle, PR 11) |
+| Bruna | Controle (só o grupo, sem lotação) | Assistente Administrativo | ❌ Não (grupo não aprova, PR 11) |
 | João | DAT | Gerente | ❌ Não (não é Superintendência) |
 | Pedro | Superintendência | Formador | ❌ Não (não é Gerente) |
 | Ana | Superintendência | Coordenador | ❌ Não (não é Gerente) |

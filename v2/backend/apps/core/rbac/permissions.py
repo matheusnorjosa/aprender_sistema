@@ -146,45 +146,11 @@ class SuperuserOnly(permissions.BasePermission):  # type: ignore[misc]
 # ============================================================================
 # Classes mantidas pós-Epic 5.3 — expressam lógica que `HasPerm(codename)`
 # não cobre:
-# - Composite rule (Setor × Função; sem consumidor, sai no PR 11)
 # - Object-level check (obj.usuario)
 # - Dynamic scope via query param
-# (`IsGerenteSuperintendencia` saiu no PR 8 das permissões, junto com `approve_solicitation_batch`.)
+# (`IsGerenteSuperintendencia` saiu no PR 8 das permissões, junto com `approve_solicitation_batch`;
+# `IsAssistenteAdministrativoControle` saiu no PR 11, com as bases de aprovação por grupo.)
 # ============================================================================
-
-
-class IsAssistenteAdministrativoControle(permissions.BasePermission):  # type: ignore[misc]
-    """
-    Regra composta fixa (PR 3 hardening RBAC, 2026-04-29):
-    - Setor Django "Controle"
-    - Função Django "Assistente Administrativo"
-
-    Sem consumidor de produção: a aprovação passa por `CanAccessSolicitationApprovals`
-    (`policies.solicitation_approval_basis`). Fica registrada para o PR 11.
-
-    Por design não usa `HasFunctionalPermission` como base: a regra é
-    estritamente composite role (Setor × Função). Cap funcional permanece
-    `approve_solicitation` no Setor `Superintendência` — composite garante
-    que apenas Setor `Controle` + Função `Assistente Administrativo` passe
-    por esta classe (Assistente fora do Controle ou Controle puro → 403).
-
-    Whitelist natural — composite documentado em RBAC_NAMING §3.
-    """
-
-    message = "Apenas Assistente Administrativo do Controle pode realizar esta ação."
-
-    def has_permission(self, request: Request, view: APIView) -> bool:
-        # PR 13 hardening RBAC (2026-05-04): a checagem composite virou
-        # helper reutilizável em `apps.core.rbac.helpers` para que o gate
-        # de delegação de bloqueios consuma o mesmo SSOT.
-        from apps.core.rbac.helpers import user_is_assistente_administrativo_controle
-
-        user = request.user
-        if not user or not user.is_authenticated:
-            return False
-        if getattr(user, "is_superuser", False):
-            return True
-        return user_is_assistente_administrativo_controle(user)
 
 
 class IsOwnerOrPrivileged(HasFunctionalPermission):  # type: ignore[misc]

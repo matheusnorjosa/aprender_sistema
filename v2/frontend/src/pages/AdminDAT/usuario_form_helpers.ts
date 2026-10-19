@@ -99,7 +99,7 @@ export function buildUsuarioPayload(
   };
 }
 
-/** Setores que compõem um par aprovador; espelha `APPROVER_COMPOSITES` (`apps/core/rbac/helpers.py`). */
+/** Setores que não viram grupo pela lotação; espelha `SETORES_RESERVADOS` (`apps/core/services/equipe_gerencia.py`). */
 const SETORES_DE_PAR_APROVADOR = new Set(['Superintendência', 'Controle']);
 
 interface GrupoLike {
@@ -112,6 +112,17 @@ interface GerenciaLike {
   id: ID;
   nome: string;
   setor_canonico?: string | null | undefined;
+}
+
+/**
+ * Gerências cujo perfil dá pacote a Equipe e Gerente; espelha `PERFIL_PERMITIDO`
+ * (`apps/core/services/rbac_pacotes.py`). PR 11: os dois pacotes aprovam solicitações.
+ */
+const GERENCIAS_COM_PACOTE = new Set(['GERENCIA DAT', 'CONTROLE']);
+
+/** A gerência dá o pacote do setor (DAT ou Controle) a quem é Equipe ou Gerente nela? */
+export function gerenciaDaPacote(gerencia: Pick<GerenciaLike, 'nome'> | undefined): boolean {
+  return gerencia !== undefined && GERENCIAS_COM_PACOTE.has(gerencia.nome);
 }
 
 /**

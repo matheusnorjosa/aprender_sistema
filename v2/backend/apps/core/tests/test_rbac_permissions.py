@@ -21,7 +21,7 @@ import pytest
 
 from apps.core.constants import FUNCAO_GROUPS, SETOR_GROUPS
 from apps.core.models import Usuario
-from apps.core.tests.factories import GroupFactory, UsuarioFactory
+from apps.core.tests.factories import GroupFactory, UsuarioFactory, com_pacote_do_controle
 
 
 class TestRBACConstants(TestCase):
@@ -115,8 +115,8 @@ class TestCanApproveSuperLogic(TestCase):
         self.assertTrue(response.data["can_approve_super"])
         self.assertTrue(response.data["is_superuser"])
 
-    def test_gerente_superintendencia_can_approve_super(self):
-        """Superintendência pode aprovar SUPER (independente de função)."""
+    def test_par_superintendencia_gerente_sem_vinculo_nao_aprova_super(self):
+        """PR 11: o par de grupos Superintendência + Gerente não aprova (só o vínculo GERENTE em g1)."""
         user = self._create_user_with_groups(
             "gerente_super",
             setores=["Superintendência"],
@@ -126,7 +126,7 @@ class TestCanApproveSuperLogic(TestCase):
         response = self.client.get("/api/me/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.data["can_approve_super"])
+        self.assertFalse(response.data["can_approve_super"])
         self.assertIn("Gerente", response.data["funcoes"])
         self.assertIn("Superintendência", response.data["setores"])
 
@@ -200,12 +200,13 @@ class TestCanApproveSuperLogic(TestCase):
         self.assertFalse(response.data["can_approve_super"])
 
     def test_asst_admin_controle_can_approve_super(self):
-        """PR 3 hardening RBAC: Controle + Assistente Administrativo aprova."""
+        """PR 11: quem trabalha no Controle (vínculo EQUIPE) aprova, com ou sem o par de grupos."""
         user = self._create_user_with_groups(
             "asst_admin_controle",
             setores=["Controle"],
             funcoes=["Assistente Administrativo"],
         )
+        com_pacote_do_controle(user)
         self.client.force_authenticate(user=user)
         response = self.client.get("/api/me/")
 

@@ -41,7 +41,7 @@ docker exec aprender_dev-web-1 pytest apps/core/tests/test_approval_policy_PA.py
 **Validates**:
 - Policy permission `CanAccessSolicitationApprovals` (from `apps.core.rbac`) blocks non-authorized users
 - 403 Forbidden for Coordenador/Formador on approve/reject endpoints
-- Only **superuser OU (Gerente + Superintendência)** can approve/reject
+- Who approves/rejects: single rule solicitation_approval_basis; see PA-02 in v2/docs/specs/domain/politica-aprovacao.spec.md (no group grants approval)
 
 #### PA-03: Post-Approval Triggers
 - [ ] `test_calendar_integration_not_called_before_approval`
@@ -165,7 +165,7 @@ Check:
 - [ ] Component imports `getMe` from API
 - [ ] `useEffect` calls `getMe()` on mount
 - [ ] State `canApprove` is set based on the canonical rule:
-  - superuser OR (Gerente + Superintendência)
+  - single rule solicitation_approval_basis; see PA-02 in v2/docs/specs/domain/politica-aprovacao.spec.md (no group grants approval)
 - [ ] Approve/Reject buttons only render if:
   - `record.status === 'pendente' && canApprove`
 

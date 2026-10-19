@@ -36,6 +36,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
     com_papel,
     liberar_par,
 )
@@ -118,6 +119,7 @@ def aprovador():
     user = UsuarioFactory(username="gerente_motivo", first_name="Carla", last_name="Gerente")
     user.groups.add(GroupFactory(name="Superintendência"))
     com_papel(user, "GERENTE")
+    com_pacote_do_controle(user)  # PR 11: aprova pelo vínculo no Controle (o par de grupos não aprova)
     return user
 
 

@@ -6,8 +6,8 @@
  *   a gerência de uma aprovadora não pode ser um jeito de salvar sem revogar).
  * - A prévia "Permissões efetivas" espelha o backend (`_apply_lotacao`): os grupos atuais
  *   que não são FUNÇÃO ficam; as funções vêm do form; o grupo de setor da gerência só
- *   entra/sai quando a gerência muda; setor de par aprovador (Superintendência, Controle)
- *   não vira grupo.
+ *   entra/sai quando a gerência muda; setor reservado (Superintendência, Controle) não vira
+ *   grupo.
  */
 
 import { describe, expect, test } from 'vitest';

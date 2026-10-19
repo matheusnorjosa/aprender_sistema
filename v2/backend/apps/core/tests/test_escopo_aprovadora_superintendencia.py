@@ -38,6 +38,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
     liberar_par,
 )
 
@@ -72,6 +73,17 @@ def outra_gerencia() -> Gerencia:
 @pytest.fixture
 def aprovadora(g1) -> Usuario:
     return _aprovadora(g1)
+
+
+def _controle(user: Usuario) -> Usuario:
+    """PR 11: dá a `user` o vínculo EQUIPE no Controle, a base ampla (`capacidade_aprovar`) por vínculo."""
+    com_pacote_do_controle(user)
+    return user
+
+
+def _par_controle() -> Usuario:
+    """Perfil da u7 em produção: o par de grupos e o vínculo EQUIPE no Controle."""
+    return _controle(UsuarioFactory(groups=["Controle", "Assistente Administrativo"], groups__vinculo=False))
 
 
 def _aprovadora(g1: Gerencia, groups: tuple[str, ...] = ("Gerente",), **kwargs) -> Usuario:
@@ -200,15 +212,15 @@ def test_aprovadora_restrita_por_persona(g1):
     # Controle puro não aprova: a única base de aprovação continua sendo o vínculo.
     assert aprovadora_restrita_a_superintendencia(_aprovadora(g1, groups=("Gerente", "Controle"))) is True
     assert aprovadora_restrita_a_superintendencia(_aprovadora(g1, superuser=True)) is False
+    # PR 11: os pares de grupos não são base; só o vínculo no Controle tira a restrição.
     assert (
         aprovadora_restrita_a_superintendencia(_aprovadora(g1, groups=("Controle", "Assistente Administrativo")))
-        is False
+        is True
     )
-    assert aprovadora_restrita_a_superintendencia(_aprovadora(g1, groups=("Superintendência", "Gerente"))) is False
+    assert aprovadora_restrita_a_superintendencia(_aprovadora(g1, groups=("Superintendência", "Gerente"))) is True
+    assert aprovadora_restrita_a_superintendencia(_controle(_aprovadora(g1))) is False
     assert aprovadora_restrita_a_superintendencia(UsuarioFactory(groups=["Gerente"])) is False
-    assert aprovadora_restrita_a_superintendencia(UsuarioFactory(groups=["Controle", "Assistente Administrativo"])) is (
-        False
-    )
+    assert aprovadora_restrita_a_superintendencia(_par_controle()) is False
 
 
 def test_solicitation_approval_basis_for_por_persona(g1, outra_gerencia):
@@ -220,15 +232,13 @@ def test_solicitation_approval_basis_for_por_persona(g1, outra_gerencia):
     # (persona, base dentro do escopo, base fora do escopo)
     casos = [
         ("aprovadora", _aprovadora(g1), "gerente_superintendencia", None),
-        ("asst", UsuarioFactory(groups=list(asst)), "asst_admin_controle", "asst_admin_controle"),
+        ("controle", _par_controle(), "capacidade_aprovar", "capacidade_aprovar"),
         ("superuser", UsuarioFactory(superuser=True), "superuser", "superuser"),
-        (
-            "legado",
-            UsuarioFactory(groups=["Superintendência", "Gerente"]),
-            "grupo_superintendencia_gerente",
-            "grupo_superintendencia_gerente",
-        ),
-        ("aprovadora_com_asst", _aprovadora(g1, groups=asst), "gerente_superintendencia", "asst_admin_controle"),
+        # PR 11: grupo não aprova.
+        ("par_controle_sem_vinculo", UsuarioFactory(groups=list(asst)), None, None),
+        ("legado", UsuarioFactory(groups=["Superintendência", "Gerente"]), None, None),
+        ("aprovadora_com_asst", _aprovadora(g1, groups=asst), "gerente_superintendencia", None),
+        ("aprovadora_no_controle", _controle(_aprovadora(g1)), "gerente_superintendencia", "capacidade_aprovar"),
         ("dat", UsuarioFactory(groups=["DAT"]), None, None),
     ]
 
@@ -285,16 +295,16 @@ def test_aprovadora_decide_super_da_g1_alheia(aprovadora, g1, acao, status_final
 
 
 @pytest.mark.parametrize(
-    ("kwargs", "autoridade"),
+    ("persona", "autoridade"),
     [
-        pytest.param({"groups": ["Controle", "Assistente Administrativo"]}, "asst_admin_controle", id="asst"),
-        pytest.param({"superuser": True}, "superuser", id="superuser"),
+        pytest.param(_par_controle, "capacidade_aprovar", id="controle"),
+        pytest.param(lambda: UsuarioFactory(superuser=True), "superuser", id="superuser"),
     ],
 )
 @pytest.mark.parametrize("caso", ["super_outra_gerencia", "nao_super_outra_gerencia", "super_sem_gerencia"])
-def test_base_ampla_decide_fora_do_escopo(g1, outra_gerencia, kwargs, autoridade, caso):
-    """Pin: a regra não toca Controle (par) nem superuser."""
-    user = UsuarioFactory(**kwargs)
+def test_base_ampla_decide_fora_do_escopo(g1, outra_gerencia, persona, autoridade, caso):
+    """Pin: a regra não toca o Controle (vínculo) nem o superuser."""
+    user = persona()
     sol = _fora_do_escopo(caso, g1, outra_gerencia)
 
     resp = _client(user).patch(f"/api/solicitacoes/{sol.id}/approve/", format="json")
@@ -338,16 +348,16 @@ def test_lote_propria_fora_do_escopo_para_na_autoaprovacao(aprovadora, outra_ger
     assert [e["code"] for e in resp.json()["errors"]] == ["self_approval_forbidden"]
 
 
-def test_gerente_de_g1_com_o_par_controle_decide_fora_com_autoridade_do_par(g1, outra_gerencia):
+def test_gerente_de_g1_no_controle_decide_fora_com_autoridade_da_capacidade(g1, outra_gerencia):
     """Quem também tem base ampla não é restringido; o AuditLog grava a base que valeu."""
-    user = _aprovadora(g1, groups=("Controle", "Assistente Administrativo"))
+    user = _controle(_aprovadora(g1, groups=("Controle", "Assistente Administrativo")))
     fora = _sol("SUPER", outra_gerencia)
     dentro = _sol("SUPER", g1)
 
     assert _client(user).patch(f"/api/solicitacoes/{fora.id}/approve/", format="json").status_code == 200
     assert _client(user).patch(f"/api/solicitacoes/{dentro.id}/approve/", format="json").status_code == 200
 
-    assert _audit(fora)[0].details["autoridade"] == "asst_admin_controle"
+    assert _audit(fora)[0].details["autoridade"] == "capacidade_aprovar"
     assert _audit(dentro)[0].details["autoridade"] == "gerente_superintendencia"
 
 
@@ -407,12 +417,12 @@ def test_lote_fora_do_escopo_nao_faz_query_por_item(aprovadora, outra_gerencia, 
 
 
 @pytest.mark.parametrize(("url", "contador", "status_final", "verbo"), _LOTES)
-def test_lote_da_gerente_de_g1_com_o_par_controle_grava_autoridade_por_item(
+def test_lote_da_gerente_de_g1_no_controle_grava_autoridade_por_item(
     g1, outra_gerencia, url, contador, status_final, verbo
 ):
-    """Persona mista: dentro do escopo vale o vínculo; fora, o par Controle. A medição pós-deploy
+    """Persona mista: dentro do escopo vale o vínculo em g1; fora, o do Controle. A medição pós-deploy
     ("gerente_superintendencia fora do escopo = 0") depende disso também no lote."""
-    user = _aprovadora(g1, groups=("Controle", "Assistente Administrativo"))
+    user = _controle(_aprovadora(g1, groups=("Controle", "Assistente Administrativo")))
     dentro = _sol("SUPER", g1)
     fora = _sol("SUPER", outra_gerencia)
 
@@ -421,18 +431,18 @@ def test_lote_da_gerente_de_g1_com_o_par_controle_grava_autoridade_por_item(
     assert resp.status_code == 200, resp.content
     assert resp.json()[contador] == 2
     assert _audit(dentro)[0].details["autoridade"] == "gerente_superintendencia"
-    assert _audit(fora)[0].details["autoridade"] == "asst_admin_controle"
+    assert _audit(fora)[0].details["autoridade"] == "capacidade_aprovar"
 
 
 @pytest.mark.parametrize(
-    "kwargs",
+    "persona",
     [
-        pytest.param({"groups": ["Controle", "Assistente Administrativo"]}, id="asst"),
-        pytest.param({"superuser": True}, id="superuser"),
+        pytest.param(_par_controle, id="controle"),
+        pytest.param(lambda: UsuarioFactory(superuser=True), id="superuser"),
     ],
 )
-def test_base_ampla_decide_fora_do_escopo_em_lote(g1, outra_gerencia, kwargs):
-    user = UsuarioFactory(**kwargs)
+def test_base_ampla_decide_fora_do_escopo_em_lote(g1, outra_gerencia, persona):
+    user = persona()
     fora = [_sol("SUPER", outra_gerencia), _sol("NAO_SUPER", outra_gerencia), _sol("SUPER", None)]
 
     resp = _client(user).post("/api/solicitacoes/batch-approve/", {"ids": [s.id for s in fora]}, format="json")
@@ -756,10 +766,10 @@ def test_home_da_aprovadora_conta_so_o_que_ela_decide(aprovadora, g1, outra_gere
     assert resp.json()["pending_approvals"] == 1
 
 
-def test_home_do_asst_admin_controle_conta_tudo(g1, outra_gerencia):
+def test_home_do_controle_conta_tudo(g1, outra_gerencia):
     _sol("SUPER", g1)
     _sol("SUPER", outra_gerencia)
 
-    resp = _client(UsuarioFactory(groups=["Controle", "Assistente Administrativo"])).get("/api/stats/home/")
+    resp = _client(_par_controle()).get("/api/stats/home/")
 
     assert resp.json()["pending_approvals"] == 2

@@ -50,7 +50,7 @@ class AvailabilityBlock(models.Model):
     )
     # PR 13 hardening RBAC (2026-05-04): separa `usuario` (target) de
     # `created_by` (delegate). Quando `created_by != usuario`, indica
-    # bloqueio delegado por Asst Admin Controle / DAT / Superuser.
+    # bloqueio delegado pelo Controle / DAT / Superuser.
     # Registros antigos: NULL (owner é o próprio `usuario`).
     created_by = models.ForeignKey(  # type: ignore[misc]
         "core.Usuario",

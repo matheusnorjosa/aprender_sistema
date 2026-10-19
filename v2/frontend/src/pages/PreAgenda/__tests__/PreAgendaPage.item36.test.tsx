@@ -134,3 +134,45 @@ describe('PreAgendaPage — remover do Google começa no Cancelar e cita o event
     await act(async () => {});
   });
 });
+
+// A lista lê no máximo 100 aprovados por fluxo. Pedia sem ordem (o padrão do servidor é -inicio):
+// vinham os 100 mais distantes no futuro e os desta semana sumiam, sem aviso.
+describe('PreAgendaPage — os mais próximos primeiro, e aviso quando a lista é cortada', () => {
+  const dataDaLinha = (tr: Element): string => tr.querySelector('td:nth-child(2)')?.textContent ?? '';
+
+  test('pede os dois fluxos do mais próximo ao mais distante e intercala as duas listas', async () => {
+    mockRows(
+      [row({ id: 1, municipio_nome: 'SuperLonge', inicio: '2099-12-20T12:00:00Z', fim: '2099-12-20T15:00:00Z' })],
+      [row({ id: 2, municipio_nome: 'NaoSuperPerto', inicio: '2099-01-10T12:00:00Z', fim: '2099-01-10T15:00:00Z' })],
+    );
+    render(<PreAgendaPage />);
+    await screen.findByText('SuperLonge');
+
+    for (const flow of ['SUPER', 'NAO_SUPER']) {
+      expect(listSolicitacoesMock).toHaveBeenCalledWith(expect.objectContaining({ flow, ordering: 'proximidade' }));
+    }
+    const linhas = Array.from(document.querySelectorAll('tr.ant-table-row'));
+    expect(linhas.map((tr) => tr.textContent?.includes('NaoSuperPerto'))).toEqual([true, false]);
+    expect(dataDaLinha(linhas[0] as Element)).toContain('10/01/2099');
+  });
+
+  test('servidor tem mais do que veio: avisa quantos estão na tela e como achar o resto', async () => {
+    listSolicitacoesMock.mockImplementation((f: { flow: string }) =>
+      Promise.resolve(f.flow === 'SUPER' ? { results: [row({ id: 1, municipio_nome: 'Crato' })], count: 140 } : { results: [], count: 0 }),
+    );
+    render(<PreAgendaPage />);
+    await screen.findByText('Crato');
+
+    const aviso = screen.getByText(/Mostrando 1 de 140 eventos aprovados/);
+    expect(aviso.closest('[role="status"]')).not.toBeNull();
+    expect(aviso.textContent).toMatch(/filtre por data, gerência ou busca/i);
+  });
+
+  test('sem corte, sem aviso', async () => {
+    mockRows([row({ id: 1, municipio_nome: 'Crato' })]);
+    render(<PreAgendaPage />);
+    await screen.findByText('Crato');
+
+    expect(screen.queryByText(/Mostrando \d+ de/)).not.toBeInTheDocument();
+  });
+});

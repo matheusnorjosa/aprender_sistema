@@ -37,7 +37,7 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { TableRowSelection } from 'antd/es/table/interface';
-import type { Dayjs } from 'dayjs';
+import dayjs, { type Dayjs } from 'dayjs';
 import {
   EyeOutlined,
   CloudUploadOutlined,
@@ -75,7 +75,7 @@ import GoogleIntegrationCard from '../../components/google/GoogleIntegrationCard
 import { TIMING } from '../../constants/timing';
 import { usePolling } from '../../hooks/usePolling';
 import { syncChannel } from '../../services/syncChannel';
-import { formatFortaleza } from '../../utils/datetime';
+import { FORTALEZA_TZ, formatFortaleza } from '../../utils/datetime';
 import { MOTIVO_NAO_PUBLICAVEL, gcalRowActions, motivoNaoPublicavel } from '../../utils/gcalRowActions';
 import logger from '../../utils/logger';
 import type { ID, Solicitacao, GCalStatus, Gerencia, PaginatedResponse, Participation } from '../../types';
@@ -91,6 +91,24 @@ const PREAGENDA_PAGE_SIZE = 100;
 const LOAD_ERROR_KEY = 'preagenda-erro-carga';
 
 const { Title, Text } = Typography;
+
+/**
+ * A ordem de `?ordering=proximidade` do servidor, para intercalar as listas dos dois fluxos: de hoje
+ * em diante, do mais próximo ao mais distante; depois os passados, do mais recente ao mais antigo.
+ * "Hoje" é o início do dia em Fortaleza.
+ */
+function porProximidade(linhas: Solicitacao[]): Solicitacao[] {
+  const hoje = dayjs().tz(FORTALEZA_TZ).startOf('day').valueOf();
+  const chave = (r: Solicitacao): [number, number] => {
+    const t = Date.parse(r.inicio);
+    return t >= hoje ? [0, t] : [1, -t];
+  };
+  return [...linhas].sort((a, b) => {
+    const [ga, ta] = chave(a);
+    const [gb, tb] = chave(b);
+    return ga - gb || ta - tb || Number(a.id) - Number(b.id);
+  });
+}
 
 /** O evento como a pessoa o reconhece: "05/11/2026 09:00 · Sobral · Projeto X" (botões e confirmações). */
 function rotuloDoEvento(row: Solicitacao): string {
@@ -134,6 +152,8 @@ export default function PreAgendaPage(): JSX.Element {
   const [loading, setLoading] = useState<boolean>(false);
   const [rows, setRows] = useState<Solicitacao[]>([]);
   const [total, setTotal] = useState<number>(0);
+  // Quantos aprovados o servidor tem com estes filtros (os dois fluxos): mais que `total` = lista cortada.
+  const [noServidor, setNoServidor] = useState<number>(0);
   // Uma carga pedida pela pessoa recebeu 429: a tela pode não corresponder ao pedido.
   const [cargaFalhou, setCargaFalhou] = useState<boolean>(false);
 
@@ -222,7 +242,9 @@ export default function PreAgendaPage(): JSX.Element {
       // então carrega o conjunto de aprovados de uma vez, não só a 1ª página.
       // `status` vai SÓ na lista: no resumo GCal, `status` é o gcal_status (o resumo já
       // conta só aprovados) — mandar `approved` lá zerava os KPIs.
-      const listParams = { ...filters, status: 'approved' as const, page_size: PREAGENDA_PAGE_SIZE };
+      // `proximidade`: os 100 mais próximos de hoje. Sem ordem, o padrão do servidor (-inicio) trazia os
+      // 100 mais distantes no futuro, e os eventos desta semana sumiam (achado do item 36).
+      const listParams = { ...filters, status: 'approved' as const, page_size: PREAGENDA_PAGE_SIZE, ordering: 'proximidade' };
       const [superData, naoSuperData, summaryData] = await Promise.all([
         listSolicitacoes({ ...listParams, flow: 'SUPER' }) as Promise<PaginatedResponse<Solicitacao> | Solicitacao[]>,
         listSolicitacoes({ ...listParams, flow: 'NAO_SUPER' }) as Promise<PaginatedResponse<Solicitacao> | Solicitacao[]>,
@@ -233,13 +255,16 @@ export default function PreAgendaPage(): JSX.Element {
 
       const superRows = 'results' in superData ? superData.results : superData;
       const naoRows = 'results' in naoSuperData ? naoSuperData.results : naoSuperData;
-      const loadedRows = [...superRows, ...naoRows];
+      const loadedRows = porProximidade([...superRows, ...naoRows]);
+      const contagem = (dados: PaginatedResponse<Solicitacao> | Solicitacao[]): number =>
+        'results' in dados ? dados.count : dados.length;
 
       // Só troca o estado se algo mudou: resposta igual não redesenha a tabela.
       setRows((atuais) => (mesmosDados(atuais, loadedRows) ? atuais : loadedRows));
       // Contador honesto: exibe o total efetivamente carregado, nunca o count do
       // servidor sobre uma lista de 1 página (total inalcançável).
       setTotal(loadedRows.length);
+      setNoServidor(contagem(superData) + contagem(naoSuperData));
       setSummary((atual) => (mesmosDados(atual, summaryData) ? atual : summaryData));
       setCargaFalhou(false);
     } catch (error) {
@@ -883,6 +908,18 @@ export default function PreAgendaPage(): JSX.Element {
                     </Button>
                   </Space>
                 </div>
+              )}
+              {noServidor > total && (
+                <Alert
+                  className="mb-4"
+                  type="info"
+                  showIcon
+                  role="status"
+                  message={
+                    `Mostrando ${total} de ${noServidor} eventos aprovados, os mais próximos de hoje. ` +
+                    'Para ver os demais, filtre por data, gerência ou busca.'
+                  }
+                />
               )}
               <Table
                 scroll={{ x: "max-content" }}

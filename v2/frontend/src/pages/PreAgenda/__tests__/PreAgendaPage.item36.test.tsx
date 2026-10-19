@@ -224,3 +224,21 @@ describe('PreAgendaPage — sem rolagem horizontal', () => {
     expect(barra).toHaveStyle({ flexWrap: 'wrap' });
   });
 });
+
+// A falha da carga só virava um toast de 3 s, e a tabela ficava no vazio padrão.
+describe('PreAgendaPage — lista que não carregou', () => {
+  test('o motivo e "Tentar de novo" no lugar das linhas', async () => {
+    listSolicitacoesMock.mockRejectedValue(Object.assign(new Error('Erro interno do servidor.'), { status: 500 }));
+    render(<PreAgendaPage />);
+
+    const aviso = await screen.findByText('Não foi possível carregar a lista.');
+    expect(aviso.closest('[role="alert"]')).not.toBeNull();
+    expect(screen.getByText('Erro interno do servidor.')).toBeInTheDocument();
+
+    mockRows([row({ id: 1, municipio_nome: 'Crato' })]);
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+
+    expect(await screen.findByText('Crato')).toBeInTheDocument();
+    expect(screen.queryByText('Não foi possível carregar a lista.')).not.toBeInTheDocument();
+  });
+});

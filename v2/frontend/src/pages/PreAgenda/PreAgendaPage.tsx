@@ -159,6 +159,8 @@ export default function PreAgendaPage(): JSX.Element {
   const [noServidor, setNoServidor] = useState<number>(0);
   // Uma carga pedida pela pessoa recebeu 429: a tela pode não corresponder ao pedido.
   const [cargaFalhou, setCargaFalhou] = useState<boolean>(false);
+  // A carga pedida pela pessoa falhou (fora o 429): o motivo vai no lugar das linhas, não o vazio.
+  const [erroCarga, setErroCarga] = useState<string | null>(null);
 
   const [summary, setSummary] = useState<GCalStatusSummary>({
     counts: { NONE: 0, PENDING: 0, PUBLISHED: 0, ERROR: 0 },
@@ -270,6 +272,7 @@ export default function PreAgendaPage(): JSX.Element {
       setNoServidor(contagem(superData) + contagem(naoSuperData));
       setSummary((atual) => (mesmosDados(atual, summaryData) ? atual : summaryData));
       setCargaFalhou(false);
+      setErroCarga(null);
     } catch (error) {
       if (seq !== seqRef.current) return; // erro de carga obsoleta: não polui a UI
       // 429 (muitas requisições): pausa o polling pelo tempo pedido e mostra um aviso só.
@@ -278,6 +281,12 @@ export default function PreAgendaPage(): JSX.Element {
       if (pausa !== null) {
         pausarPolling(pausa);
         if (!silencioso) setCargaFalhou(true);
+        return;
+      }
+      // Pedida pela pessoa: o motivo e "Tentar de novo" no lugar das linhas (um toast some em 3 s e a
+      // tabela ficava vazia). No segundo plano, a lista que já estava na tela fica, com o toast.
+      if (!silencioso) {
+        setErroCarga((error as Error).message || 'Erro desconhecido.');
         return;
       }
       message.error({
@@ -913,7 +922,7 @@ export default function PreAgendaPage(): JSX.Element {
                   </Space>
                 </div>
               )}
-              {noServidor > total && (
+              {noServidor > total && !erroCarga && (
                 <Alert
                   className="mb-4"
                   type="info"
@@ -932,6 +941,8 @@ export default function PreAgendaPage(): JSX.Element {
                 rowKey="id"
                 rowSelection={rowSelection}
                 nomeDaLinha={rotuloDoEvento}
+                erro={erroCarga}
+                onTentarDeNovo={() => { void loadData(); }}
                 pagination={{
                   total,
                   pageSize: 20,

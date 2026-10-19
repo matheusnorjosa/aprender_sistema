@@ -7,7 +7,6 @@
  * que some vai para a linha expandida. Sem `scroll.x` e sem coluna fixa.
  */
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { MemoryRouter } from 'react-router';
 
@@ -101,7 +100,6 @@ describe('ApprovalsPage responsiva', () => {
 
   test('a 360 px: só o evento e o menu de ações; o resto na linha expandida', async () => {
     definirLarguraTela(360);
-    const user = userEvent.setup();
     renderPage();
     const linha = await linhaDoEvento('Mais ações');
 
@@ -111,7 +109,8 @@ describe('ApprovalsPage responsiva', () => {
       expect(within(linha).getByText(texto, { exact: false })).toBeInTheDocument();
     }
 
-    await user.click(within(linha).getByRole('button', { name: `Expandir linha de ${EVENTO}` }));
+    // fireEvent: o Spin da carga pode estar com pointer-events none (o userEvent recusa).
+    fireEvent.click(within(linha).getByRole('button', { name: `Expandir linha de ${EVENTO}` }));
     const expandida = within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);
     for (const texto of ['Coordenadora Teste', 'FORMACAO', 'Pendente']) {
       expect(expandida.getByText(texto)).toBeInTheDocument();
@@ -125,6 +124,16 @@ describe('ApprovalsPage responsiva', () => {
     act(() => definirLarguraTela(360));
 
     expect(cabecalhos()).toEqual(['Evento', 'Ações']);
+  }, 20000);
+
+  // axe (item 36): checkbox da linha sem nome ([critical] label) e Tag laranja sem contraste AA.
+  test('a caixa de seleção diz qual evento marca e as etiquetas têm contraste AA', async () => {
+    renderPage();
+    const linha = await linhaDoEvento('Aprovar');
+
+    expect(within(linha).getByRole('checkbox', { name: `Selecionar: ${EVENTO}` })).toBeInTheDocument();
+    expect(within(linha).getByText('Pendente')).toHaveStyle({ color: '#ad4e00' });
+    expect(screen.getByText('1', { selector: '.ant-tag' })).toHaveStyle({ color: '#ad4e00' });
   }, 20000);
 
   test('a barra do lote quebra linha em tela estreita', async () => {

@@ -82,6 +82,7 @@ import { formadoresLabel } from '../../utils/participants';
 import { mesmosDados } from '../../utils/mesmosDados';
 import { pausaDo429Ms } from '../../utils/retryAfter';
 import AvisoAtualizacaoPausada from '../../components/AvisoAtualizacaoPausada';
+import { TEXTO_DA_TAG } from '../../components/textoDaTag';
 import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
 import { AcoesLinha, larguraAcoesLinha, type AcaoDaLinha } from '../../components/AcoesLinha';
 
@@ -497,6 +498,8 @@ export default function ApprovalsPage(): JSX.Element {
     getCheckboxProps: (record: Solicitacao) => ({
       // Só pendentes; a impedida (própria, conta alterada, editada) nunca entra no lote (PA-02)
       disabled: record.status !== 'pendente' || impedimento(record) !== null,
+      // Sem nome, o leitor de tela ouvia só "caixa de seleção" em toda linha (axe: label).
+      'aria-label': `Selecionar: ${rotuloDoEvento(record)}`,
     }),
     // A impedida sai sem checkbox (não só desabilitado): não há ação possível nela.
     renderCell: (_checked, record, _index, originNode) => (impedimento(record) !== null ? null : originNode),
@@ -565,7 +568,7 @@ export default function ApprovalsPage(): JSX.Element {
         <div style={{ lineHeight: 1.3 }}>
           {record.tipo && <div style={UMA_LINHA} title={record.tipo}>{record.tipo}</div>}
           {record.encontro && <small className="text-gray-500">{record.encontro}</small>}
-          {record.segmento && <div><small className="text-gray-400">{record.segmento}</small></div>}
+          {record.segmento && <div><small className="text-gray-500">{record.segmento}</small></div>}
           {!record.tipo && !record.encontro && !record.segmento && '-'}
         </div>
       ),
@@ -602,7 +605,8 @@ export default function ApprovalsPage(): JSX.Element {
       width: 100,
       render: (valor) => {
         const status = valor as SolicitacaoStatus;
-        return <Tag color={STATUS_COLORS[status]}>{STATUS_LABELS[status] || status}</Tag>;
+        // TEXTO_DA_TAG: o laranja e o verde do AntD não passam de 4,5:1.
+        return <Tag color={STATUS_COLORS[status]} style={{ color: TEXTO_DA_TAG[STATUS_COLORS[status]] }}>{STATUS_LABELS[status] || status}</Tag>;
       },
     },
     {
@@ -667,7 +671,7 @@ export default function ApprovalsPage(): JSX.Element {
           {statusFilter === 'pendente' && total > 0 && !erroCarga && (
             <aside aria-label="Contador de pendentes">
               <Paragraph>
-                <Tag color="orange">{total}</Tag> solicitações aguardando aprovação
+                <Tag color="orange" style={{ color: TEXTO_DA_TAG['orange'] }}>{total}</Tag> solicitações aguardando aprovação
               </Paragraph>
             </aside>
           )}

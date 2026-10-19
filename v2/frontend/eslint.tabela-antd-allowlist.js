@@ -9,8 +9,9 @@ export const TABELA_ANTD_PADRAO = 'src/components/ResponsiveTable.tsx';
  *
  * Medida em 2026-09-29 pela própria regra, sem allowlist: 27 arquivos importavam
  * `Table` de `antd`; 26 depois do C1 (Usuários, o piloto), 21 depois do C2 (Admin DAT),
- * 20 depois de Projetos (01/10/2026), 19 depois de Meus Eventos e 18 depois de Minhas
- * Solicitações (item 36, 19/10/2026).
+ * 20 depois de Projetos (01/10/2026), 19 depois de Meus Eventos, 18 depois de Minhas
+ * Solicitações e 15 depois de Aprovações, Publicar na agenda e Pré-agenda (item 36,
+ * 19/10/2026).
  * SÓ ENCOLHE. Cada PR do Programa C tira os arquivos que migra (o valor diz qual PR). src/test/lint/tabelaAntdRestrita.test.ts mede quem importa
  * Table em src/ e exige que o conjunto seja exatamente esta lista: arquivo novo
  * reprova (use ResponsiveTable) e entrada que já não importa também (tire-a daqui).

@@ -127,9 +127,11 @@ v2/frontend/
 
 ## 📱 Funcionalidades
 
-### Página de Disponibilidade (Formadores)
+### Página de Bloqueios (Formadores)
 
-**URL**: `/disponibilidade`
+**URL**: `/solicitacoes/bloqueios` (atalho `/bloqueios`), policy `access_availability_blocks`: abre com `view_all_availability` ou com papel G/C/A ou FORMADOR vigente na lotação.
+
+A Grade Mensal (`/solicitacoes/disponibilidade`; `/disponibilidade` redireciona para ela) é outra tela, policy `access_monthly_availability`: só abre com `view_all_availability` ou com papel G/C/A vigente. O papel FORMADOR não a abre.
 
 **Recursos**:
 
@@ -145,11 +147,15 @@ v2/frontend/
 
 **Nota sobre Conflitos**: Para projetos SUPER, a decisão de disponibilidade é feita manualmente pela Superintendência através da Grade Mensal (/disponibilidade), não há checagem automática em tempo real.
 
-### Página de Solicitações (Superintendência)
+### Página de Aprovações
 
-**URL**: `/solicitacoes`
+**URL**: `/solicitacoes/aprovacoes` (atalho `/aprovacoes`), policy `access_solicitation_approvals`
 
-**Acesso**: Apenas usuários do grupo **Superintendência**
+**Acesso**: quem aprova pela regra única `solicitation_approval_basis` (backend). Nenhum grupo aprova; o poder vem da lotação:
+
+- superusuário;
+- papel GERENTE vigente na gerência Superintendência (só o SUPER dela);
+- `approve_solicitation` pelo pacote do perfil da gerência: ADMIN_OPERACIONAL (DAT) e CONTROLE, que decidem qualquer gerência e fluxo.
 
 **Recursos**:
 
@@ -164,8 +170,8 @@ v2/frontend/
 **Controle de Permissões**:
 
 - Botões "Aprovar" e "Reprovar" só aparecem para:
-  - Usuários do grupo **Superintendência**
-  - Solicitações com `status=pendente`
+  - Quem tem base em `solicitation_approval_basis` (lista acima)
+  - Solicitações com `status=pendente` que não caem na segregação de `decisoes_impedidas` (backend)
 - Alinhado com **PA-06** (Política de Aprovação Manual)
 
 **Validações**:
@@ -185,9 +191,9 @@ v2/frontend/
 | POST | `/api/availability-blocks/` | Cria novo bloqueio |
 | DELETE | `/api/availability-blocks/{id}/` | Remove bloqueio (apenas pendente) |
 
-**Nota**: Endpoints de checagem de disponibilidade (`/api/availability/check/` e `/api/availability/check-many/`) são ferramentas consultivas restritas a perfis Controle/Superintendência (não usadas em tempo real na UX).
+**Nota**: Endpoints de checagem de disponibilidade (`/api/availability/check/` e `/api/availability/check-many/`) são ferramentas consultivas (não usadas em tempo real na UX). Exigem `view_all_availability`, `create_solicitation` ou `approve_solicitation`; quem não é global só consulta a si e as pessoas das gerências onde tem papel G/C/A (`_alvos_no_escopo` em `views_availability.py`).
 
-### Solicitações (Superintendência)
+### Solicitações (Aprovações)
 
 | Método | Endpoint | Descrição |
 |--------|----------|-----------|

@@ -11,8 +11,10 @@ Destino: PostgreSQL (`apps.core`) via endpoints HTTP DRF (síncronos `POST /api/
 > sentido oposto ao da v0.1: descreveu **garantias que o código não dá**. Corrigidos nesta versão:
 > §2.1 (targets `make etl-*` não existem — ETL removido; `dry_run` desconhecido = apply),
 > §2.2 (SHA-1, não SHA-256; nem todo import tem hash; reimport sobrescreve),
-> §2.3 (gate não tem noção de alvo), §2.4 (**não existe `AuditLog` em import síncrono**),
-> §2.6 (3 das 5 garantias eram falsas), §3.1 (resolvers escolhem em vez de rejeitar),
+> §2.3 (gate não tem noção de alvo), §2.4 (**não existe `AuditLog` em import síncrono** — desde então
+> usuários e bloqueios ganharam trilha, ver §2.4),
+> §2.6 (3 das 5 garantias eram falsas), §3.1 (resolvers escolhem em vez de rejeitar — desde então
+> os cinco resolvers rejeitam ambiguidade, ver §3.1),
 > §6 e §7 (paths inexistentes removidos).
 > Documento vivo dos achados: [../audits/ACHADOS_REAIS.md](../audits/ACHADOS_REAIS.md).
 
@@ -103,23 +105,27 @@ o furo de [#1610](https://github.com/matheusnorjosa/aprender_sistema/issues/1610
 (`ccbe1e05`): a concessão de grupos no import passou a ser gated por superuser
 (`_actor_pode_atribuir_grupos`, `usuarios_import.py:273-283`) — ver [usuarios.md](./usuarios.md).
 
-### 2.4 Audit trail — 🔴 **não existe nos imports síncronos**
+### 2.4 Audit trail — ⚠️ **só usuários e bloqueios têm trilha**
 
-Corrigido em 2026-07-24. As ações `IMPORT_USUARIOS`, `IMPORT_COMPRAS`, `IMPORT_AGENDA`,
-`IMPORT_AVAILABILITY_BLOCKS` e `IMPORT_PRODUTOS_CONTROLE` **nunca existiram**.
-`AuditLog.Action` (`apps/core/models/auditoria.py:72-73`) define apenas:
+As ações `IMPORT_USUARIOS`, `IMPORT_COMPRAS`, `IMPORT_AGENDA`, `IMPORT_AVAILABILITY_BLOCKS` e
+`IMPORT_PRODUTOS_CONTROLE` **nunca existiram**. O que existe hoje em `AuditLog.Action`
+(`apps/core/models/auditoria.py`) e quem grava, por service (SSOT: os `services/*_import.py`):
 
-- `IMPORT_JOB_COMPLETED`
-- `IMPORT_JOB_FAILED`
+| Service | Trilha |
+|---|---|
+| `usuarios_import.py` (síncrono) | `USER_IMPORT` no apply, com ator, arquivo e contagens (`registrar_auditoria`, #1672) |
+| `bloqueios_import.py` (síncrono em `views_import_bloqueios.py` e assíncrono via `ImportJob`) | `DELEGATE_BLOCK_CREATE` por bloqueio criado (`origem=import`) e `created_by` = ator (#2011/#1643), nos dois caminhos; só o job assíncrono grava também `IMPORT_JOB_COMPLETED`/`IMPORT_JOB_FAILED` (`apps/core/tasks.py`) |
+| demais endpoints (eventos, compras, produtos etc.) | **nenhuma** |
 
-e as duas são emitidas **só** pelo caminho assíncrono (`apps/core/tasks.py:634,669`), que hoje
-cobre exclusivamente `bloqueios`. Nenhuma das 10 views síncronas nem nenhum dos 10 services grava
-`AuditLog`.
+Fora dos endpoints, o command `import_export_contract` (`export_contract_importer.py`) grava
+`AuditLog` `UPDATE`/`REJECT` nas decisões da carga de eventos (re-chave, cancelado na planilha,
+reconcile).
 
-Consequência: **um apply síncrono não deixa rastro de quem rodou, com qual arquivo, nem do que
-mudou.** É o que ainda torna #1628 silencioso. (A auto-escalação de grupos que #1610 explorava foi
-**corrigida** em `ccbe1e05` — concessão gated por superuser —, mas a lacuna de auditoria do apply
-síncrono permanece.)
+`IMPORT_ARTIFACT_PURGE` registra o expurgo de artefatos de import (retenção LGPD), não o import.
+
+Consequência: **nos demais services, um apply síncrono não deixa rastro de quem rodou, com qual
+arquivo, nem do que mudou.** (A auto-escalação de grupos que #1610 explorava foi **corrigida** em
+`ccbe1e05` — concessão gated por superuser.)
 
 `ImportBatch` nunca foi criado; o modelo real é `ImportJob`
 ([apps/core/models/import_job.py](../../backend/apps/core/models/import_job.py)).
@@ -142,7 +148,7 @@ Datas de calendário (Solicitação, AvailabilityBlock) **são armazenadas em UT
 | ~~Nunca aprova solicitações~~ | ✅ **corrigido (#2021)** | `fluxo == NAO_SUPER` grava `aprovado`, mas o import agora aplica o hard gate de disponibilidade a evento **FUTURO** (conflito → pendência `availability`, não grava); **histórico** entra sem checar (decisão do dono) — `M08-12` / [#1620](https://github.com/matheusnorjosa/aprender_sistema/issues/1620). (SUPER continua nascendo `pendente`.) |
 | Nunca atribui `Gerente`/`Superintendência` por ator não-superuser | ✅ **verdadeiro** (corrigido) | **era** falso — a coluna `grupos` concedia qualquer grupo sem gate; **corrigido** por `M03-01`/[#1610](https://github.com/matheusnorjosa/aprender_sistema/issues/1610) (`ccbe1e05`): concessão de grupos gated por superuser (`usuarios_import.py:273-283`, decisão `:362`, `_assign_groups:495-496`); ator não-superuser recebe `grupos_ignorados`. Resíduo ator×alvo amplo → [#1656](https://github.com/matheusnorjosa/aprender_sistema/issues/1656) |
 | ~~Nunca sobrescreve sem match confirmado~~ | ✅ **corrigido #2021** | reimport protege status/owner/local (divergência → pendência `protected`) + diff real; não reverte mais decisão humana — `M10-07` / [#1628](https://github.com/matheusnorjosa/aprender_sistema/issues/1628) |
-| (não alegado) Nunca resolve pessoa/município errado | ⚠️ **parcial** | `M02-09`/[#1613](https://github.com/matheusnorjosa/aprender_sistema/issues/1613) **✅ resolvido**: `resolve_projeto`/`resolve_tipo_evento` rejeitam ambiguidade (não mais `.first()`) + import DAT com norm simétrica. **Seguem abertos**: `M22-14`/[#1643](https://github.com/matheusnorjosa/aprender_sistema/issues/1643) (`resolve_user_by_name` substring de pessoa), `M15-05`/[#1635](https://github.com/matheusnorjosa/aprender_sistema/issues/1635); **✅ resolvido**: `M04-01`/[#1615](https://github.com/matheusnorjosa/aprender_sistema/issues/1615) (#2022, resolve-only) — épico [#1658](https://github.com/matheusnorjosa/aprender_sistema/issues/1658) |
+| (não alegado) Nunca resolve pessoa/município errado | ⚠️ **parcial** | `M02-09`/[#1613](https://github.com/matheusnorjosa/aprender_sistema/issues/1613) **✅ resolvido**: `resolve_projeto`/`resolve_tipo_evento` rejeitam ambiguidade (não mais `.first()`) + import DAT com norm simétrica. **Parcial**: `M22-14`/[#1643](https://github.com/matheusnorjosa/aprender_sistema/issues/1643) (`resolve_user_by_name` exige candidato único desde #1929; resta o residual de #1643). **Segue aberto**: `M15-05`/[#1635](https://github.com/matheusnorjosa/aprender_sistema/issues/1635); **✅ resolvido**: `M04-01`/[#1615](https://github.com/matheusnorjosa/aprender_sistema/issues/1615) (#2022, resolve-only) — épico [#1658](https://github.com/matheusnorjosa/aprender_sistema/issues/1658) |
 | (não alegado) Nunca grava linha inválida | ❌ **falso** | compras aceita quantidade vazia/negativa/decimal e data ausente — `M15-04` / [#1634](https://github.com/matheusnorjosa/aprender_sistema/issues/1634) |
 
 Épico de causa raiz para os itens de invariante:
@@ -186,29 +192,26 @@ Para os 4 tipos acima, o backend **já tem implementação funcional** em produ�
 
 Helpers de reconciliação compartilhados em `apps/core/services/resolvers.py`:
 
-- `resolve_user_by_email(email)` (`:32-53`), `resolve_user_by_name(name)` (`:56-98`).
-- `resolve_municipio(nome)` (`:181-227`) — aceita `"Cidade"`, `"Cidade - UF"`, `"Cidade (UF)"`, `"Cidade/UF"`; normaliza com NFKD.
-- `resolve_projeto(nome)` (`:312-369`) — aceita código ou nome; aplica `normalize_projeto_name` com aliases (IDEB→GESTÃO ESCOLAR, "Nível 1"→N1, "Vida &"→"VIDA E", etc.).
-- `resolve_tipo_evento(nome)` (`:372-397`).
-- `_nfkd(value)` (`:101-112`) para normalização case-insensitive sem acento.
+- `resolve_user_by_email(email)`, `resolve_user_by_name(name)`.
+- `resolve_municipio(nome)` — aceita `"Cidade"`, `"Cidade - UF"`, `"Cidade (UF)"`, `"Cidade/UF"`; normaliza com NFKD.
+- `resolve_projeto(nome)` — aceita código ou nome; aplica `normalize_projeto_name` com aliases (IDEB→GESTÃO ESCOLAR, "Nível 1"→N1, "Vida &"→"VIDA E", etc.).
+- `resolve_tipo_evento(nome)`.
+- `_nfkd(value)` para normalização case-insensitive sem acento.
 - Texto base em `apps/core/services/normalize.py::norm_text()`.
 
-> 🔴 **Todos estes resolvers escolhem em vez de rejeitar** (épico
+> ✅ **Os cinco resolvers rejeitam ambiguidade** (épico
 > [#1658](https://github.com/matheusnorjosa/aprender_sistema/issues/1658), "resolvers por rótulo
-> humano"). Dois padrões se repetem:
+> humano"): 2+ candidatos ⇒ `None` + WARNING, e o chamador grava pendência — nunca `.first()`
+> no chute. `resolve_projeto`/`resolve_tipo_evento` via `_pick_unique` (#1613),
+> `resolve_user_by_name` sem substring nem `.first()` (#1929), `resolve_user_by_email` (#2012) e
+> `resolve_municipio` (#2003/#2008). ~~Gerência duplicada~~ (✅
+> [#1615](https://github.com/matheusnorjosa/aprender_sistema/issues/1615) resolvido #2022).
 >
-> 1. **`.first()` em ambiguidade** — `resolve_user_by_email:53`, `resolve_user_by_name:75,87,93`,
->    `resolve_municipio:208,213`, `resolve_projeto:335,340`, `resolve_tipo_evento:397`.
->    Dois registros que casam ⇒ pega um e segue, sem pendência e sem log.
-> 2. **Fallback por substring** — `resolve_user_by_name:87,93` usa `first_name__icontains` /
->    `last_name__icontains`; a terceira tentativa (`:93`) é um **OR**, que casa com qualquer
->    pessoa que compartilhe um pedaço do primeiro *ou* do último nome.
->
-> Efeitos já confirmados: bloqueio auto-aprovado na agenda da pessoa errada
-> ([#1643](https://github.com/matheusnorjosa/aprender_sistema/issues/1643)), ~~Gerência duplicada~~
-> (✅ [#1615](https://github.com/matheusnorjosa/aprender_sistema/issues/1615) resolvido #2022), município homônimo em
-> UF errada ([#1635](https://github.com/matheusnorjosa/aprender_sistema/issues/1635)).
-> A correção estrutural é **rejeitar ambiguidade como pendência**, não melhorar a heurística.
+> O épico segue aberto só pelo que ainda casa por rótulo humano sem a chave certa: o import de
+> compras não passa a UF ao `resolve_municipio` nem usa o código do produto (`M15-05`,
+> [#1635](https://github.com/matheusnorjosa/aprender_sistema/issues/1635)), e o residual de
+> [#1643](https://github.com/matheusnorjosa/aprender_sistema/issues/1643) (pendência sem separar
+> `ambiguo` × `nao_encontrado`; decisão A (CPF) × B (nome exato)).
 
 ### Endpoints HTTP
 
@@ -323,12 +326,13 @@ Mudanças que quebram contrato (renomear coluna obrigatória, mudar tipo de dado
    writers → épico [#1656](https://github.com/matheusnorjosa/aprender_sistema/issues/1656).
 2. **Resolvers devem rejeitar ambiguidade em vez de escolher com `.first()`** — épico
    [#1658](https://github.com/matheusnorjosa/aprender_sistema/issues/1658)
-   (✅ #1613 p/ `resolve_projeto`/`resolve_tipo_evento` + #1615 #2022 resolve-only; #1635, #1643 abertos). Inclui a pergunta antiga: qual chave usar para Formador 1..5 na
+   (✅ #1613 p/ `resolve_projeto`/`resolve_tipo_evento` + #1615 #2022 resolve-only; ✅ #1929 p/ `resolve_user_by_name`).
+   Pendentes: #1635 e o residual da #1643. Inclui a pergunta antiga: qual chave usar para Formador 1..5 na
    planilha de Agenda, já que CPF não aparece lá.
 3. **Import não pode bypassar invariante de domínio** — épico
    [#1659](https://github.com/matheusnorjosa/aprender_sistema/issues/1659) (#1620, #1628, #1634, #1640).
 4. ✅ **`dry_run` fail-closed** ([#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649)) — **feito** (2026-08-25, helper `parse_dry_run`).
-   Resta a **auditoria do apply** (§2.4).
+   Resta a **auditoria do apply** nos services sem trilha (§2.4; usuários e bloqueios já têm).
 5. **Mapeamento Cargo → Função RBAC**: `usuarios.md` propõe tabela; **não implementado**. Falta
    confirmar os termos reais da planilha antes de decidir se vale implementar.
 6. **Disponibilidade**: tipo `D` e recorrência continuam sem contrato — ver

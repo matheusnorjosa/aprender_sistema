@@ -13,11 +13,13 @@ Template: [templates/produtos_controle.template.csv](./templates/produtos_contro
 >    portanto **passa**. Quantidade negativa passa. Decimal é truncado em silêncio (`2.7 → 2`).
 >    **`data` ausente não é validada** e é gravada como `None`. Achado `M15-04`, issue
 >    [#1634](https://github.com/matheusnorjosa/aprender_sistema/issues/1634).
-> 2. **UF é lida mas não é usada na resolução.** O campo é normalizado (`:167`) e aparece nas
->    pendências, mas a chamada é `resolve_municipio(r["municipio"])` (`:225`) — **sem a UF**.
->    Municípios homônimos em UFs diferentes são desempatados por `.first()`
->    (`services/resolvers.py:213`). Achado `M15-05`, issue
->    [#1635](https://github.com/matheusnorjosa/aprender_sistema/issues/1635).
+> 2. **UF é lida mas não é usada na resolução.** O campo é normalizado e aparece nas
+>    pendências, mas a chamada é `resolve_municipio(r["municipio"])` (`controle_imports.py`) —
+>    **sem a UF**. Desde o #2003, `resolve_municipio` (`services/resolvers.py`) não desempata mais
+>    por `.first()`: municípios homônimos em UFs diferentes são ambíguos, devolvem `None` e a linha
+>    vira pendência `municipios` (não grava no município errado). O residual é não usar a UF para
+>    desambiguar — o homônimo para em pendência mesmo com a UF certa na planilha. Achado `M15-05`,
+>    issue [#1635](https://github.com/matheusnorjosa/aprender_sistema/issues/1635).
 > 3. **`Compra.produto` nunca é gravado, e o código do produto não resolve nada.** Os `defaults`
 >    do upsert (`:251-258`) são `municipio`, `projeto`, `codigo`, `quantidade`, `data`, `uso` —
 >    **sem FK para `Produto`**. O projeto vem de `_infer_projeto_from_produto(produto_norm)`
@@ -297,7 +299,7 @@ Não é auditoria — não tem usuário, não tem histórico e o arquivo seguint
 
 | Risco | Severidade | Mitigação **real hoje** |
 |---|---|---|
-| **Município homônimo em UF diferente** | **P1 vivo** | ❌ **Nenhuma.** UF é lida e descartada; desempate por `.first()` — [#1635](https://github.com/matheusnorjosa/aprender_sistema/issues/1635) |
+| **Município homônimo em UF diferente** | Média (residual) | ✅ Não grava errado — desde o #2003 homônimo entre UFs é ambíguo → `None` → pendência `municipios`. Residual: a UF é lida e descartada, então o homônimo não se resolve nem com a UF certa — [#1635](https://github.com/matheusnorjosa/aprender_sistema/issues/1635) |
 | **Quantidade vazia/negativa/decimal aceita no preview** | **P1 vivo** | ❌ **Nenhuma** — vazio vira `0` e passa ([#1634](https://github.com/matheusnorjosa/aprender_sistema/issues/1634)) |
 | **Data ausente gravada como `None`** | **P1 vivo** | ❌ **Nenhuma** — `data` não está na validação bloqueante (#1634) |
 | **`Compra.produto` nunca preenchido** | **P1 vivo** | ❌ **Nenhuma** — não há FK no `defaults` (#1635) |

@@ -245,8 +245,8 @@ def process_data(data):  # Vago: qual data? qual processo?
 
 **✅ Bom:**
 ```python
-def approve_solicitacao(solicitacao: Solicitacao) -> Aprovacao:
-    aprovador = solicitacao.solicitante
+def approve_solicitacao(solicitacao: Solicitacao, aprovador: Usuario) -> Aprovacao:
+    # aprovador vem de fora (request.user), nunca do dono da solicitação: ninguém aprova a própria
     audit_service = AuditLogService()  # Service é OK quando realmente é serviço
     return audit_service.log_approval(solicitacao, aprovador)
 ```
@@ -461,7 +461,7 @@ def check_conflicts(usuario, inicio, fim, municipio):
 # PA-03: Google Calendar integration only AFTER manual approval
 # (aprovar revalida conflitos de disponibilidade; conflito bloqueia, sem override)
 if solicitacao.status == 'aprovado':
-    task_publish_to_gcal.delay(solicitacao.id)
+    task_publish_solicitacao_to_gcal.delay(solicitacao.id)
 ```
 
 ---
@@ -527,7 +527,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 ```python
 # select_related para FKs (1:1, N:1)
 solicitacoes = Solicitacao.objects.select_related(
-    'municipio', 'projeto', 'solicitante'
+    'municipio', 'projeto', 'usuario'
 )
 
 # prefetch_related para M2M

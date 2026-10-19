@@ -47,7 +47,7 @@
 
 ### Frontend (`v2/frontend/`)
 
-- **React 18**: Biblioteca UI
+- **React 19**: Biblioteca UI
 - **Vite**: Build tool
 - **Ant Design**: Componentes UI
 - **Tailwind CSS**: Utilitários CSS

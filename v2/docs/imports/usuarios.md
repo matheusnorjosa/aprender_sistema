@@ -227,7 +227,8 @@ um campo foi desconsiderado. O frontend as roteia para `warnings[]`
   `vinculo_com_pacote_bloqueado`; SSOT `vinculo_exige_superusuario`).
 - Remover Setor/Função existente.
 - Capabilities individuais (`PermissaoFuncional.groups`) — mudam só por PR (seed + migration, D21, que substituiu a D17).
-- Reset de senha — usuário recebe email de bem-vindo separado (fora deste import).
+- Senha — a conta importada fica sem senha utilizável e nenhum e-mail é enviado; quem administra
+  define a senha pela tela de Usuários (ver §13, item 5).
 
 Mecânica sugerida (PR 6): linhas que cairiam em qualquer um desses casos viram **warning + log**, e o sistema cria o usuário **sem** a atribuição sensível, deixando para o admin completar.
 
@@ -236,16 +237,20 @@ Mecânica sugerida (PR 6): linhas que cairiam em qualquer um desses casos viram 
 ## 11. Como auditar depois
 
 ### AuditLog
-Filtrar:
+O apply (não o dry-run) grava um `AuditLog` com `action="USER_IMPORT"` (`usuarios_import.py`,
+#1672). Filtrar:
 ```python
 AuditLog.objects.filter(
-    action="IMPORT_USUARIOS",
+    action="USER_IMPORT",
     created_at__gte=<timestamp>
 ).values(
-    "usuario", "details__arquivo_hash",
-    "details__linhas_criadas",
-    "details__linhas_atualizadas",
-    "details__linhas_warnings",
+    "usuario", "details__file",
+    "details__created",
+    "details__updated",
+    "details__unchanged",
+    "details__grupos_ignorados",
+    "details__grupos_desconhecidos",
+    "details__skipped",
 )
 ```
 
@@ -255,7 +260,7 @@ AuditLog.objects.filter(
 - Linhas processadas e seu estado individual.
 
 ### Drift check
-- Comparar `Usuario.objects.filter(date_joined__date=<dia_import>).count()` com `linhas_criadas`.
+- Comparar `Usuario.objects.filter(date_joined__date=<dia_import>).count()` com `details["created"]`.
 - Listar usuários com `groups.count() == 0` (criados sem Setor — sinal de mapa inválido).
 - Listar usuários sem Função (`FUNCAO_GROUPS` não intersecciona com `user.groups`).
 

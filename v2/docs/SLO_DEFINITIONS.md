@@ -1,7 +1,7 @@
 ---
 title: Service Level Objectives (SLOs)
 status: active
-last_verified: 2026-09-11
+last_verified: 2026-10-19
 verified_at_commit: d0d43890c58b6620a9c6dabca2c940a4e9589911
 sources_of_truth:
   - v2/backend/apps/core/services/db_retry.py
@@ -133,7 +133,7 @@ Error Budget (horas/mês) = (100 - SLO%) × 720 / 100
 | Dado | RPO (alvo) | RTO (alvo) | Backup |
 |------|-----|-----|--------|
 | Banco de Dados | 5 min | 1 hora | WAL + dump diário cifrado — ver SSOT [`BACKUP_OPERATIONS.md`](./BACKUP_OPERATIONS.md) |
-| Redis (cache **e sessões**) | N/A | 5 min | Não persistido — reiniciar o Redis **desloga todos os usuários** (`SESSION_ENGINE=cache`) |
+| Redis (cache **e sessões**) | N/A | 5 min | Persistido (AOF + RDB no volume `redis_data`, `v2/infra/docker-compose.prod.yml`): reiniciar o container preserva as sessões. Só perde sessões (`SESSION_ENGINE=cache`) se o volume for apagado, se o Redis for recriado sem volume ou por despejo do `allkeys-lru` ao bater o `maxmemory` |
 | Google Calendar | 0 | 24 horas | Resync automático |
 
 > ⚠️ **Estes são alvos, não capacidade demonstrada.** Hoje: o WAL archiving da VM02 **não

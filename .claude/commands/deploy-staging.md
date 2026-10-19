@@ -12,7 +12,7 @@ Deployment type: ${ARGUMENTS:-full}
 **There is NO dedicated staging environment** in AS v2, e **merge na `main` NÃO deploya**.
 O fluxo tem dois atos deliberados:
 
-1. **Validar localmente** com `make staging-full` (stack prod-like) — precisa fechar **8/8 PASS**.
+1. **Validar localmente** com `make staging-full`, rodado de `v2/infra/` (stack prod-like) — precisa fechar **8/8 PASS**.
 2. **Merge (squash) na `main`** → dispara `deploy.yaml` (*"Build, sign and release"*): build → scan →
    push no Docker Hub → **assina** (cosign keyless + provenance SLSA) → cria a tag imutável
    `vYYYY.MM.DD-<sha7>` + GitHub Release. **Produção não muda aqui.**
@@ -85,7 +85,7 @@ O fluxo tem dois atos deliberados:
 
 - [ ] **Run the full prod-like validation** — must end **8/8 PASS**
   ```bash
-  make staging-full
+  cd v2/infra && make staging-full   # o target só existe em v2/infra/Makefile
   # Expected: ALL 8 CHECKS PASSED
   ```
   > On GnuWin32/Windows, `$(MAKE)` recursion can break — run the staging-precheck/build/up/test/down

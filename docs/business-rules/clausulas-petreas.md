@@ -78,9 +78,9 @@ Ordem obrigatória para agentes autônomos:
 ## CP-08: dev_tools Desabilitado em Produção
 
 - **`apps.dev_tools` (seeds/backfills/cleanup) NÃO deve rodar em produção**
-- Mecanismo: `config/settings.py:126` inclui `apps.dev_tools` apenas se `INCLUDE_DEV_TOOLS != "false"`
+- Mecanismo: `config/settings.py` lê `INCLUDE_DEV_TOOLS` (default `"true"`) e só acrescenta `apps.dev_tools` ao `INSTALLED_APPS` quando ele resulta em `True` (bloco `if INCLUDE_DEV_TOOLS:`)
 - **Default é `true`** (conveniência de dev), mas desde o #1466 há guard rígido em
-  `config/settings.py:137-143`: quando `ENVIRONMENT == "production"`, `INCLUDE_DEV_TOOLS` é
+  `config/settings.py` (bloco logo após a leitura da variável): quando `ENVIRONMENT == "production"`, `INCLUDE_DEV_TOOLS` é
   forçado a `False` **independentemente** da env var. Pedir `true` em produção emite warning e
   é ignorado — omitir a variável no `stack.env` deixou de violar a CP-08
 - ⚠️ O guard casa `ENVIRONMENT` com a string exata `"production"`; um ambiente rotulado de

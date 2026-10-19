@@ -1,7 +1,7 @@
 ---
 title: Specs de Frontend
 status: active
-last_verified: 2026-07-24
+last_verified: 2026-10-19
 owner: frontend
 related:
   - ../INDEX_SDD.md
@@ -16,13 +16,15 @@ Voltar ao [índice SDD](../INDEX_SDD.md).
 
 | Spec | Cobre | Código | Status |
 |---|---|---|---|
-| [`pages.spec.md`](./pages.spec.md) | inventário de rotas × páginas × guard aplicado | `src/components/AppRoutes.tsx`, `src/components/access/RequirePolicy.tsx`, `src/pages/` (15 diretórios de domínio) | canonical |
-| [`hooks-rbac.spec.md`](./hooks-rbac.spec.md) | camada de identidade/capability e guards | `hooks/useCapabilities`, `useIdentity`, `usePermissions` (`@deprecated`), `useCanAccess`, `useGoogleGuard` | canonical |
-| [`api-clients.spec.md`](./api-clients.spec.md) | wrapper `fetch` + CSRF + clientes por domínio | `src/api/` (16 arquivos: `config.ts` + 15 clientes) | canonical |
+| [`pages.spec.md`](./pages.spec.md) | inventário de rotas × páginas × guard aplicado | `src/components/AppRoutes.tsx`, `src/components/access/RequirePolicy.tsx`, `src/pages/` (16 diretórios de domínio) | canonical |
+| [`hooks-rbac.spec.md`](./hooks-rbac.spec.md) | camada de identidade/capability e guards | `contexts/AcessoContext` (`useAcesso`), `hooks/useCapabilities`, `useIdentity`, `useGoogleGuard` | canonical |
+| [`api-clients.spec.md`](./api-clients.spec.md) | wrapper `fetch` + CSRF + clientes por domínio | `src/api/` (17 arquivos: `config.ts`, `unwrapList.ts` + 15 clientes) | canonical |
 
-Números conferidos contra o código em 2026-07-24: **41 páginas lazy-loaded** (40 em
-`AppRoutes.tsx` + `LoginPage` em `App.tsx`), **51 `<Route>`** dos quais 6 são redirects de
-URLs legadas, **15 diretórios** em `src/pages/`, **16 arquivos** em `src/api/`. A contagem
+Números conferidos contra o código em 2026-10-19: **43 páginas lazy-loaded** (41 em
+`AppRoutes.tsx` + `LoginPage` e `TrocaSenhaObrigatoriaPage` em `App.tsx`), **52 `<Route>`** dos
+quais 6 são redirects de URLs legadas, **16 diretórios** de domínio em `src/pages/`, **17 arquivos**
+em `src/api/` (fora os testes). O detalhe vive em [`pages.spec.md`](./pages.spec.md) e
+[`api-clients.spec.md`](./api-clients.spec.md). A contagem
 antiga de "45+ pages" e "6/14 documentadas" não correspondia ao código.
 
 ## Divergências vivas em produção

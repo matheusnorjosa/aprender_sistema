@@ -12,7 +12,7 @@ AS v2 diverges.
 
 ## Backend layout (modular)
 
-The only real apps are `apps/core` (41 models, `serializers/`, `services/`) and
+The only real apps are `apps/core` (39 models, `serializers/`, `services/`) and
 `apps/dev_tools` (15 seed commands, disabled in prod). `apps/core` is split into Python
 packages, each with an `__init__.py` that re-exports its public names:
 
@@ -103,11 +103,17 @@ Canonical idiom — capability codenames are English (`approve_solicitation`,
 ```python
 from apps.core.rbac import HasPerm
 
-permission_classes = [HasPerm("approve_solicitation")]                 # single capability
-permission_classes = [HasPerm("approve_solicitation") | HasPerm("create_solicitation")]  # OR
-permission_classes = [IsAuthenticated, HasPerm("approve_solicitation")]  # AND
+permission_classes = [HasPerm("create_solicitation")]                 # single capability
+permission_classes = [HasPerm("operate_preagenda") | HasPerm("create_solicitation")]  # OR
+permission_classes = [IsAuthenticated, HasPerm("import_spreadsheet")]  # AND
 permission_classes = [~HasPerm("bloqueado")]                          # NOT
 ```
+
+Aprovar **não** se gateia por `HasPerm("approve_solicitation")`: a decisão é a Policy
+`CanAccessSolicitationApprovals` (regra única `solicitation_approval_basis`, 3 bases:
+superuser, GERENTE vigente na gerência Superintendência, ou a capacidade de aprovar vinda do
+pacote do perfil da gerência — DAT/Controle). A base do GERENTE não é capacidade, então
+`HasPerm` a negaria. Ver `reference/viewset-template.md`.
 
 `HasPerm("a") | HasPerm("b")` composition is tactical (ok for ≤2 capabilities). For ≥3 caps,
 a shared rule, or "who can see this and why" repeated across sites, promote it to a **Policy
@@ -119,7 +125,7 @@ Programmatic checks outside views (services, signals, commands):
 ```python
 from apps.core.rbac import user_has_any_perm, user_has_all_perms
 
-if user_has_any_perm(user, "approve_solicitation", "create_solicitation"):
+if user_has_any_perm(user, "operate_preagenda", "create_solicitation"):
     ...
 ```
 

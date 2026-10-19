@@ -2,7 +2,8 @@
 
 ## Docker Compose
 
-O sistema roda em containers Docker:
+O sistema roda em containers Docker (`v2/infra/docker-compose.yml`, 6 serviços, mais o `frontend-e2e` do profile `e2e`; tabela de
+portas em [Instalação](../getting-started/installation.md)):
 
 ```yaml
 services:
@@ -11,20 +12,21 @@ services:
   web:       # Django + Gunicorn
   worker:    # Celery Worker
   beat:      # Celery Beat (scheduler)
+  frontend:  # Vite (em dev, dev server com HMR na porta 5173)
 ```
 
 ## Containers
 
 ### PostgreSQL
 
-- **Imagem**: postgres:15
+- **Imagem**: postgres:15-alpine
 - **Porta**: 5434 (externa), 5432 (interna)
-- **Volume**: `pgdata` para persistência
+- **Volume**: `db_data` para persistência
 
 ### Redis
 
-- **Imagem**: redis:7
-- **Porta**: 6379
+- **Imagem**: redis:7-alpine
+- **Porta**: 6380 (externa em dev, `REDIS_HOST_PORT`), 6379 (interna)
 - **Uso**: Cache de sessões, broker Celery
 
 ### Web (Django)
@@ -35,21 +37,25 @@ services:
 
 ## Comandos Úteis
 
+O compose exige `IMAGE_TAG` (e as credenciais do Postgres): sem `--env-file`, qualquer
+`docker compose` abaixo aborta no parsing. Rode a partir de `v2/infra`, com o `.env.dev`
+criado como em [Instalação](../getting-started/installation.md):
+
 ```bash
-# Subir ambiente
-docker compose -f v2/infra/docker-compose.yml up -d
+# Subir ambiente (compose + override de dev)
+make up-dev
 
 # Ver logs
-docker compose -f v2/infra/docker-compose.yml logs -f web
+docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.override.yml logs -f web
 
 # Migrations
-docker compose -f v2/infra/docker-compose.yml exec web python manage.py migrate
+docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.override.yml exec web python manage.py migrate
 
 # Shell Django
-docker compose -f v2/infra/docker-compose.yml exec web python manage.py shell
+docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.override.yml exec web python manage.py shell
 
 # Testes
-docker compose -f v2/infra/docker-compose.yml exec web pytest
+docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.override.yml exec web pytest
 ```
 
 ## CI/CD

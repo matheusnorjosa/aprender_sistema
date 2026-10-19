@@ -13,8 +13,8 @@ cd v2 && make up
 # Parar containers
 cd v2 && make down
 
-# Rebuild completo
-cd v2 && make rebuild
+# Rebuild completo (sem cache)
+cd v2 && make build && make up
 
 # Logs
 docker compose logs -f web
@@ -90,8 +90,10 @@ cd v2/backend && pyright
 
 ```bash
 # Management command unificado (dry-run por padrão; --apply exige allowlist)
-docker compose exec web python manage.py import_export_contract --file=/data/export.xlsx
-docker compose exec web python manage.py import_export_contract --file=/data/export.xlsx --apply
+# --path = diretório do export-contract com manifest.json (não lê .xlsx)
+docker compose exec web python manage.py import_export_contract --path=<dir-com-manifest.json>
+docker compose exec web python manage.py import_export_contract --path=<dir-com-manifest.json> --apply --allow-entity <entidade>
+# Carga da virada (--mode virada) e regras de apply: ver specs/backend/imports.spec.md
 
 # Make targets (dry-run)
 make import-compras-dry FILE=...
@@ -110,9 +112,9 @@ make import-cadastros-dry FILE=...
 
 ```bash
 # Seeds
-docker compose exec web python manage.py seed_usuarios
-docker compose exec web python manage.py seed_projetos
 docker compose exec web python manage.py seed_rbac
+docker compose exec web python manage.py seed_e2e_users
+docker compose exec web python manage.py seed_frontend_contract_data
 
 # Backfills
 docker compose exec web python manage.py backfill_<nome>
@@ -165,12 +167,12 @@ gh pr merge <number> --squash --delete-branch
 
 ```bash
 # Backend
-docker compose exec web ruff check apps/
-docker compose exec web ruff format apps/
+docker compose exec web flake8 apps/
+docker compose exec web black --check apps/
+docker compose exec web isort --check apps/
 
 # Frontend
 cd v2/frontend && npm run lint
-cd v2/frontend && npm run format
 ```
 
 ---

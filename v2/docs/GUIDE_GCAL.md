@@ -250,27 +250,30 @@ O `GoogleCalendarClient` (`apps/core/services/gcal_google_client.py`) lê `setti
 # 1. Configure env
 export GCAL_CLIENT=fake
 export GCAL_SEND_UPDATES=none
+# A API só aceita sessão (SessionAuthentication): faça login como em API_EXAMPLES.md
+# (gera cookies.txt) e mande o CSRF; Authorization: Bearer não é aceito (403).
+CSRF=$(curl -s -b cookies.txt -c cookies.txt http://localhost:8002/api/csrf/ | jq -r '.csrfToken')
 
 # 2. Preview (sempre permitido)
 curl -X POST http://localhost:8002/api/solicitacoes/123/preview-gcal/ \
-  -H "Authorization: Bearer $TOKEN"
+  -b cookies.txt -H "X-CSRFToken: $CSRF"
 
 # 3. Dry-run (simula publicação)
 curl -X POST http://localhost:8002/api/solicitacoes/123/publish/ \
-  -H "Authorization: Bearer $TOKEN" \
+  -b cookies.txt -H "X-CSRFToken: $CSRF" \
   -H "Content-Type: application/json" \
   -d '{"dry_run": true, "apply_blocked": false}'
 
 # 4. Publicação real (bloqueada por GCAL_CLIENT=fake)
 curl -X POST http://localhost:8002/api/solicitacoes/123/publish/ \
-  -H "Authorization: Bearer $TOKEN" \
+  -b cookies.txt -H "X-CSRFToken: $CSRF" \
   -H "Content-Type: application/json" \
   -d '{"dry_run": false, "apply_blocked": false}'
 # → Retorna 409 CONFLICT
 
 # 5. Forçar publicação (teste com fake client)
 curl -X POST http://localhost:8002/api/solicitacoes/123/publish/ \
-  -H "Authorization: Bearer $TOKEN" \
+  -b cookies.txt -H "X-CSRFToken: $CSRF" \
   -H "Content-Type: application/json" \
   -d '{"dry_run": false, "apply_blocked": true}'
 # → 200/202 OK (usa fake client)
@@ -282,7 +285,7 @@ curl -X POST http://localhost:8002/api/solicitacoes/123/publish/ \
 
 1. Solicitação é aprovada
 2. API `POST /api/solicitacoes/{id}/publish/` é chamada com `dry_run=false` e `apply_blocked=false` (ou `GCAL_CLIENT=google`)
-3. Payload inclui `conferenceData` com `requestId` único
+3. Payload inclui `conferenceData` com `requestId` determinístico (`meet-asv2-{id}`, `_request_id_for` em `gcal/validation.py`, ADR-008): mesmo ID = mesmo link Meet
 4. Google Calendar cria evento + gera link Meet
 5. Backend extrai `hangoutLink` do response
 6. Campo `meet_link` é **persistido no banco APENAS em APPLY real**
@@ -392,7 +395,7 @@ is_online = models.BooleanField(
   "attendees": [...],
   "conferenceData": {
     "createRequest": {
-      "requestId": "asv2-123-1730123456",
+      "requestId": "meet-asv2-123",
       "conferenceSolutionKey": {"type": "hangoutsMeet"}
     }
   }
@@ -438,7 +441,9 @@ is_online = models.BooleanField(
 > `build_event_payload(s: Solicitacao, *, enable_meet: bool = False)`.
 
 ```python
-# apps/core/services/gcal/payload.py:274
+# apps/core/services/gcal/payload.py — build_event_payload é wrapper de _build_payload
+# (resumo abaixo); o requestId vem de _request_id_for em gcal/validation.py —
+# determinístico (ADR-008, fix #573). Quem chama passa enable_meet=bool(s.is_online).
 def build_event_payload(s, *, enable_meet: bool = False):
     payload = {
         "summary": "...",
@@ -447,11 +452,11 @@ def build_event_payload(s, *, enable_meet: bool = False):
         # ...
     }
 
-    # Adiciona conferenceData apenas se is_online=True
-    if enable_meet and solicitacao.is_online:
+    # Adiciona conferenceData apenas se enable_meet=True (modalidade online)
+    if enable_meet:
         payload["conferenceData"] = {
             "createRequest": {
-                "requestId": f"asv2-{solicitacao.id}-{int(datetime.now().timestamp())}",
+                "requestId": _request_id_for(s),  # "meet-asv2-{id}", sem timestamp
                 "conferenceSolutionKey": {"type": "hangoutsMeet"}
             }
         }
@@ -507,7 +512,7 @@ não existe no codebase.)*
 **Exemplo**:
 ```bash
 curl -X POST http://localhost:8002/api/solicitacoes/123/resync-gcal/ \
-  -H "Authorization: Bearer <token>" \
+  -b cookies.txt -H "X-CSRFToken: $CSRF" \
   -H "Content-Type: application/json"
 ```
 
@@ -545,7 +550,7 @@ não existe no codebase.)*
 **Exemplo**:
 ```bash
 curl -X POST http://localhost:8002/api/solicitacoes/123/cancel-gcal/ \
-  -H "Authorization: Bearer <token>" \
+  -b cookies.txt -H "X-CSRFToken: $CSRF" \
   -H "Content-Type: application/json"
 ```
 
@@ -561,8 +566,8 @@ curl -X POST http://localhost:8002/api/solicitacoes/123/cancel-gcal/ \
 ### Helpers (Service Layer)
 
 **Arquivo real**: pacote `v2/backend/apps/core/services/gcal/`
-— `payload.py` (`build_event_payload:274`) e `sync.py`
-(`upsert_one:143`, `resync_solicitacao:388`, `cancel_solicitacao:416`).
+— `payload.py` (`build_event_payload`) e `sync.py`
+(`upsert_one`, `resync_solicitacao`, `cancel_solicitacao`).
 
 `v2/backend/apps/core/services/gcal_sync_service.py` continua importável, mas é apenas uma
 **fachada de re-export** (`:1-60`). Ao procurar código, vá no pacote.
@@ -660,12 +665,13 @@ Os bloqueios vêm de `publish_ready` e `publish_block_reason` em `GET /api/integ
 
 **Cobertura** (`v2/backend/apps/core/tests/test_gcal_cancel_resync.py`):
 
-**13 testes totais**:
-- **3 testes helpers**:
+**14 testes totais**:
+- **5 testes helpers (service)**:
   - `test_resync_requires_approved_status`: ValueError se `status != 'aprovado'`
   - `test_resync_resets_hash_and_calls_apply`: Valida reset de hash e chamada de `apply_one`
   - `test_cancel_validates_published`: ValueError se não publicado
   - `test_cancel_deletes_and_clears_fields`: Valida delete + limpeza de campos
+  - `test_cancel_oauth_uses_credential_calendar_not_primary`: em OAuth, o cancel apaga no calendário da credencial, não em `primary`
 
 - **2 testes task**:
   - `test_task_cancel_success`: Sucesso com AuditLog
@@ -684,7 +690,7 @@ Os bloqueios vêm de `publish_ready` e `publish_block_reason` em `GET /api/integ
 ```bash
 cd v2/infra
 docker compose exec -T web pytest apps/core/tests/test_gcal_cancel_resync.py -v
-# ========================= 13 passed in 10.00s =========================
+# ========================= 14 passed =========================
 ```
 
 ### Idempotência

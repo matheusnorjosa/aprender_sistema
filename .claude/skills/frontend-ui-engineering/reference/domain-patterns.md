@@ -24,10 +24,10 @@ dayjs(solicitacao.inicio).tz('America/Fortaleza').format('DD/MM/YYYY HH:mm');
 ```tsx
 import { Steps } from 'antd';
 <Steps current={currentStep}>
-  <Steps.Step title="Projeto" />
-  <Steps.Step title="Data e Local" />
-  <Steps.Step title="Formadores" />
-  <Steps.Step title="Revisão" />
+  <Steps.Step title="Informações Básicas" />
+  <Steps.Step title="Participantes" />
+  <Steps.Step title="Detalhes" />
+  <Steps.Step title="Confirmação" />
 </Steps>
 ```
 

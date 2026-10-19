@@ -12,10 +12,10 @@ Requisitos funcionais do sistema Aprender Sistema v2.
 
 ## RF01: Autenticação
 
-- Login por **CPF ou username** + senha (`apps/core/auth_backends.py:21` —
-  `CPFOrUsernameBackend`: entrada com 11 dígitos após remover pontuação é tratada como CPF,
+- Login por **CPF ou username** + senha (`CPFOrUsernameBackend` em
+  `apps/core/auth_backends.py`: entrada com 11 dígitos após remover pontuação é tratada como CPF,
   o resto como username). Na prática o identificador operacional é o CPF
-- Sessão com duração default de 2 horas (`SESSION_COOKIE_AGE`, `config/settings.py:333`,
+- Sessão com duração default de 2 horas (`SESSION_COOKIE_AGE` em `config/settings.py`,
   sobrescrevível por env)
 - CSRF token obrigatório nas requisições que alteram estado
 - Logout com invalidação de sessão
@@ -52,7 +52,7 @@ Ver [Regras de Disponibilidade (RD)](regras-disponibilidade.md).
 
 - Aprovam/reprovam (fluxo SUPER): superuser, **Gerente da Superintendência**, **DAT** ou
   **Controle** — ver [PA-02](politica-aprovacao.md#pa-02-perfil-exigido)
-- Interface dedicada em `/aprovacoes`
+- Interface dedicada em `/solicitacoes/aprovacoes` (`/aprovacoes` só redireciona)
 - Registro de justificativa em reprovações
 - AuditLog de todas as ações
 - Aprovação em lote disponível (máx. 100 IDs)
@@ -68,10 +68,12 @@ registrava (#1610, #1624, #1650) estão resolvidas.
   código) e `oauth` (`apps/core/services/gcal_client_factory.py:83-87`).
   **Produção roda em modo `oauth`** com cliente Google real; não há
   `GCAL_SERVICE_ACCOUNT_JSON` configurado
-- Cliente selecionado por `GCAL_CLIENT=fake|google` (`config/settings.py:722`)
+- Cliente selecionado por `GCAL_CLIENT=fake|google` (`GCAL_CLIENT` em `config/settings.py`)
 - Suporte a dry-run (simulação)
 - Controle de send_updates (notificações)
-- Sincronização idempotente (`external_event_id = asv2-{id}` + hash do payload)
+- Sincronização idempotente (eventId determinístico `asv2{id}`, sem hífen — o Google só aceita
+  base32hex, a-v e 0-9 — + hash do payload). Na virada (#1899) o `external_event_id` pode ser
+  o Event ID adotado do evento que a planilha já tinha criado no Google, em vez do `asv2{id}`
 
 ## RF06: Gerar Link Google Meet
 

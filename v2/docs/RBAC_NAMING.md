@@ -10,7 +10,7 @@
 
 **Permission é capacidade, não identidade.** Separar o que a pessoa pode fazer (permission) de quem ela é organizacionalmente (setor, função, grupo). Groups agregam permissions; permissions nomeiam ações sobre recursos. Essa é a forma canônica do NIST RBAC.
 
-Manifestação prática: se a organização reestrutura (DAT vira "Operações Administrativas"), **zero linha de código** muda. Apenas `Group.name`.
+Manifestação prática: renomear um grupo (`Group.name`) não muda poder no modo padrão (`RBAC_FONTE=lotacao`), porque desde o PR 12 o grupo é etiqueta e o poder vem da lotação. Ainda assim não é livre: o seed (`functional_permissions_seed.py`) nomeia os grupos, então `rbac_diff --auditar` acusa os pares (grupo, capacidade) divergentes e sai com exit 1, e na volta de emergência (`RBAC_FONTE=uniao`) o grupo volta a dar poder. Renomear a gerência (`Gerencia.nome`) **muda poder**: o nome é a chave de `PERFIL_PERMITIDO` (`apps/core/services/rbac_pacotes.py`; ex.: "GERENCIA DAT" → `ADMIN_OPERACIONAL`) e da gerência aprovadora (`GERENCIA_APROVADORA_NOME` em `apps/core/rbac/helpers.py`). Isso exige PR com `rbac_diff` (`rbac_diff --auditar` sai com exit 1 se o perfil ficar numa gerência fora de `PERFIL_PERMITIDO`).
 
 ---
 
@@ -404,7 +404,7 @@ nunca em deploy automático). Em prod o command nem é registrado
 | **Category**         | `solicitacao`, `operacao`, ...            | `admin_dat`, `gerencia`                           |
 | **Permission class** | `HasPerm("approve_solicitation")`         | `IsSuperintendencia`                              |
 | **Authz check**      | `user.has_perm("approve_solicitation")`   | `user.groups.filter(name="Superintendência")`     |
-| **Classe dedicada**  | `IsSolicitationOwner` (condição)          | `IsDAT` (identidade)                              |
+| **Classe dedicada**  | `IsOwnerOrPrivileged` (condição)          | `IsDAT` (identidade)                              |
 
 ---
 
@@ -463,7 +463,7 @@ NUNCA usar `if user.is_dat: return True` espalhado em views. DAT-as-suporte SEMP
 if user.groups.filter(name="DAT").exists():
     return True
 
-# ✅ CORRETO — valor real em apps/core/rbac/policies.py:85-90
+# ✅ CORRETO — valor real em ACCESS_POLICIES (apps/core/rbac/policies.py)
 ACCESS_POLICIES["access_audit_logs"] = frozenset({
     "manage_admin_registries",  # DAT entra como capability declarada
     "operate_preagenda",

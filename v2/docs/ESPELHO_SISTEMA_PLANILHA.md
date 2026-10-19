@@ -10,6 +10,7 @@ sources_of_truth:
   - v2/backend/apps/core/services/gcal/sync.py
   - v2/backend/apps/core/services/export_contract_importer.py
   - v2/backend/apps/core/rbac/policies.py
+  - v2/backend/apps/core/services/solicitacao_scope.py
 ---
 
 # Espelho Sistema × Planilha
@@ -67,9 +68,10 @@ Rótulos, como na `REFERENCIA-DOMINIO.md`: **MEDIDO** (contado no código/banco,
   `EquipeGerencia.vigentes_em()` (`models/organizacao.py`, é o SSOT de vigência, RD-06).
 
 **MEDIDO:** `EquipeGerencia.PAPEL_CHOICES` = `GERENTE, COORDENADOR, APOIO, FORMADOR`, mais `EQUIPE`
-("Equipe administrativa", 05/10/2026 — ver §4.4) (`models/organizacao.py`). Escopo de autorização deve sair do **vínculo**
-(`EquipeGerencia` + setor canônico), não do **grupo** — grupo serve para *capability*,
-vínculo serve para *escopo*.
+("Equipe administrativa", 05/10/2026 — ver §4.4) (`models/organizacao.py`). Escopo de autorização sai do **vínculo**
+(`EquipeGerencia` na gerência do projeto desde o PR 9; o setor canônico não dá escopo, §6), não do
+**grupo**. Desde o PR 12 (`RBAC_FONTE=lotacao`) a *capability* também vem do vínculo (pacote do
+perfil da gerência + direitos do papel); o grupo de Setor/Função é etiqueta.
 
 ### 1.3 Fluxo de aprovação
 
@@ -102,10 +104,10 @@ do import real:
 
 | MEDIDO no banco (2026-08-26) | Estado | Consequência |
 |---|---|---|
-| `Projeto.gerencia` (setor) | **NULL em 124/125** | sem setor, o gate D6 não roda |
+| `Projeto.gerencia` (setor) | **NULL em 124/125** (medição histórica; hoje 0 projetos ativos sem gerência em produção, `ACHADOS_REAIS` M10-04) | sem gerência, o escopo nega (fail-closed, PR 9) |
 | `Projeto.projeto_geral` (família) | **NULL em 125/125** | a regra de códigos mora na família → **nenhum** cálculo funciona |
-| `Gerencia.setor_canonico` | **existe** (mig 0099), gravado pelo importer | o de-para v15 já pousa; D6 segue bloqueado pelo predicado (§6.3) + `projeto.gerencia` vazio |
-| `papel` SUPORTE/OPERACIONAL | **não existem no enum** (só APOIO) | 9 vínculos DAT sem casa (§4) |
+| `Gerencia.setor_canonico` | **existe** (mig 0099), gravado pelo importer | o de-para v15 já pousa; desde o PR 9 o escopo não usa setor (§6) |
+| `papel` SUPORTE/OPERACIONAL | **não existem no enum**; o papel `EQUIPE` ("Equipe administrativa") foi criado em 05/10/2026 | os 9 vínculos DAT vão para `EQUIPE` (§4.4) |
 | `desativado_localmente` | **existe** (mig 0098), guarda implementada em `usuarios_import` (§4.1) | o import não reativa mais quem foi desligado localmente |
 | SKU cadastrado como projeto | resíduo ETL | diferença 125 (sistema) × 114 (planilha) |
 
@@ -127,7 +129,8 @@ Registro durável da verificação adversarial de 2026-08-26 (11 afirmações de
 - **`_update_formadores` (`views_solicitacao.py`)** não filtrava `is_active` (o create
   filtra em `:378/:384`) e reconciliava só `FORMADOR`, nunca `COORD_ACOMPANHA`.
   **Corrigido no PR #1886** (filtra ativos + reconcilia os dois papéis; guests por
-  e-mail seguem só no create — D6c em revisão pelo dono).
+  e-mail seguem só no create — D6c em revisão pelo dono). Desde 05/10/2026 reconcilia só
+  `FORMADOR`: `COORD_ACOMPANHA` saiu da tela e as linhas antigas ficam como estão.
 
 ### 3.2 🟡 RECLASSIFICADO — o núcleo sobrevive, refatorar (não apagar)
 
@@ -229,16 +232,23 @@ solicitações criaria eventos novos.
 
 ## 6. O de-para de setor no sistema
 
-O predicado do gate D6 recomendado pelo sheets.banco compara **setor canônico** dos dois
-lados (não igualdade de gerência — igualdade barraria 46% da operação). No sistema isso
-exige:
+O predicado do gate D6 recomendado pelo sheets.banco comparava **setor canônico** dos dois
+lados (não igualdade de gerência — igualdade barraria 46% da operação).
 
-1. `Gerencia.setor_canonico` — **já existe** (migration 0099) e é populado pelo import;
-2. o setor do `Projeto` populado via import (`projeto.gerencia`, hoje 124/125 vazio);
-3. o predicado `EquipeGerencia.vigentes_em().filter(usuario=user, gerencia__setor_canonico=<setor do projeto>)` — **ainda não reescrito** (0 usos de `setor_canonico` em `solicitacao_scope.py`/`rbac`).
+**Superado no PR 9 das permissões (16/10/2026).** O escopo ficou pela **gerência do projeto**,
+não pelo setor:
 
-Com (1) já feito, **o gate D6 segue bloqueado** enquanto (2) e (3) não existirem — é
-dependência de import **e** de código de autorização.
+1. `Gerencia.setor_canonico` — existe (migration 0099) e é populado pelo import, mas não dá
+   escopo: o lint V006 proíbe o setor nos arquivos de escopo;
+2. `projeto.gerencia` — a medição de 2026-08-26 (124/125 vazio) é histórica; hoje há 0 projetos
+   ativos sem gerência em produção (`ACHADOS_REAIS`, M10-04);
+3. o predicado — `solicitacao_scope.py` filtra por `projeto__gerencia_id`;
+   `participantes_fora_da_gerencia` (P9-5) só aceita participante com vínculo vigente com escopo
+   (papel ≠ `EQUIPE`) na gerência do projeto, e só se quem cria tem papel GERENTE/COORDENADOR/APOIO
+   nela; fail-closed (projeto sem gerência ou criador sem papel lá → todos fora). Global/privilegiado
+   (superuser, Superintendência, Controle, DAT) é isento.
+
+SSOT: `services/solicitacao_scope.py` e [`rbac.spec.md`](specs/backend/rbac.spec.md).
 
 ---
 
@@ -246,9 +256,9 @@ dependência de import **e** de código de autorização.
 
 | # | tarefa | estado |
 |---|---|---|
-| 1 | `_update_formadores` (`is_active` + COORD_ACOMPANHA) | ✅ **PR #1886** (gate 8/8) |
+| 1 | `_update_formadores` (`is_active` + COORD_ACOMPANHA) | ✅ **PR #1886** (gate 8/8); desde 05/10/2026 só `FORMADOR` |
 | 2 | remover os 6 scripts de raspagem | pronto (§3.3: seguro) |
-| 3 | migrations: `setor_canonico` ✅ (0099), `desativado_localmente` ✅ (0098); falta `projeto_geral`, papel | parcial |
+| 3 | migrations: `setor_canonico` ✅ (0099), `desativado_localmente` ✅ (0098); papel `EQUIPE` ✅ (05/10/2026); falta `projeto_geral` | parcial |
 | 4 | import real (dry-run → apply, autorização) | depois de 3 |
 | 5 | gates D6/D7 + cálculo de códigos | depois de 4 |
 | 6 | feature de transferência de carteira (§4.2) | planejar (CP-04), depois de 4 |

@@ -31,14 +31,15 @@ Retorna a grade mensal de disponibilidade.
 >   `cache_scope="wide"`);
 > - os demais são escopados aos usuários das **próprias** gerências via `EquipeGerencia`
 >   (`:192-208`);
-> - quem não tem vínculo algum vê **apenas a si mesmo** (`:210-212`).
+> - quem não tem papel G/C/A vigente em gerência ativa recebe **403** antes de chegar à view
+>   (`HasSectorAccess`); o ramo "só o próprio usuário" da view não é alcançado (ver "Permissões").
 >
 > `build_monthly_grid` é então chamado com `gerencia_id=None` **+ `allowed_user_ids`** (`:233-241`).
 
 **Exemplos:**
 
 ```bash
-# Escopo derivado do usuário (amplo, das próprias gerências, ou só o próprio)
+# Escopo derivado do usuário (amplo ou das próprias gerências; sem vínculo G/C/A = 403)
 GET /api/availability/monthly?year=2026&month=1&role=FORMADOR
 
 # Grade do setor Vidas (gerencia_id=2)
@@ -107,9 +108,9 @@ Retorna os bloqueios de disponibilidade visíveis para o usuário.
 |--------|--------|
 | Superuser | Escopo amplo (`cache_scope="wide"`) |
 | **Controle e DAT** (têm `view_all_availability` pelo vínculo na gerência) | Escopo amplo — **não é bloqueado** (`:188-190`) |
-| Com `gerencia_id` | Apenas se o usuário pertence à gerência |
+| Com `gerencia_id` | Apenas se o usuário atua na gerência (papel G/C/A vigente; senão 403) |
 | Sem `gerencia_id`, com vínculo | Usuários das próprias gerências via `EquipeGerencia` (`:192-208`) |
-| Sem `gerencia_id`, sem vínculo | Apenas o próprio usuário (`:210-212`) |
+| Sem `gerencia_id`, sem vínculo | **403** — `HasSectorAccess` nega quem não tem papel G/C/A vigente em gerência ativa (`EquipeGerencia.gerencias_de_atuacao`) nem `view_all_availability`; Formador sozinho também dá 403. O ramo "só o próprio usuário" da view não é alcançado |
 
 > ⚠️ O docstring de `MonthlyAvailabilityView` (`views_availability_monthly.py`) ainda repete o texto antigo
 > "Controle: BLOQUEADO". O comentário autoritativo é `:13-19` / `:75-79`. Drift no código.
@@ -134,8 +135,11 @@ aplicado em `get_queryset`, invariante travado por `test_availability_privileged
 superuser, o Controle (`operate_preagenda`) e o DAT (`manage_admin_registries`) criem bloqueio **em nome de** um Formador.
 A operação registra `AuditLog` `DELEGATE_BLOCK_CREATE`.
 
-⚠️ O **import** de bloqueios não passa por essa policy e cria blocos auto-aprovados **sem
-`created_by`** — ver [imports/disponibilidade.md](./imports/disponibilidade.md) e issue
+⚠️ O **import** de bloqueios (rota só do superusuário, `SuperuserOnly` em
+`views_import_bloqueios.py`) não passa por essa policy: grava `created_by` = quem rodou e um
+`AuditLog` `DELEGATE_BLOCK_CREATE`, mas o bloco segue **auto-aprovado**. A partir de 31/07/2026 o
+alvo precisa ser Formador ativo (`bloqueios_import.py`) — ver
+[imports/disponibilidade.md](./imports/disponibilidade.md) e issue
 [#1643](https://github.com/matheusnorjosa/aprender_sistema/issues/1643).
 
 ## Gerências e Setores
@@ -157,10 +161,13 @@ Usuários são vinculados a gerências através da tabela `EquipeGerencia`:
 ```
 Usuario ─── EquipeGerencia ─── Gerencia
               │
-              └─ papel (GERENTE, COORDENADOR, APOIO, FORMADOR)
+              └─ papel (GERENTE, COORDENADOR, APOIO, FORMADOR, EQUIPE)
 ```
 
-Valores reais de `PAPEL_CHOICES` em `apps/core/models/organizacao.py`.
+Valores reais de `PAPEL_CHOICES` em `apps/core/models/organizacao.py`. `EQUIPE` (Equipe
+administrativa) só diz "trabalha neste setor": não conta como vínculo de escopo na grade, mas dá o
+pacote do perfil da gerência (no Controle e no DAT o pacote traz `view_all_availability`, o que dá
+escopo amplo). Na grade, só G/C/A vigente conta como vínculo; Formador sozinho recebe 403.
 *(Corrigido em 2026-07-24: não existe `APOIO_COORDENACAO`; o valor é `APOIO`.)*
 
 O vínculo em `EquipeGerencia` é o que define o escopo **para quem não é privilegiado**.
@@ -172,11 +179,16 @@ dele — ver "Permissões" acima.
 A grade mensal é cacheada no Redis por 5 minutos + jitter de até 30 s
 (`_ttl_with_jitter` em `apps/core/utils/cache_utils.py`, usado em `MonthlyAvailabilityView.get`, `views_availability_monthly.py`).
 
-Chave real (`cache_key` em `MonthlyAvailabilityView.get`, `views_availability_monthly.py`):
+Chave real (`chave_cache_grade` em `views_availability_monthly.py`, a SSOT):
 
 ```
-monthly:v7:{monthly_ver}:{year}:{month}:{role}:{cache_scope}:{sector or '*'}:{q_lower}:teto{teto}
+monthly:v8:{monthly_ver}:{sha256 do JSON [year, month, role, cache_scope, setor, busca, teto]}
 ```
+
+- `v8` (F8, scan de 16/10/2026): os parâmetros entram num JSON e a chave usa o hash dele. O setor
+  ausente é `null` (não mais `'*'`), então `sector=*` não colide com a grade sem filtro, e um `:` no
+  setor ou na busca não desloca os campos. Setor sem espaço nas pontas (vazio = sem filtro), busca
+  sem caixa.
 
 - `teto` = o teto de horas por evento vigente (`parametros_disponibilidade()`); salvar um teto
   novo em Configurações vale na consulta seguinte. `v6` entrou em 05/10/2026 com a CH com teto;

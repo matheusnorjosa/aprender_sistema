@@ -1,7 +1,7 @@
 ---
 title: Ambientes (dev / staging / prod-like)
 status: canonical
-last_verified: 2026-10-16
+last_verified: 2026-10-19
 sources_of_truth:
   - v2/Makefile
   - v2/infra/Makefile
@@ -161,12 +161,12 @@ PostgreSQL externo da VM02; Redis é local na stack. Backend em `:28000`, fronte
 - **Override `!reset` é transitório.** O `staging-gate` existe porque a base `docker-compose.yml` monta volumes
   de dev no `frontend`; a solução estrutural (mover esses binds para o `override.yml` dev-only) está em **#857**.
   Até lá, o gate depende de Docker Compose **v2.24.6+**.
-- **`v2/Makefile` desatualizado em alguns targets:** o target `test` ainda referencia `apps/dat_ingest/tests`,
-  app **removido** do projeto — usar os targets de teste de `apps/core`/`apps/dev_tools` (ver
-  [django-patterns]) e ignorar `dat_ingest` nesses alvos. Os targets `etl_*`/`etl_completo` do `v2/Makefile`
-  são do **ETL legado morto**; o import real hoje é `import_export_contract` + endpoints DRF.
-- **Não existe doc canônico `v2/docs/ENVIRONMENTS.md`** (esperado pelo contexto, mas ausente no repo) — esta
-  spec passa a ser a SSOT do tópico; quando o doc longo existir, deve ser linkado aqui (não duplicado).
+- **`v2/infra/Makefile` ainda expõe targets do ETL legado morto:** `etl-usuarios`, `etl-agenda`, `etl-all` e
+  `etl-dry-run` chamam `manage.py etl_usuarios`/`etl_agenda`/`etl_completo`, comandos que não existem mais. O
+  import real hoje é `import_export_contract` + endpoints DRF.
+- **Matriz operacional de ambientes:** [`v2/infra/ENVIRONMENTS.md`](../../../infra/ENVIRONMENTS.md) (compose,
+  env-file, `COMPOSE_PROJECT_NAME` e portas por ambiente), citado pelo `CLAUDE.md` como SSOT junto de
+  `v2/infra/README.md`. Esta spec é o contrato vivo do tópico e linka para ele em vez de duplicar a matriz.
 - **`make health-*` usa health externo via curl,** que em algumas redes (Kaspersky/Golden) retorna HTTP 000
   para `:443` mesmo com containers `healthy` — não confundir falha de rede com falha de app (ver deploy.spec).
 - **Prod sem staging remoto; deploy pull-based ([ADR-018](../../../../docs/architecture/project-decisions/ADR-018-pull-based-deploy.md)):** não há ambiente de staging em VM. Merge na `main`

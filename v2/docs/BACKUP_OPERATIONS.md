@@ -1,7 +1,7 @@
 ---
 title: Backup Operations Guide
 status: active
-last_verified: 2026-09-11
+last_verified: 2026-10-19
 verified_at_commit: d0d43890c58b6620a9c6dabca2c940a4e9589911
 sources_of_truth:
   - v2/infra/scripts/backup_db.sh
@@ -102,7 +102,7 @@ qual #1646 continua aberta: código correto não é drill executado.
 | **RTO** (Recovery Time Objective) | **1 hora** | Inclui restore + migrations + smoke; restore puro é tipicamente 10-30 min em base atual |
 | **Retenção padrão** | **7 dias** | Configurável via `BACKUP_RETENTION_DAYS`; S3 pode ter lifecycle policy mais longa |
 | **Frequência** | **1×/dia** | 2:00 AM em Docker (Celery beat) / 3:00 AM em VM (cron) — janela noturna |
-| **Verificação** | Semanal (domingos) | `verify_backup_health` (Docker) ou `verify_backup.sh` (VM) |
+| **Verificação** | Diária (06:00, dead-man de frescor) + semanal (domingos) | `check_backup_freshness` e `verify_backup_health` (Docker) ou `verify_backup.sh` (VM) |
 
 ## Overview
 
@@ -186,10 +186,12 @@ vs `/var/backups/aprender` na VM).
 3. **Celery Tasks** (`v2/backend/apps/core/tasks_backup.py`)
    - `backup.perform_database_backup` - Main backup task
    - `backup.verify_backup_health` - Health monitoring
+   - `backup.check_backup_freshness` - Dead-man diário de frescor
 
 4. **Celery Beat Schedule** (`v2/backend/config/celery.py`)
    - Daily backup at 2:00 AM
    - Weekly health check on Sundays at 3:00 AM
+   - Daily dead-man check at 6:00 AM
 
 ### Data Flow
 
@@ -414,11 +416,12 @@ Configured in `v2/backend/config/celery.py`:
 |------|----------|-------------|
 | `daily-database-backup` | Daily at 2:00 AM | Full pg_dump backup |
 | `weekly-backup-health-check` | Sundays at 3:00 AM | Verify backup system health |
+| `daily-backup-deadman-check` | Daily at 6:00 AM | Dead-man: alarme se o backup mais novo passar de 24h (`backup.check_backup_freshness`) |
 
 ### Verify Schedule
 
 A SSOT do schedule é o `CELERY_BEAT_SCHEDULE` de `v2/backend/config/celery.py` (`daily-database-backup` às 02:00,
-`weekly-backup-health-check` domingos 03:00). Em produção o beat roda com o **scheduler
+`weekly-backup-health-check` domingos 03:00, `daily-backup-deadman-check` todo dia às 06:00). Em produção o beat roda com o **scheduler
 padrão** (o `command` do serviço `beat` em `docker-compose.prod.yml`:
 `celery -A config beat -l info --schedule /tmp/celerybeat-schedule`), que é quem lê esse
 schedule do código — e **não** o `DatabaseScheduler` do `django_celery_beat`.
@@ -437,6 +440,15 @@ docker compose logs --tail=200 worker | grep -i "perform_database_backup"
 > `worker`.
 
 ## Health Monitoring
+
+### Daily Dead-man Check
+
+A task `backup.check_backup_freshness` (`tasks_backup.check_backup_freshness`) roda todo dia às
+6:00 AM e dispara alarme (ERROR no log + Sentry quando há DSN) se o backup mais novo passar de
+`BACKUP_DEADMAN_MAX_AGE_HOURS` (default 24h) ou se não houver backup nenhum. Foi criada depois de o
+backup diário morrer ~10 dias em silêncio (2026-08): o backup das 2:00 que falha alarma às 6:00 do
+mesmo dia (o mais novo fica com ~28h; no dia saudável, ~4h), não no domingo seguinte. Limitação: se o próprio beat/worker estiver morto, ela também não roda; o backstop
+externo é o gate `check_backup.sh` do deploy.
 
 ### Weekly Health Check
 

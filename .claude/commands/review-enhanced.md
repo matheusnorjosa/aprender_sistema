@@ -174,8 +174,9 @@ Review code: $ARGUMENTS
   ```
 - [ ] **Throttling** on sensitive endpoints
   ```python
-  throttle_classes = [UserRateThrottle]
-  throttle_scope = 'approval_actions'
+  # ScopedRateThrottle já está em DEFAULT_THROTTLE_CLASSES: basta o scope, que precisa
+  # existir em DEFAULT_THROTTLE_RATES (config/settings.py). Ex.: views/imports.py
+  throttle_scope = "import"
   ```
 - [ ] **select_related/prefetch_related** to avoid N+1
   ```python

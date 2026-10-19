@@ -120,13 +120,16 @@ AuditLog.objects.create(
 > a decisão passou de **grupos** para **policy**.
 
 - **Arquivo real**: `v2/frontend/src/pages/Aprovacoes/ApprovalsPage.tsx`
-- **Linhas**: `:107` (estado `canApprove`), `:158-159` (carga), `:384` (gate do botão)
+- **Onde**: estado `canApprove` (`useState`), carga no `useEffect` `loadAccess`, gate nas
+  colunas de ação e na barra de seleção em lote
 - **Implementação real**:
-  - Chama `getMyPolicies()` (`:158`), **não** `getMe`
-  - Deriva com `computeAccess(policies)` (`:159`), chaveado em `access_solicitation_approvals`
-    (comentário `:152-153`)
+  - `loadAccess` chama `getMyPolicies()`; o `getMe()` em paralelo só alimenta a regra de
+    segregação (PA-02) na tabela, não a decisão de mostrar os botões
+  - Deriva com `computeCapabilities(policies).canAccessApprovals`, chaveado em
+    `access_solicitation_approvals` (comentário acima do `useEffect`)
   - **Não** existe `groups.includes('Superintendência')` — a decisão não olha grupos
-  - Botões só renderizam se `record.status === 'pendente' && canApprove`
+  - Botões só renderizam se `record.status === 'pendente' && canApprove`; com impedimento
+    (`impedimento(record)`, PA-02) a linha mostra uma etiqueta da decisão impedida em vez dos botões
 - **Conformidade ISO 9241-110**: Controle explícito (usuário vê apenas ações permitidas)
 
 ## Resultados dos Testes

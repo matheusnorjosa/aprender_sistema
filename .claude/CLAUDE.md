@@ -44,8 +44,8 @@ cd v2 && make seed-e2e && cd frontend && npm run test:e2e -- --project=chromium 
 **MCPs (wired)**: `MCP_DOCKER` (playwright, fetch, duckduckgo, dockerhub,
 sequentialthinking) · `context7` (docs de libs — `.mcp.json`) · `oraculo-bd` (banco) ·
 `multi-model` · `vercel` · Google Calendar.
-**Não wired** (definições inertes em `.claude/settings.json` — Claude Code só lê
-server-defs de `.mcp.json`; mover p/ lá + restart p/ ativar): postgres (use
+**Não wired** (as defs antigas em `.claude/settings.json` eram inertes e foram removidas; Claude Code
+só lê server-defs de `.mcp.json`, arquivo local e não versionado — `.gitignore`): postgres (use
 `docker exec … manage.py dbshell`), github (use `gh` CLI), tree-sitter (use `graphify`), devdocs.
 
 ## Cláusulas Pétreas — IMUTÁVEIS

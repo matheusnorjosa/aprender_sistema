@@ -178,7 +178,8 @@ def com_pacote_da_diretoria(user: Usuario) -> EquipeGerencia:
     """Vínculo EQUIPE na gerência `DIRETORIA` (perfil DIRETORIA): o pacote da Diretoria (PR 12, C8).
 
     O pacote DIRETORIA é igual ao grupo Diretoria do seed. Em produção ninguém está no grupo nem existe a
-    gerência; o vínculo é o caminho da Diretoria quando o grupo deixar de dar poder.
+    gerência. Desde o PR 12 (`RBAC_FONTE=lotacao`) o grupo não dá poder: o vínculo EQUIPE na DIRETORIA é o
+    caminho do pacote.
     """
     from apps.core.services.rbac_permissions import invalidate_user_functional_permissions_cache
 

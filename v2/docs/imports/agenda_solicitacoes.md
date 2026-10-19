@@ -224,13 +224,15 @@ As colunas `cancelar` e `atualizar` **não são lidas pelo service**: `_normaliz
   - `Projeto.fluxo == 'NAO_SUPER'` → `status='aprovado'`.
   - **A data do evento não entra na decisão** — passado e futuro são tratados igual.
 - **Participation criada por linha** (`:562-607`): 1 `role='COORDENADOR'` + até 5 `role='FORMADOR'`.
-  Reconciliação por email (preferido) ou nome — `_resolve_user` (`:368-380`) cai em
-  `resolve_user_by_name`, que faz **fallback por substring** (`icontains`) e resolve ambiguidade com `.first()`
-  (`services/resolvers.py:89-131`). Achado `M22-14` /
+  Reconciliação por email (preferido) ou nome — `_resolve_user` (`eventos_import.py`) cai em
+  `resolve_user_by_name` (`services/resolvers.py`), que desde o **#1929** exige candidato único
+  (nome completo exato, depois todos os tokens do nome): homônimo (2+ candidatos) devolve `None` +
+  WARNING e o participante vira pendência `usuarios` — nunca escolhe no chute (coordenador não
+  resolvido pula a linha; formador não resolvido só fica fora da `Participation`). Achado `M22-14` /
   [#1643](https://github.com/matheusnorjosa/aprender_sistema/issues/1643), épico
-  [#1658](https://github.com/matheusnorjosa/aprender_sistema/issues/1658) — um homônimo entra na
-  agenda da pessoa errada, em silêncio. (O #1613/M02-09 cobriu só projeto/tipo_evento; o residual de
-  pessoa segue vivo em #1643.)
+  [#1658](https://github.com/matheusnorjosa/aprender_sistema/issues/1658). (Antes do #1929 havia
+  fallback por substring `icontains` + `.first()`, e um homônimo entrava na agenda da pessoa errada
+  em silêncio.)
 - **Timezone**: `ZoneInfo("America/Fortaleza")` (`:55`).
 - **Google Calendar**: **NÃO é tocado pelo import** — nenhum client GCal é importado pelo service.
   Publicação só via fluxo manual (preview + publish).
@@ -280,7 +282,7 @@ lock e **nunca sobrescreve decisão humana**:
 | Atualizar Solicitacao mesmo com `atualizar=true` | Update precisa passar por RD-01..08 | ✅ **#2021** — reimport protege status/owner/local (divergência → pendência `protected`) (#1628) |
 | Criar Usuario novo (Coordenador/Formador inexistente) | Usuários vêm do import #1; agenda só reconcilia | ✅ sim — não resolvido vira `pendencias.usuarios` |
 | Criar Municipio/Projeto novo | Cadastros mestres vêm dos passos 3-4 da ordem | ✅ sim — não resolvido vira pendência e a linha é pulada |
-| Reconciliar formador para a pessoa errada | Homônimo entra na agenda de terceiro | ❌ **não** — `resolve_user_by_name` usa substring + `.first()` (#1643) |
+| Reconciliar formador para a pessoa errada | Homônimo entra na agenda de terceiro | ✅ **#1929** — `resolve_user_by_name` exige candidato único; homônimo vira pendência `usuarios` (#1643) |
 | Atribuir grupo `Gerente` a usuário | Sensibilidade RBAC | ✅ sim — **neste** import. Ver [usuarios.md](./usuarios.md) §10 para o que acontece no import de usuários |
 | Enviar emails para `convidados` | Nenhum side-effect de notificação | ✅ sim — a coluna nem é lida |
 | Registrar quem rodou o import | Rastreabilidade | ❌ **não** — nenhum `AuditLog` (§8) |
@@ -323,7 +325,7 @@ Gerar lista de:
 | **Aprovação automática de fluxo SUPER** | Crítica | ✅ Mitigado — `resolve_initial_status` devolve `pendente` (`:497`) |
 | **Aprovação de `NAO_SUPER` sem hard gate de disponibilidade** | ✅ Resolvido | **#2021** — gate RD-01..08 p/ evento FUTURO (conflito → pendência `availability`); histórico entra sem checar — [#1620](https://github.com/matheusnorjosa/aprender_sistema/issues/1620) |
 | **Update automático sobrescrevendo decisões, owner e datas** | ✅ Resolvido | **#2021** — reimport protege status/owner/local (→ pendência `protected`) + diff real ([#1628](https://github.com/matheusnorjosa/aprender_sistema/issues/1628)) |
-| **Match errado de Formador/Coordenador por nome (homônimos)** | **P1 vivo** | ❌ **Nenhuma** — substring + `.first()` (`resolvers.py:89-131`), [#1643](https://github.com/matheusnorjosa/aprender_sistema/issues/1643) |
+| **Match errado de Formador/Coordenador por nome (homônimos)** | ✅ Mitigado | **#1929** — `resolve_user_by_name` exige candidato único; ambiguidade → `None` + WARNING → pendência `usuarios` ([#1643](https://github.com/matheusnorjosa/aprender_sistema/issues/1643)) |
 | Colisão de hash entre turmas simultâneas | Alta | ❌ Nenhuma — a chave não inclui formador nem coordenador (§7) |
 | Cancel automático destruindo dados | Alta | ✅ Na prática — a coluna `cancelar` não é lida |
 | **Apply sem rastro de auditoria** | Alta | ❌ **Nenhuma** — não há `AuditLog` (§11) |

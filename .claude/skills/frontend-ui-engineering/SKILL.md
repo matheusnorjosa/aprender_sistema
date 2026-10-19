@@ -11,8 +11,8 @@ Stack: **React 19 + Ant Design v5 + Tailwind CSS + Vite 7** (migrado do React 18
 antd usa o shim `@ant-design/v5-patch-for-react-19`, importado no `main.tsx`). Goal: UI that
 matches AS v2's existing design language, not AI-generated-looking output.
 
-Layout under `v2/frontend/src/`: `pages/` (40, lazy-loaded), `components/` (18 reusable),
-`hooks/` (14 custom), `api/` (one client per domain).
+Layout under `v2/frontend/src/`: `pages/` (41, lazy-loaded in `AppRoutes.tsx`), `components/` (22 reusable + `access/`,
+`google/`, `lgpd/`), `hooks/` (13 custom), `api/` (one client per domain).
 
 ## The one rule: Antd first
 
@@ -117,7 +117,7 @@ Before merging a UI change:
 - [ ] Keyboard navigable (Tab through page); icon-only buttons have `aria-label`
 - [ ] Responsive at 375 / 768 / 1024 / 1920px
 - [ ] No console errors/warnings
-- [ ] Lighthouse Performance ≥ 90 for new pages; bundle size not significantly increased
+- [ ] Lighthouse Performance ≥ 70 (Lighthouse CI gate, `v2/frontend/lighthouserc.cjs`); bundle size not significantly increased
 - [ ] E2E checklist passes (`cd v2/frontend && npm run test:checklist`)
 
 ## References

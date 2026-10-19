@@ -78,7 +78,7 @@ gh release list --limit 3   # a tag imutavel vYYYY.MM.DD-<sha7> que o merge torn
 
 > A tag existir **não** prova que as imagens foram assinadas: `tag_and_release` tem
 > `needs: [prepare, build_and_push]`, com o `sign` fora do `needs` e fora do `if`
-> (`.github/workflows/deploy.yaml:231-235`). Se a assinatura importa, olhe o job
+> (job `tag_and_release` em `.github/workflows/deploy.yaml`). Se a assinatura importa, olhe o job
 > *Sign images (cosign keyless + SLSA)* à parte — o gate duro dela é o `promote.yml`
 > (`.github/workflows/promote.yml:139`), não este run.
 

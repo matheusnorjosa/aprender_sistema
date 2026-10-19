@@ -32,7 +32,7 @@ def profile_view():
 ```python
 # BAD: N+1 (one query per solicitacao for coordenador)
 for sol in Solicitacao.objects.filter(status='aprovado'):
-    print(sol.coordenador.usuario.full_name)  # +1 query each
+    print(sol.coordenador.get_full_name())  # +1 query each
 
 # GOOD: select_related for FK, prefetch_related for M2M / reverse FK
 (

@@ -7,8 +7,8 @@
  *
  * Uso esperado dentro de fixtures:
  *
- *   const api = await createApiContext(baseURL, username, password);
- *   const solic = await seedSolicitacao(api, { projeto: 'Vidas' });
+ *   const api = await createApiContext({ baseURL, username, password });
+ *   const solic = await seedSolicitacao(api, { fluxo: 'NAO_SUPER' });
  *   await page.goto(`/solicitacoes/${solic.id}/editar`);
  */
 import { APIRequestContext, expect, request } from '@playwright/test';

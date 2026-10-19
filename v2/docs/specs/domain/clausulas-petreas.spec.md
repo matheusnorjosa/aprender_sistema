@@ -1,7 +1,7 @@
 ---
 title: Cláusulas Pétreas (CP-01..CP-08)
 status: canonical
-last_verified: 2026-10-17
+last_verified: 2026-10-19
 sources_of_truth:
   - docs/business-rules/clausulas-petreas.md
   - v2/backend/config/settings.py
@@ -36,14 +36,14 @@ Esta spec é o **índice canônico** das CPs: lista cada cláusula com seu **enf
 
 | CP | Enforcement real | Arquivo |
 |----|------------------|---------|
-| CP-01 | Guard de runtime + CI seta `REQUIRE_DOCKER=1` | [`v2/backend/config/settings.py`](../../../backend/config/settings.py) (linhas ~19-27), [`.github/workflows/ci.yaml`](../../../../.github/workflows/ci.yaml) |
+| CP-01 | Guard de runtime + CI seta `REQUIRE_DOCKER=1` | [`v2/backend/config/settings.py`](../../../backend/config/settings.py) (bloco `REQUIRE_DOCKER` no topo, que sai com `sys.exit(1)` fora de `/.dockerenv`), [`.github/workflows/ci.yaml`](../../../../.github/workflows/ci.yaml) |
 | CP-02 | Política de aprovação (PA-01..PA-07) | → [`politica-aprovacao.spec.md`](./politica-aprovacao.spec.md) |
 | CP-03 | Regras de disponibilidade (RD-01..RD-08) | → [`regras-disponibilidade.spec.md`](./regras-disponibilidade.spec.md) |
 | CP-04 | Workflow de sub-agents (convenção; **sem gate de CI**) | [`docs/business-rules/clausulas-petreas.md`](../../../../docs/business-rules/clausulas-petreas.md) §CP-04 |
 | CP-05 | v1 congelado (convenção/branch protection; **sem script dedicado**) | [`docs/business-rules/clausulas-petreas.md`](../../../../docs/business-rules/clausulas-petreas.md) §CP-05 |
 | CP-06 | Conventional commits (convenção; **sem commit-lint em CI**) | [ADR-004](../../../../docs/architecture/project-decisions/ADR-004-conventional-commits-branch-protection.md) |
 | CP-07 | Hook local `PreToolUse` + branch protection da `main` | `.claude/settings.json` (bloco `PreToolUse`, local) |
-| CP-08 | Gate de `INSTALLED_APPS` por `INCLUDE_DEV_TOOLS` + guard rígido por `ENVIRONMENT` (#1466) | [`v2/backend/config/settings.py`](../../../backend/config/settings.py) (linhas 126, 137-143, 170-171) |
+| CP-08 | Gate de `INSTALLED_APPS` por `INCLUDE_DEV_TOOLS` + guard rígido por `ENVIRONMENT` (#1466) | [`v2/backend/config/settings.py`](../../../backend/config/settings.py) (`INCLUDE_DEV_TOOLS`, o bloco `if ENVIRONMENT == "production"` que o força a `False`, o `INSTALLED_APPS.append("apps.dev_tools")` e o gate do `FreezeTimeMiddleware`) |
 
 ## Contratos e invariantes
 

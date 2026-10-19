@@ -57,7 +57,7 @@ const rules: Rule[] = [{ required: true, message: 'Campo obrigatório' }];
 |----------|----------|
 | Component UI state | `useState` |
 | Theme/auth | Context (`ThemeContext`, `AuthContext`) |
-| Filters/pagination | URL searchParams (`useSearchParams`) |
+| Filters/pagination | `useTableFilters` (estado local) |
 | Server data | `fetchAPI` + local state |
 | Shared across pages | context or props (avoid global stores) |
 

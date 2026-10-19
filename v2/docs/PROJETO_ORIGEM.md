@@ -62,12 +62,12 @@ O sistema original funcionava integralmente sobre planilhas Google/Excel, que ac
 #### Frontend (`v2/frontend`)
 - **Framework**: React 19 + Vite 7
 - **UI**: Ant Design 5 + Tailwind CSS
-- **Páginas**: 57 arquivos `.tsx` em `src/pages` (o projeto é 100% TypeScript — não há `.jsx`)
+- **Páginas**: 55 arquivos `.tsx` não-teste em `src/pages` (contagem do `INDEX_DOCUMENTACAO.md`) (o projeto é 100% TypeScript — não há `.jsx`)
 
 ### 2.3 Modelos do Sistema
 
 > 🔴 **Corrigido em 2026-07-24.** O título dizia "28 modelos", a tabela abaixo lista 29 e o código
-> exporta **43 nomes** em `__all__` de `apps/core/models/__init__.py`. Não confie na contagem daqui:
+> exporta **40 nomes** em `__all__` (recontado em 2026-10-19) de `apps/core/models/__init__.py`. Não confie na contagem daqui:
 > o **SSOT é `apps/core/models/__init__.py`**.
 >
 > Ausentes da tabela abaixo: `MunicipioReferencia`, `ImportJob`, `PermissaoFuncional`,
@@ -88,7 +88,7 @@ O sistema original funcionava integralmente sobre planilhas Google/Excel, que ac
 | Modelo | Descrição |
 |--------|-----------|
 | `Solicitacao` | Pedido de evento (status: pendente/aprovado/reprovado) |
-| `Participation` | Participantes de uma solicitação (role: COORDENADOR/FORMADOR/APOIO) |
+| `Participation` | Participantes de uma solicitação (role: COORDENADOR/FORMADOR/COORD_ACOMPANHA/CONVIDADO — `Participation.Role`; não existe APOIO) |
 | `AvailabilityBlock` | Bloqueios de agenda (tipos: P=parcial, T=total) |
 | `Deslocamento` | Registros de deslocamentos entre municípios |
 

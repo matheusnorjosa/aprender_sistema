@@ -93,17 +93,17 @@ apps/core/services/availability_service.py   98%   145-149
 def check_conflicts(...):
     # ... covered code ...
 
-    if daily_capacity_exceeded:  # Line 145 not tested
+    if travel_buffer_violated:   # Line 145 not tested
         conflicts.append(...)     # Line 146 not tested
         return result             # Line 147 not tested
 ```
 
 **Missing test**:
 ```python
-def test_daily_capacity_exceeded():
-    """Test daily capacity limit (RD-05)."""
-    # Create multiple events exceeding daily limit
-    # Assert conflict code 'M' returned
+def test_travel_buffer_violated():
+    """Test travel buffer between cities (RD-04)."""
+    # Create two events in different cities without the buffer
+    # Assert conflict code 'D' returned
 ```
 
 #### Medium Priority (Should Fix)
@@ -213,7 +213,7 @@ def test_process_batch_multiple_items():
 
 #### availability_service.py (RD-01 to RD-08)
 
-**Required tests** (17 total):
+**Required tests** (18 total, `apps/core/tests/test_availability_service.py`):
 - [ ] `test_conflict_overlap_total` (RD-01)
 - [ ] `test_conflict_overlap_partial` (RD-01)
 - [ ] `test_no_conflict_adjacent_end_equals_start` (RD-01)
@@ -221,16 +221,21 @@ def test_process_batch_multiple_items():
 - [ ] `test_block_partial_P_prevents_inside_allows_outside` (RD-03)
 - [ ] `test_travel_buffer_between_cities_required` (RD-04)
 - [ ] `test_same_city_allows_zero_buffer` (RD-04)
-- [ ] `test_daily_capacity_M_exceeded` (RD-05)
-- [ ] `test_multi_formador_any_conflict_blocks` (RD-01)
+- [ ] `test_dia_acima_de_8_horas_nao_gera_M` (RD-05: o motor não emite M desde 05/10/2026)
 - [ ] `test_timezone_aware_fortaleza_localtime` (RD-06)
+- [ ] `test_midnight_boundary_timezone_aware` (RD-06)
+- [ ] `test_multi_formador_any_conflict_blocks` (RD-01)
 - [ ] `test_conflict_messages_include_codes_and_intervals` (RD-08)
-- [ ] `test_check_conflicts_requires_authentication` (API)
-- [ ] `test_check_conflicts_missing_params_returns_400` (API)
-- [ ] `test_check_conflicts_returns_conflicts` (API)
-- [ ] `test_check_many_batch_processing` (API)
-- [ ] `test_check_conflicts_rbac_self_or_privileged` (API)
-- [ ] `test_check_conflicts_structured_messages` (API)
+- [ ] `test_availability_check_endpoint_returns_conflicts` (API)
+- [ ] `test_availability_check_requires_auth` (API)
+- [ ] `test_check_endpoint_requires_usuario_id` (API)
+- [ ] `test_check_endpoint_validates_dates` (API)
+- [ ] `test_check_many_endpoint_batch_processing` (API)
+- [ ] `test_permission_only_self_or_privileged` (API, RBAC)
+
+RD-05 hoje é teto da contagem de horas de formação, não checagem de agenda: os testes
+ficam em `apps/core/tests/test_horas_formacao.py` (SSOT `services/horas_formacao.py`).
+Mesma lista de `/check-conflicts`.
 
 **Target**: 100% coverage
 

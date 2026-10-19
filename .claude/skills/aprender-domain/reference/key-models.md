@@ -42,7 +42,7 @@
 ## AvailabilityBlock
 
 **SSOT**: Bloqueios de agenda do formador
-**Fields**: usuario, start_date, end_date, start_time, end_time, tipo (P/T), status
+**Fields**: usuario, created_by, inicio, fim (DateTimeField, UTC), tipo (T/P), motivo, status (pendente/aprovado/reprovado, default aprovado)
 
 ## AuditLog
 

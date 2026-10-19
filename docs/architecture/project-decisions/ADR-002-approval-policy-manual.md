@@ -14,6 +14,7 @@ Implementar política de aprovação manual obrigatória com 7 regras:
 
 - **PA-01**: Nenhuma solicitação auto-aprovada (fluxo SUPER)
 - **PA-02**: Apenas Superintendência/DAT/superuser podem aprovar
+  (texto de 2025-10-23; quem aprova hoje está na emenda de 2026-10-19 abaixo)
 - **PA-03**: Integrações externas (GCal) executam somente após aprovação
 - **PA-04**: Estado inicial sempre `pendente` (SUPER) ou `aprovado` (NAO_SUPER)
 - **PA-05**: Auditoria completa em AuditLog (IP, user_agent, justificativa)
@@ -23,6 +24,7 @@ Implementar política de aprovação manual obrigatória com 7 regras:
 ## Consequences
 
 - Fluxo SUPER: Coordenador cria → Superintendência aprova → Controle publica
+  (quem aprova mudou; ver emenda de 2026-10-19)
 - Fluxo NAO_SUPER: Coordenador cria (auto-aprovado) → Controle publica
 - AuditLog registra toda ação com rastreabilidade completa
 - ~~Aprovação manual NÃO revalida conflitos (decisão humana com contexto)~~
@@ -41,9 +43,11 @@ O que mudou:
 - `approve_solicitacao` revalida a disponibilidade de **todos** os participantes dentro
   da mesma `transaction.atomic()`, depois do `select_for_update()` da linha e antes de
   gravar `status="aprovado"`
-  (`v2/backend/apps/core/services/solicitacao_approval.py:117-130`, chamada em `:126`).
+  (`approve_solicitacao` em `v2/backend/apps/core/services/solicitacao_approval.py`, que
+  chama `enforce_solicitacao_availability(..., action="approve")`).
 - `batch_approve_solicitacoes` revalida **item a item**, em sequência, dentro da
-  transação do lote (`solicitacao_approval.py:288-298`, chamada em `:295`). Como as
+  transação do lote (`batch_approve_solicitacoes` em `solicitacao_approval.py`, que chama
+  `enforce_solicitacao_availability(..., action="batch_approve")` por item). Como as
   aprovações anteriores já estão gravadas quando a próxima é checada, um lote não
   consegue aprovar dois eventos conflitantes do mesmo formador de uma vez. Conflito
   reprova só aquele item (entra em `errors`); o resto do lote segue.
@@ -63,9 +67,33 @@ o humano decide *sobre um estado revalidado*, não sobre um instantâneo velho.
 **Decision e Context acima permanecem como registrados em 2025-10-23.** PA-01 a PA-07 não
 foram alterados pelo #1452.
 
+### Emenda 2026-10-19: quem aprova (PA-02)
+
+O texto de PA-02 acima ("Apenas Superintendência/DAT/superuser") envelheceu com o PR 3, o
+B1, o PR 10 e o PR 11. A regra hoje é uma só, `solicitation_approval_basis`
+(`v2/backend/apps/core/rbac/policies.py`), com três bases em ordem de precedência:
+
+1. `superuser`;
+2. `gerente_superintendencia` — vínculo `EquipeGerencia` vigente com papel GERENTE na
+   gerência da Superintendência (com escopo: fora dela vale a próxima base);
+3. `capacidade_aprovar` — a capacidade `approve_solicitation`, que vem do pacote do perfil
+   da gerência: ADMIN_OPERACIONAL (DAT) e CONTROLE. Sem escopo.
+
+**Nenhum grupo Django aprova**: o poder vem só da lotação (`RBAC_FONTE` padrão
+`lotacao`). O Controle também aprova, coisa que o texto de 2025-10-23 não previa. Além da
+base, `decisoes_impedidas` (em `solicitacao_approval.py`) barra a decisão sobre
+solicitação que o próprio ator criou ou editou e, numa janela de 30 dias, quando ator e autor
+alteraram a conta um do outro ou a mesma pessoa alterou as duas (segregação de funções; o
+superusuário decide tudo, com break-glass registrado).
+
+SSOT da política: `v2/docs/specs/domain/politica-aprovacao.spec.md` (PA-02). PA-01 e
+PA-03 a PA-07 seguem valendo como decididos.
+
 ## References
 
 - CP-02 (Cláusula Pétrea)
+- `v2/docs/specs/domain/politica-aprovacao.spec.md` (PA-02 vivo)
+- `v2/backend/apps/core/rbac/policies.py` (`solicitation_approval_basis`)
 - `v2/backend/apps/core/services/solicitacao_approval.py`
 - `v2/backend/apps/core/services/solicitacao_availability.py` (guard + advisory lock, #1452)
 - `v2/backend/apps/core/tests/test_approval_policy_PA.py`

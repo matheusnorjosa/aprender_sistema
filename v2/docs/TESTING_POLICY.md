@@ -108,7 +108,7 @@ que **não existe** — nem o arquivo, nem o diretório `apps/core/data/`.)*
 | Lado | Threshold configurado | Enforçado no CI? |
 |---|---|---|
 | Backend | **85%** — `v2/backend/pytest.ini` (`fail_under = 85`) | ✅ sim — `.github/workflows/ci.yaml` (`coverage report --fail-under=85`) |
-| Frontend | **ratchet no baseline medido** (statements/branches/functions/lines ~44-46%; SSOT em `v2/frontend/vitest.config.ts`, sobe a cada leva de testes — #1800) | ✅ sim — `.github/workflows/frontend-ci.yml` roda `npm run test:coverage` |
+| Frontend | **ratchet no baseline medido** (valores por métrica em `thresholds` de `v2/frontend/vitest.config.ts`, a SSOT; sobe a cada leva de testes — #1800) | ✅ sim — `.github/workflows/frontend-ci.yml` roda `npm run test:coverage` |
 
 Política e histórico do gate de 85%: [analysis/COVERAGE_POLICY.md](./analysis/COVERAGE_POLICY.md).
 O alvo de 90% (Fase 2) segue como meta, não como gate.

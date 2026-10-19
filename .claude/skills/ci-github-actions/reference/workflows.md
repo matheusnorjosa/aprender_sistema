@@ -4,8 +4,8 @@ Consultado sob demanda pela skill `ci-github-actions`. Nomes (`name:`) e arquivo
 
 ## Backend / orquestração
 
-- **`ci.yaml`** — *CI – Continuous Integration*. Orquestrador. `backend-impact` (gate de impacto) → `lint`, `rbac-lint`, `backend-tests-core` + `backend-tests-ingest-devtools` (via reusable), `backend-migrate-integrity`, `backend-typecheck` (pyright), `docker-parity-backend`, e o agregador `tests`. Faz `coverage combine` (≥85%) e upload Codecov (guarded por token).
-- **`_backend-test.yml`** — *Backend Test (reusable)*. Consumido pelo `ci.yaml`. Roda `pytest -n auto --dist loadscope`. Input `run_migrations` (default true) gateia o passo `manage.py migrate`; o gate core/ingest passa `run_migrations:false` + `--no-migrations`.
+- **`ci.yaml`** — *CI – Continuous Integration*. Orquestrador. `backend-impact` (gate de impacto) → `lint`, `rbac-lint`, `backend-tests-core` + `backend-tests-devtools` (via reusable; agregados em `[required] backend tests (runner)`), `backend-migrate-integrity`, `backend-typecheck` (pyright), `docker-parity-backend`, e o agregador `tests`. Faz `coverage combine` (≥85%) e upload Codecov (guarded por token).
+- **`_backend-test.yml`** — *Backend Test (reusable)*. Consumido pelo `ci.yaml`. Roda `pytest -n auto --dist loadscope`. Input `run_migrations` (default true) gateia o passo `manage.py migrate`; o gate core/devtools passa `run_migrations:false` + `--no-migrations`.
 
 ## Frontend
 
@@ -26,14 +26,23 @@ Consultado sob demanda pela skill `ci-github-actions`. Nomes (`name:`) e arquivo
 
 ## Gate de processo / deploy
 
-- **`staging-gate-audit.yml`** — *Staging Gate Evidence*. `[required]`. Dispara em `v2/backend/apps/`; exige os 3 marcadores literais no corpo do PR (ver SKILL.md). `on: edited` re-roda.
+- **`staging-gate-audit.yml`** — *Staging Gate Evidence*. `[required]`. Roda em todo PR para `main` (sem `paths:`); o escopo é decidido por `v2/infra/scripts/staging-gate-scope.sh` (runtime de backend, frontend `src/`/`public/`/`Dockerfile.prod` e compose/Dockerfile de infra, menos arquivos de teste). No escopo, exige os 3 marcadores literais no corpo do PR (ver SKILL.md). `on: edited` re-roda.
 - **`deploy.yaml`** — *Build, sign and release (main)*. Pós-merge: build/scan/push no Docker Hub, **assina** (cosign keyless + SLSA), cria tag imutável + GitHub Release. **NÃO deploya** — o job `deploy` (PUT ao `:9443` público) foi deletado na Fase 4 do ADR-018 (#1516).
 - **`promote.yml`** — *Promote*. `workflow_dispatch`, gated no Environment `production` (required reviewer). Resolve tag→digest (com retry: o Docker Hub flaka), exige imagens assinadas (gate duro em `.github/workflows/promote.yml:139`), assina o `production.json` e publica no branch protegido `deploy-pointer`. Na VM01 (systemd ~60s) o `aprender-deployer` **lê e verifica** o ponteiro; quem **aplica** — o `PUT` por digest em `127.0.0.1:9443` — é o `aprender-applier`, o único que detém o token do Portainer. É separação de privilégio (decisão #4 do ADR-018): o deployer parseia dado vindo da internet e por isso **não** tem o token. A confirmação é feita de dentro da VM, o que a torna imune ao *false-red* do `:9443`.
 
 ## Monitoramento (não bloqueia merge)
 
 - **`backend-xdist-canary.yml`** — *Backend xdist Canary (non-blocking)*. 4 matrix runs de `pytest apps` num banco **migrado** (o gate roda `--no-migrations`). O alerta vai para uma issue aberta pelo `github-actions[bot]` com o marcador `<!-- as-xdist-canary -->`: run com falha abre ou comenta; só run completo e limpo da `main`, sem `extra_pytest_args`, fecha.
-- **`agent-browser-smoke.yml`** — *agent-browser-smoke*. Smoke de browser via agente.
+- **`frontend-metrics-monthly.yml`** — *frontend-metrics-monthly*. Agendado (dia 1º de cada mês) + `workflow_dispatch`.
+
+(O `agent-browser-smoke.yml` foi removido no #1933, por ser smoke redundante.)
+
+## Outros
+
+- **`rbac-doc-drift.yml`** — *RBAC doc drift*. PR que toca `apps/core/rbac/matrix.py` ou `v2/docs/rbac_authorization_matrix.md`.
+- **`deployer-bats.yml`** — *Deployer Bats*. Testes bats de `v2/infra/deployer/**`.
+- **`staging-gate-bats.yml`** — *Staging Gate Bats*. Testes bats dos scripts do staging gate (`staging-gate*.sh`, `smoke_test_staging.sh`, `restore_db.sh`).
+- **`release-notes-producao.yml`** — *Notas de producao (Release promovida)*. `workflow_run` depois do `promote.yml`.
 
 ## Composite actions (`.github/actions/`)
 

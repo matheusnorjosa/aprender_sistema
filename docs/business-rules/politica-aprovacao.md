@@ -104,7 +104,9 @@ test_approval_flow_records_audit_log
    Aprovar **revalida** a disponibilidade (#1452): se algum participante entrou em conflito
    desde a criação, a aprovação é recusada com 400
 3. Se aprovado → vai para Pré-Agenda
-4. Controle, Superintendência ou DAT publica no Google Calendar
+4. Controle ou DAT (`use_gcal`), o superuser ou a Apoio de Coordenação da gerência do evento
+   (`publish_setor_solicitacao`) publica no Google Calendar. A Gerente da Superintendência
+   aprova pelo vínculo e não publica (vê só a prévia)
 
 ### Aprovação em lote
 

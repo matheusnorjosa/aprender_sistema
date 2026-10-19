@@ -14,11 +14,13 @@
 - Autorização em views usa `permission_classes = [HasPerm("codename")]` — **não** checagem direta de grupos
   (`user.groups.filter(name=...)` é banido pelo `scripts/rbac_lint.py`).
 - SSOT de setores/funções: `apps.core.constants` (**13 setores, 5 funções**, inclui "Assistente Administrativo").
-- SSOT de capabilities × grupos: `apps.core.rbac` + admin-driven (Group × Capability).
+- Matriz Grupo × Capability = `FUNCTIONAL_PERMISSIONS_SEED` (`apps/core/services/functional_permissions_seed.py`)
+  + migration, muda só por PR (D21; o Admin e a tela de Grupos são só leitura). Desde o PR 12 (`RBAC_FONTE=lotacao`) o poder vem da lotação; o grupo só soma no modo de
+  emergência `uniao`.
 - O bloco `ACCESS_MATRIX` de `rbac_authorization_matrix.md` é **gerado** de
   `apps/core/rbac/matrix.py` (SSOT executável) pelo command `rbac_matrix_doc --check`;
   editá-lo à mão gera drift. Ver `.github/workflows/rbac-doc-drift.yml`.
 - Toda **escrita** em `GroupViewSet` (create/update/destroy/`sync_members`) é
   **superuser-only** desde o #1567; `list`/`retrieve` seguem com
-  `HasPerm("manage_purchases_and_materials")` — `apps/core/views/admin.py:494-500`.
+  `HasPerm("manage_purchases_and_materials")` — `GroupViewSet.get_permissions` em `apps/core/views/admin.py`.
   Em produção há **um único superuser ativo** (bus factor 1).

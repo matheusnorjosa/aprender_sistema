@@ -108,12 +108,15 @@ def foo(user: Usuario, data: dict[str, Any]) -> CheckResult:
 
 ### Missing AuditLog (PA-05)
 ```python
-# Add after critical action
+# Add after critical action (fields: usuario, action, model_name, details;
+# see services/solicitacao_approval.py). IP goes inside details.
+from apps.core.utils.net import get_client_ip
+
 AuditLog.objects.create(
     usuario=request.user,
-    acao='approve',
-    detalhes={'solicitacao_id': obj.id},
-    ip=_get_client_ip(request),
+    action=AuditLog.Action.APPROVE,
+    model_name='Solicitacao',
+    details={'solicitacao_id': obj.id, 'ip_address': get_client_ip(request)},
 )
 ```
 

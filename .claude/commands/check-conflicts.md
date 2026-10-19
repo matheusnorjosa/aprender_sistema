@@ -170,14 +170,20 @@ print(f"Local (Fortaleza): {solicitacao.inicio.astimezone(ZoneInfo('America/Fort
 
 ### 7. API Endpoint Testing
 
+The API uses DRF `SessionAuthentication` only (no Bearer token). Log in through the
+browser/session first and send the session cookie; the `POST` also needs the CSRF token
+(`$SESSION` / `$CSRF` below come from that login).
+
 ```bash
 # Individual check
 curl -X GET "http://localhost:8002/api/availability/check/?usuario_id=1&inicio=2025-01-15T09:00:00-03:00&fim=2025-01-15T12:00:00-03:00&municipio_id=1" \
-  -H "Authorization: Bearer $TOKEN"
+  -b "sessionid=$SESSION; csrftoken=$CSRF"
 
 # Batch check
 curl -X POST "http://localhost:8002/api/availability/check-many/" \
-  -H "Authorization: Bearer $TOKEN" \
+  -b "sessionid=$SESSION; csrftoken=$CSRF" \
+  -H "X-CSRFToken: $CSRF" \
+  -H "Referer: http://localhost:8002/" \
   -H "Content-Type: application/json" \
   -d '{
     "checks": [
@@ -186,6 +192,8 @@ curl -X POST "http://localhost:8002/api/availability/check-many/" \
     ]
   }'
 ```
+
+In Python, prefer `APIClient().force_authenticate(user=...)`, as the tests do.
 
 ### 8. Output
 

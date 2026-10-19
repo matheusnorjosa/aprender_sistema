@@ -144,6 +144,8 @@ export default function MySolicitacoesPage(): JSX.Element {
       const filters: Record<string, string | number> = { mine: 'true' };
       if (statusFilter) filters['status'] = statusFilter;
       if (termoBuscado) filters['q'] = termoBuscado;
+      // Desempate por id: com só '-inicio', eventos no mesmo horário se repetem ou somem entre as páginas.
+      filters['ordering'] = '-inicio,id';
       filters['page'] = page;
       filters['page_size'] = pageSize;
 

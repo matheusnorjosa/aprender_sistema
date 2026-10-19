@@ -84,15 +84,15 @@ describe('MySolicitacoesPage — item 36', { timeout: 20000 }, () => {
     deleteSolicitacaoMock.mockReset();
   });
 
-  test('pagina no servidor: a página 2 é pedida ao backend', async () => {
+  test('pagina no servidor: a página 2 é pedida ao backend, com desempate por id na ordem', async () => {
     listSolicitacoesMock.mockResolvedValue(pagina([makeSolic()], 150));
     renderPage();
     await waitFor(() =>
-      expect(listSolicitacoesMock).toHaveBeenCalledWith({ mine: 'true', page: 1, page_size: 20 })
+      expect(listSolicitacoesMock).toHaveBeenCalledWith({ mine: 'true', ordering: '-inicio,id', page: 1, page_size: 20 })
     );
     fireEvent.click(await screen.findByTitle('2'));
     await waitFor(() =>
-      expect(listSolicitacoesMock).toHaveBeenLastCalledWith({ mine: 'true', page: 2, page_size: 20 })
+      expect(listSolicitacoesMock).toHaveBeenLastCalledWith({ mine: 'true', ordering: '-inicio,id', page: 2, page_size: 20 })
     );
   });
 
@@ -125,7 +125,7 @@ describe('MySolicitacoesPage — item 36', { timeout: 20000 }, () => {
     fireEvent.change(busca, { target: { value: 'Crato' } });
     expect(await screen.findByText('Crato')).toBeInTheDocument();
     expect(listSolicitacoesMock).not.toHaveBeenCalledWith(expect.objectContaining({ q: 'Cr' }));
-    expect(listSolicitacoesMock).toHaveBeenLastCalledWith({ mine: 'true', q: 'Crato', page: 1, page_size: 20 });
+    expect(listSolicitacoesMock).toHaveBeenLastCalledWith({ mine: 'true', q: 'Crato', ordering: '-inicio,id', page: 1, page_size: 20 });
 
     // A carga inicial (sem busca) chega depois: não pode substituir o resultado da busca.
     await act(async () => soltarInicial(pagina([makeSolic({ municipio_nome: 'Fortaleza' })])));

@@ -1,7 +1,7 @@
 ---
 title: Specs de Backend
 status: active
-last_verified: 2026-08-26
+last_verified: 2026-10-19
 owner: backend
 related:
   - ../INDEX_SDD.md
@@ -10,7 +10,7 @@ related:
 
 # Specs de Backend (`apps/core` + `apps/dev_tools`)
 
-Backend real = **apenas** `apps/core` (42 models concretos em `apps/core/models/`) + `apps/dev_tools`.
+Backend real = **apenas** `apps/core` (39 models concretos em `apps/core/models/`) + `apps/dev_tools`.
 Voltar ao [índice SDD](../INDEX_SDD.md).
 
 ## Monólito modular — não fatiar em apps Django

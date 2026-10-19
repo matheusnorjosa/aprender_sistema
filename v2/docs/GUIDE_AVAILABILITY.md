@@ -128,13 +128,15 @@ aplicado em `get_queryset`, invariante travado por `test_availability_privileged
 | Superuser | Todos os bloqueios |
 | **Controle e DAT** | Todos os bloqueios |
 | **Superintendência** | ❌ **Não** — não tem `view_all_availability`; cai na regra de gerência |
-| Outros | Bloqueios de usuários da mesma gerência (`AvailabilityBlockViewSet.get_queryset`, `views_availability.py`) |
+| G/C/A vigente em gerência ativa | Bloqueios das pessoas da gerência (`AvailabilityBlockViewSet.get_queryset`, `views_availability.py`) |
+| Demais (inclusive Formador) | Só os próprios (decisão do dono P9-1, 15/10/2026) |
 
-### Delegação de criação de bloqueio (PR 13)
+### Delegação de bloqueio: criar, editar e apagar em nome de outro (PR 13)
 
 `user_can_delegate_availability_block` (`apps/core/rbac/policies.py`) permite que
-superuser, o Controle (`operate_preagenda`) e o DAT (`manage_admin_registries`) criem bloqueio **em nome de** um Formador.
-A operação registra `AuditLog` `DELEGATE_BLOCK_CREATE`.
+superuser, o Controle (`operate_preagenda`) e o DAT (`manage_admin_registries`) criem bloqueio **em nome de** um Formador
+e editem ou apaguem bloqueio alheio (`AvailabilityBlockViewSet._assert_can_mutate`).
+Cada operação registra `AuditLog`: `DELEGATE_BLOCK_CREATE`, `DELEGATE_BLOCK_UPDATE` ou `DELEGATE_BLOCK_DELETE`.
 
 ⚠️ O **import** de bloqueios (rota só do superusuário, `SuperuserOnly` em
 `views_import_bloqueios.py`) não passa por essa policy: grava `created_by` = quem rodou e um

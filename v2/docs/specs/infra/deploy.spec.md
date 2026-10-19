@@ -237,10 +237,11 @@ Como conferir (sem tocar em produção): `docker run --rm -v <nginx.conf>:/etc/n
 
 - **#1455** — *mount `/backups` fechado no compose* (worker, linhas 234-235). Resta confirmar em produção que o
   backup realmente roda e gera artefato (fato **F7**, não verificado; precedente #1537).
-- **#1456** — *serviço `migrate` entregue* (aplica migrations no deploy) e `makemigrations --check` existe na CI.
-  Resta o **gating**: o job `backend-migrate-integrity` é `[info]` e não entra no `needs` do `[required] tests`,
-  então model-drift é detectado mas **não bloqueia merge**. Ver [`ci.spec.md`](./ci.spec.md).
-- **#1457** — guard de `REDIS_PASSWORD` obrigatório (em prod está setado; falta o fail-fast preventivo).
+- **#1456 (fechado, resolvido)** — *serviço `migrate` entregue* (aplica migrations no deploy), e o job
+  `[required] backend migrate-integrity` (`makemigrations --check`) está no `needs` + assert do agregador
+  `[required] tests`: model-drift **bloqueia o merge**. Ver [`ci.spec.md`](./ci.spec.md).
+- **#1457 (fechado, resolvido)** — o fail-fast existe: em produção, `REDIS_PASSWORD` vazio ou ausente encerra o
+  boot (`sys.exit(1)` em `config/settings.py`, SEC-002).
 - **#1611 / #1645 fechados; épico #1662 aberto por #1646** — `restore_db.sh` já restaura o `.age` de produção (fix `815b1afc` / `e4c2d22b`); resta o drill real de DR (#1646). Ver a seção de backup acima.
 - **#1660 (P2)** — o `ports:` do serviço `web` (`docker-compose.prod.yml`) publica a porta do backend em `0.0.0.0` sem bind em
   `127.0.0.1`. O dono confirmou por teste externo (4G) que a porta **não responde** da internet: há allowlist de

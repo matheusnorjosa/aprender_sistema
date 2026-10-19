@@ -32,7 +32,7 @@
 - `local`: CharField (max 300, endereço ou local específico do evento)
 - `is_online`: Boolean (RF06 - determines if Meet link is generated)
 - `external_event_id`: Google Calendar ID (idempotence)
-- `meet_link`: TextField (auto-generated if `is_online=True`)
+- `meet_link`: URLField (max 500, nullable; auto-generated if `is_online=True`)
 - `gcal_status`: NONE | PENDING | PUBLISHED | ERROR
 - `gcal_payload_hash`: SHA256 for update idempotence
 - `external_hash`: SHA1 for import idempotence

@@ -69,7 +69,7 @@ São **5** (`FUNCAO_GROUPS`, `apps/core/constants.py`).
 |--------|------------------|
 | **Formador** | Etiqueta. O papel Formador na lotação gerencia os próprios bloqueios; a Grade Mensal exige papel Gerente, Coordenador ou Apoio na gerência, ou a capacidade `view_all_availability` (`TELAS_DE_ESCOPO`, `apps/core/rbac/policies.py`) |
 | **Coordenador** | Cria solicitações de eventos para sua equipe |
-| **Apoio de Coordenação** | Auxilia coordenação, visualiza solicitações |
+| **Apoio de Coordenação** | Etiqueta. O papel Apoio na lotação cria e edita eventos da gerência e publica no Google (`publish_setor_solicitacao`; `DIREITOS_PAPEL`, `apps/core/services/rbac_pacotes.py`) |
 | **Gerente** | Etiqueta. O papel Gerente na lotação cria e edita eventos da gerência; na Superintendência, aprova |
 | **Assistente Administrativo** | Etiqueta. Não aprova (PR 11): quem trabalha no Controle aprova pela lotação |
 

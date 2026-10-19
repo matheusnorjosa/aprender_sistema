@@ -18,7 +18,7 @@ docker exec aprender_dev-web-1 pytest apps/core/tests/ -v
 cd v2/backend && pyright apps/core config
 make import-compras-dry FILE=...   # import via API DRF (dry-run); ETL legado REMOVIDO
 cd v2 && make seed-e2e && cd frontend && npm run test:e2e -- --project=chromium   # jornadas da CI (v2/frontend/e2e)
-# `make test-e2e` roda a suíte legada de v2/tests/playwright (personas anteriores ao PR 9)
+# `make test-e2e` roda a suíte legada de v2/tests/playwright (fluxo Google; personas da lotação desde o #2125)
 ```
 
 ## Ferramentas — USO OBRIGATÓRIO

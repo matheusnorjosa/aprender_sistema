@@ -32,7 +32,7 @@ npx playwright install --with-deps chromium
 ### 3. Criar Seeds E2E
 
 ```bash
-cd ../../infra
+cd ../..
 make seed-e2e
 ```
 
@@ -78,10 +78,10 @@ npm run test:debug
 npm run test:report
 ```
 
-### Via Makefile (no diretório infra/)
+### Via Makefile (no diretório v2/)
 
 ```bash
-cd v2/infra
+cd v2
 
 # Criar seeds E2E
 make seed-e2e
@@ -122,14 +122,15 @@ v2/tests/playwright/
 
 **Cria**:
 - **13 usuários** (todos com senha `testpass123`). Desde o corte (PR 12) o poder vem só da
-  lotação (vínculo `EquipeGerencia`); o grupo é etiqueta. Os 4 legados desta suíte:
+  lotação (vínculo `EquipeGerencia`); o grupo é etiqueta. Os 4 legados (`*_e2e`):
   - `coord_e2e@test.com` (grupo Coordenador; papel COORDENADOR só na `GERENCIA E2E`)
   - `super_e2e@test.com` (grupo Gerente; aprova pelo vínculo GERENTE na gerência Super)
   - `controle_e2e@test.com` (grupo Controle; vínculo EQUIPE na gerência CONTROLE)
   - `formador_e2e@test.com` (grupo Formador; papel FORMADOR na `GERENCIA E2E`)
   - Os demais (`coord_vidas`, `coord_fluir`, `coord_acerta`, `gerente_vidas`, `dat_e2e`,
     `super_geral`, `approver_03`, `formador_vidas`, `formador_fluir`) servem às jornadas de
-    `v2/frontend/e2e/journeys`. Lista e vínculos: `_create_users` e `vinculos` em `seed_e2e_users.py`.
+    `v2/frontend/e2e/journeys`; esta suíte usa também `coord_vidas` e `formador_vidas`, que têm
+    papel na gerência Super (ver Fluxo do Teste). Lista e vínculos: `_create_users` e `vinculos` em `seed_e2e_users.py`.
 - **2 municípios**: Salvador (BA) e Fortaleza (CE)
 - **2 projetos**: TESTE E2E (fluxo SUPER, gerência Super) e TESTE E2E NAO_SUPER (gerência Vidas)
 
@@ -139,19 +140,18 @@ v2/tests/playwright/
 
 ## 🔄 Fluxo do Teste
 
-> [!warning] Suíte legada, desalinhada com o RBAC atual
+> [!note] Personas alinhadas ao RBAC atual
 > Desde o PR 9/PR 11, quem cria precisa ter papel G/C/A vigente na gerência do projeto
-> (`projeto_fora_da_gerencia`). O TESTE E2E fica na gerência Super e o `coord_e2e` só atua na
-> `GERENCIA E2E`: o lookup não lhe mostra o projeto e a criação é recusada, então o Test Case 1
-> falha e os seguintes, que dependem do ID dele, também. No Test Case 4, o `super_e2e` recebe 403
-> em `/api/audit-logs/` (`access_audit_logs` exige DAT ou Controle) e o teste se pula. As
-> jornadas de `v2/frontend/e2e/journeys` cobrem esses fluxos com as personas atuais
-> (o `coord_vidas` tem COORDENADOR na Super).
+> (`projeto_fora_da_gerencia`). O TESTE E2E fica na gerência Super, então a suíte usa
+> `coord_vidas` (COORDENADOR na Super) para criar, `super_e2e` (GERENTE na Super) para aprovar e
+> `controle_e2e` (EQUIPE na CONTROLE) para publicar e ler o AuditLog. O `coord_e2e` só atua na
+> `GERENCIA E2E` e não enxerga o projeto. No Test Case 4, `/api/audit-logs/` exige
+> `access_audit_logs` e a spec exige 200: um 403 é falha, não motivo para pular.
 
 ### Test Case 1: Criar Solicitação (Coordenador)
-1. Login como `coord_e2e@test.com`
+1. Login como `coord_vidas@test.com` (COORDENADOR na gerência Super)
 2. Navegar para `/solicitacoes/nova`
-3. Preencher formulário (projeto: TESTE E2E, município: Salvador, formador: Formador E2E)
+3. Preencher formulário (projeto: TESTE E2E, município: Salvador, formador: FormadorVidas)
 4. Salvar e capturar ID da solicitação criada
 5. **Assert**: `status = 'pendente'`, `gcal_event_id = null`
 
@@ -172,8 +172,9 @@ v2/tests/playwright/
    - `gcal_payload_hash` tem 64 caracteres (SHA256)
 
 ### Test Case 4: Validar AuditLog
-1. Consultar API `/api/audit-log/`
-2. **Assert**: Pelo menos 3 logs (CREATE, APPROVE, PUBLISH)
+1. Login como `controle_e2e@test.com` (EQUIPE na gerência CONTROLE, pacote CONTROLE)
+2. Consultar API `/api/audit-logs/?model_name=Solicitacao` (**Assert**: status 200)
+3. **Assert**: Pelo menos 3 logs (PREVIEW_GCAL, APPROVE, PUBLISH_GCAL_REQUESTED)
 
 ---
 
@@ -233,7 +234,7 @@ v2/tests/playwright/
 
 **Solução**:
 ```bash
-cd v2/infra
+cd v2
 make seed-e2e
 ```
 

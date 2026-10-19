@@ -4,8 +4,8 @@ PR 3 hardening RBAC (2026-04-29): matriz consolidada para a Policy
 pelo vínculo EQUIPE/GERENTE na gerência CONTROLE (pacote do perfil), como o DAT.
 
 Endpoints cobertos:
-- POST /api/solicitacoes/{id}/approve/
-- POST /api/solicitacoes/{id}/reject/
+- PATCH /api/solicitacoes/{id}/approve/
+- PATCH /api/solicitacoes/{id}/reject/
 - POST /api/solicitacoes/batch-approve/
 - POST /api/solicitacoes/batch-reject/
 

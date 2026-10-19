@@ -61,7 +61,9 @@ class Command(BaseCommand):
         # Não dá poder a nenhuma persona no modo padrão: desde o PR 8 as funções não têm
         # capacidade e desde o PR 12 (RBAC_FONTE="lotacao") o grupo não soma nada; o poder vem do
         # vínculo EquipeGerencia (DIREITOS_PAPEL / pacote do perfil, passo 4a). O vínculo aos grupos
-        # só importa no modo "uniao" (volta de emergência). Em prod o seed_rbac roda com False.
+        # só importa no modo "uniao" (volta de emergência). O seed_rbac (dev/CI; não existe em
+        # prod, CP-08) chama com False e desvincula as capacidades dos grupos; em prod o catálogo
+        # vem das migrations.
         from apps.core.services.functional_permissions_seed import seed_functional_permissions
 
         fp_stats = seed_functional_permissions(assign_default_groups=True, verbose=False)

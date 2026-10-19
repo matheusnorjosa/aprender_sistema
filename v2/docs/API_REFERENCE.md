@@ -312,17 +312,22 @@ A rota é `/api/availability-blocks/` (registrada no router como
 | GET | `/api/availability-blocks/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar bloqueios (escopo aplicado no queryset) | IsAuthenticated |
 | POST | `/api/availability-blocks/` | ![Stable](https://img.shields.io/badge/-stable-green) | Criar bloqueio (auto-aprovado) | IsAuthenticated |
 | GET | `/api/availability-blocks/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Detalhe do bloqueio | IsAuthenticated |
-| PUT/PATCH | `/api/availability-blocks/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Atualizar bloqueio próprio | IsAuthenticated |
-| DELETE | `/api/availability-blocks/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Remover bloqueio | IsAuthenticated |
+| PUT/PATCH | `/api/availability-blocks/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Atualizar bloqueio (próprio; de terceiro só com delegação) | IsAuthenticated |
+| DELETE | `/api/availability-blocks/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Remover bloqueio (próprio; de terceiro só com delegação) | IsAuthenticated |
 
 É um `ModelViewSet` completo com `permission_classes = [IsAuthenticated]`
 (`AvailabilityBlockViewSet`, `views_availability.py`). A restrição real é de **dado**, no
-`get_queryset`: privilegiados veem todos; usuários comuns só os próprios ou os
-da mesma gerência (`AvailabilityBlockViewSet.get_queryset`, `views_availability.py`).
+`get_queryset`: privilegiados veem todos; quem tem papel G/C/A vigente em gerência ativa vê
+os bloqueios das pessoas dessa gerência; os demais (inclusive a formadora), só os próprios
+(`AvailabilityBlockViewSet.get_queryset`, `views_availability.py`). Em PUT/PATCH/DELETE o
+queryset de quem não é privilegiado é só o dos próprios bloqueios.
 
 Delegação: enviar `usuario_id` diferente do próprio no POST exige
 `user_can_delegate_availability_block` e o alvo precisa ser Formador ativo —
 caso contrário 403/400 (`AvailabilityBlockViewSet.perform_create`, `views_availability.py`).
+Editar ou apagar bloqueio de terceiro exige o mesmo gate (`_assert_can_mutate`) e grava
+`AuditLog` `DELEGATE_BLOCK_UPDATE` / `DELEGATE_BLOCK_DELETE` (`perform_update` / `perform_destroy`).
+SSOT: [availability.spec.md](specs/backend/availability.spec.md).
 
 ---
 

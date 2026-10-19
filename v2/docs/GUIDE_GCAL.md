@@ -497,7 +497,8 @@ task Celery operaria sobre um registro já removido. Aguarde a conclusão da sin
 **Descrição**: Republicar solicitação no Google Calendar (força UPDATE)
 
 **Permissão**: `CanUseGcal` (policy `use_gcal` = `{operate_preagenda, approve_solicitation}`,
-entrada `use_gcal` de `ACCESS_POLICIES` em `apps/core/rbac/policies.py`). *(Corrigido em 2026-07-24: a classe `IsControleOrSuper`
+entrada `use_gcal` de `ACCESS_POLICIES` em `apps/core/rbac/policies.py`) **ou** `CanPublishSetorSolicitacao`
+(a Apoio de Coordenação com setor vigente, `publish_setor_solicitacao`; `views_solicitacao.py`). *(Corrigido em 2026-07-24: a classe `IsControleOrSuper`
 não existe no codebase.)*
 
 **Fluxo**:
@@ -530,7 +531,8 @@ curl -X POST http://localhost:8002/api/solicitacoes/123/resync-gcal/ \
 **Descrição**: Cancelar evento no Google Calendar e limpar campos
 
 **Permissão**: `CanUseGcal` (policy `use_gcal` = `{operate_preagenda, approve_solicitation}`,
-entrada `use_gcal` de `ACCESS_POLICIES` em `apps/core/rbac/policies.py`). *(Corrigido em 2026-07-24: a classe `IsControleOrSuper`
+entrada `use_gcal` de `ACCESS_POLICIES` em `apps/core/rbac/policies.py`) **ou** `CanPublishSetorSolicitacao`
+(a Apoio de Coordenação com setor vigente, `publish_setor_solicitacao`; `views_solicitacao.py`). *(Corrigido em 2026-07-24: a classe `IsControleOrSuper`
 não existe no codebase.)*
 
 **Fluxo**:
@@ -741,7 +743,8 @@ docker compose exec web python manage.py preagenda_to_gcal --help
 ```
 
 Para publicar uma solicitação específica, o caminho suportado é o endpoint
-`POST /api/solicitacoes/{id}/publish/` (gate `CanUseGcal`), que despacha a task
+`POST /api/solicitacoes/{id}/publish/` (gate `CanUseGcal` OU `CanPublishSetorSolicitacao`, a Apoio de
+Coordenação com setor vigente), que despacha a task
 `task_publish_solicitacao_to_gcal`.
 
 ### Testes

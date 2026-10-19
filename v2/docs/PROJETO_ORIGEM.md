@@ -156,7 +156,8 @@ Contratos por entidade e ordem de importação: `v2/docs/imports/README.md`.
   Logística Viagens, Logística Galpão. Não existe grupo "Gerência" (Gerente é função).
 
 ### 3.2 Grupos de FUNÇÃO (o que pode fazer)
-- **Formador**: Visualiza grade, gerencia bloqueios pessoais
+- **Formador**: Etiqueta. O papel FORMADOR na lotação gerencia os próprios bloqueios e não abre a
+  Grade Mensal (`TELAS_DE_ESCOPO` em `apps/core/rbac/policies.py`, ver [rbac.spec.md](./specs/backend/rbac.spec.md))
 - **Coordenador**: Cria solicitações de eventos
 - **Apoio de Coordenação**: Auxilia coordenação
 - **Gerente**: Etiqueta. O papel GERENTE na lotação cria e edita eventos da gerência; aprova na

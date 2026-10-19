@@ -234,10 +234,13 @@ class ProdutoViewSet(viewsets.ModelViewSet):  # type: ignore[misc]
 
     Endpoints:
         - GET /api/produtos/ - Listar produtos
-        - POST /api/produtos/ - Criar produto (DAT only)
+        - POST /api/produtos/ - Criar produto (manage_purchases_and_materials)
         - GET /api/produtos/{id}/ - Detalhe
-        - PUT/PATCH /api/produtos/{id}/ - Atualizar (DAT only)
-        - DELETE /api/produtos/{id}/ - Deletar (DAT only)
+        - PUT/PATCH /api/produtos/{id}/ - Atualizar (manage_purchases_and_materials)
+        - DELETE /api/produtos/{id}/ - Deletar (manage_purchases_and_materials)
+
+    Escrita: quem tem `manage_purchases_and_materials` — pacotes ADMIN_OPERACIONAL (DAT)
+    e CONTROLE, pelo vínculo EQUIPE/GERENTE (`services/rbac_pacotes.py`).
 
     Filtros:
         - ativo (bool)
@@ -286,10 +289,14 @@ class GerenciaViewSet(viewsets.ModelViewSet):  # type: ignore[misc]
 
     Endpoints:
         - GET /api/gerencias/ - Listar gerências
-        - POST /api/gerencias/ - Criar gerência (DAT only)
+        - POST /api/gerencias/ - Criar gerência (manage_purchases_and_materials)
         - GET /api/gerencias/{id}/ - Detalhe de gerência
-        - PUT/PATCH /api/gerencias/{id}/ - Atualizar (DAT only)
-        - DELETE /api/gerencias/{id}/ - Deletar (DAT only)
+        - PUT/PATCH /api/gerencias/{id}/ - Atualizar (manage_purchases_and_materials)
+        - DELETE /api/gerencias/{id}/ - Deletar (manage_purchases_and_materials)
+
+    Escrita: quem tem `manage_purchases_and_materials` — pacotes ADMIN_OPERACIONAL (DAT)
+    e CONTROLE, pelo vínculo EQUIPE/GERENTE (`services/rbac_pacotes.py`). A tela
+    /dat/admin/gerencias pede `manage_admin_registries`, que o CONTROLE não tem.
 
     Filtros:
         - ativo (bool)
@@ -311,7 +318,7 @@ class GerenciaViewSet(viewsets.ModelViewSet):  # type: ignore[misc]
     ordering = ["nome_setor"]
 
     def get_permissions(self) -> list:  # type: ignore[type-arg]
-        """DAT pode criar/editar/deletar. Outros apenas leitura."""
+        """Quem tem `manage_purchases_and_materials` (DAT e Controle) cria/edita/deleta. Outros apenas leitura."""
         if self.action in ["create", "update", "partial_update", "destroy"]:
             return [IsAuthenticated(), HasPerm("manage_purchases_and_materials")()]
         return [IsAuthenticated()]

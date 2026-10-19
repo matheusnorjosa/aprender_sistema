@@ -22,10 +22,10 @@ e as fases estão no [plano SDD](../plans/PLAN_sdd_migration_2026-06-19.md), apo
 > contra o código; cada spec traz o próprio `last_verified`. O modelo SDD está formalizado na
 > [ADR-017](../../../docs/architecture/project-decisions/ADR-017-spec-driven-documentation.md).
 >
-> **Leia junto:** [`ACHADOS_REAIS.md`](../audits/ACHADOS_REAIS.md) é a fila viva de defeitos (57
-> achados: 2 P0, 36 P1, 19 P2). Várias specs abaixo têm uma seção **Divergências**, que registra
-> onde o código **não** cumpre a regra descrita — com link para o achado. Uma spec descrever o
-> comportamento real, inclusive quando ele é o errado, é intencional: o comportamento pretendido
+> **Leia junto:** [`ACHADOS_REAIS.md`](../audits/ACHADOS_REAIS.md) é a fila viva de defeitos (ver
+> o arquivo para o estado vigente; a contagem de 57 é do corte de 2026-07-20). Várias specs abaixo
+> têm uma seção **Divergências**, que registra onde o código **não** cumpre a regra descrita — com
+> link para o achado. Uma spec descrever o comportamento real, inclusive quando ele é o errado, é intencional: o comportamento pretendido
 > só entra como "pretendido", nunca como se já existisse.
 >
 > O que foi corrigido, o que ficou pendente de decisão humana e o que já estava certo está em

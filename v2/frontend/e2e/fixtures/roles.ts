@@ -42,7 +42,7 @@ export const E2E_ROLES = [
   'coord_acerta',
   'gerente_vidas',
   'super_geral',
-  'approver_03', // 3º aprovador real (Super+Gerente) — J08 race com 3 paralelos
+  'approver_03', // 3º aprovador real (vínculo GERENTE na Superintendência; grupo Gerente só etiqueta) — J08 race com 3 paralelos
   'formador_vidas',
   'formador_fluir',
   'dat_e2e', // DAT puro — jornada J18

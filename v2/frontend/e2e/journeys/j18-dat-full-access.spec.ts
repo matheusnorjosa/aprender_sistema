@@ -2,14 +2,14 @@
  * J18 — DAT tem acesso total ao frontend.
  *
  * Ref: Regra PO confirmada em 2026-04-22, memória
- * `project_rbac_invariants`: DAT é o grupo de manutenção da plataforma;
- * deve navegar em todas as telas sem receber 403/404 no frontend, embora
- * não receba autonomia de decisão de negócio (ex: aprovar solicitações —
- * isso já é permitido pela `IsSuperintendencia` que aceita DAT também).
+ * `project_rbac_invariants`: DAT é o administrador operacional da plataforma;
+ * deve navegar em todas as telas sem receber 403/404 no frontend. Desde o
+ * PR 10 o DAT também aprova solicitações (base `capacidade_aprovar` do
+ * pacote `ADMIN_OPERACIONAL` em `solicitation_approval_basis`).
  *
- * Esta jornada valida que um usuário com **apenas** o group `DAT` (sem
- * `Superuser`, sem função adicional) consegue carregar todas as rotas
- * principais do sistema.
+ * Esta jornada valida que um usuário com o vínculo EQUIPE na GERENCIA DAT
+ * (pacote `ADMIN_OPERACIONAL`), sem `Superuser`, consegue carregar todas as
+ * rotas principais do sistema; o group `DAT` é só etiqueta.
  *
  * Três camadas:
  *
@@ -21,7 +21,7 @@
  *    `access_solicitation_approvals`). É essa lista que menu e rotas leem
  *    (`RequirePolicy`); o grupo `DAT` no `/api/me/` é só etiqueta desde o PR 12.
  * 3. **Operação**: DAT consegue chamar endpoints de manutenção — ex:
- *    `/api/dat/compras-materiais/dashboard/` retorna 200 (canDashboardCompras).
+ *    `/api/dat/compras-materiais/dashboard/` retorna 200 (`CanViewComprasDashboard`).
  *
  * **Nota**: issue #1166 (normalizar dashboards para Diretoria+DAT+superuser)
  * está aberta — quando resolvida, expandir este spec para validar acesso a
@@ -39,13 +39,13 @@ const DAT_ACCESSIBLE_ROUTES = [
   '/home',
   '/solicitacoes/minhas',
   '/solicitacoes/nova',
-  '/aprovacoes', // DAT aprova (IsSuperintendencia inclui DAT)
-  '/pre-agenda', // IsControleOrDAT
-  '/deslocamentos', // IsControleOrDAT
+  '/aprovacoes', // access_solicitation_approvals (base capacidade_aprovar do pacote)
+  '/pre-agenda', // access_controle_section
+  '/deslocamentos', // access_travel
   '/dat/admin',
   '/dat/cadastros',
   '/dat/registros',
-  '/dashboards/compras', // canDashboardCompras (atual já permite DAT)
+  '/dashboards/compras', // view_compras_dashboard (manage_admin_registries)
 ];
 
 test.describe(

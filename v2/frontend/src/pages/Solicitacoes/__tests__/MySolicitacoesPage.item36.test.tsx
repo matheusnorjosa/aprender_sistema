@@ -171,6 +171,24 @@ describe('MySolicitacoesPage — item 36', { timeout: 20000 }, () => {
     informar.mockRestore();
   });
 
+  test('SUPER aprovada no Google Agenda: o motivo não promete excluir depois de cancelar', async () => {
+    const informar = vi
+      .spyOn(Modal, 'info')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([
+        makeSolic({ id: 9, municipio_nome: 'Crato', fluxo: 'SUPER', status: 'aprovado', gcal_status: 'PUBLISHED' }),
+      ])
+    );
+    renderPage();
+    expect(await screen.findByText('Na agenda')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Por que não dá para editar nem excluir: 10/05/2026 · Crato' }));
+    const texto = String(informar.mock.calls[0]![0].content);
+    expect(texto).not.toMatch(/excluir aqui/);
+    expect(texto).toContain('Solicitações do fluxo Superintendência só podem ser excluídas enquanto estão pendentes.');
+    informar.mockRestore();
+  });
+
   test('no celular, as ações vão para "Mais ações" e o município fica junto da data', async () => {
     listSolicitacoesMock.mockResolvedValue(pagina([makeSolic({ municipio_nome: 'Crato' })]));
     renderPage();

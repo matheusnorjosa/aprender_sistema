@@ -89,11 +89,14 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
   const motivos: string[] = [];
   if (isPublished) {
     motivos.push(
-      'Este evento já está no Google Agenda. Para mudar ou excluir, peça ao Apoio de Coordenação da sua gerência ou ao Controle que cancele a publicação; depois disso, você consegue editar ou excluir aqui.'
+      'Este evento já está no Google Agenda. Para mudar, peça ao Apoio de Coordenação da sua gerência ou ao Controle que cancele a publicação; depois disso, você consegue editar aqui.'
     );
-  } else {
-    if (record.status === 'reprovado') motivos.push('Solicitações reprovadas não podem ser editadas.');
-    if (!podeExcluir) motivos.push('Solicitações do fluxo Superintendência só podem ser excluídas enquanto estão pendentes.');
+  } else if (record.status === 'reprovado') {
+    motivos.push('Solicitações reprovadas não podem ser editadas.');
+  }
+  // Cancelar a publicação não devolve a exclusão a uma SUPER que já saiu de pendente.
+  if (isSuper && record.status !== 'pendente') {
+    motivos.push('Solicitações do fluxo Superintendência só podem ser excluídas enquanto estão pendentes.');
   }
   return { podeEditar, podeExcluir, motivos };
 }

@@ -268,16 +268,34 @@ export default function PublicacaoSetorPage(): JSX.Element {
       return;
     }
     message.success(config.successText);
-    void load();
+    // Com await, o diálogo só fecha com a linha já recarregada: o afterClose sabe se o botão sobrou.
+    await load();
   }, [handleActionError, load]);
+
+  // Alvo do foco quando o botão da linha some com a recarga; fora do Tab.
+  const listaRef = useRef<HTMLDivElement>(null);
+  const focarLista = useCallback((): void => {
+    const alvo = listaRef.current;
+    if (!alvo) return;
+    // Focável só neste instante (mesmo padrão do "Tentar de novo" da ResponsiveTable).
+    alvo.setAttribute('tabindex', '-1');
+    alvo.addEventListener('blur', () => alvo.removeAttribute('tabindex'), { once: true });
+    alvo.focus();
+  }, []);
 
   // Confirmação num diálogo de verdade (role=dialog, foco preso e devolvido ao botão da linha, Esc):
   // o Popconfirm não recebia o foco e, pelo teclado, a confirmação ficava fora de alcance (item 36).
   // Abre no Cancelar e cita o evento; só o OK dispara a ação, nunca a tela sozinha.
+  // Publicar, Atualizar e Remover trocam ou tiram o botão da linha: sem ele, o foco vai para a lista,
+  // não para o body (o Tab recomeçaria do topo da página a cada evento).
   const [modal, contextoDoModal] = Modal.useModal();
   const confirmar = useCallback((row: Solicitacao, action: GcalRowAction, evento: string): void => {
     const config = ACTIONS[action];
+    const gatilho = document.activeElement;
     void modal.confirm({
+      afterClose: () => {
+        if (!gatilho?.isConnected) focarLista();
+      },
       title: `${config.confirmTitle}: ${evento}?`,
       content: config.confirmDescription,
       okText: config.okText,
@@ -286,7 +304,7 @@ export default function PublicacaoSetorPage(): JSX.Element {
       autoFocusButton: 'cancel',
       onOk: () => runAction(row, action),
     });
-  }, [modal, runAction]);
+  }, [modal, runAction, focarLista]);
 
   const handleConnect = (): void => {
     window.location.href = GOOGLE_CONNECT_URL;
@@ -444,7 +462,7 @@ export default function PublicacaoSetorPage(): JSX.Element {
           />
         )}
 
-        <Card {...(celular && { styles: { body: { padding: 12 } } })}>
+        <Card ref={listaRef} {...(celular && { styles: { body: { padding: 12 } } })}>
           <ResponsiveTable<Solicitacao>
             rowKey="id"
             columns={columns}

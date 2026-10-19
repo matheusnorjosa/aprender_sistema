@@ -535,6 +535,31 @@ describe('PublicacaoSetorPage — ações', () => {
     await waitFor(() => expect(botao).toHaveFocus());
   });
 
+  test.each([
+    { acao: 'Publicar', row: {}, ok: 'Publicar' },
+    { acao: 'Remover do Google', row: { gcal_status: 'PUBLISHED' as const, external_event_id: 'asv27' }, ok: 'Remover' },
+  ])('$acao confirmado: a linha recarrega sem o botão e o foco vai para a tabela, não para o body', async ({ acao, row, ok }) => {
+    listResponse = pageOf([makeSolic(row)]);
+    // Depois da ação a linha volta em voo (PENDING): sem ação nenhuma, o botão da linha sai do DOM.
+    actionResult = () => {
+      listResponse = pageOf([makeSolic({ gcal_status: 'PENDING' })]);
+      return Promise.resolve({ detail: 'ok', solicitacao_id: 7 });
+    };
+    renderPage();
+
+    const botao = await screen.findByLabelText(new RegExp(`^${acao}: Vidas Em Rede`));
+    botao.focus();
+    fireEvent.click(botao);
+    const dialogo = await screen.findByRole('dialog');
+    fireEvent.click(within(dialogo).getByRole('button', { name: ok }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    const linhaEmVoo = await screen.findByText('Publicando…');
+    expect(botao).not.toBeInTheDocument();
+    await waitFor(() => expect(document.activeElement).not.toBe(document.body));
+    expect(document.activeElement?.contains(linhaEmVoo)).toBe(true);
+  });
+
   test('linha PENDING não oferece ação (publicação em voo)', async () => {
     listResponse = pageOf([makeSolic({ gcal_status: 'PENDING' })]);
     renderPage();

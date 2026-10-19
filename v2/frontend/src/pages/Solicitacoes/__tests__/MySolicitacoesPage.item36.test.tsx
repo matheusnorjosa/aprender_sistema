@@ -171,6 +171,34 @@ describe('MySolicitacoesPage — item 36', { timeout: 20000 }, () => {
     informar.mockRestore();
   });
 
+  test('evento no Google Agenda pela planilha: sem Editar/Excluir, com o motivo próprio', async () => {
+    const informar = vi
+      .spyOn(Modal, 'info')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([
+        makeSolic({
+          id: 10,
+          municipio_nome: 'Crato',
+          status: 'aprovado',
+          gcal_status: 'NONE',
+          publicado_fora_do_sistema: true,
+        }),
+      ])
+    );
+    renderPage();
+    expect(await screen.findByText('Na agenda')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Editar:/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Excluir:/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Por que não dá para editar nem excluir: 10/05/2026 · Crato' }));
+    const texto = String(informar.mock.calls[0]![0].content);
+    expect(texto).toContain('já está no Google Agenda pela planilha');
+    expect(texto).toContain('Apoio de Coordenação');
+    // A publicação não foi feita pelo sistema: não há o que cancelar aqui.
+    expect(texto).not.toMatch(/cancele a publicação/);
+    informar.mockRestore();
+  });
+
   test('SUPER aprovada no Google Agenda: o motivo não promete excluir depois de cancelar', async () => {
     const informar = vi
       .spyOn(Modal, 'info')

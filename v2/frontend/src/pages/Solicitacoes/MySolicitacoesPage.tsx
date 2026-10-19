@@ -37,6 +37,7 @@ import type { ID, Solicitacao, SolicitacaoStatus, FluxoType, GCalStatus, Paginat
 import { formadoresLabel } from '../../utils/participants';
 import { formatFortaleza } from '../../utils/datetime';
 import { TEXTO_DA_TAG } from '../../components/textoDaTag';
+import { MOTIVO_NAO_PUBLICAVEL } from '../../utils/gcalRowActions';
 
 const { Title, Text } = Typography;
 
@@ -79,15 +80,22 @@ function nomeDaSolicitacao(record: Solicitacao): string {
  * O que a dona pode fazer na linha e, quando não pode, por quê (texto visível por um botão, e não
  * só no Tooltip de um botão desabilitado, que o teclado e o toque não alcançam). As regras são as
  * de sempre: editar se não estiver publicado no GCal e não estiver reprovado; excluir se não
- * estiver publicado e, no fluxo SUPER, só enquanto pendente.
+ * estiver publicado e, no fluxo SUPER, só enquanto pendente. Evento no Google Agenda pela planilha
+ * (`publicado_fora_do_sistema`) conta como publicado: mudar aqui deixaria a agenda com o dado antigo.
  */
 function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcluir: boolean; motivos: string[] } {
-  const isPublished = record.gcal_status === ('PUBLISHED' as GCalStatus);
+  const naPlanilha = record.publicado_fora_do_sistema === true;
+  const isPublished = naPlanilha || record.gcal_status === ('PUBLISHED' as GCalStatus);
   const isSuper = record.fluxo === ('SUPER' as FluxoType);
   const podeEditar = !isPublished && record.status !== 'reprovado';
   const podeExcluir = !isPublished && (!isSuper || record.status === 'pendente');
   const motivos: string[] = [];
-  if (isPublished) {
+  if (naPlanilha) {
+    // Não foi o sistema que publicou: não há publicação para cancelar aqui.
+    motivos.push(
+      `Este evento ${MOTIVO_NAO_PUBLICAVEL.publicado_fora_do_sistema}; mudar aqui não muda a agenda. Para mudar, peça ao Apoio de Coordenação da sua gerência ou ao Controle.`
+    );
+  } else if (isPublished) {
     motivos.push(
       'Este evento já está no Google Agenda. Para mudar, peça ao Apoio de Coordenação da sua gerência ou ao Controle que cancele a publicação; depois disso, você consegue editar aqui.'
     );
@@ -267,7 +275,7 @@ export default function MySolicitacoesPage(): JSX.Element {
           >
             {STATUS_LABELS[record.status] || record.status}
           </Tag>
-          {record.gcal_status === ('PUBLISHED' as GCalStatus) ? (
+          {record.publicado_fora_do_sistema || record.gcal_status === ('PUBLISHED' as GCalStatus) ? (
             <Tag color="blue" style={{ marginInlineEnd: 0 }}>Na agenda</Tag>
           ) : null}
         </Space>

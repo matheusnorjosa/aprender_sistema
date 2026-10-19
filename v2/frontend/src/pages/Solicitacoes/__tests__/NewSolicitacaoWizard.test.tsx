@@ -5,6 +5,7 @@ import { Link, MemoryRouter } from 'react-router';
 import Modal from 'antd/es/modal';
 
 import { ComAcesso } from '../../../test/comAcesso';
+import { apagarAvisoDoLogin, avisarSaidaAsOutrasAbas, guardarAvisoDoLogin, storageKeys } from '../../../utils/storage';
 
 const {
   createSolicitacaoMock,
@@ -286,6 +287,8 @@ describe('NewSolicitacaoWizard - sair do assistente (item 36)', { timeout: 20000
   };
 
   test('recarregar ou fechar a aba com algo preenchido pede o aviso do navegador; vazio, não', async () => {
+    // No app, o monitor de sessão grava o horário comum às abas ao montar.
+    localStorage.setItem(storageKeys.sessaoUltimaResposta, String(Date.now()));
     const { unmount } = render(
       <MemoryRouter>
         <NewSolicitacaoWizard />
@@ -300,6 +303,32 @@ describe('NewSolicitacaoWizard - sair do assistente (item 36)', { timeout: 20000
     const preenchido = new Event('beforeunload', { cancelable: true });
     window.dispatchEvent(preenchido);
     expect(preenchido.defaultPrevented).toBe(true);
+    unmount();
+  });
+
+  test('o reload do próprio app (sessão encerrada ou Sair) não é segurado, mesmo com algo preenchido', async () => {
+    localStorage.setItem(storageKeys.sessaoUltimaResposta, String(Date.now()));
+    const { unmount } = render(
+      <MemoryRouter>
+        <NewSolicitacaoWizard />
+      </MemoryRouter>
+    );
+    await preencher();
+    const descarregar = (): boolean => {
+      const evento = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(evento);
+      return evento.defaultPrevented;
+    };
+    expect(descarregar()).toBe(true);
+
+    // Sessão encerrada (expirou ou caiu em outra aba): o App guarda o motivo e recarrega para o login.
+    guardarAvisoDoLogin('Sua sessão expirou.');
+    expect(descarregar()).toBe(false);
+    apagarAvisoDoLogin();
+
+    // "Sair": o App apaga o horário comum às abas e recarrega.
+    avisarSaidaAsOutrasAbas();
+    expect(descarregar()).toBe(false);
     unmount();
   });
 

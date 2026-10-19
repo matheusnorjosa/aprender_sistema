@@ -56,6 +56,7 @@ import ComboBox from '../../components/ComboBox';
 import FormadoresPicker from '../../components/FormadoresPicker';
 import AvailabilityConflictAlert, { AvisosDeAgenda } from '../../components/AvailabilityConflictAlert';
 import logger from '../../utils/logger';
+import { lerAvisoDoLogin, storageKeys } from '../../utils/storage';
 import type { ID, FluxoType, BlockedParticipant, AvailabilityConflictErrorPayload } from '../../types';
 
 dayjs.extend(utc);
@@ -296,6 +297,15 @@ export default function NewSolicitacaoWizard(): JSX.Element {
     if (!entradaExtra.current) segurarVoltar();
 
     const aoDescarregar = (e: BeforeUnloadEvent): void => {
+      // O reload do próprio app leva ao login e não é segurado: a sessão encerrada guarda o
+      // motivo para o login; o "Sair" apaga o horário comum às abas (App.tsx). Com Cancelar, a
+      // aba ficaria no assistente sem sessão e o app não a levaria mais ao login.
+      if (lerAvisoDoLogin() !== null) return;
+      try {
+        if (localStorage.getItem(storageKeys.sessaoUltimaResposta) === null) return;
+      } catch {
+        // storage bloqueado: sem como saber, segue perguntando
+      }
       e.preventDefault();
     };
     const aoVoltar = (): void => {

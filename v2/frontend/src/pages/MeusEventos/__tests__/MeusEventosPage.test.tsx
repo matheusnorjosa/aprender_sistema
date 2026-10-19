@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { MemoryRouter } from 'react-router';
 
@@ -15,6 +15,7 @@ vi.mock('../../../components/MeetLink', () => ({
     href ? <a href={href}>Entrar na reunião</a> : null,
 }));
 
+import { definirLarguraTela } from '../../../test/larguraTela';
 import MeusEventosPage from '../MeusEventosPage';
 import type { MeEvent } from '../../../api/me';
 import type { PaginatedResponse } from '../../../types/common';
@@ -156,5 +157,32 @@ describe('MeusEventosPage', () => {
     // ...e nunca o horário UTC cru (regressão RD-06)
     expect(screen.queryByText(/13:00/)).not.toBeInTheDocument();
     expect(screen.queryByText(/17:00/)).not.toBeInTheDocument();
+  });
+
+  // Item 36 (19/10/2026): a falha não vira "você não tem eventos".
+  test('falha ao carregar mostra o motivo e "Tentar de novo", não o vazio', async () => {
+    getMyEventsMock
+      .mockRejectedValueOnce(new Error('Servidor indisponível.'))
+      .mockResolvedValueOnce(makePage([makeEvent({ id: 60, municipio_nome: 'Crato' })]));
+    renderPage();
+    expect(await screen.findByText('Não foi possível carregar a lista.')).toBeInTheDocument();
+    expect(screen.getByText('Servidor indisponível.')).toBeInTheDocument();
+    expect(screen.queryByText(/você não tem eventos agendados/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+    expect(await screen.findByText('Crato')).toBeInTheDocument();
+  });
+
+  // Item 36: sem rolagem horizontal; no celular, o que não cabe vai para a linha expandida.
+  test('no celular, Local e Reunião vão para a linha expandida', async () => {
+    getMyEventsMock.mockResolvedValueOnce(
+      makePage([makeEvent({ id: 70, municipio_nome: 'Salvador', local: 'Escola Municipal X' })])
+    );
+    renderPage();
+    await screen.findByText('Salvador');
+    act(() => definirLarguraTela(360));
+    expect(screen.queryByRole('columnheader', { name: 'Local' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Escola Municipal X')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Expandir linha de 10/05/2026 · Salvador' }));
+    expect(await screen.findByText('Escola Municipal X')).toBeInTheDocument();
   });
 });

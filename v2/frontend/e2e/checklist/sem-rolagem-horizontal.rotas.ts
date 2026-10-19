@@ -162,7 +162,15 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
     dados: { em: LINHA, texto: T.motivoBloqueio },
   },
   { path: '/solicitacoes/deslocamentos', perfil: 'controle', marco: 'Deslocamentos', dados: { em: LINHA, texto: T.municipio } },
-  { path: '/solicitacoes/meus-eventos', perfil: 'coordenador', marco: 'Meus Eventos', dados: { em: LINHA, texto: T.municipio } },
+  {
+    path: '/solicitacoes/meus-eventos',
+    perfil: 'coordenador',
+    marco: 'Meus Eventos',
+    dados: { em: LINHA, texto: T.municipio },
+    // Item 36: Projeto (< 768), Local (< 992), Formadores e Reunião (< 1200) e Tipo (< 1600) vão
+    // para a linha expandida: há linha expandida em toda largura.
+    estados: [expandida(T.municipio, 'Tipo')],
+  },
   { path: '/perfil', perfil: 'coordenador', marco: 'Meu perfil' },
   { path: '/politica-privacidade', perfil: 'coordenador', marco: 'Política de Privacidade' },
   { path: '/controle', perfil: 'controle', marco: 'Painel de Controle' },
@@ -374,6 +382,8 @@ export const TELA_LOGIN = 'login';
  * A vista "expandida" de cada uma é medida e não rola.
  * Projetos (01/10/2026, marca de série): saíram as 3 de /dat/admin/projetos. Ficam 87. A vista
  * "expandida" é medida e não rola.
+ * Meus Eventos (item 36, 19/10/2026): saíram as 4 de /solicitacoes/meus-eventos. Ficam 83. A
+ * vista "expandida" é medida e não rola.
  * O ratchet do Vitest (semRolagemHorizontal.pendentes.test.ts) trava a lista: nada novo
  * entra e o tamanho só desce.
  */
@@ -391,7 +401,6 @@ export const PENDENTES: Readonly<Record<string, readonly Largura[]>> = {
   '/solicitacoes/disponibilidade': [360, 768, 1024],
   '/solicitacoes/bloqueios': [360, 768, 1024, 1280],
   '/solicitacoes/deslocamentos': [360, 768, 1024, 1280],
-  '/solicitacoes/meus-eventos': [360, 768, 1024, 1280],
   '/controle/acoes': [360, 768, 1024, 1280],
   '/controle/compras': [360, 768, 1024, 1280],
   '/controle/coordenadores': [360, 768, 1024, 1280],

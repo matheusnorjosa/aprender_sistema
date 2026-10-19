@@ -33,7 +33,7 @@ interface Pendencias {
  * Medida em 2026-09-29 (main acd04afd), menos o que o Programa C consertou. 112 combinações da
  * 1ª medição, mais 14 que vieram de critério e vistas novos, não de regressão: o corte sem
  * reticências em Coordenadores (4) e as vistas Coordenadores "Lista" (4) e "Por área" (2) e Mapa
- * "Lista" (4). O C1 tirou 9 e o C2 tirou 27 (as mesmas que saíram de PENDENTES). Consertou uma tela? Tire as
+ * "Lista" (4). O C1 tirou 9, o C2 tirou 27 e o item 36 tirou as 4 de Meus Eventos (as mesmas que saíram de PENDENTES). Consertou uma tela? Tire as
  * combinações daqui também (o ratchet reprova folga: o que ficasse aqui poderia voltar a
  * PENDENTES sem ele ver). Não edite para acomodar tela nova: conserte a tela.
  */
@@ -51,7 +51,6 @@ const LINHA_DE_BASE: ListaPendentes = {
   '/solicitacoes/disponibilidade': [360, 768, 1024],
   '/solicitacoes/bloqueios': [360, 768, 1024, 1280],
   '/solicitacoes/deslocamentos': [360, 768, 1024, 1280],
-  '/solicitacoes/meus-eventos': [360, 768, 1024, 1280],
   '/controle/acoes': [360, 768, 1024, 1280],
   '/controle/compras': [360, 768, 1024, 1280],
   '/controle/coordenadores': [360, 768, 1024, 1280],
@@ -75,12 +74,12 @@ const LINHA_DE_BASE_SO_LINUX: ListaPendentes = {
 };
 
 /**
- * Tamanho atual de PENDENTES mais PENDENTES_SO_LINUX (87 + 2). Só desce. C0: 126 + 2; o C1
+ * Tamanho atual de PENDENTES mais PENDENTES_SO_LINUX (83 + 2). Só desce. C0: 126 + 2; o C1
  * tirou 9 (as 4 de Usuários e 5 que a sidebar nova liberou a 768 e 1024); o C2 tirou 27 (Admin
  * DAT: grupos, setores, funções, gerências, municípios, produtos e projetos gerais); a tela
- * Projetos (01/10/2026, marca de série) tirou 3.
+ * Projetos (01/10/2026, marca de série) tirou 3; Meus Eventos (item 36, 19/10/2026) tirou 4.
  */
-const TETO_PENDENTES = 89;
+const TETO_PENDENTES = 85;
 
 const SO_LINUX = ' (só Linux)';
 

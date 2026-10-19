@@ -16,7 +16,7 @@ import {
   BarChartOutlined,
   CheckCircleOutlined,
   TeamOutlined,
-  DashboardOutlined,
+  CalendarOutlined,
   FileTextOutlined,
   ShoppingOutlined,
   SafetyOutlined,
@@ -216,10 +216,10 @@ export default function HomePage(): JSX.Element {
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} md={8}>
           <AccessCard
-            icon={<DashboardOutlined />}
-            title="Meu Painel"
-            description="Seu painel pessoal com informações-chave."
-            link="/disponibilidade"
+            icon={<CalendarOutlined />}
+            title="Meus Eventos"
+            description="Eventos aprovados em que você participa."
+            link="/solicitacoes/meus-eventos"
           />
         </Col>
         {podeCriarSolicitacao && (

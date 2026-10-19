@@ -92,10 +92,12 @@ Retorna os bloqueios de disponibilidade visíveis para o usuário.
 > diziam que **Controle é BLOQUEADO** na grade mensal (é o oposto — Controle é privilegiado) e
 > que **Superintendência vê todos os bloqueios** (não vê).
 >
-> O eixo real é a capability **`view_all_availability`**, atribuída no seed apenas a
-> **Controle** e **DAT** (entrada de seed `view_all_availability` — `group_names=("Controle", "DAT")` —
-> em `apps/core/services/functional_permissions_seed.py`). Como a atribuição é admin-driven (D17), o
-> conjunto efetivo em produção **depende de verificação humana** no Django Admin.
+> O eixo real é a capability **`view_all_availability`**. Desde o PR 12 (modo padrão `lotacao`) ela
+> vem do **pacote do perfil** da gerência, pelo vínculo `EQUIPE`/`GERENTE` vigente: perfis
+> `CONTROLE` e `ADMIN_OPERACIONAL` (DAT), em `apps/core/services/rbac_pacotes.py`. O seed
+> (`group_names=("Controle", "DAT")` em `apps/core/services/functional_permissions_seed.py`) só dá
+> poder no modo de emergência `uniao`. A matriz muda só por PR e o Django Admin é somente leitura
+> (D21); `rbac_diff --auditar` confere banco = seed no pós-deploy.
 
 ### Grade Mensal (`MonthlyAvailabilityView`)
 
@@ -104,7 +106,7 @@ Retorna os bloqueios de disponibilidade visíveis para o usuário.
 | Perfil | Acesso |
 |--------|--------|
 | Superuser | Escopo amplo (`cache_scope="wide"`) |
-| **Controle e DAT** (têm `view_all_availability`) | Escopo amplo — **não é bloqueado** (`:188-190`) |
+| **Controle e DAT** (têm `view_all_availability` pelo vínculo na gerência) | Escopo amplo — **não é bloqueado** (`:188-190`) |
 | Com `gerencia_id` | Apenas se o usuário pertence à gerência |
 | Sem `gerencia_id`, com vínculo | Usuários das próprias gerências via `EquipeGerencia` (`:192-208`) |
 | Sem `gerencia_id`, sem vínculo | Apenas o próprio usuário (`:210-212`) |

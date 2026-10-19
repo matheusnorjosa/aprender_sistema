@@ -35,10 +35,10 @@ test.describe(
       });
       const solicitacao = await seedSolicitacao(coordApi, { fluxo: 'SUPER' });
 
-      // Issue #1237: aprovação só por quem tem `approve_solicitation`
-      // (Superintendência). DAT é ator transversal mas NÃO aprova solicitações
-      // (não é função dele — refer reference_rbac_intent_matrix). Race testa
-      // aprovadores reais: super_geral (Gerente+Super) + super_e2e (Super+Gerente).
+      // Aprovam (`solicitation_approval_basis`): o superusuário, a GERENTE vigente
+      // da Superintendência (só o escopo SUPER dela) e quem tem `approve_solicitation`
+      // pelo pacote (DAT, Controle). Por escolha, a corrida usa duas GERENTES da
+      // Super (super_geral, super_e2e: vínculo GERENTE na Super, sem superuser).
       const superApi1 = await createApiContext({
         baseURL: baseURL!,
         username: ROLE_CREDENTIALS.super_geral.username,
@@ -78,9 +78,10 @@ test.describe(
       });
       const solicitacao = await seedSolicitacao(coordApi, { fluxo: 'SUPER' });
 
-      // Issue #1237: 3 aprovadores reais (todos Super+Gerente) — DAT excluído
-      // por intent matrix (não aprova). approver_03 adicionado ao seed para
-      // este caso de N=3 paralelos sem usar superuser bypass.
+      // 3 aprovadores reais, todas com vínculo GERENTE na Super (escolha do
+      // teste; DAT e Controle também aprovam, pela capacidade do pacote).
+      // approver_03 adicionado ao seed para este caso de N=3 paralelos sem
+      // usar superuser bypass.
       const ctx1 = await createApiContext({
         baseURL: baseURL!,
         username: ROLE_CREDENTIALS.super_geral.username,

@@ -257,8 +257,8 @@ GET /api/me/policies/
 
 ### Por que um Gerente não consegue aprovar?
 Verifique se ele está **lotado como Gerente na gerência Superintendência** (formulário de Usuários). Gerente
-lotado em outra gerência não aprova.
-O outro caminho é Assistente Administrativo **do Controle**.
+lotado em outra gerência não aprova por ser Gerente.
+O outro caminho é estar **lotado como Equipe ou Gerente na gerência Controle ou DAT** (pacote do setor); grupo e função sozinhos não aprovam.
 
 ### Por que os campos de Gerência/Função aparecem desabilitados para mim?
 Sem a policy `manage_lotacao_comum`, a lotação é **somente do superusuário**. Com ela (o DAT), os campos

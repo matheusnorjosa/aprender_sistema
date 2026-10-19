@@ -1,6 +1,6 @@
 ---
 status: canonical
-last_verified: 2026-08-28
+last_verified: 2026-10-19
 audit_baseline: 90f6a048
 last_runtime_reverification: d08acfa5 (2026-07-20)
 last_v0_revalidation: f6eecd5f (2026-08-19; revalidação por código+git dos 46 itens `aberto`)
@@ -129,7 +129,8 @@ respondem por esses 7.
 `M10-06` `M10-07` `M11-04` `M14-01` `M14-02` `M14-03` `M14-05` `M15-04` `M15-05` `M15-08`
 `M15-09` `M16-04` `M17-01` `M18-05` `M18-06` `M22-14` `M26-02` `M26-03` `M27-24`
 
-> ⚠️ **`M07-01`/`M07-02` — reclassificar severidade (era P1):** `get_assignable_group_names`
+> ⚠️ **`M07-01`/`M07-02` — reclassificar severidade (era P1) — histórico, superado (ver a atualização
+> de 2026-10-19 no fim deste bloco):** `get_assignable_group_names`
 > (`services/rbac_service.py:41-50`) libera todo grupo `SETOR`/`FUNCAO` — inclui **Superintendência
 > (SETOR) + Gerente (FUNCAO)**, o combo aprovador (PA: `superuser OU Gerente+Superintendência`).
 > `validate_group_ids` (`serializers/usuario.py:243-263`) só barra auto-modificação e alvo superuser
@@ -142,6 +143,16 @@ respondem por esses 7.
 > introduziu a policy ator×alvo no admin de usuários; issues #1616 e #1617 estão CLOSED. A
 > pergunta de severidade (P1 → P0) ficou **sem resposta** e perdeu urgência com a correção: não
 > foi decidida nem promovida aqui. Deploy não verificado.
+>
+> **Atualização de 2026-10-19 — premissa superada; fora da lista acionável.** Nenhum par de grupos
+> aprova mais: `solicitation_approval_basis` (`rbac/policies.py`) tem três bases (`superuser`,
+> `gerente_superintendencia` pelo VÍNCULO `EquipeGerencia` GERENTE vigente na gerência
+> SUPERINTENDENCIA, e `capacidade_aprovar` pelo pacote do perfil da gerência, ADMIN_OPERACIONAL do
+> DAT e CONTROLE), e as bases por grupo saíram no PR 11. Com `RBAC_FONTE="lotacao"` (padrão desde o
+> PR 12) grupo é só etiqueta, então montar [Gerente, Superintendência] não escala a aprovador. A
+> proteção de alvo do `M07-02` foi retirada por decisão do dono (S4 do PR 10). A ameaça que resta é
+> criar VÍNCULO GERENTE na gerência SUPERINTENDENCIA, travado nos importers (D18;
+> `tests/test_import_vinculo_aprovador_bloqueado.py`).
 
 **Total acionável no corte de 2026-08-19 (por código, não deploy): 45** (39 LIVE + 6 parciais
 com residual). Os `resolvido` deixam de contar. Épicos-causa-raiz (V2) inalterados naquele corte.
@@ -307,7 +318,7 @@ Onde a issue é um épico que cobre outros IDs, ela pode seguir OPEN com o ID j�
 | `M11-04` | P2 | LIVE | resolvido | `59b001e5` (2026-08-19) | #1650 CLOSED |
 | `M12-15` | P2 | resolvido (só no texto) | resolvido | `9328227f` (2026-08-19) | #1652 CLOSED |
 | `M12-19` | P1 | parcial (residual: publish tratava HTTP 202 como concluído) | resolvido | `3ab590d6` (2026-08-20) | #1629 CLOSED |
-| `M14-01` | P2 | LIVE | **parcial** | `2818a2ad` (2026-08-24) | #1656 OPEN (épico) |
+| `M14-01` | P2 | LIVE | **parcial** → **resolvido** no PR 9 (P9-3, `ac423fa5`, 2026-10-16) | `2818a2ad` (2026-08-24; vigência) + `ac423fa5` (#2113; papel G/C/A em gerência ativa) | #1656 OPEN (épico) |
 | `M14-02` | P1 | LIVE | resolvido | `4321d90b` (2026-08-20) | #1630 CLOSED |
 | `M14-03` | P2 | LIVE | resolvido | `4f63caf0` (2026-08-21) | #1663 OPEN (épico) |
 | `M15-02` | P1 | parcial | **parcial** (inalterado) | `5f78a59b` (2026-08-19) | #1632 OPEN |
@@ -348,10 +359,15 @@ Nove desses 31 são só correção de contradição do registro: `M03-03`, `M12-
   gerência onde só é formadora) fechado. **M10-04 resolvido no código**; a completude do enforcement em prod
   depende do backfill dos vínculos `EquipeGerencia` faltantes (S0). O escopo de **projeto** e o
   `can_act_on` central seguem no épico #1656.
-- **`M14-01`** — `2818a2ad` (#1824) fechou só o ramo de vigência: `HasSectorAccess` passou a usar
-  `EquipeGerencia.vigentes_em()` (`v2/backend/apps/core/rbac/permissions.py:300-311` e `:319-327`),
-  então ex-membro expirado perde o gate. O mecanismo titulado **segue LIVE**: sem `gerencia_id`,
-  qualquer papel com vínculo vigente entra — a query não filtra papel (`permissions.py:301-307`).
+- **`M14-01`** — **resolvido no PR 9 (P9-3, `ac423fa5`/#2113, 2026-10-16).** `2818a2ad` (#1824)
+  tinha fechado só o ramo de vigência (ex-membro expirado perde o gate). Desde o PR 9,
+  `HasSectorAccess` (`rbac/permissions.py`) lê `EquipeGerencia.gerencias_de_atuacao`: só conta papel
+  GERENTE/COORDENADOR/APOIO (`EquipeGerencia.PAPEIS_DE_ATUACAO`) vigente em gerência **ativa**
+  (`gerencias_com_papel` filtra `gerencia__ativo=True`). FORMADOR sozinho não abre; sem `gerencia_id`
+  exige ao menos uma gerência de atuação; com `gerencia_id` exige que ela esteja no conjunto. Os dois
+  ramos do título (papel e `ativo`) estão fechados. Teste: `test_c9_grade_de_B_403_e_de_A_200`
+  (`tests/test_rbac_escopo_por_papel.py`). O épico #1656 segue aberto pelo escopo de **projeto** e
+  pelo `can_act_on` central.
 - **`M15-02`** — `CHECK`-constraint numérico no banco (utilizada≤quantidade, valor≥0) aplicado na
   migração `0110` (dev: 0 violações; ≥0 já vinha do `PositiveIntegerField`). Resta o DB-enforcement de
   item-vazio/produto-de-outro-projeto (hoje só no serializer; produto-de-outro-projeto não é expressável
@@ -495,7 +511,7 @@ commit traz a data **de cada commit**, porque eles podem estar a semanas de dist
 | `M10-06` | **P2** | aberto | gcal: descrição do evento perde a seção "Equipe" — payload lê formadores/coordenador legados qu… | Qualquer criador de solicitação — Coordenador (42 ativos), Formador (9… | #1666 (épico, OPEN) | — |
 | `M11-04` | **P2** | resolvido | aprovação: `ids` em lote sem validação decompõe string em dígitos e aprova alvo não nomeado | — | #1650 (CLOSED) | `59b001e5` (2026-08-19) |
 | `M12-15` | **P2** | resolvido | oauth: vincular state do OAuth Google a sessao que o criou (identidade lida do sufixo mutavel) | Atacante precisa mintar um state via /oauth/google/start, que exige Ca… | #1652 (CLOSED) | `9328227f` (2026-08-19) |
-| `M14-01` | **P2** | parcial | RBAC/Grade mensal: HasSectorAccess autoriza qualquer papel com vínculo e ignora `ativo` no ramo… | Depende de variável NÃO VERIFICADA. O gate só é alcançável por quem te… | #1656 (épico, OPEN) | `2818a2ad` (2026-08-24; so o ramo de vigencia) |
+| `M14-01` | **P2** | **resolvido** (PR 9, P9-3) | RBAC/Grade mensal: HasSectorAccess autoriza qualquer papel com vínculo e ignora `ativo` no ramo… | Depende de variável NÃO VERIFICADA. O gate só é alcançável por quem te… | #1656 (épico, OPEN) | `2818a2ad` (2026-08-24; so o ramo de vigencia) + `ac423fa5` (#2113, 2026-10-16; papel G/C/A em gerência ativa) |
 | `M14-03` | **P2** | resolvido | Disponibilidade: CH Ano na grade mensal soma so o mes consultado e repete o CH Mes | ~14 atores nao-superuser: DAT 3 + Controle 1 + Assistente Administrati… | #1663 (épico, OPEN) | `4f63caf0` (2026-08-21) |
 | `M15-08` | **P2** | **parcial** | DAT/Compras: PATCH concorrente em DATCompra sobrescreve estoque (lost update) e duplo POST cria… | DAT (3 ativos), Controle (1), Assistente Administrativo lotado em Cont… | #1665 (épico, OPEN) | lost-update via `LockOnWriteMixin`; "duplo POST/duplicata" = NK descartada por medição (§M15-02) |
 | `M16-04` | **P2** | **resolvido** | DAT: PATCH concorrente perde update (lost update) em ProjetoGeral/DATRegistro | — | #1651 (fechado por este PR) | `LockOnWriteMixin` (select_for_update + atomic) em ProjetoGeral/DATRegistro |
@@ -809,7 +825,7 @@ fechados no código, e #1657 está CLOSED com resíduo teórico registrado em `M
 | paginacao-global-sem-page-size | P1 | `M01-07`, `M18-06` | #1653 CLOSED | resolvido (`aa8bfb5c`, `062df0ec`; 2026-08-20) |
 | list-serializer-como-fonte-de-detalhe | P1 | `M15-09`, `M17-02`, `M18-05` | #1654 OPEN (épico) | **resolvido** (as 3 fatias): `M15-09` (#1917/#1919 List expõe ids), `M17-02` (editFetchesDetail — getAcao/getCadastro), `M18-05` data_admissao (#1917) + vaza observacoes (#2020: handleEdit busca detail + resetFields). Épico #1654 segue OPEN pelos itens estruturais (adapter dirtyFields, hook useEditModal, lint) |
 | contrato-fe-be-sem-ssot | P1 | `M15-10`, `M16-07`, `M16-08`, `M09-05`, `M05-07` | #1655 OPEN | parcial (`M16-07`/`M16-08` fechados; `M15-10` parcial; `M09-05`/`M05-07` abertos) |
-| escopo-ator-alvo-ausente | P0 | `M22-01` (duplicata histórica de `M03-01`), `M07-02`, `M10-01`, `M10-04`, `M14-01` | #1656 OPEN | parcial (`M10-01` voltou no B1 para a aprovadora por vínculo e é fechado de novo pela regra do dono de 30/09 — §Escopo da aprovadora por vínculo; `M10-04` fechado por #2033 — participante escopado por setor no create/update/lookup; `M14-01` segue só no ramo sem `gerencia_id`; #1656 segue pelo escopo de **projeto** + `can_act_on` central) |
+| escopo-ator-alvo-ausente | P0 | `M22-01` (duplicata histórica de `M03-01`), `M07-02`, `M10-01`, `M10-04`, `M14-01` | #1656 OPEN | parcial (`M10-01` voltou no B1 para a aprovadora por vínculo e é fechado de novo pela regra do dono de 30/09 — §Escopo da aprovadora por vínculo; `M10-04` fechado por #2033 — participante escopado por setor no create/update/lookup; `M14-01` resolvido no PR 9 (P9-3: só papel G/C/A vigente em gerência ativa); #1656 segue pelo escopo de **projeto** + `can_act_on` central) |
 | auditoria-nao-invariante-e-pii | P1 | `M07-03`, `M05-05`, `M23-02`, `M03-10` | #1657 CLOSED | parcial (`11219a7e`, `20c6f48d`, `d2f226cc`, todos 2026-08-18, fecham `M07-03`/`M05-05`/`M03-10`; `M23-02` segue `parcial` na fila, com o resíduo teórico) |
 | resolvers-por-rotulo-humano | P1 | `M02-09`, `M04-01`, `M22-14`, `M15-05` | #1658 OPEN | parcial (`M02-09`/#1613 e `M04-01`/#2022 resolvidos: `resolve_projeto`/`resolve_tipo_evento` rejeitam ambiguidade; equipe_gerencia resolve-only via `_resolve_gerencia`. `M22-14`/`M15-05` seguem abertos) |
 | import-bypassa-invariantes | P1 | `M08-12`, `M10-07`, `M17-01`, `M15-04` | #1659 OPEN | parcial: `M08-12` (#2021 gate futuro) + `M10-07` (#2021 protege reimport) resolvidos; `M17-01` (cadastros DAT) e `M15-04` (compras) abertos |

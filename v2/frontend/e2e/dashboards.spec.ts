@@ -1,8 +1,15 @@
 /**
  * Testes E2E de Dashboards
  *
- * Testa todas as páginas de dashboards e visualizações.
- * Autenticação é feita automaticamente via auth.setup.ts
+ * Smoke de shell: confere só que o <main> aparece nas rotas de dashboards e visualizações.
+ * Autenticação é feita automaticamente via auth.setup.ts, com o storageState padrão
+ * (coord_e2e: papel COORDENADOR na GERENCIA E2E, perfil PADRAO). Pela lotação essa persona
+ * não tem view_overview_dashboard, view_team_dashboard, view_gcal_dashboard nem
+ * view_map_metrics: nessas rotas o RequirePolicy mostra "Recurso indisponível" dentro do
+ * <main>, e o teste passa sem ter aberto o dashboard. Abrir de fato exige uma persona com
+ * a policy (authedPage de e2e/fixtures/roles.ts) e conferir o título da tela. Grade e
+ * Bloqueios (/disponibilidade e /bloqueios redirecionam para /solicitacoes/...) abrem para
+ * coord_e2e pelo papel COORDENADOR vigente (TELAS_DE_ESCOPO).
  */
 
 import { test, expect } from '@playwright/test';

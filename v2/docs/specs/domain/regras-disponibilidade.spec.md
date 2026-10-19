@@ -1,7 +1,7 @@
 ---
 title: Regras de Disponibilidade (RD-01..RD-08)
 status: canonical
-last_verified: 2026-10-06
+last_verified: 2026-10-19
 sources_of_truth:
   - v2/backend/apps/core/services/availability_service.py
   - v2/backend/apps/core/services/horas_formacao.py
@@ -99,7 +99,7 @@ Endpoints DRF (rota em `apps/core/urls.py`):
 - `GET /api/availability/monthly/` — grade mensal (legenda/celulas); ver `GUIDE_AVAILABILITY.md`.
 - `GET/POST /api/availability-blocks/` — CRUD de `AvailabilityBlock` (formador declara os proprios; RD-02/RD-03).
 
-RBAC dos endpoints de check: `permission_classes = [HasPerm("view_all_availability") | HasPerm("create_solicitation") | HasPerm("approve_solicitation_batch")]`. Filtro fino em runtime: consultar **outro** usuario exige `can_check_availability_for_others`; senao 403. Throttle scope `availability_check`. (Linguagem RBAC canonica `HasPerm`; grupos diretos banidos por `scripts/rbac_lint.py`.)
+RBAC dos endpoints de check: `permission_classes = [HasPerm("view_all_availability") | HasPerm("create_solicitation") | HasPerm("approve_solicitation")]` (`approve_solicitation_batch` foi apagada na migration 0125). Filtro fino em runtime: consultar **outro** usuario exige `can_check_availability_for_others`; senao 403. O alvo ainda passa pelo escopo de objeto (`_alvos_no_escopo`, F4): ver [availability.spec](../backend/availability.spec.md). SSOT: `views_availability.py`. Throttle scope `availability_check`. (Linguagem RBAC canonica `HasPerm`; grupos diretos banidos por `scripts/rbac_lint.py`.)
 
 ## Fluxos principais
 

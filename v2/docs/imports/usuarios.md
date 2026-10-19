@@ -20,7 +20,7 @@ Importar/atualizar usuários do sistema (`apps.core.models.usuario.Usuario`) a p
 Não cobre (gate manual obrigatório):
 - Atribuição de função `Gerente` ou `Superintendência`.
 - `is_superuser=True`.
-- Atribuição de capabilities individuais (D17 — admin-driven).
+- Atribuição de capabilities individuais (mudam só por PR: seed + migration, D21, que substituiu a D17).
 
 ---
 
@@ -80,7 +80,7 @@ Mapeamento `Cargo → Função RBAC` (proposta — confirmar com Matheus):
 | Coordenador / Coordenadora | Coordenador | ✅ sim |
 | Apoio de Coordenação | Apoio de Coordenação | ✅ sim |
 | Assistente Administrativo | Assistente Administrativo | ✅ sim |
-| Gerente | Gerente | ⚠️ **revisão manual** — pode habilitar aprovação |
+| Gerente | Gerente | ⚠️ **revisão manual** — grupo é etiqueta e não aprova (D26); aprovação vem do vínculo (§10) |
 | Diretor / Superintendente | (sem mapeamento direto) | ❌ não atribuir; criar usuário sem Função |
 
 ---
@@ -170,9 +170,12 @@ normalize_cpf(cpf) + "|" + normalize_email(email)
 
 ### 8.1 Gate Tier-0 da coluna `grupos` (PR #1608)
 
-Associação a grupo define autoridade no RBAC, inclusive a de aprovação (PA-01).
-`manage_admin_registries` — a capability que abre o endpoint — é **operacional**
-(cadastro), então o import **não** é caminho para conceder privilégio.
+Desde o PR 12 (D27), com `RBAC_FONTE=lotacao` (padrão), o grupo Django é **etiqueta**:
+capacidade, tela e aprovação vêm do superusuário e do vínculo `EquipeGerencia` vigente
+(pacote do perfil da gerência + direitos do papel). Nenhum grupo aprova (PR 11, D26). O
+gate continua porque, na volta de emergência `RBAC_FONTE=uniao`, os grupos voltam a somar
+capacidade. `manage_admin_registries` — a capability que abre o endpoint — é
+**operacional** (cadastro), então o import **não** é caminho para conceder privilégio.
 
 - Ator **superusuário**: a coluna `grupos` é aplicada normalmente.
 - Ator **não-superusuário**: a coluna é ignorada por completo, e cada linha afetada
@@ -212,11 +215,15 @@ um campo foi desconsiderado. O frontend as roteia para `warnings[]`
 
 - `is_superuser = True` — **nunca** vinda de import.
 - `is_staff = True` — só via Admin (manual).
-- Atribuir Função **`Gerente`** — exige aprovação humana (pode habilitar aprovação de solicitação).
-- Atribuir Setor **`Superintendência` + Função `Gerente`** (composite) — pode aprovar fluxo SUPER (PA-02).
-- Atribuir Função **`Assistente Administrativo`** combinada com Setor **`Controle`** — composite delega aprovação.
+- Atribuir Função **`Gerente`**, ou os pares Setor **`Superintendência` + Função `Gerente`** e
+  Setor **`Controle` + Função `Assistente Administrativo`** — exige ator superusuário (§8.1).
+  Esses grupos são etiqueta e não aprovam desde o PR 11 (D26); quem aprova é o **vínculo**:
+  GERENTE vigente na gerência `SUPERINTENDENCIA` (D18) ou EQUIPE/GERENTE em gerência com pacote
+  (DAT, Controle; D25/D26). Este import não cria vínculo; o importador de `EquipeGerencia`
+  recusa criar ou reativar esses vínculos (pendências `vinculo_aprovador_bloqueado` e
+  `vinculo_com_pacote_bloqueado`; SSOT `vinculo_exige_superusuario`).
 - Remover Setor/Função existente.
-- Capabilities individuais (`PermissaoFuncional.groups`) — admin-driven (D17).
+- Capabilities individuais (`PermissaoFuncional.groups`) — mudam só por PR (seed + migration, D21, que substituiu a D17).
 - Reset de senha — usuário recebe email de bem-vindo separado (fora deste import).
 
 Mecânica sugerida (PR 6): linhas que cairiam em qualquer um desses casos viram **warning + log**, e o sistema cria o usuário **sem** a atribuição sensível, deixando para o admin completar.
@@ -259,7 +266,7 @@ AuditLog.objects.filter(
 | **Email duplicado** com CPF diferente | Alta | Bloqueante; conflito de identidade |
 | Telefone em formatos heterogêneos | Média | `normalize_phone` aceita variantes; warning se inválido |
 | Cargo/Gerência mapeando errado para grupo | Alta | Whitelist explícita; "Diretor" não vira Função; "Gerente" gera warning |
-| Atribuição automática de `Gerente` Superintendência → aprovador SUPER inesperado | **Crítica** | NÃO atribuir automaticamente; gate manual sempre |
+| Vínculo de lotação criado em gerência com poder (GERENTE na `SUPERINTENDENCIA`; EQUIPE/GERENTE no DAT ou Controle) → aprovador inesperado. O grupo `Gerente` sozinho não aprova (D26) | **Crítica** | Este import não cria vínculo; o importador de `EquipeGerencia` recusa (`vinculo_exige_superusuario`); grupos só com ator superusuário (§8.1) |
 | Nome com acento variável (ex: "Sá" vs "Sa") | Baixa | `nome` é livre; chave é CPF |
 | Encoding (latin-1 vs utf-8) | Média | Especificar UTF-8 no template; rejeitar se decode falhar |
 
@@ -274,7 +281,7 @@ AuditLog.objects.filter(
 5. **Senha inicial**: a conta criada pelo import fica sem senha (`set_unusable_password()`, P27 em 19/10/2026; antes ganhava uma senha aleatória que ninguém via). Não há email nem token de reset: quem administra define a senha pela tela de Usuários.
 6. **Cargo `"Gerente"`** + Setor `"Superintendência"`: política definitiva. Hoje o service simplesmente grava no campo `cargo` (texto) — não atribui grupo `Gerente` automaticamente. Atribuição via grupos só acontece pela coluna `grupos` explícita **e com ator
 superusuário** (§8.1) — a coluna explícita é condição necessária, não suficiente.
-7. **`Assistente Administrativo` + `Controle`** (composite de aprovação): mesma situação. Atribuição automática violaria D17; só admin manual.
+7. **`Assistente Administrativo` + `Controle`**: mesma situação. O par de grupos não aprova desde o PR 11 (D26); a aprovação do Controle vem do vínculo EQUIPE/GERENTE na gerência `CONTROLE` (pacote), que só o superusuário concede. Grupo continua só pela coluna `grupos` com ator superusuário (§8.1).
 8. **Telefone obrigatório?** Hoje no model é opcional; service aceita vazio.
 
 ### Pendências que a v0.1 listava e o código já resolve

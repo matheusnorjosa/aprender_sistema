@@ -1,7 +1,7 @@
 ---
 title: Clientes de API (Fetch)
 status: canonical
-last_verified: 2026-10-14
+last_verified: 2026-10-19
 sources_of_truth:
   - v2/frontend/src/api/config.ts
   - v2/frontend/src/api/auth.ts
@@ -33,7 +33,7 @@ related:
 
 A camada `src/api/` concentra todo o acesso HTTP do frontend ao backend DRF. **A migracao axios -> Fetch API nativa esta concluida**: `axios` nao aparece em `v2/frontend/package.json` (nem em `dependencies` nem em `devDependencies`) e o unico residuo no codigo sao dois comentarios de teste legado (`hooks/__tests__/useGoogleIntegration.test.ts` e `useSessionMonitor.test.ts`, Epic #1039). Todos os clientes consomem um wrapper unico (`config.ts`) construido sobre `fetch()`, eliminando risco de supply chain e ~40KB de bundle (ver ADR-013).
 
-`src/api/` tem hoje **16 arquivos**: o wrapper `config.ts` + **15 clientes tematicos** (auth, me, lookup, solicitacoes, availability, deslocamentos, ops/Controle, adminDAT, datModule, gcal, dashboard, stats, teamMetrics, systemConfig, acoesNotificacao). Eles expoem funcoes tipadas que retornam `Promise<T>` e delegam o transporte, CSRF e tratamento de erro ao `config.ts`. Nenhum componente de `src/pages/` deve chamar `fetch()` diretamente — isso e travado por um teste sentinela (ver "Testes que cobrem"); a regra de ouro e uma funcao de cliente por endpoint.
+`src/api/` tem hoje **17 arquivos** (fora os testes): o wrapper `config.ts`, o helper `unwrapList.ts` (nao e cliente) e **15 clientes tematicos** (auth, me, lookup, solicitacoes, availability, deslocamentos, ops/Controle, adminDAT, datModule, gcal, dashboard, stats, teamMetrics, systemConfig, acoesNotificacao). Eles expoem funcoes tipadas que retornam `Promise<T>` e delegam o transporte, CSRF e tratamento de erro ao `config.ts`. Nenhum componente de `src/pages/` deve chamar `fetch()` diretamente — isso e travado por um teste sentinela (ver "Testes que cobrem"); a regra de ouro e uma funcao de cliente por endpoint.
 
 ## Fonte de verdade no codigo
 

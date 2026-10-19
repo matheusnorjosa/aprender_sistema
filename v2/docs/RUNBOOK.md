@@ -585,7 +585,8 @@ $DC exec -T web python manage.py seed_rbac
 **Permissões atribuídas:** ver `PERMS_BY_GROUP` em `seed_rbac.py`. A matriz de
 autorização real (capabilities/policies) está em
 [rbac_authorization_matrix.md](./rbac_authorization_matrix.md) — as Django permissions do
-seed são só o piso.
+seed são só o piso. Desde o PR 12 (`RBAC_FONTE=lotacao`) o grupo é etiqueta: a capacidade vem da
+lotação, e o mapeamento grupo → permissões só soma no modo `uniao`.
 
 ---
 
@@ -931,7 +932,7 @@ Para onde ir:
 | Se você queria | Use |
 |---|---|
 | Listar ações do ciclo DAT | `GET /api/dat/acoes-ciclo/` (`DATAcaoViewSet`, `urls.py`) |
-| Importar ações de planilha | `POST /api/controle/import-acoes/` — `HasPerm("import_spreadsheet")`, `dry_run=true` por padrão (`ControleImportAcoesView`, `views_imports.py`) |
+| Importar ações de planilha | `POST /api/controle/import-acoes/` — só superusuário (`[IsAuthenticated, SuperuserOnly]`, D20 em [rbac_authorization_matrix.md](./rbac_authorization_matrix.md)), `dry_run=true` por padrão (`ControleImportAcoesView`, `views_imports.py`); a carga de verdade vai por script, com ensaio |
 | Listar cadastros DAT legados | [API 2](#api-2-cadastros-dat-leitura), abaixo |
 
 ---
@@ -1075,8 +1076,10 @@ curl -X POST http://localhost:8002/api/dat/acoes/ \
 **Causa:** Usuário sem a **capability** exigida pela view.
 
 **Solução:** diagnostique pela capability, não pelo nome do grupo — é a permissão que
-a view checa (`HasPerm("manage_admin_registries")`), e o grupo é só um dos caminhos
-para chegar nela.
+a view checa (`HasPerm("manage_admin_registries")`). Desde o PR 12 (`RBAC_FONTE=lotacao`, o
+padrão) o grupo é etiqueta: a capability vem da **lotação** (vínculo EQUIPE/GERENTE vigente na
+gerência com perfil, como DAT ou CONTROLE) e dos direitos do papel vigente. `rbac_diff --diagnostico`
+mostra a fonte ativa.
 
 ```bash
 make shell
@@ -1089,10 +1092,10 @@ print('tem a capability:', user_has_any_perm(u, 'manage_admin_registries'))
 "
 ```
 
-Se faltar, atribua o usuário ao grupo que carrega a permissão pelo **Django Admin**
-(`/admin/auth/user/`) ou reaplique o seed em dev (`make seed-rbac`). O mapeamento
-grupo → permissões é `PERMS_BY_GROUP` em
-`apps/dev_tools/management/commands/seed_rbac.py`; a matriz de autorização real está em
+Se faltar, **não** ponha a pessoa num grupo: no modo `lotacao` isso não libera nada. Confira a
+lotação dela e corrija pelo caminho do [GUIA_ADMIN_RBAC.md](./GUIA_ADMIN_RBAC.md) e do
+[DEPLOY_CHECKLIST.md §9](./DEPLOY_CHECKLIST.md) (sem outro vínculo ativo, o superusuário lota na tela
+de Usuários; com vínculo em outra gerência, script com ensaio). A matriz de autorização real está em
 [rbac_authorization_matrix.md](./rbac_authorization_matrix.md).
 
 #### **400 Bad Request (campo obrigatório faltando)**

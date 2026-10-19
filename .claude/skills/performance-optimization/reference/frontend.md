@@ -1,4 +1,4 @@
-# Frontend Performance Reference (React 18 / Vite / Antd)
+# Frontend Performance Reference (React 19 / Vite / Antd)
 
 Anti-pattern catalogue and profiling recipes. Inline workflow lives in `SKILL.md`.
 
@@ -88,8 +88,8 @@ build: { rollupOptions: { output: { manualChunks: { /* ... */ } } } }
 // GOOD: dimensions + lazy + decoding
 <img src="/logo.png" width={200} height={40} loading="lazy" decoding="async" alt="Logo" />
 
-// LCP images (hero, above the fold): fetchpriority LOWERCASE (React 18 warns on camelCase)
-<img src="/hero.webp" width={1200} height={600} fetchpriority="high" alt="..." />
+// LCP images (hero, above the fold): camelCase `fetchPriority` (React 19: lowercase gives `Invalid DOM property`)
+<img src="/hero.webp" width={1200} height={600} fetchPriority="high" alt="..." />
 ```
 
 ## Frontend Caching

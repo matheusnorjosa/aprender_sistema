@@ -26,7 +26,7 @@ investigação não valem.
 | **API Endpoints** | ver [API_REFERENCE.md](./API_REFERENCE.md) | Referência **curada**. O inventário exaustivo é o schema OpenAPI em `/api/schema/` (drf-spectacular). Número não duplicado aqui — ADR-017. |
 | **Testes backend** (pytest) | **2.318** funções em **226** arquivos | `def test_` em arquivos `test_*.py` sob `v2/backend/apps/` |
 | **Testes frontend** (vitest) | **306** blocos em **45** arquivos | `it()` / `test()` em `*.test.ts(x)` sob `v2/frontend/src/` |
-| **Testes E2E** (Playwright) | **140** blocos em **23** arquivos | `test()` em `v2/frontend/e2e/**/*.spec.ts` |
+| **Testes E2E** (Playwright) | **168** blocos em **29** arquivos | `test()` em `v2/frontend/e2e/**/*.spec.ts` (recontado em 2026-10-19; não conta os `test()` gerados por laço) |
 | **Rotas do frontend** | **51** | atributos `path="…"` em `v2/frontend/src/components/AppRoutes.tsx` |
 | **Componentes de página** | 39 `*Page.tsx` | de 57 `.tsx` não-teste em `v2/frontend/src/pages/`; os outros 18 são subcomponentes e helpers (`columns`/`constants`/`helpers`) |
 | **Management commands** | **28** | `core` 13 + `dev_tools` 15 |
@@ -64,7 +64,7 @@ investigação não valem.
 
 ### 2. 🔐 **RBAC e Controle de Acesso**
 
-O modelo é NIST 3-tier: `Usuário → Grupos (Django) → Capabilities (PermissaoFuncional) ← Policies ← Views/Rotas`.
+Desde o PR 12 o poder vem da lotação (ADR-020): `Usuário → Lotação (EquipeGerencia: gerência + papel) → pacote do perfil da gerência + direitos do papel vigente → Capabilities (PermissaoFuncional) ← Policies ← Views/Rotas`. O grupo Django (Setor/Função) é etiqueta; só soma capacidade em `RBAC_FONTE=uniao`, a volta de emergência. SSOT: [specs/backend/rbac.spec.md](./specs/backend/rbac.spec.md) e [ADR-020](./adr/ADR-020-lugar-onde-trabalha-da-o-poder.md).
 
 | Documento | Papel |
 |-----------|-------|
@@ -385,7 +385,7 @@ o schema OpenAPI servido em `/api/schema/`. Não há número de endpoints mantid
 |--------|---------:|---------------------:|
 | Backend (pytest, `v2/backend/apps/`) | 226 | 2.318 |
 | Frontend (vitest, `v2/frontend/src/`) | 45 | 306 |
-| E2E (Playwright, `v2/frontend/e2e/`) | 23 | 140 |
+| E2E (Playwright, `v2/frontend/e2e/`) | 29 | 168 |
 
 Contagem estática de declarações (`def test_`, `it()`, `test()`). O número de casos
 efetivamente executados é **maior**, por causa de parametrização. Gate de cobertura: 85%

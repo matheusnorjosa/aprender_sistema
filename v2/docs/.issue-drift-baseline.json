@@ -1,11 +1,11 @@
 {
   "docs/architecture/project-decisions": 1,
-  "docs/business-rules": 5,
+  "docs/business-rules": 1,
   "docs/operations": 1,
   "v2/docs": 4,
   "v2/docs/audits": 4,
   "v2/docs/imports": 1,
   "v2/docs/issues": 6,
   "v2/docs/plans": 2,
-  "v2/docs/specs": 9
+  "v2/docs/specs": 8
 }

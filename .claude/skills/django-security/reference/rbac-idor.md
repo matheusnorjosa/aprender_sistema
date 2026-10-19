@@ -19,8 +19,10 @@ codename, not the group name. `apps.core.rbac` public API: `HasPerm`,
 `user_has_any_perm`, `user_has_all_perms`, plus data-scope constants
 `COORDENADOR_ROLE_GROUPS` / `FORMADOR_ROLE_GROUPS`. Real codenames seen in
 production views: `create_solicitation`, `approve_solicitation`,
-`approve_solicitation_batch`, `view_all_availability`, `operate_preagenda`,
-`manage_admin_registries`, `view_overview_dashboard`, `import_spreadsheet`.
+`view_all_availability`, `operate_preagenda`, `manage_admin_registries`,
+`view_overview_dashboard`, `import_spreadsheet`. (`approve_solicitation_batch` foi
+apagada na migration 0125, PR 8; `approve_solicitation` nenhum grupo tem — vem do
+pacote do perfil da gerência, DAT e Controle.)
 
 ## Canonical permission idiom
 
@@ -30,7 +32,9 @@ from apps.core.rbac import HasPerm
 class SolicitacaoViewSet(ModelViewSet):
     # capability-based; compose with | (OR) / & (AND) / ~ (NOT)
     permission_classes = [HasPerm("create_solicitation")]
-    # e.g. HasPerm("approve_solicitation") | HasPerm("approve_solicitation_batch")
+    # e.g. HasPerm("operate_preagenda") | HasPerm("manage_admin_registries")
+    # Aprovar NÃO é HasPerm: usa a Policy CanAccessSolicitationApprovals
+    # (SSOT `solicitation_approval_basis`, 3 bases; uma delas não é capacidade).
 ```
 
 Gotcha: if a ViewSet overrides `get_permissions()`, an `@action(permission_classes=...)`
@@ -41,7 +45,7 @@ before trusting a decorator.
 ## IDOR prevention — gate by capability, then scope the queryset
 
 ```python
-from apps.core.rbac import HasPerm, user_has_any_perm
+from apps.core.services.solicitacao_scope import scope_solicitacoes
 
 # WRONG — exposes every row to any authenticated user
 def get_queryset(self):
@@ -53,25 +57,21 @@ def get_queryset(self):
         return Solicitacao.objects.all()
     ...
 
-# CORRECT — privileged capability sees all; everyone else sees only their own rows
+# CORRECT — delegate to the actor×gerência scope SSOT
 def get_queryset(self):
-    user = self.request.user
-    if user_has_any_perm(
-        user,
-        "operate_preagenda",
-        "approve_solicitation",
-        "approve_solicitation_batch",
-        "manage_admin_registries",
-    ):
-        return Solicitacao.objects.select_related(
-            "usuario", "municipio", "tipo_evento", "projeto", "coordenador"
-        )
-    return Solicitacao.objects.filter(usuario=user)
+    base = Solicitacao.objects.select_related(
+        "usuario", "municipio", "tipo_evento", "projeto", "coordenador"
+    )
+    return scope_solicitacoes(base, self.request.user)
 ```
 
-This mirrors `apps/core/views_solicitacao.py`. The non-privileged branch scopes
-rows by ownership (`filter(usuario=user)`); the privileged branch is gated by a
-capability OR-set, never by `groups.filter(name=...)`.
+This mirrors `SolicitacaoViewSet.get_queryset` in `apps/core/views_solicitacao.py`.
+`scope_solicitacoes` (`apps/core/services/solicitacao_scope.py`) applies the rule:
+GLOBAL (superuser, `operate_preagenda`, `manage_admin_registries`, `approve_solicitation`
+ou quem aprova por `solicitation_approval_basis`) vê tudo; GESTORA (papel GERENTE vigente)
+vê as gerências dela + as próprias; APOIO (`publish_setor_solicitacao`) vê as aprovadas das gerências onde é APOIO; DEMAIS
+só as próprias. Never `groups.filter(name=...)`; the same function backs
+`IsOwnerOrPrivileged.has_object_permission` (fora do escopo → 404).
 
 ## Lint guard
 

@@ -80,18 +80,20 @@ Ver §2.6.
 
 ### 2.3 RBAC — quem pode importar
 
-Gates efetivos, lidos nas views (tabela completa em §3.1):
+Gate efetivo, lido nas views (tabela completa em "Endpoints HTTP", adiante): **todas** as rotas
+de importação pela tela são `[IsAuthenticated, SuperuserOnly]` desde 02/10/2026 (D20 da
+[matriz](../rbac_authorization_matrix.md); SSOT da tabela: [API_REFERENCE.md](../API_REFERENCE.md),
+seção "Imports (planilhas)"). Nenhuma capability abre importação: DAT, Controle e Diretoria
+recebem 403. As cargas passam pelo command `import_export_contract`, com ensaio.
 
-- `HasPerm("import_spreadsheet")` — solicitações, bloqueios, produtos, compras, ações de controle.
-- `HasPerm("manage_admin_registries")` — usuários, municípios, coleções, equipe/gerência, cadastros DAT.
-
-No seed (`apps/core/services/functional_permissions_seed.py`), **ambas** as capabilities são
-atribuídas apenas ao grupo **DAT** (`:93-94`, `:97-102`). As policies públicas
+`import_spreadsheet` não está em grupo nenhum desde a migration 0126 (PR 10) e é capacidade
+técnica, que nunca entra em pacote (`TECNICAS` em `services/rbac_pacotes.py`). As policies públicas
 `import_availability_blocks`, `import_compras` e `import_generic_spreadsheet` existem para
 **exposição em `/api/me/policies/`** e não são o gate destes endpoints.
 
-Atribuição via Django Admin (D17 — admin-driven, ratificado 2026-05-04). Não automático em deploy.
-Como é admin-driven, **o conjunto real em produção depende de verificação humana** no Django Admin.
+A matriz Grupo × Capability muda só por PR (seed + migration de dados, D21, que substituiu a D17);
+o Admin de `PermissaoFuncional` é somente leitura. O conjunto real em produção é conferido contra o
+seed por `rbac_diff --auditar` (checklist pós-deploy; exit 1 se divergir).
 
 **O gate responde "pode importar?", nunca "pode importar *este alvo*?".** Não existe política
 ator×alvo abrangente nos imports; o resíduo desse padrão (demais writers) é rastreado pelo épico
@@ -215,15 +217,15 @@ Helpers de reconciliação compartilhados em `apps/core/services/resolvers.py`:
 
 | Endpoint | View | Gate RBAC |
 |---|---|---|
-| `POST /api/usuarios/import/` | `ImportUsuariosView` | `HasPerm("manage_admin_registries")` |
-| `POST /api/solicitacoes/import/` | `ImportEventosView` | `HasPerm("import_spreadsheet")` |
-| `POST /api/disponibilidade/import-bloqueios/` | `ImportBloqueiosView` | `HasPerm("import_spreadsheet")` |
-| `POST /api/produtos/import/` | `ImportProdutosView` | `HasPerm("import_spreadsheet")` |
-| `POST /api/municipios/import/` | `ImportMunicipiosView` | `HasPerm("manage_admin_registries")` |
-| `POST /api/equipe-gerencia/import/` | `ImportEquipeGerenciaView` | `HasPerm("manage_admin_registries")` |
-| `POST /api/controle/import-compras/` | `ImportComprasView` | `HasPerm("import_spreadsheet")` |
-| `POST /api/controle/import-acoes/` | `ControleImportAcoesView` | `HasPerm("import_spreadsheet")` |
-| `POST /api/dat/import-cadastros/` | `DATImportCadastrosView` | `HasPerm("manage_admin_registries")` |
+| `POST /api/usuarios/import/` | `ImportUsuariosView` | `IsAuthenticated + SuperuserOnly` (D20) |
+| `POST /api/solicitacoes/import/` | `ImportEventosView` | `IsAuthenticated + SuperuserOnly` (D20) |
+| `POST /api/disponibilidade/import-bloqueios/` | `ImportBloqueiosView` | `IsAuthenticated + SuperuserOnly` (D20) |
+| `POST /api/produtos/import/` | `ImportProdutosView` | `IsAuthenticated + SuperuserOnly` (D20) |
+| `POST /api/municipios/import/` | `ImportMunicipiosView` | `IsAuthenticated + SuperuserOnly` (D20) |
+| `POST /api/equipe-gerencia/import/` | `ImportEquipeGerenciaView` | `IsAuthenticated + SuperuserOnly` (D20) |
+| `POST /api/controle/import-compras/` | `ImportComprasView` | `IsAuthenticated + SuperuserOnly` (D20) |
+| `POST /api/controle/import-acoes/` | `ControleImportAcoesView` | `IsAuthenticated + SuperuserOnly` (D20) |
+| `POST /api/dat/import-cadastros/` | `DATImportCadastrosView` | `IsAuthenticated + SuperuserOnly` (D20) |
 
 Todos aceitam `?dry_run=true|false` (default `true`). O parse é **fail-closed** (§2.1, #1649): valor desconhecido permanece em dry-run (preview); só `false`/`0`/`no`/… aplicam.
 
@@ -332,7 +334,8 @@ Mudanças que quebram contrato (renomear coluna obrigatória, mudar tipo de dado
    confirmar os termos reais da planilha antes de decidir se vale implementar.
 6. **Disponibilidade**: tipo `D` e recorrência continuam sem contrato — ver
    [disponibilidade.md](./disponibilidade.md) §14.
-7. **Decisão D17 e Imports**: imports não devem atribuir capabilities (admin-driven). ✅ Confirmado
+7. **Decisão D17 (hoje D21) e Imports**: imports não devem atribuir capabilities (a matriz
+   Grupo × Capability muda só por PR, D21). ✅ Confirmado
    — nenhum service de import toca `PermissaoFuncional`; o import de usuários mexe em `Group`, mas
    essa concessão passou a ser gated por superuser (#1610, `ccbe1e05`), fechando a auto-escalação
    que **era** o problema. `seed_rbac` é um command de `apps/dev_tools`, manual, fora do pipeline de

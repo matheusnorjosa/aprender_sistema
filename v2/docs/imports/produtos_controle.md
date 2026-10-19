@@ -186,15 +186,19 @@ from apps.core.models import Compra, Municipio, Produto, Projeto
 | Model `Municipio` | `apps/core/models/organizacao.py` | nome, uf, ibge_code | ✅ existe |
 | Resolvers compartilhados | `apps/core/services/resolvers.py` | `resolve_municipio` (com `_split_city_uf` para "Cidade - UF"), `resolve_projeto` (aliases IDEB→GESTÃO ESCOLAR, Nível N→NN) | ✅ existe |
 
-### Endpoints HTTP (estado real — 2026-05-05)
+### Endpoints HTTP (estado real — gates revistos 2026-10-19)
+
+Importação pela tela é só do superusuário desde 02/10/2026 (D20 da
+[matriz](../rbac_authorization_matrix.md)); nenhuma capability abre estas rotas. SSOT da tabela:
+[API_REFERENCE.md](../API_REFERENCE.md), seção "Imports (planilhas)".
 
 | Endpoint | View | Gate RBAC |
 |---|---|---|
-| `POST /api/controle/import-compras/` | `ImportComprasView` em `apps/core/views_controle_imports.py` | `IsAuthenticated + HasPerm("import_spreadsheet")` (PR-A1 DAT-Imports 2026-04-29 centralizou em DAT-only) |
-| `POST /api/produtos/import/` | `ImportProdutosView` em `apps/core/views_import_produtos.py` | `IsAuthenticated + HasPerm("import_spreadsheet")` |
-| `POST /api/municipios/import/` | `ImportMunicipiosView` em `apps/core/views_import_municipios.py` | `IsAuthenticated + HasPerm("manage_admin_registries")` |
-| `POST /api/controle/import-acoes/` | `ControleImportAcoesView` em `apps/core/views_imports.py` | `IsAuthenticated + HasPerm("import_spreadsheet")` |
-| `POST /api/dat/import-cadastros/` | `DATImportCadastrosView` em `apps/core/views_imports.py` | `IsAuthenticated + HasPerm("manage_admin_registries")` |
+| `POST /api/controle/import-compras/` | `ImportComprasView` em `apps/core/views_controle_imports.py` | `IsAuthenticated + SuperuserOnly` (D20; substituiu o "DAT-only" do PR-A1 DAT-Imports, 2026-04-29) |
+| `POST /api/produtos/import/` | `ImportProdutosView` em `apps/core/views_import_produtos.py` | `IsAuthenticated + SuperuserOnly` (D20) |
+| `POST /api/municipios/import/` | `ImportMunicipiosView` em `apps/core/views_import_municipios.py` | `IsAuthenticated + SuperuserOnly` (D20) |
+| `POST /api/controle/import-acoes/` | `ControleImportAcoesView` em `apps/core/views_imports.py` | `IsAuthenticated + SuperuserOnly` (D20) |
+| `POST /api/dat/import-cadastros/` | `DATImportCadastrosView` em `apps/core/views_imports.py` | `IsAuthenticated + SuperuserOnly` (D20) |
 
 Todos aceitam `?dry_run=true|false` (default `true`).
 

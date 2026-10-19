@@ -304,7 +304,7 @@ services/
 ```python
 def approve(solicitacao):
     if solicitacao.status == 'pendente':
-        if user_has_any_perm(request.user, "aprovar_solicitacao"):
+        if user_has_policy(request.user, "access_solicitation_approvals"):
             # ... lógica de aprovação
             return success
         else:
@@ -320,7 +320,7 @@ def approve(solicitacao):
     if solicitacao.status != 'pendente':
         return error_status
 
-    if not user_has_any_perm(request.user, "aprovar_solicitacao"):
+    if not user_has_policy(request.user, "access_solicitation_approvals"):
         return error_permission
 
     # Lógica principal no nível mais alto
@@ -403,7 +403,7 @@ class TestSolicitacaoApproval:
             ...
 
     class TestPermissions:
-        """PA-02: Only Superintendência can approve"""
+        """PA-02: só aprova quem tem base em solicitation_approval_basis"""
         def test_superintendencia_approves_successfully(self):
             ...
 
@@ -426,10 +426,10 @@ if request.user.is_superuser or request.user.groups.filter(name='Superintendênc
 
 ✅ **Bom:**
 ```python
-from apps.core.rbac import user_has_any_perm
+from apps.core.rbac import user_has_policy
 
 def can_approve_solicitacao(user: Usuario) -> bool:
-    return user_has_any_perm(user, "aprovar_solicitacao")
+    return user_has_policy(user, "access_solicitation_approvals")
 
 if can_approve_solicitacao(request.user):
     ...
@@ -459,7 +459,7 @@ def check_conflicts(usuario, inicio, fim, municipio):
 ✅ **WHY, não WHAT** (quando lógica é não-óbvia):
 ```python
 # PA-03: Google Calendar integration only AFTER manual approval
-# (Superintendência may override conflicts with human context)
+# (aprovar revalida conflitos de disponibilidade; conflito bloqueia, sem override)
 if solicitacao.status == 'aprovado':
     task_publish_to_gcal.delay(solicitacao.id)
 ```

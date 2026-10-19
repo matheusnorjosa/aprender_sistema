@@ -154,9 +154,9 @@ def check_conflicts(
 
 2. **Business context**:
    ```python
-   # Superintendência may override conflicts with human context
+   # Approvers (PA-02) may override conflicts with human context
    # (political priorities, informal negotiations, etc.)
-   if user_has_any_perm(user, "pode_aprovar_superintendencia"):
+   if solicitation_approval_basis(user) is not None:
        approve_without_recheck()
    ```
 

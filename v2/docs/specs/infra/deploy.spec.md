@@ -1,7 +1,7 @@
 ---
 title: Deploy & Produção (spec)
 status: canonical
-last_verified: 2026-10-16
+last_verified: 2026-10-19
 verified_at_commit: 0dd1dcb630fdc1cf9b2b488121553e89488dde3c
 sources_of_truth:
   - v2/infra/docker-compose.prod.yml
@@ -28,9 +28,13 @@ related:
 > desde então** — o que esta spec afirma sobre *o repositório* foi reverificado em 2026-07-24, mas o que ela
 > afirma sobre *o Portainer* (em especial a lista de variáveis da `stack.env`) segue sendo o snapshot de junho.
 >
-> **⚠️ O go-live já aconteceu (2026-07-03).** Produção roda `v2026.07.18-94f2765` e tem **148 usuários ativos**
-> (94 Formador, 42 Coordenador, 9 Gerente, 3 DAT, 1 Controle, 1 Superintendência, 1 Assistente Administrativo;
-> Diretoria e Apoio de Coordenação sem membros ativos) e **apenas 1 superuser**. Qualquer texto abaixo que trate
+> **⚠️ O go-live já aconteceu (2026-07-03).** *Snapshot de 2026-07-24, não refeito:* produção rodava
+> `v2026.07.18-94f2765` com **148 usuários ativos** (contagem por grupo: 94 Formador, 42 Coordenador, 9 Gerente,
+> 3 DAT, 1 Controle, 1 Superintendência, 1 Assistente Administrativo; Diretoria e Apoio de Coordenação sem membros
+> ativos) e **apenas 1 superuser**. Esta spec não afirma a versão de prod: a vigente é a tag promovida mais recente
+> (`git tag --sort=-creatordate`, fluxo na seção «Mecanismo de deploy» abaixo). Desde o PR 12
+> (`RBAC_FONTE=lotacao`) o grupo é etiqueta e o poder vem da lotação, então a contagem por grupo não mede quem pode
+> o quê. Qualquer texto abaixo que trate
 > os gaps como "pré-go-live, sem urgência" está obsoleto: eles alcançam dados e pessoas reais. O bus factor de
 > **1 superuser** é agravado pelo #1567, que tornou a administração de Grupo×Capability superuser-only.
 

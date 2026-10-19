@@ -2,11 +2,13 @@
 Seed RBAC — Criar grupos e permissões mínimas (idempotente).
 
 Grupos criados: união de SETOR_GROUPS (13) + FUNCAO_GROUPS (4), conforme
-apps.core.constants. Setores de projeto (Vidas, Fluir, etc.) não recebem
-permissões Django CRUD — servem como marca de filtro RBAC via
-EquipeGerencia. Setores administrativos (DAT, Controle, Superintendência,
-Diretoria) e funções (Coordenador, Formador, Apoio, Gerente) recebem as
-Django permissions em PERMS_BY_GROUP abaixo.
+apps.core.constants. Os grupos são etiqueta: no modo padrão "lotacao"
+(PR 12) o grupo Django não dá capacidade nem abre tela; o poder vem do
+vínculo EquipeGerencia (pacote do perfil da gerência, ver
+apps.core.services.rbac_permissions). Setores administrativos (DAT,
+Controle, Superintendência, Diretoria) e funções (Coordenador, Formador,
+Apoio, Gerente) ainda recebem as Django model permissions em
+PERMS_BY_GROUP abaixo, mas elas são residuais: nenhuma view da API as lê.
 
 Atualizado em 2026-04-22: passou a usar SETOR_GROUPS + FUNCAO_GROUPS como
 SSOT (antes a lista estava hardcoded com 8 entradas e divergia).
@@ -54,7 +56,8 @@ PERMS_BY_GROUP = {
         ("delete", AvailabilityBlock),
         ("view", AvailabilityBlock),
     ],
-    # Superintendência: Aprovar/reprovar + read references
+    # Superintendência: perms Django residuais (não dão poder). Aprovar vem da lotação
+    # (solicitation_approval_basis: vínculo GERENTE na SUPERINTENDENCIA ou pacote), não do grupo.
     "Superintendência": [
         ("view", Solicitacao),
         ("change", Solicitacao),

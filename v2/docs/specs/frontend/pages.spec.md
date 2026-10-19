@@ -1,7 +1,7 @@
 ---
 title: Páginas (React)
 status: canonical
-last_verified: 2026-10-16
+last_verified: 2026-10-19
 verified_at_commit: 5205b976648b0f481a8842101b3f0ddae4647965
 sources_of_truth:
   - v2/frontend/src/App.tsx
@@ -354,7 +354,6 @@ páginas fazem, não o que deveriam fazer.
 ## Pontos de atenção / dívidas conhecidas
 
 - **Rota e endpoint podem divergir na policy.** A matriz viva no backend é o SSOT — qualquer página nova deve usar a policy do endpoint que consome. Desde o PR 7 nenhum guard reimplementa a matriz no cliente (só policy, `ehSuperusuario` e "autenticado").
-- **Grupos de função ainda abrem Grade/Bloqueios/Deslocamentos** (`TELAS_DE_ESCOPO`): cópia fiel da regra antiga; sai no PR 8 ("função deixa de dar poder").
 - **`pages/Solicitacoes.tsx` removido (#1728).** O arquivo raiz (~15 KB) era dead code — **não importado por nenhum módulo**, nenhuma rota o alcançava — e foi removido nesta limpeza. `pages/Disponibilidade.tsx` (também na raiz) **está** roteado; os dois não devem ser tratados como o mesmo caso.
 - **Logout via `window.location.reload()`.** Tech-debt assumido (#927, `App.tsx`, `handleLogout`) — sem auth store centralizado, logout força reload em vez de limpeza de estado.
 - **Sidebar e rotas usam camadas diferentes.** O menu decide por `useCapabilities` (policy pura) e as rotas compostas por flags legacy; onde as duas discordam, o item aparece e a rota nega (ou o contrário). `AppSidebar.menu.test.tsx` cobre a paridade nos atores canônicos, não em todas as rotas.

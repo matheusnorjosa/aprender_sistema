@@ -1,8 +1,16 @@
 /**
  * Testes E2E do Módulo DAT
  *
- * Testa todas as páginas do módulo DAT (Departamento de Apoio Técnico).
- * Autenticação é feita automaticamente via auth.setup.ts
+ * Smoke de shell: confere só que o <main> aparece nas rotas do módulo DAT
+ * (Departamento de Apoio Técnico).
+ * Autenticação é feita automaticamente via auth.setup.ts, com o storageState padrão
+ * (coord_e2e: papel COORDENADOR na GERENCIA E2E, perfil PADRAO, sem
+ * manage_admin_registries nem as demais policies dessas rotas). Nas rotas /dat/* o
+ * RequirePolicy mostra "Recurso indisponível" dentro do <main>, e o teste passa sem DAT
+ * nem superusuário. Abrir de fato exige authedPage('dat_e2e') (e2e/fixtures/roles.ts;
+ * pacote ADMIN_OPERACIONAL) e conferir a ausência de "Recurso indisponível"; a importação
+ * (/dat/importacao → /dat/importacoes) e /dat/admin/equipe-gerencia só abrem para o
+ * superusuário (`podeImportarPelaTela` em AppRoutes.tsx), e /dat/etl-reports não tem rota.
  */
 
 import { test, expect } from '@playwright/test';

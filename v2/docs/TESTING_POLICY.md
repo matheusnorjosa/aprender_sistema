@@ -23,12 +23,15 @@ Este documento consolida práticas e contratos adotados nos testes para manter o
 - **Com permissão + dados válidos** → `200/204`
 
 **Em testes que validam parâmetros (esperam 400)**:
-- Autentique um usuário com grupo "Controle" ou "Superintendência"
+- Autentique um usuário **lotado** com a capacidade: desde o PR 12 (`RBAC_FONTE=lotacao`) o
+  grupo é só etiqueta, e um usuário só com o grupo "Controle" toma 403 em vez de 400
+- `UsuarioFactory(groups=[...])` (`apps/core/tests/factories.py`) cria o grupo **e** o vínculo
+  do pacote (DAT, Controle, Diretoria) ou do papel; `groups__vinculo=False` cria só o grupo. A
+  mecânica grupo → capacidade só vale com a fixture `modo_uniao`
 - Exemplo:
   ```python
-  from django.contrib.auth.models import Group
-  grupo, _ = Group.objects.get_or_create(name="Controle")
-  user.groups.add(grupo)
+  from apps.core.tests.factories import UsuarioFactory
+  user = UsuarioFactory(groups=["Controle"])  # grupo + vínculo EQUIPE na gerência CONTROLE
   ```
 
 ## Celery / GCal Safety

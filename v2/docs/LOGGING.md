@@ -151,9 +151,9 @@ async function badFetch() {
 - IPs (considerar LGPD)
 
 > **Backstop automático**: o `PIIRedactionFilter` (ver a seção **Configuração**) mascara
-> e-mail e CPF cru em toda linha antes da formatação. Ele reduz o dano de um vazamento
-> acidental, mas cobre só CPF cru — não o formatado (`123.456.789-00`) —, então as regras
-> acima seguem obrigatórias.
+> e-mail e CPF, cru ou formatado (`123.456.789-00`), em toda linha antes da formatação. Ele
+> reduz o dano de um vazamento acidental, mas não pega o login `user_<cpf>` (o `_` cola no
+> CPF), então as regras acima seguem obrigatórias.
 
 ---
 

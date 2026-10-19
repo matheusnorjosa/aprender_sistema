@@ -1,7 +1,7 @@
 ---
 title: Espelho Sistema × Planilha
 status: living
-last_verified: 2026-09-03
+last_verified: 2026-10-19
 owner: backend
 sources_of_truth:
   - v2/backend/apps/core/models/organizacao.py
@@ -198,12 +198,14 @@ Dados de co-coordenação em prod = re-import futuro à parte.
 
 **DECIDIDO (dono):** SUPORTE e OPERACIONAL são cargos do **DAT** (não coordenação) →
 **não** mapeiam para `APOIO`. `APOIO DE COORDENAÇÃO` tem as **mesmas permissões de
-COORDENADOR**. As pessoas de SUPORTE/OPERACIONAL veem a grade via a capability do grupo
-DAT (`view_all_availability`), não via papel.
+COORDENADOR**. As pessoas de SUPORTE/OPERACIONAL veem a grade (`view_all_availability`) via o
+pacote do perfil DAT, pelo vínculo `EQUIPE`/`GERENTE` na gerência DAT — não via grupo (desde o
+PR 12 o grupo não dá poder).
 
 **DECIDIDO (dono, 05/10/2026):** essas pessoas ganham o papel `EQUIPE` ("Equipe administrativa"),
 que só diz "trabalha neste setor" e também serve ao Controle e a outros setores — sem efeito em
-lista, escopo, permissão ou grupo (a capability do grupo DAT segue valendo por ser grupo). Regra completa em [`rbac.spec.md`](specs/backend/rbac.spec.md).
+lista, escopo ou grupo; desde o PR 12 é esse vínculo `EQUIPE` na gerência DAT que dá o pacote do perfil
+(o grupo DAT sozinho não dá a grade). Regra completa em [`rbac.spec.md`](specs/backend/rbac.spec.md).
 
 ---
 

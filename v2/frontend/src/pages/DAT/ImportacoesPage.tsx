@@ -13,7 +13,7 @@
  * - Operacional: Compras, Ações, Eventos, Produtos
  * - Disponibilidade: Bloqueios, Deslocamentos
  *
- * Acesso: DAT/superuser only (guard em AppRoutes via canDAT).
+ * Acesso: só superusuário (`podeImportarPelaTela` em AppRoutes; decisão do dono de 02/10/2026).
  *
  * Reutiliza:
  * - `ImportUploader` para UI de cada card

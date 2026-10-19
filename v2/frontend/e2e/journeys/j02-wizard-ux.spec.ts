@@ -20,7 +20,8 @@
  *    o passo — o spec valida que o indicador de passo permanece no primeiro.
  * 3. **Operação (RBAC)**: formador_vidas tenta acessar `/solicitacoes/nova`
  *    → rota protegida (menu não mostra, frontend bloqueia via
- *    `canCoordenador`). Valida auditoria #1169 (gate fraco em /editar) NÃO
+ *    `RequirePolicy create_solicitation`: o papel FORMADOR não tem direito
+ *    de evento). Valida auditoria #1169 (gate fraco em /editar) NÃO
  *    se aplica aqui — o gate de nova solicitação é correto.
  */
 import { test, expect } from '../fixtures';
@@ -77,7 +78,7 @@ test.describe('J02 — Wizard de nova solicitação: estrutura e navegação', {
     await page.goto('/solicitacoes/nova');
     await waitForRouteReady(page);
 
-    // Formador não tem canCoordenador → rota deve mostrar <Forbidden /> ou equivalente.
+    // Formador não tem a policy create_solicitation (papel FORMADOR sem direito de evento) → rota deve mostrar <Forbidden /> ou equivalente.
     // Heurísticas (qualquer uma satisfaz):
     //  (a) texto "Forbidden/403/acesso negado"
     //  (b) redirecionamento para outra rota

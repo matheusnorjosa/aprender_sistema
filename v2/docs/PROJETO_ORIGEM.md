@@ -148,6 +148,9 @@ Contratos por entidade e ordem de importação: `v2/docs/imports/README.md`.
 
 ## 3. Papéis, Perfis e Autorizações (RBAC)
 
+> Desde o PR 12 (`RBAC_FONTE=lotacao`) os grupos abaixo são etiqueta: o poder vem da lotação
+> (gerência + papel vigente). SSOT: [specs/backend/rbac.spec.md](./specs/backend/rbac.spec.md).
+
 ### 3.1 Grupos de SETOR (onde trabalha)
 - Superintendência, DAT, Controle, Vidas, ACerta, Brincando, Fluir, Sou da Paz, Gerência
 
@@ -162,7 +165,7 @@ Contratos por entidade e ordem de importação: `v2/docs/imports/README.md`.
 #### Fluxo SUPER (Requer Aprovação Manual)
 1. Coordenador envia solicitação → `status = pendente`
 2. Sistema checa disponibilidade (RD-01 a RD-08)
-3. Superintendência aprova/reprova
+3. Quem tem base em `solicitation_approval_basis` aprova/reprova (PA-02, §5.2)
 4. Se aprovado → Controle publica no Google Calendar
 
 #### Fluxo NAO_SUPER (Auto-Aprovado)
@@ -200,7 +203,9 @@ Contratos por entidade e ordem de importação: `v2/docs/imports/README.md`.
 
 ### 5.2 Política de Aprovação (PA-01 a PA-07)
 - **PA-01**: Projetos SUPER nunca auto-aprovam
-- **PA-02**: Superintendência/DAT/superuser podem aprovar
+- **PA-02**: quem aprova é definido por `solicitation_approval_basis` (superuser, Gerente vigente da
+  gerência Superintendência, capacidade de aprovar pelo pacote do DAT ou do Controle). SSOT:
+  [specs/domain/politica-aprovacao.spec.md](./specs/domain/politica-aprovacao.spec.md)
 - **PA-03**: Integrações executam após aprovação
 - **PA-04**: Estado inicial = pendente (SUPER) ou aprovado (NAO_SUPER)
 - **PA-05**: Auditoria em AuditLog

@@ -18,7 +18,7 @@
 
 **SSOT**: Projetos organizacionais (ACerta, Brincando, etc.)
 **Fields**: nome (UK), codigo (UK), **fluxo (SUPER/NAO_SUPER)**, descricao
-- **SUPER Flow**: Requires manual Superintendência approval
+- **SUPER Flow**: Requires manual approval by someone with a base in `solicitation_approval_basis` (PA-02: superuser, GERENTE vigente na Superintendência, DAT ou Controle pelo pacote da gerência)
 - **NAO_SUPER Flow**: Auto-approved on creation
 
 ## Solicitacao (Core of System)

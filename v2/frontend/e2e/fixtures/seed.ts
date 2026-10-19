@@ -91,8 +91,9 @@ export interface SeedSolicitacaoInput {
   /** IDs de formadores que participam. Default: nenhum. */
   formadorIds?: number[];
   /**
-   * Coordenador responsável (FK `coordenador`). Default: quem cria, se tem a função Coordenador;
-   * senão o primeiro coordenador que o lookup oferece (decisão do dono, 05/10/2026).
+   * Coordenador responsável (FK `coordenador`). Default: quem cria, se tem o papel COORDENADOR
+   * vigente na gerência do projeto (PR 8/9; a função/grupo não conta); senão o primeiro coordenador
+   * que o lookup oferece (decisão do dono, 05/10/2026).
    */
   coordenadorId?: number;
 }
@@ -179,7 +180,7 @@ export async function seedSolicitacao(
     }
     lastStatus = res.status();
     lastBody = await res.text();
-    // Quem cria sem a função Coordenador precisa informar o responsável: usa o 1º do lookup.
+    // Quem cria sem o papel COORDENADOR vigente na gerência do projeto precisa informar o responsável: usa o 1º do lookup.
     if (res.status() === 400 && lastBody.includes('"coordenador"') && payload.coordenador === undefined) {
       payload.coordenador = await findCoordenadorId(api);
       continue;

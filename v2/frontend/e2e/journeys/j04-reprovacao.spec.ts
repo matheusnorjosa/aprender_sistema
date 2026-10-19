@@ -3,8 +3,10 @@
  *
  * Ref: Regras PA (skill `aprender-domain` confirmada em 2026-04-22):
  *
- * - **PA-02**: Superintendência, DAT ou superuser reprovam (permission
- *   `IsSuperintendencia`).
+ * - **PA-02**: reprova quem tem base em `solicitation_approval_basis`
+ *   (permission `CanAccessSolicitationApprovals`): superuser, GERENTE vigente
+ *   da Superintendência e a capacidade `approve_solicitation` pelo pacote
+ *   (DAT, Controle). Nenhum grupo dá o poder.
  * - **PA-05**: AuditLog registra `REJECT` com `details.justificativa`.
  *   A justificativa é opcional ("when applicable") — backend aceita vazio.
  *

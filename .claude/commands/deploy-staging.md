@@ -256,8 +256,8 @@ gh workflow run promote.yml -f release=v2026.MM.DD-<sha7>   # -> gate `productio
 ## 📊 Environment Reality
 
 - **No remote staging server.** Validation is **local** (`make staging-full`, prod-like Docker stack).
-- **Prod = 3 Golden VMs**: VM01_App (Nginx/Gunicorn/Celery/React), VM02_DB (PostgreSQL 15),
-  VM03_Red (Redis 7).
+- **Prod = 2 VMs**: VM01_App (Nginx/Gunicorn/Celery/React + Redis 7 em container, serviço `redis`
+  na rede `backend-internal`) e VM02_DB (PostgreSQL 15). SSOT: `v2/infra/README.md`.
 - **Produção puxa; o CI não empurra** (ADR-018). O `PUT` sai do `aprender-applier` para
   `127.0.0.1:9443`; o `aprender-deployer`, que faz o parsing do que vem da internet, **não** detém
   o token do Portainer (separação de privilégio entre dois usuários de sistema).

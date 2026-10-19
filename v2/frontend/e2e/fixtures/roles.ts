@@ -1,8 +1,10 @@
 /**
  * Fixtures de autenticação multi-role.
  *
- * O projeto tem 4 funções × 13 setores via Django Groups, então um
- * storageState único (legado) é insuficiente. Esta fixture permite o spec
+ * O projeto tem 5 funções × 13 setores como Django Groups, mas o grupo é
+ * etiqueta: o poder vem da lotação (papel vigente e pacote do perfil da
+ * gerência, `EquipeGerencia`). Por isso um storageState único (legado) é
+ * insuficiente. Esta fixture permite o spec
  * declarar o papel que precisa:
  *
  *   test('coord Vidas vê apenas as próprias', async ({ authedPage }) => {

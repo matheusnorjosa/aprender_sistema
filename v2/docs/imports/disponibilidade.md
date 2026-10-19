@@ -168,8 +168,8 @@ Observações de comportamento que o contrato original não previa:
 | **Endpoint assíncrono (ASQ-005 Fase 1 — piloto)** | `POST /api/imports/bloqueios/` → cria `ImportJob`, retorna `202 Accepted` | Despacha Celery task `task_run_import_job`. Job persiste com `import_type='bloqueios'`. Status acompanhado via `GET /api/imports/<id>/`. | ✅ **já funciona** (único tipo async hoje) |
 | Endpoint async (status) | `GET /api/imports/<id>/` | Retorna `ImportJob` serializado (status, stats, pendencias) | ✅ existe |
 | Endpoint async (lista) | `GET /api/imports/` | Lista jobs do usuário (filtro `type=` `status=`) | ✅ existe |
-| Gate RBAC (endpoint sync) | `IsAuthenticated + HasPerm("import_spreadsheet")` (DAT) | NÃO `import_availability_blocks` direto — policy `import_availability_blocks` é apenas para exposição via `/api/me/policies/` | ✅ aplicado |
-| Gate RBAC (endpoint async upload) | `IsAuthenticated + CanImportGenericSpreadsheet` (Policy class) | Verificar em `apps/core/views/imports.py` | ✅ aplicado |
+| Gate RBAC (endpoint sync) | `IsAuthenticated + SuperuserOnly` (D20) | Só superusuário (decisão do dono 02/10/2026); nenhuma capability abre. A policy `import_availability_blocks` é apenas para exposição via `/api/me/policies/` | ✅ aplicado |
+| Gate RBAC (endpoint async upload) | `IsAuthenticated + SuperuserOnly` (D20) | `apps/core/views/imports.py`; `CanImportGenericSpreadsheet` segue em `policies.py`, mas não gateia mais esta rota | ✅ aplicado |
 | AuditLog delegação | `DELEGATE_BLOCK_CREATE` (PR 13) | Quando outro user cria bloqueio em nome de Formador (não vem de import — vem de POST manual) | ✅ existe |
 
 ### Comportamento real do service (lido em código + docstring)

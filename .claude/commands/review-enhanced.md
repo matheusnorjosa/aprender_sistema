@@ -10,7 +10,7 @@ Review code: $ARGUMENTS
 
 **Review Framework**: 11-category comprehensive analysis
 - **Primary Focus**: Clarity (naming, anti-patterns, specificity)
-- **Context**: Python/Django/DRF + React 18/Vite/Ant Design + AS v2 business rules (CP, RD, PA)
+- **Context**: Python/Django/DRF + React 19/Vite/Ant Design + AS v2 business rules (CP, RD, PA)
 - **NEW**: React Performance (Vercel Engineering's 45 rules)
 
 ## Review Process
@@ -74,13 +74,13 @@ Review code: $ARGUMENTS
   # Good
   if not user.is_authenticated:
       return Response(status=401)
-  if not user_has_any_perm(user, "aprovar_solicitacao"):
+  if solicitation_approval_basis(user) is None:
       return Response(status=403)
   # ... happy path
 
   # Bad
   if user.is_authenticated:
-      if user_has_any_perm(user, "aprovar_solicitacao"):
+      if solicitation_approval_basis(user) is not None:
           # ... deep nesting
   ```
 - [ ] **Max 2-3 levels** of indentation
@@ -168,8 +168,9 @@ Review code: $ARGUMENTS
 - [ ] **Permission classes** correct (canonical: `HasPerm("codename")` from `apps.core.rbac`; compose with `|`/`&`/`~`; ver `v2/docs/RBAC_NAMING.md`)
   ```python
   from apps.core.rbac import HasPerm
-  permission_classes = [HasPerm("core.aprovar_solicitacao")]
+  permission_classes = [HasPerm("operate_preagenda")]
   # composition: permission_classes = [HasPerm("a") | HasPerm("b")]
+  # aprovação NÃO é HasPerm: usa a Policy CanAccessSolicitationApprovals (solicitation_approval_basis)
   ```
 - [ ] **Throttling** on sensitive endpoints
   ```python
@@ -344,7 +345,7 @@ Review code: $ARGUMENTS
 
 ### 8. **React Performance** (Vercel Best Practices)
 
-> 45 regras da Vercel Engineering adaptadas para React 18 + Vite + Ant Design
+> 45 regras da Vercel Engineering adaptadas para React 19 + Vite + Ant Design
 
 #### 🔴 CRÍTICO — Eliminating Waterfalls
 
@@ -703,12 +704,12 @@ Review code: $ARGUMENTS
   ```python
   # Bad
   # Check if user can approve (and: groups.filter(name=...) is banned by scripts/rbac_lint.py)
-  if user.has_perm("core.aprovar_solicitacao"):
+  if user.has_perm("core.approve_solicitation"):
 
   # Good
-  from apps.core.rbac import user_has_any_perm
+  from apps.core.rbac.policies import solicitation_approval_basis
 
-  if user_has_any_perm(user, "core.aprovar_solicitacao"):
+  if solicitation_approval_basis(user) is not None:
   ```
 - [ ] **WHY, not WHAT**
   ```python
@@ -763,7 +764,7 @@ If code handles availability/conflicts:
 #### Política de Aprovação (PA-01 to PA-07)
 If code handles approvals:
 - [ ] **PA-01**: No auto-approval for SUPER projects
-- [ ] **PA-02**: Only Superintendência can approve/reject
+- [ ] **PA-02**: Only users with a `solicitation_approval_basis` can approve/reject (superuser, GERENTE vigente na Superintendência — só projeto SUPER da gerência dela, capacidade `approve_solicitation` pelo pacote da gerência — DAT e Controle); `decisoes_impedidas` barra decidir a própria solicitação (e as demais decisões impedidas, ex.: conta alterada por quem decide)
 - [ ] **PA-03**: External integrations AFTER approval
 - [ ] **PA-04**: Initial status = 'pendente' (SUPER)
 - [ ] **PA-05**: AuditLog persistent (usuario, action, details, ip)
@@ -840,7 +841,7 @@ Suggestion:
 **Adaptations Applied**:
 - Added Python/Django/DRF standards
 - Added AS v2 compliance checks (CP, RD, PA)
-- Retained React 18 Performance section (Vercel React Best Practices)
+- Retained React Performance section, React 19 (Vercel React Best Practices)
 - Focus on PEP 257, Pyright strict, Django ORM
 
 **Last Updated**: 2026-06

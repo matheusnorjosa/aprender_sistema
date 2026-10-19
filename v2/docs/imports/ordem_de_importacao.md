@@ -26,15 +26,15 @@ A ordem abaixo respeita as dependências de chave estrangeira e regras de domín
 
 - **Por quê**: definir 13 Setores + 5 Funções (SSOT em `apps/core/constants.py:16-45`).
 - **Como**: management command `seed_rbac`, que vive em **`apps/dev_tools/management/commands/seed_rbac.py`**
-  (não em `apps/core`). Manual. **NÃO automatizar** em deploy (D17).
-- **Atribuição Group × Capability**: via Django Admin (`/admin/core/permissaofuncional/`), nunca em migration.
+  (não em `apps/core`). Manual; não roda em deploy (`dev_tools` fica desligado em produção, CP-08).
+- **Atribuição Group × Capability**: muda só por PR (seed `functional_permissions_seed.py` + migration de dados, D21, que substituiu a D17). O Admin de `PermissaoFuncional` é somente leitura.
 - **Sem documento de import** porque cadastros base já existem no schema (não vêm de planilha).
 
 ### 3. Municípios
 
 - **Por quê**: Solicitacao e DATCompra usam FK para `Municipio`.
 - **Service real**: `apps/core/services/municipios_import.py` (`import_municipios_from_file`).
-- **Endpoint**: `POST /api/municipios/import/` — gate `HasPerm("manage_admin_registries")`.
+- **Endpoint**: `POST /api/municipios/import/` — gate `IsAuthenticated + SuperuserOnly` (D20: importação pela tela é só do superusuário).
 - **Pendência para Matheus**: confirmar cabeçalho real esperado e se `sheets.banco` é a fonte ou se há fixture/seed inicial separada.
 
 ### 4. Projetos
@@ -47,7 +47,7 @@ A ordem abaixo respeita as dependências de chave estrangeira e regras de domín
 
 - **Por quê**: Compra/DATCompra usam FK para `Produto`.
 - **Service real**: `apps/core/services/produtos_import.py` (`import_produtos_from_file`).
-- **Endpoint**: `POST /api/produtos/import/` — gate `HasPerm("import_spreadsheet")`.
+- **Endpoint**: `POST /api/produtos/import/` — gate `IsAuthenticated + SuperuserOnly` (D20).
 - **Fonte histórica**: 139 produtos cadastrados (`produtos.xlsx`), cada um com `codigo` único e FK para `Projeto`.
 - Catálogo é **atualizável via importação** — não está congelado.
 
@@ -71,7 +71,7 @@ A ordem abaixo respeita as dependências de chave estrangeira e regras de domín
 - **Por quê**: agendamento concreto de eventos.
 - **Documento**: [agenda_solicitacoes.md](./agenda_solicitacoes.md)
 - **Service real**: `apps/core/services/eventos_import.py` (`import_eventos_from_file`). Cria 1 `Solicitacao` + N `Participation` (coord + formadores 1..5).
-- **Endpoint**: `POST /api/solicitacoes/import/` — gate `HasPerm("import_spreadsheet")`.
+- **Endpoint**: `POST /api/solicitacoes/import/` — gate `IsAuthenticated + SuperuserOnly` (D20).
 - **Pré-requisitos**: Usuários (passo 1), Municípios (passo 3), Projetos (passo 4).
 - **Status inicial**: decidido **só pelo `projeto.fluxo`** (`eventos_import.py:497`) —
   `SUPER` → `pendente`, `NAO_SUPER` → `aprovado`. 🔴 **A data do evento não influencia nada**
@@ -157,7 +157,7 @@ evidência que existe. `AuditLog` filtrado por `action LIKE 'IMPORT_%'` **não d
 
 - Existe pipeline automatizado entre `sheets.banco` e o sistema (ex: cron + API) ou todo import é manual via UI/CLI?
 - Municípios e Projetos têm uma fonte de cadastro contínua na planilha ou ficam congelados após o seed inicial?
-- Em quais cenários **Cadastros base** (passo 2) precisam ser refeitos pós-deploy? Sentinela D17 deveria bloquear?
+- Em quais cenários **Cadastros base** (passo 2) precisam ser refeitos pós-deploy? Sentinela D17 (substituída pela D21) deveria bloquear?
 - Disponibilidade deve preceder Agenda no fluxo real ou as duas chegam juntas? *(Atualizado #2021:
   o import agora consulta disponibilidade para evento FUTURO (#1620); histórico entra sem checar.)*
 - 🟡 **Antes do próximo reimport em massa**: #1628 (sobrescrita silenciosa de aprovação) **resolvido no #2021**

@@ -55,10 +55,11 @@ class Command(BaseCommand):
             status = "✅ Criado" if created else "⏭️  Já existe"
             self.stdout.write(f"   {status}: {nome_grupo}")
 
-        # 1b. Vincular permissions funcionais aos grupos (testes E2E exigem
-        # que Coordenador tenha `pode_criar_solicitacao_coord_dat`, etc.).
-        # Em prod o seed_rbac roda com assign_default_groups=False — aqui
-        # forçamos True porque o ambiente E2E precisa do vínculo padrão.
+        # 1b. Garantir o catálogo de permissions funcionais (e o vínculo padrão aos grupos).
+        # Não dá poder a nenhuma persona no modo padrão: desde o PR 8 as funções não têm
+        # capacidade e desde o PR 12 (RBAC_FONTE="lotacao") o grupo não soma nada; o poder vem do
+        # vínculo EquipeGerencia (DIREITOS_PAPEL / pacote do perfil, passo 4a). O vínculo aos grupos
+        # só importa no modo "uniao" (volta de emergência). Em prod o seed_rbac roda com False.
         from apps.core.services.functional_permissions_seed import seed_functional_permissions
 
         fp_stats = seed_functional_permissions(assign_default_groups=True, verbose=False)
@@ -109,7 +110,10 @@ class Command(BaseCommand):
         # Todo grupo de função vem com o vínculo do papel (o PR 8 faz o papel dar o poder).
         self.stdout.write("\n4a. Criando vínculos EquipeGerencia...")
         # Gerência das personas legadas: perfil PADRAO (sem pacote), sem setor_canonico e sem
-        # projeto. O vínculo nela não muda o escopo de setor delas, que segue aberto.
+        # projeto. Desde o PR 9 o alcance é a gerência do projeto (`projeto.gerencia_id`), então o
+        # vínculo aqui prende coord_e2e/formador_e2e a uma gerência sem projeto: eles não criam evento
+        # (o `/lookup/projetos/` da Nova Solicitação vem vazio, `scope_projetos_por_gerencia`). Spec
+        # que precise de coord_e2e criando evento: dar a ele um projeto aqui.
         Gerencia.objects.update_or_create(
             nome="GERENCIA E2E",
             defaults={"nome_setor": "E2E", "setor_canonico": "", "perfil": Gerencia.Perfil.PADRAO, "ativo": True},
@@ -296,7 +300,8 @@ class Command(BaseCommand):
                 "groups": [grupos["Gerente"], grupos["Vidas"]],
                 "is_superuser": False,
             },
-            # === DAT puro (jornada J18 — regra PO: DAT acesso total no frontend) ===
+            # === DAT administrador operacional (jornada J18; PR 10): o poder vem do vínculo EQUIPE na
+            # GERENCIA DAT (passo 4a), não do grupo; sem importação técnica (só o superusuário) ===
             {
                 "username": "dat_e2e@test.com",
                 "email": "dat_e2e@test.com",

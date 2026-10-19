@@ -17,7 +17,7 @@ não `/skill <nome>`. Comandos slash (`/<nome>`) são os de `.claude/commands/`.
 | `aprender-domain` | Regras de negócio RF/RD/PA/CP |
 | `django-patterns` | Models, serializers, views, services (Django/DRF) |
 | `django-security` | Auditoria de vulnerabilidades, auth, RBAC, OWASP |
-| `frontend-ui-engineering` | UIs React 18 + Antd 5 + Tailwind |
+| `frontend-ui-engineering` | UIs React 19 + Antd 5 + Tailwind |
 | `performance-optimization` | Endpoints lentos, N+1, bundle, Core Web Vitals |
 | `writing-standards` | Docs, docstrings (PEP 257), commits |
 | `test-driven-development` | **Antes** de implementar feature/bugfix |
@@ -58,7 +58,6 @@ não `/skill <nome>`. Comandos slash (`/<nome>`) são os de `.claude/commands/`.
 | `/test-coverage` | Testes + cobertura (gate 85%) |
 | `/approve-flow` | Testar política PA-01~07 |
 | `/check-conflicts` | Testar RF03 / RD-01~08 |
-| `/project_e2e-smoke` | Smoke E2E RF01→…→RF07 (Playwright MCP) |
 | `/project_fix-django-url` | Investigar/corrigir URL reversing |
 | `/project_git-pr` | Commit limpo + descrição de PR |
 | `/deploy-staging` | Checklist do release: gate local `staging-full` → merge (build/sign/tag) → `promote.yml` |

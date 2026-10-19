@@ -7,9 +7,9 @@
  * - Sem conexão, a mensagem diz isso, e não "Verifique os dados".
  */
 import { useEffect } from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { MemoryRouter } from 'react-router';
+import { renderNoRoteador } from '../../../test/comRoteador';
 import message from 'antd/es/message';
 
 const {
@@ -111,10 +111,8 @@ vi.mock('../../../components/ComboBox', () => ({ default: MockComboBox }));
 import NewSolicitacaoWizard from '../NewSolicitacaoWizard';
 
 function renderWizard(): void {
-  render(
-    <MemoryRouter>
-      <NewSolicitacaoWizard />
-    </MemoryRouter>
+  renderNoRoteador(
+    <NewSolicitacaoWizard />
   );
 }
 

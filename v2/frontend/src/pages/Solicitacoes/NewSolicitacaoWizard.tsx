@@ -11,7 +11,7 @@
  */
 
 import { useState, useMemo, useCallback, useEffect, useRef, ChangeEvent, JSX, ReactNode } from 'react';
-import { useLocation, useNavigate } from 'react-router';
+import { useBlocker, useNavigate, type BlockerFunction } from 'react-router';
 // antd - direct imports for tree-shaking (Issue #424)
 import Steps from 'antd/es/steps';
 import Form from 'antd/es/form';
@@ -243,21 +243,26 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   const [formData, setFormData] = useState<FormDataType>(FORM_INICIAL);
 
   // Sair do assistente descarta o que foi preenchido: com algo preenchido, pergunta antes,
-  // começando no Cancelar (ação destrutiva, ux-principios).
+  // começando no Cancelar (ação destrutiva, ux-principios). Toda saída para outra página passa
+  // pelo `useBlocker` do data router (App.tsx): o botão do topo, o Voltar do navegador e o do
+  // Android, o menu lateral e os outros links. Passos do assistente não mudam o endereço.
   const preenchido = JSON.stringify(formData) !== JSON.stringify(FORM_INICIAL);
-  // Entrada repetida da própria rota no histórico, que segura o Voltar do navegador (abaixo).
-  // Saindo por dentro do app, ela é substituída pelo destino, senão o Voltar de lá parava aqui duas vezes.
-  const entradaExtra = useRef(false);
-  const irPara = useCallback((destino: string): void => {
-    void navigate(destino, { replace: entradaExtra.current });
-  }, [navigate]);
+  // Depois do envio com sucesso, sai sem perguntar: o que foi preenchido virou a solicitação.
+  const saidaLiberada = useRef(false);
+  const deveSegurar = useCallback<BlockerFunction>(
+    ({ currentLocation, nextLocation }) =>
+      preenchido && !saidaLiberada.current && currentLocation.pathname !== nextLocation.pathname,
+    [preenchido],
+  );
+  const bloqueio = useBlocker(deveSegurar);
+  // O bloqueio da hora: outro Voltar com o aviso aberto bloqueia de novo, e "Sair" segue o último.
+  const bloqueioAtual = useRef(bloqueio);
   // O aviso aberto: o `Modal.confirm` não é ligado ao componente, então ele é fechado à mão
-  // quando o assistente sai da tela (não fica aberto sobre outra) e no Voltar do Android.
+  // quando o assistente sai da tela (não fica aberto sobre outra).
   const aviso = useRef<ReturnType<typeof Modal.confirm> | null>(null);
-  const confirmarSaida = useCallback((sair: () => void): void => {
-    const fechou = (): void => {
-      aviso.current = null;
-    };
+  useEffect(() => {
+    bloqueioAtual.current = bloqueio;
+    if (bloqueio.state !== 'blocked' || aviso.current) return;
     aviso.current = Modal.confirm({
       title: 'Sair sem criar a solicitação?',
       content: 'O que você preencheu será perdido.',
@@ -266,50 +271,24 @@ export default function NewSolicitacaoWizard(): JSX.Element {
       cancelText: 'Continuar preenchendo',
       autoFocusButton: 'cancel',
       onOk: () => {
-        fechou();
-        sair();
+        aviso.current = null;
+        if (bloqueioAtual.current.state === 'blocked') bloqueioAtual.current.proceed();
       },
-      onCancel: fechou,
+      onCancel: () => {
+        aviso.current = null;
+        if (bloqueioAtual.current.state === 'blocked') bloqueioAtual.current.reset();
+      },
     });
-  }, []);
+  }, [bloqueio]);
   useEffect(() => () => aviso.current?.destroy(), []);
   const sairDoAssistente = (): void => {
-    if (!preenchido) {
-      irPara('/solicitacoes/minhas');
-      return;
-    }
-    confirmarSaida(() => irPara('/solicitacoes/minhas'));
+    void navigate('/solicitacoes/minhas');
   };
 
-  // As outras saídas também perguntam com algo preenchido. O app usa `BrowserRouter`, onde o
-  // `useBlocker` não funciona, então cada saída é segurada aqui:
-  // - recarregar/fechar a aba: o aviso do próprio navegador (`beforeunload`);
-  // - Voltar do navegador/Android: os passos não entram no histórico, então uma entrada repetida
-  //   desta rota recebe o Voltar e o assistente pergunta;
-  // - links (menu lateral e outros): o clique é segurado antes do `Link` navegar.
-  const { pathname } = useLocation();
+  // Recarregar ou fechar a aba não passa pelo roteador: com algo preenchido, o aviso do próprio
+  // navegador (`beforeunload`).
   useEffect(() => {
-    // O Voltar que pulou a entrada repetida (segurar o Voltar e escolher outra página) já saiu do
-    // assistente: não há como segurá-lo, e empurrar ou voltar mais uma entrada estragaria o histórico.
-    const voltouParaOutraPagina = (): boolean => window.location.pathname !== pathname;
-    if (!preenchido) {
-      if (!entradaExtra.current) return undefined;
-      // Esvaziado com a entrada repetida ainda no histórico: o Voltar a consome (mesma URL, nada
-      // muda na tela) e segue sem perguntar. Preenchido de novo, ela é posta outra vez.
-      const aoVoltarVazio = (): void => {
-        if (voltouParaOutraPagina()) return;
-        entradaExtra.current = false;
-        window.history.back();
-      };
-      window.addEventListener('popstate', aoVoltarVazio);
-      return () => window.removeEventListener('popstate', aoVoltarVazio);
-    }
-    const segurarVoltar = (): void => {
-      window.history.pushState(window.history.state, '', window.location.href);
-      entradaExtra.current = true;
-    };
-    if (!entradaExtra.current) segurarVoltar();
-
+    if (!preenchido) return undefined;
     const aoDescarregar = (e: BeforeUnloadEvent): void => {
       // O reload do próprio app leva ao login e não é segurado: a sessão encerrada guarda o
       // motivo para o login; o "Sair" apaga o horário comum às abas (App.tsx). Com Cancelar, a
@@ -322,42 +301,9 @@ export default function NewSolicitacaoWizard(): JSX.Element {
       }
       e.preventDefault();
     };
-    const aoVoltar = (): void => {
-      if (voltouParaOutraPagina()) return;
-      // O Voltar consumiu a entrada repetida: ela volta na hora, senão o Voltar seguinte (o do
-      // Android para fechar o aviso) sairia do assistente sem perguntar.
-      segurarVoltar();
-      if (aviso.current) {
-        // Voltar com o aviso aberto fecha o aviso, como Continuar preenchendo.
-        aviso.current.destroy();
-        aviso.current = null;
-        return;
-      }
-      confirmarSaida(() => {
-        window.removeEventListener('popstate', aoVoltar);
-        // Passa pela entrada repetida e segue o Voltar que a pessoa pediu.
-        window.history.go(-2);
-      });
-    };
-    const aoClicar = (e: MouseEvent): void => {
-      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-      const link = e.target instanceof Element ? e.target.closest('a[href]') : null;
-      if (!(link instanceof HTMLAnchorElement) || (link.target !== '' && link.target !== '_self') || link.hasAttribute('download')) return;
-      const destino = new URL(link.href);
-      if (destino.origin !== window.location.origin || destino.pathname === pathname) return;
-      e.preventDefault();
-      e.stopPropagation();
-      confirmarSaida(() => irPara(destino.pathname + destino.search + destino.hash));
-    };
     window.addEventListener('beforeunload', aoDescarregar);
-    window.addEventListener('popstate', aoVoltar);
-    document.addEventListener('click', aoClicar, true);
-    return () => {
-      window.removeEventListener('beforeunload', aoDescarregar);
-      window.removeEventListener('popstate', aoVoltar);
-      document.removeEventListener('click', aoClicar, true);
-    };
-  }, [preenchido, pathname, confirmarSaida, irPara]);
+    return () => window.removeEventListener('beforeunload', aoDescarregar);
+  }, [preenchido]);
 
   useEffect(() => {
     let mounted = true;
@@ -585,7 +531,8 @@ export default function NewSolicitacaoWizard(): JSX.Element {
 
       await createSolicitacao(payload);
       message.success('Solicitação criada com sucesso!');
-      irPara('/solicitacoes/minhas');
+      saidaLiberada.current = true;
+      void navigate('/solicitacoes/minhas');
     } catch (error) {
       logger.error('Erro ao criar solicitação:', error);
 

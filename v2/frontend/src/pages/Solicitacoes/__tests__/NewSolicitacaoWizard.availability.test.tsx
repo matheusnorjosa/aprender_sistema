@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { MemoryRouter } from 'react-router';
+import { renderNoRoteador } from '../../../test/comRoteador';
 
 import { ComAcesso } from '../../../test/comAcesso';
 
@@ -161,12 +161,10 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
   });
 
   test('selecionar formador + data dispara check-many com os formadores (quem cria não entra por criar)', async () => {
-    render(
-      <MemoryRouter>
-        <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
-          <NewSolicitacaoWizard />
-        </ComAcesso>
-      </MemoryRouter>
+    renderNoRoteador(
+      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+        <NewSolicitacaoWizard />
+      </ComAcesso>
     );
     await irParaParticipantesESelecionarFormador();
 
@@ -180,12 +178,10 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
 
   test('conflito confirmado: mostra o formador e DESABILITA o Próximo', async () => {
     checkAvailabilityManyMock.mockResolvedValue(RESP_CONFLITO);
-    render(
-      <MemoryRouter>
-        <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
-          <NewSolicitacaoWizard />
-        </ComAcesso>
-      </MemoryRouter>
+    renderNoRoteador(
+      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+        <NewSolicitacaoWizard />
+      </ComAcesso>
     );
     await irParaParticipantesESelecionarFormador();
 
@@ -198,12 +194,10 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
 
   test('sem conflito: nenhum alerta de bloqueio e Próximo habilitado', async () => {
     checkAvailabilityManyMock.mockResolvedValue({ ok: true, results: [] });
-    render(
-      <MemoryRouter>
-        <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
-          <NewSolicitacaoWizard />
-        </ComAcesso>
-      </MemoryRouter>
+    renderNoRoteador(
+      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+        <NewSolicitacaoWizard />
+      </ComAcesso>
     );
     await irParaParticipantesESelecionarFormador();
 
@@ -232,12 +226,10 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
         },
       ],
     });
-    render(
-      <MemoryRouter>
-        <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
-          <NewSolicitacaoWizard />
-        </ComAcesso>
-      </MemoryRouter>
+    renderNoRoteador(
+      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+        <NewSolicitacaoWizard />
+      </ComAcesso>
     );
     await irParaParticipantesESelecionarFormador();
 
@@ -252,12 +244,10 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
 
   test('checagem falha (500): fail-open — Próximo continua habilitado', async () => {
     checkAvailabilityManyMock.mockRejectedValue(Object.assign(new Error('boom'), { status: 500 }));
-    render(
-      <MemoryRouter>
-        <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
-          <NewSolicitacaoWizard />
-        </ComAcesso>
-      </MemoryRouter>
+    renderNoRoteador(
+      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+        <NewSolicitacaoWizard />
+      </ComAcesso>
     );
     await irParaParticipantesESelecionarFormador();
 
@@ -288,12 +278,10 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
         },
       },
     });
-    render(
-      <MemoryRouter>
-        <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
-          <NewSolicitacaoWizard />
-        </ComAcesso>
-      </MemoryRouter>
+    renderNoRoteador(
+      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+        <NewSolicitacaoWizard />
+      </ComAcesso>
     );
     await irParaParticipantesESelecionarFormador();
     fireEvent.click(screen.getByTestId('cb-municipio')); // no passo 2, o único ComboBox é o do responsável
@@ -344,12 +332,10 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
         },
       },
     });
-    render(
-      <MemoryRouter>
-        <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
-          <NewSolicitacaoWizard />
-        </ComAcesso>
-      </MemoryRouter>
+    renderNoRoteador(
+      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+        <NewSolicitacaoWizard />
+      </ComAcesso>
     );
     await irParaParticipantesESelecionarFormador();
     fireEvent.click(screen.getByTestId('cb-municipio'));
@@ -376,12 +362,10 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
   });
 
   test('avançar do passo Participantes com as respostas chega ao passo Detalhes (guarda do P0)', async () => {
-    render(
-      <MemoryRouter>
-        <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
-          <NewSolicitacaoWizard />
-        </ComAcesso>
-      </MemoryRouter>
+    renderNoRoteador(
+      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+        <NewSolicitacaoWizard />
+      </ComAcesso>
     );
     await irParaParticipantesESelecionarFormador();
     // Quem cria aqui não tem a função Coordenador: escolhe o responsável e responde se acompanha.

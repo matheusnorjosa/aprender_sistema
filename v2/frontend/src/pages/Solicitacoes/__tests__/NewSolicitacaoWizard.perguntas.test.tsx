@@ -12,9 +12,11 @@
  * - Trocar o projeto limpa formadores e responsável (PR 9, P9-5: só pessoas da gerência do projeto).
  */
 import { useEffect } from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { MemoryRouter } from 'react-router';
+import Modal from 'antd/es/modal';
+
+import { enderecoAtual, renderNoRoteador } from '../../../test/comRoteador';
 
 const {
   createSolicitacaoMock,
@@ -23,7 +25,6 @@ const {
   lookupMunicipiosWithFiltersMock,
   lookupProjetosMock,
   lookupTiposEventoMock,
-  navigateMock,
   formadoresEscolhidos,
   lookupUsuariosMock,
   formadoresPickerProps,
@@ -34,16 +35,11 @@ const {
   lookupMunicipiosWithFiltersMock: vi.fn(),
   lookupProjetosMock: vi.fn(),
   lookupTiposEventoMock: vi.fn(),
-  navigateMock: vi.fn(),
   formadoresEscolhidos: { atual: [] as Array<{ id: number; label: string; avaliavel?: boolean }> },
   lookupUsuariosMock: vi.fn(),
   formadoresPickerProps: { projetoIds: [] as unknown[] },
 }));
 
-vi.mock('react-router', async () => {
-  const actual = await vi.importActual('react-router');
-  return { ...actual, useNavigate: () => navigateMock };
-});
 vi.mock('../../../api/solicitacoes', () => ({ createSolicitacao: createSolicitacaoMock }));
 vi.mock('../../../api/availability', () => ({
   getMe: getMeMock,
@@ -138,12 +134,8 @@ const SEM_FUNCAO_COORDENADOR = {
 const AVALIAVEL = { id: 99, label: 'Bruno Formador', avaliavel: true };
 const NAO_AVALIAVEL = { id: 98, label: 'Celia Coordenadora', avaliavel: false };
 
-function renderWizard(): void {
-  render(
-    <MemoryRouter>
-      <NewSolicitacaoWizard />
-    </MemoryRouter>
-  );
+function renderWizard(): ReturnType<typeof renderNoRoteador>['router'] {
+  return renderNoRoteador(<NewSolicitacaoWizard />, { em: '/solicitacoes/nova' }).router;
 }
 
 async function irParaParticipantes(): Promise<void> {
@@ -315,6 +307,25 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     expect(payload.coordenador_acompanha).toBe(true);
     expect(payload.pretende_avaliar_formador).toBe(false);
     expect(payload.extra_participants).toEqual({ formador_ids: [99] });
+  });
+
+  // Item 36: sair do assistente com algo preenchido pergunta; depois do envio com sucesso, não
+  // (o que foi preenchido virou a solicitação).
+  test('depois de enviar com sucesso, vai para Minhas Solicitações sem perguntar', async () => {
+    const confirmar = vi.spyOn(Modal, 'confirm');
+    const router = renderWizard();
+    await irParaParticipantes();
+    responder(ACOMPANHA, 'Não');
+    responder(AVALIAR, 'Não');
+    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
+    await screen.findByLabelText('Local do Evento');
+    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
+    await screen.findByText('Revise sua solicitação');
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar Solicitação/i }));
+
+    await waitFor(() => expect(enderecoAtual(router)).toBe('/solicitacoes/minhas'));
+    expect(confirmar).not.toHaveBeenCalled();
+    confirmar.mockRestore();
   });
 
   test('trocar o projeto limpa os formadores e o responsável já escolhidos (PR 9, P9-5)', async () => {

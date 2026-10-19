@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { MemoryRouter } from 'react-router';
+import Modal from 'antd/es/modal';
 
 import { ComAcesso } from '../../../test/comAcesso';
 
@@ -229,5 +230,54 @@ describe('NewSolicitacaoWizard - filtros dependentes municipio/projeto', () => {
       expect(getMeMock).toHaveBeenCalled();
       expect(lookupProjetosMock).toHaveBeenLastCalledWith('', { com_compra: true });
     });
+  });
+});
+
+describe('NewSolicitacaoWizard - sair do assistente (item 36)', { timeout: 20000 }, () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    lookupProjetosMock.mockResolvedValue([]);
+    lookupTiposEventoMock.mockResolvedValue([]);
+    lookupMunicipiosWithFiltersMock.mockResolvedValue([]);
+    getMeMock.mockResolvedValue({ is_superuser: false });
+  });
+
+  const sair = () => screen.getByRole('button', { name: /Voltar para Minhas Solicitações/i });
+
+  test('sem nada preenchido, sai direto para Minhas Solicitações', async () => {
+    render(
+      <MemoryRouter>
+        <NewSolicitacaoWizard />
+      </MemoryRouter>
+    );
+    await screen.findByRole('button', { name: 'Busque ou selecione um projeto' });
+    fireEvent.click(sair());
+    expect(navigateMock).toHaveBeenCalledWith('/solicitacoes/minhas');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  test('com algo preenchido, pergunta antes de descartar, começando no Cancelar', async () => {
+    const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    render(
+      <MemoryRouter>
+        <NewSolicitacaoWizard />
+      </MemoryRouter>
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Busque ou selecione um projeto' }));
+    fireEvent.click(sair());
+
+    expect(confirmar).toHaveBeenCalledTimes(1);
+    const opcoes = confirmar.mock.calls[0]![0];
+    expect(opcoes).toMatchObject({
+      title: 'Sair sem criar a solicitação?',
+      content: 'O que você preencheu será perdido.',
+      okText: 'Sair e descartar',
+      cancelText: 'Continuar preenchendo',
+      autoFocusButton: 'cancel',
+    });
+    expect(navigateMock).not.toHaveBeenCalled();
+    void opcoes.onOk?.();
+    expect(navigateMock).toHaveBeenCalledWith('/solicitacoes/minhas');
+    confirmar.mockRestore();
   });
 });

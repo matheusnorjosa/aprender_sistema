@@ -44,7 +44,7 @@ export class SolicitacaoWizardPage extends BasePage {
 
   /** Navegação de volta para listagem (fora do wizard propriamente dito). */
   get btnVoltarListagem(): Locator {
-    return this.page.getByRole('button', { name: 'Voltar para minhas solicitacoes' });
+    return this.page.getByRole('button', { name: 'Voltar para Minhas Solicitações' });
   }
 
   /** Lista de passos visíveis (usa AntD Steps — usamos aria-label do `<nav>`). */

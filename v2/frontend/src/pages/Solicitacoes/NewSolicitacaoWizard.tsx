@@ -19,6 +19,7 @@ import Input from 'antd/es/input';
 import Button from 'antd/es/button';
 import Card from 'antd/es/card';
 import Alert from 'antd/es/alert';
+import Modal from 'antd/es/modal';
 import message from 'antd/es/message';
 import Typography from 'antd/es/typography';
 import Descriptions from 'antd/es/descriptions';
@@ -124,6 +125,30 @@ interface FormDataType {
   is_online: boolean;
 }
 
+/** Formulário vazio: o estado inicial e a régua de "tem algo preenchido" ao sair. */
+const FORM_INICIAL: FormDataType = {
+  // Passo 1
+  projeto: null,
+  tipoEvento: null,
+  municipio: null,
+  inicio: null,
+  fim: null,
+  // Passo 2
+  formadores: [],
+  coordenadorResponsavel: null,
+  coordenadorAcompanha: null,
+  pretendeAvaliar: null,
+  formadorAvaliado: null,
+  // Passo 3
+  tipo: '',
+  encontro: '',
+  segmento: '',
+  observacoes: '',
+  local: '',
+  // PR19: Modalidade online/presencial
+  is_online: false,
+};
+
 /** Range value type */
 interface RangeValueType {
   date: string;
@@ -214,28 +239,27 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   const [erroHorario, setErroHorario] = useState<string | null>(null);
 
   // Estado do formulário
-  const [formData, setFormData] = useState<FormDataType>({
-    // Passo 1
-    projeto: null,
-    tipoEvento: null,
-    municipio: null,
-    inicio: null,
-    fim: null,
-    // Passo 2
-    formadores: [],
-    coordenadorResponsavel: null,
-    coordenadorAcompanha: null,
-    pretendeAvaliar: null,
-    formadorAvaliado: null,
-    // Passo 3
-    tipo: '',
-    encontro: '',
-    segmento: '',
-    observacoes: '',
-    local: '',
-    // PR19: Modalidade online/presencial
-    is_online: false,
-  });
+  const [formData, setFormData] = useState<FormDataType>(FORM_INICIAL);
+
+  // Sair do assistente descarta o que foi preenchido: com algo preenchido, pergunta antes,
+  // começando no Cancelar (ação destrutiva, ux-principios).
+  const sairDoAssistente = (): void => {
+    if (JSON.stringify(formData) === JSON.stringify(FORM_INICIAL)) {
+      void navigate('/solicitacoes/minhas');
+      return;
+    }
+    Modal.confirm({
+      title: 'Sair sem criar a solicitação?',
+      content: 'O que você preencheu será perdido.',
+      okText: 'Sair e descartar',
+      okType: 'danger',
+      cancelText: 'Continuar preenchendo',
+      autoFocusButton: 'cancel',
+      onOk: () => {
+        void navigate('/solicitacoes/minhas');
+      },
+    });
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -987,13 +1011,9 @@ export default function NewSolicitacaoWizard(): JSX.Element {
       <Card>
         {/* Header semantico com navegacao e titulo */}
         <header>
-          <Button
-            icon={<ArrowLeftOutlined />}
-            onClick={() => navigate('/solicitacoes/minhas')}
-            className="mb-4"
-            aria-label="Voltar para minhas solicitacoes"
-          >
-            Voltar
+          {/* Sai do assistente (o "Anterior" do rodapé volta um passo): o texto diz para onde. */}
+          <Button icon={<ArrowLeftOutlined />} onClick={sairDoAssistente} className="mb-4">
+            Voltar para Minhas Solicitações
           </Button>
 
           <Title level={2} className="mb-2" id="nova-solicitacao-title">Nova Solicitação</Title>

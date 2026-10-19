@@ -61,10 +61,8 @@ import {
   approveSolicitacoesBatch,
   rejectSolicitacoesBatch,
 } from '../../api/solicitacoes';
-import { getMyPolicies } from '../../api/me';
 import { getMe } from '../../api/availability';
-import { computeCapabilities } from '../../hooks/useCapabilities';
-import { ehSuperusuario } from '../../contexts/AcessoContext';
+import { ehSuperusuario, useAcesso } from '../../contexts/AcessoContext';
 import { TIMING } from '../../constants/timing';
 import { usePolling } from '../../hooks/usePolling';
 import { syncChannel } from '../../services/syncChannel';
@@ -166,8 +164,10 @@ export default function ApprovalsPage(): JSX.Element {
   const [previewVisible, setPreviewVisible] = useState<boolean>(false);
   const [previewData, setPreviewData] = useState<PreviewDataType | null>(null);
 
-  // PA-06: permissão de aprovar (policy `access_solicitation_approvals`)
-  const [canApprove, setCanApprove] = useState<boolean>(false);
+  // PA-06: permissão de aprovar (policy `access_solicitation_approvals`), do acesso da sessão:
+  // a mesma policy que abriu a rota. Uma 2ª busca aqui podia falhar sozinha e sumir com os
+  // botões sem aviso (achado do item 36, 19/10/2026).
+  const canApprove = useAcesso().caps.canAccessApprovals;
   // PA-02 (segregação): usuário logado, para reconhecer a própria solicitação
   const [me, setMe] = useState<CurrentUser | null>(null);
 
@@ -278,27 +278,12 @@ export default function ApprovalsPage(): JSX.Element {
     return () => { unsub1(); unsub2(); };
   }, [loadData]);
 
-  // PA-06 + PR 3 hardening RBAC (#1308) + PR 10 hardening RBAC (2026-04-30):
-  // a fonte exclusiva de autorização passou a ser a policy pública
-  // `access_solicitation_approvals` (gerência da Superintendência, DAT ou
-  // Controle; SSOT `solicitation_approval_basis`). Legacy `can_approve_super`
-  // deixou de ser consultado pelo frontend.
-  // PR B1: `getMe()` em paralelo, para a regra de segregação (PA-02) na tabela.
+  // PA-02 (segregação): o usuário logado, para reconhecer a própria solicitação na tabela.
+  // A permissão de aprovar não sai daqui: vem do AcessoContext (acima).
   useEffect(() => {
-    const loadAccess = async (): Promise<void> => {
-      try {
-        const [policies, currentUser] = await Promise.all([
-          getMyPolicies().catch(() => [] as string[]),
-          getMe().catch(() => null),
-        ]);
-        setCanApprove(computeCapabilities(policies).canAccessApprovals);
-        setMe(currentUser);
-      } catch (error) {
-        logger.error('Erro ao carregar policies:', error);
-        setCanApprove(false);
-      }
-    };
-    void loadAccess();
+    getMe()
+      .then(setMe)
+      .catch((error: unknown) => logger.error('Erro ao carregar o usuário:', error));
   }, []);
 
   // PA-02 (segregação): quem criou não decide a própria; superusuário pode (fica no AuditLog).

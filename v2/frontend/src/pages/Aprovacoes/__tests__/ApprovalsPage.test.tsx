@@ -4,7 +4,7 @@
  * Cobertura (presença/estado, sem dirigir fluxo assíncrono nem Modal.confirm):
  * - Título "Aprovações" + filtros renderizam; polling é o mock (não roda de verdade).
  * - Estado vazio: tabela renderiza sem linhas de ação de aprovar.
- * - Sem permissão (policies = []): botão "Aprovar" ausente mesmo com pendente.
+ * - Sem permissão (acesso sem a policy): botão "Aprovar" ausente mesmo com pendente.
  * - Com permissão (`access_solicitation_approvals`): botão "Aprovar" presente.
  * - PR B1 (PA-02 segregação): a linha da PRÓPRIA solicitação sai sem checkbox e sem
  *   Aprovar/Reprovar, com a Tag "Sua solicitação" (a de outra pessoa segue normal).
@@ -16,14 +16,15 @@
  * Sem isso, o fetch rejeita no jsdom e loga async no teardown do worker →
  * EnvironmentTeardownError, reprovando o CI mesmo com asserts verdes.
  * `usePolling` também é mockado (no-op) para não disparar polling real.
- * `computeCapabilities` fica REAL — a permissão é dirigida via as
- * policies mockadas, exercitando a tradução policy → canApprove de verdade.
+ * A permissão vem do `AcessoContext` (as policies da sessão, como no App): `renderPage(APROVA)`.
+ * `computeCapabilities` fica REAL (via `montarAcesso`), exercitando policy → canApprove.
  */
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { message, Modal } from 'antd';
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MemoryRouter } from 'react-router';
+import { AcessoContext, montarAcesso } from '../../../contexts/AcessoContext';
 import type { CurrentUser, PaginatedResponse, Solicitacao, SolicitacaoFilters } from '../../../types';
 
 vi.mock('../../../api/solicitacoes', () => ({
@@ -106,11 +107,20 @@ function meUser(overrides: Partial<CurrentUser> = {}): CurrentUser {
   };
 }
 
-function renderPage(): ReturnType<typeof render> {
+/** Policy que abre a rota e dá Aprovar/Reprovar. */
+const APROVA = ['access_solicitation_approvals'];
+
+/**
+ * A permissão vem do acesso da sessão (`AcessoContext`, as policies que liberaram a rota),
+ * como no App: `policies` é o que `/api/me/policies/` devolveu no login.
+ */
+function renderPage(policies: readonly string[] = []): ReturnType<typeof render> {
   return render(
-    <MemoryRouter>
-      <ApprovalsPage />
-    </MemoryRouter>,
+    <AcessoContext.Provider value={montarAcesso(policies, null)}>
+      <MemoryRouter>
+        <ApprovalsPage />
+      </MemoryRouter>
+    </AcessoContext.Provider>,
   );
 }
 
@@ -164,7 +174,6 @@ describe('ApprovalsPage', () => {
       previous: null,
       results: [pendingRow()],
     });
-    vi.mocked(getMyPolicies).mockResolvedValue([]);
 
     renderPage();
 
@@ -215,9 +224,8 @@ describe('ApprovalsPage', () => {
       previous: null,
       results: [pendingRow()],
     });
-    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
 
-    renderPage();
+    renderPage(APROVA);
 
     // Espera a LINHA renderizar (query de texto, rápida) e então os botões de ação
     // DENTRO da tabela. canApprove vem de computeCapabilities(policies) real. `findByRole`
@@ -237,6 +245,18 @@ describe('ApprovalsPage', () => {
     ).toBeInTheDocument();
   }, 20000);
 
+  test('a permissão vem do acesso da sessão: falha do /me/policies não some com Aprovar/Reprovar', async () => {
+    vi.mocked(listSolicitacoes).mockResolvedValue({ count: 1, next: null, previous: null, results: [pendingRow()] });
+    // Rede oscilou na 2ª busca das policies: a sessão já tem a policy (foi ela que abriu a rota).
+    vi.mocked(getMyPolicies).mockRejectedValue(new Error('Failed to fetch'));
+
+    renderPage(APROVA);
+
+    const linha = (await screen.findByText('MunicipioTesteAlfa')).closest('tr') as HTMLElement;
+    expect(await within(linha).findByRole('button', { name: /Aprovar/i }, { timeout: 10000 })).toBeInTheDocument();
+    expect(within(linha).getByRole('button', { name: /Reprovar/i })).toBeInTheDocument();
+  }, 20000);
+
   test('linha própria: sem checkbox e sem Aprovar/Reprovar, com a Tag "Sua solicitação"', async () => {
     vi.mocked(listSolicitacoes).mockResolvedValue({
       count: 2,
@@ -247,10 +267,9 @@ describe('ApprovalsPage', () => {
         pendingRow({ id: 2, usuario: 5, municipio_nome: 'MunicipioAlheio' }),
       ],
     });
-    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
     vi.mocked(getMe).mockResolvedValue(meUser({ id: 99 }));
 
-    renderPage();
+    renderPage(APROVA);
 
     const propria = (await screen.findByText('MunicipioProprio')).closest('tr');
     const alheia = screen.getByText('MunicipioAlheio').closest('tr');
@@ -283,10 +302,9 @@ describe('ApprovalsPage', () => {
         pendingRow({ id: 2, usuario: 6, municipio_nome: 'MunicipioLivre', decisao_impedida: null }),
       ],
     });
-    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
     vi.mocked(getMe).mockResolvedValue(meUser({ id: 99 }));
 
-    renderPage();
+    renderPage(APROVA);
 
     const impedida = (await screen.findByText('MunicipioImpedido')).closest('tr') as HTMLElement;
     const livre = screen.getByText('MunicipioLivre').closest('tr') as HTMLElement;
@@ -307,10 +325,9 @@ describe('ApprovalsPage', () => {
       previous: null,
       results: [pendingRow({ id: 1, usuario: 99, municipio_nome: 'MunicipioProprio' })],
     });
-    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
     vi.mocked(getMe).mockResolvedValue(meUser({ id: 99, is_superuser: true }));
 
-    renderPage();
+    renderPage(APROVA);
 
     const linha = within((await screen.findByText('MunicipioProprio')).closest('tr') as HTMLElement);
     await linha.findByRole('button', { name: /Aprovar/i }, { timeout: 10000 });
@@ -356,9 +373,8 @@ describe('ApprovalsPage', () => {
   test('trocar de página busca a página no servidor e limpa a seleção', async () => {
     vi.mocked(listSolicitacoes).mockImplementation((filters = {}) =>
       Promise.resolve(filters.page === 2 ? pagina(20, 45, 21) : pagina(20, 45)));
-    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
 
-    renderPage();
+    renderPage(APROVA);
 
     const linha = (await screen.findByText('Municipio1')).closest('tr') as HTMLElement;
     fireEvent.click(await within(linha).findByRole('checkbox', {}, { timeout: 10000 }));
@@ -438,9 +454,8 @@ describe('ApprovalsPage', () => {
 
   test('polling tira da seleção o item que saiu da lista (sem chave órfã)', async () => {
     vi.mocked(listSolicitacoes).mockResolvedValue(pagina(2, 2));
-    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
 
-    renderPage();
+    renderPage(APROVA);
 
     const linha = (await screen.findByText('Municipio2')).closest('tr') as HTMLElement;
     fireEvent.click(await within(linha).findByRole('checkbox', {}, { timeout: 10000 }));
@@ -642,7 +657,6 @@ describe('ApprovalsPage', () => {
 
   test('lote com erros lista o evento e o motivo de cada um', async () => {
     vi.mocked(listSolicitacoes).mockResolvedValue(pagina(2, 2));
-    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
     vi.mocked(approveSolicitacoesBatch).mockResolvedValue({
       approved: 1,
       errors: [
@@ -651,7 +665,7 @@ describe('ApprovalsPage', () => {
       ],
     });
 
-    renderPage();
+    renderPage(APROVA);
 
     for (const municipio of ['Municipio1', 'Municipio2']) {
       const linha = (await screen.findByText(municipio)).closest('tr') as HTMLElement;
@@ -673,7 +687,6 @@ describe('ApprovalsPage', () => {
   test('aprovar um com conflito de agenda mostra quem e por quê', async () => {
     const erro = vi.spyOn(message, 'error');
     vi.mocked(listSolicitacoes).mockResolvedValue(pagina(1, 1));
-    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
     vi.mocked(approveSolicitacao).mockRejectedValue(Object.assign(new Error(DETALHE_CONFLITO), {
       status: 400,
       response: {
@@ -682,7 +695,7 @@ describe('ApprovalsPage', () => {
       },
     }));
 
-    renderPage();
+    renderPage(APROVA);
 
     const linha = (await screen.findByText('Municipio1')).closest('tr') as HTMLElement;
     const confirmacao = vi.spyOn(Modal, 'confirm').mockImplementation(semModal);
@@ -705,13 +718,12 @@ describe('ApprovalsPage', () => {
   test('aprovar um com outro erro segue na mensagem curta', async () => {
     const erro = vi.spyOn(message, 'error');
     vi.mocked(listSolicitacoes).mockResolvedValue(pagina(1, 1));
-    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
     vi.mocked(approveSolicitacao).mockRejectedValue(Object.assign(new Error('Solicitação já aprovada.'), {
       status: 400,
       response: { status: 400, data: { code: 'already_approved', detail: 'Solicitação já aprovada.' } },
     }));
 
-    renderPage();
+    renderPage(APROVA);
 
     const linha = (await screen.findByText('Municipio1')).closest('tr') as HTMLElement;
     const confirmacao = vi.spyOn(Modal, 'confirm').mockImplementation(semModal);

@@ -129,7 +129,7 @@ O cancel também confere, antes de apagar, se a conta enxerga o calendário (`ca
 
 #### Comportamento do modo OAuth
 
-- **Pré-requisito**: quem publica conecta a PRÓPRIA conta Google via `GET /api/oauth/google/start/` (callback em `/api/oauth/google/callback/`): Controle e Superintendência (`use_gcal`) e a Apoio de Coordenação com setor vigente (`publish_setor_solicitacao`, #1656). A Apoio não escolhe calendário: publica no da organização (`GCAL_OAUTH_CALENDAR_ID`), então a conta conectada precisa do compartilhamento «Fazer alterações nos eventos» nesse calendário.
+- **Pré-requisito**: quem publica conecta a PRÓPRIA conta Google via `GET /api/oauth/google/start/` (callback em `/api/oauth/google/callback/`): Controle e DAT (`use_gcal`, que vem do pacote da gerência em `apps/core/services/rbac_pacotes.py`; a aprovadora da Superintendência aprova pelo vínculo GERENTE e não recebe `use_gcal`) e a Apoio de Coordenação com setor vigente (`publish_setor_solicitacao`, #1656). A Apoio não escolhe calendário: publica no da organização (`GCAL_OAUTH_CALENDAR_ID`), então a conta conectada precisa do compartilhamento «Fazer alterações nos eventos» nesse calendário.
 - **Fluxo de publicação**: ao publicar/resync na Pré-agenda, o sistema verifica a conexão. Sem conexão retorna **403 Forbidden** (UI mostra card/modal "Conectar conta Google"); com conexão enfileira a task Celery com `operator_user_id` e retorna **202 Accepted**.
 - **Governança**: `apply_blocked` continua dependendo de `GCAL_CLIENT='google'`.
 - **Verificação diária das contas** (#2039): às 05:00 o job `probe_google_credentials` força o refresh de cada credencial. Conta que o Google recusa (`invalid_grant`) é removida e a pessoa vê o aviso de reconectar; o Controle vê a lista no resumo de alertas do GCal. Erro de rede ou 5xx não remove nada. Ver §6, "Conta Google desconectada pelo sistema".
@@ -330,11 +330,10 @@ GET /api/solicitacoes/
   1. **"Entrar na reunião"** (primário, abre em nova aba)
   2. **"Copiar link"** (copia para clipboard com feedback)
 
-**3 locais integrados:**
+**4 locais integrados** (fonte: `grep -rl MeetLink v2/frontend/src`, fora o próprio componente e os testes):
 
-1. **`src/pages/Solicitacoes.tsx`** (drawer de detalhes):
-   - Campo "Reunião Online" com `<MeetLink href={selectedSolicitacao.meet_link} />`
-   - Exibido apenas se meet_link existir
+1. **`src/pages/MeusEventos/MeusEventosPage.tsx`** (coluna reunião):
+   - `<MeetLink href={meet_link} />` (retorna null se vazio)
 
 2. **`src/pages/PreAgenda/PreAgendaPage.tsx`** (coluna ações):
    - `<MeetLink href={record.meet_link} />` na coluna "Ações"
@@ -343,6 +342,9 @@ GET /api/solicitacoes/
 3. **`src/pages/Solicitacoes/MySolicitacoesPage.tsx`** (coluna reunião):
    - Coluna dedicada "Reunião"
    - `<MeetLink href={meet_link} />` (retorna null se vazio)
+
+4. **`src/pages/Solicitacoes/PublicacaoSetorPage.tsx`** (publicação da Apoio de Coordenação):
+   - `<MeetLink href={href} />` na coluna do link
 
 ## 4.5. Modalidade (Online x Presencial)
 

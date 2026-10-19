@@ -32,8 +32,8 @@ curl -X POST http://localhost:8000/api/auth/login/ \
   -H "X-CSRFToken: $CSRF" \
   -c cookies.txt \
   -d '{
-    "username": "admin",
-    "password": "admin123"
+    "username": "<CPF, só dígitos>",
+    "password": "<senha>"
   }'
 ```
 

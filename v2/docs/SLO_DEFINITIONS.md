@@ -54,7 +54,7 @@ SLOs são metas internas de qualidade de serviço que guiam decisões de arquite
 |----------|-----|-----|-----|-------|
 | `POST /api/solicitacoes/` | 200ms | 500ms | 1000ms | Criação com validações |
 | `PATCH /api/solicitacoes/{id}/` | 150ms | 400ms | 800ms | Atualização parcial |
-| `POST /api/solicitacoes/{id}/aprovar/` | 200ms | 500ms | 1000ms | Aprovação + audit log |
+| `PATCH /api/solicitacoes/{id}/approve/` | 200ms | 500ms | 1000ms | Aprovação + audit log |
 | `POST /api/availability-blocks/` | 100ms | 300ms | 500ms | Criar bloqueio |
 
 ### 2.3 Endpoints de Integração (GCal)

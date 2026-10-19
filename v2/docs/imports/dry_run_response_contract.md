@@ -48,7 +48,7 @@ Escopo: auditoria dos 11 services `*_import.py` existentes + proposta de contrat
 | Métrica | Valor |
 |---|---|
 | Services auditados | **11** |
-| Todos têm parâmetro `dry_run`? | ✅ Sim — todos aceitam `dry_run: bool` (default `True` em 8; `False` em 3 legacy) |
+| Todos têm parâmetro `dry_run`? | ✅ Sim — todos aceitam `dry_run: bool` (default `True` em 9; `False` só em `controle_acoes_import`, legacy — `colecoes_import` foi removido) |
 | Padrões de retorno distintos identificados | **2** ("dataclass legacy" + "dict aninhado moderno") |
 | Services com idempotência via `external_hash` (SHA1) | 4 (compras, ações controle, DAT cadastros, eventos) |
 | Services com idempotência via campo unique | 3 (usuarios=cpf, produtos=codigo, municipios=nome+uf) |
@@ -84,14 +84,14 @@ Escopo: auditoria dos 11 services `*_import.py` existentes + proposta de contrat
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 9 | `controle_imports.py` (**Compras**) | `POST /api/controle/import-compras/` | `ImportComprasView` (`views_controle_imports.py`) | `import_compras_from_file(*, path, dry_run=True, auto_create_municipios=False)` | `True` | **`CÓD`/`COD`/`Cód`/`id`/`ID`** (variantes), **`Produto`**, **`Quant.`/`Quant`/`Quantidade`**, **`Município`/`Municipio`**, **`UF`**, **`Data`**, **`Uso das coleções`/`Uso`** | `Compra` (FK `Municipio`, `Projeto`) | ✅ | ✅ (via `update_or_create`) | ❌ — `transaction.atomic()` única | `external_hash` SHA1 | `SHA1(municipio_id\|projeto_id\|codigo\|produto_norm\|quantidade\|data\|uso_norm)` | dataclass + `created_ids` + relatório JSON em `out_etl/import_compras_report.json` |
 | 10 | `controle_acoes_import.py` | `POST /api/controle/import-acoes/` | `ControleImportAcoesView` (`views_imports.py`) | `import_acoes_controle(file_path, dry_run=False)` | **`False`** ⚠️ | (não documentado em docstring; padrão Município, Projeto, Coordenador, datas) | `AcaoControle` | ✅ | ✅ (via `update_or_create`) | ✅ ASQ-016 | `external_hash` SHA1 | `SHA1(municipio_id\|projeto_id\|coordenador_id)` | dict aninhado **+ relatório JSON** em `out_etl/import_acoes_controle_report.json` |
-| 11 | `dat_cadastros_import.py` | `POST /api/dat/import-cadastros/` | `DATImportCadastrosView` (`views_imports.py`) | `import_dat_cadastros(file_path, dry_run=False)` | **`False`** ⚠️ | (não documentado em docstring; padrão Município, Projeto, Tipo de ação, Responsável) | `AcaoDAT` (+ FK `TipoAcaoDAT`) | ✅ | ✅ (via `update_or_create`) | ✅ ASQ-016 | `external_hash` SHA1 | `SHA1(municipio_id\|projeto_id\|tipo_acao\|responsavel_id)` | dict aninhado **+ relatório JSON** em `out_etl/import_dat_cadastros_report.json` |
+| 11 | `dat_cadastros_import.py` | `POST /api/dat/import-cadastros/` | `DATImportCadastrosView` (`views_imports.py`) | `import_dat_cadastros(file_path, dry_run=True)` | `True` (era `False` em 2026-07-24) | (não documentado em docstring; padrão Município, Projeto, Tipo de ação, Responsável) | `AcaoDAT` (+ FK `TipoAcaoDAT`) | ✅ | ✅ (via `update_or_create`) | ✅ ASQ-016 | `external_hash` SHA1 | `SHA1(municipio_id\|projeto_id\|tipo_acao\|responsavel_id)` | dict aninhado **+ relatório JSON** em `out_etl/import_dat_cadastros_report.json` |
 
 ### 2.3 Observações por inconsistência
 
 | Inconsistência | Services afetados | Risco |
 |---|---|---|
 | ~~**`dry_run` desconhecido = APPLY**~~ ✅ **RESOLVIDO** (`M04-05`, [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649)) | 12 sítios, agora via `parse_dry_run` | **Corrigido (fail-closed)** — `?dry_run=maybe` permanece em dry-run (preview). Só token de apply explícito grava |
-| **`dry_run` default `False`** em vez de `True` | `controle_acoes_import` (`services/controle_acoes_import.py:43`), `dat_cadastros_import` (`services/dat_cadastros_import.py:77`) | **Alto** — chamada interna sem keyword vai persistir. Endpoints externos passam o valor explicitamente, mas chamada Python direta é perigosa. Confirmado ainda vivo em 2026-07-24 |
+| **`dry_run` default `False`** em vez de `True` | `controle_acoes_import` (`import_acoes_controle`) | **Alto** — chamada interna sem keyword vai persistir. Endpoints externos passam o valor explicitamente, mas chamada Python direta é perigosa. Em 2026-10-19 só `controle_acoes_import` segue com default `False`; `dat_cadastros_import` (`import_dat_cadastros`) já tem default `True` |
 | **Nenhum import síncrono grava `AuditLog`** | todos os 10 endpoints síncronos | **Alto** — um apply não deixa rastro de quem rodou nem do que mudou. `AuditLog.Action` (`models/auditoria.py:72-73`) só tem `IMPORT_JOB_COMPLETED`/`IMPORT_JOB_FAILED`, emitidos apenas pelo caminho async em `tasks.py:634,669` (hoje só `bloqueios`) |
 | **Stats com 4 campos vs 4+aninhado** | `controle_imports` (dataclass `{created,updated,skipped,errors}`) vs demais (dict `{created,updated,unchanged,skipped:{...}}`) | Médio — frontend precisa branch lógica |
 | **`pendencias` com chaves diferentes** | Cada service define categorias próprias (`municipios`, `projetos`, `cpf_invalid`, `dates`, `usuarios`, `outros`, etc.) | Médio — frontend não pode tratar genericamente |
@@ -287,7 +287,7 @@ Critérios: complexidade, models afetados, dry_run real, idempotência, uso em p
 | `bloqueios_import.py` | Reconciliação por nome é frágil. Já tem **endpoint sync E async** (`ImportJob`). Bom candidato para validar contrato funcionar nas duas modalidades. |
 | `deslocamentos_import.py` | Reconciliação por nome/email. Endpoint sync não confirmado. |
 | `controle_acoes_import.py` | Legacy. Default `dry_run=False`. Grava JSON em disco. Migrar exige corrigir default. |
-| `dat_cadastros_import.py` | Legacy. Mesmas características de controle_acoes. Mapa `TipoAcaoDAT` complexo. |
+| `dat_cadastros_import.py` | Legacy. Mesmas características de controle_acoes, exceto o default (`dry_run=True` em `import_dat_cadastros`). Mapa `TipoAcaoDAT` complexo. |
 
 ### 5.3 Alto risco
 
@@ -329,7 +329,7 @@ Cada PR:
 6. `deslocamentos_import.py`
 7. `bloqueios_import.py` (cuidado: usado por endpoint sync **e** async via `ImportJob`)
 8. `controle_acoes_import.py` (corrigir `dry_run=False` default antes)
-9. `dat_cadastros_import.py` (corrigir `dry_run=False` default antes)
+9. `dat_cadastros_import.py` (default já é `dry_run=True`)
 
 ### Fase 4 — Migrar alto risco
 
@@ -352,7 +352,7 @@ Quem ler este documento consegue responder:
 | Quais retornam stats? | Todos os 11. Mas com shape diferente (4-campos vs 4+aninhado). Ver §3. |
 | Quais retornam pendências? | Todos os 11. Mas com chaves de categoria diferentes por service. Ver §2.3. |
 | Quais retornam erro por linha? | **Nenhum nativamente** — alguns colocam `linha`/`row` dentro do dict de pendência; nenhum tem array `rows[*]` com `row_number` estruturado. **Lacuna real para padronizar.** |
-| Quais têm dry_run real? | Todos os 11. **O parsing é fail-closed** desde [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649) (`M04-05`): valor desconhecido permanece em dry-run (preview), nunca apply — via `parse_dry_run` nos 12 sítios (ver bloco no topo). Além disso 2 services têm default `False` (`controle_acoes_import:43`, `dat_cadastros_import:77`) — risco se chamado via Python direto. |
+| Quais têm dry_run real? | Todos os 11. **O parsing é fail-closed** desde [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649) (`M04-05`): valor desconhecido permanece em dry-run (preview), nunca apply — via `parse_dry_run` nos 12 sítios (ver bloco no topo). Além disso 1 service tem default `False` (`import_acoes_controle` em `controle_acoes_import`) — risco se chamado via Python direto. `import_dat_cadastros` já tem default `True`. |
 | O apply fica auditado? | **Não.** Nenhum endpoint síncrono grava `AuditLog` — ver §2.3. Só o caminho async (`ImportJob` → `tasks.py:634,669`, hoje só `bloqueios`) registra. |
 | Quais têm idempotência? | **Todos** — 4 via SHA1 explícito (compras, ações controle, DAT cadastros, eventos), 3 via campo unique (usuarios=cpf, produtos=codigo, municipios=nome+uf), 4 via tupla natural sem hash visível (bloqueios, colecoes, equipe_gerencia, deslocamentos). |
 | Quais podem ser migrados para `ImportJob` async? | **Todos os 11**, conforme comentário em `apps/core/models/import_job.py:41-44`. Hoje só `bloqueios` está async (piloto ASQ-005 Fase 1). |
@@ -370,7 +370,7 @@ Quem ler este documento consegue responder:
 | ~~Shape final de `bloqueios_import.py` apply~~ | ✅ **Resolvido 2026-07-24**: **não há `external_hash`.** Idempotência é filtro pela tupla natural `(usuario, inicio, fim, tipo)` (`services/bloqueios_import.py`, `_process_row`). O bloco é criado com `status="aprovado"` e **sem `created_by`**. |
 | `_process_row` de `colecoes_import.py`, `municipios_import.py`, `produtos_import.py`, `equipe_gerencia_import.py`, `deslocamentos_import.py` | Confirmar exatamente quais campos vão para `pendencias.outros` vs categorias específicas. |
 | ~~Endpoint sync de **`deslocamentos`**~~ | ✅ **Resolvido 2026-07-24**: rota `deslocamentos/import/` → `ImportDeslocamentosView` (`apps/core/urls.py:76,235-236`). |
-| Default `dry_run=False` em `controle_acoes_import` e `dat_cadastros_import` | **Ainda aberto em 2026-07-24** (`controle_acoes_import.py:43`, `dat_cadastros_import.py:77`). Decidir se é bug a corrigir ou intencional (Makefile chama com `?dry_run=true\|false` explícito). |
+| Default `dry_run=False` em `controle_acoes_import` | **Ainda aberto em 2026-10-19** só em `controle_acoes_import` (`import_acoes_controle`); `dat_cadastros_import` (`import_dat_cadastros`) já tem default `True`. Decidir se é bug a corrigir ou intencional (Makefile chama com `?dry_run=true\|false` explícito). |
 | ~~Parsing de `dry_run` nas 11 views~~ | ✅ **Resolvido — `M04-05` / [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649) (2026-08-25).** `parse_dry_run` fail-closed (valor desconhecido permanece em dry-run/preview), wired em 12 views via `apps.core.imports.request_params.parse_dry_run`. Ver bloco no topo. |
 
 ---
@@ -381,7 +381,7 @@ Quem ler este documento consegue responder:
 2. **Preview das primeiras 50 linhas**: implementar como opt-in (`?preview=true`) ou sempre?
 3. **`import_hash` por linha em dry-run**: aceita esforço extra para auditoria pré-apply ou só após apply?
 4. **`out_etl/*_report.json` (legacy)**: continuar gravando mesmo após migração para contrato novo, ou descontinuar?
-5. **`controle_acoes_import` e `dat_cadastros_import` com default `dry_run=False`**: corrigir agora (PR de runtime separada) ou esperar migração ao contrato novo?
+5. **`controle_acoes_import` com default `dry_run=False`** (`dat_cadastros_import` já tem default `True`): corrigir agora (PR de runtime separada) ou esperar migração ao contrato novo?
 6. **Cabeçalhos com acento (`CÓD`, `Município`, `Uso das coleções`)**: manter aceitação de variantes ou forçar snake_case nos templates (mais limpo)?
 
 ---

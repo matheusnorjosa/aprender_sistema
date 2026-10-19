@@ -102,14 +102,15 @@ AuditLog.objects.create(
 ```
 
 #### 3. Testes Obrigatórios (PA-07)
-- **Arquivo**: `v2/backend/apps/core/tests/test_approval_policy_PA.py` (372 linhas)
-- **6 testes implementados e passando**:
+- **Arquivo**: `v2/backend/apps/core/tests/test_approval_policy_PA.py`
+- **7 testes implementados e passando** (o 7º entrou no PR 10 das permissões):
   1. `test_never_auto_approves_on_clean_or_save` - Valida PA-01
   2. `test_only_superintendencia_can_approve_or_reject` - Valida PA-02
   3. `test_non_privileged_user_gets_403_on_approval_endpoint` - Valida PA-02 (complementar)
   4. `test_calendar_integration_not_called_before_approval` - Valida PA-03
   5. `test_calendar_integration_is_called_after_approval` - Valida PA-03 (lado positivo)
   6. `test_approval_flow_records_audit_log` - Valida PA-05
+  7. `test_segregacao_conta_alterada_bloqueia_decisao` - Valida a segregação (`decisoes_impedidas`) na decisão
 
 ### Frontend (React)
 
@@ -129,6 +130,8 @@ AuditLog.objects.create(
 - **Conformidade ISO 9241-110**: Controle explícito (usuário vê apenas ações permitidas)
 
 ## Resultados dos Testes
+
+> Saída registrada no PR17, com os 6 testes da época. Hoje o arquivo tem 7 (ver lista acima).
 
 ```bash
 cd v2/infra && docker compose exec -T web pytest apps/core/tests/test_approval_policy_PA.py -v
@@ -156,7 +159,7 @@ test_approval_policy_PA.py::test_approval_flow_records_audit_log PASSED
 | **PA-04** | ✅ | Campo `status` com `default="pendente"` | `Solicitacao.status` (`models/solicitacao.py`) |
 | **PA-05** | ✅ | `AuditLog.objects.create()` em approve/reject | `approve_solicitacao`/`reject_solicitacao` (`services/solicitacao_approval.py`) |
 | **PA-06** | ✅ | Botões gateados por policy `access_solicitation_approvals` | `ApprovalsPage.tsx` |
-| **PA-07** | ✅ | **6** funções de teste (372 linhas) | as funções de teste em `tests/test_approval_policy_PA.py` |
+| **PA-07** | ✅ | **7** funções de teste | as funções de teste em `tests/test_approval_policy_PA.py` |
 
 ## ✅ Atualização #1452 (2026-07-16): a aprovação manual **revalida** conflitos
 
@@ -192,7 +195,7 @@ continua sendo a ferramenta de consulta, mas deixou de ser a única barreira.
 **Backend**:
 - ~~`v2/backend/apps/core/models.py`~~ → `apps/core/services/solicitacao_create.py`
 - ~~`v2/backend/apps/core/views.py`~~ → `apps/core/views_solicitacao.py` + `apps/core/services/solicitacao_approval.py`
-- `v2/backend/apps/core/tests/test_approval_policy_PA.py` (hoje 372 linhas, 6 testes)
+- `v2/backend/apps/core/tests/test_approval_policy_PA.py` (hoje 7 testes)
 
 **Frontend**:
 - ~~`.../ApprovalsPage.jsx`~~ → `v2/frontend/src/pages/Aprovacoes/ApprovalsPage.tsx`

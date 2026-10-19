@@ -35,8 +35,8 @@ docker exec aprender_dev-web-1 pytest apps/core/tests/test_<module>.py::TestClas
 # Specific frontend test
 cd v2/frontend && npx vitest run src/path/to.test.tsx
 
-# E2E suite (Playwright; specs in tests/playwright/e2e/)
-make test-e2e
+# E2E suite (Playwright; journeys mantidas em v2/frontend/e2e/ — journeys/, checklist/; é o que a CI roda)
+cd v2/frontend && npm run test:e2e
 ```
 
 **If not reproducible on demand:**
@@ -142,8 +142,8 @@ cd v2/backend && pyright apps/core config
 # Frontend
 cd v2/frontend && npx vitest run && npm run build
 
-# E2E smoke
-make test-e2e
+# E2E smoke (v2/frontend/e2e)
+cd v2/frontend && npm run test:e2e
 ```
 
 ## AS v2 patterns, fallbacks, instrumentation

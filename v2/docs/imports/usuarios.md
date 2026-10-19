@@ -134,7 +134,7 @@ normalize_cpf(cpf) + "|" + normalize_email(email)
 | **Service** | `apps/core/services/usuarios_import.py` | `import_usuarios_from_file(*, path: str, dry_run: bool = True, actor: Any = None) -> dict` | ✅ **já implementado** |
 | **Endpoint síncrono** | `POST /api/usuarios/import/` (`ImportUsuariosView` em `apps/core/views_import_usuarios.py`) | dry_run via query param `?dry_run=true\|false`; multipart `file=` no body | ✅ **já funciona** |
 | Endpoint async | (não implementado para usuarios) | ASQ-005 Fase 1 só cobre `bloqueios`; Fase 2 migrará usuarios | ⏳ Fase 2 do ImportJob |
-| Gate RBAC efetivo | `IsAuthenticated + HasPerm("manage_admin_registries")` | DAT + Diretoria (via cap `manage_admin_registries`) — **NÃO** `import_spreadsheet` | ✅ aplicado em prod |
+| Gate RBAC efetivo | `IsAuthenticated + SuperuserOnly` (D20, decisão do dono de 02/10/2026) | Só superusuário; quem não é toma 403 e não importa nada. DAT e Diretoria **não** chegam ao endpoint | ✅ aplicado em prod |
 | Validação de upload | `apps.core.upload_validators.validate_upload` | Magic bytes + tamanho + content-type | ✅ existe |
 | Reconciliação | (não usa `resolvers.py` — Usuario é destino, não FK alvo) | — | — |
 
@@ -174,12 +174,15 @@ Desde o PR 12 (D27), com `RBAC_FONTE=lotacao` (padrão), o grupo Django é **eti
 capacidade, tela e aprovação vêm do superusuário e do vínculo `EquipeGerencia` vigente
 (pacote do perfil da gerência + direitos do papel). Nenhum grupo aprova (PR 11, D26). O
 gate continua porque, na volta de emergência `RBAC_FONTE=uniao`, os grupos voltam a somar
-capacidade. `manage_admin_registries` — a capability que abre o endpoint — é
-**operacional** (cadastro), então o import **não** é caminho para conceder privilégio.
+capacidade. Desde D20 (02/10/2026) o endpoint é `IsAuthenticated + SuperuserOnly`
+(`ImportUsuariosView`): nenhum ator não-superusuário chega ao import pela tela.
 
 - Ator **superusuário**: a coluna `grupos` é aplicada normalmente.
-- Ator **não-superusuário**: a coluna é ignorada por completo, e cada linha afetada
-  sai em `pendencias["grupos_ignorados"]`. Os demais campos são importados normalmente.
+- Ator **não-superusuário**: hoje não existe pelo endpoint (403 antes do service). A
+  regra continua no service (`import_usuarios_from_file`) como defesa em profundidade
+  e só voltaria a valer se o gate abrir: a coluna seria ignorada por completo, cada
+  linha afetada sairia em `pendencias["grupos_ignorados"]` e os demais campos seriam
+  importados.
 - **Fail-closed**: chamada sem `actor` não atribui grupo nenhum. Um caller novo que
   esquecer de passar `actor=` verá os grupos silenciosamente descartados.
 - Nome de grupo **inexistente** no banco sai em `pendencias["grupos_desconhecidos"]`,

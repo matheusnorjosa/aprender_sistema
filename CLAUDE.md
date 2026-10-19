@@ -13,7 +13,7 @@ obrigatória, e não deve ser tratado como mapa de arquitetura.
 > responder qualquer pergunta de arquitetura. A auditoria de 2026-08-24 mediu o
 > custo dessa instrução:
 >
-> - **O grafo não está no git** (`.gitignore:619`). Em clone limpo ou CI, a
+> - **O grafo não está no git** (padrão `graphify-out/` no `.gitignore`). Em clone limpo ou CI, a
 >   instrução apontava para o vazio.
 > - **`graphify-out/wiki/index.md` não existe.** A regra mandava navegá-lo.
 > - **Seis dos dez «god nodes»** que ele apresenta como *core abstractions* são

@@ -63,7 +63,7 @@ server-defs de `.mcp.json`; mover p/ lá + restart p/ ativar): postgres (use
 
 ```text
 v2/backend/apps/
-  core/           42 models, serializers/, services/
+  core/           39 models, serializers/, services/
   dev_tools/      15 seed commands (prod disabled)
 
 v2/frontend/src/

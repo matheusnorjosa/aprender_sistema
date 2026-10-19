@@ -216,7 +216,7 @@ def typescript_code_context(tool_input: dict) -> str:
     if "pages/" in file_path:
         parts.append("### Page Component Guidelines")
         parts.append("- All pages must be lazy-loaded via React.lazy()")
-        parts.append("- Use `usePermissions()` hook for RBAC checks")
+        parts.append("- Use `useCapabilities()` (policies de /api/me/policies/) para gates de tela; a decisão é do backend")
         parts.append("- Mobile responsive: check `useResponsive()` hook")
 
     elif "api/" in file_path:

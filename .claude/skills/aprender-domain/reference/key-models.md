@@ -4,7 +4,7 @@
 
 **SSOT**: Substitui a planilha "Usuários"
 **Fields**: cpf (UK), telefone, cargo, groups (Django RBAC)
-**Groups (RBAC SSOT)**:
+**Groups (etiquetas; o poder vem da lotação, PR 12)**: com `RBAC_FONTE="lotacao"` (padrão), dar grupo não libera acesso; capacidade, tela e aprovação vêm do superusuário e do vínculo vigente (pacote do perfil da gerência + papel). `RBAC_FONTE=uniao` é só a volta de emergência. Ver `v2/docs/specs/backend/rbac.spec.md`.
 - **13 Setores** (`apps.core.constants.SETOR_GROUPS`): Superintendência, Vidas, Fluir, ACerta, Brincando, Sou da Paz, DAT, Controle, Diretoria, Comercial, Relacionamento, Logística Viagens, Logística Galpão
 - **5 Funções** (`apps.core.constants.FUNCAO_GROUPS`): Formador, Coordenador, Apoio de Coordenação, Gerente, Assistente Administrativo
 - Idioma canônico de permissão: `permission_classes = [HasPerm("codename")]` (ver `v2/docs/RBAC_NAMING.md`)

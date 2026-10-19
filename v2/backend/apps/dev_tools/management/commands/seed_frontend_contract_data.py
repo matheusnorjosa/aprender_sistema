@@ -7,7 +7,8 @@ Seed deterministico para testes de contrato funcional frontend-backend
 Tambem semeia textos longos (80+ caracteres) em todo campo que aparece em tabela,
 para o spec `e2e/checklist/sem-rolagem-horizontal.spec.ts` (Programa C): tabela
 vazia nunca estoura largura e daria falso verde. E cria `admin_matrix@test.com`
-(superusuario), o unico perfil que abre as rotas cuja policy nao tem grupo no seed.
+(superusuario), o unico perfil que abre as rotas cuja policy nao esta no pacote nem
+nos direitos do papel de nenhuma persona do seed (o poder vem da lotacao, nao do grupo).
 """
 
 from __future__ import annotations

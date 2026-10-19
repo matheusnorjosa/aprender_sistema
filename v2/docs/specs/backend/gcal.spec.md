@@ -95,7 +95,7 @@ O módulo isola o acesso à Google Calendar API atrás de um adaptador único (`
 
 ## API / Interface
 
-Ações sobre `Solicitacao` (DRF `@action`, todas `CanUseGcal | CanPublishSetorSolicitacao`; ver RBAC acima):
+Ações sobre `Solicitacao` (DRF `@action`, todas `CanUseGcal | CanPublishSetorSolicitacao`, exceto `preview-gcal`, que também aceita `CanAccessSolicitationApprovals`; ver RBAC acima):
 
 - `POST /api/solicitacoes/{id}/preview-gcal/` → payload simulado, sem persistir (200).
 - `POST /api/solicitacoes/{id}/publish/` — corpo `{dry_run?, apply_blocked?}` → enfileira `task_publish_solicitacao_to_gcal` (202 `task_id`); 409 se bloqueado; 403 se OAuth sem conexão.

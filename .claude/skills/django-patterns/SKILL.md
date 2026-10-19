@@ -127,12 +127,12 @@ if user_has_any_perm(user, "approve_solicitation", "create_solicitation"):
 identity checks by group.
 
 ```python
+from apps.core.services.solicitacao_scope import scope_solicitacoes
+
 def get_queryset(self):
-    qs = Solicitacao.objects.select_related("solicitante")
-    user = self.request.user
-    if not user.is_superuser:
-        qs = qs.filter(solicitante=user)  # owner-scope
-    return qs
+    base = Solicitacao.objects.select_related("usuario")  # dono = `usuario`
+    # escopo SSOT: global (superuser/capacidades) + gestora (GERENTE vigente) + APOIO + próprias
+    return scope_solicitacoes(base, self.request.user)
 ```
 
 Full naming convention: `v2/docs/RBAC_NAMING.md` + `v2/docs/specs/backend/rbac.spec.md`.
@@ -171,7 +171,7 @@ Core Web Vitals, **use the `performance-optimization` skill** (perf SSOT) — do
 guidance here.
 
 ```python
-solicitacoes = Solicitacao.objects.select_related("solicitante")  # avoids N+1
+solicitacoes = Solicitacao.objects.select_related("usuario")  # avoids N+1
 ```
 
 ---

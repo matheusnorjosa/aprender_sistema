@@ -403,13 +403,12 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                 )
                 .prefetch_related("participations__usuario")
             )
-        # M10-01 (#1623): escopo ator×gerência (SSOT `scope_solicitacoes`).
-        # GLOBAL (superuser / Controle `operate_preagenda` / DAT
-        # `manage_admin_registries` / aprovador-composto) vê tudo; GESTOR não-global
-        # (Gerente com `approve_solicitation*`) é reduzido à(s) própria(s) gerência(s)
-        # + as próprias; DEMAIS veem só as próprias. Antes, as caps de aprovação
-        # (concedidas ao grupo FUNÇÃO Gerente inteiro) davam alcance NACIONAL a
-        # qualquer Gerente, inclusive os que não podem aprovar.
+        # M10-01 (#1623): escopo ator×gerência (SSOT `scope_solicitacoes`, regra no
+        # docstring de `services/solicitacao_scope.py`). GLOBAL (superuser, `_GLOBAL_CAPS`
+        # do pacote ou quem aprova por `access_solicitation_approvals`) vê tudo; GESTORA
+        # não-global = papel GERENTE vigente (`_e_gestora`): as gerências dela + as
+        # próprias; APOIO soma as aprovadas das gerências onde é APOIO; DEMAIS veem só
+        # as próprias.
         else:
             base = Solicitacao.objects.select_related(
                 "usuario", "municipio", "tipo_evento", "projeto", "coordenador", "formador_avaliado"

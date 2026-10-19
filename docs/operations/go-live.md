@@ -1,7 +1,9 @@
 # Go-Live Checklist
 
-> **Histórico, não pendência.** O go-live do AS v2 já ocorreu; produção roda
-> `v2026.07.18-94f2765` com 148 usuários ativos. Este checklist é mantido como
+> **Histórico, não pendência.** O go-live do AS v2 já ocorreu (2026-07-03). *Snapshot de
+> 2026-07-24, não refeito:* produção rodava `v2026.07.18-94f2765` com 148 usuários ativos. A
+> versão vigente é a tag promovida mais recente (`git tag --sort=-creatordate`; ver
+> deploy.spec.md). Este checklist é mantido como
 > referência de *o que precisa estar verde* antes de uma promoção — não como uma
 > lista de tarefas por fazer.
 >
@@ -144,4 +146,4 @@ e redes do projeto Docker legado `aprendersistema` e é higiene de máquina loca
 
 | Data | Versão | Status |
 |------|--------|--------|
-| 2026-07-18 | `v2026.07.18-94f2765` | em produção |
+| 2026-07-18 | `v2026.07.18-94f2765` | em produção no snapshot de 2026-07-24 (já substituída) |

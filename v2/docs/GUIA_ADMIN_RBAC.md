@@ -67,7 +67,7 @@ São **5** (`FUNCAO_GROUPS`, `apps/core/constants.py`).
 
 | Função | O que pode fazer |
 |--------|------------------|
-| **Formador** | Visualiza grade mensal, gerencia bloqueios pessoais |
+| **Formador** | Etiqueta. O papel Formador na lotação gerencia os próprios bloqueios; a Grade Mensal exige papel Gerente, Coordenador ou Apoio na gerência, ou a capacidade `view_all_availability` (`TELAS_DE_ESCOPO`, `apps/core/rbac/policies.py`) |
 | **Coordenador** | Cria solicitações de eventos para sua equipe |
 | **Apoio de Coordenação** | Auxilia coordenação, visualiza solicitações |
 | **Gerente** | Etiqueta. O papel Gerente na lotação cria e edita eventos da gerência; na Superintendência, aprova |
@@ -311,5 +311,8 @@ para não usá-lo como via de administração.)*
 Rotas em `v2/frontend/src/components/AppRoutes.tsx`:
 `/dat/admin/usuarios`, `/grupos`, `/setores`, `/funcoes`, `/gerencias`, `/produtos`, `/configuracoes`.
 
-A administração de **Grupo × Capability** não fica no frontend: é o Django Admin
-(`/admin/core/permissaofuncional/`, `PermissaoFuncionalAdmin` em `apps/core/admin.py`), **superuser-only** desde o #1567.
+A matriz **Grupo × Capability** não se edita em tela nenhuma: muda só por PR (seed
+`functional_permissions_seed.py` + migration de dados, D21 em
+[rbac_authorization_matrix.md](./rbac_authorization_matrix.md), D4 do ADR-020). O Django Admin
+(`/admin/core/permissaofuncional/`, `PermissaoFuncionalAdmin` em `apps/core/admin.py`) é **só leitura**
+(add/change/delete desabilitados): serve para conferir, junto com `rbac_diff --auditar`.

@@ -383,11 +383,11 @@ Nove desses 31 são só correção de contradição do registro: `M03-03`, `M12-
 - **`M15-10`** — inalterado desde 2026-08-17: só a Fase A (`8f894279`, 2026-08-11, e `e94f15f4`,
   2026-08-12); issue #1637 segue OPEN e a Fase B continua sem desenho.
 
-### Seguem `aberto`: 13 IDs
+### Seguem `aberto`: 11 IDs
 
 Issue OPEN **e** nenhum commit citando o ID ou a issue (`M04-05` saiu: **resolvido em #1852**, parse `dry_run` fail-closed; `M02-09` saiu: **resolvido** (issue #1613 — resolvers rejeitam ambiguidade + norm simétrica no import DAT); ambos posteriores a esta reconciliação):
 
-`M05-07` `M09-05` `M10-05` `M10-06` `M14-05` (`M08-12`/`M10-07` #2021 · `M04-01` #2022 saíram: resolvidos, posteriores a esta reconciliação)
+`M10-05` `M10-06` `M14-05` (`M08-12`/`M10-07` #2021 · `M04-01` #2022 · `M05-07` #2108 saíram: resolvidos; `M09-05` saiu para `parcial` com o #2112; todos posteriores a esta reconciliação)
 `M15-04` `M15-05` `M15-08` `M15-09` `M16-04` `M17-01` `M22-14` `M26-03` (`M18-05` saiu: resolvido em #2020, posterior a esta reconciliação)
 
 Amostra reverificada no artefato, não só por ausência de commit:
@@ -467,7 +467,7 @@ commit traz a data **de cada commit**, porque eles podem estar a semanas de dist
 | `M07-03` | **P1** | resolvido | RBAC/Auditoria: registrar AuditLog em todas as mutações de identidade do UsuarioAdminViewSet | 3 usuários ativos do grupo DAT no censo de 2026-07-20 | #1618 (CLOSED) | `aba033f1` (2026-07-31)+`11219a7e` (2026-08-18) |
 | `M08-01` | **P1** | resolvido | disponibilidade: PATCH transfere bloqueio aprovado para usuário arbitrário, sem policy nem Audi… | — | #1619 (CLOSED) | `af2e8810` (2026-08-19) |
 | `M08-12` | **P1** | resolvido | imports/eventos: ~~grava aprovada sem gate de disponibilidade~~ → gate RD-01..08 (+advisory lock) p/ evento FUTURO; histórico entra sem checar (decisão do dono) | Grupo DAT (3 membros ativos nao-superuser) + 1 superuser ativo. `Permi… | #1620 | #2021 (2026-09-14) |
-| `M09-05` | **P1** | aberto | Deslocamentos: UI exige delegacao que o backend nega — Coordenador nao consegue registrar nenhu… | Coordenador (42 ativos) e o ator principal: 100% dos creates pela UI f… | #1621 (OPEN) | — |
+| `M09-05` | **P1** | **parcial** | Deslocamentos: ~~UI exige delegacao que o backend nega — Coordenador nao consegue registrar nenhu…~~ → fechado no PR 8 (#2112): sem alvo de delegação o POST grava para quem está logado, e GERENTE/COORDENADOR vigentes delegam para os FORMADOR da própria gerência (`user_can_delegate_deslocamento`, `GET /api/deslocamentos/alvos/`). Resta: coluna Ações sem `pode_editar` por linha, decisão sobre o Formador na tela, docstring de `api/deslocamentos.ts` | Coordenador (42 ativos) e o ator principal: 100% dos creates pela UI f… | #1621 (OPEN, retitulada em 19/10 para o residual) | defeito original: `804df36a` (#2112, 2026-10-16); residual aberto |
 | `M09-06` | **P1** | resolvido | Deslocamentos: filtros Origem/Destino inutilizáveis — página desmonta a cada tecla e o filtro falha | Coordenador, DAT, Controle, Superintendência e superuser | #1622 (CLOSED) | `6d73ba29` (2026-08-12)+`659c164f` (2026-08-18) |
 | `M10-01` | **P1** | resolvido (voltou no B1 para a aprovadora por vínculo: §Escopo da aprovadora por vínculo) | solicitações: Gerente lê, edita e exclui solicitação de qualquer gerência (sem escopo ator×alvo… | Gerente — 9 usuários ativos não-superuser em produção. Ator real e num… | #1623 (CLOSED) | `824f777c` (2026-08-20) |
 | `M10-02` | **P1** | resolvido | solicitação: troca de projeto para fluxo SUPER mantém status aprovado (lavagem de aprovação, vi… | — | #1624 (CLOSED) | `a1577d41` (2026-08-19) |
@@ -504,7 +504,7 @@ commit traz a data **de cada commit**, porque eles podem estar a semanas de dist
 | `M04-05` | **P2** | **resolvido** | imports: valor desconhecido de `dry_run` é tratado como APPLY em 11 views | — | #1649 (OPEN) | #1852 (parse fail-closed `parse_dry_run`, 2026-08-25) |
 | `M05-03` | **P2** | resolvido | RBAC: excluir um Group deixa capabilities dos ex-membros em cache por ate 300s | apenas superuser (1 ativo em prod). DELETE /api/grupos/{id}/ e Superus… | #1667 (épico, CLOSED) | `a545d5f8` (2026-07-18)+`01ddb4cd` (2026-08-21) |
 | `M05-05` | **P2** | resolvido | RBAC: mudança de Grupo×Capability via API não gera AuditLog e o delta pendente é atribuído ao próximo ator | Somente superuser e operações administrativas | #1657 (épico) | `aba033f1` (2026-07-31) |
-| `M05-07` | **P2** | aberto | frontend: HomePage decide criacao de solicitacao por setor/funcao em vez da policy create_solic… | DAT (3 ativos nao-superuser) e Gerente (9 ativos) — ambos existem hoje… | #1655 (épico, OPEN) | — |
+| `M05-07` | **P2** | **resolvido** | frontend: ~~HomePage decide criacao de solicitacao por setor/funcao em vez da policy create_solic…~~ → a HomePage decide por `caps.canCreateSolicitation` (`create_solicitation` de `/api/me/policies/`); `HomePage.acesso.test.tsx` trava os cartões por policy | DAT (3 ativos nao-superuser) e Gerente (9 ativos) — ambos existem hoje… | #1655 (épico, OPEN) | `8041980e` (#2108, 2026-10-15) |
 | `M06-04` | **P2** | resolvido | frontend/nginx: locations `/`, `/assets/`, imagens e `/health` perdem os 7 headers de segurança | Não é achado de RBAC — o censo de grupos não se aplica. A superfície a… | #1661 (épico, CLOSED) | `88626736` (2026-08-19) |
 | `M08-07` | **P2** | resolvido | disponibilidade: filtrar papeis ocupantes tambem na query de eventos existentes (CONVIDADO bloq… | Somente o superuser (1 ativo), via Django admin (`ParticipationAdmin`,… | #1664 (épico, OPEN) | `cd60882a` (2026-08-21) |
 | `M08-09` | **P2** | resolvido | Disponibilidade (RD-05): capacidade diaria ignora eventos que cruzam a meia-noite | Qualquer usuario autenticado que crie/edite Solicitacao ou consulte /a… | #1664 (épico, OPEN) | `a986a250` (2026-08-21) |
@@ -824,7 +824,7 @@ fechados no código, e #1657 está CLOSED com resíduo teórico registrado em `M
 |---|---|---|---|---|
 | paginacao-global-sem-page-size | P1 | `M01-07`, `M18-06` | #1653 CLOSED | resolvido (`aa8bfb5c`, `062df0ec`; 2026-08-20) |
 | list-serializer-como-fonte-de-detalhe | P1 | `M15-09`, `M17-02`, `M18-05` | #1654 OPEN (épico) | **resolvido** (as 3 fatias): `M15-09` (#1917/#1919 List expõe ids), `M17-02` (editFetchesDetail — getAcao/getCadastro), `M18-05` data_admissao (#1917) + vaza observacoes (#2020: handleEdit busca detail + resetFields). Épico #1654 segue OPEN pelos itens estruturais (adapter dirtyFields, hook useEditModal, lint) |
-| contrato-fe-be-sem-ssot | P1 | `M15-10`, `M16-07`, `M16-08`, `M09-05`, `M05-07` | #1655 OPEN | parcial (`M16-07`/`M16-08` fechados; `M15-10` parcial; `M09-05`/`M05-07` abertos) |
+| contrato-fe-be-sem-ssot | P1 | `M15-10`, `M16-07`, `M16-08`, `M09-05`, `M05-07` | #1655 OPEN | parcial (`M16-07`/`M16-08` fechados; `M05-07` resolvido em #2108; `M15-10` parcial; `M09-05` parcial: o defeito original saiu no #2112, resta o residual da #1621) |
 | escopo-ator-alvo-ausente | P0 | `M22-01` (duplicata histórica de `M03-01`), `M07-02`, `M10-01`, `M10-04`, `M14-01` | #1656 OPEN | parcial (`M10-01` voltou no B1 para a aprovadora por vínculo e é fechado de novo pela regra do dono de 30/09 — §Escopo da aprovadora por vínculo; `M10-04` fechado por #2033 — participante escopado por setor no create/update/lookup; `M14-01` resolvido no PR 9 (P9-3: só papel G/C/A vigente em gerência ativa); #1656 segue pelo escopo de **projeto** + `can_act_on` central) |
 | auditoria-nao-invariante-e-pii | P1 | `M07-03`, `M05-05`, `M23-02`, `M03-10` | #1657 CLOSED | parcial (`11219a7e`, `20c6f48d`, `d2f226cc`, todos 2026-08-18, fecham `M07-03`/`M05-05`/`M03-10`; `M23-02` segue `parcial` na fila, com o resíduo teórico) |
 | resolvers-por-rotulo-humano | P1 | `M02-09`, `M04-01`, `M22-14`, `M15-05` | #1658 OPEN | parcial (`M02-09`/#1613 e `M04-01`/#2022 resolvidos: `resolve_projeto`/`resolve_tipo_evento` rejeitam ambiguidade; equipe_gerencia resolve-only via `_resolve_gerencia`. `M22-14`/`M15-05` seguem abertos) |

@@ -12,10 +12,12 @@ Uso:
     python manage.py seed_e2e_users
 
 Dados criados:
-    - 4 usuários (coord, super, controle, formador) + grupos
-    - vínculo EquipeGerencia vigente junto de cada grupo de função
-    - 1 município (Salvador, BA)
-    - 1 projeto (TESTE E2E, fluxo SUPER)
+    - 13 personas + grupos (o grupo é etiqueta) e a conta inativa compras_e2e, autora das compras
+    - vínculo EquipeGerencia vigente de cada persona, que é a fonte do poder (lotação)
+    - 3 gerências criadas se faltarem: GERENCIA E2E, GERENCIA DAT e CONTROLE
+    - 2 municípios (Salvador, BA e Fortaleza, CE)
+    - 2 projetos (TESTE E2E fluxo SUPER na Super; TESTE E2E NAO_SUPER fluxo NAO_SUPER em Vidas)
+    - TipoEvento e as DATCompra que liberam os 4 pares (regra da compra)
     - Logs de criação
 
 Fase 2 - Testes E2E (Playwright) - Plano DAT/GCal 2025-10-29
@@ -209,11 +211,13 @@ class Command(BaseCommand):
         Legacy (back-compat com specs existentes):
         - coord_e2e, super_e2e, controle_e2e, formador_e2e
 
-        Por combinação setor × função (jornadas J01-J19 do plano QA 2026-04-22):
+        Por combinação setor × função (specs de jornada que existem: J01-J08, J10, J18):
         - coord_vidas, coord_fluir, coord_acerta (Coordenador + setor)
-        - gerente_vidas (Gerente + setor — jornada J14, issue #1165)
+        - gerente_vidas (Gerente + setor; a J14 não foi escrita, a #1165 fechou coberta pelo backend)
+        - dat_e2e (DAT, vínculo EQUIPE na GERENCIA DAT — J18; também J01, J04, J08)
         - super_geral (Gerente, vínculo GERENTE na SUPERINTENDENCIA — PA-02; PR 11: sem o grupo Superintendência)
-        - formador_vidas, formador_fluir (Formador + setor — jornadas J06, J11, J13)
+        - approver_03 (Gerente, vínculo GERENTE na SUPERINTENDENCIA — J08)
+        - formador_vidas, formador_fluir (Formador + setor — formador_vidas em J02, J03, J06; formador_fluir em J07)
         """
         users_data = [
             # === Legacy — manter compat com specs atuais ===
@@ -289,7 +293,7 @@ class Command(BaseCommand):
                 "groups": [grupos["Coordenador"], grupos["ACerta"]],
                 "is_superuser": False,
             },
-            # === Gerente por setor (jornada J14 — issue #1165) ===
+            # === Gerente por setor (issue #1165; a jornada J14 não foi escrita) ===
             {
                 "username": "gerente_vidas@test.com",
                 "email": "gerente_vidas@test.com",
@@ -334,7 +338,7 @@ class Command(BaseCommand):
                 "groups": [grupos["Gerente"]],
                 "is_superuser": False,
             },
-            # === Formadores por setor (jornadas J06, J11, J13) ===
+            # === Formadores por setor (jornadas J02, J03, J06, J07) ===
             {
                 "username": "formador_vidas@test.com",
                 "email": "formador_vidas@test.com",

@@ -9,7 +9,7 @@ O **Aprender Sistema (AS) v2** substitui planilhas Google/Excel por uma platafor
 - **Gestão de Solicitações**: Criação, aprovação e acompanhamento de eventos
 - **Verificação de Conflitos**: Validação automática de disponibilidade de formadores
 - **Integração Google Calendar**: Publicação automática de eventos com Google Meet
-- **RBAC por capabilities**: Usuário → Grupos (Django) → Capabilities → Policies nas rotas
+- **RBAC por capabilities**: Usuário → Lotação (gerência + papel) → pacote do perfil da gerência + direitos do papel → Capabilities → Policies nas rotas. O grupo Django é etiqueta; só soma poder em `RBAC_FONTE=uniao`, a volta de emergência
 - **Auditoria**: Trilha de `AuditLog` nas operações sensíveis
 
 ## Stack Tecnológica
@@ -17,7 +17,7 @@ O **Aprender Sistema (AS) v2** substitui planilhas Google/Excel por uma platafor
 | Camada | Tecnologias |
 |--------|-------------|
 | **Backend** | Python 3.12, Django 5.2 LTS, DRF 3.17, Celery 5.5 |
-| **Frontend** | React 18, TypeScript 5, Vite 7, Tailwind CSS 3, Ant Design 5 |
+| **Frontend** | React 19, TypeScript 5, Vite 7, Tailwind CSS 3, Ant Design 5 |
 | **Banco de Dados** | PostgreSQL 15 |
 | **Cache/Filas** | Redis 7 |
 | **Infraestrutura** | Docker, Docker Compose |

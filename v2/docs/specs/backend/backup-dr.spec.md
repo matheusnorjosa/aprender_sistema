@@ -1,7 +1,7 @@
 ---
 title: Backup & Disaster Recovery
 status: canonical
-last_verified: 2026-09-11
+last_verified: 2026-10-19
 verified_at_commit: 0dd1dcb630fdc1cf9b2b488121553e89488dde3c
 sources_of_truth:
   - v2/backend/apps/core/tasks_backup.py
@@ -47,9 +47,11 @@ Esta spec e o **indice canonico** do tema. Os parametros e procedimentos detalha
 - **Tasks Celery** — [`v2/backend/apps/core/tasks_backup.py`](../../../backend/apps/core/tasks_backup.py)
   - `backup.perform_database_backup(backup_type="full")` — invoca o script, `max_retries=3`, `default_retry_delay=300`, `timeout=3600`, backoff exponencial; alerta Sentry se `SENTRY_DSN` setado.
   - `backup.verify_backup_health()` — health check semanal (3 checks: dir gravavel, backup recente < 25h, conectividade S3 se configurado).
+  - `backup.check_backup_freshness()` — dead-man diario: se o backup mais novo passar de `BACKUP_DEADMAN_MAX_AGE_HOURS` (default 24h) ou se nao houver backup nenhum, alarma via `_alert_backup_deadman` (`logger.error`, que chega mesmo sem Sentry, + Sentry quando ha DSN).
 - **Schedule (beat)** — [`v2/backend/config/celery.py`](../../../backend/config/celery.py)
   - `daily-database-backup` — `crontab(hour=2, minute=0)`, args `("full",)`, `expires=3600`.
   - `weekly-backup-health-check` — `crontab(hour=3, minute=0, day_of_week=0)` (domingos).
+  - `daily-backup-deadman-check` — `crontab(hour=6, minute=0)`, task `backup.check_backup_freshness`, `expires=3600`.
 - **Script de backup** — [`v2/infra/scripts/backup_db.sh`](../../../infra/scripts/backup_db.sh) — `set -euo pipefail`, `pg_dump | gzip [| age]`, nomenclatura `backup_full_YYYYMMDD_HHMMSS.sql.gz[.age]`, `BACKUP_DIR="${BACKUP_DIR:-/backups}"`, retencao que cobre **os dois sufixos**, upload S3 opcional. Mesmo script para Docker e VM (muda so a chamada e os defaults das env vars).
 - **Script de restore** — [`v2/infra/scripts/restore_db.sh`](../../../infra/scripts/restore_db.sh) — interativo (exige `yes`), verificacao de integridade **ciente do formato** (`.age` -> `age -d | gzip -t` com pipefail local; branch plaintext usa `gzip -t` direto), dump de seguranca antes do `DROP` (`SAFETY_DUMP`), termina conexoes, drop+create do DB, restaura com `psql -v ON_ERROR_STOP=1` e **valida piso de contagem de tabelas**. Honra `BACKUP_DIR`.
 - **Onde os scripts vivem no container** — [`v2/infra/Dockerfile.prod`](../../../infra/Dockerfile.prod): `COPY infra/scripts /app/infra/scripts` + `chmod +x`. Sao **assados na imagem**, nao montados. Por isso `Path("/app/infra/scripts/backup_db.sh").exists()` (`tasks_backup.py`, `perform_database_backup`) e verdadeiro em producao sem mount algum.
@@ -65,6 +67,7 @@ Esta spec e o **indice canonico** do tema. Os parametros e procedimentos detalha
 | **Retencao** | 7 dias (`BACKUP_RETENTION_DAYS`) | `backup_db.sh` |
 | **Frequencia** | 1x/dia (02:00 Docker / 03:00 VM, `America/Fortaleza`) | `celery.py` / cron |
 | **Health check** | semanal (domingos 03:00) | `verify_backup_health` |
+| **Dead-man de frescor** | diario 06:00, limite 24h (`BACKUP_DEADMAN_MAX_AGE_HOURS`) | `check_backup_freshness` |
 
 Invariantes que NAO podem ser violados:
 
@@ -137,7 +140,7 @@ O unico gap restante e o **drill real** (`M26-03`, #1646): a suite `.bats` exerc
 - **CORRIGIDO — `M26-02` (P1, #1645), fechado por `3bca74f3` (#1793).** `restore_db.sh` agora roda o `psql` de restore com `-v ON_ERROR_STOP=1`, compara `TABLE_COUNT` com um piso e aborta se `< MIN_TABLES`, alem do dump de seguranca antes do `DROP`. O "Restore completed successfully!" so e impresso apos passar o piso.
 - **P1 ABERTO — DR nunca exercitado no formato real** (`M26-03`, issue #1646, epico #1662). Os `.bats` exercitam o script, mas nenhum round-trip real de um `.age` num banco de verdade ocorreu. Ver §Testes.
 - **CORRIGIDO (nao repetir o diagnostico antigo do #1455).** Versoes anteriores desta spec afirmavam que `worker`/`beat` de producao nao montavam `/backups` nem `/app/infra/scripts`, e que `script_path.exists()` falhava com `FileNotFoundError`. Isso **nao corresponde ao codigo atual**: o `worker` monta `/var/backups/aprender:/backups` (`docker-compose.prod.yml`, com comentario `#1455 / ADR-018 B2`) e os scripts vem assados na imagem (`Dockerfile.prod`), logo nao dependem de mount. A causa raiz real era outra: `autodiscover_tasks()` importa apenas o modulo `tasks` de cada app, e as tasks de backup vivem em `tasks_backup.py` — o beat despachava e o worker respondia `NotRegistered` em silencio. Fechado por `config/celery.py` (`app.autodiscover_tasks(related_name="tasks_backup")`). O `beat` continua sem mount de `/backups`, e isso e correto: quem executa o script e o `worker`.
-- **Sem alerta de "backup ausente"**: o health check semanal so emite warning ao Sentry; se `SENTRY_DSN` nao estiver configurado, `degraded` nao chega a ninguem. Se o Sentry esta ou nao ativo em producao **depende de verificacao humana** (conteudo do env no Portainer — item F5 de `ACHADOS_REAIS.md`).
+- **Alerta de "backup ausente" depende do beat/worker vivos**: o dead-man diario `check_backup_freshness` (06:00) alarma com `logger.error` (chega mesmo sem `SENTRY_DSN`) e Sentry quando ha DSN. Limitacao residual: se o proprio beat/worker estiver morto, a task tambem nao roda; o backstop externo e o gate `check_backup.sh` do deploy, que recusa deploy sem backup fresco. SSOT: `tasks_backup.py`. Se o Sentry esta ou nao ativo em producao **depende de verificacao humana** (conteudo do env no Portainer — item F5 de `ACHADOS_REAIS.md`).
 - **RPO 5 min depende do WAL na VM02**, nao do `pg_dump` (diario). Em ambiente Docker sem `archive_mode`, o RPO efetivo regride para ~24h (ultimo dump).
 - **Sem backup de media/uploads e secrets** automatizado — so procedimento manual. Estrategia 3-2-1 e aspiracional (sem copia offsite ativa).
 - **Restore drill nao automatizado em CI** — `test_dr.sh` existe mas a execucao recorrente nao esta garantida, e no formato atual ele nao provaria o caminho de producao (ver §Testes).

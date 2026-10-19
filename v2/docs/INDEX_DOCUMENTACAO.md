@@ -3,8 +3,8 @@
 **Última Atualização**: 2026-07-24 (varredura de veracidade contra o código)
 
 > **Como ler os números desta página**: são contagens **estáticas** feitas contra este
-> repositório em 2026-07-24 (`main` = `d08acfa5`), com o critério registrado ao lado de cada
-> métrica. Contam **declarações**, não casos executados — `pytest.mark.parametrize` e
+> repositório em 2026-07-24 (`main` = `d08acfa5`) e recontadas em 2026-10-19, com o critério
+> registrado ao lado de cada métrica. Contam **declarações**, não casos executados — `pytest.mark.parametrize` e
 > `test.each` multiplicam o número real de casos quando a suíte roda.
 
 ---
@@ -22,17 +22,17 @@ investigação não valem.
 
 | Métrica | Valor | Critério de contagem |
 |---------|-------|----------------------|
-| **Models Django** | **42** (app `core`) | 41 `class X(models.Model)` em `v2/backend/apps/core/models/` + `Usuario(AbstractUser)`. Nenhum abstrato, nenhum proxy. Excluídos 9 `models.TextChoices` (enums). `dev_tools` não define models. |
+| **Models Django** | **39** (app `core`) | 38 `class X(models.Model)` em `v2/backend/apps/core/models/` + `Usuario(AbstractUser)`. Nenhum abstrato, nenhum proxy. Excluídos 27 `models.TextChoices` (enums). `dev_tools` não define models. |
 | **API Endpoints** | ver [API_REFERENCE.md](./API_REFERENCE.md) | Referência **curada**. O inventário exaustivo é o schema OpenAPI em `/api/schema/` (drf-spectacular). Número não duplicado aqui — ADR-017. |
-| **Testes backend** (pytest) | **2.318** funções em **226** arquivos | `def test_` em arquivos `test_*.py` sob `v2/backend/apps/` |
-| **Testes frontend** (vitest) | **306** blocos em **45** arquivos | `it()` / `test()` em `*.test.ts(x)` sob `v2/frontend/src/` |
+| **Testes backend** (pytest) | **4.348** funções em **392** arquivos | `def test_` em arquivos `test_*.py` sob `v2/backend/apps/` |
+| **Testes frontend** (vitest) | **1.095** blocos em **156** arquivos | `it()` / `test()` em `*.test.ts(x)` sob `v2/frontend/src/` |
 | **Testes E2E** (Playwright) | **168** blocos em **29** arquivos | `test()` em `v2/frontend/e2e/**/*.spec.ts` (recontado em 2026-10-19; não conta os `test()` gerados por laço) |
-| **Rotas do frontend** | **51** | atributos `path="…"` em `v2/frontend/src/components/AppRoutes.tsx` |
-| **Componentes de página** | 39 `*Page.tsx` | de 57 `.tsx` não-teste em `v2/frontend/src/pages/`; os outros 18 são subcomponentes e helpers (`columns`/`constants`/`helpers`) |
-| **Management commands** | **28** | `core` 13 + `dev_tools` 15 |
+| **Rotas do frontend** | **52** | atributos `path="…"` em `v2/frontend/src/components/AppRoutes.tsx` |
+| **Componentes de página** | 41 `*Page.tsx` | de 55 `.tsx` não-teste em `v2/frontend/src/pages/`; os outros 14 são subcomponentes e helpers (`columns`/`constants`/`helpers`) |
+| **Management commands** | **35** | `core` 20 + `dev_tools` 15 |
 | **Type Hints** | Pyright `strict` | `v2/backend/pyproject.toml` |
 | **Gate de cobertura** | 85% | `v2/backend/pytest.ini` (`fail_under = 85`) e `codecov.yml` |
-| **Documentos** | 95 vivos em `v2/docs/` · 87 em `_archive/` · 47 em `docs/` (MkDocs) | `.md`, `_archive/` contado à parte |
+| **Documentos** | 107 vivos em `v2/docs/` · 88 em `_archive/` · 48 em `docs/` (MkDocs) | `.md`, `_archive/` contado à parte |
 
 ---
 
@@ -48,7 +48,7 @@ investigação não valem.
 
 ### 1. 📋 **CLAUDE.md** (Guia Principal)
 
-**Arquivo**: `.claude/CLAUDE.md` (local, **não versionado** — `.claude/` está no `.gitignore`)
+**Arquivo**: `.claude/CLAUDE.md` (**versionado**; as exceções locais estão no `.gitignore`, decisão D3)
 
 **Quando usar**: Ponto de entrada para qualquer trabalho no projeto.
 
@@ -70,7 +70,7 @@ Desde o PR 12 o poder vem da lotação (ADR-020): `Usuário → Lotação (Equip
 |-----------|-------|
 | [rbac_authorization_matrix.md](./rbac_authorization_matrix.md) | **SSOT declarativo** de "quem pode o quê". O bloco §3 é gerado de `apps/core/rbac/matrix.py` e guardado por CI (`rbac-doc-drift.yml`). |
 | [specs/backend/rbac.spec.md](./specs/backend/rbac.spec.md) | Spec do subsistema (HasPerm, policies, lint) |
-| [GUIA_ADMIN_RBAC.md](./GUIA_ADMIN_RBAC.md) | Operação: administrar grupos e capabilities |
+| [GUIA_ADMIN_RBAC.md](./GUIA_ADMIN_RBAC.md) | Operação: grupos, lotação e aprovação (a matriz Grupo × Capability muda só por PR, D21) |
 | [RBAC_NAMING.md](./RBAC_NAMING.md) | Convenção de nomes de grupos/capabilities |
 | [audits/2026-07-17-rbac-security-audit.md](./audits/2026-07-17-rbac-security-audit.md) | Auditoria de segurança RBAC (2026-07) |
 | [_archive/RBAC_COMPLETO.md](./_archive/RBAC_COMPLETO.md) | **Histórico** — descreve o modelo anterior, por setor/função. Não use como referência atual. |
@@ -349,11 +349,11 @@ Cada módulo em produção tem uma spec versionada, datada e rastreável ao cód
 
 ## 📋 Referência de Arquitetura
 
-### Backend — 42 models no app `core`
+### Backend — 39 models no app `core`
 
 | App | Models | Arquivos de definição |
 |-----|--------|-----------------------|
-| **core** | 42 | `apps/core/models/`: `usuario.py`, `organizacao.py`, `solicitacao.py`, `agenda.py`, `compra.py`, `workflow.py`, `config.py`, `auditoria.py`, `integracao.py`, `import_job.py`, `permissao_funcional.py`, `group_classificacao.py`, `formacao.py`, `acompanhamento.py`, `prova.py`, `plano_formacoes.py`, `dat_registro.py`, `dat_coordenador.py`, `dat_acao.py`, `dat_compra.py`, `dat_cadastro.py`, `dat_formacao.py`, `acoes_notificacao.py` |
+| **core** | 39 | `apps/core/models/`: `usuario.py`, `organizacao.py`, `solicitacao.py`, `agenda.py`, `compra.py`, `workflow.py`, `config.py`, `auditoria.py`, `integracao.py`, `import_job.py`, `permissao_funcional.py`, `group_classificacao.py`, `formacao.py`, `acompanhamento.py`, `prova.py`, `plano_formacoes.py`, `dat_registro.py`, `dat_coordenador.py`, `dat_acao.py`, `dat_compra.py`, `dat_cadastro.py`, `acoes_notificacao.py` |
 | **dev_tools** | 0 | — |
 
 A lista nominal e a estrutura do pacote estão em `apps/core/models/__init__.py` (`__all__`),
@@ -368,11 +368,11 @@ o schema OpenAPI servido em `/api/schema/`. Não há número de endpoints mantid
 
 ---
 
-### Management Commands — 28
+### Management Commands — 35
 
 | App | Commands | Exemplos |
 |-----|----------|----------|
-| **core** | 13 | `import_export_contract`, `preagenda_to_gcal`, `compliance_audit`, `lgpd_export`, `rbac_matrix_doc`, `rotate_gcal_encryption_key`, `sync_municipios_ibge` |
+| **core** | 20 | `import_export_contract`, `preagenda_to_gcal`, `compliance_audit`, `lgpd_export`, `rbac_matrix_doc`, `rotate_gcal_encryption_key`, `sync_municipios_ibge` |
 | **dev_tools** | 15 | `seed_rbac`, `seed_gerencias`, `seed_e2e_users`, `backfill_is_online`, `cleanup_e2e_data` |
 
 `dev_tools` é desabilitado em produção (CP-08) — ver [specs/backend/dev-tools.spec.md](./specs/backend/dev-tools.spec.md).
@@ -383,8 +383,8 @@ o schema OpenAPI servido em `/api/schema/`. Não há número de endpoints mantid
 
 | Camada | Arquivos | Declarações de teste |
 |--------|---------:|---------------------:|
-| Backend (pytest, `v2/backend/apps/`) | 226 | 2.318 |
-| Frontend (vitest, `v2/frontend/src/`) | 45 | 306 |
+| Backend (pytest, `v2/backend/apps/`) | 392 | 4.348 |
+| Frontend (vitest, `v2/frontend/src/`) | 156 | 1.095 |
 | E2E (Playwright, `v2/frontend/e2e/`) | 29 | 168 |
 
 Contagem estática de declarações (`def test_`, `it()`, `test()`). O número de casos
@@ -400,7 +400,7 @@ efetivamente executados é **maior**, por causa de parametrização. Gate de cob
 | Ver o que está quebrado hoje | [audits/ACHADOS_REAIS.md](./audits/ACHADOS_REAIS.md) |
 | Entender o projeto | [PROJETO_ORIGEM.md](./PROJETO_ORIGEM.md) |
 | Saber quem pode o quê | [rbac_authorization_matrix.md](./rbac_authorization_matrix.md) |
-| Administrar grupos e capabilities | [GUIA_ADMIN_RBAC.md](./GUIA_ADMIN_RBAC.md) |
+| Administrar grupos e lotação (capabilities só por PR) | [GUIA_ADMIN_RBAC.md](./GUIA_ADMIN_RBAC.md) |
 | Configurar Google Calendar | [GUIDE_GCAL.md](./GUIDE_GCAL.md) |
 | Entender regras de disponibilidade | [GUIDE_AVAILABILITY.md](./GUIDE_AVAILABILITY.md) |
 | Ver fluxo de aprovação | [IMPLEMENTACAO_PA.md](./IMPLEMENTACAO_PA.md) |
@@ -417,20 +417,20 @@ efetivamente executados é **maior**, por causa de parametrização. Gate de cob
 
 ```
 aprender_sistema/
-├── .claude/                    # Guias e ferramentas Claude (LOCAL, no .gitignore)
-├── docs/                       # Site MkDocs (público) — 47 .md
+├── .claude/                    # Guias e ferramentas Claude (versionado; exceções no .gitignore, D3)
+├── docs/                       # Site MkDocs (público) — 48 .md
 ├── scripts/                    # Gates de doc (check_doc_links, check_doc_frontmatter)
 ├── specs/                      # Spec-kit (CONSTITUTION.md, templates)
 ├── v2/
 │   ├── backend/
 │   │   ├── apps/
-│   │   │   ├── core/          # App principal (42 models)
+│   │   │   ├── core/          # App principal (39 models)
 │   │   │   └── dev_tools/     # Seeds (desabilitado em prod, CP-08)
 │   │   └── config/            # Django settings
 │   ├── frontend/
 │   │   ├── src/
-│   │   │   ├── pages/         # Componentes de página (51 rotas em AppRoutes.tsx)
-│   │   │   ├── components/    # 19 componentes de nível raiz
+│   │   │   ├── pages/         # Componentes de página (52 rotas em AppRoutes.tsx)
+│   │   │   ├── components/    # 22 componentes de nível raiz
 │   │   │   └── api/           # 16 módulos de cliente HTTP
 │   │   └── e2e/               # Testes Playwright
 │   ├── infra/                 # Docker + configs
@@ -441,7 +441,7 @@ aprender_sistema/
 │   ├── scripts/               # Utilitários do monorepo v2
 │   ├── data/                  # Datasets de apoio
 │   ├── tests/                 # Testes fora de apps/
-│   └── docs/                  # 95 documentos vivos + 87 arquivados
+│   └── docs/                  # 107 documentos vivos + 88 arquivados
 └── thoughts/                   # Handoffs e ledgers (LOCAL, no .gitignore)
 ```
 

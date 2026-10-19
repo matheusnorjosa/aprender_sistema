@@ -238,7 +238,7 @@ help:
 	@echo "  make logs-beat-last        Show last 200 lines of beat logs"
 	@echo ""
 	@echo "E2E Tests (Playwright) — Fase 2:"
-	@echo "  make seed-e2e              Create seeds for E2E tests (coord, super, controle, formador)"
+	@echo "  make seed-e2e              Create E2E personas (13; power via EquipeGerencia: coord/gerente/formador por setor, GERENTE na Super, dat_e2e e controle_e2e com pacote)"
 	@echo "  make test-e2e              Run E2E tests (headless)"
 	@echo "  make test-e2e-ui           Run E2E tests with interactive UI"
 	@echo "  make test-e2e-headed       Run E2E tests (headed mode - visible browser)"

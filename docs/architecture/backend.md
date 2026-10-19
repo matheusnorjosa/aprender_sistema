@@ -89,10 +89,10 @@ O sistema possui dois domínios distintos de compras e eles não devem ser confu
 ### Leitura e escrita por caso de uso
 
 - `core_compra`
-  - leitura: Controle e Superintendência
+  - leitura: Controle e DAT, pelo pacote do perfil da gerência (`/api/controle/compras/` exige `run_daily_operations`; ver `views_compras.py`)
   - escrita: pipelines/importações de controle (`services/controle_imports.py`)
 - `core_dat_compra`
-  - leitura/escrita: DAT e Superintendência (CRUD operacional DAT)
+  - leitura/escrita: DAT e Controle, pelo pacote do perfil da gerência (`CanViewComprasStats` no `DATCompraViewSet`, `views/dat_module.py`); excluir exige `execute_restricted_operations` (DAT). A Superintendência não tem acesso a nenhum dos dois. Gates por endpoint: tabela do `v2/docs/API_REFERENCE.md`
 
 ### Contratos mínimos
 

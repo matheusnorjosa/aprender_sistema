@@ -2,7 +2,7 @@
 Management command: cleanup_e2e_data
 
 Remove dados de testes E2E (Playwright) criados por seed_e2e_users.
-Comando idempotente: roda várias vezes sem erros.
+Pensado para ser idempotente, mas hoje falha logo depois de seed_e2e_users (ver abaixo).
 
 Uso:
     # Docker (recomendado)
@@ -15,8 +15,12 @@ Dados removidos:
     - Usuários E2E (coord_e2e, super_e2e, controle_e2e, formador_e2e)
     - Solicitações criadas por esses usuários
     - Participations relacionadas
-    - Município "Salvador, BA" (ibge_code=2927408) se não houver dependências
-    - Projeto "TESTE E2E" (codigo=E2E) se não houver dependências
+    - Município "Salvador, BA" (ibge_code=2927408) se nenhuma Solicitacao depender dele
+    - Projeto "TESTE E2E" (codigo=E2E) se nenhuma Solicitacao depender dele
+
+Defeito conhecido: só Solicitacao conta como dependência. As DATCompra que o seed cria
+(municipio/projeto com PROTECT) fazem municipio.delete() (fora do --dry-run) levantar ProtectedError dentro do
+transaction.atomic, e o rollback desfaz tudo, inclusive a remoção das personas.
 
 Fase 2 - Testes E2E (Playwright) - Plano DAT/GCal 2025-10-29
 """

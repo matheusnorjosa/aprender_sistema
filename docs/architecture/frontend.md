@@ -16,9 +16,9 @@
 
 ## Stack
 
-Conferido em `v2/frontend/package.json` (2026-07-24):
+Conferido em `v2/frontend/package.json` (2026-10-19):
 
-- **React 18** (`react` 18.3.1) com hooks
+- **React 19** (`react` ^19.2.8) com hooks
 - **Vite 7** (`vite` 7.3.5) para build e dev server
 - **Ant Design 5** (`antd` 5.27.4) para componentes UI
 - **Tailwind CSS 3** (`tailwindcss` 3.4.18) para utilitários

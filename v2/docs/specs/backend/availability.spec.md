@@ -87,7 +87,7 @@ Idioma RBAC canônico: `permission_classes=[HasPerm("codename")]` (grupos direto
 
 **Endpoint de check pontual** — valida `usuario_id`/datas (400 em entrada inválida; 404 se usuário não existe); 403 se consultar outro usuário sem `can_check_availability_for_others`; força timezone-aware (RD-06); chama o serviço; serializa conflitos e avisos via `__dict__` (`conflicts` e `warnings`).
 
-**Criação de bloqueio** — sem `usuario_id` (ou self): `usuario=created_by=request.user`, `status="aprovado"`. Com `usuario_id` de terceiro: 403 **antes** de qualquer lookup (anti-enumeração); depois valida target ativo + Função Formador (400 senão), salva e grava AuditLog.
+**Criação de bloqueio** — sem `usuario_id` (ou self): `usuario=created_by=request.user`, `status="aprovado"`. Com `usuario_id` de terceiro: 403 **antes** de qualquer lookup (anti-enumeração); depois valida target ativo + papel FORMADOR vigente (`EquipeGerencia.gerencias_com_papel`, desde o PR 8; o grupo Formador sozinho não basta) (400 senão), salva e grava AuditLog.
 
 **Edição de bloqueio (achado M08-01 / issue #1619, corrigido em `af2e8810`)** — a titularidade é **imutável** na edição: `AvailabilityBlockViewSet.perform_update` tira `usuario_id` do payload e responde 403 se a edição tentar mudar o dono (a concessão de titularidade só existe no create delegado, `perform_create`). Antes de salvar, `_assert_can_mutate` exige `user_can_delegate_availability_block` para editar bloqueio de outra pessoa (GAP-1, 403 senão) e a edição delegada grava AuditLog `DELEGATE_BLOCK_UPDATE`; o próprio bloqueio segue livre. `perform_destroy` usa o mesmo gate, com AuditLog `DELEGATE_BLOCK_DELETE`. SSOT: `views_availability.py`.
 

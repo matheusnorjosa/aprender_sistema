@@ -18,10 +18,12 @@ de revisão no PR.
 
 ## Escopo desta primeira versão (decisão stakeholder, opção `c` híbrida)
 
-- **8 atores** × **8 recursos** = 64 cases parametrizados
+- **10 atores** (`ACTORS`) × **12 recursos** (`RESOURCES`) = 120 cases parametrizados
+  (começou com 8 × 8 = 64; o PR 8 e o import pela tela ampliaram)
 - **Sem scope cases** (Coord vs gerência X vs Y) — esses ficam em tests
   dedicados (`test_deslocamento_rbac.py`, `test_availability_monthly_rbac.py`).
-- **GET only** — POST/create coberto em tests específicos por endpoint.
+- **GET e dois POST** (`solicitacoes_batch_approve` e `import_pela_tela`); os demais
+  POST/create ficam em tests específicos por endpoint.
 - **Sem cobertura combinatorial** de múltiplos grupos por user.
 
 Expansão futura: adicionar mais recursos sob demanda; representar scope
@@ -88,7 +90,7 @@ ACTOR_GROUPS: Final[dict[str, list[str]]] = {
 
 
 # ============================================================================
-# Recursos canônicos (8 endpoints discriminantes)
+# Recursos canônicos (12 endpoints discriminantes)
 # ============================================================================
 
 
@@ -181,12 +183,12 @@ ACCESS_MATRIX: Final[dict[str, dict[str, int]]] = {
     # Scope discriminante (Gerente Vidas não vê Fluir, etc.) é PR 8 / test_availability_monthly_rbac.py.
     "grade_mensal": {
         SUPERUSER: ALLOW,
-        DAT: ALLOW,  # D9: ator transversal admin recebe view_all_availability via seed 0080
-        CONTROLE: ALLOW,  # view_all_availability via seed 0080 (mantém de D6)
+        DAT: ALLOW,  # D9: view_all_availability pelo pacote ADMIN_OPERACIONAL (vínculo EQUIPE)
+        CONTROLE: ALLOW,  # view_all_availability pelo pacote CONTROLE (vínculo EQUIPE; mantém de D6)
         DIRETORIA: DENY,  # D8: decisão executiva, não consulta operacional
         GERENTE: ALLOW,  # D9: scoped via EquipeGerencia (perdeu cap global) — fixture cria vínculo
         GERENTE_SUPER: ALLOW,  # PR 8: composite Sup+Gerente — fixture cria EquipeGerencia
-        ASST_ADMIN_CONTROLE: ALLOW,  # PR 8: setor Controle herda view_all_availability via seed 0080
+        ASST_ADMIN_CONTROLE: ALLOW,  # view_all_availability pelo pacote CONTROLE (vínculo EQUIPE)
         COORDENADOR: ALLOW,  # scoped via EquipeGerencia (D6) — fixture cria vínculo
         APOIO: ALLOW,  # scoped via EquipeGerencia (D6) — fixture cria vínculo
         # PR 9 (P9-3): o `HasSectorAccess` só aceita papel G/C/A vigente (`gerencias_de_atuacao`), o
@@ -232,8 +234,8 @@ ACCESS_MATRIX: Final[dict[str, dict[str, int]]] = {
     },
     #
     # Ações Internas (CicloAcoesViewSet): `[HasPerm("manage_internal_actions")]` (Onda 1 C3).
-    # Capability sem grupos atribuídos no seed → apenas superuser bypassa.
-    # Quando feature ficar madura, admin atribui grupo via UI sem code change.
+    # Capacidade fora de todo pacote e papel → só o superuser abre. Para liberar, incluir no
+    # pacote do perfil (`rbac_pacotes.py`) num PR com `rbac_diff`; atribuir grupo não dá poder desde o PR 12.
     "ciclos_acoes": {
         SUPERUSER: ALLOW,
         DAT: DENY,
@@ -321,15 +323,16 @@ ACCESS_MATRIX: Final[dict[str, dict[str, int]]] = {
     # Composition: `create_solicitation | manage_admin_registries`.
     # Coord/Apoio/Gerente (pedagógico ou Sup) usam `create_solicitation` para
     # popular pickers em NewSolicitacaoWizard. DAT usa manage_admin_registries.
-    # Asst Admin Controle puro não tem create_solicitation no seed; só passa
-    # se também tiver Função Coord/Apoio/Gerente — não esse ator.
+    # `create_solicitation` vem do papel vigente (vínculo EquipeGerencia, `DIREITOS_PAPEL`), não da
+    # Função. Asst Admin Controle (vínculo EQUIPE) não tem; só passaria com papel
+    # COORDENADOR/GERENTE/APOIO vigente — não esse ator.
     "usuario_lookup": {
         SUPERUSER: ALLOW,
         DAT: ALLOW,  # manage_admin_registries
         CONTROLE: DENY,  # PR 5: sem create_solicitation nem manage_admin_registries
         DIRETORIA: DENY,
-        GERENTE: ALLOW,  # create_solicitation (seed atribui a Função Gerente)
-        GERENTE_SUPER: ALLOW,  # idem (composite tem Função Gerente)
+        GERENTE: ALLOW,  # create_solicitation pelo papel GERENTE (DIREITOS_PAPEL) — fixture cria vínculo
+        GERENTE_SUPER: ALLOW,  # idem (vínculo GERENTE na SUPERINTENDENCIA)
         ASST_ADMIN_CONTROLE: DENY,  # composite Asst Admin não tem create_solicitation
         COORDENADOR: ALLOW,  # create_solicitation
         APOIO: ALLOW,  # create_solicitation

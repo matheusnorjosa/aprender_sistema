@@ -6,7 +6,7 @@
 
 ## Stack
 - **Backend**: Python 3.12, Django 5.2, DRF, PostgreSQL 15, Redis 7, Docker
-- **Frontend**: React 18, Vite 7, Ant Design 5, Tailwind
+- **Frontend**: React 19, Vite 7, Ant Design 5, Tailwind
 - **Timezone**: `America/Fortaleza` (storage em UTC)
 - **Type checking**: Pyright strict (PEP 695)
 - **Objetivo**: substituir 82.389 fórmulas Excel por plataforma web
@@ -69,7 +69,7 @@ PR abre como **Draft**; só promove a Ready após `make staging-full` passar. Sq
 - **Tools do Codex**: edição = `apply_patch` (não `Edit`/`Write`); shell = `shell`/`local_shell`. As regras acima são tool-agnósticas.
 
 ## Produção
-3 VMs (App: Nginx/Gunicorn/Celery/React · DB: PostgreSQL 15 · Red: Redis 7).
+2 VMs (VM01 App: Nginx/Gunicorn/Celery/React + Redis 7 em container na rede interna `backend-internal` · VM02 DB: PostgreSQL 15). SSOT: `v2/infra/README.md`.
 
 **Deploy pull-based (ADR-018).** Produção **puxa**; o CI não empurra:
 

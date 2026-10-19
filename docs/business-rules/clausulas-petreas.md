@@ -38,7 +38,8 @@ Ver [Regras de Disponibilidade (RD)](regras-disponibilidade.md).
 - Não-sobreposição de eventos
 - Bloqueios totais (T) e parciais (P)
 - Buffer de deslocamento (D)
-- Capacidade diária (M)
+- Não há limite de horas por dia na agenda: desde 05/10/2026 o RD-05 é só o teto por evento da
+  contagem de horas de formação e o motor não emite mais o conflito M
 
 ## CP-04: Workflow de Sub-Agents
 
@@ -71,8 +72,8 @@ Ordem obrigatória para agentes autônomos:
 
 - **Push direto na `main` é proibido** — sempre via branch + Pull Request
 - Merge por **squash-merge** após CI verde
-- Enforced por hook local `PreToolUse` (`.claude/settings.json`) que bloqueia `git push origin main`
-- ⚠️ O hook vive em `.claude/` (gitignored) → enforcement local não é herdado por um clone novo; o backstop real é o **ruleset de branch protection** da `main` no GitHub (PR obrigatório)
+- Enforced por hook local `PreToolUse` (`.claude/settings.json` → `.claude/hooks/guardrails.py`, guarda `g1_push_main`) que bloqueia `git push origin main`
+- O hook é versionado (desde a D3 de 2026-08-25, `.gitignore` abre exceção para `.claude/settings.json` e `.claude/hooks/`), então um clone novo o herda; ele só age dentro do harness do agente. O backstop autoritativo é o **ruleset de branch protection** da `main` no GitHub (PR obrigatório)
 
 ## CP-08: dev_tools Desabilitado em Produção
 

@@ -734,11 +734,10 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = AuditLog.objects.select_related("usuario").all()
     serializer_class = AuditLogSerializer
-    # Issue #1233 (Epic 4.2.a): logs visíveis por motivo legítimo de acesso —
-    # DAT (suporte/admin transversal), Controle (operação diária),
-    # Superintendência (auditar próprias aprovações/reprovações),
-    # Gerente (auditar batch). Encapsulado na Policy `access_audit_logs`
-    # (Epic 1.6 já tinha consolidado a composição OR; agora vira Policy nomeada).
+    # Issue #1233 (Epic 4.2.a): logs visíveis por motivo legítimo de acesso.
+    # Policy `access_audit_logs` = DAT (`manage_admin_registries`) + Controle
+    # (`operate_preagenda`), pelo pacote da lotação. A gerente da Superintendência
+    # e o Gerente não leem o log (PR 6 do hardening RBAC).
     permission_classes = [CanAccessAuditLogs]
 
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]

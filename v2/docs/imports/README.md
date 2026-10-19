@@ -113,7 +113,7 @@ Corrigido em 2026-07-24. As ações `IMPORT_USUARIOS`, `IMPORT_COMPRAS`, `IMPORT
 - `IMPORT_JOB_FAILED`
 
 e as duas são emitidas **só** pelo caminho assíncrono (`apps/core/tasks.py:634,669`), que hoje
-cobre exclusivamente `bloqueios`. Nenhuma das 10 views síncronas nem nenhum dos 11 services grava
+cobre exclusivamente `bloqueios`. Nenhuma das 10 views síncronas nem nenhum dos 10 services grava
 `AuditLog`.
 
 Consequência: **um apply síncrono não deixa rastro de quem rodou, com qual arquivo, nem do que
@@ -169,7 +169,7 @@ Ordem de execução: [ordem_de_importacao.md](./ordem_de_importacao.md).
 
 Para os 4 tipos acima, o backend **já tem implementação funcional** em produção. Os contratos deste diretório descrevem o formato esperado da planilha `sheets.banco` e servem para **alinhar a geração de CSV externa com o que o backend já aceita** — não para projetar funcionalidades inexistentes.
 
-### Services (11 já implementados em `apps/core/services/`)
+### Services (10 já implementados em `apps/core/services/`, mais o `export_contract_importer.py`)
 
 | Service | Função pública | Idempotência | Dry-run |
 |---|---|---|---|
@@ -177,7 +177,6 @@ Para os 4 tipos acima, o backend **já tem implementação funcional** em produ�
 | `eventos_import.py` | `import_eventos_from_file(path, dry_run=True)` | `external_hash` + Participation M2M | ✅ |
 | `bloqueios_import.py` | `import_bloqueios_from_file(path, dry_run=True)` | tupla (usuario, inicio, fim, tipo) | ✅ |
 | `produtos_import.py` | `import_produtos_from_file(...)` | `Produto.codigo` | ✅ |
-| `colecoes_import.py` | `import_colecoes_from_file(...)` | — | ✅ |
 | `municipios_import.py` | `import_municipios_from_file(...)` | — | ✅ |
 | `equipe_gerencia_import.py` | `import_equipe_gerencia_from_file(...)` | — | ✅ |
 | `controle_imports.py` | `import_compras_from_file(...)` (alimenta **`Compra`**) | SHA1 `external_hash` | ✅ |
@@ -226,6 +225,7 @@ Helpers de reconciliação compartilhados em `apps/core/services/resolvers.py`:
 | `POST /api/controle/import-compras/` | `ImportComprasView` | `IsAuthenticated + SuperuserOnly` (D20) |
 | `POST /api/controle/import-acoes/` | `ControleImportAcoesView` | `IsAuthenticated + SuperuserOnly` (D20) |
 | `POST /api/dat/import-cadastros/` | `DATImportCadastrosView` | `IsAuthenticated + SuperuserOnly` (D20) |
+| `POST /api/deslocamentos/import/` | `ImportDeslocamentosView` | `IsAuthenticated + SuperuserOnly` (D20) |
 
 Todos aceitam `?dry_run=true|false` (default `true`). O parse é **fail-closed** (§2.1, #1649): valor desconhecido permanece em dry-run (preview); só `false`/`0`/`no`/… aplicam.
 
@@ -262,12 +262,11 @@ Modelo de rastreabilidade de execuções async. Campos:
 - `error_message` (≤500c), `error_traceback` (não exposto via API).
 - `celery_task_id`, `duration_ms`, timestamps + métodos `mark_running/success/failed`.
 
-Comentário do código: **"Fase 2 migrará USUARIOS, COMPRAS, ACOES, DESLOCAMENTOS, EVENTOS, PRODUTOS, MUNICIPIOS, COLECOES, EQUIPE_GERENCIA"** — esse é o backlog real.
+Comentário do código: **"Fase 2 adicionara: USUARIOS, COMPRAS, ACOES, DESLOCAMENTOS, EVENTOS, PRODUTOS, MUNICIPIOS, EQUIPE_GERENCIA"** — esse é o backlog real.
 
-### Frontend (3 páginas confirmadas; mais provavelmente)
+### Frontend (2 páginas confirmadas; mais provavelmente)
 
 - `v2/frontend/src/pages/DAT/ImportacoesPage.tsx` — hub `/dat/importacoes`.
-- `v2/frontend/src/pages/AdminDAT/ColecoesImportPage.tsx`.
 - `v2/frontend/src/pages/AdminDAT/EquipeGerenciaImportPage.tsx`.
 - Páginas adjacentes de cadastro AdminDAT (Usuarios, Municipios, Produtos, Projetos, Grupos, Setores, Funcoes, Gerencias) — gerenciam CRUD, **não confirmado** se cada uma tem botão de upload de planilha.
 
@@ -368,10 +367,10 @@ Setor/Função é `apps/core/constants.py:16-45`.)*
 | PR | Escopo | Justificativa | Risco |
 |---|---|---|---|
 | PR 1 | Documentação e contratos + templates (este PR, revisado) | Alinhar `sheets.banco` com formato aceito hoje | Nenhum (docs-only) |
-| PR 2 | **Auditar e padronizar shape de retorno de dry-run** nos 11 services existentes | Cada service hoje retorna estrutura ligeiramente diferente (`stats/pendencias`, `relatório`, `created_ids`, etc.); contrato único facilita frontend e testes | Baixo (não muda comportamento) |
+| PR 2 | **Auditar e padronizar shape de retorno de dry-run** nos 10 services existentes | Cada service hoje retorna estrutura ligeiramente diferente (`stats/pendencias`, `relatório`, `created_ids`, etc.); contrato único facilita frontend e testes | Baixo (não muda comportamento) |
 | PR 3 | **Consolidar helpers de normalização** em `apps/core/imports/normalization.py` extraindo o que já existe em `services/resolvers.py` + `services/normalize.py` | Hoje há helpers úteis (`resolve_municipio`, `resolve_projeto`, `_nfkd`, `norm_text`) mas falta `normalize_cpf`, `normalize_phone`, `parse_br_date`, `parse_bool_ptbr`, `build_import_hash` como API pública | Baixo (refactor) |
-| PR 4 | **Migrar 9 imports síncronos restantes para `ImportJob` async** (ASQ-005 Fase 2) — usuários, compras, ações, deslocamentos, eventos, produtos, municípios, coleções, equipe_gerencia. Um tipo por sub-PR | Padroniza upload + rastreabilidade; já há infra pronta para `bloqueios` | Médio (Celery + auditoria) |
-| PR 5 | **Adicionar botões "Baixar template"** nas páginas de import existentes (`ImportacoesPage.tsx`, `ColecoesImportPage.tsx`, `EquipeGerenciaImportPage.tsx`, e demais que aceitem upload) — apontando para `v2/docs/imports/templates/*.csv` | UX: hoje **não confirmado** se algum botão existe | Baixo (frontend simples) |
+| PR 4 | **Migrar 8 imports síncronos restantes para `ImportJob` async** (ASQ-005 Fase 2) — usuários, compras, ações, deslocamentos, eventos, produtos, municípios, equipe_gerencia. Um tipo por sub-PR | Padroniza upload + rastreabilidade; já há infra pronta para `bloqueios` | Médio (Celery + auditoria) |
+| PR 5 | **Adicionar botões "Baixar template"** nas páginas de import existentes (`ImportacoesPage.tsx`, `EquipeGerenciaImportPage.tsx`, e demais que aceitem upload) — apontando para `v2/docs/imports/templates/*.csv` | UX: hoje **não confirmado** se algum botão existe | Baixo (frontend simples) |
 | PR 6 (talvez desnecessária) | Reforçar **validadores específicos** apenas se PR 2 identificar lacuna | Cada service já tem suas validações; provavelmente bastam ajustes pontuais | A definir após PR 2 |
 
 ### Ordem sugerida
@@ -386,6 +385,6 @@ Setor/Função é `apps/core/constants.py:16-45`.)*
 
 - Criar `ImportBatch` (já existe `ImportJob`).
 - Criar dry-run (todos os services já implementam).
-- Criar services `*_import.py` (11 já existem).
+- Criar services `*_import.py` (10 já existem).
 - Criar endpoints (10 síncronos + 3 async já existem).
 - Criar `normalize_text_key`, `resolve_municipio`, `resolve_projeto` (já existem em `resolvers.py`/`normalize.py`).

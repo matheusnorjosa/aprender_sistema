@@ -60,13 +60,13 @@ Esta spec é o **índice canônico do inventário de páginas**: domínio, rota 
 ## Fonte de verdade no código
 
 - [`v2/frontend/src/App.tsx`](../../../frontend/src/App.tsx) — shell: carrega `getMe()` + `getMyPolicies()`, decide login vs app, monta sidebar/header/`<AppRoutes>`. `LoginPage` é a única página lazy fora de `AppRoutes` (`App.tsx`, const `LoginPage`); sem `user`, o app renderiza só a `LoginPage` (`App.tsx`, `AppContent` → ramo `if (!user)`) — é daí que vem o guard "autenticado" das rotas sem gate próprio.
-- [`v2/frontend/src/components/AppRoutes.tsx`](../../../frontend/src/components/AppRoutes.tsx) — **registro único de rotas**. **42 páginas lazy** (`AppRoutes.tsx`) e **53 `<Route>`**, dos quais **6 são redirects** de URLs legadas (`<Navigate replace>`).
+- [`v2/frontend/src/components/AppRoutes.tsx`](../../../frontend/src/components/AppRoutes.tsx) — **registro único de rotas**. **41 páginas lazy** (`AppRoutes.tsx`) e **52 `<Route>`**, dos quais **6 são redirects** de URLs legadas (`<Navigate replace>`).
 - [`v2/frontend/src/components/access/RequirePolicy.tsx`](../../../frontend/src/components/access/RequirePolicy.tsx) — guard único. Decisão no componente `RequirePolicy` (local `granted`): `allow` (boolean explícito) tem precedência; senão alguma das `policy` em `policies`; **sem `policy` nem `allow` → fail-secure** (`granted = false`). Fallback padrão é `DefaultForbidden`.
 - [`v2/frontend/src/contexts/AcessoContext.ts`](../../../frontend/src/contexts/AcessoContext.ts) — **fonte única de acesso** (PR 7): `useAcesso()` dá `caps` (as policies de `/api/me/policies/`) e `ehSuperusuario`. `AppRoutes`, `AppSidebar`, a Página Inicial e os botões das páginas leem daqui; `usePermissions`/`useCanAccess` foram apagados.
 - [`v2/frontend/src/components/AppSidebar.tsx`](../../../frontend/src/components/AppSidebar.tsx) — menu lateral; cada item lê a mesma policy da rota (`useAcesso().caps`) e, em DAT > Importações, `ehSuperusuario`. É UX, não é o gate autoritativo.
-- Diretório [`v2/frontend/src/pages/`](../../../frontend/src/pages) — **15 diretórios de domínio** (AdminDAT, Aprovacoes, Auth, Controle, DAT, DATModule, Dashboards, Deslocamentos, Disponibilidade, Home, MapaBrasil, MeusEventos, Perfil, PreAgenda, Solicitacoes) + `__tests__`.
+- Diretório [`v2/frontend/src/pages/`](../../../frontend/src/pages) — **16 diretórios de domínio** (AdminDAT, Aprovacoes, Auth, Controle, DAT, DATModule, Dashboards, Deslocamentos, Disponibilidade, Home, MapaBrasil, MeusEventos, Perfil, Politica, PreAgenda, Solicitacoes) + `__tests__`.
 
-> **Contagem real:** **44 páginas lazy-loaded** (42 em `AppRoutes` + `LoginPage` e `TrocaSenhaObrigatoriaPage` em `App.tsx`), não "45+".
+> **Contagem real:** **43 páginas lazy-loaded** (41 em `AppRoutes` + `LoginPage` e `TrocaSenhaObrigatoriaPage` em `App.tsx`), não "45+".
 >
 > **Correção de mito (o inverso do que esta spec dizia até 2026-07-20):** `pages/Disponibilidade/` (diretório) **não tem `index`**; quem está roteado em `/solicitacoes/bloqueios` é o arquivo solto [`pages/Disponibilidade.tsx`](../../../frontend/src/pages/Disponibilidade.tsx) (`AppRoutes.tsx`, const `DisponibilidadeBlocks` → `import('../pages/Disponibilidade')` resolve o arquivo antes do diretório). Do diretório homônimo, só `MonthlyPage` é roteada (`AppRoutes.tsx`, const `MonthlyPage`).
 
@@ -203,6 +203,7 @@ Inventário por domínio (rota → componente → guard **como o código aplica 
 | Rota | Página | Guard (`AppRoutes.tsx`) |
 |---|---|---|
 | `/perfil` | `Perfil/PerfilPage` | `allow={!!user}` |
+| `/politica-privacidade` | `Politica/PoliticaPrivacidadePage` | `allow={!!user}` |
 
 > **F1 (scan de segurança, 16/10/2026):** com `redefinicoes_senha` não vazio (`/api/me/`), o Perfil mostra o cartão "Redefinições da sua senha nos últimos 30 dias" (quem e quando, lista com `aria-labelledby`) e pede para avisar a administração se a pessoa não reconhecer alguma.
 
@@ -238,7 +239,7 @@ Inventário por domínio (rota → componente → guard **como o código aplica 
 
 > **PR 9 das permissões (16/10/2026):** a `FiltersBar` da Grade oferece só as gerências de `me.gerencias` com papel GERENTE, COORDENADOR ou APOIO (a API recusa o papel FORMADOR sozinho, P9-3). Na Nova Solicitação e na tela Editar, o seletor de formadores e o de responsável mandam `projeto_id` ao `/api/lookup/usuarios/`: só pessoas da gerência do projeto escolhido (P9-5).
 
-> **PR 7 das permissões (15/10/2026):** as três telas de escopo usam policies compostas no servidor (`TELAS_DE_ESCOPO`, `rbac/policies.py`): `view_all_availability` OU grupo (Grade: Controle, DAT, Gerente, Coordenador, Apoio; Bloqueios: Controle, DAT, Coordenador, Apoio, Formador; Deslocamentos: Controle, DAT, Coordenador, Apoio) OU vínculo GERENTE/COORDENADOR/APOIO vigente em gerência ativa — a fórmula que o front calculava, provada pessoa a pessoa em `test_rbac_politicas_de_tela.py`. Antes a `DeslocamentosPage` tinha regra própria (com Superintendência, sem `view_all_availability`) e divergia da rota.
+> **PR 7 das permissões (15/10/2026):** as três telas de escopo passaram a usar policies compostas no servidor (`TELAS_DE_ESCOPO`, `rbac/policies.py`), na época com a fórmula que o front calculava (capacidade OU grupo de setor/função OU vínculo G/C/A), provada pessoa a pessoa em `test_rbac_politicas_de_tela.py`. **Hoje** (PR 8 e PR 12, `_abre_tela_de_escopo`) abre a tela `view_all_availability` OU papel vigente em gerência ativa (`EquipeGerencia.PAPEIS_DE_ATUACAO` = GERENTE/COORDENADOR/APOIO; Bloqueios também FORMADOR); o grupo de setor (Controle, DAT) só abre no modo `RBAC_FONTE=uniao`, e grupo de função não abre nada — ver [`hooks-rbac.spec.md`](./hooks-rbac.spec.md). Antes a `DeslocamentosPage` tinha regra própria (com Superintendência, sem `view_all_availability`) e divergia da rota.
 
 > **PR A (2026-09-29):** Grade, Bloqueios e Deslocamentos também abrem por vínculo GERENTE/COORDENADOR/APOIO, mesmo sem grupo de FUNÇÃO (o backend já escopa por vínculo); desde o PR 7 o servidor soma o vínculo nas policies `access_*` e o menu, a rota e o gate local da `DeslocamentosPage` leem a mesma policy. Na Grade, a `FiltersBar` escolhe a gerência pela policy `view_all_availability` + `me.gerencias` (ver [`hooks-rbac.spec.md`](./hooks-rbac.spec.md)); a opção sem gerência se chama "Participantes de projetos SUPER". Na PreAgenda, o filtro de gerência é um Select das gerências ativas que manda `gerencia_id` para a lista e para o resumo (KPIs); o resumo não recebe mais o `status` da lista (lá `status` é o `gcal_status`, e `approved` zerava os KPIs). Nas telas de admin, setor = `rotulo` da gerência: coluna Setor de Usuários pela lotação vigente (sem vínculo — Controle, DAT, Diretoria —, os grupos de setor, como no Perfil), o Select de lotação inclui a gerência atual mesmo inativa, 1ª coluna de Gerências, e em Projetos a tag da gerência com o setor do catálogo embaixo quando difere (sem coluna nova).
 
@@ -268,7 +269,7 @@ Inventário por domínio (rota → componente → guard **como o código aplica 
 
 | Rota | Página | Guard (`AppRoutes.tsx`) |
 |---|---|---|
-| `/dat/admin` + `/dat/admin/{usuarios,municipios,projetos,grupos,setores,funcoes,gerencias,produtos,configuracoes}` | `AdminDAT/*` | policy `manage_admin_registries` |
+| `/dat/admin` + `/dat/admin/{usuarios,municipios,projetos,grupos,setores,funcoes,gerencias,produtos,projetos-gerais,configuracoes}` | `AdminDAT/*` | policy `manage_admin_registries` |
 | `/dat/admin/equipe-gerencia` (tela de importação) | `AdminDAT/EquipeGerenciaImportPage` | só superusuário (`allow={ehSuperusuario}`) |
 | `/dat/cadastros` | `DATModule/CadastrosPage` | policy `manage_admin_registries` |
 | `/dat/importacoes` | `DAT/ImportacoesPage` | só superusuário (`allow={ehSuperusuario}`) |
@@ -356,4 +357,4 @@ páginas fazem, não o que deveriam fazer.
 - **Rota e endpoint podem divergir na policy.** A matriz viva no backend é o SSOT — qualquer página nova deve usar a policy do endpoint que consome. Desde o PR 7 nenhum guard reimplementa a matriz no cliente (só policy, `ehSuperusuario` e "autenticado").
 - **`pages/Solicitacoes.tsx` removido (#1728).** O arquivo raiz (~15 KB) era dead code — **não importado por nenhum módulo**, nenhuma rota o alcançava — e foi removido nesta limpeza. `pages/Disponibilidade.tsx` (também na raiz) **está** roteado; os dois não devem ser tratados como o mesmo caso.
 - **Logout via `window.location.reload()`.** Tech-debt assumido (#927, `App.tsx`, `handleLogout`) — sem auth store centralizado, logout força reload em vez de limpeza de estado.
-- **Sidebar e rotas usam camadas diferentes.** O menu decide por `useCapabilities` (policy pura) e as rotas compostas por flags legacy; onde as duas discordam, o item aparece e a rota nega (ou o contrário). `AppSidebar.menu.test.tsx` cobre a paridade nos atores canônicos, não em todas as rotas.
+- **Menu e rota leem a mesma fonte, mas a paridade só é testada nos atores canônicos.** Desde o PR 7 o `AppSidebar` e o `AppRoutes` decidem pela mesma policy (`useAcesso().caps`, mais `ehSuperusuario` onde a regra é o superusuário); não há mais flags legacy. `AppSidebar.menu.test.tsx` cobre a paridade nos atores canônicos, não em todas as rotas.

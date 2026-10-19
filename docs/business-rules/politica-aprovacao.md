@@ -3,8 +3,8 @@
 Regras que governam o fluxo de aprovação de solicitações.
 
 !!! info "SSOT técnica"
-    O contrato detalhado — enforcement real por arquivo, idempotência, auditoria e as
-    divergências vivas entre a regra e o código — está em
+    O contrato detalhado — enforcement real por arquivo, idempotência, auditoria e o
+    registro das divergências entre a regra e o código (hoje resolvidas) — está em
     [`v2/docs/specs/domain/politica-aprovacao.spec.md`](https://github.com/matheusnorjosa/aprender_sistema/blob/main/v2/docs/specs/domain/politica-aprovacao.spec.md).
     Esta página é o resumo legível. Em caso de conflito, a spec vence.
 
@@ -108,15 +108,15 @@ test_approval_flow_records_audit_log
 
 ### Aprovação em lote
 
-Máximo 100 IDs por chamada (`POST /api/solicitacoes/batch_approve/`). Cada item gera
+Máximo 100 IDs por chamada (`POST /api/solicitacoes/batch-approve/`). Cada item gera
 `AuditLog` próprio com `batch: true`, e cada item é revalidado contra disponibilidade antes
 de ser aprovado.
 
-!!! warning "`ids` não é validado como lista de inteiros (P2 · #1650)"
-    Enviar `ids` como **string** passa pelas guardas (`len` conta caracteres) e o Django itera
-    a string: `"123"` alveja as solicitações 1, 2 e 3. O ator já precisa da permissão de
-    aprovação, então não é escalação — o dano é aprovar alvo que não foi nomeado
-    (`apps/core/views_solicitacao.py:857`, `apps/core/services/solicitacao_approval.py:272-291`).
+!!! success "`ids` é validado como lista de inteiros (#1650, resolvido)"
+    `batch_approve` e `batch_reject` validam o corpo com `_BatchIdsSerializer`
+    (`apps/core/views_solicitacao.py`) antes do serviço: `ids` precisa ser uma **lista** de
+    inteiros positivos. String, inteiro solto e dict são recusados com 400, então `"123"` não
+    alveja mais as solicitações 1, 2 e 3. Vazio e o limite de 100 seguem a cargo do serviço.
 
 ### NAO_SUPER (Auto-aprovado)
 

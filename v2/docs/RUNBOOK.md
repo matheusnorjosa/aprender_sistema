@@ -503,8 +503,9 @@ curl http://localhost:8002/api/features/
 # Django Admin
 # ════════════════════════════════════════════════════════════
 # URL: http://localhost:8002/admin/
-# User: admin
-# Pass: Admin@123
+# User: admin (o entrypoint só cria com CREATE_SUPERUSER=1; ligue só em dev)
+# Pass: a de DJANGO_SUPERUSER_PASSWORD do seu .env (não há senha padrão)
+# Em prod CREATE_SUPERUSER fica desligado e o username é o CPF
 
 # ════════════════════════════════════════════════════════════
 # Parar Stack (sem perder dados)

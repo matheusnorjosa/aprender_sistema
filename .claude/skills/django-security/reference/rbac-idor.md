@@ -70,8 +70,9 @@ This mirrors `SolicitacaoViewSet.get_queryset` in `apps/core/views_solicitacao.p
 GLOBAL (superuser, `operate_preagenda`, `manage_admin_registries`, `approve_solicitation`
 ou quem aprova por `solicitation_approval_basis`) vê tudo; GESTORA (papel GERENTE vigente)
 vê as gerências dela + as próprias; APOIO (`publish_setor_solicitacao`) vê as aprovadas das gerências onde é APOIO; DEMAIS
-só as próprias. Never `groups.filter(name=...)`; the same function backs
-`IsOwnerOrPrivileged.has_object_permission` (fora do escopo → 404).
+só as próprias. Never `groups.filter(name=...)`. A linha fora do escopo nem entra no
+queryset (→ 404); a edição/exclusão passa ainda por `IsOwnerOrPrivileged.has_object_permission`,
+que usa `user_can_access_solicitacao` do mesmo módulo (mesma regra, salvo a aprovadora restrita).
 
 ## Lint guard
 

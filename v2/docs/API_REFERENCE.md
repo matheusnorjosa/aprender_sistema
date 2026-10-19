@@ -523,7 +523,7 @@ CRUD de `TipoEvento` só pelo Django Admin (superuser).
 |--------|----------|--------|-----------|-----------|
 | GET | `/api/gerencias/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar gerências | IsAuthenticated |
 | GET | `/api/gerencias/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Detalhes da gerência | IsAuthenticated |
-| POST/PUT/PATCH/DELETE | `/api/gerencias/` | ![Stable](https://img.shields.io/badge/-stable-green) | Escrita de gerência | `IsAuthenticated` + `manage_purchases_and_materials` |
+| POST/PUT/PATCH/DELETE | `/api/gerencias/` | ![Stable](https://img.shields.io/badge/-stable-green) | Escrita de gerência | `IsAuthenticated` + `manage_admin_registries` (19/10/2026; antes `manage_purchases_and_materials`, que o Controle também tinha) |
 
 Gate em `GerenciaViewSet.get_permissions` (`views/admin.py`). Campo `pergunta_avaliar_formador` (bool,
 padrão `true`; 05/10/2026): `false` tira da Nova Solicitação a pergunta "pretende avaliar o formador?"

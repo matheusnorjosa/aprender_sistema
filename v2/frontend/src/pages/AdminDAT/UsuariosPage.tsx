@@ -48,6 +48,7 @@ import {
   gruposAposSalvar,
   lotacaoObrigatoria,
   mensagemDoErro,
+  motivoDaLotacaoTravada,
   nomeDe,
 } from './usuario_form_helpers';
 import type { PermissaoFuncional, RBACMetaPayload, GerenciaRecord } from '../../api/adminDAT';
@@ -61,7 +62,7 @@ import { formatFortaleza } from '../../utils/datetime';
 import type { ValidationResult, ApplyResult } from '../../components/ImportUploader';
 import logger from '../../utils/logger';
 import { PAGE_SIZES } from '../../constants';
-import { ehSuperusuario } from '../../contexts/AcessoContext';
+import { ehSuperusuario, useAcesso } from '../../contexts/AcessoContext';
 import type { ID } from '../../types';
 
 /** View mode type */
@@ -121,6 +122,8 @@ interface UserRecord {
   gerencia_atual?: { gerencia_id: number; rotulo: string; nome_setor: string; setor_canonico: string; papel: string } | null;
   // Tem vínculo vigente de papel EQUIPE ("Equipe administrativa").
   equipe_administrativa?: boolean;
+  // Vínculo reservado vigente (DAT, Controle, Diretoria, Gerente da Superintendência): só o superusuário lota.
+  lotacao_reservada?: boolean;
   date_joined?: string;
   last_login?: string | null;
 }
@@ -365,14 +368,27 @@ export default function UsuariosPage(): JSX.Element {
   const [gerencias, setGerencias] = useState<GerenciaRecord[]>([]);
   const [rbacMeta, setRbacMeta] = useState<RBACMetaPayload | null>(null);
   const [currentIsSuperuser, setCurrentIsSuperuser] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<ID | null>(null);
+  const { caps } = useAcesso();
   const [viewMode, setViewMode] = useState<ViewMode>('lista');
 
   const [form] = Form.useForm<UserFormValues>();
   const [resetForm] = Form.useForm<{ nova_senha: string; confirmar_nova_senha: string }>();
   const selectedGerenciaId = Form.useWatch('gerencia_id', form);
   const equipeMarcada = Form.useWatch('equipe_administrativa', form);
+  // 17/10/2026: o DAT (`manage_lotacao_comum`) lota nas gerências comuns, menos a própria conta e a que tem
+  // vínculo reservado (o backend recusa com 400; aqui os campos travam com o motivo).
+  const travaDoDat = motivoDaLotacaoTravada({
+    currentIsSuperuser,
+    podeLotarComum: caps.canManageLotacaoComum,
+    propria: !!editingUser && editingUser.id === currentUserId,
+    reservada: !!editingUser?.lotacao_reservada,
+  });
+  const lotaComum = !currentIsSuperuser && caps.canManageLotacaoComum && travaDoDat === null;
+  const editaLotacao = currentIsSuperuser || lotaComum;
   const obrigatorio = lotacaoObrigatoria({
     currentIsSuperuser,
+    lotaComum,
     isEditing: !!editingUser,
     temLotacao: !!editingUser?.gerencia_atual,
     equipeAdministrativa: equipeMarcada,
@@ -393,7 +409,9 @@ export default function UsuariosPage(): JSX.Element {
   // mais a lotação atual de quem está em edição quando ela foi desativada — o form a
   // reenvia e o backend aceita (sem ela o Select mostraria o id cru).
   const gerenciaOptions = useMemo(() => {
+    // O DAT não vê as gerências reservadas (DAT, Controle, Diretoria): lotar nelas é do superusuário.
     const options = gerencias
+      .filter((g) => currentIsSuperuser || !g.lotacao_reservada)
       .slice()
       .sort((a, b) => a.rotulo.localeCompare(b.rotulo, 'pt-BR'))
       .map((g) => ({ label: g.rotulo, value: g.id }));
@@ -402,7 +420,7 @@ export default function UsuariosPage(): JSX.Element {
       options.push({ label: atual.rotulo, value: atual.gerencia_id });
     }
     return options;
-  }, [gerencias, editingUser]);
+  }, [gerencias, editingUser, currentIsSuperuser]);
 
   const funcaoOptions = useMemo(
     () => grupos
@@ -477,6 +495,7 @@ export default function UsuariosPage(): JSX.Element {
       try {
         const auth = await checkAuth();
         setCurrentIsSuperuser(ehSuperusuario(auth.user));
+        setCurrentUserId(auth.user?.id ?? null);
       } catch {
         setCurrentIsSuperuser(false);
       }
@@ -585,6 +604,7 @@ export default function UsuariosPage(): JSX.Element {
         isEditing: !!editingUser,
         cpfEditUnlocked,
         currentIsSuperuser,
+        lotaComum,
         funcoesCarregadas: funcoesProntasParaSalvar({
           isEditing: !!editingUser,
           hidratouComFuncoes,
@@ -957,12 +977,14 @@ export default function UsuariosPage(): JSX.Element {
             description="Gerência define onde a pessoa atua (o setor é atribuído automaticamente). Função define o que a pessoa pode fazer no sistema."
           />
 
+          {travaDoDat ? <Alert type="warning" showIcon className="mb-4" message={travaDoDat} /> : null}
+
           <Form.Item
             name="gerencia_id"
             label="Gerência (onde trabalha)"
             tooltip="Gerência específica de lotação da pessoa. O setor é derivado da gerência."
-            // P0-1 Tier-0 (D-1=2a): lotação é superuser-only. Não-superuser vê o
-            // valor atual, mas não edita (e o helper não envia gerencia_id). Relaxa
+            // P0-1 Tier-0 (D-1=2a): lotação é do superuser e, nas comuns, do DAT (`editaLotacao`). Os
+            // demais veem o valor atual, mas não editam (e o helper não envia gerencia_id). Relaxa
             // o required p/ não travar o submit de conta comum com o Select disabled.
             // #2071: obrigatória ao criar e para quem já tem lotação (o Controle não tem).
             rules={
@@ -975,7 +997,7 @@ export default function UsuariosPage(): JSX.Element {
               optionFilterProp="label"
               placeholder="Selecione uma gerência"
               options={gerenciaOptions}
-              disabled={!currentIsSuperuser}
+              disabled={!editaLotacao}
             />
           </Form.Item>
 
@@ -983,7 +1005,7 @@ export default function UsuariosPage(): JSX.Element {
             name="funcao_ids"
             label="Função (o que pode fazer)"
             tooltip="Papel da pessoa no processo"
-            // P0-1 Tier-0 (D-1=2a): membership é superuser-only (ver gerencia_id acima).
+            // P0-1 Tier-0 (D-1=2a): membership segue o mesmo gate (ver gerencia_id acima).
             // #2071: obrigatória só ao criar (na edição, o DAT não tem função).
             rules={obrigatorio.funcao ? [{ required: true, message: 'Selecione pelo menos uma função' }] : []}
           >
@@ -995,7 +1017,7 @@ export default function UsuariosPage(): JSX.Element {
               maxTagCount="responsive"
               placeholder="Selecione uma ou mais funções"
               options={funcaoOptions}
-              disabled={!currentIsSuperuser}
+              disabled={!editaLotacao}
             />
           </Form.Item>
 
@@ -1004,7 +1026,7 @@ export default function UsuariosPage(): JSX.Element {
             valuePropName="checked"
             extra="Na gerência do DAT ou do Controle, dá o pacote do setor, inclusive aprovar solicitações. Nas demais, só registra que a pessoa trabalha nesta gerência."
           >
-            <Checkbox disabled={!currentIsSuperuser}>Equipe administrativa</Checkbox>
+            <Checkbox disabled={!editaLotacao}>Equipe administrativa</Checkbox>
           </Form.Item>
 
           <Card size="small" title="Resumo do perfil de acesso" className="mb-4">

@@ -363,6 +363,8 @@ export interface GerenciaRecord {
   descricao: string;
   /** False = a Nova Solicitação não pergunta se a pessoa pretende avaliar o formador (05/10/2026). */
   pergunta_avaliar_formador?: boolean;
+  /** Read-only: lotar nela é só do superusuário (DAT, Controle, Diretoria; 17/10/2026). */
+  lotacao_reservada?: boolean;
   projetos_count: number;
   created_at: string;
   updated_at: string;

@@ -45,6 +45,11 @@ export interface BuildPayloadOptions {
   /** Se o user logado é superuser (controla visibilidade de is_superuser no payload) */
   currentIsSuperuser: boolean;
   /**
+   * 17/10/2026: o DAT (`manage_lotacao_comum`) lota esta conta nas gerências comuns (não é a própria nem
+   * tem vínculo reservado). Envia a lotação como o superusuário; o backend aplica a regra.
+   */
+  lotaComum?: boolean;
+  /**
    * #2071: se a lista de funções (RBAC meta + grupos) carregou. Sem ela, o form hidrata as funções
    * vazias; mandar `group_ids` tiraria todas as funções (e a aprovação) por falha de carga.
    */
@@ -65,8 +70,8 @@ export function buildUsuarioPayload(
   options: BuildPayloadOptions,
 ): Record<string, unknown> {
   const { funcao_ids = [], gerencia_id, equipe_administrativa, is_superuser, cpf, ...rest } = values;
-  const { isEditing, cpfEditUnlocked, currentIsSuperuser, funcoesCarregadas = true } = options;
-  const editaLotacao = currentIsSuperuser && funcoesCarregadas;
+  const { isEditing, cpfEditUnlocked, currentIsSuperuser, lotaComum = false, funcoesCarregadas = true } = options;
+  const editaLotacao = (currentIsSuperuser || lotaComum) && funcoesCarregadas;
 
   // CPF: incluir se create OU se edit+unlocked com valor preenchido
   const includeCpf = !isEditing || cpfEditUnlocked;
@@ -75,14 +80,13 @@ export function buildUsuarioPayload(
   // is_superuser: incluir apenas se quem está editando é superuser
   const superuserPayload = currentIsSuperuser ? { is_superuser } : {};
 
-  // group_ids (memberships): P0-1 Tier-0 (D-1=2a) — gestão de grupo é
-  // superuser-only. Editor não-superuser NÃO envia group_ids (co-deploy: para
-  // de enviar antes de o backend rejeitar). DAT segue editando conta comum
-  // (cadastral/senha/ativo) sem tocar em memberships. Agora só as FUNÇÕES — o
-  // grupo de setor é auto-atribuído pelo backend a partir da Gerência.
+  // group_ids (memberships): P0-1 Tier-0 (D-1=2a) — gestão de grupo é do
+  // superuser e, desde 17/10/2026, do DAT que lota nas gerências comuns (`lotaComum`).
+  // Fora disso o editor não-superuser NÃO envia group_ids (cadastral/senha/ativo só).
+  // Só as FUNÇÕES — o grupo de setor é auto-atribuído pelo backend a partir da Gerência.
   const groupsPayload = editaLotacao ? { group_ids: [...funcao_ids] } : {};
 
-  // gerencia_id (lotação): mesmo gate superuser-only. O backend cria/sincroniza
+  // gerencia_id (lotação): mesmo gate. O backend cria/sincroniza
   // o vínculo EquipeGerencia; null = não altera o vínculo existente.
   const gerenciaPayload = editaLotacao ? { gerencia_id: gerencia_id ?? null } : {};
   // Papel EQUIPE: mesmo gate; reenvia o valor hidratado (salvar sem mudar mantém o vínculo).
@@ -126,7 +130,7 @@ export function gerenciaDaPacote(gerencia: Pick<GerenciaLike, 'nome'> | undefine
 }
 
 /**
- * #2071: o que é obrigatório no form (só para superuser, o único que edita lotação). Ao criar,
+ * #2071: o que é obrigatório no form (para quem edita lotação: o superuser e o DAT com `lotaComum`). Ao criar,
  * gerência e função. Na edição, a função é opcional (o DAT não tem) e a gerência só é obrigatória
  * para quem já tem lotação: o Controle não tem, e limpar a gerência não pode ser um jeito de salvar
  * uma aprovadora sem revogar. Com "Equipe administrativa" marcada, a gerência é obrigatória (o vínculo
@@ -134,15 +138,35 @@ export function gerenciaDaPacote(gerencia: Pick<GerenciaLike, 'nome'> | undefine
  */
 export function lotacaoObrigatoria(opts: {
   currentIsSuperuser: boolean;
+  lotaComum?: boolean;
   isEditing: boolean;
   temLotacao: boolean;
   equipeAdministrativa?: boolean | undefined;
 }): { gerencia: boolean; funcao: boolean } {
-  const { currentIsSuperuser, isEditing, temLotacao, equipeAdministrativa = false } = opts;
+  const { currentIsSuperuser, lotaComum = false, isEditing, temLotacao, equipeAdministrativa = false } = opts;
+  const edita = currentIsSuperuser || lotaComum;
   return {
-    gerencia: currentIsSuperuser && (!isEditing || temLotacao || equipeAdministrativa),
-    funcao: currentIsSuperuser && !isEditing && !equipeAdministrativa,
+    gerencia: edita && (!isEditing || temLotacao || equipeAdministrativa),
+    funcao: edita && !isEditing && !equipeAdministrativa,
   };
+}
+
+/**
+ * 17/10/2026: por que o DAT (`manage_lotacao_comum`) não edita a lotação desta conta; null = edita (ou não é o
+ * caso: superusuário edita tudo, sem a policy ninguém edita). Espelha `_valida_lotacao_comum` do backend.
+ */
+export function motivoDaLotacaoTravada(opts: {
+  currentIsSuperuser: boolean;
+  podeLotarComum: boolean;
+  propria: boolean;
+  reservada: boolean;
+}): string | null {
+  if (opts.currentIsSuperuser || !opts.podeLotarComum) return null;
+  if (opts.propria) return 'Sua própria lotação só o superusuário altera.';
+  if (opts.reservada) {
+    return 'Esta pessoa trabalha no DAT, no Controle ou na Diretoria, ou é Gerente da Superintendência: a lotação dela só o superusuário altera.';
+  }
+  return null;
 }
 
 /**

@@ -11,7 +11,8 @@
  *   remedida com o PR 10, 16/10/2026: o DAT tem o vínculo EQUIPE na gerência DAT e o pacote final,
  *   a Diretoria saiu do painel do Google, e o grupo Superintendência perdeu as capacidades, o que
  *   tira do ator "Gerente da Superintendência" (que tem esse grupo) o Google, os relatórios e excluir;
- *   em produção as gerentes aprovam pelo vínculo e não têm o grupo).
+ *   em produção as gerentes aprovam pelo vínculo e não têm o grupo). 17/10/2026: `manage_lotacao_comum`
+ *   (= `manage_admin_registries`) para o superusuário e o DAT.
  *   Mudou o seed ou uma policy? Meça de novo e atualize aqui; o backend trava a fórmula em
  *   `test_rbac_politicas_de_tela.py`.
  *
@@ -99,6 +100,7 @@ export const ATORES_RBAC: readonly AtorRbac[] = [
       'import_generic_spreadsheet',
       'manage_admin_registries',
       'manage_internal_actions',
+      'manage_lotacao_comum',
       'manage_purchases_and_materials',
       'manage_solicitacao_status',
       'publish_setor_solicitacao',
@@ -131,6 +133,7 @@ export const ATORES_RBAC: readonly AtorRbac[] = [
       'import_compras',
       'import_generic_spreadsheet',
       'manage_admin_registries',
+      'manage_lotacao_comum',
       'manage_purchases_and_materials',
       'manage_solicitacao_status',
       'use_gcal',
@@ -283,6 +286,7 @@ export const PERSONAS_POR_VINCULO: readonly (Omit<AtorRbac, 'ator'> & { ator: st
       'import_compras',
       'import_generic_spreadsheet',
       'manage_admin_registries',
+      'manage_lotacao_comum',
       'manage_purchases_and_materials',
       'manage_solicitacao_status',
       'use_gcal',

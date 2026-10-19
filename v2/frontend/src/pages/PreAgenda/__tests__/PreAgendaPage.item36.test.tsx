@@ -169,6 +169,38 @@ describe('PreAgendaPage — os mais próximos primeiro, e aviso quando a lista �
     expect(aviso.textContent).toMatch(/filtre por data, gerência ou busca/i);
   });
 
+  // Cada fluxo é cortado no servidor de forma independente. Se o SUPER veio cortado no dia 20, um
+  // NAO_SUPER do dia 25 não pode aparecer: os SUPER dos dias 21 a 30 ficaram de fora, e a lista
+  // deixaria de ser "os mais próximos de hoje".
+  test('um fluxo cortado: a lista juntada para no último evento dele, sem buraco no meio', async () => {
+    const dia = (d: number) => ({ inicio: `2099-03-${d}T12:00:00Z`, fim: `2099-03-${d}T15:00:00Z` });
+    listSolicitacoesMock.mockImplementation((f: { flow: string }) =>
+      Promise.resolve(
+        f.flow === 'SUPER'
+          ? {
+              results: [
+                row({ id: 1, municipio_nome: 'SuperDia10', ...dia(10) }),
+                row({ id: 2, municipio_nome: 'SuperDia20', ...dia(20) }),
+              ],
+              count: 150,
+            }
+          : {
+              results: [
+                row({ id: 3, municipio_nome: 'NaoSuperDia15', ...dia(15) }),
+                row({ id: 4, municipio_nome: 'NaoSuperDia25', ...dia(25) }),
+              ],
+              count: 2,
+            },
+      ),
+    );
+    render(<PreAgendaPage />);
+    await screen.findByText('SuperDia20');
+
+    expect(screen.getByText('NaoSuperDia15')).toBeInTheDocument();
+    expect(screen.queryByText('NaoSuperDia25')).not.toBeInTheDocument();
+    expect(screen.getByText(/Mostrando 3 de 152 eventos aprovados, os mais próximos de hoje/)).toBeInTheDocument();
+  });
+
   test('sem corte, sem aviso', async () => {
     mockRows([row({ id: 1, municipio_nome: 'Crato' })]);
     render(<PreAgendaPage />);

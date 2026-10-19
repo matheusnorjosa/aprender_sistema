@@ -96,21 +96,35 @@ const { Title, Text } = Typography;
 const UMA_LINHA: CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 
 /**
- * A ordem de `?ordering=proximidade` do servidor, para intercalar as listas dos dois fluxos: de hoje
- * em diante, do mais próximo ao mais distante; depois os passados, do mais recente ao mais antigo.
- * "Hoje" é o início do dia em Fortaleza.
+ * Junta as listas dos fluxos na ordem de `?ordering=proximidade` do servidor: de hoje em diante, do
+ * mais próximo ao mais distante; depois os passados, do mais recente ao mais antigo. "Hoje" é o
+ * início do dia em Fortaleza.
+ *
+ * Cada fluxo é cortado no servidor de forma independente. Se um veio cortado, a lista juntada para
+ * no último evento dele (o mais cedo, se os dois vieram cortados); eventos no mesmo horário ficam,
+ * porque estão à mesma distância de hoje. Sem o corte, eventos do outro fluxo depois desse ponto
+ * entravam e os do fluxo cortado sumiam no meio da lista.
  */
-function porProximidade(linhas: Solicitacao[]): Solicitacao[] {
+function porProximidade(listas: Array<PaginatedResponse<Solicitacao> | Solicitacao[]>): Solicitacao[] {
   const hoje = dayjs().tz(FORTALEZA_TZ).startOf('day').valueOf();
-  const chave = (r: Solicitacao): [number, number] => {
+  const distancia = (r: Solicitacao): [number, number] => {
     const t = Date.parse(r.inicio);
     return t >= hoje ? [0, t] : [1, -t];
   };
-  return [...linhas].sort((a, b) => {
-    const [ga, ta] = chave(a);
-    const [gb, tb] = chave(b);
-    return ga - gb || ta - tb || Number(a.id) - Number(b.id);
-  });
+  const compararDistancia = (a: Solicitacao, b: Solicitacao): number => {
+    const [ga, ta] = distancia(a);
+    const [gb, tb] = distancia(b);
+    return ga - gb || ta - tb;
+  };
+  const comparar = (a: Solicitacao, b: Solicitacao): number => compararDistancia(a, b) || Number(a.id) - Number(b.id);
+
+  const ultimosDosCortados = listas
+    .filter((d): d is PaginatedResponse<Solicitacao> => 'results' in d && d.results.length > 0 && d.results.length < d.count)
+    .map((d) => [...d.results].sort(comparar)[d.results.length - 1] as Solicitacao)
+    .sort(comparar);
+  const juntas = listas.flatMap((d) => ('results' in d ? d.results : d)).sort(comparar);
+  const horizonte = ultimosDosCortados[0];
+  return horizonte ? juntas.filter((r) => compararDistancia(r, horizonte) <= 0) : juntas;
 }
 
 /** O evento como a pessoa o reconhece: "05/11/2026 09:00 · Sobral · Projeto X" (botões e confirmações). */
@@ -258,9 +272,7 @@ export default function PreAgendaPage(): JSX.Element {
 
       if (seq !== seqRef.current) return; // carga obsoleta: uma mais nova venceu
 
-      const superRows = 'results' in superData ? superData.results : superData;
-      const naoRows = 'results' in naoSuperData ? naoSuperData.results : naoSuperData;
-      const loadedRows = porProximidade([...superRows, ...naoRows]);
+      const loadedRows = porProximidade([superData, naoSuperData]);
       const contagem = (dados: PaginatedResponse<Solicitacao> | Solicitacao[]): number =>
         'results' in dados ? dados.count : dados.length;
 

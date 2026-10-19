@@ -2,7 +2,7 @@
 title: Backup Operations Guide
 status: active
 last_verified: 2026-10-19
-verified_at_commit: d0d43890c58b6620a9c6dabca2c940a4e9589911
+verified_at_commit: b37bdcdfa581543c07a22ae6641d667ff73c74ea
 sources_of_truth:
   - v2/infra/scripts/backup_db.sh
   - v2/infra/scripts/restore_db.sh
@@ -37,8 +37,8 @@ sources_of_truth:
 |---|---|
 | O backup é gerado? | O wiring existe e é *fail-closed*: task Celery no `worker` às 02:00, bind-mount `/backups`, recipient `age` fixo no compose. **Se está rodando hoje em prod, não foi verificado neste documento.** |
 | O backup é cifrado? | Sim, sempre. O guard fail-closed de `backup_db.sh` **aborta** sem `BACKUP_AGE_RECIPIENT`. Produção grava só `.sql.gz.age`. |
-| `restore_db.sh` aceita `.age`? | **Sim**, desde `8f392636` (2026-08-10, #1611 / M26-01). A verificação de integridade é ciente do formato: o Step 1 (`restore_db.sh`) decifra com `age -d` e **só então** roda `gzip -t`; o `gzip -t` cru ficou no branch plaintext do mesmo Step 1. |
-| Ele declara sucesso indevido? | **Não mais**, desde `3bca74f3` (2026-08-21, #1645 / M26-02). Ver [O que mudou](#o-que-mudou-nos-fixes-1611--1645). |
+| `restore_db.sh` aceita `.age`? | **Sim**, desde `815b1afc` (2026-08-10, #1611 / M26-01). A verificação de integridade é ciente do formato: o Step 1 (`restore_db.sh`) decifra com `age -d` e **só então** roda `gzip -t`; o `gzip -t` cru ficou no branch plaintext do mesmo Step 1. |
+| Ele declara sucesso indevido? | **Não mais**, desde `e4c2d22b` (2026-08-21, #1645 / M26-02). Ver [O que mudou](#o-que-mudou-nos-fixes-1611--1645). |
 | O backup é restaurável em produção? | **Ainda não demonstrado.** O código está correto, mas **nenhum drill real** contra um artefato `.age` de produção foi executado — issue [#1646](https://github.com/matheusnorjosa/aprender_sistema/issues/1646) (M26-03) segue **ABERTA**. Ver [Último ensaio de restore](#último-ensaio-de-restore). |
 
 ### Procedimento — use a ferramenta
@@ -159,7 +159,7 @@ vs `/var/backups/aprender` na VM).
    - Restauração interativa com confirmação explícita (`yes`)
    - Verificação de integridade **ciente do formato** (Step 1): `.age` é decifrado com
      `age -d` e só então testado com `gzip -t`; plaintext vai direto no `gzip -t`
-     ([#1611](https://github.com/matheusnorjosa/aprender_sistema/issues/1611), `8f392636`)
+     ([#1611](https://github.com/matheusnorjosa/aprender_sistema/issues/1611), `815b1afc`)
    - `BACKUP_DIR` respeita a env var — `--latest` funciona de dentro do container
    - Seleção (`--latest` e interativa) cobre `*.sql.gz` **e** `*.sql.gz.age`
    - Safety dump do banco atual antes do DROP (Step 2.5); em caso de falha o caminho de
@@ -168,11 +168,11 @@ vs `/var/backups/aprender` na VM).
      SQL, decifragem ou descompressão aborta em vermelho
    - Verificação pós-restore (Step 5): piso de tabelas (`RESTORE_MIN_TABLES`, default
      20) **e** linhas > 0 em `core_usuario`/`core_solicitacao`
-     ([#1645](https://github.com/matheusnorjosa/aprender_sistema/issues/1645), `3bca74f3`)
+     ([#1645](https://github.com/matheusnorjosa/aprender_sistema/issues/1645), `e4c2d22b`)
    - Cobertura: **`v2/infra/scripts/tests/restore_db.bats`** — 7 casos (`.age` válido,
      `.age` corrompido abortando **antes** do `DROP DATABASE`, `.sql.gz` simples,
      `--latest` respeitando `BACKUP_DIR`, diretório só com `.age`, erro no meio do restore
-     e tabela-chave vazia). Criado em `8f392636` e ampliado em `3bca74f3` — **os mesmos
+     e tabela-chave vazia). Criado em `815b1afc` e ampliado em `e4c2d22b` — **os mesmos
      commits** que fecharam #1611 e #1645. Roda no CI em
      `.github/workflows/staging-gate-bats.yml` (step `bats tests/` do job `bats`, a partir de
      `v2/infra/scripts`), disparado por mudança em `restore_db.sh` ou em `tests/**`
@@ -551,7 +551,7 @@ O procedimento canônico está em
 
    > Até 2026-08-25 este passo era um pipeline manual `age -d | gunzip | psql`, porque a
    > ferramenta rejeitava `.age` (#1611) e declarava sucesso com banco vazio (#1645). Os
-   > dois foram corrigidos (`8f392636`, `3bca74f3`). O pipeline manual continua registrado
+   > dois foram corrigidos (`815b1afc`, `e4c2d22b`). O pipeline manual continua registrado
    > em [Estado real do restore](#estado-real-do-restore) para hosts sem o repositório.
 
 5. **Ler a saída do script.** Exit 0 já significa "tabelas restauradas e tabelas-chave não
@@ -608,8 +608,8 @@ docker compose exec -T worker ls -lh /backups/
 
 ### Test Restore Script
 
-`restore_db.sh` já exercita o formato de produção: desde `8f392636` (#1611) ele decifra o
-`.age` e só então testa o gzip, e desde `3bca74f3` (#1645) ele aborta em erro e confere o
+`restore_db.sh` já exercita o formato de produção: desde `815b1afc` (#1611) ele decifra o
+`.age` e só então testa o gzip, e desde `e4c2d22b` (#1645) ele aborta em erro e confere o
 resultado. Rodá-lo contra um `.age` real, com a chave privada, **fora de produção**, é o
 ensaio que vale.
 
@@ -623,8 +623,8 @@ Roteiro do ensaio:
 [GUIDE_DR.md → Ensaio de DR](./GUIDE_DR.md#ensaio-de-dr-o-único-teste-que-vale).
 
 Cobertura de teste automatizado do `restore_db.sh`: **existe** —
-`v2/infra/scripts/tests/restore_db.bats`, 7 casos, criado em `8f392636` e ampliado em
-`3bca74f3` (os mesmos commits dos fixes), executado no CI por
+`v2/infra/scripts/tests/restore_db.bats`, 7 casos, criado em `815b1afc` e ampliado em
+`e4c2d22b` (os mesmos commits dos fixes), executado no CI por
 `.github/workflows/staging-gate-bats.yml` (step `bats tests/`). Ela é **hermética**: stuba `age` e `psql`
 no `PATH` e afirma o fluxo de controle do script.
 
@@ -847,7 +847,7 @@ docker compose exec -T worker env | grep AWS
 
 **Symptoms**: `restore_db.sh` aborta com `ERROR: Backup file is corrupted!`
 
-Esse era o sintoma do **#1611**, corrigido em `8f392636` (2026-08-10): o script rodava
+Esse era o sintoma do **#1611**, corrigido em `815b1afc` (2026-08-10): o script rodava
 `gzip -t` no `.age` sem decifrar. **Hoje essa mensagem só sai no branch plaintext**
 (branch plaintext do Step 1 de `restore_db.sh`) — num `.sql.gz` de verdade corrompido. Para um `.age` inválido a
 mensagem é outra: `ERROR: backup cifrado invalido (falha ao decifrar ou gzip corrompido)!`
@@ -858,13 +858,13 @@ mensagem é outra: `ERROR: backup cifrado invalido (falha ao decifrar ou gzip co
 head -c 22 /var/backups/aprender/backup_full_<DATA>.sql.gz.age
 # "age-encryption.org/v1" => o arquivo está CIFRADO e provavelmente íntegro
 
-# Confirme que o script está atualizado (o fix é 8f392636):
+# Confirme que o script está atualizado (o fix é 815b1afc):
 grep -n "age -d -i" /app/infra/scripts/restore_db.sh   # deve casar em :112 e :166
 ```
 
 **Solution**:
 - **Sai `Backup file is corrupted!` num arquivo `.age`** → o script é anterior a
-  `8f392636`. Atualize a imagem/checkout; não contorne.
+  `815b1afc`. Atualize a imagem/checkout; não contorne.
 - **Sai `backup cifrado invalido`** → decifragem ou gzip falharam de verdade. Confira
   `BACKUP_AGE_KEY` (chave certa? legível?) e teste outro artefato.
 
@@ -956,7 +956,7 @@ Cadência recomendada: **trimestral**, e obrigatoriamente após qualquer mudanç
 `backup_db.sh`, `restore_db.sh` ou na chave `age`.
 
 > ⚠️ **Duas mudanças em `restore_db.sh` já disparam essa regra e ainda não foram
-> ensaiadas**: `8f392636` (2026-08-10, #1611) e `3bca74f3` (2026-08-21, #1645). O ensaio
+> ensaiadas**: `815b1afc` (2026-08-10, #1611) e `e4c2d22b` (2026-08-21, #1645). O ensaio
 > é a issue [#1646](https://github.com/matheusnorjosa/aprender_sistema/issues/1646),
 > **ABERTA**.
 
@@ -998,11 +998,11 @@ Em ordem de risco.
 
 **Concluídos** (mantidos aqui porque a lista antiga os listava como pendentes):
 
-- ~~**Corrigir `restore_db.sh` (#1611)**~~ — **feito** em `8f392636`, 2026-08-10: Step 1
+- ~~**Corrigir `restore_db.sh` (#1611)**~~ — **feito** em `815b1afc`, 2026-08-10: Step 1
   ciente do formato `.age`, `pipefail` local nos pipes do `age`, `BACKUP_DIR` respeitando
   a env var, e falha cedo se `age` não estiver no PATH (Step 1).
 - ~~**`ON_ERROR_STOP=1` + verificação real de sucesso (#1645)**~~ — **feito** em
-  `3bca74f3`, 2026-08-21: `ON_ERROR_STOP=1` nos dois branches, safety dump pré-DROP e
+  `e4c2d22b`, 2026-08-21: `ON_ERROR_STOP=1` nos dois branches, safety dump pré-DROP e
   verificação pós-restore de tabelas + linhas (Step 5).
 
 **Abertos:**
@@ -1012,7 +1012,7 @@ Em ordem de risco.
    **ABERTA**). É o único item que ainda separa "o código está certo" de "sabemos
    restaurar". Registrar em [Último ensaio de restore](#último-ensaio-de-restore).
 2. ~~**Cobrir `restore_db.sh` com `.bats`**~~ — **feito**: `restore_db.bats` (7 casos)
-   nasceu em `8f392636` e cresceu em `3bca74f3`. O **round-trip cifrado real** continua
+   nasceu em `815b1afc` e cresceu em `e4c2d22b`. O **round-trip cifrado real** continua
    fora dela (os testes stubam `age`/`psql`) e é justamente o item 1 acima, #1646
 3. **Cópia offsite de verdade** (exige `aws` CLI na imagem, ou outro transporte)
 4. **Prometheus metrics** integration (MP1) — nenhuma métrica de backup existe hoje

@@ -2,7 +2,7 @@
 title: Páginas (React)
 status: canonical
 last_verified: 2026-10-19
-verified_at_commit: 5205b976648b0f481a8842101b3f0ddae4647965
+verified_at_commit: 804df36a1741d1faa53586eafade5c4c74c0659d
 sources_of_truth:
   - v2/frontend/src/App.tsx
   - v2/frontend/src/components/AppRoutes.tsx
@@ -350,7 +350,7 @@ páginas fazem, não o que deveriam fazer.
 | `M12-19` (#1629) | `PreAgenda/PreAgendaPage` | **RESOLVIDO (#1629)** (#1750). Era: a tabela anunciava `total = superCount + naoCount` mas só carregava a primeira página de cada lista e paginava no cliente sem handler — as páginas além do buscado ficavam vazias, e o polling pressionava o throttle `user: 1000/hour`. Hoje: carrega as duas listas de uma vez, `total = loadedRows.length` (contador honesto), guarda latest-wins e **pausa após 429** no polling (desde 2026-10 pelo `Retry-After`, ver "Telas que se atualizam sozinhas"). |
 | `M15-10` (#1637) | `DATModule/ComprasPage` | **Fase A resolvida (#1714/#1716); resta Fase B (#1637 OPEN)** — o achado NÃO fechou por inteiro. Fase A: `buildCompraPayload` faz strip **explícito** dos campos extras (não é mais spread cru) e o save reporta erro por-campo; `codigo_produto` **existe** no serializer como mirror read-only (`source="produto.codigo"`); `valor_unitario` e `ano_uso` viraram **obrigatórios** no modal (o `valor_total` R$0 sumiu — card removido em #1983). Fase B (aberta): persistir `fornecedor`, `numero_nota_fiscal` e `data_entrega` no lado do Controle — hoje `buildCompraPayload` ainda os remove por não terem destino no serializer. |
 | `M16-08` (#1639) | `DATModule/DATRegistrosPage` | **RESOLVIDO (#1712).** Era: um único `STATUS_OPTIONS` de 3 valores reusado para dois conjuntos de choices diferentes do backend (`DATRegistro.STATUS_CHOICES`/`TURMA_STATUS_CHOICES`), tornando `em_andamento`/`concluido` inválidos em `turma_formar_status` → 400. Hoje partido em `TURMA_STATUS_OPTIONS` (3, casa `TURMA_STATUS_CHOICES`) e `ETAPA_STATUS_OPTIONS` (5, casa `STATUS_CHOICES`) em `DATRegistros/constants.tsx`; `turma_formar_status` usa `TURMA_STATUS_OPTIONS`; contrato travado por `statusOptionsContract.test.ts`. |
-| `M18-06` (#1653) | telas DAT com `useTableFilters` | **RESOLVIDO (#1653)** (commit `062df0ec`). Era: o FE enviava `page_size` mas o DRF usava `PageNumberPagination` de estoque como `DEFAULT_PAGINATION_CLASS`, com `page_size_query_param` = `None` — o parâmetro era ignorado e a API devolvia 100 linhas. Hoje o default é `StandardPagination(PageNumberPagination)` com `page_size_query_param="page_size"` e `max_page_size=500`, honrando `?page_size` (coberto por teste). |
+| `M18-06` (#1653) | telas DAT com `useTableFilters` | **RESOLVIDO (#1653)** (commit `59c64140`). Era: o FE enviava `page_size` mas o DRF usava `PageNumberPagination` de estoque como `DEFAULT_PAGINATION_CLASS`, com `page_size_query_param` = `None` — o parâmetro era ignorado e a API devolvia 100 linhas. Hoje o default é `StandardPagination(PageNumberPagination)` com `page_size_query_param="page_size"` e `max_page_size=500`, honrando `?page_size` (coberto por teste). |
 
 ## Pontos de atenção / dívidas conhecidas
 

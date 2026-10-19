@@ -2,7 +2,7 @@
 title: Disaster Recovery Runbook
 status: active
 last_verified: 2026-09-11
-verified_at_commit: d0d43890c58b6620a9c6dabca2c940a4e9589911
+verified_at_commit: b37bdcdfa581543c07a22ae6641d667ff73c74ea
 sources_of_truth:
   - v2/infra/docker-compose.prod.yml
   - v2/infra/scripts/restore_db.sh
@@ -39,8 +39,8 @@ procedimentos do lado PostgreSQL nativo e PITR, ver [GUIDE_DR.md](./GUIDE_DR.md)
 >
 > | Defeito | Corrigido em |
 > |---|---|
-> | #1611 / M26-01 — `gzip -t` incondicional rejeitava todo `.age` com `Backup file is corrupted!` (mensagem falsa) | `8f392636`, 2026-08-10 |
-> | #1645 / M26-02 — declarava `Restore completed successfully!` com exit 0 sobre banco vazio | `3bca74f3`, 2026-08-21 |
+> | #1611 / M26-01 — `gzip -t` incondicional rejeitava todo `.age` com `Backup file is corrupted!` (mensagem falsa) | `815b1afc`, 2026-08-10 |
+> | #1645 / M26-02 — declarava `Restore completed successfully!` com exit 0 sobre banco vazio | `e4c2d22b`, 2026-08-21 |
 >
 > Numa emergência, um aviso obsoleto empurra o operador para o caminho pior — sem safety
 > dump e sem verificação. **Use a ferramenta.**
@@ -311,7 +311,7 @@ Scripts canônicos em `v2/infra/scripts/`:
   integridade ciente do formato (Step 1), `BACKUP_DIR` respeitando a env var (
   então `--latest` funciona de dentro do container), safety dump pré-DROP (Step 2.5),
   `ON_ERROR_STOP=1` + `pipefail` (Step 4) e verificação pós-restore de tabelas e
-  linhas (Step 5). Corrigido em `8f392636` (#1611) e `3bca74f3` (#1645); o aviso
+  linhas (Step 5). Corrigido em `815b1afc` (#1611) e `e4c2d22b` (#1645); o aviso
   anterior de "quebrado" foi revogado em 2026-08-25.
 - **`verify_backup.sh`** — para `.age`, verifica **presença + tamanho + frescor** e
   **pula a checagem de conteúdo** (o branch `*.age` de `verify_backup.sh`), porque a chave privada não
@@ -347,8 +347,8 @@ Este script:
 - ❌ Depende de um serviço `db` no compose (`docker compose exec -T db …`), que só existe
   em **dev/staging**. Em produção o PostgreSQL é externo.
 - ✅ **Corrigido.** Existe `v2/infra/scripts/tests/restore_db.bats`, com 7 testes:
-  **criado por `8f392636`** (2026-08-10, #1691 — o fix do #1611) com 5 casos, e
-  **ampliado por `3bca74f3`** (2026-08-21, #1793) com os 2 do #1645. Cobre `.age` válido,
+  **criado por `815b1afc`** (2026-08-10, #1691 — o fix do #1611) com 5 casos, e
+  **ampliado por `e4c2d22b`** (2026-08-21, #1793) com os 2 do #1645. Cobre `.age` válido,
   corrupção, formato simples, diretório customizado, `--latest`, erro no meio do restore
   e banco com tabela-chave vazia. Até 2026-08-25 esta linha dizia que a cobertura era zero.
 
@@ -423,7 +423,7 @@ Instrumentar backup em Prometheus continua como item de backlog — ver
 |------|--------|----------|
 | 2026-01-12 | 1.0 | Versão inicial |
 | 2026-07-24 | 1.1 | Revisão contra o código (auditoria M26). Adicionada seção 0 (#1611: `restore_db.sh` rejeita todo backup `.age` de produção). Corrigidos: nomes de arquivo (`latest.sql.gz` → `backup_full_*.sql.gz.age`), serviço `celery` → `worker`, ausência do serviço `db` em produção, `clearsessions` vs sessões no Redis, métricas Prometheus inexistentes, limites reais do `test_dr.sh`. |
-| 2026-08-25 | 1.2 | **Seção 0 revogada**: #1611 corrigido em `8f392636` (2026-08-10) e #1645 em `3bca74f3` (2026-08-21). O runbook voltou a mandar usar `restore_db.sh`; o pipeline manual virou contorno histórico. **#1646 (drill real de DR) permanece ABERTA** e continua sinalizada. |
+| 2026-08-25 | 1.2 | **Seção 0 revogada**: #1611 corrigido em `815b1afc` (2026-08-10) e #1645 em `e4c2d22b` (2026-08-21). O runbook voltou a mandar usar `restore_db.sh`; o pipeline manual virou contorno histórico. **#1646 (drill real de DR) permanece ABERTA** e continua sinalizada. |
 
 ---
 

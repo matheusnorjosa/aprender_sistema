@@ -32,7 +32,7 @@ related:
 >
 > **As severidades deste arquivo estão substituídas.** O pente fino adversarial (seção 15)
 > e a reverificação por execução derrubaram **P0 de 11 para 5** e **P1 de 181 para 52**;
-> depois da confrontação contra `main d08acfa5` restaram **57 achados acionáveis (2 P0,
+> depois da confrontação contra `main 8b6bd1fd` restaram **57 achados acionáveis (2 P0,
 > 36 P1, 19 P2)**. Ao citar um achado daqui, use **sempre** a severidade de
 > `ACHADOS_REAIS.md`, nunca a das seções 10 e 14.
 >
@@ -42,7 +42,7 @@ related:
 > aberta na internet"), concluído a partir de probes rodados de dentro da rede allowlisted e
 > refutado pelo dono testando por 4G.
 >
-> Baseline da investigação: `90f6a048`. O código andou desde então (3 de 12 achados
+> Baseline da investigação: `6be22fb7`. O código andou desde então (3 de 12 achados
 > reverificados já estavam corrigidos). Revalide contra `HEAD` antes de agir sobre qualquer
 > linha daqui.
 
@@ -50,7 +50,7 @@ related:
 
 | Item | Valor |
 |---|---|
-| Baseline | snapshot inicial `cc24ccf89fe7d6dbc7683ab4752339029ae052b1`; revalidação corrente em `main` `90f6a048519227546f734f7cf29be546708bb555` |
+| Baseline | snapshot inicial `dcc803bc7446d1547be2fdaa83800815ffdc32f2`; revalidação corrente em `main` `6be22fb7d0b159b37ee00cbf732c3bd13d111985` |
 | Branch local | `docs/system-module-audit` |
 | Worktree | `C:\tmp\aprender_sistema-module-audit` |
 | Início | 2026-07-17 |
@@ -59,7 +59,7 @@ related:
 | Runtime | Provas Docker de M01–M09 bloqueadas ou sem mount verificável do SHA; M06 teve build, testes direcionados e probes browser/artefato no host; M08 teve probe Node de timezone; no M10, hashes confirmaram paridade e 40 de 41 testes passaram, com um skip; no M11, 99 passaram e uma colisão de fixture passou isolada; no M12, oito hashes casaram e 137 de 138 passaram; no M13, probe Node confirmou drift de timezone; no M15, oito hashes casaram e 117 passaram; no M16, 59 passaram; no M17, dez hashes casaram e 107 testes focais passaram; no M18, oito hashes casaram, 103 testes focais passaram e probes reproduziram N+1, contrato, identidade, lifecycle/cache e apply no-op; Django nunca foi executado fora de Docker |
 | Produção | Não consultada; nenhum estado externo é inferido do repositório |
 
-A auditoria começou em `cc24ccf8` e foi atualizada por fast-forward para a `main` `90f6a048` quando o hotfix P0-0 entrou pelo commit `86afdef3`. As evidências históricas preservam o estado inicial, mas o registro ativo foi reclassificado contra o código corrente. A branch paralela `46a7637` foi comparada somente por leitura: sua UI read-only ainda não pertence à `main` e não é tratada como correção backend.
+A auditoria começou em `dcc803bc` e foi atualizada por fast-forward para a `main` `6be22fb7` quando o hotfix P0-0 entrou pelo commit `ad13b9e0`. As evidências históricas preservam o estado inicial, mas o registro ativo foi reclassificado contra o código corrente. A branch paralela `46a7637` foi comparada somente por leitura: sua UI read-only ainda não pertence à `main` e não é tratada como correção backend.
 
 ### Dentro do escopo
 
@@ -236,7 +236,7 @@ Os itens abaixo vieram da pesquisa RBAC anterior e serão revalidados no snapsho
 
 | Intake | Síntese | Estado de entrada |
 |---|---|---|
-| R-01 | Operador com `manage_admin_registries` alcançava `UsuarioAdminViewSet` global e podia redefinir senha de alvo superuser. | P0 confirmado no snapshot inicial; corrigido no código da `main` por `86afdef3`; deploy não verificado; takeover de contas privilegiadas não-superuser permanece em M07-02 |
+| R-01 | Operador com `manage_admin_registries` alcançava `UsuarioAdminViewSet` global e podia redefinir senha de alvo superuser. | P0 confirmado no snapshot inicial; corrigido no código da `main` por `ad13b9e0`; deploy não verificado; takeover de contas privilegiadas não-superuser permanece em M07-02 |
 | R-02 | `GroupViewSet` sob capability operacional permite alterar Grupo × Capability e membros, criando escalada circular. | P0 previamente confirmado |
 | R-03 | Gerente recebe queryset global de solicitações e permission de edição privilegiada, permitindo mutação cross-gerência. | P0 reconciliado e confirmado em M10-01; Coord/Apoio isoladamente continuam owner-scoped |
 | R-04 | Scope de aprovação deve ser ratificado separadamente para Gerente+Superintendência e Assistente+Controle. O runtime atual é global e group-only; o lote usa `Solicitacao.objects` diretamente. | Reconciliado em M11 como duas decisões abertas; não chamar de intenção nem de bypass de scope antes da ratificação |
@@ -802,7 +802,7 @@ Os itens RBAC ficam na seção 8 até sua reconciliação formal; os candidatos 
 | Frontmatter sobre `docs/architecture/project-decisions` | FAIL esperado; 18 arquivos sem YAML. |
 | Validação dos `sources_of_truth` das specs | 241 referências, 241 caminhos existentes. |
 | Dependency Cruiser no snapshot isolado | PASS; 153 módulos e 327 dependências, zero violações das três regras atuais. |
-| Architecture Guardrails no GitHub | PASS no mesmo SHA `cc24ccf8`, run `29605995401`. |
+| Architecture Guardrails no GitHub | PASS no mesmo SHA `dcc803bc`, run `29605995401`. |
 | Docs Quality no GitHub | PASS no mesmo SHA, run `29605994210`. |
 | Ruleset `Protect main` | Ativo, strict status checks, sem bypass actors; classic branch protection ausente. |
 | Merge methods do repositório | Só squash habilitado; merge commit e rebase desabilitados. |
@@ -956,7 +956,7 @@ Dentro de ambos os prefixos, `apps/core/urls.py` registra 24 ViewSets e 87 `path
 
 | Prova | Resultado |
 |---|---|
-| Mapeamento de URLConfs, middleware, callers frontend e consumers de infra | Concluído no baseline `cc24ccf8`. |
+| Mapeamento de URLConfs, middleware, callers frontend e consumers de infra | Concluído no baseline `dcc803bc`. |
 | Comparação de envelopes runtime × OpenAPI × frontend | Drift confirmado por código e testes existentes. |
 | Comparação de sessão Redis × readiness × compose | Contradição confirmada. |
 | Comparação de SSL redirect × healthcheck/confirmador | Falso-verde/falso-vermelho confirmado na configuração versionada. |
@@ -1288,7 +1288,7 @@ Logo, somente dois campos governam lógica de produção encontrada. A mensagem 
 
 | Prova | Resultado |
 |---|---|
-| Inventário de rotas, gates, models, services, signals e callers | Concluído no baseline `cc24ccf8`. |
+| Inventário de rotas, gates, models, services, signals e callers | Concluído no baseline `dcc803bc`. |
 | Busca de consumidores dos 15 campos, `/features/`, preload e clientes | Dois campos e nenhum caller de `/features/` confirmados; resíduos listados em M02-15. |
 | Comparação `/config/` × `/features/` × task GCal | Três fontes incompatíveis confirmadas por código/testes. |
 | Comparação options × lookups × fluxo de solicitação | Drift de `is_test`, atividade, parâmetros e autorização confirmado. |
@@ -1696,7 +1696,7 @@ Este achado é independente do takeover via `UsuarioAdminViewSet`:
 2. A migration 0077 e o seed atual atribuem essa capability ao grupo DAT automaticamente.
 3. O import localiza conta existente por CPF, atualiza inclusive `is_active` e sempre processa `grupos` se fornecido.
 4. `_assign_groups()` aceita qualquer `Group` existente por nome case-insensitive e o adiciona diretamente.
-5. O serviço não recebe o ator, não compara ator×alvo, não usa `get_assignable_group_names()`, não bloqueia autoalvo/staff ou autoridade de negócio e não escreve AuditLog. Desde `86afdef3`, ele pula especificamente um alvo já `is_superuser=True`.
+5. O serviço não recebe o ator, não compara ator×alvo, não usa `get_assignable_group_names()`, não bloqueia autoalvo/staff ou autoridade de negócio e não escreve AuditLog. Desde `ad13b9e0`, ele pula especificamente um alvo já `is_superuser=True`.
 
 Exploit estático fechado: um DAT pode enviar o próprio CPF com `grupos=Superintendência` — ou qualquer outro grupo ligado a capabilities — e adquirir a autoridade correspondente. Também pode atingir por CPF uma conta staff ou aprovador não-superuser e desativá-la/adicionar grupos. O import **não** seta `is_superuser` diretamente, só aceita grupos já existentes e agora pula alvo superuser; essas contraprovas limitam o mecanismo, mas não removem a escalada de capabilities nem a mutação privilegiada.
 
@@ -1845,7 +1845,7 @@ Correção: DTO único gerado/validado contra OpenAPI; store único de auth; dep
 
 #### Cruzamentos encaminhados, sem duplicação
 
-- **R-01/P0 takeover de superuser** existia no snapshot inicial e foi corrigido no código da `main` por `86afdef3`; M07 separa a proteção do alvo superuser do takeover ainda permitido contra contas privilegiadas comuns.
+- **R-01/P0 takeover de superuser** existia no snapshot inicial e foi corrigido no código da `main` por `ad13b9e0`; M07 separa a proteção do alvo superuser do takeover ainda permitido contra contas privilegiadas comuns.
 - **M02-10/service worker** também cobre `/api/me/`, `/me/policies/` e `/me/events/` porque o match usa substring. A prova Chrome do M06 confirmou a reutilização cross-account mesmo com `no-store` e `Vary: Cookie`.
 - **OAuth**: desconexão pode reportar estado diferente da revogação/remoção, callback não reavalia capability e rotação de chave não é atômica. As evidências foram capturadas para validação completa em M12, cujo limite inclui OAuth/GCal.
 - **Auditoria/PII/retenção** segue para M23; **Redis/evicção** para M26; **entrypoints** para M27/M28.
@@ -3506,7 +3506,7 @@ O hotfix de CacheStorage não deve esperar o redesenho do auth store, router ou 
 
 ### M07 — Administração de registros e configuração operacional
 
-- Estado: concluído em 2026-07-17 contra a `main` `90f6a048`; runtime Docker e confirmação de deploy pendentes.
+- Estado: concluído em 2026-07-17 contra a `main` `6be22fb7`; runtime Docker e confirmação de deploy pendentes.
 - Superfícies: Django Admin, AdminDAT, usuários, grupos, permissions, catálogos, configurações, import pages e operações Tier-0.
 - Depende de: M02–M06; entrega riscos e contratos a M08–M12, M22–M23 e M26–M28.
 
@@ -3534,8 +3534,8 @@ As fontes confrontadas foram `rbac.spec.md`, D17, política de aprovação, `vie
 
 | Estado | Evidência | Conclusão |
 |---|---|---|
-| snapshot inicial `cc24ccf8` | queryset de usuário incluía superusers; PATCH aceitava `password` | R-01/P0-0 era takeover de superuser em uma requisição |
-| `main` `90f6a048` | commit `86afdef3`; `get_queryset()` exclui superuser, serializer repete o guard, import pula alvo e DELETE protege o último | P0-0 está **corrigido no código da main**; produção não foi consultada e não se afirma deploy |
+| snapshot inicial `dcc803bc` | queryset de usuário incluía superusers; PATCH aceitava `password` | R-01/P0-0 era takeover de superuser em uma requisição |
+| `main` `6be22fb7` | commit `ad13b9e0`; `get_queryset()` exclui superuser, serializer repete o guard, import pula alvo e DELETE protege o último | P0-0 está **corrigido no código da main**; produção não foi consultada e não se afirma deploy |
 | branch `46a7637` | Grupos read-only para não-superuser; Usuários omite `group_ids`; client morto removido | mitigação de UX ainda fora da `main`; backend e import continuam graváveis por chamada direta |
 | risco corrente | `group_ids`, `assign_groups`, import com grupos e `GroupViewSet` permanecem | Tier-0 ainda aberto por vetores distintos; fechar apenas a tela ou o `GroupViewSet` é insuficiente |
 
@@ -3598,8 +3598,8 @@ O queryset 404 para superuser e o guard do serializer são controles corretos. P
 
 #### Verificações executadas e limites
 
-- diff `cc24ccf8..90f6a048` e commit `86afdef3` inspecionados arquivo a arquivo;
-- diff `90f6a048..46a7637` usado apenas para distinguir mitigação proposta de estado vigente;
+- diff `dcc803bc..90f6a048` e commit `ad13b9e0` inspecionados arquivo a arquivo;
+- diff `6be22fb7..46a7637` usado apenas para distinguir mitigação proposta de estado vigente;
 - URLConf, ViewSets/actions, serializers, migrations, AdminSite/ModelAdmins, callers React e testes reconciliados;
 - buscas de `AuditLog`, transações, locks, query optimization, consumers e documentação executadas;
 - tentativa de Vitest focal (`adminDAT.test.ts` + helper CPF) não iniciou porque esta worktree não possui `node_modules`/`vitest`; dependências não foram instaladas;
@@ -3706,7 +3706,7 @@ REDs ausentes:
 
 #### Hipóteses refutadas ou qualificadas
 
-- **“P0-0 continua vivo na main atual”**: refutado na fonte; era verdadeiro em `cc24ccf8`. Falta confirmar deploy, não reabrir o código corrigido.
+- **“P0-0 continua vivo na main atual”**: refutado na fonte; era verdadeiro em `dcc803bc`. Falta confirmar deploy, não reabrir o código corrigido.
 - **“Django Admin aceita qualquer staff”**: refutado; exige superuser ativo.
 - **“A branch read-only fecha P0-1”**: refutado; chamada direta e import continuam.
 - **“A UI edita senha no modal existente”**: refutado para edição; o campo aparece só em criação. O backend aceita PATCH direto.
@@ -3744,7 +3744,7 @@ P0-B não deve esperar o redesenho completo de identidade, config ou frontend. T
 
 ### M08 — Disponibilidade e bloqueios
 
-- Estado: **concluído em 2026-07-17** contra `main` `90f6a048`; um P0 e vinte achados adicionais próprios foram registrados.
+- Estado: **concluído em 2026-07-17** contra `main` `6be22fb7`; um P0 e vinte achados adicionais próprios foram registrados.
 - Escopo: bloqueios individuais/delegados, consulta unitária e em lote, motor RD-01..08, enforcement em solicitações, cache/invalidação, import de bloqueios, consumidor do import de eventos, frontend e testes.
 - Dependências: M02–M06; entrega contratos e riscos a M09–M14, M22–M23, M26 e M28.
 - Método: leitura estática independente de backend, frontend/testes e specs/consumidores; probe Node de timezone; Docker, Vitest focal e produção não foram acessados.
@@ -4015,7 +4015,7 @@ O P0 é micro-hotfix independente e não deve esperar decisões de check, refato
 
 ### M09 — Deslocamentos
 
-- Estado: **concluído em 2026-07-17** contra `main` `90f6a048`; 14 achados próprios registrados, sem P0 novo.
+- Estado: **concluído em 2026-07-17** contra `main` `6be22fb7`; 14 achados próprios registrados, sem P0 novo.
 - Escopo: model/migration, CRUD, paginação/filtros, owner/delegação, AuditLog, import síncrono, `external_hash`, Admin, Grade Mensal, frontend e testes.
 - Dependências: M02–M08; entrega contratos e riscos a M10, M14, M22–M23, M26 e M28.
 - Método: três trilhas estáticas independentes e síntese no código vivo; RBAC lint executado. Docker e frontend dinâmico permaneceram pendentes.
@@ -4276,7 +4276,7 @@ Não há P0 que justifique misturar todas as ondas. A correção de auditoria/tr
 
 ### M10 — Solicitações e participação
 
-- Estado: **concluído em 2026-07-17** contra `main` `90f6a048`; 17 achados próprios, incluindo dois P0 confirmados.
+- Estado: **concluído em 2026-07-17** contra `main` `6be22fb7`; 17 achados próprios, incluindo dois P0 confirmados.
 - Propósito: representar o pedido de evento, seu conteúdo material, responsáveis e participantes antes das decisões de aprovação e publicação.
 - Contratos de maior autoridade: CP-02 e PA-01..07; RF de solicitação; models/migrations; services de criação e disponibilidade; policy RBAC e `EquipeGerencia`.
 - Depende de: M03–M09; entrega transições para M11, efeitos externos para M12, projeções para M13–M14, imports para M22 e auditoria/LGPD para M23.
@@ -4816,7 +4816,7 @@ Ordem: preservar CP-02 em M10 primeiro; depois command validation e vínculo de 
 
 - Estado: **concluído em 2026-07-17**, com 29 achados próprios; não surgiu P0 exclusivo novo. M10-02 continua sendo o P0 dominante, porque nenhum efeito GCal é confiável enquanto conteúdo aprovado puder ser trocado sem nova decisão.
 - Superfícies: `GoogleOAuthCredential`, state/callback/revocation/refresh/rotação, clients fake/service-account/OAuth, payload/Meet, preview/publish/resync/cancel individual e lote, tasks/retry/breaker, dashboards/export/drift, frontend, specs e testes.
-- Baseline: `main` `90f6a048519227546f734f7cf29be546708bb555`; oito arquivos focais tiveram SHA idêntico no container `aprender_dev-web-1`.
+- Baseline: `main` `6be22fb7d0b159b37ee00cbf732c3bd13d111985`; oito arquivos focais tiveram SHA idêntico no container `aprender_dev-web-1`.
 - Depende de: M02–M06 e M10–M11; entrega handoffs a M13, M21 e M23–M28.
 
 #### Propósito, contrato e fronteiras
@@ -5070,7 +5070,7 @@ Ordem de severidade: state/escape fake/revogação; ID e target; operation/outbo
 
 ### M13 — Pré-agenda, agenda pessoal e meus eventos
 
-- Estado: **concluído em 2026-07-18**, no snapshot `90f6a048519227546f734f7cf29be546708bb555`.
+- Estado: **concluído em 2026-07-18**, no snapshot `6be22fb7d0b159b37ee00cbf732c3bd13d111985`.
 - Escopo: leitura pessoal por participação, operação da Pré-agenda, aba de eventos do calendário Google, filtros, paginação, polling, seleção, guards, rotas/menu e testes.
 - Dependências: M01, M03, M05–M06 e M10–M12; M13 não possui model próprio nem deve redefinir lifecycle, RBAC ou publicação.
 
@@ -5707,7 +5707,7 @@ M15-15 requer primeiro corrigir semântica e só então consolidar agregações/
 
 #### Testes e provas executadas
 
-Foi comparado SHA-256 de oito arquivos entre a worktree `90f6a048` e `/app` no container; todos coincidiram. Em seguida:
+Foi comparado SHA-256 de oito arquivos entre a worktree `6be22fb7` e `/app` no container; todos coincidiram. Em seguida:
 
 ```text
 pytest --no-migrations
@@ -6620,7 +6620,7 @@ Pontos positivos: botões de modo têm `aria-label`, formulário usa labels e a�
 
 #### Testes e provas executadas
 
-O SHA-256 de oito arquivos críticos coincidiu entre a worktree `90f6a048` e `/app`. Execução principal:
+O SHA-256 de oito arquivos críticos coincidiu entre a worktree `6be22fb7` e `/app`. Execução principal:
 
 ```text
 pytest --no-migrations
@@ -6725,14 +6725,14 @@ Ordem obrigatória: decisões/export antes de constraint; falhar import fechado 
 
 - Estado: **concluído em 2026-07-18**; 21 achados próprios após verificação adversarial.
 - Prova de runtime: (1) 34 passed, 7 warnings in 5.95s — nota: a analise estatica estimou 37 testes; a contagem real do runner e 34. (2) 95 passed, 36 warnings in 13.70s. (3) 17 passed, 16 warnings in 8.59s. Saidas decisivas: M19-01 apos 1o PATCH ch_total=0.00 ch_anual=10.00 (esperado 4.00/14.00), apos 2o PATCH 4.00/14.00 => CONFIRMADO. M19-04 PATCH forjado 200, ch_total=9999.00 ch_anual=8888.00, stats.ch_total=8888.0 => CONFIRMADO. M19-05 reparentagem 200 em formacao/prova/acompanhamento (plano_id A=108 -> B=109) + renumeracao 5->9 => CONFIRMADO. M19-06/11 matriz por ator: DAT {list200,stats200,cal200,resumo200,patch200,dat_form200,destroy403}; Controle IDEM (prova que os permission_classes das @action sao inertes); Superintendencia {todos 403, destroy 204}; Formador e anonimo todos 403. M19-02 1 projeto real -> len(resumo)=3, projeto_ids=[93,93,93], coordenadores=['Coord X'x3] => CONFIRMADO. M19-03 total_municipios=3 em stats e no resumo => REFUTACAO MANTIDA. M19-09 list 10 planos -> 57 queries; retrieve -> 9 => CONFIRMADO. M19-18 escrita concorrente injetada perdida (observacoes='' ativo=True ch_estudo=10.00) e updated_by=None => CONFIRMADO. M19-12 duracao_horas=-9.0, taxa_presenca=9990.0, cancelada sem motivo, duplicata criada, observacoes 5000 chars gravados => CONFIRMADO. M19-13 ?minimal=true responde ['id','label'] => rota VIVA, achado NUANCADO. M19-20 list filtrada=1 item vs calendario mesmo filtro=2 itens => CONFIRMADO. M19-10 dry-run would_create=1 vs apply applied={'plano_formacao':0} apply_blocked=False, 0 linhas criadas => CONFIRMADO. M19-08 plano orfao persistido com 15 formacoes/2 acomp/0 provas => CONFIRMADO. M19-21 PATCH {status:cancelada, realizada:true} -> 200 gravado => CONFIRMADO. (4) exit 0, 'No changes detected'. (5) exit 0, 'OK RBAC lint: 0 violacoes'. (6) tsc --noEmit sem erros. (7) PASS (0) FAIL (0) — nao existe NENHUM teste de frontend no diretorio DATModule. (8) ATOMIC_REQUESTS=False. CORRECAO DE PROBE REGISTRADA: a 1a versao do probe M19-08 usou mock.patch.object(type(Prova.objects),'create',...); type(Prova.objects) e a classe Manager COMPARTILHADA por todos os models, o patch derrubou tambem o INSERT do plano e produziu um falso 'depois=0 orfao=NAO' que teria REFUTADO indevidamente um achado verdadeiro. Corrigido para patch da INSTANCIA (Prova.objects), revelando o orfao real.
-- Hash-parity: HASH-PARITY 8/8 IDENTICOS entre host (C:\tmp\aprender_sistema-module-audit, commit 90f6a048) e container aprender_audit-web-1. Comandos: host `python -c "import hashlib; print(hashlib.sha256(open(F,'rb').read()).hexdigest()[:16])"` / container `docker exec aprender_audit-web-1 python -c "..."`. Resultados: apps/core/views/plano_formacoes.py=0e4bd2b0d4b8e4f8; apps/core/serializers/plano_formacoes.p
-- Não verificado: 1) ESTADO DE PRODUCAO — nada aqui foi observado em prod. Todos os numeros vem do stack de auditoria (aprender_audit-*, DB aud_m19/aud_m19b) sobre o commit 90f6a048. NAO sei quantos planos existem em prod, se ha ch_total/ch_anual ja divergentes ou forjados, nem se ha linhas de DATFormacao que violariam as constraints propostas em M19-12. Preflight em PROD e pre-requisito de M19-12 e de qualquer CheckConstraint de CH. 2) --APPLY REAL DO IMPORTER — o probe M19-10 rodou contra um export SINTETICO em tmp_path, dentro de teste transacional. Nenhum dado real foi importado (CLAUDE.md proibe ate um dry
+- Hash-parity: HASH-PARITY 8/8 IDENTICOS entre host (C:\tmp\aprender_sistema-module-audit, commit 6be22fb7) e container aprender_audit-web-1. Comandos: host `python -c "import hashlib; print(hashlib.sha256(open(F,'rb').read()).hexdigest()[:16])"` / container `docker exec aprender_audit-web-1 python -c "..."`. Resultados: apps/core/views/plano_formacoes.py=0e4bd2b0d4b8e4f8; apps/core/serializers/plano_formacoes.p
+- Não verificado: 1) ESTADO DE PRODUCAO — nada aqui foi observado em prod. Todos os numeros vem do stack de auditoria (aprender_audit-*, DB aud_m19/aud_m19b) sobre o commit 6be22fb7. NAO sei quantos planos existem em prod, se ha ch_total/ch_anual ja divergentes ou forjados, nem se ha linhas de DATFormacao que violariam as constraints propostas em M19-12. Preflight em PROD e pre-requisito de M19-12 e de qualquer CheckConstraint de CH. 2) --APPLY REAL DO IMPORTER — o probe M19-10 rodou contra um export SINTETICO em tmp_path, dentro de teste transacional. Nenhum dado real foi importado (CLAUDE.md proibe ate um dry
 
 **Resumo.** A execução de runtime confirmou 14 dos 15 achados da análise estática, manteve o único refutado como refutado, e produziu 4 achados novos que só a execução revelou. Não há P0. Os três P1 estão provados com número: (a) M19-01 — após o 1º PATCH inline a CH do plano fica em ch_total=0.00/ch_anual=10.00 quando o correto seria 4.00/14.00, e só converge no 2º PATCH, exatamente o defeito que o frontend admite no tooltip "Aguardando recálculo de CH total (PlanoFormacoes.recalcular_ch)"; (b) M19-04 — PATCH com ch_total=9999.00/ch_anual=8888.00 retorna 200 e o endpoint /stats/ passa a reportar ch_total=8888.0, ou seja, o indicador agregado do módulo é forjável por qualquer portador da capability; (c) M19-07 — a matriz de autorização real, medida ator a ator, contradiz a docstring do próprio ViewSet: Superintendência recebe 403 em list/stats/calendário/resumo/PATCH e 204 em DELETE, isto é, destrói em cascata 20 filhas de um recurso que não pode sequer ler, enquanto DAT (dona de manage_admin_registries) é barrada da página pelo guard canControle do frontend. O achado novo mais grave é esse desalinhamento destroy-sem-read (M19-19). Confirmei ainda 57 queries para listar 10 planos (5,7 por linha), rollback ausente no create (plano órfão persistido com 15 formações, 2 acompanhamentos e 0 provas), lost update comprovado no plano.save(), reparentagem bem-sucedida das três entidades inline, e o gap do importer com prova executável: dry-run reporta would_create=1 e o --apply devolve applied={'plano_formacao': 0} com apply_blocked=False, criando zero linhas em silêncio.
 
 ### M19 — Formações e PlanoFormacoes (dossiê atualizado por prova de runtime)
 
-> Etapa de runtime executada sobre a worktree `C:\tmp\aprender_sistema-module-audit`, commit `90f6a048`,
+> Etapa de runtime executada sobre a worktree `C:\tmp\aprender_sistema-module-audit`, commit `6be22fb7`,
 > stack `aprender_audit-*`, DB isolado `aud_m19` / `aud_m19b`. Hash-parity conferido em 8 arquivos (§10).
 > Todo estado abaixo foi reavaliado contra o que a execução mostrou.
 
@@ -6973,7 +6973,7 @@ Dependências de M04/M05 (Município, Projeto, DATCoordenador, Usuario, seed de 
 | `apps/core/services/export_contract_importer.py` | `c1108997a6eeaed2` |
 | `apps/core/tests/test_plano_formacoes.py` | `ded34fdba254dae2` |
 
-Paridade provada ⇒ o pytest abaixo é prova vinculada ao SHA `90f6a048`.
+Paridade provada ⇒ o pytest abaixo é prova vinculada ao SHA `6be22fb7`.
 
 **Suítes existentes (verdes, sem alteração de código):**
 
@@ -7096,7 +7096,7 @@ negócio, §Decisões pendentes).
 
 **Não verificado, com motivo:**
 - **Estado de PRODUÇÃO**: nada aqui foi observado em prod. Todos os números vêm do stack de auditoria
-  (`aprender_audit-*`, DB `aud_m19`) sobre o commit `90f6a048`. Não sei quantos planos existem em prod, se há
+  (`aprender_audit-*`, DB `aud_m19`) sobre o commit `6be22fb7`. Não sei quantos planos existem em prod, se há
   linhas de `DATFormacao` já violando as constraints propostas, nem se algum `ch_total` em prod está forjado.
   Um preflight em prod é pré-requisito de M19-12 e de qualquer `CheckConstraint` de CH.
 - **`--apply` real do importer**: executado apenas contra um export sintético em `tmp_path`, dentro de teste
@@ -7182,11 +7182,11 @@ verificado nesta auditoria.
 - Hash-parity: HASH-PARITY TOTAL: 8/8 arquivos idênticos entre host (C:\tmp\aprender_sistema-module-audit\v2\backend) e container (aprender_audit-web-1:/app). models/acoes_notificacao.py=e16599a57d3baa9d; services/business_calendar_service.py=b63336a5f26e8525; services/prazo_engine_service.py=d17943c3186844ee; services/notificacoes_acoes_service.py=eaa0a4f695f248ab; views/acoes_notificacao.py=ac46023fa87d56c3; s
 - Não verificado: 1) ESTADO DE PRODUCAO — nada foi verificado em prod e nada foi inferido do dev. Especificamente NAO VERIFICADOS: distribuicao real de CicloAcoes.status; existencia e quantidade de municipios fora do CE (magnitude de exposicao de M20-04); volume acumulado de NotificacaoInterna (M20-07); se manage_internal_actions recebeu grupos manualmente via /admin/grupos em producao, divergindo do seed (M20-03). As afirmacoes sobre a capability referem-se a seed e migration, que e o que o codigo garante. 2) M20-08 (limites temporais) — PROBE NAO EXECUTADO. Motivo: sem politica de janela definida, o probe pro
 
-**Resumo.** M20 (Ações Internas "32 Passos" + Notificações Internas) foi submetido a prova de runtime com hash-parity total (8/8 arquivos idênticos host↔container), portanto os testes contam como prova vinculada ao SHA 90f6a048. A suíte do produto está verde (52 passed em 8 arquivos; 203 testes frontend; typecheck limpo; rbac_lint 0 violações) e não há P0. O P1 M20-01 foi reproduzido literalmente: uma âncora registrada manualmente em 2026-05-04 virou 2026-03-01 em template MARCO_CALENDARIO e foi apagada (data_ancora=None, data_vencimento=None, estado regredido a AGUARDANDO_ANCORA) em ACAO_ANTERIOR na primeira execução do beat, enquanto o RegistroAncora segue afirmando 04/05 no histórico — com agravante provado de que a ação zerada sai do queryset do processador e para de gerar cobrança para sempre. Onze achados foram confirmados em runtime, incluindo DELETE de ciclo retornando 204 sem AuditLog e destruindo RegistroConclusaoAcao por CASCADE, ciclo que nunca fecha (100% das ações concluídas e status permanece EM_ANDAMENTO), feriado de Fortaleza deslocando prazo de município UF=SP, e motor de notificação falhando em silêncio absoluto (zero log records). Dois achados mudaram de estado pela evidência: M20-09 foi refutado na magnitude por medição (19 µs por chamada, imaterial diante do expires=3600 do beat) e M20-11 foi rebaixado por prova de que nenhum call site cria notificação com acao_instancia nulo. Um achado ganhou alcance: M20-03 atinge 4 perfis, não 3, e as suítes frontend e backend estão ambas verdes codificando contratos contraditórios sobre os mesmos papéis.
+**Resumo.** M20 (Ações Internas "32 Passos" + Notificações Internas) foi submetido a prova de runtime com hash-parity total (8/8 arquivos idênticos host↔container), portanto os testes contam como prova vinculada ao SHA 6be22fb7. A suíte do produto está verde (52 passed em 8 arquivos; 203 testes frontend; typecheck limpo; rbac_lint 0 violações) e não há P0. O P1 M20-01 foi reproduzido literalmente: uma âncora registrada manualmente em 2026-05-04 virou 2026-03-01 em template MARCO_CALENDARIO e foi apagada (data_ancora=None, data_vencimento=None, estado regredido a AGUARDANDO_ANCORA) em ACAO_ANTERIOR na primeira execução do beat, enquanto o RegistroAncora segue afirmando 04/05 no histórico — com agravante provado de que a ação zerada sai do queryset do processador e para de gerar cobrança para sempre. Onze achados foram confirmados em runtime, incluindo DELETE de ciclo retornando 204 sem AuditLog e destruindo RegistroConclusaoAcao por CASCADE, ciclo que nunca fecha (100% das ações concluídas e status permanece EM_ANDAMENTO), feriado de Fortaleza deslocando prazo de município UF=SP, e motor de notificação falhando em silêncio absoluto (zero log records). Dois achados mudaram de estado pela evidência: M20-09 foi refutado na magnitude por medição (19 µs por chamada, imaterial diante do expires=3600 do beat) e M20-11 foi rebaixado por prova de que nenhum call site cria notificação com acao_instancia nulo. Um achado ganhou alcance: M20-03 atinge 4 perfis, não 3, e as suítes frontend e backend estão ambas verdes codificando contratos contraditórios sobre os mesmos papéis.
 
 ### M20 — Ações Internas (32 Passos) e Notificações Internas — PROVA DE RUNTIME
 
-Baseline: worktree `C:\tmp\aprender_sistema-module-audit`, branch `docs/system-module-audit`, HEAD `90f6a048`.
+Baseline: worktree `C:\tmp\aprender_sistema-module-audit`, branch `docs/system-module-audit`, HEAD `6be22fb7`.
 Etapa: **runtime**. Hash-parity conferido host↔container para **8 de 8** arquivos centrais.
 Stack: `aprender_audit-web-1`, DB isolado `aud_m20`.
 
@@ -7228,7 +7228,7 @@ FE/BE) e M20-04 (`abrangencia` inerte).
 | `apps/core/services/acoes_notificacao_seed.py` | `3bc84427a887cd86` |
 | `apps/core/tasks.py` | `225d7beb194211b8` |
 
-Paridade total: **pytest conta como prova vinculada ao SHA `90f6a048`**.
+Paridade total: **pytest conta como prova vinculada ao SHA `6be22fb7`**.
 
 8 models, 3 serviços, 3 ViewSets, 1 task Celery com beat diário, 3 páginas React, 8 ModelAdmins,
 migrations `0059`–`0063` + `0079`.
@@ -7537,14 +7537,14 @@ documentado, sem salvaguarda).
 
 - Estado: **concluído em 2026-07-18**; 22 achados próprios após verificação adversarial.
 - Prova de runtime: BASELINE: 115 passed, 1 skipped, 116 warnings in 20.82s — suite VERDE com todos os 26 defeitos presentes. PROBE A: 27 passed in 7.76s. PROBE B: 3 passed in 6.92s. FRONTEND: PASS (6) FAIL (0) para MapaBrasil + clientes de API; PASS (159) FAIL (0) para AppRoutes.access-by-profile + usePermissions; npm run typecheck (tsc --noEmit) sem erros; ls src/pages/Dashboards/__tests__ -> 'No such file or directory'. LINT: 'OK RBAC lint: 0 violacoes'. MEDICOES-CHAVE: days invalido -> 500 em 12/12 combinacoes (3 rotas x 4 valores) e 200 com period '-5d'/'0d' em 6/6 casos de days<=0, contra 400 no metrics-map?limit=abc; rework_rate=300.0 com denominador 1; conflict_rate 0.0 em pt-BR vs 25.0 com o literal ingles; overview por_fluxo=3 incluindo evento D+400 onde a janela fechada daria 1; overview top_coordenadores='Gerente Criador' vs map/coordinators='Real Coordenador' na MESMA solicitacao; metrics-map sem limit -> 25 municipios com meta.limit=None e max_limit=1000; coordinators -> 30 linhas sem paginacao em 2 queries; orcamentos medidos (primeiros do repositorio) coordinators=2, metrics-map=10, overview=7 queries — sem N+1; by_uf PE municipios=2 vs by_municipio PE=['ComCoord']; reports status-counts publica 'publicado':0 contra Status.values de 3 valores; persona DAT -> 403 em metrics-map E dashboard-overview; wiring de throttle: overview/HomeStats/DATCompraViewSet com [Anon,User,Scoped] e scope=None, os 4 escopados com [Scoped] APENAS e scope='metrics'.
-- Hash-parity: Paridade host<->container conferida em 9/9 arquivos, todos identicos (SHA 90f6a048): views_dashboard.py 5bbe167ccd0a2ed7; views_reports.py 28a4f194d2437452; views/stats.py 8a66eb8fe27c465e; views/metrics/map_metrics.py 9cb0d8692797374f; views/metrics/dashboard_metrics.py bf61378f2f12871f; views/metrics/formador_metrics.py 849ae9f4a6b1df04; views/dat_module.py 7940dd2a5cb27a18; views_metrics.py 37e
+- Hash-parity: Paridade host<->container conferida em 9/9 arquivos, todos identicos (SHA 6be22fb7): views_dashboard.py 5bbe167ccd0a2ed7; views_reports.py 28a4f194d2437452; views/stats.py 8a66eb8fe27c465e; views/metrics/map_metrics.py 9cb0d8692797374f; views/metrics/dashboard_metrics.py bf61378f2f12871f; views/metrics/formador_metrics.py 849ae9f4a6b1df04; views/dat_module.py 7940dd2a5cb27a18; views_metrics.py 37e
 - Não verificado: 1) VOLUME E LATENCIA COM DADOS REAIS — nao verificado. O banco aprender_db do stack de auditoria EXISTE (confirmado em psql -l) mas esta SEM SCHEMA: o probe read-only falhou com ProgrammingError: relation "core_solicitacao" does not exist. Consequencia: nao foi possivel medir o tamanho real do payload de /api/metrics/map/ e /api/metrics/map/coordinators/ (M21-08, M21-09), nem contar quantos municipios reais estao sem coordenada (M21-20), nem verificar se algum registro de producao/golden contem a string 'conflict' em observacoes (M21-05 — o zero foi provado apenas com dados sinteticos pt-BR). 
 
 **Resumo.** A execução confirmou o P1 e o AGRAVOU: `?days=abc`, `?days=` (vazio), `?days=1.5` e um inteiro gigante retornam 500 nos três endpoints `/api/metrics/team/*` (12 combinações reproduzidas), enquanto `?days=-5` e `?days=0` retornam 200 com `period: "-5d"` e todas as taxas zeradas — falha silenciosa que a análise estática só suspeitava. O endpoint irmão `/api/metrics/map/?limit=abc` devolve 400, provando que o padrão correto existe no mesmo módulo. A família P2 de integridade de métrica foi toda reproduzida com números concretos: `rework_rate` retornou **300.0%** com denominador 1; `conflict_rate` ficou em 0.0 com observação pt-BR "Conflito de agenda detectado" e só saiu de zero (25.0) quando injetei a palavra inglesa "conflict", provando a métrica fantasma; o overview contou um evento em **D+400** dentro do bloco rotulado "últimos 30 dias" (3 eventos onde a janela fechada daria 1); e "coordenador" retornou duas pessoas diferentes sob o mesmo rótulo (overview → "Gerente Criador", mapa/coordinators → "Real Coordenador"). O mapa devolveu 25 municípios sem teto com `meta.limit: None` apesar de anunciar `max_limit: 1000`. A divergência FE↔BE do mapa está fechada dos dois lados: backend nega DAT com 403, a suíte frontend (159 passed) afirma `/mapa-brasil: true` para DAT. Um achado foi **nuançado pela execução**: M21-11 — os três endpoints "sem throttle" na verdade herdam `UserRateThrottle` (1000/h) do `DEFAULT_THROTTLE_CLASSES` global; o que falta é o escopo `metrics`, e a descoberta inversa é que os endpoints escopados perderam o `UserRateThrottle` ao sobrescrever `throttle_classes`. Baseline: 115 passed, 1 skipped; paridade de hash conferida em 9 arquivos; typecheck limpo; rbac_lint 0 violações. Não verificado: volume/latência com dados reais (o `aprender_db` do stack de auditoria não tem schema) e uso de `/api/reports/*` em produção.
 
 ### M21 — Dashboards, métricas, relatórios, mapa e home stats (prova de runtime)
 
-Baseline: worktree `C:\tmp\aprender_sistema-module-audit`, branch `fix/rbac-tier0-fe-readonly`, HEAD `90f6a048`.
+Baseline: worktree `C:\tmp\aprender_sistema-module-audit`, branch `fix/rbac-tier0-fe-readonly`, HEAD `6be22fb7`.
 Django 5.2.16 / Python 3.12.13 / pytest 9.1.0 no container `aprender_audit-web-1`. DB isolado: `aud_m21`.
 
 As subseções 1–9, 11, 13 e 14 permanecem como na análise estática. As subseções **10** e **12** foram
@@ -7568,7 +7568,7 @@ reescritas com a evidência de execução; a subseção **12** registra os estad
 | `apps/core/views_metrics.py` | `37ef29253e624e7a` |
 | `apps/core/exceptions.py` | `8580fb2d00957e32` |
 
-Paridade total. **pytest neste stack conta como prova vinculada ao SHA `90f6a048`.**
+Paridade total. **pytest neste stack conta como prova vinculada ao SHA `6be22fb7`.**
 
 #### 10.2 Suíte existente (baseline, sem alteração de código)
 
@@ -7775,7 +7775,7 @@ dados reais, e uso de `/api/reports/*` em produção.
 
 ### M22 — Imports, export-contract, sincronizações e ImportJob (prova de runtime)
 
-Baseline: worktree `C:\tmp\aprender_sistema-module-audit`, branch `docs/system-module-audit`, HEAD `90f6a048`. Etapa: **prova de runtime** sobre o dossiê estático anterior. Stack de auditoria isolada, DB `aud_m22`.
+Baseline: worktree `C:\tmp\aprender_sistema-module-audit`, branch `docs/system-module-audit`, HEAD `6be22fb7`. Etapa: **prova de runtime** sobre o dossiê estático anterior. Stack de auditoria isolada, DB `aud_m22`.
 
 **Veredito da etapa**: 13 achados estáticos submetidos a execução. 11 confirmados por runtime (2 com mecanismo corrigido pela evidência), 1 refutado e reforçado, 1 rebaixado a `não verificado` por limite de ambiente. **1 achado novo (M22-14, P1)** descoberto durante a execução. Nenhum arquivo de aplicação foi modificado (`git diff --stat` vazio).
 
@@ -7862,7 +7862,7 @@ Contradição de contrato que a execução tornou nítida: o frontend promete "a
 Provado por runtime nesta etapa:
 - **Auto-escalada consumada** via HTTP 200 (M22-01);
 - **Grupo fora da allowlist** atribuído com `pendencias` inteiramente vazias (M22-01b);
-- **Proteção de alvo superuser viva** (M22-01c) — o hardening `86afdef3` funciona e cobre só o alvo, não o autoalvo.
+- **Proteção de alvo superuser viva** (M22-01c) — o hardening `ad13b9e0` funciona e cobre só o alvo, não o autoalvo.
 
 AuditLog continua ausente nos 11 endpoints síncronos, inclusive o que muda privilégio.
 
@@ -8005,7 +8005,7 @@ Os PRs não colidem em arquivo, exceto (3)/(4)/(5) que tocam `views/imports.py` 
 
 ### M23 — Auditoria, compliance e privacidade/LGPD (dossiê com prova de runtime)
 
-Baseline: worktree `C:\tmp\aprender_sistema-module-audit`, branch `docs/system-module-audit`, HEAD `90f6a048`. Etapa: **execução**. Hash-parity provado para 12 arquivos centrais; pytest, probes transacionais e frontend executados. Nenhum código de aplicação alterado; único artefato criado é o probe untracked `v2/backend/apps/core/tests/test_zzz_audit_m23_probe.py` (não commitado).
+Baseline: worktree `C:\tmp\aprender_sistema-module-audit`, branch `docs/system-module-audit`, HEAD `6be22fb7`. Etapa: **execução**. Hash-parity provado para 12 arquivos centrais; pytest, probes transacionais e frontend executados. Nenhum código de aplicação alterado; único artefato criado é o probe untracked `v2/backend/apps/core/tests/test_zzz_audit_m23_probe.py` (não commitado).
 
 ---
 
@@ -8166,7 +8166,7 @@ A assimetria `assign_groups` × `sync_members` foi provada lado a lado no mesmo 
 | `apps/core/rbac/policies.py` | `4ad4f38cff4283e0` |
 | `apps/core/views_gcal/detail.py` | `771b4ca5183083b6` |
 
-Pytest conta como prova vinculada ao SHA `90f6a048`.
+Pytest conta como prova vinculada ao SHA `6be22fb7`.
 
 **Suíte focal existente** — `48 passed, 33 warnings in 19.52s`:
 ```
@@ -8231,7 +8231,7 @@ Todos verdes — e é justamente esse verde que **fixa** o vazamento: `test_reda
 
 - **Duplicação real**: `AuditLogSerializer` × `AuditLogTimelineSerializer` — ambos vivos, políticas de PII divergentes. Divergência de contrato, não código morto (M23-03).
 - **`compliance_audit` procura ações inexistentes** (`"APROVAR"`/`"aprovar"` `:78`; `"CRIAR_SOLICITACAO"` `:201`). **Não declaro código morto** — registros históricos em produção podem conter os literais legados (`models/auditoria.py:26-28`) e o banco de produção **não foi verificado**.
-- **`lgpd_export` e `compliance_audit` nunca executados com sucesso**: `git log` de ambos mostra apenas `9c56b8cf` (introdução, #390), `47bdc717` (só `compliance_audit`), `6e5ea4c2` (black/flake8) e `d54c7fe0` (isort). Desde a criação só receberam commits de formatação. Cruza com as memórias `manual-validation-skips-the-broken-link` e `first-real-execution-latent-bugs`.
+- **`lgpd_export` e `compliance_audit` nunca executados com sucesso**: `git log` de ambos mostra apenas `7b275306` (introdução, #390), `0c8ebbb7` (só `compliance_audit`), `26825d6c` (black/flake8) e `6f6e6704` (isort). Desde a criação só receberam commits de formatação. Cruza com as memórias `manual-validation-skips-the-broken-link` e `first-real-execution-latent-bugs`.
 - **`access_audit_logs` sem consumidor de frontend** — capability viva no backend (endpoint responde, 21 testes de persona verdes) e na matriz do frontend (61 testes verdes), zero UI. Superfície sem consumidor, não código morto (M23-11).
 
 ---
@@ -8326,7 +8326,7 @@ Todos verdes — e é justamente esse verde que **fixa** o vazamento: `test_reda
 
 ### M24 — Celery, scheduling, retries e jobs assincronos (PROVA DE RUNTIME)
 
-Baseline: worktree `C:\tmp\aprender_sistema-module-audit`, branch `docs/system-module-audit`, HEAD `90f6a048`.
+Baseline: worktree `C:\tmp\aprender_sistema-module-audit`, branch `docs/system-module-audit`, HEAD `6be22fb7`.
 Hash-parity host/container reconferida para 5 arquivos centrais nesta etapa (secao 10). Todos os probes
 foram read-only ou revertidos; o arquivo temporario de probe foi deletado e a worktree ficou sem residuo meu.
 
@@ -8511,7 +8511,7 @@ depende do path absoluto `/app/infra/scripts/backup_db.sh` (`tasks_backup.py:57`
 | `config/settings.py` | `8858ce56b673c542` | `8858ce56b673c542` |
 | `apps/core/views_gcal/batch.py` | `a76ed50eb833dd52` | `a76ed50eb833dd52` |
 
-Paridade provada; pytest conta como prova vinculada ao SHA `90f6a048`.
+Paridade provada; pytest conta como prova vinculada ao SHA `6be22fb7`.
 
 **PYTEST FOCAL (DB isolado `aud_m24`, `--no-migrations -p no:cacheprovider`):**
 
@@ -8708,14 +8708,14 @@ consolidar `debug_task`), M24-13 (`worker_prefetch_multiplier=1` para tasks long
 
 - Estado: **concluído em 2026-07-18**; 15 achados próprios após verificação adversarial.
 - Prova de runtime: PYTEST FOCAL: '51 passed, 24 warnings in 6.83s' (test_security_hardening 22, test_readyz 12, test_sentry 5, test_logging_config 4, test_structured_logging 8) — suite integralmente VERDE apesar de todos os defeitos reproduzidos, que e a evidencia central de M25-04. PROBES: '9 passed' e '2 passed'. FRONTEND: vitest 'PASS (10) FAIL (0)'; npm run typecheck (tsc --noEmit) limpo, sem saida de erro. SAIDAS-CHAVE DOS PROBES: M25-01 readyz status=301 loc=https://testserver/api/readyz/, healthz status=301, SECURE_REDIRECT_EXEMPT default=[], e curl -f contra 301 -> 'code=301 exit=0'; M25-02 /metrics XFF forjado 200, /healthz/detailed/ XFF forjado 200 com corpo de diagnostico, cadeia '127.0.0.1, 203.0.113.1' 200, baseline sem XFF 403; M25-03 REMOTE_ADDR=172.217.5.1 -> 200 nos dois endpoints, ipaddress.is_private=False; M25-05 SESSION_ENGINE=...backends.cache e cache down -> http=200 status healthy; M25-08 django.request level=40, isEnabledFor(WARNING)=False, 403 real -> caplog.records vazio; M25-12 db down -> http=200 com body status 'unhealthy'; M25-13 X-Request-ID de entrada descartado; M25-11 worker 'request_id = AUSENTE'; M25-07 os.kill(1,0) exit 0 e inspect ping '1 node online / pong'. MUDANCAS DE ESTADO: 12 achados passaram de deducao estatica a CONFIRMADO POR REPRODUCAO; M25-10 virou NUANCADO com hipotese parcialmente REFUTADA (mock_init.called=True, asserts rodam, a suite detectaria a remocao do bloco Sentry) e com defeito novo provado (importlib.reload vaza SENTRY_DSN falso para testes subsequentes; o mesmo probe isolado le vazio); M25-14 teve o IMPACTO REFUTADO (o formatter do caminho real do dictConfig filtra 'request' — 'segredo vazou? False' — enquanto o campo nao-reservado 'outro' passa), rebaixado a divida de teste. DESCOBERTA NOVA (dobrada em M25-06): SENTRY nao aparece em nenhuma linha de docker-compose.prod.yml, entao provisionar SENTRY_DSN no Portainer sozinho nao alcancaria o container.
-- Hash-parity: PARIDADE HOST<->CONTAINER CONFIRMADA (SHA256[:16] identicos nos 10 arquivos), logo os resultados de pytest estao vinculados ao SHA 90f6a048. HOST (v2/backend, python hashlib) e CONTAINER (docker exec aprender_audit-web-1, cwd /app) produziram: config/settings.py=8858ce56b673c542; config/urls.py=b6f2b431317af1e3; apps/core/views_health.py=a21879a8df5004db; apps/core/middleware.py=fd713e4657cab154; 
+- Hash-parity: PARIDADE HOST<->CONTAINER CONFIRMADA (SHA256[:16] identicos nos 10 arquivos), logo os resultados de pytest estao vinculados ao SHA 6be22fb7. HOST (v2/backend, python hashlib) e CONTAINER (docker exec aprender_audit-web-1, cwd /app) produziram: config/settings.py=8858ce56b673c542; config/urls.py=b6f2b431317af1e3; apps/core/views_health.py=a21879a8df5004db; apps/core/middleware.py=fd713e4657cab154; 
 - Não verificado: (1) ESTADO DE PRODUCAO: nada foi observado em producao. SENTRY_DSN efetivo, valor real de ENVIRONMENT, SECURE_SSL_REDIRECT efetivo e existencia de scraper externo em prod continuam inferidos de templates, compose e docs — nunca do ambiente vivo. O 301 de M25-01 foi provado no caminho de codigo (override_settings) e o comportamento de curl -f foi provado no container, mas a composicao dos dois EM PRODUCAO nao foi observada. (2) EXPOSICAO DE REDE: se a porta 8000, publicada em docker-compose.prod.yml:100 como '${BACKEND_HOST_PORT:-8000}:8000' sem bind em 127.0.0.1, esta filtrada pelo firewall da
 
 **Resumo.** A execução confirmou 12 dos 15 achados com reprodução dinâmica, nuançou 2 e refutou parcialmente 1. As duas provas mais importantes: (a) sob SECURE_SSL_REDIRECT=True com SECURE_REDIRECT_EXEMPT=[] (o default real, verificado em runtime), /api/readyz/ e /healthz/ devolvem 301, e curl -f contra um 301 sai com exit 0 — provado no próprio container — logo o healthcheck de produção é um no-op e o container fica healthy sem jamais consultar PostgreSQL; (b) o gate de IP interno cai com um header: X-Forwarded-For: 127.0.0.1 sobre REMOTE_ADDR=203.0.113.1 devolve 200 em /metrics e em /healthz/detailed/, contra 403 de baseline sem o header, inclusive na cadeia realista "127.0.0.1, 203.0.113.1" que o $proxy_add_x_forwarded_for produz. Também confirmados em runtime: /healthz/detailed/ devolve HTTP 200 com status=unhealthy e o DB fora; readyz devolve 200 healthy com o cache fora enquanto SESSION_ENGINE é cache-based; django.request está em nível 40 com isEnabledFor(WARNING)=False e um 403 real gerou zero registros de log; o worker não tem request_id; os.kill(1,0) sai 0 no worker enquanto celery -A config inspect ping responde pong. Refutado: M25-14 — o formatter montado pelo caminho real do dictConfig filtra o atributo request (payload sensível não vazou), então a guarda do incidente 2026-07-06 está efetiva. Nuançado: M25-10 — os "if mock_init.called:" não estão vacuosos hoje (mock_init.called=True) e a suite detectaria a remoção do bloco Sentry; o defeito real, esse sim provado, é vazamento de estado global entre testes pelo importlib.reload(config.settings). Nenhum P0. 6 P1, 6 P2, 3 P3. Suites focais: 51 passed — verdes apesar de todos os defeitos, que é a própria medida da lacuna de cobertura.
 
 ### M25 — Observabilidade, health, logging e métricas operacionais (etapa de runtime)
 
-Baseline: worktree `C:\tmp\aprender_sistema-module-audit`, branch `docs/system-module-audit`, HEAD `90f6a048`.
+Baseline: worktree `C:\tmp\aprender_sistema-module-audit`, branch `docs/system-module-audit`, HEAD `6be22fb7`.
 Etapa: **prova de runtime**. Hash-paridade conferida host↔container nos 10 arquivos auditados (§10). DB isolado `aud_m25`.
 
 ---
@@ -8944,7 +8944,7 @@ apps/core/tests/test_sentry.py                  e71e657260f987eb
 apps/core/tests/test_logging_config.py          cc82edd79948aa02
 ```
 
-Paridade provada ⇒ os resultados de pytest abaixo estão vinculados ao SHA `90f6a048`.
+Paridade provada ⇒ os resultados de pytest abaixo estão vinculados ao SHA `6be22fb7`.
 
 **Suites focais executadas**
 
@@ -9143,7 +9143,7 @@ M25 fecha quando, verificável por comando:
 
 ### M26 — Persistência, migrations, Redis/cache, backup e DR (dossiê pós-runtime)
 
-Baseline: worktree `C:\tmp\aprender_sistema-module-audit`, branch `docs/system-module-audit`, HEAD `90f6a048`. Etapa: **prova de runtime** sobre a análise estática. Stack `aprender_audit-*`. DB isolado `aud_m26` (pytest) e `aud_m26rev` / `dr_probe_m26` (probes, ambos destruídos ao final).
+Baseline: worktree `C:\tmp\aprender_sistema-module-audit`, branch `docs/system-module-audit`, HEAD `6be22fb7`. Etapa: **prova de runtime** sobre a análise estática. Stack `aprender_audit-*`. DB isolado `aud_m26` (pytest) e `aud_m26rev` / `dr_probe_m26` (probes, ambos destruídos ao final).
 
 #### 1. Propósito, domínio e SSOT
 
@@ -9340,7 +9340,7 @@ frontend | volumes: NAO | BACKUP_AGE_RECIPIENT: NAO | /backups: NAO
 | infra/cron/aprender-backup | `f777fd61690f1fdc` | ausente (artefato de host) |
 | infra/docker-compose.prod.yml | — | ausente (artefato de host) |
 
-Paridade provada: pytest conta como prova vinculada ao SHA `90f6a048`.
+Paridade provada: pytest conta como prova vinculada ao SHA `6be22fb7`.
 
 **Pytest focal.**
 
@@ -9453,7 +9453,7 @@ Distribuição: `test_celery_backup` 9, `test_tasks_mp5` 5, `test_celery_beat_re
 
 ### M27 — Ambientes, containers, edge, deploy, CI/CD e supply chain (dossiê com prova de runtime)
 
-Baseline: worktree `C:\tmp\aprender_sistema-module-audit`, branch **`docs/system-module-audit`**, HEAD **`90f6a048`** (a etapa estática registrou `f79566f1`/`fix/rbac-tier0-fe-readonly` — divergência de baseline registrada em §runtime). Produção observada: **`v2026.07.18-a545d5f`**, imagem `norjosamatheus/aprender-backend@sha256:3be7565e5692d3da8c2166c2f1db88dee32b4ef713d6f0c3e7c4cc16a3b549d0`. Nenhum arquivo do repositório foi alterado; nenhum commit; nenhum deploy. Todos os probes foram leitura, com um laboratório efêmero em rede Docker isolada (removido ao final).
+Baseline: worktree `C:\tmp\aprender_sistema-module-audit`, branch **`docs/system-module-audit`**, HEAD **`6be22fb7`** (a etapa estática registrou `b1fc3994`/`fix/rbac-tier0-fe-readonly` — divergência de baseline registrada em §runtime). Produção observada: **`v2026.07.18-a545d5f`**, imagem `norjosamatheus/aprender-backend@sha256:3be7565e5692d3da8c2166c2f1db88dee32b4ef713d6f0c3e7c4cc16a3b549d0`. Nenhum arquivo do repositório foi alterado; nenhum commit; nenhum deploy. Todos os probes foram leitura, com um laboratório efêmero em rede Docker isolada (removido ao final).
 
 ---
 
@@ -9529,7 +9529,7 @@ EXIT=0
 -> 2 bundles: type "https://slsa.dev/provenance/v1" e "https://sigstore.dev/cosign/sign/v1"
 ```
 
-E `gh run list --workflow promote.yml` mostra `Promote (assina o ponteiro de release)` = **success** em `a545d5f` às 06:34Z de 2026-07-18, coerente com a versão que a produção reporta.
+E `gh run list --workflow promote.yml` mostra `Promote (assina o ponteiro de release)` = **success** em `35b6b11` às 06:34Z de 2026-07-18, coerente com a versão que a produção reporta.
 
 **Porém** essa verificação depende da versão da ferramenta: o **mesmo** comando com `cosign v2.4.3` retorna `Error: no signatures found` (exit 10), porque as assinaturas estão no formato novo (OCI referrers, `application/vnd.dev.sigstore.bundle.v0.3+json`) e não na tag legada `.sig` (`HEAD .../manifests/sha256-3be7...sig` → **404**, idem para `v2026.07.17-e80a61d` e `v2026.06.17-fe1ab66`). E `bootstrap/install-deps.sh:24-35` instala o **`latest`** do cosign, sem pin, e faz `if have cosign; then return`. Achado novo M27-25.
 
@@ -9999,7 +9999,7 @@ M28 pode ser fechado quando:
 O auditor anterior registrou achados em M01–M09 sem prova de runtime, por duas limitações de
 ambiente hoje resolvidas: o container não tinha mount verificável para a worktree (hash-parity
 agora provado) e a worktree não tinha `node_modules` (agora instalado). As frentes abaixo
-reexecutaram as provas pendentes contra o baseline `90f6a048`, cada uma com DB de teste isolado.
+reexecutaram as provas pendentes contra o baseline `6be22fb7`, cada uma com DB de teste isolado.
 
 #### Frente L1 — L1 — Fechamento de lacunas de runtime em M01 (kernel HTTP, health, proxy, erros, paginação, /api/v1, CSP) e M02 (config,
 
@@ -10037,7 +10037,7 @@ reexecutaram as provas pendentes contra o baseline `90f6a048`, cada uma com DB d
 
 ### L1 — Fechamento de lacunas de runtime: M01 e M02
 
-Baseline: worktree `C:\tmp\aprender_sistema-module-audit`, branch `fix/rbac-tier0-fe-readonly`, HEAD `f79566f1`, main `90f6a048`. Stack `aprender_audit-*`. DB isolado `aud_l1` (schema via `--no-migrations`) e `aud_l1mig` (migrations reais, necessário para o seed RBAC).
+Baseline: worktree `C:\tmp\aprender_sistema-module-audit`, branch `fix/rbac-tier0-fe-readonly`, HEAD `b1fc3994`, main `6be22fb7`. Stack `aprender_audit-*`. DB isolado `aud_l1` (schema via `--no-migrations`) e `aud_l1mig` (migrations reais, necessário para o seed RBAC).
 
 ---
 
@@ -10563,7 +10563,7 @@ Antes de aceitar qualquer pytest como prova vinculada ao SHA, conferi 20 arquivo
 | `f1b4f67d7da9cdce` | `apps/core/auth_backends.py` |
 | `94844931d0a35c12` | `apps/core/views_options.py` |
 
-Worktree em `90f6a048` (baseline main declarado). `git status` no fim do turno: nenhum arquivo rastreado modificado.
+Worktree em `6be22fb7` (baseline main declarado). `git status` no fim do turno: nenhum arquivo rastreado modificado.
 
 #### 3. Modelos, constraints e migrations
 
@@ -10704,9 +10704,9 @@ Hash-parity provado para os 20 arquivos auditados; três suítes focais executad
 - Resultado: BACKEND FOCAL: 154 passed, 1 skipped, 130 warnings in 34.41s (155 coletados em 9 arquivos). O skip é intencional e documentado: test_admin_user_security.py:289, grupo legacy 'Gerência' descontinuado pela Issue #1222. PROBES BACKEND: 9 passed (7 + 2 em execução separada). FRONTEND FOCAL: PASS (252) FAIL (0) em 10 arquivos; subconjunto de 7 arquivos: PASS (223) FAIL (0). TYPECHECK: exit 0, zero linhas de saída. PROBES FRONTEND: Test Files 1 passed, Tests 3 passed — as 3 asserções-evidência (M06-01 com controle, M06-07, M06-17) passaram, confirmando as três afirmações. ESLINT: npx eslint src/App.tsx → 'File ignored because no matching configuration was supplied', errorCount 0, warningCount 1; 188 arquivos .ts/.tsx vs 6 .js/.jsx em src/.
 - Hash-parity: 7/7 idênticos host vs container aprender_audit-web-1 (sha256[:16]): apps/core/views/admin.py=481d56047b6037ae; apps/core/serializers/usuario.py=47223098c3cefc38; apps/core/admin.py=3cf67a1a0f9345ca; apps/core/admin_site.py=206e49875728f237; apps/core/serializers/organizacao.py=a55d0aba02dc2be6; apps/core/services/rbac_service.py=05583537e3bab040; apps/core/utils/csv_sanitize.py=877497f9830d675c. V
 - Comandos: (1) HASH-PARITY: python -c hashlib.sha256 no host vs docker exec aprender_audit-web-1 python -c hashlib.sha256, para os 7 arquivos acima. (2) BACKEND FOCAL: docker exec -e DB_NAME=aud_l3 aprender_audit-web-1 pytest apps/core/tests/{test_admin_api,test_admin_user_security,test_assign_groups,test_group_sync_members,test_rbac_superuser_target_protection,test_pr16_admin_group_capability,test_import_usuarios,test_municipios_admin_cache,test_pr5_usuario_lookup_cap_gate}.py -q --no-migrations -p no:cacheprovider. (3) PROBES BACKEND: mesmo comando sobre arquivo de probe efêmero test_zz_audit_probe_l3.py (9 testes: membership writers, N+1 Projeto/Gerencia com CaptureQueriesContext, máscara de CPF + b
-- Continua não verificado: (a) LIMITAÇÃO DE AMBIENTE REGISTRADA: o caminho de probe descrito no briefing — docker exec -e DB_NAME=aprender_db aprender_audit-web-1 python manage.py shell — NÃO funciona neste stack. O banco aprender_db do stack de auditoria existe mas está SEM SCHEMA: a primeira escrita falhou com django.db.utils.ProgrammingError: relation "core_usuario" does not exist. Não rodei migrations (proibido). Roteei todos os probes por pytest com DB_NAME=aud_l3, que cria o schema via --no-migrations e isola de agentes paralelos. Isso preserva o rigor (DB real, código com hash-parity) e evita escrita persistente. (b) ESTADO DE PRODUÇÃO: não consultado em nenhum ponto. Não afirmo se 86afdef3 está deployado, nem 
+- Continua não verificado: (a) LIMITAÇÃO DE AMBIENTE REGISTRADA: o caminho de probe descrito no briefing — docker exec -e DB_NAME=aprender_db aprender_audit-web-1 python manage.py shell — NÃO funciona neste stack. O banco aprender_db do stack de auditoria existe mas está SEM SCHEMA: a primeira escrita falhou com django.db.utils.ProgrammingError: relation "core_usuario" does not exist. Não rodei migrations (proibido). Roteei todos os probes por pytest com DB_NAME=aud_l3, que cria o schema via --no-migrations e isola de agentes paralelos. Isso preserva o rigor (DB real, código com hash-parity) e evita escrita persistente. (b) ESTADO DE PRODUÇÃO: não consultado em nenhum ponto. Não afirmo se ad13b9e0 está deployado, nem 
 
-**Resumo.** M06 e M07 tinham achados registrados sem prova de execução porque o auditor anterior não tinha Docker acessível nem node_modules. Ambos os bloqueios caíram: hash-parity host↔container confirmado em 7/7 arquivos backend centrais, 154 testes focais backend verdes (1 skip conhecido), 252 testes Vitest verdes em 10 arquivos e `npm run typecheck` exit 0. Todos os probes convergiram para CONFIRMAR, e dois achados ficaram materialmente mais graves do que estavam escritos. Há P0: com o hotfix `86afdef3` já aplicado, DAT ainda cria em UMA requisição (201, nos dois aliases) uma conta com senha conhecida e grupos Gerente+Superintendência que responde `approve_solicitation=True`; e Controle — que recebe **403 ao apenas listar usuários** — concede esses mesmos grupos a terceiros por `assign_groups` (200). Cinco mutações de identidade (create, assign_groups, reset de senha, desativação, delete) produziram AuditLog delta = 0. Elevações propostas: M07-07 de P2→P1 (o `UsuarioAdmin` grava a senha digitada em TEXTO PLANO — `check_password` passa a retornar False, inutilizando a conta — e expõe o hash como valor inicial de um input editável) e M07-05 de nuançado→confirmado (a API barra com 400 a remoção do último superuser, mas o Django Admin não reusa a guarda: `delete_model` levou superusers ativos de 1 → 0). Uma única refutação parcial: M06-18 vira nuançado, pois `useCrudOperations` tem consumidor de tipo real.
+**Resumo.** M06 e M07 tinham achados registrados sem prova de execução porque o auditor anterior não tinha Docker acessível nem node_modules. Ambos os bloqueios caíram: hash-parity host↔container confirmado em 7/7 arquivos backend centrais, 154 testes focais backend verdes (1 skip conhecido), 252 testes Vitest verdes em 10 arquivos e `npm run typecheck` exit 0. Todos os probes convergiram para CONFIRMAR, e dois achados ficaram materialmente mais graves do que estavam escritos. Há P0: com o hotfix `ad13b9e0` já aplicado, DAT ainda cria em UMA requisição (201, nos dois aliases) uma conta com senha conhecida e grupos Gerente+Superintendência que responde `approve_solicitation=True`; e Controle — que recebe **403 ao apenas listar usuários** — concede esses mesmos grupos a terceiros por `assign_groups` (200). Cinco mutações de identidade (create, assign_groups, reset de senha, desativação, delete) produziram AuditLog delta = 0. Elevações propostas: M07-07 de P2→P1 (o `UsuarioAdmin` grava a senha digitada em TEXTO PLANO — `check_password` passa a retornar False, inutilizando a conta — e expõe o hash como valor inicial de um input editável) e M07-05 de nuançado→confirmado (a API barra com 400 a remoção do último superuser, mas o Django Admin não reusa a guarda: `delete_model` levou superusers ativos de 1 → 0). Uma única refutação parcial: M06-18 vira nuançado, pois `useCrudOperations` tem consumidor de tipo real.
 
 | Achado reverificado | Estado após execução | Sev. | Evidência de runtime |
 |---|---|---|---|
@@ -10734,7 +10734,7 @@ Hash-parity provado para os 20 arquivos auditados; três suítes focais executad
 
 ### L3 — Fechamento de lacunas de runtime: M06 e M07
 
-Baseline: worktree `C:\tmp\aprender_sistema-module-audit`, HEAD `90f6a048`, árvore sem modificações minhas ao final (`git status --porcelain` só lista artefatos de outros agentes L2 e o doc mestre). Os dois arquivos de probe que criei (`v2/backend/apps/core/tests/test_zz_audit_probe_l3.py` e `v2/frontend/src/components/__tests__/zz_audit_probe_l3.test.tsx`) foram **removidos** após a execução; nenhum código de aplicação foi tocado.
+Baseline: worktree `C:\tmp\aprender_sistema-module-audit`, HEAD `6be22fb7`, árvore sem modificações minhas ao final (`git status --porcelain` só lista artefatos de outros agentes L2 e o doc mestre). Os dois arquivos de probe que criei (`v2/backend/apps/core/tests/test_zz_audit_probe_l3.py` e `v2/frontend/src/components/__tests__/zz_audit_probe_l3.test.tsx`) foram **removidos** após a execução; nenhum código de aplicação foi tocado.
 
 #### 1. Propósito, domínio e SSOT
 
@@ -10839,7 +10839,7 @@ Consumidores estáticos (busca em `src`, excluindo `__tests__`):
 
 #### 7. RBAC / object scope / data scope / auditoria
 
-O hotfix `86afdef3` está íntegro para o eixo que ele mirou: os testes versionados de proteção de alvo superuser passam (`test_rbac_superuser_target_protection.py` 28/28). O que ele **não** fecha é o eixo ator→autoridade-de-negócio: a allowlist de grupos é taxonômica (nome do grupo), não baseada em privilégio, então `Gerente` e `Superintendência` — que compõem o composite de aprovação — são atribuíveis por não-superuser.
+O hotfix `ad13b9e0` está íntegro para o eixo que ele mirou: os testes versionados de proteção de alvo superuser passam (`test_rbac_superuser_target_protection.py` 28/28). O que ele **não** fecha é o eixo ator→autoridade-de-negócio: a allowlist de grupos é taxonômica (nome do grupo), não baseada em privilégio, então `Gerente` e `Superintendência` — que compõem o composite de aprovação — são atribuíveis por não-superuser.
 
 Auditoria: `AuditLog.objects.count()` medido imediatamente antes e depois de cada mutação. Delta observado:
 
@@ -10927,7 +10927,7 @@ Rollback: itens 1 e 4 mudam autorização e podem travar operação Tier-0 — e
 - Resultado: M08 focal: 78 passed, 11 skipped, 60 warnings in 27.39s (os 11 skipped sao test_availability_block_idor.py INTEGRALMENTE, marcador 'sssssssssss'). M09 focal: 57 passed, 39 warnings in 16.12s. Frontend vitest: PASS (19) FAIL (0). Typecheck: `tsc --noEmit` limpo, zero erros. PROBES — M08-01: CREATE 201 status='aprovado'; PATCH 200 owner 348->349; check vitima ok=False conflito ('T','Bloqueio total'); GET atacante 404; escalada superuser True; PUT 200 transferiu True; v1 CREATE 201 e v1 PATCH 200 owner==superuser True; AuditLog no update = 0. M08-02: superuser=False, view_all_availability=True; PATCH terceiro 200; transferencia 200; DELETE 204. M08-03: owner=me devolveu 1 item de terceiro com motivo 'SEGREDO-DO-B'. M08-06: tipo invalido -> 500 TypeError em views_availability.py:432; 500 ids -> 200 com 500 resultados em 9.95s. M08-09: 10h cruzando meia-noite -> ok=False ('M', 600 min > 480) FALSO POSITIVO; 8h cruzando -> ok=True; falso negativo -> ok=True sem codigo 'M' com dia 2 em 11h; CONTRAPROVA intra-dia -> ok=False ['M']. M08-10: Django 5.2.16, `timezone.utc existe? False None`, AttributeError 500 em check/ (linha 323) e em check-many/ (linha 411). M08-11: TZ=UTC -> envia 09:00Z (esperado 12:00Z) e exibe 12:00 (esperado 09:00); TZ=America/Fortaleza -> ambos corretos. M08-17: AuditLog delta 0 em create proprio, update, transferencia e delete. M09-01: PATCH usuario 200, 0 AuditLog. M09-07: start==end -> 400. M09-08: ORM aceitou datas invertidas + origem==destino (rollback aplicado). M09-09: external_hash None -> None apos transferencia.
 - Hash-parity: 8/8 arquivos centrais com hash sha256[:16] IDENTICO entre host (C:\tmp\aprender_sistema-module-audit\v2\backend) e container (aprender_audit-web-1:/app): views_availability.py f75208995b39f075; views_deslocamento.py 914919144ab370d5; services/availability_service.py ec2d999fe26b1d7e; services/solicitacao_availability.py e2ee2f2cdf5ba52f; views/availability.py c31a2b91ed2e339a; serializers/agenda.p
 - Comandos: SUITES FOCAIS (todas com `docker exec -e DB_NAME=aud_l4 aprender_audit-web-1 pytest ... -q --no-migrations -p no:cacheprovider`): (1) M08: test_api_availability_blocks.py test_availability_batch.py test_availability_block_autoapproval.py test_availability_block_idor.py test_availability_service.py test_d9_availability_check.py test_pr13_delegated_availability_blocks.py test_availability_per_formador_1452.py; (2) M09: test_deslocamento_api.py test_deslocamento_idor_1454.py test_deslocamento_rbac.py test_import_deslocamentos.py test_import_bloqueios.py test_monthly_with_deslocamento.py. PROBES (5 arquivos, criados no scratchpad, copiados por docker cp, executados com -s --tb=line e depois REMO
-- Continua não verificado: (1) PRODUCAO — nada foi observado em producao; todos os resultados valem para o stack de auditoria neste SHA (base 90f6a048, branch fix/rbac-tier0-fe-readonly). A presenca dos mesmos defeitos em producao e plausivel pela natureza estatica do codigo, mas NAO foi verificada e nao deve ser afirmada. (2) M09-03 — probe especifico nao executado; alem disso views_deslocamento.py possui _ensure_owner_or_delegate (gate objeto-nivel ausente em AvailabilityBlockViewSet), o que pode NUANCAR ou refutar o achado original; exige probe com usuario Controle nao-superuser tentando PATCH/DELETE de deslocamento alheio. (3) M08-16 — exigiria instrumentar chaves de versao no Redis durante dry-run e comparar ante
+- Continua não verificado: (1) PRODUCAO — nada foi observado em producao; todos os resultados valem para o stack de auditoria neste SHA (base 6be22fb7, branch fix/rbac-tier0-fe-readonly). A presenca dos mesmos defeitos em producao e plausivel pela natureza estatica do codigo, mas NAO foi verificada e nao deve ser afirmada. (2) M09-03 — probe especifico nao executado; alem disso views_deslocamento.py possui _ensure_owner_or_delegate (gate objeto-nivel ausente em AvailabilityBlockViewSet), o que pode NUANCAR ou refutar o achado original; exige probe com usuario Controle nao-superuser tentando PATCH/DELETE de deslocamento alheio. (3) M08-16 — exigiria instrumentar chaves de versao no Redis durante dry-run e comparar ante
 
 **Resumo.** M08 e M09 tinham achados registrados sem prova de execução; com hash-parity provado e node_modules disponível, 14 achados foram reverificados em runtime. O P0 M08-01 está CONFIRMADO e é PIOR que o registrado: um usuário autenticado sem nenhum grupo cria bloqueio próprio (auto-aprovado) e o transfere por PATCH ou PUT `usuario_id` para qualquer conta — inclusive um superuser — em ambas as rotas `/api` e `/api/v1`, sem qualquer AuditLog, e a vítima passa a colidir no hard gate (`check_conflicts_uncached` retorna conflito `T`). Dois 500 não tratados foram confirmados executando: `django.utils.timezone.utc` não existe em Django 5.2.16 (AttributeError em `/api/availability/check/` e `/check-many/` com ISO sem offset) e `check-many` estoura TypeError com item não-inteiro. M08-09 foi confirmado nas duas metades com contraprova (falso positivo e falso negativo em RD-05 cruzando meia-noite). Nenhum achado foi refutado; M08-09 e M08-11 tiveram o mecanismo exato reproduzido. As suítes focais passam (78+11 skipped em M08, 57 em M09, 19 no frontend, typecheck limpo) — ou seja, todo o P0 é invisível para a bateria atual, e a suíte de IDOR está 100% pulada sob uma justificativa factualmente obsoleta.
 
@@ -10956,7 +10956,7 @@ Rollback: itens 1 e 4 mudam autorização e podem travar operação Tier-0 — e
 
 ### L4 — Fechamento de lacunas de runtime: M08 e M09
 
-Worktree: `C:\tmp\aprender_sistema-module-audit` (branch `fix/rbac-tier0-fe-readonly`, base `90f6a048`).
+Worktree: `C:\tmp\aprender_sistema-module-audit` (branch `fix/rbac-tier0-fe-readonly`, base `6be22fb7`).
 Stack: `aprender_audit-web-1` / `-db-1` / `-redis-1`. DB isolado: `aud_l4`.
 Escopo desta rodada: **reverificação em runtime** de achados M08/M09 já registrados; nenhum código de aplicação foi alterado (`git diff --stat` vazio; probes criados via bind mount foram removidos ao final).
 
@@ -11176,7 +11176,7 @@ Ao iniciar um módulo, seu dossiê será expandido com estas subseções:
 | 2026-07-17 | Concluído M04: oito mestres organizacionais, cadeia de migrations, CRUDs/imports, data scope, catálogo de materiais e clientes; 15 achados registrados, sem P0 novo; provas Docker e dados reais ficaram explicitamente pendentes. |
 | 2026-07-17 | Concluído M05: matriz RBAC automática, APIs/Admin, policies, scope, cache, signals, seed, lint e divergências frontend; 21 achados registrados, incluindo dois P0 de escalada/sabotagem Tier-0; runtime Docker, concorrência e export read-only de produção ficaram explicitamente pendentes. |
 | 2026-07-17 | Concluído M06: shell, transportes, rotas/menu, polling, PWA, build, Nginx, assets e testes; 20 achados próprios registrados, build e 201 testes passaram, e o cross-account de M02-10 foi reproduzido em Chrome sem alterar código. |
-| 2026-07-17 | Atualizado o baseline de auditoria por fast-forward para `main` `90f6a048`; o P0-0 histórico foi reclassificado como corrigido na fonte por `86afdef3`, sem inferir deploy. |
+| 2026-07-17 | Atualizado o baseline de auditoria por fast-forward para `main` `6be22fb7`; o P0-0 histórico foi reclassificado como corrigido na fonte por `ad13b9e0`, sem inferir deploy. |
 | 2026-07-17 | Concluído M07: AdminDAT/Django Admin, usuários, grupos, memberships, cadastros, config, frontend e testes; dez achados próprios registrados, M01-07 elevado a P1 e writers Tier-0 residuais delimitados. Runtime Docker, Vitest focal e produção ficaram explicitamente pendentes. |
 | 2026-07-17 | Concluído M08: bloqueios, RD-01..08, check/check-many, hard gate, cache, imports, frontend e testes; 21 achados próprios registrados, incluindo P0 de transferência arbitrária de bloqueio aprovado. Probe Node confirmou desvio de timezone; Docker, Vitest focal e produção ficaram explicitamente pendentes. |
 | 2026-07-17 | Concluído M09: Deslocamento, owner/delegação, auditoria, invariantes, hash/import, Grade, frontend e testes; 14 achados próprios registrados, sem reabrir o IDOR já corrigido e sem P0 novo. Docker no SHA correto, frontend dinâmico e produção ficaram pendentes. |
@@ -11207,7 +11207,7 @@ Ao iniciar um módulo, seu dossiê será expandido com estas subseções:
 O acumulado é de **319 achados M00–M18** mais **~90 novos ou promovidos** nas ondas M19–M23 e nas frentes de runtime L1–L4. O número é ruído. O sinal está em quatro propriedades sistêmicas, todas reproduzidas por execução contra código com hash-parity provado.
 
 **1. A fronteira Tier-0 não é uma fronteira — são três portas, e o programa em andamento fecha duas.**
-`M03-01`/`M22-01` (import CSV de usuários), `M05-01`/`M05-02` (GroupViewSet) e `M07-01` (`group_ids` + `assign_groups`) são a **mesma capacidade**: escrever membership de grupo sem política ator×alvo. Os PRs P0-1 em voo (#1563 FE read-only, #1567 gate superuser-only, #1572 cache) endurecem GroupViewSet e o CRUD de usuário. **Nenhum toca `usuarios_import._assign_groups`.** Prova literal: operador do grupo DAT faz `POST /api/usuarios/import/?dry_run=false` com o próprio CPF e `grupos="Superintendência,Gerente,Diretoria"`, recebe **HTTP 200** e vai de 4 para 13 capabilities, incluindo `approve_solicitation` e `execute_restricted_operations` — a autoridade que CP-02 declara imutável. O hotfix P0-0 (`86afdef3`) protegeu o *alvo* superuser e deixou o *autoalvo* e a allowlist de grupos abertos, **no mesmo arquivo e na mesma função**. Um critério de conclusão do P0-1 que não inclua o importer declara vitória sobre uma porta aberta.
+`M03-01`/`M22-01` (import CSV de usuários), `M05-01`/`M05-02` (GroupViewSet) e `M07-01` (`group_ids` + `assign_groups`) são a **mesma capacidade**: escrever membership de grupo sem política ator×alvo. Os PRs P0-1 em voo (#1563 FE read-only, #1567 gate superuser-only, #1572 cache) endurecem GroupViewSet e o CRUD de usuário. **Nenhum toca `usuarios_import._assign_groups`.** Prova literal: operador do grupo DAT faz `POST /api/usuarios/import/?dry_run=false` com o próprio CPF e `grupos="Superintendência,Gerente,Diretoria"`, recebe **HTTP 200** e vai de 4 para 13 capabilities, incluindo `approve_solicitation` e `execute_restricted_operations` — a autoridade que CP-02 declara imutável. O hotfix P0-0 (`ad13b9e0`) protegeu o *alvo* superuser e deixou o *autoalvo* e a allowlist de grupos abertos, **no mesmo arquivo e na mesma função**. Um critério de conclusão do P0-1 que não inclua o importer declara vitória sobre uma porta aberta.
 
 **2. O sistema falha aberto onde deveria falhar fechado, e em silêncio onde deveria gritar.**
 Valor desconhecido de `dry_run` significa **APPLY** em sete views, incluindo o import de maior privilégio (`M04-05`, `M17-11`): `?dry_run=tru` aplica. O healthcheck do compose fica verde sem tocar Postgres ou Redis, porque `curl -f` trata o 301 do `SECURE_SSL_REDIRECT` como sucesso (`M01-02`, exit code 0 medido); com Redis fora — onde vivem as sessões — `/api/readyz/` devolve **200 healthy** (`M01-03`). O export-contract classifica `would_create=1` e o `--apply` devolve `applied=0` com `apply_blocked=False`, criando zero linhas sem erro: **5 das 10 entidades de `IMPLEMENTED` não têm handler de escrita** (`M22-06`, `M17-09`, `M18-09`, `M19-10`). O motor de notificações não encontra destinatário e emite **zero log records** (`M20-06`). `compliance_audit` — passo 5 do runbook de chave comprometida — **aborta com `ProgrammingError` incondicionalmente** e nunca produziu relatório (`M23-17`); `lgpd_export`, única implementação de portabilidade LGPD Art. 18 V, **falha com `FieldError` para qualquer titular** (`M23-01`). Esta é a mesma classe do backup que nunca rodou (#1537): a garantia existe no papel, o elo está quebrado, e ninguém foi avisado.
@@ -11233,7 +11233,7 @@ Registrar isto importa tanto quanto os defeitos, e vários foram testados advers
 
 - **Fail-closed da capability nova**: `manage_internal_actions` tem `group_names=()` e o backend devolve 403 real para DAT/Coordenador/Gerente. O over-grant de M20-03 é exclusivamente frontend, do lado permissivo — **não concede acesso**.
 - **Fail-closed da aprovação sob falha de auditoria**: falha injetada na escrita do AuditLog **reverteu a aprovação** (`M23-15b`, prova comportamental, não estática).
-- **P0-0 (`86afdef3`) está vivo e correto no alvo que cobriu**: probe confirma `skipped.superuser_protected=1`.
+- **P0-0 (`ad13b9e0`) está vivo e correto no alvo que cobriu**: probe confirma `skipped.superuser_protected=1`.
 - **Registro da task diária M20 no worker**: `apps.core.tasks.processar_notificacoes_acoes_diarias` presente em `app.tasks`, beat entry ativa — a lição do backup foi aplicada verificando o runtime do worker, não o arquivo.
 - **Gate do AdminSite**: staff puro negado, superuser inativo negado.
 - **Anti-enumeração em `/lookup/usuarios/`**: 403 para usuário comum autenticado, confirmado em três probes independentes.
@@ -11612,7 +11612,7 @@ Estes **não têm resposta técnica**. Ver campo dedicado. Em resumo: escopo de 
 
 #### E · JÁ EM ANDAMENTO — referenciar, não refazer
 
-- **P0-0** (`86afdef3`): proteção de superuser como alvo. **Vivo e correto**, confirmado por probe. Cobriu o alvo, não o autoalvo.
+- **P0-0** (`ad13b9e0`): proteção de superuser como alvo. **Vivo e correto**, confirmado por probe. Cobriu o alvo, não o autoalvo.
 - **P0-1**: #1563 (FE read-only), #1567 (gate superuser-only), #1572 (P1-3 cache). Mergeiam em qualquer ordem.
 - **Recomendação de coordenação:** adicionar o item 0.1 (importer) como **quarto PR do P0-1**, não como onda separada. Sem ele, o critério de conclusão do programa é falso.
 
@@ -11649,7 +11649,7 @@ do produto, não do time de engenharia.
 
 #### 1. PRODUÇÃO NUNCA FOI CONSULTADA. Sem exceção.
 
-**Nenhum resultado desta auditoria descreve produção.** Tudo veio do stack `aprender_audit-*` sobre a worktree em `90f6a048`. Onde há probe de "ramo de produção" (ALLOWED_HOSTS, SECURE_SSL_REDIRECT), ele prova o **comportamento do código sob aquela configuração** — jamais a configuração real dos containers. Consequências concretas, cada uma bloqueante para um fix:
+**Nenhum resultado desta auditoria descreve produção.** Tudo veio do stack `aprender_audit-*` sobre a worktree em `6be22fb7`. Onde há probe de "ramo de produção" (ALLOWED_HOSTS, SECURE_SSL_REDIRECT), ele prova o **comportamento do código sob aquela configuração** — jamais a configuração real dos containers. Consequências concretas, cada uma bloqueante para um fix:
 
 | Não verificado | Por que bloqueia | Como provar |
 |---|---|---|
@@ -11661,7 +11661,7 @@ do produto, não do time de engenharia.
 | Uso do import async de bloqueios por Controle | Determina se 0.4 corta acesso vivo | Log de acesso + AuditLog |
 | Taxas de throttle efetivas | Lidas só de `settings.py:467-469`, com override dev-only em `:542-548` | Ler ENV |
 | Configuração real de nginx/NPM e mount de `/media/` | **Decide se `M22-03` é P1 ou não-issue** | Acesso a VM01 |
-| Se `86afdef3` está deployado | Não afirmado em nenhum ponto | `/api/version/` |
+| Se `ad13b9e0` está deployado | Não afirmado em nenhum ponto | `/api/version/` |
 | Se o P0 de escalada já foi explorado | **Indeterminável — não há AuditLog** (CR-04). Essa é a resposta, e ela é ruim | Impossível retroativamente; só a instrumentação futura resolve |
 
 #### 2. Módulos M24–M28 chegaram truncados
@@ -11832,7 +11832,7 @@ Dos 81 casos escalados à segunda instância, **30 vieram marcados DISCORDA — 
 | **M05-02** | Ator com capability de compras faz `POST /api/grupos/{Gerente}/sync-members/` com `user_ids:[self]` → **200**. Idem Superintendência. **Auto-promoção completa, sem intermediários.** | Existe humano no grupo Controle em prod |
 | **M05-01** | Gate `manage_purchases_and_materials` → `['Controle','DAT']` alcançável em banco normalmente migrado (cadeia 0065-0083) | Idem |
 | **M03-01** | `manage_admin_registries` pertence a DAT; rota viva em `apps/core/urls.py:245`. Cadeia completa reproduzida | Existe humano em DAT |
-| **M07-01** | DAT reseta senha, desativa e faz **hard delete (204)** de titular Gerente+Superintendência. Sem política ator×alvo | **Duas:** (a) humano em DAT; (b) que prod rode o SHA `90f6a048` — mas a memória registra prod = `v2026.07.18-a545d5f`, que já inclui #1563/#1567/#1572 |
+| **M07-01** | DAT reseta senha, desativa e faz **hard delete (204)** de titular Gerente+Superintendência. Sem política ator×alvo | **Duas:** (a) humano em DAT; (b) que prod rode o SHA `6be22fb7` — mas a memória registra prod = `v2026.07.18-a545d5f`, que já inclui #1563/#1567/#1572 |
 | **M10-02** | Coordenador comum cria solicitação em fluxo NÃO_SUPER → status manipulável. **Violação de CP-02 consumada no banco** | **Nenhuma que importe.** O agravante de vazar para o Calendar depende de GCal ativo; a violação em si, não |
 
 Dois avisos sobre esta tabela:
@@ -11889,7 +11889,7 @@ Oito fatos, ordenados por alavancagem. **Regra herdada do M27-05: cada um deve s
 
 | # | Fato | Como verificar | Custo | O que muda |
 |---|---|---|---|---|
-| **F2** | Qual SHA roda em prod | `curl -s https://aprendersistema.com.br/api/version/` | 10s | Decide se **M07-01 (P0)** é urgente ou já mitigado por `a545d5f` |
+| **F2** | Qual SHA roda em prod | `curl -s https://aprendersistema.com.br/api/version/` | 10s | Decide se **M07-01 (P0)** é urgente ou já mitigado por `35b6b11` |
 | **F4** | GCal está ativo? | Portainer → env `GCAL_CLIENT`, `GCAL_AUTH_MODE` | 2min | **Reclassifica 13 achados de uma vez.** Se stub, 9 P2 caem para P3 |
 | **F3** | Quem está em DAT / Controle / Gerente | Query read-only em réplica ou dump: `SELECT g.name, count(*) FROM auth_group g JOIN core_usuario_groups ug … WHERE u.is_active AND NOT u.is_superuser GROUP BY g.name` | 5min | **Converte 4 dos 5 P0 de "ativo" para "latente" ou confirma.** Contagem 0 → risco de configuração; >0 → P0 vivo |
 | **F5** | Conteúdo real dos envs no Portainer | `docker exec <web> env \| sort`, comparado 1-a-1 com o template | 10min | 18 achados. **O único fato com potencial de *promover* algo a P0** (ex.: `DEBUG=True`) |

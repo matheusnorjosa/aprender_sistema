@@ -1,7 +1,7 @@
 # Auditoria de Segurança RBAC — 2026-07-17
 
 Status: **registro histórico — parcialmente remediado.** Ver a nota de estado abaixo.
-Base: `main` (auditoria refeita sobre `e80a61d2`; verificação de prod sobre a stack viva)
+Base: `main` (auditoria refeita sobre `cf6d3bdd`; verificação de prod sobre a stack viva)
 Método: leitura de código + migrations + specs + testes + **verificação read-only na VM01 de produção**
 Plano de correção definitiva: `v2/docs/plans/2026-07-17-rbac-correcao-definitiva.md`
 Escopo: nenhum arquivo de aplicação alterado nesta auditoria.
@@ -11,15 +11,15 @@ Escopo: nenhum arquivo de aplicação alterado nesta auditoria.
 ## Nota de estado — 2026-07-24
 
 O cabeçalho original dizia "remediação não iniciada". **Isso deixou de ser verdade.** Os
-quatro commits abaixo estão no histórico de `94f27651`, que é o commit em produção
+quatro commits abaixo estão no histórico de `32f2717a`, que é o commit em produção
 (`v2026.07.18-94f2765`):
 
 | Commit | PR | O que fechou |
 |---|---|---|
-| `86afdef3` | #1558 | P0-0 — superuser intocável por não-superuser |
-| `f555d22b` | #1563 | P0-1 — frontend read-only para não-superuser |
-| `82dfa0f2` | #1567 | P0-1 — gate Tier-0 backend superuser-only (`GroupViewSet.get_permissions`, `v2/backend/apps/core/views/admin.py:494-500`) |
-| `a545d5f8` | #1572 | P1-3 — invalidação reversa do cache de permissões |
+| `ad13b9e0` | #1558 | P0-0 — superuser intocável por não-superuser |
+| `70293ea1` | #1563 | P0-1 — frontend read-only para não-superuser |
+| `a4b0a3b6` | #1567 | P0-1 — gate Tier-0 backend superuser-only (`GroupViewSet.get_permissions`, `v2/backend/apps/core/views/admin.py:494-500`) |
+| `35b6b112` | #1572 | P1-3 — invalidação reversa do cache de permissões |
 
 **O que continua aberto — e por quê importa:** o hotfix P0-0 protegeu o *alvo* superuser,
 mas deixou o **autoalvo** e a **allowlist de grupos** abertos, no mesmo arquivo e na mesma
@@ -122,7 +122,7 @@ As migrations semeiam e atribuem a matriz automaticamente, e o deploy versionado
 - `0076` remove os codenames antigos `pode_*`.
 - `0077_realign_funcperm_groups.py:29-69` realinha (`groups.set()`): `manage_admin_registries`→DAT; `manage_purchases_and_materials`→DAT/Controle; `approve_solicitation_batch`→Gerente/Superintendência; `edit_solicitation_as_owner_or_privileged`→Gerente/Coord/Apoio.
 - `0080_redistribute_view_all_availability.py:49` fixa `view_all_availability` em Controle/DAT.
-- Deploy: `docker-compose.prod.yml:47-50` serviço one-shot `migrate`; web/worker/beat dependem de `service_completed_successfully` (106-107/202-203/261-262). Commit `b4f80393` (#1495). **Correção documental aplicada nesta rodada**: `deploy.spec.md` dizia "migrations manuais" — desatualizado; o compose roda migrate automaticamente.
+- Deploy: `docker-compose.prod.yml:47-50` serviço one-shot `migrate`; web/worker/beat dependem de `service_completed_successfully` (106-107/202-203/261-262). Commit `12bb9562` (#1495). **Correção documental aplicada nesta rodada**: `deploy.spec.md` dizia "migrations manuais" — desatualizado; o compose roda migrate automaticamente.
 
 **Anomalia do dev (não do prod)**: o banco dev tem migrations aplicadas até 0082 mas `PF_COUNT=0` — divergência entre o ledger de migrations e os dados (fake/restore/exclusão pós-migração). É **anômalo, não o baseline**. Prod tem `PF_COUNT=16` (verificado em §2.1).
 

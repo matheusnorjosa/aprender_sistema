@@ -4,7 +4,7 @@ status: historical
 last_verified: 2026-07-24
 sources_of_truth:
   - v2/docs/audits/ACHADOS_REAIS.md
-  - reverificação por leitura de código contra main d08acfa5 (2026-07-24)
+  - reverificação por leitura de código contra main 8b6bd1fd (2026-07-24)
 owner: docs
 related:
   - ./ACHADOS_REAIS.md
@@ -15,7 +15,7 @@ related:
 # Varredura documental — 2026-07-24
 
 Varredura completa de `v2/docs/` e `docs/` à luz do que a auditoria modular M00–M28 provou.
-Base: `main d08acfa5`; produção `v2026.07.18-94f2765` (`94f27651`).
+Base: `main 8b6bd1fd`; produção `v2026.07.18-94f2765` (`32f2717a`).
 
 **Escopo do que foi feito:** só documentação. Nenhum arquivo de aplicação, teste, workflow,
 compose ou script foi alterado. `v2/docs/_archive/` não foi tocado. Nada foi enviado: sem

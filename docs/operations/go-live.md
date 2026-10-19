@@ -37,7 +37,7 @@
 - [ ] Backup automatizado **funcionando e verificado por restore drill** — ver
       [Backup](backup.md). O job voltou a gravar (#1455 → #1528, bind-mount em
       `docker-compose.prod.yml:235`) e `restore_db.sh` restaura `.age` (#1611 →
-      `8f392636`; #1645 → `3bca74f3`). **O drill em si continua pendente**
+      `815b1afc`; #1645 → `e4c2d22b`). **O drill em si continua pendente**
       ([#1646](https://github.com/matheusnorjosa/aprender_sistema/issues/1646)) — este
       item só pode ser marcado depois dele
 - [ ] Migrations aplicadas — em prod o serviço one-shot `migrate` roda antes de

@@ -28,9 +28,9 @@ Implementar política de aprovação manual obrigatória com 7 regras:
 - Fluxo NAO_SUPER: Coordenador cria (auto-aprovado) → Controle publica
 - AuditLog registra toda ação com rastreabilidade completa
 - ~~Aprovação manual NÃO revalida conflitos (decisão humana com contexto)~~
-  — **revogado em 2026-07-16 pelo #1452** (`ba3d6e38`; ver emenda abaixo)
+  — **revogado em 2026-07-16 pelo #1452** (`2a859b5a`; ver emenda abaixo)
 
-### Emenda 2026-07-16 (#1452, `ba3d6e38`): a aprovação REVALIDA conflitos
+### Emenda 2026-07-16 (#1452, `2a859b5a`): a aprovação REVALIDA conflitos
 
 > [!warning] Não remova `enforce_solicitacao_availability` do caminho de aprovação
 > Este ADR afirmou até 2026-08-25 que a aprovação manual não revalidava conflitos.

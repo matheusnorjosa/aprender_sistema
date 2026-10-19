@@ -2,7 +2,7 @@
 title: Service Level Objectives (SLOs)
 status: active
 last_verified: 2026-10-19
-verified_at_commit: d0d43890c58b6620a9c6dabca2c940a4e9589911
+verified_at_commit: b37bdcdfa581543c07a22ae6641d667ff73c74ea
 sources_of_truth:
   - v2/backend/apps/core/services/db_retry.py
   - v2/backend/config/settings.py
@@ -141,7 +141,7 @@ Error Budget (horas/mês) = (100 - SLO%) × 720 / 100
 > ensaio de restore foi registrado**
 > ([#1646](https://github.com/matheusnorjosa/aprender_sistema/issues/1646), aberta).
 > A ferramenta oficial de restore **voltou a funcionar** com o formato de produção
-> `.age` — #1611 corrigido em `8f392636`, #1645 em `3bca74f3` —, mas ferramenta correta
+> `.age` — #1611 corrigido em `815b1afc`, #1645 em `e4c2d22b` —, mas ferramenta correta
 > não é RTO medido. Antes de comprometer RPO/RTO com terceiros, leia
 > [BACKUP_OPERATIONS.md → Estado real do restore](./BACKUP_OPERATIONS.md#estado-real-do-restore).
 
@@ -224,7 +224,7 @@ do escopo de SLO, há um *dead-man* diário de frescor de backup
 |--------|------|----------|
 | 1.0 | 2026-01-12 | Versão inicial |
 | 1.1 | 2026-07-24 | Marcado como **não medido em produção**; corrigidos os nomes de métrica PromQL (não são as séries do `django-prometheus`); alertas reclassificados de "recomendados" para **não implementados**; ressalva de RPO/RTO ligada a #1611 |
-| 1.2 | 2026-08-25 | Ressalva de RPO/RTO **religada a #1646** (ensaio de DR, aberta): #1611 e #1645 foram corrigidos (`8f392636`, `3bca74f3`) e a ferramenta de restore deixou de ser o gargalo |
+| 1.2 | 2026-08-25 | Ressalva de RPO/RTO **religada a #1646** (ensaio de DR, aberta): #1611 e #1645 foram corrigidos (`815b1afc`, `e4c2d22b`) e a ferramenta de restore deixou de ser o gargalo |
 
 ---
 

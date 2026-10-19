@@ -2,7 +2,7 @@
 title: Princípios de UX
 status: canonical
 last_verified: 2026-10-19
-verified_at_commit: 2a79cf5c6bafdddb8d2072036f2b0527c3426f3f
+verified_at_commit: 37bc7afd586dd304aa7d0b376a0272906862cdac
 sources_of_truth:
   - v2/frontend/e2e/checklist/accessibility.spec.ts
   - v2/frontend/e2e/checklist/performance.spec.ts

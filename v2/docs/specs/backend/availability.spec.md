@@ -2,7 +2,7 @@
 title: Disponibilidade (serviço)
 status: canonical
 last_verified: 2026-10-19
-verified_at_commit: 5205b976648b0f481a8842101b3f0ddae4647965
+verified_at_commit: 804df36a1741d1faa53586eafade5c4c74c0659d
 sources_of_truth:
   - v2/backend/apps/core/services/availability_service.py
   - v2/backend/apps/core/services/solicitacao_availability.py
@@ -89,7 +89,7 @@ Idioma RBAC canônico: `permission_classes=[HasPerm("codename")]` (grupos direto
 
 **Criação de bloqueio** — sem `usuario_id` (ou self): `usuario=created_by=request.user`, `status="aprovado"`. Com `usuario_id` de terceiro: 403 **antes** de qualquer lookup (anti-enumeração); depois valida target ativo + papel FORMADOR vigente (`EquipeGerencia.gerencias_com_papel`, desde o PR 8; o grupo Formador sozinho não basta) (400 senão), salva e grava AuditLog.
 
-**Edição de bloqueio (achado M08-01 / issue #1619, corrigido em `af2e8810`)** — a titularidade é **imutável** na edição: `AvailabilityBlockViewSet.perform_update` tira `usuario_id` do payload e responde 403 se a edição tentar mudar o dono (a concessão de titularidade só existe no create delegado, `perform_create`). Antes de salvar, `_assert_can_mutate` exige `user_can_delegate_availability_block` para editar bloqueio de outra pessoa (GAP-1, 403 senão) e a edição delegada grava AuditLog `DELEGATE_BLOCK_UPDATE`; o próprio bloqueio segue livre. `perform_destroy` usa o mesmo gate, com AuditLog `DELEGATE_BLOCK_DELETE`. SSOT: `views_availability.py`.
+**Edição de bloqueio (achado M08-01 / issue #1619, corrigido em `c2ff044f`)** — a titularidade é **imutável** na edição: `AvailabilityBlockViewSet.perform_update` tira `usuario_id` do payload e responde 403 se a edição tentar mudar o dono (a concessão de titularidade só existe no create delegado, `perform_create`). Antes de salvar, `_assert_can_mutate` exige `user_can_delegate_availability_block` para editar bloqueio de outra pessoa (GAP-1, 403 senão) e a edição delegada grava AuditLog `DELEGATE_BLOCK_UPDATE`; o próprio bloqueio segue livre. `perform_destroy` usa o mesmo gate, com AuditLog `DELEGATE_BLOCK_DELETE`. SSOT: `views_availability.py`.
 
 ## Decisões relacionadas (ADRs)
 
@@ -114,8 +114,8 @@ Idioma RBAC canônico: `permission_classes=[HasPerm("codename")]` (grupos direto
 
 - **`apps/core/views/availability.py` é shim, não cópia**: reexporta `views_availability` (`views/availability.py`); manter assim ou remover, mas não reimplementar ali.
 - **TOCTOU**: o check é consultivo e cacheado (300 s); entre o check e a gravação da solicitação o estado pode mudar (novo evento/bloqueio concorrente). A garantia real de não-conflito é o guard `enforce_solicitacao_availability` (`services/solicitacao_availability.py`, #1452), que revalida sob advisory lock por participante em create/update/approve/batch-approve — não este serviço.
-- **Motor de regra — achados M08-07 e M08-09 corrigidos** (épico #1664, `ACHADOS_REAIS.md`): M08-07 (ocupação sem filtro de papel) foi resolvido na PR #1794 (commit `cd60882a`) — a query de eventos existentes agora filtra por `ENFORCED_ROLES`; M08-09 (janela diária derivada só do dia de início) foi resolvido na PR #1796 (commit `a986a250`) — a capacidade passou a ser avaliada por dia local (e, desde 05/10/2026, o RD-05 saiu do motor). M08-07 está descrito em §Contratos e invariantes. O épico #1664 segue **aberto** (a decisão de fechá-lo é do dono); estes dois achados de código já não descrevem defeito.
-- **Bloqueio transferível por PATCH** (M08-01 / #1619): **corrigido** em `af2e8810` (`perform_update` torna o dono imutável; ver §Fluxos). `usuario_id` segue gravável no serializer por causa do create delegado, então qualquer refactor do serializer ou do `perform_update` precisa manter a troca de dono bloqueada.
+- **Motor de regra — achados M08-07 e M08-09 corrigidos** (épico #1664, `ACHADOS_REAIS.md`): M08-07 (ocupação sem filtro de papel) foi resolvido na PR #1794 (commit `74e6cc34`) — a query de eventos existentes agora filtra por `ENFORCED_ROLES`; M08-09 (janela diária derivada só do dia de início) foi resolvido na PR #1796 (commit `b0529225`) — a capacidade passou a ser avaliada por dia local (e, desde 05/10/2026, o RD-05 saiu do motor). M08-07 está descrito em §Contratos e invariantes. O épico #1664 segue **aberto** (a decisão de fechá-lo é do dono); estes dois achados de código já não descrevem defeito.
+- **Bloqueio transferível por PATCH** (M08-01 / #1619): **corrigido** em `c2ff044f` (`perform_update` torna o dono imutável; ver §Fluxos). `usuario_id` segue gravável no serializer por causa do create delegado, então qualquer refactor do serializer ou do `perform_update` precisa manter a troca de dono bloqueada.
 - **`municipio=None` = cidade diferente** (RD-04): chamadas sem `municipio_id` disparam buffer; intencional (fix #588), mas pode gerar conflito D inesperado quando o município simplesmente não foi informado.
 - **Permissão por composition OR** nos endpoints de check (3 caps) é tática; se a matriz crescer, migrar para Policy class (ver `feedback_composition_or_is_tactical`).
 - **Grade mensal**: legenda/células dependem de `monthly_grid_service`; este spec cobre o contrato HTTP, não o algoritmo da grade (ver `GUIDE_AVAILABILITY.md`).

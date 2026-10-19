@@ -145,7 +145,7 @@ Caminhos de erro do endpoint `check/`: `usuario_id` ausente/invalido → 400; us
 
 ## Divergencias entre a regra escrita e o codigo
 
-> As duas divergencias abaixo foram reconfirmadas por execucao contra `main d08acfa5` e depois
+> As duas divergencias abaixo foram reconfirmadas por execucao contra `main 8b6bd1fd` e depois
 > **corrigidas no codigo** (epico #1664; detalhe e commits em
 > [`availability.spec.md`](../backend/availability.spec.md)). Ficam aqui como historico; o texto
 > de cada uma descreve o comportamento **anterior** ao conserto. Fonte:

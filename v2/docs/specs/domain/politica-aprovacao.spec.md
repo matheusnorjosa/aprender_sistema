@@ -164,7 +164,7 @@ Corpo de `approve`/`reject` aceita `{"justificativa": "..."}` (opcional). Lote a
 
 ### `M03-01` — a autoridade de aprovação (PA-02 / CP-02) era auto-concedível — **RESOLVIDO (#1610)**
 
-PA-02 e CP-02 tratam "quem aprova" como invariante. O import de usuários **furava** isso; corrigido em `ccbe1e05` (2026-07-30).
+PA-02 e CP-02 tratam "quem aprova" como invariante. O import de usuários **furava** isso; corrigido em `e2b7c528` (2026-07-30).
 
 - Até 02/10/2026 o gate do endpoint era a capability do grupo **DAT**; desde a decisão do dono dessa data é `[IsAuthenticated, SuperuserOnly]` ([`views_import_usuarios.py`](../../../backend/apps/core/views_import_usuarios.py); o DAT recebe 403, ver [`imports.spec.md`](../backend/imports.spec.md)). A concessão de grupos já era **gated por superuser** e segue como segunda trava: `_actor_pode_atribuir_grupos` ([`usuarios_import.py`](../../../backend/apps/core/services/usuarios_import.py)) só retorna `True` para `actor.is_superuser`, e tanto a decisão quanto a primitiva `_assign_groups` aplicam o gate; um ator não-superuser recebe `grupos_ignorados`, não a escalação. O importer de export-contract só concede grupo do allowlist `ALLOWED_USER_GROUPS` ([`export_contract_importer.py`](../../../backend/apps/core/services/export_contract_importer.py)).
 - Cadeia antiga (um usuário DAT importava o próprio CPF com `grupos="Gerente,Superintendencia"` → HTTP 200 → passava a auto-aprovar) está **fechada**: hoje esses grupos só são concedidos por superuser.

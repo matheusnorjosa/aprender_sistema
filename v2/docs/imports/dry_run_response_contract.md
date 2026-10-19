@@ -276,7 +276,7 @@ Critérios: complexidade, models afetados, dry_run real, idempotência, uso em p
 |---|---|
 | `municipios_import.py` | Cadastro mestre. Sem FK para nada crítico. Sem GCal. Cache de options para invalidar é simples. |
 | `colecoes_import.py` | Cadastro mestre. FK apenas `Projeto`. Sem GCal. |
-| `usuarios_import.py` | Cadastro mestre (FK `Group` M2M). ✅ **P0 #1610 resolvido (`ccbe1e05`):** a coluna `grupos` passou a exigir gate de superuser — para não-superusuário os grupos pedidos entram em `grupos_ignorados` em vez de serem concedidos (`services/usuarios_import.py:273-283/362/495-496`), e o `export_contract_importer` aplica allowlist (`export_contract_importer.py:1077-1082`). Achado histórico `M03-01`. Residual acompanhado em [#1656](https://github.com/matheusnorjosa/aprender_sistema/issues/1656). Padronizar o shape de retorno segue seguro. Ver [usuarios.md](./usuarios.md) §10. |
+| `usuarios_import.py` | Cadastro mestre (FK `Group` M2M). ✅ **P0 #1610 resolvido (`e2b7c528`):** a coluna `grupos` passou a exigir gate de superuser — para não-superusuário os grupos pedidos entram em `grupos_ignorados` em vez de serem concedidos (`services/usuarios_import.py:273-283/362/495-496`), e o `export_contract_importer` aplica allowlist (`export_contract_importer.py:1077-1082`). Achado histórico `M03-01`. Residual acompanhado em [#1656](https://github.com/matheusnorjosa/aprender_sistema/issues/1656). Padronizar o shape de retorno segue seguro. Ver [usuarios.md](./usuarios.md) §10. |
 | `produtos_import.py` | Cadastro mestre. FK apenas `Projeto`. |
 | `equipe_gerencia_import.py` | Cadastro de vínculo. Tem extras `gerencias_created/existing` no stats — bom caso de teste para extensibilidade do contrato. |
 

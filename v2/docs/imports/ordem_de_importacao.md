@@ -143,7 +143,7 @@ Cada seta indica dependência de FK ou de validação de domínio.
 - **Bloqueios** — reimport atualiza `motivo`.
 - **Usuários** — reimport reconcilia por CPF; a concessão dos grupos da coluna `grupos` **era**
   irrestrita a cada reimport (auto-escalação), **corrigida** por
-  [#1610](https://github.com/matheusnorjosa/aprender_sistema/issues/1610) (`ccbe1e05`): agora só o
+  [#1610](https://github.com/matheusnorjosa/aprender_sistema/issues/1610) (`e2b7c528`): agora só o
   ator superuser concede grupos — não-superuser recebe `grupos_ignorados`.
 
 **Antes de reimportar em produção**: rodar dry-run e ler a resposta HTTP — ela é a **única**
@@ -162,5 +162,5 @@ evidência que existe. `AuditLog` filtrado por `action LIKE 'IMPORT_%'` **não d
   o import agora consulta disponibilidade para evento FUTURO (#1620); histórico entra sem checar.)*
 - 🟡 **Antes do próximo reimport em massa**: #1628 (sobrescrita silenciosa de aprovação) **resolvido no #2021**
   (reimport protege decisão humana); resta #1633 (duplicação de `Compra`). "Re-rodar o arquivo corrigido"
-  sem rastro. (A auto-escalação de grupos de #1610 já foi **corrigida** em `ccbe1e05` — concessão
+  sem rastro. (A auto-escalação de grupos de #1610 já foi **corrigida** em `e2b7c528` — concessão
   gated por superuser.) Ver [../audits/ACHADOS_REAIS.md](../audits/ACHADOS_REAIS.md).

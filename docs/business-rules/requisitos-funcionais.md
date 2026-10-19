@@ -97,7 +97,7 @@ registrava (#1610, #1624, #1650) estão resolvidas.
 
 "Implementado" significa que o caminho existe e está em produção — não que esteja livre de
 defeito conhecido. As ressalvas abaixo registram o estado de cada RF; as divergências de RF03 e
-RF04, reconfirmadas por execução contra `main d08acfa5`, já foram corrigidas no código.
+RF04, reconfirmadas por execução contra `main 8b6bd1fd`, já foram corrigidas no código.
 
 | RF | Descrição | Status | Ressalva |
 |----|-----------|--------|----------|

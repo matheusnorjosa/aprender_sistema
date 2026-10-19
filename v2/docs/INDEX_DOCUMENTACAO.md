@@ -3,7 +3,7 @@
 **Última Atualização**: 2026-07-24 (varredura de veracidade contra o código)
 
 > **Como ler os números desta página**: são contagens **estáticas** feitas contra este
-> repositório em 2026-07-24 (`main` = `d08acfa5`) e recontadas em 2026-10-19, com o critério
+> repositório em 2026-07-24 (`main` = `8b6bd1fd`) e recontadas em 2026-10-19, com o critério
 > registrado ao lado de cada métrica. Contam **declarações**, não casos executados — `pytest.mark.parametrize` e
 > `test.each` multiplicam o número real de casos quando a suíte roda.
 

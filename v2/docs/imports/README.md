@@ -102,7 +102,7 @@ ator×alvo abrangente nos imports; o resíduo desse padrão (demais writers) é 
 [#1656](https://github.com/matheusnorjosa/aprender_sistema/issues/1656). O caso concreto do import
 de usuários — a coluna `grupos` concedia qualquer grupo sem gate, permitindo auto-escalação — **era**
 o furo de [#1610](https://github.com/matheusnorjosa/aprender_sistema/issues/1610) e foi **corrigido**
-(`ccbe1e05`): a concessão de grupos no import passou a ser gated por superuser
+(`e2b7c528`): a concessão de grupos no import passou a ser gated por superuser
 (`_actor_pode_atribuir_grupos`, `usuarios_import.py:273-283`) — ver [usuarios.md](./usuarios.md).
 
 ### 2.4 Audit trail — ⚠️ **só usuários e bloqueios têm trilha**
@@ -125,7 +125,7 @@ reconcile).
 
 Consequência: **nos demais services, um apply síncrono não deixa rastro de quem rodou, com qual
 arquivo, nem do que mudou.** (A auto-escalação de grupos que #1610 explorava foi **corrigida** em
-`ccbe1e05` — concessão gated por superuser.)
+`e2b7c528` — concessão gated por superuser.)
 
 `ImportBatch` nunca foi criado; o modelo real é `ImportJob`
 ([apps/core/models/import_job.py](../../backend/apps/core/models/import_job.py)).
@@ -146,7 +146,7 @@ Datas de calendário (Solicitação, AvailabilityBlock) **são armazenadas em UT
 | Nunca cria usuário com `is_superuser=True` | ✅ verdadeiro | o campo não é entrada de `usuarios_import` |
 | Nunca altera conta superuser existente | ✅ verdadeiro | `usuarios_import.py:291-300` (P0-0) |
 | ~~Nunca aprova solicitações~~ | ✅ **corrigido (#2021)** | `fluxo == NAO_SUPER` grava `aprovado`, mas o import agora aplica o hard gate de disponibilidade a evento **FUTURO** (conflito → pendência `availability`, não grava); **histórico** entra sem checar (decisão do dono) — `M08-12` / [#1620](https://github.com/matheusnorjosa/aprender_sistema/issues/1620). (SUPER continua nascendo `pendente`.) |
-| Nunca atribui `Gerente`/`Superintendência` por ator não-superuser | ✅ **verdadeiro** (corrigido) | **era** falso — a coluna `grupos` concedia qualquer grupo sem gate; **corrigido** por `M03-01`/[#1610](https://github.com/matheusnorjosa/aprender_sistema/issues/1610) (`ccbe1e05`): concessão de grupos gated por superuser (`usuarios_import.py:273-283`, decisão `:362`, `_assign_groups:495-496`); ator não-superuser recebe `grupos_ignorados`. Resíduo ator×alvo amplo → [#1656](https://github.com/matheusnorjosa/aprender_sistema/issues/1656) |
+| Nunca atribui `Gerente`/`Superintendência` por ator não-superuser | ✅ **verdadeiro** (corrigido) | **era** falso — a coluna `grupos` concedia qualquer grupo sem gate; **corrigido** por `M03-01`/[#1610](https://github.com/matheusnorjosa/aprender_sistema/issues/1610) (`e2b7c528`): concessão de grupos gated por superuser (`usuarios_import.py:273-283`, decisão `:362`, `_assign_groups:495-496`); ator não-superuser recebe `grupos_ignorados`. Resíduo ator×alvo amplo → [#1656](https://github.com/matheusnorjosa/aprender_sistema/issues/1656) |
 | ~~Nunca sobrescreve sem match confirmado~~ | ✅ **corrigido #2021** | reimport protege status/owner/local (divergência → pendência `protected`) + diff real; não reverte mais decisão humana — `M10-07` / [#1628](https://github.com/matheusnorjosa/aprender_sistema/issues/1628) |
 | (não alegado) Nunca resolve pessoa/município errado | ⚠️ **parcial** | `M02-09`/[#1613](https://github.com/matheusnorjosa/aprender_sistema/issues/1613) **✅ resolvido**: `resolve_projeto`/`resolve_tipo_evento` rejeitam ambiguidade (não mais `.first()`) + import DAT com norm simétrica. **Parcial**: `M22-14`/[#1643](https://github.com/matheusnorjosa/aprender_sistema/issues/1643) (`resolve_user_by_name` exige candidato único desde #1929; resta o residual de #1643). **Segue aberto**: `M15-05`/[#1635](https://github.com/matheusnorjosa/aprender_sistema/issues/1635); **✅ resolvido**: `M04-01`/[#1615](https://github.com/matheusnorjosa/aprender_sistema/issues/1615) (#2022, resolve-only) — épico [#1658](https://github.com/matheusnorjosa/aprender_sistema/issues/1658) |
 | (não alegado) Nunca grava linha inválida | ❌ **falso** | compras aceita quantidade vazia/negativa/decimal e data ausente — `M15-04` / [#1634](https://github.com/matheusnorjosa/aprender_sistema/issues/1634) |
@@ -318,7 +318,7 @@ Mudanças que quebram contrato (renomear coluna obrigatória, mudar tipo de dado
 > pendências de design. Detalhe e evidência em [../audits/ACHADOS_REAIS.md](../audits/ACHADOS_REAIS.md).
 
 1. ✅ **Gate de concessão de grupos no import de usuários** — **feito**
-   ([#1610](https://github.com/matheusnorjosa/aprender_sistema/issues/1610), `ccbe1e05`): a concessão
+   ([#1610](https://github.com/matheusnorjosa/aprender_sistema/issues/1610), `e2b7c528`): a concessão
    de grupos no import passou a ser gated por superuser (`_actor_pode_atribuir_grupos`,
    `usuarios_import.py:273-283`; decisão `:362`; `_assign_groups:495-496`) — ator não-superuser recebe
    `grupos_ignorados`; o importer export-contract concede apenas a allowlist `ALLOWED_USER_GROUPS`
@@ -340,7 +340,7 @@ Mudanças que quebram contrato (renomear coluna obrigatória, mudar tipo de dado
 7. **Decisão D17 (hoje D21) e Imports**: imports não devem atribuir capabilities (a matriz
    Grupo × Capability muda só por PR, D21). ✅ Confirmado
    — nenhum service de import toca `PermissaoFuncional`; o import de usuários mexe em `Group`, mas
-   essa concessão passou a ser gated por superuser (#1610, `ccbe1e05`), fechando a auto-escalação
+   essa concessão passou a ser gated por superuser (#1610, `e2b7c528`), fechando a auto-escalação
    que **era** o problema. `seed_rbac` é um command de `apps/dev_tools`, manual, fora do pipeline de
    import.
 

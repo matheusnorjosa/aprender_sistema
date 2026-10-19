@@ -275,7 +275,7 @@ mostra (setor, permissões): na tela de Grupos.
 ⚠️ **O import de usuários NÃO remove grupos — só adiciona.** A concessão de grupos por
 `POST /api/usuarios/import/` (coluna `grupos`) **passou a exigir superusuário** — era drift
 (issue [#1610](https://github.com/matheusnorjosa/aprender_sistema/issues/1610)), **corrigido**
-em `ccbe1e05`: `_actor_pode_atribuir_grupos` (`usuarios_import.py`) faz um ator não-superusuário
+em `e2b7c528`: `_actor_pode_atribuir_grupos` (`usuarios_import.py`) faz um ator não-superusuário
 ter os grupos ignorados (`grupos_ignorados`), e o importer dedicado impõe allowlist (`run` de
 `ExportContractImporter`, `export_contract_importer.py`). Resta o residual
 de escopo ator × alvo abrangente, endereçado pelo épico

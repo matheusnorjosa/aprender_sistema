@@ -24,8 +24,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef, ChangeEvent, Key, JSX, CSSProperties } from 'react';
 import {
   Alert,
-  Table,
   Card,
+  Grid,
   Input,
   Select,
   Button,
@@ -40,7 +40,6 @@ import {
   Avatar,
   Tooltip,
 } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
 import type { TableRowSelection } from 'antd/es/table/interface';
 import {
   CalendarOutlined,
@@ -83,6 +82,8 @@ import { formadoresLabel } from '../../utils/participants';
 import { mesmosDados } from '../../utils/mesmosDados';
 import { pausaDo429Ms } from '../../utils/retryAfter';
 import AvisoAtualizacaoPausada from '../../components/AvisoAtualizacaoPausada';
+import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
+import { AcoesLinha, larguraAcoesLinha, type AcaoDaLinha } from '../../components/AcoesLinha';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -481,51 +482,70 @@ export default function ApprovalsPage(): JSX.Element {
     }),
     // A impedida sai sem checkbox (não só desabilitado): não há ação possível nela.
     renderCell: (_checked, record, _index, originNode) => (impedimento(record) !== null ? null : originNode),
-    selections: [
-      Table.SELECTION_ALL,
-      Table.SELECTION_INVERT,
-      Table.SELECTION_NONE,
-    ],
+    // `true`: os atalhos padrão do AntD (tudo, inverter, nada) sem importar o `Table` cru.
+    selections: true,
   } : undefined;
 
+  // Celular: as ações vão para o menu "Mais ações" (AcoesLinha) e a página perde padding.
+  const telas = Grid.useBreakpoint();
+  const acoesCompactas = !telas.sm;
+
+  // Sem rolagem horizontal (achado do item 36): no celular a coluna fixa Ações cobria a tabela e
+  // a pessoa aprovava sem ver o evento. Sempre na linha: o Evento (data, município, projeto) e as
+  // ações; o resto sobe por largura e, escondido, vai para a linha expandida.
   // Issue #260: Memoizar columns para evitar re-renderização desnecessária da tabela
-  const columns: ColumnsType<Solicitacao> = useMemo(() => [
+  const columns: ColunaResponsiva<Solicitacao>[] = useMemo(() => [
     {
-      title: 'Data/Horário',
-      key: 'data_horario',
-      width: 140,
-      render: (_, record) => (
-        <div>
-          <div>{formatFortaleza(record.inicio, 'DD/MM/YYYY')}</div>
-          <small className="text-gray-500">
-            {formatFortaleza(record.inicio, 'HH:mm')} - {formatFortaleza(record.fim, 'HH:mm')}
-          </small>
-        </div>
-      ),
+      title: 'Evento',
+      key: 'evento',
+      render: (_, record) => {
+        const motivo = record.status === 'pendente' && canApprove ? impedimento(record) : null;
+        return (
+          <div style={{ lineHeight: 1.3 }}>
+            <div style={UMA_LINHA}>
+              {formatFortaleza(record.inicio, 'DD/MM/YYYY')}{' '}
+              <small className="text-gray-500">
+                {formatFortaleza(record.inicio, 'HH:mm')} - {formatFortaleza(record.fim, 'HH:mm')}
+              </small>
+            </div>
+            <div style={UMA_LINHA} title={record.municipio_nome || undefined}>{record.municipio_nome || '-'}</div>
+            <small className="text-gray-500" style={{ ...UMA_LINHA, display: 'block' }} title={record.projeto_nome || undefined}>
+              {record.projeto_nome || '-'}
+            </small>
+            {/* PA-02: quem lê não decide esta; outra pessoa aprovadora decide */}
+            {motivo !== null && (
+              <Tooltip title="Outra pessoa aprovadora precisa decidir">
+                <Tag color="blue" className="mt-1" style={{ whiteSpace: 'normal' }}>{TAG_DA_DECISAO_IMPEDIDA[motivo]}</Tag>
+              </Tooltip>
+            )}
+          </div>
+        );
+      },
     },
     {
-      title: 'Município',
-      dataIndex: 'municipio_nome',
-      key: 'municipio_nome',
-      render: (nome: string | null) => nome || '-',
-      width: 130,
-      ellipsis: true,
-    },
-    {
-      title: 'Projeto',
-      dataIndex: 'projeto_nome',
-      key: 'projeto_nome',
-      render: (nome: string | null) => nome || '-',
-      width: 130,
-      ellipsis: true,
+      title: 'Coordenador',
+      dataIndex: 'coordenador_nome',
+      key: 'coordenador_nome',
+      responsive: VISIVEL_A_PARTIR.md,
+      // 05/10/2026: a resposta "acompanha?" vai numa 2ª linha da mesma célula, sem coluna nova.
+      render: (valor, record) => {
+        const nome = valor as string | null;
+        return (
+          <div style={{ lineHeight: 1.3 }}>
+            <div style={UMA_LINHA} title={nome || undefined}>{nome || '-'}</div>
+            <small className="text-gray-500">{record.coordenador_acompanha ? 'Acompanha' : 'Não acompanha'}</small>
+          </div>
+        );
+      },
     },
     {
       title: 'Tipo/Enc./Seg.',
       key: 'tipo_encontro_segmento',
-      width: 100,
+      responsive: VISIVEL_A_PARTIR.lg,
+      width: 110,
       render: (_, record) => (
         <div style={{ lineHeight: 1.3 }}>
-          {record.tipo && <div>{record.tipo}</div>}
+          {record.tipo && <div style={UMA_LINHA} title={record.tipo}>{record.tipo}</div>}
           {record.encontro && <small className="text-gray-500">{record.encontro}</small>}
           {record.segmento && <div><small className="text-gray-400">{record.segmento}</small></div>}
           {!record.tipo && !record.encontro && !record.segmento && '-'}
@@ -533,100 +553,63 @@ export default function ApprovalsPage(): JSX.Element {
       ),
     },
     {
-      title: 'Coordenador',
-      dataIndex: 'coordenador_nome',
-      key: 'coordenador_nome',
-      // 05/10/2026: a resposta "acompanha?" vai numa 2ª linha da mesma célula — sem coluna nova,
-      // para não alargar a tabela (a rolagem lateral desta tela já está na fila).
-      render: (nome: string | null, record) => (
-        <div style={{ lineHeight: 1.3 }}>
-          <div style={UMA_LINHA} title={nome || undefined}>{nome || '-'}</div>
-          <small className="text-gray-500">{record.coordenador_acompanha ? 'Acompanha' : 'Não acompanha'}</small>
-        </div>
-      ),
-      width: 130,
-      ellipsis: true,
-    },
-    {
       title: 'Formadores',
       dataIndex: 'participations',
       key: 'formadores',
+      responsive: VISIVEL_A_PARTIR.lg,
       // Nome do formador (inclui convidados "que saíram" via guest_nome — sem FK). Ver utils/participants.
       // 2ª linha: "pretende avaliar o formador?" (05/10/2026); sem resposta (antigas), nada.
-      render: (participations: Participation[] | undefined, record) => (
-        <div style={{ lineHeight: 1.3 }}>
-          <div style={UMA_LINHA} title={formadoresLabel(participations) || undefined}>
-            {formadoresLabel(participations) || '-'}
+      render: (valor, record) => {
+        const participations = valor as Participation[] | undefined;
+        return (
+          <div style={{ lineHeight: 1.3 }}>
+            <div style={UMA_LINHA} title={formadoresLabel(participations) || undefined}>
+              {formadoresLabel(participations) || '-'}
+            </div>
+            {record.pretende_avaliar_formador === true && (
+              <small className="text-gray-500" style={{ ...UMA_LINHA, display: 'block' }} title={record.formador_avaliado_nome || undefined}>
+                Pretende avaliar: {record.formador_avaliado_nome || '-'}
+              </small>
+            )}
+            {record.pretende_avaliar_formador === false && <small className="text-gray-500">Não pretende avaliar</small>}
           </div>
-          {record.pretende_avaliar_formador === true && (
-            <small className="text-gray-500" style={{ ...UMA_LINHA, display: 'block' }} title={record.formador_avaliado_nome || undefined}>
-              Pretende avaliar: {record.formador_avaliado_nome || '-'}
-            </small>
-          )}
-          {record.pretende_avaliar_formador === false && <small className="text-gray-500">Não pretende avaliar</small>}
-        </div>
-      ),
-      width: 150,
-      ellipsis: true,
+        );
+      },
     },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: (status: SolicitacaoStatus) => (
-        <Tag color={STATUS_COLORS[status]}>{STATUS_LABELS[status] || status}</Tag>
-      ),
-      width: 90,
+      responsive: VISIVEL_A_PARTIR.sm,
+      width: 100,
+      render: (valor) => {
+        const status = valor as SolicitacaoStatus;
+        return <Tag color={STATUS_COLORS[status]}>{STATUS_LABELS[status] || status}</Tag>;
+      },
     },
     {
       title: 'Ações',
       key: 'actions',
-      width: 220,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="small">
-          <Button
-            size="small"
-            icon={<EyeOutlined />}
-            onClick={() => handlePreview(record.id)}
-            aria-label={`Ver prévia do evento: ${rotuloDoEvento(record)}`}
-          />
-          {/* PA-06: Aprovar/Reprovar para quem tem a policy; PA-02: nunca na impedida */}
-          {record.status === 'pendente' && canApprove && impedimento(record) !== null ? (
-            <Tooltip title="Outra pessoa aprovadora precisa decidir">
-              <Tag color="blue">{TAG_DA_DECISAO_IMPEDIDA[impedimento(record) as DecisaoImpedida]}</Tag>
-            </Tooltip>
-          ) : null}
-          {record.status === 'pendente' && canApprove && impedimento(record) === null ? (
-            <>
-              <Button
-                size="small"
-                type="primary"
-                icon={<CheckOutlined />}
-                onClick={() => handleApprove(record)}
-                aria-label={`Aprovar: ${rotuloDoEvento(record)}`}
-              >
-                Aprovar
-              </Button>
-              <Button
-                size="small"
-                danger
-                icon={<CloseOutlined />}
-                onClick={() => handleReject(record)}
-                aria-label={`Reprovar: ${rotuloDoEvento(record)}`}
-              >
-                Reprovar
-              </Button>
-            </>
-          ) : null}
-        </Space>
-      ),
+      width: larguraAcoesLinha(3, acoesCompactas),
+      render: (_, record) => {
+        const acoes: AcaoDaLinha[] = [
+          { chave: 'ver', rotulo: 'Ver prévia do evento', icone: <EyeOutlined />, onClick: () => void handlePreview(record.id) },
+        ];
+        // PA-06: Aprovar/Reprovar para quem tem a policy; PA-02: nunca na impedida
+        if (record.status === 'pendente' && canApprove && impedimento(record) === null) {
+          acoes.push(
+            { chave: 'aprovar', rotulo: 'Aprovar', icone: <CheckOutlined />, onClick: () => handleApprove(record) },
+            { chave: 'reprovar', rotulo: 'Reprovar', icone: <CloseOutlined />, onClick: () => handleReject(record), perigo: true },
+          );
+        }
+        return <AcoesLinha acoes={acoes} alvo={rotuloDoEvento(record)} compacto={acoesCompactas} />;
+      },
     },
-  ], [handlePreview, handleApprove, handleReject, canApprove, impedimento]);
+  ], [handlePreview, handleApprove, handleReject, canApprove, impedimento, acoesCompactas]);
 
   return (
-    <section className="p-6" aria-labelledby="aprovacoes-title">
-      <Card>
+    <section className="p-3 sm:p-6" aria-labelledby="aprovacoes-title">
+      <Card {...(!telas.sm && { styles: { body: { padding: 12 } } })}>
         <Space direction="vertical" style={{ width: '100%' }} size="large">
           {/* Header semantico */}
           <header>
@@ -635,7 +618,7 @@ export default function ApprovalsPage(): JSX.Element {
 
           {/* Filtros */}
           <nav aria-label="Filtros de busca">
-            <Space>
+            <Space wrap className="w-full">
               <Select
                 value={statusFilter}
                 onChange={handleStatusChange}
@@ -674,7 +657,7 @@ export default function ApprovalsPage(): JSX.Element {
           {/* Toolbar de ações em lote (PA-06: apenas para usuários com permissão) */}
           {selectedRowKeys.length > 0 && canApprove && (
             <nav aria-label="Acoes em lote" className="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
-              <Space>
+              <Space wrap>
                 <Text strong aria-live="polite">
                   {selectedRowKeys.length} solicitação(ões) selecionada(s)
                 </Text>
@@ -724,13 +707,13 @@ export default function ApprovalsPage(): JSX.Element {
 
           {/* Tabela */}
           <section aria-label="Lista de solicitacoes para aprovacao">
-            <Table
+            <ResponsiveTable<Solicitacao>
               {...(rowSelection !== undefined && { rowSelection })}
               columns={columns}
               dataSource={rows}
               loading={loading}
               rowKey="id"
-              scroll={{ x: 1090 }}
+              nomeDaLinha={rotuloDoEvento}
               pagination={{
                 current: page,
                 pageSize,

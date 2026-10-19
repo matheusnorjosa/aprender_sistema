@@ -1,0 +1,142 @@
+/**
+ * Aprovações sem rolagem horizontal (achado do item 36, 19/10/2026): lista enxuta no ResponsiveTable.
+ *
+ * No celular a coluna fixa Ações (220 px) cobria a tabela e a pessoa aprovava sem ver o evento.
+ * Sempre na linha: o Evento (data e horário, município, projeto) e as ações (AcoesLinha, que leva
+ * o evento no nome: "Aprovar: 25/08/2026 · Município · Projeto"). As demais sobem por largura e o
+ * que some vai para a linha expandida. Sem `scroll.x` e sem coluna fixa.
+ */
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { MemoryRouter } from 'react-router';
+
+import { AcessoContext, montarAcesso } from '../../../contexts/AcessoContext';
+import { definirLarguraTela } from '../../../test/larguraTela';
+import type { PaginatedResponse, Solicitacao } from '../../../types';
+
+vi.mock('../../../api/solicitacoes', () => ({
+  listSolicitacoes: vi.fn(),
+  approveSolicitacao: vi.fn(),
+  rejectSolicitacao: vi.fn(),
+  previewSolicitacao: vi.fn(),
+  approveSolicitacoesBatch: vi.fn(),
+  rejectSolicitacoesBatch: vi.fn(),
+}));
+vi.mock('../../../api/availability', () => ({ getMe: vi.fn().mockResolvedValue(null) }));
+vi.mock('../../../hooks/usePolling', () => ({ usePolling: vi.fn(() => ({ pausado: false, pausar: vi.fn() })) }));
+
+import ApprovalsPage from '../ApprovalsPage';
+import { listSolicitacoes } from '../../../api/solicitacoes';
+
+const EVENTO = '25/08/2026 · MunicipioTeste · ProjetoTeste';
+
+function linhas(n: number): PaginatedResponse<Solicitacao> {
+  return {
+    count: n,
+    next: null,
+    previous: null,
+    results: Array.from({ length: n }, (_, i) => ({
+      id: i + 1,
+      usuario: 5,
+      municipio_nome: i === 0 ? 'MunicipioTeste' : `Municipio${i + 1}`,
+      projeto_nome: 'ProjetoTeste',
+      coordenador_nome: 'Coordenadora Teste',
+      coordenador_acompanha: true,
+      tipo: 'FORMACAO',
+      encontro: null,
+      segmento: null,
+      inicio: '2026-08-25T13:00:00Z',
+      fim: '2026-08-25T15:00:00Z',
+      status: 'pendente',
+      participations: [],
+    })) as unknown as Solicitacao[],
+  };
+}
+
+function renderPage(): ReturnType<typeof render> {
+  return render(
+    <AcessoContext.Provider value={montarAcesso(['access_solicitation_approvals'], null)}>
+      <MemoryRouter>
+        <ApprovalsPage />
+      </MemoryRouter>
+    </AcessoContext.Provider>,
+  );
+}
+
+/** Títulos das colunas de dados (sem a da seleção e a do botão de expandir). */
+function cabecalhos(): string[] {
+  return screen
+    .getAllByRole('columnheader')
+    .filter((th) => !th.classList.contains('ant-table-row-expand-icon-cell') && !th.classList.contains('ant-table-selection-column'))
+    .map((th) => th.textContent?.trim() ?? '')
+    .filter(Boolean);
+}
+
+async function linhaDoEvento(acao: 'Aprovar' | 'Mais ações'): Promise<HTMLElement> {
+  const botao = await screen.findByRole('button', { name: `${acao}: ${EVENTO}` }, { timeout: 15000 });
+  const linha = botao.closest('tr');
+  if (!linha) throw new Error('o botão não está numa linha da tabela');
+  return linha;
+}
+
+describe('ApprovalsPage responsiva', () => {
+  beforeEach(() => {
+    vi.mocked(listSolicitacoes).mockResolvedValue(linhas(1));
+  });
+
+  test('a 1280 px: o evento e as ações na linha, sem coluna fixa nem rolagem', async () => {
+    const { container } = renderPage();
+    const linha = await linhaDoEvento('Aprovar');
+
+    expect(cabecalhos()).toEqual(['Evento', 'Coordenador', 'Tipo/Enc./Seg.', 'Formadores', 'Status', 'Ações']);
+    for (const texto of ['25/08/2026', 'MunicipioTeste', 'ProjetoTeste']) {
+      expect(within(linha).getByText(texto, { exact: false })).toBeInTheDocument();
+    }
+    expect(within(linha).getByRole('button', { name: `Reprovar: ${EVENTO}` })).toBeInTheDocument();
+    expect(within(linha).getByRole('button', { name: `Ver prévia do evento: ${EVENTO}` })).toBeInTheDocument();
+    expect(container.querySelector('.ant-table-cell-fix-right, .ant-table-cell-fix-left')).toBeNull();
+    expect(container.querySelector('.ant-table-content')?.getAttribute('style') ?? '').not.toMatch(/overflow/);
+  }, 20000);
+
+  test('a 360 px: só o evento e o menu de ações; o resto na linha expandida', async () => {
+    definirLarguraTela(360);
+    const user = userEvent.setup();
+    renderPage();
+    const linha = await linhaDoEvento('Mais ações');
+
+    expect(cabecalhos()).toEqual(['Evento', 'Ações']);
+    // Data, município e projeto continuam ao lado das ações.
+    for (const texto of ['25/08/2026', 'MunicipioTeste', 'ProjetoTeste']) {
+      expect(within(linha).getByText(texto, { exact: false })).toBeInTheDocument();
+    }
+
+    await user.click(within(linha).getByRole('button', { name: `Expandir linha de ${EVENTO}` }));
+    const expandida = within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);
+    for (const texto of ['Coordenadora Teste', 'FORMACAO', 'Pendente']) {
+      expect(expandida.getByText(texto)).toBeInTheDocument();
+    }
+  }, 20000);
+
+  test('mudar a largura com a página aberta reorganiza as colunas', async () => {
+    renderPage();
+    await linhaDoEvento('Aprovar');
+
+    act(() => definirLarguraTela(360));
+
+    expect(cabecalhos()).toEqual(['Evento', 'Ações']);
+  }, 20000);
+
+  test('a barra do lote quebra linha em tela estreita', async () => {
+    vi.mocked(listSolicitacoes).mockResolvedValue(linhas(2));
+    definirLarguraTela(360);
+    renderPage();
+    const linha = await linhaDoEvento('Mais ações');
+
+    // fireEvent: o Spin da carga põe pointer-events none na tabela (o userEvent recusa).
+    fireEvent.click(within(linha).getByRole('checkbox'));
+
+    const barra = screen.getByRole('navigation', { name: 'Acoes em lote' });
+    expect(barra.firstElementChild).toHaveStyle({ flexWrap: 'wrap' });
+  }, 20000);
+});

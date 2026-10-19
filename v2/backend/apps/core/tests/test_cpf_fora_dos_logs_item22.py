@@ -5,7 +5,8 @@ Desde 29/09 o login (`username`) de toda conta é o CPF. Então:
 - as rotas do Google (`views_oauth.py`) logam `user_id=<pk>`, não o login;
 - o importador de usuários loga o pk da conta, não o login `user_<cpf>` (que o filtro de log não
   reconhece: o `_` cola no CPF e tira a fronteira de palavra);
-- o `target_username` que a tela de Usuários grava no AuditLog passa por `redact_cpf`;
+- o `target_username` que a tela de Usuários grava no AuditLog passa por `redact_username`, que
+  também tira o CPF do login `user_<cpf>`;
 - o filtro de log (`PIIRedactionFilter`) também redige o CPF formatado `000.000.000-00`, com a
   mesma regra de `apps/core/pii.py` (#1964: os dois módulos tinham divergido).
 
@@ -29,7 +30,13 @@ import pytest
 
 from apps.core.logging_filters import PIIRedactionFilter
 from apps.core.models import AuditLog, GoogleOAuthCredential
-from apps.core.pii import redact_cpf
+from apps.core.pii import redact_cpf, redact_username
+from apps.core.services.audit import (
+    auditar_assign_groups,
+    auditar_privilege_flags,
+    auditar_reset_senha,
+    auditar_user_delete,
+)
 from apps.core.services.usuarios_import import _assign_groups
 from apps.core.tests.factories import UsuarioFactory
 
@@ -214,4 +221,57 @@ def test_auditoria_de_criar_e_alterar_conta_nao_guarda_o_cpf():
     acoes = {log.action for log in logs}
     assert {AuditLog.Action.CREATE, AuditLog.Action.UPDATE} <= acoes
     for log in logs:
+        assert _sem_cpf(str(log.details)), log.details
+
+
+# =============================================================================
+# Login `user_<cpf>` do importador: o `target_username` do AuditLog também sai sem CPF
+# =============================================================================
+
+
+@pytest.mark.parametrize(
+    ("entrada", "esperado"),
+    [
+        (f"user_{CPF}", "user_<cpf>"),
+        (f"user_{CPF}_2", "user_<cpf>_2"),
+        (CPF, "<cpf>"),
+        ("novo_m0703", "novo_m0703"),
+        ("user_ab12cd34ef56", "user_ab12cd34ef56"),
+        (None, None),
+    ],
+)
+def test_redact_username_tira_o_cpf_do_login_user_cpf(entrada, esperado):
+    assert redact_username(entrada) == esperado
+
+
+def test_auditoria_de_alterar_conta_user_cpf_nao_guarda_o_cpf():
+    root = UsuarioFactory(superuser=True)
+    alvo = UsuarioFactory(username=f"user_{CPF}", cpf=CPF)
+    resp = _client(root).patch(f"/api/usuarios-admin/{alvo.pk}/", {"first_name": "Bia"}, format="json")
+    assert resp.status_code == 200, resp.content
+
+    log = AuditLog.objects.get(action=AuditLog.Action.UPDATE, details__target_user_id=alvo.pk)
+    assert log.details["target_username"] == "user_<cpf>"
+
+
+def test_registradores_de_audit_nao_guardam_o_login_user_cpf():
+    root = UsuarioFactory(superuser=True)
+    alvo = UsuarioFactory(username=f"user_{CPF}_1", cpf=CPF)
+    grupo, _ = Group.objects.get_or_create(name="Formador")
+    auditar_assign_groups(actor=root, target_user=alvo, before_group_ids=[], after_group_ids=[grupo.pk], imediato=True)
+    auditar_reset_senha(actor=root, target_user=alvo, imediato=True)
+    alvo.is_staff = True
+    auditar_privilege_flags(
+        actor=root,
+        target_user=alvo,
+        before={"is_superuser": False, "is_staff": False, "is_active": True},
+        via="teste",
+        imediato=True,
+    )
+    auditar_user_delete(actor=root, target_user=alvo, imediato=True)
+
+    logs = AuditLog.objects.filter(details__target_user_id=alvo.pk)
+    assert logs.count() == 4
+    for log in logs:
+        assert log.details["target_username"] == "user_<cpf>_1", log.details
         assert _sem_cpf(str(log.details)), log.details

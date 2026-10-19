@@ -35,6 +35,18 @@ def redact_cpf(value: Any) -> Any:
     return _CPF_RE.sub(_CPF_PLACEHOLDER, value)
 
 
+# Login que o importador de usuários dá à linha sem e-mail: `user_<cpf>` ou `user_<cpf>_N`
+# (services/usuarios_import.py). O `_` cola no CPF e o `_CPF_RE` não o acha.
+_LOGIN_USER_CPF_RE = re.compile(r"^user_\d{11}(?=(?:_\d+)?$)")
+
+
+def redact_username(value: Any) -> Any:
+    """Login sem CPF: `user_<cpf>` (e `user_<cpf>_N`) troca o CPF por `<cpf>`; o resto passa por `redact_cpf`."""
+    if not isinstance(value, str):
+        return value
+    return redact_cpf(_LOGIN_USER_CPF_RE.sub(f"user_{_CPF_PLACEHOLDER}", value))
+
+
 def email_de_reserva(email: str) -> bool:
     """True para o e-mail `<cpf>@placeholder.local` dado a conta importada sem e-mail."""
     return email.strip().lower().endswith(EMAIL_DE_RESERVA_SUFIXO)

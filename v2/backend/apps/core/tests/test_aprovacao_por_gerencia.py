@@ -245,9 +245,14 @@ def test_solicitation_approval_basis_por_persona(g1):
     assert solicitation_approval_basis(_aprovadora(g1)) == "gerente_superintendencia"
     assert solicitation_approval_basis(_controle()) == "capacidade_aprovar"
     # PR 11: grupo não aprova.
-    assert solicitation_approval_basis(UsuarioFactory(groups=["Controle", "Assistente Administrativo"])) is None
+    assert (
+        solicitation_approval_basis(
+            UsuarioFactory(groups=["Controle", "Assistente Administrativo"], groups__vinculo=False)
+        )
+        is None
+    )
     assert solicitation_approval_basis(composite) is None
-    assert solicitation_approval_basis(UsuarioFactory(groups=["DAT"])) is None
+    assert solicitation_approval_basis(UsuarioFactory(groups=["DAT"], groups__vinculo=False)) is None
 
 
 def test_sentinela_seed_gerencias_contem_a_gerencia_aprovadora():

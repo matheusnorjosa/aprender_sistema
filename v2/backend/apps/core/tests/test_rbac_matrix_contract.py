@@ -143,7 +143,7 @@ EXPECTED_MATRIX: dict[str, dict[str, int]] = {
     "solicitacoes_batch_approve": {
         "Superuser": ALLOW_PAYLOAD_INVALID,
         "DAT": ALLOW_PAYLOAD_INVALID,  # PR 10: base 5 pelo pacote ADMIN_OPERACIONAL
-        "Controle": DENY,
+        "Controle": ALLOW_PAYLOAD_INVALID,  # PR 12a: o ator tem o vínculo no Controle (pacote CONTROLE, D1)
         "Diretoria": DENY,
         "Gerente": DENY,
         "Gerente da Superintendência": ALLOW_PAYLOAD_INVALID,

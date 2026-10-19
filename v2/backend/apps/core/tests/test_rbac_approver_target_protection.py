@@ -29,7 +29,7 @@ import pytest
 
 from apps.core.models import AuditLog, Usuario
 from apps.core.rbac import can_admin_mutate_target
-from apps.core.tests.factories import GroupFactory, UsuarioFactory, com_pacote_do_controle
+from apps.core.tests.factories import GroupFactory, UsuarioFactory, com_pacote_do_controle, com_pacote_do_dat
 
 APPROVER_PASSWORD = "AprovOldPass!123"
 COMMON_PASSWORD = "CommonOld!123"
@@ -47,6 +47,7 @@ def usuario_dat(db):
     """DAT pelo grupo: tem manage_admin_registries (seed). Não é aprovador nem superuser."""
     user = UsuarioFactory(username="dat_m07", cpf="90000000021")
     user.groups.add(GroupFactory(name="DAT"))
+    com_pacote_do_dat(user)
     return user
 
 
@@ -180,6 +181,7 @@ class TestCanAdminMutateTargetHelper:
     def test_non_superuser_can_mutate_asst_admin_controle_approver(self, usuario_dat):
         target = UsuarioFactory(username="asst_controle", cpf="90000000032")
         target.groups.add(GroupFactory(name="Controle"), GroupFactory(name="Assistente Administrativo"))
+        com_pacote_do_controle(target)
         com_pacote_do_controle(target)  # PR 11: aprova pelo vínculo no Controle
         assert can_admin_mutate_target(usuario_dat, target) is True
 

@@ -29,6 +29,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
 )
 
 if TYPE_CHECKING:
@@ -56,6 +57,7 @@ def usuario_controle(db: None, grupos: dict[str, Group]) -> Usuario:
         cpf=f"111{uid.ljust(8, '0')}",
     )
     usuario.groups.add(grupos["controle"])
+    com_pacote_do_controle(usuario)
     return usuario
 
 

@@ -21,6 +21,7 @@ from apps.core.tests.factories import (
     TipoEventoFactory,
     UsuarioFactory,
     com_papel,
+    com_vinculo_dos_grupos,
 )
 
 pytestmark = pytest.mark.django_db
@@ -85,12 +86,39 @@ def test_solicitacao_factory_is_pendente_with_fks():
 
 def test_grupo_de_funcao_vem_com_vinculo_vigente_em_gerencia_neutra():
     """PR 8.0: `UsuarioFactory(groups=[...])` cria o vínculo do papel junto do grupo de função."""
-    user = UsuarioFactory(groups=["Coordenador", "DAT"])
+    user = UsuarioFactory(groups=["Coordenador", "Vidas"])
 
     vinculo = EquipeGerencia.vigentes_em().get(usuario=user)
     assert vinculo.papel == "COORDENADOR"
     assert vinculo.gerencia.ativo and vinculo.gerencia.perfil == Gerencia.Perfil.PADRAO
     assert vinculo.gerencia.setor_canonico == ""
+
+
+@pytest.mark.parametrize(
+    ("grupo", "gerencia", "perfil"),
+    [
+        ("DAT", "GERENCIA DAT", Gerencia.Perfil.ADMIN_OPERACIONAL),
+        ("Controle", "CONTROLE", Gerencia.Perfil.CONTROLE),
+        ("Diretoria", "DIRETORIA", Gerencia.Perfil.DIRETORIA),
+    ],
+)
+def test_grupo_de_setor_com_capacidade_vem_com_o_vinculo_do_pacote(grupo, gerencia, perfil):
+    """PR 12a: DAT, Controle e Diretoria vêm com o vínculo EQUIPE na gerência do pacote, como em produção."""
+    user = UsuarioFactory(groups=[grupo])
+    so_grupo = UsuarioFactory(groups=[grupo], groups__vinculo=False)
+
+    vinculo = EquipeGerencia.vigentes_em().get(usuario=user)
+    assert (vinculo.papel, vinculo.gerencia.nome, vinculo.gerencia.perfil) == ("EQUIPE", gerencia, perfil)
+    assert set(user.groups.values_list("name", flat=True)) == {grupo}
+    assert not EquipeGerencia.objects.filter(usuario=so_grupo).exists()
+
+
+def test_com_vinculo_dos_grupos_so_cria_o_dos_grupos_com_pacote():
+    user = UsuarioFactory(groups=["Controle", "Vidas"], groups__vinculo=False)
+    com_vinculo_dos_grupos(user)
+    assert list(EquipeGerencia.vigentes_em().filter(usuario=user).values_list("gerencia__nome", "papel")) == [
+        ("CONTROLE", "EQUIPE")
+    ]
 
 
 def test_grupo_sem_vinculo_e_gerencia_escolhida():

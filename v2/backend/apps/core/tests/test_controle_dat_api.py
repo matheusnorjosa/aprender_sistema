@@ -31,6 +31,7 @@ from apps.core.tests.factories import (
     MunicipioFactory,
     ProjetoFactory,
     UsuarioFactory,
+    com_pacote_do_dat,
 )
 
 pytestmark = pytest.mark.django_db
@@ -51,6 +52,7 @@ def test_dat_user_can_list():
         cpf="22222222222",
     )
     user.groups.add(dat_group)
+    com_pacote_do_dat(user)
 
     municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
     projeto = ProjetoFactory(nome="ACerta", ativo=True)
@@ -105,6 +107,7 @@ def test_filter_by_projeto():
         cpf="22222222222",
     )
     user.groups.add(dat_group)
+    com_pacote_do_dat(user)
 
     municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
     projeto1 = ProjetoFactory(nome="ACerta", ativo=True)
@@ -141,6 +144,7 @@ def test_filter_by_tipo_acao():
         cpf="22222222222",
     )
     user.groups.add(dat_group)
+    com_pacote_do_dat(user)
 
     municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
     projeto = ProjetoFactory(nome="ACerta", ativo=True)
@@ -181,6 +185,7 @@ def test_dat_user_can_create():
         cpf="22222222222",
     )
     user.groups.add(dat_group)
+    com_pacote_do_dat(user)
 
     municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
     projeto = ProjetoFactory(nome="ACerta", ativo=True)
@@ -247,6 +252,7 @@ def test_create_returns_read_serializer():
         cpf="22222222222",
     )
     user.groups.add(dat_group)
+    com_pacote_do_dat(user)
 
     municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
     projeto = ProjetoFactory(nome="ACerta", ativo=True)
@@ -278,6 +284,7 @@ def test_create_without_optional_fields():
         cpf="22222222222",
     )
     user.groups.add(dat_group)
+    com_pacote_do_dat(user)
 
     municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
     projeto = ProjetoFactory(nome="ACerta", ativo=True)
@@ -307,6 +314,7 @@ def test_tipo_acao_invalido_rejeitado_pelo_serializer():
         cpf="22222222222",
     )
     user.groups.add(dat_group)
+    com_pacote_do_dat(user)
 
     municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
     projeto = ProjetoFactory(nome="ACerta", ativo=True)
@@ -342,6 +350,7 @@ def test_create_missing_required_fields():
         cpf="22222222222",
     )
     user.groups.add(dat_group)
+    com_pacote_do_dat(user)
 
     municipio = MunicipioFactory(nome="Fortaleza", uf="CE", ativo=True)
 

@@ -33,6 +33,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_da_diretoria,
 )
 
 pytestmark = pytest.mark.django_db
@@ -72,6 +73,7 @@ def user_controle(grupos):
         cpf=f"1{uid[:10].ljust(10, '0')}",
     )
     user.groups.add(grupos["diretoria"])
+    com_pacote_da_diretoria(user)
     return user
 
 
@@ -88,6 +90,7 @@ def user_gerencia(grupos):
         cpf=f"2{uid[:10].ljust(10, '0')}",
     )
     user.groups.add(grupos["diretoria"])
+    com_pacote_da_diretoria(user)
     return user
 
 

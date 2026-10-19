@@ -70,7 +70,9 @@ ACTORS: Final[tuple[str, ...]] = (
 )
 
 # Mapping ator → group_names usados em `_make_user`. Superuser é caso especial.
-# Atores compostos têm múltiplos grupos (Setor + Função).
+# Atores compostos têm múltiplos grupos (Setor + Função). PR 12a: o grupo é etiqueta; o poder de DAT,
+# Controle, Diretoria e Assistente Administrativo do Controle vem do vínculo que a fixture cria na gerência
+# do pacote (`test_rbac_matrix_living._make_user_for_actor`), como em produção.
 ACTOR_GROUPS: Final[dict[str, list[str]]] = {
     SUPERUSER: [],  # is_superuser=True (não usa grupos)
     DAT: ["DAT"],
@@ -288,7 +290,7 @@ ACCESS_MATRIX: Final[dict[str, dict[str, int]]] = {
         # solicitação pendente real está em test_pr3_approvals_policy.py.
         SUPERUSER: ALLOW_PAYLOAD_INVALID,
         DAT: ALLOW_PAYLOAD_INVALID,  # PR 10: `capacidade_aprovar` pelo pacote ADMIN_OPERACIONAL
-        CONTROLE: DENY,  # grupo Controle sem vínculo não aprova (D1 vale pelo vínculo na g27)
+        CONTROLE: ALLOW_PAYLOAD_INVALID,  # PR 12a: o ator tem o vínculo na gerência CONTROLE (D1, pacote)
         DIRETORIA: DENY,
         GERENTE: DENY,  # Gerente pedagógico (Vidas + Gerente) NÃO aprova
         GERENTE_SUPER: ALLOW_PAYLOAD_INVALID,  # vínculo GERENTE na gerência SUPERINTENDENCIA

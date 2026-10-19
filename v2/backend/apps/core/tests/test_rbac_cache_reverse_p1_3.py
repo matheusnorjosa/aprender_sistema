@@ -24,7 +24,8 @@ from apps.core.tests.factories import GroupFactory, UsuarioFactory
 LOCMEM = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "rbac-p1-3"}}
 
 
-@override_settings(CACHES=LOCMEM)
+# PR 12: grupo com capacidade só vale no modo soma (`RBAC_FONTE=uniao`, a volta de emergência).
+@override_settings(CACHES=LOCMEM, RBAC_FONTE="uniao")
 class TestReverseMembershipCacheInvalidation(TestCase):
     def setUp(self):
         cache.clear()

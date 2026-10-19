@@ -230,6 +230,7 @@ def seeded_db(db):
     call_command("seed_rbac")
 
 
+@pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
 class TestPolicySmoke:
     @pytest.mark.parametrize("policy_cls", _all_policy_classes(), ids=lambda c: c.__name__)
     def test_blocks_anonymous(self, policy_cls):
@@ -296,6 +297,7 @@ class TestEdgeCases:
         req = _request_for(user)
         assert _EmptyPolicy().has_permission(req, view=object()) is False
 
+    @pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
     def test_policies_can_be_composed_with_or(self, db, seeded_db):
         """Composition CanA() | CanB() funciona via DRF OR (monkey-patch ativo)."""
         # Pega 2 classes diferentes da matriz para compor
@@ -339,6 +341,7 @@ class TestEdgeCases:
 
 
 class TestIntegration:
+    @pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
     def test_works_alongside_isauthenticated(self, db, seeded_db):
         """Padrão idiomático em views: [IsAuthenticated, CanXxx]."""
         classes = _all_policy_classes()
@@ -349,6 +352,7 @@ class TestIntegration:
         assert IsAuthenticated().has_permission(req, view=object()) is True
         assert cls().has_permission(req, view=object()) is True
 
+    @pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
     def test_drf_or_composition_with_isauthenticated_short_circuit(self, db, seeded_db):
         """`IsAuthenticated() & CanXxx()` exige ambos."""
         classes = _all_policy_classes()

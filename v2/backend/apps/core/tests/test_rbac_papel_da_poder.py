@@ -233,6 +233,7 @@ class TestGestoraPorPapel:
         _vinculo(usuario, "COORDENADOR", gerencia)
         assert _cliente(usuario).get(f"/api/solicitacoes/{alheia.id}/").status_code == 404
 
+    @pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
     def test_superintendencia_pura_nao_edita_alheia(self, gerencia_com_alheia):
         """O8-11: vê (global por `approve_solicitation`), mas não edita."""
         _, alheia = gerencia_com_alheia
@@ -324,6 +325,7 @@ class TestTravas:
         )
         assert response.status_code == 200
 
+    @pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
     def test_superintendencia_sem_gerente_checa_disponibilidade(self):
         """Sem papel C/A/G: consulta por `approve_solicitation` (o batch saiu)."""
         sup = _so_aprovar()

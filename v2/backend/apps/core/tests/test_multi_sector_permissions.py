@@ -34,6 +34,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
 )
 
 
@@ -71,6 +72,7 @@ class TestHasSectorAccessPermission(TestCase):
             cpf="11111111111",
         )
         self.user_controle.groups.add(self.controle_group)
+        com_pacote_do_controle(self.user_controle)
 
         self.user_vidas = UsuarioFactory(
             username="vidas_user",
@@ -228,6 +230,7 @@ class TestMonthlyAvailabilityViewMultiSector(TestCase):
             cpf="11111111111",
         )
         self.user_controle.groups.add(self.controle_group)
+        com_pacote_do_controle(self.user_controle)
 
     def test_superuser_can_access_any_gerencia(self):
         """Superuser pode acessar qualquer gerência."""

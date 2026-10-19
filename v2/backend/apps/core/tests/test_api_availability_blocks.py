@@ -20,7 +20,7 @@ import pytest
 
 from apps.core.models import AvailabilityBlock
 from apps.core.tests.conftest import get_field_errors
-from apps.core.tests.factories import GroupFactory, UsuarioFactory
+from apps.core.tests.factories import GroupFactory, UsuarioFactory, com_pacote_do_controle
 
 
 @pytest.fixture
@@ -35,6 +35,7 @@ def user_test(db):
     )
     grupo_controle = GroupFactory(name="Controle")
     user.groups.add(grupo_controle)
+    com_pacote_do_controle(user)
     return user
 
 

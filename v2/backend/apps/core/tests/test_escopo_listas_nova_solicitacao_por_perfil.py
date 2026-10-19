@@ -104,7 +104,7 @@ _PERFIS = [
     ("coordenador", True, True),
     ("gerente", True, True),
     ("apoio", True, True),
-    ("dat", False, False),
+    ("dat", False, True),  # PR 10: o DAT (vínculo na gerência DAT) cria em qualquer projeto
     ("controle", None, False),  # sem acesso às listas
     ("superusuario", False, True),
 ]

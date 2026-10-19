@@ -16,7 +16,7 @@ from rest_framework.test import APIClient
 
 from apps.core.models import AuditLog
 from apps.core.serializers.auditoria import _mask_email, _mask_ip, _redact_details
-from apps.core.tests.factories import GerenciaFactory, GroupFactory, UsuarioFactory, com_papel
+from apps.core.tests.factories import GerenciaFactory, GroupFactory, UsuarioFactory, com_pacote_do_controle, com_papel
 
 _cpf_counter = 0
 
@@ -240,6 +240,7 @@ class TestAuditLogViewSetRedaction(TestCase):
             username="controle_audit", email="c@test.com", password="pass1234", cpf=_next_cpf()
         )
         self.controle_user.groups.add(self.controle_group)
+        com_pacote_do_controle(self.controle_user)
 
         # Create superuser
         self.superuser = UsuarioFactory(

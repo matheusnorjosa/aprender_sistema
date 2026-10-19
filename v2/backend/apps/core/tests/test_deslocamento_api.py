@@ -26,7 +26,7 @@ import pytest
 
 from apps.core.models import AuditLog, Deslocamento
 from apps.core.tests.conftest import get_field_errors
-from apps.core.tests.factories import GroupFactory, UsuarioFactory
+from apps.core.tests.factories import GroupFactory, UsuarioFactory, com_pacote_do_controle, com_pacote_do_dat
 
 
 @pytest.fixture
@@ -51,6 +51,7 @@ def user_controle(db, grupos):
         username="controle1", email="controle1@example.com", password="testpass123", cpf="12345678901"
     )
     user.groups.add(grupos["controle"])
+    com_pacote_do_controle(user)
     return user
 
 
@@ -59,6 +60,7 @@ def user_dat(db, grupos):
     """User with DAT permission."""
     user = UsuarioFactory(username="dat1", email="dat1@example.com", password="testpass123", cpf="98765432109")
     user.groups.add(grupos["dat"])
+    com_pacote_do_dat(user)
     return user
 
 

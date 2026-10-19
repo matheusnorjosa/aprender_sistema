@@ -107,3 +107,44 @@ manual, no container `web` novo. Os comandos são só leitura e não mostram dad
 - [ ] `rbac_diff --auditar` termina com exit 0: matriz Grupo × Capability do banco igual à do seed
       (`functional_permissions_seed.py`) e nenhuma gerência com perfil fora de `PERFIL_PERMITIDO`
       (`services/rbac_pacotes.py`). Exit 1 lista a divergência (grupo / capacidade, ou gerência / perfil)
+- [ ] `rbac_diff --diagnostico` mostra `fonte ativa: lotacao` no cabeçalho (PR 12, o corte). Se mostrar
+      `uniao`, a volta de emergência da seção 9 está ligada no Environment da stack
+
+## 9. Volta do corte (`RBAC_FONTE`, PR 12)
+
+Desde o PR 12 o poder vem só do lugar onde a pessoa trabalha: superusuário, pacote do perfil da gerência
+(vínculo EQUIPE ou GERENTE vigente) e direitos do papel vigente. O grupo Django (DAT, Controle, Diretoria) é
+etiqueta. A variável `RBAC_FONTE` escolhe o modo: `lotacao` (padrão, também vazia ou ausente) ou `uniao`, que
+volta a somar os grupos. Valor inválido derruba a subida (o `migrate` falha e nada sobe), de propósito.
+
+**Uma pessoa sem acesso não pede a volta inteira.** O caminho depende da lotação dela:
+
+- [ ] Sem outro vínculo ativo: o superusuário marca a gerência e "Equipe administrativa" na tela de Usuários.
+      Vale na hora (o sinal limpa o cache no commit)
+- [ ] Com vínculo ativo em outra gerência: **não usar a tela.** O formulário tem uma gerência só; trocar a
+      gerência leva todos os papéis da pessoa para a nova e encerra os outros vínculos (`sync_user_lotacao`).
+      Criar só o vínculo que falta por script (`upsert_vinculo`), com ensaio, OK do dono e releitura
+      (skill `escrita-em-fonte-viva`), ou fazer a volta inteira abaixo
+- [ ] Antes de salvar o formulário de alguém da gerência DAT ou CONTROLE, conferir que "Equipe administrativa"
+      continua marcada: tirar ou trocar função refaz a lotação, e no corte o vínculo é a única porta
+
+**Volta inteira (todo mundo de novo com a soma de grupos):**
+
+- [ ] Passo 0, antes de virar: no container `web`, `rbac_diff --salvar /tmp/agora.json` e
+      `rbac_diff --salvar /tmp/uniao.json --simular-fonte uniao`, depois
+      `rbac_diff --comparar /tmp/agora.json --depois /tmp/uniao.json`. A volta soma os grupos **de hoje**: quem
+      foi posto no grupo DAT, Controle ou Diretoria depois do corte ganha o poder do grupo na hora. Cada `+` da
+      lista precisa do OK do dono, ou a pessoa sai do grupo antes da volta
+- [ ] Portainer → stack de produção → Environment → `RBAC_FONTE=uniao` → **Update the stack**. Mexer só no
+      Environment, nunca no editor do compose (compose diferente do pinado faz o agente recusar o deploy
+      seguinte por `compose_drift`). O deployer preserva o Environment nos deploys seguintes: a volta vale até
+      alguém apagar a variável. Registrar no arquivo de pós-deploy
+- [ ] Se o site parar de responder de fora (HTTP 000): `systemctl restart kesl` na VM01, nunca restart do Docker
+- [ ] Conferir: `rbac_diff --diagnostico` mostra `fonte ativa: uniao`. A chave do cache inclui a fonte: ninguém
+      fica com o poder do modo anterior
+- [ ] Para desfazer a volta: apagar a variável (ou deixá-la vazia) e "Update the stack". Vazio vale `lotacao`
+
+**Antes do deploy do PR 12 e depois, a cada reativação de conta:** pessoa **inativa** com vínculo EQUIPE ou
+GERENTE vigente na gerência DAT ou CONTROLE, ou GERENTE na Superintendência, volta com o poder ao ser reativada
+(o retrato do `rbac_diff` só lê ativos, e desativar não encerra vínculo). A lista vai ao dono; o vínculo que não
+deve voltar é encerrado por script com ensaio.

@@ -26,6 +26,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_vinculo_dos_grupos,
 )
 
 pytestmark = pytest.mark.django_db
@@ -48,6 +49,7 @@ def _usuario(*grupos, gerencia=None):
     user = UsuarioFactory()
     for nome in grupos:
         user.groups.add(GroupFactory(name=nome))
+        com_vinculo_dos_grupos(user)
     if gerencia is not None:
         EquipeGerencia.objects.create(usuario=user, gerencia=gerencia, papel="APOIO")
     return user

@@ -28,7 +28,7 @@ import pytest
 
 from apps.core.models import Usuario
 from apps.core.services.usuarios_import import import_usuarios_from_file
-from apps.core.tests.factories import GroupFactory, UsuarioFactory
+from apps.core.tests.factories import GroupFactory, UsuarioFactory, com_pacote_do_dat
 
 SUPERUSER_PASSWORD = "SuperOldPass!123"
 COMMON_PASSWORD = "CommonOld!123"
@@ -44,6 +44,7 @@ def usuario_dat(db):
     """DAT: tem manage_admin_registries + manage_purchases_and_materials (seed)."""
     user = UsuarioFactory(username="dat_p0", cpf="90000000001")
     user.groups.add(GroupFactory(name="DAT"))
+    com_pacote_do_dat(user)
     return user
 
 

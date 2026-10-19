@@ -25,7 +25,7 @@ import pytest
 
 from apps.core.models import AuditLog, Usuario
 from apps.core.rbac.policies import can_admin_mutate_target
-from apps.core.tests.factories import GroupFactory, UsuarioFactory
+from apps.core.tests.factories import GroupFactory, UsuarioFactory, com_pacote_do_dat
 
 pytestmark = pytest.mark.django_db
 
@@ -37,6 +37,7 @@ SENHA_NOVA = "Girassol#Azul77"
 def dat() -> Usuario:
     user = UsuarioFactory(first_name="Pessoa", last_name="Do Dat")
     user.groups.add(GroupFactory(name="DAT"))
+    com_pacote_do_dat(user)  # PR 12: o poder do DAT vem do vínculo na GERENCIA DAT, não do grupo
     return user
 
 
@@ -71,6 +72,7 @@ def test_quem_teve_a_senha_redefinida_ve_quem_e_quando(dat):
 def test_rotulo_de_quem_redefiniu_sem_nome_nao_traz_cpf_login_nem_email():
     ator = UsuarioFactory(first_name="", last_name="", username="52998224725", cpf="52998224725")
     ator.groups.add(GroupFactory(name="DAT"))
+    com_pacote_do_dat(ator)
     alvo = UsuarioFactory()
     _redefinir(ator, alvo)
 
@@ -170,6 +172,7 @@ def test_dona_ve_a_redefinicao_do_invasor_depois_que_outra_pessoa_devolve_o_aces
     _trocar_a_senha_como(alvo, SENHA_RECEBIDA, SENHA_NOVA)
     outra = UsuarioFactory(first_name="Outra", last_name="Pessoa")
     outra.groups.add(GroupFactory(name="DAT"))
+    com_pacote_do_dat(outra)
     _redefinir(outra, alvo, "Devolvida#2026")
 
     me = _me(alvo)
@@ -223,6 +226,7 @@ def test_historico_fica_de_fora_criacao_de_conta_propria_troca_e_mais_de_30_dias
 def test_historico_sem_a_conta_de_quem_redefiniu_nao_mostra_cpf_login_nem_email():
     ator = UsuarioFactory(first_name="", last_name="", username="52998224725", cpf="52998224725")
     ator.groups.add(GroupFactory(name="DAT"))
+    com_pacote_do_dat(ator)
     alvo = UsuarioFactory()
     _redefinir(ator, alvo)
 

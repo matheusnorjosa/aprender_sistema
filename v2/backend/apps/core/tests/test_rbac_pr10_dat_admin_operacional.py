@@ -121,7 +121,7 @@ def root() -> Usuario:
 
 def _dat(g19: Gerencia, papel: str = "EQUIPE", grupo: bool = True) -> Usuario:
     """Pessoa do DAT como em produção: grupo DAT + vínculo EQUIPE (ou GERENTE) na gerência DAT."""
-    user = UsuarioFactory(groups=["DAT"] if grupo else None)
+    user = UsuarioFactory(groups=["DAT"] if grupo else None, groups__vinculo=False)
     com_papel(user, papel, g19)
     cache.clear()
     return user
@@ -237,7 +237,7 @@ class TestPacote:
         assert _approve(user, _pendente_super(g1)).status_code == 403
 
     def test_grupo_dat_sem_vinculo_nao_aprova(self, g1):
-        user = UsuarioFactory(groups=["DAT"])
+        user = UsuarioFactory(groups=["DAT"], groups__vinculo=False)
         assert solicitation_approval_basis(user) is None
         assert _approve(user, _pendente_super(g1)).status_code == 403
 
@@ -1324,7 +1324,10 @@ class TestTelas:
         assert user_has_policy(_dat(g19), "create_solicitation_without_purchase") is True
 
     def test_grupo_dat_sem_vinculo_sem_import_generico(self):
-        assert user_has_policy(UsuarioFactory(groups=["DAT"]), "import_generic_spreadsheet") is False
+        assert (
+            user_has_policy(UsuarioFactory(groups=["DAT"], groups__vinculo=False), "import_generic_spreadsheet")
+            is False
+        )
 
     def test_dat_lista_controle_compras(self, g19):
         """`/controle/compras/` pede `run_daily_operations`, que vem do pacote final."""

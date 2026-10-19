@@ -104,6 +104,7 @@ def _build_request(factory, user) -> Request:
 # ============================================================================
 
 
+@pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
 def test_hasperm_grants_user_with_functional_permission(request_factory, user_with_capability):
     """HasPerm('codename') deve retornar True para user com a permissão via group."""
     perm = HasPerm("can_do_test_action")
@@ -132,6 +133,7 @@ def test_hasperm_grants_superuser_bypass(request_factory, superuser):
     assert perm.has_permission(req, None) is True
 
 
+@pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
 def test_hasperm_strips_app_label_prefix(request_factory, user_with_capability):
     """HasPerm aceita 'core.codename' e 'codename' como formas equivalentes.
 
@@ -162,6 +164,7 @@ def test_hasperm_repr_includes_codename():
 # ============================================================================
 
 
+@pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
 def test_hasperm_composition_or_grants_if_any_match(request_factory, user_with_capability):
     """HasPerm('A') | HasPerm('B') deve grantar se user tem A OU B."""
     composed = HasPerm("can_do_test_action") | HasPerm("nonexistent_perm")
@@ -176,6 +179,7 @@ def test_hasperm_composition_and_requires_both(request_factory, user_with_capabi
     assert composed.has_permission(req, None) is False
 
 
+@pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
 def test_hasperm_composition_not_inverts_grant(request_factory, user_with_capability):
     """~HasPerm('A') deve negar user que TEM a permissão A."""
     composed = ~HasPerm("can_do_test_action")

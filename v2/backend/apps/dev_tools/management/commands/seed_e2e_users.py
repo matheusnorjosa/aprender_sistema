@@ -155,6 +155,16 @@ class Command(BaseCommand):
             )
             self._upsert_equipe_gerencia(usuario=dat_user, gerencia=gerencia_dat, papel="EQUIPE")
 
+        # PR 12a: o Controle de produção (u7) tem o vínculo EQUIPE na gerência CONTROLE (perfil CONTROLE).
+        # Depois do corte (PR 12) o grupo não dá poder: sem o vínculo, controle_e2e não abriria nada.
+        controle_user = by_username.get("controle_e2e@test.com")
+        if controle_user:
+            gerencia_controle, _ = Gerencia.objects.update_or_create(
+                nome="CONTROLE",
+                defaults={"nome_setor": "Controle", "perfil": Gerencia.Perfil.CONTROLE, "ativo": True},
+            )
+            self._upsert_equipe_gerencia(usuario=controle_user, gerencia=gerencia_controle, papel="EQUIPE")
+
         # 4b. Compras (pré-requisito para criação de solicitação: a regra da compra
         # exige DATCompra ativa com quantidade > 0 que libere o par (municipio, projeto)).
         self.stdout.write("\n4b. Criando compras pré-requisitas...")

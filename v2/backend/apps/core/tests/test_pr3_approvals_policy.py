@@ -57,6 +57,8 @@ def _user_in_groups(*group_names: str, label: str = "user") -> Usuario:
         password="testpass",
         cpf=cpf,
         groups=list(group_names),
+        # Só os grupos: o poder de quem aprova vem do vínculo, posto à parte (`_aprovador`).
+        groups__vinculo=False,
     )
 
 

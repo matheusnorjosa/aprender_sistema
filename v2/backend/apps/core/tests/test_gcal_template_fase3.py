@@ -37,6 +37,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
 )
 
 
@@ -76,6 +77,7 @@ class GCalTemplateFase3Tests(TestCase):
             cpf="33333333333",  # CPF único
         )
         self.controle.groups.add(self.group_controle)
+        com_pacote_do_controle(self.controle)
 
         # Criar entidades de negócio
         self.municipio = MunicipioFactory(nome="Salvador", uf="BA")

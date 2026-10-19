@@ -12,6 +12,8 @@ import os
 import sys
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 from pythonjsonlogger.jsonlogger import RESERVED_ATTRS as _PJL_RESERVED_ATTRS
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -664,6 +666,24 @@ CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
 # Quando False: Task retorna status="SKIPPED" sem executar sync
 # Fase 3 - Governança GCal: única via de criação é /pre-agenda (individual + massa)
 FEATURE_AUTO_APPLY_ENABLED = os.getenv("FEATURE_AUTO_APPLY_ENABLED", "0") == "1"
+
+
+def ler_rbac_fonte(valor: str | None) -> str:
+    """Fonte do poder (PR 12 das permissões, ADR-020). Vazio ou ausente = "lotacao"; inválido derruba a subida.
+
+    - "lotacao" (padrão): capacidade, tela e aprovação vêm só do superusuário e do vínculo vigente (pacote do
+      perfil da gerência + direitos do papel). O grupo Django é etiqueta.
+    - "uniao": a volta de emergência (`RBAC_FONTE=uniao` no Environment da stack). Soma também os grupos.
+
+    Vazio vale o padrão porque apagar o valor no Portainer é o jeito comum de desfazer a volta.
+    """
+    fonte = (valor or "").strip().lower() or "lotacao"
+    if fonte not in ("uniao", "lotacao"):
+        raise ImproperlyConfigured("RBAC_FONTE deve ser 'uniao' ou 'lotacao'")
+    return fonte
+
+
+RBAC_FONTE = ler_rbac_fonte(os.getenv("RBAC_FONTE"))
 
 # Celery Beat Schedule (tarefas periódicas)
 from celery.schedules import crontab  # noqa: E402 — usado só pelo beat schedule abaixo

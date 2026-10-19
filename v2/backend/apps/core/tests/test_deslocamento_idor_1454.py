@@ -40,7 +40,7 @@ from rest_framework.test import APIClient
 import pytest
 
 from apps.core.models import AuditLog, Deslocamento, EquipeGerencia, Gerencia
-from apps.core.tests.factories import GroupFactory, UsuarioFactory
+from apps.core.tests.factories import GroupFactory, UsuarioFactory, com_vinculo_dos_grupos
 
 pytestmark = pytest.mark.django_db
 
@@ -57,6 +57,7 @@ def _make_user(username: str, group_names: list[str]):
     user = UsuarioFactory(username=username, email=f"{username}@example.com", password="testpass123", cpf=_next_cpf())
     for gname in group_names:
         user.groups.add(GroupFactory(name=gname))
+    com_vinculo_dos_grupos(user)
     return user
 
 

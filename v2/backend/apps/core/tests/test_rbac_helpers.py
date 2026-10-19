@@ -121,6 +121,7 @@ def superuser():
 # ============================================================================
 
 
+@pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
 def test_any_perm_true_when_user_has_one(user_with_a):
     assert user_has_any_perm(user_with_a, "test_can_a", "test_can_b") is True
 
@@ -152,6 +153,7 @@ def test_any_perm_false_when_called_with_no_codenames(user_with_a):
 # ============================================================================
 
 
+@pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
 def test_all_perms_true_when_user_has_both(user_with_a_and_b):
     assert user_has_all_perms(user_with_a_and_b, "test_can_a", "test_can_b") is True
 

@@ -328,6 +328,7 @@ class DATRegistroAPITests(APITestCase):
             cpf=f"222{suffix[:8]}",
         )
         cls.dat_user.groups.add(cls.dat_group)
+        com_pacote_do_dat(cls.dat_user)
         cls.super_user = UsuarioFactory(
             username=f"superuser_{suffix}",
             password="test123",
@@ -414,14 +415,14 @@ class DATRegistroAPITests(APITestCase):
             created_by=self.dat_user,
         )
 
-        # DAT user should not be able to delete
-        self.client.force_authenticate(user=self.dat_user)
+        # Sem o pacote do DAT, não exclui
+        self.client.force_authenticate(user=self.regular_user)
         url = reverse("core:dat-registro-detail", args=[registro.id])
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-        # Super user should be able to delete
-        self.client.force_authenticate(user=self.super_user)
+        # PR 10: quem trabalha no DAT (vínculo na gerência DAT) exclui nos cadastros
+        self.client.force_authenticate(user=self.dat_user)
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
@@ -483,6 +484,7 @@ class ProjetoGeralAPITests(APITestCase):
             cpf=f"555{suffix[:8]}",
         )
         cls.dat_user.groups.add(cls.dat_group)
+        com_pacote_do_dat(cls.dat_user)
 
     def test_list_projects_gerais(self):
         """GET /api/projetos-gerais/ should list all projetos gerais."""
@@ -576,6 +578,7 @@ class DATRegistroFilterRegiaoTests(APITestCase):
         cls.dat_group = GroupFactory(name="DAT")
         cls.user = UsuarioFactory(username=f"regiao_test_{suffix}", password="t123", cpf=f"444{suffix[:8]}")
         cls.user.groups.add(cls.dat_group)
+        com_pacote_do_dat(cls.user)
         cls.pg = ProjetoGeral.objects.create(nome=f"PG Regiao Test {suffix}", usa_avaliar=False)
         cls.projeto = ProjetoFactory(
             nome=f"Projeto Regiao Test {suffix}",
@@ -672,6 +675,7 @@ class DATRegistroListagemPorAnoTests(APITestCase):
         cls.dat_group = GroupFactory(name="DAT")
         cls.user = UsuarioFactory(username=f"ano_test_{suffix}", password="t123", cpf=f"555{suffix[:8]}")
         cls.user.groups.add(cls.dat_group)
+        com_pacote_do_dat(cls.user)
         cls.pg = ProjetoGeral.objects.create(nome=f"PG Ano {suffix}", usa_avaliar=False)
         cls.projeto = ProjetoFactory(
             nome=f"Projeto Ano {suffix}",

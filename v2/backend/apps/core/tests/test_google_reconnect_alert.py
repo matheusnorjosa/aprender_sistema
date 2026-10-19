@@ -28,7 +28,7 @@ import requests
 from apps.core.models import AuditLog, GoogleOAuthCredential
 from apps.core.services.oauth import token_manager
 from apps.core.services.oauth.token_manager import encrypt_token
-from apps.core.tests.factories import GroupFactory, UsuarioFactory
+from apps.core.tests.factories import GroupFactory, UsuarioFactory, com_vinculo_dos_grupos
 
 pytestmark = pytest.mark.django_db
 
@@ -192,6 +192,7 @@ def test_beat_agenda_o_probe_diario_de_madrugada():
 def _usuario(grupo: str = "Controle", **campos):
     user = UsuarioFactory(**campos)
     user.groups.add(GroupFactory(name=grupo))
+    com_vinculo_dos_grupos(user)
     return user
 
 

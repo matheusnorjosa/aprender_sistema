@@ -49,6 +49,7 @@ def dat_user(db: Any) -> Any:
     user = UsuarioFactory(username="dat_user", email="dat@example.com", password="testpass123")
     dat_group = GroupFactory(name="DAT")
     user.groups.add(dat_group)
+    com_pacote_do_dat(user)
     return user
 
 

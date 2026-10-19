@@ -165,14 +165,14 @@ APROVADORAS = {
 # Quem não aprova: Controle puro, os pares de grupos sem vínculo (PR 11), COORDENADOR e FORMADOR na
 # gerência DAT, grupo DAT sem vínculo, Gerente pedagógico.
 SEM_PODER = {
-    "controle_puro": lambda: UsuarioFactory(groups=["Controle"]),
+    "controle_puro": lambda: UsuarioFactory(groups=["Controle"], groups__vinculo=False),
     "par_controle_sem_vinculo": lambda: UsuarioFactory(
         groups=["Controle", "Assistente Administrativo"], groups__vinculo=False
     ),
     "par_legado_sem_vinculo": lambda: UsuarioFactory(groups=["Superintendência", "Gerente"], groups__vinculo=False),
     "coordenador_na_gerencia_dat": lambda: _com_vinculo("COORDENADOR", _gerencia("GERENCIA DAT", "ADMIN_OPERACIONAL")),
     "formador_na_gerencia_dat": lambda: _com_vinculo("FORMADOR", _gerencia("GERENCIA DAT", "ADMIN_OPERACIONAL")),
-    "grupo_dat_sem_vinculo": lambda: UsuarioFactory(groups=["DAT"]),
+    "grupo_dat_sem_vinculo": lambda: UsuarioFactory(groups=["DAT"], groups__vinculo=False),
     "gerente_pedagogico": lambda: _com_vinculo("GERENTE", _gerencia("GERENCIA VIDAS PA07")),
 }
 

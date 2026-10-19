@@ -79,6 +79,11 @@ Definições das variáveis de composição estão no topo de [`v2/infra/Makefil
   o da conexão (em Docker Desktop, o gateway da rede). A cadeia completa, o `NUM_PROXIES` e o
   `TRUSTED_PROXY_NETWORKS` (F7, redes de quem pode repassar o `X-Forwarded-For`) estão em
   [deploy.spec](./deploy.spec.md), seção "Borda HTTP".
+- **`RBAC_FONTE` (PR 12 das permissões, ADR-020).** Fonte do poder lida pelo `settings.py`
+  (`ler_rbac_fonte`): `lotacao` é o padrão em todo ambiente (ausente ou vazia também vale `lotacao`), e o grupo
+  Django não dá poder; `uniao` é a volta de emergência e soma os grupos. Valor inválido derruba a subida. Os
+  `.env.*.example` a deixam comentada. Em produção a volta é `RBAC_FONTE=uniao` no Environment da stack, sem
+  deploy de código: passo a passo e conferências em [DEPLOY_CHECKLIST.md §9](../../DEPLOY_CHECKLIST.md).
 - **`.env.*` versionados são templates.** `SECRET_KEY=CHANGE_ME_*` e senhas placeholder. Segredos reais de
   produção vivem no `stack.env` do Portainer, **não** no repo.
 - **Observabilidade é DEV-only.** Prometheus+Grafana sobem só via `make up-obs` (compose de observabilidade é

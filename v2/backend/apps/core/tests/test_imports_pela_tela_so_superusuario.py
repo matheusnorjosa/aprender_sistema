@@ -49,7 +49,7 @@ import pytest
 
 from apps.core.models import Usuario
 from apps.core.permissions import SuperuserOnly
-from apps.core.tests.factories import GroupFactory, UsuarioFactory
+from apps.core.tests.factories import GroupFactory, UsuarioFactory, com_vinculo_dos_grupos
 
 pytestmark = pytest.mark.django_db
 
@@ -92,6 +92,7 @@ def _user_in_groups(*group_names: str, username: str = "u") -> Usuario:
     for name in group_names:
         group = GroupFactory(name=name)
         user.groups.add(group)
+        com_vinculo_dos_grupos(user)
     return user
 
 

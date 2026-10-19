@@ -32,6 +32,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
 )
 
 pytestmark = pytest.mark.django_db
@@ -62,6 +63,7 @@ def user_controle(grupo_controle):
         cpf=str(uuid4().int % 10**11).zfill(11),
     )
     user.groups.add(grupo_controle)
+    com_pacote_do_controle(user)
     return user
 
 

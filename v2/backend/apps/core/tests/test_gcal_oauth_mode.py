@@ -39,6 +39,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
 )
 
 # ============================================================================
@@ -60,6 +61,7 @@ def usuario_controle(db):
         cpf=f"111{uid.ljust(8, '0')}",
     )
     user.groups.add(controle_group)
+    com_pacote_do_controle(user)
     return user
 
 

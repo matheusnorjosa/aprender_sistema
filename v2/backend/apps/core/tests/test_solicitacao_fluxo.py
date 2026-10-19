@@ -315,6 +315,7 @@ class TestPreAgendaFiltroPorFluxo:
             username="controle1", password="senha123", cpf="33333333333", email="controle@test.com"
         )
         usuario_controle.groups.add(grupos["Controle"])
+        com_pacote_do_controle(usuario_controle)
 
         # Criar 2 solicitações: 1 SUPER (pendente→aprovado) + 1 NAO_SUPER (auto-aprovado)
         sol_super = SolicitacaoFactory(
@@ -380,6 +381,7 @@ class TestSerializerFluxo:
             username="controle1", password="senha123", cpf="33333333333", email="controle@test.com"
         )
         usuario_controle.groups.add(grupos["Controle"])
+        com_pacote_do_controle(usuario_controle)
 
         # Criar solicitação SUPER aprovada
         sol = SolicitacaoFactory(
@@ -416,6 +418,7 @@ class TestSerializerFluxo:
             username="controle2", password="senha123", cpf="44444444444", email="controle2@test.com"
         )
         usuario_controle.groups.add(grupos["Controle"])
+        com_pacote_do_controle(usuario_controle)
 
         # Criar solicitação SEM projeto (cenário raro, mas testável)
         sol = SolicitacaoFactory(

@@ -34,6 +34,8 @@ from apps.core.tests.factories import (
     MunicipioFactory,
     ProjetoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
+    com_pacote_do_dat,
 )
 
 
@@ -54,6 +56,7 @@ def usuario_dat(db):
     )
     group_dat = GroupFactory(name="DAT")
     user.groups.add(group_dat)
+    com_pacote_do_dat(user)
     return user
 
 
@@ -74,6 +77,7 @@ def usuario_controle(db):
     )
     group_controle = GroupFactory(name="Controle")
     user.groups.add(group_controle)
+    com_pacote_do_controle(user)
     return user
 
 

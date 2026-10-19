@@ -22,7 +22,7 @@ from rest_framework.test import APIClient
 import pytest
 
 from apps.core.models import PermissaoFuncional, Usuario
-from apps.core.tests.factories import GroupFactory, UsuarioFactory
+from apps.core.tests.factories import GroupFactory, UsuarioFactory, com_pacote_do_dat
 
 
 @pytest.fixture
@@ -35,6 +35,7 @@ def dat(db):
     """Não-superuser com manage_admin_registries + manage_purchases_and_materials."""
     user = UsuarioFactory(username="dat_gate", cpf="91000000001")
     user.groups.add(GroupFactory(name="DAT"))
+    com_pacote_do_dat(user)
     return user
 
 

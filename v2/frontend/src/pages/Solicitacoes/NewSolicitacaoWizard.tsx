@@ -289,11 +289,15 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   // - links (menu lateral e outros): o clique é segurado antes do `Link` navegar.
   const { pathname } = useLocation();
   useEffect(() => {
+    // O Voltar que pulou a entrada repetida (segurar o Voltar e escolher outra página) já saiu do
+    // assistente: não há como segurá-lo, e empurrar ou voltar mais uma entrada estragaria o histórico.
+    const voltouParaOutraPagina = (): boolean => window.location.pathname !== pathname;
     if (!preenchido) {
       if (!entradaExtra.current) return undefined;
       // Esvaziado com a entrada repetida ainda no histórico: o Voltar a consome (mesma URL, nada
       // muda na tela) e segue sem perguntar. Preenchido de novo, ela é posta outra vez.
       const aoVoltarVazio = (): void => {
+        if (voltouParaOutraPagina()) return;
         entradaExtra.current = false;
         window.history.back();
       };
@@ -319,6 +323,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
       e.preventDefault();
     };
     const aoVoltar = (): void => {
+      if (voltouParaOutraPagina()) return;
       // O Voltar consumiu a entrada repetida: ela volta na hora, senão o Voltar seguinte (o do
       // Android para fechar o aviso) sairia do assistente sem perguntar.
       segurarVoltar();

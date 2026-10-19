@@ -414,6 +414,37 @@ describe('NewSolicitacaoWizard - sair do assistente (item 36)', { timeout: 20000
     confirmar.mockRestore();
   });
 
+  test('o Voltar que pula a entrada repetida (segurar o Voltar e escolher outra página) não é segurado', async () => {
+    const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    const anterior = vi.spyOn(window.history, 'back').mockImplementation(() => {});
+    const original = window.location.href;
+    const { unmount } = render(
+      <MemoryRouter>
+        <NewSolicitacaoWizard />
+      </MemoryRouter>
+    );
+    // O Voltar parou em outra página (go(-3) para o Início): o assistente já está saindo.
+    const voltarPara = (url: string): void => {
+      window.history.replaceState(null, '', url);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      window.history.replaceState(null, '', original);
+    };
+    await preencher();
+    const entradas = window.history.length;
+    voltarPara('/home');
+    expect(confirmar).not.toHaveBeenCalled();
+    // Não empurra uma cópia da página de destino no histórico.
+    expect(window.history.length).toBe(entradas);
+
+    // Esvaziado com a entrada repetida ainda lá: não dá um Voltar a mais a partir do destino.
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar projeto' }));
+    voltarPara('/home');
+    expect(anterior).not.toHaveBeenCalled();
+    unmount();
+    anterior.mockRestore();
+    confirmar.mockRestore();
+  });
+
   test('o aviso de sair não fica aberto sobre outra tela quando o assistente sai', async () => {
     const destruir = vi.fn();
     const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: destruir, update: vi.fn(), then: vi.fn() }) as never);

@@ -531,6 +531,10 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
 
         if password:
             self._definir_senha_por_admin(user, password, actor, contexto="create")
+        else:
+            # P27: conta sem senha no formulário fica sem senha (o campo vazio contava como utilizável).
+            user.set_unusable_password()
+            user.save(update_fields=["password"])
 
         # P0-1 Tier-0 (D-1=2a): membership + lotação são superuser-only. group_ids /
         # gerencia_id de não-superuser são ignorados (o frontend já não envia — aqui é a

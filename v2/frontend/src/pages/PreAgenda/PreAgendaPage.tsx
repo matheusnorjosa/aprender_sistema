@@ -76,7 +76,7 @@ import { TIMING } from '../../constants/timing';
 import { usePolling } from '../../hooks/usePolling';
 import { syncChannel } from '../../services/syncChannel';
 import { formatFortaleza } from '../../utils/datetime';
-import { MOTIVO_NAO_PUBLICAVEL, motivoNaoPublicavel } from '../../utils/gcalRowActions';
+import { MOTIVO_NAO_PUBLICAVEL, gcalRowActions, motivoNaoPublicavel } from '../../utils/gcalRowActions';
 import logger from '../../utils/logger';
 import type { ID, Solicitacao, GCalStatus, Gerencia, PaginatedResponse, Participation } from '../../types';
 import { formadoresLabel } from '../../utils/participants';
@@ -92,14 +92,6 @@ const LOAD_ERROR_KEY = 'preagenda-erro-carga';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
-
-/** GCAL status colors */
-const GCAL_STATUS_COLORS: Record<string, string> = {
-  NONE: 'default',
-  PENDING: 'processing',
-  PUBLISHED: 'success',
-  ERROR: 'error',
-};
 
 /** Google Calendar event from API */
 interface GoogleCalendarEvent {
@@ -526,13 +518,25 @@ export default function PreAgendaPage(): JSX.Element {
       width: 160,
     },
     {
-      title: 'GCal Status',
+      // Rótulo em pt-BR (o mesmo de Publicar na agenda) e, em ERROR, o motivo que o backend gravou
+      // (`gcal_last_error`, que diz o que fazer): antes só o código cru, e o Controle reenviava às cegas.
+      title: 'Google Agenda',
       dataIndex: 'gcal_status',
       key: 'gcal_status',
-      render: (gcal_status: GCalStatus) => (
-        <Tag color={GCAL_STATUS_COLORS[gcal_status] || 'default'}>{gcal_status || 'NONE'}</Tag>
-      ),
-      width: 120,
+      render: (_: GCalStatus, record) => {
+        const { tag } = gcalRowActions(record, { ready: true });
+        return (
+          <Space direction="vertical" size={2}>
+            <Tag color={tag.color} style={{ whiteSpace: 'normal' }}>{tag.label}</Tag>
+            {record.gcal_status === 'ERROR' && record.gcal_last_error && (
+              <Text type="danger" style={{ fontSize: 12, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
+                {record.gcal_last_error}
+              </Text>
+            )}
+          </Space>
+        );
+      },
+      width: 160,
     },
     {
       title: 'Ações',

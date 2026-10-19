@@ -139,10 +139,10 @@ describe('PreAgendaPage — evento passado e publicado fora do sistema', () => {
     mockRows([
       row({ id: 60, municipio_nome: 'Nunca', ...FUTURO }),
       row({ id: 61, municipio_nome: 'Passou', gcal_status: 'PUBLISHED', ...PASSADO }),
-      row({ id: 62, municipio_nome: 'Publicado', gcal_status: 'PUBLISHED', ...FUTURO }),
+      row({ id: 62, municipio_nome: 'JaPublicado', gcal_status: 'PUBLISHED', ...FUTURO }),
     ]);
     render(<PreAgendaPage />);
-    await screen.findByText('Publicado');
+    await screen.findByText('JaPublicado');
     expect(screen.getByLabelText('Selecionar evento: ainda não publicado')).toBeDisabled();
     expect(screen.getByLabelText('Selecionar evento: o evento já terminou')).toBeDisabled();
     expect(screen.getByLabelText('Selecionar evento')).not.toBeDisabled();

@@ -10,8 +10,8 @@
  * 4. Revisão e Confirmação
  */
 
-import { useState, useMemo, useCallback, useEffect, ChangeEvent, JSX, ReactNode } from 'react';
-import { useNavigate } from 'react-router';
+import { useState, useMemo, useCallback, useEffect, useRef, ChangeEvent, JSX, ReactNode } from 'react';
+import { useLocation, useNavigate } from 'react-router';
 // antd - direct imports for tree-shaking (Issue #424)
 import Steps from 'antd/es/steps';
 import Form from 'antd/es/form';
@@ -243,11 +243,14 @@ export default function NewSolicitacaoWizard(): JSX.Element {
 
   // Sair do assistente descarta o que foi preenchido: com algo preenchido, pergunta antes,
   // começando no Cancelar (ação destrutiva, ux-principios).
-  const sairDoAssistente = (): void => {
-    if (JSON.stringify(formData) === JSON.stringify(FORM_INICIAL)) {
-      void navigate('/solicitacoes/minhas');
-      return;
-    }
+  const preenchido = JSON.stringify(formData) !== JSON.stringify(FORM_INICIAL);
+  // Entrada repetida da própria rota no histórico, que segura o Voltar do navegador (abaixo).
+  // Saindo por dentro do app, ela é substituída pelo destino, senão o Voltar de lá parava aqui duas vezes.
+  const entradaExtra = useRef(false);
+  const irPara = useCallback((destino: string): void => {
+    void navigate(destino, { replace: entradaExtra.current });
+  }, [navigate]);
+  const confirmarSaida = useCallback((sair: () => void, ficar?: () => void): void => {
     Modal.confirm({
       title: 'Sair sem criar a solicitação?',
       content: 'O que você preencheu será perdido.',
@@ -255,11 +258,62 @@ export default function NewSolicitacaoWizard(): JSX.Element {
       okType: 'danger',
       cancelText: 'Continuar preenchendo',
       autoFocusButton: 'cancel',
-      onOk: () => {
-        void navigate('/solicitacoes/minhas');
-      },
+      onOk: sair,
+      ...(ficar !== undefined && { onCancel: ficar }),
     });
+  }, []);
+  const sairDoAssistente = (): void => {
+    if (!preenchido) {
+      irPara('/solicitacoes/minhas');
+      return;
+    }
+    confirmarSaida(() => irPara('/solicitacoes/minhas'));
   };
+
+  // As outras saídas também perguntam com algo preenchido. O app usa `BrowserRouter`, onde o
+  // `useBlocker` não funciona, então cada saída é segurada aqui:
+  // - recarregar/fechar a aba: o aviso do próprio navegador (`beforeunload`);
+  // - Voltar do navegador/Android: os passos não entram no histórico, então uma entrada repetida
+  //   desta rota recebe o Voltar e o assistente pergunta;
+  // - links (menu lateral e outros): o clique é segurado antes do `Link` navegar.
+  const { pathname } = useLocation();
+  useEffect(() => {
+    if (!preenchido) return undefined;
+    const segurarVoltar = (): void => {
+      window.history.pushState(window.history.state, '', window.location.href);
+      entradaExtra.current = true;
+    };
+    if (!entradaExtra.current) segurarVoltar();
+
+    const aoDescarregar = (e: BeforeUnloadEvent): void => {
+      e.preventDefault();
+    };
+    const aoVoltar = (): void => {
+      entradaExtra.current = false;
+      confirmarSaida(() => {
+        window.removeEventListener('popstate', aoVoltar);
+        window.history.back();
+      }, segurarVoltar);
+    };
+    const aoClicar = (e: MouseEvent): void => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const link = e.target instanceof Element ? e.target.closest('a[href]') : null;
+      if (!(link instanceof HTMLAnchorElement) || (link.target !== '' && link.target !== '_self') || link.hasAttribute('download')) return;
+      const destino = new URL(link.href);
+      if (destino.origin !== window.location.origin || destino.pathname === pathname) return;
+      e.preventDefault();
+      e.stopPropagation();
+      confirmarSaida(() => irPara(destino.pathname + destino.search + destino.hash));
+    };
+    window.addEventListener('beforeunload', aoDescarregar);
+    window.addEventListener('popstate', aoVoltar);
+    document.addEventListener('click', aoClicar, true);
+    return () => {
+      window.removeEventListener('beforeunload', aoDescarregar);
+      window.removeEventListener('popstate', aoVoltar);
+      document.removeEventListener('click', aoClicar, true);
+    };
+  }, [preenchido, pathname, confirmarSaida, irPara]);
 
   useEffect(() => {
     let mounted = true;
@@ -487,7 +541,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
 
       await createSolicitacao(payload);
       message.success('Solicitação criada com sucesso!');
-      void navigate('/solicitacoes/minhas');
+      irPara('/solicitacoes/minhas');
     } catch (error) {
       logger.error('Erro ao criar solicitação:', error);
 

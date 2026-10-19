@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { MemoryRouter } from 'react-router';
+import { Link, MemoryRouter } from 'react-router';
 import Modal from 'antd/es/modal';
 
 import { ComAcesso } from '../../../test/comAcesso';
@@ -252,7 +252,7 @@ describe('NewSolicitacaoWizard - sair do assistente (item 36)', { timeout: 20000
     );
     await screen.findByRole('button', { name: 'Busque ou selecione um projeto' });
     fireEvent.click(sair());
-    expect(navigateMock).toHaveBeenCalledWith('/solicitacoes/minhas');
+    expect(navigateMock).toHaveBeenCalledWith('/solicitacoes/minhas', { replace: false });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
@@ -277,7 +277,75 @@ describe('NewSolicitacaoWizard - sair do assistente (item 36)', { timeout: 20000
     });
     expect(navigateMock).not.toHaveBeenCalled();
     void opcoes.onOk?.();
-    expect(navigateMock).toHaveBeenCalledWith('/solicitacoes/minhas');
+    expect(navigateMock).toHaveBeenCalledWith('/solicitacoes/minhas', { replace: true });
+    confirmar.mockRestore();
+  });
+
+  const preencher = async (): Promise<void> => {
+    fireEvent.click(await screen.findByRole('button', { name: 'Busque ou selecione um projeto' }));
+  };
+
+  test('recarregar ou fechar a aba com algo preenchido pede o aviso do navegador; vazio, não', async () => {
+    const { unmount } = render(
+      <MemoryRouter>
+        <NewSolicitacaoWizard />
+      </MemoryRouter>
+    );
+    await screen.findByRole('button', { name: 'Busque ou selecione um projeto' });
+    const vazio = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(vazio);
+    expect(vazio.defaultPrevented).toBe(false);
+
+    await preencher();
+    const preenchido = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(preenchido);
+    expect(preenchido.defaultPrevented).toBe(true);
+    unmount();
+  });
+
+  test('o Voltar do navegador (ou do Android) com algo preenchido pergunta antes de sair', async () => {
+    const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    const voltar = vi.spyOn(window.history, 'back').mockImplementation(() => {});
+    const { unmount } = render(
+      <MemoryRouter>
+        <NewSolicitacaoWizard />
+      </MemoryRouter>
+    );
+    await preencher();
+    const entradas = window.history.length;
+
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    expect(confirmar).toHaveBeenCalledTimes(1);
+    const opcoes = confirmar.mock.calls[0]![0];
+    expect(opcoes).toMatchObject({ title: 'Sair sem criar a solicitação?', autoFocusButton: 'cancel' });
+
+    // Continuar preenchendo: o assistente segura o próximo Voltar de novo.
+    void opcoes.onCancel?.();
+    expect(window.history.length).toBe(entradas + 1);
+    // Sair e descartar: segue o Voltar que a pessoa pediu.
+    void opcoes.onOk?.();
+    expect(voltar).toHaveBeenCalledTimes(1);
+    unmount();
+    voltar.mockRestore();
+    confirmar.mockRestore();
+  });
+
+  test('um link do menu lateral com algo preenchido pergunta antes de sair', async () => {
+    const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    const { unmount } = render(
+      <MemoryRouter initialEntries={['/solicitacoes/nova']}>
+        <nav><Link to="/home?x=1">Página Inicial</Link></nav>
+        <NewSolicitacaoWizard />
+      </MemoryRouter>
+    );
+    await preencher();
+
+    fireEvent.click(screen.getByRole('link', { name: 'Página Inicial' }));
+    expect(confirmar).toHaveBeenCalledTimes(1);
+    expect(navigateMock).not.toHaveBeenCalled();
+    void confirmar.mock.calls[0]![0].onOk?.();
+    expect(navigateMock).toHaveBeenCalledWith('/home?x=1', { replace: true });
+    unmount();
     confirmar.mockRestore();
   });
 });

@@ -181,7 +181,7 @@ describe('ApprovalsPage', () => {
     expect(await screen.findByText('MunicipioTesteAlfa')).toBeInTheDocument();
     // Ação de preview sempre presente; aprovar/reprovar não (sem permissão).
     expect(
-      screen.getByRole('button', { name: /Visualizar preview do evento/i }),
+      screen.getByRole('button', { name: /Ver prévia do evento/i }),
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Aprovar/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Reprovar/i })).not.toBeInTheDocument();
@@ -713,6 +713,61 @@ describe('ApprovalsPage', () => {
     expect(screen.getByText(/Reprove a solicitação ou peça a quem criou/)).toBeInTheDocument();
     expect(erro).not.toHaveBeenCalled();
     erro.mockRestore();
+  }, 30000);
+
+  // Achado do item 36 (19/10/2026): a decisão não se desfaz, então a confirmação diz qual é o
+  // evento e começa no Cancelar (ux-principios: ação destrutiva começa no Cancelar e cita o nome).
+  const EVENTO_1 = '25/08/2026 · Municipio1 · ProjetoTeste';
+
+  test.each([
+    ['Aprovar', 'Confirmar aprovação'],
+    ['Reprovar', 'Confirmar reprovação'],
+  ] as const)('%s de uma linha: o botão e a confirmação citam o evento, e o foco abre no Cancelar', async (acao, titulo) => {
+    vi.mocked(listSolicitacoes).mockResolvedValue(pagina(1, 1));
+
+    renderPage(APROVA);
+
+    await screen.findByText('Municipio1');
+    const confirmacao = vi.spyOn(Modal, 'confirm').mockImplementation(semModal);
+    fireEvent.click(await screen.findByRole('button', { name: `${acao}: ${EVENTO_1}` }, { timeout: 10000 }));
+
+    await waitFor(() => expect(confirmacao).toHaveBeenCalledTimes(1));
+    const config = confirmacao.mock.calls[0]?.[0];
+    expect(config).toMatchObject({ autoFocusButton: 'cancel', title: titulo });
+    render(<>{config?.content}</>);
+    expect(screen.getByText(EVENTO_1, { exact: false })).toBeInTheDocument();
+  }, 30000);
+
+  test('o olho de cada linha diz de qual evento é a prévia', async () => {
+    vi.mocked(listSolicitacoes).mockResolvedValue(pagina(1, 1));
+
+    renderPage();
+
+    expect(await screen.findByRole('button', { name: `Ver prévia do evento: ${EVENTO_1}` })).toBeInTheDocument();
+  });
+
+  test.each([
+    ['Aprovar Selecionadas'],
+    ['Reprovar Selecionadas'],
+  ] as const)('%s: a confirmação lista os eventos e o foco abre no Cancelar', async (botao) => {
+    vi.mocked(listSolicitacoes).mockResolvedValue(pagina(2, 2));
+
+    renderPage(APROVA);
+
+    for (const municipio of ['Municipio1', 'Municipio2']) {
+      const linha = (await screen.findByText(municipio)).closest('tr') as HTMLElement;
+      fireEvent.click(await within(linha).findByRole('checkbox', {}, { timeout: 10000 }));
+    }
+    const confirmacao = vi.spyOn(Modal, 'confirm').mockImplementation(semModal);
+    fireEvent.click(await screen.findByRole('button', { name: new RegExp(botao) }));
+
+    await waitFor(() => expect(confirmacao).toHaveBeenCalledTimes(1));
+    const config = confirmacao.mock.calls[0]?.[0];
+    expect(config).toMatchObject({ autoFocusButton: 'cancel' });
+    render(<>{config?.content}</>);
+    expect(screen.getByText(EVENTO_1)).toBeInTheDocument();
+    expect(screen.getByText('25/08/2026 · Municipio2 · ProjetoTeste')).toBeInTheDocument();
+    expect(screen.getByText(/não pode ser desfeita/)).toBeInTheDocument();
   }, 30000);
 
   test('aprovar um com outro erro segue na mensagem curta', async () => {

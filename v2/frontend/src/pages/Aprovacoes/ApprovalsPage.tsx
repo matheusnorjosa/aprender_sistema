@@ -149,6 +149,14 @@ interface PreviewDataType {
 // e mostra o texto inteiro no title (achado da revisão do PR-2, 05/10/2026).
 const UMA_LINHA: CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 
+/** O evento como a pessoa o reconhece: "25/08/2026 · Sobral · Projeto X" (botões, confirmações, lote). */
+function rotuloDoEvento(row: Solicitacao): string {
+  return [formatFortaleza(row.inicio, 'DD/MM/YYYY'), row.municipio_nome, row.projeto_nome].filter(Boolean).join(' · ');
+}
+
+/** Quantos eventos a confirmação do lote lista pelo nome; o resto vai na contagem. */
+const EVENTOS_NA_CONFIRMACAO = 10;
+
 export default function ApprovalsPage(): JSX.Element {
   const [loading, setLoading] = useState<boolean>(false);
   const [rows, setRows] = useState<Solicitacao[]>([]);
@@ -308,13 +316,16 @@ export default function ApprovalsPage(): JSX.Element {
     }
   }, []);
 
-  const handleApprove = useCallback((id: ID): void => {
+  // A decisão não se desfaz: a confirmação cita o evento e abre com o foco no Cancelar.
+  const handleApprove = useCallback((row: Solicitacao): void => {
+    const id = row.id;
     Modal.confirm({
-      title: 'Confirmar Aprovação',
-      content: 'Deseja aprovar esta solicitação?',
+      title: 'Confirmar aprovação',
+      content: `Aprovar o evento ${rotuloDoEvento(row)}?`,
       okText: 'Aprovar',
       okType: 'primary',
       cancelText: 'Cancelar',
+      autoFocusButton: 'cancel',
       onOk: async () => {
         try {
           await approveSolicitacao(id);
@@ -344,13 +355,15 @@ export default function ApprovalsPage(): JSX.Element {
     });
   }, [loadData]);
 
-  const handleReject = useCallback((id: ID): void => {
+  const handleReject = useCallback((row: Solicitacao): void => {
+    const id = row.id;
     Modal.confirm({
-      title: 'Confirmar Reprovação',
-      content: 'Deseja reprovar esta solicitação?',
+      title: 'Confirmar reprovação',
+      content: `Reprovar o evento ${rotuloDoEvento(row)}? Esta ação não pode ser desfeita.`,
       okText: 'Reprovar',
       okType: 'danger',
       cancelText: 'Cancelar',
+      autoFocusButton: 'cancel',
       onOk: async () => {
         try {
           await rejectSolicitacao(id);
@@ -375,22 +388,39 @@ export default function ApprovalsPage(): JSX.Element {
       acao,
       itens: errors.map((e) => {
         const row = porId.get(e.id);
-        const evento = row
-          ? [formatFortaleza(row.inicio, 'DD/MM/YYYY'), row.municipio_nome, row.projeto_nome].filter(Boolean).join(' · ')
-          : `Solicitação #${e.id}`;
+        const evento = row ? rotuloDoEvento(row) : `Solicitação #${e.id}`;
         return { id: e.id, evento, detail: e.detail };
       }),
     });
+  };
+
+  // Lote: a confirmação lista os eventos selecionados (os da página visível).
+  const conteudoDoLote = (): JSX.Element => {
+    const selecionadas = new Set<Key>(selectedRowKeys);
+    const eventos = rows.filter((r) => selecionadas.has(r.id)).map(rotuloDoEvento);
+    const resto = selectedRowKeys.length - Math.min(eventos.length, EVENTOS_NA_CONFIRMACAO);
+    return (
+      <>
+        <ul className="pl-5 my-2">
+          {eventos.slice(0, EVENTOS_NA_CONFIRMACAO).map((evento) => (
+            <li key={evento} className="break-words">{evento}</li>
+          ))}
+        </ul>
+        {resto > 0 && <Paragraph className="mb-2">e mais {resto}.</Paragraph>}
+        <Paragraph className="mb-0">Esta ação não pode ser desfeita.</Paragraph>
+      </>
+    );
   };
 
   // Handlers de operações em lote
   const handleBatchApprove = (): void => {
     Modal.confirm({
       title: `Aprovar ${selectedRowKeys.length} solicitação(ões)?`,
-      content: 'Esta ação não pode ser desfeita.',
+      content: conteudoDoLote(),
       okText: 'Aprovar Todas',
       okType: 'primary',
       cancelText: 'Cancelar',
+      autoFocusButton: 'cancel',
       onOk: async () => {
         try {
           setBatchLoading(true);
@@ -415,10 +445,11 @@ export default function ApprovalsPage(): JSX.Element {
   const handleBatchReject = (): void => {
     Modal.confirm({
       title: `Reprovar ${selectedRowKeys.length} solicitação(ões)?`,
-      content: 'Esta ação não pode ser desfeita.',
+      content: conteudoDoLote(),
       okText: 'Reprovar Todas',
       okType: 'danger',
       cancelText: 'Cancelar',
+      autoFocusButton: 'cancel',
       onOk: async () => {
         try {
           setBatchLoading(true);
@@ -558,7 +589,7 @@ export default function ApprovalsPage(): JSX.Element {
             size="small"
             icon={<EyeOutlined />}
             onClick={() => handlePreview(record.id)}
-            aria-label="Visualizar preview do evento"
+            aria-label={`Ver prévia do evento: ${rotuloDoEvento(record)}`}
           />
           {/* PA-06: Aprovar/Reprovar para quem tem a policy; PA-02: nunca na impedida */}
           {record.status === 'pendente' && canApprove && impedimento(record) !== null ? (
@@ -572,7 +603,8 @@ export default function ApprovalsPage(): JSX.Element {
                 size="small"
                 type="primary"
                 icon={<CheckOutlined />}
-                onClick={() => handleApprove(record.id)}
+                onClick={() => handleApprove(record)}
+                aria-label={`Aprovar: ${rotuloDoEvento(record)}`}
               >
                 Aprovar
               </Button>
@@ -580,7 +612,8 @@ export default function ApprovalsPage(): JSX.Element {
                 size="small"
                 danger
                 icon={<CloseOutlined />}
-                onClick={() => handleReject(record.id)}
+                onClick={() => handleReject(record)}
+                aria-label={`Reprovar: ${rotuloDoEvento(record)}`}
               >
                 Reprovar
               </Button>

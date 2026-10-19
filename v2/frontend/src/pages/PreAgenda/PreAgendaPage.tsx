@@ -714,7 +714,8 @@ export default function PreAgendaPage(): JSX.Element {
       title: 'Evento',
       dataIndex: 'summary',
       key: 'summary',
-      ellipsis: true,
+      // No celular o nome quebra linha: cortado, ficaria só no `title`, que o toque não mostra.
+      ellipsis: !celular,
     },
     {
       title: 'Início',
@@ -753,6 +754,8 @@ export default function PreAgendaPage(): JSX.Element {
       dataIndex: 'htmlLink',
       key: 'htmlLink',
       width: 70,
+      // Abaixo de md, na linha expandida: os 70 px ficam para o nome do evento.
+      responsive: VISIVEL_A_PARTIR.md,
       render: (val) =>
         val ? (
           <a href={val as string} target="_blank" rel="noopener noreferrer" aria-label="Abrir no Google Agenda">

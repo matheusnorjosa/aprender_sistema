@@ -55,6 +55,7 @@ vi.mock('../../../components/google/GoogleIntegrationCard', () => ({
   default: () => <div data-testid="google-card" />,
 }));
 
+import { fetchAPI } from '../../../api/config';
 import { definirLarguraTela } from '../../../test/larguraTela';
 import PreAgendaPage from '../PreAgendaPage';
 
@@ -243,6 +244,49 @@ describe('PreAgendaPage — sem rolagem horizontal', () => {
     fireEvent.click(within(linha).getByRole('button', { name: /^Expandir linha de 05\/11\/2099 09:00 · Crato/ }));
     const expandida = within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);
     expect(expandida.getByText('Formação')).toBeInTheDocument();
+  });
+
+  // Eventos do Google a 360 px: Início (150) e Link (70) na linha deixavam ~36 px para o Evento,
+  // cortado em reticências; o nome só no `title`, que no toque não aparece.
+  test('a 360 px, Eventos do Google: o nome inteiro na linha; o link vai para a linha expandida', async () => {
+    const NOME = 'Formação de professores — Superativar Linguagens 3 (Crato)';
+    vi.mocked(fetchAPI).mockImplementation((url: string) =>
+      Promise.resolve(
+        url.startsWith('/integrations/google/events/')
+          ? {
+              calendar_id: 'agenda@x.br',
+              count: 1,
+              events: [
+                {
+                  id: 'g1',
+                  summary: NOME,
+                  start: '2099-11-05T12:00:00Z',
+                  end: '2099-11-05T15:00:00Z',
+                  status: 'confirmed',
+                  htmlLink: 'https://calendar.google.com/event?eid=g1',
+                  location: 'Crato',
+                  creator: 'x@y.br',
+                },
+              ],
+            }
+          : {},
+      ),
+    );
+    definirLarguraTela(360);
+    render(<PreAgendaPage />);
+    fireEvent.click(await screen.findByText('Eventos Google Calendar'));
+
+    const celula = await screen.findByText(NOME);
+    expect(celula.closest('td')?.classList.contains('ant-table-cell-ellipsis')).toBe(false);
+    expect(cabecalhos()).toEqual(['Evento', 'Início']);
+
+    const linha = celula.closest('tr') as HTMLElement;
+    fireEvent.click(within(linha).getByRole('button', { name: `Expandir linha de ${NOME}` }));
+    const expandida = within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);
+    expect(expandida.getByRole('link', { name: 'Abrir no Google Agenda' })).toHaveAttribute(
+      'href',
+      'https://calendar.google.com/event?eid=g1',
+    );
   });
 
   test('a barra do lote quebra linha', async () => {

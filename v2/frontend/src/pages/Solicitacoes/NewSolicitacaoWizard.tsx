@@ -593,6 +593,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
               onChange={handleProjetoChange}
               value={formData.projeto as unknown as { id: ID; label: string; [key: string]: unknown } | null}
               placeholder="Busque ou selecione um projeto"
+              oQueCarrega="os projetos"
             />
           </Form.Item>
 
@@ -620,6 +621,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
               onChange={(value: ComboBoxValue | null) => setFormData({ ...formData, tipoEvento: value })}
               value={formData.tipoEvento as unknown as { id: ID; label: string; [key: string]: unknown } | null}
               placeholder="Busque ou selecione um tipo de evento"
+              oQueCarrega="os tipos de evento"
             />
           </Form.Item>
 
@@ -638,6 +640,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
                   : 'Busque ou selecione um município'
               }
               disabled={!dispensaCompra && !formData.projeto}
+              oQueCarrega="os municípios"
               notFoundContent={
                 !dispensaCompra && formData.projeto
                   ? 'Nenhum município elegível para o projeto selecionado'
@@ -699,6 +702,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
               onChange={(value: ComboBoxValue | null) => setFormData({ ...formData, coordenadorResponsavel: value })}
               value={formData.coordenadorResponsavel as unknown as { id: ID; label: string; [key: string]: unknown } | null}
               placeholder={vazioEhQuemCria ? 'Busque o coordenador responsável (opcional)' : 'Busque o coordenador responsável'}
+              oQueCarrega="os coordenadores"
             />
           </Form.Item>
 

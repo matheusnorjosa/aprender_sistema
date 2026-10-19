@@ -6,9 +6,12 @@
  * domínio vira um wrapper fino sobre este.
  */
 
-import { useState, type JSX } from 'react';
-import { Tag, AutoComplete, Spin } from 'antd';
+import { useRef, useState, type JSX } from 'react';
+import { Tag, AutoComplete, Button, Spin } from 'antd';
+import type { RefSelectProps } from 'antd/es/select';
+import CloseOutlined from '@ant-design/icons/CloseOutlined';
 import { lookupUsuarios } from '../api/lookup';
+import { FalhaAoCarregar } from './FalhaAoCarregar';
 import logger from '../utils/logger';
 import type { ID } from '../types';
 
@@ -43,6 +46,12 @@ export interface UsuarioPickerProps {
   tagColor?: string;
   /** aria-label da lista de selecionados. */
   ariaLabel?: string;
+  /** O que o lookup carrega, com artigo ("os formadores"): vai na mensagem de falha ao carregar. */
+  oQueCarrega?: string;
+  /** Do Form.Item: liga o rótulo ao campo de busca e o erro ao leitor de tela. */
+  id?: string;
+  'aria-describedby'?: string;
+  'aria-invalid'?: boolean | 'true' | 'false';
 }
 
 export default function UsuarioPicker({
@@ -52,18 +61,24 @@ export default function UsuarioPicker({
   projetoId,
   tagColor = 'blue',
   ariaLabel,
+  oQueCarrega = 'as pessoas',
+  ...doFormItem
 }: UsuarioPickerProps): JSX.Element {
   const [options, setOptions] = useState<UserOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  // Falha ao carregar: o motivo fica na tela (com "Tentar de novo") em vez de uma lista vazia.
+  const [erro, setErro] = useState<string | null>(null);
+  const campoRef = useRef<RefSelectProps>(null);
 
-  const handleSearch = async (query: string): Promise<void> => {
+  /** Busca e troca as opções; devolve se carregou. */
+  const handleSearch = async (query: string): Promise<boolean> => {
     setSearch(query);
 
     // Permitir busca vazia (mostra lista inicial) ou com 2+ caracteres
     if (query && query.length > 0 && query.length < 2) {
       setOptions([]);
-      return;
+      return true;
     }
 
     try {
@@ -76,8 +91,12 @@ export default function UsuarioPicker({
           data: { id: item.id, label: item.label, avaliavel: item['avaliavel'] === true },
         }))
       );
+      setErro(null);
+      return true;
     } catch (error) {
       logger.error(`Erro ao buscar ${role}:`, error);
+      setErro((error as Error)?.message || 'Tente de novo em instantes.');
+      return false;
     } finally {
       setLoading(false);
     }
@@ -105,10 +124,12 @@ export default function UsuarioPicker({
     setSearch('');
   };
 
-  const handleRemove = (id: ID): void => {
+  const handleRemove = (idRemovido: ID): void => {
     if (onChange) {
-      onChange(value.filter((u) => u.id !== id));
+      onChange(value.filter((u) => u.id !== idRemovido));
     }
+    // O botão some com a pessoa: o foco vai para a busca, e não para o body.
+    campoRef.current?.focus();
   };
 
   return (
@@ -118,12 +139,17 @@ export default function UsuarioPicker({
         <ul style={{ display: 'flex', flexWrap: 'wrap', gap: 8, listStyle: 'none', padding: 0, margin: '0 0 8px 0' }} aria-label={ariaLabel}>
           {value.map((usuario) => (
             <li key={usuario.id}>
-              <Tag
-                closable
-                onClose={() => handleRemove(usuario.id)}
-                color={tagColor}
-              >
+              {/* O "x" do Tag do antd não recebe foco: o botão próprio é alcançável pelo teclado. */}
+              <Tag color={tagColor} className="inline-flex items-center gap-1">
                 {usuario.label || usuario.name}
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<CloseOutlined />}
+                  aria-label={`Remover ${usuario.label || usuario.name}`}
+                  onClick={() => handleRemove(usuario.id)}
+                  style={{ width: 20, height: 20, minWidth: 20 }}
+                />
               </Tag>
             </li>
           ))}
@@ -132,6 +158,8 @@ export default function UsuarioPicker({
 
       {/* Autocomplete para adicionar */}
       <AutoComplete
+        ref={campoRef}
+        {...doFormItem}
         value={search}
         options={options}
         onSearch={handleSearch}
@@ -147,6 +175,9 @@ export default function UsuarioPicker({
         style={{ width: '100%' }}
         notFoundContent={loading ? <Spin size="small" /> : null}
       />
+      {erro && (
+        <FalhaAoCarregar oque={oQueCarrega} erro={erro} onTentarDeNovo={() => handleSearch(search)} campo={campoRef} />
+      )}
     </div>
   );
 }

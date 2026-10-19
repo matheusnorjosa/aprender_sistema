@@ -7,8 +7,9 @@
  * - Seleção de item
  */
 
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, test, expect, vi, beforeEach } from 'vitest'
+import { Button, Form } from 'antd'
 import ComboBox from '../ComboBox'
 
 describe('ComboBox', () => {
@@ -149,5 +150,50 @@ describe('ComboBox', () => {
     // Componente não deve quebrar
     const selectElement = document.querySelector('.ant-select')
     expect(selectElement).toBeInTheDocument()
+  })
+
+  // ============================================================================
+  // ITEM 36 (19/10/2026): rótulo, texto solto e falha ao carregar
+  // ============================================================================
+
+  test('dentro do Form.Item, o rótulo nomeia o campo e o erro chega ao leitor de tela', async () => {
+    render(
+      <Form>
+        <Form.Item label="Município" name="municipio" rules={[{ required: true, message: 'Selecione um município' }]}>
+          <ComboBox lookupFunction={mockLookupFunction} />
+        </Form.Item>
+        <Button htmlType="submit">Enviar</Button>
+      </Form>
+    )
+    const campo = screen.getByRole('combobox', { name: 'Município' })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
+    const erro = await screen.findByText('Selecione um município')
+    await waitFor(() => expect(campo).toHaveAttribute('aria-invalid', 'true'))
+    const descritores = (campo.getAttribute('aria-describedby') ?? '').split(' ')
+    expect(descritores.some((id) => id && document.getElementById(id)?.contains(erro))).toBe(true)
+  })
+
+  test('texto digitado sem escolher uma opção volta para o valor guardado ao sair do campo', async () => {
+    const onChange = vi.fn()
+    render(
+      <ComboBox lookupFunction={mockLookupFunction} value={{ id: 1, label: 'Fortaleza' }} onChange={onChange} />
+    )
+    await waitFor(() => expect(mockLookupFunction).toHaveBeenCalled())
+    const campo = screen.getByRole('combobox')
+    fireEvent.change(campo, { target: { value: 'Caucaia' } })
+    expect(campo).toHaveValue('Caucaia')
+    fireEvent.blur(campo)
+    await waitFor(() => expect(campo).toHaveValue('Fortaleza'))
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  test('falha ao carregar mostra o motivo e "Tentar de novo", não "Nenhum resultado"', async () => {
+    const lookup = vi.fn().mockRejectedValueOnce(new Error('Servidor indisponível.')).mockResolvedValue(mockOptions)
+    render(<ComboBox lookupFunction={lookup} oQueCarrega="os municípios" />)
+    expect(await screen.findByText('Não foi possível carregar os municípios.')).toBeInTheDocument()
+    expect(screen.getByText('Servidor indisponível.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo: carregar os municípios' }))
+    await waitFor(() => expect(screen.queryByText('Não foi possível carregar os municípios.')).not.toBeInTheDocument())
+    expect(lookup).toHaveBeenCalledTimes(2)
   })
 })

@@ -68,6 +68,9 @@ MATRIX_ENDPOINT_COVERAGE: dict[str, list[str]] = {
         "/api/equipe-gerencia/import/",
         "/api/imports/bloqueios/",
     ],
+    # gerencias_escrita: POST representa a escrita (mesmo gate em `GerenciaViewSet.get_permissions`);
+    # a leitura é `IsAuthenticated`. Método a método em test_gerencias_escrita_so_dat.py.
+    "gerencias_escrita": ["/api/gerencias/", "/api/gerencias/<id>/"],
 }
 
 
@@ -133,7 +136,6 @@ RBAC_MATRIX_EXEMPT_PREFIXES: dict[str, str] = {
     "/api/municipios/": "Admin DAT registry — cobertura via test_admin_api.py",
     "/api/projetos/": "Admin DAT registry — cobertura via test_admin_api.py + test_pr7_projeto_fluxo_required.py",
     "/api/projetos-gerais/": "Admin DAT registry — cobertura via tests específicos",
-    "/api/gerencias/": "Admin DAT registry — cobertura via test_admin_api.py",
     "/api/compras/": "Compras CRUD — cobertura via test_admin_api.py",
     "/api/usuarios-admin/": "Admin Usuários — cobertura via tests específicos",
     "/api/grupos/": "Admin Groups — cobertura via tests específicos",

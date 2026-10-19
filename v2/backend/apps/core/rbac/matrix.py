@@ -159,6 +159,10 @@ RESOURCES: Final[tuple[ResourceCase, ...]] = (
     # import pela tela (mesmo gate `SuperuserOnly`); cada um tem cobertura em
     # test_imports_pela_tela_so_superusuario.py.
     ResourceCase("import_pela_tela", "POST", "/api/controle/import-compras/"),
+    # Escrita em gerências (decisão do dono, 19/10/2026): POST representa create/update/partial_update/
+    # destroy (mesmo gate em `GerenciaViewSet.get_permissions`); método a método em
+    # test_gerencias_escrita_so_dat.py. Corpo vazio: o gate aprova e o serializer responde 400.
+    ResourceCase("gerencias_escrita", "POST", "/api/gerencias/"),
 )
 
 
@@ -351,6 +355,22 @@ ACCESS_MATRIX: Final[dict[str, dict[str, int]]] = {
         GERENTE: DENY,
         GERENTE_SUPER: DENY,
         ASST_ADMIN_CONTROLE: DENY,
+        COORDENADOR: DENY,
+        APOIO: DENY,
+        FORMADOR: DENY,
+    },
+    #
+    # Escrita em gerências (decisão do dono, 19/10/2026; D29): `HasPerm("manage_admin_registries")`, a
+    # capacidade da tela /dat/admin/gerencias. Antes era `manage_purchases_and_materials`, que o pacote
+    # CONTROLE também tem. A leitura segue `IsAuthenticated`.
+    "gerencias_escrita": {
+        SUPERUSER: ALLOW_PAYLOAD_INVALID,
+        DAT: ALLOW_PAYLOAD_INVALID,  # manage_admin_registries (pacote ADMIN_OPERACIONAL)
+        CONTROLE: DENY,  # 19/10: o pacote CONTROLE tem manage_purchases_and_materials, não manage_admin_registries
+        DIRETORIA: DENY,
+        GERENTE: DENY,
+        GERENTE_SUPER: DENY,
+        ASST_ADMIN_CONTROLE: DENY,  # 19/10: idem Controle (vínculo EQUIPE no Controle)
         COORDENADOR: DENY,
         APOIO: DENY,
         FORMADOR: DENY,

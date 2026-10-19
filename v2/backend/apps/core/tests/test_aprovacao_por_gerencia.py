@@ -303,7 +303,7 @@ def test_chave_e_o_nome_exato_da_gerencia(nome, g1):
 
 
 def test_g1_desativada_continua_aprovando(g1):
-    """`Gerencia.ativo` não entra na regra: DAT/Controle editam esse campo e desligar g1 pararia
+    """`Gerencia.ativo` não entra na regra: o DAT edita esse campo e desligar g1 pararia
     todas as aprovações. O desligamento é pelo vínculo (ativo/vigência)."""
     aprovadora = _aprovadora(g1)
     g1.ativo = False

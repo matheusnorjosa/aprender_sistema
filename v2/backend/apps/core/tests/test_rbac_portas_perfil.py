@@ -115,9 +115,11 @@ def test_nome_de_perfil_permitido_nao_sai_da_gerencia_mesmo_com_perfil_padrao(no
     """A auditoria acha a gerência pelo `nome` e a 0120 deixa todas em PADRAO: o nome é a trava."""
     g, _ = Gerencia.objects.update_or_create(nome=nome, defaults={"nome_setor": f"Setor {nome}"})
     assert g.perfil == Gerencia.Perfil.PADRAO
-    controle = _cliente(UsuarioFactory(groups=["Controle"]))
+    # Superusuário: a escrita em gerências pede `manage_admin_registries` (19/10), e o vínculo do pacote
+    # do DAT poria a `GERENCIA DAT` em ADMIN_OPERACIONAL, tirando o caso "perfil PADRAO".
+    root = _cliente(UsuarioFactory(superuser=True))
 
-    resp = controle.patch(f"/api/gerencias/{g.id}/", {"nome": f"{nome} ANTIGA"}, format="json")
+    resp = root.patch(f"/api/gerencias/{g.id}/", {"nome": f"{nome} ANTIGA"}, format="json")
 
     assert resp.status_code == 400, resp.content
     assert "nome" in resp.json()["errors"]

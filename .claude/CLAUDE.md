@@ -86,7 +86,7 @@ v2/frontend/src/
   (SSOT: `apps.core.constants.SETOR_GROUPS`)
 - **Funções (5)**: Formador, Coordenador, Apoio de Coordenação, Gerente, Assistente Administrativo
   (SSOT: `apps.core.constants.FUNCAO_GROUPS`)
-- **Aprovação**: superuser OU (Gerente + Superintendência)
+- **Aprovação**: regra única `solicitation_approval_basis`; ver PA-02 em `v2/docs/specs/domain/politica-aprovacao.spec.md` (nenhum grupo aprova)
 - **Lint guard**: `scripts/rbac_lint.py` bane `user.groups.filter(name=...)`
   fora de whitelist. CI job: `[required] backend rbac-lint`.
 

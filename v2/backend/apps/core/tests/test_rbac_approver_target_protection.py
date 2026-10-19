@@ -29,7 +29,7 @@ import pytest
 
 from apps.core.models import AuditLog, Usuario
 from apps.core.rbac import can_admin_mutate_target
-from apps.core.tests.factories import GroupFactory, UsuarioFactory
+from apps.core.tests.factories import GroupFactory, UsuarioFactory, com_pacote_do_controle
 
 APPROVER_PASSWORD = "AprovOldPass!123"
 COMMON_PASSWORD = "CommonOld!123"
@@ -180,6 +180,7 @@ class TestCanAdminMutateTargetHelper:
     def test_non_superuser_can_mutate_asst_admin_controle_approver(self, usuario_dat):
         target = UsuarioFactory(username="asst_controle", cpf="90000000032")
         target.groups.add(GroupFactory(name="Controle"), GroupFactory(name="Assistente Administrativo"))
+        com_pacote_do_controle(target)  # PR 11: aprova pelo vínculo no Controle
         assert can_admin_mutate_target(usuario_dat, target) is True
 
     def test_non_superuser_can_mutate_common_target(self, usuario_dat, common_user):

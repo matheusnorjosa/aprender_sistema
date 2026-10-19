@@ -53,9 +53,7 @@ from apps.core.rbac.helpers import (
     GERENCIA_APROVADORA_NOME,
     fluxo_super_fora_da_superintendencia,
     user_has_any_perm,
-    user_is_assistente_administrativo_controle,
     user_is_gerente_superintendencia,
-    user_matches_any_approver_composite,
 )
 
 # ============================================================================
@@ -79,7 +77,7 @@ from apps.core.rbac.helpers import (
 
 
 # Composite policies: keys cuja semântica não cabe em "OR de capabilities"
-# (ex: composite Setor × Função). A lógica vive em helpers dedicados despachados por
+# (ex: vínculo GERENTE em g1 ou capacidade). A lógica vive em helpers dedicados despachados por
 # `user_has_policy`. `access_solicitation_approvals` tem frozenset() vazio como
 # sentinela; as telas de escopo (`TELAS_DE_ESCOPO`) listam a capacidade que também abre.
 # Tests que assumem "frozenset não-vazio" devem excluir essas keys.
@@ -201,8 +199,8 @@ ACCESS_POLICIES: Final[dict[str, frozenset[str]]] = {
     "manage_internal_actions": frozenset({"manage_internal_actions"}),
     # --- Aprovação de solicitações (PR 3 hardening RBAC, 2026-04-29) ---
     # Policy COMPOSITE: a semântica não cabe em "OR de capabilities" porque
-    # exige composite Setor × Função (Gerente da Superintendência OU
-    # Assistente Administrativo do Controle). Frozenset vazio é sentinela —
+    # soma o vínculo GERENTE em g1 (com escopo) à capacidade `approve_solicitation`
+    # (DAT e Controle pelo pacote, PR 11). Frozenset vazio é sentinela —
     # `user_has_policy` trata a key via `_user_has_solicitation_approvals`.
     "access_solicitation_approvals": frozenset(),
     # Menu policy-only (#1589, destrava #1270). Paridade com gates legacy do
@@ -394,15 +392,14 @@ class CanCreateSolicitationWithoutPurchase(_PolicyPermission):
 
 class CanAccessSolicitationApprovals(_PolicyPermission):
     """
-    Policy composta de aprovação de solicitações (PR 3, 2026-04-29; PR B1, 2026-09-29).
+    Policy composta de aprovação de solicitações (PR 3, 2026-04-29; PR B1, 2026-09-29; PR 11, 2026-10-17).
 
-    Habilitada para (SSOT `solicitation_approval_basis`):
+    Habilitada para (SSOT `solicitation_approval_basis`, 3 bases):
+    - superuser
     - Gerente da Superintendência por VÍNCULO: EquipeGerencia vigente com papel
       GERENTE na gerência `GERENCIA_APROVADORA_NOME` (sem depender de grupo)
-    - Assistente Administrativo do Controle (Setor `Controle` + Função
-      `Assistente Administrativo`)
-    - Legado até o B2: composite Setor `Superintendência` + Função `Gerente`
-    - PR 10: a capacidade `approve_solicitation` (pacote ADMIN_OPERACIONAL: o DAT pelo vínculo)
+    - a capacidade `approve_solicitation`: o DAT (pacote ADMIN_OPERACIONAL, PR 10) e o Controle
+      (pacote CONTROLE, PR 11), pelo vínculo EQUIPE/GERENTE. Nenhum grupo a tem.
 
     Implementação composite (não OR de capabilities): a semântica vive em
     `_user_has_solicitation_approvals` e é compartilhada com
@@ -411,10 +408,7 @@ class CanAccessSolicitationApprovals(_PolicyPermission):
     """
 
     policy = "access_solicitation_approvals"
-    message = (
-        "Apenas a gerência da Superintendência, o DAT ou o Assistente Administrativo do Controle "
-        "podem aprovar solicitações."
-    )
+    message = "Apenas a gerência da Superintendência, o DAT ou o Controle podem aprovar solicitações."
 
     def has_permission(self, request: Request, view: APIView) -> bool:
         return _user_has_solicitation_approvals(request.user)
@@ -483,11 +477,11 @@ PUBLIC_POLICY_KEYS: Final[frozenset[str]] = frozenset(
 # ============================================================================
 
 
+# PR 11 (17/10/2026): 3 bases. Os rótulos `asst_admin_controle` e `grupo_superintendencia_gerente`
+# (bases por grupo, até o PR 11) seguem nos AuditLogs já gravados; nenhum leitor depende do valor.
 SolicitationApprovalBasis = Literal[
     "superuser",
     "gerente_superintendencia",
-    "asst_admin_controle",
-    "grupo_superintendencia_gerente",
     "capacidade_aprovar",
 ]
 
@@ -498,24 +492,23 @@ def solicitation_approval_basis(
     capacidades: AbstractSet[str] | None = None,
 ) -> SolicitationApprovalBasis | None:
     """
-    SSOT de QUEM aprova/reprova solicitações e POR QUÊ (PR B1, 2026-09-29).
+    SSOT de QUEM aprova/reprova solicitações e POR QUÊ (PR B1, 2026-09-29; PR 11, 2026-10-17).
 
     Retorna a base da autoridade (gravada em `AuditLog.details.autoridade`) ou
     None quando o usuário não aprova. Ordem de precedência:
 
     1. `superuser`
     2. `gerente_superintendencia` — vínculo EquipeGerencia VIGENTE com papel GERENTE
-       na gerência `GERENCIA_APROVADORA_NOME` (sem depender de grupo Django)
-    3. `asst_admin_controle` — composite Setor "Controle" + Função "Assistente
-       Administrativo"
-    4. `grupo_superintendencia_gerente` — composite Setor "Superintendência" + Função
-       "Gerente" (legado; sai no B2)
-    5. `capacidade_aprovar` — a capacidade `approve_solicitation` (PR 10). Nenhum grupo a tem (seed e
-       migration 0126): vem do pacote ADMIN_OPERACIONAL, isto é, do vínculo EQUIPE/GERENTE vigente na
-       gerência DAT. Sem escopo: decide qualquer gerência e fluxo. Por último, para que nenhuma base
-       anterior mude de rótulo
+       na gerência `GERENCIA_APROVADORA_NOME` (sem depender de grupo Django). Com escopo
+    3. `capacidade_aprovar` — a capacidade `approve_solicitation`. Nenhum grupo a tem (seed e
+       migration 0126): vem do pacote do perfil da gerência, pelo vínculo EQUIPE/GERENTE vigente:
+       ADMIN_OPERACIONAL (DAT, PR 10) e CONTROLE (D1 de 06/10, PR 11). Sem escopo: decide qualquer
+       gerência e fluxo
 
-    `capacidades`: só para o simulador `rbac_diff` (a base 5 lê esse conjunto em vez do cache).
+    Nenhum grupo dá o poder de aprovar: as bases por grupo (par Controle + Assistente Administrativo e
+    par Superintendência + Gerente) saíram no PR 11.
+
+    `capacidades`: só para o simulador `rbac_diff` (a base 3 lê esse conjunto em vez do cache).
     """
     if not user or not getattr(user, "is_authenticated", False):
         return None
@@ -531,11 +524,7 @@ def _base_de_aprovacao_fora_do_vinculo(
     *,
     capacidades: AbstractSet[str] | None = None,
 ) -> SolicitationApprovalBasis | None:
-    """Bases 3, 4 e 5 de `solicitation_approval_basis` (sem superuser nem o vínculo GERENTE em g1)."""
-    if user_is_assistente_administrativo_controle(user):
-        return "asst_admin_controle"
-    if user_matches_any_approver_composite(user):
-        return "grupo_superintendencia_gerente"
+    """Base 3 de `solicitation_approval_basis` (sem superuser nem o vínculo GERENTE em g1): a capacidade."""
     if capacidades is not None:
         tem_capacidade = "approve_solicitation" in capacidades
     else:
@@ -547,8 +536,8 @@ def _base_de_aprovacao_fora_do_vinculo(
 # Regra do dono (30/09): escopo da aprovadora por vínculo
 # ----------------------------------------------------------------------------
 # A base `gerente_superintendencia` só aprova/reprova, edita, exclui e cria solicitação de projeto
-# do fluxo SUPER da gerência Superintendência (g1). Ver não muda. As bases por grupo e o superuser
-# não têm escopo. O predicado é um só (`projeto_no_escopo_da_superintendencia`); os Q abaixo são a
+# do fluxo SUPER da gerência Superintendência (g1). Ver não muda. A capacidade de aprovar (DAT e
+# Controle) e o superuser não têm escopo. O predicado é um só (`projeto_no_escopo_da_superintendencia`); os Q abaixo são a
 # mesma regra em SQL, para o lote e a Home (paridade coberta por teste).
 
 ESCOPO_SUPERINTENDENCIA_PROJETO_Q: Final = Q(fluxo="SUPER", gerencia__nome=GERENCIA_APROVADORA_NOME)
@@ -568,9 +557,8 @@ def projeto_no_escopo_da_superintendencia(projeto: Any) -> bool:
 def aprovadora_restrita_a_superintendencia(user: AbstractBaseUser | AnonymousUser | None) -> bool:
     """A única base de aprovação do usuário é o vínculo GERENTE em g1?
 
-    Então ela só decide solicitação no escopo (`projeto_no_escopo_da_superintendencia`). Superuser,
-    o par Controle + Assistente Administrativo, o par legado e a capacidade de aprovar (DAT) não são
-    restringidos.
+    Então ela só decide solicitação no escopo (`projeto_no_escopo_da_superintendencia`). Superuser e a
+    capacidade de aprovar (DAT e Controle) não são restringidos.
     """
     if not user or not getattr(user, "is_authenticated", False) or getattr(user, "is_superuser", False):
         return False
@@ -584,7 +572,7 @@ def solicitation_approval_basis_for(
     """Base de aprovação do usuário para ESTA solicitação (vai para `AuditLog.details.autoridade`).
 
     Mesma precedência de `solicitation_approval_basis`, mas o vínculo GERENTE em g1 só vale no escopo
-    da Superintendência. Fora dele vale a próxima base (par Controle, par legado, capacidade) ou None, e None com
+    da Superintendência. Fora dele vale a próxima base (a capacidade) ou None, e None com
     base global não nula = fora do escopo. `solicitacao=None` responde pelo "fora do escopo".
     """
     basis = solicitation_approval_basis(user)

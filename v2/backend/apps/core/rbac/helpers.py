@@ -26,19 +26,6 @@ from apps.core.models import EquipeGerencia, GroupClassificacao
 from apps.core.rbac.constants import FORMADOR_ROLE_GROUPS, FUNCAO_COORDENADOR_GROUPS
 from apps.core.services.rbac_permissions import get_user_functional_permissions
 
-# SSOT dos composites Setor×Função que conferem autoridade de APROVAÇÃO de
-# solicitações (H2 / refactor rename-robusto, 2026-09-15). Cada dupla é
-# (nome do grupo de SETOR, nome do grupo de FUNÇÃO); "aprovador" = estar em AMBOS.
-# Único lugar onde esses nomes vivem — consumido por
-# `policies._user_has_solicitation_approvals`, `user_is_assistente_administrativo_controle`
-# (abaixo) e `views_basic` (/api/me/). Uma capability não expressa isto (é por-grupo,
-# o composite é AND de 2 grupos), por isso a robustez a rename vem da guarda de drift
-# (system check + teste-sentinela) que valida estes nomes contra SETOR_GROUPS/FUNCAO_GROUPS.
-APPROVER_COMPOSITES: Final[tuple[tuple[str, str], ...]] = (
-    ("Superintendência", "Gerente"),
-    ("Controle", "Assistente Administrativo"),
-)
-
 # PR B1 (2026-09-29): chave TÉCNICA da gerência cujos GERENTEs vigentes aprovam
 # solicitações (g1, `seed_gerencias.GERENCIAS`). É `Gerencia.nome`, não `nome_setor`
 # nem `nome_exibicao` (rótulos editáveis), nem `setor_canonico` (reescrito pelo import),
@@ -55,37 +42,6 @@ def fluxo_super_fora_da_superintendencia(fluxo: str | None, gerencia: object | N
     Fail-closed: SUPER sem gerência também viola. Chave = `Gerencia.nome` (a mesma da aprovação).
     """
     return fluxo == "SUPER" and getattr(gerencia, "nome", None) != GERENCIA_APROVADORA_NOME
-
-
-def user_in_composite(
-    user: AbstractBaseUser | AnonymousUser | None,
-    setor: str,
-    funcao: str,
-) -> bool:
-    """True se o usuário está em AMBOS os grupos (Setor E Função) do composite.
-
-    NÃO faz bypass de superuser (quem chama decide) — espelha
-    `user_is_assistente_administrativo_controle`.
-    """
-    if not user or not user.is_authenticated:
-        return False
-    return bool(
-        user.groups.filter(name=setor).exists()  # noqa: RBAC-composite-allowed
-        and user.groups.filter(name=funcao).exists()  # noqa: RBAC-composite-allowed
-    )
-
-
-def user_matches_any_approver_composite(
-    user: AbstractBaseUser | AnonymousUser | None,
-) -> bool:
-    """True se o usuário casa QUALQUER composite aprovador de `APPROVER_COMPOSITES`.
-
-    Sem bypass de superuser (quem chama decide — `_user_has_solicitation_approvals`
-    trata superuser antes).
-    """
-    if not user or not user.is_authenticated:
-        return False
-    return any(user_in_composite(user, setor, funcao) for setor, funcao in APPROVER_COMPOSITES)
 
 
 def user_has_any_perm(
@@ -112,27 +68,6 @@ def user_has_any_perm(
         return False
     user_perms = get_user_functional_permissions(user)
     return any(code in user_perms for code in codenames)
-
-
-def user_is_assistente_administrativo_controle(
-    user: AbstractBaseUser | AnonymousUser | None,
-) -> bool:
-    """
-    True se o usuário é Assistente Administrativo do Controle (composite
-    Setor `Controle` + Função `Assistente Administrativo`).
-
-    SSOT extraído em PR 13 hardening RBAC (2026-05-04). Antes a checagem
-    vivia inline em `IsAssistenteAdministrativoControle` (permissions.py);
-    este helper é reutilizado pela classe DRF E pelo helper de delegação
-    de bloqueios (`_user_can_delegate_availability_block`).
-
-    - user None ou anônimo → False
-    - is_superuser → False (bypass é decidido por quem chama)
-    - caso geral → exige AMBOS os grupos
-
-    Nomes do composite vêm da SSOT `APPROVER_COMPOSITES` (não mais literais aqui).
-    """
-    return user_in_composite(user, "Controle", "Assistente Administrativo")
 
 
 def user_is_gerente_superintendencia(

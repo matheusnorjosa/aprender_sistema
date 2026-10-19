@@ -47,11 +47,6 @@ from apps.core.services.rbac_service import get_assignable_group_names, nomes_gr
 _UNSET: Any = object()
 
 
-# #2071: par do composite LEGADO de aprovação (espelha `APPROVER_COMPOSITES`; sai no B2). O par
-# Controle + Assistente Administrativo é base legítima e fica fora da trava.
-_PAR_LEGADO: tuple[str, str] = ("Superintendência", "Gerente")
-
-
 def _vinculo_exibido(user: Any) -> Any:
     """O vínculo vigente que o form de Usuários mostra (e reenvia no save): o primeiro por id, preferindo
     gerência ativa (senão um vínculo antigo em gerência desativada viraria a lotação editada).
@@ -415,7 +410,8 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
           None = manter como está. Ele entra nos papéis de antes e de depois, então salvar sem mudar não
           o apaga e dar ou tirar uma função o mantém.
         - PR B1: audita a concessão/revogação do poder de aprovar solicitações (vínculo GERENTE
-          na gerência aprovadora ou composite de grupos) — antes/depois de grupos + vínculo.
+          na gerência aprovadora ou, desde o PR 11, vínculo EQUIPE/GERENTE no DAT ou no Controle) —
+          antes/depois de grupos + vínculo.
         """
         base_antes = solicitation_approval_basis(user)
         aprovava = base_antes is not None
@@ -467,27 +463,12 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             encerrar_lotacao(user)
         elif has_gerencia and papeis and (nova_lotacao or papeis != papeis_antes or encerrou_gerente):
             sync_user_lotacao(user, gerencia, papeis)
-        # PR 10: a base 5 (`capacidade_aprovar`) lê as capacidades pelo cache, que o `base_antes` acabou
+        # PR 10: a base `capacidade_aprovar` lê as capacidades pelo cache, que o `base_antes` acabou
         # de preencher e os sinais só limpam no commit. Limpa antes de ler o "depois" e de novo depois,
-        # para não deixar no cache um estado que a transação ainda pode desfazer (#2071 logo abaixo).
+        # para não deixar no cache um estado que a transação ainda pode desfazer.
         invalidate_user_functional_permissions_cache(user.pk)
         base = solicitation_approval_basis(user)
         invalidate_user_functional_permissions_cache(user.pk)
-        setor, funcao = _PAR_LEGADO
-        pedido = groups is not None and setor in {g.name for g in groups}
-        par_novo = {setor, funcao} <= {g.name for g in final} and not {setor, funcao} <= {g.name for g in antes}
-        if not pedido and (par_novo or (base == "grupo_superintendencia_gerente" and base != base_antes)):
-            # O form não mostra o grupo de setor e o preserva; ele não pode virar poder de aprovar pelo
-            # par legado sem ninguém pedir (a transação do update() desfaz tudo).
-            raise serializers.ValidationError(
-                {
-                    "group_ids": (
-                        f'Esta pessoa tem o grupo "{setor}", que o formulário não mostra. Com a função {funcao}, ela '
-                        f"passaria a aprovar solicitações por esse grupo (regra antiga, que vai sair). Tire o grupo "
-                        f'"{setor}" dela na tela de Grupos antes de salvar.'
-                    )
-                }
-            )
         aprova = base is not None
         if aprova != aprovava:
             registrar_auditoria(

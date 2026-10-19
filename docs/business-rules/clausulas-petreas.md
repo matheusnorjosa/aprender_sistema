@@ -19,10 +19,9 @@ Regras imutáveis do sistema que não podem ser alteradas.
 Ver [Política de Aprovação (PA)](politica-aprovacao.md).
 
 - Sem auto-aprovação para fluxo SUPER
-- Aprovam: o superuser, a **Gerente da Superintendência** (vínculo; o par de grupos Gerente +
-  Superintendência até o B2), o **Assistente Administrativo do Controle** (até o PR 11) e o
-  **DAT** pelo pacote `ADMIN_OPERACIONAL` (decisão do dono de 02/10, nº 16; PR 10) (PA-02).
-  Controle puro não aprova
+- Aprovam: o superuser, a **Gerente da Superintendência** (vínculo) e quem trabalha no **DAT ou no
+  Controle** como Equipe ou Gerente (pacote do perfil da gerência; decisões do dono de 02/10, nº 16, e de
+  06/10, D1; PR 10 e PR 11) (PA-02). Nenhum grupo dá o poder de aprovar
 - Ninguém decide a própria solicitação nem a de pessoa cuja conta alterou nos últimos 30 dias
   (o superuser só como break-glass registrado)
 - Integrações só executam após aprovação

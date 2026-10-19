@@ -48,6 +48,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
     com_pacote_do_dat,
 )
 
@@ -419,12 +420,22 @@ class TestParityWithLegacyBehavior:
         assert response.json()["pending_approvals"] is None
 
     def test_asst_admin_controle_conta_pendentes_super(self, world):
-        """Controle + Assistente Administrativo aprova → conta (antes recebia null)."""
+        """Quem trabalha no Controle aprova (PR 11: pelo vínculo EQUIPE na gerência CONTROLE) → conta."""
         _pendentes_nao_super_e_super(world, world["autor"])
+        user = _make_user("asst_ctrl", ["Controle", "Assistente Administrativo"])
+        com_pacote_do_controle(user)
 
-        response = _get_home_stats(_make_user("asst_ctrl", ["Controle", "Assistente Administrativo"]))
+        response = _get_home_stats(user)
         assert response.status_code == 200
         assert response.json()["pending_approvals"] == 1
+
+    def test_par_controle_sem_vinculo_recebe_null(self, world):
+        """PR 11: o par Controle + Assistente Administrativo sem o vínculo não aprova → null."""
+        _pendentes_nao_super_e_super(world, world["autor"])
+
+        response = _get_home_stats(_make_user("par_ctrl", ["Controle", "Assistente Administrativo"]))
+        assert response.status_code == 200
+        assert response.json()["pending_approvals"] is None
 
     def test_aprovadora_nao_conta_as_proprias(self, world):
         """As pendentes que a aprovadora criou não entram: ela não pode decidi-las."""

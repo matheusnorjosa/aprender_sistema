@@ -336,8 +336,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     PA-01: Status sempre começa pendente.
     PA-02 (Adaptada): aprovar/reprovar exige a policy `access_solicitation_approvals`
     (CanAccessSolicitationApprovals) — GERENTE vigente na gerência SUPERINTENDENCIA
-    (vínculo), Assistente Administrativo do Controle, o DAT pela capacidade
-    `approve_solicitation` (PR 10) ou superuser (SSOT `solicitation_approval_basis`).
+    (vínculo), o DAT ou o Controle pela capacidade `approve_solicitation` (pacote do
+    perfil, PR 10 e PR 11) ou superuser (SSOT `solicitation_approval_basis`).
     Segregação (PR B1, PR 10): ninguém decide a própria solicitação, a de autor cuja conta
     alterou nos últimos 30 dias nem a que editou em campo material; superuser pode, marcado
     no AuditLog.
@@ -1121,7 +1121,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         summary="Aprovar solicitação",
         description=(
             "Aprova uma solicitação pendente. Requer a policy access_solicitation_approvals "
-            "(PA-02): gerência da Superintendência, Assistente Administrativo do Controle ou superuser. "
+            "(PA-02): gerência da Superintendência, o DAT, o Controle ou superuser. "
             "Quem criou a solicitação não a aprova: 403 com code=self_approval_forbidden "
             "(superuser pode; o AuditLog marca autoaprovacao=true). A gerência da Superintendência "
             "(vínculo) só decide projeto do fluxo SUPER da Superintendência: fora disso, 403 com "
@@ -1167,7 +1167,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         description=(
             "Reprova uma solicitação pendente. Requer justificativa e a policy "
             "access_solicitation_approvals (PA-02): gerência da Superintendência, "
-            "Assistente Administrativo do Controle ou superuser. Quem criou a solicitação "
+            "o DAT, o Controle ou superuser. Quem criou a solicitação "
             "não a reprova: 403 com code=self_approval_forbidden (superuser pode; o AuditLog "
             "marca autoaprovacao=true). A gerência da Superintendência (vínculo) só decide projeto "
             "do fluxo SUPER da Superintendência: fora disso, 403 com code=out_of_approval_scope."
@@ -1388,7 +1388,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         (a própria solicitação: {"id": 4, "code": "self_approval_forbidden", "detail": "..."})
 
         Permissão: policy access_solicitation_approvals (PA-02) — gerência da
-        Superintendência, Assistente Administrativo do Controle ou superuser.
+        Superintendência, o DAT, o Controle ou superuser.
         PA-05: Cada solicitação gera um AuditLog individual com batch=true.
         Limite: máximo 100 solicitações por requisição.
         """
@@ -1443,7 +1443,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         (a própria solicitação: {"id": 4, "code": "self_approval_forbidden", "detail": "..."})
 
         Permissão: policy access_solicitation_approvals (PA-02) — gerência da
-        Superintendência, Assistente Administrativo do Controle ou superuser.
+        Superintendência, o DAT, o Controle ou superuser.
         PA-05: Cada solicitação gera um AuditLog individual com batch=true.
         Limite: máximo 100 solicitações por requisição.
         """

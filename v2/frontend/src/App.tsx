@@ -8,7 +8,8 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense, type JSX } from 'react';
-import { BrowserRouter as Router } from 'react-router';
+import { createBrowserRouter } from 'react-router';
+import { RouterProvider } from 'react-router/dom';
 import { ConfigProvider, Layout, message, Result, Button } from 'antd';
 import logger from './utils/logger';
 import { getErrorStatus, isAuthError } from './utils/errors';
@@ -311,7 +312,7 @@ function AppContent(): JSX.Element {
     );
   }
 
-  // Fora do Router de propósito: o endereço pedido fica intacto e abre depois da troca.
+  // Sem navegar: o endereço pedido fica intacto e abre depois da troca.
   if (trocaPendente) {
     return (
       <ConfigProvider locale={ptBR} theme={antThemeConfig}>
@@ -342,7 +343,6 @@ function AppContent(): JSX.Element {
     <ConfigProvider locale={ptBR} theme={antThemeConfig}>
       <Toaster position="top-right" toastOptions={{ duration: 5000 }} />
       <AcessoContext.Provider value={acesso}>
-      <Router>
         <OfflineBanner />
         <MonitorDeSessao onExpirada={handleInatividade} onSair={handleLogout} />
         <Layout style={{ minHeight: '100vh', background: colors.pageBackground }}>
@@ -379,18 +379,33 @@ function AppContent(): JSX.Element {
             </Content>
           </Layout>
         </Layout>
-      </Router>
       </AcessoContext.Provider>
     </ConfigProvider>
   );
 }
 
+/**
+ * Data router (`createBrowserRouter`), para o `useBlocker` funcionar (a Nova Solicitação pergunta
+ * antes de descartar o que foi preenchido). Uma rota coringa renderiza o app inteiro; as `<Routes>`
+ * de AppRoutes seguem como rotas descendentes.
+ * - Criado na montagem, não no módulo: lê o endereço da hora em que o App monta.
+ * - O ErrorBoundary fica dentro da rota: no data router, erro de renderização de uma rota pararia
+ *   no boundary do próprio roteador (a tela padrão em inglês) e não chegaria a um boundary de fora.
+ */
 function App(): JSX.Element {
+  const [router] = useState(() => createBrowserRouter([
+    {
+      path: '*',
+      element: (
+        <ErrorBoundary>
+          <AppContent />
+        </ErrorBoundary>
+      ),
+    },
+  ]));
   return (
     <ThemeProvider>
-      <ErrorBoundary>
-        <AppContent />
-      </ErrorBoundary>
+      <RouterProvider router={router} />
     </ThemeProvider>
   );
 }

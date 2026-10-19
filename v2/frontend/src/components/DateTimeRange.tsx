@@ -35,7 +35,11 @@ export interface DateTimeRangeValue {
 export interface DateTimeRangeProps {
   value?: DateTimeRangeValue;
   onChange?: (value: DateTimeRangeValue) => void;
+  /** Motivo de o horário não valer, junto dos campos: marca os vazios ou, com tudo preenchido, o Fim. */
+  erro?: string | null;
 }
+
+const ID_DO_ERRO = 'data-horario-erro';
 
 /**
  * Internal state for change trigger
@@ -46,7 +50,7 @@ interface ChangeState {
   end: Dayjs | null;
 }
 
-export default function DateTimeRange({ value = {}, onChange }: DateTimeRangeProps): JSX.Element {
+export default function DateTimeRange({ value = {}, onChange, erro = null }: DateTimeRangeProps): JSX.Element {
   const [date, setDate] = useState<Dayjs | null>(value.date ? dayjs(value.date) : null);
   const [start, setStart] = useState<Dayjs | null>(value.start ? dayjs(value.start, 'HH:mm') : null);
   const [end, setEnd] = useState<Dayjs | null>(value.end ? dayjs(value.end, 'HH:mm') : null);
@@ -83,6 +87,13 @@ export default function DateTimeRange({ value = {}, onChange }: DateTimeRangePro
     }
   };
 
+  // Com erro: os campos vazios; com tudo preenchido, o Fim (a ordem dos horários).
+  const algumVazio = !date || !start || !end;
+  const marcar = (vazio: boolean, ehFim = false): { 'aria-invalid'?: 'true'; 'aria-describedby'?: string; status?: 'error'; 'data-campo-horario': true } =>
+    erro && (algumVazio ? vazio : ehFim)
+      ? { 'aria-invalid': 'true', 'aria-describedby': ID_DO_ERRO, status: 'error', 'data-campo-horario': true }
+      : { 'data-campo-horario': true };
+
   return (
     <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
       <legend className="sr-only">Data e horário do evento</legend>
@@ -98,6 +109,7 @@ export default function DateTimeRange({ value = {}, onChange }: DateTimeRangePro
             format="DD/MM/YYYY"
             placeholder="Selecione a data"
             className="w-full mt-2"
+            {...marcar(!date)}
           />
         </div>
         <Space direction="horizontal" style={{ width: '100%' }}>
@@ -113,6 +125,9 @@ export default function DateTimeRange({ value = {}, onChange }: DateTimeRangePro
               placeholder="HH:mm"
               className="w-full mt-2"
               minuteStep={15}
+              // O horário escolhido nas colunas vale sem o OK (sair do campo não o descarta).
+              needConfirm={false}
+              {...marcar(!start)}
             />
           </div>
           <div style={{ flex: 1 }}>
@@ -127,9 +142,16 @@ export default function DateTimeRange({ value = {}, onChange }: DateTimeRangePro
               placeholder="HH:mm"
               className="w-full mt-2"
               minuteStep={15}
+              needConfirm={false}
+              {...marcar(!end, true)}
             />
           </div>
         </Space>
+        {erro ? (
+          <div id={ID_DO_ERRO} role="alert">
+            <Text type="danger">{erro}</Text>
+          </div>
+        ) : null}
       </Space>
     </fieldset>
   );

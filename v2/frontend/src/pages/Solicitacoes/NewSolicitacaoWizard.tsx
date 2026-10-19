@@ -210,6 +210,8 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   // `chave` (horário, município e participantes) com que foi enviado: mudou um deles, o
   // conflito antigo deixa de valer e o Confirmar volta (o backend confere de novo no envio).
   const [conflitoDoEnvio, setConflitoDoEnvio] = useState<{ chave: string; bloqueados: BlockedParticipant[] } | null>(null);
+  // Motivo de o horário do passo 1 não valer (faltando, ou fim antes do início), junto dos campos.
+  const [erroHorario, setErroHorario] = useState<string | null>(null);
 
   // Estado do formulário
   const [formData, setFormData] = useState<FormDataType>({
@@ -256,6 +258,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
 
   // Handler para DateTimeRange: converte {date, start, end} para ISO UTC (Issue #428)
   const handleRangeChange = useCallback((range: RangeValueType | null): void => {
+    setErroHorario(null);
     if (!range || !range.date || !range.start || !range.end) {
       setFormData(prev => ({ ...prev, inicio: null, fim: null }));
       return;
@@ -350,16 +353,26 @@ export default function NewSolicitacaoWizard(): JSX.Element {
     [dispensaCompra],
   );
 
+  // DateTimeRange (Step 0) fica fora de Form.Item, então validateFields() não o vê.
+  // Sem esta guarda dá para avançar sem data, e o gatilho da checagem (#1452) depende dela.
+  // O backend recusa fim igual ou antes do início (`errors.fim`); aqui a pessoa vê antes.
+  const motivoDoHorario = (): string | null => {
+    if (!formData.inicio || !formData.fim) return 'Escolha a data e os horários de início e de fim do evento.';
+    if (!dayjs(formData.fim).isAfter(dayjs(formData.inicio))) return 'O horário de fim precisa ser depois do início.';
+    return null;
+  };
+
   // Navegação entre passos
   const next = (): void => {
-    // DateTimeRange (Step 0) fica fora de Form.Item, então validateFields() não o vê.
-    // Sem esta guarda dá para avançar sem data, e o gatilho da checagem (#1452) depende dela.
-    if (currentStep === 0 && (!formData.inicio || !formData.fim)) {
-      message.error('Por favor, selecione a data e o horário do evento');
-      return;
-    }
+    const motivoHorario = currentStep === 0 ? motivoDoHorario() : null;
+    setErroHorario(motivoHorario);
 
     form.validateFields().then(values => {
+      if (motivoHorario) {
+        // Os outros campos estão certos: o foco vai ao primeiro campo do horário marcado.
+        setTimeout(() => document.querySelector<HTMLElement>('[data-campo-horario][aria-invalid="true"]')?.focus());
+        return;
+      }
       // validateFields() sem args devolve a chave de TODO field montado, inclusive os
       // opcionais não tocados — com valor `undefined`. Sem filtrar, o spread abaixo
       // sobrescreve `coordenadores: []` por `undefined` e o render do resumo estoura em
@@ -369,8 +382,11 @@ export default function NewSolicitacaoWizard(): JSX.Element {
       );
       setFormData({ ...formData, ...definidos });
       setCurrentStep(currentStep + 1);
-    }).catch(err => {
+    }).catch((err: { errorFields?: Array<{ name: Array<string | number> }> }) => {
       logger.debug('Validação falhou:', err);
+      // Nada de clique mudo: leva a tela e o foco ao primeiro campo com erro.
+      const primeiro = err?.errorFields?.[0]?.name;
+      if (primeiro) form.scrollToField(primeiro, { block: 'center', focus: true });
     });
   };
 
@@ -461,8 +477,16 @@ export default function NewSolicitacaoWizard(): JSX.Element {
         setConflitoDoEnvio({ chave: chaveDoEnvio, bloqueados });
         message.error(payloadErro.detail || 'Um participante já está alocado neste horário.');
       } else {
+        // Recusa por campo (400): o motivo vem em `errors.<campo>`; o `detail` é o genérico
+        // "Erro de validação.". Sem resposta (rede), a mensagem do próprio erro diz o que houve.
+        const motivoDoCampo = Object.values((data as { errors?: Record<string, unknown> })?.errors ?? {})
+          .flat()
+          .find((texto): texto is string => typeof texto === 'string');
         const detail = (data as { detail?: string })?.detail;
-        message.error(detail || 'Erro ao criar solicitação. Verifique os dados e tente novamente.');
+        const semResposta = !(error as { response?: unknown })?.response ? (error as Error)?.message : undefined;
+        message.error(
+          motivoDoCampo || detail || semResposta || 'Erro ao criar solicitação. Verifique os dados e tente novamente.'
+        );
       }
     } finally {
       setLoading(false);
@@ -660,6 +684,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
           )}
 
           <DateTimeRange
+            erro={erroHorario}
             value={rangeValue}
             onChange={handleRangeChange as unknown as (value: { date?: string | null; start?: string | null; end?: string | null }) => void}
           />
@@ -831,6 +856,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
           <Form.Item
             label="Observações"
             name="observacoes"
+            rules={[{ max: 5000, message: 'Máximo 5000 caracteres' }]}
           >
             <TextArea
               rows={4}
@@ -954,7 +980,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
         </>
       ),
     },
-  ], [formData, rangeValue, handleRangeChange, handleProjetoChange, lookupProjetosElegiveis, lookupMunicipiosElegiveis, lookupCoordenadores, dispensaCompra, municipioLookupHasResults, preview, submitConflito, me, vazioEhQuemCria, perguntaAvaliar, formadoresAvaliaveis, handleFormadoresChange]);
+  ], [formData, rangeValue, erroHorario, handleRangeChange, handleProjetoChange, lookupProjetosElegiveis, lookupMunicipiosElegiveis, lookupCoordenadores, dispensaCompra, municipioLookupHasResults, preview, submitConflito, me, vazioEhQuemCria, perguntaAvaliar, formadoresAvaliaveis, handleFormadoresChange]);
 
   return (
     <section className="p-6 max-w-4xl mx-auto" aria-labelledby="nova-solicitacao-title">

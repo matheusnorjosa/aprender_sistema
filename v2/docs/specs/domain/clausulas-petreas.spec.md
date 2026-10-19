@@ -42,7 +42,7 @@ Esta spec é o **índice canônico** das CPs: lista cada cláusula com seu **enf
 | CP-04 | Workflow de sub-agents (convenção; **sem gate de CI**) | [`docs/business-rules/clausulas-petreas.md`](../../../../docs/business-rules/clausulas-petreas.md) §CP-04 |
 | CP-05 | v1 congelado (convenção/branch protection; **sem script dedicado**) | [`docs/business-rules/clausulas-petreas.md`](../../../../docs/business-rules/clausulas-petreas.md) §CP-05 |
 | CP-06 | Conventional commits (convenção; **sem commit-lint em CI**) | [ADR-004](../../../../docs/architecture/project-decisions/ADR-004-conventional-commits-branch-protection.md) |
-| CP-07 | Hook local `PreToolUse` + branch protection da `main` | `.claude/settings.json` (bloco `PreToolUse`, local) |
+| CP-07 | Hook `PreToolUse` do Claude Code + branch protection da `main` | [`.claude/hooks/guardrails.py`](../../../../.claude/hooks/guardrails.py) (guard G1, `g1_push_main`), ligado pelo bloco `PreToolUse` de `.claude/settings.json` |
 | CP-08 | Gate de `INSTALLED_APPS` por `INCLUDE_DEV_TOOLS` + guard rígido por `ENVIRONMENT` (#1466) | [`v2/backend/config/settings.py`](../../../backend/config/settings.py) (`INCLUDE_DEV_TOOLS`, o bloco `if ENVIRONMENT == "production"` que o força a `False`, o `INSTALLED_APPS.append("apps.dev_tools")` e o gate do `FreezeTimeMiddleware`) |
 
 ## Contratos e invariantes
@@ -53,7 +53,7 @@ Esta spec é o **índice canônico** das CPs: lista cada cláusula com seu **enf
 - **CP-04 — Workflow**: agentes autônomos seguem a ordem **Entender → Planejar → Implementar → Testar** (Infra/ETL/UI como fases subsequentes). É disciplina de processo, **não** verificada por CI.
 - **CP-05 — v1 congelado**: v1 só muda por branch `fix/v1-*` + PR para `main-v1`, com aprovação. Não há script que bloqueie edição de v1 — o backstop é a separação de branches + revisão.
 - **CP-06 — Conventional commits**: commits seguem `type(scope): message` (`feat|fix|chore|docs|test|refactor`); branches `type/nome`; PR exige aprovação + CI verde. Convenção formalizada em ADR-004 (não há job de commit-lint que reprove o título).
-- **CP-07 — Nunca push direto na `main`**: sempre via branch + PR (squash-merge após CI verde). Hook local `PreToolUse` em `.claude/settings.json` bloqueia `git push ... origin main`; o backstop **autoritativo** é o ruleset de branch protection da `main` no GitHub.
+- **CP-07 — Nunca push direto na `main`**: sempre via branch + PR (squash-merge após CI verde). Hook `PreToolUse` do Claude Code (guard G1 de `.claude/hooks/guardrails.py`, ligado em `.claude/settings.json`) bloqueia o `git push` cujo destino é a `main`; o backstop **autoritativo** é o ruleset de branch protection da `main` no GitHub.
 - **CP-08 — dev_tools off em produção**: `apps.dev_tools` (seeds/backfills/fixtures/`FreezeTimeMiddleware`) só entra em `INSTALLED_APPS` se `INCLUDE_DEV_TOOLS != "false"` ([`settings.py`](../../../backend/config/settings.py)). **Default é `true`**, mas desde o #1466 há guard rígido: `if ENVIRONMENT == "production": INCLUDE_DEV_TOOLS = False`, aplicado **independentemente** da env var. Pedir `INCLUDE_DEV_TOOLS=true` em produção emite warning e é ignorado. O guard força o valor em vez de `sys.exit(1)` de propósito — como a stack de produção não define a variável, abortar o boot converteria o footgun em indisponibilidade no primeiro deploy.
 
 ## API / Interface
@@ -67,7 +67,7 @@ As CPs não expõem endpoints próprios; são invariantes atravessando o sistema
 ## Fluxos principais
 
 1. **Boot do backend (CP-01 + CP-08)**: `settings.py` lê `REQUIRE_DOCKER` → se `1` e fora de container, aborta. Em seguida lê `INCLUDE_DEV_TOOLS` → se `≠ "false"`, anexa `apps.dev_tools` a `INSTALLED_APPS`; `FreezeTimeMiddleware` só é inserido com `DEBUG_E2E and INCLUDE_DEV_TOOLS` (gate duplo).
-2. **Tentativa de push na main (CP-07)**: o comando é interceptado pelo hook `PreToolUse`; se casar `push ... origin main`, falha com `CP-07 VIOLADO`. Mesmo que o hook não exista (clone novo), a branch protection da `main` recusa o push sem PR.
+2. **Tentativa de push na main (CP-07)**: dentro do Claude Code, o comando é interceptado pelo hook `PreToolUse`; se um `git push` tiver `main` como destino (`g1_push_main`), é barrado com "CP-07: push direto na main bloqueado. Use branch + PR.". Fora do harness o hook não roda, e a branch protection da `main` recusa o push sem PR.
 3. **Aprovação de evento SUPER (CP-02)**: solicitação → aprovação manual por papel autorizado → só então a integração (GCal) executa. Erro relevante: SUPER tentando auto-aprovar é negado (PA-01).
 4. **Erro comum (CP-08), fechado pelo #1466**: `stack.env` de produção sem `INCLUDE_DEV_TOOLS` → default `true` → `apps.dev_tools` era carregado em prod (CP-08 violado silenciosamente). Hoje o guard por `ENVIRONMENT == "production"` (em `settings.py`) zera a variável antes do `INSTALLED_APPS`, então a omissão deixou de ser um footgun. Setar `INCLUDE_DEV_TOOLS=false` explicitamente continua sendo boa higiene, mas não é mais a única linha de defesa.
 
@@ -106,6 +106,6 @@ CP-03 também tem divergências vivas (`M08-07`, `M08-09`, épico #1664) — ver
 
 - **CP-04, CP-05, CP-06 não têm enforcement automatizado**: são convenções. Não há commit-lint em CI (CP-06), nem script que proteja v1 (CP-05), nem gate de workflow (CP-04). O cumprimento depende de revisão humana + branch protection.
 - **`v2/scripts/ban_v1.sh` NÃO é o enforcement de CP-05**: apesar do nome, o script faz **limpeza de containers/redes/volumes Docker** do projeto legado (`project=aprendersistema`), não bane edições de código v1. Não citar como guard de CP-05.
-- **CP-07 — hook é gitignored**: `.claude/settings.json` vive em `.claude/` (não herdado por clone novo); o enforcement **confiável** é a branch protection da `main` no GitHub. O hook é defesa-em-profundidade local.
+- **CP-07 — o hook só vale dentro do Claude Code**: `.claude/settings.json` e `.claude/hooks/guardrails.py` são versionados (exceções `!.claude/settings.json` e `!.claude/hooks/` no `.gitignore`) e vêm em clone novo; o guard G1 (`g1_push_main`) barra o push cujo destino é a `main` quando o harness do Claude Code carrega o hook. Push feito fora do harness (terminal, IDE) não passa por ele; por isso o enforcement **confiável** é a branch protection da `main` no GitHub, e o hook é defesa em profundidade.
 - **CP-08 — resolvido pelo #1466**: o hardening que esta spec recomendava (`if ENVIRONMENT == "production": INCLUDE_DEV_TOOLS = False`) **existe** em `settings.py`. O default de `INCLUDE_DEV_TOOLS` continua `true`, mas ele só vale fora de produção. Resta a dívida menor de o default ser inseguro para qualquer `ENVIRONMENT` que não seja exatamente `"production"` (ex.: staging escrito com outro rótulo).
 - **CP-01 — guard só dispara com `REQUIRE_DOCKER=1`**: rodar v2 fora de Docker com a variável ausente (`"0"`) não aborta. A garantia em prod vem do compose/imagem, não do guard isolado.

@@ -27,14 +27,14 @@ Retorna a grade mensal de disponibilidade.
 > SUPERINTENDENCIA (SUPER)". **Falso.** Em `MonthlyAvailabilityView.get` (`apps/core/views_availability_monthly.py`),
 > quando `gerencia_id is None`:
 >
-> - quem tem a capability `view_all_availability` recebe escopo **amplo** (`:188-190`,
+> - quem tem a capability `view_all_availability` recebe escopo **amplo** (`has_wide_scope`,
 >   `cache_scope="wide"`);
 > - os demais são escopados aos usuários das **próprias** gerências via `EquipeGerencia`
->   (`:192-208`);
+>   (`EquipeGerencia.gerencias_de_atuacao`, no `else` do mesmo ramo);
 > - quem não tem papel G/C/A vigente em gerência ativa recebe **403** antes de chegar à view
 >   (`HasSectorAccess`); o ramo "só o próprio usuário" da view não é alcançado (ver "Permissões").
 >
-> `build_monthly_grid` é então chamado com `gerencia_id=None` **+ `allowed_user_ids`** (`:233-241`).
+> `build_monthly_grid` é então chamado com `gerencia_id=None` **+ `allowed_user_ids`** (mais abaixo, no mesmo `MonthlyAvailabilityView.get`).
 
 **Exemplos:**
 
@@ -107,13 +107,14 @@ Retorna os bloqueios de disponibilidade visíveis para o usuário.
 | Perfil | Acesso |
 |--------|--------|
 | Superuser | Escopo amplo (`cache_scope="wide"`) |
-| **Controle e DAT** (têm `view_all_availability` pelo vínculo na gerência) | Escopo amplo — **não é bloqueado** (`:188-190`) |
+| **Controle e DAT** (têm `view_all_availability` pelo vínculo na gerência) | Escopo amplo — **não é bloqueado** (`has_wide_scope` no ramo `gerencia_id is None` de `MonthlyAvailabilityView.get`) |
 | Com `gerencia_id` | Apenas se o usuário atua na gerência (papel G/C/A vigente; senão 403) |
-| Sem `gerencia_id`, com vínculo | Usuários das próprias gerências via `EquipeGerencia` (`:192-208`) |
+| Sem `gerencia_id`, com vínculo | Usuários das próprias gerências via `EquipeGerencia.gerencias_de_atuacao` (mesmo ramo, sem `has_wide_scope`) |
 | Sem `gerencia_id`, sem vínculo | **403** — `HasSectorAccess` nega quem não tem papel G/C/A vigente em gerência ativa (`EquipeGerencia.gerencias_de_atuacao`) nem `view_all_availability`; Formador sozinho também dá 403. O ramo "só o próprio usuário" da view não é alcançado |
 
 > ⚠️ O docstring de `MonthlyAvailabilityView` (`views_availability_monthly.py`) ainda repete o texto antigo
-> "Controle: BLOQUEADO". O comentário autoritativo é `:13-19` / `:75-79`. Drift no código.
+> "Controle: BLOQUEADO". O comentário autoritativo é o que abre o ramo `gerencia_id is None` em
+> `MonthlyAvailabilityView.get` ("Sem gerencia_id, restringir escopo..."). Drift no código.
 
 ### Bloqueios (`AvailabilityBlockViewSet`)
 
@@ -194,9 +195,9 @@ monthly:v8:{monthly_ver}:{sha256 do JSON [year, month, role, cache_scope, setor,
   novo em Configurações vale na consulta seguinte. `v6` entrou em 05/10/2026 com a CH com teto;
   `v7`, em 16/10/2026, com o S5 (nome e e-mail sem CPF, `q` com dígito não casa o e-mail).
 
-- `monthly_ver` = `get_monthly_cache_version(request.user.id)` (`:218-220`) — permite invalidar
+- `monthly_ver` = `get_monthly_cache_version(request.user.id)` (em `MonthlyAvailabilityView.get`) — permite invalidar
   por usuário sem varrer o Redis.
-- `cache_scope` ∈ `{"wide", "user:{id}", "gerencia:{id}"}` (`:186-215`) — **substitui** o
+- `cache_scope` ∈ `{"wide", "user:{id}", "gerencia:{id}"}` (decidido no ramo de `gerencia_id` de `MonthlyAvailabilityView.get`) — **substitui** o
   `gerencia_id` cru da chave antiga. É o que impede vazamento entre escopos.
 
 *(Corrigido em 2026-07-24: a chave documentada era `monthly:v3:...:{gerencia_id}:...`, de duas

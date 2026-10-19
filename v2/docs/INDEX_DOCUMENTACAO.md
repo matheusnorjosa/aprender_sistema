@@ -24,7 +24,7 @@ investigação não valem.
 |---------|-------|----------------------|
 | **Models Django** | **39** (app `core`) | 38 `class X(models.Model)` em `v2/backend/apps/core/models/` + `Usuario(AbstractUser)`. Nenhum abstrato, nenhum proxy. Excluídos 27 `models.TextChoices` (enums). `dev_tools` não define models. |
 | **API Endpoints** | ver [API_REFERENCE.md](./API_REFERENCE.md) | Referência **curada**. O inventário exaustivo é o schema OpenAPI em `/api/schema/` (drf-spectacular). Número não duplicado aqui — ADR-017. |
-| **Testes backend** (pytest) | **4.348** funções em **392** arquivos | `def test_` em arquivos `test_*.py` sob `v2/backend/apps/` |
+| **Testes backend** (pytest) | **4.385** funções em **394** arquivos | `def test_` em arquivos `test_*.py` sob `v2/backend/apps/` (recontado em 2026-10-19) |
 | **Testes frontend** (vitest) | **1.095** blocos em **156** arquivos | `it()` / `test()` em `*.test.ts(x)` sob `v2/frontend/src/` |
 | **Testes E2E** (Playwright) | **168** blocos em **29** arquivos | `test()` em `v2/frontend/e2e/**/*.spec.ts` (recontado em 2026-10-19; não conta os `test()` gerados por laço) |
 | **Rotas do frontend** | **52** | atributos `path="…"` em `v2/frontend/src/components/AppRoutes.tsx` |
@@ -383,7 +383,7 @@ o schema OpenAPI servido em `/api/schema/`. Não há número de endpoints mantid
 
 | Camada | Arquivos | Declarações de teste |
 |--------|---------:|---------------------:|
-| Backend (pytest, `v2/backend/apps/`) | 392 | 4.348 |
+| Backend (pytest, `v2/backend/apps/`) | 394 | 4.385 |
 | Frontend (vitest, `v2/frontend/src/`) | 156 | 1.095 |
 | E2E (Playwright, `v2/frontend/e2e/`) | 29 | 168 |
 

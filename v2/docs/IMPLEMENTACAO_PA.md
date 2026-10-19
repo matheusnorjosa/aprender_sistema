@@ -80,7 +80,7 @@ model.save())"* (mesmo `perform_create`).
 
 #### 2. Auditoria Persistente (PA-05)
 - **Arquivo real**: `v2/backend/apps/core/services/solicitacao_approval.py`
-  — `AuditLog.objects.create()` em `:143-155` (approve) e `:214-226` (reject)
+  — `AuditLog.objects.create()` dentro de `approve_solicitacao` (approve) e `reject_solicitacao` (reject)
 - **Endpoints**: métodos `approve` e `reject` do `SolicitacaoViewSet` (`apps/core/views_solicitacao.py`)
 - **Problema original**: métodos só faziam `logger.info()`, sem AuditLog persistente
 - **Código** *(o snippet abaixo é o do PR17; a estrutura atual vive no service acima)*:

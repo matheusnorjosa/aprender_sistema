@@ -6,8 +6,9 @@
 
 import { test, expect } from '@playwright/test';
 
-// Credenciais de teste (usuários E2E)
-const ADMIN_USER = {
+// Credenciais de teste: o coord_e2e (Coordenador, sem is_superuser; seed_e2e_users), com o papel
+// COORDENADOR só na GERENCIA E2E.
+const COORD_USER = {
   username: 'coord_e2e@test.com',
   password: 'testpass123',
 };
@@ -27,12 +28,12 @@ test.describe('Fluxo de Autenticação', () => {
       await expect(page.locator('button[type="submit"]')).toBeVisible();
     });
 
-    test('2. Login com superuser funciona e mostra dashboard', async ({ page }) => {
+    test('2. Login com coordenador funciona e mostra o menu', async ({ page }) => {
       await page.goto('/');
 
       // Preencher formulário
-      await page.fill('input[id="login_username"]', ADMIN_USER.username);
-      await page.fill('input[id="login_password"]', ADMIN_USER.password);
+      await page.fill('input[id="login_username"]', COORD_USER.username);
+      await page.fill('input[id="login_password"]', COORD_USER.password);
 
       // Clicar no botão de login
       await page.click('button[type="submit"]');
@@ -67,8 +68,8 @@ test.describe('Fluxo de Autenticação', () => {
     test('4. Logout funciona corretamente', async ({ page }) => {
       // Login inline (storage vazio, sessão autocontida)
       await page.goto('/');
-      await page.fill('input[id="login_username"]', ADMIN_USER.username);
-      await page.fill('input[id="login_password"]', ADMIN_USER.password);
+      await page.fill('input[id="login_username"]', COORD_USER.username);
+      await page.fill('input[id="login_password"]', COORD_USER.password);
       await page.click('button[type="submit"]');
       await expect(
         page.getByRole('navigation', { name: 'Navegacao principal' })

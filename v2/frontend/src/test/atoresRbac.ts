@@ -11,8 +11,12 @@
  *   remedida com o PR 10, 16/10/2026: o DAT tem o vínculo EQUIPE na gerência DAT e o pacote final,
  *   a Diretoria saiu do painel do Google, e o grupo Superintendência perdeu as capacidades, o que
  *   tira do ator "Gerente da Superintendência" (que tem esse grupo) o Google, os relatórios e excluir;
- *   em produção as gerentes aprovam pelo vínculo e não têm o grupo). 17/10/2026: `manage_lotacao_comum`
- *   (= `manage_admin_registries`) para o superusuário e o DAT.
+ *   em produção as gerentes aprovam pelo vínculo e não têm o grupo; remedida em 19/10/2026 com
+ *   RBAC_FONTE=lotacao, depois do corte do PR 12: o Controle, como o Assistente Administrativo do
+ *   Controle, tem o vínculo EQUIPE na gerência CONTROLE e o pacote dá access_solicitation_approvals;
+ *   a Diretoria tem o vínculo EQUIPE na DIRETORIA, sem mudança; o vínculo EQUIPE não entra em
+ *   `gerencias` do /me, e quem tem o pacote que aprova recebe `can_approve_super`). Decisão de
+ *   17/10/2026 (#2124): `manage_lotacao_comum` (= `manage_admin_registries`) para o superusuário e o DAT.
  *   Mudou o seed ou uma policy? Meça de novo e atualize aqui; o backend trava a fórmula em
  *   `test_rbac_politicas_de_tela.py`.
  *
@@ -118,7 +122,7 @@ export const ATORES_RBAC: readonly AtorRbac[] = [
   },
   {
     ator: 'DAT',
-    user: usuarioDeTeste({ setores: ['DAT'] }),
+    user: usuarioDeTeste({ setores: ['DAT'], aprovador: true }),
     policies: [
       'access_audit_logs',
       'access_availability_blocks',
@@ -148,13 +152,15 @@ export const ATORES_RBAC: readonly AtorRbac[] = [
     ],
   },
   {
+    // PR 12a: vínculo EQUIPE na gerência CONTROLE (D1 de 06/10: todo o Controle aprova).
     ator: 'Controle',
-    user: usuarioDeTeste({ setores: ['Controle'] }),
+    user: usuarioDeTeste({ setores: ['Controle'], aprovador: true }),
     policies: [
       'access_audit_logs',
       'access_availability_blocks',
       'access_controle_section',
       'access_monthly_availability',
+      'access_solicitation_approvals',
       'access_travel',
       'import_availability_blocks',
       'import_compras',
@@ -269,7 +275,7 @@ export const PERSONAS_POR_VINCULO: readonly (Omit<AtorRbac, 'ator'> & { ator: st
   {
     ator: 'Ana (EQUIPE no perfil ADMIN_OPERACIONAL)',
     equivale: 'DAT',
-    user: usuarioDeTeste({}),
+    user: usuarioDeTeste({ aprovador: true }),
     // PR 10: o pacote final do DAT (aprova, cria, exclui, Pré-agenda). Sem `import_spreadsheet`;
     // import_generic_spreadsheet vem do run_daily_operations.
     policies: [
@@ -303,12 +309,14 @@ export const PERSONAS_POR_VINCULO: readonly (Omit<AtorRbac, 'ator'> & { ator: st
   {
     ator: 'Bruno (EQUIPE no perfil CONTROLE)',
     equivale: 'Controle',
-    user: usuarioDeTeste({}),
+    user: usuarioDeTeste({ aprovador: true }),
+    // PR 11: o pacote CONTROLE aprova (approve_solicitation → access_solicitation_approvals).
     policies: [
       'access_audit_logs',
       'access_availability_blocks',
       'access_controle_section',
       'access_monthly_availability',
+      'access_solicitation_approvals',
       'access_travel',
       'import_availability_blocks',
       'import_compras',

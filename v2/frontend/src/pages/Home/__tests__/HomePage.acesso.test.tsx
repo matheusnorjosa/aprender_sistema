@@ -43,7 +43,8 @@ type Pessoa = Pick<AtorRbac, 'user' | 'policies'> & { ator: string };
 const GERENTE_DO_SETOR_GERENCIA: Pessoa = {
   ator: 'Gerente do setor Gerência',
   user: usuarioDeTeste({ setores: ['Gerência'], funcoes: ['Gerente'] }),
-  policies: ['access_monthly_availability', 'create_solicitation'], // o que o backend devolve
+  // O que o backend devolve (medido em 19/10/2026, RBAC_FONTE=lotacao): grupos sem vínculo = nada.
+  policies: [],
 };
 
 const ESPERADO: Record<string, readonly Cartao[]> = {
@@ -59,7 +60,8 @@ const ESPERADO: Record<string, readonly Cartao[]> = {
   // E1: perde Enviar/Minhas (sem create_solicitation: a rota negava). E2: ganha Desempenho.
   // PR 10: o DAT aprova e cria (pacote final do administrador operacional).
   DAT: ['Solicitações de Aprovação', 'Desempenho da Equipe', 'Meus Eventos', 'Enviar Solicitação', 'Minhas Solicitações'],
-  Controle: ['Meus Eventos'],
+  // PR 12a: vínculo EQUIPE na gerência CONTROLE; o pacote aprova (D1 de 06/10).
+  Controle: ['Solicitações de Aprovação', 'Meus Eventos'],
   Diretoria: ['Desempenho da Equipe', 'Meus Eventos'], // E2: ganha
   // E1: ganha Enviar/Minhas (create_solicitation).
   'Gerente da Superintendência': ['Solicitações de Aprovação', 'Meus Eventos', 'Enviar Solicitação', 'Minhas Solicitações'],
@@ -68,8 +70,9 @@ const ESPERADO: Record<string, readonly Cartao[]> = {
   'Apoio de Coordenação': ['Meus Eventos', 'Enviar Solicitação', 'Minhas Solicitações'],
   Formador: ['Meus Eventos'],
   'Assistente Administrativo Controle': ['Solicitações de Aprovação', 'Meus Eventos'],
-  // E2: perde Desempenho (sem view_team_dashboard: a rota negava). E1: ganha Enviar/Minhas.
-  'Gerente do setor Gerência': ['Meus Eventos', 'Enviar Solicitação', 'Minhas Solicitações'],
+  // E2: perde Desempenho (sem view_team_dashboard: a rota negava). Desde o PR 12 os grupos
+  // não dão poder e ela não tem vínculo: fica só com o cartão aberto a todos.
+  'Gerente do setor Gerência': ['Meus Eventos'],
 };
 
 const PESSOAS: readonly Pessoa[] = [...ATORES_RBAC, GERENTE_DO_SETOR_GERENCIA];

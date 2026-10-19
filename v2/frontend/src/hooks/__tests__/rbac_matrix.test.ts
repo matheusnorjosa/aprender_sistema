@@ -32,7 +32,14 @@ const ESPERADO: Record<NomeDoAtor, readonly Flag[]> = {
   Superuser: FLAGS,
   // PR 10: o DAT é o administrador operacional (pacote final): aprova, cria, exclui, sem a compra.
   DAT: FLAGS,
-  Controle: ['canAccessAvailabilityBlocks', 'canAccessMonthlyAvailability', 'canAccessTravel', 'canViewComprasStats'],
+  // PR 12a: vínculo EQUIPE na gerência CONTROLE; o pacote aprova (D1 de 06/10).
+  Controle: [
+    'canAccessApprovals',
+    'canAccessAvailabilityBlocks',
+    'canAccessMonthlyAvailability',
+    'canAccessTravel',
+    'canViewComprasStats',
+  ],
   Diretoria: ['canViewComprasDashboard'],
   // PR 10: o grupo Superintendência perdeu `execute_restricted_operations` (migration 0126).
   'Gerente da Superintendência': [

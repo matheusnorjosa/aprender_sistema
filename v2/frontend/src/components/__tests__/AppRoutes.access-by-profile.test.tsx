@@ -207,11 +207,14 @@ const ACTORS: ActorSnapshot[] = [
     },
   },
   {
+    // PR 12a: o Controle tem o vínculo EQUIPE na gerência CONTROLE e o pacote aprova (D1 de 06/10).
     actor: 'Controle',
     expectedAccess: {
       ...NEGA_TUDO,
       '/dashboards/gcal': true,
+      '/solicitacoes/aprovacoes': true,
       ...ESCOPO,
+      [EDITAR]: true,
       '/controle': true,
       ...COMPRAS,
     },
@@ -318,8 +321,8 @@ describe('AppRoutes — personas por vínculo ≡ grupo (PR 7)', () => {
   }
 });
 
-// Os atores sempre recebem as três juntas; aqui cada policy vem sozinha. Quem a recebe sozinha
-// existe: o Gerente do setor Gerência (grupos Gerência + Gerente, sem vínculo) tem só a da Grade.
+// Os atores sempre recebem as três juntas; aqui cada policy vem sozinha, para provar que cada
+// rota lê só a sua.
 describe('AppRoutes — Grade, Bloqueios e Deslocamentos: cada policy abre a sua rota, e só ela', () => {
   const ROTA_DA_POLICY = {
     access_monthly_availability: '/solicitacoes/disponibilidade',
@@ -384,8 +387,9 @@ describe('AppRoutes — Forbidden é mensagem genérica (OWASP)', () => {
     }
   });
 
-  test('Forbidden em /solicitacoes/aprovacoes (Controle puro) não vaza policy', async () => {
-    renderRotaDoAtor('/solicitacoes/aprovacoes', atorRbac('Controle'));
+  test('Forbidden em /solicitacoes/aprovacoes (só o grupo Controle, sem vínculo) não vaza policy', async () => {
+    // Desde o PR 12 o grupo é etiqueta: sem o vínculo, o backend devolve policies [].
+    renderRoute('/solicitacoes/aprovacoes', usuarioDeTeste({ setores: ['Controle'] }), []);
     expect(await screen.findByText(FORBIDDEN_TEXT)).toBeInTheDocument();
     for (const pat of FORBIDDEN_LEAKAGE_PATTERNS) {
       expect(screen.queryByText(pat)).not.toBeInTheDocument();

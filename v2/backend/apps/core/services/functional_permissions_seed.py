@@ -167,9 +167,9 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
         label="Administrar ações internas",
         description=(
             "CRUD de templates de ações, ciclos, instâncias e notificações "
-            "internas. Feature em desenvolvimento — capability sem grupos "
-            "atribuídos por padrão (apenas superuser bypassa por ora). Quando "
-            "a feature for liberada, atribuir via admin UI ao papel correto."
+            "internas. Feature em desenvolvimento — capability sem grupos e "
+            "fora de todo pacote de perfil (apenas superuser bypassa por ora). "
+            "Liberar = PR que põe a capacidade no pacote de um perfil (D4 do ADR-020)."
         ),
         category="cadastros_administrativos",
         group_names=(),
@@ -208,7 +208,7 @@ FUNCTIONAL_PERMISSIONS_SEED: tuple[FunctionalPermissionSeed, ...] = (
         label="Criar solicitações sem compra",
         description=(
             "Criar e editar evento em município e projeto sem compra que os libere (isenção da regra da "
-            "compra). Sem grupo atribuído por padrão: só o superusuário passa."
+            "compra). Sem grupo: vem do pacote do perfil administrador operacional e do superusuário."
         ),
         category="solicitacao",
         group_names=(),

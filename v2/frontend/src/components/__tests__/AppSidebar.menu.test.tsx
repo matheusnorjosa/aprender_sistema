@@ -144,10 +144,12 @@ const ACTORS: ActorSnapshot[] = [
     expectedSolicitacoesChildren: ['Minhas Solicitações', 'Nova Solicitação'],
   },
   {
+    // PR 12a: vínculo EQUIPE na gerência CONTROLE; o pacote aprova (D1 de 06/10).
     actor: 'Controle',
     expectedVisible: [
       'Página Inicial',
       'Meus Eventos',
+      'Aprovações',
       'Bloqueios',
       'Controle',
       'Deslocamentos',

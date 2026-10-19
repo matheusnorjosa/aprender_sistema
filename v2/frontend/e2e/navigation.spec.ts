@@ -5,7 +5,7 @@
  * Autenticação é feita automaticamente via auth.setup.ts
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { waitForAppReady } from './helpers/wait';
 
 test.describe('Navegação Principal', () => {
@@ -42,9 +42,13 @@ test.describe('Navegação Principal', () => {
     await expect(page.getByRole('main')).toBeVisible();
   });
 
-  test('6. Aprovações carrega para superuser', async ({ page }) => {
+  test('6. Aprovações carrega para a aprovadora', async ({ authedPage }) => {
+    // O storageState padrão (coord_e2e) não aprova: a tela cairia em "Recurso indisponível" dentro
+    // do <main>. super_geral tem o vínculo GERENTE na SUPERINTENDENCIA (aprova pela lotação).
+    const page = await authedPage('super_geral');
     await page.goto('/aprovacoes');
     await expect(page.getByRole('main')).toBeVisible();
+    await expect(page.getByText('Recurso indisponível')).toHaveCount(0);
   });
 
   test('7. Pré-Agenda carrega', async ({ page }) => {
@@ -79,11 +83,6 @@ test.describe('Navegação Principal', () => {
 
   test('13. Painel de Controle carrega', async ({ page }) => {
     await page.goto('/controle');
-    await expect(page.getByRole('main')).toBeVisible();
-  });
-
-  test('14. Relatórios ETL carrega', async ({ page }) => {
-    await page.goto('/dat/etl-reports');
     await expect(page.getByRole('main')).toBeVisible();
   });
 });

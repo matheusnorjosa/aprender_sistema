@@ -352,27 +352,21 @@ class TestMonthlyAvailabilityViewMultiSector(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
-@pytest.mark.skip(
-    reason=(
-        "Issue #1221 (Epic 1 RBAC Access Policy Realignment): após mudança de "
-        "`IsAuthenticated` para `HasPerm('view_all_availability')` em "
-        "AvailabilityBlockViewSet, usuário comum sem perm é 403 GLOBAL. "
-        "O cenário 'multi-sector data scope para usuários comuns' não existe "
-        "mais — quem tem view_all_availability é privileged e vê tudo."
-    )
-)
 @pytest.mark.django_db
 class TestAvailabilityBlockViewSetMultiSector(TestCase):
-    """Testes para AvailabilityBlockViewSet filtro por gerência (conforme plano Seção 3.4).
-    OBSOLETO após Issue #1221 — ver docstring do skip."""
+    """Escopo do AvailabilityBlockViewSet por papel vigente (P9-1; PR 12: o poder vem da lotação).
+
+    O endpoint é `IsAuthenticated`. Privilegiado (`view_all_availability`: superusuário, Controle pelo
+    pacote) vê todos; gerente, coordenadora e apoio veem os bloqueios das pessoas das gerências onde têm o
+    papel; a formadora, só os próprios.
+    """
 
     def setUp(self):
         """Cria fixtures de teste."""
         self.client = APIClient()
 
-        # Criar grupos (get_or_create para evitar duplicatas)
+        # O grupo é etiqueta; o poder do Controle vem do vínculo EQUIPE na gerência CONTROLE.
         self.controle_group = GroupFactory(name="Controle")
-        self.superintendencia_group = GroupFactory(name="Superintendência")
 
         # Criar gerências com nomes únicos para este teste
         self.gerencia_vidas, _ = Gerencia.objects.get_or_create(
@@ -433,6 +427,20 @@ class TestAvailabilityBlockViewSetMultiSector(TestCase):
             cpf=f"66{unique_suffix[:9]}",
         )
         self.user_controle.groups.add(self.controle_group)
+        com_pacote_do_controle(self.user_controle)
+
+        # Coordenadora da gerência Vidas: vê os bloqueios das pessoas da gerência (P9-1).
+        self.coord_vidas = UsuarioFactory(
+            username=f"coord_block_{unique_suffix}",
+            email=f"coord_block_{unique_suffix}@test.com",
+            password="test123",
+            cpf=f"44{unique_suffix[:9]}",
+        )
+        EquipeGerencia.objects.create(
+            gerencia=self.gerencia_vidas,
+            usuario=self.coord_vidas,
+            papel="COORDENADOR",
+        )
 
         # Criar bloqueios para os usuários de teste
         self.block_vidas = AvailabilityBlock.objects.create(
@@ -468,8 +476,8 @@ class TestAvailabilityBlockViewSetMultiSector(TestCase):
         self.assertIn(self.block_vidas.id, block_ids)
         self.assertIn(self.block_fluir.id, block_ids)
 
-    def test_user_sees_only_same_gerencia_blocks(self):
-        """Usuário não-privilegiado vê apenas bloqueios da sua gerência."""
+    def test_formadora_sees_only_own_blocks(self):
+        """P9-1: a formadora vê só os próprios bloqueios, nem os da colega da mesma gerência."""
         self.client.force_authenticate(user=self.user_vidas)
         response = self.client.get("/api/availability-blocks/")
         self.assertEqual(response.status_code, 200)
@@ -477,11 +485,22 @@ class TestAvailabilityBlockViewSetMultiSector(TestCase):
         results = response.data.get("results", response.data)
         block_ids = [b["id"] for b in results]
         self.assertIn(self.block_vidas.id, block_ids)
-        # Verificar que NÃO vê o bloqueio de outra gerência
+        self.assertNotIn(self.block_vidas_peer.id, block_ids)
+        self.assertNotIn(self.block_fluir.id, block_ids)
+
+    def test_coordenadora_sees_only_same_gerencia_blocks(self):
+        """P9-1: a coordenadora vê os bloqueios das pessoas da sua gerência, e não os de outra."""
+        self.client.force_authenticate(user=self.coord_vidas)
+        response = self.client.get("/api/availability-blocks/")
+        self.assertEqual(response.status_code, 200)
+        results = response.data.get("results", response.data)
+        block_ids = [b["id"] for b in results]
+        self.assertIn(self.block_vidas.id, block_ids)
+        self.assertIn(self.block_vidas_peer.id, block_ids)
         self.assertNotIn(self.block_fluir.id, block_ids)
 
     def test_controle_user_sees_all_blocks(self):
-        """Controle é privilegiado e vê todos os bloqueios (conforme plano)."""
+        """Controle (vínculo EQUIPE na gerência CONTROLE) tem view_all_availability e vê todos."""
         self.client.force_authenticate(user=self.user_controle)
         response = self.client.get("/api/availability-blocks/")
         self.assertEqual(response.status_code, 200)
@@ -540,7 +559,7 @@ class TestAvailabilityBlockViewSetMultiSector(TestCase):
         self.assertTrue(AvailabilityBlock.objects.filter(id=self.block_vidas_peer.id).exists())
 
     def test_controle_can_update_peer_block(self):
-        """Perfil Controle continua podendo editar bloqueio de terceiros."""
+        """Controle pelo pacote pode delegar e, por isso, editar bloqueio de terceiro (GAP-1)."""
         self.client.force_authenticate(user=self.user_controle)
         response = self.client.patch(
             f"/api/availability-blocks/{self.block_vidas_peer.id}/",

@@ -25,8 +25,10 @@ from apps.core.rbac.matrix import (
     ACTORS,
     APOIO,
     ASST_ADMIN_CONTROLE,
+    CONTROLE,
     COORDENADOR,
     DAT,
+    DIRETORIA,
     FORMADOR,
     GERENTE,
     GERENTE_SUPER,
@@ -99,10 +101,20 @@ def _make_user_for_actor(actor: str) -> Usuario:
 
     # PR 11 das permissões: o Assistente Administrativo do Controle de produção (u7) tem o vínculo EQUIPE
     # na gerência CONTROLE (perfil CONTROLE), e é dele que vem a aprovação. O par de grupos não aprova.
-    if actor == ASST_ADMIN_CONTROLE:
+    # PR 12a: o ator CONTROLE também tem o vínculo (quem é do Controle trabalha na gerência CONTROLE; D1 de
+    # 06/10: todo o Controle aprova). O grupo é etiqueta: no corte (PR 12) ele não dá poder.
+    if actor in (CONTROLE, ASST_ADMIN_CONTROLE):
         gerencia, _ = Gerencia.objects.get_or_create(nome="CONTROLE", defaults={"nome_setor": "Controle"})
         if gerencia.perfil != Gerencia.Perfil.CONTROLE:
             gerencia.perfil = Gerencia.Perfil.CONTROLE
+            gerencia.save(update_fields=["perfil"])
+        EquipeGerencia.objects.create(gerencia=gerencia, usuario=user, papel="EQUIPE", ativo=True)
+
+    # PR 12a: a Diretoria trabalha na gerência DIRETORIA (perfil DIRETORIA, pacote igual ao grupo do seed).
+    if actor == DIRETORIA:
+        gerencia, _ = Gerencia.objects.get_or_create(nome="DIRETORIA", defaults={"nome_setor": "Diretoria"})
+        if gerencia.perfil != Gerencia.Perfil.DIRETORIA:
+            gerencia.perfil = Gerencia.Perfil.DIRETORIA
             gerencia.save(update_fields=["perfil"])
         EquipeGerencia.objects.create(gerencia=gerencia, usuario=user, papel="EQUIPE", ativo=True)
 

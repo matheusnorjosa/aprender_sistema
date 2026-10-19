@@ -74,6 +74,7 @@ def _check(user, target_id, municipio_id=None):
 class TestD9CheckAvailabilityForOthers:
     """D9 (PR 2 RBAC hardening): expandir consulta de conflito para Coord/Gerente Sup."""
 
+    @pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
     def test_super_geral_consulta_formador(self):
         """Sup com approve_solicitation (sem create): consulta formador → 200.
 

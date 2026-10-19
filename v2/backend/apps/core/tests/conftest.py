@@ -118,3 +118,16 @@ def hoje_importador_fixo(monkeypatch):
     from apps.core.services import export_contract_importer
 
     monkeypatch.setattr(export_contract_importer, "_hoje", lambda: date(2026, 1, 1))
+
+
+@pytest.fixture
+def modo_uniao():
+    """Fixa `RBAC_FONTE = "uniao"` (a volta de emergência do PR 12): o grupo soma capacidade e abre tela.
+
+    Para testes da mecânica grupo → capacidade (grupo de teste com capacidade avulsa, cache por grupo) e dos
+    retratos de transição medidos no modo soma. O padrão da suíte é "lotacao", o modo de produção.
+    """
+    from django.test import override_settings
+
+    with override_settings(RBAC_FONTE="uniao"):
+        yield

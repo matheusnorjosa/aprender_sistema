@@ -83,6 +83,8 @@ def test_perfil_permitido_so_tem_perfis_com_pacote():
     assert PERFIL_PERMITIDO == {
         "GERENCIA DAT": Gerencia.Perfil.ADMIN_OPERACIONAL,
         "CONTROLE": Gerencia.Perfil.CONTROLE,
+        # PR 12 (dúvida 2 do dono: sim): o caminho da Diretoria pelo lugar.
+        "DIRETORIA": Gerencia.Perfil.DIRETORIA,
     }
 
 

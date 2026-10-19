@@ -28,7 +28,7 @@ from googleapiclient.errors import HttpError
 from apps.core.models import GoogleOAuthCredential, Solicitacao
 from apps.core.services.gcal_oauth_client import OAuthCalendarClient, resolve_publish_calendar_id
 from apps.core.services.oauth.token_manager import encrypt_token
-from apps.core.tests.factories import GroupFactory, SolicitacaoFactory, UsuarioFactory
+from apps.core.tests.factories import GroupFactory, SolicitacaoFactory, UsuarioFactory, com_pacote_do_controle
 
 pytestmark = pytest.mark.django_db
 
@@ -118,6 +118,7 @@ def test_calendar_accessible_500_propaga():
 def _controle_conectado(default_calendar_id=""):
     user = UsuarioFactory()
     user.groups.add(GroupFactory(name="Controle"))
+    com_pacote_do_controle(user)
     GoogleOAuthCredential.objects.create(
         user=user,
         google_email="controle@aprendereditora.com.br",

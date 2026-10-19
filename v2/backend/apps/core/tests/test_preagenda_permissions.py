@@ -27,6 +27,7 @@ from apps.core.tests.factories import (
     TipoEventoFactory,
     UsuarioFactory,
     com_pacote_do_dat,
+    com_vinculo_dos_grupos,
 )
 
 pytestmark = pytest.mark.django_db
@@ -42,6 +43,7 @@ def make_user_in_group(name="Controle"):
     )
     g = GroupFactory(name=name)
     u.groups.add(g)
+    com_vinculo_dos_grupos(u)
     return u
 
 

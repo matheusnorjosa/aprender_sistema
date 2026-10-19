@@ -3,7 +3,11 @@ Capability Policy Layer (Epic 4.1, Issue #1232).
 
 Implementa a 3ª camada NIST RBAC do projeto:
 
-    User → Roles (Groups) → Capabilities (PermissaoFuncional) ← Policies ← Views
+    User → Lotação (vínculo + perfil da gerência) → Capabilities (PermissaoFuncional) ← Policies ← Views
+
+Desde o PR 12 das permissões (ADR-020, o corte) o grupo Django não dá capacidade nem abre tela: as
+capacidades vêm de `services/rbac_permissions.capacidades_sem_cache` (pacote do perfil + direitos do
+papel). `settings.RBAC_FONTE = "uniao"` é a volta de emergência e soma os grupos de novo.
 
 Views referenciam `permission_classes = [CanXxx]` em vez de empilhar
 `HasPerm("a") | HasPerm("b") | HasPerm("c")`. Cada Policy é mapeada para
@@ -55,6 +59,7 @@ from apps.core.rbac.helpers import (
     user_has_any_perm,
     user_is_gerente_superintendencia,
 )
+from apps.core.services.rbac_permissions import grupos_dao_poder
 
 # ============================================================================
 # SSOT: matriz declarativa Policy → capabilities elegíveis (OR semantics)
@@ -91,8 +96,9 @@ COMPOSITE_POLICY_KEYS: Final[frozenset[str]] = frozenset(
 )
 
 # Telas de escopo (PR 7 das permissões, 15/10/2026): Grade Mensal, Bloqueios e Deslocamentos.
-# Abre a tela: a capacidade em ACCESS_POLICIES (view_all_availability) OU um dos grupos de setor
-# abaixo OU um dos papéis abaixo, vigente em gerência ativa (`EquipeGerencia.gerencias_com_papel`).
+# Abre a tela: a capacidade em ACCESS_POLICIES (view_all_availability) OU um dos papéis abaixo, vigente
+# em gerência ativa (`EquipeGerencia.gerencias_com_papel`). O grupo de setor abaixo só abre no modo
+# "uniao" (`grupos_dao_poder`, a volta de emergência do PR 12).
 # PR 8: o papel substitui o grupo de função e o antigo "vínculo de gestão" (G/C/A). PR 9: Grade e
 # Deslocamentos usam os mesmos papéis do alcance da API (`EquipeGerencia.PAPEIS_DE_ATUACAO`).
 TELAS_DE_ESCOPO: Final[dict[str, tuple[frozenset[str], frozenset[str]]]] = {
@@ -601,11 +607,13 @@ def _abre_tela_de_escopo(
     user: AbstractBaseUser | AnonymousUser,
     key: str,
     capacidades: AbstractSet[str] | None,
+    fonte: str | None = None,
 ) -> bool:
-    """Grade, Bloqueios ou Deslocamentos (`TELAS_DE_ESCOPO`): capacidade OU grupo de setor OU papel vigente.
+    """Grade, Bloqueios ou Deslocamentos (`TELAS_DE_ESCOPO`): capacidade OU papel vigente (OU grupo de setor,
+    só no modo "uniao").
 
-    Sem bypass de superuser (`user_has_policy` decide antes). `capacidades` vale só para a parte da
-    capacidade (simulador `rbac_diff`); grupos e vínculos são os de hoje.
+    Sem bypass de superuser (`user_has_policy` decide antes). `capacidades` e `fonte` valem só para o
+    simulador `rbac_diff`; vínculos e grupos são os de hoje.
     """
     codenames = ACCESS_POLICIES[key]
     if capacidades is not None:
@@ -614,7 +622,7 @@ def _abre_tela_de_escopo(
     elif user_has_any_perm(user, *codenames):
         return True
     setores_da_tela, papeis_da_tela = TELAS_DE_ESCOPO[key]
-    if user.groups.filter(name__in=setores_da_tela).exists():
+    if grupos_dao_poder(fonte) and user.groups.filter(name__in=setores_da_tela).exists():
         return True
     return bool(EquipeGerencia.gerencias_com_papel(user, papeis_da_tela))
 
@@ -687,12 +695,14 @@ def user_has_policy(
     key: str,
     *,
     capacidades: AbstractSet[str] | None = None,
+    fonte: str | None = None,
 ) -> bool:
     """
     True sse o usuário possui a policy identificada por `key`.
 
     `capacidades`: só para o simulador `rbac_diff` (somente leitura). Quando vem, o caso geral
     usa esse conjunto no lugar das capacidades de hoje (que passam pelo cache). None = hoje.
+    `fonte`: só para o simulador (`--simular-fonte`): o modo das telas de escopo. None = `RBAC_FONTE`.
 
     Semântica (idêntica a `_PolicyPermission.has_permission` — esta função
     é a fonte única de verdade; `_PolicyPermission` delega para cá):
@@ -717,7 +727,7 @@ def user_has_policy(
     if key == "access_solicitation_approvals":
         return _user_has_solicitation_approvals(user, capacidades)
     if key in TELAS_DE_ESCOPO:
-        return _abre_tela_de_escopo(user, key, capacidades)
+        return _abre_tela_de_escopo(user, key, capacidades, fonte)
     codenames = ACCESS_POLICIES.get(key)
     if not codenames:
         return False
@@ -730,6 +740,7 @@ def resolve_public_policies(
     user: AbstractBaseUser | AnonymousUser | None,
     *,
     capacidades: AbstractSet[str] | None = None,
+    fonte: str | None = None,
 ) -> list[str]:
     """
     Retorna lista ordenada (alfabética) das `PUBLIC_POLICY_KEYS` que o
@@ -740,9 +751,9 @@ def resolve_public_policies(
     - User regular → subset baseado em capabilities (OR semantics)
 
     Não vaza capability codenames — só keys do registro público.
-    `capacidades`: ver `user_has_policy` (simulador `rbac_diff`).
+    `capacidades` e `fonte`: ver `user_has_policy` (simulador `rbac_diff`).
     """
-    return sorted(k for k in PUBLIC_POLICY_KEYS if user_has_policy(user, k, capacidades=capacidades))
+    return sorted(k for k in PUBLIC_POLICY_KEYS if user_has_policy(user, k, capacidades=capacidades, fonte=fonte))
 
 
 def can_admin_mutate_target(

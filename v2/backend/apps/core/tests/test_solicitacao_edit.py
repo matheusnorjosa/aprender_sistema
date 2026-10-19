@@ -47,6 +47,7 @@ from apps.core.tests.factories import (
     TipoEventoFactory,
     UsuarioFactory,
     com_pacote_do_controle,
+    com_pacote_do_dat,
     com_papel,
     liberar_par,
 )
@@ -141,6 +142,7 @@ def usuario_dat(grupo_dat):
         is_active=True,
     )
     user.groups.add(grupo_dat)
+    com_pacote_do_dat(user)
     com_papel(user, "GERENTE")
     return user
 

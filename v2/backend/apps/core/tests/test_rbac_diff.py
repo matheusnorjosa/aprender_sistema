@@ -97,8 +97,9 @@ def _pessoa(**campos: Any) -> dict[str, Any]:
 
 
 class TestSnapshot:
+    @pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
     def test_usuario_de_grupo_tem_as_capacidades_e_policies_do_grupo(self):
-        u = UsuarioFactory(groups=["DAT"])
+        u = UsuarioFactory(groups=["DAT"], groups__vinculo=False)
 
         p = snapshot_de_poder(usuarios=_so(u))[f"u{u.id}"]
 
@@ -164,6 +165,7 @@ class TestSnapshot:
         for campo in ("superusuario", "grupos", "gerencias_escopo", "vinculos"):
             assert simulado[campo] == hoje[campo], campo
 
+    @pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
     def test_capacidades_de_hoje_igual_a_fonte_da_api(self):
         # Trava de paridade: se a fórmula de `get_user_functional_permissions` mudar (PR 11)
         # e o padrão do simulador não, o `--comparar` pós-deploy mostraria o poder antigo.
@@ -172,7 +174,7 @@ class TestSnapshot:
         dat = _gerencia_real("GERENCIA DAT", "DAT")
         dat.perfil = Gerencia.Perfil.ADMIN_OPERACIONAL
         dat.save()
-        com_grupo = UsuarioFactory(groups=["DAT", "Coordenador"])
+        com_grupo = UsuarioFactory(groups=["DAT", "Coordenador"], groups__vinculo=False)
         sem_grupo = UsuarioFactory()
         com_vinculo = UsuarioFactory(groups=["Formador"])
         com_pacote = UsuarioFactory()
@@ -242,12 +244,12 @@ class TestDiagnostico:
     def test_lista_quem_tem_grupo_de_setor_sem_vinculo_na_gerencia_do_setor(self):
         dat = _gerencia_real("GERENCIA DAT")
         vidas = _gerencia_real("GERENCIA 2", "Vidas")
-        com_vinculo = UsuarioFactory(groups=["DAT"])
+        com_vinculo = UsuarioFactory(groups=["DAT"], groups__vinculo=False)
         _vincula(com_vinculo, dat, "EQUIPE")
-        sem_vinculo = UsuarioFactory(groups=["DAT"])
-        vinculo_noutro_setor = UsuarioFactory(groups=["DAT"])
+        sem_vinculo = UsuarioFactory(groups=["DAT"], groups__vinculo=False)
+        vinculo_noutro_setor = UsuarioFactory(groups=["DAT"], groups__vinculo=False)
         _vincula(vinculo_noutro_setor, vidas, "FORMADOR")
-        inativo = UsuarioFactory(groups=["DAT"], is_active=False)
+        inativo = UsuarioFactory(groups=["DAT"], groups__vinculo=False, is_active=False)
 
         sem = diagnostico_de_lotacao()["grupo_de_setor_sem_vinculo"]["DAT"]
 
@@ -257,7 +259,7 @@ class TestDiagnostico:
         assert f"u{inativo.id}" not in sem
 
     def test_setor_sem_gerencia_lista_todos_do_grupo(self):
-        controle = UsuarioFactory(groups=["Controle"])
+        controle = UsuarioFactory(groups=["Controle"], groups__vinculo=False)
 
         diag = diagnostico_de_lotacao()
 
@@ -279,7 +281,7 @@ class TestDiagnostico:
 
     def test_dat_casa_com_a_gerencia_dat_mesmo_com_setor_canonico_vazio(self):
         dat = _gerencia_real("GERENCIA DAT", "")
-        lotado = UsuarioFactory(groups=["DAT"])
+        lotado = UsuarioFactory(groups=["DAT"], groups__vinculo=False)
         _vincula(lotado, dat, "EQUIPE")
 
         diag = diagnostico_de_lotacao()
@@ -328,7 +330,7 @@ class TestDiagnostico:
 
 class TestComando:
     def test_salvar_e_comparar_sem_mudanca(self, tmp_path: Path):
-        u = UsuarioFactory(groups=["DAT"])
+        u = UsuarioFactory(groups=["DAT"], groups__vinculo=False)
         arq = tmp_path / "antes.json"
 
         saida = _rbac_diff("--salvar", str(arq))
@@ -339,7 +341,7 @@ class TestComando:
         assert "rbac_diff: 0 ganhos, 0 perdas" in _rbac_diff("--comparar", str(arq))
 
     def test_arquivo_e_estavel(self, tmp_path: Path):
-        UsuarioFactory(groups=["DAT"])
+        UsuarioFactory(groups=["DAT"], groups__vinculo=False)
         a, b = tmp_path / "a.json", tmp_path / "b.json"
 
         _rbac_diff("--salvar", str(a))
@@ -349,8 +351,8 @@ class TestComando:
 
     def test_comparar_com_o_banco_mostra_quem_ganha_e_quem_perde(self, tmp_path: Path):
         ganha = UsuarioFactory()
-        perde = UsuarioFactory(groups=["Diretoria"])
-        parado = UsuarioFactory(groups=["DAT"])
+        perde = UsuarioFactory(groups=["Diretoria"], groups__vinculo=False)
+        parado = UsuarioFactory(groups=["DAT"], groups__vinculo=False)
         arq = tmp_path / "antes.json"
         _rbac_diff("--salvar", str(arq))
         ganha.groups.add(Group.objects.get(name="DAT"))
@@ -385,7 +387,7 @@ class TestComando:
 
     def test_diagnostico_imprime_as_medicoes(self):
         dat = _gerencia_real("GERENCIA DAT", "DAT")
-        sem_vinculo = UsuarioFactory(groups=["DAT"])
+        sem_vinculo = UsuarioFactory(groups=["DAT"], groups__vinculo=False)
         UsuarioFactory(groups=["Comercial"])
 
         saida = _rbac_diff("--diagnostico")
@@ -432,7 +434,7 @@ class TestSomenteLeituraESemDadoPessoal:
 
     def test_nada_e_gravado_no_banco_nem_no_cache(self, tmp_path: Path):
         dat = _gerencia("GER DAT RO", "DAT")
-        u = UsuarioFactory(groups=["DAT"])
+        u = UsuarioFactory(groups=["DAT"], groups__vinculo=False)
         _vincula(u, dat, "EQUIPE")
         UsuarioFactory(superuser=True)
         arq = tmp_path / "antes.json"

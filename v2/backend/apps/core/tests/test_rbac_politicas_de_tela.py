@@ -40,7 +40,7 @@ from apps.core.rbac import policies as modulo_policies
 from apps.core.rbac.matrix import ACTOR_GROUPS, ACTORS, SUPERUSER
 from apps.core.rbac.policies import PUBLIC_POLICY_KEYS, resolve_public_policies
 from apps.core.services.rbac_snapshot import diff_snapshots, snapshot_de_poder
-from apps.core.tests.factories import UsuarioFactory
+from apps.core.tests.factories import PACOTE_DO_GRUPO_DE_SETOR, UsuarioFactory
 from apps.core.tests.test_rbac_matrix_living import _make_user_for_actor
 
 pytestmark = pytest.mark.django_db
@@ -182,7 +182,17 @@ def _gerente_com_pacote(nome: str, perfil: str) -> Callable[[], Usuario]:
 
 
 def _so_grupos(ator: str) -> Callable[[], Usuario]:
-    return lambda: UsuarioFactory(groups=ACTOR_GROUPS[ator])
+    """Os grupos do ator: o de função com o papel (#2111), o de setor com pacote sem o vínculo (PR 12a)."""
+
+    def criar() -> Usuario:
+        grupos = ACTOR_GROUPS[ator]
+        usuario = UsuarioFactory(groups=[g for g in grupos if g not in PACOTE_DO_GRUPO_DE_SETOR])
+        for nome in grupos:
+            if nome in PACOTE_DO_GRUPO_DE_SETOR:
+                usuario.groups.add(Group.objects.get_or_create(name=nome)[0])
+        return usuario
+
+    return criar
 
 
 PESSOAS: dict[str, Callable[[], Usuario]] = {
@@ -236,6 +246,7 @@ DELTA_PR10: dict[str, dict[str, bool]] = {
 }
 
 
+@pytest.mark.usefixtures("modo_uniao")  # fórmula do front sobre grupo e vínculo (PR 7/10): modo soma (PR 12)
 class TestPoliciesNovas:
     def test_as_cinco_sao_publicas(self):
         assert set(NOVAS) <= PUBLIC_POLICY_KEYS
@@ -251,7 +262,7 @@ class TestPoliciesNovas:
     def test_so_o_setor_abre_as_compostas_sem_view_all_availability(self, setor):
         """No seed todo DAT/Controle tem `view_all_availability`; sem ela, só o setor decide (fórmula antiga)."""
         PermissaoFuncional.objects.get(codename="view_all_availability").groups.remove(Group.objects.get(name=setor))
-        usuario = UsuarioFactory(groups=[setor])
+        usuario = UsuarioFactory(groups=[setor], groups__vinculo=False)
         me, policies = _me(usuario)
         assert "view_all_availability" not in policies, "pré-condição: o setor é o único caminho"
         assert set(COMPOSTAS) <= set(policies)
@@ -306,6 +317,7 @@ PR10_TELAS_DO_DAT = {"access_solicitation_approvals", "create_solicitation", "ac
 PR11_TELAS_DO_CONTROLE = {"access_solicitation_approvals"}
 
 
+@pytest.mark.usefixtures("modo_uniao")  # fórmula do front sobre grupo e vínculo (PR 7/10): modo soma (PR 12)
 class TestPersonasPorPacote:
     """Quem trabalha numa gerência com perfil vê as mesmas telas de quem tem o grupo."""
 
@@ -316,7 +328,7 @@ class TestPersonasPorPacote:
     )
     def test_mesmas_policies_de_tela_que_o_grupo(self, persona, ator):
         _, da_persona = _me(persona())
-        _, do_grupo = _me(UsuarioFactory(groups=ACTOR_GROUPS[ator]))
+        _, do_grupo = _me(UsuarioFactory(groups=ACTOR_GROUPS[ator], groups__vinculo=False))
         assert set(COMPOSTAS) <= set(da_persona), "Grade, Bloqueios e Deslocamentos vêm pela policy"
         # PR 10: o pacote do DAT é o final; o grupo DAT sozinho não aprova, não cria nem abre o Controle.
         # PR 11: o pacote do Controle aprova; o grupo Controle sozinho não.
@@ -410,6 +422,7 @@ DELTA_MEDIDO: dict[str, dict[str, tuple[bool, bool]]] = {
 }
 
 
+@pytest.mark.usefixtures("modo_uniao")  # fórmula do front sobre grupo e vínculo (PR 7/10): modo soma (PR 12)
 class TestDeltaDasTelasQueTrocaramDeRegra:
     def test_so_as_pessoas_e_telas_listadas_mudam(self):
         delta: dict[str, dict[str, tuple[bool, bool]]] = {}

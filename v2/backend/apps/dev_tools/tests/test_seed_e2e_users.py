@@ -163,6 +163,29 @@ class TestSeedE2EUsersCommand:
         ]
         assert sem_vinculo == []
 
+    def test_grupo_de_setor_com_pacote_vem_com_o_vinculo_do_pacote(self, clean_seed_e2e_state):
+        """PR 12a: persona no grupo DAT ou Controle tem o vínculo EQUIPE na gerência do pacote, como em
+        produção. Depois do corte (PR 12) o grupo não dá poder; persona só com o grupo perderia tudo."""
+        _run_seed_command()
+
+        gerencia_do_grupo = {"DAT": ("GERENCIA DAT", "ADMIN_OPERACIONAL"), "Controle": ("CONTROLE", "CONTROLE")}
+        sem_vinculo = [
+            (usuario.username, grupo.name)
+            for usuario in Usuario.objects.filter(username__endswith="@test.com").prefetch_related("groups")
+            for grupo in usuario.groups.all()
+            if grupo.name in gerencia_do_grupo
+            and not EquipeGerencia.vigentes_em()
+            .filter(
+                usuario=usuario,
+                papel="EQUIPE",
+                gerencia__nome=gerencia_do_grupo[grupo.name][0],
+                gerencia__perfil=gerencia_do_grupo[grupo.name][1],
+            )
+            .exists()
+        ]
+        assert sem_vinculo == []
+        assert Usuario.objects.filter(username="controle_e2e@test.com", groups__name="Controle").exists()
+
     def test_cleanup_remove_persona_com_vinculo(self, clean_seed_e2e_state):
         """`cleanup_e2e_data` apaga super_e2e mesmo com o vínculo GERENTE (FK PROTECT).
 

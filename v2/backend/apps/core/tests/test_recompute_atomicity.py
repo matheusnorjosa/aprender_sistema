@@ -33,6 +33,7 @@ from apps.core.tests.factories import (
     MunicipioFactory,
     ProjetoFactory,
     UsuarioFactory,
+    com_pacote_do_dat,
 )
 
 pytestmark = pytest.mark.django_db
@@ -52,6 +53,7 @@ def projeto():
 def dat_user():
     u = UsuarioFactory(username="dat_ra", cpf="66600000601")
     u.groups.add(GroupFactory(name="DAT"))
+    com_pacote_do_dat(u)
     return u
 
 

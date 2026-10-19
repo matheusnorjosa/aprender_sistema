@@ -20,7 +20,7 @@ from rest_framework.test import APIClient
 import pytest
 
 from apps.core.models import GoogleOAuthCredential
-from apps.core.tests.factories import GroupFactory, UsuarioFactory
+from apps.core.tests.factories import GroupFactory, UsuarioFactory, com_pacote_do_controle
 
 pytestmark = pytest.mark.django_db
 
@@ -29,6 +29,7 @@ def _controle_client() -> tuple[APIClient, object]:
     """APIClient autenticado com grupo Controle (satisfaz CanUseGcal)."""
     user = UsuarioFactory()
     user.groups.add(GroupFactory(name="Controle"))
+    com_pacote_do_controle(user)
     api = APIClient()
     api.force_authenticate(user=user)
     return api, user

@@ -84,8 +84,11 @@ DIREITOS_PAPEL: dict[str, frozenset[str]] = {
 TECNICAS: frozenset[str] = frozenset({"import_spreadsheet"})
 
 # `Gerencia.nome` → único perfil ≠ PADRAO aceito nela. `rbac_diff --auditar` sai com exit 1 para
-# qualquer outro. Cresce no PR que liberar o próximo perfil.
+# qualquer outro. Cresce no PR que liberar o próximo perfil. DIRETORIA entrou no PR 12 (dúvida 2 do dono:
+# sim): depois do corte o grupo Diretoria não dá poder, e o caminho é a gerência DIRETORIA. Hoje ela não
+# existe; o perfil é gravado só por script com ensaio (a API não lê nem grava `perfil`).
 PERFIL_PERMITIDO: dict[str, str] = {
     "GERENCIA DAT": "ADMIN_OPERACIONAL",
     "CONTROLE": "CONTROLE",
+    "DIRETORIA": "DIRETORIA",
 }

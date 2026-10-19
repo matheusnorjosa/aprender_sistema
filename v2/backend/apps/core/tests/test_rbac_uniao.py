@@ -39,7 +39,8 @@ from apps.core.services.rbac_permissions import get_user_functional_permissions
 from apps.core.services.rbac_snapshot import capacidades_de_hoje, snapshot_de_poder
 from apps.core.tests.factories import UsuarioFactory
 
-pytestmark = pytest.mark.django_db
+# PR 12 (T5): a fórmula da soma segue valendo como a volta de emergência (`RBAC_FONTE=uniao`).
+pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("modo_uniao")]
 
 ADMIN_OPERACIONAL = PACOTE["ADMIN_OPERACIONAL"]
 

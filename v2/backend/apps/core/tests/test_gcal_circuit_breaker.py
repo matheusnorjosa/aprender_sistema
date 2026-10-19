@@ -29,7 +29,7 @@ from apps.core.services.gcal.circuit_breaker import (
     reset_circuit,
 )
 from apps.core.services.gcal.utils import _retry_with_circuit_breaker
-from apps.core.tests.factories import GroupFactory, UsuarioFactory
+from apps.core.tests.factories import GroupFactory, UsuarioFactory, com_pacote_do_controle
 
 
 @pytest.fixture(autouse=True)
@@ -160,6 +160,7 @@ class TestCircuitBreakerEndpoint:
         user = UsuarioFactory(username="operator", email="operator@test.com", password="x")
         group = GroupFactory(name="Controle")
         user.groups.add(group)
+        com_pacote_do_controle(user)
         return user
 
     @pytest.fixture

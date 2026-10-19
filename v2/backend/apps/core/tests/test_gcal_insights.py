@@ -27,6 +27,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
 )
 
 
@@ -66,6 +67,7 @@ class TestGCalInsights(TestCase):
             cpf="33333333333",
         )
         self.user_controle.groups.add(self.group_controle)
+        com_pacote_do_controle(self.user_controle)
 
         self.user_coordenador = UsuarioFactory(
             username="coordenador_insights",

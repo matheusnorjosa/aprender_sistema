@@ -15,7 +15,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.core.exceptions import APIError, ConflictError, NotFoundError, ServiceUnavailableError, ValidationAPIError
-from apps.core.tests.factories import GroupFactory, UsuarioFactory
+from apps.core.tests.factories import GroupFactory, UsuarioFactory, com_pacote_do_controle
 
 
 class TestCustomExceptionClasses(TestCase):
@@ -130,6 +130,7 @@ class TestGCalHealthErrorHandling(APITestCase):
         )
         group = GroupFactory(name="Controle")
         self.usuario.groups.add(group)
+        com_pacote_do_controle(self.usuario)
         self.client.force_authenticate(user=self.usuario)
 
     @override_settings(GCAL_CLIENT="fake")

@@ -123,6 +123,7 @@ class TestBasicCases:
 
 
 class TestCapabilityDerivedSubsets:
+    @pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
     def test_dat_user_returns_policies_with_manage_admin_registries(self, seeded_db):
         user = _make_user("dat_user", "manage_admin_registries")
         client = APIClient()
@@ -131,6 +132,7 @@ class TestCapabilityDerivedSubsets:
         assert res.status_code == 200
         assert res.json() == _public_policies_for_cap("manage_admin_registries")
 
+    @pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
     def test_diretoria_user_returns_policies_with_view_compras_dashboard(self, seeded_db):
         user = _make_user("dir_user", "view_compras_dashboard")
         client = APIClient()
@@ -139,6 +141,7 @@ class TestCapabilityDerivedSubsets:
         assert res.status_code == 200
         assert res.json() == _public_policies_for_cap("view_compras_dashboard")
 
+    @pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
     def test_controle_user_returns_policies_with_operate_preagenda(self, seeded_db):
         user = _make_user("controle_user", "operate_preagenda")
         client = APIClient()
@@ -288,6 +291,7 @@ class TestMenuPolicies1589:
         for key in self.NEW_KEYS:
             assert key in PUBLIC_POLICY_KEYS, f"{key} deveria estar em PUBLIC_POLICY_KEYS"
 
+    @pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
     def test_controle_user_gets_controle_section_and_gcal(self, seeded_db):
         # Setor Controle recebe operate_preagenda E run_daily_operations no seed.
         user = _make_user("m1589_controle", "operate_preagenda", "run_daily_operations")
@@ -296,6 +300,7 @@ class TestMenuPolicies1589:
         assert "view_gcal_dashboard" in policies
         assert "view_team_dashboard" not in policies  # Controle NÃO é Diretoria/DAT
 
+    @pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
     def test_controle_via_run_daily_only_still_gets_section(self, seeded_db):
         # Robustez: qualquer uma das capabilities de Controle basta.
         user = _make_user("m1589_controle_rdo", "run_daily_operations")
@@ -303,6 +308,7 @@ class TestMenuPolicies1589:
         assert "access_controle_section" in policies
         assert "view_gcal_dashboard" in policies
 
+    @pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
     def test_diretoria_user_gets_team_and_gcal(self, seeded_db):
         """PR 10 (decisão do dono de 02/10, nº 13): a Diretoria sai do painel do Google."""
         user = _make_user("m1589_diretoria", "supervise_operations")
@@ -311,6 +317,7 @@ class TestMenuPolicies1589:
         assert "view_gcal_dashboard" not in policies
         assert "access_controle_section" not in policies  # Diretoria NÃO é Controle
 
+    @pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
     def test_dat_user_gets_team_and_gcal(self, seeded_db):
         user = _make_user("m1589_dat", "manage_admin_registries")
         policies = _policies_for(user)

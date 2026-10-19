@@ -44,7 +44,7 @@ Decisões do dono que entram no modelo:
 
 ## Sequência (13 PRs, meio-termo)
 
-Os PRs 1 a 11 entram antes da liberação; o 12 e o 13, depois.
+Os PRs 1 a 12 entram antes da liberação (o 12 por decisão do dono, B4: o corte antes do teste com pessoas); o 13, depois.
 
 1. Simulador `rbac_diff` + este ADR (somente leitura).
 2. Papel EQUIPE ("Equipe administrativa") no vínculo — mergeado no #2094.
@@ -72,7 +72,15 @@ Os PRs 1 a 11 entram antes da liberação; o 12 e o 13, depois.
     quem alterou a conta do autor não decide por 30 dias, e quem editou campo material não decide. S4 (decisão
     do dono de 16/10): o DAT altera todas as contas menos a de superusuário.
 11. Aprovação com uma fonte só.
-12. Corte: o poder deixa de ler grupos.
+12. Corte: o poder deixa de ler grupos. Feito em 17/10/2026, antes do teste com pessoas (decisão B4):
+    `settings.RBAC_FONTE` com padrão `lotacao` (ausente ou vazia também; inválida derruba a subida). Capacidade,
+    tela e aprovação vêm do superusuário, do pacote do perfil, dos direitos do papel e do vínculo GERENTE na
+    Superintendência; o grupo é etiqueta. Um predicado só (`grupos_dao_poder`) guarda os dois pontos que liam
+    grupo (parcela de grupos das capacidades e setor nas telas de escopo); a chave do cache inclui a fonte. A
+    volta é `RBAC_FONTE=uniao` no Environment da stack, sem deploy de código, medida antes com
+    `rbac_diff --salvar --simular-fonte uniao` (soma os grupos do dia da volta). `PERFIL_PERMITIDO` ganha
+    `DIRETORIA`. "Quem é formadora" no painel e no import de bloqueios, avaliáveis e notificações seguem por
+    cargo até o 13 (hoje grupo = vínculo).
 13. Limpeza do M2M, dos símbolos e dos grupos, 2 a 4 semanas depois do 12.
 
 **Recorte A/B (14/10/2026, decisão técnica sem mudar decisão do dono).** Os PRs 3, 4 e 6 viram
@@ -86,7 +94,7 @@ dois PRs de código, cada um com `rbac_diff` = 0 ganhos e 0 perdas:
   e `rbac_diff --auditar` (checklist pós-deploy) sai com exit 1 se o banco divergir dele ou se
   houver perfil fora de `PERFIL_PERMITIDO`. A D4 se cumpre assim: capacidade muda por migration de
   dados no PR, com `# noqa: RBAC-migration-allowed`.
-- **PR B = 6.** Capacidades = grupos ∪ pacote, sem o setting `RBAC_FONTE` (entra no PR 12).
+- **PR B = 6.** Capacidades = grupos ∪ pacote, sem o setting `RBAC_FONTE` (entrou no PR 12, com padrão `lotacao`).
   Implementado em `rbac_permissions.capacidades_sem_cache`, a função única que a API (por trás do
   cache) e o `rbac_diff` usam: pacote de cada vínculo vigente EQUIPE/GERENTE em gerência com perfil
   ≠ `PADRAO`, sem olhar `Gerencia.ativo`. O cache cai depois do commit quando o vínculo ou a

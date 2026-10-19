@@ -300,6 +300,7 @@ class TestRegraUnica:
         assert c["m3"].id in _municipios(admin, com_compra="true", projeto_id=c["familia_x"].id)
         assert c["outro_y"].id in _projetos(admin, com_compra="true")
 
+    @pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
     def test_capacidade_isenta_quem_a_tem(self, c):
         grupo = Group.objects.create(name="Teste Isencao Compra")
         PermissaoFuncional.objects.get(codename="create_solicitation_without_purchase").groups.add(grupo)

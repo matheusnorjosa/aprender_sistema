@@ -67,7 +67,7 @@ def test_dat_importando_gerente_em_super_recebe_403_e_nao_grava(tmp_path, g1):
 
     # Import pela tela é só do superusuário (02/10/2026): o DAT nem chega ao service.
     assert resp.status_code == 403, resp.content
-    assert not EquipeGerencia.objects.filter(usuario=dat).exists()
+    assert not EquipeGerencia.objects.filter(usuario=dat, gerencia=g1).exists()
 
 
 def test_superusuario_importando_gerente_em_super_nao_grava_e_gera_pendencia(tmp_path, g1, alvo):

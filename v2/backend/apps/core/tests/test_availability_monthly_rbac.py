@@ -30,7 +30,7 @@ from rest_framework.test import APIClient
 import pytest
 
 from apps.core.models import EquipeGerencia, Gerencia, PermissaoFuncional, Usuario
-from apps.core.tests.factories import GroupFactory, UsuarioFactory
+from apps.core.tests.factories import GroupFactory, UsuarioFactory, com_vinculo_dos_grupos
 
 pytestmark = pytest.mark.django_db
 
@@ -59,6 +59,7 @@ def _make_user_with_groups_and_caps(username: str, group_names: list[str], capab
     for gname in group_names:
         group = GroupFactory(name=gname)
         user.groups.add(group)
+        com_vinculo_dos_grupos(user)
         for code in capability_codenames:
             perm = PermissaoFuncional.objects.filter(codename=code).first()
             assert perm is not None, f"PermissaoFuncional '{code}' não está no seed"

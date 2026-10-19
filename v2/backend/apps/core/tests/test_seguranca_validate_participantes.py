@@ -209,10 +209,11 @@ class TestGateEEscopo:
         assert usuarios["formadores_not_found"] == [email]
 
     def test_dat_resolve_pessoa_de_qualquer_gerencia(self, cenario):
-        from apps.core.tests.factories import GroupFactory
+        from apps.core.tests.factories import GroupFactory, com_pacote_do_dat
 
         dat = UsuarioFactory()
         dat.groups.add(GroupFactory(name="DAT"))
+        com_pacote_do_dat(dat)  # PR 12: o poder do DAT vem do vínculo na GERENCIA DAT, não do grupo
         de_fora = UsuarioFactory(email="outra.gerencia@example.invalid")
         com_papel(de_fora, "FORMADOR", GerenciaFactory())
         resp = _post(dat, _payload(cenario, {"formadores": [de_fora.email]}))

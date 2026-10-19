@@ -78,6 +78,14 @@ def root() -> Usuario:
     return UsuarioFactory(superuser=True)
 
 
+@pytest.fixture(params=["lotacao", "uniao"])
+def nos_dois_modos(request, settings) -> str:
+    """PR 12: grupo não aprova no corte nem na volta (`RBAC_FONTE=uniao`). No corte o grupo não dá nada de
+    qualquer jeito; a prova que importa é a da volta, que soma os grupos de novo."""
+    settings.RBAC_FONTE = request.param
+    return request.param
+
+
 def _client(user: Usuario) -> APIClient:
     client = APIClient()
     client.force_authenticate(user=user)
@@ -138,6 +146,7 @@ def test_perfil_da_u7_aprova_pela_capacidade(g27):
     assert solicitation_approval_basis(user) == "capacidade_aprovar"
 
 
+@pytest.mark.usefixtures("nos_dois_modos")
 def test_par_controle_sem_vinculo_nao_aprova():
     """Teste 4: o par de grupos sem o vínculo não aprova (PR 11: grupo não aprova)."""
     user = UsuarioFactory(groups=["Controle", "Assistente Administrativo"], groups__vinculo=False)
@@ -148,6 +157,7 @@ def test_par_controle_sem_vinculo_nao_aprova():
     assert "access_solicitation_approvals" not in policies.json()
 
 
+@pytest.mark.usefixtures("nos_dois_modos")
 def test_par_superintendencia_gerente_sem_vinculo_nao_aprova(g1):
     """Teste 5: o par legado sem GERENTE na g1 não aprova (PR 11: grupo não aprova)."""
     user = UsuarioFactory(groups=["Superintendência", "Gerente"], groups__vinculo=False)
@@ -292,8 +302,9 @@ def test_controle_nao_aprova_a_propria(g27):
     assert resp.data["errors"][0]["code"] == "self_approval_forbidden"
 
 
+@pytest.mark.usefixtures("nos_dois_modos")
 def test_grupo_controle_sozinho_nao_aprova():
-    user = UsuarioFactory(groups=["Controle"])
+    user = UsuarioFactory(groups=["Controle"], groups__vinculo=False)
     assert solicitation_approval_basis(user) is None
 
 

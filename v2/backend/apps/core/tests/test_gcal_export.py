@@ -33,6 +33,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_do_controle,
     com_pacote_do_dat,
 )
 
@@ -60,6 +61,7 @@ class TestGCalExport(TestCase):
             cpf="11111111111",  # CPF único para evitar constraint violation
         )
         self.user_controle.groups.add(self.grupo_controle)
+        com_pacote_do_controle(self.user_controle)
 
         self.user_super = UsuarioFactory(username="super_user", password="testpass123", cpf="22222222222")  # CPF único
         self.user_super.groups.add(self.grupo_super)

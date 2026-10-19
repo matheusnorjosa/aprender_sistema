@@ -41,6 +41,7 @@ from apps.core.tests.factories import (
     SolicitacaoFactory,
     TipoEventoFactory,
     UsuarioFactory,
+    com_pacote_da_diretoria,
     com_pacote_do_dat,
 )
 
@@ -340,6 +341,7 @@ class DATModuleAPITestCase(APITestCase):
         uid = uuid.uuid4().hex[:5]
         cls.dat_user = UsuarioFactory(username=f"dat_user_{uid}", password="test123", cpf=f"666{uid}666")  # 11 chars
         cls.dat_user.groups.add(cls.dat_group)
+        com_pacote_do_dat(cls.dat_user)
 
         uid2 = uuid.uuid4().hex[:5]
         cls.super_user = UsuarioFactory(
@@ -359,6 +361,7 @@ class DATModuleAPITestCase(APITestCase):
             username=f"diretoria_user_{uid4}", password="test123", cpf=f"889{uid4}889"  # 11 chars
         )
         cls.diretoria_user.groups.add(cls.diretoria_group)
+        com_pacote_da_diretoria(cls.diretoria_user)
 
         # Create base data with unique names
         uid = uuid.uuid4().hex[:8]
@@ -424,8 +427,8 @@ class DATCoordenadorAPITests(DATModuleAPITestCase):
         self.assertEqual(response.data["nome"], "Novo Coordenador")
 
     def test_delete_coordenador_dat_user_forbidden(self):
-        """DAT user should NOT delete coordenador (Super only)."""
-        self.client.force_authenticate(user=self.dat_user)
+        """Sem o pacote do DAT, não exclui coordenador (PR 10: o DAT exclui pelo vínculo)."""
+        self.client.force_authenticate(user=self.regular_user)
         url = reverse("core:dat-coordenador-detail", args=[self.coordenador.id])
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
@@ -855,8 +858,8 @@ class DATModulePermissionTests(DATModuleAPITestCase):
         )
 
     def test_dat_user_cannot_delete(self):
-        """DAT user should NOT be able to delete records."""
-        self.client.force_authenticate(user=self.dat_user)
+        """Sem o pacote do DAT, não exclui registros (PR 10: o DAT exclui pelo vínculo)."""
+        self.client.force_authenticate(user=self.regular_user)
 
         acao = DATAcao.objects.create(
             municipio=self.municipio2,  # Use different municipio to avoid constraint

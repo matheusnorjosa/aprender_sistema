@@ -1,8 +1,9 @@
 /**
  * Acesso da pessoa logada — fonte única para menu, rotas, botões e Página Inicial (PR 7 das permissões).
  *
- * - `caps`: as policies de `GET /api/me/policies/`, calculadas no servidor sobre a união
- *   grupos + pacote do perfil da gerência. Toda decisão de "pode ver/fazer" lê daqui.
+ * - `caps`: as policies de `GET /api/me/policies/`, calculadas no servidor sobre a lotação (pacote
+ *   do perfil da gerência + papel vigente; desde o PR 12 o grupo não dá poder). Toda decisão de
+ *   "pode ver/fazer" lê daqui.
  * - `ehSuperusuario`: só onde a regra É o superusuário (importação pela tela, PA-02 do próprio,
  *   campos que só ele grava, widget de debug). Fora disso, use uma policy.
  *

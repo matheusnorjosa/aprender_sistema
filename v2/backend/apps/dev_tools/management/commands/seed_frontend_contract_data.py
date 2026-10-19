@@ -33,11 +33,11 @@ from apps.core.models import (
     DATCoordenador,
     DATRegistro,
     Deslocamento,
+    EquipeGerencia,
     Gerencia,
     Municipio,
     NotificacaoInterna,
     Participation,
-    PermissaoFuncional,
     PlanoFormacoes,
     Produto,
     Projeto,
@@ -109,9 +109,6 @@ class Command(BaseCommand):
         call_command("seed_e2e_users")
 
         dat_group, _ = Group.objects.get_or_create(name="DAT")
-        dashboard_perm = PermissaoFuncional.objects.filter(codename="view_compras_dashboard").first()
-        if dashboard_perm is not None:
-            dashboard_perm.groups.add(dat_group)
 
         dat_user, created = Usuario.objects.update_or_create(
             username="dat_matrix@test.com",
@@ -127,6 +124,15 @@ class Command(BaseCommand):
             dat_user.set_password("testpass123")
             dat_user.save(update_fields=["password"])
         dat_user.groups.set([dat_group])
+        # PR 12a: o poder do DAT vem do vínculo EQUIPE na gerência DAT (perfil ADMIN_OPERACIONAL), criada
+        # como no seed_e2e_users. O painel de compras abre por `manage_admin_registries` (CanViewComprasDashboard).
+        gerencia_dat, _ = Gerencia.objects.update_or_create(
+            nome="GERENCIA DAT",
+            defaults={"nome_setor": "DAT", "perfil": Gerencia.Perfil.ADMIN_OPERACIONAL, "ativo": True},
+        )
+        EquipeGerencia.objects.update_or_create(
+            gerencia=gerencia_dat, usuario=dat_user, papel="EQUIPE", defaults={"ativo": True, "valid_to": None}
+        )
 
         projeto, _ = Projeto.objects.get_or_create(
             codigo="E2E",

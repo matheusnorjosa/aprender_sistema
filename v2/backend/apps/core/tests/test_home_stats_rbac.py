@@ -69,7 +69,7 @@ def _next_username(prefix: str) -> str:
     return f"{prefix}_{_USER_COUNTER['i']}"
 
 
-def _make_user(prefix: str, group_names: list[str], is_superuser: bool = False) -> Usuario:
+def _make_user(prefix: str, group_names: list[str], is_superuser: bool = False, vinculo: bool = True) -> Usuario:
     username = _next_username(prefix)
     return UsuarioFactory(
         username=username,
@@ -78,6 +78,7 @@ def _make_user(prefix: str, group_names: list[str], is_superuser: bool = False) 
         cpf=_next_cpf(),
         superuser=is_superuser,
         groups=group_names,
+        groups__vinculo=vinculo,
     )
 
 
@@ -404,7 +405,7 @@ class TestParityWithLegacyBehavior:
 
     def test_dat_nao_aprova_e_recebe_null(self, world):
         """DAT não tem a policy de aprovação → null (antes contava todos os fluxos)."""
-        dat_user = _make_user("dat_pa", ["DAT"])
+        dat_user = _make_user("dat_pa", ["DAT"], vinculo=False)
         _pendentes_nao_super_e_super(world, world["autor"])
 
         response = _get_home_stats(dat_user)
@@ -433,7 +434,7 @@ class TestParityWithLegacyBehavior:
         """PR 11: o par Controle + Assistente Administrativo sem o vínculo não aprova → null."""
         _pendentes_nao_super_e_super(world, world["autor"])
 
-        response = _get_home_stats(_make_user("par_ctrl", ["Controle", "Assistente Administrativo"]))
+        response = _get_home_stats(_make_user("par_ctrl", ["Controle", "Assistente Administrativo"], vinculo=False))
         assert response.status_code == 200
         assert response.json()["pending_approvals"] is None
 

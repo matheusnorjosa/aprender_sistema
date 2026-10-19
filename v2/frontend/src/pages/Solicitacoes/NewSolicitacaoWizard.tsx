@@ -289,7 +289,17 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   // - links (menu lateral e outros): o clique é segurado antes do `Link` navegar.
   const { pathname } = useLocation();
   useEffect(() => {
-    if (!preenchido) return undefined;
+    if (!preenchido) {
+      if (!entradaExtra.current) return undefined;
+      // Esvaziado com a entrada repetida ainda no histórico: o Voltar a consome (mesma URL, nada
+      // muda na tela) e segue sem perguntar. Preenchido de novo, ela é posta outra vez.
+      const aoVoltarVazio = (): void => {
+        entradaExtra.current = false;
+        window.history.back();
+      };
+      window.addEventListener('popstate', aoVoltarVazio);
+      return () => window.removeEventListener('popstate', aoVoltarVazio);
+    }
     const segurarVoltar = (): void => {
       window.history.pushState(window.history.state, '', window.location.href);
       entradaExtra.current = true;

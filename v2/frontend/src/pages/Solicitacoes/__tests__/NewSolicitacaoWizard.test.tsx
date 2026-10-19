@@ -70,20 +70,25 @@ function MockComboBox({
   }, [lookupFunction]);
 
   return (
-    <button
-      type="button"
-      data-testid={placeholder}
-      disabled={disabled}
-      onClick={() => {
-        if (placeholder.includes('projeto')) {
-          onChange?.({ id: 123, label: 'Projeto X', fluxo: 'SUPER' });
-          return;
-        }
-        onChange?.({ id: 456, label: 'Fortaleza - CE' });
-      }}
-    >
-      {placeholder}
-    </button>
+    <>
+      <button
+        type="button"
+        data-testid={placeholder}
+        disabled={disabled}
+        onClick={() => {
+          if (placeholder.includes('projeto')) {
+            onChange?.({ id: 123, label: 'Projeto X', fluxo: 'SUPER' });
+            return;
+          }
+          onChange?.({ id: 456, label: 'Fortaleza - CE' });
+        }}
+      >
+        {placeholder}
+      </button>
+      {placeholder === 'Busque ou selecione um projeto' && (
+        <button type="button" onClick={() => onChange?.(null)}>Limpar projeto</button>
+      )}
+    </>
   );
 }
 
@@ -379,6 +384,33 @@ describe('NewSolicitacaoWizard - sair do assistente (item 36)', { timeout: 20000
     expect(window.history.length).toBe(entradas + 1);
     unmount();
     voltar.mockRestore();
+    confirmar.mockRestore();
+  });
+
+  test('esvaziar o formulário e apertar Voltar sai de verdade; preencher de novo volta a segurar o Voltar', async () => {
+    const confirmar = vi.spyOn(Modal, 'confirm').mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    const anterior = vi.spyOn(window.history, 'back').mockImplementation(() => {});
+    const { unmount } = render(
+      <MemoryRouter>
+        <NewSolicitacaoWizard />
+      </MemoryRouter>
+    );
+    await preencher();
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar projeto' }));
+
+    // O Voltar consome a entrada repetida (mesma URL): sem nada preenchido, segue o Voltar pedido.
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    expect(confirmar).not.toHaveBeenCalled();
+    expect(anterior).toHaveBeenCalledTimes(1);
+
+    // Preenchido de novo, a entrada repetida volta e o Voltar seguinte pergunta antes de sair.
+    const entradas = window.history.length;
+    await preencher();
+    expect(window.history.length).toBe(entradas + 1);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    expect(confirmar).toHaveBeenCalledTimes(1);
+    unmount();
+    anterior.mockRestore();
     confirmar.mockRestore();
   });
 

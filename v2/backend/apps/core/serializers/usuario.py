@@ -487,7 +487,8 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         - PR B1: audita a concessão/revogação do poder de aprovar solicitações (vínculo GERENTE
           na gerência aprovadora ou, desde o PR 11, vínculo EQUIPE/GERENTE no DAT ou no Controle) —
           antes/depois de grupos + vínculo.
-        - Audita a mudança dos vínculos vigentes (`EquipeGerencia`, antes/depois; 17/10/2026).
+        - Audita a mudança dos vínculos vigentes (`UPDATE` de `Usuario` com `lotacao_antes`/`lotacao_depois`;
+          17/10/2026), que entra na segregação da PA-02.
         """
         base_antes = solicitation_approval_basis(user)
         lotacao_antes = _lotacao_vigente(user)
@@ -545,7 +546,9 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             registrar_auditoria(
                 actor=actor,
                 action=AuditLog.Action.UPDATE,
-                model_name="EquipeGerencia",
+                # `Usuario`: a segregação da PA-02 (`contas_alteradas_por`) lê só esse model_name, e mudar a
+                # lotação de alguém conta como alterar a conta dele.
+                model_name="Usuario",
                 details={"target_user_id": user.pk, "lotacao_antes": lotacao_antes, "lotacao_depois": lotacao_depois},
                 imediato=True,
             )

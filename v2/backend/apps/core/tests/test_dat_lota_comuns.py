@@ -26,6 +26,7 @@ from apps.core.models import AuditLog, EquipeGerencia, Gerencia, Usuario
 from apps.core.rbac.policies import resolve_public_policies
 from apps.core.serializers.usuario import UsuarioAdminSerializer
 from apps.core.services.equipe_gerencia_import import gerencia_reservada, lotacao_reservada
+from apps.core.services.solicitacao_approval import contas_alteradas_por
 from apps.core.tests.factories import (
     GerenciaFactory,
     GroupFactory,
@@ -139,7 +140,7 @@ class TestDatLotaNasComuns:
         assert resp.status_code == status.HTTP_200_OK, resp.data
         assert _vigentes(alvo) == {(comum.id, papel)}
         assert funcao in alvo.groups.all()
-        log = AuditLog.objects.get(action=AuditLog.Action.UPDATE, model_name="EquipeGerencia")
+        log = AuditLog.objects.get(action=AuditLog.Action.UPDATE, details__has_key="lotacao_depois")
         assert log.usuario_id == dat.id
         assert log.details["target_user_id"] == alvo.id
         assert log.details["lotacao_depois"] == [[comum.id, papel]]
@@ -155,7 +156,7 @@ class TestDatLotaNasComuns:
         resp = _patch(dat, alvo, {"group_ids": [], "gerencia_id": comum.id, "equipe_administrativa": True})
         assert resp.status_code == status.HTTP_200_OK, resp.data
         assert _vigentes(alvo) == {(comum.id, "EQUIPE")}
-        assert AuditLog.objects.filter(action=AuditLog.Action.UPDATE, model_name="EquipeGerencia").exists()
+        assert AuditLog.objects.filter(action=AuditLog.Action.UPDATE, details__has_key="lotacao_depois").exists()
 
     def test_coordenador_na_superintendencia_passa(self, dat, g1):
         alvo = UsuarioFactory()
@@ -321,7 +322,7 @@ class TestSalvarSemMudar:
         com_papel(alvo, "FORMADOR", comum)
         resp = _patch(dat, alvo, {"group_ids": [_grupo("Formador").id], "gerencia_id": comum.id})
         assert resp.status_code == status.HTTP_200_OK, resp.data
-        assert not AuditLog.objects.filter(model_name="EquipeGerencia").exists()
+        assert not AuditLog.objects.filter(details__has_key="lotacao_depois").exists()
 
 
 class TestQuemNaoGanha:
@@ -408,3 +409,30 @@ class TestCamposDeLeitura:
         client.force_authenticate(dat)
         assert client.get(f"/api/usuarios-admin/{protegida.id}/").json()["lotacao_reservada"] is True
         assert client.get(f"/api/usuarios-admin/{livre.id}/").json()["lotacao_reservada"] is False
+
+
+class TestLotacaoContaNaSegregacao:
+    """PA-02: mudar só a lotação pela tela de Usuários conta como alterar a conta (`contas_alteradas_por`)."""
+
+    def test_trocar_a_gerencia_sem_mudar_grupo_conta(self, dat):
+        a = GerenciaFactory(setor_canonico="")
+        b = GerenciaFactory(setor_canonico="")
+        coordenador = _grupo("Coordenador")
+        alvo = UsuarioFactory()
+        alvo.groups.add(coordenador)
+        com_papel(alvo, "COORDENADOR", a)
+        resp = _patch(dat, alvo, {"gerencia_id": b.id, "group_ids": [coordenador.id]})
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+        assert _vigentes(alvo) == {(b.id, "COORDENADOR")}
+        assert alvo.id in contas_alteradas_por(dat)
+
+    def test_dar_a_equipe_administrativa_conta(self, dat):
+        a = GerenciaFactory(setor_canonico="")
+        coordenador = _grupo("Coordenador")
+        alvo = UsuarioFactory()
+        alvo.groups.add(coordenador)
+        com_papel(alvo, "COORDENADOR", a)
+        resp = _patch(dat, alvo, {"gerencia_id": a.id, "group_ids": [coordenador.id], "equipe_administrativa": True})
+        assert resp.status_code == status.HTTP_200_OK, resp.data
+        assert _vigentes(alvo) == {(a.id, "COORDENADOR"), (a.id, "EQUIPE")}
+        assert alvo.id in contas_alteradas_por(dat)

@@ -630,6 +630,31 @@ describe('ApprovalsPage', () => {
     expect(screen.queryByText(LISTA_NAO_CARREGOU)).not.toBeInTheDocument();
   }, 20000);
 
+  // Achado do item 36 (19/10/2026): lista que não carregou não é "Não há dados".
+  test('falha ao carregar: o motivo e "Tentar de novo" no lugar das linhas, não o vazio', async () => {
+    vi.mocked(listSolicitacoes).mockRejectedValue(Object.assign(new Error('Erro interno do servidor.'), { status: 500 }));
+
+    renderPage(APROVA);
+
+    const aviso = await screen.findByText('Não foi possível carregar a lista.');
+    expect(screen.getByText('Erro interno do servidor.')).toBeInTheDocument();
+    expect(screen.queryByText('Não há dados')).not.toBeInTheDocument();
+    expect(aviso.closest('[role="alert"]')).not.toBeNull();
+
+    vi.mocked(listSolicitacoes).mockResolvedValue(pagina(1, 1));
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+
+    expect(await screen.findByText('Municipio1')).toBeInTheDocument();
+    expect(screen.queryByText('Não foi possível carregar a lista.')).not.toBeInTheDocument();
+  }, 20000);
+
+  test('vazio de verdade diz que não há solicitação aguardando aprovação', async () => {
+    renderPage(APROVA);
+
+    expect(await screen.findByText('Nenhuma solicitação aguardando aprovação.')).toBeInTheDocument();
+    expect(screen.queryByText('Não foi possível carregar a lista.')).not.toBeInTheDocument();
+  });
+
   // ------------------------------------------------------------------
   // Mapa de acesso 02/10 (P9): o erro ao aprovar diz quem e por quê.
   // ------------------------------------------------------------------

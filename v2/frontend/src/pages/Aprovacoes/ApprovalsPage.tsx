@@ -155,6 +155,14 @@ function rotuloDoEvento(row: Solicitacao): string {
   return [formatFortaleza(row.inicio, 'DD/MM/YYYY'), row.municipio_nome, row.projeto_nome].filter(Boolean).join(' · ');
 }
 
+/** O vazio da lista diz o que não há (o do AntD, "Não há dados", não diz). */
+function textoDoVazio(status: string, busca: string): string {
+  if (busca.trim()) return `Nenhuma solicitação encontrada para "${busca.trim()}".`;
+  if (status === 'aprovado') return 'Nenhuma solicitação aprovada.';
+  if (status === 'reprovado') return 'Nenhuma solicitação reprovada.';
+  return 'Nenhuma solicitação aguardando aprovação.';
+}
+
 /** Quantos eventos a confirmação do lote lista pelo nome; o resto vai na contagem. */
 const EVENTOS_NA_CONFIRMACAO = 10;
 
@@ -164,6 +172,8 @@ export default function ApprovalsPage(): JSX.Element {
   const [total, setTotal] = useState<number>(0);
   // Uma carga pedida pela pessoa recebeu 429: a tela pode não corresponder ao pedido.
   const [cargaFalhou, setCargaFalhou] = useState<boolean>(false);
+  // A carga pedida pela pessoa falhou (fora o 429): o motivo vai no lugar das linhas, não o vazio.
+  const [erroCarga, setErroCarga] = useState<string | null>(null);
 
   const [statusFilter, setStatusFilter] = useState<SolicitacaoStatus | (string & {})>('pendente');
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -233,6 +243,7 @@ export default function ApprovalsPage(): JSX.Element {
       const visiveis = new Set<Key>(results.map((r) => r.id));
       setSelectedRowKeys((keys) => (keys.every((k) => visiveis.has(k)) ? keys : keys.filter((k) => visiveis.has(k))));
       setCargaFalhou(false);
+      setErroCarga(null);
     } catch (error) {
       if (seq !== seqRef.current) return;
       // A página deixou de existir (os últimos itens dela foram decididos): volta uma.
@@ -246,6 +257,13 @@ export default function ApprovalsPage(): JSX.Element {
       if (pausa !== null) {
         pausarPolling(pausa);
         if (!silencioso) setCargaFalhou(true);
+        return;
+      }
+      // Pedida pela pessoa: o motivo e "Tentar de novo" no lugar das linhas (um toast some em 3 s e
+      // a tabela ficava em "Não há dados", como se nada esperasse aprovação). No segundo plano, a
+      // lista que já estava na tela fica, com o toast.
+      if (!silencioso) {
+        setErroCarga((error as Error).message || 'Erro desconhecido.');
         return;
       }
       message.error({
@@ -646,7 +664,7 @@ export default function ApprovalsPage(): JSX.Element {
           {(pollingPausado || cargaFalhou) && <AvisoAtualizacaoPausada cargaFalhou={cargaFalhou} />}
 
           {/* Contagem de pendentes */}
-          {statusFilter === 'pendente' && total > 0 && (
+          {statusFilter === 'pendente' && total > 0 && !erroCarga && (
             <aside aria-label="Contador de pendentes">
               <Paragraph>
                 <Tag color="orange">{total}</Tag> solicitações aguardando aprovação
@@ -714,6 +732,9 @@ export default function ApprovalsPage(): JSX.Element {
               loading={loading}
               rowKey="id"
               nomeDaLinha={rotuloDoEvento}
+              erro={erroCarga}
+              onTentarDeNovo={() => { void loadData(); }}
+              locale={{ emptyText: textoDoVazio(statusFilter, searchTerm) }}
               pagination={{
                 current: page,
                 pageSize,

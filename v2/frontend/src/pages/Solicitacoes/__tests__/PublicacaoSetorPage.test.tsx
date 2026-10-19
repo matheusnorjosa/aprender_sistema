@@ -137,12 +137,16 @@ function renderPage(url = '/solicitacoes/publicacao') {
   );
 }
 
-/** Clica na ação da linha (por aria-label) e confirma no Popconfirm. */
+/**
+ * Clica na ação da linha (por aria-label) e confirma no diálogo. O diálogo é um modal de verdade
+ * (role=dialog, foco preso), não um Popconfirm: o balão não recebia o foco (achado do item 36).
+ */
 async function confirmAction(buttonLabel: RegExp, popTitle: string, okText: string) {
   fireEvent.click(await screen.findByLabelText(buttonLabel));
-  const title = await screen.findByText(popTitle);
-  const popover = title.closest('.ant-popover') as HTMLElement;
-  fireEvent.click(within(popover).getByText(okText));
+  const dialogo = await screen.findByRole('dialog');
+  // O AntD repete o título (um oculto, que nomeia o diálogo): daí o getAll.
+  expect(within(dialogo).getAllByText(popTitle, { exact: false }).length).toBeGreaterThan(0);
+  fireEvent.click(within(dialogo).getByRole('button', { name: okText }));
 }
 
 const originalLocation = window.location;
@@ -389,11 +393,11 @@ describe('PublicacaoSetorPage — conexão e prontidão', () => {
 });
 
 describe('PublicacaoSetorPage — ações', () => {
-  test('(c) confirmar o Popconfirm faz UM POST em /publish/ com corpo {} e recarrega', async () => {
+  test('(c) confirmar o diálogo faz UM POST em /publish/ com corpo {} e recarrega', async () => {
     listResponse = pageOf([makeSolic()]);
     renderPage();
 
-    await confirmAction(/^Publicar: Vidas Em Rede, 10\/10\/2026 09:00/, 'Publicar este evento na agenda da organização?', 'Publicar');
+    await confirmAction(/^Publicar: Vidas Em Rede, 10\/10\/2026 09:00/, 'Publicar na agenda da organização', 'Publicar');
 
     await waitFor(() => expect(actionCalls()).toHaveLength(1));
     const [url, options] = actionCalls()[0] ?? [];
@@ -409,7 +413,7 @@ describe('PublicacaoSetorPage — ações', () => {
       caso: 'PUBLISHED → Atualizar no Google = /resync-gcal/',
       row: { gcal_status: 'PUBLISHED' as const, external_event_id: 'asv27' },
       label: /^Atualizar no Google: Vidas Em Rede/,
-      popTitle: 'Atualizar este evento no Google Agenda?',
+      popTitle: 'Atualizar no Google Agenda',
       ok: 'Atualizar',
       endpoint: '/solicitacoes/7/resync-gcal/',
     },
@@ -417,7 +421,7 @@ describe('PublicacaoSetorPage — ações', () => {
       caso: 'PUBLISHED → Remover do Google = /cancel-gcal/',
       row: { gcal_status: 'PUBLISHED' as const, external_event_id: 'asv27' },
       label: /^Remover do Google: Vidas Em Rede/,
-      popTitle: 'Remover este evento do Google Agenda?',
+      popTitle: 'Remover do Google Agenda',
       ok: 'Remover',
       endpoint: '/solicitacoes/7/cancel-gcal/',
     },
@@ -425,7 +429,7 @@ describe('PublicacaoSetorPage — ações', () => {
       caso: 'ERROR sem id → Tentar de novo = /publish/',
       row: { gcal_status: 'ERROR' as const, external_event_id: null },
       label: /^Tentar de novo: Vidas Em Rede/,
-      popTitle: 'Tentar publicar este evento de novo?',
+      popTitle: 'Tentar publicar de novo',
       ok: 'Tentar de novo',
       endpoint: '/solicitacoes/7/publish/',
     },
@@ -438,6 +442,37 @@ describe('PublicacaoSetorPage — ações', () => {
     await waitFor(() => expect(actionCalls()).toHaveLength(1));
     expect(actionCalls()[0]?.[0]).toBe(endpoint);
     await waitFor(() => expect(listCalls()).toHaveLength(2));
+  });
+
+  test.each([
+    {
+      acao: 'Publicar',
+      row: {},
+      titulo: 'Publicar na agenda da organização: Vidas Em Rede, 10/10/2026 09:00?',
+    },
+    {
+      acao: 'Remover do Google',
+      row: { gcal_status: 'PUBLISHED' as const, external_event_id: 'asv27' },
+      titulo: 'Remover do Google Agenda: Vidas Em Rede, 10/10/2026 09:00?',
+    },
+  ])('$acao: a confirmação é um diálogo que cita o evento, abre no Cancelar e devolve o foco', async ({ acao, row, titulo }) => {
+    listResponse = pageOf([makeSolic(row)]);
+    renderPage();
+
+    const botao = await screen.findByLabelText(new RegExp(`^${acao}: Vidas Em Rede`));
+    botao.focus();
+    fireEvent.click(botao);
+
+    const dialogo = await screen.findByRole('dialog');
+    expect(dialogo).toHaveAccessibleName(titulo);
+    const cancelar = within(dialogo).getByRole('button', { name: 'Cancelar' });
+    await waitFor(() => expect(cancelar).toHaveFocus());
+
+    // Cancelar não publica nada e o foco volta ao botão da linha.
+    fireEvent.click(cancelar);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(actionCalls()).toHaveLength(0);
+    await waitFor(() => expect(botao).toHaveFocus());
   });
 
   test('linha PENDING não oferece ação (publicação em voo)', async () => {
@@ -453,7 +488,7 @@ describe('PublicacaoSetorPage — ações', () => {
     actionResult = () => Promise.reject(apiError(403, { code: 'google_not_connected' }));
     renderPage();
 
-    await confirmAction(/^Publicar: Vidas Em Rede/, 'Publicar este evento na agenda da organização?', 'Publicar');
+    await confirmAction(/^Publicar: Vidas Em Rede/, 'Publicar na agenda da organização', 'Publicar');
 
     await waitFor(() => expect(googleHook.fetchStatus).toHaveBeenCalled());
     expect(message.warning).toHaveBeenCalledWith(
@@ -467,7 +502,7 @@ describe('PublicacaoSetorPage — ações', () => {
     actionResult = () => Promise.reject(apiError(404, { detail: 'Não encontrado.' }));
     renderPage();
 
-    await confirmAction(/^Publicar: Vidas Em Rede/, 'Publicar este evento na agenda da organização?', 'Publicar');
+    await confirmAction(/^Publicar: Vidas Em Rede/, 'Publicar na agenda da organização', 'Publicar');
 
     await waitFor(() =>
       expect(message.error).toHaveBeenCalledWith('Este evento não está mais disponível para você.'),
@@ -481,7 +516,7 @@ describe('PublicacaoSetorPage — ações', () => {
       Promise.reject(apiError(409, { code: 'CONFLICT', detail: 'Evento não está publicado.' }));
     renderPage();
 
-    await confirmAction(/^Remover do Google: Vidas Em Rede/, 'Remover este evento do Google Agenda?', 'Remover');
+    await confirmAction(/^Remover do Google: Vidas Em Rede/, 'Remover do Google Agenda', 'Remover');
 
     await waitFor(() => expect(message.error).toHaveBeenCalledWith('Evento não está publicado.'));
   });
@@ -497,7 +532,7 @@ describe('PublicacaoSetorPage — ações', () => {
       );
     renderPage();
 
-    await confirmAction(/^Publicar: Vidas Em Rede/, 'Publicar este evento na agenda da organização?', 'Publicar');
+    await confirmAction(/^Publicar: Vidas Em Rede/, 'Publicar na agenda da organização', 'Publicar');
 
     await waitFor(() =>
       expect(message.error).toHaveBeenCalledWith(
@@ -512,7 +547,7 @@ describe('PublicacaoSetorPage — ações', () => {
     actionResult = () => Promise.reject(apiError(429, { detail: 'Request was throttled.' }));
     renderPage();
 
-    await confirmAction(/^Publicar: Vidas Em Rede/, 'Publicar este evento na agenda da organização?', 'Publicar');
+    await confirmAction(/^Publicar: Vidas Em Rede/, 'Publicar na agenda da organização', 'Publicar');
 
     await waitFor(() =>
       expect(message.error).toHaveBeenCalledWith('Muitas ações seguidas; aguarde um minuto.'),

@@ -14,7 +14,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { Alert, Button, Card, Empty, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Empty, Modal, Space, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 
 import {
@@ -65,6 +65,7 @@ const OAUTH_ERROR_FALLBACK =
 interface ActionConfig {
   /** Texto do botão; também abre o aria-label (nome acessível contém o visível). */
   label: string;
+  /** Início do título da confirmação; o evento vem depois: "Remover do Google Agenda: <evento>?". */
   confirmTitle: string;
   confirmDescription: string;
   okText: string;
@@ -78,7 +79,7 @@ interface ActionConfig {
 const ACTIONS: Record<GcalRowAction, ActionConfig> = {
   publicar: {
     label: 'Publicar',
-    confirmTitle: 'Publicar este evento na agenda da organização?',
+    confirmTitle: 'Publicar na agenda da organização',
     confirmDescription: 'O evento é criado no calendário oficial da organização.',
     okText: 'Publicar',
     danger: false,
@@ -87,7 +88,7 @@ const ACTIONS: Record<GcalRowAction, ActionConfig> = {
   },
   tentar: {
     label: 'Tentar de novo',
-    confirmTitle: 'Tentar publicar este evento de novo?',
+    confirmTitle: 'Tentar publicar de novo',
     confirmDescription: 'O sistema envia o evento outra vez para o Google Agenda.',
     okText: 'Tentar de novo',
     danger: false,
@@ -96,7 +97,7 @@ const ACTIONS: Record<GcalRowAction, ActionConfig> = {
   },
   atualizar: {
     label: 'Atualizar no Google',
-    confirmTitle: 'Atualizar este evento no Google Agenda?',
+    confirmTitle: 'Atualizar no Google Agenda',
     confirmDescription: 'O evento no Google passa a ter os dados atuais do sistema.',
     okText: 'Atualizar',
     danger: false,
@@ -105,7 +106,7 @@ const ACTIONS: Record<GcalRowAction, ActionConfig> = {
   },
   remover: {
     label: 'Remover do Google',
-    confirmTitle: 'Remover este evento do Google Agenda?',
+    confirmTitle: 'Remover do Google Agenda',
     confirmDescription:
       'O evento sai da agenda da organização; a solicitação continua aprovada no sistema.',
     okText: 'Remover',
@@ -234,6 +235,23 @@ export default function PublicacaoSetorPage(): JSX.Element {
     void load();
   }, [handleActionError, load]);
 
+  // Confirmação num diálogo de verdade (role=dialog, foco preso e devolvido ao botão da linha, Esc):
+  // o Popconfirm não recebia o foco e, pelo teclado, a confirmação ficava fora de alcance (item 36).
+  // Abre no Cancelar e cita o evento; só o OK dispara a ação, nunca a tela sozinha.
+  const [modal, contextoDoModal] = Modal.useModal();
+  const confirmar = useCallback((row: Solicitacao, action: GcalRowAction, evento: string): void => {
+    const config = ACTIONS[action];
+    void modal.confirm({
+      title: `${config.confirmTitle}: ${evento}?`,
+      content: config.confirmDescription,
+      okText: config.okText,
+      okButtonProps: { danger: config.danger },
+      cancelText: 'Cancelar',
+      autoFocusButton: 'cancel',
+      onOk: () => runAction(row, action),
+    });
+  }, [modal, runAction]);
+
   const handleConnect = (): void => {
     window.location.href = GOOGLE_CONNECT_URL;
   };
@@ -322,35 +340,27 @@ export default function PublicacaoSetorPage(): JSX.Element {
             {actions.map((action) => {
               const config = ACTIONS[action];
               return (
-                <Popconfirm
+                <Button
                   key={action}
-                  title={config.confirmTitle}
-                  description={config.confirmDescription}
-                  okText={config.okText}
-                  cancelText="Cancelar"
-                  okButtonProps={{ danger: config.danger }}
-                  onConfirm={() => runAction(row, action)}
+                  size="small"
+                  danger={config.danger}
                   disabled={disabled}
+                  aria-label={`${config.label}: ${evento}`}
+                  onClick={() => confirmar(row, action, evento)}
                 >
-                  <Button
-                    size="small"
-                    danger={config.danger}
-                    disabled={disabled}
-                    aria-label={`${config.label}: ${evento}`}
-                  >
-                    {config.label}
-                  </Button>
-                </Popconfirm>
+                  {config.label}
+                </Button>
               );
             })}
           </Space>
         );
       },
     },
-  ], [ready, runAction]);
+  ], [ready, confirmar]);
 
   return (
     <section className="p-6" aria-labelledby={TITLE_ID}>
+      {contextoDoModal}
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         <Card>
           <header>

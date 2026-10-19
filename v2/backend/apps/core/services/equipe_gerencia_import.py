@@ -38,7 +38,7 @@ from apps.core.imports.normalization import norm_text, normalize_active_flag, no
 from apps.core.imports.row_errors import registrar_erro_import
 from apps.core.models import EquipeGerencia, Gerencia, Usuario
 from apps.core.rbac.helpers import GERENCIA_APROVADORA_NOME
-from apps.core.services.rbac_pacotes import PACOTE, PAPEIS_COM_PACOTE
+from apps.core.services.rbac_pacotes import PACOTE, PAPEIS_COM_PACOTE, PERFIL_PERMITIDO
 from apps.core.services.resolvers import resolve_user_by_email, resolve_user_by_name
 
 # Mapeamento de nomes de setor -> nome_setor canonico
@@ -308,6 +308,29 @@ def vinculo_exige_superusuario(gerencia: Gerencia, papel: str) -> bool:
     return is_vinculo_aprovador(gerencia, papel) or (
         papel in PAPEIS_COM_PACOTE and bool(PACOTE.get(str(gerencia.perfil)))
     )
+
+
+def gerencia_reservada(gerencia: Gerencia) -> bool:
+    """True se lotar nesta gerência, em qualquer papel, é só do superusuário (decisão do dono de 17/10/2026).
+
+    Perfil diferente de PADRAO e APROVACAO (DAT, Controle, Diretoria) ou nome em `PERFIL_PERMITIDO` (vale
+    para a gerência que vai ganhar perfil, mesmo antes de ganhá-lo).
+    """
+    return str(gerencia.perfil) not in ("PADRAO", "APROVACAO") or gerencia.nome in PERFIL_PERMITIDO
+
+
+def lotacao_reservada(gerencia: Gerencia, papel: str) -> bool:
+    """True se o vínculo (gerencia, papel) só o superusuário grava: gerência reservada ou GERENTE na aprovadora.
+
+    O DAT (`manage_lotacao_comum`) lota em todo o resto pela tela de Usuários.
+    """
+    return gerencia_reservada(gerencia) or is_vinculo_aprovador(gerencia, papel)
+
+
+def tem_lotacao_reservada(usuario: Any) -> bool:
+    """True se `usuario` tem vínculo VIGENTE reservado: a lotação dele (inclusive encerrar) é só do superusuário."""
+    vigentes = EquipeGerencia.vigentes_em().filter(usuario=usuario).select_related("gerencia")
+    return any(lotacao_reservada(v.gerencia, v.papel) for v in vigentes)
 
 
 def motivo_vinculo_bloqueado(gerencia: Gerencia, papel: str) -> str:

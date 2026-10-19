@@ -125,9 +125,10 @@ describe('computeCapabilities — flags nomeadas por ator', () => {
       ['canAccessTravel', 'access_travel'],
       ['canExecuteRestrictedOperations', 'execute_restricted_operations'],
       ['canCreateSolicitationWithoutPurchase', 'create_solicitation_without_purchase'],
+      ['canManageLotacaoComum', 'manage_lotacao_comum'],
     ];
-    // Uma flag por PUBLIC_POLICY_KEY do backend (test_rbac_policies_contract.py: 27 chaves).
-    expect(CASES).toHaveLength(27);
+    // Uma flag por PUBLIC_POLICY_KEY do backend (test_rbac_policies_contract.py: 28 chaves).
+    expect(CASES).toHaveLength(28);
     const flags = Object.keys(computeCapabilities([])).filter((k) => k.startsWith('can') && k !== 'can');
     expect(flags.sort()).toEqual(CASES.map(([flag]) => String(flag)).sort());
     for (const [flag, policy] of CASES) {

@@ -24,7 +24,7 @@ from apps.core.constants import FUNCAO_GROUPS, RESERVED_GROUPS, SETOR_GROUPS
 from apps.core.models import AuditLog, EquipeGerencia, Gerencia, GroupClassificacao, PermissaoFuncional
 from apps.core.pii import email_sem_cpf, redact_username
 from apps.core.rbac import can_admin_mutate_target
-from apps.core.rbac.policies import solicitation_approval_basis
+from apps.core.rbac.policies import solicitation_approval_basis, user_has_policy
 from apps.core.services.audit import (
     auditar_assign_groups,
     auditar_privilege_flags,
@@ -33,6 +33,7 @@ from apps.core.services.audit import (
 )
 from apps.core.services.equipe_gerencia import (
     PAPEL_EQUIPE,
+    PAPEL_POR_FUNCAO,
     encerrar_gerente_aprovador,
     encerrar_lotacao,
     papeis_de_grupos,
@@ -40,6 +41,7 @@ from apps.core.services.equipe_gerencia import (
     sync_user_lotacao,
     tem_equipe_administrativa,
 )
+from apps.core.services.equipe_gerencia_import import gerencia_reservada, lotacao_reservada, tem_lotacao_reservada
 from apps.core.services.rbac_permissions import invalidate_user_functional_permissions_cache
 from apps.core.services.rbac_service import get_assignable_group_names, nomes_grupos_funcao
 
@@ -58,6 +60,14 @@ def _vinculo_exibido(user: Any) -> Any:
         if vinculo is not None:
             return vinculo
     return None
+
+
+def _lotacao_vigente(user: Any) -> list[list[Any]]:
+    """Os vínculos vigentes de `user` como `[[gerencia_id, papel], ...]` ordenados (auditoria da lotação)."""
+    return sorted(
+        [gid, papel]
+        for gid, papel in EquipeGerencia.vigentes_em().filter(usuario=user).values_list("gerencia_id", "papel")
+    )
 
 
 class UserSlimSerializer(serializers.ModelSerializer):
@@ -193,6 +203,11 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
     # Papel EQUIPE ("Equipe administrativa") na gerência do form: não vem de função (grupo), o form
     # marca à parte. Ausente = não mexer. A leitura sai em `to_representation`.
     equipe_administrativa = serializers.BooleanField(required=False, write_only=True)
+    # Vínculo reservado vigente (DAT, Controle, Diretoria, Gerente da Superintendência): a lotação desta
+    # conta só o superusuário altera; a tela trava os campos para o DAT (17/10/2026).
+    lotacao_reservada = serializers.SerializerMethodField()
+    # Definido em `validate`: o DAT (`manage_lotacao_comum`) muda a lotação dentro da regra.
+    _lotacao_comum: bool = False
 
     def to_representation(self, instance: Any) -> dict[str, Any]:
         data = super().to_representation(instance)
@@ -232,6 +247,9 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             "papel": v.papel,
         }
 
+    def get_lotacao_reservada(self, obj: Any) -> bool:
+        return tem_lotacao_reservada(obj)
+
     def get_cpf_masked(self, obj: Any) -> str | None:
         """
         Return masked CPF for LGPD compliance.
@@ -266,6 +284,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             "gerencia_id",  # Write-only (cria/atualiza vínculo EquipeGerencia)
             "gerencia_atual",  # Read-only (hidrata a gerência atual no EDIT)
             "equipe_administrativa",  # Papel EQUIPE na gerência do form (lido em to_representation)
+            "lotacao_reservada",  # Read-only (a lotação desta conta só o superusuário altera)
             "date_joined",
             "last_login",
         ]
@@ -348,12 +367,20 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
                         raise serializers.ValidationError({"is_superuser": message})
                     raise serializers.ValidationError({"is_active": message})
 
-        # Marcar "Equipe administrativa" precisa de uma gerência (o vínculo é nela). Só vale para o
-        # superuser: de outro ator o campo é ignorado, como a lotação toda.
+        # Decisão do dono de 17/10/2026: o DAT (`manage_lotacao_comum`) lota nas gerências comuns. Sem a
+        # policy, a lotação de não-superuser segue ignorada; com ela, a mudança fora da regra é 400.
+        self._lotacao_comum = (
+            not self._actor_is_superuser()
+            and user_has_policy(request_user, "manage_lotacao_comum")
+            and self._valida_lotacao_comum(attrs_typed)
+        )
+
+        # Marcar "Equipe administrativa" precisa de uma gerência (o vínculo é nela). Só vale para quem
+        # lota: de outro ator o campo é ignorado, como a lotação toda.
         if (
             attrs_typed.get("equipe_administrativa")
             and attrs_typed.get("gerencia_id") is None
-            and self._actor_is_superuser()
+            and (self._actor_is_superuser() or self._lotacao_comum)
             and not (instance is not None and tem_equipe_administrativa(instance))
         ):
             raise serializers.ValidationError({"gerencia_id": "Escolha a gerência da equipe administrativa."})
@@ -393,10 +420,58 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
     def _actor(self) -> Any:
         return getattr(self.context.get("request"), "user", None)
 
+    def _valida_lotacao_comum(self, attrs: dict[str, object]) -> bool:
+        """Lotação pelo DAT (decisão do dono de 17/10/2026). False: o salvar não muda a lotação (o form
+        reenvia tudo, #2071) e nada é aplicado. True: muda e pode. 400 com o motivo quando não pode.
+
+        Mexe só nas funções de `PAPEL_POR_FUNCAO`, em gerência comum (`lotacao_reservada`), em conta que
+        não é a própria e não tem vínculo reservado vigente (protege também o encerramento).
+        """
+        instance: Any = self.instance
+        antes: set[Any] = set(instance.groups.all()) if instance is not None else set()
+        funcoes = nomes_grupos_funcao()
+        funcoes_antes = {g for g in antes if g.name in funcoes}
+        enviados: set[Any] | None = set(cast(list[Any], attrs["groups"])) if "groups" in attrs else None
+        mexidos = (enviados - antes) | (funcoes_antes - enviados) if enviados is not None else set()
+        gerencia: Any = attrs.get("gerencia_id")
+        exibido = _vinculo_exibido(instance) if instance is not None else None
+        nova_gerencia = gerencia is not None and (exibido is None or exibido.gerencia_id != gerencia.pk)
+        equipe_antes = instance is not None and tem_equipe_administrativa(instance)
+        equipe = attrs.get("equipe_administrativa")
+        equipe_depois = equipe_antes if equipe is None else bool(equipe)
+        if not (mexidos or nova_gerencia or equipe_depois != equipe_antes):
+            return False
+
+        if instance is not None and instance.pk == getattr(self._actor(), "pk", None):
+            raise serializers.ValidationError({"gerencia_id": "A sua própria lotação só o superusuário altera."})
+        if instance is not None and tem_lotacao_reservada(instance):
+            raise serializers.ValidationError(
+                {
+                    "gerencia_id": "Esta pessoa trabalha no DAT, no Controle ou na Diretoria, ou é Gerente da "
+                    "Superintendência: a lotação dela só o superusuário altera."
+                }
+            )
+        fora = sorted(g.name for g in mexidos if g.name not in PAPEL_POR_FUNCAO)
+        if fora:
+            raise serializers.ValidationError({"group_ids": f"Só o superusuário dá ou tira: {', '.join(fora)}."})
+        # Sem `gerencia_id`, a gerência exibida: é a que o próximo salvar do form reenvia (e sincroniza).
+        alvo = gerencia if gerencia is not None else (exibido.gerencia if exibido is not None else None)
+        if alvo is not None:
+            papeis = papeis_de_grupos(enviados if enviados is not None else funcoes_antes)
+            papeis |= {PAPEL_EQUIPE} if equipe_depois else set()
+            if gerencia_reservada(alvo) or any(lotacao_reservada(alvo, p) for p in papeis):
+                raise serializers.ValidationError(
+                    {
+                        "gerencia_id": "Lotar no DAT, no Controle, na Diretoria ou como Gerente da "
+                        "Superintendência só o superusuário pode."
+                    }
+                )
+        return True
+
     def _apply_lotacao(
         self, user: Any, groups: Any, gerencia: Any, actor: Any, before_group_ids: Any, equipe: bool | None = None
     ) -> None:
-        """Aplica grupos + vínculo de gerência (chamado por create/update; superuser-only).
+        """Aplica grupos + vínculo de gerência (chamado por create/update; superuser ou o DAT dentro da regra).
 
         #2071 — o salvar mexe só no que o form mudou (o form mostra as FUNÇÕES e UMA gerência):
         - `group_ids` substitui só os grupos de FUNÇÃO; os demais (setor, permissão funcional) ficam.
@@ -412,8 +487,11 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         - PR B1: audita a concessão/revogação do poder de aprovar solicitações (vínculo GERENTE
           na gerência aprovadora ou, desde o PR 11, vínculo EQUIPE/GERENTE no DAT ou no Controle) —
           antes/depois de grupos + vínculo.
+        - Audita a mudança dos vínculos vigentes (`UPDATE` de `Usuario` com `lotacao_antes`/`lotacao_depois`;
+          17/10/2026), que entra na segregação da PA-02.
         """
         base_antes = solicitation_approval_basis(user)
+        lotacao_antes = _lotacao_vigente(user)
         aprovava = base_antes is not None
         has_gerencia = gerencia is not None and gerencia is not _UNSET
         funcoes = nomes_grupos_funcao()
@@ -463,6 +541,17 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             encerrar_lotacao(user)
         elif has_gerencia and papeis and (nova_lotacao or papeis != papeis_antes or encerrou_gerente):
             sync_user_lotacao(user, gerencia, papeis)
+        lotacao_depois = _lotacao_vigente(user)
+        if lotacao_depois != lotacao_antes:
+            registrar_auditoria(
+                actor=actor,
+                action=AuditLog.Action.UPDATE,
+                # `Usuario`: a segregação da PA-02 (`contas_alteradas_por`) lê só esse model_name, e mudar a
+                # lotação de alguém conta como alterar a conta dele.
+                model_name="Usuario",
+                details={"target_user_id": user.pk, "lotacao_antes": lotacao_antes, "lotacao_depois": lotacao_depois},
+                imediato=True,
+            )
         # PR 10: a base `capacidade_aprovar` lê as capacidades pelo cache, que o `base_antes` acabou
         # de preencher e os sinais só limpam no commit. Limpa antes de ler o "depois" e de novo depois,
         # para não deixar no cache um estado que a transação ainda pode desfazer.
@@ -536,10 +625,10 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             user.set_unusable_password()
             user.save(update_fields=["password"])
 
-        # P0-1 Tier-0 (D-1=2a): membership + lotação são superuser-only. group_ids /
-        # gerencia_id de não-superuser são ignorados (o frontend já não envia — aqui é a
-        # fronteira real). DAT cria a conta comum; grupo/vínculo ficam a cargo do superuser.
-        if self._actor_is_superuser():
+        # P0-1 Tier-0 (D-1=2a): membership + lotação são do superuser. Desde 17/10/2026 o DAT
+        # (`manage_lotacao_comum`) lota nas gerências comuns, validado em `_valida_lotacao_comum`;
+        # de qualquer outro não-superuser, group_ids / gerencia_id são ignorados.
+        if self._actor_is_superuser() or self._lotacao_comum:
             self._apply_lotacao(user, groups, gerencia, actor, before_group_ids=[], equipe=equipe)
 
         return user
@@ -599,9 +688,9 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         if password:
             self._definir_senha_por_admin(user, password, actor, contexto="update")
 
-        # P0-1 Tier-0 (D-1=2a): membership + lotação são superuser-only (ver create()).
-        # group_ids / gerencia_id de não-superuser são ignorados.
-        if self._actor_is_superuser():
+        # P0-1 Tier-0 (D-1=2a): membership + lotação são do superuser e, nas gerências comuns, do
+        # DAT (ver create()). De outro não-superuser, group_ids / gerencia_id são ignorados.
+        if self._actor_is_superuser() or self._lotacao_comum:
             self._apply_lotacao(user, groups, gerencia, actor, before_group_ids=before_group_ids, equipe=equipe)
 
         return user

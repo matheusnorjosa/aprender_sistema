@@ -12,7 +12,7 @@ Regras:
   função: Formador->FORMADOR, Coordenador->COORDENADOR, Gerente->GERENTE,
   Apoio de Coordenação->APOIO; Assistente Administrativo NÃO vira papel).
 - Auto-atribui o grupo de setor cujo nome == `Gerencia.setor_canonico`, quando existir.
-- Superuser-only (mesma trava de `group_ids`, Tier-0).
+- Superuser e, nas gerências comuns, o DAT (`manage_lotacao_comum`, 17/10/2026; test_dat_lota_comuns.py).
 - O form é SSOT da lotação: trocar a gerência encerra o vínculo antigo e abre o novo.
 - PATCH sem `gerencia_id` (ex.: só senha/telefone) NÃO mexe no vínculo.
 """
@@ -127,7 +127,7 @@ class TestCreateUserWithGerencia:
         # Assistente Administrativo não é papel -> nenhum vínculo criado
         assert not EquipeGerencia.objects.filter(usuario=u, gerencia=gerencia_fluir).exists()
 
-    def test_dat_non_superuser_gerencia_ignored(self, api_client, dat, gerencia_fluir):
+    def test_dat_lota_em_gerencia_comum(self, api_client, dat, gerencia_fluir):
         formador = GroupFactory(name="Formador")
         api_client.force_authenticate(dat)
         resp = api_client.post(
@@ -144,9 +144,9 @@ class TestCreateUserWithGerencia:
         )
         assert resp.status_code == status.HTTP_201_CREATED, resp.data
         u = Usuario.objects.get(username="novo_por_dat")
-        # Tier-0: não-superuser não muta membership nem lotação
-        assert not EquipeGerencia.objects.filter(usuario=u).exists()
-        assert u.groups.count() == 0
+        # 17/10/2026: o DAT lota nas gerências comuns (as reservadas em test_dat_lota_comuns.py)
+        assert EquipeGerencia.objects.filter(usuario=u, gerencia=gerencia_fluir, papel="FORMADOR", ativo=True).exists()
+        assert set(u.groups.values_list("name", flat=True)) == {"Formador", "Fluir"}
 
 
 @pytest.mark.django_db

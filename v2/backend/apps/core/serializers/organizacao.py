@@ -22,6 +22,7 @@ from apps.core.rbac.helpers import (
     fluxo_super_fora_da_superintendencia,
 )
 from apps.core.services.equipe_gerencia import SETORES_RESERVADOS, grupos_com_capacidade
+from apps.core.services.equipe_gerencia_import import gerencia_reservada
 from apps.core.services.rbac_pacotes import PERFIL_PERMITIDO
 
 
@@ -197,6 +198,9 @@ class GerenciaSerializer(serializers.ModelSerializer["Gerencia"]):
     gerente_nome = serializers.CharField(source="gerente.get_full_name", read_only=True, allow_null=True)
     projetos_count = serializers.IntegerField(read_only=True, required=False)
     rotulo = serializers.CharField(read_only=True)
+    # Lotar nela, em qualquer papel, é só do superusuário (DAT, Controle, Diretoria; 17/10/2026). A tela de
+    # Usuários a esconde do DAT.
+    lotacao_reservada = serializers.SerializerMethodField()
 
     class Meta:  # type: ignore[misc]
         model = Gerencia
@@ -215,6 +219,7 @@ class GerenciaSerializer(serializers.ModelSerializer["Gerencia"]):
             # Decisão do dono (05/10/2026): False = a Nova Solicitação não pergunta se a pessoa
             # pretende avaliar o formador (vale a gerência do PROJETO do evento).
             "pergunta_avaliar_formador",
+            "lotacao_reservada",
             "projetos_count",
             "created_at",
             "updated_at",
@@ -222,6 +227,9 @@ class GerenciaSerializer(serializers.ModelSerializer["Gerencia"]):
         # setor_canonico_confianca: sinal importado do de-para (RELAY 50, item 8), SEM entrada-direta →
         # read-only. Fora da tela desde o C2b; o campo segue na API.
         read_only_fields = ["created_at", "updated_at", "setor_canonico_confianca"]
+
+    def get_lotacao_reservada(self, obj: Gerencia) -> bool:
+        return gerencia_reservada(obj)
 
     def validate_nome(self, value: str) -> str:
         """PR B1 (anti-escalada): `nome` da gerência aprovadora é chave de autorização.

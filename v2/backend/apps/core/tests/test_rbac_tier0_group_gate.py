@@ -7,7 +7,8 @@ Auditoria 2026-07-17 §4.2: um não-superuser (DAT/Controle) editava a matriz vi
 e criava/renomeava/excluía grupos — tudo sob `manage_purchases_and_materials`.
 
 Invariante: só superuser cria/edita/exclui grupo, edita a matriz, ou muta
-membership (sync_members, assign_groups, `group_ids` no cadastro de usuário).
+membership (sync_members, assign_groups). Exceção (17/10/2026): no cadastro de usuário o DAT dá e
+tira as funções de `PAPEL_POR_FUNCAO` ao lotar nas gerências comuns (test_dat_lota_comuns.py).
 DAT mantém: CRUD de conta comum + LEITURA de grupos (a tela fica read-only).
 """
 
@@ -128,9 +129,9 @@ class TestAssignGroupsTier0Gate:
 
 @pytest.mark.django_db
 class TestUserGroupIdsTier0Gate:
-    """`group_ids` no cadastro de usuário é superuser-only (membership)."""
+    """`group_ids` no cadastro de usuário: o DAT só dá as funções de `PAPEL_POR_FUNCAO` (17/10/2026)."""
 
-    def test_dat_create_user_group_ids_ignored(self, api_client, dat):
+    def test_dat_create_user_grupo_que_nao_e_funcao_400(self, api_client, dat):
         grupo = GroupFactory(name="Superintendência")
         api_client.force_authenticate(dat)
         resp = api_client.post(
@@ -144,18 +145,17 @@ class TestUserGroupIdsTier0Gate:
             },
             format="json",
         )
-        assert resp.status_code == status.HTTP_201_CREATED
-        novo = Usuario.objects.get(username="novo_comum")
-        assert novo.groups.count() == 0  # membership ignorada p/ não-superuser
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert not Usuario.objects.filter(username="novo_comum").exists()
 
-    def test_dat_update_user_group_ids_ignored(self, api_client, dat):
+    def test_dat_update_user_da_funcao(self, api_client, dat):
         target = UsuarioFactory(username="alvo_update", cpf="91000000006")
         grupo = GroupFactory(name="Gerente")
         api_client.force_authenticate(dat)
         resp = api_client.patch(f"/api/usuarios-admin/{target.id}/", {"group_ids": [grupo.id]}, format="json")
         assert resp.status_code == status.HTTP_200_OK
         target.refresh_from_db()
-        assert target.groups.count() == 0
+        assert set(target.groups.values_list("name", flat=True)) == {"Gerente"}
 
     def test_dat_can_still_update_common_user_cadastral(self, api_client, dat):
         target = UsuarioFactory(username="alvo_cad", cpf="91000000007")

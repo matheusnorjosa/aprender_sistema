@@ -52,6 +52,8 @@ export interface Capabilities {
   // Botões: excluir plano de formações e Nova Solicitação sem compra.
   canExecuteRestrictedOperations: boolean;
   canCreateSolicitationWithoutPurchase: boolean;
+  // O DAT lota nas gerências comuns pela tela de Usuários (17/10/2026).
+  canManageLotacaoComum: boolean;
 }
 
 /** Versão pura (sem React) — usada em tests e call sites sem render. */
@@ -89,6 +91,7 @@ export function computeCapabilities(policies: readonly string[]): Capabilities {
     canAccessTravel: can('access_travel'),
     canExecuteRestrictedOperations: can('execute_restricted_operations'),
     canCreateSolicitationWithoutPurchase: can('create_solicitation_without_purchase'),
+    canManageLotacaoComum: can('manage_lotacao_comum'),
   };
 }
 

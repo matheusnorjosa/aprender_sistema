@@ -177,13 +177,12 @@ export default function MySolicitacoesPage(): JSX.Element {
     setPageSize(novoTamanho);
   };
 
-  const handleDelete = useCallback(async (id: ID): Promise<void> => {
+  const handleDelete = useCallback(async (id: ID): Promise<boolean> => {
     try {
       await deleteSolicitacao(id);
       message.success('Solicitação excluída com sucesso!');
-      // A linha (e o botão que tinha o foco) sai: o foco vai para a lista, e não para o body.
-      listaRef.current?.focus();
       void loadData();
+      return true;
     } catch (error) {
       const apiErr = error as ApiErrorResponse;
       if (apiErr.response?.data?.detail) {
@@ -191,12 +190,14 @@ export default function MySolicitacoesPage(): JSX.Element {
       } else {
         message.error('Erro ao excluir solicitação: ' + (error as Error).message);
       }
+      return false;
     }
   }, [loadData]);
 
   // Ação destrutiva: cita a solicitação e começa no Cancelar (ux-principios).
   const confirmarExclusao = useCallback((record: Solicitacao): void => {
     const quando = formatFortaleza(record.inicio, 'DD/MM/YYYY HH:mm');
+    let excluiu = false;
     Modal.confirm({
       title: 'Excluir solicitação?',
       content: `${quando} · ${record.municipio_nome || 'sem município'} · ${record.projeto_nome || 'sem projeto'}. Esta ação não pode ser desfeita.`,
@@ -204,7 +205,14 @@ export default function MySolicitacoesPage(): JSX.Element {
       okType: 'danger',
       cancelText: 'Cancelar',
       autoFocusButton: 'cancel',
-      onOk: () => handleDelete(record.id),
+      onOk: async () => {
+        excluiu = await handleDelete(record.id);
+      },
+      // A linha (e o botão que tinha o foco) sai. O rc-dialog devolve o foco a esse botão ao fim da
+      // animação de saída, antes do afterClose: só aqui o foco vai para a lista, e não para o body.
+      afterClose: () => {
+        if (excluiu) listaRef.current?.focus();
+      },
     });
   }, [handleDelete]);
 

@@ -152,6 +152,38 @@ describe('MySolicitacoesPage — item 36', { timeout: 20000 }, () => {
     confirmar.mockRestore();
   });
 
+  test('depois de excluir, o foco fica na lista mesmo com a recarga ainda em andamento', async () => {
+    const confirmar = vi
+      .spyOn(Modal, 'confirm')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    listSolicitacoesMock
+      .mockResolvedValueOnce(pagina([makeSolic({ id: 7, municipio_nome: 'Crato' })]))
+      .mockImplementation(() => new Promise(() => {})); // rede lenta: a recarga não chega
+    deleteSolicitacaoMock.mockResolvedValue(undefined);
+    renderPage();
+    const excluir = await screen.findByRole('button', { name: 'Excluir: 10/05/2026 · Crato' });
+    const lista = screen.getByRole('region', { name: 'Lista de solicitações' });
+
+    // Cancelar: o rc-dialog devolve o foco ao Excluir (focusTriggerAfterClose) e ele fica lá.
+    excluir.focus();
+    fireEvent.click(excluir);
+    act(() => confirmar.mock.calls[0]![0].afterClose?.());
+    expect(document.activeElement).toBe(excluir);
+
+    // Sim, excluir: ao fim da animação de saída o rc-dialog devolve o foco ao Excluir da linha que
+    // vai sair e só então chama afterClose; o foco tem de terminar na lista.
+    fireEvent.click(excluir);
+    const opcoes = confirmar.mock.calls[1]![0];
+    await act(async () => {
+      await opcoes.onOk?.();
+    });
+    expect(deleteSolicitacaoMock).toHaveBeenCalledWith(7);
+    excluir.focus();
+    act(() => opcoes.afterClose?.());
+    expect(document.activeElement).toBe(lista);
+    confirmar.mockRestore();
+  });
+
   test('evento já no Google Agenda: sem Editar/Excluir, com o motivo e a quem pedir', async () => {
     const informar = vi
       .spyOn(Modal, 'info')

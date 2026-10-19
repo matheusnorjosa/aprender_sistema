@@ -104,7 +104,9 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
   }
   // Cancelar a publicação não devolve a exclusão a uma SUPER que já saiu de pendente.
   if (isSuper && record.status !== 'pendente') {
-    motivos.push('Solicitações do fluxo Superintendência só podem ser excluídas enquanto estão pendentes.');
+    motivos.push(
+      'Solicitações do fluxo Superintendência só podem ser excluídas enquanto estão pendentes. Para tirar o evento, fale com a administração do sistema.'
+    );
   }
   return { podeEditar, podeExcluir, motivos };
 }

@@ -214,6 +214,8 @@ describe('MySolicitacoesPage — item 36', { timeout: 20000 }, () => {
     const texto = String(informar.mock.calls[0]![0].content);
     expect(texto).not.toMatch(/excluir aqui/);
     expect(texto).toContain('Solicitações do fluxo Superintendência só podem ser excluídas enquanto estão pendentes.');
+    // A saída real, a mesma que o backend dá ao recusar a exclusão (perform_destroy).
+    expect(texto).toContain('fale com a administração do sistema');
     informar.mockRestore();
   });
 

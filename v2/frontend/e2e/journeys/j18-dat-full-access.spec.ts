@@ -16,8 +16,10 @@
  * 1. **Canônica**: DAT abre rotas autenticadas comuns → todas carregam
  *    o shell (`<main>`) sem redirecionar para `/login` ou mostrar
  *    `<Forbidden />`.
- * 2. **Borda**: DAT tem flags de menu correspondentes via `/api/me/`
- *    (permissões funcionais retornadas pelo endpoint incluem as de DAT).
+ * 2. **Borda**: `/api/me/policies/` do DAT traz as policies do pacote do
+ *    administrador operacional (`manage_admin_registries`,
+ *    `access_solicitation_approvals`). É essa lista que menu e rotas leem
+ *    (`RequirePolicy`); o grupo `DAT` no `/api/me/` é só etiqueta desde o PR 12.
  * 3. **Operação**: DAT consegue chamar endpoints de manutenção — ex:
  *    `/api/dat/compras-materiais/dashboard/` retorna 200 (canDashboardCompras).
  *
@@ -59,30 +61,29 @@ test.describe(
         // Shell autenticado carregado (role="main" presente no AppShell)
         await expect(page.getByRole('main')).toBeVisible();
 
-        // Não deve ter chegado em <Forbidden /> (rota de 403 do frontend)
-        await expect(page.getByText(/403|forbidden|acesso negado/i)).toHaveCount(0);
+        // Não deve ter chegado na tela genérica do RequirePolicy nem no ErrorBoundary
+        await expect(page.getByText('Recurso indisponível')).toHaveCount(0);
+        await expect(page.getByText('Algo deu errado')).toHaveCount(0);
 
         // Não deve ter redirecionado para /login
         expect(page.url()).not.toContain('/login');
       });
     }
 
-    test('borda: /api/me/ retorna grupos com DAT e flag canDAT=true derivável', async ({ baseURL }) => {
+    test('borda: /api/me/policies/ do DAT traz as policies do pacote', async ({ baseURL }) => {
       const datApi = await createApiContext({
         baseURL: baseURL!,
         username: ROLE_CREDENTIALS.dat_e2e.username,
         password: ROLE_CREDENTIALS.dat_e2e.password,
       });
-      const res = await datApi.get('/api/me/');
+      const res = await datApi.get('/api/me/policies/');
       expect(res.ok()).toBeTruthy();
-      const me = (await res.json()) as { username: string; groups?: string[]; setores?: string[] };
+      const policies = (await res.json()) as string[];
 
-      expect(me.username).toBe('dat_e2e@test.com');
-      // O backend expõe groups OU setores/funcoes (dependendo da versão do /me/).
-      // Ambos os caminhos devem incluir DAT.
-      const hasDatViaGroups = !!me.groups?.some((g) => g === 'DAT');
-      const hasDatViaSetores = !!me.setores?.some((s) => s === 'DAT');
-      expect(hasDatViaGroups || hasDatViaSetores).toBeTruthy();
+      // O poder vem do vínculo EQUIPE na GERENCIA DAT (pacote ADMIN_OPERACIONAL), não do grupo.
+      expect(policies).toEqual(
+        expect.arrayContaining(['manage_admin_registries', 'access_solicitation_approvals']),
+      );
     });
 
     test('operação: DAT consegue chamar endpoint de manutenção do dashboard Compras', async ({

@@ -702,8 +702,8 @@ describe('ApprovalsPage', () => {
 
     const aviso = await screen.findByRole('status');
     expect(within(aviso).getByText('2 solicitação(ões) não foram aprovadas')).toBeInTheDocument();
-    // Evento (data · município · projeto) + motivo; o que não está na tela vai pelo número.
-    expect(within(aviso).getByText(/25\/08\/2026 · Municipio2 · ProjetoTeste/)).toBeInTheDocument();
+    // Evento (data e hora · município · projeto) + motivo; o que não está na tela vai pelo número.
+    expect(within(aviso).getByText(/25\/08\/2026 10:00 · Municipio2 · ProjetoTeste/)).toBeInTheDocument();
     expect(within(aviso).getByText(/tem outro evento aprovado neste horário/)).toBeInTheDocument();
     expect(within(aviso).getByText(/Solicitação #77/)).toBeInTheDocument();
     expect(within(aviso).getByText(/Solicitação não encontrada/)).toBeInTheDocument();
@@ -742,7 +742,7 @@ describe('ApprovalsPage', () => {
 
   // Achado do item 36 (19/10/2026): a decisão não se desfaz, então a confirmação diz qual é o
   // evento e começa no Cancelar (ux-principios: ação destrutiva começa no Cancelar e cita o nome).
-  const EVENTO_1 = '25/08/2026 · Municipio1 · ProjetoTeste';
+  const EVENTO_1 = '25/08/2026 10:00 · Municipio1 · ProjetoTeste';
 
   test.each([
     ['Aprovar', 'Confirmar aprovação'],
@@ -793,8 +793,39 @@ describe('ApprovalsPage', () => {
     expect(config).toMatchObject({ autoFocusButton: 'cancel' });
     render(<>{config?.content}</>);
     expect(screen.getByText(EVENTO_1)).toBeInTheDocument();
-    expect(screen.getByText('25/08/2026 · Municipio2 · ProjetoTeste')).toBeInTheDocument();
+    expect(screen.getByText('25/08/2026 10:00 · Municipio2 · ProjetoTeste')).toBeInTheDocument();
     expect(screen.getByText(/não pode ser desfeita/)).toBeInTheDocument();
+  }, 30000);
+
+  // Revisão do item 36: duas sessões no mesmo dia, município e projeto (manhã e tarde) ficam lado a
+  // lado com ordering=proximidade. O rótulo leva a hora, senão a confirmação, a caixa de seleção e os
+  // botões saem com o mesmo texto nas duas linhas (WCAG 2.4.6) e a lista do lote repete a chave.
+  test('duas sessões do mesmo dia: o rótulo traz a hora e a confirmação do lote lista as duas', async () => {
+    vi.mocked(listSolicitacoes).mockResolvedValue({
+      count: 2,
+      next: null,
+      previous: null,
+      results: [
+        pendingRow({ id: 1, usuario: 5, municipio_nome: 'Sobral', inicio: '2026-08-25T11:00:00Z', fim: '2026-08-25T15:00:00Z' }),
+        pendingRow({ id: 2, usuario: 5, municipio_nome: 'Sobral', inicio: '2026-08-25T16:30:00Z', fim: '2026-08-25T20:30:00Z' }),
+      ],
+    });
+    const manha = '25/08/2026 08:00 · Sobral · ProjetoTeste';
+    const tarde = '25/08/2026 13:30 · Sobral · ProjetoTeste';
+
+    renderPage(APROVA);
+
+    fireEvent.click(await screen.findByRole('checkbox', { name: `Selecionar: ${manha}` }, { timeout: 10000 }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: `Selecionar: ${tarde}` }));
+    expect(screen.getByRole('button', { name: `Reprovar: ${manha}` })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `Reprovar: ${tarde}` })).toBeInTheDocument();
+
+    const confirmacao = vi.spyOn(Modal, 'confirm').mockImplementation(semModal);
+    fireEvent.click(await screen.findByRole('button', { name: /Reprovar Selecionadas/ }));
+    await waitFor(() => expect(confirmacao).toHaveBeenCalledTimes(1));
+    render(<>{confirmacao.mock.calls[0]?.[0]?.content}</>);
+    expect(screen.getByText(manha)).toBeInTheDocument();
+    expect(screen.getByText(tarde)).toBeInTheDocument();
   }, 30000);
 
   test('aprovar um com outro erro segue na mensagem curta', async () => {

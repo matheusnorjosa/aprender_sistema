@@ -3,7 +3,7 @@
  *
  * No celular a coluna fixa Ações (220 px) cobria a tabela e a pessoa aprovava sem ver o evento.
  * Sempre na linha: o Evento (data e horário, município, projeto) e as ações (AcoesLinha, que leva
- * o evento no nome: "Aprovar: 25/08/2026 · Município · Projeto"). As demais sobem por largura e o
+ * o evento no nome: "Aprovar: 25/08/2026 08:00 · Município · Projeto"). As demais sobem por largura e o
  * que some vai para a linha expandida. Sem `scroll.x` e sem coluna fixa.
  */
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
@@ -28,7 +28,7 @@ vi.mock('../../../hooks/usePolling', () => ({ usePolling: vi.fn(() => ({ pausado
 import ApprovalsPage from '../ApprovalsPage';
 import { listSolicitacoes } from '../../../api/solicitacoes';
 
-const EVENTO = '25/08/2026 · MunicipioTeste · ProjetoTeste';
+const EVENTO = '25/08/2026 10:00 · MunicipioTeste · ProjetoTeste';
 
 function linhas(n: number): PaginatedResponse<Solicitacao> {
   return {

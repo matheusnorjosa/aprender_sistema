@@ -151,9 +151,12 @@ interface PreviewDataType {
 // e mostra o texto inteiro no title (achado da revisão do PR-2, 05/10/2026).
 const UMA_LINHA: CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 
-/** O evento como a pessoa o reconhece: "25/08/2026 · Sobral · Projeto X" (botões, confirmações, lote). */
+/**
+ * O evento como a pessoa o reconhece: "25/08/2026 08:00 · Sobral · Projeto X" (botões, confirmações, lote).
+ * Leva a hora: manhã e tarde no mesmo dia, município e projeto ficam lado a lado e não podem ter o mesmo nome.
+ */
 function rotuloDoEvento(row: Solicitacao): string {
-  return [formatFortaleza(row.inicio, 'DD/MM/YYYY'), row.municipio_nome, row.projeto_nome].filter(Boolean).join(' · ');
+  return [formatFortaleza(row.inicio), row.municipio_nome, row.projeto_nome].filter(Boolean).join(' · ');
 }
 
 /** O vazio da lista diz o que não há (o do AntD, "Não há dados", não diz). */
@@ -417,13 +420,13 @@ export default function ApprovalsPage(): JSX.Element {
   // Lote: a confirmação lista os eventos selecionados (os da página visível).
   const conteudoDoLote = (): JSX.Element => {
     const selecionadas = new Set<Key>(selectedRowKeys);
-    const eventos = rows.filter((r) => selecionadas.has(r.id)).map(rotuloDoEvento);
+    const eventos = rows.filter((r) => selecionadas.has(r.id));
     const resto = selectedRowKeys.length - Math.min(eventos.length, EVENTOS_NA_CONFIRMACAO);
     return (
       <>
         <ul className="pl-5 my-2">
           {eventos.slice(0, EVENTOS_NA_CONFIRMACAO).map((evento) => (
-            <li key={evento} className="break-words">{evento}</li>
+            <li key={evento.id} className="break-words">{rotuloDoEvento(evento)}</li>
           ))}
         </ul>
         {resto > 0 && <Paragraph className="mb-2">e mais {resto}.</Paragraph>}

@@ -439,12 +439,13 @@ def upsert_one(
             # batch resync), então o SKIP nunca bloqueia um reenvio intencional.
             # Id adotado: o hash é o do sistema, não o do Google. Mesmo dia e hora diferente no Google =
             # atualizar (decisão do dono de 20/10, relay 65); com a mesma hora, pula como qualquer outro.
-            # Outro dia = o id é de outro encontro: o PATCH mudaria o dia dele, então vira erro.
+            # Outro dia = o id é de outro encontro: o PATCH mudaria o dia dele, então vira erro. Fora da
+            # condição do hash: o ERROR, o Resync e o Publicar chegam com o hash vazio.
+            if adotado and _data_difere(existing, payload):
+                raise ValueError(
+                    f"Solicitação #{s.id}: o evento adotado está em outro dia no Google; nada foi atualizado."
+                )
             if action == "UPDATE" and s.gcal_payload_hash and s.gcal_payload_hash == _payload_hash(payload):
-                if adotado and _data_difere(existing, payload):
-                    raise ValueError(
-                        f"Solicitação #{s.id}: o evento adotado está em outro dia no Google; nada foi atualizado."
-                    )
                 if not (adotado and _hora_difere(existing, payload)):
                     return SyncOutcome("SKIP", s.id, s.external_event_id, payload["summary"])
 

@@ -93,8 +93,9 @@ def _upsert(client, s, **kw):
 # ---------- #1899: UPDATE pelo id gravado ----------
 def test_update_vai_para_o_event_id_adotado():
     s = _futuro(external_event_id=_ADOTADO, gcal_status="PUBLISHED")
-    client = _Cliente(store={_ADOTADO})
-    out = _upsert(client, s)
+    payload = build_event_payload(s, enable_meet=False)
+    client = _Cliente(store={_ADOTADO}, horas={"start": payload["start"], "end": payload["end"]})
+    out = _upsert(client, s, payload=payload)
     assert out.action == "UPDATE"
     assert client.updates == [_ADOTADO], "o UPDATE tem de mirar o id gravado, não o asv2{id}"
     assert client.inserts == []
@@ -153,6 +154,19 @@ def test_adotado_com_hash_igual_e_outro_dia_no_google_nao_atualiza():
     client = _Cliente(store={_ADOTADO}, horas=_no_google(s, dias=1, hora=14))
     with pytest.raises(ValueError, match="outro dia"):
         _upsert(client, s, payload=payload)
+    assert client.updates == [] and client.inserts == []
+
+
+def test_adotado_em_outro_dia_segue_travado_na_nova_tentativa_e_sem_hash():
+    """O ERROR apaga o hash, e o Resync/Publicar também chegam sem ele: a trava não pode depender do hash."""
+    s, _ = _adotado_as_14h_com_hash()
+    client = _Cliente(store={_ADOTADO}, horas=_no_google(s, dias=1, hora=14))
+    with patch(_PASSTHROUGH, side_effect=_passthrough):
+        for _tentativa in range(2):
+            with pytest.raises(ValueError, match="outro dia"):
+                apply_one_solicitacao(s, apply_blocked=True, client=client)
+            s.refresh_from_db()
+            assert s.gcal_status == "ERROR" and s.gcal_payload_hash is None
     assert client.updates == [] and client.inserts == []
 
 

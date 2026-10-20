@@ -170,6 +170,18 @@ def test_adotado_em_outro_dia_segue_travado_na_nova_tentativa_e_sem_hash():
     assert client.updates == [] and client.inserts == []
 
 
+@pytest.mark.parametrize("hash_gravado", [None, "hash-de-antes-de-uma-edicao"])
+def test_adotado_em_outro_dia_nao_atualiza_com_hash_vazio_ou_diferente(hash_gravado):
+    """Reenviar zera o hash e qualquer save muda o payload (`updated_at`): nos dois casos, sem PATCH."""
+    s, payload = _adotado_as_14h_com_hash()
+    s.gcal_payload_hash = hash_gravado
+    s.save(update_fields=["gcal_payload_hash"])
+    client = _Cliente(store={_ADOTADO}, horas=_no_google(s, dias=1, hora=14))
+    with pytest.raises(ValueError, match="outro dia"):
+        _upsert(client, s, payload=payload)
+    assert client.updates == [] and client.inserts == []
+
+
 def test_get_com_excecao_num_adotado_nao_cria():
     s = _futuro(external_event_id=_ADOTADO, gcal_status="PUBLISHED")
     client = _Cliente(get_exc=RuntimeError("503 Service Unavailable"))

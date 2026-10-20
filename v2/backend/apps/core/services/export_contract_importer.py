@@ -84,8 +84,6 @@ from apps.core.services.export_contract_projeto_resolver import (
     resolve_projeto_agenda,
     resolve_projeto_export,
 )
-from apps.core.services.gcal.payload import build_event_payload
-from apps.core.services.gcal.utils import _payload_hash
 from apps.core.services.resolvers import resolve_user_by_email, resolve_user_by_name
 from apps.core.services.solicitacao_create import resolve_initial_status
 from apps.core.utils.cache_utils import invalidate_availability_cache
@@ -3008,8 +3006,8 @@ class ExportContractImporter:
         return planilha != {x.usuario_id for x in parts if x.role == Participation.Role.FORMADOR}
 
     def _adotar(self, s: Solicitacao, eid: str, conf: str) -> None:
-        """Grava a adoção. Salva sem `updated_at` e calcula o hash depois do `refresh_from_db()`: o payload
-        leva o `updated_at` do banco, e é com ele que o Reapply seguinte compara (e pula, sem e-mail)."""
+        """Grava a adoção, sem `updated_at`. Sem `gcal_payload_hash`: o Google pode estar com outro horário, e
+        o primeiro Reapply depois da virada manda o UPDATE pelo id adotado (decisão do dono de 20/10)."""
         agora = timezone.now()
         s.external_event_id = eid
         s.gcal_status = Solicitacao.GCalStatus.PUBLISHED
@@ -3017,6 +3015,7 @@ class ExportContractImporter:
         s.last_synced_at = agora
         s.gcal_last_sync_at = agora
         s.publicado_fora_do_sistema = False
+        s.gcal_payload_hash = None
         s.save(
             update_fields=[
                 "external_event_id",
@@ -3025,11 +3024,9 @@ class ExportContractImporter:
                 "last_synced_at",
                 "gcal_last_sync_at",
                 "publicado_fora_do_sistema",
+                "gcal_payload_hash",
             ]
         )
-        s.refresh_from_db()
-        s.gcal_payload_hash = _payload_hash(build_event_payload(s, enable_meet=bool(s.is_online)))
-        s.save(update_fields=["gcal_payload_hash"])
         AuditLog.objects.create(
             usuario=self.actor,
             action=AuditLog.Action.UPDATE,

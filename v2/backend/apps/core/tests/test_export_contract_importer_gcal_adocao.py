@@ -3,8 +3,8 @@
 Roda à parte, depois da carga e do A5, lendo o mesmo solicitacao.csv. Só adota `confianca=alta`, de
 evento aprovado, marcado `publicado_fora_do_sistema`, sem rastro de publicação pelo sistema, com Event ID
 que nenhum outro evento tem; o evento mexido por alguém só entra com data, hora e formadores iguais aos
-da planilha. Grava o hash do payload do sistema DEPOIS do `refresh_from_db()`, para o Reapply seguinte
-pular (sem e-mail aos convidados). A adoção nunca chama o Google.
+da planilha. NÃO grava o hash do payload: o Google pode ter outro horário, e o primeiro Reapply depois da
+virada manda o UPDATE pelo id adotado (decisão do dono de 20/10, relay 65). A adoção nunca chama o Google.
 
 Fixtures sintéticos, sem dado pessoal.
 """
@@ -94,7 +94,7 @@ def test_16_adota_alta_aprovado_marcado(tmp_path, m):
     assert s.last_sync_action == "ADOPT"
     assert s.last_synced_at is not None and s.gcal_last_sync_at is not None
     assert s.publicado_fora_do_sistema is False
-    assert s.gcal_payload_hash == _payload_hash(build_event_payload(s, enable_meet=False))
+    assert s.gcal_payload_hash is None, "sem hash, o próximo Reapply atualiza o Google"
     log = AuditLog.objects.get(action="UPDATE", details__campo="external_event_id")
     assert log.details["origem"] == "import_export_contract"
     assert log.details["para"] == EID
@@ -201,15 +201,22 @@ def test_18_adocao_nao_chama_o_google(tmp_path, m):
     assert task.call_count == 0 and factory.call_count == 0
 
 
-# ---------- 33. o Reapply seguinte pula ----------
-def test_33_reapply_depois_da_adocao_pula_pelo_hash(tmp_path, m):
+# ---------- 33. o Reapply seguinte atualiza o Google pelo id adotado ----------
+def test_33_reapply_depois_da_adocao_faz_update_pelo_id_adotado(tmp_path, m):
+    """Caso EV003991: o Google estava com outro horário. O primeiro Reapply manda o UPDATE pelo id adotado
+    (sem criar outro evento) e grava o hash; o Reapply seguinte pula."""
     s = _pronto(m, formadores=(m.f1,))
     _adocao(_export(tmp_path, [_linha()], [_part("EV1", _CPF_F1)]))
     s = Solicitacao.objects.get(id=s.id)
     client = _Cliente(store={EID})
     out = apply_one_solicitacao(s, apply_blocked=True, client=client)
-    assert out.action == "SKIP"
-    assert client.updates == [] and client.inserts == []
+    assert out.action == "UPDATE"
+    assert client.updates == [EID] and client.inserts == []
+    s = Solicitacao.objects.get(id=s.id)
+    assert s.external_event_id == EID
+    assert s.gcal_payload_hash == _payload_hash(build_event_payload(s, enable_meet=False))
+    assert apply_one_solicitacao(s, apply_blocked=True, client=client).action == "SKIP"
+    assert client.updates == [EID]
 
 
 def test_adocao_e_dry_run_por_padrao(tmp_path, m):

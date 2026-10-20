@@ -26,6 +26,7 @@ import { clearApiCaches } from './services/swCache';
 import { apagarAvisoDoLogin, avisarSaidaAsOutrasAbas, guardarAvisoDoLogin, storageKeys } from './utils/storage';
 import OfflineBanner from './components/OfflineBanner';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { PularParaConteudo } from './components/PularParaConteudo';
 import { FullscreenLoader } from './components/FullscreenLoader';
 import { AppSidebar } from './components/AppSidebar';
 import { AppHeader } from './components/AppHeader';
@@ -405,6 +406,7 @@ function App(): JSX.Element {
   ]));
   return (
     <ThemeProvider>
+      <PularParaConteudo />
       <RouterProvider router={router} />
     </ThemeProvider>
   );

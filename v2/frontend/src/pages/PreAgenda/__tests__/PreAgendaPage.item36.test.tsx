@@ -10,7 +10,7 @@
  * no jsdom deste projeto: o teste espia a chamada (padrão das telas AdminDAT).
  */
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { Modal } from 'antd';
+import { ConfigProvider, Modal } from 'antd';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 const { listSolicitacoesMock, getStatusSummaryMock } = vi.hoisted(() => ({
@@ -149,7 +149,42 @@ describe('PreAgendaPage — status do Google em pt-BR, com o motivo do erro', ()
     fireEvent.click(within(linha).getByRole('checkbox'));
     expect((await screen.findByText('Reapply Selecionados')).closest('button')).toHaveStyle({ color: '#ad4e00' });
   });
+
+  // O AntD tira o fundo da linha selecionada do colorPrimary (#006B52 → #9aaba4; com o mouse,
+  // #659e89) e o motivo do erro caía para 2,72 e 2,12:1 justo no caso do "Resync Selecionados".
+  test('linha marcada para o lote: o motivo do erro mantém 4,5:1, parada e com o mouse em cima', async () => {
+    mockRows([row({ id: 1, municipio_nome: 'Crato', gcal_status: 'ERROR', gcal_last_error: 'Motivo do Google.' })]);
+    render(
+      <ConfigProvider theme={{ token: { colorPrimary: '#006B52' } }}>
+        <PreAgendaPage />
+      </ConfigProvider>,
+    );
+    const linha = (await screen.findByText('Crato')).closest('tr') as HTMLElement;
+    fireEvent.click(within(linha).getByRole('checkbox'));
+    expect(linha).toHaveClass('ant-table-row-selected');
+
+    // O jsdom não aplica o CSS do AntD: lê a regra gerada para o hash da própria tabela.
+    const hash = Array.from(linha.closest('.ant-table-wrapper')?.classList ?? []).find((c) => c.startsWith('css-'));
+    const css = Array.from(document.querySelectorAll('style')).map((s) => s.textContent ?? '').join('').replace(/\s/g, '');
+    for (const comMouse of [false, true]) {
+      const alvo = `.ant-table-row-selected>.ant-table-cell${comMouse ? '-row-hover' : ''}{`;
+      const regra = css.split('}').find((r) => r.includes(`(.${hash})`) && r.includes(alvo));
+      const fundo = /background:(#[0-9a-f]{6})/i.exec(regra ?? '')?.[1] ?? 'sem regra';
+      expect(contraste('#b32430', fundo), `motivo sobre ${fundo}`).toBeGreaterThanOrEqual(4.5);
+    }
+  }, 20000);
 });
+
+function luminancia(hex: string): number {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)) as [number, number, number];
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contraste(a: string, b: string): number {
+  const [claro, escuro] = [luminancia(a), luminancia(b)].sort((x, y) => y - x) as [number, number];
+  return (claro + 0.05) / (escuro + 0.05);
+}
 
 describe('PreAgendaPage — remover do Google começa no Cancelar e cita o evento', () => {
   const semModal = (): { destroy: () => void; update: () => void } => ({ destroy: vi.fn(), update: vi.fn() });

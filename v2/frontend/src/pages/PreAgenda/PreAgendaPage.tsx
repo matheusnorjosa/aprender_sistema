@@ -9,9 +9,10 @@
  * - Operações em lote (Reapply/Resync) via seleção múltipla
  */
 
-import { useState, useEffect, useCallback, useMemo, useRef, ChangeEvent, CSSProperties, Key, JSX } from 'react';
+import { useState, useEffect, useCallback, useContext, useMemo, useRef, ChangeEvent, CSSProperties, Key, JSX } from 'react';
 import {
   Card,
+  ConfigProvider,
   Grid,
   Input,
   DatePicker,
@@ -68,6 +69,7 @@ import { getStatusSummary, reapplyBatch, resyncBatch, type GCalStatusSummary } f
 import { MeetLink } from '../../components/MeetLink';
 import { getGerencias } from '../../api/availability';
 import { useAcesso } from '../../contexts/AcessoContext';
+import ThemeContext from '../../contexts/ThemeContext';
 import useGoogleIntegration from '../../hooks/useGoogleIntegration';
 import useGoogleGuard from '../../hooks/useGoogleGuard';
 import GoogleIntegrationCard from '../../components/google/GoogleIntegrationCard';
@@ -104,6 +106,12 @@ const TEXTO_DA_TAG_GCAL: Partial<Record<GcalRowTag['color'], string>> = {
   error: '#b32430', // red-8: 5,98:1
 };
 const COR_DO_MOTIVO_DO_ERRO = '#b32430'; // red-8: 6,54:1 no branco
+// Linha marcada para o lote (tema claro): o AntD tira o fundo do colorPrimary (#006B52 → #9aaba4;
+// com o mouse, #659e89) e o motivo do erro caía para 2,72 e 2,12:1. Mesmo verde claro da tela Aprovações.
+const FUNDO_DA_LINHA_MARCADA = '#f4faf7';
+const TEMA_DA_TABELA = {
+  components: { Table: { rowSelectedBg: FUNDO_DA_LINHA_MARCADA, rowSelectedHoverBg: FUNDO_DA_LINHA_MARCADA } },
+};
 // Pendente e reenviar: o gold-6 (#faad14) dá 1,90:1 no branco; publicado: o green-6 (#52c41a), 2,27:1.
 const COR_PENDENTE = '#ad4e00'; // orange-8: 5,43:1 no branco, 4,99:1 no bg-blue-50 da barra do lote
 const COR_PUBLICADO = '#237804'; // green-8: 5,59:1
@@ -221,6 +229,7 @@ export default function PreAgendaPage(): JSX.Element {
 
   // OAuth Phase 5: acesso (AcessoContext) e integração Google
   const { caps, ehSuperusuario } = useAcesso();
+  const temaEscuro = useContext(ThemeContext)?.isDark === true; // o escuro tem fundo próprio (App.css)
   const { status: googleStatus, disconnect: googleDisconnect } = useGoogleIntegration();
 
   // Section 4 Epic #459: Consolidated Google OAuth guard
@@ -962,21 +971,23 @@ export default function PreAgendaPage(): JSX.Element {
                   }
                 />
               )}
-              <ResponsiveTable<Solicitacao>
-                columns={columns}
-                dataSource={rows}
-                loading={loading}
-                rowKey="id"
-                rowSelection={rowSelection}
-                nomeDaLinha={rotuloDoEvento}
-                erro={erroCarga}
-                onTentarDeNovo={() => { void loadData(); }}
-                pagination={{
-                  total,
-                  pageSize: 20,
-                  showTotal: (total) => `Total: ${total} eventos aprovados`,
-                }}
-              />
+              <ConfigProvider {...(!temaEscuro && { theme: TEMA_DA_TABELA })}>
+                <ResponsiveTable<Solicitacao>
+                  columns={columns}
+                  dataSource={rows}
+                  loading={loading}
+                  rowKey="id"
+                  rowSelection={rowSelection}
+                  nomeDaLinha={rotuloDoEvento}
+                  erro={erroCarga}
+                  onTentarDeNovo={() => { void loadData(); }}
+                  pagination={{
+                    total,
+                    pageSize: 20,
+                    showTotal: (total) => `Total: ${total} eventos aprovados`,
+                  }}
+                />
+              </ConfigProvider>
             </Card>
 
             {/* Rodapé */}

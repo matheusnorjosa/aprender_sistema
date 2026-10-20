@@ -103,9 +103,28 @@ describe('Gestão de Ações sem rolagem horizontal', () => {
     const { container } = renderPagina('acoes');
     const linha = await linhaPelaAcao(`Editar: ${ACAO}`);
 
-    expect(cabecalhos()).toEqual(['Município - UF', 'Projeto', 'Coordenador', 'Carta', 'Contato', 'Reunião', 'Entrega', 'Ações']);
+    expect(cabecalhos()).toEqual([
+      'Município - UF',
+      'Projeto',
+      'Coleção',
+      'Coordenador',
+      'Carta',
+      'Contato',
+      'Reunião',
+      'Entrega',
+      'Ações',
+    ]);
     expect(within(linha).getByRole('button', { name: `Excluir: ${ACAO}` })).toBeInTheDocument();
     semLarguraForcada(container);
+  });
+
+  test('a 1280 px: a Coleção fica na linha e ordena (o "reagrupar por família", #1897)', async () => {
+    renderPagina('acoes');
+    await linhaPelaAcao(`Editar: ${ACAO}`);
+
+    const colecao = screen.getByRole('columnheader', { name: /Coleção/ });
+    fireEvent.click(colecao);
+    expect(colecao).toHaveAttribute('aria-sort', 'ascending');
   });
 
   test('a 360 px: só a ação (município e projeto) e o menu; o resto na linha expandida', async () => {

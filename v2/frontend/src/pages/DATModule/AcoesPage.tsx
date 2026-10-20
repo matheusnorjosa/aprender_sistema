@@ -367,10 +367,11 @@ export default function AcoesPage(): JSX.Element {
     },
     {
       // Coleção = família (projeto_geral_nome) ao lado da variante. ⚠️ sorter CLIENT-SIDE (só a página carregada).
+      // Única coluna que ordena (o "reagrupar por família", #1897): fica na linha a partir de lg, como o fluxo.
       title: 'Coleção',
       dataIndex: 'projeto_geral_nome',
       key: 'projeto_geral',
-      responsive: VISIVEL_A_PARTIR.xxl,
+      responsive: VISIVEL_A_PARTIR.lg,
       width: 140,
       sorter: (a: AcaoRecord, b: AcaoRecord) =>
         (a.projeto_geral_nome ?? '').localeCompare(b.projeto_geral_nome ?? ''),

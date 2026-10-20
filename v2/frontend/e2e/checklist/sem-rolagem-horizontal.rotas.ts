@@ -187,7 +187,7 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
     perfil: 'controle',
     marco: 'Gestão de Ações',
     dados: { em: LINHA, texto: T.municipio },
-    // Item 38: Coordenador (< 768), o fluxo (< 992) e Coleção, Área, Progresso e Observações
+    // Item 38: Coordenador (< 768), o fluxo e a Coleção (< 992) e Área, Progresso e Observações
     // (< 1600) vão para a linha expandida: há linha expandida em toda largura.
     estados: [expandida(T.municipio, 'Observações')],
   },

@@ -183,8 +183,9 @@ describe('NewSolicitacaoWizard — erros que a pessoa consegue corrigir (item 36
     await screen.findByTestId('cb-projeto');
     fireEvent.click(screen.getByTestId('set-date'));
     fireEvent.click(proximo());
-    await screen.findByText('Por favor selecione um projeto');
-    await waitFor(() => expect(screen.getByTestId('cb-projeto')).toHaveFocus());
+    // A validação do Form do AntD é assíncrona; com a suíte inteira e a cobertura na CI ela passa de 1 s.
+    await screen.findByText('Por favor selecione um projeto', undefined, { timeout: 5000 });
+    await waitFor(() => expect(screen.getByTestId('cb-projeto')).toHaveFocus(), { timeout: 5000 });
   });
 
   test('recusa do backend por campo mostra o motivo, não "Erro de validação."', async () => {

@@ -11,9 +11,7 @@
 import { useState, useEffect, useCallback, useMemo, type JSX } from 'react';
 import { useTableFilters, type TableFilterParams } from '../../hooks/useTableFilters';
 import type { PaginatedResponse } from '../../types';
-import type { ColumnsType } from 'antd/es/table';
 import {
-  Table,
   Button,
   Input,
   Space,
@@ -32,6 +30,7 @@ import {
   Col,
   Statistic,
   Progress,
+  Grid,
 } from 'antd';
 import {
   ReloadOutlined,
@@ -64,6 +63,8 @@ import {
 } from '../../api/datModule';
 import dayjs, { type Dayjs } from 'dayjs';
 import { UF_OPTIONS } from '../../constants';
+import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
+import { AcoesLinha, larguraAcoesLinha } from '../../components/AcoesLinha';
 
 const { Title, Text } = Typography;
 
@@ -175,7 +176,13 @@ const buildAcoesParams = (f: AcoesFilters): TableFilterParams => ({
   ...(f.status_geral && { status_geral: f.status_geral }),
 });
 
+/** Quem a linha representa: nomeia as ações e o botão de expandir ("Editar: Fortaleza - CE · Projeto"). */
+const nomeDaAcao = (record: AcaoRecord): string =>
+  `${record.municipio_nome} - ${record.municipio_uf} · ${record.projeto_nome}`;
+
 export default function AcoesPage(): JSX.Element {
+  // Celular (abaixo de sm): o projeto vai junto do município e as ações para o menu.
+  const acoesCompactas = !Grid.useBreakpoint().sm;
   const {
     data: acoes,
     stats,
@@ -330,47 +337,59 @@ export default function AcoesPage(): JSX.Element {
     return Math.round((concluidas / 4) * 100);
   }, []);
 
-  // Table columns - memoized to prevent re-renders (§3 Epic #459)
-  const columns: ColumnsType<AcaoRecord> = useMemo(() => [
+  // Sem rolagem horizontal (padrão responsivo, item 38): sempre na linha o município (com o
+  // projeto, no celular) e as ações; o fluxo sobe a partir de lg, o resto por largura e, abaixo
+  // dela, vai para a linha expandida. Etiquetas quebram linha em vez de passar da célula.
+  const columns: ColunaResponsiva<AcaoRecord>[] = useMemo(() => [
     {
       title: 'Município - UF',
       key: 'municipio_uf',
-      width: 180,
-      fixed: 'left' as const,
       render: (_: unknown, record: AcaoRecord) => (
-        <Text strong>
-          {record.municipio_nome} - {record.municipio_uf}
-        </Text>
+        <>
+          <Text strong>
+            {record.municipio_nome} - {record.municipio_uf}
+          </Text>
+          {acoesCompactas ? (
+            <>
+              <br />
+              <Text type="secondary" className="break-words">{record.projeto_nome}</Text>
+            </>
+          ) : null}
+        </>
       ),
     },
     {
       title: 'Projeto',
       dataIndex: 'projeto_nome',
       key: 'projeto',
-      width: 150,
-      render: (nome: string) => <Tag color="blue">{nome}</Tag>,
+      responsive: VISIVEL_A_PARTIR.sm,
+      render: (nome: string) => <Tag color="blue" className="max-w-full whitespace-normal break-words">{nome}</Tag>,
     },
     {
       // Coleção = família (projeto_geral_nome) ao lado da variante. ⚠️ sorter CLIENT-SIDE (só a página carregada).
+      // Única coluna que ordena (o "reagrupar por família", #1897): fica na linha a partir de lg, como o fluxo.
       title: 'Coleção',
       dataIndex: 'projeto_geral_nome',
       key: 'projeto_geral',
+      responsive: VISIVEL_A_PARTIR.lg,
       width: 140,
       sorter: (a: AcaoRecord, b: AcaoRecord) =>
         (a.projeto_geral_nome ?? '').localeCompare(b.projeto_geral_nome ?? ''),
-      render: (nome: string | undefined) => (nome ? <Tag color="geekblue">{nome}</Tag> : '—'),
+      render: (nome: string | undefined) =>
+        nome ? <Tag color="geekblue" className="max-w-full whitespace-normal break-words">{nome}</Tag> : '—',
     },
     {
       title: 'Coordenador',
       dataIndex: 'coordenador_nome',
       key: 'coordenador',
-      width: 150,
+      responsive: VISIVEL_A_PARTIR.md,
       ellipsis: true,
     },
     {
       title: 'Área',
       dataIndex: 'area',
       key: 'area',
+      responsive: VISIVEL_A_PARTIR.xxl,
       width: 100,
     },
     {
@@ -383,6 +402,7 @@ export default function AcoesPage(): JSX.Element {
         </Tooltip>
       ),
       key: 'carta',
+      responsive: VISIVEL_A_PARTIR.lg,
       width: 100,
       align: 'center' as const,
       render: (_: unknown, record: AcaoRecord) => (
@@ -404,6 +424,7 @@ export default function AcoesPage(): JSX.Element {
         </Tooltip>
       ),
       key: 'contato',
+      responsive: VISIVEL_A_PARTIR.lg,
       width: 100,
       align: 'center' as const,
       render: (_: unknown, record: AcaoRecord) => (
@@ -425,6 +446,7 @@ export default function AcoesPage(): JSX.Element {
         </Tooltip>
       ),
       key: 'reuniao',
+      responsive: VISIVEL_A_PARTIR.lg,
       width: 100,
       align: 'center' as const,
       render: (_: unknown, record: AcaoRecord) => (
@@ -446,6 +468,7 @@ export default function AcoesPage(): JSX.Element {
         </Tooltip>
       ),
       key: 'entrega',
+      responsive: VISIVEL_A_PARTIR.lg,
       width: 100,
       align: 'center' as const,
       render: (_: unknown, record: AcaoRecord) => (
@@ -460,6 +483,7 @@ export default function AcoesPage(): JSX.Element {
     {
       title: 'Progresso',
       key: 'progresso',
+      responsive: VISIVEL_A_PARTIR.xxl,
       width: 120,
       render: (_: unknown, record: AcaoRecord) => {
         const progress = calculateProgress(record);
@@ -477,6 +501,7 @@ export default function AcoesPage(): JSX.Element {
       title: 'Observações',
       dataIndex: 'observacoes',
       key: 'observacoes',
+      responsive: VISIVEL_A_PARTIR.xxl,
       width: 200,
       ellipsis: { showTitle: false },
       render: (val: string | null) => (
@@ -488,39 +513,25 @@ export default function AcoesPage(): JSX.Element {
     {
       title: 'Ações',
       key: 'acoes',
-      width: 100,
-      fixed: 'right' as const,
+      width: larguraAcoesLinha(2, acoesCompactas),
       render: (_: unknown, record: AcaoRecord) => (
-        <Space size="small">
-          <Tooltip title="Editar">
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => handleEdit(record)}
-              aria-label="Editar ação"
-            />
-          </Tooltip>
-          <Tooltip title="Excluir">
-            <Button
-              type="text"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => handleDelete(record)}
-              aria-label="Excluir ação"
-            />
-          </Tooltip>
-        </Space>
+        <AcoesLinha
+          compacto={acoesCompactas}
+          alvo={nomeDaAcao(record)}
+          acoes={[
+            { chave: 'editar', rotulo: 'Editar', icone: <EditOutlined />, onClick: () => handleEdit(record) },
+            { chave: 'excluir', rotulo: 'Excluir', icone: <DeleteOutlined />, onClick: () => handleDelete(record), perigo: true },
+          ]}
+        />
       ),
     },
-  ], [handleEdit, handleDelete, renderStatusIcon, calculateProgress]);
+  ], [acoesCompactas, handleEdit, handleDelete, renderStatusIcon, calculateProgress]);
 
   return (
     <section className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }} aria-labelledby="acoes-title">
       {/* Header */}
       <header className="mb-6">
-        <div className="flex justify-between items-start mb-2">
+        <div className="flex flex-wrap justify-between items-start gap-3 mb-2">
           <div>
             <Title level={3} className="m-0" id="acoes-title">
               <RocketOutlined className="mr-2" />
@@ -722,54 +733,21 @@ export default function AcoesPage(): JSX.Element {
           </Space>
         }
       >
-        {/* Column Group Headers */}
-        <div
-          className="flex text-xs font-semibold uppercase bg-gray-50"
-          style={{ borderBottom: '1px solid #f0f0f0' }}
-        >
-          <div
-            style={{
-              // 620 = Município-UF(180) + Projeto(150) + Coleção(140) + Coordenador(150).
-              flex: '0 0 620px',
-              padding: '8px 16px',
-              borderRight: '1px solid #f0f0f0',
-            }}
-          >
-            Identificação
-          </div>
-          <div
-            style={{
-              flex: '0 0 400px',
-              padding: '8px 16px',
-              borderRight: '1px solid #f0f0f0',
-              color: '#1890ff',
-            }}
-          >
-            Fluxo: Carta → Contato → Reunião → Entrega
-          </div>
-          <div
-            style={{
-              flex: 1,
-              padding: '8px 16px',
-            }}
-          >
-            Detalhes
-          </div>
-        </div>
-
-        <Table
+        {/* Item 38: saiu o cabeçalho de grupos (Identificação 620 px, Fluxo 400 px, Detalhes), que só
+            se alinhava com todas as colunas na linha e obrigava a tela a ter mais de 1000 px. O fluxo
+            Carta → Contato → Reunião → Entrega segue no subtítulo da página. */}
+        <ResponsiveTable<AcaoRecord>
           columns={columns}
           dataSource={acoes}
           rowKey="id"
           loading={loading}
-          scroll={{ x: 1400 }}
+          nomeDaLinha={nomeDaAcao}
           pagination={{
             ...pagination,
             showSizeChanger: true,
             showTotal: (total, range) => `Mostrando ${range[0]} a ${range[1]} de ${total} ações`,
             onChange: handleTableChange,
           }}
-          size="middle"
         />
       </Card>
       </section>

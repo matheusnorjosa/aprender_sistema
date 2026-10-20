@@ -2488,7 +2488,13 @@ class ExportContractImporter:
                 continue
             if ext_hash in existing:
                 sid, cur_sn = existing[ext_hash]
-                if key is not None and seg_norm and seg_norm != cur_sn:
+                if (
+                    key is not None
+                    and seg_norm
+                    and seg_norm != cur_sn
+                    # Data suspeita: a linha é de outro evento e fica toda de fora, segmento_norm também.
+                    and not (virada and _linha_com_data_suspeita(Solicitacao.objects.get(id=sid).inicio, r, hoje))
+                ):
                     Solicitacao.objects.filter(id=sid).update(segmento_norm=seg_norm, segmento_norm_confianca=seg_conf)
                     existing[ext_hash] = (sid, seg_norm)
                     reconciled += 1

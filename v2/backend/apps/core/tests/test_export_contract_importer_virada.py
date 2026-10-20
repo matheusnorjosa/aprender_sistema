@@ -991,18 +991,24 @@ def test_apagado_pela_tela_sem_external_hash_nao_bloqueia_a_vaga(tmp_path, m, mo
     ],
 )
 def test_data_suspeita_pula_a_linha_e_conta(tmp_path, m, dia, nova):
-    s = _existente(m, dia=dia, formadores=(m.f1,))
-    path = _export(tmp_path, [_sol(data=nova, hora_inicio="09:00", cancelado="true")], [_part("EV1", _CPF_F2)])
+    s = _existente(m, dia=dia, formadores=(m.f1,), segmento_norm="ANTIGO")
+    path = _export(
+        tmp_path,
+        [_sol(data=nova, hora_inicio="09:00", cancelado="true", segmento_norm="NOVO_DE_OUTRO")],
+        [_part("EV1", _CPF_F2)],
+    )
     dry = _dry(path)
     assert dry["data_suspeita"] == {str(s.id): 1}
     assert dry["evento_atualizado"] == 0
     report = _virada(path)
     assert report["applied"].get("solicitacao__virada_atualizada", 0) == 0
+    assert report["applied"].get("solicitacao__segmento_norm_reconciled", 0) == 0
     s.refresh_from_db()
     assert timezone.localtime(s.inicio, _FORTALEZA).date() == dia, "a data não muda"
     assert _hora(s) == (8, 12)
     assert s.status == "aprovado", "o resto da linha também não entra"
     assert _formadores(s) == {"form1"}
+    assert s.segmento_norm == "ANTIGO", "nem o segmento_norm de outro evento"
     assert not AuditLog.objects.filter(details__modo="virada").exists()
 
 

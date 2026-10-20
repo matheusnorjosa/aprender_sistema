@@ -175,6 +175,11 @@ def custom_exception_handler(exc: Exception, context: dict[str, Any]) -> Respons
     if isinstance(exc, ProtectedError):
         exc = ConflictError(message=_mensagem_em_uso(exc))
 
+    # O Http404 do get_object_or_404 vem em inglês e com o nome do model ("No Solicitacao matches
+    # the given query."): a tela recebe a mensagem em português, sem dizer que registro é.
+    if isinstance(exc, Http404):
+        exc = Http404("Recurso não encontrado.")
+
     # Handle our custom APIError exceptions first
     if isinstance(exc, APIError):
         data: dict[str, Any] = {

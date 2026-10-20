@@ -106,6 +106,14 @@ class TestExceptionHandlerFormat(APITestCase):
         # Code should be present (NOT_FOUND or ERROR depending on exception type)
         self.assertIsNotNone(response.data["code"])
 
+    def test_404_sai_em_portugues_sem_nome_do_model(self):
+        """O Http404 do get_object_or_404 não mostra o texto em inglês nem o nome do model (item 38)."""
+        response = self.client.get("/api/solicitacoes/999999/")
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(set(response.data), {"code", "detail"})
+        self.assertEqual(response.data["detail"], "Recurso não encontrado.")
+
     def test_403_error_has_detail_and_code(self):
         """403 errors include detail and code fields."""
         self.client.logout()

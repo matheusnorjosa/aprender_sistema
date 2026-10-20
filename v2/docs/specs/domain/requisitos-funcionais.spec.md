@@ -1,7 +1,7 @@
 ---
 title: Requisitos Funcionais (RF01..RF08)
 status: canonical
-last_verified: 2026-10-19
+last_verified: 2026-10-20
 sources_of_truth:
   - v2/backend/apps/core/management/commands/import_export_contract.py
   - v2/backend/apps/core/services/export_contract_importer.py
@@ -66,7 +66,7 @@ Esta spec é um **índice** (SSOT do conjunto RF) e não duplica os guias/specs 
 - **RF05 / PA-03**: integração GCal só ocorre **após** aprovação manual; `preview` nunca persiste; idempotência por `external_event_id` (o `asv2{id}` do sistema, ou o Event ID adotado da planilha na virada) + `gcal_payload_hash` (SHA1); o sistema não cria evento passado nem evento `publicado_fora_do_sistema` ([`gcal.spec.md`](../backend/gcal.spec.md)); retry/backoff para 429/5xx. Cliente selecionado por `GCAL_CLIENT=fake|google`.
 - **RF06**: `meet_link` é read-only no serializer; só é gerado/persistido em apply real com `is_online=True` (nunca em preview, dry-run ou 409). `is_online=False` (default) → sem `conferenceData`.
 - **RF07 / PA-05**: toda ação sensível grava `AuditLog` (usuario, action, model_name, details JSON com `solicitacao_id`, `prev_status`, `new_status`, `ip_address`, `user_agent`). Ações: `APPROVE`, `REJECT`, `PREVIEW_GCAL`, `PUBLISH_GCAL_REQUESTED`, `PUBLISH_GCAL`, `PUBLISH_GCAL_ERROR`, `RESYNC_GCAL_REQUESTED`, `CANCEL_GCAL_REQUESTED`, `CANCEL_GCAL`.
-- **RF08**: grade mensal usa precedência de código `X > D1 > 2 > E > T/P > D`; cacheada em Redis (~5 min); ranking denso por carga horária do mês.
+- **RF08**: grade mensal usa precedência de código `X > D1 > 2 > E > T/P > D`; cacheada em Redis (~5 min); ranking denso por carga horária do mês. Na aba Coordenadores, o dia conta só os eventos que ocupam a agenda pela regra do motor de conflito (`ocupa_agenda_q`): o responsável que não acompanha (`coordenador_acompanha=False`) não fica com E/2 naquele dia (item 38, 20/10/2026).
 
 ## API / Interface
 

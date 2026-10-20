@@ -74,7 +74,7 @@ def chave_cache_grade(
     setor = (sector or "").strip() or None
     busca = (q or "").strip().lower()
     parametros = json.dumps([year, month, role, escopo, setor, busca, str(teto)], ensure_ascii=False)
-    return f"monthly:v8:{monthly_ver}:{hashlib.sha256(parametros.encode('utf-8')).hexdigest()}"
+    return f"monthly:v9:{monthly_ver}:{hashlib.sha256(parametros.encode('utf-8')).hexdigest()}"
 
 
 class MonthlyAvailabilityView(APIView):
@@ -248,7 +248,8 @@ class MonthlyAvailabilityView(APIView):
         # O teto da contagem de horas (Configurações) entra na chave: salvar um teto novo
         # vale já na consulta seguinte. v6: CH com teto por evento (05/10/2026). v7: S5, sem CPF
         # no nome nem no e-mail e `q` sem e-mail se tem dígito (16/10/2026): a grade em cache levava os dois.
-        # v8: chave por hash dos parâmetros (F8).
+        # v8: chave por hash dos parâmetros (F8). v9: aba Coordenadores pela regra de ocupação
+        # (`ocupa_agenda_q`; item 38, 20/10/2026): a grade em cache marcava quem não acompanha.
         teto = parametros_disponibilidade()["AVAILABILITY_DAILY_LIMIT_HOURS"]
         cache_key = chave_cache_grade(
             monthly_ver=monthly_ver,

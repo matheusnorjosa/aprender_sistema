@@ -43,7 +43,7 @@ from apps.core.utils.cache_utils import cache_availability_check
 ENFORCED_ROLES: tuple[str, ...] = (Participation.Role.FORMADOR.value,)
 
 
-def ocupa_agenda_q(usuario: Usuario) -> Q:
+def ocupa_agenda_q(usuario: Usuario | int) -> Q:
     """Eventos (Solicitacao) que ocupam a agenda de `usuario` — SSOT do lado "evento existente".
 
     Ocupa se a pessoa é FORMADORA no evento, ou se é a coordenadora responsável e o evento

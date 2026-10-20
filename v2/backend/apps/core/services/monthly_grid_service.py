@@ -22,12 +22,15 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import date, datetime, timedelta
+from functools import reduce
+from operator import or_
 from typing import Any
 
 from django.utils import timezone
 
 from apps.core.models import AvailabilityBlock, Deslocamento, EquipeGerencia, Participation, Solicitacao, Usuario
 from apps.core.pii import busca_por_nome, email_sem_cpf
+from apps.core.services.availability_service import ENFORCED_ROLES, coordenador_ocupante, ocupa_agenda_q
 from apps.core.services.horas_formacao import horas_formacao
 from apps.core.types import UserId
 
@@ -48,7 +51,9 @@ def build_monthly_grid(
     Args:
         year: Ano (YYYY)
         month: Mês (1..12)
-        role: "FORMADOR" ou "COORDENADOR"
+        role: "FORMADOR" ou "COORDENADOR". Na aba COORDENADOR o dia marca os eventos que
+            ocupam a agenda pela regra do motor de conflito (`ocupa_agenda_q`): formador, ou
+            responsável que acompanha (decisão do dono, 05/10/2026)
         gerencia_id: ID da gerência para filtrar. Quando especificado, filtra
             participações e eventos apenas dessa gerência. Quando None, mantém
             comportamento legado (apenas fluxo SUPER).
@@ -129,12 +134,19 @@ def build_monthly_grid(
             "details_index": {},
         }
 
-    # 2. Eventos aprovados do mês (por pessoa)
-    events_q = Solicitacao.objects.filter(
-        status="aprovado",
-        participations__role=role,
-        participations__usuario_id__in=user_ids,
-    ).filter(
+    # 2. Eventos aprovados do mês (por pessoa). Coordenadores: só o que ocupa a agenda, a
+    # mesma regra do motor de conflito (o responsável que não acompanha não ocupa).
+    if role == "COORDENADOR":
+        events_q = Solicitacao.objects.filter(status="aprovado").filter(
+            reduce(or_, (ocupa_agenda_q(uid) for uid in user_ids))
+        )
+    else:
+        events_q = Solicitacao.objects.filter(
+            status="aprovado",
+            participations__role=role,
+            participations__usuario_id__in=user_ids,
+        )
+    events_q = events_q.filter(
         # Interseção com o mês: evento.inicio < month_end AND evento.fim > month_start
         inicio__lt=month_end,
         fim__gt=month_start,
@@ -159,6 +171,8 @@ def build_monthly_grid(
     # As colunas do SELECT (Solicitacao + municipio/tipo_evento via select_related)
     # são determinísticas por evento, então o DISTINCT colapsa só as cópias. (#1630)
     events_q = events_q.select_related("municipio", "tipo_evento").distinct()
+    if role == "COORDENADOR":
+        events_q = events_q.select_related("coordenador", "usuario")
     events = list(events_q)
 
     # Batch fetch participants for every event in one query. Returns a flat
@@ -168,10 +182,16 @@ def build_monthly_grid(
     if event_ids:
         for sol_id, uid in Participation.objects.filter(
             solicitacao_id__in=event_ids,
-            role=role,
+            role__in=ENFORCED_ROLES if role == "COORDENADOR" else (role,),
             usuario_id__in=user_ids,
         ).values_list("solicitacao_id", "usuario_id"):
             event_to_users[sol_id].append(uid)
+    if role == "COORDENADOR":
+        ids = set(user_ids)
+        for event in events:
+            ocupante = coordenador_ocupante(event)
+            if ocupante is not None and ocupante.pk in ids and ocupante.pk not in event_to_users[event.id]:
+                event_to_users[event.id].append(ocupante.pk)
 
     # 3. Bloqueios aprovados
     blocks = list(

@@ -106,7 +106,7 @@ const TEXTO_DA_TAG_GCAL: Partial<Record<GcalRowTag['color'], string>> = {
   error: '#b32430', // red-8: 5,98:1
 };
 const COR_DO_MOTIVO_DO_ERRO = '#b32430'; // red-8: 6,54:1 no branco
-// Linha marcada para o lote (tema claro): o AntD tira o fundo do colorPrimary (#006B52 → #9aaba4;
+// Linha marcada para o lote (tema claro): o AntD tira o fundo do colorPrimary (o verde da marca clareado para #9aaba4;
 // com o mouse, #659e89) e o motivo do erro caía para 2,72 e 2,12:1. Mesmo verde claro da tela Aprovações.
 const FUNDO_DA_LINHA_MARCADA = '#f4faf7';
 const TEMA_DA_TABELA = {

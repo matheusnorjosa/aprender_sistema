@@ -153,7 +153,7 @@ interface PreviewDataType {
 // e mostra o texto inteiro no title (achado da revisão do PR-2, 05/10/2026).
 const UMA_LINHA: CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 
-// Linha marcada para o lote (tema claro): o AntD tira o fundo do colorPrimary (#006B52 → #9aaba4),
+// Linha marcada para o lote (tema claro): o AntD tira o fundo do colorPrimary (o verde da marca clareado para #9aaba4),
 // e os ícones de Aprovar e Reprovar (link, sem fundo) caíam para 1,71 e 1,36:1. Este verde bem
 // claro dá 3:1 aos dois ícones e 4,5:1 ao texto cinza da célula (WCAG 1.4.11 e 1.4.3).
 const FUNDO_DA_LINHA_MARCADA = '#f4faf7';

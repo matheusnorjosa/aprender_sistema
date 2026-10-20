@@ -220,6 +220,10 @@ _CONSUMED_FIELDS: dict[str, frozenset[str]] = {
             "disciplina",
             "cancelado",
             "evento_ids_anteriores",
+            # lidos pela marca `publicado_fora_do_sistema` e pela adoção do Event ID (`gcal_adocao`)
+            "na_agenda_google",
+            "external_event_id",
+            "external_event_id_confianca",
         }
     ),
     "participation": frozenset(

@@ -1012,3 +1012,11 @@ def test_data_plausivel_dentro_do_limite_muda(tmp_path, m):
     _virada(path)
     s.refresh_from_db()
     assert timezone.localtime(s.inicio, _FORTALEZA).date() == date(2026, 12, 20)
+
+
+def test_campos_do_google_lidos_nao_aparecem_como_ignorados(tmp_path, m):
+    """O relatório de campos ignorados fica honesto: o que a marca e a adoção leem não sai como ignorado."""
+    tally = ExportContractImporter(path=_export(tmp_path, [_sol()]), mode="virada").run()["por_entidade"]["solicitacao"]
+    for lido in ("external_event_id", "external_event_id_confianca", "na_agenda_google"):
+        assert lido not in tally["ignored_fields"]
+    assert "aprovado" in tally["ignored_fields"], "coluna que ninguém lê continua listada"

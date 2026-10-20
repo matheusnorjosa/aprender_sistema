@@ -182,7 +182,15 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
   { path: '/perfil', perfil: 'coordenador', marco: 'Meu perfil' },
   { path: '/politica-privacidade', perfil: 'coordenador', marco: 'Política de Privacidade' },
   { path: '/controle', perfil: 'controle', marco: 'Painel de Controle' },
-  { path: '/controle/acoes', perfil: 'controle', marco: 'Gestão de Ações', dados: { em: LINHA, texto: T.coordenadorDat } },
+  {
+    path: '/controle/acoes',
+    perfil: 'controle',
+    marco: 'Gestão de Ações',
+    dados: { em: LINHA, texto: T.municipio },
+    // Item 38: Coordenador (< 768), o fluxo (< 992) e Coleção, Área, Progresso e Observações
+    // (< 1600) vão para a linha expandida: há linha expandida em toda largura.
+    estados: [expandida(T.municipio, 'Observações')],
+  },
   { path: '/controle/compras', perfil: 'controle', marco: 'Gestão de Compras/Materiais', dados: { em: LINHA, texto: T.produto } },
   {
     path: '/controle/coordenadores',
@@ -305,7 +313,15 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
     dados: { em: LINHA, texto: T.municipio },
   },
   { path: '/dat/importacoes', perfil: 'superusuario', marco: 'DAT > Importações' },
-  { path: '/dat/registros', perfil: 'dat', marco: 'Listagem de Registros DAT', dados: { em: LINHA, texto: T.municipio } },
+  {
+    path: '/dat/registros',
+    perfil: 'dat',
+    marco: 'Listagem de Registros DAT',
+    dados: { em: LINHA, texto: T.municipio },
+    // Item 38: as etapas de detalhe e as observações do FORMAR e do AVALIAR (< 1600) vão para a
+    // linha expandida: há linha expandida em toda largura.
+    estados: [expandida(T.municipio, 'Obs. AVALIAR')],
+  },
 ];
 
 /** Chave de uma medição em PENDENTES: o path, ou `path#estado` para uma vista alternativa. */
@@ -398,6 +414,8 @@ export const TELA_LOGIN = 'login';
  * vista "expandida" é medida e não rola.
  * Aprovações, Publicar na agenda e Pré-agenda (19/10/2026, item 36): saíram as 4 de
  * /solicitacoes/aprovacoes, as 4 de /solicitacoes/publicacao e as 4 de /controle/pre-agenda. Ficam 67.
+ * Gestão de Ações e Registros de Turmas (item 38, 20/10/2026): saíram as 4 de /controle/acoes e
+ * as 4 de /dat/registros. Ficam 59. A vista "expandida" de cada uma é medida e não rola.
  * O ratchet do Vitest (semRolagemHorizontal.pendentes.test.ts) trava a lista: nada novo
  * entra e o tamanho só desce.
  */
@@ -412,7 +430,6 @@ export const PENDENTES: Readonly<Record<string, readonly Largura[]>> = {
   '/solicitacoes/disponibilidade': [360, 768, 1024],
   '/solicitacoes/bloqueios': [360, 768, 1024, 1280],
   '/solicitacoes/deslocamentos': [360, 768, 1024, 1280],
-  '/controle/acoes': [360, 768, 1024, 1280],
   '/controle/compras': [360, 768, 1024, 1280],
   '/controle/coordenadores': [360, 768, 1024, 1280],
   '/controle/coordenadores#lista': [360, 768, 1024, 1280],
@@ -421,7 +438,6 @@ export const PENDENTES: Readonly<Record<string, readonly Largura[]>> = {
   '/acoes-notificacao': [360, 768, 1024, 1280],
   '/notificacoes-internas': [360, 768],
   '/dat/cadastros': [360, 768, 1024, 1280],
-  '/dat/registros': [360, 768, 1024, 1280],
 };
 
 /**

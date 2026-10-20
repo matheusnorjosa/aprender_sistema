@@ -55,7 +55,7 @@ gh workflow run promote.yml -f release=vYYYY.MM.DD-<sha7>
 
 > Rollback de **imagem** não desfaz **migration**. Se a release promovida aplicou migration
 > destrutiva, o caminho de volta é restore de banco, com `restore_db.sh` — operante para
-> `.age` desde `8f392636` (#1611) e com verificação real de sucesso desde `3bca74f3`
+> `.age` desde `815b1afc` (#1611) e com verificação real de sucesso desde `e4c2d22b`
 > (#1645). O que ainda **não** foi ensaiado é o drill de ponta a ponta
 > ([#1646](https://github.com/matheusnorjosa/aprender_sistema/issues/1646), aberta):
 > trate o RTO de restore como estimativa. Ver [DISASTER_RECOVERY.md](DISASTER_RECOVERY.md).

@@ -1,7 +1,7 @@
 ---
 title: Regras de Disponibilidade (RD-01..RD-08)
 status: canonical
-last_verified: 2026-10-06
+last_verified: 2026-10-19
 sources_of_truth:
   - v2/backend/apps/core/services/availability_service.py
   - v2/backend/apps/core/services/horas_formacao.py
@@ -99,7 +99,7 @@ Endpoints DRF (rota em `apps/core/urls.py`):
 - `GET /api/availability/monthly/` — grade mensal (legenda/celulas); ver `GUIDE_AVAILABILITY.md`.
 - `GET/POST /api/availability-blocks/` — CRUD de `AvailabilityBlock` (formador declara os proprios; RD-02/RD-03).
 
-RBAC dos endpoints de check: `permission_classes = [HasPerm("view_all_availability") | HasPerm("create_solicitation") | HasPerm("approve_solicitation_batch")]`. Filtro fino em runtime: consultar **outro** usuario exige `can_check_availability_for_others`; senao 403. Throttle scope `availability_check`. (Linguagem RBAC canonica `HasPerm`; grupos diretos banidos por `scripts/rbac_lint.py`.)
+RBAC dos endpoints de check: `permission_classes = [HasPerm("view_all_availability") | HasPerm("create_solicitation") | HasPerm("approve_solicitation")]` (`approve_solicitation_batch` foi apagada na migration 0125). Filtro fino em runtime: consultar **outro** usuario exige `can_check_availability_for_others`; senao 403. O alvo ainda passa pelo escopo de objeto (`_alvos_no_escopo`, F4): ver [availability.spec](../backend/availability.spec.md). SSOT: `views_availability.py`. Throttle scope `availability_check`. (Linguagem RBAC canonica `HasPerm`; grupos diretos banidos por `scripts/rbac_lint.py`.)
 
 ## Fluxos principais
 
@@ -145,7 +145,7 @@ Caminhos de erro do endpoint `check/`: `usuario_id` ausente/invalido → 400; us
 
 ## Divergencias entre a regra escrita e o codigo
 
-> As duas divergencias abaixo foram reconfirmadas por execucao contra `main d08acfa5` e depois
+> As duas divergencias abaixo foram reconfirmadas por execucao contra `main 8b6bd1fd` e depois
 > **corrigidas no codigo** (epico #1664; detalhe e commits em
 > [`availability.spec.md`](../backend/availability.spec.md)). Ficam aqui como historico; o texto
 > de cada uma descreve o comportamento **anterior** ao conserto. Fonte:
@@ -192,5 +192,5 @@ estreito — hoje so o superuser (1 ativo) cria `Participation` `CONVIDADO` por 
 - **Codigo `E` orfao no `ConflictCode`**: presente no `Literal` mas nunca emitido pelo servico (so legenda da grade). Possivel fonte de confusao entre saida do check e celulas da Grade Mensal.
 - **TOCTOU: depende da camada.** No caminho **consultivo** (`check_conflicts`) o `ok=True` continua sem valor transacional — resultado cacheado por 300s, e outro evento pode ser aprovado no meio. No caminho de **enforcement** a janela esta fechada: `enforce_solicitacao_availability` roda dentro de `transaction.atomic()`, depois de `pg_advisory_xact_lock` por participante, lendo sem cache. Nao trocar um pelo outro: usar `check_conflicts` em enforcement reabre o double-booking que o lock existe para impedir.
 - **Sem checagem de buffer transitivo**: RD-04 so olha o evento imediatamente anterior e o imediatamente posterior; cadeias com 3+ eventos no mesmo dia nao reavaliam o buffer entre pares nao-adjacentes.
-- **Participacoes**: `events_qs` inclui solicitacoes onde o usuario e participante (`participations__usuario`) alem de dono; confirmar que novas relacoes de participacao mantenham esse filtro ao evoluir o modelo.
+- **Participacoes**: `events_qs` filtra por `ocupa_agenda_q(usuario)`: so ocupa quem e FORMADOR no evento (`ENFORCED_ROLES`) ou o responsavel (`coordenador`; sem ele, quem criou) quando `coordenador_acompanha=True`; ter criado o evento, por si so, ou ser `COORDENADOR`/`COORD_ACOMPANHA`/`CONVIDADO`, nao ocupa. Confirmar que novas relacoes de participacao passem por `ocupa_agenda_q` ao evoluir o modelo.
 - **GUIDE_AVAILABILITY.md** descreve gerencias/setores de forma resumida (lista parcial); a SSOT de setores/funcoes e `apps.core.constants` (13 setores / 5 funcoes, sendo 4 funcoes RBAC + Gerente). Nao tratar a tabela do guia como SSOT organizacional.

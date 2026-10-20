@@ -21,8 +21,15 @@ docker compose --env-file .env.dev \
   exec web python manage.py createsuperuser
 ```
 
-O `Usuario` é customizado: além de `username`/senha, o comando pede um `cpf`
-obrigatório e único, de exatamente 11 dígitos (`apps/core/models/usuario.py:22-31`).
+O `Usuario` é customizado e tem `cpf` único (11 dígitos, `apps/core/models/usuario.py`),
+mas não define `REQUIRED_FIELDS`: o `createsuperuser` pergunta só username, e-mail e senha,
+e o `cpf` fica vazio. O primeiro superusuário criado assim funciona; um segundo colide no
+`unique` do `cpf` vazio. Alternativas:
+
+- Só em dev, subir com `CREATE_SUPERUSER=1` e `DJANGO_SUPERUSER_PASSWORD` definidos: o
+  `entrypoint.sh` cria o usuário `admin` se ele não existir (também com `cpf` vazio).
+- Criar pelo shell informando o CPF:
+  `python manage.py shell -c "from django.contrib.auth import get_user_model; get_user_model().objects.create_superuser(username='...', email='...', password='...', cpf='<11 dígitos>')"`.
 O login é `POST /api/auth/login/` com `username` + `password`.
 
 ## 3. Acesse o Admin
@@ -41,7 +48,7 @@ Acesse http://localhost:8002/admin/ com as credenciais criadas.
 
 ### Aprovar Solicitação (Superintendência)
 
-1. Acesse `/aprovacoes`
+1. Acesse `/solicitacoes/aprovacoes`
 2. Revise solicitações pendentes
 3. Aprove ou reprove com justificativa
 

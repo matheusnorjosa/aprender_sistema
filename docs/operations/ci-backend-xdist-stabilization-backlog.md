@@ -16,7 +16,7 @@ Ultima atualizacao: 2026-06-19
 |---|---|---|---|---|---|
 | #681 | `test_config_validation` com `SessionInterrupted` em xdist | @matheusnorjosa | resolved | PR #685 (mergeado) | Troca para `APIClient` + `force_authenticate` no modulo de config API |
 | #682 | Ruido de `duplicate key / unique constraint` intencional em testes de unicidade | @matheusnorjosa | resolved | PR #686 (mergeado) | Testes migrados para validacao por `full_clean()`/`ValidationError` |
-| #1402 | ~537 testes falhando sob xdist (403 PERMISSION_DENIED em cascata) | @matheusnorjosa | resolved | PR #1450 (`64dfeb4`); canary 0/4 em 2 runs consecutivos | Causa: testes `@pytest.mark.django_db(transaction=True)` TRUNCAM o DB no teardown, apagando o seed de RBAC (grupos x capability); Django reordena `TransactionTestCase` pro fim (serial ok), pytest-xdist NAO -> truncate no meio do worker envenena os seguintes. Fix: fixture autouse `ensure_rbac_seed` (conftest raiz) re-semeia idempotente pos-truncate + isolamento de cache/sessao Redis por worker. |
+| #1402 | ~537 testes falhando sob xdist (403 PERMISSION_DENIED em cascata) | @matheusnorjosa | resolved | PR #1450 (`a5b9c3a`); canary 0/4 em 2 runs consecutivos | Causa: testes `@pytest.mark.django_db(transaction=True)` TRUNCAM o DB no teardown, apagando o seed de RBAC (grupos x capability); Django reordena `TransactionTestCase` pro fim (serial ok), pytest-xdist NAO -> truncate no meio do worker envenena os seguintes. Fix: fixture autouse `ensure_rbac_seed` (conftest raiz) re-semeia idempotente pos-truncate + isolamento de cache/sessao Redis por worker. |
 
 ## Promocao ao gate (#1403)
 

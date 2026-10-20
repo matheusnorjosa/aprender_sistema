@@ -129,7 +129,7 @@ O cancel também confere, antes de apagar, se a conta enxerga o calendário (`ca
 
 #### Comportamento do modo OAuth
 
-- **Pré-requisito**: quem publica conecta a PRÓPRIA conta Google via `GET /api/oauth/google/start/` (callback em `/api/oauth/google/callback/`): Controle e Superintendência (`use_gcal`) e a Apoio de Coordenação com setor vigente (`publish_setor_solicitacao`, #1656). A Apoio não escolhe calendário: publica no da organização (`GCAL_OAUTH_CALENDAR_ID`), então a conta conectada precisa do compartilhamento «Fazer alterações nos eventos» nesse calendário.
+- **Pré-requisito**: quem publica conecta a PRÓPRIA conta Google via `GET /api/oauth/google/start/` (callback em `/api/oauth/google/callback/`): Controle e DAT (`use_gcal`, que vem do pacote da gerência em `apps/core/services/rbac_pacotes.py`; a aprovadora da Superintendência aprova pelo vínculo GERENTE e não recebe `use_gcal`) e a Apoio de Coordenação com setor vigente (`publish_setor_solicitacao`, #1656). A Apoio não escolhe calendário: publica no da organização (`GCAL_OAUTH_CALENDAR_ID`), então a conta conectada precisa do compartilhamento «Fazer alterações nos eventos» nesse calendário.
 - **Fluxo de publicação**: ao publicar/resync na Pré-agenda, o sistema verifica a conexão. Sem conexão retorna **403 Forbidden** (UI mostra card/modal "Conectar conta Google"); com conexão enfileira a task Celery com `operator_user_id` e retorna **202 Accepted**.
 - **Governança**: `apply_blocked` continua dependendo de `GCAL_CLIENT='google'`.
 - **Verificação diária das contas** (#2039): às 05:00 o job `probe_google_credentials` força o refresh de cada credencial. Conta que o Google recusa (`invalid_grant`) é removida e a pessoa vê o aviso de reconectar; o Controle vê a lista no resumo de alertas do GCal. Erro de rede ou 5xx não remove nada. Ver §6, "Conta Google desconectada pelo sistema".
@@ -250,27 +250,30 @@ O `GoogleCalendarClient` (`apps/core/services/gcal_google_client.py`) lê `setti
 # 1. Configure env
 export GCAL_CLIENT=fake
 export GCAL_SEND_UPDATES=none
+# A API só aceita sessão (SessionAuthentication): faça login como em API_EXAMPLES.md
+# (gera cookies.txt) e mande o CSRF; Authorization: Bearer não é aceito (403).
+CSRF=$(curl -s -b cookies.txt -c cookies.txt http://localhost:8002/api/csrf/ | jq -r '.csrfToken')
 
 # 2. Preview (sempre permitido)
 curl -X POST http://localhost:8002/api/solicitacoes/123/preview-gcal/ \
-  -H "Authorization: Bearer $TOKEN"
+  -b cookies.txt -H "X-CSRFToken: $CSRF"
 
 # 3. Dry-run (simula publicação)
 curl -X POST http://localhost:8002/api/solicitacoes/123/publish/ \
-  -H "Authorization: Bearer $TOKEN" \
+  -b cookies.txt -H "X-CSRFToken: $CSRF" \
   -H "Content-Type: application/json" \
   -d '{"dry_run": true, "apply_blocked": false}'
 
 # 4. Publicação real (bloqueada por GCAL_CLIENT=fake)
 curl -X POST http://localhost:8002/api/solicitacoes/123/publish/ \
-  -H "Authorization: Bearer $TOKEN" \
+  -b cookies.txt -H "X-CSRFToken: $CSRF" \
   -H "Content-Type: application/json" \
   -d '{"dry_run": false, "apply_blocked": false}'
 # → Retorna 409 CONFLICT
 
 # 5. Forçar publicação (teste com fake client)
 curl -X POST http://localhost:8002/api/solicitacoes/123/publish/ \
-  -H "Authorization: Bearer $TOKEN" \
+  -b cookies.txt -H "X-CSRFToken: $CSRF" \
   -H "Content-Type: application/json" \
   -d '{"dry_run": false, "apply_blocked": true}'
 # → 200/202 OK (usa fake client)
@@ -282,7 +285,7 @@ curl -X POST http://localhost:8002/api/solicitacoes/123/publish/ \
 
 1. Solicitação é aprovada
 2. API `POST /api/solicitacoes/{id}/publish/` é chamada com `dry_run=false` e `apply_blocked=false` (ou `GCAL_CLIENT=google`)
-3. Payload inclui `conferenceData` com `requestId` único
+3. Payload inclui `conferenceData` com `requestId` determinístico (`meet-asv2-{id}`, `_request_id_for` em `gcal/validation.py`, ADR-008): mesmo ID = mesmo link Meet
 4. Google Calendar cria evento + gera link Meet
 5. Backend extrai `hangoutLink` do response
 6. Campo `meet_link` é **persistido no banco APENAS em APPLY real**
@@ -330,11 +333,10 @@ GET /api/solicitacoes/
   1. **"Entrar na reunião"** (primário, abre em nova aba)
   2. **"Copiar link"** (copia para clipboard com feedback)
 
-**3 locais integrados:**
+**4 locais integrados** (fonte: `grep -rl MeetLink v2/frontend/src`, fora o próprio componente e os testes):
 
-1. **`src/pages/Solicitacoes.tsx`** (drawer de detalhes):
-   - Campo "Reunião Online" com `<MeetLink href={selectedSolicitacao.meet_link} />`
-   - Exibido apenas se meet_link existir
+1. **`src/pages/MeusEventos/MeusEventosPage.tsx`** (coluna reunião):
+   - `<MeetLink href={meet_link} />` (retorna null se vazio)
 
 2. **`src/pages/PreAgenda/PreAgendaPage.tsx`** (coluna ações):
    - `<MeetLink href={record.meet_link} />` na coluna "Ações"
@@ -343,6 +345,9 @@ GET /api/solicitacoes/
 3. **`src/pages/Solicitacoes/MySolicitacoesPage.tsx`** (coluna reunião):
    - Coluna dedicada "Reunião"
    - `<MeetLink href={meet_link} />` (retorna null se vazio)
+
+4. **`src/pages/Solicitacoes/PublicacaoSetorPage.tsx`** (publicação da Apoio de Coordenação):
+   - `<MeetLink href={href} />` na coluna do link
 
 ## 4.5. Modalidade (Online x Presencial)
 
@@ -390,7 +395,7 @@ is_online = models.BooleanField(
   "attendees": [...],
   "conferenceData": {
     "createRequest": {
-      "requestId": "asv2-123-1730123456",
+      "requestId": "meet-asv2-123",
       "conferenceSolutionKey": {"type": "hangoutsMeet"}
     }
   }
@@ -436,7 +441,9 @@ is_online = models.BooleanField(
 > `build_event_payload(s: Solicitacao, *, enable_meet: bool = False)`.
 
 ```python
-# apps/core/services/gcal/payload.py:274
+# apps/core/services/gcal/payload.py — build_event_payload é wrapper de _build_payload
+# (resumo abaixo); o requestId vem de _request_id_for em gcal/validation.py —
+# determinístico (ADR-008, fix #573). Quem chama passa enable_meet=bool(s.is_online).
 def build_event_payload(s, *, enable_meet: bool = False):
     payload = {
         "summary": "...",
@@ -445,11 +452,11 @@ def build_event_payload(s, *, enable_meet: bool = False):
         # ...
     }
 
-    # Adiciona conferenceData apenas se is_online=True
-    if enable_meet and solicitacao.is_online:
+    # Adiciona conferenceData apenas se enable_meet=True (modalidade online)
+    if enable_meet:
         payload["conferenceData"] = {
             "createRequest": {
-                "requestId": f"asv2-{solicitacao.id}-{int(datetime.now().timestamp())}",
+                "requestId": _request_id_for(s),  # "meet-asv2-{id}", sem timestamp
                 "conferenceSolutionKey": {"type": "hangoutsMeet"}
             }
         }
@@ -490,7 +497,8 @@ task Celery operaria sobre um registro já removido. Aguarde a conclusão da sin
 **Descrição**: Republicar solicitação no Google Calendar (força UPDATE)
 
 **Permissão**: `CanUseGcal` (policy `use_gcal` = `{operate_preagenda, approve_solicitation}`,
-entrada `use_gcal` de `ACCESS_POLICIES` em `apps/core/rbac/policies.py`). *(Corrigido em 2026-07-24: a classe `IsControleOrSuper`
+entrada `use_gcal` de `ACCESS_POLICIES` em `apps/core/rbac/policies.py`) **ou** `CanPublishSetorSolicitacao`
+(a Apoio de Coordenação com setor vigente, `publish_setor_solicitacao`; `views_solicitacao.py`). *(Corrigido em 2026-07-24: a classe `IsControleOrSuper`
 não existe no codebase.)*
 
 **Fluxo**:
@@ -505,7 +513,7 @@ não existe no codebase.)*
 **Exemplo**:
 ```bash
 curl -X POST http://localhost:8002/api/solicitacoes/123/resync-gcal/ \
-  -H "Authorization: Bearer <token>" \
+  -b cookies.txt -H "X-CSRFToken: $CSRF" \
   -H "Content-Type: application/json"
 ```
 
@@ -523,7 +531,8 @@ curl -X POST http://localhost:8002/api/solicitacoes/123/resync-gcal/ \
 **Descrição**: Cancelar evento no Google Calendar e limpar campos
 
 **Permissão**: `CanUseGcal` (policy `use_gcal` = `{operate_preagenda, approve_solicitation}`,
-entrada `use_gcal` de `ACCESS_POLICIES` em `apps/core/rbac/policies.py`). *(Corrigido em 2026-07-24: a classe `IsControleOrSuper`
+entrada `use_gcal` de `ACCESS_POLICIES` em `apps/core/rbac/policies.py`) **ou** `CanPublishSetorSolicitacao`
+(a Apoio de Coordenação com setor vigente, `publish_setor_solicitacao`; `views_solicitacao.py`). *(Corrigido em 2026-07-24: a classe `IsControleOrSuper`
 não existe no codebase.)*
 
 **Fluxo**:
@@ -543,7 +552,7 @@ não existe no codebase.)*
 **Exemplo**:
 ```bash
 curl -X POST http://localhost:8002/api/solicitacoes/123/cancel-gcal/ \
-  -H "Authorization: Bearer <token>" \
+  -b cookies.txt -H "X-CSRFToken: $CSRF" \
   -H "Content-Type: application/json"
 ```
 
@@ -559,8 +568,8 @@ curl -X POST http://localhost:8002/api/solicitacoes/123/cancel-gcal/ \
 ### Helpers (Service Layer)
 
 **Arquivo real**: pacote `v2/backend/apps/core/services/gcal/`
-— `payload.py` (`build_event_payload:274`) e `sync.py`
-(`upsert_one:143`, `resync_solicitacao:388`, `cancel_solicitacao:416`).
+— `payload.py` (`build_event_payload`) e `sync.py`
+(`upsert_one`, `resync_solicitacao`, `cancel_solicitacao`).
 
 `v2/backend/apps/core/services/gcal_sync_service.py` continua importável, mas é apenas uma
 **fachada de re-export** (`:1-60`). Ao procurar código, vá no pacote.
@@ -658,12 +667,13 @@ Os bloqueios vêm de `publish_ready` e `publish_block_reason` em `GET /api/integ
 
 **Cobertura** (`v2/backend/apps/core/tests/test_gcal_cancel_resync.py`):
 
-**13 testes totais**:
-- **3 testes helpers**:
+**14 testes totais**:
+- **5 testes helpers (service)**:
   - `test_resync_requires_approved_status`: ValueError se `status != 'aprovado'`
   - `test_resync_resets_hash_and_calls_apply`: Valida reset de hash e chamada de `apply_one`
   - `test_cancel_validates_published`: ValueError se não publicado
   - `test_cancel_deletes_and_clears_fields`: Valida delete + limpeza de campos
+  - `test_cancel_oauth_uses_credential_calendar_not_primary`: em OAuth, o cancel apaga no calendário da credencial, não em `primary`
 
 - **2 testes task**:
   - `test_task_cancel_success`: Sucesso com AuditLog
@@ -682,7 +692,7 @@ Os bloqueios vêm de `publish_ready` e `publish_block_reason` em `GET /api/integ
 ```bash
 cd v2/infra
 docker compose exec -T web pytest apps/core/tests/test_gcal_cancel_resync.py -v
-# ========================= 13 passed in 10.00s =========================
+# ========================= 14 passed =========================
 ```
 
 ### Idempotência
@@ -733,7 +743,8 @@ docker compose exec web python manage.py preagenda_to_gcal --help
 ```
 
 Para publicar uma solicitação específica, o caminho suportado é o endpoint
-`POST /api/solicitacoes/{id}/publish/` (gate `CanUseGcal`), que despacha a task
+`POST /api/solicitacoes/{id}/publish/` (gate `CanUseGcal` OU `CanPublishSetorSolicitacao`, a Apoio de
+Coordenação com setor vigente), que despacha a task
 `task_publish_solicitacao_to_gcal`.
 
 ### Testes

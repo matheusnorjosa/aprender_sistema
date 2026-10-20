@@ -42,7 +42,8 @@ O sistema original funcionava integralmente sobre planilhas Google/Excel, que ac
 - **Infraestrutura**: Docker + Docker Compose (`v2/infra/docker-compose.yml`)
 - **Frontend**: React (Vite) + Tailwind + Ant Design
 - **Type Checking**: Pyright (strict mode)
-- **Testes E2E**: Playwright — **137 testes** em 23 arquivos `.spec.ts` sob `v2/frontend/e2e/`
+- **Testes E2E**: Playwright, arquivos `.spec.ts` sob `v2/frontend/e2e/` (contagem atual em
+  [INDEX_DOCUMENTACAO.md](./INDEX_DOCUMENTACAO.md); em 2026-10-19: 168 blocos em 29 arquivos)
 
 ### 2.2 Estrutura de Código
 
@@ -54,19 +55,19 @@ O sistema original funcionava integralmente sobre planilhas Google/Excel, que ac
 - **Apps**: `apps.core` (domínio principal) e `apps.dev_tools` (seeds e tooling de dev).
   **`apps.dat_ingest` não existe mais.**
 - **Configurações**: `config/` (settings, urls, wsgi, celery)
-- **Management commands**: 13 em `apps/core/management/commands/` + 15 em
+- **Management commands**: 20 em `apps/core/management/commands/` + 15 em
   `apps/dev_tools/management/commands/`. **Nenhum comando `etl_*`.** O comando canônico de
   importação é `import_export_contract` (ver §2.4).
 
 #### Frontend (`v2/frontend`)
-- **Framework**: React 18 + Vite 7
+- **Framework**: React 19 + Vite 7
 - **UI**: Ant Design 5 + Tailwind CSS
-- **Páginas**: 57 arquivos `.tsx` em `src/pages` (o projeto é 100% TypeScript — não há `.jsx`)
+- **Páginas**: 55 arquivos `.tsx` não-teste em `src/pages` (contagem do `INDEX_DOCUMENTACAO.md`) (o projeto é 100% TypeScript — não há `.jsx`)
 
 ### 2.3 Modelos do Sistema
 
 > 🔴 **Corrigido em 2026-07-24.** O título dizia "28 modelos", a tabela abaixo lista 29 e o código
-> exporta **43 nomes** em `__all__` de `apps/core/models/__init__.py`. Não confie na contagem daqui:
+> exporta **40 nomes** em `__all__` (recontado em 2026-10-19) de `apps/core/models/__init__.py`. Não confie na contagem daqui:
 > o **SSOT é `apps/core/models/__init__.py`**.
 >
 > Ausentes da tabela abaixo: `MunicipioReferencia`, `ImportJob`, `PermissaoFuncional`,
@@ -87,7 +88,7 @@ O sistema original funcionava integralmente sobre planilhas Google/Excel, que ac
 | Modelo | Descrição |
 |--------|-----------|
 | `Solicitacao` | Pedido de evento (status: pendente/aprovado/reprovado) |
-| `Participation` | Participantes de uma solicitação (role: COORDENADOR/FORMADOR/APOIO) |
+| `Participation` | Participantes de uma solicitação (role: COORDENADOR/FORMADOR/COORD_ACOMPANHA/CONVIDADO — `Participation.Role`; não existe APOIO) |
 | `AvailabilityBlock` | Bloqueios de agenda (tipos: P=parcial, T=total) |
 | `Deslocamento` | Registros de deslocamentos entre municípios |
 
@@ -106,7 +107,6 @@ O sistema original funcionava integralmente sobre planilhas Google/Excel, que ac
 | `DATCadastro` | Cadastros em plataformas (etapas: ABERTA→COLETA→PREENCHIMENTO→REVISAO→FINALIZADA) |
 | `DATCompra` | Compras de materiais |
 | `DATCoordenador` | Coordenadores DAT |
-| `DATFormacao` | Formações DAT |
 | `DATArea` | Áreas de atuação DAT |
 
 #### Módulo PlanoFormações
@@ -120,7 +120,6 @@ O sistema original funcionava integralmente sobre planilhas Google/Excel, que ac
 #### Controle e Compras
 | Modelo | Descrição |
 |--------|-----------|
-| `AcaoControle` | Ações do setor Controle |
 | `AcaoDAT` | Ações DAT (legado) |
 | `Compra` | Registro de compras |
 | `Produto` | Produtos para compra |
@@ -148,21 +147,28 @@ Contratos por entidade e ordem de importação: `v2/docs/imports/README.md`.
 
 ## 3. Papéis, Perfis e Autorizações (RBAC)
 
+> Desde o PR 12 (`RBAC_FONTE=lotacao`) os grupos abaixo são etiqueta: o poder vem da lotação
+> (gerência + papel vigente). SSOT: [specs/backend/rbac.spec.md](./specs/backend/rbac.spec.md).
+
 ### 3.1 Grupos de SETOR (onde trabalha)
-- Superintendência, DAT, Controle, Vidas, ACerta, Brincando, Fluir, Sou da Paz, Gerência
+- São 13 (`SETOR_GROUPS` em `v2/backend/apps/core/constants.py`, o SSOT): Superintendência, Vidas,
+  Fluir, ACerta, Brincando, Sou da Paz, DAT, Controle, Diretoria, Comercial, Relacionamento,
+  Logística Viagens, Logística Galpão. Não existe grupo "Gerência" (Gerente é função).
 
 ### 3.2 Grupos de FUNÇÃO (o que pode fazer)
-- **Formador**: Visualiza grade, gerencia bloqueios pessoais
+- **Formador**: Etiqueta. O papel FORMADOR na lotação gerencia os próprios bloqueios e não abre a
+  Grade Mensal (`TELAS_DE_ESCOPO` em `apps/core/rbac/policies.py`, ver [rbac.spec.md](./specs/backend/rbac.spec.md))
 - **Coordenador**: Cria solicitações de eventos
 - **Apoio de Coordenação**: Auxilia coordenação
-- **Gerente**: Aprova/reprova, acessa dashboards
+- **Gerente**: Etiqueta. O papel GERENTE na lotação cria e edita eventos da gerência; aprova na
+  Superintendência e, pelo pacote do perfil, no DAT e no Controle (`solicitation_approval_basis`, §5.2)
 
 ### 3.3 Fluxos de Aprovação
 
 #### Fluxo SUPER (Requer Aprovação Manual)
 1. Coordenador envia solicitação → `status = pendente`
 2. Sistema checa disponibilidade (RD-01 a RD-08)
-3. Superintendência aprova/reprova
+3. Quem tem base em `solicitation_approval_basis` aprova/reprova (PA-02, §5.2)
 4. Se aprovado → Controle publica no Google Calendar
 
 #### Fluxo NAO_SUPER (Auto-Aprovado)
@@ -193,14 +199,18 @@ Contratos por entidade e ordem de importação: `v2/docs/imports/README.md`.
 - **RD-02**: Bloqueio total (T) impede eventos
 - **RD-03**: Bloqueio parcial (P) impede no subintervalo
 - **RD-04**: Buffer de deslocamento (D) entre municípios
-- **RD-05**: Capacidade diária (M) por formador
+- **RD-05**: saiu do motor de conflito em 05/10/2026 (o `M` não é mais emitido); o parâmetro
+  virou o teto por evento da contagem de horas de formação
+  ([regras-disponibilidade.spec.md](./specs/domain/regras-disponibilidade.spec.md))
 - **RD-06**: Timezone America/Fortaleza (armazena UTC)
-- **RD-07**: Prioridade: Bloqueios → Conflitos → Buffer → Limite
+- **RD-07**: o serviço reporta tudo, na ordem Bloqueios → Conflitos → Buffer (o Limite saiu com o RD-05)
 - **RD-08**: Mensagens estruturadas com código/tipo
 
 ### 5.2 Política de Aprovação (PA-01 a PA-07)
 - **PA-01**: Projetos SUPER nunca auto-aprovam
-- **PA-02**: Superintendência/DAT/superuser podem aprovar
+- **PA-02**: quem aprova é definido por `solicitation_approval_basis` (superuser, Gerente vigente da
+  gerência Superintendência, capacidade de aprovar pelo pacote do DAT ou do Controle). SSOT:
+  [specs/domain/politica-aprovacao.spec.md](./specs/domain/politica-aprovacao.spec.md)
 - **PA-03**: Integrações executam após aprovação
 - **PA-04**: Estado inicial = pendente (SUPER) ou aprovado (NAO_SUPER)
 - **PA-05**: Auditoria em AuditLog
@@ -249,11 +259,11 @@ Contratos por entidade e ordem de importação: `v2/docs/imports/README.md`.
 | Área | Testes | Status |
 |------|--------|--------|
 | Availability Service (RD-01→RD-08) | 17 | ✅ |
-| Approval Policy (PA-01→PA-07) | 5 | ✅ |
+| Approval Policy (PA-01→PA-07) | 7 | ✅ |
 | RBAC Permissions | 20+ | ✅ |
 | Google Calendar | 6+ | ✅ |
 | Imports (10 services `*_import.py` + `import_export_contract`) | 40+ | ✅ |
-| E2E Playwright | 137 (23 arquivos `.spec.ts`) | ✅ |
+| E2E Playwright | 168 (29 arquivos `.spec.ts`; recontado em 2026-10-19, ver INDEX_DOCUMENTACAO) | ✅ |
 
 ---
 

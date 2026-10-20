@@ -32,8 +32,8 @@ curl -X POST http://localhost:8000/api/auth/login/ \
   -H "X-CSRFToken: $CSRF" \
   -c cookies.txt \
   -d '{
-    "username": "admin",
-    "password": "admin123"
+    "username": "<CPF, só dígitos>",
+    "password": "<senha>"
   }'
 ```
 
@@ -77,6 +77,8 @@ Campos gravaveis: `municipio`, `projeto`, `tipo_evento`, `tipo`, `encontro`,
 `usuario` e `status` sao read-only — o backend os define.
 
 Criar exige a capability `create_solicitation` (`SolicitacaoViewSet.get_permissions`, `views_solicitacao.py`).
+Na criacao, `coordenador_acompanha` e obrigatorio: sem ele o POST responde 400 nesse campo
+(`SolicitacaoSerializer.validate`).
 
 ### Criar Solicitacao Presencial
 
@@ -93,6 +95,7 @@ curl -X POST http://localhost:8000/api/solicitacoes/ \
     "tipo_evento": 1,
     "is_online": false,
     "local": "Sala 101",
+    "coordenador_acompanha": false,
     "observacoes": "Formacao Fundamental I"
   }'
 ```
@@ -138,6 +141,7 @@ curl -X POST http://localhost:8000/api/solicitacoes/ \
     "projeto": 2,
     "tipo_evento": 1,
     "is_online": true,
+    "coordenador_acompanha": false,
     "observacoes": "Link Meet sera gerado automaticamente"
   }'
 ```
@@ -333,7 +337,10 @@ curl -s http://localhost:8000/api/availability-blocks/ -b cookies.txt | jq
 
 ## Google Calendar
 
-Todas as rotas abaixo exigem a policy `use_gcal` (`CanUseGcal`).
+As acoes por solicitacao (preview-gcal, publish, resync-gcal, cancel-gcal) exigem a policy
+`use_gcal` (`CanUseGcal`) OU `publish_setor_solicitacao` (`CanPublishSetorSolicitacao`, a Apoio
+escopada pela gerencia); o preview tambem aceita quem aprova (`CanAccessSolicitationApprovals`).
+O publish-batch exige so `use_gcal`.
 
 ### Preview antes de Publicar
 

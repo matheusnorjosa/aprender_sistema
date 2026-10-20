@@ -1,8 +1,9 @@
 /**
  * POM da página de Aprovações (`/aprovacoes`).
  *
- * Usada por Superintendência / DAT / superuser para aprovar/reprovar
- * solicitações pendentes (fluxo PA-01..PA-07).
+ * Usada por superusuário, gerente da Superintendência (vínculo GERENTE; só
+ * projetos do fluxo SUPER dela), DAT e Controle (pacote da gerência) para
+ * aprovar/reprovar solicitações pendentes (fluxo PA-01..PA-07).
  */
 import type { Locator } from '@playwright/test';
 import { BasePage } from './BasePage';

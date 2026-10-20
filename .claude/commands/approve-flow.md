@@ -22,7 +22,7 @@ docker exec aprender_dev-web-1 pytest apps/core/tests/test_approval_policy_PA.py
 docker exec aprender_dev-web-1 pytest apps/core/tests/test_approval_policy_PA.py --cov=apps.core.services.solicitacao_create --cov=apps.core.views_solicitacao --cov-report=term-missing
 ```
 
-### 2. Expected Results (5 mandatory tests)
+### 2. Expected Results (7 mandatory tests)
 
 #### PA-01: No Auto-Approval (SUPER Projects)
 - [ ] `test_never_auto_approves_on_clean_or_save`
@@ -34,21 +34,25 @@ docker exec aprender_dev-web-1 pytest apps/core/tests/test_approval_policy_PA.py
 
 **Note**: NAO_SUPER projects ARE auto-approved (tested in `test_solicitacao_fluxo.py`)
 
-#### PA-02: Required Profile (Superintendência Only)
-- [ ] `test_only_superintendencia_can_approve_or_reject`
+#### PA-02: Required Profile (only who has an approval basis)
+- [ ] `test_only_superintendencia_can_approve_or_reject` (legacy name; parametrized over the `APROVADORAS` bases)
 - [ ] `test_non_privileged_user_gets_403_on_approval_endpoint`
+- [ ] `test_segregacao_conta_alterada_bloqueia_decisao` (who altered the author's account in the last 30 days cannot decide: 403 `altered_account_approval_forbidden`)
 
 **Validates**:
 - Policy permission `CanAccessSolicitationApprovals` (from `apps.core.rbac`) blocks non-authorized users
 - 403 Forbidden for Coordenador/Formador on approve/reject endpoints
-- Who approves/rejects: single rule solicitation_approval_basis; see PA-02 in v2/docs/specs/domain/politica-aprovacao.spec.md (no group grants approval)
+- Who approves/rejects: single rule `solicitation_approval_basis` (`apps/core/rbac/policies.py`) with 3 bases: `superuser`, `gerente_superintendencia` (EquipeGerencia GERENTE vigente in gerência `SUPERINTENDENCIA`) and `capacidade_aprovar` (`approve_solicitation` from the gerência profile package: ADMIN_OPERACIONAL of the DAT and CONTROLE, via EQUIPE/GERENTE vínculo). No group grants approval — a user with only the Superintendência group gets 403. See PA-02 in v2/docs/specs/domain/politica-aprovacao.spec.md
+- Nobody approves/rejects their own solicitação (403 `self_approval_forbidden`, except superuser), and the rest of the segregation (`impedimentos` / `decisoes_impedidas` in `services/solicitacao_approval.py`: conta alterada, editada pelo ator) also blocks a decision
+- The `gerente_superintendencia` base only decides projects of fluxo SUPER in gerência SUPERINTENDENCIA (`projeto_no_escopo_da_superintendencia`); outside that → 403 `out_of_approval_scope`. Superuser and `capacidade_aprovar` have no scope limit
 
 #### PA-03: Post-Approval Triggers
 - [ ] `test_calendar_integration_not_called_before_approval`
+- [ ] `test_calendar_integration_is_called_after_approval`
 
 **Validates**:
 - `task_publish_solicitacao_to_gcal` is NOT called during creation (service-layer flow, post-approval only)
-- External integrations only execute AFTER manual approval
+- External integrations only execute AFTER manual approval (`publish` of an `aprovado` solicitação enqueues the task)
 - Google Calendar integration respects approval flow
 
 #### PA-05: Audit Persistent
@@ -91,47 +95,63 @@ solicitacao = Solicitacao.objects.create(
 print(f"Status after save: {solicitacao.status}")  # Should be 'pendente'
 assert solicitacao.status == 'pendente', "PA-01 VIOLATED: Auto-approved!"
 
-# Verify NAO_SUPER auto-approval
+# Verify NAO_SUPER auto-approval. The model never applies the flow: Solicitacao.objects.create()
+# keeps the default 'pendente' for any project. 'aprovado' comes from resolve_initial_status(),
+# called by the create API (POST /api/solicitacoes/) and the importers — check it directly.
+from apps.core.services.solicitacao_create import resolve_initial_status
+
 projeto_nao_super = Projeto.objects.get_or_create(
     nome='Teste NAO_SUPER',
     fluxo='NAO_SUPER'
 )[0]
 
-solicitacao_nao_super = Solicitacao.objects.create(
-    projeto=projeto_nao_super,
-    usuario=usuario,
-    municipio=municipio,
-    inicio=datetime(2025, 1, 16, 9, 0, tzinfo=tz),
-    fim=datetime(2025, 1, 16, 12, 0, tzinfo=tz)
-)
-
-print(f"NAO_SUPER status: {solicitacao_nao_super.status}")  # Should be 'aprovado'
+decisao = resolve_initial_status(projeto=projeto_nao_super)
+print(f"NAO_SUPER initial status: {decisao.status}")  # Should be 'aprovado'
 ```
 
 #### PA-02: Permission Class
 ```python
 from django.test import Client
 from django.contrib.auth.models import Group
+from apps.core.models import EquipeGerencia
+from apps.core.rbac.helpers import GERENCIA_APROVADORA_NOME
 
 client = Client()
 
-# Login as Coordenador (non-authorized)
-# NOTE: groups.filter(name=) aqui e DIAGNOSTICO DE SHELL apenas. Em codigo de
-# producao e BANIDO por scripts/rbac_lint.py — use HasPerm(...) / user_has_any_perm(...).
-coordenador = Usuario.objects.filter(groups__name='Coordenador').first()
-client.force_login(coordenador)
+# Login as a non-authorized user, chosen by LOTAÇÃO, not by group (groups are labels since PR 12):
+# someone with no basis in solicitation_approval_basis — e.g. only a COORDENADOR vínculo vigente,
+# with no GERENTE vínculo in SUPERINTENDENCIA and no EQUIPE/GERENTE vínculo in DAT or CONTROLE.
+# A Coordenador-group account with one of those vínculos DOES approve.
+from apps.core.rbac.policies import solicitation_approval_basis
 
-# Try to approve (should fail with 403)
-response = client.post(f'/api/solicitacoes/{solicitacao.id}/approve/')
+nao_autorizado = next(
+    u for u in Usuario.objects.filter(is_active=True, is_superuser=False)
+    if solicitation_approval_basis(u) is None
+)
+client.force_login(nao_autorizado)
+
+# Try to approve (should fail with 403) — approve/reject are PATCH (POST gives 405)
+response = client.patch(f'/api/solicitacoes/{solicitacao.id}/approve/')
 print(f"Response status: {response.status_code}")  # Should be 403
 assert response.status_code == 403, "PA-02 VIOLATED: Non-authorized can approve!"
 
-# Login as Superintendência (authorized)
-superintendencia = Usuario.objects.filter(groups__name='Superintendência').first()
-client.force_login(superintendencia)
+# Login as an approver chosen by VÍNCULO, not by group (no group grants approval):
+# GERENTE vigente in gerência SUPERINTENDENCIA (base `gerente_superintendencia`).
+# Must not be the solicitação's own author (403 self_approval_forbidden), and this base only
+# decides projects of fluxo SUPER in gerência SUPERINTENDENCIA (else 403 out_of_approval_scope):
+# the PA-01 `projeto_super` above has no gerência, so give it that gerência first.
+vinculo = (
+    EquipeGerencia.vigentes_em()
+    .filter(papel='GERENTE', gerencia__nome=GERENCIA_APROVADORA_NOME)
+    .exclude(usuario=solicitacao.usuario)
+    .select_related('usuario')
+    .first()
+)
+aprovador = vinculo.usuario
+client.force_login(aprovador)
 
 # Try to approve (should succeed with 200)
-response = client.post(f'/api/solicitacoes/{solicitacao.id}/approve/')
+response = client.patch(f'/api/solicitacoes/{solicitacao.id}/approve/')
 print(f"Response status: {response.status_code}")  # Should be 200
 ```
 
@@ -140,7 +160,7 @@ print(f"Response status: {response.status_code}")  # Should be 200
 from apps.core.models import AuditLog
 
 # Approve solicitacao
-response = client.post(f'/api/solicitacoes/{solicitacao.id}/approve/')
+response = client.patch(f'/api/solicitacoes/{solicitacao.id}/approve/')
 
 # Check AuditLog
 audit_log = AuditLog.objects.filter(
@@ -170,46 +190,58 @@ Check:
   - `record.status === 'pendente' && canApprove`
 
 **Manual test**:
-1. Login as Coordenador → Go to `/aprovacoes`
+1. Login as a user with no approval basis (`solicitation_approval_basis(u) is None`, e.g. only a COORDENADOR vínculo; not chosen by group) → Go to `/aprovacoes`
 2. Verify Approve/Reject buttons are HIDDEN
-3. Login as Superintendência → Go to `/aprovacoes`
+3. Login as an approver (GERENTE vigente in gerência SUPERINTENDENCIA, or an EQUIPE/GERENTE vínculo vigente in DAT/Controle) → Go to `/aprovacoes`
 4. Verify Approve/Reject buttons are VISIBLE
 
 ### 5. API Endpoint Testing
 
+The API uses DRF `SessionAuthentication` (no Bearer token) and approve/reject are
+`PATCH` actions. Log in through the browser/session first and send the session
+cookie plus the CSRF token (`$SESSION_*` / `$CSRF_*` below come from that login).
+
 ```bash
-# Test approve endpoint (as Superintendência)
-curl -X POST "http://localhost:8002/api/solicitacoes/1/approve/" \
-  -H "Authorization: Bearer $TOKEN_SUPERINTENDENCIA" \
+# Test approve endpoint (as an approver: GERENTE vigente in SUPERINTENDENCIA, DAT or Controle vínculo)
+curl -X PATCH "http://localhost:8002/api/solicitacoes/1/approve/" \
+  -b "sessionid=$SESSION_APROVADOR; csrftoken=$CSRF_APROVADOR" \
+  -H "X-CSRFToken: $CSRF_APROVADOR" \
+  -H "Referer: http://localhost:8002/" \
   -H "Content-Type: application/json" \
   -d '{"justificativa": "Teste aprovação"}'
 
 # Expected: 200 OK
 
-# Test approve endpoint (as Coordenador)
-curl -X POST "http://localhost:8002/api/solicitacoes/1/approve/" \
-  -H "Authorization: Bearer $TOKEN_COORDENADOR" \
+# Test approve endpoint (as a user with no approval basis, e.g. only a COORDENADOR vínculo)
+curl -X PATCH "http://localhost:8002/api/solicitacoes/1/approve/" \
+  -b "sessionid=$SESSION_COORDENADOR; csrftoken=$CSRF_COORDENADOR" \
+  -H "X-CSRFToken: $CSRF_COORDENADOR" \
+  -H "Referer: http://localhost:8002/" \
   -H "Content-Type: application/json" \
   -d '{"justificativa": "Teste aprovação"}'
 
 # Expected: 403 Forbidden
 
 # Test reject endpoint
-curl -X POST "http://localhost:8002/api/solicitacoes/1/reject/" \
-  -H "Authorization: Bearer $TOKEN_SUPERINTENDENCIA" \
+curl -X PATCH "http://localhost:8002/api/solicitacoes/1/reject/" \
+  -b "sessionid=$SESSION_APROVADOR; csrftoken=$CSRF_APROVADOR" \
+  -H "X-CSRFToken: $CSRF_APROVADOR" \
+  -H "Referer: http://localhost:8002/" \
   -H "Content-Type: application/json" \
   -d '{"justificativa": "Teste reprovação"}'
 
 # Expected: 200 OK
 ```
 
+In Python, prefer `APIClient().force_authenticate(user=...)` + `client.patch(...)`, as `test_approval_policy_PA.py` does.
+
 ### 6. Compliance Matrix
 
 | Requisito | Implementação | Teste | Status |
 |-----------|---------------|-------|--------|
 | **PA-01** | `services/solicitacao_create.py:resolve_initial_status` (SUPER only) | `test_never_auto_approves_on_clean_or_save` | ✅ |
-| **PA-02** | `rbac/policies.py:CanAccessSolicitationApprovals` | `test_only_superintendencia_can_approve_or_reject` | ✅ |
-| **PA-03** | `views_solicitacao.py:approve()` (no task call) | `test_calendar_integration_not_called_before_approval` | ✅ |
+| **PA-02** | `rbac/policies.py:CanAccessSolicitationApprovals` → `solicitation_approval_basis` (superuser, gerente_superintendencia, capacidade_aprovar) | `test_only_superintendencia_can_approve_or_reject` (parametrized over `APROVADORAS`), `test_non_privileged_user_gets_403_on_approval_endpoint`, `test_segregacao_conta_alterada_bloqueia_decisao` | ✅ |
+| **PA-03** | `views_solicitacao.py:approve()` (no task call) | `test_calendar_integration_not_called_before_approval`, `test_calendar_integration_is_called_after_approval` | ✅ |
 | **PA-04** | `services/solicitacao_create.py` (SUPER → `pendente`) | Implicit in PA-01 test | ✅ |
 | **PA-05** | `views_solicitacao.py` `approve()` / `reject()` actions | `test_approval_flow_records_audit_log` | ✅ |
 | **PA-06** | `ApprovalsPage.tsx` (`canApprove` gate) | Manual UI test | ✅ |
@@ -217,18 +249,18 @@ curl -X POST "http://localhost:8002/api/solicitacoes/1/reject/" \
 
 ### 7. Output
 
-**If all tests pass (5/5)**:
+**If all tests pass (7/7)**:
 ```
 ✅ PA-01 to PA-07 COMPLIANT
 - PA-01: No auto-approval (SUPER) ✓
-- PA-02: Superintendência only ✓
+- PA-02: only who has a basis in solicitation_approval_basis (superuser, gerente_superintendencia, capacidade_aprovar) ✓
 - PA-03: Post-approval triggers ✓
 - PA-04: Initial status pendente ✓
 - PA-05: AuditLog persistent ✓
 - PA-06: UI buttons hidden (manual check)
-- PA-07: 5 mandatory tests passing ✓
+- PA-07: 7 mandatory tests passing ✓
 
-Total: 5/5 tests passing
+Total: 7/7 tests passing
 
 Approval policy fully compliant with CP-02.
 ```
@@ -236,7 +268,7 @@ Approval policy fully compliant with CP-02.
 **If tests fail**:
 ```
 ❌ PA-01 to PA-07 NON-COMPLIANT
-Failed tests: N/5
+Failed tests: N/7
 
 [List failed tests with details]
 
@@ -252,13 +284,13 @@ Next steps:
 
 **Behavior**: The `approve()` endpoint **DOES NOT** call `check_conflicts()` before approving.
 
-**Reason**: Superintendência decisions include **human context** that the system cannot capture:
+**Reason**: approvers' decisions (Superintendência gerente, DAT, Controle) include **human context** that the system cannot capture:
 - Authorized exceptions
 - Political/organizational priorities
 - Municipality/project specific context
 - Non-formalized negotiations
 
-**Workflow**: Superintendência accesses `/disponibilidade` (grid view) and verifies **manually** before approving in `/aprovacoes`.
+**Workflow**: the approver accesses `/disponibilidade` (grid view) and verifies **manually** before approving in `/aprovacoes`.
 
 **System = decision support tool, NOT total automation.**
 
@@ -271,4 +303,4 @@ Next steps:
 
 ---
 
-**Expected**: 5/5 PA-07 mandatory tests passing (test_approval_policy_PA.py; o arquivo tem 6 funcoes — 5 mandatorias PA-07 + 1 extra)
+**Expected**: 7/7 PA-07 mandatory tests passing (test_approval_policy_PA.py; o arquivo tem 7 funcoes de teste, todas mandatorias PA-07 — ver "Testes que cobrem" em v2/docs/specs/domain/politica-aprovacao.spec.md)

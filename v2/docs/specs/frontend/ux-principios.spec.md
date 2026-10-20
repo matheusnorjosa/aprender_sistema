@@ -1,8 +1,8 @@
 ---
 title: Princípios de UX
 status: canonical
-last_verified: 2026-09-30
-verified_at_commit: 2a79cf5c6bafdddb8d2072036f2b0527c3426f3f
+last_verified: 2026-10-19
+verified_at_commit: 37bc7afd586dd304aa7d0b376a0272906862cdac
 sources_of_truth:
   - v2/frontend/e2e/checklist/accessibility.spec.ts
   - v2/frontend/e2e/checklist/performance.spec.ts
@@ -48,7 +48,7 @@ no C1) e poucos cliques; tarefas raras ou de quem está começando pedem guia (e
 
 | Limite | Onde é cobrado hoje |
 |---|---|
-| WCAG 2.1 AA (axe `wcag2a`, `wcag2aa`, `wcag21aa`) | [`accessibility.spec.ts`](../../../frontend/e2e/checklist/accessibility.spec.ts), job `[required] checklist tests`. Cobre o login, `/perfil`, `/dat/admin/usuarios` (C1) e as 7 rotas do C2 (`/dat/admin/grupos`, `/setores`, `/funcoes`, `/gerencias`, `/municipios`, `/produtos`, `/projetos-gerais`) a 360 e 1280 px, mais o erro de carga das opções em Gerências e Produtos e o vazio com filtro de Produtos: **cada PR de tela acrescenta suas telas** |
+| WCAG 2.1 AA (axe `wcag2a`, `wcag2aa`, `wcag21aa`) | [`accessibility.spec.ts`](../../../frontend/e2e/checklist/accessibility.spec.ts), job `[required] checklist tests`. Cobre o login, `/perfil`, `/dat/admin/usuarios` (C1) e as 7 rotas do C2 (`/dat/admin/grupos`, `/setores`, `/funcoes`, `/gerencias`, `/municipios`, `/produtos`, `/projetos-gerais`) e `/dat/admin/projetos` (marca de série, 01/10/2026) a 360 e 1280 px, mais o erro de carga das opções em Gerências e Produtos e o vazio com filtro de Produtos: **cada PR de tela acrescenta suas telas** |
 | Teclado e leitor de tela nos componentes do padrão | E2E `menu-lateral-teclado`, `mais-acoes-teclado` e `excluir-em-uso-foco` no mesmo job |
 | Core Web Vitals: LCP < 2,5 s, CLS < 0,1, JS inicial < 200 KB | [`performance.spec.ts`](../../../frontend/e2e/checklist/performance.spec.ts), mesmo job (mede a página inicial) |
 | Sem rolagem horizontal em 360/768/1024/1280 | [`sem-rolagem-horizontal.spec.ts`](../../../frontend/e2e/checklist/sem-rolagem-horizontal.spec.ts) com ratchet de `PENDENTES` |

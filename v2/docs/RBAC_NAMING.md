@@ -10,7 +10,7 @@
 
 **Permission é capacidade, não identidade.** Separar o que a pessoa pode fazer (permission) de quem ela é organizacionalmente (setor, função, grupo). Groups agregam permissions; permissions nomeiam ações sobre recursos. Essa é a forma canônica do NIST RBAC.
 
-Manifestação prática: se a organização reestrutura (DAT vira "Operações Administrativas"), **zero linha de código** muda. Apenas `Group.name`.
+Manifestação prática: renomear um grupo (`Group.name`) não muda poder no modo padrão (`RBAC_FONTE=lotacao`), porque desde o PR 12 o grupo é etiqueta e o poder vem da lotação. Ainda assim não é livre: o seed (`functional_permissions_seed.py`) nomeia os grupos, então `rbac_diff --auditar` acusa os pares (grupo, capacidade) divergentes e sai com exit 1, e na volta de emergência (`RBAC_FONTE=uniao`) o grupo volta a dar poder. Renomear a gerência (`Gerencia.nome`) **muda poder**: o nome é a chave de `PERFIL_PERMITIDO` (`apps/core/services/rbac_pacotes.py`; ex.: "GERENCIA DAT" → `ADMIN_OPERACIONAL`) e da gerência aprovadora (`GERENCIA_APROVADORA_NOME` em `apps/core/rbac/helpers.py`). Isso exige PR com `rbac_diff` (`rbac_diff --auditar` sai com exit 1 se o perfil ficar numa gerência fora de `PERFIL_PERMITIDO`).
 
 ---
 
@@ -254,15 +254,20 @@ Lint AST custom em `v2/backend/scripts/rbac_lint.py` falha PRs que:
   `.save()` de um vínculo que já existe.
   V004 e V005 são ratchet por arquivo (arquivo novo reprova, sem noqa) e isentam `tests/`,
   `migrations/` e `apps/dev_tools/`.
-  Implementação: `MigrationLintVisitor` (`rbac_lint.py`), dispatch em `check_file`,
-  documentação no docblock do módulo.
+- **V006 (PR 9 das permissões, 2026-10-16)**: o setor nos arquivos de escopo (`V006_ARQUIVOS`):
+  o atributo `.setor`/`.setor_canonico` e o lookup ORM `setor`, `setor__*`, `*__setor`,
+  `*__setor_canonico*`. O escopo é a gerência do projeto. Proibição simples, sem allowlist nem noqa.
+
+Implementação (`rbac_lint.py`): `RBACLintVisitor` (V001/V002), `MigrationLintVisitor` (V003),
+`MutationLintVisitor` (V004/V005) e `SetorNoEscopoVisitor` (V006); dispatch em `check_file`,
+documentação no docblock do módulo.
 
 > 🔴 **Corrigido em 2026-07-24.** Este documento afirmava que "V003 (import de `Group`) foi
 > descartado". **Existe um V003 — com outra semântica.** Ele não é sobre *import* de `Group`,
 > é sobre *mutação de grupos dentro de migrations*, e **está ativo no CI**.
 > Consequência prática: `apps/core/migrations/` **não é mais totalmente whitelisted** —
-> V003 inverte a whitelist para migrations acima da 82. A migration mais recente é a `0083`,
-> portanto já sob enforcement.
+> V003 inverte a whitelist para migrations acima da 82. A migration mais recente é a `0128`
+> (2026-10-19), portanto já sob enforcement.
 
 **Paths whitelisted** (o lint pula — `WHITELIST_PATH_SUBSTRINGS`/`WHITELIST_EXACT_FILES`, `rbac_lint.py`):
 
@@ -284,7 +289,7 @@ Lint AST custom em `v2/backend/scripts/rbac_lint.py` falha PRs que:
 
 **CI job**: `[required] backend rbac-lint` em `.github/workflows/ci.yaml` — falha o PR automaticamente.
 
-**Self-test**: `apps/core/tests/test_rbac_lint.py` valida que o lint aceita o baseline atual e rejeita os padrões proibidos (**23 testes**).
+**Self-test**: `apps/core/tests/test_rbac_lint.py` valida que o lint aceita o baseline atual e rejeita os padrões proibidos (**36 testes** em 2026-10-19).
 
 Rodar localmente:
 
@@ -354,7 +359,7 @@ perm.groups.clear()
 Esses padrões existem em migrations legadas (até a `0082`, one-shot, já rodaram em prod
 e não rodam de novo). Migrations **acima da 82** de redistribuição ferem D17 e são
 **bloqueadas pelo V003 no CI** (`D17_LEGACY_MIGRATIONS_MAX`, `scripts/rbac_lint.py`) — **use Admin**.
-A migration mais recente é a `0083`, ou seja, o enforcement já vale para tudo que vier agora.
+A migration mais recente é a `0128` (2026-10-19), ou seja, o enforcement já vale para tudo que vier agora.
 
 **Permitido em migration nova:**
 
@@ -399,7 +404,7 @@ nunca em deploy automático). Em prod o command nem é registrado
 | **Category**         | `solicitacao`, `operacao`, ...            | `admin_dat`, `gerencia`                           |
 | **Permission class** | `HasPerm("approve_solicitation")`         | `IsSuperintendencia`                              |
 | **Authz check**      | `user.has_perm("approve_solicitation")`   | `user.groups.filter(name="Superintendência")`     |
-| **Classe dedicada**  | `IsSolicitationOwner` (condição)          | `IsDAT` (identidade)                              |
+| **Classe dedicada**  | `IsOwnerOrPrivileged` (condição)          | `IsDAT` (identidade)                              |
 
 ---
 
@@ -458,7 +463,7 @@ NUNCA usar `if user.is_dat: return True` espalhado em views. DAT-as-suporte SEMP
 if user.groups.filter(name="DAT").exists():
     return True
 
-# ✅ CORRETO — valor real em apps/core/rbac/policies.py:85-90
+# ✅ CORRETO — valor real em ACCESS_POLICIES (apps/core/rbac/policies.py)
 ACCESS_POLICIES["access_audit_logs"] = frozenset({
     "manage_admin_registries",  # DAT entra como capability declarada
     "operate_preagenda",
@@ -554,9 +559,10 @@ O frontend decide menu, rotas, botões e Página Inicial **só** pelas policies 
 `ehSuperusuario(user)`. Trava: `frontend/src/test/lint/acessoSoPorPolicy.test.ts`.
 
 O que o front calculava sobre o organograma virou policy composta no servidor (`TELAS_DE_ESCOPO`).
-Desde o PR 8: `view_all_availability` OU setor Controle/DAT OU papel vigente em gerência ativa
+Desde o PR 8: `view_all_availability` OU papel vigente em gerência ativa
 (`EquipeGerencia.gerencias_com_papel`): Grade e Deslocamentos com GERENTE/COORDENADOR/APOIO,
-Bloqueios também com FORMADOR. O grupo de função não entra. Prova pessoa a pessoa:
+Bloqueios também com FORMADOR. O grupo de setor Controle/DAT só entra no modo `uniao`
+(`grupos_dao_poder`, PR 12); o grupo de função não entra. Prova pessoa a pessoa:
 `apps/core/tests/test_rbac_politicas_de_tela.py`.
 
 **Papel dá o poder (PR 8 das permissões, 15/10/2026)**: grupo de FUNÇÃO não tem capacidade
@@ -565,8 +571,8 @@ Bloqueios também com FORMADOR. O grupo de função não entra. Prova pessoa a p
 `approve_solicitation_batch` foi apagada. Regra de nome continua: o codename não diz o papel.
 
 **DAT administrador operacional (PR 10 das permissões, 16/10/2026)**: `approve_solicitation` deixa de
-estar em grupo (migration `0126`) e vem só do pacote `ADMIN_OPERACIONAL`; ter a capacidade é a base 5 de
-`solicitation_approval_basis`, com o rótulo genérico `capacidade_aprovar`. Nenhum codename novo.
+estar em grupo (migration `0126`) e vem só do pacote `ADMIN_OPERACIONAL`; ter a capacidade é uma base de
+`solicitation_approval_basis` (a 3ª das 3 desde o PR 11), com o rótulo genérico `capacidade_aprovar`. Nenhum codename novo.
 
 **Uma fonte só para quem aprova (PR 11 das permissões, 17/10/2026)**: o pacote `CONTROLE` ganha
 `approve_solicitation` (D1 de 06/10); o Controle aprova pela mesma base do DAT. As bases por grupo

@@ -67,9 +67,9 @@ São **5** (`FUNCAO_GROUPS`, `apps/core/constants.py`).
 
 | Função | O que pode fazer |
 |--------|------------------|
-| **Formador** | Visualiza grade mensal, gerencia bloqueios pessoais |
+| **Formador** | Etiqueta. O papel Formador na lotação gerencia os próprios bloqueios; a Grade Mensal exige papel Gerente, Coordenador ou Apoio na gerência, ou a capacidade `view_all_availability` (`TELAS_DE_ESCOPO`, `apps/core/rbac/policies.py`) |
 | **Coordenador** | Cria solicitações de eventos para sua equipe |
-| **Apoio de Coordenação** | Auxilia coordenação, visualiza solicitações |
+| **Apoio de Coordenação** | Etiqueta. O papel Apoio na lotação cria e edita eventos da gerência e publica no Google (`publish_setor_solicitacao`; `DIREITOS_PAPEL`, `apps/core/services/rbac_pacotes.py`) |
 | **Gerente** | Etiqueta. O papel Gerente na lotação cria e edita eventos da gerência; na Superintendência, aprova |
 | **Assistente Administrativo** | Etiqueta. Não aprova (PR 11): quem trabalha no Controle aprova pela lotação |
 
@@ -257,8 +257,8 @@ GET /api/me/policies/
 
 ### Por que um Gerente não consegue aprovar?
 Verifique se ele está **lotado como Gerente na gerência Superintendência** (formulário de Usuários). Gerente
-lotado em outra gerência não aprova.
-O outro caminho é Assistente Administrativo **do Controle**.
+lotado em outra gerência não aprova por ser Gerente.
+O outro caminho é estar **lotado como Equipe ou Gerente na gerência Controle ou DAT** (pacote do setor); grupo e função sozinhos não aprovam.
 
 ### Por que os campos de Gerência/Função aparecem desabilitados para mim?
 Sem a policy `manage_lotacao_comum`, a lotação é **somente do superusuário**. Com ela (o DAT), os campos
@@ -275,7 +275,7 @@ mostra (setor, permissões): na tela de Grupos.
 ⚠️ **O import de usuários NÃO remove grupos — só adiciona.** A concessão de grupos por
 `POST /api/usuarios/import/` (coluna `grupos`) **passou a exigir superusuário** — era drift
 (issue [#1610](https://github.com/matheusnorjosa/aprender_sistema/issues/1610)), **corrigido**
-em `ccbe1e05`: `_actor_pode_atribuir_grupos` (`usuarios_import.py`) faz um ator não-superusuário
+em `e2b7c528`: `_actor_pode_atribuir_grupos` (`usuarios_import.py`) faz um ator não-superusuário
 ter os grupos ignorados (`grupos_ignorados`), e o importer dedicado impõe allowlist (`run` de
 `ExportContractImporter`, `export_contract_importer.py`). Resta o residual
 de escopo ator × alvo abrangente, endereçado pelo épico
@@ -311,5 +311,8 @@ para não usá-lo como via de administração.)*
 Rotas em `v2/frontend/src/components/AppRoutes.tsx`:
 `/dat/admin/usuarios`, `/grupos`, `/setores`, `/funcoes`, `/gerencias`, `/produtos`, `/configuracoes`.
 
-A administração de **Grupo × Capability** não fica no frontend: é o Django Admin
-(`/admin/core/permissaofuncional/`, `PermissaoFuncionalAdmin` em `apps/core/admin.py`), **superuser-only** desde o #1567.
+A matriz **Grupo × Capability** não se edita em tela nenhuma: muda só por PR (seed
+`functional_permissions_seed.py` + migration de dados, D21 em
+[rbac_authorization_matrix.md](./rbac_authorization_matrix.md), D4 do ADR-020). O Django Admin
+(`/admin/core/permissaofuncional/`, `PermissaoFuncionalAdmin` em `apps/core/admin.py`) é **só leitura**
+(add/change/delete desabilitados): serve para conferir, junto com `rbac_diff --auditar`.

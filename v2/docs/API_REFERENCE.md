@@ -125,8 +125,9 @@ tentativas respondem o mesmo `400` genérico (o bloqueio não é revelado).
 `GET /me/` inclui `gerencias: [{id, rotulo, papeis[]}]` (PR A, 2026-09-29): vínculos
 `EquipeGerencia` vigentes (`vigentes_em()`) em gerência ativa, um item por gerência,
 ordenados pelo `rotulo`. É por ele que a Grade Mensal escolhe a gerência de quem não tem
-`view_all_availability`. `setores`, `is_superintendencia` e `can_approve_super` não mudaram
-(continuam vindo dos grupos). Construído em `views_basic.py` (`_gerencias_do_vinculo`).
+`view_all_availability`. `setores` e `is_superintendencia` não mudaram (continuam vindo dos
+grupos); `can_approve_super` espelha a policy `access_solicitation_approvals` (SSOT
+`policies.py::solicitation_approval_basis`). Construído em `views_basic.py` (`_gerencias_do_vinculo`).
 
 ### Headers Obrigatórios
 
@@ -235,7 +236,7 @@ desconhecido cai no default `-inicio`).
 
 | Método | Endpoint | Status | Descrição | Permissão |
 |--------|----------|--------|-----------|-----------|
-| GET | `/api/availability/check/` | ![Stable](https://img.shields.io/badge/-stable-green) | Verificar conflitos (individual) | `view_all_availability` OU `create_solicitation` OU `approve_solicitation_batch` |
+| GET | `/api/availability/check/` | ![Stable](https://img.shields.io/badge/-stable-green) | Verificar conflitos (individual) | `view_all_availability` OU `create_solicitation` OU `approve_solicitation` |
 | POST | `/api/availability/check-many/` | ![Stable](https://img.shields.io/badge/-stable-green) | Verificar conflitos em lote | idem acima |
 | GET | `/api/availability/monthly/` | ![Stable](https://img.shields.io/badge/-stable-green) | Grade mensal de disponibilidade | `IsAuthenticated` + (`CanViewAllAvailability` \| `HasSectorAccess`) |
 
@@ -311,17 +312,22 @@ A rota é `/api/availability-blocks/` (registrada no router como
 | GET | `/api/availability-blocks/` | ![Stable](https://img.shields.io/badge/-stable-green) | Listar bloqueios (escopo aplicado no queryset) | IsAuthenticated |
 | POST | `/api/availability-blocks/` | ![Stable](https://img.shields.io/badge/-stable-green) | Criar bloqueio (auto-aprovado) | IsAuthenticated |
 | GET | `/api/availability-blocks/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Detalhe do bloqueio | IsAuthenticated |
-| PUT/PATCH | `/api/availability-blocks/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Atualizar bloqueio próprio | IsAuthenticated |
-| DELETE | `/api/availability-blocks/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Remover bloqueio | IsAuthenticated |
+| PUT/PATCH | `/api/availability-blocks/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Atualizar bloqueio (próprio; de terceiro só com delegação) | IsAuthenticated |
+| DELETE | `/api/availability-blocks/{id}/` | ![Stable](https://img.shields.io/badge/-stable-green) | Remover bloqueio (próprio; de terceiro só com delegação) | IsAuthenticated |
 
 É um `ModelViewSet` completo com `permission_classes = [IsAuthenticated]`
 (`AvailabilityBlockViewSet`, `views_availability.py`). A restrição real é de **dado**, no
-`get_queryset`: privilegiados veem todos; usuários comuns só os próprios ou os
-da mesma gerência (`AvailabilityBlockViewSet.get_queryset`, `views_availability.py`).
+`get_queryset`: privilegiados veem todos; quem tem papel G/C/A vigente em gerência ativa vê
+os bloqueios das pessoas dessa gerência; os demais (inclusive a formadora), só os próprios
+(`AvailabilityBlockViewSet.get_queryset`, `views_availability.py`). Em PUT/PATCH/DELETE o
+queryset de quem não é privilegiado é só o dos próprios bloqueios.
 
 Delegação: enviar `usuario_id` diferente do próprio no POST exige
 `user_can_delegate_availability_block` e o alvo precisa ser Formador ativo —
 caso contrário 403/400 (`AvailabilityBlockViewSet.perform_create`, `views_availability.py`).
+Editar ou apagar bloqueio de terceiro exige o mesmo gate (`_assert_can_mutate`) e grava
+`AuditLog` `DELEGATE_BLOCK_UPDATE` / `DELEGATE_BLOCK_DELETE` (`perform_update` / `perform_destroy`).
+SSOT: [availability.spec.md](specs/backend/availability.spec.md).
 
 ---
 
@@ -832,13 +838,14 @@ Policies usadas nesta referência (`rbac/policies.py`):
 | `CanViewComprasPendencias` | as 3 de stats + `view_compras_dashboard` |
 | `CanViewReports` | `operate_preagenda`, `approve_solicitation`, `manage_admin_registries` |
 | `CanViewAllAvailability` | `view_all_availability` |
-| `CanAccessSolicitationApprovals` | **composite Setor × Função** (não é OR de capabilities) |
+| `CanAccessSolicitationApprovals` | `solicitation_approval_basis` (3 bases: superuser, vínculo GERENTE na Superintendência, `approve_solicitation` do pacote) |
 
 Quais **grupos** têm cada capability é assunto de outro documento — o SSOT é
-[rbac_authorization_matrix.md](rbac_authorization_matrix.md) §4. Desde a decisão
-D17 (PR 16), a relação Grupo × Capability é **admin-driven** (editável no Django
-Admin por superuser), então não replique essa tabela aqui: ela pode mudar sem
-alteração de código.
+[rbac_authorization_matrix.md](rbac_authorization_matrix.md) §4. A matriz Grupo ×
+Capability é `FUNCTIONAL_PERMISSIONS_SEED` e muda só por PR (D21 / ADR-020, que
+substituiu a D17); o Django Admin a mostra só para leitura. No modo padrão `lotacao`
+(PR 12) o grupo não dá poder: a capability vem do pacote do perfil da gerência, pelo
+vínculo. Não replique essa tabela aqui.
 
 ### Regra de Aprovação SUPER
 

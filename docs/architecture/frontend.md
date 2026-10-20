@@ -16,9 +16,9 @@
 
 ## Stack
 
-Conferido em `v2/frontend/package.json` (2026-07-24):
+Conferido em `v2/frontend/package.json` (2026-10-19):
 
-- **React 18** (`react` 18.3.1) com hooks
+- **React 19** (`react` ^19.2.8) com hooks
 - **Vite 7** (`vite` 7.3.5) para build e dev server
 - **Ant Design 5** (`antd` 5.27.4) para componentes UI
 - **Tailwind CSS 3** (`tailwindcss` 3.4.18) para utilitários
@@ -30,7 +30,7 @@ Conferido em `v2/frontend/package.json` (2026-07-24):
 
 ```
 src/
-├── pages/              # 15 diretórios de domínio (inventário na pages.spec.md)
+├── pages/              # 16 diretórios de domínio (inventário na pages.spec.md)
 ├── components/         # Componentes reutilizáveis
 │   └── access/         # RequirePolicy — guard único de rota
 ├── api/                # config.ts (wrapper fetch) + 15 clientes temáticos
@@ -44,25 +44,10 @@ src/
 Autenticação é por sessão Django com cookie + CSRF em toda mutação — o contrato do lado do
 cliente está em [`api-clients.spec.md`](https://github.com/matheusnorjosa/aprender_sistema/blob/main/v2/docs/specs/frontend/api-clients.spec.md).
 O tempo de vida da sessão tem default de 2 horas
-(`SESSION_COOKIE_AGE`, `v2/backend/config/settings.py:333`), mas é sobrescrito por variável
+(`SESSION_COOKIE_AGE` em `v2/backend/config/settings.py`), mas é sobrescrito por variável
 de ambiente; o valor efetivo em produção depende de verificação humana no Portainer.
 
 ## Componentes chave (não cobertos por spec)
-
-### RemoteSelect
-
-Select com busca remota paginada para entidades
-(`v2/frontend/src/components/RemoteSelect.tsx`).
-Props principais: `fetchOptions`, `renderLabel`, `placeholder`, `disabled`, `mode`, `value`,
-`onChange`, `debounceMs`, `extraParams`.
-
-```jsx
-<RemoteSelect
-  fetchOptions={fetchMunicipios}
-  renderLabel={(item) => item.nome}
-  placeholder="Selecione um município"
-/>
-```
 
 ### MeetLink
 

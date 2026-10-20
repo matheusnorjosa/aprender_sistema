@@ -20,8 +20,9 @@ Template: [templates/agenda_solicitacoes.template.csv](./templates/agenda_solici
 >    [#1620](https://github.com/matheusnorjosa/aprender_sistema/issues/1620) (épico
 >    [#1659](https://github.com/matheusnorjosa/aprender_sistema/issues/1659)). As linhas de análise
 >    abaixo descrevem o estado ANTERIOR ao #2021.
-> 3. **Reimport SOBRESCREVE decisão de aprovação, owner e datas — e reporta "unchanged".**
->    A v0.2 afirmava "linhas com hash existente são ignoradas". Falso: é
+> 3. **[RESOLVIDO #2021] Reimport SOBRESCREVIA decisão de aprovação, owner e datas — e reportava "unchanged".**
+>    Hoje o reimport não sobrescreve decisão humana (ver §7 e §9, `_reimport_existing` em
+>    `eventos_import.py`). O texto a seguir é o diagnóstico do estado anterior. A v0.2 afirmava "linhas com hash existente são ignoradas". Falso: é
 >    `Solicitacao.objects.update_or_create(external_hash=..., defaults={...})`
 >    (`eventos_import.py:523-539`), e os `defaults` incluem `usuario`, `coordenador`, `inicio`,
 >    `fim` e `status`. Pior: o cálculo de `changed` (`:544-556`) compara o objeto **já
@@ -47,9 +48,11 @@ NÃO cobre (crítico):
 - **Publicação no Google Calendar** (RF05/RF06) — só após aprovação manual (PA-03). ✅ verdadeiro:
   `eventos_import.py` não importa nenhum client GCal.
 - **Aprovação automática de fluxo SUPER** — se `projeto.fluxo=="SUPER"`, status inicial é `pendente`. ✅
-  verdadeiro. ⚠️ Mas `NAO_SUPER` entra **`aprovado`** direto, sem checagem de disponibilidade (#1620).
+  verdadeiro. `NAO_SUPER` entra **`aprovado`**; desde o #2021 o evento futuro passa antes pelo gate de
+  disponibilidade (#1620), e o histórico entra sem checar.
 - ~~**Atualização/cancelamento** de Solicitacao existente automaticamente~~ — ❌ **FALSO**:
-  o reimport atualiza sim, e sobrescreve status/owner/datas (#1628). Ver §9.
+  o reimport atualiza sim. Até o #2021 sobrescrevia status/owner/datas (#1628); hoje só atualiza
+  `observacoes`/`encontro` e manda divergência de campo protegido para pendência. Ver §9.
 
 ---
 
@@ -153,12 +156,15 @@ Aba `Agenda` (ou `Acompanhamento`) da planilha `sheets.banco`.
 
 ## 7. Regras de duplicidade / hash
 
-### Chave natural — **REAL** (`eventos_import.py:344-365`)
+### Chave natural — **REAL** (`_compute_external_hash` em `eventos_import.py`)
 
-`(municipio_id, projeto_id, tipo_evento_id, data, hora_inicio, hora_fim)`.
+`(municipio_id, projeto_id, tipo_evento_id, data, hora_inicio, hora_fim, segmento)` — o `segmento`
+entrou na chave no #1915.
 
 **Não inclui formador nem coordenador.** Consequência: duas turmas simultâneas do mesmo
-tipo/projeto/município colidem no mesmo hash e a segunda **sobrescreve** a primeira.
+tipo/projeto/município e com o mesmo segmento (ou segmento vazio) colidem no mesmo hash. Desde o
+#2021 a segunda não sobrescreve a primeira: campo protegido divergente vira pendência `protected`
+(ver a tabela abaixo).
 
 ### `external_hash` — **SHA-1**, não SHA-256
 
@@ -179,12 +185,13 @@ As colunas `cancelar` e `atualizar` **não são lidas pelo service**: `_normaliz
 `hora_inicio`, `hora_fim`, `coordenador`, `formador1..5`, `encontro`, `segmento` e `local`.
 `aprovacao`, `cancelar`, `atualizar`, `coord_acompanha` e `convidados` são **silenciosamente ignoradas**.
 
-| Hash existe no banco | Ação pretendida | Ação **real** (`:523-556`) |
+| Hash existe no banco | Ação pretendida | Ação **real** (`_reimport_existing`, #2021) |
 |---|---|---|
-| Não | Criar Solicitacao | Cria (`created=True`) |
-| Sim | **Ignorar** (idempotente) | 🔴 **`update_or_create` sobrescreve** `usuario`, `coordenador`, `municipio`, `projeto`, `tipo_evento`, `inicio`, `fim`, `status`, `observacoes`, `local`, `encontro`, `segmento` |
-| Sim, com `cancelar=true` | Não cancelar; relatar | Coluna ignorada; a linha é aplicada como qualquer outra |
-| Sim, com `atualizar=true` | Não atualizar; relatar | Coluna ignorada; **atualiza de qualquer jeito** |
+| Não | Criar Solicitacao | Cria (`Solicitacao.objects.create`; evento futuro passa antes pelo gate RD-01..08) |
+| Sim, campo protegido diverge | **Ignorar** (idempotente) | ✅ **Não grava**: `status`, `usuario`, `coordenador`, `local` ou `projeto` divergente vira pendência `protected` (`_PROTECTED_FIELDS`) |
+| Sim, sem divergência protegida | **Ignorar** (idempotente) | Atualiza só `observacoes`/`encontro`; `municipio`, `tipo_evento`, `inicio`/`fim` e `segmento` estão na chave do hash e não mudam |
+| Sim, com `cancelar=true` | Não cancelar; relatar | Coluna ignorada; a linha segue a regra acima |
+| Sim, com `atualizar=true` | Não atualizar; relatar | Coluna ignorada; a linha segue a regra acima |
 | Sim, e algo mudou | Contar como `updated` | ✅ **#2021**: conta `updated` (diff real, comparado ANTES da escrita) (#1628) |
 
 ---
@@ -202,27 +209,30 @@ As colunas `cancelar` e `atualizar` **não são lidas pelo service**: `_normaliz
 | Service availability | `solicitacao_availability.check_solicitacao_availability()` | RD-01..08 — ✅ **#2021**: chamado pelo import p/ evento **FUTURO** (conflito → pendência `availability`, não grava); histórico entra sem checar (decisão do dono) — `M08-12` / [#1620](https://github.com/matheusnorjosa/aprender_sistema/issues/1620) | ✅ existe e usado (futuro) |
 | **Endpoint síncrono** | `POST /api/solicitacoes/import/` (`ImportEventosView` em `apps/core/views_import_eventos.py`) | dry_run via query param; multipart `file=` no body | ✅ **já funciona** |
 | Endpoint async | (não implementado para eventos) | ASQ-005 Fase 2 migrará | ⏳ Fase 2 do `ImportJob` |
-| Gate RBAC efetivo | `IsAuthenticated + HasPerm("import_spreadsheet")` (DAT) | NÃO `manage_admin_registries` — eventos é operacional, não cadastro | ✅ aplicado em prod |
+| Gate RBAC efetivo | `IsAuthenticated + SuperuserOnly` (`ImportEventosView`) | Só superusuário (D20, decisão do dono 02/10/2026); nenhuma capability abre, o DAT recebe 403. `import_spreadsheet` saiu do grupo DAT na migration 0126 (PR 10) | ✅ aplicado |
 | Endpoint manual (1 a 1) | `POST /api/solicitacoes/` (`SolicitacaoViewSet.create`) | Para criação não-bulk; usa `HasPerm("create_solicitation")` | ✅ existe |
 | AuditLog action | **(nenhuma)** | 🔴 O import síncrono **não grava `AuditLog`**. `AuditLog.Action` (`apps/core/models/auditoria.py:72-73`) só tem `IMPORT_JOB_COMPLETED`/`IMPORT_JOB_FAILED`, emitidos no caminho async (`apps/core/tasks.py:634,669`), que hoje cobre apenas `bloqueios` | ❌ não existe |
 
 ### Comportamento real do service (lido em código)
 
 - **Idempotência**: `external_hash` **SHA-1** sobre `(municipio_id, projeto_id, tipo_evento_id, data,
-  hora_inicio, hora_fim)` (`:344-365`). **Sem coordenador e sem formador na chave.** Re-import com a
-  mesma chave **não duplica — mas sobrescreve** (ver §7 e §9).
+  hora_inicio, hora_fim, segmento)` (`_compute_external_hash`; `segmento` entrou na chave no #1915).
+  **Sem coordenador e sem formador na chave.** Re-import com a
+  mesma chave **não duplica e não sobrescreve decisão humana** (ver §7 e §9).
 - **Status inicial** (`:495-497`, docstring `:19-23`):
   - `Projeto.fluxo == 'SUPER'` → `status='pendente'` (aguarda aprovação manual em `/aprovacoes`).
   - `Projeto.fluxo == 'NAO_SUPER'` → `status='aprovado'`.
   - **A data do evento não entra na decisão** — passado e futuro são tratados igual.
 - **Participation criada por linha** (`:562-607`): 1 `role='COORDENADOR'` + até 5 `role='FORMADOR'`.
-  Reconciliação por email (preferido) ou nome — `_resolve_user` (`:368-380`) cai em
-  `resolve_user_by_name`, que faz **fallback por substring** (`icontains`) e resolve ambiguidade com `.first()`
-  (`services/resolvers.py:89-131`). Achado `M22-14` /
+  Reconciliação por email (preferido) ou nome — `_resolve_user` (`eventos_import.py`) cai em
+  `resolve_user_by_name` (`services/resolvers.py`), que desde o **#1929** exige candidato único
+  (nome completo exato, depois todos os tokens do nome): homônimo (2+ candidatos) devolve `None` +
+  WARNING e o participante vira pendência `usuarios` — nunca escolhe no chute (coordenador não
+  resolvido pula a linha; formador não resolvido só fica fora da `Participation`). Achado `M22-14` /
   [#1643](https://github.com/matheusnorjosa/aprender_sistema/issues/1643), épico
-  [#1658](https://github.com/matheusnorjosa/aprender_sistema/issues/1658) — um homônimo entra na
-  agenda da pessoa errada, em silêncio. (O #1613/M02-09 cobriu só projeto/tipo_evento; o residual de
-  pessoa segue vivo em #1643.)
+  [#1658](https://github.com/matheusnorjosa/aprender_sistema/issues/1658). (Antes do #1929 havia
+  fallback por substring `icontains` + `.first()`, e um homônimo entrava na agenda da pessoa errada
+  em silêncio.)
 - **Timezone**: `ZoneInfo("America/Fortaleza")` (`:55`).
 - **Google Calendar**: **NÃO é tocado pelo import** — nenhum client GCal é importado pelo service.
   Publicação só via fluxo manual (preview + publish).
@@ -234,26 +244,28 @@ As colunas `cancelar` e `atualizar` **não são lidas pelo service**: `_normaliz
 ### Pode criar
 - `Solicitacao` com:
   - `status='pendente'` se `Projeto.fluxo=='SUPER'`.
-  - `status='aprovado'` se `Projeto.fluxo=='NAO_SUPER'` — 🔴 **sem passar pelo hard gate de
-    disponibilidade** (#1620). A flag `imported_from_sheets` continua sendo apenas uma sugestão;
-    não existe no model.
+  - `status='aprovado'` se `Projeto.fluxo=='NAO_SUPER'` — ✅ **#2021**: evento **futuro** passa
+    antes pelo hard gate de disponibilidade (conflito → pendência `availability`, não grava);
+    histórico entra sem checar (#1620). A flag `imported_from_sheets` continua sendo apenas uma
+    sugestão; não existe no model.
   - `is_online` não é escrito pelo import (fica no default do model — planilha não indica).
   - `gcal_status` / `external_event_id` / `meet_link` não são escritos (ficam nos defaults do model).
 
-### Pode atualizar — 🔴 a v0.2 dizia "nada"; é falso
+### Pode atualizar — só o descritivo (✅ #2021)
 
-Em toda linha cujo `external_hash` já exista, `update_or_create` (`eventos_import.py:523-539`)
-sobrescreve **11 campos**, incluindo três que carregam decisão humana:
+Em linha cujo `external_hash` já exista, `_reimport_existing` (`eventos_import.py`) lê a linha com
+lock e **nunca sobrescreve decisão humana**:
 
-| Campo sobrescrito | Por que importa |
+| Situação | O que acontece |
 |---|---|
-| `status` | **apaga a decisão de aprovação** — uma solicitação reprovada/pendente volta ao valor derivado do `fluxo` |
-| `usuario` e `coordenador` | **troca o dono** da solicitação para quem a planilha disser |
-| `inicio` / `fim` | **move o evento** sem passar por RD-01..08 |
-| `municipio`, `projeto`, `tipo_evento`, `observacoes`, `local`, `encontro`, `segmento` | reescritos com o valor da planilha |
+| `status`, `usuario`, `coordenador`, `local` ou `projeto` diverge da planilha (`_PROTECTED_FIELDS`) | **não grava**; vira pendência `protected` (`skipped.protected`), para decisão humana |
+| Nada protegido diverge | atualiza só `observacoes` e `encontro`; o diff é real (comparado antes da escrita) e cai em `updated` ou `unchanged`. As participações da planilha que faltam são acrescentadas (`_sync_participations`, `get_or_create`), sem o gate de disponibilidade, que só roda na criação |
+| Participante ocupante sumiu da planilha | é **reportado** em `orfaos`, nunca removido |
 
-E a resposta reporta isso como **`unchanged`** (`:544-556`), então nem o operador que rodou o
-import percebe. Achado `M10-07` / [#1628](https://github.com/matheusnorjosa/aprender_sistema/issues/1628).
+`municipio`, `tipo_evento`, `inicio`/`fim` e `segmento` fazem parte da chave do hash: mudar um deles
+é outra linha, não atualização. Até o #2021 o caminho era `update_or_create`, que sobrescrevia
+`status`, `usuario`, `coordenador` e os demais campos e reportava `unchanged` (achado `M10-07` /
+[#1628](https://github.com/matheusnorjosa/aprender_sistema/issues/1628)).
 
 ---
 
@@ -270,7 +282,7 @@ import percebe. Achado `M10-07` / [#1628](https://github.com/matheusnorjosa/apre
 | Atualizar Solicitacao mesmo com `atualizar=true` | Update precisa passar por RD-01..08 | ✅ **#2021** — reimport protege status/owner/local (divergência → pendência `protected`) (#1628) |
 | Criar Usuario novo (Coordenador/Formador inexistente) | Usuários vêm do import #1; agenda só reconcilia | ✅ sim — não resolvido vira `pendencias.usuarios` |
 | Criar Municipio/Projeto novo | Cadastros mestres vêm dos passos 3-4 da ordem | ✅ sim — não resolvido vira pendência e a linha é pulada |
-| Reconciliar formador para a pessoa errada | Homônimo entra na agenda de terceiro | ❌ **não** — `resolve_user_by_name` usa substring + `.first()` (#1643) |
+| Reconciliar formador para a pessoa errada | Homônimo entra na agenda de terceiro | ✅ **#1929** — `resolve_user_by_name` exige candidato único; homônimo vira pendência `usuarios` (#1643) |
 | Atribuir grupo `Gerente` a usuário | Sensibilidade RBAC | ✅ sim — **neste** import. Ver [usuarios.md](./usuarios.md) §10 para o que acontece no import de usuários |
 | Enviar emails para `convidados` | Nenhum side-effect de notificação | ✅ sim — a coluna nem é lida |
 | Registrar quem rodou o import | Rastreabilidade | ❌ **não** — nenhum `AuditLog` (§8) |
@@ -313,7 +325,7 @@ Gerar lista de:
 | **Aprovação automática de fluxo SUPER** | Crítica | ✅ Mitigado — `resolve_initial_status` devolve `pendente` (`:497`) |
 | **Aprovação de `NAO_SUPER` sem hard gate de disponibilidade** | ✅ Resolvido | **#2021** — gate RD-01..08 p/ evento FUTURO (conflito → pendência `availability`); histórico entra sem checar — [#1620](https://github.com/matheusnorjosa/aprender_sistema/issues/1620) |
 | **Update automático sobrescrevendo decisões, owner e datas** | ✅ Resolvido | **#2021** — reimport protege status/owner/local (→ pendência `protected`) + diff real ([#1628](https://github.com/matheusnorjosa/aprender_sistema/issues/1628)) |
-| **Match errado de Formador/Coordenador por nome (homônimos)** | **P1 vivo** | ❌ **Nenhuma** — substring + `.first()` (`resolvers.py:89-131`), [#1643](https://github.com/matheusnorjosa/aprender_sistema/issues/1643) |
+| **Match errado de Formador/Coordenador por nome (homônimos)** | ✅ Mitigado | **#1929** — `resolve_user_by_name` exige candidato único; ambiguidade → `None` + WARNING → pendência `usuarios` ([#1643](https://github.com/matheusnorjosa/aprender_sistema/issues/1643)) |
 | Colisão de hash entre turmas simultâneas | Alta | ❌ Nenhuma — a chave não inclui formador nem coordenador (§7) |
 | Cancel automático destruindo dados | Alta | ✅ Na prática — a coluna `cancelar` não é lida |
 | **Apply sem rastro de auditoria** | Alta | ❌ **Nenhuma** — não há `AuditLog` (§11) |

@@ -13,7 +13,7 @@ import { test as setup, expect } from '@playwright/test';
 import { E2E_ROLES, ROLE_CREDENTIALS, storageStatePath, type E2eRole } from './fixtures/roles';
 
 // Setup serial — evita flake de rate-limit/concorrência em /api/auth/login/
-// quando 12 roles tentam autenticar simultaneamente no dev server.
+// quando todas as roles de E2E_ROLES tentam autenticar simultaneamente no dev server.
 // Cada role leva ~1-2s; o custo total (~15-25s) é aceitável e roda apenas
 // quando storageState não existe ou expirou.
 setup.describe.configure({ mode: 'serial' });

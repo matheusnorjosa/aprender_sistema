@@ -4,7 +4,7 @@
 
 **SSOT**: Substitui a planilha "Usuários"
 **Fields**: cpf (UK), telefone, cargo, groups (Django RBAC)
-**Groups (RBAC SSOT)**:
+**Groups (etiquetas; o poder vem da lotação, PR 12)**: com `RBAC_FONTE="lotacao"` (padrão), dar grupo não libera acesso; capacidade, tela e aprovação vêm do superusuário e do vínculo vigente (pacote do perfil da gerência + papel). `RBAC_FONTE=uniao` é só a volta de emergência. Ver `v2/docs/specs/backend/rbac.spec.md`.
 - **13 Setores** (`apps.core.constants.SETOR_GROUPS`): Superintendência, Vidas, Fluir, ACerta, Brincando, Sou da Paz, DAT, Controle, Diretoria, Comercial, Relacionamento, Logística Viagens, Logística Galpão
 - **5 Funções** (`apps.core.constants.FUNCAO_GROUPS`): Formador, Coordenador, Apoio de Coordenação, Gerente, Assistente Administrativo
 - Idioma canônico de permissão: `permission_classes = [HasPerm("codename")]` (ver `v2/docs/RBAC_NAMING.md`)
@@ -18,7 +18,7 @@
 
 **SSOT**: Projetos organizacionais (ACerta, Brincando, etc.)
 **Fields**: nome (UK), codigo (UK), **fluxo (SUPER/NAO_SUPER)**, descricao
-- **SUPER Flow**: Requires manual Superintendência approval
+- **SUPER Flow**: Requires manual approval by someone with a base in `solicitation_approval_basis` (PA-02: superuser, GERENTE vigente na Superintendência, DAT ou Controle pelo pacote da gerência)
 - **NAO_SUPER Flow**: Auto-approved on creation
 
 ## Solicitacao (Core of System)
@@ -42,7 +42,7 @@
 ## AvailabilityBlock
 
 **SSOT**: Bloqueios de agenda do formador
-**Fields**: usuario, start_date, end_date, start_time, end_time, tipo (P/T), status
+**Fields**: usuario, created_by, inicio, fim (DateTimeField, UTC), tipo (T/P), motivo, status (pendente/aprovado/reprovado, default aprovado)
 
 ## AuditLog
 

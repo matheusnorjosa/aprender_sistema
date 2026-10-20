@@ -23,9 +23,9 @@ Você audita a configuração `.claude/` (skills, commands, agents, hooks, cheat
   SSOT: `v2/docs/specs/backend/imports.spec.md`.
 - **Apps reais**: `apps/core` + `apps/dev_tools` (só esses). Serviço de aprovação real =
   `apps/core/services/solicitacao_approval.py` (NÃO existe `approval_service.py`).
-- **Counts**: 40 pages; 5 funções (Formador, Coordenador, Apoio de Coordenação, Gerente, Assistente
+- **Counts**: 41 pages (lazy em `AppRoutes.tsx`); 5 funções (Formador, Coordenador, Apoio de Coordenação, Gerente, Assistente
   Administrativo); 13 setores. Aprovação: regra única `solicitation_approval_basis`; ver PA-02 em `v2/docs/specs/domain/politica-aprovacao.spec.md` (nenhum grupo aprova).
-- **Stack**: Python 3.12 / Django 5.2 / DRF / React 18 / Vite 7 / Antd 5. v2 Docker-only (CP-01).
+- **Stack**: Python 3.12 / Django 5.2 / DRF / React 19 / Vite 7 / Antd 5. v2 Docker-only (CP-01).
   Frontend migrado p/ TypeScript (`.tsx`, não `.jsx`).
 - **Agent types reais**: Explore, Plan, general-purpose, Workflow (nunca "Bash"). `.claude/` é **versionado** desde a decisão D3 (`PLAN_doc_drift_2026-08-25.md`; negado em `.gitignore` p/ `agents/`, `commands/`, `hooks/`, `skills/`, `CLAUDE.md`, `settings.json` — exceto `_archive/`, `worktrees/`, `settings.local.json`, caches); o gate `check_agent_instructions.py` roda em todo PR que toca `.claude/**`.
 

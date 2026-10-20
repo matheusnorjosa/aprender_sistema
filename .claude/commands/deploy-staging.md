@@ -12,7 +12,7 @@ Deployment type: ${ARGUMENTS:-full}
 **There is NO dedicated staging environment** in AS v2, e **merge na `main` NÃO deploya**.
 O fluxo tem dois atos deliberados:
 
-1. **Validar localmente** com `make staging-full` (stack prod-like) — precisa fechar **8/8 PASS**.
+1. **Validar localmente** com `make staging-full`, rodado de `v2/infra/` (stack prod-like) — precisa fechar **8/8 PASS**.
 2. **Merge (squash) na `main`** → dispara `deploy.yaml` (*"Build, sign and release"*): build → scan →
    push no Docker Hub → **assina** (cosign keyless + provenance SLSA) → cria a tag imutável
    `vYYYY.MM.DD-<sha7>` + GitHub Release. **Produção não muda aqui.**
@@ -85,7 +85,7 @@ O fluxo tem dois atos deliberados:
 
 - [ ] **Run the full prod-like validation** — must end **8/8 PASS**
   ```bash
-  make staging-full
+  cd v2/infra && make staging-full   # o target só existe em v2/infra/Makefile
   # Expected: ALL 8 CHECKS PASSED
   ```
   > On GnuWin32/Windows, `$(MAKE)` recursion can break — run the staging-precheck/build/up/test/down
@@ -256,8 +256,8 @@ gh workflow run promote.yml -f release=v2026.MM.DD-<sha7>   # -> gate `productio
 ## 📊 Environment Reality
 
 - **No remote staging server.** Validation is **local** (`make staging-full`, prod-like Docker stack).
-- **Prod = 3 Golden VMs**: VM01_App (Nginx/Gunicorn/Celery/React), VM02_DB (PostgreSQL 15),
-  VM03_Red (Redis 7).
+- **Prod = 2 VMs**: VM01_App (Nginx/Gunicorn/Celery/React + Redis 7 em container, serviço `redis`
+  na rede `backend-internal`) e VM02_DB (PostgreSQL 15). SSOT: `v2/infra/README.md`.
 - **Produção puxa; o CI não empurra** (ADR-018). O `PUT` sai do `aprender-applier` para
   `127.0.0.1:9443`; o `aprender-deployer`, que faz o parsing do que vem da internet, **não** detém
   o token do Portainer (separação de privilégio entre dois usuários de sistema).

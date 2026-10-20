@@ -30,7 +30,7 @@ a arquitetura stateless e como escalar a aplicação **quando for preciso**.
 | Django App | Stateless | - | ✅ |
 | Sessions | Redis | `SESSION_ENGINE=cache` (`settings.py`) | ✅ em uso |
 | Cache | Redis | `django_redis.cache.RedisCache` | ✅ em uso |
-| Media Files | S3 (opcional) | `django-storages` **só se `AWS_STORAGE_BUCKET_NAME` estiver setado** (`settings.py`) | ⚠️ **não configurado**; cai em `MEDIA_ROOT = BASE_DIR/"media"` (disco local, `settings.py`). Hoje nenhum model usa `FileField`/`ImageField`, então isso não bloqueia réplicas — **passaria a bloquear** no primeiro upload persistente |
+| Media Files | S3 (opcional) | `django-storages` **só se `AWS_STORAGE_BUCKET_NAME` estiver setado** (`settings.py`) | ⚠️ **não configurado**; cai em `MEDIA_ROOT = BASE_DIR/"media"` (disco local, `settings.py`). `ImportJob.file` é o único `FileField` (upload do import assíncrono, `upload_to="imports/%Y/%m/%d/"`) e exige disco compartilhado entre `web` (grava) e `worker` (lê `job.file.path` em `apps/core/tasks.py`) — **já bloqueia réplicas**: o arquivo gravado por uma instância não é visto pela outra. Na stack de prod (`v2/infra/docker-compose.prod.yml`) nem esse disco existe: `web` e `worker` têm root FS `read_only` e nenhum volume em `MEDIA_ROOT`. SSOT: `apps/core/models/import_job.py` |
 | Task Queue | Redis | Celery broker | ✅ em uso |
 | Database | PostgreSQL | Externo (VM02) | ✅ |
 

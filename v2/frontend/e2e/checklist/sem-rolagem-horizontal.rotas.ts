@@ -21,9 +21,11 @@ export const PERFIS = {
   controle: 'controle_e2e@test.com',
   dat: 'dat_matrix@test.com',
   aprovador: 'super_e2e@test.com',
-  // Único jeito de abrir as rotas cuja policy não tem grupo no seed
-  // (manage_internal_actions só o superuser tem; view_overview_dashboard e
-  // view_map_metrics são da Diretoria, sem usuário no seed E2E).
+  // Único jeito de abrir as rotas cuja policy não está no pacote nem nos direitos
+  // do papel de nenhum perfil do seed (o poder vem da lotação, não do grupo):
+  // manage_internal_actions só o superuser tem; view_overview_dashboard é do
+  // pacote DIRETORIA, sem usuário no seed E2E. O /mapa-brasil (view_map_metrics)
+  // também abre para `dat` (pacote ADMIN_OPERACIONAL) e é medido como superusuário.
   superusuario: 'admin_matrix@test.com',
 } as const;
 export type Perfil = keyof typeof PERFIS;

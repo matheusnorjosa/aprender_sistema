@@ -56,15 +56,12 @@ def _make_user_for_actor(actor: str) -> Usuario:
     Cria user com grupos correspondentes ao ator. Superuser é caso especial.
     Cada test gera CPF/username único via atomic counter.
 
-    D8 (2026-04-28): Coordenador e Apoio de Coordenação ganham EquipeGerencia
-    ativa pré-criada. Sem o vínculo, eles cairiam em 403 pelo HasSectorAccess
-    endurecido (sem cap global E sem gerência → DENY). Outros atores não
-    precisam — Controle passa pela cap; DAT/Diretoria/Formador são DENY/ALLOW
-    por design.
-
-    D9 (2026-04-28): Gerente perde cap global e cai em scope via EquipeGerencia
-    (igual Coord/Apoio). Fixture cria vínculo papel="GERENTE" para que o ator
-    GERENTE retorne 200 na Matriz Viva. DAT recebe cap global (sem fixture).
+    Desde o PR 12 o grupo é etiqueta: o poder vem da lotação. Por isso todo ator
+    não superuser recebe aqui o vínculo EquipeGerencia que tem em produção: o papel
+    (FORMADOR, COORDENADOR, APOIO, GERENTE) numa gerência de teste ou na
+    SUPERINTENDENCIA, ou EQUIPE na gerência do pacote (GERENCIA DAT para o DAT,
+    CONTROLE para Controle e Assistente Administrativo, DIRETORIA para a Diretoria).
+    Sem o vínculo, o ator cairia em 403 (DAT e Controle inclusive).
     """
     if actor == SUPERUSER:
         return UsuarioFactory(

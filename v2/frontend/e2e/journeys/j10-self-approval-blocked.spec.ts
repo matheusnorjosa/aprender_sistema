@@ -1,15 +1,18 @@
 /**
  * J10 — Coord não aprova própria solicitação.
  *
- * Ref: PA-02 adaptada (Superintendência, DAT ou superuser aprovam).
+ * Ref: PA-02 (regra única `solicitation_approval_basis`; nenhum grupo aprova).
  *
- * O criador não pode aprovar a própria solicitação — mesmo que seja
- * superintendente ou tenha permissão de aprovação. Esta regra impede
- * conflito de interesse e é garantida pela permission class
- * `IsSuperintendencia` combinada com o check de ownership.
+ * Aprova quem tem uma das três bases: superuser, `gerente_superintendencia`
+ * (vínculo GERENTE vigente na gerência Superintendência; só decide o escopo
+ * SUPER dela) e `capacidade_aprovar` (capacidade `approve_solicitation` pelo
+ * pacote do perfil da gerência: DAT e Controle). A permission class
+ * `CanAccessSolicitationApprovals` aplica essa regra.
  *
- * Na prática atual, `IsSuperintendencia` aceita `Superintendência | DAT |
- * superuser`. Coord (sem essas funções) bate direto na permission class e
+ * Mesmo com base, o criador não decide a própria solicitação: a segregação
+ * por autoria e as demais de `decisoes_impedidas` (conta alterada, edição
+ * pelo aprovador) barram com 403; só o superusuário passa (break-glass
+ * registrado). Coord (sem nenhuma base) bate direto na permission class e
  * recebe 403, independente de ser dono ou não.
  *
  * Quatro camadas:

@@ -1,7 +1,7 @@
 ---
 title: Clientes de API (Fetch)
 status: canonical
-last_verified: 2026-10-14
+last_verified: 2026-10-19
 sources_of_truth:
   - v2/frontend/src/api/config.ts
   - v2/frontend/src/api/auth.ts
@@ -33,7 +33,7 @@ related:
 
 A camada `src/api/` concentra todo o acesso HTTP do frontend ao backend DRF. **A migracao axios -> Fetch API nativa esta concluida**: `axios` nao aparece em `v2/frontend/package.json` (nem em `dependencies` nem em `devDependencies`) e o unico residuo no codigo sao dois comentarios de teste legado (`hooks/__tests__/useGoogleIntegration.test.ts` e `useSessionMonitor.test.ts`, Epic #1039). Todos os clientes consomem um wrapper unico (`config.ts`) construido sobre `fetch()`, eliminando risco de supply chain e ~40KB de bundle (ver ADR-013).
 
-`src/api/` tem hoje **16 arquivos**: o wrapper `config.ts` + **15 clientes tematicos** (auth, me, lookup, solicitacoes, availability, deslocamentos, ops/Controle, adminDAT, datModule, gcal, dashboard, stats, teamMetrics, systemConfig, acoesNotificacao). Eles expoem funcoes tipadas que retornam `Promise<T>` e delegam o transporte, CSRF e tratamento de erro ao `config.ts`. Nenhum componente de `src/pages/` deve chamar `fetch()` diretamente — isso e travado por um teste sentinela (ver "Testes que cobrem"); a regra de ouro e uma funcao de cliente por endpoint.
+`src/api/` tem hoje **17 arquivos** (fora os testes): o wrapper `config.ts`, o helper `unwrapList.ts` (nao e cliente) e **15 clientes tematicos** (auth, me, lookup, solicitacoes, availability, deslocamentos, ops/Controle, adminDAT, datModule, gcal, dashboard, stats, teamMetrics, systemConfig, acoesNotificacao). Eles expoem funcoes tipadas que retornam `Promise<T>` e delegam o transporte, CSRF e tratamento de erro ao `config.ts`. Nenhum componente de `src/pages/` deve chamar `fetch()` diretamente — isso e travado por um teste sentinela (ver "Testes que cobrem"); a regra de ouro e uma funcao de cliente por endpoint.
 
 ## Fonte de verdade no codigo
 
@@ -81,7 +81,7 @@ Wrapper publico exportado por `config.ts`:
 3. **Login**: `auth.login()` -> `POST /auth/login/` -> sucesso -> `clearCsrfCache()` (Django rotacionou o token) de forma que a proxima mutacao busca token novo.
 4. **Bootstrap**: no carregamento do app, `initCsrfToken()` pre-aquece o token para evitar race no primeiro submit.
 5. **Regra da compra nas listas (14/10/2026)**: `lookupProjetos(q, params)` aceita `{ com_compra }` sem mudar a assinatura de `q` (o `ComboBox` chama só com `q`); `lookupMunicipiosWithFilters({ q, com_compra, projeto_id })`; `getProjetosOptions({ excludeKits, comCompra })` monta `/options/projetos/` com `buildUrl`. O servidor isenta quem é isento.
-6. **Download de arquivo**: `fetchBlob('/dat/compras/export/')` retorna `Blob`; o caller cria `URL.createObjectURL`. Falha lanca `Error('Export failed: HTTP <status>')`; sem rede, `TypeError('Sem conexão com o servidor.')`.
+6. **Download de arquivo**: `fetchBlob('/dat/registros/export/')` (`datModule.ts`; `me.ts` usa `/me/export/`) retorna `Blob`; o caller cria `URL.createObjectURL`. Falha lanca `Error('Export failed: HTTP <status>')`; sem rede, `TypeError('Sem conexão com o servidor.')`.
 
 ## Decisoes relacionadas (ADRs)
 
@@ -92,7 +92,7 @@ Wrapper publico exportado por `config.ts`:
 
 - [`v2/frontend/src/api/__tests__/config.test.ts`](../../../frontend/src/api/__tests__/config.test.ts) — `getCsrfToken`, `clearCsrfCache`, `buildUrl`, `fetchAPI` (com MSW). Nota: cookie de teste usa `; Secure` porque jsdom roda em HTTPS (memoria vitest+jsdom Secure cookies).
 - [`v2/frontend/src/pages/__tests__/NoRawFetchInPages.test.ts`](../../../frontend/src/pages/__tests__/NoRawFetchInPages.test.ts) — **sentinela #1453**: varre `src/pages/` e falha se alguma pagina chamar `fetch(` cru (mutacao sem `X-CSRFToken` => `403` em producao). Tem um segundo teste que garante que o walk enxerga >20 arquivos, para nao dar falso-verde se a estrutura de pastas mudar. Clientes em `src/api/` estao fora do escopo por serem onde `fetchAPI` e implementado.
-- Testes por cliente: `availability.test.ts`, `lookup.test.ts`, `gcal.test.ts`, `adminDAT.test.ts`, `datModule.test.ts`, `systemConfig.test.ts`, `dashboard.test.ts`, `teamMetrics.test.ts`, `ops.normalizeImportResponse.test.ts` (todos em `v2/frontend/src/api/__tests__/`).
+- Testes por cliente: `availability.test.ts`, `lookup.test.ts`, `gcal.test.ts`, `adminDAT.test.ts`, `datModule.test.ts`, `systemConfig.test.ts`, `dashboard.test.ts`, `teamMetrics.test.ts`, `ops.normalizeImportResponse.test.ts`, `deslocamentos.test.ts` (todos em `v2/frontend/src/api/__tests__/`).
 - Mocks de rede via MSW (`src/test/mocks/`), sem servidor real.
 
 ## Pontos de atencao / dividas conhecidas
@@ -102,4 +102,3 @@ Wrapper publico exportado por `config.ts`:
 - **Retry CSRF detecta por string**: o gatilho do retry e `errorBody.includes('CSRF')`; mudanca na mensagem do Django pode quebrar o retry silenciosamente.
 - **`fetchBlob` engole detalhe do erro**: lanca mensagem generica `HTTP <status>` sem parsear o body — pior UX que `fetchAPI` para exports que falham com 400 detalhado.
 - **CSRF stale residual**: o TTL de 30 min cobre a maioria dos casos, mas o cookie tem prioridade sobre o cache; se o cookie ficar stale (sem HttpOnly) o retry-1x e a unica rede de seguranca.
-- **`deslocamentos.ts` sem teste de cliente**: e o unico cliente com pagina critica (`/solicitacoes/deslocamentos`) e sem arquivo em `src/api/__tests__/`.

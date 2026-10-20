@@ -25,7 +25,7 @@ def ensure_base_groups() -> int:
     Idempotente. Necessário em ambientes sem as migrations de seed RunPython
     (ex.: `pytest --no-migrations`), onde nenhuma migration cria os grupos.
     `seed_functional_permissions(assign_default_groups=True)` só cria os grupos
-    que têm capability atribuída (4 dos 18 desde o PR 8: Superintendência, DAT,
+    que têm capability atribuída (3 dos 18 desde o PR 10, migration 0126: DAT,
     Diretoria e Controle); este helper cobre os demais (outros setores e as funções). Retorna a
     quantidade de grupos criados nesta chamada.
     """

@@ -2,7 +2,7 @@
 title: Módulo DAT
 status: canonical
 last_verified: 2026-10-14
-verified_at_commit: 120f8a89bc56ab9ae9210e55f2efbc34eb849932
+verified_at_commit: b59d979087fe568203f2503d6c186a0b6748225b
 sources_of_truth:
   - v2/backend/apps/core/services/controle_acoes_import.py
   - v2/backend/apps/core/models/dat_acao.py

@@ -1,7 +1,7 @@
 ---
 title: Índice SDD (Spec-Driven Development)
 status: active
-last_verified: 2026-07-24
+last_verified: 2026-10-19
 owner: docs
 related:
   - ../plans/PLAN_sdd_migration_2026-06-19.md
@@ -17,15 +17,15 @@ contrato em produção tem (ou terá) uma spec versionada, datada e rastreável 
 e as fases estão no [plano SDD](../plans/PLAN_sdd_migration_2026-06-19.md), apoiado na
 [auditoria documental 2026-06-19](../reports/AUDITORIA_DOCUMENTAL_2026-06-19.md).
 
-> Estado: **as 21 specs foram reverificadas contra o código** (varredura documental
-> pós-auditoria M00–M28); **20 `canonical` + 1 `draft`** (`at-rest-encryption`, pendente de verificação
-> de infra). O modelo SDD está formalizado na
+> Estado: **22 specs, 21 `canonical` + 1 `draft`** (`at-rest-encryption`, pendente de verificação
+> de infra). As 21 que existiam na varredura documental pós-auditoria M00–M28 foram reverificadas
+> contra o código; cada spec traz o próprio `last_verified`. O modelo SDD está formalizado na
 > [ADR-017](../../../docs/architecture/project-decisions/ADR-017-spec-driven-documentation.md).
 >
-> **Leia junto:** [`ACHADOS_REAIS.md`](../audits/ACHADOS_REAIS.md) é a fila viva de defeitos (57
-> achados: 2 P0, 36 P1, 19 P2). Várias specs abaixo têm uma seção **Divergências**, que registra
-> onde o código **não** cumpre a regra descrita — com link para o achado. Uma spec descrever o
-> comportamento real, inclusive quando ele é o errado, é intencional: o comportamento pretendido
+> **Leia junto:** [`ACHADOS_REAIS.md`](../audits/ACHADOS_REAIS.md) é a fila viva de defeitos (ver
+> o arquivo para o estado vigente; a contagem de 57 é do corte de 2026-07-20). Várias specs abaixo
+> têm uma seção **Divergências**, que registra onde o código **não** cumpre a regra descrita — com
+> link para o achado. Uma spec descrever o comportamento real, inclusive quando ele é o errado, é intencional: o comportamento pretendido
 > só entra como "pretendido", nunca como se já existisse.
 >
 > O que foi corrigido, o que ficou pendente de decisão humana e o que já estava certo está em
@@ -91,7 +91,7 @@ related: []                   # links a specs/ADRs relacionados
 | [pages.spec.md](./frontend/pages.spec.md) | páginas React (rotas + guards) | canonical |
 | [ux-principios.spec.md](./frontend/ux-principios.spec.md) | princípios de UX, limites duros (WCAG AA, CWV) e como provar melhora | canonical |
 | [hooks-rbac.spec.md](./frontend/hooks-rbac.spec.md) | hooks de RBAC/guards (GAP preenchido) | canonical |
-| [api-clients.spec.md](./frontend/api-clients.spec.md) | clientes axios/fetch | canonical |
+| [api-clients.spec.md](./frontend/api-clients.spec.md) | clientes de API (Fetch API) | canonical |
 
 ### `infra/` — deploy, ambientes, CI
 

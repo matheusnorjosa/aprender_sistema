@@ -1,8 +1,8 @@
 ---
 title: Deslocamento
 status: canonical
-last_verified: 2026-10-16
-verified_at_commit: 5205b976648b0f481a8842101b3f0ddae4647965
+last_verified: 2026-10-19
+verified_at_commit: 804df36a1741d1faa53586eafade5c4c74c0659d
 sources_of_truth:
   - v2/backend/apps/core/models/workflow.py
   - v2/backend/apps/core/migrations/0016_create_deslocamento.py
@@ -63,7 +63,7 @@ E um cadastro operacional simples (CRUD + import em massa), sem fluxo de aprovac
 - **Idempotencia de import**: `external_hash = SHA1(usuario_id|origem|destino|start_iso|end_iso)` via `stable_import_hash` (byte-equivalente ao formato historico). Re-import do mesmo registro nao duplica; so `observacao` e atualizada quando muda (never-overwrite dos demais campos). `unique=True` no `external_hash` e a barreira de banco.
 - **Dry-run por padrao no import**: `dry_run=true` faz `transaction.set_rollback(True)`; nada e persistido. O endpoint inteiro exige `SuperuserOnly` (so superusuario, decisao do dono de 02/10/2026: nenhum perfil importa pela tela), tanto em dry-run quanto em apply. Isolamento savepoint-por-linha (ASQ-016): uma linha ruim nao derruba o lote. **O parse de `dry_run` e FAIL-CLOSED** (corrigido em [#1649](https://github.com/matheusnorjosa/aprender_sistema/issues/1649); achado historico `M04-05`): `views_import_deslocamentos.py` chama `parse_dry_run(request.query_params.get("dry_run"))` — só um token de apply explícito (`false`/`0`/`no`/…) grava; qualquer valor desconhecido (`sim`, `maybe`, typo, vazio) permanece em dry-run (preview). Antes de #1649 o parse era uma allowlist do valor verdadeiro e o valor desconhecido virava apply silencioso.
 - **Leitura: scope por gerencia + self-service** (`views_deslocamento.py`, `get_queryset`):
-  - Superuser **ou** capability `view_all_availability` (Controle/Gerente via seed 0078) -> ve todos os deslocamentos.
+  - Superuser **ou** capability `view_all_availability` -> ve todos os deslocamentos. Hoje essa capability vem so dos pacotes do perfil da gerencia `CONTROLE` e `ADMIN_OPERACIONAL` (quem tem vinculo EQUIPE/GERENTE vigente no Controle ou no DAT; `services/rbac_pacotes.py`); so na volta de emergencia `RBAC_FONTE=uniao` os grupos Controle e DAT tambem a dao (seed). O grupo Gerente nao da capability nenhuma (migration 0125; no modo `RBAC_FONTE=lotacao` o grupo e etiqueta): a gerente comum cai na regra abaixo e ve so as gerencias em que tem papel.
   - Demais autenticados -> `Q(usuario=user) | Q(usuario__equipes__gerencia_id__in=<gerencias de atuacao do user>)`. Desde o PR 9 das permissoes (16/10/2026, P9-1, decisao do dono de 15/10) as gerencias sao so as de papel GERENTE, COORDENADOR ou APOIO vigente (`EquipeGerencia.gerencias_de_atuacao`): a formadora ve so os proprios deslocamentos. **O proprio dono SEMPRE ve os proprios deslocamentos**, mesmo sem vinculo de `EquipeGerencia` (#1454). A regra anterior desta spec ("sem vinculo -> 0 resultados") deixou de valer.
 - **Escrita: owner-forced com delegacao por capability** (#1454, audit 2026-07-10) — **isto NAO estava documentado**:
   - `perform_create`: `usuario` omitido ou == `request.user` -> grava para o proprio (`delegated=False`). `usuario` != `request.user` -> exige `user_can_delegate_deslocamento`, senao **403**.
@@ -103,7 +103,7 @@ Schema detalhado/exemplos: ver `API_REFERENCE` quando disponivel.
 ## Decisoes relacionadas (ADRs)
 
 - Idempotencia de import via SHA1 — ADR-012 (hashing `apps/core/imports/hashing.py`), reutilizada por `_compute_external_hash`.
-- Scope C2 de Deslocamentos (Coord/Apoio/DAT scoped via `EquipeGerencia`, Controle/Gerente full) — decisao de stakeholder 2026-04-27, documentada em [`rbac_authorization_matrix.md`](../../rbac_authorization_matrix.md) (§3) e PR #1250.
+- Scope C2 de Deslocamentos (Coord/Apoio/DAT scoped via `EquipeGerencia`, Controle/Gerente full) — decisao de stakeholder 2026-04-27, documentada em [`rbac_authorization_matrix.md`](../../rbac_authorization_matrix.md) (§3) e PR #1250. Desde as permissoes por lotacao (PR 8 a PR 12, 10/2026) o "full" e de quem tem `view_all_availability` pelos pacotes `CONTROLE` e `ADMIN_OPERACIONAL` (Controle e DAT, este agora full); a gerente comum deixou de ser full e ve so as gerencias em que tem papel (ver Leitura acima).
 - Centralizacao DAT-only do import (`HasPerm("import_spreadsheet")`) — PR-A1 DAT-Imports (2026-04-29); substituida em 02/10/2026 por `SuperuserOnly` (importacao pela tela so do superusuario, decisao do dono).
 
 ## Testes que cobrem
@@ -118,7 +118,7 @@ Schema detalhado/exemplos: ver `API_REFERENCE` quando disponivel.
 
 ## Pontos de atencao / dividas conhecidas
 
-- **Contrato FE↔BE quebrado no create** (`M09-05`, issue #1621) — **RESOLVIDO no PR 8 das permissoes** (15/10/2026): o campo "Formador" so aparece para quem delega (`GET /api/deslocamentos/alvos/`) e e opcional; sem ele o POST vai sem `usuario`. Historico: ver §Contratos. A decisao pendente e de produto — ou o backend passa a aceitar auto-registro de Coordenador, ou a UI para de exigir "Formador" e passa a permitir o proprio usuario. Nao "consertar" so um lado.
+- **Contrato FE↔BE quebrado no create** (`M09-05`, issue #1621) — **RESOLVIDO no PR 8 das permissoes** (15/10/2026): o campo "Formador" so aparece para quem delega (`GET /api/deslocamentos/alvos/`) e e opcional; sem ele o POST vai sem `usuario`. Historico: ver §Contratos. Os dois lados ja fecham: o backend aceita o registro da propria viagem (`usuario` omitido ou igual ao `request.user`, `DeslocamentoViewSet.perform_create`) e a UI nao exige mais "Formador". Resta na #1621 (OPEN): `pode_editar` por linha (Editar/Excluir aparecem em toda linha), o acesso do Formador a tela (`access_travel` nao inclui o papel FORMADOR) e o docstring de `api/deslocamentos.ts`.
 - **Filtros Origem/Destino inutilizaveis na UI** (`M09-06`, issue #1622, épico #1668) — **RESOLVIDO (#1622)** (PRs #1731/#1737/#1753). O defeito era de frontend: o early-return `if (loading) return <div>Carregando...</div>` em `DeslocamentosPage` remontava a arvore inteira (filtros inclusive) a cada tecla, os `<Input>` eram nao-controlados (voltavam vazios e sem foco) e nao havia debounce (1 request por tecla). Hoje os inputs sao **controlados** (`value={filters.origem ?? ''}` / `value={filters.destino ?? ''}`), o fetch tem **debounce de 350 ms**, o loading foi separado em `pageLoading` (pagina, cobre so a carga inicial no early-return) e `tableLoading` (so a tabela), e as respostas obsoletas sao descartadas por `seqRef` (latest-wins) + `AbortController`.
 - **Paginacao**: o backend respeita `?page_size` (`views_deslocamento.py`, `DeslocamentoPagination`); a `DeslocamentosPage` fixa `pageSize: 50` e nunca envia o parametro, sem `showSizeChanger`. O achado `M18-06` (épico #1653) e de frontend neste modulo.
 - **GAP de documentacao (resolvido)**: este modulo nao tinha spec/doc canonico ate 2026-06-19. Confirmar dono de produto da regra de negocio de viagem.

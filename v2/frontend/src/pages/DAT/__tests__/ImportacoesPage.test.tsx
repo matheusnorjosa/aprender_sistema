@@ -7,8 +7,8 @@
  * - 11 cards de upload (cada um com label esperado)
  *
  * Não cobre (escopo de outros PRs):
- * - Guard `canDAT` na rota (PR-B só configura — guard é validado em
- *   testes de AppRoutes, padrão de PR 11/12 do programa hardening RBAC)
+ * - Guard da rota: só superusuário (`podeImportarPelaTela` em AppRoutes.tsx, decisão do dono de
+ *   02/10/2026); coberto em AppRoutes.access-by-profile.test.tsx (bloco Importação pela tela)
  * - Lógica de upload em si (já coberta pelos testes de `ImportUploader`)
  * - Backend gate de cada endpoint (PR-A1 cobre)
  */

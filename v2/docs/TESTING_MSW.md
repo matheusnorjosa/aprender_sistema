@@ -20,7 +20,7 @@ Default to MSW for any new test that touches the API boundary. Fall back to
   (e.g. `/api/csrf/`). Keep this minimal. Scenario-specific handlers live in
   tests via `server.use(...)`.
 - **Server**: `v2/frontend/src/test/mocks/server.ts` — `setupServer` instance.
-- **Lifecycle**: wired in `v2/frontend/src/test/setup.js`.
+- **Lifecycle**: wired in `v2/frontend/src/test/setup.ts`.
   - `beforeAll`: `server.listen({ onUnhandledRequest: 'bypass' })`
   - `afterEach`: `server.resetHandlers()`
   - `afterAll`: `server.close()`

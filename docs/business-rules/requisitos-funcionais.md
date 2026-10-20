@@ -12,10 +12,10 @@ Requisitos funcionais do sistema Aprender Sistema v2.
 
 ## RF01: Autenticação
 
-- Login por **CPF ou username** + senha (`apps/core/auth_backends.py:21` —
-  `CPFOrUsernameBackend`: entrada com 11 dígitos após remover pontuação é tratada como CPF,
+- Login por **CPF ou username** + senha (`CPFOrUsernameBackend` em
+  `apps/core/auth_backends.py`: entrada com 11 dígitos após remover pontuação é tratada como CPF,
   o resto como username). Na prática o identificador operacional é o CPF
-- Sessão com duração default de 2 horas (`SESSION_COOKIE_AGE`, `config/settings.py:333`,
+- Sessão com duração default de 2 horas (`SESSION_COOKIE_AGE` em `config/settings.py`,
   sobrescrevível por env)
 - CSRF token obrigatório nas requisições que alteram estado
 - Logout com invalidação de sessão
@@ -41,25 +41,25 @@ Requisitos funcionais do sistema Aprender Sistema v2.
     - Não-sobreposição de eventos
     - Bloqueios totais (T) e parciais (P)
     - Buffer de deslocamento entre municípios
-    - Capacidade diária por formador
-- Exibição visual de conflitos com códigos M/D/P/T/X
+- Não há limite de horas por dia na agenda: desde 05/10/2026 o RD-05 é o teto por evento da
+  contagem de horas de formação, não conflito
+- Exibição visual de conflitos com códigos D/P/T/X
   (`E` é código de célula da Grade Mensal, não de conflito)
 
-Ver [Regras de Disponibilidade (RD)](regras-disponibilidade.md) — inclui duas divergências
-vivas (#1664).
+Ver [Regras de Disponibilidade (RD)](regras-disponibilidade.md).
 
 ## RF04: Aprovar/Reprovar
 
 - Aprovam/reprovam (fluxo SUPER): superuser, **Gerente da Superintendência**, **DAT** ou
   **Controle** — ver [PA-02](politica-aprovacao.md#pa-02-perfil-exigido)
-- Interface dedicada em `/aprovacoes`
+- Interface dedicada em `/solicitacoes/aprovacoes` (`/aprovacoes` só redireciona)
 - Registro de justificativa em reprovações
 - AuditLog de todas as ações
 - Aprovação em lote disponível (máx. 100 IDs)
 - Aprovar revalida a disponibilidade antes de mudar o status (#1452)
 
-Ver [Política de Aprovação (PA)](politica-aprovacao.md) — inclui três divergências vivas,
-uma delas **P0** (#1610).
+Ver [Política de Aprovação (PA)](politica-aprovacao.md). As três divergências que ela
+registrava (#1610, #1624, #1650) estão resolvidas.
 
 ## RF05: Publicar no Google Calendar
 
@@ -68,10 +68,12 @@ uma delas **P0** (#1610).
   código) e `oauth` (`apps/core/services/gcal_client_factory.py:83-87`).
   **Produção roda em modo `oauth`** com cliente Google real; não há
   `GCAL_SERVICE_ACCOUNT_JSON` configurado
-- Cliente selecionado por `GCAL_CLIENT=fake|google` (`config/settings.py:722`)
+- Cliente selecionado por `GCAL_CLIENT=fake|google` (`GCAL_CLIENT` em `config/settings.py`)
 - Suporte a dry-run (simulação)
 - Controle de send_updates (notificações)
-- Sincronização idempotente (`external_event_id = asv2-{id}` + hash do payload)
+- Sincronização idempotente (eventId determinístico `asv2{id}`, sem hífen — o Google só aceita
+  base32hex, a-v e 0-9 — + hash do payload). Na virada (#1899) o `external_event_id` pode ser
+  o Event ID adotado do evento que a planilha já tinha criado no Google, em vez do `asv2{id}`
 
 ## RF06: Gerar Link Google Meet
 
@@ -94,15 +96,15 @@ uma delas **P0** (#1610).
 ## Status de Implementação
 
 "Implementado" significa que o caminho existe e está em produção — não que esteja livre de
-defeito conhecido. As ressalvas abaixo são achados reconfirmados por execução contra
-`main d08acfa5` e vivos em produção.
+defeito conhecido. As ressalvas abaixo registram o estado de cada RF; as divergências de RF03 e
+RF04, reconfirmadas por execução contra `main 8b6bd1fd`, já foram corrigidas no código.
 
 | RF | Descrição | Status | Ressalva |
 |----|-----------|--------|----------|
 | RF01 | Autenticação | ✅ Implementado | — |
 | RF02 | Solicitar Evento | ✅ Implementado | — |
-| RF03 | Verificar Conflitos | ⚠️ Implementado com defeito | RD-05 ignora eventos que cruzam a meia-noite; papéis ocupantes não filtrados na query de eventos existentes (#1664) |
-| RF04 | Aprovar/Reprovar | ⚠️ Implementado com defeito | **P0**: autoridade de aprovação auto-concedível via import de usuários (#1610). Troca de projeto preserva `aprovado` (#1624); `ids` de lote sem validação (#1650) |
+| RF03 | Verificar Conflitos | ✅ Implementado | As duas divergências do #1664 saíram do código: o RD-05 deixou de ser checagem de agenda (05/10/2026) e a query de eventos existentes usa o mesmo predicado de papéis ocupantes (`ocupa_agenda_q`). O épico #1664 segue aberto no GitHub |
+| RF04 | Aprovar/Reprovar | ✅ Implementado | Sem divergência viva: o import não concede autoridade (#1610), editar a SUPER aprovada pede nova aprovação (#1624) e o lote valida `ids` (#1650) |
 | RF05 | Google Calendar | ✅ Implementado | Produção usa OAuth, não Service Account |
 | RF06 | Google Meet | ✅ Implementado | — |
 | RF07 | Resync/Cancel | ✅ Implementado | — |

@@ -1,6 +1,11 @@
 """
 Management command para migrar usuários para nova estrutura RBAC (Setor + Função).
 
+OBSOLETO desde o PR 12 (o corte, ADR-020): o poder vem só da lotação (`RBAC_FONTE="lotacao"`) e o
+grupo de função é etiqueta desde o PR 8. Pôr alguém no grupo "Gerente" não muda nada no modo padrão;
+só soma poder no modo de emergência "uniao" (`grupos_dao_poder` em `services/rbac_permissions.py`).
+Dar o papel de gerente hoje é criar `EquipeGerencia(papel="GERENTE")` vigente na gerência.
+
 Uso:
     python manage.py migrate_rbac_groups --dry-run  # Preview das mudanças
     python manage.py migrate_rbac_groups            # Aplicar mudanças

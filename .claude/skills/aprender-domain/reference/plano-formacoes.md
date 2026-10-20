@@ -5,7 +5,7 @@ Estrutura de formações anuais por Município + Projeto.
 
 ## FORM-01: Estrutura do Plano
 
-**Model**: `PlanoFormacoes` (`apps/core/models/plano_formacoes.py`) — chave única `(municipio, projeto)`
+**Model**: `PlanoFormacoes` (`apps/core/models/plano_formacoes.py`) — chave única `(municipio, projeto, ano)` (`unique_plano_municipio_projeto_ano`, `nulls_distinct=False`)
 
 **Relacionamentos**:
 - 1 PlanoFormacoes → até 15 `Formacao` (via `related_name="formacoes"`)

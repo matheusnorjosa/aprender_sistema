@@ -76,7 +76,7 @@ class ExampleModel(models.Model):
 
         constraints = [
             models.CheckConstraint(
-                check=models.Q(fim__gt=models.F("inicio")),
+                condition=models.Q(fim__gt=models.F("inicio")),  # Django 5.1+: `check=` deprecado
                 name="valid_time_range",
             ),
             models.UniqueConstraint(

@@ -1,6 +1,6 @@
 # Auditoria Documental Completa — 2026-06-19
 
-> Status: report (datado) · Repo @ `cbf10a7` (branch `main`) · Método: auditoria multi-agente read-only (14 agentes)
+> Status: report (datado) · Repo @ `e4276b0` (branch `main`) · Método: auditoria multi-agente read-only (14 agentes)
 > Escopo: todos os `.md` versionados e locais. Nenhum arquivo foi movido, apagado ou reescrito.
 > Documento-irmão: plano de migração em [`../plans/PLAN_sdd_migration_2026-06-19.md`](../plans/PLAN_sdd_migration_2026-06-19.md).
 

@@ -26,7 +26,7 @@ apps/core/
 │   └── oauth/        # Fluxo OAuth Google
 ├── rbac/             # Capabilities, policies, matrix.py (SSOT executável)
 ├── imports/          # Pipeline export-contract (hashing, normalização)
-├── schemas/          # Schemas drf-spectacular
+├── api_schemas.py    # Schemas drf-spectacular (arquivo, não diretório)
 ├── management/       # Management commands (import_export_contract, …)
 └── tests/            # Testes unitários
 ```
@@ -89,10 +89,10 @@ O sistema possui dois domínios distintos de compras e eles não devem ser confu
 ### Leitura e escrita por caso de uso
 
 - `core_compra`
-  - leitura: Controle e Superintendência
+  - leitura: Controle e DAT, pelo pacote do perfil da gerência (`/api/controle/compras/` exige `run_daily_operations`; ver `views_compras.py`)
   - escrita: pipelines/importações de controle (`services/controle_imports.py`)
 - `core_dat_compra`
-  - leitura/escrita: DAT e Superintendência (CRUD operacional DAT)
+  - leitura/escrita: DAT e Controle, pelo pacote do perfil da gerência (`CanViewComprasStats` no `DATCompraViewSet`, `views/dat_module.py`); excluir exige `execute_restricted_operations` (DAT). A Superintendência não tem acesso a nenhum dos dois. Gates por endpoint: tabela do `v2/docs/API_REFERENCE.md`
 
 ### Contratos mínimos
 
@@ -101,7 +101,7 @@ O sistema possui dois domínios distintos de compras e eles não devem ser confu
 
 ## Services
 
-A lógica de negócio está isolada em `apps/core/services/` (~40 módulos). Os principais:
+A lógica de negócio está isolada em `apps/core/services/` (~50 módulos). Os principais:
 
 - `availability_service.py`: verificação de conflitos (RD-01..RD-08)
 - `solicitacao_approval.py` / `solicitacao_publish.py`: fluxo de aprovação e publicação
@@ -116,7 +116,7 @@ Pyright roda em **modo strict** sobre `apps/core`, `apps/dev_tools` e `config`
 (`v2/backend/pyproject.toml`, `[tool.pyright]`), excluindo `migrations`. É um check
 bloqueante de PR: `[required] backend typecheck (pyright)`.
 
-Exemplo real (`apps/core/services/availability_service.py:327-329`) — note os
+Exemplo real (`check_conflicts` em `apps/core/services/availability_service.py`) — note os
 argumentos **keyword-only** e o retorno `CheckResult`:
 
 ```python

@@ -2,22 +2,24 @@
 
 > índice — full em `.claude/skills/<nome>/SKILL.md`, `.claude/commands/<nome>.md` e CLAUDE.md
 
-Inventário atual do disco: **28 skills · 18 commands · 4 agent types · 6 MCPs wired**.
-(6 skills são user-invoked — `disable-model-invocation`: create-plan, implement-plan, create-handoff, resume-handoff, continuity-ledger, security-scan.)
+Inventário atual do disco: **30 skills · 15 commands · 4 agent types · 6 MCPs wired**.
+(3 skills são user-invoked — `disable-model-invocation`: etl-guidelines, grill-with-docs, security-scan.)
 
 **Invocação de skill:** via Skill tool com o **nome direto** (ex.: `test-driven-development`),
 não `/skill <nome>`. Comandos slash (`/<nome>`) são os de `.claude/commands/`.
 
 ---
 
-## Skills (28)
+## Skills (30)
 
 | Skill | Quando usar |
 |-------|-------------|
 | `aprender-domain` | Regras de negócio RF/RD/PA/CP |
+| `domain-modeling` | Afiar glossário e ADRs durante conversa de design |
+| `grill-with-docs` | Entrevista implacável sobre plano/design, registrando glossário e ADRs (user-invoked) |
 | `django-patterns` | Models, serializers, views, services (Django/DRF) |
 | `django-security` | Auditoria de vulnerabilidades, auth, RBAC, OWASP |
-| `frontend-ui-engineering` | UIs React 18 + Antd 5 + Tailwind |
+| `frontend-ui-engineering` | UIs React 19 + Antd 5 + Tailwind |
 | `performance-optimization` | Endpoints lentos, N+1, bundle, Core Web Vitals |
 | `writing-standards` | Docs, docstrings (PEP 257), commits |
 | `test-driven-development` | **Antes** de implementar feature/bugfix |
@@ -39,12 +41,13 @@ não `/skill <nome>`. Comandos slash (`/<nome>`) são os de `.claude/commands/`.
 | `git-worktrees` | Trabalhar em múltiplas branches |
 | `graphify` | Knowledge graph local do codebase |
 | `plan-crosscheck` | Cross-check adversarial de um PLANO contra o código antes de implementar |
+| `memory-maintenance` | Podar memória morta e corrigir o índice `MEMORY.md` |
 | `ponytail` | Modo "senior dev preguiçoso" — YAGNI, reusar, menor diff que funciona |
 | `etl-guidelines` | **DEPRECATED-OK** — ETL legado removido; usar `import_export_contract` + DRF |
 
 ---
 
-## Commands (18)
+## Commands (15)
 
 | Command | Quando usar |
 |---------|-------------|
@@ -58,14 +61,13 @@ não `/skill <nome>`. Comandos slash (`/<nome>`) são os de `.claude/commands/`.
 | `/test-coverage` | Testes + cobertura (gate 85%) |
 | `/approve-flow` | Testar política PA-01~07 |
 | `/check-conflicts` | Testar RF03 / RD-01~08 |
-| `/project_e2e-smoke` | Smoke E2E RF01→…→RF07 (Playwright MCP) |
 | `/project_fix-django-url` | Investigar/corrigir URL reversing |
 | `/project_git-pr` | Commit limpo + descrição de PR |
 | `/deploy-staging` | Checklist do release: gate local `staging-full` → merge (build/sign/tag) → `promote.yml` |
 | `/security-scan` | Scan de segurança automatizado |
 | `/trim` | Reduzir descrição de PR em ~70% |
-| `/etl-dry` | **DEPRECATED-OK** — usar `import_export_contract` (dry-run) |
-| `/etl-apply` | **DEPRECATED-OK** — usar `import_export_contract --apply` |
+
+> `/etl-dry` e `/etl-apply` foram removidos (ETL legado removido): usar `import_export_contract` (dry-run por padrão; `--apply` exige allowlist).
 
 ---
 

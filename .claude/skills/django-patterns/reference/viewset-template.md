@@ -13,7 +13,8 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from apps.core.rbac import HasPerm
+from apps.core.rbac import CanAccessSolicitationApprovals
+from apps.core.services.solicitacao_scope import scope_solicitacoes
 from apps.core.serializers import (
     SolicitacaoReadSerializer,
     SolicitacaoWriteSerializer,
@@ -26,13 +27,12 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        qs = Solicitacao.objects.select_related(
-            "solicitante", "municipio", "projeto",
-        ).prefetch_related("participantes")
-        user = self.request.user
-        if not user.is_superuser:
-            qs = qs.filter(solicitante=user)  # owner-scope
-        return qs
+        base = Solicitacao.objects.select_related(
+            "usuario", "municipio", "projeto",  # dono = `usuario`
+        ).prefetch_related("participations__usuario")
+        # escopo SSOT: global (superuser/capacidades/quem aprova) + gestora (GERENTE
+        # vigente: as gerências dela) + APOIO + demais só as próprias
+        return scope_solicitacoes(base, self.request.user)
 
     def get_serializer_class(self):
         if self.action in ["list", "retrieve"]:
@@ -41,11 +41,13 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         # keep thin; set owner from request
-        serializer.save(solicitante=self.request.user)
+        serializer.save(usuario=self.request.user)
 
-    @action(detail=True, methods=["post"], permission_classes=[HasPerm("approve_solicitation")])
+    # Aprovar NÃO é HasPerm("approve_solicitation"): a Policy cobre as 3 bases de
+    # `solicitation_approval_basis` (a do GERENTE na Superintendência não é capacidade).
+    @action(detail=True, methods=["patch"], permission_classes=[CanAccessSolicitationApprovals])
     def approve(self, request, pk=None):
-        """POST /api/solicitacoes/{id}/approve/ — delegate to service."""
+        """PATCH /api/solicitacoes/{id}/approve/ — delegate to service."""
         solicitacao = self.get_object()
         if solicitacao.status != "pendente":
             return Response(
@@ -56,7 +58,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         try:
             result = approve_solicitacao(
                 solicitacao=solicitacao,
-                aprovador=request.user,
+                user=request.user,
+                request=request,  # IP/user-agent no log de auditoria
                 justificativa=request.data.get("justificativa", ""),
             )
             return Response(result, status=status.HTTP_200_OK)
@@ -70,7 +73,9 @@ If a ViewSet overrides `get_permissions()`, that override **wins** over
 `@action(permission_classes=...)` — the decorator's classes are silently ignored.
 Check `get_permissions()` before assuming an action's declared permissions apply.
 (Real example: `apps/core/views_solicitacao.py` `SolicitacaoViewSet.get_permissions()`
-maps `approve`/`batch_approve` to a Policy class, `CanAccessSolicitationApprovals`.)
+lists `approve`/`reject`/`batch_approve`/`batch_reject` etc. in `actions_with_custom_permissions`
+and returns `super().get_permissions()` for them, so the decorator's Policy class,
+`CanAccessSolicitationApprovals`, applies.)
 
 ## DRF permission composition needs instances in get_permissions()
 
@@ -79,8 +84,8 @@ In `permission_classes = [...]` you pass classes. In `get_permissions()` you mus
 
 ```python
 def get_permissions(self):
-    if self.action == "approve":
-        return [HasPerm("approve_solicitation")()]   # note the trailing ()
+    if self.action == "create":
+        return [HasPerm("create_solicitation")()]   # note the trailing ()
     return [IsAuthenticated()]
 ```
 

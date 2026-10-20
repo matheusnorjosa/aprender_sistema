@@ -1,8 +1,8 @@
 ---
 title: Deploy & Produção (spec)
 status: canonical
-last_verified: 2026-10-16
-verified_at_commit: 0dd1dcb630fdc1cf9b2b488121553e89488dde3c
+last_verified: 2026-10-19
+verified_at_commit: 247b74c4cee914c9085019e84780acf2d4905503
 sources_of_truth:
   - v2/infra/docker-compose.prod.yml
   - v2/infra/Dockerfile.prod
@@ -28,9 +28,13 @@ related:
 > desde então** — o que esta spec afirma sobre *o repositório* foi reverificado em 2026-07-24, mas o que ela
 > afirma sobre *o Portainer* (em especial a lista de variáveis da `stack.env`) segue sendo o snapshot de junho.
 >
-> **⚠️ O go-live já aconteceu (2026-07-03).** Produção roda `v2026.07.18-94f2765` e tem **148 usuários ativos**
-> (94 Formador, 42 Coordenador, 9 Gerente, 3 DAT, 1 Controle, 1 Superintendência, 1 Assistente Administrativo;
-> Diretoria e Apoio de Coordenação sem membros ativos) e **apenas 1 superuser**. Qualquer texto abaixo que trate
+> **⚠️ O go-live já aconteceu (2026-07-03).** *Snapshot de 2026-07-24, não refeito:* produção rodava
+> `v2026.07.18-94f2765` com **148 usuários ativos** (contagem por grupo: 94 Formador, 42 Coordenador, 9 Gerente,
+> 3 DAT, 1 Controle, 1 Superintendência, 1 Assistente Administrativo; Diretoria e Apoio de Coordenação sem membros
+> ativos) e **apenas 1 superuser**. Esta spec não afirma a versão de prod: a vigente é a tag promovida mais recente
+> (`git tag --sort=-creatordate`, fluxo na seção «Mecanismo de deploy» abaixo). Desde o PR 12
+> (`RBAC_FONTE=lotacao`) o grupo é etiqueta e o poder vem da lotação, então a contagem por grupo não mede quem pode
+> o quê. Qualquer texto abaixo que trate
 > os gaps como "pré-go-live, sem urgência" está obsoleto: eles alcançam dados e pessoas reais. O bus factor de
 > **1 superuser** é agravado pelo #1567, que tornou a administração de Grupo×Capability superuser-only.
 
@@ -125,8 +129,8 @@ criado com dono/permissão corretos (0755, UID do `appuser`), pré-requisito doc
 próprio compose. Precedente: **#1537**, backup que nunca rodou. Para confirmar seria preciso
 SSH na VM01 e `ls -la /var/backups/aprender` + `journalctl`/logs do worker.
 
-**Restore corrigido; falta o drill real (#1646).** `M26-01` (#1611, `8f392636`) e `M26-02`
-(#1645, `3bca74f3`/#1793) estão **fechados**: `restore_db.sh` agora é ciente do formato
+**Restore corrigido; falta o drill real (#1646).** `M26-01` (#1611, `815b1afc`) e `M26-02`
+(#1645, `e4c2d22b`/#1793) estão **fechados**: `restore_db.sh` agora é ciente do formato
 (decifra `.age` com `age -d` **antes** do `gzip -t`, com `set -o pipefail` local), roda o
 restore com `psql -v ON_ERROR_STOP=1` + piso de contagem de tabelas, e faz dump de segurança
 antes do `DROP`. Cobertura `.bats` criada (`restore_db.bats`, 7 casos). O que **permanece
@@ -233,11 +237,12 @@ Como conferir (sem tocar em produção): `docker run --rm -v <nginx.conf>:/etc/n
 
 - **#1455** — *mount `/backups` fechado no compose* (worker, linhas 234-235). Resta confirmar em produção que o
   backup realmente roda e gera artefato (fato **F7**, não verificado; precedente #1537).
-- **#1456** — *serviço `migrate` entregue* (aplica migrations no deploy) e `makemigrations --check` existe na CI.
-  Resta o **gating**: o job `backend-migrate-integrity` é `[info]` e não entra no `needs` do `[required] tests`,
-  então model-drift é detectado mas **não bloqueia merge**. Ver [`ci.spec.md`](./ci.spec.md).
-- **#1457** — guard de `REDIS_PASSWORD` obrigatório (em prod está setado; falta o fail-fast preventivo).
-- **#1611 / #1645 fechados; épico #1662 aberto por #1646** — `restore_db.sh` já restaura o `.age` de produção (fix `8f392636` / `3bca74f3`); resta o drill real de DR (#1646). Ver a seção de backup acima.
+- **#1456 (fechado, resolvido)** — *serviço `migrate` entregue* (aplica migrations no deploy), e o job
+  `[required] backend migrate-integrity` (`makemigrations --check`) está no `needs` + assert do agregador
+  `[required] tests`: model-drift **bloqueia o merge**. Ver [`ci.spec.md`](./ci.spec.md).
+- **#1457 (fechado, resolvido)** — o fail-fast existe: em produção, `REDIS_PASSWORD` vazio ou ausente encerra o
+  boot (`sys.exit(1)` em `config/settings.py`, SEC-002).
+- **#1611 / #1645 fechados; épico #1662 aberto por #1646** — `restore_db.sh` já restaura o `.age` de produção (fix `815b1afc` / `e4c2d22b`); resta o drill real de DR (#1646). Ver a seção de backup acima.
 - **#1660 (P2)** — o `ports:` do serviço `web` (`docker-compose.prod.yml`) publica a porta do backend em `0.0.0.0` sem bind em
   `127.0.0.1`. O dono confirmou por teste externo (4G) que a porta **não responde** da internet: há allowlist de
   firewall externo (Golden). Não é exposição pública — mas o firewall externo é a **única** camada protegendo um

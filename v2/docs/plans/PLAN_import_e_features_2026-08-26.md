@@ -14,7 +14,7 @@ related:
 
 ## ⏩ Status 2026-09-02 — IMPORT REAL FEITO, golden dev = só-v16
 
-`main = 7beb36cc`, 0 PRs. O dono AUTORIZOU o import real (RF01) e pediu "montar tudo localmente pra
+`main = e4d3e563`, 0 PRs. O dono AUTORIZOU o import real (RF01) e pediu "montar tudo localmente pra
 testar". **PRs mergeados** (v16.4→lookup): #1943 (solicitacao: `solicitante_cpf/email` + procedência +
 filtro `linha_completa` + afrouxa `apoio_requires_supervisor`) · #1944 (participation: guarda
 `match_procedencia` vazio→`guest_nome`) · #1945/#1947 (MeEventSerializer.`participantes` + coluna

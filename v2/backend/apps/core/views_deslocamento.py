@@ -104,9 +104,9 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
     queryset = Deslocamento.objects.select_related("usuario").all()
     serializer_class = DeslocamentoSerializer
     # Onda 1 C2 (2026-04-27): camada de tradução semântica.
-    # Quem tem capability `view_all_availability` (Controle/Gerente via seed
-    # 0078) bypassa scope. Quem não tem cai em filtro por gerência via
-    # `EquipeGerencia` (aplicado em `get_queryset`). Gerente/Coord/Apoio
+    # Quem tem capability `view_all_availability` (Controle e DAT, pelo pacote
+    # do perfil da gerência — `services/rbac_pacotes.py`) bypassa scope. Quem não
+    # tem cai em filtro por gerência via `EquipeGerencia` (aplicado em `get_queryset`). Gerente/Coord/Apoio
     # veem os próprios e os de usuários das gerências onde têm o papel (PR 9).
     # A formadora vê só os próprios (P9-1).
     permission_classes = [IsAuthenticated]
@@ -121,7 +121,7 @@ class DeslocamentoViewSet(viewsets.ModelViewSet):
 
         Scope (Onda 1 C2, 2026-04-27):
         - Superuser: vê tudo (bypass)
-        - Capability `view_all_availability` (Controle/Gerente): vê tudo
+        - Capability `view_all_availability` (Controle e DAT, pelo pacote do perfil da gerência): vê tudo
         - Demais autenticados: os próprios, mais os de usuários com vínculo vigente
           nas gerências onde têm papel G/C/A (PR 9, P9-1: a formadora vê só os próprios).
 

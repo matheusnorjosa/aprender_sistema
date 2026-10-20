@@ -7,9 +7,9 @@
 
 ## 🎯 Como Usar Este Arquivo
 
-- **CLAUDE.md**: Contém TODAS as regras de negócio do AS v2 (CP, RD, PA, RF, histórico de PRs)
+- **CLAUDE.md**: Índice do projeto e as cláusulas pétreas (CP); as regras RD/PA/RF vivem nas specs `v2/docs/specs/domain/` e na skill `aprender-domain`
 - **Este arquivo**: Contém princípios de QUALIDADE DE CÓDIGO aplicáveis a qualquer implementação
-- **Use ambos**: CLAUDE.md para regras de negócio + este para qualidade de código
+- **Use ambos**: CLAUDE.md + specs de domínio para regras de negócio + este para qualidade de código
 
 ---
 
@@ -245,10 +245,10 @@ def process_data(data):  # Vago: qual data? qual processo?
 
 **✅ Bom:**
 ```python
-def approve_solicitacao(solicitacao: Solicitacao) -> Aprovacao:
-    aprovador = solicitacao.solicitante
-    audit_service = AuditLogService()  # Service é OK quando realmente é serviço
-    return audit_service.log_approval(solicitacao, aprovador)
+def approve_solicitacao(solicitacao: Solicitacao, user: Usuario, request: Any) -> ApprovalResult:
+    # user vem de fora (request.user), nunca do dono da solicitação: ninguém aprova a própria.
+    # Real: services/solicitacao_approval.py — grava o AuditLog APPROVE (PA-05); não existe model Aprovacao
+    ...
 ```
 
 ---
@@ -304,7 +304,7 @@ services/
 ```python
 def approve(solicitacao):
     if solicitacao.status == 'pendente':
-        if user_has_any_perm(request.user, "aprovar_solicitacao"):
+        if user_has_policy(request.user, "access_solicitation_approvals"):
             # ... lógica de aprovação
             return success
         else:
@@ -320,7 +320,7 @@ def approve(solicitacao):
     if solicitacao.status != 'pendente':
         return error_status
 
-    if not user_has_any_perm(request.user, "aprovar_solicitacao"):
+    if not user_has_policy(request.user, "access_solicitation_approvals"):
         return error_permission
 
     # Lógica principal no nível mais alto
@@ -403,7 +403,7 @@ class TestSolicitacaoApproval:
             ...
 
     class TestPermissions:
-        """PA-02: Only Superintendência can approve"""
+        """PA-02: só aprova quem tem base em solicitation_approval_basis"""
         def test_superintendencia_approves_successfully(self):
             ...
 
@@ -426,10 +426,10 @@ if request.user.is_superuser or request.user.groups.filter(name='Superintendênc
 
 ✅ **Bom:**
 ```python
-from apps.core.rbac import user_has_any_perm
+from apps.core.rbac import user_has_policy
 
 def can_approve_solicitacao(user: Usuario) -> bool:
-    return user_has_any_perm(user, "aprovar_solicitacao")
+    return user_has_policy(user, "access_solicitation_approvals")
 
 if can_approve_solicitacao(request.user):
     ...
@@ -459,9 +459,9 @@ def check_conflicts(usuario, inicio, fim, municipio):
 ✅ **WHY, não WHAT** (quando lógica é não-óbvia):
 ```python
 # PA-03: Google Calendar integration only AFTER manual approval
-# (Superintendência may override conflicts with human context)
+# (aprovar revalida conflitos de disponibilidade; conflito bloqueia, sem override)
 if solicitacao.status == 'aprovado':
-    task_publish_to_gcal.delay(solicitacao.id)
+    task_publish_solicitacao_to_gcal.delay(solicitacao.id)
 ```
 
 ---
@@ -527,7 +527,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
 ```python
 # select_related para FKs (1:1, N:1)
 solicitacoes = Solicitacao.objects.select_related(
-    'municipio', 'projeto', 'solicitante'
+    'municipio', 'projeto', 'usuario'
 )
 
 # prefetch_related para M2M
@@ -666,7 +666,7 @@ fix(imports): handle empty CSV files gracefully
 
 ```
 .claude/
-├── CLAUDE.md                    # REGRAS DE NEGÓCIO (CP, RD, PA, RF, histórico)
+├── CLAUDE.md                    # ÍNDICE + CP (RD/PA/RF em v2/docs/specs/domain/)
 ├── CLAUDE-principles.md         # QUALIDADE DE CÓDIGO (este arquivo)
 ├── skills/
 │   ├── aprender-domain/         # Detalhes RD, PA, RF
@@ -697,4 +697,4 @@ fix(imports): handle empty CSV files gracefully
 
 **Última Atualização**: 2026-06
 **Versão**: 1.0 (Adaptado de Configuração Premium)
-**Complementa**: CLAUDE.md (regras de negócio AS v2)
+**Complementa**: CLAUDE.md e as specs de domínio em `v2/docs/specs/domain/` (regras de negócio AS v2)

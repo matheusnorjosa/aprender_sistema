@@ -23,12 +23,15 @@ Este documento consolida práticas e contratos adotados nos testes para manter o
 - **Com permissão + dados válidos** → `200/204`
 
 **Em testes que validam parâmetros (esperam 400)**:
-- Autentique um usuário com grupo "Controle" ou "Superintendência"
+- Autentique um usuário **lotado** com a capacidade: desde o PR 12 (`RBAC_FONTE=lotacao`) o
+  grupo é só etiqueta, e um usuário só com o grupo "Controle" toma 403 em vez de 400
+- `UsuarioFactory(groups=[...])` (`apps/core/tests/factories.py`) cria o grupo **e** o vínculo
+  do pacote (DAT, Controle, Diretoria) ou do papel; `groups__vinculo=False` cria só o grupo. A
+  mecânica grupo → capacidade só vale com a fixture `modo_uniao`
 - Exemplo:
   ```python
-  from django.contrib.auth.models import Group
-  grupo, _ = Group.objects.get_or_create(name="Controle")
-  user.groups.add(grupo)
+  from apps.core.tests.factories import UsuarioFactory
+  user = UsuarioFactory(groups=["Controle"])  # grupo + vínculo EQUIPE na gerência CONTROLE
   ```
 
 ## Celery / GCal Safety
@@ -105,7 +108,7 @@ que **não existe** — nem o arquivo, nem o diretório `apps/core/data/`.)*
 | Lado | Threshold configurado | Enforçado no CI? |
 |---|---|---|
 | Backend | **85%** — `v2/backend/pytest.ini` (`fail_under = 85`) | ✅ sim — `.github/workflows/ci.yaml` (`coverage report --fail-under=85`) |
-| Frontend | **ratchet no baseline medido** (statements/branches/functions/lines ~44-46%; SSOT em `v2/frontend/vitest.config.ts`, sobe a cada leva de testes — #1800) | ✅ sim — `.github/workflows/frontend-ci.yml` roda `npm run test:coverage` |
+| Frontend | **ratchet no baseline medido** (valores por métrica em `thresholds` de `v2/frontend/vitest.config.ts`, a SSOT; sobe a cada leva de testes — #1800) | ✅ sim — `.github/workflows/frontend-ci.yml` roda `npm run test:coverage` |
 
 Política e histórico do gate de 85%: [analysis/COVERAGE_POLICY.md](./analysis/COVERAGE_POLICY.md).
 O alvo de 90% (Fase 2) segue como meta, não como gate.

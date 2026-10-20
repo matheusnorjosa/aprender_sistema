@@ -27,24 +27,26 @@ Ver `RBAC_NAMING.md` para convenção de nomes (verbos canônicos, classe ↔ ke
 
 ## 2. Atores reconhecidos
 
-### Setores (organizacional, vínculo via grupo Django)
+> **Desde o PR 12 (D27), o poder vem da lotação.** Com `RBAC_FONTE=lotacao` (padrão), capacidade, tela e aprovação vêm do superusuário e do vínculo `EquipeGerencia` vigente: pacote do perfil da gerência (`PACOTE` em `apps/core/services/rbac_pacotes.py`, para EQUIPE/GERENTE) + direitos do papel (`DIREITOS_PAPEL`). Os grupos de Setor e de Função abaixo são **etiquetas**; só os de Setor voltam a somar capacidade, na volta de emergência `RBAC_FONTE=uniao` (os de Função não têm capacidade desde o PR 8, D23). Aprovar = `solicitation_approval_basis` (superuser, GERENTE vigente na gerência `SUPERINTENDENCIA`, ou `approve_solicitation` pelo pacote `ADMIN_OPERACIONAL`/`CONTROLE`), com segregação (D18, D25, D26).
+
+### Setores (etiqueta; o poder vem da gerência do vínculo)
 
 | Setor | Papel resumido | Ator transversal? |
 |-------|----------------|-------------------|
-| Superintendência | Aprovação executiva | Não (escopo decisório) |
-| DAT | Manutenção administrativa, suporte, validação | **Sim** (acessa por motivo "suportar/validar") |
+| Superintendência | Aprovação executiva pelo vínculo GERENTE na gerência `SUPERINTENDENCIA` (o grupo não aprova, D26) | Não (escopo decisório) |
+| DAT | Administrador operacional pelo vínculo EQUIPE/GERENTE na gerência DAT (pacote `ADMIN_OPERACIONAL`, D25): cadastros, suporte, validação, aprovação | **Sim** (acessa por motivo "suportar/validar") |
 | Diretoria | Decisão executiva (dashboards, mapa) | Não (escopo decisório) |
-| Controle | Operação diária do calendário | **Sim** (acessa transversalmente por motivo "operar") |
+| Controle | Operação diária do calendário e aprovação, pelo vínculo EQUIPE/GERENTE na gerência `CONTROLE` (pacote `CONTROLE`, D26) | **Sim** (acessa transversalmente por motivo "operar") |
 | Vidas / Fluir / ACerta / Brincando / Sou da Paz / Comercial / Relacionamento / Logística Viagens / Logística Galpão | Setores de produto (escopados por gerência) | Não |
 
 ### Funções (papel funcional, ortogonal ao setor)
 
 | Função | Papel resumido | Scope |
 |--------|----------------|-------|
-| Gerente | Supervisão, aprovação composta com Superintendência | Cross-sector (transversal) |
-| Coordenador | Cria solicitações, gerencia bloqueios próprios | Setor vinculado via `EquipeGerencia` |
-| Apoio de Coordenação | Mesma regra do Coordenador | Setor vinculado |
-| Assistente Administrativo | Função formal criada em PR 3 hardening RBAC (#1308). Sem poder desde o PR 8 (D23); a aprovação pelo par com o Setor `Controle` saiu no PR 11 (D26). | Setor vinculado |
+| Gerente | Etiqueta; o papel GERENTE na lotação cria/edita na própria gerência; na `SUPERINTENDENCIA`, aprova (D18/D26) | Gerência do vínculo `EquipeGerencia` (D9, D24) |
+| Coordenador | Cria solicitações, gerencia bloqueios próprios (papel COORDENADOR, D23) | Gerência do vínculo `EquipeGerencia` (D24) |
+| Apoio de Coordenação | Mesma regra do Coordenador (papel APOIO, que também publica) | Gerência do vínculo `EquipeGerencia` (D24) |
+| Assistente Administrativo | Função formal criada em PR 3 hardening RBAC (#1308). Sem poder desde o PR 8 (D23); a aprovação pelo par com o Setor `Controle` saiu no PR 11 (D26). | Nenhum próprio (etiqueta) |
 | Formador | Declara próprio bloqueio (RD-02/03), participa de eventos | Próprios dados |
 
 ### Composites Setor × Função (PR 3 hardening RBAC, 2026-04-29)
@@ -53,7 +55,7 @@ Ver `RBAC_NAMING.md` para convenção de nomes (verbos canônicos, classe ↔ ke
 |-----------|-------|--------|------------------|
 | **Gerente da Superintendência** | `Superintendência` | `Gerente` | Aprovação de solicitações (individual + lote) — o par de grupos não aprova desde o PR 11 (D26); desde o PR B1 a aprovação vem do **vínculo** `EquipeGerencia` GERENTE vigente na gerência `SUPERINTENDENCIA`, sem grupo (D18) |
 | **Assistente Administrativo do Controle** | `Controle` | `Assistente Administrativo` | Até o PR 11: aprovação de solicitações. Desde o PR 11 (D26) quem aprova é o vínculo EQUIPE/GERENTE na gerência `CONTROLE` (pacote); o par de grupos sozinho não aprova |
-| **Gerente pedagógico** | `Vidas` / `Fluir` / etc. (não-Sup) | `Gerente` | Cria/edita solicitação (`create_solicitation`); **não aprova** |
+| **Gerente pedagógico** | `Vidas` / `Fluir` / etc. (não-Sup) | `Gerente` | Nenhuma pelo grupo desde o PR 8 (D23): cria/edita solicitação pelo papel GERENTE vigente (`DIREITOS_PAPEL`); **não aprova** |
 
 ### Princípio "ator transversal"
 
@@ -114,20 +116,25 @@ Legenda dos status codes (matriz executável):
 
 ---
 
-## 4. Capability ↔ grupo (estado canônico pós migration 0080)
+## 4. Capability ↔ grupo (estado canônico pós migration 0126)
 
-Estado autoritativo após `0080_redistribute_view_all_availability` (2026-04-28, que substituiu a 0078) e `0125_funcoes_sem_capacidade` (PR 8 das permissões, 15/10/2026: grupo de função sem capacidade; criar, editar e publicar vêm do papel vigente, `DIREITOS_PAPEL`; ver D23). Mudanças exigem migration data-only nova + atualização desta tabela.
+Estado após `0080_redistribute_view_all_availability` (2026-04-28, que substituiu a 0078), `0125_funcoes_sem_capacidade` (PR 8 das permissões, 15/10/2026: grupo de função sem capacidade; criar, editar e publicar vêm do papel vigente, `DIREITOS_PAPEL`; ver D23) e `0126_dat_admin_operacional_grupos` (PR 10, D25: tira `import_spreadsheet` do grupo DAT e `approve_solicitation`/`execute_restricted_operations` do grupo Superintendência). SSOT: `FUNCTIONAL_PERMISSIONS_SEED[*].group_names` em `apps/core/services/functional_permissions_seed.py` (17 capacidades) e `PACOTE`/`DIREITOS_PAPEL` em `apps/core/services/rbac_pacotes.py`; quando esta tabela diverge deles, valem eles (`rbac_diff --auditar` confere o banco contra o seed). Mudanças exigem seed + migration data-only nova (D21) + atualização desta tabela.
+
+> Com `RBAC_FONTE=lotacao` (padrão desde o PR 12, D27) a coluna "Grupos atribuídos" é **etiqueta**: o grupo não soma capacidade. Ela só vale na volta de emergência `RBAC_FONTE=uniao`. O poder vem do pacote do perfil da gerência (vínculo EQUIPE/GERENTE) e dos direitos do papel vigente.
 
 | Capability | Grupos atribuídos | Justificativa |
 |------------|-------------------|---------------|
-| `approve_solicitation` | Superintendência | Aprovação executiva final (PA-02) |
+| `approve_solicitation` | — (pacote `ADMIN_OPERACIONAL` e `CONTROLE`, vínculo EQUIPE/GERENTE; D25/D26) | Aprovação final (PA-02). O GERENTE vigente na gerência `SUPERINTENDENCIA` aprova pela base `gerente_superintendencia` de `solicitation_approval_basis`, sem a capacidade (D18) |
 | `create_solicitation` | — (papel COORDENADOR, APOIO ou GERENTE vigente, D23) | Quem cria pedido de evento |
+| `create_solicitation_without_purchase` | — (pacote `ADMIN_OPERACIONAL`, D25) | Isenção da regra da compra ao criar/editar evento |
 | `edit_solicitation_as_owner_or_privileged` | — (papel COORDENADOR, APOIO ou GERENTE vigente, D23) | Edição da própria solicitação ou de qualquer com privilégio |
-| `execute_restricted_operations` | Superintendência | Operações irreversíveis (bloqueio executivo) |
-| `import_spreadsheet` | DAT | Sem efeito em endpoint desde 02/10/2026 (D20): nenhuma capability abre importação pela tela, só superusuário. O grupo segue atribuído, mas a capability não libera rota nem tela |
+| `execute_restricted_operations` | — (pacote `ADMIN_OPERACIONAL`, D25) | Operações irreversíveis (bloqueio executivo) |
+| `import_spreadsheet` | — (capacidade técnica, `TECNICAS`: nunca entra em pacote; migration 0126, D25) | Sem efeito em endpoint desde 02/10/2026 (D20): nenhuma capability abre importação pela tela, só superusuário (`[IsAuthenticated, SuperuserOnly]` nas 12 rotas: 11 síncronas, contando o alias `/api/import-compras/`, mais `/api/imports/bloqueios/` assíncrona) |
 | `manage_admin_registries` | DAT | Manutenção de cadastros administrativos |
+| `manage_internal_actions` | — (nenhum grupo nem pacote: só superusuário) | Ações internas (feature em desenvolvimento) |
 | `manage_purchases_and_materials` | DAT, Controle | Compras e materiais (DAT operacionaliza, Controle audita uso). A função Assistente Administrativo saiu no PR 8 (D23) |
 | `operate_preagenda` | Controle | Operação diária do calendário. A função Assistente Administrativo saiu no PR 8 (D23) |
+| `publish_setor_solicitacao` | — (papel APOIO vigente, D23) | Publicar no Google os eventos aprovados da gerência (#1656 Feature 2) |
 | `run_daily_operations` | Controle | Workflow diário do Controle (a função Assistente Administrativo saiu no PR 8, D23). Não abre importação pela tela desde 02/10/2026 (D20): só superusuário |
 | `supervise_operations` | Diretoria | Visão executiva consolidada |
 | **`view_all_availability`** | **Controle, DAT** *(Gerente perdeu a cap global na 0080 e cai em scope via EquipeGerencia; Coord/Apoio idem — D9)* | **Visão transversal sem restrição** (decisão D9, pós migration 0080) |
@@ -148,7 +155,7 @@ permission_classes = [HasPerm("approve_solicitation")]
 ### 5.2 Composition OR via Policy class (quando há semântica unificada)
 
 ```python
-permission_classes = [CanAccessAuditLogs]   # 4 caps internas, semântica única
+permission_classes = [CanAccessAuditLogs]   # 2 caps internas, semântica única
 ```
 
 ### 5.3 Composition OR ad-hoc (quando ainda não estabilizou em Policy)
@@ -163,7 +170,7 @@ permission_classes = [HasPerm("a") | HasPerm("b")]   # sites <3, intent fluido
 permission_classes = [IsAuthenticated, CanViewAllAvailability | HasSectorAccess]
 ```
 
-Quem tem capability bypassa scope; quem não tem cai no scope. **Padrão correto para Grade Mensal e Deslocamentos** (após Onda 1).
+Quem tem capability bypassa scope; quem não tem cai no scope. **Padrão da Grade Mensal** (`views_availability_monthly.py`). O `DeslocamentoViewSet` não usa este padrão: é `[IsAuthenticated]` com o escopo no `get_queryset` (tudo para `view_all_availability`; senão os próprios mais os das gerências onde há papel G/C/A).
 
 ### 5.5 Anti-padrões (lint guarda)
 
@@ -199,7 +206,7 @@ permission_classes = [IsAdminUser]                    # ❌ DRF built-in fora da
 | D18 | Aprovação pela **gerência** (vínculo) + **segregação** (PR B1) | 2026-09-29 | Aprova quem tem `EquipeGerencia` vigente com papel GERENTE na gerência `Gerencia.nome == "SUPERINTENDENCIA"` (`GERENCIA_APROVADORA_NOME`) — ninguém de g1 tinha o par de grupos. SSOT `solicitation_approval_basis` (`superuser` / `gerente_superintendencia` / `asst_admin_controle` / `grupo_superintendencia_gerente`), gravada em `AuditLog.details.autoridade`. Chave = `nome` (rótulos e `setor_canonico` são editáveis/reescritos; id muda entre ambientes); `Gerencia.ativo` não é checado. Segregação: ninguém decide a própria solicitação (403 `self_approval_forbidden`; lote → `errors[]`); superuser pode, marcado `details.autoaprovacao`. Anti-escalada no mesmo PR: importers recusam criar/reativar o vínculo aprovador, `validate_nome` protege a chave, lotação audita concessão/revogação. `is_superintendencia` não muda. O composite de grupos sai no B2. |
 | D19 | **Escopo da aprovadora por vínculo** + trava de cadastro de projeto SUPER (regra do dono) | 2026-09-30 | A base `gerente_superintendencia` aprova/reprova (individual e lote), edita, exclui e cria **só** solicitação de projeto do fluxo SUPER da gerência `SUPERINTENDENCIA` (`projeto_no_escopo_da_superintendencia`, fail-closed). Fora: decidir → 403 `out_of_approval_scope` (lote → `errors[]`); editar/excluir → 403; criar/mover → 400 em `projeto`. **Ver não muda** (lista, detalhe, prévia). As próprias seguem editáveis como para qualquer coordenador. Não mudam: superuser, par Controle + Assistente Administrativo, par legado (sai no B2) e quem é global por capability (Controle/DAT) para editar/excluir. Exceção: 2º vínculo vigente de GERENTE dela em outra gerência (COORDENADOR, APOIO e FORMADOR não) abre criar/editar/excluir/mover naquela gerência, não decidir. Racional: o B1 pôs a policy em `user_is_solicitacao_global` e devolveu o `M10-01` para as 5 aprovadoras. Trava de cadastro: `fluxo = SUPER` só em projeto da `SUPERINTENDENCIA` (API 400, admin, import não cria SUPER, seed cria na g1) — toda pendente SUPER fica no escopo delas. |
 | D21 | **Matriz Group × Capability muda só por PR** (D4 do [ADR-020](adr/ADR-020-lugar-onde-trabalha-da-o-poder.md)) | 2026-10-14 (PR A da arquitetura de permissões) | Substitui a D17. `FUNCTIONAL_PERMISSIONS_SEED[*].group_names` é a matriz, alinhada à de produção medida em 02/10 (DAT + `view_map_metrics`; Assistente Administrativo + `manage_purchases_and_materials`, `operate_preagenda`, `run_daily_operations`). Mudar = seed + migration de dados com `# noqa: RBAC-migration-allowed`, com `rbac_diff` no PR. `PermissaoFuncionalAdmin` só leitura (`has_change_permission → False`); `GroupSerializer` responde 400 quando `permissao_funcional_ids` difere do conjunto atual e nunca grava; a tela de Grupos mostra as permissões só para leitura. `rbac_diff --auditar` (checklist pós-deploy) sai com exit 1 se banco ≠ seed ou se houver gerência com perfil ≠ PADRAO fora de `PERFIL_PERMITIDO`. No mesmo PR: `Gerencia.perfil` (sem efeito até o PR B), trava dos importadores para EQUIPE/GERENTE em gerência com pacote (`vinculo_com_pacote_bloqueado`) e lint V004/V005. |
-| D20 | **Importação pela tela = só superusuário** | 2026-10-02 (decisão do dono) | Nenhuma importação pela tela na liberação: as cargas passam por script (`import_export_contract`), com ensaio. As 13 rotas de upload de planilha (12 endpoints + 1 alias, `/api/import-compras/`) trocam `HasPerm("import_spreadsheet")` / `HasPerm("manage_admin_registries")` / `CanImportGenericSpreadsheet` por `[IsAuthenticated, SuperuserOnly]`; nenhuma capability abre. Recurso `import_pela_tela` na Matriz Viva (representado por `POST /api/controle/import-compras/`); rota a rota em `test_imports_pela_tela_so_superusuario.py`, com sentinela para view nova que receba arquivo (`APIView`, `@api_view` ou rota de `ViewSet`; sinais: "import" na rota, parser de arquivo declarado, `request.FILES` lido no próprio handler ou `serializer_class` com campo de arquivo). A sentinela é uma rede auxiliar, não a garantia: ela **não pega** (a) a view que entrega o `request` a função de outro módulo sem ler arquivo no próprio handler, (b) o serializer escolhido só por `get_serializer_class()` e (c) a permissão definida só por `get_permissions()`. A garantia real são os testes por rota (cada perfil contra cada uma das 13 rotas) e a Matriz Viva (recurso `import_pela_tela`). No frontend, o item DAT > Importações, as rotas `/dat/importacoes`, `/dat/admin/colecoes` e `/dat/admin/equipe-gerencia` e os uploads dentro de Municípios e Usuários só aparecem para superusuário. Substitui a regra do PR-A1 DAT-Imports (2026-04-29, "DAT importa"). |
+| D20 | **Importação pela tela = só superusuário** | 2026-10-02 (decisão do dono) | Nenhuma importação pela tela na liberação: as cargas passam por script (`import_export_contract`), com ensaio. As rotas de upload de planilha (hoje 12: 11 síncronas, contando o alias `/api/import-compras/`, mais `/api/imports/bloqueios/` assíncrona; eram 13 em 02/10) trocam `HasPerm("import_spreadsheet")` / `HasPerm("manage_admin_registries")` / `CanImportGenericSpreadsheet` por `[IsAuthenticated, SuperuserOnly]`; nenhuma capability abre. Recurso `import_pela_tela` na Matriz Viva (representado por `POST /api/controle/import-compras/`); rota a rota em `test_imports_pela_tela_so_superusuario.py`, com sentinela para view nova que receba arquivo (`APIView`, `@api_view` ou rota de `ViewSet`; sinais: "import" na rota, parser de arquivo declarado, `request.FILES` lido no próprio handler ou `serializer_class` com campo de arquivo). A sentinela é uma rede auxiliar, não a garantia: ela **não pega** (a) a view que entrega o `request` a função de outro módulo sem ler arquivo no próprio handler, (b) o serializer escolhido só por `get_serializer_class()` e (c) a permissão definida só por `get_permissions()`. A garantia real são os testes por rota (cada perfil contra cada uma das rotas; eram 13 em 02/10, hoje 12, porque o #2096 removeu `/api/colecoes/import/`) e a Matriz Viva (recurso `import_pela_tela`). No frontend, o item DAT > Importações, as rotas `/dat/importacoes`, `/dat/admin/colecoes` e `/dat/admin/equipe-gerencia` e os uploads dentro de Municípios e Usuários só aparecem para superusuário. Substitui a regra do PR-A1 DAT-Imports (2026-04-29, "DAT importa"). |
 | D22 | **Front decide acesso só por policy** (PR 7 das permissões) | 2026-10-15 | Menu, rotas, botões e Página Inicial leem só `/api/me/policies/` (`useAcesso().caps`) e, onde a regra é o superusuário (importação pela tela, PA-02 do próprio, campos só dele, debug), o helper `ehSuperusuario`. Sem mudar poder: 5 policies públicas novas — `access_monthly_availability`, `access_availability_blocks`, `access_travel` (compostas, `TELAS_DE_ESCOPO`: `view_all_availability` OU o grupo que o front lia OU vínculo GERENTE/COORDENADOR/APOIO vigente em gerência ativa; provadas pessoa a pessoa em `test_rbac_politicas_de_tela.py`), `execute_restricted_operations` e `create_solicitation_without_purchase` (a capacidade de mesmo nome). Matriz persona × tela (menu e rotas) igual para os 10 atores; exceções aprovadas pelo dono só na Página Inicial: E1 "Enviar"/"Minhas Solicitações" por `create_solicitation` (DAT sai, Gerente entra), E2 "Desempenho da Equipe" por `view_team_dashboard` (Diretoria/DAT entram, Gerente do setor Gerência sai), E3 bloco Administração só do superusuário. Deploy: `rbac_diff --comparar` mostra só `+ policies` destas 5 chaves (o superusuário e quem tem Grade, Bloqueios ou Deslocamentos), 0 perdas e nada em grupos, capacidades ou vínculos (`TestRbacDiffDoDeploy`). Delta de tela fora de E1–E3, medido em `DELTA_MEDIDO` (`test_rbac_politicas_de_tela.py`) e pendente do aval do dono: Compras (`view_compras_stats`) abre para a função Assistente Administrativo sem o setor Controle e para vínculo EQUIPE ou GERENTE (os papéis com pacote) no CONTROLE e no ADMIN_OPERACIONAL; Editar solicitação abre para EQUIPE ou GERENTE no ADMIN_OPERACIONAL; o cartão do Google na Pré-agenda e a consulta periódica ao Google (`access_controle_section`) passam a valer para a função Assistente Administrativo sem o Controle e para EQUIPE ou GERENTE no CONTROLE; a página de Deslocamentos (`access_travel`, que inclui `view_all_availability`) passa a abrir lista e formulário para EQUIPE no CONTROLE e no ADMIN_OPERACIONAL, que antes chegavam pela rota e pelo menu (`view_all_availability`) e viam "Sem permissão" no check da própria página (o GERENTE já abria pelo vínculo de gestão). As APIs já autorizavam essas pessoas (`DeslocamentoViewSet` devolve tudo a quem tem `view_all_availability`); antes, Compras era link morto no submenu Controle para elas. `usePermissions`/`useCanAccess` apagados; trava `acessoSoPorPolicy.test.ts`. Os grupos de função saem das telas de escopo no PR 8. |
 | D23 | **O papel dá o poder, não o cargo** (PR 8 das permissões) | 2026-10-15 | Grupo de FUNÇÃO sem capacidade (migration `0125`); `approve_solicitation_batch` e `IsGerenteSuperintendencia` apagadas. Criar, editar e publicar vêm do papel vigente em gerência ativa (`DIREITOS_PAPEL`; GERENTE não publica, O8-4); gestora de solicitação alheia = papel GERENTE; telas compostas por papel; bloqueio em nome de outra pessoa = `operate_preagenda` ∨ `manage_admin_registries` (Controle puro passa a delegar, O8-7); deslocamento em nome do formador da gerência para GERENTE e COORDENADOR vigentes (P16, O8-5); coordenador padrão e filtro `role` pelo papel. Matriz viva: o ator Formador passou a ter o papel FORMADOR, como em produção, e a API da grade mensal responde 200 a ele (`HasSectorAccess` aceita qualquer vínculo com escopo; já era assim em produção, a D8 só valia porque a fixture não tinha o vínculo). A tela da grade segue fechada para ele (policy `access_monthly_availability` = G/C/A). Estreitar a API é poder: PR 9, com medição. Aprovação por cargo (`APPROVER_COMPOSITES`) segue até o PR 11 |
 | D24 | **Escopo por gerência** (PR 9 das permissões) | 2026-10-16 | O alcance é a gerência do projeto (`projeto.gerencia_id`), não o texto do setor; cada superfície conta só o papel vigente certo em gerência ativa: gestora de alheias = GERENTE (C9), publicação = APOIO, criar/mover, participantes, responsável (COORDENADOR), lookups, Grade, opções de formador e painel = G/C/A (`EquipeGerencia.gerencias_de_atuacao`). Fail-closed (projeto sem gerência, criador sem papel G/C/A). Decisões do dono (15/10): P9-5 (num evento da gerência A só entram pessoas da A) e P9-1 (a formadora vê só os próprios bloqueios e deslocamentos). Matriz viva: a API da grade mensal volta a responder 403 ao ator Formador (`HasSectorAccess` pede G/C/A, a mesma regra da tela). Lint V006 proíbe o setor nos arquivos de escopo |
@@ -214,9 +221,7 @@ permission_classes = [IsAdminUser]                    # ❌ DRF built-in fora da
 
 ### Onda 1 — Críticos (próximo PR)
 
-| # | Recurso | Problema | Fix |
-|---|---------|----------|-----|
-| C2 | Deslocamentos sidebar | UI mostra para Coord/DAT, backend exige `view_all_availability` (Controle/DAT após 0080) | Alinhar gate (esconder pra Coord) ou alargar backend (decisão pendente) |
+Nenhuma pendência aberta (C2 foi para "Concluído").
 
 ### Onda 2 — Altos
 
@@ -230,6 +235,10 @@ permission_classes = [IsAdminUser]                    # ❌ DRF built-in fora da
   (`view_team_dashboard`, `view_map_metrics`, `view_gcal_dashboard`, `view_compras_dashboard`) desde o
   #1270; as flags de organograma (`usePermissions`) foram apagadas no PR 7 (D22).
 
+- **C2 — Deslocamentos sidebar**: front e back alinhados nos PR 7/8/9 das permissões. A rota e o
+  menu leem a policy `access_travel` (D22); o `DeslocamentoViewSet` é `[IsAuthenticated]` com escopo
+  no `get_queryset` (tudo para `view_all_availability`; senão os próprios mais os das gerências onde
+  há papel G/C/A, D24).
 - **C3 — Ações Internas**: `[IsAdminUser]` substituído pela capability `manage_internal_actions`
   (migration `0079_add_manage_internal_actions`); `CicloAcoesViewSet`/`AcaoInstanciaViewSet` usam
   `HasPerm("manage_internal_actions")`.

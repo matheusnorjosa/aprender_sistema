@@ -123,7 +123,7 @@ A new export = helper + an injection test on the endpoint (model:
 - Session-based (Redis backend), NOT JWT for web
 - CSRF token via HttpOnly cookie + `/api/csrf/` endpoint
 - Account lockout: 10 attempts → 15 min block
-- Rate limiting: login 10/min, gcal_write 10/min
+- Rate limiting: login 30/min por IP (o escritório sai por um IP só) + bloqueio de conta (`ACCOUNT_LOCKOUT_THRESHOLD` 10 erros → 15 min); gcal_write 10/min
 
 **Checklist:**
 - [ ] Login endpoint rate-limited (DRF throttle + Nginx)

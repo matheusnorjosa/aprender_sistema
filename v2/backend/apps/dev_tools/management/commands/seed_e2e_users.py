@@ -12,10 +12,12 @@ Uso:
     python manage.py seed_e2e_users
 
 Dados criados:
-    - 4 usuários (coord, super, controle, formador) + grupos
-    - vínculo EquipeGerencia vigente junto de cada grupo de função
-    - 1 município (Salvador, BA)
-    - 1 projeto (TESTE E2E, fluxo SUPER)
+    - 13 personas + grupos (o grupo é etiqueta) e a conta inativa compras_e2e, autora das compras
+    - vínculo EquipeGerencia vigente de cada persona, que é a fonte do poder (lotação)
+    - 3 gerências criadas se faltarem: GERENCIA E2E, GERENCIA DAT e CONTROLE
+    - 2 municípios (Salvador, BA e Fortaleza, CE)
+    - 2 projetos (TESTE E2E fluxo SUPER na Super; TESTE E2E NAO_SUPER fluxo NAO_SUPER em Vidas)
+    - TipoEvento e as DATCompra que liberam os 4 pares (regra da compra)
     - Logs de criação
 
 Fase 2 - Testes E2E (Playwright) - Plano DAT/GCal 2025-10-29
@@ -55,10 +57,13 @@ class Command(BaseCommand):
             status = "✅ Criado" if created else "⏭️  Já existe"
             self.stdout.write(f"   {status}: {nome_grupo}")
 
-        # 1b. Vincular permissions funcionais aos grupos (testes E2E exigem
-        # que Coordenador tenha `pode_criar_solicitacao_coord_dat`, etc.).
-        # Em prod o seed_rbac roda com assign_default_groups=False — aqui
-        # forçamos True porque o ambiente E2E precisa do vínculo padrão.
+        # 1b. Garantir o catálogo de permissions funcionais (e o vínculo padrão aos grupos).
+        # Não dá poder a nenhuma persona no modo padrão: desde o PR 8 as funções não têm
+        # capacidade e desde o PR 12 (RBAC_FONTE="lotacao") o grupo não soma nada; o poder vem do
+        # vínculo EquipeGerencia (DIREITOS_PAPEL / pacote do perfil, passo 4a). O vínculo aos grupos
+        # só importa no modo "uniao" (volta de emergência). O seed_rbac (dev/CI; não existe em
+        # prod, CP-08) chama com False e desvincula as capacidades dos grupos; em prod o catálogo
+        # vem das migrations.
         from apps.core.services.functional_permissions_seed import seed_functional_permissions
 
         fp_stats = seed_functional_permissions(assign_default_groups=True, verbose=False)
@@ -109,7 +114,10 @@ class Command(BaseCommand):
         # Todo grupo de função vem com o vínculo do papel (o PR 8 faz o papel dar o poder).
         self.stdout.write("\n4a. Criando vínculos EquipeGerencia...")
         # Gerência das personas legadas: perfil PADRAO (sem pacote), sem setor_canonico e sem
-        # projeto. O vínculo nela não muda o escopo de setor delas, que segue aberto.
+        # projeto. Desde o PR 9 o alcance é a gerência do projeto (`projeto.gerencia_id`), então o
+        # vínculo aqui prende coord_e2e/formador_e2e a uma gerência sem projeto: eles não criam evento
+        # (o `/lookup/projetos/` da Nova Solicitação vem vazio, `scope_projetos_por_gerencia`). Spec
+        # que precise de coord_e2e criando evento: dar a ele um projeto aqui.
         Gerencia.objects.update_or_create(
             nome="GERENCIA E2E",
             defaults={"nome_setor": "E2E", "setor_canonico": "", "perfil": Gerencia.Perfil.PADRAO, "ativo": True},
@@ -205,11 +213,13 @@ class Command(BaseCommand):
         Legacy (back-compat com specs existentes):
         - coord_e2e, super_e2e, controle_e2e, formador_e2e
 
-        Por combinação setor × função (jornadas J01-J19 do plano QA 2026-04-22):
+        Por combinação setor × função (specs de jornada que existem: J01-J08, J10, J18):
         - coord_vidas, coord_fluir, coord_acerta (Coordenador + setor)
-        - gerente_vidas (Gerente + setor — jornada J14, issue #1165)
+        - gerente_vidas (Gerente + setor; a J14 não foi escrita, a #1165 fechou coberta pelo backend)
+        - dat_e2e (DAT, vínculo EQUIPE na GERENCIA DAT — J18; também J01, J04, J08)
         - super_geral (Gerente, vínculo GERENTE na SUPERINTENDENCIA — PA-02; PR 11: sem o grupo Superintendência)
-        - formador_vidas, formador_fluir (Formador + setor — jornadas J06, J11, J13)
+        - approver_03 (Gerente, vínculo GERENTE na SUPERINTENDENCIA — J08)
+        - formador_vidas, formador_fluir (Formador + setor — formador_vidas em J02, J03, J06; formador_fluir em J07)
         """
         users_data = [
             # === Legacy — manter compat com specs atuais ===
@@ -285,7 +295,7 @@ class Command(BaseCommand):
                 "groups": [grupos["Coordenador"], grupos["ACerta"]],
                 "is_superuser": False,
             },
-            # === Gerente por setor (jornada J14 — issue #1165) ===
+            # === Gerente por setor (issue #1165; a jornada J14 não foi escrita) ===
             {
                 "username": "gerente_vidas@test.com",
                 "email": "gerente_vidas@test.com",
@@ -296,7 +306,8 @@ class Command(BaseCommand):
                 "groups": [grupos["Gerente"], grupos["Vidas"]],
                 "is_superuser": False,
             },
-            # === DAT puro (jornada J18 — regra PO: DAT acesso total no frontend) ===
+            # === DAT administrador operacional (jornada J18; PR 10): o poder vem do vínculo EQUIPE na
+            # GERENCIA DAT (passo 4a), não do grupo; sem importação técnica (só o superusuário) ===
             {
                 "username": "dat_e2e@test.com",
                 "email": "dat_e2e@test.com",
@@ -329,7 +340,7 @@ class Command(BaseCommand):
                 "groups": [grupos["Gerente"]],
                 "is_superuser": False,
             },
-            # === Formadores por setor (jornadas J06, J11, J13) ===
+            # === Formadores por setor (jornadas J02, J03, J06, J07) ===
             {
                 "username": "formador_vidas@test.com",
                 "email": "formador_vidas@test.com",

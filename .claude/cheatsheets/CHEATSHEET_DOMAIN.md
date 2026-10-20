@@ -40,7 +40,7 @@ ficam nas specs vivas (com `status` + `last_verified`) e na skill `aprender-doma
 | RD-02 | Bloqueio total |
 | RD-03 | Bloqueio parcial |
 | RD-04 | Buffer de deslocamento entre municípios |
-| RD-05 | Capacidade diária por formador |
+| RD-05 | Teto por evento da contagem de horas de formação (não bloqueia nem avisa) |
 | RD-06 | Timezone America/Fortaleza, storage UTC |
 | RD-07 | Prioridade de avaliação das regras |
 | RD-08 | Formato das mensagens de conflito |
@@ -53,7 +53,7 @@ ficam nas specs vivas (com `status` + `last_verified`) e na skill `aprender-doma
 | PA-02 | Quem pode aprovar/reprovar |
 | PA-03 | GCal só após aprovação |
 | PA-04 | Estado inicial por fluxo |
-| PA-05 | Registrar em Aprovacao + AuditLog |
+| PA-05 | Registrar em AuditLog (APPROVE/REJECT) |
 | PA-06 | Esconder ações sem permissão na UI |
 | PA-07 | Testes obrigatórios da política |
 

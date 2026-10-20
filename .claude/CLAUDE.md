@@ -17,7 +17,8 @@ cd v2 && make up
 docker exec aprender_dev-web-1 pytest apps/core/tests/ -v
 cd v2/backend && pyright apps/core config
 make import-compras-dry FILE=...   # import via API DRF (dry-run); ETL legado REMOVIDO
-make test-e2e
+cd v2 && make seed-e2e && cd frontend && npm run test:e2e -- --project=chromium   # jornadas da CI (v2/frontend/e2e)
+# `make test-e2e` roda a suíte legada de v2/tests/playwright (fluxo Google; personas da lotação desde o #2125)
 ```
 
 ## Ferramentas — USO OBRIGATÓRIO
@@ -43,8 +44,8 @@ make test-e2e
 **MCPs (wired)**: `MCP_DOCKER` (playwright, fetch, duckduckgo, dockerhub,
 sequentialthinking) · `context7` (docs de libs — `.mcp.json`) · `oraculo-bd` (banco) ·
 `multi-model` · `vercel` · Google Calendar.
-**Não wired** (definições inertes em `.claude/settings.json` — Claude Code só lê
-server-defs de `.mcp.json`; mover p/ lá + restart p/ ativar): postgres (use
+**Não wired** (as defs antigas em `.claude/settings.json` eram inertes e foram removidas; Claude Code
+só lê server-defs de `.mcp.json`, arquivo local e não versionado — `.gitignore`): postgres (use
 `docker exec … manage.py dbshell`), github (use `gh` CLI), tree-sitter (use `graphify`), devdocs.
 
 ## Cláusulas Pétreas — IMUTÁVEIS
@@ -62,14 +63,14 @@ server-defs de `.mcp.json`; mover p/ lá + restart p/ ativar): postgres (use
 
 ```text
 v2/backend/apps/
-  core/           42 models, serializers/, services/
+  core/           39 models, serializers/, services/
   dev_tools/      15 seed commands (prod disabled)
 
 v2/frontend/src/
-  pages/          39 lazy-loaded (AppRoutes.tsx)
-  components/     18 reutilizáveis
-  hooks/          14 custom hooks
-  api/            15 clientes API (fetch)
+  pages/          41 lazy-loaded (AppRoutes.tsx)
+  components/     22 reutilizáveis (+ access/, google/, lgpd/)
+  hooks/          13 custom hooks
+  api/            15 clientes API (fetch) + config.ts + unwrapList.ts
   types/          TypeScript definitions
 ```
 
@@ -80,13 +81,18 @@ v2/frontend/src/
   - Composition: `HasPerm("a") | HasPerm("b")` (OR/AND/NOT)
   - Helpers não-DRF: `user_has_any_perm(user, *codenames)`
   - Convenção completa: `v2/docs/RBAC_NAMING.md`
+- **De onde vem o poder (PR 12)**: só da lotação — superuser, pacote do perfil da gerência
+  (vínculo EQUIPE/GERENTE vigente), direitos do papel vigente e vínculo GERENTE na Superintendência.
+  `settings.RBAC_FONTE` vale `lotacao` por padrão; `uniao` é a volta de emergência. Grupo de setor e
+  de função é **etiqueta**: dar grupo não concede acesso. Ver `v2/docs/specs/backend/rbac.spec.md`.
 - **Setores (13)**: Superintendência, Vidas, Fluir, ACerta,
   Brincando, Sou da Paz, DAT, Controle, Diretoria, Comercial,
   Relacionamento, Logística Viagens, Logística Galpão
   (SSOT: `apps.core.constants.SETOR_GROUPS`)
 - **Funções (5)**: Formador, Coordenador, Apoio de Coordenação, Gerente, Assistente Administrativo
-  (SSOT: `apps.core.constants.FUNCAO_GROUPS`)
-- **Aprovação**: regra única `solicitation_approval_basis`; ver PA-02 em `v2/docs/specs/domain/politica-aprovacao.spec.md` (nenhum grupo aprova)
+  (SSOT: `apps.core.constants.FUNCAO_GROUPS`; sem capacidade desde o PR 8)
+- **Aprovação**: regra única `solicitation_approval_basis` (superuser, GERENTE vigente na Superintendência,
+  capacidade `approve_solicitation` pelo pacote ADMIN_OPERACIONAL do DAT ou CONTROLE); ver PA-02 em `v2/docs/specs/domain/politica-aprovacao.spec.md` (nenhum grupo aprova)
 - **Lint guard**: `scripts/rbac_lint.py` bane `user.groups.filter(name=...)`
   fora de whitelist. CI job: `[required] backend rbac-lint`.
 
@@ -101,6 +107,9 @@ Redis 7 (cache/sessions/broker) roda como **container na stack da VM01** (servi�
 
 ## Planos em Andamento
 
+Versão em produção não se fixa aqui: é a última tag promovida por `.github/workflows/promote.yml`
+(input `release`, tag imutável `vYYYY.MM.DD-<sha7>`; ver `v2/infra/ENVIRONMENTS.md`). As linhas de 2026-06 abaixo são histórico já concluído.
+
 | Plano                       | Epic / PRs |
 |-----------------------------|------------|
 | Backend Code Formatting     | #450 |
@@ -108,28 +117,27 @@ Redis 7 (cache/sessions/broker) roda como **container na stack da VM01** (servi�
 | Import Pages Web            | ---  |
 | Pipeline Sheets→Sistema (export-contract) | #1372 resolver · #1373 skeleton · #1375 masters (8 entid.) · #1384 dat_acao+plano_formacao (dry-run) **MERGEADO** |
 | Dependabot sweep + pin policy (2026-06-16) | 12 PRs + 8 alertas → **0**; pin policy #1420 (base-image só patch); a11y resgatada #1424 (memória `pr-sweep-session-2026-06-16`) |
-| CI/CD audit + perf roadmap (2026-06) | 4 milestones (M1-M4) + issues **#1391–#1404**; **M1 MERGEADO** 2026-06-17 (#1391-#1395; #1394 via #1442). **M2 6/6 MERGEADO** (#1396/#1398/#1399/#1400/#1397 + #1401 reusable workflow via #1449). **M3 2/2 MERGEADO** 2026-06-19 (#1402 `64dfeb4` — 537 falhas xdist→0/4, causa=`transaction=True` trunca seed RBAC; fix `ensure_rbac_seed`; #1403 `cbf10a7` — `-n auto --dist loadscope` no gate, ~15min→~5min, cobertura 85% ok). **M4 #1404 MERGEADO** 2026-06-22 (#1481 `80f5b98` — `pytest --no-migrations` no gate, setup DB −69%; seeds RBAC via fixtures; 141 testes→factory_boy; job `backend-migrate-integrity` exercita a cadeia RunPython em DB limpo). **Roadmap M1–M4 = 100%**. Memórias `m4-no-migrations-1404`, `m3-xdist-stabilization-2026-06-19`, `xdist-transaction-truncates-seed` |
-| Dependency sweep (2026-06-17) | #1391 destravou **12 PRs Dependabot** de backend → todos mergeados (0 major, pin policy ok); validação combinada `staging-full` 8/8. Prod=`v2026.06.17-fe1ab66` |
-| Baseline-drift / nó circular CI | #1390 (deps) MERGEADO+deployado · #1407 (cache-bust OS-CVE imagens + dependabot docker dir) · #1408 (dependabot day válido) — todos mergeados; **prod = v2026.06.16** |
+| CI/CD audit + perf roadmap (2026-06) | 4 milestones (M1-M4) + issues **#1391–#1404**; **M1 MERGEADO** 2026-06-17 (#1391-#1395; #1394 via #1442). **M2 6/6 MERGEADO** (#1396/#1398/#1399/#1400/#1397 + #1401 reusable workflow via #1449). **M3 2/2 MERGEADO** 2026-06-19 (#1402 `a5b9c3a` — 537 falhas xdist→0/4, causa=`transaction=True` trunca seed RBAC; fix `ensure_rbac_seed`; #1403 `e4276b0` — `-n auto --dist loadscope` no gate, ~15min→~5min, cobertura 85% ok). **M4 #1404 MERGEADO** 2026-06-22 (#1481 `1b2af16` — `pytest --no-migrations` no gate, setup DB −69%; seeds RBAC via fixtures; 141 testes→factory_boy; job `backend-migrate-integrity` exercita a cadeia RunPython em DB limpo). **Roadmap M1–M4 = 100%**. Memórias `m4-no-migrations-1404`, `m3-xdist-stabilization-2026-06-19`, `xdist-transaction-truncates-seed` |
+| Dependency sweep (2026-06-17) | #1391 destravou **12 PRs Dependabot** de backend → todos mergeados (0 major, pin policy ok); validação combinada `staging-full` 8/8 |
+| Baseline-drift / nó circular CI | #1390 (deps) MERGEADO+deployado · #1407 (cache-bust OS-CVE imagens + dependabot docker dir) · #1408 (dependabot day válido) — todos mergeados |
 | Segurança de imagem / deploy gate | #1407 cache-bust `apt/apk upgrade` por GIT_SHA (gate Trivy travava por CVE de SO); memória `image-os-cve-deploy-gate-2026-06` |
 
-### Estado da pipeline export-contract (2026-06)
+### Estado da pipeline export-contract (atualizado 2026-10-19; SSOT `v2/docs/specs/backend/imports.spec.md`)
 
 - **Catálogo Projeto** consolidado 137→123 (E1 aplicado; E2 Caminho A: variantes numeradas = KEEP).
   Rename Superativar Língua Portuguesa N → **Superativar Linguagens N** (dev DB).
 - **Resolver de Projeto** (`apps/core/services/export_contract_projeto_resolver.py`) — PR #1372
   mergeada. Canonicaliza & vs E / hífen / vírgula / prefixo PROJETO + aliases escopados por família.
 - **Importer dedicado** (`apps/core/services/export_contract_importer.py` + command
-  `import_export_contract.py`) — PR #1373 mergeada. **Dry-run por padrão**, `--apply` exige allowlist,
-  modo create-only, **never-overwrite de campos protegidos** (Solicitacao.status, Formacao.data_formacao,
-  Acompanhamento). Fatia mestre expandida — PR #1375 (squash `0243cad`) adicionou produto/usuario/
-  tipo_evento/gerencia/dat_coordenador (PII só conta), **8 entidades** implementadas; `--apply` segue
-  bloqueado sem allowlist e nenhum import real foi executado.
-- **Slice operacional 1** — `dat_acao` + `plano_formacao` classify dry-run (NK municipio+projeto,
-  resolver #1372, existence-based, sem PII) — **PR #1384 MERGEADO** (`7d6f6027`, 10 entid., 21 testes,
-  staging 8/8). `--apply` segue bloqueado; nenhum import real executado.
-- **REGRA**: NÃO importar dados de verdade até um dry-run real do `--apply` passar verde + autorização.
-  Re-import cego sobrescreveria os data-fixes manuais (D2/C3-A/C4.4).
+  `import_export_contract.py`) — PR #1373 mergeada. **Dry-run por padrão**; `--apply` sem
+  `--allow-entity` é bloqueado e grava só as entidades da allowlist. **Never-overwrite de campos
+  protegidos** (Solicitacao.status, Formacao.data_formacao, Acompanhamento). Dois modos (`--mode`):
+  `create-only` (padrão; só insere `would_create`) e `virada` (#2116, carga **única** da virada, decisões
+  do dono de 16/10: atualiza o evento que ninguém mexeu pela tela; `--apply` exige `solicitacao` +
+  `participation` juntos; depois do A5, `--allow-entity gcal_adocao` sozinha adota o Event ID do Google).
+  Entidades graváveis e o passo a passo: `imports.spec.md` (seções de entidades e "Carga da virada").
+- **REGRA**: antes de qualquer `--apply` com dado real: dry-run verde, OK do dono e backup do alvo.
+  Re-import cego sobrescreveria os data-fixes manuais (D2/C3-A/C4.4); a carga da virada é uma só.
 - **PA-01** no importer de eventos corrigido (#1370): SUPER nunca auto-aprova (mesmo evento passado).
 - **react-doctor gate**: score depende de telemetria remota → exige `--offline` (memória `react-doctor-offline-determinism`).
 

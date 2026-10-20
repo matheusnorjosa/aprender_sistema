@@ -12,8 +12,8 @@ Operações de backup do AS v2.
 >
 > | Defeito | Estado |
 > |---|---|
-> | #1611 / M26-01 — `restore_db.sh` rejeitava todo backup `.age` de produção com `ERROR: Backup file is corrupted!` | **Corrigido** — `8f392636`, 2026-08-10 |
-> | #1645 / M26-02 — `restore_db.sh` declarava sucesso com exit 0 sobre banco vazio | **Corrigido** — `3bca74f3`, 2026-08-21 |
+> | #1611 / M26-01 — `restore_db.sh` rejeitava todo backup `.age` de produção com `ERROR: Backup file is corrupted!` | **Corrigido** — `815b1afc`, 2026-08-10 |
+> | #1645 / M26-02 — `restore_db.sh` declarava sucesso com exit 0 sobre banco vazio | **Corrigido** — `e4c2d22b`, 2026-08-21 |
 > | #1455 — `worker` de produção não montava `/backups`, então o job gravava no vazio | **Corrigido** — #1528; bind-mount `/var/backups/aprender:/backups` em `docker-compose.prod.yml:235` |
 > | [#1646](https://github.com/matheusnorjosa/aprender_sistema/issues/1646) / M26-03 — nenhum drill real de DR com artefato `.age` | **ABERTO** |
 

@@ -1,7 +1,7 @@
 ---
 title: Notificações (32 Passos)
 status: canonical
-last_verified: 2026-07-24
+last_verified: 2026-10-19
 sources_of_truth:
   - v2/backend/apps/core/models/acoes_notificacao.py
   - v2/backend/apps/core/services/prazo_engine_service.py
@@ -69,7 +69,7 @@ Rotas DRF (router em [`urls.py`](../../../backend/apps/core/urls.py); prefixo `/
 Operações administrativas:
 
 - `python manage.py seed_acoes_notificacao [--verbose]` — semeia/atualiza os 32 templates + executores (idempotente).
-- Task Celery `apps.core.tasks.processar_notificacoes_acoes_diarias(reference_date_iso?)` — beat diário às **08:00** (`config/celery.py`, key `acoes-notificacoes-diarias`). Retorna métricas (`actions_evaluated/triggered`, `notifications_created/deduplicated`, `fallback_actions`, `phases`) e grava `AuditLog` (`ACOES_NOTIFICACOES_DAILY`).
+- Task Celery `apps.core.tasks.processar_notificacoes_acoes_diarias(reference_date_iso?)` — beat diário às **08:00** (`config/celery.py`, key `acoes-notificacoes-diarias`). Retorna métricas (`actions_evaluated/triggered`, `notifications_created/deduplicated`, `fallback_actions`, `phases`) e grava `AuditLog` (`ACOES_NOTIFICACOES_DAILY`). Em dia não-útil (fim de semana ou feriado, `BusinessCalendarService.is_business_day`) o processador pula desde o #1721: devolve `skipped_non_business_day: true` com as contagens zeradas e grava o mesmo `AuditLog`, para quem monitora saber que a task rodou.
 
 Toda mutação relevante grava `AuditLog`: `CICLO_ACOES_CREATE`, `ACAO_REGISTRAR_ANCORA`, `ACAO_CONCLUIR`.
 
@@ -78,7 +78,7 @@ Toda mutação relevante grava `AuditLog`: `CICLO_ACOES_CREATE`, `ACAO_REGISTRAR
 1. **Provisionamento**: `seed_acoes_notificacao` cria os 32 `AcaoTemplate` + grupos executores (ação 1 → Logística Galpão; ação 2 → Comercial/Relacionamento/DAT; ações 3–32 → Coordenador/Gerente).
 2. **Abertura de ciclo**: `POST ciclos-acoes/` → cria `CicloAcoes` + 32 `AcaoInstancia` (`AGUARDANDO_ANCORA`).
 3. **Registro de âncora**: `POST .../registrar-ancora/` → `PrazoEngineService.recalculate_action` resolve âncora, calcula `data_vencimento` em dias úteis e move o estado para `EM_ANDAMENTO`/`ATRASADA`. Grava `RegistroAncora` (histórico).
-4. **Processamento diário** (`AcoesNotificacaoDailyService.run`): para cada ação de ciclo `EM_ANDAMENTO` com vencimento e não concluída → recalcula estado → `EscalonamentoService.resolve_rule` mapeia a distância em dias úteis até o vencimento para uma fase (**D-7** lembrete/responsável, **D-3**/**D-1** alta, **D0** vencimento/crítica, **D+1** escala p/ coordenador, **D+3** escala p/ gerente) → `NotificationService.dispatch_for_action` resolve destinatários (executores ∩ papel do nível) e cria notificações dedup.
+4. **Processamento diário** (`AcoesNotificacaoDailyService.run`): em dia não-útil não avalia nada e só audita o pulo (#1721; sem isso, sábado e domingo repetiriam as fases já enviadas na sexta). Em dia útil, para cada ação de ciclo `EM_ANDAMENTO` com vencimento e não concluída → recalcula estado → `EscalonamentoService.resolve_rule` mapeia a distância em dias úteis até o vencimento para uma fase (**D-7** lembrete/responsável, **D-3**/**D-1** alta, **D0** vencimento/crítica, **D+1** escala p/ coordenador, **D+3** escala p/ gerente) → `NotificationService.dispatch_for_action` resolve destinatários (executores ∩ papel do nível) e cria notificações dedup.
 5. **Conclusão**: `POST .../concluir/` → estado `CONCLUIDA`, `RegistroConclusaoAcao` único, e recálculo das ações dependentes (que ancoram nesta).
 6. **Erros relevantes**: âncora/conclusão em ação já concluída → 400 (ValidationError); conclusão sem observação → 400; recriação de conclusão → erro; sem destinatários elegíveis → notificação não criada, registrada em `fallback_actions`.
 

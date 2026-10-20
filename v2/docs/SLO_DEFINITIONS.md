@@ -1,8 +1,8 @@
 ---
 title: Service Level Objectives (SLOs)
 status: active
-last_verified: 2026-09-11
-verified_at_commit: d0d43890c58b6620a9c6dabca2c940a4e9589911
+last_verified: 2026-10-19
+verified_at_commit: b37bdcdfa581543c07a22ae6641d667ff73c74ea
 sources_of_truth:
   - v2/backend/apps/core/services/db_retry.py
   - v2/backend/config/settings.py
@@ -54,7 +54,7 @@ SLOs são metas internas de qualidade de serviço que guiam decisões de arquite
 |----------|-----|-----|-----|-------|
 | `POST /api/solicitacoes/` | 200ms | 500ms | 1000ms | Criação com validações |
 | `PATCH /api/solicitacoes/{id}/` | 150ms | 400ms | 800ms | Atualização parcial |
-| `POST /api/solicitacoes/{id}/aprovar/` | 200ms | 500ms | 1000ms | Aprovação + audit log |
+| `PATCH /api/solicitacoes/{id}/approve/` | 200ms | 500ms | 1000ms | Aprovação + audit log |
 | `POST /api/availability-blocks/` | 100ms | 300ms | 500ms | Criar bloqueio |
 
 ### 2.3 Endpoints de Integração (GCal)
@@ -133,7 +133,7 @@ Error Budget (horas/mês) = (100 - SLO%) × 720 / 100
 | Dado | RPO (alvo) | RTO (alvo) | Backup |
 |------|-----|-----|--------|
 | Banco de Dados | 5 min | 1 hora | WAL + dump diário cifrado — ver SSOT [`BACKUP_OPERATIONS.md`](./BACKUP_OPERATIONS.md) |
-| Redis (cache **e sessões**) | N/A | 5 min | Não persistido — reiniciar o Redis **desloga todos os usuários** (`SESSION_ENGINE=cache`) |
+| Redis (cache **e sessões**) | N/A | 5 min | Persistido (AOF + RDB no volume `redis_data`, `v2/infra/docker-compose.prod.yml`): reiniciar o container preserva as sessões. Só perde sessões (`SESSION_ENGINE=cache`) se o volume for apagado, se o Redis for recriado sem volume ou por despejo do `allkeys-lru` ao bater o `maxmemory` |
 | Google Calendar | 0 | 24 horas | Resync automático |
 
 > ⚠️ **Estes são alvos, não capacidade demonstrada.** Hoje: o WAL archiving da VM02 **não
@@ -141,7 +141,7 @@ Error Budget (horas/mês) = (100 - SLO%) × 720 / 100
 > ensaio de restore foi registrado**
 > ([#1646](https://github.com/matheusnorjosa/aprender_sistema/issues/1646), aberta).
 > A ferramenta oficial de restore **voltou a funcionar** com o formato de produção
-> `.age` — #1611 corrigido em `8f392636`, #1645 em `3bca74f3` —, mas ferramenta correta
+> `.age` — #1611 corrigido em `815b1afc`, #1645 em `e4c2d22b` —, mas ferramenta correta
 > não é RTO medido. Antes de comprometer RPO/RTO com terceiros, leia
 > [BACKUP_OPERATIONS.md → Estado real do restore](./BACKUP_OPERATIONS.md#estado-real-do-restore).
 
@@ -224,7 +224,7 @@ do escopo de SLO, há um *dead-man* diário de frescor de backup
 |--------|------|----------|
 | 1.0 | 2026-01-12 | Versão inicial |
 | 1.1 | 2026-07-24 | Marcado como **não medido em produção**; corrigidos os nomes de métrica PromQL (não são as séries do `django-prometheus`); alertas reclassificados de "recomendados" para **não implementados**; ressalva de RPO/RTO ligada a #1611 |
-| 1.2 | 2026-08-25 | Ressalva de RPO/RTO **religada a #1646** (ensaio de DR, aberta): #1611 e #1645 foram corrigidos (`8f392636`, `3bca74f3`) e a ferramenta de restore deixou de ser o gargalo |
+| 1.2 | 2026-08-25 | Ressalva de RPO/RTO **religada a #1646** (ensaio de DR, aberta): #1611 e #1645 foram corrigidos (`815b1afc`, `e4c2d22b`) e a ferramenta de restore deixou de ser o gargalo |
 
 ---
 

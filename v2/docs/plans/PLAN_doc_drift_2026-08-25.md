@@ -1,7 +1,7 @@
 ---
 status: active
 last_verified: 2026-08-25
-verified_at_commit: 5801e17d
+verified_at_commit: 1d023f57
 sources_of_truth:
   - scripts/check_doc_frontmatter.py
   - scripts/check_doc_links.py
@@ -153,7 +153,7 @@ pytest apps/core/tests/test_check_issue_drift.py -q
 | # | Alvo | O quê | Rastreado no git? |
 |---|---|---|---|
 | A.2.1 | `ADR-002` §Consequences | «aprovação NÃO revalida conflitos» — **único achado acionável**: leva a apagar guard que sustenta produção | ✅ |
-| A.2.2 | 5 docs de DR | `⛔ restore quebrado (#1611)` — corrigido em `8f392636` | ✅ |
+| A.2.2 | 5 docs de DR | `⛔ restore quebrado (#1611)` — corrigido em `815b1afc` | ✅ |
 | A.2.3 | `RUNBOOK.md` | `aprender_v2` → `aprender_dev`; sem isso **nenhum** comando roda | ✅ |
 | A.2.4 | `.claude/`, `AGENTS.md` | deploy revogado, incl. hook que injeta em toda sessão | ❌ **gitignored** — ver D3 |
 
@@ -174,7 +174,7 @@ grep -rlc "#1611" v2/docs/*.md docs/operations/*.md
 **Por quê.** `--since=<data>` é não-determinístico (approxidate usa a hora atual)
 e inclui o mesmo dia, acusando a spec corrigida no próprio PR. **O projeto já
 inventou a solução certa**: `ACHADOS_REAIS.md` ancora em SHA
-(`audit_baseline: 90f6a048`).
+(`audit_baseline: 6be22fb7`).
 
 **Ação.** Frontmatter de spec ganha `verified_at_commit: <sha>` ao lado de
 `last_verified`. O drift passa a ser `git log <sha>..HEAD -- <paths>` — que não
@@ -354,7 +354,7 @@ Cada gate precisa, no mínimo:
 - [x] borda: spec sem `sources_of_truth`
 - [x] borda: **entrada que não é caminho.** Medido: **6 de 303** entradas não
       resolvem — três são frases em prosa dentro da lista do próprio árbitro de
-      defeitos (`reverificação por execução contra main d08acfa5`), três são
+      defeitos (`reverificação por execução contra main 8b6bd1fd`), três são
       caminho com anotação entre parênteses. Passadas ao `git log` como pathspec
       não casam nada, e a spec aparecia «sem drift» por malformação. Agora saem
       numa seção própria do relatório.
@@ -472,8 +472,8 @@ esteja errada sobre o código.
       `check_agent_instructions.py` só olhava caminho de máquina e credencial, e
       `check_doc_impact.py` nem enxerga a árvore (`RAIZES_DOC` não inclui
       `.claude`). **170 arquivos de instrução citam caminho de código real.**
-      Medido: `apps/core/models.py` foi apagado em `4ae989fe` (#213, há 9 meses),
-      `views.py` em `733e3933` e `serializers.py` em `18eb7148` — e a instrução
+      Medido: `apps/core/models.py` foi apagado em `8171457c` (#213, há 9 meses),
+      `views.py` em `4981cb66` e `serializers.py` em `91e3b86a` — e a instrução
       ainda mandava o agente procurar a regra PA-01 dentro de `Solicitacao.save()`,
       método que não existe.
 

@@ -2,7 +2,7 @@
 title: Observabilidade (v2)
 status: active
 last_verified: 2026-09-11
-verified_at_commit: d0d43890c58b6620a9c6dabca2c940a4e9589911
+verified_at_commit: b37bdcdfa581543c07a22ae6641d667ff73c74ea
 sources_of_truth:
   - v2/backend/config/settings.py
   - v2/backend/config/urls.py

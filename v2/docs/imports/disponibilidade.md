@@ -1,26 +1,33 @@
 # Importação: Disponibilidade / Bloqueios
 
-Status: PR 1 — **backend implementado para tipos T/P; tipo D e recorrência ainda em aberto** (revisto 2026-07-24)
-Versão: 2026-07-24 v0.3
+Status: PR 1 — **backend implementado para tipos T/P; tipo D e recorrência ainda em aberto** (revisto 2026-10-19)
+Versão: 2026-10-19 v0.4
 Template: [templates/disponibilidade.template.csv](./templates/disponibilidade.template.csv)
 
-> 🔴 **Atualização v0.3 (2026-07-24) — achado `M22-14`, issue
+> 🟢 **Atualização v0.4 (2026-10-19) — achado `M22-14`, issue
 > [#1643](https://github.com/matheusnorjosa/aprender_sistema/issues/1643) (épico
 > [#1658](https://github.com/matheusnorjosa/aprender_sistema/issues/1658)).**
 >
-> A combinação de três comportamentos reais faz o import de bloqueios **criar um bloqueio
-> auto-aprovado na agenda da pessoa errada, em silêncio**:
+> A v0.3 (2026-07-24) descrevia três comportamentos que, juntos, faziam o import **criar um
+> bloqueio auto-aprovado na agenda da pessoa errada, em silêncio**: fallback por substring +
+> `.first()` em `resolve_user_by_name`, `created_by` não gravado e nenhum `AuditLog`. Isso foi
+> corrigido:
 >
-> 1. `resolve_user_by_name` (`services/resolvers.py:75-98`) tenta match exato; se falhar, faz
->    **fallback por substring** (`first_name__icontains` / `last_name__icontains`) e resolve
->    qualquer ambiguidade com **`.first()`** — nunca rejeita, nunca avisa.
-> 2. O bloco é criado com **`status="aprovado"`** direto (`services/bloqueios_import.py`,
->    `_process_row`), sem revisão do formador.
-> 3. Não há `AuditLog` no import síncrono (§12), então não fica rastro de quem importou.
+> 1. **Homônimo não vira chute (#1929).** `resolve_user_by_name` (`services/resolvers.py`) exige
+>    candidato único — nome completo exato, depois todos os tokens do nome. Ambiguidade devolve
+>    `None` + WARNING e a linha vira pendência `usuarios`.
+> 2. **Autor e auditoria (#2011).** `import_bloqueios_from_file(..., actor=...)` grava
+>    `created_by=actor` e um `AuditLog` `DELEGATE_BLOCK_CREATE` (`origem=import`) por bloco criado.
+>    As duas rotas passam o ator (`request.user` na síncrona, `job.user` no `ImportJob`), e ambas são
+>    `SuperuserOnly`.
+> 3. **Alvo precisa ser Formador ativo (#2016)** para bloqueio com início a partir de 31/07/2026
+>    (`_FORMADOR_CUTOFF` / `_is_active_formador` em `bloqueios_import.py`); antes disso é dado
+>    histórico e aceita qualquer usuário.
 >
-> Um bloqueio na agenda errada **remove o formador certo da disponibilidade** e bloqueia
-> indevidamente o formador errado — com 94 formadores ativos em produção, homônimos e
-> sobrenomes compartilhados são plausíveis. Ver [../audits/ACHADOS_REAIS.md](../audits/ACHADOS_REAIS.md).
+> **Residual:** a pendência `usuarios` não distingue ambíguo de não encontrado; `status="aprovado"`
+> segue incondicional; `tipo` inválido é coagido para `T`; bloqueios importados antes do #2011 têm
+> `created_by` nulo. SSOT: `bloqueios_import.py` e `resolvers.py`. Ver
+> [../audits/ACHADOS_REAIS.md](../audits/ACHADOS_REAIS.md).
 
 > ⚠️ **Atualização v0.2**: a v0.1 tratava o formato como totalmente pendente. Verificação contra o código mostra que `apps/core/services/bloqueios_import.py` já existe e funciona para tipos **T** (total) e **P** (parcial), com endpoint síncrono `POST /api/disponibilidade/import-bloqueios/` **e** endpoint assíncrono `POST /api/imports/bloqueios/` (ASQ-005 Fase 1 — `bloqueios` é o piloto). Tipo **D** (deslocamento) e bloqueios **recorrentes** continuam em aberto.
 
@@ -162,15 +169,15 @@ Observações de comportamento que o contrato original não previa:
 |---|---|---|---|
 | Model `AvailabilityBlock` | `apps/core/models/agenda.py` | `tipo` (T/P — não D), `inicio`, `fim`, `usuario`, `motivo`, `status`, **`created_by`** (PR 13) | ✅ existe |
 | ViewSet (CRUD) | `views_availability.AvailabilityBlockViewSet` | CRUD; `POST` permite delegação via helper `user_can_delegate_availability_block` (PR 13) | ✅ existe |
-| **Service de import** | `apps/core/services/bloqueios_import.py` | `import_bloqueios_from_file(path: str, dry_run: bool = True) -> dict`. Cabeçalho: `usuario,inicio,fim,tipo,motivo`. Reconciliação de `usuario` via `resolve_user_by_name` (linha 28 do service). Timezone `America/Fortaleza` (linha 30). | ✅ **já implementado** |
+| **Service de import** | `apps/core/services/bloqueios_import.py` | `import_bloqueios_from_file(*, path: str, dry_run: bool = True, actor=None) -> dict` (`actor` desde o #2011). Cabeçalho: `usuario,inicio,fim,tipo,motivo`. Reconciliação de `usuario` via `resolve_user_by_name` (linha 28 do service). Timezone `America/Fortaleza` (linha 30). | ✅ **já implementado** |
 | Service `check_conflicts` | `apps/core/services/availability_service.py` | RD-01..08 (consome bloqueios — não é o service de import). **Calcula D dinamicamente** entre Solicitações em municípios diferentes; D não é armazenado como bloqueio. | ✅ existe |
 | **Endpoint síncrono** | `POST /api/disponibilidade/import-bloqueios/` (`ImportBloqueiosView` em `apps/core/views_import_bloqueios.py`) | dry_run + multipart `file=` | ✅ **já funciona** |
 | **Endpoint assíncrono (ASQ-005 Fase 1 — piloto)** | `POST /api/imports/bloqueios/` → cria `ImportJob`, retorna `202 Accepted` | Despacha Celery task `task_run_import_job`. Job persiste com `import_type='bloqueios'`. Status acompanhado via `GET /api/imports/<id>/`. | ✅ **já funciona** (único tipo async hoje) |
 | Endpoint async (status) | `GET /api/imports/<id>/` | Retorna `ImportJob` serializado (status, stats, pendencias) | ✅ existe |
 | Endpoint async (lista) | `GET /api/imports/` | Lista jobs do usuário (filtro `type=` `status=`) | ✅ existe |
-| Gate RBAC (endpoint sync) | `IsAuthenticated + HasPerm("import_spreadsheet")` (DAT) | NÃO `import_availability_blocks` direto — policy `import_availability_blocks` é apenas para exposição via `/api/me/policies/` | ✅ aplicado |
-| Gate RBAC (endpoint async upload) | `IsAuthenticated + CanImportGenericSpreadsheet` (Policy class) | Verificar em `apps/core/views/imports.py` | ✅ aplicado |
-| AuditLog delegação | `DELEGATE_BLOCK_CREATE` (PR 13) | Quando outro user cria bloqueio em nome de Formador (não vem de import — vem de POST manual) | ✅ existe |
+| Gate RBAC (endpoint sync) | `IsAuthenticated + SuperuserOnly` (D20) | Só superusuário (decisão do dono 02/10/2026); nenhuma capability abre. A policy `import_availability_blocks` é apenas para exposição via `/api/me/policies/` | ✅ aplicado |
+| Gate RBAC (endpoint async upload) | `IsAuthenticated + SuperuserOnly` (D20) | `apps/core/views/imports.py`; `CanImportGenericSpreadsheet` segue em `policies.py`, mas não gateia mais esta rota | ✅ aplicado |
+| AuditLog delegação | `DELEGATE_BLOCK_CREATE` (PR 13) | Quando outro user cria bloqueio em nome de Formador: POST manual e, desde o #2011, também o import (`details.origem="import"`, ator = quem rodou) | ✅ existe |
 
 ### Comportamento real do service (lido em código + docstring)
 
@@ -180,17 +187,18 @@ Observações de comportamento que o contrato original não previa:
   - `fim` (obrigatório, datetime > inicio)
   - `tipo` (obrigatório, **T=Total** ou **P=Parcial**; **D não suportado**)
   - `motivo` (opcional)
-- **Reconciliação**: 🔴 `resolve_user_by_name(name)` (`services/resolvers.py:56-98`) em **três
-  tentativas cada vez mais frouxas**: (1) `first_name__iexact` OU `last_name__iexact` + `.first()`;
-  (2) `first_name__icontains` E `last_name__icontains` + `.first()`; (3) `first_name__icontains`
-  **OU** `last_name__icontains` + `.first()`. Nenhuma delas detecta ambiguidade — a terceira casa
-  com qualquer pessoa que compartilhe um pedaço do primeiro **ou** do último nome.
-  Achado `M22-14` / [#1643](https://github.com/matheusnorjosa/aprender_sistema/issues/1643).
+- **Reconciliação**: `resolve_user_by_name(name)` (`services/resolvers.py`) exige candidato único
+  (#1929): (1) nome completo exato; (2) todos os tokens do nome presentes no nome do usuário.
+  Comparação acento/caixa-insensível. 2+ candidatos → `None` + WARNING → pendência `usuarios`
+  (a pendência não diz se foi ambíguo ou não encontrado). A partir de 31/07/2026 (data do
+  bloqueio), o alvo também precisa ser **Formador ativo** (#2016, `_is_active_formador`), senão
+  pendência. Achado `M22-14` / [#1643](https://github.com/matheusnorjosa/aprender_sistema/issues/1643).
+  *(Até o #1929 havia três tentativas frouxas por `icontains` + `.first()`, sem detectar ambiguidade.)*
 - **Timezone**: `ZoneInfo("America/Fortaleza")` fixo (`bloqueios_import.py:30`).
 - **Idempotência**: tupla natural `(usuario, inicio, fim, tipo)`. **Não há `external_hash`** — ver §8.
-- **`created_by`**: 🔴 **não é gravado.** O `AvailabilityBlock.objects.create(...)` do service passa
-  apenas `usuario`, `inicio`, `fim`, `tipo`, `motivo` e `status`. O bloco criado por import fica
-  **sem autor**, e como não há `AuditLog` (§12) não existe nenhum rastro de quem o criou.
+- **`created_by`**: ✅ gravado com o ator do import desde o #2011 (`created_by=actor`), mais um
+  `AuditLog` `DELEGATE_BLOCK_CREATE` por bloco criado (§12). Chamada sem ator (legada) e bloqueios
+  importados antes do #2011 ficam com `created_by` nulo.
 - **`status`**: 🔴 **`"aprovado"` incondicional**, com o comentário `# Auto-aprovado` no código.
   O formador alvo não revisa e não é notificado.
 
@@ -200,11 +208,12 @@ Observações de comportamento que o contrato original não previa:
 
 ### Pode criar — **REAL**
 - `AvailabilityBlock` com:
-  - `usuario` = quem `resolve_user_by_name` devolver — **pode ser a pessoa errada** (#1643).
+  - `usuario` = o candidato único que `resolve_user_by_name` devolver (#1929); homônimo vira pendência.
+    A partir de 31/07/2026, só Formador ativo (#2016).
   - `status='aprovado'` — auto-aprovado, mas **não** "declarado pelo próprio": quem declara é o
     operador do import, não o formador.
   - `tipo` (coerção silenciosa para `T` se não for parcial), `inicio`, `fim`, `motivo`.
-  - ❌ **`created_by` NÃO é gravado** — o campo existe no model mas o import não o preenche.
+  - ✅ `created_by` = ator do import (#2011).
 
 ### Pode atualizar — **REAL**
 - `motivo`, quando a chave natural já existe e o novo motivo é não-vazio e diferente.
@@ -219,12 +228,12 @@ Observações de comportamento que o contrato original não previa:
 | Regra pretendida | Aplicada? | Prova |
 |---|---|---|
 | Não deletar bloqueios ausentes da planilha (import é additive) | ✅ sim | o service só faz `create`/`save(update_fields=["motivo"])` |
-| Não criar bloqueio para usuário sem Função `Formador`/`Coordenador` | ❌ **não** | `resolve_user_by_name` busca em **todos** os usuários; nenhum filtro por grupo |
-| Não criar bloqueio na agenda da pessoa errada | ❌ **não** | fallback por substring + `.first()` (#1643) |
+| Não criar bloqueio para quem não é Formador | ✅ a partir de 31/07/2026 | `_is_active_formador` (#2016): bloqueio com início desde o cutoff exige Formador ativo; antes é histórico e aceita qualquer usuário |
+| Não criar bloqueio na agenda da pessoa errada | ✅ sim | `resolve_user_by_name` exige candidato único; homônimo → pendência `usuarios` (#1929) |
 | Timezone sempre via America/Fortaleza | ✅ sim | `TZ = ZoneInfo("America/Fortaleza")` (`:30`), aplicado em `_parse_datetime_flexible` |
 | Não notificar usuário nem Controle | ✅ sim | nenhum envio no service — mas isso é o que **esconde** o bloqueio errado do formador |
 | Não mover/cancelar Solicitação conflitante | ✅ sim | o service não toca em `Solicitacao` |
-| Registrar quem criou o bloqueio | ❌ **não** | `created_by` não é preenchido e não há `AuditLog` (§12) |
+| Registrar quem criou o bloqueio | ✅ sim | `created_by=actor` + `AuditLog` `DELEGATE_BLOCK_CREATE` (#2011, §12) |
 
 ---
 
@@ -234,12 +243,11 @@ Observações de comportamento que o contrato original não previa:
 
 | Caminho | Grava `AuditLog`? |
 |---|---|
-| `POST /api/disponibilidade/import-bloqueios/` (síncrono) | ❌ **não** — a ação `IMPORT_AVAILABILITY_BLOCKS` não existe |
-| `POST /api/imports/bloqueios/` (assíncrono, `ImportJob`) | ✅ sim — `IMPORT_JOB_COMPLETED` / `IMPORT_JOB_FAILED` (`apps/core/tasks.py:634,669`) |
+| `POST /api/disponibilidade/import-bloqueios/` (síncrono) | ✅ por bloco — `DELEGATE_BLOCK_CREATE` (`origem=import`) para cada bloqueio criado (#2011); não há ação de resumo do import |
+| `POST /api/imports/bloqueios/` (assíncrono, `ImportJob`) | ✅ sim — `IMPORT_JOB_COMPLETED` / `IMPORT_JOB_FAILED` (`apps/core/tasks.py`) + `DELEGATE_BLOCK_CREATE` por bloco (ator = `job.user`) |
 
-`AuditLog.Action` (`apps/core/models/auditoria.py:72-73`) só define essas duas ações de import.
-**Preferir o endpoint assíncrono** é hoje a única forma de ter rastro de um import de bloqueios —
-o que é especialmente relevante dado #1643.
+Filtrar `AuditLog` por `action="DELEGATE_BLOCK_CREATE"` e `details__origem="import"` lista os
+bloqueios criados por import, com `target_user_id`, `block_id`, `inicio` e `fim`.
 
 ### Drift check
 - Comparar `AvailabilityBlock.objects.filter(created_at__date=<dia>).count()` com `linhas_criadas`.
@@ -257,13 +265,13 @@ Listar Solicitações `status='aprovado'` que após o import passam a colidir co
 
 | Risco | Severidade | Mitigação **real hoje** |
 |---|---|---|
-| **Match errado de Usuario por nome** (bloqueio na agenda de terceiro) | **P1 vivo** | ❌ **Nenhuma.** Substring + `.first()`, sem warning. [#1643](https://github.com/matheusnorjosa/aprender_sistema/issues/1643) |
-| **Bloqueio auto-aprovado sem autor e sem auditoria** | **P1 vivo** | ❌ **Nenhuma** — `status="aprovado"`, `created_by` vazio, sem `AuditLog` no caminho síncrono |
+| **Match errado de Usuario por nome** (bloqueio na agenda de terceiro) | ✅ Mitigado | **#1929** — candidato único; ambiguidade → `None` + WARNING → pendência `usuarios`. Residual: a pendência não distingue ambíguo de não encontrado. [#1643](https://github.com/matheusnorjosa/aprender_sistema/issues/1643) |
+| **Bloqueio auto-aprovado sem autor e sem auditoria** | Média (residual) | ✅ autor + auditoria (**#2011**: `created_by=actor` + `DELEGATE_BLOCK_CREATE`). Segue `status="aprovado"` incondicional; bloqueios anteriores ao #2011 têm `created_by` nulo |
 | `tipo` inválido vira `T` (Total) em silêncio | Alta | ❌ Nenhuma — coerção sem pendência (ver §8) |
 | Bloqueio em horário UTC errado | Alta | ✅ Mitigado — `TZ` fixo em `America/Fortaleza` (`:30`) |
 | Usuario inexistente | Alta | ✅ Mitigado — linha vira `pendencias.usuarios` e é pulada |
 | Bloqueio T sobrescrevendo Solicitacao já aprovada | Alta | ✅ Mitigado — o service não toca em `Solicitacao` |
-| Bloqueio para quem não é Formador/Coordenador | Média | ❌ Nenhuma — não há filtro por grupo na resolução |
+| Bloqueio para quem não é Formador | Média | ✅ a partir de 31/07/2026 — `_is_active_formador` (#2016); antes do cutoff é histórico e aceita qualquer usuário |
 | Deslocamento sem origem/destino | Média | Não se aplica — tipo D não é suportado (§2) |
 | Lapso de timezone em sync internacional | Baixa | Documentar TZ no template |
 
@@ -280,11 +288,11 @@ Listar Solicitações `status='aprovado'` que após o import passam a colidir co
 
 ### Pendências reais ainda
 
-1. 🔴 **Identificador do Usuário — bloqueante (#1643).** Hoje `resolve_user_by_name` faz fallback
-   por substring e desempata com `.first()`. A correção estrutural (épico
-   [#1658](https://github.com/matheusnorjosa/aprender_sistema/issues/1658)) tem duas partes:
-   **(a)** aceitar CPF/email como identificador; **(b)** **rejeitar ambiguidade** em vez de
-   escolher — 2+ candidatos devem virar pendência, nunca um `.first()` silencioso.
+1. **Identificador do Usuário (#1643).** A parte **(b)** da correção (épico
+   [#1658](https://github.com/matheusnorjosa/aprender_sistema/issues/1658)) — **rejeitar
+   ambiguidade** em vez de escolher — entrou no #1929: 2+ candidatos viram pendência. Falta
+   **(a)** aceitar CPF/email como identificador e distinguir, na pendência, ambíguo de não
+   encontrado.
 2. **Tipo D (Deslocamento)**: hoje **não suportado** como bloqueio. Deslocamentos são calculados dinamicamente por `availability_service` entre Solicitações de municípios diferentes. Se `sheets.banco` traz D explícito, precisa decidir:
    - (a) ignorar coluna D na importação (manter cálculo dinâmico);
    - (b) estender model `AvailabilityBlock` para aceitar D (mudança de schema);
@@ -297,9 +305,10 @@ Listar Solicitações `status='aprovado'` que após o import passam a colidir co
    bloqueios do usuário no período, exige PR de runtime.
 5. **Status inicial**: ✅ **verificado** — o service cria com `status='aprovado'` incondicional.
    Decisão pendente: manter auto-aprovado (fonte oficial) ou passar a `pendente` para revisão do
-   formador. Enquanto #1643 estiver aberto, auto-aprovar amplifica o dano do match errado.
-6. **`created_by` vazio**: decidir se o import deve gravar o operador que rodou (o campo já existe
-   no model, usado pelo POST manual). Sem isso não há como responder "quem bloqueou minha agenda?".
+   formador. (Com o match por candidato único do #1929, homônimo não chega a criar bloqueio; o risco que sobra é o degrau por tokens casar um único usuário que não é a pessoa da planilha.)
+6. ~~**`created_by` vazio**~~ → **Resolvido no #2011**: o import grava o operador em `created_by` e
+   um `AuditLog` `DELEGATE_BLOCK_CREATE`. Resta o passivo de bloqueios importados antes disso, com
+   `created_by` nulo.
 7. **Cancelar bloqueios**: planilha tem coluna `cancelar`? Hoje import é additive (não remove). Se for necessário cancelar via planilha, exige PR de runtime + soft-delete no model.
 8. **`deslocamentos_import.py`**: confirmar se esse serviço (que existe, com rota
    `deslocamentos/import/` → `ImportDeslocamentosView` em `apps/core/urls.py:76,235-236`) cobre o
@@ -317,3 +326,6 @@ Listar Solicitações `status='aprovado'` que após o import passam a colidir co
   `external_hash` neste import; `created_by` **não** é gravado; `tipo` inválido é coagido para `T`;
   `fim` à meia-noite vira `23:59:59`; o reimport atualiza `motivo`; e o caminho síncrono não grava
   `AuditLog` (só o assíncrono grava).
+- 2026-10-19 — v0.4 — Registrado o que fechou o `M22-14`: candidato único em `resolve_user_by_name`
+  (#1929), `created_by=actor` + `AuditLog` `DELEGATE_BLOCK_CREATE` nas duas rotas (#2011) e alvo
+  Formador ativo a partir de 31/07/2026 (#2016). Residual listado no topo.

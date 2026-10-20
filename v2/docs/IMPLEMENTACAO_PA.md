@@ -28,22 +28,22 @@
 PR17 implementa conformidade com a Política de Aprovação Manual (CP-02), garantindo que:
 1. **Fluxo SUPER** nunca é auto-aprovado (PA-01). *(NAO_SUPER é auto-aprovado por decisão de
    negócio — ver bloco acima.)*
-2. Apenas perfis autorizados podem aprovar/reprovar (PA-02 — composite Setor × Função após PR 3 #1308)
+2. Apenas perfis autorizados podem aprovar/reprovar (PA-02 — hoje `solicitation_approval_basis`, 3 bases; ver bloco abaixo)
 3. Integrações externas só executam após aprovação (PA-03)
 4. Auditoria completa em AuditLog (PA-05)
 5. Botões ocultos para não-autorizados no frontend (PA-06)
 6. Testes obrigatórios implementados e passando (PA-07) — hoje **7** funções de teste em
    `apps/core/tests/test_approval_policy_PA.py` (PR 10: + `test_segregacao_conta_alterada_bloqueia_decisao`)
 
-> **Atualização hardening RBAC (2026-04-29 — PR 3 #1308):** PA-02 evoluiu da
-> regra original "Superintendência ou superuser" e da "PA-02 Adaptada" intermediária
-> ("Sup OR DAT") para uma policy composite Setor × Função:
-> `access_solicitation_approvals` exige **Gerente da Superintendência** (Setor
-> `Superintendência` + Função `Gerente`) **OU** **Assistente Administrativo do
-> Controle** (Setor `Controle` + Função `Assistente Administrativo`).
-> DAT, Controle puro e Gerente pedagógico **não aprovam** mais. *(Desde o PR 10, 16/10/2026, o
-> DAT volta a aprovar, pelo pacote `ADMIN_OPERACIONAL` do vínculo na gerência DAT (base
-> `capacidade_aprovar`), com a segregação por histórico. Fonte atual: a spec.)*
+> **Atualização PR 11 das permissões (2026-10-17):** PA-02 passou pela regra original
+> "Superintendência ou superuser", pela "PA-02 Adaptada" ("Sup OR DAT") e pelo composite
+> Setor × Função do PR 3 #1308. Hoje **nenhum grupo aprova**: `access_solicitation_approvals`
+> segue a SSOT `solicitation_approval_basis` (`apps/core/rbac/policies.py`), com 3 bases —
+> superuser; vínculo `GERENTE` vigente na gerência Superintendência; a capacidade
+> `approve_solicitation` do pacote do perfil, pelo vínculo `EQUIPE`/`GERENTE` na gerência DAT
+> (`ADMIN_OPERACIONAL`, PR 10) ou Controle (`CONTROLE`, PR 11) — com a segregação por histórico.
+> Regra completa: [`politica-aprovacao.spec.md`](specs/domain/politica-aprovacao.spec.md) (PA-02)
+> e [`rbac.spec.md`](specs/backend/rbac.spec.md).
 > Frontend usa `access_solicitation_approvals` direto (PR 10 #1315);
 > `can_approve_super` permanece no payload de `/api/me/` apenas como
 > contrato legado — não é fonte de decisão.
@@ -80,7 +80,7 @@ model.save())"* (mesmo `perform_create`).
 
 #### 2. Auditoria Persistente (PA-05)
 - **Arquivo real**: `v2/backend/apps/core/services/solicitacao_approval.py`
-  — `AuditLog.objects.create()` em `:143-155` (approve) e `:214-226` (reject)
+  — `AuditLog.objects.create()` dentro de `approve_solicitacao` (approve) e `reject_solicitacao` (reject)
 - **Endpoints**: métodos `approve` e `reject` do `SolicitacaoViewSet` (`apps/core/views_solicitacao.py`)
 - **Problema original**: métodos só faziam `logger.info()`, sem AuditLog persistente
 - **Código** *(o snippet abaixo é o do PR17; a estrutura atual vive no service acima)*:
@@ -102,14 +102,15 @@ AuditLog.objects.create(
 ```
 
 #### 3. Testes Obrigatórios (PA-07)
-- **Arquivo**: `v2/backend/apps/core/tests/test_approval_policy_PA.py` (372 linhas)
-- **6 testes implementados e passando**:
+- **Arquivo**: `v2/backend/apps/core/tests/test_approval_policy_PA.py`
+- **7 testes implementados e passando** (o 7º entrou no PR 10 das permissões):
   1. `test_never_auto_approves_on_clean_or_save` - Valida PA-01
   2. `test_only_superintendencia_can_approve_or_reject` - Valida PA-02
   3. `test_non_privileged_user_gets_403_on_approval_endpoint` - Valida PA-02 (complementar)
   4. `test_calendar_integration_not_called_before_approval` - Valida PA-03
   5. `test_calendar_integration_is_called_after_approval` - Valida PA-03 (lado positivo)
   6. `test_approval_flow_records_audit_log` - Valida PA-05
+  7. `test_segregacao_conta_alterada_bloqueia_decisao` - Valida a segregação (`decisoes_impedidas`) na decisão
 
 ### Frontend (React)
 
@@ -119,16 +120,21 @@ AuditLog.objects.create(
 > a decisão passou de **grupos** para **policy**.
 
 - **Arquivo real**: `v2/frontend/src/pages/Aprovacoes/ApprovalsPage.tsx`
-- **Linhas**: `:107` (estado `canApprove`), `:158-159` (carga), `:384` (gate do botão)
+- **Onde**: estado `canApprove` (`useState`), carga no `useEffect` `loadAccess`, gate nas
+  colunas de ação e na barra de seleção em lote
 - **Implementação real**:
-  - Chama `getMyPolicies()` (`:158`), **não** `getMe`
-  - Deriva com `computeAccess(policies)` (`:159`), chaveado em `access_solicitation_approvals`
-    (comentário `:152-153`)
+  - `loadAccess` chama `getMyPolicies()`; o `getMe()` em paralelo só alimenta a regra de
+    segregação (PA-02) na tabela, não a decisão de mostrar os botões
+  - Deriva com `computeCapabilities(policies).canAccessApprovals`, chaveado em
+    `access_solicitation_approvals` (comentário acima do `useEffect`)
   - **Não** existe `groups.includes('Superintendência')` — a decisão não olha grupos
-  - Botões só renderizam se `record.status === 'pendente' && canApprove`
+  - Botões só renderizam se `record.status === 'pendente' && canApprove`; com impedimento
+    (`impedimento(record)`, PA-02) a linha mostra uma etiqueta da decisão impedida em vez dos botões
 - **Conformidade ISO 9241-110**: Controle explícito (usuário vê apenas ações permitidas)
 
 ## Resultados dos Testes
+
+> Saída registrada no PR17, com os 6 testes da época. Hoje o arquivo tem 7 (ver lista acima).
 
 ```bash
 cd v2/infra && docker compose exec -T web pytest apps/core/tests/test_approval_policy_PA.py -v
@@ -151,12 +157,12 @@ test_approval_policy_PA.py::test_approval_flow_records_audit_log PASSED
 | Requisito | Status | Implementação real | Arquivo:linha |
 |-----------|--------|---------------|---------|
 | **PA-01** | ✅ (SUPER) | `resolve_initial_status(*, projeto)` — SUPER→`pendente`, NAO_SUPER→`aprovado`. A **data não entra** na decisão | `services/solicitacao_create.py` |
-| **PA-02** | ✅ | Gate `CanAccessSolicitationApprovals`. A classe `IsSuperintendencia` **não existe**; `apps/core/permissions.py` exporta só `HasFunctionalPermission, HasPerm, HasSectorAccess, IsGerenteSuperintendencia, IsOwnerOrPrivileged, SuperuserOnly`. **DAT aprova desde o PR 10** (base `capacidade_aprovar`) | 4 `@action` gateados por `CanAccessSolicitationApprovals` (`approve`/`reject`/`batch_approve`/`batch_reject`); `_user_has_solicitation_approvals` (`rbac/policies.py`) |
+| **PA-02** | ✅ | Gate `CanAccessSolicitationApprovals`. A classe `IsSuperintendencia` **não existe**; `apps/core/permissions.py` exporta só `HasFunctionalPermission, HasPerm, HasSectorAccess, IsOwnerOrPrivileged, SuperuserOnly` (`IsGerenteSuperintendencia` saiu no PR 8). **DAT aprova desde o PR 10 e o Controle desde o PR 11** (base `capacidade_aprovar`) | 4 `@action` gateados por `CanAccessSolicitationApprovals` (`approve`/`reject`/`batch_approve`/`batch_reject`); `_user_has_solicitation_approvals` (`rbac/policies.py`) |
 | **PA-03** | ✅ | Celery task `task_publish_solicitacao_to_gcal` validado via mock | `test_calendar_integration_not_called_before_approval` / `test_calendar_integration_is_called_after_approval` (`tests/test_approval_policy_PA.py`) |
 | **PA-04** | ✅ | Campo `status` com `default="pendente"` | `Solicitacao.status` (`models/solicitacao.py`) |
 | **PA-05** | ✅ | `AuditLog.objects.create()` em approve/reject | `approve_solicitacao`/`reject_solicitacao` (`services/solicitacao_approval.py`) |
 | **PA-06** | ✅ | Botões gateados por policy `access_solicitation_approvals` | `ApprovalsPage.tsx` |
-| **PA-07** | ✅ | **6** funções de teste (372 linhas) | as funções de teste em `tests/test_approval_policy_PA.py` |
+| **PA-07** | ✅ | **7** funções de teste | as funções de teste em `tests/test_approval_policy_PA.py` |
 
 ## ✅ Atualização #1452 (2026-07-16): a aprovação manual **revalida** conflitos
 
@@ -192,7 +198,7 @@ continua sendo a ferramenta de consulta, mas deixou de ser a única barreira.
 **Backend**:
 - ~~`v2/backend/apps/core/models.py`~~ → `apps/core/services/solicitacao_create.py`
 - ~~`v2/backend/apps/core/views.py`~~ → `apps/core/views_solicitacao.py` + `apps/core/services/solicitacao_approval.py`
-- `v2/backend/apps/core/tests/test_approval_policy_PA.py` (hoje 372 linhas, 6 testes)
+- `v2/backend/apps/core/tests/test_approval_policy_PA.py` (hoje 7 testes)
 
 **Frontend**:
 - ~~`.../ApprovalsPage.jsx`~~ → `v2/frontend/src/pages/Aprovacoes/ApprovalsPage.tsx`

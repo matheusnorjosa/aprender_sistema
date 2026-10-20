@@ -676,7 +676,8 @@ class TestMetricsRBAC:
     """
     Test RBAC for metrics endpoints (Issue #189).
 
-    All endpoints require HasPerm("run_daily_operations") | HasPerm("supervise_operations") permission.
+    All endpoints require HasPerm("run_daily_operations") | HasPerm("supervise_operations") |
+    HasPerm("manage_admin_registries") permission.
     Unauthorized users (Formador, Coordenador) should get 403.
     """
 
@@ -700,8 +701,9 @@ class TestMetricsRBAC:
         reason=(
             "Issue #1222 (Epic 1 RBAC Access Policy Realignment): grupo "
             "'Gerência' (legacy) foi descontinuado em favor de 'Gerente' "
-            "(função). Endpoints metrics/team/* exigem `supervise_operations` "
-            "que agora é exclusivo da Diretoria."
+            "(função). Endpoints metrics/team/* exigem `run_daily_operations | "
+            "supervise_operations | manage_admin_registries` (Controle, Diretoria "
+            "e DAT pelo pacote)."
         )
     )
     def test_metrics_rbac_gerencia_allowed(self, gerencia_user):

@@ -24,7 +24,7 @@ docker exec aprender_dev-web-1 pytest apps/core/tests/test_availability_service.
 
 ### 2. Expected Results (18 tests)
 
-#### TestAvailabilityServiceRules (11 tests)
+#### TestAvailabilityServiceRules (10 tests)
 - [ ] `test_conflict_overlap_total` — RD-01 (overlap ≥ 1 min)
 - [ ] `test_conflict_overlap_partial` — RD-01 (partial overlap)
 - [ ] `test_no_conflict_adjacent_end_equals_start` — RD-01 (fim==início OK)
@@ -32,18 +32,24 @@ docker exec aprender_dev-web-1 pytest apps/core/tests/test_availability_service.
 - [ ] `test_block_partial_P_prevents_inside_allows_outside` — RD-03 (bloqueio parcial)
 - [ ] `test_travel_buffer_between_cities_required` — RD-04 (deslocamento)
 - [ ] `test_same_city_allows_zero_buffer` — RD-04 (mesmo município OK)
-- [ ] `test_daily_capacity_M_exceeded` — RD-05 (capacidade diária)
-- [ ] `test_multi_formador_any_conflict_blocks` — Multi-formador
+- [ ] `test_dia_acima_de_8_horas_nao_gera_M` — RD-05 (o motor não emite M desde 05/10/2026)
 - [ ] `test_timezone_aware_fortaleza_localtime` — RD-06 (timezone)
-- [ ] `test_conflict_messages_include_codes_and_intervals` — RD-08 (mensagens)
+- [ ] `test_midnight_boundary_timezone_aware` — RD-06 (virada do dia)
 
 #### TestAvailabilityCheckEndpoint (6 tests)
-- [ ] `test_check_conflicts_requires_authentication` — Security
-- [ ] `test_check_conflicts_missing_params_returns_400` — Validation
-- [ ] `test_check_conflicts_returns_conflicts` — API structure
-- [ ] `test_check_many_batch_processing` — Batch endpoint
-- [ ] `test_check_conflicts_rbac_self_or_privileged` — RBAC
-- [ ] `test_check_conflicts_structured_messages` — RD-08 (API)
+- [ ] `test_availability_check_endpoint_returns_conflicts` — API structure
+- [ ] `test_availability_check_requires_auth` — Security
+- [ ] `test_check_endpoint_requires_usuario_id` — Validation
+- [ ] `test_check_endpoint_validates_dates` — Validation
+- [ ] `test_check_many_endpoint_batch_processing` — Batch endpoint
+- [ ] `test_permission_only_self_or_privileged` — RBAC
+
+#### TestAvailabilityServiceAdditional (2 tests)
+- [ ] `test_multi_formador_any_conflict_blocks` — Multi-formador
+- [ ] `test_conflict_messages_include_codes_and_intervals` — RD-08 (mensagens)
+
+RD-05 hoje é teto da contagem de horas de formação, não checagem de agenda: os testes
+ficam em `apps/core/tests/test_horas_formacao.py` (SSOT `services/horas_formacao.py`).
 
 ### 3. Manual Validation
 
@@ -100,9 +106,9 @@ AvailabilityBlock.objects.create(
     status='ativo'
 )
 
-# Test event 10:00-11:00 (should conflict with code 'X')
+# Test event 10:00-11:00 (should conflict with code 'T')
 result = check_conflicts(usuario, inicio2, fim2, municipio)
-print(f"Conflicts: {result.conflicts}")  # Should have code='X'
+print(f"Conflicts: {result.conflicts}")  # Should have code='T'
 ```
 
 #### RD-04: Travel Buffer (D)
@@ -129,12 +135,13 @@ print(f"Conflicts: {result.conflicts}")  # Should have code='D'
 
 | Code | Title | Description | Rule |
 |------|-------|-------------|------|
-| **E** | Evento aprovado | Single approved event | RD-01 |
-| **M** | Mais de um evento | Daily capacity exceeded | RD-05 |
-| **D** | Deslocamento necessário | Travel buffer required | RD-04 |
-| **P** | Bloqueio parcial | Partial block | RD-03 |
+| **X** | Sobreposição | Overlap with an approved event (also invalid interval) | RD-01 |
 | **T** | Bloqueio total | Total block | RD-02 |
-| **X** | Conflito (evento + bloqueio) | Event + block overlap | RD-01 + RD-02/03 |
+| **P** | Bloqueio parcial | Partial block | RD-03 |
+| **D** | Deslocamento necessário | Travel buffer required | RD-04 |
+
+The engine emits only X, T, P and D. `M` (daily limit) is no longer emitted since 05/10/2026
+(RD-05 became an hours-count ceiling), and there is no `E` code.
 
 ### 5. Priority Verification (RD-07)
 
@@ -142,7 +149,8 @@ Check order:
 1. **Bloqueios** (T, P) — Highest priority
 2. **Conflitos** (overlapping approved events)
 3. **Buffer** (D) — Travel time
-4. **Capacidade** (M) — Daily limit
+
+All of them block (`conflicts`); `warnings` comes back empty.
 
 Implementation: `apps/core/services/availability_service.py:check_conflicts()`
 
@@ -162,14 +170,20 @@ print(f"Local (Fortaleza): {solicitacao.inicio.astimezone(ZoneInfo('America/Fort
 
 ### 7. API Endpoint Testing
 
+The API uses DRF `SessionAuthentication` only (no Bearer token). Log in through the
+browser/session first and send the session cookie; the `POST` also needs the CSRF token
+(`$SESSION` / `$CSRF` below come from that login).
+
 ```bash
 # Individual check
 curl -X GET "http://localhost:8002/api/availability/check/?usuario_id=1&inicio=2025-01-15T09:00:00-03:00&fim=2025-01-15T12:00:00-03:00&municipio_id=1" \
-  -H "Authorization: Bearer $TOKEN"
+  -b "sessionid=$SESSION; csrftoken=$CSRF"
 
 # Batch check
 curl -X POST "http://localhost:8002/api/availability/check-many/" \
-  -H "Authorization: Bearer $TOKEN" \
+  -b "sessionid=$SESSION; csrftoken=$CSRF" \
+  -H "X-CSRFToken: $CSRF" \
+  -H "Referer: http://localhost:8002/" \
   -H "Content-Type: application/json" \
   -d '{
     "checks": [
@@ -178,6 +192,8 @@ curl -X POST "http://localhost:8002/api/availability/check-many/" \
     ]
   }'
 ```
+
+In Python, prefer `APIClient().force_authenticate(user=...)`, as the tests do.
 
 ### 8. Output
 
@@ -193,7 +209,7 @@ All availability rules validated:
 ✓ RD-02: Total block (T)
 ✓ RD-03: Partial block (P)
 ✓ RD-04: Travel buffer (D)
-✓ RD-05: Daily capacity (M)
+✓ RD-05: no M emitted (hours-count ceiling lives in horas_formacao)
 ✓ RD-06: Timezone-aware
 ✓ RD-07: Priority enforcement
 ✓ RD-08: Structured messages
@@ -202,7 +218,7 @@ All availability rules validated:
 **If tests fail**:
 ```
 ❌ RF03 NON-COMPLIANT
-Failed tests: N/17
+Failed tests: N/18
 
 [List failed tests with details]
 

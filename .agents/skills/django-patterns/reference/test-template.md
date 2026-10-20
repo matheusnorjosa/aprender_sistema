@@ -13,8 +13,10 @@ Conventions:
 
 ```python
 import pytest
-from django.contrib.auth.models import Group
-from apps.core.models import Usuario, Solicitacao
+from django.core.cache import cache
+from rest_framework.test import APIClient
+from apps.core.models import Gerencia, Solicitacao
+from apps.core.tests.factories import UsuarioFactory, com_papel
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -25,29 +27,41 @@ def tz_fortaleza():
 
 
 @pytest.fixture
-def grupo_superintendencia(db):
-    return Group.objects.get_or_create(name="Superintendência")[0]
+def usuario_comum(db):
+    return UsuarioFactory()
 
 
 @pytest.fixture
-def usuario_superintendencia(db, grupo_superintendencia):
-    usuario = Usuario.objects.create_user(
-        username="super1", email="super@example.com", password="pass123",
+def gerente_superintendencia(db):
+    # PA-02: grupo "Superintendência" é etiqueta e NÃO aprova (migration 0126). Aprovar vem de
+    # `solicitation_approval_basis`: aqui, vínculo EquipeGerencia GERENTE vigente na gerência
+    # aprovadora (como `APROVADORAS` em test_approval_policy_PA.py).
+    g1, _ = Gerencia.objects.get_or_create(
+        nome="SUPERINTENDENCIA", defaults={"nome_setor": "Superintendência"}
     )
-    usuario.groups.add(grupo_superintendencia)
+    usuario = UsuarioFactory(groups__vinculo=False)
+    com_papel(usuario, "GERENTE", g1)
+    cache.clear()
     return usuario
 
 
 @pytest.fixture
-def solicitacao_pendente(db, usuario_superintendencia, tz_fortaleza):
-    from apps.core.models import Projeto, Municipio
+def solicitacao_pendente(db, usuario_comum, tz_fortaleza):
+    from apps.core.models import Projeto, Municipio, TipoEvento
 
-    projeto = Projeto.objects.create(nome="Teste", fluxo="SUPER")
+    # O GERENTE da Superintendência só decide projeto SUPER da gerência dele: sem `gerencia=g1`,
+    # a aprovação dá 403 `out_of_approval_scope` (`projeto_no_escopo_da_superintendencia`).
+    g1, _ = Gerencia.objects.get_or_create(
+        nome="SUPERINTENDENCIA", defaults={"nome_setor": "Superintendência"}
+    )
+    projeto = Projeto.objects.create(nome="Teste", fluxo="SUPER", gerencia=g1)
     municipio = Municipio.objects.create(nome="Fortaleza", uf="CE")
+    tipo_evento = TipoEvento.objects.create(nome="Formação")
     inicio = datetime(2025, 1, 15, 9, 0, tzinfo=tz_fortaleza)
+    # Solicitante ≠ aprovador: decidir a própria solicitação dá 403 (`decisoes_impedidas`).
     return Solicitacao.objects.create(
-        solicitante=usuario_superintendencia,
-        projeto=projeto, municipio=municipio,
+        usuario=usuario_comum,
+        projeto=projeto, municipio=municipio, tipo_evento=tipo_evento,
         inicio=inicio, fim=inicio + timedelta(hours=3),
         status="pendente",
     )
@@ -63,13 +77,14 @@ class TestSolicitacaoApproval:
             assert solicitacao_pendente.status == "pendente"
 
     class TestPermissions:
-        """PA-02: only Superintendência can approve."""
+        """PA-02: only users with a `solicitation_approval_basis` can approve."""
 
-        def test_superintendencia_approves_successfully(
-            self, client, usuario_superintendencia, solicitacao_pendente
+        def test_gerente_superintendencia_approves_successfully(
+            self, gerente_superintendencia, solicitacao_pendente
         ):
-            client.force_login(usuario_superintendencia)
-            response = client.post(
+            client = APIClient()
+            client.force_authenticate(user=gerente_superintendencia)
+            response = client.patch(
                 f"/api/solicitacoes/{solicitacao_pendente.id}/approve/",
                 {"justificativa": "Aprovado para teste"},
             )

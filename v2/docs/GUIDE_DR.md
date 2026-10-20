@@ -2,7 +2,7 @@
 title: Backup e Recovery — PostgreSQL nativo (VM02)
 status: active
 last_verified: 2026-09-11
-verified_at_commit: d0d43890c58b6620a9c6dabca2c940a4e9589911
+verified_at_commit: b37bdcdfa581543c07a22ae6641d667ff73c74ea
 sources_of_truth:
   - v2/infra/configs/vm02/pg_hba.conf
   - v2/infra/configs/vm02/postgresql.conf
@@ -38,8 +38,8 @@ Docker, ver [DISASTER_RECOVERY.md](./DISASTER_RECOVERY.md).
 >
 > | Defeito | Sintoma antigo | Corrigido em |
 > |---|---|---|
-> | [#1611](https://github.com/matheusnorjosa/aprender_sistema/issues/1611) / M26-01 | `gzip -t` incondicional no `.age` → `ERROR: Backup file is corrupted!` (falso) | `8f392636`, 2026-08-10 |
-> | [#1645](https://github.com/matheusnorjosa/aprender_sistema/issues/1645) / M26-02 | `Restore completed successfully!` com exit 0 sobre banco vazio | `3bca74f3`, 2026-08-21 |
+> | [#1611](https://github.com/matheusnorjosa/aprender_sistema/issues/1611) / M26-01 | `gzip -t` incondicional no `.age` → `ERROR: Backup file is corrupted!` (falso) | `815b1afc`, 2026-08-10 |
+> | [#1645](https://github.com/matheusnorjosa/aprender_sistema/issues/1645) / M26-02 | `Restore completed successfully!` com exit 0 sobre banco vazio | `e4c2d22b`, 2026-08-21 |
 >
 > Sob incidente, um aviso obsoleto empurra o operador para o caminho pior — sem safety
 > dump e sem verificação. **Use a ferramenta.**
@@ -257,7 +257,7 @@ age -d -i /etc/backup-key.txt /var/backups/aprender/backup_full_<DATA>.sql.gz.ag
   | gunzip | head -20
 
 # 5. REDE DE SEGURANÇA: dump do estado atual ANTES do DROP. É a lição de #1645 — o
-#    restore_db.sh passou a fazer isso em 3bca74f3 (restore_db.sh:132-148); no
+#    restore_db.sh passou a fazer isso em e4c2d22b (restore_db.sh:132-148); no
 #    pipeline manual ela é sua responsabilidade.
 sudo -u postgres pg_dump aprender_db \
   | gzip > /var/backups/aprender/pre-restore-safety-$(date +%Y%m%d_%H%M%S).sql.gz
@@ -316,7 +316,7 @@ shred -u /etc/backup-key.txt 2>/dev/null || rm -f /etc/backup-key.txt
 > **`ON_ERROR_STOP=1` não é opcional.** Sem ela o `psql` engole erros linha a linha e
 > termina com exit 0 mesmo tendo perdido objetos — era exatamente o buraco de
 > [#1645](https://github.com/matheusnorjosa/aprender_sistema/issues/1645), fechado em
-> `3bca74f3`. O `restore_db.sh` passa a flag nos dois branches, cifrado e plaintext
+> `e4c2d22b`. O `restore_db.sh` passa a flag nos dois branches, cifrado e plaintext
 > (no Step 4 de `restore_db.sh`); no pipeline manual ela vai na mão, como no passo 7.
 
 ### Restore Point-in-Time (PITR)
@@ -430,7 +430,7 @@ tail -f /var/log/postgresql/postgresql-15-main.log
 >   `BACKUP_DEADMAN_MAX_AGE_HOURS` (default 24h, `settings.py`) ou quando não há backup
 >   nenhum (`check_backup_freshness` em `tasks_backup.py`). O alarme é `logger.error` **mais** Sentry quando há
 >   DSN (`_alert_backup_deadman` em `tasks_backup.py`) — ou seja, **não depende do Sentry** para existir.
->   Criado em `2bbcf60b` ([#1733](https://github.com/matheusnorjosa/aprender_sistema/issues/1733),
+>   Criado em `699f0e80` ([#1733](https://github.com/matheusnorjosa/aprender_sistema/issues/1733),
 >   2026-08-17) depois de o backup morrer 10 dias em silêncio (docstring de `check_backup_freshness` em `tasks_backup.py`).
 > - **Gate de deploy** — `check_backup.sh` continua sendo a única checagem que **bloqueia**
 >   algo (idade + tamanho), e é o backstop se o próprio beat/worker estiver morto
@@ -471,7 +471,7 @@ tail -f /var/log/postgresql/postgresql-15-main.log
 
 ### "ERROR: Backup file is corrupted!" ao rodar `restore_db.sh`
 
-Esse era o sintoma do **#1611**, corrigido em `8f392636` (2026-08-10): o script rodava
+Esse era o sintoma do **#1611**, corrigido em `815b1afc` (2026-08-10): o script rodava
 `gzip -t` no `.age` sem decifrar. **Hoje essa mensagem só sai no branch plaintext**
 (o branch plaintext do Step 1 em `restore_db.sh`) — num `.sql.gz` de verdade corrompido. Para um `.age` inválido a
 mensagem é outra: `ERROR: backup cifrado invalido (falha ao decifrar ou gzip
@@ -481,18 +481,18 @@ corrompido)!` (`:113`).
 head -c 22 /var/backups/aprender/backup_full_<DATA>.sql.gz.age
 # "age-encryption.org/v1"  => arquivo cifrado
 
-# O script no host/imagem está atualizado? O fix é 8f392636:
+# O script no host/imagem está atualizado? O fix é 815b1afc:
 grep -n "age -d -i" /app/infra/scripts/restore_db.sh   # deve casar em :112 e :166
 ```
 
 - **Sai `Backup file is corrupted!` num arquivo `.age`** → o script é anterior a
-  `8f392636`. Atualize a imagem/checkout; não contorne.
+  `815b1afc`. Atualize a imagem/checkout; não contorne.
 - **Sai `backup cifrado invalido`** → decifragem ou gzip falharam de verdade. Confira
   `BACKUP_AGE_KEY` (chave certa? legível?) e teste outro artefato.
 
 ### `restore_db.sh --latest` não acha nada
 
-`BACKUP_DIR` **passou a ser respeitado** em `8f392636` (a variável `BACKUP_DIR` em `restore_db.sh`) — antes era
+`BACKUP_DIR` **passou a ser respeitado** em `815b1afc` (a variável `BACKUP_DIR` em `restore_db.sh`) — antes era
 hardcoded em `/var/backups/aprender`, e de dentro do container (onde o diretório é
 `/backups`) o `--latest` não achava nada. Exporte a variável:
 

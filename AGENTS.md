@@ -6,7 +6,7 @@
 
 ## Stack
 - **Backend**: Python 3.12, Django 5.2, DRF, PostgreSQL 15, Redis 7, Docker
-- **Frontend**: React 18, Vite 7, Ant Design 5, Tailwind
+- **Frontend**: React 19, Vite 7, Ant Design 5, Tailwind
 - **Timezone**: `America/Fortaleza` (storage em UTC)
 - **Type checking**: Pyright strict (PEP 695)
 - **Objetivo**: substituir 82.389 fórmulas Excel por plataforma web
@@ -38,9 +38,10 @@ Valem **mesmo que nenhum hook dispare**. São o piso de qualidade:
 ## RBAC
 - **SSOT**: `apps.core.rbac`. Idioma canônico: `permission_classes = [HasPerm("codename")]`; composição `HasPerm("a") | HasPerm("b")`; helper não-DRF `user_has_any_perm(user, *codenames)`.
 - **NUNCA** `user.groups.filter(name=...)` / `groups__name=` fora da whitelist — banido por `scripts/rbac_lint.py` (CI `[required] backend rbac-lint`, regra V001). Uso legítimo (composite/block/data-scope): adicione `# noqa: RBAC-<tipo>-allowed` na linha.
-- **13 setores** (SSOT `apps.core.constants.SETOR_GROUPS`): Superintendência, Vidas, Fluir, ACerta, Brincando, Sou da Paz, DAT, Controle, Diretoria, Comercial, Relacionamento, Logística Viagens, Logística Galpão.
-- **5 funções** (SSOT `FUNCAO_GROUPS`): Formador, Coordenador, Apoio de Coordenação, Gerente, Assistente Administrativo.
-- **Aprovação**: regra única `solicitation_approval_basis`; ver PA-02 em `v2/docs/specs/domain/politica-aprovacao.spec.md` (nenhum grupo aprova).
+- **De onde vem o poder (PR 12)**: só da lotação — superuser, pacote do perfil da gerência (vínculo EQUIPE/GERENTE vigente), direitos do papel vigente e vínculo GERENTE na Superintendência. `settings.RBAC_FONTE` vale `lotacao` por padrão; `uniao` é a volta de emergência (soma os grupos, `grupos_dao_poder`). Grupo de setor e de função é **etiqueta**: dar o grupo DAT/Controle/Gerente **não** concede acesso. Ver `v2/docs/specs/backend/rbac.spec.md`.
+- **13 setores** (etiquetas; SSOT `apps.core.constants.SETOR_GROUPS`): Superintendência, Vidas, Fluir, ACerta, Brincando, Sou da Paz, DAT, Controle, Diretoria, Comercial, Relacionamento, Logística Viagens, Logística Galpão.
+- **5 funções** (etiquetas, sem capacidade desde o PR 8; SSOT `FUNCAO_GROUPS`): Formador, Coordenador, Apoio de Coordenação, Gerente, Assistente Administrativo.
+- **Aprovação**: regra única `solicitation_approval_basis` (superuser, GERENTE vigente na Superintendência, capacidade `approve_solicitation` pelo pacote ADMIN_OPERACIONAL do DAT ou CONTROLE); ver PA-02 em `v2/docs/specs/domain/politica-aprovacao.spec.md` (nenhum grupo aprova).
 
 ## Quick reference
 ```bash
@@ -69,7 +70,7 @@ PR abre como **Draft**; só promove a Ready após `make staging-full` passar. Sq
 - **Tools do Codex**: edição = `apply_patch` (não `Edit`/`Write`); shell = `shell`/`local_shell`. As regras acima são tool-agnósticas.
 
 ## Produção
-3 VMs (App: Nginx/Gunicorn/Celery/React · DB: PostgreSQL 15 · Red: Redis 7).
+2 VMs (VM01 App: Nginx/Gunicorn/Celery/React + Redis 7 em container na rede interna `backend-internal` · VM02 DB: PostgreSQL 15). SSOT: `v2/infra/README.md`.
 
 **Deploy pull-based (ADR-018).** Produção **puxa**; o CI não empurra:
 

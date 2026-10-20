@@ -21,7 +21,7 @@ from __future__ import annotations
 # Uma linha explícita por perfil (`Gerencia.Perfil`).
 PACOTE: dict[str, frozenset[str]] = {
     "PADRAO": frozenset(),
-    # PR 10 (decisões do dono de 02/10, nº 12 e 16, e de 14/10): o DAT aprova (base 5 de
+    # PR 10 (decisões do dono de 02/10, nº 12 e 16, e de 14/10): o DAT aprova (base 3, `capacidade_aprovar`, de
     # `solicitation_approval_basis`), cria, edita e exclui evento em qualquer projeto, sem a regra da
     # compra, exclui nos cadastros e opera a pré-agenda e a seção Controle. Sem `import_spreadsheet`
     # ("técnico só para mim"); o grupo DAT também o perdeu (migration 0126).

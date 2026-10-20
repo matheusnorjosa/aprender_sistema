@@ -24,20 +24,23 @@ dayjs(solicitacao.inicio).tz('America/Fortaleza').format('DD/MM/YYYY HH:mm');
 ```tsx
 import { Steps } from 'antd';
 <Steps current={currentStep}>
-  <Steps.Step title="Projeto" />
-  <Steps.Step title="Data e Local" />
-  <Steps.Step title="Formadores" />
-  <Steps.Step title="Revisão" />
+  <Steps.Step title="Informações Básicas" />
+  <Steps.Step title="Participantes" />
+  <Steps.Step title="Detalhes" />
+  <Steps.Step title="Confirmação" />
 </Steps>
 ```
 
 ## Approval flow (PA-01 a PA-07)
 
-Gate approval controls on the permission flag — never render Aprovar/Recusar to users who
-can't approve:
+Gate approval controls on the server policy — never render Aprovar/Recusar to users who
+can't approve. `canApprove` = `computeCapabilities(policies).canAccessApprovals`
+(`hooks/useCapabilities.ts`, policy `access_solicitation_approvals` de `/api/me/policies/`);
+per row, `impedimento(record)` hides the buttons when the decision is impeded (`decisao_impedida`
+do backend: a própria solicitação, conta alterada por quem lê, evento editado por quem lê etc.), as in `pages/Aprovacoes/ApprovalsPage.tsx`:
 
 ```tsx
-{permissions.pode_aprovar_superintendencia && (
+{record.status === 'pendente' && canApprove && impedimento(record) === null && (
   <Space>
     <Button type="primary" onClick={handleApprove}>Aprovar</Button>
     <Button danger onClick={handleReject}>Recusar</Button>

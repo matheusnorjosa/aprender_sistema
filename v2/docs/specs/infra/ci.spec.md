@@ -1,7 +1,7 @@
 ---
 title: CI/CD (GitHub Actions)
 status: canonical
-last_verified: 2026-09-30
+last_verified: 2026-10-19
 sources_of_truth:
   - .github/workflows/ci.yaml
   - .github/workflows/promote.yml
@@ -68,7 +68,7 @@ A nomenclatura dos checks é o contrato de governança: `[required]` bloqueia me
 
 ## API / Interface
 
-- **CI (`ci.yaml`)** — dispara em `push`/`pull_request` para `main`. Jobs: `backend-impact`, `lint`, `rbac-lint`, `backend-tests-core`, `backend-tests-devtools`, `backend-tests` (combine+threshold), `backend-typecheck`, `docker-parity-backend`, `tests` (agregador `[required]`).
+- **CI (`ci.yaml`)** — dispara só em `pull_request` para `main` (o gatilho `push` saiu em 2026-09-14; ver o comentário no bloco `on:` do `ci.yaml`). Jobs: `backend-impact`, `lint`, `rbac-lint`, `backend-tests-core`, `backend-tests-devtools`, `backend-tests` (combine+threshold), `backend-typecheck`, `docker-parity-backend`, `backend-migrate-integrity` (ver Contratos), `prod-compose-contract` (`docker compose config -q` do `v2/infra/docker-compose.prod.yml` com o template prod-like `v2/infra/.env.prodlike.example`: interpolação, sintaxe, volumes e redes; roda em todo PR e **não** entra no `needs` do agregador), `tests` (agregador `[required]`).
 - **Reusable (`_backend-test.yml`)** — `workflow_call` com inputs: `pytest_paths`, `pytest_extra_args`, `coverage_file`, `validate_test_paths`, `fail_on_test_error`, `emit_canary_metadata`, `artifact_name`/`artifact_paths` (obrigatórios), entre outros. Roda em Python 3.12 com `COVERAGE_CORE=sysmon` (sys.monitoring do 3.12, #1399).
 - **Canary (`backend-xdist-canary.yml`)** — `schedule` mensal (cron `20 10 1 * *`), `workflow_dispatch` (input `extra_pytest_args`) e `push` em paths do próprio canary. Matriz `workers=[2,auto] × dist=[loadscope,loadfile]` rodando `pytest apps` num banco migrado. O alerta vai para **uma** issue aberta pelo `github-actions[bot]` com o marcador `<!-- as-xdist-canary -->` (busca filtrada por autor: o repo é público). Só um run **completo e limpo** fecha a issue: `refs/heads/main`, `extra_pytest_args` vazio, as 4 células com artefato e metadata, zero falhas. Falha ou "não mediu" em run oficial abre ou comenta; run de outro ref ou filtrado nunca toca na issue (o resultado fica só no summary). Todo estado diferente de "limpo" deixa o `canary-report` vermelho. Run filtrado tem grupo de concorrência próprio e não cancela o oficial. Até 2026-09 o alerta era comentário na #677, fechada desde 2026-04-23.
 - **Deploy (`deploy.yaml`)** — `push` em `main` → build+scan+push+**sign**+tag/release (não deploya). Promoção/rollback e mudança de prod ficam no `promote.yml` (gated no Environment `production`) + agente `aprender-deployer` na VM01. O `workflow_dispatch` do `deploy.yaml` **não** tem mais `target_environment`/`promotion_tag`/`rollback_tag`. Interface detalhada: [`deploy.spec.md`](./deploy.spec.md).

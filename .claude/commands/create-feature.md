@@ -82,7 +82,7 @@ def check_something(
 
 ### ViewSet Pattern
 ```python
-from apps.core.rbac import HasPerm  # idioma canônico; composition: HasPerm("a") | HasPerm("b")
+from apps.core.rbac import CanAccessSolicitationApprovals, HasPerm  # idioma canônico; composition: HasPerm("a") | HasPerm("b")
 
 class MyViewSet(viewsets.ModelViewSet):
     """Docstring with RBAC info."""
@@ -93,7 +93,8 @@ class MyViewSet(viewsets.ModelViewSet):
     permission_classes = [HasPerm("core.view_model")]
 
     # NUNCA combine get_permissions() override com @action(permission_classes=...) — o override esconde o do action
-    @action(detail=True, methods=['patch'], permission_classes=[HasPerm("core.aprovar_solicitacao")])
+    # Aprovar: a Policy CanAccessSolicitationApprovals (regra única solicitation_approval_basis), como em views_solicitacao.py
+    @action(detail=True, methods=['patch'], permission_classes=[CanAccessSolicitationApprovals])
     def approve(self, request, pk=None):
         """Custom action with AuditLog (PA-05)."""
         obj = self.get_object()

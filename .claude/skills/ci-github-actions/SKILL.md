@@ -14,7 +14,7 @@ description: CI/CD do AS v2 (GitHub Actions). Use ao editar workflows, destravar
 
 ## Arquitetura
 
-- **`ci.yaml`** orquestra o backend: `backend-impact` decide se a suíte roda (PR sem impacto em backend pula os jobs pesados); chama o reusable **`_backend-test.yml`** para `backend-tests-core` e `backend-tests-ingest-devtools` (`-n auto --dist loadscope`), faz `coverage combine` (gate **≥85%**) e roda `backend-migrate-integrity`.
+- **`ci.yaml`** orquestra o backend: `backend-impact` decide se a suíte roda (PR sem impacto em backend pula os jobs pesados); chama o reusable **`_backend-test.yml`** para `backend-tests-core` e `backend-tests-devtools` (`-n auto --dist loadscope`; o agregador `[required]` é `backend tests (runner)`), faz `coverage combine` (gate **≥85%**) e roda `backend-migrate-integrity`.
 - **`frontend-ci.yml`**: build/lint, react-doctor (exige `--offline`), checklist (meta/a11y/security), `[info] e2e journeys`.
 - Segurança/infra: `security-scan.yml`, `dependency-review-scorecard.yml`, `strict-security-headers.yml`, `architecture-guardrails.yml`, `docs-quality.yml`, `staging-gate-audit.yml`.
 - **`deploy.yaml`** (*Build, sign and release*): pós-merge, **não deploya** — build/scan/push + cosign + tag/release. Prod muda por `promote.yml` (gate `production`) + agente pull-based na VM01 (ADR-018).
@@ -30,13 +30,13 @@ description: CI/CD do AS v2 (GitHub Actions). Use ao editar workflows, destravar
 
 1. **Localize a falha:** `gh run view <id> --log-failed` (ou `gh pr checks <PR>`).
 2. **Reproduza local** (CP-01, Docker): `docker exec aprender_dev-web-1 pytest apps/core/tests/ -q`; pyright via `cd v2/backend && pyright apps/core config`; lint com black+isort+flake8 nos arquivos tocados.
-3. **Staging gate** (se tocar `v2/backend/apps/`): ver abaixo — exige marcadores literais no corpo do PR.
+3. **Staging gate** (se tocar runtime de backend, frontend `src/`/`public/` ou compose/Dockerfile de infra): ver abaixo — exige marcadores literais no corpo do PR.
 4. **Base mudou →** `gh pr update-branch <PR>` e **esperar o re-run** (~5-15min) antes de mergear; "N of N required checks expected" some sozinho.
 5. **Done quando:** `gh pr view <PR> --json mergeStateStatus` = `CLEAN` e 0 checks `FAILURE`/pending.
 
 ## Staging gate — marcadores EXATOS (literais)
 
-`staging-gate-audit.yml` dispara em mudanças sob `v2/backend/apps/` e exige no **corpo do PR** os 3 marcadores **literais** (regex sem acento):
+`staging-gate-audit.yml` roda em **todo** PR para `main` (sem filtro de `paths:`); o script `v2/infra/scripts/staging-gate-scope.sh` (SSOT do escopo) exige os marcadores quando o PR muda **runtime**: `v2/backend/{apps/,config/,requirements.txt}`, `v2/frontend/{src/,public/,Dockerfile.prod}` ou `v2/infra/{docker-compose*.yml,Dockerfile*,scripts/smoke_test_staging.sh}`, descontados os arquivos só de teste (`tests/`, `__tests__/`, `test_*.py`, `conftest*.py`, `*.test|spec.*`). PR só de frontend `src/` **exige**; PR só de `ci.yaml`/`_backend-test.yml`/docs **não**. Quando exige, cobra no **corpo do PR** os 3 marcadores **literais** (regex sem acento):
 
 - `- [x] make staging-full executado com sucesso (8/8 PASS)`
 - `- [x] Evidencia anexada no PR`  ← **"Evidencia" SEM acento**

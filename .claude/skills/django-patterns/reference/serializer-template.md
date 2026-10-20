@@ -14,16 +14,16 @@ from apps.core.models import Solicitacao, Usuario, Municipio
 class SolicitacaoReadSerializer(serializers.ModelSerializer):
     """Read-only — GET /api/solicitacoes/."""
 
-    solicitante = serializers.StringRelatedField()   # uses model __str__()
+    usuario = serializers.StringRelatedField()   # dono; uses model __str__()
     municipio = serializers.StringRelatedField()
     inicio_formatado = serializers.SerializerMethodField()
-    participantes = UsuarioReadSerializer(many=True, read_only=True)  # watch N+1
+    formadores = UsuarioReadSerializer(many=True, read_only=True)  # M2M; watch N+1
 
     class Meta:
         model = Solicitacao
         fields = [
-            "id", "solicitante", "municipio", "inicio", "fim",
-            "inicio_formatado", "status", "participantes",
+            "id", "usuario", "municipio", "inicio", "fim",
+            "inicio_formatado", "status", "formadores",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
@@ -36,14 +36,16 @@ class SolicitacaoReadSerializer(serializers.ModelSerializer):
 class SolicitacaoWriteSerializer(serializers.ModelSerializer):
     """Write + validation — POST/PUT/PATCH."""
 
+    # O dono (`usuario`) NUNCA vem do payload: é somente-leitura aqui e o
+    # `perform_create` da view grava `serializer.save(usuario=self.request.user)`.
+    # Aceitar o dono do cliente = IDOR/spoofing.
+    usuario = serializers.PrimaryKeyRelatedField(read_only=True)
+
     # PrimaryKeyRelatedField: accept IDs, validate existence + scope
-    solicitante = serializers.PrimaryKeyRelatedField(
-        queryset=Usuario.objects.filter(is_active=True)
-    )
     municipio = serializers.PrimaryKeyRelatedField(
         queryset=Municipio.objects.filter(ativo=True)
     )
-    participantes = serializers.PrimaryKeyRelatedField(
+    formadores = serializers.PrimaryKeyRelatedField(
         many=True,
         queryset=Usuario.objects.filter(is_active=True),
         required=False,
@@ -52,8 +54,8 @@ class SolicitacaoWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Solicitacao
         fields = [
-            "solicitante", "municipio", "inicio", "fim",
-            "status", "participantes", "observacao",
+            "usuario", "municipio", "inicio", "fim",
+            "status", "formadores", "observacoes",
         ]
 
     def validate_inicio(self, value):
@@ -71,11 +73,14 @@ class SolicitacaoWriteSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         """Pop M2M before create, then .set()."""
-        participantes = validated_data.pop("participantes", [])
+        formadores = validated_data.pop("formadores", [])
         solicitacao = Solicitacao.objects.create(**validated_data)
-        solicitacao.participantes.set(participantes)
+        solicitacao.formadores.set(formadores)
         return solicitacao
 ```
+
+Os papéis no evento (coordenador, formador, quem acompanha, convidado) moram em
+`Participation` (related_name `participations`), não num campo `participantes`.
 
 ## Gotchas seen in AS v2
 

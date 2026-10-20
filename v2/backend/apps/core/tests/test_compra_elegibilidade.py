@@ -9,7 +9,9 @@ Decisões do dono (02/10 e 14/10/2026):
 - projeto sem compra que o libere fica "em espera": some das listas de operação (Nova Solicitação,
   edição e Plano Anual) e volta sozinho quando a compra entra;
 - superusuário isento; a capacidade `create_solicitation_without_purchase` também isenta, mas nasce
-  sem grupo nenhum (entra no pacote do DAT num PR próprio).
+  sem grupo nenhum (entra no pacote do DAT num PR próprio);
+- combo (20/10/2026): a compra de um projeto da coleção `NL E AMMA PORT E MAT` libera, no mesmo
+  município, os projetos das coleções NOVO LENDO e PROJETO AMMA (`compra_elegibilidade.COMBOS`).
 
 Cada POST e PATCH isola a regra: data fixa em dia útil (Fortaleza), formador sem agenda,
 `coordenador_acompanha` informado, projeto sem setor (o escopo #1656 não dá 400 no lugar da regra) e
@@ -407,3 +409,89 @@ class TestGuardas:
 def _marca_se_existir() -> dict[str, bool]:
     """A marca `eh_nome_geral` só existe depois deste PR; na main a guarda roda sem ela."""
     return {"eh_nome_geral": True} if any(f.name == "eh_nome_geral" for f in Projeto._meta.get_fields()) else {}
+
+
+# ============================================================================ combo NL E AMMA (decisão do dono de 20/10)
+
+
+@pytest.fixture
+def combo(c):
+    """As três coleções com os nomes reais (a migração 0045 já cria NOVO LENDO e PROJETO AMMA)."""
+    col_combo, _ = ProjetoGeral.objects.get_or_create(nome="NL E AMMA PORT E MAT")
+    col_nl, _ = ProjetoGeral.objects.get_or_create(nome="NOVO LENDO")
+    col_amma, _ = ProjetoGeral.objects.get_or_create(nome="PROJETO AMMA")
+    ga = c["ga"]
+    return {
+        "combo_1": ProjetoFactory(nome="Combo Ficticio 1", gerencia=ga, projeto_geral=col_combo, eh_serie=True),
+        "novo_lendo": ProjetoFactory(nome="Novo Lendo Ficticio", gerencia=ga, projeto_geral=col_nl),
+        "nl_1": ProjetoFactory(nome="Novo Lendo Ficticio 1", gerencia=ga, projeto_geral=col_nl, eh_serie=True),
+        "amma": ProjetoFactory(nome="Projeto Amma Ficticio", gerencia=ga, projeto_geral=col_amma),
+    }
+
+
+class TestCombo:
+    def test_tabela_tem_so_o_combo_decidido(self):
+        from apps.core.services.compra_elegibilidade import COMBOS
+
+        assert COMBOS == {"NL E AMMA PORT E MAT": ("NOVO LENDO", "PROJETO AMMA")}
+
+    def test_compra_do_combo_libera_novo_lendo_e_amma_no_municipio(self, c, combo):
+        from apps.core.services.compra_elegibilidade import par_liberado
+
+        liberar_par(c["m1"], combo["combo_1"])
+        for nome in ("novo_lendo", "nl_1", "amma"):
+            assert par_liberado(c["m1"].id, combo[nome]) is True, nome
+        r = _post(c, c["coord"], c["m1"], combo["novo_lendo"])
+        assert r.status_code == 201, r.data
+        # o segundo evento no mesmo horário daria conflito de agenda: o Amma vai pelo validate
+        assert _validate(c, c["coord"], c["m1"], combo["amma"]).json()["ok"] is True
+
+    def test_compra_do_combo_nao_libera_outro_municipio(self, c, combo):
+        liberar_par(c["m1"], combo["combo_1"])
+        r = _post(c, c["coord"], c["m2"], combo["novo_lendo"])
+        assert r.status_code == 400, r.data
+        assert "municipio" in get_field_errors(r)
+        assert _municipios(c["coord"], com_compra="true", projeto_id=combo["amma"].id) == {c["m1"].id}
+
+    def test_compra_do_combo_nao_libera_outros_projetos(self, c, combo):
+        liberar_par(c["m1"], combo["combo_1"])
+        r = _post(c, c["coord"], c["m1"], c["familia_x"])
+        assert r.status_code == 400, r.data
+        ids = _projetos(c["coord"], municipio_id=c["m1"].id)
+        assert {combo["novo_lendo"].id, combo["amma"].id} <= ids
+        assert not ids & {c[n].id for n in ("familia_x", "outro_y", "geral_a", "solto_1", "solto_2")}
+
+    def test_combo_e_mao_unica(self, c, combo):
+        """A compra de Novo Lendo não libera o Projeto Amma (nem o inverso pela coleção do combo)."""
+        from apps.core.services.compra_elegibilidade import par_liberado
+
+        liberar_par(c["m1"], combo["nl_1"])
+        assert par_liberado(c["m1"].id, combo["novo_lendo"]) is True
+        assert par_liberado(c["m1"].id, combo["amma"]) is False
+
+    def test_as_tres_consultas_concordam_com_o_combo(self, c, combo):
+        from apps.core.services.compra_elegibilidade import municipios_liberados, par_liberado, projetos_liberados
+
+        liberar_par(c["m1"], combo["combo_1"])
+        liberar_par(c["m2"], c["serie_x3"])
+        esperado = {
+            ("m1", "combo_1"),
+            ("m1", "novo_lendo"),
+            ("m1", "nl_1"),
+            ("m1", "amma"),
+            ("m2", "serie_x3"),
+            ("m2", "familia_x"),
+        }
+        todos = {**combo, "familia_x": c["familia_x"], "serie_x3": c["serie_x3"], "outro_y": c["outro_y"]}
+        chave = {c["m1"].id: "m1", c["m2"].id: "m2", c["m3"].id: "m3"}
+        todos_m = Municipio.objects.filter(pk__in=chave)
+        todos_p = Projeto.objects.filter(pk__in=[p.pk for p in todos.values()])
+        for m in (c["m1"], c["m2"], c["m3"]):
+            no_projeto = set(projetos_liberados(todos_p, m.id).values_list("pk", flat=True))
+            for n, p in todos.items():
+                por_par = par_liberado(m.id, p)
+                por_municipio = municipios_liberados(todos_m, p).filter(pk=m.pk).exists()
+                assert por_par == por_municipio == (p.pk in no_projeto), (chave[m.id], n)
+                assert por_par == ((chave[m.id], n) in esperado), (chave[m.id], n)
+        em_operacao = set(projetos_liberados(todos_p).values_list("pk", flat=True))
+        assert em_operacao == {todos[n].pk for _, n in esperado}

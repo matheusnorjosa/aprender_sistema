@@ -5,7 +5,8 @@ Um par (município, projeto) está liberado quando, NO MESMO MUNICÍPIO, existe 
 quantidade > 0 (qualquer ano de uso, qualquer tipo):
 - do mesmo projeto; ou
 - de qualquer projeto da mesma coleção (`projeto_geral`); ou
-- de qualquer projeto da mesma gerência, se o projeto tem a marca `eh_nome_geral`.
+- de qualquer projeto da mesma gerência, se o projeto tem a marca `eh_nome_geral`; ou
+- de qualquer projeto da coleção de um combo (`COMBOS`) que libera a coleção do projeto.
 
 Projeto sem compra que o libere em município nenhum fica "em espera": some das listas de operação e
 volta sozinho quando a compra entra.
@@ -32,6 +33,12 @@ from apps.core.rbac.helpers import user_has_any_perm
 
 CAPACIDADE_ISENTA = "create_solicitation_without_purchase"
 
+# Combo: kit vendido como um produto só que atravessa coleções (decisão do dono de 20/10/2026). Coleção do
+# combo -> coleções que a compra dele libera, sempre no mesmo município. Por `ProjetoGeral.nome` (único).
+COMBOS: dict[str, tuple[str, ...]] = {
+    "NL E AMMA PORT E MAT": ("NOVO LENDO", "PROJETO AMMA"),
+}
+
 
 def isento_da_regra_da_compra(user: Any) -> bool:
     """Superusuário (bypass de `user_has_any_perm`) ou quem tem a capacidade de isenção."""
@@ -48,6 +55,10 @@ def _q_libera(projeto: Projeto) -> Q:
     projeto_geral_id = projeto.projeto_geral_id  # type: ignore[attr-defined]
     if projeto_geral_id is not None:
         q |= Q(projeto__projeto_geral_id=projeto_geral_id)
+        colecao = projeto.projeto_geral.nome  # type: ignore[union-attr]
+        combos = [combo for combo, colecoes in COMBOS.items() if colecao in colecoes]
+        if combos:
+            q |= Q(projeto__projeto_geral__nome__in=combos)
     gerencia_id = projeto.gerencia_id  # type: ignore[attr-defined]
     if projeto.eh_nome_geral and gerencia_id is not None:
         q |= Q(projeto__gerencia_id=gerencia_id)
@@ -75,4 +86,7 @@ def projetos_liberados(qs: QuerySet[Projeto], municipio_id: int | None = None) -
     mesmo_projeto = Exists(compras.filter(projeto_id=OuterRef("pk")))
     mesma_colecao = Exists(compras.filter(projeto__projeto_geral_id=OuterRef("projeto_geral_id")))
     mesma_gerencia = Exists(compras.filter(projeto__gerencia_id=OuterRef("gerencia_id")))
-    return qs.filter(mesmo_projeto | mesma_colecao | (Q(eh_nome_geral=True) & mesma_gerencia))
+    libera = mesmo_projeto | mesma_colecao | (Q(eh_nome_geral=True) & mesma_gerencia)
+    for combo, colecoes in COMBOS.items():
+        libera |= Q(projeto_geral__nome__in=colecoes) & Exists(compras.filter(projeto__projeto_geral__nome=combo))
+    return qs.filter(libera)

@@ -326,6 +326,14 @@ def upsert_one(
                 raise ValueError(
                     f"Solicitação #{s.id}: o evento adotado não foi achado no Google; nada foi criado para não duplicar."
                 )
+            if adotado and existing is not None and s.last_sync_action == "ADOPT" and _data_difere(existing, payload):
+                # Conferência da adoção (dono, 20/10, relay 65): outro dia no Google = o id é de outro encontro,
+                # e o PATCH mudaria o dia dele. Vale até o primeiro sync que confere o id (UPDATE, ou o SKIP
+                # abaixo); depois, a remarcação feita no sistema segue no UPDATE. Fora da condição do hash (o
+                # ERROR, o Resync e o Publicar chegam sem ele) e antes de `action`, para o erro não apagar o ADOPT.
+                raise ValueError(
+                    f"Solicitação #{s.id}: o evento adotado está em outro dia no Google; nada foi atualizado."
+                )
 
         if existing is None:
             # Tentar adotar evento com eventId determinístico
@@ -439,14 +447,13 @@ def upsert_one(
             # batch resync), então o SKIP nunca bloqueia um reenvio intencional.
             # Id adotado: o hash é o do sistema, não o do Google. Mesmo dia e hora diferente no Google =
             # atualizar (decisão do dono de 20/10, relay 65); com a mesma hora, pula como qualquer outro.
-            # Outro dia = o id é de outro encontro: o PATCH mudaria o dia dele, então vira erro. Fora da
-            # condição do hash: o ERROR, o Resync e o Publicar chegam com o hash vazio.
-            if adotado and _data_difere(existing, payload):
-                raise ValueError(
-                    f"Solicitação #{s.id}: o evento adotado está em outro dia no Google; nada foi atualizado."
-                )
             if action == "UPDATE" and s.gcal_payload_hash and s.gcal_payload_hash == _payload_hash(payload):
                 if not (adotado and _hora_difere(existing, payload)):
+                    if adotado and s.last_sync_action == "ADOPT" and not dry_run:
+                        # Google no mesmo dia: o id adotado está conferido (encerra a trava do outro dia).
+                        s.last_synced_at = timezone.now()
+                        s.last_sync_action = "SKIP"
+                        s.save(update_fields=["last_synced_at", "last_sync_action"])
                     return SyncOutcome("SKIP", s.id, s.external_event_id, payload["summary"])
 
             if not dry_run:

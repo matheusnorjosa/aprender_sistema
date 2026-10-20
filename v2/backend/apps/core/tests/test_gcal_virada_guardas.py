@@ -20,6 +20,7 @@ from unittest.mock import patch
 
 from django.core.management import call_command
 from django.db import connection
+from django.db.models import F
 from django.test import RequestFactory, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -115,7 +116,7 @@ def test_adotado_com_hash_igual_pula():
 
 
 def _adotado_as_14h_com_hash() -> tuple[Solicitacao, dict]:
-    """Adotado das 14h às 16h (Fortaleza) daqui a 3 dias, com o hash do sistema gravado como na adoção."""
+    """Adotado das 14h às 16h (Fortaleza) daqui a 3 dias, com o hash e o `ADOPT` gravados como na adoção."""
     inicio = timezone.localtime(timezone.now() + timedelta(days=3)).replace(hour=14, minute=0, second=0, microsecond=0)
     s = SolicitacaoFactory(
         status="aprovado",
@@ -123,6 +124,7 @@ def _adotado_as_14h_com_hash() -> tuple[Solicitacao, dict]:
         fim=inicio + timedelta(hours=2),
         external_event_id=_ADOTADO,
         gcal_status="PUBLISHED",
+        last_sync_action="ADOPT",
     )
     payload = build_event_payload(s, enable_meet=False)
     s.gcal_payload_hash = _payload_hash(payload)
@@ -167,12 +169,14 @@ def test_adotado_em_outro_dia_segue_travado_na_nova_tentativa_e_sem_hash():
                 apply_one_solicitacao(s, apply_blocked=True, client=client)
             s.refresh_from_db()
             assert s.gcal_status == "ERROR" and s.gcal_payload_hash is None
+            assert s.last_sync_action == "ADOPT", "o erro da trava não conta como conferência do id"
     assert client.updates == [] and client.inserts == []
 
 
 @pytest.mark.parametrize("hash_gravado", [None, "hash-de-antes-de-uma-edicao"])
 def test_adotado_em_outro_dia_nao_atualiza_com_hash_vazio_ou_diferente(hash_gravado):
-    """Reenviar zera o hash e qualquer save muda o payload (`updated_at`): nos dois casos, sem PATCH."""
+    """Reenviar zera o hash e qualquer save muda o payload (`updated_at`): nos dois casos, sem PATCH. Antes
+    do primeiro sync depois da adoção, uma edição de data não se distingue de um id de outro encontro."""
     s, payload = _adotado_as_14h_com_hash()
     s.gcal_payload_hash = hash_gravado
     s.save(update_fields=["gcal_payload_hash"])
@@ -180,6 +184,23 @@ def test_adotado_em_outro_dia_nao_atualiza_com_hash_vazio_ou_diferente(hash_grav
     with pytest.raises(ValueError, match="outro dia"):
         _upsert(client, s, payload=payload)
     assert client.updates == [] and client.inserts == []
+
+
+def test_adotado_conferido_e_remarcado_no_sistema_muda_de_dia_no_google():
+    """A trava do outro dia é a conferência da adoção (dono, 20/10): o Reapply que acha o Google no mesmo
+    dia confere o id, e a remarcação feita depois no sistema vai no UPDATE pelo id adotado."""
+    s, _ = _adotado_as_14h_com_hash()
+    client = _Cliente(store={_ADOTADO}, horas=_no_google(s, dias=0, hora=14))
+    with patch(_PASSTHROUGH, side_effect=_passthrough):
+        assert apply_one_solicitacao(s, apply_blocked=True, client=client).action == "SKIP"
+        um_dia = timedelta(days=1)
+        Solicitacao.objects.filter(pk=s.pk).update(inicio=F("inicio") + um_dia, fim=F("fim") + um_dia)
+        s.refresh_from_db()
+        out = apply_one_solicitacao(s, apply_blocked=True, client=client)
+    assert out.action == "UPDATE"
+    assert client.updates == [_ADOTADO] and client.inserts == []
+    s.refresh_from_db()
+    assert s.gcal_status == "PUBLISHED" and s.external_event_id == _ADOTADO
 
 
 def test_get_com_excecao_num_adotado_nao_cria():

@@ -59,6 +59,10 @@ import { fetchAPI } from '../../../api/config';
 import { definirLarguraTela } from '../../../test/larguraTela';
 import PreAgendaPage from '../PreAgendaPage';
 
+// A Pré-agenda monta duas tabelas e o AntD inteiro; na CI (cerca de 4x mais lenta que local, com cobertura)
+// estes casos passam dos 5 s padrão. Só o limite de tempo muda, nenhuma asserção.
+vi.setConfig({ testTimeout: 20_000 });
+
 const FUTURO = { inicio: '2099-11-05T12:00:00Z', fim: '2099-11-05T15:00:00Z' };
 
 const row = (overrides: Record<string, unknown> = {}) => ({

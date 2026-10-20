@@ -975,7 +975,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
             <Descriptions.Item label="Projeto">
               {formData.projeto?.label}
               <Tag color={formData.projeto?.fluxo === 'SUPER' ? 'blue' : 'green'} style={{ marginLeft: 8 }}>
-                {formData.projeto?.fluxo === 'SUPER' ? 'SUPER' : 'NAO_SUPER'}
+                {formData.projeto?.fluxo === 'SUPER' ? 'Superintendência' : 'Não-Superintendência'}
               </Tag>
             </Descriptions.Item>
             <Descriptions.Item label="Tipo de Evento">
@@ -1009,19 +1009,19 @@ export default function NewSolicitacaoWizard(): JSX.Element {
                   : 'Não'}
               </Descriptions.Item>
             )}
-            {formData.tipo && (
+            {Boolean(formData.tipo) && (
               <Descriptions.Item label="Tipo">{formData.tipo}</Descriptions.Item>
             )}
-            {formData.encontro && (
+            {Boolean(formData.encontro) && (
               <Descriptions.Item label="Encontro">{formData.encontro}</Descriptions.Item>
             )}
-            {formData.segmento && (
+            {Boolean(formData.segmento) && (
               <Descriptions.Item label="Segmento">{formData.segmento}</Descriptions.Item>
             )}
-            {formData.local && (
+            {Boolean(formData.local) && (
               <Descriptions.Item label="Local">{formData.local}</Descriptions.Item>
             )}
-            {formData.observacoes && (
+            {Boolean(formData.observacoes) && (
               <Descriptions.Item label="Observações">{formData.observacoes}</Descriptions.Item>
             )}
             <Descriptions.Item label="Modalidade">

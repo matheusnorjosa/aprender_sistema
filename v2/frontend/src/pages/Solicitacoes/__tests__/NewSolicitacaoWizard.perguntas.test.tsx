@@ -156,6 +156,9 @@ function responder(pergunta: RegExp, resposta: 'Sim' | 'Não'): void {
 
 const ACOMPANHA = /O coordenador responsável vai acompanhar o evento\?/;
 const AVALIAR = /Você pretende avaliar o formador nesse evento\?/;
+// A validação do Form do AntD é assíncrona: aqui leva 0,2–0,6 s; na CI, com a suíte inteira e a
+// cobertura, passa de 1 s (o padrão do findBy) — o aviso aparece, só demora.
+const ESPERA_VALIDACAO = { timeout: 5000 };
 
 // Percorrer o assistente com antd leva ~3 s por teste isolado; na suíte inteira passa dos 5 s padrão.
 describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { timeout: 20000 }, () => {
@@ -215,7 +218,7 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     await irParaParticipantes();
     responder(AVALIAR, 'Não');
     fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
-    expect(await screen.findByText('Responda se o coordenador responsável vai acompanhar o evento.')).toBeInTheDocument();
+    expect(await screen.findByText('Responda se o coordenador responsável vai acompanhar o evento.', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Voltar para passo anterior/i })).toBeInTheDocument();
     expect(screen.getByTestId('pick-formador')).toBeInTheDocument();
   });
@@ -262,7 +265,7 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     responder(ACOMPANHA, 'Não');
     responder(AVALIAR, 'Não');
     fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
-    expect(await screen.findByText('Escolha o coordenador responsável pelo evento.')).toBeInTheDocument();
+    expect(await screen.findByText('Escolha o coordenador responsável pelo evento.', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
   });
 
   test('projeto em que o backend aceita o vazio: quem cria é o responsável', async () => {
@@ -288,7 +291,7 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     responder(ACOMPANHA, 'Não');
     responder(AVALIAR, 'Não');
     fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
-    expect(await screen.findByText('Escolha o coordenador responsável pelo evento.')).toBeInTheDocument();
+    expect(await screen.findByText('Escolha o coordenador responsável pelo evento.', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
   });
 
   test('envia as respostas e mostra-as na confirmação', async () => {
@@ -344,7 +347,7 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     // Sem formador escolhido de novo, o passo não avança.
     responder(ACOMPANHA, 'Não');
     fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
-    expect(await screen.findByText('Por favor selecione pelo menos um formador')).toBeInTheDocument();
+    expect(await screen.findByText('Por favor selecione pelo menos um formador', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('pick-formador'));
     responder(AVALIAR, 'Não');

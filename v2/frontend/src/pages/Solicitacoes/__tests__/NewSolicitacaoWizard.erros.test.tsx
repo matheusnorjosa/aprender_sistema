@@ -175,7 +175,7 @@ describe('NewSolicitacaoWizard — erros que a pessoa consegue corrigir (item 36
     await screen.findByTestId('cb-projeto');
     fireEvent.click(proximo());
     expect(await screen.findByTestId('erro-horario')).toHaveTextContent('Escolha a data e os horários de início e de fim do evento.');
-    expect(await screen.findByText('Por favor selecione um projeto')).toBeInTheDocument();
+    expect(await screen.findByText('Por favor selecione um projeto', undefined, { timeout: 5000 })).toBeInTheDocument();
   });
 
   test('"Próximo" com campo faltando leva o foco ao primeiro campo com erro', async () => {

@@ -9,10 +9,11 @@
  * - Operações em lote (Reapply/Resync) via seleção múltipla
  */
 
-import { useState, useEffect, useCallback, useMemo, useRef, ChangeEvent, Key, JSX } from 'react';
+import { useState, useEffect, useCallback, useContext, useMemo, useRef, ChangeEvent, CSSProperties, Key, JSX } from 'react';
 import {
-  Table,
   Card,
+  ConfigProvider,
+  Grid,
   Input,
   DatePicker,
   Button,
@@ -35,9 +36,8 @@ import {
   Spin,
   Select,
 } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
 import type { TableRowSelection } from 'antd/es/table/interface';
-import type { Dayjs } from 'dayjs';
+import dayjs, { type Dayjs } from 'dayjs';
 import {
   EyeOutlined,
   CloudUploadOutlined,
@@ -69,20 +69,22 @@ import { getStatusSummary, reapplyBatch, resyncBatch, type GCalStatusSummary } f
 import { MeetLink } from '../../components/MeetLink';
 import { getGerencias } from '../../api/availability';
 import { useAcesso } from '../../contexts/AcessoContext';
+import ThemeContext from '../../contexts/ThemeContext';
 import useGoogleIntegration from '../../hooks/useGoogleIntegration';
 import useGoogleGuard from '../../hooks/useGoogleGuard';
 import GoogleIntegrationCard from '../../components/google/GoogleIntegrationCard';
 import { TIMING } from '../../constants/timing';
 import { usePolling } from '../../hooks/usePolling';
 import { syncChannel } from '../../services/syncChannel';
-import { formatFortaleza } from '../../utils/datetime';
-import { MOTIVO_NAO_PUBLICAVEL, motivoNaoPublicavel } from '../../utils/gcalRowActions';
+import { FORTALEZA_TZ, formatFortaleza } from '../../utils/datetime';
+import { MOTIVO_NAO_PUBLICAVEL, gcalRowActions, motivoNaoPublicavel, type GcalRowTag } from '../../utils/gcalRowActions';
 import logger from '../../utils/logger';
 import type { ID, Solicitacao, GCalStatus, Gerencia, PaginatedResponse, Participation } from '../../types';
 import { formadoresLabel } from '../../utils/participants';
 import { mesmosDados } from '../../utils/mesmosDados';
 import { pausaDo429Ms } from '../../utils/retryAfter';
 import AvisoAtualizacaoPausada from '../../components/AvisoAtualizacaoPausada';
+import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
 
 // #1668 (M12-19): orçamento de requisições da Pré-agenda.
 /** Carrega a pré-agenda inteira como lista única (paginação client-side). */
@@ -91,15 +93,66 @@ const PREAGENDA_PAGE_SIZE = 100;
 const LOAD_ERROR_KEY = 'preagenda-erro-carga';
 
 const { Title, Text } = Typography;
-const { RangePicker } = DatePicker;
 
-/** GCAL status colors */
-const GCAL_STATUS_COLORS: Record<string, string> = {
-  NONE: 'default',
-  PENDING: 'processing',
-  PUBLISHED: 'success',
-  ERROR: 'error',
+/** Uma linha da célula, cortada com reticências (o texto inteiro fica no `title`). */
+const UMA_LINHA: CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
+
+// Contraste AA (4,5:1) do estado no Google: o preset do AntD pinta a cor 6 sobre a cor 1 (success 2,21,
+// processing 3,66, error 2,99:1) e o Text danger, a 12 px no branco, dá 3,27:1. Mesmo padrão de
+// TEXTO_DA_TAG (components/textoDaTag.ts), que só cobre green, orange e gold.
+const TEXTO_DA_TAG_GCAL: Partial<Record<GcalRowTag['color'], string>> = {
+  success: '#237804', // green-8: 5,44:1
+  processing: '#0958d9', // blue-7: 5,50:1
+  error: '#b32430', // red-8: 5,98:1
 };
+const COR_DO_MOTIVO_DO_ERRO = '#b32430'; // red-8: 6,54:1 no branco
+// Linha marcada para o lote (tema claro): o AntD tira o fundo do colorPrimary (o verde da marca clareado para #9aaba4;
+// com o mouse, #659e89) e o motivo do erro caía para 2,72 e 2,12:1. Mesmo verde claro da tela Aprovações.
+const FUNDO_DA_LINHA_MARCADA = '#f4faf7';
+const TEMA_DA_TABELA = {
+  components: { Table: { rowSelectedBg: FUNDO_DA_LINHA_MARCADA, rowSelectedHoverBg: FUNDO_DA_LINHA_MARCADA } },
+};
+// Pendente e reenviar: o gold-6 (#faad14) dá 1,90:1 no branco; publicado: o green-6 (#52c41a), 2,27:1.
+const COR_PENDENTE = '#ad4e00'; // orange-8: 5,43:1 no branco, 4,99:1 no bg-blue-50 da barra do lote
+const COR_PUBLICADO = '#237804'; // green-8: 5,59:1
+
+/**
+ * Junta as listas dos fluxos na ordem de `?ordering=proximidade` do servidor: de hoje em diante, do
+ * mais próximo ao mais distante; depois os passados, do mais recente ao mais antigo. "Hoje" é o
+ * início do dia em Fortaleza.
+ *
+ * Cada fluxo é cortado no servidor de forma independente. Se um veio cortado, a lista juntada para
+ * no último evento dele (o mais cedo, se os dois vieram cortados); eventos no mesmo horário ficam,
+ * porque estão à mesma distância de hoje. Sem o corte, eventos do outro fluxo depois desse ponto
+ * entravam e os do fluxo cortado sumiam no meio da lista.
+ */
+function porProximidade(listas: Array<PaginatedResponse<Solicitacao> | Solicitacao[]>): Solicitacao[] {
+  const hoje = dayjs().tz(FORTALEZA_TZ).startOf('day').valueOf();
+  const distancia = (r: Solicitacao): [number, number] => {
+    const t = Date.parse(r.inicio);
+    return t >= hoje ? [0, t] : [1, -t];
+  };
+  const compararDistancia = (a: Solicitacao, b: Solicitacao): number => {
+    const [ga, ta] = distancia(a);
+    const [gb, tb] = distancia(b);
+    return ga - gb || ta - tb;
+  };
+  const comparar = (a: Solicitacao, b: Solicitacao): number => compararDistancia(a, b) || Number(a.id) - Number(b.id);
+
+  const ultimosDosCortados = listas
+    .filter((d): d is PaginatedResponse<Solicitacao> => 'results' in d && d.results.length > 0 && d.results.length < d.count)
+    .map((d) => [...d.results].sort(comparar)[d.results.length - 1] as Solicitacao)
+    .sort(comparar);
+  const juntas = listas.flatMap((d) => ('results' in d ? d.results : d)).sort(comparar);
+  const horizonte = ultimosDosCortados[0];
+  return horizonte ? juntas.filter((r) => compararDistancia(r, horizonte) <= 0) : juntas;
+}
+
+/** O evento como a pessoa o reconhece: "05/11/2026 09:00 · Sobral · Projeto X" (botões e confirmações). */
+function rotuloDoEvento(row: Solicitacao): string {
+  return [formatFortaleza(row.inicio), row.municipio_nome, row.projeto_nome].filter(Boolean).join(' · ');
+}
+const { RangePicker } = DatePicker;
 
 /** Google Calendar event from API */
 interface GoogleCalendarEvent {
@@ -137,8 +190,12 @@ export default function PreAgendaPage(): JSX.Element {
   const [loading, setLoading] = useState<boolean>(false);
   const [rows, setRows] = useState<Solicitacao[]>([]);
   const [total, setTotal] = useState<number>(0);
+  // Quantos aprovados o servidor tem com estes filtros (os dois fluxos): mais que `total` = lista cortada.
+  const [noServidor, setNoServidor] = useState<number>(0);
   // Uma carga pedida pela pessoa recebeu 429: a tela pode não corresponder ao pedido.
   const [cargaFalhou, setCargaFalhou] = useState<boolean>(false);
+  // A carga pedida pela pessoa falhou (fora o 429): o motivo vai no lugar das linhas, não o vazio.
+  const [erroCarga, setErroCarga] = useState<string | null>(null);
 
   const [summary, setSummary] = useState<GCalStatusSummary>({
     counts: { NONE: 0, PENDING: 0, PUBLISHED: 0, ERROR: 0 },
@@ -172,6 +229,7 @@ export default function PreAgendaPage(): JSX.Element {
 
   // OAuth Phase 5: acesso (AcessoContext) e integração Google
   const { caps, ehSuperusuario } = useAcesso();
+  const temaEscuro = useContext(ThemeContext)?.isDark === true; // o escuro tem fundo próprio (App.css)
   const { status: googleStatus, disconnect: googleDisconnect } = useGoogleIntegration();
 
   // Section 4 Epic #459: Consolidated Google OAuth guard
@@ -225,7 +283,9 @@ export default function PreAgendaPage(): JSX.Element {
       // então carrega o conjunto de aprovados de uma vez, não só a 1ª página.
       // `status` vai SÓ na lista: no resumo GCal, `status` é o gcal_status (o resumo já
       // conta só aprovados) — mandar `approved` lá zerava os KPIs.
-      const listParams = { ...filters, status: 'approved' as const, page_size: PREAGENDA_PAGE_SIZE };
+      // `proximidade`: os 100 mais próximos de hoje. Sem ordem, o padrão do servidor (-inicio) trazia os
+      // 100 mais distantes no futuro, e os eventos desta semana sumiam (achado do item 36).
+      const listParams = { ...filters, status: 'approved' as const, page_size: PREAGENDA_PAGE_SIZE, ordering: 'proximidade' };
       const [superData, naoSuperData, summaryData] = await Promise.all([
         listSolicitacoes({ ...listParams, flow: 'SUPER' }) as Promise<PaginatedResponse<Solicitacao> | Solicitacao[]>,
         listSolicitacoes({ ...listParams, flow: 'NAO_SUPER' }) as Promise<PaginatedResponse<Solicitacao> | Solicitacao[]>,
@@ -234,17 +294,19 @@ export default function PreAgendaPage(): JSX.Element {
 
       if (seq !== seqRef.current) return; // carga obsoleta: uma mais nova venceu
 
-      const superRows = 'results' in superData ? superData.results : superData;
-      const naoRows = 'results' in naoSuperData ? naoSuperData.results : naoSuperData;
-      const loadedRows = [...superRows, ...naoRows];
+      const loadedRows = porProximidade([superData, naoSuperData]);
+      const contagem = (dados: PaginatedResponse<Solicitacao> | Solicitacao[]): number =>
+        'results' in dados ? dados.count : dados.length;
 
       // Só troca o estado se algo mudou: resposta igual não redesenha a tabela.
       setRows((atuais) => (mesmosDados(atuais, loadedRows) ? atuais : loadedRows));
       // Contador honesto: exibe o total efetivamente carregado, nunca o count do
       // servidor sobre uma lista de 1 página (total inalcançável).
       setTotal(loadedRows.length);
+      setNoServidor(contagem(superData) + contagem(naoSuperData));
       setSummary((atual) => (mesmosDados(atual, summaryData) ? atual : summaryData));
       setCargaFalhou(false);
+      setErroCarga(null);
     } catch (error) {
       if (seq !== seqRef.current) return; // erro de carga obsoleta: não polui a UI
       // 429 (muitas requisições): pausa o polling pelo tempo pedido e mostra um aviso só.
@@ -253,6 +315,12 @@ export default function PreAgendaPage(): JSX.Element {
       if (pausa !== null) {
         pausarPolling(pausa);
         if (!silencioso) setCargaFalhou(true);
+        return;
+      }
+      // Pedida pela pessoa: o motivo e "Tentar de novo" no lugar das linhas (um toast some em 3 s e a
+      // tabela ficava vazia). No segundo plano, a lista que já estava na tela fica, com o toast.
+      if (!silencioso) {
+        setErroCarga((error as Error).message || 'Erro desconhecido.');
         return;
       }
       message.error({
@@ -360,21 +428,23 @@ export default function PreAgendaPage(): JSX.Element {
     });
   }, [requireGoogleConnection, handleGoogleError, loadData]);
 
-  const handleCancel = useCallback((id: ID): void => {
+  // Remover do Google tira o convite e o link do Meet de todos: a confirmação abre no Cancelar,
+  // cita o evento e diz que a solicitação continua aprovada ("Cancelar Evento" sugeria cancelá-la).
+  const handleCancel = useCallback((record: Solicitacao): void => {
+    const id = record.id;
     Modal.confirm({
-      title: 'Confirmar Cancelamento',
+      title: `Remover do Google Agenda: ${rotuloDoEvento(record)}?`,
       icon: <StopOutlined className="text-red-500" />,
       content: (
         <div>
-          <p>Deseja cancelar este evento no Google Calendar?</p>
-          <p className="text-red-500 font-bold text-xs">
-            Atenção: Esta ação irá deletar permanentemente o evento do Calendar e limpar todos os campos relacionados (event_id, meet_link, etc.).
-          </p>
+          <p>O evento e o link do Meet saem do Google Agenda.</p>
+          <p>A solicitação continua aprovada no sistema e pode ser publicada de novo.</p>
         </div>
       ),
-      okText: 'Sim, Cancelar Evento',
+      okText: 'Remover do Google',
       okType: 'danger',
-      cancelText: 'Não',
+      cancelText: 'Cancelar',
+      autoFocusButton: 'cancel',
       onOk: async () => {
         try {
           await cancelSolicitacao(id);
@@ -462,6 +532,7 @@ export default function PreAgendaPage(): JSX.Element {
       okText: 'Resync',
       okType: 'danger',
       cancelText: 'Cancelar',
+      autoFocusButton: 'cancel',
       onOk: async () => {
         try {
           setBatchLoading(true);
@@ -489,55 +560,71 @@ export default function PreAgendaPage(): JSX.Element {
     });
   };
 
+  // Celular: os ícones das ações quebram em duas por linha e a página perde padding.
+  const celular = !Grid.useBreakpoint().sm;
+
+  // Sem rolagem horizontal (achado do item 36): sempre na linha, o Evento (data/hora, município,
+  // projeto e o estado no Google, com o motivo do erro) e as ações; o resto sobe por largura e,
+  // escondido, vai para a linha expandida.
   // Issue #260: Memoizar columns para evitar re-renderização desnecessária da tabela
-  const columns: ColumnsType<Solicitacao> = useMemo(() => [
+  const columns: ColunaResponsiva<Solicitacao>[] = useMemo(() => [
     {
-      title: 'Data/Hora',
-      dataIndex: 'inicio',
-      key: 'inicio',
-      render: (inicio: string) => formatFortaleza(inicio),
-      width: 150,
-    },
-    {
-      title: 'Município',
-      dataIndex: 'municipio_nome',
-      key: 'municipio_nome',
-      render: (nome: string | null) => nome || '-',
-    },
-    {
-      title: 'Projeto',
-      dataIndex: 'projeto_nome',
-      key: 'projeto_nome',
-      render: (nome: string | null) => nome || '-',
+      title: 'Evento',
+      key: 'evento',
+      render: (_, record) => {
+        // Rótulo em pt-BR (o mesmo de Publicar na agenda) e, em ERROR, o motivo que o backend gravou
+        // (`gcal_last_error`, que diz o que fazer): antes só o código cru, e o Controle reenviava às cegas.
+        const { tag } = gcalRowActions(record, { ready: true });
+        return (
+          <Space direction="vertical" size={2} className="w-full">
+            <div style={UMA_LINHA}>{formatFortaleza(record.inicio)}</div>
+            <div style={UMA_LINHA} title={record.municipio_nome || undefined}>{record.municipio_nome || '-'}</div>
+            <div style={UMA_LINHA} title={record.projeto_nome || undefined}>{record.projeto_nome || '-'}</div>
+            <Tag color={tag.color} style={{ whiteSpace: 'normal', color: TEXTO_DA_TAG_GCAL[tag.color] }}>{tag.label}</Tag>
+            {record.gcal_status === 'ERROR' && record.gcal_last_error && (
+              <Text type="danger" style={{ color: COR_DO_MOTIVO_DO_ERRO, fontSize: 12, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
+                {record.gcal_last_error}
+              </Text>
+            )}
+          </Space>
+        );
+      },
     },
     {
       title: 'Tipo',
       dataIndex: 'tipo',
       key: 'tipo',
-      render: (tipo: string | null) => tipo || '-',
+      responsive: VISIVEL_A_PARTIR.lg,
+      ellipsis: true,
+      render: (tipo) => (tipo as string | null) || '-',
     },
     {
       // Nome do formador (inclui convidados "que saíram" via guest_nome — sem FK). Ver utils/participants.
       title: 'Formadores',
       dataIndex: 'participations',
       key: 'formadores',
-      render: (participations: Participation[] | undefined) => formadoresLabel(participations) || '-',
+      responsive: VISIVEL_A_PARTIR.lg,
       ellipsis: true,
-      width: 160,
+      render: (participations) => formadoresLabel(participations as Participation[] | undefined) || '-',
     },
     {
-      title: 'GCal Status',
-      dataIndex: 'gcal_status',
-      key: 'gcal_status',
-      render: (gcal_status: GCalStatus) => (
-        <Tag color={GCAL_STATUS_COLORS[gcal_status] || 'default'}>{gcal_status || 'NONE'}</Tag>
+      title: 'Meet',
+      dataIndex: 'meet_link',
+      key: 'meet',
+      responsive: VISIVEL_A_PARTIR.xl,
+      width: 170,
+      // Os dois botões do MeetLink quebram linha em vez de passar da célula.
+      render: (href) => (
+        <div className="[&_.ant-space]:flex-wrap">
+          <MeetLink href={href as string | null} />
+        </div>
       ),
-      width: 120,
     },
     {
       title: 'Ações',
       key: 'actions',
-      width: 200,
+      // Até 4 ícones; no celular, dois por linha.
+      width: celular ? 76 : 128,
       render: (_, record) => {
         const isPublished = record.gcal_status === ('PUBLISHED' as GCalStatus);
         // PENDING = publicação já enfileirada (task Celery em voo). Bloquear o
@@ -560,7 +647,7 @@ export default function PreAgendaPage(): JSX.Element {
           : 'Publicar evento no Google Calendar';
 
         return (
-          <Space size="small">
+          <Space size={4} wrap>
             <Button
               size="small"
               icon={<EyeOutlined />}
@@ -583,7 +670,7 @@ export default function PreAgendaPage(): JSX.Element {
                 icon={<SyncOutlined />}
                 onClick={() => handleResync(record.id)}
                 aria-label="Reenviar evento (forçar atualização)"
-                style={{ color: '#faad14', borderColor: '#faad14' }}
+                style={{ color: COR_PENDENTE, borderColor: COR_PENDENTE }}
               />
             )}
             {showCancel && (
@@ -591,16 +678,15 @@ export default function PreAgendaPage(): JSX.Element {
                 size="small"
                 danger
                 icon={<StopOutlined />}
-                onClick={() => handleCancel(record.id)}
-                aria-label="Cancelar evento no Google Calendar"
+                onClick={() => handleCancel(record)}
+                aria-label={`Remover do Google Agenda: ${rotuloDoEvento(record)}`}
               />
             )}
-            <MeetLink href={record.meet_link} />
           </Space>
         );
       },
     },
-  ], [handlePreview, handlePublish, handleResync, handleCancel]);
+  ], [handlePreview, handlePublish, handleResync, handleCancel, celular]);
 
   // Google Calendar events loader
   const loadGcalEvents = useCallback(async (): Promise<void> => {
@@ -645,20 +731,20 @@ export default function PreAgendaPage(): JSX.Element {
     }
   };
 
-  const gcalEventsColumns: ColumnsType<GoogleCalendarEvent> = [
+  const gcalEventsColumns: ColunaResponsiva<GoogleCalendarEvent>[] = [
     {
       title: 'Evento',
       dataIndex: 'summary',
       key: 'summary',
-      ellipsis: true,
-      filterSearch: true,
+      // No celular o nome quebra linha: cortado, ficaria só no `title`, que o toque não mostra.
+      ellipsis: !celular,
     },
     {
       title: 'Início',
       dataIndex: 'start',
       key: 'start',
-      width: 160,
-      render: (val: string) => formatGcalDate(val),
+      width: 150,
+      render: (val) => formatGcalDate(val as string),
       sorter: (a: GoogleCalendarEvent, b: GoogleCalendarEvent) => a.start.localeCompare(b.start),
       defaultSortOrder: 'ascend',
     },
@@ -666,31 +752,35 @@ export default function PreAgendaPage(): JSX.Element {
       title: 'Fim',
       dataIndex: 'end',
       key: 'end',
-      width: 160,
-      render: (val: string) => formatGcalDate(val),
+      width: 150,
+      responsive: VISIVEL_A_PARTIR.lg,
+      render: (val) => formatGcalDate(val as string),
     },
     {
       title: 'Local',
       dataIndex: 'location',
       key: 'location',
       ellipsis: true,
-      render: (val: string) => val || '-',
+      responsive: VISIVEL_A_PARTIR.md,
+      render: (val) => (val as string) || '-',
     },
     {
       title: 'Criador',
       dataIndex: 'creator',
       key: 'creator',
       ellipsis: true,
-      width: 200,
+      responsive: VISIVEL_A_PARTIR.xl,
     },
     {
       title: 'Link',
       dataIndex: 'htmlLink',
       key: 'htmlLink',
       width: 70,
-      render: (val: string) =>
+      // Abaixo de md, na linha expandida: os 70 px ficam para o nome do evento.
+      responsive: VISIVEL_A_PARTIR.md,
+      render: (val) =>
         val ? (
-          <a href={val} target="_blank" rel="noopener noreferrer">
+          <a href={val as string} target="_blank" rel="noopener noreferrer" aria-label="Abrir no Google Agenda">
             <LinkOutlined />
           </a>
         ) : '-',
@@ -732,19 +822,16 @@ export default function PreAgendaPage(): JSX.Element {
         'aria-label': motivo ? `Selecionar evento: ${MOTIVO_NAO_PUBLICAVEL[motivo]}` : 'Selecionar evento',
       };
     },
-    selections: [
-      Table.SELECTION_ALL,
-      Table.SELECTION_INVERT,
-      Table.SELECTION_NONE,
-    ],
+    // `true`: os atalhos padrão do AntD (tudo, inverter, nada) sem importar o `Table` cru.
+    selections: true,
   };
 
   return (
-    <div className="p-6">
+    <div className="p-3 sm:p-6">
       <Space direction="vertical" style={{ width: '100%' }} size="large">
         {/* Header */}
         <Card>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <Title level={2} className="m-0">
               Pré-agenda
             </Title>
@@ -785,14 +872,14 @@ export default function PreAgendaPage(): JSX.Element {
                   <Statistic
                     title="Pendentes"
                     value={summary.counts?.PENDING || 0}
-                    valueStyle={{ color: '#faad14' }}
+                    valueStyle={{ color: COR_PENDENTE }}
                   />
                 </Col>
                 <Col span={6}>
                   <Statistic
                     title="Publicados"
                     value={summary.counts?.PUBLISHED || 0}
-                    valueStyle={{ color: '#52c41a' }}
+                    valueStyle={{ color: COR_PUBLICADO }}
                   />
                 </Col>
                 <Col span={6}>
@@ -840,18 +927,18 @@ export default function PreAgendaPage(): JSX.Element {
             </Card>
 
             {/* Tabela */}
-            <Card>
+            <Card {...(celular && { styles: { body: { padding: 12 } } })}>
               {/* Issue #95: Toolbar de Ações em Massa */}
               {selectedRowKeys.length > 0 && (
                 <div className="mb-4 p-3 bg-blue-50 rounded">
-                  <Space>
+                  <Space wrap>
                     <Text strong>{selectedRowKeys.length} evento(s) selecionado(s)</Text>
                     <Button
                       type="default"
                       icon={<SyncOutlined />}
                       onClick={handleBatchReapply}
                       loading={batchLoading}
-                      style={{ color: '#faad14', borderColor: '#faad14' }}
+                      style={{ color: COR_PENDENTE, borderColor: COR_PENDENTE }}
                     >
                       Reapply Selecionados
                     </Button>
@@ -872,19 +959,35 @@ export default function PreAgendaPage(): JSX.Element {
                   </Space>
                 </div>
               )}
-              <Table
-                scroll={{ x: "max-content" }}
-                columns={columns}
-                dataSource={rows}
-                loading={loading}
-                rowKey="id"
-                rowSelection={rowSelection}
-                pagination={{
-                  total,
-                  pageSize: 20,
-                  showTotal: (total) => `Total: ${total} eventos aprovados`,
-                }}
-              />
+              {noServidor > total && !erroCarga && (
+                <Alert
+                  className="mb-4"
+                  type="info"
+                  showIcon
+                  role="status"
+                  message={
+                    `Mostrando ${total} de ${noServidor} eventos aprovados, os mais próximos de hoje. ` +
+                    'Para ver os demais, filtre por data, gerência ou busca.'
+                  }
+                />
+              )}
+              <ConfigProvider {...(!temaEscuro && { theme: TEMA_DA_TABELA })}>
+                <ResponsiveTable<Solicitacao>
+                  columns={columns}
+                  dataSource={rows}
+                  loading={loading}
+                  rowKey="id"
+                  rowSelection={rowSelection}
+                  nomeDaLinha={rotuloDoEvento}
+                  erro={erroCarga}
+                  onTentarDeNovo={() => { void loadData(); }}
+                  pagination={{
+                    total,
+                    pageSize: 20,
+                    showTotal: (total) => `Total: ${total} eventos aprovados`,
+                  }}
+                />
+              </ConfigProvider>
             </Card>
 
             {/* Rodapé */}
@@ -970,12 +1073,12 @@ export default function PreAgendaPage(): JSX.Element {
                   />
                 )
               ) : (
-                <Table
-                  scroll={{ x: "max-content" }}
+                <ResponsiveTable<GoogleCalendarEvent>
                   columns={gcalEventsColumns}
                   dataSource={gcalEvents}
                   rowKey="id"
                   size="small"
+                  nomeDaLinha={(evento) => evento.summary || 'evento'}
                   pagination={{
                     pageSize: 20,
                     showSizeChanger: true,

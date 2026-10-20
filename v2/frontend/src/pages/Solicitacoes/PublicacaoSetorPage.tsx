@@ -12,10 +12,9 @@
  *   desabilitadas, com o motivo visível.
  * - Polling só enquanto alguma linha está PENDING; `seqRef` descarta resposta obsoleta.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type JSX } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { Alert, Button, Card, Empty, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import { Alert, Button, Card, Empty, Grid, Modal, Space, Tag, Typography, message } from 'antd';
 
 import {
   cancelSolicitacao,
@@ -24,6 +23,7 @@ import {
   resyncSolicitacao,
 } from '../../api/solicitacoes';
 import { MeetLink } from '../../components/MeetLink';
+import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
 import GoogleIntegrationCard from '../../components/google/GoogleIntegrationCard';
 import { TIMING } from '../../constants/timing';
 import useGoogleIntegration from '../../hooks/useGoogleIntegration';
@@ -32,7 +32,7 @@ import { syncChannel } from '../../services/syncChannel';
 import type { ID, Solicitacao } from '../../types';
 import type { PublishBlockReason } from '../../types/gcal';
 import { formatFortaleza } from '../../utils/datetime';
-import { gcalRowActions, type GcalRowAction } from '../../utils/gcalRowActions';
+import { gcalRowActions, type GcalRowAction, type GcalRowTag } from '../../utils/gcalRowActions';
 
 const { Title, Text } = Typography;
 
@@ -40,8 +40,20 @@ const TITLE_ID = 'publicacao-setor-title';
 const PAGE_SIZE = 20;
 /** O OAuth volta para esta página (o backend valida o `return_to`). */
 const GOOGLE_CONNECT_URL = `/api/oauth/google/start/?return_to=${encodeURIComponent('/solicitacoes/publicacao')}`;
-/** Uma só mensagem de erro de carga na tela (o polling não empilha toasts). */
+/** Uma só mensagem de erro de carga em segundo plano (o polling não empilha toasts). */
 const LOAD_ERROR_KEY = 'publicacao-setor-load';
+/** Uma linha da célula, cortada com reticências (o texto inteiro fica no `title`). */
+const UMA_LINHA: CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
+
+// Contraste AA (4,5:1) do estado no Google: o preset do AntD pinta a cor 6 sobre a cor 1 (success 2,21,
+// processing 3,66, error 2,99:1) e o Text danger, a 12 px no branco, dá 3,27:1. Mesmo padrão de
+// TEXTO_DA_TAG (components/textoDaTag.ts), que só cobre green, orange e gold.
+const TEXTO_DA_TAG_GCAL: Partial<Record<GcalRowTag['color'], string>> = {
+  success: '#237804', // green-8: 5,44:1
+  processing: '#0958d9', // blue-7: 5,50:1
+  error: '#b32430', // red-8: 5,98:1
+};
+const COR_DO_MOTIVO_DO_ERRO = '#b32430'; // red-8: 6,54:1 no branco
 
 const BLOCK_REASON_TEXT: Record<PublishBlockReason, string> = {
   no_setor_scope:
@@ -65,6 +77,9 @@ const OAUTH_ERROR_FALLBACK =
 interface ActionConfig {
   /** Texto do botão; também abre o aria-label (nome acessível contém o visível). */
   label: string;
+  /** Texto do botão no celular (abaixo de `sm`); o nome acessível continua com o `label`. */
+  labelCurto: string;
+  /** Início do título da confirmação; o evento vem depois: "Remover do Google Agenda: <evento>?". */
   confirmTitle: string;
   confirmDescription: string;
   okText: string;
@@ -78,7 +93,8 @@ interface ActionConfig {
 const ACTIONS: Record<GcalRowAction, ActionConfig> = {
   publicar: {
     label: 'Publicar',
-    confirmTitle: 'Publicar este evento na agenda da organização?',
+    labelCurto: 'Publicar',
+    confirmTitle: 'Publicar na agenda da organização',
     confirmDescription: 'O evento é criado no calendário oficial da organização.',
     okText: 'Publicar',
     danger: false,
@@ -87,7 +103,8 @@ const ACTIONS: Record<GcalRowAction, ActionConfig> = {
   },
   tentar: {
     label: 'Tentar de novo',
-    confirmTitle: 'Tentar publicar este evento de novo?',
+    labelCurto: 'Tentar de novo',
+    confirmTitle: 'Tentar publicar de novo',
     confirmDescription: 'O sistema envia o evento outra vez para o Google Agenda.',
     okText: 'Tentar de novo',
     danger: false,
@@ -96,7 +113,8 @@ const ACTIONS: Record<GcalRowAction, ActionConfig> = {
   },
   atualizar: {
     label: 'Atualizar no Google',
-    confirmTitle: 'Atualizar este evento no Google Agenda?',
+    labelCurto: 'Atualizar',
+    confirmTitle: 'Atualizar no Google Agenda',
     confirmDescription: 'O evento no Google passa a ter os dados atuais do sistema.',
     okText: 'Atualizar',
     danger: false,
@@ -105,7 +123,8 @@ const ACTIONS: Record<GcalRowAction, ActionConfig> = {
   },
   remover: {
     label: 'Remover do Google',
-    confirmTitle: 'Remover este evento do Google Agenda?',
+    labelCurto: 'Remover',
+    confirmTitle: 'Remover do Google Agenda',
     confirmDescription:
       'O evento sai da agenda da organização; a solicitação continua aprovada no sistema.',
     okText: 'Remover',
@@ -145,13 +164,20 @@ export default function PublicacaoSetorPage(): JSX.Element {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
+  // A lista não carregou: o motivo vai no lugar das linhas. Antes só um toast de 3 s, e a tabela
+  // ficava no vazio "Nenhum evento aprovado do seu setor", como se não houvesse o que publicar.
+  const [erroCarga, setErroCarga] = useState<string | null>(null);
   const [oauthReturn, setOauthReturn] = useState<OAuthReturn | null>(null);
 
   // Latest-wins: polling, paginação e ações disparam cargas concorrentes; só a
   // mais recente grava na tela.
   const seqRef = useRef(0);
 
-  const load = useCallback(async (): Promise<void> => {
+  /**
+   * `silencioso`: carga em segundo plano (polling, outra aba). Se falhar, a lista que estava na tela
+   * fica, com um toast; o aviso no lugar das linhas é só para a carga pedida pela pessoa.
+   */
+  const load = useCallback(async (silencioso = false): Promise<void> => {
     const seq = ++seqRef.current;
     setLoading(true);
     try {
@@ -166,8 +192,19 @@ export default function PublicacaoSetorPage(): JSX.Element {
       if (seq !== seqRef.current) return;
       setRows(data.results);
       setTotal(data.count);
+      setErroCarga(null);
     } catch (error) {
       if (seq !== seqRef.current) return;
+      // A página deixou de existir (a lista encolheu): volta uma. Sem isso, o erro tirava a
+      // paginação e o "Tentar de novo" repetia o mesmo 404.
+      if ((error as ApiErrorLike).status === 404 && page > 1) {
+        setPage((p) => Math.max(1, p - 1));
+        return;
+      }
+      if (!silencioso) {
+        setErroCarga((error as Error).message || 'Erro desconhecido.');
+        return;
+      }
       message.error({
         key: LOAD_ERROR_KEY,
         content: `Erro ao carregar os eventos: ${(error as Error).message}`,
@@ -182,14 +219,14 @@ export default function PublicacaoSetorPage(): JSX.Element {
   }, [load]);
 
   // Só há o que acompanhar enquanto alguma publicação está em voo (PENDING).
-  usePolling(load, {
+  usePolling(() => load(true), {
     enabled: rows.some((row) => row.gcal_status === 'PENDING'),
     intervalMs: TIMING.PUBLICACAO_PENDENTE_POLL_MS,
     immediate: false,
   });
 
   // Mudança de solicitação em outra aba → recarrega.
-  useEffect(() => syncChannel.subscribe('solicitacoes', () => { void load(); }), [load]);
+  useEffect(() => syncChannel.subscribe('solicitacoes', () => { void load(true); }), [load]);
 
   // Volta do OAuth (?google=connected | ?google=error&reason=…): mostra o resultado,
   // tira os parâmetros da URL e recarrega o status da integração.
@@ -231,8 +268,43 @@ export default function PublicacaoSetorPage(): JSX.Element {
       return;
     }
     message.success(config.successText);
-    void load();
+    // Com await, o diálogo só fecha com a linha já recarregada: o afterClose sabe se o botão sobrou.
+    await load();
   }, [handleActionError, load]);
+
+  // Alvo do foco quando o botão da linha some com a recarga; fora do Tab.
+  const listaRef = useRef<HTMLDivElement>(null);
+  const focarLista = useCallback((): void => {
+    const alvo = listaRef.current;
+    if (!alvo) return;
+    // Focável só neste instante (mesmo padrão do "Tentar de novo" da ResponsiveTable).
+    alvo.setAttribute('tabindex', '-1');
+    alvo.addEventListener('blur', () => alvo.removeAttribute('tabindex'), { once: true });
+    alvo.focus();
+  }, []);
+
+  // Confirmação num diálogo de verdade (role=dialog, foco preso e devolvido ao botão da linha, Esc):
+  // o Popconfirm não recebia o foco e, pelo teclado, a confirmação ficava fora de alcance (item 36).
+  // Abre no Cancelar e cita o evento; só o OK dispara a ação, nunca a tela sozinha.
+  // Publicar, Atualizar e Remover trocam ou tiram o botão da linha: sem ele, o foco vai para a lista,
+  // não para o body (o Tab recomeçaria do topo da página a cada evento).
+  const [modal, contextoDoModal] = Modal.useModal();
+  const confirmar = useCallback((row: Solicitacao, action: GcalRowAction, evento: string): void => {
+    const config = ACTIONS[action];
+    const gatilho = document.activeElement;
+    void modal.confirm({
+      afterClose: () => {
+        if (!gatilho?.isConnected) focarLista();
+      },
+      title: `${config.confirmTitle}: ${evento}?`,
+      content: config.confirmDescription,
+      okText: config.okText,
+      okButtonProps: { danger: config.danger },
+      cancelText: 'Cancelar',
+      autoFocusButton: 'cancel',
+      onOk: () => runAction(row, action),
+    });
+  }, [modal, runAction, focarLista]);
 
   const handleConnect = (): void => {
     window.location.href = GOOGLE_CONNECT_URL;
@@ -257,63 +329,67 @@ export default function PublicacaoSetorPage(): JSX.Element {
   const blockedIsWarning =
     reason === 'no_setor_scope' || reason === 'google_calendar_not_configured' || (!reason && !!statusError);
 
-  const columns: ColumnsType<Solicitacao> = useMemo(() => [
+  // Sem rolagem horizontal (achado do item 36): sempre na linha, o Evento (data/hora, projeto,
+  // município e o estado no Google, com o motivo do erro quebrando linha) e as ações; o resto sobe por largura e,
+  // escondido, vai para a linha expandida. No celular os botões usam o rótulo curto.
+  const celular = !Grid.useBreakpoint().sm;
+  const columns: ColunaResponsiva<Solicitacao>[] = useMemo(() => [
     {
-      title: 'Data/hora',
-      dataIndex: 'inicio',
-      key: 'inicio',
-      width: 150,
-      render: (inicio: string) => formatFortaleza(inicio),
-    },
-    {
-      title: 'Projeto',
-      dataIndex: 'projeto_nome',
-      key: 'projeto',
-      render: (nome: string | null) => nome || '-',
-    },
-    {
-      title: 'Município',
-      dataIndex: 'municipio_nome',
-      key: 'municipio',
-      render: (nome: string | null) => nome || '-',
-    },
-    {
-      title: 'Tipo',
-      dataIndex: 'tipo_evento_nome',
-      key: 'tipo_evento',
-      render: (nome: string | null) => nome || '-',
-    },
-    {
-      // Nome, não username: o username de login pode ser o CPF (LGPD).
-      title: 'Coordenador',
-      dataIndex: 'coordenador_nome',
-      key: 'coordenador',
-      render: (nome: string | null) => nome || '-',
-    },
-    {
-      title: 'Google Agenda',
-      key: 'gcal',
+      title: 'Evento',
+      key: 'evento',
       render: (_, row) => {
         const { tag } = gcalRowActions(row, { ready });
         return (
-          <Space direction="vertical" size={2}>
-            <Tag color={tag.color}>{tag.label}</Tag>
+          <Space direction="vertical" size={2} className="w-full">
+            <div style={UMA_LINHA}>{formatFortaleza(row.inicio)}</div>
+            <div style={UMA_LINHA} title={row.projeto_nome || undefined}>{row.projeto_nome || '-'}</div>
+            <div style={UMA_LINHA} title={row.municipio_nome || undefined}>{row.municipio_nome || '-'}</div>
+            <Tag color={tag.color} style={{ whiteSpace: 'normal', color: TEXTO_DA_TAG_GCAL[tag.color] }}>{tag.label}</Tag>
             {row.gcal_status === 'ERROR' && row.gcal_last_error && (
-              <Text type="danger" style={{ fontSize: 12 }}>{row.gcal_last_error}</Text>
+              // O motivo do Google tem até 500 caracteres: quebra linha na célula em vez de esticar a tabela.
+              <Text type="danger" style={{ color: COR_DO_MOTIVO_DO_ERRO, fontSize: 12, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
+                {row.gcal_last_error}
+              </Text>
             )}
           </Space>
         );
       },
     },
     {
+      title: 'Tipo',
+      dataIndex: 'tipo_evento_nome',
+      key: 'tipo_evento',
+      responsive: VISIVEL_A_PARTIR.lg,
+      ellipsis: true,
+      render: (nome) => (nome as string | null) || '-',
+    },
+    {
+      // Nome, não username: o username de login pode ser o CPF (LGPD).
+      title: 'Coordenador',
+      dataIndex: 'coordenador_nome',
+      key: 'coordenador',
+      responsive: VISIVEL_A_PARTIR.lg,
+      ellipsis: true,
+      render: (nome) => (nome as string | null) || '-',
+    },
+    {
       title: 'Meet',
       dataIndex: 'meet_link',
       key: 'meet',
-      render: (href: string | null) => <MeetLink href={href} />,
+      responsive: VISIVEL_A_PARTIR.xl,
+      width: 170,
+      // Os dois botões do MeetLink quebram linha em vez de passar da célula.
+      render: (href) => (
+        <div className="[&_.ant-space]:flex-wrap">
+          <MeetLink href={href as string | null} />
+        </div>
+      ),
     },
     {
       title: 'Ações',
       key: 'acoes',
+      // Folga para a fonte mais larga do Linux da CI: "Atualizar no Google" com +1,5 px por letra.
+      width: celular ? 116 : 190,
       render: (_, row) => {
         const { actions, disabled } = gcalRowActions(row, { ready });
         const evento = `${row.projeto_nome ?? 'Evento'}, ${formatFortaleza(row.inicio)}`;
@@ -322,35 +398,27 @@ export default function PublicacaoSetorPage(): JSX.Element {
             {actions.map((action) => {
               const config = ACTIONS[action];
               return (
-                <Popconfirm
+                <Button
                   key={action}
-                  title={config.confirmTitle}
-                  description={config.confirmDescription}
-                  okText={config.okText}
-                  cancelText="Cancelar"
-                  okButtonProps={{ danger: config.danger }}
-                  onConfirm={() => runAction(row, action)}
+                  size="small"
+                  danger={config.danger}
                   disabled={disabled}
+                  aria-label={`${config.label}: ${evento}`}
+                  onClick={() => confirmar(row, action, evento)}
                 >
-                  <Button
-                    size="small"
-                    danger={config.danger}
-                    disabled={disabled}
-                    aria-label={`${config.label}: ${evento}`}
-                  >
-                    {config.label}
-                  </Button>
-                </Popconfirm>
+                  {celular ? config.labelCurto : config.label}
+                </Button>
               );
             })}
           </Space>
         );
       },
     },
-  ], [ready, runAction]);
+  ], [ready, confirmar, celular]);
 
   return (
-    <section className="p-6" aria-labelledby={TITLE_ID}>
+    <section className="p-3 sm:p-6" aria-labelledby={TITLE_ID}>
+      {contextoDoModal}
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         <Card>
           <header>
@@ -394,13 +462,15 @@ export default function PublicacaoSetorPage(): JSX.Element {
           />
         )}
 
-        <Card>
-          <Table
+        <Card ref={listaRef} {...(celular && { styles: { body: { padding: 12 } } })}>
+          <ResponsiveTable<Solicitacao>
             rowKey="id"
             columns={columns}
             dataSource={rows}
             loading={loading}
-            scroll={{ x: 'max-content' }}
+            nomeDaLinha={(row) => `${row.projeto_nome ?? 'Evento'}, ${formatFortaleza(row.inicio)}`}
+            erro={erroCarga}
+            onTentarDeNovo={() => { void load(); }}
             pagination={{
               current: page,
               pageSize: PAGE_SIZE,

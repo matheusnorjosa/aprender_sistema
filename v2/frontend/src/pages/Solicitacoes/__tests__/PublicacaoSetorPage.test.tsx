@@ -17,6 +17,7 @@ import { message } from 'antd';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { TIMING } from '../../../constants/timing';
+import { definirLarguraTela } from '../../../test/larguraTela';
 import type { GoogleIntegrationStatus } from '../../../types/gcal';
 import type { Solicitacao } from '../../../types';
 
@@ -41,6 +42,10 @@ vi.mock('../../../services/syncChannel', () => ({
 }));
 
 import PublicacaoSetorPage from '../PublicacaoSetorPage';
+
+// Tela pesada (AntD + ResponsiveTable): na CI, cerca de 4x mais lenta que local e com cobertura, casos passam dos
+// 5 s padrão. Só o limite de tempo muda, nenhuma asserção.
+vi.setConfig({ testTimeout: 20_000 });
 
 // ============================================================================
 // Fixtures
@@ -137,12 +142,16 @@ function renderPage(url = '/solicitacoes/publicacao') {
   );
 }
 
-/** Clica na ação da linha (por aria-label) e confirma no Popconfirm. */
+/**
+ * Clica na ação da linha (por aria-label) e confirma no diálogo. O diálogo é um modal de verdade
+ * (role=dialog, foco preso), não um Popconfirm: o balão não recebia o foco (achado do item 36).
+ */
 async function confirmAction(buttonLabel: RegExp, popTitle: string, okText: string) {
   fireEvent.click(await screen.findByLabelText(buttonLabel));
-  const title = await screen.findByText(popTitle);
-  const popover = title.closest('.ant-popover') as HTMLElement;
-  fireEvent.click(within(popover).getByText(okText));
+  const dialogo = await screen.findByRole('dialog');
+  // O AntD repete o título (um oculto, que nomeia o diálogo): daí o getAll.
+  expect(within(dialogo).getAllByText(popTitle, { exact: false }).length).toBeGreaterThan(0);
+  fireEvent.click(within(dialogo).getByRole('button', { name: okText }));
 }
 
 const originalLocation = window.location;
@@ -227,6 +236,22 @@ describe('PublicacaoSetorPage — estrutura e lista', () => {
     expect(screen.getByText('Entrar na reunião')).toBeInTheDocument();
   });
 
+  test('Publicado, Publicando… e Erro, e o motivo do erro, com contraste AA (4,5:1)', async () => {
+    // O preset do AntD pinta a cor 6 sobre a cor 1 (2,21, 3,66 e 2,99:1); o Text danger dá 3,27:1.
+    listResponse = pageOf([
+      makeSolic({ id: 1, municipio_nome: 'Crato', gcal_status: 'ERROR', gcal_last_error: 'Motivo do Google.' }),
+      makeSolic({ id: 2, municipio_nome: 'Iguatu', gcal_status: 'PENDING' }),
+      makeSolic({ id: 3, municipio_nome: 'Quixadá', gcal_status: 'PUBLISHED', external_event_id: 'asv3' }),
+    ]);
+    renderPage();
+
+    const erro = (await screen.findByText('Crato')).closest('tr') as HTMLElement;
+    expect(within(erro).getByText('Erro')).toHaveStyle({ color: '#b32430' });
+    expect(within(erro).getByText('Motivo do Google.')).toHaveStyle({ color: '#b32430' });
+    expect(within(screen.getByText('Iguatu').closest('tr') as HTMLElement).getByText('Publicando…')).toHaveStyle({ color: '#0958d9' });
+    expect(within(screen.getByText('Quixadá').closest('tr') as HTMLElement).getByText('Publicado')).toHaveStyle({ color: '#237804' });
+  });
+
   test('(i) lista vazia mostra a copy do estado vazio com link para Nova Solicitação', async () => {
     renderPage();
     const empty = await screen.findByText(/Nenhum evento aprovado do seu setor a partir de hoje\./);
@@ -236,6 +261,27 @@ describe('PublicacaoSetorPage — estrutura e lista', () => {
     expect(within(empty).getByText('Nova Solicitação').closest('a')?.getAttribute('href')).toBe(
       '/solicitacoes/nova',
     );
+  });
+
+  // Achado do item 36 (19/10/2026): a falha virava "Nenhum evento aprovado do seu setor".
+  test('falha ao carregar: o motivo e "Tentar de novo" no lugar do vazio que mandava criar solicitação', async () => {
+    fetchAPIMock.mockImplementation((url: string) =>
+      isList(url) ? Promise.reject(apiError(500, { detail: 'Erro interno do servidor.' })) : Promise.reject(new Error(url)),
+    );
+    renderPage();
+
+    const aviso = await screen.findByText('Não foi possível carregar a lista.');
+    expect(aviso.closest('[role="alert"]')).not.toBeNull();
+    expect(screen.getByText('Erro interno do servidor.')).toBeInTheDocument();
+    expect(screen.queryByText(/Nenhum evento aprovado do seu setor/)).not.toBeInTheDocument();
+
+    fetchAPIMock.mockImplementation((url: string) =>
+      isList(url) ? Promise.resolve(pageOf([makeSolic()])) : Promise.reject(new Error(url)),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+
+    expect(await screen.findByText('Vidas Em Rede')).toBeInTheDocument();
+    expect(screen.queryByText('Não foi possível carregar a lista.')).not.toBeInTheDocument();
   });
 
   test('paginação no servidor: trocar de página pede page=2 com os mesmos filtros', async () => {
@@ -250,6 +296,28 @@ describe('PublicacaoSetorPage — estrutura e lista', () => {
     expect(params.get('page')).toBe('2');
     expect(params.get('publishable')).toBe('true');
     expect(params.get('page_size')).toBe('20');
+  });
+
+  // A lista encolheu com a pessoa na página 2 (evento cancelado, virada do dia): o DRF responde 404
+  // "Página inválida". Sem recuo, o erro tirava a paginação e o "Tentar de novo" repetia o 404.
+  test('página que deixou de existir (404): volta uma página em vez de travar no erro', async () => {
+    listResponse = pageOf([makeSolic()], 25);
+    renderPage();
+    await screen.findByText('Vidas Em Rede');
+
+    fetchAPIMock.mockImplementation((url: string) => {
+      if (!isList(url)) return Promise.reject(new Error(url));
+      const pagina = new URL(url, 'https://x').searchParams.get('page');
+      return pagina === '2'
+        ? Promise.reject(apiError(404, { detail: 'Página inválida.' }))
+        : Promise.resolve(pageOf([makeSolic({ municipio_nome: 'Crato' })], 20));
+    });
+    fireEvent.click(screen.getByTitle('2'));
+
+    expect(await screen.findByText('Crato')).toBeInTheDocument();
+    const ultima = new URL(String(listCalls().at(-1)?.[0]), 'https://x').searchParams;
+    expect(ultima.get('page')).toBe('1');
+    expect(screen.queryByText('Não foi possível carregar a lista.')).not.toBeInTheDocument();
   });
 
   test('latest-wins: resposta obsoleta não sobrescreve a mais recente', async () => {
@@ -389,11 +457,11 @@ describe('PublicacaoSetorPage — conexão e prontidão', () => {
 });
 
 describe('PublicacaoSetorPage — ações', () => {
-  test('(c) confirmar o Popconfirm faz UM POST em /publish/ com corpo {} e recarrega', async () => {
+  test('(c) confirmar o diálogo faz UM POST em /publish/ com corpo {} e recarrega', async () => {
     listResponse = pageOf([makeSolic()]);
     renderPage();
 
-    await confirmAction(/^Publicar: Vidas Em Rede, 10\/10\/2026 09:00/, 'Publicar este evento na agenda da organização?', 'Publicar');
+    await confirmAction(/^Publicar: Vidas Em Rede, 10\/10\/2026 09:00/, 'Publicar na agenda da organização', 'Publicar');
 
     await waitFor(() => expect(actionCalls()).toHaveLength(1));
     const [url, options] = actionCalls()[0] ?? [];
@@ -409,7 +477,7 @@ describe('PublicacaoSetorPage — ações', () => {
       caso: 'PUBLISHED → Atualizar no Google = /resync-gcal/',
       row: { gcal_status: 'PUBLISHED' as const, external_event_id: 'asv27' },
       label: /^Atualizar no Google: Vidas Em Rede/,
-      popTitle: 'Atualizar este evento no Google Agenda?',
+      popTitle: 'Atualizar no Google Agenda',
       ok: 'Atualizar',
       endpoint: '/solicitacoes/7/resync-gcal/',
     },
@@ -417,7 +485,7 @@ describe('PublicacaoSetorPage — ações', () => {
       caso: 'PUBLISHED → Remover do Google = /cancel-gcal/',
       row: { gcal_status: 'PUBLISHED' as const, external_event_id: 'asv27' },
       label: /^Remover do Google: Vidas Em Rede/,
-      popTitle: 'Remover este evento do Google Agenda?',
+      popTitle: 'Remover do Google Agenda',
       ok: 'Remover',
       endpoint: '/solicitacoes/7/cancel-gcal/',
     },
@@ -425,7 +493,7 @@ describe('PublicacaoSetorPage — ações', () => {
       caso: 'ERROR sem id → Tentar de novo = /publish/',
       row: { gcal_status: 'ERROR' as const, external_event_id: null },
       label: /^Tentar de novo: Vidas Em Rede/,
-      popTitle: 'Tentar publicar este evento de novo?',
+      popTitle: 'Tentar publicar de novo',
       ok: 'Tentar de novo',
       endpoint: '/solicitacoes/7/publish/',
     },
@@ -438,6 +506,62 @@ describe('PublicacaoSetorPage — ações', () => {
     await waitFor(() => expect(actionCalls()).toHaveLength(1));
     expect(actionCalls()[0]?.[0]).toBe(endpoint);
     await waitFor(() => expect(listCalls()).toHaveLength(2));
+  });
+
+  test.each([
+    {
+      acao: 'Publicar',
+      row: {},
+      titulo: 'Publicar na agenda da organização: Vidas Em Rede, 10/10/2026 09:00?',
+    },
+    {
+      acao: 'Remover do Google',
+      row: { gcal_status: 'PUBLISHED' as const, external_event_id: 'asv27' },
+      titulo: 'Remover do Google Agenda: Vidas Em Rede, 10/10/2026 09:00?',
+    },
+  ])('$acao: a confirmação é um diálogo que cita o evento, abre no Cancelar e devolve o foco', async ({ acao, row, titulo }) => {
+    listResponse = pageOf([makeSolic(row)]);
+    renderPage();
+
+    const botao = await screen.findByLabelText(new RegExp(`^${acao}: Vidas Em Rede`));
+    botao.focus();
+    fireEvent.click(botao);
+
+    const dialogo = await screen.findByRole('dialog');
+    expect(dialogo).toHaveAccessibleName(titulo);
+    const cancelar = within(dialogo).getByRole('button', { name: 'Cancelar' });
+    await waitFor(() => expect(cancelar).toHaveFocus());
+
+    // Cancelar não publica nada e o foco volta ao botão da linha.
+    fireEvent.click(cancelar);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(actionCalls()).toHaveLength(0);
+    await waitFor(() => expect(botao).toHaveFocus());
+  });
+
+  test.each([
+    { acao: 'Publicar', row: {}, ok: 'Publicar' },
+    { acao: 'Remover do Google', row: { gcal_status: 'PUBLISHED' as const, external_event_id: 'asv27' }, ok: 'Remover' },
+  ])('$acao confirmado: a linha recarrega sem o botão e o foco vai para a tabela, não para o body', async ({ acao, row, ok }) => {
+    listResponse = pageOf([makeSolic(row)]);
+    // Depois da ação a linha volta em voo (PENDING): sem ação nenhuma, o botão da linha sai do DOM.
+    actionResult = () => {
+      listResponse = pageOf([makeSolic({ gcal_status: 'PENDING' })]);
+      return Promise.resolve({ detail: 'ok', solicitacao_id: 7 });
+    };
+    renderPage();
+
+    const botao = await screen.findByLabelText(new RegExp(`^${acao}: Vidas Em Rede`));
+    botao.focus();
+    fireEvent.click(botao);
+    const dialogo = await screen.findByRole('dialog');
+    fireEvent.click(within(dialogo).getByRole('button', { name: ok }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    const linhaEmVoo = await screen.findByText('Publicando…');
+    expect(botao).not.toBeInTheDocument();
+    await waitFor(() => expect(document.activeElement).not.toBe(document.body));
+    expect(document.activeElement?.contains(linhaEmVoo)).toBe(true);
   });
 
   test('linha PENDING não oferece ação (publicação em voo)', async () => {
@@ -453,7 +577,7 @@ describe('PublicacaoSetorPage — ações', () => {
     actionResult = () => Promise.reject(apiError(403, { code: 'google_not_connected' }));
     renderPage();
 
-    await confirmAction(/^Publicar: Vidas Em Rede/, 'Publicar este evento na agenda da organização?', 'Publicar');
+    await confirmAction(/^Publicar: Vidas Em Rede/, 'Publicar na agenda da organização', 'Publicar');
 
     await waitFor(() => expect(googleHook.fetchStatus).toHaveBeenCalled());
     expect(message.warning).toHaveBeenCalledWith(
@@ -467,7 +591,7 @@ describe('PublicacaoSetorPage — ações', () => {
     actionResult = () => Promise.reject(apiError(404, { detail: 'Não encontrado.' }));
     renderPage();
 
-    await confirmAction(/^Publicar: Vidas Em Rede/, 'Publicar este evento na agenda da organização?', 'Publicar');
+    await confirmAction(/^Publicar: Vidas Em Rede/, 'Publicar na agenda da organização', 'Publicar');
 
     await waitFor(() =>
       expect(message.error).toHaveBeenCalledWith('Este evento não está mais disponível para você.'),
@@ -481,7 +605,7 @@ describe('PublicacaoSetorPage — ações', () => {
       Promise.reject(apiError(409, { code: 'CONFLICT', detail: 'Evento não está publicado.' }));
     renderPage();
 
-    await confirmAction(/^Remover do Google: Vidas Em Rede/, 'Remover este evento do Google Agenda?', 'Remover');
+    await confirmAction(/^Remover do Google: Vidas Em Rede/, 'Remover do Google Agenda', 'Remover');
 
     await waitFor(() => expect(message.error).toHaveBeenCalledWith('Evento não está publicado.'));
   });
@@ -497,7 +621,7 @@ describe('PublicacaoSetorPage — ações', () => {
       );
     renderPage();
 
-    await confirmAction(/^Publicar: Vidas Em Rede/, 'Publicar este evento na agenda da organização?', 'Publicar');
+    await confirmAction(/^Publicar: Vidas Em Rede/, 'Publicar na agenda da organização', 'Publicar');
 
     await waitFor(() =>
       expect(message.error).toHaveBeenCalledWith(
@@ -512,7 +636,7 @@ describe('PublicacaoSetorPage — ações', () => {
     actionResult = () => Promise.reject(apiError(429, { detail: 'Request was throttled.' }));
     renderPage();
 
-    await confirmAction(/^Publicar: Vidas Em Rede/, 'Publicar este evento na agenda da organização?', 'Publicar');
+    await confirmAction(/^Publicar: Vidas Em Rede/, 'Publicar na agenda da organização', 'Publicar');
 
     await waitFor(() =>
       expect(message.error).toHaveBeenCalledWith('Muitas ações seguidas; aguarde um minuto.'),
@@ -547,5 +671,81 @@ describe('PublicacaoSetorPage — polling (d)', () => {
 
     await vi.advanceTimersByTimeAsync(TIMING.PUBLICACAO_PENDENTE_POLL_MS * 3);
     expect(listCalls()).toHaveLength(2);
+  });
+
+  // Revisão do item 36: uma falha passageira do polling (429, rede do celular) trocava a lista certa
+  // pelo erro, tirava os botões da linha (o foco caía no body) e a tabela piscava no tick seguinte.
+  test('falha de um tick do polling: a lista que estava na tela fica, com um aviso só', async () => {
+    vi.useFakeTimers();
+    listResponse = pageOf([makeSolic({ gcal_status: 'PENDING' })]);
+    renderPage();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(screen.getByText('Vidas Em Rede')).toBeInTheDocument();
+
+    fetchAPIMock.mockImplementation((url: string) =>
+      isList(url) ? Promise.reject(apiError(429, { detail: 'Muitas requisições.' })) : Promise.reject(new Error(url)),
+    );
+    await act(() => vi.advanceTimersByTimeAsync(TIMING.PUBLICACAO_PENDENTE_POLL_MS));
+    expect(listCalls()).toHaveLength(2);
+
+    expect(screen.queryByText('Não foi possível carregar a lista.')).not.toBeInTheDocument();
+    expect(screen.getByText('Vidas Em Rede')).toBeInTheDocument();
+    expect(message.error).toHaveBeenCalledWith(expect.objectContaining({ key: expect.any(String) }));
+  });
+});
+
+// Achado do item 36 (19/10/2026): a tabela rolava na horizontal (scroll.x max-content) e, no
+// celular, os botões ficavam fora da tela; a mensagem de erro do Google virava uma linha só.
+describe('PublicacaoSetorPage — sem rolagem horizontal', () => {
+  /** Títulos das colunas de dados (sem a do botão de expandir). */
+  function cabecalhos(): string[] {
+    return screen
+      .getAllByRole('columnheader')
+      .filter((th) => !th.classList.contains('ant-table-row-expand-icon-cell'))
+      .map((th) => th.textContent?.trim() ?? '')
+      .filter(Boolean);
+  }
+
+  test('a 1280 px: o evento (data, projeto, município, Google Agenda) e as ações; sem rolagem nem coluna fixa', async () => {
+    listResponse = pageOf([makeSolic({ meet_link: 'https://meet.google.com/abc-defg-hij' })]);
+    const { container } = renderPage();
+    await screen.findByText('Vidas Em Rede');
+
+    expect(cabecalhos()).toEqual(['Evento', 'Tipo', 'Coordenador', 'Meet', 'Ações']);
+    const linha = screen.getByText('Vidas Em Rede').closest('tr') as HTMLElement;
+    expect(within(linha).getByText('10/10/2026 09:00')).toBeInTheDocument();
+    expect(within(linha).getByText('Sobral')).toBeInTheDocument();
+    expect(within(linha).getByText('Não publicado')).toBeInTheDocument();
+    expect(container.querySelector('.ant-table-content')?.getAttribute('style') ?? '').not.toMatch(/overflow/);
+  });
+
+  test('a 360 px: só o evento e as ações, com rótulo curto; o resto na linha expandida', async () => {
+    definirLarguraTela(360);
+    listResponse = pageOf([makeSolic({ gcal_status: 'PUBLISHED', external_event_id: 'asv27' })]);
+    renderPage();
+    await screen.findByText('Vidas Em Rede');
+
+    expect(cabecalhos()).toEqual(['Evento', 'Ações']);
+    const linha = screen.getByText('Vidas Em Rede').closest('tr') as HTMLElement;
+    expect(within(linha).getByText('Sobral')).toBeInTheDocument();
+    // Texto visível curto; o nome acessível continua completo e começa por ele (WCAG 2.5.3).
+    const atualizar = within(linha).getByLabelText(/^Atualizar no Google: Vidas Em Rede/);
+    expect(atualizar).toHaveTextContent(/^Atualizar$/);
+    expect(within(linha).getByLabelText(/^Remover do Google: Vidas Em Rede/)).toHaveTextContent(/^Remover$/);
+
+    fireEvent.click(within(linha).getByRole('button', { name: /^Expandir linha de Vidas Em Rede/ }));
+    const expandida = within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);
+    for (const texto of ['Formação', 'Maria Coordenadora']) {
+      expect(expandida.getByText(texto)).toBeInTheDocument();
+    }
+  });
+
+  test('a mensagem de erro do Google quebra linha na célula (não estica a tabela)', async () => {
+    const longa = 'O Google recusou o acesso ao calendário da organização. '.repeat(6).trim();
+    listResponse = pageOf([makeSolic({ gcal_status: 'ERROR', gcal_last_error: longa })]);
+    renderPage();
+
+    const erro = await screen.findByText(longa);
+    expect(erro).toHaveStyle({ overflowWrap: 'anywhere', whiteSpace: 'normal' });
   });
 });

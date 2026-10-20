@@ -21,11 +21,12 @@
  * - Conformidade ISO 9241-110: Controle explícito (usuário vê apenas ações permitidas)
  */
 
-import { useState, useEffect, useCallback, useMemo, useRef, ChangeEvent, Key, JSX, CSSProperties } from 'react';
+import { useState, useEffect, useCallback, useContext, useMemo, useRef, ChangeEvent, Key, JSX, CSSProperties } from 'react';
 import {
   Alert,
-  Table,
   Card,
+  ConfigProvider,
+  Grid,
   Input,
   Select,
   Button,
@@ -40,7 +41,6 @@ import {
   Avatar,
   Tooltip,
 } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
 import type { TableRowSelection } from 'antd/es/table/interface';
 import {
   CalendarOutlined,
@@ -61,10 +61,9 @@ import {
   approveSolicitacoesBatch,
   rejectSolicitacoesBatch,
 } from '../../api/solicitacoes';
-import { getMyPolicies } from '../../api/me';
 import { getMe } from '../../api/availability';
-import { computeCapabilities } from '../../hooks/useCapabilities';
-import { ehSuperusuario } from '../../contexts/AcessoContext';
+import { ehSuperusuario, useAcesso } from '../../contexts/AcessoContext';
+import ThemeContext from '../../contexts/ThemeContext';
 import { TIMING } from '../../constants/timing';
 import { usePolling } from '../../hooks/usePolling';
 import { syncChannel } from '../../services/syncChannel';
@@ -85,6 +84,9 @@ import { formadoresLabel } from '../../utils/participants';
 import { mesmosDados } from '../../utils/mesmosDados';
 import { pausaDo429Ms } from '../../utils/retryAfter';
 import AvisoAtualizacaoPausada from '../../components/AvisoAtualizacaoPausada';
+import { TEXTO_DA_TAG } from '../../components/textoDaTag';
+import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
+import { AcoesLinha, larguraAcoesLinha, type AcaoDaLinha } from '../../components/AcoesLinha';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -151,12 +153,41 @@ interface PreviewDataType {
 // e mostra o texto inteiro no title (achado da revisão do PR-2, 05/10/2026).
 const UMA_LINHA: CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 
+// Linha marcada para o lote (tema claro): o AntD tira o fundo do colorPrimary (o verde da marca clareado para #9aaba4),
+// e os ícones de Aprovar e Reprovar (link, sem fundo) caíam para 1,71 e 1,36:1. Este verde bem
+// claro dá 3:1 aos dois ícones e 4,5:1 ao texto cinza da célula (WCAG 1.4.11 e 1.4.3).
+const FUNDO_DA_LINHA_MARCADA = '#f4faf7';
+const TEMA_DA_TABELA = {
+  components: { Table: { rowSelectedBg: FUNDO_DA_LINHA_MARCADA, rowSelectedHoverBg: FUNDO_DA_LINHA_MARCADA } },
+};
+
+/**
+ * O evento como a pessoa o reconhece: "25/08/2026 08:00 · Sobral · Projeto X" (botões, confirmações, lote).
+ * Leva a hora: manhã e tarde no mesmo dia, município e projeto ficam lado a lado e não podem ter o mesmo nome.
+ */
+function rotuloDoEvento(row: Solicitacao): string {
+  return [formatFortaleza(row.inicio), row.municipio_nome, row.projeto_nome].filter(Boolean).join(' · ');
+}
+
+/** O vazio da lista diz o que não há (o do AntD, "Não há dados", não diz). */
+function textoDoVazio(status: string, busca: string): string {
+  if (busca.trim()) return `Nenhuma solicitação encontrada para "${busca.trim()}".`;
+  if (status === 'aprovado') return 'Nenhuma solicitação aprovada.';
+  if (status === 'reprovado') return 'Nenhuma solicitação reprovada.';
+  return 'Nenhuma solicitação aguardando aprovação.';
+}
+
+/** Quantos eventos a confirmação do lote lista pelo nome; o resto vai na contagem. */
+const EVENTOS_NA_CONFIRMACAO = 10;
+
 export default function ApprovalsPage(): JSX.Element {
   const [loading, setLoading] = useState<boolean>(false);
   const [rows, setRows] = useState<Solicitacao[]>([]);
   const [total, setTotal] = useState<number>(0);
   // Uma carga pedida pela pessoa recebeu 429: a tela pode não corresponder ao pedido.
   const [cargaFalhou, setCargaFalhou] = useState<boolean>(false);
+  // A carga pedida pela pessoa falhou (fora o 429): o motivo vai no lugar das linhas, não o vazio.
+  const [erroCarga, setErroCarga] = useState<string | null>(null);
 
   const [statusFilter, setStatusFilter] = useState<SolicitacaoStatus | (string & {})>('pendente');
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -166,8 +197,10 @@ export default function ApprovalsPage(): JSX.Element {
   const [previewVisible, setPreviewVisible] = useState<boolean>(false);
   const [previewData, setPreviewData] = useState<PreviewDataType | null>(null);
 
-  // PA-06: permissão de aprovar (policy `access_solicitation_approvals`)
-  const [canApprove, setCanApprove] = useState<boolean>(false);
+  // PA-06: permissão de aprovar (policy `access_solicitation_approvals`), do acesso da sessão:
+  // a mesma policy que abriu a rota. Uma 2ª busca aqui podia falhar sozinha e sumir com os
+  // botões sem aviso (achado do item 36, 19/10/2026).
+  const canApprove = useAcesso().caps.canAccessApprovals;
   // PA-02 (segregação): usuário logado, para reconhecer a própria solicitação
   const [me, setMe] = useState<CurrentUser | null>(null);
 
@@ -224,6 +257,7 @@ export default function ApprovalsPage(): JSX.Element {
       const visiveis = new Set<Key>(results.map((r) => r.id));
       setSelectedRowKeys((keys) => (keys.every((k) => visiveis.has(k)) ? keys : keys.filter((k) => visiveis.has(k))));
       setCargaFalhou(false);
+      setErroCarga(null);
     } catch (error) {
       if (seq !== seqRef.current) return;
       // A página deixou de existir (os últimos itens dela foram decididos): volta uma.
@@ -237,6 +271,13 @@ export default function ApprovalsPage(): JSX.Element {
       if (pausa !== null) {
         pausarPolling(pausa);
         if (!silencioso) setCargaFalhou(true);
+        return;
+      }
+      // Pedida pela pessoa: o motivo e "Tentar de novo" no lugar das linhas (um toast some em 3 s e
+      // a tabela ficava em "Não há dados", como se nada esperasse aprovação). No segundo plano, a
+      // lista que já estava na tela fica, com o toast.
+      if (!silencioso) {
+        setErroCarga((error as Error).message || 'Erro desconhecido.');
         return;
       }
       message.error({
@@ -278,27 +319,12 @@ export default function ApprovalsPage(): JSX.Element {
     return () => { unsub1(); unsub2(); };
   }, [loadData]);
 
-  // PA-06 + PR 3 hardening RBAC (#1308) + PR 10 hardening RBAC (2026-04-30):
-  // a fonte exclusiva de autorização passou a ser a policy pública
-  // `access_solicitation_approvals` (gerência da Superintendência, DAT ou
-  // Controle; SSOT `solicitation_approval_basis`). Legacy `can_approve_super`
-  // deixou de ser consultado pelo frontend.
-  // PR B1: `getMe()` em paralelo, para a regra de segregação (PA-02) na tabela.
+  // PA-02 (segregação): o usuário logado, para reconhecer a própria solicitação na tabela.
+  // A permissão de aprovar não sai daqui: vem do AcessoContext (acima).
   useEffect(() => {
-    const loadAccess = async (): Promise<void> => {
-      try {
-        const [policies, currentUser] = await Promise.all([
-          getMyPolicies().catch(() => [] as string[]),
-          getMe().catch(() => null),
-        ]);
-        setCanApprove(computeCapabilities(policies).canAccessApprovals);
-        setMe(currentUser);
-      } catch (error) {
-        logger.error('Erro ao carregar policies:', error);
-        setCanApprove(false);
-      }
-    };
-    void loadAccess();
+    getMe()
+      .then(setMe)
+      .catch((error: unknown) => logger.error('Erro ao carregar o usuário:', error));
   }, []);
 
   // PA-02 (segregação): quem criou não decide a própria; superusuário pode (fica no AuditLog).
@@ -323,13 +349,16 @@ export default function ApprovalsPage(): JSX.Element {
     }
   }, []);
 
-  const handleApprove = useCallback((id: ID): void => {
+  // A decisão não se desfaz: a confirmação cita o evento e abre com o foco no Cancelar.
+  const handleApprove = useCallback((row: Solicitacao): void => {
+    const id = row.id;
     Modal.confirm({
-      title: 'Confirmar Aprovação',
-      content: 'Deseja aprovar esta solicitação?',
+      title: 'Confirmar aprovação',
+      content: `Aprovar o evento ${rotuloDoEvento(row)}?`,
       okText: 'Aprovar',
       okType: 'primary',
       cancelText: 'Cancelar',
+      autoFocusButton: 'cancel',
       onOk: async () => {
         try {
           await approveSolicitacao(id);
@@ -359,13 +388,15 @@ export default function ApprovalsPage(): JSX.Element {
     });
   }, [loadData]);
 
-  const handleReject = useCallback((id: ID): void => {
+  const handleReject = useCallback((row: Solicitacao): void => {
+    const id = row.id;
     Modal.confirm({
-      title: 'Confirmar Reprovação',
-      content: 'Deseja reprovar esta solicitação?',
+      title: 'Confirmar reprovação',
+      content: `Reprovar o evento ${rotuloDoEvento(row)}? Esta ação não pode ser desfeita.`,
       okText: 'Reprovar',
       okType: 'danger',
       cancelText: 'Cancelar',
+      autoFocusButton: 'cancel',
       onOk: async () => {
         try {
           await rejectSolicitacao(id);
@@ -390,22 +421,39 @@ export default function ApprovalsPage(): JSX.Element {
       acao,
       itens: errors.map((e) => {
         const row = porId.get(e.id);
-        const evento = row
-          ? [formatFortaleza(row.inicio, 'DD/MM/YYYY'), row.municipio_nome, row.projeto_nome].filter(Boolean).join(' · ')
-          : `Solicitação #${e.id}`;
+        const evento = row ? rotuloDoEvento(row) : `Solicitação #${e.id}`;
         return { id: e.id, evento, detail: e.detail };
       }),
     });
+  };
+
+  // Lote: a confirmação lista os eventos selecionados (os da página visível).
+  const conteudoDoLote = (): JSX.Element => {
+    const selecionadas = new Set<Key>(selectedRowKeys);
+    const eventos = rows.filter((r) => selecionadas.has(r.id));
+    const resto = selectedRowKeys.length - Math.min(eventos.length, EVENTOS_NA_CONFIRMACAO);
+    return (
+      <>
+        <ul className="pl-5 my-2">
+          {eventos.slice(0, EVENTOS_NA_CONFIRMACAO).map((evento) => (
+            <li key={evento.id} className="break-words">{rotuloDoEvento(evento)}</li>
+          ))}
+        </ul>
+        {resto > 0 && <Paragraph className="mb-2">e mais {resto}.</Paragraph>}
+        <Paragraph className="mb-0">Esta ação não pode ser desfeita.</Paragraph>
+      </>
+    );
   };
 
   // Handlers de operações em lote
   const handleBatchApprove = (): void => {
     Modal.confirm({
       title: `Aprovar ${selectedRowKeys.length} solicitação(ões)?`,
-      content: 'Esta ação não pode ser desfeita.',
+      content: conteudoDoLote(),
       okText: 'Aprovar Todas',
       okType: 'primary',
       cancelText: 'Cancelar',
+      autoFocusButton: 'cancel',
       onOk: async () => {
         try {
           setBatchLoading(true);
@@ -430,10 +478,11 @@ export default function ApprovalsPage(): JSX.Element {
   const handleBatchReject = (): void => {
     Modal.confirm({
       title: `Reprovar ${selectedRowKeys.length} solicitação(ões)?`,
-      content: 'Esta ação não pode ser desfeita.',
+      content: conteudoDoLote(),
       okText: 'Reprovar Todas',
       okType: 'danger',
       cancelText: 'Cancelar',
+      autoFocusButton: 'cancel',
       onOk: async () => {
         try {
           setBatchLoading(true);
@@ -462,153 +511,141 @@ export default function ApprovalsPage(): JSX.Element {
     getCheckboxProps: (record: Solicitacao) => ({
       // Só pendentes; a impedida (própria, conta alterada, editada) nunca entra no lote (PA-02)
       disabled: record.status !== 'pendente' || impedimento(record) !== null,
+      // Sem nome, o leitor de tela ouvia só "caixa de seleção" em toda linha (axe: label).
+      'aria-label': `Selecionar: ${rotuloDoEvento(record)}`,
     }),
     // A impedida sai sem checkbox (não só desabilitado): não há ação possível nela.
     renderCell: (_checked, record, _index, originNode) => (impedimento(record) !== null ? null : originNode),
-    selections: [
-      Table.SELECTION_ALL,
-      Table.SELECTION_INVERT,
-      Table.SELECTION_NONE,
-    ],
+    // `true`: os atalhos padrão do AntD (tudo, inverter, nada) sem importar o `Table` cru.
+    selections: true,
   } : undefined;
 
+  // Celular: as ações vão para o menu "Mais ações" (AcoesLinha) e a página perde padding.
+  const telas = Grid.useBreakpoint();
+  const temaEscuro = useContext(ThemeContext)?.isDark === true; // o escuro tem fundo próprio (App.css)
+  const acoesCompactas = !telas.sm;
+
+  // Sem rolagem horizontal (achado do item 36): no celular a coluna fixa Ações cobria a tabela e
+  // a pessoa aprovava sem ver o evento. Sempre na linha: o Evento (data, município, projeto) e as
+  // ações; o resto sobe por largura e, escondido, vai para a linha expandida.
   // Issue #260: Memoizar columns para evitar re-renderização desnecessária da tabela
-  const columns: ColumnsType<Solicitacao> = useMemo(() => [
+  const columns: ColunaResponsiva<Solicitacao>[] = useMemo(() => [
     {
-      title: 'Data/Horário',
-      key: 'data_horario',
-      width: 140,
-      render: (_, record) => (
-        <div>
-          <div>{formatFortaleza(record.inicio, 'DD/MM/YYYY')}</div>
-          <small className="text-gray-500">
-            {formatFortaleza(record.inicio, 'HH:mm')} - {formatFortaleza(record.fim, 'HH:mm')}
-          </small>
-        </div>
-      ),
-    },
-    {
-      title: 'Município',
-      dataIndex: 'municipio_nome',
-      key: 'municipio_nome',
-      render: (nome: string | null) => nome || '-',
-      width: 130,
-      ellipsis: true,
-    },
-    {
-      title: 'Projeto',
-      dataIndex: 'projeto_nome',
-      key: 'projeto_nome',
-      render: (nome: string | null) => nome || '-',
-      width: 130,
-      ellipsis: true,
-    },
-    {
-      title: 'Tipo/Enc./Seg.',
-      key: 'tipo_encontro_segmento',
-      width: 100,
-      render: (_, record) => (
-        <div style={{ lineHeight: 1.3 }}>
-          {record.tipo && <div>{record.tipo}</div>}
-          {record.encontro && <small className="text-gray-500">{record.encontro}</small>}
-          {record.segmento && <div><small className="text-gray-400">{record.segmento}</small></div>}
-          {!record.tipo && !record.encontro && !record.segmento && '-'}
-        </div>
-      ),
+      title: 'Evento',
+      key: 'evento',
+      render: (_, record) => {
+        const motivo = record.status === 'pendente' && canApprove ? impedimento(record) : null;
+        return (
+          <div style={{ lineHeight: 1.3 }}>
+            <div style={UMA_LINHA}>
+              {formatFortaleza(record.inicio, 'DD/MM/YYYY')}{' '}
+              <small className="text-gray-500">
+                {formatFortaleza(record.inicio, 'HH:mm')} - {formatFortaleza(record.fim, 'HH:mm')}
+              </small>
+            </div>
+            <div style={UMA_LINHA} title={record.municipio_nome || undefined}>{record.municipio_nome || '-'}</div>
+            <small className="text-gray-500" style={{ ...UMA_LINHA, display: 'block' }} title={record.projeto_nome || undefined}>
+              {record.projeto_nome || '-'}
+            </small>
+            {/* PA-02: quem lê não decide esta; outra pessoa aprovadora decide */}
+            {motivo !== null && (
+              <Tooltip title="Outra pessoa aprovadora precisa decidir">
+                <Tag color="blue" className="mt-1" style={{ whiteSpace: 'normal' }}>{TAG_DA_DECISAO_IMPEDIDA[motivo]}</Tag>
+              </Tooltip>
+            )}
+          </div>
+        );
+      },
     },
     {
       title: 'Coordenador',
       dataIndex: 'coordenador_nome',
       key: 'coordenador_nome',
-      // 05/10/2026: a resposta "acompanha?" vai numa 2ª linha da mesma célula — sem coluna nova,
-      // para não alargar a tabela (a rolagem lateral desta tela já está na fila).
-      render: (nome: string | null, record) => (
+      responsive: VISIVEL_A_PARTIR.md,
+      // 05/10/2026: a resposta "acompanha?" vai numa 2ª linha da mesma célula, sem coluna nova.
+      render: (valor, record) => {
+        const nome = valor as string | null;
+        return (
+          <div style={{ lineHeight: 1.3 }}>
+            <div style={UMA_LINHA} title={nome || undefined}>{nome || '-'}</div>
+            <small className="text-gray-500">{record.coordenador_acompanha ? 'Acompanha' : 'Não acompanha'}</small>
+          </div>
+        );
+      },
+    },
+    {
+      title: 'Tipo/Enc./Seg.',
+      key: 'tipo_encontro_segmento',
+      responsive: VISIVEL_A_PARTIR.lg,
+      width: 110,
+      render: (_, record) => (
         <div style={{ lineHeight: 1.3 }}>
-          <div style={UMA_LINHA} title={nome || undefined}>{nome || '-'}</div>
-          <small className="text-gray-500">{record.coordenador_acompanha ? 'Acompanha' : 'Não acompanha'}</small>
+          {record.tipo && <div style={UMA_LINHA} title={record.tipo}>{record.tipo}</div>}
+          {record.encontro && <small className="text-gray-500">{record.encontro}</small>}
+          {record.segmento && <div><small className="text-gray-500">{record.segmento}</small></div>}
+          {!record.tipo && !record.encontro && !record.segmento && '-'}
         </div>
       ),
-      width: 130,
-      ellipsis: true,
     },
     {
       title: 'Formadores',
       dataIndex: 'participations',
       key: 'formadores',
+      responsive: VISIVEL_A_PARTIR.lg,
       // Nome do formador (inclui convidados "que saíram" via guest_nome — sem FK). Ver utils/participants.
       // 2ª linha: "pretende avaliar o formador?" (05/10/2026); sem resposta (antigas), nada.
-      render: (participations: Participation[] | undefined, record) => (
-        <div style={{ lineHeight: 1.3 }}>
-          <div style={UMA_LINHA} title={formadoresLabel(participations) || undefined}>
-            {formadoresLabel(participations) || '-'}
+      render: (valor, record) => {
+        const participations = valor as Participation[] | undefined;
+        return (
+          <div style={{ lineHeight: 1.3 }}>
+            <div style={UMA_LINHA} title={formadoresLabel(participations) || undefined}>
+              {formadoresLabel(participations) || '-'}
+            </div>
+            {record.pretende_avaliar_formador === true && (
+              <small className="text-gray-500" style={{ ...UMA_LINHA, display: 'block' }} title={record.formador_avaliado_nome || undefined}>
+                Pretende avaliar: {record.formador_avaliado_nome || '-'}
+              </small>
+            )}
+            {record.pretende_avaliar_formador === false && <small className="text-gray-500">Não pretende avaliar</small>}
           </div>
-          {record.pretende_avaliar_formador === true && (
-            <small className="text-gray-500" style={{ ...UMA_LINHA, display: 'block' }} title={record.formador_avaliado_nome || undefined}>
-              Pretende avaliar: {record.formador_avaliado_nome || '-'}
-            </small>
-          )}
-          {record.pretende_avaliar_formador === false && <small className="text-gray-500">Não pretende avaliar</small>}
-        </div>
-      ),
-      width: 150,
-      ellipsis: true,
+        );
+      },
     },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: (status: SolicitacaoStatus) => (
-        <Tag color={STATUS_COLORS[status]}>{STATUS_LABELS[status] || status}</Tag>
-      ),
-      width: 90,
+      responsive: VISIVEL_A_PARTIR.sm,
+      width: 100,
+      render: (valor) => {
+        const status = valor as SolicitacaoStatus;
+        // TEXTO_DA_TAG: o laranja e o verde do AntD não passam de 4,5:1.
+        return <Tag color={STATUS_COLORS[status]} style={{ color: TEXTO_DA_TAG[STATUS_COLORS[status]] }}>{STATUS_LABELS[status] || status}</Tag>;
+      },
     },
     {
       title: 'Ações',
       key: 'actions',
-      width: 220,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="small">
-          <Button
-            size="small"
-            icon={<EyeOutlined />}
-            onClick={() => handlePreview(record.id)}
-            aria-label="Visualizar preview do evento"
-          />
-          {/* PA-06: Aprovar/Reprovar para quem tem a policy; PA-02: nunca na impedida */}
-          {record.status === 'pendente' && canApprove && impedimento(record) !== null ? (
-            <Tooltip title="Outra pessoa aprovadora precisa decidir">
-              <Tag color="blue">{TAG_DA_DECISAO_IMPEDIDA[impedimento(record) as DecisaoImpedida]}</Tag>
-            </Tooltip>
-          ) : null}
-          {record.status === 'pendente' && canApprove && impedimento(record) === null ? (
-            <>
-              <Button
-                size="small"
-                type="primary"
-                icon={<CheckOutlined />}
-                onClick={() => handleApprove(record.id)}
-              >
-                Aprovar
-              </Button>
-              <Button
-                size="small"
-                danger
-                icon={<CloseOutlined />}
-                onClick={() => handleReject(record.id)}
-              >
-                Reprovar
-              </Button>
-            </>
-          ) : null}
-        </Space>
-      ),
+      width: larguraAcoesLinha(3, acoesCompactas),
+      render: (_, record) => {
+        const acoes: AcaoDaLinha[] = [
+          { chave: 'ver', rotulo: 'Ver prévia do evento', icone: <EyeOutlined />, onClick: () => void handlePreview(record.id) },
+        ];
+        // PA-06: Aprovar/Reprovar para quem tem a policy; PA-02: nunca na impedida
+        if (record.status === 'pendente' && canApprove && impedimento(record) === null) {
+          acoes.push(
+            { chave: 'aprovar', rotulo: 'Aprovar', icone: <CheckOutlined />, onClick: () => handleApprove(record) },
+            { chave: 'reprovar', rotulo: 'Reprovar', icone: <CloseOutlined />, onClick: () => handleReject(record), perigo: true },
+          );
+        }
+        return <AcoesLinha acoes={acoes} alvo={rotuloDoEvento(record)} compacto={acoesCompactas} />;
+      },
     },
-  ], [handlePreview, handleApprove, handleReject, canApprove, impedimento]);
+  ], [handlePreview, handleApprove, handleReject, canApprove, impedimento, acoesCompactas]);
 
   return (
-    <section className="p-6" aria-labelledby="aprovacoes-title">
-      <Card>
+    <section className="p-3 sm:p-6" aria-labelledby="aprovacoes-title">
+      <Card {...(!telas.sm && { styles: { body: { padding: 12 } } })}>
         <Space direction="vertical" style={{ width: '100%' }} size="large">
           {/* Header semantico */}
           <header>
@@ -617,7 +654,7 @@ export default function ApprovalsPage(): JSX.Element {
 
           {/* Filtros */}
           <nav aria-label="Filtros de busca">
-            <Space>
+            <Space wrap className="w-full">
               <Select
                 value={statusFilter}
                 onChange={handleStatusChange}
@@ -645,10 +682,10 @@ export default function ApprovalsPage(): JSX.Element {
           {(pollingPausado || cargaFalhou) && <AvisoAtualizacaoPausada cargaFalhou={cargaFalhou} />}
 
           {/* Contagem de pendentes */}
-          {statusFilter === 'pendente' && total > 0 && (
+          {statusFilter === 'pendente' && total > 0 && !erroCarga && (
             <aside aria-label="Contador de pendentes">
               <Paragraph>
-                <Tag color="orange">{total}</Tag> solicitações aguardando aprovação
+                <Tag color="orange" style={{ color: TEXTO_DA_TAG['orange'] }}>{total}</Tag> solicitações aguardando aprovação
               </Paragraph>
             </aside>
           )}
@@ -656,7 +693,7 @@ export default function ApprovalsPage(): JSX.Element {
           {/* Toolbar de ações em lote (PA-06: apenas para usuários com permissão) */}
           {selectedRowKeys.length > 0 && canApprove && (
             <nav aria-label="Acoes em lote" className="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
-              <Space>
+              <Space wrap>
                 <Text strong aria-live="polite">
                   {selectedRowKeys.length} solicitação(ões) selecionada(s)
                 </Text>
@@ -706,23 +743,28 @@ export default function ApprovalsPage(): JSX.Element {
 
           {/* Tabela */}
           <section aria-label="Lista de solicitacoes para aprovacao">
-            <Table
-              {...(rowSelection !== undefined && { rowSelection })}
-              columns={columns}
-              dataSource={rows}
-              loading={loading}
-              rowKey="id"
-              scroll={{ x: 1090 }}
-              pagination={{
-                current: page,
-                pageSize,
-                total,
-                showSizeChanger: true,
-                pageSizeOptions: PAGE_SIZE_OPTIONS,
-                showTotal: (count) => `Total: ${count} solicitações`,
-                onChange: handlePageChange,
-              }}
-            />
+            <ConfigProvider {...(!temaEscuro && { theme: TEMA_DA_TABELA })}>
+              <ResponsiveTable<Solicitacao>
+                {...(rowSelection !== undefined && { rowSelection })}
+                columns={columns}
+                dataSource={rows}
+                loading={loading}
+                rowKey="id"
+                nomeDaLinha={rotuloDoEvento}
+                erro={erroCarga}
+                onTentarDeNovo={() => { void loadData(); }}
+                locale={{ emptyText: textoDoVazio(statusFilter, searchTerm) }}
+                pagination={{
+                  current: page,
+                  pageSize,
+                  total,
+                  showSizeChanger: true,
+                  pageSizeOptions: PAGE_SIZE_OPTIONS,
+                  showTotal: (count) => `Total: ${count} solicitações`,
+                  onChange: handlePageChange,
+                }}
+              />
+            </ConfigProvider>
           </section>
         </Space>
       </Card>

@@ -471,6 +471,9 @@ test.describe('Checklist: Acessibilidade — telas do Programa C (axe-core, back
     '/dat/admin/projetos', // marca de série (01/10/2026)
     '/solicitacoes/minhas', // item 36 (19/10/2026)
     '/solicitacoes/meus-eventos',
+    '/solicitacoes/aprovacoes',
+    '/solicitacoes/publicacao',
+    '/controle/pre-agenda',
   ];
 
   // O sw.js (modo offline) esconde as requisições dos eventos de rede que `verificarTela` lê.

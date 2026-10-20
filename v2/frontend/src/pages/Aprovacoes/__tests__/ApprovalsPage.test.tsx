@@ -4,7 +4,7 @@
  * Cobertura (presença/estado, sem dirigir fluxo assíncrono nem Modal.confirm):
  * - Título "Aprovações" + filtros renderizam; polling é o mock (não roda de verdade).
  * - Estado vazio: tabela renderiza sem linhas de ação de aprovar.
- * - Sem permissão (policies = []): botão "Aprovar" ausente mesmo com pendente.
+ * - Sem permissão (acesso sem a policy): botão "Aprovar" ausente mesmo com pendente.
  * - Com permissão (`access_solicitation_approvals`): botão "Aprovar" presente.
  * - PR B1 (PA-02 segregação): a linha da PRÓPRIA solicitação sai sem checkbox e sem
  *   Aprovar/Reprovar, com a Tag "Sua solicitação" (a de outra pessoa segue normal).
@@ -16,14 +16,15 @@
  * Sem isso, o fetch rejeita no jsdom e loga async no teardown do worker →
  * EnvironmentTeardownError, reprovando o CI mesmo com asserts verdes.
  * `usePolling` também é mockado (no-op) para não disparar polling real.
- * `computeCapabilities` fica REAL — a permissão é dirigida via as
- * policies mockadas, exercitando a tradução policy → canApprove de verdade.
+ * A permissão vem do `AcessoContext` (as policies da sessão, como no App): `renderPage(APROVA)`.
+ * `computeCapabilities` fica REAL (via `montarAcesso`), exercitando policy → canApprove.
  */
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { message, Modal } from 'antd';
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MemoryRouter } from 'react-router';
+import { AcessoContext, montarAcesso } from '../../../contexts/AcessoContext';
 import type { CurrentUser, PaginatedResponse, Solicitacao, SolicitacaoFilters } from '../../../types';
 
 vi.mock('../../../api/solicitacoes', () => ({
@@ -59,6 +60,10 @@ import { getMyPolicies } from '../../../api/me';
 import { getMe } from '../../../api/availability';
 import { usePolling } from '../../../hooks/usePolling';
 import { formadoresLabel } from '../../../utils/participants';
+
+// Tela pesada (AntD + ResponsiveTable): na CI, cerca de 4x mais lenta que local e com cobertura, casos passam dos
+// 5 s padrão. Só o limite de tempo muda, nenhuma asserção.
+vi.setConfig({ testTimeout: 20_000 });
 
 const pausarPolling = vi.fn();
 
@@ -106,11 +111,20 @@ function meUser(overrides: Partial<CurrentUser> = {}): CurrentUser {
   };
 }
 
-function renderPage(): ReturnType<typeof render> {
+/** Policy que abre a rota e dá Aprovar/Reprovar. */
+const APROVA = ['access_solicitation_approvals'];
+
+/**
+ * A permissão vem do acesso da sessão (`AcessoContext`, as policies que liberaram a rota),
+ * como no App: `policies` é o que `/api/me/policies/` devolveu no login.
+ */
+function renderPage(policies: readonly string[] = []): ReturnType<typeof render> {
   return render(
-    <MemoryRouter>
-      <ApprovalsPage />
-    </MemoryRouter>,
+    <AcessoContext.Provider value={montarAcesso(policies, null)}>
+      <MemoryRouter>
+        <ApprovalsPage />
+      </MemoryRouter>
+    </AcessoContext.Provider>,
   );
 }
 
@@ -164,7 +178,6 @@ describe('ApprovalsPage', () => {
       previous: null,
       results: [pendingRow()],
     });
-    vi.mocked(getMyPolicies).mockResolvedValue([]);
 
     renderPage();
 
@@ -172,7 +185,7 @@ describe('ApprovalsPage', () => {
     expect(await screen.findByText('MunicipioTesteAlfa')).toBeInTheDocument();
     // Ação de preview sempre presente; aprovar/reprovar não (sem permissão).
     expect(
-      screen.getByRole('button', { name: /Visualizar preview do evento/i }),
+      screen.getByRole('button', { name: /Ver prévia do evento/i }),
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Aprovar/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Reprovar/i })).not.toBeInTheDocument();
@@ -215,9 +228,8 @@ describe('ApprovalsPage', () => {
       previous: null,
       results: [pendingRow()],
     });
-    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
 
-    renderPage();
+    renderPage(APROVA);
 
     // Espera a LINHA renderizar (query de texto, rápida) e então os botões de ação
     // DENTRO da tabela. canApprove vem de computeCapabilities(policies) real. `findByRole`
@@ -237,6 +249,18 @@ describe('ApprovalsPage', () => {
     ).toBeInTheDocument();
   }, 20000);
 
+  test('a permissão vem do acesso da sessão: falha do /me/policies não some com Aprovar/Reprovar', async () => {
+    vi.mocked(listSolicitacoes).mockResolvedValue({ count: 1, next: null, previous: null, results: [pendingRow()] });
+    // Rede oscilou na 2ª busca das policies: a sessão já tem a policy (foi ela que abriu a rota).
+    vi.mocked(getMyPolicies).mockRejectedValue(new Error('Failed to fetch'));
+
+    renderPage(APROVA);
+
+    const linha = (await screen.findByText('MunicipioTesteAlfa')).closest('tr') as HTMLElement;
+    expect(await within(linha).findByRole('button', { name: /Aprovar/i }, { timeout: 10000 })).toBeInTheDocument();
+    expect(within(linha).getByRole('button', { name: /Reprovar/i })).toBeInTheDocument();
+  }, 20000);
+
   test('linha própria: sem checkbox e sem Aprovar/Reprovar, com a Tag "Sua solicitação"', async () => {
     vi.mocked(listSolicitacoes).mockResolvedValue({
       count: 2,
@@ -247,10 +271,9 @@ describe('ApprovalsPage', () => {
         pendingRow({ id: 2, usuario: 5, municipio_nome: 'MunicipioAlheio' }),
       ],
     });
-    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
     vi.mocked(getMe).mockResolvedValue(meUser({ id: 99 }));
 
-    renderPage();
+    renderPage(APROVA);
 
     const propria = (await screen.findByText('MunicipioProprio')).closest('tr');
     const alheia = screen.getByText('MunicipioAlheio').closest('tr');
@@ -283,10 +306,9 @@ describe('ApprovalsPage', () => {
         pendingRow({ id: 2, usuario: 6, municipio_nome: 'MunicipioLivre', decisao_impedida: null }),
       ],
     });
-    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
     vi.mocked(getMe).mockResolvedValue(meUser({ id: 99 }));
 
-    renderPage();
+    renderPage(APROVA);
 
     const impedida = (await screen.findByText('MunicipioImpedido')).closest('tr') as HTMLElement;
     const livre = screen.getByText('MunicipioLivre').closest('tr') as HTMLElement;
@@ -307,10 +329,9 @@ describe('ApprovalsPage', () => {
       previous: null,
       results: [pendingRow({ id: 1, usuario: 99, municipio_nome: 'MunicipioProprio' })],
     });
-    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
     vi.mocked(getMe).mockResolvedValue(meUser({ id: 99, is_superuser: true }));
 
-    renderPage();
+    renderPage(APROVA);
 
     const linha = within((await screen.findByText('MunicipioProprio')).closest('tr') as HTMLElement);
     await linha.findByRole('button', { name: /Aprovar/i }, { timeout: 10000 });
@@ -356,9 +377,8 @@ describe('ApprovalsPage', () => {
   test('trocar de página busca a página no servidor e limpa a seleção', async () => {
     vi.mocked(listSolicitacoes).mockImplementation((filters = {}) =>
       Promise.resolve(filters.page === 2 ? pagina(20, 45, 21) : pagina(20, 45)));
-    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
 
-    renderPage();
+    renderPage(APROVA);
 
     const linha = (await screen.findByText('Municipio1')).closest('tr') as HTMLElement;
     fireEvent.click(await within(linha).findByRole('checkbox', {}, { timeout: 10000 }));
@@ -438,9 +458,8 @@ describe('ApprovalsPage', () => {
 
   test('polling tira da seleção o item que saiu da lista (sem chave órfã)', async () => {
     vi.mocked(listSolicitacoes).mockResolvedValue(pagina(2, 2));
-    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
 
-    renderPage();
+    renderPage(APROVA);
 
     const linha = (await screen.findByText('Municipio2')).closest('tr') as HTMLElement;
     fireEvent.click(await within(linha).findByRole('checkbox', {}, { timeout: 10000 }));
@@ -615,6 +634,31 @@ describe('ApprovalsPage', () => {
     expect(screen.queryByText(LISTA_NAO_CARREGOU)).not.toBeInTheDocument();
   }, 20000);
 
+  // Achado do item 36 (19/10/2026): lista que não carregou não é "Não há dados".
+  test('falha ao carregar: o motivo e "Tentar de novo" no lugar das linhas, não o vazio', async () => {
+    vi.mocked(listSolicitacoes).mockRejectedValue(Object.assign(new Error('Erro interno do servidor.'), { status: 500 }));
+
+    renderPage(APROVA);
+
+    const aviso = await screen.findByText('Não foi possível carregar a lista.');
+    expect(screen.getByText('Erro interno do servidor.')).toBeInTheDocument();
+    expect(screen.queryByText('Não há dados')).not.toBeInTheDocument();
+    expect(aviso.closest('[role="alert"]')).not.toBeNull();
+
+    vi.mocked(listSolicitacoes).mockResolvedValue(pagina(1, 1));
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
+
+    expect(await screen.findByText('Municipio1')).toBeInTheDocument();
+    expect(screen.queryByText('Não foi possível carregar a lista.')).not.toBeInTheDocument();
+  }, 20000);
+
+  test('vazio de verdade diz que não há solicitação aguardando aprovação', async () => {
+    renderPage(APROVA);
+
+    expect(await screen.findByText('Nenhuma solicitação aguardando aprovação.')).toBeInTheDocument();
+    expect(screen.queryByText('Não foi possível carregar a lista.')).not.toBeInTheDocument();
+  });
+
   // ------------------------------------------------------------------
   // Mapa de acesso 02/10 (P9): o erro ao aprovar diz quem e por quê.
   // ------------------------------------------------------------------
@@ -642,7 +686,6 @@ describe('ApprovalsPage', () => {
 
   test('lote com erros lista o evento e o motivo de cada um', async () => {
     vi.mocked(listSolicitacoes).mockResolvedValue(pagina(2, 2));
-    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
     vi.mocked(approveSolicitacoesBatch).mockResolvedValue({
       approved: 1,
       errors: [
@@ -651,7 +694,7 @@ describe('ApprovalsPage', () => {
       ],
     });
 
-    renderPage();
+    renderPage(APROVA);
 
     for (const municipio of ['Municipio1', 'Municipio2']) {
       const linha = (await screen.findByText(municipio)).closest('tr') as HTMLElement;
@@ -663,8 +706,8 @@ describe('ApprovalsPage', () => {
 
     const aviso = await screen.findByRole('status');
     expect(within(aviso).getByText('2 solicitação(ões) não foram aprovadas')).toBeInTheDocument();
-    // Evento (data · município · projeto) + motivo; o que não está na tela vai pelo número.
-    expect(within(aviso).getByText(/25\/08\/2026 · Municipio2 · ProjetoTeste/)).toBeInTheDocument();
+    // Evento (data e hora · município · projeto) + motivo; o que não está na tela vai pelo número.
+    expect(within(aviso).getByText(/25\/08\/2026 10:00 · Municipio2 · ProjetoTeste/)).toBeInTheDocument();
     expect(within(aviso).getByText(/tem outro evento aprovado neste horário/)).toBeInTheDocument();
     expect(within(aviso).getByText(/Solicitação #77/)).toBeInTheDocument();
     expect(within(aviso).getByText(/Solicitação não encontrada/)).toBeInTheDocument();
@@ -673,7 +716,6 @@ describe('ApprovalsPage', () => {
   test('aprovar um com conflito de agenda mostra quem e por quê', async () => {
     const erro = vi.spyOn(message, 'error');
     vi.mocked(listSolicitacoes).mockResolvedValue(pagina(1, 1));
-    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
     vi.mocked(approveSolicitacao).mockRejectedValue(Object.assign(new Error(DETALHE_CONFLITO), {
       status: 400,
       response: {
@@ -682,7 +724,7 @@ describe('ApprovalsPage', () => {
       },
     }));
 
-    renderPage();
+    renderPage(APROVA);
 
     const linha = (await screen.findByText('Municipio1')).closest('tr') as HTMLElement;
     const confirmacao = vi.spyOn(Modal, 'confirm').mockImplementation(semModal);
@@ -702,16 +744,103 @@ describe('ApprovalsPage', () => {
     erro.mockRestore();
   }, 30000);
 
+  // Achado do item 36 (19/10/2026): a decisão não se desfaz, então a confirmação diz qual é o
+  // evento e começa no Cancelar (ux-principios: ação destrutiva começa no Cancelar e cita o nome).
+  const EVENTO_1 = '25/08/2026 10:00 · Municipio1 · ProjetoTeste';
+
+  test.each([
+    ['Aprovar', 'Confirmar aprovação'],
+    ['Reprovar', 'Confirmar reprovação'],
+  ] as const)('%s de uma linha: o botão e a confirmação citam o evento, e o foco abre no Cancelar', async (acao, titulo) => {
+    vi.mocked(listSolicitacoes).mockResolvedValue(pagina(1, 1));
+
+    renderPage(APROVA);
+
+    await screen.findByText('Municipio1');
+    const confirmacao = vi.spyOn(Modal, 'confirm').mockImplementation(semModal);
+    fireEvent.click(await screen.findByRole('button', { name: `${acao}: ${EVENTO_1}` }, { timeout: 10000 }));
+
+    await waitFor(() => expect(confirmacao).toHaveBeenCalledTimes(1));
+    const config = confirmacao.mock.calls[0]?.[0];
+    expect(config).toMatchObject({ autoFocusButton: 'cancel', title: titulo });
+    render(<>{config?.content}</>);
+    expect(screen.getByText(EVENTO_1, { exact: false })).toBeInTheDocument();
+  }, 30000);
+
+  test('o olho de cada linha diz de qual evento é a prévia', async () => {
+    vi.mocked(listSolicitacoes).mockResolvedValue(pagina(1, 1));
+
+    renderPage();
+
+    // Linha primeiro (texto, rápido) e o botão dentro dela: findByRole na tabela inteira é lento no CI.
+    const linha = (await screen.findByText('Municipio1')).closest('tr') as HTMLElement;
+    expect(await within(linha).findByRole('button', { name: `Ver prévia do evento: ${EVENTO_1}` }, { timeout: 10000 })).toBeInTheDocument();
+  }, 20000);
+
+  test.each([
+    ['Aprovar Selecionadas'],
+    ['Reprovar Selecionadas'],
+  ] as const)('%s: a confirmação lista os eventos e o foco abre no Cancelar', async (botao) => {
+    vi.mocked(listSolicitacoes).mockResolvedValue(pagina(2, 2));
+
+    renderPage(APROVA);
+
+    for (const municipio of ['Municipio1', 'Municipio2']) {
+      const linha = (await screen.findByText(municipio)).closest('tr') as HTMLElement;
+      fireEvent.click(await within(linha).findByRole('checkbox', {}, { timeout: 10000 }));
+    }
+    const confirmacao = vi.spyOn(Modal, 'confirm').mockImplementation(semModal);
+    fireEvent.click(await screen.findByRole('button', { name: new RegExp(botao) }));
+
+    await waitFor(() => expect(confirmacao).toHaveBeenCalledTimes(1));
+    const config = confirmacao.mock.calls[0]?.[0];
+    expect(config).toMatchObject({ autoFocusButton: 'cancel' });
+    render(<>{config?.content}</>);
+    expect(screen.getByText(EVENTO_1)).toBeInTheDocument();
+    expect(screen.getByText('25/08/2026 10:00 · Municipio2 · ProjetoTeste')).toBeInTheDocument();
+    expect(screen.getByText(/não pode ser desfeita/)).toBeInTheDocument();
+  }, 30000);
+
+  // Revisão do item 36: duas sessões no mesmo dia, município e projeto (manhã e tarde) ficam lado a
+  // lado com ordering=proximidade. O rótulo leva a hora, senão a confirmação, a caixa de seleção e os
+  // botões saem com o mesmo texto nas duas linhas (WCAG 2.4.6) e a lista do lote repete a chave.
+  test('duas sessões do mesmo dia: o rótulo traz a hora e a confirmação do lote lista as duas', async () => {
+    vi.mocked(listSolicitacoes).mockResolvedValue({
+      count: 2,
+      next: null,
+      previous: null,
+      results: [
+        pendingRow({ id: 1, usuario: 5, municipio_nome: 'Sobral', inicio: '2026-08-25T11:00:00Z', fim: '2026-08-25T15:00:00Z' }),
+        pendingRow({ id: 2, usuario: 5, municipio_nome: 'Sobral', inicio: '2026-08-25T16:30:00Z', fim: '2026-08-25T20:30:00Z' }),
+      ],
+    });
+    const manha = '25/08/2026 08:00 · Sobral · ProjetoTeste';
+    const tarde = '25/08/2026 13:30 · Sobral · ProjetoTeste';
+
+    renderPage(APROVA);
+
+    fireEvent.click(await screen.findByRole('checkbox', { name: `Selecionar: ${manha}` }, { timeout: 10000 }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: `Selecionar: ${tarde}` }));
+    expect(screen.getByRole('button', { name: `Reprovar: ${manha}` })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `Reprovar: ${tarde}` })).toBeInTheDocument();
+
+    const confirmacao = vi.spyOn(Modal, 'confirm').mockImplementation(semModal);
+    fireEvent.click(await screen.findByRole('button', { name: /Reprovar Selecionadas/ }));
+    await waitFor(() => expect(confirmacao).toHaveBeenCalledTimes(1));
+    render(<>{confirmacao.mock.calls[0]?.[0]?.content}</>);
+    expect(screen.getByText(manha)).toBeInTheDocument();
+    expect(screen.getByText(tarde)).toBeInTheDocument();
+  }, 30000);
+
   test('aprovar um com outro erro segue na mensagem curta', async () => {
     const erro = vi.spyOn(message, 'error');
     vi.mocked(listSolicitacoes).mockResolvedValue(pagina(1, 1));
-    vi.mocked(getMyPolicies).mockResolvedValue(['access_solicitation_approvals']);
     vi.mocked(approveSolicitacao).mockRejectedValue(Object.assign(new Error('Solicitação já aprovada.'), {
       status: 400,
       response: { status: 400, data: { code: 'already_approved', detail: 'Solicitação já aprovada.' } },
     }));
 
-    renderPage();
+    renderPage(APROVA);
 
     const linha = (await screen.findByText('Municipio1')).closest('tr') as HTMLElement;
     const confirmacao = vi.spyOn(Modal, 'confirm').mockImplementation(semModal);

@@ -44,9 +44,7 @@ const LINHA_DE_BASE: ListaPendentes = {
   '/dashboards/gcal': [360, 768, 1024],
   '/mapa-brasil': [360, 1024, 1280],
   '/mapa-brasil#lista': [360, 1024, 1280],
-  '/solicitacoes/publicacao': [360, 768, 1024, 1280],
   '/solicitacoes/:id/editar': [360],
-  '/solicitacoes/aprovacoes': [360, 768, 1024, 1280],
   '/solicitacoes/disponibilidade': [360, 768, 1024],
   '/solicitacoes/bloqueios': [360, 768, 1024, 1280],
   '/solicitacoes/deslocamentos': [360, 768, 1024, 1280],
@@ -56,7 +54,6 @@ const LINHA_DE_BASE: ListaPendentes = {
   '/controle/coordenadores#lista': [360, 768, 1024, 1280],
   '/controle/coordenadores#area': [360],
   '/controle/plano-formacoes': [360, 768, 1024, 1280],
-  '/controle/pre-agenda': [360, 768, 1024, 1280],
   '/acoes-notificacao': [360, 768, 1024, 1280],
   '/notificacoes-internas': [360, 768],
   '/dat/cadastros': [360, 768, 1024, 1280],
@@ -73,12 +70,13 @@ const LINHA_DE_BASE_SO_LINUX: ListaPendentes = {
 };
 
 /**
- * Tamanho atual de PENDENTES mais PENDENTES_SO_LINUX (79 + 2). Só desce. C0: 126 + 2; o C1
+ * Tamanho atual de PENDENTES mais PENDENTES_SO_LINUX (67 + 2). Só desce. C0: 126 + 2; o C1
  * tirou 9 (as 4 de Usuários e 5 que a sidebar nova liberou a 768 e 1024); o C2 tirou 27 (Admin
  * DAT: grupos, setores, funções, gerências, municípios, produtos e projetos gerais); a tela
- * Projetos (01/10/2026, marca de série) tirou 3; Meus Eventos e Minhas Solicitações (item 36, 19/10/2026) tiraram 4 cada.
+ * Projetos (01/10/2026, marca de série) tirou 3; Meus Eventos e Minhas Solicitações (item 36, 19/10/2026) tiraram 4 cada; Aprovações, Publicar na agenda e Pré-agenda (19/10/2026, item 36)
+ * tiraram 12.
  */
-const TETO_PENDENTES = 81;
+const TETO_PENDENTES = 69;
 
 const SO_LINUX = ' (só Linux)';
 

@@ -189,6 +189,19 @@ EXPECTED_MATRIX: dict[str, dict[str, int]] = {
         "Apoio de Coordenação": DENY,
         "Formador": DENY,
     },
+    # Escrita em gerências só com manage_admin_registries (decisão do dono, 19/10/2026; D29).
+    "gerencias_escrita": {
+        "Superuser": ALLOW_PAYLOAD_INVALID,
+        "DAT": ALLOW_PAYLOAD_INVALID,
+        "Controle": DENY,
+        "Diretoria": DENY,
+        "Gerente": DENY,
+        "Gerente da Superintendência": DENY,
+        "Assistente Administrativo do Controle": DENY,
+        "Coordenador": DENY,
+        "Apoio de Coordenação": DENY,
+        "Formador": DENY,
+    },
 }
 
 
@@ -212,10 +225,10 @@ def test_matrix_snapshot_is_unchanged():
     )
 
 
-def test_matrix_resource_count_is_twelve():
-    """Matriz tem 12 recursos (PR 8 #1313: 8 → 11; import pela tela, 2026-10-02: 12)."""
-    assert len(ACCESS_MATRIX) == 12, (
-        f"ACCESS_MATRIX tem {len(ACCESS_MATRIX)} recursos; esperado 12. "
+def test_matrix_resource_count_is_thirteen():
+    """Matriz tem 13 recursos (PR 8 #1313: 8 → 11; import pela tela, 2026-10-02: 12; escrita em gerências, 2026-10-19: 13)."""
+    assert len(ACCESS_MATRIX) == 13, (
+        f"ACCESS_MATRIX tem {len(ACCESS_MATRIX)} recursos; esperado 13. "
         "Adicione recurso em RESOURCES + ACCESS_MATRIX + EXPECTED_MATRIX juntos."
     )
 

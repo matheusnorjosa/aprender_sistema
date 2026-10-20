@@ -318,9 +318,10 @@ class GerenciaViewSet(viewsets.ModelViewSet):  # type: ignore[misc]
     ordering = ["nome_setor"]
 
     def get_permissions(self) -> list:  # type: ignore[type-arg]
-        """Quem tem `manage_purchases_and_materials` (DAT e Controle) cria/edita/deleta. Outros apenas leitura."""
+        """Escrita com `manage_admin_registries`, a capacidade da tela /dat/admin/gerencias (decisão
+        do dono, 19/10/2026: o Controle deixa de escrever). Leitura para qualquer autenticado."""
         if self.action in ["create", "update", "partial_update", "destroy"]:
-            return [IsAuthenticated(), HasPerm("manage_purchases_and_materials")()]
+            return [IsAuthenticated(), HasPerm("manage_admin_registries")()]
         return [IsAuthenticated()]
 
 

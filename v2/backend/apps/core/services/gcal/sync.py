@@ -292,6 +292,12 @@ def upsert_one(
                 if adotado:
                     raise
                 error_msg = f"Erro ao buscar evento: {str(e)}"
+            if adotado and existing is not None and existing.get("status") == "cancelled":
+                # O DELETE do Google é soft-delete: o GET acha o evento apagado, e o UPDATE (status
+                # confirmed) o traria de volta. Id adotado cancelado = não achado (relay 65, ação 2).
+                raise ValueError(
+                    f"Solicitação #{s.id}: o evento adotado está cancelado no Google; nada foi atualizado nem criado."
+                )
             if existing is None and adotado:
                 raise ValueError(
                     f"Solicitação #{s.id}: o evento adotado não foi achado no Google; nada foi criado para não duplicar."

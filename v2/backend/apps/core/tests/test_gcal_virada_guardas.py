@@ -29,7 +29,7 @@ import pytest
 from apps.core.exceptions import ValidationAPIError
 from apps.core.models import Solicitacao
 from apps.core.services.gcal.payload import build_event_payload
-from apps.core.services.gcal.sync import CriacaoRecusada, upsert_one
+from apps.core.services.gcal.sync import CriacaoRecusada, apply_one_solicitacao, upsert_one
 from apps.core.services.gcal.utils import _payload_hash
 from apps.core.services.gcal_fake_client import FakeCalendarClient
 from apps.core.services.solicitacao_publish import motivo_nao_publicavel, publish_to_gcal
@@ -124,6 +124,26 @@ def test_adotado_que_nao_existe_no_google_nao_cria():
     with pytest.raises(Exception):
         _upsert(client, s)
     assert client.inserts == []
+
+
+class _ClienteAdotadoCancelado(_Cliente):
+    """O id adotado foi apagado no Google: o GET devolve o evento com `status=cancelled` (soft-delete)."""
+
+    def get(self, calendar_id, event_id):  # noqa: ARG002
+        return {"id": event_id, "status": "cancelled"} if event_id in self.store else None
+
+
+def test_adotado_cancelado_no_google_nao_ressuscita():
+    """Relay 65, ação 2: o UPDATE leva `status: confirmed` e traria de volta o evento apagado no Google."""
+    s = _futuro(external_event_id=_ADOTADO, gcal_status="PUBLISHED")
+    client = _ClienteAdotadoCancelado(store={_ADOTADO})
+    with patch(_PASSTHROUGH, side_effect=_passthrough), pytest.raises(ValueError, match="cancelado no Google"):
+        apply_one_solicitacao(s, apply_blocked=True, client=client)
+    assert client.updates == [] and client.inserts == []
+    s.refresh_from_db()
+    assert s.external_event_id == _ADOTADO
+    assert s.gcal_status == "ERROR"
+    assert "cancelado no Google" in s.gcal_last_error, "o motivo fica no erro do evento"
 
 
 def test_id_deterministico_gravado_segue_o_caminho_de_antes():

@@ -2659,15 +2659,8 @@ class ExportContractImporter:
             "reaprovacao": [],
             "marca": False,
         }
-        data_ev = _parse_iso_date(r.get("data"))
-        if data_ev is not None and _data_suspeita(
-            timezone.localtime(s.inicio, _FORTALEZA_TZ).date(), data_ev, ctx["hoje"]
-        ):
-            _conta(c, "data_suspeita", str(s.id))
-            return p  # a linha toda fica de fora: com a data errada, o resto dela também não é confiável
         categoria, travados, reprovado_pela_carga = tocado
         if categoria == "publicado_pelo_sistema":
-            _conta(c, "publicado_pelo_sistema")
             # Sem evento vivo do sistema no Google (ERROR ou PENDING sem id, ou já tirado de lá): Publicar ou
             # Resync criaria um segundo evento ao lado do da planilha. A marca só segura isso; o resto fica.
             p["marca"] = (
@@ -2676,13 +2669,25 @@ class ExportContractImporter:
                 and s.gcal_status != Solicitacao.GCalStatus.PUBLISHED
                 and not s.publicado_fora_do_sistema
             )
-            if p["marca"]:
-                _conta(c, "marca_fora_do_sistema")
-                _conta(c, "evento_atualizado")
-            return p
-        p["marca"] = _marca_da_linha(r) and not s.publicado_fora_do_sistema
+        else:
+            p["marca"] = _marca_da_linha(r) and not s.publicado_fora_do_sistema
         if p["marca"]:
             _conta(c, "marca_fora_do_sistema")
+        data_ev = _parse_iso_date(r.get("data"))
+        if data_ev is not None and _data_suspeita(
+            timezone.localtime(s.inicio, _FORTALEZA_TZ).date(), data_ev, ctx["hoje"]
+        ):
+            _conta(c, "data_suspeita", str(s.id))
+            if p["marca"]:
+                _conta(c, "evento_atualizado")
+            # a linha toda fica de fora (com a data errada, o resto dela também não é confiável), menos a
+            # marca: ela só segura o Publicar contra um segundo evento no Google
+            return p
+        if categoria == "publicado_pelo_sistema":
+            _conta(c, "publicado_pelo_sistema")
+            if p["marca"]:
+                _conta(c, "evento_atualizado")
+            return p
         if categoria == "pessoa":
             _conta(c, "tocado_pessoa")
             if p["marca"]:

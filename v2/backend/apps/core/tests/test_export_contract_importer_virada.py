@@ -1005,6 +1005,22 @@ def test_data_suspeita_pula_a_linha_e_conta(tmp_path, m, dia, nova):
     assert not AuditLog.objects.filter(details__modo="virada").exists()
 
 
+@pytest.mark.parametrize("rastro", [{}, {"gcal_status": "ERROR"}, {"gcal_status": "PENDING"}])
+def test_data_suspeita_ainda_recebe_a_marca(tmp_path, m, rastro):
+    """A marca só segura o Publicar: sem ela, o evento que o sheet2gcal já pôs no Google ganha um duplicado."""
+    s = _existente(m, **rastro)
+    path = _export(tmp_path, [_sol(data="2029-01-10", hora_inicio="09:00", na_agenda_google="true")])
+    dry = _dry(path)
+    assert dry["data_suspeita"] == {str(s.id): 1}
+    assert dry["marca_fora_do_sistema"] == 1
+    _virada(path)
+    s.refresh_from_db()
+    assert s.publicado_fora_do_sistema is True
+    assert motivo_nao_publicavel(s) == "publicado_fora_do_sistema"
+    assert timezone.localtime(s.inicio, _FORTALEZA).date() == FUTURO, "a data não muda"
+    assert _hora(s) == (8, 12), "o resto da linha também não entra"
+
+
 def test_data_plausivel_dentro_do_limite_muda(tmp_path, m):
     s = _existente(m, dia=date(2025, 12, 1))
     path = _export(tmp_path, [_sol(data="2026-12-20")])  # 384 dias, dentro de 400

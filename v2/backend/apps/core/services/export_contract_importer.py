@@ -28,6 +28,7 @@ import json
 import os
 import re
 import unicodedata
+from collections.abc import Callable
 from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Any
@@ -84,8 +85,6 @@ from apps.core.services.export_contract_projeto_resolver import (
     resolve_projeto_agenda,
     resolve_projeto_export,
 )
-from apps.core.services.gcal.payload import build_event_payload
-from apps.core.services.gcal.utils import _payload_hash
 from apps.core.services.resolvers import resolve_user_by_email, resolve_user_by_name
 from apps.core.services.solicitacao_create import resolve_initial_status
 from apps.core.utils.cache_utils import invalidate_availability_cache
@@ -222,6 +221,10 @@ _CONSUMED_FIELDS: dict[str, frozenset[str]] = {
             "disciplina",
             "cancelado",
             "evento_ids_anteriores",
+            # lidos pela marca `publicado_fora_do_sistema` e pela adoção do Event ID (`gcal_adocao`)
+            "na_agenda_google",
+            "external_event_id",
+            "external_event_id_confianca",
         }
     ),
     "participation": frozenset(
@@ -411,16 +414,27 @@ def _ids_proprios(rows: list[dict[str, str]]) -> set[str]:
     return {s for s in ((r.get("evento_id") or "").strip() for r in rows) if s}
 
 
-def _id_antigo_em_prod(r: dict[str, str], existentes: set[str] | dict[str, Any], bloqueados: set[str]) -> str | None:
+def _id_antigo_em_prod(
+    r: dict[str, str],
+    existentes: set[str] | dict[str, Any],
+    bloqueados: set[str],
+    suspeito: Callable[[str], bool] | None = None,
+) -> str | None:
     """Primeiro id de `evento_ids_anteriores` (array JSON do v35) que já é `external_hash` em prod e não
     está em `bloqueados` (ids próprios do arquivo + ids antigos já usados). O id devolvido entra em
-    `bloqueados`: cada id antigo re-chaveia uma linha só, no dry-run e no apply."""
-    for antigo in _parse_json_list(r.get("evento_ids_anteriores")):
-        s = str(antigo).strip()
-        if s and s in existentes and s not in bloqueados:
-            bloqueados.add(s)
-            return s
-    return None
+    `bloqueados`: cada id antigo re-chaveia uma linha só, no dry-run e no apply. Com `suspeito` (data
+    suspeita contra o evento do id), o primeiro id sem data suspeita vence; um suspeito só volta quando
+    todos são."""
+    elegiveis = [
+        s
+        for s in (str(a).strip() for a in _parse_json_list(r.get("evento_ids_anteriores")))
+        if s and s in existentes and s not in bloqueados
+    ]
+    if not elegiveis:
+        return None
+    escolhido = next((s for s in elegiveis if suspeito is None or not suspeito(s)), elegiveis[0])
+    bloqueados.add(escolhido)
+    return escolhido
 
 
 # projeto_geral: config de cálculo do contrato v5 → choices do Django.
@@ -746,7 +760,31 @@ _CONTADORES_VIRADA = (
     "fim_antes_do_inicio",
     "repetido_no_arquivo",
 )
-_CONTADORES_VIRADA_POR_CHAVE = ("would_update_virada", "fora_do_escopo", "existente_linha_incompleta")
+_CONTADORES_VIRADA_POR_CHAVE = (
+    "would_update_virada",
+    "fora_do_escopo",
+    "existente_linha_incompleta",
+    "data_suspeita",
+)
+# Mudança de data plausível na virada (relay 65, ação 4): salto de até 400 dias (um ano e folga para a
+# remarcação) e, para evento com ano entre hoje − 1 e hoje + 2, ano novo também nessa faixa. Fora disso a linha
+# quase sempre é de outro evento (Filadélfia: EV002608 com data de 2016) e nada dela entra. A faixa não vale
+# para evento histórico: corrigir a data de um evento de 2024 em 2024 não é sinal de outro evento.
+_SALTO_MAXIMO_DIAS = 400
+
+
+def _data_suspeita(atual: date, nova: date, hoje: date) -> bool:
+    if nova == atual:
+        return False
+    if abs((nova - atual).days) > _SALTO_MAXIMO_DIAS:
+        return True
+    faixa = range(hoje.year - 1, hoje.year + 3)
+    return atual.year in faixa and nova.year not in faixa
+
+
+def _linha_com_data_suspeita(inicio: datetime, r: dict[str, str], hoje: date) -> bool:
+    data_ev = _parse_iso_date(r.get("data"))
+    return data_ev is not None and _data_suspeita(timezone.localtime(inicio, _FORTALEZA_TZ).date(), data_ev, hoje)
 
 
 def _contagem_virada() -> dict[str, Any]:
@@ -1644,7 +1682,44 @@ class ExportContractImporter:
                 ):
                     tally["rekey_contraditorio"] += 1
                 existe = ext_hash in atual
-                antigo = None if existe else _id_antigo_em_prod(r, atual, bloqueados)
+                antigo = (
+                    None
+                    if existe
+                    else _id_antigo_em_prod(
+                        r,
+                        atual,
+                        bloqueados,
+                        (
+                            (
+                                lambda a: (x := atual[a]) is not None
+                                and _linha_com_data_suspeita(
+                                    por_id[x].inicio, r, hoje  # pyright: ignore[reportArgumentType]
+                                )
+                            )
+                            if virada
+                            else None
+                        ),
+                    )
+                )
+                sid_antigo = atual[antigo] if antigo is not None else None
+                if (
+                    virada
+                    and antigo is not None
+                    and sid_antigo is not None
+                    and _linha_com_data_suspeita(por_id[sid_antigo].inicio, r, hoje)
+                ):
+                    # Achada pelo id antigo com data suspeita: é de outro evento; não re-chaveia e nada entra,
+                    # menos a marca (o plano para na data suspeita). O id antigo volta a ficar livre para a
+                    # linha certa do mesmo evento re-chavear.
+                    bloqueados.discard(antigo)
+                    sol = por_id[sid_antigo]
+                    tocado = _tocado(sol, logs_idx.get(sid_antigo, []), sid_antigo in admin_idx)
+                    plano = self._plano_virada(sol, r, key, tocado, parts_por_sol.get(sid_antigo, []), [], ctx)
+                    _somar_contagem(contagem, plano["c"])
+                    if plano["marca"]:
+                        sol.publicado_fora_do_sistema = True  # espelha o apply para a linha seguinte do evento
+                    tally["would_update" if plano["c"]["evento_atualizado"] else "would_skip_same"] += 1
+                    continue
                 if antigo is not None:
                     atual[ext_hash] = atual.pop(antigo)
                     existe = True
@@ -2411,7 +2486,31 @@ class ExportContractImporter:
             ext_hash = key[-1] if key is not None else _identidade_da_linha(r)
             seg_norm = (r.get("segmento_norm") or "").strip()[:100]
             seg_conf = (r.get("segmento_norm_confianca") or "").strip()[:30]
-            antigo = None if ext_hash in existing else _id_antigo_em_prod(r, existing, bloqueados)
+            antigo = (
+                None
+                if ext_hash in existing
+                else _id_antigo_em_prod(
+                    r,
+                    existing,
+                    bloqueados,
+                    (
+                        (lambda a: _linha_com_data_suspeita(Solicitacao.objects.get(id=existing[a][0]).inicio, r, hoje))
+                        if virada
+                        else None
+                    ),
+                )
+            )
+            if (
+                virada
+                and antigo is not None
+                and _linha_com_data_suspeita(Solicitacao.objects.get(id=existing[antigo][0]).inicio, r, hoje)
+            ):
+                # Achada pelo id antigo com data suspeita: é de outro evento; não re-chaveia e nada entra,
+                # menos a marca (o plano para na data suspeita). O id antigo volta a ficar livre para a linha
+                # certa do mesmo evento re-chavear.
+                bloqueados.discard(antigo)
+                atualizadas += self._aplicar_virada(existing[antigo][0], r, key, antigo, ctx, contagem)
+                continue
             if antigo is not None:
                 # Evento que trocou de id na planilha e já está em prod pelo id antigo: é o mesmo evento.
                 # Re-chaveia para as próximas cargas acharem; status/data/campos protegidos ficam.
@@ -2435,7 +2534,13 @@ class ExportContractImporter:
                 continue
             if ext_hash in existing:
                 sid, cur_sn = existing[ext_hash]
-                if key is not None and seg_norm and seg_norm != cur_sn:
+                if (
+                    key is not None
+                    and seg_norm
+                    and seg_norm != cur_sn
+                    # Data suspeita: a linha é de outro evento e fica toda de fora, segmento_norm também.
+                    and not (virada and _linha_com_data_suspeita(Solicitacao.objects.get(id=sid).inicio, r, hoje))
+                ):
                     Solicitacao.objects.filter(id=sid).update(segmento_norm=seg_norm, segmento_norm_confianca=seg_conf)
                     existing[ext_hash] = (sid, seg_norm)
                     reconciled += 1
@@ -2644,7 +2749,6 @@ class ExportContractImporter:
         }
         categoria, travados, reprovado_pela_carga = tocado
         if categoria == "publicado_pelo_sistema":
-            _conta(c, "publicado_pelo_sistema")
             # Sem evento vivo do sistema no Google (ERROR ou PENDING sem id, ou já tirado de lá): Publicar ou
             # Resync criaria um segundo evento ao lado do da planilha. A marca só segura isso; o resto fica.
             p["marca"] = (
@@ -2653,13 +2757,25 @@ class ExportContractImporter:
                 and s.gcal_status != Solicitacao.GCalStatus.PUBLISHED
                 and not s.publicado_fora_do_sistema
             )
-            if p["marca"]:
-                _conta(c, "marca_fora_do_sistema")
-                _conta(c, "evento_atualizado")
-            return p
-        p["marca"] = _marca_da_linha(r) and not s.publicado_fora_do_sistema
+        else:
+            p["marca"] = _marca_da_linha(r) and not s.publicado_fora_do_sistema
         if p["marca"]:
             _conta(c, "marca_fora_do_sistema")
+        data_ev = _parse_iso_date(r.get("data"))
+        if data_ev is not None and _data_suspeita(
+            timezone.localtime(s.inicio, _FORTALEZA_TZ).date(), data_ev, ctx["hoje"]
+        ):
+            _conta(c, "data_suspeita", str(s.id))
+            if p["marca"]:
+                _conta(c, "evento_atualizado")
+            # a linha toda fica de fora (com a data errada, o resto dela também não é confiável), menos a
+            # marca: ela só segura o Publicar contra um segundo evento no Google
+            return p
+        if categoria == "publicado_pelo_sistema":
+            _conta(c, "publicado_pelo_sistema")
+            if p["marca"]:
+                _conta(c, "evento_atualizado")
+            return p
         if categoria == "pessoa":
             _conta(c, "tocado_pessoa")
             if p["marca"]:
@@ -2698,7 +2814,6 @@ class ExportContractImporter:
                 _conta(c, "projeto_diverge")
 
         # data e hora (local de Fortaleza → UTC, como na criação)
-        data_ev = _parse_iso_date(r.get("data"))
         hora_ini = _parse_hora(r.get("hora_inicio"))
         hora_fim = _parse_hora(r.get("hora_fim"))
         inicio, fim = s.inicio, s.fim
@@ -3008,8 +3123,8 @@ class ExportContractImporter:
         return planilha != {x.usuario_id for x in parts if x.role == Participation.Role.FORMADOR}
 
     def _adotar(self, s: Solicitacao, eid: str, conf: str) -> None:
-        """Grava a adoção. Salva sem `updated_at` e calcula o hash depois do `refresh_from_db()`: o payload
-        leva o `updated_at` do banco, e é com ele que o Reapply seguinte compara (e pula, sem e-mail)."""
+        """Grava a adoção, sem `updated_at`. Sem `gcal_payload_hash`: o Google pode estar com outro horário, e
+        o primeiro Reapply depois da virada manda o UPDATE pelo id adotado (decisão do dono de 20/10)."""
         agora = timezone.now()
         s.external_event_id = eid
         s.gcal_status = Solicitacao.GCalStatus.PUBLISHED
@@ -3017,6 +3132,7 @@ class ExportContractImporter:
         s.last_synced_at = agora
         s.gcal_last_sync_at = agora
         s.publicado_fora_do_sistema = False
+        s.gcal_payload_hash = None
         s.save(
             update_fields=[
                 "external_event_id",
@@ -3025,11 +3141,9 @@ class ExportContractImporter:
                 "last_synced_at",
                 "gcal_last_sync_at",
                 "publicado_fora_do_sistema",
+                "gcal_payload_hash",
             ]
         )
-        s.refresh_from_db()
-        s.gcal_payload_hash = _payload_hash(build_event_payload(s, enable_meet=bool(s.is_online)))
-        s.save(update_fields=["gcal_payload_hash"])
         AuditLog.objects.create(
             usuario=self.actor,
             action=AuditLog.Action.UPDATE,

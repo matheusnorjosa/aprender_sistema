@@ -978,3 +978,161 @@ def test_apagado_pela_tela_sem_external_hash_nao_bloqueia_a_vaga(tmp_path, m, mo
     assert tally["skip_reasons"]["apagado_no_sistema"] == 0
     ExportContractImporter(path=path, mode=modo, apply=True, allow=("solicitacao", "participation")).run()
     assert set(Solicitacao.objects.values_list("external_hash", flat=True)) == {"EVNOVO"}
+
+
+# ---------- relay 65, ação 4: mudança de data absurda não entra ----------
+@pytest.mark.parametrize(
+    ("dia", "nova"),
+    [
+        (FUTURO, "2016-03-10"),  # Filadélfia: a linha do EV002608 traz 2016 para um evento de 2026
+        (FUTURO, "2029-01-10"),  # ano depois de hoje + 2
+        (date(2025, 1, 10), "2026-10-01"),  # anos plausíveis, salto de mais de 400 dias
+        (date(2018, 3, 1), "2016-03-10"),  # evento histórico: o salto ainda barra
+    ],
+)
+def test_data_suspeita_pula_a_linha_e_conta(tmp_path, m, dia, nova):
+    s = _existente(m, dia=dia, formadores=(m.f1,), segmento_norm="ANTIGO")
+    path = _export(
+        tmp_path,
+        [_sol(data=nova, hora_inicio="09:00", cancelado="true", segmento_norm="NOVO_DE_OUTRO")],
+        [_part("EV1", _CPF_F2)],
+    )
+    dry = _dry(path)
+    assert dry["data_suspeita"] == {str(s.id): 1}
+    assert dry["evento_atualizado"] == 0
+    report = _virada(path)
+    assert report["applied"].get("solicitacao__virada_atualizada", 0) == 0
+    assert report["applied"].get("solicitacao__segmento_norm_reconciled", 0) == 0
+    s.refresh_from_db()
+    assert timezone.localtime(s.inicio, _FORTALEZA).date() == dia, "a data não muda"
+    assert _hora(s) == (8, 12)
+    assert s.status == "aprovado", "o resto da linha também não entra"
+    assert _formadores(s) == {"form1"}
+    assert s.segmento_norm == "ANTIGO", "nem o segmento_norm de outro evento"
+    assert not AuditLog.objects.filter(details__modo="virada").exists()
+
+
+@pytest.mark.parametrize("rastro", [{}, {"gcal_status": "ERROR"}, {"gcal_status": "PENDING"}])
+def test_data_suspeita_ainda_recebe_a_marca(tmp_path, m, rastro):
+    """A marca só segura o Publicar: sem ela, o evento que o sheet2gcal já pôs no Google ganha um duplicado."""
+    s = _existente(m, **rastro)
+    path = _export(tmp_path, [_sol(data="2029-01-10", hora_inicio="09:00", na_agenda_google="true")])
+    dry = _dry(path)
+    assert dry["data_suspeita"] == {str(s.id): 1}
+    assert dry["marca_fora_do_sistema"] == 1
+    _virada(path)
+    s.refresh_from_db()
+    assert s.publicado_fora_do_sistema is True
+    assert motivo_nao_publicavel(s) == "publicado_fora_do_sistema"
+    assert timezone.localtime(s.inicio, _FORTALEZA).date() == FUTURO, "a data não muda"
+    assert _hora(s) == (8, 12), "o resto da linha também não entra"
+
+
+def test_data_suspeita_pelo_id_antigo_nao_rechaveia(tmp_path, m):
+    """A linha achada pelo id antigo com data suspeita é de outro evento: o id dela não vira a chave do evento
+    (senão a carga seguinte, com o id antigo de volta como linha própria, criaria um segundo evento)."""
+    s = _existente(m, "EV100")
+    path = _export(tmp_path, [_sol(evento_id="EV200", evento_ids_anteriores='["EV100"]', data="2016-03-10")])
+    tally = ExportContractImporter(path=path, mode="virada").run()["por_entidade"]["solicitacao"]
+    assert tally["would_rekey"] == 0
+    assert tally["would_create"] == 0
+    assert tally["virada"]["data_suspeita"] == {str(s.id): 1}
+    report = _virada(path)
+    assert report["applied"].get("solicitacao__rechaveada", 0) == 0
+    assert list(Solicitacao.objects.values_list("external_hash", flat=True)) == ["EV100"]
+    assert not AuditLog.objects.filter(details__campo="external_hash").exists()
+    # carga seguinte: o EV100 volta como linha própria e casa com o mesmo evento
+    path2 = _export(tmp_path, [_sol(evento_id="EV100")])
+    _virada(path2)
+    assert Solicitacao.objects.count() == 1
+
+
+def test_data_suspeita_pelo_id_antigo_ainda_recebe_a_marca(tmp_path, m):
+    """Achada pelo id antigo, a linha com data suspeita não re-chaveia, mas a marca entra: se é a única linha do
+    evento, sem ela o Publicar cria um segundo evento ao lado do que o sheet2gcal já pôs no Google."""
+    s = _existente(m, "EV100")
+    path = _export(
+        tmp_path,
+        [_sol(evento_id="EV200", evento_ids_anteriores='["EV100"]', data="2016-03-10", na_agenda_google="true")],
+    )
+    dry = _dry(path)
+    assert dry["data_suspeita"] == {str(s.id): 1}
+    assert dry["marca_fora_do_sistema"] == 1
+    _virada(path)
+    s.refresh_from_db()
+    assert s.publicado_fora_do_sistema is True
+    assert motivo_nao_publicavel(s) == "publicado_fora_do_sistema"
+    assert s.external_hash == "EV100", "não re-chaveia"
+    assert timezone.localtime(s.inicio, _FORTALEZA).date() == FUTURO, "a data não muda"
+
+
+def test_data_suspeita_pelo_id_antigo_libera_o_id_para_a_linha_seguinte(tmp_path, m):
+    """A linha com data suspeita não gasta o id antigo: a linha certa que vem depois, com o mesmo id antigo,
+    re-chaveia o evento (senão nasce um segundo evento aprovado no mesmo horário)."""
+    s = _existente(m, "EV100")
+    path = _export(
+        tmp_path,
+        [
+            _sol(evento_id="EV200", evento_ids_anteriores='["EV100"]', data="2016-03-10"),
+            _sol(evento_id="EV300", evento_ids_anteriores='["EV100"]'),
+        ],
+    )
+    tally = ExportContractImporter(path=path, mode="virada").run()["por_entidade"]["solicitacao"]
+    assert tally["would_rekey"] == 1
+    assert tally["would_create"] == 0
+    assert tally["virada"]["data_suspeita"] == {str(s.id): 1}
+    _virada(path)
+    assert list(Solicitacao.objects.values_list("id", "external_hash")) == [(s.id, "EV300")]
+
+
+def test_data_suspeita_no_primeiro_id_antigo_tenta_os_seguintes(tmp_path, m):
+    """Com vários ids antigos, a data suspeita contra o primeiro não encerra a busca: o id seguinte, do evento
+    certo, re-chaveia e recebe a marca (senão o Publicar dele cria um segundo evento no Google)."""
+    velho = _existente(m, "EV100", dia=date(2016, 5, 5))
+    certo = _existente(m, "EV200")
+    path = _export(
+        tmp_path,
+        [_sol(evento_id="EV300", evento_ids_anteriores='["EV100", "EV200"]', na_agenda_google="true")],
+    )
+    tally = ExportContractImporter(path=path, mode="virada").run()["por_entidade"]["solicitacao"]
+    assert tally["would_rekey"] == 1
+    assert tally["would_create"] == 0
+    assert tally["virada"]["data_suspeita"] == {}
+    assert tally["virada"]["marca_fora_do_sistema"] == 1
+    _virada(path)
+    certo.refresh_from_db()
+    velho.refresh_from_db()
+    assert certo.external_hash == "EV300"
+    assert motivo_nao_publicavel(certo) == "publicado_fora_do_sistema"
+    assert velho.external_hash == "EV100"
+    assert timezone.localtime(velho.inicio, _FORTALEZA).date() == date(2016, 5, 5)
+    assert Solicitacao.objects.count() == 2
+
+
+def test_data_plausivel_dentro_do_limite_muda(tmp_path, m):
+    s = _existente(m, dia=date(2025, 12, 1))
+    path = _export(tmp_path, [_sol(data="2026-12-20")])  # 384 dias, dentro de 400
+    assert _dry(path)["data_suspeita"] == {}
+    _virada(path)
+    s.refresh_from_db()
+    assert timezone.localtime(s.inicio, _FORTALEZA).date() == date(2026, 12, 20)
+
+
+def test_evento_historico_com_data_corrigida_nao_e_suspeito(tmp_path, m):
+    """A faixa de ano vale para evento dentro dela; um evento de 2024 corrigido em 2024 não é de outro evento."""
+    s = _existente(m, dia=date(2024, 5, 1), formadores=(m.f1,))
+    path = _export(tmp_path, [_sol(data="2024-05-08", cancelado="true")], [_part("EV1", _CPF_F2)])
+    assert _dry(path)["data_suspeita"] == {}
+    _virada(path)
+    s.refresh_from_db()
+    assert timezone.localtime(s.inicio, _FORTALEZA).date() == date(2024, 5, 8)
+    assert s.status == "reprovado", "cancelado na planilha vira reprovado"
+    assert _formadores(s) == {"form2"}
+
+
+def test_campos_do_google_lidos_nao_aparecem_como_ignorados(tmp_path, m):
+    """O relatório de campos ignorados fica honesto: o que a marca e a adoção leem não sai como ignorado."""
+    tally = ExportContractImporter(path=_export(tmp_path, [_sol()]), mode="virada").run()["por_entidade"]["solicitacao"]
+    for lido in ("external_event_id", "external_event_id_confianca", "na_agenda_google"):
+        assert lido not in tally["ignored_fields"]
+    assert "aprovado" in tally["ignored_fields"], "coluna que ninguém lê continua listada"

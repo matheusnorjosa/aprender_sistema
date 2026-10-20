@@ -113,17 +113,47 @@ def test_adotado_com_hash_igual_pula():
     assert client.updates == [] and client.inserts == []
 
 
-def test_adotado_com_hash_igual_e_outra_hora_no_google_atualiza():
-    """O hash do id adotado é o do sistema, não o do Google: hora diferente lá vai no UPDATE (dono, 20/10)."""
-    s = _futuro(external_event_id=_ADOTADO, gcal_status="PUBLISHED")
+def _adotado_as_14h_com_hash() -> tuple[Solicitacao, dict]:
+    """Adotado das 14h às 16h (Fortaleza) daqui a 3 dias, com o hash do sistema gravado como na adoção."""
+    inicio = timezone.localtime(timezone.now() + timedelta(days=3)).replace(hour=14, minute=0, second=0, microsecond=0)
+    s = SolicitacaoFactory(
+        status="aprovado",
+        inicio=inicio,
+        fim=inicio + timedelta(hours=2),
+        external_event_id=_ADOTADO,
+        gcal_status="PUBLISHED",
+    )
     payload = build_event_payload(s, enable_meet=False)
     s.gcal_payload_hash = _payload_hash(payload)
     s.save(update_fields=["gcal_payload_hash"])
-    outra = {"dateTime": "2000-01-01T09:00:00-03:00"}
-    client = _Cliente(store={_ADOTADO}, horas={"start": payload["start"], "end": outra})
+    return s, payload
+
+
+def _no_google(s: Solicitacao, dias: int, hora: int) -> dict:
+    """`start`/`end` como o GET devolve, `dias` depois do dia do sistema, das `hora` às `hora`+2 (-03:00)."""
+    dia = timezone.localtime(s.inicio).date() + timedelta(days=dias)
+    return {
+        "start": {"dateTime": f"{dia.isoformat()}T{hora:02d}:00:00-03:00"},
+        "end": {"dateTime": f"{dia.isoformat()}T{hora + 2:02d}:00:00-03:00"},
+    }
+
+
+def test_adotado_com_hash_igual_e_outra_hora_no_google_atualiza():
+    """O hash do id adotado é o do sistema, não o do Google: hora diferente lá vai no UPDATE (dono, 20/10)."""
+    s, payload = _adotado_as_14h_com_hash()
+    client = _Cliente(store={_ADOTADO}, horas=_no_google(s, dias=0, hora=8))
     out = _upsert(client, s, payload=payload)
     assert out.action == "UPDATE"
     assert client.updates == [_ADOTADO] and client.inserts == []
+
+
+def test_adotado_com_hash_igual_e_outro_dia_no_google_nao_atualiza():
+    """Dia diferente = o id adotado é de outro encontro (relay 65): o PATCH mudaria o dia desse evento."""
+    s, payload = _adotado_as_14h_com_hash()
+    client = _Cliente(store={_ADOTADO}, horas=_no_google(s, dias=1, hora=14))
+    with pytest.raises(ValueError, match="outro dia"):
+        _upsert(client, s, payload=payload)
+    assert client.updates == [] and client.inserts == []
 
 
 def test_get_com_excecao_num_adotado_nao_cria():

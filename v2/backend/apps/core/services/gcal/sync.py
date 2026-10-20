@@ -39,6 +39,18 @@ def _hora_difere(google: JsonDict, payload: JsonDict) -> bool:
     return False
 
 
+def _data_difere(google: JsonDict, payload: JsonDict) -> bool:
+    """Dia local (fuso do sistema) do início ou do fim no Google diferente do payload. Ilegível conta como diferente."""
+    for campo in ("start", "end"):
+        try:
+            g = timezone.localtime(datetime.fromisoformat(google[campo]["dateTime"])).date()
+            if g != timezone.localtime(datetime.fromisoformat(payload[campo]["dateTime"])).date():
+                return True
+        except (KeyError, TypeError, ValueError):
+            return True
+    return False
+
+
 class CriacaoRecusada(ValueError):
     """O sync ia CRIAR (ou adotar o `asv2{id}`) no Google e a guarda da virada recusou (`code` diz por quê).
 
@@ -425,15 +437,16 @@ def upsert_one(
             # GCAL_SEND_UPDATES=all, reenvia e-mail a TODOS os convidados sem mudança
             # real. O resync zera gcal_payload_hash de propósito (resync_solicitacao /
             # batch resync), então o SKIP nunca bloqueia um reenvio intencional.
-            # Id adotado: o hash é o do sistema, não o do Google. Hora diferente no Google = atualizar
-            # (decisão do dono de 20/10, relay 65); com a mesma hora, pula como qualquer outro.
-            if (
-                action == "UPDATE"
-                and s.gcal_payload_hash
-                and s.gcal_payload_hash == _payload_hash(payload)
-                and not (adotado and _hora_difere(existing, payload))
-            ):
-                return SyncOutcome("SKIP", s.id, s.external_event_id, payload["summary"])
+            # Id adotado: o hash é o do sistema, não o do Google. Mesmo dia e hora diferente no Google =
+            # atualizar (decisão do dono de 20/10, relay 65); com a mesma hora, pula como qualquer outro.
+            # Outro dia = o id é de outro encontro: o PATCH mudaria o dia dele, então vira erro.
+            if action == "UPDATE" and s.gcal_payload_hash and s.gcal_payload_hash == _payload_hash(payload):
+                if adotado and _data_difere(existing, payload):
+                    raise ValueError(
+                        f"Solicitação #{s.id}: o evento adotado está em outro dia no Google; nada foi atualizado."
+                    )
+                if not (adotado and _hora_difere(existing, payload)):
+                    return SyncOutcome("SKIP", s.id, s.external_event_id, payload["summary"])
 
             if not dry_run:
                 try:

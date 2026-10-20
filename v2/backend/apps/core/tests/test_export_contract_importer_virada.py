@@ -987,6 +987,7 @@ def test_apagado_pela_tela_sem_external_hash_nao_bloqueia_a_vaga(tmp_path, m, mo
         (FUTURO, "2016-03-10"),  # Filadélfia: a linha do EV002608 traz 2016 para um evento de 2026
         (FUTURO, "2029-01-10"),  # ano depois de hoje + 2
         (date(2025, 1, 10), "2026-10-01"),  # anos plausíveis, salto de mais de 400 dias
+        (date(2018, 3, 1), "2016-03-10"),  # evento histórico: o salto ainda barra
     ],
 )
 def test_data_suspeita_pula_a_linha_e_conta(tmp_path, m, dia, nova):
@@ -1028,6 +1029,18 @@ def test_data_plausivel_dentro_do_limite_muda(tmp_path, m):
     _virada(path)
     s.refresh_from_db()
     assert timezone.localtime(s.inicio, _FORTALEZA).date() == date(2026, 12, 20)
+
+
+def test_evento_historico_com_data_corrigida_nao_e_suspeito(tmp_path, m):
+    """A faixa de ano vale para evento dentro dela; um evento de 2024 corrigido em 2024 não é de outro evento."""
+    s = _existente(m, dia=date(2024, 5, 1), formadores=(m.f1,))
+    path = _export(tmp_path, [_sol(data="2024-05-08", cancelado="true")], [_part("EV1", _CPF_F2)])
+    assert _dry(path)["data_suspeita"] == {}
+    _virada(path)
+    s.refresh_from_db()
+    assert timezone.localtime(s.inicio, _FORTALEZA).date() == date(2024, 5, 8)
+    assert s.status == "reprovado", "cancelado na planilha vira reprovado"
+    assert _formadores(s) == {"form2"}
 
 
 def test_campos_do_google_lidos_nao_aparecem_como_ignorados(tmp_path, m):

@@ -754,16 +754,20 @@ _CONTADORES_VIRADA_POR_CHAVE = (
     "existente_linha_incompleta",
     "data_suspeita",
 )
-# Mudança de data plausível na virada (relay 65, ação 4): ano novo entre hoje − 1 e hoje + 2 e salto de até
-# 400 dias (um ano e folga para a remarcação). Fora disso a linha quase sempre é de outro evento (Filadélfia:
-# EV002608 com data de 2016) e nada dela entra.
+# Mudança de data plausível na virada (relay 65, ação 4): salto de até 400 dias (um ano e folga para a
+# remarcação) e, para evento com ano entre hoje − 1 e hoje + 2, ano novo também nessa faixa. Fora disso a linha
+# quase sempre é de outro evento (Filadélfia: EV002608 com data de 2016) e nada dela entra. A faixa não vale
+# para evento histórico: corrigir a data de um evento de 2024 em 2024 não é sinal de outro evento.
 _SALTO_MAXIMO_DIAS = 400
 
 
 def _data_suspeita(atual: date, nova: date, hoje: date) -> bool:
     if nova == atual:
         return False
-    return not (hoje.year - 1 <= nova.year <= hoje.year + 2) or abs((nova - atual).days) > _SALTO_MAXIMO_DIAS
+    if abs((nova - atual).days) > _SALTO_MAXIMO_DIAS:
+        return True
+    faixa = range(hoje.year - 1, hoje.year + 3)
+    return atual.year in faixa and nova.year not in faixa
 
 
 def _contagem_virada() -> dict[str, Any]:

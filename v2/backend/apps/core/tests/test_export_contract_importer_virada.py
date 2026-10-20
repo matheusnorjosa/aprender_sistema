@@ -1041,6 +1041,25 @@ def test_data_suspeita_pelo_id_antigo_nao_rechaveia(tmp_path, m):
     assert Solicitacao.objects.count() == 1
 
 
+def test_data_suspeita_pelo_id_antigo_libera_o_id_para_a_linha_seguinte(tmp_path, m):
+    """A linha com data suspeita não gasta o id antigo: a linha certa que vem depois, com o mesmo id antigo,
+    re-chaveia o evento (senão nasce um segundo evento aprovado no mesmo horário)."""
+    s = _existente(m, "EV100")
+    path = _export(
+        tmp_path,
+        [
+            _sol(evento_id="EV200", evento_ids_anteriores='["EV100"]', data="2016-03-10"),
+            _sol(evento_id="EV300", evento_ids_anteriores='["EV100"]'),
+        ],
+    )
+    tally = ExportContractImporter(path=path, mode="virada").run()["por_entidade"]["solicitacao"]
+    assert tally["would_rekey"] == 1
+    assert tally["would_create"] == 0
+    assert tally["virada"]["data_suspeita"] == {str(s.id): 1}
+    _virada(path)
+    assert list(Solicitacao.objects.values_list("id", "external_hash")) == [(s.id, "EV300")]
+
+
 def test_data_plausivel_dentro_do_limite_muda(tmp_path, m):
     s = _existente(m, dia=date(2025, 12, 1))
     path = _export(tmp_path, [_sol(data="2026-12-20")])  # 384 dias, dentro de 400

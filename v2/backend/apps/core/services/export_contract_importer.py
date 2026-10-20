@@ -1674,6 +1674,8 @@ class ExportContractImporter:
                 sid_antigo = atual[antigo] if antigo is not None else None
                 if virada and sid_antigo is not None and _linha_com_data_suspeita(por_id[sid_antigo].inicio, r, hoje):
                     # Achada pelo id antigo com data suspeita: é de outro evento; não re-chaveia e nada entra.
+                    # O id antigo volta a ficar livre para a linha certa do mesmo evento re-chavear.
+                    bloqueados.discard(antigo)
                     _conta(contagem, "data_suspeita", str(sid_antigo))
                     tally["would_skip_same"] += 1
                     continue
@@ -2450,6 +2452,8 @@ class ExportContractImporter:
                 and _linha_com_data_suspeita(Solicitacao.objects.get(id=existing[antigo][0]).inicio, r, hoje)
             ):
                 # Achada pelo id antigo com data suspeita: é de outro evento; não re-chaveia e nada entra.
+                # O id antigo volta a ficar livre para a linha certa do mesmo evento re-chavear.
+                bloqueados.discard(antigo)
                 _conta(contagem, "data_suspeita", str(existing[antigo][0]))
                 continue
             if antigo is not None:

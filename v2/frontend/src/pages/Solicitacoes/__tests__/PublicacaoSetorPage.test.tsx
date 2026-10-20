@@ -43,6 +43,10 @@ vi.mock('../../../services/syncChannel', () => ({
 
 import PublicacaoSetorPage from '../PublicacaoSetorPage';
 
+// Tela pesada (AntD + ResponsiveTable): na CI, cerca de 4x mais lenta que local e com cobertura, casos passam dos
+// 5 s padrão. Só o limite de tempo muda, nenhuma asserção.
+vi.setConfig({ testTimeout: 20_000 });
+
 // ============================================================================
 // Fixtures
 // ============================================================================

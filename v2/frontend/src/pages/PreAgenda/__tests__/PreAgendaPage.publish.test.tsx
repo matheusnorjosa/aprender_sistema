@@ -64,6 +64,10 @@ import { previewSolicitacao } from '../../../api/solicitacoes';
 import { ComAcesso } from '../../../test/comAcesso';
 import PreAgendaPage from '../PreAgendaPage';
 
+// Tela pesada (AntD + ResponsiveTable): na CI, cerca de 4x mais lenta que local e com cobertura, casos passam dos
+// 5 s padrão. Só o limite de tempo muda, nenhuma asserção.
+vi.setConfig({ testTimeout: 20_000 });
+
 const row = (overrides: Record<string, unknown> = {}) => ({
   id: 1,
   municipio_nome: 'Fortaleza',

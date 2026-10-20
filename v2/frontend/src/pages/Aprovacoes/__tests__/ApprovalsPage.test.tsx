@@ -61,6 +61,10 @@ import { getMe } from '../../../api/availability';
 import { usePolling } from '../../../hooks/usePolling';
 import { formadoresLabel } from '../../../utils/participants';
 
+// Tela pesada (AntD + ResponsiveTable): na CI, cerca de 4x mais lenta que local e com cobertura, casos passam dos
+// 5 s padrão. Só o limite de tempo muda, nenhuma asserção.
+vi.setConfig({ testTimeout: 20_000 });
+
 const pausarPolling = vi.fn();
 
 /** Página vazia (nenhuma solicitação). */

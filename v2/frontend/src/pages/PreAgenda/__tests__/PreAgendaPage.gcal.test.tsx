@@ -112,6 +112,10 @@ vi.mock('../../../components/google/GoogleIntegrationCard', () => ({
 
 import PreAgendaPage from '../PreAgendaPage';
 
+// Tela pesada (AntD + ResponsiveTable): na CI, cerca de 4x mais lenta que local e com cobertura, casos passam dos
+// 5 s padrão. Só o limite de tempo muda, nenhuma asserção.
+vi.setConfig({ testTimeout: 20_000 });
+
 type EventsResponse = {
   events: Array<Record<string, unknown>>;
   calendar_id: string;

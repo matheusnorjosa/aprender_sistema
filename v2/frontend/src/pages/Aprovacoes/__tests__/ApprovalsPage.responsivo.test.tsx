@@ -29,6 +29,10 @@ vi.mock('../../../hooks/usePolling', () => ({ usePolling: vi.fn(() => ({ pausado
 import ApprovalsPage from '../ApprovalsPage';
 import { listSolicitacoes } from '../../../api/solicitacoes';
 
+// Tela pesada (AntD + ResponsiveTable): na CI, cerca de 4x mais lenta que local e com cobertura, casos passam dos
+// 5 s padrão. Só o limite de tempo muda, nenhuma asserção.
+vi.setConfig({ testTimeout: 20_000 });
+
 const EVENTO = '25/08/2026 10:00 · MunicipioTeste · ProjetoTeste';
 
 function linhas(n: number): PaginatedResponse<Solicitacao> {

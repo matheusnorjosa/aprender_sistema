@@ -744,7 +744,22 @@ _CONTADORES_VIRADA = (
     "fim_antes_do_inicio",
     "repetido_no_arquivo",
 )
-_CONTADORES_VIRADA_POR_CHAVE = ("would_update_virada", "fora_do_escopo", "existente_linha_incompleta")
+_CONTADORES_VIRADA_POR_CHAVE = (
+    "would_update_virada",
+    "fora_do_escopo",
+    "existente_linha_incompleta",
+    "data_suspeita",
+)
+# Mudança de data plausível na virada (relay 65, ação 4): ano novo entre hoje − 1 e hoje + 2 e salto de até
+# 400 dias (um ano e folga para a remarcação). Fora disso a linha quase sempre é de outro evento (Filadélfia:
+# EV002608 com data de 2016) e nada dela entra.
+_SALTO_MAXIMO_DIAS = 400
+
+
+def _data_suspeita(atual: date, nova: date, hoje: date) -> bool:
+    if nova == atual:
+        return False
+    return not (hoje.year - 1 <= nova.year <= hoje.year + 2) or abs((nova - atual).days) > _SALTO_MAXIMO_DIAS
 
 
 def _contagem_virada() -> dict[str, Any]:
@@ -2640,6 +2655,12 @@ class ExportContractImporter:
             "reaprovacao": [],
             "marca": False,
         }
+        data_ev = _parse_iso_date(r.get("data"))
+        if data_ev is not None and _data_suspeita(
+            timezone.localtime(s.inicio, _FORTALEZA_TZ).date(), data_ev, ctx["hoje"]
+        ):
+            _conta(c, "data_suspeita", str(s.id))
+            return p  # a linha toda fica de fora: com a data errada, o resto dela também não é confiável
         categoria, travados, reprovado_pela_carga = tocado
         if categoria == "publicado_pelo_sistema":
             _conta(c, "publicado_pelo_sistema")
@@ -2696,7 +2717,6 @@ class ExportContractImporter:
                 _conta(c, "projeto_diverge")
 
         # data e hora (local de Fortaleza → UTC, como na criação)
-        data_ev = _parse_iso_date(r.get("data"))
         hora_ini = _parse_hora(r.get("hora_inicio"))
         hora_fim = _parse_hora(r.get("hora_fim"))
         inicio, fim = s.inicio, s.fim

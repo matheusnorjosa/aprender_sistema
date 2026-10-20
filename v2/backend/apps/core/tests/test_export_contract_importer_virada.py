@@ -978,3 +978,37 @@ def test_apagado_pela_tela_sem_external_hash_nao_bloqueia_a_vaga(tmp_path, m, mo
     assert tally["skip_reasons"]["apagado_no_sistema"] == 0
     ExportContractImporter(path=path, mode=modo, apply=True, allow=("solicitacao", "participation")).run()
     assert set(Solicitacao.objects.values_list("external_hash", flat=True)) == {"EVNOVO"}
+
+
+# ---------- relay 65, ação 4: mudança de data absurda não entra ----------
+@pytest.mark.parametrize(
+    ("dia", "nova"),
+    [
+        (FUTURO, "2016-03-10"),  # Filadélfia: a linha do EV002608 traz 2016 para um evento de 2026
+        (FUTURO, "2029-01-10"),  # ano depois de hoje + 2
+        (date(2025, 1, 10), "2026-10-01"),  # anos plausíveis, salto de mais de 400 dias
+    ],
+)
+def test_data_suspeita_pula_a_linha_e_conta(tmp_path, m, dia, nova):
+    s = _existente(m, dia=dia, formadores=(m.f1,))
+    path = _export(tmp_path, [_sol(data=nova, hora_inicio="09:00", cancelado="true")], [_part("EV1", _CPF_F2)])
+    dry = _dry(path)
+    assert dry["data_suspeita"] == {str(s.id): 1}
+    assert dry["evento_atualizado"] == 0
+    report = _virada(path)
+    assert report["applied"].get("solicitacao__virada_atualizada", 0) == 0
+    s.refresh_from_db()
+    assert timezone.localtime(s.inicio, _FORTALEZA).date() == dia, "a data não muda"
+    assert _hora(s) == (8, 12)
+    assert s.status == "aprovado", "o resto da linha também não entra"
+    assert _formadores(s) == {"form1"}
+    assert not AuditLog.objects.filter(details__modo="virada").exists()
+
+
+def test_data_plausivel_dentro_do_limite_muda(tmp_path, m):
+    s = _existente(m, dia=date(2025, 12, 1))
+    path = _export(tmp_path, [_sol(data="2026-12-20")])  # 384 dias, dentro de 400
+    assert _dry(path)["data_suspeita"] == {}
+    _virada(path)
+    s.refresh_from_db()
+    assert timezone.localtime(s.inicio, _FORTALEZA).date() == date(2026, 12, 20)

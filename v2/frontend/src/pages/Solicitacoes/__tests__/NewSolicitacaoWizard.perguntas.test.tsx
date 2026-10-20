@@ -312,6 +312,28 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     expect(payload.extra_participants).toEqual({ formador_ids: [99] });
   });
 
+  // Item 38 (ensaio de 20/10/2026): a revisão mostrava o código NAO_SUPER ao lado do projeto e uma
+  // linha vazia, sem rótulo nem valor, para cada campo opcional deixado em branco.
+  test('a revisão mostra o fluxo pelo nome e não tem linha vazia para campo opcional em branco', async () => {
+    renderWizard();
+    await irParaParticipantes();
+    responder(ACOMPANHA, 'Não');
+    responder(AVALIAR, 'Não');
+    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
+    await screen.findByLabelText('Local do Evento');
+    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
+    await screen.findByText('Revise sua solicitação');
+
+    expect(screen.queryByText('NAO_SUPER')).not.toBeInTheDocument();
+    expect(screen.getByText('Não-Superintendência')).toBeInTheDocument();
+    const linhas = Array.from(document.querySelectorAll('.ant-descriptions-row'));
+    const vazias = linhas.filter((linha) => !linha.querySelector('.ant-descriptions-item-label')?.textContent?.trim());
+    expect(vazias).toHaveLength(0);
+    for (const rotulo of ['Tipo', 'Encontro', 'Segmento', 'Observações']) {
+      expect(screen.queryByText(rotulo, { selector: '.ant-descriptions-item-label' })).not.toBeInTheDocument();
+    }
+  });
+
   // Item 36: sair do assistente com algo preenchido pergunta; depois do envio com sucesso, não
   // (o que foi preenchido virou a solicitação).
   test('depois de enviar com sucesso, vai para Minhas Solicitações sem perguntar', async () => {

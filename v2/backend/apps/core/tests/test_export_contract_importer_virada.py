@@ -1041,6 +1041,25 @@ def test_data_suspeita_pelo_id_antigo_nao_rechaveia(tmp_path, m):
     assert Solicitacao.objects.count() == 1
 
 
+def test_data_suspeita_pelo_id_antigo_ainda_recebe_a_marca(tmp_path, m):
+    """Achada pelo id antigo, a linha com data suspeita não re-chaveia, mas a marca entra: se é a única linha do
+    evento, sem ela o Publicar cria um segundo evento ao lado do que o sheet2gcal já pôs no Google."""
+    s = _existente(m, "EV100")
+    path = _export(
+        tmp_path,
+        [_sol(evento_id="EV200", evento_ids_anteriores='["EV100"]', data="2016-03-10", na_agenda_google="true")],
+    )
+    dry = _dry(path)
+    assert dry["data_suspeita"] == {str(s.id): 1}
+    assert dry["marca_fora_do_sistema"] == 1
+    _virada(path)
+    s.refresh_from_db()
+    assert s.publicado_fora_do_sistema is True
+    assert motivo_nao_publicavel(s) == "publicado_fora_do_sistema"
+    assert s.external_hash == "EV100", "não re-chaveia"
+    assert timezone.localtime(s.inicio, _FORTALEZA).date() == FUTURO, "a data não muda"
+
+
 def test_data_suspeita_pelo_id_antigo_libera_o_id_para_a_linha_seguinte(tmp_path, m):
     """A linha com data suspeita não gasta o id antigo: a linha certa que vem depois, com o mesmo id antigo,
     re-chaveia o evento (senão nasce um segundo evento aprovado no mesmo horário)."""

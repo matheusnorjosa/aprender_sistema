@@ -1675,11 +1675,17 @@ class ExportContractImporter:
                 antigo = None if existe else _id_antigo_em_prod(r, atual, bloqueados)
                 sid_antigo = atual[antigo] if antigo is not None else None
                 if virada and sid_antigo is not None and _linha_com_data_suspeita(por_id[sid_antigo].inicio, r, hoje):
-                    # Achada pelo id antigo com data suspeita: é de outro evento; não re-chaveia e nada entra.
-                    # O id antigo volta a ficar livre para a linha certa do mesmo evento re-chavear.
+                    # Achada pelo id antigo com data suspeita: é de outro evento; não re-chaveia e nada entra,
+                    # menos a marca (o plano para na data suspeita). O id antigo volta a ficar livre para a
+                    # linha certa do mesmo evento re-chavear.
                     bloqueados.discard(antigo)
-                    _conta(contagem, "data_suspeita", str(sid_antigo))
-                    tally["would_skip_same"] += 1
+                    sol = por_id[sid_antigo]
+                    tocado = _tocado(sol, logs_idx.get(sid_antigo, []), sid_antigo in admin_idx)
+                    plano = self._plano_virada(sol, r, key, tocado, parts_por_sol.get(sid_antigo, []), [], ctx)
+                    _somar_contagem(contagem, plano["c"])
+                    if plano["marca"]:
+                        sol.publicado_fora_do_sistema = True  # espelha o apply para a linha seguinte do evento
+                    tally["would_update" if plano["c"]["evento_atualizado"] else "would_skip_same"] += 1
                     continue
                 if antigo is not None:
                     atual[ext_hash] = atual.pop(antigo)
@@ -2453,10 +2459,11 @@ class ExportContractImporter:
                 and antigo is not None
                 and _linha_com_data_suspeita(Solicitacao.objects.get(id=existing[antigo][0]).inicio, r, hoje)
             ):
-                # Achada pelo id antigo com data suspeita: é de outro evento; não re-chaveia e nada entra.
-                # O id antigo volta a ficar livre para a linha certa do mesmo evento re-chavear.
+                # Achada pelo id antigo com data suspeita: é de outro evento; não re-chaveia e nada entra,
+                # menos a marca (o plano para na data suspeita). O id antigo volta a ficar livre para a linha
+                # certa do mesmo evento re-chavear.
                 bloqueados.discard(antigo)
-                _conta(contagem, "data_suspeita", str(existing[antigo][0]))
+                atualizadas += self._aplicar_virada(existing[antigo][0], r, key, antigo, ctx, contagem)
                 continue
             if antigo is not None:
                 # Evento que trocou de id na planilha e já está em prod pelo id antigo: é o mesmo evento.

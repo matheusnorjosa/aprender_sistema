@@ -289,14 +289,14 @@ class GerenciaViewSet(viewsets.ModelViewSet):  # type: ignore[misc]
 
     Endpoints:
         - GET /api/gerencias/ - Listar gerências
-        - POST /api/gerencias/ - Criar gerência (manage_purchases_and_materials)
+        - POST /api/gerencias/ - Criar gerência (manage_admin_registries)
         - GET /api/gerencias/{id}/ - Detalhe de gerência
-        - PUT/PATCH /api/gerencias/{id}/ - Atualizar (manage_purchases_and_materials)
-        - DELETE /api/gerencias/{id}/ - Deletar (manage_purchases_and_materials)
+        - PUT/PATCH /api/gerencias/{id}/ - Atualizar (manage_admin_registries)
+        - DELETE /api/gerencias/{id}/ - Deletar (manage_admin_registries)
 
-    Escrita: quem tem `manage_purchases_and_materials` — pacotes ADMIN_OPERACIONAL (DAT)
-    e CONTROLE, pelo vínculo EQUIPE/GERENTE (`services/rbac_pacotes.py`). A tela
-    /dat/admin/gerencias pede `manage_admin_registries`, que o CONTROLE não tem.
+    Escrita: quem tem `manage_admin_registries` — hoje só o pacote ADMIN_OPERACIONAL (DAT),
+    pelo vínculo EQUIPE/GERENTE (`services/rbac_pacotes.py`), e o superusuário. O CONTROLE
+    não escreve (decisão do dono, 19/10/2026).
 
     Filtros:
         - ativo (bool)

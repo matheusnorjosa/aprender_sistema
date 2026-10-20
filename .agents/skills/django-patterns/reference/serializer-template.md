@@ -36,10 +36,12 @@ class SolicitacaoReadSerializer(serializers.ModelSerializer):
 class SolicitacaoWriteSerializer(serializers.ModelSerializer):
     """Write + validation — POST/PUT/PATCH."""
 
+    # O dono (`solicitante`) NUNCA vem do payload: é somente-leitura aqui e o
+    # `perform_create` da view grava `serializer.save(solicitante=self.request.user)`.
+    # Aceitar o dono do cliente = IDOR/spoofing.
+    solicitante = serializers.PrimaryKeyRelatedField(read_only=True)
+
     # PrimaryKeyRelatedField: accept IDs, validate existence + scope
-    solicitante = serializers.PrimaryKeyRelatedField(
-        queryset=Usuario.objects.filter(is_active=True)
-    )
     municipio = serializers.PrimaryKeyRelatedField(
         queryset=Municipio.objects.filter(ativo=True)
     )
@@ -55,6 +57,9 @@ class SolicitacaoWriteSerializer(serializers.ModelSerializer):
             "solicitante", "municipio", "inicio", "fim",
             "status", "participantes", "observacao",
         ]
+        # O status vem de `resolve_initial_status` e das ações approve/reject,
+        # nunca do payload (PA-01).
+        read_only_fields = ["status"]
 
     def validate_inicio(self, value):
         """Per-field validation."""

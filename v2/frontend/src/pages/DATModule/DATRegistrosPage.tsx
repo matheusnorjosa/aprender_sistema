@@ -11,7 +11,6 @@ import { useState, useEffect, type JSX } from 'react';
 import { useTableFilters, type TableFilterParams } from '../../hooks/useTableFilters';
 import type { PaginatedResponse } from '../../types';
 import {
-  Table,
   Button,
   Input,
   Space,
@@ -28,6 +27,7 @@ import {
   Row,
   Col,
   Tag,
+  Grid,
 } from 'antd';
 import {
   ReloadOutlined,
@@ -64,7 +64,8 @@ import {
   REGIAO_OPTIONS,
   DEFAULT_FILTERS,
 } from './DATRegistros/constants';
-import { getColumns, type DATRegistroRecord } from './DATRegistros/columns';
+import { getColumns, nomeDoRegistro, type DATRegistroRecord } from './DATRegistros/columns';
+import ResponsiveTable from '../../components/ResponsiveTable';
 
 const { Title, Text } = Typography;
 
@@ -185,6 +186,8 @@ function unwrapOptionList<T>(data: T[] | PaginatedResponse<T>): T[] {
 }
 
 export default function DATRegistrosPage(): JSX.Element {
+  // Celular (abaixo de sm): o projeto vai junto do município e as ações para o menu.
+  const acoesCompactas = !Grid.useBreakpoint().sm;
   // Options for dropdowns
   const [projetosGerais, setProjetosGerais] = useState<ProjetoGeralOption[]>([]);
   const [municipios, setMunicipios] = useState<MunicipioOption[]>([]);
@@ -364,13 +367,14 @@ export default function DATRegistrosPage(): JSX.Element {
   const columns = getColumns({
     onEdit: handleEdit,
     onDelete: handleDelete,
+    compacto: acoesCompactas,
   });
 
   return (
     <section className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }} aria-labelledby="dat-registros-title">
       {/* Header */}
       <header className="mb-6">
-        <div className="flex justify-between items-start mb-2">
+        <div className="flex flex-wrap justify-between items-start gap-3 mb-2">
           <div>
             <Title level={3} className="m-0" id="dat-registros-title">
               Listagem de Registros DAT
@@ -537,44 +541,22 @@ export default function DATRegistrosPage(): JSX.Element {
           </Space>
         }
       >
-        {/* Column Group Headers */}
-        <div
-          className="flex text-xs font-semibold uppercase bg-gray-50"
-          style={{ borderBottom: '1px solid #f0f0f0' }}
-        >
-          <div
-            className="flex items-center gap-1.5"
-            style={{ flex: '0 0 720px', padding: '8px 16px', borderRight: '1px solid #f0f0f0' }}
-          >
-            <DatabaseOutlined /> Dados Básicos
-          </div>
-          <div
-            className="flex items-center gap-1.5 text-blue-500"
-            style={{ flex: '0 0 580px', padding: '8px 16px', borderRight: '1px solid #f0f0f0' }}
-          >
-            <BookOutlined /> Detalhes FORMAR
-          </div>
-          <div
-            className="flex items-center gap-1.5 text-green-500"
-            style={{ flex: 1, padding: '8px 16px' }}
-          >
-            <BarChartOutlined /> Detalhes AVALIAR
-          </div>
-        </div>
-
-        <Table
+        {/* Item 38: saiu o cabeçalho de grupos (Dados Básicos 720 px, Detalhes FORMAR 580 px, Detalhes
+            AVALIAR), que só se alinhava com todas as colunas na linha e obrigava a tela a ter mais de
+            1300 px. As colunas seguem na ordem de antes (Dados Básicos, FORMAR, AVALIAR), na linha ou
+            na linha expandida. */}
+        <ResponsiveTable<DATRegistroRecord>
           columns={columns}
           dataSource={registros}
           rowKey="id"
           loading={loading}
-          scroll={{ x: 1800 }}
+          nomeDaLinha={nomeDoRegistro}
           pagination={{
             ...pagination,
             showSizeChanger: true,
             showTotal: (total, range) => `Mostrando ${range[0]} a ${range[1]} de ${total} registros`,
             onChange: handleTableChange,
           }}
-          size="middle"
         />
       </Card>
       </section>

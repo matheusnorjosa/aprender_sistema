@@ -233,10 +233,38 @@ def _invalid_credentials_response() -> Response:
     """
     Generic authentication failure response to prevent account enumeration.
 
-    OWASP recommendation: never disclose whether username exists, password is wrong,
-    or account is locked.
+    OWASP recommendation: never disclose whether username exists or password is wrong.
+    O bloqueio por tentativas tem resposta própria (``_conta_bloqueada_response``, item 38).
     """
     return Response({"error": "Credenciais inválidas."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def _conta_bloqueada_response(request: Request, username: str) -> Response:
+    """Resposta do bloqueio por tentativas: diz que é bloqueio e por quanto tempo (item 38).
+
+    Não revela se a conta existe: o bloqueio conta erros pelo identificador DIGITADO, exista a
+    conta ou não, então um identificador inexistente bloqueia e recebe esta mesma resposta.
+    """
+    response = Response(
+        {"error": "Acesso bloqueado temporariamente por excesso de tentativas.", "code": "ACCOUNT_LOCKED"},
+        status=status.HTTP_400_BAD_REQUEST,
+    )
+    restante = _get_lockout_remaining_time(_lockout_bucket(username), _get_client_ip(request))
+    if restante:
+        response["Retry-After"] = str(restante)
+    return response
+
+
+def limpar_bloqueio_da_conta(user: object) -> None:
+    """Zera os contadores de erro da conta em TODO IP, pelo login e pelo CPF (item 38).
+
+    Chamado quando a senha é redefinida pela administração: a senha nova vale na hora. Só as
+    chaves desta conta; o global de outros identificadores fica como está.
+    """
+    for identificador in {getattr(user, "username", ""), getattr(user, "cpf", "") or ""} - {""}:
+        bucket = _lockout_bucket(identificador)
+        cache.delete_pattern(_get_lockout_key(bucket, "*"))
+        cache.delete(_get_lockout_key(bucket))
 
 
 # Issue #135: CSRF token endpoint (SEC-P2)
@@ -346,9 +374,9 @@ def login(request: Request) -> Response:
     bucket = _lockout_bucket(username)
 
     # C2 (auditoria 2026-10-14): o bloqueio é checado ANTES de autenticar; bloqueada,
-    # a senha nem é testada. Resposta genérica igual à de credencial inválida (#745).
+    # a senha nem é testada. Item 38: a resposta diz que é bloqueio (antes era a genérica, #745).
     if conta_bloqueada(request, username, password):
-        return _invalid_credentials_response()
+        return _conta_bloqueada_response(request, username)
 
     # Falha: o receptor de user_login_failed (registrar_falha_de_login) conta e grava
     # LOGIN_FAILED. O hash falso do CPF inexistente fica no backend (C7).

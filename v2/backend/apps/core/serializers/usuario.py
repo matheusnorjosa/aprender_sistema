@@ -590,6 +590,11 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             user.senha_redefinida_por = actor
             user.senha_redefinida_em = timezone.now()
         user.save()
+        # Item 38: a senha nova vale na hora; sem isto, os erros de antes mantinham a conta bloqueada.
+        # Import local: views_auth -> views.utils -> pacote views -> serializers (ciclo).
+        from apps.core.views_auth import limpar_bloqueio_da_conta
+
+        limpar_bloqueio_da_conta(user)
         auditar_reset_senha(actor=actor, target_user=user, contexto=contexto, imediato=True)
 
     @transaction.atomic

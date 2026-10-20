@@ -127,7 +127,7 @@ def test_api_e_admin_compartilham_o_contador_sem_contar_em_dobro(superusuario):
     # Bloqueio vale nos dois lados, com a senha certa.
     resposta_api = _api(api, superusuario.username, _SENHA)
     assert resposta_api.status_code == 400
-    assert resposta_api.data == {"error": "Credenciais inválidas."}
+    assert resposta_api.data["code"] == "ACCOUNT_LOCKED"
     assert not _entrou(_admin(admin, superusuario.username, _SENHA), admin)
 
 
@@ -232,7 +232,7 @@ def test_api_conta_bloqueada_nao_chama_authenticate(superusuario):
         resposta = _api(APIClient(), superusuario.username, _SENHA)
     autenticar.assert_not_called()
     assert resposta.status_code == 400
-    assert resposta.data == {"error": "Credenciais inválidas."}
+    assert resposta.data["code"] == "ACCOUNT_LOCKED"
 
 
 @override_settings(ACCOUNT_LOCKOUT_THRESHOLD=10)

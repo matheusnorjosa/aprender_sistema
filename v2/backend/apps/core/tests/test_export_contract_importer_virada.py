@@ -1022,6 +1022,25 @@ def test_data_suspeita_ainda_recebe_a_marca(tmp_path, m, rastro):
     assert _hora(s) == (8, 12), "o resto da linha também não entra"
 
 
+def test_data_suspeita_pelo_id_antigo_nao_rechaveia(tmp_path, m):
+    """A linha achada pelo id antigo com data suspeita é de outro evento: o id dela não vira a chave do evento
+    (senão a carga seguinte, com o id antigo de volta como linha própria, criaria um segundo evento)."""
+    s = _existente(m, "EV100")
+    path = _export(tmp_path, [_sol(evento_id="EV200", evento_ids_anteriores='["EV100"]', data="2016-03-10")])
+    tally = ExportContractImporter(path=path, mode="virada").run()["por_entidade"]["solicitacao"]
+    assert tally["would_rekey"] == 0
+    assert tally["would_create"] == 0
+    assert tally["virada"]["data_suspeita"] == {str(s.id): 1}
+    report = _virada(path)
+    assert report["applied"].get("solicitacao__rechaveada", 0) == 0
+    assert list(Solicitacao.objects.values_list("external_hash", flat=True)) == ["EV100"]
+    assert not AuditLog.objects.filter(details__campo="external_hash").exists()
+    # carga seguinte: o EV100 volta como linha própria e casa com o mesmo evento
+    path2 = _export(tmp_path, [_sol(evento_id="EV100")])
+    _virada(path2)
+    assert Solicitacao.objects.count() == 1
+
+
 def test_data_plausivel_dentro_do_limite_muda(tmp_path, m):
     s = _existente(m, dia=date(2025, 12, 1))
     path = _export(tmp_path, [_sol(data="2026-12-20")])  # 384 dias, dentro de 400

@@ -770,6 +770,11 @@ def _data_suspeita(atual: date, nova: date, hoje: date) -> bool:
     return atual.year in faixa and nova.year not in faixa
 
 
+def _linha_com_data_suspeita(inicio: datetime, r: dict[str, str], hoje: date) -> bool:
+    data_ev = _parse_iso_date(r.get("data"))
+    return data_ev is not None and _data_suspeita(timezone.localtime(inicio, _FORTALEZA_TZ).date(), data_ev, hoje)
+
+
 def _contagem_virada() -> dict[str, Any]:
     c: dict[str, Any] = dict.fromkeys(_CONTADORES_VIRADA, 0)
     for k in _CONTADORES_VIRADA_POR_CHAVE:
@@ -1666,6 +1671,12 @@ class ExportContractImporter:
                     tally["rekey_contraditorio"] += 1
                 existe = ext_hash in atual
                 antigo = None if existe else _id_antigo_em_prod(r, atual, bloqueados)
+                sid_antigo = atual[antigo] if antigo is not None else None
+                if virada and sid_antigo is not None and _linha_com_data_suspeita(por_id[sid_antigo].inicio, r, hoje):
+                    # Achada pelo id antigo com data suspeita: é de outro evento; não re-chaveia e nada entra.
+                    _conta(contagem, "data_suspeita", str(sid_antigo))
+                    tally["would_skip_same"] += 1
+                    continue
                 if antigo is not None:
                     atual[ext_hash] = atual.pop(antigo)
                     existe = True
@@ -2433,6 +2444,14 @@ class ExportContractImporter:
             seg_norm = (r.get("segmento_norm") or "").strip()[:100]
             seg_conf = (r.get("segmento_norm_confianca") or "").strip()[:30]
             antigo = None if ext_hash in existing else _id_antigo_em_prod(r, existing, bloqueados)
+            if (
+                virada
+                and antigo is not None
+                and _linha_com_data_suspeita(Solicitacao.objects.get(id=existing[antigo][0]).inicio, r, hoje)
+            ):
+                # Achada pelo id antigo com data suspeita: é de outro evento; não re-chaveia e nada entra.
+                _conta(contagem, "data_suspeita", str(existing[antigo][0]))
+                continue
             if antigo is not None:
                 # Evento que trocou de id na planilha e já está em prod pelo id antigo: é o mesmo evento.
                 # Re-chaveia para as próximas cargas acharem; status/data/campos protegidos ficam.

@@ -80,14 +80,15 @@ class PlanoFormacoesViewSet(viewsets.ModelViewSet):
         - POST /api/dat/plano-formacoes/ - Criar
         - GET /api/dat/plano-formacoes/{id}/ - Detalhe
         - PATCH /api/dat/plano-formacoes/{id}/ - Atualizar
-        - DELETE /api/dat/plano-formacoes/{id}/ - Excluir (Superintendencia only)
+        - DELETE /api/dat/plano-formacoes/{id}/ - Excluir (DAT, pelo pacote ADMIN_OPERACIONAL, e superusuario)
         - GET /api/dat/plano-formacoes/stats/ - Estatisticas
         - GET /api/dat/plano-formacoes/calendario/ - Dados para calendario
         - GET /api/dat/plano-formacoes/resumo-projeto/ - Resumo por projeto
         - PATCH /api/dat/plano-formacoes/{id}/formacao/{numero}/ - Atualizar formacao inline
 
     Permissoes (decididas SO em `get_permissions`; os `@action` nao declaram as suas):
-        - destroy: `execute_restricted_operations` (Superintendencia)
+        - destroy: `execute_restricted_operations` (o DAT, pelo pacote ADMIN_OPERACIONAL,
+          e o superusuario)
         - todo o resto (list, retrieve, create, update, stats, calendario,
           resumo-projeto e edicoes inline): `manage_admin_registries` (DAT)
           ou `run_daily_operations` (Controle)

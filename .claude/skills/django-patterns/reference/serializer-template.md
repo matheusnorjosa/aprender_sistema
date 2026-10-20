@@ -57,6 +57,9 @@ class SolicitacaoWriteSerializer(serializers.ModelSerializer):
             "usuario", "municipio", "inicio", "fim",
             "status", "formadores", "observacoes",
         ]
+        # O status vem de `resolve_initial_status` e das ações approve/reject,
+        # nunca do payload (PA-01).
+        read_only_fields = ["status"]
 
     def validate_inicio(self, value):
         """Per-field validation."""

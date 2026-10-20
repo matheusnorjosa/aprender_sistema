@@ -143,7 +143,7 @@ def test_adotado_cancelado_no_google_nao_ressuscita():
     s.refresh_from_db()
     assert s.external_event_id == _ADOTADO
     assert s.gcal_status == "ERROR"
-    assert "cancelado no Google" in s.gcal_last_error, "o motivo fica no erro do evento"
+    assert "cancelado no Google" in (s.gcal_last_error or ""), "o motivo fica no erro do evento"
 
 
 def test_id_deterministico_gravado_segue_o_caminho_de_antes():

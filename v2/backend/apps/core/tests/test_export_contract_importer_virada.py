@@ -1085,6 +1085,30 @@ def test_data_suspeita_pelo_id_antigo_libera_o_id_para_a_linha_seguinte(tmp_path
     assert list(Solicitacao.objects.values_list("id", "external_hash")) == [(s.id, "EV300")]
 
 
+def test_data_suspeita_no_primeiro_id_antigo_tenta_os_seguintes(tmp_path, m):
+    """Com vários ids antigos, a data suspeita contra o primeiro não encerra a busca: o id seguinte, do evento
+    certo, re-chaveia e recebe a marca (senão o Publicar dele cria um segundo evento no Google)."""
+    velho = _existente(m, "EV100", dia=date(2016, 5, 5))
+    certo = _existente(m, "EV200")
+    path = _export(
+        tmp_path,
+        [_sol(evento_id="EV300", evento_ids_anteriores='["EV100", "EV200"]', na_agenda_google="true")],
+    )
+    tally = ExportContractImporter(path=path, mode="virada").run()["por_entidade"]["solicitacao"]
+    assert tally["would_rekey"] == 1
+    assert tally["would_create"] == 0
+    assert tally["virada"]["data_suspeita"] == {}
+    assert tally["virada"]["marca_fora_do_sistema"] == 1
+    _virada(path)
+    certo.refresh_from_db()
+    velho.refresh_from_db()
+    assert certo.external_hash == "EV300"
+    assert motivo_nao_publicavel(certo) == "publicado_fora_do_sistema"
+    assert velho.external_hash == "EV100"
+    assert timezone.localtime(velho.inicio, _FORTALEZA).date() == date(2016, 5, 5)
+    assert Solicitacao.objects.count() == 2
+
+
 def test_data_plausivel_dentro_do_limite_muda(tmp_path, m):
     s = _existente(m, dia=date(2025, 12, 1))
     path = _export(tmp_path, [_sol(data="2026-12-20")])  # 384 dias, dentro de 400

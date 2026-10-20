@@ -28,6 +28,7 @@ import json
 import os
 import re
 import unicodedata
+from collections.abc import Callable
 from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Any
@@ -415,16 +416,27 @@ def _ids_proprios(rows: list[dict[str, str]]) -> set[str]:
     return {s for s in ((r.get("evento_id") or "").strip() for r in rows) if s}
 
 
-def _id_antigo_em_prod(r: dict[str, str], existentes: set[str] | dict[str, Any], bloqueados: set[str]) -> str | None:
+def _id_antigo_em_prod(
+    r: dict[str, str],
+    existentes: set[str] | dict[str, Any],
+    bloqueados: set[str],
+    suspeito: Callable[[str], bool] | None = None,
+) -> str | None:
     """Primeiro id de `evento_ids_anteriores` (array JSON do v35) que já é `external_hash` em prod e não
     está em `bloqueados` (ids próprios do arquivo + ids antigos já usados). O id devolvido entra em
-    `bloqueados`: cada id antigo re-chaveia uma linha só, no dry-run e no apply."""
-    for antigo in _parse_json_list(r.get("evento_ids_anteriores")):
-        s = str(antigo).strip()
-        if s and s in existentes and s not in bloqueados:
-            bloqueados.add(s)
-            return s
-    return None
+    `bloqueados`: cada id antigo re-chaveia uma linha só, no dry-run e no apply. Com `suspeito` (data
+    suspeita contra o evento do id), o primeiro id sem data suspeita vence; um suspeito só volta quando
+    todos são."""
+    elegiveis = [
+        s
+        for s in (str(a).strip() for a in _parse_json_list(r.get("evento_ids_anteriores")))
+        if s and s in existentes and s not in bloqueados
+    ]
+    if not elegiveis:
+        return None
+    escolhido = next((s for s in elegiveis if suspeito is None or not suspeito(s)), elegiveis[0])
+    bloqueados.add(escolhido)
+    return escolhido
 
 
 # projeto_geral: config de cálculo do contrato v5 → choices do Django.
@@ -1672,7 +1684,25 @@ class ExportContractImporter:
                 ):
                     tally["rekey_contraditorio"] += 1
                 existe = ext_hash in atual
-                antigo = None if existe else _id_antigo_em_prod(r, atual, bloqueados)
+                antigo = (
+                    None
+                    if existe
+                    else _id_antigo_em_prod(
+                        r,
+                        atual,
+                        bloqueados,
+                        (
+                            (
+                                lambda a: (x := atual[a]) is not None
+                                and _linha_com_data_suspeita(
+                                    por_id[x].inicio, r, hoje  # pyright: ignore[reportArgumentType]
+                                )
+                            )
+                            if virada
+                            else None
+                        ),
+                    )
+                )
                 sid_antigo = atual[antigo] if antigo is not None else None
                 if virada and sid_antigo is not None and _linha_com_data_suspeita(por_id[sid_antigo].inicio, r, hoje):
                     # Achada pelo id antigo com data suspeita: é de outro evento; não re-chaveia e nada entra,
@@ -2453,7 +2483,20 @@ class ExportContractImporter:
             ext_hash = key[-1] if key is not None else _identidade_da_linha(r)
             seg_norm = (r.get("segmento_norm") or "").strip()[:100]
             seg_conf = (r.get("segmento_norm_confianca") or "").strip()[:30]
-            antigo = None if ext_hash in existing else _id_antigo_em_prod(r, existing, bloqueados)
+            antigo = (
+                None
+                if ext_hash in existing
+                else _id_antigo_em_prod(
+                    r,
+                    existing,
+                    bloqueados,
+                    (
+                        (lambda a: _linha_com_data_suspeita(Solicitacao.objects.get(id=existing[a][0]).inicio, r, hoje))
+                        if virada
+                        else None
+                    ),
+                )
+            )
             if (
                 virada
                 and antigo is not None

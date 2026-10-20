@@ -362,6 +362,8 @@ export const ROTAS_NAO_MEDIDAS: Readonly<Record<string, { tipo: 'redirect' | 'al
   '/deslocamentos': { tipo: 'redirect', destino: '/solicitacoes/deslocamentos' },
   '/meus-eventos': { tipo: 'redirect', destino: '/solicitacoes/meus-eventos' },
   '/dat/importacao': { tipo: 'redirect', destino: '/dat/importacoes' },
+  // Endereço desconhecido (inclui o '/login' de quem acabou de entrar) vai para a Página Inicial.
+  '*': { tipo: 'redirect', destino: '/' },
 };
 
 /** A tela de login não é rota do AppRoutes (aparece em qualquer URL sem sessão), mas também é medida. */

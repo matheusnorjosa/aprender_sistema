@@ -21,10 +21,11 @@
  * - Conformidade ISO 9241-110: Controle explícito (usuário vê apenas ações permitidas)
  */
 
-import { useState, useEffect, useCallback, useMemo, useRef, ChangeEvent, Key, JSX, CSSProperties } from 'react';
+import { useState, useEffect, useCallback, useContext, useMemo, useRef, ChangeEvent, Key, JSX, CSSProperties } from 'react';
 import {
   Alert,
   Card,
+  ConfigProvider,
   Grid,
   Input,
   Select,
@@ -62,6 +63,7 @@ import {
 } from '../../api/solicitacoes';
 import { getMe } from '../../api/availability';
 import { ehSuperusuario, useAcesso } from '../../contexts/AcessoContext';
+import ThemeContext from '../../contexts/ThemeContext';
 import { TIMING } from '../../constants/timing';
 import { usePolling } from '../../hooks/usePolling';
 import { syncChannel } from '../../services/syncChannel';
@@ -150,6 +152,14 @@ interface PreviewDataType {
 // Célula de duas linhas: o `ellipsis` da coluna só corta texto simples, então cada linha corta a si mesma
 // e mostra o texto inteiro no title (achado da revisão do PR-2, 05/10/2026).
 const UMA_LINHA: CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
+
+// Linha marcada para o lote (tema claro): o AntD tira o fundo do colorPrimary (#006B52 → #9aaba4),
+// e os ícones de Aprovar e Reprovar (link, sem fundo) caíam para 1,71 e 1,36:1. Este verde bem
+// claro dá 3:1 aos dois ícones e 4,5:1 ao texto cinza da célula (WCAG 1.4.11 e 1.4.3).
+const FUNDO_DA_LINHA_MARCADA = '#f4faf7';
+const TEMA_DA_TABELA = {
+  components: { Table: { rowSelectedBg: FUNDO_DA_LINHA_MARCADA, rowSelectedHoverBg: FUNDO_DA_LINHA_MARCADA } },
+};
 
 /**
  * O evento como a pessoa o reconhece: "25/08/2026 08:00 · Sobral · Projeto X" (botões, confirmações, lote).
@@ -512,6 +522,7 @@ export default function ApprovalsPage(): JSX.Element {
 
   // Celular: as ações vão para o menu "Mais ações" (AcoesLinha) e a página perde padding.
   const telas = Grid.useBreakpoint();
+  const temaEscuro = useContext(ThemeContext)?.isDark === true; // o escuro tem fundo próprio (App.css)
   const acoesCompactas = !telas.sm;
 
   // Sem rolagem horizontal (achado do item 36): no celular a coluna fixa Ações cobria a tabela e
@@ -732,26 +743,28 @@ export default function ApprovalsPage(): JSX.Element {
 
           {/* Tabela */}
           <section aria-label="Lista de solicitacoes para aprovacao">
-            <ResponsiveTable<Solicitacao>
-              {...(rowSelection !== undefined && { rowSelection })}
-              columns={columns}
-              dataSource={rows}
-              loading={loading}
-              rowKey="id"
-              nomeDaLinha={rotuloDoEvento}
-              erro={erroCarga}
-              onTentarDeNovo={() => { void loadData(); }}
-              locale={{ emptyText: textoDoVazio(statusFilter, searchTerm) }}
-              pagination={{
-                current: page,
-                pageSize,
-                total,
-                showSizeChanger: true,
-                pageSizeOptions: PAGE_SIZE_OPTIONS,
-                showTotal: (count) => `Total: ${count} solicitações`,
-                onChange: handlePageChange,
-              }}
-            />
+            <ConfigProvider {...(!temaEscuro && { theme: TEMA_DA_TABELA })}>
+              <ResponsiveTable<Solicitacao>
+                {...(rowSelection !== undefined && { rowSelection })}
+                columns={columns}
+                dataSource={rows}
+                loading={loading}
+                rowKey="id"
+                nomeDaLinha={rotuloDoEvento}
+                erro={erroCarga}
+                onTentarDeNovo={() => { void loadData(); }}
+                locale={{ emptyText: textoDoVazio(statusFilter, searchTerm) }}
+                pagination={{
+                  current: page,
+                  pageSize,
+                  total,
+                  showSizeChanger: true,
+                  pageSizeOptions: PAGE_SIZE_OPTIONS,
+                  showTotal: (count) => `Total: ${count} solicitações`,
+                  onChange: handlePageChange,
+                }}
+              />
+            </ConfigProvider>
           </section>
         </Space>
       </Card>

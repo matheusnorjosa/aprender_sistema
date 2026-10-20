@@ -9,6 +9,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { MemoryRouter } from 'react-router';
+import { ConfigProvider } from 'antd';
 
 import { AcessoContext, montarAcesso } from '../../../contexts/AcessoContext';
 import { definirLarguraTela } from '../../../test/larguraTela';
@@ -79,6 +80,31 @@ async function linhaDoEvento(acao: 'Aprovar' | 'Mais ações'): Promise<HTMLElem
   return linha;
 }
 
+/**
+ * Fundo que o CSS-in-JS do AntD dá à célula da linha selecionada, parada ou com o mouse em cima.
+ * O jsdom não aplica o CSS do AntD: o teste lê a regra gerada para o hash da própria tabela.
+ */
+function fundoDaLinhaSelecionada(linha: HTMLElement, comMouse: boolean): string {
+  const hash = Array.from(linha.closest('.ant-table-wrapper')?.classList ?? []).find((c) => c.startsWith('css-'));
+  const css = Array.from(document.querySelectorAll('style')).map((s) => s.textContent ?? '').join('').replace(/\s/g, '');
+  const alvo = `.ant-table-row-selected>.ant-table-cell${comMouse ? '-row-hover' : ''}{`;
+  const regra = css.split('}').find((r) => r.includes(`(.${hash})`) && r.includes(alvo));
+  const cor = /background:(#[0-9a-f]{6})/i.exec(regra ?? '')?.[1];
+  if (!cor) throw new Error(`sem regra de fundo para ${alvo} em .${hash}`);
+  return cor;
+}
+
+function luminancia(hex: string): number {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)) as [number, number, number];
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contraste(a: string, b: string): number {
+  const [claro, escuro] = [luminancia(a), luminancia(b)].sort((x, y) => y - x) as [number, number];
+  return (claro + 0.05) / (escuro + 0.05);
+}
+
 describe('ApprovalsPage responsiva', () => {
   beforeEach(() => {
     vi.mocked(listSolicitacoes).mockResolvedValue(linhas(1));
@@ -134,6 +160,31 @@ describe('ApprovalsPage responsiva', () => {
     expect(within(linha).getByRole('checkbox', { name: `Selecionar: ${EVENTO}` })).toBeInTheDocument();
     expect(within(linha).getByText('Pendente')).toHaveStyle({ color: '#ad4e00' });
     expect(screen.getByText('1', { selector: '.ant-tag' })).toHaveStyle({ color: '#ad4e00' });
+  }, 20000);
+
+  // Achado da revisão do item 36: o AntD tira o fundo da linha selecionada do colorPrimary
+  // (#006B52 → #9aaba4) e os ícones de link do AcoesLinha (sem fundo próprio) caíam para 1,71:1
+  // (Aprovar, #1677ff) e 1,36:1 (Reprovar, #ff4d4f); o projeto, small gray-500, para 2,01:1.
+  test('linha marcada para o lote: Aprovar e Reprovar com 3:1 e o texto cinza com 4,5:1', async () => {
+    render(
+      <ConfigProvider theme={{ token: { colorPrimary: '#006B52' } }}>
+        <AcessoContext.Provider value={montarAcesso(['access_solicitation_approvals'], null)}>
+          <MemoryRouter>
+            <ApprovalsPage />
+          </MemoryRouter>
+        </AcessoContext.Provider>
+      </ConfigProvider>,
+    );
+    const linha = await linhaDoEvento('Aprovar');
+    fireEvent.click(within(linha).getByRole('checkbox'));
+    expect(linha).toHaveClass('ant-table-row-selected');
+
+    for (const comMouse of [false, true]) {
+      const fundo = fundoDaLinhaSelecionada(linha, comMouse);
+      expect(contraste('#1677ff', fundo), `Aprovar sobre ${fundo}`).toBeGreaterThanOrEqual(3);
+      expect(contraste('#ff4d4f', fundo), `Reprovar sobre ${fundo}`).toBeGreaterThanOrEqual(3);
+      expect(contraste('#6b7280', fundo), `gray-500 sobre ${fundo}`).toBeGreaterThanOrEqual(4.5);
+    }
   }, 20000);
 
   test('a barra do lote quebra linha em tela estreita', async () => {

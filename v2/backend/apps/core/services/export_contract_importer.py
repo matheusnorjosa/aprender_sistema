@@ -1702,7 +1702,12 @@ class ExportContractImporter:
                     )
                 )
                 sid_antigo = atual[antigo] if antigo is not None else None
-                if virada and sid_antigo is not None and _linha_com_data_suspeita(por_id[sid_antigo].inicio, r, hoje):
+                if (
+                    virada
+                    and antigo is not None
+                    and sid_antigo is not None
+                    and _linha_com_data_suspeita(por_id[sid_antigo].inicio, r, hoje)
+                ):
                     # Achada pelo id antigo com data suspeita: é de outro evento; não re-chaveia e nada entra,
                     # menos a marca (o plano para na data suspeita). O id antigo volta a ficar livre para a
                     # linha certa do mesmo evento re-chavear.

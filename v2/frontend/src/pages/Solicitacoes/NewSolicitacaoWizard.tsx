@@ -10,8 +10,8 @@
  * 4. Revisão e Confirmação
  */
 
-import { useState, useMemo, useCallback, useEffect, ChangeEvent, JSX, ReactNode } from 'react';
-import { useNavigate } from 'react-router';
+import { useState, useMemo, useCallback, useEffect, useRef, ChangeEvent, JSX, ReactNode } from 'react';
+import { useBlocker, useNavigate, type BlockerFunction } from 'react-router';
 // antd - direct imports for tree-shaking (Issue #424)
 import Steps from 'antd/es/steps';
 import Form from 'antd/es/form';
@@ -19,6 +19,7 @@ import Input from 'antd/es/input';
 import Button from 'antd/es/button';
 import Card from 'antd/es/card';
 import Alert from 'antd/es/alert';
+import Modal from 'antd/es/modal';
 import message from 'antd/es/message';
 import Typography from 'antd/es/typography';
 import Descriptions from 'antd/es/descriptions';
@@ -55,6 +56,7 @@ import ComboBox from '../../components/ComboBox';
 import FormadoresPicker from '../../components/FormadoresPicker';
 import AvailabilityConflictAlert, { AvisosDeAgenda } from '../../components/AvailabilityConflictAlert';
 import logger from '../../utils/logger';
+import { lerAvisoDoLogin, storageKeys } from '../../utils/storage';
 import type { ID, FluxoType, BlockedParticipant, AvailabilityConflictErrorPayload } from '../../types';
 
 dayjs.extend(utc);
@@ -73,6 +75,9 @@ const SIM_NAO = [
   { label: 'Sim', value: true },
   { label: 'Não', value: false },
 ];
+
+/** Lista vazia estável (o `steps` memoizado depende do conflito do envio). */
+const SEM_BLOQUEADOS: BlockedParticipant[] = [];
 
 /** ComboBox value type */
 interface ComboBoxValue {
@@ -120,6 +125,30 @@ interface FormDataType {
   // PR19: Modalidade online/presencial
   is_online: boolean;
 }
+
+/** Formulário vazio: o estado inicial e a régua de "tem algo preenchido" ao sair. */
+const FORM_INICIAL: FormDataType = {
+  // Passo 1
+  projeto: null,
+  tipoEvento: null,
+  municipio: null,
+  inicio: null,
+  fim: null,
+  // Passo 2
+  formadores: [],
+  coordenadorResponsavel: null,
+  coordenadorAcompanha: null,
+  pretendeAvaliar: null,
+  formadorAvaliado: null,
+  // Passo 3
+  tipo: '',
+  encontro: '',
+  segmento: '',
+  observacoes: '',
+  local: '',
+  // PR19: Modalidade online/presencial
+  is_online: false,
+};
 
 /** Range value type */
 interface RangeValueType {
@@ -203,32 +232,78 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   // backend aceita o vazio para o projeto escolhido (`responsavel_padrao` do lookup de projetos: papel
   // COORDENADOR na gerência do projeto, PR 9). Só entra na checagem de agenda se acompanhar.
   const [me, setMe] = useState<{ id: ID; nome: string } | null>(null);
-  // #1452: conflito devolvido pelo backend no submit (fecha o TOCTOU / cache).
-  const [submitConflito, setSubmitConflito] = useState<BlockedParticipant[]>([]);
+  // #1452: conflito devolvido pelo backend no submit (fecha o TOCTOU / cache). Vale para a
+  // `chave` (horário, município e participantes) com que foi enviado: mudou um deles, o
+  // conflito antigo deixa de valer e o Confirmar volta (o backend confere de novo no envio).
+  const [conflitoDoEnvio, setConflitoDoEnvio] = useState<{ chave: string; bloqueados: BlockedParticipant[] } | null>(null);
+  // Motivo de o horário do passo 1 não valer (faltando, ou fim antes do início), junto dos campos.
+  const [erroHorario, setErroHorario] = useState<string | null>(null);
 
   // Estado do formulário
-  const [formData, setFormData] = useState<FormDataType>({
-    // Passo 1
-    projeto: null,
-    tipoEvento: null,
-    municipio: null,
-    inicio: null,
-    fim: null,
-    // Passo 2
-    formadores: [],
-    coordenadorResponsavel: null,
-    coordenadorAcompanha: null,
-    pretendeAvaliar: null,
-    formadorAvaliado: null,
-    // Passo 3
-    tipo: '',
-    encontro: '',
-    segmento: '',
-    observacoes: '',
-    local: '',
-    // PR19: Modalidade online/presencial
-    is_online: false,
-  });
+  const [formData, setFormData] = useState<FormDataType>(FORM_INICIAL);
+
+  // Sair do assistente descarta o que foi preenchido: com algo preenchido, pergunta antes,
+  // começando no Cancelar (ação destrutiva, ux-principios). Toda saída para outra página passa
+  // pelo `useBlocker` do data router (App.tsx): o botão do topo, o Voltar do navegador e o do
+  // Android, o menu lateral e os outros links. Passos do assistente não mudam o endereço.
+  const preenchido = JSON.stringify(formData) !== JSON.stringify(FORM_INICIAL);
+  // Depois do envio com sucesso, sai sem perguntar: o que foi preenchido virou a solicitação.
+  const saidaLiberada = useRef(false);
+  const deveSegurar = useCallback<BlockerFunction>(
+    ({ currentLocation, nextLocation }) =>
+      preenchido && !saidaLiberada.current && currentLocation.pathname !== nextLocation.pathname,
+    [preenchido],
+  );
+  const bloqueio = useBlocker(deveSegurar);
+  // O bloqueio da hora: outro Voltar com o aviso aberto bloqueia de novo, e "Sair" segue o último.
+  const bloqueioAtual = useRef(bloqueio);
+  // O aviso aberto: o `Modal.confirm` não é ligado ao componente, então ele é fechado à mão
+  // quando o assistente sai da tela (não fica aberto sobre outra).
+  const aviso = useRef<ReturnType<typeof Modal.confirm> | null>(null);
+  useEffect(() => {
+    bloqueioAtual.current = bloqueio;
+    if (bloqueio.state !== 'blocked' || aviso.current) return;
+    aviso.current = Modal.confirm({
+      title: 'Sair sem criar a solicitação?',
+      content: 'O que você preencheu será perdido.',
+      okText: 'Sair e descartar',
+      okType: 'danger',
+      cancelText: 'Continuar preenchendo',
+      autoFocusButton: 'cancel',
+      onOk: () => {
+        aviso.current = null;
+        if (bloqueioAtual.current.state === 'blocked') bloqueioAtual.current.proceed();
+      },
+      onCancel: () => {
+        aviso.current = null;
+        if (bloqueioAtual.current.state === 'blocked') bloqueioAtual.current.reset();
+      },
+    });
+  }, [bloqueio]);
+  useEffect(() => () => aviso.current?.destroy(), []);
+  const sairDoAssistente = (): void => {
+    void navigate('/solicitacoes/minhas');
+  };
+
+  // Recarregar ou fechar a aba não passa pelo roteador: com algo preenchido, o aviso do próprio
+  // navegador (`beforeunload`).
+  useEffect(() => {
+    if (!preenchido) return undefined;
+    const aoDescarregar = (e: BeforeUnloadEvent): void => {
+      // O reload do próprio app leva ao login e não é segurado: a sessão encerrada guarda o
+      // motivo para o login; o "Sair" apaga o horário comum às abas (App.tsx). Com Cancelar, a
+      // aba ficaria no assistente sem sessão e o app não a levaria mais ao login.
+      if (lerAvisoDoLogin() !== null) return;
+      try {
+        if (localStorage.getItem(storageKeys.sessaoUltimaResposta) === null) return;
+      } catch {
+        // storage bloqueado: sem como saber, segue perguntando
+      }
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', aoDescarregar);
+    return () => window.removeEventListener('beforeunload', aoDescarregar);
+  }, [preenchido]);
 
   useEffect(() => {
     let mounted = true;
@@ -251,6 +326,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
 
   // Handler para DateTimeRange: converte {date, start, end} para ISO UTC (Issue #428)
   const handleRangeChange = useCallback((range: RangeValueType | null): void => {
+    setErroHorario(null);
     if (!range || !range.date || !range.start || !range.end) {
       setFormData(prev => ({ ...prev, inicio: null, fim: null }));
       return;
@@ -345,16 +421,26 @@ export default function NewSolicitacaoWizard(): JSX.Element {
     [dispensaCompra],
   );
 
+  // DateTimeRange (Step 0) fica fora de Form.Item, então validateFields() não o vê.
+  // Sem esta guarda dá para avançar sem data, e o gatilho da checagem (#1452) depende dela.
+  // O backend recusa fim igual ou antes do início (`errors.fim`); aqui a pessoa vê antes.
+  const motivoDoHorario = (): string | null => {
+    if (!formData.inicio || !formData.fim) return 'Escolha a data e os horários de início e de fim do evento.';
+    if (!dayjs(formData.fim).isAfter(dayjs(formData.inicio))) return 'O horário de fim precisa ser depois do início.';
+    return null;
+  };
+
   // Navegação entre passos
   const next = (): void => {
-    // DateTimeRange (Step 0) fica fora de Form.Item, então validateFields() não o vê.
-    // Sem esta guarda dá para avançar sem data, e o gatilho da checagem (#1452) depende dela.
-    if (currentStep === 0 && (!formData.inicio || !formData.fim)) {
-      message.error('Por favor, selecione a data e o horário do evento');
-      return;
-    }
+    const motivoHorario = currentStep === 0 ? motivoDoHorario() : null;
+    setErroHorario(motivoHorario);
 
     form.validateFields().then(values => {
+      if (motivoHorario) {
+        // Os outros campos estão certos: o foco vai ao primeiro campo do horário marcado.
+        setTimeout(() => document.querySelector<HTMLElement>('[data-campo-horario][aria-invalid="true"]')?.focus());
+        return;
+      }
       // validateFields() sem args devolve a chave de TODO field montado, inclusive os
       // opcionais não tocados — com valor `undefined`. Sem filtrar, o spread abaixo
       // sobrescreve `coordenadores: []` por `undefined` e o render do resumo estoura em
@@ -364,8 +450,11 @@ export default function NewSolicitacaoWizard(): JSX.Element {
       );
       setFormData({ ...formData, ...definidos });
       setCurrentStep(currentStep + 1);
-    }).catch(err => {
+    }).catch((err: { errorFields?: Array<{ name: Array<string | number> }> }) => {
       logger.debug('Validação falhou:', err);
+      // Nada de clique mudo: leva a tela e o foco ao primeiro campo com erro.
+      const primeiro = err?.errorFields?.[0]?.name;
+      if (primeiro) form.scrollToField(primeiro, { block: 'center', focus: true });
     });
   };
 
@@ -376,7 +465,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
   // Submit final
   const handleSubmit = async (): Promise<void> => {
     setLoading(true);
-    setSubmitConflito([]);
+    setConflitoDoEnvio(null);
     try {
       // Garantir que formadores é um array
       const formadores = Array.isArray(formData.formadores) ? formData.formadores : [];
@@ -442,6 +531,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
 
       await createSolicitacao(payload);
       message.success('Solicitação criada com sucesso!');
+      saidaLiberada.current = true;
       void navigate('/solicitacoes/minhas');
     } catch (error) {
       logger.error('Erro ao criar solicitação:', error);
@@ -453,11 +543,19 @@ export default function NewSolicitacaoWizard(): JSX.Element {
 
       if (payloadErro?.code === 'availability_conflict') {
         const bloqueados = payloadErro.errors?.blocked_participants ?? [];
-        setSubmitConflito(bloqueados);
+        setConflitoDoEnvio({ chave: chaveDoEnvio, bloqueados });
         message.error(payloadErro.detail || 'Um participante já está alocado neste horário.');
       } else {
+        // Recusa por campo (400): o motivo vem em `errors.<campo>`; o `detail` é o genérico
+        // "Erro de validação.". Sem resposta (rede), a mensagem do próprio erro diz o que houve.
+        const motivoDoCampo = Object.values((data as { errors?: Record<string, unknown> })?.errors ?? {})
+          .flat()
+          .find((texto): texto is string => typeof texto === 'string');
         const detail = (data as { detail?: string })?.detail;
-        message.error(detail || 'Erro ao criar solicitação. Verifique os dados e tente novamente.');
+        const semResposta = !(error as { response?: unknown })?.response ? (error as Error)?.message : undefined;
+        message.error(
+          motivoDoCampo || detail || semResposta || 'Erro ao criar solicitação. Verifique os dados e tente novamente.'
+        );
       }
     } finally {
       setLoading(false);
@@ -506,6 +604,15 @@ export default function NewSolicitacaoWizard(): JSX.Element {
       form.setFieldsValue({ formadorAvaliado: undefined });
     }
   }, [form]);
+
+  // O que o conflito do envio confere: se mudar, ele já não descreve o evento da tela.
+  const chaveDoEnvio = [
+    formData.inicio,
+    formData.fim,
+    formData.municipio?.id,
+    participantes.map(p => p.id).sort((a, b) => Number(a) - Number(b)).join(','),
+  ].join('|');
+  const submitConflito = conflitoDoEnvio?.chave === chaveDoEnvio ? conflitoDoEnvio.bloqueados : SEM_BLOQUEADOS;
 
   const preview = useAvailabilityPreview({
     inicio: formData.inicio,
@@ -579,6 +686,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
               onChange={handleProjetoChange}
               value={formData.projeto as unknown as { id: ID; label: string; [key: string]: unknown } | null}
               placeholder="Busque ou selecione um projeto"
+              oQueCarrega="os projetos"
             />
           </Form.Item>
 
@@ -606,6 +714,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
               onChange={(value: ComboBoxValue | null) => setFormData({ ...formData, tipoEvento: value })}
               value={formData.tipoEvento as unknown as { id: ID; label: string; [key: string]: unknown } | null}
               placeholder="Busque ou selecione um tipo de evento"
+              oQueCarrega="os tipos de evento"
             />
           </Form.Item>
 
@@ -624,6 +733,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
                   : 'Busque ou selecione um município'
               }
               disabled={!dispensaCompra && !formData.projeto}
+              oQueCarrega="os municípios"
               notFoundContent={
                 !dispensaCompra && formData.projeto
                   ? 'Nenhum município elegível para o projeto selecionado'
@@ -643,6 +753,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
           )}
 
           <DateTimeRange
+            erro={erroHorario}
             value={rangeValue}
             onChange={handleRangeChange as unknown as (value: { date?: string | null; start?: string | null; end?: string | null }) => void}
           />
@@ -685,6 +796,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
               onChange={(value: ComboBoxValue | null) => setFormData({ ...formData, coordenadorResponsavel: value })}
               value={formData.coordenadorResponsavel as unknown as { id: ID; label: string; [key: string]: unknown } | null}
               placeholder={vazioEhQuemCria ? 'Busque o coordenador responsável (opcional)' : 'Busque o coordenador responsável'}
+              oQueCarrega="os coordenadores"
             />
           </Form.Item>
 
@@ -813,6 +925,7 @@ export default function NewSolicitacaoWizard(): JSX.Element {
           <Form.Item
             label="Observações"
             name="observacoes"
+            rules={[{ max: 5000, message: 'Máximo 5000 caracteres' }]}
           >
             <TextArea
               rows={4}
@@ -936,20 +1049,16 @@ export default function NewSolicitacaoWizard(): JSX.Element {
         </>
       ),
     },
-  ], [formData, rangeValue, handleRangeChange, handleProjetoChange, lookupProjetosElegiveis, lookupMunicipiosElegiveis, lookupCoordenadores, dispensaCompra, municipioLookupHasResults, preview, submitConflito, me, vazioEhQuemCria, perguntaAvaliar, formadoresAvaliaveis, handleFormadoresChange]);
+  ], [formData, rangeValue, erroHorario, handleRangeChange, handleProjetoChange, lookupProjetosElegiveis, lookupMunicipiosElegiveis, lookupCoordenadores, dispensaCompra, municipioLookupHasResults, preview, submitConflito, me, vazioEhQuemCria, perguntaAvaliar, formadoresAvaliaveis, handleFormadoresChange]);
 
   return (
     <section className="p-6 max-w-4xl mx-auto" aria-labelledby="nova-solicitacao-title">
       <Card>
         {/* Header semantico com navegacao e titulo */}
         <header>
-          <Button
-            icon={<ArrowLeftOutlined />}
-            onClick={() => navigate('/solicitacoes/minhas')}
-            className="mb-4"
-            aria-label="Voltar para minhas solicitacoes"
-          >
-            Voltar
+          {/* Sai do assistente (o "Anterior" do rodapé volta um passo): o texto diz para onde. */}
+          <Button icon={<ArrowLeftOutlined />} onClick={sairDoAssistente} className="mb-4">
+            Voltar para Minhas Solicitações
           </Button>
 
           <Title level={2} className="mb-2" id="nova-solicitacao-title">Nova Solicitação</Title>

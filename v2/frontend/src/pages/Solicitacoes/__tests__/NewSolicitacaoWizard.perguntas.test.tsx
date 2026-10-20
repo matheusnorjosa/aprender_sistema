@@ -12,9 +12,11 @@
  * - Trocar o projeto limpa formadores e responsável (PR 9, P9-5: só pessoas da gerência do projeto).
  */
 import { useEffect } from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { MemoryRouter } from 'react-router';
+import Modal from 'antd/es/modal';
+
+import { enderecoAtual, renderNoRoteador } from '../../../test/comRoteador';
 
 const {
   createSolicitacaoMock,
@@ -23,7 +25,6 @@ const {
   lookupMunicipiosWithFiltersMock,
   lookupProjetosMock,
   lookupTiposEventoMock,
-  navigateMock,
   formadoresEscolhidos,
   lookupUsuariosMock,
   formadoresPickerProps,
@@ -34,16 +35,11 @@ const {
   lookupMunicipiosWithFiltersMock: vi.fn(),
   lookupProjetosMock: vi.fn(),
   lookupTiposEventoMock: vi.fn(),
-  navigateMock: vi.fn(),
   formadoresEscolhidos: { atual: [] as Array<{ id: number; label: string; avaliavel?: boolean }> },
   lookupUsuariosMock: vi.fn(),
   formadoresPickerProps: { projetoIds: [] as unknown[] },
 }));
 
-vi.mock('react-router', async () => {
-  const actual = await vi.importActual('react-router');
-  return { ...actual, useNavigate: () => navigateMock };
-});
 vi.mock('../../../api/solicitacoes', () => ({ createSolicitacao: createSolicitacaoMock }));
 vi.mock('../../../api/availability', () => ({
   getMe: getMeMock,
@@ -138,12 +134,8 @@ const SEM_FUNCAO_COORDENADOR = {
 const AVALIAVEL = { id: 99, label: 'Bruno Formador', avaliavel: true };
 const NAO_AVALIAVEL = { id: 98, label: 'Celia Coordenadora', avaliavel: false };
 
-function renderWizard(): void {
-  render(
-    <MemoryRouter>
-      <NewSolicitacaoWizard />
-    </MemoryRouter>
-  );
+function renderWizard(): ReturnType<typeof renderNoRoteador>['router'] {
+  return renderNoRoteador(<NewSolicitacaoWizard />, { em: '/solicitacoes/nova' }).router;
 }
 
 async function irParaParticipantes(): Promise<void> {
@@ -164,6 +156,9 @@ function responder(pergunta: RegExp, resposta: 'Sim' | 'Não'): void {
 
 const ACOMPANHA = /O coordenador responsável vai acompanhar o evento\?/;
 const AVALIAR = /Você pretende avaliar o formador nesse evento\?/;
+// A validação do Form do AntD é assíncrona: aqui leva 0,2–0,6 s; na CI, com a suíte inteira e a
+// cobertura, passa de 1 s (o padrão do findBy) — o aviso aparece, só demora.
+const ESPERA_VALIDACAO = { timeout: 5000 };
 
 // Percorrer o assistente com antd leva ~3 s por teste isolado; na suíte inteira passa dos 5 s padrão.
 describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { timeout: 20000 }, () => {
@@ -223,7 +218,7 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     await irParaParticipantes();
     responder(AVALIAR, 'Não');
     fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
-    expect(await screen.findByText('Responda se o coordenador responsável vai acompanhar o evento.')).toBeInTheDocument();
+    expect(await screen.findByText('Responda se o coordenador responsável vai acompanhar o evento.', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Voltar para passo anterior/i })).toBeInTheDocument();
     expect(screen.getByTestId('pick-formador')).toBeInTheDocument();
   });
@@ -270,7 +265,7 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     responder(ACOMPANHA, 'Não');
     responder(AVALIAR, 'Não');
     fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
-    expect(await screen.findByText('Escolha o coordenador responsável pelo evento.')).toBeInTheDocument();
+    expect(await screen.findByText('Escolha o coordenador responsável pelo evento.', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
   });
 
   test('projeto em que o backend aceita o vazio: quem cria é o responsável', async () => {
@@ -296,7 +291,7 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     responder(ACOMPANHA, 'Não');
     responder(AVALIAR, 'Não');
     fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
-    expect(await screen.findByText('Escolha o coordenador responsável pelo evento.')).toBeInTheDocument();
+    expect(await screen.findByText('Escolha o coordenador responsável pelo evento.', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
   });
 
   test('envia as respostas e mostra-as na confirmação', async () => {
@@ -317,6 +312,25 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     expect(payload.extra_participants).toEqual({ formador_ids: [99] });
   });
 
+  // Item 36: sair do assistente com algo preenchido pergunta; depois do envio com sucesso, não
+  // (o que foi preenchido virou a solicitação).
+  test('depois de enviar com sucesso, vai para Minhas Solicitações sem perguntar', async () => {
+    const confirmar = vi.spyOn(Modal, 'confirm');
+    const router = renderWizard();
+    await irParaParticipantes();
+    responder(ACOMPANHA, 'Não');
+    responder(AVALIAR, 'Não');
+    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
+    await screen.findByLabelText('Local do Evento');
+    fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
+    await screen.findByText('Revise sua solicitação');
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar Solicitação/i }));
+
+    await waitFor(() => expect(enderecoAtual(router)).toBe('/solicitacoes/minhas'));
+    expect(confirmar).not.toHaveBeenCalled();
+    confirmar.mockRestore();
+  });
+
   test('trocar o projeto limpa os formadores e o responsável já escolhidos (PR 9, P9-5)', async () => {
     renderWizard();
     await irParaParticipantes();
@@ -333,7 +347,7 @@ describe('NewSolicitacaoWizard — responsável e perguntas (05/10/2026)', { tim
     // Sem formador escolhido de novo, o passo não avança.
     responder(ACOMPANHA, 'Não');
     fireEvent.click(screen.getByRole('button', { name: /Ir para proximo passo/i }));
-    expect(await screen.findByText('Por favor selecione pelo menos um formador')).toBeInTheDocument();
+    expect(await screen.findByText('Por favor selecione pelo menos um formador', undefined, ESPERA_VALIDACAO)).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('pick-formador'));
     responder(AVALIAR, 'Não');

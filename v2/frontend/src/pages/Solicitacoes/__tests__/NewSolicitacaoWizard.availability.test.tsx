@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { MemoryRouter } from 'react-router';
+import { renderNoRoteador } from '../../../test/comRoteador';
 
 import { ComAcesso } from '../../../test/comAcesso';
 
@@ -55,13 +55,22 @@ vi.mock('../../../components/DateTimeRange', () => ({
 }));
 vi.mock('../../../components/FormadoresPicker', () => ({
   default: ({ onChange }: { onChange?: (v: unknown) => void }) => (
-    <button
-      type="button"
-      data-testid="pick-formador"
-      onClick={() => onChange?.([{ id: 99, email: 'f@x.com', label: 'Bruno Formador' }])}
-    >
-      pick-formador
-    </button>
+    <>
+      <button
+        type="button"
+        data-testid="pick-formador"
+        onClick={() => onChange?.([{ id: 99, email: 'f@x.com', label: 'Bruno Formador' }])}
+      >
+        pick-formador
+      </button>
+      <button
+        type="button"
+        data-testid="pick-outro-formador"
+        onClick={() => onChange?.([{ id: 77, email: 'g@x.com', label: 'Gil Formador' }])}
+      >
+        pick-outro-formador
+      </button>
+    </>
   ),
 }));
 
@@ -152,12 +161,10 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
   });
 
   test('selecionar formador + data dispara check-many com os formadores (quem cria não entra por criar)', async () => {
-    render(
-      <MemoryRouter>
-        <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
-          <NewSolicitacaoWizard />
-        </ComAcesso>
-      </MemoryRouter>
+    renderNoRoteador(
+      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+        <NewSolicitacaoWizard />
+      </ComAcesso>
     );
     await irParaParticipantesESelecionarFormador();
 
@@ -171,12 +178,10 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
 
   test('conflito confirmado: mostra o formador e DESABILITA o Próximo', async () => {
     checkAvailabilityManyMock.mockResolvedValue(RESP_CONFLITO);
-    render(
-      <MemoryRouter>
-        <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
-          <NewSolicitacaoWizard />
-        </ComAcesso>
-      </MemoryRouter>
+    renderNoRoteador(
+      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+        <NewSolicitacaoWizard />
+      </ComAcesso>
     );
     await irParaParticipantesESelecionarFormador();
 
@@ -189,12 +194,10 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
 
   test('sem conflito: nenhum alerta de bloqueio e Próximo habilitado', async () => {
     checkAvailabilityManyMock.mockResolvedValue({ ok: true, results: [] });
-    render(
-      <MemoryRouter>
-        <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
-          <NewSolicitacaoWizard />
-        </ComAcesso>
-      </MemoryRouter>
+    renderNoRoteador(
+      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+        <NewSolicitacaoWizard />
+      </ComAcesso>
     );
     await irParaParticipantesESelecionarFormador();
 
@@ -223,12 +226,10 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
         },
       ],
     });
-    render(
-      <MemoryRouter>
-        <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
-          <NewSolicitacaoWizard />
-        </ComAcesso>
-      </MemoryRouter>
+    renderNoRoteador(
+      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+        <NewSolicitacaoWizard />
+      </ComAcesso>
     );
     await irParaParticipantesESelecionarFormador();
 
@@ -243,12 +244,10 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
 
   test('checagem falha (500): fail-open — Próximo continua habilitado', async () => {
     checkAvailabilityManyMock.mockRejectedValue(Object.assign(new Error('boom'), { status: 500 }));
-    render(
-      <MemoryRouter>
-        <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
-          <NewSolicitacaoWizard />
-        </ComAcesso>
-      </MemoryRouter>
+    renderNoRoteador(
+      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+        <NewSolicitacaoWizard />
+      </ComAcesso>
     );
     await irParaParticipantesESelecionarFormador();
 
@@ -259,13 +258,114 @@ describe('NewSolicitacaoWizard — aviso antecipado de disponibilidade (#1452)',
     );
   });
 
+  test('conflito recusado no envio: trocar o formador destrava o Confirmar e tira o alerta antigo', async () => {
+    createSolicitacaoMock.mockRejectedValueOnce({
+      response: {
+        data: {
+          code: 'availability_conflict',
+          detail: 'Não é possível criar o evento: Bruno Formador já tem evento neste horário.',
+          errors: {
+            conflicts: [],
+            skipped_guests: [],
+            blocked_participants: [
+              {
+                usuario_id: 99,
+                usuario_nome: 'Bruno Formador',
+                conflicts: [{ code: 'X', title: 'Sobreposição', detail: 'Conflita com evento aprovado #5', ref_id: 5 }],
+              },
+            ],
+          },
+        },
+      },
+    });
+    renderNoRoteador(
+      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+        <NewSolicitacaoWizard />
+      </ComAcesso>
+    );
+    await irParaParticipantesESelecionarFormador();
+    fireEvent.click(screen.getByTestId('cb-municipio')); // no passo 2, o único ComboBox é o do responsável
+    fireEvent.click(
+      within(screen.getByRole('radiogroup', { name: /vai acompanhar o evento/ })).getByLabelText('Não')
+    );
+    const proximo = () => screen.getByRole('button', { name: /Ir para proximo passo/i });
+    await waitFor(() => expect(proximo()).not.toBeDisabled());
+    fireEvent.click(proximo());
+    await screen.findByLabelText('Local do Evento');
+    fireEvent.click(proximo());
+    await screen.findByText('Revise sua solicitação');
+
+    const confirmar = () => screen.getByRole('button', { name: /Confirmar Solicitação/i });
+    await waitFor(() => expect(confirmar()).not.toBeDisabled());
+    fireEvent.click(confirmar());
+    expect(await screen.findByText('Não é possível criar o evento')).toBeInTheDocument();
+    await waitFor(() => expect(confirmar()).toBeDisabled());
+
+    // Segue a orientação do alerta: volta ao passo Participantes e troca o formador.
+    fireEvent.click(screen.getByRole('button', { name: /Voltar para passo anterior/i }));
+    await screen.findByLabelText('Local do Evento');
+    fireEvent.click(screen.getByRole('button', { name: /Voltar para passo anterior/i }));
+    fireEvent.click(await screen.findByTestId('pick-outro-formador'));
+    await waitFor(() => expect(proximo()).not.toBeDisabled());
+    fireEvent.click(proximo());
+    await screen.findByLabelText('Local do Evento');
+    fireEvent.click(proximo());
+    await screen.findByText('Revise sua solicitação');
+
+    await waitFor(() => expect(confirmar()).not.toBeDisabled());
+    expect(screen.queryByText('Não é possível criar o evento')).not.toBeInTheDocument();
+  });
+
+  test('conflito recusado no envio: sem mudar nada, o Confirmar continua travado', async () => {
+    createSolicitacaoMock.mockRejectedValueOnce({
+      response: {
+        data: {
+          code: 'availability_conflict',
+          detail: 'Não é possível criar o evento: Bruno Formador já tem evento neste horário.',
+          errors: {
+            conflicts: [],
+            skipped_guests: [],
+            blocked_participants: [
+              { usuario_id: 99, usuario_nome: 'Bruno Formador', conflicts: [{ code: 'X', title: 'Sobreposição', detail: '', ref_id: 5 }] },
+            ],
+          },
+        },
+      },
+    });
+    renderNoRoteador(
+      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+        <NewSolicitacaoWizard />
+      </ComAcesso>
+    );
+    await irParaParticipantesESelecionarFormador();
+    fireEvent.click(screen.getByTestId('cb-municipio'));
+    fireEvent.click(
+      within(screen.getByRole('radiogroup', { name: /vai acompanhar o evento/ })).getByLabelText('Não')
+    );
+    const proximo = () => screen.getByRole('button', { name: /Ir para proximo passo/i });
+    await waitFor(() => expect(proximo()).not.toBeDisabled());
+    fireEvent.click(proximo());
+    await screen.findByLabelText('Local do Evento');
+    fireEvent.click(proximo());
+    await screen.findByText('Revise sua solicitação');
+    const confirmar = () => screen.getByRole('button', { name: /Confirmar Solicitação/i });
+    await waitFor(() => expect(confirmar()).not.toBeDisabled());
+    fireEvent.click(confirmar());
+    expect(await screen.findByText('Não é possível criar o evento')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Voltar para passo anterior/i }));
+    await screen.findByLabelText('Local do Evento');
+    fireEvent.click(proximo());
+    await screen.findByText('Revise sua solicitação');
+    expect(screen.getByText('Não é possível criar o evento')).toBeInTheDocument();
+    expect(confirmar()).toBeDisabled();
+  });
+
   test('avançar do passo Participantes com as respostas chega ao passo Detalhes (guarda do P0)', async () => {
-    render(
-      <MemoryRouter>
-        <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
-          <NewSolicitacaoWizard />
-        </ComAcesso>
-      </MemoryRouter>
+    renderNoRoteador(
+      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+        <NewSolicitacaoWizard />
+      </ComAcesso>
     );
     await irParaParticipantesESelecionarFormador();
     // Quem cria aqui não tem a função Coordenador: escolhe o responsável e responde se acompanha.

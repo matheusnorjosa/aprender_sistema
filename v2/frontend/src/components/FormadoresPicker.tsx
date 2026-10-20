@@ -13,10 +13,19 @@ import UsuarioPicker, { type UsuarioItem, type UsuarioPickerProps } from './Usua
 /** Formador selecionado (mesmo shape de UsuarioItem). */
 export type FormadorItem = UsuarioItem;
 
-export type FormadoresPickerProps = Pick<UsuarioPickerProps, 'value' | 'onChange' | 'projetoId'>;
+export type FormadoresPickerProps = Pick<
+  UsuarioPickerProps,
+  'value' | 'onChange' | 'projetoId' | 'id' | 'aria-describedby' | 'aria-invalid'
+>;
 
 export default function FormadoresPicker(props: FormadoresPickerProps): JSX.Element {
   return (
-    <UsuarioPicker {...props} role="Formador,Coordenador" tagColor="blue" ariaLabel="Formadores selecionados" />
+    <UsuarioPicker
+      {...props}
+      role="Formador,Coordenador"
+      tagColor="blue"
+      ariaLabel="Formadores selecionados"
+      oQueCarrega="os formadores"
+    />
   );
 }

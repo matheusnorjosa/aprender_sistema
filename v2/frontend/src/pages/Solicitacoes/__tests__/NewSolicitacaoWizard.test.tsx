@@ -1,9 +1,12 @@
 import { useEffect } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { MemoryRouter } from 'react-router';
+import { Link } from 'react-router';
+import Modal from 'antd/es/modal';
 
 import { ComAcesso } from '../../../test/comAcesso';
+import { enderecoAtual, renderNoRoteador } from '../../../test/comRoteador';
+import { apagarAvisoDoLogin, avisarSaidaAsOutrasAbas, guardarAvisoDoLogin, storageKeys } from '../../../utils/storage';
 
 const {
   createSolicitacaoMock,
@@ -11,23 +14,13 @@ const {
   lookupMunicipiosWithFiltersMock,
   lookupProjetosMock,
   lookupTiposEventoMock,
-  navigateMock,
 } = vi.hoisted(() => ({
   createSolicitacaoMock: vi.fn(),
   getMeMock: vi.fn(),
   lookupMunicipiosWithFiltersMock: vi.fn(),
   lookupProjetosMock: vi.fn(),
   lookupTiposEventoMock: vi.fn(),
-  navigateMock: vi.fn(),
 }));
-
-vi.mock('react-router', async () => {
-  const actual = await vi.importActual('react-router');
-  return {
-    ...actual,
-    useNavigate: () => navigateMock,
-  };
-});
 
 vi.mock('../../../api/solicitacoes', () => ({
   createSolicitacao: createSolicitacaoMock,
@@ -68,20 +61,25 @@ function MockComboBox({
   }, [lookupFunction]);
 
   return (
-    <button
-      type="button"
-      data-testid={placeholder}
-      disabled={disabled}
-      onClick={() => {
-        if (placeholder.includes('projeto')) {
-          onChange?.({ id: 123, label: 'Projeto X', fluxo: 'SUPER' });
-          return;
-        }
-        onChange?.({ id: 456, label: 'Fortaleza - CE' });
-      }}
-    >
-      {placeholder}
-    </button>
+    <>
+      <button
+        type="button"
+        data-testid={placeholder}
+        disabled={disabled}
+        onClick={() => {
+          if (placeholder.includes('projeto')) {
+            onChange?.({ id: 123, label: 'Projeto X', fluxo: 'SUPER' });
+            return;
+          }
+          onChange?.({ id: 456, label: 'Fortaleza - CE' });
+        }}
+      >
+        {placeholder}
+      </button>
+      {placeholder === 'Busque ou selecione um projeto' && (
+        <button type="button" onClick={() => onChange?.(null)}>Limpar projeto</button>
+      )}
+    </>
   );
 }
 
@@ -117,10 +115,8 @@ describe('NewSolicitacaoWizard - filtros dependentes municipio/projeto', () => {
   });
 
   test('usuário comum consulta municípios elegíveis por projeto e mostra estado vazio', async () => {
-    render(
-      <MemoryRouter>
-        <NewSolicitacaoWizard />
-      </MemoryRouter>
+    renderNoRoteador(
+      <NewSolicitacaoWizard />
     );
 
     const municipioDisabledButton = await screen.findByRole('button', {
@@ -149,12 +145,10 @@ describe('NewSolicitacaoWizard - filtros dependentes municipio/projeto', () => {
   test('quem dispensa a compra mantém lookup de municípios sem filtro de compra/projeto', async () => {
     lookupMunicipiosWithFiltersMock.mockResolvedValue([{ id: 1, label: 'Fortaleza - CE' }]);
 
-    render(
-      <MemoryRouter>
-        <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
-          <NewSolicitacaoWizard />
-        </ComAcesso>
-      </MemoryRouter>
+    renderNoRoteador(
+      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+        <NewSolicitacaoWizard />
+      </ComAcesso>
     );
 
     const municipioButton = await screen.findByRole('button', {
@@ -186,10 +180,8 @@ describe('NewSolicitacaoWizard - filtros dependentes municipio/projeto', () => {
 
   // Regra da compra: o projeto "em espera" (sem compra que o libere) some da lista.
   test('usuário comum busca projetos com com_compra e vê a linha de ajuda', async () => {
-    render(
-      <MemoryRouter>
-        <NewSolicitacaoWizard />
-      </MemoryRouter>
+    renderNoRoteador(
+      <NewSolicitacaoWizard />
     );
 
     await waitFor(() => {
@@ -200,12 +192,10 @@ describe('NewSolicitacaoWizard - filtros dependentes municipio/projeto', () => {
   });
 
   test('quem dispensa a compra busca projetos sem filtro de compra', async () => {
-    render(
-      <MemoryRouter>
-        <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
-          <NewSolicitacaoWizard />
-        </ComAcesso>
-      </MemoryRouter>
+    renderNoRoteador(
+      <ComAcesso policies={['create_solicitation', 'create_solicitation_without_purchase']}>
+        <NewSolicitacaoWizard />
+      </ComAcesso>
     );
 
     await screen.findByRole('button', { name: 'Busque ou selecione um município' });
@@ -217,17 +207,223 @@ describe('NewSolicitacaoWizard - filtros dependentes municipio/projeto', () => {
 
   test('is_superuser no /me sem a policy: continua filtrando por compra (o payload não decide)', async () => {
     getMeMock.mockResolvedValue({ is_superuser: true });
-    render(
-      <MemoryRouter>
-        <ComAcesso policies={['create_solicitation']}>
-          <NewSolicitacaoWizard />
-        </ComAcesso>
-      </MemoryRouter>
+    renderNoRoteador(
+      <ComAcesso policies={['create_solicitation']}>
+        <NewSolicitacaoWizard />
+      </ComAcesso>
     );
 
     await waitFor(() => {
       expect(getMeMock).toHaveBeenCalled();
       expect(lookupProjetosMock).toHaveBeenLastCalledWith('', { com_compra: true });
     });
+  });
+});
+
+describe('NewSolicitacaoWizard - sair do assistente (item 36)', { timeout: 20000 }, () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    lookupProjetosMock.mockResolvedValue([]);
+    lookupTiposEventoMock.mockResolvedValue([]);
+    lookupMunicipiosWithFiltersMock.mockResolvedValue([]);
+    getMeMock.mockResolvedValue({ is_superuser: false });
+  });
+
+  const NOVA = '/solicitacoes/nova';
+  // O assistente aberto a partir da Página Inicial, com o menu lateral ao lado.
+  const abrir = (antes: string[] = ['/home']) => renderNoRoteador(
+    <>
+      <nav><Link to="/home?x=1">Página Inicial</Link></nav>
+      <NewSolicitacaoWizard />
+    </>,
+    { em: NOVA, antes },
+  );
+  const sair = () => screen.getByRole('button', { name: /Voltar para Minhas Solicitações/i });
+  const preencher = async (): Promise<void> => {
+    fireEvent.click(await screen.findByRole('button', { name: 'Busque ou selecione um projeto' }));
+  };
+  const voltarDoNavegador = async (router: ReturnType<typeof abrir>['router'], passos = 1): Promise<void> => {
+    await act(async () => {
+      await router.navigate(-passos);
+    });
+  };
+  // O aviso de sair, sem abrir o modal do antd: guarda as opções para o teste responder.
+  const espiarAviso = (destruir = vi.fn()) => vi.spyOn(Modal, 'confirm')
+    .mockImplementation(() => ({ destroy: destruir, update: vi.fn(), then: vi.fn() }) as never);
+  const responder = (confirmar: ReturnType<typeof espiarAviso>, resposta: 'onOk' | 'onCancel'): void => {
+    act(() => {
+      void confirmar.mock.calls.at(-1)![0][resposta]?.();
+    });
+  };
+
+  test('sem nada preenchido, o botão do topo sai direto para Minhas Solicitações', async () => {
+    const confirmar = espiarAviso();
+    const { router } = abrir();
+    await screen.findByRole('button', { name: 'Busque ou selecione um projeto' });
+    fireEvent.click(sair());
+    await waitFor(() => expect(enderecoAtual(router)).toBe('/solicitacoes/minhas'));
+    expect(confirmar).not.toHaveBeenCalled();
+    confirmar.mockRestore();
+  });
+
+  test('com algo preenchido, o botão do topo pergunta uma vez antes de descartar, começando no Cancelar', async () => {
+    const confirmar = espiarAviso();
+    const { router } = abrir();
+    await preencher();
+    fireEvent.click(sair());
+
+    await waitFor(() => expect(confirmar).toHaveBeenCalledTimes(1));
+    expect(confirmar.mock.calls[0]![0]).toMatchObject({
+      title: 'Sair sem criar a solicitação?',
+      content: 'O que você preencheu será perdido.',
+      okText: 'Sair e descartar',
+      okType: 'danger',
+      cancelText: 'Continuar preenchendo',
+      autoFocusButton: 'cancel',
+    });
+    expect(enderecoAtual(router)).toBe(NOVA);
+
+    responder(confirmar, 'onOk');
+    await waitFor(() => expect(enderecoAtual(router)).toBe('/solicitacoes/minhas'));
+    expect(confirmar).toHaveBeenCalledTimes(1);
+    confirmar.mockRestore();
+  });
+
+  test('Continuar preenchendo fica no assistente com o que foi preenchido, e a próxima saída pergunta de novo', async () => {
+    const confirmar = espiarAviso();
+    const { router } = abrir();
+    await preencher();
+    fireEvent.click(sair());
+    await waitFor(() => expect(confirmar).toHaveBeenCalledTimes(1));
+
+    responder(confirmar, 'onCancel');
+    expect(enderecoAtual(router)).toBe(NOVA);
+    expect(screen.getByRole('button', { name: 'Busque ou selecione um município' })).toBeInTheDocument();
+
+    fireEvent.click(sair());
+    await waitFor(() => expect(confirmar).toHaveBeenCalledTimes(2));
+    expect(enderecoAtual(router)).toBe(NOVA);
+    confirmar.mockRestore();
+  });
+
+  test('o Voltar do navegador (ou do Android) com algo preenchido pergunta antes de sair', async () => {
+    const confirmar = espiarAviso();
+    const { router } = abrir();
+    await preencher();
+
+    await voltarDoNavegador(router);
+    expect(confirmar).toHaveBeenCalledTimes(1);
+    expect(confirmar.mock.calls[0]![0]).toMatchObject({ title: 'Sair sem criar a solicitação?', autoFocusButton: 'cancel' });
+    expect(enderecoAtual(router)).toBe(NOVA);
+
+    responder(confirmar, 'onOk');
+    await waitFor(() => expect(enderecoAtual(router)).toBe('/home'));
+    confirmar.mockRestore();
+  });
+
+  test('o Voltar com o aviso aberto não abre um segundo aviso nem sai do assistente', async () => {
+    const confirmar = espiarAviso();
+    const { router } = abrir();
+    await preencher();
+
+    await voltarDoNavegador(router);
+    await voltarDoNavegador(router);
+    expect(confirmar).toHaveBeenCalledTimes(1);
+    expect(enderecoAtual(router)).toBe(NOVA);
+
+    responder(confirmar, 'onOk');
+    await waitFor(() => expect(enderecoAtual(router)).toBe('/home'));
+    confirmar.mockRestore();
+  });
+
+  test('segurar o Voltar e escolher uma página mais antiga pergunta e, ao sair, vai para ela', async () => {
+    const confirmar = espiarAviso();
+    const { router } = abrir(['/notificacoes', '/home']);
+    await preencher();
+
+    await voltarDoNavegador(router, 2);
+    expect(confirmar).toHaveBeenCalledTimes(1);
+    expect(enderecoAtual(router)).toBe(NOVA);
+
+    responder(confirmar, 'onOk');
+    await waitFor(() => expect(enderecoAtual(router)).toBe('/notificacoes'));
+    confirmar.mockRestore();
+  });
+
+  test('esvaziado de novo, o Voltar sai sem perguntar', async () => {
+    const confirmar = espiarAviso();
+    const { router } = abrir();
+    await preencher();
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar projeto' }));
+
+    await voltarDoNavegador(router);
+    await waitFor(() => expect(enderecoAtual(router)).toBe('/home'));
+    expect(confirmar).not.toHaveBeenCalled();
+    confirmar.mockRestore();
+  });
+
+  test('um link do menu lateral com algo preenchido pergunta antes de sair', async () => {
+    const confirmar = espiarAviso();
+    const { router } = abrir();
+    await preencher();
+
+    fireEvent.click(screen.getByRole('link', { name: 'Página Inicial' }));
+    await waitFor(() => expect(confirmar).toHaveBeenCalledTimes(1));
+    expect(enderecoAtual(router)).toBe(NOVA);
+
+    responder(confirmar, 'onOk');
+    await waitFor(() => expect(enderecoAtual(router)).toBe('/home?x=1'));
+    confirmar.mockRestore();
+  });
+
+  test('o aviso de sair não fica aberto sobre outra tela quando o assistente sai', async () => {
+    const destruir = vi.fn();
+    const confirmar = espiarAviso(destruir);
+    const { router, unmount } = abrir();
+    await preencher();
+    await voltarDoNavegador(router);
+    expect(confirmar).toHaveBeenCalledTimes(1);
+
+    unmount();
+    expect(destruir).toHaveBeenCalledTimes(1);
+    confirmar.mockRestore();
+  });
+
+  test('recarregar ou fechar a aba com algo preenchido pede o aviso do navegador; vazio, não', async () => {
+    // No app, o monitor de sessão grava o horário comum às abas ao montar.
+    localStorage.setItem(storageKeys.sessaoUltimaResposta, String(Date.now()));
+    const { unmount } = abrir();
+    await screen.findByRole('button', { name: 'Busque ou selecione um projeto' });
+    const vazio = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(vazio);
+    expect(vazio.defaultPrevented).toBe(false);
+
+    await preencher();
+    const preenchido = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(preenchido);
+    expect(preenchido.defaultPrevented).toBe(true);
+    unmount();
+  });
+
+  test('o reload do próprio app (sessão encerrada ou Sair) não é segurado, mesmo com algo preenchido', async () => {
+    localStorage.setItem(storageKeys.sessaoUltimaResposta, String(Date.now()));
+    const { unmount } = abrir();
+    await preencher();
+    const descarregar = (): boolean => {
+      const evento = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(evento);
+      return evento.defaultPrevented;
+    };
+    expect(descarregar()).toBe(true);
+
+    // Sessão encerrada (expirou ou caiu em outra aba): o App guarda o motivo e recarrega para o login.
+    guardarAvisoDoLogin('Sua sessão expirou.');
+    expect(descarregar()).toBe(false);
+    apagarAvisoDoLogin();
+
+    // "Sair": o App apaga o horário comum às abas e recarrega.
+    avisarSaidaAsOutrasAbas();
+    expect(descarregar()).toBe(false);
+    unmount();
   });
 });

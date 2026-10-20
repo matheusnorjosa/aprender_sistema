@@ -7,7 +7,7 @@
  * - Callback onChange com formato correto
  */
 
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, test, expect, vi } from 'vitest'
 import DateTimeRange from '../DateTimeRange'
 
@@ -95,5 +95,49 @@ describe('DateTimeRange', () => {
 
     expect(screen.getByPlaceholderText('Selecione a data')).toBeInTheDocument()
     expect(screen.getAllByPlaceholderText('HH:mm')).toHaveLength(2)
+  })
+
+  // ============================================================================
+  // ITEM 36 (19/10/2026): erro junto do horário e horário que vale sem o OK
+  // ============================================================================
+
+  test('com erro e tudo preenchido, a mensagem fica junto do horário e marca o Fim', () => {
+    render(
+      <DateTimeRange
+        value={{ date: '2026-08-01', start: '14:00', end: '10:00' }}
+        erro="O horário de fim precisa ser depois do início."
+      />
+    )
+    const aviso = screen.getByRole('alert')
+    expect(aviso).toHaveTextContent('O horário de fim precisa ser depois do início.')
+    const fim = screen.getByLabelText('Fim:')
+    expect(fim).toHaveAttribute('aria-invalid', 'true')
+    expect(fim.getAttribute('aria-describedby')).toBe(aviso.id)
+    expect(screen.getByLabelText('Início:')).not.toHaveAttribute('aria-invalid', 'true')
+  })
+
+  test('com erro e campos vazios, marca os vazios', () => {
+    render(<DateTimeRange value={{ date: '2026-08-01' }} erro="Escolha a data e os horários de início e de fim do evento." />)
+    expect(screen.getByLabelText('Data:')).not.toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText('Início:')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText('Fim:')).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  test('o horário escolhido no painel vale sem apertar OK', async () => {
+    const onChange = vi.fn()
+    render(<DateTimeRange value={{ date: '2026-08-01' }} onChange={onChange} />)
+    const inicio = screen.getByLabelText('Início:')
+    fireEvent.mouseDown(inicio)
+    fireEvent.click(inicio)
+    const painel = await waitFor(() => {
+      const el = document.querySelector('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)')
+      if (!el) throw new Error('painel não abriu')
+      return el as HTMLElement
+    })
+    const colunas = painel.querySelectorAll('.ant-picker-time-panel-column')
+    fireEvent.click(colunas[0]!.querySelectorAll('.ant-picker-time-panel-cell-inner')[9]!)
+    fireEvent.click(colunas[1]!.querySelectorAll('.ant-picker-time-panel-cell-inner')[0]!)
+    fireEvent.blur(inicio)
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith({ date: '2026-08-01', start: '09:00', end: null }))
   })
 })

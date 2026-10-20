@@ -4,14 +4,13 @@
  * Features:
  * - Filtro por status (Todas, Pendentes, Aprovadas, Reprovadas)
  * - Busca textual
- * - Tabela com dados principais
+ * - Tabela com dados principais (padrão responsivo: sem rolagem horizontal)
  * - Botão para criar nova solicitação
  */
 
-import { useState, useEffect, useCallback, useMemo, ChangeEvent, JSX } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, ChangeEvent, JSX } from 'react';
 import { Link, useNavigate } from 'react-router';
 // antd - direct imports for tree-shaking (Issue #424)
-import Table from 'antd/es/table';
 import Card from 'antd/es/card';
 import Select from 'antd/es/select';
 import Input from 'antd/es/input';
@@ -20,22 +19,27 @@ import Space from 'antd/es/space';
 import Tag from 'antd/es/tag';
 import Typography from 'antd/es/typography';
 import message from 'antd/es/message';
-import Tooltip from 'antd/es/tooltip';
-import Popconfirm from 'antd/es/popconfirm';
-import type { ColumnsType } from 'antd/es/table';
+import Modal from 'antd/es/modal';
+import Grid from 'antd/es/grid';
+import type { TablePaginationConfig } from 'antd/es/table';
 // icons - direct imports for tree-shaking (Issue #425)
 import PlusOutlined from '@ant-design/icons/PlusOutlined';
 import SearchOutlined from '@ant-design/icons/SearchOutlined';
 import EditOutlined from '@ant-design/icons/EditOutlined';
 import DeleteOutlined from '@ant-design/icons/DeleteOutlined';
+import InfoCircleOutlined from '@ant-design/icons/InfoCircleOutlined';
 
 import { listSolicitacoes, deleteSolicitacao } from '../../api/solicitacoes';
 import { MeetLink } from '../../components/MeetLink';
-import type { ID, Solicitacao, SolicitacaoStatus, FluxoType, GCalStatus, Participation, PaginatedResponse } from '../../types';
+import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
+import { AcoesLinha, larguraAcoesLinha, type AcaoDaLinha } from '../../components/AcoesLinha';
+import type { ID, Solicitacao, SolicitacaoStatus, FluxoType, GCalStatus, PaginatedResponse } from '../../types';
 import { formadoresLabel } from '../../utils/participants';
 import { formatFortaleza } from '../../utils/datetime';
+import { TEXTO_DA_TAG } from '../../components/textoDaTag';
+import { MOTIVO_NAO_PUBLICAVEL } from '../../utils/gcalRowActions';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
 /** Status colors */
 const STATUS_COLORS: Record<SolicitacaoStatus, string> = {
@@ -51,6 +55,11 @@ const STATUS_LABELS: Record<SolicitacaoStatus, string> = {
   reprovado: 'Reprovado',
 };
 
+/** Tamanho de página padrão; 100 é o limite que a tela oferece. */
+const PAGE_SIZE = 20;
+/** Espera depois da última letra antes de buscar (uma requisição por termo, não por letra). */
+const ESPERA_BUSCA_MS = 350;
+
 /** API error response type */
 interface ApiErrorResponse {
   response?: {
@@ -58,7 +67,48 @@ interface ApiErrorResponse {
       detail?: string;
     };
   };
+  status?: number;
   message?: string;
+}
+
+/** Quem a linha representa: a data e o município ("Editar: 10/05/2026 · Crato"). */
+function nomeDaSolicitacao(record: Solicitacao): string {
+  return `${formatFortaleza(record.inicio, 'DD/MM/YYYY')} · ${record.municipio_nome || 'sem município'}`;
+}
+
+/**
+ * O que a dona pode fazer na linha e, quando não pode, por quê (texto visível por um botão, e não
+ * só no Tooltip de um botão desabilitado, que o teclado e o toque não alcançam). As regras são as
+ * de sempre: editar se não estiver publicado no GCal e não estiver reprovado; excluir se não
+ * estiver publicado e, no fluxo SUPER, só enquanto pendente. Evento no Google Agenda pela planilha
+ * (`publicado_fora_do_sistema`) conta como publicado: mudar aqui deixaria a agenda com o dado antigo.
+ */
+function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcluir: boolean; motivos: string[] } {
+  const naPlanilha = record.publicado_fora_do_sistema === true;
+  const isPublished = naPlanilha || record.gcal_status === ('PUBLISHED' as GCalStatus);
+  const isSuper = record.fluxo === ('SUPER' as FluxoType);
+  const podeEditar = !isPublished && record.status !== 'reprovado';
+  const podeExcluir = !isPublished && (!isSuper || record.status === 'pendente');
+  const motivos: string[] = [];
+  if (naPlanilha) {
+    // Não foi o sistema que publicou: não há publicação para cancelar aqui.
+    motivos.push(
+      `Este evento ${MOTIVO_NAO_PUBLICAVEL.publicado_fora_do_sistema}; mudar aqui não muda a agenda. Para mudar, peça ao Apoio de Coordenação da sua gerência ou ao Controle.`
+    );
+  } else if (isPublished) {
+    motivos.push(
+      'Este evento já está no Google Agenda. Para mudar, peça ao Apoio de Coordenação da sua gerência ou ao Controle que cancele a publicação; depois disso, você consegue editar aqui.'
+    );
+  } else if (record.status === 'reprovado') {
+    motivos.push('Solicitações reprovadas não podem ser editadas.');
+  }
+  // Cancelar a publicação não devolve a exclusão a uma SUPER que já saiu de pendente.
+  if (isSuper && record.status !== 'pendente') {
+    motivos.push(
+      'Solicitações do fluxo Superintendência só podem ser excluídas enquanto estão pendentes. Para tirar o evento, fale com a administração do sistema.'
+    );
+  }
+  return { podeEditar, podeExcluir, motivos };
 }
 
 export default function MySolicitacoesPage(): JSX.Element {
@@ -66,38 +116,75 @@ export default function MySolicitacoesPage(): JSX.Element {
   const [loading, setLoading] = useState<boolean>(false);
   const [rows, setRows] = useState<Solicitacao[]>([]);
   const [total, setTotal] = useState<number>(0);
+  // Falha ao carregar: o motivo e "Tentar de novo" no lugar das linhas (não as da carga anterior).
+  const [erro, setErro] = useState<string | null>(null);
+  // Paginação no servidor: antes a tela recebia as 100 primeiras e paginava no cliente.
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZE);
+  // Celular (< 576 px): as ações vão todas para o menu "Mais ações".
+  const acoesCompactas = !Grid.useBreakpoint().sm;
+  const listaRef = useRef<HTMLElement>(null);
 
   const [statusFilter, setStatusFilter] = useState<SolicitacaoStatus | ''>(''); // '' = Todas
   const [searchTerm, setSearchTerm] = useState<string>('');
+  // O termo que vai ao servidor: o digitado, depois de a pessoa parar de digitar.
+  const [termoBuscado, setTermoBuscado] = useState<string>('');
+  // A última carga vence: uma resposta antiga não substitui a lista do filtro atual.
+  const seqRef = useRef(0);
+
+  useEffect(() => {
+    const espera = setTimeout(() => setTermoBuscado(searchTerm), ESPERA_BUSCA_MS);
+    return () => clearTimeout(espera);
+  }, [searchTerm]);
 
   const loadData = useCallback(async (): Promise<void> => {
+    const seq = ++seqRef.current;
     try {
       setLoading(true);
-      const filters: Record<string, string> = { mine: 'true' };
+      const filters: Record<string, string | number> = { mine: 'true' };
       if (statusFilter) filters['status'] = statusFilter;
-      if (searchTerm) filters['q'] = searchTerm;
+      if (termoBuscado) filters['q'] = termoBuscado;
+      // Desempate por id: com só '-inicio', eventos no mesmo horário se repetem ou somem entre as páginas.
+      filters['ordering'] = '-inicio,id';
+      filters['page'] = page;
+      filters['page_size'] = pageSize;
 
       const data = await listSolicitacoes(filters) as PaginatedResponse<Solicitacao> | Solicitacao[];
+      if (seq !== seqRef.current) return;
       const results = 'results' in data ? data.results : data;
       const count = 'count' in data ? data.count : (data).length;
       setRows(results || []);
       setTotal(count || 0);
+      setErro(null);
     } catch (error) {
-      message.error('Erro ao carregar solicitações: ' + (error as Error).message);
+      if (seq !== seqRef.current) return;
+      // A página deixou de existir (ex.: o último item dela foi excluído): volta uma.
+      if ((error as ApiErrorResponse).status === 404 && page > 1) {
+        setPage((p) => Math.max(1, p - 1));
+        return;
+      }
+      setErro((error as Error).message || 'Tente de novo em instantes.');
     } finally {
-      setLoading(false);
+      if (seq === seqRef.current) setLoading(false);
     }
-  }, [statusFilter, searchTerm]);
+  }, [statusFilter, termoBuscado, page, pageSize]);
 
   useEffect(() => {
     void loadData();
   }, [loadData]);
 
-  const handleDelete = useCallback(async (id: ID): Promise<void> => {
+  const handleTableChange = (pagination: TablePaginationConfig): void => {
+    const novoTamanho = pagination.pageSize ?? pageSize;
+    setPage(novoTamanho !== pageSize ? 1 : (pagination.current ?? 1));
+    setPageSize(novoTamanho);
+  };
+
+  const handleDelete = useCallback(async (id: ID): Promise<boolean> => {
     try {
       await deleteSolicitacao(id);
       message.success('Solicitação excluída com sucesso!');
       void loadData();
+      return true;
     } catch (error) {
       const apiErr = error as ApiErrorResponse;
       if (apiErr.response?.data?.detail) {
@@ -105,128 +192,165 @@ export default function MySolicitacoesPage(): JSX.Element {
       } else {
         message.error('Erro ao excluir solicitação: ' + (error as Error).message);
       }
+      return false;
     }
   }, [loadData]);
 
-  // Colunas memoizadas (Issue #427)
-  const columns: ColumnsType<Solicitacao> = useMemo(() => [
+  // Ação destrutiva: cita a solicitação e começa no Cancelar (ux-principios).
+  const confirmarExclusao = useCallback((record: Solicitacao): void => {
+    const quando = formatFortaleza(record.inicio, 'DD/MM/YYYY HH:mm');
+    let excluiu = false;
+    Modal.confirm({
+      title: 'Excluir solicitação?',
+      content: `${quando} · ${record.municipio_nome || 'sem município'} · ${record.projeto_nome || 'sem projeto'}. Esta ação não pode ser desfeita.`,
+      okText: 'Sim, excluir',
+      okType: 'danger',
+      cancelText: 'Cancelar',
+      autoFocusButton: 'cancel',
+      onOk: async () => {
+        excluiu = await handleDelete(record.id);
+      },
+      // A linha (e o botão que tinha o foco) sai. O rc-dialog devolve o foco a esse botão ao fim da
+      // animação de saída, antes do afterClose: só aqui o foco vai para a lista, e não para o body.
+      afterClose: () => {
+        if (excluiu) listaRef.current?.focus();
+      },
+    });
+  }, [handleDelete]);
+
+  // Sem rolagem horizontal (padrão responsivo): sempre na linha a data, o status e as ações; o
+  // município também (no celular, junto da data). O resto sobe por largura e, abaixo dela, vai
+  // para a linha expandida.
+  const columns: ColunaResponsiva<Solicitacao>[] = useMemo(() => [
     {
       title: 'Data/Hora',
       dataIndex: 'inicio',
       key: 'inicio',
-      render: (inicio: string) => formatFortaleza(inicio),
-      width: 150,
+      // No celular, a coluna leva também o município: fica com a largura que sobra.
+      ...(acoesCompactas ? {} : { width: 112 }),
+      render: (_, record) => (
+        <>
+          {formatFortaleza(record.inicio, 'DD/MM/YYYY')}
+          <br />
+          <Text type="secondary">{formatFortaleza(record.inicio, 'HH:mm')}</Text>
+          {acoesCompactas ? (
+            <>
+              <br />
+              <Text className="min-w-0 max-w-full break-words">{record.municipio_nome || '-'}</Text>
+            </>
+          ) : null}
+        </>
+      ),
     },
     {
       title: 'Município',
       dataIndex: 'municipio_nome',
       key: 'municipio',
-      render: (nome: string | null) => nome || '-',
+      responsive: VISIVEL_A_PARTIR.sm,
+      render: (_, record) => <Text className="min-w-0 max-w-full break-words">{record.municipio_nome || '-'}</Text>,
     },
     {
       title: 'Projeto',
       dataIndex: 'projeto_nome',
       key: 'projeto',
-      render: (nome: string | null) => nome || '-',
+      responsive: VISIVEL_A_PARTIR.md,
+      ellipsis: true,
+      render: (_, record) => record.projeto_nome || '-',
     },
     {
       title: 'Tipo',
       dataIndex: 'tipo_evento_nome',
       key: 'tipo_evento',
-      render: (nome: string | null) => nome || '-',
+      responsive: VISIVEL_A_PARTIR.xl,
+      ellipsis: true,
+      render: (_, record) => record.tipo_evento_nome || '-',
     },
     {
       title: 'Formadores',
       dataIndex: 'participations',
       key: 'formadores',
+      responsive: VISIVEL_A_PARTIR.xl,
       // Nome do formador (inclui convidados "que saíram" via guest_nome — sem FK). Ver utils/participants.
-      render: (participations: Participation[] | undefined) => formadoresLabel(participations) || '-',
+      render: (_, record) => formadoresLabel(record.participations) || '-',
       ellipsis: true,
     },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: (status: SolicitacaoStatus) => (
-        <Tag color={STATUS_COLORS[status]}>{STATUS_LABELS[status] || status}</Tag>
+      width: 104,
+      render: (_, record) => (
+        <Space direction="vertical" size={4}>
+          <Tag
+            color={STATUS_COLORS[record.status]}
+            style={{ marginInlineEnd: 0, color: TEXTO_DA_TAG[STATUS_COLORS[record.status]] }}
+          >
+            {STATUS_LABELS[record.status] || record.status}
+          </Tag>
+          {record.publicado_fora_do_sistema || record.gcal_status === ('PUBLISHED' as GCalStatus) ? (
+            <Tag color="blue" style={{ marginInlineEnd: 0 }}>Na agenda</Tag>
+          ) : null}
+        </Space>
       ),
-      width: 120,
     },
     {
       title: 'Reunião',
       dataIndex: 'meet_link',
       key: 'meet_link',
-      render: (meet_link: string | null) => <MeetLink href={meet_link} />,
-      width: 150,
+      responsive: VISIVEL_A_PARTIR.xxl,
+      width: 200,
+      render: (_, record) => <MeetLink href={record.meet_link} />,
     },
     {
       title: 'Ações',
       key: 'actions',
-      width: 120,
+      width: larguraAcoesLinha(2, acoesCompactas),
       render: (_, record) => {
-        // Pode editar se não estiver publicado no GCal e não estiver reprovado
-        const canEdit = record.gcal_status !== ('PUBLISHED' as GCalStatus) && record.status !== 'reprovado';
-        // Pode excluir conforme regras por fluxo:
-        // - SUPER: só se pendente E não publicado no GCal
-        // - NAO_SUPER: se não publicado no GCal (independente do status)
-        const isPublished = record.gcal_status === ('PUBLISHED' as GCalStatus);
-        const isSuper = record.fluxo === ('SUPER' as FluxoType);
-        const canDelete = !isPublished && (!isSuper || record.status === 'pendente');
-
-        return (
-          <Space size="small">
-            {canEdit ? (
-              <Tooltip title="Editar solicitação">
-                <Button
-                  type="text"
-                  icon={<EditOutlined />}
-                  onClick={() => navigate(`/solicitacoes/${record.id}/editar`)}
-                />
-              </Tooltip>
-            ) : (
-              <Tooltip title={
-                record.status === 'reprovado'
-                  ? 'Solicitações reprovadas não podem ser editadas'
-                  : 'Solicitações publicadas no Google Calendar não podem ser editadas'
-              }>
-                <Button type="text" icon={<EditOutlined />} disabled />
-              </Tooltip>
-            )}
-
-            {canDelete ? (
-              <Popconfirm
-                title="Excluir solicitação"
-                description="Tem certeza que deseja excluir esta solicitação? Esta ação não pode ser desfeita."
-                onConfirm={() => handleDelete(record.id)}
-                okText="Sim, excluir"
-                cancelText="Cancelar"
-                okButtonProps={{ danger: true }}
-              >
-                <Tooltip title="Excluir solicitação">
-                  <Button type="text" icon={<DeleteOutlined />} danger />
-                </Tooltip>
-              </Popconfirm>
-            ) : (
-              <Tooltip title={
-                isPublished
-                  ? 'Solicitações publicadas no Google Calendar não podem ser excluídas'
-                  : 'Solicitações do fluxo SUPER só podem ser excluídas enquanto pendentes'
-              }>
-                <Button type="text" icon={<DeleteOutlined />} disabled />
-              </Tooltip>
-            )}
-          </Space>
-        );
+        const { podeEditar, podeExcluir, motivos } = permissoesDaLinha(record);
+        const acoes: AcaoDaLinha[] = [];
+        if (podeEditar) {
+          acoes.push({
+            chave: 'editar',
+            rotulo: 'Editar',
+            icone: <EditOutlined />,
+            onClick: () => void navigate(`/solicitacoes/${record.id}/editar`),
+          });
+        }
+        if (podeExcluir) {
+          acoes.push({
+            chave: 'excluir',
+            rotulo: 'Excluir',
+            icone: <DeleteOutlined />,
+            onClick: () => confirmarExclusao(record),
+            perigo: true,
+          });
+        }
+        if (motivos.length > 0) {
+          const titulo = !podeEditar && !podeExcluir
+            ? 'Por que não dá para editar nem excluir'
+            : !podeEditar
+              ? 'Por que não dá para editar'
+              : 'Por que não dá para excluir';
+          acoes.push({
+            chave: 'motivo',
+            rotulo: titulo,
+            icone: <InfoCircleOutlined />,
+            onClick: () => {
+              Modal.info({ title: `${titulo}?`, content: motivos.join(' '), okText: 'Entendi' });
+            },
+          });
+        }
+        return <AcoesLinha compacto={acoesCompactas} alvo={nomeDaSolicitacao(record)} acoes={acoes} />;
       },
     },
-  ], [handleDelete, navigate]);
+  ], [acoesCompactas, confirmarExclusao, navigate]);
 
   return (
     <section className="p-6" aria-labelledby="minhas-solicitacoes-title">
       <Card>
         <Space direction="vertical" style={{ width: '100%' }} size="large">
           {/* Header semantico */}
-          <header className="flex justify-between items-center">
+          <header className="flex flex-wrap justify-between items-center gap-3">
             <Title level={2} className="m-0" id="minhas-solicitacoes-title">
               Minhas Solicitações
             </Title>
@@ -239,11 +363,14 @@ export default function MySolicitacoesPage(): JSX.Element {
 
           {/* Filtros */}
           <nav aria-label="Filtros de busca">
-            <Space>
+            <Space wrap>
               <Select
                 value={statusFilter}
-                onChange={setStatusFilter}
-                style={{ width: '100%', maxWidth: 200 }}
+                onChange={(valor: SolicitacaoStatus | '') => {
+                  setStatusFilter(valor);
+                  setPage(1);
+                }}
+                style={{ width: 200, maxWidth: '100%' }}
                 placeholder="Status"
                 aria-label="Filtrar por status"
               >
@@ -256,28 +383,41 @@ export default function MySolicitacoesPage(): JSX.Element {
               <Input.Search
                 placeholder="Buscar por município, projeto..."
                 value={searchTerm}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-                onSearch={loadData}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                  setSearchTerm(e.target.value);
+                  setPage(1);
+                }}
+                // Enter ou o botão buscam na hora, sem esperar.
+                onSearch={(valor: string) => {
+                  setTermoBuscado(valor);
+                  setPage(1);
+                }}
                 enterButton={<SearchOutlined />}
-                style={{ width: '100%', maxWidth: 300 }}
+                style={{ width: 300, maxWidth: '100%' }}
                 allowClear
-                aria-label="Buscar solicitacoes"
+                aria-label="Buscar solicitações"
               />
             </Space>
           </nav>
 
-          {/* Tabela */}
-          <section aria-label="Lista de solicitacoes">
-            <Table
-              scroll={{ x: "max-content" }}
+          {/* Tabela. tabIndex -1: recebe o foco depois de excluir (fora do Tab). */}
+          <section aria-label="Lista de solicitações" ref={listaRef} tabIndex={-1}>
+            <ResponsiveTable<Solicitacao>
               columns={columns}
               dataSource={rows}
               loading={loading}
               rowKey="id"
+              nomeDaLinha={nomeDaSolicitacao}
+              erro={erro}
+              onTentarDeNovo={() => void loadData()}
+              onChange={handleTableChange}
               pagination={{
+                current: page,
+                pageSize,
                 total,
-                pageSize: 20,
-                showTotal: (total) => `Total: ${total} solicitações`,
+                showSizeChanger: true,
+                pageSizeOptions: ['20', '50', '100'],
+                showTotal: (totalCount) => `Total: ${totalCount} solicitações`,
               }}
             />
           </section>

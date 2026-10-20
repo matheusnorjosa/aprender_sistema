@@ -1,12 +1,12 @@
 [
   {
-    "name": "JS Bundle (gzipped, excluding lazy chunks)",
+    "name": "JS total (gzip, lazy incluido, exceto GeoJSON)",
     "path": [
       "dist/assets/*.js",
       "!dist/assets/brazil-states-*.js"
     ],
     "gzip": true,
-    "limit": "750 KB",
+    "limit": "800 KB",
     "running": false
   },
   {

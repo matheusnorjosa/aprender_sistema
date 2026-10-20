@@ -429,7 +429,7 @@ aprender_sistema/
 │   │   └── config/            # Django settings
 │   ├── frontend/
 │   │   ├── src/
-│   │   │   ├── pages/         # Componentes de página (52 rotas em AppRoutes.tsx)
+│   │   │   ├── pages/         # Componentes de página (53 rotas em AppRoutes.tsx)
 │   │   │   ├── components/    # 22 componentes de nível raiz
 │   │   │   └── api/           # 16 módulos de cliente HTTP
 │   │   └── e2e/               # Testes Playwright

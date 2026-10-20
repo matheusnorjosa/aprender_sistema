@@ -20,7 +20,6 @@ from unittest.mock import patch
 
 from django.core.management import call_command
 from django.db import connection
-from django.db.models import F
 from django.test import RequestFactory, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -30,7 +29,7 @@ import pytest
 from apps.core.exceptions import ValidationAPIError
 from apps.core.models import Solicitacao
 from apps.core.services.gcal.payload import build_event_payload
-from apps.core.services.gcal.sync import CriacaoRecusada, apply_one_solicitacao, cancel_solicitacao, upsert_one
+from apps.core.services.gcal.sync import CriacaoRecusada, apply_one_solicitacao, upsert_one
 from apps.core.services.gcal.utils import _payload_hash
 from apps.core.services.gcal_fake_client import FakeCalendarClient
 from apps.core.services.solicitacao_publish import motivo_nao_publicavel, publish_to_gcal
@@ -49,19 +48,16 @@ def _passthrough(fn, **kwargs):
 class _Cliente:
     """Cliente mínimo que registra as chamadas. `store` = eventos que existem no Google."""
 
-    def __init__(
-        self, store: set[str] | None = None, get_exc: Exception | None = None, horas: dict[str, object] | None = None
-    ) -> None:
+    def __init__(self, store: set[str] | None = None, get_exc: Exception | None = None) -> None:
         self.store = set(store or ())
         self.get_exc = get_exc
-        self.horas = horas  # `start`/`end` que o GET devolve (o Google sempre devolve)
         self.inserts: list[str] = []
         self.updates: list[str] = []
 
     def get(self, calendar_id, event_id):  # noqa: ARG002
         if self.get_exc is not None:
             raise self.get_exc
-        return {"id": event_id, **(self.horas or {})} if event_id in self.store else None
+        return {"id": event_id} if event_id in self.store else None
 
     def insert(self, calendar_id, event_id, payload):  # noqa: ARG002
         self.inserts.append(event_id)
@@ -94,9 +90,8 @@ def _upsert(client, s, **kw):
 # ---------- #1899: UPDATE pelo id gravado ----------
 def test_update_vai_para_o_event_id_adotado():
     s = _futuro(external_event_id=_ADOTADO, gcal_status="PUBLISHED")
-    payload = build_event_payload(s, enable_meet=False)
-    client = _Cliente(store={_ADOTADO}, horas={"start": payload["start"], "end": payload["end"]})
-    out = _upsert(client, s, payload=payload)
+    client = _Cliente(store={_ADOTADO})
+    out = _upsert(client, s)
     assert out.action == "UPDATE"
     assert client.updates == [_ADOTADO], "o UPDATE tem de mirar o id gravado, não o asv2{id}"
     assert client.inserts == []
@@ -109,98 +104,10 @@ def test_adotado_com_hash_igual_pula():
     payload = build_event_payload(s, enable_meet=False)
     s.gcal_payload_hash = _payload_hash(payload)
     s.save(update_fields=["gcal_payload_hash"])
-    client = _Cliente(store={_ADOTADO}, horas={"start": payload["start"], "end": payload["end"]})
+    client = _Cliente(store={_ADOTADO})
     out = _upsert(client, s, payload=payload)
     assert out.action == "SKIP"
     assert client.updates == [] and client.inserts == []
-
-
-def _adotado_as_14h_com_hash() -> tuple[Solicitacao, dict]:
-    """Adotado das 14h às 16h (Fortaleza) daqui a 3 dias, com o hash e o `ADOPT` gravados como na adoção."""
-    inicio = timezone.localtime(timezone.now() + timedelta(days=3)).replace(hour=14, minute=0, second=0, microsecond=0)
-    s = SolicitacaoFactory(
-        status="aprovado",
-        inicio=inicio,
-        fim=inicio + timedelta(hours=2),
-        external_event_id=_ADOTADO,
-        gcal_status="PUBLISHED",
-        last_sync_action="ADOPT",
-    )
-    payload = build_event_payload(s, enable_meet=False)
-    s.gcal_payload_hash = _payload_hash(payload)
-    s.save(update_fields=["gcal_payload_hash"])
-    return s, payload
-
-
-def _no_google(s: Solicitacao, dias: int, hora: int) -> dict:
-    """`start`/`end` como o GET devolve, `dias` depois do dia do sistema, das `hora` às `hora`+2 (-03:00)."""
-    dia = timezone.localtime(s.inicio).date() + timedelta(days=dias)
-    return {
-        "start": {"dateTime": f"{dia.isoformat()}T{hora:02d}:00:00-03:00"},
-        "end": {"dateTime": f"{dia.isoformat()}T{hora + 2:02d}:00:00-03:00"},
-    }
-
-
-def test_adotado_com_hash_igual_e_outra_hora_no_google_atualiza():
-    """O hash do id adotado é o do sistema, não o do Google: hora diferente lá vai no UPDATE (dono, 20/10)."""
-    s, payload = _adotado_as_14h_com_hash()
-    client = _Cliente(store={_ADOTADO}, horas=_no_google(s, dias=0, hora=8))
-    out = _upsert(client, s, payload=payload)
-    assert out.action == "UPDATE"
-    assert client.updates == [_ADOTADO] and client.inserts == []
-
-
-def test_adotado_com_hash_igual_e_outro_dia_no_google_nao_atualiza():
-    """Dia diferente = o id adotado é de outro encontro (relay 65): o PATCH mudaria o dia desse evento."""
-    s, payload = _adotado_as_14h_com_hash()
-    client = _Cliente(store={_ADOTADO}, horas=_no_google(s, dias=1, hora=14))
-    with pytest.raises(ValueError, match="outro dia"):
-        _upsert(client, s, payload=payload)
-    assert client.updates == [] and client.inserts == []
-
-
-def test_adotado_em_outro_dia_segue_travado_na_nova_tentativa_e_sem_hash():
-    """O ERROR apaga o hash, e o Resync/Publicar também chegam sem ele: a trava não pode depender do hash."""
-    s, _ = _adotado_as_14h_com_hash()
-    client = _Cliente(store={_ADOTADO}, horas=_no_google(s, dias=1, hora=14))
-    with patch(_PASSTHROUGH, side_effect=_passthrough):
-        for _tentativa in range(2):
-            with pytest.raises(ValueError, match="outro dia"):
-                apply_one_solicitacao(s, apply_blocked=True, client=client)
-            s.refresh_from_db()
-            assert s.gcal_status == "ERROR" and s.gcal_payload_hash is None
-            assert s.last_sync_action == "ADOPT", "o erro da trava não conta como conferência do id"
-    assert client.updates == [] and client.inserts == []
-
-
-@pytest.mark.parametrize("hash_gravado", [None, "hash-de-antes-de-uma-edicao"])
-def test_adotado_em_outro_dia_nao_atualiza_com_hash_vazio_ou_diferente(hash_gravado):
-    """Reenviar zera o hash e qualquer save muda o payload (`updated_at`): nos dois casos, sem PATCH. Antes
-    do primeiro sync depois da adoção, uma edição de data não se distingue de um id de outro encontro."""
-    s, payload = _adotado_as_14h_com_hash()
-    s.gcal_payload_hash = hash_gravado
-    s.save(update_fields=["gcal_payload_hash"])
-    client = _Cliente(store={_ADOTADO}, horas=_no_google(s, dias=1, hora=14))
-    with pytest.raises(ValueError, match="outro dia"):
-        _upsert(client, s, payload=payload)
-    assert client.updates == [] and client.inserts == []
-
-
-def test_adotado_conferido_e_remarcado_no_sistema_muda_de_dia_no_google():
-    """A trava do outro dia é a conferência da adoção (dono, 20/10): o Reapply que acha o Google no mesmo
-    dia confere o id, e a remarcação feita depois no sistema vai no UPDATE pelo id adotado."""
-    s, _ = _adotado_as_14h_com_hash()
-    client = _Cliente(store={_ADOTADO}, horas=_no_google(s, dias=0, hora=14))
-    with patch(_PASSTHROUGH, side_effect=_passthrough):
-        assert apply_one_solicitacao(s, apply_blocked=True, client=client).action == "SKIP"
-        um_dia = timedelta(days=1)
-        Solicitacao.objects.filter(pk=s.pk).update(inicio=F("inicio") + um_dia, fim=F("fim") + um_dia)
-        s.refresh_from_db()
-        out = apply_one_solicitacao(s, apply_blocked=True, client=client)
-    assert out.action == "UPDATE"
-    assert client.updates == [_ADOTADO] and client.inserts == []
-    s.refresh_from_db()
-    assert s.gcal_status == "PUBLISHED" and s.external_event_id == _ADOTADO
 
 
 def test_get_com_excecao_num_adotado_nao_cria():
@@ -237,52 +144,6 @@ def test_adotado_cancelado_no_google_nao_ressuscita():
     assert s.external_event_id == _ADOTADO
     assert s.gcal_status == "ERROR"
     assert "cancelado no Google" in (s.gcal_last_error or ""), "o motivo fica no erro do evento"
-
-
-# ---------- Remover (cancel-gcal) e DELETE do sync com id adotado ainda não conferido ----------
-def _remover(client, s):
-    with patch(_PASSTHROUGH, side_effect=_passthrough):
-        return cancel_solicitacao(s, client=client)
-
-
-def _apagar_pelo_sync(client, s):
-    s.status = "reprovado"
-    s.save(update_fields=["status"])
-    return _upsert(client, s)
-
-
-@pytest.mark.parametrize("apagar", [_remover, _apagar_pelo_sync])
-def test_apagar_adotado_em_outro_dia_nao_apaga_o_outro_encontro(apagar):
-    """Outro dia no Google = o id adotado é de outro encontro: apagar tiraria esse evento do Google."""
-    s, _ = _adotado_as_14h_com_hash()
-    client = _Cliente(store={_ADOTADO}, horas=_no_google(s, dias=1, hora=14))
-    with pytest.raises(ValueError, match="outro dia"):
-        apagar(client, s)
-    assert client.store == {_ADOTADO}, "o evento do outro encontro continua no Google"
-    s.refresh_from_db()
-    assert s.external_event_id == _ADOTADO and s.last_sync_action == "ADOPT"
-
-
-@pytest.mark.parametrize("cliente", [_ClienteAdotadoCancelado, _Cliente], ids=["cancelado", "nao_achado"])
-def test_remover_adotado_ja_apagado_no_google_limpa_e_mantem_o_publicar_travado(cliente):
-    """O id adotado não confere com nada vivo no Google: o evento real do encontro pode estar lá com outro
-    id (a planilha disse que estava), então o Publicar segue travado em vez de criar o `asv2{id}`."""
-    s, _ = _adotado_as_14h_com_hash()
-    client = cliente(store={_ADOTADO} if cliente is _ClienteAdotadoCancelado else set())
-    _remover(client, s)
-    s.refresh_from_db()
-    assert s.external_event_id is None
-    assert s.publicado_fora_do_sistema is True
-    assert motivo_nao_publicavel(s) == "publicado_fora_do_sistema"
-
-
-def test_remover_adotado_no_mesmo_dia_apaga():
-    s, payload = _adotado_as_14h_com_hash()
-    client = _Cliente(store={_ADOTADO}, horas={"start": payload["start"], "end": payload["end"]})
-    _remover(client, s)
-    assert client.store == set()
-    s.refresh_from_db()
-    assert s.external_event_id is None and s.publicado_fora_do_sistema is False
 
 
 def test_id_deterministico_gravado_segue_o_caminho_de_antes():

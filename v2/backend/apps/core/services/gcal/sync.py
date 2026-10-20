@@ -9,7 +9,6 @@ Core synchronization operations for Google Calendar.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from typing import Any, cast
 
 from django.conf import settings
@@ -26,46 +25,6 @@ from .utils import _payload_hash, _retry_with_circuit_breaker
 from .validation import _event_id_for
 
 logger = logging.getLogger(__name__)
-
-
-def _hora_difere(google: JsonDict, payload: JsonDict) -> bool:
-    """Início ou fim do evento no Google diferente do payload. Sem `dateTime` legível conta como diferente."""
-    for campo in ("start", "end"):
-        try:
-            if datetime.fromisoformat(google[campo]["dateTime"]) != datetime.fromisoformat(payload[campo]["dateTime"]):
-                return True
-        except (KeyError, TypeError, ValueError):
-            return True
-    return False
-
-
-def _data_difere(google: JsonDict, payload: JsonDict) -> bool:
-    """Dia local (fuso do sistema) do início ou do fim no Google diferente do payload. Ilegível conta como diferente."""
-    for campo in ("start", "end"):
-        try:
-            g = timezone.localtime(datetime.fromisoformat(google[campo]["dateTime"])).date()
-            if g != timezone.localtime(datetime.fromisoformat(payload[campo]["dateTime"])).date():
-                return True
-        except (KeyError, TypeError, ValueError):
-            return True
-    return False
-
-
-def _adotado_vivo_antes_de_apagar(client: CalendarClientAdapter, calendar_id: CalendarId, s: Solicitacao) -> bool:
-    """Conferência do id adotado ainda não conferido (`last_sync_action=ADOPT`) antes de apagar no Google.
-
-    Outro dia no Google = o id é de outro encontro: levanta e nada é apagado (relay 65). Cancelado ou não
-    achado: devolve False (nada a apagar), e quem chama trava o Publicar, porque o evento real deste encontro
-    pode estar no Google com outro id. Os outros casos devolvem True e seguem para o DELETE."""
-    if not s.external_event_id or s.external_event_id == _event_id_for(s) or s.last_sync_action != "ADOPT":
-        return True
-    existing = client.get(calendar_id, s.external_event_id)
-    if existing is None or existing.get("status") == "cancelled":
-        return False
-    sistema = {"start": {"dateTime": s.inicio.isoformat()}, "end": {"dateTime": s.fim.isoformat()}}
-    if _data_difere(existing, sistema):
-        raise ValueError(f"Solicitação #{s.id}: o evento adotado está em outro dia no Google; nada foi apagado.")
-    return True
 
 
 class CriacaoRecusada(ValueError):
@@ -274,15 +233,13 @@ def upsert_one(
                     )
 
                 eid = s.external_event_id
-                vivo = _adotado_vivo_antes_de_apagar(client, calendar_id, s)
                 if not dry_run:
                     try:
                         # RF05: Retry com backoff exponencial (PR19)
-                        if vivo:
-                            _retry_with_circuit_breaker(
-                                lambda: client.delete(calendar_id, eid),
-                                operation_name=f"GCal DELETE #{s.id}",
-                            )
+                        _retry_with_circuit_breaker(
+                            lambda: client.delete(calendar_id, eid),
+                            operation_name=f"GCal DELETE #{s.id}",
+                        )
                     except Exception as e:
                         # 404 = evento já deletado no Google (idempotência OK). Para
                         # QUALQUER outro erro, RE-LEVANTA (#1541): limpar
@@ -294,14 +251,12 @@ def upsert_one(
                         if "404" not in str(e):
                             raise
 
-                    s.publicado_fora_do_sistema = s.publicado_fora_do_sistema or not vivo
                     s.external_event_id = None
                     s.last_synced_at = timezone.now()
                     s.last_sync_action = "DELETE"
                     s.last_sync_error = error_msg
                     s.save(
                         update_fields=[
-                            "publicado_fora_do_sistema",
                             "external_event_id",
                             "last_synced_at",
                             "last_sync_action",
@@ -346,14 +301,6 @@ def upsert_one(
             if existing is None and adotado:
                 raise ValueError(
                     f"Solicitação #{s.id}: o evento adotado não foi achado no Google; nada foi criado para não duplicar."
-                )
-            if adotado and existing is not None and s.last_sync_action == "ADOPT" and _data_difere(existing, payload):
-                # Conferência da adoção (dono, 20/10, relay 65): outro dia no Google = o id é de outro encontro,
-                # e o PATCH mudaria o dia dele. Vale até o primeiro sync que confere o id (UPDATE, ou o SKIP
-                # abaixo); depois, a remarcação feita no sistema segue no UPDATE. Fora da condição do hash (o
-                # ERROR, o Resync e o Publicar chegam sem ele) e antes de `action`, para o erro não apagar o ADOPT.
-                raise ValueError(
-                    f"Solicitação #{s.id}: o evento adotado está em outro dia no Google; nada foi atualizado."
                 )
 
         if existing is None:
@@ -466,16 +413,8 @@ def upsert_one(
             # GCAL_SEND_UPDATES=all, reenvia e-mail a TODOS os convidados sem mudança
             # real. O resync zera gcal_payload_hash de propósito (resync_solicitacao /
             # batch resync), então o SKIP nunca bloqueia um reenvio intencional.
-            # Id adotado: o hash é o do sistema, não o do Google. Mesmo dia e hora diferente no Google =
-            # atualizar (decisão do dono de 20/10, relay 65); com a mesma hora, pula como qualquer outro.
             if action == "UPDATE" and s.gcal_payload_hash and s.gcal_payload_hash == _payload_hash(payload):
-                if not (adotado and _hora_difere(existing, payload)):
-                    if adotado and s.last_sync_action == "ADOPT" and not dry_run:
-                        # Google no mesmo dia: o id adotado está conferido (encerra a trava do outro dia).
-                        s.last_synced_at = timezone.now()
-                        s.last_sync_action = "SKIP"
-                        s.save(update_fields=["last_synced_at", "last_sync_action"])
-                    return SyncOutcome("SKIP", s.id, s.external_event_id, payload["summary"])
+                return SyncOutcome("SKIP", s.id, s.external_event_id, payload["summary"])
 
             if not dry_run:
                 try:
@@ -612,21 +551,18 @@ def cancel_solicitacao(
             "Peça o compartilhamento e tente de novo."
         )
 
-    vivo = _adotado_vivo_antes_de_apagar(client, calendar_id, s)
-    if vivo:
-        try:
-            # Tentar deletar com retry/backoff
-            _retry_with_circuit_breaker(
-                lambda: client.delete(calendar_id, event_id),
-                operation_name=f"GCal CANCEL #{s.id}",
-            )
-        except Exception as e:
-            # 404 = já foi deletado (idempotência OK)
-            if "404" not in str(e):
-                raise
+    try:
+        # Tentar deletar com retry/backoff
+        _retry_with_circuit_breaker(
+            lambda: client.delete(calendar_id, event_id),
+            operation_name=f"GCal CANCEL #{s.id}",
+        )
+    except Exception as e:
+        # 404 = já foi deletado (idempotência OK)
+        if "404" not in str(e):
+            raise
 
     # Limpar campos
-    s.publicado_fora_do_sistema = s.publicado_fora_do_sistema or not vivo
     s.external_event_id = None
     s.meet_link = None
     s.gcal_payload_hash = None
@@ -636,7 +572,6 @@ def cancel_solicitacao(
     s.last_sync_error = None
     s.save(
         update_fields=[
-            "publicado_fora_do_sistema",
             "external_event_id",
             "meet_link",
             "gcal_payload_hash",

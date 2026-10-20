@@ -30,7 +30,7 @@ import pytest
 from apps.core.exceptions import ValidationAPIError
 from apps.core.models import Solicitacao
 from apps.core.services.gcal.payload import build_event_payload
-from apps.core.services.gcal.sync import CriacaoRecusada, apply_one_solicitacao, upsert_one
+from apps.core.services.gcal.sync import CriacaoRecusada, apply_one_solicitacao, cancel_solicitacao, upsert_one
 from apps.core.services.gcal.utils import _payload_hash
 from apps.core.services.gcal_fake_client import FakeCalendarClient
 from apps.core.services.solicitacao_publish import motivo_nao_publicavel, publish_to_gcal
@@ -237,6 +237,52 @@ def test_adotado_cancelado_no_google_nao_ressuscita():
     assert s.external_event_id == _ADOTADO
     assert s.gcal_status == "ERROR"
     assert "cancelado no Google" in (s.gcal_last_error or ""), "o motivo fica no erro do evento"
+
+
+# ---------- Remover (cancel-gcal) e DELETE do sync com id adotado ainda não conferido ----------
+def _remover(client, s):
+    with patch(_PASSTHROUGH, side_effect=_passthrough):
+        return cancel_solicitacao(s, client=client)
+
+
+def _apagar_pelo_sync(client, s):
+    s.status = "reprovado"
+    s.save(update_fields=["status"])
+    return _upsert(client, s)
+
+
+@pytest.mark.parametrize("apagar", [_remover, _apagar_pelo_sync])
+def test_apagar_adotado_em_outro_dia_nao_apaga_o_outro_encontro(apagar):
+    """Outro dia no Google = o id adotado é de outro encontro: apagar tiraria esse evento do Google."""
+    s, _ = _adotado_as_14h_com_hash()
+    client = _Cliente(store={_ADOTADO}, horas=_no_google(s, dias=1, hora=14))
+    with pytest.raises(ValueError, match="outro dia"):
+        apagar(client, s)
+    assert client.store == {_ADOTADO}, "o evento do outro encontro continua no Google"
+    s.refresh_from_db()
+    assert s.external_event_id == _ADOTADO and s.last_sync_action == "ADOPT"
+
+
+@pytest.mark.parametrize("cliente", [_ClienteAdotadoCancelado, _Cliente], ids=["cancelado", "nao_achado"])
+def test_remover_adotado_ja_apagado_no_google_limpa_e_mantem_o_publicar_travado(cliente):
+    """O id adotado não confere com nada vivo no Google: o evento real do encontro pode estar lá com outro
+    id (a planilha disse que estava), então o Publicar segue travado em vez de criar o `asv2{id}`."""
+    s, _ = _adotado_as_14h_com_hash()
+    client = cliente(store={_ADOTADO} if cliente is _ClienteAdotadoCancelado else set())
+    _remover(client, s)
+    s.refresh_from_db()
+    assert s.external_event_id is None
+    assert s.publicado_fora_do_sistema is True
+    assert motivo_nao_publicavel(s) == "publicado_fora_do_sistema"
+
+
+def test_remover_adotado_no_mesmo_dia_apaga():
+    s, payload = _adotado_as_14h_com_hash()
+    client = _Cliente(store={_ADOTADO}, horas={"start": payload["start"], "end": payload["end"]})
+    _remover(client, s)
+    assert client.store == set()
+    s.refresh_from_db()
+    assert s.external_event_id is None and s.publicado_fora_do_sistema is False
 
 
 def test_id_deterministico_gravado_segue_o_caminho_de_antes():

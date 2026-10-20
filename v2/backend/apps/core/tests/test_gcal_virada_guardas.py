@@ -48,16 +48,19 @@ def _passthrough(fn, **kwargs):
 class _Cliente:
     """Cliente mínimo que registra as chamadas. `store` = eventos que existem no Google."""
 
-    def __init__(self, store: set[str] | None = None, get_exc: Exception | None = None) -> None:
+    def __init__(
+        self, store: set[str] | None = None, get_exc: Exception | None = None, horas: dict[str, object] | None = None
+    ) -> None:
         self.store = set(store or ())
         self.get_exc = get_exc
+        self.horas = horas  # `start`/`end` que o GET devolve (o Google sempre devolve)
         self.inserts: list[str] = []
         self.updates: list[str] = []
 
     def get(self, calendar_id, event_id):  # noqa: ARG002
         if self.get_exc is not None:
             raise self.get_exc
-        return {"id": event_id} if event_id in self.store else None
+        return {"id": event_id, **(self.horas or {})} if event_id in self.store else None
 
     def insert(self, calendar_id, event_id, payload):  # noqa: ARG002
         self.inserts.append(event_id)
@@ -104,10 +107,23 @@ def test_adotado_com_hash_igual_pula():
     payload = build_event_payload(s, enable_meet=False)
     s.gcal_payload_hash = _payload_hash(payload)
     s.save(update_fields=["gcal_payload_hash"])
-    client = _Cliente(store={_ADOTADO})
+    client = _Cliente(store={_ADOTADO}, horas={"start": payload["start"], "end": payload["end"]})
     out = _upsert(client, s, payload=payload)
     assert out.action == "SKIP"
     assert client.updates == [] and client.inserts == []
+
+
+def test_adotado_com_hash_igual_e_outra_hora_no_google_atualiza():
+    """O hash do id adotado é o do sistema, não o do Google: hora diferente lá vai no UPDATE (dono, 20/10)."""
+    s = _futuro(external_event_id=_ADOTADO, gcal_status="PUBLISHED")
+    payload = build_event_payload(s, enable_meet=False)
+    s.gcal_payload_hash = _payload_hash(payload)
+    s.save(update_fields=["gcal_payload_hash"])
+    outra = {"dateTime": "2000-01-01T09:00:00-03:00"}
+    client = _Cliente(store={_ADOTADO}, horas={"start": payload["start"], "end": outra})
+    out = _upsert(client, s, payload=payload)
+    assert out.action == "UPDATE"
+    assert client.updates == [_ADOTADO] and client.inserts == []
 
 
 def test_get_com_excecao_num_adotado_nao_cria():

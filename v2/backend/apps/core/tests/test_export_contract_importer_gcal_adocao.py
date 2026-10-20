@@ -3,8 +3,9 @@
 Roda à parte, depois da carga e do A5, lendo o mesmo solicitacao.csv. Só adota `confianca=alta`, de
 evento aprovado, marcado `publicado_fora_do_sistema`, sem rastro de publicação pelo sistema, com Event ID
 que nenhum outro evento tem; o evento mexido por alguém só entra com data, hora e formadores iguais aos
-da planilha. NÃO grava o hash do payload: o Google pode ter outro horário, e o primeiro Reapply depois da
-virada manda o UPDATE pelo id adotado (decisão do dono de 20/10, relay 65). A adoção nunca chama o Google.
+da planilha. Grava o hash do payload do sistema DEPOIS do `refresh_from_db()`: o Reapply seguinte pula o
+evento igual ao Google (sem e-mail nem Meet novo) e só atualiza o de hora diferente no Google (decisão do dono
+de 20/10, relay 65). A adoção nunca chama o Google.
 
 Fixtures sintéticos, sem dado pessoal.
 """
@@ -13,6 +14,7 @@ Fixtures sintéticos, sem dado pessoal.
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Any
 from unittest.mock import patch
 
@@ -64,13 +66,22 @@ def _pronto(m, ext: str = "EV1", **kw: Any) -> Solicitacao:
 
 
 class _Cliente:
-    def __init__(self, store: set[str]) -> None:
+    """Google falso. `horas` dá o início e o fim que o Google tem para o evento (ISO com fuso)."""
+
+    def __init__(self, store: set[str], horas: tuple[str, str] | None = None) -> None:
         self.store = store
+        self.horas = horas
         self.updates: list[str] = []
         self.inserts: list[str] = []
 
     def get(self, calendar_id, event_id):  # noqa: ARG002
-        return {"id": event_id} if event_id in self.store else None
+        if event_id not in self.store:
+            return None
+        ev: dict[str, Any] = {"id": event_id, "status": "confirmed"}
+        if self.horas is not None:
+            ev["start"] = {"dateTime": self.horas[0], "timeZone": "America/Fortaleza"}
+            ev["end"] = {"dateTime": self.horas[1], "timeZone": "America/Fortaleza"}
+        return ev
 
     def insert(self, calendar_id, event_id, payload):  # noqa: ARG002
         self.inserts.append(event_id)
@@ -94,7 +105,7 @@ def test_16_adota_alta_aprovado_marcado(tmp_path, m):
     assert s.last_sync_action == "ADOPT"
     assert s.last_synced_at is not None and s.gcal_last_sync_at is not None
     assert s.publicado_fora_do_sistema is False
-    assert s.gcal_payload_hash is None, "sem hash, o próximo Reapply atualiza o Google"
+    assert s.gcal_payload_hash == _payload_hash(build_event_payload(s, enable_meet=False))
     log = AuditLog.objects.get(action="UPDATE", details__campo="external_event_id")
     assert log.details["origem"] == "import_export_contract"
     assert log.details["para"] == EID
@@ -201,20 +212,35 @@ def test_18_adocao_nao_chama_o_google(tmp_path, m):
     assert task.call_count == 0 and factory.call_count == 0
 
 
-# ---------- 33. o Reapply seguinte atualiza o Google pelo id adotado ----------
-def test_33_reapply_depois_da_adocao_faz_update_pelo_id_adotado(tmp_path, m):
-    """Caso EV003991: o Google estava com outro horário. O primeiro Reapply manda o UPDATE pelo id adotado
-    (sem criar outro evento) e grava o hash; o Reapply seguinte pula."""
+# ---------- 33. o Reapply seguinte só atualiza o Google quando a hora lá é outra ----------
+def _horas_no_google(inicio, fim) -> tuple[str, str]:
+    return (timezone.localtime(inicio).isoformat(), timezone.localtime(fim).isoformat())
+
+
+def test_33_reapply_depois_da_adocao_pula_quando_o_google_tem_a_mesma_hora(tmp_path, m):
+    """Evento igual ao Google não recebe PATCH: o PATCH trocaria os convidados e, no online, pediria outro Meet."""
+    s = _pronto(m, formadores=(m.f1,), is_online=True)
+    _adocao(_export(tmp_path, [_linha()], [_part("EV1", _CPF_F1)]))
+    s = Solicitacao.objects.get(id=s.id)
+    client = _Cliente(store={EID}, horas=_horas_no_google(s.inicio, s.fim))
+    out = apply_one_solicitacao(s, apply_blocked=True, client=client)
+    assert out.action == "SKIP"
+    assert client.updates == [] and client.inserts == []
+
+
+def test_33_reapply_depois_da_adocao_faz_update_quando_o_google_tem_outra_hora(tmp_path, m):
+    """Caso EV003991: o Google estava com outro horário. O Reapply manda o UPDATE pelo id adotado (sem criar
+    outro evento); depois disso o Google fica com a hora do sistema e o Reapply seguinte pula."""
     s = _pronto(m, formadores=(m.f1,))
     _adocao(_export(tmp_path, [_linha()], [_part("EV1", _CPF_F1)]))
     s = Solicitacao.objects.get(id=s.id)
-    client = _Cliente(store={EID})
+    client = _Cliente(store={EID}, horas=_horas_no_google(s.inicio + timedelta(hours=1), s.fim))
     out = apply_one_solicitacao(s, apply_blocked=True, client=client)
     assert out.action == "UPDATE"
     assert client.updates == [EID] and client.inserts == []
     s = Solicitacao.objects.get(id=s.id)
     assert s.external_event_id == EID
-    assert s.gcal_payload_hash == _payload_hash(build_event_payload(s, enable_meet=False))
+    client.horas = _horas_no_google(s.inicio, s.fim)
     assert apply_one_solicitacao(s, apply_blocked=True, client=client).action == "SKIP"
     assert client.updates == [EID]
 

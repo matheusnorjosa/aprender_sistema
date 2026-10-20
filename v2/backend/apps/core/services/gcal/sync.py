@@ -9,6 +9,7 @@ Core synchronization operations for Google Calendar.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any, cast
 
 from django.conf import settings
@@ -25,6 +26,17 @@ from .utils import _payload_hash, _retry_with_circuit_breaker
 from .validation import _event_id_for
 
 logger = logging.getLogger(__name__)
+
+
+def _hora_difere(google: JsonDict, payload: JsonDict) -> bool:
+    """Início ou fim do evento no Google diferente do payload. Sem `dateTime` legível conta como diferente."""
+    for campo in ("start", "end"):
+        try:
+            if datetime.fromisoformat(google[campo]["dateTime"]) != datetime.fromisoformat(payload[campo]["dateTime"]):
+                return True
+        except (KeyError, TypeError, ValueError):
+            return True
+    return False
 
 
 class CriacaoRecusada(ValueError):
@@ -413,7 +425,14 @@ def upsert_one(
             # GCAL_SEND_UPDATES=all, reenvia e-mail a TODOS os convidados sem mudança
             # real. O resync zera gcal_payload_hash de propósito (resync_solicitacao /
             # batch resync), então o SKIP nunca bloqueia um reenvio intencional.
-            if action == "UPDATE" and s.gcal_payload_hash and s.gcal_payload_hash == _payload_hash(payload):
+            # Id adotado: o hash é o do sistema, não o do Google. Hora diferente no Google = atualizar
+            # (decisão do dono de 20/10, relay 65); com a mesma hora, pula como qualquer outro.
+            if (
+                action == "UPDATE"
+                and s.gcal_payload_hash
+                and s.gcal_payload_hash == _payload_hash(payload)
+                and not (adotado and _hora_difere(existing, payload))
+            ):
                 return SyncOutcome("SKIP", s.id, s.external_event_id, payload["summary"])
 
             if not dry_run:

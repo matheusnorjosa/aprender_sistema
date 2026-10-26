@@ -91,6 +91,10 @@ def cache_availability_check(timeout: int | None = None) -> Callable[[F], F]:
     return decorator
 
 
+# Versão única da grade mensal (item 38): sobe a cada mudança de bloqueio/evento/participação.
+_MONTHLY_VER_KEY = "monthly_ver:__global__"
+
+
 def invalidate_availability_cache(usuario_id: int | None = None) -> None:
     """
     Invalidate availability cache for a specific user or globally.
@@ -99,7 +103,7 @@ def invalidate_availability_cache(usuario_id: int | None = None) -> None:
     Incrementing the version makes all old cache entries miss
     without scanning Redis keys.
 
-    Also invalidates monthly grid cache for the affected scope.
+    Also invalidates the monthly grid cache for every viewer (item 38).
 
     Args:
         usuario_id: Specific user to invalidate. If None, bumps global version.
@@ -119,32 +123,27 @@ def invalidate_availability_cache(usuario_id: int | None = None) -> None:
         except ValueError:
             cache.set("avail_ver:__global__", 1, timeout=3600)
 
-    # Also invalidate monthly grid cache for this user
-    _invalidate_monthly_cache(usuario_id)
+    # A grade mensal mostra várias pessoas: a mudança de uma invalida a grade de todos (item 38).
+    _invalidate_monthly_cache()
 
 
-def _invalidate_monthly_cache(usuario_id: int | None = None) -> None:
+def _invalidate_monthly_cache() -> None:
     """
-    Invalidate monthly availability grid cache.
+    Invalidate monthly availability grid cache — for EVERY viewer.
 
-    Uses the same version-counter approach: bump monthly_ver for the user
-    so the view generates fresh data on next request.
+    Uses the same version-counter approach: bump the global `monthly_ver` that enters every grid
+    cache key. Item 38 (ensaio r2): the key used the VIEWER's version while a change bumped only
+    the owner's, so whoever looked at someone else's agenda saw a stale grid for ~5 min.
     """
-    if usuario_id is not None:
-        ver_key = f"monthly_ver:{usuario_id}"
-    else:
-        ver_key = "monthly_ver:__global__"
-
     try:
-        cache.incr(ver_key)
+        cache.incr(_MONTHLY_VER_KEY)
     except ValueError:
-        cache.set(ver_key, 1, timeout=3600)
+        cache.set(_MONTHLY_VER_KEY, 1, timeout=3600)
 
 
-def get_monthly_cache_version(usuario_id: int | None = None) -> int:
+def get_monthly_cache_version() -> int:
     """Get current monthly cache version for cache key composition."""
-    ver_key = f"monthly_ver:{usuario_id}" if usuario_id else "monthly_ver:__global__"
-    ver = cache.get(ver_key)
+    ver = cache.get(_MONTHLY_VER_KEY)
     return int(ver) if ver is not None else 0
 
 

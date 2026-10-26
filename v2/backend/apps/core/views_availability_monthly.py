@@ -237,10 +237,11 @@ class MonthlyAvailabilityView(APIView):
         else:
             cache_scope = f"gerencia:{gerencia_id}"
 
-        # ASQ-007: Include monthly version in cache key for targeted invalidation
+        # ASQ-007: versão da grade na chave. Item 38: a versão é uma só para todos que olham — a
+        # mudança na agenda de qualquer pessoa invalida a grade de quem a vê.
         from apps.core.utils.cache_utils import get_monthly_cache_version
 
-        monthly_ver = get_monthly_cache_version(request.user.id)
+        monthly_ver = get_monthly_cache_version()
         # Vigência (EquipeGerencia) NÃO entra na chave: o TTL curto (_ttl_with_jitter,
         # ~5min) já limita a defasagem de uma expiração de vínculo exatamente como
         # já limita o toggle de `ativo` (não há signal EquipeGerencia→cache). Pôr

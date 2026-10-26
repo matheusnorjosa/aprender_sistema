@@ -74,12 +74,12 @@ def busca_por_nome(q: str, prefixo: str = "") -> Q:
     busca = Q(*[(f"{prefixo}{campo}__icontains", q) for campo in campos], _connector=Q.OR)
     palavras = q.split()
     if len(palavras) > 1:
-        busca |= Q(
-            *[
-                Q(**{f"{prefixo}first_name__icontains": p}) | Q(**{f"{prefixo}last_name__icontains": p})
-                for p in palavras
-            ]
-        )
+        todas = Q()
+        for p in palavras:
+            no_nome: dict[str, str] = {f"{prefixo}first_name__icontains": p}
+            no_sobrenome: dict[str, str] = {f"{prefixo}last_name__icontains": p}
+            todas &= Q(**no_nome) | Q(**no_sobrenome)
+        busca |= todas
     return busca
 
 

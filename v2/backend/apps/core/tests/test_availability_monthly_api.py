@@ -456,3 +456,24 @@ def test_item38_bloqueio_de_ana_aparece_e_some_na_hora_na_grade_vista_por_outra_
 
     assert cliente_ana.delete(f"/api/availability-blocks/{criado.json()['id']}/").status_code == 204
     assert dia_12_de_ana() == antes
+
+
+@pytest.mark.parametrize("q", ["Ana Silva", "  ana   SILVA ", "Silva Ana", "An Silv"])
+def test_item38_buscar_nome_completo_acha_a_pessoa(user_auth, setup_data, q):
+    """Item 38 (ensaio r2): "Buscar nome" com nome e sobrenome não achava ninguém, porque o termo
+    inteiro era comparado com `first_name` OU `last_name`. Cada palavra casa num dos dois."""
+    cache.clear()
+    cliente = APIClient()
+    cliente.force_authenticate(user=user_auth)
+    data = cliente.get("/api/availability/monthly/", {"year": 2025, "month": 10, "role": "FORMADOR", "q": q}).json()
+    assert [p["email"] for p in data["people"]] == ["ana@example.com"]
+
+
+@pytest.mark.parametrize("q", ["Ana Costa", "Ana 11111111111", "Ana example"])
+def test_item38_nome_completo_nao_mistura_pessoas_nem_busca_cpf_ou_email(user_auth, setup_data, q):
+    """Toda palavra precisa casar no nome da MESMA pessoa; o CPF e o e-mail não entram por palavra."""
+    cache.clear()
+    cliente = APIClient()
+    cliente.force_authenticate(user=user_auth)
+    data = cliente.get("/api/availability/monthly/", {"year": 2025, "month": 10, "role": "FORMADOR", "q": q}).json()
+    assert data["people"] == []

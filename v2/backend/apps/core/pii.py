@@ -65,11 +65,22 @@ def busca_por_nome(q: str, prefixo: str = "") -> Q:
     O e-mail entra só quando o termo não tem dígito: sem dígito não há pedaço de CPF a testar,
     e o e-mail (sem acento) é o que acha "Conceição" por quem digita "conceicao".
     `prefixo` é o caminho até o usuário (ex.: `"usuario__"`).
+    Item 38: termo com mais de uma palavra ("Ana Silva") também casa quando CADA palavra casa
+    em `first_name` ou `last_name` da mesma pessoa; essa parte não olha o e-mail.
     """
     campos = ["first_name", "last_name"]
     if not any(c.isdigit() for c in q):
         campos.append("email")
-    return Q(*[(f"{prefixo}{campo}__icontains", q) for campo in campos], _connector=Q.OR)
+    busca = Q(*[(f"{prefixo}{campo}__icontains", q) for campo in campos], _connector=Q.OR)
+    palavras = q.split()
+    if len(palavras) > 1:
+        busca |= Q(
+            *[
+                Q(**{f"{prefixo}first_name__icontains": p}) | Q(**{f"{prefixo}last_name__icontains": p})
+                for p in palavras
+            ]
+        )
+    return busca
 
 
 def redact_cpf_deep(value: Any) -> Any:

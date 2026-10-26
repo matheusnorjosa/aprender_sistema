@@ -69,7 +69,8 @@ def _invalidate_cache_on_solicitacao_change(
     """
     Invalida cache de availability ao modificar Solicitacao.
 
-    ASQ-007: Scoped invalidation — only bumps version for the affected user.
+    ASQ-007: Scoped invalidation — the conflict-check version (`avail_ver`) bumps only for the
+    affected user; the monthly grid uses one global version, bumped by every change (item 38).
     O coordenador responsável também: ele ocupa a agenda quando acompanha (05/10/2026) e
     pode não ser quem criou. O responsável ANTERIOR, numa troca, é invalidado na edição.
     """
@@ -86,7 +87,8 @@ def _invalidate_cache_on_block_change(
     """
     Invalida cache de availability ao modificar AvailabilityBlock.
 
-    ASQ-007: Scoped invalidation — only bumps version for the affected user.
+    ASQ-007: Scoped invalidation — the conflict-check version (`avail_ver`) bumps only for the
+    affected user; the monthly grid uses one global version, bumped by every change (item 38).
     """
     invalidate_availability_cache(usuario_id=getattr(instance, "usuario_id", None))
 

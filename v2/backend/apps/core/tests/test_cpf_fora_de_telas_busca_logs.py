@@ -135,6 +135,20 @@ def test_coordenador_continua_achando_por_nome(alvo, g):
     assert alvo.id in _ids(resp)
 
 
+def test_item38_coordenador_acha_pelo_nome_completo(alvo, g):
+    """Item 38 (ensaio r2): nome e sobrenome no mesmo termo não achavam ninguém."""
+    coord = _coord_em(g)
+    resp = _client(coord).get("/api/lookup/usuarios/", {"q": "Maria Alvo"})
+    assert alvo.id in _ids(resp)
+
+
+def test_item38_nome_mais_pedaco_do_cpf_nao_acha_ninguem(alvo, g):
+    """A busca por palavra olha só o nome: um pedaço do CPF ao lado do nome não vira oráculo."""
+    coord = _coord_em(g)
+    resp = _client(coord).get("/api/lookup/usuarios/", {"q": f"Maria {alvo.cpf[:6]}"})
+    assert _ids(resp) == set()
+
+
 def _conceicao(**extra):
     """Nome acentuado com e-mail sem acento e com dígito: quem digita sem acento acha pelo e-mail."""
     u = _conta(nome="Conceição", sobrenome="Lima", **extra)

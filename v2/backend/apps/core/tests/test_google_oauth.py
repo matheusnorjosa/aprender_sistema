@@ -1104,8 +1104,9 @@ class TestViewsOAuthCoverage:
 
         response = client.get("/api/oauth/google/start/")
 
-        assert response.status_code == http_status.HTTP_500_INTERNAL_SERVER_ERROR
-        assert "Configuração OAuth incompleta" in response.data["error"]
+        # Item 38: o start é navegação de página inteira; volta para a tela em vez de 500 em JSON.
+        assert response.status_code == http_status.HTTP_302_FOUND
+        assert response.url.endswith("/pre-agenda?google=error&reason=server_error")
 
     def test_google_oauth_callback_google_error(self, usuario_controle):
         """

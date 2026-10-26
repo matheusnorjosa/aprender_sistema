@@ -139,13 +139,35 @@ def test_controle_start_sem_return_to_continua_em_pre_agenda(mock_build):
 
 @pytest.mark.usefixtures("modo_uniao")  # grupo com capacidade: só vale no modo soma (PR 12)
 @patch("apps.core.views_oauth.build_authorization_url", return_value=GOOGLE_AUTH_URL)
-def test_apoio_sem_setor_start_403_no_setor_scope(mock_build):
-    """M12-15: quem não pode publicar nada (sem gerência de APOIO vigente) não recebe token Google."""
-    resp = _cliente(_apoio_sem_setor()).get("/api/oauth/google/start/")
+@pytest.mark.parametrize("params", [{"return_to": PAGINA_PUBLICACAO}, {}])
+def test_apoio_sem_setor_start_volta_para_a_tela_com_no_setor_scope(mock_build, params):
+    """M12-15: quem não pode publicar nada (sem gerência de APOIO vigente) não recebe token Google.
 
-    assert resp.status_code == status.HTTP_403_FORBIDDEN
-    assert resp.data["code"] == "no_setor_scope"
+    Item 38 (ensaio r2): o start é aberto por navegação de página inteira, e o 403 em JSON deixava a
+    pessoa numa página de JSON. Volta para a tela de origem com o parâmetro que o callback já usa.
+    """
+    resp = _cliente(_apoio_sem_setor()).get("/api/oauth/google/start/", params)
+
+    assert resp.status_code == status.HTTP_302_FOUND
+    assert resp.url.endswith(f"{PAGINA_PUBLICACAO}?google=error&reason=no_setor_scope")
     mock_build.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        {"side_effect": ValueError("GCAL_OAUTH_CLIENT_ID não configurado")},
+        {"return_value": "https://evil.example.com/o/oauth2/v2/auth"},
+    ],
+    ids=["config_incompleta", "url_inesperada"],
+)
+def test_start_com_configuracao_oauth_quebrada_volta_para_a_tela_com_server_error(build, apoio_fluir):
+    """Item 38: a configuração OAuth quebrada respondia 500 em JSON na navegação de página inteira."""
+    with patch("apps.core.views_oauth.build_authorization_url", **build):
+        resp = _cliente(apoio_fluir).get("/api/oauth/google/start/", {"return_to": PAGINA_PUBLICACAO})
+
+    assert resp.status_code == status.HTTP_302_FOUND
+    assert resp.url.endswith(f"{PAGINA_PUBLICACAO}?google=error&reason=server_error")
 
 
 @patch("apps.core.views_oauth.build_authorization_url", return_value=GOOGLE_AUTH_URL)

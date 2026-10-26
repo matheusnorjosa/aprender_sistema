@@ -13,7 +13,7 @@ Estes testes provam que, após o fix:
 - o caminho de UPDATE que usa `bulk_create` (que NÃO dispara post_save) também
   invalida, via invalidação explícita em `_update_formadores`;
 - convidados externos (usuario_id None) não quebram o receiver;
-- a versão da grade mensal (`monthly_ver:<id>`) é bumpada para o participante.
+- a versão da grade mensal (`monthly_ver`, única para todos desde o item 38) é bumpada.
 """
 
 # pyright: reportMissingParameterType=false, reportUnknownParameterType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportOptionalMemberAccess=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportMissingTypeArgument=false, reportCallIssue=false, reportIndexIssue=false, reportOperatorIssue=false, reportOptionalSubscript=false, reportUnknownLambdaType=false, reportPrivateUsage=false
@@ -157,18 +157,17 @@ class TestParticipationCacheInvalidation:
         part.delete()  # delete também não quebra
 
     def test_criar_participation_bumpa_monthly_ver_do_formador(self):
-        """A grade mensal (monthly_ver:<id>) é bumpada para o participante afetado."""
+        """A grade mensal é invalidada (item 38: a versão é única para todos que olham)."""
         formador = _make_user("form")
         coord = _make_user("coord")
         municipio = MunicipioFactory()
         inicio = timezone.now() + timedelta(days=7, hours=9)
         fim = inicio + timedelta(hours=2)
 
-        # Estado conhecido da versão mensal do formador.
-        cache.set(f"monthly_ver:{formador.id}", 5, timeout=3600)
-
         evento = _evento_aprovado(criador=coord, municipio=municipio, inicio=inicio, fim=fim)
+        # Estado conhecido da versão da grade DEPOIS do evento (que já bumpou pelo sinal).
+        cache.set("monthly_ver:__global__", 5, timeout=3600)
         Participation.objects.create(solicitacao=evento, usuario=formador, role=Participation.Role.FORMADOR)
 
-        # A invalidação bumpa a versão mensal do formador (não do criador).
-        assert cache.get(f"monthly_ver:{formador.id}") == 6
+        # A invalidação bumpa a versão da grade (única para todos desde o item 38).
+        assert cache.get("monthly_ver:__global__") == 6

@@ -83,7 +83,7 @@ class TestApprovalCacheParticipants:
         assert check_conflicts(usuario=formador, inicio=inicio, fim=fim, municipio=municipio).ok is False
 
     def test_aprovar_bumpa_monthly_ver_do_participante(self):
-        """A aprovação também invalida a grade mensal (monthly_ver) do participante."""
+        """A aprovação também invalida a grade mensal (monthly_ver; única para todos desde o item 38)."""
         coord = _make_user("coord")
         formador = _make_user("form")
         municipio = MunicipioFactory()
@@ -94,11 +94,12 @@ class TestApprovalCacheParticipants:
         Participation.objects.create(solicitacao=evento, usuario=formador, role=Participation.Role.FORMADOR)
 
         # Fixa um valor conhecido DEPOIS da criação da Participation (que já bumpou via #1556).
-        cache.set(f"monthly_ver:{formador.id}", 5, timeout=3600)
+        cache.set("monthly_ver:__global__", 5, timeout=3600)
 
         approve_solicitacao(solicitacao=evento, user=_make_user("super"), request=_req())
 
-        assert cache.get(f"monthly_ver:{formador.id}") == 6
+        # A aprovação bumpa a versão ao menos uma vez (evento + cada participante).
+        assert cache.get("monthly_ver:__global__") > 5
 
     def test_aprovar_nao_bumpa_convidado_externo(self):
         """Convidado externo (usuario_id None) não tem disponibilidade — não deve quebrar."""

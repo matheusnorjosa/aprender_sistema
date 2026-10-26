@@ -108,6 +108,29 @@ describe('LoginPage', () => {
       );
     });
 
+    // Item 38: a conta bloqueada recebia a frase da senha errada, até com a senha certa.
+    test('conta bloqueada (400 ACCOUNT_LOCKED): diz que está bloqueada, quanto esperar e que o DAT pode redefinir', async () => {
+      loginMock.mockRejectedValue(
+        erroHttp(400, { retryAfter: 840, response: { status: 400, data: { code: 'ACCOUNT_LOCKED' } } }),
+      );
+      render(<LoginPage />);
+
+      await tentarEntrar();
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'O acesso está bloqueado temporariamente por excesso de tentativas. Aguarde cerca de 14 minutos e tente de novo, ou peça ao DAT para redefinir sua senha.',
+      );
+    });
+
+    test('conta bloqueada sem tempo de espera: "alguns minutos"', async () => {
+      loginMock.mockRejectedValue(erroHttp(400, { response: { status: 400, data: { code: 'ACCOUNT_LOCKED' } } }));
+      render(<LoginPage />);
+
+      await tentarEntrar();
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Aguarde alguns minutos e tente de novo');
+    });
+
     test('muitas tentativas da rede (429): diz quanto esperar e que a senha não foi recusada', async () => {
       loginMock.mockRejectedValue(erroHttp(429, { retryAfter: 37 }));
       render(<LoginPage />);

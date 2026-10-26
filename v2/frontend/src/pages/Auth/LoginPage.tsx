@@ -43,17 +43,21 @@ function tempoDeEspera(segundos: number | undefined): string {
 }
 
 /**
- * Frase do erro ao entrar, por causa. Decide pelo STATUS (a falha de login responde
- * `{error}`, sem `code`). Senha errada e bloqueio por tentativas têm a MESMA frase de
- * propósito: o servidor não revela o bloqueio (#745).
+ * Frase do erro ao entrar, por causa. Decide pelo STATUS e, no 400, pelo `code`: a conta
+ * bloqueada por tentativas responde `code: ACCOUNT_LOCKED` + `Retry-After` (item 38); a
+ * senha errada responde só `{error}`.
  */
 function mensagemDoErroDeLogin(error: unknown): string {
   if (error instanceof TypeError) {
     return 'Sem conexão com o servidor. Confira a internet e tente de novo. Sua senha não foi recusada.';
   }
-  const { status, retryAfter } = error as ErroHttp;
+  const { status, retryAfter, response } = error as ErroHttp;
   if (status === 429) {
     return `Muitas tentativas de entrada vindas desta rede. Aguarde ${tempoDeEspera(retryAfter)} e tente de novo. Sua senha não foi recusada.`;
+  }
+  if (status === 400 && (response?.data as { code?: string } | undefined)?.code === 'ACCOUNT_LOCKED') {
+    const espera = retryAfter ? tempoDeEspera(retryAfter) : 'alguns minutos';
+    return `O acesso está bloqueado temporariamente por excesso de tentativas. Aguarde ${espera} e tente de novo, ou peça ao DAT para redefinir sua senha.`;
   }
   if (status === 400) {
     return 'CPF ou senha incorretos. Depois de 10 erros o acesso fica bloqueado por alguns minutos.';

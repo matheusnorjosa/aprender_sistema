@@ -197,8 +197,11 @@ monthly:v8:{monthly_ver}:{sha256 do JSON [year, month, role, cache_scope, setor,
   novo em Configurações vale na consulta seguinte. `v6` entrou em 05/10/2026 com a CH com teto;
   `v7`, em 16/10/2026, com o S5 (nome e e-mail sem CPF, `q` com dígito não casa o e-mail).
 
-- `monthly_ver` = `get_monthly_cache_version(request.user.id)` (em `MonthlyAvailabilityView.get`) — permite invalidar
-  por usuário sem varrer o Redis.
+- `monthly_ver` = `get_monthly_cache_version()` (em `MonthlyAvailabilityView.get`), a versão única
+  `monthly_ver:__global__`. Toda mudança de bloqueio, evento ou participação sobe essa versão
+  (`invalidate_availability_cache` → `_invalidate_monthly_cache`), então a grade de **todos** que olham
+  refaz na consulta seguinte, sem varrer o Redis. Até 26/10/2026 (item 38) a chave levava a versão de
+  quem olha e a mudança subia só a do dono: a agenda de outra pessoa ficava velha por até ~5 min.
 - `cache_scope` ∈ `{"wide", "user:{id}", "gerencia:{id}"}` (decidido no ramo de `gerencia_id` de `MonthlyAvailabilityView.get`) — **substitui** o
   `gerencia_id` cru da chave antiga. É o que impede vazamento entre escopos.
 

@@ -235,14 +235,14 @@ def test_login_failed_redige_cpf_no_details_username(api_client, cpf_username):
 
 
 @override_settings(ACCOUNT_LOCKOUT_THRESHOLD=1, ACCOUNT_LOCKOUT_DURATION=900)
-def test_login_locked_account_returns_generic_error_response(api_client, usuario_ativo):
+def test_login_locked_account_says_it_is_locked(api_client, usuario_ativo):
     """
-    Conta bloqueada deve retornar a mesma resposta genérica de credencial inválida.
+    Item 38: conta bloqueada diz que é bloqueio (antes era a resposta genérica, #745).
 
     Valida:
     - Status 400 (não 403) mesmo em lockout
-    - Sem campos sensíveis (locked/remaining_attempts/lockout_minutes)
-    - Detalhes de lockout mantidos apenas em AuditLog
+    - `code = ACCOUNT_LOCKED` + `Retry-After`; sem contagem de tentativas restantes
+    - Detalhes de lockout mantidos em AuditLog
     """
     # 1ª tentativa inválida: incrementa contador para atingir lockout (threshold=1)
     first = api_client.post(
@@ -251,15 +251,16 @@ def test_login_locked_account_returns_generic_error_response(api_client, usuario
     assert first.status_code == status.HTTP_400_BAD_REQUEST
     assert first.data == {"error": "Credenciais inválidas."}
 
-    # 2ª tentativa: conta já bloqueada internamente, resposta pública continua genérica
+    # 2ª tentativa: conta já bloqueada
     locked = api_client.post(
         "/api/auth/login/", {"username": usuario_ativo.username, "password": "wrongpass"}, format="json"
     )
     assert locked.status_code == status.HTTP_400_BAD_REQUEST
-    assert locked.data == {"error": "Credenciais inválidas."}
-    assert "locked" not in locked.data
-    assert "remaining_attempts" not in locked.data
-    assert "lockout_minutes" not in locked.data
+    assert locked.data == {
+        "error": "Acesso bloqueado temporariamente por excesso de tentativas.",
+        "code": "ACCOUNT_LOCKED",
+    }
+    assert 0 < int(locked["Retry-After"]) <= 900
 
     blocked_log = AuditLog.objects.filter(action="LOGIN_BLOCKED").latest("created_at")
     assert blocked_log.details["username"] == usuario_ativo.username
@@ -267,14 +268,10 @@ def test_login_locked_account_returns_generic_error_response(api_client, usuario
 
 
 @override_settings(ACCOUNT_LOCKOUT_THRESHOLD=1, ACCOUNT_LOCKOUT_DURATION=900)
-def test_login_failure_response_is_uniform_across_invalid_nonexistent_and_locked(api_client, usuario_ativo):
+def test_login_failure_response_is_uniform_across_invalid_and_nonexistent(api_client, usuario_ativo):
     """
-    Cenários de falha de autenticação devem ter payload idêntico (anti-enumeração).
-
-    Valida:
-    - Senha inválida (usuário existente)
-    - Usuário inexistente
-    - Conta bloqueada por lockout
+    Anti-enumeração: senha errada e usuário inexistente têm payload idêntico; o bloqueio também
+    é idêntico para os dois (item 38: o bloqueio conta pelo identificador digitado).
     """
     expected = {"error": "Credenciais inválidas."}
 
@@ -283,6 +280,7 @@ def test_login_failure_response_is_uniform_across_invalid_nonexistent_and_locked
     )
     nonexistent = api_client.post("/api/auth/login/", {"username": "ghost_user_123", "password": "wrongpass"})
     locked = api_client.post("/api/auth/login/", {"username": usuario_ativo.username, "password": "wrongpass"})
+    locked_nonexistent = api_client.post("/api/auth/login/", {"username": "ghost_user_123", "password": "wrongpass"})
 
     assert invalid_existing.status_code == status.HTTP_400_BAD_REQUEST
     assert nonexistent.status_code == status.HTTP_400_BAD_REQUEST
@@ -290,7 +288,8 @@ def test_login_failure_response_is_uniform_across_invalid_nonexistent_and_locked
 
     assert invalid_existing.data == expected
     assert nonexistent.data == expected
-    assert locked.data == expected
+    assert locked.data == locked_nonexistent.data
+    assert locked.data["code"] == "ACCOUNT_LOCKED"
 
 
 @patch("apps.core.auth_backends._hash_falso")
@@ -443,7 +442,7 @@ def test_lockout_compartilha_bucket_entre_grafias_do_mesmo_cpf(api_client, usuar
 
     RED (bug M03-03): cada grafia é um bucket independente → a senha correta na grafia
     mascarada autentica (200). GREEN: o bucket é derivado do identificador canônico →
-    a conta está bloqueada e a resposta é a genérica 400.
+    a conta está bloqueada (400 ACCOUNT_LOCKED).
     """
     # Bypass do throttle: este teste é sobre LOCKOUT (precisa de >10 POSTs). O rate de
     # login em CI é 10/min e mascararia o lockout com 429 — concerns separados.
@@ -455,7 +454,7 @@ def test_lockout_compartilha_bucket_entre_grafias_do_mesmo_cpf(api_client, usuar
         # Senha CORRETA, mas na grafia mascarada → deve estar bloqueado (mesmo bucket do CPF cru).
         locked = _post_login(api_client, _CPF_MASCARA, "testpass123")
     assert locked.status_code == status.HTTP_400_BAD_REQUEST
-    assert locked.data == {"error": "Credenciais inválidas."}
+    assert locked.data["code"] == "ACCOUNT_LOCKED"
 
 
 @override_settings(ACCOUNT_LOCKOUT_THRESHOLD=100)  # isola o caminho GLOBAL (IP-path nunca dispara)

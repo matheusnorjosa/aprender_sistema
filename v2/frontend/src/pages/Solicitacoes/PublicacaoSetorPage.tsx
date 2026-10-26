@@ -70,6 +70,8 @@ const OAUTH_ERROR_TEXT: Record<string, string> = {
   validation:
     'Não foi possível validar essa conta Google. Conecte com a sua conta corporativa (e-mail de trabalho).',
   invalid_state: 'A conexão com o Google expirou ou foi interrompida. Tente conectar de novo.',
+  // Item 38: o início do OAuth também volta com este motivo; o alerta da DAT logo abaixo diz o que fazer.
+  no_setor_scope: 'A conta Google não foi conectada porque seu cadastro não tem setor vigente.',
 };
 const OAUTH_ERROR_FALLBACK =
   'Não foi possível conectar sua conta Google. Tente de novo; se o erro continuar, avise o Controle.';

@@ -446,6 +446,22 @@ describe('PublicacaoSetorPage — conexão e prontidão', () => {
     );
   });
 
+  test('(e) item 38: volta do start com ?google=error&reason=no_setor_scope diz por que não conectou, sem mandar tentar de novo', async () => {
+    googleHook.status = { ...NOT_CONNECTED, publishBlockReason: 'no_setor_scope' };
+    renderPage('/solicitacoes/publicacao?google=error&reason=no_setor_scope');
+
+    const err = await screen.findByText(
+      'A conta Google não foi conectada porque seu cadastro não tem setor vigente.',
+    );
+    expect(err.closest('[role="alert"]')).not.toBeNull();
+    expect(
+      screen.getByText(
+        'Seu cadastro não tem setor vigente. Peça à DAT para cadastrar seu vínculo de gerência.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Tente de novo/)).not.toBeInTheDocument();
+  });
+
   test('(e) motivo desconhecido cai na copy genérica', async () => {
     renderPage('/solicitacoes/publicacao?google=error&reason=server_error');
     expect(

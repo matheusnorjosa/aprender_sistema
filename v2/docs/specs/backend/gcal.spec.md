@@ -1,7 +1,7 @@
 ---
 title: Integração Google Calendar + Meet
 status: canonical
-last_verified: 2026-10-20
+last_verified: 2026-10-26
 verified_at_commit: 804df36a1741d1faa53586eafade5c4c74c0659d
 sources_of_truth:
   - v2/backend/apps/core/services/gcal_client_factory.py
@@ -106,7 +106,7 @@ Ações sobre `Solicitacao` (DRF `@action`, todas `CanUseGcal | CanPublishSetorS
 
 Fluxo OAuth (em [`urls.py`](../../../backend/apps/core/urls.py), sob prefixo `/api/`):
 
-- `GET /api/oauth/google/start/?return_to=…` → redireciona para o consent do Google (state CSRF em cache, TTL 10min). Aberto a `use_gcal` e à Apoio com setor vigente.
+- `GET /api/oauth/google/start/?return_to=…` → redireciona para o consent do Google (state CSRF em cache, TTL 10min). Aberto a `use_gcal` e à Apoio com setor vigente. A rota é aberta por navegação de página inteira, então dois erros do início também redirecionam: sem setor vigente volta para o `return_to` com `?google=error&reason=no_setor_scope`, e configuração OAuth incompleta ou URL de consentimento inesperada volta com `reason=server_error` — o mesmo contrato do callback (item 38, 26/10/2026; antes eram 403 e 500 em JSON). Só esses: o `429` do throttle (`OAuthThrottle`) e o `403` de permissão (`CanUseGcal | CanPublishSetorSolicitacao`) acontecem antes da view e seguem em JSON.
 - `GET /api/oauth/google/callback/` → troca código por tokens, cria `GoogleOAuthCredential` (sem `default_calendar_id`: quem escolhe o calendário é o servidor).
 - `GET /api/integrations/google/status/` → estado da credencial + `publish_ready` e `publish_block_reason` (`no_setor_scope` | `google_not_connected` | `google_calendar_not_configured` | `null`) + `reconnect_required` (bool: o sistema removeu a conexão e a pessoa não reconectou; sempre `false` com credencial), calculados localmente, sem chamar o Google.
 - `GET /api/gcal/dashboard/alerts/summary/` (`CanUseGcal`) → além das contagens por `gcal_status`, `google_reconnect: {"count": int, "users": [{"id": int, "nome": str}]}` — quem precisa reconectar, ordenado por nome, sem e-mail/CPF (`nome` = `str(usuario)`), independente de `start`/`end`.

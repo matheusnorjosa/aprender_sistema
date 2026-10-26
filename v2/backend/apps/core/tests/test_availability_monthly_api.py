@@ -423,3 +423,57 @@ def test_grade_guardada_na_chave_antiga_nao_e_lida(api_client, user_auth):
     assert resposta.status_code == 200
     assert resposta.json() != {"grade": "ANTIGA"}
     assert lidas and not any(key.startswith("monthly:v8:") for key in lidas)
+
+
+def test_item38_bloqueio_de_ana_aparece_e_some_na_hora_na_grade_vista_por_outra_pessoa(user_auth, setup_data):
+    """Item 38 (ensaio r2): a grade em cache levava a versão de QUEM OLHA (`monthly_ver:<quem olha>`),
+    e o bloqueio de Ana só subia a versão dela. Quem olhava a agenda de Ana via a grade velha por
+    até ~5 min. Agora toda mudança de bloqueio/evento/participação invalida a grade de todos.
+    """
+    cache.clear()
+    ana = setup_data["ana"]
+    params = {"year": 2025, "month": 10, "role": "FORMADOR"}
+    quem_olha = APIClient()
+    quem_olha.force_authenticate(user=user_auth)
+    cliente_ana = APIClient()
+    cliente_ana.force_authenticate(user=ana)
+
+    def dia_12_de_ana() -> str:
+        data = quem_olha.get("/api/availability/monthly/", params).json()
+        linha = [p["email"] for p in data["people"]].index("ana@example.com")
+        return data["cells"][linha][11]
+
+    antes = dia_12_de_ana()  # a grade fica em cache para quem olha
+    assert antes != "T"
+
+    criado = cliente_ana.post(
+        "/api/availability-blocks/",
+        {"inicio": "2025-10-12T08:00:00-03:00", "fim": "2025-10-12T18:00:00-03:00", "tipo": "T"},
+        format="json",
+    )
+    assert criado.status_code == 201, criado.content
+    assert dia_12_de_ana() == "T"
+
+    assert cliente_ana.delete(f"/api/availability-blocks/{criado.json()['id']}/").status_code == 204
+    assert dia_12_de_ana() == antes
+
+
+@pytest.mark.parametrize("q", ["Ana Silva", "  ana   SILVA ", "Silva Ana", "An Silv"])
+def test_item38_buscar_nome_completo_acha_a_pessoa(user_auth, setup_data, q):
+    """Item 38 (ensaio r2): "Buscar nome" com nome e sobrenome não achava ninguém, porque o termo
+    inteiro era comparado com `first_name` OU `last_name`. Cada palavra casa num dos dois."""
+    cache.clear()
+    cliente = APIClient()
+    cliente.force_authenticate(user=user_auth)
+    data = cliente.get("/api/availability/monthly/", {"year": 2025, "month": 10, "role": "FORMADOR", "q": q}).json()
+    assert [p["email"] for p in data["people"]] == ["ana@example.com"]
+
+
+@pytest.mark.parametrize("q", ["Ana Costa", "Ana 11111111111", "Ana example"])
+def test_item38_nome_completo_nao_mistura_pessoas_nem_busca_cpf_ou_email(user_auth, setup_data, q):
+    """Toda palavra precisa casar no nome da MESMA pessoa; o CPF e o e-mail não entram por palavra."""
+    cache.clear()
+    cliente = APIClient()
+    cliente.force_authenticate(user=user_auth)
+    data = cliente.get("/api/availability/monthly/", {"year": 2025, "month": 10, "role": "FORMADOR", "q": q}).json()
+    assert data["people"] == []

@@ -402,3 +402,24 @@ def test_f8_chave_nao_colide_por_dois_pontos_nem_por_setor_ausente():
         **base, sector="ACerta", q="ana"
     )
     assert chave_cache_grade(**base, sector="", q="") == chave_cache_grade(**base, sector=None, q=None)
+
+
+def test_grade_guardada_na_chave_antiga_nao_e_lida(api_client, user_auth):
+    """A aba Coordenadores passou a seguir a regra de ocupação (item 38, 20/10/2026): a grade
+    guardada antes do deploy marcava quem não acompanha e não pode ser servida por até 5 min."""
+    from unittest.mock import patch
+
+    api_client.force_authenticate(user=user_auth)
+    lidas: list[str] = []
+
+    def get_com_chave_antiga_povoada(key, *args, **kwargs):
+        lidas.append(key)
+        return {"grade": "ANTIGA"} if key.startswith("monthly:v8:") else None
+
+    with patch("apps.core.views_availability_monthly.cache") as cache_mock:
+        cache_mock.get.side_effect = get_com_chave_antiga_povoada
+        resposta = api_client.get("/api/availability/monthly/", {"year": 2026, "month": 12, "role": "COORDENADOR"})
+
+    assert resposta.status_code == 200
+    assert resposta.json() != {"grade": "ANTIGA"}
+    assert lidas and not any(key.startswith("monthly:v8:") for key in lidas)

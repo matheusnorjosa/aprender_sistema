@@ -223,6 +223,24 @@ class TestGradeEPainel:
 
         assert ch == {coordenador.id: 4.0, outro.id: 0.0}
 
+    def test_aba_coordenadores_so_marca_o_dia_de_quem_acompanha(self, coordenador, projeto_super):
+        # Mesma regra de ocupação do motor de conflito (`ocupa_agenda_q`): o responsável que
+        # não acompanha não fica com E no dia do evento (item 38).
+        outro = UsuarioFactory(username="coord_ch_2", email="coord_ch_2@example.invalid", first_name="Duda")
+        for coord, acompanha in ((coordenador, True), (outro, False)):
+            sol = _evento(
+                _local(DIA, 8), _local(DIA, 12), coordenador=coord, acompanha=acompanha, projeto=projeto_super
+            )
+            Participation.objects.create(solicitacao=sol, usuario=coord, role=Participation.Role.COORDENADOR)
+
+        grade = build_monthly_grid(year=2026, month=3, role="COORDENADOR")
+        linha = {p["id"]: i for i, p in enumerate(grade["people"])}
+        coluna = DIA.day - 1
+
+        assert grade["cells"][linha[coordenador.id]][coluna] == "E"
+        assert grade["cells"][linha[outro.id]][coluna] == ""
+        assert f"{linha[outro.id]}:{coluna}" not in grade["details_index"]
+
     def test_grade_e_painel_dao_o_mesmo_numero(self, formador, projeto_super, monkeypatch):
         _evento(_local(DIA, 7), _local(DIA, 23), formador=formador, projeto=projeto_super)
         _evento(_local(date(2026, 3, 20), 7), _local(date(2026, 3, 20), 12), formador=formador)

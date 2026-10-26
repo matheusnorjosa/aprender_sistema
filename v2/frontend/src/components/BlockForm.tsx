@@ -105,7 +105,7 @@ export default function BlockForm({ onSubmit }: BlockFormProps): JSX.Element {
             { required: true, message: 'Informe a data/hora de início!' },
             { validator: validateDateRange },
           ]}
-          help="Selecione a data e hora de início do bloqueio"
+          extra="Selecione a data e hora de início do bloqueio"
         >
           <DatePicker
             showTime
@@ -124,7 +124,7 @@ export default function BlockForm({ onSubmit }: BlockFormProps): JSX.Element {
             { required: true, message: 'Informe a data/hora de fim!' },
             { validator: validateDateRange },
           ]}
-          help="Selecione a data e hora de término do bloqueio"
+          extra="Selecione a data e hora de término do bloqueio"
         >
           <DatePicker
             showTime
@@ -154,7 +154,7 @@ export default function BlockForm({ onSubmit }: BlockFormProps): JSX.Element {
         <Form.Item
           name="motivo"
           label="Motivo (opcional)"
-          help="Descreva o motivo do bloqueio (férias, compromisso, etc.)"
+          extra="Descreva o motivo do bloqueio (férias, compromisso, etc.)"
         >
           <TextArea rows={3} placeholder="Ex: Férias, compromisso pessoal, etc." maxLength={500} showCount />
         </Form.Item>

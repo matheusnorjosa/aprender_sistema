@@ -197,7 +197,10 @@ const nomeDaCompra = (record: CompraRecord): string =>
 
 export default function ComprasPage(): JSX.Element {
   // Celular (abaixo de sm): o projeto e o município vão junto do produto e as ações para o menu.
-  const acoesCompactas = !Grid.useBreakpoint().sm;
+  const telas = Grid.useBreakpoint();
+  const acoesCompactas = !telas.sm;
+  // Projeto e Município só viram colunas juntas a partir de lg: abaixo disso, vão embaixo do produto.
+  const apoioNoProduto = !telas.lg;
   // O destroy exige `execute_restricted_operations` (item 38: o Controle via Excluir e levava 403).
   const podeExcluir = useAcesso().caps.canExecuteRestrictedOperations;
   // Options for dropdowns
@@ -346,7 +349,7 @@ export default function ComprasPage(): JSX.Element {
   };
 
   // Sem rolagem horizontal (padrão responsivo, item 38): sempre na linha o produto (com o projeto
-  // e o município, no celular) e as ações; Projeto e Coleção (a única que ordena) a partir de lg; o
+  // e o município, abaixo de lg) e as ações; Projeto e Coleção (a única que ordena) a partir de lg; o
   // resto por largura e, abaixo dela, na linha expandida. Etiquetas quebram linha em vez de passar.
   const columns: ColunaResponsiva<CompraRecord>[] = useMemo(() => [
     {
@@ -363,7 +366,7 @@ export default function ComprasPage(): JSX.Element {
               </Text>
             </div>
           )}
-          {acoesCompactas && (
+          {apoioNoProduto && (
             <div>
               <Text type="secondary" className="break-words">
                 {`${record.projeto_nome} · ${record.municipio_nome} - ${record.municipio_uf ?? record.uf ?? ''}`}
@@ -510,7 +513,7 @@ export default function ComprasPage(): JSX.Element {
         />
       ),
     },
-  ], [acoesCompactas, podeExcluir]);
+  ], [acoesCompactas, apoioNoProduto, podeExcluir]);
 
   return (
     <section className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }} aria-labelledby="compras-title">
@@ -723,7 +726,10 @@ export default function ComprasPage(): JSX.Element {
 
             return (
               <Text strong>
-                {`Total da página: quantidade ${totalQtd.toLocaleString('pt-BR')} · utilizado ${totalUtilizado.toLocaleString('pt-BR')} · disponível ${totalDisponivel.toLocaleString('pt-BR')}`}
+                {`Total da página: quantidade ${totalQtd.toLocaleString('pt-BR')} · utilizado ${totalUtilizado.toLocaleString('pt-BR')} · disponível `}
+                <Text type={totalDisponivel > 0 ? 'success' : 'danger'}>
+                  {totalDisponivel.toLocaleString('pt-BR')}
+                </Text>
               </Text>
             );
           }}

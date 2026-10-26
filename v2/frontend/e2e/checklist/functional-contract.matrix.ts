@@ -42,8 +42,9 @@ export const FUNCTIONAL_CRITICAL_MATRIX: FunctionalMatrixCase[] = [
       {
         field: 'Tabela de compras renderiza resumo da página',
         endpoint: '/api/dat/compras-materiais/',
-        selector: 'table',
-        expectedText: 'Total da Página',
+        // Item 38: o total saiu do <table> (summary) para o rodapé da tabela.
+        selector: '.ant-table-footer',
+        expectedText: 'Total da página',
       },
     ],
   },

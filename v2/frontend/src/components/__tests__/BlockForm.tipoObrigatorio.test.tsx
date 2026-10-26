@@ -32,3 +32,19 @@ describe('BlockForm: tipo do bloqueio sem valor de fábrica', () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 });
+
+describe('BlockForm: mensagens de validação das datas aparecem', () => {
+  test('enviar sem início e fim mostra o que falta, com a explicação do campo junto', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<BlockForm onSubmit={onSubmit} />);
+
+    await user.click(screen.getByRole('button', { name: 'Criar Bloqueio' }));
+
+    expect(await screen.findByText('Informe a data/hora de início!')).toBeInTheDocument();
+    expect(screen.getByText('Informe a data/hora de fim!')).toBeInTheDocument();
+    expect(screen.getByText('Selecione a data e hora de início do bloqueio')).toBeInTheDocument();
+    expect(screen.getByText('Selecione a data e hora de término do bloqueio')).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+});

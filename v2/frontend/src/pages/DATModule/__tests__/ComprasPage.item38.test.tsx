@@ -187,7 +187,27 @@ describe('Compras sem rolagem horizontal', () => {
     renderPagina();
     await linhaPelaAcao(`Mais ações: ${COMPRA}`);
 
-    expect(screen.getByText('Total da página: quantidade 200 · utilizado 40 · disponível 160')).toBeInTheDocument();
+    const rodape = document.querySelector<HTMLElement>('.ant-table-footer');
+    expect(rodape?.textContent).toBe('Total da página: quantidade 200 · utilizado 40 · disponível 160');
+    // O disponível mantém a cor de antes (verde se sobra, vermelho se não).
+    expect(within(rodape!).getByText('160')).toHaveClass('ant-typography-success');
+  });
+
+  test('entre 576 e 991 px: projeto e município embaixo do produto (as colunas ainda não estão todas)', async () => {
+    definirLarguraTela(700);
+    renderPagina();
+    const linha = await linhaPelaAcao(`Editar: ${COMPRA}`);
+
+    expect(cabecalhos()).not.toContain('Projeto');
+    expect(cabecalhos()).not.toContain('Município');
+    expect(within(linha).getByText('NOVO LENDO 1 · Fortaleza - CE')).toBeInTheDocument();
+  });
+
+  test('a 1280 px: projeto e município só nas colunas, não repetidos embaixo do produto', async () => {
+    renderPagina();
+    const linha = await linhaPelaAcao(`Editar: ${COMPRA}`);
+
+    expect(within(linha).queryByText('NOVO LENDO 1 · Fortaleza - CE')).not.toBeInTheDocument();
   });
 });
 

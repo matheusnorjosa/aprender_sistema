@@ -595,7 +595,7 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
         # Import local: views_auth -> views.utils -> pacote views -> serializers (ciclo).
         from apps.core.views_auth import limpar_bloqueio_da_conta
 
-        transaction.on_commit(lambda: limpar_bloqueio_da_conta(user))
+        transaction.on_commit(lambda: limpar_bloqueio_da_conta(user), robust=True)
         auditar_reset_senha(actor=actor, target_user=user, contexto=contexto, imediato=True)
 
     @transaction.atomic

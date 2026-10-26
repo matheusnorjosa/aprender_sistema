@@ -96,9 +96,6 @@ export default function BlockForm({ onSubmit }: BlockFormProps): JSX.Element {
         layout="vertical"
         autoComplete="off"
         onFinish={handleSubmit}
-        initialValues={{
-          tipo: 'T',
-        }}
       >
         {/* Data/Hora Início */}
         <Form.Item
@@ -138,12 +135,14 @@ export default function BlockForm({ onSubmit }: BlockFormProps): JSX.Element {
           />
         </Form.Item>
 
-        {/* Tipo de Bloqueio */}
+        {/* Tipo de Bloqueio. Item 38: sem valor de fábrica. Com "Total" pré-marcado, o Enter na
+            data criava um bloqueio total sem a pessoa escolher; agora sem tipo não envia. A
+            explicação vai em `extra` (o `help` esconderia a mensagem de obrigatório). */}
         <Form.Item
           name="tipo"
           label="Tipo de Bloqueio"
-          rules={[{ required: true, message: 'Selecione o tipo de bloqueio!' }]}
-          help="Total (T): indisponível em todo o período. Parcial (P): indisponível parcialmente"
+          rules={[{ required: true, message: 'Escolha o tipo do bloqueio.' }]}
+          extra="Total (T): indisponível em todo o período. Parcial (P): indisponível parcialmente"
         >
           <Select placeholder="Selecione o tipo">
             <Option value="T">Total (T)</Option>

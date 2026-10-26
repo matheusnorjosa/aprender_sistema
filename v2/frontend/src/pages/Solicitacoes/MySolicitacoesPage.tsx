@@ -106,8 +106,16 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
       'Este evento já está no Google Agenda. Para mudar, peça ao Apoio de Coordenação da sua gerência ou ao Controle que cancele a publicação; depois disso, você consegue editar aqui.'
     );
   } else if (isPublished) {
+    // Publicar na agenda só lista aprovado de hoje em diante e só tira do Google com o id; evento
+    // passado não volta para o Google, então tirá-lo de lá para editar não tem volta.
+    const consegueTirar =
+      record.status === 'aprovado' &&
+      Boolean(record.external_event_id) &&
+      motivoNaoPublicavel(record) !== 'evento_passado';
     motivos.push(
-      'Este evento já está no Google Agenda: para editar, tire-o do Google antes, na tela Publicar na agenda ou na Pré-agenda; depois disso, você consegue editar aqui.'
+      consegueTirar
+        ? 'Este evento já está no Google Agenda: para editar, tire-o do Google antes, na tela Publicar na agenda ou na Pré-agenda; depois disso, você consegue editar aqui.'
+        : 'Este evento já está no Google Agenda e não dá para editá-lo aqui. Para mudar, fale com a administração do sistema.'
     );
   } else if (noGoogle && !podeTirarDoGoogle && !superForaDePendente) {
     // ERROR: a publicação deu erro, mas o evento pode estar no Google; excluir aqui o tiraria de lá.

@@ -316,20 +316,58 @@ describe('MySolicitacoesPage — Excluir sai do sistema e do Google', { timeout:
     confirmar.mockRestore();
   });
 
-  test('publicado, para quem pode tirar do Google: sem o aviso de pedir ao Apoio', async () => {
+  test.each([
+    ['evento que já passou', { external_event_id: 'asv29' }],
+    ['publicado sem o id do Google', { inicio: '2099-05-10T13:00:00Z', fim: '2099-05-10T17:00:00Z' }],
+  ])('publicado, para quem pode tirar do Google, %s: não manda para Publicar na agenda', async (_caso, extra) => {
     listSolicitacoesMock.mockResolvedValue(
       pagina([
-        makeSolic({ id: 8, municipio_nome: 'Crato', status: 'aprovado', gcal_status: 'PUBLISHED', pode_tirar_do_google: true }),
+        makeSolic({
+          id: 9,
+          municipio_nome: 'Crato',
+          status: 'aprovado',
+          gcal_status: 'PUBLISHED',
+          pode_tirar_do_google: true,
+          ...extra,
+        }),
       ])
     );
     renderPage();
-    expect(await screen.findByRole('button', { name: 'Excluir: 10/05/2026 · Crato' })).toBeInTheDocument();
+    const botao = await screen.findByRole('button', { name: /^Por que não dá para editar: .* · Crato$/ });
+    const informar = vi
+      .spyOn(Modal, 'info')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    fireEvent.click(botao);
+    const texto = String(informar.mock.calls[0]![0].content);
+    // A tela Publicar na agenda não lista evento passado nem oferece tirar do Google sem o id.
+    expect(texto).not.toContain('Publicar na agenda');
+    expect(texto).toContain('administração do sistema');
+    informar.mockRestore();
+  });
+
+  test('publicado, para quem pode tirar do Google: sem o aviso de pedir ao Apoio', async () => {
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([
+        makeSolic({
+          id: 8,
+          municipio_nome: 'Crato',
+          status: 'aprovado',
+          gcal_status: 'PUBLISHED',
+          external_event_id: 'asv28',
+          inicio: '2099-05-10T13:00:00Z',
+          fim: '2099-05-10T17:00:00Z',
+          pode_tirar_do_google: true,
+        }),
+      ])
+    );
+    renderPage();
+    expect(await screen.findByRole('button', { name: 'Excluir: 10/05/2099 · Crato' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Por que não dá para editar nem excluir/ })).not.toBeInTheDocument();
     // Editar continua fechado enquanto está no Google; o motivo diz o que ela mesma pode fazer.
     const informar = vi
       .spyOn(Modal, 'info')
       .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
-    fireEvent.click(screen.getByRole('button', { name: 'Por que não dá para editar: 10/05/2026 · Crato' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Por que não dá para editar: 10/05/2099 · Crato' }));
     const texto = String(informar.mock.calls[0]![0].content);
     expect(texto).toContain('tire-o do Google antes');
     // Diz onde: Minhas Solicitações não tem a ação de tirar do Google.

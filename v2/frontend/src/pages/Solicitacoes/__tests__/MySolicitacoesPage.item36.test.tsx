@@ -261,3 +261,112 @@ describe('MySolicitacoesPage — item 36', { timeout: 20000 }, () => {
     expect(screen.getByText('Crato')).toBeInTheDocument();
   });
 });
+
+// Excluir um evento no Google tira dos dois lados (opção A do dono: sem poder novo). Quem vê Excluir
+// num evento no Google é quem já pode excluir E já pode tirar do Google (`pode_tirar_do_google`).
+describe('MySolicitacoesPage — Excluir sai do sistema e do Google', { timeout: 20000 }, () => {
+  beforeEach(() => {
+    listSolicitacoesMock.mockReset();
+    deleteSolicitacaoMock.mockReset();
+  });
+
+  test.each([
+    { caso: 'publicado', row: { gcal_status: 'PUBLISHED' as const, external_event_id: 'evt-1' } },
+    { caso: 'erro com o evento ainda no Google', row: { gcal_status: 'ERROR' as const, external_event_id: 'evt-1' } },
+  ])('$caso, para quem pode tirar do Google: Excluir aparece e avisa que sai do Google também', async ({ row }) => {
+    const confirmar = vi
+      .spyOn(Modal, 'confirm')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([
+        makeSolic({ id: 7, municipio_nome: 'Crato', projeto_nome: 'Vidas', status: 'aprovado', pode_tirar_do_google: true, ...row }),
+      ])
+    );
+    deleteSolicitacaoMock.mockResolvedValue(undefined);
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Excluir: 10/05/2026 · Crato' }));
+    const opcoes = confirmar.mock.calls[0]![0];
+    expect(opcoes.title).toBe('Excluir evento?');
+    expect(String(opcoes.content)).toBe(
+      '10/05/2026 10:00 · Crato · Vidas. Ele sai do sistema e do Google Agenda, junto com o link do Meet. Não dá para desfazer.'
+    );
+    expect(opcoes).toMatchObject({ autoFocusButton: 'cancel', okText: 'Sim, excluir', cancelText: 'Cancelar' });
+    await act(async () => {
+      await opcoes.onOk?.();
+    });
+    expect(deleteSolicitacaoMock).toHaveBeenCalledWith(7);
+    confirmar.mockRestore();
+  });
+
+  test('publicado, para quem pode tirar do Google: sem o aviso de pedir ao Apoio', async () => {
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([
+        makeSolic({ id: 8, municipio_nome: 'Crato', status: 'aprovado', gcal_status: 'PUBLISHED', pode_tirar_do_google: true }),
+      ])
+    );
+    renderPage();
+    expect(await screen.findByRole('button', { name: 'Excluir: 10/05/2026 · Crato' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Por que não dá para editar nem excluir/ })).not.toBeInTheDocument();
+    // Editar continua fechado enquanto está no Google; o motivo diz o que ela mesma pode fazer.
+    const informar = vi
+      .spyOn(Modal, 'info')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    fireEvent.click(screen.getByRole('button', { name: 'Por que não dá para editar: 10/05/2026 · Crato' }));
+    const texto = String(informar.mock.calls[0]![0].content);
+    expect(texto).toContain('tire-o do Google antes');
+    expect(texto).not.toContain('Apoio de Coordenação');
+    informar.mockRestore();
+  });
+
+  test('erro com o evento ainda no Google, para quem não pode tirar de lá: sem Excluir', async () => {
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([
+        makeSolic({
+          id: 8,
+          municipio_nome: 'Crato',
+          status: 'aprovado',
+          gcal_status: 'ERROR',
+          external_event_id: 'evt-1',
+          pode_tirar_do_google: false,
+        }),
+      ])
+    );
+    renderPage();
+    expect(await screen.findByText('Crato')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Excluir:/ })).not.toBeInTheDocument();
+  });
+
+  test('na planilha (não adotado): sem Excluir mesmo para quem pode tirar do Google', async () => {
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([
+        makeSolic({
+          id: 10,
+          municipio_nome: 'Crato',
+          status: 'aprovado',
+          gcal_status: 'NONE',
+          publicado_fora_do_sistema: true,
+          pode_tirar_do_google: true,
+        }),
+      ])
+    );
+    renderPage();
+    expect(await screen.findByText('Na agenda')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Excluir:/ })).not.toBeInTheDocument();
+  });
+
+  test('fora do Google, a confirmação continua a de sempre', async () => {
+    const confirmar = vi
+      .spyOn(Modal, 'confirm')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([makeSolic({ id: 7, municipio_nome: 'Crato', projeto_nome: 'Vidas', pode_tirar_do_google: true })])
+    );
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Excluir: 10/05/2026 · Crato' }));
+    const opcoes = confirmar.mock.calls[0]![0];
+    expect(opcoes.title).toBe('Excluir solicitação?');
+    expect(String(opcoes.content)).toBe('10/05/2026 10:00 · Crato · Vidas. Esta ação não pode ser desfeita.');
+    confirmar.mockRestore();
+  });
+});

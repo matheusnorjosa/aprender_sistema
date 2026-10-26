@@ -2,8 +2,8 @@
  * PublicacaoSetorPage — "Publicar na agenda" (#1656).
  *
  * A Apoio de Coordenação (policy `publish_setor_solicitacao`, NÃO `use_gcal`) conecta
- * a PRÓPRIA conta Google e publica, atualiza ou remove, no calendário oficial da
- * organização, os eventos APROVADOS do próprio setor.
+ * a PRÓPRIA conta Google e publica, atualiza ou tira só do Google, no calendário oficial da
+ * organização, os eventos APROVADOS do próprio setor (tirar do Google não apaga do sistema).
  *
  * - Lista: `GET /solicitacoes/?status=aprovado&publishable=true&date_from=<hoje em
  *   Fortaleza>&ordering=inicio`, paginada no servidor. O backend só devolve linhas que
@@ -81,7 +81,7 @@ interface ActionConfig {
   label: string;
   /** Texto do botão no celular (abaixo de `sm`); o nome acessível continua com o `label`. */
   labelCurto: string;
-  /** Início do título da confirmação; o evento vem depois: "Remover do Google Agenda: <evento>?". */
+  /** Início do título da confirmação; o evento vem depois: "Tirar da agenda Google: <evento>?". */
   confirmTitle: string;
   confirmDescription: string;
   okText: string;
@@ -123,13 +123,13 @@ const ACTIONS: Record<GcalRowAction, ActionConfig> = {
     successText: 'Atualização enviada; o status muda em alguns segundos.',
     run: (id) => resyncSolicitacao(id),
   },
+  // "Remover" sozinho parecia apagar o evento: o rótulo diz, também no celular, que só sai do Google.
   remover: {
-    label: 'Remover do Google',
-    labelCurto: 'Remover',
-    confirmTitle: 'Remover do Google Agenda',
-    confirmDescription:
-      'O evento sai da agenda da organização; a solicitação continua aprovada no sistema.',
-    okText: 'Remover',
+    label: 'Tirar só do Google',
+    labelCurto: 'Tirar só do Google',
+    confirmTitle: 'Tirar da agenda Google',
+    confirmDescription: 'O evento continua no sistema. Para apagar de vez, use Excluir em Minhas Solicitações.',
+    okText: 'Tirar do Google',
     danger: true,
     successText: 'Remoção enviada; o status muda em alguns segundos.',
     run: (id) => cancelSolicitacao(id),
@@ -406,6 +406,8 @@ export default function PublicacaoSetorPage(): JSX.Element {
                   danger={config.danger}
                   disabled={disabled}
                   aria-label={`${config.label}: ${evento}`}
+                  // No celular, "Tirar só do Google" quebra linha no botão em vez de alargar a coluna.
+                  style={celular ? { height: 'auto', whiteSpace: 'normal' } : undefined}
                   onClick={() => confirmar(row, action, evento)}
                 >
                   {celular ? config.labelCurto : config.label}
@@ -428,8 +430,8 @@ export default function PublicacaoSetorPage(): JSX.Element {
               Publicar na agenda do Google
             </Title>
             <Text type="secondary">
-              Eventos aprovados do seu setor, a partir de hoje. Publique, atualize ou remova cada um
-              na agenda oficial da organização.
+              Eventos aprovados do seu setor, a partir de hoje. Publique ou atualize cada um na agenda
+              oficial da organização, ou tire só do Google: o evento continua no sistema.
             </Text>
           </header>
         </Card>

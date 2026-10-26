@@ -498,11 +498,11 @@ describe('PublicacaoSetorPage — ações', () => {
       endpoint: '/solicitacoes/7/resync-gcal/',
     },
     {
-      caso: 'PUBLISHED → Remover do Google = /cancel-gcal/',
+      caso: 'PUBLISHED → Tirar só do Google = /cancel-gcal/',
       row: { gcal_status: 'PUBLISHED' as const, external_event_id: 'asv27' },
-      label: /^Remover do Google: Vidas Em Rede/,
-      popTitle: 'Remover do Google Agenda',
-      ok: 'Remover',
+      label: /^Tirar só do Google: Vidas Em Rede/,
+      popTitle: 'Tirar da agenda Google',
+      ok: 'Tirar do Google',
       endpoint: '/solicitacoes/7/cancel-gcal/',
     },
     {
@@ -529,13 +529,16 @@ describe('PublicacaoSetorPage — ações', () => {
       acao: 'Publicar',
       row: {},
       titulo: 'Publicar na agenda da organização: Vidas Em Rede, 10/10/2026 09:00?',
+      texto: 'O evento é criado no calendário oficial da organização.',
     },
     {
-      acao: 'Remover do Google',
+      acao: 'Tirar só do Google',
       row: { gcal_status: 'PUBLISHED' as const, external_event_id: 'asv27' },
-      titulo: 'Remover do Google Agenda: Vidas Em Rede, 10/10/2026 09:00?',
+      titulo: 'Tirar da agenda Google: Vidas Em Rede, 10/10/2026 09:00?',
+      // Tirar do Google não apaga: diz onde o evento fica e onde se apaga de vez.
+      texto: 'O evento continua no sistema. Para apagar de vez, use Excluir em Minhas Solicitações.',
     },
-  ])('$acao: a confirmação é um diálogo que cita o evento, abre no Cancelar e devolve o foco', async ({ acao, row, titulo }) => {
+  ])('$acao: a confirmação é um diálogo que cita o evento, abre no Cancelar e devolve o foco', async ({ acao, row, titulo, texto }) => {
     listResponse = pageOf([makeSolic(row)]);
     renderPage();
 
@@ -545,6 +548,7 @@ describe('PublicacaoSetorPage — ações', () => {
 
     const dialogo = await screen.findByRole('dialog');
     expect(dialogo).toHaveAccessibleName(titulo);
+    expect(dialogo).toHaveTextContent(texto);
     const cancelar = within(dialogo).getByRole('button', { name: 'Cancelar' });
     await waitFor(() => expect(cancelar).toHaveFocus());
 
@@ -557,7 +561,7 @@ describe('PublicacaoSetorPage — ações', () => {
 
   test.each([
     { acao: 'Publicar', row: {}, ok: 'Publicar' },
-    { acao: 'Remover do Google', row: { gcal_status: 'PUBLISHED' as const, external_event_id: 'asv27' }, ok: 'Remover' },
+    { acao: 'Tirar só do Google', row: { gcal_status: 'PUBLISHED' as const, external_event_id: 'asv27' }, ok: 'Tirar do Google' },
   ])('$acao confirmado: a linha recarrega sem o botão e o foco vai para a tabela, não para o body', async ({ acao, row, ok }) => {
     listResponse = pageOf([makeSolic(row)]);
     // Depois da ação a linha volta em voo (PENDING): sem ação nenhuma, o botão da linha sai do DOM.
@@ -621,7 +625,7 @@ describe('PublicacaoSetorPage — ações', () => {
       Promise.reject(apiError(409, { code: 'CONFLICT', detail: 'Evento não está publicado.' }));
     renderPage();
 
-    await confirmAction(/^Remover do Google: Vidas Em Rede/, 'Remover do Google Agenda', 'Remover');
+    await confirmAction(/^Tirar só do Google: Vidas Em Rede/, 'Tirar da agenda Google', 'Tirar do Google');
 
     await waitFor(() => expect(message.error).toHaveBeenCalledWith('Evento não está publicado.'));
   });
@@ -747,7 +751,8 @@ describe('PublicacaoSetorPage — sem rolagem horizontal', () => {
     // Texto visível curto; o nome acessível continua completo e começa por ele (WCAG 2.5.3).
     const atualizar = within(linha).getByLabelText(/^Atualizar no Google: Vidas Em Rede/);
     expect(atualizar).toHaveTextContent(/^Atualizar$/);
-    expect(within(linha).getByLabelText(/^Remover do Google: Vidas Em Rede/)).toHaveTextContent(/^Remover$/);
+    // "Remover" sozinho parecia apagar o evento: no celular também diz que só sai do Google.
+    expect(within(linha).getByLabelText(/^Tirar só do Google: Vidas Em Rede/)).toHaveTextContent(/^Tirar só do Google$/);
 
     fireEvent.click(within(linha).getByRole('button', { name: /^Expandir linha de Vidas Em Rede/ }));
     const expandida = within(document.querySelector<HTMLElement>('.ant-table-expanded-row')!);

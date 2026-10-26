@@ -79,26 +79,32 @@ function nomeDaSolicitacao(record: Solicitacao): string {
 /**
  * O que a dona pode fazer na linha e, quando não pode, por quê (texto visível por um botão, e não
  * só no Tooltip de um botão desabilitado, que o teclado e o toque não alcançam). As regras são as
- * de sempre: editar se não estiver publicado no GCal e não estiver reprovado; excluir se não
- * estiver publicado e, no fluxo SUPER, só enquanto pendente. Evento no Google Agenda pela planilha
- * (`publicado_fora_do_sistema`) conta como publicado: mudar aqui deixaria a agenda com o dado antigo.
+ * de sempre: editar se não estiver publicado no GCal e não estiver reprovado; excluir, no fluxo
+ * SUPER, só enquanto pendente. Evento no Google Agenda pela planilha (`publicado_fora_do_sistema`)
+ * conta como publicado: mudar aqui deixaria a agenda com o dado antigo, e ele não se exclui.
+ * Evento que o sistema pôs no Google (publicado, ou com o id de lá depois de um erro) se exclui só
+ * por quem também pode tirá-lo do Google (`pode_tirar_do_google`): a exclusão tira dos dois lados.
  */
 function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcluir: boolean; motivos: string[] } {
   const naPlanilha = record.publicado_fora_do_sistema === true;
   const isPublished = naPlanilha || record.gcal_status === ('PUBLISHED' as GCalStatus);
+  const noGoogle = estaNoGoogle(record);
+  const podeTirarDoGoogle = record.pode_tirar_do_google === true;
   const isSuper = record.fluxo === ('SUPER' as FluxoType);
   const podeEditar = !isPublished && record.status !== 'reprovado';
-  const podeExcluir = !isPublished && (!isSuper || record.status === 'pendente');
+  const podeExcluir = !naPlanilha && (!noGoogle || podeTirarDoGoogle) && (!isSuper || record.status === 'pendente');
   const motivos: string[] = [];
   if (naPlanilha) {
     // Não foi o sistema que publicou: não há publicação para cancelar aqui.
     motivos.push(
       `Este evento ${MOTIVO_NAO_PUBLICAVEL.publicado_fora_do_sistema}; mudar aqui não muda a agenda. Para mudar, peça ao Apoio de Coordenação da sua gerência ou ao Controle.`
     );
-  } else if (isPublished) {
+  } else if (noGoogle && !podeTirarDoGoogle) {
     motivos.push(
       'Este evento já está no Google Agenda. Para mudar, peça ao Apoio de Coordenação da sua gerência ou ao Controle que cancele a publicação; depois disso, você consegue editar aqui.'
     );
+  } else if (isPublished) {
+    motivos.push('Este evento já está no Google Agenda: para editar, tire-o do Google antes; depois disso, você consegue editar aqui.');
   } else if (record.status === 'reprovado') {
     motivos.push('Solicitações reprovadas não podem ser editadas.');
   }
@@ -109,6 +115,11 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
     );
   }
   return { podeEditar, podeExcluir, motivos };
+}
+
+/** Evento que o sistema pôs no Google: publicado, ou com o id de lá depois de um cancelamento que falhou. */
+function estaNoGoogle(record: Solicitacao): boolean {
+  return record.gcal_status === ('PUBLISHED' as GCalStatus) || Boolean(record.external_event_id);
 }
 
 export default function MySolicitacoesPage(): JSX.Element {
@@ -199,10 +210,15 @@ export default function MySolicitacoesPage(): JSX.Element {
   // Ação destrutiva: cita a solicitação e começa no Cancelar (ux-principios).
   const confirmarExclusao = useCallback((record: Solicitacao): void => {
     const quando = formatFortaleza(record.inicio, 'DD/MM/YYYY HH:mm');
+    const evento = `${quando} · ${record.municipio_nome || 'sem município'} · ${record.projeto_nome || 'sem projeto'}`;
     let excluiu = false;
     Modal.confirm({
-      title: 'Excluir solicitação?',
-      content: `${quando} · ${record.municipio_nome || 'sem município'} · ${record.projeto_nome || 'sem projeto'}. Esta ação não pode ser desfeita.`,
+      ...(estaNoGoogle(record)
+        ? {
+            title: 'Excluir evento?',
+            content: `${evento}. Ele sai do sistema e do Google Agenda, junto com o link do Meet. Não dá para desfazer.`,
+          }
+        : { title: 'Excluir solicitação?', content: `${evento}. Esta ação não pode ser desfeita.` }),
       okText: 'Sim, excluir',
       okType: 'danger',
       cancelText: 'Cancelar',

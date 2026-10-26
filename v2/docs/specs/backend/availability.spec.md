@@ -38,7 +38,7 @@ O coração é um **serviço puro, sem efeitos colaterais** (`check_conflicts`):
 - [`views_availability.py`](../../../backend/apps/core/views_availability.py) (raiz de `apps/core/` — **arquivo ativo**) — `AvailabilityBlockViewSet`, `AvailabilityCheckView`, `AvailabilityCheckManyView` + helpers `is_privileged_user`, `can_check_availability_for_others`. Os bloqueios dos colegas seguem `EquipeGerencia.gerencias_de_atuacao` (PR 9).
 - [`views_availability_monthly.py`](../../../backend/apps/core/views_availability_monthly.py) — `MonthlyAvailabilityView` (grade mensal; delega para `services/monthly_grid_service.build_monthly_grid`).
 - [`models/agenda.py`](../../../backend/apps/core/models/agenda.py) — `AvailabilityBlock` (`tipo` T/P, `status` aprovado, `inicio`/`fim` UTC; check constraints `fim>inicio` e `tipo in {T,P}`).
-- [`utils/cache_utils.py`](../../../backend/apps/core/utils/cache_utils.py) — decorator `cache_availability_check` + `invalidate_availability_cache` (versionamento por usuário no Redis).
+- [`utils/cache_utils.py`](../../../backend/apps/core/utils/cache_utils.py) — decorator `cache_availability_check` + `invalidate_availability_cache` (versionamento no Redis: a versão por usuário, `avail_ver:<id>`, vale para o cache dos checks de conflito; a grade mensal usa a versão global `monthly_ver:__global__`, que toda invalidação sobe).
 - [`urls.py`](../../../backend/apps/core/urls.py) — registro das rotas sob `/api/`.
 - Guia detalhado (grade multi-setor, permissões, exemplos de payload): [`GUIDE_AVAILABILITY.md`](../../GUIDE_AVAILABILITY.md).
 

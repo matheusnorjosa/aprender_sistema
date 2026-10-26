@@ -81,7 +81,7 @@ interface ActionConfig {
   label: string;
   /** Texto do botão no celular (abaixo de `sm`); o nome acessível continua com o `label`. */
   labelCurto: string;
-  /** Início do título da confirmação; o evento vem depois: "Tirar da agenda Google: <evento>?". */
+  /** Início do título da confirmação; o evento vem depois: "Tirar do Google Agenda: <evento>?". */
   confirmTitle: string;
   confirmDescription: string;
   okText: string;
@@ -127,11 +127,12 @@ const ACTIONS: Record<GcalRowAction, ActionConfig> = {
   remover: {
     label: 'Tirar só do Google',
     labelCurto: 'Tirar só do Google',
-    confirmTitle: 'Tirar da agenda Google',
-    confirmDescription: 'O evento continua no sistema. Para apagar de vez, use Excluir em Minhas Solicitações.',
+    confirmTitle: 'Tirar do Google Agenda',
+    // Sem apontar Minhas Solicitações: ela só lista os eventos de quem está logado.
+    confirmDescription: 'O evento sai só da agenda da organização e continua no sistema.',
     okText: 'Tirar do Google',
     danger: true,
-    successText: 'Remoção enviada; o status muda em alguns segundos.',
+    successText: 'Pedido enviado: o evento sai do Google Agenda em alguns segundos e continua no sistema.',
     run: (id) => cancelSolicitacao(id),
   },
 };

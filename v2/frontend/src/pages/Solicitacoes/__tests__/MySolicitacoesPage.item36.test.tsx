@@ -271,9 +271,28 @@ describe('MySolicitacoesPage — Excluir sai do sistema e do Google', { timeout:
   });
 
   test.each([
-    { caso: 'publicado', row: { gcal_status: 'PUBLISHED' as const, external_event_id: 'evt-1' } },
-    { caso: 'erro com o evento ainda no Google', row: { gcal_status: 'ERROR' as const, external_event_id: 'evt-1' } },
-  ])('$caso, para quem pode tirar do Google: Excluir aparece e avisa que sai do Google também', async ({ row }) => {
+    {
+      caso: 'publicado, com Meet',
+      row: { gcal_status: 'PUBLISHED' as const, external_event_id: 'evt-1', meet_link: 'https://meet.google.com/abc-defg-hij' },
+      texto: 'Ele sai do sistema e do Google Agenda, junto com o link do Meet. Não dá para desfazer.',
+    },
+    {
+      caso: 'publicado, presencial (sem Meet)',
+      row: { gcal_status: 'PUBLISHED' as const, external_event_id: 'evt-1', meet_link: null },
+      texto: 'Ele sai do sistema e do Google Agenda. Não dá para desfazer.',
+    },
+    {
+      caso: 'erro com o evento ainda no Google',
+      row: { gcal_status: 'ERROR' as const, external_event_id: 'evt-1' },
+      texto: 'Ele sai do sistema e do Google Agenda, se estiver lá. Não dá para desfazer.',
+    },
+    {
+      // A publicação que falhou pode ter criado o evento no Google sem gravar o id.
+      caso: 'erro sem id',
+      row: { gcal_status: 'ERROR' as const, external_event_id: null },
+      texto: 'Ele sai do sistema e do Google Agenda, se estiver lá. Não dá para desfazer.',
+    },
+  ])('$caso, para quem pode tirar do Google: Excluir aparece e avisa que sai do Google também', async ({ row, texto }) => {
     const confirmar = vi
       .spyOn(Modal, 'confirm')
       .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
@@ -288,9 +307,7 @@ describe('MySolicitacoesPage — Excluir sai do sistema e do Google', { timeout:
     fireEvent.click(await screen.findByRole('button', { name: 'Excluir: 10/05/2026 · Crato' }));
     const opcoes = confirmar.mock.calls[0]![0];
     expect(opcoes.title).toBe('Excluir evento?');
-    expect(String(opcoes.content)).toBe(
-      '10/05/2026 10:00 · Crato · Vidas. Ele sai do sistema e do Google Agenda, junto com o link do Meet. Não dá para desfazer.'
-    );
+    expect(String(opcoes.content)).toBe(`10/05/2026 10:00 · Crato · Vidas. ${texto}`);
     expect(opcoes).toMatchObject({ autoFocusButton: 'cancel', okText: 'Sim, excluir', cancelText: 'Cancelar' });
     await act(async () => {
       await opcoes.onOk?.();
@@ -315,11 +332,16 @@ describe('MySolicitacoesPage — Excluir sai do sistema e do Google', { timeout:
     fireEvent.click(screen.getByRole('button', { name: 'Por que não dá para editar: 10/05/2026 · Crato' }));
     const texto = String(informar.mock.calls[0]![0].content);
     expect(texto).toContain('tire-o do Google antes');
+    // Diz onde: Minhas Solicitações não tem a ação de tirar do Google.
+    expect(texto).toContain('Publicar na agenda');
     expect(texto).not.toContain('Apoio de Coordenação');
     informar.mockRestore();
   });
 
-  test('erro com o evento ainda no Google, para quem não pode tirar de lá: sem Excluir', async () => {
+  test.each([
+    { caso: 'com id', external_event_id: 'evt-1' },
+    { caso: 'sem id', external_event_id: null },
+  ])('erro $caso, para quem não pode tirar do Google: sem Excluir, e o motivo fala de excluir', async ({ external_event_id }) => {
     listSolicitacoesMock.mockResolvedValue(
       pagina([
         makeSolic({
@@ -327,7 +349,7 @@ describe('MySolicitacoesPage — Excluir sai do sistema e do Google', { timeout:
           municipio_nome: 'Crato',
           status: 'aprovado',
           gcal_status: 'ERROR',
-          external_event_id: 'evt-1',
+          external_event_id,
           pode_tirar_do_google: false,
         }),
       ])
@@ -335,6 +357,16 @@ describe('MySolicitacoesPage — Excluir sai do sistema e do Google', { timeout:
     renderPage();
     expect(await screen.findByText('Crato')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Excluir:/ })).not.toBeInTheDocument();
+    // Em ERROR a edição continua aberta: o motivo explica a exclusão, não a edição.
+    expect(screen.getByRole('button', { name: 'Editar: 10/05/2026 · Crato' })).toBeInTheDocument();
+    const informar = vi
+      .spyOn(Modal, 'info')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    fireEvent.click(screen.getByRole('button', { name: 'Por que não dá para excluir: 10/05/2026 · Crato' }));
+    const texto = String(informar.mock.calls[0]![0].content);
+    expect(texto).toContain('Para excluir, peça ao Apoio de Coordenação da sua gerência ou ao Controle');
+    expect(texto).not.toContain('editar');
+    informar.mockRestore();
   });
 
   test('na planilha (não adotado): sem Excluir mesmo para quem pode tirar do Google', async () => {

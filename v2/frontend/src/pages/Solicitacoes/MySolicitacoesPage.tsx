@@ -82,8 +82,9 @@ function nomeDaSolicitacao(record: Solicitacao): string {
  * de sempre: editar se não estiver publicado no GCal e não estiver reprovado; excluir, no fluxo
  * SUPER, só enquanto pendente. Evento no Google Agenda pela planilha (`publicado_fora_do_sistema`)
  * conta como publicado: mudar aqui deixaria a agenda com o dado antigo, e ele não se exclui.
- * Evento que o sistema pôs no Google (publicado, ou com o id de lá depois de um erro) se exclui só
- * por quem também pode tirá-lo do Google (`pode_tirar_do_google`): a exclusão tira dos dois lados.
+ * Evento que o sistema pôs (ou pode ter posto) no Google (`estaNoGoogle`) se exclui só por quem
+ * também pode tirá-lo de lá (`pode_tirar_do_google`): a exclusão tira dos dois lados. Em ERROR a
+ * edição continua aberta; o motivo, então, fala só da exclusão.
  */
 function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcluir: boolean; motivos: string[] } {
   const naPlanilha = record.publicado_fora_do_sistema === true;
@@ -99,12 +100,19 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
     motivos.push(
       `Este evento ${MOTIVO_NAO_PUBLICAVEL.publicado_fora_do_sistema}; mudar aqui não muda a agenda. Para mudar, peça ao Apoio de Coordenação da sua gerência ou ao Controle.`
     );
-  } else if (noGoogle && !podeTirarDoGoogle) {
+  } else if (isPublished && !podeTirarDoGoogle) {
     motivos.push(
       'Este evento já está no Google Agenda. Para mudar, peça ao Apoio de Coordenação da sua gerência ou ao Controle que cancele a publicação; depois disso, você consegue editar aqui.'
     );
   } else if (isPublished) {
-    motivos.push('Este evento já está no Google Agenda: para editar, tire-o do Google antes; depois disso, você consegue editar aqui.');
+    motivos.push(
+      'Este evento já está no Google Agenda: para editar, tire-o do Google antes, na tela Publicar na agenda ou na Pré-agenda; depois disso, você consegue editar aqui.'
+    );
+  } else if (noGoogle && !podeTirarDoGoogle) {
+    // ERROR: a publicação deu erro, mas o evento pode estar no Google; excluir aqui o tiraria de lá.
+    motivos.push(
+      'Este evento pode estar no Google Agenda, e excluir aqui também o tiraria de lá. Para excluir, peça ao Apoio de Coordenação da sua gerência ou ao Controle que tire o evento do Google.'
+    );
   } else if (record.status === 'reprovado') {
     motivos.push('Solicitações reprovadas não podem ser editadas.');
   }
@@ -117,9 +125,16 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
   return { podeEditar, podeExcluir, motivos };
 }
 
-/** Evento que o sistema pôs no Google: publicado, ou com o id de lá depois de um cancelamento que falhou. */
+/**
+ * Evento que o sistema pôs (ou pode ter posto) no Google: publicado, com o id de lá, ou em ERROR
+ * (a publicação que falhou pode ter criado o evento sem gravar o id). Mesmo critério do backend.
+ */
 function estaNoGoogle(record: Solicitacao): boolean {
-  return record.gcal_status === ('PUBLISHED' as GCalStatus) || Boolean(record.external_event_id);
+  return (
+    record.gcal_status === ('PUBLISHED' as GCalStatus) ||
+    record.gcal_status === ('ERROR' as GCalStatus) ||
+    Boolean(record.external_event_id)
+  );
 }
 
 export default function MySolicitacoesPage(): JSX.Element {
@@ -211,12 +226,15 @@ export default function MySolicitacoesPage(): JSX.Element {
   const confirmarExclusao = useCallback((record: Solicitacao): void => {
     const quando = formatFortaleza(record.inicio, 'DD/MM/YYYY HH:mm');
     const evento = `${quando} · ${record.municipio_nome || 'sem município'} · ${record.projeto_nome || 'sem projeto'}`;
+    // Em ERROR o evento pode não ter chegado ao Google; o Meet só é citado quando existe.
+    const doGoogle = record.gcal_status === ('ERROR' as GCalStatus) ? 'do Google Agenda, se estiver lá' : 'do Google Agenda';
+    const meet = record.meet_link ? ', junto com o link do Meet' : '';
     let excluiu = false;
     Modal.confirm({
       ...(estaNoGoogle(record)
         ? {
             title: 'Excluir evento?',
-            content: `${evento}. Ele sai do sistema e do Google Agenda, junto com o link do Meet. Não dá para desfazer.`,
+            content: `${evento}. Ele sai do sistema e ${doGoogle}${meet}. Não dá para desfazer.`,
           }
         : { title: 'Excluir solicitação?', content: `${evento}. Esta ação não pode ser desfeita.` }),
       okText: 'Sim, excluir',

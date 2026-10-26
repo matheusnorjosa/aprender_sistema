@@ -501,7 +501,7 @@ describe('PublicacaoSetorPage — ações', () => {
       caso: 'PUBLISHED → Tirar só do Google = /cancel-gcal/',
       row: { gcal_status: 'PUBLISHED' as const, external_event_id: 'asv27' },
       label: /^Tirar só do Google: Vidas Em Rede/,
-      popTitle: 'Tirar da agenda Google',
+      popTitle: 'Tirar do Google Agenda',
       ok: 'Tirar do Google',
       endpoint: '/solicitacoes/7/cancel-gcal/',
     },
@@ -522,6 +522,12 @@ describe('PublicacaoSetorPage — ações', () => {
     await waitFor(() => expect(actionCalls()).toHaveLength(1));
     expect(actionCalls()[0]?.[0]).toBe(endpoint);
     await waitFor(() => expect(listCalls()).toHaveLength(2));
+    if (endpoint.endsWith('/cancel-gcal/')) {
+      // Sem "Remoção", a palavra ambígua que o rótulo novo tirou.
+      expect(message.success).toHaveBeenCalledWith(
+        'Pedido enviado: o evento sai do Google Agenda em alguns segundos e continua no sistema.'
+      );
+    }
   });
 
   test.each([
@@ -534,9 +540,10 @@ describe('PublicacaoSetorPage — ações', () => {
     {
       acao: 'Tirar só do Google',
       row: { gcal_status: 'PUBLISHED' as const, external_event_id: 'asv27' },
-      titulo: 'Tirar da agenda Google: Vidas Em Rede, 10/10/2026 09:00?',
-      // Tirar do Google não apaga: diz onde o evento fica e onde se apaga de vez.
-      texto: 'O evento continua no sistema. Para apagar de vez, use Excluir em Minhas Solicitações.',
+      titulo: 'Tirar do Google Agenda: Vidas Em Rede, 10/10/2026 09:00?',
+      // Tirar do Google não apaga: diz que o evento fica no sistema (sem mandar a Apoio procurar
+      // em Minhas Solicitações, que só lista os eventos de quem está logado).
+      texto: 'O evento sai só da agenda da organização e continua no sistema.',
     },
   ])('$acao: a confirmação é um diálogo que cita o evento, abre no Cancelar e devolve o foco', async ({ acao, row, titulo, texto }) => {
     listResponse = pageOf([makeSolic(row)]);
@@ -625,7 +632,7 @@ describe('PublicacaoSetorPage — ações', () => {
       Promise.reject(apiError(409, { code: 'CONFLICT', detail: 'Evento não está publicado.' }));
     renderPage();
 
-    await confirmAction(/^Tirar só do Google: Vidas Em Rede/, 'Tirar da agenda Google', 'Tirar do Google');
+    await confirmAction(/^Tirar só do Google: Vidas Em Rede/, 'Tirar do Google Agenda', 'Tirar do Google');
 
     await waitFor(() => expect(message.error).toHaveBeenCalledWith('Evento não está publicado.'));
   });

@@ -49,6 +49,11 @@ import { getMonthlyAvailability } from '../../../api/availability';
 
 const GRADE_VAZIA = { days: [], legend: {}, people: [], cells: [], details_index: {} };
 
+// Na CI a tela roda cerca de 4x mais lenta que local: os 5 s padrão por teste e o 1 s padrão
+// de findBy/waitFor não bastam. Só o limite de tempo muda, nenhuma asserção.
+vi.setConfig({ testTimeout: 20_000 });
+const ESPERA = { timeout: 5000 };
+
 /**
  * Aguarda o fetch mockado resolver: cada Grid renderiza um cabeçalho "Nome".
  * Duas grades = dois cabeçalhos. Serve como ponto de sincronização estável.
@@ -57,12 +62,15 @@ async function renderEDeixarResolver(): Promise<void> {
   render(<MonthlyPage />);
   await waitFor(() => {
     expect(screen.getAllByText('Nome')).toHaveLength(2);
-  });
+  }, ESPERA);
 }
 
 describe('MonthlyPage — grade mensal', () => {
   afterEach(() => {
     vi.clearAllMocks();
+    // clearAllMocks não desfaz mockRejectedValue/mockReturnValue. Restaurar aqui, e não no fim
+    // do teste, garante que um teste que falha (e o retry dele) não deixe a grade quebrada para o próximo.
+    vi.mocked(getMonthlyAvailability).mockResolvedValue(GRADE_VAZIA);
   });
 
   test('renderiza o título da grade', async () => {
@@ -112,7 +120,7 @@ describe('MonthlyPage — grade mensal', () => {
   test('exibe as grades após o fetch mockado resolver', async () => {
     render(<MonthlyPage />);
 
-    const cabecalhosNome = await screen.findAllByText('Nome');
+    const cabecalhosNome = await screen.findAllByText('Nome', undefined, ESPERA);
     expect(cabecalhosNome).toHaveLength(2);
   });
 
@@ -131,8 +139,6 @@ describe('MonthlyPage — grade mensal', () => {
     // Os mesmos nós: as grades não foram desmontadas e remontadas.
     expect(screen.getAllByText('Nome')).toEqual(cabecalhos);
     cabecalhos.forEach((no) => expect(no).toBeInTheDocument());
-
-    vi.mocked(getMonthlyAvailability).mockResolvedValue(GRADE_VAZIA);
   });
 
   test('429 na atualização: UM aviso discreto (role=status), grades na tela, sem erro', async () => {
@@ -143,13 +149,11 @@ describe('MonthlyPage — grade mensal', () => {
     );
     await act(async () => { window.dispatchEvent(new Event('availability:refresh')); });
 
-    const avisos = await screen.findAllByText('Atualização automática pausada por alguns instantes.');
+    const avisos = await screen.findAllByText('Atualização automática pausada por alguns instantes.', undefined, ESPERA);
     expect(avisos).toHaveLength(1);
     expect(avisos[0]?.closest('[role="status"]')).not.toBeNull();
     expect(screen.getAllByText('Nome')).toHaveLength(2);
     expect(screen.queryByText(/Erro ao carregar/)).not.toBeInTheDocument();
-
-    vi.mocked(getMonthlyAvailability).mockResolvedValue(GRADE_VAZIA);
   });
 
   test('falha ao atualizar com a grade na tela: avisa (role=alert) e mantém as grades', async () => {
@@ -158,18 +162,16 @@ describe('MonthlyPage — grade mensal', () => {
     vi.mocked(getMonthlyAvailability).mockRejectedValue(new Error('Sem conexão com o servidor.'));
     await act(async () => { window.dispatchEvent(new Event('availability:refresh')); });
 
-    const avisos = await screen.findAllByText(/Não foi possível atualizar a grade/);
+    const avisos = await screen.findAllByText(/Não foi possível atualizar a grade/, undefined, ESPERA);
     expect(avisos).toHaveLength(1);
     expect(avisos[0]?.closest('[role="alert"]')).not.toBeNull();
     expect(avisos[0]?.textContent).toContain('Sem conexão com o servidor.');
     expect(screen.getAllByText('Nome')).toHaveLength(2);
-
-    vi.mocked(getMonthlyAvailability).mockResolvedValue(GRADE_VAZIA);
   });
 
   test('botão de atualizar: o ícone gira enquanto busca e as grades continuam na tela', async () => {
     const { container } = render(<MonthlyPage />);
-    await waitFor(() => expect(screen.getAllByText('Nome')).toHaveLength(2));
+    await waitFor(() => expect(screen.getAllByText('Nome')).toHaveLength(2), ESPERA);
     expect(container.querySelector('.anticon-spin')).toBeNull();
 
     vi.mocked(getMonthlyAvailability).mockReturnValue(new Promise(() => undefined));
@@ -180,7 +182,5 @@ describe('MonthlyPage — grade mensal', () => {
     expect(container.querySelector('.anticon-spin')).not.toBeNull();
     expect(screen.queryByText('Carregando...')).not.toBeInTheDocument();
     expect(screen.getAllByText('Nome')).toHaveLength(2);
-
-    vi.mocked(getMonthlyAvailability).mockResolvedValue(GRADE_VAZIA);
   });
 });

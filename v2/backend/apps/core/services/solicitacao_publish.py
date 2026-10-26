@@ -509,3 +509,62 @@ def cancel_from_gcal(
         solicitacao_id=solicitacao.id,
         message="Cancelamento solicitado com sucesso (processando em background).",
     )
+
+
+def remover_do_google_agora(solicitacao: Solicitacao, user: Usuario) -> str | None:
+    """Tira o evento do Google AGORA (síncrono), para a exclusão apagar dos dois lados.
+
+    Mesmo caminho da task de cancelamento (`task_cancel_solicitacao_from_gcal`): no modo OAuth o
+    cliente é o da conta de quem exclui; fora dele, o service account. `cancel_solicitacao` só limpa
+    os campos depois que o Google confirma (404 = já removido) e grava `gcal_status=NONE`; o
+    `status` não muda. Quem chama já conferiu `can_publish_solicitacao`.
+
+    Returns:
+        O `external_event_id` que estava no Google.
+
+    Raises:
+        ValidationAPIError 400 `gcal_cancel_failed` com o motivo legível. Nada foi alterado: o
+        evento continua no Google e no sistema.
+    """
+    from django.db import transaction
+
+    from apps.core.services.gcal_sync_service import cancel_solicitacao
+    from apps.core.tasks import _MSG_CREDENCIAL_GOOGLE, _friendly_gcal_error  # pyright: ignore[reportPrivateUsage]
+
+    try:
+        client = None
+        if _check_google_oauth(user) is not None:
+            from apps.core.services.gcal_client_factory import get_oauth_client_for_user
+
+            try:
+                client, _ = get_oauth_client_for_user(user)
+            except ValueError as e:
+                raise ValidationAPIError(message=_MSG_CREDENCIAL_GOOGLE, code="gcal_cancel_failed") from e
+
+        with transaction.atomic():
+            s = Solicitacao.objects.select_for_update().get(pk=solicitacao.pk)
+            external_event_id = s.external_event_id
+            outcome = cancel_solicitacao(s, client=client)
+            AuditLog.objects.create(
+                usuario=user,
+                action=AuditLog.Action.CANCEL_GCAL,
+                model_name="Solicitacao",
+                details={
+                    "solicitacao_id": s.id,
+                    "action": outcome.action,
+                    "external_event_id": external_event_id,
+                    "summary": outcome.summary,
+                    "origem": "exclusao",
+                },
+            )
+    except ValidationAPIError:
+        raise
+    except Exception as e:
+        logger.warning(
+            "excluir_cancel_gcal_failed",
+            extra={"event": "excluir_cancel_gcal_failed", "solicitacao_id": solicitacao.pk, "error": str(e)[:500]},
+        )
+        mensagem = e.message if isinstance(e, APIError) else _friendly_gcal_error(e)
+        raise ValidationAPIError(message=mensagem, code="gcal_cancel_failed") from e
+
+    return external_event_id

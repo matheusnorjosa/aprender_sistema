@@ -53,7 +53,7 @@ from .services.solicitacao_approval import (
 from .services.solicitacao_create import resolve_initial_status
 from .services.solicitacao_publish import cancel_from_gcal
 from .services.solicitacao_publish import preview_gcal as preview_gcal_service
-from .services.solicitacao_publish import publish_to_gcal, resync_to_gcal
+from .services.solicitacao_publish import publish_to_gcal, remover_do_google_agora, resync_to_gcal
 from .services.solicitacao_scope import (
     can_publish_solicitacao,
     participantes_fora_da_gerencia,
@@ -1029,17 +1029,23 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
           NAO_SUPER, que segue `aprovado`). Vale para todos na API, superusuário incluso. A
           auto-aprovação da NAO_SUPER não grava nenhum dos dois e não trava.
 
+        - No Google (PUBLISHED, ou `external_event_id` preenchido, que cobre o ERROR de um cancel que
+          falhou): sai dos dois lados numa ação só, para quem já pode tirar do Google
+          (`can_publish_solicitacao`). O Google vem primeiro e síncrono; se falhar, nada é apagado.
+          Quem não pode recebe 400 e o Google não é chamado. Todas as recusas abaixo vêm antes.
+        - No Google pela planilha sem adoção (`publicado_fora_do_sistema`): não se exclui (não há id
+          para apagar lá, e o evento ficaria no Google).
+
         Registra exclusão no AuditLog antes de deletar.
         """
         from django.db import transaction
         from rest_framework.exceptions import ValidationError
 
-        # Bloquear exclusão de solicitações publicadas (ambos os fluxos)
-        if instance.gcal_status == "PUBLISHED":
+        if instance.publicado_fora_do_sistema:
             raise ValidationError(
                 {
-                    "detail": "Não é possível excluir uma solicitação já publicada no Google Calendar. "
-                    "Cancele o evento primeiro se precisar excluir."
+                    "detail": "Este evento está no Google Agenda pela planilha e o sistema não o adotou: "
+                    "excluir aqui deixaria o evento no Google. Ajuste no Google, ou peça a adoção."
                 }
             )
 
@@ -1071,8 +1077,8 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             .exists()
         )
         if ja_aprovada:
-            # Publicada já parou acima. Pendente sai pela reprovação; aprovada (ou reprovada) não
-            # pendente não tem reject nem cancel-gcal na API: só a administração tira o evento.
+            # Antes do Google: recusar depois deixaria o evento fora da agenda e no sistema.
+            # Pendente sai pela reprovação; aprovada (ou reprovada) não pendente: só a administração.
             if instance.status == "pendente":
                 saida = "Para tirar o evento, peça a reprovação a quem aprova: assim a saída fica registrada."
             else:
@@ -1081,6 +1087,20 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                     "fale com a administração do sistema."
                 )
             raise ValidationError({"detail": f"Esta solicitação já foi aprovada e não pode ser excluída. {saida}"})
+
+        # No Google: sai de lá primeiro (fora do atomic do delete: o NONE fica gravado e o delete vem
+        # depois; se o delete falhar, sobra a linha "não publicada", que é o estado verdadeiro).
+        removido_do_google: dict[str, Any] = {}
+        if instance.gcal_status == "PUBLISHED" or instance.external_event_id:
+            if not can_publish_solicitacao(self.request.user, instance):
+                raise ValidationError(
+                    {
+                        "detail": "Não é possível excluir uma solicitação já publicada no Google Calendar. "
+                        "Cancele o evento primeiro se precisar excluir."
+                    }
+                )
+            external_event_id = remover_do_google_agora(instance, self.request.user)
+            removido_do_google = {"removido_do_google": True, "external_event_id": external_event_id}
 
         # Capturar dados antes da exclusão para o AuditLog
         solicitacao_data = {
@@ -1112,6 +1132,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
                     "solicitacao_data": solicitacao_data,
                     "ip_address": client_ip,
                     "user_agent": self.request.META.get("HTTP_USER_AGENT", "")[:200],
+                    **removido_do_google,
                 },
             )
 

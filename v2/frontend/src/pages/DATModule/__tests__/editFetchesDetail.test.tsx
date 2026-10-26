@@ -88,7 +88,7 @@ describe('M17-02: editar busca o DETAIL antes de abrir o modal', () => {
           <AcoesPage />
         </MemoryRouter>,
       );
-      const btn = await screen.findByLabelText('Editar ação', {}, { timeout: 15000 });
+      const btn = await screen.findByLabelText('Editar: Fortaleza - CE · Sub X', {}, { timeout: 15000 });
       await userEvent.click(btn);
       await waitFor(() => expect(getAcao).toHaveBeenCalledWith(7), { timeout: 10000 });
     },

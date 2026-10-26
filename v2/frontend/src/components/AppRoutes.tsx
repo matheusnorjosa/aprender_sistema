@@ -157,6 +157,11 @@ export function AppRoutes({ user }: AppRoutesProps): JSX.Element {
         <Route path="/dat/importacao" element={<Navigate to="/dat/importacoes" replace />} />
         <Route path="/dat/importacoes" element={<RequirePolicy allow={podeImportarPelaTela}><DATImportacoesPage /></RequirePolicy>} />
         <Route path="/dat/registros" element={<RequirePolicy policy="manage_admin_registries" policies={policies}><DATRegistrosPage /></RequirePolicy>} />
+
+        {/* Item 38: endereço sem rota deixava a área logada em branco. Vai para a Página Inicial;
+            inclui o '/login' de quem acabou de entrar ('/login' não é rota: o login aparece quando
+            não há sessão). */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
     </ErrorBoundary>

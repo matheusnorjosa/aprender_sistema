@@ -56,7 +56,7 @@ describe('#1655: Form.Items dangling foram removidos', () => {
     async () => {
       const user = userEvent.setup();
       render(<MemoryRouter><AcoesPage /></MemoryRouter>);
-      const btn = await screen.findByLabelText('Editar ação', {}, { timeout: 15000 });
+      const btn = await screen.findByLabelText('Editar: Fortaleza - CE · Sub X', {}, { timeout: 15000 });
       await user.click(btn);
       const dialog = await screen.findByRole('dialog', {}, { timeout: 10000 });
       expect(within(dialog).queryByLabelText('Área')).toBeNull();

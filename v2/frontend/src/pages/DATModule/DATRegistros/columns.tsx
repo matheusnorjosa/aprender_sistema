@@ -3,13 +3,14 @@
  * Issue #303: Split large DATModule pages
  */
 
-import { Space, Tag, Typography, Tooltip, Button } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import { Tag, Typography, Tooltip } from 'antd';
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { ETAPA_STATUS_OPTIONS } from './constants';
 import { renderStatusIcon } from './helpers';
 import type { ID } from '../../../types';
+import { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../../components/ResponsiveTable';
+import { AcoesLinha, larguraAcoesLinha } from '../../../components/AcoesLinha';
 
 const { Text } = Typography;
 
@@ -48,38 +49,57 @@ export interface DATRegistroRecord {
 export interface ColumnHandlers {
   onEdit: (record: DATRegistroRecord) => void;
   onDelete: (record: DATRegistroRecord) => void;
+  /** Celular (abaixo de sm): o projeto vai junto do município e as ações para o menu. */
+  compacto?: boolean;
+}
+
+/** Quem a linha representa (a listagem é por ano): nomeia as ações e o botão de expandir. */
+export function nomeDoRegistro(record: DATRegistroRecord): string {
+  return `${record.municipio_nome} - ${record.municipio_uf} · ${record.projeto_nome ?? '-'} · ${record.ano ?? 'ano pendente'}`;
 }
 
 /**
  * Creates column definitions for DAT registros table
  * @param handlers - Event handlers object
  * @returns Column definitions
+ *
+ * Sem rolagem horizontal (padrão responsivo, item 38): sempre na linha o município (com o projeto,
+ * no celular), o ano e as ações; o resto sobe por largura e, abaixo dela, vai para a linha
+ * expandida. Observações e as etapas de detalhe só entram na linha a partir de xxl.
  */
-export function getColumns({ onEdit, onDelete }: ColumnHandlers): ColumnsType<DATRegistroRecord> {
+export function getColumns({ onEdit, onDelete, compacto = false }: ColumnHandlers): ColunaResponsiva<DATRegistroRecord>[] {
   return [
     // Dados Básicos
     {
       title: 'Município - UF',
       key: 'municipio_uf',
-      width: 180,
-      fixed: 'left',
       render: (_, record) => (
-        <Text strong>
-          {record.municipio_nome} - {record.municipio_uf}
-        </Text>
+        <>
+          <Text strong>
+            {record.municipio_nome} - {record.municipio_uf}
+          </Text>
+          {compacto ? (
+            <>
+              <br />
+              <Text type="secondary" className="break-words">{record.projeto_nome || '-'}</Text>
+            </>
+          ) : null}
+        </>
       ),
     },
     {
       title: 'Coleção',
       dataIndex: 'projeto_geral_nome',
       key: 'projeto_geral',
+      responsive: VISIVEL_A_PARTIR.xxl,
       width: 150,
     },
     {
       title: 'Projeto',
       dataIndex: 'projeto_nome',
       key: 'projeto',
-      width: 150,
+      responsive: VISIVEL_A_PARTIR.sm,
+      ellipsis: true,
     },
     {
       // A listagem é POR ANO (split fan-out). Sem esta coluna as linhas por-ano
@@ -97,6 +117,7 @@ export function getColumns({ onEdit, onDelete }: ColumnHandlers): ColumnsType<DA
       title: 'Alunos',
       dataIndex: 'aluno_qtde',
       key: 'aluno_qtde',
+      responsive: VISIVEL_A_PARTIR.lg,
       width: 80,
       align: 'right',
       render: (val: number | undefined) => val?.toLocaleString('pt-BR') || '-',
@@ -105,6 +126,7 @@ export function getColumns({ onEdit, onDelete }: ColumnHandlers): ColumnsType<DA
       title: 'Profs.',
       dataIndex: 'professor_qtde',
       key: 'professor_qtde',
+      responsive: VISIVEL_A_PARTIR.xl,
       width: 80,
       align: 'right',
       render: (val: number | undefined) => val?.toLocaleString('pt-BR') || '-',
@@ -114,6 +136,7 @@ export function getColumns({ onEdit, onDelete }: ColumnHandlers): ColumnsType<DA
       title: 'Reunião DAT',
       dataIndex: 'reuniao_dat',
       key: 'reuniao_dat',
+      responsive: VISIVEL_A_PARTIR.xxl,
       width: 110,
       render: (val: string | undefined) => (val ? dayjs(val).format('DD/MM/YYYY') : '-'),
     },
@@ -121,6 +144,7 @@ export function getColumns({ onEdit, onDelete }: ColumnHandlers): ColumnsType<DA
       title: 'ID Turma',
       dataIndex: 'turma_formar_id',
       key: 'turma_formar_id',
+      responsive: VISIVEL_A_PARTIR.xxl,
       width: 100,
       render: (val: string | undefined) =>
         val ? (
@@ -135,6 +159,7 @@ export function getColumns({ onEdit, onDelete }: ColumnHandlers): ColumnsType<DA
       title: 'Status Turma',
       dataIndex: 'turma_formar_status',
       key: 'turma_formar_status',
+      responsive: VISIVEL_A_PARTIR.md,
       width: 100,
       render: (status: string | undefined) => {
         if (!status) return <Text type="secondary">-</Text>;
@@ -151,6 +176,7 @@ export function getColumns({ onEdit, onDelete }: ColumnHandlers): ColumnsType<DA
       title: 'Códs',
       dataIndex: 'nr_codigos',
       key: 'nr_codigos',
+      responsive: VISIVEL_A_PARTIR.xxl,
       width: 70,
       align: 'center',
       render: (val: number | undefined) => (val ? <Tag>{val}</Tag> : '-'),
@@ -159,6 +185,7 @@ export function getColumns({ onEdit, onDelete }: ColumnHandlers): ColumnsType<DA
       title: 'Chaves',
       dataIndex: 'chaves_inscricao_status',
       key: 'chaves',
+      responsive: VISIVEL_A_PARTIR.xl,
       width: 100,
       render: (status: string | undefined) => {
         if (!status) return <Text type="secondary">-</Text>;
@@ -185,6 +212,7 @@ export function getColumns({ onEdit, onDelete }: ColumnHandlers): ColumnsType<DA
       title: 'Envio',
       dataIndex: 'envio_codigos_status',
       key: 'envio',
+      responsive: VISIVEL_A_PARTIR.xxl,
       width: 70,
       align: 'center',
       render: (status: string | undefined) => (
@@ -197,6 +225,7 @@ export function getColumns({ onEdit, onDelete }: ColumnHandlers): ColumnsType<DA
       title: 'Obs. FORMAR',
       dataIndex: 'obs_formar',
       key: 'obs_formar',
+      responsive: VISIVEL_A_PARTIR.xxl,
       width: 150,
       ellipsis: { showTitle: false },
       render: (val: string | undefined) => (
@@ -210,6 +239,7 @@ export function getColumns({ onEdit, onDelete }: ColumnHandlers): ColumnsType<DA
       title: 'Usa AVALIAR',
       dataIndex: 'usa_avaliar',
       key: 'usa_avaliar',
+      responsive: VISIVEL_A_PARTIR.lg,
       width: 100,
       align: 'center',
       render: (val: boolean | undefined) =>
@@ -219,6 +249,7 @@ export function getColumns({ onEdit, onDelete }: ColumnHandlers): ColumnsType<DA
       title: 'Recebidos',
       dataIndex: 'alunos_recebidos_status',
       key: 'recebidos',
+      responsive: VISIVEL_A_PARTIR.xxl,
       width: 90,
       align: 'center',
       render: (status: string | undefined) => renderStatusIcon(status),
@@ -227,6 +258,7 @@ export function getColumns({ onEdit, onDelete }: ColumnHandlers): ColumnsType<DA
       title: 'Validados',
       dataIndex: 'alunos_validados_status',
       key: 'validados',
+      responsive: VISIVEL_A_PARTIR.xxl,
       width: 90,
       align: 'center',
       render: (status: string | undefined) => renderStatusIcon(status),
@@ -235,6 +267,7 @@ export function getColumns({ onEdit, onDelete }: ColumnHandlers): ColumnsType<DA
       title: 'Importados',
       dataIndex: 'alunos_importados_status',
       key: 'importados',
+      responsive: VISIVEL_A_PARTIR.xxl,
       width: 90,
       align: 'center',
       render: (status: string | undefined) => renderStatusIcon(status),
@@ -243,6 +276,7 @@ export function getColumns({ onEdit, onDelete }: ColumnHandlers): ColumnsType<DA
       title: 'Obs. AVALIAR',
       dataIndex: 'obs_avaliar',
       key: 'obs_avaliar',
+      responsive: VISIVEL_A_PARTIR.xxl,
       width: 150,
       ellipsis: { showTitle: false },
       render: (val: string | undefined) => (
@@ -255,30 +289,16 @@ export function getColumns({ onEdit, onDelete }: ColumnHandlers): ColumnsType<DA
     {
       title: 'Ações',
       key: 'acoes',
-      width: 100,
-      fixed: 'right',
+      width: larguraAcoesLinha(2, compacto),
       render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="Editar">
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => onEdit(record)}
-              aria-label="Editar registro"
-            />
-          </Tooltip>
-          <Tooltip title="Excluir">
-            <Button
-              type="text"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => onDelete(record)}
-              aria-label="Excluir registro"
-            />
-          </Tooltip>
-        </Space>
+        <AcoesLinha
+          compacto={compacto}
+          alvo={nomeDoRegistro(record)}
+          acoes={[
+            { chave: 'editar', rotulo: 'Editar', icone: <EditOutlined />, onClick: () => onEdit(record) },
+            { chave: 'excluir', rotulo: 'Excluir', icone: <DeleteOutlined />, onClick: () => onDelete(record), perigo: true },
+          ]}
+        />
       ),
     },
   ];

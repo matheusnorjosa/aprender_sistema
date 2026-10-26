@@ -16,13 +16,16 @@ from collections.abc import Iterator
 from unittest.mock import patch
 
 from django.core.cache import cache
-from django.test import override_settings
+from django.test import TestCase, override_settings
+from rest_framework import serializers
 from rest_framework.test import APIClient
 
 import pytest
 
 from apps.core.models import AuditLog, Usuario
+from apps.core.serializers.usuario import UsuarioAdminSerializer
 from apps.core.tests.factories import GroupFactory, UsuarioFactory, com_pacote_do_dat
+from apps.core.views_auth import _get_lockout_key, _lockout_bucket
 
 pytestmark = pytest.mark.django_db
 
@@ -63,10 +66,16 @@ def _errar_ate_bloquear(identificador: str, ip: str = IP_CASA) -> None:
         assert _entrar(identificador, "errada", ip).status_code == 400
 
 
-def _redefinir(ator: Usuario, alvo: Usuario) -> None:
+def _patch_senha(ator: Usuario, alvo: Usuario):
     client = APIClient()
     client.force_authenticate(ator)
-    resp = client.patch(f"/api/usuarios-admin/{alvo.pk}/", {"password": SENHA_NOVA}, format="json")
+    # A limpeza do bloqueio roda no commit da transação; o teste vive dentro de uma que nunca comita.
+    with TestCase.captureOnCommitCallbacks(execute=True):
+        return client.patch(f"/api/usuarios-admin/{alvo.pk}/", {"password": SENHA_NOVA}, format="json")
+
+
+def _redefinir(ator: Usuario, alvo: Usuario) -> None:
+    resp = _patch_senha(ator, alvo)
     assert resp.status_code == 200, resp.content
 
 
@@ -128,4 +137,54 @@ def test_senha_errada_sem_bloqueio_continua_com_a_resposta_generica():
 
     assert resp.status_code == 400
     assert resp.data == {"error": "Credenciais inválidas."}
-    assert "Retry-After" not in resp
+    assert not resp.has_header("Retry-After")
+
+
+def test_username_com_cpf_de_outra_conta_nao_desbloqueia_a_outra(dat):
+    """S1: o DAT dá à conta B o CPF do superusuário (com máscara) como login; redefinir a senha de B
+    não pode zerar o bloqueio do superusuário, que cai no mesmo balde."""
+    superusuario = UsuarioFactory(username=CPF, cpf=CPF, is_superuser=True, password=SENHA_ANTIGA)
+    alvo = UsuarioFactory(username="529.982.247-25", cpf="11144477735", password=SENHA_ANTIGA)
+    _errar_ate_bloquear(superusuario.cpf)
+
+    _redefinir(dat, alvo)
+
+    assert _entrar(superusuario.cpf, SENHA_ANTIGA).data["code"] == "ACCOUNT_LOCKED"
+
+
+def test_username_com_o_proprio_cpf_mascarado_continua_desbloqueando(dat):
+    alvo = UsuarioFactory(username="111.444.777-35", cpf="11144477735", password=SENHA_ANTIGA)
+    _errar_ate_bloquear(alvo.username)
+
+    _redefinir(dat, alvo)
+
+    assert _entrar(alvo.username, SENHA_NOVA).status_code == 200
+
+
+def test_redefinir_que_falha_na_lotacao_nao_desbloqueia():
+    """S2: se o salvar é recusado depois da senha (a lotação recusa), a senha e a auditoria voltam;
+    o bloqueio também precisa continuar."""
+    superusuario = UsuarioFactory(is_superuser=True, is_staff=True)
+    alvo = UsuarioFactory(cpf=CPF, password=SENHA_ANTIGA)
+    _errar_ate_bloquear(CPF)
+
+    recusa = serializers.ValidationError({"gerencia_id": "recusado"})
+    with patch.object(UsuarioAdminSerializer, "_apply_lotacao", side_effect=recusa):
+        resp = _patch_senha(superusuario, alvo)
+
+    assert resp.status_code == 400, resp.content
+    assert _entrar(CPF, SENHA_ANTIGA).data["code"] == "ACCOUNT_LOCKED"
+
+
+@patch("apps.core.views_auth._GLOBAL_LOCKOUT_THRESHOLD", 3)
+def test_retry_after_usa_o_maior_prazo_entre_as_chaves_que_bloqueiam():
+    """R1: bloqueado pela chave global (30 min); a chave deste IP existe, abaixo do limite e com
+    prazo curto. O aviso não pode sair com o prazo do IP."""
+    bucket = _lockout_bucket(CPF)
+    cache.set(_get_lockout_key(bucket, IP_CASA), 1, timeout=60)
+    cache.set(_get_lockout_key(bucket), 3, timeout=1800)
+
+    resp = _entrar(CPF, SENHA_ANTIGA, IP_CASA)
+
+    assert resp.data["code"] == "ACCOUNT_LOCKED"
+    assert int(resp["Retry-After"]) > 60

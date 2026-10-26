@@ -591,10 +591,11 @@ class UsuarioAdminSerializer(serializers.ModelSerializer):
             user.senha_redefinida_em = timezone.now()
         user.save()
         # Item 38: a senha nova vale na hora; sem isto, os erros de antes mantinham a conta bloqueada.
+        # No commit: se o salvar for recusado depois (ex.: `_apply_lotacao`), a senha volta e o bloqueio fica.
         # Import local: views_auth -> views.utils -> pacote views -> serializers (ciclo).
         from apps.core.views_auth import limpar_bloqueio_da_conta
 
-        limpar_bloqueio_da_conta(user)
+        transaction.on_commit(lambda: limpar_bloqueio_da_conta(user))
         auditar_reset_senha(actor=actor, target_user=user, contexto=contexto, imediato=True)
 
     @transaction.atomic

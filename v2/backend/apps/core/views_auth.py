@@ -146,13 +146,20 @@ def _is_account_locked(bucket: str, ip: str) -> bool:
 
 
 def _get_lockout_remaining_time(bucket: str, ip: str) -> int | None:
-    """Retorna tempo restante de bloqueio em segundos, ou None se não bloqueado."""
-    # Check IP-specific first, then global
-    for key in [_get_lockout_key(bucket, ip), _get_lockout_key(bucket)]:
-        ttl = cache.ttl(key) if hasattr(cache, "ttl") else None
-        if ttl and ttl > 0:
-            return ttl
-    return None
+    """Retorna tempo restante de bloqueio em segundos, ou None se não bloqueado.
+
+    Conta só as chaves que estão bloqueando (por IP e/ou global) e devolve o MAIOR prazo: a chave
+    do IP abaixo do limite, com prazo curto, não encurta o aviso de um bloqueio pela global.
+    """
+    if not hasattr(cache, "ttl"):
+        return None
+    bloqueando: list[str] = []
+    if _get_failed_attempts(bucket, ip) >= getattr(settings, "ACCOUNT_LOCKOUT_THRESHOLD", 10):
+        bloqueando.append(_get_lockout_key(bucket, ip))
+    if _get_failed_attempts(bucket) >= _GLOBAL_LOCKOUT_THRESHOLD:
+        bloqueando.append(_get_lockout_key(bucket))
+    ttls = [ttl for ttl in (cache.ttl(key) for key in bloqueando) if ttl and ttl > 0]
+    return max(ttls) if ttls else None
 
 
 def _username_para_auditoria(username: str) -> str:
@@ -260,8 +267,14 @@ def limpar_bloqueio_da_conta(user: object) -> None:
 
     Chamado quando a senha é redefinida pela administração: a senha nova vale na hora. Só as
     chaves desta conta; o global de outros identificadores fica como está.
+
+    O login entra só se for desta conta: com formato de CPF (``529.982.247-25`` vira o CPF canônico)
+    e diferente do CPF dela, o balde é o de OUTRA conta (ex.: o superusuário), e fica como está.
     """
-    for identificador in {getattr(user, "username", ""), getattr(user, "cpf", "") or ""} - {""}:
+    cpf = getattr(user, "cpf", "") or ""
+    login = normalize_login_identifier(getattr(user, "username", "") or "")
+    login_e_outro_cpf = len(login) == 11 and login.isdigit() and login != cpf
+    for identificador in {cpf, "" if login_e_outro_cpf else login} - {""}:
         bucket = _lockout_bucket(identificador)
         cache.delete_pattern(_get_lockout_key(bucket, "*"))
         cache.delete(_get_lockout_key(bucket))

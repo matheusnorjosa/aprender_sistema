@@ -224,11 +224,10 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             calculados = calculados or {}
             request: Any = self.context.get("request")
             ids = self._ids_da_pagina(obj)
-            publicaveis = set(
-                scope_publishable_solicitacoes(
-                    Solicitacao.objects.filter(id__in=ids), getattr(request, "user", None)
-                ).values_list("id", flat=True)
-            )
+            ids_publicaveis: Any = scope_publishable_solicitacoes(
+                Solicitacao.objects.filter(id__in=ids), getattr(request, "user", None)
+            ).values_list("id", flat=True)
+            publicaveis: set[int] = set(ids_publicaveis)
             calculados.update({sol_id: sol_id in publicaveis for sol_id in ids})
             self.context["_pode_tirar_do_google"] = calculados
         return calculados[obj.pk]

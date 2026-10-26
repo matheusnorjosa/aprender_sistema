@@ -179,12 +179,32 @@ def test_google_com_erro_nao_apaga_nada(apoio, projeto, google):
     response = _delete(apoio, sol)
 
     assert response.status_code == 400
-    assert "500" in response.data["detail"]
+    # Quem exclui lê o motivo no aviso da tela: o erro cru do Google não diz nada a ela.
+    detail = response.data["detail"]
+    assert "HttpError" not in detail and "500" not in detail
+    assert "nada foi excluído" in detail.lower()
+    assert "tente excluir de novo" in detail.lower()
     sol.refresh_from_db()
     assert sol.external_event_id == "evt-excluir-1"
     assert sol.gcal_status == "PUBLISHED"
     assert not AuditLog.objects.filter(action="DELETE", details__solicitacao_data__id=sol.pk).exists()
     assert not AuditLog.objects.filter(action="CANCEL_GCAL", details__solicitacao_id=sol.pk).exists()
+
+
+def test_google_recusa_403_diz_o_que_fazer_e_nao_apaga(apoio, projeto, google):
+    erro = Exception("<HttpError 403 forbidden>")
+    erro.resp = MagicMock(status=403)
+    google.delete.side_effect = erro
+    sol = _evento(apoio, projeto)
+
+    response = _delete(apoio, sol)
+
+    assert response.status_code == 400
+    detail = response.data["detail"]
+    assert "HttpError" not in detail
+    assert "nada foi excluído" in detail.lower()
+    assert "compartilhamento" in detail
+    assert Solicitacao.objects.filter(pk=sol.pk, external_event_id="evt-excluir-1").exists()
 
 
 def test_sem_acesso_ao_calendario_nao_apaga_nada(apoio, projeto, google):
@@ -195,6 +215,7 @@ def test_sem_acesso_ao_calendario_nao_apaga_nada(apoio, projeto, google):
 
     assert response.status_code == 400
     assert "acesso ao calendário" in response.data["detail"]
+    assert "nada foi excluído" in response.data["detail"].lower()
     google.delete.assert_not_called()
     sol.refresh_from_db()
     assert sol.external_event_id == "evt-excluir-1"

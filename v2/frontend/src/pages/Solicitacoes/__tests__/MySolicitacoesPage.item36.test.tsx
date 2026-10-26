@@ -338,10 +338,28 @@ describe('MySolicitacoesPage — Excluir sai do sistema e do Google', { timeout:
     informar.mockRestore();
   });
 
+  // A saída indicada tem de existir: "Tirar só do Google" (Publicar na agenda) só aparece em ERROR com id
+  // e só lista evento de hoje em diante; nas outras, nenhuma tela tira o evento do Google.
   test.each([
-    { caso: 'com id', external_event_id: 'evt-1' },
-    { caso: 'sem id', external_event_id: null },
-  ])('erro $caso, para quem não pode tirar do Google: sem Excluir, e o motivo fala de excluir', async ({ external_event_id }) => {
+    {
+      caso: 'com id, evento futuro',
+      external_event_id: 'evt-1',
+      fim: '2099-05-10T17:00:00Z',
+      saida: 'Para excluir, peça ao Apoio de Coordenação da sua gerência que tire o evento só do Google, na tela Publicar na agenda',
+    },
+    {
+      caso: 'com id, evento que já terminou',
+      external_event_id: 'evt-1',
+      fim: '2026-05-10T17:00:00Z',
+      saida: 'Para excluir, fale com a administração do sistema.',
+    },
+    {
+      caso: 'sem id',
+      external_event_id: null,
+      fim: '2099-05-10T17:00:00Z',
+      saida: 'Para excluir, fale com a administração do sistema.',
+    },
+  ])('erro $caso, para quem não pode tirar do Google: sem Excluir, e o motivo dá uma saída que existe', async ({ external_event_id, fim, saida }) => {
     listSolicitacoesMock.mockResolvedValue(
       pagina([
         makeSolic({
@@ -350,6 +368,7 @@ describe('MySolicitacoesPage — Excluir sai do sistema e do Google', { timeout:
           status: 'aprovado',
           gcal_status: 'ERROR',
           external_event_id,
+          fim,
           pode_tirar_do_google: false,
         }),
       ])
@@ -364,7 +383,10 @@ describe('MySolicitacoesPage — Excluir sai do sistema e do Google', { timeout:
       .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
     fireEvent.click(screen.getByRole('button', { name: 'Por que não dá para excluir: 10/05/2026 · Crato' }));
     const texto = String(informar.mock.calls[0]![0].content);
-    expect(texto).toContain('Para excluir, peça ao Apoio de Coordenação da sua gerência ou ao Controle');
+    expect(texto).toContain('Este evento pode estar no Google Agenda, e excluir aqui também o tiraria de lá.');
+    expect(texto).toContain(saida);
+    // O Controle não tem "tirar do Google" para evento em ERROR (a Pré-agenda só cancela o publicado).
+    expect(texto).not.toContain('Controle');
     expect(texto).not.toContain('editar');
     informar.mockRestore();
   });

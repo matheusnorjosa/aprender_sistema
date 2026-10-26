@@ -37,7 +37,7 @@ import type { ID, Solicitacao, SolicitacaoStatus, FluxoType, GCalStatus, Paginat
 import { formadoresLabel } from '../../utils/participants';
 import { formatFortaleza } from '../../utils/datetime';
 import { TEXTO_DA_TAG } from '../../components/textoDaTag';
-import { MOTIVO_NAO_PUBLICAVEL } from '../../utils/gcalRowActions';
+import { MOTIVO_NAO_PUBLICAVEL, motivoNaoPublicavel } from '../../utils/gcalRowActions';
 
 const { Title, Text } = Typography;
 
@@ -110,9 +110,13 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
     );
   } else if (noGoogle && !podeTirarDoGoogle) {
     // ERROR: a publicação deu erro, mas o evento pode estar no Google; excluir aqui o tiraria de lá.
-    motivos.push(
-      'Este evento pode estar no Google Agenda, e excluir aqui também o tiraria de lá. Para excluir, peça ao Apoio de Coordenação da sua gerência ou ao Controle que tire o evento do Google.'
-    );
+    // Só a Apoio, em Publicar na agenda, tira do Google um ERROR, e só com id e de hoje em diante
+    // (gcalRowActions; a Pré-agenda só cancela o publicado). Fora disso, nenhuma tela tira.
+    const apoioConsegueTirar = Boolean(record.external_event_id) && motivoNaoPublicavel(record) !== 'evento_passado';
+    const saida = apoioConsegueTirar
+      ? 'Para excluir, peça ao Apoio de Coordenação da sua gerência que tire o evento só do Google, na tela Publicar na agenda; depois disso, você consegue excluir aqui.'
+      : 'Para excluir, fale com a administração do sistema.';
+    motivos.push(`Este evento pode estar no Google Agenda, e excluir aqui também o tiraria de lá. ${saida}`);
   } else if (record.status === 'reprovado') {
     motivos.push('Solicitações reprovadas não podem ser editadas.');
   }

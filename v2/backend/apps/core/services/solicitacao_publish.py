@@ -514,6 +514,10 @@ def cancel_from_gcal(
 _MSG_SINCRONIZACAO_EM_ANDAMENTO = (
     "Não é possível excluir enquanto a sincronização com o Google Calendar está em andamento. Aguarde a conclusão."
 )
+_MSG_GOOGLE_NAO_CONFIRMOU = (
+    "O Google Agenda não confirmou a remoção do evento, e nada foi excluído: ele continua no sistema e no "
+    "Google. Tente excluir de novo em alguns minutos."
+)
 
 
 def remover_do_google_agora(solicitacao: Solicitacao, user: Usuario) -> str | None:
@@ -542,7 +546,11 @@ def remover_do_google_agora(solicitacao: Solicitacao, user: Usuario) -> str | No
         _event_id_for,
         cancel_solicitacao,
     )
-    from apps.core.tasks import _MSG_CREDENCIAL_GOOGLE, _friendly_gcal_error  # pyright: ignore[reportPrivateUsage]
+    from apps.core.tasks import (  # pyright: ignore[reportPrivateUsage]
+        _MSG_CREDENCIAL_GOOGLE,
+        _MSG_SEM_ACESSO_CALENDARIO,
+        _friendly_gcal_error,
+    )
 
     try:
         client = None
@@ -585,8 +593,14 @@ def remover_do_google_agora(solicitacao: Solicitacao, user: Usuario) -> str | No
                 "O evento pode já ter saído do Google Agenda, mas o sistema não conseguiu gravar. "
                 "Nada foi excluído aqui: tente excluir de novo."
             )
+        elif isinstance(e, APIError):
+            mensagem = e.message
+        elif isinstance(e, ValueError) or _friendly_gcal_error(e) == _MSG_SEM_ACESSO_CALENDARIO:
+            # Sem acesso ao calendário (403/404, ou a checagem do `cancel_solicitacao`): o texto diz o que fazer.
+            mensagem = f"Nada foi excluído. {_friendly_gcal_error(e)}"
         else:
-            mensagem = e.message if isinstance(e, APIError) else _friendly_gcal_error(e)
+            # Fora de 403/404 (5xx, rede) o texto do Google é técnico: o cru fica só no log acima.
+            mensagem = _MSG_GOOGLE_NAO_CONFIRMOU
         raise ValidationAPIError(message=mensagem, code="gcal_cancel_failed") from e
 
     return external_event_id

@@ -10,7 +10,6 @@
 
 import { useState, useEffect, useMemo, type JSX } from 'react';
 import {
-  Table,
   Button,
   Input,
   Space,
@@ -23,18 +22,17 @@ import {
   Form,
   InputNumber,
   DatePicker,
-  Tooltip,
   Divider,
   Row,
   Col,
   Progress,
+  Grid,
 } from 'antd';
 import {
   ReloadOutlined,
   EditOutlined,
   PlusOutlined,
   DeleteOutlined,
-  DownloadOutlined,
   FilterOutlined,
   ClearOutlined,
   ShoppingCartOutlined,
@@ -48,12 +46,14 @@ import {
   getProjetosOptions,
   getProdutosOptions,
 } from '../../api/datModule';
-import type { ColumnsType } from 'antd/es/table';
 import type { PaginatedResponse } from '../../types';
 import { useTableFilters, type TableFilterParams } from '../../hooks/useTableFilters';
 import DatImportsCentralizedBanner from '../../components/DatImportsCentralizedBanner';
 import dayjs, { type Dayjs } from 'dayjs';
 import { UF_OPTIONS } from '../../constants';
+import { useAcesso } from '../../contexts/AcessoContext';
+import ResponsiveTable, { VISIVEL_A_PARTIR, type ColunaResponsiva } from '../../components/ResponsiveTable';
+import { AcoesLinha, larguraAcoesLinha } from '../../components/AcoesLinha';
 
 const { Title, Text } = Typography;
 
@@ -68,7 +68,7 @@ interface CompraRecord {
   // Família do projeto (read-only do serializer) — coluna ao lado da variante. H.1/#1897.
   projeto_geral_nome?: string;
   produto: number;
-  produto_nome: string;
+  produto_nome: string | null;
   codigo_produto: string | null;
   tipo_compra?: string | null;
   uf?: string;
@@ -188,7 +188,18 @@ const buildComprasParams = (f: ComprasFilters): TableFilterParams => ({
   ...(f.tipo_compra && { tipo_compra: f.tipo_compra }),
 });
 
+/**
+ * Quem a linha representa: nomeia as ações, o botão de expandir e a confirmação de exclusão.
+ * Compra sem produto vai pelo projeto (item 38: a confirmação dizia 'Deseja excluir "null"?').
+ */
+const nomeDaCompra = (record: CompraRecord): string =>
+  `${record.produto_nome ?? record.projeto_nome} · ${record.municipio_nome} - ${record.municipio_uf ?? record.uf ?? ''}`;
+
 export default function ComprasPage(): JSX.Element {
+  // Celular (abaixo de sm): o projeto e o município vão junto do produto e as ações para o menu.
+  const acoesCompactas = !Grid.useBreakpoint().sm;
+  // O destroy exige `execute_restricted_operations` (item 38: o Controle via Excluir e levava 403).
+  const podeExcluir = useAcesso().caps.canExecuteRestrictedOperations;
   // Options for dropdowns
   const [municipios, setMunicipios] = useState<MunicipioOption[]>([]);
   const [projetos, setProjetos] = useState<ProjetoOption[]>([]);
@@ -290,7 +301,7 @@ export default function ComprasPage(): JSX.Element {
   const handleDelete = (record: CompraRecord) => {
     Modal.confirm({
       title: 'Excluir Compra?',
-      content: `Deseja excluir "${record.produto_nome}"? Esta ação não pode ser desfeita.`,
+      content: `Deseja excluir a compra "${nomeDaCompra(record)}"? Esta ação não pode ser desfeita.`,
       okText: 'Sim, excluir',
       okType: 'danger',
       cancelText: 'Cancelar',
@@ -334,37 +345,17 @@ export default function ComprasPage(): JSX.Element {
     return <Tag color={config?.color || 'default'}>{config?.label || tipo}</Tag>;
   };
 
-  // Table columns (memoized §16 Epic #459)
-  const columns: ColumnsType<CompraRecord> = useMemo(() => [
-    {
-      title: 'Projeto',
-      dataIndex: 'projeto_nome',
-      key: 'projeto',
-      width: 120,
-      fixed: 'left' as const,
-      render: (nome: string) => <Tag color="blue">{nome}</Tag>,
-    },
-    {
-      // Coleção = família (projeto_geral_nome) ao lado da variante — reagrupar por coleção via ordenar.
-      // ⚠️ sorter CLIENT-SIDE: ordena só a página carregada (ordering server-side não é wired aqui).
-      title: 'Coleção',
-      dataIndex: 'projeto_geral_nome',
-      key: 'projeto_geral',
-      width: 140,
-      fixed: 'left' as const,
-      sorter: (a: CompraRecord, b: CompraRecord) =>
-        (a.projeto_geral_nome ?? '').localeCompare(b.projeto_geral_nome ?? ''),
-      render: (nome: string | undefined) => (nome ? <Tag color="geekblue">{nome}</Tag> : '—'),
-    },
+  // Sem rolagem horizontal (padrão responsivo, item 38): sempre na linha o produto (com o projeto
+  // e o município, no celular) e as ações; Projeto e Coleção (a única que ordena) a partir de lg; o
+  // resto por largura e, abaixo dela, na linha expandida. Etiquetas quebram linha em vez de passar.
+  const columns: ColunaResponsiva<CompraRecord>[] = useMemo(() => [
     {
       title: 'Produto',
       dataIndex: 'produto_nome',
       key: 'produto',
-      width: 200,
-      fixed: 'left' as const,
-      render: (nome: string, record: CompraRecord) => (
+      render: (nome: string | null, record: CompraRecord) => (
         <div>
-          <Text strong>{nome}</Text>
+          <Text strong className="break-words">{nome}</Text>
           {record.codigo_produto && (
             <div>
               <Text type="secondary" style={{ fontSize: 12 }}>
@@ -372,12 +363,40 @@ export default function ComprasPage(): JSX.Element {
               </Text>
             </div>
           )}
+          {acoesCompactas && (
+            <div>
+              <Text type="secondary" className="break-words">
+                {`${record.projeto_nome} · ${record.municipio_nome} - ${record.municipio_uf ?? record.uf ?? ''}`}
+              </Text>
+            </div>
+          )}
         </div>
       ),
     },
     {
+      title: 'Projeto',
+      dataIndex: 'projeto_nome',
+      key: 'projeto',
+      responsive: VISIVEL_A_PARTIR.lg,
+      render: (nome: string) => <Tag color="blue" className="max-w-full whitespace-normal break-words">{nome}</Tag>,
+    },
+    {
+      // Coleção = família (projeto_geral_nome) ao lado da variante — reagrupar por coleção via ordenar.
+      // ⚠️ sorter CLIENT-SIDE: ordena só a página carregada (ordering server-side não é wired aqui).
+      // Única coluna que ordena: fica na linha a partir de lg.
+      title: 'Coleção',
+      dataIndex: 'projeto_geral_nome',
+      key: 'projeto_geral',
+      responsive: VISIVEL_A_PARTIR.lg,
+      sorter: (a: CompraRecord, b: CompraRecord) =>
+        (a.projeto_geral_nome ?? '').localeCompare(b.projeto_geral_nome ?? ''),
+      render: (nome: string | undefined) =>
+        nome ? <Tag color="geekblue" className="max-w-full whitespace-normal break-words">{nome}</Tag> : '—',
+    },
+    {
       title: 'UF',
       key: 'uf',
+      responsive: VISIVEL_A_PARTIR.xxl,
       width: 60,
       render: (_: unknown, record: CompraRecord) => {
         const uf = record.municipio_uf || record.uf;
@@ -388,13 +407,14 @@ export default function ComprasPage(): JSX.Element {
       title: 'Município',
       dataIndex: 'municipio_nome',
       key: 'municipio',
-      width: 150,
+      responsive: VISIVEL_A_PARTIR.md,
       ellipsis: true,
     },
     {
       title: 'Data Compra',
       dataIndex: 'data_compra',
       key: 'data_compra',
+      responsive: VISIVEL_A_PARTIR.xxl,
       width: 110,
       render: (data: string | null | undefined) =>
         data ? dayjs(data).format('DD/MM/YYYY') : <span style={{ color: '#bfbfbf' }}>—</span>,
@@ -403,6 +423,7 @@ export default function ComprasPage(): JSX.Element {
       title: 'Quantidade',
       dataIndex: 'quantidade',
       key: 'quantidade',
+      responsive: VISIVEL_A_PARTIR.sm,
       width: 100,
       align: 'right' as const,
       render: (val: number | null) => (
@@ -415,6 +436,7 @@ export default function ComprasPage(): JSX.Element {
       title: 'Utilizado',
       dataIndex: 'quantidade_utilizada',
       key: 'utilizado',
+      responsive: VISIVEL_A_PARTIR.xxl,
       width: 100,
       align: 'right' as const,
       render: (val: number | null) => val?.toLocaleString('pt-BR') || 0,
@@ -422,7 +444,8 @@ export default function ComprasPage(): JSX.Element {
     {
       title: 'Disponível',
       key: 'disponivel',
-      width: 120,
+      responsive: VISIVEL_A_PARTIR.sm,
+      width: 100,
       align: 'right' as const,
       render: (_: unknown, record: CompraRecord) => {
         const disponivel = calcularDisponivel(record.quantidade, record.quantidade_utilizada);
@@ -448,6 +471,7 @@ export default function ComprasPage(): JSX.Element {
       title: 'Ano Uso',
       dataIndex: 'ano_uso',
       key: 'ano_uso',
+      responsive: VISIVEL_A_PARTIR.md,
       width: 90,
       align: 'center' as const,
       render: (ano: number | null) => ano ? <Tag>{ano}</Tag> : '-',
@@ -456,12 +480,13 @@ export default function ComprasPage(): JSX.Element {
       title: 'Tipo Compra',
       dataIndex: 'tipo_compra',
       key: 'tipo_compra',
-      width: 140,
+      responsive: VISIVEL_A_PARTIR.xxl,
       render: (tipo: string | null) => renderTipoCompraTag(tipo),
     },
     {
       title: 'Status',
       key: 'status',
+      responsive: VISIVEL_A_PARTIR.sm,
       width: 120,
       render: (_: unknown, record: CompraRecord) => {
         const disponivel = calcularDisponivel(record.quantidade, record.quantidade_utilizada);
@@ -471,33 +496,21 @@ export default function ComprasPage(): JSX.Element {
     {
       title: 'Ações',
       key: 'acoes',
-      width: 100,
-      fixed: 'right' as const,
+      width: larguraAcoesLinha(podeExcluir ? 2 : 1, acoesCompactas),
       render: (_: unknown, record: CompraRecord) => (
-        <Space size="small">
-          <Tooltip title="Editar">
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => handleEdit(record)}
-              aria-label="Editar compra"
-            />
-          </Tooltip>
-          <Tooltip title="Excluir">
-            <Button
-              type="text"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => handleDelete(record)}
-              aria-label="Excluir compra"
-            />
-          </Tooltip>
-        </Space>
+        <AcoesLinha
+          compacto={acoesCompactas}
+          alvo={nomeDaCompra(record)}
+          acoes={[
+            { chave: 'editar', rotulo: 'Editar', icone: <EditOutlined />, onClick: () => handleEdit(record) },
+            ...(podeExcluir
+              ? [{ chave: 'excluir', rotulo: 'Excluir', icone: <DeleteOutlined />, onClick: () => handleDelete(record), perigo: true }]
+              : []),
+          ]}
+        />
       ),
     },
-  ], []);
+  ], [acoesCompactas, podeExcluir]);
 
   return (
     <section className="p-6 bg-gray-100" style={{ minHeight: 'calc(100vh - 64px)' }} aria-labelledby="compras-title">
@@ -514,7 +527,7 @@ export default function ComprasPage(): JSX.Element {
             </Text>
           </div>
           <Space wrap>
-            <Button icon={<DownloadOutlined />}>Exportar</Button>
+            {/* Item 38: saiu o "Exportar", que não fazia nada (não há export de compras no servidor). */}
             <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
               Nova Compra
             </Button>
@@ -529,12 +542,13 @@ export default function ComprasPage(): JSX.Element {
       <Card className="mb-4" bodyStyle={{ paddingBottom: 12 }}>
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} md={8} lg={4}>
-            <div className="mb-1">
+            <label htmlFor="compras-filtro-busca" className="block mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Buscar
               </Text>
-            </div>
+            </label>
             <Input.Search
+              id="compras-filtro-busca"
               placeholder="Produto, código..."
               allowClear
               value={filters.search}
@@ -543,12 +557,13 @@ export default function ComprasPage(): JSX.Element {
             />
           </Col>
           <Col xs={24} sm={12} md={8} lg={3}>
-            <div className="mb-1">
+            <label htmlFor="compras-filtro-projeto" className="block mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Projeto
               </Text>
-            </div>
+            </label>
             <Select
+              id="compras-filtro-projeto"
               style={{ width: '100%' }}
               placeholder="Todos"
               allowClear
@@ -560,12 +575,13 @@ export default function ComprasPage(): JSX.Element {
             />
           </Col>
           <Col xs={24} sm={12} md={8} lg={4}>
-            <div className="mb-1">
+            <label htmlFor="compras-filtro-produto" className="block mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Produto
               </Text>
-            </div>
+            </label>
             <Select
+              id="compras-filtro-produto"
               style={{ width: '100%' }}
               placeholder="Todos"
               allowClear
@@ -577,12 +593,13 @@ export default function ComprasPage(): JSX.Element {
             />
           </Col>
           <Col xs={24} sm={12} md={8} lg={3}>
-            <div className="mb-1">
+            <label htmlFor="compras-filtro-uf" className="block mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 UF
               </Text>
-            </div>
+            </label>
             <Select
+              id="compras-filtro-uf"
               style={{ width: '100%' }}
               placeholder="Todos"
               allowClear
@@ -593,12 +610,13 @@ export default function ComprasPage(): JSX.Element {
             />
           </Col>
           <Col xs={24} sm={12} md={8} lg={4}>
-            <div className="mb-1">
+            <label htmlFor="compras-filtro-municipio" className="block mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Município
               </Text>
-            </div>
+            </label>
             <Select
+              id="compras-filtro-municipio"
               style={{ width: '100%' }}
               placeholder="Buscar..."
               allowClear
@@ -610,12 +628,13 @@ export default function ComprasPage(): JSX.Element {
             />
           </Col>
           <Col xs={24} sm={12} md={8} lg={3}>
-            <div className="mb-1">
+            <label htmlFor="compras-filtro-ano-uso" className="block mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Ano Uso
               </Text>
-            </div>
+            </label>
             <Select
+              id="compras-filtro-ano-uso"
               style={{ width: '100%' }}
               placeholder="Todos"
               allowClear
@@ -625,12 +644,13 @@ export default function ComprasPage(): JSX.Element {
             />
           </Col>
           <Col xs={24} sm={12} md={8} lg={3}>
-            <div className="mb-1">
+            <label htmlFor="compras-filtro-status" className="block mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Status
               </Text>
-            </div>
+            </label>
             <Select
+              id="compras-filtro-status"
               style={{ width: '100%' }}
               placeholder="Todos"
               allowClear
@@ -640,12 +660,13 @@ export default function ComprasPage(): JSX.Element {
             />
           </Col>
           <Col xs={24} sm={12} md={8} lg={4}>
-            <div className="mb-1">
+            <label htmlFor="compras-filtro-tipo-compra" className="block mb-1">
               <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
                 Tipo Compra
               </Text>
-            </div>
+            </label>
             <Select
+              id="compras-filtro-tipo-compra"
               style={{ width: '100%' }}
               placeholder="Todos"
               allowClear
@@ -682,44 +703,28 @@ export default function ComprasPage(): JSX.Element {
           </Space>
         }
       >
-        <Table
+        <ResponsiveTable<CompraRecord>
           columns={columns}
           dataSource={compras}
           rowKey="id"
           loading={loading}
-          scroll={{ x: 1400 }}
+          nomeDaLinha={nomeDaCompra}
           pagination={{
             ...pagination,
             showSizeChanger: true,
             showTotal: (total, range) => `Mostrando ${range[0]} a ${range[1]} de ${total} registros`,
             onChange: handleTableChange,
           }}
-          size="middle"
-          summary={(pageData) => {
+          // Item 38: os totais numa linha só, fora das colunas (que mudam com a largura da tela).
+          footer={(pageData) => {
             const totalQtd = pageData.reduce((sum: number, r: CompraRecord) => sum + (r.quantidade || 0), 0);
             const totalUtilizado = pageData.reduce((sum: number, r: CompraRecord) => sum + (r.quantidade_utilizada || 0), 0);
             const totalDisponivel = totalQtd - totalUtilizado;
 
             return (
-              <Table.Summary fixed>
-                <Table.Summary.Row className="bg-gray-50 font-bold">
-                  <Table.Summary.Cell index={0} colSpan={5}>
-                    Total da Página
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={4} align="right">
-                    {totalQtd.toLocaleString('pt-BR')}
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={5} align="right">
-                    {totalUtilizado.toLocaleString('pt-BR')}
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={6} align="right">
-                    <Text type={totalDisponivel > 0 ? 'success' : 'danger'}>
-                      {totalDisponivel.toLocaleString('pt-BR')}
-                    </Text>
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={7} colSpan={4} />
-                </Table.Summary.Row>
-              </Table.Summary>
+              <Text strong>
+                {`Total da página: quantidade ${totalQtd.toLocaleString('pt-BR')} · utilizado ${totalUtilizado.toLocaleString('pt-BR')} · disponível ${totalDisponivel.toLocaleString('pt-BR')}`}
+              </Text>
             );
           }}
         />
@@ -766,7 +771,7 @@ export default function ComprasPage(): JSX.Element {
         footer={
           <div className="flex justify-between">
             <div>
-              {editingCompra && (
+              {editingCompra && podeExcluir && (
                 <Button
                   danger
                   type="text"

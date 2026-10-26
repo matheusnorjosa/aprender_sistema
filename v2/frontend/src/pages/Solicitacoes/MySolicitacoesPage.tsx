@@ -92,8 +92,9 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
   const noGoogle = estaNoGoogle(record);
   const podeTirarDoGoogle = record.pode_tirar_do_google === true;
   const isSuper = record.fluxo === ('SUPER' as FluxoType);
+  const superForaDePendente = isSuper && record.status !== 'pendente';
   const podeEditar = !isPublished && record.status !== 'reprovado';
-  const podeExcluir = !naPlanilha && (!noGoogle || podeTirarDoGoogle) && (!isSuper || record.status === 'pendente');
+  const podeExcluir = !naPlanilha && (!noGoogle || podeTirarDoGoogle) && !superForaDePendente;
   const motivos: string[] = [];
   if (naPlanilha) {
     // Não foi o sistema que publicou: não há publicação para cancelar aqui.
@@ -108,11 +109,16 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
     motivos.push(
       'Este evento já está no Google Agenda: para editar, tire-o do Google antes, na tela Publicar na agenda ou na Pré-agenda; depois disso, você consegue editar aqui.'
     );
-  } else if (noGoogle && !podeTirarDoGoogle) {
+  } else if (noGoogle && !podeTirarDoGoogle && !superForaDePendente) {
     // ERROR: a publicação deu erro, mas o evento pode estar no Google; excluir aqui o tiraria de lá.
-    // Só a Apoio, em Publicar na agenda, tira do Google um ERROR, e só com id e de hoje em diante
-    // (gcalRowActions; a Pré-agenda só cancela o publicado). Fora disso, nenhuma tela tira.
-    const apoioConsegueTirar = Boolean(record.external_event_id) && motivoNaoPublicavel(record) !== 'evento_passado';
+    // Só a Apoio, em Publicar na agenda, tira do Google um ERROR, e só aprovado, com id e de hoje em
+    // diante (a tela lista só 'aprovado'; gcalRowActions; a Pré-agenda só cancela o publicado). Fora
+    // disso, nenhuma tela tira. A SUPER fora de pendente não chega aqui: tirar do Google não devolve
+    // a exclusão a ela, e o motivo dela (abaixo) já dá a saída.
+    const apoioConsegueTirar =
+      record.status === 'aprovado' &&
+      Boolean(record.external_event_id) &&
+      motivoNaoPublicavel(record) !== 'evento_passado';
     const saida = apoioConsegueTirar
       ? 'Para excluir, peça ao Apoio de Coordenação da sua gerência que tire o evento só do Google, na tela Publicar na agenda; depois disso, você consegue excluir aqui.'
       : 'Para excluir, fale com a administração do sistema.';
@@ -121,7 +127,7 @@ function permissoesDaLinha(record: Solicitacao): { podeEditar: boolean; podeExcl
     motivos.push('Solicitações reprovadas não podem ser editadas.');
   }
   // Cancelar a publicação não devolve a exclusão a uma SUPER que já saiu de pendente.
-  if (isSuper && record.status !== 'pendente') {
+  if (superForaDePendente) {
     motivos.push(
       'Solicitações do fluxo Superintendência só podem ser excluídas enquanto estão pendentes. Para tirar o evento, fale com a administração do sistema.'
     );

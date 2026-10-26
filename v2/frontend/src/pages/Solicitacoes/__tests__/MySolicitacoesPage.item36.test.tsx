@@ -391,6 +391,68 @@ describe('MySolicitacoesPage — Excluir sai do sistema e do Google', { timeout:
     informar.mockRestore();
   });
 
+  // Publicar na agenda só lista 'aprovado': a ERROR editada (volta a pendente, PA-04) ou reprovada não
+  // aparece lá, então o Apoio não tem onde tirá-la do Google.
+  test.each([
+    { caso: 'pendente', fluxo: 'NAO_SUPER' as const, status: 'pendente' as const },
+    { caso: 'reprovada', fluxo: 'NAO_SUPER' as const, status: 'reprovado' as const },
+    { caso: 'SUPER que voltou a pendente', fluxo: 'SUPER' as const, status: 'pendente' as const },
+  ])('erro com id, $caso, para quem não pode tirar do Google: não manda pedir ao Apoio', async ({ fluxo, status }) => {
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([
+        makeSolic({
+          id: 8,
+          municipio_nome: 'Crato',
+          fluxo,
+          status,
+          gcal_status: 'ERROR',
+          external_event_id: 'evt-1',
+          fim: '2099-05-10T17:00:00Z',
+          pode_tirar_do_google: false,
+        }),
+      ])
+    );
+    renderPage();
+    expect(await screen.findByText('Crato')).toBeInTheDocument();
+    const informar = vi
+      .spyOn(Modal, 'info')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    fireEvent.click(screen.getByRole('button', { name: /^Por que não dá para .*: 10\/05\/2026 · Crato$/ }));
+    const texto = String(informar.mock.calls[0]![0].content);
+    expect(texto).not.toContain('Publicar na agenda');
+    expect(texto).toContain('Para excluir, fale com a administração do sistema.');
+    informar.mockRestore();
+  });
+
+  test('SUPER aprovada em erro com id, para quem não pode tirar do Google: o motivo não se contradiz', async () => {
+    listSolicitacoesMock.mockResolvedValue(
+      pagina([
+        makeSolic({
+          id: 8,
+          municipio_nome: 'Crato',
+          fluxo: 'SUPER',
+          status: 'aprovado',
+          gcal_status: 'ERROR',
+          external_event_id: 'evt-1',
+          fim: '2099-05-10T17:00:00Z',
+          pode_tirar_do_google: false,
+        }),
+      ])
+    );
+    renderPage();
+    expect(await screen.findByText('Crato')).toBeInTheDocument();
+    const informar = vi
+      .spyOn(Modal, 'info')
+      .mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn(), then: vi.fn() }) as never);
+    fireEvent.click(screen.getByRole('button', { name: /^Por que não dá para .*: 10\/05\/2026 · Crato$/ }));
+    const texto = String(informar.mock.calls[0]![0].content);
+    // Tirar do Google não devolve a exclusão a uma SUPER fora de pendente: nada de "excluir aqui".
+    expect(texto).not.toMatch(/excluir aqui/);
+    expect(texto).toContain('Solicitações do fluxo Superintendência só podem ser excluídas enquanto estão pendentes.');
+    expect(texto).toContain('fale com a administração do sistema');
+    informar.mockRestore();
+  });
+
   test('na planilha (não adotado): sem Excluir mesmo para quem pode tirar do Google', async () => {
     listSolicitacoesMock.mockResolvedValue(
       pagina([

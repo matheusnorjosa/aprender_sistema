@@ -191,7 +191,16 @@ export const ROTAS_MEDIDAS: readonly RotaMedida[] = [
     // (< 1600) vão para a linha expandida: há linha expandida em toda largura.
     estados: [expandida(T.municipio, 'Observações')],
   },
-  { path: '/controle/compras', perfil: 'controle', marco: 'Gestão de Compras/Materiais', dados: { em: LINHA, texto: T.produto } },
+  {
+    path: '/controle/compras',
+    perfil: 'controle',
+    marco: 'Gestão de Compras/Materiais',
+    dados: { em: LINHA, texto: T.produto },
+    // Item 38: Status, Quantidade e Disponível (< 576), Município e Ano Uso (< 768), Projeto e
+    // Coleção (< 992) e UF, Data Compra, Utilizado e Tipo Compra (< 1600) vão para a linha
+    // expandida: há linha expandida em toda largura.
+    estados: [expandida(T.produto, 'Tipo Compra')],
+  },
   {
     path: '/controle/coordenadores',
     perfil: 'controle',
@@ -416,6 +425,8 @@ export const TELA_LOGIN = 'login';
  * /solicitacoes/aprovacoes, as 4 de /solicitacoes/publicacao e as 4 de /controle/pre-agenda. Ficam 67.
  * Gestão de Ações e Registros de Turmas (item 38, 20/10/2026): saíram as 4 de /controle/acoes e
  * as 4 de /dat/registros. Ficam 59. A vista "expandida" de cada uma é medida e não rola.
+ * Gestão de Compras (item 38, 26/10/2026): saíram as 4 de /controle/compras. Ficam 55. A vista
+ * "expandida" é medida e não rola.
  * O ratchet do Vitest (semRolagemHorizontal.pendentes.test.ts) trava a lista: nada novo
  * entra e o tamanho só desce.
  */
@@ -430,7 +441,6 @@ export const PENDENTES: Readonly<Record<string, readonly Largura[]>> = {
   '/solicitacoes/disponibilidade': [360, 768, 1024],
   '/solicitacoes/bloqueios': [360, 768, 1024, 1280],
   '/solicitacoes/deslocamentos': [360, 768, 1024, 1280],
-  '/controle/compras': [360, 768, 1024, 1280],
   '/controle/coordenadores': [360, 768, 1024, 1280],
   '/controle/coordenadores#lista': [360, 768, 1024, 1280],
   '/controle/coordenadores#area': [360],

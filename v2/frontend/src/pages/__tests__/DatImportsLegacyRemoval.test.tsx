@@ -173,7 +173,8 @@ describe('DAT Imports PR-D — remoção de entrypoints legados', () => {
 
     expect(screen.getByRole('heading', { name: /Gestão de Compras\/Materiais/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Nova Compra/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Exportar/i })).toBeInTheDocument();
+    // Item 38: o Exportar saiu (não fazia nada; não há export de compras no servidor).
+    expect(screen.queryByRole('button', { name: /Exportar/i })).not.toBeInTheDocument();
     // Controle não é superusuário: o aviso de DAT > Importações não aparece (02/10/2026).
     await waitFor(() => expect(getMe).toHaveBeenCalled());
     expect(screen.queryByLabelText(DAT_IMPORTS_CENTRALIZED_MESSAGE)).not.toBeInTheDocument();

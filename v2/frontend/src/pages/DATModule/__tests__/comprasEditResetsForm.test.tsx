@@ -53,7 +53,7 @@ describe('Cinto M17 (#1636): editar compra reseta o form (sem carry-over)', () =
         </MemoryRouter>,
       );
 
-      const editBtns = await screen.findAllByLabelText('Editar compra', {}, { timeout: 15000 });
+      const editBtns = await screen.findAllByLabelText(/^Editar: /, {}, { timeout: 15000 });
       await user.click(editBtns[0]); // edita A
 
       const obs = await screen.findByLabelText('Observações', {}, { timeout: 10000 });
@@ -66,7 +66,7 @@ describe('Cinto M17 (#1636): editar compra reseta o form (sem carry-over)', () =
       await user.click(screen.getByRole('button', { name: /cancelar/i }));
 
       // reabre a edição, agora na compra B
-      const editBtns2 = await screen.findAllByLabelText('Editar compra', {}, { timeout: 10000 });
+      const editBtns2 = await screen.findAllByLabelText(/^Editar: /, {}, { timeout: 10000 });
       await user.click(editBtns2[1]); // edita B
 
       const obsB = await screen.findByLabelText('Observações', {}, { timeout: 10000 });

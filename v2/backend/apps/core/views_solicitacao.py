@@ -1029,10 +1029,13 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
           NAO_SUPER, que segue `aprovado`). Vale para todos na API, superusuário incluso. A
           auto-aprovação da NAO_SUPER não grava nenhum dos dois e não trava.
 
-        - No Google (PUBLISHED, ou `external_event_id` preenchido, que cobre o ERROR de um cancel que
-          falhou): sai dos dois lados numa ação só, para quem já pode tirar do Google
-          (`can_publish_solicitacao`). O Google vem primeiro e síncrono; se falhar, nada é apagado.
-          Quem não pode recebe 400 e o Google não é chamado. Todas as recusas abaixo vêm antes.
+        - No Google (PUBLISHED, ERROR com ou sem id, ou `external_event_id` preenchido): sai dos dois
+          lados numa ação só, para quem já pode tirar do Google (`can_publish_solicitacao`). ERROR
+          sem id conta: a publicação que falhou pode ter criado o evento com o id determinístico. O
+          Google vem primeiro e síncrono; se falhar, nada é apagado. Quem não pode recebe 400 e o
+          Google não é chamado. Todas as recusas abaixo vêm antes.
+        - O delete relê a linha com lock: se uma publicação ou reenvio concorrente a pôs (de volta)
+          no Google, recusa em vez de deixar o evento órfão lá.
         - No Google pela planilha sem adoção (`publicado_fora_do_sistema`): não se exclui (não há id
           para apagar lá, e o evento ficaria no Google).
 
@@ -1091,7 +1094,7 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         # No Google: sai de lá primeiro (fora do atomic do delete: o NONE fica gravado e o delete vem
         # depois; se o delete falhar, sobra a linha "não publicada", que é o estado verdadeiro).
         removido_do_google: dict[str, Any] = {}
-        if instance.gcal_status == "PUBLISHED" or instance.external_event_id:
+        if instance.gcal_status in ("PUBLISHED", "ERROR") or instance.external_event_id:
             if not can_publish_solicitacao(self.request.user, instance):
                 raise ValidationError(
                     {
@@ -1123,6 +1126,22 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         # é desfeito junto (senão sobra trilha "excluído" para um registro que
         # continua existindo — ATOMIC_REQUESTS=False → a request não é atômica por si).
         with transaction.atomic():
+            # As checagens acima leram `instance` sem lock: uma publicação ou reenvio concorrente pode
+            # ter posto o evento no Google desde então (a task trava a linha enquanto fala com o Google).
+            atual = (
+                Solicitacao.objects.select_for_update()
+                .filter(pk=instance.pk)
+                .values_list("gcal_status", "external_event_id")
+                .first()
+            )
+            if atual is not None and (atual[0] != "NONE" or atual[1]):
+                raise ValidationError(
+                    {
+                        "detail": "O evento mudou no Google Agenda enquanto você excluía (alguém publicou ou "
+                        "reenviou agora). Nada foi excluído: recarregue a lista e tente de novo."
+                    }
+                )
+
             # Registrar exclusão no AuditLog ANTES de deletar
             AuditLog.objects.create(
                 usuario=self.request.user,

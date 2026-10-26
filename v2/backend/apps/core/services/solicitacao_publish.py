@@ -511,6 +511,11 @@ def cancel_from_gcal(
     )
 
 
+_MSG_SINCRONIZACAO_EM_ANDAMENTO = (
+    "Não é possível excluir enquanto a sincronização com o Google Calendar está em andamento. Aguarde a conclusão."
+)
+
+
 def remover_do_google_agora(solicitacao: Solicitacao, user: Usuario) -> str | None:
     """Tira o evento do Google AGORA (síncrono), para a exclusão apagar dos dois lados.
 
@@ -519,16 +524,24 @@ def remover_do_google_agora(solicitacao: Solicitacao, user: Usuario) -> str | No
     os campos depois que o Google confirma (404 = já removido) e grava `gcal_status=NONE`; o
     `status` não muda. Quem chama já conferiu `can_publish_solicitacao`.
 
+    A linha é relida com lock: PENDING (publicação ou reenvio enfileirado) recusa sem chamar o
+    Google. ERROR sem id (publicação que falhou) usa o id determinístico do insert, porque o evento
+    pode ter sido criado lá. O AuditLog vem antes do Google: depois dele só sobra o save da linha.
+
     Returns:
-        O `external_event_id` que estava no Google.
+        O `external_event_id` que estava (ou podia estar) no Google.
 
     Raises:
-        ValidationAPIError 400 `gcal_cancel_failed` com o motivo legível. Nada foi alterado: o
-        evento continua no Google e no sistema.
+        ValidationAPIError 400 `gcal_cancel_failed` com o motivo legível. Se o Google falhou, nada
+        mudou. Se a gravação falhou depois do Google (raro), o evento pode já ter saído de lá e a
+        linha continua como antes; tentar de novo resolve (404 conta como sucesso).
     """
-    from django.db import transaction
+    from django.db import DatabaseError, transaction
 
-    from apps.core.services.gcal_sync_service import cancel_solicitacao
+    from apps.core.services.gcal_sync_service import (  # pyright: ignore[reportPrivateUsage]
+        _event_id_for,
+        cancel_solicitacao,
+    )
     from apps.core.tasks import _MSG_CREDENCIAL_GOOGLE, _friendly_gcal_error  # pyright: ignore[reportPrivateUsage]
 
     try:
@@ -543,20 +556,23 @@ def remover_do_google_agora(solicitacao: Solicitacao, user: Usuario) -> str | No
 
         with transaction.atomic():
             s = Solicitacao.objects.select_for_update().get(pk=solicitacao.pk)
+            if s.gcal_status == Solicitacao.GCalStatus.PENDING:
+                raise ValidationAPIError(message=_MSG_SINCRONIZACAO_EM_ANDAMENTO, code="gcal_cancel_failed")
+            if s.gcal_status == Solicitacao.GCalStatus.ERROR and not s.external_event_id:
+                s.external_event_id = _event_id_for(s)
             external_event_id = s.external_event_id
-            outcome = cancel_solicitacao(s, client=client)
             AuditLog.objects.create(
                 usuario=user,
                 action=AuditLog.Action.CANCEL_GCAL,
                 model_name="Solicitacao",
                 details={
                     "solicitacao_id": s.id,
-                    "action": outcome.action,
+                    "action": "DELETE",
                     "external_event_id": external_event_id,
-                    "summary": outcome.summary,
                     "origem": "exclusao",
                 },
             )
+            cancel_solicitacao(s, client=client)
     except ValidationAPIError:
         raise
     except Exception as e:
@@ -564,7 +580,13 @@ def remover_do_google_agora(solicitacao: Solicitacao, user: Usuario) -> str | No
             "excluir_cancel_gcal_failed",
             extra={"event": "excluir_cancel_gcal_failed", "solicitacao_id": solicitacao.pk, "error": str(e)[:500]},
         )
-        mensagem = e.message if isinstance(e, APIError) else _friendly_gcal_error(e)
+        if isinstance(e, DatabaseError):
+            mensagem = (
+                "O evento pode já ter saído do Google Agenda, mas o sistema não conseguiu gravar. "
+                "Nada foi excluído aqui: tente excluir de novo."
+            )
+        else:
+            mensagem = e.message if isinstance(e, APIError) else _friendly_gcal_error(e)
         raise ValidationAPIError(message=mensagem, code="gcal_cancel_failed") from e
 
     return external_event_id

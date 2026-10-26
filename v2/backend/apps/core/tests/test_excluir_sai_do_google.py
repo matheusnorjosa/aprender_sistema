@@ -323,3 +323,121 @@ def test_lista_calcula_o_escopo_de_publicacao_uma_vez_por_request(apoio, projeto
     assert len(linhas) == 3
     assert all(r["pode_tirar_do_google"] for r in linhas)
     assert tier.call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# ERROR sem id: a publicação que falhou pode ter criado o evento no Google
+# ---------------------------------------------------------------------------
+
+
+def test_erro_sem_id_tenta_o_id_deterministico_antes_de_apagar(apoio, projeto, google):
+    """O insert usa `_event_id_for(s)` e não grava o id quando falha: o evento pode estar lá."""
+    from apps.core.services.gcal_sync_service import _event_id_for
+
+    sol = _evento(apoio, projeto, gcal_status="ERROR", external_event_id=None)
+    sol_id = sol.pk
+
+    response = _delete(apoio, sol)
+
+    assert response.status_code == 204, response.data
+    google.delete.assert_called_once_with(CALENDARIO, _event_id_for(sol))
+    assert not Solicitacao.objects.filter(pk=sol_id).exists()
+
+
+def test_dono_sem_can_publish_nao_exclui_erro_sem_id(formador, projeto, google):
+    sol = _evento(formador, projeto, gcal_status="ERROR", external_event_id=None)
+
+    response = _delete(formador, sol)
+
+    assert response.status_code == 400
+    google.delete.assert_not_called()
+    assert Solicitacao.objects.filter(pk=sol.pk).exists()
+
+
+# ---------------------------------------------------------------------------
+# Concorrência: o delete confere de novo, com a linha travada
+# ---------------------------------------------------------------------------
+
+
+def _publica_por_fora(sol_id: int):
+    """Simula a task de publicação que gravou o evento entre as checagens e o delete."""
+
+    def efeito(request):
+        Solicitacao.objects.filter(pk=sol_id).update(gcal_status="PUBLISHED", external_event_id="evt-concorrente")
+        return "127.0.0.1"
+
+    return efeito
+
+
+def test_publicacao_concorrente_antes_do_delete_nao_apaga(apoio, projeto, google):
+    sol = _evento(apoio, projeto, gcal_status="NONE", external_event_id=None)
+
+    with patch("apps.core.views_solicitacao.get_client_ip", side_effect=_publica_por_fora(sol.pk)):
+        response = _delete(apoio, sol)
+
+    assert response.status_code == 400
+    assert "mudou no Google Agenda" in response.data["detail"]
+    assert Solicitacao.objects.filter(pk=sol.pk, external_event_id="evt-concorrente").exists()
+    assert not AuditLog.objects.filter(action="DELETE", details__solicitacao_data__id=sol.pk).exists()
+
+
+def test_reenvio_concorrente_depois_de_tirar_do_google_nao_apaga(apoio, projeto, google):
+    sol = _evento(apoio, projeto)
+
+    with patch("apps.core.views_solicitacao.get_client_ip", side_effect=_publica_por_fora(sol.pk)):
+        response = _delete(apoio, sol)
+
+    assert response.status_code == 400
+    google.delete.assert_called_once_with(CALENDARIO, "evt-excluir-1")
+    assert Solicitacao.objects.filter(pk=sol.pk, external_event_id="evt-concorrente").exists()
+
+
+def test_pending_que_apareceu_depois_da_checagem_nao_chama_o_google(apoio, projeto, google):
+    """A linha relida com lock está PENDING (publicação ou reenvio enfileirado): não mexe no Google."""
+    sol = _evento(apoio, projeto)
+
+    def pode_e_enfileira(user, obj):
+        Solicitacao.objects.filter(pk=obj.pk).update(gcal_status="PENDING")
+        return True
+
+    with patch("apps.core.views_solicitacao.can_publish_solicitacao", side_effect=pode_e_enfileira):
+        response = _delete(apoio, sol)
+
+    assert response.status_code == 400
+    assert "sincronização" in response.data["detail"]
+    google.delete.assert_not_called()
+    assert Solicitacao.objects.filter(pk=sol.pk, gcal_status="PENDING").exists()
+
+
+# ---------------------------------------------------------------------------
+# O que vem depois do Google não desfaz em silêncio a saída de lá
+# ---------------------------------------------------------------------------
+
+
+def test_auditoria_do_cancelamento_vem_antes_do_google(apoio, projeto, google):
+    """Se o AuditLog falhar, o Google não foi chamado: a resposta 'nada mudou' é verdadeira."""
+    from django.db import DatabaseError
+
+    sol = _evento(apoio, projeto)
+
+    with patch.object(AuditLog.objects, "create", side_effect=DatabaseError("audit fora")):
+        response = _delete(apoio, sol)
+
+    assert response.status_code == 400
+    google.delete.assert_not_called()
+    sol.refresh_from_db()
+    assert sol.external_event_id == "evt-excluir-1"
+
+
+def test_falha_ao_gravar_depois_do_google_diz_que_pode_ter_saido(apoio, projeto, google):
+    from django.db import DatabaseError
+
+    sol = _evento(apoio, projeto)
+
+    with patch.object(Solicitacao, "save", side_effect=DatabaseError("db fora")):
+        response = _delete(apoio, sol)
+
+    assert response.status_code == 400
+    google.delete.assert_called_once()
+    assert "pode já ter saído do Google Agenda" in response.data["detail"]
+    assert Solicitacao.objects.filter(pk=sol.pk).exists()

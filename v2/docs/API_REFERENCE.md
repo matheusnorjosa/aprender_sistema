@@ -409,7 +409,7 @@ As rotas OAuth ficam sob `/api/oauth/google/` e `/api/integrations/google/` —
 
 | Método | Endpoint | Status | Descrição | Permissão |
 |--------|----------|--------|-----------|-----------|
-| GET | `/api/oauth/google/start/` | ![Stable](https://img.shields.io/badge/-stable-green) | Iniciar fluxo OAuth (redirect) | `CanUseGcal \| CanPublishSetorSolicitacao` + throttle `oauth`; sem setor vigente → 403 `no_setor_scope` |
+| GET | `/api/oauth/google/start/` | ![Stable](https://img.shields.io/badge/-stable-green) | Iniciar fluxo OAuth (redirect) | `CanUseGcal \| CanPublishSetorSolicitacao` + throttle `oauth`; sem setor vigente → redirect para `return_to?google=error&reason=no_setor_scope`; configuração OAuth quebrada → `reason=server_error` (item 38) |
 | GET | `/api/oauth/google/callback/` | ![Stable](https://img.shields.io/badge/-stable-green) | Callback do Google (redirect p/ frontend) | `CanUseGcal \| CanPublishSetorSolicitacao` |
 | GET | `/api/integrations/google/status/` | ![Stable](https://img.shields.io/badge/-stable-green) | Status da conexão OAuth + `publish_ready`/`publish_block_reason`/`reconnect_required` | `CanUseGcal \| CanPublishSetorSolicitacao` |
 | POST | `/api/integrations/google/disconnect/` | ![Stable](https://img.shields.io/badge/-stable-green) | Revogar/desconectar credenciais | `CanUseGcal \| CanPublishSetorSolicitacao` |

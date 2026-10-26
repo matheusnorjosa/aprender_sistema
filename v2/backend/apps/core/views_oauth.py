@@ -22,6 +22,7 @@ from datetime import timedelta
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from django.conf import settings
+from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
 from django.utils import timezone
 from rest_framework import status
@@ -30,7 +31,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 
-from apps.core.exceptions import APIError, ServiceUnavailableError
+from apps.core.exceptions import ServiceUnavailableError
 from apps.core.models import AuditLog, GoogleOAuthCredential
 from apps.core.rbac.policies import CanPublishSetorSolicitacao, CanUseGcal, user_has_policy
 from apps.core.services.google_oauth import build_authorization_url, exchange_code_for_tokens, revoke_token
@@ -229,6 +230,11 @@ def _build_frontend_redirect_url(path: str) -> str:
     return full_url
 
 
+def _voltar_com_erro(return_to: str, reason: str) -> HttpResponseRedirect:
+    """Volta para a tela de origem com ``?google=error&reason=…``, o mesmo contrato do callback (item 38)."""
+    return redirect(_build_frontend_redirect_url(_merge_query_params(return_to, google="error", reason=reason)))
+
+
 # ============================================================================
 # RATE LIMITING (GAP-3)
 # ============================================================================
@@ -261,7 +267,7 @@ def google_oauth_start(request: Request) -> Response:
     Inicia fluxo OAuth 2.0 com Google.
 
     **Permissão**: `use_gcal` ou `publish_setor_solicitacao` (Apoio de Coordenação com setor vigente;
-    sem setor → 403 `no_setor_scope`)
+    sem setor → volta para ``return_to`` com ``?google=error&reason=no_setor_scope``)
     **Throttling**: 10 requests/hour por usuário (GAP-3)
 
     Query Params:
@@ -269,24 +275,22 @@ def google_oauth_start(request: Request) -> Response:
             `use_gcal`; senão /solicitacoes/publicacao)
 
     Returns:
-        302 Redirect: Redireciona para Google OAuth Consent Screen
+        302 Redirect: Redireciona para Google OAuth Consent Screen. Item 38: a rota é aberta por
+        navegação de página inteira, então os erros daqui (sem setor, configuração OAuth quebrada)
+        também voltam para ``return_to`` com ``?google=error&reason=…``, como o callback.
 
     Example:
         GET /oauth/google/start/?return_to=/pre-agenda
 
         → Redirects to: https://accounts.google.com/o/oauth2/v2/auth?...
     """
-    # M12-15: quem não pode publicar nada (Apoio sem setor vigente) não recebe token Google.
-    if not has_publish_scope(request.user):
-        raise APIError(
-            code="no_setor_scope",
-            message="Seu cadastro não tem setor vigente. Peça à DAT para cadastrar seu vínculo de gerência.",
-            status_code=403,
-        )
-
     # Security: ``return_to`` é user-controlled — validar contra allowlist
     # antes de injetar no fluxo OAuth (CodeQL py/url-redirection).
     return_to = _safe_return_to(request.GET.get("return_to"), default=_default_return_to(request.user))
+
+    # M12-15: quem não pode publicar nada (Apoio sem setor vigente) não recebe token Google.
+    if not has_publish_scope(request.user):
+        return _voltar_com_erro(return_to, "no_setor_scope")
 
     try:
         # Gerar URL de autorização
@@ -298,10 +302,7 @@ def google_oauth_start(request: Request) -> Response:
         # acidental do serviço retornar URL inesperada.
         if not _is_google_oauth_authorize_url(auth_url):
             logger.error("OAuth start: build_authorization_url returned unexpected host")
-            return Response(
-                {"error": "Configuração OAuth inválida. Contate o administrador."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+            return _voltar_com_erro(return_to, "server_error")
 
         logger.info(f"🔐 OAuth start: user_id={request.user.pk} → Google consent screen")
 
@@ -309,10 +310,7 @@ def google_oauth_start(request: Request) -> Response:
 
     except ValueError as e:
         logger.error(f"❌ OAuth start falhou: {e}")
-        return Response(
-            {"error": "Configuração OAuth incompleta. Contate o administrador."},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
+        return _voltar_com_erro(return_to, "server_error")
 
 
 @api_view(["GET"])

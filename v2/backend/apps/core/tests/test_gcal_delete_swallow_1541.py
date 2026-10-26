@@ -136,3 +136,51 @@ class TestBreakerAutoRetryWired:
 
         assert result["action"] == "ERROR"
         assert not mock_enqueue.called
+
+
+def _http_error(status: int, event_id: str):
+    from googleapiclient.errors import HttpError
+    from httplib2 import Response
+
+    uri = f"https://www.googleapis.com/calendar/v3/calendars/primary/events/{event_id}?sendUpdates=none"
+    return HttpError(Response({"status": status}), b'{"error": {"message": "x"}}', uri=uri)
+
+
+class TestDeleteConfereStatusNaoTexto:
+    """O id do evento vai na URL do erro: `asv21404` não pode fazer um 500 passar por 404."""
+
+    def test_upsert_delete_500_com_404_no_id_relevanta(self):
+        s = SolicitacaoFactory(status="reprovado", external_event_id="asv21404")
+        client = _FakeClient(delete_exc=_http_error(500, "asv21404"))
+
+        with patch(_PASSTHROUGH, side_effect=_passthrough):
+            with pytest.raises(Exception):
+                upsert_one(client=client, calendar_id="primary", s=s)
+
+        s.refresh_from_db()
+        assert s.external_event_id == "asv21404"
+
+    def test_upsert_delete_410_conta_como_removido(self):
+        s = SolicitacaoFactory(status="reprovado", external_event_id="asv2gone2")
+        client = _FakeClient(delete_exc=_http_error(410, "asv2gone2"))
+
+        with patch(_PASSTHROUGH, side_effect=_passthrough):
+            outcome = upsert_one(client=client, calendar_id="primary", s=s)
+
+        assert outcome.action == "DELETE"
+        s.refresh_from_db()
+        assert s.external_event_id is None
+
+    def test_cancel_500_com_404_no_id_relevanta(self):
+        from apps.core.services.gcal.sync import cancel_solicitacao
+
+        s = SolicitacaoFactory(status="aprovado", external_event_id="asv21404", gcal_status="PUBLISHED")
+        client = _FakeClient(delete_exc=_http_error(500, "asv21404"))
+
+        with patch(_PASSTHROUGH, side_effect=_passthrough):
+            with pytest.raises(Exception):
+                cancel_solicitacao(client=client, s=s)
+
+        s.refresh_from_db()
+        assert s.external_event_id == "asv21404"
+        assert s.gcal_status == "PUBLISHED"

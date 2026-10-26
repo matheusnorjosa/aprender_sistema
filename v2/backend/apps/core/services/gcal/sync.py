@@ -241,14 +241,14 @@ def upsert_one(
                             operation_name=f"GCal DELETE #{s.id}",
                         )
                     except Exception as e:
-                        # 404 = evento já deletado no Google (idempotência OK). Para
+                        # 404/410 = evento já saiu do Google (idempotência OK). Para
                         # QUALQUER outro erro, RE-LEVANTA (#1541): limpar
                         # external_event_id e retornar action="DELETE" aqui deixava o
                         # evento VIVO no Google (participantes ainda o viam) e
                         # descartava o único ponteiro para ele — evento órfão
                         # permanente, reportado como sucesso. Espelha
                         # cancel_solicitacao; o caller marca gcal_status=ERROR.
-                        if "404" not in str(e):
+                        if not _ja_saiu_do_google(e):
                             raise
 
                     s.external_event_id = None
@@ -499,6 +499,19 @@ def resync_solicitacao(s: Solicitacao, *, apply_blocked: bool = False) -> SyncOu
     return apply_one_solicitacao(s, dry_run=False, apply_blocked=apply_blocked)
 
 
+def _ja_saiu_do_google(e: Exception) -> bool:
+    """404 (já removido) ou 410 (apagado direto no Google) no DELETE contam como sucesso.
+
+    Confere o status HTTP quando o erro tem um: o texto do HttpError traz a URL com o id do
+    evento, e um id como ``asv21404`` faria um 500 passar por 404 (evento órfão no Google).
+    Sem status (clientes falsos, erros sem resposta HTTP), cai no texto.
+    """
+    status = getattr(getattr(e, "resp", None), "status", None)
+    if status is not None:
+        return str(status) in ("404", "410")
+    return "404" in str(e)
+
+
 def cancel_solicitacao(
     s: Solicitacao,
     *,
@@ -558,10 +571,7 @@ def cancel_solicitacao(
             operation_name=f"GCal CANCEL #{s.id}",
         )
     except Exception as e:
-        # 404 = já foi deletado (idempotência OK). 410 (Gone) = o evento foi apagado direto no Google:
-        # também já saiu de lá. Confere pelo status, não pelo texto (o texto traz a URL com o id).
-        status = getattr(getattr(e, "resp", None), "status", None)
-        if "404" not in str(e) and str(status) != "410":
+        if not _ja_saiu_do_google(e):
             raise
 
     # Limpar campos

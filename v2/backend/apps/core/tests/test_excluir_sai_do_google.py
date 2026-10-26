@@ -172,6 +172,40 @@ def test_excluir_nao_publicado_nao_chama_o_google(apoio, projeto, google):
 # ---------------------------------------------------------------------------
 
 
+def _http_error(status: int, motivo: str):
+    from googleapiclient.errors import HttpError
+    from httplib2 import Response
+
+    return HttpError(Response({"status": status}), f'{{"error": {{"message": "{motivo}"}}}}'.encode())
+
+
+def test_evento_ja_apagado_no_google_410_conta_como_removido(apoio, projeto, google):
+    """Evento apagado direto no Google: o DELETE volta 410 (Gone). Já saiu de lá, então a exclusão segue."""
+    google.delete.side_effect = _http_error(410, "Resource has been deleted")
+    sol = _evento(apoio, projeto)
+    sol_id = sol.pk
+
+    response = _delete(apoio, sol)
+
+    assert response.status_code == 204, response.data
+    assert not Solicitacao.objects.filter(pk=sol_id).exists()
+
+
+def test_retentativa_depois_da_falha_ao_gravar_recebe_410_e_exclui(apoio, projeto, google):
+    """A promessa da falha parcial: o Google já tirou, a gravação caiu; tentar de novo (410) resolve."""
+    from django.db import DatabaseError
+
+    sol = _evento(apoio, projeto)
+    with patch.object(Solicitacao, "save", side_effect=DatabaseError("db fora")):
+        assert _delete(apoio, sol).status_code == 400
+    google.delete.side_effect = _http_error(410, "Resource has been deleted")
+
+    response = _delete(apoio, sol)
+
+    assert response.status_code == 204, response.data
+    assert not Solicitacao.objects.filter(pk=sol.pk).exists()
+
+
 def test_google_com_erro_nao_apaga_nada(apoio, projeto, google):
     google.delete.side_effect = Exception("<HttpError 500 backendError>")
     sol = _evento(apoio, projeto)

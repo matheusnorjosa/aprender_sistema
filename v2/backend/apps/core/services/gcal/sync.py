@@ -558,8 +558,10 @@ def cancel_solicitacao(
             operation_name=f"GCal CANCEL #{s.id}",
         )
     except Exception as e:
-        # 404 = já foi deletado (idempotência OK)
-        if "404" not in str(e):
+        # 404 = já foi deletado (idempotência OK). 410 (Gone) = o evento foi apagado direto no Google:
+        # também já saiu de lá. Confere pelo status, não pelo texto (o texto traz a URL com o id).
+        status = getattr(getattr(e, "resp", None), "status", None)
+        if "404" not in str(e) and str(status) != "410":
             raise
 
     # Limpar campos

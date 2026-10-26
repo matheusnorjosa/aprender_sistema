@@ -525,7 +525,7 @@ def remover_do_google_agora(solicitacao: Solicitacao, user: Usuario) -> str | No
 
     Mesmo caminho da task de cancelamento (`task_cancel_solicitacao_from_gcal`): no modo OAuth o
     cliente é o da conta de quem exclui; fora dele, o service account. `cancel_solicitacao` só limpa
-    os campos depois que o Google confirma (404 = já removido) e grava `gcal_status=NONE`; o
+    os campos depois que o Google confirma (404 ou 410 = já removido) e grava `gcal_status=NONE`; o
     `status` não muda. Quem chama já conferiu `can_publish_solicitacao`.
 
     A linha é relida com lock: PENDING (publicação ou reenvio enfileirado) recusa sem chamar o
@@ -538,7 +538,7 @@ def remover_do_google_agora(solicitacao: Solicitacao, user: Usuario) -> str | No
     Raises:
         ValidationAPIError 400 `gcal_cancel_failed` com o motivo legível. Se o Google falhou, nada
         mudou. Se a gravação falhou depois do Google (raro), o evento pode já ter saído de lá e a
-        linha continua como antes; tentar de novo resolve (404 conta como sucesso).
+        linha continua como antes; tentar de novo resolve (404 e 410 contam como sucesso).
     """
     from django.db import DatabaseError, transaction
 

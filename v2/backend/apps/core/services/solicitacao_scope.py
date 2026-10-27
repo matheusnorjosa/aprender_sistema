@@ -17,7 +17,8 @@ Regra:
 - GESTORA não-global (papel GERENTE vigente, `_e_gestora`): as gerências onde ela é GERENTE (PR 9; C9
   da auditoria) + as próprias.
 - APOIO (`publish_setor_solicitacao`): as aprovadas das gerências onde é APOIO + as próprias (soma-se
-  ao alcance da gestora, se ela também for GERENTE em outra gerência).
+  ao alcance da gestora, se ela também for GERENTE em outra gerência). Não edita a de outra pessoa;
+  exclui só a que já está no Google (decisão do dono, 27/10: `EscritaEmSolicitacao.apoio_pode_excluir_do_google`).
 - DEMAIS (Coordenador etc.): apenas as próprias (comportamento inalterado).
 
 PR 9 (16/10/2026): o alcance é a gerência do PROJETO (`projeto.gerencia_id`), nunca o texto do setor
@@ -39,6 +40,7 @@ nele e nas próprias. Fora disso o objeto aparece e a escrita dá 403/400.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from functools import cached_property
 from typing import Any
 
 from django.db.models import Q, QuerySet
@@ -52,6 +54,8 @@ from apps.core.rbac.policies import (
     user_has_policy,
 )
 from apps.core.rbac_helpers import user_has_any_perm
+from apps.core.services.rbac_permissions import get_user_functional_permissions
+from apps.core.services.solicitacao_exclusao import esta_no_google
 
 # `approve_solicitation` vem do pacote do DAT (PR 10) e do Controle (PR 11); nenhum grupo a tem —
 # visão global legítima de quem aprova qualquer evento. `operate_preagenda`=Controle,
@@ -150,25 +154,89 @@ def projeto_fora_do_alcance_da_restrita(user: Any, projeto: Any) -> bool:
     GERENTE (COORDENADOR, APOIO e FORMADOR não contam). Projeto None → fora (fail-closed). Usado para
     editar/excluir (objeto) e para criar ou mover solicitação (write-path).
     """
-    if not restrita_ao_escopo_da_superintendencia(user):
-        return False
-    if projeto_no_escopo_da_superintendencia(projeto):
-        return False
-    gerencia_id = getattr(projeto, "gerencia_id", None)
-    return gerencia_id is None or gerencia_id not in _gerencias_de_gestor_sem_g1(user)
+    return EscritaEmSolicitacao(user).fora_do_alcance_da_restrita(projeto)
 
 
 def user_can_access_solicitacao(user: Any, obj: Any) -> bool:
     """True sse `user` pode editar/excluir a Solicitacao `obj` (mesma regra do queryset, salvo a
     aprovadora restrita: vê tudo, mas só escreve nas próprias e no alcance dela)."""
-    if not user or not getattr(user, "is_authenticated", False):
-        return False
-    if getattr(obj, "usuario_id", None) == getattr(user, "id", None):
-        return True
-    if user_is_solicitacao_global(user):
-        return not projeto_fora_do_alcance_da_restrita(user, getattr(obj, "projeto", None))
-    gerencia_id = getattr(getattr(obj, "projeto", None), "gerencia_id", None)
-    return gerencia_id is not None and gerencia_id in _gerencias_da_gestora(user)
+    return EscritaEmSolicitacao(user).no_escopo(obj)
+
+
+class EscritaEmSolicitacao:
+    """A regra de objeto de quem escreve (edita ou exclui) numa solicitação, com os fatos de `user`
+    lidos uma vez.
+
+    Cada fato é uma consulta preguiçosa (`cached_property`): para um objeto, o custo é o de antes; a
+    lista reusa a mesma instância na página inteira (campo `pode_excluir`), e a consulta sai uma vez por
+    request. Quem edita e quem exclui (`IsOwnerOrPrivileged`, `PodeExcluirSolicitacao`) leem daqui.
+    """
+
+    def __init__(self, user: Any) -> None:
+        self.user = user
+
+    @cached_property
+    def capacidades(self) -> set[str]:
+        return get_user_functional_permissions(self.user)
+
+    @cached_property
+    def restrita(self) -> bool:
+        return restrita_ao_escopo_da_superintendencia(self.user)
+
+    @cached_property
+    def _global(self) -> bool:
+        return user_is_solicitacao_global(self.user)
+
+    @cached_property
+    def _gerencias_da_gestora(self) -> set[int]:
+        return _gerencias_da_gestora(self.user)
+
+    @cached_property
+    def _gerencias_de_gestor_sem_g1(self) -> set[int]:
+        return _gerencias_de_gestor_sem_g1(self.user)
+
+    @cached_property
+    def _gerencias_de_apoio(self) -> set[int]:
+        if not user_has_any_perm(self.user, "publish_setor_solicitacao"):
+            return set()
+        return _gerencias_de_apoio(self.user)
+
+    def fora_do_alcance_da_restrita(self, projeto: Any) -> bool:
+        """`projeto_fora_do_alcance_da_restrita`."""
+        if not self.restrita:
+            return False
+        if projeto_no_escopo_da_superintendencia(projeto):
+            return False
+        gerencia_id = getattr(projeto, "gerencia_id", None)
+        return gerencia_id is None or gerencia_id not in self._gerencias_de_gestor_sem_g1
+
+    def no_escopo(self, obj: Any) -> bool:
+        """`user_can_access_solicitacao`."""
+        user = self.user
+        if not user or not getattr(user, "is_authenticated", False):
+            return False
+        if getattr(obj, "usuario_id", None) == getattr(user, "id", None):
+            return True
+        if self._global:
+            return not self.fora_do_alcance_da_restrita(getattr(obj, "projeto", None))
+        gerencia_id = getattr(getattr(obj, "projeto", None), "gerencia_id", None)
+        return gerencia_id is not None and gerencia_id in self._gerencias_da_gestora
+
+    def apoio_pode_excluir_do_google(self, obj: Any) -> bool:
+        """A Apoio exclui o evento de outra pessoa que já está no Google (decisão do dono, 27/10/2026).
+
+        Só quando (a) o projeto é de uma gerência onde ela é APOIO vigente (com `publish_setor_solicitacao`,
+        o mesmo alcance de quem tira do Google), (b) o evento está no Google (`esta_no_google`) e (c) não
+        é `publicado_fora_do_sistema`. Pedido fora do Google (ex.: SUPER pendente esperando a gerente)
+        continua fora; editar não muda. As recusas do `perform_destroy` valem por cima.
+        """
+        user = self.user
+        if not user or not getattr(user, "is_authenticated", False):
+            return False
+        if getattr(obj, "publicado_fora_do_sistema", False) or not esta_no_google(obj):
+            return False
+        gerencia_id = getattr(getattr(obj, "projeto", None), "gerencia_id", None)
+        return gerencia_id is not None and gerencia_id in self._gerencias_de_apoio
 
 
 def can_publish_solicitacao(user: Any, obj: Any) -> bool:

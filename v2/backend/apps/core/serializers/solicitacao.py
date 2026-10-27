@@ -16,12 +16,14 @@ from rest_framework import serializers  # type: ignore[attr-defined]
 
 from apps.core.models import AuditLog, Participation, Solicitacao, Usuario
 from apps.core.pii import email_sem_cpf, redact_cpf_deep
+from apps.core.rbac.permissions import PodeExcluirSolicitacao
 from apps.core.rbac.policies import user_has_policy
 from apps.core.serializers.usuario import UserSlimSerializer
 from apps.core.services.avaliacao_formador import formadores_avaliaveis_ids, gerencia_pergunta
 from apps.core.services.compra_elegibilidade import isento_da_regra_da_compra, par_liberado
 from apps.core.services.solicitacao_approval import DECISAO_IMPEDIDA, decisoes_impedidas
-from apps.core.services.solicitacao_scope import scope_publishable_solicitacoes
+from apps.core.services.solicitacao_exclusao import ids_ja_aprovadas, motivo_que_impede_excluir
+from apps.core.services.solicitacao_scope import EscritaEmSolicitacao, scope_publishable_solicitacoes
 
 
 class ParticipationNestedSerializer(serializers.ModelSerializer):
@@ -80,6 +82,10 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
     # Quem lê pode tirar este evento do Google (`can_publish_solicitacao`)? Minhas Solicitações só
     # mostra Excluir de evento no Google a quem pode as duas coisas (a exclusão tira de lá também).
     pode_tirar_do_google = serializers.SerializerMethodField()
+    # Quem lê pode excluir esta linha? A regra do DELETE: quem (`PodeExcluirSolicitacao`, com a Apoio no
+    # evento de outra pessoa que está no Google) e as recusas que se sabem sem o Google
+    # (`motivo_que_impede_excluir`). Publicar na agenda só mostra Excluir com ele.
+    pode_excluir = serializers.SerializerMethodField()
 
     class Meta:
         model = Solicitacao
@@ -108,6 +114,7 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             "projeto_pergunta_avaliar_formador",
             "decisao_impedida",
             "pode_tirar_do_google",
+            "pode_excluir",
             "inicio",
             "fim",
             "status",
@@ -207,11 +214,16 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
 
     def _ids_da_pagina(self, obj: Solicitacao) -> set[int]:
         """Ids da página que está sendo serializada (só `obj` fora de listagem)."""
+        return {int(o.pk) for o in self._pagina(obj)}
+
+    def _pagina(self, obj: Solicitacao) -> list[Solicitacao]:
+        """Solicitações da página que está sendo serializada, com `obj` (só ele fora de listagem)."""
         parent: object = getattr(self, "parent", None)
         pagina: Any = getattr(parent, "instance", None) if isinstance(parent, serializers.ListSerializer) else None
-        ids: set[int] = {int(o.pk) for o in pagina} if pagina is not None else set()
-        ids.add(obj.pk)
-        return ids
+        objs: list[Solicitacao] = list(pagina) if pagina is not None else []
+        if all(o.pk != obj.pk for o in objs):
+            objs.append(obj)
+        return objs
 
     def get_pode_tirar_do_google(self, obj: Solicitacao) -> bool:
         """`can_publish_solicitacao` de quem lê, para a página inteira numa consulta só.
@@ -230,6 +242,33 @@ class SolicitacaoSerializer(serializers.ModelSerializer):
             publicaveis: set[int] = set(ids_publicaveis)
             calculados.update({sol_id: sol_id in publicaveis for sol_id in ids})
             self.context["_pode_tirar_do_google"] = calculados
+        return calculados[obj.pk]
+
+    def get_pode_excluir(self, obj: Solicitacao) -> bool:
+        """O DELETE de quem lê daria certo (salvo o Google recusar)? Para a página inteira de uma vez.
+
+        Mesma regra do `destroy`: `PodeExcluirSolicitacao.permite` com uma `EscritaEmSolicitacao` só (os
+        fatos de quem lê saem uma vez) e `motivo_que_impede_excluir`, com a aprovação da página numa
+        consulta (`ids_ja_aprovadas`) e o `pode_tirar_do_google` já calculado.
+        """
+        calculados: dict[int, bool] | None = cast(Any, self.context.get("_pode_excluir"))
+        if calculados is None or obj.pk not in calculados:
+            calculados = calculados or {}
+            request: Any = self.context.get("request")
+            user: Any = getattr(request, "user", None)
+            pagina = self._pagina(obj)
+            if user is None or not getattr(user, "is_authenticated", False):
+                calculados.update({o.pk: False for o in pagina})
+            else:
+                permissao = PodeExcluirSolicitacao()
+                escrita = EscritaEmSolicitacao(user)
+                aprovadas = ids_ja_aprovadas(o.pk for o in pagina)
+                for o in pagina:
+                    motivo = motivo_que_impede_excluir(
+                        o, ja_aprovada=o.pk in aprovadas, pode_tirar_do_google=self.get_pode_tirar_do_google(o)
+                    )
+                    calculados[o.pk] = motivo is None and permissao.permite(user, o, escrita)
+            self.context["_pode_excluir"] = calculados
         return calculados[obj.pk]
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:

@@ -12,7 +12,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from django.db.models import Case, F, IntegerField, Max, Q, QuerySet, Value, When
+from django.db.models import Case, F, IntegerField, Max, QuerySet, Value, When
 from django.db.models.functions import Lower
 from django.utils import timezone
 from rest_framework import serializers, status, viewsets
@@ -34,7 +34,7 @@ from .api_schemas import (
     SOLICITACAO_CREATED_EXAMPLE,
 )
 from .models import AuditLog, Solicitacao
-from .permissions import HasPerm, IsOwnerOrPrivileged
+from .permissions import HasPerm, IsOwnerOrPrivileged, PodeExcluirSolicitacao
 from .rbac.helpers import user_e_coordenador
 from .rbac.policies import (
     CanAccessSolicitationApprovals,
@@ -51,6 +51,7 @@ from .services.solicitacao_approval import (
     reject_solicitacao,
 )
 from .services.solicitacao_create import resolve_initial_status
+from .services.solicitacao_exclusao import esta_no_google, ids_ja_aprovadas, motivo_que_impede_excluir
 from .services.solicitacao_publish import cancel_from_gcal
 from .services.solicitacao_publish import preview_gcal as preview_gcal_service
 from .services.solicitacao_publish import publish_to_gcal, remover_do_google_agora, resync_to_gcal
@@ -381,8 +382,10 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
             return super().get_permissions()
         if self.action == "create":
             return [HasPerm("create_solicitation")()]
-        if self.action in ["update", "partial_update", "destroy"]:
+        if self.action in ["update", "partial_update"]:
             return [IsOwnerOrPrivileged()]
+        if self.action == "destroy":
+            return [PodeExcluirSolicitacao()]
         return [IsAuthenticated()]
 
     def get_queryset(self) -> QuerySet:
@@ -412,8 +415,16 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         # próprias; APOIO soma as aprovadas das gerências onde é APOIO; DEMAIS veem só
         # as próprias.
         else:
+            # `projeto__gerencia`: o `pode_excluir` da aprovadora restrita lê a gerência do projeto SUPER
+            # (`projeto_no_escopo_da_superintendencia`); sem o join, seria uma consulta por linha.
             base = Solicitacao.objects.select_related(
-                "usuario", "municipio", "tipo_evento", "projeto", "coordenador", "formador_avaliado"
+                "usuario",
+                "municipio",
+                "tipo_evento",
+                "projeto",
+                "projeto__gerencia",
+                "coordenador",
+                "formador_avaliado",
             ).prefetch_related("participations__usuario")
             qs = scope_solicitacoes(base, self.request.user)
 
@@ -1039,69 +1050,30 @@ class SolicitacaoViewSet(viewsets.ModelViewSet):
         - No Google pela planilha sem adoção (`publicado_fora_do_sistema`): não se exclui (não há id
           para apagar lá, e o evento ficaria no Google).
 
+        Quem exclui é o `PodeExcluirSolicitacao`: quem edita (`IsOwnerOrPrivileged`) e, desde 27/10, a
+        Apoio de Coordenação no evento de outra pessoa que já está no Google, na gerência onde ela é
+        APOIO (`EscritaEmSolicitacao.apoio_pode_excluir_do_google`). As recusas valem para todos.
+
         Registra exclusão no AuditLog antes de deletar.
         """
         from django.db import transaction
         from rest_framework.exceptions import ValidationError
 
-        if instance.publicado_fora_do_sistema:
-            raise ValidationError(
-                {
-                    "detail": "Este evento está no Google Agenda pela planilha e o sistema não o adotou: "
-                    "excluir aqui deixaria o evento no Google. Ajuste no Google, ou peça a adoção."
-                }
-            )
-
-        # M10-03 (#1625): PENDING = task Celery de sincronização já enfileirada;
-        # excluir nessa janela deixa a task operar sobre um registro removido.
-        if instance.gcal_status == "PENDING":
-            raise ValidationError(
-                {
-                    "detail": "Não é possível excluir enquanto a sincronização com o Google Calendar está "
-                    "em andamento. Aguarde a conclusão."
-                }
-            )
-
-        # Validação adicional para fluxo SUPER
-        projeto_fluxo = instance.projeto.fluxo if instance.projeto else None
-        if projeto_fluxo == "SUPER" and instance.status != "pendente":
-            raise ValidationError(
-                {
-                    "detail": "Solicitações do fluxo SUPER só podem ser excluídas enquanto estiverem pendentes. "
-                    "Esta solicitação já foi aprovada ou reprovada."
-                }
-            )
-
-        ja_aprovada = (
-            AuditLog.objects.filter(model_name="Solicitacao", details__solicitacao_id=instance.id)
-            .filter(
-                Q(action=AuditLog.Action.APPROVE) | Q(action=AuditLog.Action.UPDATE, details__aprovada_como_super=True)
-            )
-            .exists()
+        # Recusas que se sabem sem o Google, antes dele (SSOT `motivo_que_impede_excluir`, a mesma do
+        # campo `pode_excluir` da lista). Recusar depois deixaria o evento fora da agenda e no sistema.
+        no_google = esta_no_google(instance)
+        motivo = motivo_que_impede_excluir(
+            instance,
+            ja_aprovada=instance.pk in ids_ja_aprovadas([instance.pk]),
+            pode_tirar_do_google=no_google and can_publish_solicitacao(self.request.user, instance),
         )
-        if ja_aprovada:
-            # Antes do Google: recusar depois deixaria o evento fora da agenda e no sistema.
-            # Pendente sai pela reprovação; aprovada (ou reprovada) não pendente: só a administração.
-            if instance.status == "pendente":
-                saida = "Para tirar o evento, peça a reprovação a quem aprova: assim a saída fica registrada."
-            else:
-                saida = (
-                    "Como ela não está pendente, não há reprovação a pedir: para tirar o evento, "
-                    "fale com a administração do sistema."
-                )
-            raise ValidationError({"detail": f"Esta solicitação já foi aprovada e não pode ser excluída. {saida}"})
+        if motivo:
+            raise ValidationError({"detail": motivo})
 
         # No Google: sai de lá primeiro (fora do atomic do delete: o NONE fica gravado e o delete vem
         # depois; se o delete falhar, sobra a linha "não publicada", que é o estado verdadeiro).
         removido_do_google: dict[str, Any] = {}
-        if instance.gcal_status in ("PUBLISHED", "ERROR") or instance.external_event_id:
-            if not can_publish_solicitacao(self.request.user, instance):
-                raise ValidationError(
-                    {
-                        "detail": "Não é possível excluir uma solicitação já publicada no Google Calendar. "
-                        "Cancele o evento primeiro se precisar excluir."
-                    }
-                )
+        if no_google:
             external_event_id = remover_do_google_agora(instance, self.request.user)
             removido_do_google = {"removido_do_google": True, "external_event_id": external_event_id}
 

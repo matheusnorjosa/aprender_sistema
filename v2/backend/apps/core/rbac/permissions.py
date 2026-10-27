@@ -10,7 +10,7 @@ Para composition:
     permission_classes = [HasPerm("a") | HasPerm("b")]
 
 2 classes "não-reduzíveis" mantidas (ver RBAC_NAMING.md §3):
-- `IsOwnerOrPrivileged` (object-level: checa obj.usuario)
+- `IsOwnerOrPrivileged` (object-level: checa obj.usuario) e a filha `PodeExcluirSolicitacao`
 - `HasSectorAccess` (dynamic scope via gerencia_id query param)
 
 Ver v2/docs/RBAC_NAMING.md para convenção completa.
@@ -19,11 +19,16 @@ Ver v2/docs/RBAC_NAMING.md para convenção completa.
 # pyright: reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportCallIssue=false, reportIncompatibleMethodOverride=false, reportMissingTypeStubs=false, reportArgumentType=false
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from rest_framework import permissions  # type: ignore[attr-defined]
 from rest_framework.request import Request
 from rest_framework.views import APIView
 
 from apps.core.services.rbac_permissions import get_user_functional_permissions
+
+if TYPE_CHECKING:
+    from apps.core.services.solicitacao_scope import EscritaEmSolicitacao
 
 # Epic 5 (2026-04-24): permitir composition de permission INSTANCES em
 # `permission_classes`. DRF espera callables (classes) em permission_classes
@@ -177,25 +182,41 @@ class IsOwnerOrPrivileged(HasFunctionalPermission):  # type: ignore[misc]
         user = request.user
         if not user or not user.is_authenticated:
             return False
+        from apps.core.services.solicitacao_scope import EscritaEmSolicitacao
+
+        escrita = EscritaEmSolicitacao(user)
+        if self.permite(user, obj, escrita):
+            return True
+        # Regra do dono (30/09): o 403 diz por que a aprovadora (que VÊ a solicitação) não edita.
+        if self.functional_codename in escrita.capacidades and escrita.restrita:
+            self.message = self.message_escopo_superintendencia
+        return False
+
+    def permite(self, user: object, obj: object, escrita: EscritaEmSolicitacao) -> bool:
+        """A regra sem efeito colateral, com os fatos do usuário de `escrita` (`EscritaEmSolicitacao`).
+
+        A lista chama com a mesma `escrita` para a página inteira (`SolicitacaoSerializer.pode_excluir`).
+        """
         if getattr(user, "is_superuser", False):
             return True
-        if self.functional_codename in get_user_functional_permissions(user):
-            # M10-01 (#1623): o privilégio de edição de solicitação só vale DENTRO
-            # do escopo do ator (global OU própria gerência OU dono) — não mais
-            # nacional. SSOT: `user_can_access_solicitacao`.
-            from apps.core.services.solicitacao_scope import (
-                restrita_ao_escopo_da_superintendencia,
-                user_can_access_solicitacao,
-            )
-
-            if user_can_access_solicitacao(user, obj):
-                return True
-            # Regra do dono (30/09): o 403 diz por que a aprovadora (que VÊ a solicitação) não edita.
-            if restrita_ao_escopo_da_superintendencia(user):
-                self.message = self.message_escopo_superintendencia
-
+        # M10-01 (#1623): o privilégio de edição de solicitação só vale DENTRO
+        # do escopo do ator (global OU própria gerência OU dono) — não mais
+        # nacional. SSOT: `user_can_access_solicitacao` (`EscritaEmSolicitacao.no_escopo`).
+        if self.functional_codename in escrita.capacidades and escrita.no_escopo(obj):
+            return True
         obj_usuario = getattr(obj, "usuario", None)
         return obj_usuario == user
+
+
+class PodeExcluirSolicitacao(IsOwnerOrPrivileged):  # type: ignore[misc]
+    """
+    Permissão para excluir solicitações: quem edita (`IsOwnerOrPrivileged`) e, desde 27/10/2026, a Apoio
+    de Coordenação no evento de outra pessoa que já está no Google, na gerência onde ela é APOIO
+    (`EscritaEmSolicitacao.apoio_pode_excluir_do_google`). As recusas do `perform_destroy` valem por cima.
+    """
+
+    def permite(self, user: object, obj: object, escrita: EscritaEmSolicitacao) -> bool:
+        return super().permite(user, obj, escrita) or escrita.apoio_pode_excluir_do_google(obj)
 
 
 class HasSectorAccess(permissions.BasePermission):  # type: ignore[misc]

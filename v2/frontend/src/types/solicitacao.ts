@@ -113,6 +113,11 @@ export interface Solicitacao {
   publicado_fora_do_sistema?: boolean;
   /** Quem lê pode tirar este evento do Google (`can_publish_solicitacao`): Excluir tira de lá também. */
   pode_tirar_do_google?: boolean;
+  /**
+   * Quem lê pode excluir esta linha (a regra do DELETE: quem exclui e as recusas que se sabem sem o
+   * Google). A Apoio exclui o evento de outra pessoa da gerência dela só quando ele está no Google.
+   */
+  pode_excluir?: boolean;
   meet_link: string | null;
 }
 
